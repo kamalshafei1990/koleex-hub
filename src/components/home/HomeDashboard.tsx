@@ -19,38 +19,23 @@
 
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import AngleDownIcon from "@/components/icons/ui/AngleDownIcon";
+import {
+  type Payload, type LayoutItem, allowedDef, defOf, renderFace, kit,
+  SIZE_CLASS, loadPins, savePins, useWidgetDrag,
+} from "@/components/dashboard/widget-kit";
 import s from "./home-dashboard.module.css";
 
 const SEEN_KEY = "kx_home_dash_seen";
 const OPEN_KEY = "kx_home_dash_open";
 
-type Quotations = {
-  openCount: number; expiringSoon: number;
-  stages: Record<string, number>; series: number[];
-  createdInPeriod: number; period: string;
-  openValue?: number; wonValueMtd?: number; wonValueInPeriod?: number; error?: string;
-};
-type Products = { total: number; active: number; draft: number; draftAging: number; error?: string };
-type Todo = { open: number; error?: string };
-type Person = { name: string; initials: string; avatar: string | null; active: boolean };
-type Presence = { activeToday: number; teamSize: number; hoursToday: number; people?: Person[]; error?: string };
-type SystemW = { pendingMembership: number; notifyErrorsToday: number; error?: string };
-type Payload = {
-  widgets: { quotations: Quotations | null; products: Products | null; todo: Todo | null; presence: Presence | null; system: SystemW | null };
-  showMoney: boolean; period: string; gatewayMs: number; ts: number;
-};
 const PERIOD_TABS = [
   { key: "today", label: "Today" },
   { key: "week", label: "Week" },
   { key: "month", label: "Month" },
   { key: "quarter", label: "Quarter" },
 ] as const;
-
-const STAGE_ORDER = ["draft", "sent", "negotiation", "won", "lost"] as const;
-const STAGE_LABEL: Record<string, string> = {
-  draft: "DRAFT", sent: "SENT", negotiation: "NEGOT.", won: "WON", lost: "LOST",
-};
 
 function money(n: number): string {
   if (n >= 1_000_000) return `$${(n / 1_000_000).toFixed(2)}M`;
@@ -78,6 +63,7 @@ function curvePath(series: number[], w: number, h: number): { d: string; peak: {
 }
 
 export default function HomeDashboard() {
+  const router = useRouter();
   const [data, setData] = useState<Payload | null>(null);
   const [failed, setFailed] = useState(false);
   const [period, setPeriod] = useState("month");
@@ -99,6 +85,16 @@ export default function HomeDashboard() {
   const [flying, setFlying] = useState(false);
   const flyTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const rootRef = useRef<HTMLDivElement | null>(null);
+
+  /* ═══ THE PINNED BOARD (owner, 2026-08-20): any card of the Dashboard app
+     can be added to Home, and Home is where it is edited/organized — the
+     iOS grammar (jiggle, drag, minus, size), powered by the shared drag
+     engine. Pins persist in kx_home_pins_v1 (same store the Dashboard app's
+     "＋ Home" buttons write). ═══ */
+  const [pins, setPins] = useState<LayoutItem[]>(() => loadPins());
+  const [editing, setEditing] = useState(false);
+  const canvasRef = useRef<HTMLDivElement | null>(null);
+  const dragEngine = useWidgetDrag({ canvasRef, layout: pins, setLayout: setPins, editing });
 
   /* THE FLIGHT, driven by the Web Animations API — not CSS keyframes.
      Chrome samples custom properties inside @keyframes ONCE at animation
@@ -210,8 +206,23 @@ export default function HomeDashboard() {
     );
   }
 
-  const stages = q?.stages ?? {};
-  const maxStage = Math.max(1, ...STAGE_ORDER.map((k) => stages[k] ?? 0));
+  /* pins render only what the account can view — hidden, never deleted:
+     grant the module back and the card reappears where it was */
+  const visiblePins = pins.filter((it) => allowedDef(defOf(it.key), data));
+
+  const doneEditing = () => { setEditing(false); savePins(pins); };
+  const removePin = (id: string) => {
+    dragEngine.snapshotRects();
+    setPins((l) => { const next = l.filter((it) => it.id !== id); savePins(next); return next; });
+  };
+  const cyclePinSize = (id: string) => {
+    dragEngine.snapshotRects();
+    setPins((l) => l.map((it) => {
+      if (it.id !== id) return it;
+      const sizes = defOf(it.key)?.sizes ?? [it.size];
+      return { ...it, size: sizes[(sizes.indexOf(it.size) + 1) % sizes.length] };
+    }));
+  };
 
   const pulse = q && !q.error
     ? (typeof q.openValue === "number" ? `${money(q.openValue)} · ${q.openCount} open` : `${q.openCount} open quotations`)
@@ -243,11 +254,11 @@ export default function HomeDashboard() {
       </div>
     <div className={`${s.collapser} ${open ? "" : s.collapsed} ${flying ? s.flying : ""}`} aria-hidden={!open}>
     <div className={s.collapseInner}>
-    <div className={s.grid}>
 
-      {/* ═══ HERO — quotations pipeline, the real headline ═══ */}
+      {/* ═══ HERO — quotations pipeline, the real headline. The ONE special
+          card: fixed above the board, not a pin. ═══ */}
       {q && !q.error && (
-        <Link href="/quotations" className={`kx-glass ${s.slab} ${s.hero}`} style={{ textDecoration: "none", color: "inherit" }} data-flight="">
+        <Link href="/quotations" className={`kx-glass ${s.slab} ${s.hero} ${s.heroWide}`} style={{ textDecoration: "none", color: "inherit" }} data-flight="">
           <div className={s.bp} />
           <div className={s.klabel}>
             <span>Quotations — created per week · 12w</span>
@@ -292,123 +303,56 @@ export default function HomeDashboard() {
         </Link>
       )}
 
-      {/* ═══ side KPIs ═══ */}
-      <div className={s.side}>
-        {p && (
-          <Link href="/product-data" className={`kx-glass ${s.slab} ${s.kpi}`} style={{ textDecoration: "none", color: "inherit" }} data-flight="">
-            <div className={s.klabel}><span>Catalogue</span></div>
-            {p.error ? <div className={s.errCard}>⚠ can&apos;t read products</div> : (
-              <div className={s.ringRow}>
-                <div className={s.ringWrap}>
-                  <div className={s.ringGauge} style={{ ["--pct" as string]: `${p.total ? Math.round((p.active / p.total) * 100) : 0}%` }} />
-                  <div className={s.ringTxt}>{p.total ? Math.round((p.active / p.total) * 100) : 0}%</div>
-                </div>
-                <div>
-                  <div className={s.kval} style={{ marginBlockStart: 0 }}>{p.active} <span className={s.unit}>/ {p.total} active</span></div>
-                  <div className={s.kdelta}>
-                    {p.draft} in draft{p.draftAging > 0 ? <> · <span className={s.warnTone}>{p.draftAging} untouched &gt; 14d</span></> : null}
-                  </div>
-                </div>
-              </div>
-            )}
-          </Link>
-        )}
-        {td && (
-          <Link href="/todo" className={`kx-glass ${s.slab} ${s.kpi}`} style={{ textDecoration: "none", color: "inherit" }} data-flight="">
-            <div className={s.klabel}><span>Your to-dos</span></div>
-            {td.error ? <div className={s.errCard}>⚠ can&apos;t read to-dos</div> : (
-              <>
-                <div className={s.kval}>{td.open} <span className={s.unit}>open</span></div>
-                <div className={s.kdelta}>{td.open === 0 ? <span className={s.good}>all clear</span> : "tap to open the list"}</div>
-              </>
-            )}
-          </Link>
-        )}
-        {pr && (
-          <div className={`kx-glass ${s.slab} ${s.kpi}`} data-flight="">
-            <div className={s.klabel}><span>Team today</span></div>
-            {pr.error ? <div className={s.errCard}>⚠ can&apos;t read presence</div> : (
-              <>
-                <div className={s.kval}>{pr.activeToday} <span className={s.unit}>/ {pr.teamSize} active · {pr.hoursToday}h</span></div>
-                <div className={s.people}>
-                  {(pr.people ?? []).slice(0, 8).map((person) => (
-                    <span key={person.name} className={`${s.pv} ${person.active ? s.pvOn : ""}`} title={person.name}>
-                      {person.avatar
-                        // eslint-disable-next-line @next/next/no-img-element
-                        ? <img src={person.avatar} alt={person.name} className={s.pvImg} />
-                        : person.initials}
-                    </span>
-                  ))}
-                  {(pr.people?.length ?? 0) > 8 && <span className={s.pv}>+{(pr.people?.length ?? 0) - 8}</span>}
-                </div>
-              </>
-            )}
-          </div>
-        )}
+      {/* ═══ THE PINNED BOARD — every card here came from the Dashboard app
+          and is organized HERE: jiggle, drag, resize, remove (iOS grammar).
+          "＋ Add cards" lives in the Dashboard app — the full summary IS the
+          gallery. ═══ */}
+      <div className={s.deckHead}>
+        <span className={s.deckTitle}>YOUR CARDS</span>
+        {editing && <Link href="/dashboard" className={s.deckAdd}>＋ Add cards from the Dashboard</Link>}
+        <button type="button" className={`${s.tab} ${editing ? s.tabOn : ""}`} onClick={() => (editing ? doneEditing() : setEditing(true))}>
+          {editing ? "Done" : "Edit"}
+        </button>
       </div>
-
-      {/* ═══ pipeline stages ═══ */}
-      {q && !q.error && (
-        <div className={`kx-glass ${s.slab} ${s.half} ${s.pipePad}`} data-flight="">
-          <div className={s.bp} />
-          <div className={s.klabel}><span className={s.ttl}>Quotation pipeline</span><span className={s.unit}>BY STAGE</span></div>
-          <div className={s.barsWrap}>
-            {STAGE_ORDER.filter((k) => (stages[k] ?? 0) > 0 || ["draft", "sent", "won"].includes(k)).map((k) => {
-              const v = stages[k] ?? 0;
-              const hot = v === maxStage && v > 0;
-              return (
-                <div key={k} className={`${s.bar} ${hot ? s.barHot : ""}`} style={{ height: `${Math.max(6, (v / maxStage) * 100)}%` }}>
-                  <b>{v}</b><em>{STAGE_LABEL[k] ?? k.toUpperCase()}</em>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
-
-      {/* ═══ attention — only rows that are TRUE right now ═══ */}
-      <div className={`kx-glass ${s.slab} ${s.half}`} data-flight="">
-        <div className={s.klabel}><span className={s.ttl}>Attention needed</span><span className={s.unit}>CROSS-APP</span></div>
-        <div style={{ marginBlockStart: 8 }}>
-          {q && !q.error && q.expiringSoon > 0 && (
-            <Link href="/quotations" className={s.attnRow}>
-              <span className={`${s.sig} ${s.sigCrit}`} /><span><b>{q.expiringSoon} quotation{q.expiringSoon === 1 ? "" : "s"}</b> expire within 7 days</span><span className={s.go}>QUOTATIONS →</span>
-            </Link>
-          )}
-          {p && !p.error && p.draftAging > 0 && (
-            <Link href="/product-data" className={s.attnRow}>
-              <span className={`${s.sig} ${s.sigWarn}`} /><span><b>{p.draftAging} product draft{p.draftAging === 1 ? "" : "s"}</b> untouched for 14+ days</span><span className={s.go}>PRODUCT DATA →</span>
-            </Link>
-          )}
-          {sys && !sys.error && sys.pendingMembership > 0 && (
-            <Link href="/membership" className={s.attnRow}>
-              <span className={`${s.sig} ${s.sigWarn}`} /><span><b>{sys.pendingMembership} membership request{sys.pendingMembership === 1 ? "" : "s"}</b> waiting review</span><span className={s.go}>MEMBERSHIP →</span>
-            </Link>
-          )}
-          {td && !td.error && td.open > 0 && (
-            <Link href="/todo" className={s.attnRow}>
-              <span className={`${s.sig} ${s.sigWarn}`} /><span><b>{td.open} to-do{td.open === 1 ? "" : "s"}</b> waiting on you</span><span className={s.go}>TO-DO →</span>
-            </Link>
-          )}
-          {(!q || q.error || q.expiringSoon === 0) && (!p || p.error || p.draftAging === 0) && (!td || td.error || td.open === 0) && (
-            <div className={s.attnRow}>
-              <span className={`${s.sig} ${s.sigOk}`} /><span><b>All clear</b> — nothing needs a human right now</span>
+      <div ref={canvasRef} className={`${kit.canvas} ${editing ? kit.editing : ""}`}>
+        {visiblePins.map((it) => {
+          const def = defOf(it.key);
+          const cls = `kx-glass ${kit.w} ${kit[SIZE_CLASS[it.size] as keyof typeof kit]} ${def?.kind === "shortcut" ? kit.shortcut : ""} ${dragEngine.dragId === it.id ? kit.dragLift : ""}`;
+          return (
+            <div
+              key={it.id}
+              data-wid={it.id}
+              data-flight=""
+              className={cls}
+              onPointerDown={(e) => dragEngine.onPointerDown(e, it.id)}
+              onPointerMove={dragEngine.onPointerMove}
+              onPointerUp={dragEngine.onPointerUp}
+              onPointerCancel={dragEngine.onPointerUp}
+              onClick={() => { if (!editing && def?.href) router.push(def.href); }}
+              role={def?.href && !editing ? "link" : undefined}
+              style={{ cursor: !editing && def?.href ? "pointer" : undefined }}
+              data-kx-keep-hover=""
+            >
+              {editing && (
+                <>
+                  <button type="button" className={kit.minus} aria-label={`Remove ${def?.title}`} onClick={(e) => { e.stopPropagation(); removePin(it.id); }}>−</button>
+                  {(def?.sizes.length ?? 0) > 1 && (
+                    <button type="button" className={kit.sizeDot} aria-label="Change size" onClick={(e) => { e.stopPropagation(); cyclePinSize(it.id); }}>
+                      {it.size}
+                    </button>
+                  )}
+                </>
+              )}
+              {renderFace(it.key, it.size, data)}
             </div>
-          )}
-        </div>
+          );
+        })}
+        {visiblePins.length === 0 && (
+          <div className={s.deckEmpty}>
+            No cards pinned yet — open the <Link href="/dashboard">Dashboard</Link> and tap ＋ HOME on any card.
+          </div>
+        )}
       </div>
-
-      {sys && !sys.error && (
-        <div className={`kx-glass ${s.slab} ${s.sysStrip}`} data-flight="">
-          <span className={s.sysItem}><span className={`${s.sig} ${s.sigOk}`} /> API {data.gatewayMs}ms</span>
-          <span className={s.sysSep} />
-          <span className={s.sysItem}><span className={`${s.sig} ${sys.notifyErrorsToday > 0 ? s.sigWarn : s.sigOk}`} /> Notify errors today {sys.notifyErrorsToday}</span>
-          <span className={s.sysSep} />
-          <span className={s.sysItem}><span className={`${s.sig} ${sys.pendingMembership > 0 ? s.sigWarn : s.sigOk}`} /> Membership pending {sys.pendingMembership}</span>
-          <span className={s.sysEnd}>KOLEEX HUB · SHAPING THE FUTURE</span>
-        </div>
-      )}
-    </div>
     </div>
     </div>
     </div>
