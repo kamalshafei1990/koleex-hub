@@ -811,6 +811,16 @@ export default function ProductList() {
      grid died. Desktop always shows all; ≥sm ignores this state. */
   const [catsOpen, setCatsOpen] = useState(false);
   useEffect(() => {
+    if (!catsOpen) return;
+    const close = (e: Event) => {
+      const t = e.target as HTMLElement | null;
+      if (t && t.closest("[data-kx-cats-menu],[data-kx-cats-trigger]")) return;
+      setCatsOpen(false);
+    };
+    document.addEventListener("pointerdown", close, true);
+    return () => document.removeEventListener("pointerdown", close, true);
+  }, [catsOpen]);
+  useEffect(() => {
     let alive = true;
     fetchClassificationIcons().then((v) => {
       if (!alive || !v || Object.keys(v).length === 0) return;
@@ -2826,6 +2836,7 @@ export default function ProductList() {
                   <button
                     type="button"
                     aria-expanded={catsOpen}
+                    data-kx-cats-trigger=""
                     onClick={() => setCatsOpen((o) => !o)}
                     className="w-full flex items-center gap-2 h-10 px-3 rounded-xl kx-glass bg-[var(--bg-card)] border border-white/[0.06] select-none active:scale-[0.99] transition-transform"
                   >
@@ -2838,14 +2849,14 @@ export default function ProductList() {
                   </button>
                   {catsOpen && (
                     <>
-                      {/* Invisible full-screen closer under the panel. */}
-                      <button
-                        type="button"
-                        aria-label="Close"
-                        className="fixed inset-0 z-40 cursor-default"
-                        onClick={() => setCatsOpen(false)}
-                      />
-                      <div className="kx-glass-pop kx-pop-panel absolute left-0 right-0 top-[calc(100%+6px)] z-50 max-h-[60vh] overflow-y-auto p-1.5 rounded-2xl">
+                      {/* NO fixed full-screen closer. The first version put an
+                          invisible fixed button over the viewport; dragging on
+                          a fixed element scrolls ITS scrollable ancestor — the
+                          body, which in this shell never scrolls — so with the
+                          panel open every touch-drag went dead. Outside-tap
+                          closing is a document listener instead (below), which
+                          eats nothing. */}
+                      <div className="kx-glass-pop kx-pop-panel absolute left-0 right-0 top-[calc(100%+6px)] z-50 max-h-[60vh] overflow-y-auto p-1.5 rounded-2xl" data-kx-cats-menu="">
                         {categoryTree.map((cat) => (
                           <a
                             key={cat.slug}
