@@ -2242,11 +2242,12 @@ export default function KoleexAiApp() {
                       the row's far end.
                   The whole pill is a single rounded-3xl surface with
                   a soft hairline border that brightens on focus. */}
-              {/* Aurora: the composer is the app's sign-in-card moment —
-                  kx-glass-pop (menus' dense glass + lighting rim + pop-in).
-                  Safe to carry backdrop-filter: the emoji picker portals to
-                  document.body, so nothing inside needs its own backdrop. */}
-              <div className="kx-glass-pop relative rounded-3xl bg-[var(--bg-secondary)] border border-[var(--border-subtle)] focus-within:border-[var(--border-focus)] transition-colors">
+              {/* Aurora: the composer is a RECESSED WELL (owner pick "B",
+                  2026-08-20) — the field grammar, carved into the page, with
+                  the Hub-Blue focus ring. kx-ai-composer is the identity
+                  hook; the paint lives in globals under the aurora scope, so
+                  Core keeps rendering the original kx-glass-pop card. */}
+              <div className="kx-ai-composer kx-glass-pop relative rounded-3xl bg-[var(--bg-secondary)] border border-[var(--border-subtle)] focus-within:border-[var(--border-focus)] transition-colors">
                 {/* Attachment chip row — only renders when there are files. */}
                 {attachments.length > 0 && (
                   <div className="flex flex-wrap items-center gap-1.5 px-4 pt-3">
