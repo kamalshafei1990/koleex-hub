@@ -17,7 +17,7 @@
    sign-out); the real W1 stores it per-account server-side.
    --------------------------------------------------------------------------- */
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { notFound, useRouter } from "next/navigation";
 import s from "./dashboard.module.css";
 
@@ -95,9 +95,106 @@ export default function DashboardApp() {
     return DEFAULT_LAYOUT;
   });
   const [editing, setEditing] = useState(false);
+
+  /* ═══ THE iOS DRAG ENGINE (owner: "smooth ease motion same as iOS") ═══
+     Pointer-driven, not HTML5 dnd: the lifted card rides the finger as a
+     pure transform (scale 1.04 + shadow), the layout reorders LIVE as you
+     hover, and every OTHER card glides to its new slot with a FLIP
+     animation (measure old rect → reorder → invert → play, WAAPI,
+     expo-out). On release the card eases into its slot. Transforms only —
+     the single reflow per reorder is the grid placement itself. */
   const [dragId, setDragId] = useState<string | null>(null);
-  const dragRef = useRef<string | null>(null);
-  const [dropId, setDropId] = useState<string | null>(null);
+  const drag = useRef<{
+    id: string; startX: number; startY: number; el: HTMLElement;
+  } | null>(null);
+  const canvasRef = useRef<HTMLDivElement | null>(null);
+  const rectsRef = useRef<Map<string, DOMRect>>(new Map());
+  const layoutRef = useRef(layout);
+  useLayoutEffect(() => { layoutRef.current = layout; }, [layout]);
+
+  const snapshotRects = () => {
+    const m = new Map<string, DOMRect>();
+    canvasRef.current?.querySelectorAll<HTMLElement>("[data-wid]").forEach((el) => {
+      m.set(el.dataset.wid as string, el.getBoundingClientRect());
+    });
+    rectsRef.current = m;
+  };
+
+  /* FLIP: after any layout mutation, glide every non-dragged card from its
+     previous rect to its new one. */
+  useLayoutEffect(() => {
+    const prev = rectsRef.current;
+    if (!prev.size) return;
+    canvasRef.current?.querySelectorAll<HTMLElement>("[data-wid]").forEach((el) => {
+      const id = el.dataset.wid as string;
+      if (id === drag.current?.id) return;
+      const was = prev.get(id);
+      if (!was) return;
+      const now = el.getBoundingClientRect();
+      const dx = was.left - now.left, dy = was.top - now.top;
+      if (Math.abs(dx) < 1 && Math.abs(dy) < 1) return;
+      el.animate(
+        [{ transform: `translate(${dx}px, ${dy}px)` }, { transform: "translate(0, 0)" }],
+        { duration: 340, easing: "cubic-bezier(0.16, 1, 0.3, 1)" },
+      );
+    });
+    rectsRef.current = new Map();
+  }, [layout]);
+
+  const onPointerDown = (e: React.PointerEvent<HTMLDivElement>, id: string) => {
+    if (!editing) return;
+    if ((e.target as HTMLElement).closest("button")) return; /* minus / size dot */
+    const el = e.currentTarget;
+    drag.current = { id, startX: e.clientX, startY: e.clientY, el };
+    setDragId(id);
+    el.setPointerCapture(e.pointerId);
+    el.style.transition = "none";
+    el.style.zIndex = "40";
+  };
+
+  const onPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    const d = drag.current;
+    if (!d) return;
+    const dx = e.clientX - d.startX, dy = e.clientY - d.startY;
+    d.el.style.transform = `translate(${dx}px, ${dy}px) scale(1.04)`;
+    d.el.style.boxShadow = "0 18px 44px rgba(0,0,0,.55), 0 0 0 1.5px rgba(127,169,214,.4)";
+
+    /* live reorder: whichever card the pointer is over becomes the target */
+    const under = document.elementsFromPoint(e.clientX, e.clientY)
+      .find((n) => (n as HTMLElement).dataset?.wid && (n as HTMLElement).dataset.wid !== d.id) as HTMLElement | undefined;
+    if (!under) return;
+    const overId = under.dataset.wid as string;
+    const l = layoutRef.current;
+    const from = l.findIndex((x) => x.id === d.id);
+    const to = l.findIndex((x) => x.id === overId);
+    if (from < 0 || to < 0 || from === to) return;
+    snapshotRects(); /* FLIP: remember where everyone is BEFORE the move */
+    setLayout(() => {
+      const next = [...l];
+      const [moved] = next.splice(from, 1);
+      next.splice(to, 0, moved);
+      return next;
+    });
+  };
+
+  const onPointerUp = () => {
+    const d = drag.current;
+    if (!d) return;
+    drag.current = null;
+    /* the lifted card eases home: from its current offset to identity */
+    const el = d.el;
+    const current = el.style.transform;
+    el.style.transform = "";
+    el.style.boxShadow = "";
+    if (current && current !== "none") {
+      el.animate(
+        [{ transform: `${current}` }, { transform: "translate(0, 0) scale(1)" }],
+        { duration: 420, easing: "cubic-bezier(0.16, 1, 0.3, 1)" },
+      );
+    }
+    window.setTimeout(() => { el.style.zIndex = ""; el.style.transition = ""; }, 430);
+    setDragId(null);
+  };
 
   useEffect(() => {
     if (!DASH_ON) return;
@@ -121,27 +218,20 @@ export default function DashboardApp() {
     setEditing(false);
     try { window.localStorage.setItem(LAYOUT_KEY, JSON.stringify(layout)); } catch { /* best-effort */ }
   };
-  const remove = (id: string) => setLayout((l) => l.filter((it) => it.id !== id));
-  const cycleSize = (id: string) =>
+  const remove = (id: string) => { snapshotRects(); setLayout((l) => l.filter((it) => it.id !== id)); };
+  const cycleSize = (id: string) => {
+    snapshotRects();
     setLayout((l) => l.map((it) => {
       if (it.id !== id) return it;
       const sizes = defOf(it.key)?.sizes ?? ["S"];
       const next = sizes[(sizes.indexOf(it.size) + 1) % sizes.length];
       return { ...it, size: next };
     }));
-  const reorder = (fromId: string, toId: string) =>
-    setLayout((l) => {
-      const from = l.findIndex((x) => x.id === fromId);
-      const to = l.findIndex((x) => x.id === toId);
-      if (from < 0 || to < 0 || from === to) return l;
-      const next = [...l];
-      const [moved] = next.splice(from, 1);
-      next.splice(to, 0, moved);
-      return next;
-    });
+  };
   const addWidget = (key: string) => {
     const def = defOf(key);
     if (!def) return;
+    snapshotRects();
     setLayout((l) => [...l, { id: `${key}-${l.length}-${l.map((x) => x.id).join("").length}`, key, size: def.sizes[0] }]);
   };
   const available = CATALOG.filter((d) => !layout.some((it) => it.key === d.key));
@@ -274,24 +364,19 @@ export default function DashboardApp() {
         </div>
       </div>
 
-      <div className={`${s.canvas} ${editing ? s.editing : ""}`}>
+      <div ref={canvasRef} className={`${s.canvas} ${editing ? s.editing : ""}`}>
         {layout.map((it) => {
           const def = defOf(it.key);
-          const cls = `kx-glass ${s.w} ${s[SIZE_CLASS[it.size] as keyof typeof s]} ${def?.kind === "shortcut" ? s.shortcut : ""} ${dragId === it.id ? s.dragging : ""} ${dropId === it.id ? s.dropTarget : ""}`;
+          const cls = `kx-glass ${s.w} ${s[SIZE_CLASS[it.size] as keyof typeof s]} ${def?.kind === "shortcut" ? s.shortcut : ""} ${dragId === it.id ? s.dragLift : ""}`;
           return (
             <div
               key={it.id}
+              data-wid={it.id}
               className={cls}
-              draggable={editing}
-              onDragStart={() => { dragRef.current = it.id; setDragId(it.id); }}
-              onDragOver={(e) => { if (editing) { e.preventDefault(); setDropId(it.id); } }}
-              onDragLeave={() => setDropId((d) => (d === it.id ? null : d))}
-              onDrop={(e) => {
-                e.preventDefault();
-                if (dragRef.current && dragRef.current !== it.id) reorder(dragRef.current, it.id);
-                dragRef.current = null; setDragId(null); setDropId(null);
-              }}
-              onDragEnd={() => { dragRef.current = null; setDragId(null); setDropId(null); }}
+              onPointerDown={(e) => onPointerDown(e, it.id)}
+              onPointerMove={onPointerMove}
+              onPointerUp={onPointerUp}
+              onPointerCancel={onPointerUp}
               onClick={() => { if (!editing && def?.href) router.push(def.href); }}
               role={def?.href && !editing ? "link" : undefined}
               style={{ cursor: !editing && def?.href ? "pointer" : undefined }}

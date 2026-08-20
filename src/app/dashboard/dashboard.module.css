@@ -102,12 +102,14 @@
 .pvImg { position: absolute; inset: 0; inline-size: 100%; block-size: 100%; object-fit: cover; border-radius: 50%; }
 
 /* ── EDIT MODE — the iOS grammar ── */
-.editing .w { animation: jiggle 300ms ease-in-out infinite alternate; cursor: grab; }
+.editing .w { animation: jiggle 300ms ease-in-out infinite alternate; cursor: grab; touch-action: none; user-select: none; }
+/* the lifted card carries an inline transform — the jiggle keyframes would
+   fight it, so the lift opts out of the jiggle entirely */
+.editing .dragLift { animation: none; cursor: grabbing; }
 .editing .w:nth-child(2n) { animation-delay: 90ms; }
 .editing .w:nth-child(3n) { animation-delay: 160ms; }
 @keyframes jiggle { from { transform: rotate(-0.5deg); } to { transform: rotate(0.5deg); } }
-.dragging { opacity: 0.35; }
-.dropTarget { outline: 1.5px dashed rgba(127, 169, 214, 0.6); outline-offset: 2px; }
+.dragLift { will-change: transform; }
 
 .minus {
   position: absolute; top: 6px; inset-inline-start: 6px; z-index: 3;
