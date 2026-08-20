@@ -76,6 +76,7 @@ export type OptionVisualType =
   | 'plug'
   | 'automation'
   | 'weight'
+  | 'packing'
   | 'generic';
 
 export interface SpecFieldOption {

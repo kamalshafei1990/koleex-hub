@@ -113,8 +113,12 @@ export function packingShippingGroup(order: number): SpecGroup {
         options: [
           { value: "wooden_case", label: "Wooden Case" },
           { value: "plywood_crate", label: "Plywood Crate" },
-          { value: "carton", label: "Carton" },
+          { value: "wooden_pallet", label: "Wooden Pallet (open)" },
           { value: "pallet_film", label: "Pallet + Stretch Film" },
+          { value: "carton", label: "Carton" },
+          { value: "foam_carton", label: "Carton + Foam Inserts" },
+          { value: "metal_frame", label: "Metal Frame Crate" },
+          { value: "bulk_loose", label: "Container Bulk (unpacked)" },
         ],
         ...pub, visualRenderType: "technical_badge",
       },

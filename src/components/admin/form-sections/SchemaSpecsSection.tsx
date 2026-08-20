@@ -32,6 +32,8 @@ import type {
 } from "@/types/product-schema";
 import CheckIcon from "@/components/icons/ui/CheckIcon";
 import AngleDownIcon from "@/components/icons/ui/AngleDownIcon";
+import VisualGlyph from "@/components/product-preview/VisualGlyph";
+import { VISUAL_OPTIONS, FIELD_VISUAL_DOMAIN } from "@/lib/product-schema/visual-options";
 
 /* ── Anchored dropdown menu (portal) ───────────────────────────────
    The specs cards use overflow-hidden, which clips any in-card absolute
@@ -234,6 +236,13 @@ function SelectField({
   const { open, setOpen, triggerRef, menuRef, rect } = useAnchoredMenu();
   const opts = field.options ?? [];
   const selected = opts.find((o) => o.value === value);
+  /* Option glyphs (owner, 2026-08-20, packing types): inline `icon` wins,
+     else the central visual-options registry supplies it by field domain —
+     so schemas keep declaring plain {value,label} and still get icons.
+     Fields with no domain and no inline icons render exactly as before. */
+  const domain = field.optionSet ?? FIELD_VISUAL_DOMAIN[field.key];
+  const iconFor = (v: string, inline?: string) =>
+    inline ?? (domain ? VISUAL_OPTIONS[domain]?.[v]?.icon : undefined);
   return (
     <div ref={triggerRef} className="relative">
       <button
@@ -241,8 +250,11 @@ function SelectField({
         onClick={() => setOpen((o) => !o)}
         className={`${inputCls} flex items-center justify-between gap-2 text-start`}
       >
-        <span className={`truncate ${selected ? "" : "text-[var(--text-ghost)]"}`}>
-          {selected ? selected.label : "— Select —"}
+        <span className={`flex min-w-0 items-center gap-2 ${selected ? "" : "text-[var(--text-ghost)]"}`}>
+          {selected && iconFor(selected.value, selected.icon) ? (
+            <VisualGlyph token={iconFor(selected.value, selected.icon)!} className="h-4 w-4 shrink-0 opacity-80" />
+          ) : null}
+          <span className="truncate">{selected ? selected.label : "— Select —"}</span>
         </span>
         <AngleDownIcon className={`h-3.5 w-3.5 shrink-0 text-[var(--text-ghost)] transition-transform ${open ? "rotate-180" : ""}`} />
       </button>
@@ -264,7 +276,10 @@ function SelectField({
                 onMouseDown={(e) => { e.preventDefault(); onSet(o.value); setOpen(false); }}
                 className={`${menuItemCls} ${active ? "font-semibold text-[var(--text-primary)]" : "text-[var(--text-secondary)]"}`}
               >
-                <span className="truncate">{o.label}</span>
+                {iconFor(o.value, o.icon) ? (
+                  <VisualGlyph token={iconFor(o.value, o.icon)!} className="h-4 w-4 shrink-0 opacity-80" />
+                ) : null}
+                <span className="flex-1 truncate">{o.label}</span>
                 {active ? <CheckIcon className="h-3.5 w-3.5 shrink-0" /> : null}
               </button>
             );
