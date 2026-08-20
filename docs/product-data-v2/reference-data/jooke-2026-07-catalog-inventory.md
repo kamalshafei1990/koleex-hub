@@ -150,8 +150,12 @@ discussion because it cannot be undone.
 
 ## 6. What I recommend doing first
 
-1. **Build the `XAPT` spec template** from §2.2. It needs no new codes, no owner
-   decision, and it unblocks the largest product family in the catalogue.
+1. ✅ **BUILT 2026-08-20** (owner-approved) — live template
+   `programmable-cnc-sewing-machine` on `programmable-cnc-sewing`: 10 sections,
+   30 fields, the §2.2 column set verbatim (sewing area, pattern capacity/input/
+   switching, rpm, hook, presser strokes, the 5-sensor boolean block, X/Y drive,
+   air + power). **Prod now holds FIVE templates**, and Automatic Sewing
+   Systems has its first.
 2. **Then** the owner decision on §4, which is the real bottleneck for the other
    half.
 3. **Do not** enter any product until its template exists — entering first and
