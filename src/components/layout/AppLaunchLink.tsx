@@ -231,6 +231,9 @@ export default function AppLaunchLink({
          of this tile) — the generic cross-fade must stand down or the two
          run stacked. This is ViewTransitions' documented opt-out hatch. */
       data-no-view-transition=""
+      /* The RETURN leg reads this to find where to shrink back to: when the
+         user presses back inside an app, the card lands on this tile. */
+      data-app-tile={app.id}
       {...aria}
     >
       {children}
