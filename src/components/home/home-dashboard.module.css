@@ -258,7 +258,10 @@
   inline-size: 9px; block-size: 9px; border-radius: 50%;
   background: #79d89a; border: 2px solid #0c0d10;
 }
-.pvImg { inline-size: 100%; block-size: 100%; object-fit: cover; border-radius: 50%; }
+/* absolute fill: percentage sizing of a grid item let portrait photos
+   escape the 30px circle as ovals (owner's second catch). Pinned to the
+   circle's box, the photo cannot be anything but a 30px disc. */
+.pvImg { position: absolute; inset: 0; inline-size: 100%; block-size: 100%; object-fit: cover; border-radius: 50%; }
 
 /* ── system strip (SA) ── */
 .sysStrip {
