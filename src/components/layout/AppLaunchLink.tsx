@@ -180,11 +180,21 @@ export default function AppLaunchLink({
       markAppLaunch(app.id, pressMs, !wasChunkWarmed(app.id));
       // Tell the launch splash a same-tab app launch just started — it takes
       // over the screen if the route doesn't arrive almost immediately.
+      // `rect` = the pressed tile's box: the zoom transition blooms the app
+      // out of the exact tile the user touched (extra fields are ignored by
+      // older listeners).
       try {
-        window.dispatchEvent(new CustomEvent("kx:app-launch", { detail: { appId: app.id, route: app.route } }));
+        const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+        window.dispatchEvent(new CustomEvent("kx:app-launch", {
+          detail: {
+            appId: app.id,
+            route: app.route,
+            rect: { left: rect.left, top: rect.top, width: rect.width, height: rect.height },
+          },
+        }));
       } catch { /* best-effort */ }
     },
-    [inactive, app.id, onNavigate],
+    [inactive, app.id, app.route, onNavigate],
   );
 
   if (inactive) {
@@ -217,6 +227,10 @@ export default function AppLaunchLink({
       onPointerEnter={doPreload}
       onFocus={doPreload}
       onTouchStart={doPreload}
+      /* App launches own their transition (AppLaunchZoom blooms the app out
+         of this tile) — the generic cross-fade must stand down or the two
+         run stacked. This is ViewTransitions' documented opt-out hatch. */
+      data-no-view-transition=""
       {...aria}
     >
       {children}

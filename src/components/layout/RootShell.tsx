@@ -14,6 +14,7 @@ import AuthGate from "@/components/admin/AuthGate";
 import MainHeader from "./MainHeader";
 import NavigationProgress from "./NavigationProgress";
 import AppLaunchSplash from "./AppLaunchSplash";
+import AppLaunchZoom from "./AppLaunchZoom";
 import ViewTransitions from "./ViewTransitions";
 import Sidebar from "./Sidebar";
 import ViewAsBanner from "./ViewAsBanner";
@@ -298,6 +299,10 @@ function ShellContent({ children }: { children: React.ReactNode }) {
       <NavigationProgress />
       <ViewTransitions />
       <AppLaunchSplash />
+      {/* The bloom-from-tile app-open motion. Sits ABOVE the splash (z-95 vs
+          z-90): a slow launch holds the card fullscreen, then hands off to
+          the brand splash beneath. Never uncovers Home mid-launch. */}
+      <AppLaunchZoom />
       <MainHeader />
       {/* Persistent banner shown when a Super Admin is "viewing as"
           another user. Sits below MainHeader (fixed, top-14) and is
