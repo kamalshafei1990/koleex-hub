@@ -170,7 +170,7 @@ function Section({ icon, title, children, id, defaultOpen = true, badge }: {
 }) {
   const [open, setOpen] = useState(defaultOpen);
   return (
-    <section id={id} {...kxInspectAttrs({ component: sectionComponentName(title), module: "Product Data", section: title })} className="kx-tab-in scroll-mt-24 bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] overflow-hidden transition-shadow hover:shadow-[0_2px_12px_rgba(0,0,0,0.15)]">
+    <section id={id} {...kxInspectAttrs({ component: sectionComponentName(title), module: "Product Data", section: title })} className="kx-tab-in scroll-mt-24 kx-glass bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] overflow-hidden transition-shadow hover:shadow-[0_2px_12px_rgba(0,0,0,0.15)]">
       <button
         type="button"
         onClick={() => setOpen(!open)}
@@ -412,7 +412,7 @@ function SectionTabs({
      are the values ProductProfile and ProductList already use for this
      identical bar; this was the one that was missed. */
   return (
-    <nav className="kx-bar-host sticky top-0 z-20 mb-6 py-2 bg-[var(--bg-primary)]/90 backdrop-blur-md [--kx-ramp-ext:1rem] [--kx-ramp-fade:2.5rem]">
+    <nav className="kx-bar-host sticky top-0 z-20 mb-6 py-2 bg-[var(--bg-primary)]/90 backdrop-blur-md [--kx-ramp-top:26rem] [--kx-ramp-ext:1rem] [--kx-ramp-fade:1.5rem]">
       <div aria-hidden className="kx-glass-bar kx-bar-prog"><i /><i /><i /><i /></div>
       <TabStrip
         ariaLabel="Product sections"

@@ -624,7 +624,7 @@ function GroupCard({
   const pct = total ? Math.round((filled / total) * 100) : 0;
 
   return (
-    <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] overflow-hidden">
+    <div className="kx-glass rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] overflow-hidden">
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
