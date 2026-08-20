@@ -38,6 +38,15 @@ import { useShortcutHint } from "@/lib/ui/use-shortcut-hint";
 /* Home dashboard is code-split: it only matters after the grid is usable,
    and keeping it out of the critical chunk protects the home budget. */
 const HomeDashboard = dynamic(() => import("@/components/home/HomeDashboard"), { ssr: false });
+/* ── DARK-LAUNCH SWITCH (owner rule, 2026-08-20) ──
+   The dashboard is still being built and must NOT appear on production —
+   but three sessions share this tree and any of them pushing main would
+   carry it out. This gate keeps it dark wherever the flag is absent:
+   always on in development, on in a deployment ONLY if
+   NEXT_PUBLIC_HOME_DASHBOARD=1 is set there (it is not set on Vercel).
+   Inlined at build time, so a prod build tree-shakes the chunk away. */
+const HOME_DASHBOARD_ON =
+  process.env.NEXT_PUBLIC_HOME_DASHBOARD === "1" || process.env.NODE_ENV === "development";
 import { useSkin } from "@/lib/appearance";
 /* A canvas and a draw loop must never sit in Home's boot chunk — Home is the
    most-opened screen in the Hub and its budget is the tightest one there is.
@@ -991,7 +1000,7 @@ export default function HomePage() {
             One request (/api/dashboard, no-store), server-side permission
             filtering, renders nothing at all for accounts with no visible
             widgets — the grid below is untouched for them. */}
-        <HomeDashboard />
+        {HOME_DASHBOARD_ON && <HomeDashboard />}
 
         {/* Mobile-resilience: while the permission bootstrap is in
             flight or has failed (timeout / 5xx / lost mobile signal),
