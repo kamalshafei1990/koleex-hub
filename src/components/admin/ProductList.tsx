@@ -2732,7 +2732,50 @@ export default function ProductList() {
                       onClick={(e) => {
                         e.preventDefault();
                         const el = document.getElementById(`cat-${cat.slug}`);
-                        if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+                        const sc = document.getElementById("main-scroll-container");
+                        const navEl = e.currentTarget.closest("nav");
+                        if (!el || !sc) return;
+                        /* scrollIntoView put the title BEHIND the docked
+                           chrome (owner: "it didn't take me to the right
+                           place"): block:"start" aligns the section with the
+                           scroller's top edge, and the sticky grid + tools
+                           row then cover exactly that strip. The offset is
+                           measured, not hardcoded, because the grid's height
+                           is 2–3 rows depending on viewport — and on phones
+                           the bar is static, so only a small clearance. */
+                        const stuck = navEl && getComputedStyle(navEl).position === "sticky";
+                        const offset = stuck
+                          ? navEl.getBoundingClientRect().height +
+                            (parseFloat(getComputedStyle(navEl).top) || 0) + 8
+                          : 60;
+                        const targetTop = () =>
+                          el.getBoundingClientRect().top - sc.getBoundingClientRect().top + sc.scrollTop - offset;
+                        sc.scrollTo({ top: targetTop(), behavior: "smooth" });
+                        /* Second half of the miss: the sections render with
+                           content-visibility:auto, so everything below the
+                           fold has an ESTIMATED height until it paints. The
+                           first scroll lands on the estimate; as the passed
+                           sections materialize, the real target moves. Wait
+                           for the scroll to stop (scrollTop stable across a
+                           few frames — works whether or not the browser has
+                           scrollend), then snap the residual error. Bounded:
+                           at most 4 corrections and ~5s of frames, and a
+                           user grabbing the scrollbar mid-flight just makes
+                           the loop finish early. */
+                        let last = -1, still = 0, passes = 0, frames = 0;
+                        const settle = () => {
+                          if (++frames > 300) return;
+                          const cur = sc.scrollTop;
+                          if (cur === last) still += 1; else { still = 0; last = cur; }
+                          if (still >= 3) {
+                            const diff = targetTop() - cur;
+                            if (Math.abs(diff) <= 4 || passes >= 4) return;
+                            passes += 1; still = 0;
+                            sc.scrollTop = cur + diff;
+                          }
+                          requestAnimationFrame(settle);
+                        };
+                        requestAnimationFrame(settle);
                       }}
                       className="group relative flex flex-row items-center justify-start gap-1.5 h-[38px] min-w-0 px-3 rounded-xl kx-glass bg-[var(--bg-card)] border border-white/[0.06] kx-hover-card kx-hover-tile kx-tile-neon select-none transition-transform duration-75 active:scale-[0.97] motion-reduce:transition-none motion-reduce:active:scale-100"
                     >
