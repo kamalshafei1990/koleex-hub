@@ -2012,14 +2012,20 @@ export default function ProductList() {
         {/* Header */}
         {/* relative z-30: the top strip's ramp (z-20) runs BEHIND this. */}
         <div className="relative z-30 flex flex-wrap items-center gap-3 mb-1">
-          <Link href="/" className="kx-glass kx-hover-glow h-8 w-8 flex items-center justify-center rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] transition-colors shrink-0">
-            <ArrowLeftIcon className="h-4 w-4" />
+          {/* Matched to Inventory's PageHeader (owner, 2026-08-20: "compare with
+              inventory app… make them same"): the BK-4 labeled back chip, the
+              plain (non-glass) icon chip, the M-1 title rule and the
+              kx-ph-search well — the four real deltas the comparison found.
+              The divisions TabStrip already shared the canon recipe. */}
+          <Link href="/" aria-label="Back to Hub" className="kx-ph-chrome flex h-8 shrink-0 items-center justify-center gap-1.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-2.5 text-[var(--text-dim)] transition-all duration-200 hover:border-[var(--border-color)] hover:bg-[var(--bg-surface-hover)] hover:text-[var(--text-primary)] sm:h-10 sm:rounded-xl sm:px-3 sm:hover:-translate-y-0.5">
+            <ArrowLeftIcon className="h-3.5 w-3.5" />
+            <span className="hidden text-[12px] font-medium sm:inline">Hub</span>
           </Link>
           <div className="flex items-center gap-2.5 min-w-0 flex-1">
-            <div className="kx-glass h-8 w-8 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-dim)] shrink-0">
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[var(--text-muted)] sm:h-10 sm:w-10 sm:rounded-xl">
               {isInternal ? <ProductDataIcon size={16} /> : <ProductsIcon size={16} />}
             </div>
-            <h1 className="text-xl md:text-[22px] font-bold tracking-tight truncate">
+            <h1 className="text-xl font-bold tracking-tight truncate md:sr-only">
               {isInternal ? t("list.productData") : t("list.products")}
             </h1>
             {/* Count and rate ride the TITLE line instead of owning a row of
@@ -2140,7 +2146,7 @@ export default function ProductList() {
                 title={t("list.searchAria")}
                 aria-autocomplete="list"
                 aria-expanded={searchOpen && suggestions.length > 0}
-                className="w-full h-10 pl-10 pr-10 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-dim)] outline-none transition-[border-color,box-shadow] focus:border-[#567FB2]/60 focus:shadow-[0_0_0_4px_rgba(86,127,178,0.16)] [&::-webkit-search-cancel-button]:hidden"
+                className="kx-ph-search w-full h-11 pl-10 pr-10 rounded-xl bg-[var(--bg-card)] border border-[var(--border-subtle)] text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-dim)] outline-none transition-colors duration-200 [&::-webkit-search-cancel-button]:hidden"
               />
               {/* Clear button — only when there's text. Native input
                   type=search clear button is inconsistent across
