@@ -422,8 +422,115 @@ const getProductFullDetails: ToolDef<
   },
 };
 
+/* ── DATA-COMPLETENESS AUDIT — the owner's question the agent could not
+   answer (2026-08-20): "how many products have no price?" The agent sampled
+   and apologised because no tool aggregates across the catalog. This one
+   does, server-side, over ALL products (Product Data's own view — drafts
+   included, which is why it gates on the Product Data module, not the
+   ACTIVE-only Products lens).
+
+   Money scoping, same as the app: SELLING price presence is neutral catalog
+   data. COST-side completeness (model cost_price, supplier unit_cost_cny)
+   is included ONLY with hasProductCostAccess — otherwise the payload says
+   RESTRICTED explicitly so the AI reports the permission, never guesses. */
+const auditProductData: ToolDef<
+  { examples_limit?: number },
+  Record<string, unknown>
+> = {
+  name: "auditProductData",
+  description:
+    "AGGREGATE data-completeness audit across the WHOLE Product Data catalog (all statuses, drafts included). Answers any 'how many products have no / are missing X' question with exact counts and example product names: selling price (global_price on models), media/photos, description, HS code, certifications, plus status breakdown. Cost-side completeness (cost prices, supplier costs) is included only for accounts with Product Data cost permission. ALWAYS use this instead of sampling products one by one.",
+  parameters: {
+    type: "object",
+    properties: {
+      examples_limit: { type: "integer", description: "Max example product names per gap list. Default 15, cap 40." },
+    },
+  },
+  requiredModule: "Product Data",
+  requiredAction: "view",
+  handler: async (ctx, args): Promise<ToolResult<Record<string, unknown>>> => {
+    const exLimit = Math.min(Math.max(Number(args.examples_limit ?? 15) || 15, 1), 40);
+    const canSeeCosts = await hasProductCostAccess(ctx.auth);
+
+    const [prodRes, modelRes, mediaRes, certRes, linkRes] = await Promise.all([
+      supabaseServer.from("products").select("id, product_name, status, description, hs_code"),
+      supabaseServer.from("product_models").select("product_id, global_price" + (canSeeCosts ? ", cost_price" : "")),
+      supabaseServer.from("product_media").select("product_id"),
+      supabaseServer.from("product_certifications").select("product_id"),
+      canSeeCosts
+        ? supabaseServer.from("product_suppliers").select("product_id, unit_cost_cny")
+        : Promise.resolve({ data: null, error: null }),
+    ]);
+    if (prodRes.error || modelRes.error || mediaRes.error || certRes.error || linkRes.error) {
+      console.error("[tool.auditProductData]", prodRes.error ?? modelRes.error ?? mediaRes.error ?? certRes.error ?? linkRes.error);
+      return { ok: false, permissionStatus: "denied", data: null, message: "Couldn't run the product data audit right now." };
+    }
+
+    const products = (prodRes.data ?? []) as Array<{ id: string; product_name: string | null; status: string | null; description: string | null; hs_code: string | null }>;
+    /* the conditional select string defeats supabase's inference — cast
+       through unknown; the columns are exactly what the string names */
+    const models = (modelRes.data ?? []) as unknown as Array<{ product_id: string; global_price: unknown; cost_price?: unknown }>;
+
+    const hasSelling = new Set<string>();
+    const hasCost = new Set<string>();
+    const modelsOf = new Map<string, number>();
+    for (const m of models) {
+      modelsOf.set(m.product_id, (modelsOf.get(m.product_id) ?? 0) + 1);
+      if (m.global_price !== null && m.global_price !== undefined && Number(m.global_price) > 0) hasSelling.add(m.product_id);
+      if (canSeeCosts && m.cost_price !== null && m.cost_price !== undefined && Number(m.cost_price) > 0) hasCost.add(m.product_id);
+    }
+    if (canSeeCosts) {
+      for (const l of ((linkRes.data ?? []) as Array<{ product_id: string; unit_cost_cny: unknown }>)) {
+        if (l.unit_cost_cny !== null && l.unit_cost_cny !== undefined && Number(l.unit_cost_cny) > 0) hasCost.add(l.product_id);
+      }
+    }
+    const hasMedia = new Set(((mediaRes.data ?? []) as Array<{ product_id: string }>).map((m) => m.product_id));
+    const hasCert = new Set(((certRes.data ?? []) as Array<{ product_id: string }>).map((c) => c.product_id));
+
+    const byStatus: Record<string, number> = {};
+    const gap = (pred: (p: (typeof products)[number]) => boolean) => {
+      const missing = products.filter(pred);
+      return {
+        count: missing.length,
+        examples: missing.slice(0, exLimit).map((p) => p.product_name ?? p.id),
+      };
+    };
+    for (const p of products) {
+      const st = (p.status ?? "draft").toLowerCase();
+      byStatus[st] = (byStatus[st] ?? 0) + 1;
+    }
+
+    const payload: Record<string, unknown> = {
+      total_products: products.length,
+      by_status: byStatus,
+      no_selling_price: gap((p) => !hasSelling.has(p.id)),
+      no_media: gap((p) => !hasMedia.has(p.id)),
+      no_description: gap((p) => !p.description || !String(p.description).trim()),
+      no_hs_code: gap((p) => !p.hs_code || !String(p.hs_code).trim()),
+      no_certifications: gap((p) => !hasCert.has(p.id)),
+      no_models_at_all: gap((p) => !modelsOf.has(p.id)),
+      ...(canSeeCosts
+        ? { no_cost_price: gap((p) => !hasCost.has(p.id)) }
+        : { cost_completeness: "RESTRICTED — this account lacks Product Data cost permission; cost-side completeness is hidden. Say so if asked about costs." }),
+    };
+
+    const noPrice = (payload.no_selling_price as { count: number }).count;
+    return {
+      ok: true,
+      permissionStatus: canSeeCosts ? "allowed" : "limited",
+      data: payload,
+      message: `Audited ${products.length} products: ${noPrice} have no selling price` +
+        (canSeeCosts ? `, ${(payload.no_cost_price as { count: number }).count} have no cost price` : "") +
+        `. Full gap counts with examples included.`,
+      sources: ["product-data(audit)"],
+      ...(canSeeCosts ? {} : { filteredFields: ["cost_price", "unit_cost_cny"] }),
+    };
+  },
+};
+
 export const productTools: ToolDef[] = [
   getProductFullDetails as ToolDef,
+  auditProductData as unknown as ToolDef,
   searchProducts as unknown as ToolDef,
   getProductByCode as ToolDef,
   countProducts as unknown as ToolDef,
