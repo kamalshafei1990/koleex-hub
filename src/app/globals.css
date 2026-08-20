@@ -1842,14 +1842,25 @@ input[type="number"]:not(.kx-spinner) {
    above it because it is neutral and covers the full row.
    Light theme uses the skin's light hover blue (62,103,150) at a lower alpha
    — the same colour the light Aurora hover puts on borders. */
-.kx-pop-panel :is(button, a):hover {
+.kx-pop-panel :is(button, a):is(:hover, :active) {
   /* :is(button, a) — a menu row is a menu row whichever element renders it.
      The category jump menu's rows are ANCHORS and had no hover at all
-     (owner: "where is the hover in dropdown menu"). */
+     (owner: "where is the hover in dropdown menu").
+     :active TOO, because the owner reviews on an iPhone — touch has no
+     hover, so without a pressed state a tap gives zero feedback and the
+     row "has no hover" is exactly what a phone user reports. The press
+     reads slightly stronger than the pointer hover on purpose: it is
+     confirmation, not focus. */
   background-color: rgba(127, 169, 214, 0.16);
 }
-[data-theme="light"] .kx-pop-panel :is(button, a):hover {
+.kx-pop-panel :is(button, a):active {
+  background-color: rgba(127, 169, 214, 0.24);
+}
+[data-theme="light"] .kx-pop-panel :is(button, a):is(:hover, :active) {
   background-color: rgba(62, 103, 150, 0.1);
+}
+[data-theme="light"] .kx-pop-panel :is(button, a):active {
+  background-color: rgba(62, 103, 150, 0.16);
 }
 
 /* ── kx-pop-dense — the MN-5 look, held over BRIGHT content ──────────────
