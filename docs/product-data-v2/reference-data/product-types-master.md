@@ -52,6 +52,9 @@ Facets reference `facet-dictionary-master.md`; devices reference `device-diction
 | ▲ XAWB | Automatic Waistband Machine | garment_type, head_config | garment_type, needle_count, curtain_feed | curtain_feed, label_insert |
 | ✅ XADT | Automatic Dart Sewing Machine | dart_length, taper_control | dart_length, single_vs_double, programmable | thread_nesting, photocell, stacker |
 | ▲ XAIX | Automatic Buttonhole/Button Indexer | function, positions, base_head | function, position_count, auto_button_feed | auto_button_feeder, transport_clamp, stacker |
+| ✅ XAGD | Glue Dispensing Machine | dispensing_heads, working_field, vision | head_count, ab_glue, vision | curing_oven, vision_registration *(CL-0026)* |
+| ✅ XAGP | Garment Prep Unit | prep_function, automation_level | function(zipper/cord/crease) | — *(CL-0026)* |
+| ✅ XFAB | Bra Hardware Machine *(lives under Fastening & Press XFA\*)* | hardware_type, feed_type | hook_eye_vs_buckle, auto_feed | auto_feeder *(CL-0026)* |
 | ✅ XATA | Automatic Tape Attaching System | tape_count, working_field, cycle_time | tape_count, robotic_feed, cycle_time | auto_feeding_arm, template_loader *(CL-0024)* |
 | ✅ XAPK | Automatic Pintuck Machine | tucking_length, tucking_width, head_type | tucking_length, plc_patterns, head_type | stepper_feed, infrared_break_detect *(CL-0024)* |
 | ✅ XSEF | Fur Sewing Machine *(lives under Leather & Footwear XSE\*)* | stitch_type, max_skin_thickness | portable_vs_stationary, speed | edge_guide *(CL-0024)* |

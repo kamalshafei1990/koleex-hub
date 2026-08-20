@@ -143,6 +143,14 @@ export const CATEGORIES: Category[] = [
       { code: "XSS", label: "Special Machines (retired — code reservation only)" },
       { code: "XSZ", label: "Zigzag Machines" },
       { code: "XSBL", label: "Blindstitch Machines" },
+      /* CL-0024/0025 (2026-08-20) — from the Lingrai/JOOKE catalogue reads.
+         XSF executes a CL-0020-era approval (its relabel note said flat
+         seamers do not belong under Interlock); XSRG is NOT overlock —
+         different bed, purpose and thread system. */
+      { code: "XSF", label: "Flatlock (Flat Seamer) Machines" },
+      { code: "XSRG", label: "Carpet Overedging Machines" },
+      { code: "XSUS", label: "Ultrasonic Sewing Machines" },
+      { code: "XSEA", label: "Elastic Attaching Machines" },
     ],
   },
   {
@@ -164,6 +172,18 @@ export const CATEGORIES: Category[] = [
       { code: "XABA", label: "Button Attaching Machines" },
       { code: "XABH", label: "Buttonhole Machines" },
       { code: "XAPT", label: "Programmable / CNC Sewing" },
+      /* CL-0024/0025/0026 (2026-08-20). XATA is tape ATTACHING (robotic
+         multi-needle cells) — distinct from XALB labels and leather XSET.
+         XAPK is the standalone pintuck CELL; the VPT pintuck device on a
+         multi-needle machine stays a device. XAGD/XAGP close the JOOKE
+         decision paper (D1-A, D3-A). */
+      { code: "XATM", label: "Template Sewing Machines" },
+      { code: "XATA", label: "Tape Attaching Units" },
+      { code: "XAPK", label: "Pintuck Sewing Units" },
+      { code: "XABL", label: "Belt Loop Attaching Units" },
+      { code: "XADT", label: "Dart Sewing Units" },
+      { code: "XAGD", label: "Glue Dispensing Machines" },
+      { code: "XAGP", label: "Garment Prep Units" },
     ],
   },
   {
@@ -179,6 +199,9 @@ export const CATEGORIES: Category[] = [
       { code: "XSEE", label: "Edge Binding Machines" },
       { code: "XSET", label: "Tape Attaching Machines" },
       { code: "XSEK", label: "Skiving & Edge Trimming Machines" },
+      /* CL-0024: fur/skin overseaming sits with the skin-goods family, not
+         the garment stitch classes. */
+      { code: "XSEF", label: "Fur Sewing Machines" },
     ],
   },
   {
@@ -218,6 +241,9 @@ export const CATEGORIES: Category[] = [
     anchor: "cat-xfa",
     subcategories: [
       { code: "XFAS", label: "Snap, Rivet & Eyelet Setters" },
+      /* CL-0026 (D2-A): hardware onto garment = the XFA process class; the
+         intimates workpiece earns its own shelf, not a new category. */
+      { code: "XFAB", label: "Bra Hardware Machines" },
     ],
   },
   {

@@ -323,6 +323,14 @@ XSF, XSBH, XSBA, XSBT, XSBL, XSZ, XSEA, XSWB, XSLP, XSSM, XSBG, XSMT, XSUS · XA
 | Automatic Pintuck | XAPK | `pintuck-sewing-units` | Live |
 | Fur Sewing (Leather family) | XSEF | `fur-sewing-machines` | Live |
 
+### CL-0026 additions (2026-08-20 — the JOOKE decision paper executed)
+| Product Type | Code | Live shelf | Status |
+|---|---|---|---|
+| Glue Dispensing | XAGD | `glue-dispensing-machines` | Live |
+| Bra Hardware (Fastening family) | XFAB | `bra-hardware-machines` | Live |
+| Garment Prep Unit | XAGP | `garment-prep-units` | Live |
+| Velcro cut-&-sew · Label pad printing | — | — | **PARKED by decision** (wait for a second source) |
+
 ## Counts
 - **Total Product Types:** 101  *(was 87; +14 from CL-0012: XFSS, XPCI, XMKP/D/S, XWIC/R/B/A, XMDS/D/C/H/N)*
 - **Confirmed:** 38

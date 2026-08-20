@@ -403,3 +403,14 @@ This follows the precedent set twice already: **CL-0014** rejected `XPRC` in fav
 - **Naming correction in passing:** `XAPK` (pintuck units, CL-0024) had Arabic name "وحدات خياطة البنسات" — but *dart* is the garment term for بنس, and XADT now exists. XAPK is renamed "وحدات خياطة الكسرات الآلية" so the two Arabic names cannot be confused; dart takes "وحدات خياطة البنس الآلية".
 - **Still homeless (the ACTUAL decision paper):** G2 glue dispensing (9), G3 intimates hardware (6), G6 zipper/cord prep (3), G8 creasing (1), G7 velcro cut+sew (2), G11 pad printing (1), G10's seamless oven (1) — see `jooke-taxonomy-decision-paper.md`.
 - **Status:** **Applied — live.**
+
+### CL-0026 · 2026-08-20 · The JOOKE decision paper executed — and the Knowledge page caught up
+- **Approved by:** Kamal ("I have no idea, do the right way, and make sure everything is in coding system in knowledge" — 2026-08-20). Per the CL-0023c precedent, the delegation was taken as: apply the paper's own recommendations.
+- **Decisions taken (from `jooke-taxonomy-decision-paper.md`):**
+  - **D1-A** → `XAGD` **Glue Dispensing Machine** → `glue-dispensing-machines` under Automatic Sewing Systems (9 dispensers + the curing oven as a kind). Garment-automation cells in every mechanical respect; no new top-level category for 10 machines from one source.
+  - **D2-A** → `XFAB` **Bra Hardware Machine** → `bra-hardware-machines` under Fastening & Press, beside `XFAS`. Same process class (hardware onto garment), different workpiece.
+  - **D3-A** → `XAGP` **Garment Prep Unit** → `garment-prep-units` under Automatic Sewing Systems (zipper pre-expansion, cord inserting, creasing — kinds, not shelves).
+  - **D4 → PARKED, no code:** velcro cut-&-sew and label pad printing wait for a second source; a prefix earned by one machine from one supplier is how codes get burned. If pad printing must be filed sooner, it enters as a kind under `XPSP` with a process facet.
+- **The Knowledge half of the instruction:** the standing rule ("every new code goes into the coding system in the Knowledge app") had been broken by CL-0024 and CL-0025 themselves — all 10 of their codes were missing from `product-coding/data.ts`, invisible to the budgets §K gate because none carries a spec template. **All 13 codes** (CL-0024's six, CL-0025's four, CL-0026's three) are now taught: data.ts rows in their category blocks + full en/zh/ar labels in the page's LBL i18n table.
+- **JOOKE status after this entry:** 0 of 77 machines without a home. 15 housed by CL-0024/0025, 20 by this entry, 3 parked by decision, the rest always had homes.
+- **Status:** **Applied — live.**

@@ -1,6 +1,8 @@
 # Decision paper — homes for the last 23 uncoded JOOKE machines
 
-**Status: AWAITING OWNER DECISION. Nothing below is applied.**
+**Status: ✅ DECIDED & APPLIED (CL-0026, 2026-08-20).** Owner delegated ("do
+the right way"); the recommendations were taken exactly: D1-A, D2-A, D3-A,
+D4 parked. Kept as the record of the options that were on the table.
 Codes are permanent and never recycled, so each option is written to be safe to
 say yes to in isolation. Confidential — supplier identity stays inside the Hub.
 

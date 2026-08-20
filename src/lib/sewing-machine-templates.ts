@@ -1223,6 +1223,10 @@ const SUBCATEGORY_TO_TEMPLATE: Record<string, string> = {
   "elastic-attaching-machines": "flatlock-interlock",
   "belt-loop-attaching-units": "bartacking",
   "dart-sewing-units": "single-needle-lockstitch",
+  /* CL-0026 — the JOOKE decision paper executed (D1-A, D2-A, D3-A). */
+  "glue-dispensing-machines": "single-needle-lockstitch",
+  "bra-hardware-machines": "button-attach",
+  "garment-prep-units": "single-needle-lockstitch",
 
   // Leather & footwear
   "shoe-sewing-machines": "single-needle-lockstitch",
