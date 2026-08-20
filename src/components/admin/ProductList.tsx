@@ -2746,7 +2746,7 @@ export default function ProductList() {
                     scroll. On phones the same grid runs 2-up (~7 rows), so
                     there the bar goes STATIC (max-sm) — a ~320px block may
                     scroll away with the page, but it must not DOCK over it. */}
-                <div className="grid grid-cols-[repeat(auto-fill,minmax(148px,1fr))] sm:grid-cols-[repeat(auto-fill,minmax(178px,1fr))] gap-2 pb-0.5">
+                <div className="hidden sm:grid grid-cols-[repeat(auto-fill,minmax(178px,1fr))] gap-2 pb-0.5">
                   {categoryTree.map((cat, catIdx) => (
                     <a
                       key={cat.slug}
@@ -2799,7 +2799,7 @@ export default function ProductList() {
                         };
                         requestAnimationFrame(settle);
                       }}
-                      className={`group relative flex flex-row items-center justify-start gap-1.5 h-[38px] min-w-0 px-3 rounded-xl kx-glass bg-[var(--bg-card)] border border-white/[0.06] kx-hover-card kx-hover-tile kx-tile-neon select-none transition-transform duration-75 active:scale-[0.97] motion-reduce:transition-none motion-reduce:active:scale-100 ${!catsOpen && catIdx >= 3 ? "max-sm:hidden" : ""}`}
+                      className={`group relative flex flex-row items-center justify-start gap-1.5 h-[38px] min-w-0 px-3 rounded-xl kx-glass bg-[var(--bg-card)] border border-white/[0.06] kx-hover-card kx-hover-tile kx-tile-neon select-none transition-transform duration-75 active:scale-[0.97] motion-reduce:transition-none motion-reduce:active:scale-100`}
                     >
                       {classIcons.category?.[cat.slug] ? (
                         <ClassMonoIcon src={classIcons.category[cat.slug]} className="kx-neon-icon h-4 w-4 shrink-0 text-[var(--text-primary)] opacity-90" />
@@ -2812,21 +2812,67 @@ export default function ProductList() {
                       <span className="text-[10px] tabular-nums text-[var(--text-ghost)] shrink-0">{cat.total}</span>
                     </a>
                   ))}
-                  {/* The 4th cell of the collapsed phone grid is the
-                      expander itself — the grid stays exactly 2 rows shut. */}
+                </div>
+                {/* ── PHONES: ONE 40px row + the MN-5 dropdown ──
+                    Third phone layout for this nav, and the owner rejected
+                    the previous two on sight (the full grid ate half the
+                    viewport; the two-row collapse was "still don't like").
+                    Sample 1 of the mobile set: the row names the control,
+                    the tap opens the one canonical dropdown (kx-glass-pop
+                    material + kx-pop-panel shell, per MN-5) listing every
+                    category with its count; picking one jumps and closes.
+                    Desktop keeps the sample-2 grid untouched. */}
+                <div className="sm:hidden relative">
                   <button
                     type="button"
+                    aria-expanded={catsOpen}
                     onClick={() => setCatsOpen((o) => !o)}
-                    className="sm:hidden group relative flex flex-row items-center justify-center gap-1.5 h-[38px] min-w-0 px-3 rounded-xl kx-glass bg-[var(--bg-card)] border border-white/[0.06] select-none transition-transform duration-75 active:scale-[0.97] motion-reduce:transition-none motion-reduce:active:scale-100"
+                    className="w-full flex items-center gap-2 h-10 px-3 rounded-xl kx-glass bg-[var(--bg-card)] border border-white/[0.06] select-none active:scale-[0.99] transition-transform"
                   >
-                    <span className="text-[11px] font-medium leading-none text-[var(--text-muted)]">
-                      {catsOpen ? t("list.lessCategories") : t("list.allCategories")}
+                    <LayoutGridIcon className="h-4 w-4 shrink-0 text-[var(--text-primary)] opacity-90" />
+                    <span className="flex-1 text-start text-[12px] font-medium text-[var(--text-primary)]">
+                      {t("list.allCategories")}
                     </span>
-                    {!catsOpen && (
-                      <span className="text-[10px] tabular-nums text-[var(--text-ghost)]">{categoryTree.length}</span>
-                    )}
-                    <span aria-hidden className={`text-[10px] text-[var(--text-ghost)] transition-transform ${catsOpen ? "rotate-180" : ""}`}>⌄</span>
+                    <span className="text-[11px] tabular-nums text-[var(--text-ghost)]">{categoryTree.length}</span>
+                    <span aria-hidden className={`text-[11px] text-[var(--text-ghost)] transition-transform ${catsOpen ? "rotate-180" : ""}`}>⌄</span>
                   </button>
+                  {catsOpen && (
+                    <>
+                      {/* Invisible full-screen closer under the panel. */}
+                      <button
+                        type="button"
+                        aria-label="Close"
+                        className="fixed inset-0 z-40 cursor-default"
+                        onClick={() => setCatsOpen(false)}
+                      />
+                      <div className="kx-glass-pop kx-pop-panel absolute left-0 right-0 top-[calc(100%+6px)] z-50 max-h-[60vh] overflow-y-auto p-1.5 rounded-2xl">
+                        {categoryTree.map((cat) => (
+                          <a
+                            key={cat.slug}
+                            href={`#cat-${cat.slug}`}
+                            onClick={(e) => {
+                              e.preventDefault();
+                              setCatsOpen(false);
+                              const el = document.getElementById(`cat-${cat.slug}`);
+                              const sc = document.getElementById("main-scroll-container");
+                              if (!el || !sc) return;
+                              const top = el.getBoundingClientRect().top - sc.getBoundingClientRect().top + sc.scrollTop - 60;
+                              sc.scrollTo({ top, behavior: "smooth" });
+                            }}
+                            className="flex items-center gap-2 h-10 px-2.5 rounded-lg text-[12px] text-[var(--text-secondary)]"
+                          >
+                            {classIcons.category?.[cat.slug] ? (
+                              <ClassMonoIcon src={classIcons.category[cat.slug]} className="h-4 w-4 shrink-0 text-[var(--text-primary)] opacity-90" />
+                            ) : (
+                              <LayoutGridIcon className="h-4 w-4 shrink-0 text-[var(--text-primary)] opacity-90" />
+                            )}
+                            <span className="flex-1 min-w-0 truncate">{cat.name}</span>
+                            <span className="text-[10px] tabular-nums text-[var(--text-ghost)]">{cat.total}</span>
+                          </a>
+                        ))}
+                      </div>
+                    </>
+                  )}
                 </div>
               </nav>
             )}
