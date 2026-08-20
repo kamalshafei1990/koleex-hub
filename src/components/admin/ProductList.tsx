@@ -396,8 +396,18 @@ const ProductCard = memo(function ProductCard({
               light image (owner: "I can't see clearly if under white
               background"). A fixed dark scrim + a light rim reads on any
               photo in any theme; Core keeps the token, where it is solid. */}
+          {/* data-kx-keep-hover, both of them: the global Aurora hover
+              REPLACES a control's own hover fill with its 3% white + blue
+              rim — which over a white product photo turned this scrim
+              nearly transparent and the white glyph invisible exactly on
+              hover (owner: "the hover become white and the background is
+              white so I can see nothing"). These two manage their own
+              contrast against an unknown photo; the skin must not touch
+              them. This is the hatch that rule documents — the FIRST
+              legitimate use, not a :not() escalation. */}
           <Link
             href={`${baseRoute}/${p.id}/edit`}
+            data-kx-keep-hover=""
             onClick={(e) => e.stopPropagation()}
             className={`h-8 w-8 rounded-lg border backdrop-blur-sm flex items-center justify-center transition-colors ${
               aurora
@@ -409,6 +419,7 @@ const ProductCard = memo(function ProductCard({
             <PencilIcon className="h-3.5 w-3.5" />
           </Link>
           <button
+            data-kx-keep-hover=""
             onClick={(e) => onAskDelete(e, p.id, p.product_name)}
             className={`h-8 w-8 rounded-lg border backdrop-blur-sm flex items-center justify-center transition-colors ${
               aurora
