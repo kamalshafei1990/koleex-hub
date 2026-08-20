@@ -2856,6 +2856,19 @@ export default function ProductList() {
                           panel open every touch-drag went dead. Outside-tap
                           closing is a document listener instead (below), which
                           eats nothing. */}
+                      {/* DIM LAYER, and the reason is the canon itself: the
+                          MN-5 glass is signed off against a NEAR-BLACK
+                          backdrop ("a lens over a near-black backdrop") —
+                          its brightness(1.5) over the white product photos
+                          behind this menu bloomed the middle rows into
+                          white-on-white (owner: "the colors and glass
+                          effects is wrong"). The popup-backdrop rule fixes
+                          the BACKDROP instead of re-tuning the signed-off
+                          material: a plain dim, no blur (a full-screen
+                          backdrop-filter over a live scroller is the iOS
+                          freezer we just removed) and pointer-events-none
+                          so it eats no touches. */}
+                      <div aria-hidden className="fixed inset-0 z-40 pointer-events-none bg-black/50" />
                       <div className="kx-glass-pop kx-pop-panel absolute left-0 right-0 top-[calc(100%+6px)] z-50 max-h-[60vh] overflow-y-auto p-1.5 rounded-2xl" data-kx-cats-menu="">
                         {categoryTree.map((cat) => (
                           <a
