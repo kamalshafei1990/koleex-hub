@@ -1863,6 +1863,30 @@ input[type="number"]:not(.kx-spinner) {
   background-color: rgba(62, 103, 150, 0.16);
 }
 
+/* ── PHONES: PRODUCT CARDS DROP THEIR BLUR ────────────────────────────────
+   Owner, scrolling the product grid fast on his iPhone: "the products
+   cards start to disappear or become empty." Every ProductCard carries
+   kx-glass — a backdrop-filter per card — and this page renders HUNDREDS
+   of them. On fast touch scroll iOS cannot re-composite that many live
+   blur layers and starts dropping them: whole cards flash blank until
+   the scroll settles. This is the priced-per-element blur cost the perf
+   rules warn about, at grid scale.
+
+   Below sm the cards keep their token surface and lose only the filter,
+   with a near-solid fill so they stay legible over the ground — the same
+   trade the low-power tier makes everywhere. Desktop keeps the glass:
+   mouse wheels don't hit the compositor the way touch flings do. */
+@media (max-width: 639px) {
+  [data-kx-skin="aurora"] .kx-pd [data-kx-component="ProductCard"].kx-glass {
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+    background: rgba(14, 17, 23, 0.92);
+  }
+  [data-kx-skin="aurora"][data-theme="light"] .kx-pd [data-kx-component="ProductCard"].kx-glass {
+    background: rgba(250, 251, 253, 0.95);
+  }
+}
+
 /* ── kx-pop-dense — the MN-5 look, held over BRIGHT content ──────────────
    The signed-off pop material is brightness(1.5) glass tuned against a
    near-black backdrop; over white product photos it white-out the menu
