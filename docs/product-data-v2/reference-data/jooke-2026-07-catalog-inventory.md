@@ -143,7 +143,7 @@ discussion because it cannot be undone.
 | Glue dispensing | 9 | 7–10 | Buildable once G2 is coded. |
 | Bra strap buckle / hook & eye | 6 | 8–12 | Buildable once G3 is coded. |
 | Ultrasonic | 7 | 5–15 | Buildable once G1 is coded. |
-| Pocket welt / placket / setter | 8 | 7–13 | Buildable — codes already exist. |
+| Pocket welt / placket / setter | 8 | 7–13 | ✅ **BUILT 2026-08-20** — three templates (`pocket-welting-machine`, `pocket-setter-machine`, `placket-sewing-unit`), one per shelf, shared skeleton. Prod = 8 templates. |
 | Hemming, dart, zipper, cord, elastic | 12 | 3–5 | **Too thin.** A template would be mostly empty; wait for a second source. |
 
 ---
