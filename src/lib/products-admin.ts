@@ -579,6 +579,29 @@ export async function saveProductDocuments(productId: string, documents: Product
   return ok;
 }
 
+// ── Feature Highlights → /api/product-feature-highlights ──
+// The supplier-catalog card: small photo + trilingual title/explanation of
+// one feature/function. Not media, not specs — its own rows.
+export interface ProductFeatureHighlightRow {
+  id?: string; product_id?: string;
+  model_id?: string | null;
+  title: string; title_zh?: string | null; title_ar?: string | null;
+  description?: string | null; description_zh?: string | null; description_ar?: string | null;
+  image_url?: string | null;
+  sort?: number;
+}
+export async function fetchProductFeatureHighlights(productId: string): Promise<ProductFeatureHighlightRow[]> {
+  if (!productId) return [];
+  const json = await jget<{ highlights?: ProductFeatureHighlightRow[] }>(
+    `/api/product-feature-highlights?product_id=${encodeURIComponent(productId)}`, {},
+  );
+  return json.highlights ?? [];
+}
+export async function saveProductFeatureHighlights(productId: string, highlights: ProductFeatureHighlightRow[]): Promise<boolean> {
+  const { ok } = await jsend(`/api/product-feature-highlights`, "PUT", { product_id: productId, highlights });
+  return ok;
+}
+
 // ── Search → /api/products/search ──
 export async function searchProducts(query: string, excludeId?: string): Promise<Pick<ProductRow, "id" | "product_name" | "slug">[]> {
   const params = new URLSearchParams({ q: query });

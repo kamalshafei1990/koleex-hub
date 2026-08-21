@@ -131,6 +131,7 @@ import ModelsSection from "./form-sections/ModelsSection";
 import FamilySpecGrid from "./form-sections/FamilySpecGrid";
 import { FamilyStrip, FamilySharedDivider, MemberPricingPanel, MemberLogisticsPanel } from "./form-sections/FamilyMemberPanels";
 import MediaSection from "./form-sections/MediaSection";
+import FeatureHighlightsSection from "./form-sections/FeatureHighlightsSection";
 import PricingIntelligenceCard from "./form-sections/PricingIntelligenceCard";
 import AccessoryOptionsSection, { type AccessoryOptionRow, axesForSubcategory } from "./form-sections/AccessoryOptionsSection";
 import BaseFobCard from "./form-sections/BaseFobCard";
@@ -5719,6 +5720,17 @@ export default function ProductForm({ productId }: Props) {
                   const mainImages = media.filter(m => m.type === "main_image");
                   setMedia([...mainImages, ...filtered]);
                 }}
+              />
+            </Section>
+
+            {/* Feature Highlights — the supplier-catalog card (small photo +
+                name + short explanation of one feature/function). Its own
+                table + endpoint; the section loads and saves itself, so the
+                form's main save machine is untouched. */}
+            <Section id="feature-highlights" icon={<ImageRawIcon className="h-4 w-4" />} title={t("features.title", "Feature Highlights")} badge={t("features.badge", "Photo + explanation cards")} defaultOpen={false}>
+              <FeatureHighlightsSection
+                productId={effectiveId ?? ""}
+                models={models.filter((m) => m.id).map((m) => ({ id: m.id as string, code: m.primary_model || m.model_name || "model" }))}
               />
             </Section>
 

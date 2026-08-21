@@ -49,6 +49,7 @@ import AngleRightIcon from "@/components/icons/ui/AngleRightIcon";
 import TabStrip from "@/components/ui/TabStrip";
 import dynamic from "next/dynamic";
 import { useSkin } from "@/lib/appearance";
+import FeatureHighlightsDisplay from "./FeatureHighlightsDisplay";
 
 const WavyBackground = dynamic(() => import("@/components/ui/WavyBackground"), { ssr: false });
 
@@ -1221,7 +1222,11 @@ export default function ProductProfile() {
       </Group>
       )}
 
-      {STEPS[step].id === "media" && (
+      {STEPS[step].id === "media" && (<>
+      {/* Feature Highlights — catalog-style photo+explanation cards; the
+          component fetches itself and renders nothing while empty. */}
+      <FeatureHighlightsDisplay productId={String(data.product.id ?? "")} />
+
       <Group icon={<BoundIcon semanticKey="field.photos" className="h-4 w-4" fallback={<ImageRawIcon className="h-4 w-4" />} />} title={t("pp.sec.media", "Media & Documents")} count={`${data.media.length} media · ${data.documents.length} docs`} onEdit={() => goStep("media")}>
         {/* Photo / file slots — every slot, filled or not. */}
         <div className="space-y-4">
@@ -1287,7 +1292,7 @@ export default function ProductProfile() {
           </div>
         )}
       </Group>
-      )}
+      </>)}
 
       {STEPS[step].id === "knowledge" && (
       <Group icon={<BoundIcon semanticKey="field.knowledge" className="h-4 w-4" fallback={<BookOpenIcon className="h-4 w-4" />} />} title={t("pp.sec.knowledge", "Knowledge & Relationships")} count={`${data.related.length} linked`} onEdit={() => goStep("knowledge")}>

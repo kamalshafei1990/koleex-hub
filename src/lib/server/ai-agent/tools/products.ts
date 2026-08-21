@@ -361,12 +361,13 @@ const getProductFullDetails: ToolDef<
 
     const canSeeCosts = await hasProductCostAccess(ctx.auth);
 
-    const [prodRes, modelsRes, mediaRes, docsRes, certsRes, linksRes] = await Promise.all([
+    const [prodRes, modelsRes, mediaRes, docsRes, certsRes, featRes, linksRes] = await Promise.all([
       supabaseServer.from("products").select("*").eq("id", productId).maybeSingle(),
       supabaseServer.from("product_models").select("*").eq("product_id", productId).order("order", { ascending: true }),
       supabaseServer.from("product_media").select("type, model_id, url").eq("product_id", productId),
       supabaseServer.from("product_documents").select("doc_type, title, language, version").eq("product_id", productId),
       supabaseServer.from("product_certifications").select("cert_type, certified_standard, cert_number, issuer, expiry_date, status").eq("product_id", productId),
+      supabaseServer.from("product_feature_highlights").select("title, title_zh, title_ar, description, description_zh, description_ar, model_id").eq("product_id", productId).order("sort", { ascending: true }),
       canSeeCosts
         ? supabaseServer
             .from("product_suppliers")
@@ -434,6 +435,10 @@ const getProductFullDetails: ToolDef<
       media_summary: mediaSummary,
       documents: docsRes.data ?? [],
       certifications: certsRes.data ?? [],
+      /* catalog-style feature cards (photo + explanation) — neutral catalog
+         data, safe for every viewer; errors tolerated (table may not exist
+         until its migration is applied) */
+      feature_highlights: featRes.error ? [] : (featRes.data ?? []),
       ...(canSeeCosts
         ? { suppliers }
         : {
