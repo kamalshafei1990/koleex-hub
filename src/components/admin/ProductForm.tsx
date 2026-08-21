@@ -76,7 +76,6 @@ import {
   fetchProductCertifications, saveProductCertifications,
   fetchProductDocuments, saveProductDocuments,
   fetchSupplierNames, fetchUniqueBrands,
-  fetchUniqueFamilies,
   fetchBrandLogos,
   fetchDivisionLogos, fetchCategoryLogos, fetchSubcategoryLogos, fetchClassificationIcons,
   fetchSewingSpecsByProductId, upsertSewingSpecs,
@@ -616,7 +615,6 @@ export default function ProductForm({ productId }: Props) {
   const [subcategories, setSubcategories] = useState<SubcategoryRow[]>([]);
   const [suppliers, setSuppliers] = useState<{ id: string; name: string; name_cn?: string | null; logo: string | null; supply_type?: string | null; payment_terms?: string | null; currency?: string | null; moq?: string | null; lead_time?: string | null; email?: string | null; phone?: string | null; website?: string | null; wechat?: string | null; location?: string | null; primary_contact?: { name: string | null; role: string | null; email: string | null; mobile: string | null } | null; rating?: number | null; sample_status?: string | null; employees?: string | null; year_established?: string | null; categories?: string[] | null; certifications?: string[] | null }[]>([]);
   const [brands, setBrands] = useState<string[]>([]);
-  const [families, setFamilies] = useState<string[]>([]);
   const [brandLogos, setBrandLogos] = useState<Record<string, string>>({});
   const [divisionLogos, setDivisionLogos] = useState<Record<string, string>>({});
   const [categoryLogos, setCategoryLogos] = useState<Record<string, string>>({});
@@ -983,11 +981,10 @@ export default function ProductForm({ productId }: Props) {
          so arriving here from the grid now costs zero taxonomy requests
          instead of three. Measured on /product-data/new: 15 requests on open,
          four of them taxonomy. */
-      const [taxo, supplierList, brandList, familyList, logoMap, attrCfg, divLogos, catLogos, subLogos, classIconMap] = await Promise.all([
+      const [taxo, supplierList, brandList, logoMap, attrCfg, divLogos, catLogos, subLogos, classIconMap] = await Promise.all([
         guard(fetchTaxonomyAll(), { divisions: [], categories: [], subcategories: [] } as Awaited<ReturnType<typeof fetchTaxonomyAll>>),
         guard(fetchSupplierNames(), [] as Awaited<ReturnType<typeof fetchSupplierNames>>),
         guard(fetchUniqueBrands(), [] as Awaited<ReturnType<typeof fetchUniqueBrands>>),
-        guard(fetchUniqueFamilies(), [] as Awaited<ReturnType<typeof fetchUniqueFamilies>>),
         guard(fetchBrandLogos(), {} as Awaited<ReturnType<typeof fetchBrandLogos>>),
         guard(fetchAttributeConfig(), { voltage: [], plug_types: [], colors: [], watt: [], levels: [], tags: [], tag_colors: {} } as Awaited<ReturnType<typeof fetchAttributeConfig>>),
         guard(fetchDivisionLogos(), {} as Awaited<ReturnType<typeof fetchDivisionLogos>>),
@@ -1009,7 +1006,6 @@ export default function ProductForm({ productId }: Props) {
           (b, i) => brandList.findIndex((x) => x.toLowerCase() === b.toLowerCase()) === i,
         ),
       );
-      setFamilies(familyList.filter((f, i) => familyList.findIndex((x) => x.toLowerCase() === f.toLowerCase()) === i));
       setAllTags(attrCfg.tags);
       setBrandLogos(logoMap);
       setDivisionLogos(divLogos);
@@ -4340,25 +4336,11 @@ export default function ProductForm({ productId }: Props) {
                         createLabel={t("hero.createBrand", "Create Brand")}
                       />
                     </div>
-                    <div>
-                      <label className={lbl}>
-                        <span className="inline-flex items-center gap-1.5"><PackageIcon className="h-3 w-3" /> {t("hero.familySeries", "Family / Series")}</span>
-                      </label>
-                      <input
-                        type="text"
-                        value={product.family}
-                        onChange={(e) => updateProduct_({ family: e.target.value })}
-                        placeholder={t("hero.familyPlaceholder", "e.g. Pro Line")}
-                        className={inp}
-                        list="family-suggestions"
-                      />
-                      {/* Existing families as suggestions — free text still
-                          allowed, but reusing a name beats inventing near-
-                          duplicates (Pro Line / ProLine / pro-line). */}
-                      <datalist id="family-suggestions">
-                        {families.map((f) => <option key={f} value={f} />)}
-                      </datalist>
-                    </div>
+                    {/* The free-text "Family / Series" input used to sit here —
+                        retired 2026-08-21: it wrote the dead products.family
+                        text column (null on every product) while the REAL
+                        family concept is the product + its models, already on
+                        this form's FAMILY strip. */}
                     {/* Country of Origin moved to the Logistics tab; Warranty
                         moved to the dedicated Compliance & Warranty tab — both
                         are post-identity data, not hero identity. */}

@@ -673,12 +673,6 @@ export async function fetchUniqueBrands(): Promise<string[]> {
   } catch { return []; }
 }
 
-export async function fetchUniqueFamilies(): Promise<string[]> {
-  try {
-    const json = await cachedGet<{ families?: string[] }>("/api/products/facets");
-    return json.families ?? [];
-  } catch { return []; }
-}
 
 // ── Taxonomy logos (storage proxy — no secrets, unchanged) ──
 async function fetchTaxonomyLogos(folder: string): Promise<Record<string, string>> {

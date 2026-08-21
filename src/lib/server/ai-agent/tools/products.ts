@@ -100,30 +100,31 @@ const searchProducts: ToolDef<
   },
 };
 
+/* The old optional `family` filter matched the retired products.family
+   text column (null catalog-wide), so any family-filtered count came back
+   0 and lied. Family questions belong to getCatalogStats, which derives
+   families from product_models. */
 const countProducts: ToolDef<
-  { brand?: string; family?: string },
-  { total: number; brand?: string; family?: string }
+  { brand?: string },
+  { total: number; brand?: string }
 > = {
   name: "countProducts",
-  description: "Count visible products in the catalog. Optional filters: brand, family.",
+  description: "Count visible products in the catalog. Optional filter: brand. For family/model counts use getCatalogStats.",
   parameters: {
     type: "object",
     properties: {
       brand: { type: "string", description: "Optional brand filter." },
-      family: { type: "string", description: "Optional family filter." },
     },
   },
   requiredModule: PRODUCT_MODULE,
   requiredAction: "view",
-  handler: async (_ctx, args): Promise<ToolResult<{ total: number; brand?: string; family?: string }>> => {
+  handler: async (_ctx, args): Promise<ToolResult<{ total: number; brand?: string }>> => {
     let query = supabaseServer
       .from("products")
       .select("id", { count: "exact", head: true })
       .eq("visible", true);
     const brand = (args.brand as string | undefined)?.trim();
-    const family = (args.family as string | undefined)?.trim();
     if (brand) query = query.ilike("brand", sanitizePostgrestLike(brand));
-    if (family) query = query.ilike("family", sanitizePostgrestLike(family));
     const { count, error } = await query;
     if (error) {
       console.error("[tool.countProducts]", error);
@@ -137,8 +138,8 @@ const countProducts: ToolDef<
     return {
       ok: true,
       permissionStatus: "allowed",
-      data: { total: count ?? 0, brand, family },
-      message: `${count ?? 0} visible product(s)${brand ? ` (brand: ${brand})` : ""}${family ? ` (family: ${family})` : ""}.`,
+      data: { total: count ?? 0, brand },
+      message: `${count ?? 0} visible product(s)${brand ? ` (brand: ${brand})` : ""}.`,
       sources: ["products(count)"],
     };
   },
