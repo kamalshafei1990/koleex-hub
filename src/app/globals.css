@@ -709,13 +709,24 @@ html[data-kx-door="1"] .kx-shell-top { overflow-x: clip; }
      fade — a double-exposure ghost on every click. */
   html[data-kx-nav] #main-scroll-container { view-transition-name: kx-main; }
 
-  /* Silence the ROOT cross-fade for the duration of a directional push.
+  /* HOLD THE SHELL PERFECTLY STILL FOR THE WHOLE TRANSITION.
      The root snapshot is everything EXCEPT the named content group — the
-     header, sidebar and background — so leaving its 6px rise + fade
-     running made the whole shell blink and hop on every drill-down while
-     the content slid. The shell must hold perfectly still. */
+     header, the sidebar, the ground. Silencing its cross-fade was not
+     enough: the UA still runs a GROUP animation that interpolates the
+     root snapshot's geometry from the old page's to the new one's, so any
+     route whose page height differs made the header and sidebar visibly
+     stretch and snap back inside 320ms. Owner: "when I switch from tab to
+     other it makes like a flash and the header and the sidebar disappear
+     for a very short time".
+     ⚠️ ZERO DURATION, NEVER `animation: none`. Removing the animations
+     outright made the browser treat the transition as having no work and
+     skip it entirely — measured: the direction attribute stamped, then no
+     ::view-transition animation ever ran and the content stopped sliding
+     either. Keeping the animations and collapsing their duration holds
+     the shell perfectly still while the transition itself stays alive. */
+  html[data-kx-nav]::view-transition-group(root),
   html[data-kx-nav]::view-transition-old(root),
-  html[data-kx-nav]::view-transition-new(root) { animation: none; }
+  html[data-kx-nav]::view-transition-new(root) { animation-duration: 0s !important; }
 
   html[data-kx-nav="fwd"]::view-transition-new(kx-main) {
     animation: kx-page-enter-fwd 360ms var(--kx-ease-expo, cubic-bezier(0.16, 1, 0.3, 1)) both;
@@ -760,6 +771,13 @@ html[data-kx-door="1"] .kx-shell-top { overflow-x: clip; }
   }
   html[dir="rtl"][data-kx-nav="tab-fwd"]::view-transition-new(kx-main) { animation-name: kx-tabpage-back; }
   html[dir="rtl"][data-kx-nav="tab-back"]::view-transition-new(kx-main) { animation-name: kx-tabpage-fwd; }
+}
+/* Same reasoning for the CONTENT group: two tabs rarely have the same
+   height, and letting the UA interpolate the group's geometry turns an
+   honest 24px slide into a stretch. The slide lives on the new snapshot;
+   the group itself must not move. */
+@media (prefers-reduced-motion: no-preference) {
+  html[data-kx-nav]::view-transition-group(kx-main) { animation-duration: 0s !important; }
 }
 @keyframes kx-tabpage-out  { to { opacity: 0; } }
 @keyframes kx-tabpage-fwd  { from { opacity: 0; transform: translateX(24px); } }
