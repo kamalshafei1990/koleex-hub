@@ -7,6 +7,7 @@
    --------------------------------------------------------------------------- */
 
 import { usePathname } from "next/navigation";
+import RouteTabPane from "@/components/ui/RouteTabPane";
 import AuroraShell from "@/components/ui/AuroraShell";
 import DatabaseHeader from "@/components/database/DatabaseHeader";
 import { useTranslation, type Translations } from "@/lib/i18n";
@@ -64,7 +65,7 @@ export default function DatabaseLayout({ children }: { children: React.ReactNode
     <AuroraShell className="pb-16 md:pb-6">
       <div className="mx-auto max-w-[1500px] space-y-5 px-4 py-6 sm:px-6">
         <DatabaseHeader title={t(meta.titleKey, meta.titleEn)} subtitle={t(meta.subKey, meta.subEn)} />
-        {children}
+        <RouteTabPane>{children}</RouteTabPane>
       </div>
     </AuroraShell>
   );

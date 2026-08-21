@@ -36,6 +36,7 @@
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { getActiveAppId } from "@/lib/navigation";
+import { clearRouteTabDir, setRouteTabDir } from "@/lib/route-tab-motion";
 
 type DocWithVT = Document & {
   startViewTransition?: (cb: () => void | Promise<void>) => {
@@ -252,13 +253,48 @@ export default function ViewTransitions() {
       if (navHost) {
         const items = [...navHost.querySelectorAll<HTMLAnchorElement>('a[href^="/"]')];
         const to = items.indexOf(a as HTMLAnchorElement);
-        let from = items.findIndex((l) => l.getAttribute("aria-selected") === "true");
-        if (from < 0) from = items.findIndex((l) => (l.getAttribute("href") || "").replace(/\/$/, "") === cur);
+        const hrefs = items.map((l) => (l.getAttribute("href") || "").split("?")[0].replace(/\/$/, ""));
+        /* WHERE WE ARE COMES FROM THE URL, NOT FROM aria-selected. The strips
+           disagree with the address bar often enough to matter: on some routes
+           no tab claims selection, on others the claim lags a navigation
+           behind, and a stale `from` flips the slide — Payments → Orders, a
+           clear step backwards, came in as forwards. The pathname is ground
+           truth at the instant of the click, so it leads; the attribute is
+           only the fallback. Deepest match wins, so a record page under a tab
+           (/purchase/orders/123) still counts as standing on that tab, and
+           the app root can never out-match it. */
+        let from = hrefs.findIndex((h) => h === cur);
+        if (from < 0) {
+          let best = -1;
+          hrefs.forEach((h, i) => {
+            if (h && cur.startsWith(h + "/") && (best < 0 || h.length > hrefs[best].length)) best = i;
+          });
+          from = best;
+        }
+        if (from < 0) from = items.findIndex((l) => l.getAttribute("aria-selected") === "true");
         if (to >= 0 && from >= 0 && to !== from) tabDir = to > from ? "tab-fwd" : "tab-back";
       }
 
-      const nav = tabDir ? tabDir
-        : isNavDestination ? ""
+      /* A TAB SWITCH DOES NOT GO THROUGH A VIEW TRANSITION.
+         The browser captures the "new" snapshot as soon as the navigation
+         callback returns — before the App Router has rendered the new page —
+         so what slid in was routinely the old screen or an empty one. It
+         measured perfectly (attribute stamped, 320ms animation running) and
+         read as nothing at all, twice over. Product Data has never had that
+         problem because its pane is keyed and animates on MOUNT.
+         So: hand the direction to RouteTabPane, navigate normally, and let
+         the pane that actually appears play the slide. */
+      if (tabDir) {
+        setRouteTabDir(url.pathname, tabDir === "tab-fwd" ? "kx-tab-fwd" : "kx-tab-back");
+        router.push(url.pathname + url.search + url.hash);
+        return;
+      }
+      /* Anything that is NOT a tab click disarms the direction, so a slide
+         armed for a route can never replay when that route is reached some
+         other way later. */
+      clearRouteTabDir();
+
+      const nav = isNavDestination ? ""
         : tgt.startsWith(cur + "/") ? "fwd"
         : cur.startsWith(tgt + "/") ? "back"
         : "";
@@ -287,8 +323,15 @@ export default function ViewTransitions() {
     /* Capture phase so we decide before React's own handler runs; the
        listener is passive-unfriendly by nature (it calls preventDefault),
        so it must not be registered as passive. */
+    /* A back/forward is not a tab click either — disarm, or returning to a
+       route whose slide was armed earlier would replay it. */
+    const onPop = () => clearRouteTabDir();
     document.addEventListener("click", onClick, true);
-    return () => document.removeEventListener("click", onClick, true);
+    window.addEventListener("popstate", onPop);
+    return () => {
+      document.removeEventListener("click", onClick, true);
+      window.removeEventListener("popstate", onPop);
+    };
   }, [router]);
 
   return null;
