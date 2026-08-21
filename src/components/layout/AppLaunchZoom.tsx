@@ -46,42 +46,17 @@ type Flight =
 const EXPAND_MS = 460;
 const FADE_MS = 240;
 const RETURN_IN_MS = 140;
-const RETURN_SHRINK_MS = 500;
+const RETURN_EXIT_MS = 380;
 const RETURN_SAFETY_MS = 4000;
 
 const reducedMotion = () =>
   typeof window !== "undefined" &&
   window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
-/* The tile to land on: prefer the Home-grid card over the sidebar row for
-   the same app — the grid tile is the one the user thinks of as "the app".
-
-   Home's INTERNAL scroller does not restore on a back-navigation (measured:
-   scrollTop 0 with the grid at y≈1672), so the tile is usually off-screen
-   when we arrive. The iOS answer: bring the page to the tile UNDER the
-   cover (the card is opaque and fullscreen, so the jump is invisible),
-   then shrink onto it — "back" literally returns you to the app's place. */
-function findTile(appId: string): DOMRect | null {
-  const els = [...document.querySelectorAll<HTMLElement>(`[data-app-tile="${appId}"]`)];
-  if (!els.length) return null;
-  const scored = els
-    .map((el) => ({ el, inChrome: !!el.closest("aside, nav"), r: el.getBoundingClientRect() }))
-    .filter(({ r }) => r.width > 0 && r.height > 0);
-  if (!scored.length) return null;
-  scored.sort((a, b) => Number(a.inChrome) - Number(b.inChrome) || b.r.width * b.r.height - a.r.width * a.r.height);
-  const el = scored[0].el;
-  let r = scored[0].r;
-  const off = r.bottom < 0 || r.top > window.innerHeight || r.right < 0 || r.left > window.innerWidth;
-  if (off) {
-    try {
-      el.scrollIntoView({ block: "center", behavior: "instant" as ScrollBehavior });
-      r = el.getBoundingClientRect();
-    } catch { /* keep the off-screen rect check below */ }
-    if (r.bottom < 0 || r.top > window.innerHeight) return null;
-  }
-  return r;
-}
-
+/* (The tile-landing helper that lived here served return cuts one and two —
+   both rejected. The exit no longer targets the tile, so the helper, the
+   commit-time polling and the scroll hijack all went with it: Home returns
+   at whatever scroll position the user left.) */
 export default function AppLaunchZoom() {
   const pathname = usePathname();
   const [flight, setFlight] = useState<Flight | null>(null);
@@ -281,107 +256,40 @@ export default function AppLaunchZoom() {
       return () => window.clearTimeout(t);
     }
     settlingRef.current = true;
-    /* Home commits before it finishes PAINTING — the dashboard section is a
-       dynamic chunk and the grid mounts a beat later, so a one-shot measure
-       right after commit misses a tile that is genuinely on screen (measured:
-       the quotations tile sits at y=598 once Home settles, but two rAFs
-       after commit findTile still came back empty). Poll each frame for up
-       to ~450ms; shrink onto the tile the moment it exists, fade if it
-       never does. */
-    const deadline = performance.now() + 900;
-    let raf = 0;
-    const fadeOut = () => {
+    /* THE EXIT, VERSION THREE — OUTWARD, BY ORDER. Cut one shrank into the
+       tile translucently ("not good"); cut two shrank into it solidly with
+       Home breathing in ("still not good … change it totally, I mean OUT
+       not IN"). So the tile is no longer the destination at all: the app
+       flies TOWARD you — the card scales past the viewport and dissolves,
+       the camera pushing THROUGH the leaving app — while Home rises into
+       place underneath (0.97→1 + dim→full; inward only, a >1 zoom would
+       overflow and dance). No tile hunt, no scroll hijack: Home returns
+       wherever the user left it. Uniform scale, so nothing distorts and no
+       counter-animation is needed. Origin slightly above center — objects
+       flying at you read as rising, not dropping. */
+    const wait = Math.max(0, expandDoneAtRef.current - performance.now());
+    const t = window.setTimeout(() => {
       if (!el) { clear(); return; }
-      const anim = el.animate([{ opacity: 1 }, { opacity: 0 }], { duration: FADE_MS, easing: "ease-in", fill: "forwards" });
-      anim.onfinish = clear;
-      window.setTimeout(clear, FADE_MS + 400);
-    };
-    const tryShrink = () => {
-      if (!el) { clear(); return; }
-      const tile = findTile(flight.appId);
-      if (!tile) {
-        if (performance.now() < deadline) { raf = window.requestAnimationFrame(tryShrink); return; }
-        fadeOut();
-        return;
-      }
-      const final = el.getBoundingClientRect();
-      if (final.width < 1) { fadeOut(); return; }
-      const sx = Math.max(tile.width / final.width, 0.01);
-      const sy = Math.max(tile.height / final.height, 0.01);
-      /* THE RETURN, RE-CUT (owner: "the motion when I back from app to home
-         is not good — create a good smooth ease creative motion"). Three
-         defects in the first cut, each fixed by one move below:
-
-         · The card faded to 0.15 WHILE flying, so mid-flight you watched
-           Home through a ghost rectangle — mushy. Now it stays OPAQUE for
-           the first ~7/10 of the flight and dissolves only as it lands on
-           the tile, so the flight reads as a solid object, not a curtain.
-         · scale(sx, sy) is anisotropic — the icon and radius squashed with
-           the card. The icon now counter-scales (s/sx, s/sy — net uniform
-           min-scale) so it stays perfectly square all the way down, and the
-           border-radius grows by 1/s so the VISUAL corner rounding holds
-           instead of sharpening to a point. The label can't counter-scale
-           legibly at these ratios, so it exits first (120ms).
-         · Home sat frozen underneath. It now breathes IN under the shrink —
-           scale 0.97→1 + dim→full, expo-out. INWARD on purpose: a 1.0x+
-           zoom-out would push content past the container edges and flash a
-           horizontal scrollbar, which is the owner's absolute no-dancing
-           rule; growing INTO place can never overflow.
-
-         iOS-sheet curve (0.32, 0.72, 0, 1): brisk exit from fullscreen,
-         long glide onto the tile. Transform/opacity (+radius on this one
-         compositor-promoted card) only — nothing here can shift layout. */
-      const s = Math.min(sx, sy);
+      el.style.transformOrigin = "50% 42%";
       const anim = el.animate(
         [
-          { transform: "translate(0px, 0px) scale(1, 1)", opacity: 1, borderRadius: "22px" },
-          { opacity: 1, offset: 0.68 },
-          { transform: `translate(${tile.left - final.left}px, ${tile.top - final.top}px) scale(${sx}, ${sy})`, opacity: 0, borderRadius: `${Math.round(18 / s)}px` },
+          { transform: "scale(1)", opacity: 1 },
+          { transform: "scale(1.05)", opacity: 0.92, offset: 0.4 },
+          { transform: "scale(1.16)", opacity: 0 },
         ],
-        { duration: RETURN_SHRINK_MS, easing: "cubic-bezier(0.32, 0.72, 0, 1)", fill: "forwards" },
-      );
-      el.querySelector<HTMLElement>("[data-kx-flight-icon]")?.animate(
-        [
-          { transform: "scale(1, 1)" },
-          { transform: `scale(${s / sx}, ${s / sy})` },
-        ],
-        { duration: RETURN_SHRINK_MS, easing: "cubic-bezier(0.32, 0.72, 0, 1)", fill: "forwards" },
-      );
-      el.querySelector<HTMLElement>("[data-kx-flight-label]")?.animate(
-        [{ opacity: 1 }, { opacity: 0 }],
-        { duration: 120, easing: "ease-out", fill: "forwards" },
+        { duration: RETURN_EXIT_MS, easing: "cubic-bezier(0.32, 0.72, 0, 1)", fill: "forwards" },
       );
       document.querySelector<HTMLElement>("[data-kx-home-stage]")?.animate(
         [
           { transform: "scale(0.97)", opacity: 0.55 },
           { transform: "scale(1)", opacity: 1 },
         ],
-        { duration: RETURN_SHRINK_MS + 80, easing: "cubic-bezier(0.16, 1, 0.3, 1)" },
+        { duration: RETURN_EXIT_MS + 140, easing: "cubic-bezier(0.16, 1, 0.3, 1)" },
       );
-      anim.onfinish = () => {
-        /* Something (Next's own popstate scroll handling) can re-zero the
-           internal scroller behind the card mid-flight — settle the page ON
-           the tile one last time so the reveal matches where we landed. */
-        try {
-          const tileEl = document.querySelector<HTMLElement>(`[data-app-tile="${flight.appId}"]:not(aside *):not(nav *)`);
-          tileEl?.scrollIntoView({ block: "center", behavior: "instant" as ScrollBehavior });
-          /* The tile RECEIVES its app: one soft pulse the instant the card
-             dissolves onto it. One-shot WAAPI, transform only, no residue. */
-          tileEl?.animate(
-            [
-              { transform: "scale(1)" },
-              { transform: "scale(1.06)", offset: 0.4 },
-              { transform: "scale(1)" },
-            ],
-            { duration: 220, easing: "ease-out" },
-          );
-        } catch { /* fine */ }
-        clear();
-      };
-      window.setTimeout(clear, RETURN_SHRINK_MS + 400); /* belt & braces */
-    };
-    raf = window.requestAnimationFrame(tryShrink);
-    return () => window.cancelAnimationFrame(raf);
+      anim.onfinish = clear;
+      window.setTimeout(clear, RETURN_EXIT_MS + 400); /* belt & braces */
+    }, wait);
+    return () => window.clearTimeout(t);
   }, [pathname, flight]);
 
   if (!flight) return null;
