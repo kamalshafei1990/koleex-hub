@@ -1,21 +1,16 @@
 "use client";
 
 /* ---------------------------------------------------------------------------
-   FeatureHighlightsSection — the supplier-catalog "feature card" editor
-   (owner ask 2026-08-21, pointing at the Sertol/Lingrai pages: small photo +
-   name + short explanation — "Sensor", "Adjustment motor", "Wire breakage
-   responder"). Not media, not specs: its own rows on
-   product_feature_highlights, optionally pinned to one model.
-
-   SELF-CONTAINED on purpose: it fetches and saves through its own endpoint
-   (replace-the-set, like certifications), so wiring it into the huge
-   ProductForm is one render line — no new tentacles into the form's main
-   save machine. Trilingual by the standing rule (EN is the source of truth;
-   zh/ar optional). Images go through the existing uploadProductFile helper
-   (the public media bucket).
+   FeatureHighlightsSection — the feature-card EDITOR, in the product-card
+   layout (owner: "same style as product card"): a responsive grid of
+   vertical cards — 4:3 photo pane on top (click to upload), title +
+   description under it, 中文/عربي in a folded "Translations" drawer with an
+   auto-translate button. Add as many cards as needed; each edits, reorders
+   and deletes. Self-contained: loads and saves through its own endpoint.
    --------------------------------------------------------------------------- */
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import ImageRawIcon from "@/components/icons/ui/ImageRawIcon";
 import {
   fetchProductFeatureHighlights,
   saveProductFeatureHighlights,
@@ -38,6 +33,7 @@ export default function FeatureHighlightsSection({
   const [saving, setSaving] = useState(false);
   const [savedAt, setSavedAt] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [translating, setTranslating] = useState<number | null>(null);
   const fileRefs = useRef<Record<number, HTMLInputElement | null>>({});
 
   useEffect(() => {
@@ -73,10 +69,8 @@ export default function FeatureHighlightsSection({
   }, []);
 
   /* Auto-translate: fill zh + ar from the English title/description via the
-     Hub's translate endpoint (the same one the hero name uses). The endpoint
-     answers 200 with fallback:true when no provider is configured — surfaced
-     honestly instead of writing English into the zh/ar fields. */
-  const [translating, setTranslating] = useState<number | null>(null);
+     Hub's translate endpoint (the hero-name contract). fallback:true is
+     surfaced honestly instead of writing English into the zh/ar fields. */
   const translateOne = async (text: string, target: "zh" | "ar"): Promise<string | null> => {
     try {
       const res = await fetch("/api/ai/translate", {
@@ -131,91 +125,122 @@ export default function FeatureHighlightsSection({
   }
   if (!loaded) return <p className="text-[12px] text-[var(--text-dim)]">Loading feature highlights…</p>;
 
+  const bare =
+    "w-full bg-transparent text-[var(--text-primary)] outline-none placeholder:text-[var(--text-dim)]";
   const input =
-    "w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-2.5 py-1.5 text-[12.5px] text-[var(--text-primary)] outline-none";
+    "w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-2.5 py-1.5 text-[12px] text-[var(--text-primary)] outline-none";
+  const chip =
+    "h-7 min-w-7 px-1.5 rounded-lg border text-[11px] inline-flex items-center justify-center";
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-4">
       <p className="text-[11.5px] text-[var(--text-muted)]">
-        Catalog-style feature cards: a small photo + a name + a short explanation
-        (like “Sensor”, “Adjustment motor” in supplier catalogs). They render on
-        the product page and feed Koleex AI.
+        Catalog-style feature cards, laid out exactly like product cards: photo
+        on top, name + short explanation under it. They render on the product
+        page and feed Koleex AI.
       </p>
 
-      {rows.map((r, i) => (
-        <div key={r.id ?? `new-${i}`} className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] p-3">
-          <div className="flex gap-3">
-            {/* photo */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        {rows.map((r, i) => (
+          <div key={r.id ?? `new-${i}`} className="group relative kx-glass bg-[var(--bg-secondary)] rounded-xl border border-[var(--border-subtle)] overflow-hidden">
+            {/* photo pane — the product card's exact ground; click = upload */}
             <button
               type="button"
               onClick={() => fileRefs.current[i]?.click()}
-              className="h-20 w-20 shrink-0 overflow-hidden rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[10px] text-[var(--text-dim)]"
+              className="relative block w-full aspect-[4/3] bg-gradient-to-b from-white to-[#f4f5f7] overflow-hidden border-b border-black/5"
               title="Upload feature photo"
             >
-              {r.image_url
+              {r.image_url ? (
                 // eslint-disable-next-line @next/next/no-img-element
-                ? <img src={r.image_url} alt={r.title || "feature"} className="h-full w-full object-cover" />
-                : "+ photo"}
+                <img src={r.image_url} alt={r.title || "feature"} className="w-full h-full object-cover" />
+              ) : (
+                <span className="w-full h-full flex flex-col items-center justify-center gap-1 text-gray-400">
+                  <ImageRawIcon className="h-9 w-9 text-gray-300" />
+                  <span className="text-[10.5px]">Click to upload photo</span>
+                </span>
+              )}
             </button>
             <input
               ref={(el) => { fileRefs.current[i] = el; }}
               type="file" accept="image/*" className="hidden" aria-hidden tabIndex={-1}
               onChange={(e) => void onPickImage(i, e.target.files?.[0] ?? null)}
             />
-            {/* trilingual title + description */}
-            <div className="min-w-0 flex-1 space-y-1.5">
-              <div className="grid grid-cols-1 gap-1.5 md:grid-cols-3">
-                <input className={input} placeholder="Feature title (EN)" value={r.title}
-                  onChange={(e) => patch(i, { title: e.target.value })} />
-                <input className={input} placeholder="标题 (中文)" value={r.title_zh ?? ""}
-                  onChange={(e) => patch(i, { title_zh: e.target.value })} />
-                <input className={input} dir="rtl" placeholder="العنوان (عربي)" value={r.title_ar ?? ""}
-                  onChange={(e) => patch(i, { title_ar: e.target.value })} />
-              </div>
-              <div className="grid grid-cols-1 gap-1.5 md:grid-cols-3">
-                <textarea className={input} rows={2} placeholder="Short explanation (EN)" value={r.description ?? ""}
-                  onChange={(e) => patch(i, { description: e.target.value })} />
-                <textarea className={input} rows={2} placeholder="说明 (中文)" value={r.description_zh ?? ""}
-                  onChange={(e) => patch(i, { description_zh: e.target.value })} />
-                <textarea className={input} dir="rtl" rows={2} placeholder="الشرح (عربي)" value={r.description_ar ?? ""}
-                  onChange={(e) => patch(i, { description_ar: e.target.value })} />
-              </div>
-              {models.length > 0 && (
-                <select
-                  className={input + " md:w-64"}
-                  value={r.model_id ?? ""}
-                  onChange={(e) => patch(i, { model_id: e.target.value || null })}
-                >
-                  <option value="">Whole product (all models)</option>
-                  {models.map((m) => (
-                    <option key={m.id} value={m.id}>Only {m.code}</option>
-                  ))}
-                </select>
-              )}
-            </div>
-            {/* translate + order + delete */}
-            <div className="flex shrink-0 flex-col items-center gap-1">
+
+            {/* card actions — overlay on the photo, product-card style */}
+            <div className="absolute top-2 right-2 z-10 flex gap-1 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
               <button type="button" onClick={() => void autoTranslate(i)} disabled={translating === i}
-                title="Auto-translate title & description to 中文 + العربية"
-                className="h-6 w-8 rounded border border-[var(--border-subtle)] text-[10px] text-[#9FC2E4] disabled:opacity-40 kx-ai-glow">
+                title="Auto-translate to 中文 + العربية"
+                className={`${chip} border-[#7FA9D6]/50 bg-black/60 text-[#BCD8F0]`}>
                 {translating === i ? "…" : "文ع"}
               </button>
               <button type="button" onClick={() => move(i, -1)} disabled={i === 0}
-                className="h-6 w-6 rounded border border-[var(--border-subtle)] text-[11px] text-[var(--text-muted)] disabled:opacity-30">↑</button>
+                className={`${chip} border-white/20 bg-black/60 text-white/80 disabled:opacity-30`}>←</button>
               <button type="button" onClick={() => move(i, 1)} disabled={i === rows.length - 1}
-                className="h-6 w-6 rounded border border-[var(--border-subtle)] text-[11px] text-[var(--text-muted)] disabled:opacity-30">↓</button>
+                className={`${chip} border-white/20 bg-black/60 text-white/80 disabled:opacity-30`}>→</button>
               <button type="button" onClick={() => remove(i)}
-                className="h-6 w-6 rounded border border-[var(--border-subtle)] text-[12px] text-rose-300">×</button>
+                className={`${chip} border-rose-400/40 bg-black/60 text-rose-300`}>×</button>
+            </div>
+
+            {/* body — title bold + description subtitle, like the product card */}
+            <div className="p-3 space-y-1">
+              <input
+                className={`${bare} text-[13px] font-semibold`}
+                placeholder="Feature title (EN)"
+                value={r.title}
+                onChange={(e) => patch(i, { title: e.target.value })}
+              />
+              <textarea
+                className={`${bare} text-[11.5px] leading-snug text-[var(--text-muted)] resize-none`}
+                rows={2}
+                placeholder="Short explanation (EN)"
+                value={r.description ?? ""}
+                onChange={(e) => patch(i, { description: e.target.value })}
+              />
+
+              {/* translations + model pin, folded so the card stays a card */}
+              <details className="pt-1">
+                <summary className="cursor-pointer list-none text-[10.5px] tracking-wide text-[var(--text-dim)]">
+                  中文 · العربية {r.title_zh || r.title_ar ? "✓" : ""} · options
+                </summary>
+                <div className="mt-2 space-y-1.5">
+                  <input className={input} placeholder="标题 (中文)" value={r.title_zh ?? ""}
+                    onChange={(e) => patch(i, { title_zh: e.target.value })} />
+                  <textarea className={input} rows={2} placeholder="说明 (中文)" value={r.description_zh ?? ""}
+                    onChange={(e) => patch(i, { description_zh: e.target.value })} />
+                  <input className={input} dir="rtl" placeholder="العنوان (عربي)" value={r.title_ar ?? ""}
+                    onChange={(e) => patch(i, { title_ar: e.target.value })} />
+                  <textarea className={input} dir="rtl" rows={2} placeholder="الشرح (عربي)" value={r.description_ar ?? ""}
+                    onChange={(e) => patch(i, { description_ar: e.target.value })} />
+                  {models.length > 0 && (
+                    <select
+                      className={input}
+                      value={r.model_id ?? ""}
+                      onChange={(e) => patch(i, { model_id: e.target.value || null })}
+                    >
+                      <option value="">Whole product (all models)</option>
+                      {models.map((m) => (
+                        <option key={m.id} value={m.id}>Only {m.code}</option>
+                      ))}
+                    </select>
+                  )}
+                </div>
+              </details>
             </div>
           </div>
-        </div>
-      ))}
+        ))}
+
+        {/* the "+ add" tile, a ghost product card */}
+        <button
+          type="button"
+          onClick={add}
+          className="flex aspect-[4/3] w-full flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-colors sm:aspect-auto sm:min-h-[220px]"
+        >
+          <span className="text-2xl leading-none">＋</span>
+          <span className="text-[11.5px]">Add feature card</span>
+        </button>
+      </div>
 
       <div className="flex items-center gap-2">
-        <button type="button" onClick={add}
-          className="rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-3 py-1.5 text-[12px] text-[var(--text-primary)]">
-          ＋ Add feature card
-        </button>
         <button type="button" onClick={() => void save()} disabled={saving}
           className="rounded-lg bg-[var(--bg-inverted)] px-3 py-1.5 text-[12px] font-medium text-[var(--text-inverted)] disabled:opacity-50">
           {saving ? "Saving…" : "Save highlights"}

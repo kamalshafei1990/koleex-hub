@@ -1,15 +1,15 @@
 "use client";
 
 /* ---------------------------------------------------------------------------
-   FeatureHighlightsDisplay — the catalog-style read view of a product's
-   feature cards (small photo + name + short explanation), the way supplier
-   catalogs present them. Self-fetching so any surface can drop it in with a
-   productId; renders nothing while empty (the profile stays clean until the
-   first card is authored). Locale-aware: zh/ar strings win under those UI
-   languages, EN is the source of truth.
+   FeatureHighlightsDisplay — feature cards in the EXACT product-card layout
+   (owner: "same style as product card"): the PD grid card's shell
+   (kx-glass + hover + rounded-xl), a 4:3 image pane on the same white
+   gradient ground, title bold + description as the subtitle, in the same
+   responsive grid. Self-fetching; renders nothing while empty.
    --------------------------------------------------------------------------- */
 
 import { useEffect, useState } from "react";
+import ImageRawIcon from "@/components/icons/ui/ImageRawIcon";
 import { fetchProductFeatureHighlights, type ProductFeatureHighlightRow } from "@/lib/products-admin";
 
 export default function FeatureHighlightsDisplay({ productId }: { productId: string }) {
@@ -29,21 +29,36 @@ export default function FeatureHighlightsDisplay({ productId }: { productId: str
     (lang === "zh" && zh) || (lang === "ar" && ar) || en || "";
 
   return (
-    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
       {rows.map((r) => (
-        <div key={r.id ?? r.title} className="flex gap-3 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] p-3">
-          {r.image_url && (
-            <div className="h-16 w-16 shrink-0 overflow-hidden rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)]">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={r.image_url} alt={pick(r.title, r.title_zh, r.title_ar)} className="h-full w-full object-cover" loading="lazy" />
-            </div>
-          )}
-          <div className="min-w-0">
-            <div className="text-[12.5px] font-semibold text-[var(--text-primary)]">
+        <div
+          key={r.id ?? r.title}
+          className="group relative kx-glass kx-hover-card bg-[var(--bg-secondary)] rounded-xl border border-[var(--border-subtle)] overflow-hidden"
+        >
+          {/* image pane — the product card's exact ground */}
+          <div className="relative aspect-[4/3] max-sm:aspect-[3/2] bg-gradient-to-b from-white to-[#f4f5f7] overflow-hidden border-b border-black/5">
+            {r.image_url ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={r.image_url}
+                alt={pick(r.title, r.title_zh, r.title_ar)}
+                loading="lazy"
+                decoding="async"
+                className="w-full h-full object-cover"
+              />
+            ) : (
+              <div className="w-full h-full flex items-center justify-center">
+                <ImageRawIcon className="h-10 w-10 text-gray-300" />
+              </div>
+            )}
+          </div>
+          {/* body — title + description, the card's text block */}
+          <div className="p-3">
+            <div className="text-[13px] font-semibold leading-snug text-[var(--text-primary)]">
               {pick(r.title, r.title_zh, r.title_ar)}
             </div>
             {pick(r.description, r.description_zh, r.description_ar) && (
-              <div className="mt-0.5 text-[11.5px] leading-snug text-[var(--text-muted)]">
+              <div className="mt-1 text-[11.5px] leading-snug text-[var(--text-muted)]">
                 {pick(r.description, r.description_zh, r.description_ar)}
               </div>
             )}
