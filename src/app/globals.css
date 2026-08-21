@@ -2118,28 +2118,37 @@ html[data-kx-tabslide] #main-scroll-container { overflow-x: clip; }
   background-color: rgba(62, 103, 150, 0.16);
 }
 
-/* ── PHONES: PRODUCT CARDS DROP THEIR BLUR ────────────────────────────────
-   Owner, scrolling the product grid fast on his iPhone: "the products
-   cards start to disappear or become empty." Every ProductCard carries
-   kx-glass — a backdrop-filter per card — and this page renders HUNDREDS
-   of them. On fast touch scroll iOS cannot re-composite that many live
-   blur layers and starts dropping them: whole cards flash blank until
-   the scroll settles. This is the priced-per-element blur cost the perf
-   rules warn about, at grid scale.
+/* ── REPEATED ITEMS DO NOT GET A BLUR PASS ───────────────────────────────
+   `.kx-flat-items` on a CONTAINER strips the backdrop-filter from every
+   glass surface inside it, keeping the fill, the rim, the gradient edge
+   and every hover — the look survives, the per-element compositing cost
+   does not.
 
-   Below sm the cards keep their token surface and lose only the filter,
-   with a near-solid fill so they stay legible over the ground — the same
-   trade the low-power tier makes everywhere. Desktop keeps the glass:
-   mouse wheels don't hit the compositor the way touch flings do. */
-@media (max-width: 639px) {
-  [data-kx-skin="aurora"] .kx-pd [data-kx-component="ProductCard"].kx-glass {
-    -webkit-backdrop-filter: none;
-    backdrop-filter: none;
-    background: rgba(14, 17, 23, 0.92);
-  }
-  [data-kx-skin="aurora"][data-theme="light"] .kx-pd [data-kx-component="ProductCard"].kx-glass {
-    background: rgba(250, 251, 253, 0.95);
-  }
+   THE MEASUREMENT THAT EARNED THIS RULE: fast-scrolling the product grid
+   on the owner's phone made whole cards flash BLANK — iOS cannot
+   re-composite hundreds of live blur layers per frame and starts dropping
+   them. The first fix was phones-only and card-specific; this replaces it,
+   because the cost is not a phone problem and not a product problem. It
+   is what the perf rules already say in words — "blur is priced per
+   element" — hitting at grid scale on every screen that lists things,
+   and weak factory machines pay it on desktop too.
+
+   THE FILL IS NOT A NEW COLOUR. It is the value the low-power tier and
+   the no-backdrop-filter fallback already use Hub-wide, so a flattened
+   grid is pixel-identical to what those tiers have always rendered — one
+   surface language, three ways to arrive at it.
+
+   WHERE IT DOES *NOT* GO: the big chrome (header pane, drawers, modals,
+   dropdown panels) keeps real glass. Those are a handful of surfaces per
+   screen, they sit over moving content, and their blur is the skin. This
+   rule is for the many, not the few. */
+[data-kx-skin="aurora"] .kx-flat-items .kx-glass {
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  background: rgba(14, 17, 23, 0.92);
+}
+[data-kx-skin="aurora"][data-theme="light"] .kx-flat-items .kx-glass {
+  background: rgba(250, 251, 253, 0.95);
 }
 
 /* ── kx-pop-dense — the MN-5 look, held over BRIGHT content ──────────────
@@ -2973,12 +2982,24 @@ html[data-kx-tabslide] #main-scroll-container { overflow-x: clip; }
 [data-kx-skin="aurora"][data-theme="light"] :is(.kx-pd, .kx-app) .kx-ph-tabs [aria-selected="true"] {
   box-shadow: inset 0 0 0 1px rgba(62, 103, 150, 0.75);
 }
-/* Hover on an unselected tab: the border/tint whisper, not a filled block. */
+/* Hover on an unselected tab: a tint whisper, not a filled block — but it
+   has to be FELT. Two problems were stacked here (owner, on the Inventory
+   tab bar: "here have a problem in hover"):
+   · the generic button-hover recipe below carries !important, so it beat
+     this rule and served tabs 3% instead of this 4% — a tab bar built out
+     of routes is a NAV, and it must not be styled by the button recipe;
+     the exclusion is added there.
+   · 3-4% white over the strip's own --bg-secondary fill is under the
+     threshold where the eye registers a change at all: measured against
+     the resting state, the tab looked completely inert under the cursor.
+   6% reads as a clear whisper and still sits far below the selected
+   tab's blue. The `!important` here is defensive: this rule is the tab's
+   own recipe and must not be re-stomped by a future blanket. */
 [data-kx-skin="aurora"] :is(.kx-pd, .kx-app) .kx-ph-tabs [aria-selected="false"]:hover {
-  background-color: rgba(255, 255, 255, 0.04);
+  background-color: rgba(255, 255, 255, 0.06) !important;
 }
 [data-kx-skin="aurora"][data-theme="light"] :is(.kx-pd, .kx-app) .kx-ph-tabs [aria-selected="false"]:hover {
-  background-color: rgba(0, 0, 0, 0.04);
+  background-color: rgba(0, 0, 0, 0.055) !important;
 }
 
 /* ── THE PRIMARY BUTTON STAYS WHITE. ONLY ITS HOVER WAS WRONG ──────────
@@ -3046,7 +3067,7 @@ html[data-kx-tabslide] #main-scroll-container { overflow-x: clip; }
    from the normal hover — which then fell through to the primary-button rule
    and went solid white. A `/` in the token means a tint, and a tint hovers
    like everything else. */
-[data-kx-skin="aurora"] :is(.kx-pd, .kx-app) :is(button, a, summary, [role="button"]):not([aria-selected="true"]):not(.kx-seg-on):not(.kx-chip-on):not([data-kx-keep-hover]):not(.kx-pop-panel *):is(:not([class*="bg-[var(--bg-inverted)]"]), [class*="bg-[var(--bg-inverted)]/"]):not([class*="bg-[var(--bg-inverted)]/"][class*="w-full"]):hover {
+[data-kx-skin="aurora"] :is(.kx-pd, .kx-app) :is(button, a, summary, [role="button"]):not([role="tab"]):not([aria-selected="true"]):not(.kx-seg-on):not(.kx-chip-on):not([data-kx-keep-hover]):not(.kx-pop-panel *):is(:not([class*="bg-[var(--bg-inverted)]"]), [class*="bg-[var(--bg-inverted)]/"]):not([class*="bg-[var(--bg-inverted)]/"][class*="w-full"]):hover {
   /* !important, and it is earned. Measured on prod with per-recipe clones:
      without it exactly the buttons carrying Tailwind's own
      `hover:border-[var(--border-color)]` kept the Core colour, while buttons
@@ -3073,7 +3094,7 @@ html[data-kx-tabslide] #main-scroll-container { overflow-x: clip; }
   background-color: rgba(255, 255, 255, 0.03) !important;
   translate: none;
 }
-[data-kx-skin="aurora"][data-theme="light"] :is(.kx-pd, .kx-app) :is(button, a, summary, [role="button"]):not([aria-selected="true"]):not(.kx-seg-on):not(.kx-chip-on):not([data-kx-keep-hover]):not(.kx-pop-panel *):is(:not([class*="bg-[var(--bg-inverted)]"]), [class*="bg-[var(--bg-inverted)]/"]):not([class*="bg-[var(--bg-inverted)]/"][class*="w-full"]):hover {
+[data-kx-skin="aurora"][data-theme="light"] :is(.kx-pd, .kx-app) :is(button, a, summary, [role="button"]):not([role="tab"]):not([aria-selected="true"]):not(.kx-seg-on):not(.kx-chip-on):not([data-kx-keep-hover]):not(.kx-pop-panel *):is(:not([class*="bg-[var(--bg-inverted)]"]), [class*="bg-[var(--bg-inverted)]/"]):not([class*="bg-[var(--bg-inverted)]/"][class*="w-full"]):hover {
   border-color: rgba(62, 103, 150, 0.6) !important;
   background-color: rgba(0, 0, 0, 0.03) !important;
 }

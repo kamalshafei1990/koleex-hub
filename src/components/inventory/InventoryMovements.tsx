@@ -46,6 +46,11 @@ import {
 } from "@/components/inventory/InventoryUx";
 
 const MV_T: Translations = {
+  /* This screen renders its own dictionary, so a key that lives only in the
+     shared inventory dictionary falls through and paints RAW — the header
+     was showing the literal "inv.shortcuts.hint" to the operator. Copied
+     here rather than re-pointed, because MV_T is what this screen reads. */
+  "inv.shortcuts.hint":  { en: "Shortcuts: R receive · S ship · T transfer · A adjust · F find", zh: "快捷键：R 入库·S 发货·T 调拨·A 调整·F 搜索", ar: "اختصارات: R استلام · S شحن · T تحويل · A تعديل · F بحث" },
   "mv.title":            { en: "Stock Movements", zh: "库存移动", ar: "حركات المخزون" },
   "mv.subtitle":         { en: "Inventory ledger. Receipts and shipments come from their workflows; adjustments require approval.", zh: "库存分录。收货与发货由工作流生成；调整需审批。", ar: "سجل المخزون. الاستلام والشحن من تدفقاتهم؛ التعديلات تتطلب موافقة." },
   "mv.tab.workflow":     { en: "Workflow",       zh: "工作流",   ar: "حركات النظام" },
