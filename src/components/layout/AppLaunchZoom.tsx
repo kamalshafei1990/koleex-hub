@@ -46,7 +46,7 @@ type Flight =
 const EXPAND_MS = 460;
 const FADE_MS = 240;
 const RETURN_IN_MS = 140;
-const RETURN_SHRINK_MS = 440;
+const RETURN_SHRINK_MS = 500;
 const RETURN_SAFETY_MS = 4000;
 
 const reducedMotion = () =>
@@ -308,20 +308,73 @@ export default function AppLaunchZoom() {
       if (final.width < 1) { fadeOut(); return; }
       const sx = Math.max(tile.width / final.width, 0.01);
       const sy = Math.max(tile.height / final.height, 0.01);
+      /* THE RETURN, RE-CUT (owner: "the motion when I back from app to home
+         is not good — create a good smooth ease creative motion"). Three
+         defects in the first cut, each fixed by one move below:
+
+         · The card faded to 0.15 WHILE flying, so mid-flight you watched
+           Home through a ghost rectangle — mushy. Now it stays OPAQUE for
+           the first ~7/10 of the flight and dissolves only as it lands on
+           the tile, so the flight reads as a solid object, not a curtain.
+         · scale(sx, sy) is anisotropic — the icon and radius squashed with
+           the card. The icon now counter-scales (s/sx, s/sy — net uniform
+           min-scale) so it stays perfectly square all the way down, and the
+           border-radius grows by 1/s so the VISUAL corner rounding holds
+           instead of sharpening to a point. The label can't counter-scale
+           legibly at these ratios, so it exits first (120ms).
+         · Home sat frozen underneath. It now breathes IN under the shrink —
+           scale 0.97→1 + dim→full, expo-out. INWARD on purpose: a 1.0x+
+           zoom-out would push content past the container edges and flash a
+           horizontal scrollbar, which is the owner's absolute no-dancing
+           rule; growing INTO place can never overflow.
+
+         iOS-sheet curve (0.32, 0.72, 0, 1): brisk exit from fullscreen,
+         long glide onto the tile. Transform/opacity (+radius on this one
+         compositor-promoted card) only — nothing here can shift layout. */
+      const s = Math.min(sx, sy);
       const anim = el.animate(
         [
-          { transform: "translate(0px, 0px) scale(1, 1)", opacity: 1 },
-          { transform: `translate(${tile.left - final.left}px, ${tile.top - final.top}px) scale(${sx}, ${sy})`, opacity: 0.15 },
+          { transform: "translate(0px, 0px) scale(1, 1)", opacity: 1, borderRadius: "22px" },
+          { opacity: 1, offset: 0.68 },
+          { transform: `translate(${tile.left - final.left}px, ${tile.top - final.top}px) scale(${sx}, ${sy})`, opacity: 0, borderRadius: `${Math.round(18 / s)}px` },
         ],
-        { duration: RETURN_SHRINK_MS, easing: "cubic-bezier(0.16, 1, 0.3, 1)", fill: "forwards" },
+        { duration: RETURN_SHRINK_MS, easing: "cubic-bezier(0.32, 0.72, 0, 1)", fill: "forwards" },
+      );
+      el.querySelector<HTMLElement>("[data-kx-flight-icon]")?.animate(
+        [
+          { transform: "scale(1, 1)" },
+          { transform: `scale(${s / sx}, ${s / sy})` },
+        ],
+        { duration: RETURN_SHRINK_MS, easing: "cubic-bezier(0.32, 0.72, 0, 1)", fill: "forwards" },
+      );
+      el.querySelector<HTMLElement>("[data-kx-flight-label]")?.animate(
+        [{ opacity: 1 }, { opacity: 0 }],
+        { duration: 120, easing: "ease-out", fill: "forwards" },
+      );
+      document.querySelector<HTMLElement>("[data-kx-home-stage]")?.animate(
+        [
+          { transform: "scale(0.97)", opacity: 0.55 },
+          { transform: "scale(1)", opacity: 1 },
+        ],
+        { duration: RETURN_SHRINK_MS + 80, easing: "cubic-bezier(0.16, 1, 0.3, 1)" },
       );
       anim.onfinish = () => {
         /* Something (Next's own popstate scroll handling) can re-zero the
            internal scroller behind the card mid-flight — settle the page ON
            the tile one last time so the reveal matches where we landed. */
         try {
-          document.querySelector<HTMLElement>(`[data-app-tile="${flight.appId}"]:not(aside *):not(nav *)`)
-            ?.scrollIntoView({ block: "center", behavior: "instant" as ScrollBehavior });
+          const tileEl = document.querySelector<HTMLElement>(`[data-app-tile="${flight.appId}"]:not(aside *):not(nav *)`);
+          tileEl?.scrollIntoView({ block: "center", behavior: "instant" as ScrollBehavior });
+          /* The tile RECEIVES its app: one soft pulse the instant the card
+             dissolves onto it. One-shot WAAPI, transform only, no residue. */
+          tileEl?.animate(
+            [
+              { transform: "scale(1)" },
+              { transform: "scale(1.06)", offset: 0.4 },
+              { transform: "scale(1)" },
+            ],
+            { duration: 220, easing: "ease-out" },
+          );
         } catch { /* fine */ }
         clear();
       };
@@ -354,13 +407,14 @@ export default function AppLaunchZoom() {
       >
         {Icon && (
           <span
+            data-kx-flight-icon=""
             className="inline-flex items-center justify-center"
             style={{ filter: "drop-shadow(0 0 18px rgba(127,169,214,0.45))", color: "rgba(226,238,250,0.95)" }}
           >
             <Icon size={56} />
           </span>
         )}
-        <span className="text-[13px] tracking-[0.14em] uppercase" style={{ color: "rgba(226,238,250,0.55)" }}>
+        <span data-kx-flight-label="" className="text-[13px] tracking-[0.14em] uppercase" style={{ color: "rgba(226,238,250,0.55)" }}>
           {app?.name ?? ""}
         </span>
       </div>
