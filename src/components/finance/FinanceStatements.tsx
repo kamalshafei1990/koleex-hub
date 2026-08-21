@@ -23,7 +23,8 @@
    --------------------------------------------------------------------------- */
 
 import { humanizeError } from "@/lib/ui/humanize-error";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
+import { useWarmData } from "@/lib/warm-cache";
 import FinanceHeader from "@/components/finance/FinanceHeader";
 import { useTabMotion } from "@/components/ui/useTabMotion";
 import { useTranslation } from "@/lib/i18n";
@@ -134,24 +135,20 @@ export default function FinanceStatements() {
 /* ─── Helper: thin fetch wrapper with loading/error ───────────── */
 
 function useJson<T>(url: string | null) {
-  const [data, setData] = useState<T | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const load = useCallback(async () => {
-    if (!url) return;
-    setLoading(true); setError(null);
-    try {
-      const r = await fetch(url, { credentials: "include", cache: "no-store" });
-      const j = await r.json();
-      if (!r.ok) throw new Error(humanizeError(j.error ?? `Failed (${r.status})`));
-      setData(j as T);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
-    } finally {
-      setLoading(false);
-    }
+    if (!url) throw new Error("no url");
+    const r = await fetch(url, { credentials: "include", cache: "no-store" });
+    const j = await r.json();
+    if (!r.ok) throw new Error(humanizeError(j.error ?? `Failed (${r.status})`));
+    return j as T;
   }, [url]);
-  useEffect(() => { void load(); }, [load]);
+  /* THE URL IS THE KEY. Every statement panel here is a date range, so a
+     name-based key would hand January's numbers to whoever opened February.
+     Keying by the full URL means a warm hit is by construction the answer to
+     the exact question being asked — the "include the filter in the key"
+     half of the cache's contract, rather than the opt-out half. */
+  const { data, loading, error: loadError } = useWarmData<T>(url ? `fin:stmt:${url}` : "", load);
+  const error = loadError ? String(loadError instanceof Error ? loadError.message : loadError) : null;
   return { data, loading, error };
 }
 
