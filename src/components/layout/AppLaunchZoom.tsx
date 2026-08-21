@@ -36,18 +36,13 @@
 
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
-import { getApp, getActiveAppId } from "@/lib/navigation";
+import { getApp } from "@/lib/navigation";
 
 type Rect = { left: number; top: number; width: number; height: number };
-type Flight =
-  | { mode: "launch"; appId: string; route: string; rect: Rect }
-  | { mode: "return"; appId: string };
+type Flight = { mode: "launch"; appId: string; route: string; rect: Rect };
 
 const EXPAND_MS = 460;
 const FADE_MS = 240;
-const RETURN_IN_MS = 140;
-const RETURN_EXIT_MS = 430;
-const RETURN_SAFETY_MS = 4000;
 
 const reducedMotion = () =>
   typeof window !== "undefined" &&
@@ -67,22 +62,6 @@ export default function AppLaunchZoom() {
      refs-during-render rule) */
   const flightRef = useRef<Flight | null>(null);
   useLayoutEffect(() => { flightRef.current = flight; }, [flight]);
-  /* A short PATH LOG, not a single "previous" ref: on a browser-back Next
-     handles popstate FIRST (registered at router boot, before this mount)
-     and flushes the navigation synchronously — by the time our popstate
-     listener runs, React has already committed "/" and a lone prev-ref has
-     already been overwritten (measured: it read "/" on a real back from
-     /quotations). The log keeps enough history that "where did we come
-     from" survives: it is the newest entry that differs from where we are. */
-  const pathLogRef = useRef<string[]>([]);
-  useEffect(() => {
-    const log = pathLogRef.current;
-    if (log[log.length - 1] !== pathname) {
-      log.push(pathname);
-      if (log.length > 6) log.shift();
-    }
-  }, [pathname]);
-
   /* ── FORWARD: launched from a tile ── */
   useEffect(() => {
     const onLaunch = (e: Event) => {
@@ -98,106 +77,14 @@ export default function AppLaunchZoom() {
     return () => window.removeEventListener("kx:app-launch", onLaunch);
   }, []);
 
-  /* ── RETURN — two detectors, one flight ──────────────────────────────────
-     Owner (round 2): "the back motion doesn't work in all apps." Because
-     the apps genuinely differ: PageHeader backs are <a href="/">, but e.g.
-     SupplierDetail's Home is a <button onClick={router.push("/")}>, and the
-     browser back gesture is a popstate — an anchor listener alone covers
-     only the first family. So:
-
-     1. The CLICK detector (kept): starts the cover at the CLICK, before the
-        route even commits — the best-feeling path, for anchor backs.
-     2. The HISTORY detector (the universal catch-all): pushState/replace
-        are patched (popstate listened) and ANY same-document navigation
-        landing on "/" while standing in an app starts the flight — buttons,
-        router.back(), browser gestures, every app the same. It fires a beat
-        later than the click (at commit), which is still before Home PAINTS
-        (Home mounts its chunks late — measured on the shrink polling), so
-        the cover is up before anything of Home shows. */
-  const startReturnRef = useRef<() => void>(() => {});
-  useLayoutEffect(() => {
-    startReturnRef.current = () => {
-      if (reducedMotion()) return;
-      if (flightRef.current) return; /* a flight is already on the wing */
-      const appId = getActiveAppId(window.location.pathname);
-      if (!appId) return;
-      settlingRef.current = false;
-      setFlight({ mode: "return", appId });
-    };
-  }, []);
-
-  useEffect(() => {
-    const onClick = (e: MouseEvent) => {
-      /* NOT gated on e.defaultPrevented: ViewTransitions registered its
-         capture listener first, preventDefaults the click, and performs the
-         router.push itself — the navigation still happens, so the flight is
-         still right. If some other code prevents AND swallows the nav, the
-         RETURN_SAFETY_MS timeout clears the card. */
-      if (e.button !== 0) return;
-      if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
-      const a = (e.target as Element | null)?.closest?.("a");
-      if (!a || a.hasAttribute("download")) return;
-      if (a.target && a.target !== "_self") return;
-      const href = a.getAttribute("href");
-      if (!href || href.startsWith("#")) return;
-      let url: URL;
-      try { url = new URL(href, window.location.href); } catch { return; }
-      if (url.origin !== window.location.origin) return;
-      if (url.pathname !== "/") return;
-      if (window.location.pathname === "/") return;
-      startReturnRef.current();
-    };
-    document.addEventListener("click", onClick, true);
-    return () => document.removeEventListener("click", onClick, true);
-  }, []);
-
-  useEffect(() => {
-    /* The history hook runs INSIDE the navigation call, so location.pathname
-       is still the app route when we read it — exactly the "from" we need;
-       the target comes from the pushState url argument. */
-    const maybeReturn = (target: string | URL | null | undefined) => {
-      try {
-        const to = new URL(String(target ?? ""), window.location.href);
-        if (to.origin !== window.location.origin) return;
-        if (to.pathname !== "/") return;
-        if (window.location.pathname === "/") return;
-        startReturnRef.current();
-      } catch { /* not a navigable url */ }
-    };
-    const hist = window.history;
-    const origPush = hist.pushState.bind(hist);
-    const origReplace = hist.replaceState.bind(hist);
-    hist.pushState = function (data, unused, url) {
-      maybeReturn(url);
-      return origPush(data, unused, url);
-    };
-    hist.replaceState = function (data, unused, url) {
-      maybeReturn(url);
-      return origReplace(data, unused, url);
-    };
-    const onPop = () => {
-      /* popstate fires AFTER Next already committed the new location — the
-         "from" comes from the path log, not from a stale single ref. */
-      if (window.location.pathname !== "/") return;
-      /* the LAST transition only: depending on who ran first, the log's top
-         is either already "/" (Next committed before us — the measured
-         Chrome order) or still the app path. Anything older is history. */
-      const log = pathLogRef.current;
-      const top = log[log.length - 1];
-      const from = top !== "/" ? top : log[log.length - 2];
-      if (!from || from === "/") return;
-      const appId = getActiveAppId(from);
-      if (!appId || reducedMotion() || flightRef.current) return;
-      settlingRef.current = false;
-      setFlight({ mode: "return", appId });
-    };
-    window.addEventListener("popstate", onPop);
-    return () => {
-      hist.pushState = origPush;
-      hist.replaceState = origReplace;
-      window.removeEventListener("popstate", onPop);
-    };
-  }, []);
+  /* RETURN FLIGHTS ARE GONE — deliberately, and this note is why. Three
+     cover-card return cuts were authored and rejected; the root defect was
+     architectural: this card is a branded panel, not the app's pixels, so
+     any motion it makes reads as "a card crossed my screen". The sliding
+     door the owner picked (#12) needs the REAL screen to move, which only
+     the View Transitions API can do — see ViewTransitions.tsx
+     ("home-return" flag) + the kx-door-* rules in globals. This component
+     is forward-only now; do not re-add a return cover. */
 
   /* ── play the entry of whichever flight just started ── */
   useEffect(() => {
@@ -205,7 +92,7 @@ export default function AppLaunchZoom() {
     const el = cardRef.current;
     if (!el) return;
     el.getAnimations().forEach((a) => a.cancel());
-    if (flight.mode === "launch") {
+    {
       const final = el.getBoundingClientRect();
       if (final.width < 1 || final.height < 1) return;
       const r = flight.rect;
@@ -219,13 +106,6 @@ export default function AppLaunchZoom() {
         { duration: EXPAND_MS, easing: "cubic-bezier(0.16, 1, 0.3, 1)", fill: "both" },
       );
       expandDoneAtRef.current = performance.now() + EXPAND_MS;
-    } else {
-      /* cover the app the user is leaving — instant but soft */
-      el.animate(
-        [{ opacity: 0 }, { opacity: 1 }],
-        { duration: RETURN_IN_MS, easing: "ease-out", fill: "both" },
-      );
-      expandDoneAtRef.current = performance.now() + RETURN_IN_MS;
     }
   }, [flight]);
 
@@ -236,68 +116,14 @@ export default function AppLaunchZoom() {
 
     const clear = () => setFlight(null);
 
-    if (flight.mode === "launch") {
-      if (flight.route.split(/[?#]/)[0] !== pathname) return;
-      settlingRef.current = true;
-      const wait = Math.max(0, expandDoneAtRef.current - performance.now()) + 60;
-      const t = window.setTimeout(() => {
-        if (!el) { clear(); return; }
-        const anim = el.animate([{ opacity: 1 }, { opacity: 0 }], { duration: FADE_MS, easing: "ease-in", fill: "forwards" });
-        anim.onfinish = clear;
-        window.setTimeout(clear, FADE_MS + 400); /* belt & braces */
-      }, wait);
-      return () => window.clearTimeout(t);
-    }
-
-    /* return leg */
-    if (pathname !== "/") {
-      /* Home hasn't committed — safety: never trap the user under the card */
-      const t = window.setTimeout(clear, RETURN_SAFETY_MS);
-      return () => window.clearTimeout(t);
-    }
+    if (flight.route.split(/[?#]/)[0] !== pathname) return;
     settlingRef.current = true;
-    /* THE SLIDING DOOR — owner-picked from twenty live samples (2026-08-21,
-       batch two #12) after three authored cuts: the app slides OFF to one
-       side while Home slides INTO place from the other, both travelling the
-       same way — one door closing as the next opens. Two pieces of geometry
-       carry the whole thing safely:
-
-       · DIRECTION FOLLOWS THE DOCUMENT. In LTR the app exits rightward and
-         Home enters from the left; RTL mirrors both. "Away" should read
-         with the reading direction, and a hardcoded side would feel
-         backwards in the Arabic UI.
-       · OVERFLOW MATH, because the no-dancing rule is absolute. The card
-         may translate anywhere — it lives in a FIXED layer outside the
-         scroller and cannot grow scrollable overflow. Home may only start
-         offset toward the scroll-start side (negative-X in LTR, positive
-         in RTL): scrollable overflow only extends toward scroll-end, so an
-         entry from the start side can never flash a horizontal scrollbar
-         mid-flight. That asymmetry DECIDES the door's direction; it is not
-         a taste choice. */
-    const wait = Math.max(0, expandDoneAtRef.current - performance.now());
+    const wait = Math.max(0, expandDoneAtRef.current - performance.now()) + 60;
     const t = window.setTimeout(() => {
       if (!el) { clear(); return; }
-      const rtl = document.documentElement.dir === "rtl";
-      const out = rtl ? -55 : 55;   /* card exit, % of its own width */
-      const from = rtl ? 7 : -7;    /* Home entry offset — start side only */
-      el.style.transformOrigin = "50% 50%";
-      const anim = el.animate(
-        [
-          { transform: "translateX(0%) scale(1)", opacity: 1 },
-          { transform: `translateX(${out * 0.55}%) scale(0.985)`, opacity: 0.55, offset: 0.6 },
-          { transform: `translateX(${out}%) scale(0.97)`, opacity: 0 },
-        ],
-        { duration: RETURN_EXIT_MS, easing: "cubic-bezier(0.32, 0.72, 0, 1)", fill: "forwards" },
-      );
-      document.querySelector<HTMLElement>("[data-kx-home-stage]")?.animate(
-        [
-          { transform: `translateX(${from}%) scale(0.985)`, opacity: 0.4 },
-          { transform: "translateX(0%) scale(1)", opacity: 1 },
-        ],
-        { duration: RETURN_EXIT_MS + 90, easing: "cubic-bezier(0.16, 1, 0.3, 1)" },
-      );
+      const anim = el.animate([{ opacity: 1 }, { opacity: 0 }], { duration: FADE_MS, easing: "ease-in", fill: "forwards" });
       anim.onfinish = clear;
-      window.setTimeout(clear, RETURN_EXIT_MS + 400); /* belt & braces */
+      window.setTimeout(clear, FADE_MS + 400); /* belt & braces */
     }, wait);
     return () => window.clearTimeout(t);
   }, [pathname, flight]);

@@ -35,6 +35,7 @@
 
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { getActiveAppId } from "@/lib/navigation";
 
 type DocWithVT = Document & {
   startViewTransition?: (cb: () => void | Promise<void>) => {
@@ -75,6 +76,20 @@ export default function ViewTransitions() {
       if (url.pathname === window.location.pathname && url.search === window.location.search) return;
 
       e.preventDefault();
+      /* THE SLIDING DOOR rides THIS transition (owner pick #12; the cover-
+         card version glitched — a generic branded panel sliding aside is
+         not "the app leaving", and mid-flight it uncovered a half-committed
+         page). The VT API is the only thing that can slide the REAL pixels:
+         flag the html element BEFORE the snapshot so the CSS below scopes
+         the door to this navigation only, and clear it when the transition
+         settles either way. Everything else keeps the standard settle. */
+      const homeReturn = url.pathname === "/" && !!getActiveAppId(window.location.pathname);
+      if (homeReturn) document.documentElement.dataset.kxVt = "home-return";
+      const clearFlag = () => {
+        if (document.documentElement.dataset.kxVt === "home-return") {
+          delete document.documentElement.dataset.kxVt;
+        }
+      };
       const vt = doc.startViewTransition!(() => {
         router.push(url.pathname + url.search + url.hash);
       });
@@ -85,9 +100,10 @@ export default function ViewTransitions() {
          only noise — but UNCAUGHT it surfaced as "InvalidStateError:
          Transition was aborted" on every back-to-Home, which is the red
          "1 Issue" badge the owner screenshotted twice. Swallow all three. */
-      vt.finished?.catch(() => {});
+      vt.finished?.then(clearFlag, clearFlag);
       vt.ready?.catch(() => {});
       vt.updateCallbackDone?.catch(() => {});
+      window.setTimeout(clearFlag, 1500); /* belt & braces — the flag must never stick */
     };
 
     /* Capture phase so we decide before React's own handler runs; the

@@ -640,6 +640,42 @@ body {
     animation: kx-vt-in 300ms cubic-bezier(0.22, 1, 0.36, 1) both;
   }
 }
+/* ── THE SLIDING DOOR (back-to-Home only) ────────────────────────────────
+   Owner-picked #12 of twenty live samples. The REAL pixels slide: while
+   html[data-kx-vt="home-return"] is set (ViewTransitions sets it before the
+   snapshot, clears it after), the scroll stage gets its own
+   view-transition-name, which LIFTS it out of the root group — so the app's
+   actual screenshot slides off one way and Home's slides in behind it,
+   while the header/sidebar (still in root) just settle in place. Naming the
+   stage ONLY under the flag is load-bearing: named permanently it would
+   drop out of every ordinary navigation's tuned root settle.
+
+   Direction follows the document (RTL mirrors). Overflow is a non-issue by
+   construction: VT snapshots animate in the browser's overlay layer and can
+   never grow scrollable overflow — the no-dancing rule holds at any
+   translation. */
+@media (prefers-reduced-motion: no-preference) {
+  html[data-kx-vt="home-return"] #main-scroll-container {
+    view-transition-name: kx-stage;
+  }
+  html[data-kx-vt="home-return"]::view-transition-old(kx-stage) {
+    animation: kx-door-out 430ms cubic-bezier(0.32, 0.72, 0, 1) both;
+  }
+  html[data-kx-vt="home-return"]::view-transition-new(kx-stage) {
+    animation: kx-door-in 520ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+  html[data-kx-vt="home-return"][dir="rtl"]::view-transition-old(kx-stage) {
+    animation-name: kx-door-out-rtl;
+  }
+  html[data-kx-vt="home-return"][dir="rtl"]::view-transition-new(kx-stage) {
+    animation-name: kx-door-in-rtl;
+  }
+}
+@keyframes kx-door-out { to { transform: translateX(56%) scale(0.98); opacity: 0; } }
+@keyframes kx-door-in { from { transform: translateX(-8%) scale(0.99); opacity: 0.45; } }
+@keyframes kx-door-out-rtl { to { transform: translateX(-56%) scale(0.98); opacity: 0; } }
+@keyframes kx-door-in-rtl { from { transform: translateX(8%) scale(0.99); opacity: 0.45; } }
+
 @keyframes kx-vt-out { to { opacity: 0; } }
 @keyframes kx-vt-in {
   from { opacity: 0; transform: translateY(6px); }
