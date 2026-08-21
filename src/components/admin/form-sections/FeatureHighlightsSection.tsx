@@ -1,16 +1,23 @@
 "use client";
 
 /* ---------------------------------------------------------------------------
-   FeatureHighlightsSection — the feature-card EDITOR, in the product-card
-   layout (owner: "same style as product card"): a responsive grid of
-   vertical cards — 4:3 photo pane on top (click to upload), title +
-   description under it, 中文/عربي in a folded "Translations" drawer with an
-   auto-translate button. Add as many cards as needed; each edits, reorders
-   and deletes. Self-contained: loads and saves through its own endpoint.
+   FeatureHighlightsSection — the feature-card EDITOR in the product-card
+   layout, round 3 (owner):
+   · an explicit ✎ EDIT button — cards rest as clean product cards and open
+     into edit mode; a freshly added card starts in edit mode.
+   · translate to ANY language, hero-style: a locale picker (the same LOCALES
+     list the hero name uses) + one Translate button. 中文/العربية land in
+     their first-class columns (the Hub UI reads them); every other locale is
+     stored per-code in `translations` jsonb — the product_translations
+     philosophy.
+   · the photo accepts click-to-upload, DRAG & DROP, and PASTE (a screenshot
+     in the clipboard pastes straight into the card in edit mode).
+   Self-contained: loads and saves through its own endpoint.
    --------------------------------------------------------------------------- */
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import ImageRawIcon from "@/components/icons/ui/ImageRawIcon";
+import { LOCALES } from "@/types/product-form";
 import {
   fetchProductFeatureHighlights,
   saveProductFeatureHighlights,
@@ -19,6 +26,9 @@ import {
 } from "@/lib/products-admin";
 
 interface ModelOpt { id: string; code: string }
+
+const localeName = (code: string) =>
+  LOCALES.find((l) => l.code === code)?.name ?? code;
 
 export default function FeatureHighlightsSection({
   productId,
@@ -33,7 +43,9 @@ export default function FeatureHighlightsSection({
   const [saving, setSaving] = useState(false);
   const [savedAt, setSavedAt] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [translating, setTranslating] = useState<number | null>(null);
+  const [editingIdx, setEditingIdx] = useState<number | null>(null);
+  const [translating, setTranslating] = useState(false);
+  const [targetLocale, setTargetLocale] = useState<string>("zh");
   const fileRefs = useRef<Record<number, HTMLInputElement | null>>({});
 
   useEffect(() => {
@@ -57,21 +69,38 @@ export default function FeatureHighlightsSection({
       [next[i], next[j]] = [next[j], next[i]];
       return next;
     });
-  const remove = (i: number) => setRows((l) => l.filter((_, j) => j !== i));
-  const add = () => setRows((l) => [...l, { title: "", description: "", image_url: null }]);
+  const remove = (i: number) => {
+    setEditingIdx(null);
+    setRows((l) => l.filter((_, j) => j !== i));
+  };
+  const add = () => {
+    setRows((l) => {
+      setEditingIdx(l.length);
+      return [...l, { title: "", description: "", image_url: null }];
+    });
+  };
 
-  const onPickImage = useCallback(async (i: number, file: File | null) => {
-    if (!file) return;
+  /* ── photo: click, drag & drop, paste ── */
+  const setImage = useCallback(async (i: number, file: File | null) => {
+    if (!file || !file.type.startsWith("image/")) return;
     setError(null);
     const up = await uploadProductFile(file);
     if (!up?.url) { setError("Image upload failed — try again."); return; }
     patch(i, { image_url: up.url });
   }, []);
+  const onDrop = (i: number) => (e: React.DragEvent) => {
+    e.preventDefault();
+    void setImage(i, e.dataTransfer.files?.[0] ?? null);
+  };
+  const onPaste = (i: number) => (e: React.ClipboardEvent) => {
+    const item = [...(e.clipboardData?.items ?? [])].find((it) => it.type.startsWith("image/"));
+    if (!item) return;
+    e.preventDefault();
+    void setImage(i, item.getAsFile());
+  };
 
-  /* Auto-translate: fill zh + ar from the English title/description via the
-     Hub's translate endpoint (the hero-name contract). fallback:true is
-     surfaced honestly instead of writing English into the zh/ar fields. */
-  const translateOne = async (text: string, target: "zh" | "ar"): Promise<string | null> => {
+  /* ── translate to the PICKED locale, hero-style ── */
+  const translateOne = async (text: string, target: string): Promise<string | null> => {
     try {
       const res = await fetch("/api/ai/translate", {
         method: "POST",
@@ -84,24 +113,54 @@ export default function FeatureHighlightsSection({
       return data.translated;
     } catch { return null; }
   };
-  const autoTranslate = async (i: number) => {
+  const translateCard = async (i: number) => {
     const r = rows[i];
     if (!r || (!r.title.trim() && !(r.description ?? "").trim())) return;
-    setTranslating(i); setError(null);
-    const [tZh, tAr, dZh, dAr] = await Promise.all([
-      r.title.trim() ? translateOne(r.title, "zh") : Promise.resolve(null),
-      r.title.trim() ? translateOne(r.title, "ar") : Promise.resolve(null),
-      (r.description ?? "").trim() ? translateOne(r.description as string, "zh") : Promise.resolve(null),
-      (r.description ?? "").trim() ? translateOne(r.description as string, "ar") : Promise.resolve(null),
+    setTranslating(true); setError(null);
+    const [tt, dd] = await Promise.all([
+      r.title.trim() ? translateOne(r.title, targetLocale) : Promise.resolve(null),
+      (r.description ?? "").trim() ? translateOne(r.description as string, targetLocale) : Promise.resolve(null),
     ]);
-    setTranslating(null);
-    if (!tZh && !tAr && !dZh && !dAr) { setError("Auto-translate is unavailable right now."); return; }
-    patch(i, {
-      ...(tZh ? { title_zh: tZh } : {}),
-      ...(tAr ? { title_ar: tAr } : {}),
-      ...(dZh ? { description_zh: dZh } : {}),
-      ...(dAr ? { description_ar: dAr } : {}),
-    });
+    setTranslating(false);
+    if (!tt && !dd) { setError(`Auto-translate to ${localeName(targetLocale)} is unavailable right now.`); return; }
+    if (targetLocale === "zh") {
+      patch(i, { ...(tt ? { title_zh: tt } : {}), ...(dd ? { description_zh: dd } : {}) });
+    } else if (targetLocale === "ar") {
+      patch(i, { ...(tt ? { title_ar: tt } : {}), ...(dd ? { description_ar: dd } : {}) });
+    } else {
+      const cur = rows[i].translations ?? {};
+      patch(i, {
+        translations: {
+          ...cur,
+          [targetLocale]: {
+            ...(cur[targetLocale] ?? {}),
+            ...(tt ? { title: tt } : {}),
+            ...(dd ? { description: dd } : {}),
+          },
+        },
+      });
+    }
+  };
+
+  /* which locales already carry text on a card (for the chips row) */
+  const filledLocales = (r: ProductFeatureHighlightRow): string[] => [
+    ...(r.title_zh || r.description_zh ? ["zh"] : []),
+    ...(r.title_ar || r.description_ar ? ["ar"] : []),
+    ...Object.keys(r.translations ?? {}),
+  ];
+  const localeValue = (r: ProductFeatureHighlightRow, code: string): { title: string; description: string } =>
+    code === "zh"
+      ? { title: r.title_zh ?? "", description: r.description_zh ?? "" }
+      : code === "ar"
+        ? { title: r.title_ar ?? "", description: r.description_ar ?? "" }
+        : { title: r.translations?.[code]?.title ?? "", description: r.translations?.[code]?.description ?? "" };
+  const setLocaleValue = (i: number, code: string, field: "title" | "description", value: string) => {
+    if (code === "zh") patch(i, field === "title" ? { title_zh: value } : { description_zh: value });
+    else if (code === "ar") patch(i, field === "title" ? { title_ar: value } : { description_ar: value });
+    else {
+      const cur = rows[i].translations ?? {};
+      patch(i, { translations: { ...cur, [code]: { ...(cur[code] ?? {}), [field]: value } } });
+    }
   };
 
   const save = async () => {
@@ -112,7 +171,7 @@ export default function FeatureHighlightsSection({
       rows.filter((r) => r.title.trim()),
     );
     setSaving(false);
-    if (ok) setSavedAt(Date.now());
+    if (ok) { setSavedAt(Date.now()); setEditingIdx(null); }
     else setError("Couldn't save feature highlights.");
   };
 
@@ -135,82 +194,135 @@ export default function FeatureHighlightsSection({
   return (
     <div className="space-y-4">
       <p className="text-[11.5px] text-[var(--text-muted)]">
-        Catalog-style feature cards, laid out exactly like product cards: photo
-        on top, name + short explanation under it. They render on the product
-        page and feed Koleex AI.
+        Catalog-style feature cards, laid out exactly like product cards. Click
+        ✎ to edit a card; the photo accepts click, drag&nbsp;&amp;&nbsp;drop, and
+        paste (a screenshot pastes straight in while editing).
       </p>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        {rows.map((r, i) => (
-          <div key={r.id ?? `new-${i}`} className="group relative kx-glass bg-[var(--bg-secondary)] rounded-xl border border-[var(--border-subtle)] overflow-hidden">
-            {/* photo pane — the product card's exact ground; click = upload */}
-            <button
-              type="button"
-              onClick={() => fileRefs.current[i]?.click()}
-              className="relative block w-full aspect-[4/3] bg-gradient-to-b from-white to-[#f4f5f7] overflow-hidden border-b border-black/5"
-              title="Upload feature photo"
+        {rows.map((r, i) => {
+          const editing = editingIdx === i;
+          return (
+            <div
+              key={r.id ?? `new-${i}`}
+              onPaste={editing ? onPaste(i) : undefined}
+              className={`group relative kx-glass bg-[var(--bg-secondary)] rounded-xl border overflow-hidden ${editing ? "border-[#7FA9D6]/60 ring-1 ring-[#7FA9D6]/30" : "border-[var(--border-subtle)] kx-hover-card"}`}
             >
-              {r.image_url ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={r.image_url} alt={r.title || "feature"} className="w-full h-full object-cover" />
-              ) : (
-                <span className="w-full h-full flex flex-col items-center justify-center gap-1 text-gray-400">
-                  <ImageRawIcon className="h-9 w-9 text-gray-300" />
-                  <span className="text-[10.5px]">Click to upload photo</span>
-                </span>
-              )}
-            </button>
-            <input
-              ref={(el) => { fileRefs.current[i] = el; }}
-              type="file" accept="image/*" className="hidden" aria-hidden tabIndex={-1}
-              onChange={(e) => void onPickImage(i, e.target.files?.[0] ?? null)}
-            />
-
-            {/* card actions — overlay on the photo, product-card style */}
-            <div className="absolute top-2 right-2 z-10 flex gap-1 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
-              <button type="button" onClick={() => void autoTranslate(i)} disabled={translating === i}
-                title="Auto-translate to 中文 + العربية"
-                className={`${chip} border-[#7FA9D6]/50 bg-black/60 text-[#BCD8F0]`}>
-                {translating === i ? "…" : "文ع"}
+              {/* photo pane — the product card's exact ground */}
+              <button
+                type="button"
+                onClick={() => { if (editing) fileRefs.current[i]?.click(); }}
+                onDragOver={editing ? (e) => e.preventDefault() : undefined}
+                onDrop={editing ? onDrop(i) : undefined}
+                className={`relative block w-full aspect-[4/3] bg-gradient-to-b from-white to-[#f4f5f7] overflow-hidden border-b border-black/5 ${editing ? "cursor-pointer" : "cursor-default"}`}
+                title={editing ? "Click, drop or paste a photo" : undefined}
+                tabIndex={editing ? 0 : -1}
+              >
+                {r.image_url ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={r.image_url} alt={r.title || "feature"} className="w-full h-full object-cover" />
+                ) : (
+                  <span className="w-full h-full flex flex-col items-center justify-center gap-1 text-gray-400">
+                    <ImageRawIcon className="h-9 w-9 text-gray-300" />
+                    {editing && <span className="text-[10.5px]">Click · drop · paste a photo</span>}
+                  </span>
+                )}
               </button>
-              <button type="button" onClick={() => move(i, -1)} disabled={i === 0}
-                className={`${chip} border-white/20 bg-black/60 text-white/80 disabled:opacity-30`}>←</button>
-              <button type="button" onClick={() => move(i, 1)} disabled={i === rows.length - 1}
-                className={`${chip} border-white/20 bg-black/60 text-white/80 disabled:opacity-30`}>→</button>
-              <button type="button" onClick={() => remove(i)}
-                className={`${chip} border-rose-400/40 bg-black/60 text-rose-300`}>×</button>
-            </div>
-
-            {/* body — title bold + description subtitle, like the product card */}
-            <div className="p-3 space-y-1">
+              {editing && r.image_url && (
+                <button type="button" onClick={() => patch(i, { image_url: null })}
+                  title="Remove photo"
+                  className={`${chip} absolute top-2 left-2 z-10 border-white/20 bg-black/60 text-white/85`}>
+                  🗑
+                </button>
+              )}
               <input
-                className={`${bare} text-[13px] font-semibold`}
-                placeholder="Feature title (EN)"
-                value={r.title}
-                onChange={(e) => patch(i, { title: e.target.value })}
-              />
-              <textarea
-                className={`${bare} text-[11.5px] leading-snug text-[var(--text-muted)] resize-none`}
-                rows={2}
-                placeholder="Short explanation (EN)"
-                value={r.description ?? ""}
-                onChange={(e) => patch(i, { description: e.target.value })}
+                ref={(el) => { fileRefs.current[i] = el; }}
+                type="file" accept="image/*" className="hidden" aria-hidden tabIndex={-1}
+                onChange={(e) => void setImage(i, e.target.files?.[0] ?? null)}
               />
 
-              {/* translations + model pin, folded so the card stays a card */}
-              <details className="pt-1">
-                <summary className="cursor-pointer list-none text-[10.5px] tracking-wide text-[var(--text-dim)]">
-                  中文 · العربية {r.title_zh || r.title_ar ? "✓" : ""} · options
-                </summary>
-                <div className="mt-2 space-y-1.5">
-                  <input className={input} placeholder="标题 (中文)" value={r.title_zh ?? ""}
-                    onChange={(e) => patch(i, { title_zh: e.target.value })} />
-                  <textarea className={input} rows={2} placeholder="说明 (中文)" value={r.description_zh ?? ""}
-                    onChange={(e) => patch(i, { description_zh: e.target.value })} />
-                  <input className={input} dir="rtl" placeholder="العنوان (عربي)" value={r.title_ar ?? ""}
-                    onChange={(e) => patch(i, { title_ar: e.target.value })} />
-                  <textarea className={input} dir="rtl" rows={2} placeholder="الشرح (عربي)" value={r.description_ar ?? ""}
-                    onChange={(e) => patch(i, { description_ar: e.target.value })} />
+              {/* card actions — overlay on the photo, product-card style */}
+              <div className="absolute top-2 right-2 z-10 flex gap-1 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
+                <button type="button" onClick={() => setEditingIdx(editing ? null : i)}
+                  title={editing ? "Close editing" : "Edit this card"}
+                  className={`${chip} ${editing ? "border-[#7FA9D6] bg-[#567FB2] text-white" : "border-white/20 bg-black/60 text-white/85"}`}>
+                  {editing ? "✓" : "✎"}
+                </button>
+                <button type="button" onClick={() => move(i, -1)} disabled={i === 0}
+                  className={`${chip} border-white/20 bg-black/60 text-white/80 disabled:opacity-30`}>←</button>
+                <button type="button" onClick={() => move(i, 1)} disabled={i === rows.length - 1}
+                  className={`${chip} border-white/20 bg-black/60 text-white/80 disabled:opacity-30`}>→</button>
+                <button type="button" onClick={() => remove(i)}
+                  className={`${chip} border-rose-400/40 bg-black/60 text-rose-300`}>×</button>
+              </div>
+
+              {/* body */}
+              {!editing ? (
+                <div className="p-3">
+                  <div className="text-[13px] font-semibold leading-snug text-[var(--text-primary)]">
+                    {r.title || <span className="text-[var(--text-dim)]">Untitled feature — press ✎</span>}
+                  </div>
+                  {r.description && (
+                    <div className="mt-1 text-[11.5px] leading-snug text-[var(--text-muted)]">{r.description}</div>
+                  )}
+                  {filledLocales(r).length > 0 && (
+                    <div className="mt-2 flex flex-wrap gap-1">
+                      {filledLocales(r).map((c) => (
+                        <span key={c} className="rounded border border-[var(--border-subtle)] px-1.5 py-0.5 text-[9px] uppercase tracking-wider text-[var(--text-dim)]">{c}</span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="p-3 space-y-2">
+                  <input
+                    className={`${bare} text-[13px] font-semibold`}
+                    placeholder="Feature title (EN)"
+                    value={r.title}
+                    onChange={(e) => patch(i, { title: e.target.value })}
+                  />
+                  <textarea
+                    className={`${bare} text-[11.5px] leading-snug text-[var(--text-muted)] resize-none`}
+                    rows={2}
+                    placeholder="Short explanation (EN)"
+                    value={r.description ?? ""}
+                    onChange={(e) => patch(i, { description: e.target.value })}
+                  />
+
+                  {/* hero-style translate row: pick ANY locale, one button */}
+                  <div className="flex items-center gap-1.5">
+                    <select
+                      className={`${input} !w-auto flex-1`}
+                      value={targetLocale}
+                      onChange={(e) => setTargetLocale(e.target.value)}
+                    >
+                      {LOCALES.map((l) => (
+                        <option key={l.code} value={l.code}>{l.name}</option>
+                      ))}
+                    </select>
+                    <button type="button" onClick={() => void translateCard(i)} disabled={translating}
+                      className="rounded-lg border border-[#7FA9D6]/50 bg-[#567FB2]/15 px-2.5 py-1.5 text-[11.5px] text-[#BCD8F0] disabled:opacity-40">
+                      {translating ? "Translating…" : "⚡ Translate"}
+                    </button>
+                  </div>
+
+                  {/* every locale that carries text, editable in place */}
+                  {filledLocales(r).map((code) => {
+                    const v = localeValue(r, code);
+                    const rtl = code === "ar" || code === "ur";
+                    return (
+                      <div key={code} className="rounded-lg border border-[var(--border-subtle)] p-2 space-y-1">
+                        <div className="text-[9.5px] uppercase tracking-wider text-[var(--text-dim)]">{localeName(code)}</div>
+                        <input className={`${bare} text-[12px]`} dir={rtl ? "rtl" : undefined} value={v.title}
+                          placeholder="Title"
+                          onChange={(e) => setLocaleValue(i, code, "title", e.target.value)} />
+                        <textarea className={`${bare} text-[11px] text-[var(--text-muted)] resize-none`} dir={rtl ? "rtl" : undefined} rows={2} value={v.description}
+                          placeholder="Description"
+                          onChange={(e) => setLocaleValue(i, code, "description", e.target.value)} />
+                      </div>
+                    );
+                  })}
+
                   {models.length > 0 && (
                     <select
                       className={input}
@@ -224,10 +336,10 @@ export default function FeatureHighlightsSection({
                     </select>
                   )}
                 </div>
-              </details>
+              )}
             </div>
-          </div>
-        ))}
+          );
+        })}
 
         {/* the "+ add" tile, a ghost product card */}
         <button

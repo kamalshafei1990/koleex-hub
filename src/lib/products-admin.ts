@@ -587,6 +587,8 @@ export interface ProductFeatureHighlightRow {
   model_id?: string | null;
   title: string; title_zh?: string | null; title_ar?: string | null;
   description?: string | null; description_zh?: string | null; description_ar?: string | null;
+  /** free-locale translations, hero-style: { "<code>": { title?, description? } } */
+  translations?: Record<string, { title?: string; description?: string }>;
   image_url?: string | null;
   sort?: number;
 }

@@ -22,7 +22,7 @@ import { humanizeError } from "@/lib/ui/humanize-error";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const COLS =
-  "id, product_id, model_id, title, title_zh, title_ar, description, description_zh, description_ar, image_url, sort";
+  "id, product_id, model_id, title, title_zh, title_ar, description, description_zh, description_ar, translations, image_url, sort";
 
 async function tenantOwnsProduct(productId: string, tenantId: string): Promise<boolean> {
   const { data } = await supabaseServer
@@ -73,6 +73,22 @@ export async function PUT(req: Request) {
       description: str(r.description),
       description_zh: str(r.description_zh),
       description_ar: str(r.description_ar),
+      /* free-locale translations: { "<code>": { title?, description? } } —
+         sanitized to plain strings so nothing else can ride in the jsonb */
+      translations: (() => {
+        const out: Record<string, { title?: string; description?: string }> = {};
+        const t = r.translations;
+        if (t && typeof t === "object" && !Array.isArray(t)) {
+          for (const [code, v] of Object.entries(t as Record<string, unknown>)) {
+            if (!/^[a-z]{2}(-[A-Za-z]{2})?$/.test(code)) continue;
+            if (!v || typeof v !== "object") continue;
+            const title = str((v as Record<string, unknown>).title);
+            const description = str((v as Record<string, unknown>).description);
+            if (title || description) out[code] = { ...(title ? { title } : {}), ...(description ? { description } : {}) };
+          }
+        }
+        return out;
+      })(),
       image_url: str(r.image_url),
       sort: i,
     }));
