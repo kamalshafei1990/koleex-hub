@@ -37,7 +37,11 @@ import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 
 type DocWithVT = Document & {
-  startViewTransition?: (cb: () => void | Promise<void>) => { finished: Promise<void> };
+  startViewTransition?: (cb: () => void | Promise<void>) => {
+    finished: Promise<void>;
+    ready?: Promise<void>;
+    updateCallbackDone?: Promise<void>;
+  };
 };
 
 export default function ViewTransitions() {
@@ -71,9 +75,19 @@ export default function ViewTransitions() {
       if (url.pathname === window.location.pathname && url.search === window.location.search) return;
 
       e.preventDefault();
-      doc.startViewTransition!(() => {
+      const vt = doc.startViewTransition!(() => {
         router.push(url.pathname + url.search + url.hash);
       });
+      /* An aborted transition REJECTS these promises — and something on this
+         shell aborts them routinely: the return-flight card mutates the DOM
+         mid-snapshot, a second navigation lands, the tab hides. All of that
+         is fine (the navigation itself already happened); the rejection is
+         only noise — but UNCAUGHT it surfaced as "InvalidStateError:
+         Transition was aborted" on every back-to-Home, which is the red
+         "1 Issue" badge the owner screenshotted twice. Swallow all three. */
+      vt.finished?.catch(() => {});
+      vt.ready?.catch(() => {});
+      vt.updateCallbackDone?.catch(() => {});
     };
 
     /* Capture phase so we decide before React's own handler runs; the
