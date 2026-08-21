@@ -96,7 +96,7 @@ Facets reference `facet-dictionary-master.md`; devices reference `device-diction
 | ✅ XFSB | Steam Boiler / Generator | boiler_capacity, irons_supported, heating_method | capacity, irons_supported, heating_method | auto_fill, descaling |
 | ✅ XFSG | Steam Generator (Electric, compact) | power_kw, steam_output, irons_supported | power_kw, steam_output, irons_supported | auto_water_feed, dual_outlet |
 | ✅ XFIT | Ironing Table (Vacuum/Heated/Blowing) | surface_features, size | vacuum, up_blow, heated_buck, with_boiler | vacuum, up_blow, heated_buck |
-| ▲ XFPB | Pressing Machine (Buck/Cabinet) | press_type, actuation, application | press_type, actuation, dual_buck | dual_buck, programmable_cycle |
+| ✅ XFPB | Pressing Machine (Buck/Cabinet) | press_type, actuation, application | press_type, actuation, dual_buck | dual_buck, programmable_cycle |
 | ✅ XFCP | Collar & Cuff Press | actuation, station_count | actuation, double_station | double_station, programmable |
 | ✅ XFFP | Fusing Machine | fusing_type, belt_width, temperature_range | fusing_type, belt_width, temperature_range | double_belt, cooling_section |
 | ▲ XFFF | Form Finisher (Steam-Air Dolly) | garment_type, tensioning_method, steam_source | garment_type, tensioning_method, twin_station | side_clamps, sleeve_tensioners |
@@ -120,11 +120,13 @@ Facets reference `facet-dictionary-master.md`; devices reference `device-diction
 |---|---|---|---|---|---|
 | ✅ XPSP | Screen Printing Machine | Printing | type(manual/auto), config, color_count | manual_vs_auto, carousel_vs_oval, color_count | flash_cure, vacuum_holddown |
 | ✅ XPDT | DTG Printer | Printing | print_area, ink_set, platen_size | print_area, white_ink, throughput | bulk_ink, pretreat |
-| ▲ XPDF | DTF Printer | Printing | film_width, ink_set, roll_fed | film_width, roll_vs_sheet, white_ink | inline_shaker_cure, take_up |
+| ✅ XPDF | DTF Printer | Printing | film_width, ink_set, roll_fed | film_width, roll_vs_sheet, white_ink | inline_shaker_cure, take_up |
 | ✅ XPSU | Sublimation Printer | Printing | print_width, mode(transfer/direct), ink | print_width, transfer_vs_direct, throughput | bulk_ink, integrated_dryer |
 | ▲ XPCD | Conveyor Dryer / Curing Oven | Printing | belt_width, heat_source, max_temp | belt_width, heat_source, chamber_length | IR_boosters, multi_zone |
-| ▲ XPPS | DTF Powder Shaker / Curing Unit | Printing | film_width, format(inline/standalone) | width, inline_vs_standalone, powder_recycling | powder_recycling, fume_extraction |
+| ✅ XPPS | DTF Powder Shaker / Curing Unit | Printing | film_width, format(inline/standalone) | width, inline_vs_standalone, powder_recycling | powder_recycling, fume_extraction |
 | ✅ XPH | Heat Press Machine (Flat) | Transfer | platen_size, opening_type, actuation, stations | platen_size, actuation, stations, platen_shape | cap_platen, mug_platen, twin_station |
+| ✅ XPUV | UV-DTF Printer | Printing | film_width, print_mode(roll/flat/cylinder), ink_channels | roll_vs_flat, varnish, rotary_set | rotary_attachment, vacuum_table *(CL-0027)* |
+| ✅ XPPD | Pad Printing Machine | Printing | plate_size, color_count, drive(electric/pneumatic) | color_count, conveyor, sealed_cup | conveyor_table, shuttle_table *(CL-0027 — un-parked)* |
 | ▲ XPRH | Calender / Rotary Heat Press | Transfer | working_width, max_temp, speed, feed_type | working_width, feed_type, speed, drum_diameter | protective_paper_feed, cooling_section |
 
 ## H. Packing & Inspection  (Category XPC)

@@ -916,6 +916,12 @@ const LBL: Record<string, Record<Lang, string>> = {
   "Bartacking Machines": { en: "Bartacking Machines", zh: "套结机", ar: "آلات تثبيت الغرزات" },
   "Button Attaching Machines": { en: "Button Attaching Machines", zh: "钉扣机", ar: "آلات تركيب الأزرار" },
   "Buttonhole Machines": { en: "Buttonhole Machines", zh: "锁眼机", ar: "آلات عمل العراوي" },
+  /* CL-0027 shelves (2026-08-21) — the S-KILO pair. */
+  "DTF Printers": { en: "DTF Printers", zh: "数码白墨烫画打印机", ar: "طابعات DTF" },
+  "DTF Powder Shakers": { en: "DTF Powder Shakers", zh: "抖粉机", ar: "هزازات بودرة DTF" },
+  "UV-DTF Printers": { en: "UV-DTF Printers", zh: "数码UV打印机", ar: "طابعات UV-DTF" },
+  "Pad Printing Machines": { en: "Pad Printing Machines", zh: "移印机", ar: "ماكينات طباعة الباد" },
+  "Pressing Machines (Buck)": { en: "Pressing Machines (Buck)", zh: "压烫机", ar: "مكابس الكي (باك)" },
   /* CL-0024/0025/0026 shelves (2026-08-20). */
   "Flatlock (Flat Seamer) Machines": { en: "Flatlock (Flat Seamer) Machines", zh: "拼缝机", ar: "ماكينات الدرز المسطح (فلات لوك)" },
   "Carpet Overedging Machines": { en: "Carpet Overedging Machines", zh: "地毯包缝机", ar: "ماكينات سرفلة السجاد" },

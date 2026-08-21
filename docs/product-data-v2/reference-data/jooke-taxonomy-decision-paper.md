@@ -50,7 +50,10 @@ pp. 17, 31. Small, single-job preparation machines that feed the sewing line.
 Velcro (p. 21) sits across Cutting and Automation; pad printing (p. 34) is a
 different process from live screen printing `XPSP`.
 
-**Recommendation: PARK both.** A code earned by a single machine from a single
+**Recommendation: PARK both.** *(Update 2026-08-21: pad printing's park
+condition was met exactly as written — S-KILO carries six pad printers across
+its two editions — and CL-0027 minted `pad-printing-machines[XPPD]`. Velcro
+remains parked.)* A code earned by a single machine from a single
 source is how prefixes get burned. The inventory rule already covers this:
 wait for a second source. (If pad printing must be filed today, the least-bad
 home is a kind under `XPSP` with a process facet — not a new code.)

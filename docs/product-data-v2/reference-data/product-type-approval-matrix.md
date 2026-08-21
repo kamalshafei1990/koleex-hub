@@ -263,7 +263,7 @@ XSF, XSBH, XSBA, XSBT, XSBL, XSZ, XSEA, XSWB, XSLP, XSSM, XSBG, XSMT, XSUS · XA
 | Steam Iron | XFSI | XFSI | Freeze | No |
 | Steam Boiler/Generator | XFSB | XFSB | Freeze | No |
 | Ironing Table | XFIT | XFIT | Freeze (absorb XFVT) | No |
-| Pressing Machine (Buck) | — | XFPB | Approve | No |
+| Pressing Machine (Buck) | — | XFPB | Approve — **applied, live shelf (CL-0027)** | No |
 | Collar & Cuff Press | XFCP | XFCP | Freeze | No |
 | Fusing Machine | XFFP | XFFP | Freeze | No |
 | Form Finisher | XFFF | XFFF | Freeze | No |
@@ -278,10 +278,10 @@ XSF, XSBH, XSBA, XSBT, XSBL, XSZ, XSEA, XSWB, XSLP, XSSM, XSBG, XSMT, XSUS · XA
 | Combination Embroidery | XEC | XEC | Decide reuse (XEC retired) | **Yes** |
 | Screen Printing | XPSP | XPSP | Freeze | No |
 | DTG Printer | XPDT | XPDT | Freeze | No |
-| DTF Printer | — | XPDF | Approve | No |
+| DTF Printer | — | XPDF | Approve — **applied, live shelf (CL-0027)** | No |
 | Sublimation Printer | XPSU | XPSU | Freeze | No |
 | Conveyor Dryer/Curing | — | XPCD→? | Resolve XP/XPC overlap | **Yes** |
-| DTF Powder Shaker | — | XPPS | Approve | No |
+| DTF Powder Shaker | — | XPPS | Approve — **applied, live shelf (CL-0027)** | No |
 | Heat Press (Flat) | XPH | XPH | Freeze | No |
 | Calender/Rotary Heat Press | XPRH(dup) | XPHR | Resolve XPRH duplicate | **Yes** |
 | Needle Detector | XPCN | XPCN (→XKN if XK adopted) | Freeze pending §4.4 | **Yes** |
@@ -330,6 +330,13 @@ XSF, XSBH, XSBA, XSBT, XSBL, XSZ, XSEA, XSWB, XSLP, XSSM, XSBG, XSMT, XSUS · XA
 | Bra Hardware (Fastening family) | XFAB | `bra-hardware-machines` | Live |
 | Garment Prep Unit | XAGP | `garment-prep-units` | Live |
 | Velcro cut-&-sew · Label pad printing | — | — | **PARKED by decision** (wait for a second source) |
+
+### CL-0027 additions (2026-08-21 — the S-KILO pair)
+| Product Type | Code | Live shelf | Status |
+|---|---|---|---|
+| UV-DTF Printer | XPUV | `uv-dtf-printers` | Live (new code) |
+| Pad Printing | XPPD | `pad-printing-machines` | Live (un-parked per its own condition) |
+| Rhinestone Shaking | — | — | **PARKED** (one source) |
 
 ## Counts
 - **Total Product Types:** 101  *(was 87; +14 from CL-0012: XFSS, XPCI, XMKP/D/S, XWIC/R/B/A, XMDS/D/C/H/N)*

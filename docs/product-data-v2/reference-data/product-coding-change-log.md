@@ -414,3 +414,17 @@ This follows the precedent set twice already: **CL-0014** rejected `XPRC` in fav
 - **The Knowledge half of the instruction:** the standing rule ("every new code goes into the coding system in the Knowledge app") had been broken by CL-0024 and CL-0025 themselves — all 10 of their codes were missing from `product-coding/data.ts`, invisible to the budgets §K gate because none carries a spec template. **All 13 codes** (CL-0024's six, CL-0025's four, CL-0026's three) are now taught: data.ts rows in their category blocks + full en/zh/ar labels in the page's LBL i18n table.
 - **JOOKE status after this entry:** 0 of 77 machines without a home. 15 housed by CL-0024/0025, 20 by this entry, 3 parked by decision, the rest always had homes.
 - **Status:** **Applied — live.**
+
+### CL-0027 · 2026-08-21 · The S-KILO pair — printing gets its four missing shelves, plus the actuation rule
+- **Approved by:** Kamal ("do it" — 2026-08-21, after the full what-we-have/what-we-need table for Printing & Heat Press).
+- **Trigger:** the S-KILO 2024+2025 catalogues (~85 models). The live 7 printing shelves absorb everything EXCEPT four families; everything outside printing already had homes (incl. `garment-prep-units` receiving the string-thrusting machines one day after CL-0026 created it).
+- **Executed (Approved-never-applied):**
+  - `XPDF` **DTF Printer** → `dtf-printers` — the opening family of both catalogues (6 models).
+  - `XPPS` **DTF Powder Shaker** → `dtf-powder-shakers` (6 standalone units).
+  - `XFPB` **Pressing Machine (Buck)** → `pressing-machines` under Ironing Systems (CL-0018 family; XF token) — the household steam presses.
+- **NEW code:** `XPUV` **UV-DTF Printer** → `uv-dtf-printers`. Not even registry-proposed, minted on judgment: an established global market class (crystal-label roll + cylinder/object UV printing), two models in S-KILO 2024.
+- **UN-PARKED:** `XPPD` **Pad Printing Machine** → `pad-printing-machines`. CL-0026 parked pad printing (JOOKE, one source) with the condition "wait for a second source" — S-KILO carries SIX pad printers across its two editions. The condition is met exactly as written.
+- **STILL PARKED:** the rhinestone shaking machine (one source, S-KILO only) — same one-source rule that parked velcro.
+- **FILING RULE (owner question: "pneumatic has double-station too — new subcategory?"):** **NO — actuation outranks station count.** Station count is a FACET (CL-0020 doctrine). The live `XPPH`/`XPDH` pair predates the doctrine and overlaps on pneumatic twins; rather than break live codes: a pneumatic press of ANY station count files under `pneumatic-heat-press-machines`; `double-station-heat-press-machines` keeps only NON-pneumatic twins; station count is recorded as a spec in every case. One machine, one home.
+- **Synchronized:** live subcategories (5 rows, zh/ar), Knowledge data.ts + i18n **in the same change** (the §K blind-spot lesson), master registry, approval matrix, S-KILO inventory doc, JOOKE decision paper un-park note.
+- **Status:** **Applied — live.** Printing & Heat Press: 7 → 11 shelves; both S-KILO catalogues fully absorbable.

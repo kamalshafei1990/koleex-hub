@@ -270,6 +270,17 @@ export const CATEGORIES: Category[] = [
       { code: "XPSP", label: "Screen Printing Machines" },
       { code: "XPDT", label: "Digital Textile Printers (DTG)" },
       { code: "XPSU", label: "Sublimation Printers" },
+      /* CL-0027 (2026-08-21) — the S-KILO catalogue pair. XPDF/XPPS were
+         Approved-never-applied; XPUV is minted (established UV-DTF market
+         class); XPPD un-parks CL-0026's pad-printing decision — KILO is
+         the second source the park condition required. Filing rule minted
+         the same day: ACTUATION OUTRANKS STATION COUNT — a pneumatic
+         double-station press files under Pneumatic; Double-Station keeps
+         only non-pneumatic twins; station count is always a spec. */
+      { code: "XPDF", label: "DTF Printers" },
+      { code: "XPPS", label: "DTF Powder Shakers" },
+      { code: "XPUV", label: "UV-DTF Printers" },
+      { code: "XPPD", label: "Pad Printing Machines" }
     ],
   },
   {
@@ -288,6 +299,8 @@ export const CATEGORIES: Category[] = [
       { code: "XFCP", label: "Collar & Cuff Press Machines" },
       { code: "XFTT", label: "Trouser Pressing Machines" },
       { code: "XFSP", label: "Spotting Machines" },
+      /* CL-0027: XFPB was Approved-never-applied; ironing family (CL-0018). */
+      { code: "XFPB", label: "Pressing Machines (Buck)" }
     ],
   },
   {
