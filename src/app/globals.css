@@ -689,6 +689,45 @@ html[data-kx-door="1"] .kx-shell-top { overflow-x: clip; }
   to   { opacity: 1; transform: translateY(0); }
 }
 
+/* ── Directional page push (owner pick 4A, motion system 2026-08-21) ─────
+   Going DEEPER in an app (list → record) the CONTENT AREA pushes in from
+   the side while the old page slides under with a parallax dim; coming
+   back it pops the other way. The scroll container gets its own
+   view-transition group so the shell header never moves; lateral
+   navigations (no data-kx-nav) keep the plain cross-fade above. The 24%
+   under-slide matches the samples the owner picked from. RTL flips. */
+@media (prefers-reduced-motion: no-preference) {
+  #main-scroll-container { view-transition-name: kx-main; }
+
+  html[data-kx-nav="fwd"]::view-transition-new(kx-main) {
+    animation: kx-page-enter-fwd 360ms var(--kx-ease-expo, cubic-bezier(0.16, 1, 0.3, 1)) both;
+  }
+  html[data-kx-nav="fwd"]::view-transition-old(kx-main) {
+    animation: kx-page-under-fwd 360ms var(--kx-ease-expo, cubic-bezier(0.16, 1, 0.3, 1)) both;
+  }
+  /* Back pop: the OLD (deeper) page must ride on top while it leaves. */
+  html[data-kx-nav="back"]::view-transition-old(kx-main) {
+    animation: kx-page-leave-back 360ms var(--kx-ease-expo, cubic-bezier(0.16, 1, 0.3, 1)) both;
+    z-index: 2;
+  }
+  html[data-kx-nav="back"]::view-transition-new(kx-main) {
+    animation: kx-page-return-back 360ms var(--kx-ease-expo, cubic-bezier(0.16, 1, 0.3, 1)) both;
+  }
+  /* RTL: the push comes from the other side. */
+  html[dir="rtl"][data-kx-nav="fwd"]::view-transition-new(kx-main) { animation-name: kx-page-enter-fwd-rtl; }
+  html[dir="rtl"][data-kx-nav="fwd"]::view-transition-old(kx-main) { animation-name: kx-page-under-fwd-rtl; }
+  html[dir="rtl"][data-kx-nav="back"]::view-transition-old(kx-main) { animation-name: kx-page-leave-back-rtl; }
+  html[dir="rtl"][data-kx-nav="back"]::view-transition-new(kx-main) { animation-name: kx-page-return-back-rtl; }
+}
+@keyframes kx-page-enter-fwd  { from { transform: translateX(100%); } }
+@keyframes kx-page-under-fwd  { to { transform: translateX(-24%); opacity: 0.5; } }
+@keyframes kx-page-leave-back { to { transform: translateX(100%); } }
+@keyframes kx-page-return-back { from { transform: translateX(-24%); opacity: 0.5; } }
+@keyframes kx-page-enter-fwd-rtl  { from { transform: translateX(-100%); } }
+@keyframes kx-page-under-fwd-rtl  { to { transform: translateX(24%); opacity: 0.5; } }
+@keyframes kx-page-leave-back-rtl { to { transform: translateX(-100%); } }
+@keyframes kx-page-return-back-rtl { from { transform: translateX(24%); opacity: 0.5; } }
+
 /* DECLARE THE PAGE'S OWN SCHEME, OR A PHONE BROWSER WILL INVENT ONE.
 
    Reported from an Oppo on the ColorOS browser: "most of the things the

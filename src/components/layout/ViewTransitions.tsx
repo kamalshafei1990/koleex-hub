@@ -175,13 +175,34 @@ export default function ViewTransitions() {
         return;
       }
 
+      /* Directional page push (owner pick 4A, motion system 2026-08-21):
+         going DEEPER inside an app (target extends the current path —
+         list → record) pushes the content area in from the side with the
+         old page sliding under in parallax; coming back up pops it the
+         other way. Lateral moves keep the plain cross-fade. The attribute
+         scopes the ::view-transition CSS in globals; only the
+         #main-scroll-container group slides — the shell header holds
+         still. RTL flips in CSS. */
+      const cur = window.location.pathname.replace(/\/$/, "");
+      const tgt = url.pathname.replace(/\/$/, "");
+      const nav = tgt.startsWith(cur + "/") ? "fwd"
+        : cur.startsWith(tgt + "/") ? "back"
+        : "";
+      const clearNav = () => document.documentElement.removeAttribute("data-kx-nav");
+      if (nav) {
+        document.documentElement.setAttribute("data-kx-nav", nav);
+        /* Belt & braces: a skipped/aborted transition must never leave the
+           attribute behind to mis-direct the NEXT navigation. */
+        window.setTimeout(clearNav, 900);
+      }
+
       const vt = doc.startViewTransition!(() => {
         router.push(url.pathname + url.search + url.hash);
       });
       /* Aborted transitions REJECT these promises (second nav, tab hide…);
          the navigation itself already happened, so the rejection is pure
          noise — but uncaught noise raised the dev overlay's red badge. */
-      vt.finished?.catch(() => {});
+      vt.finished?.catch(() => {}).finally(clearNav);
       vt.ready?.catch(() => {});
       vt.updateCallbackDone?.catch(() => {});
     };
