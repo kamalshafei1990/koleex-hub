@@ -658,11 +658,19 @@ body {
   html[data-kx-vt="home-return"] #main-scroll-container {
     view-transition-name: kx-stage;
   }
+  /* Re-tuned (owner: "not smooth and ease enough"): longer breath, gentler
+     curves, LATE fade. 430ms with a brisk-start curve read as a yank; the
+     out now uses a symmetric glide (soft-in, soft-out) over 600ms, and the
+     old screen stays fully OPAQUE for the first 55% of its travel — a
+     solid object leaving, dissolving only near the end. The in runs longer
+     than the out (680ms expo-out) so Home is still settling after the app
+     is gone — the tail of the motion is calm, and calm tails are what
+     "smooth" means to the eye. */
   html[data-kx-vt="home-return"]::view-transition-old(kx-stage) {
-    animation: kx-door-out 430ms cubic-bezier(0.32, 0.72, 0, 1) both;
+    animation: kx-door-out 600ms cubic-bezier(0.55, 0, 0.15, 1) both;
   }
   html[data-kx-vt="home-return"]::view-transition-new(kx-stage) {
-    animation: kx-door-in 520ms cubic-bezier(0.16, 1, 0.3, 1) both;
+    animation: kx-door-in 680ms cubic-bezier(0.16, 1, 0.3, 1) both;
   }
   html[data-kx-vt="home-return"][dir="rtl"]::view-transition-old(kx-stage) {
     animation-name: kx-door-out-rtl;
@@ -671,10 +679,24 @@ body {
     animation-name: kx-door-in-rtl;
   }
 }
-@keyframes kx-door-out { to { transform: translateX(56%) scale(0.98); opacity: 0; } }
-@keyframes kx-door-in { from { transform: translateX(-8%) scale(0.99); opacity: 0.45; } }
-@keyframes kx-door-out-rtl { to { transform: translateX(-56%) scale(0.98); opacity: 0; } }
-@keyframes kx-door-in-rtl { from { transform: translateX(8%) scale(0.99); opacity: 0.45; } }
+@keyframes kx-door-out {
+  0%   { transform: translateX(0) scale(1); opacity: 1; }
+  55%  { opacity: 1; }
+  100% { transform: translateX(58%) scale(0.985); opacity: 0; }
+}
+@keyframes kx-door-in {
+  from { transform: translateX(-9%) scale(0.992); opacity: 0.5; }
+  to   { transform: translateX(0) scale(1); opacity: 1; }
+}
+@keyframes kx-door-out-rtl {
+  0%   { transform: translateX(0) scale(1); opacity: 1; }
+  55%  { opacity: 1; }
+  100% { transform: translateX(-58%) scale(0.985); opacity: 0; }
+}
+@keyframes kx-door-in-rtl {
+  from { transform: translateX(9%) scale(0.992); opacity: 0.5; }
+  to   { transform: translateX(0) scale(1); opacity: 1; }
+}
 
 @keyframes kx-vt-out { to { opacity: 0; } }
 @keyframes kx-vt-in {
