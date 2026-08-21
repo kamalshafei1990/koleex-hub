@@ -13,7 +13,6 @@ import { useTranslation } from "@/lib/i18n";
 import { PRODUCT_ARRAY_COLUMNS, toTextArray } from "@/lib/product-array-columns";
 import { localizedName } from "@/lib/i18n-name";
 import { FieldHelp, IDENTIFIER_HELP } from "@/components/admin/form-sections/FieldHelp";
-import FeatureCardsSection from "@/components/admin/form-sections/FeatureCardsSection";
 import { PRODUCTS_UI_I18N } from "@/lib/products-ui-i18n";
 import { humanizeError } from "@/lib/ui/humanize-error";
 import ArrowLeftIcon from "@/components/icons/ui/ArrowLeftIcon";
@@ -101,7 +100,6 @@ import ExternalLinkIcon from "@/components/icons/ui/ExternalLinkIcon";
 import EyeIcon from "@/components/icons/ui/EyeIcon";
 import EyeOffIcon from "@/components/icons/ui/EyeOffIcon";
 import PlusIcon from "@/components/icons/ui/PlusIcon";
-import PictureIcon from "@/components/icons/ui/PictureIcon";
 import TrashIcon from "@/components/icons/ui/TrashIcon";
 import CrossIcon from "@/components/icons/ui/CrossIcon";
 import PencilIcon from "@/components/icons/ui/PencilIcon";
@@ -4515,22 +4513,11 @@ export default function ProductForm({ productId }: Props) {
               />
             </Section>
 
-            {/* ── Main Devices & Functions — the catalog photo-card pattern:
-                one card per device/function/part (photo + title + short
-                explanation). Universal across all categories; rendered as a
-                uniform card grid on the public page. */}
-            <Section
-              id="feature-cards"
-              icon={<PictureIcon className="h-4 w-4" />}
-              title={t("fc.title", "Main Devices & Functions")}
-              badge={product.feature_cards.length ? `${product.feature_cards.length}` : t("fc.badge", "Photo cards · public page")}
-              defaultOpen={false}
-            >
-              <FeatureCardsSection
-                cards={product.feature_cards}
-                onChange={(feature_cards) => updateProduct_({ feature_cards })}
-              />
-            </Section>
+            {/* "Main Devices & Functions" (feature_cards) used to live here —
+                retired 2026-08-21: the Feature Highlights tab is the same
+                catalog photo-card concept done properly (own table, model
+                pinning, any-locale translations). The column was empty on
+                every product when the section was removed. */}
 
             {/* Tags */}
             <Section id="tags" icon={<TagsIcon className="h-4 w-4" />} title={t("hero.tagsTitle", "Tags & Keywords")}>

@@ -45,7 +45,6 @@ export const UI_COMPONENT_MODULES: UiModule[] = [
       "FamilySharedDivider",
       "FamilySpecGrid",
       "FamilyStrip",
-      "FeatureCardsSection",
       "FieldHelp",
       "KnowledgeSection",
       "MediaSection",
