@@ -10,9 +10,9 @@
      · services — consultants, freelancers
      · capex    — equipment, furniture, durable assets */
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo } from "react";
 import type { PurchaseModuleProps } from "../shared";
-import { cardCls, sectionTitleCls, TONE_KIND_AURORA } from "../shared";
+import { cardCls, sectionTitleCls, TONE_KIND_AURORA, usePurchaseList } from "../shared";
 import { useSkin } from "@/lib/appearance";
 import LayoutGridIcon from "@/components/icons/ui/LayoutGridIcon";
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
@@ -39,20 +39,8 @@ const KIND_LABEL: Record<string, string> = {
 
 export default function CategoriesModule({ t }: PurchaseModuleProps) {
   const aurora = useSkin() === "aurora";
-  const [rows, setRows] = useState<Category[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      const res = await fetch("/api/purchase/list?resource=categories", { credentials: "include" });
-      const data = (res.ok ? await res.json() : { rows: [] }) as { rows: Category[] };
-      if (cancelled) return;
-      setRows(data.rows);
-      setLoading(false);
-    })();
-    return () => { cancelled = true; };
-  }, []);
+  const { data, loading } = usePurchaseList<{ rows: Category[] }>("categories");
+  const rows = useMemo(() => data?.rows ?? [], [data]);
 
   const grouped = useMemo(() => {
     const m = new Map<string, Category[]>();

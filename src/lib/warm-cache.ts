@@ -36,7 +36,7 @@
      how old they are.
    --------------------------------------------------------------------------- */
 
-import { useSyncExternalStore } from "react";
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 
 const PREFIX = "kx:warm:";
 /* Big enough for a list page, small enough that one screen cannot eat the
@@ -101,11 +101,12 @@ function clientSnapshot<T>(key: string, maxAgeMs: number): T | null {
 }
 const NO_SERVER_SNAPSHOT = () => null;
 
-/** The previous answer for `key`, or null on the server and on a cold tab. */
+/** The previous answer for `key`, or null on the server and on a cold tab.
+ *  An empty key means "this view must not be warmed" and always returns null. */
 export function useWarm<T>(key: string, maxAgeMs = DEFAULT_MAX_AGE_MS): T | null {
   return useSyncExternalStore<T | null>(
     NEVER_CHANGES,
-    () => clientSnapshot<T>(key, maxAgeMs),
+    () => (key ? clientSnapshot<T>(key, maxAgeMs) : null),
     NO_SERVER_SNAPSHOT,
   );
 }
@@ -125,3 +126,72 @@ export function dropWarm(key: string): void {
  *
  * Deriving keeps one source of truth and avoids a setState-inside-an-effect,
  * which this codebase lints against for good reason. */
+
+/* ── useWarmData — the whole pattern in one call ──────────────────────────
+   The block above is the contract, and writing it out by hand in every
+   screen is how it gets subtly wrong: a warm value copied into state instead
+   of derived, a fetch that forgets to persist, an error response cached as
+   if it were data. Fifty-odd tab screens need this, so it exists once.
+
+   `load` MUST be referentially stable (wrap it in useCallback) — it is an
+   effect dependency, and an inline function refetches on every render.
+
+   WHAT IT DELIBERATELY DOES NOT DO:
+
+   · It never caches a failed load. `load` should throw (or the caller should
+     throw) on a bad response; a rejected promise leaves the warm entry
+     untouched, so the screen keeps showing the last answer it trusted rather
+     than memorising an empty list as the truth.
+
+   · It has no opinion about FILTERED requests, and callers must. This cache
+     is keyed by name, not by query: warming a server-filtered list would
+     repaint someone's search result as if it were the whole catalogue on the
+     next open. Warm the DEFAULT view only — pass an EMPTY key the moment a
+     filter is applied and the screen loads normally, showing nothing rather
+     than something untrue. An empty key neither reads nor writes.
+
+   · Results arriving after unmount are dropped. A tab switched away from
+     mid-flight must not push state into a component that is gone, and its
+     answer must not overwrite a newer screen's warm entry. */
+export function useWarmData<T>(
+  key: string,
+  load: () => Promise<T>,
+  maxAgeMs = DEFAULT_MAX_AGE_MS,
+): { data: T | null; loading: boolean; error: unknown; reload: () => Promise<void> } {
+  const warm = useWarm<T>(key, maxAgeMs);
+  const [fresh, setFresh] = useState<T | null>(null);
+  const [error, setError] = useState<unknown>(null);
+  const aliveRef = useRef(true);
+  useEffect(() => {
+    aliveRef.current = true;
+    return () => { aliveRef.current = false; };
+  }, []);
+
+  const reload = useCallback(async () => {
+    try {
+      const d = await load();
+      if (!aliveRef.current) return;
+      if (key) writeWarm(key, d);
+      setFresh(d);
+      setError(null);
+    } catch (e) {
+      if (!aliveRef.current) return;
+      setError(e);
+    }
+  }, [key, load]);
+
+  /* set-state-in-effect follows `reload` into its body, finds setFresh, and
+     reports a synchronous update. It is not one: every setState in there sits
+     behind `await load()`, so the earliest it can run is a later task, long
+     after this effect returns. The rule cannot see past the await, and the
+     revalidate has to start from an effect — that is what "fetch after paint"
+     means. */
+  // eslint-disable-next-line react-hooks/set-state-in-effect
+  useEffect(() => { void reload(); }, [reload]);
+
+  const data = fresh ?? warm;
+  /* Loading means "nothing to show yet" — NOT "a request is in flight".
+     A warm screen is never loading, which is the entire point: the revalidate
+     runs behind a fully painted page. */
+  return { data, loading: data == null && error == null, error, reload };
+}
