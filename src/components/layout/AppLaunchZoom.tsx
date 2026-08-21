@@ -46,7 +46,7 @@ type Flight =
 const EXPAND_MS = 460;
 const FADE_MS = 240;
 const RETURN_IN_MS = 140;
-const RETURN_EXIT_MS = 380;
+const RETURN_EXIT_MS = 430;
 const RETURN_SAFETY_MS = 4000;
 
 const reducedMotion = () =>
@@ -256,35 +256,45 @@ export default function AppLaunchZoom() {
       return () => window.clearTimeout(t);
     }
     settlingRef.current = true;
-    /* THE EXIT, VERSION THREE — OUTWARD, BY ORDER. Cut one shrank into the
-       tile translucently ("not good"); cut two shrank into it solidly with
-       Home breathing in ("still not good … change it totally, I mean OUT
-       not IN"). So the tile is no longer the destination at all: the app
-       flies TOWARD you — the card scales past the viewport and dissolves,
-       the camera pushing THROUGH the leaving app — while Home rises into
-       place underneath (0.97→1 + dim→full; inward only, a >1 zoom would
-       overflow and dance). No tile hunt, no scroll hijack: Home returns
-       wherever the user left it. Uniform scale, so nothing distorts and no
-       counter-animation is needed. Origin slightly above center — objects
-       flying at you read as rising, not dropping. */
+    /* THE SLIDING DOOR — owner-picked from twenty live samples (2026-08-21,
+       batch two #12) after three authored cuts: the app slides OFF to one
+       side while Home slides INTO place from the other, both travelling the
+       same way — one door closing as the next opens. Two pieces of geometry
+       carry the whole thing safely:
+
+       · DIRECTION FOLLOWS THE DOCUMENT. In LTR the app exits rightward and
+         Home enters from the left; RTL mirrors both. "Away" should read
+         with the reading direction, and a hardcoded side would feel
+         backwards in the Arabic UI.
+       · OVERFLOW MATH, because the no-dancing rule is absolute. The card
+         may translate anywhere — it lives in a FIXED layer outside the
+         scroller and cannot grow scrollable overflow. Home may only start
+         offset toward the scroll-start side (negative-X in LTR, positive
+         in RTL): scrollable overflow only extends toward scroll-end, so an
+         entry from the start side can never flash a horizontal scrollbar
+         mid-flight. That asymmetry DECIDES the door's direction; it is not
+         a taste choice. */
     const wait = Math.max(0, expandDoneAtRef.current - performance.now());
     const t = window.setTimeout(() => {
       if (!el) { clear(); return; }
-      el.style.transformOrigin = "50% 42%";
+      const rtl = document.documentElement.dir === "rtl";
+      const out = rtl ? -55 : 55;   /* card exit, % of its own width */
+      const from = rtl ? 7 : -7;    /* Home entry offset — start side only */
+      el.style.transformOrigin = "50% 50%";
       const anim = el.animate(
         [
-          { transform: "scale(1)", opacity: 1 },
-          { transform: "scale(1.05)", opacity: 0.92, offset: 0.4 },
-          { transform: "scale(1.16)", opacity: 0 },
+          { transform: "translateX(0%) scale(1)", opacity: 1 },
+          { transform: `translateX(${out * 0.55}%) scale(0.985)`, opacity: 0.55, offset: 0.6 },
+          { transform: `translateX(${out}%) scale(0.97)`, opacity: 0 },
         ],
         { duration: RETURN_EXIT_MS, easing: "cubic-bezier(0.32, 0.72, 0, 1)", fill: "forwards" },
       );
       document.querySelector<HTMLElement>("[data-kx-home-stage]")?.animate(
         [
-          { transform: "scale(0.97)", opacity: 0.55 },
-          { transform: "scale(1)", opacity: 1 },
+          { transform: `translateX(${from}%) scale(0.985)`, opacity: 0.4 },
+          { transform: "translateX(0%) scale(1)", opacity: 1 },
         ],
-        { duration: RETURN_EXIT_MS + 140, easing: "cubic-bezier(0.16, 1, 0.3, 1)" },
+        { duration: RETURN_EXIT_MS + 90, easing: "cubic-bezier(0.16, 1, 0.3, 1)" },
       );
       anim.onfinish = clear;
       window.setTimeout(clear, RETURN_EXIT_MS + 400); /* belt & braces */
