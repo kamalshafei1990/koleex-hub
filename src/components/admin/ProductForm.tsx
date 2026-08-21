@@ -133,6 +133,7 @@ import PricingIntelligenceCard from "./form-sections/PricingIntelligenceCard";
 import AccessoryOptionsSection, { type AccessoryOptionRow, axesForSubcategory } from "./form-sections/AccessoryOptionsSection";
 import BaseFobCard from "./form-sections/BaseFobCard";
 import TabStrip from "@/components/ui/TabStrip";
+import { useTabMotion } from "@/components/ui/useTabMotion";
 import RelatedProductsSection from "./form-sections/RelatedProductsSection";
 import SearchSocialSection from "./form-sections/SearchSocialSection";
 import SewingMachineSection from "./form-sections/SewingMachineSection";
@@ -685,6 +686,9 @@ export default function ProductForm({ productId }: Props) {
 
   /* ── Wizard state ── */
   const [currentStep, setCurrentStep] = useState(0);
+  /* Directional pane swap (owner pick 3A): later tab slides in from the end,
+     earlier tab from the start; RTL flips in CSS. */
+  const tabMotion = useTabMotion(currentStep);
   const [completedSteps, setCompletedSteps] = useState<Set<number>>(new Set());
 
   /* ── UI state ── */
@@ -3338,7 +3342,7 @@ export default function ProductForm({ productId }: Props) {
         {/* ═══════════════════════════════════════════════════════════
            STEP: HERO (identity + primary model)
            ═══════════════════════════════════════════════════════════ */}
-        <div key={onePage ? "one-page" : currentStep} className={(onePage ? "space-y-10" : "") + " kx-tab-in"}>
+        <div key={onePage ? "one-page" : currentStep} className={(onePage ? "space-y-10" : "") + " " + (onePage ? "kx-tab-in" : tabMotion)}>
         {(onePage || steps[currentStep]?.id === "identity") && (
           <div id="sec-identity" className="space-y-5 scroll-mt-28">
             {/* ── HAS FAMILY ── the owner's switch: ON reveals the member

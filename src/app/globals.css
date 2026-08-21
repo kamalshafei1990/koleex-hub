@@ -943,6 +943,35 @@ input[type="number"]:not(.kx-spinner) {
   from { opacity: 0; }
   to   { opacity: 1; }
 }
+/* Directional pane swap (owner pick 3A, motion system 2026-08-21): the new
+   pane enters FROM the travel direction — going to a later tab it slides in
+   from the end, going back it slides in from the start — so tab rows read
+   like turning pages. Same fill-mode discipline as kx-tab-in below
+   (`backwards`, no will-change): no lingering transform, so fixed-position
+   descendants keep the viewport as their containing block once settled.
+   Under RTL the names swap, keeping the spatial story true. Use via
+   useTabMotion(index); first mount falls back to the plain rise. */
+@keyframes kx-tab-in-fwd {
+  from { opacity: 0; transform: translateX(24px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+@keyframes kx-tab-in-back {
+  from { opacity: 0; transform: translateX(-24px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+.kx-tab-fwd {
+  animation: kx-tab-in-fwd var(--kx-tab-in-dur, var(--kx-dur-slow, 0.32s))
+             var(--kx-tab-in-ease, var(--kx-ease-expo, cubic-bezier(0.16, 1, 0.3, 1))) backwards;
+}
+.kx-tab-back {
+  animation: kx-tab-in-back var(--kx-tab-in-dur, var(--kx-dur-slow, 0.32s))
+             var(--kx-tab-in-ease, var(--kx-ease-expo, cubic-bezier(0.16, 1, 0.3, 1))) backwards;
+}
+[dir="rtl"] .kx-tab-fwd { animation-name: kx-tab-in-back; }
+[dir="rtl"] .kx-tab-back { animation-name: kx-tab-in-fwd; }
+@media (prefers-reduced-motion: reduce) {
+  .kx-tab-fwd, .kx-tab-back { animation: none; }
+}
 .kx-tab-in-soft {
   animation: kx-tab-in-soft var(--kx-tab-in-dur, 0.32s)
              var(--kx-tab-in-ease, cubic-bezier(0.22, 1, 0.36, 1)) backwards;

@@ -11,6 +11,7 @@ import { hrT } from "@/lib/translations/hr";
 import type { EmployeeListItem } from "@/lib/employees-admin";
 import { cachedEmployeeList } from "@/lib/hr-admin";
 import { type TabId, TAB_IDS, TAB_LABEL_KEYS } from "./shared";
+import { useTabMotion } from "@/components/ui/useTabMotion";
 
 /* ── Icons ── */
 import BarChart3Icon from "@/components/icons/ui/BarChart3Icon";
@@ -100,6 +101,9 @@ export default function HRApp() {
     return (TAB_IDS as string[]).includes(t ?? "") ? (t as TabId) : "dashboard";
   })();
   const [activeTab, setActiveTab] = useState<TabId>(initialTab);
+  /* Directional pane swap (owner pick 3A) — direction from the tab's index
+     in the strip order; RTL flips in CSS. */
+  const tabMotion = useTabMotion(TAB_IDS.indexOf(activeTab));
 
   /* ── Shared employee list (many modules need it) ──
      Warm-start: hydrate instantly from the last session's snapshot so the
@@ -158,7 +162,7 @@ export default function HRApp() {
         {empLoading ? (
           <BrandLoading className="h-full min-h-[40vh]" />
         ) : (
-          <div key={activeTab} className="kx-tab-in">
+          <div key={activeTab} className={tabMotion}>
             <ActiveModule employees={employees} t={t} lang={lang} setActiveTab={setActiveTab} />
           </div>
         )}
