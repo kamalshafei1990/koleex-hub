@@ -5,7 +5,8 @@
    Card grid, search + category/type/status filters + sort, create modal.
    --------------------------------------------------------------------------- */
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
+import { useWarmData } from "@/lib/warm-cache";
 import Link from "next/link";
 import {
   COLLECTION_TYPES, COLLECTION_TYPE_LABEL, COLLECTION_CATEGORIES, COLLECTION_STATES,
@@ -45,8 +46,6 @@ const STATE_PILL: Record<string, string> = {
 
 export default function CollectionsBrowser() {
   const { t } = useTranslation(T);
-  const [cols, setCols] = useState<VisualCollection[]>([]);
-  const [loading, setLoading] = useState(true);
   const [q, setQ] = useState("");
   const [category, setCategory] = useState("");
   const [type, setType] = useState("");
@@ -55,18 +54,24 @@ export default function CollectionsBrowser() {
   const [showCreate, setShowCreate] = useState(false);
 
   const load = useCallback(async () => {
-    setLoading(true);
     const params = new URLSearchParams({ sort });
     if (category) params.set("category", category);
     if (type) params.set("collection_type", type);
     if (status) params.set("approval_status", status);
     if (q.trim()) params.set("q", q.trim());
     const res = await fetch(`/api/visual-library/collections?${params}`, { credentials: "include", cache: "no-store" });
-    const json = res.ok ? await res.json() : { collections: [] };
-    setCols(json.collections ?? []);
-    setLoading(false);
+    if (!res.ok) throw new Error(`collections: ${res.status}`);
+    return ((await res.json()).collections ?? []) as VisualCollection[];
   }, [sort, category, type, status, q]);
-  useEffect(() => { const timer = setTimeout(load, 200); return () => clearTimeout(timer); }, [load]);
+
+  /* ONLY THE DEFAULT VIEW IS WARMED: category / type / status / q all go to
+     the server, so a cached filtered answer would come back looking like the
+     whole shelf. An empty key opts a filtered render out entirely. */
+  const isDefaultView = !category && !type && !status && !q.trim();
+  const { data, loading } = useWarmData<VisualCollection[]>(
+    isDefaultView ? `db:collections:${sort}` : "", load,
+  );
+  const cols = useMemo(() => data ?? [], [data]);
 
   const grouped = useMemo(() => {
     const m: Record<string, VisualCollection[]> = {};

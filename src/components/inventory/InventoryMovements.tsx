@@ -16,6 +16,7 @@
    --------------------------------------------------------------------------- */
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useWarmData } from "@/lib/warm-cache";
 import { useInput } from "@/components/kds/useInput";
 import InventoryHeader from "@/components/inventory/InventoryHeader";
 import type { MovementStatus, MovementType } from "@/lib/inventory/types";
@@ -165,10 +166,8 @@ export default function InventoryMovements() {
     if (create) setPendingCreate(create);
   }, []);
 
-  const [movements, setMovements] = useState<MovementRow[]>([]);
   const [products, setProducts] = useState<ProductOption[]>([]);
   const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
-  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [tab, setTab] = useState<TabKey>("workflow");
   const [showForm, setShowForm] = useState(false);
@@ -258,25 +257,24 @@ export default function InventoryMovements() {
     return m;
   }, [warehouses]);
 
-  const loadMovements = useCallback(async () => {
-    setLoading(true); setError(null);
-    try {
-      const qs = new URLSearchParams();
-      qs.set("limit", "200");
-      const r = await fetch(`/api/inventory/movements?${qs.toString()}`, {
-        cache: "no-store", credentials: "include",
-      });
-      const j = await r.json();
-      if (!r.ok) throw new Error(humanizeError(j.error ?? `HTTP ${r.status}`));
-      setMovements((j.movements ?? []) as MovementRow[]);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
-    } finally {
-      setLoading(false);
-    }
+  /* Warm: the query carries only a fixed page size, no user filter, so the
+     response IS the default view. This is the table the operator watches
+     load, so it is the one that must be on screen when the tab commits.
+     The reference-data effect above stays cold on purpose — it fills
+     dropdowns, and nobody waits on a dropdown. */
+  const fetchMovements = useCallback(async () => {
+    const qs = new URLSearchParams();
+    qs.set("limit", "200");
+    const r = await fetch(`/api/inventory/movements?${qs.toString()}`, {
+      cache: "no-store", credentials: "include",
+    });
+    const j = await r.json();
+    if (!r.ok) throw new Error(humanizeError(j.error ?? `HTTP ${r.status}`));
+    return (j.movements ?? []) as MovementRow[];
   }, []);
-
-  useEffect(() => { void loadMovements(); }, [loadMovements]);
+  const { data: movementsData, loading, reload: loadMovements } =
+    useWarmData<MovementRow[]>("inv:movements", fetchMovements);
+  const movements = useMemo(() => movementsData ?? [], [movementsData]);
 
   /* Apply ?create= deep-link once the form state is wired. */
   useEffect(() => {

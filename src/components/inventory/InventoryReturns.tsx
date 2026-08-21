@@ -15,6 +15,7 @@
    --------------------------------------------------------------------------- */
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useWarmData } from "@/lib/warm-cache";
 import Link from "next/link";
 import InventoryHeader from "@/components/inventory/InventoryHeader";
 import RrIcon from "@/components/ui/RrIcon";
@@ -85,6 +86,14 @@ function contactLabel(c: ContactRow | undefined): string {
   );
 }
 
+type ReturnsSnap = {
+  returns: ReturnRow[];
+  warehouses: Warehouse[];
+  customers: ContactRow[];
+  suppliers: ContactRow[];
+  rollups: Record<string, ReturnRollup>;
+};
+
 export default function InventoryReturns() {
   const { t } = useTranslation({ ...inventoryT, ...RT_T });
   const [showMoreFilters, setShowMoreFilters] = useState(false);
@@ -96,14 +105,7 @@ export default function InventoryReturns() {
       return next;
     });
 
-  const [returns, setReturns] = useState<ReturnRow[]>([]);
-  const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
-  const [customers, setCustomers] = useState<ContactRow[]>([]);
-  const [suppliers, setSuppliers] = useState<ContactRow[]>([]);
-  const [rollups, setRollups] = useState<Record<string, ReturnRollup>>({});
   const [tab, setTab] = useState<TabKey>("all");
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
 
   /* INV-H5A — ?create=1 deep link */
@@ -113,23 +115,11 @@ export default function InventoryReturns() {
     if (params.get("create") === "1") setCreateOpen(true);
   }, []);
 
-  const warehouseMap = useMemo(() => {
-    const m = new Map<string, Warehouse>();
-    for (const w of warehouses) m.set(w.id, w);
-    return m;
-  }, [warehouses]);
-
-  const contactMap = useMemo(() => {
-    const m = new Map<string, ContactRow>();
-    for (const c of customers) m.set(c.id, c);
-    for (const c of suppliers) m.set(c.id, c);
-    return m;
-  }, [customers, suppliers]);
-
-  const load = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
+  /* Warm: every call here is fixed — `type=customer` / `type=supplier` are
+     the screen's own shape, not a user filter — so the response IS the
+     default view. The per-row rollups are cached with it, so a return visit
+     shows the table complete on the first frame. */
+  const fetchAll = useCallback(async (): Promise<ReturnsSnap> => {
       const [rRes, whRes, cRes, sRes] = await Promise.all([
         fetch("/api/inventory/returns?limit=500", { cache: "no-store", credentials: "include" }),
         fetch("/api/inventory/warehouses", { cache: "no-store", credentials: "include" }),
@@ -139,15 +129,27 @@ export default function InventoryReturns() {
       const rJ = await rRes.json();
       if (!rRes.ok) throw new Error(humanizeError(rJ.error ?? `HTTP ${rRes.status}`));
       const list = (rJ.returns ?? []) as ReturnRow[];
-      setReturns(list);
-
       const whJ = await whRes.json();
-      setWarehouses((whJ.warehouses ?? []) as Warehouse[]);
-
       const cJ = await cRes.json();
       const sJ = await sRes.json();
-      setCustomers((cJ.contacts ?? []) as ContactRow[]);
-      setSuppliers((sJ.contacts ?? []) as ContactRow[]);
+      /* KEEP THE SIX FIELDS THIS SCREEN DISPLAYS, DROP THE OTHER 243.
+         /api/contacts returns the FULL contact record — measured at 2.0MB for
+         343 contacts, 249 keys each — and this page uses exactly one thing
+         from it: a name to put next to a return. Carried whole, the snapshot
+         blew past the warm cache's 512KB ceiling and was dropped in silence,
+         which is why Returns was the one Inventory tab still showing a
+         spinner (2.8s) after every other tab went instant. Trimming here also
+         spares the render and the JSON round-trip. The 2MB still crosses the
+         wire, and that belongs to the contacts API, not to this screen. */
+      const slim = (rows: unknown): ContactRow[] =>
+        ((rows ?? []) as ContactRow[]).map((c) => ({
+          id: c.id,
+          display_name: c.display_name,
+          company_name: c.company_name,
+          full_name: c.full_name,
+          first_name: c.first_name,
+          last_name: c.last_name,
+        }));
 
       /* Pull rollups (item count) for the visible returns. */
       const rolls: Record<string, ReturnRollup> = {};
@@ -169,15 +171,37 @@ export default function InventoryReturns() {
           } catch {/* ignore */}
         }),
       );
-      setRollups(rolls);
-    } catch (e) {
-      setError(humanizeError(e instanceof Error ? e.message : String(e)));
-    } finally {
-      setLoading(false);
-    }
+      return {
+        returns: list,
+        warehouses: (whJ.warehouses ?? []) as Warehouse[],
+        customers: slim(cJ.contacts),
+        suppliers: slim(sJ.contacts),
+        rollups: rolls,
+      };
   }, []);
+  const { data, loading, error: loadError, reload: load } =
+    useWarmData<ReturnsSnap>("inv:returns", fetchAll);
+  const returns = useMemo(() => data?.returns ?? [], [data]);
+  const warehouses = useMemo(() => data?.warehouses ?? [], [data]);
+  const customers = useMemo(() => data?.customers ?? [], [data]);
+  const suppliers = useMemo(() => data?.suppliers ?? [], [data]);
+  const rollups = useMemo(() => data?.rollups ?? {}, [data]);
+  const error = loadError ? humanizeError(loadError instanceof Error ? loadError.message : String(loadError)) : null;
 
-  useEffect(() => { void load(); }, [load]);
+  const warehouseMap = useMemo(() => {
+    const m = new Map<string, Warehouse>();
+    for (const w of warehouses) m.set(w.id, w);
+    return m;
+  }, [warehouses]);
+
+  const contactMap = useMemo(() => {
+    const m = new Map<string, ContactRow>();
+    for (const c of customers) m.set(c.id, c);
+    for (const c of suppliers) m.set(c.id, c);
+    return m;
+  }, [customers, suppliers]);
+
+
 
   const filtered = useMemo(() => {
     if (tab === "all") return returns;
