@@ -6868,7 +6868,15 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                   for. top-0 is correct: these pin to the LIST's scroller, not
                   the page, so the under-glass offset other apps need does not
                   apply here. */}
-              <div className="kx-letterbar px-4 py-1.5 text-xs font-semibold text-[var(--text-dim)] bg-[var(--bg-surface-subtle)] sticky top-0 z-10 backdrop-blur-sm">
+              {/* NO backdrop-blur — it was already dead weight and the CSS rule for
+                  .kx-letterbar says so in its own words: these headers sit inside
+                  the filtered list pane, "a filtered ancestor starves a
+                  descendant's backdrop-filter, so that blur never rendered",
+                  which is why the rule gives them a dense FILL instead. The
+                  class stayed on the markup though, and a starved filter still
+                  builds a composited layer: measured 33 of them on /contacts,
+                  one per alphabet header, all paying for nothing. */}
+              <div className="kx-letterbar px-4 py-1.5 text-xs font-semibold text-[var(--text-dim)] bg-[var(--bg-surface-subtle)] sticky top-0 z-10">
                 {letter}
               </div>
               {/* Stacked mode puts the list across the whole app width, where a
