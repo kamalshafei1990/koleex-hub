@@ -728,6 +728,36 @@ html[data-kx-door="1"] .kx-shell-top { overflow-x: clip; }
 @keyframes kx-page-leave-back-rtl { to { transform: translateX(-100%); } }
 @keyframes kx-page-return-back-rtl { from { transform: translateX(24%); opacity: 0.5; } }
 
+/* ── Master→detail push, phone width (owner yes, motion system) ──────────
+   The iOS pattern for split screens (Settings first): on a phone the two
+   panes share one grid cell; opening a section slides the detail in over
+   the list, which recedes with a parallax dim — Back reverses it. The
+   end states hide the inactive pane with `visibility` (delayed to the
+   animation's end), so with reduced motion — where the global nuke zeroes
+   every duration — this degrades to exactly the old instant swap.
+   Desktop (md+) is untouched: the classes only exist under 767px. */
+@media (max-width: 767px) {
+  .kx-md-split { display: grid; grid-template-columns: minmax(0, 1fr); overflow-x: clip; }
+  .kx-md-split > .kx-md-list,
+  .kx-md-split > .kx-md-detail {
+    grid-area: 1 / 1;
+    transition:
+      transform var(--kx-dur-slow, 320ms) var(--kx-ease-expo, cubic-bezier(0.16, 1, 0.3, 1)),
+      opacity var(--kx-dur-slow, 320ms) var(--kx-ease-expo, cubic-bezier(0.16, 1, 0.3, 1)),
+      visibility 0s linear var(--kx-dur-slow, 320ms);
+  }
+  .kx-md-split > .kx-md-detail { transform: translateX(103%); visibility: hidden; pointer-events: none; }
+  [dir="rtl"] .kx-md-split > .kx-md-detail { transform: translateX(-103%); }
+  .kx-md-split.kx-md-pushed > .kx-md-detail {
+    transform: none; visibility: visible; pointer-events: auto; transition-delay: 0s;
+  }
+  .kx-md-split.kx-md-pushed > .kx-md-list {
+    transform: translateX(-28%); opacity: 0.5; visibility: hidden; pointer-events: none;
+  }
+  [dir="rtl"] .kx-md-split.kx-md-pushed > .kx-md-list { transform: translateX(28%); }
+  .kx-md-split:not(.kx-md-pushed) > .kx-md-list { transition-delay: 0s; }
+}
+
 /* DECLARE THE PAGE'S OWN SCHEME, OR A PHONE BROWSER WILL INVENT ONE.
 
    Reported from an Oppo on the ColorOS browser: "most of the things the
@@ -3361,6 +3391,10 @@ input[type="number"]:not(.kx-spinner) {
   to { opacity: 0; transform: translateY(-6px) scale(0.965); }
 }
 .kx-pop-closing { animation: kx-pop-out 140ms var(--kx-ease-exit, cubic-bezier(0.4, 0, 1, 1)) both !important; }
+/* Phone-sheet variant: a panel presented as a bottom/under-header sheet
+   leaves by sliding back down, not by shrinking. */
+@keyframes kx-sheet-out { to { opacity: 0; transform: translateY(28px); } }
+.kx-sheet-closing { animation: kx-sheet-out 200ms var(--kx-ease-exit, cubic-bezier(0.4, 0, 1, 1)) both !important; }
 
 /* ── Toast arrival & departure (owner pick, motion system) ──────────────
    Rises in, falls away. Put these on an inner node, never on the node that
@@ -3377,8 +3411,16 @@ input[type="number"]:not(.kx-spinner) {
 .kx-toast-out { animation: kx-toast-out 200ms var(--kx-ease-exit, cubic-bezier(0.4, 0, 1, 1)) both; }
 
 @media (prefers-reduced-motion: reduce) {
-  .kx-glass-pop, .kx-pop-closing, .kx-toast-in, .kx-toast-out { animation: none !important; }
+  .kx-glass-pop, .kx-pop-closing, .kx-sheet-closing, .kx-toast-in, .kx-toast-out { animation: none !important; }
 }
+
+/* Low-power tier: the DECORATIVE infinite loops pause (they were running
+   forever on weak devices while every glass arm was already dropped).
+   Loading indicators — the orb, the comet bar, the loadbar — keep moving:
+   a frozen loader reads as a hang. */
+[data-kx-lowpower] .kx-tier-metal,
+[data-kx-lowpower] .kx-update-capsule::before,
+[data-kx-lowpower] .kx-ai-glow::before { animation-play-state: paused; }
 
 /* ── The glow ring ──────────────────────────────────────────────────────
    A bright arc travelling slowly around the edge of a card.

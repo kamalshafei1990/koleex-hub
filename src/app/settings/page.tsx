@@ -373,10 +373,12 @@ function SettingsContent() {
 
       {/* Body */}
       <div className="relative z-[1] flex-1 min-h-0">
-        <div className="mx-auto max-w-[1600px] h-full px-4 md:px-6 py-5 md:grid md:grid-cols-[320px_minmax(0,1fr)] md:gap-8">
+        <div className={`kx-md-split ${mobileDetail ? "kx-md-pushed" : ""} mx-auto max-w-[1600px] h-full px-4 md:px-6 py-5 md:grid md:grid-cols-[320px_minmax(0,1fr)] md:gap-8`}>
 
-          {/* Master list — sidebar on iPad, full screen on iPhone. */}
-          <aside className={`${mobileDetail ? "hidden" : "block"} md:block h-full overflow-y-auto no-scrollbar space-y-4`}>
+          {/* Master list — sidebar on iPad, full screen on iPhone. The
+              hidden/block flip became the kx-md push (motion system):
+              opening a section slides the detail in over this list. */}
+          <aside className="kx-md-list md:block h-full overflow-y-auto no-scrollbar space-y-4">
             {/* Account card (Apple-ID style).
 
                 REFRACTION WAS TRIED HERE AND REMOVED. LiquidGlass wrapped this
@@ -472,7 +474,7 @@ function SettingsContent() {
           </aside>
 
           {/* Detail pane */}
-          <main className={`${mobileDetail ? "block" : "hidden"} md:block h-full overflow-y-auto no-scrollbar`}>
+          <main className="kx-md-detail max-md:bg-[var(--bg-primary)] md:block h-full overflow-y-auto no-scrollbar">
             {/* Mobile-only back to the settings list (iOS push nav). */}
             <button
               type="button"

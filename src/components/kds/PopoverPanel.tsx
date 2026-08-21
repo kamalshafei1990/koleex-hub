@@ -294,7 +294,7 @@ export default function PopoverPanel({
         overflowY: "auto",
         zIndex: 200,
       }}
-      className={`kx-glass-pop kx-pop-panel ${closing ? "kx-pop-closing" : ""} ${className}`}
+      className={`kx-glass-pop kx-pop-panel ${closing ? (rect.sheet ? "kx-sheet-closing" : "kx-pop-closing") : ""} ${className}`}
     >
       {children}
     </div>
