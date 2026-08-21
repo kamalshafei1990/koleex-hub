@@ -53,7 +53,30 @@ export default function ViewTransitions() {
     if (typeof doc.startViewTransition !== "function") return;
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
 
+    /* THE ONE GUARANTEED EXIT for the door. The choreography below holds
+       the live stage off-screen (fill: forwards) between the out and the
+       in — and the owner caught the failure class this creates: any path
+       that skips the release leaves a BLACK page (Home mounted, stage —
+       and the aurora ground inside it — parked at 112%) that only a
+       refresh could fix. So one idempotent restore, converged on from
+       EVERY terminal: arrival finish, arrival cancel, the armed failsafe,
+       and — crucially — the top of the NEXT click, so even an unforeseen
+       path self-heals the moment the user touches anything. Cancelling
+       animations and clearing inline styles is safe at any moment,
+       including after a clean finish. */
+    const restoreDoor = () => {
+      const st = document.getElementById("main-scroll-container");
+      if (st) {
+        st.getAnimations().forEach((a) => a.cancel());
+        st.style.transform = "";
+        st.style.opacity = "";
+      }
+      delete document.documentElement.dataset.kxDoor;
+    };
+
     const onClick = (e: MouseEvent) => {
+      /* A stuck door heals on the very next interaction, whatever it is. */
+      if (document.documentElement.dataset.kxDoor === "1") restoreDoor();
       /* Anything but a plain primary click means something else entirely —
          open in new tab, save, context menu. Never intercept those. */
       if (e.defaultPrevented || e.button !== 0) return;
@@ -101,12 +124,7 @@ export default function ViewTransitions() {
         const html = document.documentElement;
         html.dataset.kxDoor = "1";
         const dir = html.dir === "rtl" ? -1 : 1;
-        const cleanup = () => {
-          stage.getAnimations().forEach((a) => a.cancel());
-          stage.style.transform = "";
-          delete html.dataset.kxDoor;
-        };
-        const failsafe = window.setTimeout(cleanup, 1600);
+        const failsafe = window.setTimeout(restoreDoor, 1600);
         const out = stage.animate(
           [
             { transform: "translateX(0%)" },
@@ -118,7 +136,7 @@ export default function ViewTransitions() {
           router.push(url.pathname + url.search + url.hash);
           /* Wait for Home to COMMIT (its stage marker exists), then slide it
              in. rAF poll, bounded by the failsafe above. */
-          const deadline = performance.now() + 1100;
+          const deadline = performance.now() + 1000;
           const arrive = () => {
             const committed =
               window.location.pathname === "/" && document.querySelector("[data-kx-home-stage]");
@@ -149,7 +167,8 @@ export default function ViewTransitions() {
               ],
               { duration: 460, easing: "cubic-bezier(0.16, 1, 0.3, 1)" },
             );
-            inn.onfinish = () => { window.clearTimeout(failsafe); delete html.dataset.kxDoor; };
+            inn.onfinish = () => { window.clearTimeout(failsafe); restoreDoor(); };
+            inn.oncancel = () => { window.clearTimeout(failsafe); restoreDoor(); };
           };
           requestAnimationFrame(arrive);
         };
