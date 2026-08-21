@@ -17,6 +17,14 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import ImageRawIcon from "@/components/icons/ui/ImageRawIcon";
+import PencilIcon from "@/components/icons/ui/PencilIcon";
+import CheckIcon from "@/components/icons/ui/CheckIcon";
+import ArrowLeftIcon from "@/components/icons/ui/ArrowLeftIcon";
+import ArrowRightIcon from "@/components/icons/ui/ArrowRightIcon";
+import TrashIcon from "@/components/icons/ui/TrashIcon";
+import XCircleIcon from "@/components/icons/ui/XCircleIcon";
+import PlusIcon from "@/components/icons/ui/PlusIcon";
+import LanguagesIcon from "@/components/icons/ui/LanguagesIcon";
 import { LOCALES } from "@/types/product-form";
 import {
   fetchProductFeatureHighlights,
@@ -188,15 +196,21 @@ export default function FeatureHighlightsSection({
     "w-full bg-transparent text-[var(--text-primary)] outline-none placeholder:text-[var(--text-dim)]";
   const input =
     "w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-2.5 py-1.5 text-[12px] text-[var(--text-primary)] outline-none";
+  /* These chips sit ON the card photo, which is usually white — same story
+     as the product-card actions: the global Aurora hover would replace their
+     fill with 3% white and vanish them over a light image, so each one keeps
+     data-kx-keep-hover and manages its own dark-scrim contrast. */
   const chip =
-    "h-7 min-w-7 px-1.5 rounded-lg border text-[11px] inline-flex items-center justify-center";
+    "h-7 w-7 rounded-lg border backdrop-blur-sm inline-flex items-center justify-center transition-colors";
+  const chipDark =
+    "bg-black/60 border-white/25 text-white/85 hover:text-white hover:bg-black/75 disabled:opacity-30";
 
   return (
     <div className="space-y-4">
       <p className="text-[11.5px] text-[var(--text-muted)]">
         Catalog-style feature cards, laid out exactly like product cards. Click
-        ✎ to edit a card; the photo accepts click, drag&nbsp;&amp;&nbsp;drop, and
-        paste (a screenshot pastes straight in while editing).
+        the pencil to edit a card; the photo accepts click, drag&nbsp;&amp;&nbsp;drop,
+        and paste (a screenshot pastes straight in while editing).
       </p>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -229,10 +243,10 @@ export default function FeatureHighlightsSection({
                 )}
               </button>
               {editing && r.image_url && (
-                <button type="button" onClick={() => patch(i, { image_url: null })}
+                <button type="button" data-kx-keep-hover="" onClick={() => patch(i, { image_url: null })}
                   title="Remove photo"
-                  className={`${chip} absolute top-2 left-2 z-10 border-white/20 bg-black/60 text-white/85`}>
-                  🗑
+                  className={`${chip} absolute top-2 left-2 z-10 bg-black/60 border-white/25 text-white/85 hover:text-red-400 hover:bg-black/75`}>
+                  <XCircleIcon className="h-3.5 w-3.5" />
                 </button>
               )}
               <input
@@ -243,17 +257,24 @@ export default function FeatureHighlightsSection({
 
               {/* card actions — overlay on the photo, product-card style */}
               <div className="absolute top-2 right-2 z-10 flex gap-1 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
-                <button type="button" onClick={() => setEditingIdx(editing ? null : i)}
-                  title={editing ? "Close editing" : "Edit this card"}
-                  className={`${chip} ${editing ? "border-[#7FA9D6] bg-[#567FB2] text-white" : "border-white/20 bg-black/60 text-white/85"}`}>
-                  {editing ? "✓" : "✎"}
+                <button type="button" data-kx-keep-hover="" onClick={() => setEditingIdx(editing ? null : i)}
+                  title={editing ? "Done editing" : "Edit this card"}
+                  className={`${chip} ${editing ? "border-[#7FA9D6] bg-[#567FB2] text-white hover:bg-[#4a6f9e]" : chipDark}`}>
+                  {editing ? <CheckIcon className="h-3.5 w-3.5" /> : <PencilIcon className="h-3.5 w-3.5" />}
                 </button>
-                <button type="button" onClick={() => move(i, -1)} disabled={i === 0}
-                  className={`${chip} border-white/20 bg-black/60 text-white/80 disabled:opacity-30`}>←</button>
-                <button type="button" onClick={() => move(i, 1)} disabled={i === rows.length - 1}
-                  className={`${chip} border-white/20 bg-black/60 text-white/80 disabled:opacity-30`}>→</button>
-                <button type="button" onClick={() => remove(i)}
-                  className={`${chip} border-rose-400/40 bg-black/60 text-rose-300`}>×</button>
+                <button type="button" data-kx-keep-hover="" onClick={() => move(i, -1)} disabled={i === 0}
+                  title="Move left" className={`${chip} ${chipDark}`}>
+                  <ArrowLeftIcon className="h-3.5 w-3.5" />
+                </button>
+                <button type="button" data-kx-keep-hover="" onClick={() => move(i, 1)} disabled={i === rows.length - 1}
+                  title="Move right" className={`${chip} ${chipDark}`}>
+                  <ArrowRightIcon className="h-3.5 w-3.5" />
+                </button>
+                <button type="button" data-kx-keep-hover="" onClick={() => remove(i)}
+                  title="Delete this card"
+                  className={`${chip} bg-black/60 border-white/25 text-white/85 hover:text-red-400 hover:bg-black/75`}>
+                  <TrashIcon className="h-3.5 w-3.5" />
+                </button>
               </div>
 
               {/* body */}
@@ -301,8 +322,9 @@ export default function FeatureHighlightsSection({
                       ))}
                     </select>
                     <button type="button" onClick={() => void translateCard(i)} disabled={translating}
-                      className="rounded-lg border border-[#7FA9D6]/50 bg-[#567FB2]/15 px-2.5 py-1.5 text-[11.5px] text-[#BCD8F0] disabled:opacity-40">
-                      {translating ? "Translating…" : "⚡ Translate"}
+                      className="inline-flex items-center gap-1.5 rounded-lg border border-[#7FA9D6]/50 bg-[#567FB2]/15 px-2.5 py-1.5 text-[11.5px] text-[#BCD8F0] disabled:opacity-40">
+                      <LanguagesIcon className="h-3.5 w-3.5" />
+                      {translating ? "Translating…" : "Translate"}
                     </button>
                   </div>
 
@@ -347,7 +369,7 @@ export default function FeatureHighlightsSection({
           onClick={add}
           className="flex aspect-[4/3] w-full flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-colors sm:aspect-auto sm:min-h-[220px]"
         >
-          <span className="text-2xl leading-none">＋</span>
+          <PlusIcon className="h-6 w-6" />
           <span className="text-[11.5px]">Add feature card</span>
         </button>
       </div>
