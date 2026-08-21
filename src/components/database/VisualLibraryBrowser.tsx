@@ -123,6 +123,16 @@ export default function VisualLibraryBrowser() {
     } finally { setCatBusy(false); }
   };
 
+  /* DELIBERATELY NOT WARM-CACHED, and this note exists so nobody "fixes"
+     that by raising the cache ceiling. Every other tab in Database paints
+     from its last answer; this one cannot. Measured: 5,087 assets at ~0.83MB
+     per thousand rows — about 4.2MB even in the trimmed ?view=list shape,
+     eight times the warm cache's per-entry cap and most of a tab's whole
+     storage budget. Over the cap, writeWarm is a silent no-op: the screen
+     would look untouched while quietly writing nothing, which is exactly the
+     failure that hid behind Inventory's Returns tab. This browser has its own
+     performance story (parallel pages, list projection); it does not get to
+     eat the budget every other screen shares. */
   const reqRef = useRef(0);
   const load = useCallback(async () => {
     const myReq = ++reqRef.current;

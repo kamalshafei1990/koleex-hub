@@ -12,7 +12,8 @@
    header + title.
    --------------------------------------------------------------------------- */
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import { useWarmData } from "@/lib/warm-cache";
 import Link from "next/link";
 import ArrowLeftIcon from "@/components/icons/ui/ArrowLeftIcon";
 import PlusIcon from "@/components/icons/ui/PlusIcon";
@@ -323,8 +324,6 @@ function DeleteModal({
 /* ── Main manager ── */
 export default function BrandsManager({ embedded = false }: { embedded?: boolean }) {
   const { t } = useTranslation(T);
-  const [brands, setBrands] = useState<BrandItem[]>([]);
-  const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
 
   const [editBrand, setEditBrand] = useState<BrandItem | null>(null);
@@ -333,14 +332,12 @@ export default function BrandsManager({ embedded = false }: { embedded?: boolean
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    const data = await fetchBrandsWithDetails();
-    setBrands(data);
-    setLoading(false);
-  }, []);
-
-  useEffect(() => { load(); }, [load]);
+  /* Warm: the brand list takes no filter — search is applied client-side
+     below — so the response IS the default view. Paints from the last answer
+     on the first frame, refreshes behind it. */
+  const fetchAll = useCallback(() => fetchBrandsWithDetails(), []);
+  const { data, loading, reload: load } = useWarmData<BrandItem[]>("db:brands", fetchAll);
+  const brands = useMemo(() => data ?? [], [data]);
 
   const filtered = search.trim()
     ? brands.filter(b => b.name.toLowerCase().includes(search.toLowerCase()))

@@ -13,7 +13,8 @@
    so a reviewer never leaves the board. KOLEEX dark / minimal.
    --------------------------------------------------------------------------- */
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
+import { useWarmData } from "@/lib/warm-cache";
 import type { VisualAsset, ReviewStatus, RiskLevel } from "@/lib/visual-library/types";
 import { REVIEW_STATUS_LABEL } from "@/lib/visual-library/types";
 import { RISK_TONE, reviewStatusTone } from "@/lib/visual-library/review";
@@ -104,10 +105,6 @@ const STATUS_I18N: Record<ReviewStatus, string> = {
 
 export default function ReviewBoard() {
   const { t } = useTranslation(T);
-  const [dash, setDash] = useState<Dashboard | null>(null);
-  const [items, setItems] = useState<QueueItem[]>([]);
-  const [total, setTotal] = useState(0);
-  const [loadingQueue, setLoadingQueue] = useState(true);
 
   // filters
   const [status, setStatus] = useState("");
@@ -118,26 +115,39 @@ export default function ReviewBoard() {
   // drawer
   const [openAsset, setOpenAsset] = useState<VisualAsset | null>(null);
 
-  const loadDash = useCallback(() => {
-    fetch(`/api/visual-library/review/dashboard`, { credentials: "include", cache: "no-store" })
-      .then((r) => r.ok ? r.json() : null).then((j) => { if (j) setDash(j); }).catch(() => {});
+  /* The eight counter cards take no filter, so they are warmed outright —
+     they are the first thing on the screen and the last thing worth waiting
+     for. */
+  const fetchDash = useCallback(async () => {
+    const r = await fetch(`/api/visual-library/review/dashboard`, { credentials: "include", cache: "no-store" });
+    if (!r.ok) throw new Error(`review dashboard: ${r.status}`);
+    return (await r.json()) as Dashboard;
   }, []);
+  const { data: dash, reload: loadDash } = useWarmData<Dashboard>("db:review:dash", fetchDash);
 
-  const loadQueue = useCallback(() => {
-    setLoadingQueue(true);
+  const fetchQueue = useCallback(async () => {
     const p = new URLSearchParams();
     if (status) p.set("status", status);
     if (risk) p.set("risk_level", risk);
     if (prodReady) p.set("production_ready", prodReady);
     p.set("sort", sort); p.set("pageSize", "60");
-    fetch(`/api/visual-library/review/queue?${p.toString()}`, { credentials: "include", cache: "no-store" })
-      .then((r) => r.ok ? r.json() : { items: [], total: 0 })
-      .then((j) => { setItems(j.items ?? []); setTotal(j.total ?? 0); })
-      .catch(() => {}).finally(() => setLoadingQueue(false));
+    const r = await fetch(`/api/visual-library/review/queue?${p.toString()}`, { credentials: "include", cache: "no-store" });
+    if (!r.ok) throw new Error(`review queue: ${r.status}`);
+    const j = await r.json();
+    return { items: (j.items ?? []) as QueueItem[], total: (j.total ?? 0) as number };
   }, [status, risk, prodReady, sort]);
 
-  useEffect(() => { loadDash(); }, [loadDash]);
-  useEffect(() => { loadQueue(); }, [loadQueue]);
+  /* ONLY THE DEFAULT QUEUE IS WARMED — status / risk / production-ready go to
+     the server, and a cached filtered queue would come back looking like the
+     whole backlog. Sort is part of the key instead of disqualifying the view:
+     it reorders the same set, it does not narrow it. */
+  const isDefaultQueue = !status && !risk && !prodReady;
+  const { data: queue, loading: loadingQueue, reload: loadQueue } =
+    useWarmData<{ items: QueueItem[]; total: number }>(
+      isDefaultQueue ? `db:review:queue:${sort}` : "", fetchQueue,
+    );
+  const items = useMemo(() => queue?.items ?? [], [queue]);
+  const total = queue?.total ?? 0;
 
   const openRow = async (assetId: string) => {
     const j = await fetch(`/api/visual-library/${assetId}`, { credentials: "include", cache: "no-store" }).then((r) => r.ok ? r.json() : null).catch(() => null);
