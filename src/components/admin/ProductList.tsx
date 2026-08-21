@@ -396,6 +396,17 @@ const ProductCard = memo(function ProductCard({
               light image (owner: "I can't see clearly if under white
               background"). A fixed dark scrim + a light rim reads on any
               photo in any theme; Core keeps the token, where it is solid. */}
+          {/* NO backdrop-blur ON THESE TWO, and the number is why: they are
+              2 per card × 214 cards = 428 live blur layers on one screen —
+              measured 2026-08-21, and they were 428 of the 429 filtered
+              elements on the whole page. They are also INVISIBLE at rest on
+              desktop (opacity-0 until the card is hovered), and a
+              compositor still pays for a filtered layer it is not showing.
+              Nothing is lost visually: they already sit on a fixed
+              black/60 scrim, which is what makes them readable over a white
+              photo — the blur under an opaque-enough scrim showed nothing.
+              This cost was SKIN-INDEPENDENT, which is why it survived the
+              kx-flat-items sweep (that rule targets .kx-glass). */}
           {/* data-kx-keep-hover, both of them: the global Aurora hover
               REPLACES a control's own hover fill with its 3% white + blue
               rim — which over a white product photo turned this scrim
@@ -409,7 +420,7 @@ const ProductCard = memo(function ProductCard({
             href={`${baseRoute}/${p.id}/edit`}
             data-kx-keep-hover=""
             onClick={(e) => e.stopPropagation()}
-            className={`h-8 w-8 rounded-lg border backdrop-blur-sm flex items-center justify-center transition-colors ${
+            className={`h-8 w-8 rounded-lg border flex items-center justify-center transition-colors ${
               aurora
                 ? "bg-black/60 border-white/25 text-white/85 hover:text-white hover:bg-black/75"
                 : "bg-[var(--bg-primary)]/80 border-[var(--border-subtle)] text-[var(--text-muted)] hover:text-[var(--text-primary)]"
@@ -421,7 +432,7 @@ const ProductCard = memo(function ProductCard({
           <button
             data-kx-keep-hover=""
             onClick={(e) => onAskDelete(e, p.id, p.product_name)}
-            className={`h-8 w-8 rounded-lg border backdrop-blur-sm flex items-center justify-center transition-colors ${
+            className={`h-8 w-8 rounded-lg border flex items-center justify-center transition-colors ${
               aurora
                 ? "bg-black/60 border-white/25 text-white/85 hover:text-red-400 hover:bg-black/75"
                 : "bg-[var(--bg-primary)]/80 border-[var(--border-subtle)] text-[var(--text-muted)] hover:text-red-400"
