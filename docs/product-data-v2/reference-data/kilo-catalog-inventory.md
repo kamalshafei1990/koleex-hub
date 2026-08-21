@@ -60,5 +60,7 @@ entry volume from this supplier.
 model/count as specs, max print width as THE sizing spec, color channels,
 speed-by-pass ladder, ink-supply and maintenance feature sets, powder-shaker
 pairing). **Prod = 9 templates; Printing & Heat Press has its first.**
-Next richest: pneumatic presses (plate-size ladder × ~30 models), roller
-calenders (drum width/power/speed).
+✅ Pneumatic press template BUILT 2026-08-21 (`pneumatic-heat-press`, 9
+sections / 24 fields — plate-size ladder, slide styles, press formats,
+heating build, IR positioning, safety set; station count = spec per the
+actuation rule). **Prod = 10 templates.** Next: roller calenders.
