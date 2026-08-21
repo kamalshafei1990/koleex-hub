@@ -15,7 +15,7 @@
    the animation restarts.
    --------------------------------------------------------------------------- */
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 export function useTabMotion(index: number): string {
   /* Render-phase derived state — same pattern as usePresence. */
@@ -25,5 +25,20 @@ export function useTabMotion(index: number): string {
     setPrev(index);
     setDir(index > prev ? 1 : -1);
   }
+
+  /* While the 24px slide is in flight the pane pokes past the scroller's
+     edge, and the scroller's overflow-y:auto forces overflow-x to auto —
+     on visible-scrollbar platforms that flashed a horizontal scrollbar on
+     every switch (the "dancing" family). Same cure as the Home door: clip
+     X for the flight only, then release so nothing's paint is ever
+     permanently clipped. */
+  useEffect(() => {
+    if (dir === 0) return;
+    const root = document.documentElement;
+    root.setAttribute("data-kx-tabslide", "1");
+    const t = setTimeout(() => root.removeAttribute("data-kx-tabslide"), 420);
+    return () => clearTimeout(t);
+  }, [dir, index]);
+
   return dir === 0 ? "kx-tab-in" : dir > 0 ? "kx-tab-fwd" : "kx-tab-back";
 }

@@ -169,8 +169,11 @@ function Section({ icon, title, children, id, defaultOpen = true, badge }: {
   icon: React.ReactNode; title: string; children: React.ReactNode; id?: string; defaultOpen?: boolean; badge?: string;
 }) {
   const [open, setOpen] = useState(defaultOpen);
+  /* No kx-tab-in on the section any more: the step pane already slides in
+     (directional 3A) — pane slide + per-section rise + body unfolds all at
+     once read as GLITCH, not polish. One surface, one motion. */
   return (
-    <section id={id} {...kxInspectAttrs({ component: sectionComponentName(title), module: "Product Data", section: title })} className="kx-tab-in scroll-mt-24 kx-glass bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] overflow-hidden transition-shadow hover:shadow-[0_2px_12px_rgba(0,0,0,0.15)]">
+    <section id={id} {...kxInspectAttrs({ component: sectionComponentName(title), module: "Product Data", section: title })} className="scroll-mt-24 kx-glass bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] overflow-hidden transition-shadow hover:shadow-[0_2px_12px_rgba(0,0,0,0.15)]">
       <button
         type="button"
         onClick={() => setOpen(!open)}

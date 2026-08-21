@@ -29,7 +29,10 @@
    clobbers an element's transition-colors — soft press-in, crisp release.
    Opt-out: data-no-press. Opt-in for non-buttons: .kx-press. */
 @media (prefers-reduced-motion: no-preference) {
-  button:not([data-no-press]):active,
+  /* Compact controls only: full-width buttons (section headers, master
+     rows, list rows) visibly WOBBLE at scale — they are excluded, and can
+     opt in with .kx-press if a surface wants it. */
+  button:not([data-no-press]):not(.w-full):active,
   .kx-press:not([data-no-press]):active {
     scale: 0.97;
     transition: scale var(--kx-dur-press) var(--kx-ease-out);
@@ -697,7 +700,11 @@ html[data-kx-door="1"] .kx-shell-top { overflow-x: clip; }
    navigations (no data-kx-nav) keep the plain cross-fade above. The 24%
    under-slide matches the samples the owner picked from. RTL flips. */
 @media (prefers-reduced-motion: no-preference) {
-  #main-scroll-container { view-transition-name: kx-main; }
+  /* The content area becomes its own transition group ONLY while a
+     directional nav is in flight. Naming it unconditionally gave every
+     plain navigation a second cross-fading snapshot on top of the root
+     fade — a double-exposure ghost on every click. */
+  html[data-kx-nav] #main-scroll-container { view-transition-name: kx-main; }
 
   html[data-kx-nav="fwd"]::view-transition-new(kx-main) {
     animation: kx-page-enter-fwd 360ms var(--kx-ease-expo, cubic-bezier(0.16, 1, 0.3, 1)) both;
@@ -1038,6 +1045,11 @@ input[type="number"]:not(.kx-spinner) {
 }
 [dir="rtl"] .kx-tab-fwd { animation-name: kx-tab-in-back; }
 [dir="rtl"] .kx-tab-back { animation-name: kx-tab-in-fwd; }
+/* While a slide is in flight (useTabMotion stamps the attr for 420ms) the
+   scroller clips X so the 24px overshoot can never flash a horizontal
+   scrollbar. Transient by design — a permanent clip on the scroller would
+   clip sticky/hover paint (the door's lesson). */
+html[data-kx-tabslide] #main-scroll-container { overflow-x: clip; }
 @media (prefers-reduced-motion: reduce) {
   .kx-tab-fwd, .kx-tab-back { animation: none; }
 }
@@ -1050,9 +1062,13 @@ input[type="number"]:not(.kx-spinner) {
    closed); the open leg animates on mount, the close leg is played by
    usePresence before unmount. */
 .kx-collapse { display: grid; grid-template-rows: 1fr; }
-.kx-collapse > * { overflow: hidden; min-height: 0; }
+.kx-collapse > * { min-height: 0; }
+/* Clip ONLY while a leg is playing — a steady-state overflow:hidden cut
+   every inline-absolute dropdown inside form sections (SelectWithCreate is
+   not portalled). At rest the body must clip nothing. */
+.kx-collapse-opening > *, .kx-collapse-closing > * { overflow: hidden; }
 @media (prefers-reduced-motion: no-preference) {
-  .kx-collapse { animation: kx-collapse-open 280ms var(--kx-ease-standard, cubic-bezier(0.4, 0, 0.2, 1)); }
+  .kx-collapse-opening { animation: kx-collapse-open 280ms var(--kx-ease-standard, cubic-bezier(0.4, 0, 0.2, 1)); }
   .kx-collapse-closing { animation: kx-collapse-close 220ms var(--kx-ease-standard, cubic-bezier(0.4, 0, 0.2, 1)) both; }
 }
 @keyframes kx-collapse-open {

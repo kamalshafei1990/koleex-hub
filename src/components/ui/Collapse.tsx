@@ -7,12 +7,18 @@
 
      <Collapse open={open}>…body…</Collapse>
 
-   Uses the grid-template-rows 0fr↔1fr trick (the one sanctioned layout
-   animation — an accordion's job IS to move the content below it) and
-   usePresence so the close leg plays before unmount. The body stays
-   UNMOUNTED while closed, so heavy section editors cost nothing shut.
+   TWO HARD RULES, learned the painful way on day one:
+   1. `overflow: hidden` exists ONLY while an animation is playing. A
+      steady-state clip silently cut every inline-absolute dropdown inside
+      the form sections (SelectWithCreate and friends are NOT portalled) —
+      the exact "state class changed geometry" failure class the owner has
+      named before. At rest the body clips nothing.
+   2. The unfold plays ONLY on a real user toggle — never on mount. Tab
+      switches remount every section; animating them all made the pane
+      slide + section unfolds pile into visual noise.
    --------------------------------------------------------------------------- */
 
+import { useState } from "react";
 import { usePresence } from "@/components/kds/usePresence";
 
 export default function Collapse({
@@ -25,9 +31,24 @@ export default function Collapse({
   className?: string;
 }) {
   const { mounted, closing } = usePresence(open, 240);
+  /* Render-phase edge detection: opening becomes true only when the OPEN
+     PROP flips true after first render — a mount with open=true stays
+     still. Cleared on animationend so the clip lifts at rest. */
+  const [prevOpen, setPrevOpen] = useState(open);
+  const [opening, setOpening] = useState(false);
+  if (prevOpen !== open) {
+    setPrevOpen(open);
+    if (open) setOpening(true);
+  }
   if (!mounted) return null;
+  const anim = closing ? "kx-collapse-closing" : opening ? "kx-collapse-opening" : "";
   return (
-    <div className={`kx-collapse ${closing ? "kx-collapse-closing" : ""}`}>
+    <div
+      className={`kx-collapse ${anim}`}
+      onAnimationEnd={(e) => {
+        if (e.target === e.currentTarget && opening) setOpening(false);
+      }}
+    >
       <div className={className}>{children}</div>
     </div>
   );
