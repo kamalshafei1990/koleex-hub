@@ -3001,6 +3001,15 @@ html[data-kx-tabslide] #main-scroll-container { overflow-x: clip; }
 [data-kx-skin="aurora"][data-theme="light"] :is(.kx-pd, .kx-app) .kx-ph-tabs [aria-selected="false"]:hover {
   background-color: rgba(0, 0, 0, 0.055) !important;
 }
+/* The SELECTED tab answers the cursor too — but by deepening its own blue,
+   never by changing colour. It is already the tab you are on; hover is an
+   acknowledgement, not a state change. */
+[data-kx-skin="aurora"] :is(.kx-pd, .kx-app) .kx-ph-tabs [aria-selected="true"]:hover {
+  background-color: rgba(86, 127, 178, 0.16) !important;
+}
+[data-kx-skin="aurora"][data-theme="light"] :is(.kx-pd, .kx-app) .kx-ph-tabs [aria-selected="true"]:hover {
+  background-color: rgba(86, 127, 178, 0.16) !important;
+}
 
 /* ── THE PRIMARY BUTTON STAYS WHITE. ONLY ITS HOVER WAS WRONG ──────────
    Owner, after I turned it Hub Blue: "keep it white same as before but just
@@ -3024,7 +3033,16 @@ html[data-kx-tabslide] #main-scroll-container { overflow-x: clip; }
    — SOLID WHITE in dark theme — the moment the pointer touched them. Owner, on
    the Supplier tab: "fix the hover and selected field UI issues, it becomes
    white." A tint is not a fill; `/` is what tells them apart. */
-[data-kx-skin="aurora"] :is(.kx-pd, .kx-app) [class*="bg-[var(--bg-inverted)]"]:not([class*="bg-[var(--bg-inverted)]/"]):not([data-kx-keep-inverted]):hover {
+/* ⚠️ A TAB IS NOT A PRIMARY BUTTON. The selected tab carries
+   `bg-[var(--bg-inverted)]` in its Tailwind classes, so it matched this rule
+   and, on hover, took `background-color: var(--bg-inverted) !important` —
+   flipping the selected tab to SOLID WHITE in dark mode and SOLID BLACK in
+   light mode, every time the cursor passed over it. Owner, on the Sales tab
+   bar: "the tab already selected, when I hover it, in dark mode becomes
+   white and in light mode becomes black". At rest the tab's own recipe
+   paints it Hub Blue; hover has no business overriding that. Tabs are
+   excluded here and governed by the .kx-ph-tabs rules above. */
+[data-kx-skin="aurora"] :is(.kx-pd, .kx-app) [class*="bg-[var(--bg-inverted)]"]:not([role="tab"]):not([class*="bg-[var(--bg-inverted)]/"]):not([data-kx-keep-inverted]):hover {
   /* NOTHING HERE MAY DARKEN THE BUTTON. Round one pinned the opacity but
      added `0 6px 18px -6px rgba(0,0,0,.45)` — a black drop shadow — and the
      owner said it was still dark, correctly: I had removed one way of dimming
