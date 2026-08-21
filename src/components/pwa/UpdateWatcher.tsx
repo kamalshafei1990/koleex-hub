@@ -13,6 +13,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "@/lib/i18n";
+import { whenNetworkQuiet } from "@/lib/net-idle";
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 
 /* The commit this BUNDLE was compiled from. Primary source: the kx-build
@@ -132,9 +133,13 @@ export default function UpdateWatcher() {
        gone quiet; a stale build stays stale for a couple more seconds, which
        is nothing against the interval this already runs on. */
     let firstCheck: number | undefined;
-    const ric = (window as Window & { requestIdleCallback?: (cb: () => void, o?: { timeout: number }) => number }).requestIdleCallback;
-    if (ric) ric(() => { void check(); }, { timeout: 4000 });
-    else firstCheck = window.setTimeout(() => { void check(); }, 2000);
+    /* Same correction as the presence beat: requestIdleCallback fired this
+       at 815ms into a screen open, competing with the six data fetches it
+       meant to yield to (main thread idle ≠ network idle). Measured on
+       Product Data, 2026-08-21. */
+    void whenNetworkQuiet({ quietMs: 700, maxWaitMs: 6000 }).then(() => {
+      if (alive) void check();
+    });
     /* HEAL WHILE HIDDEN. The user must never watch a full page load: the
        browser keeps the OLD page on screen until the new document commits,
        so a reload triggered mid-tap looks like "it threw me back to Home,

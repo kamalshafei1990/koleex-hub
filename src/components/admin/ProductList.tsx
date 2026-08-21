@@ -2891,7 +2891,12 @@ export default function ProductList() {
           {/* 8, not 14: each section now carries 24px of its own bottom padding
               so its cards' hover glow is not clipped by paint containment
               (see SECTION_CV). 32 + 24 = the 56px this used to be. */}
-          <div className="space-y-8">
+          {/* kx-flat-items: every product card below loses its blur pass and
+              keeps its surface — one attribute covering all category
+              sections at once. See the rule in globals for the measurement
+              (cards flashing blank on a fast scroll: hundreds of live blur
+              layers per frame). */}
+          <div className="kx-flat-items space-y-8">
           {categoryTree.map((cat) => (
             /* Every section renders; content-visibility:auto skips the paint +
                layout of the offscreen ones. This replaced a progressive-mount

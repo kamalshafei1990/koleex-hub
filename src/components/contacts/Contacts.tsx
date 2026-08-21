@@ -6752,7 +6752,11 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
       </div>
 
       {/* Contact list */}
-      <div className="flex-1 overflow-y-auto will-change-scroll">
+      {/* kx-flat-items: the contact rows below drop their blur pass and keep
+          their surface. This list is the Hub's longest (the scale target is
+          6,000 contacts) — see the rule in globals for why repeated items
+          never get a blur pass. */}
+        <div className="kx-flat-items flex-1 overflow-y-auto will-change-scroll">
         {/* LIST EDGE — the same ramp Purchase runs, moved to the surface that
             actually scrolls.
 
