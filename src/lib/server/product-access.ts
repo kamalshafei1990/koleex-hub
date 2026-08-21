@@ -139,6 +139,22 @@ export const SECRET_MODEL_FIELDS: readonly string[] = [
   "moq",          // supplier minimum order qty
 ];
 
+/** The full COST-side surface of a model row: the secrets plus the cost
+ *  provenance columns. This is what a Product Data editor WITHOUT
+ *  can_view_private must never read — and never write. Everything else on
+ *  the row (specs_overrides, supplier_overrides, i18n, packing, coding…)
+ *  is normal catalog data such an editor works with every day; stripping
+ *  more than this from their read made the form hydrate those fields
+ *  empty and the next save NULL them in the DB (the family-override
+ *  data-loss bug, 2026-08-21). */
+export const MODEL_COST_FIELDS: readonly string[] = [
+  ...SECRET_MODEL_FIELDS,
+  "cost_source",
+  "cost_updated_at",
+  "cost_updated_by",
+  "cost_updated_by_name",
+];
+
 /** Strip a list of keys from any row/object. Safe on null. */
 export function stripSecrets<T extends Record<string, unknown>>(
   row: T | null,

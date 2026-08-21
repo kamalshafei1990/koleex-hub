@@ -557,6 +557,31 @@ function StatusBadge({ status, t }: { status: string; t: (key: string, fallback?
 /* ═══════════════════════════════════════════════════════════════════
    MAIN PRODUCT FORM (WIZARD)
    ═══════════════════════════════════════════════════════════════════ */
+
+/* Every ModelFormState field that persists to product_models. Save diffs a
+   model against its hydration baseline over EXACTLY these keys and PATCHes
+   only what changed — an untouched key is never sent, so it can never
+   overwrite or NULL another session's save. Keep in sync with the
+   modelData builder in save(). */
+const MODEL_SYNC_KEYS = [
+  "model_name", "slug", "tagline", "supplier", "reference_model",
+  "cost_price", "pricing_mode", "price_note", "global_price",
+  "supports_head_only", "supports_complete_set", "head_only_price",
+  "complete_set_price", "weight", "net_weight", "cbm", "carton_dimensions",
+  "packing_type", "box_include", "extra_accessories", "container_20ft_qty",
+  "container_40ft_qty", "container_40hq_qty", "stock_status",
+  "supplier_overrides", "order", "visible", "status", "moq", "lead_time",
+  "barcode", "primary_model", "code_prefix", "coding_status",
+  "specs_overrides", "name_i18n", "tagline_i18n",
+] as const satisfies readonly (keyof ModelFormState)[];
+
+/** Deep-clone the persisted slice of a model's form state (the baseline). */
+function modelBaselineOf(m: ModelFormState): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const k of MODEL_SYNC_KEYS) out[k] = structuredClone(m[k]);
+  return out;
+}
+
 interface Props {
   productId?: string;
 }
@@ -741,6 +766,13 @@ export default function ProductForm({ productId }: Props) {
 
   /* ── Track original IDs for diff in edit mode ── */
   const [originalModelIds, setOriginalModelIds] = useState<string[]>([]);
+  /* Per-model save baseline: the form state exactly as HYDRATED (or as last
+     saved) plus the row's updated_at. Save diffs against this and PATCHes
+     only the keys the operator actually changed, with the updated_at as an
+     optimistic lock — so an untouched field can never overwrite (or NULL)
+     what someone else saved meanwhile. Root fix for the family-override
+     data-loss bug (2026-08-21). */
+  const modelBaselines = useRef<Map<string, { form: Record<string, unknown>; updated_at: string | null }>>(new Map());
   const [originalMediaIds, setOriginalMediaIds] = useState<string[]>([]);
   const [originalTranslationIds, setOriginalTranslationIds] = useState<string[]>([]);
 
@@ -1171,6 +1203,16 @@ export default function ProductForm({ productId }: Props) {
           tagline_i18n: ((m as { tagline_i18n?: Record<string, string> | null }).tagline_i18n) ?? {},
         }));
         setModels(mappedModels);
+        /* Save baseline: what each row looked like at hydration + its
+           updated_at for the optimistic lock (dbModels pairs by index). */
+        modelBaselines.current = new Map(
+          mappedModels.flatMap((mm, i) => mm.id
+            ? [[mm.id, {
+                form: modelBaselineOf(mm),
+                updated_at: ((dbModels[i] as { updated_at?: string | null })?.updated_at) ?? null,
+              }] as const]
+            : []),
+        );
         setOriginalModelIds(modelIds);
         if (mappedModels.length > 1) setFamilyOn(true);
 
@@ -1607,8 +1649,12 @@ export default function ProductForm({ productId }: Props) {
      to the supplier-link sync below. */
   const memberCtx = familyOn && !!models[safeActiveMember];
   const activeModel = models[safeActiveMember];
+  /* Functional update — the closure form (`models.map`) rewrote the WHOLE
+     array from a stale render whenever an async callback (AI translate,
+     the cost-migration effect) fired between renders, silently reverting
+     a member's typed edits before Save ever ran (2026-08-21). */
   const updateActiveMember = (u: Partial<ModelFormState>) =>
-    setModels(models.map((m, i) => (i === safeActiveMember ? { ...m, ...u } : m)));
+    setModels(prev => prev.map((m, i) => (i === safeActiveMember ? { ...m, ...u } : m)));
 
   /* ── Hero photo, scoped to the selected member ──
      Declared here rather than beside the other hero helpers above because it
@@ -2788,44 +2834,59 @@ export default function ProductForm({ productId }: Props) {
             }
             return Object.keys(out).length > 0 ? out : null;
           })(),
+          /* Member translations used to ride a separate best-effort PATCH
+             whose failure was swallowed; the columns are live, so they save
+             with everything else now. */
+          name_i18n: m.name_i18n && Object.keys(m.name_i18n).length ? m.name_i18n : null,
+          tagline_i18n: m.tagline_i18n && Object.keys(m.tagline_i18n).length ? m.tagline_i18n : null,
         };
 
+        const modelLabel = m.primary_model || m.model_name || `#${m.order + 1}`;
         if (m.id) {
-          /* updateModel returns a boolean and never throws — ignoring it
-             meant a failed model write (403, validation, anything) still
-             ended in "Product saved successfully!". The operator then
-             reports "my price didn't save" and nothing anywhere says why.
-             A failed model write is a failed SAVE: name the model, stop. */
-          const ok = await updateModel(m.id, modelData);
-          if (!ok) {
+          /* Diff against the hydration baseline and PATCH only what the
+             operator actually changed, guarded by the loaded updated_at.
+             A full-row write from stale state was how one save silently
+             reverted every other session's member overrides (2026-08-21). */
+          const base = modelBaselines.current.get(m.id);
+          const changedKeys = base
+            ? MODEL_SYNC_KEYS.filter(
+                (k) => JSON.stringify(m[k] ?? null) !== JSON.stringify(base.form[k] ?? null),
+              )
+            : [...MODEL_SYNC_KEYS];
+          if (changedKeys.length === 0) {
+            tempIdToRealId[m._tempId] = m.id;
+            continue;
+          }
+          const patch: Record<string, unknown> = {};
+          for (const k of changedKeys) patch[k] = modelData[k];
+          if (base?.updated_at) patch._expected_updated_at = base.updated_at;
+          /* A failed model write is a failed SAVE: name the model, stop —
+             nothing half-written, and a conflict says WHO to blame. */
+          const res = await updateModel(m.id, patch);
+          if (!res.ok) {
             throw new Error(
-              t("save.modelFailed", "Couldn't save model \"{code}\" — the rest of the save was stopped so nothing is half-written. Check your access or try again.")
-                .replace("{code}", m.primary_model || m.model_name || `#${m.order + 1}`),
+              res.conflict
+                ? t("save.modelConflict", "Model \"{code}\" was changed by someone else while you were editing. Reload the product, check their change, then re-apply yours.")
+                    .replace("{code}", modelLabel)
+                : t("save.modelFailed", "Couldn't save model \"{code}\" — the rest of the save was stopped so nothing is half-written. Check your access or try again.")
+                    .replace("{code}", modelLabel),
             );
           }
+          modelBaselines.current.set(m.id, { form: modelBaselineOf(m), updated_at: res.updated_at ?? null });
           tempIdToRealId[m._tempId] = m.id;
         } else {
           const created = await createModel({ ...modelData, sku: "auto" });
           if (!created) {
             throw new Error(
               t("save.modelCreateFailed", "Couldn't create model \"{code}\" — the rest of the save was stopped.")
-                .replace("{code}", m.primary_model || m.model_name || `#${m.order + 1}`),
+                .replace("{code}", modelLabel),
             );
           }
+          modelBaselines.current.set(created.id, {
+            form: modelBaselineOf(m),
+            updated_at: (created as { updated_at?: string | null }).updated_at ?? null,
+          });
           tempIdToRealId[m._tempId] = created.id;
-        }
-        /* Member translations ride a SEPARATE best-effort write: if the
-           name_i18n/tagline_i18n columns aren't migrated yet, this fails
-           quietly and the product save is untouched. */
-        const realId = m.id || tempIdToRealId[m._tempId];
-        const hasI18n = (m.name_i18n && Object.keys(m.name_i18n).length) || (m.tagline_i18n && Object.keys(m.tagline_i18n).length);
-        if (realId && hasI18n) {
-          try {
-            await updateModel(realId, {
-              name_i18n: m.name_i18n && Object.keys(m.name_i18n).length ? m.name_i18n : null,
-              tagline_i18n: m.tagline_i18n && Object.keys(m.tagline_i18n).length ? m.tagline_i18n : null,
-            });
-          } catch { /* pending migration — advisory only */ }
         }
       }
 
@@ -2835,6 +2896,12 @@ export default function ProductForm({ productId }: Props) {
           if (!currentModelIds.includes(oldId)) await deleteModel(oldId);
         }
       }
+      /* Attach the real ids to freshly created members and refresh the
+         reconciliation list — without this a second save in the same
+         session re-created new members (or tripped the code-taken check)
+         because state still held them id-less. */
+      setModels(prev => prev.map(mm => mm.id ? mm : (tempIdToRealId[mm._tempId] ? { ...mm, id: tempIdToRealId[mm._tempId] } : mm)));
+      setOriginalModelIds(models.map(mm => mm.id || tempIdToRealId[mm._tempId]).filter((x): x is string => !!x));
 
       for (const item of media) {
         if (item._file && !item.id) {

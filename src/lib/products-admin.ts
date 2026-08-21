@@ -65,7 +65,7 @@ async function jsend(
   url: string,
   method: "POST" | "PATCH" | "PUT" | "DELETE",
   body?: unknown,
-): Promise<{ ok: boolean; json: Record<string, unknown> }> {
+): Promise<{ ok: boolean; status: number; json: Record<string, unknown> }> {
   try {
     const res = await fetch(url, {
       method,
@@ -79,10 +79,10 @@ async function jsend(
        bumpProductsWriteVersion above) — reads after a save must never be
        answered by the browser's HTTP cache. */
     if (res.ok) bumpProductsWriteVersion();
-    return { ok: res.ok, json };
+    return { ok: res.ok, status: res.status, json };
   } catch (e) {
     console.error(`[products-admin ${method}]`, url, e);
-    return { ok: false, json: {} };
+    return { ok: false, status: 0, json: {} };
   }
 }
 
@@ -379,9 +379,20 @@ export async function createModel(model: Record<string, unknown>): Promise<Produ
   const { ok, json } = await jsend("/api/product-models", "POST", model);
   return ok ? ((json.model as ProductModelRow) ?? null) : null;
 }
-export async function updateModel(id: string, updates: Record<string, unknown>): Promise<boolean> {
-  const { ok } = await jsend(`/api/product-models/${id}`, "PATCH", updates);
-  return ok;
+export interface UpdateModelResult {
+  ok: boolean;
+  /** true when the row changed under us (optimistic-lock 409) */
+  conflict?: boolean;
+  /** the row's new updated_at after a successful write */
+  updated_at?: string | null;
+}
+export async function updateModel(id: string, updates: Record<string, unknown>): Promise<UpdateModelResult> {
+  const { ok, status, json } = await jsend(`/api/product-models/${id}`, "PATCH", updates);
+  return {
+    ok,
+    conflict: status === 409 || (json as { conflict?: boolean } | null)?.conflict === true,
+    updated_at: (json as { updated_at?: string | null } | null)?.updated_at ?? null,
+  };
 }
 export async function deleteModel(id: string): Promise<boolean> {
   const { ok } = await jsend(`/api/product-models/${id}`, "DELETE");

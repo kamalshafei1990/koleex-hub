@@ -93,11 +93,15 @@ export async function POST(req: Request) {
   // ── 1. Tenant-scoped exact lookup: model_name → primary_model → reference_model
   let found: FoundModel | null = null;
   for (const col of ["model_name", "primary_model", "reference_model"] as const) {
+    /* Deterministic pick: without an order, .limit(1) over an ambiguous
+       ilike match returned an ARBITRARY family member — the quotation cost
+       could land on a different model each time. Primary (order 0) first. */
     const { data, error } = await supabaseServer
       .from("product_models")
       .select("id, product_id, cost_price, product:products!inner(id, description, tenant_id)")
       .eq("products.tenant_id", tenantId)
       .ilike(col, pattern)
+      .order("order", { ascending: true })
       .limit(1);
     if (error) {
       console.error("[save-cost] lookup", col, error.message);
