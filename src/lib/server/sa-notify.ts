@@ -152,9 +152,26 @@ async function suppressedRecipients(ids: string[], kind: AlertKind): Promise<Set
     .from("notification_preferences")
     .select("account_id, prefs")
     .in("account_id", ids);
+  /* THE SETTINGS TOGGLE NEVER WORKED, and this is the key mismatch that
+     broke it: the Settings tab writes ONE umbrella key — "security_alerts"
+     — while this lookup only ever read the fine-grained kind ("login",
+     "new_device", …). Muting security alerts in Settings therefore did
+     nothing; measured on the owner's inbox as 188 accumulated alert rows.
+     The umbrella now covers the SIGN-IN NOISE family only. The sensitive
+     admin kinds (data_delete, admin_role_change, sensitive_export,
+     settings_change, file_change, price_cost_change) stay unmutable by
+     the umbrella on purpose: a super-admin silencing "someone deleted
+     data" with a broad toggle is a hole, not a preference. */
+  const UMBRELLA_KINDS: ReadonlySet<AlertKind> = new Set([
+    "login", "new_device", "new_ip", "failed_login_threshold", "suspicious",
+  ]);
   for (const row of (data ?? []) as Array<{ account_id: string; prefs: Record<string, unknown> }>) {
     const pref = row.prefs?.[kind] as { inapp?: boolean } | undefined;
-    if (pref && pref.inapp === false) off.add(row.account_id);
+    if (pref && pref.inapp === false) { off.add(row.account_id); continue; }
+    if (UMBRELLA_KINDS.has(kind)) {
+      const umbrella = row.prefs?.["security_alerts"] as { inapp?: boolean } | undefined;
+      if (umbrella && umbrella.inapp === false) off.add(row.account_id);
+    }
   }
   return off;
 }

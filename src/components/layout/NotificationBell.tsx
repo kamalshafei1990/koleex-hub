@@ -614,6 +614,28 @@ export default function NotificationBell({ dk, defaultOpen = false }: { dk: bool
     const aid = accountIdRef.current;
     if (!aid) return;
 
+    /* SCOPED TO THE ACTIVE FILTER (owner request): standing on "Task
+       reminders" and pressing the button clears task reminders — not the
+       approvals you haven't looked at yet. On "All" it behaves exactly as
+       before. Per-id marking for a filtered set (the sets are small once
+       the lifecycle fixes landed); the one bulk call stays for "All". */
+    if (filter !== "all" && filter !== "discuss") {
+      const targets = messages.filter((m) => {
+        if ((m as { read_at?: string | null }).read_at) return false;
+        const a = classifyInboxActivity((m as { metadata?: unknown }).metadata);
+        return filter === "other" ? a === null : a === filter;
+      });
+      if (targets.length === 0) return;
+      const nowIso = new Date().toISOString();
+      const ids = new Set(targets.map((m) => m.id));
+      setInboxUnread((n) => Math.max(0, n - targets.length));
+      setMessages((prev) =>
+        prev.map((m) => (ids.has(m.id) ? { ...m, read_at: nowIso } : m)),
+      );
+      targets.forEach((m) => void markMessageRead(m.id));
+      return;
+    }
+
     /* Optimistic local clear. */
     if (inboxUnread > 0) {
       setInboxUnread(0);
