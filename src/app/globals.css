@@ -640,63 +640,15 @@ body {
     animation: kx-vt-in 300ms cubic-bezier(0.22, 1, 0.36, 1) both;
   }
 }
-/* ── THE SLIDING DOOR (back-to-Home only) ────────────────────────────────
-   Owner-picked #12 of twenty live samples. The REAL pixels slide: while
-   html[data-kx-vt="home-return"] is set (ViewTransitions sets it before the
-   snapshot, clears it after), the scroll stage gets its own
-   view-transition-name, which LIFTS it out of the root group — so the app's
-   actual screenshot slides off one way and Home's slides in behind it,
-   while the header/sidebar (still in root) just settle in place. Naming the
-   stage ONLY under the flag is load-bearing: named permanently it would
-   drop out of every ordinary navigation's tuned root settle.
-
-   Direction follows the document (RTL mirrors). Overflow is a non-issue by
-   construction: VT snapshots animate in the browser's overlay layer and can
-   never grow scrollable overflow — the no-dancing rule holds at any
-   translation. */
-@media (prefers-reduced-motion: no-preference) {
-  html[data-kx-vt="home-return"] #main-scroll-container {
-    view-transition-name: kx-stage;
-  }
-  /* Re-tuned (owner: "not smooth and ease enough"): longer breath, gentler
-     curves, LATE fade. 430ms with a brisk-start curve read as a yank; the
-     out now uses a symmetric glide (soft-in, soft-out) over 600ms, and the
-     old screen stays fully OPAQUE for the first 55% of its travel — a
-     solid object leaving, dissolving only near the end. The in runs longer
-     than the out (680ms expo-out) so Home is still settling after the app
-     is gone — the tail of the motion is calm, and calm tails are what
-     "smooth" means to the eye. */
-  html[data-kx-vt="home-return"]::view-transition-old(kx-stage) {
-    animation: kx-door-out 600ms cubic-bezier(0.55, 0, 0.15, 1) both;
-  }
-  html[data-kx-vt="home-return"]::view-transition-new(kx-stage) {
-    animation: kx-door-in 680ms cubic-bezier(0.16, 1, 0.3, 1) both;
-  }
-  html[data-kx-vt="home-return"][dir="rtl"]::view-transition-old(kx-stage) {
-    animation-name: kx-door-out-rtl;
-  }
-  html[data-kx-vt="home-return"][dir="rtl"]::view-transition-new(kx-stage) {
-    animation-name: kx-door-in-rtl;
-  }
-}
-@keyframes kx-door-out {
-  0%   { transform: translateX(0) scale(1); opacity: 1; }
-  55%  { opacity: 1; }
-  100% { transform: translateX(58%) scale(0.985); opacity: 0; }
-}
-@keyframes kx-door-in {
-  from { transform: translateX(-9%) scale(0.992); opacity: 0.5; }
-  to   { transform: translateX(0) scale(1); opacity: 1; }
-}
-@keyframes kx-door-out-rtl {
-  0%   { transform: translateX(0) scale(1); opacity: 1; }
-  55%  { opacity: 1; }
-  100% { transform: translateX(-58%) scale(0.985); opacity: 0; }
-}
-@keyframes kx-door-in-rtl {
-  from { transform: translateX(9%) scale(0.992); opacity: 0.5; }
-  to   { transform: translateX(0) scale(1); opacity: 1; }
-}
+/* ── THE SLIDING DOOR — the one rule the live-DOM edition needs ──────────
+   The door itself is WAAPI on the live scroller (ViewTransitions.tsx); CSS
+   only has to make the 112% travel physically unable to grow a horizontal
+   scrollbar: while the flight flag is up, the shell clips X. Set on the
+   shell, not the scroller — clipping the scroller would also clip its own
+   sticky/hover paint. (The VT-snapshot door that lived here was retired:
+   capturing a full page + rendering Home inside the transition callback
+   stalls frame one, and no curve hides a first-frame hitch.) */
+html[data-kx-door="1"] .kx-shell-top { overflow-x: clip; }
 
 @keyframes kx-vt-out { to { opacity: 0; } }
 @keyframes kx-vt-in {

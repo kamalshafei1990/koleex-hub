@@ -76,34 +76,79 @@ export default function ViewTransitions() {
       if (url.pathname === window.location.pathname && url.search === window.location.search) return;
 
       e.preventDefault();
-      /* THE SLIDING DOOR rides THIS transition (owner pick #12; the cover-
-         card version glitched — a generic branded panel sliding aside is
-         not "the app leaving", and mid-flight it uncovered a half-committed
-         page). The VT API is the only thing that can slide the REAL pixels:
-         flag the html element BEFORE the snapshot so the CSS below scopes
-         the door to this navigation only, and clear it when the transition
-         settles either way. Everything else keeps the standard settle. */
+
+      /* ── THE SLIDING DOOR, LIVE-DOM EDITION ────────────────────────────
+         Owner pick #12, fourth architecture, and the reason for the fourth:
+         the VT-snapshot version stalled at its FIRST frame — capturing a
+         full-page snapshot and rendering Home inside the transition
+         callback blocks the main thread, and no easing curve can hide a
+         hitch at frame one ("still no good"). So no snapshots at all: the
+         LIVE scroller — the app's actual, still-mounted screen — slides
+         fully off on the compositor; in the off-screen beat only the aurora
+         ground breathes (that gap is a feature, not a flaw: a clean breath
+         between rooms); the route commits while nothing is on stage; and
+         the freshly-mounted Home slides in from the other side. Every
+         frame animates a live layer; nothing is captured, nothing stalls.
+
+         Geometry guards: the shell clips horizontally during the flight
+         (html[data-kx-door] rule) so the 112% travel can never grow a
+         scrollbar — the no-dancing rule; direction follows dir (RTL
+         mirrors); a 1.6s failsafe strips transform + flag so no failure
+         mode can strand the page off-screen. */
       const homeReturn = url.pathname === "/" && !!getActiveAppId(window.location.pathname);
-      if (homeReturn) document.documentElement.dataset.kxVt = "home-return";
-      const clearFlag = () => {
-        if (document.documentElement.dataset.kxVt === "home-return") {
-          delete document.documentElement.dataset.kxVt;
-        }
-      };
+      const stage = homeReturn ? document.getElementById("main-scroll-container") : null;
+      if (homeReturn && stage && document.documentElement.dataset.kxDoor !== "1") {
+        const html = document.documentElement;
+        html.dataset.kxDoor = "1";
+        const dir = html.dir === "rtl" ? -1 : 1;
+        const cleanup = () => {
+          stage.getAnimations().forEach((a) => a.cancel());
+          stage.style.transform = "";
+          delete html.dataset.kxDoor;
+        };
+        const failsafe = window.setTimeout(cleanup, 1600);
+        const out = stage.animate(
+          [
+            { transform: "translateX(0%)" },
+            { transform: `translateX(${dir * 112}%)` },
+          ],
+          { duration: 380, easing: "cubic-bezier(0.5, 0, 0.7, 0.6)", fill: "forwards" },
+        );
+        out.onfinish = () => {
+          router.push(url.pathname + url.search + url.hash);
+          /* Wait for Home to COMMIT (its stage marker exists), then slide it
+             in. rAF poll, bounded by the failsafe above. */
+          const deadline = performance.now() + 1100;
+          const arrive = () => {
+            const committed =
+              window.location.pathname === "/" && document.querySelector("[data-kx-home-stage]");
+            if (!committed && performance.now() < deadline) {
+              requestAnimationFrame(arrive);
+              return;
+            }
+            const inn = stage.animate(
+              [
+                { transform: `translateX(${dir * -64}%)`, opacity: 0.6 },
+                { transform: "translateX(0%)", opacity: 1 },
+              ],
+              { duration: 520, easing: "cubic-bezier(0.16, 1, 0.3, 1)" },
+            );
+            inn.onfinish = () => { window.clearTimeout(failsafe); cleanup(); };
+          };
+          requestAnimationFrame(arrive);
+        };
+        return;
+      }
+
       const vt = doc.startViewTransition!(() => {
         router.push(url.pathname + url.search + url.hash);
       });
-      /* An aborted transition REJECTS these promises — and something on this
-         shell aborts them routinely: the return-flight card mutates the DOM
-         mid-snapshot, a second navigation lands, the tab hides. All of that
-         is fine (the navigation itself already happened); the rejection is
-         only noise — but UNCAUGHT it surfaced as "InvalidStateError:
-         Transition was aborted" on every back-to-Home, which is the red
-         "1 Issue" badge the owner screenshotted twice. Swallow all three. */
-      vt.finished?.then(clearFlag, clearFlag);
+      /* Aborted transitions REJECT these promises (second nav, tab hide…);
+         the navigation itself already happened, so the rejection is pure
+         noise — but uncaught noise raised the dev overlay's red badge. */
+      vt.finished?.catch(() => {});
       vt.ready?.catch(() => {});
       vt.updateCallbackDone?.catch(() => {});
-      window.setTimeout(clearFlag, 1500); /* belt & braces — the flag must never stick */
     };
 
     /* Capture phase so we decide before React's own handler runs; the
