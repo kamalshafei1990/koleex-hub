@@ -53,3 +53,12 @@ Richest tables: DTF printers (print head count/width/speed/ink system —
 models), roller calenders (drum width/power/speed). No template exists for any
 printing type yet — the category's first template would unblock the largest
 entry volume from this supplier.
+
+
+✅ **DTF template BUILT 2026-08-21** (owner-approved) — `dtf-printer` on
+`dtf-printers`: 10 sections, 25 fields from the six-model column set (head
+model/count as specs, max print width as THE sizing spec, color channels,
+speed-by-pass ladder, ink-supply and maintenance feature sets, powder-shaker
+pairing). **Prod = 9 templates; Printing & Heat Press has its first.**
+Next richest: pneumatic presses (plate-size ladder × ~30 models), roller
+calenders (drum width/power/speed).
