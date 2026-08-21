@@ -18,6 +18,7 @@ import ArrowLeftIcon from "@/components/icons/ui/ArrowLeftIcon";
 import PencilIcon from "@/components/icons/ui/PencilIcon";
 import TrashIcon from "@/components/icons/ui/TrashIcon";
 import BrandLoading from "@/components/ui/BrandLoading";
+import { useTabMotion } from "@/components/ui/useTabMotion";
 import UserIcon from "@/components/icons/ui/UserIcon";
 import PhoneIcon from "@/components/icons/ui/PhoneIcon";
 import EnvelopeIcon from "@/components/icons/ui/EnvelopeIcon";
@@ -423,6 +424,7 @@ export default function EmployeeProfilePage({
   const [notFound, setNotFound] = useState(false);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<Tab>("overview");
+  const tabMotion = useTabMotion(TABS.indexOf(tab));
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
@@ -689,6 +691,7 @@ export default function EmployeeProfilePage({
           </nav>
         </div>
 
+        <div key={tab} className={tabMotion}>
         {tab === "overview" && (
           <>
             <GroupLabel>{t("grp.identity")}</GroupLabel>
@@ -864,6 +867,7 @@ export default function EmployeeProfilePage({
             <BehaviorStanding employeeId={employee.id} t={t} />
           </>
         )}
+        </div>
       </div>
 
       {/* ── Delete confirm ── */}

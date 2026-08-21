@@ -25,6 +25,7 @@
 import { humanizeError } from "@/lib/ui/humanize-error";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import FinanceHeader from "@/components/finance/FinanceHeader";
+import { useTabMotion } from "@/components/ui/useTabMotion";
 import { useTranslation } from "@/lib/i18n";
 import { financeT } from "@/lib/translations/finance";
 import { Eyebrow, Hairline } from "@/components/finance/FinanceDashboardUi";
@@ -60,6 +61,7 @@ export default function FinanceStatements() {
   const yearStart = useMemo(() => `${new Date().getUTCFullYear()}-01-01`, []);
 
   const [tab, setTab] = useState<Tab>("pl");
+  const tabMotion = useTabMotion(TAB_KEYS.indexOf(tab));
   const [from, setFrom] = useState(yearStart);
   const [to,   setTo]   = useState(today);
 
@@ -115,13 +117,15 @@ export default function FinanceStatements() {
         <Hairline />
 
         {/* Active panel */}
-        {tab === "pl"  && <ProfitLossPanel from={from} to={to} />}
-        {tab === "bs"  && <BalanceSheetPanel asOf={to} />}
-        {tab === "cf"  && <CashFlowPanel from={from} to={to} />}
-        {tab === "ar"  && <ArAgingPanel asOf={to} />}
-        {tab === "ap"  && <ApAgingPanel asOf={to} />}
-        {tab === "inv" && <InventoryValuePanel />}
-        {tab === "gp"  && <GrossProfitPanel from={from} to={to} />}
+        <div key={tab} className={tabMotion}>
+          {tab === "pl"  && <ProfitLossPanel from={from} to={to} />}
+          {tab === "bs"  && <BalanceSheetPanel asOf={to} />}
+          {tab === "cf"  && <CashFlowPanel from={from} to={to} />}
+          {tab === "ar"  && <ArAgingPanel asOf={to} />}
+          {tab === "ap"  && <ApAgingPanel asOf={to} />}
+          {tab === "inv" && <InventoryValuePanel />}
+          {tab === "gp"  && <GrossProfitPanel from={from} to={to} />}
+        </div>
       </div>
     </div>
   );
