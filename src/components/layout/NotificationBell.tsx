@@ -731,7 +731,7 @@ export default function NotificationBell({ dk, defaultOpen = false }: { dk: bool
           under the header — while md+ stays a dropdown anchored to the bell. */}
       <PopoverPanel anchorRef={wrapRef} open={open} onClose={() => setOpen(false)} align="end"
         matchAnchorWidth={false} mobileSheet maxHeight={620}
-        className="kx-drop-in kx-pop-sheet w-auto md:w-[380px] md:max-w-[92vw]">
+        className="kx-drop-in kx-pop-sheet kx-pop-clear w-auto md:w-[380px] md:max-w-[92vw]">
           {/* Header */}
           <div
             className={`flex items-center justify-between px-4 py-3 border-b ${
