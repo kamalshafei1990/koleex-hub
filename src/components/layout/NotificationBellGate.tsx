@@ -132,9 +132,20 @@ export default function NotificationBellGate({ dk }: { dk: boolean }) {
           } catch { /* fall through to the endpoints */ }
         }
         if (!inbox && !channels) {
+          /* YIELD TO THE SCREEN FIRST. A request costs 400-920ms on this
+             network path (measured on prod 2026-08-22), so two badge reads
+             fired during a navigation compete with the data the operator is
+             actually waiting to see — measured landing on /products, which
+             does not own either of them. An unread count is never worth
+             delaying the page: wait for the screen's own fetching to go
+             quiet, with a ceiling so a chatty screen cannot starve the
+             badge forever. */
+          const { whenNetworkQuiet } = await import("@/lib/net-idle");
+          await whenNetworkQuiet({ quietMs: 500, maxWaitMs: 4000 });
+          if (!alive) return;
           [inbox, channels] = await Promise.all([
-            cachedGet<Badges>("/api/inbox/feed?resource=badges", 15_000).catch(() => null),
-            cachedGet<Channels>("/api/discuss/read?resource=myChannels", 15_000).catch(() => null),
+            cachedGet<Badges>("/api/inbox/feed?resource=badges", 45_000).catch(() => null),
+            cachedGet<Channels>("/api/discuss/read?resource=myChannels", 45_000).catch(() => null),
           ]);
         }
         if (!alive) return;
