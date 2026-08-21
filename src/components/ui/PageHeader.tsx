@@ -20,7 +20,7 @@
    · Menu pills at the bottom — text + active state + "More ▾" overflow
    --------------------------------------------------------------------------- */
 
-import { useEffect, useMemo, useRef, useState, isValidElement, type FormEvent, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, isValidElement, type FormEvent, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import RrIcon, { type RrIconName } from "@/components/ui/RrIcon";
@@ -434,6 +434,72 @@ function SlidingPillNav({
     tabs.findIndex((t) => (t.active ?? (t.key === activeKey))),
   );
 
+  /* ── The gliding pill ────────────────────────────────────────────────
+     Measured in the TRACK's own coordinates (offsetLeft scrolls with the
+     tabs, so the pill stays under its tab while the bar scrolls). Null
+     until measured, and the first placement jumps rather than animating —
+     otherwise the pill streaks in from x=0 on every page load. */
+  const pillRef = useRef<HTMLSpanElement>(null);
+  const firstPlaceRef = useRef(true);
+  const trackWidthRef = useRef(-1);
+
+  /* Written straight onto the node rather than held in state. Geometry read
+     from the DOM can only be measured after layout, and pushing it back
+     through state costs an extra render of the whole header on every tab
+     change to say something the element could have been told directly.
+     `instant` suppresses the transition for placements that must not read as
+     movement — the first one, and relayouts. The attribute and the styles
+     land in the same style pass, so `transition: none` is already in force
+     when the new geometry is computed and nothing animates. */
+  const placePill = useCallback((instant: boolean) => {
+    const el = trackRef.current?.querySelectorAll<HTMLElement>('[role="tab"]')[activeIndex];
+    const p = pillRef.current;
+    if (!el || !p) return;
+    if (instant) p.setAttribute("data-kx-instant", "1");
+    p.style.transform = `translateX(${el.offsetLeft}px)`;
+    p.style.width = `${el.offsetWidth}px`;
+    p.style.opacity = "1";
+    if (instant) requestAnimationFrame(() => p.removeAttribute("data-kx-instant"));
+  }, [activeIndex]);
+
+  /* Selection changed — this is the move that should GLIDE. The very first
+     placement jumps: an unmeasured pill gliding in from x=0 would streak
+     across the whole bar on load. */
+  useLayoutEffect(() => {
+    placePill(firstPlaceRef.current);
+    firstPlaceRef.current = false;
+  }, [placePill, tabs.length, tabWidth]);
+
+  /* THE RESIZE WATCHER IS MOUNTED ONCE AND ONLY REACTS TO A REAL WIDTH
+     CHANGE. Both halves matter, and getting either wrong kills the glide
+     silently: a ResizeObserver fires an initial callback the moment it
+     observes, so an observer re-created on every selection change re-armed
+     the no-animation flag mid-flight and the pill teleported. It measured as
+     a running transition and looked like a jump. */
+  useEffect(() => {
+    const track = trackRef.current;
+    if (!track) return;
+    trackWidthRef.current = track.clientWidth;
+    const ro = new ResizeObserver(() => {
+      const w = track.clientWidth;
+      if (w === trackWidthRef.current) return;
+      trackWidthRef.current = w;
+      /* A relayout must not send the pill gliding across the bar — dragging
+         a window edge would look like the selection was moving. */
+      placePill(true);
+    });
+    ro.observe(track);
+    return () => ro.disconnect();
+  }, [placePill]);
+
+  /* Fonts settling after hydration shift label widths once; re-place a beat
+     later so the pill never sits a few px off its tab — without animating,
+     because a few pixels of drift is a correction, not a move. */
+  useEffect(() => {
+    const t = window.setTimeout(() => placePill(true), 250);
+    return () => window.clearTimeout(t);
+  }, [placePill]);
+
   /* Scroll the active pill into view ONLY when it changes AND is currently
      off-screen. Two guards stop the auto-scroll from fighting the user:
        1. If the active tab is already fully visible, do nothing.
@@ -604,15 +670,27 @@ function SlidingPillNav({
       // brand-minimal aesthetic.
       className="kx-ph-tabs relative inline-flex max-w-full items-center gap-1 overflow-x-auto rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] px-1.5 py-1.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
     >
+      {/* The moving fill. It carries the active background that used to sit
+          on the tab itself, which is why the tabs below only carry colour. */}
+      <span
+        ref={pillRef}
+        aria-hidden
+        className="kx-ph-pill"
+        data-kx-instant="1"
+        style={{ opacity: 0, width: 0 }}
+      />
       {tabs.map((tab, i) => {
         const isActive = i === activeIndex;
-        /* Canonical TabStrip pill: auto-width, per-button filled active.
-           (Matches src/components/ui/TabStrip.tsx so every tab bar in the
-           system looks identical.) */
+        /* Canonical TabStrip pill: auto-width, filled active — except the
+           fill is the ONE gliding element above, not a background per tab.
+           The label colour still cross-fades, and it is retimed to the
+           pill's own curve: at Tailwind's 150ms default the text flipped to
+           inverted well before the fill arrived under it, which read as a
+           flicker on the destination tab. */
         const tabClass =
-          "relative z-10 inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg px-3.5 py-1.5 text-[12.5px] font-medium outline-none transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--border-focus)] " +
+          "relative z-10 inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg px-3.5 py-1.5 text-[12.5px] font-medium outline-none transition-colors [transition-duration:var(--kx-dur-slow,320ms)] [transition-timing-function:var(--kx-ease-glide,cubic-bezier(0.32,0.72,0,1))] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--border-focus)] " +
           (isActive
-            ? "bg-[var(--bg-inverted)] text-[var(--text-inverted)]"
+            ? "text-[var(--text-inverted)]"
             : "text-[var(--text-muted)] hover:bg-[var(--bg-surface-subtle)] hover:text-[var(--text-primary)]");
         const inner = (
           <>

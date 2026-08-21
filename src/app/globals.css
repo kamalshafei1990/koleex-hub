@@ -17,6 +17,11 @@
   --kx-dur-flight: 460ms; /* the big flights (bloom, sign-in card) */
   --kx-ease-out: cubic-bezier(0.22, 1, 0.36, 1);      /* soft general out */
   --kx-ease-expo: cubic-bezier(0.16, 1, 0.3, 1);      /* entrances / flights */
+  /* Glide — the gentlest curve in the set, and the one tab switching uses.
+     expo covers ~80% of its distance in the first third of its time, which
+     reads as a snap with a long tail; glide spreads the movement evenly and
+     lands on a long, soft finish. Owner: "more smooth and ease". */
+  --kx-ease-glide: cubic-bezier(0.32, 0.72, 0, 1);
   --kx-ease-standard: cubic-bezier(0.4, 0, 0.2, 1);   /* position & size morphs */
   --kx-ease-pop: cubic-bezier(0.34, 1.3, 0.5, 1);     /* menus, faint spring */
   --kx-ease-exit: cubic-bezier(0.4, 0, 1, 1);         /* dismissals, accelerate away */
@@ -1054,6 +1059,13 @@ input[type="number"]:not(.kx-spinner) {
   from { opacity: 0; }
   to   { opacity: 1; }
 }
+/* kx-tab-in and kx-tab-in-soft are the same event as the directional slide —
+   a tab body arriving — so they take the same softened timing. The tokens
+   below let any single strip override without touching the language. */
+:root {
+  --kx-tab-in-dur: 0.42s;
+  --kx-tab-in-ease: var(--kx-ease-glide, cubic-bezier(0.32, 0.72, 0, 1));
+}
 /* Directional pane swap (owner pick 3A, motion system 2026-08-21): the new
    pane enters FROM the travel direction — going to a later tab it slides in
    from the end, going back it slides in from the start — so tab rows read
@@ -1062,21 +1074,35 @@ input[type="number"]:not(.kx-spinner) {
    descendants keep the viewport as their containing block once settled.
    Under RTL the names swap, keeping the spatial story true. Use via
    useTabMotion(index); first mount falls back to the plain rise. */
+/* SHORTER TRAVEL, LONGER TIME, AND THE FADE FINISHES FIRST — the three
+   things that separate "smooth" from "quick" (owner: "more smooth and
+   ease", asked for every app at once).
+     · 20px, not 24: a longer animation over a shorter distance reads
+       unhurried; the same time over the old distance reads slow.
+     · the opacity stop at 55% means the pane is fully opaque while the
+       last few pixels are still easing home, so the arrival is a settle
+       rather than a fade that is somehow still running after it lands.
+     · translate3d keeps the whole thing on the compositor. */
 @keyframes kx-tab-in-fwd {
-  from { opacity: 0; transform: translateX(24px); }
-  to   { opacity: 1; transform: translateX(0); }
+  from { opacity: 0; transform: translate3d(20px, 0, 0); }
+  55%  { opacity: 1; }
+  to   { opacity: 1; transform: translate3d(0, 0, 0); }
 }
 @keyframes kx-tab-in-back {
-  from { opacity: 0; transform: translateX(-24px); }
-  to   { opacity: 1; transform: translateX(0); }
+  from { opacity: 0; transform: translate3d(-20px, 0, 0); }
+  55%  { opacity: 1; }
+  to   { opacity: 1; transform: translate3d(0, 0, 0); }
 }
+/* Tabs own their duration rather than borrowing --kx-dur-slow: that token
+   also drives sheets and drawers, which are correct at 320ms and would be
+   dragged along by a change meant for tabs alone. */
 .kx-tab-fwd {
-  animation: kx-tab-in-fwd var(--kx-tab-in-dur, var(--kx-dur-slow, 0.32s))
-             var(--kx-tab-in-ease, var(--kx-ease-expo, cubic-bezier(0.16, 1, 0.3, 1))) backwards;
+  animation: kx-tab-in-fwd var(--kx-tab-in-dur, 0.42s)
+             var(--kx-tab-in-ease, var(--kx-ease-glide, cubic-bezier(0.32, 0.72, 0, 1))) backwards;
 }
 .kx-tab-back {
-  animation: kx-tab-in-back var(--kx-tab-in-dur, var(--kx-dur-slow, 0.32s))
-             var(--kx-tab-in-ease, var(--kx-ease-expo, cubic-bezier(0.16, 1, 0.3, 1))) backwards;
+  animation: kx-tab-in-back var(--kx-tab-in-dur, 0.42s)
+             var(--kx-tab-in-ease, var(--kx-ease-glide, cubic-bezier(0.32, 0.72, 0, 1))) backwards;
 }
 [dir="rtl"] .kx-tab-fwd { animation-name: kx-tab-in-back; }
 [dir="rtl"] .kx-tab-back { animation-name: kx-tab-in-fwd; }
@@ -1085,6 +1111,39 @@ input[type="number"]:not(.kx-spinner) {
    scrollbar. Transient by design — a permanent clip on the scroller would
    clip sticky/hover paint (the door's lesson). */
 html[data-kx-tabslide] #main-scroll-container { overflow-x: clip; }
+
+/* ── The header tab bar's selection GLIDES ───────────────────────────────
+   The bar was named SlidingPillNav and did not slide: the dark fill lived on
+   the active tab itself, so switching cross-faded one solid block out and
+   another in — a blink, a hundred pixels from where the eye was looking. It
+   is the most visible half of "switching a tab", and no amount of easing on
+   the content pane can cover for it (owner: "more smooth and ease").
+   One pill, moved. Geometry is measured in the track's own coordinates so it
+   stays glued to its tab while the bar scrolls; `left: 0` plus a transform
+   means the movement is compositor-only.
+   The width transition is what sells it between tabs of different label
+   lengths — without it the pill would arrive and then visibly grow. */
+.kx-ph-pill {
+  position: absolute;
+  top: 6px;
+  bottom: 6px;
+  left: 0;
+  z-index: 0;
+  border-radius: 0.5rem;
+  pointer-events: none;
+  background: var(--bg-inverted);
+  transition:
+    transform var(--kx-dur-slow, 320ms) var(--kx-ease-glide, cubic-bezier(0.32, 0.72, 0, 1)),
+    width var(--kx-dur-slow, 320ms) var(--kx-ease-glide, cubic-bezier(0.32, 0.72, 0, 1)),
+    opacity var(--kx-dur-fast, 160ms) linear;
+}
+/* Before the first measurement, and on a resize, the pill must JUMP: an
+   unmeasured pill animating from x=0 would streak across the whole bar on
+   load. */
+.kx-ph-pill[data-kx-instant="1"] { transition: none; }
+@media (prefers-reduced-motion: reduce) {
+  .kx-ph-pill { transition: none; }
+}
 @media (prefers-reduced-motion: reduce) {
   .kx-tab-fwd, .kx-tab-back { animation: none; }
 }
@@ -1134,7 +1193,7 @@ html[data-kx-tabslide] #main-scroll-container { overflow-x: clip; }
      ends, and a transformed element becomes the containing block for every
      `position: fixed` descendant — which silently drags modals inside the tab
      pane and under the app header. `backwards` still prevents the opening
-     flash; once the 0.32s is up the element returns to its natural styles,
+     flash; once the run is up the element returns to its natural styles,
      which are visually identical to the final keyframe. */
   /* Timing comes from two custom properties so a screen can retime the
      entrance on itself without forking the class. The defaults ARE the
@@ -2991,12 +3050,19 @@ html[data-kx-tabslide] #main-scroll-container { overflow-x: clip; }
    Aurora the selected state is the Hub-Blue inset ring over a 10% fill, the
    same as every other segmented control in the Hub (canon D). Bound to
    .kx-app so the twenty-two apps still on Core keep their white pill. */
+/* THE FILL MOVED TO .kx-ph-pill, THE COLOUR STAYED. The selected tab used to
+   paint its own ring-over-fill, which is exactly what made switching read as
+   a blink — one block off, another on. The look is unchanged; it is now
+   carried by the one element that glides between tabs, so the skin still
+   decides WHAT the selection looks like and the pill decides HOW it moves. */
 [data-kx-skin="aurora"] :is(.kx-pd, .kx-app) .kx-ph-tabs [aria-selected="true"] {
-  background-color: rgba(86, 127, 178, 0.10);
-  box-shadow: inset 0 0 0 1px rgba(86, 127, 178, 0.70);
   color: var(--text-primary);
 }
-[data-kx-skin="aurora"][data-theme="light"] :is(.kx-pd, .kx-app) .kx-ph-tabs [aria-selected="true"] {
+[data-kx-skin="aurora"] :is(.kx-pd, .kx-app) .kx-ph-pill {
+  background: rgba(86, 127, 178, 0.10);
+  box-shadow: inset 0 0 0 1px rgba(86, 127, 178, 0.70);
+}
+[data-kx-skin="aurora"][data-theme="light"] :is(.kx-pd, .kx-app) .kx-ph-pill {
   box-shadow: inset 0 0 0 1px rgba(62, 103, 150, 0.75);
 }
 /* Hover on an unselected tab: a tint whisper, not a filled block — but it
@@ -3021,11 +3087,15 @@ html[data-kx-tabslide] #main-scroll-container { overflow-x: clip; }
 /* The SELECTED tab answers the cursor too — but by deepening its own blue,
    never by changing colour. It is already the tab you are on; hover is an
    acknowledgement, not a state change. */
+/* 6%, not 16%: this now paints ON TOP of the pill's own 10% rather than
+   replacing it, so the old value would land at roughly 24% and turn the
+   acknowledgement into a state change. 6% over 10% reproduces what the tab
+   looked like before the fill moved. */
 [data-kx-skin="aurora"] :is(.kx-pd, .kx-app) .kx-ph-tabs [aria-selected="true"]:hover {
-  background-color: rgba(86, 127, 178, 0.16) !important;
+  background-color: rgba(86, 127, 178, 0.06) !important;
 }
 [data-kx-skin="aurora"][data-theme="light"] :is(.kx-pd, .kx-app) .kx-ph-tabs [aria-selected="true"]:hover {
-  background-color: rgba(86, 127, 178, 0.16) !important;
+  background-color: rgba(86, 127, 178, 0.06) !important;
 }
 
 /* ── THE PRIMARY BUTTON STAYS WHITE. ONLY ITS HOVER WAS WRONG ──────────

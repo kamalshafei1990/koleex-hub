@@ -26,17 +26,19 @@ export function useTabMotion(index: number): string {
     setDir(index > prev ? 1 : -1);
   }
 
-  /* While the 24px slide is in flight the pane pokes past the scroller's
+  /* While the 20px slide is in flight the pane pokes past the scroller's
      edge, and the scroller's overflow-y:auto forces overflow-x to auto —
      on visible-scrollbar platforms that flashed a horizontal scrollbar on
      every switch (the "dancing" family). Same cure as the Home door: clip
      X for the flight only, then release so nothing's paint is ever
-     permanently clipped. */
+     permanently clipped.
+     The window has to OUTLAST the animation: the slide is 420ms, so a 420ms
+     clip releases on the same frame the last pixels are still moving. */
   useEffect(() => {
     if (dir === 0) return;
     const root = document.documentElement;
     root.setAttribute("data-kx-tabslide", "1");
-    const t = setTimeout(() => root.removeAttribute("data-kx-tabslide"), 420);
+    const t = setTimeout(() => root.removeAttribute("data-kx-tabslide"), 480);
     /* Drop the attribute on unmount too. Navigating away mid-flight used to
        leave it set forever, and `#main-scroll-container { overflow-x: clip }`
        then became the permanent scroller clip this system exists to avoid

@@ -29,6 +29,7 @@
    --------------------------------------------------------------------------- */
 
 import { usePathname } from "next/navigation";
+import { useEffect } from "react";
 import { readRouteTabDir } from "@/lib/route-tab-motion";
 
 export default function RouteTabPane({ children }: { children: React.ReactNode }) {
@@ -47,6 +48,22 @@ export default function RouteTabPane({ children }: { children: React.ReactNode }
      A later re-render (state changing inside the page) keeps both the key and
      the class, so nothing replays. */
   const dir = readRouteTabDir(pathname);
+
+  /* Same clip window useTabMotion opens for in-component tabs: while the pane
+     is sliding it pokes past the scroller's edge, and the scroller's
+     overflow-y:auto forces overflow-x to auto, so visible-scrollbar platforms
+     flash a horizontal bar on every switch. Clip for the flight only —
+     a permanent clip on the scroller eats edge hover glows Hub-wide.
+     Dropped on unmount as well, or navigating away mid-slide would leave the
+     scroller clipped for good. */
+  useEffect(() => {
+    if (!dir) return;
+    const root = document.documentElement;
+    root.setAttribute("data-kx-tabslide", "1");
+    const t = window.setTimeout(() => root.removeAttribute("data-kx-tabslide"), 480);
+    return () => { window.clearTimeout(t); root.removeAttribute("data-kx-tabslide"); };
+  }, [dir, pathname]);
+
   return (
     <div key={pathname} className={dir}>
       {children}
