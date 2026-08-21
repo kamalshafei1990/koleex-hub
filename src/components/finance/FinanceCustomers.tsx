@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
+import { useWarmData } from "@/lib/warm-cache";
 import { useToast } from "@/components/kds/useToast";
 import FinanceHeader from "@/components/finance/FinanceHeader";
 import { EmptyState, ProgressBar, StatusBadge } from "@/components/finance/FinanceUi";
@@ -18,20 +19,17 @@ import type { FinanceCustomerAccount } from "@/lib/finance/types";
 export default function FinanceCustomers() {
   const { showToast, toastElement } = useToast();
   const { t } = useTranslation(financeT);
-  const [rows, setRows] = useState<FinanceCustomerAccount[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  const load = useCallback(async () => {
-    setLoading(true);
-    try {
-      const r = await fetch("/api/finance/customers", { cache: "no-store" });
-      const j = (await r.json()) as { customers?: FinanceCustomerAccount[] };
-      setRows(j.customers ?? []);
-    } finally {
-      setLoading(false);
-    }
+  /* Warm: this endpoint takes no filter, so the response IS the default
+     view. Paints from the last answer on the first frame, refreshes behind
+     the painted screen. */
+  const fetchAll = useCallback(async () => {
+    const r = await fetch("/api/finance/customers", { cache: "no-store" });
+    if (!r.ok) throw new Error(`fin:customers: ${r.status}`);
+    const j = (await r.json()) as { customers?: FinanceCustomerAccount[] };
+    return j.customers ?? [];
   }, []);
-  useEffect(() => { void load(); }, [load]);
+  const { data, loading, reload: load } = useWarmData<FinanceCustomerAccount[]>("fin:customers", fetchAll);
+  const rows = useMemo(() => data ?? [], [data]);
 
   /* Phase R.1 — generate an external account statement for one
      customer. Calls the print export endpoint to record the audit

@@ -9,7 +9,8 @@
    --------------------------------------------------------------------------- */
 
 import { humanizeError } from "@/lib/ui/humanize-error";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
+import { useWarmData } from "@/lib/warm-cache";
 import { useInput } from "@/components/kds/useInput";
 import Link from "next/link";
 import {
@@ -50,12 +51,10 @@ function fmtTime(iso: string | null) {
   return iso.replace("T", " ").slice(0, 16);
 }
 
+type ApprovalsSnap = { items: PendingItem[]; canApprove: boolean; activity: ActivityRow[] };
+
 export default function FinanceApprovals() {
   const { t } = useTranslation(financeT);
-  const [items, setItems] = useState<PendingItem[]>([]);
-  const [activity, setActivity] = useState<ActivityRow[]>([]);
-  const [canApprove, setCanApprove] = useState(false);
-  const [loading, setLoading] = useState(true);
   const [error, setError]     = useState<string | null>(null);
   const [busyId, setBusyId]   = useState<string | null>(null);
 
@@ -69,26 +68,25 @@ export default function FinanceApprovals() {
   };
   const statusLabel = (s: Status) => t(`approvals.status.${s}`, s);
 
-  const fetchAll = useCallback(async () => {
-    setLoading(true); setError(null);
-    try {
-      const [pendRes, actRes] = await Promise.all([
-        fetch("/api/approvals"),
-        fetch("/api/approvals/activity?limit=40"),
-      ]);
-      const pendJ = await pendRes.json();
-      const actJ  = await actRes.json();
-      if (!pendRes.ok) throw new Error(pendJ.error || `HTTP ${pendRes.status}`);
-      if (!actRes.ok)  throw new Error(actJ.error  || `HTTP ${actRes.status}`);
-      setItems(pendJ.items);
-      setCanApprove(!!pendJ.can_approve);
-      setActivity(actJ.items);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
-    } finally { setLoading(false); }
+  /* Warm: neither call takes a filter — `limit=40` is the screen's own
+     shape — so the response IS the default view. */
+  const load = useCallback(async (): Promise<ApprovalsSnap> => {
+    const [pendRes, actRes] = await Promise.all([
+      fetch("/api/approvals"),
+      fetch("/api/approvals/activity?limit=40"),
+    ]);
+    const pendJ = await pendRes.json();
+    const actJ  = await actRes.json();
+    if (!pendRes.ok) throw new Error(pendJ.error || `HTTP ${pendRes.status}`);
+    if (!actRes.ok)  throw new Error(actJ.error  || `HTTP ${actRes.status}`);
+    return { items: pendJ.items, canApprove: !!pendJ.can_approve, activity: actJ.items };
   }, []);
+  const { data, loading, error: loadError, reload: fetchAll } =
+    useWarmData<ApprovalsSnap>("fin:approvals", load);
+  const items = useMemo(() => data?.items ?? [], [data]);
+  const activity = useMemo(() => data?.activity ?? [], [data]);
+  const canApprove = data?.canApprove ?? false;
 
-  useEffect(() => { fetchAll(); }, [fetchAll]);
 
   const { askInput, inputDialog } = useInput();
   function transition(it: PendingItem, action: "submit" | "approve" | "reject") {
@@ -135,7 +133,10 @@ export default function FinanceApprovals() {
     >
       {inputDialog}
       {loading && <div className="text-sm text-[var(--text-dim)]">{t("common.loading", "Loading…")}</div>}
-      {error && <div className="text-sm text-rose-600 dark:text-rose-300">{error}</div>}
+      {/* The screen's own action errors and a failed refresh share one
+          banner — a refresh that fails must not go unseen just because the
+          warm list is still on screen. */}
+      {Boolean(error || loadError) && <div className="text-sm text-rose-600 dark:text-rose-300">{error ?? String(loadError instanceof Error ? loadError.message : loadError)}</div>}
 
       <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
         {/* Pending list */}
