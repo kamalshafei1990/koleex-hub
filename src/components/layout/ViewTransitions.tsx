@@ -126,12 +126,18 @@ export default function ViewTransitions() {
               requestAnimationFrame(arrive);
               return;
             }
+            /* Home SETTLES, it does not slide (owner: "good but I don't
+               want the home page motion is slide"). The app LEAVES with
+               motion; the place you return to is already where it belongs —
+               it just comes into focus: fade up from a 12px rise, the same
+               arrival language the shell's standard settle uses, one size
+               larger for the occasion. */
             const inn = stage.animate(
               [
-                { transform: `translateX(${dir * -64}%)`, opacity: 0.6 },
-                { transform: "translateX(0%)", opacity: 1 },
+                { transform: "translateY(12px) scale(0.992)", opacity: 0 },
+                { transform: "translateY(0) scale(1)", opacity: 1 },
               ],
-              { duration: 520, easing: "cubic-bezier(0.16, 1, 0.3, 1)" },
+              { duration: 460, easing: "cubic-bezier(0.16, 1, 0.3, 1)" },
             );
             inn.onfinish = () => { window.clearTimeout(failsafe); cleanup(); };
           };
