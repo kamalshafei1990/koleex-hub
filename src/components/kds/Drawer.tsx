@@ -29,7 +29,9 @@ export default function Drawer({
   return (
     <div className="fixed inset-0 z-[200] flex" role="dialog" aria-modal="true">
       <button type="button" aria-label="Close" onClick={onClose} className={`flex-1 bg-black/30 backdrop-blur-[2px] transition-opacity duration-150 ${closing ? "opacity-0" : "opacity-100"}`} />
-      <aside className={`kx-slide-in-end ${closing ? "kx-slide-closing" : ""} flex h-full w-full flex-col border-s border-white/[0.06] bg-[var(--bg-primary)] shadow-[-12px_0_48px_-12px_rgba(0,0,0,0.6)] ${maxWidth}`}>
+      {/* pointer-events off while leaving: a footer action could still be
+          triggered on a drawer that is visibly sliding away. */}
+      <aside className={`kx-slide-in-end ${closing ? "kx-slide-closing pointer-events-none" : ""} flex h-full w-full flex-col border-s border-white/[0.06] bg-[var(--bg-primary)] shadow-[-12px_0_48px_-12px_rgba(0,0,0,0.6)] ${maxWidth}`}>
         <header className="flex items-start gap-3 border-b border-white/[0.05] px-4 py-3">
           <div className="min-w-0 flex-1">
             {eyebrow && <p className="text-[10px] uppercase tracking-[0.18em] text-[var(--text-dim)]">{eyebrow}</p>}

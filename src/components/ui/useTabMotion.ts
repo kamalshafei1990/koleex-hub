@@ -37,7 +37,12 @@ export function useTabMotion(index: number): string {
     const root = document.documentElement;
     root.setAttribute("data-kx-tabslide", "1");
     const t = setTimeout(() => root.removeAttribute("data-kx-tabslide"), 420);
-    return () => clearTimeout(t);
+    /* Drop the attribute on unmount too. Navigating away mid-flight used to
+       leave it set forever, and `#main-scroll-container { overflow-x: clip }`
+       then became the permanent scroller clip this system exists to avoid
+       (it eats edge hover glows Hub-wide). A re-run re-stamps it in the
+       same tick, so mid-flight re-fires are unaffected. */
+    return () => { clearTimeout(t); root.removeAttribute("data-kx-tabslide"); };
   }, [dir, index]);
 
   return dir === 0 ? "kx-tab-in" : dir > 0 ? "kx-tab-fwd" : "kx-tab-back";

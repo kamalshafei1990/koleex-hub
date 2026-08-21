@@ -64,6 +64,17 @@ export default function ViewTransitions() {
        path self-heals the moment the user touches anything. Cancelling
        animations and clearing inline styles is safe at any moment,
        including after a clean finish. */
+    /* When the current door flight began, and how long a door may legally
+       be up before the next click treats it as stuck. */
+    let doorStartedAt = 0;
+    const DOOR_STUCK_MS = 1600;
+    /* Generation token for the directional-nav attribute: a second
+       navigation ABORTS the first, whose rejected `finished` promise then
+       settles a microtask later and would strip the attribute the SECOND
+       nav just set — the push would silently degrade mid-flight. Only the
+       newest navigation may clear it. */
+    let navGen = 0;
+
     const restoreDoor = () => {
       const st = document.getElementById("main-scroll-container");
       if (st) {
@@ -75,8 +86,25 @@ export default function ViewTransitions() {
     };
 
     const onClick = (e: MouseEvent) => {
-      /* A stuck door heals on the very next interaction, whatever it is. */
-      if (document.documentElement.dataset.kxDoor === "1") restoreDoor();
+      /* A stuck door heals on the very next interaction — but ONLY once it
+         is genuinely stuck. Healing unconditionally cancelled healthy
+         in-flight doors: router.push lives in the exit animation's
+         onfinish, and a cancelled animation never finishes, so a stray tap
+         within the 380ms flight silently swallowed the whole navigation
+         (owner-visible as "back does nothing"). Past the failsafe window
+         it is stuck by definition. */
+      if (
+        document.documentElement.dataset.kxDoor === "1" &&
+        performance.now() - doorStartedAt > DOOR_STUCK_MS
+      ) restoreDoor();
+
+      /* The Hub's own Reduce-motion preference lives on a class, and it is
+         read PER CLICK: the media check below runs once at bind time, so a
+         user toggling the pref mid-session kept every flight. Also, the
+         `.kx-reduce-motion *` nuke is a DESCENDANT selector and can never
+         reach ::view-transition-* pseudo-elements, which hang off <html> —
+         so these transitions have to bail in JS, not in CSS. */
+      if (document.documentElement.classList.contains("kx-reduce-motion")) return;
       /* Anything but a plain primary click means something else entirely —
          open in new tab, save, context menu. Never intercept those. */
       if (e.defaultPrevented || e.button !== 0) return;
@@ -123,6 +151,7 @@ export default function ViewTransitions() {
       if (homeReturn && stage && document.documentElement.dataset.kxDoor !== "1") {
         const html = document.documentElement;
         html.dataset.kxDoor = "1";
+        doorStartedAt = performance.now();
         const dir = html.dir === "rtl" ? -1 : 1;
         const failsafe = window.setTimeout(restoreDoor, 1600);
         const out = stage.animate(
@@ -188,7 +217,10 @@ export default function ViewTransitions() {
       const nav = tgt.startsWith(cur + "/") ? "fwd"
         : cur.startsWith(tgt + "/") ? "back"
         : "";
-      const clearNav = () => document.documentElement.removeAttribute("data-kx-nav");
+      const myGen = ++navGen;
+      const clearNav = () => {
+        if (navGen === myGen) document.documentElement.removeAttribute("data-kx-nav");
+      };
       if (nav) {
         document.documentElement.setAttribute("data-kx-nav", nav);
         /* Belt & braces: a skipped/aborted transition must never leave the

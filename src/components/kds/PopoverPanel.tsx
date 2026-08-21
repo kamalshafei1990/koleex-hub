@@ -257,8 +257,10 @@ export default function PopoverPanel({
   }, [open, place]);
 
   /* Exit choreography (owner-approved motion system): stay mounted while the
-     140ms kx-pop-closing shrink plays; rect survives from the open phase. */
-  const { mounted, closing } = usePresence(open);
+     exit plays; rect survives from the open phase. The window must cover the
+     LONGER of the two exits — the phone sheet slides for 200ms, and a 160ms
+     unmount cut it off mid-slide (a visible blink). */
+  const { mounted, closing } = usePresence(open, 200);
   if (!mounted || !rect || typeof document === "undefined") return null;
 
   return createPortal(
@@ -294,7 +296,10 @@ export default function PopoverPanel({
         overflowY: "auto",
         zIndex: 200,
       }}
-      className={`kx-glass-pop kx-pop-panel ${closing ? (rect.sheet ? "kx-sheet-closing" : "kx-pop-closing") : ""} ${className}`}
+      /* pointer-events off while leaving: a click landing on a visually
+         departing row still fired its action (the outside-click listener is
+         already torn down by then). */
+      className={`kx-glass-pop kx-pop-panel ${closing ? `pointer-events-none ${rect.sheet ? "kx-sheet-closing" : "kx-pop-closing"}` : ""} ${className}`}
     >
       {children}
     </div>

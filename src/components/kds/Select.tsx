@@ -27,7 +27,7 @@
    behaviour. That is what lets one component serve a full-width form field, a
    80px inline label picker and a flex-1 add-control. */
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { usePresence } from "./usePresence";
 import AngleDownIcon from "@/components/icons/ui/AngleDownIcon";
@@ -166,7 +166,14 @@ export default function Select({
     setRect({ top, left: box.left, width: box.width, maxH });
   }, []);
 
-  useEffect(() => {
+  /* Layout effect, not a plain effect: `rect` survives a close (the exit
+     choreography needs it), so on RE-OPEN after the field has moved — form
+     scrolled, a section collapsed — a post-paint measure showed one frame
+     at the stale coordinates and then jumped. Measuring before paint means
+     the first frame the user sees is already correct. Same reasoning, and
+     the same SSR-safe alias, as PopoverPanel. */
+  const useIsoLayout = typeof window === "undefined" ? useEffect : useLayoutEffect;
+  useIsoLayout(() => {
     if (!open) { autoScrolled.current = false; return; }
     place();
     /* Capture phase: the Hub scrolls in #main-scroll-container, not on
@@ -278,7 +285,9 @@ export default function Select({
         <div
           ref={panelRef}
           style={{ position: "fixed", top: rect.top, left: rect.left, minWidth: rect.width, zIndex: 200 }}
-          className={`kx-glass-pop kx-pop-panel ${panelClosing ? "kx-pop-closing" : ""} ${panelWidthClassName === "w-full" ? "" : panelWidthClassName}`}
+          /* pointer-events off while leaving — a click on a departing option
+             still called commit() from an already-closed select. */
+          className={`kx-glass-pop kx-pop-panel ${panelClosing ? "kx-pop-closing pointer-events-none" : ""} ${panelWidthClassName === "w-full" ? "" : panelWidthClassName}`}
         >
           {/* maxHeight inline so it BEATS max-h-60: the class is the height the
               list wants, this is the height the viewport actually allows. */}

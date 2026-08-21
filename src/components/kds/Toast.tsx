@@ -25,10 +25,14 @@ export default function Toast({
   message: React.ReactNode;
   kind?: keyof typeof KIND;
 }) {
-  const { mounted, closing } = usePresence(!!message, 220);
+  /* `!= null` not truthiness — a caller clearing to "" or 0 must still be
+     treated as "nothing to show", and the presence flag has to agree with
+     the fallback below or the pill renders blank while it exits. */
+  const has = message != null && message !== "";
+  const { mounted, closing } = usePresence(has, 220);
   /* Keep the last message text so the pill doesn't blank while it exits. */
   const [last, setLast] = useState<React.ReactNode>(message);
-  if (message && message !== last) setLast(message);
+  if (has && message !== last) setLast(message);
   if (!mounted) return null;
   return (
     <div className="fixed bottom-6 start-1/2 -translate-x-1/2 rtl:translate-x-1/2 z-[250]">
@@ -36,7 +40,7 @@ export default function Toast({
         role="status"
         className={`kx-toast-in ${closing ? "kx-toast-out" : ""} px-4 py-2.5 rounded-xl border shadow-lg text-[12.5px] font-semibold flex items-center gap-2 ${KIND[kind]}`}
       >
-        {message ?? last}
+        {has ? message : last}
       </div>
     </div>
   );
