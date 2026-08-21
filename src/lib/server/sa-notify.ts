@@ -15,6 +15,7 @@ import "server-only";
    --------------------------------------------------------------------------- */
 
 import { supabaseServer } from "@/lib/server/supabase-server";
+import { supersedeUnread } from "@/lib/server/inbox-lifecycle";
 import { sendPushToAccounts } from "@/lib/server/web-push";
 import { emitPings, rtTopic } from "@/lib/server/realtime-broadcast";
 
@@ -183,6 +184,14 @@ export async function notifySuperAdmins(alert: SaAlert): Promise<void> {
         },
       }));
     if (rows.length === 0) return;
+    /* Security alerts REPEAT ("xiang signed in" ×25 measured on the
+       owner's inbox). The newest unread copy represents the series; the
+       audit log keeps full history. Superseded by recipient+subject. */
+    await supersedeUnread({
+      recipients,
+      category: "alert",
+      subject: alert.subject,
+    });
     await supabaseServer.from("inbox_messages").insert(rows);
     await emitPings(rows.map((r) => ({ topic: rtTopic.inbox((r as { recipient_account_id: string }).recipient_account_id) })));
 

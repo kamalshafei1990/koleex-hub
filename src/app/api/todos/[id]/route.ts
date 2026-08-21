@@ -2,6 +2,7 @@ import "server-only";
 
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
+import { clearUnreadByMeta } from "@/lib/server/inbox-lifecycle";
 import { requireAuth, requireModuleAction } from "@/lib/server/auth";
 import { sendPushToAccounts } from "@/lib/server/web-push";
 
@@ -454,5 +455,7 @@ export async function DELETE(
     .is("archived_at", null);
   if (clearErr) console.error("[api/todos/[id] DELETE] clear task notifications:", clearErr.message);
 
+  /* Deleting the task resolves every notification about it. */
+  await clearUnreadByMeta({ todo_id: id });
   return NextResponse.json({ ok: true });
 }

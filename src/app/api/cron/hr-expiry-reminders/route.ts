@@ -12,6 +12,7 @@ import "server-only";
 
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
+import { supersedeUnread } from "@/lib/server/inbox-lifecycle";
 import { sendPushToAccounts } from "@/lib/server/web-push";
 
 export const dynamic = "force-dynamic";
@@ -115,6 +116,12 @@ export async function GET(req: Request) {
 
       const subject = `${field.label} expiring soon: ${empName}`;
       const body = `${field.label} for ${empName} expires on ${day}. Review and renew before the deadline.`;
+      /* Supersede the earlier tier's unread copy — the 60-day warning is
+         finished business once the 30-day one lands for the same document. */
+      await supersedeUnread({
+        recipients,
+        meta: { type: "hr_expiry", employee_id: emp.id, field: field.column },
+      });
       await supabaseServer.from("inbox_messages").insert(
         recipients.map((recipientId) => ({
           recipient_account_id: recipientId,
