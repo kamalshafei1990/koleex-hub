@@ -126,12 +126,22 @@ export default function ViewTransitions() {
               requestAnimationFrame(arrive);
               return;
             }
-            /* Home SETTLES, it does not slide (owner: "good but I don't
-               want the home page motion is slide"). The app LEAVES with
-               motion; the place you return to is already where it belongs —
-               it just comes into focus: fade up from a 12px rise, the same
-               arrival language the shell's standard settle uses, one size
-               larger for the occasion. */
+            /* Home SETTLES, it does not slide (owner, twice: "I don't want
+               the home page motion slide"). The app LEAVES with motion; the
+               place you return to is already where it belongs — it comes
+               into focus: fade up from a 12px rise, the shell's standard
+               arrival language one size larger.
+
+               CANCEL THE OUT FIRST, in this exact order. `out` holds the
+               stage at 112% with fill:forwards; while `inn` runs it wins
+               the composite, but the moment `inn` FINISHES (it has no
+               fill), the out's held transform would RESUME for the frame
+               before cleanup lands — a full-screen flash off-screen right.
+               Killing the hold before starting the arrival removes that
+               frame entirely; `inn`'s own first keyframe (opacity 0)
+               covers the same instant, so nothing flashes at X=0 either. */
+            out.cancel();
+            stage.style.transform = "";
             const inn = stage.animate(
               [
                 { transform: "translateY(12px) scale(0.992)", opacity: 0 },
@@ -139,7 +149,7 @@ export default function ViewTransitions() {
               ],
               { duration: 460, easing: "cubic-bezier(0.16, 1, 0.3, 1)" },
             );
-            inn.onfinish = () => { window.clearTimeout(failsafe); cleanup(); };
+            inn.onfinish = () => { window.clearTimeout(failsafe); delete html.dataset.kxDoor; };
           };
           requestAnimationFrame(arrive);
         };
