@@ -668,15 +668,24 @@ export default function NotificationBell({ dk, defaultOpen = false }: { dk: bool
 
   /* Per-type counts over the WHOLE loaded feed — they drive which chips are
      shown (only types that actually have something) and the count badges. */
+  /* UNREAD counts, deliberately — the chips counted EVERY loaded row while
+     the badge and the header counted unread, so the owner's panel said
+     "30 new" under a chip row shouting "All 99+ · Task reminders 64":
+     three different truths for one bell. One convention now, everywhere
+     a number appears on this panel: a count is things needing attention. */
   const typeCounts = new Map<NotifFilter, number>();
   for (const m of messages) {
+    if ((m as { read_at?: string | null }).read_at) continue;
     const a =
       classifyInboxActivity((m as { metadata?: unknown }).metadata) ?? "other";
     typeCounts.set(a, (typeCounts.get(a) ?? 0) + 1);
   }
+  const unreadInboxCount = messages.filter(
+    (m) => !(m as { read_at?: string | null }).read_at,
+  ).length;
   const chipCount = (key: NotifFilter): number =>
     key === "all"
-      ? messages.length + allDiscussRows.length
+      ? unreadInboxCount + allDiscussRows.length
       : key === "discuss"
         ? allDiscussRows.length
         : (typeCounts.get(key) ?? 0);

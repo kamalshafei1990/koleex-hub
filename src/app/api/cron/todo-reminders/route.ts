@@ -96,6 +96,18 @@ export async function GET(req: Request) {
       new Set([...(byTodo.get(t.id) ?? []), t.created_by_account_id].filter(Boolean) as string[]),
     );
     if (recipients.length > 0) {
+      /* Supersede an unread copy of the SAME task's reminder before
+         writing today's — the recurrence spawner's lesson applied here:
+         reminders inform, they must not accumulate. */
+      const nowIso = new Date().toISOString();
+      await supabaseServer
+        .from("inbox_messages")
+        .update({ read_at: nowIso, archived_at: nowIso })
+        .in("recipient_account_id", recipients)
+        .eq("category", "task")
+        .eq("metadata->>todo_id", t.id)
+        .eq("metadata->>type", "todo_reminder")
+        .is("read_at", null);
       await supabaseServer.from("inbox_messages").insert(
         recipients.map((rid) => ({
           recipient_account_id: rid,
