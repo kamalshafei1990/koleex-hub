@@ -18,6 +18,7 @@
 
 import { useCallback, useEffect, useRef } from "react";
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
+import { usePresence } from "@/components/kds/usePresence";
 
 export interface ConfirmDialogProps {
   open: boolean;
@@ -67,7 +68,9 @@ export default function ConfirmDialog({
     if (!busy) onCancel();
   }, [busy, onCancel]);
 
-  if (!open) return null;
+  /* Motion (owner-approved system 2026-08-21): pop in, shrink away. */
+  const { mounted, closing } = usePresence(open);
+  if (!mounted) return null;
 
   /* Destructive mode uses the same rose vocabulary the rest of the Hub
      uses for non-positive actions; standard mode uses the Hub-inverted
@@ -78,14 +81,14 @@ export default function ConfirmDialog({
 
   return (
     <div
-      className="fixed inset-0 z-[300] flex items-center justify-center px-4 bg-black/40 backdrop-blur-[2px]"
+      className={`fixed inset-0 z-[300] flex items-center justify-center px-4 bg-black/40 backdrop-blur-[2px] transition-opacity duration-150 ${closing ? "opacity-0 pointer-events-none" : "opacity-100"}`}
       onClick={handleBackdropClick}
       role="dialog"
       aria-modal="true"
       aria-label={title}
     >
       <div
-        className="w-full max-w-sm rounded-2xl border border-white/[0.08] bg-[var(--bg-secondary)] shadow-[0_24px_64px_-24px_rgba(0,0,0,0.7)]"
+        className={`kx-glass-pop ${closing ? "kx-pop-closing" : ""} w-full max-w-sm rounded-2xl border border-white/[0.08] bg-[var(--bg-secondary)] shadow-[0_24px_64px_-24px_rgba(0,0,0,0.7)]`}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="px-4 py-3.5">

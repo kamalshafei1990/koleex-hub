@@ -1,7 +1,11 @@
 "use client";
 
 /* KDS Drawer — ELECTED DR-1 by owner 2026-08-02 (Approvals style):
-   end-side panel, eyebrow + title header, ruled footer slot. */
+   end-side panel, eyebrow + title header, ruled footer slot.
+   Motion (owner-approved system 2026-08-21): slides from the end edge,
+   leaves the way it came — both flip under RTL. */
+
+import { usePresence } from "./usePresence";
 
 export default function Drawer({
   open,
@@ -20,11 +24,12 @@ export default function Drawer({
   footer?: React.ReactNode;
   maxWidth?: string;
 }) {
-  if (!open) return null;
+  const { mounted, closing } = usePresence(open, 220);
+  if (!mounted) return null;
   return (
     <div className="fixed inset-0 z-[200] flex" role="dialog" aria-modal="true">
-      <button type="button" aria-label="Close" onClick={onClose} className="flex-1 bg-black/30 backdrop-blur-[2px]" />
-      <aside className={`flex h-full w-full flex-col border-s border-white/[0.06] bg-[var(--bg-primary)] shadow-[-12px_0_48px_-12px_rgba(0,0,0,0.6)] ${maxWidth}`}>
+      <button type="button" aria-label="Close" onClick={onClose} className={`flex-1 bg-black/30 backdrop-blur-[2px] transition-opacity duration-150 ${closing ? "opacity-0" : "opacity-100"}`} />
+      <aside className={`kx-slide-in-end ${closing ? "kx-slide-closing" : ""} flex h-full w-full flex-col border-s border-white/[0.06] bg-[var(--bg-primary)] shadow-[-12px_0_48px_-12px_rgba(0,0,0,0.6)] ${maxWidth}`}>
         <header className="flex items-start gap-3 border-b border-white/[0.05] px-4 py-3">
           <div className="min-w-0 flex-1">
             {eyebrow && <p className="text-[10px] uppercase tracking-[0.18em] text-[var(--text-dim)]">{eyebrow}</p>}

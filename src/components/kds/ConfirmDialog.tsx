@@ -1,7 +1,10 @@
 "use client";
 
 /* KDS ConfirmDialog — ELECTED CF-1 by owner 2026-08-02 (Expenses style):
-   compact hairline card, no header bar, rose-tint destructive confirm. */
+   compact hairline card, no header bar, rose-tint destructive confirm.
+   Motion (owner-approved system 2026-08-21): pops in, shrinks away. */
+
+import { usePresence } from "./usePresence";
 
 export default function ConfirmDialog({
   open,
@@ -26,16 +29,17 @@ export default function ConfirmDialog({
    *  "neutral" = benign confirms ("Add another copy") — inverted primary. */
   tone?: "danger" | "neutral";
 }) {
-  if (!open) return null;
+  const { mounted, closing } = usePresence(open);
+  if (!mounted) return null;
   return (
     <div
-      className="fixed inset-0 z-[300] flex items-center justify-center px-4 bg-black/60 backdrop-blur-sm"
+      className={`fixed inset-0 z-[300] flex items-center justify-center px-4 bg-black/60 backdrop-blur-sm transition-opacity duration-150 ${closing ? "opacity-0 pointer-events-none" : "opacity-100"}`}
       onClick={onCancel}
       role="alertdialog"
       aria-modal="true"
     >
       <div
-        className="kx-glass-pop w-full max-w-sm rounded-2xl border border-white/[0.08] bg-[var(--bg-secondary)] shadow-[0_24px_64px_-24px_rgba(0,0,0,0.7)] overflow-hidden"
+        className={`kx-glass-pop ${closing ? "kx-pop-closing" : ""} w-full max-w-sm rounded-2xl border border-white/[0.08] bg-[var(--bg-secondary)] shadow-[0_24px_64px_-24px_rgba(0,0,0,0.7)] overflow-hidden`}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="px-4 py-3.5">

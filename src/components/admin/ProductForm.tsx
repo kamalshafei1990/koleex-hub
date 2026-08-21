@@ -3340,7 +3340,7 @@ export default function ProductForm({ productId }: Props) {
            ═══════════════════════════════════════════════════════════ */}
         <div key={onePage ? "one-page" : currentStep} className={(onePage ? "space-y-10" : "") + " kx-tab-in"}>
         {(onePage || steps[currentStep]?.id === "identity") && (
-          <div id="sec-identity" className="space-y-5 scroll-mt-28 animate-in fade-in duration-300">
+          <div id="sec-identity" className="space-y-5 scroll-mt-28">
             {/* ── HAS FAMILY ── the owner's switch: ON reveals the member
                 strip under the main tabs. OFF is only possible while the
                 product still has a single model. */}
@@ -4774,7 +4774,7 @@ export default function ProductForm({ productId }: Props) {
            STEP 2: CLASSIFICATION
            ═══════════════════════════════════════════════════════════ */}
         {(onePage || steps[currentStep]?.id === "classify") && (
-          <div id="sec-classify" className="space-y-5 scroll-mt-28 animate-in fade-in duration-300">
+          <div id="sec-classify" className="space-y-5 scroll-mt-28">
             <Section
               id="classification"
               icon={<FolderTreeIcon className="h-4 w-4" />}
@@ -4839,7 +4839,7 @@ export default function ProductForm({ productId }: Props) {
            an existing supplier and edits only the per-product facts.
            ═══════════════════════════════════════════════════════════ */}
         {(onePage || steps[currentStep]?.id === "supplier") && (
-          <div id="sec-supplier" className="space-y-5 scroll-mt-28 animate-in fade-in duration-300">
+          <div id="sec-supplier" className="space-y-5 scroll-mt-28">
             <Section id="suppliers" icon={<FactoryIcon className="h-4 w-4" />} title={t("models.suppliers", "Supplier & Sourcing")} badge={t("models.suppliersBadge", "From Suppliers app")} defaultOpen>
               {(() => {
                 /* Spec lines offered by the cost-note "Import from product
@@ -5007,7 +5007,7 @@ export default function ProductForm({ productId }: Props) {
            this is the in-form editor for all 14 knowledge types.
            ═══════════════════════════════════════════════════════════ */}
         {(onePage || steps[currentStep]?.id === "knowledge") && (
-          <div id="sec-knowledge" className="space-y-5 scroll-mt-28 animate-in fade-in duration-300">
+          <div id="sec-knowledge" className="space-y-5 scroll-mt-28">
             <Section
               id="knowledge"
               icon={<BookOpenIcon className="h-4 w-4" />}
@@ -5039,7 +5039,7 @@ export default function ProductForm({ productId }: Props) {
            section: loads and saves through its own endpoint.
            ═══════════════════════════════════════════════════════════ */}
         {(onePage || steps[currentStep]?.id === "highlights") && (
-          <div id="sec-highlights" className="space-y-5 scroll-mt-28 animate-in fade-in duration-300">
+          <div id="sec-highlights" className="space-y-5 scroll-mt-28">
             <Section id="feature-highlights" icon={<ImageRawIcon className="h-4 w-4" />} title={t("features.title", "Feature Highlights")} badge={t("features.badge", "Photo + explanation cards")}>
               <FeatureHighlightsSection
                 productId={effectiveId ?? ""}
@@ -5059,7 +5059,7 @@ export default function ProductForm({ productId }: Props) {
         {steps[currentStep]?.id === "specs" && (isSewing || activeSpecsSchema) && (() => {
           const specsSchema = specsTabSchema;
           return (
-            <div className="space-y-5 animate-in fade-in duration-300">
+            <div className="space-y-5">
               {specsSchema ? (
                 <Section
                   id="schema-specs"
@@ -5131,7 +5131,7 @@ export default function ProductForm({ productId }: Props) {
            STEP N: TECHNICAL DETAILS
            ═══════════════════════════════════════════════════════════ */}
         {steps[currentStep]?.id === "specs" && (
-          <div id="sec-technical" className="space-y-5 scroll-mt-28 animate-in fade-in duration-300">
+          <div id="sec-technical" className="space-y-5 scroll-mt-28">
             {/* Stand / Table products: their specs & variants ARE the
                 configurable option axes (shape · type · size · quality —
                 thickness · lifting · wheels · wheel size), each able to carry a
@@ -5168,7 +5168,7 @@ export default function ProductForm({ productId }: Props) {
            STEP N: MODELS & VARIANTS
            ═══════════════════════════════════════════════════════════ */}
         {(onePage || steps[currentStep]?.id === "commercial") && (
-          <div id="sec-commercial" className="space-y-5 scroll-mt-28 animate-in fade-in duration-300">
+          <div id="sec-commercial" className="space-y-5 scroll-mt-28">
             {/* Purchase Options — which configurations (head-only / complete set)
                 customers can order. Lives WITH the variants it governs
                 (owner tab-cleanup: Specs stays purely technical). */}
@@ -5339,7 +5339,7 @@ export default function ProductForm({ productId }: Props) {
            here READ-ONLY.
            ═══════════════════════════════════════════════════════════ */}
         {(onePage || steps[currentStep]?.id === "pricing") && (
-          <div id="sec-pricing" className="space-y-5 scroll-mt-28 animate-in fade-in duration-300">
+          <div id="sec-pricing" className="space-y-5 scroll-mt-28">
             {memberCtx && activeModel && (
               <>
                 <MemberPricingPanel
@@ -5509,7 +5509,7 @@ export default function ProductForm({ productId }: Props) {
            there rather than duplicating them.
            ═══════════════════════════════════════════════════════════ */}
         {(onePage || steps[currentStep]?.id === "logistics") && (
-          <div id="sec-logistics" className="space-y-5 scroll-mt-28 animate-in fade-in duration-300">
+          <div id="sec-logistics" className="space-y-5 scroll-mt-28">
             {memberCtx && activeModel && (
               <>
                 <MemberLogisticsPanel model={activeModel} onUpdate={updateActiveMember} />
@@ -5631,7 +5631,7 @@ export default function ProductForm({ productId }: Props) {
            here in a later phase; CE/RoHS + warranty are surfaced now.
            ═══════════════════════════════════════════════════════════ */}
         {(onePage || steps[currentStep]?.id === "compliance") && (
-          <div id="sec-compliance" className="space-y-5 scroll-mt-28 animate-in fade-in duration-300">
+          <div id="sec-compliance" className="space-y-5 scroll-mt-28">
             <Section id="compliance-certs" icon={<ShieldCheckIcon className="h-4 w-4" />} title={t("compliance.title", "Compliance")} badge={t("compliance.badge", "Certifications")}>
               {certsCoveredBySchema && (
                 <p className="mb-3 text-[11px] leading-relaxed text-[var(--text-ghost)]">{t("compliance.ceInSpecs", "CE and other certifications for this category are set on the Specifications tab (Safety & Compliance → Certifications). Add certificate records with issuer, number and expiry below.")}</p>
@@ -5767,7 +5767,7 @@ export default function ProductForm({ productId }: Props) {
         )}
 
         {(onePage || steps[currentStep]?.id === "media") && (
-          <div id="sec-media" className="space-y-5 scroll-mt-28 animate-in fade-in duration-300">
+          <div id="sec-media" className="space-y-5 scroll-mt-28">
             <Section id="media" icon={<ImageRawIcon className="h-4 w-4" />} title={t("media.filesTitle", "Media & Documents")}>
               <MediaSection
                 media={media.filter(m => m.type !== "main_image")}
@@ -5950,7 +5950,7 @@ export default function ProductForm({ productId }: Props) {
             : { headline: t("review.draftHeadline", "Save as draft"), body: t("review.draftBody", "Status is Draft — saved internally, not shown on the public catalog. Switch to Active on the Hero step when ready to publish.") };
 
           return (
-            <div className="space-y-5 animate-in fade-in duration-300">
+            <div className="space-y-5">
               {/* ── Live preview card ──
                     Mirrors the public detail page's hero: image,
                     name, tagline, quick-fact pills, pricing. Built
