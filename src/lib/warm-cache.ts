@@ -159,7 +159,15 @@ export function useWarmData<T>(
   maxAgeMs = DEFAULT_MAX_AGE_MS,
 ): { data: T | null; loading: boolean; error: unknown; reload: () => Promise<void> } {
   const warm = useWarm<T>(key, maxAgeMs);
-  const [fresh, setFresh] = useState<T | null>(null);
+  /* The fetched value is STAMPED WITH THE KEY IT ANSWERED. Holding it bare
+     was a correctness bug the moment a key could change: switch the
+     reconciliation filter or the statement period and `fresh` still holds the
+     previous question's answer, so the screen shows the rejected pile under
+     "Active" — and because a warm screen is never `loading`, there is no
+     spinner covering it any more. Stamped, a stale answer simply does not
+     match and the warm value for the NEW key takes over until the refetch
+     lands. */
+  const [fresh, setFresh] = useState<{ k: string; d: T } | null>(null);
   const [error, setError] = useState<unknown>(null);
   const aliveRef = useRef(true);
   useEffect(() => {
@@ -172,7 +180,7 @@ export function useWarmData<T>(
       const d = await load();
       if (!aliveRef.current) return;
       if (key) writeWarm(key, d);
-      setFresh(d);
+      setFresh({ k: key, d });
       setError(null);
     } catch (e) {
       if (!aliveRef.current) return;
@@ -189,7 +197,7 @@ export function useWarmData<T>(
   // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { void reload(); }, [reload]);
 
-  const data = fresh ?? warm;
+  const data = (fresh && fresh.k === key ? fresh.d : null) ?? warm;
   /* Loading means "nothing to show yet" — NOT "a request is in flight".
      A warm screen is never loading, which is the entire point: the revalidate
      runs behind a fully painted page. */
