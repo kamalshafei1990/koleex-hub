@@ -227,8 +227,8 @@ export default function ViewTransitions() {
          thing. */
       const cur = window.location.pathname.replace(/\/$/, "");
       const tgt = url.pathname.replace(/\/$/, "");
-      const inNav = !!a.closest('nav, [role="tablist"], [role="navigation"], aside');
-      let isNavDestination = inNav;
+      const navHost = a.closest('nav, [role="tablist"]');
+      let isNavDestination = !!navHost || !!a.closest('[role="navigation"], aside');
       if (!isNavDestination) {
         for (const link of document.querySelectorAll<HTMLAnchorElement>(
           'nav a[href], [role="tablist"] a[href], [role="navigation"] a[href]',
@@ -238,7 +238,27 @@ export default function ViewTransitions() {
           if (p.replace(/\/$/, "").split("?")[0] === tgt) { isNavDestination = true; break; }
         }
       }
-      const nav = isNavDestination ? ""
+
+      /* A ROUTE-BASED TAB BAR STILL DESERVES THE TAB MOTION.
+         Apps like Inventory and Purchases build their tab strip out of real
+         sub-routes, so treating those clicks as plain navigations left them
+         with only the root cross-fade — which reads as nothing at all
+         (owner: "there is no motion when I switch from tab to another, I
+         want it same as Product Data"). Product Data's tabs are component
+         state, so their direction comes from the tab INDEX; do the same
+         here and the two feel identical. Index, not path depth: depth is
+         what made one tab bar play three different motions. */
+      let tabDir = "";
+      if (navHost) {
+        const items = [...navHost.querySelectorAll<HTMLAnchorElement>('a[href^="/"]')];
+        const to = items.indexOf(a as HTMLAnchorElement);
+        let from = items.findIndex((l) => l.getAttribute("aria-selected") === "true");
+        if (from < 0) from = items.findIndex((l) => (l.getAttribute("href") || "").replace(/\/$/, "") === cur);
+        if (to >= 0 && from >= 0 && to !== from) tabDir = to > from ? "tab-fwd" : "tab-back";
+      }
+
+      const nav = tabDir ? tabDir
+        : isNavDestination ? ""
         : tgt.startsWith(cur + "/") ? "fwd"
         : cur.startsWith(tgt + "/") ? "back"
         : "";

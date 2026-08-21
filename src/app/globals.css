@@ -741,6 +741,30 @@ html[data-kx-door="1"] .kx-shell-top { overflow-x: clip; }
 @keyframes kx-page-under-fwd  { to { transform: translateX(-24%); opacity: 0.5; } }
 @keyframes kx-page-leave-back { to { transform: translateX(100%); } }
 @keyframes kx-page-return-back { from { transform: translateX(-24%); opacity: 0.5; } }
+/* ── Route-based TAB switch (owner: "same as product data") ──────────────
+   Inventory, Purchases and Sales build their tab strips out of real
+   sub-routes, so a tab click is a navigation. It still has to FEEL like a
+   tab: the same 24px directional slide and the same expo curve as the
+   in-component kx-tab-in-fwd/back, not the 100% drill-in push. The old
+   page leaves quickly so the two never cross-dissolve, and only the
+   content group moves — the strip you just clicked holds still. */
+@media (prefers-reduced-motion: no-preference) {
+  html[data-kx-nav^="tab-"]::view-transition-old(kx-main) {
+    animation: kx-tabpage-out 120ms var(--kx-ease-exit, cubic-bezier(0.4, 0, 1, 1)) both;
+  }
+  html[data-kx-nav="tab-fwd"]::view-transition-new(kx-main) {
+    animation: kx-tabpage-fwd var(--kx-dur-slow, 320ms) var(--kx-ease-expo, cubic-bezier(0.16, 1, 0.3, 1)) both;
+  }
+  html[data-kx-nav="tab-back"]::view-transition-new(kx-main) {
+    animation: kx-tabpage-back var(--kx-dur-slow, 320ms) var(--kx-ease-expo, cubic-bezier(0.16, 1, 0.3, 1)) both;
+  }
+  html[dir="rtl"][data-kx-nav="tab-fwd"]::view-transition-new(kx-main) { animation-name: kx-tabpage-back; }
+  html[dir="rtl"][data-kx-nav="tab-back"]::view-transition-new(kx-main) { animation-name: kx-tabpage-fwd; }
+}
+@keyframes kx-tabpage-out  { to { opacity: 0; } }
+@keyframes kx-tabpage-fwd  { from { opacity: 0; transform: translateX(24px); } }
+@keyframes kx-tabpage-back { from { opacity: 0; transform: translateX(-24px); } }
+
 @keyframes kx-page-enter-fwd-rtl  { from { transform: translateX(-100%); } }
 @keyframes kx-page-under-fwd-rtl  { to { transform: translateX(24%); opacity: 0.5; } }
 @keyframes kx-page-leave-back-rtl { to { transform: translateX(-100%); } }
