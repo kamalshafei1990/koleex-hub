@@ -48,6 +48,7 @@ import AngleDownIcon from "@/components/icons/ui/AngleDownIcon";
 import AngleRightIcon from "@/components/icons/ui/AngleRightIcon";
 import TabStrip from "@/components/ui/TabStrip";
 import { useTabMotion } from "@/components/ui/useTabMotion";
+import Collapse from "@/components/ui/Collapse";
 import dynamic from "next/dynamic";
 import { useSkin } from "@/lib/appearance";
 import FeatureHighlightsDisplay from "./FeatureHighlightsDisplay";
@@ -394,7 +395,9 @@ function Group({
           <AngleDownIcon className={`h-4 w-4 transition-transform duration-300 ${open ? "rotate-180" : ""}`} />
         </button>
       </div>
-      {open && <div className="px-6 pb-6 pt-4 border-t border-[var(--border-subtle)]">{children}</div>}
+      <Collapse open={open} className="px-6 pb-6 pt-4 border-t border-[var(--border-subtle)]">
+        {children}
+      </Collapse>
     </section>
   );
 }

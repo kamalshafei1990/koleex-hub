@@ -972,6 +972,28 @@ input[type="number"]:not(.kx-spinner) {
 @media (prefers-reduced-motion: reduce) {
   .kx-tab-fwd, .kx-tab-back { animation: none; }
 }
+
+/* ── Collapse (owner yes, motion system 2026-08-21) ──────────────────────
+   Accordion bodies unfold instead of snapping: the grid-template-rows
+   0fr↔1fr trick — the ONE sanctioned layout animation, because an
+   accordion's whole job is to move the content below it. The body stays
+   conditionally mounted (heavy section editors must not render while
+   closed); the open leg animates on mount, the close leg is played by
+   usePresence before unmount. */
+.kx-collapse { display: grid; grid-template-rows: 1fr; }
+.kx-collapse > * { overflow: hidden; min-height: 0; }
+@media (prefers-reduced-motion: no-preference) {
+  .kx-collapse { animation: kx-collapse-open 280ms var(--kx-ease-standard, cubic-bezier(0.4, 0, 0.2, 1)); }
+  .kx-collapse-closing { animation: kx-collapse-close 220ms var(--kx-ease-standard, cubic-bezier(0.4, 0, 0.2, 1)) both; }
+}
+@keyframes kx-collapse-open {
+  from { grid-template-rows: 0fr; opacity: 0; }
+  to   { grid-template-rows: 1fr; opacity: 1; }
+}
+@keyframes kx-collapse-close {
+  from { grid-template-rows: 1fr; opacity: 1; }
+  to   { grid-template-rows: 0fr; opacity: 0; }
+}
 .kx-tab-in-soft {
   animation: kx-tab-in-soft var(--kx-tab-in-dur, 0.32s)
              var(--kx-tab-in-ease, cubic-bezier(0.22, 1, 0.36, 1)) backwards;

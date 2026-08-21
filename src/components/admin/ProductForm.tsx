@@ -134,6 +134,7 @@ import AccessoryOptionsSection, { type AccessoryOptionRow, axesForSubcategory } 
 import BaseFobCard from "./form-sections/BaseFobCard";
 import TabStrip from "@/components/ui/TabStrip";
 import { useTabMotion } from "@/components/ui/useTabMotion";
+import Collapse from "@/components/ui/Collapse";
 import RelatedProductsSection from "./form-sections/RelatedProductsSection";
 import SearchSocialSection from "./form-sections/SearchSocialSection";
 import SewingMachineSection from "./form-sections/SewingMachineSection";
@@ -184,9 +185,9 @@ function Section({ icon, title, children, id, defaultOpen = true, badge }: {
         )}
         <AngleDownIcon className={`h-4 w-4 text-[var(--text-ghost)] transition-transform duration-300 ${open ? "rotate-180" : ""}`} />
       </button>
-      {open && (
-        <div className="px-6 pb-6 pt-2 border-t border-[var(--border-subtle)]">{children}</div>
-      )}
+      <Collapse open={open} className="px-6 pb-6 pt-2 border-t border-[var(--border-subtle)]">
+        {children}
+      </Collapse>
     </section>
   );
 }
