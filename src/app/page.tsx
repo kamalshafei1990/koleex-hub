@@ -38,15 +38,25 @@ import { useShortcutHint } from "@/lib/ui/use-shortcut-hint";
 /* Home dashboard is code-split: it only matters after the grid is usable,
    and keeping it out of the critical chunk protects the home budget. */
 const HomeDashboard = dynamic(() => import("@/components/home/HomeDashboard"), { ssr: false });
-/* ── DARK-LAUNCH SWITCH (owner rule, 2026-08-20) ──
+/* ── DARK-LAUNCH SWITCH (owner rule, 2026-08-20; widened 2026-08-22) ──
    The dashboard is still being built and must NOT appear on production —
    but three sessions share this tree and any of them pushing main would
-   carry it out. This gate keeps it dark wherever the flag is absent:
-   always on in development, on in a deployment ONLY if
-   NEXT_PUBLIC_HOME_DASHBOARD=1 is set there (it is not set on Vercel).
-   Inlined at build time, so a prod build tree-shakes the chunk away. */
-const HOME_DASHBOARD_ON =
-  process.env.NEXT_PUBLIC_HOME_DASHBOARD === "1" || process.env.NODE_ENV === "development";
+   carry it out. This gate keeps it dark wherever the flag is absent, and
+   is inlined at build time so a build without it tree-shakes the chunk
+   away entirely.
+
+   The `NODE_ENV === "development"` half is GONE on purpose. Production was
+   already clean — measured 2026-08-22, zero dashboard cards on prod Home —
+   but a development tree still painted 56 of them, which is what the owner
+   was actually looking at when he said "remove any dashboard cards from
+   home screen, we will work on it later then add it back". Off everywhere
+   is the honest reading of that, and it keeps every session's local Home
+   showing the same thing production shows.
+
+   TO BRING IT BACK: set NEXT_PUBLIC_HOME_DASHBOARD=1 (locally in
+   .env.local, or on Vercel when it is ready to ship). No code change —
+   the component, its data route and its widgets are all untouched. */
+const HOME_DASHBOARD_ON = process.env.NEXT_PUBLIC_HOME_DASHBOARD === "1";
 import { useSkin } from "@/lib/appearance";
 /* A canvas and a draw loop must never sit in Home's boot chunk — Home is the
    most-opened screen in the Hub and its budget is the tightest one there is.
