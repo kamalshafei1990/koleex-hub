@@ -205,16 +205,41 @@ export default function ViewTransitions() {
       }
 
       /* Directional page push (owner pick 4A, motion system 2026-08-21):
-         going DEEPER inside an app (target extends the current path —
-         list → record) pushes the content area in from the side with the
-         old page sliding under in parallax; coming back up pops it the
-         other way. Lateral moves keep the plain cross-fade. The attribute
-         scopes the ::view-transition CSS in globals; only the
+         opening a RECORD from a list pushes the content area in from the
+         side with the old page sliding under in parallax; going back up
+         pops it the other way. Everything else keeps the plain cross-fade.
+         The attribute scopes the ::view-transition CSS in globals; only the
          #main-scroll-container group slides — the shell header holds
-         still. RTL flips in CSS. */
+         still. RTL flips in CSS.
+
+         ⚠️ PATH DEPTH ALONE IS NOT A DRILL-IN. Apps like Purchases and
+         Inventory build their TAB BAR out of real sub-routes
+         (/purchase → /purchase/orders → /purchase/rfqs), so a pure
+         "target extends current" test made one tab bar produce three
+         different motions — a full sideways push from the home tab, a
+         plain fade between tabs, a pop on the way back. Owner, on both
+         apps: "the motion and navigation is totally wrong".
+
+         So a destination that any TAB/NAV on this page points at is a
+         lateral move by definition, however deep its path looks. That
+         covers both the tab itself and a shortcut card aimed at the same
+         place, which is what keeps one destination feeling like one
+         thing. */
       const cur = window.location.pathname.replace(/\/$/, "");
       const tgt = url.pathname.replace(/\/$/, "");
-      const nav = tgt.startsWith(cur + "/") ? "fwd"
+      const inNav = !!a.closest('nav, [role="tablist"], [role="navigation"], aside');
+      let isNavDestination = inNav;
+      if (!isNavDestination) {
+        for (const link of document.querySelectorAll<HTMLAnchorElement>(
+          'nav a[href], [role="tablist"] a[href], [role="navigation"] a[href]',
+        )) {
+          const p = link.getAttribute("href");
+          if (!p || !p.startsWith("/")) continue;
+          if (p.replace(/\/$/, "").split("?")[0] === tgt) { isNavDestination = true; break; }
+        }
+      }
+      const nav = isNavDestination ? ""
+        : tgt.startsWith(cur + "/") ? "fwd"
         : cur.startsWith(tgt + "/") ? "back"
         : "";
       const myGen = ++navGen;

@@ -33,7 +33,7 @@ export default function Modal({
       aria-modal="true"
     >
       <div
-        className={`kx-glass-pop ${closing ? "kx-pop-closing" : ""} w-full ${maxWidth} space-y-4 rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-5 max-h-[88vh] overflow-y-auto`}
+        className={`kx-glass-pop kx-pop-in ${closing ? "kx-pop-closing" : ""} w-full ${maxWidth} space-y-4 rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-5 max-h-[88vh] overflow-y-auto`}
         onClick={(e) => e.stopPropagation()}
       >
         {title && <p className="text-[14px] font-semibold text-[var(--text-primary)]">{title}</p>}

@@ -299,7 +299,7 @@ export default function PopoverPanel({
       /* pointer-events off while leaving: a click landing on a visually
          departing row still fired its action (the outside-click listener is
          already torn down by then). */
-      className={`kx-glass-pop kx-pop-panel ${closing ? `pointer-events-none ${rect.sheet ? "kx-sheet-closing" : "kx-pop-closing"}` : ""} ${className}`}
+      className={`kx-glass-pop kx-pop-panel kx-pop-arrive ${closing ? `pointer-events-none ${rect.sheet ? "kx-sheet-closing" : "kx-pop-closing"}` : ""} ${className}`}
     >
       {children}
     </div>

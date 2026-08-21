@@ -88,7 +88,7 @@ export default function ConfirmDialog({
       aria-label={title}
     >
       <div
-        className={`kx-glass-pop ${closing ? "kx-pop-closing" : ""} w-full max-w-sm rounded-2xl border border-white/[0.08] bg-[var(--bg-secondary)] shadow-[0_24px_64px_-24px_rgba(0,0,0,0.7)]`}
+        className={`kx-glass-pop kx-pop-in ${closing ? "kx-pop-closing" : ""} w-full max-w-sm rounded-2xl border border-white/[0.08] bg-[var(--bg-secondary)] shadow-[0_24px_64px_-24px_rgba(0,0,0,0.7)]`}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="px-4 py-3.5">

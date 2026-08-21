@@ -287,7 +287,7 @@ export default function Select({
           style={{ position: "fixed", top: rect.top, left: rect.left, minWidth: rect.width, zIndex: 200 }}
           /* pointer-events off while leaving — a click on a departing option
              still called commit() from an already-closed select. */
-          className={`kx-glass-pop kx-pop-panel ${panelClosing ? "kx-pop-closing pointer-events-none" : ""} ${panelWidthClassName === "w-full" ? "" : panelWidthClassName}`}
+          className={`kx-glass-pop kx-pop-panel kx-pop-arrive ${panelClosing ? "kx-pop-closing pointer-events-none" : ""} ${panelWidthClassName === "w-full" ? "" : panelWidthClassName}`}
         >
           {/* maxHeight inline so it BEATS max-h-60: the class is the height the
               list wants, this is the height the viewport actually allows. */}

@@ -3434,7 +3434,19 @@ html[data-kx-tabslide] #main-scroll-container { overflow-x: clip; }
    skin every menu used to appear with zero animation because this arrival was
    aurora-gated. The glass STYLING stays skin-scoped elsewhere; the movement
    does not. */
-.kx-glass-pop {
+/* ⚠️ MOTION IS ITS OWN CLASS — never a styling class.
+   `.kx-glass-pop` is the glass MATERIAL and `.kx-pop-panel` is the dropdown
+   SHELL (the note at the top of the pop-glass block says so outright).
+   Hanging the arrival on either one gave an entrance to everything that
+   merely wanted the LOOK: Inventory's floating Shortcuts button re-popped
+   on every navigation, the AI composer popped on mount, and the eight
+   sidebar fly-outs — permanently mounted at opacity 0 — replayed an
+   invisible animation on every page. Owner, on Inventory and Purchases:
+   "the motion and navigation is totally wrong".
+   So the arrival is applied BY THE COMPONENT that decides when a surface
+   appears: PopoverPanel and Select add .kx-pop-arrive; dialogs use the
+   older .kx-pop-in settle. Persistent chrome carries neither. */
+.kx-pop-arrive {
   /* `backwards`, NEVER `both`. `both` keeps the last keyframe's transform
      applied FOREVER, and a transformed element becomes the containing block
      for every position:fixed descendant — a non-portalled confirm dialog
@@ -3445,7 +3457,7 @@ html[data-kx-tabslide] #main-scroll-container { overflow-x: clip; }
   animation: kx-pop-in var(--kx-dur-base, 0.24s) var(--kx-ease-pop, cubic-bezier(0.34, 1.3, 0.5, 1)) backwards;
   transform-origin: calc(100% - 28px) 0%;
 }
-[dir="rtl"] .kx-glass-pop { transform-origin: 28px 0%; }
+[dir="rtl"] .kx-pop-arrive { transform-origin: 28px 0%; }
 /* Exit choreography (pick 2A): dismissal shrinks away on the exit curve at
    ~60% of the entrance. Applied by usePresence just before unmount. */
 @keyframes kx-pop-out {
@@ -3472,7 +3484,7 @@ html[data-kx-tabslide] #main-scroll-container { overflow-x: clip; }
 .kx-toast-out { animation: kx-toast-out 200ms var(--kx-ease-exit, cubic-bezier(0.4, 0, 1, 1)) both; }
 
 @media (prefers-reduced-motion: reduce) {
-  .kx-glass-pop, .kx-pop-closing, .kx-sheet-closing, .kx-toast-in, .kx-toast-out { animation: none !important; }
+  .kx-pop-arrive, .kx-pop-closing, .kx-sheet-closing, .kx-toast-in, .kx-toast-out { animation: none !important; }
 }
 
 /* Low-power tier: the DECORATIVE infinite loops pause (they were running
