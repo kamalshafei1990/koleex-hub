@@ -72,6 +72,44 @@ export default function FeatureHighlightsSection({
     patch(i, { image_url: up.url });
   }, []);
 
+  /* Auto-translate: fill zh + ar from the English title/description via the
+     Hub's translate endpoint (the same one the hero name uses). The endpoint
+     answers 200 with fallback:true when no provider is configured — surfaced
+     honestly instead of writing English into the zh/ar fields. */
+  const [translating, setTranslating] = useState<number | null>(null);
+  const translateOne = async (text: string, target: "zh" | "ar"): Promise<string | null> => {
+    try {
+      const res = await fetch("/api/ai/translate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ text, target_lang: target, source_lang: "en" }),
+      });
+      const data = (await res.json()) as { translated?: string; fallback?: boolean };
+      if (!res.ok || data.fallback || !data.translated) return null;
+      return data.translated;
+    } catch { return null; }
+  };
+  const autoTranslate = async (i: number) => {
+    const r = rows[i];
+    if (!r || (!r.title.trim() && !(r.description ?? "").trim())) return;
+    setTranslating(i); setError(null);
+    const [tZh, tAr, dZh, dAr] = await Promise.all([
+      r.title.trim() ? translateOne(r.title, "zh") : Promise.resolve(null),
+      r.title.trim() ? translateOne(r.title, "ar") : Promise.resolve(null),
+      (r.description ?? "").trim() ? translateOne(r.description as string, "zh") : Promise.resolve(null),
+      (r.description ?? "").trim() ? translateOne(r.description as string, "ar") : Promise.resolve(null),
+    ]);
+    setTranslating(null);
+    if (!tZh && !tAr && !dZh && !dAr) { setError("Auto-translate is unavailable right now."); return; }
+    patch(i, {
+      ...(tZh ? { title_zh: tZh } : {}),
+      ...(tAr ? { title_ar: tAr } : {}),
+      ...(dZh ? { description_zh: dZh } : {}),
+      ...(dAr ? { description_ar: dAr } : {}),
+    });
+  };
+
   const save = async () => {
     if (!productId) return;
     setSaving(true); setError(null);
@@ -155,8 +193,13 @@ export default function FeatureHighlightsSection({
                 </select>
               )}
             </div>
-            {/* order + delete */}
+            {/* translate + order + delete */}
             <div className="flex shrink-0 flex-col items-center gap-1">
+              <button type="button" onClick={() => void autoTranslate(i)} disabled={translating === i}
+                title="Auto-translate title & description to 中文 + العربية"
+                className="h-6 w-8 rounded border border-[var(--border-subtle)] text-[10px] text-[#9FC2E4] disabled:opacity-40 kx-ai-glow">
+                {translating === i ? "…" : "文ع"}
+              </button>
               <button type="button" onClick={() => move(i, -1)} disabled={i === 0}
                 className="h-6 w-6 rounded border border-[var(--border-subtle)] text-[11px] text-[var(--text-muted)] disabled:opacity-30">↑</button>
               <button type="button" onClick={() => move(i, 1)} disabled={i === rows.length - 1}

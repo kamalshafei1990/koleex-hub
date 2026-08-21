@@ -372,6 +372,9 @@ function getSteps(isSewing: boolean): WizardStep[] {
     { id: "classify", label: "Classification", shortLabel: "Classify", icon: <FolderTreeIcon className="h-4 w-4" /> },
     { id: "supplier", label: "Supplier & Sourcing", shortLabel: "Supplier", icon: <FactoryIcon className="h-4 w-4" /> },
     { id: "identity", label: "Hero & Identity", shortLabel: "Identity", icon: <SparklesIcon className="h-4 w-4" /> },
+    /* Owner call 2026-08-21: highlights live in their OWN tab right after the
+       hero — photo + description cards with auto-translate, add/edit/delete. */
+    { id: "highlights", label: "Feature Highlights", shortLabel: "Highlights", icon: <ImageRawIcon className="h-4 w-4" /> },
     { id: "specs", label: "Specifications", shortLabel: "Specs", icon: <Settings2Icon className="h-4 w-4" /> },
     { id: "commercial", label: "Variants", shortLabel: "Variants", icon: <BoxesIcon className="h-4 w-4" /> },
     { id: "pricing", label: "Cost & Price", shortLabel: "Price", icon: <DollarSignIcon className="h-4 w-4" /> },
@@ -4993,6 +4996,23 @@ export default function ProductForm({ productId }: Props) {
            so this step only renders the dynamic spec fields driven
            by the template the kind chose.
            ═══════════════════════════════════════════════════════════ */}
+        {/* ═══════════════════════════════════════════════════════════
+           FEATURE HIGHLIGHTS — its own tab right after the hero (owner
+           call): catalog-style cards, each a photo + description with
+           auto-translate; add / edit / delete freely. Self-contained
+           section: loads and saves through its own endpoint.
+           ═══════════════════════════════════════════════════════════ */}
+        {(onePage || steps[currentStep]?.id === "highlights") && (
+          <div id="sec-highlights" className="space-y-5 scroll-mt-28 animate-in fade-in duration-300">
+            <Section id="feature-highlights" icon={<ImageRawIcon className="h-4 w-4" />} title={t("features.title", "Feature Highlights")} badge={t("features.badge", "Photo + explanation cards")}>
+              <FeatureHighlightsSection
+                productId={effectiveId ?? ""}
+                models={models.filter((m) => m.id).map((m) => ({ id: m.id as string, code: m.primary_model || m.model_name || "model" }))}
+              />
+            </Section>
+          </div>
+        )}
+
         {onePage && isSewing && <div id="sec-sewing" className="scroll-mt-28" aria-hidden />}
         {/* Schema-driven specs — the canonical structured editor that writes
             product.schema_specs (the data that lights up the public product
@@ -5720,17 +5740,6 @@ export default function ProductForm({ productId }: Props) {
                   const mainImages = media.filter(m => m.type === "main_image");
                   setMedia([...mainImages, ...filtered]);
                 }}
-              />
-            </Section>
-
-            {/* Feature Highlights — the supplier-catalog card (small photo +
-                name + short explanation of one feature/function). Its own
-                table + endpoint; the section loads and saves itself, so the
-                form's main save machine is untouched. */}
-            <Section id="feature-highlights" icon={<ImageRawIcon className="h-4 w-4" />} title={t("features.title", "Feature Highlights")} badge={t("features.badge", "Photo + explanation cards")} defaultOpen={false}>
-              <FeatureHighlightsSection
-                productId={effectiveId ?? ""}
-                models={models.filter((m) => m.id).map((m) => ({ id: m.id as string, code: m.primary_model || m.model_name || "model" }))}
               />
             </Section>
 

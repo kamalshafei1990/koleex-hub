@@ -404,6 +404,8 @@ const STEPS = [
   { id: "classify",   short: "Classify" },
   { id: "supplier",   short: "Supplier" },
   { id: "identity",   short: "Hero" },
+  /* Owner call 2026-08-21: highlights get their OWN tab right after Hero. */
+  { id: "highlights", short: "Highlights" },
   { id: "specs",      short: "Specs" },
   { id: "commercial", short: "Variants" },
   { id: "pricing",    short: "Price" },
@@ -1222,11 +1224,15 @@ export default function ProductProfile() {
       </Group>
       )}
 
-      {STEPS[step].id === "media" && (<>
-      {/* Feature Highlights — catalog-style photo+explanation cards; the
-          component fetches itself and renders nothing while empty. */}
-      <FeatureHighlightsDisplay productId={String(data.product.id ?? "")} />
+      {/* Feature Highlights — its own tab (owner call): catalog-style
+          photo+explanation cards; the component fetches itself. */}
+      {STEPS[step].id === "highlights" && (
+        <Group icon={<ImageRawIcon className="h-4 w-4" />} title={t("pp.sec.highlights", "Feature Highlights")} count="" onEdit={() => goStep("highlights")}>
+          <FeatureHighlightsDisplay productId={String(data.product.id ?? "")} />
+        </Group>
+      )}
 
+      {STEPS[step].id === "media" && (<>
       <Group icon={<BoundIcon semanticKey="field.photos" className="h-4 w-4" fallback={<ImageRawIcon className="h-4 w-4" />} />} title={t("pp.sec.media", "Media & Documents")} count={`${data.media.length} media · ${data.documents.length} docs`} onEdit={() => goStep("media")}>
         {/* Photo / file slots — every slot, filled or not. */}
         <div className="space-y-4">
