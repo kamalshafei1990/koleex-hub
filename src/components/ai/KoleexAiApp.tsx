@@ -2840,6 +2840,10 @@ function Bubble({
   /* MessageBubble takes `lang`, not the resolved dictionary — resolve it here
      rather than threading another prop through every call site. */
   const copy = COPY[lang] ?? COPY.en;
+  /* Which option was tapped, so the card can show the choice instead of
+     going inert. Local to the bubble — the real record of the choice is the
+     user message it sends. */
+  const [pickedOption, setPickedOption] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const bubbleRef = useRef<HTMLDivElement | null>(null);
   const handleCopyClick = useCallback(async () => {
@@ -2988,54 +2992,82 @@ function Bubble({
               ) : (
                 msg.content
               )
-            ) : (
-              <>
-              <MessageMarkdown content={msg.content} />
-              {/* CLARIFYING OPTIONS. Rendered only on the LAST assistant
-                  message: the buttons are live controls, and leaving them
-                  tappable half-way up a transcript invites someone to answer
-                  a question that was settled ten messages ago.
-                  There is deliberately no "Other" button — the composer is
-                  right there and already does that job better than a button
-                  that only opens the composer. */}
-              {isLast && onAnswerQuestion && (() => {
-                const q = steps.find((st) => st.kind === "question")?.payload as
-                  | { options?: Array<{ label: string; detail?: string; recommended?: boolean }> }
-                  | undefined;
-                const options = q?.options ?? [];
-                if (options.length === 0) return null;
-                return (
-                  <div className="mt-3 flex flex-col gap-1.5">
-                    {options.map((o, i) => (
-                      <button
-                        key={`${o.label}-${i}`}
-                        type="button"
-                        onClick={() => onAnswerQuestion(o.label)}
-                        className={`w-full rounded-xl border px-3 py-2 text-start transition-colors ${
-                          o.recommended
-                            ? "border-[var(--border-focus)] bg-[var(--bg-surface-subtle)]"
-                            : "border-[var(--border-subtle)] bg-[var(--bg-surface)] hover:border-[var(--border-focus)]"
-                        }`}
-                      >
-                        <span className="flex items-center gap-2">
-                          <span className="text-[13px] font-semibold text-[var(--text-primary)]">{o.label}</span>
-                          {o.recommended && (
-                            <span className="rounded-full border border-[var(--border-focus)] px-1.5 py-px text-[9.5px] font-bold uppercase tracking-wider text-[var(--text-muted)]">
-                              {copy.recommended}
+            ) : (() => {
+              /* THE QUESTION IS A CARD, not a paragraph with buttons under it.
+                 When the assistant asks, the whole reply IS the question, so
+                 the card carries it as its own heading and the plain markdown
+                 is skipped — rendering both would print the question twice.
+                 Only on the LAST message: these are live controls, and leaving
+                 them tappable half-way up a transcript invites someone to
+                 answer a question that was settled ten messages ago. */
+              const q = isLast
+                ? (steps.find((st) => st.kind === "question")?.payload as
+                    | { question?: string; options?: Array<{ label: string; detail?: string; recommended?: boolean }> }
+                    | undefined)
+                : undefined;
+              const options = q?.options ?? [];
+              if (!onAnswerQuestion || options.length === 0) {
+                return <MessageMarkdown content={msg.content} />;
+              }
+              return (
+                <div className="kx-glass-pop -mx-1 rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-3">
+                  <p className="mb-2.5 px-0.5 text-[13.5px] font-semibold text-[var(--text-primary)]">
+                    {q?.question || msg.content}
+                  </p>
+                  <div className="flex flex-col gap-1.5">
+                    {options.map((o, i) => {
+                      const chosen = pickedOption === o.label;
+                      return (
+                        <button
+                          key={`${o.label}-${i}`}
+                          type="button"
+                          disabled={pickedOption !== null}
+                          onClick={() => { setPickedOption(o.label); onAnswerQuestion(o.label); }}
+                          className={`group w-full rounded-xl border px-3 py-2.5 text-start transition-all ${
+                            chosen
+                              ? "border-[var(--border-focus)] bg-[var(--bg-surface-subtle)]"
+                              : pickedOption
+                                /* The unpicked options fade rather than vanish:
+                                   the transcript should still show what the
+                                   choice WAS, not just what was chosen. */
+                                ? "border-[var(--border-subtle)] opacity-40"
+                                : "border-[var(--border-subtle)] bg-[var(--bg-secondary)] hover:border-[var(--border-focus)] hover:bg-[var(--bg-surface-subtle)]"
+                          } ${pickedOption ? "cursor-default" : "cursor-pointer"}`}
+                        >
+                          <span className="flex items-center gap-2">
+                            {/* A radio mark, so the row reads as "choose one"
+                                before it is read as "press me". */}
+                            <span
+                              aria-hidden
+                              className={`inline-flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-full border ${
+                                chosen ? "border-[var(--border-focus)]" : "border-[var(--border-color)]"
+                              }`}
+                            >
+                              {chosen && <span className="h-1.5 w-1.5 rounded-full bg-[var(--text-primary)]" />}
+                            </span>
+                            <span className="text-[13px] font-medium text-[var(--text-primary)]">{o.label}</span>
+                            {o.recommended && (
+                              <span className="ms-auto shrink-0 rounded-full border border-[var(--border-focus)] px-1.5 py-px text-[9.5px] font-bold uppercase tracking-wider text-[var(--text-muted)]">
+                                {copy.recommended}
+                              </span>
+                            )}
+                          </span>
+                          {o.detail && (
+                            <span className="mt-1 block ps-[22px] text-[11.5px] leading-snug text-[var(--text-dim)]">
+                              {o.detail}
                             </span>
                           )}
-                        </span>
-                        {o.detail && (
-                          <span className="mt-0.5 block text-[11.5px] text-[var(--text-dim)]">{o.detail}</span>
-                        )}
-                      </button>
-                    ))}
-                    <span className="px-1 text-[11px] text-[var(--text-dim)]">{copy.orTypeYourOwn}</span>
+                        </button>
+                      );
+                    })}
                   </div>
-                );
-              })()}
-              </>
-            )}
+                  {/* No "Other" button: the composer is directly below and
+                      already does that job better than a control whose only
+                      action is to focus the composer. */}
+                  <p className="mt-2 px-0.5 text-[11px] text-[var(--text-dim)]">{copy.orTypeYourOwn}</p>
+                </div>
+              );
+            })()}
           </div>
         )}
         {/* Phase 13: user-side action row — Edit (re-runs the turn
