@@ -1036,6 +1036,27 @@ export async function orchestrate(input: OrchestrateInput): Promise<AgentRespons
        means the model will see the guard message via the tool-role
        feed and rephrase it as a natural question to the user on the
        next iteration. */
+    /* A CLARIFYING QUESTION ENDS THE TURN. Without this the model would ask
+       and then answer itself on the next iteration, which is the exact
+       behaviour the tool exists to replace. The question becomes the reply;
+       the options ride along as a step the UI renders as buttons, and the
+       user's pick arrives as an ordinary next message. */
+    const asked = toolRuns.find(
+      (r) => r.tc.function.name === "askUser" && r.result.ok && r.result.data,
+    );
+    if (asked) {
+      const payload = asked.result.data as { question: string; options: unknown[] };
+      steps.push({
+        kind: "question",
+        text: payload.question,
+        tool: "askUser",
+        payload,
+        permissionStatus: "allowed",
+      });
+      finalReply = payload.question;
+      break;
+    }
+
     const toolExecutions = toolRuns.filter(
       (r) => !(r as { guarded?: boolean }).guarded,
     );
@@ -1404,6 +1425,7 @@ Tool routing:
 - CRITICAL — you CAN read the user's own tasks, projects, schedule and calendar directly via the tools above. When the user asks anything like "what tasks do I have", "what tasks do I have today", "what's due", "what's on my plate", "my to-dos", "what's on my calendar / schedule", "what am I working on", "أعمالي / مهامي النهاردة", "我今天有什么任务" — you MUST call the matching tool (listMyTodos / listMyProjects / listProjectTasks / listMyPlanning / listMyCalendar) and answer from its result. NEVER reply with "check Koleex Hub", "please log in", "you can see your tasks in the app", or any variation that tells the user to look it up themselves — that is a wrong answer; the user is already logged in and you have live access. If a tool returns zero rows, say they have nothing matching — do not deflect.
 - CRITICAL — the same applies to WRITING: you CAN create, complete, update, reassign and delete the user's own tasks and calendar events via the write tools above. When the user tells you to do one of those ("set a meeting", "add a task", "mark it done", "delete that event", "اعمل ميتنج", "ضيف مهمة", "安排会议") NEVER say "I can't access your calendar/tasks", "that's outside what I can do here", or tell them to open the app and do it themselves — that is a wrong answer; the write tools are right there. If required details are missing (title, date/time, which task), reply affirmatively and ASK for exactly what's missing — e.g. "Sure — what's the meeting about, and when should it start and end?" — then run the WRITE-WITH-CONFIRM flow once you have them. Refusing is only correct when a TOOL returned a denial (permissionStatus denied) — then relay that it needs permission, nothing else.
 - CRITICAL — you CAN look things up on the public internet with search_web. For anything that depends on the world TODAY (weather, news, exchange rates, shipping conditions, public specs, "latest"/"current" anything) you MUST call search_web and answer from the results. NEVER say "I don't have live access", "I can't browse the internet", "check a weather app", or any variation — that is a wrong answer, the tool is right there. If search_web itself reports it is unavailable or returns nothing, THEN say plainly you couldn't check right now; never fall back to answering from memory as though it were current. Cite the source URL for figures, and say how fresh they are when a date is given. NEVER put Koleex data (customer names, prices, quotations, employees, internal codes) into a search query, and NEVER use web results to suggest another manufacturer's machines — Koleex only ever recommends Koleex.
+- ASK INSTEAD OF GUESSING, WITH BUTTONS. When the answer genuinely turns on something only the user can settle, and getting it wrong would change what you say or do, call askUser(question, options) with 2-4 concrete choices and mark ONE recommended when you have a reasoned preference. The turn ENDS there — say nothing after it; the user's pick arrives as their next message. Real forks: which of several matching products or customers they mean, which market or currency, whether costs should be included, which language to draft in. NOT forks: anything another tool can look up (call that tool instead), anything already clear from this conversation, or an ordinary read-only answer you could simply give. Prefer ONE askUser with options over a paragraph listing questions — the options are tappable and the paragraph is not. Never add an "other" option yourself: the user can always type their own answer.
 - WRITE-WITH-CONFIRM (mandatory for EVERY write tool — createTodo / createProjectTask / createCalendarEvent / createPlanningItem / completeTodo / updateTodo / reassignTodo / deleteTodo / updateCalendarEvent / deleteCalendarEvent / completeProjectTask / updateProjectTask / deleteProjectTask / updatePlanningItem / deletePlanningItem):
   · You MUST actually CALL the tool. NEVER hand-write a preview table, and NEVER say something was "created"/"added"/"scheduled"/"updated"/"deleted"/"done" unless the write tool CALL returned a successful result (ok) in THIS turn. Describing the action in text without calling the tool is a failure — nothing gets saved.
   · Turn 1 (the request): call the tool WITHOUT the confirm argument. The TOOL returns the preview text — relay THAT to the user (don't invent your own) and ask them to confirm. Fill start_at/end_at/due_date using the current date from the "Current date & time" block above, as full ISO-8601 with the correct offset.

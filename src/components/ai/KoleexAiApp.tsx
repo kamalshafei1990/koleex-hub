@@ -66,7 +66,7 @@ import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 
 type MsgRole = "user" | "assistant" | "system";
 interface AgentStep {
-  kind: "answer" | "tool-call" | "tool-result" | "recommendation" | "draft" | "denied";
+  kind: "answer" | "tool-call" | "tool-result" | "recommendation" | "draft" | "denied" | "question";
   text?: string;
   tool?: string;
   payload?: unknown;
@@ -117,6 +117,8 @@ const COPY: Record<Lang, {
   footer: string;
   stopped: string;
   dropHere: string;
+  recommended: string;
+  orTypeYourOwn: string;
   searchChats?: string;
   noSearchResults?: string;
   /* Projects + pinning */
@@ -164,6 +166,8 @@ const COPY: Record<Lang, {
     footer: "Koleex AI — Powered by Koleex Technology Systems",
     stopped: "Stopped",
     dropHere: "Drop files to attach",
+    recommended: "Recommended",
+    orTypeYourOwn: "Or type your own answer below.",
     searchChats: "Search chats…",
     noSearchResults: "No chats match your search.",
     projects: "Projects",
@@ -216,6 +220,8 @@ const COPY: Record<Lang, {
     footer: "Koleex AI — 由 Koleex 技术系统驱动",
     stopped: "已停止",
     dropHere: "拖放文件以附加",
+    recommended: "推荐",
+    orTypeYourOwn: "或在下方输入你自己的答案。",
     searchChats: "搜索对话…",
     noSearchResults: "没有匹配的对话。",
     projects: "项目",
@@ -267,6 +273,8 @@ const COPY: Record<Lang, {
     footer: "Koleex AI — بدعم من أنظمة Koleex التقنية",
     stopped: "تم الإيقاف",
     dropHere: "أفلت الملفات لإرفاقها",
+    recommended: "موصى به",
+    orTypeYourOwn: "أو اكتب إجابتك بنفسك في الأسفل.",
     searchChats: "ابحث في المحادثات…",
     noSearchResults: "لا توجد محادثات تطابق بحثك.",
     projects: "المشاريع",
@@ -2220,6 +2228,12 @@ export default function KoleexAiApp() {
                   onEdit={(newText) => handleEditAndRetry(i, newText)}
                   onSpeak={handleSpeak}
                   onFeedback={handleFeedback}
+                  /* Tapping an option is exactly the same as typing it —
+                     it goes through send(), so the agent continues from a
+                     normal user message and the transcript reads honestly
+                     afterwards, with the choice visible as something the
+                     user said. */
+                  onAnswerQuestion={(answer) => { void send(answer, false); }}
                   lang={lang}
                   /* Only the latest AI bubble reacts to the live
                      conversation; older ones stay idle. */
@@ -2788,6 +2802,7 @@ function Bubble({
   onEdit,
   onSpeak,
   onFeedback,
+  onAnswerQuestion,
   lang,
   orbState = "idle",
   orbActivity = "none",
@@ -2806,6 +2821,8 @@ function Bubble({
   onCopy?: (text: string, renderedEl?: HTMLElement | null) => Promise<boolean> | boolean;
   onRegenerate?: () => void;
   onEdit?: (newText: string) => void;
+  /** A clarifying option was tapped — send it as the next user message. */
+  onAnswerQuestion?: (answer: string) => void;
   /** Per-message TTS replay — gets the bubble's text and the chosen
    *  language; returns a handle the bubble can use to stop playback. */
   onSpeak?: (text: string) => void;
@@ -2820,6 +2837,9 @@ function Bubble({
   /* Memoised so the `?? []` fallback doesn't mint a new array each render
      and re-run everything downstream that depends on it. */
   const steps = useMemo(() => msg.steps ?? [], [msg.steps]);
+  /* MessageBubble takes `lang`, not the resolved dictionary — resolve it here
+     rather than threading another prop through every call site. */
+  const copy = COPY[lang] ?? COPY.en;
   const [copied, setCopied] = useState(false);
   const bubbleRef = useRef<HTMLDivElement | null>(null);
   const handleCopyClick = useCallback(async () => {
@@ -2969,7 +2989,52 @@ function Bubble({
                 msg.content
               )
             ) : (
+              <>
               <MessageMarkdown content={msg.content} />
+              {/* CLARIFYING OPTIONS. Rendered only on the LAST assistant
+                  message: the buttons are live controls, and leaving them
+                  tappable half-way up a transcript invites someone to answer
+                  a question that was settled ten messages ago.
+                  There is deliberately no "Other" button — the composer is
+                  right there and already does that job better than a button
+                  that only opens the composer. */}
+              {isLast && onAnswerQuestion && (() => {
+                const q = steps.find((st) => st.kind === "question")?.payload as
+                  | { options?: Array<{ label: string; detail?: string; recommended?: boolean }> }
+                  | undefined;
+                const options = q?.options ?? [];
+                if (options.length === 0) return null;
+                return (
+                  <div className="mt-3 flex flex-col gap-1.5">
+                    {options.map((o, i) => (
+                      <button
+                        key={`${o.label}-${i}`}
+                        type="button"
+                        onClick={() => onAnswerQuestion(o.label)}
+                        className={`w-full rounded-xl border px-3 py-2 text-start transition-colors ${
+                          o.recommended
+                            ? "border-[var(--border-focus)] bg-[var(--bg-surface-subtle)]"
+                            : "border-[var(--border-subtle)] bg-[var(--bg-surface)] hover:border-[var(--border-focus)]"
+                        }`}
+                      >
+                        <span className="flex items-center gap-2">
+                          <span className="text-[13px] font-semibold text-[var(--text-primary)]">{o.label}</span>
+                          {o.recommended && (
+                            <span className="rounded-full border border-[var(--border-focus)] px-1.5 py-px text-[9.5px] font-bold uppercase tracking-wider text-[var(--text-muted)]">
+                              {copy.recommended}
+                            </span>
+                          )}
+                        </span>
+                        {o.detail && (
+                          <span className="mt-0.5 block text-[11.5px] text-[var(--text-dim)]">{o.detail}</span>
+                        )}
+                      </button>
+                    ))}
+                    <span className="px-1 text-[11px] text-[var(--text-dim)]">{copy.orTypeYourOwn}</span>
+                  </div>
+                );
+              })()}
+              </>
             )}
           </div>
         )}

@@ -168,6 +168,18 @@ export const SUPPLIER_CONFIDENTIALITY =
    The chat already renders markdown images — verified — and the product tools
    now return the same photo the catalogue shows. What was missing was anyone
    telling the model it may use them. */
+/* OWNER RULE (2026-08-22): ask rather than guess — but only at a real fork.
+   The failure mode this guards against is not the model asking too little,
+   it is asking too much: an assistant that checks before every step hands
+   the work back to the person who asked it. */
+export const ASK_WHEN_UNSURE_RULE =
+  " WHEN YOU ARE GENUINELY UNSURE, ASK — do not guess. If the answer depends on something only the user can settle," +
+  " and getting it wrong would change what you say or do, call askUser with the question and 2-4 concrete options," +
+  " marking one recommended when you have a reasoned preference. Then stop; the user answers next." +
+  " Real forks: which of several matching products or customers they mean, which market or currency, whether to include cost figures, which language to draft in." +
+  " NOT forks: anything another tool can look up (call the tool instead), anything already clear from this conversation, or a plain read-only answer you could simply give." +
+  " Asking when you could have answered wastes their time and is worse than an answer they can correct.";
+
 export const PRODUCT_PHOTO_RULE =
   " SHOW THE PRODUCT: when a tool result carries main_photo_url or photo_url for a Koleex product you are describing, comparing or recommending," +
   " include that photo in your answer as markdown — ![<product name>](<the exact url>) — placed right after you first name the product." +
@@ -200,6 +212,7 @@ export function buildFastPrompt(
         SUPPLIER_CONFIDENTIALITY +
         AI_PROVENANCE_RULE +
         PRODUCT_PHOTO_RULE +
+        ASK_WHEN_UNSURE_RULE +
         ` ${BRAND_EXCLUSIVITY_RULE}` +
         ` ${DIRECT_VOICE_RULE}` +
         ` ${ENTITY_GUIDANCE_SHORT}` +
@@ -243,6 +256,7 @@ export function buildSmartPrompt(
         SUPPLIER_CONFIDENTIALITY +
         AI_PROVENANCE_RULE +
         PRODUCT_PHOTO_RULE +
+        ASK_WHEN_UNSURE_RULE +
         ` ${BRAND_EXCLUSIVITY_RULE}` +
         ` ${DIRECT_VOICE_RULE}` +
         `${ENTITY_GUIDANCE_FULL}\n\n` +
@@ -312,6 +326,7 @@ export function buildChatPrompt(
         SUPPLIER_CONFIDENTIALITY +
         AI_PROVENANCE_RULE +
         PRODUCT_PHOTO_RULE +
+        ASK_WHEN_UNSURE_RULE +
         ` ${BRAND_EXCLUSIVITY_RULE}` +
         ` ${DIRECT_VOICE_RULE}` +
         ` Language: reply in the user's current message language by default (fall back to ${lang} for very short turns). If the user explicitly tells you which language to use for replies ("reply in Arabic", "answer in English", "رد بالعربية", "请用中文回答"), honor that for ALL subsequent replies until they ask you to switch again — even if they keep writing to you in a different language. Request-language and reply-language can legitimately be different.` +
@@ -368,6 +383,7 @@ export function buildBusinessPrompt(
         SUPPLIER_CONFIDENTIALITY +
         AI_PROVENANCE_RULE +
         PRODUCT_PHOTO_RULE +
+        ASK_WHEN_UNSURE_RULE +
         ` ${BRAND_EXCLUSIVITY_RULE}` +
         ` ${DIRECT_VOICE_RULE}` +
         ` Reply in ${lang}. Structure answers as short bullet points or numbered steps.` +
