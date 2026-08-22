@@ -49,7 +49,7 @@ import ArrowLeftIcon from "@/components/icons/ui/ArrowLeftIcon";
 import ProductsIcon from "@/components/icons/ProductsIcon";
 import ProductDataIcon from "@/components/icons/ProductDataIcon";
 import {
-  fetchProducts, fetchTaxonomyAll,
+  fetchTaxonomyAll,
   fetchModelSummaries, fetchProductMainImages, deleteProduct,
   fetchClassificationIcons,
 } from "@/lib/products-admin";
@@ -1970,7 +1970,11 @@ export default function ProductList() {
       const displayName = catName.charAt(0).toUpperCase() + catName.slice(1);
       return { slug: catSlug, name: displayName, total, loaded, subSections };
     });
-  }, [filtered, categories, subcategories, subMap, catNameBySlug, viewMode, groupCounts, isInternal, filterSupplier]);
+    /* `t` IS a dependency. It supplies the "Uncategorized" and "Other"
+       fallback names above, so leaving it out meant switching language
+       relaid the whole page and left those two group headings in the
+       previous language until some unrelated filter happened to change. */
+  }, [filtered, categories, subcategories, subMap, catNameBySlug, viewMode, groupCounts, isInternal, filterSupplier, t]);
 
   /* THE CONDITION HAS TO MATCH THE RENDER, EXACTLY.
      The category jump-nav below hosts this screen's long ramp, and it only
@@ -2144,8 +2148,15 @@ export default function ProductList() {
           <div className="flex flex-wrap gap-3">
             <div className="relative basis-full sm:basis-0 sm:flex-1 min-w-0" ref={searchBoxRef}>
               <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[var(--text-dim)] z-10" />
+              {/* role="combobox": this input already carries
+                  aria-autocomplete and aria-expanded and drives a suggestion
+                  list with the arrow keys, but a bare <input> is a textbox,
+                  where neither property is allowed — so assistive tech was
+                  being told about a listbox it had no way to reach. */}
               <input
                 type="search"
+                role="combobox"
+                aria-controls="pl-search-suggestions"
                 value={search}
                 onChange={(e) => { setSearch(e.target.value); setSearchOpen(true); }}
                 onFocus={() => setSearchOpen(true)}
@@ -2195,6 +2206,7 @@ export default function ProductList() {
                   active row, Enter applies, Escape closes. */}
               {searchOpen && suggestions.length > 0 && (
                 <div
+                  id="pl-search-suggestions"
                   role="listbox"
                   className="kx-glass-pop absolute left-0 right-0 top-[calc(100%+8px)] z-40 max-h-[420px] overflow-y-auto rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-subtle)] shadow-2xl"
                 >
@@ -2768,7 +2780,7 @@ export default function ProductList() {
                     there the bar goes STATIC (max-sm) — a ~320px block may
                     scroll away with the page, but it must not DOCK over it. */}
                 <div className="hidden sm:grid grid-cols-[repeat(auto-fill,minmax(178px,1fr))] gap-2 pb-0.5">
-                  {categoryTree.map((cat, catIdx) => (
+                  {categoryTree.map((cat) => (
                     <a
                       key={cat.slug}
                       href={`#cat-${cat.slug}`}

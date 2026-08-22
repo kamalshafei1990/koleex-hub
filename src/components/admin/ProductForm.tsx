@@ -354,7 +354,7 @@ function schemaColumnMirror(
   return out;
 }
 
-function getSteps(isSewing: boolean): WizardStep[] {
+function getSteps(): WizardStep[] {
   /* Machine Kind used to be its own step (id: "machine-type") but
      it's really a 4th-tier classification decision — Division →
      Category → Subcategory → Kind — so it now lives INSIDE the
@@ -996,7 +996,10 @@ export default function ProductForm({ productId }: Props) {
   const isSewing = !isAccessory && isSewingMachineSubcategory(product.subcategory_slug, product.division_slug, product.category_slug);
 
   /* ── Wizard steps ── */
-  const steps = useMemo(() => getSteps(isSewing), [isSewing]);
+  /* getSteps takes no input any more — Machine Kind stopped being its own
+     step (see the note on getSteps) and the argument went with it. Memoised
+     on nothing so the array identity stays stable across renders. */
+  const steps = useMemo(() => getSteps(), []);
 
   /* ── Load data ── */
   useEffect(() => {
@@ -1572,7 +1575,11 @@ export default function ProductForm({ productId }: Props) {
 
   useEffect(() => {
     if (!loading && models.length === 0) ensureFirstModel();
-  }, [loading, ensureFirstModel]);
+    /* models.length is read here, not just inside ensureFirstModel, so it
+       belongs in the list. It changes together with ensureFirstModel's own
+       identity, so this adds no extra runs — it just stops the rule from
+       being right about a real omission. */
+  }, [loading, models.length, ensureFirstModel]);
 
   /* ── v30: KOLEEX Primary Model auto-coding ──
      Resolve the prefix from the currently-selected subcategory's `code`

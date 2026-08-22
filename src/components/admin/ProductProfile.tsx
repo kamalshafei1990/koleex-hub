@@ -509,8 +509,6 @@ function Row({ label, value, help, mono, badge, iconSrc }: {
 
 const rows = "divide-y divide-[var(--border-subtle)]";
 
-const grid = "grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-x-5 gap-y-4";
-
 export default function ProductProfile() {
   const params = useParams<{ id: string }>();
   const handle = params?.id;
@@ -1376,7 +1374,12 @@ function CostHistoryDrawer({ target, onClose, t }: {
 }) {
   const [rows, setRows] = useState<Row[] | null>(null);
   useEffect(() => {
-    if (!target) { setRows(null); return; }
+    /* No synchronous reset here. The drawer is mounted permanently and only
+       `target` changes, so clearing rows on close used to run a setState
+       during the effect — a cascading render on every dismissal. The list is
+       not rendered while target is null anyway, and the fetch below replaces
+       it before the next open can paint, so there is nothing to clear. */
+    if (!target) return;
     let alive = true;
     (async () => {
       try {
