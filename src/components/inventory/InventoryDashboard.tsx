@@ -16,7 +16,7 @@
    --------------------------------------------------------------------------- */
 
 import { useEffect, useState } from "react";
-import { useWarm, writeWarm } from "@/lib/warm-cache";
+import { useWarm, warmAge, writeWarm } from "@/lib/warm-cache";
 import Link from "next/link";
 import InventoryHeader from "@/components/inventory/InventoryHeader";
 import InventoryInternalItemDrawer from "@/components/inventory/InventoryInternalItemDrawer";
@@ -72,8 +72,14 @@ export default function InventoryDashboard() {
   const [internalDrawerOpen, setInternalDrawerOpen] = useState(false);
   const warm = useWarm<OperatorSummary>("inventory:summary");
 
+  /* Home is part of the same tab strip, so it gets the same stale window as
+     every other tab: a summary fetched less than a minute ago is trusted and
+     no request goes out. Without this, walking back through Home between
+     tabs put one more request on the wire each time — the churn behind
+     "there is a lag". */
   useEffect(() => {
     let cancelled = false;
+    if (warmAge("inventory:summary") < 60_000) return;
     void (async () => {
       try {
         const opRes = await fetch("/api/inventory/operator-summary", { credentials: "include", cache: "no-store" });
