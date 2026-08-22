@@ -42,8 +42,9 @@ export interface AskUserPayload {
 const askUser: ToolDef<Record<string, unknown>, AskUserPayload> = {
   name: "askUser",
   description:
-    "Ask the user a short clarifying question with 2-4 concrete options when you genuinely cannot tell what they want and the difference CHANGES what you would do or say. " +
-    "Use it for real forks: which of several matching products they mean, which customer, which currency or market, whether to include costs, which language to draft in. " +
+    "Ask the user a CLOSED question — one whose sensible answers are a short knowable list — and let them tap the answer instead of typing it. " +
+    "Call this whenever you were about to write a sentence offering the user a choice: \"which one did you mean\", \"would you like A or B\", \"should I use X or Y\". If your reply would contain two or more alternatives for them to pick between, it belongs here instead. " +
+    "Typical: several products/customers/suppliers match what they said; which market or currency to price in; which language to draft in; whether to include cost figures; which of two machines to compare; which project a task belongs to. " +
     "Mark ONE option as recommended when you have a reasoned preference. The user can always ignore the options and type their own answer, so never add an 'other' option yourself. " +
     "DO NOT use it for anything you can look up with another tool, for confirmation of something already clear from the conversation, or before ordinary read-only answers — asking when you could simply answer wastes the user's time and is worse than a wrong guess you can correct. " +
     "After calling it, say nothing else: the turn ends with your question and the user replies next.",
