@@ -119,6 +119,9 @@ const COPY: Record<Lang, {
   dropHere: string;
   recommended: string;
   orTypeYourOwn: string;
+  otherOption: string;
+  otherPlaceholder: string;
+  otherSend: string;
   searchChats?: string;
   noSearchResults?: string;
   /* Projects + pinning */
@@ -168,6 +171,9 @@ const COPY: Record<Lang, {
     dropHere: "Drop files to attach",
     recommended: "Recommended",
     orTypeYourOwn: "Or type your own answer below.",
+    otherOption: "Something else",
+    otherPlaceholder: "Tell me what you mean…",
+    otherSend: "Send",
     searchChats: "Search chats…",
     noSearchResults: "No chats match your search.",
     projects: "Projects",
@@ -222,6 +228,9 @@ const COPY: Record<Lang, {
     dropHere: "拖放文件以附加",
     recommended: "推荐",
     orTypeYourOwn: "或在下方输入你自己的答案。",
+    otherOption: "其他",
+    otherPlaceholder: "请说明你的意思…",
+    otherSend: "发送",
     searchChats: "搜索对话…",
     noSearchResults: "没有匹配的对话。",
     projects: "项目",
@@ -275,6 +284,9 @@ const COPY: Record<Lang, {
     dropHere: "أفلت الملفات لإرفاقها",
     recommended: "موصى به",
     orTypeYourOwn: "أو اكتب إجابتك بنفسك في الأسفل.",
+    otherOption: "حاجة تانية",
+    otherPlaceholder: "اكتبلي قصدك إيه…",
+    otherSend: "ابعت",
     searchChats: "ابحث في المحادثات…",
     noSearchResults: "لا توجد محادثات تطابق بحثك.",
     projects: "المشاريع",
@@ -2851,6 +2863,12 @@ function Bubble({
      going inert. Local to the bubble — the real record of the choice is the
      user message it sends. */
   const [pickedOption, setPickedOption] = useState<string | null>(null);
+  /* The "something else" row. Owner asked for it explicitly: the composer
+     below could always take a free-text reply, but a row INSIDE the card is
+     where the eye already is, and it keeps "none of these" part of the same
+     choice rather than a separate act. */
+  const [otherOpen, setOtherOpen] = useState(false);
+  const [otherText, setOtherText] = useState("");
   const [copied, setCopied] = useState(false);
   const bubbleRef = useRef<HTMLDivElement | null>(null);
   const handleCopyClick = useCallback(async () => {
@@ -3008,7 +3026,16 @@ function Bubble({
                  them tappable half-way up a transcript invites someone to
                  answer a question that was settled ten messages ago. */
               const q = steps.find((st) => st.kind === "question")?.payload as
-                | { question?: string; options?: Array<{ label: string; detail?: string; recommended?: boolean }> }
+                | {
+                    question?: string;
+                    lang?: "ar" | "zh" | "en";
+                    options?: Array<{
+                      label: string;
+                      detail?: string;
+                      recommended?: boolean;
+                      photo_url?: string;
+                    }>;
+                  }
                 | undefined;
               const options = q?.options ?? [];
               if (options.length === 0) {
@@ -3020,8 +3047,26 @@ function Bubble({
                  collapsing back to a line of text loses why the answer took
                  the shape it did. Only the LIVE card is tappable: an answered
                  one, or one half-way up the transcript, is a record. */
+              /* The card labels itself in the language of the QUESTION, not the
+                 Hub's UI setting: the owner writes to Koleex AI in Arabic while
+                 his Hub is in English, and an Arabic card badged RECOMMENDED
+                 reads like two different products stapled together. Falls back
+                 to the UI copy when the server sent no language. */
+              const cardCopy = q?.lang ? COPY[q.lang] : copy;
               const settled = answeredWith ?? pickedOption;
               const live = isLast && !!onAnswerQuestion && !settled;
+              /* An answer that matches no option came through the "something
+                 else" row (or the composer). The card records it there, so the
+                 transcript still shows the question was answered — a settled
+                 card with nothing marked reads like it was ignored. */
+              const settledIsOther =
+                !!settled && !options.some((o) => o.label === settled);
+              const submitOther = () => {
+                const t = otherText.trim();
+                if (!t) return;
+                setPickedOption(t);
+                onAnswerQuestion?.(t);
+              };
               return (
                 <div className="kx-glass-pop -mx-1 rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-3">
                   <p className="mb-2.5 px-0.5 text-[13.5px] font-semibold text-[var(--text-primary)]">
@@ -3058,15 +3103,31 @@ function Bubble({
                             >
                               {chosen && <span className="h-1.5 w-1.5 rounded-full bg-[var(--text-primary)]" />}
                             </span>
+                            {/* The product's real photo when the tool resolved
+                                one from its code. Machines are far easier to
+                                tell apart by sight than by code. */}
+                            {o.photo_url && (
+                              // eslint-disable-next-line @next/next/no-img-element
+                              <img
+                                src={o.photo_url}
+                                alt=""
+                                loading="lazy"
+                                className="h-9 w-9 shrink-0 rounded-lg border border-[var(--border-subtle)] object-cover"
+                              />
+                            )}
                             <span className="text-[13px] font-medium text-[var(--text-primary)]">{o.label}</span>
                             {o.recommended && (
                               <span className="ms-auto shrink-0 rounded-full border border-[var(--border-focus)] px-1.5 py-px text-[9.5px] font-bold uppercase tracking-wider text-[var(--text-muted)]">
-                                {copy.recommended}
+                                {cardCopy.recommended}
                               </span>
                             )}
                           </span>
                           {o.detail && (
-                            <span className="mt-1 block ps-[22px] text-[11.5px] leading-snug text-[var(--text-dim)]">
+                            <span
+                              className={`mt-1 block text-[11.5px] leading-snug text-[var(--text-dim)] ${
+                                o.photo_url ? "ps-[58px]" : "ps-[22px]"
+                              }`}
+                            >
                               {o.detail}
                             </span>
                           )}
@@ -3077,8 +3138,73 @@ function Bubble({
                   {/* No "Other" button: the composer is directly below and
                       already does that job better than a control whose only
                       action is to focus the composer. */}
-                  {live && (
-                    <p className="mt-2 px-0.5 text-[11px] text-[var(--text-dim)]">{copy.orTypeYourOwn}</p>
+                  {/* "Something else" — the last row, not a paragraph under
+                      the card, so it reads as one more choice in the same
+                      list. Tapping it opens a field IN PLACE rather than
+                      sending the user down to the composer and back. */}
+                  {(live || settledIsOther) && (
+                    <div className="mt-1.5">
+                      {settledIsOther ? (
+                        <div className="w-full rounded-xl border border-[var(--border-focus)] bg-[var(--bg-surface-subtle)] px-3 py-2.5 text-start">
+                          <span className="flex items-center gap-2">
+                            <span
+                              aria-hidden
+                              className="inline-flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-full border border-[var(--border-focus)]"
+                            >
+                              <span className="h-1.5 w-1.5 rounded-full bg-[var(--text-primary)]" />
+                            </span>
+                            <span className="text-[13px] font-medium text-[var(--text-primary)]">
+                              {cardCopy.otherOption}
+                            </span>
+                          </span>
+                          <span className="mt-1 block ps-[22px] text-[11.5px] leading-snug text-[var(--text-dim)]">
+                            {settled}
+                          </span>
+                        </div>
+                      ) : otherOpen ? (
+                        <div className="flex items-center gap-1.5 rounded-xl border border-[var(--border-focus)] bg-[var(--bg-secondary)] px-2.5 py-1.5">
+                          <input
+                            autoFocus
+                            dir="auto"
+                            value={otherText}
+                            onChange={(e) => setOtherText(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") { e.preventDefault(); submitOther(); }
+                              if (e.key === "Escape") { setOtherOpen(false); setOtherText(""); }
+                            }}
+                            placeholder={cardCopy.otherPlaceholder}
+                            className="min-w-0 flex-1 bg-transparent py-1 text-[13px] text-[var(--text-primary)] outline-none placeholder:text-[var(--text-dim)]"
+                          />
+                          <button
+                            type="button"
+                            onClick={submitOther}
+                            disabled={!otherText.trim()}
+                            className="shrink-0 rounded-lg border border-[var(--border-subtle)] px-2.5 py-1 text-[11.5px] font-medium text-[var(--text-primary)] transition-colors hover:border-[var(--border-focus)] hover:bg-[var(--bg-surface-subtle)] disabled:opacity-40"
+                          >
+                            {cardCopy.otherSend}
+                          </button>
+                        </div>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => setOtherOpen(true)}
+                          className="group w-full cursor-pointer rounded-xl border border-dashed border-[var(--border-subtle)] px-3 py-2.5 text-start transition-all hover:border-[var(--border-focus)] hover:bg-[var(--bg-surface-subtle)]"
+                        >
+                          <span className="flex items-center gap-2">
+                            <span
+                              aria-hidden
+                              className="inline-flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-full border border-dashed border-[var(--border-color)]"
+                            />
+                            <span className="text-[13px] font-medium text-[var(--text-primary)]">
+                              {cardCopy.otherOption}
+                            </span>
+                          </span>
+                          <span className="mt-1 block ps-[22px] text-[11.5px] leading-snug text-[var(--text-dim)]">
+                            {cardCopy.otherPlaceholder}
+                          </span>
+                        </button>
+                      )}
+                    </div>
                   )}
                 </div>
               );
