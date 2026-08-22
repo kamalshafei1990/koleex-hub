@@ -411,6 +411,7 @@ function SlidingPillNav({
 }) {
   const [tabWidth, setTabWidth] = useState<number>(TAB_WIDTH_LG);
   const trackRef = useRef<HTMLDivElement>(null);
+  const router = useRouter();
   /* No scroll-arrow buttons: they were removed at Kamal's request (they read
      as clutter sitting on top of the rail). The track still scrolls by swipe,
      trackpad and shift-wheel, arrow keys still move focus between tabs, and
@@ -442,6 +443,49 @@ function SlidingPillNav({
   const pillRef = useRef<HTMLSpanElement>(null);
   const firstPlaceRef = useRef(true);
   const trackWidthRef = useRef(-1);
+
+  /* ── PULL EVERY TAB'S ROUTE INTO THE ROUTER CACHE UP FRONT ─────────────
+     The warm data cache made these screens paint instantly and the owner
+     still saw a loading sign, because the thing on screen was not our
+     spinner: it was the segment's `loading.tsx` skeleton, and it shows
+     whenever a navigation has to go and FETCH the route. Data being ready
+     cannot help — the boundary renders before the page component mounts.
+
+     A tab bar is the one place where the next destination is known in
+     advance and is almost certainly where the user is going, so there is no
+     reason to wait for a click to find out. Prefetching all of them puts
+     the routes in the cache while the operator is still reading the page,
+     and the navigation then has nothing to suspend on.
+
+     NOT ALL OF THEM, THOUGH. A fourteen-tab strip would fire fourteen route
+     fetches on every app open, and on this network each request is most of a
+     second — spending the operator's bandwidth on thirteen screens they are
+     not looking at to save one they might. So: the two NEIGHBOURS after idle,
+     since a tab bar is mostly walked sideways, and anything else the moment
+     the cursor lands on it. Hover precedes a click by a few hundred
+     milliseconds, which is the whole fetch.
+
+     Measured in development: no prefetch request fires for a tab until it is
+     clicked, and router.prefetch here produces none either. That is Next's
+     own behaviour — prefetching is DISABLED in dev — so this earns its keep
+     only in production, and the route skeleton will keep appearing on
+     localhost no matter what we do here. */
+  const prefetched = useRef(new Set<string>());
+  const warmRoute = useCallback((href: string) => {
+    if (!href.startsWith("/") || prefetched.current.has(href)) return;
+    prefetched.current.add(href);
+    router.prefetch(href);
+  }, [router]);
+
+  useEffect(() => {
+    const t = window.setTimeout(() => {
+      for (const i of [activeIndex - 1, activeIndex + 1]) {
+        const href = tabs[i]?.key;
+        if (href) warmRoute(href);
+      }
+    }, 600);
+    return () => window.clearTimeout(t);
+  }, [tabs, activeIndex, warmRoute]);
 
   /* Written straight onto the node rather than held in state. Geometry read
      from the DOM can only be measured after layout, and pushing it back
@@ -723,6 +767,12 @@ function SlidingPillNav({
              of the viewport when the user finishes a swipe. */
           style: { scrollSnapAlign: "start" as const },
           className: tabClass,
+          /* Intent, not clairvoyance: the cursor arriving is the cheapest
+             honest signal that this tab is next, and it lands a few hundred
+             milliseconds before the click — enough to have the route in hand
+             by then. Focus counts too, for keyboard users. */
+          onPointerEnter: () => warmRoute(tab.key),
+          onFocus: () => warmRoute(tab.key),
         };
         if (tab.onClick) {
           return (
