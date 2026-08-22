@@ -719,8 +719,14 @@ export default function KoleexAiApp() {
               failed
                 .map((f) => {
                   const why =
-                    f.error === "image_not_supported" ? "images can't be read yet"
-                    : f.error === "no_text" ? "no readable text (scanned file?)"
+                    /* "couldn't read" — NOT "can't read images". The feature
+                       exists now; this branch means one particular picture
+                       defeated it (too blurry, or the vision model was
+                       unreachable), and telling the user the capability is
+                       missing would send them off to solve the wrong
+                       problem. */
+                    f.error === "unreadable_image" ? "couldn't read this image — try a sharper photo"
+                    : f.error === "no_text" ? "no readable text found"
                     : f.error === "too_large" ? "over 10 MB"
                     : "file type not supported";
                   return `${f.name}: ${why}`;
@@ -2332,7 +2338,7 @@ export default function KoleexAiApp() {
                     <input
                       ref={fileInputRef}
                       type="file"
-                      accept=".pdf,.txt,.md,.markdown,.csv,.tsv,.json,.log,application/pdf,text/plain,text/markdown,text/csv,application/json"
+                      accept=".pdf,.txt,.md,.markdown,.csv,.tsv,.json,.log,.xlsx,.xlsm,.xls,.png,.jpg,.jpeg,.webp,.gif,application/pdf,text/plain,text/markdown,text/csv,application/json,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel,image/*"
                       multiple
                       onChange={onFilesPicked}
                       className="hidden"
