@@ -61,6 +61,13 @@ const MAX_BYTES = 512_000;
    changes with age is how WRONG it could be during that second, so a screen
    that cannot tolerate that passes its own, shorter maxAgeMs. */
 export const DEFAULT_MAX_AGE_MS = 12 * 60 * 60 * 1000;
+/* Below this age, a stored answer is trusted outright and no request is made.
+   Sixty seconds is chosen against how the Hub is actually used: tabs get
+   flipped in bursts of seconds, and refetching eight screens' worth of data
+   because someone walked across their own tab bar is the churn the owner felt
+   as lag. Anything older refreshes on the next visit, and any screen that
+   needs tighter freshness passes its own value. */
+export const DEFAULT_STALE_MS = 60 * 1000;
 
 type Envelope<T> = { v: 1; at: number; d: T };
 
@@ -76,6 +83,20 @@ export function readWarm<T>(key: string, maxAgeMs = DEFAULT_MAX_AGE_MS): T | nul
     return env.d;
   } catch {
     return null;
+  }
+}
+
+/** Age of the stored answer in ms, or Infinity when there isn't one. */
+export function warmAge(key: string): number {
+  if (typeof window === "undefined") return Infinity;
+  try {
+    const raw = window.localStorage.getItem(PREFIX + key);
+    if (!raw) return Infinity;
+    const env = JSON.parse(raw) as Envelope<unknown>;
+    if (!env || env.v !== 1 || typeof env.at !== "number") return Infinity;
+    return Date.now() - env.at;
+  } catch {
+    return Infinity;
   }
 }
 
@@ -174,11 +195,24 @@ export function dropWarm(key: string): void {
 
    · Results arriving after unmount are dropped. A tab switched away from
      mid-flight must not push state into a component that is gone, and its
-     answer must not overwrite a newer screen's warm entry. */
+     answer must not overwrite a newer screen's warm entry.
+
+   · It does NOT refetch an answer it only just fetched. `staleMs` is the
+     second half of the owner's complaint and the half a cache alone cannot
+     fix: the screens painted instantly and still felt laggy, because every
+     single tab visit fired the whole revalidate again. Measured on one lap
+     of the Inventory strip — Movements 23 requests after the route
+     committed, Transfers 17 — on a network where a request is most of a
+     second. The page was up and then churned underneath itself.
+     So a warm entry younger than staleMs is simply trusted: no request at
+     all. Flipping between tabs costs nothing, and the moment the data is
+     older than the window the next visit refreshes it. reload() always
+     goes to the network, so anything that follows a mutation is unaffected. */
 export function useWarmData<T>(
   key: string,
   load: () => Promise<T>,
   maxAgeMs = DEFAULT_MAX_AGE_MS,
+  staleMs = DEFAULT_STALE_MS,
 ): { data: T | null; loading: boolean; error: unknown; reload: () => Promise<void> } {
   const warm = useWarm<T>(key, maxAgeMs);
   /* The fetched value is STAMPED WITH THE KEY IT ANSWERED. Holding it bare
@@ -216,8 +250,14 @@ export function useWarmData<T>(
      after this effect returns. The rule cannot see past the await, and the
      revalidate has to start from an effect — that is what "fetch after paint"
      means. */
-  // eslint-disable-next-line react-hooks/set-state-in-effect
-  useEffect(() => { void reload(); }, [reload]);
+  /* The initial revalidate is SKIPPED while the stored answer is younger
+     than staleMs — see the note above. Deliberately not `reload` itself, so
+     a caller's explicit reload() after a mutation is never skipped. */
+  useEffect(() => {
+    if (key && warmAge(key) < staleMs) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    void reload();
+  }, [reload, key, staleMs]);
 
   const data = (fresh && fresh.k === key ? fresh.d : null) ?? warm;
   /* Loading means "nothing to show yet" — NOT "a request is in flight".

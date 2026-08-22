@@ -31,7 +31,7 @@
    ========================================================================== */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useWarm, writeWarm } from "@/lib/warm-cache";
+import { useWarm, warmAge, writeWarm } from "@/lib/warm-cache";
 import { record, event } from "@/lib/perf/client";
 import Link from "next/link";
 import FinanceHeader from "@/components/finance/FinanceHeader";
@@ -254,10 +254,17 @@ export default function FinanceDashboard() {
     const t0 = typeof performance !== "undefined" ? performance.now() : 0;
     const firstMount = !didInitialLoad.current;
     /* First mount loads everything; later period changes refetch only the
-       period-scoped KPI endpoint. */
-    const tasks = firstMount
-      ? [loadDashboard(period), loadStatic()]
-      : [loadDashboard(period)];
+       period-scoped KPI endpoint.
+       And neither runs at all while its stored answer is younger than the
+       stale window: eight feeds refetched because someone walked across the
+       tab bar is exactly the churn that made the painted screen feel laggy.
+       The stale check is per-feed, so the period KPI can refresh on its own
+       while the seven static ones stay put. */
+    const STALE = 60_000;
+    const tasks = [
+      ...(warmAge(`fin:dash:kpi:${period}`) < STALE ? [] : [loadDashboard(period)]),
+      ...(firstMount && warmAge("fin:dash:static") >= STALE ? [loadStatic()] : []),
+    ];
     didInitialLoad.current = true;
     void Promise.all(tasks).finally(() => {
       if (cancelled) return;

@@ -16,7 +16,7 @@
    --------------------------------------------------------------------------- */
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useWarmData } from "@/lib/warm-cache";
+import { readWarm, useWarmData, warmAge, writeWarm } from "@/lib/warm-cache";
 import { useInput } from "@/components/kds/useInput";
 import InventoryHeader from "@/components/inventory/InventoryHeader";
 import type { MovementStatus, MovementType } from "@/lib/inventory/types";
@@ -143,6 +143,15 @@ const WORKFLOW_TYPES: MovementType[] = [
   "transfer_in", "transfer_out",
 ];
 
+type MovementsRef = {
+  products: ProductOption[];
+  warehouses: Warehouse[];
+  internalItems: Array<{
+    id: string; item_code: string; item_name: string; brand: string | null;
+    unit_of_measure: string; type_name: string; usage_scope?: string;
+  }>;
+};
+
 export default function InventoryMovements() {
   const { t } = useTranslation(MV_T);
   useInventoryShortcuts({ isActive: true });
@@ -201,41 +210,62 @@ export default function InventoryMovements() {
   const [variantOptions, setVariantOptions] = useState<Array<{ id: string; variant_name: string }>>([]);
   const [batchOptions, setBatchOptions] = useState<Array<{ id: string; batch_no: string; variant_id: string | null; expiry_date: string | null }>>([]);
 
+  /* THE REFERENCE BUNDLE IS CACHED TOO, and skipped outright while it is
+     fresh. Leaving it cold was a deliberate call — "nobody waits on a
+     dropdown" — and it was wrong for the reason that matters: it is three of
+     the heaviest calls in the app (two of them ?limit=500) and they fired on
+     EVERY visit to this tab, competing with the screen that had already
+     painted. Measured on one lap of the Inventory strip, Movements issued 23
+     requests after its route committed, more than any other tab, and the
+     owner named it first: "the movement tab ... not load immediately there is
+     a lag." Warm and inside the stale window, this now costs nothing.
+     Kept as one effect rather than moved to useWarmData because of the
+     `setWarehouseId` default below — a side effect on first arrival that a
+     pure derivation has nowhere to live. Every setState stays behind an
+     await, which is what keeps it out of the synchronous-update rule. */
   useEffect(() => {
     let cancelled = false;
     void (async () => {
       try {
-        const [whRes, prodRes, invRes] = await Promise.all([
-          fetch("/api/inventory/warehouses", { cache: "no-store", credentials: "include" }),
-          fetch("/api/products/with-stock-profile?limit=500", { cache: "no-store", credentials: "include" }),
-          /* INV-H5B — internal-use items live in inventory_items but have no
-             linked product. Pull a generous page and filter client-side. */
-          fetch("/api/inventory/items?status=active&limit=500", { cache: "no-store", credentials: "include" }),
-        ]);
-        const whJ = await whRes.json();
-        const prodJ = await prodRes.json();
-        const invJ = await invRes.json();
+        const KEY = "inv:movements:ref";
+        const cached = warmAge(KEY) < 60_000 ? readWarm<MovementsRef>(KEY) : null;
+        const d: MovementsRef = cached ?? await (async () => {
+          const [whRes, prodRes, invRes] = await Promise.all([
+            fetch("/api/inventory/warehouses", { cache: "no-store", credentials: "include" }),
+            fetch("/api/products/with-stock-profile?limit=500", { cache: "no-store", credentials: "include" }),
+            /* INV-H5B — internal-use items live in inventory_items but have no
+               linked product. Pull a generous page and filter client-side. */
+            fetch("/api/inventory/items?status=active&limit=500", { cache: "no-store", credentials: "include" }),
+          ]);
+          const whJ = await whRes.json();
+          const prodJ = await prodRes.json();
+          const invJ = await invRes.json();
+          const allItems = (invJ.items ?? []) as Array<{
+            id: string; item_code: string; item_name: string; brand: string | null;
+            unit_of_measure: string; type_name: string;
+            usage_scope?: string; requires_product?: boolean;
+            linked_product_id?: string | null;
+          }>;
+          const built: MovementsRef = {
+            products: (prodJ.products ?? []) as ProductOption[],
+            warehouses: (whJ.warehouses ?? []) as Warehouse[],
+            internalItems: allItems
+              .filter((it) => it.usage_scope === "internal_use" || it.requires_product === false || !it.linked_product_id)
+              .map((it) => ({
+                id: it.id, item_code: it.item_code, item_name: it.item_name,
+                brand: it.brand, unit_of_measure: it.unit_of_measure,
+                type_name: it.type_name, usage_scope: it.usage_scope,
+              })),
+          };
+          writeWarm(KEY, built);
+          return built;
+        })();
         if (cancelled) return;
-        setProducts((prodJ.products ?? []) as ProductOption[]);
-        const whList = (whJ.warehouses ?? []) as Warehouse[];
-        setWarehouses(whList);
-        const def = whList.find((w) => w.is_default) ?? whList[0];
+        setProducts(d.products);
+        setWarehouses(d.warehouses);
+        const def = d.warehouses.find((w) => w.is_default) ?? d.warehouses[0];
         if (def) setWarehouseId(def.id);
-        const allItems = (invJ.items ?? []) as Array<{
-          id: string; item_code: string; item_name: string; brand: string | null;
-          unit_of_measure: string; type_name: string;
-          usage_scope?: string; requires_product?: boolean;
-          linked_product_id?: string | null;
-        }>;
-        setInternalItems(
-          allItems
-            .filter((it) => it.usage_scope === "internal_use" || it.requires_product === false || !it.linked_product_id)
-            .map((it) => ({
-              id: it.id, item_code: it.item_code, item_name: it.item_name,
-              brand: it.brand, unit_of_measure: it.unit_of_measure,
-              type_name: it.type_name, usage_scope: it.usage_scope,
-            })),
-        );
+        setInternalItems(d.internalItems);
       } catch {
         /* surface via movement load instead */
       }
