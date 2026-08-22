@@ -359,14 +359,17 @@ export default function KoleexAiApp() {
   const onFilesPicked = useCallback((ev: React.ChangeEvent<HTMLInputElement>) => {
     const list = ev.target.files;
     if (!list || list.length === 0) return;
-    /* V1 readable set: text-bearing files only. DeepSeek has no vision,
-       so images are rejected up-front with an honest message instead of
-       silently attaching something the model can't see. */
-    const SUPPORTED = /\.(pdf|txt|md|markdown|csv|tsv|json|log)$/i;
+    /* THE CLIENT GATE HAS TO MATCH THE SERVER, and it did not: the reader
+       gained images, scanned PDFs and Excel, the accept= list gained them,
+       and this filter still threw every image away before it left the
+       browser — with a message announcing a limitation that no longer
+       existed. A picker, an accept attribute and a filter are three places
+       that must agree, and two of them were updated. */
+    const SUPPORTED = /\.(pdf|txt|md|markdown|csv|tsv|json|log|xlsx|xlsm|xls|png|jpe?g|webp|gif)$/i;
     const all = Array.from(list);
-    const ok = all.filter((f) => SUPPORTED.test(f.name));
+    const ok = all.filter((f) => SUPPORTED.test(f.name) || (f.type || "").startsWith("image/"));
     if (ok.length < all.length) {
-      setError("Supported files: PDF, TXT, MD, CSV, JSON. Images can't be read yet.");
+      setError("Supported files: images, PDF, Excel, TXT, MD, CSV, JSON.");
     }
     const picked = ok.slice(0, 6 - attachments.length);
     if (picked.length > 0) setAttachments((prev) => [...prev, ...picked]);
