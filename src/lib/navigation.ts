@@ -254,6 +254,15 @@ export const APP_REGISTRY: AppDef[] = [
      redirects here so existing deep-links keep working). */
   { id: "issue-reports",    tKey: "app.issueReports",     name: "Issue Reports",     icon: ExclamationIcon, route: "/issues", active: true, newSince: "2026-08-07" },
   { id: "ai",               tKey: "app.ai",               name: "AI",                icon: KoleexOrbIcon,  route: "/ai",            active: true  },
+  /* AI KNOWLEDGE IS A MODULE, NOT A TILE. It is reached from inside the AI
+     app, so it must not appear in the launcher — but it needs a registry
+     entry all the same, because that is what makes it grantable in Roles &
+     Permissions. Without one the only expressible states were "super admin
+     only" or "every internal user", and the owner asked for the third:
+     his by default, and grantable to named accounts.
+     Deny-by-default like every other module (no openAccess): a role with no
+     row cannot read the AI's knowledge corpus, and super admins always can. */
+  { id: "ai-knowledge",     tKey: "app.aiKnowledge",      name: "AI Knowledge",      icon: KnowledgeIcon,  route: "/ai/knowledge",  active: true, hideFromLauncher: true },
 
   /* ── System ── */
   { id: "accounts",         tKey: "app.accounts",         name: "Accounts",          icon: AccountsIcon,  route: "/accounts",         active: true  },

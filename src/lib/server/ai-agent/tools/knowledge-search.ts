@@ -36,10 +36,12 @@ const searchKnowledge: ToolDef<{ query: string }, { hits: Hit[] }> = {
      internal user while /ai/knowledge redirects non-super-admins and every
      one of its API routes answers 403. A person who cannot open Knowledge
      could still read it, with source title and page, by asking the agent.
-     Same bar as the plane it reads from. */
-  requiredModule: undefined,
+     Same bar as the plane it reads from — and expressed as a MODULE rather
+     than a role tier, so the super admin can grant it to named accounts
+     instead of the choice being his-only-or-everyone. Deny-by-default: a
+     role with no row gets nothing; super admins short-circuit to allowed. */
+  requiredModule: "AI Knowledge",
   requiredAction: "view",
-  minRole: "super_admin",
   handler: async (ctx, args): Promise<ToolResult<{ hits: Hit[] }>> => {
     const q = String(args.query ?? "").trim();
     if (!q) return { ok: false, permissionStatus: "denied", data: null, message: "query required" };

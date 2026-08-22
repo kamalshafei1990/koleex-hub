@@ -93,6 +93,7 @@ export const hubT: Translations = {
   "app.database":        { en: "Database",         zh: "数据库",             ar: "قاعدة البيانات" },
   "app.issueReports":    { en: "Issue Reports",    zh: "问题报告",           ar: "بلاغات المشاكل" },
   "app.ai":              { en: "Koleex AI",        zh: "Koleex AI",        ar: "Koleex AI" },
+  "app.aiKnowledge":     { en: "AI Knowledge",     zh: "AI 知识库",        ar: "معرفة الذكاء الاصطناعي" },
   "app.settings":        { en: "Settings",         zh: "设置",              ar: "الإعدادات" },
   "app.accounts":        { en: "Accounts",         zh: "账户管理",          ar: "الحسابات" },
   "app.brands":          { en: "Brands",           zh: "品牌",              ar: "العلامات التجارية" },

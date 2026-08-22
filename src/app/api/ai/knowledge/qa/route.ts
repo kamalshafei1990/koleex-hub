@@ -7,7 +7,7 @@
    prompt and does the meaning-matching. */
 
 import { NextResponse } from "next/server";
-import { requireAuth } from "@/lib/server/auth";
+import { requireAuth, requireModuleAction } from "@/lib/server/auth";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { estimateTokens, invalidateTaughtAnswersCache } from "@/lib/server/ai-knowledge";
 
@@ -28,10 +28,15 @@ async function qaSourceId(tenantId: string | null, accountId: string | null): Pr
   return created.id as string;
 }
 
+  /* READ is grantable, WRITE is not. The super admin can hand "AI Knowledge"
+     to an account so it can open the bench and read the corpus; ingesting
+     sources and approving units stay his alone, because approval is what
+     decides what the AI treats as true. */
 export async function GET() {
   const auth = await requireAuth();
   if (auth instanceof NextResponse) return auth;
-  if (!auth.is_super_admin) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  const denied = await requireModuleAction(auth, "AI Knowledge", "view");
+  if (denied) return denied;
   let q = supabaseServer
     .from("ai_knowledge_units")
     .select("id, title, body, meta, status, created_at")
