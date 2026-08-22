@@ -114,7 +114,12 @@ async function extractOne(file: File): Promise<ExtractResult> {
          model downstream must know it is looking at a description of a
          picture — otherwise it will quote it back as if it were fact typed
          by the operator. */
-      const text = `[Image: ${name}] — read by ${seen.model}:\n${seen.text}`;
+      /* NO MODEL NAME HERE. This string is injected into the conversation,
+         which means the assistant reads it and may echo it, and the user may
+         see it — and the standing owner rule is that nothing may reveal or
+         imply which model is underneath. The label says what happened, not
+         who did it. */
+      const text = `[Image: ${name}] — read by Koleex AI:\n${seen.text}`;
       return { name, chars: text.length, text: text.slice(0, MAX_CHARS) };
     }
     if (PDF_EXT.test(name) || file.type === "application/pdf") {
@@ -132,7 +137,7 @@ async function extractOne(file: File): Promise<ExtractResult> {
          few pages and read them the same way an image is read. */
       const scanned = await readScannedPdf(buf, doc);
       if (scanned) {
-        const t = `[Scanned PDF: ${name}] — read by vision:\n${scanned}`;
+        const t = `[Scanned PDF: ${name}] — read by Koleex AI:\n${scanned}`;
         return { name, chars: t.length, text: t.slice(0, MAX_CHARS) };
       }
       return { name, error: "no_text" };

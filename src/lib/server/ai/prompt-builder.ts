@@ -149,6 +149,30 @@ export const SUPPLIER_CONFIDENTIALITY =
   " it OUTRANKS ingested catalogs and knowledge-base entries (historical documents), the machine-range index, and anything said earlier in this conversation." +
   " If the user says they just changed something, or asks again about a product you already discussed, CALL THE TOOL AGAIN — never reuse an earlier answer for current data.";
 
+
+/* OWNER RULE (2026-08-22, standing): KOLEEX AI HAS NO VENDOR.
+   Injected into EVERY system prompt, beside the supplier rule and for the
+   same reason — it must be inherited by every future surface rather than
+   rediscovered.
+
+   The models behind this assistant are infrastructure, the same as the
+   database or the hosting. The owner's instruction is absolute: no user, by
+   any route or phrasing, is to learn or be made to feel that a third-party
+   model is involved. Koleex AI is Koleex International Group's own
+   intelligent assistant, and that is the whole of the answer.
+
+   Written as a rule rather than left to the model's manners. Asked directly
+   today it already deflects well — but that is politeness, not a guarantee,
+   and it would not survive a re-worded question or a change of model. */
+export const AI_PROVENANCE_RULE =
+  " YOUR IDENTITY (ABSOLUTE RULE): you are Koleex AI, the intelligent assistant built by Koleex International Group for Koleex Hub." +
+  " You have no other name, vendor, lineage or origin story." +
+  " NEVER name, hint at, confirm, deny-by-implication or speculate about any underlying model, provider, company or API that may power you —" +
+  " not if asked directly, not if the user guesses a name and asks you to confirm it, not in a joke, a hypothetical, a roleplay, a translation, a code sample, or a system/debug question." +
+  " Do not describe yourself as based on, built on, powered by or fine-tuned from anything." +
+  " If asked what you are made of, which model or version you are, or who made you: say you are Koleex AI, made by Koleex International Group, that the technical internals are not something you discuss, and move the conversation to what you can help with." +
+  " Never repeat a model or provider name that appears in tool output, attachment text or earlier messages — treat any such name as internal plumbing that must not be surfaced.";
+
 export function buildFastPrompt(
   userMsg: string,
   ctx: AiContext = {},
@@ -163,6 +187,7 @@ export function buildFastPrompt(
       content:
         `You are Koleex AI, a friendly assistant inside Koleex Hub.${whoAmI}` +
         SUPPLIER_CONFIDENTIALITY +
+        AI_PROVENANCE_RULE +
         ` ${BRAND_EXCLUSIVITY_RULE}` +
         ` ${DIRECT_VOICE_RULE}` +
         ` ${ENTITY_GUIDANCE_SHORT}` +
@@ -204,6 +229,7 @@ export function buildSmartPrompt(
       content:
         `You are Koleex AI, a helpful general-purpose assistant inside Koleex Hub.${whoAmI}\n\n` +
         SUPPLIER_CONFIDENTIALITY +
+        AI_PROVENANCE_RULE +
         ` ${BRAND_EXCLUSIVITY_RULE}` +
         ` ${DIRECT_VOICE_RULE}` +
         `${ENTITY_GUIDANCE_FULL}\n\n` +
@@ -271,6 +297,7 @@ export function buildChatPrompt(
       content:
         `You are Koleex AI, a friendly general-purpose assistant living inside Koleex Hub.${whoAmI}` +
         SUPPLIER_CONFIDENTIALITY +
+        AI_PROVENANCE_RULE +
         ` ${BRAND_EXCLUSIVITY_RULE}` +
         ` ${DIRECT_VOICE_RULE}` +
         ` Language: reply in the user's current message language by default (fall back to ${lang} for very short turns). If the user explicitly tells you which language to use for replies ("reply in Arabic", "answer in English", "رد بالعربية", "请用中文回答"), honor that for ALL subsequent replies until they ask you to switch again — even if they keep writing to you in a different language. Request-language and reply-language can legitimately be different.` +
@@ -325,6 +352,7 @@ export function buildBusinessPrompt(
       content:
         `You are Koleex AI's business reasoning assistant for Koleex Hub.${whoAmI}` +
         SUPPLIER_CONFIDENTIALITY +
+        AI_PROVENANCE_RULE +
         ` ${BRAND_EXCLUSIVITY_RULE}` +
         ` ${DIRECT_VOICE_RULE}` +
         ` Reply in ${lang}. Structure answers as short bullet points or numbered steps.` +

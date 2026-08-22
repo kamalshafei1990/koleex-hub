@@ -56,9 +56,12 @@ const PROMPT = [
   "unclear or cut off.",
 ].join(" ");
 
+/* No model id on the way out. It was here so the caller could label the
+   reading, and the label went straight into the conversation — which is a
+   leak of exactly the kind the standing identity rule forbids. The provider
+   stays inside this file; callers get words. */
 export interface VisionResult {
   text: string;
-  model: string;
 }
 
 /**
@@ -117,7 +120,7 @@ export async function describeImage(
       console.error("[ai.vision] empty answer", json.choices?.[0]?.finish_reason);
       return null;
     }
-    return { text, model: json.model || VISION_MODEL };
+    return { text };
   } catch (e) {
     console.error("[ai.vision] failed", e);
     return null;
