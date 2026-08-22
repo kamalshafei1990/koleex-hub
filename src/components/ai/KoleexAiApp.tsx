@@ -383,6 +383,24 @@ export default function KoleexAiApp() {
     ev.target.value = "";
   }, [addFiles]);
 
+  /* ── Image previews ────────────────────────────────────────────────────
+     A filename is the wrong thing to show someone who just handed you a
+     picture — they know what they attached, they want to confirm it is the
+     RIGHT one, and only the image itself answers that.
+
+     Object URLs are created once per batch and revoked when the batch
+     changes or the component unmounts. Skipping the revoke is the classic
+     leak here: every attach would pin its full-size bitmap in memory for the
+     life of the tab, and a few phone photos is tens of megabytes. */
+  const previews = useMemo(
+    () => attachments.map((f) => ((f.type || "").startsWith("image/") ? URL.createObjectURL(f) : null)),
+    [attachments],
+  );
+  useEffect(
+    () => () => { for (const u of previews) if (u) URL.revokeObjectURL(u); },
+    [previews],
+  );
+
   /* ── Drag and drop ──────────────────────────────────────────────────────
      dragCounter, not a boolean. Dragging over a composer fires dragenter and
      dragleave for every child element it crosses, so a plain flag flickers
@@ -2334,24 +2352,52 @@ export default function KoleexAiApp() {
                 {/* Attachment chip row — only renders when there are files. */}
                 {attachments.length > 0 && (
                   <div className="flex flex-wrap items-center gap-1.5 px-4 pt-3">
-                    {attachments.map((file, i) => (
-                      <span
-                        key={`${file.name}-${i}`}
-                        className="inline-flex items-center gap-1.5 max-w-[200px] rounded-md border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-2 py-1 text-[11.5px] text-[var(--text-primary)]"
-                        title={file.name}
-                      >
-                        <span aria-hidden>📎</span>
-                        <span className="truncate">{file.name}</span>
-                        <button
-                          type="button"
-                          onClick={() => removeAttachment(i)}
-                          className="ms-0.5 text-[var(--text-dim)] hover:text-rose-300"
-                          aria-label={`Remove ${file.name}`}
+                    {attachments.map((file, i) => {
+                      const preview = previews[i];
+                      if (preview) {
+                        return (
+                          /* The picture IS the chip. The remove control sits
+                             on the corner rather than beside it, so the
+                             thumbnail stays square and the row reads as a
+                             strip of images — the shape people already know
+                             from every other assistant. */
+                          <span
+                            key={`${file.name}-${i}`}
+                            className="group relative inline-block h-16 w-16 overflow-hidden rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)]"
+                            title={file.name}
+                          >
+                            {/* eslint-disable-next-line @next/next/no-img-element -- a local blob: URL; next/image cannot optimise one and would only add a loader in front of bytes we already hold */}
+                            <img src={preview} alt={file.name} className="h-full w-full object-cover" />
+                            <button
+                              type="button"
+                              onClick={() => removeAttachment(i)}
+                              className="absolute end-0.5 top-0.5 inline-flex h-5 w-5 items-center justify-center rounded-full bg-black/60 text-white opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100"
+                              aria-label={`Remove ${file.name}`}
+                            >
+                              <CrossIcon size={9} />
+                            </button>
+                          </span>
+                        );
+                      }
+                      return (
+                        <span
+                          key={`${file.name}-${i}`}
+                          className="inline-flex items-center gap-1.5 max-w-[200px] rounded-md border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-2 py-1 text-[11.5px] text-[var(--text-primary)]"
+                          title={file.name}
                         >
-                          <CrossIcon size={10} />
-                        </button>
-                      </span>
-                    ))}
+                          <span aria-hidden>📎</span>
+                          <span className="truncate">{file.name}</span>
+                          <button
+                            type="button"
+                            onClick={() => removeAttachment(i)}
+                            className="ms-0.5 text-[var(--text-dim)] hover:text-rose-300"
+                            aria-label={`Remove ${file.name}`}
+                          >
+                            <CrossIcon size={10} />
+                          </button>
+                        </span>
+                      );
+                    })}
                   </div>
                 )}
 
