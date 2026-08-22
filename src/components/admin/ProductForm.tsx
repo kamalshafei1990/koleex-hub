@@ -16,6 +16,8 @@ import { FieldHelp, IDENTIFIER_HELP } from "@/components/admin/form-sections/Fie
 import { PRODUCTS_UI_I18N } from "@/lib/products-ui-i18n";
 import { humanizeError } from "@/lib/ui/humanize-error";
 import ArrowLeftIcon from "@/components/icons/ui/ArrowLeftIcon";
+import PageHeader from "@/components/ui/PageHeader";
+import ProductDataIcon from "@/components/icons/ProductDataIcon";
 import ArrowUpRightIcon from "@/components/icons/ui/ArrowUpRightIcon";
 import DiskIcon from "@/components/icons/ui/DiskIcon";
 import CameraIcon from "@/components/icons/ui/CameraIcon";
@@ -3171,29 +3173,39 @@ export default function ProductForm({ productId }: Props) {
           on wide screens while every other app stops. */}
       <div className="relative z-[1] mx-auto max-w-[1500px] px-4 md:px-6 lg:px-8 py-6 md:py-8">
 
-        {/* ═══ INLINE HEADER — matches AccountForm / EmployeeWizard style.
-              Back-arrow + Cancel both route to /products via handleCancel,
-              which warns when there are unsaved changes. Save publishes
-              and clears the dirty flag inside `save()`. ═══ */}
-        {/* relative z-30 lifts this row ABOVE the tab bar's 26rem ramp —
-            the same lift PageHeader gives its hero. Without it the ramp
-            treats the parked title row as scrolled-under content and smears
-            it (owner screenshot, 2026-08-20: "the header have a problem"). */}
-        <div className="relative z-30 flex items-center justify-between mb-6 md:mb-8 gap-3">
-          <div className="flex items-center gap-3 min-w-0">
-            <button
-              type="button"
-              onClick={handleCancel}
-              className="kx-glass h-10 w-10 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all shrink-0 cursor-pointer"
-              title={dirty ? t("wizard.unsavedChangesTitle", "You have unsaved changes") : t("wizard.backToProducts", "Back to products")}
-            >
-              <ArrowLeftIcon className="h-4 w-4" />
-            </button>
-            <div className="min-w-0">
+        {/* THE SHARED HEADER, not a copy of it. This row used to be
+            hand-rolled "to match AccountForm / EmployeeWizard" — three
+            screens imitating a component that already existed, and the
+            imitation drifted: a 40x40 icon-only back button where the Hub's
+            names its destination, no app-icon chip, a title that skipped the
+            sm step, kx-glass instead of kx-ph-chrome, no hover lift, and a
+            `title` tooltip standing in for an accessible name.
+            The one thing that genuinely could not be expressed here was the
+            GUARDED back — handleCancel warns about unsaved changes — so
+            PageHeader gained `onBack` rather than this screen keeping its own
+            header. The z-30 lift over the tab ramp is PageHeader's own. */}
+        {/* relative z-30 IS LOAD-BEARING — PageHeader only lifts itself when it
+            owns the ramp, and here it does not. Without the lift the tab
+            bar's 26rem ramp treats this row as scrolled-under content and
+            smears it away entirely (owner, 2026-08-20: "the header have a
+            problem" — and it vanished again the moment this wrapper lost it). */}
+        <div className="relative z-30 mb-6 md:mb-8">
+          <PageHeader
+            /* The app's own mark, the same one the list header wears — not an
+               RrIcon name guessed at the call site. */
+            icon={<ProductDataIcon size={16} />}
+            showTabs={false}
+            /* title stays a STRING even though titleNode draws the row — it is
+               the accessible and document name, which a badge-decorated node
+               cannot be. */
+            title={product.product_name || t("wizard.newProductHeading", "New Product")}
+            onBack={handleCancel}
+            backLabel={t("wizard.backToProducts", "Products")}
+            titleNode={
               <div className="flex items-center gap-2 flex-wrap">
-                <h1 className="text-xl md:text-[26px] font-bold text-[var(--text-primary)] truncate">
+                <span className="truncate">
                   {product.product_name || t("wizard.newProductHeading", "New Product")}
-                </h1>
+                </span>
                 {product.product_name && <StatusBadge status={product.status} t={t} />}
                 {dirty && (
                   <span className="inline-flex items-center gap-1 h-5 px-2 rounded-full bg-amber-500/10 border border-amber-500/30 text-[9px] font-bold uppercase tracking-wider text-amber-400">
@@ -3202,30 +3214,32 @@ export default function ProductForm({ productId }: Props) {
                   </span>
                 )}
               </div>
-              <p className="text-[12px] md:text-[13px] text-[var(--text-dim)] mt-0.5">
-                {product.product_name
-                  ? t("wizard.editSubtitle", "Edit product details.")
-                  : t("wizard.createSubtitle", "Create a new product in your catalogue.")}
-              </p>
-            </div>
-          </div>
-          <div className="flex items-center gap-2 shrink-0">
-            <button
-              type="button"
-              onClick={handleCancel}
-              className="kx-glass hidden sm:inline-flex items-center justify-center h-10 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[13px] font-semibold text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all cursor-pointer"
-            >
-              {t("action.cancel", "Cancel")}
-            </button>
-            <button
-              onClick={save}
-              disabled={saving}
-              className="h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold flex items-center gap-2 transition-all disabled:opacity-50 shadow-lg shrink-0"
-            >
-              {saving ? <SpinnerIcon className="h-4 w-4" /> : <DiskIcon className="h-4 w-4" />}
-              <span className="hidden sm:inline">{saving ? t("action.saving", "Saving...") : t("action.saveProduct", "Save Product")}</span>
-            </button>
-          </div>
+            }
+            subtitle={
+              product.product_name
+                ? t("wizard.editSubtitle", "Edit product details.")
+                : t("wizard.createSubtitle", "Create a new product in your catalogue.")
+            }
+            action={
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={handleCancel}
+                  className="kx-glass hidden sm:inline-flex items-center justify-center h-10 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[13px] font-semibold text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all cursor-pointer"
+                >
+                  {t("action.cancel", "Cancel")}
+                </button>
+                <button
+                  onClick={save}
+                  disabled={saving}
+                  className="h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold flex items-center gap-2 transition-all disabled:opacity-50 shadow-lg shrink-0"
+                >
+                  {saving ? <SpinnerIcon className="h-4 w-4" /> : <DiskIcon className="h-4 w-4" />}
+                  <span className="hidden sm:inline">{saving ? t("action.saving", "Saving...") : t("action.saveProduct", "Save Product")}</span>
+                </button>
+              </div>
+            }
+          />
         </div>
 
         {/* Messages */}

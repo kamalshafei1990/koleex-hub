@@ -59,6 +59,12 @@ export interface PageHeaderProps {
    *  "Hub". Set it when the parent is a specific record — "Quotation #1042" —
    *  so the control answers "back to what?" instead of just "back". */
   backLabel?: string;
+  /** Run instead of navigating. For screens whose back is GUARDED — a form
+   *  that must warn about unsaved changes cannot hand its exit to a plain
+   *  <Link>, and that single gap is why every wizard in the Hub hand-rolled
+   *  its own header instead of using this one. The control keeps the exact
+   *  same chrome either way; only the element changes. */
+  onBack?: () => void;
   action?: ReactNode;
   controls?: ReactNode;
   meta?: ReactNode;
@@ -83,6 +89,13 @@ function parentPath(pathname: string): string {
   return trimmed.slice(0, idx);
 }
 
+/* Exported so a screen that deliberately does NOT take the full hero still
+   wears the same back control. Product Data's record view is the case: its
+   identity strip is slim on purpose, to keep the tabs from being pushed down
+   the page, but "slim" was never a reason for a different-looking control. */
+export const BACK_CHROME =
+  "kx-ph-chrome flex h-8 shrink-0 items-center justify-center gap-1.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-2.5 text-[var(--text-dim)] transition-all duration-200 hover:border-[var(--border-color)] hover:bg-[var(--bg-surface-hover)] hover:text-[var(--text-primary)] sm:h-10 sm:rounded-xl sm:px-3 sm:hover:-translate-y-0.5";
+
 export default function PageHeader({
   title,
   titleNode,
@@ -90,6 +103,7 @@ export default function PageHeader({
   icon,
   backHref,
   backLabel,
+  onBack,
   action,
   controls,
   meta,
@@ -213,14 +227,30 @@ export default function PageHeader({
               beside it must not be squeezed; there it is the wider arrow (BK-2)
               instead. `backLabel` lets a caller name a real parent
               ("Quotation #1042"); the default is the Hub. */}
-          <Link
-            href={resolvedBackHref}
-            aria-label={backLabel ? `Back to ${backLabel}` : "Back"}
-            className="kx-ph-chrome flex h-8 shrink-0 items-center justify-center gap-1.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-2.5 text-[var(--text-dim)] transition-all duration-200 hover:border-[var(--border-color)] hover:bg-[var(--bg-surface-hover)] hover:text-[var(--text-primary)] sm:h-10 sm:rounded-xl sm:px-3 sm:hover:-translate-y-0.5"
-          >
-            <RrIcon name="arrow-left" size={14} />
-            <span className="hidden text-[12px] font-medium sm:inline">{backLabel ?? "Hub"}</span>
-          </Link>
+          {/* The class string is written ONCE and worn by whichever element
+              this screen needs — a link when back is a destination, a button
+              when it is a decision. Duplicating it per branch is how the two
+              would drift apart. */}
+          {onBack ? (
+            <button
+              type="button"
+              onClick={onBack}
+              aria-label={backLabel ? `Back to ${backLabel}` : "Back"}
+              className={BACK_CHROME}
+            >
+              <RrIcon name="arrow-left" size={14} />
+              <span className="hidden text-[12px] font-medium sm:inline">{backLabel ?? "Hub"}</span>
+            </button>
+          ) : (
+            <Link
+              href={resolvedBackHref}
+              aria-label={backLabel ? `Back to ${backLabel}` : "Back"}
+              className={BACK_CHROME}
+            >
+              <RrIcon name="arrow-left" size={14} />
+              <span className="hidden text-[12px] font-medium sm:inline">{backLabel ?? "Hub"}</span>
+            </Link>
+          )}
           {/* NO kx-ph-chrome HERE. This is the app-icon chip: a plain div with
               no href and no handler, sitting next to a back LINK that wears
               the identical box. It was carrying the chrome recipe anyway, so

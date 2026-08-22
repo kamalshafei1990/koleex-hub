@@ -46,6 +46,7 @@ import PackageIcon from "@/components/icons/ui/PackageIcon";
 import ListIcon from "@/components/icons/ui/ListIcon";
 import SettingsIcon2 from "@/components/icons/ui/SettingsIcon2";
 import ArrowLeftIcon from "@/components/icons/ui/ArrowLeftIcon";
+import { BACK_CHROME } from "@/components/ui/PageHeader";
 import ProductsIcon from "@/components/icons/ProductsIcon";
 import ProductDataIcon from "@/components/icons/ProductDataIcon";
 import {
@@ -2047,7 +2048,13 @@ export default function ProductList() {
               plain (non-glass) icon chip, the M-1 title rule and the
               kx-ph-search well — the four real deltas the comparison found.
               The divisions TabStrip already shared the canon recipe. */}
-          <Link href="/" aria-label="Back to Hub" className="kx-ph-chrome flex h-8 shrink-0 items-center justify-center gap-1.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-2.5 text-[var(--text-dim)] transition-all duration-200 hover:border-[var(--border-color)] hover:bg-[var(--bg-surface-hover)] hover:text-[var(--text-primary)] sm:h-10 sm:rounded-xl sm:px-3 sm:hover:-translate-y-0.5">
+          {/* The recipe is IMPORTED, not re-typed. This row was hand-matched
+              to PageHeader once and the class string copied along with it —
+              which is exactly how the two drift the next time the canon moves.
+              The arrangement below stays bespoke on purpose (the count and FX
+              rate ride the title line to reclaim vertical space), but the
+              control wears the shared definition. */}
+          <Link href="/" aria-label="Back to Hub" className={BACK_CHROME}>
             <ArrowLeftIcon className="h-3.5 w-3.5" />
             <span className="hidden text-[12px] font-medium sm:inline">Hub</span>
           </Link>

@@ -28,6 +28,8 @@ import { PRODUCTS_UI_I18N } from "@/lib/products-ui-i18n";
 import { fetchClassificationIcons } from "@/lib/products-admin";
 import { fetchIconBindings, type BindingsMap } from "@/lib/visual-bindings";
 import ArrowLeftIcon from "@/components/icons/ui/ArrowLeftIcon";
+import { BACK_CHROME } from "@/components/ui/PageHeader";
+import RrIcon from "@/components/ui/RrIcon";
 import PencilIcon from "@/components/icons/ui/PencilIcon";
 import BoundIcon from "@/components/common/BoundIcon";
 import Drawer from "@/components/kds/Drawer";
@@ -618,12 +620,19 @@ export default function ProductProfile() {
          record. A slim identity strip keeps "what am I looking at?" answered
          without pushing the tabs down the page. */}
       <div className="flex items-center gap-3 mb-3 min-w-0">
+        {/* THE HUB'S BACK CONTROL, borrowed rather than re-styled. This strip
+            stays slim on purpose — a full hero here would push the tabs down
+            the page, which is the whole reason it exists — but the control
+            itself was a 32x32 icon-only square while every other screen in
+            the Hub uses a chip that NAMES where it goes. Same recipe now,
+            same answer to "back to what". */}
         <Link
           href="/product-data"
           aria-label={t("pp.back", "Back to Product Data")}
-          className="kx-glass kx-hover-glow h-8 w-8 rounded-lg bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-all shrink-0"
+          className={BACK_CHROME}
         >
-          <ArrowLeftIcon className="h-3.5 w-3.5" />
+          <RrIcon name="arrow-left" size={14} />
+          <span className="hidden text-[12px] font-medium sm:inline">{t("pp.backShort", "Product Data")}</span>
         </Link>
         <h1 className="text-[15px] font-semibold text-[var(--text-primary)] truncate">
           {(s2("product_name") as string) || t("pp.untitled", "Untitled product")}
