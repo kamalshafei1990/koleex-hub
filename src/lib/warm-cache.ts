@@ -16,12 +16,19 @@
 
    THE RULES THIS FILE ENFORCES, each one paid for:
 
-   · sessionStorage, not localStorage. The contacts directory already
-     outgrew the localStorage quota once and a full store fails SILENTLY,
-     killing every warm start at once (storage-guard.ts exists because of
-     that). Per-tab storage keeps this feature off that contended budget.
-     The cost is that a brand-new tab cold-loads — which is the rarer case;
-     the complaint was about moving BETWEEN apps all day.
+   · localStorage, through storage-guard's setCache. This started on
+     sessionStorage to stay off the quota that the contacts directory had
+     already exhausted once — a full store fails SILENTLY and kills every
+     warm start at the same moment. The reasoning was sound and the
+     conclusion was wrong: sessionStorage is per browser TAB, so the cache
+     was empty every time the Hub was opened fresh, and the first visit to
+     each screen still showed a spinner. Owner, after the sweep landed:
+     "no it still load and show the loading sign."
+     The quota problem has its own answer and it is not "use a smaller
+     store" — setCache prunes and retries on QuotaExceededError and reports
+     whether the value actually landed, which is precisely the silent
+     failure this rule was avoiding. So: the durable store, with the guard
+     that makes it safe.
 
    · Synchronous only. IndexedDB is async, so a value that arrives in an
      effect lands AFTER first paint — that is a content shift, not a warm
@@ -37,13 +44,23 @@
    --------------------------------------------------------------------------- */
 
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { setCache } from "@/lib/storage-guard";
 
 const PREFIX = "kx:warm:";
 /* Big enough for a list page, small enough that one screen cannot eat the
-   per-tab budget and evict every other screen's warm start. */
+   budget and evict every other screen's warm start. */
 const MAX_BYTES = 512_000;
-/* Past this, a cached answer is not worth showing before the fresh one. */
-export const DEFAULT_MAX_AGE_MS = 10 * 60 * 1000;
+/* Past this, a cached answer is not worth showing before the fresh one.
+   TWELVE HOURS, NOT TEN MINUTES — the old value was chosen when the cache
+   died with the browser tab anyway, so nothing outlived it. On a durable
+   store a ten-minute ceiling would mean the Hub cold-loads every screen each
+   morning, which is the complaint this file exists to answer.
+   The exposure is not what it looks like: every screen revalidates on mount,
+   so a stale entry is only ever on the glass for the second the fresh answer
+   takes to arrive — the same second a ten-minute-old entry would be. What
+   changes with age is how WRONG it could be during that second, so a screen
+   that cannot tolerate that passes its own, shorter maxAgeMs. */
+export const DEFAULT_MAX_AGE_MS = 12 * 60 * 60 * 1000;
 
 type Envelope<T> = { v: 1; at: number; d: T };
 
@@ -51,7 +68,7 @@ type Envelope<T> = { v: 1; at: number; d: T };
 export function readWarm<T>(key: string, maxAgeMs = DEFAULT_MAX_AGE_MS): T | null {
   if (typeof window === "undefined") return null;
   try {
-    const raw = window.sessionStorage.getItem(PREFIX + key);
+    const raw = window.localStorage.getItem(PREFIX + key);
     if (!raw) return null;
     const env = JSON.parse(raw) as Envelope<T>;
     if (!env || env.v !== 1 || typeof env.at !== "number") return null;
@@ -68,7 +85,12 @@ export function writeWarm<T>(key: string, data: T): void {
   try {
     const raw = JSON.stringify({ v: 1, at: Date.now(), d: data } satisfies Envelope<T>);
     if (raw.length > MAX_BYTES) return;
-    window.sessionStorage.setItem(PREFIX + key, raw);
+    /* setCache, never a bare setItem: it prunes and retries on a full store
+       and REPORTS whether the value landed. A bare write would fail silently
+       here, and a silently-empty warm cache looks exactly like a working one
+       until someone measures — which is how Inventory's Returns tab stayed
+       slow while every tab around it went instant. */
+    if (!setCache(PREFIX + key, raw, MAX_BYTES)) return;
     /* Keep the in-memory snapshot in step. The Hub is a single-page app, so
        this module outlives every navigation: without this line, coming back
        to a screen later in the same session would hand it the snapshot read
@@ -82,9 +104,9 @@ export function writeWarm<T>(key: string, data: T): void {
 
 /* ── The React binding ────────────────────────────────────────────────────
    A warm value exists only on the client, and the server renders the
-   spinner. Reading sessionStorage during the first client render would
+   spinner. Reading localStorage during the first client render would
    therefore contradict the server's HTML — a hydration mismatch, which is
-   exactly the bug the HRApp-style `useState(() => sessionStorage…)` shortcut
+   exactly the bug the HRApp-style `useState(() => localStorage…)` shortcut
    invites. useSyncExternalStore is the supported way to say "the server has
    nothing, the client has this": React hydrates against the server snapshot
    and swaps to the client one immediately afterwards, in the same tick,
@@ -114,7 +136,7 @@ export function useWarm<T>(key: string, maxAgeMs = DEFAULT_MAX_AGE_MS): T | null
 /** Drop one warm entry — after a mutation whose new shape we do not hold. */
 export function dropWarm(key: string): void {
   if (typeof window === "undefined") return;
-  try { window.sessionStorage.removeItem(PREFIX + key); } catch { /* noop */ }
+  try { window.localStorage.removeItem(PREFIX + key); } catch { /* noop */ }
 }
 
 /* HOW A SCREEN USES THIS — derive, never setState from the warm value:
