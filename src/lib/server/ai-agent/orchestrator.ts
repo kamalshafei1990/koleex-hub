@@ -803,6 +803,12 @@ export async function orchestrate(input: OrchestrateInput): Promise<AgentRespons
      lookup and only called askUser on the next pass. Two attempts absorbs
      that without ever becoming a loop. */
   let forcedAsk = 0;
+  /* Set when a choice-shaped turn came back as PROSE with no tool calls at
+     all. Measured on prod: the model answered "which spreading machine should
+     I choose?" with four numbered questions and never touched a tool, so the
+     force below — which waited for a lookup — never got its turn. Nothing had
+     streamed yet at that point, so the reply can be thrown away and re-asked. */
+  let proseRefused = false;
 
   for (let iter = 0; iter < MAX_ITERATIONS; iter++) {
     /* After the per-turn tool budget is spent, disable tools so the
@@ -811,7 +817,10 @@ export async function orchestrate(input: OrchestrateInput): Promise<AgentRespons
        the model has candidates in hand and would otherwise write prose.
        See CHOICE_OPENER. `forcedAsk` makes it strictly once per turn. */
     const forceAskNow =
-      wantsChoiceCard && forcedAsk < 2 && totalToolRuns > 0 && totalToolRuns < MAX_TOOLS_PER_TURN;
+      wantsChoiceCard &&
+      forcedAsk < 2 &&
+      (totalToolRuns > 0 || proseRefused) &&
+      totalToolRuns < MAX_TOOLS_PER_TURN;
     if (forceAskNow) forcedAsk += 1;
     const toolChoice: ToolChoice =
       totalToolRuns >= MAX_TOOLS_PER_TURN
@@ -943,6 +952,17 @@ export async function orchestrate(input: OrchestrateInput): Promise<AgentRespons
          text over GENERIC_FOLLOWUP, so a valid search/lookup answer
          isn't replaced with "Could you share a bit more so I can
          help?" just because the summariser returned nothing. */
+      /* CHOICE-SHAPED TURN THAT ANSWERED IN PROSE — reject it and ask again
+         with askUser named. Only while NOTHING has been streamed yet
+         (totalToolRuns === 0 means liveEmit was never armed), so we are
+         discarding a reply the user has not seen, not retracting one they
+         have. The messages array is left untouched: the very same request
+         goes back out, differing only in tool_choice. Bounded by forcedAsk. */
+      if (wantsChoiceCard && forcedAsk < 2 && totalToolRuns === 0) {
+        proseRefused = true;
+        continue;
+      }
+
       const cleaned = cleanAssistantText(content);
       const attempted = normaliseBrandName(cleaned);
       finalReply =
