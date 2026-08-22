@@ -2221,6 +2221,11 @@ export default function KoleexAiApp() {
                     .charAt(0)
                     .toUpperCase()}
                   isLast={i === messages.length - 1}
+                  /* What the user replied to THIS message. When the message
+                     is a question card, that reply IS the chosen option, so
+                     the card can stay on screen with the pick marked instead
+                     of collapsing to a bare line of text once answered. */
+                  answeredWith={messages[i + 1]?.role === "user" ? messages[i + 1].content : null}
                   canRegenerate={!sending}
                   canEdit={!sending}
                   onCopy={handleCopy}
@@ -2795,6 +2800,7 @@ function Bubble({
   userAvatar,
   userInitial,
   isLast,
+  answeredWith,
   canRegenerate,
   canEdit,
   onCopy,
@@ -2811,6 +2817,7 @@ function Bubble({
   userAvatar?: string | null;
   userInitial: string;
   isLast?: boolean;
+  answeredWith?: string | null;
   /** Live orb reaction for THIS bubble — only the last assistant message
       gets a non-idle value (thinking/typing/success/error); the rest stay
       calm so the transcript doesn't twitch. */
@@ -3000,15 +3007,21 @@ function Bubble({
                  Only on the LAST message: these are live controls, and leaving
                  them tappable half-way up a transcript invites someone to
                  answer a question that was settled ten messages ago. */
-              const q = isLast
-                ? (steps.find((st) => st.kind === "question")?.payload as
-                    | { question?: string; options?: Array<{ label: string; detail?: string; recommended?: boolean }> }
-                    | undefined)
-                : undefined;
+              const q = steps.find((st) => st.kind === "question")?.payload as
+                | { question?: string; options?: Array<{ label: string; detail?: string; recommended?: boolean }> }
+                | undefined;
               const options = q?.options ?? [];
-              if (!onAnswerQuestion || options.length === 0) {
+              if (options.length === 0) {
                 return <MessageMarkdown content={msg.content} />;
               }
+              /* The card OUTLIVES the answer. It stays in the transcript with
+                 the chosen row marked and the rest faded, because the question
+                 and the options are the context for everything said after it —
+                 collapsing back to a line of text loses why the answer took
+                 the shape it did. Only the LIVE card is tappable: an answered
+                 one, or one half-way up the transcript, is a record. */
+              const settled = answeredWith ?? pickedOption;
+              const live = isLast && !!onAnswerQuestion && !settled;
               return (
                 <div className="kx-glass-pop -mx-1 rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-3">
                   <p className="mb-2.5 px-0.5 text-[13.5px] font-semibold text-[var(--text-primary)]">
@@ -3016,23 +3029,23 @@ function Bubble({
                   </p>
                   <div className="flex flex-col gap-1.5">
                     {options.map((o, i) => {
-                      const chosen = pickedOption === o.label;
+                      const chosen = settled === o.label;
                       return (
                         <button
                           key={`${o.label}-${i}`}
                           type="button"
-                          disabled={pickedOption !== null}
-                          onClick={() => { setPickedOption(o.label); onAnswerQuestion(o.label); }}
+                          disabled={!live}
+                          onClick={() => { setPickedOption(o.label); onAnswerQuestion?.(o.label); }}
                           className={`group w-full rounded-xl border px-3 py-2.5 text-start transition-all ${
                             chosen
                               ? "border-[var(--border-focus)] bg-[var(--bg-surface-subtle)]"
-                              : pickedOption
+                              : !live
                                 /* The unpicked options fade rather than vanish:
                                    the transcript should still show what the
                                    choice WAS, not just what was chosen. */
                                 ? "border-[var(--border-subtle)] opacity-40"
                                 : "border-[var(--border-subtle)] bg-[var(--bg-secondary)] hover:border-[var(--border-focus)] hover:bg-[var(--bg-surface-subtle)]"
-                          } ${pickedOption ? "cursor-default" : "cursor-pointer"}`}
+                          } ${live ? "cursor-pointer" : "cursor-default"}`}
                         >
                           <span className="flex items-center gap-2">
                             {/* A radio mark, so the row reads as "choose one"
@@ -3064,7 +3077,9 @@ function Bubble({
                   {/* No "Other" button: the composer is directly below and
                       already does that job better than a control whose only
                       action is to focus the composer. */}
-                  <p className="mt-2 px-0.5 text-[11px] text-[var(--text-dim)]">{copy.orTypeYourOwn}</p>
+                  {live && (
+                    <p className="mt-2 px-0.5 text-[11px] text-[var(--text-dim)]">{copy.orTypeYourOwn}</p>
+                  )}
                 </div>
               );
             })()}
