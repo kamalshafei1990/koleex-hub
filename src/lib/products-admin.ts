@@ -21,7 +21,7 @@ import {
 import type {
   DivisionRow, CategoryRow, SubcategoryRow,
   ProductRow, ProductModelRow, ProductMediaRow,
-  ProductTranslationRow, ModelTranslationRow,
+  ProductTranslationRow,
   ProductMarketPriceRow, RelatedProductRow,
   SewingMachineSpecsRow,
 } from "@/types/supabase";
@@ -147,8 +147,11 @@ function clearTaxoKey(key: string): void {
   try { store.removeItem(key); } catch { /* noop */ }
 }
 
-/** Call this from every taxonomy mutation so the next read pulls fresh data. */
-export function invalidateTaxonomyCache(): void {
+/* Called from every taxonomy mutation below so the next read pulls fresh
+   data. Module-private: every caller lives in this file, and exporting it
+   made an audit read it as dead code and very nearly delete a live cache
+   invalidation. */
+function invalidateTaxonomyCache(): void {
   clearTaxoKey("kx:taxo:divisions");
   clearTaxoKey("kx:taxo:categories");
   clearTaxoKey("kx:taxo:subcategories");
@@ -445,23 +448,6 @@ export async function deleteTranslation(id: string): Promise<boolean> {
   return ok;
 }
 
-// ── Model Translations → /api/model-translations ──
-export async function fetchModelTranslations(modelIds: string[]): Promise<ModelTranslationRow[]> {
-  if (!modelIds.length) return [];
-  const json = await jget<{ translations?: ModelTranslationRow[] }>(
-    `/api/model-translations?model_ids=${encodeURIComponent(modelIds.join(","))}`, {},
-  );
-  return json.translations ?? [];
-}
-export async function upsertModelTranslation(t: Record<string, unknown>): Promise<boolean> {
-  const { ok } = await jsend("/api/model-translations", "POST", t);
-  return ok;
-}
-export async function deleteModelTranslation(id: string): Promise<boolean> {
-  const { ok } = await jsend(`/api/model-translations/${id}`, "DELETE");
-  return ok;
-}
-
 // ── Market Prices → /api/product-market-prices ──
 export async function fetchMarketPricesByModelIds(modelIds: string[]): Promise<ProductMarketPriceRow[]> {
   if (!modelIds.length) return [];
@@ -472,10 +458,6 @@ export async function fetchMarketPricesByModelIds(modelIds: string[]): Promise<P
 }
 export async function upsertMarketPrice(p: Record<string, unknown>): Promise<boolean> {
   const { ok } = await jsend("/api/product-market-prices", "POST", p);
-  return ok;
-}
-export async function deleteMarketPrice(id: string): Promise<boolean> {
-  const { ok } = await jsend(`/api/product-market-prices/${id}`, "DELETE");
   return ok;
 }
 
@@ -868,9 +850,5 @@ export async function upsertSewingSpecs(specs: {
   const { ok } = await jsend(
     `/api/products/${encodeURIComponent(specs.product_id)}/sewing-specs`, "PUT", specs,
   );
-  return ok;
-}
-export async function deleteSewingSpecs(productId: string): Promise<boolean> {
-  const { ok } = await jsend(`/api/products/${encodeURIComponent(productId)}/sewing-specs`, "DELETE");
   return ok;
 }

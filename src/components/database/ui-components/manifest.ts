@@ -663,13 +663,10 @@ export const UI_COMPONENT_MODULES: UiModule[] = [
   },
   {
     "key": "product-templates",
-    "fileCount": 4,
-    "kitFiles": 1,
+    "fileCount": 1,
+    "kitFiles": 0,
     "components": [
-      "FieldRenderer",
-      "SectionRenderer",
-      "TemplateForm",
-      "TemplateView"
+      "FieldRenderer"
     ]
   },
   {
