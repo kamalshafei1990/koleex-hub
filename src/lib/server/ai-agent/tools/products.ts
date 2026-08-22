@@ -12,6 +12,7 @@ import { supabaseServer } from "../../supabase-server";
 import { hasProductCostAccess, stripSecrets, SECRET_MODEL_FIELDS } from "../../product-access";
 import type { ToolDef, ToolResult } from "../types";
 import { filterFieldsMany } from "../permissions";
+import { mainPhotoByProduct } from "../../product-photos";
 
 const PRODUCT_MODULE = "Products";
 
@@ -84,12 +85,22 @@ const searchProducts: ToolDef<
     const rows = (data ?? []) as Array<Record<string, unknown>>;
     const { filtered, stripped } = filterFieldsMany(ctx, "products", rows);
 
+    /* A photo per row, so a comparison can SHOW the machines instead of
+       listing their names. Same hero-then-order rule the catalogue uses, so
+       the assistant never displays a different picture from the product
+       page for the same product. */
+    const photos = await mainPhotoByProduct(rows.map((r) => String(r.id ?? "")));
+    const withPhotos = (filtered as Array<Record<string, unknown>>).map((r) => {
+      const url = photos[String(r.id ?? "")];
+      return url ? { ...r, photo_url: url } : r;
+    });
+
     return {
       ok: true,
       permissionStatus: stripped.length > 0 ? "limited" : "allowed",
       data: {
         total,
-        products: filtered as Array<Record<string, unknown>>,
+        products: withPhotos,
       },
       message: q
         ? `Found ${filtered.length} of ${total} visible products matching "${q}".`
@@ -423,6 +434,21 @@ const getProductFullDetails: ToolDef<
       const t = String(m.type ?? "other");
       mediaSummary[t] = (mediaSummary[t] ?? 0) + 1;
     }
+    /* THE URLS, NOT JUST A TALLY. This used to hand the model "photo: 4" and
+       keep the four addresses to itself, so an assistant that could render a
+       picture perfectly well had nothing to render. The photo is neutral
+       catalogue data — the same one any viewer sees on the product page —
+       so it needs no permission of its own beyond the module check this
+       tool already passed. */
+    const photoMap = await mainPhotoByProduct([productId]);
+    const mainPhoto = photoMap[productId] ?? null;
+    /* A handful, not the whole gallery: the model only ever shows one or two,
+       and a long list of URLs is prompt weight that buys nothing. */
+    const photoUrls = media
+      .filter((m) => String(m.type ?? "") === "photo" || String(m.type ?? "") === "image")
+      .map((m) => String(m.url ?? ""))
+      .filter(Boolean)
+      .slice(0, 6);
 
     const payload: Record<string, unknown> = {
       matched_model: matchedModel,
@@ -434,6 +460,8 @@ const getProductFullDetails: ToolDef<
       },
       models,
       media_summary: mediaSummary,
+      main_photo_url: mainPhoto,
+      photo_urls: photoUrls,
       documents: docsRes.data ?? [],
       certifications: certsRes.data ?? [],
       /* catalog-style feature cards (photo + explanation) — neutral catalog

@@ -164,6 +164,17 @@ export const SUPPLIER_CONFIDENTIALITY =
    Written as a rule rather than left to the model's manners. Asked directly
    today it already deflects well — but that is politeness, not a guarantee,
    and it would not survive a re-worded question or a change of model. */
+/* OWNER RULE (2026-08-22): when the answer is about a Koleex product, SHOW it.
+   The chat already renders markdown images — verified — and the product tools
+   now return the same photo the catalogue shows. What was missing was anyone
+   telling the model it may use them. */
+export const PRODUCT_PHOTO_RULE =
+  " SHOW THE PRODUCT: when a tool result carries main_photo_url or photo_url for a Koleex product you are describing, comparing or recommending," +
+  " include that photo in your answer as markdown — ![<product name>](<the exact url>) — placed right after you first name the product." +
+  " ONE photo per product, and only for products actually in the answer." +
+  " Use the URL EXACTLY as the tool returned it: never edit it, never guess one, never reuse a URL from a different product, and never invent an image for a product whose tool result had none — say it has no photo on file instead." +
+  " If you are listing more than four products, name them all but show photos only for the ones the user asked about or the ones you are recommending, so the answer stays readable.";
+
 export const AI_PROVENANCE_RULE =
   " YOUR IDENTITY (ABSOLUTE RULE): you are Koleex AI, the intelligent assistant built by Koleex International Group for Koleex Hub." +
   " You have no other name, vendor, lineage or origin story." +
@@ -188,6 +199,7 @@ export function buildFastPrompt(
         `You are Koleex AI, a friendly assistant inside Koleex Hub.${whoAmI}` +
         SUPPLIER_CONFIDENTIALITY +
         AI_PROVENANCE_RULE +
+        PRODUCT_PHOTO_RULE +
         ` ${BRAND_EXCLUSIVITY_RULE}` +
         ` ${DIRECT_VOICE_RULE}` +
         ` ${ENTITY_GUIDANCE_SHORT}` +
@@ -230,6 +242,7 @@ export function buildSmartPrompt(
         `You are Koleex AI, a helpful general-purpose assistant inside Koleex Hub.${whoAmI}\n\n` +
         SUPPLIER_CONFIDENTIALITY +
         AI_PROVENANCE_RULE +
+        PRODUCT_PHOTO_RULE +
         ` ${BRAND_EXCLUSIVITY_RULE}` +
         ` ${DIRECT_VOICE_RULE}` +
         `${ENTITY_GUIDANCE_FULL}\n\n` +
@@ -298,6 +311,7 @@ export function buildChatPrompt(
         `You are Koleex AI, a friendly general-purpose assistant living inside Koleex Hub.${whoAmI}` +
         SUPPLIER_CONFIDENTIALITY +
         AI_PROVENANCE_RULE +
+        PRODUCT_PHOTO_RULE +
         ` ${BRAND_EXCLUSIVITY_RULE}` +
         ` ${DIRECT_VOICE_RULE}` +
         ` Language: reply in the user's current message language by default (fall back to ${lang} for very short turns). If the user explicitly tells you which language to use for replies ("reply in Arabic", "answer in English", "رد بالعربية", "请用中文回答"), honor that for ALL subsequent replies until they ask you to switch again — even if they keep writing to you in a different language. Request-language and reply-language can legitimately be different.` +
@@ -353,6 +367,7 @@ export function buildBusinessPrompt(
         `You are Koleex AI's business reasoning assistant for Koleex Hub.${whoAmI}` +
         SUPPLIER_CONFIDENTIALITY +
         AI_PROVENANCE_RULE +
+        PRODUCT_PHOTO_RULE +
         ` ${BRAND_EXCLUSIVITY_RULE}` +
         ` ${DIRECT_VOICE_RULE}` +
         ` Reply in ${lang}. Structure answers as short bullet points or numbered steps.` +
