@@ -13,6 +13,7 @@ import { hasProductCostAccess, stripSecrets, SECRET_MODEL_FIELDS } from "../../p
 import type { ToolDef, ToolResult } from "../types";
 import { filterFieldsMany } from "../permissions";
 import { mainPhotoByProduct } from "../../product-photos";
+import { hasProductDataAccess } from "../../product-access";
 
 const PRODUCT_MODULE = "Products";
 
@@ -21,6 +22,17 @@ const PRODUCT_MODULE = "Products";
    tables (product_suppliers, landed_cost_calculations, etc.) — they're
    NOT on the products row, so SELECTing them would error. We expose
    the neutral catalog fields here and keep cost joins as future tools. */
+/* What a CATALOGUE viewer may see — the fields the public product page
+   already shows. An allowlist, not a subtraction: a new column added to
+   products tomorrow is invisible here by default, which is the only way a
+   list like this stays safe without anyone remembering to update it. */
+const CATALOGUE_FIELDS = [
+  "id", "product_name", "slug", "brand", "division_slug", "category_slug",
+  "subcategory_slug", "family", "description", "hs_code", "voltage",
+  "plug_types", "watt", "colors", "warranty", "lead_time",
+  "country_of_origin",
+] as const;
+
 const PRODUCT_SELECT = `id, product_name, slug, brand, division_slug,
   category_slug, subcategory_slug, family, level, description, hs_code,
   voltage, plug_types, watt, colors, warranty, moq, lead_time,
@@ -85,12 +97,33 @@ const searchProducts: ToolDef<
     const rows = (data ?? []) as Array<Record<string, unknown>>;
     const { filtered, stripped } = filterFieldsMany(ctx, "products", rows);
 
+    /* ⚠️ TWO APPS, TWO TRUTHS. Both product tools are gated on "Products" —
+       the CATALOGUE module — while the rows they read come from the Product
+       Data tables. So anyone who could open the catalogue was getting the
+       working record through the assistant: draft rows, internal status,
+       visibility flags, the lot. Owner: "for other accounts or customers he
+       only can know the products information from Products app, not Product
+       Data — Product Data has very sensitive data."
+       So the SOURCE now follows the account. With Product Data access you get
+       the record; without it you get the catalogue, which means active
+       products only and only the fields the public product page shows. */
+    const catalogueOnly = !(await hasProductDataAccess(ctx.auth));
+    const shaped = catalogueOnly
+      ? (filtered as Array<Record<string, unknown>>)
+          .filter((r) => String(r.status ?? "").toLowerCase() === "active")
+          .map((r) => {
+            const out: Record<string, unknown> = {};
+            for (const k of CATALOGUE_FIELDS) if (k in r) out[k] = r[k];
+            return out;
+          })
+      : (filtered as Array<Record<string, unknown>>);
+
     /* A photo per row, so a comparison can SHOW the machines instead of
        listing their names. Same hero-then-order rule the catalogue uses, so
        the assistant never displays a different picture from the product
        page for the same product. */
     const photos = await mainPhotoByProduct(rows.map((r) => String(r.id ?? "")));
-    const withPhotos = (filtered as Array<Record<string, unknown>>).map((r) => {
+    const withPhotos = shaped.map((r) => {
       const url = photos[String(r.id ?? "")];
       return url ? { ...r, photo_url: url } : r;
     });
@@ -290,6 +323,30 @@ const getProductByCode: ToolDef<
         message: `No product matched "${code}".`,
       };
     }
+    /* Same two-app rule as the other reads: a catalogue account gets the
+       catalogue, so a product that is not published simply is not there. */
+    if (!(await hasProductDataAccess(ctx.auth))) {
+      const row = data as Record<string, unknown>;
+      const published = String(row.status ?? "").toLowerCase() === "active" && row.visible !== false;
+      if (!published) {
+        return {
+          ok: true,
+          permissionStatus: "allowed",
+          data: null,
+          message: `No product matched "${code}". Say you don't have one by that name — never mention drafts or internal records.`,
+        };
+      }
+      const publicRow: Record<string, unknown> = {};
+      for (const k of CATALOGUE_FIELDS) if (k in row) publicRow[k] = row[k];
+      return {
+        ok: true,
+        permissionStatus: "limited",
+        data: publicRow,
+        message: `Catalogue record for "${String(row.product_name ?? code)}".`,
+        sources: ["products(catalog)"],
+      };
+    }
+
     const { filtered, stripped } = filterFieldsMany(ctx, "products", [
       data as Record<string, unknown>,
     ]);
@@ -449,6 +506,55 @@ const getProductFullDetails: ToolDef<
       .map((m) => String(m.url ?? ""))
       .filter(Boolean)
       .slice(0, 6);
+
+    /* ⚠️ THE SAME TWO-APP RULE, and this is where it matters most: this tool
+       returns the WORKING RECORD — every column of products and
+       product_models, documents, certifications, the lot. Gated on the
+       catalogue module, it was handing that record to anyone who could open
+       the catalogue.
+       Without Product Data access the answer becomes the catalogue answer: a
+       product that is not active does not exist, and what comes back is the
+       public shape — no status, no visibility, no internal fields, no model
+       internals. Costs and suppliers were already gated separately and stay
+       gated. */
+    const catalogueOnly = !(await hasProductDataAccess(ctx.auth));
+    if (catalogueOnly) {
+      const isActive = String(product.status ?? "").toLowerCase() === "active"
+        && product.visible !== false;
+      if (!isActive) {
+        return {
+          ok: false,
+          permissionStatus: "denied",
+          data: null,
+          message:
+            "That product is not published in the catalogue. Tell the user you don't have a product by that name — do NOT mention drafts, internal records or Product Data.",
+        };
+      }
+      const publicProduct: Record<string, unknown> = {};
+      for (const k of CATALOGUE_FIELDS) if (k in product) publicProduct[k] = (product as Record<string, unknown>)[k];
+      return {
+        ok: true,
+        permissionStatus: "limited",
+        data: {
+          product: publicProduct,
+          /* Model CODES only — the family shape a customer-facing answer
+             needs, without the per-model working data behind it. */
+          family: {
+            is_family: models.length > 1,
+            member_count: models.length,
+            member_codes: models
+              .map((m) => (m.primary_model as string) || (m.model_name as string))
+              .filter(Boolean),
+          },
+          main_photo_url: (await mainPhotoByProduct([productId]))[productId] ?? null,
+          certifications: certsRes.data ?? [],
+          feature_highlights: featRes.error ? [] : (featRes.data ?? []),
+        },
+        message:
+          `Catalogue record for "${product.product_name}". This account sees the published catalogue, not the internal Product Data record — answer from these fields only and never imply more exists.`,
+        sources: [`products(catalog id=${String(productId).slice(0, 8)})`],
+      };
+    }
 
     const payload: Record<string, unknown> = {
       matched_model: matchedModel,
