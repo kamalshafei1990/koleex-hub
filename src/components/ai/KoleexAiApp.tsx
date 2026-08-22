@@ -116,6 +116,7 @@ const COPY: Record<Lang, {
   renamePrompt: string;
   footer: string;
   stopped: string;
+  dropHere: string;
   searchChats?: string;
   noSearchResults?: string;
   /* Projects + pinning */
@@ -162,6 +163,7 @@ const COPY: Record<Lang, {
     renamePrompt: "New title",
     footer: "Koleex AI — Powered by Koleex Technology Systems",
     stopped: "Stopped",
+    dropHere: "Drop files to attach",
     searchChats: "Search chats…",
     noSearchResults: "No chats match your search.",
     projects: "Projects",
@@ -213,6 +215,7 @@ const COPY: Record<Lang, {
     renamePrompt: "新标题",
     footer: "Koleex AI — 由 Koleex 技术系统驱动",
     stopped: "已停止",
+    dropHere: "拖放文件以附加",
     searchChats: "搜索对话…",
     noSearchResults: "没有匹配的对话。",
     projects: "项目",
@@ -263,6 +266,7 @@ const COPY: Record<Lang, {
     renamePrompt: "عنوان جديد",
     footer: "Koleex AI — بدعم من أنظمة Koleex التقنية",
     stopped: "تم الإيقاف",
+    dropHere: "أفلت الملفات لإرفاقها",
     searchChats: "ابحث في المحادثات…",
     noSearchResults: "لا توجد محادثات تطابق بحثك.",
     projects: "المشاريع",
@@ -356,26 +360,73 @@ export default function KoleexAiApp() {
   const openFilePicker = useCallback(() => {
     fileInputRef.current?.click();
   }, []);
-  const onFilesPicked = useCallback((ev: React.ChangeEvent<HTMLInputElement>) => {
-    const list = ev.target.files;
-    if (!list || list.length === 0) return;
-    /* THE CLIENT GATE HAS TO MATCH THE SERVER, and it did not: the reader
-       gained images, scanned PDFs and Excel, the accept= list gained them,
-       and this filter still threw every image away before it left the
-       browser — with a message announcing a limitation that no longer
-       existed. A picker, an accept attribute and a filter are three places
-       that must agree, and two of them were updated. */
-    const SUPPORTED = /\.(pdf|txt|md|markdown|csv|tsv|json|log|xlsx|xlsm|xls|png|jpe?g|webp|gif)$/i;
-    const all = Array.from(list);
-    const ok = all.filter((f) => SUPPORTED.test(f.name) || (f.type || "").startsWith("image/"));
-    if (ok.length < all.length) {
+  /* ONE GATE, THREE DOORS. Files arrive by button, by drop and by paste, and
+     the last time this filter lived in only one of them the other two were
+     silently wrong for an hour. Every route now lands here. */
+  const SUPPORTED_FILES = /\.(pdf|txt|md|markdown|csv|tsv|json|log|xlsx|xlsm|xls|png|jpe?g|webp|gif)$/i;
+  const addFiles = useCallback((incoming: File[]) => {
+    if (incoming.length === 0) return;
+    const ok = incoming.filter(
+      (f) => SUPPORTED_FILES.test(f.name) || (f.type || "").startsWith("image/"),
+    );
+    if (ok.length < incoming.length) {
       setError("Supported files: images, PDF, Excel, TXT, MD, CSV, JSON.");
     }
     const picked = ok.slice(0, 6 - attachments.length);
     if (picked.length > 0) setAttachments((prev) => [...prev, ...picked]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [attachments.length]);
+
+  const onFilesPicked = useCallback((ev: React.ChangeEvent<HTMLInputElement>) => {
+    addFiles(Array.from(ev.target.files ?? []));
     /* Allow re-picking the same file twice in a row. */
     ev.target.value = "";
-  }, [attachments.length]);
+  }, [addFiles]);
+
+  /* ── Drag and drop ──────────────────────────────────────────────────────
+     dragCounter, not a boolean. Dragging over a composer fires dragenter and
+     dragleave for every child element it crosses, so a plain flag flickers
+     off the moment the cursor passes from the textarea to the button row.
+     Counting enters minus leaves is the only reading that survives a real
+     pointer path. */
+  const dragDepth = useRef(0);
+  const [dragging, setDragging] = useState(false);
+  const onDragEnter = useCallback((e: React.DragEvent) => {
+    if (!Array.from(e.dataTransfer?.types ?? []).includes("Files")) return;
+    e.preventDefault();
+    dragDepth.current += 1;
+    setDragging(true);
+  }, []);
+  const onDragOver = useCallback((e: React.DragEvent) => {
+    if (!Array.from(e.dataTransfer?.types ?? []).includes("Files")) return;
+    /* Both calls are required: without preventDefault the browser opens the
+       file instead of letting us have it, and dropEffect is what makes the
+       cursor say "copy" rather than the forbidden sign. */
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "copy";
+  }, []);
+  const onDragLeave = useCallback(() => {
+    dragDepth.current = Math.max(0, dragDepth.current - 1);
+    if (dragDepth.current === 0) setDragging(false);
+  }, []);
+  const onDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    dragDepth.current = 0;
+    setDragging(false);
+    addFiles(Array.from(e.dataTransfer?.files ?? []));
+  }, [addFiles]);
+
+  /* ── Paste ──────────────────────────────────────────────────────────────
+     A screenshot never becomes a file on disk — it goes to the clipboard, and
+     asking someone to save it first just to attach it is the long way round
+     the exact thing they are trying to show you. Only files are taken; a
+     normal text paste falls through untouched. */
+  const onPasteFiles = useCallback((e: React.ClipboardEvent) => {
+    const files = Array.from(e.clipboardData?.files ?? []);
+    if (files.length === 0) return;
+    e.preventDefault();
+    addFiles(files);
+  }, [addFiles]);
   const removeAttachment = useCallback((index: number) => {
     setAttachments((prev) => prev.filter((_, i) => i !== index));
   }, []);
@@ -2256,7 +2307,30 @@ export default function KoleexAiApp() {
                   the Hub-Blue focus ring. kx-ai-composer is the identity
                   hook; the paint lives in globals under the aurora scope, so
                   Core keeps rendering the original kx-glass-pop card. */}
-              <div className="kx-ai-composer kx-glass-pop relative rounded-3xl bg-[var(--bg-secondary)] border border-[var(--border-subtle)] focus-within:border-[var(--border-focus)] transition-colors">
+              {/* The DROP TARGET is the composer itself, not a separate zone
+                  that only appears once you are already dragging — you should
+                  be able to aim at the thing you are talking into. The border
+                  lights in the same Hub-Blue as focus, because dropping a file
+                  and typing are the same act of addressing the assistant. */}
+              <div
+                onDragEnter={onDragEnter}
+                onDragOver={onDragOver}
+                onDragLeave={onDragLeave}
+                onDrop={onDrop}
+                className={`kx-ai-composer kx-glass-pop relative rounded-3xl bg-[var(--bg-secondary)] border transition-colors focus-within:border-[var(--border-focus)] ${
+                  dragging
+                    ? "border-[var(--border-focus)] bg-[var(--bg-surface-subtle)]"
+                    : "border-[var(--border-subtle)]"
+                }`}
+              >
+                {dragging && (
+                  /* pointer-events-none is load-bearing: an overlay that
+                     accepts the pointer swallows the drop it exists to
+                     announce, and the file lands on the page instead. */
+                  <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center rounded-3xl bg-[var(--bg-secondary)]/80 text-[13px] font-semibold text-[var(--text-primary)]">
+                    {copy.dropHere}
+                  </div>
+                )}
                 {/* Attachment chip row — only renders when there are files. */}
                 {attachments.length > 0 && (
                   <div className="flex flex-wrap items-center gap-1.5 px-4 pt-3">
@@ -2306,6 +2380,7 @@ export default function KoleexAiApp() {
                       send();
                     }
                   }}
+                  onPaste={onPasteFiles}
                   placeholder={copy.placeholder}
                   rows={1}
                   dir={isRtl(input) ? "rtl" : "auto"}
