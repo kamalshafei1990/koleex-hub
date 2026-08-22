@@ -32,6 +32,7 @@ import { catalogTools } from "./tools/catalog";
 import { machineKnowledgeTools } from "./tools/machine-knowledge-tool";
 import { inventoryTools } from "./tools/inventory";
 import { permissionTools } from "./tools/permissions-tool";
+import { askUserTools } from "./tools/ask-user";
 import { quotationTools } from "./tools/quotations";
 /* Work-management read tools (To-do / Projects / Planning / Calendar).
    Each ports the owning app's per-user visibility scope verbatim, so the
@@ -57,6 +58,7 @@ const REGISTRY: Readonly<Record<string, ToolDef>> = Object.freeze(
       ...machineKnowledgeTools,
       ...inventoryTools,
       ...permissionTools,
+      ...askUserTools,
       ...quotationTools,
       ...todoTools,
       ...projectTools,

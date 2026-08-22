@@ -233,8 +233,18 @@ export function detectLane(
  *  lane now runs on DeepSeek, with Gemini as the only fallback where one
  *  is configured. */
 export function providersForLane(lane: Lane): Array<"groq" | "deepseek" | "gemini"> {
-  if (lane === "FAST") return ["deepseek", "gemini"];
-  if (lane === "SMART") return ["deepseek", "gemini"];
+  /* ONE PROVIDER. Groq and Gemini were listed as fallbacks and neither has
+     ever had a key in this project, so every lane was walking past two doors
+     that answer null on sight before reaching the only one that opens.
+     Owner, 2026-08-22: "I'm not using Groq or Gemini at all."
+     The adapters stay in the tree — re-listing a name here is all it takes to
+     bring one back — but nothing attempts them any more.
+     WORTH KNOWING: this leaves no automatic failover. If DeepSeek is down,
+     Koleex AI is down, and the local-knowledge fallback below is all that
+     answers. That was already the practical situation; it is now the stated
+     one. */
+  if (lane === "FAST") return ["deepseek"];
+  if (lane === "SMART") return ["deepseek"];
   return []; // PROTECTED handled by orchestrator, not this router
 }
 

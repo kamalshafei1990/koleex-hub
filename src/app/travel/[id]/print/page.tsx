@@ -18,6 +18,7 @@
    --------------------------------------------------------------------------- */
 
 import { use, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import LetterSheet, { type SheetAssets } from "@/components/travel/LetterSheet";
 import { LETTER_STYLES } from "@/components/travel/letter-styles";
 import { buildChinese, buildEnglish } from "@/lib/invitations/templates";
@@ -47,6 +48,7 @@ export default function InvitationPrintPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = use(params);
+  const router = useRouter();
   const [data, setData] = useState<Loaded | null>(null);
   const [failed, setFailed] = useState(false);
   /** Sheets that grew past one page — measured after paint, shown on screen
@@ -126,7 +128,13 @@ export default function InvitationPrintPage({
       const MM = 96 / 25.4;
       const over: number[] = [];
       document.querySelectorAll(".inv-a4").forEach((el, i) => {
-        if (el.getBoundingClientRect().height > 270 * MM + 2 * MM) over.push(i + 1);
+        /* 292, not 270. The sheet's MIN-height is 270mm, but the printed page
+           is 297mm (A4) — sheets legitimately sit at 275-281 since the stamp
+           took its real 40mm size, and warning at 270 cried wolf on letters
+           whose PDFs measured exactly three pages. 292 leaves 5mm of pagination
+           tolerance below the true limit, so the warning fires only when a
+           fourth page will actually exist. */
+        if (el.getBoundingClientRect().height > 292 * MM) over.push(i + 1);
       });
       setOverflowing(over);
 
@@ -160,6 +168,22 @@ export default function InvitationPrintPage({
   }
 
   const { letter, settings, assets } = data;
+
+  /* WHAT THE LETTER CANNOT BE SENT WITHOUT.
+     Found by rendering a real letter against an empty settings row: the
+     Chinese page read "我司系在中华人民共和国浙江省台州市依法注册成立的企业"
+     — the company inviting was simply absent, and nothing said so. A letter
+     that does not name the inviting company is not a document a consulate can
+     act on, so the gap is named here rather than left to be noticed by the
+     person at the counter. */
+  const missing: string[] = [];
+  if (!settings.companyNameEn) missing.push("the registered name (English)");
+  if (!settings.companyNameCn) missing.push("the registered name (Chinese)");
+  if (!settings.creditCode) missing.push("the Unified Social Credit Code");
+  if (!settings.addressEn && !settings.addressCn) missing.push("the licence address");
+  if (!settings.inviterName) missing.push("who signs the letter");
+  if (!assets.stampUrl) missing.push("the company stamp");
+  if (!assets.signatureUrl) missing.push("the signature");
   const input = {
     visitor: letter.visitor,
     visit: letter.visit,
@@ -171,7 +195,51 @@ export default function InvitationPrintPage({
   return (
     <>
       <style>{LETTER_STYLES}</style>
+      {/* The control bar — same shape as the Quotation editor's dark toolbar
+          above its A4: Back, then the letter's actions. In the desktop shell
+          there is no browser chrome, so this bar is also the only way out —
+          the trap the owner hit twice. no-print + the PDF route's readiness
+          flag ignores it, so paper never carries it. */}
+      <div className="inv-bar no-print">
+        <button type="button" className="inv-bar-btn" onClick={() => router.back()}>
+          ← Back
+        </button>
+        <span className="inv-bar-ref">{letter.reference}</span>
+        <span className="inv-bar-spacer" />
+        <button
+          type="button"
+          className="inv-bar-btn"
+          onClick={() => router.push(`/travel/${id}`)}
+        >
+          Edit
+        </button>
+        <button type="button" className="inv-bar-btn" onClick={() => window.print()}>
+          Print
+        </button>
+        <button
+          type="button"
+          className="inv-bar-btn inv-bar-btn-primary"
+          onClick={() => {
+            window.location.href = `/api/invitations/${id}/pdf`;
+          }}
+        >
+          Export PDF
+        </button>
+      </div>
       <div className="inv-stack">
+        {missing.length > 0 && (
+          /* no-print: this is guidance for the operator, never part of the
+             document. The letter still renders in full so what IS set can be
+             checked — refusing to render would hide the rest. */
+          <div className="inv-missing-note no-print">
+            <strong>This letter is missing {missing.length === 1 ? "one thing" : `${missing.length} things`}.</strong>{" "}
+            Not set yet: {missing.join(", ")}.{" "}
+            {(!assets.stampUrl || !assets.signatureUrl)
+              ? "The stamp and signature come from Quotations → saved assets; everything else is in Travel → Settings."
+              : "Add them in Travel → Settings."}{" "}
+            This notice is not printed.
+          </div>
+        )}
         {overflowing.length > 0 && (
           <div className="inv-overflow-note no-print">
             <strong>
@@ -196,8 +264,12 @@ export default function InvitationPrintPage({
             Business Licence · 营业执照
           </h2>
           {settings.licenceDocUrl ? (
-            // eslint-disable-next-line @next/next/no-img-element -- see LetterSheet
-            <img src={settings.licenceDocUrl} alt="" className="inv-licence-img" />
+            /* The frame exists because the image inside it is ROTATED — see
+               .inv-licence-img in letter-styles for why. */
+            <div className="inv-licence-frame">
+              {/* eslint-disable-next-line @next/next/no-img-element -- see LetterSheet */}
+              <img src={settings.licenceDocUrl} alt="" className="inv-licence-img" />
+            </div>
           ) : (
             <div className="inv-licence-missing">
               No business licence has been uploaded yet.

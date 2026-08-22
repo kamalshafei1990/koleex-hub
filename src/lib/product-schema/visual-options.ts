@@ -109,6 +109,18 @@ const PLUG: DomainMap = {
   M: { icon: "plug", badge: "ZA",    description: "Type M — South Africa", visualType: "plug" },
 };
 
+/* ── Packing types — one glyph per shipping method ─────────────── */
+const PACKING: DomainMap = {
+  wooden_case:   { icon: "pack-wooden-case",   description: "Fully closed timber box", visualType: "packing" },
+  plywood_crate: { icon: "pack-plywood-crate", description: "Braced plywood crate", visualType: "packing" },
+  wooden_pallet: { icon: "pack-pallet",        description: "Open wooden pallet, machine strapped", visualType: "packing" },
+  pallet_film:   { icon: "pack-pallet-film",   description: "Pallet wrapped in stretch film", visualType: "packing" },
+  carton:        { icon: "pack-carton",        description: "Export carton", visualType: "packing" },
+  foam_carton:   { icon: "pack-carton-foam",   description: "Carton with foam inserts", visualType: "packing" },
+  metal_frame:   { icon: "pack-metal-frame",   description: "Welded steel frame crate", visualType: "packing" },
+  bulk_loose:    { icon: "pack-bulk",          description: "Loaded loose in the container", visualType: "packing" },
+};
+
 /* ── Material weight class ─────────────────────────────────────── */
 const WEIGHT: DomainMap = {
   light:       { icon: "weight-light",  description: "Light fabric (shirting, lining)", visualType: "weight" },
@@ -126,6 +138,7 @@ export const VISUAL_OPTIONS: Record<OptionVisualType, DomainMap> = {
   hook: HOOK,
   plug: PLUG,
   weight: WEIGHT,
+  packing: PACKING,
   automation: {},
   generic: {},
 };
@@ -143,6 +156,7 @@ export const FIELD_VISUAL_DOMAIN: Record<string, OptionVisualType> = {
   hook_looper_type: "hook",
   plug_types: "plug",
   material_weight: "weight",
+  packing_type: "packing",
 };
 
 /* ── Product Intelligence Anchors ──────────────────────────────────

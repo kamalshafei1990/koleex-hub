@@ -362,6 +362,44 @@ export {
    app" which is the right UX. The reverse (routing a general
    question through the tool loop) is what users are complaining
    about right now. */
+/* OpenAI-shaped tool_choice. "auto" lets the model decide, "none" strips
+   the tools entirely, and the object form NAMES a function the model must
+   call on that one request. We use the third form for exactly one case —
+   see CHOICE_OPENER below. */
+type ToolChoice = "auto" | "none" | { type: "function"; function: { name: string } };
+
+/* ---------------------------------------------------------------------------
+   CHOICE-SHAPED TURNS — the one place we take the decision away from the model.
+
+   Owner, 2026-08-22: a "which one should I pick" question should come back as
+   a CARD of options he taps, not a paragraph. The `askUser` tool renders that
+   card, and the prompt asks the model to use it. Measured against the live
+   model on "Which spreading machine should I choose?": it ran its lookups,
+   found the candidates, and then wrote an excellent three-paragraph answer
+   ending in three questions — prose, every time, however the rule was worded.
+
+   A prompt rule the model reliably ignores is not a rule. So on this one
+   shape we stop asking: once the lookups are done, the next request is sent
+   with `tool_choice` NAMING askUser, which the API guarantees. The model still
+   chooses the options — it has just lost the option of answering in prose.
+
+   Kept deliberately narrow, and it costs the model nothing it needs:
+     · BOTH a "which one" opener AND a Koleex domain noun must appear, so
+       "which is better, tea or coffee?" is untouched.
+     · It fires only AFTER at least one tool has run, so the options are real
+       records the model just looked up, never invented ones.
+     · Once per turn (see forcedAsk). If askUser comes back malformed the loop
+       returns to normal rather than forcing forever.
+   --------------------------------------------------------------------------- */
+const CHOICE_OPENER = /(\bwhich\b|\bwhat\s+kind\b|\bwhat\s+type\b|أي\s|أنهي|انهي|哪个|哪种)/;
+const CHOICE_DOMAIN_NOUN =
+  /(machine|model|product|item|equipment|supplier|vendor|customer|client|fabric|series|ماكين|موديل|منتج|مورد|عميل|قماش|机器|型号|产品)/;
+
+function isChoiceShapedQuestion(msg: string): boolean {
+  const s = msg.toLowerCase();
+  return CHOICE_OPENER.test(s) && CHOICE_DOMAIN_NOUN.test(s);
+}
+
 function isBusinessDataQuery(msg: string): boolean {
   const s = (msg ?? "").toLowerCase();
   if (!s) return false;
@@ -384,6 +422,21 @@ function isBusinessDataQuery(msg: string): boolean {
     )
   )
     return true;
+
+  /* CHOICE-SHAPED QUESTIONS — "which spreading machine should I choose",
+     "which of these models", "أي ماكينة أختار", "哪个型号".
+
+     These reach for a decision between real Koleex records, which is
+     precisely what askUser exists to turn into a card of options. Without
+     this they matched nothing above and fell to the general lane, which
+     streams WITHOUT TOOLS — so the assistant could not offer choices no
+     matter how well the agent prompt was written, and answered with a
+     paragraph instead. Owner saw exactly that, twice.
+
+     Deliberately narrow: it needs BOTH a "which one" opener AND a Koleex
+     domain noun. "Which is better, tea or coffee" stays on the fast lane
+     where it belongs. */
+  if (CHOICE_OPENER.test(s) && CHOICE_DOMAIN_NOUN.test(s)) return true;
 
   /* Commercial action verbs: create / draft / prepare a quotation,
      invoice, order, RFQ, etc. */
@@ -744,10 +797,37 @@ export async function orchestrate(input: OrchestrateInput): Promise<AgentRespons
     /* Fall through to the full agent loop on any failure. */
   }
 
+  const wantsChoiceCard = isChoiceShapedQuestion(userMessage);
+  /* Attempts, not a boolean: the provider does not always honour a named
+     tool_choice on the first request — measured, it answered with another
+     lookup and only called askUser on the next pass. Two attempts absorbs
+     that without ever becoming a loop. */
+  let forcedAsk = 0;
+  /* Set when a choice-shaped turn came back as PROSE with no tool calls at
+     all. Measured on prod: the model answered "which spreading machine should
+     I choose?" with four numbered questions and never touched a tool, so the
+     force below — which waited for a lookup — never got its turn. Nothing had
+     streamed yet at that point, so the reply can be thrown away and re-asked. */
+  let proseRefused = false;
+
   for (let iter = 0; iter < MAX_ITERATIONS; iter++) {
     /* After the per-turn tool budget is spent, disable tools so the
        model can only produce a final answer. */
-    const toolChoice: "auto" | "none" = totalToolRuns >= MAX_TOOLS_PER_TURN ? "none" : "auto";
+    /* Force the card on choice-shaped turns once the lookups are done —
+       the model has candidates in hand and would otherwise write prose.
+       See CHOICE_OPENER. `forcedAsk` makes it strictly once per turn. */
+    const forceAskNow =
+      wantsChoiceCard &&
+      forcedAsk < 2 &&
+      (totalToolRuns > 0 || proseRefused) &&
+      totalToolRuns < MAX_TOOLS_PER_TURN;
+    if (forceAskNow) forcedAsk += 1;
+    const toolChoice: ToolChoice =
+      totalToolRuns >= MAX_TOOLS_PER_TURN
+        ? "none"
+        : forceAskNow
+          ? { type: "function", function: { name: "askUser" } }
+          : "auto";
     /* REAL answer streaming (perf fix 2026-08-03): once tools have run,
        the next call is (almost always) the final answer — stream it so
        the user reads while it generates instead of waiting ~8-12s for
@@ -872,6 +952,17 @@ export async function orchestrate(input: OrchestrateInput): Promise<AgentRespons
          text over GENERIC_FOLLOWUP, so a valid search/lookup answer
          isn't replaced with "Could you share a bit more so I can
          help?" just because the summariser returned nothing. */
+      /* CHOICE-SHAPED TURN THAT ANSWERED IN PROSE — reject it and ask again
+         with askUser named. Only while NOTHING has been streamed yet
+         (totalToolRuns === 0 means liveEmit was never armed), so we are
+         discarding a reply the user has not seen, not retracting one they
+         have. The messages array is left untouched: the very same request
+         goes back out, differing only in tool_choice. Bounded by forcedAsk. */
+      if (wantsChoiceCard && forcedAsk < 2 && totalToolRuns === 0) {
+        proseRefused = true;
+        continue;
+      }
+
       const cleaned = cleanAssistantText(content);
       const attempted = normaliseBrandName(cleaned);
       finalReply =
@@ -1036,6 +1127,27 @@ export async function orchestrate(input: OrchestrateInput): Promise<AgentRespons
        means the model will see the guard message via the tool-role
        feed and rephrase it as a natural question to the user on the
        next iteration. */
+    /* A CLARIFYING QUESTION ENDS THE TURN. Without this the model would ask
+       and then answer itself on the next iteration, which is the exact
+       behaviour the tool exists to replace. The question becomes the reply;
+       the options ride along as a step the UI renders as buttons, and the
+       user's pick arrives as an ordinary next message. */
+    const asked = toolRuns.find(
+      (r) => r.tc.function.name === "askUser" && r.result.ok && r.result.data,
+    );
+    if (asked) {
+      const payload = asked.result.data as { question: string; options: unknown[] };
+      steps.push({
+        kind: "question",
+        text: payload.question,
+        tool: "askUser",
+        payload,
+        permissionStatus: "allowed",
+      });
+      finalReply = payload.question;
+      break;
+    }
+
     const toolExecutions = toolRuns.filter(
       (r) => !(r as { guarded?: boolean }).guarded,
     );
@@ -1197,7 +1309,7 @@ Content-fidelity rule for languages other than English:
 Dialect + tone + messy-input handling:
 - Match the user's DIALECT and REGISTER, not just the language. Egyptian Arabic in → Egyptian Arabic out. Formal MSA in → formal MSA out. Casual English in → casual English out. Professional English in → professional English out.
 - Franco Arabic / Arabizi: if the user writes Arabic with Latin letters and numerals (3→ع, 7→ح, 2→ء, 5→خ, 6→ط, 9→ص), understand it as Arabic (usually Egyptian) and answer in proper Arabic script.
-- Tolerate typos, broken grammar, and partial sentences. If you are ~80% sure what they meant, answer that — never ask them to rephrase.
+- Tolerate typos, broken grammar, and partial sentences. If you are ~80% sure what they meant, answer that — never ask them to rephrase. This is about WORDING, not about choices: when several real records match, or the answer changes with a market/currency/language you have not been told, that is not a typo to guess through — that is an askUser question.
 
 Current user: ${ctx.auth.username}.
 
@@ -1402,8 +1514,15 @@ Tool routing:
   · Editing: "rename / change priority / postpone / move the due date of task X" → updateTodo (id via listMyTodos; owner-only). Project tasks → updateProjectTask (id via listProjectTasks). "move / reschedule / rename my meeting" → updateCalendarEvent (id via listMyCalendar). "change / cancel my shift" → updatePlanningItem (id via listMyPlanning; status:"cancelled" cancels).
   · Deleting: "delete / remove task X" → deleteTodo; project tasks → deleteProjectTask; "cancel / delete my meeting" → deleteCalendarEvent; "delete my shift / planning item" → deletePlanningItem. Deletion is permanent — relay the tool's warning as-is.
 - CRITICAL — you CAN read the user's own tasks, projects, schedule and calendar directly via the tools above. When the user asks anything like "what tasks do I have", "what tasks do I have today", "what's due", "what's on my plate", "my to-dos", "what's on my calendar / schedule", "what am I working on", "أعمالي / مهامي النهاردة", "我今天有什么任务" — you MUST call the matching tool (listMyTodos / listMyProjects / listProjectTasks / listMyPlanning / listMyCalendar) and answer from its result. NEVER reply with "check Koleex Hub", "please log in", "you can see your tasks in the app", or any variation that tells the user to look it up themselves — that is a wrong answer; the user is already logged in and you have live access. If a tool returns zero rows, say they have nothing matching — do not deflect.
-- CRITICAL — the same applies to WRITING: you CAN create, complete, update, reassign and delete the user's own tasks and calendar events via the write tools above. When the user tells you to do one of those ("set a meeting", "add a task", "mark it done", "delete that event", "اعمل ميتنج", "ضيف مهمة", "安排会议") NEVER say "I can't access your calendar/tasks", "that's outside what I can do here", or tell them to open the app and do it themselves — that is a wrong answer; the write tools are right there. If required details are missing (title, date/time, which task), reply affirmatively and ASK for exactly what's missing — e.g. "Sure — what's the meeting about, and when should it start and end?" — then run the WRITE-WITH-CONFIRM flow once you have them. Refusing is only correct when a TOOL returned a denial (permissionStatus denied) — then relay that it needs permission, nothing else.
+- CRITICAL — the same applies to WRITING: you CAN create, complete, update, reassign and delete the user's own tasks and calendar events via the write tools above. When the user tells you to do one of those ("set a meeting", "add a task", "mark it done", "delete that event", "اعمل ميتنج", "ضيف مهمة", "安排会议") NEVER say "I can't access your calendar/tasks", "that's outside what I can do here", or tell them to open the app and do it themselves — that is a wrong answer; the write tools are right there. If required details are missing, reply affirmatively and ask for exactly what's missing — as PROSE when it is free text ("Sure — what's the meeting about, and when should it start and end?"), but via askUser when it is a choice from a short list (WHICH task, WHICH project, WHICH of several matching people) — then run the WRITE-WITH-CONFIRM flow once you have them. Refusing is only correct when a TOOL returned a denial (permissionStatus denied) — then relay that it needs permission, nothing else.
 - CRITICAL — you CAN look things up on the public internet with search_web. For anything that depends on the world TODAY (weather, news, exchange rates, shipping conditions, public specs, "latest"/"current" anything) you MUST call search_web and answer from the results. NEVER say "I don't have live access", "I can't browse the internet", "check a weather app", or any variation — that is a wrong answer, the tool is right there. If search_web itself reports it is unavailable or returns nothing, THEN say plainly you couldn't check right now; never fall back to answering from memory as though it were current. Cite the source URL for figures, and say how fresh they are when a date is given. NEVER put Koleex data (customer names, prices, quotations, employees, internal codes) into a search query, and NEVER use web results to suggest another manufacturer's machines — Koleex only ever recommends Koleex.
+- HARD RULE, NO JUDGEMENT: if the user's message asks WHICH ONE — "which machine/model/product/supplier/customer should I…", "which of these…", "أي/أنهي … أختار", "哪个…" — and more than one real record could be the answer, your reply MUST be a single askUser call with those records as the options. Not a comparison table, not a paragraph of follow-up questions, not a recommendation followed by "tell me more and I'll narrow it down". Look the candidates up first if you need to, then ask. This one is not a preference: a "which one" question with several possible answers IS the case this tool was built for, and answering it in prose is the wrong shape even when the prose is good.
+- WHEN YOU MUST ASK, ASK THE RIGHT WAY. There are two shapes and the choice between them is mechanical:
+  · CLOSED question — the sensible answers are a short knowable list. USE askUser(question, options). Examples that MUST use it: several products/customers/suppliers match what they said and you need to know which; which market or currency to price in; which language to draft in; whether to include cost figures; which of two machines to compare; which of their projects a task belongs to. Give 2-4 options, mark ONE recommended when you have a reason, then STOP — say nothing after the call; the user's pick arrives as their next message.
+  · OPEN question — the answer is free text nobody could list in advance (a meeting title, a description, a specific date and time, a customer's own wording). Ask it in ONE short sentence, in prose.
+  If you catch yourself writing a paragraph that lists two or more choices for the user to pick from — "would you like A, B, or C?" — that is a CLOSED question and you should have called askUser instead. The options are tappable; your paragraph is not.
+  Never add an "other" option yourself: the user can always type their own answer, and the composer is right there.
+  Do NOT ask at all when another tool can settle it (call that tool), when the conversation already says it, or when you could simply answer — asking then wastes their time and is worse than an answer they can correct.
 - WRITE-WITH-CONFIRM (mandatory for EVERY write tool — createTodo / createProjectTask / createCalendarEvent / createPlanningItem / completeTodo / updateTodo / reassignTodo / deleteTodo / updateCalendarEvent / deleteCalendarEvent / completeProjectTask / updateProjectTask / deleteProjectTask / updatePlanningItem / deletePlanningItem):
   · You MUST actually CALL the tool. NEVER hand-write a preview table, and NEVER say something was "created"/"added"/"scheduled"/"updated"/"deleted"/"done" unless the write tool CALL returned a successful result (ok) in THIS turn. Describing the action in text without calling the tool is a failure — nothing gets saved.
   · Turn 1 (the request): call the tool WITHOUT the confirm argument. The TOOL returns the preview text — relay THAT to the user (don't invent your own) and ask them to confirm. Fill start_at/end_at/due_date using the current date from the "Current date & time" block above, as full ISO-8601 with the correct offset.
@@ -2451,6 +2570,31 @@ function buildSafeQuotationReply(steps: AgentStep[]): string {
    Either way the last "answer" step is force-synced to the returned
    text so steps[] and finalReply cannot diverge. */
 
+/* ─── Leaked tool-markup scrubber ───────────────────────────────────
+   Owner screenshot 2026-08-21: a reply ended in raw provider tool
+   tokens — "DSML ｜ tool_calls> … invoke name=\"getProductFullDetails\"
+   … parameter name=\"code\" …" — because once the per-turn tool budget
+   flips toolChoice to "none", a model that still WANTS a tool writes
+   the call into its content as text, special tokens and all. The
+   system nudge alone does not stop it, so the last line of defense is
+   here: cut the reply at the FIRST tool marker (legit prose always
+   precedes the leak), and if nothing legible remains, replace it with
+   an honest hand-back instead of an empty bubble. These markers can
+   never appear in a legitimate user-facing answer. */
+const TOOL_LEAK_RE =
+  /<?\s*[|｜]?\s*DSML\s*[|｜]|<\s*tool_calls|tool_calls\s*>|<?\s*invoke\s+name=|<[|｜]tool[▁_]calls|antml:invoke/i;
+
+function scrubLeakedToolMarkup(reply: string): string {
+  const m = TOOL_LEAK_RE.exec(reply);
+  if (!m) return reply;
+  const kept = reply.slice(0, m.index).trim();
+  console.warn(
+    `[ai.agent.tool-leak] raw tool markup scrubbed from final reply (at ${m.index}/${reply.length}).`,
+  );
+  if (kept.length >= 20) return kept;
+  return "I hit this turn's tool limit before finishing. Say “continue” and I'll pick up right where I stopped.";
+}
+
 function sealFinalReply(
   finalReply: string,
   steps: AgentStep[],
@@ -2459,7 +2603,7 @@ function sealFinalReply(
   // Start from the model's text. In quotation hard mode we replace
   // it entirely with a deterministic reply before running the guard
   // chain. The guards still run as belt-and-braces.
-  let sealed = finalReply;
+  let sealed = scrubLeakedToolMarkup(finalReply);
   if (userMessage && isQuotationRequest(userMessage)) {
     sealed = buildSafeQuotationReply(steps);
     console.warn(
@@ -2752,7 +2896,7 @@ async function callGroqPlain(
 async function callGroqStreamingOnce(
   key: string,
   messages: WireMsg[],
-  opts: { toolChoice: "auto" | "none"; onDelta: (t: string) => void },
+  opts: { toolChoice: ToolChoice; onDelta: (t: string) => void },
 ): Promise<{
   ok: boolean;
   status: number;
@@ -2769,7 +2913,7 @@ async function callGroqStreamingOnce(
   };
   if (opts.toolChoice !== "none") {
     body.tools = openAiToolSchemas();
-    body.tool_choice = "auto";
+    body.tool_choice = opts.toolChoice;
   }
   const res = await fetch(AGENT_LLM_URL, {
     method: "POST",
@@ -2847,7 +2991,7 @@ async function callGroqStreamingOnce(
 async function callGroqWithRetry(
   key: string,
   messages: WireMsg[],
-  opts: { toolChoice?: "auto" | "none" } = {},
+  opts: { toolChoice?: ToolChoice } = {},
   attempt = 0,
 ): Promise<Response> {
   const toolChoice = opts.toolChoice ?? "auto";
@@ -2859,7 +3003,7 @@ async function callGroqWithRetry(
   };
   if (toolChoice !== "none") {
     body.tools = openAiToolSchemas();
-    body.tool_choice = "auto";
+    body.tool_choice = toolChoice;
   }
   const res = await fetch(AGENT_LLM_URL, {
     method: "POST",

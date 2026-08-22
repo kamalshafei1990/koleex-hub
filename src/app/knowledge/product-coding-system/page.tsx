@@ -74,7 +74,7 @@ function PageInner() {
   return (
     <div
       dir={dir}
-      className="relative min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)]"
+      className="relative min-h-full bg-[var(--bg-primary)] text-[var(--text-primary)]"
     >
       {/* ── Print stylesheet — hide page chrome, keep document content ── */}
       <style jsx global>{`

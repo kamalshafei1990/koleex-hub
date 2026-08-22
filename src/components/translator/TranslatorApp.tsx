@@ -315,7 +315,7 @@ function LanguageRow({
         inPane ? "hidden" : "grid"
       }`}
     >
-      <div className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-card)] p-1.5">
+      <div className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] p-1.5">
         <LangButton side="from" {...lang} />
       </div>
       <div className="flex items-center justify-center">
@@ -324,12 +324,12 @@ function LanguageRow({
           onClick={swap}
           title={t("tr.swap", "Swap languages")}
           aria-label={t("tr.swap", "Swap languages")}
-          className="flex h-10 w-10 items-center justify-center rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-card)] text-[var(--text-muted)] transition-colors hover:bg-[var(--bg-surface-hover)] hover:text-[var(--text-primary)] md:border-transparent md:bg-transparent"
+          className="flex h-10 w-10 items-center justify-center rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] text-[var(--text-muted)] transition-colors hover:bg-[var(--bg-surface-hover)] hover:text-[var(--text-primary)] md:border-transparent md:bg-transparent"
         >
           <VlIcon slug="exchange" size={16} />
         </button>
       </div>
-      <div className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-card)] p-1.5">
+      <div className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] p-1.5">
         <LangButton side="to" {...lang} />
       </div>
     </div>
@@ -365,7 +365,7 @@ function EntryList({
     );
   }
   return (
-    <div className="overflow-hidden rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-card)]">
+    <div className="overflow-hidden rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)]">
       {items.map((e, i) => (
         <div
           key={e.id}
@@ -1260,7 +1260,7 @@ export default function TranslatorApp() {
             {/* Source. On mobile this is the TOP HALF of one shared card, so
                 it drops its own border/rounding; on desktop it becomes its
                 own card again. */}
-            <div className="flex min-h-0 flex-col overflow-hidden rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-card)] focus-within:border-[var(--border-focus)]">
+            <div className="flex min-h-0 flex-col overflow-hidden rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] focus-within:border-[var(--border-focus)]">
               {/* Mobile-only language chip, sitting directly above the text it
                   applies to — you read "English → this box" in one glance. */}
               <div className="shrink-0 px-1.5 pt-1.5 md:hidden">
@@ -1333,7 +1333,7 @@ export default function TranslatorApp() {
                 onClick={swap}
                 title={t("tr.swap", "Swap languages")}
                 aria-label={t("tr.swap", "Swap languages")}
-                className="grid h-9 w-9 place-items-center rounded-full border border-[var(--border-subtle)] bg-[var(--bg-card)] text-[var(--text-muted)] transition-colors active:bg-[var(--bg-surface-hover)] md:hidden"
+                className="grid h-9 w-9 place-items-center rounded-full border border-[var(--border-subtle)] bg-[var(--bg-secondary)] text-[var(--text-muted)] transition-colors active:bg-[var(--bg-surface-hover)] md:hidden"
               >
                 <VlIcon slug="exchange" size={15} />
               </button>
@@ -1397,7 +1397,7 @@ export default function TranslatorApp() {
         <div className="mx-auto flex w-full min-h-0 max-w-[1600px] flex-1 flex-col gap-3 px-4 pb-14 pt-3 sm:px-6 sm:pb-6">
           <LanguageRow swap={swap} {...langProps} />
 
-          <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-card)]">
+          <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)]">
             <input
               ref={fileRef}
               type="file"
@@ -1560,7 +1560,7 @@ export default function TranslatorApp() {
                 if (f) void handleImage(f);
               }}
               className={`flex min-h-0 flex-1 flex-col items-center justify-center gap-3 rounded-2xl border border-dashed px-6 text-center transition-colors ${
-                dragging ? "border-[var(--border-focus)] bg-[var(--bg-surface)]" : "border-[var(--border-subtle)] bg-[var(--bg-card)]"
+                dragging ? "border-[var(--border-focus)] bg-[var(--bg-surface)]" : "border-[var(--border-subtle)] bg-[var(--bg-secondary)]"
               }`}
             >
               <VlIcon slug="image" size={28} className="text-[var(--text-dim)]" />
@@ -1592,7 +1592,7 @@ export default function TranslatorApp() {
                   them — the photo ate everything. Desktop keeps the locked
                   two-column layout. */}
               {/* The photo — capped on mobile so it can't crowd out the text. */}
-              <div className="flex max-h-[40vh] shrink-0 flex-col overflow-hidden rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-card)] md:max-h-none md:min-h-0 md:shrink">
+              <div className="flex max-h-[40vh] shrink-0 flex-col overflow-hidden rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] md:max-h-none md:min-h-0 md:shrink">
                 <div className="flex shrink-0 items-center gap-2 border-b border-[var(--border-subtle)] px-3 py-2">
                   <VlIcon slug="image" size={15} className="shrink-0 text-[var(--text-dim)]" />
                   <span className="min-w-0 flex-1 truncate text-[13px] font-medium text-[var(--text-primary)]">{imgName}</span>
@@ -1668,7 +1668,7 @@ export default function TranslatorApp() {
 
               {/* Recognised text + translation */}
               <div className="flex min-h-0 flex-col gap-3">
-                <div className="flex min-h-[180px] flex-1 flex-col overflow-hidden rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-card)] md:min-h-0">
+                <div className="flex min-h-[180px] flex-1 flex-col overflow-hidden rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] md:min-h-0">
                   <div className="shrink-0 border-b border-[var(--border-subtle)] px-3 py-2 text-[11.5px] font-semibold uppercase tracking-wide text-[var(--text-dim)]">
                     {t("tr.imgFound", "Text found in the image")}
                   </div>
@@ -1753,7 +1753,7 @@ export default function TranslatorApp() {
 
           <form
             onSubmit={(e) => { e.preventDefault(); void loadPage(); }}
-            className="flex shrink-0 items-center gap-2 rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-card)] p-1.5"
+            className="flex shrink-0 items-center gap-2 rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] p-1.5"
           >
             <VlIcon slug="link-alt" size={14} className="ms-2 shrink-0 text-[var(--text-dim)]" />
             <input
@@ -1773,7 +1773,7 @@ export default function TranslatorApp() {
             </button>
           </form>
 
-          <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-card)]">
+          <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)]">
             {pageError ? (
               <div className="m-3 rounded-xl border border-red-500/25 bg-red-500/10 px-3 py-2 text-[12px] text-red-300">{pageError}</div>
             ) : !page && !pageBusy ? (

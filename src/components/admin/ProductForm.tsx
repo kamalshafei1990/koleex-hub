@@ -13,10 +13,11 @@ import { useTranslation } from "@/lib/i18n";
 import { PRODUCT_ARRAY_COLUMNS, toTextArray } from "@/lib/product-array-columns";
 import { localizedName } from "@/lib/i18n-name";
 import { FieldHelp, IDENTIFIER_HELP } from "@/components/admin/form-sections/FieldHelp";
-import FeatureCardsSection from "@/components/admin/form-sections/FeatureCardsSection";
 import { PRODUCTS_UI_I18N } from "@/lib/products-ui-i18n";
 import { humanizeError } from "@/lib/ui/humanize-error";
 import ArrowLeftIcon from "@/components/icons/ui/ArrowLeftIcon";
+import PageHeader from "@/components/ui/PageHeader";
+import ProductDataIcon from "@/components/icons/ProductDataIcon";
 import ArrowUpRightIcon from "@/components/icons/ui/ArrowUpRightIcon";
 import DiskIcon from "@/components/icons/ui/DiskIcon";
 import CameraIcon from "@/components/icons/ui/CameraIcon";
@@ -77,7 +78,6 @@ import {
   fetchProductCertifications, saveProductCertifications,
   fetchProductDocuments, saveProductDocuments,
   fetchSupplierNames, fetchUniqueBrands,
-  fetchUniqueFamilies,
   fetchBrandLogos,
   fetchDivisionLogos, fetchCategoryLogos, fetchSubcategoryLogos, fetchClassificationIcons,
   fetchSewingSpecsByProductId, upsertSewingSpecs,
@@ -101,7 +101,6 @@ import ExternalLinkIcon from "@/components/icons/ui/ExternalLinkIcon";
 import EyeIcon from "@/components/icons/ui/EyeIcon";
 import EyeOffIcon from "@/components/icons/ui/EyeOffIcon";
 import PlusIcon from "@/components/icons/ui/PlusIcon";
-import PictureIcon from "@/components/icons/ui/PictureIcon";
 import TrashIcon from "@/components/icons/ui/TrashIcon";
 import CrossIcon from "@/components/icons/ui/CrossIcon";
 import PencilIcon from "@/components/icons/ui/PencilIcon";
@@ -131,10 +130,13 @@ import ModelsSection from "./form-sections/ModelsSection";
 import FamilySpecGrid from "./form-sections/FamilySpecGrid";
 import { FamilyStrip, FamilySharedDivider, MemberPricingPanel, MemberLogisticsPanel } from "./form-sections/FamilyMemberPanels";
 import MediaSection from "./form-sections/MediaSection";
+import FeatureHighlightsSection from "./form-sections/FeatureHighlightsSection";
 import PricingIntelligenceCard from "./form-sections/PricingIntelligenceCard";
 import AccessoryOptionsSection, { type AccessoryOptionRow, axesForSubcategory } from "./form-sections/AccessoryOptionsSection";
 import BaseFobCard from "./form-sections/BaseFobCard";
 import TabStrip from "@/components/ui/TabStrip";
+import { useTabMotion } from "@/components/ui/useTabMotion";
+import Collapse from "@/components/ui/Collapse";
 import RelatedProductsSection from "./form-sections/RelatedProductsSection";
 import SearchSocialSection from "./form-sections/SearchSocialSection";
 import SewingMachineSection from "./form-sections/SewingMachineSection";
@@ -169,8 +171,11 @@ function Section({ icon, title, children, id, defaultOpen = true, badge }: {
   icon: React.ReactNode; title: string; children: React.ReactNode; id?: string; defaultOpen?: boolean; badge?: string;
 }) {
   const [open, setOpen] = useState(defaultOpen);
+  /* No kx-tab-in on the section any more: the step pane already slides in
+     (directional 3A) — pane slide + per-section rise + body unfolds all at
+     once read as GLITCH, not polish. One surface, one motion. */
   return (
-    <section id={id} {...kxInspectAttrs({ component: sectionComponentName(title), module: "Product Data", section: title })} className="kx-tab-in scroll-mt-24 bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] overflow-hidden transition-shadow hover:shadow-[0_2px_12px_rgba(0,0,0,0.15)]">
+    <section id={id} {...kxInspectAttrs({ component: sectionComponentName(title), module: "Product Data", section: title })} className="scroll-mt-24 kx-glass bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] overflow-hidden transition-shadow hover:shadow-[0_2px_12px_rgba(0,0,0,0.15)]">
       <button
         type="button"
         onClick={() => setOpen(!open)}
@@ -185,9 +190,9 @@ function Section({ icon, title, children, id, defaultOpen = true, badge }: {
         )}
         <AngleDownIcon className={`h-4 w-4 text-[var(--text-ghost)] transition-transform duration-300 ${open ? "rotate-180" : ""}`} />
       </button>
-      {open && (
-        <div className="px-6 pb-6 pt-2 border-t border-[var(--border-subtle)]">{children}</div>
-      )}
+      <Collapse open={open} className="px-6 pb-6 pt-2 border-t border-[var(--border-subtle)]">
+        {children}
+      </Collapse>
     </section>
   );
 }
@@ -351,7 +356,7 @@ function schemaColumnMirror(
   return out;
 }
 
-function getSteps(isSewing: boolean): WizardStep[] {
+function getSteps(): WizardStep[] {
   /* Machine Kind used to be its own step (id: "machine-type") but
      it's really a 4th-tier classification decision — Division →
      Category → Subcategory → Kind — so it now lives INSIDE the
@@ -371,6 +376,9 @@ function getSteps(isSewing: boolean): WizardStep[] {
     { id: "classify", label: "Classification", shortLabel: "Classify", icon: <FolderTreeIcon className="h-4 w-4" /> },
     { id: "supplier", label: "Supplier & Sourcing", shortLabel: "Supplier", icon: <FactoryIcon className="h-4 w-4" /> },
     { id: "identity", label: "Hero & Identity", shortLabel: "Identity", icon: <SparklesIcon className="h-4 w-4" /> },
+    /* Owner call 2026-08-21: highlights live in their OWN tab right after the
+       hero — photo + description cards with auto-translate, add/edit/delete. */
+    { id: "highlights", label: "Feature Highlights", shortLabel: "Highlights", icon: <ImageRawIcon className="h-4 w-4" /> },
     { id: "specs", label: "Specifications", shortLabel: "Specs", icon: <Settings2Icon className="h-4 w-4" /> },
     { id: "commercial", label: "Variants", shortLabel: "Variants", icon: <BoxesIcon className="h-4 w-4" /> },
     { id: "pricing", label: "Cost & Price", shortLabel: "Price", icon: <DollarSignIcon className="h-4 w-4" /> },
@@ -411,8 +419,15 @@ function SectionTabs({
      content PASSING under a bar, not for content parked there. 1rem / 2.5rem
      are the values ProductProfile and ProductList already use for this
      identical bar; this was the one that was missed. */
+  /* FULL-BLEED, and the owner's screenshot ("what is this?") is why. The
+     ramp layer is inset:0 of this nav — inside the page's px-4…px-16 padding
+     it painted a floating blurred RECTANGLE with visible side edges over the
+     empty strip above the tabs, instead of the edge-to-edge top frost every
+     other page shows. Same negative-margin breakout ProductList's bar uses,
+     sized to this page's own padding scale; the matching padding puts the
+     tab strip itself back on the grid. */
   return (
-    <nav className="kx-bar-host sticky top-0 z-20 mb-6 py-2 bg-[var(--bg-primary)]/90 backdrop-blur-md [--kx-ramp-ext:1rem] [--kx-ramp-fade:2.5rem]">
+    <nav className="kx-bar-host sticky top-0 z-20 mb-6 py-2 -mx-4 md:-mx-6 lg:-mx-8 px-4 md:px-6 lg:px-8 bg-[var(--bg-primary)]/90 backdrop-blur-md [--kx-ramp-top:26rem] [--kx-ramp-ext:1rem] [--kx-ramp-fade:1.5rem]">
       <div aria-hidden className="kx-glass-bar kx-bar-prog"><i /><i /><i /><i /></div>
       <TabStrip
         ariaLabel="Product sections"
@@ -549,6 +564,31 @@ function StatusBadge({ status, t }: { status: string; t: (key: string, fallback?
 /* ═══════════════════════════════════════════════════════════════════
    MAIN PRODUCT FORM (WIZARD)
    ═══════════════════════════════════════════════════════════════════ */
+
+/* Every ModelFormState field that persists to product_models. Save diffs a
+   model against its hydration baseline over EXACTLY these keys and PATCHes
+   only what changed — an untouched key is never sent, so it can never
+   overwrite or NULL another session's save. Keep in sync with the
+   modelData builder in save(). */
+const MODEL_SYNC_KEYS = [
+  "model_name", "slug", "tagline", "supplier", "reference_model",
+  "cost_price", "pricing_mode", "price_note", "global_price",
+  "supports_head_only", "supports_complete_set", "head_only_price",
+  "complete_set_price", "weight", "net_weight", "cbm", "carton_dimensions",
+  "packing_type", "box_include", "extra_accessories", "container_20ft_qty",
+  "container_40ft_qty", "container_40hq_qty", "stock_status",
+  "supplier_overrides", "order", "visible", "status", "moq", "lead_time",
+  "barcode", "primary_model", "code_prefix", "coding_status",
+  "specs_overrides", "name_i18n", "tagline_i18n",
+] as const satisfies readonly (keyof ModelFormState)[];
+
+/** Deep-clone the persisted slice of a model's form state (the baseline). */
+function modelBaselineOf(m: ModelFormState): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const k of MODEL_SYNC_KEYS) out[k] = structuredClone(m[k]);
+  return out;
+}
+
 interface Props {
   productId?: string;
 }
@@ -607,7 +647,6 @@ export default function ProductForm({ productId }: Props) {
   const [subcategories, setSubcategories] = useState<SubcategoryRow[]>([]);
   const [suppliers, setSuppliers] = useState<{ id: string; name: string; name_cn?: string | null; logo: string | null; supply_type?: string | null; payment_terms?: string | null; currency?: string | null; moq?: string | null; lead_time?: string | null; email?: string | null; phone?: string | null; website?: string | null; wechat?: string | null; location?: string | null; primary_contact?: { name: string | null; role: string | null; email: string | null; mobile: string | null } | null; rating?: number | null; sample_status?: string | null; employees?: string | null; year_established?: string | null; categories?: string[] | null; certifications?: string[] | null }[]>([]);
   const [brands, setBrands] = useState<string[]>([]);
-  const [families, setFamilies] = useState<string[]>([]);
   const [brandLogos, setBrandLogos] = useState<Record<string, string>>({});
   const [divisionLogos, setDivisionLogos] = useState<Record<string, string>>({});
   const [categoryLogos, setCategoryLogos] = useState<Record<string, string>>({});
@@ -653,6 +692,9 @@ export default function ProductForm({ productId }: Props) {
 
   /* ── Wizard state ── */
   const [currentStep, setCurrentStep] = useState(0);
+  /* Directional pane swap (owner pick 3A): later tab slides in from the end,
+     earlier tab from the start; RTL flips in CSS. */
+  const tabMotion = useTabMotion(currentStep);
   const [completedSteps, setCompletedSteps] = useState<Set<number>>(new Set());
 
   /* ── UI state ── */
@@ -722,11 +764,25 @@ export default function ProductForm({ productId }: Props) {
      autosaved draft found on mount so we can offer Restore / Discard.
      We NEVER auto-apply it — the saved product is left untouched until
      the operator explicitly chooses to restore (no dumb overwrite). */
-  const [draftMeta, setDraftMeta] = useState<{ savedAt: number } | null>(null);
+  const [draftMeta, setDraftMeta] = useState<{ savedAt: number; stale: boolean } | null>(null);
   const draftCheckedRef = useRef(false);
+  /* The DB row's updated_at, captured at load. A draft autosaved BEFORE the
+     product's last save is a time machine: restoring it and saving reverts
+     every newer change (the save loop deletes DB rows absent from the form).
+     That exact sequence collapsed a family's per-model photos and prices back
+     to the family values on 2026-08-19 — so a stale draft must announce
+     itself, not sit behind the primary button. */
+  const dbSavedAtRef = useRef<number | null>(null);
 
   /* ── Track original IDs for diff in edit mode ── */
   const [originalModelIds, setOriginalModelIds] = useState<string[]>([]);
+  /* Per-model save baseline: the form state exactly as HYDRATED (or as last
+     saved) plus the row's updated_at. Save diffs against this and PATCHes
+     only the keys the operator actually changed, with the updated_at as an
+     optimistic lock — so an untouched field can never overwrite (or NULL)
+     what someone else saved meanwhile. Root fix for the family-override
+     data-loss bug (2026-08-21). */
+  const modelBaselines = useRef<Map<string, { form: Record<string, unknown>; updated_at: string | null }>>(new Map());
   const [originalMediaIds, setOriginalMediaIds] = useState<string[]>([]);
   const [originalTranslationIds, setOriginalTranslationIds] = useState<string[]>([]);
 
@@ -848,7 +904,10 @@ export default function ProductForm({ productId }: Props) {
         try { window.localStorage.removeItem(draftKey); } catch { /* noop */ }
         return;
       }
-      setDraftMeta({ savedAt: parsed.savedAt });
+      setDraftMeta({
+        savedAt: parsed.savedAt,
+        stale: dbSavedAtRef.current != null && parsed.savedAt < dbSavedAtRef.current,
+      });
     } catch {
       /* corrupt draft — ignore it rather than block the form */
     }
@@ -865,7 +924,18 @@ export default function ProductForm({ productId }: Props) {
       const d = JSON.parse(raw);
       if (d.product) setProduct(d.product);
       if (Array.isArray(d.models)) setModels(d.models);
-      if (Array.isArray(d.media)) setMedia(d.media);
+      /* Ghost photos: a freshly-attached image exists only as `_file`, and
+         `_file` is deliberately not serialised into the draft — so a draft
+         row with no id and no url is an empty shell. Restoring it looks like
+         the photo survived, then the save loop skips it silently (no _file,
+         no id) and the photo is just gone. Drop the shells here and SAY so,
+         or the operator learns photos "randomly" vanish. */
+      let droppedPhotos = 0;
+      if (Array.isArray(d.media)) {
+        const rows = (d.media as MediaFormState[]).filter((m) => m.id || (m.url && m.url.trim() !== ""));
+        droppedPhotos = d.media.length - rows.length;
+        setMedia(rows);
+      }
       if (Array.isArray(d.translations)) setTranslations(d.translations);
       if (Array.isArray(d.prices)) setPrices(d.prices);
       if (Array.isArray(d.related)) setRelated(d.related);
@@ -876,7 +946,12 @@ export default function ProductForm({ productId }: Props) {
       setDirty(true);
       setDraftMeta(null);
       setError("");
-      setSuccess(t("draft.restored", "Draft restored — review the fields, then Save when you're ready."));
+      setSuccess(
+        t("draft.restored", "Draft restored — review the fields, then Save when you're ready.") +
+        (droppedPhotos > 0
+          ? " " + t("draft.photosDropped", "{n} attached photo(s) could not be kept in the draft — please attach them again before saving.").replace("{n}", String(droppedPhotos))
+          : ""),
+      );
     } catch {
       setError(t("save.draftReadError", "That saved draft couldn't be read — it may be from an older version. Discarding it is safe."));
     }
@@ -923,7 +998,10 @@ export default function ProductForm({ productId }: Props) {
   const isSewing = !isAccessory && isSewingMachineSubcategory(product.subcategory_slug, product.division_slug, product.category_slug);
 
   /* ── Wizard steps ── */
-  const steps = useMemo(() => getSteps(isSewing), [isSewing]);
+  /* getSteps takes no input any more — Machine Kind stopped being its own
+     step (see the note on getSteps) and the argument went with it. Memoised
+     on nothing so the array identity stays stable across renders. */
+  const steps = useMemo(() => getSteps(), []);
 
   /* ── Load data ── */
   useEffect(() => {
@@ -948,11 +1026,10 @@ export default function ProductForm({ productId }: Props) {
          so arriving here from the grid now costs zero taxonomy requests
          instead of three. Measured on /product-data/new: 15 requests on open,
          four of them taxonomy. */
-      const [taxo, supplierList, brandList, familyList, logoMap, attrCfg, divLogos, catLogos, subLogos, classIconMap] = await Promise.all([
+      const [taxo, supplierList, brandList, logoMap, attrCfg, divLogos, catLogos, subLogos, classIconMap] = await Promise.all([
         guard(fetchTaxonomyAll(), { divisions: [], categories: [], subcategories: [] } as Awaited<ReturnType<typeof fetchTaxonomyAll>>),
         guard(fetchSupplierNames(), [] as Awaited<ReturnType<typeof fetchSupplierNames>>),
         guard(fetchUniqueBrands(), [] as Awaited<ReturnType<typeof fetchUniqueBrands>>),
-        guard(fetchUniqueFamilies(), [] as Awaited<ReturnType<typeof fetchUniqueFamilies>>),
         guard(fetchBrandLogos(), {} as Awaited<ReturnType<typeof fetchBrandLogos>>),
         guard(fetchAttributeConfig(), { voltage: [], plug_types: [], colors: [], watt: [], levels: [], tags: [], tag_colors: {} } as Awaited<ReturnType<typeof fetchAttributeConfig>>),
         guard(fetchDivisionLogos(), {} as Awaited<ReturnType<typeof fetchDivisionLogos>>),
@@ -974,7 +1051,6 @@ export default function ProductForm({ productId }: Props) {
           (b, i) => brandList.findIndex((x) => x.toLowerCase() === b.toLowerCase()) === i,
         ),
       );
-      setFamilies(familyList.filter((f, i) => familyList.findIndex((x) => x.toLowerCase() === f.toLowerCase()) === i));
       setAllTags(attrCfg.tags);
       setBrandLogos(logoMap);
       setDivisionLogos(divLogos);
@@ -1003,6 +1079,7 @@ export default function ProductForm({ productId }: Props) {
         ]);
         if (cancelled) return;
         if (!p) { setError("Product not found"); return; }
+        dbSavedAtRef.current = p.updated_at ? new Date(p.updated_at).getTime() : null;
 
         const modelIds = dbModels.map(m => m.id);
         const dbPrices = await guard(fetchMarketPricesByModelIds(modelIds), [] as Awaited<ReturnType<typeof fetchMarketPricesByModelIds>>);
@@ -1139,6 +1216,16 @@ export default function ProductForm({ productId }: Props) {
           tagline_i18n: ((m as { tagline_i18n?: Record<string, string> | null }).tagline_i18n) ?? {},
         }));
         setModels(mappedModels);
+        /* Save baseline: what each row looked like at hydration + its
+           updated_at for the optimistic lock (dbModels pairs by index). */
+        modelBaselines.current = new Map(
+          mappedModels.flatMap((mm, i) => mm.id
+            ? [[mm.id, {
+                form: modelBaselineOf(mm),
+                updated_at: ((dbModels[i] as { updated_at?: string | null })?.updated_at) ?? null,
+              }] as const]
+            : []),
+        );
         setOriginalModelIds(modelIds);
         if (mappedModels.length > 1) setFamilyOn(true);
 
@@ -1357,6 +1444,14 @@ export default function ProductForm({ productId }: Props) {
       return;
     }
     setError("");
+    /* Family mode: the strip points this tab at ONE member and the banner
+       promises "Hero … save to this model". Writing `main_image` here would
+       break that promise — the line below drops EVERY existing main_image
+       row, so a member's upload replaced the family photo and all members
+       ended up showing it. A member writes its own `model_image` row (the
+       same shape the Models section already uses); only the primary owns
+       `main_image`, so single-model products are untouched. */
+    if (heroMember) { setModelPhoto(heroMember, file); return; }
     const filtered = media.filter(m => m.type !== "main_image");
     const newItem: MediaFormState = {
       _tempId: crypto.randomUUID(),
@@ -1482,7 +1577,11 @@ export default function ProductForm({ productId }: Props) {
 
   useEffect(() => {
     if (!loading && models.length === 0) ensureFirstModel();
-  }, [loading, ensureFirstModel]);
+    /* models.length is read here, not just inside ensureFirstModel, so it
+       belongs in the list. It changes together with ensureFirstModel's own
+       identity, so this adds no extra runs — it just stops the rule from
+       being right about a real omission. */
+  }, [loading, models.length, ensureFirstModel]);
 
   /* ── v30: KOLEEX Primary Model auto-coding ──
      Resolve the prefix from the currently-selected subcategory's `code`
@@ -1567,8 +1666,33 @@ export default function ProductForm({ productId }: Props) {
      to the supplier-link sync below. */
   const memberCtx = familyOn && !!models[safeActiveMember];
   const activeModel = models[safeActiveMember];
+  /* Functional update — the closure form (`models.map`) rewrote the WHOLE
+     array from a stale render whenever an async callback (AI translate,
+     the cost-migration effect) fired between renders, silently reverting
+     a member's typed edits before Save ever ran (2026-08-21). */
   const updateActiveMember = (u: Partial<ModelFormState>) =>
-    setModels(models.map((m, i) => (i === safeActiveMember ? { ...m, ...u } : m)));
+    setModels(prev => prev.map((m, i) => (i === safeActiveMember ? { ...m, ...u } : m)));
+
+  /* ── Hero photo, scoped to the selected member ──
+     Declared here rather than beside the other hero helpers above because it
+     needs activeModel/memberCtx. handleMainImage closes over heroMember and
+     only reads it when the operator clicks, so the later declaration is fine.
+     A member with no photo of its own INHERITS the family photo for display,
+     mirroring how factory cost inherits the supplier baseline — the caption
+     under the slot says which of the two you are looking at. */
+  const heroMember = memberCtx && safeActiveMember > 0 ? activeModel : null;
+  const heroMemberPhoto = heroMember ? modelPhotoOf(heroMember) : undefined;
+  const heroMemberFile = heroMemberPhoto?._file ?? null;
+  const heroMemberUrl = heroMemberPhoto?.url || null;
+  const heroMemberSrc = useMemo(
+    () => (heroMemberFile ? URL.createObjectURL(heroMemberFile) : heroMemberUrl),
+    [heroMemberFile, heroMemberUrl],
+  );
+  useEffect(() => () => { if (heroMemberFile && heroMemberSrc) URL.revokeObjectURL(heroMemberSrc); }, [heroMemberFile, heroMemberSrc]);
+  /* What the Hero slot actually shows: the member's own photo, else the
+     family photo it inherits, else the family photo when on the primary. */
+  const heroSrc = heroMember ? (heroMemberSrc ?? mainImageSrc) : mainImageSrc;
+  const heroInherited = !!heroMember && !heroMemberPhoto;
   /* New member = a COPY of the primary's identity you then edit — code,
      supplier reference, tagline and its zh/ar translations all start
      synced from the primary/family (owner rule: "synced with the primary
@@ -2727,27 +2851,59 @@ export default function ProductForm({ productId }: Props) {
             }
             return Object.keys(out).length > 0 ? out : null;
           })(),
+          /* Member translations used to ride a separate best-effort PATCH
+             whose failure was swallowed; the columns are live, so they save
+             with everything else now. */
+          name_i18n: m.name_i18n && Object.keys(m.name_i18n).length ? m.name_i18n : null,
+          tagline_i18n: m.tagline_i18n && Object.keys(m.tagline_i18n).length ? m.tagline_i18n : null,
         };
 
+        const modelLabel = m.primary_model || m.model_name || `#${m.order + 1}`;
         if (m.id) {
-          await updateModel(m.id, modelData);
+          /* Diff against the hydration baseline and PATCH only what the
+             operator actually changed, guarded by the loaded updated_at.
+             A full-row write from stale state was how one save silently
+             reverted every other session's member overrides (2026-08-21). */
+          const base = modelBaselines.current.get(m.id);
+          const changedKeys = base
+            ? MODEL_SYNC_KEYS.filter(
+                (k) => JSON.stringify(m[k] ?? null) !== JSON.stringify(base.form[k] ?? null),
+              )
+            : [...MODEL_SYNC_KEYS];
+          if (changedKeys.length === 0) {
+            tempIdToRealId[m._tempId] = m.id;
+            continue;
+          }
+          const patch: Record<string, unknown> = {};
+          for (const k of changedKeys) patch[k] = modelData[k];
+          if (base?.updated_at) patch._expected_updated_at = base.updated_at;
+          /* A failed model write is a failed SAVE: name the model, stop —
+             nothing half-written, and a conflict says WHO to blame. */
+          const res = await updateModel(m.id, patch);
+          if (!res.ok) {
+            throw new Error(
+              res.conflict
+                ? t("save.modelConflict", "Model \"{code}\" was changed by someone else while you were editing. Reload the product, check their change, then re-apply yours.")
+                    .replace("{code}", modelLabel)
+                : t("save.modelFailed", "Couldn't save model \"{code}\" — the rest of the save was stopped so nothing is half-written. Check your access or try again.")
+                    .replace("{code}", modelLabel),
+            );
+          }
+          modelBaselines.current.set(m.id, { form: modelBaselineOf(m), updated_at: res.updated_at ?? null });
           tempIdToRealId[m._tempId] = m.id;
         } else {
           const created = await createModel({ ...modelData, sku: "auto" });
-          if (created) tempIdToRealId[m._tempId] = created.id;
-        }
-        /* Member translations ride a SEPARATE best-effort write: if the
-           name_i18n/tagline_i18n columns aren't migrated yet, this fails
-           quietly and the product save is untouched. */
-        const realId = m.id || tempIdToRealId[m._tempId];
-        const hasI18n = (m.name_i18n && Object.keys(m.name_i18n).length) || (m.tagline_i18n && Object.keys(m.tagline_i18n).length);
-        if (realId && hasI18n) {
-          try {
-            await updateModel(realId, {
-              name_i18n: m.name_i18n && Object.keys(m.name_i18n).length ? m.name_i18n : null,
-              tagline_i18n: m.tagline_i18n && Object.keys(m.tagline_i18n).length ? m.tagline_i18n : null,
-            });
-          } catch { /* pending migration — advisory only */ }
+          if (!created) {
+            throw new Error(
+              t("save.modelCreateFailed", "Couldn't create model \"{code}\" — the rest of the save was stopped.")
+                .replace("{code}", modelLabel),
+            );
+          }
+          modelBaselines.current.set(created.id, {
+            form: modelBaselineOf(m),
+            updated_at: (created as { updated_at?: string | null }).updated_at ?? null,
+          });
+          tempIdToRealId[m._tempId] = created.id;
         }
       }
 
@@ -2757,6 +2913,12 @@ export default function ProductForm({ productId }: Props) {
           if (!currentModelIds.includes(oldId)) await deleteModel(oldId);
         }
       }
+      /* Attach the real ids to freshly created members and refresh the
+         reconciliation list — without this a second save in the same
+         session re-created new members (or tripped the code-taken check)
+         because state still held them id-less. */
+      setModels(prev => prev.map(mm => mm.id ? mm : (tempIdToRealId[mm._tempId] ? { ...mm, id: tempIdToRealId[mm._tempId] } : mm)));
+      setOriginalModelIds(models.map(mm => mm.id || tempIdToRealId[mm._tempId]).filter((x): x is string => !!x));
 
       for (const item of media) {
         if (item._file && !item.id) {
@@ -3003,27 +3165,47 @@ export default function ProductForm({ productId }: Props) {
           <WavyBackground topLight />
         </div>
       )}
-      <div className="relative z-[1] w-full px-4 md:px-8 lg:px-12 xl:px-16 py-6 md:py-8">
+      {/* Container matched to the rest of the Hub (owner, 2026-08-20: "is
+          this fit the screen size same as the other apps?" — it wasn't).
+          Padding follows the --kx-bleed convention (px-4/6/8) instead of a
+          private 8/12/16 scale, and the 1500px cap + centering is the
+          Purchase reference — without it the form stretched edge-to-edge
+          on wide screens while every other app stops. */}
+      <div className="relative z-[1] mx-auto max-w-[1500px] px-4 md:px-6 lg:px-8 py-6 md:py-8">
 
-        {/* ═══ INLINE HEADER — matches AccountForm / EmployeeWizard style.
-              Back-arrow + Cancel both route to /products via handleCancel,
-              which warns when there are unsaved changes. Save publishes
-              and clears the dirty flag inside `save()`. ═══ */}
-        <div className="flex items-center justify-between mb-6 md:mb-8 gap-3">
-          <div className="flex items-center gap-3 min-w-0">
-            <button
-              type="button"
-              onClick={handleCancel}
-              className="h-10 w-10 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all shrink-0 cursor-pointer"
-              title={dirty ? t("wizard.unsavedChangesTitle", "You have unsaved changes") : t("wizard.backToProducts", "Back to products")}
-            >
-              <ArrowLeftIcon className="h-4 w-4" />
-            </button>
-            <div className="min-w-0">
+        {/* THE SHARED HEADER, not a copy of it. This row used to be
+            hand-rolled "to match AccountForm / EmployeeWizard" — three
+            screens imitating a component that already existed, and the
+            imitation drifted: a 40x40 icon-only back button where the Hub's
+            names its destination, no app-icon chip, a title that skipped the
+            sm step, kx-glass instead of kx-ph-chrome, no hover lift, and a
+            `title` tooltip standing in for an accessible name.
+            The one thing that genuinely could not be expressed here was the
+            GUARDED back — handleCancel warns about unsaved changes — so
+            PageHeader gained `onBack` rather than this screen keeping its own
+            header. The z-30 lift over the tab ramp is PageHeader's own. */}
+        {/* relative z-30 IS LOAD-BEARING — PageHeader only lifts itself when it
+            owns the ramp, and here it does not. Without the lift the tab
+            bar's 26rem ramp treats this row as scrolled-under content and
+            smears it away entirely (owner, 2026-08-20: "the header have a
+            problem" — and it vanished again the moment this wrapper lost it). */}
+        <div className="relative z-30 mb-6 md:mb-8">
+          <PageHeader
+            /* The app's own mark, the same one the list header wears — not an
+               RrIcon name guessed at the call site. */
+            icon={<ProductDataIcon size={16} />}
+            showTabs={false}
+            /* title stays a STRING even though titleNode draws the row — it is
+               the accessible and document name, which a badge-decorated node
+               cannot be. */
+            title={product.product_name || t("wizard.newProductHeading", "New Product")}
+            onBack={handleCancel}
+            backLabel={t("wizard.backToProducts", "Products")}
+            titleNode={
               <div className="flex items-center gap-2 flex-wrap">
-                <h1 className="text-xl md:text-[26px] font-bold text-[var(--text-primary)] truncate">
+                <span className="truncate">
                   {product.product_name || t("wizard.newProductHeading", "New Product")}
-                </h1>
+                </span>
                 {product.product_name && <StatusBadge status={product.status} t={t} />}
                 {dirty && (
                   <span className="inline-flex items-center gap-1 h-5 px-2 rounded-full bg-amber-500/10 border border-amber-500/30 text-[9px] font-bold uppercase tracking-wider text-amber-400">
@@ -3032,41 +3214,43 @@ export default function ProductForm({ productId }: Props) {
                   </span>
                 )}
               </div>
-              <p className="text-[12px] md:text-[13px] text-[var(--text-dim)] mt-0.5">
-                {product.product_name
-                  ? t("wizard.editSubtitle", "Edit product details.")
-                  : t("wizard.createSubtitle", "Create a new product in your catalogue.")}
-              </p>
-            </div>
-          </div>
-          <div className="flex items-center gap-2 shrink-0">
-            <button
-              type="button"
-              onClick={handleCancel}
-              className="hidden sm:inline-flex items-center justify-center h-10 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[13px] font-semibold text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all cursor-pointer"
-            >
-              {t("action.cancel", "Cancel")}
-            </button>
-            <button
-              onClick={save}
-              disabled={saving}
-              className="h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold flex items-center gap-2 transition-all disabled:opacity-50 shadow-lg shrink-0"
-            >
-              {saving ? <SpinnerIcon className="h-4 w-4" /> : <DiskIcon className="h-4 w-4" />}
-              <span className="hidden sm:inline">{saving ? t("action.saving", "Saving...") : t("action.saveProduct", "Save Product")}</span>
-            </button>
-          </div>
+            }
+            subtitle={
+              product.product_name
+                ? t("wizard.editSubtitle", "Edit product details.")
+                : t("wizard.createSubtitle", "Create a new product in your catalogue.")
+            }
+            action={
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={handleCancel}
+                  className="kx-glass hidden sm:inline-flex items-center justify-center h-10 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[13px] font-semibold text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all cursor-pointer"
+                >
+                  {t("action.cancel", "Cancel")}
+                </button>
+                <button
+                  onClick={save}
+                  disabled={saving}
+                  className="h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold flex items-center gap-2 transition-all disabled:opacity-50 shadow-lg shrink-0"
+                >
+                  {saving ? <SpinnerIcon className="h-4 w-4" /> : <DiskIcon className="h-4 w-4" />}
+                  <span className="hidden sm:inline">{saving ? t("action.saving", "Saving...") : t("action.saveProduct", "Save Product")}</span>
+                </button>
+              </div>
+            }
+          />
         </div>
 
         {/* Messages */}
         {error && (
-          <div className="mb-5 px-4 py-3 rounded-xl bg-red-500/10 border border-red-500/20 text-[13px] text-red-400 flex items-center gap-2">
+          <div className="relative z-30 mb-5 px-4 py-3 rounded-xl bg-red-500/10 border border-red-500/20 text-[13px] text-red-400 flex items-center gap-2">
             <TriangleWarningIcon className="h-4 w-4 shrink-0" /> {error}
             <button onClick={() => setError("")} className="ml-auto text-red-400/50 hover:text-red-400">×</button>
           </div>
         )}
         {success && (
-          <div className="mb-5 px-4 py-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-[13px] text-emerald-400 flex items-center gap-2">
+          <div className="relative z-30 mb-5 px-4 py-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-[13px] text-emerald-400 flex items-center gap-2">
             <CheckIcon className="h-4 w-4 shrink-0" /> {success}
           </div>
         )}
@@ -3076,8 +3260,14 @@ export default function ProductForm({ productId }: Props) {
             mount. Restore loads it into the form (review-then-save);
             Discard throws it away and keeps whatever is loaded. The
             saved product is never touched automatically. */}
+        {/* relative z-30, same lift as the title row: these three banners PARK
+            in the strip the tab bar's ramp covers, and under it the recovery
+            banner rendered as an unreadable amber smear with a white blob —
+            the owner circled it twice before it was even recognizable as a
+            banner ("what is this?", "still have the same problem"). Parked
+            chrome goes ABOVE the frost, always. */}
         {draftMeta && (
-          <div className="mb-5 rounded-2xl border border-amber-500/30 bg-amber-500/[0.06] p-4">
+          <div className="relative z-30 mb-5 rounded-2xl border border-amber-500/30 bg-amber-500/[0.06] p-4">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
               <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-amber-500/30 bg-amber-500/15 text-amber-500">
                 <DocumentIcon className="h-4 w-4" />
@@ -3089,19 +3279,32 @@ export default function ProductForm({ productId }: Props) {
                 <p className="mt-0.5 text-[11px] text-[var(--text-ghost)]">
                   {t("draft.recoveredBodyAt").replace("{when}", new Date(draftMeta.savedAt).toLocaleString())}
                 </p>
+                {/* A draft older than the product's last save is a revert, not
+                    a recovery — restoring and saving it undoes every change
+                    made since. Warn in words AND swap the button emphasis so
+                    the safe action (Discard) is the prominent one. */}
+                {draftMeta.stale && (
+                  <p className="mt-1 text-[11px] font-semibold text-amber-500">
+                    {t("draft.staleWarning", "⚠ This draft is OLDER than the last save — restoring it will bring back old values and undo newer changes.")}
+                  </p>
+                )}
               </div>
               <div className="flex shrink-0 items-center gap-2">
                 <button
                   type="button"
                   onClick={discardDraft}
-                  className="h-10 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] px-4 text-[13px] font-semibold text-[var(--text-muted)] transition-all hover:text-[var(--text-primary)] hover:border-[var(--border-focus)]"
+                  className={draftMeta.stale
+                    ? "h-10 rounded-xl bg-[var(--bg-inverted)] px-5 text-[13px] font-semibold text-[var(--text-inverted)] transition-all shadow-lg"
+                    : "h-10 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] px-4 text-[13px] font-semibold text-[var(--text-muted)] transition-all hover:text-[var(--text-primary)] hover:border-[var(--border-focus)]"}
                 >
                   {t("draft.discard", "Discard")}
                 </button>
                 <button
                   type="button"
                   onClick={restoreDraft}
-                  className="h-10 rounded-xl bg-[var(--bg-inverted)] px-5 text-[13px] font-semibold text-[var(--text-inverted)] transition-all shadow-lg"
+                  className={draftMeta.stale
+                    ? "h-10 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] px-4 text-[13px] font-semibold text-[var(--text-muted)] transition-all hover:text-[var(--text-primary)] hover:border-[var(--border-focus)]"
+                    : "h-10 rounded-xl bg-[var(--bg-inverted)] px-5 text-[13px] font-semibold text-[var(--text-inverted)] transition-all shadow-lg"}
                 >
                   {t("draft.restore", "Restore draft")}
                 </button>
@@ -3164,9 +3367,9 @@ export default function ProductForm({ productId }: Props) {
         {/* ═══════════════════════════════════════════════════════════
            STEP: HERO (identity + primary model)
            ═══════════════════════════════════════════════════════════ */}
-        <div key={onePage ? "one-page" : currentStep} className={(onePage ? "space-y-10" : "") + " kx-tab-in"}>
+        <div key={onePage ? "one-page" : currentStep} className={(onePage ? "space-y-10" : "") + " " + (onePage ? "kx-tab-in" : tabMotion)}>
         {(onePage || steps[currentStep]?.id === "identity") && (
-          <div id="sec-identity" className="space-y-5 scroll-mt-28 animate-in fade-in duration-300">
+          <div id="sec-identity" className="space-y-5 scroll-mt-28">
             {/* ── HAS FAMILY ── the owner's switch: ON reveals the member
                 strip under the main tabs. OFF is only possible while the
                 product still has a single model. */}
@@ -3312,10 +3515,10 @@ export default function ProductForm({ productId }: Props) {
                        never stretches to match the tall fields column. */
                     className="relative w-full h-44 sm:h-52 lg:h-auto lg:aspect-square rounded-2xl overflow-hidden cursor-pointer group border-2 border-dashed border-[var(--border-subtle)] hover:border-[var(--border-focus)] transition-all bg-gradient-to-br from-[var(--bg-surface-subtle)] to-[var(--bg-surface)]"
                   >
-                    {mainImageSrc ? (
+                    {heroSrc ? (
                       <>
                         {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img src={mainImageSrc} alt="Product" className="w-full h-full object-contain p-6" />
+                        <img src={heroSrc} alt="Product" className="w-full h-full object-contain p-6" />
                         <div className="absolute inset-0 bg-black/50 backdrop-blur-[2px] opacity-0 group-hover:opacity-100 transition-all duration-300 flex items-center justify-center">
                           <div className="flex items-center gap-2.5 bg-white/20 px-5 py-2.5 rounded-xl text-white text-[13px] font-medium backdrop-blur-sm">
                             <CameraIcon className="h-4 w-4" />
@@ -3336,6 +3539,29 @@ export default function ProductForm({ productId }: Props) {
                       </div>
                     )}
                   </div>
+
+                  {/* Which photo am I looking at? In family mode the slot is
+                      member-scoped, and an inherited family photo looks
+                      identical to an owned one — so it has to be said in
+                      words. rounded-md on the revert control because the
+                      Aurora control-hover rule paints a ring on any button
+                      and a ring cannot be clipped into a curve. */}
+                  {heroMember && (
+                    <p className="mt-2 text-[10.5px] leading-relaxed text-[var(--text-ghost)]">
+                      {heroInherited
+                        ? t("hero.memberPhotoInherited", "Showing the family photo — upload one to give this model its own.")
+                        : t("hero.memberPhotoOwn", "This model's own photo.")}
+                      {!heroInherited && (
+                        <button
+                          type="button"
+                          onClick={() => removeModelPhoto(heroMember)}
+                          className="ms-2 rounded-md px-1.5 py-0.5 text-[10.5px] font-semibold text-[var(--text-dim)] hover:text-[var(--text-primary)]"
+                        >
+                          {t("hero.memberPhotoRevert", "Use the family photo")}
+                        </button>
+                      )}
+                    </p>
+                  )}
 
                   {/* ── Gallery strip ──
                       More photos live here, not in a hidden tab. Items are
@@ -4206,25 +4432,11 @@ export default function ProductForm({ productId }: Props) {
                         createLabel={t("hero.createBrand", "Create Brand")}
                       />
                     </div>
-                    <div>
-                      <label className={lbl}>
-                        <span className="inline-flex items-center gap-1.5"><PackageIcon className="h-3 w-3" /> {t("hero.familySeries", "Family / Series")}</span>
-                      </label>
-                      <input
-                        type="text"
-                        value={product.family}
-                        onChange={(e) => updateProduct_({ family: e.target.value })}
-                        placeholder={t("hero.familyPlaceholder", "e.g. Pro Line")}
-                        className={inp}
-                        list="family-suggestions"
-                      />
-                      {/* Existing families as suggestions — free text still
-                          allowed, but reusing a name beats inventing near-
-                          duplicates (Pro Line / ProLine / pro-line). */}
-                      <datalist id="family-suggestions">
-                        {families.map((f) => <option key={f} value={f} />)}
-                      </datalist>
-                    </div>
+                    {/* The free-text "Family / Series" input used to sit here —
+                        retired 2026-08-21: it wrote the dead products.family
+                        text column (null on every product) while the REAL
+                        family concept is the product + its models, already on
+                        this form's FAMILY strip. */}
                     {/* Country of Origin moved to the Logistics tab; Warranty
                         moved to the dedicated Compliance & Warranty tab — both
                         are post-identity data, not hero identity. */}
@@ -4379,22 +4591,11 @@ export default function ProductForm({ productId }: Props) {
               />
             </Section>
 
-            {/* ── Main Devices & Functions — the catalog photo-card pattern:
-                one card per device/function/part (photo + title + short
-                explanation). Universal across all categories; rendered as a
-                uniform card grid on the public page. */}
-            <Section
-              id="feature-cards"
-              icon={<PictureIcon className="h-4 w-4" />}
-              title={t("fc.title", "Main Devices & Functions")}
-              badge={product.feature_cards.length ? `${product.feature_cards.length}` : t("fc.badge", "Photo cards · public page")}
-              defaultOpen={false}
-            >
-              <FeatureCardsSection
-                cards={product.feature_cards}
-                onChange={(feature_cards) => updateProduct_({ feature_cards })}
-              />
-            </Section>
+            {/* "Main Devices & Functions" (feature_cards) used to live here —
+                retired 2026-08-21: the Feature Highlights tab is the same
+                catalog photo-card concept done properly (own table, model
+                pinning, any-locale translations). The column was empty on
+                every product when the section was removed. */}
 
             {/* Tags */}
             <Section id="tags" icon={<TagsIcon className="h-4 w-4" />} title={t("hero.tagsTitle", "Tags & Keywords")}>
@@ -4578,11 +4779,13 @@ export default function ProductForm({ productId }: Props) {
                 brand={product.brand}
                 slug={product.slug}
                 excerpt={product.excerpt}
-                /* Use the same preview source as the hero: mainImageSrc is the
+                /* Use the same preview source as the hero: heroSrc is the
                    saved URL when present, or a local object-URL for a freshly
                    uploaded (not-yet-saved) file. Reading only .url here showed
-                   "No main image yet" until the product was saved. */
-                primaryImageUrl={mainImageSrc || undefined}
+                   "No main image yet" until the product was saved. In family
+                   mode it follows the selected member, so the preview shows
+                   the photo the operator is actually editing. */
+                primaryImageUrl={heroSrc || undefined}
                 primaryModel={primaryModel?.primary_model || primaryModel?.model_name || ""}
                 categoryName={categoryName}
                 metaTitle={product.meta_title}
@@ -4600,7 +4803,7 @@ export default function ProductForm({ productId }: Props) {
            STEP 2: CLASSIFICATION
            ═══════════════════════════════════════════════════════════ */}
         {(onePage || steps[currentStep]?.id === "classify") && (
-          <div id="sec-classify" className="space-y-5 scroll-mt-28 animate-in fade-in duration-300">
+          <div id="sec-classify" className="space-y-5 scroll-mt-28">
             <Section
               id="classification"
               icon={<FolderTreeIcon className="h-4 w-4" />}
@@ -4665,7 +4868,7 @@ export default function ProductForm({ productId }: Props) {
            an existing supplier and edits only the per-product facts.
            ═══════════════════════════════════════════════════════════ */}
         {(onePage || steps[currentStep]?.id === "supplier") && (
-          <div id="sec-supplier" className="space-y-5 scroll-mt-28 animate-in fade-in duration-300">
+          <div id="sec-supplier" className="space-y-5 scroll-mt-28">
             <Section id="suppliers" icon={<FactoryIcon className="h-4 w-4" />} title={t("models.suppliers", "Supplier & Sourcing")} badge={t("models.suppliersBadge", "From Suppliers app")} defaultOpen>
               {(() => {
                 /* Spec lines offered by the cost-note "Import from product
@@ -4785,7 +4988,36 @@ export default function ProductForm({ productId }: Props) {
                   />
                 );
               })() : (
-                <SupplierLinkSection links={productSuppliers} suppliers={suppliers} onChange={setProductSuppliers} productSpecs={specEntries} />
+                <>
+                  <SupplierLinkSection links={productSuppliers} suppliers={suppliers} onChange={setProductSuppliers} productSpecs={specEntries} />
+                  {/* With the PRIMARY selected, the cost above is the FAMILY
+                      baseline — but the strip sits right there, so an operator
+                      who just saved a member's own cost reopens the form (it
+                      always mounts on the primary), sees ¥40000, and reads it
+                      as "my member's price was overwritten by the main one"
+                      (reported 2026-08-19, prices were in fact saved). Show
+                      the members' own costs HERE so the truth is visible at
+                      the exact spot the misreading happens. */}
+                  {familyOn && models.length > 1 && (() => {
+                    const own = models.slice(1).map((m) => {
+                      const ov = (m.supplier_overrides ?? {}) as Record<string, unknown>;
+                      const cost = (ov.unit_cost_cny as string | number | undefined) ?? (m.cost_price || null);
+                      const code = m.primary_model || m.model_name || "";
+                      return cost != null && String(cost).trim() !== "" && code ? { code, cost: String(cost) } : null;
+                    }).filter((x): x is { code: string; cost: string } => x !== null);
+                    if (!own.length) return null;
+                    return (
+                      <p className="mt-2 text-[11px] leading-relaxed text-[var(--text-ghost)]">
+                        {t("sup.memberCosts", "This is the family cost. These models have their own — pick one on the strip above to edit it:")}{" "}
+                        {own.map((o, i) => (
+                          <span key={o.code} className="font-semibold tabular-nums text-[var(--text-muted)]">
+                            {i > 0 ? " · " : ""}{o.code} ¥{o.cost}
+                          </span>
+                        ))}
+                      </p>
+                    );
+                  })()}
+                </>
               );
               })()}
             </Section>
@@ -4804,7 +5036,7 @@ export default function ProductForm({ productId }: Props) {
            this is the in-form editor for all 14 knowledge types.
            ═══════════════════════════════════════════════════════════ */}
         {(onePage || steps[currentStep]?.id === "knowledge") && (
-          <div id="sec-knowledge" className="space-y-5 scroll-mt-28 animate-in fade-in duration-300">
+          <div id="sec-knowledge" className="space-y-5 scroll-mt-28">
             <Section
               id="knowledge"
               icon={<BookOpenIcon className="h-4 w-4" />}
@@ -4829,6 +5061,23 @@ export default function ProductForm({ productId }: Props) {
            so this step only renders the dynamic spec fields driven
            by the template the kind chose.
            ═══════════════════════════════════════════════════════════ */}
+        {/* ═══════════════════════════════════════════════════════════
+           FEATURE HIGHLIGHTS — its own tab right after the hero (owner
+           call): catalog-style cards, each a photo + description with
+           auto-translate; add / edit / delete freely. Self-contained
+           section: loads and saves through its own endpoint.
+           ═══════════════════════════════════════════════════════════ */}
+        {(onePage || steps[currentStep]?.id === "highlights") && (
+          <div id="sec-highlights" className="space-y-5 scroll-mt-28">
+            <Section id="feature-highlights" icon={<ImageRawIcon className="h-4 w-4" />} title={t("features.title", "Feature Highlights")} badge={t("features.badge", "Photo + explanation cards")}>
+              <FeatureHighlightsSection
+                productId={effectiveId ?? ""}
+                models={models.filter((m) => m.id).map((m) => ({ id: m.id as string, code: m.primary_model || m.model_name || "model" }))}
+              />
+            </Section>
+          </div>
+        )}
+
         {onePage && isSewing && <div id="sec-sewing" className="scroll-mt-28" aria-hidden />}
         {/* Schema-driven specs — the canonical structured editor that writes
             product.schema_specs (the data that lights up the public product
@@ -4839,7 +5088,7 @@ export default function ProductForm({ productId }: Props) {
         {steps[currentStep]?.id === "specs" && (isSewing || activeSpecsSchema) && (() => {
           const specsSchema = specsTabSchema;
           return (
-            <div className="space-y-5 animate-in fade-in duration-300">
+            <div className="space-y-5">
               {specsSchema ? (
                 <Section
                   id="schema-specs"
@@ -4911,7 +5160,7 @@ export default function ProductForm({ productId }: Props) {
            STEP N: TECHNICAL DETAILS
            ═══════════════════════════════════════════════════════════ */}
         {steps[currentStep]?.id === "specs" && (
-          <div id="sec-technical" className="space-y-5 scroll-mt-28 animate-in fade-in duration-300">
+          <div id="sec-technical" className="space-y-5 scroll-mt-28">
             {/* Stand / Table products: their specs & variants ARE the
                 configurable option axes (shape · type · size · quality —
                 thickness · lifting · wheels · wheel size), each able to carry a
@@ -4948,7 +5197,7 @@ export default function ProductForm({ productId }: Props) {
            STEP N: MODELS & VARIANTS
            ═══════════════════════════════════════════════════════════ */}
         {(onePage || steps[currentStep]?.id === "commercial") && (
-          <div id="sec-commercial" className="space-y-5 scroll-mt-28 animate-in fade-in duration-300">
+          <div id="sec-commercial" className="space-y-5 scroll-mt-28">
             {/* Purchase Options — which configurations (head-only / complete set)
                 customers can order. Lives WITH the variants it governs
                 (owner tab-cleanup: Specs stays purely technical). */}
@@ -5119,7 +5368,7 @@ export default function ProductForm({ productId }: Props) {
            here READ-ONLY.
            ═══════════════════════════════════════════════════════════ */}
         {(onePage || steps[currentStep]?.id === "pricing") && (
-          <div id="sec-pricing" className="space-y-5 scroll-mt-28 animate-in fade-in duration-300">
+          <div id="sec-pricing" className="space-y-5 scroll-mt-28">
             {memberCtx && activeModel && (
               <>
                 <MemberPricingPanel
@@ -5289,7 +5538,7 @@ export default function ProductForm({ productId }: Props) {
            there rather than duplicating them.
            ═══════════════════════════════════════════════════════════ */}
         {(onePage || steps[currentStep]?.id === "logistics") && (
-          <div id="sec-logistics" className="space-y-5 scroll-mt-28 animate-in fade-in duration-300">
+          <div id="sec-logistics" className="space-y-5 scroll-mt-28">
             {memberCtx && activeModel && (
               <>
                 <MemberLogisticsPanel model={activeModel} onUpdate={updateActiveMember} />
@@ -5411,7 +5660,7 @@ export default function ProductForm({ productId }: Props) {
            here in a later phase; CE/RoHS + warranty are surfaced now.
            ═══════════════════════════════════════════════════════════ */}
         {(onePage || steps[currentStep]?.id === "compliance") && (
-          <div id="sec-compliance" className="space-y-5 scroll-mt-28 animate-in fade-in duration-300">
+          <div id="sec-compliance" className="space-y-5 scroll-mt-28">
             <Section id="compliance-certs" icon={<ShieldCheckIcon className="h-4 w-4" />} title={t("compliance.title", "Compliance")} badge={t("compliance.badge", "Certifications")}>
               {certsCoveredBySchema && (
                 <p className="mb-3 text-[11px] leading-relaxed text-[var(--text-ghost)]">{t("compliance.ceInSpecs", "CE and other certifications for this category are set on the Specifications tab (Safety & Compliance → Certifications). Add certificate records with issuer, number and expiry below.")}</p>
@@ -5547,7 +5796,7 @@ export default function ProductForm({ productId }: Props) {
         )}
 
         {(onePage || steps[currentStep]?.id === "media") && (
-          <div id="sec-media" className="space-y-5 scroll-mt-28 animate-in fade-in duration-300">
+          <div id="sec-media" className="space-y-5 scroll-mt-28">
             <Section id="media" icon={<ImageRawIcon className="h-4 w-4" />} title={t("media.filesTitle", "Media & Documents")}>
               <MediaSection
                 media={media.filter(m => m.type !== "main_image")}
@@ -5730,7 +5979,7 @@ export default function ProductForm({ productId }: Props) {
             : { headline: t("review.draftHeadline", "Save as draft"), body: t("review.draftBody", "Status is Draft — saved internally, not shown on the public catalog. Switch to Active on the Hero step when ready to publish.") };
 
           return (
-            <div className="space-y-5 animate-in fade-in duration-300">
+            <div className="space-y-5">
               {/* ── Live preview card ──
                     Mirrors the public detail page's hero: image,
                     name, tagline, quick-fact pills, pricing. Built

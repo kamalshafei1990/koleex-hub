@@ -46,10 +46,11 @@ import PackageIcon from "@/components/icons/ui/PackageIcon";
 import ListIcon from "@/components/icons/ui/ListIcon";
 import SettingsIcon2 from "@/components/icons/ui/SettingsIcon2";
 import ArrowLeftIcon from "@/components/icons/ui/ArrowLeftIcon";
+import { BACK_CHROME } from "@/components/ui/PageHeader";
 import ProductsIcon from "@/components/icons/ProductsIcon";
 import ProductDataIcon from "@/components/icons/ProductDataIcon";
 import {
-  fetchProducts, fetchTaxonomyAll,
+  fetchTaxonomyAll,
   fetchModelSummaries, fetchProductMainImages, deleteProduct,
   fetchClassificationIcons,
 } from "@/lib/products-admin";
@@ -126,16 +127,29 @@ const EMPTY_SUPPLIERS: string[] = [];
    shrinking the utility itself: 32px gap + 24px padding = the same 56px that
    `space-y-14` used to give. Change one and change the other.
 
-   Checked at 375px too: the room needed drops to 18px against the same 24px,
-   the section overhangs the viewport by 8px each side, and there is still no
-   horizontal scrollbar because the body carries `overflow-x: hidden` there.
-   Same dependency as `.kx-lazy-grid`; the full note is in globals.css. */
+   THE BLEED MUST MATCH THE CONTAINER'S OWN PADDING, NOT A FIXED 24.
+   The wrapper is `px-4 md:px-6 lg:px-8` — 16px on a phone, 24 from md up.
+   A hardcoded -24 therefore overhung the viewport by 8px each side at 375px.
+   The earlier note here accepted that, reasoning the body's `overflow-x:
+   hidden` would absorb it; it does not, because the Hub scrolls inside
+   #main-scroll-container, not the body — measured, the page scrolled
+   sideways by exactly those 8px and the owner reported the whole app
+   "dancing" on mobile.
+
+   `--kx-bleed` is defined from the same breakpoints as the wrapper padding
+   (globals.css), so the two can no longer disagree. Change the wrapper's
+   padding and change --kx-bleed with it.
+
+   The bleed itself stays: content-visibility clips paint at the box edge, so
+   without room the cards' hover glow was sheared off. The bottom padding is
+   paid for by the utility: 32px gap + 24px padding = the 56px `space-y-14`
+   used to give. Same dependency as `.kx-lazy-grid`; full note in globals.css. */
 const SECTION_CV = {
   contentVisibility: "auto",
   containIntrinsicSize: "1px 800px",
-  paddingInline: 24,
+  paddingInline: "var(--kx-bleed)",
   paddingBottom: 24,
-  marginInline: -24,
+  marginInline: "calc(var(--kx-bleed) * -1)",
 } as const;
 
 const levelColors: Record<string, string> = {
@@ -221,7 +235,7 @@ function SupplierRowShell({ supplierId, children }: { supplierId: string | null;
     <Link
       href={`/suppliers/${supplierId}`}
       onClick={(e) => e.stopPropagation()}
-      className="relative z-[6] flex items-center gap-2 min-w-0 rounded-md -mx-1 px-1 py-0.5 transition-colors hover:bg-[var(--bg-inverted)]/[0.06] group/sup"
+      className="relative z-[6] flex items-center gap-2 min-w-0 rounded-md px-1 py-0.5 transition-colors hover:bg-[var(--bg-inverted)]/[0.06] group/sup"
       title="Open in the Suppliers app"
     >
       {children}
@@ -383,10 +397,31 @@ const ProductCard = memo(function ProductCard({
               light image (owner: "I can't see clearly if under white
               background"). A fixed dark scrim + a light rim reads on any
               photo in any theme; Core keeps the token, where it is solid. */}
+          {/* NO backdrop-blur ON THESE TWO, and the number is why: they are
+              2 per card × 214 cards = 428 live blur layers on one screen —
+              measured 2026-08-21, and they were 428 of the 429 filtered
+              elements on the whole page. They are also INVISIBLE at rest on
+              desktop (opacity-0 until the card is hovered), and a
+              compositor still pays for a filtered layer it is not showing.
+              Nothing is lost visually: they already sit on a fixed
+              black/60 scrim, which is what makes them readable over a white
+              photo — the blur under an opaque-enough scrim showed nothing.
+              This cost was SKIN-INDEPENDENT, which is why it survived the
+              kx-flat-items sweep (that rule targets .kx-glass). */}
+          {/* data-kx-keep-hover, both of them: the global Aurora hover
+              REPLACES a control's own hover fill with its 3% white + blue
+              rim — which over a white product photo turned this scrim
+              nearly transparent and the white glyph invisible exactly on
+              hover (owner: "the hover become white and the background is
+              white so I can see nothing"). These two manage their own
+              contrast against an unknown photo; the skin must not touch
+              them. This is the hatch that rule documents — the FIRST
+              legitimate use, not a :not() escalation. */}
           <Link
             href={`${baseRoute}/${p.id}/edit`}
+            data-kx-keep-hover=""
             onClick={(e) => e.stopPropagation()}
-            className={`h-8 w-8 rounded-lg border backdrop-blur-sm flex items-center justify-center transition-colors ${
+            className={`h-8 w-8 rounded-lg border flex items-center justify-center transition-colors ${
               aurora
                 ? "bg-black/60 border-white/25 text-white/85 hover:text-white hover:bg-black/75"
                 : "bg-[var(--bg-primary)]/80 border-[var(--border-subtle)] text-[var(--text-muted)] hover:text-[var(--text-primary)]"
@@ -396,8 +431,9 @@ const ProductCard = memo(function ProductCard({
             <PencilIcon className="h-3.5 w-3.5" />
           </Link>
           <button
+            data-kx-keep-hover=""
             onClick={(e) => onAskDelete(e, p.id, p.product_name)}
-            className={`h-8 w-8 rounded-lg border backdrop-blur-sm flex items-center justify-center transition-colors ${
+            className={`h-8 w-8 rounded-lg border flex items-center justify-center transition-colors ${
               aurora
                 ? "bg-black/60 border-white/25 text-white/85 hover:text-red-400 hover:bg-black/75"
                 : "bg-[var(--bg-primary)]/80 border-[var(--border-subtle)] text-[var(--text-muted)] hover:text-red-400"
@@ -662,7 +698,7 @@ const ProductCard = memo(function ProductCard({
             <div className="flex items-baseline gap-2 min-w-0 mt-auto pt-1">
               {signal.cost != null ? (
                 <span
-                  className="flex items-baseline gap-1 shrink-0"
+                  className="flex min-w-0 items-baseline gap-1"
                   title={[
                     signal.priceNote || "",
                     signal.costNote || "",
@@ -781,6 +817,21 @@ export default function ProductList() {
       return parsed && typeof parsed === "object" ? parsed : {};
     } catch { return {}; }
   });
+  /* Phone-only: the category grid collapsed to its first two rows.
+     13 categories at 2-up = ~7 rows ≈ half the phone viewport before any
+     product shows (owner screenshot) — the exact reason the original tile
+     grid died. Desktop always shows all; ≥sm ignores this state. */
+  const [catsOpen, setCatsOpen] = useState(false);
+  useEffect(() => {
+    if (!catsOpen) return;
+    const close = (e: Event) => {
+      const t = e.target as HTMLElement | null;
+      if (t && t.closest("[data-kx-cats-menu],[data-kx-cats-trigger]")) return;
+      setCatsOpen(false);
+    };
+    document.addEventListener("pointerdown", close, true);
+    return () => document.removeEventListener("pointerdown", close, true);
+  }, [catsOpen]);
   useEffect(() => {
     let alive = true;
     fetchClassificationIcons().then((v) => {
@@ -1920,7 +1971,11 @@ export default function ProductList() {
       const displayName = catName.charAt(0).toUpperCase() + catName.slice(1);
       return { slug: catSlug, name: displayName, total, loaded, subSections };
     });
-  }, [filtered, categories, subcategories, subMap, catNameBySlug, viewMode, groupCounts, isInternal, filterSupplier]);
+    /* `t` IS a dependency. It supplies the "Uncategorized" and "Other"
+       fallback names above, so leaving it out meant switching language
+       relaid the whole page and left those two group headings in the
+       previous language until some unrelated filter happened to change. */
+  }, [filtered, categories, subcategories, subMap, catNameBySlug, viewMode, groupCounts, isInternal, filterSupplier, t]);
 
   /* THE CONDITION HAS TO MATCH THE RENDER, EXACTLY.
      The category jump-nav below hosts this screen's long ramp, and it only
@@ -1988,14 +2043,26 @@ export default function ProductList() {
         {/* Header */}
         {/* relative z-30: the top strip's ramp (z-20) runs BEHIND this. */}
         <div className="relative z-30 flex flex-wrap items-center gap-3 mb-1">
-          <Link href="/" className="kx-glass kx-hover-glow h-8 w-8 flex items-center justify-center rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] transition-colors shrink-0">
-            <ArrowLeftIcon className="h-4 w-4" />
+          {/* Matched to Inventory's PageHeader (owner, 2026-08-20: "compare with
+              inventory app… make them same"): the BK-4 labeled back chip, the
+              plain (non-glass) icon chip, the M-1 title rule and the
+              kx-ph-search well — the four real deltas the comparison found.
+              The divisions TabStrip already shared the canon recipe. */}
+          {/* The recipe is IMPORTED, not re-typed. This row was hand-matched
+              to PageHeader once and the class string copied along with it —
+              which is exactly how the two drift the next time the canon moves.
+              The arrangement below stays bespoke on purpose (the count and FX
+              rate ride the title line to reclaim vertical space), but the
+              control wears the shared definition. */}
+          <Link href="/" aria-label="Back to Hub" className={BACK_CHROME}>
+            <ArrowLeftIcon className="h-3.5 w-3.5" />
+            <span className="hidden text-[12px] font-medium sm:inline">Hub</span>
           </Link>
           <div className="flex items-center gap-2.5 min-w-0 flex-1">
-            <div className="kx-glass h-8 w-8 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-dim)] shrink-0">
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[var(--text-muted)] sm:h-10 sm:w-10 sm:rounded-xl">
               {isInternal ? <ProductDataIcon size={16} /> : <ProductsIcon size={16} />}
             </div>
-            <h1 className="text-xl md:text-[22px] font-bold tracking-tight truncate">
+            <h1 className="text-xl font-bold tracking-tight truncate md:sr-only">
               {isInternal ? t("list.productData") : t("list.products")}
             </h1>
             {/* Count and rate ride the TITLE line instead of owning a row of
@@ -2072,7 +2139,7 @@ export default function ProductList() {
             4px under the app header when pinned — on a phone that read as the
             two bars touching. Its measured height feeds --kx-pd-tools-h, which
             is what the category nav below pins to. */}
-        <div ref={toolbarRef} className="kx-bar-host sticky top-0 z-30 -mx-4 md:-mx-6 lg:-mx-8 px-4 md:px-6 lg:px-8 pt-2 pb-2 mb-3 bg-[var(--bg-primary)]">
+        <div ref={toolbarRef} className="kx-bar-host kx-pd-toolbar sticky top-0 z-30 -mx-4 md:-mx-6 lg:-mx-8 px-4 md:px-6 lg:px-8 pt-2 pb-2 mb-3 bg-[var(--bg-primary)]">
           {/* NO layer of its own. This bar sits inside the category nav's
               ramp, which now reaches up over it (--kx-ramp-top) — one
               blurred edge for the whole top strip, owner's rule: "you are
@@ -2088,8 +2155,15 @@ export default function ProductList() {
           <div className="flex flex-wrap gap-3">
             <div className="relative basis-full sm:basis-0 sm:flex-1 min-w-0" ref={searchBoxRef}>
               <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[var(--text-dim)] z-10" />
+              {/* role="combobox": this input already carries
+                  aria-autocomplete and aria-expanded and drives a suggestion
+                  list with the arrow keys, but a bare <input> is a textbox,
+                  where neither property is allowed — so assistive tech was
+                  being told about a listbox it had no way to reach. */}
               <input
                 type="search"
+                role="combobox"
+                aria-controls="pl-search-suggestions"
                 value={search}
                 onChange={(e) => { setSearch(e.target.value); setSearchOpen(true); }}
                 onFocus={() => setSearchOpen(true)}
@@ -2116,7 +2190,7 @@ export default function ProductList() {
                 title={t("list.searchAria")}
                 aria-autocomplete="list"
                 aria-expanded={searchOpen && suggestions.length > 0}
-                className="w-full h-10 pl-10 pr-10 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-dim)] outline-none transition-[border-color,box-shadow] focus:border-[#567FB2]/60 focus:shadow-[0_0_0_4px_rgba(86,127,178,0.16)] [&::-webkit-search-cancel-button]:hidden"
+                className="kx-ph-search w-full h-11 pl-10 pr-10 rounded-xl bg-[var(--bg-card)] border border-[var(--border-subtle)] text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-dim)] outline-none transition-colors duration-200 [&::-webkit-search-cancel-button]:hidden"
               />
               {/* Clear button — only when there's text. Native input
                   type=search clear button is inconsistent across
@@ -2139,6 +2213,7 @@ export default function ProductList() {
                   active row, Enter applies, Escape closes. */}
               {searchOpen && suggestions.length > 0 && (
                 <div
+                  id="pl-search-suggestions"
                   role="listbox"
                   className="kx-glass-pop absolute left-0 right-0 top-[calc(100%+8px)] z-40 max-h-[420px] overflow-y-auto rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-subtle)] shadow-2xl"
                 >
@@ -2676,7 +2751,7 @@ export default function ProductList() {
                    --kx-ramp-fade must be a LENGTH here, not the default 45%:
                    a percentage is taken from the layer's own height, so once
                    the layer grew to cover the strip the fade grew with it. */
-                className="kx-bar-host sticky z-20 -mx-4 md:-mx-6 lg:-mx-8 px-4 md:px-6 lg:px-8 pt-1.5 pb-3.5 mb-5 bg-[var(--bg-primary)] [--kx-ramp-ext:1rem] [--kx-ramp-fade:4rem]"
+                className="kx-bar-host max-sm:static sticky z-20 -mx-4 md:-mx-6 lg:-mx-8 px-4 md:px-6 lg:px-8 pt-1.5 pb-3.5 mb-5 bg-[var(--bg-primary)] [--kx-ramp-ext:1rem] [--kx-ramp-fade:4rem]"
                 data-kx-progressive=""
                 aria-label="Categories"
               >
@@ -2697,15 +2772,21 @@ export default function ProductList() {
                     instead of ~380px. From `sm` up the tile grid is unchanged.
                     One DOM tree, responsive classes: no duplicated markup and
                     no second copy for screen readers to read out. */}
-                {/* THE PILL ROW IS NOW THE ONLY LAYOUT, not the phone fallback.
-                    The 88px tile grid was already replaced below `sm` for the
-                    exact reason it fails everywhere: it is the largest object
-                    on the page and it is NAVIGATION, not content. On a laptop
-                    it pushed the first product to 597px of a 686px viewport.
-                    Same DOM, same links, same icons — one row that scrolls,
-                    ~44px instead of ~200px, and identical on every size, which
-                    also removes a whole breakpoint's worth of divergence. */}
-                <div className="flex gap-2 overflow-x-auto pb-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                {/* UNIFORM GRID, owner's pick (2026-08-20, sample 2 of 4):
+                    "I don't want have scrolling, I want all can show in the
+                    page with organize way." Every category is visible — equal
+                    columns, names truncating, counts on the trailing edge —
+                    instead of the one scrolling pill row.
+
+                    History, because this bar has flip-flopped: the original
+                    88px tile grid died for pushing the first product to 597px
+                    of a 686px viewport; the scrolling row that replaced it is
+                    what the owner has now rejected. This grid is the middle:
+                    ~2–3 rows of 38px on a laptop (~130px), never a sideways
+                    scroll. On phones the same grid runs 2-up (~7 rows), so
+                    there the bar goes STATIC (max-sm) — a ~320px block may
+                    scroll away with the page, but it must not DOCK over it. */}
+                <div className="hidden sm:grid grid-cols-[repeat(auto-fill,minmax(178px,1fr))] gap-2 pb-0.5">
                   {categoryTree.map((cat) => (
                     <a
                       key={cat.slug}
@@ -2713,21 +2794,126 @@ export default function ProductList() {
                       onClick={(e) => {
                         e.preventDefault();
                         const el = document.getElementById(`cat-${cat.slug}`);
-                        if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+                        const sc = document.getElementById("main-scroll-container");
+                        const navEl = e.currentTarget.closest("nav");
+                        if (!el || !sc) return;
+                        /* scrollIntoView put the title BEHIND the docked
+                           chrome (owner: "it didn't take me to the right
+                           place"): block:"start" aligns the section with the
+                           scroller's top edge, and the sticky grid + tools
+                           row then cover exactly that strip. The offset is
+                           measured, not hardcoded, because the grid's height
+                           is 2–3 rows depending on viewport — and on phones
+                           the bar is static, so only a small clearance. */
+                        const stuck = navEl && getComputedStyle(navEl).position === "sticky";
+                        const offset = stuck
+                          ? navEl.getBoundingClientRect().height +
+                            (parseFloat(getComputedStyle(navEl).top) || 0) + 8
+                          : 60;
+                        const targetTop = () =>
+                          el.getBoundingClientRect().top - sc.getBoundingClientRect().top + sc.scrollTop - offset;
+                        sc.scrollTo({ top: targetTop(), behavior: "smooth" });
+                        /* Second half of the miss: the sections render with
+                           content-visibility:auto, so everything below the
+                           fold has an ESTIMATED height until it paints. The
+                           first scroll lands on the estimate; as the passed
+                           sections materialize, the real target moves. Wait
+                           for the scroll to stop (scrollTop stable across a
+                           few frames — works whether or not the browser has
+                           scrollend), then snap the residual error. Bounded:
+                           at most 4 corrections and ~5s of frames, and a
+                           user grabbing the scrollbar mid-flight just makes
+                           the loop finish early. */
+                        let last = -1, still = 0, passes = 0, frames = 0;
+                        const settle = () => {
+                          if (++frames > 300) return;
+                          const cur = sc.scrollTop;
+                          if (cur === last) still += 1; else { still = 0; last = cur; }
+                          if (still >= 3) {
+                            const diff = targetTop() - cur;
+                            if (Math.abs(diff) <= 4 || passes >= 4) return;
+                            passes += 1; still = 0;
+                            sc.scrollTop = cur + diff;
+                          }
+                          requestAnimationFrame(settle);
+                        };
+                        requestAnimationFrame(settle);
                       }}
-                      className="group relative flex flex-row items-center justify-start gap-1.5 h-[36px] w-auto shrink-0 px-3 rounded-full kx-glass bg-[var(--bg-card)] border border-white/[0.06] kx-hover-card kx-hover-tile kx-tile-neon select-none transition-transform duration-75 active:scale-[0.97] motion-reduce:transition-none motion-reduce:active:scale-100"
+                      className={`group relative flex flex-row items-center justify-start gap-1.5 h-[38px] min-w-0 px-3 rounded-xl kx-glass bg-[var(--bg-card)] border border-white/[0.06] kx-hover-card kx-hover-tile kx-tile-neon select-none transition-transform duration-75 active:scale-[0.97] motion-reduce:transition-none motion-reduce:active:scale-100`}
                     >
                       {classIcons.category?.[cat.slug] ? (
                         <ClassMonoIcon src={classIcons.category[cat.slug]} className="kx-neon-icon h-4 w-4 shrink-0 text-[var(--text-primary)] opacity-90" />
                       ) : (
                         <LayoutGridIcon className="kx-neon-svg h-4 w-4 shrink-0 text-[var(--text-primary)] opacity-90" />
                       )}
-                      <span className="kx-neon-label text-[11px] font-medium leading-none whitespace-nowrap text-[var(--text-muted)]">{cat.name}</span>
+                      <span className="kx-neon-label flex-1 min-w-0 truncate text-[11px] font-medium leading-none text-[var(--text-muted)]">{cat.name}</span>
                       {/* The count earns the pill its keep: the row is now
                           navigation AND a size read, which the tile never was. */}
                       <span className="text-[10px] tabular-nums text-[var(--text-ghost)] shrink-0">{cat.total}</span>
                     </a>
                   ))}
+                </div>
+                {/* ── PHONES: ONE 40px row + the MN-5 dropdown ──
+                    Third phone layout for this nav, and the owner rejected
+                    the previous two on sight (the full grid ate half the
+                    viewport; the two-row collapse was "still don't like").
+                    Sample 1 of the mobile set: the row names the control,
+                    the tap opens the one canonical dropdown (kx-glass-pop
+                    material + kx-pop-panel shell, per MN-5) listing every
+                    category with its count; picking one jumps and closes.
+                    Desktop keeps the sample-2 grid untouched. */}
+                <div className="sm:hidden relative">
+                  <button
+                    type="button"
+                    aria-expanded={catsOpen}
+                    data-kx-cats-trigger=""
+                    onClick={() => setCatsOpen((o) => !o)}
+                    className="w-full flex items-center gap-2 h-10 px-3 rounded-xl kx-glass bg-[var(--bg-card)] border border-white/[0.06] select-none active:scale-[0.99] transition-transform"
+                  >
+                    <LayoutGridIcon className="h-4 w-4 shrink-0 text-[var(--text-primary)] opacity-90" />
+                    <span className="flex-1 text-start text-[12px] font-medium text-[var(--text-primary)]">
+                      {t("list.allCategories")}
+                    </span>
+                    <span className="text-[11px] tabular-nums text-[var(--text-ghost)]">{categoryTree.length}</span>
+                    <span aria-hidden className={`text-[11px] text-[var(--text-ghost)] transition-transform ${catsOpen ? "rotate-180" : ""}`}>⌄</span>
+                  </button>
+                  {catsOpen && (
+                    <>
+                      {/* NO fixed full-screen closer. The first version put an
+                          invisible fixed button over the viewport; dragging on
+                          a fixed element scrolls ITS scrollable ancestor — the
+                          body, which in this shell never scrolls — so with the
+                          panel open every touch-drag went dead. Outside-tap
+                          closing is a document listener instead (below), which
+                          eats nothing. */}
+                      <div className="kx-glass-pop kx-pop-panel kx-pop-dense absolute left-0 right-0 top-[calc(100%+6px)] z-50 max-h-[60vh] overflow-y-auto p-1.5 rounded-2xl" data-kx-cats-menu="">
+                        {categoryTree.map((cat) => (
+                          <a
+                            key={cat.slug}
+                            href={`#cat-${cat.slug}`}
+                            onClick={(e) => {
+                              e.preventDefault();
+                              setCatsOpen(false);
+                              const el = document.getElementById(`cat-${cat.slug}`);
+                              const sc = document.getElementById("main-scroll-container");
+                              if (!el || !sc) return;
+                              const top = el.getBoundingClientRect().top - sc.getBoundingClientRect().top + sc.scrollTop - 60;
+                              sc.scrollTo({ top, behavior: "smooth" });
+                            }}
+                            className="flex items-center gap-2 h-10 px-2.5 rounded-lg text-[12px] text-[var(--text-secondary)]"
+                          >
+                            {classIcons.category?.[cat.slug] ? (
+                              <ClassMonoIcon src={classIcons.category[cat.slug]} className="h-4 w-4 shrink-0 text-[var(--text-primary)] opacity-90" />
+                            ) : (
+                              <LayoutGridIcon className="h-4 w-4 shrink-0 text-[var(--text-primary)] opacity-90" />
+                            )}
+                            <span className="flex-1 min-w-0 truncate">{cat.name}</span>
+                            <span className="text-[10px] tabular-nums text-[var(--text-ghost)]">{cat.total}</span>
+                          </a>
+                        ))}
+                      </div>
+                    </>
+                  )}
                 </div>
               </nav>
             )}
@@ -2735,7 +2921,12 @@ export default function ProductList() {
           {/* 8, not 14: each section now carries 24px of its own bottom padding
               so its cards' hover glow is not clipped by paint containment
               (see SECTION_CV). 32 + 24 = the 56px this used to be. */}
-          <div className="space-y-8">
+          {/* kx-flat-items: every product card below loses its blur pass and
+              keeps its surface — one attribute covering all category
+              sections at once. See the rule in globals for the measurement
+              (cards flashing blank on a fast scroll: hundreds of live blur
+              layers per frame). */}
+          <div className="kx-flat-items space-y-8">
           {categoryTree.map((cat) => (
             /* Every section renders; content-visibility:auto skips the paint +
                layout of the offscreen ones. This replaced a progressive-mount

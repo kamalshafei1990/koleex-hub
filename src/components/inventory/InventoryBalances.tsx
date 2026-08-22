@@ -10,6 +10,7 @@
    --------------------------------------------------------------------------- */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useWarmData } from "@/lib/warm-cache";
 import { useTranslation } from "@/lib/i18n";
 import { inventoryT } from "@/lib/translations/inventory";
 import InventoryHeader from "@/components/inventory/InventoryHeader";
@@ -60,21 +61,23 @@ function fmtQty(n: number) {
   return Number(n ?? 0).toLocaleString("en-US", { maximumFractionDigits: 4 });
 }
 
+type BalancesSnap = {
+  rows: Balance[];
+  drilled: DrilledRow[];
+  warehouses: Warehouse[];
+  /* Entry pairs, not Maps — see the loader. */
+  variantNames: Array<[string, string]>;
+  batchNos: Array<[string, string]>;
+};
+
 export default function InventoryBalances() {
   const { t } = useTranslation(inventoryT);
-  const [rows, setRows] = useState<Balance[]>([]);
-  const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
   const [filterWh, setFilterWh] = useState("");
   const [onlyPositive, setOnlyPositive] = useState(true);
   const [search, setSearch] = useState("");
   const [searchKey, setSearchKey] = useState("");
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   /* INV-H4A — group-by control. */
   const [groupBy, setGroupBy] = useState<GroupBy>("item");
-  const [drilled, setDrilled] = useState<DrilledRow[]>([]);
-  const [variantNames, setVariantNames] = useState<Map<string, string>>(new Map());
-  const [batchNos, setBatchNos] = useState<Map<string, string>>(new Map());
 
   /* Debounced search. */
   const debounceRef = useRef<number | null>(null);
@@ -84,10 +87,7 @@ export default function InventoryBalances() {
     return () => { if (debounceRef.current) window.clearTimeout(debounceRef.current); };
   }, [search]);
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
+  const fetchAll = useCallback(async (): Promise<BalancesSnap> => {
       const qs = new URLSearchParams();
       if (filterWh) qs.set("warehouse_id", filterWh);
       if (onlyPositive) qs.set("only_positive", "1");
@@ -99,13 +99,16 @@ export default function InventoryBalances() {
       const bJ = await bRes.json();
       const wJ = await wRes.json();
       if (!bRes.ok) throw new Error(bJ.error ?? `Failed (${bRes.status})`);
+      const snap: BalancesSnap = {
+        rows: [], drilled: [], warehouses: (wJ.warehouses ?? []) as Warehouse[],
+        variantNames: [], batchNos: [],
+      };
       if (groupBy === "item") {
-        setRows((bJ.balances ?? []) as Balance[]);
-        setDrilled([]);
+        snap.rows = (bJ.balances ?? []) as Balance[];
       } else {
-        setDrilled((bJ.balances ?? []) as DrilledRow[]);
-        setRows([]);
-        /* Build a lookup for variant + batch names. */
+        snap.drilled = (bJ.balances ?? []) as DrilledRow[];
+        /* Build a lookup for variant + batch names. Stored as entry PAIRS,
+           not Maps: the warm cache is JSON, and a Map serialises to {}. */
         const variantIds = Array.from(new Set(((bJ.balances ?? []) as DrilledRow[]).map((r) => r.variant_id).filter(Boolean) as string[]));
         const batchIds   = Array.from(new Set(((bJ.balances ?? []) as DrilledRow[]).map((r) => r.batch_id).filter(Boolean) as string[]));
         const [vJ, btJ] = await Promise.all([
@@ -116,22 +119,28 @@ export default function InventoryBalances() {
             ? fetch(`/api/inventory/batches?limit=500`, { credentials: "include", cache: "no-store" }).then((r) => r.json())
             : Promise.resolve({ batches: [] }),
         ]);
-        const vm = new Map<string, string>();
-        for (const v of (vJ.variants ?? []) as Array<{ id: string; variant_name: string }>) vm.set(v.id, v.variant_name);
-        const bm = new Map<string, string>();
-        for (const b of (btJ.batches ?? []) as Array<{ id: string; batch_no: string }>) bm.set(b.id, b.batch_no);
-        setVariantNames(vm);
-        setBatchNos(bm);
+        snap.variantNames = ((vJ.variants ?? []) as Array<{ id: string; variant_name: string }>)
+          .map((v) => [v.id, v.variant_name] as [string, string]);
+        snap.batchNos = ((btJ.batches ?? []) as Array<{ id: string; batch_no: string }>)
+          .map((b) => [b.id, b.batch_no] as [string, string]);
       }
-      setWarehouses((wJ.warehouses ?? []) as Warehouse[]);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
-    } finally {
-      setLoading(false);
-    }
+      return snap;
   }, [filterWh, onlyPositive, groupBy]);
 
-  useEffect(() => { void load(); }, [load]);
+  /* ONLY THE DEFAULT VIEW IS WARMED. filterWh/onlyPositive/groupBy are sent
+     to the server, so a cached filtered answer would repaint as if it were
+     the whole balance sheet the next time this tab opens. An empty key opts
+     this render out entirely — a filtered view loads the honest way. */
+  const isDefaultView = filterWh === "" && onlyPositive && groupBy === "item";
+  const { data, loading, error: loadError, reload: load } =
+    useWarmData<BalancesSnap>(isDefaultView ? "inv:balances" : "", fetchAll);
+  const rows = useMemo(() => data?.rows ?? [], [data]);
+  const drilled = useMemo(() => data?.drilled ?? [], [data]);
+  const warehouses = useMemo(() => data?.warehouses ?? [], [data]);
+  const variantNames = useMemo(() => new Map(data?.variantNames ?? []), [data]);
+  const batchNos = useMemo(() => new Map(data?.batchNos ?? []), [data]);
+  const error = loadError ? (loadError instanceof Error ? loadError.message : String(loadError)) : null;
+
 
   const whMap = useMemo(() => {
     const m = new Map<string, Warehouse>();

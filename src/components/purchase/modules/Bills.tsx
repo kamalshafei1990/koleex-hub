@@ -5,9 +5,9 @@
    paid) and overdue computation, just on the AP (accounts payable)
    side instead of AR. */
 
-import { useCallback, useEffect, useState } from "react";
-import type { PurchaseModuleProps } from "../shared";
-import { cardCls, formatMoney, formatDate, sectionTitleCls, STATUS_TONE_BILL } from "../shared";
+import { useMemo, useState } from "react";
+import type { PurchaseModuleProps, SupplierRef } from "../shared";
+import { cardCls, formatMoney, formatDate, sectionTitleCls, STATUS_TONE_BILL, supplierNames, usePurchaseList } from "../shared";
 import { NewBillDialog } from "../dialogs";
 import DocumentIcon from "@/components/icons/ui/DocumentIcon";
 import PlusIcon from "@/components/icons/ui/PlusIcon";
@@ -22,27 +22,10 @@ type Bill = {
 };
 
 export default function BillsModule({ t }: PurchaseModuleProps) {
-  const [rows, setRows] = useState<Bill[]>([]);
-  const [supplierName, setSupplierName] = useState<Map<string, string>>(new Map());
-  const [loading, setLoading] = useState(true);
   const [newOpen, setNewOpen] = useState(false);
-
-  const load = useCallback(async () => {
-    const res = await fetch("/api/purchase/list?resource=bills", { credentials: "include" });
-    const data = (res.ok ? await res.json() : { rows: [], suppliers: [] }) as {
-      rows: Bill[];
-      suppliers: { id: string; display_name: string | null; company_name: string | null; full_name: string | null }[];
-    };
-    setRows(data.rows);
-    const m = new Map<string, string>();
-    for (const c of data.suppliers) {
-      m.set(c.id, c.company_name || c.display_name || c.full_name || "—");
-    }
-    setSupplierName(m);
-    setLoading(false);
-  }, []);
-
-  useEffect(() => { load(); }, [load]);
+  const { data, loading, reload: load } = usePurchaseList<{ rows: Bill[]; suppliers: SupplierRef[] }>("bills");
+  const rows = data?.rows ?? [];
+  const supplierName = useMemo(() => supplierNames(data?.suppliers), [data]);
 
   if (loading) return <div className="h-full flex items-center justify-center text-[var(--text-dim)]"><SpinnerIcon size={20} /></div>;
 

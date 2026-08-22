@@ -36,7 +36,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
      start_date/created_at  the template's own first period
 */
 type OpenRow = {
-  id: string; status: string | null; completed: boolean | null;
+  id: string; title: string | null; status: string | null; completed: boolean | null;
   approval_state: string | null;
   recurrence: string | null; recurrence_parent_id: string | null;
   recurrence_spawned_for: string | null; start_date: string | null; created_at: string | null;
@@ -53,16 +53,32 @@ export async function countOpenTodos(
   accountId: string,
   tenantId: string | null | undefined,
 ): Promise<number> {
+  return (await openTodoItems(db, accountId, tenantId)).length;
+}
+
+/** One open item, as the dashboard's To-do list card shows it. */
+export type OpenTodoItem = { id: string; title: string; createdAt: string | null };
+
+/**
+ * The open items themselves — THE SAME set countOpenTodos counts, so a list
+ * card and the count badge can never disagree (the 36-over-an-empty-list bug
+ * family: two answers to one question IS the defect).
+ */
+export async function openTodoItems(
+  db: SupabaseClient,
+  accountId: string,
+  tenantId: string | null | undefined,
+): Promise<OpenTodoItem[]> {
   const { data: mine } = await db
     .from("koleex_todo_assignees")
     .select("todo_id")
     .eq("account_id", accountId);
   const ids = (mine ?? []).map((r) => (r as { todo_id: string }).todo_id);
-  if (ids.length === 0) return 0;
+  if (ids.length === 0) return [];
 
   let q = db
     .from("koleex_todos")
-    .select("id, status, completed, approval_state, recurrence, recurrence_parent_id, recurrence_spawned_for, start_date, created_at")
+    .select("id, title, status, completed, approval_state, recurrence, recurrence_parent_id, recurrence_spawned_for, start_date, created_at")
     .in("id", ids)
     .neq("status", "done");
   /* ⚠️ The tenant filter was missing from the badge's own version. `ids` comes
@@ -72,8 +88,8 @@ export async function countOpenTodos(
 
   const { data, error } = await q;
   if (error) {
-    console.error("[countOpenTodos]", error.message);
-    return 0;
+    console.error("[openTodoItems]", error.message);
+    return [];
   }
 
   const rows = (data ?? []) as OpenRow[];
@@ -98,8 +114,11 @@ export async function countOpenTodos(
   const periodOf = (r: OpenRow) =>
     r.recurrence_spawned_for ?? r.start_date ?? (r.created_at ?? "").slice(0, 10);
 
+  const toItem = (r: OpenRow): OpenTodoItem =>
+    ({ id: r.id, title: r.title || "Untitled task", createdAt: r.created_at });
+
   const series = rows.filter((r) => cadenceOf(r));
-  if (series.length === 0) return rows.length;
+  if (series.length === 0) return rows.map(toItem);
 
   /* Only asked for when a series is involved — most callers never pay it. */
   const { data: noteRows } = await db
@@ -126,5 +145,5 @@ export async function countOpenTodos(
       r.approval_state !== null ||
       hasNote.has(r.id)
     );
-  }).length;
+  }).map(toItem);
 }

@@ -324,7 +324,7 @@ export default function ClassificationManager() {
 
         {/* Toolbar */}
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-          <div className="flex flex-1 items-center gap-2 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-card)] px-3.5 py-2.5 focus-within:border-[var(--border-focus)]">
+          <div className="flex flex-1 items-center gap-2 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] px-3.5 py-2.5 focus-within:border-[var(--border-focus)]">
             <SearchIcon size={14} className="shrink-0 text-[var(--text-dim)]" />
             <input value={q} onChange={(e) => setQ(e.target.value)} placeholder={t("vl.class.search", "Search {x}…").replace("{x}", lvlLabel)}
               className="min-w-0 flex-1 bg-transparent text-[13px] outline-none placeholder:text-[var(--text-dim)]" />
@@ -342,7 +342,7 @@ export default function ClassificationManager() {
         )}
 
         {adding && !isTypes && (
-          <div className="flex items-center gap-2 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-card)] px-3 py-2">
+          <div className="flex items-center gap-2 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] px-3 py-2">
             <input autoFocus value={newName} onChange={(e) => setNewName(e.target.value)}
               onKeyDown={(e) => { if (e.key === "Enter") create(); if (e.key === "Escape") { setAdding(false); setNewName(""); } }}
               placeholder={t("vl.class.newNamePh", "New {x} name…").replace("{x}", oneLabel)}
@@ -430,14 +430,14 @@ function ClassificationCard({
           <input autoFocus value={editName} onChange={(e) => onEditName(e.target.value)}
             onKeyDown={(e) => { if (e.key === "Enter") onCommitRename(); if (e.key === "Escape") onCancelRename(); }}
             onBlur={onCommitRename}
-            className="w-full rounded border border-[var(--border-focus)] bg-[var(--bg-card)] px-1.5 py-1 text-[11px] text-[var(--text-primary)] outline-none" />
+            className="w-full rounded border border-[var(--border-focus)] bg-[var(--bg-secondary)] px-1.5 py-1 text-[11px] text-[var(--text-primary)] outline-none" />
         </div>
       ) : (
         <button type="button" onClick={onDrill ?? onOpenIcon} className="flex flex-col items-start gap-0.5 border-t border-[var(--border-subtle)] px-2 py-1.5 text-left">
           <div className="flex w-full items-center justify-between gap-1.5">
             <span className="truncate text-[11px] font-medium text-[var(--text-primary)]">{item.name}</span>
             {count !== undefined ? (
-              <span className="shrink-0 rounded-full bg-[var(--bg-card)] px-1.5 text-[9px] font-semibold tabular-nums text-[var(--text-dim)]">{count}</span>
+              <span className="shrink-0 rounded-full bg-[var(--bg-secondary)] px-1.5 text-[9px] font-semibold tabular-nums text-[var(--text-dim)]">{count}</span>
             ) : level === "types" ? (
               <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--text-dim)] opacity-40" />
             ) : null}
@@ -476,7 +476,7 @@ function MonoImg({ src, className }: { src: string; className?: string }) {
 function CardBtn({ children, title, onClick, tone }: { children: React.ReactNode; title: string; onClick: () => void; tone?: "rose" }) {
   return (
     <button type="button" title={title} onClick={onClick}
-      className={`flex h-6 w-6 items-center justify-center rounded-md border border-[var(--border-subtle)] bg-[var(--bg-card)]/90 text-[var(--text-dim)] backdrop-blur hover:text-[var(--text-primary)] ${tone === "rose" ? "hover:text-rose-400" : ""}`}>
+      className={`flex h-6 w-6 items-center justify-center rounded-md border border-[var(--border-subtle)] bg-[var(--bg-secondary)]/90 text-[var(--text-dim)] backdrop-blur hover:text-[var(--text-primary)] ${tone === "rose" ? "hover:text-rose-400" : ""}`}>
       {children}
     </button>
   );
@@ -551,7 +551,7 @@ function IconPicker({ onClose, onPick }: { onClose: () => void; onPick: (icon: V
 
   return (
     <div className="fixed inset-0 z-[140] flex items-start justify-center bg-black/60 backdrop-blur-sm pt-20" onClick={onClose}>
-      <div className="w-full max-w-md rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-card)] p-4" onClick={(e) => e.stopPropagation()}>
+      <div className="w-full max-w-md rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] p-4" onClick={(e) => e.stopPropagation()}>
         <div className="mb-2 flex items-center justify-between">
           <span className="text-[12px] font-semibold text-[var(--text-primary)]">{t("vl.class.pickTitle", "Choose an icon from the Visual Library")}</span>
           <button type="button" onClick={onClose} className="text-[var(--text-dim)] hover:text-[var(--text-primary)]"><CrossIcon size={14} /></button>

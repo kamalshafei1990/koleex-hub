@@ -254,6 +254,15 @@ export const APP_REGISTRY: AppDef[] = [
      redirects here so existing deep-links keep working). */
   { id: "issue-reports",    tKey: "app.issueReports",     name: "Issue Reports",     icon: ExclamationIcon, route: "/issues", active: true, newSince: "2026-08-07" },
   { id: "ai",               tKey: "app.ai",               name: "AI",                icon: KoleexOrbIcon,  route: "/ai",            active: true  },
+  /* AI KNOWLEDGE IS A MODULE, NOT A TILE. It is reached from inside the AI
+     app, so it must not appear in the launcher — but it needs a registry
+     entry all the same, because that is what makes it grantable in Roles &
+     Permissions. Without one the only expressible states were "super admin
+     only" or "every internal user", and the owner asked for the third:
+     his by default, and grantable to named accounts.
+     Deny-by-default like every other module (no openAccess): a role with no
+     row cannot read the AI's knowledge corpus, and super admins always can. */
+  { id: "ai-knowledge",     tKey: "app.aiKnowledge",      name: "AI Knowledge",      icon: KnowledgeIcon,  route: "/ai/knowledge",  active: true, hideFromLauncher: true },
 
   /* ── System ── */
   { id: "accounts",         tKey: "app.accounts",         name: "Accounts",          icon: AccountsIcon,  route: "/accounts",         active: true  },
@@ -268,7 +277,14 @@ export const APP_REGISTRY: AppDef[] = [
   { id: "price-calculator", tKey: "app.price-calculator", name: "Price Calculator",  icon: PriceCalculatorIcon, route: "/price-calculator", active: true  },
   /* Brands is NOT an app — it lives inside Database → Visual Library
      (/database/brands). Intentionally not registered here. */
-  { id: "dashboard",        tKey: "app.dashboard",        name: "Dashboard",         icon: AppsIcon,    route: "/dashboard",        active: false },
+  /* Dashboard — ACTIVE behind the same dark-launch gate as its page: the
+     registry flips with the flag, so a sibling push cannot expose it in
+     production (launcher entry + roles module + page all appear together).
+     openAccess: the app itself is open to everyone — every widget inside is
+     already gated per-module by /api/dashboard, so the app shows each person
+     only what their role can see. */
+  { id: "dashboard",        tKey: "app.dashboard",        name: "Dashboard",         icon: AppsIcon,    route: "/dashboard",
+    active: process.env.NEXT_PUBLIC_HOME_DASHBOARD === "1" || process.env.NODE_ENV === "development", openAccess: true },
 ];
 
 /* ═══════════════════════════════════════════════════
@@ -288,7 +304,7 @@ export const SIDEBAR_GROUPS: SidebarGroup[] = [
     tKey: "cat.commercial",
     label: "Commercial",
     icon: CommercialSidebarIcon,
-    appIds: ["customers", "suppliers", "quotations", "invoices", "sales", "travel", "crm", "contacts", "markets", "price-calculator", "website"],
+    appIds: ["customers", "suppliers", "quotations", "invoices", "sales", "crm", "contacts", "markets", "price-calculator", "website"],
   },
   {
     id: "finance",
@@ -320,7 +336,7 @@ export const SIDEBAR_GROUPS: SidebarGroup[] = [
     tKey: "cat.planning",
     label: "Planning",
     icon: PlanningSidebarIcon,
-    appIds: ["planning", "projects"],
+    appIds: ["planning", "projects", "travel"],
   },
   {
     id: "knowledge",

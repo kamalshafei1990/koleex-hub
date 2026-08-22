@@ -28,6 +28,8 @@ import { PRODUCTS_UI_I18N } from "@/lib/products-ui-i18n";
 import { fetchClassificationIcons } from "@/lib/products-admin";
 import { fetchIconBindings, type BindingsMap } from "@/lib/visual-bindings";
 import ArrowLeftIcon from "@/components/icons/ui/ArrowLeftIcon";
+import { BACK_CHROME } from "@/components/ui/PageHeader";
+import RrIcon from "@/components/ui/RrIcon";
 import PencilIcon from "@/components/icons/ui/PencilIcon";
 import BoundIcon from "@/components/common/BoundIcon";
 import Drawer from "@/components/kds/Drawer";
@@ -47,8 +49,11 @@ import CrossIcon from "@/components/icons/ui/CrossIcon";
 import AngleDownIcon from "@/components/icons/ui/AngleDownIcon";
 import AngleRightIcon from "@/components/icons/ui/AngleRightIcon";
 import TabStrip from "@/components/ui/TabStrip";
+import { useTabMotion } from "@/components/ui/useTabMotion";
+import Collapse from "@/components/ui/Collapse";
 import dynamic from "next/dynamic";
 import { useSkin } from "@/lib/appearance";
+import FeatureHighlightsDisplay from "./FeatureHighlightsDisplay";
 
 const WavyBackground = dynamic(() => import("@/components/ui/WavyBackground"), { ssr: false });
 
@@ -368,11 +373,13 @@ function Val({ v, mono }: { v: unknown; mono?: boolean }) {
 /* The editor's Section card, field-for-field: icon in a rounded square,
    title, optional badge, collapse chevron. */
 function Group({
-  icon, title, count, onEdit, children,
-}: { icon?: React.ReactNode; title: string; count?: string; onEdit?: () => void; children: React.ReactNode }) {
+  icon, title, count, onEdit, children, motion = "kx-tab-in",
+}: { icon?: React.ReactNode; title: string; count?: string; onEdit?: () => void; children: React.ReactNode;
+  /** Entrance class — the profile passes useTabMotion's directional pick. */
+  motion?: string }) {
   const [open, setOpen] = useState(true);
   return (
-    <section className="kx-tab-in scroll-mt-24 bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] overflow-hidden transition-shadow hover:shadow-[0_2px_12px_rgba(0,0,0,0.15)]">
+    <section className={`${motion} scroll-mt-24 bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] overflow-hidden transition-shadow hover:shadow-[0_2px_12px_rgba(0,0,0,0.15)]`}>
       <div className="w-full flex items-center gap-3 px-6 py-4">
         <div className="h-8 w-8 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-secondary)] shrink-0">
           {icon}
@@ -390,7 +397,9 @@ function Group({
           <AngleDownIcon className={`h-4 w-4 transition-transform duration-300 ${open ? "rotate-180" : ""}`} />
         </button>
       </div>
-      {open && <div className="px-6 pb-6 pt-4 border-t border-[var(--border-subtle)]">{children}</div>}
+      <Collapse open={open} className="px-6 pb-6 pt-4 border-t border-[var(--border-subtle)]">
+        {children}
+      </Collapse>
     </section>
   );
 }
@@ -403,6 +412,8 @@ const STEPS = [
   { id: "classify",   short: "Classify" },
   { id: "supplier",   short: "Supplier" },
   { id: "identity",   short: "Hero" },
+  /* Owner call 2026-08-21: highlights get their OWN tab right after Hero. */
+  { id: "highlights", short: "Highlights" },
   { id: "specs",      short: "Specs" },
   { id: "commercial", short: "Variants" },
   { id: "pricing",    short: "Price" },
@@ -500,8 +511,6 @@ function Row({ label, value, help, mono, badge, iconSrc }: {
 
 const rows = "divide-y divide-[var(--border-subtle)]";
 
-const grid = "grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-x-5 gap-y-4";
-
 export default function ProductProfile() {
   const params = useParams<{ id: string }>();
   const handle = params?.id;
@@ -513,6 +522,9 @@ export default function ProductProfile() {
   const [historyFor, setHistoryFor] = useState<{ id: string; name: string } | null>(null);
   NOT_SET = t("pp.notSet", "Not set");
   const [step, setStep] = useState(0);
+  /* Directional pane swap (owner pick 3A): forward slides from the end,
+     back from the start; RTL flips in CSS. Fed to every Group below. */
+  const tabMotion = useTabMotion(step);
   const [error, setError] = useState<string | null>(null);
   /* Family focus — which member the record is spotlighting. -1 = family
      view. Seeded from ?model= (card chips and search deep-link here);
@@ -608,12 +620,19 @@ export default function ProductProfile() {
          record. A slim identity strip keeps "what am I looking at?" answered
          without pushing the tabs down the page. */}
       <div className="flex items-center gap-3 mb-3 min-w-0">
+        {/* THE HUB'S BACK CONTROL, borrowed rather than re-styled. This strip
+            stays slim on purpose — a full hero here would push the tabs down
+            the page, which is the whole reason it exists — but the control
+            itself was a 32x32 icon-only square while every other screen in
+            the Hub uses a chip that NAMES where it goes. Same recipe now,
+            same answer to "back to what". */}
         <Link
           href="/product-data"
           aria-label={t("pp.back", "Back to Product Data")}
-          className="kx-glass kx-hover-glow h-8 w-8 rounded-lg bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-all shrink-0"
+          className={BACK_CHROME}
         >
-          <ArrowLeftIcon className="h-3.5 w-3.5" />
+          <RrIcon name="arrow-left" size={14} />
+          <span className="hidden text-[12px] font-medium sm:inline">{t("pp.backShort", "Product Data")}</span>
         </Link>
         <h1 className="text-[15px] font-semibold text-[var(--text-primary)] truncate">
           {(s2("product_name") as string) || t("pp.untitled", "Untitled product")}
@@ -825,7 +844,7 @@ export default function ProductProfile() {
 
       {/* ── Step panels — one at a time, exactly like the editor ── */}
       {STEPS[step].id === "classify" && (
-      <Group icon={<BoundIcon semanticKey="field.category" className="h-4 w-4" fallback={<FolderTreeIcon className="h-4 w-4" />} />} title={t("pp.sec.classification", "Classification")} onEdit={() => goStep("classify")}>
+      <Group motion={tabMotion} icon={<BoundIcon semanticKey="field.category" className="h-4 w-4" fallback={<FolderTreeIcon className="h-4 w-4" />} />} title={t("pp.sec.classification", "Classification")} onEdit={() => goStep("classify")}>
         <div className={rows}>
           <Row label={t("pp.f.division", "Division")} value={s2("division_slug")} iconSrc={classIcons.division?.[String(s2("division_slug") ?? "")]} />
           <Row label={t("pp.f.category", "Category")} value={s2("category_slug")} iconSrc={classIcons.category?.[String(s2("category_slug") ?? "")]} />
@@ -859,7 +878,7 @@ export default function ProductProfile() {
       )}
 
       {STEPS[step].id === "supplier" && (
-      <Group icon={<BoundIcon semanticKey="field.supplier" className="h-4 w-4" fallback={<FactoryIcon className="h-4 w-4" />} />} title={t("pp.sec.supplier", "Supplier & Sourcing")} count={`${data.suppliers.length}`} onEdit={() => goStep("supplier")}>
+      <Group motion={tabMotion} icon={<BoundIcon semanticKey="field.supplier" className="h-4 w-4" fallback={<FactoryIcon className="h-4 w-4" />} />} title={t("pp.sec.supplier", "Supplier & Sourcing")} count={`${data.suppliers.length}`} onEdit={() => goStep("supplier")}>
         {data.suppliers.length === 0 ? (
           <p className="text-[12px] text-[var(--text-ghost)] italic">{t("pp.e.noSupplier", "No supplier linked.")}</p>
         ) : (
@@ -908,7 +927,7 @@ export default function ProductProfile() {
       <div className="space-y-4">
         {/* Same two-column hero the editor opens with: the product photo owns
             the left, status/visibility/name the right. */}
-        <Group icon={<BoundIcon semanticKey="section.hero" className="h-4 w-4" fallback={<SparklesIcon className="h-4 w-4" />} />} title={t("pp.sec.identity", "Identity & lifecycle")} onEdit={() => goStep("identity")}>
+        <Group motion={tabMotion} icon={<BoundIcon semanticKey="section.hero" className="h-4 w-4" fallback={<SparklesIcon className="h-4 w-4" />} />} title={t("pp.sec.identity", "Identity & lifecycle")} onEdit={() => goStep("identity")}>
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 mb-5">
             <div>
               <div className="text-[10.5px] uppercase tracking-wider text-[var(--text-ghost)] mb-2">
@@ -947,7 +966,7 @@ export default function ProductProfile() {
             <Row label={t("pp.f.statusReason", "Status reason")} value={s2("status_reason")} />
           </div>
         </Group>
-        <Group icon={<BoundIcon semanticKey="field.description" className="h-4 w-4" fallback={<SparklesIcon className="h-4 w-4" />} />} title={t("pp.sec.description", "Description")} onEdit={() => goStep("identity")}>
+        <Group motion={tabMotion} icon={<BoundIcon semanticKey="field.description" className="h-4 w-4" fallback={<SparklesIcon className="h-4 w-4" />} />} title={t("pp.sec.description", "Description")} onEdit={() => goStep("identity")}>
           <div className="space-y-4">
             <Row label={t("pp.f.excerpt", "Short description")} value={s2("excerpt")} />
             <Row label={t("pp.f.description", "Full description")} value={s2("description")} />
@@ -955,7 +974,7 @@ export default function ProductProfile() {
             <Row label={t("pp.f.tags", "Tags")} value={s2("tags")} />
           </div>
         </Group>
-        <Group icon={<BoundIcon semanticKey="field.languages" className="h-4 w-4" fallback={<SparklesIcon className="h-4 w-4" />} />} title={t("pp.sec.languages", "Languages & markets")} count={`${data.translations.length}`} onEdit={() => goStep("identity")}>
+        <Group motion={tabMotion} icon={<BoundIcon semanticKey="field.languages" className="h-4 w-4" fallback={<SparklesIcon className="h-4 w-4" />} />} title={t("pp.sec.languages", "Languages & markets")} count={`${data.translations.length}`} onEdit={() => goStep("identity")}>
           {data.translations.length === 0
             ? <p className="text-[12px] text-[var(--text-ghost)] italic">{t("pp.e.englishOnly", "English only — no localized names recorded.")}</p>
             : <div className={rows}>{data.translations.map((tr, i) => <Row key={i} label={String(tr.locale ?? "?")} value={tr.product_name} />)}</div>}
@@ -965,7 +984,7 @@ export default function ProductProfile() {
 
       {STEPS[step].id === "specs" && (
       !data.schema ? (
-        <Group icon={<BoundIcon semanticKey="field.spec_template" className="h-4 w-4" fallback={<Settings2Icon className="h-4 w-4" />} />} title={t("pp.sec.specs", "Specifications")} onEdit={() => goStep("specs")}>
+        <Group motion={tabMotion} icon={<BoundIcon semanticKey="field.spec_template" className="h-4 w-4" fallback={<Settings2Icon className="h-4 w-4" />} />} title={t("pp.sec.specs", "Specifications")} onEdit={() => goStep("specs")}>
           <p className="text-[12px] text-[var(--text-ghost)] italic">
             {t("pp.e.noTemplate", "No spec template resolves for this classification, so there are no specification fields to fill.")}
           </p>
@@ -1032,7 +1051,7 @@ export default function ProductProfile() {
       )}
 
       {STEPS[step].id === "commercial" && (
-      <Group icon={<BoundIcon semanticKey="field.family" className="h-4 w-4" fallback={<BoxesIcon className="h-4 w-4" />} />} title={t("pp.sec.variants", "Variants")} count={`${data.models.length}`} onEdit={() => goStep("commercial")}>
+      <Group motion={tabMotion} icon={<BoundIcon semanticKey="field.family" className="h-4 w-4" fallback={<BoxesIcon className="h-4 w-4" />} />} title={t("pp.sec.variants", "Variants")} count={`${data.models.length}`} onEdit={() => goStep("commercial")}>
         {data.models.length === 0 ? (
           <p className="text-[12px] text-[var(--text-ghost)] italic">{t("pp.e.noVariant", "No variant recorded — a product needs at least one.")}</p>
         ) : (
@@ -1103,7 +1122,7 @@ export default function ProductProfile() {
       )}
 
       {STEPS[step].id === "pricing" && (
-      <Group icon={<BoundIcon semanticKey="field.price" className="h-4 w-4" fallback={<DollarSignIcon className="h-4 w-4" />} />} title={t("pp.sec.price", "Cost & Price")} count={`${data.models.length} variant`} onEdit={() => goStep("pricing")}>
+      <Group motion={tabMotion} icon={<BoundIcon semanticKey="field.price" className="h-4 w-4" fallback={<DollarSignIcon className="h-4 w-4" />} />} title={t("pp.sec.price", "Cost & Price")} count={`${data.models.length} variant`} onEdit={() => goStep("pricing")}>
         {data.models.length === 0 ? (
           <p className="text-[12px] text-[var(--text-ghost)] italic">{t("pp.e.noPrice", "No variant to price.")}</p>
         ) : (
@@ -1160,7 +1179,7 @@ export default function ProductProfile() {
       <CostHistoryDrawer target={historyFor} onClose={() => setHistoryFor(null)} t={t} />
 
       {STEPS[step].id === "logistics" && (
-      <Group icon={<BoundIcon semanticKey="section.logistics" className="h-4 w-4" fallback={<GlobeIcon className="h-4 w-4" />} />} title={t("pp.sec.logistics", "Logistics & Customs")} onEdit={() => goStep("logistics")}>
+      <Group motion={tabMotion} icon={<BoundIcon semanticKey="section.logistics" className="h-4 w-4" fallback={<GlobeIcon className="h-4 w-4" />} />} title={t("pp.sec.logistics", "Logistics & Customs")} onEdit={() => goStep("logistics")}>
         <div className={rows}>
           <Row label={t("pp.f.origin", "Country of origin")} value={s2("country_of_origin")} />
           <Row label={t("pp.f.hs", "HS code")} value={s2("hs_code")} mono />
@@ -1188,7 +1207,7 @@ export default function ProductProfile() {
       )}
 
       {STEPS[step].id === "compliance" && (
-      <Group icon={<BoundIcon semanticKey="field.certifications" className="h-4 w-4" fallback={<ShieldCheckIcon className="h-4 w-4" />} />} title={t("pp.sec.compliance", "Compliance & Warranty")} count={`${data.certifications.length} cert`} onEdit={() => goStep("compliance")}>
+      <Group motion={tabMotion} icon={<BoundIcon semanticKey="field.certifications" className="h-4 w-4" fallback={<ShieldCheckIcon className="h-4 w-4" />} />} title={t("pp.sec.compliance", "Compliance & Warranty")} count={`${data.certifications.length} cert`} onEdit={() => goStep("compliance")}>
         <div className={rows}>
           <Row label={t("pp.f.warrMonths", "Warranty (months)")} value={s2("warranty_months")} />
           <Row label={t("pp.f.warrType", "Warranty type")} value={s2("warranty_type")} />
@@ -1221,8 +1240,16 @@ export default function ProductProfile() {
       </Group>
       )}
 
-      {STEPS[step].id === "media" && (
-      <Group icon={<BoundIcon semanticKey="field.photos" className="h-4 w-4" fallback={<ImageRawIcon className="h-4 w-4" />} />} title={t("pp.sec.media", "Media & Documents")} count={`${data.media.length} media · ${data.documents.length} docs`} onEdit={() => goStep("media")}>
+      {/* Feature Highlights — its own tab (owner call): catalog-style
+          photo+explanation cards; the component fetches itself. */}
+      {STEPS[step].id === "highlights" && (
+        <Group motion={tabMotion} icon={<ImageRawIcon className="h-4 w-4" />} title={t("pp.sec.highlights", "Feature Highlights")} count="" onEdit={() => goStep("highlights")}>
+          <FeatureHighlightsDisplay productId={String(data.product.id ?? "")} />
+        </Group>
+      )}
+
+      {STEPS[step].id === "media" && (<>
+      <Group motion={tabMotion} icon={<BoundIcon semanticKey="field.photos" className="h-4 w-4" fallback={<ImageRawIcon className="h-4 w-4" />} />} title={t("pp.sec.media", "Media & Documents")} count={`${data.media.length} media · ${data.documents.length} docs`} onEdit={() => goStep("media")}>
         {/* Photo / file slots — every slot, filled or not. */}
         <div className="space-y-4">
           {MEDIA_SLOTS.map((slot) => {
@@ -1287,10 +1314,10 @@ export default function ProductProfile() {
           </div>
         )}
       </Group>
-      )}
+      </>)}
 
       {STEPS[step].id === "knowledge" && (
-      <Group icon={<BoundIcon semanticKey="field.knowledge" className="h-4 w-4" fallback={<BookOpenIcon className="h-4 w-4" />} />} title={t("pp.sec.knowledge", "Knowledge & Relationships")} count={`${data.related.length} linked`} onEdit={() => goStep("knowledge")}>
+      <Group motion={tabMotion} icon={<BoundIcon semanticKey="field.knowledge" className="h-4 w-4" fallback={<BookOpenIcon className="h-4 w-4" />} />} title={t("pp.sec.knowledge", "Knowledge & Relationships")} count={`${data.related.length} linked`} onEdit={() => goStep("knowledge")}>
         <div className={rows}>
           <Row label={t("pp.f.knowledge", "Knowledge blocks")} value={((s2("schema_knowledge") as unknown[]) ?? []).length || null} />
         </div>
@@ -1311,7 +1338,7 @@ export default function ProductProfile() {
 
       {STEPS[step].id === "finalize" && (
       <div className="space-y-4">
-        <Group icon={<BoundIcon semanticKey="field.readiness" className="h-4 w-4" fallback={<CheckIcon className="h-4 w-4" />} />} title={t("pp.sec.readiness", "Readiness")}>
+        <Group motion={tabMotion} icon={<BoundIcon semanticKey="field.readiness" className="h-4 w-4" fallback={<CheckIcon className="h-4 w-4" />} />} title={t("pp.sec.readiness", "Readiness")}>
           {readiness == null ? (
             <p className="text-[12px] text-[var(--text-ghost)] italic">{t("pp.e.noScore", "No spec template resolves, so completeness can\u2019t be scored.")}</p>
           ) : (
@@ -1330,7 +1357,7 @@ export default function ProductProfile() {
             </div>
           )}
         </Group>
-        <Group icon={<BoundIcon semanticKey="field.dates" className="h-4 w-4" fallback={<CheckIcon className="h-4 w-4" />} />} title={t("pp.sec.record", "Record")}>
+        <Group motion={tabMotion} icon={<BoundIcon semanticKey="field.dates" className="h-4 w-4" fallback={<CheckIcon className="h-4 w-4" />} />} title={t("pp.sec.record", "Record")}>
           <div className={rows}>
             <Row label={t("pp.f.productId", "Product id")} value={s2("id")} mono />
             <Row label={t("pp.f.created", "Created")} value={s2("created_at")} />
@@ -1356,7 +1383,12 @@ function CostHistoryDrawer({ target, onClose, t }: {
 }) {
   const [rows, setRows] = useState<Row[] | null>(null);
   useEffect(() => {
-    if (!target) { setRows(null); return; }
+    /* No synchronous reset here. The drawer is mounted permanently and only
+       `target` changes, so clearing rows on close used to run a setState
+       during the effect — a cascading render on every dismissal. The list is
+       not rendered while target is null anyway, and the fetch below replaces
+       it before the next open can paint, so there is nothing to clear. */
+    if (!target) return;
     let alive = true;
     (async () => {
       try {

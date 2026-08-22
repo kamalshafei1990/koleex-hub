@@ -136,10 +136,21 @@ export default function AiKnowledgePage() {
     await fetch(`/api/ai/knowledge/qa?id=${id}`, { method: "DELETE", credentials: "include" });
   }, []);
 
+  /* SUPER ADMIN, OR AN ACCOUNT HE HAS GRANTED. This used to be a bare
+     is_super_admin check, which made the bench his-or-nobody's — there was no
+     third state to express. "AI Knowledge" is a governable module now, so the
+     question becomes the same one every other app asks, and he can hand it to
+     named accounts from Roles & Permissions without changing code.
+     Deny-by-default still holds: no grant, no entry. */
   useEffect(() => {
-    fetch("/api/me", { credentials: "include" })
+    fetch("/api/me/permitted-modules", { credentials: "include" })
       .then((r) => (r.ok ? r.json() : null))
-      .then((j) => setAllowed(!!j?.is_super_admin))
+      .then((j) => setAllowed(
+        !!j?.is_super_admin ||
+        (Array.isArray(j?.modules) && j.modules.some(
+          (m: string) => String(m).toLowerCase() === "ai knowledge",
+        )),
+      ))
       .catch(() => setAllowed(false));
   }, []);
 
@@ -219,7 +230,7 @@ export default function AiKnowledgePage() {
 
   if (allowed === false) {
     /* Owner rule: this bench must not even LOOK like a page to anyone
-       but the super admin — silent redirect, no denial screen. */
+       without access — silent redirect, no denial screen. */
     if (typeof window !== "undefined") window.location.replace("/ai");
     return null;
   }

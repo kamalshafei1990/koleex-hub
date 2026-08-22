@@ -1197,13 +1197,13 @@ function SupplierPickerModal({
 
   return createPortal((
     <div
-      className="fixed inset-0 z-[120] flex items-start justify-center p-4 pt-[12vh] bg-black/60 backdrop-blur-sm animate-in fade-in duration-150"
+      className="fixed inset-0 z-[120] flex items-start justify-center p-4 pt-[12vh] bg-black/60 backdrop-blur-sm"
       onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}
       role="dialog"
       aria-modal="true"
       aria-label={t("sup.linkSupplier", "Link a supplier")}
     >
-      <div className="w-full max-w-2xl flex flex-col max-h-[78vh] rounded-2xl bg-[var(--bg-card)] border border-[var(--border-subtle)] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-150">
+      <div className="w-full max-w-2xl flex flex-col max-h-[78vh] rounded-2xl bg-[var(--bg-card)] border border-[var(--border-subtle)] shadow-2xl overflow-hidden kx-pop-in">
         {/* Header + search */}
         <div className="shrink-0 p-3 border-b border-[var(--border-subtle)]">
           <div className="flex items-center justify-between mb-2.5 px-1">

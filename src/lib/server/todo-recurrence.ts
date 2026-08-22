@@ -181,6 +181,23 @@ export async function spawnDueRecurringTodos(now: Date = new Date()): Promise<nu
       ),
     );
     if (recipients.length > 0) {
+      /* SUPERSEDE, don't stack. This spawner wrote a fresh notification
+         every day forever, never asking whether YESTERDAY'S copy of the
+         same recurring task was still unread — measured on the owner's
+         own inbox: "🔁 Customer follow up" ×31, one per day since the
+         template was created, the single biggest source of his flooded
+         panel. Today's instance REPLACES an unread older one: same
+         recipient, same recurring subject, still unread → read+archived
+         before the new row lands. A copy the user already read is
+         history and stays. */
+      const nowIso = new Date().toISOString();
+      await supabaseServer
+        .from("inbox_messages")
+        .update({ read_at: nowIso, archived_at: nowIso })
+        .in("recipient_account_id", recipients)
+        .eq("category", "task")
+        .eq("subject", `🔁 ${t.title}`)
+        .is("read_at", null);
       await supabaseServer.from("inbox_messages").insert(
         recipients.map((rid) => ({
           recipient_account_id: rid,

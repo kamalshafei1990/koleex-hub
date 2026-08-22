@@ -97,14 +97,27 @@ export interface UserContext {
 
 export type ToolAction = "view" | "create" | "edit" | "delete";
 
+/* A JSON-schema subset. `items` carries its own properties so a tool can take
+   an ARRAY OF OBJECTS — askUser needs {label, detail, recommended} per option,
+   and the alternative was three parallel string arrays the model would have to
+   keep aligned by hand, which is exactly the kind of thing it gets wrong. */
+export interface ToolParameterProperty {
+  type: "string" | "number" | "integer" | "boolean" | "array" | "object";
+  description?: string;
+  enum?: string[];
+  items?: {
+    type: string;
+    description?: string;
+    properties?: Record<string, ToolParameterProperty>;
+    required?: string[];
+  };
+  properties?: Record<string, ToolParameterProperty>;
+  required?: string[];
+}
+
 export interface ToolParameterSchema {
   type: "object";
-  properties: Record<string, {
-    type: "string" | "number" | "integer" | "boolean" | "array" | "object";
-    description: string;
-    enum?: string[];
-    items?: { type: string };
-  }>;
+  properties: Record<string, ToolParameterProperty>;
   required?: string[];
 }
 
@@ -170,6 +183,9 @@ export interface ToolResult<T = unknown> {
 
 export type AgentStepKind =
   | "answer"
+  /** A clarifying question with options — the turn ENDS here and the user
+   *  answers next. payload is { question, options[] }. */
+  | "question"
   | "tool-call"
   | "tool-result"
   | "recommendation"

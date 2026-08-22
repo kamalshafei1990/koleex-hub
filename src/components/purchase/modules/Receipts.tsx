@@ -5,9 +5,9 @@
    accepted vs rejected. Sits between Purchase Orders and Vendor
    Bills in the standard 3-way match (PO ↔ Receipt ↔ Bill). */
 
-import { useCallback, useEffect, useState } from "react";
-import type { PurchaseModuleProps } from "../shared";
-import { cardCls, formatDate, sectionTitleCls } from "../shared";
+import { useMemo, useState } from "react";
+import type { PurchaseModuleProps, SupplierRef } from "../shared";
+import { cardCls, formatDate, sectionTitleCls, supplierNames, usePurchaseList } from "../shared";
 import { NewReceiptDialog } from "../dialogs";
 import ClipboardCheckIcon from "@/components/icons/ui/ClipboardCheckIcon";
 import PlusIcon from "@/components/icons/ui/PlusIcon";
@@ -29,31 +29,19 @@ const STATUS_TONE: Record<string, string> = {
 };
 
 export default function ReceiptsModule({ t }: PurchaseModuleProps) {
-  const [rows, setRows] = useState<Receipt[]>([]);
-  const [supplierName, setSupplierName] = useState<Map<string, string>>(new Map());
-  const [poNo, setPoNo] = useState<Map<string, string>>(new Map());
-  const [loading, setLoading] = useState(true);
   const [newOpen, setNewOpen] = useState(false);
-
-  const load = useCallback(async () => {
-    const res = await fetch("/api/purchase/list?resource=receipts", { credentials: "include" });
-    const data = (res.ok ? await res.json() : { rows: [], suppliers: [], pos: [] }) as {
-      rows: Receipt[];
-      suppliers: { id: string; display_name: string | null; company_name: string | null; full_name: string | null }[];
-      pos: { id: string; po_no: string | null }[];
-    };
-
-    setRows(data.rows);
-    const sm = new Map<string, string>();
-    for (const c of data.suppliers) sm.set(c.id, c.company_name || c.display_name || c.full_name || "—");
-    setSupplierName(sm);
-    const pm = new Map<string, string>();
-    for (const p of data.pos) pm.set(p.id, p.po_no || "");
-    setPoNo(pm);
-    setLoading(false);
-  }, []);
-
-  useEffect(() => { load(); }, [load]);
+  const { data, loading, reload: load } = usePurchaseList<{
+    rows: Receipt[];
+    suppliers: SupplierRef[];
+    pos: { id: string; po_no: string | null }[];
+  }>("receipts");
+  const rows = data?.rows ?? [];
+  const supplierName = useMemo(() => supplierNames(data?.suppliers), [data]);
+  const poNo = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const p of data?.pos ?? []) m.set(p.id, p.po_no || "");
+    return m;
+  }, [data]);
 
   if (loading) return <div className="h-full flex items-center justify-center text-[var(--text-dim)]"><SpinnerIcon size={20} /></div>;
 

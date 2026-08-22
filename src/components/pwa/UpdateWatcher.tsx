@@ -13,6 +13,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "@/lib/i18n";
+import { whenNetworkQuiet } from "@/lib/net-idle";
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 
 /* The commit this BUNDLE was compiled from. Primary source: the kx-build
@@ -40,6 +41,51 @@ const T = {
   "u.refresh":  { en: "Update",      zh: "更新",       ar: "تحديث" },
   "u.updating": { en: "Updating…",   zh: "正在更新…",  ar: "جارٍ التحديث…" },
 };
+
+/* ── THE INSTALLED APP CANNOT HEAL WHILE HIDDEN ──
+   onHide (below) reloads the moment the tab disappears: the work happens
+   off-screen and the user comes back fresh. That is the right trade for every
+   browser, and it is why nothing here auto-reloads in view.
+
+   An installed iOS app never finishes that reload. The WebView is suspended
+   the instant the app leaves the screen, so the navigation is killed
+   mid-flight, and on resume iOS restores the very page it was already
+   showing — including its stale stylesheet. The app can therefore sit on a
+   bundle from weeks ago while Safari on the SAME phone is current. That is
+   exactly what the owner hit: a header fix live in the browser and absent
+   from the home-screen app, with prod verified as serving the new build.
+
+   So standalone heals on the way IN. Once we know the build is stale and the
+   app is on screen, reload. It costs a visible load — the reason no other
+   surface does it — but never updating costs more, and on resume the user has
+   just arrived, which is the cheapest moment there is to spend.
+
+   ONE reload per build id, kept in sessionStorage: if a build somehow keeps
+   reporting stale (an HTML the CDN is still serving from cache, a half-rolled
+   deploy), the guard turns an infinite reload loop into a single wasted load. */
+function isInstalledApp(): boolean {
+  if (typeof window === "undefined") return false;
+  return (
+    window.matchMedia?.("(display-mode: standalone)").matches === true ||
+    (window.navigator as Navigator & { standalone?: boolean }).standalone === true
+  );
+}
+
+function healInstalledApp(id: string): void {
+  if (!isInstalledApp()) return;
+  if (document.visibilityState !== "visible") return;
+  /* Never interrupt unsaved work — the same guard onHide and the exit
+     prompts use. A stale bundle can wait for the next resume. */
+  if (document.querySelector("[data-kx-unsaved='1']")) return;
+  try {
+    if (sessionStorage.getItem("kx-healed-build") === id) return;
+    sessionStorage.setItem("kx-healed-build", id);
+  } catch {
+    /* Private mode / storage disabled: the loop guard is best-effort, but a
+       reload that fixes the app is still better than an app frozen forever. */
+  }
+  window.location.reload();
+}
 
 export default function UpdateWatcher() {
   const { t } = useTranslation(T);
@@ -71,6 +117,10 @@ export default function UpdateWatcher() {
           };
           g.__kxStaleBuild = true;
           g.__kxStaleBuildId = id;
+          /* The pill is enough everywhere the hide-heal works. It is not
+             enough in the installed app, which may never go hidden-and-back
+             in a way iOS lets us use. */
+          healInstalledApp(id);
         }
       } catch {
         /* offline / transient — ignore */
@@ -83,9 +133,13 @@ export default function UpdateWatcher() {
        gone quiet; a stale build stays stale for a couple more seconds, which
        is nothing against the interval this already runs on. */
     let firstCheck: number | undefined;
-    const ric = (window as Window & { requestIdleCallback?: (cb: () => void, o?: { timeout: number }) => number }).requestIdleCallback;
-    if (ric) ric(() => { void check(); }, { timeout: 4000 });
-    else firstCheck = window.setTimeout(() => { void check(); }, 2000);
+    /* Same correction as the presence beat: requestIdleCallback fired this
+       at 815ms into a screen open, competing with the six data fetches it
+       meant to yield to (main thread idle ≠ network idle). Measured on
+       Product Data, 2026-08-21. */
+    void whenNetworkQuiet({ quietMs: 700, maxWaitMs: 6000 }).then(() => {
+      if (alive) void check();
+    });
     /* HEAL WHILE HIDDEN. The user must never watch a full page load: the
        browser keeps the OLD page on screen until the new document commits,
        so a reload triggered mid-tap looks like "it threw me back to Home,

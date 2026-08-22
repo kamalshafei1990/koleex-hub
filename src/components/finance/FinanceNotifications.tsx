@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
+import { useWarmData } from "@/lib/warm-cache";
 import { useInput } from "@/components/kds/useInput";
 import FinanceHeader from "@/components/finance/FinanceHeader";
 import { useTranslation } from "@/lib/i18n";
@@ -57,20 +58,18 @@ const OFFSET_OPTIONS = [
 export default function FinanceNotifications() {
   const { t } = useTranslation(financeT);
   const baseCurrency = useBaseCurrency();
-  const [rows, setRows] = useState<FinanceNotification[]>([]);
-  const [loading, setLoading] = useState(true);
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    try {
-      const r = await fetch("/api/finance/notifications", { cache: "no-store" });
-      const j = (await r.json()) as { notifications?: FinanceNotification[] };
-      setRows(j.notifications ?? []);
-    } finally {
-      setLoading(false);
-    }
+  /* Warm: this endpoint takes no filter, so the response IS the default
+     view. Paints from the last answer on the first frame, refreshes behind
+     the painted screen. */
+  const fetchAll = useCallback(async () => {
+    const r = await fetch("/api/finance/notifications", { cache: "no-store" });
+    if (!r.ok) throw new Error(`fin:notifications: ${r.status}`);
+    const j = (await r.json()) as { notifications?: FinanceNotification[] };
+    return j.notifications ?? [];
   }, []);
-  useEffect(() => { void load(); }, [load]);
+  const { data, loading, reload: load } = useWarmData<FinanceNotification[]>("fin:notifications", fetchAll);
+  const rows = useMemo(() => data ?? [], [data]);
 
   const today = new Date().toISOString().slice(0, 10);
   const upcoming = useMemo(() => rows.filter((n) => n.status === "scheduled" || n.status === "snoozed"), [rows]);

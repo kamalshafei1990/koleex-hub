@@ -59,6 +59,13 @@ export const SENSITIVE_FIELDS: Record<string, {
   /* Customers / suppliers — commercial side */
   "customers.credit_limit":     { requiresViewPrivate: true, label: "customer credit limit" },
   "customers.payment_terms":    { requiresViewPrivate: true, label: "customer payment terms" },
+  /* The COLUMN is `notes`, and filterFields builds its id from the column
+     name — so a key of "customers.internal_notes" matched nothing and the
+     field sailed through for everyone, while the customers tool's own header
+     promised the AI "never even receives" it. Both spellings are registered:
+     the real one does the work, the other stays in case a caller passes the
+     logical name. */
+  "customers.notes":            { requiresViewPrivate: true, label: "internal customer notes" },
   "customers.internal_notes":   { requiresViewPrivate: true, label: "internal customer notes" },
   "suppliers.bank_details":     { superAdminOnly: true,      label: "supplier bank details" },
   "suppliers.internal_notes":   { requiresViewPrivate: true, label: "internal supplier notes" },

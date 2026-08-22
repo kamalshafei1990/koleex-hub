@@ -420,7 +420,7 @@ function SubCard({
   children: React.ReactNode;
 }) {
   return (
-    <div className="bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] overflow-hidden">
+    <div className="kx-glass bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] overflow-hidden">
       <div className="flex items-center gap-3 px-5 py-4 border-b border-[var(--border-subtle)]">
         <div className="h-9 w-9 rounded-full bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] flex items-center justify-center shrink-0 relative">
           <span className={`text-[14px] font-bold tabular-nums ${accent.text}`}>{number}</span>

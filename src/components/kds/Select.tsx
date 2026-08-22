@@ -27,8 +27,9 @@
    behaviour. That is what lets one component serve a full-width form field, a
    80px inline label picker and a flex-1 add-control. */
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { usePresence } from "./usePresence";
 import AngleDownIcon from "@/components/icons/ui/AngleDownIcon";
 import CheckIcon from "@/components/icons/ui/CheckIcon";
 
@@ -58,6 +59,9 @@ export default function Select({
   disabled?: boolean;
 }) {
   const [open, setOpen] = useState(false);
+  /* Exit choreography (owner-approved motion system): stay mounted while the
+     140ms shrink plays; rect survives from the open phase. */
+  const { mounted: panelMounted, closing: panelClosing } = usePresence(open);
   const [activeIdx, setActiveIdx] = useState(0);
   const wrapRef = useRef<HTMLDivElement>(null);
   const btnRef = useRef<HTMLButtonElement>(null);
@@ -162,7 +166,14 @@ export default function Select({
     setRect({ top, left: box.left, width: box.width, maxH });
   }, []);
 
-  useEffect(() => {
+  /* Layout effect, not a plain effect: `rect` survives a close (the exit
+     choreography needs it), so on RE-OPEN after the field has moved — form
+     scrolled, a section collapsed — a post-paint measure showed one frame
+     at the stale coordinates and then jumped. Measuring before paint means
+     the first frame the user sees is already correct. Same reasoning, and
+     the same SSR-safe alias, as PopoverPanel. */
+  const useIsoLayout = typeof window === "undefined" ? useEffect : useLayoutEffect;
+  useIsoLayout(() => {
     if (!open) { autoScrolled.current = false; return; }
     place();
     /* Capture phase: the Hub scrolls in #main-scroll-container, not on
@@ -254,7 +265,7 @@ export default function Select({
         </span>
       </button>
       <AngleDownIcon size={14} className={`absolute end-3 top-1/2 -translate-y-1/2 text-[var(--text-ghost)] pointer-events-none transition-transform ${open ? "rotate-180" : ""}`} />
-      {open && rect && typeof document !== "undefined" && createPortal(
+      {panelMounted && rect && typeof document !== "undefined" && createPortal(
         <>
           {/* THE SCRIM IS WHAT MAKES THE GLASS READABLE. The material itself is
               signed off and must not be thickened — but glass only works when
@@ -268,13 +279,15 @@ export default function Select({
           <div
             aria-hidden
             onMouseDown={() => setOpen(false)}
-            className="fixed inset-x-0 bottom-0 top-[var(--kx-header-h)] bg-black/30 backdrop-blur-sm"
+            className={`fixed inset-x-0 bottom-0 top-[var(--kx-header-h)] bg-black/30 backdrop-blur-sm transition-opacity duration-150 ${panelClosing ? "opacity-0 pointer-events-none" : "opacity-100"}`}
             style={{ zIndex: 199 }}
           />
         <div
           ref={panelRef}
           style={{ position: "fixed", top: rect.top, left: rect.left, minWidth: rect.width, zIndex: 200 }}
-          className={`kx-glass-pop kx-pop-panel ${panelWidthClassName === "w-full" ? "" : panelWidthClassName}`}
+          /* pointer-events off while leaving — a click on a departing option
+             still called commit() from an already-closed select. */
+          className={`kx-glass-pop kx-pop-panel kx-pop-arrive ${panelClosing ? "kx-pop-closing pointer-events-none" : ""} ${panelWidthClassName === "w-full" ? "" : panelWidthClassName}`}
         >
           {/* maxHeight inline so it BEATS max-h-60: the class is the height the
               list wants, this is the height the viewport actually allows. */}

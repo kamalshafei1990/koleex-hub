@@ -72,6 +72,16 @@ export const PRODUCTS_UI_I18N: Translations = {
   "status.active": { en: "Active", zh: "已上架", ar: "نشط" },
   "status.archived": { en: "Archived", zh: "已归档", ar: "مؤرشف" },
   "save.success": { en: "Product saved successfully!", zh: "产品保存成功！", ar: "تم حفظ المنتج بنجاح!" },
+  "save.modelFailed": {
+    en: "Couldn't save model \"{code}\" — the rest of the save was stopped so nothing is half-written. Check your access or try again.",
+    zh: "无法保存型号“{code}” — 已停止其余保存操作，避免数据写入一半。请检查您的权限或重试。",
+    ar: "تعذّر حفظ الموديل «{code}» — تم إيقاف بقية الحفظ حتى لا تُكتب البيانات نصف كتابة. تحقق من صلاحياتك أو حاول مجددًا.",
+  },
+  "save.modelCreateFailed": {
+    en: "Couldn't create model \"{code}\" — the rest of the save was stopped.",
+    zh: "无法创建型号“{code}” — 已停止其余保存操作。",
+    ar: "تعذّر إنشاء الموديل «{code}» — تم إيقاف بقية الحفظ.",
+  },
   "save.cantPublish": {
     en: "Can't publish yet — fill the required fields. Switch status to Draft to save your work for now.",
     zh: "暂时无法发布 — 请填写必填字段。可先将状态切换为草稿以保存当前进度。",
@@ -91,6 +101,16 @@ export const PRODUCTS_UI_I18N: Translations = {
     en: "Draft restored — review the fields, then Save when you're ready.",
     zh: "草稿已恢复 — 请检查各字段，准备好后点击保存。",
     ar: "تم استرجاع المسودة — راجع الحقول ثم احفظ عندما تكون جاهزًا.",
+  },
+  "draft.staleWarning": {
+    en: "⚠ This draft is OLDER than the last save — restoring it will bring back old values and undo newer changes.",
+    zh: "⚠ 此草稿早于最近一次保存 — 恢复它将带回旧值并撤销较新的更改。",
+    ar: "⚠ هذه المسودة أقدم من آخر حفظ — استرجاعها سيعيد قيمًا قديمة ويلغي التغييرات الأحدث.",
+  },
+  "draft.photosDropped": {
+    en: "{n} attached photo(s) could not be kept in the draft — please attach them again before saving.",
+    zh: "{n} 张已附加的图片无法保留在草稿中 — 请在保存前重新附加。",
+    ar: "تعذّر الاحتفاظ بـ {n} صورة مرفقة في المسودة — يرجى إرفاقها مرة أخرى قبل الحفظ.",
   },
 
   /* ── Media upload feedback (P0 #3) ──────────────────────────────── */
@@ -142,6 +162,11 @@ export const PRODUCTS_UI_I18N: Translations = {
   "sup.modelNumber": { en: "Model number", zh: "型号", ar: "رقم الموديل" },
   "sup.costPrice": { en: "Cost price", zh: "成本价", ar: "سعر التكلفة" },
   "sup.eg": { en: "e.g.", zh: "例如", ar: "مثال:" },
+  "sup.memberCosts": {
+    en: "This is the family cost. These models have their own — pick one on the strip above to edit it:",
+    zh: "这是家族成本。以下型号有各自的成本 — 在上方型号条中选择一个进行编辑：",
+    ar: "هذه تكلفة العائلة. الموديلات التالية لها تكلفتها الخاصة — اختر أحدها من الشريط أعلاه لتعديله:",
+  },
   "sup.cnyTitle": { en: "Factory cost is always entered in CNY (¥) — the pricing engine works from the CNY cost.", zh: "出厂成本始终以人民币(¥)录入——定价引擎基于人民币成本计算。", ar: "تكلفة المصنع تُدخل دائماً بعملة CNY (¥) — محرك التسعير يعمل على التكلفة بها." },
   "sup.costIncludes": { en: "Cost includes", zh: "成本包含", ar: "التكلفة تشمل" },
   "sup.costDelivered": { en: "Delivered to Koleex (full landed)", zh: "送达Koleex(全到岸)", ar: "التسليم إلى Koleex (تكلفة كاملة)" },

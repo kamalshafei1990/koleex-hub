@@ -66,7 +66,7 @@ import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 
 type MsgRole = "user" | "assistant" | "system";
 interface AgentStep {
-  kind: "answer" | "tool-call" | "tool-result" | "recommendation" | "draft" | "denied";
+  kind: "answer" | "tool-call" | "tool-result" | "recommendation" | "draft" | "denied" | "question";
   text?: string;
   tool?: string;
   payload?: unknown;
@@ -116,6 +116,12 @@ const COPY: Record<Lang, {
   renamePrompt: string;
   footer: string;
   stopped: string;
+  dropHere: string;
+  recommended: string;
+  orTypeYourOwn: string;
+  otherOption: string;
+  otherPlaceholder: string;
+  otherSend: string;
   searchChats?: string;
   noSearchResults?: string;
   /* Projects + pinning */
@@ -162,6 +168,12 @@ const COPY: Record<Lang, {
     renamePrompt: "New title",
     footer: "Koleex AI — Powered by Koleex Technology Systems",
     stopped: "Stopped",
+    dropHere: "Drop files to attach",
+    recommended: "Recommended",
+    orTypeYourOwn: "Or type your own answer below.",
+    otherOption: "Something else",
+    otherPlaceholder: "Tell me what you mean…",
+    otherSend: "Send",
     searchChats: "Search chats…",
     noSearchResults: "No chats match your search.",
     projects: "Projects",
@@ -213,6 +225,12 @@ const COPY: Record<Lang, {
     renamePrompt: "新标题",
     footer: "Koleex AI — 由 Koleex 技术系统驱动",
     stopped: "已停止",
+    dropHere: "拖放文件以附加",
+    recommended: "推荐",
+    orTypeYourOwn: "或在下方输入你自己的答案。",
+    otherOption: "其他",
+    otherPlaceholder: "请说明你的意思…",
+    otherSend: "发送",
     searchChats: "搜索对话…",
     noSearchResults: "没有匹配的对话。",
     projects: "项目",
@@ -263,6 +281,12 @@ const COPY: Record<Lang, {
     renamePrompt: "عنوان جديد",
     footer: "Koleex AI — بدعم من أنظمة Koleex التقنية",
     stopped: "تم الإيقاف",
+    dropHere: "أفلت الملفات لإرفاقها",
+    recommended: "موصى به",
+    orTypeYourOwn: "أو اكتب إجابتك بنفسك في الأسفل.",
+    otherOption: "حاجة تانية",
+    otherPlaceholder: "اكتبلي قصدك إيه…",
+    otherSend: "ابعت",
     searchChats: "ابحث في المحادثات…",
     noSearchResults: "لا توجد محادثات تطابق بحثك.",
     projects: "المشاريع",
@@ -356,23 +380,91 @@ export default function KoleexAiApp() {
   const openFilePicker = useCallback(() => {
     fileInputRef.current?.click();
   }, []);
-  const onFilesPicked = useCallback((ev: React.ChangeEvent<HTMLInputElement>) => {
-    const list = ev.target.files;
-    if (!list || list.length === 0) return;
-    /* V1 readable set: text-bearing files only. DeepSeek has no vision,
-       so images are rejected up-front with an honest message instead of
-       silently attaching something the model can't see. */
-    const SUPPORTED = /\.(pdf|txt|md|markdown|csv|tsv|json|log)$/i;
-    const all = Array.from(list);
-    const ok = all.filter((f) => SUPPORTED.test(f.name));
-    if (ok.length < all.length) {
-      setError("Supported files: PDF, TXT, MD, CSV, JSON. Images can't be read yet.");
+  /* ONE GATE, THREE DOORS. Files arrive by button, by drop and by paste, and
+     the last time this filter lived in only one of them the other two were
+     silently wrong for an hour. Every route now lands here. */
+  const SUPPORTED_FILES = /\.(pdf|txt|md|markdown|csv|tsv|json|log|xlsx|xlsm|xls|png|jpe?g|webp|gif)$/i;
+  const addFiles = useCallback((incoming: File[]) => {
+    if (incoming.length === 0) return;
+    const ok = incoming.filter(
+      (f) => SUPPORTED_FILES.test(f.name) || (f.type || "").startsWith("image/"),
+    );
+    if (ok.length < incoming.length) {
+      setError("Supported files: images, PDF, Excel, TXT, MD, CSV, JSON.");
     }
     const picked = ok.slice(0, 6 - attachments.length);
     if (picked.length > 0) setAttachments((prev) => [...prev, ...picked]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [attachments.length]);
+
+  const onFilesPicked = useCallback((ev: React.ChangeEvent<HTMLInputElement>) => {
+    addFiles(Array.from(ev.target.files ?? []));
     /* Allow re-picking the same file twice in a row. */
     ev.target.value = "";
-  }, [attachments.length]);
+  }, [addFiles]);
+
+  /* ── Image previews ────────────────────────────────────────────────────
+     A filename is the wrong thing to show someone who just handed you a
+     picture — they know what they attached, they want to confirm it is the
+     RIGHT one, and only the image itself answers that.
+
+     Object URLs are created once per batch and revoked when the batch
+     changes or the component unmounts. Skipping the revoke is the classic
+     leak here: every attach would pin its full-size bitmap in memory for the
+     life of the tab, and a few phone photos is tens of megabytes. */
+  const previews = useMemo(
+    () => attachments.map((f) => ((f.type || "").startsWith("image/") ? URL.createObjectURL(f) : null)),
+    [attachments],
+  );
+  useEffect(
+    () => () => { for (const u of previews) if (u) URL.revokeObjectURL(u); },
+    [previews],
+  );
+
+  /* ── Drag and drop ──────────────────────────────────────────────────────
+     dragCounter, not a boolean. Dragging over a composer fires dragenter and
+     dragleave for every child element it crosses, so a plain flag flickers
+     off the moment the cursor passes from the textarea to the button row.
+     Counting enters minus leaves is the only reading that survives a real
+     pointer path. */
+  const dragDepth = useRef(0);
+  const [dragging, setDragging] = useState(false);
+  const onDragEnter = useCallback((e: React.DragEvent) => {
+    if (!Array.from(e.dataTransfer?.types ?? []).includes("Files")) return;
+    e.preventDefault();
+    dragDepth.current += 1;
+    setDragging(true);
+  }, []);
+  const onDragOver = useCallback((e: React.DragEvent) => {
+    if (!Array.from(e.dataTransfer?.types ?? []).includes("Files")) return;
+    /* Both calls are required: without preventDefault the browser opens the
+       file instead of letting us have it, and dropEffect is what makes the
+       cursor say "copy" rather than the forbidden sign. */
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "copy";
+  }, []);
+  const onDragLeave = useCallback(() => {
+    dragDepth.current = Math.max(0, dragDepth.current - 1);
+    if (dragDepth.current === 0) setDragging(false);
+  }, []);
+  const onDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    dragDepth.current = 0;
+    setDragging(false);
+    addFiles(Array.from(e.dataTransfer?.files ?? []));
+  }, [addFiles]);
+
+  /* ── Paste ──────────────────────────────────────────────────────────────
+     A screenshot never becomes a file on disk — it goes to the clipboard, and
+     asking someone to save it first just to attach it is the long way round
+     the exact thing they are trying to show you. Only files are taken; a
+     normal text paste falls through untouched. */
+  const onPasteFiles = useCallback((e: React.ClipboardEvent) => {
+    const files = Array.from(e.clipboardData?.files ?? []);
+    if (files.length === 0) return;
+    e.preventDefault();
+    addFiles(files);
+  }, [addFiles]);
   const removeAttachment = useCallback((index: number) => {
     setAttachments((prev) => prev.filter((_, i) => i !== index));
   }, []);
@@ -719,8 +811,14 @@ export default function KoleexAiApp() {
               failed
                 .map((f) => {
                   const why =
-                    f.error === "image_not_supported" ? "images can't be read yet"
-                    : f.error === "no_text" ? "no readable text (scanned file?)"
+                    /* "couldn't read" — NOT "can't read images". The feature
+                       exists now; this branch means one particular picture
+                       defeated it (too blurry, or the vision model was
+                       unreachable), and telling the user the capability is
+                       missing would send them off to solve the wrong
+                       problem. */
+                    f.error === "unreadable_image" ? "couldn't read this image — try a sharper photo"
+                    : f.error === "no_text" ? "no readable text found"
                     : f.error === "too_large" ? "over 10 MB"
                     : "file type not supported";
                   return `${f.name}: ${why}`;
@@ -2135,6 +2233,11 @@ export default function KoleexAiApp() {
                     .charAt(0)
                     .toUpperCase()}
                   isLast={i === messages.length - 1}
+                  /* What the user replied to THIS message. When the message
+                     is a question card, that reply IS the chosen option, so
+                     the card can stay on screen with the pick marked instead
+                     of collapsing to a bare line of text once answered. */
+                  answeredWith={messages[i + 1]?.role === "user" ? messages[i + 1].content : null}
                   canRegenerate={!sending}
                   canEdit={!sending}
                   onCopy={handleCopy}
@@ -2142,6 +2245,12 @@ export default function KoleexAiApp() {
                   onEdit={(newText) => handleEditAndRetry(i, newText)}
                   onSpeak={handleSpeak}
                   onFeedback={handleFeedback}
+                  /* Tapping an option is exactly the same as typing it —
+                     it goes through send(), so the agent continues from a
+                     normal user message and the transcript reads honestly
+                     afterwards, with the choice visible as something the
+                     user said. */
+                  onAnswerQuestion={(answer) => { void send(answer, false); }}
                   lang={lang}
                   /* Only the latest AI bubble reacts to the live
                      conversation; older ones stay idle. */
@@ -2242,32 +2351,84 @@ export default function KoleexAiApp() {
                       the row's far end.
                   The whole pill is a single rounded-3xl surface with
                   a soft hairline border that brightens on focus. */}
-              {/* Aurora: the composer is the app's sign-in-card moment —
-                  kx-glass-pop (menus' dense glass + lighting rim + pop-in).
-                  Safe to carry backdrop-filter: the emoji picker portals to
-                  document.body, so nothing inside needs its own backdrop. */}
-              <div className="kx-glass-pop relative rounded-3xl bg-[var(--bg-secondary)] border border-[var(--border-subtle)] focus-within:border-[var(--border-focus)] transition-colors">
+              {/* Aurora: the composer is a RECESSED WELL (owner pick "B",
+                  2026-08-20) — the field grammar, carved into the page, with
+                  the Hub-Blue focus ring. kx-ai-composer is the identity
+                  hook; the paint lives in globals under the aurora scope, so
+                  Core keeps rendering the original kx-glass-pop card. */}
+              {/* The DROP TARGET is the composer itself, not a separate zone
+                  that only appears once you are already dragging — you should
+                  be able to aim at the thing you are talking into. The border
+                  lights in the same Hub-Blue as focus, because dropping a file
+                  and typing are the same act of addressing the assistant. */}
+              <div
+                onDragEnter={onDragEnter}
+                onDragOver={onDragOver}
+                onDragLeave={onDragLeave}
+                onDrop={onDrop}
+                className={`kx-ai-composer kx-glass-pop relative rounded-3xl bg-[var(--bg-secondary)] border transition-colors focus-within:border-[var(--border-focus)] ${
+                  dragging
+                    ? "border-[var(--border-focus)] bg-[var(--bg-surface-subtle)]"
+                    : "border-[var(--border-subtle)]"
+                }`}
+              >
+                {dragging && (
+                  /* pointer-events-none is load-bearing: an overlay that
+                     accepts the pointer swallows the drop it exists to
+                     announce, and the file lands on the page instead. */
+                  <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center rounded-3xl bg-[var(--bg-secondary)]/80 text-[13px] font-semibold text-[var(--text-primary)]">
+                    {copy.dropHere}
+                  </div>
+                )}
                 {/* Attachment chip row — only renders when there are files. */}
                 {attachments.length > 0 && (
                   <div className="flex flex-wrap items-center gap-1.5 px-4 pt-3">
-                    {attachments.map((file, i) => (
-                      <span
-                        key={`${file.name}-${i}`}
-                        className="inline-flex items-center gap-1.5 max-w-[200px] rounded-md border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-2 py-1 text-[11.5px] text-[var(--text-primary)]"
-                        title={file.name}
-                      >
-                        <span aria-hidden>📎</span>
-                        <span className="truncate">{file.name}</span>
-                        <button
-                          type="button"
-                          onClick={() => removeAttachment(i)}
-                          className="ms-0.5 text-[var(--text-dim)] hover:text-rose-300"
-                          aria-label={`Remove ${file.name}`}
+                    {attachments.map((file, i) => {
+                      const preview = previews[i];
+                      if (preview) {
+                        return (
+                          /* The picture IS the chip. The remove control sits
+                             on the corner rather than beside it, so the
+                             thumbnail stays square and the row reads as a
+                             strip of images — the shape people already know
+                             from every other assistant. */
+                          <span
+                            key={`${file.name}-${i}`}
+                            className="group relative inline-block h-16 w-16 overflow-hidden rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)]"
+                            title={file.name}
+                          >
+                            {/* eslint-disable-next-line @next/next/no-img-element -- a local blob: URL; next/image cannot optimise one and would only add a loader in front of bytes we already hold */}
+                            <img src={preview} alt={file.name} className="h-full w-full object-cover" />
+                            <button
+                              type="button"
+                              onClick={() => removeAttachment(i)}
+                              className="absolute end-0.5 top-0.5 inline-flex h-5 w-5 items-center justify-center rounded-full bg-black/60 text-white opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100"
+                              aria-label={`Remove ${file.name}`}
+                            >
+                              <CrossIcon size={9} />
+                            </button>
+                          </span>
+                        );
+                      }
+                      return (
+                        <span
+                          key={`${file.name}-${i}`}
+                          className="inline-flex items-center gap-1.5 max-w-[200px] rounded-md border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-2 py-1 text-[11.5px] text-[var(--text-primary)]"
+                          title={file.name}
                         >
-                          <CrossIcon size={10} />
-                        </button>
-                      </span>
-                    ))}
+                          <span aria-hidden>📎</span>
+                          <span className="truncate">{file.name}</span>
+                          <button
+                            type="button"
+                            onClick={() => removeAttachment(i)}
+                            className="ms-0.5 text-[var(--text-dim)] hover:text-rose-300"
+                            aria-label={`Remove ${file.name}`}
+                          >
+                            <CrossIcon size={10} />
+                          </button>
+                        </span>
+                      );
+                    })}
                   </div>
                 )}
 
@@ -2296,6 +2457,7 @@ export default function KoleexAiApp() {
                       send();
                     }
                   }}
+                  onPaste={onPasteFiles}
                   placeholder={copy.placeholder}
                   rows={1}
                   dir={isRtl(input) ? "rtl" : "auto"}
@@ -2331,7 +2493,7 @@ export default function KoleexAiApp() {
                     <input
                       ref={fileInputRef}
                       type="file"
-                      accept=".pdf,.txt,.md,.markdown,.csv,.tsv,.json,.log,application/pdf,text/plain,text/markdown,text/csv,application/json"
+                      accept=".pdf,.txt,.md,.markdown,.csv,.tsv,.json,.log,.xlsx,.xlsm,.xls,.png,.jpg,.jpeg,.webp,.gif,application/pdf,text/plain,text/markdown,text/csv,application/json,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel,image/*"
                       multiple
                       onChange={onFilesPicked}
                       className="hidden"
@@ -2650,6 +2812,7 @@ function Bubble({
   userAvatar,
   userInitial,
   isLast,
+  answeredWith,
   canRegenerate,
   canEdit,
   onCopy,
@@ -2657,6 +2820,7 @@ function Bubble({
   onEdit,
   onSpeak,
   onFeedback,
+  onAnswerQuestion,
   lang,
   orbState = "idle",
   orbActivity = "none",
@@ -2665,6 +2829,7 @@ function Bubble({
   userAvatar?: string | null;
   userInitial: string;
   isLast?: boolean;
+  answeredWith?: string | null;
   /** Live orb reaction for THIS bubble — only the last assistant message
       gets a non-idle value (thinking/typing/success/error); the rest stay
       calm so the transcript doesn't twitch. */
@@ -2675,6 +2840,8 @@ function Bubble({
   onCopy?: (text: string, renderedEl?: HTMLElement | null) => Promise<boolean> | boolean;
   onRegenerate?: () => void;
   onEdit?: (newText: string) => void;
+  /** A clarifying option was tapped — send it as the next user message. */
+  onAnswerQuestion?: (answer: string) => void;
   /** Per-message TTS replay — gets the bubble's text and the chosen
    *  language; returns a handle the bubble can use to stop playback. */
   onSpeak?: (text: string) => void;
@@ -2689,6 +2856,19 @@ function Bubble({
   /* Memoised so the `?? []` fallback doesn't mint a new array each render
      and re-run everything downstream that depends on it. */
   const steps = useMemo(() => msg.steps ?? [], [msg.steps]);
+  /* MessageBubble takes `lang`, not the resolved dictionary — resolve it here
+     rather than threading another prop through every call site. */
+  const copy = COPY[lang] ?? COPY.en;
+  /* Which option was tapped, so the card can show the choice instead of
+     going inert. Local to the bubble — the real record of the choice is the
+     user message it sends. */
+  const [pickedOption, setPickedOption] = useState<string | null>(null);
+  /* The "something else" row. Owner asked for it explicitly: the composer
+     below could always take a free-text reply, but a row INSIDE the card is
+     where the eye already is, and it keeps "none of these" part of the same
+     choice rather than a separate act. */
+  const [otherOpen, setOtherOpen] = useState(false);
+  const [otherText, setOtherText] = useState("");
   const [copied, setCopied] = useState(false);
   const bubbleRef = useRef<HTMLDivElement | null>(null);
   const handleCopyClick = useCallback(async () => {
@@ -2837,9 +3017,198 @@ function Bubble({
               ) : (
                 msg.content
               )
-            ) : (
-              <MessageMarkdown content={msg.content} />
-            )}
+            ) : (() => {
+              /* THE QUESTION IS A CARD, not a paragraph with buttons under it.
+                 When the assistant asks, the whole reply IS the question, so
+                 the card carries it as its own heading and the plain markdown
+                 is skipped — rendering both would print the question twice.
+                 Only on the LAST message: these are live controls, and leaving
+                 them tappable half-way up a transcript invites someone to
+                 answer a question that was settled ten messages ago. */
+              const q = steps.find((st) => st.kind === "question")?.payload as
+                | {
+                    question?: string;
+                    lang?: "ar" | "zh" | "en";
+                    options?: Array<{
+                      label: string;
+                      detail?: string;
+                      recommended?: boolean;
+                      photo_url?: string;
+                    }>;
+                  }
+                | undefined;
+              const options = q?.options ?? [];
+              if (options.length === 0) {
+                return <MessageMarkdown content={msg.content} />;
+              }
+              /* The card OUTLIVES the answer. It stays in the transcript with
+                 the chosen row marked and the rest faded, because the question
+                 and the options are the context for everything said after it —
+                 collapsing back to a line of text loses why the answer took
+                 the shape it did. Only the LIVE card is tappable: an answered
+                 one, or one half-way up the transcript, is a record. */
+              /* The card labels itself in the language of the QUESTION, not the
+                 Hub's UI setting: the owner writes to Koleex AI in Arabic while
+                 his Hub is in English, and an Arabic card badged RECOMMENDED
+                 reads like two different products stapled together. Falls back
+                 to the UI copy when the server sent no language. */
+              const cardCopy = q?.lang ? COPY[q.lang] : copy;
+              const settled = answeredWith ?? pickedOption;
+              const live = isLast && !!onAnswerQuestion && !settled;
+              /* An answer that matches no option came through the "something
+                 else" row (or the composer). The card records it there, so the
+                 transcript still shows the question was answered — a settled
+                 card with nothing marked reads like it was ignored. */
+              const settledIsOther =
+                !!settled && !options.some((o) => o.label === settled);
+              const submitOther = () => {
+                const t = otherText.trim();
+                if (!t) return;
+                setPickedOption(t);
+                onAnswerQuestion?.(t);
+              };
+              return (
+                <div className="kx-glass-pop -mx-1 rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-3">
+                  <p className="mb-2.5 px-0.5 text-[13.5px] font-semibold text-[var(--text-primary)]">
+                    {q?.question || msg.content}
+                  </p>
+                  <div className="flex flex-col gap-1.5">
+                    {options.map((o, i) => {
+                      const chosen = settled === o.label;
+                      return (
+                        <button
+                          key={`${o.label}-${i}`}
+                          type="button"
+                          disabled={!live}
+                          onClick={() => { setPickedOption(o.label); onAnswerQuestion?.(o.label); }}
+                          className={`group w-full rounded-xl border px-3 py-2.5 text-start transition-all ${
+                            chosen
+                              ? "border-[var(--border-focus)] bg-[var(--bg-surface-subtle)]"
+                              : !live
+                                /* The unpicked options fade rather than vanish:
+                                   the transcript should still show what the
+                                   choice WAS, not just what was chosen. */
+                                ? "border-[var(--border-subtle)] opacity-40"
+                                : "border-[var(--border-subtle)] bg-[var(--bg-secondary)] hover:border-[var(--border-focus)] hover:bg-[var(--bg-surface-subtle)]"
+                          } ${live ? "cursor-pointer" : "cursor-default"}`}
+                        >
+                          <span className="flex items-center gap-2">
+                            {/* A radio mark, so the row reads as "choose one"
+                                before it is read as "press me". */}
+                            <span
+                              aria-hidden
+                              className={`inline-flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-full border ${
+                                chosen ? "border-[var(--border-focus)]" : "border-[var(--border-color)]"
+                              }`}
+                            >
+                              {chosen && <span className="h-1.5 w-1.5 rounded-full bg-[var(--text-primary)]" />}
+                            </span>
+                            {/* The product's real photo when the tool resolved
+                                one from its code. Machines are far easier to
+                                tell apart by sight than by code. */}
+                            {o.photo_url && (
+                              // eslint-disable-next-line @next/next/no-img-element
+                              <img
+                                src={o.photo_url}
+                                alt=""
+                                loading="lazy"
+                                className="h-9 w-9 shrink-0 rounded-lg border border-[var(--border-subtle)] object-cover"
+                              />
+                            )}
+                            <span className="text-[13px] font-medium text-[var(--text-primary)]">{o.label}</span>
+                            {o.recommended && (
+                              <span className="ms-auto shrink-0 rounded-full border border-[var(--border-focus)] px-1.5 py-px text-[9.5px] font-bold uppercase tracking-wider text-[var(--text-muted)]">
+                                {cardCopy.recommended}
+                              </span>
+                            )}
+                          </span>
+                          {o.detail && (
+                            <span
+                              className={`mt-1 block text-[11.5px] leading-snug text-[var(--text-dim)] ${
+                                o.photo_url ? "ps-[58px]" : "ps-[22px]"
+                              }`}
+                            >
+                              {o.detail}
+                            </span>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  {/* No "Other" button: the composer is directly below and
+                      already does that job better than a control whose only
+                      action is to focus the composer. */}
+                  {/* "Something else" — the last row, not a paragraph under
+                      the card, so it reads as one more choice in the same
+                      list. Tapping it opens a field IN PLACE rather than
+                      sending the user down to the composer and back. */}
+                  {(live || settledIsOther) && (
+                    <div className="mt-1.5">
+                      {settledIsOther ? (
+                        <div className="w-full rounded-xl border border-[var(--border-focus)] bg-[var(--bg-surface-subtle)] px-3 py-2.5 text-start">
+                          <span className="flex items-center gap-2">
+                            <span
+                              aria-hidden
+                              className="inline-flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-full border border-[var(--border-focus)]"
+                            >
+                              <span className="h-1.5 w-1.5 rounded-full bg-[var(--text-primary)]" />
+                            </span>
+                            <span className="text-[13px] font-medium text-[var(--text-primary)]">
+                              {cardCopy.otherOption}
+                            </span>
+                          </span>
+                          <span className="mt-1 block ps-[22px] text-[11.5px] leading-snug text-[var(--text-dim)]">
+                            {settled}
+                          </span>
+                        </div>
+                      ) : otherOpen ? (
+                        <div className="flex items-center gap-1.5 rounded-xl border border-[var(--border-focus)] bg-[var(--bg-secondary)] px-2.5 py-1.5">
+                          <input
+                            autoFocus
+                            dir="auto"
+                            value={otherText}
+                            onChange={(e) => setOtherText(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") { e.preventDefault(); submitOther(); }
+                              if (e.key === "Escape") { setOtherOpen(false); setOtherText(""); }
+                            }}
+                            placeholder={cardCopy.otherPlaceholder}
+                            className="min-w-0 flex-1 bg-transparent py-1 text-[13px] text-[var(--text-primary)] outline-none placeholder:text-[var(--text-dim)]"
+                          />
+                          <button
+                            type="button"
+                            onClick={submitOther}
+                            disabled={!otherText.trim()}
+                            className="shrink-0 rounded-lg border border-[var(--border-subtle)] px-2.5 py-1 text-[11.5px] font-medium text-[var(--text-primary)] transition-colors hover:border-[var(--border-focus)] hover:bg-[var(--bg-surface-subtle)] disabled:opacity-40"
+                          >
+                            {cardCopy.otherSend}
+                          </button>
+                        </div>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => setOtherOpen(true)}
+                          className="group w-full cursor-pointer rounded-xl border border-dashed border-[var(--border-subtle)] px-3 py-2.5 text-start transition-all hover:border-[var(--border-focus)] hover:bg-[var(--bg-surface-subtle)]"
+                        >
+                          <span className="flex items-center gap-2">
+                            <span
+                              aria-hidden
+                              className="inline-flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-full border border-dashed border-[var(--border-color)]"
+                            />
+                            <span className="text-[13px] font-medium text-[var(--text-primary)]">
+                              {cardCopy.otherOption}
+                            </span>
+                          </span>
+                          <span className="mt-1 block ps-[22px] text-[11.5px] leading-snug text-[var(--text-dim)]">
+                            {cardCopy.otherPlaceholder}
+                          </span>
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
           </div>
         )}
         {/* Phase 13: user-side action row — Edit (re-runs the turn

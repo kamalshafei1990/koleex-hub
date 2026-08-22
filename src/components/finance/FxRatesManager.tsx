@@ -10,6 +10,7 @@
    --------------------------------------------------------------------------- */
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useWarmData } from "@/lib/warm-cache";
 import ConfirmDialog from "@/components/kds/ConfirmDialog";
 import Link from "next/link";
 import {
@@ -48,16 +49,15 @@ interface FxStatus {
   stale_pairs: PairUsage[];
 }
 
+type FxSnap = { rates: RateRow[]; status: FxStatus | null };
+
 export default function FxRatesManager() {
   const { t } = useTranslation(financeT);
-  const [rates, setRates] = useState<RateRow[]>([]);
-  const [status, setStatus] = useState<FxStatus | null>(null);
   /* Base currency comes from the shared cached hook. It feeds both the
      display labels and the "To" select default — once it resolves, the
      form auto-flips from "USD" → tenant base. */
   const baseCurrencyResolved = useBaseCurrencyOptional();
   const baseCurrency = baseCurrencyResolved ?? "";
-  const [loading, setLoading] = useState(true);
   const [error,   setError]   = useState<string | null>(null);
 
   /* Form state */
@@ -75,22 +75,21 @@ export default function FxRatesManager() {
     if (baseCurrencyResolved && !toTouched) setTo(baseCurrencyResolved);
   }, [baseCurrencyResolved, toTouched]);
 
-  const load = useCallback(async () => {
-    setLoading(true); setError(null);
-    try {
-      const [rRes, sRes] = await Promise.all([
-        fetch("/api/finance/fx/rates", { cache: "no-store" }),
-        fetch("/api/finance/fx/status", { cache: "no-store" }),
-      ]);
-      const rJ = await rRes.json();
-      const sJ = await sRes.json().catch(() => ({}));
-      if (!rRes.ok) throw new Error(humanizeError(rJ.error || `HTTP ${rRes.status}`));
-      setRates(rJ.rates ?? []);
-      if (sJ.status) setStatus(sJ.status as FxStatus);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
-    } finally { setLoading(false); }
+  /* Warm: no filter goes to the server, so the response IS the default
+     view. Paints from the last answer on the first frame. */
+  const fetchAll = useCallback(async (): Promise<FxSnap> => {
+    const [rRes, sRes] = await Promise.all([
+      fetch("/api/finance/fx/rates", { cache: "no-store" }),
+      fetch("/api/finance/fx/status", { cache: "no-store" }),
+    ]);
+    const rJ = await rRes.json();
+    const sJ = await sRes.json().catch(() => ({}));
+    if (!rRes.ok) throw new Error(humanizeError(rJ.error || `HTTP ${rRes.status}`));
+    return { rates: rJ.rates ?? [], status: (sJ.status as FxStatus) ?? null };
   }, []);
+  const { data, loading, error: loadError, reload: load } = useWarmData<FxSnap>("fin:fx", fetchAll);
+  const rates = useMemo(() => data?.rates ?? [], [data]);
+  const status = data?.status ?? null;
 
   useEffect(() => { load(); }, [load]);
 
@@ -167,7 +166,10 @@ export default function FxRatesManager() {
         </Link>
       }
     >
-      {error && <div className="rounded-md border border-rose-500/60 dark:border-rose-300/40 bg-rose-500/12 dark:bg-rose-300/[0.06] px-3 py-2 text-[12px] text-rose-700 dark:text-rose-200">{error}</div>}
+      {/* `error` is this screen's own form validation; loadError comes from
+          the fetch. Both belong in the same banner — a failed refresh must
+          not be silent just because the warm list is still on screen. */}
+      {Boolean(error || loadError) && <div className="rounded-md border border-rose-500/60 dark:border-rose-300/40 bg-rose-500/12 dark:bg-rose-300/[0.06] px-3 py-2 text-[12px] text-rose-700 dark:text-rose-200">{error ?? String(humanizeError(loadError instanceof Error ? loadError.message : String(loadError)))}</div>}
 
       {/* Status — pairs in use + missing + stale */}
       {status && (status.missing_pairs.length > 0 || status.stale_pairs.length > 0 || status.pairs.length > 0) && (

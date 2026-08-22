@@ -11,7 +11,7 @@
    for non-physical types.
    --------------------------------------------------------------------------- */
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { useTranslation } from "@/lib/i18n";
 import { inventoryT } from "@/lib/translations/inventory";
 import InventoryHeader from "@/components/inventory/InventoryHeader";
@@ -23,6 +23,7 @@ import {
 import { ALLOWED_LOCATION_TYPES, type LocationType, type Warehouse } from "@/lib/inventory/types";
 import RrIcon from "@/components/ui/RrIcon";
 import { humanizeError } from "@/lib/ui/humanize-error";
+import { useWarmData } from "@/lib/warm-cache";
 import { kxInspectAttrs } from "@/lib/qa/inspector";
 
 /* Friendly labels for the picker. Mirrors the chip vocabulary in
@@ -42,28 +43,21 @@ const LOCATION_TYPE_LABELS: Record<LocationType, string> = {
 
 export default function InventoryWarehouses() {
   const { t } = useTranslation(inventoryT);
-  const [rows, setRows] = useState<Warehouse[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [filterType, setFilterType] = useState<"" | LocationType>("");
   const [drawerOpen, setDrawerOpen] = useState(false);
 
+  /* Warm: this endpoint takes no filters, so the response IS the default
+     view and can be mirrored under a plain key. The list paints from the
+     last answer on the first frame and refreshes behind it. */
   const load = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const r = await fetch("/api/inventory/warehouses", { credentials: "include", cache: "no-store" });
-      const j = await r.json();
-      if (!r.ok) throw new Error(humanizeError(j.error ?? `HTTP ${r.status}`));
-      setRows((j.warehouses ?? []) as Warehouse[]);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
-    } finally {
-      setLoading(false);
-    }
+    const r = await fetch("/api/inventory/warehouses", { credentials: "include", cache: "no-store" });
+    const j = await r.json();
+    if (!r.ok) throw new Error(humanizeError(j.error ?? `HTTP ${r.status}`));
+    return (j.warehouses ?? []) as Warehouse[];
   }, []);
-
-  useEffect(() => { void load(); }, [load]);
+  const { data, loading, error: loadError, reload } = useWarmData<Warehouse[]>("inv:warehouses", load);
+  const rows = useMemo(() => data ?? [], [data]);
+  const error = loadError ? (loadError instanceof Error ? loadError.message : String(loadError)) : null;
 
   const visible = useMemo(() => {
     if (!filterType) return rows;
@@ -189,7 +183,7 @@ export default function InventoryWarehouses() {
       {drawerOpen && (
         <NewLocationDrawer
           onClose={() => setDrawerOpen(false)}
-          onSuccess={() => { setDrawerOpen(false); void load(); }}
+          onSuccess={() => { setDrawerOpen(false); void reload(); }}
         />
       )}
     </div>

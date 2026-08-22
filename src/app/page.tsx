@@ -35,6 +35,28 @@ import { useAfterInteractive } from "@/lib/perf/use-after-interactive";
 import { usePermittedModules } from "@/lib/use-scope";
 import { getMeBootstrapLastError, retryMeBootstrap, useMeBootstrap } from "@/lib/me-bootstrap";
 import { useShortcutHint } from "@/lib/ui/use-shortcut-hint";
+/* Home dashboard is code-split: it only matters after the grid is usable,
+   and keeping it out of the critical chunk protects the home budget. */
+const HomeDashboard = dynamic(() => import("@/components/home/HomeDashboard"), { ssr: false });
+/* ── DARK-LAUNCH SWITCH (owner rule, 2026-08-20; widened 2026-08-22) ──
+   The dashboard is still being built and must NOT appear on production —
+   but three sessions share this tree and any of them pushing main would
+   carry it out. This gate keeps it dark wherever the flag is absent, and
+   is inlined at build time so a build without it tree-shakes the chunk
+   away entirely.
+
+   The `NODE_ENV === "development"` half is GONE on purpose. Production was
+   already clean — measured 2026-08-22, zero dashboard cards on prod Home —
+   but a development tree still painted 56 of them, which is what the owner
+   was actually looking at when he said "remove any dashboard cards from
+   home screen, we will work on it later then add it back". Off everywhere
+   is the honest reading of that, and it keeps every session's local Home
+   showing the same thing production shows.
+
+   TO BRING IT BACK: set NEXT_PUBLIC_HOME_DASHBOARD=1 (locally in
+   .env.local, or on Vercel when it is ready to ship). No code change —
+   the component, its data route and its widgets are all untouched. */
+const HOME_DASHBOARD_ON = process.env.NEXT_PUBLIC_HOME_DASHBOARD === "1";
 import { useSkin } from "@/lib/appearance";
 /* A canvas and a draw loop must never sit in Home's boot chunk — Home is the
    most-opened screen in the Hub and its budget is the tightest one there is.
@@ -920,7 +942,7 @@ export default function HomePage() {
         .kx-grid > * { animation: kx-tile-in 150ms ease-out both; }
         @media (prefers-reduced-motion: reduce) { .kx-grid > * { animation: none; } }
       `}</style>
-      <div className="relative z-10 px-4 md:px-10 py-5 md:py-6 pb-20 max-w-[1400px] mx-auto">
+      <div data-kx-home-stage="" className="relative z-10 px-4 md:px-10 py-5 md:py-6 pb-20 max-w-[1400px] mx-auto">
 
         {/* ── Header: Greeting + Clock + Date ── */}
         {/* min-height = card (~96px) + the orb's 27px float amplitude on
@@ -983,6 +1005,12 @@ export default function HomePage() {
           </div>
         </div>
 
+        {/* ── Zone B: the Dashboard (owner call 2026-08-20: the FULL dashboard
+            lives on Home, in the slab style cloned from his references).
+            One request (/api/dashboard, no-store), server-side permission
+            filtering, renders nothing at all for accounts with no visible
+            widgets — the grid below is untouched for them. */}
+        {HOME_DASHBOARD_ON && <HomeDashboard />}
 
         {/* Mobile-resilience: while the permission bootstrap is in
             flight or has failed (timeout / 5xx / lost mobile signal),

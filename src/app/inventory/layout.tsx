@@ -26,6 +26,7 @@
    --------------------------------------------------------------------------- */
 
 import { usePathname } from "next/navigation";
+import RouteTabPane from "@/components/ui/RouteTabPane";
 import dynamic from "next/dynamic";
 import InventoryHeader from "@/components/inventory/InventoryHeader";
 import { InventoryShortcutsLegend } from "@/components/inventory/InventoryUx";
@@ -88,7 +89,7 @@ export default function InventoryLayout({ children }: { children: React.ReactNod
       )}
       <div className="relative z-[1] mx-auto max-w-[1500px] space-y-5 px-4 py-6 sm:px-6">
         <InventoryHeader title={meta.title} subtitle={meta.subtitle} />
-        {children}
+        <RouteTabPane>{children}</RouteTabPane>
       </div>
       {/* GEN-8 — discoverable keyboard-shortcuts legend (desktop). */}
       <InventoryShortcutsLegend />

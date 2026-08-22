@@ -29,7 +29,18 @@ const searchKnowledge: ToolDef<{ query: string }, { hits: Hit[] }> = {
     },
     required: ["query"],
   },
-  requiredModule: undefined,
+  /* No module of its own — the knowledge plane is not a Hub module — so the
+     bar is expressed as a ROLE tier instead. It has to be expressed somehow:
+     `requiredModule: undefined` means dispatchTool's module guard is skipped
+     entirely, and this tool was reaching the whole approved corpus for any
+     internal user while /ai/knowledge redirects non-super-admins and every
+     one of its API routes answers 403. A person who cannot open Knowledge
+     could still read it, with source title and page, by asking the agent.
+     Same bar as the plane it reads from — and expressed as a MODULE rather
+     than a role tier, so the super admin can grant it to named accounts
+     instead of the choice being his-only-or-everyone. Deny-by-default: a
+     role with no row gets nothing; super admins short-circuit to allowed. */
+  requiredModule: "AI Knowledge",
   requiredAction: "view",
   handler: async (ctx, args): Promise<ToolResult<{ hits: Hit[] }>> => {
     const q = String(args.query ?? "").trim();

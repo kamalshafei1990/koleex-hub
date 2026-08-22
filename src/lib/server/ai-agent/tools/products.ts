@@ -12,6 +12,8 @@ import { supabaseServer } from "../../supabase-server";
 import { hasProductCostAccess, stripSecrets, SECRET_MODEL_FIELDS } from "../../product-access";
 import type { ToolDef, ToolResult } from "../types";
 import { filterFieldsMany } from "../permissions";
+import { mainPhotoByProduct } from "../../product-photos";
+import { hasProductDataAccess } from "../../product-access";
 
 const PRODUCT_MODULE = "Products";
 
@@ -20,6 +22,17 @@ const PRODUCT_MODULE = "Products";
    tables (product_suppliers, landed_cost_calculations, etc.) — they're
    NOT on the products row, so SELECTing them would error. We expose
    the neutral catalog fields here and keep cost joins as future tools. */
+/* What a CATALOGUE viewer may see — the fields the public product page
+   already shows. An allowlist, not a subtraction: a new column added to
+   products tomorrow is invisible here by default, which is the only way a
+   list like this stays safe without anyone remembering to update it. */
+const CATALOGUE_FIELDS = [
+  "id", "product_name", "slug", "brand", "division_slug", "category_slug",
+  "subcategory_slug", "family", "description", "hs_code", "voltage",
+  "plug_types", "watt", "colors", "warranty", "lead_time",
+  "country_of_origin",
+] as const;
+
 const PRODUCT_SELECT = `id, product_name, slug, brand, division_slug,
   category_slug, subcategory_slug, family, level, description, hs_code,
   voltage, plug_types, watt, colors, warranty, moq, lead_time,
@@ -84,12 +97,43 @@ const searchProducts: ToolDef<
     const rows = (data ?? []) as Array<Record<string, unknown>>;
     const { filtered, stripped } = filterFieldsMany(ctx, "products", rows);
 
+    /* ⚠️ TWO APPS, TWO TRUTHS. Both product tools are gated on "Products" —
+       the CATALOGUE module — while the rows they read come from the Product
+       Data tables. So anyone who could open the catalogue was getting the
+       working record through the assistant: draft rows, internal status,
+       visibility flags, the lot. Owner: "for other accounts or customers he
+       only can know the products information from Products app, not Product
+       Data — Product Data has very sensitive data."
+       So the SOURCE now follows the account. With Product Data access you get
+       the record; without it you get the catalogue, which means active
+       products only and only the fields the public product page shows. */
+    const catalogueOnly = !(await hasProductDataAccess(ctx.auth));
+    const shaped = catalogueOnly
+      ? (filtered as Array<Record<string, unknown>>)
+          .filter((r) => String(r.status ?? "").toLowerCase() === "active")
+          .map((r) => {
+            const out: Record<string, unknown> = {};
+            for (const k of CATALOGUE_FIELDS) if (k in r) out[k] = r[k];
+            return out;
+          })
+      : (filtered as Array<Record<string, unknown>>);
+
+    /* A photo per row, so a comparison can SHOW the machines instead of
+       listing their names. Same hero-then-order rule the catalogue uses, so
+       the assistant never displays a different picture from the product
+       page for the same product. */
+    const photos = await mainPhotoByProduct(rows.map((r) => String(r.id ?? "")));
+    const withPhotos = shaped.map((r) => {
+      const url = photos[String(r.id ?? "")];
+      return url ? { ...r, photo_url: url } : r;
+    });
+
     return {
       ok: true,
       permissionStatus: stripped.length > 0 ? "limited" : "allowed",
       data: {
         total,
-        products: filtered as Array<Record<string, unknown>>,
+        products: withPhotos,
       },
       message: q
         ? `Found ${filtered.length} of ${total} visible products matching "${q}".`
@@ -100,30 +144,31 @@ const searchProducts: ToolDef<
   },
 };
 
+/* The old optional `family` filter matched the retired products.family
+   text column (null catalog-wide), so any family-filtered count came back
+   0 and lied. Family questions belong to getCatalogStats, which derives
+   families from product_models. */
 const countProducts: ToolDef<
-  { brand?: string; family?: string },
-  { total: number; brand?: string; family?: string }
+  { brand?: string },
+  { total: number; brand?: string }
 > = {
   name: "countProducts",
-  description: "Count visible products in the catalog. Optional filters: brand, family.",
+  description: "Count visible products in the catalog. Optional filter: brand. For family/model counts use getCatalogStats.",
   parameters: {
     type: "object",
     properties: {
       brand: { type: "string", description: "Optional brand filter." },
-      family: { type: "string", description: "Optional family filter." },
     },
   },
   requiredModule: PRODUCT_MODULE,
   requiredAction: "view",
-  handler: async (_ctx, args): Promise<ToolResult<{ total: number; brand?: string; family?: string }>> => {
+  handler: async (_ctx, args): Promise<ToolResult<{ total: number; brand?: string }>> => {
     let query = supabaseServer
       .from("products")
       .select("id", { count: "exact", head: true })
       .eq("visible", true);
     const brand = (args.brand as string | undefined)?.trim();
-    const family = (args.family as string | undefined)?.trim();
     if (brand) query = query.ilike("brand", sanitizePostgrestLike(brand));
-    if (family) query = query.ilike("family", sanitizePostgrestLike(family));
     const { count, error } = await query;
     if (error) {
       console.error("[tool.countProducts]", error);
@@ -137,29 +182,37 @@ const countProducts: ToolDef<
     return {
       ok: true,
       permissionStatus: "allowed",
-      data: { total: count ?? 0, brand, family },
-      message: `${count ?? 0} visible product(s)${brand ? ` (brand: ${brand})` : ""}${family ? ` (family: ${family})` : ""}.`,
+      data: { total: count ?? 0, brand },
+      message: `${count ?? 0} visible product(s)${brand ? ` (brand: ${brand})` : ""}.`,
       sources: ["products(count)"],
     };
   },
 };
 
+/* ⚠️ THE OLD VERSION LIED (owner: "this is wrong", 2026-08-21): it counted
+   the LEGACY `products.family` text column — null on the whole catalog — and
+   answered "0 families" for a catalog whose real taxonomy is:
+   · a FAMILY = one product row with MULTIPLE models in product_models
+     (the owner standard: family=product, members=models);
+   · the CLASSIFICATION = division_slug / category_slug / subcategory_slug.
+   The stats now come from those real sources. */
 const getCatalogStats: ToolDef<
   Record<string, never>,
-  { total_products: number; brands: Array<{ brand: string; count: number }>; families: Array<{ family: string; count: number }> }
+  Record<string, unknown>
 > = {
   name: "getCatalogStats",
-  description: "Catalog overview: total products + breakdown by brand and family.",
+  description:
+    "Catalog overview from the REAL taxonomy: total products, brands, divisions and categories (division/category/subcategory classification), and family stats — a family is one product with multiple models; standalone products have one model. Use for 'how many families/categories/divisions' questions.",
   parameters: { type: "object", properties: {} },
   requiredModule: PRODUCT_MODULE,
   requiredAction: "view",
-  handler: async (): Promise<ToolResult<{ total_products: number; brands: Array<{ brand: string; count: number }>; families: Array<{ family: string; count: number }> }>> => {
-    const { data, error } = await supabaseServer
-      .from("products")
-      .select("brand, family")
-      .eq("visible", true);
-    if (error || !data) {
-      console.error("[tool.getCatalogStats]", error);
+  handler: async (): Promise<ToolResult<Record<string, unknown>>> => {
+    const [prodRes, modelRes] = await Promise.all([
+      supabaseServer.from("products").select("id, brand, division_slug, category_slug, subcategory_slug").eq("visible", true),
+      supabaseServer.from("product_models").select("product_id"),
+    ]);
+    if (prodRes.error || !prodRes.data || modelRes.error) {
+      console.error("[tool.getCatalogStats]", prodRes.error ?? modelRes.error);
       return {
         ok: false,
         permissionStatus: "denied",
@@ -167,30 +220,54 @@ const getCatalogStats: ToolDef<
         message: "Couldn't load catalog stats.",
       };
     }
-    const brands = new Map<string, number>();
-    const families = new Map<string, number>();
-    for (const row of data) {
-      if (row.brand) brands.set(row.brand, (brands.get(row.brand) ?? 0) + 1);
-      if (row.family) families.set(row.family, (families.get(row.family) ?? 0) + 1);
+    const rows = prodRes.data;
+    const count = (key: "brand" | "division_slug" | "category_slug" | "subcategory_slug") => {
+      const m = new Map<string, number>();
+      for (const r of rows) {
+        const v = r[key];
+        if (v) m.set(String(v), (m.get(String(v)) ?? 0) + 1);
+      }
+      return m;
+    };
+    const top = (m: Map<string, number>, n: number) =>
+      [...m.entries()].map(([name, c]) => ({ name, count: c })).sort((a, b) => b.count - a.count).slice(0, n);
+
+    const brands = count("brand");
+    const divisions = count("division_slug");
+    const categories = count("category_slug");
+    const subcategories = count("subcategory_slug");
+
+    const visibleIds = new Set(rows.map((r) => r.id as string));
+    const modelsPerProduct = new Map<string, number>();
+    for (const m of (modelRes.data ?? []) as Array<{ product_id: string }>) {
+      if (!visibleIds.has(m.product_id)) continue;
+      modelsPerProduct.set(m.product_id, (modelsPerProduct.get(m.product_id) ?? 0) + 1);
     }
-    const topBrands = [...brands.entries()]
-      .map(([brand, count]) => ({ brand, count }))
-      .sort((a, b) => b.count - a.count)
-      .slice(0, 10);
-    const topFamilies = [...families.entries()]
-      .map(([family, count]) => ({ family, count }))
-      .sort((a, b) => b.count - a.count)
-      .slice(0, 10);
+    let familyProducts = 0, totalModels = 0;
+    for (const n of modelsPerProduct.values()) {
+      totalModels += n;
+      if (n > 1) familyProducts++;
+    }
+
     return {
       ok: true,
       permissionStatus: "allowed",
       data: {
-        total_products: data.length,
-        brands: topBrands,
-        families: topFamilies,
+        total_products: rows.length,
+        brands: top(brands, 10),
+        divisions: top(divisions, 12),
+        categories: top(categories, 15),
+        subcategory_count: subcategories.size,
+        families: {
+          definition: "a family = one product with multiple models (members)",
+          family_products: familyProducts,
+          standalone_products: modelsPerProduct.size - familyProducts,
+          products_without_models: rows.length - modelsPerProduct.size,
+          total_models: totalModels,
+        },
       },
-      message: `Catalog: ${data.length} products across ${brands.size} brands and ${families.size} families.`,
-      sources: ["products(stats)"],
+      message: `Catalog: ${rows.length} products (${totalModels} models — ${familyProducts} families with multiple members), ${brands.size} brand(s), ${divisions.size} division(s), ${categories.size} categories, ${subcategories.size} subcategories.`,
+      sources: ["products(stats)", "product_models(stats)"],
     };
   },
 };
@@ -246,6 +323,30 @@ const getProductByCode: ToolDef<
         message: `No product matched "${code}".`,
       };
     }
+    /* Same two-app rule as the other reads: a catalogue account gets the
+       catalogue, so a product that is not published simply is not there. */
+    if (!(await hasProductDataAccess(ctx.auth))) {
+      const row = data as Record<string, unknown>;
+      const published = String(row.status ?? "").toLowerCase() === "active" && row.visible !== false;
+      if (!published) {
+        return {
+          ok: true,
+          permissionStatus: "allowed",
+          data: null,
+          message: `No product matched "${code}". Say you don't have one by that name — never mention drafts or internal records.`,
+        };
+      }
+      const publicRow: Record<string, unknown> = {};
+      for (const k of CATALOGUE_FIELDS) if (k in row) publicRow[k] = row[k];
+      return {
+        ok: true,
+        permissionStatus: "limited",
+        data: publicRow,
+        message: `Catalogue record for "${String(row.product_name ?? code)}".`,
+        sources: ["products(catalog)"],
+      };
+    }
+
     const { filtered, stripped } = filterFieldsMany(ctx, "products", [
       data as Record<string, unknown>,
     ]);
@@ -329,12 +430,13 @@ const getProductFullDetails: ToolDef<
 
     const canSeeCosts = await hasProductCostAccess(ctx.auth);
 
-    const [prodRes, modelsRes, mediaRes, docsRes, certsRes, linksRes] = await Promise.all([
+    const [prodRes, modelsRes, mediaRes, docsRes, certsRes, featRes, linksRes] = await Promise.all([
       supabaseServer.from("products").select("*").eq("id", productId).maybeSingle(),
       supabaseServer.from("product_models").select("*").eq("product_id", productId).order("order", { ascending: true }),
       supabaseServer.from("product_media").select("type, model_id, url").eq("product_id", productId),
       supabaseServer.from("product_documents").select("doc_type, title, language, version").eq("product_id", productId),
       supabaseServer.from("product_certifications").select("cert_type, certified_standard, cert_number, issuer, expiry_date, status").eq("product_id", productId),
+      supabaseServer.from("product_feature_highlights").select("title, title_zh, title_ar, description, description_zh, description_ar, model_id").eq("product_id", productId).order("sort", { ascending: true }),
       canSeeCosts
         ? supabaseServer
             .from("product_suppliers")
@@ -389,6 +491,70 @@ const getProductFullDetails: ToolDef<
       const t = String(m.type ?? "other");
       mediaSummary[t] = (mediaSummary[t] ?? 0) + 1;
     }
+    /* THE URLS, NOT JUST A TALLY. This used to hand the model "photo: 4" and
+       keep the four addresses to itself, so an assistant that could render a
+       picture perfectly well had nothing to render. The photo is neutral
+       catalogue data — the same one any viewer sees on the product page —
+       so it needs no permission of its own beyond the module check this
+       tool already passed. */
+    const photoMap = await mainPhotoByProduct([productId]);
+    const mainPhoto = photoMap[productId] ?? null;
+    /* A handful, not the whole gallery: the model only ever shows one or two,
+       and a long list of URLs is prompt weight that buys nothing. */
+    const photoUrls = media
+      .filter((m) => String(m.type ?? "") === "photo" || String(m.type ?? "") === "image")
+      .map((m) => String(m.url ?? ""))
+      .filter(Boolean)
+      .slice(0, 6);
+
+    /* ⚠️ THE SAME TWO-APP RULE, and this is where it matters most: this tool
+       returns the WORKING RECORD — every column of products and
+       product_models, documents, certifications, the lot. Gated on the
+       catalogue module, it was handing that record to anyone who could open
+       the catalogue.
+       Without Product Data access the answer becomes the catalogue answer: a
+       product that is not active does not exist, and what comes back is the
+       public shape — no status, no visibility, no internal fields, no model
+       internals. Costs and suppliers were already gated separately and stay
+       gated. */
+    const catalogueOnly = !(await hasProductDataAccess(ctx.auth));
+    if (catalogueOnly) {
+      const isActive = String(product.status ?? "").toLowerCase() === "active"
+        && product.visible !== false;
+      if (!isActive) {
+        return {
+          ok: false,
+          permissionStatus: "denied",
+          data: null,
+          message:
+            "That product is not published in the catalogue. Tell the user you don't have a product by that name — do NOT mention drafts, internal records or Product Data.",
+        };
+      }
+      const publicProduct: Record<string, unknown> = {};
+      for (const k of CATALOGUE_FIELDS) if (k in product) publicProduct[k] = (product as Record<string, unknown>)[k];
+      return {
+        ok: true,
+        permissionStatus: "limited",
+        data: {
+          product: publicProduct,
+          /* Model CODES only — the family shape a customer-facing answer
+             needs, without the per-model working data behind it. */
+          family: {
+            is_family: models.length > 1,
+            member_count: models.length,
+            member_codes: models
+              .map((m) => (m.primary_model as string) || (m.model_name as string))
+              .filter(Boolean),
+          },
+          main_photo_url: (await mainPhotoByProduct([productId]))[productId] ?? null,
+          certifications: certsRes.data ?? [],
+          feature_highlights: featRes.error ? [] : (featRes.data ?? []),
+        },
+        message:
+          `Catalogue record for "${product.product_name}". This account sees the published catalogue, not the internal Product Data record — answer from these fields only and never imply more exists.`,
+        sources: [`products(catalog id=${String(productId).slice(0, 8)})`],
+      };
+    }
 
     const payload: Record<string, unknown> = {
       matched_model: matchedModel,
@@ -400,8 +566,14 @@ const getProductFullDetails: ToolDef<
       },
       models,
       media_summary: mediaSummary,
+      main_photo_url: mainPhoto,
+      photo_urls: photoUrls,
       documents: docsRes.data ?? [],
       certifications: certsRes.data ?? [],
+      /* catalog-style feature cards (photo + explanation) — neutral catalog
+         data, safe for every viewer; errors tolerated (table may not exist
+         until its migration is applied) */
+      feature_highlights: featRes.error ? [] : (featRes.data ?? []),
       ...(canSeeCosts
         ? { suppliers }
         : {
@@ -422,8 +594,115 @@ const getProductFullDetails: ToolDef<
   },
 };
 
+/* ── DATA-COMPLETENESS AUDIT — the owner's question the agent could not
+   answer (2026-08-20): "how many products have no price?" The agent sampled
+   and apologised because no tool aggregates across the catalog. This one
+   does, server-side, over ALL products (Product Data's own view — drafts
+   included, which is why it gates on the Product Data module, not the
+   ACTIVE-only Products lens).
+
+   Money scoping, same as the app: SELLING price presence is neutral catalog
+   data. COST-side completeness (model cost_price, supplier unit_cost_cny)
+   is included ONLY with hasProductCostAccess — otherwise the payload says
+   RESTRICTED explicitly so the AI reports the permission, never guesses. */
+const auditProductData: ToolDef<
+  { examples_limit?: number },
+  Record<string, unknown>
+> = {
+  name: "auditProductData",
+  description:
+    "AGGREGATE data-completeness audit across the WHOLE Product Data catalog (all statuses, drafts included). Answers any 'how many products have no / are missing X' question with exact counts and example product names: selling price (global_price on models), media/photos, description, HS code, certifications, plus status breakdown. Cost-side completeness (cost prices, supplier costs) is included only for accounts with Product Data cost permission. ALWAYS use this instead of sampling products one by one.",
+  parameters: {
+    type: "object",
+    properties: {
+      examples_limit: { type: "integer", description: "Max example product names per gap list. Default 15, cap 40." },
+    },
+  },
+  requiredModule: "Product Data",
+  requiredAction: "view",
+  handler: async (ctx, args): Promise<ToolResult<Record<string, unknown>>> => {
+    const exLimit = Math.min(Math.max(Number(args.examples_limit ?? 15) || 15, 1), 40);
+    const canSeeCosts = await hasProductCostAccess(ctx.auth);
+
+    const [prodRes, modelRes, mediaRes, certRes, linkRes] = await Promise.all([
+      supabaseServer.from("products").select("id, product_name, status, description, hs_code"),
+      supabaseServer.from("product_models").select("product_id, global_price" + (canSeeCosts ? ", cost_price" : "")),
+      supabaseServer.from("product_media").select("product_id"),
+      supabaseServer.from("product_certifications").select("product_id"),
+      canSeeCosts
+        ? supabaseServer.from("product_suppliers").select("product_id, unit_cost_cny")
+        : Promise.resolve({ data: null, error: null }),
+    ]);
+    if (prodRes.error || modelRes.error || mediaRes.error || certRes.error || linkRes.error) {
+      console.error("[tool.auditProductData]", prodRes.error ?? modelRes.error ?? mediaRes.error ?? certRes.error ?? linkRes.error);
+      return { ok: false, permissionStatus: "denied", data: null, message: "Couldn't run the product data audit right now." };
+    }
+
+    const products = (prodRes.data ?? []) as Array<{ id: string; product_name: string | null; status: string | null; description: string | null; hs_code: string | null }>;
+    /* the conditional select string defeats supabase's inference — cast
+       through unknown; the columns are exactly what the string names */
+    const models = (modelRes.data ?? []) as unknown as Array<{ product_id: string; global_price: unknown; cost_price?: unknown }>;
+
+    const hasSelling = new Set<string>();
+    const hasCost = new Set<string>();
+    const modelsOf = new Map<string, number>();
+    for (const m of models) {
+      modelsOf.set(m.product_id, (modelsOf.get(m.product_id) ?? 0) + 1);
+      if (m.global_price !== null && m.global_price !== undefined && Number(m.global_price) > 0) hasSelling.add(m.product_id);
+      if (canSeeCosts && m.cost_price !== null && m.cost_price !== undefined && Number(m.cost_price) > 0) hasCost.add(m.product_id);
+    }
+    if (canSeeCosts) {
+      for (const l of ((linkRes.data ?? []) as Array<{ product_id: string; unit_cost_cny: unknown }>)) {
+        if (l.unit_cost_cny !== null && l.unit_cost_cny !== undefined && Number(l.unit_cost_cny) > 0) hasCost.add(l.product_id);
+      }
+    }
+    const hasMedia = new Set(((mediaRes.data ?? []) as Array<{ product_id: string }>).map((m) => m.product_id));
+    const hasCert = new Set(((certRes.data ?? []) as Array<{ product_id: string }>).map((c) => c.product_id));
+
+    const byStatus: Record<string, number> = {};
+    const gap = (pred: (p: (typeof products)[number]) => boolean) => {
+      const missing = products.filter(pred);
+      return {
+        count: missing.length,
+        examples: missing.slice(0, exLimit).map((p) => p.product_name ?? p.id),
+      };
+    };
+    for (const p of products) {
+      const st = (p.status ?? "draft").toLowerCase();
+      byStatus[st] = (byStatus[st] ?? 0) + 1;
+    }
+
+    const payload: Record<string, unknown> = {
+      total_products: products.length,
+      by_status: byStatus,
+      no_selling_price: gap((p) => !hasSelling.has(p.id)),
+      no_media: gap((p) => !hasMedia.has(p.id)),
+      no_description: gap((p) => !p.description || !String(p.description).trim()),
+      no_hs_code: gap((p) => !p.hs_code || !String(p.hs_code).trim()),
+      no_certifications: gap((p) => !hasCert.has(p.id)),
+      no_models_at_all: gap((p) => !modelsOf.has(p.id)),
+      ...(canSeeCosts
+        ? { no_cost_price: gap((p) => !hasCost.has(p.id)) }
+        : { cost_completeness: "RESTRICTED — this account lacks Product Data cost permission; cost-side completeness is hidden. Say so if asked about costs." }),
+    };
+
+    const noPrice = (payload.no_selling_price as { count: number }).count;
+    return {
+      ok: true,
+      permissionStatus: canSeeCosts ? "allowed" : "limited",
+      data: payload,
+      message: `Audited ${products.length} products: ${noPrice} have no selling price` +
+        (canSeeCosts ? `, ${(payload.no_cost_price as { count: number }).count} have no cost price` : "") +
+        `. Full gap counts with examples included.`,
+      sources: ["product-data(audit)"],
+      ...(canSeeCosts ? {} : { filteredFields: ["cost_price", "unit_cost_cny"] }),
+    };
+  },
+};
+
 export const productTools: ToolDef[] = [
   getProductFullDetails as ToolDef,
+  auditProductData as unknown as ToolDef,
   searchProducts as unknown as ToolDef,
   getProductByCode as ToolDef,
   countProducts as unknown as ToolDef,
