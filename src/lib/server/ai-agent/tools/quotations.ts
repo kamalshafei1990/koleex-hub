@@ -30,7 +30,7 @@ import "server-only";
 import { supabaseServer } from "../../supabase-server";
 import type { ToolDef, ToolResult } from "../types";
 import { calculatePricing, type PricingEngineResult } from "../../pricing-engine";
-import { filterFields } from "../permissions";
+import { checkField, filterFields } from "../permissions";
 
 const PRODUCTS_MODULE = "Products";
 const QUOTATIONS_MODULE = "Quotations";
@@ -171,7 +171,7 @@ const getPricingRules: ToolDef<
   },
   requiredModule: QUOTATIONS_MODULE,
   requiredAction: "view",
-  handler: async (_ctx, args): Promise<ToolResult<PricingRulesResult>> => {
+  handler: async (ctx, args): Promise<ToolResult<PricingRulesResult>> => {
     const customerType = String(args.customerType ?? "").trim();
     const marketArg = (args.market as string | undefined)?.trim();
 
@@ -211,9 +211,10 @@ const getPricingRules: ToolDef<
           .then((r) => r.data)
       : null;
 
+    const canSeeMargin = checkField(ctx, "quotations.margin_percent");
+
     return {
       ok: true,
-      permissionStatus: "allowed",
       data: {
         market: marketRow
           ? {
@@ -223,18 +224,28 @@ const getPricingRules: ToolDef<
               import_duty_percent: marketRow.import_duty_percent ?? null,
             }
           : null,
+        /* MARGIN IS A VIEW-PRIVATE FIELD, and module access is not the same
+           bar. This tool is gated on Quotations:view, which let anyone who
+           can open a quotation read the company's margin policy — while the
+           registry classes quotations.margin_percent as requiring
+           can_view_private. Discounts and the market adjustment stay: they
+           are what a salesperson quotes with. The margins are what the
+           business earns, and that is the distinction the registry draws. */
         customerType: typeRow
           ? {
               type: typeRow.customer_type,
-              margin_percent: typeRow.margin_percent ?? null,
+              margin_percent: canSeeMargin ? (typeRow.margin_percent ?? null) : null,
               discount_percent: typeRow.discount_percent ?? null,
-              min_margin_percent: typeRow.min_margin_percent ?? null,
+              min_margin_percent: canSeeMargin ? (typeRow.min_margin_percent ?? null) : null,
               max_discount_percent: typeRow.max_discount_percent ?? null,
             }
           : null,
       },
+      permissionStatus: typeRow && !canSeeMargin ? "limited" : "allowed",
       message: typeRow
-        ? `Pricing rules loaded for ${customerType}.`
+        ? canSeeMargin
+          ? `Pricing rules loaded for ${customerType}.`
+          : `Pricing rules loaded for ${customerType}. Margin figures withheld — this account lacks private-data permission; say so rather than estimating them.`
         : `No pricing rule row for ${customerType} in that market.`,
       sources: [
         ...(marketRow ? [`pricing_markets(market=${marketId?.slice(0, 8)})`] : []),
