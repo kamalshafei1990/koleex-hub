@@ -63,6 +63,7 @@ import {
   type ProjectIcon,
 } from "@/lib/ai-projects";
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
+import { textDirection } from "@/lib/text-direction";
 
 type MsgRole = "user" | "assistant" | "system";
 interface AgentStep {
@@ -2852,7 +2853,9 @@ function Bubble({
   lang: Lang;
 }) {
   const isUser = msg.role === "user";
-  const rtl = isRtl(msg.content);
+  /* One measurement drives layout, font and size, so they cannot disagree */
+  const bubbleDir = textDirection(msg.content);
+  const rtl = bubbleDir === "rtl";
   /* Memoised so the `?? []` fallback doesn't mint a new array each render
      and re-run everything downstream that depends on it. */
   const steps = useMemo(() => msg.steps ?? [], [msg.steps]);
@@ -2951,17 +2954,21 @@ function Bubble({
           <TypingIndicator />
         ) : (
           <div
-            /* dir="auto" + unicode-bidi: plaintext together make the browser
-               apply the first-strong-character algorithm per paragraph AND
-               isolate embedded segments properly. That's what fixes Arabic
-               replies that also contain English words like "Koleex Hub" —
-               without this the hard dir="rtl" can flip the embedded English
-               into the wrong visual position. User bubbles keep the
-               whitespace-pre-wrap path (literal text only). Assistant
-               bubbles render markdown via MessageMarkdown for bullets,
-               headings, code blocks, tables, links. */
+            /* Direction is MEASURED from the whole message, not guessed from
+               its first letter. `dir="auto"` and `unicode-bidi: plaintext`
+               both resolve per paragraph off the first strong character, so
+               any Arabic reply opening with "Koleex Hub…" was laid out as an
+               English paragraph and rendered reversed. Measuring the message
+               also keeps its blocks consistent — a heading like
+               "ما يغطيه Koleex Hub" has more Latin letters than Arabic on
+               its own and would flip if judged alone. Embedded English still
+               sits correctly: the bidi algorithm handles runs inside a
+               correctly-directed paragraph, which was never the problem.
+               User bubbles keep the whitespace-pre-wrap path (literal text
+               only). Assistant bubbles render markdown via MessageMarkdown
+               for bullets, headings, code blocks, tables, links. */
             ref={bubbleRef}
-            dir="auto"
+            dir={bubbleDir}
             className={`rounded-2xl leading-relaxed ${
               isUser ? "whitespace-pre-wrap px-4 py-2.5" : "px-5 py-3.5"
             } ${
@@ -2977,7 +2984,6 @@ function Bubble({
                   "kx-glass bg-[var(--bg-secondary)] border border-[var(--border-subtle)] text-[var(--text-primary)]"
             }`}
             style={{
-              unicodeBidi: "plaintext",
               ...(rtl
                 ? { fontFamily: '"SF Arabic","Geeza Pro","Noto Naskh Arabic",Arial,sans-serif' }
                 : {}),
