@@ -13,6 +13,7 @@
     "validate:apply-scope": "tsx scripts/validate-apply-scope.ts",
     "validate:ai-quotation-guard": "tsx scripts/validate-ai-quotation-guard.ts",
     "validate:trade-terms": "tsx --conditions=react-server scripts/validate-trade-terms.ts",
+    "backfill:customer-codes": "tsx scripts/backfill-customer-codes.mts",
     "validate:customer-quotation-guard": "tsx scripts/validate-customer-quotation-guard.ts",
     "validate:password-state": "tsx scripts/validate-password-state.ts",
     "validate:session-shadow": "tsx scripts/validate-session-shadow.ts",
