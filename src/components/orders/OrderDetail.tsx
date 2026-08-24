@@ -193,7 +193,7 @@ export default function OrderDetail({ id }: { id: string }) {
               currency: q.currency,
               date: q.date ?? q.created_at ?? null,
             }))}
-            hrefFor={() => "/quotations"}
+            hrefFor={(d) => `/quotations?doc=${d.id}`}
           />
           <DocGroup
             title={t("doc.invoices")}
@@ -206,7 +206,7 @@ export default function OrderDetail({ id }: { id: string }) {
               currency: r.currency,
               date: r.date ?? r.issue_date ?? null,
             }))}
-            hrefFor={() => "/invoices"}
+            hrefFor={(d) => `/invoices?doc=${d.id}`}
           />
           <DocGroup
             title={t("doc.contracts")}

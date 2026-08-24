@@ -38,6 +38,7 @@ import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 import AppIcon from "@/components/common/AppIcon";
 import DocTitlePicker from "@/components/quotations/DocTitlePicker";
 import ContractIcon from "@/components/icons/ui/ContractIcon";
+import OrdersIcon from "@/components/icons/OrdersIcon";
 import BoxIcon from "@/components/icons/ui/BoxIcon";
 import { useRouter } from "next/navigation";
 import { useConfirm } from "@/components/kds/useConfirm";
@@ -133,6 +134,12 @@ export interface Invoice {
   /* Master-data references for the Terms quick-fill row. Mirror of
      the Quotation type — see Quotations.tsx. */
   paymentTermId?: string;
+  /* The deal this invoice belongs to. Read from the ROW, never from the doc
+     snapshot — the order is a relationship between records, not part of the
+     printed document, and it is set by the routes that create contracts,
+     packing lists and POs rather than by this editor. */
+  orderId?: string | null;
+  dealNo?: number | null;
   /* Heading this document prints under — see DocTitlePicker. */
   docTitleId?: string;
   docTitleText?: string;
@@ -266,6 +273,8 @@ export function fromRow(row: RemoteDocRow): Invoice {
     customerName: doc.customerName ?? "",
     companyName: doc.companyName ?? "",
     invoiceNo: (row.inv_no as string | null) ?? doc.invoiceNo ?? "",
+    orderId: (row as { order_id?: string | null }).order_id ?? null,
+    dealNo: (row as { deal_no?: number | null }).deal_no ?? null,
     date: doc.date ?? todayDDMMYYYY(),
     clientNo: doc.clientNo ?? "",
     validTill: doc.validTill ?? addDays(todayDDMMYYYY(), 30),
@@ -1017,6 +1026,27 @@ export default function Quotations() {
       } catch {
         /* Non-blocking — leave blank if preview fails. */
       }
+    })();
+  }, []);
+
+  /* ── Deep link ──
+     /invoices?doc=<id> opens that invoice straight into the editor. The
+     Orders app links here, and without this an order's "INV2026-0008" landed
+     the reader on a list to scroll, which is not a link.
+
+     Fires ONCE via a ref, reading the id rather than watching it, so Back
+     returns to the list instead of pulling the reader straight back in. */
+  const deepLinkedRef = useRef(false);
+  useEffect(() => {
+    if (deepLinkedRef.current) return;
+    const id = new URLSearchParams(window.location.search).get("doc");
+    if (!id || id.length !== 36) return;
+    deepLinkedRef.current = true;
+    void (async () => {
+      const row = await fetchDocOne(INVOICES_DOC_SYNC, id);
+      if (!row) return;
+      setCurrent(fromRow(row));
+      setView("editor");
     })();
   }, []);
 
@@ -2176,6 +2206,23 @@ export default function Quotations() {
             )
           }
         />
+        {/* The deal this invoice belongs to. Shown only once it has one — an
+            invoice raised before the numbering scheme has no order until a
+            contract, packing list or backfill brings one into being.
+            KL-{deal} is exactly how ensureOrder and the backfill build
+            order_no, so deriving the label costs nothing where fetching the
+            order row to read the same string would cost a round-trip. */}
+        {current.orderId ? (
+          <button
+            onClick={() => router.push(`/orders/${current.orderId}`)}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] text-gray-300 bg-[var(--bg-surface)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-inverted)]/[0.1] transition"
+            title="Open the order and every document raised against it"
+          >
+            <OrdersIcon size={13} />
+            <span className="font-mono">KL-{current.dealNo}</span>
+          </button>
+        ) : null}
+
         <div style={{ flex: 1 }} />
         {/* Clickable status pill — opens a menu of transitions. The
             colour map mirrors the list-view row badge so the same

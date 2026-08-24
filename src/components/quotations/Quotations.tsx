@@ -1325,6 +1325,31 @@ export default function Quotations() {
     setView("editor");
   }, [markSaved]);
 
+  /* ── Deep link ──
+     /quotations?doc=<id> opens that quotation straight into the editor, so
+     an order's "KL2026-1520" is a link rather than an instruction to go and
+     find it in a list.
+
+     Fires ONCE via a ref, reading the id rather than watching it, so Back
+     returns to the list instead of pulling the reader straight back in.
+     markSaved sets the dirty baseline — without it the editor would think
+     the freshly-loaded quotation had unsaved edits. */
+  const deepLinkedRef = useRef(false);
+  useEffect(() => {
+    if (deepLinkedRef.current) return;
+    const id = new URLSearchParams(window.location.search).get("doc");
+    if (!id || id.length !== 36) return;
+    deepLinkedRef.current = true;
+    void (async () => {
+      const row = await fetchDocOne(QUOTATIONS_SYNC, id);
+      if (!row) return;
+      const loaded = fromRow(row);
+      setCurrent(loaded);
+      markSaved(loaded);
+      setView("editor");
+    })();
+  }, [markSaved]);
+
   /* ── Open existing ──
      The list endpoint strips `items` from the doc payload to keep the
      response small, so the row coming from the list view has no items.
