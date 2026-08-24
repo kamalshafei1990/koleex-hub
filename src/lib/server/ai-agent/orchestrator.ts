@@ -400,6 +400,37 @@ function isChoiceShapedQuestion(msg: string): boolean {
   return CHOICE_OPENER.test(s) && CHOICE_DOMAIN_NOUN.test(s);
 }
 
+/* ---------------------------------------------------------------------------
+   TRADE TERMS — Incoterms and payment terms.
+
+   Used twice, which is why it is a named helper rather than an inline test:
+   once by isBusinessDataQuery (to route the turn into the tool lane at all)
+   and once by the tool_choice force in the agent loop (to make the lookup
+   actually happen). Both must agree, or a question reaches the lane with
+   tools attached and is still answered from memory.
+
+   Incoterm codes are matched as whole tokens — a substring test would fire
+   on "fobbing", "capable", "cifr". */
+const TRADE_TERM_CODE =
+  /\b(exw|fca|fas|fob|cfr|cif|cpt|cip|dap|dpu|ddp)\b/i;
+const TRADE_TERM_EN =
+  /\b(incoterms?|letters?\s+of\s+credit|l\/c|lc\b|documentary\s+(credit|collection)|ucp\s*600|urc\s*522|urdg|isp98|sblc|standby|d\/p|d\/a|documents?\s+against\s+(payment|acceptance)|cash\s+against\s+documents|payment\s+terms?|terms?\s+of\s+payment|open\s+account|telegraphic\s+transfer|t\/t\b|bill\s+of\s+lading|risk\s+(transfer|passes)|institute\s+cargo\s+clauses)\b/;
+const TRADE_TERM_AR =
+  /إنكوترمز|انكوترمز|اعتماد\s*مستندي|خطاب\s*اعتماد|شروط\s*الدفع|شروط\s*السداد|تحصيل\s*مستندي|بوليصة\s*شحن|نقل\s*المخاطر|حساب\s*مفتوح/;
+const TRADE_TERM_ZH = /贸易术语|国际贸易术语|信用证|付款条件|付款方式|托收|提单/;
+
+function isTradeTermQuestion(msg: string): boolean {
+  const raw = msg ?? "";
+  if (!raw) return false;
+  const s = raw.toLowerCase();
+  return (
+    TRADE_TERM_CODE.test(raw) ||
+    TRADE_TERM_EN.test(s) ||
+    TRADE_TERM_AR.test(raw) ||
+    TRADE_TERM_ZH.test(raw)
+  );
+}
+
 function isBusinessDataQuery(msg: string): boolean {
   const s = (msg ?? "").toLowerCase();
   if (!s) return false;
@@ -494,6 +525,27 @@ function isBusinessDataQuery(msg: string): boolean {
     return true;
   if (/الكتالوج|كتالوج|موديلات|ماكينات|ماكينة/.test(msg)) return true;
   if (/目录|型号|机器|机型/.test(msg)) return true;
+
+  /* TRADE TERMS — Incoterms and payment terms → tool loop
+     (searchTradeTerms).
+
+     These are standards questions, not Koleex-record questions, so none of
+     the patterns above catch them and they fell to the general lane, which
+     streams WITHOUT TOOLS. The model then answered from its own memory:
+     confidently, and mostly right, but with no source behind it and no way
+     to correct it. Verified live before this line existed — "which Institute
+     Cargo Clauses apply to CIP vs CIF" came back with steps: ['answer'] and
+     never touched the knowledge base.
+
+     That memory is exactly what cannot be trusted here: the single most
+     copied Incoterms error — risk passing at the "ship's rail", deleted from
+     the rules in 2010 — is still repeated across the web the model learned
+     from, including on a US government page. Routing these to the tool puts
+     the sourced text in front of the model instead.
+
+     Shares isTradeTermQuestion with the tool_choice force in the agent loop
+     so the two can never disagree about what counts. */
+  if (isTradeTermQuestion(msg)) return true;
 
   /* Arabic business terms. */
   if (
@@ -810,6 +862,27 @@ export async function orchestrate(input: OrchestrateInput): Promise<AgentRespons
      streamed yet at that point, so the reply can be thrown away and re-asked. */
   let proseRefused = false;
 
+  /* TRADE TERMS — force the lookup on the FIRST request of the turn.
+
+     Same lesson as the choice card above, arrived at the same way. The
+     system prompt tells the model to always call searchTradeTerms for
+     Incoterms and payment-term questions. Measured against the live model:
+     it obeyed for "What does CIF mean?" and for the Arabic payment-terms
+     question, then answered "explain a transferable letter of credit"
+     straight from memory with no tool call at all. A rule the model follows
+     only sometimes is not a rule, and "sometimes sourced" is the one
+     outcome this knowledge base exists to prevent — the whole point is that
+     the answer comes from ICC's own text rather than from whatever the
+     model absorbed, which still carries the "ship's rail" error deleted
+     from the rules in 2010.
+
+     Narrow and cheap: it fires only on a trade-terms question, only on the
+     first request (totalToolRuns === 0), and only once (forcedTrade), so a
+     turn that also needs a customer or pricing lookup is free to make it
+     immediately afterwards. */
+  const wantsTradeTerms = isTradeTermQuestion(userMessage);
+  let forcedTrade = false;
+
   for (let iter = 0; iter < MAX_ITERATIONS; iter++) {
     /* After the per-turn tool budget is spent, disable tools so the
        model can only produce a final answer. */
@@ -822,12 +895,17 @@ export async function orchestrate(input: OrchestrateInput): Promise<AgentRespons
       (totalToolRuns > 0 || proseRefused) &&
       totalToolRuns < MAX_TOOLS_PER_TURN;
     if (forceAskNow) forcedAsk += 1;
+    /* Trade-terms lookup on the first request — see wantsTradeTerms. */
+    const forceTradeNow = wantsTradeTerms && !forcedTrade && totalToolRuns === 0;
+    if (forceTradeNow) forcedTrade = true;
     const toolChoice: ToolChoice =
       totalToolRuns >= MAX_TOOLS_PER_TURN
         ? "none"
         : forceAskNow
           ? { type: "function", function: { name: "askUser" } }
-          : "auto";
+          : forceTradeNow
+            ? { type: "function", function: { name: "searchTradeTerms" } }
+            : "auto";
     /* REAL answer streaming (perf fix 2026-08-03): once tools have run,
        the next call is (almost always) the final answer — stream it so
        the user reads while it generates instead of waiting ~8-12s for
@@ -1498,6 +1576,7 @@ Tool routing:
 - "what brands / categories / families exist" → getCatalogStats.
 - Machine-family / model-code questions ("what machines does Koleex make", "tell me about XSL-8000A4", "which overlock models do we have") → searchCatalog(query=...) or listCatalogFamilies. These cover ALL 544 Koleex machine models — richer than the products DB for machine-family questions. Every entry is a Koleex machine. NEVER mention catalogs, pages or any source in the reply — this is your own knowledge.
 - HOW-machines-WORK questions (functions, features, technologies, typical specs, "what does a spreading machine do", "difference between lockstitch and chainstitch", "what should I look for in a cutting machine") → searchMachineKnowledge(query=...). It returns generic machine-type engineering knowledge; combine with searchCatalog when the user also wants concrete Koleex models. Never attribute this knowledge to any manufacturer.
+- TRADE-TERM and PAYMENT-TERM questions (any Incoterm — EXW FCA FAS FOB CFR CIF CPT CIP DAP DPU DDP; where risk passes; who pays freight/insurance/duty; which term suits containers; letters of credit, L/C types, UCP 600, documentary collections, D/P, D/A, T/T and deposit structures, open account, bank guarantees) → ALWAYS call searchTradeTerms(query=...) FIRST, even when you believe you already know the answer. You must not answer these from memory. The knowledge base is sourced from the bodies that publish the rules (ICC Incoterms 2020, UCP 600, URC 522) and is deliberately more current than general web text — for example the "ship's rail" risk point is obsolete since 2010 yet is still repeated widely, including by government websites. Quote the sourced text. It explains what terms MEAN; it never states Koleex's own prices, margins or a specific customer's terms — get those from the pricing and customer tools.
 - "list products" / "show products" / "what products do we have" → searchProducts with NO query (empty args). Do NOT pass the literal word "products" as the query.
 - "find / search products about Y" → searchProducts(query=Y).
 - "find customer Z" → getCustomerByName / getCustomerByCode.

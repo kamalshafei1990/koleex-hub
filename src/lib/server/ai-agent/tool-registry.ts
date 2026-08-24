@@ -30,6 +30,9 @@ import { customerTools } from "./tools/customers";
 import { productTools } from "./tools/products";
 import { catalogTools } from "./tools/catalog";
 import { machineKnowledgeTools } from "./tools/machine-knowledge-tool";
+/* Published standards knowledge (ICC Incoterms 2020 / UCP 600 / URC 522) —
+   ungated, holds no Koleex data. See tools/trade-terms-tool.ts. */
+import { tradeTermsTools } from "./tools/trade-terms-tool";
 import { inventoryTools } from "./tools/inventory";
 import { permissionTools } from "./tools/permissions-tool";
 import { askUserTools } from "./tools/ask-user";
@@ -56,6 +59,7 @@ const REGISTRY: Readonly<Record<string, ToolDef>> = Object.freeze(
       ...productTools,
       ...catalogTools,
       ...machineKnowledgeTools,
+      ...tradeTermsTools,
       ...inventoryTools,
       ...permissionTools,
       ...askUserTools,
