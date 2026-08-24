@@ -37,7 +37,35 @@ async function invoiceNumberFor(
   quotationDealNo: number | null,
 ): Promise<{ inv_no: string; deal_no: number }> {
   if (quotationDealNo != null) {
-    return { inv_no: `KL-IN-${quotationDealNo}`, deal_no: quotationDealNo };
+    /* A deal can carry more than one invoice — the owner's own case is a
+       proforma issued for an L/C and the commercial invoice that follows it
+       after shipment, both kept. inv_no is unique, so the first invoice on a
+       deal takes the bare number and later ones are suffixed:
+
+           KL-IN-12350      first
+           KL-IN-12350-2    second
+           KL-IN-12350-3    third
+
+       Without this the second conversion died on a unique-key violation,
+       which is how this was found. */
+    const base = `KL-IN-${quotationDealNo}`;
+    const { data: siblings } = await supabaseServer
+      .from("invoices")
+      .select("inv_no")
+      .eq("tenant_id", tenantId)
+      .eq("deal_no", quotationDealNo);
+
+    const taken = new Set(
+      (siblings ?? [])
+        .map((r) => (r as { inv_no: string | null }).inv_no)
+        .filter((n): n is string => typeof n === "string"),
+    );
+    if (!taken.has(base)) return { inv_no: base, deal_no: quotationDealNo };
+    for (let n = 2; n < 1000; n++) {
+      const candidate = `${base}-${n}`;
+      if (!taken.has(candidate)) return { inv_no: candidate, deal_no: quotationDealNo };
+    }
+    throw new Error(`Deal ${quotationDealNo} already has 999 invoices.`);
   }
   const { data, error } = await supabaseServer.rpc("next_deal_number", {
     p_tenant: tenantId,
@@ -49,6 +77,68 @@ async function invoiceNumberFor(
   }
   const n = Number(data);
   return { inv_no: `KL-IN-${n}`, deal_no: n };
+}
+
+/* Create the order for this deal, or return the one that already exists.
+   Never fatal: an invoice without an order is still a valid invoice and can
+   be attached later, whereas refusing to convert because the order insert
+   failed would block real work over bookkeeping. */
+async function ensureOrder(args: {
+  tenantId: string;
+  dealNo: number;
+  customerId: string | null;
+  currency: string | null;
+  total: number;
+  accountId: string;
+}): Promise<string | null> {
+  const { tenantId, dealNo, customerId, currency, total, accountId } = args;
+
+  const { data: existing } = await supabaseServer
+    .from("orders")
+    .select("id")
+    .eq("tenant_id", tenantId)
+    .eq("deal_no", dealNo)
+    .maybeSingle();
+  if (existing?.id) return existing.id as string;
+
+  type CustomerSnapshot = {
+    customer_code: string | null;
+    name: string | null;
+    company_name: string | null;
+  };
+  let snapshot: CustomerSnapshot | null = null;
+  if (customerId) {
+    const { data } = await supabaseServer
+      .from("customers")
+      .select("customer_code, name, company_name")
+      .eq("id", customerId)
+      .maybeSingle();
+    snapshot = (data as CustomerSnapshot | null) ?? null;
+  }
+
+  const { data, error } = await supabaseServer
+    .from("orders")
+    .insert({
+      tenant_id: tenantId,
+      deal_no: dealNo,
+      order_no: `KL-${dealNo}`,
+      customer_id: customerId,
+      customer_code: snapshot?.customer_code ?? null,
+      customer_name: snapshot?.name ?? null,
+      company_name: snapshot?.company_name ?? null,
+      currency,
+      total,
+      status: "open",
+      created_by: accountId,
+    })
+    .select("id")
+    .single();
+
+  if (error) {
+    console.warn("[orders] could not create order for deal", dealNo, error.message);
+    return null;
+  }
+  return data.id as string;
 }
 
 export async function POST(req: Request) {
@@ -142,6 +232,27 @@ export async function POST(req: Request) {
     (quote as { deal_no?: number | null }).deal_no ?? null,
   );
 
+  /* ── The order ────────────────────────────────────────────────────────────
+     Created here rather than with the quotation: a quotation may go to ten
+     prospects and come back from none, and an order per quotation would bury
+     the real ones. Converting to an invoice is the moment the sale is real.
+
+     Idempotent by (tenant, deal_no) — converting the same quotation twice, or
+     raising a second invoice on the same deal (a commercial invoice replacing
+     a proforma), joins the existing order instead of making a rival one.
+
+     Customer identity is snapshotted so the orders list renders without
+     joining customers per row, and so the record shows who the buyer was when
+     the deal was struck. */
+  const orderId = await ensureOrder({
+    tenantId: auth.tenant_id,
+    dealNo: deal_no,
+    customerId: quote.customer_id ?? null,
+    currency: quote.currency ?? null,
+    total,
+    accountId: auth.account_id,
+  });
+
   const { data: invoice, error } = await supabaseServer
     .from("invoices")
     .insert({
@@ -162,6 +273,7 @@ export async function POST(req: Request) {
       amount_paid: 0,
       notes: quote.notes ?? null,
       linked_quotation_id: quote.id,
+      order_id: orderId,
       status: "draft",
       created_by_account_id: auth.account_id,
     })
@@ -176,6 +288,17 @@ export async function POST(req: Request) {
     await supabaseServer
       .from("invoice_items")
       .insert(hydrated.map((h) => ({ ...h, invoice_id: invoice.id })));
+  }
+
+  /* Attach the source quotation to the same order, so the order shows the
+     whole paper trail and not just what came after the sale. Best-effort:
+     the invoice already exists and is correct without it. */
+  if (orderId) {
+    await supabaseServer
+      .from("quotations")
+      .update({ order_id: orderId })
+      .eq("id", quote.id)
+      .is("order_id", null);
   }
 
   return NextResponse.json({ invoice });
