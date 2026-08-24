@@ -555,6 +555,17 @@ export default function QuotationA4Preview({
     return `(${code}${locationPart}, ${cur})`;
   }, [current.incotermCode, current.loadingPort, current.dischargePort, cur]);
 
+  /* ACID is NAFEZA's Advance Cargo Information Declaration reference —
+     Egyptian customs only. An invoice shipping to Bangladesh (or anywhere
+     else) has no ACID number and never will, so the field must not appear
+     just because docKind === "invoice"; it has to also read the shipment's
+     actual destination. Reuses the same "Port, Country" parsing the terms
+     card already does for the discharge-port country picker. */
+  const isEgyptShipment = useMemo(
+    () => deriveDischargeCountry(current.dischargePort) === "Egypt",
+    [current.dischargePort],
+  );
+
   /* Which item-description cell currently has the user's focus.
      The rich-text toolbar renders right above that cell so the user
      can hit B / I / U / colour / size without losing their text
@@ -1109,8 +1120,10 @@ export default function QuotationA4Preview({
                     (the number doesn't exist yet at quote stage).
                     Stored on toAcid in the doc data model — shared
                     between quotation + invoice so a number captured
-                    after the quote is preserved into the invoice. */}
-                {docKind === "invoice" && (
+                    after the quote is preserved into the invoice.
+                    Gated on isEgyptShipment too — a Bangladesh (or any
+                    non-Egypt) invoice has no ACID number and never will. */}
+                {docKind === "invoice" && isEgyptShipment && (
                   <>
                     <span style={{ color: T.inkGhost, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em", whiteSpace: "nowrap" }}>{L("party.acid")}</span>
                     <input
@@ -2314,15 +2327,18 @@ export default function QuotationA4Preview({
           </div>
         </div>
 
-        {/* ── Customer counter-signature block — INVOICE ONLY ──
+        {/* ── Customer counter-signature block — INVOICE ONLY, EGYPT ONLY ──
             A commercial invoice that crosses Egyptian customs needs a
             counter-signature + stamp from the buyer acknowledging
             receipt of goods. Quotations don't need this (the buyer
-            confirms intent by issuing the PO instead). Two blank
-            cards, sized to match the seller's row above, with the
-            same dark header strip and a centred placeholder line so
-            the customer can sign + stamp on the printed copy. */}
-        {docKind === "invoice" && (
+            confirms intent by issuing the PO instead), and neither does
+            an invoice bound anywhere but Egypt — same isEgyptShipment
+            gate as the ACID field above, confirmed with Kamal 2026-08-24
+            rather than assumed from the comment alone. Two blank cards,
+            sized to match the seller's row above, with the same dark
+            header strip and a centred placeholder line so the customer
+            can sign + stamp on the printed copy. */}
+        {docKind === "invoice" && isEgyptShipment && (
           <div
             style={{
               display: "grid",
