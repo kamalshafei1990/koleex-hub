@@ -36,62 +36,77 @@ import {
 
 /* ── Small building blocks ────────────────────────────────────────────────── */
 
+/* The label + input shapes the Invoices and Quotations editors use for their
+   dark field row. Copied deliberately rather than invented: three documents
+   edited side by side in one week should not each have their own idea of what
+   a form field looks like. */
 const FIELD_LABEL: React.CSSProperties = {
-  display: "block",
   fontSize: 11,
   fontWeight: 600,
+  color: "#666",
+  textTransform: "uppercase",
   letterSpacing: "0.04em",
-  color: "var(--text-secondary)",
   marginBottom: 4,
+  display: "block",
 };
 
 const INPUT =
-  "w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-3 py-2 text-[13px] text-[var(--text-primary)] outline-none transition focus:border-[var(--border-strong)]";
+  "w-full bg-[var(--bg-surface)] border border-[var(--border-subtle)] rounded-lg px-3 py-2 text-sm text-[var(--text-primary)] placeholder-gray-600 focus:outline-none focus:border-white/40 transition";
 
 function Field({
   label,
+  width = 200,
+  grow = 1,
   hint,
   flagged,
   children,
 }: {
   label: string;
+  /** Minimum width before the row wraps — the invoice row's own mechanism. */
+  width?: number;
+  grow?: number;
   hint?: string;
   flagged?: boolean;
   children: React.ReactNode;
 }) {
   return (
-    <div>
+    <div style={{ flex: `${grow} 1 ${width}px`, minWidth: width }}>
       <label style={FIELD_LABEL}>
         {label}
-        {flagged ? <span style={{ color: "var(--kx-warn, #f59e0b)", marginInlineStart: 6 }}>•</span> : null}
+        {flagged ? <span style={{ color: "#fbbf24", marginInlineStart: 6 }}>•</span> : null}
       </label>
       {children}
-      {hint ? (
-        <div style={{ fontSize: 10.5, color: "var(--text-faint)", marginTop: 3 }}>{hint}</div>
-      ) : null}
+      {hint ? <div style={{ fontSize: 10.5, color: "var(--text-faint)", marginTop: 3 }}>{hint}</div> : null}
     </div>
   );
 }
 
-function Group({ title, children }: { title: string; children: React.ReactNode }) {
+/** One dark band of related fields, above the paper — the same arrangement
+    the invoice uses for its customer row, repeated per group because a
+    contract negotiates more than an invoice does. */
+function FieldRow({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <section style={{ marginBottom: 20 }}>
-      <h3
+    <div
+      className="no-print kx-glass"
+      style={{
+        padding: "10px 16px 12px",
+        borderBottom: "1px solid var(--border-subtle)",
+      }}
+    >
+      <div
         style={{
-          fontSize: 10,
+          fontSize: 9.5,
           fontWeight: 700,
           letterSpacing: "0.16em",
           textTransform: "uppercase",
           color: "var(--text-faint)",
-          marginBottom: 10,
-          paddingBottom: 6,
-          borderBottom: "1px solid var(--border-subtle)",
+          marginBottom: 8,
         }}
       >
         {title}
-      </h3>
-      <div style={{ display: "grid", gap: 12 }}>{children}</div>
-    </section>
+      </div>
+      <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>{children}</div>
+    </div>
   );
 }
 
@@ -420,247 +435,127 @@ export default function ContractDoc({ id }: { id: string }) {
         </div>
       )}
 
-      {/* ── Body: terms left, document right ── */}
-      <div className="flex-1 min-h-0 overflow-auto">
-        <div
-          style={{
-            display: "flex",
-            alignItems: "flex-start",
-            gap: 20,
-            padding: 20,
-            flexWrap: "wrap",
-          }}
-        >
-          {!signed && (
-            <aside
+      {/* ── The negotiated terms, above the paper ──
+          Not a side panel. The Invoices and Quotations editors both put their
+          editable fields in a dark band directly above the A4 and let the
+          document have the width; a contract that arranged itself differently
+          would read as a different application. */}
+      {!signed && (
+        <div className="no-print">
+          <FieldRow title="Delivery">
+            <Field label="Incoterms 2020 rule" width={150} flagged={flaggedFields.has("incoterm")}>
+              <select className={INPUT} value={terms.incoterm ?? ""} onChange={(e) => set("incoterm", e.target.value || undefined)}>
+                <option value="">— none —</option>
+                {["EXW", "FCA", "FAS", "FOB", "CFR", "CIF", "CPT", "CIP", "DAP", "DPU", "DDP"].map((c) => (
+                  <option key={c} value={c}>{c}</option>
+                ))}
+              </select>
+            </Field>
+            <Field label="Named place" hint="The rule is incomplete without one — “FOB Ningbo”, not “FOB”." flagged={flaggedFields.has("incotermPlace")}>
+              <input className={INPUT} value={terms.incotermPlace ?? ""} onChange={(e) => set("incotermPlace", e.target.value || undefined)} placeholder="e.g. Ningbo, China" />
+            </Field>
+            <Field label="Port of loading" flagged={flaggedFields.has("loadingPort")}>
+              <input className={INPUT} value={terms.loadingPort ?? ""} onChange={(e) => set("loadingPort", e.target.value || undefined)} placeholder="—" />
+            </Field>
+            <Field label="Port of discharge" flagged={flaggedFields.has("dischargePort")}>
+              <input className={INPUT} value={terms.dischargePort ?? ""} onChange={(e) => set("dischargePort", e.target.value || undefined)} placeholder="—" />
+            </Field>
+          </FieldRow>
+
+          <FieldRow title="Payment and timing">
+            <Field label="Payment shape" width={210} hint="Decides which articles print." flagged={flaggedFields.has("paymentTermId")}>
+              <select className={INPUT} value={terms.paymentKind ?? ""} onChange={(e) => set("paymentKind", (e.target.value || undefined) as ContractTerms["paymentKind"])}>
+                <option value="">— none —</option>
+                <option value="tt">T/T — telegraphic transfer</option>
+                <option value="lc">L/C — documentary credit</option>
+                <option value="dp">D/P — documents against payment</option>
+                <option value="da">D/A — documents against acceptance</option>
+                <option value="open">Open account</option>
+                <option value="mixed">Mixed / staged</option>
+              </select>
+            </Field>
+            <Field label="Payment term as printed" grow={2} width={260}>
+              <input className={INPUT} value={terms.paymentLabel ?? ""} onChange={(e) => set("paymentLabel", e.target.value || undefined)} placeholder="e.g. 30% T/T deposit, 70% before shipment" />
+            </Field>
+            <Field label="Production (days)" width={130} grow={0} flagged={flaggedFields.has("leadTimeDays")}>
+              <input className={INPUT} type="number" min={0} value={terms.leadTimeDays ?? ""} onChange={(e) => set("leadTimeDays", e.target.value ? Number(e.target.value) : undefined)} />
+            </Field>
+            <Field label="Counted from" width={190} flagged={flaggedFields.has("leadTimeBasis")}>
+              <select className={INPUT} value={terms.leadTimeBasis ?? ""} onChange={(e) => set("leadTimeBasis", (e.target.value || undefined) as ContractTerms["leadTimeBasis"])}>
+                <option value="after_deposit">the advance payment</option>
+                <option value="after_lc_opening">the operative credit</option>
+                <option value="after_order">the contract date</option>
+              </select>
+            </Field>
+          </FieldRow>
+
+          <FieldRow title="Quality, cover and documents">
+            <Field label="Warranty (months)" width={140} grow={0} flagged={flaggedFields.has("warrantyMonths")}>
+              <input className={INPUT} type="number" min={0} value={terms.warrantyMonths ?? ""} onChange={(e) => set("warrantyMonths", e.target.value ? Number(e.target.value) : undefined)} />
+            </Field>
+            <Field label="Inspection" width={190}>
+              <select className={INPUT} value={terms.inspection ?? "seller"} onChange={(e) => set("inspection", e.target.value as ContractTerms["inspection"])}>
+                <option value="none">none agreed</option>
+                <option value="seller">by the Seller</option>
+                <option value="buyer">by the Buyer</option>
+                <option value="third_party">independent third party</option>
+              </select>
+            </Field>
+            <Field label="Documents provided" grow={3} width={300} hint="One per line. Under a credit the bank pays against this list." flagged={flaggedFields.has("documents")}>
+              <textarea className={INPUT} rows={3} value={(terms.documents ?? []).join("\n")} onChange={(e) => set("documents", e.target.value.split("\n").map((x) => x.trim()).filter(Boolean))} />
+            </Field>
+          </FieldRow>
+
+          <FieldRow title="Law, special conditions and execution">
+            <Field label="Governing law and forum" grow={2} width={300} hint="Name both — the law that applies and where a claim is brought." flagged={flaggedFields.has("governingLaw")}>
+              <textarea className={INPUT} rows={3} value={terms.governingLaw ?? ""} onChange={(e) => set("governingLaw", e.target.value || undefined)} />
+            </Field>
+            <Field label="Special conditions" grow={2} width={300} hint="One per line. These outrank the general articles, and print after them." flagged={flaggedFields.has("specialConditions")}>
+              <textarea className={INPUT} rows={3} value={(terms.specialConditions ?? []).join("\n")} onChange={(e) => set("specialConditions", e.target.value.split("\n").map((x) => x.trim()).filter(Boolean))} />
+            </Field>
+            <Field label="Place of signing" width={180}>
+              <input className={INPUT} value={row.place_of_signing ?? ""} onChange={(e) => setRow((r) => (r ? { ...r, place_of_signing: e.target.value } : r))} onBlur={(e) => void patch({ place_of_signing: e.target.value || null })} placeholder="e.g. Taizhou" />
+            </Field>
+            <Field label="Contract date" width={160} grow={0}>
+              <input className={INPUT} type="date" value={row.contract_date ?? ""} onChange={(e) => setRow((r) => (r ? { ...r, contract_date: e.target.value } : r))} onBlur={(e) => void patch({ contract_date: e.target.value || null })} />
+            </Field>
+          </FieldRow>
+
+          {/* The checker's findings sit with the fields they are about, not in
+              a panel elsewhere on the screen. */}
+          {findings.length > 0 && (
+            <div
               className="no-print kx-glass"
-              style={{
-                width: 360,
-                flex: "1 1 320px",
-                maxWidth: 420,
-                borderRadius: 14,
-                border: "1px solid var(--border-subtle)",
-                padding: 16,
-                position: "sticky",
-                top: 0,
-              }}
+              style={{ padding: "10px 16px 12px", borderBottom: "1px solid var(--border-subtle)" }}
             >
-              {findings.length > 0 && (
-                <div style={{ display: "grid", gap: 8, marginBottom: 20 }}>
-                  {findings.map((f) => (
-                    <FindingCard key={f.id} f={f} />
-                  ))}
-                </div>
-              )}
-
-              <Group title="Delivery">
-                <Field label="Incoterms 2020 rule" flagged={flaggedFields.has("incoterm")}>
-                  <select
-                    className={INPUT}
-                    value={terms.incoterm ?? ""}
-                    onChange={(e) => set("incoterm", e.target.value || undefined)}
-                  >
-                    <option value="">— none —</option>
-                    {["EXW", "FCA", "FAS", "FOB", "CFR", "CIF", "CPT", "CIP", "DAP", "DPU", "DDP"].map((c) => (
-                      <option key={c} value={c}>
-                        {c}
-                      </option>
-                    ))}
-                  </select>
-                </Field>
-                <Field
-                  label="Named place"
-                  hint="The rule is incomplete without one — “FOB Ningbo”, not “FOB”."
-                  flagged={flaggedFields.has("incotermPlace")}
-                >
-                  <input
-                    className={INPUT}
-                    value={terms.incotermPlace ?? ""}
-                    onChange={(e) => set("incotermPlace", e.target.value || undefined)}
-                  />
-                </Field>
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-                  <Field label="Port of loading" flagged={flaggedFields.has("loadingPort")}>
-                    <input
-                      className={INPUT}
-                      value={terms.loadingPort ?? ""}
-                      onChange={(e) => set("loadingPort", e.target.value || undefined)}
-                    />
-                  </Field>
-                  <Field label="Port of discharge" flagged={flaggedFields.has("dischargePort")}>
-                    <input
-                      className={INPUT}
-                      value={terms.dischargePort ?? ""}
-                      onChange={(e) => set("dischargePort", e.target.value || undefined)}
-                    />
-                  </Field>
-                </div>
-              </Group>
-
-              <Group title="Payment and timing">
-                <Field
-                  label="Payment shape"
-                  hint="Inherited from the invoice. It decides which articles print."
-                  flagged={flaggedFields.has("paymentTermId")}
-                >
-                  <select
-                    className={INPUT}
-                    value={terms.paymentKind ?? ""}
-                    onChange={(e) => set("paymentKind", (e.target.value || undefined) as ContractTerms["paymentKind"])}
-                  >
-                    <option value="">— none —</option>
-                    <option value="tt">T/T — telegraphic transfer</option>
-                    <option value="lc">L/C — documentary credit</option>
-                    <option value="dp">D/P — documents against payment</option>
-                    <option value="da">D/A — documents against acceptance</option>
-                    <option value="open">Open account</option>
-                    <option value="mixed">Mixed / staged</option>
-                  </select>
-                </Field>
-                <Field label="Payment term as printed">
-                  <input
-                    className={INPUT}
-                    value={terms.paymentLabel ?? ""}
-                    onChange={(e) => set("paymentLabel", e.target.value || undefined)}
-                  />
-                </Field>
-                <div style={{ display: "grid", gridTemplateColumns: "110px 1fr", gap: 10 }}>
-                  <Field label="Production" flagged={flaggedFields.has("leadTimeDays")}>
-                    <input
-                      className={INPUT}
-                      type="number"
-                      min={0}
-                      value={terms.leadTimeDays ?? ""}
-                      onChange={(e) => set("leadTimeDays", e.target.value ? Number(e.target.value) : undefined)}
-                    />
-                  </Field>
-                  <Field label="Days counted from" flagged={flaggedFields.has("leadTimeBasis")}>
-                    <select
-                      className={INPUT}
-                      value={terms.leadTimeBasis ?? ""}
-                      onChange={(e) =>
-                        set("leadTimeBasis", (e.target.value || undefined) as ContractTerms["leadTimeBasis"])
-                      }
-                    >
-                      <option value="after_deposit">the advance payment</option>
-                      <option value="after_lc_opening">the operative credit</option>
-                      <option value="after_order">the contract date</option>
-                    </select>
-                  </Field>
-                </div>
-              </Group>
-
-              <Group title="Quality and cover">
-                <div style={{ display: "grid", gridTemplateColumns: "110px 1fr", gap: 10 }}>
-                  <Field label="Warranty (months)" flagged={flaggedFields.has("warrantyMonths")}>
-                    <input
-                      className={INPUT}
-                      type="number"
-                      min={0}
-                      value={terms.warrantyMonths ?? ""}
-                      onChange={(e) => set("warrantyMonths", e.target.value ? Number(e.target.value) : undefined)}
-                    />
-                  </Field>
-                  <Field label="Inspection">
-                    <select
-                      className={INPUT}
-                      value={terms.inspection ?? "seller"}
-                      onChange={(e) => set("inspection", e.target.value as ContractTerms["inspection"])}
-                    >
-                      <option value="none">none agreed</option>
-                      <option value="seller">by the Seller</option>
-                      <option value="buyer">by the Buyer</option>
-                      <option value="third_party">independent third party</option>
-                    </select>
-                  </Field>
-                </div>
-                <Field
-                  label="Documents provided"
-                  hint="One per line. Under a credit the bank pays against this list."
-                  flagged={flaggedFields.has("documents")}
-                >
-                  <textarea
-                    className={INPUT}
-                    rows={4}
-                    value={(terms.documents ?? []).join("\n")}
-                    onChange={(e) =>
-                      set(
-                        "documents",
-                        e.target.value.split("\n").map((s) => s.trim()).filter(Boolean),
-                      )
-                    }
-                  />
-                </Field>
-              </Group>
-
-              <Group title="Law and special conditions">
-                <Field
-                  label="Governing law and forum"
-                  hint="Name both — the law that applies and where a claim is brought."
-                  flagged={flaggedFields.has("governingLaw")}
-                >
-                  <textarea
-                    className={INPUT}
-                    rows={3}
-                    value={terms.governingLaw ?? ""}
-                    onChange={(e) => set("governingLaw", e.target.value || undefined)}
-                  />
-                </Field>
-                <Field
-                  label="Special conditions"
-                  hint="One per line. These outrank the general articles, and print after them."
-                  flagged={flaggedFields.has("specialConditions")}
-                >
-                  <textarea
-                    className={INPUT}
-                    rows={4}
-                    value={(terms.specialConditions ?? []).join("\n")}
-                    onChange={(e) =>
-                      set(
-                        "specialConditions",
-                        e.target.value.split("\n").map((s) => s.trim()).filter(Boolean),
-                      )
-                    }
-                  />
-                </Field>
-              </Group>
-
-              <Group title="Execution">
-                <Field label="Place of signing">
-                  <input
-                    className={INPUT}
-                    value={row.place_of_signing ?? ""}
-                    onChange={(e) => setRow((r) => (r ? { ...r, place_of_signing: e.target.value } : r))}
-                    onBlur={(e) => void patch({ place_of_signing: e.target.value || null })}
-                  />
-                </Field>
-                <Field label="Contract date">
-                  <input
-                    className={INPUT}
-                    type="date"
-                    value={row.contract_date ?? ""}
-                    onChange={(e) => setRow((r) => (r ? { ...r, contract_date: e.target.value } : r))}
-                    onBlur={(e) => void patch({ contract_date: e.target.value || null })}
-                  />
-                </Field>
-              </Group>
-            </aside>
+              <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+                {findings.map((f) => (
+                  <div key={f.id} style={{ flex: "1 1 300px", minWidth: 280 }}>
+                    <FindingCard f={f} />
+                  </div>
+                ))}
+              </div>
+            </div>
           )}
+        </div>
+      )}
 
-          <div className="quot-a4-stack" style={{ flex: "1 1 210mm", minWidth: 0, display: "flex", justifyContent: "center" }}>
-            <ContractA4
-              contractNo={row.contract_no}
-              status={row.status}
-              contractDate={row.contract_date}
-              placeOfSigning={row.place_of_signing}
-              currency={row.currency}
-              total={row.total}
-              terms={terms}
-              invoice={invoice}
-              snapshot={row.snapshot}
-              amendsNo={amends?.contract_no ?? null}
-            />
-          </div>
+      {/* ── The paper ── */}
+      <div className="flex-1 min-h-0 overflow-auto">
+        <div className="quot-a4-stack" style={{ padding: "20px 0 40px" }}>
+          <ContractA4
+            contractNo={row.contract_no}
+            status={row.status}
+            dealNo={row.deal_no}
+            contractDate={row.contract_date}
+            placeOfSigning={row.place_of_signing}
+            currency={row.currency}
+            total={row.total}
+            terms={terms}
+            invoice={invoice}
+            snapshot={row.snapshot}
+            amendsNo={amends?.contract_no ?? null}
+          />
         </div>
       </div>
 

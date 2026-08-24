@@ -34,6 +34,9 @@ export interface ContractTerms extends ContractContext {
 export interface ScheduleItem {
   name?: string;
   description?: string;
+  /* Printed beside the description on the contract's schedule, the same way
+     the invoice prints it — a buyer's bank matches on the model, not prose. */
+  model?: string;
   qty?: number;
   price?: number;
 }
