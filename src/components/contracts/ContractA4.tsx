@@ -88,6 +88,141 @@ export interface ContractA4Props {
   amendsNo?: string | null;
 }
 
+/* ── Paging ────────────────────────────────────────────────────────────────
+   The house sheet is 210 × 270 mm, NOT 210 × 297. 270 is deliberate: it fits
+   A4 *and* US Letter without the every-other-blank-sheet overflow the invoice
+   hit, and `.quot-a4-doc` in globals.css fixes every sheet to it.
+
+   This document used to be one box with `minHeight: 297mm` and three sheets'
+   worth of prose inside it — 840 mm of content spilling 543 mm past its own
+   paper. On screen `overflow: visible` hid the problem; on paper the browser
+   cut it wherever it liked, and pages 2 and 3 came out carrying no logo, no
+   company name and no page number. For a contract that is not cosmetic: a
+   page can be pulled from the set and nothing on the remaining paper says so.
+
+   So the articles are measured and dealt onto real sheets, every sheet
+   carries the contract number and "Page X of Y", and every sheet after the
+   first repeats a compact identity strip.
+
+   Heights are ESTIMATED from character counts rather than measured in the
+   DOM. A measuring pass would be exact and would also mean a layout read on
+   every keystroke of the editor beside it. The budget below leaves enough
+   slack to absorb the error, and `breakInside: avoid` on each article stops
+   the browser splitting one mid-sentence if an estimate runs short. */
+const SHEET_INNER_PX = 978;      // 270mm less the 24/18px vertical padding
+const CONT_HEAD_PX = 58;         // identity strip on sheets 2..N
+const FOOT_PX = 26;              // page-number footer on every sheet
+const SIGN_BLOCK_PX = 250;       // the two signature cards
+const CHARS_PER_LINE = 148;      // 10px text across ~738px of inner width
+const LINE_PX = 15;
+const ART_TITLE_PX = 16;
+const ART_GAP_PX = 9;
+
+function articleHeight(body: string): number {
+  const paras = body.split("\n\n");
+  let lines = 0;
+  for (const para of paras) lines += Math.max(1, Math.ceil(para.length / CHARS_PER_LINE));
+  return ART_TITLE_PX + lines * LINE_PX + (paras.length - 1) * 6 + ART_GAP_PX;
+}
+
+interface Sheet {
+  articles: RenderedArticle[];
+  /** The first sheet carries the full header, parties, schedule and key terms. */
+  isFirst: boolean;
+  /** The last sheet carries the special conditions and the signatures. */
+  isLast: boolean;
+}
+
+/** Deal the articles onto sheets. The first sheet is the cover — it holds the
+    schedule and key terms and no articles at all, because those two blocks
+    already fill it. */
+function paginate(articles: RenderedArticle[], specialCount: number): Sheet[] {
+  const sheets: Sheet[] = [{ articles: [], isFirst: true, isLast: false }];
+
+  let budget = SHEET_INNER_PX - CONT_HEAD_PX - FOOT_PX;
+  let current: RenderedArticle[] = [];
+  const flush = () => {
+    sheets.push({ articles: current, isFirst: false, isLast: false });
+    current = [];
+    budget = SHEET_INNER_PX - CONT_HEAD_PX - FOOT_PX;
+  };
+
+  for (const a of articles) {
+    const h = articleHeight(a.body);
+    if (current.length > 0 && h > budget) flush();
+    current.push(a);
+    budget -= h;
+  }
+  if (current.length > 0) flush();
+
+  /* The signatures must not be marooned on a sheet of their own with nothing
+     above them — a signature page that carries no terms is the classic way a
+     signed page gets attached to a document nobody agreed to. Keep them with
+     the last articles when there is room; otherwise give them their own
+     sheet, which then still repeats the identity strip and the page number. */
+  const last = sheets[sheets.length - 1];
+  const needed = SIGN_BLOCK_PX + (specialCount > 0 ? 40 + specialCount * 18 : 0);
+  if (last.isFirst || budget < needed) {
+    sheets.push({ articles: [], isFirst: false, isLast: true });
+  } else {
+    last.isLast = true;
+  }
+  return sheets;
+}
+
+/** The strip that identifies sheets 2..N. Not the full brand header — that
+    would eat a third of every continuation sheet — but enough that a loose
+    page can be placed: whose contract, which number, which deal. */
+function ContinuationHead({ contractNo, buyer }: { contractNo: string; buyer: string }) {
+  return (
+    <div
+      style={{
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "center",
+        background: T.black,
+        color: "#fff",
+        borderRadius: 8,
+        padding: "6px 14px",
+        fontSize: 9,
+        fontWeight: 700,
+        letterSpacing: "0.08em",
+        textTransform: "uppercase",
+        marginBottom: 12,
+      }}
+    >
+      <span>Sales Contract · {contractNo}</span>
+      <span style={{ fontWeight: 600, letterSpacing: "0.04em" }}>{buyer}</span>
+    </div>
+  );
+}
+
+function SheetFooter({ contractNo, n, of }: { contractNo: string; n: number; of: number }) {
+  return (
+    <div
+      style={{
+        marginTop: "auto",
+        paddingTop: 8,
+        borderTop: `1px solid ${T.border}`,
+        display: "flex",
+        justifyContent: "space-between",
+        fontFamily: T.mono,
+        fontSize: 8,
+        color: T.inkSoft,
+        letterSpacing: "0.04em",
+      }}
+    >
+      <span>{contractNo}</span>
+      {/* Initialling each page is what stops a sheet being swapped after
+          signature. The box is printed whether or not anyone uses it. */}
+      <span>Buyer&rsquo;s initials ________</span>
+      <span>
+        Page {n} of {of}
+      </span>
+    </div>
+  );
+}
+
 function ContractA4Inner(props: ContractA4Props) {
   const frozen = props.snapshot ?? null;
   const band = BANDS[props.status];
@@ -102,22 +237,30 @@ function ContractA4Inner(props: ContractA4Props) {
   const invoiceNo = frozen?.schedule.invoiceNo ?? props.invoice?.inv_no ?? null;
   const contractDate = frozen?.contractDate ?? props.contractDate;
 
+  const sheets = paginate(articles, (terms.specialConditions ?? []).length);
+  const buyerName = buyer.company || buyer.name || "—";
+
   return (
-    <div
-      className="quot-a4-doc"
-      style={{
-        width: "210mm",
-        minHeight: "297mm",
-        background: "#fff",
-        color: T.ink,
-        padding: "0 16mm 18mm",
-        fontFamily: "inherit",
-        fontSize: 11,
-        lineHeight: 1.5,
-        margin: "0 auto",
-        boxShadow: "0 2px 24px rgba(0,0,0,0.28)",
-      }}
-    >
+    <>
+      {sheets.map((sheet, i) => (
+        <div
+          key={i}
+          className="quot-a4-doc"
+          /* Geometry comes from `.quot-a4-doc` in globals.css — 210 × 270 mm
+             fixed, the same sheet the quotation and invoice print on. Nothing
+             here overrides height: a document that sets its own paper size is
+             how this ended up 840 mm tall. */
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            color: T.ink,
+            fontSize: 11,
+            lineHeight: 1.5,
+            boxShadow: "0 2px 24px rgba(0,0,0,0.28)",
+          }}
+        >
+          {sheet.isFirst ? (
+            <>
       {/* ── (a) Header: wordmark + document title ── */}
       <div
         className="pq-top-header"
@@ -300,50 +443,89 @@ function ContractA4Inner(props: ContractA4Props) {
         ) : null}
       </div>
 
-      {/* ── Articles ── */}
-      <SectionBar>General Terms and Conditions</SectionBar>
-      <ol style={{ margin: "0 0 14px", padding: 0, listStyle: "none" }}>
-        {articles.map((a) => (
-          <li key={a.key ?? a.n} style={{ marginBottom: 9, breakInside: "avoid" }}>
-            <div style={{ fontWeight: 700, fontSize: 10.5, color: T.black }}>
-              {a.n}. {a.title}
-            </div>
-            <div style={{ whiteSpace: "pre-wrap", textAlign: "justify", fontSize: 10, color: T.ink }}>{a.body}</div>
-          </li>
-        ))}
-      </ol>
+            </>
+          ) : (
+            <ContinuationHead contractNo={props.contractNo} buyer={buyerName} />
+          )}
 
-      {/* Anything negotiated for this deal alone outranks the general terms,
-          so it prints after them and says so. */}
-      {(terms.specialConditions ?? []).length > 0 && (
-        <>
-          <SectionBar>Special Conditions</SectionBar>
-          <p style={{ margin: "0 0 6px", fontSize: 9.5, color: T.inkSoft }}>
-            Where these conflict with the General Terms above, these prevail.
-          </p>
-          <ol style={{ margin: "0 0 14px", paddingInlineStart: 18, fontSize: 10 }}>
-            {(terms.specialConditions ?? []).map((c, i) => (
-              <li key={i} style={{ marginBottom: 4 }}>
-                {c}
-              </li>
-            ))}
-          </ol>
-        </>
-      )}
+          {/* ── Articles ──
+              The first sheet carries none: the schedule and key terms fill
+              it. Numbering is continuous across sheets because the numbers
+              come from articlesFor(), not from the position on the page. */}
+          {sheet.articles.length > 0 && (
+            <>
+              {sheet.isFirst || sheets[i - 1]?.isFirst ? (
+                <SectionBar>General Terms and Conditions</SectionBar>
+              ) : null}
+              <ol style={{ margin: "0 0 10px", padding: 0, listStyle: "none" }}>
+                {sheet.articles.map((a) => (
+                  <li key={a.key ?? a.n} style={{ marginBottom: 9, breakInside: "avoid" }}>
+                    <div style={{ fontWeight: 700, fontSize: 10.5, color: T.black }}>
+                      {a.n}. {a.title}
+                    </div>
+                    <div style={{ whiteSpace: "pre-wrap", textAlign: "justify", fontSize: 10, color: T.ink }}>
+                      {a.body}
+                    </div>
+                  </li>
+                ))}
+              </ol>
+            </>
+          )}
 
-      {/* ── Signatures ── */}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginTop: 18, breakInside: "avoid" }}>
-        <SignBlock role="For and on behalf of the SELLER" party={KOLEEX_COMPANY.en} />
-        <SignBlock role="For and on behalf of the BUYER" party={buyer.company || buyer.name || "—"} />
-      </div>
+          {sheet.isLast && (
+            <>
+              {/* Anything negotiated for this deal alone outranks the general
+                  terms, so it prints after them and says so. */}
+              {(terms.specialConditions ?? []).length > 0 && (
+                <>
+                  <SectionBar>Special Conditions</SectionBar>
+                  <p style={{ margin: "0 0 6px", fontSize: 9.5, color: T.inkSoft }}>
+                    Where these conflict with the General Terms above, these prevail.
+                  </p>
+                  <ol style={{ margin: "0 0 14px", paddingInlineStart: 18, fontSize: 10 }}>
+                    {(terms.specialConditions ?? []).map((c, j) => (
+                      <li key={j} style={{ marginBottom: 4 }}>
+                        {c}
+                      </li>
+                    ))}
+                  </ol>
+                </>
+              )}
 
-      {frozen ? (
-        <div style={{ marginTop: 14, fontFamily: T.mono, fontSize: 8, color: T.inkGhost, textAlign: "center" }}>
-          Executed {dmy(frozen.frozenAt)} · terms edition {frozen.termsVersion} · this text is fixed and no longer
-          follows later changes.
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "1fr 1fr",
+                  gap: 16,
+                  marginTop: 14,
+                  breakInside: "avoid",
+                }}
+              >
+                <SignBlock role="For and on behalf of the SELLER" party={KOLEEX_COMPANY.en} />
+                <SignBlock role="For and on behalf of the BUYER" party={buyerName} />
+              </div>
+
+              {frozen ? (
+                <div
+                  style={{
+                    marginTop: 12,
+                    fontFamily: T.mono,
+                    fontSize: 8,
+                    color: T.inkGhost,
+                    textAlign: "center",
+                  }}
+                >
+                  Executed {dmy(frozen.frozenAt)} · terms edition {frozen.termsVersion} · this text is fixed and no
+                  longer follows later changes.
+                </div>
+              ) : null}
+            </>
+          )}
+
+          <SheetFooter contractNo={props.contractNo} n={i + 1} of={sheets.length} />
         </div>
-      ) : null}
-    </div>
+      ))}
+    </>
   );
 }
 

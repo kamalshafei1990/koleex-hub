@@ -22,6 +22,12 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import ContractA4 from "./ContractA4";
+/* The sheet geometry (210 × 270 mm), the print page-breaks and the rules that
+   hide the toolbar on paper all live here. Without it the contract had NO
+   `.quot-a4-doc` definition at all — which is why it was carrying its own
+   inline `297mm` and printing wherever the browser felt like cutting. Same
+   import PackingListDoc uses. */
+import { PRINT_AND_DOC_STYLES } from "@/components/quotations/Quotations";
 import OrdersIcon from "@/components/icons/OrdersIcon";
 import { checkContract, blocksSignature, type Finding } from "@/lib/contracts/contradictions";
 import type { ContractRef, ContractRow, ContractTerms, InvoiceLite } from "./types";
@@ -286,6 +292,8 @@ export default function ContractDoc({ id }: { id: string }) {
 
   return (
     <div className="h-full flex flex-col">
+      <style>{PRINT_AND_DOC_STYLES}</style>
+
       {/* ── Toolbar ── */}
       <div
         className="no-print kx-glass"
