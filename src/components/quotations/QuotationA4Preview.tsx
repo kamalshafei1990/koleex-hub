@@ -223,6 +223,12 @@ interface Props {
   /* Optional handler for the "Link customer" button on the
      QUOTATION TO header. Parent owns the modal. */
   onPickCustomer?: () => void;
+  /* Save the typed party details as a new CRM customer. Rendered only when
+     there is something to save and nothing already linked — a details card
+     filled by hand is otherwise a dead end: the operator retypes the same
+     buyer on the next document. */
+  onSaveCustomer?: () => void;
+  savingCustomer?: boolean;
   /* Doc kind — flips the visible labels for the same renderer:
        "quotation" → "QUOTATION" / "Quotation No" / "Valid Till" /
                      "Quotation To"
@@ -356,6 +362,8 @@ export default function QuotationA4Preview({
   addHeader,
   onPickFromCatalog,
   onPickCustomer,
+  onSaveCustomer,
+  savingCustomer,
   docKind = "quotation",
   savedStampUrl,
   savedSignatureUrl,
@@ -1089,6 +1097,34 @@ export default function QuotationA4Preview({
                   {current.customerContactId ? "Change" : "Link Customer"}
                 </button>
               )}
+              {/* Only when the card holds typed details that are not already a
+                  CRM record. Linking one hides it — there is nothing to add. */}
+              {onSaveCustomer &&
+                !current.customerContactId &&
+                (current.companyName?.trim() || current.customerName?.trim()) && (
+                  <button
+                    type="button"
+                    className="no-print"
+                    onClick={onSaveCustomer}
+                    disabled={savingCustomer}
+                    title="Add these details to the Customers app, so the next document can just link them."
+                    style={{
+                      background: "rgba(255,255,255,0.14)",
+                      color: "#fff",
+                      border: "1px solid rgba(255,255,255,0.25)",
+                      padding: "2px 8px",
+                      borderRadius: 5,
+                      fontSize: 9,
+                      fontWeight: 700,
+                      letterSpacing: "0.06em",
+                      textTransform: "uppercase",
+                      cursor: savingCustomer ? "default" : "pointer",
+                      opacity: savingCustomer ? 0.55 : 1,
+                    }}
+                  >
+                    {savingCustomer ? "Saving…" : "+ Save as Customer"}
+                  </button>
+                )}
             </div>
             <div style={{ padding: "10px 14px", display: "flex", flexDirection: "column", gap: 8 }}>
               {/* Company name — prominent at the top */}

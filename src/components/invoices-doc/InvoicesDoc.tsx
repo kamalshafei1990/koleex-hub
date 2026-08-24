@@ -37,6 +37,7 @@ import {
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 import AppIcon from "@/components/common/AppIcon";
 import DocTitlePicker from "@/components/quotations/DocTitlePicker";
+import { useConfirm } from "@/components/kds/useConfirm";
 
 /* ON DEMAND, not on arrival. These two open when someone clicks "add product"
    or "pick customer" — most visits to the list never do either, and a static
@@ -1151,9 +1152,75 @@ export default function Quotations() {
      persist it as-is. The statusHistory audit log only grows when the
      status actually changes; idle saves don't pollute it with
      duplicate "draft" rows. */
+  /* The heading this document last carried on disk. A proforma invoice that
+     becomes a commercial invoice is a NEW document — the proforma was issued
+     to a bank and has to survive — so retitling a saved document and pressing
+     save offers to branch instead of silently overwriting. */
+  const { askConfirm, confirmDialog } = useConfirm();
+  const savedTitleRef = useRef<string | undefined>(undefined);
+  useEffect(() => {
+    if (view === "editor" && current?.id) savedTitleRef.current = current.docTitleText;
+    if (view !== "editor") savedTitleRef.current = undefined;
+  }, [view, current?.id]);
+
+  /* Branch: keep the document on disk untouched and save the retitled version
+     as a separate one. It joins the same order, so both sit on the same deal. */
+  const saveRetitledAsNew = useCallback(
+    async (status: InvoiceStatus | "final") => {
+      if (!current) return;
+      const today = todayDDMMYYYY();
+      const branched: Invoice = {
+        ...current,
+        id: generateId(),
+        /* Blank so the server mints the next number on this deal —
+           KL-IN-12350 keeps its identity, the new one becomes -2. */
+        invoiceNo: "",
+        date: today,
+        status: "draft",
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        serverTotal: undefined,
+        statusHistory: [],
+        items: current.items.map((it) => ({ ...it })),
+      };
+      setCurrent(branched);
+      savedTitleRef.current = branched.docTitleText;
+      /* Defer so the editor is rendering the branch before it is written. */
+      setTimeout(() => { void handleSaveInner(status, branched); }, 0);
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [current],
+  );
+
   const handleSave = useCallback(
     async (status: InvoiceStatus | "final") => {
       if (!current) return;
+      /* Retitled a document that already exists on disk → ask. Doing it
+         silently either destroys the proforma or produces a surprise second
+         invoice; both are worse than one question. */
+      const savedTitle = savedTitleRef.current;
+      const nowTitle = current.docTitleText;
+      if (current.id && savedTitle !== undefined && savedTitle !== nowTitle) {
+        askConfirm(
+          `Save "${nowTitle ?? "this document"}" as a NEW document and keep "${savedTitle ?? "the original"}"?`,
+          () => saveRetitledAsNew(status),
+          {
+            confirmLabel: "Save as new",
+            tone: "neutral",
+            onCancel: () => { savedTitleRef.current = nowTitle; void handleSaveInner(status, current); },
+          },
+        );
+        return;
+      }
+      return handleSaveInner(status, current);
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [current, saveRetitledAsNew],
+  );
+
+  const handleSaveInner = useCallback(
+    async (status: InvoiceStatus | "final", doc: Invoice) => {
+      const current = doc;
       setSaveState("saving");
       setSaveError("");
       const nextStatus: InvoiceStatus = status === "final" ? "sent" : status;
@@ -1172,6 +1239,10 @@ export default function Quotations() {
         const saved = await saveInvoiceRemote(intent);
         if (saved) {
           setCurrent(saved);
+          /* What is on disk is now this title — otherwise a later retitle
+             would be compared against the one from page load and the prompt
+             would never fire twice in a session. */
+          savedTitleRef.current = saved.docTitleText;
           const list = await loadInvoicesRemote({ fresh: true });
           setQuotations(list);
           setSaveState("saved");
@@ -2011,6 +2082,7 @@ export default function Quotations() {
     <AuroraShell className="text-[var(--text-primary)]">
       <style>{PRINT_AND_DOC_STYLES}</style>
       {toastElement}
+      {confirmDialog}
 
       {/* ── Toolbar (dark bar above A4) ── */}
       <div

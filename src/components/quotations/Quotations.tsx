@@ -2117,6 +2117,54 @@ export default function Quotations() {
     [current],
   );
 
+  /* Save the typed party details as a CRM customer.
+
+     A details card filled by hand is a dead end otherwise: the buyer exists
+     on this one document and the operator retypes them on the next. Creating
+     the customer also earns them a permanent code (BD-100 …), which is what
+     makes the same buyer recognisable across every document afterwards.
+
+     The new customer is linked straight back onto the document, so the button
+     disappears and the card behaves exactly as if it had been picked from the
+     CRM in the first place. */
+  const [savingCustomer, setSavingCustomer] = useState(false);
+  const saveCurrentPartyAsCustomer = useCallback(async () => {
+    if (!current || savingCustomer) return;
+    const name = (current.customerName || current.companyName || "").trim();
+    if (!name) return;
+
+    setSavingCustomer(true);
+    try {
+      const res = await fetch("/api/customers", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name,
+          company_name: current.companyName?.trim() || null,
+          email: current.toEmail?.trim() || null,
+          phone: current.toPhone?.trim() || null,
+          /* The card holds a free-text address; the country is parsed out of
+             its last line, which is where an export address puts it. A wrong
+             guess only costs an XX- prefix, never a failed save. */
+          country: (current.toAddress || "").split(/[\n,]/).map((x) => x.trim()).filter(Boolean).pop() || null,
+        }),
+      });
+      const json = (await res.json().catch(() => null)) as
+        | { customer?: { id: string; customer_code: string | null }; error?: string }
+        | null;
+      if (!res.ok || !json?.customer) {
+        alert(json?.error ?? "Could not save the customer.");
+        return;
+      }
+      setCurrent((q) => (q ? { ...q, customerContactId: json.customer!.id } : q));
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "Could not save the customer.");
+    } finally {
+      setSavingCustomer(false);
+    }
+  }, [current, savingCustomer]);
+
   /* Append a new item pre-filled from the catalog picker. If the
      bottom-most row is still completely blank (typical right after
      a "+ Add row"), replace it instead of appending — keeps the
@@ -3005,6 +3053,8 @@ export default function Quotations() {
         addHeader={addHeader}
         onPickFromCatalog={() => setPickerOpen(true)}
         onPickCustomer={() => setCustomerPickerOpen(true)}
+        onSaveCustomer={saveCurrentPartyAsCustomer}
+        savingCustomer={savingCustomer}
         savedStampUrl={savedStampUrl}
         savedSignatureUrl={savedSignatureUrl}
         isSuperAdmin={isSuperAdmin}
