@@ -108,7 +108,16 @@ const ROUTE_BUDGETS: Record<string, { chunks: number; kbytes: number }> = {
   "inventory": { chunks: 13, kbytes: 675 },
   "invoices": { chunks: 8, kbytes: 520 },
   "issues": { chunks: 12, kbytes: 712 },
-  "knowledge": { chunks: 11, kbytes: 520 },
+  /* Re-measured 2026-08-24: 525 KB against a 520 budget. NOT drift — its
+     peers (ai, contacts, crm, customers, discuss, notes, planning) all sit at
+     497-502 KB, so the knowledge route genuinely carries ~24 KB of its own,
+     and 5 KB of that is new. The source is product-coding/data.ts, which went
+     12 KB -> 34 KB across CL-0026 and CL-0027. That growth is mandated: the
+     owner's standing rule is that every minted code is taught in the Knowledge
+     app, so this number rises every time the taxonomy does. Budgeted at
+     measured + 12%; it is the one route where headroom is expected to be
+     spent, and a jump far past 590 means something OTHER than codes arrived. */
+  "knowledge": { chunks: 11, kbytes: 590 },
   "landed-cost": { chunks: 11, kbytes: 577 },
   "management": { chunks: 12, kbytes: 983 },
   "markets": { chunks: 11, kbytes: 772 },

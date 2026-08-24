@@ -37,6 +37,8 @@ import {
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 import AppIcon from "@/components/common/AppIcon";
 import DocTitlePicker from "@/components/quotations/DocTitlePicker";
+import ContractIcon from "@/components/icons/ui/ContractIcon";
+import { useRouter } from "next/navigation";
 import { useConfirm } from "@/components/kds/useConfirm";
 
 /* ON DEMAND, not on arrival. These two open when someone clicks "add product"
@@ -1192,6 +1194,38 @@ export default function Quotations() {
     [current],
   );
 
+  /* ── Sales contract ──────────────────────────────────────────────────────
+     One invoice, one contract — until an amendment is raised, which takes its
+     own suffixed number. So the button opens the existing contract rather
+     than minting a second one, and only creates when there is none. */
+  const router = useRouter();
+  const [contractState, setContractState] = useState<"idle" | "working">("idle");
+
+  const handleSalesContract = useCallback(async () => {
+    if (!current?.id) return;
+    setContractState("working");
+    try {
+      const found = await fetch(`/api/sales-contracts?invoice_id=${current.id}`, { cache: "no-store" });
+      const foundJson = (await found.json()) as { contracts?: { id: string }[]; error?: string };
+      const existing = foundJson.contracts?.[0];
+      if (existing) {
+        router.push(`/contracts/${existing.id}`);
+        return;
+      }
+      const res = await fetch("/api/sales-contracts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ invoice_id: current.id }),
+      });
+      const json = (await res.json()) as { contract?: { id: string }; error?: string };
+      if (!res.ok || !json.contract) throw new Error(json.error ?? "Could not create the contract.");
+      router.push(`/contracts/${json.contract.id}`);
+    } catch (e) {
+      showToast(e instanceof Error ? e.message : "Could not create the contract.", "error");
+      setContractState("idle");
+    }
+  }, [current?.id, router, showToast]);
+
   const handleSave = useCallback(
     async (status: InvoiceStatus | "final") => {
       if (!current) return;
@@ -2162,6 +2196,20 @@ export default function Quotations() {
           className="px-4 py-2 text-sm bg-[var(--bg-inverted)] hover:opacity-90 text-[var(--text-inverted)] rounded-lg font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {saveState === "saving" ? "Saving…" : t("btn.saveFinal")}
+        </button>
+        {/* Raises the sales contract for this deal, or opens the one already
+            raised. Sits with the document actions because that is what it is:
+            another document of the same order. */}
+        <button
+          onClick={handleSalesContract}
+          disabled={!current.id || contractState === "working"}
+          className="inline-flex items-center gap-1.5 px-3 py-2 text-sm text-gray-300 bg-[var(--bg-surface)] hover:bg-[var(--bg-inverted)]/[0.1] rounded-lg transition disabled:opacity-40 disabled:cursor-not-allowed"
+          title={current.id
+            ? "Open the sales contract for this deal, or raise one from this invoice."
+            : "Save the invoice first — a contract is raised from a saved invoice."}
+        >
+          <ContractIcon size={14} />
+          {contractState === "working" ? "Opening…" : "Contract"}
         </button>
         <button
           onClick={handleDuplicate}

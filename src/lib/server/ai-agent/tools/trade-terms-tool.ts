@@ -46,6 +46,15 @@ const searchTradeTerms: ToolDef<
     },
     required: ["query"],
   },
+  /* No module: this reads a shipped file of published ICC and ITA standards —
+     no customer, no price, no supplier, nothing of Koleex's own. There is no
+     module that owns "what does CIF mean". The bar is a role tier instead,
+     because `requiredModule: undefined` on its own means UNGATED, which is
+     how the knowledge tool once ended up open to everyone. Internal staff
+     get it; it is not reachable from a customer-facing conversation. */
+  requiredModule: undefined,
+  requiredAction: "view",
+  minRole: "internal",
   handler: async (
     _ctx,
     args,

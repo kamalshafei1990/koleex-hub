@@ -3,6 +3,7 @@ import "server-only";
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { requireAuth, requireModuleAccess , requireModuleAction} from "@/lib/server/auth";
+import { ensureOrder } from "@/lib/server/orders";
 import { calcInvoiceTotals, type LineInput } from "@/lib/server/invoice-totals";
 import { assertScopeShadowForRow, toScopeContext } from "@/lib/server/apply-scope";
 import { getScopeMode } from "@/lib/server/scope-flags";
@@ -77,68 +78,6 @@ async function invoiceNumberFor(
   }
   const n = Number(data);
   return { inv_no: `KL-IN-${n}`, deal_no: n };
-}
-
-/* Create the order for this deal, or return the one that already exists.
-   Never fatal: an invoice without an order is still a valid invoice and can
-   be attached later, whereas refusing to convert because the order insert
-   failed would block real work over bookkeeping. */
-async function ensureOrder(args: {
-  tenantId: string;
-  dealNo: number;
-  customerId: string | null;
-  currency: string | null;
-  total: number;
-  accountId: string;
-}): Promise<string | null> {
-  const { tenantId, dealNo, customerId, currency, total, accountId } = args;
-
-  const { data: existing } = await supabaseServer
-    .from("orders")
-    .select("id")
-    .eq("tenant_id", tenantId)
-    .eq("deal_no", dealNo)
-    .maybeSingle();
-  if (existing?.id) return existing.id as string;
-
-  type CustomerSnapshot = {
-    customer_code: string | null;
-    name: string | null;
-    company_name: string | null;
-  };
-  let snapshot: CustomerSnapshot | null = null;
-  if (customerId) {
-    const { data } = await supabaseServer
-      .from("customers")
-      .select("customer_code, name, company_name")
-      .eq("id", customerId)
-      .maybeSingle();
-    snapshot = (data as CustomerSnapshot | null) ?? null;
-  }
-
-  const { data, error } = await supabaseServer
-    .from("orders")
-    .insert({
-      tenant_id: tenantId,
-      deal_no: dealNo,
-      order_no: `KL-${dealNo}`,
-      customer_id: customerId,
-      customer_code: snapshot?.customer_code ?? null,
-      customer_name: snapshot?.name ?? null,
-      company_name: snapshot?.company_name ?? null,
-      currency,
-      total,
-      status: "open",
-      created_by: accountId,
-    })
-    .select("id")
-    .single();
-
-  if (error) {
-    console.warn("[orders] could not create order for deal", dealNo, error.message);
-    return null;
-  }
-  return data.id as string;
 }
 
 export async function POST(req: Request) {

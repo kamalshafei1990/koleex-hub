@@ -14,6 +14,7 @@
     "validate:ai-quotation-guard": "tsx scripts/validate-ai-quotation-guard.ts",
     "validate:trade-terms": "tsx --conditions=react-server scripts/validate-trade-terms.ts",
     "validate:contract-terms": "tsx scripts/validate-contract-terms.ts",
+    "validate:contract-contradictions": "tsx scripts/validate-contract-contradictions.ts",
     "backfill:customer-codes": "tsx scripts/backfill-customer-codes.mts",
     "validate:customer-quotation-guard": "tsx scripts/validate-customer-quotation-guard.ts",
     "validate:password-state": "tsx scripts/validate-password-state.ts",

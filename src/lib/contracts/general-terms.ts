@@ -225,11 +225,20 @@ export const GENERAL_ARTICLES: ContractArticle[] = [
 ];
 
 /** Articles that apply to this deal, in order, numbered from 1. */
-export function articlesFor(ctx: ContractContext): Array<{ n: number; title: string; body: string }> {
-  const out: Array<{ n: number; title: string; body: string }> = [];
+export interface RenderedArticle {
+  /** Position as printed. Recomputed every render — never stored as identity. */
+  n: number;
+  /** Stable identity, safe to store and compare across editions. */
+  key: string;
+  title: string;
+  body: string;
+}
+
+export function articlesFor(ctx: ContractContext): RenderedArticle[] {
+  const out: RenderedArticle[] = [];
   for (const a of GENERAL_ARTICLES) {
     if (a.applies && !a.applies(ctx)) continue;
-    out.push({ n: out.length + 1, title: a.title, body: a.body(ctx) });
+    out.push({ n: out.length + 1, key: a.key, title: a.title, body: a.body(ctx) });
   }
   return out;
 }
