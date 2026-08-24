@@ -17,6 +17,7 @@
     "validate:contract-contradictions": "tsx scripts/validate-contract-contradictions.ts",
     "backfill:orders": "tsx scripts/backfill-orders.mts",
     "audit:orders": "tsx scripts/audit-orders-integrity.mts",
+    "migrate:customer-codes": "tsx scripts/migrate-legacy-customer-codes.mts",
     "backfill:customer-codes": "tsx scripts/backfill-customer-codes.mts",
     "validate:customer-quotation-guard": "tsx scripts/validate-customer-quotation-guard.ts",
     "validate:password-state": "tsx scripts/validate-password-state.ts",
