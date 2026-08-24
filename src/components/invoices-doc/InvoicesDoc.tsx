@@ -38,6 +38,7 @@ import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 import AppIcon from "@/components/common/AppIcon";
 import DocTitlePicker from "@/components/quotations/DocTitlePicker";
 import ContractIcon from "@/components/icons/ui/ContractIcon";
+import BoxIcon from "@/components/icons/ui/BoxIcon";
 import { useRouter } from "next/navigation";
 import { useConfirm } from "@/components/kds/useConfirm";
 
@@ -1226,6 +1227,31 @@ export default function Quotations() {
     }
   }, [current?.id, router, showToast]);
 
+  /* ── Packing list ────────────────────────────────────────────────────────
+     Raised from the invoice so the shipment it describes is the shipment the
+     bank is paying against. Goods, buyer and ports are copied; cartons and
+     weights are left blank because they are measured at packing, and a guess
+     printed there would end up on a customs declaration. */
+  const [packingState, setPackingState] = useState<"idle" | "working">("idle");
+
+  const handlePackingList = useCallback(async () => {
+    if (!current?.id) return;
+    setPackingState("working");
+    try {
+      const res = await fetch("/api/packing-lists/from-invoice", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ invoice_id: current.id }),
+      });
+      const json = (await res.json()) as { document?: { id: string }; error?: string };
+      if (!res.ok || !json.document) throw new Error(json.error ?? "Could not create the packing list.");
+      router.push(`/documents?doc=${json.document.id}`);
+    } catch (e) {
+      showToast(e instanceof Error ? e.message : "Could not create the packing list.", "error");
+      setPackingState("idle");
+    }
+  }, [current?.id, router, showToast]);
+
   const handleSave = useCallback(
     async (status: InvoiceStatus | "final") => {
       if (!current) return;
@@ -2210,6 +2236,17 @@ export default function Quotations() {
         >
           <ContractIcon size={14} />
           {contractState === "working" ? "Opening…" : "Contract"}
+        </button>
+        <button
+          onClick={handlePackingList}
+          disabled={!current.id || packingState === "working"}
+          className="inline-flex items-center gap-1.5 px-3 py-2 text-sm text-gray-300 bg-[var(--bg-surface)] hover:bg-[var(--bg-inverted)]/[0.1] rounded-lg transition disabled:opacity-40 disabled:cursor-not-allowed"
+          title={current.id
+            ? "Open the packing list for this shipment, or raise one from this invoice."
+            : "Save the invoice first — a packing list is raised from a saved invoice."}
+        >
+          <BoxIcon size={14} />
+          {packingState === "working" ? "Opening…" : "Packing"}
         </button>
         <button
           onClick={handleDuplicate}

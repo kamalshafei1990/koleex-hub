@@ -28,6 +28,7 @@ export const ordersT: Translations = {
   "doc.quotations":   { en: "Quotations", zh: "报价单", ar: "عروض الأسعار" },
   "doc.invoices":     { en: "Invoices",   zh: "发票",   ar: "الفواتير" },
   "doc.contracts":    { en: "Contracts",  zh: "合同",   ar: "العقود" },
+  "doc.packingLists": { en: "Packing lists", zh: "装箱单", ar: "قوايم التعبئة" },
   "doc.none":         { en: "No documents yet", zh: "暂无单据", ar: "مفيش مستندات لسه" },
 
   /* ── empty and error ── */

@@ -29,6 +29,7 @@ import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 import QuotationIcon from "@/components/icons/QuotationIcon";
 import InvoicesIcon from "@/components/icons/InvoicesIcon";
 import ContractIcon from "@/components/icons/ui/ContractIcon";
+import BoxIcon from "@/components/icons/ui/BoxIcon";
 import { CARD } from "@/components/travel/fields";
 import {
   dmy,
@@ -146,8 +147,8 @@ export default function OrdersApp() {
         ) : (
           <ul className="flex flex-col gap-2">
             {visible.map((o) => {
-              const d = docs[o.id] ?? { quotations: [], invoices: [], contracts: [] };
-              const nDocs = d.quotations.length + d.invoices.length + d.contracts.length;
+              const d = docs[o.id] ?? { quotations: [], invoices: [], contracts: [], packingLists: [] };
+              const nDocs = d.quotations.length + d.invoices.length + d.contracts.length + d.packingLists.length;
               return (
                 <li key={o.id}>
                   <button
@@ -185,6 +186,9 @@ export default function OrdersApp() {
                           )}
                           {d.contracts.length > 0 && (
                             <DocCount icon={<ContractIcon size={12} />} n={d.contracts.length} label={t("doc.contracts")} />
+                          )}
+                          {d.packingLists.length > 0 && (
+                            <DocCount icon={<BoxIcon size={12} />} n={d.packingLists.length} label={t("doc.packingLists")} />
                           )}
                         </>
                       )}

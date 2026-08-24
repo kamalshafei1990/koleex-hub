@@ -515,6 +515,27 @@ export default function DocumentsApp() {
     if (openKind === null) void refresh();
   }, [openKind, refresh]);
 
+  /* Deep link — /documents?doc=<id> opens that document straight into its
+     editor. Without this a packing list raised from an invoice could only be
+     found by scrolling the list, which is not a link at all.
+
+     Runs once: the id is read from the URL rather than watched, so closing
+     the document with Back returns to the list instead of being yanked
+     straight back into it. */
+  const deepLinked = useRef(false);
+  useEffect(() => {
+    if (deepLinked.current) return;
+    const id = new URLSearchParams(window.location.search).get("doc");
+    if (!id) return;
+    deepLinked.current = true;
+    void (async () => {
+      const full = await getDocument(id);
+      if (!full) return;
+      setEditing(full);
+      setOpenKind(full.doc_kind);
+    })();
+  }, []);
+
   const openTemplate = (kind: OpenKind) => {
     setEditing(null);
     setOpenKind(kind);

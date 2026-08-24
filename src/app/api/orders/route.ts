@@ -64,7 +64,7 @@ export async function GET(req: Request) {
   const ids = (orders ?? []).map((o) => o.id as string);
   if (ids.length === 0) return NextResponse.json({ orders: [], documents: {} });
 
-  const [quotes, invoices, contracts] = await Promise.all([
+  const [quotes, invoices, contracts, packingLists] = await Promise.all([
     supabaseServer
       .from("quotations")
       .select("id, order_id, quote_no, status, total, currency, created_at")
@@ -77,11 +77,21 @@ export async function GET(req: Request) {
       .from("sales_contracts")
       .select("id, order_id, contract_no, status, total, currency, contract_date")
       .in("order_id", ids),
+    /* The packing list lives in the Documents store, not a table of its own —
+       it always did, and linking it beat rebuilding it. */
+    supabaseServer
+      .from("documents")
+      .select("id, order_id, doc_no, status, total, currency, issue_date")
+      .eq("doc_kind", "packing_list")
+      .in("order_id", ids),
   ]);
 
   /* Keyed by order id so the client renders without searching arrays per row. */
-  const documents: Record<string, { quotations: OrderDocSummary[]; invoices: OrderDocSummary[]; contracts: OrderDocSummary[] }> = {};
-  for (const id of ids) documents[id] = { quotations: [], invoices: [], contracts: [] };
+  const documents: Record<
+    string,
+    { quotations: OrderDocSummary[]; invoices: OrderDocSummary[]; contracts: OrderDocSummary[]; packingLists: OrderDocSummary[] }
+  > = {};
+  for (const id of ids) documents[id] = { quotations: [], invoices: [], contracts: [], packingLists: [] };
 
   for (const r of quotes.data ?? []) {
     const o = documents[r.order_id as string];
@@ -94,6 +104,11 @@ export async function GET(req: Request) {
   for (const r of contracts.data ?? []) {
     const o = documents[r.order_id as string];
     if (o) o.contracts.push({ id: r.id as string, number: r.contract_no as string, status: r.status as string, total: r.total as number, currency: r.currency as string, date: r.contract_date as string });
+  }
+
+  for (const r of packingLists.data ?? []) {
+    const o = documents[r.order_id as string];
+    if (o) o.packingLists.push({ id: r.id as string, number: r.doc_no as string, status: r.status as string, total: r.total as number, currency: r.currency as string, date: r.issue_date as string });
   }
 
   return NextResponse.json({ orders: orders ?? [], documents });

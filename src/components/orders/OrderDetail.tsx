@@ -27,6 +27,7 @@ import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 import QuotationIcon from "@/components/icons/QuotationIcon";
 import InvoicesIcon from "@/components/icons/InvoicesIcon";
 import ContractIcon from "@/components/icons/ui/ContractIcon";
+import BoxIcon from "@/components/icons/ui/BoxIcon";
 import { CARD } from "@/components/travel/fields";
 import {
   dmy,
@@ -61,6 +62,7 @@ interface Payload {
   quotations: (OrderDocSummary & { quote_no?: string; created_at?: string })[];
   invoices: (OrderDocSummary & { inv_no?: string; issue_date?: string })[];
   contracts: (OrderDocSummary & { contract_no?: string; contract_date?: string })[];
+  packingLists: (OrderDocSummary & { doc_no?: string; issue_date?: string })[];
   customer: OrderCustomer | null;
 }
 
@@ -82,6 +84,7 @@ export default function OrderDetail({ id }: { id: string }) {
         quotations: json.quotations ?? [],
         invoices: json.invoices ?? [],
         contracts: json.contracts ?? [],
+        packingLists: json.packingLists ?? [],
         customer: json.customer ?? null,
       });
     } catch {
@@ -212,6 +215,21 @@ export default function OrderDetail({ id }: { id: string }) {
               date: r.date ?? r.contract_date ?? null,
             }))}
             hrefFor={(d) => `/contracts/${d.id}`}
+          />
+          <DocGroup
+            title={t("doc.packingLists")}
+            icon={<BoxIcon size={14} />}
+            docs={data.packingLists.map((r) => ({
+              id: r.id,
+              number: r.number ?? r.doc_no ?? null,
+              status: r.status,
+              total: r.total,
+              currency: r.currency,
+              date: r.date ?? r.issue_date ?? null,
+            }))}
+            /* The packing list lives in the Documents app; the deep link opens
+               it straight into its editor rather than its list. */
+            hrefFor={(d) => `/documents?doc=${d.id}`}
           />
         </div>
       </div>

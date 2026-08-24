@@ -34,6 +34,7 @@ export interface OrderDocuments {
   quotations: OrderDocSummary[];
   invoices: OrderDocSummary[];
   contracts: OrderDocSummary[];
+  packingLists: OrderDocSummary[];
 }
 
 export interface OrderCustomer {
