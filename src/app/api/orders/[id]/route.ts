@@ -34,7 +34,7 @@ export async function GET(req: Request, { params }: Params) {
     .maybeSingle();
   if (!order) return NextResponse.json({ error: "Order not found." }, { status: 404 });
 
-  const [quotations, invoices, contracts, packingLists, customer] = await Promise.all([
+  const [quotations, invoices, contracts, packingLists, purchaseOrders, customer] = await Promise.all([
     supabaseServer
       .from("quotations")
       .select("id, quote_no, status, total, currency, created_at, updated_at")
@@ -56,6 +56,11 @@ export async function GET(req: Request, { params }: Params) {
       .eq("order_id", id)
       .eq("doc_kind", "packing_list")
       .order("issue_date", { ascending: true }),
+    supabaseServer
+      .from("purchase_orders")
+      .select("id, po_no, status, supplier_id, total, currency, order_date, expected_delivery_date")
+      .eq("order_id", id)
+      .order("order_date", { ascending: true }),
     order.customer_id
       ? supabaseServer
           .from("customers")
@@ -71,6 +76,7 @@ export async function GET(req: Request, { params }: Params) {
     invoices: invoices.data ?? [],
     contracts: contracts.data ?? [],
     packingLists: packingLists.data ?? [],
+    purchaseOrders: purchaseOrders.data ?? [],
     customer: (customer as { data: unknown }).data ?? null,
   });
 }

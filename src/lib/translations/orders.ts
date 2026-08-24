@@ -29,6 +29,8 @@ export const ordersT: Translations = {
   "doc.invoices":     { en: "Invoices",   zh: "发票",   ar: "الفواتير" },
   "doc.contracts":    { en: "Contracts",  zh: "合同",   ar: "العقود" },
   "doc.packingLists": { en: "Packing lists", zh: "装箱单", ar: "قوايم التعبئة" },
+  "doc.purchaseOrders": { en: "Purchase orders", zh: "采购订单", ar: "أوامر الشراء" },
+  "action.raisePo":   { en: "Raise purchase order", zh: "创建采购订单", ar: "اعمل أمر شراء" },
   "doc.none":         { en: "No documents yet", zh: "暂无单据", ar: "مفيش مستندات لسه" },
 
   /* ── empty and error ── */

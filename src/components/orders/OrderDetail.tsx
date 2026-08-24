@@ -28,6 +28,8 @@ import QuotationIcon from "@/components/icons/QuotationIcon";
 import InvoicesIcon from "@/components/icons/InvoicesIcon";
 import ContractIcon from "@/components/icons/ui/ContractIcon";
 import BoxIcon from "@/components/icons/ui/BoxIcon";
+import PurchaseIcon from "@/components/icons/PurchaseIcon";
+import RaisePurchaseOrderDialog from "./RaisePurchaseOrderDialog";
 import { CARD } from "@/components/travel/fields";
 import {
   dmy,
@@ -63,6 +65,7 @@ interface Payload {
   invoices: (OrderDocSummary & { inv_no?: string; issue_date?: string })[];
   contracts: (OrderDocSummary & { contract_no?: string; contract_date?: string })[];
   packingLists: (OrderDocSummary & { doc_no?: string; issue_date?: string })[];
+  purchaseOrders: (OrderDocSummary & { po_no?: string; order_date?: string })[];
   customer: OrderCustomer | null;
 }
 
@@ -72,6 +75,7 @@ export default function OrderDetail({ id }: { id: string }) {
 
   const [data, setData] = useState<Payload | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [raisingPo, setRaisingPo] = useState(false);
 
   const load = useCallback(async () => {
     setError(null);
@@ -85,6 +89,7 @@ export default function OrderDetail({ id }: { id: string }) {
         invoices: json.invoices ?? [],
         contracts: json.contracts ?? [],
         packingLists: json.packingLists ?? [],
+        purchaseOrders: json.purchaseOrders ?? [],
         customer: json.customer ?? null,
       });
     } catch {
@@ -231,8 +236,42 @@ export default function OrderDetail({ id }: { id: string }) {
                it straight into its editor rather than its list. */
             hrefFor={(d) => `/documents?doc=${d.id}`}
           />
+          <DocGroup
+            title={t("doc.purchaseOrders")}
+            icon={<PurchaseIcon size={14} />}
+            docs={data.purchaseOrders.map((r) => ({
+              id: r.id,
+              number: r.number ?? r.po_no ?? null,
+              status: r.status,
+              total: r.total,
+              currency: r.currency,
+              date: r.date ?? r.order_date ?? null,
+            }))}
+            /* The Purchases app owns the PO; this only points at it. */
+            hrefFor={() => "/purchase/orders"}
+          />
+
+          {/* Sourcing is an ACTION on the deal, not a document of it, so it
+              sits after the paperwork rather than among it. */}
+          <div>
+            <Button variant="secondary" onClick={() => setRaisingPo(true)}>
+              {t("action.raisePo")}
+            </Button>
+          </div>
         </div>
       </div>
+
+      {raisingPo && (
+        <RaisePurchaseOrderDialog
+          orderId={order.id}
+          orderNo={order.order_no}
+          onClose={() => setRaisingPo(false)}
+          onCreated={() => {
+            setRaisingPo(false);
+            void load();
+          }}
+        />
+      )}
     </div>
   );
 }
