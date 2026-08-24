@@ -42,6 +42,16 @@ const T = {
   mono: 'ui-monospace, "SF Mono", Menlo, monospace',
 };
 
+/* What the document stamps across its own face, by state. `signed` is absent
+   deliberately: an executed contract carries no band at all. */
+const BANDS: Record<string, { text: string; colour: string } | undefined> = {
+  draft: { text: "DRAFT — NOT FOR SIGNATURE", colour: "#b45309" },
+  ready: { text: "AWAITING SIGNATURE", colour: "#b45309" },
+  signed: undefined,
+  superseded: { text: "SUPERSEDED — REPLACED BY A LATER CONTRACT", colour: "#6b7280" },
+  cancelled: { text: "CANCELLED", colour: "#b91c1c" },
+};
+
 export interface ContractA4Props {
   contractNo: string;
   status: string;
@@ -53,6 +63,8 @@ export interface ContractA4Props {
   invoice: InvoiceLite | null;
   /** Present only once signed. When present it wins over everything above. */
   snapshot?: SnapshotShape | null;
+  /** The contract this one replaces, when it is an amendment. */
+  amendsNo?: string | null;
 }
 
 function ContractA4Inner(props: ContractA4Props) {
@@ -68,6 +80,8 @@ function ContractA4Inner(props: ContractA4Props) {
   const currency = frozen?.currency ?? props.currency ?? props.invoice?.currency ?? "";
   const total = frozen?.total ?? props.total ?? props.invoice?.total ?? 0;
   const invoiceNo = frozen?.schedule.invoiceNo ?? props.invoice?.inv_no ?? null;
+
+  const band = BANDS[props.status] ?? BANDS.draft;
 
   return (
     <div
@@ -101,13 +115,15 @@ function ContractA4Inner(props: ContractA4Props) {
         </div>
       </div>
 
-      {/* A draft says so on its face. Nothing is worse than a buyer signing
-          a version that was still being edited. */}
-      {props.status !== "signed" && (
+      {/* A document says on its face what it is. A draft must never be
+          mistaken for something signable — and a SUPERSEDED contract must
+          never be stamped "DRAFT": it is executed history, and printing it as
+          a draft would misrepresent a document the parties actually signed. */}
+      {band ? (
         <div
           style={{
-            border: "1px dashed #b45309",
-            color: "#b45309",
+            border: `1px dashed ${band.colour}`,
+            color: band.colour,
             fontFamily: T.mono,
             fontSize: 9,
             letterSpacing: "0.14em",
@@ -116,9 +132,17 @@ function ContractA4Inner(props: ContractA4Props) {
             marginBottom: 14,
           }}
         >
-          {props.status === "ready" ? "AWAITING SIGNATURE" : "DRAFT — NOT FOR SIGNATURE"}
+          {band.text}
         </div>
-      )}
+      ) : null}
+
+      {/* An amendment must say what it replaces, on the page, or a reader
+          holding one printed copy cannot tell it is not the whole agreement. */}
+      {props.amendsNo ? (
+        <p style={{ margin: "0 0 14px", fontSize: 10.5, fontStyle: "italic" }}>
+          This Contract amends and replaces Contract No. {props.amendsNo} in its entirety.
+        </p>
+      ) : null}
 
       {/* ── Parties ── */}
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 18, marginBottom: 16 }}>

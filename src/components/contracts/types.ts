@@ -79,6 +79,8 @@ export interface ContractRow {
   contract_no: string;
   order_id: string | null;
   invoice_id: string | null;
+  /* The signed contract this one amends, when it is an amendment. */
+  amends_id: string | null;
   customer_id: string | null;
   status: ContractStatus;
   contract_date: string | null;
@@ -92,4 +94,12 @@ export interface ContractRow {
   notes: string | null;
   created_at: string;
   updated_at: string;
+}
+
+/** A neighbour in the amendment chain — enough to name it and link to it. */
+export interface ContractRef {
+  id: string;
+  contract_no: string;
+  status: ContractStatus;
+  signed_at: string | null;
 }

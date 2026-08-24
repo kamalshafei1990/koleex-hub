@@ -77,7 +77,32 @@ export async function GET(req: Request, { params }: Params) {
     invoice = (data as Record<string, unknown> | null) ?? null;
   }
 
-  return NextResponse.json({ contract, invoice });
+  /* The chain around this contract: what it amends, and what replaced it.
+     Both are one indexed read and both change what the screen may offer —
+     a superseded contract must not offer "amend", it must point forward. */
+  const [amendsRes, replacedByRes] = await Promise.all([
+    contract.amends_id
+      ? supabaseServer
+          .from("sales_contracts")
+          .select("id, contract_no, status, signed_at")
+          .eq("id", contract.amends_id as string)
+          .maybeSingle()
+      : Promise.resolve({ data: null }),
+    supabaseServer
+      .from("sales_contracts")
+      .select("id, contract_no, status, signed_at")
+      .eq("amends_id", id)
+      .eq("tenant_id", auth.tenant_id)
+      .order("created_at", { ascending: false })
+      .limit(1),
+  ]);
+
+  return NextResponse.json({
+    contract,
+    invoice,
+    amends: (amendsRes as { data: unknown }).data ?? null,
+    replacedBy: (replacedByRes as { data?: unknown[] }).data?.[0] ?? null,
+  });
 }
 
 /** Everything a signed contract must keep, independent of every live row. */
@@ -183,6 +208,26 @@ export async function PATCH(req: Request, { params }: Params) {
       patch.snapshot = buildSnapshot({ contract, terms, invoice });
       patch.signed_at = new Date().toISOString();
       patch.signed_by = auth.account_id;
+
+      /* An amendment retires what it amends AT THE MOMENT IT IS SIGNED, not
+         when it was drafted — so exactly one contract is in force at every
+         instant. Status only: the DB guard permits signed → superseded
+         precisely when snapshot and terms are untouched, which is what keeps
+         a retired contract still readable as what was agreed. */
+      if (contract.amends_id) {
+        const { error: supErr } = await supabaseServer
+          .from("sales_contracts")
+          .update({ status: "superseded" })
+          .eq("id", contract.amends_id as string)
+          .eq("tenant_id", auth.tenant_id)
+          .eq("status", "signed");
+        if (supErr) {
+          return NextResponse.json(
+            { error: `Could not retire the contract this amends: ${supErr.message}` },
+            { status: 500 },
+          );
+        }
+      }
     }
   }
 

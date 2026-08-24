@@ -24,7 +24,7 @@ import { useRouter } from "next/navigation";
 import ContractA4 from "./ContractA4";
 import OrdersIcon from "@/components/icons/OrdersIcon";
 import { checkContract, blocksSignature, type Finding } from "@/lib/contracts/contradictions";
-import type { ContractRow, ContractTerms, InvoiceLite } from "./types";
+import type { ContractRef, ContractRow, ContractTerms, InvoiceLite } from "./types";
 import {
   ArrowLeftIcon,
   ContractIcon,
@@ -135,13 +135,23 @@ export default function ContractDoc({ id }: { id: string }) {
   const [saveState, setSaveState] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [saveError, setSaveError] = useState<string | null>(null);
   const [confirmSign, setConfirmSign] = useState(false);
+  /* Where this contract sits in the amendment chain. */
+  const [amends, setAmends] = useState<ContractRef | null>(null);
+  const [replacedBy, setReplacedBy] = useState<ContractRef | null>(null);
+  const [amending, setAmending] = useState(false);
 
   useEffect(() => {
     let alive = true;
     (async () => {
       try {
         const res = await fetch(`/api/sales-contracts/${id}`, { cache: "no-store" });
-        const json = (await res.json()) as { contract?: ContractRow; invoice?: InvoiceLite; error?: string };
+        const json = (await res.json()) as {
+          contract?: ContractRow;
+          invoice?: InvoiceLite;
+          amends?: ContractRef | null;
+          replacedBy?: ContractRef | null;
+          error?: string;
+        };
         if (!alive) return;
         if (!res.ok || !json.contract) {
           setLoadError(json.error ?? "Could not load this contract.");
@@ -150,6 +160,8 @@ export default function ContractDoc({ id }: { id: string }) {
         setRow(json.contract);
         setInvoice(json.invoice ?? null);
         setTerms(json.contract.terms ?? {});
+        setAmends(json.amends ?? null);
+        setReplacedBy(json.replacedBy ?? null);
       } catch (e) {
         if (alive) setLoadError(e instanceof Error ? e.message : "Could not load this contract.");
       }
@@ -203,6 +215,23 @@ export default function ContractDoc({ id }: { id: string }) {
     setConfirmSign(false);
     await patch({ terms, status: "signed" });
   }, [patch, terms]);
+
+  /* Amending does not touch this contract — it raises the replacement and
+     leaves this one in force until that replacement is signed. */
+  const handleAmend = useCallback(async () => {
+    if (!row) return;
+    setAmending(true);
+    try {
+      const res = await fetch(`/api/sales-contracts/${row.id}/amend`, { method: "POST" });
+      const json = (await res.json()) as { contract?: { id: string }; error?: string };
+      if (!res.ok || !json.contract) throw new Error(json.error ?? "Could not raise the amendment.");
+      router.push(`/contracts/${json.contract.id}`);
+    } catch (e) {
+      setSaveError(e instanceof Error ? e.message : "Could not raise the amendment.");
+      setSaveState("error");
+      setAmending(false);
+    }
+  }, [row, router]);
 
   const handleDelete = useCallback(async () => {
     if (!row) return;
@@ -329,6 +358,18 @@ export default function ContractDoc({ id }: { id: string }) {
           </>
         )}
 
+        {signed && !replacedBy && (
+          <button
+            onClick={handleAmend}
+            disabled={amending}
+            className="inline-flex items-center gap-1.5 px-4 py-2 text-sm bg-[var(--bg-inverted)] hover:opacity-90 text-[var(--text-inverted)] rounded-lg font-semibold transition disabled:opacity-40 disabled:cursor-not-allowed"
+            title="Raise a replacement contract. This one stays in force until the replacement is signed."
+          >
+            <ContractIcon size={13} />
+            {amending ? "Raising…" : "Amend"}
+          </button>
+        )}
+
         <button
           onClick={() => window.print()}
           className="inline-flex items-center gap-1.5 px-3 py-2 text-sm text-[var(--text-secondary)] bg-[var(--bg-surface)] hover:bg-[var(--bg-inverted)]/[0.1] rounded-lg transition"
@@ -347,6 +388,37 @@ export default function ContractDoc({ id }: { id: string }) {
           </button>
         )}
       </div>
+
+      {/* ── Where this contract sits in the chain ──
+          A reader who opens a retired contract must not have to work out that
+          it is retired, and a reader of an amendment must be able to see what
+          it changes. Both states say so on the page, above everything else. */}
+      {(replacedBy || amends) && (
+        <div className="no-print px-4 pt-3 flex flex-col gap-2">
+          {replacedBy && (
+            <ChainBanner
+              tone="retired"
+              text={
+                replacedBy.status === "signed"
+                  ? `Superseded by ${replacedBy.contract_no}. That contract is the one in force.`
+                  : `${replacedBy.contract_no} is being drafted to replace this. This contract stays in force until that one is signed.`
+              }
+              action={{ label: `Open ${replacedBy.contract_no}`, href: `/contracts/${replacedBy.id}` }}
+            />
+          )}
+          {amends && (
+            <ChainBanner
+              tone="amendment"
+              text={
+                signed
+                  ? `This amendment replaced ${amends.contract_no}.`
+                  : `Amends ${amends.contract_no}, which stays in force until this is signed.`
+              }
+              action={{ label: `Open ${amends.contract_no}`, href: `/contracts/${amends.id}` }}
+            />
+          )}
+        </div>
+      )}
 
       {/* ── Body: terms left, document right ── */}
       <div className="flex-1 min-h-0 overflow-auto">
@@ -586,6 +658,7 @@ export default function ContractDoc({ id }: { id: string }) {
               terms={terms}
               invoice={invoice}
               snapshot={row.snapshot}
+              amendsNo={amends?.contract_no ?? null}
             />
           </div>
         </div>
@@ -644,6 +717,36 @@ export default function ContractDoc({ id }: { id: string }) {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+function ChainBanner({
+  tone,
+  text,
+  action,
+}: {
+  tone: "retired" | "amendment";
+  text: string;
+  action: { label: string; href: string };
+}) {
+  const router = useRouter();
+  const retired = tone === "retired";
+  return (
+    <div
+      className="flex flex-wrap items-center gap-x-3 gap-y-1.5 rounded-xl border px-3.5 py-2.5"
+      style={{
+        background: retired ? "rgba(244,63,94,0.09)" : "rgba(96,165,250,0.09)",
+        borderColor: retired ? "rgba(244,63,94,0.32)" : "rgba(96,165,250,0.30)",
+      }}
+    >
+      <span className="text-[12.5px] text-[var(--text-primary)]">{text}</span>
+      <button
+        onClick={() => router.push(action.href)}
+        className="ms-auto text-[12px] font-semibold underline underline-offset-2 text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition"
+      >
+        {action.label}
+      </button>
     </div>
   );
 }
