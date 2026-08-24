@@ -122,6 +122,11 @@ const ROUTE_BUDGETS: Record<string, { chunks: number; kbytes: number }> = {
   "management": { chunks: 12, kbytes: 983 },
   "markets": { chunks: 11, kbytes: 772 },
   "notes": { chunks: 10, kbytes: 513 },
+  /* Measured 8 chunks / 502 KB the day it shipped, +12%. Sits exactly with
+     customers (502) and suppliers (502): almost all of it is the shared
+     baseline, which is the expected shape — the app is one list and one
+     detail screen with no library of its own. */
+  "orders": { chunks: 10, kbytes: 562 },
   "planning": { chunks: 10, kbytes: 514 },
   "price-calculator": { chunks: 12, kbytes: 803 },
   "product-data": { chunks: 12, kbytes: 796 },

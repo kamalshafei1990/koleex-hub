@@ -22,6 +22,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import ContractA4 from "./ContractA4";
+import OrdersIcon from "@/components/icons/OrdersIcon";
 import { checkContract, blocksSignature, type Finding } from "@/lib/contracts/contradictions";
 import type { ContractRow, ContractTerms, InvoiceLite } from "./types";
 import {
@@ -269,6 +270,20 @@ export default function ContractDoc({ id }: { id: string }) {
         </div>
 
         <StatusPill status={row.status} />
+
+        {/* The deal this contract belongs to. Every document of an order can
+            be reached from every other; a contract that only knew its invoice
+            would be a dead end. */}
+        {row.order_id ? (
+          <button
+            onClick={() => router.push(`/orders/${row.order_id}`)}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] text-[var(--text-secondary)] bg-[var(--bg-surface)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-inverted)]/[0.1] transition"
+            title="Open the order and every document raised against it"
+          >
+            <OrdersIcon size={13} />
+            <span className="font-mono">KL-{row.deal_no}</span>
+          </button>
+        ) : null}
 
         <div style={{ flex: 1 }} />
 
