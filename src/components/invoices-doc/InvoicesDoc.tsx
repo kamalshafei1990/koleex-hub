@@ -36,6 +36,7 @@ import {
 } from "@/lib/docs-sync";
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 import AppIcon from "@/components/common/AppIcon";
+import DocTitlePicker from "@/components/quotations/DocTitlePicker";
 
 /* ON DEMAND, not on arrival. These two open when someone clicks "add product"
    or "pick customer" — most visits to the list never do either, and a static
@@ -128,6 +129,11 @@ export interface Invoice {
   /* Master-data references for the Terms quick-fill row. Mirror of
      the Quotation type — see Quotations.tsx. */
   paymentTermId?: string;
+  /* Heading this document prints under — see DocTitlePicker. */
+  docTitleId?: string;
+  docTitleText?: string;
+  docTitleNoun?: string;
+  docTitleValidity?: boolean;
   incotermId?: string;
   incotermCode?: string;
   incotermLocation?: string;
@@ -281,6 +287,10 @@ export function fromRow(row: RemoteDocRow): Invoice {
     signatureUrl: doc.signatureUrl,
     customerContactId: doc.customerContactId,
     paymentTermId: doc.paymentTermId,
+    docTitleId: doc.docTitleId,
+    docTitleText: doc.docTitleText,
+    docTitleNoun: doc.docTitleNoun,
+    docTitleValidity: doc.docTitleValidity,
     incotermId: doc.incotermId,
     incotermCode: doc.incotermCode,
     incotermLocation: doc.incotermLocation,
@@ -2021,6 +2031,19 @@ export default function Quotations() {
           <ArrowLeftIcon size={15} />
           {t("btn.back")}
         </button>
+        {/* Document heading — same control as Quotations. An invoice
+            record legitimately prints as a Commercial Invoice, a plain
+            Invoice, or a Tax Invoice depending on the market. */}
+        <DocTitlePicker
+          titleId={current.docTitleId}
+          titleText={current.docTitleText}
+          fallbackLabel="COMMERCIAL INVOICE"
+          onPick={({ id, text, noun, validity }) =>
+            setCurrent((q) =>
+              q ? { ...q, docTitleId: id, docTitleText: text, docTitleNoun: noun, docTitleValidity: validity } : q,
+            )
+          }
+        />
         <div style={{ flex: 1 }} />
         {/* Clickable status pill — opens a menu of transitions. The
             colour map mirrors the list-view row badge so the same

@@ -104,6 +104,7 @@ const btn =
 export default function DocToolbar({
   backLabel = "Templates",
   onBack,
+  leading,
   status,
   statuses = ["draft", "final", "sent"],
   onStatusChange,
@@ -122,6 +123,11 @@ export default function DocToolbar({
 }: {
   backLabel?: string;
   onBack: () => void;
+  /* Rendered immediately after Back, before the spacer — for controls that
+     describe the document itself rather than an action on it (currently the
+     document-title picker). A slot rather than a fixed prop so this toolbar
+     stays generic across Quotation / Invoice / Packing List. */
+  leading?: React.ReactNode;
   status: string;
   statuses?: string[];
   onStatusChange: (next: string) => void;
@@ -163,6 +169,8 @@ export default function DocToolbar({
         <ArrowLeftIcon size={15} />
         {backLabel}
       </button>
+
+      {leading}
 
       <div style={{ flex: 1 }} />
 

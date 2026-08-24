@@ -46,6 +46,7 @@ import {
 } from "@/lib/docs-sync";
 import { useQuotationCollab } from "@/lib/quotation-collab";
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
+import DocTitlePicker from "@/components/quotations/DocTitlePicker";
 
 /* ON DEMAND, not on arrival. These two open when someone clicks "add product"
    or "pick customer" — most visits to the list never do either, and a static
@@ -172,6 +173,13 @@ export interface Quotation {
      formatted text is also baked into `terms` for the printed doc.
      All optional — legacy quotes have these undefined. */
   paymentTermId?: string;
+  /* Heading this document prints under — see DocTitlePicker. Stored on the
+     doc so the same record can go out as a Proforma Invoice now and a
+     Commercial Invoice later. */
+  docTitleId?: string;
+  docTitleText?: string;
+  docTitleNoun?: string;
+  docTitleValidity?: boolean;
   incotermId?: string;
   /* Picked Incoterm's short code (FOB, CIF, DDP, ...). Stored
      alongside incotermId so the items-table header can show the
@@ -374,6 +382,10 @@ export function fromRow(row: RemoteDocRow): Quotation {
     signatureUrl: doc.signatureUrl,
     customerContactId: doc.customerContactId,
     paymentTermId: doc.paymentTermId,
+    docTitleId: doc.docTitleId,
+    docTitleText: doc.docTitleText,
+    docTitleNoun: doc.docTitleNoun,
+    docTitleValidity: doc.docTitleValidity,
     incotermId: doc.incotermId,
     incotermCode: doc.incotermCode,
     incotermLocation: doc.incotermLocation,
@@ -2672,6 +2684,18 @@ export default function Quotations() {
           {hidePanels ? <EyeIcon size={15} /> : <EyeOffIcon size={15} />}
           {hidePanels ? "Show panels" : "Hide panels"}
         </button>
+        {/* Document heading — a top-level decision, so it sits in the
+            toolbar rather than inside Quick Fill. */}
+        <DocTitlePicker
+          titleId={current.docTitleId}
+          titleText={current.docTitleText}
+          fallbackLabel="QUOTATION"
+          onPick={({ id, text, noun, validity }) =>
+            setCurrent((q) =>
+              q ? { ...q, docTitleId: id, docTitleText: text, docTitleNoun: noun, docTitleValidity: validity } : q,
+            )
+          }
+        />
         <div style={{ flex: 1 }} />
         {/* ── Presence — who else is on this quotation right now ── */}
         {peers.length > 0 && (

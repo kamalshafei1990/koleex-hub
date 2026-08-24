@@ -150,6 +150,27 @@ export interface Quotation {
      reads these so the picker dropdowns hydrate with the saved
      selection when an existing doc is opened. */
   paymentTermId?: string;
+  /* The heading this document prints under, chosen in the toolbar (see
+     DocTitlePicker). Stored ON the document rather than derived from the
+     page that opened it: the same record legitimately goes out as a
+     Proforma Invoice for L/C issuance and later as a Commercial Invoice
+     after shipment, and only the operator knows which. `docTitleText` is
+     copied at pick time so a title later renamed or deactivated in
+     settings cannot rewrite an already-issued document. Empty → fall back
+     to docKind, which is how every existing doc renders. */
+  docTitleId?: string;
+  docTitleText?: string;
+  /* How the REST of the sheet should read for this heading. Copied at pick
+     time next to the text, because the labels have to follow the title, not
+     the page: a document titled COMMERCIAL INVOICE was still printing
+     "Quotation No" and "Quotation To" since those came from docKind.
+       docTitleNoun     — the word in "<noun> No" / "<noun> To"
+       docTitleValidity — whether a "Valid Till" cell prints
+     doc_family alone cannot decide this: a Proforma Invoice is in the
+     quotation family (it precedes the sale, it expires) yet must read
+     "Invoice No". */
+  docTitleNoun?: string;
+  docTitleValidity?: boolean;
   incotermId?: string;
   incotermCode?: string;
   incotermLocation?: string;
@@ -555,6 +576,14 @@ export default function QuotationA4Preview({
     return `(${code}${locationPart}, ${cur})`;
   }, [current.incotermCode, current.loadingPort, current.dischargePort, cur]);
 
+  /* The chosen title decides the sheet's wording; docKind is only the
+     fallback for documents saved before titles existed. */
+  const metaNoun =
+    current.docTitleNoun?.trim() ||
+    (docKind === "invoice" ? "Invoice" : "Quotation");
+  const showsValidity =
+    current.docTitleNoun ? current.docTitleValidity !== false : docKind !== "invoice";
+
   /* ACID is NAFEZA's Advance Cargo Information Declaration reference —
      Egyptian customs only. An invoice shipping to Bangladesh (or anywhere
      else) has no ACID number and never will, so the field must not appear
@@ -807,7 +836,10 @@ export default function QuotationA4Preview({
               letterSpacing: "0.08em",
             }}
           >
-            {L(docKind === "invoice" ? "title.invoice" : "title.quotation")}
+            {/* A heading chosen on the document wins; otherwise the page's
+                docKind decides, exactly as before this field existed. */}
+            {current.docTitleText?.trim() ||
+              L(docKind === "invoice" ? "title.invoice" : "title.quotation")}
           </div>
         </div>
 
@@ -885,7 +917,7 @@ export default function QuotationA4Preview({
         <div
           style={{
             display: "grid",
-            gridTemplateColumns: docKind === "invoice" ? "repeat(3, 1fr)" : "repeat(4, 1fr)",
+            gridTemplateColumns: showsValidity ? "repeat(4, 1fr)" : "repeat(3, 1fr)",
             border: `1px solid ${T.border}`,
             borderRadius: 12,
             overflow: "hidden",
@@ -902,7 +934,7 @@ export default function QuotationA4Preview({
               style={{ ...inputResetStyle, fontSize: 11, fontVariantNumeric: "tabular-nums" }}
             />
           </MetaStripCell>
-          <MetaStripCell label={L(docKind === "invoice" ? "meta.invoiceNo" : "meta.quotationNo")}>
+          <MetaStripCell label={`${metaNoun} No`}>
             <span
               data-quote-no={current.invoiceNo || undefined}
               style={{ fontSize: 11, fontFamily: T.mono, letterSpacing: "0.02em" }}
@@ -910,7 +942,7 @@ export default function QuotationA4Preview({
               {current.invoiceNo || "—"}
             </span>
           </MetaStripCell>
-          {docKind !== "invoice" && (
+          {showsValidity && (
             <MetaStripCell label={L("meta.validTill")}>
               <input
                 value={current.validTill}
@@ -1032,7 +1064,7 @@ export default function QuotationA4Preview({
                 gap: 8,
               }}
             >
-              <span>{L(docKind === "invoice" ? "party.invoiceTo" : "party.quotationTo")}</span>
+              <span>{metaNoun} To</span>
               {/* Link-to-CRM button. Editor-only (`.no-print`) so the
                   black header strip stays clean on the printed PDF. */}
               {onPickCustomer && (
@@ -3119,6 +3151,8 @@ function TermsToolbarButton({
 interface QuickFillPatch {
   fields: {
     paymentTermId?: string;
+    docTitleId?: string;
+    docTitleText?: string;
     incotermId?: string;
     incotermCode?: string;
     incotermLocation?: string;
@@ -4340,7 +4374,29 @@ function applyQuickFillToTerms(termsHtml: string, updates: Record<string, string
     "Cancellation Policy":["Cancellation Policy", "Cancellation policy", "Cancellation", "Cancel Policy"],
     "Governing Law":      ["Governing Law", "Governing law", "Applicable law", "Jurisdiction"],
     "Total Qty":          ["Total Qty", "Total Quantity", "Total qty", "Qty Total"],
+    /* L/C-only lines, written by the L/C auto-adjust below. They need
+       entries here or a second pick would append duplicates instead of
+       replacing what the first one wrote. */
+    "Latest shipment date": ["Latest shipment date", "Latest date of shipment", "Latest shipment", "Last shipment date", "Shipment deadline"],
+    "L/C validity":         ["L/C validity", "LC validity", "Credit validity", "Validity of credit", "L/C expiry", "LC expiry"],
+    "Presentation period":  ["Presentation period", "Document presentation", "Presentation of documents", "Document presentation period"],
+    "Partial shipment":     ["Partial shipment", "Partial shipments", "Part shipment", "Partial delivery"],
+    "Transhipment":         ["Transhipment", "Transshipment", "Trans-shipment"],
   };
+
+  /* Lines that exist only while a particular payment shape is selected.
+     Blanking one REMOVES the row; blanking a standard row (Payment terms,
+     Price Type, Bank Charges…) keeps it visible as a placeholder, which is
+     what the operator expects there. Without this, switching away from an
+     L/C left "Latest shipment date:" and four more empty labels printed on
+     the document — measured, not theorised. */
+  const OPTIONAL_LINES = new Set([
+    "Latest shipment date",
+    "L/C validity",
+    "Presentation period",
+    "Partial shipment",
+    "Transhipment",
+  ]);
 
   const keyMatches = (segText: string, key: string): boolean => {
     const plain = segText.replace(/<[^>]+>/g, "").trim().toLowerCase();
@@ -4385,6 +4441,8 @@ function applyQuickFillToTerms(termsHtml: string, updates: Record<string, string
         if (keyMatches(inner, key)) {
           usedKeys.add(key);
           const value = updates[key] ?? "";
+          /* A blanked conditional line leaves no empty label behind. */
+          if (!value && OPTIONAL_LINES.has(key)) return "";
           /* Rebuild the inner content in the canonical bold format
              — '<strong>Label:</strong> value'. The outer <div>
              with its border-bottom styling stays intact. */
@@ -4422,6 +4480,7 @@ function applyQuickFillToTerms(termsHtml: string, updates: Record<string, string
     for (const key of Object.keys(updates)) {
       if (!usedKeys.has(key) && keyMatches(seg, key)) {
         usedKeys.add(key);
+        if (!updates[key] && OPTIONAL_LINES.has(key)) return "";
         return rewriteSegment(seg, key, updates[key]);
       }
     }
@@ -6028,11 +6087,98 @@ function TermsQuickFillModal({
   };
 
   // Helpers to package up onPatch calls cleanly per field.
+
+  /* ── L/C auto-adjust ────────────────────────────────────────────────
+     A document quoted against a Letter of Credit is not the same document
+     quoted against T/T, and the differences are exactly the ones that get a
+     presentation rejected:
+
+       · "45 days after receipt of deposit" is meaningless under an L/C —
+         there is no deposit. The clock has to start at the OPERATIVE credit,
+         and a deposit-based cancellation clause describes money never paid.
+         Both of those shipped on a real Koleex invoice.
+       · the credit needs a latest shipment date, a validity and a
+         presentation period, or the issuing bank chooses them for you.
+       · partial shipment and transhipment must be stated, because under
+         UCP 600 silence is itself a rule.
+       · every extra required document is another chance of a discrepancy.
+         That same invoice listed eight — including "Photos" and "Manual",
+         which no bank can judge for compliance. Four is the working set;
+         the rest travel WITH the shipment.
+
+     Applied the moment an L/C term is picked (owner's call). Only lines the
+     L/C shape governs are touched; anything else the operator typed is left
+     alone. The test reads the master-list CATEGORY, so it never guesses
+     from free text. */
+  const LC_DOCUMENTS = [
+    "Signed Commercial Invoice",
+    "Full set 3/3 original clean on-board B/L",
+    "Packing List",
+    "Certificate of Origin",
+  ];
+  const LC_CANCELLATION =
+    "Order is firm once the operative L/C is received; amendments are at the applicant's cost";
+  const isLCTerm = (catName?: string) => /letter of credit|l\/c/i.test(catName ?? "");
+
   const onPickPayment = (id: string) => {
     const term = allPaymentTerms.find((t) => t.id === id);
+    if (!term) {
+      onPatch({ fields: { paymentTermId: undefined }, termsLineUpdates: { "Payment terms": "" } });
+      return;
+    }
+    if (isLCTerm(term.catName)) {
+      const days = current.leadTimeDays && current.leadTimeDays > 0 ? current.leadTimeDays : 45;
+      onPatch({
+        fields: {
+          paymentTermId: id,
+          leadTimeDays: days,
+          leadTimeBasis: "after_lc_opening",
+          documentsProvided: LC_DOCUMENTS,
+          cancellationPolicy: LC_CANCELLATION,
+        },
+        termsLineUpdates: {
+          "Payment terms": term.label,
+          "Lead time": `Within ${days} days after receipt of the operative L/C`,
+          "Latest shipment date": `${days + 30} days from L/C issuance`,
+          "L/C validity": "Valid for negotiation for at least 21 days after the latest shipment date",
+          "Presentation period":
+            "Documents to be presented within 15 days after B/L date, within L/C validity",
+          "Partial shipment": "Allowed",
+          "Transhipment": "Allowed",
+          "Documents Provided": LC_DOCUMENTS.join(", "),
+          "Cancellation Policy": LC_CANCELLATION,
+        },
+      });
+      return;
+    }
+    /* Leaving an L/C: clear what the L/C shape wrote, or the document keeps
+       clauses that contradict its own payment line — a T&C reading "30% T/T
+       deposit" above an "L/C validity" clause is the same class of internal
+       contradiction this feature exists to prevent. */
+    const wasLC = isLCTerm(
+      allPaymentTerms.find((t) => t.id === current.paymentTermId)?.catName,
+    );
     onPatch({
-      fields: { paymentTermId: id || undefined },
-      termsLineUpdates: { "Payment terms": term?.label ?? "" },
+      fields: {
+        paymentTermId: id,
+        ...(wasLC ? { leadTimeBasis: "after_deposit" as const, cancellationPolicy: "" } : {}),
+      },
+      termsLineUpdates: {
+        "Payment terms": term.label,
+        ...(wasLC
+          ? {
+              "Latest shipment date": "",
+              "L/C validity": "",
+              "Presentation period": "",
+              "Partial shipment": "",
+              "Transhipment": "",
+              "Cancellation Policy": "",
+              "Lead time": current.leadTimeDays
+                ? `${current.leadTimeDays} days after receipt of deposit`
+                : "",
+            }
+          : {}),
+      },
     });
   };
   const onPickIncoterm = (id: string) => {

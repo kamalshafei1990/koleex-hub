@@ -43,6 +43,7 @@ import InvoicesIcon from "@/components/icons/InvoicesIcon";
 import PackageIcon from "@/components/icons/ui/PackageIcon";
 import TrashIcon from "@/components/icons/ui/TrashIcon";
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
+import DocTitlePicker from "@/components/quotations/DocTitlePicker";
 
 type OpenKind = DocKind; // "quotation" | "invoice" | "packing_list"
 
@@ -330,6 +331,18 @@ function DocEditor({
 
       <DocToolbar
         onBack={onBack}
+        leading={
+          <DocTitlePicker
+            titleId={current.docTitleId}
+            titleText={current.docTitleText}
+            fallbackLabel={kind === "invoice" ? "COMMERCIAL INVOICE" : "QUOTATION"}
+            onPick={({ id, text, noun, validity }) =>
+              setCurrent((q) =>
+                q ? { ...q, docTitleId: id, docTitleText: text, docTitleNoun: noun, docTitleValidity: validity } : q,
+              )
+            }
+          />
+        }
         status={status}
         statuses={kind === "invoice" ? ["draft", "sent", "paid", "cancelled"] : ["draft", "final", "sent"]}
         onStatusChange={(next) => doSave(next)}
