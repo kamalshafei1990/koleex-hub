@@ -34,59 +34,39 @@ import { isCustomerEnforced } from "@/lib/server/customer-quotation-guard";
          doc: Record<string, unknown> // full UI snapshot
        } */
 
-/* Date-based quote numbering: `KL{YYYY}-{MMDD}` derived from the
-   issue date. A quote dated 24/10/2025 becomes `KL2025-1024`. When
-   multiple quotes are minted on the same date the first keeps the
-   bare form and subsequent ones get a `-A`, `-B`, `-C`… suffix in
-   ASCII order. This replaced the prior monotonic-sequence scheme
-   (KL2026-1520, -1521…) so the number reads as a date and stays
-   meaningful at a glance. */
-async function nextQuoteNumber(
-  tenantId: string,
-  issueDate?: string,
-): Promise<string> {
-  // Parse the issue date as a calendar date in the operator's intent,
-  // not as a UTC instant. `new Date("2025-10-24")` would be UTC midnight
-  // and slip a day in negative tz offsets, so split the YYYY-MM-DD
-  // string directly.
-  const iso = (issueDate ?? new Date().toISOString().slice(0, 10)).slice(0, 10);
-  const [yStr, mStr, dStr] = iso.split("-");
-  const year = yStr || String(new Date().getFullYear());
-  const mmdd = `${mStr ?? "01"}${dStr ?? "01"}`;
-  const base = `KL${year}-${mmdd}`;
+/* ── Quote numbering ────────────────────────────────────────────────────────
+   One counter issues the number for the whole DEAL; each document prefixes it
+   with its own two letters:
 
-  // Pull every quote_no in this tenant that starts with the base. The
-  // set is tiny (one date's worth), so an in-memory scan for the next
-  // free letter is cheaper than a clever SQL ordering.
-  const { data } = await supabaseServer
-    .from("quotations")
-    .select("quote_no")
-    .eq("tenant_id", tenantId)
-    .ilike("quote_no", `${base}%`);
-  const taken = new Set(
-    (data ?? [])
-      .map((r) => (r as { quote_no: string | null }).quote_no)
-      .filter((n): n is string => typeof n === "string"),
-  );
+       KL-QU-12349   quotation
+       KL-IN-12349   invoice for the same deal
+       KL-CN-12349   sales contract
+       KL-PL-12349 / KL-PO-12349
 
-  if (!taken.has(base)) return base;
-  // Walk A, B, C … Z, then AA, AB, … on the off-chance a single date
-  // overflows 26 quotes (extremely unlikely, but cheap to support).
-  const letter = (n: number): string => {
-    let s = "";
-    let v = n;
-    while (v >= 0) {
-      s = String.fromCharCode(65 + (v % 26)) + s;
-      v = Math.floor(v / 26) - 1;
-    }
-    return s;
-  };
-  for (let i = 0; i < 26 * 27; i++) {
-    const candidate = `${base}-${letter(i)}`;
-    if (!taken.has(candidate)) return candidate;
+   This replaces a date-derived scheme (KL{YYYY}-{MMDD} plus -A/-B on
+   collision), which identified the DAY a quote was raised rather than the
+   deal, and so could not be shared with the invoice that follows it. Owner
+   asked for the linked form 2026-08-24; note it reverses an earlier
+   deliberate move away from sequential numbers.
+
+   `next_deal_number` increments under a row lock, so two documents opened at
+   the same moment cannot collide — verified with 10 concurrent calls. A
+   read-then-write here in application code would not hold that guarantee,
+   which is exactly why the counter lives in the database.
+
+   Owner decisions: the counter never resets, and a number is reserved when a
+   document is opened, so gaps from abandoned drafts are expected. */
+async function nextDealNumber(tenantId: string): Promise<number> {
+  const { data, error } = await supabaseServer.rpc("next_deal_number", {
+    p_tenant: tenantId,
+  });
+  if (error || data == null) {
+    /* Deliberately fatal. A duplicate or malformed document number is worse
+       than a failed create: it corrupts the link between a quotation and
+       every document that follows it, and only shows up later. */
+    throw new Error(`Could not allocate a document number: ${error?.message ?? "no value returned"}`);
   }
-  // Truly degenerate fallback — should never run in practice.
-  return `${base}-${Date.now()}`;
+  return Number(data);
 }
 
 export async function GET(req: Request) {
@@ -336,14 +316,16 @@ export async function POST(req: Request) {
     });
   }
 
-  const quote_no =
-    body.quote_no ??
-    (await nextQuoteNumber(auth.tenant_id, body.issue_date));
+  /* An explicit quote_no in the payload (an import, or a duplicate carrying
+     its source number) skips the counter and therefore has no deal_no. */
+  const dealNo = body.quote_no ? null : await nextDealNumber(auth.tenant_id);
+  const quote_no = body.quote_no ?? `KL-QU-${dealNo}`;
   const { data, error } = await supabaseServer
     .from("quotations")
     .insert({
       tenant_id: auth.tenant_id,
       quote_no,
+      deal_no: dealNo,
       customer_id: body.customer_id ?? null,
       currency: body.currency ?? baseCurrency,
       status: body.status ?? "draft",

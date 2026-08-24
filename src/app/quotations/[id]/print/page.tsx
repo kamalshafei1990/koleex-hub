@@ -58,14 +58,16 @@ export default function QuotationPrintPage({
     };
   }, [id]);
 
-  /* Name the saved PDF after the quotation. The browser's "Save as PDF"
-     dialog uses document.title as the default filename, so without this every
-     export defaulted to the same generic title. */
+  /* Name the saved PDF. The browser's "Save as PDF" dialog uses
+     document.title as the default filename, so without this every export
+     lands as the app's own title and they all collide in the download
+     folder. Owner's order: customer - company - number. Blanks are dropped
+     rather than left as empty separators. */
   useEffect(() => {
     if (!quote) return;
     const safe = (s: unknown) => (typeof s === "string" ? s.trim() : "");
     const name =
-      [safe(quote.invoiceNo), safe(quote.customerName) || safe(quote.companyName)]
+      [safe(quote.customerName), safe(quote.companyName), safe(quote.invoiceNo)]
         .filter(Boolean)
         .join(" - ") || "Quotation";
     const prev = document.title;

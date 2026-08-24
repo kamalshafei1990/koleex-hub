@@ -15,20 +15,40 @@ import { isCustomerEnforced, ownsQuotation } from "@/lib/server/customer-quotati
    invoice. Preserves customer, currency, notes, and discount. Returns
    the new invoice row. */
 
-async function nextInvoiceNumber(tenantId: string): Promise<string> {
-  const now = new Date();
-  const ym = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, "0")}`;
-  const prefix = `INV-${ym}-`;
-  const { data } = await supabaseServer
-    .from("invoices")
-    .select("inv_no")
-    .eq("tenant_id", tenantId)
-    .ilike("inv_no", `${prefix}%`)
-    .order("inv_no", { ascending: false })
-    .limit(1);
-  const last = data?.[0]?.inv_no as string | undefined;
-  const nextSeq = last ? Number(last.replace(prefix, "")) + 1 : 1;
-  return `${prefix}${String(nextSeq).padStart(4, "0")}`;
+/* ── Invoice numbering ──────────────────────────────────────────────────────
+   An invoice raised from a quotation INHERITS that quotation's deal number and
+   only swaps the document letters:
+
+       KL-QU-12349  →  KL-IN-12349
+
+   so the pair is recognisable at a glance and on paper. Owner asked for this
+   2026-08-24.
+
+   Only a quotation minted before the deal counter existed (deal_no null, an
+   old KL{YYYY}-{MMDD} number) needs a fresh number — it has nothing to
+   inherit. Those take a new deal number of their own rather than a
+   month-sequence, so every invoice from here on carries a linkable counter.
+
+   The old scheme read the highest INV-YYYYMM-NNNN and added one. Two
+   conversions at the same instant would have read the same "highest" and
+   produced the same number; the counter cannot. */
+async function invoiceNumberFor(
+  tenantId: string,
+  quotationDealNo: number | null,
+): Promise<{ inv_no: string; deal_no: number }> {
+  if (quotationDealNo != null) {
+    return { inv_no: `KL-IN-${quotationDealNo}`, deal_no: quotationDealNo };
+  }
+  const { data, error } = await supabaseServer.rpc("next_deal_number", {
+    p_tenant: tenantId,
+  });
+  if (error || data == null) {
+    /* Fatal on purpose: a duplicate invoice number breaks the link to every
+       document that follows and surfaces only much later. */
+    throw new Error(`Could not allocate an invoice number: ${error?.message ?? "no value returned"}`);
+  }
+  const n = Number(data);
+  return { inv_no: `KL-IN-${n}`, deal_no: n };
 }
 
 export async function POST(req: Request) {
@@ -49,7 +69,7 @@ export async function POST(req: Request) {
       // created_by is selected for DS1b-2a shadow scope evaluation only; it is
       // NOT echoed (the response is the new invoice). Used to read the source
       // quote's owner for the scope-shadow log.
-      .select("id, quote_no, customer_id, currency, discount_percent, notes, created_by, doc")
+      .select("id, quote_no, deal_no, customer_id, currency, discount_percent, notes, created_by, doc")
       .eq("id", body.quotation_id)
       .eq("tenant_id", auth.tenant_id)
       .maybeSingle(),
@@ -117,13 +137,17 @@ export async function POST(req: Request) {
   const { hydrated, subtotal, tax_total, discount_total, total } =
     calcInvoiceTotals(lines, quoteTaxPct, Number(quote.discount_percent ?? 0));
 
-  const inv_no = await nextInvoiceNumber(auth.tenant_id);
+  const { inv_no, deal_no } = await invoiceNumberFor(
+    auth.tenant_id,
+    (quote as { deal_no?: number | null }).deal_no ?? null,
+  );
 
   const { data: invoice, error } = await supabaseServer
     .from("invoices")
     .insert({
       tenant_id: auth.tenant_id,
       inv_no,
+      deal_no,
       customer_id: quote.customer_id,
       currency: quote.currency,
       issue_date: new Date().toISOString().slice(0, 10),
