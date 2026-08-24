@@ -58,7 +58,7 @@ export default function DocTitlePicker({
   titleText?: string;
   /** Heading used when nothing is picked — the host app's own default. */
   fallbackLabel: string;
-  onPick: (row: { id?: string; text?: string; noun?: string; validity?: boolean }) => void;
+  onPick: (row: { id?: string; text?: string; noun?: string; validity?: boolean; code?: string }) => void;
 }) {
   const [rows, setRows] = useState<DocTitleRow[]>([]);
   const [open, setOpen] = useState(false);
@@ -127,6 +127,9 @@ export default function DocTitlePicker({
             text: r.label_en,
             noun: r.meta_noun ?? (r.doc_family === "invoice" ? "Invoice" : "Quotation"),
             validity: r.shows_validity,
+            /* The stable code, not the printed label — a title renamed in
+               settings must not change how a document behaves. */
+            code: r.code,
           }
         : {},
     );

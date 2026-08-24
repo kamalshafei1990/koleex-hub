@@ -172,6 +172,7 @@ export interface Quotation {
      quotation family (it precedes the sale, it expires) yet must read
      "Invoice No". */
   docTitleNoun?: string;
+  docTitleCode?: string;
   docTitleValidity?: boolean;
   incotermId?: string;
   incotermCode?: string;
@@ -594,6 +595,24 @@ export default function QuotationA4Preview({
   const showsValidity =
     current.docTitleNoun ? current.docTitleValidity !== false : docKind !== "invoice";
 
+  /* ── Party labels on a proforma raised for a credit ────────────────────
+     A proforma invoice is what a buyer hands their bank to have the credit
+     issued, and UCP 600 calls the two sides the APPLICANT and the
+     BENEFICIARY. "From" and "Invoice To" are correct English and the wrong
+     words on that desk — they leave the bank clerk to work out which party
+     is which. The switch is deliberately narrow: it needs BOTH a proforma
+     title AND a letter-of-credit payment term, because on a proforma that is
+     going to be paid by T/T the plain wording is the right one.
+     The credit test reads leadTimeBasis, which the payment picker already
+     sets to "after_lc_opening" the moment an L/C term is chosen. That value
+     is ON the document — asking the payment-terms API here would add a
+     network round-trip to a component whose only job is to draw paper. */
+  const isCreditProforma =
+    current.docTitleCode === "proforma_invoice" && current.leadTimeBasis === "after_lc_opening";
+
+  const sellerLabel = isCreditProforma ? "Beneficiary / Seller" : L("party.from");
+  const buyerLabel = isCreditProforma ? "Applicant / Buyer" : `${metaNoun} To`;
+
   /* ACID is NAFEZA's Advance Cargo Information Declaration reference —
      Egyptian customs only. An invoice shipping to Bangladesh (or anywhere
      else) has no ACID number and never will, so the field must not appear
@@ -836,6 +855,22 @@ export default function QuotationA4Preview({
                 docKind decides, exactly as before this field existed. */}
             {current.docTitleText?.trim() ||
               L(docKind === "invoice" ? "title.invoice" : "title.quotation")}
+            {/* Says what the paper is FOR. A bank receiving a proforma with
+                no stated purpose treats it as an offer; this one is asking to
+                have a credit opened against it. */}
+            {isCreditProforma ? (
+              <div
+                style={{
+                  fontSize: 9,
+                  fontWeight: 600,
+                  letterSpacing: "0.1em",
+                  color: T.inkSoft,
+                  marginTop: 3,
+                }}
+              >
+                FOR LETTER OF CREDIT ISSUANCE
+              </div>
+            ) : null}
           </div>
         </div>
 
@@ -949,7 +984,7 @@ export default function QuotationA4Preview({
                 textTransform: "uppercase",
               }}
             >
-              {L("party.from")}
+              {sellerLabel}
             </div>
             <div style={{ padding: "10px 14px" }}>
               <div
@@ -1023,7 +1058,7 @@ export default function QuotationA4Preview({
                 gap: 8,
               }}
             >
-              <span>{metaNoun} To</span>
+              <span>{buyerLabel}</span>
               {/* Link-to-CRM button. Editor-only (`.no-print`) so the
                   black header strip stays clean on the printed PDF. */}
               {onPickCustomer && (

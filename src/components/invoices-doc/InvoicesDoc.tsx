@@ -144,6 +144,9 @@ export interface Invoice {
   docTitleId?: string;
   docTitleText?: string;
   docTitleNoun?: string;
+  /* The chosen title's stable code (e.g. "proforma_invoice"). Read for
+     behaviour; docTitleText is only ever for printing. */
+  docTitleCode?: string;
   docTitleValidity?: boolean;
   incotermId?: string;
   incotermCode?: string;
@@ -303,6 +306,7 @@ export function fromRow(row: RemoteDocRow): Invoice {
     docTitleId: doc.docTitleId,
     docTitleText: doc.docTitleText,
     docTitleNoun: doc.docTitleNoun,
+    docTitleCode: doc.docTitleCode,
     docTitleValidity: doc.docTitleValidity,
     incotermId: doc.incotermId,
     incotermCode: doc.incotermCode,
@@ -2200,9 +2204,9 @@ export default function Quotations() {
           titleId={current.docTitleId}
           titleText={current.docTitleText}
           fallbackLabel="COMMERCIAL INVOICE"
-          onPick={({ id, text, noun, validity }) =>
+          onPick={({ id, text, noun, validity, code }) =>
             setCurrent((q) =>
-              q ? { ...q, docTitleId: id, docTitleText: text, docTitleNoun: noun, docTitleValidity: validity } : q,
+              q ? { ...q, docTitleId: id, docTitleText: text, docTitleNoun: noun, docTitleValidity: validity, docTitleCode: code } : q,
             )
           }
         />

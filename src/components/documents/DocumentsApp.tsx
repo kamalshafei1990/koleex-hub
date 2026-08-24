@@ -336,9 +336,9 @@ function DocEditor({
             titleId={current.docTitleId}
             titleText={current.docTitleText}
             fallbackLabel={kind === "invoice" ? "COMMERCIAL INVOICE" : "QUOTATION"}
-            onPick={({ id, text, noun, validity }) =>
+            onPick={({ id, text, noun, validity, code }) =>
               setCurrent((q) =>
-                q ? { ...q, docTitleId: id, docTitleText: text, docTitleNoun: noun, docTitleValidity: validity } : q,
+                q ? { ...q, docTitleId: id, docTitleText: text, docTitleNoun: noun, docTitleValidity: validity, docTitleCode: code } : q,
               )
             }
           />
