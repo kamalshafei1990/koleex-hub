@@ -28,6 +28,10 @@ import { memo } from "react";
 import { articlesFor, type RenderedArticle } from "@/lib/contracts/general-terms";
 import KoleexWordmark from "@/components/brand/KoleexWordmark";
 import DocumentBrandStrips, { KOLEEX_COMPANY } from "@/components/brand/DocumentBrandStrips";
+/* The same seal and signature boxes the quotation and invoice print — a 40mm
+   square for the Chinese company seal, the signature beside it. Reused rather
+   than redrawn so all three documents seal identically. */
+import { StampSignatureBox, StampSignatureActions } from "@/components/quotations/QuotationA4Preview";
 import type { ContractTerms, InvoiceLite, ScheduleItem, SnapshotShape } from "./types";
 
 /* The same tokens the quotation and invoice use. */
@@ -110,6 +114,20 @@ export interface ContractA4Props {
   snapshot?: SnapshotShape | null;
   /** The contract this one replaces, when it is an amendment. */
   amendsNo?: string | null;
+
+  /* Seal + signature. The tenant's saved pair, and the actions to attach,
+     upload or clear them. Absent on the print route, which renders read-only
+     and must show no controls. */
+  savedStampUrl?: string | null;
+  savedSignatureUrl?: string | null;
+  onAttachSavedStamp?: () => void;
+  onAttachSavedSignature?: () => void;
+  onUploadStamp?: (file: File) => void;
+  onUploadSignature?: (file: File) => void;
+  onClearStamp?: () => void;
+  onClearSignature?: () => void;
+  /** False on a signed contract and on the print route. */
+  isEditable?: boolean;
 }
 
 /* ── Paging ────────────────────────────────────────────────────────────────
@@ -159,7 +177,11 @@ const BLOCK_GAP_PX = 13;         // the margin under each block
 const SHEET_INNER_PX = 978;      // 270mm less the 24/18px vertical padding
 const CONT_HEAD_PX = 58;         // identity strip on sheets 2..N
 const FOOT_PX = 26;              // page-number footer on every sheet
-const SIGN_BLOCK_PX = 250;       // the two signature cards
+/* The two signature cards. The seller's now carries a 40mm seal and a
+   signature box, which is ~150px taller than the bare rules it replaced —
+   budgeted, or the signatures get pushed past the sheet edge and clipped the
+   way Key Terms were. */
+const SIGN_BLOCK_PX = 400;
 const CHARS_PER_LINE = 148;      // 10px text across ~738px of inner width
 const LINE_PX = 15;
 const ART_TITLE_PX = 16;
@@ -662,7 +684,41 @@ function ContractA4Inner(props: ContractA4Props) {
                   breakInside: "avoid",
                 }}
               >
-                <SignBlock role="For and on behalf of the SELLER" party={KOLEEX_COMPANY.en} />
+                <SignBlock role="For and on behalf of the SELLER" party={KOLEEX_COMPANY.en}>
+                  {/* The seal sits INSIDE the seller's block, over the rule it
+                      is signed above — where a company chop actually goes. */}
+                  <div style={{ display: "flex", gap: 10, alignItems: "flex-end", marginBottom: 6 }}>
+                    <StampSignatureBox
+                      imageUrl={terms.stampUrl}
+                      placeholder="Company seal"
+                      aspectSquare
+                      isEditable={props.isEditable && !!props.onClearStamp}
+                      onClear={props.onClearStamp}
+                    />
+                    <StampSignatureBox
+                      imageUrl={terms.signatureUrl}
+                      placeholder="Signature"
+                      isEditable={props.isEditable && !!props.onClearSignature}
+                      onClear={props.onClearSignature}
+                    />
+                  </div>
+                  {props.isEditable && (
+                    <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                      <StampSignatureActions
+                        label="Seal"
+                        savedUrl={props.savedStampUrl ?? null}
+                        onUseSaved={props.onAttachSavedStamp}
+                        onUpload={props.onUploadStamp}
+                      />
+                      <StampSignatureActions
+                        label="Signature"
+                        savedUrl={props.savedSignatureUrl ?? null}
+                        onUseSaved={props.onAttachSavedSignature}
+                        onUpload={props.onUploadSignature}
+                      />
+                    </div>
+                  )}
+                </SignBlock>
                 <SignBlock role="For and on behalf of the BUYER" party={buyerName} />
               </div>
 
@@ -869,7 +925,15 @@ function FactRow({ k, v, last }: { k: string; v: string; last?: boolean }) {
   );
 }
 
-function SignBlock({ role, party }: { role: string; party: string }) {
+function SignBlock({
+  role,
+  party,
+  children,
+}: {
+  role: string;
+  party: string;
+  children?: React.ReactNode;
+}) {
   return (
     <div style={{ border: `1px solid ${T.border}`, borderRadius: 12, overflow: "hidden" }}>
       <div
@@ -886,7 +950,8 @@ function SignBlock({ role, party }: { role: string; party: string }) {
         {role}
       </div>
       <div style={{ padding: "12px 14px" }}>
-        <div style={{ fontSize: 10.5, fontWeight: 700, marginBottom: 28 }}>{party}</div>
+        <div style={{ fontSize: 10.5, fontWeight: 700, marginBottom: children ? 8 : 28 }}>{party}</div>
+        {children}
         <div style={{ borderTop: `1px solid ${T.ink}`, paddingTop: 5, fontSize: 9.5, color: T.inkSoft }}>
           Name / Title
         </div>

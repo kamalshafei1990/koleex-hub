@@ -19,6 +19,12 @@ export interface ContractTerms extends ContractContext {
   cancellationPolicy?: string;
   documents?: string[];
   specialConditions?: string[];
+  /* The seller's seal and signature, attached to THIS contract. Stored in
+     `terms` so they travel into the frozen snapshot at signature — a signed
+     contract must keep the seal it was signed under even if the tenant later
+     replaces its saved one. */
+  stampUrl?: string;
+  signatureUrl?: string;
   buyer?: {
     name?: string;
     company?: string;

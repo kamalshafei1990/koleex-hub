@@ -168,6 +168,59 @@ export default function ContractDoc({ id }: { id: string }) {
      modal for the same reason: the DOCUMENT is what the screen is for. */
   const [termsOpen, setTermsOpen] = useState(false);
 
+  /* The tenant's saved seal and signature — they belong to the COMPANY, not
+     to this contract, so they load once when the screen mounts. Same endpoint
+     the quotation and invoice editors use. */
+  const [savedStampUrl, setSavedStampUrl] = useState<string | null>(null);
+  const [savedSignatureUrl, setSavedSignatureUrl] = useState<string | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const res = await fetch("/api/quotations/saved-assets", { credentials: "include" });
+        if (!res.ok) return;
+        const json = (await res.json()) as { stampUrl: string | null; signatureUrl: string | null };
+        if (cancelled) return;
+        setSavedStampUrl(json.stampUrl);
+        setSavedSignatureUrl(json.signatureUrl);
+      } catch {
+        /* Non-fatal — the buttons degrade to upload-only. */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  /* Uploading REPLACES the tenant's saved asset and attaches it here, exactly
+     as the invoice editor behaves. */
+  const uploadAsset = useCallback(async (kind: "stamp" | "signature", file: File) => {
+    const form = new FormData();
+    form.append("kind", kind);
+    form.append("file", file);
+    try {
+      const res = await fetch("/api/quotations/saved-assets", {
+        method: "POST",
+        credentials: "include",
+        body: form,
+      });
+      if (!res.ok) return;
+      const json = (await res.json()) as { url?: string };
+      if (!json.url) return;
+      const url = json.url;
+      if (kind === "stamp") {
+        setSavedStampUrl(url);
+        setTerms((t) => ({ ...t, stampUrl: url }));
+      } else {
+        setSavedSignatureUrl(url);
+        setTerms((t) => ({ ...t, signatureUrl: url }));
+      }
+      setSaveState("idle");
+    } catch {
+      /* Non-fatal. */
+    }
+  }, []);
+
   useEffect(() => {
     let alive = true;
     (async () => {
@@ -678,6 +731,17 @@ export default function ContractDoc({ id }: { id: string }) {
             invoice={invoice}
             snapshot={row.snapshot}
             amendsNo={amends?.contract_no ?? null}
+            /* A signed contract is read-only: its seal is part of the frozen
+               record and must not gain a Clear button. */
+            isEditable={!signed}
+            savedStampUrl={savedStampUrl}
+            savedSignatureUrl={savedSignatureUrl}
+            onAttachSavedStamp={() => savedStampUrl && set("stampUrl", savedStampUrl)}
+            onAttachSavedSignature={() => savedSignatureUrl && set("signatureUrl", savedSignatureUrl)}
+            onUploadStamp={(f) => void uploadAsset("stamp", f)}
+            onUploadSignature={(f) => void uploadAsset("signature", f)}
+            onClearStamp={() => set("stampUrl", undefined)}
+            onClearSignature={() => set("signatureUrl", undefined)}
           />
         </div>
       </div>
