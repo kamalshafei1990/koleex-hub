@@ -133,6 +133,29 @@ export interface ContractA4Props {
    every keystroke of the editor beside it. The budget below leaves enough
    slack to absorb the error, and `breakInside: avoid` on each article stops
    the browser splitting one mid-sentence if an estimate runs short. */
+/* ── Measured on the live sheet, not guessed ─────────────────────────────
+   The cover used to be assumed to fit: header, parties, schedule and key
+   terms all went on sheet one and nothing checked. With five goods lines it
+   came to 294 mm inside a 270 mm box, and `.quot-a4-doc`'s `overflow: hidden`
+   swallowed the last 24 mm IN SILENCE — the Documents row of Key Terms was
+   sliced through the middle and simply did not print.
+
+   Silent truncation is the worst failure mode a contract can have: the page
+   looks finished. So every block on the cover is now costed and the ones that
+   do not fit move to the next sheet. */
+const COVER_HEAD_PX = 118;       // wordmark + document title
+const BRAND_STRIPS_PX = 51;      // company line + tagline
+const STATUS_BAND_PX = 26;       // DRAFT / SUPERSEDED / CANCELLED band
+const META_STRIP_PX = 56;        // date · contract no · invoice no · client no
+const PARTIES_PX = 157;          // the two party cards
+const PREAMBLE_PX = 32;          // "This Contract is made on …"
+const SECTION_BAR_PX = 25;       // one black section heading
+const TABLE_HEAD_PX = 34;        // the goods table's own head row
+const TABLE_TOTAL_PX = 32;       // the black total bar
+const GOODS_ROW_PX = 30;         // one goods line
+const KEY_TERM_ROW_PX = 28;      // one Key Terms row
+const BLOCK_GAP_PX = 13;         // the margin under each block
+
 const SHEET_INNER_PX = 978;      // 270mm less the 24/18px vertical padding
 const CONT_HEAD_PX = 58;         // identity strip on sheets 2..N
 const FOOT_PX = 26;              // page-number footer on every sheet
@@ -151,22 +174,54 @@ function articleHeight(body: string): number {
 
 interface Sheet {
   articles: RenderedArticle[];
-  /** The first sheet carries the full header, parties, schedule and key terms. */
+  /** The cover — header, parties, preamble, and the schedule. */
   isFirst: boolean;
   /** The last sheet carries the special conditions and the signatures. */
   isLast: boolean;
+  /** Key Terms ride on whichever sheet has room for them, cover or not. */
+  keyTerms?: boolean;
 }
 
 /** Deal the articles onto sheets. The first sheet is the cover — it holds the
     schedule and key terms and no articles at all, because those two blocks
     already fill it. */
-function paginate(articles: RenderedArticle[], specialCount: number): Sheet[] {
-  const sheets: Sheet[] = [{ articles: [], isFirst: true, isLast: false }];
+function paginate(
+  articles: RenderedArticle[],
+  specialCount: number,
+  opts: { goodsCount: number; keyTermRows: number; hasBand: boolean },
+): Sheet[] {
+  /* ── Does the cover actually fit? ──────────────────────────────────────
+     Costed block by block instead of assumed. Key Terms are the movable
+     part: if the schedule has left no room for them they go to the next
+     sheet rather than being clipped away. */
+  const coverFixed =
+    COVER_HEAD_PX +
+    BRAND_STRIPS_PX +
+    (opts.hasBand ? STATUS_BAND_PX : 0) +
+    META_STRIP_PX +
+    PARTIES_PX +
+    PREAMBLE_PX +
+    SECTION_BAR_PX +
+    TABLE_HEAD_PX +
+    TABLE_TOTAL_PX +
+    opts.goodsCount * GOODS_ROW_PX +
+    8 * BLOCK_GAP_PX;
+
+  const keyTermsCost = SECTION_BAR_PX + opts.keyTermRows * KEY_TERM_ROW_PX + BLOCK_GAP_PX;
+  const coverAvailable = SHEET_INNER_PX - FOOT_PX;
+  const keyTermsOnCover = coverFixed + keyTermsCost <= coverAvailable;
+
+  const sheets: Sheet[] = [{ articles: [], isFirst: true, isLast: false, keyTerms: keyTermsOnCover }];
 
   let budget = SHEET_INNER_PX - CONT_HEAD_PX - FOOT_PX;
+  /* Key Terms pushed off the cover take their space from the first articles
+     sheet instead. */
+  let pendingKeyTerms = !keyTermsOnCover;
+  if (pendingKeyTerms) budget -= keyTermsCost;
   let current: RenderedArticle[] = [];
   const flush = () => {
-    sheets.push({ articles: current, isFirst: false, isLast: false });
+    sheets.push({ articles: current, isFirst: false, isLast: false, keyTerms: pendingKeyTerms });
+    pendingKeyTerms = false;
     current = [];
     budget = SHEET_INNER_PX - CONT_HEAD_PX - FOOT_PX;
   };
@@ -177,7 +232,7 @@ function paginate(articles: RenderedArticle[], specialCount: number): Sheet[] {
     current.push(a);
     budget -= h;
   }
-  if (current.length > 0) flush();
+  if (current.length > 0 || pendingKeyTerms) flush();
 
   /* BALANCE — the same rule the quotation and invoice now use. A trailing
      sheet holding one article above a page of white is the defect the owner
@@ -314,7 +369,15 @@ function ContractA4Inner(props: ContractA4Props) {
   const invoiceNo = frozen?.schedule.invoiceNo ?? props.invoice?.inv_no ?? null;
   const contractDate = frozen?.contractDate ?? props.contractDate;
 
-  const sheets = paginate(articles, (terms.specialConditions ?? []).length);
+  /* Six fixed Key Terms rows, plus Documents when there are any — counted
+     the same way the JSX below renders them, so the cost cannot drift from
+     what is actually drawn. */
+  const keyTermRows = 6 + ((terms.documents ?? []).length > 0 ? 1 : 0);
+  const sheets = paginate(articles, (terms.specialConditions ?? []).length, {
+    goodsCount: items.length,
+    keyTermRows,
+    hasBand: !!band,
+  });
   const buyerName = buyer.company || buyer.name || "—";
 
   return (
@@ -516,26 +579,34 @@ function ContractA4Inner(props: ContractA4Props) {
         </div>
       </div>
 
-      {/* ── The facts a reader checks first ── */}
-      <SectionBar>Key Terms</SectionBar>
-      <div style={{ border: `1px solid ${T.border}`, borderRadius: 12, overflow: "hidden", marginBottom: 14 }}>
-        <FactRow k="Price basis" v={terms.incoterm ? `${terms.incoterm} ${terms.incotermPlace ?? ""}`.trim() + " (Incoterms® 2020)" : "—"} />
-        <FactRow k="Payment" v={terms.paymentLabel ?? "—"} />
-        <FactRow k="Port of loading" v={terms.loadingPort ?? "—"} />
-        <FactRow k="Port of discharge" v={terms.dischargePort ?? "—"} />
-        <FactRow
-          k="Delivery time"
-          v={terms.leadTimeDays ? `${terms.leadTimeDays} days ${basisWords(terms.leadTimeBasis)}` : "—"}
-        />
-        <FactRow k="Warranty" v={terms.warrantyMonths ? `${terms.warrantyMonths} months` : "—"} />
-        {(terms.documents ?? []).length > 0 ? (
-          <FactRow k="Documents" v={(terms.documents ?? []).join(" · ")} last />
-        ) : null}
-      </div>
-
             </>
           ) : (
             <ContinuationHead contractNo={props.contractNo} buyer={buyerName} />
+          )}
+
+          {/* ── The facts a reader checks first ──
+              Rides the cover when the schedule left room, otherwise the next
+              sheet. It used to be nailed to the cover and clipped away when
+              it did not fit. */}
+          {sheet.keyTerms && (
+            <>
+
+        <SectionBar>Key Terms</SectionBar>
+        <div style={{ border: `1px solid ${T.border}`, borderRadius: 12, overflow: "hidden", marginBottom: 14 }}>
+          <FactRow k="Price basis" v={terms.incoterm ? `${terms.incoterm} ${terms.incotermPlace ?? ""}`.trim() + " (Incoterms® 2020)" : "—"} />
+          <FactRow k="Payment" v={terms.paymentLabel ?? "—"} />
+          <FactRow k="Port of loading" v={terms.loadingPort ?? "—"} />
+          <FactRow k="Port of discharge" v={terms.dischargePort ?? "—"} />
+          <FactRow
+            k="Delivery time"
+            v={terms.leadTimeDays ? `${terms.leadTimeDays} days ${basisWords(terms.leadTimeBasis)}` : "—"}
+          />
+          <FactRow k="Warranty" v={terms.warrantyMonths ? `${terms.warrantyMonths} months` : "—"} />
+          {(terms.documents ?? []).length > 0 ? (
+            <FactRow k="Documents" v={(terms.documents ?? []).join(" · ")} last />
+          ) : null}
+        </div>
+            </>
           )}
 
           {/* ── Articles ──
