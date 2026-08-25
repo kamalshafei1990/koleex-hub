@@ -38,7 +38,11 @@ export interface ScheduleItem {
      the invoice prints it — a buyer's bank matches on the model, not prose. */
   model?: string;
   qty?: number;
+  /* ⚠️ The invoice's own items store the figure as `unitPrice`. `price` is
+     kept for the frozen snapshots written before this was noticed — read
+     BOTH, or a live contract prints every line at 0.00. */
   price?: number;
+  unitPrice?: number;
 }
 
 export interface InvoiceLite {

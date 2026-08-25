@@ -20,6 +20,7 @@
    --------------------------------------------------------------------------- */
 
 import dynamic from "next/dynamic";
+import { usePathname } from "next/navigation";
 import { useSkin } from "@/lib/appearance";
 
 /* The Aurora ground. ssr:false and mounted only under Aurora — a canvas is
@@ -28,6 +29,15 @@ const WavyBackground = dynamic(() => import("@/components/ui/WavyBackground"), {
 
 export default function ContractsLayout({ children }: { children: React.ReactNode }) {
   const aurora = useSkin() === "aurora";
+  const pathname = usePathname() ?? "";
+
+  /* The print route renders BARE — no scope class, no ground canvas, no
+     wrapper. That page exists precisely to keep the Hub's layout out of the
+     print pass; wrapping it here would put back the thing it was built to
+     escape, and wrappers imposing their own heights on the page box is what
+     produced pages that did not fit and a run of near-empty sheets. */
+  if (pathname.endsWith("/print")) return <>{children}</>;
+
   return (
     <div
       className={`${aurora ? "kx-app kx-ground-host " : ""}relative min-h-full bg-[var(--bg-primary)] text-[var(--text-primary)]`}

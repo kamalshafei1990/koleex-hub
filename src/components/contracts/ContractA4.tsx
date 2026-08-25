@@ -66,6 +66,30 @@ function money(v: unknown, currency?: string | null): string {
   return `${currency ?? ""} ${n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`.trim();
 }
 
+/** Item descriptions carry editor markup. A contract is read by a buyer and
+    their bank, not by a browser — the live document was printing
+    "MachineBrand:KOLEEX<div>Warranty:5 YEARS</div>" onto the page.
+
+    Every tag becomes a SPACE, not nothing: deleting them welds words
+    together ("MachineBrand"). */
+function plainText(v: unknown): string {
+  if (typeof v !== "string") return "";
+  return v
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&nbsp;/g, " ")
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+/** The invoice writes `unitPrice`; older frozen snapshots wrote `price`. */
+function unitPriceOf(it: ScheduleItem): number {
+  const n = Number(it.unitPrice ?? it.price ?? 0);
+  return Number.isFinite(n) ? n : 0;
+}
+
 function basisWords(b?: string): string {
   if (b === "after_lc_opening") return "after receipt of the operative credit";
   if (b === "after_order") return "from the date of this Contract";
@@ -387,16 +411,18 @@ function ContractA4Inner(props: ContractA4Props) {
                 <tr key={i}>
                   <Td style={{ textAlign: "center", fontFamily: T.mono, color: T.inkSoft }}>{i + 1}</Td>
                   <Td>
-                    <div style={{ fontWeight: 600 }}>{it.name || it.description || "—"}</div>
+                    <div style={{ fontWeight: 600 }}>{plainText(it.name) || plainText(it.description) || "—"}</div>
                     {it.description && it.name ? (
-                      <div style={{ color: T.inkSoft, fontSize: 9.5 }}>{it.description}</div>
+                      <div style={{ color: T.inkSoft, fontSize: 9.5 }}>{plainText(it.description)}</div>
                     ) : null}
                   </Td>
-                  <Td style={{ fontFamily: T.mono, fontSize: 9.5 }}>{(it as { model?: string }).model ?? "—"}</Td>
+                  <Td style={{ fontFamily: T.mono, fontSize: 9.5 }}>{it.model ?? "—"}</Td>
                   <Td style={{ textAlign: "right", fontVariantNumeric: "tabular-nums" }}>{it.qty ?? "—"}</Td>
-                  <Td style={{ textAlign: "right", fontVariantNumeric: "tabular-nums" }}>{money(it.price, currency)}</Td>
                   <Td style={{ textAlign: "right", fontVariantNumeric: "tabular-nums" }}>
-                    {money(Number(it.qty ?? 0) * Number(it.price ?? 0), currency)}
+                    {money(unitPriceOf(it), currency)}
+                  </Td>
+                  <Td style={{ textAlign: "right", fontVariantNumeric: "tabular-nums" }}>
+                    {money(Number(it.qty ?? 0) * unitPriceOf(it), currency)}
                   </Td>
                 </tr>
               ))

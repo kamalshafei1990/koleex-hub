@@ -29,6 +29,7 @@ import ContractA4 from "./ContractA4";
    import PackingListDoc uses. */
 import { PRINT_AND_DOC_STYLES } from "@/components/quotations/Quotations";
 import OrdersIcon from "@/components/icons/OrdersIcon";
+import ScaleIcon from "@/components/icons/ui/ScaleIcon";
 import { checkContract, blocksSignature, type Finding } from "@/lib/contracts/contradictions";
 import type { ContractRef, ContractRow, ContractTerms, InvoiceLite } from "./types";
 import {
@@ -160,6 +161,12 @@ export default function ContractDoc({ id }: { id: string }) {
   const [amends, setAmends] = useState<ContractRef | null>(null);
   const [replacedBy, setReplacedBy] = useState<ContractRef | null>(null);
   const [amending, setAmending] = useState(false);
+  /* The negotiated terms live in a modal, not in bands above the paper.
+     Four stacked bands pushed the document below the fold and made the screen
+     read as a form with a preview attached — the owner's word was
+     "horrible… not organized". Invoices put their commercial terms behind a
+     modal for the same reason: the DOCUMENT is what the screen is for. */
+  const [termsOpen, setTermsOpen] = useState(false);
 
   useEffect(() => {
     let alive = true;
@@ -253,6 +260,48 @@ export default function ContractDoc({ id }: { id: string }) {
       setAmending(false);
     }
   }, [row, router]);
+
+  /* ── Print / PDF ──────────────────────────────────────────────────────
+     Through a HIDDEN IFRAME pointing at /contracts/<id>/print, never
+     window.print() on this window. Printing the editor drags the whole Hub
+     layout into the print pass; even with .no-print on the chrome the
+     surviving wrappers impose their own heights on the page box, which is
+     the "pages don't fit, lots of empty pages" the owner saw. Invoices hit
+     exactly this and solved it the same way. */
+  const handlePrint = useCallback(() => {
+    if (!row) return;
+    const FRAME_ID = "koleex-contract-print-frame";
+    let frame = document.getElementById(FRAME_ID) as HTMLIFrameElement | null;
+    if (!frame) {
+      frame = document.createElement("iframe");
+      frame.id = FRAME_ID;
+      frame.style.position = "fixed";
+      frame.style.left = "-10000px";
+      frame.style.top = "0";
+      frame.style.width = "210mm";
+      frame.style.height = "297mm";
+      frame.style.border = "none";
+      /* Off-screen by position, never visibility:hidden — some browsers skip
+         invisible iframes when printing. */
+      document.body.appendChild(frame);
+    }
+    /* Cache-bust so a second print always reloads fresh server data. */
+    frame.src = `/contracts/${encodeURIComponent(row.id)}/print?_t=${Date.now()}`;
+    const onLoad = () => {
+      frame!.removeEventListener("load", onLoad);
+      const ready = () => {
+        const win = frame!.contentWindow as (Window & { __quotation_pdf_ready__?: boolean }) | null;
+        if (win?.__quotation_pdf_ready__) {
+          win.focus();
+          win.print();
+        } else {
+          setTimeout(ready, 100);
+        }
+      };
+      ready();
+    };
+    frame.addEventListener("load", onLoad);
+  }, [row]);
 
   const handleDelete = useCallback(async () => {
     if (!row) return;
@@ -358,6 +407,28 @@ export default function ContractDoc({ id }: { id: string }) {
 
         {!signed && (
           <>
+            {/* Opens the terms. The finding count rides ON the button so
+                moving the fields into a modal cannot hide a contradiction —
+                a checker you have to go looking for is a checker nobody
+                reads. Red when something blocks signature. */}
+            <button
+              onClick={() => setTermsOpen(true)}
+              className="inline-flex items-center gap-2 px-4 py-2 text-sm text-[var(--text-secondary)] bg-[var(--bg-surface)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-inverted)]/[0.1] rounded-lg transition"
+            >
+              <ScaleIcon size={14} />
+              Terms
+              {findings.length > 0 && (
+                <span
+                  className={`inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full text-[10px] font-bold ${
+                    cannotSign
+                      ? "bg-rose-500/20 text-rose-300 border border-rose-500/40"
+                      : "bg-amber-500/18 text-amber-300 border border-amber-500/40"
+                  }`}
+                >
+                  {findings.length}
+                </span>
+              )}
+            </button>
             <button
               onClick={handleSave}
               disabled={saveState === "saving"}
@@ -394,7 +465,7 @@ export default function ContractDoc({ id }: { id: string }) {
         )}
 
         <button
-          onClick={() => window.print()}
+          onClick={handlePrint}
           className="inline-flex items-center gap-1.5 px-3 py-2 text-sm text-[var(--text-secondary)] bg-[var(--bg-surface)] hover:bg-[var(--bg-inverted)]/[0.1] rounded-lg transition"
         >
           <PrintIcon size={14} />
@@ -448,8 +519,34 @@ export default function ContractDoc({ id }: { id: string }) {
           editable fields in a dark band directly above the A4 and let the
           document have the width; a contract that arranged itself differently
           would read as a different application. */}
-      {!signed && (
-        <div className="no-print">
+      {!signed && termsOpen && (
+        <div
+          className="no-print fixed inset-0 z-50 flex items-start justify-center overflow-auto p-4 sm:p-6"
+          style={{ background: "rgba(0,0,0,0.55)", backdropFilter: "blur(10px)" }}
+          onClick={() => setTermsOpen(false)}
+        >
+          <div
+            className="kx-pop-clear w-full"
+            style={{
+              maxWidth: 980,
+              borderRadius: 16,
+              border: "1px solid var(--border-subtle)",
+              background: "var(--bg-secondary)",
+              overflow: "hidden",
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between px-5 py-3.5 border-b border-[var(--border-subtle)]">
+              <h2 className="text-[14px] font-semibold text-[var(--text-primary)]">
+                Negotiated terms — {row.contract_no}
+              </h2>
+              <button
+                onClick={() => setTermsOpen(false)}
+                className="px-3 py-1.5 rounded-lg text-[12px] font-semibold bg-[var(--bg-inverted)] text-[var(--text-inverted)] hover:opacity-90 transition"
+              >
+                Done
+              </button>
+            </div>
           <FieldRow title="Delivery">
             <Field label="Incoterms 2020 rule" width={150} flagged={flaggedFields.has("incoterm")}>
               <select className={INPUT} value={terms.incoterm ?? ""} onChange={(e) => set("incoterm", e.target.value || undefined)}>
@@ -529,12 +626,11 @@ export default function ContractDoc({ id }: { id: string }) {
             </Field>
           </FieldRow>
 
-          {/* The checker's findings sit with the fields they are about, not in
-              a panel elsewhere on the screen. */}
+          {/* The checker's findings sit with the fields they are about. */}
           {findings.length > 0 && (
             <div
-              className="no-print kx-glass"
-              style={{ padding: "10px 16px 12px", borderBottom: "1px solid var(--border-subtle)" }}
+              className="no-print"
+              style={{ padding: "10px 16px 14px" }}
             >
               <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
                 {findings.map((f) => (
@@ -545,6 +641,7 @@ export default function ContractDoc({ id }: { id: string }) {
               </div>
             </div>
           )}
+          </div>
         </div>
       )}
 
