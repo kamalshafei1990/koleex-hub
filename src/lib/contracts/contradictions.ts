@@ -377,3 +377,60 @@ export function checkContract(t: CheckableTerms): Finding[] {
 export function blocksSignature(findings: Finding[]): boolean {
   return findings.some((f) => f.severity === "error");
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   The same checks, on a QUOTATION or INVOICE
+
+   The contract checker needs a resolved payment CATEGORY, which only the
+   server knows. A quotation or invoice editor has the document and nothing
+   else, so this runs the subset that can be judged from the document alone —
+   and that subset happens to contain the most expensive mistake of the lot.
+
+   Run over the five real invoices the day this was written, THREE carried
+   "FOB <the buyer's port>": FOB Alexandria, FOB Chittagong, FOB Benghazi.
+   Read literally each one obliges Koleex to carry the goods to the buyer's
+   country at its own cost and risk. They had already been sent.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+export interface TradeDocumentFacts {
+  incotermCode?: string;
+  /** The place printed after the rule. */
+  incotermLocation?: string;
+  loadingPort?: string;
+  dischargePort?: string;
+  leadTimeDays?: number;
+  leadTimeBasis?: string;
+  /** Item descriptions, for the warranty cross-check. */
+  goods?: { description?: string }[];
+  /** What the document prints as its warranty, when it states one. */
+  warrantyMonths?: number;
+}
+
+/** Findings a quotation or invoice can raise without asking the server
+    anything. Deliberately a SUBSET — no payment-shape rules, because the
+    category that decides them is not on the document. */
+export function checkTradeDocument(d: TradeDocumentFacts): Finding[] {
+  const place = (d.incotermLocation ?? "").trim() || (d.dischargePort ?? "").trim();
+  return checkContract({
+    incoterm: d.incotermCode,
+    incotermPlace: place || undefined,
+    loadingPort: d.loadingPort,
+    dischargePort: d.dischargePort,
+    leadTimeDays: d.leadTimeDays,
+    leadTimeBasis: d.leadTimeBasis as CheckableTerms["leadTimeBasis"],
+    warrantyMonths: d.warrantyMonths,
+    goods: d.goods,
+  }).filter((f) =>
+    /* Only what the document itself can answer for. Everything else needs the
+       payment category, the document list, or a governing-law clause that a
+       quotation legitimately does not carry. */
+    [
+      "incoterm-unknown",
+      "place-is-destination-on-origin-term",
+      "place-is-origin-on-destination-term",
+      "exw-with-ports",
+      "container-on-sea-term",
+      "warranty-conflicts-with-goods",
+    ].includes(f.id),
+  );
+}

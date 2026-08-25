@@ -35,6 +35,7 @@ import ArrowDownIcon from "@/components/icons/ui/ArrowDownIcon";
 import TrashIcon from "@/components/icons/ui/TrashIcon";
 import KoleexWordmark from "@/components/brand/KoleexWordmark";
 import DocumentBrandStrips from "@/components/brand/DocumentBrandStrips";
+import { checkTradeDocument } from "@/lib/contracts/contradictions";
 import BoldIcon from "@/components/icons/ui/BoldIcon";
 import ItalicIcon from "@/components/icons/ui/ItalicIcon";
 import UnderlineIcon from "@/components/icons/ui/UnderlineIcon";
@@ -610,6 +611,37 @@ export default function QuotationA4Preview({
   const isCreditProforma =
     current.docTitleCode === "proforma_invoice" && current.leadTimeBasis === "after_lc_opening";
 
+  /* ── Trade-terms check, live on the document ─────────────────────────────
+     Three of the five real invoices carried "FOB <the buyer's port>" —
+     FOB Alexandria, FOB Chittagong, FOB Benghazi — and every one had already
+     been sent. Read literally each obliges Koleex to carry the goods to the
+     buyer's country at its own cost. Nothing in the editor said a word.
+
+     The subset that a document can answer for on its own; no payment-shape
+     rules, because the category that decides those is not on the document.
+     Pure and cheap, so it runs on every keystroke. */
+  const tradeFindings = useMemo(
+    () =>
+      checkTradeDocument({
+        incotermCode: current.incotermCode,
+        incotermLocation: current.incotermLocation,
+        loadingPort: current.loadingPort,
+        dischargePort: current.dischargePort,
+        leadTimeDays: current.leadTimeDays,
+        leadTimeBasis: current.leadTimeBasis,
+        goods: current.items?.map((it) => ({ description: it.description })),
+      }),
+    [
+      current.incotermCode,
+      current.incotermLocation,
+      current.loadingPort,
+      current.dischargePort,
+      current.leadTimeDays,
+      current.leadTimeBasis,
+      current.items,
+    ],
+  );
+
   const sellerLabel = isCreditProforma ? "Beneficiary / Seller" : L("party.from");
   const buyerLabel = isCreditProforma ? "Applicant / Buyer" : `${metaNoun} To`;
 
@@ -899,6 +931,35 @@ export default function QuotationA4Preview({
           >
             <DocSettingsCard current={current} setCurrent={setCurrent} />
             <PricingSettingsCard current={current} setCurrent={setCurrent} />
+          </div>
+        )}
+
+        {/* ── Trade-terms warnings ──
+            On the paper but no-print, like every other editor affordance, and
+            only on the first sheet. Sits ABOVE the header so it cannot be
+            scrolled past: the whole reason FOB Alexandria reached a customer
+            is that nothing was in the way of sending it. */}
+        {isFirstPage && tradeFindings.length > 0 && (
+          <div className="no-print" style={{ marginBottom: 12, display: "grid", gap: 6 }}>
+            {tradeFindings.map((f) => (
+              <div
+                key={f.id}
+                style={{
+                  border: `1px solid ${f.severity === "error" ? "#fca5a5" : "#fcd34d"}`,
+                  background: f.severity === "error" ? "#fef2f2" : "#fffbeb",
+                  borderRadius: 8,
+                  padding: "7px 10px",
+                  fontSize: 10,
+                  lineHeight: 1.45,
+                }}
+              >
+                <div style={{ fontWeight: 700, color: f.severity === "error" ? "#b91c1c" : "#b45309" }}>
+                  {f.severity === "error" ? "Check this before sending" : "Worth a look"}
+                </div>
+                <div style={{ color: T.ink }}>{f.message}</div>
+                <div style={{ color: T.inkSoft, marginTop: 2 }}>{f.fix}</div>
+              </div>
+            ))}
           </div>
         )}
 
