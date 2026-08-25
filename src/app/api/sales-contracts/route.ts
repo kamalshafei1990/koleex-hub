@@ -21,7 +21,12 @@ import { supabaseServer } from "@/lib/server/supabase-server";
 import { requireAuth, requireModuleAccess, requireModuleAction } from "@/lib/server/auth";
 import { ensureOrder } from "@/lib/server/orders";
 import { TERMS_VERSION, type ContractContext } from "@/lib/contracts/general-terms";
-import { impliesAdvancePayment } from "@/lib/contracts/contradictions";
+import {
+  impliesAdvancePayment,
+  warrantyMonthsInText,
+  PLACE_IS_ORIGIN,
+  PLACE_IS_DESTINATION,
+} from "@/lib/contracts/contradictions";
 
 const MODULE = "Invoices";
 
@@ -219,10 +224,43 @@ export async function POST(req: Request) {
 
   const leadTimeBasis = basisIsCoherent ? storedBasis : derivedBasis;
 
+  /* ── The named place belongs to the rule's OWN side ──────────────────────
+     This used to read `dischargePort || loadingPort` — the buyer's port,
+     always. On an FOB deal that produced "FOB Chittagong, Bangladesh", which
+     in ICC's own vocabulary says the Seller carries the goods to Bangladesh
+     and loads them there. A bank or a buyer reading it literally would be
+     entitled to hold Koleex to exactly that. Caught on a live contract by an
+     outside reader (2026-08-25).
+
+     EXW/FCA/FAS/FOB name where the Seller hands over; the C and D rules name
+     where the carriage the Seller paid for ends. */
+  const incotermCode = (str("incotermCode") ?? "").toUpperCase();
+  const originPort = str("loadingPort");
+  const destinationPort = str("dischargePort");
+  const incotermPlace = PLACE_IS_ORIGIN.has(incotermCode)
+    ? (originPort ?? destinationPort)
+    : PLACE_IS_DESTINATION.has(incotermCode)
+      ? (destinationPort ?? originPort)
+      : (destinationPort ?? originPort);
+
+  /* ── The warranty the GOODS actually carry ───────────────────────────────
+     A flat 12 was contradicting item descriptions that read "Warranty: 5
+     YEARS" — the same document promising two different periods. Take the
+     goods' own figure when every line agrees on one; fall back to the house
+     12 only when they are silent or disagree with each other, and let the
+     checker raise the disagreement rather than this route guessing. */
+  const rawItemsForWarranty = Array.isArray(doc.items) ? (doc.items as Record<string, unknown>[]) : [];
+  const statedWarranties = new Set(
+    rawItemsForWarranty
+      .map((it) => warrantyMonthsInText(typeof it.description === "string" ? it.description : ""))
+      .filter((m): m is number => m != null),
+  );
+  const warrantyMonths = statedWarranties.size === 1 ? [...statedWarranties][0] : 12;
+
   const terms = {
     incoterm: str("incotermCode"),
     incotermId: str("incotermId"),
-    incotermPlace: str("dischargePort") || str("loadingPort"),
+    incotermPlace,
     loadingPort: str("loadingPort"),
     dischargePort: str("dischargePort"),
     containerType: str("containerType"),
@@ -239,7 +277,7 @@ export async function POST(req: Request) {
     /* Not carried on any invoice today — the contract is the first document
        that has to state it, so it starts at the house standard and is edited
        on the contract itself. */
-    warrantyMonths: 12,
+    warrantyMonths,
     inspection: "seller" as const,
 
     governingLaw: str("governingLaw"),

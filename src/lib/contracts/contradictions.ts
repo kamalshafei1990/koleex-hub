@@ -41,6 +41,37 @@ const ALL_INCOTERMS = new Set([
   "EXW", "FCA", "FAS", "FOB", "CFR", "CIF", "CPT", "CIP", "DAP", "DPU", "DDP",
 ]);
 
+/* ── What the named place MEANS, per rule ───────────────────────────────────
+   This is the distinction that makes "FOB Chittagong" wrong rather than
+   merely odd. Under FOB the named place is the port where the goods are put
+   ON BOARD — the SELLER's port. Naming the buyer's port instead says, in
+   ICC's own vocabulary, that the seller carries the goods all the way to
+   Bangladesh and loads them there. A bank or a buyer reading it literally
+   would be entitled to hold Koleex to exactly that.
+
+   Caught on a live contract by an outside reader (2026-08-25) after our own
+   checker passed it: it knew "no named place" and "EXW with ports", and had
+   no idea the place could be the WRONG one. */
+export const PLACE_IS_ORIGIN = new Set(["EXW", "FCA", "FAS", "FOB"]);
+export const PLACE_IS_DESTINATION = new Set(["CFR", "CIF", "CPT", "CIP", "DAP", "DPU", "DDP"]);
+
+/** Loose match — "Ningbo, China" vs "ningbo,  china" is the same port. */
+function samePlace(a?: string, b?: string): boolean {
+  if (!a || !b) return false;
+  const norm = (v: string) => v.toLowerCase().replace(/[\s,.\-]+/g, " ").trim();
+  return norm(a) === norm(b);
+}
+
+/** Any warranty stated in a goods description, in MONTHS. Reads "5 years",
+    "5 YEARS", "24 months", "12 mo". */
+export function warrantyMonthsInText(text: string): number | null {
+  const m = /(\d+)\s*(years?|yrs?|months?|mos?)\b/i.exec(text);
+  if (!m) return null;
+  const n = Number(m[1]);
+  if (!Number.isFinite(n) || n <= 0) return null;
+  return /^y/i.test(m[2]) ? n * 12 : n;
+}
+
 /** Terms whose whole point is that the bank pays against documents. */
 const DOCUMENTARY = new Set(["lc", "dp", "da"]);
 
@@ -50,6 +81,11 @@ export interface CheckableTerms extends ContractContext {
   containerType?: string;
   documents?: string[];
   specialConditions?: string[];
+  /* The goods as they will PRINT. The checker has to see them: a contract
+     whose articles promise 12 months while every line of its own schedule
+     says "Warranty: 5 YEARS" contradicts itself on one page, and no amount
+     of checking the terms object alone can find that. */
+  goods?: { description?: string }[];
 }
 
 /** Does this payment term actually produce a payment before production?
@@ -94,6 +130,50 @@ export function checkContract(t: CheckableTerms): Finding[] {
       message: `"${incoterm}" without a named place is incomplete — the rule only works with one.`,
       fix: `Name the place: "${incoterm} ${SELLER_CARRIES.has(incoterm) ? "Chittagong" : "Ningbo"}", for example.`,
     });
+  }
+
+  /* ── The named place must be on the rule's OWN side ── */
+  if (incoterm && t.incotermPlace) {
+    if (PLACE_IS_ORIGIN.has(incoterm) && samePlace(t.incotermPlace, t.dischargePort)) {
+      add({
+        id: "place-is-destination-on-origin-term",
+        severity: "error",
+        field: "incotermPlace",
+        message: `"${incoterm} ${t.incotermPlace}" names the port of DISCHARGE. Under ${incoterm} the named place is where the Seller hands the goods over — the port of loading.`,
+        fix: `Write "${incoterm} ${t.loadingPort || "the port of loading"}". ${t.incotermPlace} is the port of discharge, and naming it here says the Seller carries the goods there at its own cost and risk.`,
+      });
+    }
+    if (PLACE_IS_DESTINATION.has(incoterm) && samePlace(t.incotermPlace, t.loadingPort)) {
+      add({
+        id: "place-is-origin-on-destination-term",
+        severity: "error",
+        field: "incotermPlace",
+        message: `"${incoterm} ${t.incotermPlace}" names the port of LOADING. Under ${incoterm} the Seller pays carriage to the named place, so it must be the destination.`,
+        fix: `Write "${incoterm} ${t.dischargePort || "the port of discharge"}".`,
+      });
+    }
+  }
+
+  /* ── The goods must not promise a different warranty from the articles ── */
+  if (t.warrantyMonths != null && t.warrantyMonths > 0) {
+    const stated = new Set<number>();
+    for (const g of t.goods ?? []) {
+      const m = warrantyMonthsInText(g.description ?? "");
+      if (m != null) stated.add(m);
+    }
+    const conflicting = [...stated].filter((m) => m !== t.warrantyMonths);
+    if (conflicting.length > 0) {
+      const asText = conflicting
+        .map((m) => (m % 12 === 0 ? `${m / 12} year${m / 12 === 1 ? "" : "s"}` : `${m} months`))
+        .join(" / ");
+      add({
+        id: "warranty-conflicts-with-goods",
+        severity: "error",
+        field: "warrantyMonths",
+        message: `The warranty article says ${t.warrantyMonths} months, but the goods on this contract are described as carrying ${asText}. The document contradicts itself on one page.`,
+        fix: `Set the warranty to match what the goods actually carry, or remove the period from the item descriptions. A buyer holding both will rely on the longer one.`,
+      });
+    }
   }
 
   /* ── Payment shape against the delivery clock ── */

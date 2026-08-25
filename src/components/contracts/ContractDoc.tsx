@@ -203,7 +203,25 @@ export default function ContractDoc({ id }: { id: string }) {
 
   /* Runs on every keystroke — pure, no I/O, and the whole point is that the
      warning appears while the mistake is being made, not at signature. */
-  const findings = useMemo(() => (signed ? [] : checkContract(terms)), [terms, signed]);
+  /* The goods go IN to the checker. Without them it cannot see that the
+     articles promise 12 months while every line of the schedule says
+     "Warranty: 5 YEARS" — a contradiction on one page that reading the terms
+     object alone can never find. Taken from the same place the paper takes
+     them, so what is checked is what prints. */
+  const goodsForCheck = useMemo(
+    () => {
+      const raw = (invoice?.doc as { items?: unknown } | undefined)?.items;
+      return Array.isArray(raw)
+        ? (raw as { description?: string }[]).map((it) => ({ description: it.description }))
+        : [];
+    },
+    [invoice],
+  );
+
+  const findings = useMemo(
+    () => (signed ? [] : checkContract({ ...terms, goods: goodsForCheck })),
+    [terms, goodsForCheck, signed],
+  );
   const flaggedFields = useMemo(() => new Set(findings.map((f) => f.field).filter(Boolean) as string[]), [findings]);
   const cannotSign = blocksSignature(findings);
 

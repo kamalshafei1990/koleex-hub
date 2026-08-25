@@ -71,6 +71,46 @@ check("containers on FOB draw the ICC's own advice",
 check("containers on FCA do not",
   !has({ ...CLEAN, incoterm: "FCA", incotermPlace: "Ningbo", containerType: "1 x 40HQ" }, "container-on-sea-term"));
 
+/* ── The named place must be on the rule's own side ──────────────────────
+   Found by an outside reader on a LIVE contract that our checker had passed:
+   it printed "FOB Chittagong, Bangladesh" — the buyer's port on a rule whose
+   named place is the seller's. Read literally that obliges Koleex to carry
+   the goods to Bangladesh at its own cost. */
+console.log("\nThe named place");
+check("FOB naming the DISCHARGE port is an error",
+  has({ ...CLEAN, incotermPlace: "Chittagong, Bangladesh" }, "place-is-destination-on-origin-term"));
+check("FOB naming the loading port is silent",
+  !has({ ...CLEAN, incotermPlace: "Ningbo, China" }, "place-is-destination-on-origin-term"));
+check("matching ignores case and punctuation",
+  has({ ...CLEAN, incotermPlace: "chittagong  bangladesh" }, "place-is-destination-on-origin-term"));
+check("CIF naming the LOADING port is an error",
+  has({ ...CLEAN, incoterm: "CIF", incotermPlace: "Ningbo, China" }, "place-is-origin-on-destination-term"));
+check("CIF naming the discharge port is silent",
+  !has({ ...CLEAN, incoterm: "CIF", incotermPlace: "Chittagong, Bangladesh",
+         documents: [...CLEAN.documents!, "Insurance Certificate"] }, "place-is-origin-on-destination-term"));
+check("EXW naming the seller's own place is silent",
+  !has({ ...CLEAN, incoterm: "EXW", incotermPlace: "Taizhou, China", loadingPort: undefined, dischargePort: undefined },
+       "place-is-destination-on-origin-term"));
+check("a place matching NEITHER port raises nothing — we cannot know",
+  !ids({ ...CLEAN, incotermPlace: "Shanghai, China" }).some((i) => i.startsWith("place-is-")));
+
+/* ── The goods must not promise a different warranty ─────────────────── */
+console.log("\nWarranty against the goods");
+const G = (d: string) => [{ description: d }];
+check("goods saying 5 YEARS against a 12-month article is an error",
+  has({ ...CLEAN, warrantyMonths: 12, goods: G("Overlock sewing machine · Brand: KOLEEX · Warranty: 5 YEARS") },
+      "warranty-conflicts-with-goods"));
+check("goods saying 5 years against a 60-month article is SILENT",
+  !has({ ...CLEAN, warrantyMonths: 60, goods: G("Warranty: 5 years") }, "warranty-conflicts-with-goods"));
+check("months in the description are read as months",
+  has({ ...CLEAN, warrantyMonths: 12, goods: G("Warranty: 24 months") }, "warranty-conflicts-with-goods"));
+check("goods with no warranty mentioned are silent",
+  !has({ ...CLEAN, warrantyMonths: 12, goods: G("Overlock sewing machine, 4 threads") }, "warranty-conflicts-with-goods"));
+check("no goods at all is silent",
+  !has({ ...CLEAN, warrantyMonths: 12 }, "warranty-conflicts-with-goods"));
+check("a stray number that is not a duration is ignored",
+  !has({ ...CLEAN, warrantyMonths: 12, goods: G("Cutting machine size: 10 Inches (750W)") }, "warranty-conflicts-with-goods"));
+
 console.log("\nInsurance");
 const CIF: CheckableTerms = { ...CLEAN, incoterm: "CIF", incotermPlace: "Chittagong, Bangladesh" };
 check("CIF states the 110% Clauses (C) minimum", has(CIF, "insurance-level"));
