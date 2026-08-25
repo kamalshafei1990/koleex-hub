@@ -24,7 +24,7 @@
    change, and a draft must follow corrections made to the invoice.
    --------------------------------------------------------------------------- */
 
-import { memo } from "react";
+import { Fragment, memo, useEffect, useState } from "react";
 import { articlesFor, type RenderedArticle } from "@/lib/contracts/general-terms";
 import KoleexWordmark from "@/components/brand/KoleexWordmark";
 import DocumentBrandStrips, { KOLEEX_COMPANY } from "@/components/brand/DocumentBrandStrips";
@@ -165,7 +165,10 @@ const COVER_HEAD_PX = 118;       // wordmark + document title
 const BRAND_STRIPS_PX = 51;      // company line + tagline
 const STATUS_BAND_PX = 26;       // DRAFT / SUPERSEDED / CANCELLED band
 const META_STRIP_PX = 56;        // date · contract no · invoice no · client no
-const PARTIES_PX = 157;          // the two party cards
+/* The two party cards. 184px measured with a four-line address and the full
+   CONTACT PERSON / PHONE / EMAIL / WEB set; budgeted at 210 because a longer
+   buyer address is normal and a cover that overflows is clipped in silence. */
+const PARTIES_PX = 210;
 const PREAMBLE_PX = 32;          // "This Contract is made on …"
 const SECTION_BAR_PX = 25;       // one black section heading
 const TABLE_HEAD_PX = 34;        // the goods table's own head row
@@ -181,7 +184,7 @@ const FOOT_PX = 26;              // page-number footer on every sheet
    signature box, which is ~150px taller than the bare rules it replaced —
    budgeted, or the signatures get pushed past the sheet edge and clipped the
    way Key Terms were. */
-const SIGN_BLOCK_PX = 400;
+const SIGN_BLOCK_PX = 470;
 const CHARS_PER_LINE = 148;      // 10px text across ~738px of inner width
 const LINE_PX = 15;
 const ART_TITLE_PX = 16;
@@ -299,11 +302,48 @@ function paginate(
      sheet, which then still repeats the identity strip and the page number. */
   const last = sheets[sheets.length - 1];
   const needed = SIGN_BLOCK_PX + (specialCount > 0 ? 40 + specialCount * 18 : 0);
-  if (last.isFirst || budget < needed) {
-    sheets.push({ articles: [], isFirst: false, isLast: true });
-  } else {
+
+  /* ⚠️ Recompute what is actually left on that sheet. The running `budget`
+     was reset by the last flush() and then invalidated again by the balancing
+     pass, so testing against it measured an EMPTY sheet — the signatures were
+     placed under five articles as though nothing were above them, and 6.8 mm
+     of the block was clipped away. Measure the sheet that will hold them. */
+  const lastSheetUsed = last.articles.reduce((n, a) => n + articleHeight(a.body), 0);
+  const lastSheetBudget =
+    (last.isFirst ? SHEET_INNER_PX - FOOT_PX : SHEET_INNER_PX - CONT_HEAD_PX - FOOT_PX) -
+    (last.keyTerms ? SECTION_BAR_PX + 7 * KEY_TERM_ROW_PX + BLOCK_GAP_PX : 0);
+  const roomOnLast = lastSheetBudget - lastSheetUsed;
+
+  if (!last.isFirst && roomOnLast >= needed) {
     last.isLast = true;
+    return sheets;
   }
+
+  /* No room. A signature sheet still must not be bare, so it BORROWS the
+     trailing articles from the sheet above rather than starting empty — move
+     articles down until the signatures fit above them, and the new sheet
+     carries real terms over the signatures the way a contract should. */
+  const signSheet: Sheet = { articles: [], isFirst: false, isLast: true };
+  const perSheet = SHEET_INNER_PX - CONT_HEAD_PX - FOOT_PX;
+  let signRoom = perSheet - needed;
+
+  /* Take only what the signature sheet NEEDS to stop being bare — two
+     articles. Filling it to the brim empties the sheet above instead:
+     borrowing greedily left that one at a single article above a page of
+     white, which just moves the hole rather than closing it. */
+  const MIN_ARTICLES_OVER_SIGNATURES = 2;
+  if (!last.isFirst) {
+    while (last.articles.length > 1 && signSheet.articles.length < MIN_ARTICLES_OVER_SIGNATURES) {
+      const candidate = last.articles[last.articles.length - 1];
+      const h = articleHeight(candidate.body);
+      if (h > signRoom) break;
+      last.articles.pop();
+      signSheet.articles.unshift(candidate);
+      signRoom -= h;
+    }
+  }
+
+  sheets.push(signSheet);
   return sheets;
 }
 
@@ -503,19 +543,28 @@ function ContractA4Inner(props: ContractA4Props) {
         <PartyCard
           label="Seller"
           name={KOLEEX_COMPANY.en}
-          lines={[KOLEEX_COMPANY.address, `Tel ${KOLEEX_COMPANY.tel}`, KOLEEX_COMPANY.web]}
+          address={KOLEEX_COMPANY.address}
+          fields={[
+            { label: "Phone", value: KOLEEX_COMPANY.tel, mono: true },
+            { label: "Web", value: KOLEEX_COMPANY.web },
+          ]}
         />
         <PartyCard
           label="Buyer"
           name={buyer.company || buyer.name || "—"}
-          lines={[
-            buyer.company && buyer.name ? `Attn: ${buyer.name}` : "",
-            buyer.address || "",
-            [buyer.phone, buyer.email].filter(Boolean).join("  ·  "),
-            /* Bangladesh clears against an ACID number; it belongs on the
-               contract for the same reason it belongs on the invoice. */
-            buyer.acid ? `ACID No: ${buyer.acid}` : "",
-          ].filter(Boolean)}
+          address={buyer.address}
+          fields={[
+            /* Same field set and the same order as the invoice's card, so the
+               two papers read alike side by side. Blank rows drop out rather
+               than printing an empty label. */
+            { label: "Contact person", value: buyer.company ? buyer.name : undefined },
+            { label: "Phone", value: buyer.phone, mono: true },
+            { label: "Email", value: buyer.email },
+            { label: "Web", value: buyer.website },
+            /* Bangladesh clears against an ACID number; Egypt-only in
+               practice, and it simply does not render when absent. */
+            { label: "ACID No.", value: buyer.acid, mono: true },
+          ]}
         />
       </div>
 
@@ -684,56 +733,57 @@ function ContractA4Inner(props: ContractA4Props) {
                   breakInside: "avoid",
                 }}
               >
-                <SignBlock role="For and on behalf of the SELLER" party={KOLEEX_COMPANY.en}>
-                  {/* The seal sits INSIDE the seller's block, over the rule it
-                      is signed above — where a company chop actually goes. */}
-                  <div style={{ display: "flex", gap: 10, alignItems: "flex-end", marginBottom: 6 }}>
-                    {/* The seal is a FIXED 40mm square — the legal diameter of
-                        a Chinese company chop. Without flexShrink:0 the
-                        signature's `width: 100%` squeezed it to 26.6 × 40,
-                        which is not a circle and not 40 mm. It gets its width
-                        first; the signature takes whatever is left. */}
-                    <div style={{ flex: "0 0 40mm", width: "40mm" }}>
-                      <StampSignatureBox
-                        imageUrl={terms.stampUrl}
-                        placeholder="Company seal"
-                        aspectSquare
-                        isEditable={props.isEditable && !!props.onClearStamp}
-                        onClear={props.onClearStamp}
-                      />
+                <SignBlock
+                  role="For and on behalf of the SELLER"
+                  party={KOLEEX_COMPANY.en}
+                  seal={
+                    /* The seal is a FIXED 40mm square — the legal diameter of
+                       a Chinese company chop. Without flex:0 0 40mm the
+                       signature's `width: 100%` squeezed it to 26.6 × 40,
+                       which is not a circle and not 40 mm. */
+                    <div style={{ display: "flex", gap: 10, alignItems: "center", marginBottom: 10 }}>
+                      <div style={{ flex: "0 0 40mm", width: "40mm" }}>
+                        <StampSignatureBox
+                          imageUrl={terms.stampUrl}
+                          placeholder="Company seal"
+                          aspectSquare
+                          isEditable={props.isEditable && !!props.onClearStamp}
+                          onClear={props.onClearStamp}
+                        />
+                      </div>
+                      <div style={{ flex: "1 1 auto", minWidth: 0 }}>
+                        <StampSignatureBox
+                          imageUrl={terms.signatureUrl}
+                          placeholder="Signature"
+                          isEditable={props.isEditable && !!props.onClearSignature}
+                          onClear={props.onClearSignature}
+                        />
+                      </div>
                     </div>
-                    <div style={{ flex: "1 1 auto", minWidth: 0 }}>
-                      <StampSignatureBox
-                        imageUrl={terms.signatureUrl}
-                        placeholder="Signature"
-                        isEditable={props.isEditable && !!props.onClearSignature}
-                        onClear={props.onClearSignature}
-                      />
-                    </div>
-                  </div>
-                  {props.isEditable && (
-                    /* One row PER control, not both on one line. The four
-                       buttons measure 439px against the 331px the seller's
-                       block gives them, so a single flex row wrapped and the
-                       overflow landed on top of the Name / Title rules
-                       underneath. Stacked, each pair keeps its own line and
-                       the block grows predictably instead. */
-                    <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
-                      <StampSignatureActions
-                        label="Seal"
-                        savedUrl={props.savedStampUrl ?? null}
-                        onUseSaved={props.onAttachSavedStamp}
-                        onUpload={props.onUploadStamp}
-                      />
-                      <StampSignatureActions
-                        label="Signature"
-                        savedUrl={props.savedSignatureUrl ?? null}
-                        onUseSaved={props.onAttachSavedSignature}
-                        onUpload={props.onUploadSignature}
-                      />
-                    </div>
-                  )}
-                </SignBlock>
+                  }
+                  controls={
+                    props.isEditable ? (
+                      /* One row PER control. The four buttons measure 439px
+                         against the 331px this block gives them, so a single
+                         flex row wrapped and the overflow landed on the rules
+                         underneath. */
+                      <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
+                        <StampSignatureActions
+                          label="Seal"
+                          savedUrl={props.savedStampUrl ?? null}
+                          onUseSaved={props.onAttachSavedStamp}
+                          onUpload={props.onUploadStamp}
+                        />
+                        <StampSignatureActions
+                          label="Signature"
+                          savedUrl={props.savedSignatureUrl ?? null}
+                          onUseSaved={props.onAttachSavedSignature}
+                          onUpload={props.onUploadSignature}
+                        />
+                      </div>
+                    ) : undefined
+                  }
+                />
                 <SignBlock role="For and on behalf of the BUYER" party={buyerName} />
               </div>
 
@@ -833,7 +883,25 @@ function MetaCell({
   );
 }
 
-function PartyCard({ label, name, lines }: { label: string; name: string; lines: string[] }) {
+/* The party card, laid out exactly as the quotation and invoice lay theirs
+   out: the name in bold, the address as its own block, then a 105px label
+   column against the structured fields. The contract used to run them all
+   together as anonymous grey lines — a reader could not tell a mobile from a
+   landline, and the layout did not match the invoice sitting beside it in the
+   same email. 105px is the width the invoice uses; it is what fits
+   "CONTACT PERSON" on one line. */
+function PartyCard({
+  label,
+  name,
+  address,
+  fields,
+}: {
+  label: string;
+  name: string;
+  address?: string;
+  fields: { label: string; value?: string; mono?: boolean }[];
+}) {
+  const shown = fields.filter((f) => (f.value ?? "").trim());
   return (
     <div style={{ border: `1px solid ${T.border}`, borderRadius: 12, overflow: "hidden" }}>
       <div
@@ -851,11 +919,39 @@ function PartyCard({ label, name, lines }: { label: string; name: string; lines:
       </div>
       <div style={{ padding: "10px 14px" }}>
         <div style={{ fontSize: 11, fontWeight: 700, color: T.ink, marginBottom: 4 }}>{name}</div>
-        {lines.map((l, i) => (
-          <div key={i} style={{ fontSize: 9.5, color: T.inkSoft, lineHeight: 1.5 }}>
-            {l}
+        {address ? (
+          <div style={{ fontSize: 9.5, color: T.inkSoft, lineHeight: 1.5, marginBottom: 6, whiteSpace: "pre-line" }}>
+            {address}
           </div>
-        ))}
+        ) : null}
+        {shown.length > 0 && (
+          <div style={{ display: "grid", gridTemplateColumns: "105px 1fr", rowGap: 3, columnGap: 8, fontSize: 9.5 }}>
+            {shown.map((f) => (
+              <Fragment key={f.label}>
+                <span
+                  style={{
+                    color: T.inkGhost,
+                    fontWeight: 600,
+                    textTransform: "uppercase",
+                    letterSpacing: "0.05em",
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  {f.label}
+                </span>
+                <span
+                  style={{
+                    color: T.ink,
+                    fontFamily: f.mono ? T.mono : undefined,
+                    letterSpacing: f.mono ? "0.02em" : undefined,
+                  }}
+                >
+                  {f.value}
+                </span>
+              </Fragment>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );
@@ -940,14 +1036,25 @@ function FactRow({ k, v, last }: { k: string; v: string; last?: boolean }) {
   );
 }
 
+/* The signature block, in the order a person signs it: who is signing, then
+   the marks they make, then the lines they fill in by hand.
+
+   The controls used to sit BETWEEN the marks and the rules, which read as
+   though "Use saved seal" belonged to the Name / Title line under it. They
+   are now last, separated by a hairline, and they carry `no-print` so the
+   signed paper shows only seal, signature and rules. */
 function SignBlock({
   role,
   party,
-  children,
+  seal,
+  controls,
 }: {
   role: string;
   party: string;
-  children?: React.ReactNode;
+  /** The seal + signature row. Absent on the buyer's block — they sign by hand. */
+  seal?: React.ReactNode;
+  /** Editor-only actions, rendered under a divider and never printed. */
+  controls?: React.ReactNode;
 }) {
   return (
     <div style={{ border: `1px solid ${T.border}`, borderRadius: 12, overflow: "hidden" }}>
@@ -965,14 +1072,27 @@ function SignBlock({
         {role}
       </div>
       <div style={{ padding: "12px 14px" }}>
-        <div style={{ fontSize: 10.5, fontWeight: 700, marginBottom: children ? 8 : 28 }}>{party}</div>
-        {children}
+        <div style={{ fontSize: 10.5, fontWeight: 700, marginBottom: seal ? 10 : 28 }}>{party}</div>
+
+        {seal}
+
+        {/* The rules the signatory completes. On the seller's side they sit
+            below the marks; on the buyer's they are the whole block. */}
         <div style={{ borderTop: `1px solid ${T.ink}`, paddingTop: 5, fontSize: 9.5, color: T.inkSoft }}>
           Name / Title
         </div>
         <div style={{ marginTop: 14, borderTop: `1px solid ${T.ink}`, paddingTop: 5, fontSize: 9.5, color: T.inkSoft }}>
           Date &amp; company stamp
         </div>
+
+        {controls ? (
+          <div
+            className="no-print"
+            style={{ marginTop: 12, paddingTop: 10, borderTop: `1px dashed ${T.border}` }}
+          >
+            {controls}
+          </div>
+        ) : null}
       </div>
     </div>
   );
