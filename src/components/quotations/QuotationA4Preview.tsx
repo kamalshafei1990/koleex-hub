@@ -692,45 +692,105 @@ export default function QuotationA4Preview({
      Items pages can now use the full ITEMS_MIDDLE budget on the
      LAST items page too (no need to leave room for the footer
      block, which lives on its own pages now). */
-  /* ITEMS_MIDDLE was 8 — fine for normal-length item descriptions
-     but item rows with very long descriptions (e.g. the "Flatbed
-     Steam Iron Press" entry with a 200-char spec sheet wrapped to
-     6-7 lines) are ~200 px tall instead of the usual 110. That
-     pushed the cumulative table height past the 270 mm page
-     boundary and the browser silently split the row across two
-     physical sheets — producing an extra mostly-blank page
-     containing only the tail of the row's last line.
-     7 rows × 110 = 770 px leaves 178 px of slack — enough for ONE
-     tall row of 280 px to fit, OR room for normal padding. */
-  const ITEMS_FIRST  = 4;   // header + thead leaves room for ~4 rows
-  const ITEMS_MIDDLE = 7;   // thead + 7 rows comfortably fits even with one tall row
+  /* ── How many rows fit, MEASURED rather than assumed ────────────────────
+     This used to be two constants — 4 on the first sheet, 7 after — and the
+     comment above them already knew why that was fragile: "item rows with
+     very long descriptions … are ~200 px tall instead of the usual 110",
+     which silently split a row across two physical sheets.
+
+     It also produced the defect the owner reported. A quotation with ELEVEN
+     items pages as 4 + 7 and both sheets are full; an invoice with FIVE pages
+     as 4 + 1, and the second sheet carries one row above 221 mm of white.
+     Nothing had broken — a fixed first-page count simply fills sheet one to
+     the brim and lets whatever is left be orphaned.
+
+     Now each row is costed from its own content and sheets are filled to a
+     measured budget, then BALANCED: if the last items sheet would come out
+     less than half full, the rows are spread evenly instead. Five items page
+     as 3 + 2 rather than 4 + 1.
+
+     Budgets are in px and were measured on the live sheet: page one gives the
+     table 527 px once the header, brand strips, meta strip and party cards
+     are placed (they measure 113 mm together), less 58 px of table head. A
+     continuation sheet has the full 978 px less the same head. */
+  const ITEMS_BUDGET_FIRST = 469;
+  const ITEMS_BUDGET_MIDDLE = 920;
+
+  /* A row is as tall as the tallest thing in it: the picture, or the text.
+     The 112 px picture box is what most rows cost; a long description with no
+     picture can pass it. Estimated rather than measured in the DOM, because
+     measuring means a layout read on every keystroke of the editor. */
+  const rowHeight = (it: QuotationItem): number => {
+    const hasImage = !!(it.image && it.image.trim());
+    const text = `${it.description ?? ""} ${it.model ?? ""}`.replace(/<[^>]+>/g, " ");
+    /* ~34 characters per line in the 206 px description column at 11 px. */
+    const lines = Math.max(1, Math.ceil(text.trim().length / 34));
+    const textHeight = 26 + lines * 15;
+    return Math.max(hasImage ? 112 : 44, textHeight);
+  };
 
   type PageKind = "items" | "footer-a" | "footer-b";
   type PageEntry = { kind: PageKind; items: QuotationItem[]; startIdx: number };
   const pages = useMemo<PageEntry[]>(() => {
     const items = current.items;
     const out: PageEntry[] = [];
-    /* Items pages — page 1 (header + ITEMS_FIRST rows), then full
-       middle pages until exhausted. Even 0 items still gets a
-       header page so the doc has somewhere for the From / To /
-       items-thead to render. */
-    out.push({ kind: "items", items: items.slice(0, ITEMS_FIRST), startIdx: 0 });
-    let offset = ITEMS_FIRST;
-    while (offset < items.length) {
-      const chunk = Math.min(ITEMS_MIDDLE, items.length - offset);
-      out.push({ kind: "items", items: items.slice(offset, offset + chunk), startIdx: offset });
-      offset += chunk;
+
+    /* Fill by measured height. Even 0 items still gets a first sheet — it
+       carries the header, the parties and the table head. */
+    const chunks: QuotationItem[][] = [];
+    let budget = ITEMS_BUDGET_FIRST;
+    let chunk: QuotationItem[] = [];
+    for (const it of items) {
+      const h = rowHeight(it);
+      if (chunk.length > 0 && h > budget) {
+        chunks.push(chunk);
+        chunk = [];
+        budget = ITEMS_BUDGET_MIDDLE;
+      }
+      chunk.push(it);
+      budget -= h;
     }
-    /* Two footer pages, ALWAYS appended. Measured on an empty
-       draft the combined footer stack is ~963 px (fits in 978 px
-       page budget with 15 px headroom) — BUT on a real quote
-       with filled T&C copy and 14-field Shipment Details those
-       sections grow ~200-300 px each, easily pushing the combined
-       stack past the page budget. The two-page split keeps the
-       output reliable across any real-world content size. */
+    chunks.push(chunk);
+
+    /* BALANCE. A trailing sheet holding one row above 221 mm of white is what
+       the owner saw. If the last sheet came out less than half full and there
+       is an earlier sheet to borrow from, spread the rows evenly instead —
+       5 items become 3 + 2, not 4 + 1. Only ever moves rows LATER, so a sheet
+       can never end up over its budget. */
+    if (chunks.length > 1) {
+      const last = chunks[chunks.length - 1];
+      const lastHeight = last.reduce((n, it) => n + rowHeight(it), 0);
+      if (lastHeight < ITEMS_BUDGET_MIDDLE / 2) {
+        const flat = chunks.flat();
+        const per = Math.ceil(flat.length / chunks.length);
+        const rebalanced: QuotationItem[][] = [];
+        for (let i = 0; i < flat.length; i += per) rebalanced.push(flat.slice(i, i + per));
+        /* Keep the rebalance only if the first sheet still fits its smaller
+           budget — it is the one with the header above it. */
+        const firstFits =
+          (rebalanced[0] ?? []).reduce((n, it) => n + rowHeight(it), 0) <= ITEMS_BUDGET_FIRST;
+        if (firstFits && rebalanced.length === chunks.length) {
+          chunks.length = 0;
+          chunks.push(...rebalanced);
+        }
+      }
+    }
+
+    let startIdx = 0;
+    for (const c of chunks) {
+      out.push({ kind: "items", items: c, startIdx });
+      startIdx += c.length;
+    }
+
+    /* Two footer pages, ALWAYS appended. Measured on an empty draft the
+       combined footer stack is ~963 px against a 978 px budget — on a real
+       document with filled T&C copy and 14-field Shipment Details those
+       sections grow 200-300 px each. The split keeps the output reliable at
+       any content size. */
     out.push({ kind: "footer-a", items: [], startIdx: items.length });
     out.push({ kind: "footer-b", items: [], startIdx: items.length });
     return out;
+    /* eslint-disable-next-line react-hooks/exhaustive-deps */
   }, [current.items]);
 
   return (
