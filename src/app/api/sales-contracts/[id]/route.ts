@@ -105,6 +105,22 @@ export async function GET(req: Request, { params }: Params) {
   });
 }
 
+/** The buyer exactly as the invoice document states them. */
+function liveBuyerFromDoc(doc: Record<string, unknown>): Record<string, string> | null {
+  const str = (k: string) => (typeof doc[k] === "string" ? (doc[k] as string).trim() : "");
+  const buyer: Record<string, string> = {
+    name: str("customerName"),
+    company: str("companyName"),
+    address: str("toAddress"),
+    email: str("toEmail"),
+    phone: str("toPhone") || str("toMobile"),
+    website: str("toWebsite"),
+    acid: str("toAcid"),
+    clientNo: str("clientNo"),
+  };
+  return Object.values(buyer).some(Boolean) ? buyer : null;
+}
+
 /** Everything a signed contract must keep, independent of every live row. */
 function buildSnapshot(args: {
   contract: Record<string, unknown>;
@@ -129,7 +145,13 @@ function buildSnapshot(args: {
     seller: {
       name: "Koleex International Corporation Taizhou Co., Ltd.",
     },
-    buyer: terms.buyer ?? {},
+    /* The buyer as the INVOICE states them at this instant, not the copy
+       taken when the contract was first drafted. A contract drafted before
+       the invoice's buyer block was corrected would otherwise freeze the old
+       name and address into the signed record — which is the one place a
+       stale copy can never be fixed afterwards. Falls back to the stored
+       terms only if the invoice is gone. */
+    buyer: liveBuyerFromDoc(doc) ?? terms.buyer ?? {},
 
     /* The commercial schedule, copied out of the invoice at this instant. */
     schedule: {

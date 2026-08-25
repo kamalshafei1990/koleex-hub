@@ -289,7 +289,24 @@ function ContractA4Inner(props: ContractA4Props) {
 
   const terms = (frozen?.terms ?? props.terms) as ContractTerms;
   const articles: RenderedArticle[] = frozen?.articles ?? articlesFor(terms);
-  const buyer = (frozen?.buyer ?? terms.buyer ?? {}) as Record<string, string | undefined>;
+  /* ── The buyer, from the LIVE invoice while this is a draft ──────────────
+     The header of this file already promised it: "a draft must follow
+     corrections made to the invoice". The goods did. The BUYER did not — it
+     was copied into `terms` at creation and never looked at again, so a
+     contract drafted before the invoice's buyer block was corrected kept the
+     old name, the old address and the old client number forever.
+
+     Caught on live data: the invoice reads "Freeland Industries Ltd. /
+     BD-1250 / MIR MANSION … Bakalia, Chattogram", the contract printed
+     "Freeland Industry / 1250 / Rajakhali, Chittagong", and an AMENDMENT
+     raised four minutes after the invoice was corrected inherited the stale
+     copy too, because it starts from the contract it amends.
+
+     Signed still wins from the snapshot — that is the whole point of
+     freezing. `terms.buyer` stays as the last-resort fallback for a contract
+     whose invoice has since been deleted. */
+  const invoiceBuyer = liveBuyer(props.invoice);
+  const buyer = (frozen?.buyer ?? invoiceBuyer ?? terms.buyer ?? {}) as Record<string, string | undefined>;
 
   const items: ScheduleItem[] = frozen ? frozen.schedule.items : invoiceItems(props.invoice);
   const currency = frozen?.currency ?? props.currency ?? props.invoice?.currency ?? "";
@@ -302,10 +319,21 @@ function ContractA4Inner(props: ContractA4Props) {
 
   return (
     <>
+      {/* ── Why this rule exists ────────────────────────────────────────────
+          The sheet is a flex column so the page-number footer can sit at the
+          bottom with `margin-top: auto`. Flex children default to
+          `flex-shrink: 1`, so when a sheet's content came close to full the
+          browser started SQUEEZING blocks to make them fit — and the first
+          thing to give was the grey tagline strip, which printed with
+          "SHAPING THE FUTURE." sliced off along the bottom.
+
+          Nothing on a contract may be compressed to fit; if it does not fit,
+          it belongs on the next sheet. */}
+      <style>{`.kx-contract-sheet > * { flex-shrink: 0; }`}</style>
       {sheets.map((sheet, i) => (
         <div
           key={i}
-          className="quot-a4-doc"
+          className="quot-a4-doc kx-contract-sheet"
           /* Geometry comes from `.quot-a4-doc` in globals.css — 210 × 270 mm
              fixed, the same sheet the quotation and invoice print on. Nothing
              here overrides height: a document that sets its own paper size is
@@ -589,6 +617,25 @@ function ContractA4Inner(props: ContractA4Props) {
       ))}
     </>
   );
+}
+
+/** The buyer as the invoice states them RIGHT NOW. Returns null when the
+    invoice is gone or carries no buyer, so the caller can fall back. */
+function liveBuyer(inv: InvoiceLite | null): Record<string, string | undefined> | null {
+  const doc = (inv?.doc ?? null) as Record<string, unknown> | null;
+  if (!doc) return null;
+  const str = (k: string) => (typeof doc[k] === "string" ? (doc[k] as string).trim() || undefined : undefined);
+  const buyer = {
+    name: str("customerName"),
+    company: str("companyName"),
+    address: str("toAddress"),
+    email: str("toEmail"),
+    phone: str("toPhone") || str("toMobile"),
+    website: str("toWebsite"),
+    acid: str("toAcid"),
+    clientNo: str("clientNo"),
+  };
+  return Object.values(buyer).some(Boolean) ? buyer : null;
 }
 
 function invoiceItems(inv: InvoiceLite | null): ScheduleItem[] {
