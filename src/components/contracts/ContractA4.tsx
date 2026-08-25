@@ -545,7 +545,11 @@ function ContractA4Inner(props: ContractA4Props) {
           name={KOLEEX_COMPANY.en}
           address={KOLEEX_COMPANY.address}
           fields={[
+            /* The same four rows, in the same order, that the quotation and
+               invoice print for the seller. */
             { label: "Phone", value: KOLEEX_COMPANY.tel, mono: true },
+            { label: "Mobile", value: KOLEEX_COMPANY.mobile, mono: true },
+            { label: "Email", value: KOLEEX_COMPANY.email },
             { label: "Web", value: KOLEEX_COMPANY.web },
           ]}
         />

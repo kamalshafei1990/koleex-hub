@@ -367,8 +367,41 @@ export default function ContractDoc({ id }: { id: string }) {
      surviving wrappers impose their own heights on the page box, which is
      the "pages don't fit, lots of empty pages" the owner saw. Invoices hit
      exactly this and solved it the same way. */
-  const handlePrint = useCallback(() => {
+  const handlePrint = useCallback(async () => {
     if (!row) return;
+
+    /* ── SAVE FIRST ────────────────────────────────────────────────────────
+       The print route reads the contract from the SERVER. Anything attached
+       in this editor and not yet saved — a seal, a signature, an edited term
+       — does not exist as far as that route is concerned, so it silently
+       prints without them. The owner hit exactly this: "in the PDF the stamp
+       and signature didn't show", because "Use saved seal" attaches to the
+       screen and Save is a separate button.
+
+       A signed contract is immutable, so there is nothing to save for one. */
+    if (!signed) {
+      const saved = await patch({ terms });
+      if (!saved) return; // patch() has already surfaced the error
+    }
+
+    /* ── NAME THE FILE ─────────────────────────────────────────────────────
+       The browser's Save-as-PDF dialog takes its filename from THIS window's
+       title, not the iframe's — the print page sets its own title and the
+       dialog never sees it, which is why the saved file came out named after
+       whatever the host tab was called. Set it here, restore on afterprint. */
+    const prevTitle = document.title;
+    const buyer = (terms.buyer?.company || terms.buyer?.name || "").trim();
+    document.title = [buyer, row.contract_no].filter(Boolean).join(" - ");
+    const restore = () => {
+      document.title = prevTitle;
+      window.removeEventListener("afterprint", restore);
+    };
+    window.addEventListener("afterprint", restore);
+
+    /* Through a HIDDEN IFRAME pointing at /contracts/<id>/print, never
+       window.print() on this window: printing the editor drags the Hub layout
+       into the print pass and the surviving wrappers impose their own heights
+       on the page box. */
     const FRAME_ID = "koleex-contract-print-frame";
     let frame = document.getElementById(FRAME_ID) as HTMLIFrameElement | null;
     if (!frame) {
@@ -384,7 +417,6 @@ export default function ContractDoc({ id }: { id: string }) {
          invisible iframes when printing. */
       document.body.appendChild(frame);
     }
-    /* Cache-bust so a second print always reloads fresh server data. */
     frame.src = `/contracts/${encodeURIComponent(row.id)}/print?_t=${Date.now()}`;
     const onLoad = () => {
       frame!.removeEventListener("load", onLoad);
@@ -400,7 +432,7 @@ export default function ContractDoc({ id }: { id: string }) {
       ready();
     };
     frame.addEventListener("load", onLoad);
-  }, [row]);
+  }, [row, signed, terms, patch]);
 
   const handleDelete = useCallback(async () => {
     if (!row) return;
@@ -564,7 +596,7 @@ export default function ContractDoc({ id }: { id: string }) {
         )}
 
         <button
-          onClick={handlePrint}
+          onClick={() => void handlePrint()}
           className="inline-flex items-center gap-1.5 px-3 py-2 text-sm text-[var(--text-secondary)] bg-[var(--bg-surface)] hover:bg-[var(--bg-inverted)]/[0.1] rounded-lg transition"
         >
           <PrintIcon size={14} />

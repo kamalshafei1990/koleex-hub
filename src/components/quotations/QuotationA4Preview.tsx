@@ -34,7 +34,7 @@ import ArrowUpIcon from "@/components/icons/ui/ArrowUpIcon";
 import ArrowDownIcon from "@/components/icons/ui/ArrowDownIcon";
 import TrashIcon from "@/components/icons/ui/TrashIcon";
 import KoleexWordmark from "@/components/brand/KoleexWordmark";
-import DocumentBrandStrips from "@/components/brand/DocumentBrandStrips";
+import DocumentBrandStrips, { KOLEEX_COMPANY } from "@/components/brand/DocumentBrandStrips";
 import { checkTradeDocument } from "@/lib/contracts/contradictions";
 import BoldIcon from "@/components/icons/ui/BoldIcon";
 import ItalicIcon from "@/components/icons/ui/ItalicIcon";
@@ -1170,13 +1170,13 @@ export default function QuotationA4Preview({
                 }}
               >
                 <span style={{ color: T.inkGhost, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em" }}>{L("party.phone")}</span>
-                <span style={{ fontFamily: T.mono, letterSpacing: "0.02em", color: T.ink }}>+86 0576 8892 7796</span>
+                <span style={{ fontFamily: T.mono, letterSpacing: "0.02em", color: T.ink }}>{KOLEEX_COMPANY.tel}</span>
                 <span style={{ color: T.inkGhost, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em" }}>{L("party.mobile")}</span>
-                <span style={{ fontFamily: T.mono, letterSpacing: "0.02em", color: T.ink }}>+86 130 7380 0720</span>
+                <span style={{ fontFamily: T.mono, letterSpacing: "0.02em", color: T.ink }}>{KOLEEX_COMPANY.mobile}</span>
                 <span style={{ color: T.inkGhost, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em" }}>{L("party.email")}</span>
-                <span style={{ color: T.ink }}>info@koleexgroup.com</span>
+                <span style={{ color: T.ink }}>{KOLEEX_COMPANY.email}</span>
                 <span style={{ color: T.inkGhost, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em" }}>{L("party.web")}</span>
-                <span style={{ color: T.ink }}>www.koleexgroup.com</span>
+                <span style={{ color: T.ink }}>{KOLEEX_COMPANY.web}</span>
               </div>
             </div>
           </div>
