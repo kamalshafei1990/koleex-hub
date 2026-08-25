@@ -730,7 +730,14 @@ export default function QuotationA4Preview({
   };
 
   type PageKind = "items" | "footer-a" | "footer-b";
-  type PageEntry = { kind: PageKind; items: QuotationItem[]; startIdx: number };
+  type PageEntry = {
+    kind: PageKind;
+    items: QuotationItem[];
+    startIdx: number;
+    /* An items sheet that also carries the totals / T&C block below its
+       table, instead of that block taking a sheet of its own. */
+    withFooterA?: boolean;
+  };
   const pages = useMemo<PageEntry[]>(() => {
     const items = current.items;
     const out: PageEntry[] = [];
@@ -782,12 +789,33 @@ export default function QuotationA4Preview({
       startIdx += c.length;
     }
 
-    /* Two footer pages, ALWAYS appended. Measured on an empty draft the
-       combined footer stack is ~963 px against a 978 px budget — on a real
-       document with filled T&C copy and 14-field Shipment Details those
-       sections grow 200-300 px each. The split keeps the output reliable at
-       any content size. */
-    out.push({ kind: "footer-a", items: [], startIdx: items.length });
+    /* ── Footer-A rides the last items sheet when it fits ──────────────────
+       The two footer sheets stay SPLIT from each other: measured on the live
+       document, footer-A is 131 mm and footer-B is 138 mm, so together they
+       are 269.8 mm against a 270 mm sheet — they miss by 0.2 mm, and the
+       original comment here was right to separate them.
+
+       But footer-A does not need a sheet of its own. INV2026-0010 pages as
+       3 + 2 items, and that second items sheet has 191 mm of white below the
+       table while footer-A sits alone on the next one above 214 mm of it.
+       Dropping footer-A onto the last items sheet when the measured room is
+       there saves a whole page and touches nothing about how the goods are
+       drawn.
+
+       FOOTER_A_PX is deliberately generous: the T&C copy and the 14-field
+       Shipment Details grow with real content, and a footer that overflows
+       its sheet is far worse than one that took its own page. */
+    const FOOTER_A_PX = 560;
+    const lastItemsSheet = out[out.length - 1];
+    const usedOnLast = lastItemsSheet.items.reduce((n, it) => n + rowHeight(it), 0);
+    const budgetOnLast = out.length === 1 ? ITEMS_BUDGET_FIRST : ITEMS_BUDGET_MIDDLE;
+    const footerAFitsWithItems = items.length > 0 && budgetOnLast - usedOnLast >= FOOTER_A_PX;
+
+    if (!footerAFitsWithItems) {
+      out.push({ kind: "footer-a", items: [], startIdx: items.length });
+    } else {
+      lastItemsSheet.withFooterA = true;
+    }
     out.push({ kind: "footer-b", items: [], startIdx: items.length });
     return out;
     /* eslint-disable-next-line react-hooks/exhaustive-deps */
@@ -816,7 +844,10 @@ export default function QuotationA4Preview({
       const pageItems    = page.items;
       const startItemIdx = page.startIdx;
       const isItemsPage  = page.kind === "items";
-      const isFooterA    = page.kind === "footer-a";
+      /* Footer-A renders on its own sheet OR under the last items table,
+         whichever the measurement chose. Everything downstream reads this
+         flag, so the block itself did not have to change. */
+      const isFooterA    = page.kind === "footer-a" || page.withFooterA === true;
       const isFooterB    = page.kind === "footer-b";
       /* True on the LAST page that actually has item rows — used to
          render the items-table tfoot summary (Total qty / Total
