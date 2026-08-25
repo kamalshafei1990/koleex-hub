@@ -179,6 +179,42 @@ function paginate(articles: RenderedArticle[], specialCount: number): Sheet[] {
   }
   if (current.length > 0) flush();
 
+  /* BALANCE — the same rule the quotation and invoice now use. A trailing
+     sheet holding one article above a page of white is the defect the owner
+     reported on the invoice; a contract can produce it just as easily when
+     the article count lands a little past a boundary. If the last articles
+     sheet came out less than half full and there is an earlier sheet to
+     borrow from, spread them evenly instead.
+
+     Only ever moves articles LATER, and the first articles sheet is checked
+     against the same budget it was filled with, so nothing can end up over. */
+  const articleSheets = sheets.filter((sh) => !sh.isFirst);
+  if (articleSheets.length > 1) {
+    const heights = articles.reduce<Record<string, number>>((acc, a) => {
+      acc[a.key] = articleHeight(a.body);
+      return acc;
+    }, {});
+    const lastHeight = articleSheets[articleSheets.length - 1].articles.reduce(
+      (n, a) => n + (heights[a.key] ?? 0),
+      0,
+    );
+    const perSheet = SHEET_INNER_PX - CONT_HEAD_PX - FOOT_PX;
+    if (lastHeight < perSheet / 2) {
+      const flat = articleSheets.flatMap((sh) => sh.articles);
+      const per = Math.ceil(flat.length / articleSheets.length);
+      const rebalanced: RenderedArticle[][] = [];
+      for (let i = 0; i < flat.length; i += per) rebalanced.push(flat.slice(i, i + per));
+      const allFit = rebalanced.every(
+        (group) => group.reduce((n, a) => n + (heights[a.key] ?? 0), 0) <= perSheet,
+      );
+      if (allFit && rebalanced.length === articleSheets.length) {
+        articleSheets.forEach((sh, i) => {
+          sh.articles = rebalanced[i] ?? [];
+        });
+      }
+    }
+  }
+
   /* The signatures must not be marooned on a sheet of their own with nothing
      above them — a signature page that carries no terms is the classic way a
      signed page gets attached to a document nobody agreed to. Keep them with
