@@ -28,7 +28,20 @@ import {
   PLACE_IS_DESTINATION,
 } from "@/lib/contracts/contradictions";
 
-const MODULE = "Invoices";
+/* Contracts is its own permission module, not a rider on Invoices.
+
+   It rode Invoices while a contract was only reachable FROM an invoice —
+   anyone who could see the bill could see what was agreed on it. Now that
+   contracts are an app of their own, that reasoning no longer holds: a
+   signed agreement carries the arbitration seat, the warranty exposure and
+   the payment security, and "may raise an invoice" is not the same decision
+   as "may read every contract Koleex has signed".
+
+   Deny-by-default meant switching would have locked out the 24 roles that
+   hold Invoices, so the module was SEEDED from Invoices on the day it
+   shipped (scripts/seed-contracts-module.mts) — same access as before, now
+   on a dial that can be turned down independently. */
+const MODULE = "Contracts";
 
 /* Every payment term hangs off a master category whose `code` is already
    exactly the shape the articles branch on. Read the code, never the label:
@@ -74,6 +87,23 @@ async function contractNumberFor(tenantId: string, dealNo: number): Promise<stri
   throw new Error(`Deal ${dealNo} already has 999 contracts.`);
 }
 
+/* ── The list payload ──────────────────────────────────────────────────────
+   NEVER `select("*")` for a list. `terms` is the whole negotiated agreement
+   and `snapshot` is the entire rendered contract; a twenty-row list that
+   shipped both would be megabytes to draw a table of numbers and names.
+
+   The buyer is read three ways because a contract can be missing any one of
+   them: the order carries a denormalised customer name, the terms carry the
+   buyer block the document actually prints, and `->>` extracts just that
+   text server-side rather than hauling the jsonb across to find it. */
+const LIST_COLUMNS =
+  `id, contract_no, deal_no, status, currency, total, contract_date,
+   signed_at, created_at, updated_at, amends_id, invoice_id, order_id,
+   buyer_company:terms->buyer->>company,
+   buyer_name:terms->buyer->>name,
+   orders:order_id ( customer_name, company_name, customer_code ),
+   invoices:invoice_id ( inv_no )`;
+
 export async function GET(req: Request) {
   const auth = await requireAuth();
   if (auth instanceof NextResponse) return auth;
@@ -81,18 +111,92 @@ export async function GET(req: Request) {
   if (deny) return deny;
 
   const url = new URL(req.url);
-  let q = supabaseServer
-    .from("sales_contracts")
-    .select("*")
-    .eq("tenant_id", auth.tenant_id)
-    .order("created_at", { ascending: false });
+
+  /* Invoices that could still be contracted — what the Contracts app offers
+     when you ask for a new contract. A contract is always raised FROM an
+     invoice, so this is the only honest way to start one from here.
+
+     Invoices that ALREADY have a contract stay in the list rather than being
+     filtered out: picking one opens the contract it has, which is what
+     somebody hunting for "the contract for INV-0009" actually wants. The
+     row says which. */
+  if (url.searchParams.get("candidates")) {
+    const [{ data: invoices, error }, { data: taken }] = await Promise.all([
+      /* The buyer is read out of `doc`, NOT off a customer join.
+         `invoices.customer_id` is null on every invoice raised through the
+         editor — the buyer is typed onto the document and lives in
+         doc.companyName / doc.customerName, which is also what the invoice
+         PRINTS. A join here returned null on all eight real invoices and the
+         picker would have listed eight rows of numbers with no names on them.
+         `->>` extracts the two strings server-side; the doc blob itself,
+         which carries embedded product images, never leaves the database. */
+      supabaseServer
+        .from("invoices")
+        .select(
+          `id, inv_no, deal_no, status, currency, total, issue_date,
+           doc_company:doc->>companyName, doc_person:doc->>customerName,
+           doc_code:doc->>clientNo`,
+        )
+        .eq("tenant_id", auth.tenant_id)
+        .order("issue_date", { ascending: false })
+        .limit(200),
+      supabaseServer
+        .from("sales_contracts")
+        .select("invoice_id, id, contract_no")
+        .eq("tenant_id", auth.tenant_id),
+    ]);
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+    const byInvoice = new Map<string, { id: string; contract_no: string }>();
+    for (const c of taken ?? []) {
+      const row = c as { invoice_id: string | null; id: string; contract_no: string };
+      /* First wins — the query is unordered, but any contract on the invoice
+         is a truthful answer to "this one is already contracted". */
+      if (row.invoice_id && !byInvoice.has(row.invoice_id)) {
+        byInvoice.set(row.invoice_id, { id: row.id, contract_no: row.contract_no });
+      }
+    }
+
+    return NextResponse.json({
+      invoices: (invoices ?? []).map((inv) => {
+        const row = inv as Record<string, unknown>;
+        return {
+          id: row.id as string,
+          inv_no: row.inv_no as string | null,
+          deal_no: row.deal_no as number | null,
+          status: row.status as string | null,
+          currency: row.currency as string | null,
+          total: row.total as number | null,
+          issue_date: row.issue_date as string | null,
+          party:
+            [row.doc_company, row.doc_person, row.doc_code]
+              .map((v) => (typeof v === "string" ? v.trim() : ""))
+              .find(Boolean) ?? null,
+          contract: byInvoice.get(row.id as string) ?? null,
+        };
+      }),
+    });
+  }
 
   const id = url.searchParams.get("id");
   const invoiceId = url.searchParams.get("invoice_id");
   const orderId = url.searchParams.get("order_id");
+
+  /* A lookup by id / invoice / order is a document read — the caller wants
+     the contract itself, terms and all. A bare GET is the app's list, and
+     gets the slim shape. Two different questions, two different payloads. */
+  const lookup = Boolean(id || invoiceId || orderId);
+
+  let q = supabaseServer
+    .from("sales_contracts")
+    .select(lookup ? "*" : LIST_COLUMNS)
+    .eq("tenant_id", auth.tenant_id)
+    .order("created_at", { ascending: false });
+
   if (id) q = q.eq("id", id);
   if (invoiceId) q = q.eq("invoice_id", invoiceId);
   if (orderId) q = q.eq("order_id", orderId);
+  if (!lookup) q = q.limit(Number(url.searchParams.get("limit") ?? 300));
 
   const { data, error } = await q;
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });

@@ -62,6 +62,7 @@ export const hubT: Translations = {
   "app.crm":             { en: "CRM",              zh: "客户管理",          ar: "إدارة العملاء" },
   "app.quotations":      { en: "Quotations",       zh: "报价单",            ar: "عروض الأسعار" },
   "app.invoices":        { en: "Invoices",         zh: "发票",              ar: "الفواتير" },
+  "app.contracts":       { en: "Contracts",        zh: "销售合同",          ar: "العقود" },
   "app.orders":          { en: "Orders",           zh: "订单",              ar: "الأوردرات" },
   "app.price-calculator":{ en: "Price Calculator",  zh: "价格计算器",        ar: "حاسبة الأسعار" },
   "app.customers":       { en: "Customers",        zh: "客户",              ar: "العملاء" },

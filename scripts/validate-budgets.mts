@@ -89,6 +89,12 @@ const ROUTE_BUDGETS: Record<string, { chunks: number; kbytes: number }> = {
      fewer, fatter chunks from unrelated shared-module churn; +5 KB tripped
      the old line). Measured + headroom. */
   "commercial-policy": { chunks: 9, kbytes: 700 },
+  /* Measured 9 chunks / 504 KB the day the app shipped, +12%. Sits with
+     contacts (508) and crm (514): almost all of it is the shared baseline,
+     which is the expected shape for one list plus one dialog. The CONTRACT
+     itself is not in this number — the paper lives on /contracts/[id],
+     which is a separate route with its own manifest. */
+  "contracts": { chunks: 10, kbytes: 564 },
   "contacts": { chunks: 10, kbytes: 508 },
   "crm": { chunks: 10, kbytes: 514 },
   "customers": { chunks: 10, kbytes: 515 },

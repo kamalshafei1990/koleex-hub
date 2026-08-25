@@ -25,7 +25,20 @@ import { supabaseServer } from "@/lib/server/supabase-server";
 import { requireAuth, requireModuleAccess, requireModuleAction } from "@/lib/server/auth";
 import { articlesFor, TERMS_VERSION, type ContractContext } from "@/lib/contracts/general-terms";
 
-const MODULE = "Invoices";
+/* Contracts is its own permission module, not a rider on Invoices.
+
+   It rode Invoices while a contract was only reachable FROM an invoice —
+   anyone who could see the bill could see what was agreed on it. Now that
+   contracts are an app of their own, that reasoning no longer holds: a
+   signed agreement carries the arbitration seat, the warranty exposure and
+   the payment security, and "may raise an invoice" is not the same decision
+   as "may read every contract Koleex has signed".
+
+   Deny-by-default meant switching would have locked out the 24 roles that
+   hold Invoices, so the module was SEEDED from Invoices on the day it
+   shipped (scripts/seed-contracts-module.mts) — same access as before, now
+   on a dial that can be turned down independently. */
+const MODULE = "Contracts";
 
 type Params = { params: Promise<{ id: string }> };
 

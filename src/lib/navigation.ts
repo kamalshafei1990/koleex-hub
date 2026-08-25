@@ -30,6 +30,7 @@ import SuppliersIcon from "@/components/icons/SuppliersIcon";
 import ContactsIcon from "@/components/icons/ContactsIcon";
 import InvoicesIcon from "@/components/icons/InvoicesIcon";
 import OrdersIcon from "@/components/icons/OrdersIcon";
+import ContractIcon from "@/components/icons/ui/ContractIcon";
 import LandedCostIcon from "@/components/icons/LandedCostIcon";
 import CatalogsIcon from "@/components/icons/CatalogsIcon";
 import DocumentsIcon from "@/components/icons/DocumentsIcon";
@@ -216,6 +217,12 @@ export const APP_REGISTRY: AppDef[] = [
   { id: "crm",              tKey: "app.crm",              name: "CRM",               icon: CrmIcon,       route: "/crm",              active: true  },
   { id: "quotations",       tKey: "app.quotations",       name: "Quotations",        icon: QuotationIcon, route: "/quotations",       active: true  },
   { id: "invoices",         tKey: "app.invoices",         name: "Invoices",          icon: InvoicesIcon,  route: "/invoices",         active: true  },
+  /* A sales contract used to be reachable ONLY from the invoice it was
+     raised on, which answered "what did we agree on THIS invoice" and no
+     other question. It is an app because the questions people actually
+     ask are "what have we signed", "what is waiting for signature" and
+     "where is KL-CN-12351". */
+  { id: "contracts",        tKey: "app.contracts",        name: "Contracts",         icon: ContractIcon,  route: "/contracts",        active: true,  newSince: "2026-08-25" },
   { id: "orders",           tKey: "app.orders",           name: "Orders",            icon: OrdersIcon,    route: "/orders",           active: true,  newSince: "2026-08-24" },
   { id: "customers",        tKey: "app.customers",        name: "Customers",         icon: CustomersIcon, route: "/customers",        active: true  },
   { id: "suppliers",        tKey: "app.suppliers",        name: "Suppliers",         icon: SuppliersIcon, route: "/suppliers",        active: true  },
@@ -306,7 +313,7 @@ export const SIDEBAR_GROUPS: SidebarGroup[] = [
     tKey: "cat.commercial",
     label: "Commercial",
     icon: CommercialSidebarIcon,
-    appIds: ["customers", "suppliers", "quotations", "invoices", "orders", "sales", "crm", "contacts", "markets", "price-calculator", "website"],
+    appIds: ["customers", "suppliers", "quotations", "invoices", "contracts", "orders", "sales", "crm", "contacts", "markets", "price-calculator", "website"],
   },
   {
     id: "finance",

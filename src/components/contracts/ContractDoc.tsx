@@ -29,6 +29,7 @@ import ContractA4 from "./ContractA4";
    import PackingListDoc uses. */
 import { PRINT_AND_DOC_STYLES } from "@/components/quotations/Quotations";
 import OrdersIcon from "@/components/icons/OrdersIcon";
+import InvoicesIcon from "@/components/icons/InvoicesIcon";
 import ScaleIcon from "@/components/icons/ui/ScaleIcon";
 import { checkContract, blocksSignature, type Finding } from "@/lib/contracts/contradictions";
 import type { ContractRef, ContractRow, ContractTerms, InvoiceLite } from "./types";
@@ -438,7 +439,7 @@ export default function ContractDoc({ id }: { id: string }) {
     if (!row) return;
     if (!window.confirm(`Delete ${row.contract_no}? This cannot be undone.`)) return;
     const res = await fetch(`/api/sales-contracts/${id}`, { method: "DELETE" });
-    if (res.ok) router.push(row.invoice_id ? "/invoices" : "/");
+    if (res.ok) router.push("/contracts");
     else {
       const json = (await res.json()) as { error?: string };
       setSaveError(json.error ?? "Could not delete.");
@@ -452,10 +453,10 @@ export default function ContractDoc({ id }: { id: string }) {
         <div className="text-center">
           <div className="text-[var(--text-primary)] font-semibold mb-2">{loadError}</div>
           <button
-            onClick={() => router.push("/invoices")}
+            onClick={() => router.push("/contracts")}
             className="px-4 py-2 text-sm rounded-lg bg-[var(--bg-surface)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition"
           >
-            Back to Invoices
+            Back to Contracts
           </button>
         </div>
       </div>
@@ -486,12 +487,17 @@ export default function ContractDoc({ id }: { id: string }) {
           flexWrap: "wrap",
         }}
       >
+        {/* Back goes to the app this document BELONGS to. It used to go to
+            Invoices, because Invoices was the only way in — which meant Back
+            took you somewhere you had never been whenever the contract was
+            opened from anywhere else. The invoice is still one click away,
+            as its own chip below. */}
         <button
-          onClick={() => router.push(row.invoice_id ? "/invoices" : "/")}
+          onClick={() => router.push("/contracts")}
           className="inline-flex items-center gap-1.5 px-3 py-2 text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] bg-[var(--bg-surface)] hover:bg-[var(--bg-inverted)]/[0.1] rounded-lg transition"
         >
           <ArrowLeftIcon size={15} />
-          Invoice
+          Contracts
         </button>
 
         <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-[var(--bg-surface)]">
@@ -506,6 +512,19 @@ export default function ContractDoc({ id }: { id: string }) {
         {/* The deal this contract belongs to. Every document of an order can
             be reached from every other; a contract that only knew its invoice
             would be a dead end. */}
+        {/* The invoice this contract was raised from — `?doc=` is what the
+            Invoices editor reads to open one directly. */}
+        {row.invoice_id ? (
+          <button
+            onClick={() => router.push(`/invoices?doc=${row.invoice_id}`)}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] text-[var(--text-secondary)] bg-[var(--bg-surface)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-inverted)]/[0.1] transition"
+            title="Open the invoice this contract was raised from"
+          >
+            <InvoicesIcon size={13} />
+            <span className="font-mono">{invoice?.inv_no ?? "Invoice"}</span>
+          </button>
+        ) : null}
+
         {row.order_id ? (
           <button
             onClick={() => router.push(`/orders/${row.order_id}`)}
