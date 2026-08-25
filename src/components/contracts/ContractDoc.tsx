@@ -254,6 +254,34 @@ export default function ContractDoc({ id }: { id: string }) {
 
   const signed = row?.status === "signed";
 
+  /* ── When a signed contract no longer matches its invoice ────────────────
+     A signed contract renders from its frozen snapshot and must never follow
+     the invoice — that is the whole point of freezing. But the screen gave no
+     hint that the two had diverged, so a contract frozen on a buyer block
+     that was later corrected looks simply WRONG, with nothing to say why.
+
+     This is not hypothetical: KL-CN-12355 was signed while the buyer copy was
+     stale, so it carries "Freeland Industry / 1250" for good while the
+     invoice reads "Freeland Industries Ltd. / BD-1250".
+
+     Comparing only the fields a reader would notice on the face of the
+     document. The contract is NOT changed — a signed record cannot be — the
+     screen just stops the divergence being a mystery. */
+  const frozenDivergence = useMemo(() => {
+    if (!row?.snapshot || !invoice?.doc) return null;
+    const b = (row.snapshot.buyer ?? {}) as Record<string, string | undefined>;
+    const d = invoice.doc as Record<string, unknown>;
+    const str = (k: string) => (typeof d[k] === "string" ? (d[k] as string).trim() : "");
+    const diffs: string[] = [];
+    const cmp = (label: string, was: string | undefined, now: string) => {
+      if (now && (was ?? "").trim() !== now) diffs.push(`${label}: “${(was ?? "—").trim()}” → “${now}”`);
+    };
+    cmp("Company", b.company, str("companyName"));
+    cmp("Client no", b.clientNo, str("clientNo"));
+    cmp("Address", b.address, str("toAddress"));
+    return diffs.length ? diffs : null;
+  }, [row?.snapshot, invoice]);
+
   /* Runs on every keystroke — pure, no I/O, and the whole point is that the
      warning appears while the mistake is being made, not at signature. */
   /* The goods go IN to the checker. Without them it cannot see that the
@@ -558,6 +586,26 @@ export default function ContractDoc({ id }: { id: string }) {
           A reader who opens a retired contract must not have to work out that
           it is retired, and a reader of an amendment must be able to see what
           it changes. Both states say so on the page, above everything else. */}
+      {frozenDivergence && (
+        <div className="no-print px-4 pt-3">
+          <div
+            className="flex flex-col gap-1.5 rounded-xl border px-3.5 py-2.5"
+            style={{ background: "rgba(245,158,11,0.09)", borderColor: "rgba(245,158,11,0.32)" }}
+          >
+            <span className="text-[12.5px] text-[var(--text-primary)]">
+              This contract was signed with the buyer details as they stood then. The invoice has been
+              corrected since, and a signed contract cannot be changed — raise an amendment to carry the
+              new details.
+            </span>
+            {frozenDivergence.map((d) => (
+              <span key={d} className="text-[11.5px] text-[var(--text-secondary)] font-mono">
+                {d}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+
       {(replacedBy || amends) && (
         <div className="no-print px-4 pt-3 flex flex-col gap-2">
           {replacedBy && (
