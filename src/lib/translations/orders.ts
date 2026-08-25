@@ -20,6 +20,12 @@ export const ordersT: Translations = {
   "status.closed":    { en: "Closed",    zh: "已完成", ar: "مقفول" },
   "status.cancelled": { en: "Cancelled", zh: "已取消", ar: "ملغي" },
 
+  /* ── the KPI band ── */
+  "kpi.orders":       { en: "Orders",    zh: "订单",   ar: "الأوردرات" },
+  "kpi.open":         { en: "Open",      zh: "进行中", ar: "المفتوحة" },
+  "kpi.value":        { en: "Value",     zh: "总金额", ar: "القيمة" },
+  "kpi.documents":    { en: "Documents", zh: "单据",   ar: "المستندات" },
+
   "search.placeholder": { en: "Search by order number, customer or code",
                           zh: "按订单号、客户或编号搜索",
                           ar: "دوّر برقم الأوردر أو العميل أو الكود" },
@@ -32,6 +38,14 @@ export const ordersT: Translations = {
   "doc.purchaseOrders": { en: "Purchase orders", zh: "采购订单", ar: "أوامر الشراء" },
   "action.raisePo":   { en: "Raise purchase order", zh: "创建采购订单", ar: "اعمل أمر شراء" },
   "doc.none":         { en: "No documents yet", zh: "暂无单据", ar: "مفيش مستندات لسه" },
+
+  /* ── the goods on the deal ── */
+  "goods.title":       { en: "Goods on this deal", zh: "本单货物", ar: "بضاعة الصفقة" },
+  "goods.description": { en: "Description", zh: "货物描述", ar: "الوصف" },
+  "goods.model":       { en: "Model",       zh: "型号",   ar: "الموديل" },
+  "goods.qty":         { en: "Qty",         zh: "数量",   ar: "الكمية" },
+  "goods.unitPrice":   { en: "Unit price",  zh: "单价",   ar: "سعر الوحدة" },
+  "goods.amount":      { en: "Amount",      zh: "金额",   ar: "الإجمالي" },
 
   /* ── empty and error ── */
   "empty.title":      { en: "No orders yet", zh: "暂无订单", ar: "مفيش أوردرات لسه" },

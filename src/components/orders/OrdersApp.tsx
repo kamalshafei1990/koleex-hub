@@ -26,6 +26,7 @@ import AppHomeMenu from "@/components/ui/AppHomeMenu";
 import Button from "@/components/ui/Button";
 import OrdersIcon from "@/components/icons/OrdersIcon";
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
+import SharedKpiCard from "@/components/ui/KpiCard";
 import QuotationIcon from "@/components/icons/QuotationIcon";
 import InvoicesIcon from "@/components/icons/InvoicesIcon";
 import ContractIcon from "@/components/icons/ui/ContractIcon";
@@ -87,6 +88,30 @@ export default function OrdersApp() {
     return c;
   }, [rows]);
 
+  /* One line per currency — a deal in CNY and a deal in USD do not add up,
+     and a single figure that pretended they did would be worse than none. */
+  const totalsByCurrency = useMemo(() => {
+    const sums = new Map<string, number>();
+    for (const r of rows ?? []) {
+      if (r.status === "cancelled") continue;
+      const cur = r.currency ?? "";
+      sums.set(cur, (sums.get(cur) ?? 0) + Number(r.total ?? 0));
+    }
+    return [...sums.entries()]
+      .sort((a, b) => b[1] - a[1])
+      .map(([cur, n]) => `${cur} ${Math.round(n).toLocaleString()}`.trim());
+  }, [rows]);
+
+  const docCount = useMemo(
+    () =>
+      Object.values(docs).reduce(
+        (n, d) =>
+          n + d.quotations.length + d.invoices.length + d.contracts.length + d.packingLists.length + d.purchaseOrders.length,
+        0,
+      ),
+    [docs],
+  );
+
   const visible = useMemo(() => {
     const q = query.trim().toLowerCase();
     return (rows ?? []).filter((r) => {
@@ -105,7 +130,10 @@ export default function OrdersApp() {
        the frost, permanently veiled but still clickable, which is worse than
        broken because nothing looks wrong enough to report. */
     <div className="min-h-full">
-      <div className="mx-auto w-full max-w-6xl px-4 pt-12 pb-16 sm:px-6">
+      {/* max-w-[1500px] is the Hub shell width. max-w-6xl (1152) left a third
+          of a wide display empty — the owner's standing rule is that a page
+          fits the screen it is on. */}
+      <div className="mx-auto w-full max-w-[1500px] px-4 pt-12 pb-8 sm:px-6 lg:px-8">
         <PageHeader
           title={t("app.title")}
           subtitle={t("app.subtitle")}
@@ -113,7 +141,24 @@ export default function OrdersApp() {
           showTabs={false}
         />
 
-        <div className="mt-5 mb-3">
+        {/* What the deals add up to. A list of five rows on a tall screen
+            leaves the lower half black no matter how wide the rows are; the
+            fix is to give the space something worth reading, not to stretch
+            the rows. Value is summed PER CURRENCY — adding USD to CNY would
+            be a number that means nothing. */}
+        <div className="mt-5 grid grid-cols-2 gap-2.5 sm:gap-3 lg:grid-cols-4">
+          <SharedKpiCard label={t("kpi.orders")} value={String(counts.all)} icon="file" />
+          <SharedKpiCard label={t("kpi.open")} value={String(counts.open)} icon="clock" tone="info" />
+          <SharedKpiCard
+            label={t("kpi.value")}
+            value={totalsByCurrency[0] ?? "—"}
+            hint={totalsByCurrency.length > 1 ? totalsByCurrency.slice(1).join("  ·  ") : undefined}
+            icon="money"
+          />
+          <SharedKpiCard label={t("kpi.documents")} value={String(docCount)} icon="document" />
+        </div>
+
+        <div className="mt-4 mb-3">
           <AppHomeMenu
             searchPlaceholder={t("search.placeholder")}
             onSearchSubmit={setQuery}

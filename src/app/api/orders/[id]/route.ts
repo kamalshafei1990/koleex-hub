@@ -70,8 +70,42 @@ export async function GET(req: Request, { params }: Params) {
       : Promise.resolve({ data: null }),
   ]);
 
+  /* The goods on the deal, taken from its LATEST invoice — what was actually
+     sold, so a commercial invoice supersedes the proforma it replaced.
+
+     Extracted HERE and reduced to four fields per line. The invoice's `doc`
+     blob carries embedded product images and runs to megabytes; an order
+     screen needs a description and a quantity, never the payload. */
+  let goods: { description: string; model: string; qty: number; price: number }[] = [];
+  let goodsFrom: string | null = null;
+  {
+    const { data: withDoc } = await supabaseServer
+      .from("invoices")
+      .select("inv_no, doc")
+      .eq("order_id", id)
+      .order("issue_date", { ascending: false })
+      .limit(1);
+    const inv = withDoc?.[0] as { inv_no: string | null; doc: Record<string, unknown> | null } | undefined;
+    const items = Array.isArray(inv?.doc?.items) ? (inv!.doc!.items as Record<string, unknown>[]) : [];
+    if (items.length > 0) {
+      goodsFrom = inv?.inv_no ?? null;
+      goods = items.map((it) => ({
+        /* Every tag becomes a space — deleting them welds words together. */
+        description:
+          typeof it.description === "string"
+            ? it.description.replace(/<[^>]+>/g, " ").replace(/&nbsp;/g, " ").replace(/&amp;/g, "&").replace(/\s+/g, " ").trim()
+            : "",
+        model: typeof it.model === "string" ? it.model : "",
+        qty: Number(it.qty ?? 0) || 0,
+        price: Number(it.unitPrice ?? 0) || 0,
+      }));
+    }
+  }
+
   return NextResponse.json({
     order,
+    goods,
+    goodsFrom,
     quotations: quotations.data ?? [],
     invoices: invoices.data ?? [],
     contracts: contracts.data ?? [],

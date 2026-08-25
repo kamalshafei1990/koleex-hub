@@ -66,6 +66,8 @@ interface Payload {
   contracts: (OrderDocSummary & { contract_no?: string; contract_date?: string })[];
   packingLists: (OrderDocSummary & { doc_no?: string; issue_date?: string })[];
   purchaseOrders: (OrderDocSummary & { po_no?: string; order_date?: string })[];
+  goods: { description: string; model: string; qty: number; price: number }[];
+  goodsFrom: string | null;
   customer: OrderCustomer | null;
 }
 
@@ -90,6 +92,8 @@ export default function OrderDetail({ id }: { id: string }) {
         contracts: json.contracts ?? [],
         packingLists: json.packingLists ?? [],
         purchaseOrders: json.purchaseOrders ?? [],
+        goods: json.goods ?? [],
+        goodsFrom: json.goodsFrom ?? null,
         customer: json.customer ?? null,
       });
     } catch {
@@ -104,7 +108,7 @@ export default function OrderDetail({ id }: { id: string }) {
   if (error) {
     return (
       <div className="min-h-full">
-        <div className="mx-auto w-full max-w-4xl px-4 pt-12 sm:px-6">
+        <div className="mx-auto w-full max-w-[1500px] px-4 pt-12 sm:px-6 lg:px-8">
           <div className={`${CARD} p-8 text-center`}>
             <p className="text-[var(--text-secondary)]">{error}</p>
             <div className="mt-4">
@@ -130,7 +134,7 @@ export default function OrderDetail({ id }: { id: string }) {
 
   return (
     <div className="min-h-full">
-      <div className="mx-auto w-full max-w-4xl px-4 pt-12 pb-16 sm:px-6">
+      <div className="mx-auto w-full max-w-[1500px] px-4 pt-12 pb-16 sm:px-6 lg:px-8">
         <PageHeader
           title={order.order_no}
           subtitle={orderParty(order)}
@@ -139,11 +143,18 @@ export default function OrderDetail({ id }: { id: string }) {
           backLabel={t("detail.back")}
           showTabs={false}
           action={
-            <span
-              className={`inline-flex items-center h-[26px] px-3 rounded-full border text-[11.5px] font-semibold ${STATUS_BADGE[order.status]}`}
-            >
-              {t(`status.${order.status}`)}
-            </span>
+            <div className="flex items-center gap-2">
+              <span
+                className={`inline-flex items-center h-[26px] px-3 rounded-full border text-[11.5px] font-semibold ${STATUS_BADGE[order.status]}`}
+              >
+                {t(`status.${order.status}`)}
+              </span>
+              {/* Sourcing acts on the DEAL, not on any one document, so it
+                  belongs with the order's own controls. */}
+              <Button variant="secondary" onClick={() => setRaisingPo(true)}>
+                {t("action.raisePo")}
+              </Button>
+            </div>
           }
         />
 
@@ -181,7 +192,10 @@ export default function OrderDetail({ id }: { id: string }) {
         ) : null}
 
         {/* ── The documents ── */}
-        <div className="mt-6 flex flex-col gap-5">
+        {/* Two columns from lg up — five short groups stacked in a single
+            column on a 1500px shell is the same wasted screen the list had.
+            Base stays one column, so narrow screens are unaffected. */}
+        <div className="mt-6 grid grid-cols-1 gap-5 lg:grid-cols-2 lg:items-start">
           <DocGroup
             title={t("doc.quotations")}
             icon={<QuotationIcon size={14} />}
@@ -251,14 +265,59 @@ export default function OrderDetail({ id }: { id: string }) {
             hrefFor={() => "/purchase/orders"}
           />
 
-          {/* Sourcing is an ACTION on the deal, not a document of it, so it
-              sits after the paperwork rather than among it. */}
-          <div>
-            <Button variant="secondary" onClick={() => setRaisingPo(true)}>
-              {t("action.raisePo")}
-            </Button>
-          </div>
         </div>
+
+        {/* ── What the deal is actually FOR ──
+            Two document chips do not fill a 1500px screen, and stretching
+            them would not make the page more useful. The goods do: reading
+            an order used to mean opening its invoice to find out what was
+            sold. Taken from the deal's latest invoice, so it follows a
+            correction there. */}
+        {data.goods.length > 0 && (
+          <section className="mt-6">
+            <h2 className="flex flex-wrap items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--text-faint)] mb-2">
+              <BoxIcon size={14} />
+              {t("goods.title")}
+              <span className="tabular-nums">({data.goods.length})</span>
+              {data.goodsFrom ? (
+                <span className="font-mono normal-case tracking-normal text-[10px] text-[var(--text-faint)]">
+                  · {data.goodsFrom}
+                </span>
+              ) : null}
+            </h2>
+            {/* Wide content owns its own scroll — the page never slides. */}
+            <div className={`${CARD} overflow-x-auto`}>
+              <table className="w-full min-w-[640px] text-[12.5px]">
+                <thead>
+                  <tr className="text-[10px] uppercase tracking-[0.1em] text-[var(--text-faint)]">
+                    <th className="px-4 py-2.5 text-start font-semibold">{t("goods.description")}</th>
+                    <th className="px-3 py-2.5 text-start font-semibold w-[120px]">{t("goods.model")}</th>
+                    <th className="px-3 py-2.5 text-end font-semibold w-[70px]">{t("goods.qty")}</th>
+                    <th className="px-3 py-2.5 text-end font-semibold w-[110px]">{t("goods.unitPrice")}</th>
+                    <th className="px-4 py-2.5 text-end font-semibold w-[120px]">{t("goods.amount")}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {data.goods.map((g, i) => (
+                    <tr key={i} className="border-t border-[var(--border-subtle)]">
+                      <td className="px-4 py-2.5 text-[var(--text-primary)]">{g.description || "—"}</td>
+                      <td className="px-3 py-2.5 font-mono text-[11.5px] text-[var(--text-secondary)]">
+                        {g.model || "—"}
+                      </td>
+                      <td className="px-3 py-2.5 text-end tabular-nums text-[var(--text-primary)]">{g.qty}</td>
+                      <td className="px-3 py-2.5 text-end tabular-nums text-[var(--text-secondary)]">
+                        {orderMoney(g.price, order.currency)}
+                      </td>
+                      <td className="px-4 py-2.5 text-end tabular-nums font-semibold text-[var(--text-primary)]">
+                        {orderMoney(g.qty * g.price, order.currency)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </section>
+        )}
       </div>
 
       {raisingPo && (
