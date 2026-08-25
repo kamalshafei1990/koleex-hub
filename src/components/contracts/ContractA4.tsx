@@ -688,22 +688,37 @@ function ContractA4Inner(props: ContractA4Props) {
                   {/* The seal sits INSIDE the seller's block, over the rule it
                       is signed above — where a company chop actually goes. */}
                   <div style={{ display: "flex", gap: 10, alignItems: "flex-end", marginBottom: 6 }}>
-                    <StampSignatureBox
-                      imageUrl={terms.stampUrl}
-                      placeholder="Company seal"
-                      aspectSquare
-                      isEditable={props.isEditable && !!props.onClearStamp}
-                      onClear={props.onClearStamp}
-                    />
-                    <StampSignatureBox
-                      imageUrl={terms.signatureUrl}
-                      placeholder="Signature"
-                      isEditable={props.isEditable && !!props.onClearSignature}
-                      onClear={props.onClearSignature}
-                    />
+                    {/* The seal is a FIXED 40mm square — the legal diameter of
+                        a Chinese company chop. Without flexShrink:0 the
+                        signature's `width: 100%` squeezed it to 26.6 × 40,
+                        which is not a circle and not 40 mm. It gets its width
+                        first; the signature takes whatever is left. */}
+                    <div style={{ flex: "0 0 40mm", width: "40mm" }}>
+                      <StampSignatureBox
+                        imageUrl={terms.stampUrl}
+                        placeholder="Company seal"
+                        aspectSquare
+                        isEditable={props.isEditable && !!props.onClearStamp}
+                        onClear={props.onClearStamp}
+                      />
+                    </div>
+                    <div style={{ flex: "1 1 auto", minWidth: 0 }}>
+                      <StampSignatureBox
+                        imageUrl={terms.signatureUrl}
+                        placeholder="Signature"
+                        isEditable={props.isEditable && !!props.onClearSignature}
+                        onClear={props.onClearSignature}
+                      />
+                    </div>
                   </div>
                   {props.isEditable && (
-                    <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                    /* One row PER control, not both on one line. The four
+                       buttons measure 439px against the 331px the seller's
+                       block gives them, so a single flex row wrapped and the
+                       overflow landed on top of the Name / Title rules
+                       underneath. Stacked, each pair keeps its own line and
+                       the block grows predictably instead. */
+                    <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
                       <StampSignatureActions
                         label="Seal"
                         savedUrl={props.savedStampUrl ?? null}

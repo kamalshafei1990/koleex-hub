@@ -8033,6 +8033,71 @@ export function StampSignatureBox({
   aspectSquare?: boolean;
   children?: React.ReactNode;
 }) {
+  /* ── The seal must print at its REAL diameter ─────────────────────────
+     A Chinese company seal (公章) is 40 mm by regulation, so the box is
+     40 mm — but `object-fit: contain` fits the IMAGE inside it, and an image
+     with white margin around the circle therefore renders the circle SMALLER
+     than 40 mm. Measured on the tenant's own stamp.png: 1236 × 1217 px with
+     the ink filling 92.2%, so the printed seal came out 37.3 mm.
+
+     The old comment knew this and made it the user's problem — "the uploaded
+     image needs to be a tight crop". That is not a reasonable thing to ask of
+     someone uploading a scan. The box now measures the ink itself, once per
+     image, and scales the render so the CIRCLE is 40 mm whatever margin the
+     file carries. */
+  const [inkScale, setInkScale] = useState(1);
+  useEffect(() => {
+    if (!imageUrl || !aspectSquare) {
+      setInkScale(1);
+      return;
+    }
+    let cancelled = false;
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+    img.onload = () => {
+      if (cancelled) return;
+      try {
+        /* Sample at a small fixed size — this is a bounding box, not a
+           rendering, so 200px is ample and keeps the pass under a
+           millisecond. */
+        const N = 200;
+        const c = document.createElement("canvas");
+        c.width = N;
+        c.height = N;
+        const ctx = c.getContext("2d", { willReadFrequently: true });
+        if (!ctx) return;
+        ctx.drawImage(img, 0, 0, N, N);
+        const { data } = ctx.getImageData(0, 0, N, N);
+        let minX = N, minY = N, maxX = 0, maxY = 0, found = false;
+        for (let y = 0; y < N; y++) {
+          for (let x = 0; x < N; x++) {
+            const i = (y * N + x) * 4;
+            const a = data[i + 3];
+            /* Ink = opaque and not near-white. */
+            if (a > 30 && !(data[i] > 235 && data[i + 1] > 235 && data[i + 2] > 235)) {
+              found = true;
+              if (x < minX) minX = x;
+              if (x > maxX) maxX = x;
+              if (y < minY) minY = y;
+              if (y > maxY) maxY = y;
+            }
+          }
+        }
+        if (!found) return;
+        const fill = Math.max((maxX - minX) / N, (maxY - minY) / N);
+        /* Clamped: a wildly wrong measurement must not blow the seal up past
+           its box, and a tight crop needs no correction at all. */
+        if (fill > 0.2 && fill < 1) setInkScale(Math.min(1 / fill, 1.6));
+      } catch {
+        /* A cross-origin image the canvas cannot read — leave it at 1. */
+      }
+    };
+    img.src = imageUrl;
+    return () => {
+      cancelled = true;
+    };
+  }, [imageUrl, aspectSquare]);
+
   /* Sizing rationale:
        · STAMP (aspectSquare=true) — locked to 40 mm × 40 mm using
          physical mm units. This is the Chinese mainland standard
@@ -8072,6 +8137,10 @@ export function StampSignatureBox({
             width: "100%",
             height: "100%",
             objectFit: "contain",
+            /* Scale up by exactly the margin the file carries, so the CIRCLE
+               lands on 40 mm rather than the file's outer edge. 1 for the
+               signature and for an already-tight crop. */
+            transform: inkScale === 1 ? undefined : `scale(${inkScale})`,
           }}
         />
       ) : (
