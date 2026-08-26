@@ -1982,7 +1982,7 @@ export default function ProductForm({ productId }: Props) {
     };
   };
 
-  const aiSuggest = async (field: "tagline" | "excerpt" | "highlights" | "tags") => {
+  const aiSuggest = async (field: "tagline" | "excerpt" | "highlights" | "tags" | "hs_code") => {
     if (aiBusy) return;
     setAiBusy(field);
     setAiMsg(null);
@@ -1993,7 +1993,14 @@ export default function ProductForm({ productId }: Props) {
         credentials: "include",
         body: JSON.stringify({ field, context: buildAiContext() }),
       });
-      const data = (await res.json()) as { value?: string; values?: string[]; fallback?: boolean; reason?: string; error?: string };
+      const data = (await res.json()) as { value?: string; values?: string[]; reason?: string; fallback?: boolean; error?: string };
+      /* hs_code: an EMPTY value with a reason is an honest answer ("nothing in
+         the table fits"), not a failure — surface the reason instead of a
+         generic error. */
+      if (field === "hs_code" && res.ok && !data.fallback && !data.value && data.reason) {
+        setAiMsg({ field, kind: "error", text: data.reason });
+        return;
+      }
       if (!res.ok || data.fallback || (!data.value && !data.values)) {
         const why = data.reason === "no_provider"
           ? t("ai.noProvider", "AI is off — no provider configured.")
@@ -2004,6 +2011,17 @@ export default function ProductForm({ productId }: Props) {
       if (field === "tagline" && data.value) updatePrimaryModel({ tagline: data.value.slice(0, 80) });
       if (field === "excerpt" && data.value) updateProduct_({ excerpt: data.value });
       if (field === "highlights" && data.values) updateProduct_({ highlights: data.values.slice(0, 5) });
+      if (field === "hs_code" && data.value) {
+        /* Fill the box, never save: an HS code is a customs declaration and
+           the operator confirms it. The model's one-line reason shows under
+           the field so the confirmation is informed, not a rubber stamp —
+           and the RETURN matters: the generic "Drafted" message below would
+           otherwise overwrite the reason, which is the one line that lets a
+           person actually verify the classification. */
+        updateProduct_({ hs_code: data.value });
+        setAiMsg({ field, kind: "ok", text: data.reason ? `${data.value} — ${data.reason}` : data.value });
+        return;
+      }
       if (field === "tags" && data.values) {
         const merged = [...product.tags];
         for (const tag of data.values) if (!merged.some(x => x.toLowerCase() === tag.toLowerCase())) merged.push(tag);
@@ -5580,7 +5598,17 @@ export default function ProductForm({ productId }: Props) {
                 </div>
                 {!schemaCoveredCols.has("hs_code") ? (
                   <div>
-                    <label className={lbl}><span className="inline-flex items-center gap-1.5"><ScanLineIcon className="h-3 w-3" /> {t("logistics.hsCode", "HS Code")}</span></label>
+                    <div className="flex items-center justify-between gap-2">
+                      <label className={lbl}><span className="inline-flex items-center gap-1.5"><ScanLineIcon className="h-3 w-3" /> {t("logistics.hsCode", "HS Code")}</span></label>
+                      <button
+                        type="button"
+                        onClick={() => aiSuggest("hs_code")}
+                        disabled={aiBusy !== null}
+                        className="kx-ai-glow h-6 px-2 mb-1.5 rounded-md text-[10px] font-bold text-[var(--accent,#0066FF)] border border-[var(--accent,#0066FF)]/40 hover:bg-[var(--accent,#0066FF)]/10 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+                      >
+                        {aiBusy === "hs_code" ? t("ai.generating", "Drafting\u2026") : t("ai.suggest", "AI Suggest")}
+                      </button>
+                    </div>
                     <input
                       type="text"
                       value={product.hs_code}
@@ -5588,7 +5616,11 @@ export default function ProductForm({ productId }: Props) {
                       placeholder="e.g. 8452.21"
                       className={inp}
                     />
-                    <p className="text-[10px] text-[var(--text-ghost)] mt-1">{t("logistics.hsHint", "Harmonized System tariff code.")}</p>
+                    {aiMsg?.field === "hs_code" ? (
+                      <p className={`mt-1 text-[10px] ${aiMsg.kind === "error" ? "text-[var(--state-warning,#FFCC00)]" : "text-[var(--text-muted)]"}`}>{aiMsg.text}</p>
+                    ) : (
+                      <p className="text-[10px] text-[var(--text-ghost)] mt-1">{t("logistics.hsHint", "Harmonized System tariff code.")}</p>
+                    )}
                   </div>
                 ) : (
                   /* Covered by the schema — whose Customs group renders on

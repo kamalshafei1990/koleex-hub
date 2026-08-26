@@ -13,7 +13,7 @@ import { aiChat, aiProviderConfigured } from "@/lib/server/ai-provider";
    server-side. Returns { fallback: true, reason } when no provider is
    configured or the model reply can't be parsed, mirroring /api/ai/translate. */
 
-type Field = "tagline" | "excerpt" | "highlights" | "tags";
+type Field = "tagline" | "excerpt" | "highlights" | "tags" | "hs_code";
 
 interface Ctx {
   name?: string;
@@ -55,6 +55,51 @@ function contextBlock(c: Ctx): string {
   return lines.join("\n");
 }
 
+/* ── HS classification reference ────────────────────────────────────────────
+   A CLOSED list of the WCO 6-digit headings that cover Koleex's world
+   (garment machinery). The model must pick from THIS table, not from its
+   memory: an HS code is a customs declaration, and a hallucinated one is a
+   held shipment or a fine. Six digits are the international part — importing
+   countries append their own suffixes, which is the broker's job, not ours. */
+const HS_REFERENCE = `
+84.52 — SEWING MACHINES
+  8452.21  industrial sewing machines, AUTOMATIC units (auto trimmer / servo / computer-controlled)
+  8452.29  industrial sewing machines, other (manual clutch, basic)
+  8452.10  household sewing machines
+  8452.30  sewing machine needles
+  8452.90  furniture, bases, covers and PARTS of sewing machines
+84.51 — WASHING / DRYING / IRONING / FINISHING machinery for textiles
+  8451.30  ironing machines and presses (incl. FUSING presses, HEAT presses, steam pressing stations)
+  8451.40  washing, bleaching or dyeing machines
+  8451.21  drying machines, capacity <= 10 kg dry linen
+  8451.29  drying machines, other (incl. tunnel drying/ironing systems)
+  8451.50  machines for reeling, unreeling, folding, CUTTING or pinking textile fabrics (incl. SPREADING machines, fabric relaxing/inspection with cutting, cutting tables)
+  8451.80  other finishing machinery (fabric inspection without cutting, preshrinking, calendering for garments)
+  8451.90  parts of 84.51 machines
+84.47 — knitting machines, stitch-bonding, EMBROIDERY machines
+  8447.90  embroidery machines and stitch-bonding
+84.48 — AUXILIARY machinery and parts for 84.44–84.47 (needles, sinkers, dobbies)
+84.02 — steam BOILERS
+  8402.19  vapour-generating boilers, other (incl. small standalone steam generators for pressing lines)
+  8402.90  parts of steam boilers
+84.43 — PRINTING machinery
+  8443.32  inkjet printers connectable to a computer (incl. DTF / transfer printers)
+84.56 — LASER cutting machines
+  8456.11  machine tools operated by laser
+84.79 — machines with individual functions not elsewhere specified (only when nothing above fits)
+`;
+
+/* ── ZERO-TRUST on the model's answer ────────────────────────────────────────
+   Owner (2026-08-25): "it is very sensitive information so I want zero
+   mistake". The prompt already tells the model to pick from the table, but a
+   prompt is a request, not a guarantee — so the ANSWER is validated against
+   the same table it was told to use. A code that is not literally printed in
+   HS_REFERENCE never reaches the form, whatever the model says. This is the
+   difference between "the AI was told not to" and "the system cannot". */
+const VALID_HS_CODES = new Set(
+  [...HS_REFERENCE.matchAll(/^\s+(\d{4}\.\d{2})\s/gm)].map((m) => m[1]),
+);
+
 function prompt(field: Field, c: Ctx): string {
   const base = contextBlock(c);
   switch (field) {
@@ -76,6 +121,15 @@ function prompt(field: Field, c: Ctx): string {
         `max 55 characters, no ending punctuation, English. Prefer concrete numbers from the specs. ` +
         `Reply with JSON only: {"values":["...", "..."]}`
       );
+    case "hs_code":
+      return (
+        `${base}\n\nClassify this machine for customs. Pick the single best 6-digit HS code ` +
+        `FROM THE REFERENCE TABLE below — never invent a code that is not in the table. ` +
+        `If two headings could apply, pick the more specific one and say why in one short sentence. ` +
+        `If genuinely nothing in the table fits, reply {"value":""} with the reason.\n` +
+        `${HS_REFERENCE}\n` +
+        `Reply with JSON only: {"value":"8452.21","reason":"one short sentence"}`
+      );
     case "tags":
       return (
         `${base}\n\nList 8–12 search keywords/tags for this product: lowercase English single words or ` +
@@ -87,20 +141,21 @@ function prompt(field: Field, c: Ctx): string {
 
 /** Pull the first JSON object out of a model reply that may carry prose or
  *  markdown fences around it. */
-function parseJson(reply: string): { value?: string; values?: string[] } | null {
+function parseJson(reply: string): { value?: string; values?: string[]; reason?: string } | null {
   const m = reply.match(/\{[\s\S]*\}/);
   if (!m) return null;
   try {
-    const obj = JSON.parse(m[0]) as { value?: unknown; values?: unknown };
-    const out: { value?: string; values?: string[] } = {};
+    const obj = JSON.parse(m[0]) as { value?: unknown; values?: unknown; reason?: unknown };
+    const out: { value?: string; values?: string[]; reason?: string } = {};
     if (typeof obj.value === "string") out.value = obj.value.trim();
+    if (typeof obj.reason === "string") out.reason = obj.reason.trim().slice(0, 200);
     if (Array.isArray(obj.values)) {
       out.values = obj.values
         .filter((v): v is string => typeof v === "string")
         .map((v) => v.trim())
         .filter(Boolean);
     }
-    return out.value || out.values?.length ? out : null;
+    return out.value || out.values?.length || out.reason ? out : null;
   } catch {
     return null;
   }
@@ -121,7 +176,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Bad JSON" }, { status: 400 });
   }
   const field = body.field;
-  if (!field || !["tagline", "excerpt", "highlights", "tags"].includes(field)) {
+  if (!field || !["tagline", "excerpt", "highlights", "tags", "hs_code"].includes(field)) {
     return NextResponse.json({ error: "Unknown field" }, { status: 400 });
   }
   const ctx = body.context ?? {};
@@ -141,6 +196,15 @@ export async function POST(req: Request) {
 
   const parsed = parseJson(result.reply);
   if (!parsed) return NextResponse.json({ fallback: true, reason: "parse_error" });
+
+  /* hs_code: refuse anything outside the curated table. An empty value with a
+     reason is an honest "nothing fits" and passes through as-is. */
+  if (field === "hs_code" && parsed.value && !VALID_HS_CODES.has(parsed.value)) {
+    return NextResponse.json({
+      value: "",
+      reason: `The model suggested ${parsed.value}, which is not in the vetted reference table — refused. Enter the code manually or consult the customs broker.`,
+    });
+  }
 
   return NextResponse.json(parsed);
 }
