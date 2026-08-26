@@ -125,7 +125,8 @@ import CreateBrandModal from "./form-sections/CreateBrandModal";
 import DescriptionSection from "./form-sections/DescriptionSection";
 import RichTextEditor from "./form-sections/RichTextEditor";
 import KnowledgeSection from "./form-sections/KnowledgeSection";
-import TechnicalSection from "./form-sections/TechnicalSection";
+import TechnicalSection, { PhysicalFields, ComplianceEnvFields } from "./form-sections/TechnicalSection";
+import RulerIcon from "@/components/icons/ui/RulerIcon";
 import ModelsSection from "./form-sections/ModelsSection";
 import FamilySpecGrid from "./form-sections/FamilySpecGrid";
 import { FamilyStrip, FamilySharedDivider, MemberPricingPanel, MemberLogisticsPanel } from "./form-sections/FamilyMemberPanels";
@@ -390,7 +391,7 @@ function getSteps(): WizardStep[] {
        reaches it — and entering models teaches you which options remain. */
     { id: "options", label: "Options", shortLabel: "Options", icon: <Settings2Icon className="h-4 w-4" /> },
     { id: "pricing", label: "Cost & Price", shortLabel: "Price", icon: <DollarSignIcon className="h-4 w-4" /> },
-    { id: "logistics", label: "Logistics & Customs", shortLabel: "Logistics", icon: <GlobeIcon className="h-4 w-4" /> },
+    { id: "logistics", label: "Packing & Logistics", shortLabel: "Logistics", icon: <GlobeIcon className="h-4 w-4" /> },
     { id: "compliance", label: "Compliance & Warranty", shortLabel: "Compliance", icon: <ShieldCheckIcon className="h-4 w-4" /> },
     { id: "media", label: "Media & Documents", shortLabel: "Media", icon: <ImageRawIcon className="h-4 w-4" /> },
     { id: "knowledge", label: "Knowledge & Relationships", shortLabel: "Knowledge", icon: <BookOpenIcon className="h-4 w-4" /> },
@@ -1628,11 +1629,12 @@ export default function ProductForm({ productId }: Props) {
   /* The legacy Technical block, Purchase Options + Fulfillment sub-sections are
      hidden when the active schema already covers their fields (no double entry).
      The schema editor is the single input; values mirror to columns on save. */
+  /* Electrical only since 2026-08-25: physical went to Packing & Logistics,
+     environmental ratings to Compliance, and the duplicate HS input was
+     deleted (the logistics tab always had one). Each moved field keeps its
+     own coverage gate on its new tab. */
   const TECH_BLOCK_COLS = [
-    "voltage", "frequency_hz", "motor_power_w", "power_consumption_w", "phase",
-    "plug_types", "pneumatic_supply", "machine_dimensions", "machine_weight_kg",
-    "hs_code", "ip_rating", "operating_temp", "ce_certified", "rohs_compliant",
-    "oil_mist_filter", "colors",
+    "frequency_hz", "motor_power_w", "power_consumption_w", "phase", "pneumatic_supply",
   ];
   const technicalHasVisibleField = TECH_BLOCK_COLS.some((c) => !schemaCoveredCols.has(c));
   const purchaseCoveredBySchema = schemaCoveredCols.has("supports_head_only") && schemaCoveredCols.has("supports_complete_set");
@@ -5195,7 +5197,7 @@ export default function ProductForm({ productId }: Props) {
               </Section>
             )}
             {!isAccessory && (technicalHasVisibleField ? (
-              <Section id="technical" icon={<ZapIcon className="h-4 w-4" />} title={t("technical.title", "Technical Details")} badge={t("technical.badge", "Electrical · Physical")}>
+              <Section id="technical" icon={<ZapIcon className="h-4 w-4" />} title={t("technical.title", "Technical Details")} badge={t("technical.badge2", "Electrical")}>
                 <TechnicalSection data={product} onChange={updateProduct_} hiddenFields={schemaCoveredCols} />
               </Section>
             ) : (
@@ -5589,12 +5591,25 @@ export default function ProductForm({ productId }: Props) {
                     <p className="text-[10px] text-[var(--text-ghost)] mt-1">{t("logistics.hsHint", "Harmonized System tariff code.")}</p>
                   </div>
                 ) : (
-                  <div className="flex items-end">
-                    <p className="text-[11px] leading-relaxed text-[var(--text-ghost)]">{t("logistics.hsInSpecs", "HS Code for this category is set in the Specifications tab (Compliance & Customs).")}</p>
-                  </div>
+                  /* Covered by the schema — whose Customs group renders on
+                     THIS tab, just below. The old pointer sent people to the
+                     Specs tab, where it no longer is. */
+                  null
                 )}
               </div>
             </Section>
+
+            {/* Physical (bare machine) — dimensions + weight of the RUNNING
+                machine; the packed crate is per-variant. Lived on the Specs
+                tab until 2026-08-25, while every schema already rendered its
+                physicalGroup HERE (formTab:"logistics") — the same fact on
+                two different tabs depending on the product's era. Now one
+                tab for both eras. */}
+            {(!schemaCoveredCols.has("machine_dimensions") || !schemaCoveredCols.has("machine_weight_kg")) && (
+            <Section id="logistics-physical" icon={<RulerIcon className="h-4 w-4" />} title={t("tech.secPhysical", "Physical (Bare Machine)")} badge={t("logistics.physicalBadge", "Dimensions · Weight")}>
+              <PhysicalFields data={product} onChange={updateProduct_} hiddenFields={schemaCoveredCols} />
+            </Section>
+            )}
 
             {/* Schema-driven Packing & Shipping group (formTab:"logistics").
                 Product-level packing/CBM/weights entered here, stored in
@@ -5709,6 +5724,15 @@ export default function ProductForm({ productId }: Props) {
               </div>
               <div className="mt-4 pt-4 border-t border-[var(--border-subtle)]">
                 <p className="text-[11px] font-medium text-[var(--text-faint)] mb-2">{t("compliance.recordsTitle", "Certificate records")}</p>
+                {/* Environmental ratings — IP, operating range, oil-mist.
+                    Moved from the Specs tab's technical block 2026-08-25:
+                    they constrain where the machine can RUN, which is this
+                    tab's question, not a spec of what it does. */}
+                {(!schemaCoveredCols.has("ip_rating") || !schemaCoveredCols.has("operating_temp") || !schemaCoveredCols.has("oil_mist_filter")) && (
+                  <div className="pt-2 border-t border-[var(--border-subtle)]/40">
+                    <ComplianceEnvFields data={product} onChange={updateProduct_} hiddenFields={schemaCoveredCols} />
+                  </div>
+                )}
                 <CertificationsSection certifications={certifications} onChange={setCertifications} />
               </div>
             </Section>

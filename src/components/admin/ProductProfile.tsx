@@ -91,7 +91,7 @@ const PROFILE_T: Record<string, { en: string; zh: string; ar: string }> = {
   "pp.sec.specs":     { en: "Specifications",     zh: "技术规格",       ar: "المواصفات" },
   "pp.sec.variants":  { en: "Variants",           zh: "型号",           ar: "المتغيّرات" },
   "pp.sec.price":     { en: "Cost & Price",       zh: "成本与价格",     ar: "التكلفة والسعر" },
-  "pp.sec.logistics": { en: "Logistics & Customs", zh: "物流与海关",    ar: "اللوجستيات والجمارك" },
+  "pp.sec.logistics": { en: "Packing & Logistics", zh: "包装与物流",    ar: "التعبئة واللوجستيات" },
   "pp.sec.compliance": { en: "Compliance & Warranty", zh: "合规与保修", ar: "المطابقة والضمان" },
   "pp.sec.media":     { en: "Media & Documents",  zh: "媒体与文件",     ar: "الوسائط والمستندات" },
   "pp.sec.knowledge": { en: "Knowledge & Relationships", zh: "知识与关联", ar: "المعرفة والعلاقات" },
@@ -1179,7 +1179,7 @@ export default function ProductProfile() {
       <CostHistoryDrawer target={historyFor} onClose={() => setHistoryFor(null)} t={t} />
 
       {STEPS[step].id === "logistics" && (
-      <Group motion={tabMotion} icon={<BoundIcon semanticKey="section.logistics" className="h-4 w-4" fallback={<GlobeIcon className="h-4 w-4" />} />} title={t("pp.sec.logistics", "Logistics & Customs")} onEdit={() => goStep("logistics")}>
+      <Group motion={tabMotion} icon={<BoundIcon semanticKey="section.logistics" className="h-4 w-4" fallback={<GlobeIcon className="h-4 w-4" />} />} title={t("pp.sec.logistics", "Packing & Logistics")} onEdit={() => goStep("logistics")}>
         <div className={rows}>
           <Row label={t("pp.f.origin", "Country of origin")} value={s2("country_of_origin")} />
           <Row label={t("pp.f.hs", "HS code")} value={s2("hs_code")} mono />

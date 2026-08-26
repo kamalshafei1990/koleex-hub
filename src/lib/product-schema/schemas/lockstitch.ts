@@ -727,6 +727,11 @@ export const LOCKSTITCH_SCHEMA: ProductSchemaDefinition = {
       id: "physical",
       title: "Physical",
       order: 100,
+      /* Every other machine schema puts Physical on the Packing & Logistics
+         tab (shared physicalGroup does); this one predates that and rendered
+         it on Specs. Aligned 2026-08-25 — same fields, same keys, different
+         tab. Display-only: schema_specs stores flat by key. */
+      formTab: "logistics",
       fields: [
         {
           id: "machine_dimensions",
@@ -760,10 +765,16 @@ export const LOCKSTITCH_SCHEMA: ProductSchemaDefinition = {
     // ------------------------------------------------------------------
     // Group 11 — Compliance & Customs
     // ------------------------------------------------------------------
+    /* Customs sits with the shipping data (owner, 2026-08-25: "Packing and
+       Logistics" is the customs tab). Split out of the old "Compliance &
+       Customs" group so HS renders on that tab; the remaining compliance
+       fields are Specs content. The KEY is unchanged — every saved hs_code
+       value keeps working. */
     {
-      id: "compliance",
-      title: "Compliance & Customs",
-      order: 110,
+      id: "customs",
+      title: "Customs",
+      order: 105,
+      formTab: "logistics",
       fields: [
         {
           id: "hs_code",
@@ -779,6 +790,13 @@ export const LOCKSTITCH_SCHEMA: ProductSchemaDefinition = {
           invoiceVisible: true,
           visualRenderType: "plain_text",
         },
+      ],
+    },
+    {
+      id: "compliance",
+      title: "Compliance",
+      order: 110,
+      fields: [
         {
           id: "ip_rating",
           key: "ip_rating",
@@ -908,6 +926,11 @@ export const LOCKSTITCH_SCHEMA: ProductSchemaDefinition = {
     {
       id: "fulfillment",
       title: "Fulfillment Defaults",
+      /* MOQ and lead time are order data. The form's own rule (owner: "keep
+         Specs purely technical") already renders the legacy version of these
+         on the logistics tab; the schema copy rendering on Specs contradicted
+         it. */
+      formTab: "logistics",
       order: 130,
       fields: [
         {

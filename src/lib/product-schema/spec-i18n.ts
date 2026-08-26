@@ -220,6 +220,11 @@ export const SPEC_I18N: Translations = {
   "g:Application": { en: "Application", zh: "应用", ar: "التطبيق" },
   "g:Automation": { en: "Automation", zh: "自动化", ar: "الأتمتة" },
   "g:Compliance & Customs": { en: "Compliance & Customs", zh: "合规与海关", ar: "الامتثال والجمارك" },
+  /* lockstitch 2026-08-25: customs (HS) moved to the Packing & Logistics tab,
+     so its old group split — Compliance stays on Specs, Customs went with the
+     shipping data. Both titles need entries or §G fails the build. */
+  "g:Compliance": { en: "Compliance", zh: "合规", ar: "الامتثال" },
+  "g:Customs": { en: "Customs", zh: "海关", ar: "الجمارك" },
   "g:Control & Automation": { en: "Control & Automation", zh: "控制与自动化", ar: "التحكم والأتمتة" },
   "g:Electrical": { en: "Electrical", zh: "电气", ar: "الكهرباء" },
   "g:Electrical & Utilities": { en: "Electrical & Utilities", zh: "电气与公用设施", ar: "الكهرباء والمرافق" },

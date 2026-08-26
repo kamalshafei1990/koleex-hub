@@ -9,11 +9,9 @@ import AngleDownIcon from "@/components/icons/ui/AngleDownIcon";
 import PlusIcon from "@/components/icons/ui/PlusIcon";
 import ZapIcon from "@/components/icons/ui/ZapIcon";
 import RulerIcon from "@/components/icons/ui/RulerIcon";
-import ShieldCheckIcon from "@/components/icons/ui/ShieldCheckIcon";
 import GaugeIcon from "@/components/icons/ui/GaugeIcon";
 import PowerIcon from "@/components/icons/ui/PowerIcon";
 import RefreshCwIcon from "@/components/icons/ui/RefreshCwIcon";
-import HashtagIcon from "@/components/icons/ui/HashtagIcon";
 import LayersIcon from "@/components/icons/ui/LayersIcon";
 import ScaleIcon from "@/components/icons/ui/ScaleIcon";
 import DropletsIcon from "@/components/icons/ui/DropletsIcon";
@@ -22,24 +20,15 @@ import type { ProductFormState } from "@/types/product-form";
 
 
 interface Props {
+  /* Electrical only. The physical and environmental fields this once listed
+     render on the Packing & Logistics and Compliance tabs now — see the
+     exported PhysicalFields / ComplianceEnvFields at the bottom. */
   data: Pick<
     ProductFormState,
-    | "hs_code"
-    | "voltage"
-    | "plug_types"
-    | "watt"
-    | "colors"
     | "motor_power_w"
     | "power_consumption_w"
-    | "machine_weight_kg"
-    | "machine_dimensions"
-    | "ce_certified"
-    | "rohs_compliant"
     | "frequency_hz"
     | "phase"
-    | "ip_rating"
-    | "operating_temp"
-    | "oil_mist_filter"
     | "pneumatic_supply"
   >;
   onChange: (u: Partial<ProductFormState>) => void;
@@ -327,20 +316,12 @@ export default function TechnicalSection({ data, onChange, hiddenFields }: Props
   const { t } = useTranslation(PRODUCTS_UI_I18N);
   const hidden = (k: string) => hiddenFields?.has(k) ?? false;
   const elecVisible = ["frequency_hz", "motor_power_w", "power_consumption_w", "phase", "pneumatic_supply"].some((k) => !hidden(k));
-  const physVisible = ["machine_dimensions", "machine_weight_kg"].some((k) => !hidden(k));
-  const compTopVisible = ["hs_code", "ip_rating", "operating_temp"].some((k) => !hidden(k));
-  /* CE/RoHS moved to the dedicated Compliance & Warranty tab; only the
-     oil-mist-filter toggle remains in the technical block. */
-  const compTogglesVisible = ["oil_mist_filter"].some((k) => !hidden(k));
-  const compVisible = compTopVisible || compTogglesVisible;
 
   // Per-card accents — only the digit inside the numbered badge and
   // a tiny dot get tinted. Whole-card chrome stays neutral so the
   // Technical step matches the Specs page palette and the rest of
   // the hub.
   const electricalAccent = { dot: "bg-amber-400", text: "text-amber-400" };
-  const physicalAccent   = { dot: "bg-blue-400",  text: "text-blue-400"  };
-  const complianceAccent = { dot: "bg-emerald-400", text: "text-emerald-400" };
 
   return (
     <div className="space-y-5">
@@ -434,135 +415,126 @@ export default function TechnicalSection({ data, onChange, hiddenFields }: Props
       </SubCard>
       )}
 
-      {/* ── 2. Physical (Bare Machine) ──
-            Distinct from per-variant packed/shipment data which lives
-            on the Models step. These describe the running machine,
-            not the crate it ships in. */}
-      {physVisible && (
-      <SubCard
-        number={2}
-        title={t("tech.secPhysical", "Physical (Bare Machine)")}
-        subtitle={t("tech.secPhysicalSub", "Footprint and weight of the machine itself — packed shipment data lives on the Models step")}
-        accent={physicalAccent}
-        icon={<RulerIcon className="h-4 w-4" />}
-      >
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {!hidden("machine_dimensions") && (
-          <div>
-            <FieldLabel icon={<RulerIcon className="h-3.5 w-3.5" />}>
-              {t("tech.machineDimsLwh", "Machine Dimensions (L × W × H)")}
-            </FieldLabel>
-            <input
-              type="text"
-              value={data.machine_dimensions}
-              onChange={(e) => onChange({ machine_dimensions: e.target.value })}
-              placeholder="e.g. 480 × 180 × 360 mm"
-              className="w-full h-10 px-4 rounded-lg bg-[var(--bg-inverted)]/[0.05] border border-[var(--border-subtle)] text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-dim)] outline-none focus:border-[var(--border-focus)] transition-colors"
-            />
-            <p className="text-[10px] text-[var(--text-ghost)] mt-1">
-              Footprint of the machine in operation. Free-text so you can use any unit / format.
-            </p>
-          </div>
-          )}
-          {!hidden("machine_weight_kg") && (
-          <NumberUnit
-            label={t("tech.machineWeight", "Machine Weight")}
-            icon={<ScaleIcon className="h-3.5 w-3.5" />}
-            value={data.machine_weight_kg}
-            unit="kg"
-            placeholder="e.g. 32"
-            onChange={(v) => onChange({ machine_weight_kg: v })}
-            helpText="Bare-head weight. Packed crate weight is per-variant on Models."
-          />
-          )}
-        </div>
-      </SubCard>
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   MOVED FIELDS — exported for the tabs they now belong to.
+
+   Until 2026-08-25 this file rendered three cards on the Specs tab. The
+   owner's read was right and matched what the schemas already did: the
+   shared physicalGroup carries formTab:"logistics", so schema products
+   showed dimensions and weight on the logistics tab while legacy products
+   showed them on Specs — two tabs for the same fact depending on which era
+   the product was entered in.
+
+   · PhysicalFields       → the Packing & Logistics tab (machine dimensions,
+                            bare weight). ProductForm wraps it in its own
+                            Section, matching that tab's idiom.
+   · ComplianceEnvFields  → the Compliance & Warranty tab (IP rating,
+                            operating temperature, oil-mist filter) — these
+                            are environmental ratings, and CE/RoHS already
+                            moved there long ago for the same reason.
+   · hs_code was NOT moved — it was DELETED here: the logistics tab has
+     carried its own HS Code input all along, so a legacy product showed two
+     inputs writing one column on two different tabs.
+   ═══════════════════════════════════════════════════════════════════ */
+
+export function PhysicalFields({ data, onChange, hiddenFields }: {
+  data: { machine_dimensions: string; machine_weight_kg: string };
+  onChange: (updates: Partial<{ machine_dimensions: string; machine_weight_kg: string }>) => void;
+  hiddenFields?: Set<string>;
+}) {
+  const { t } = useTranslation(PRODUCTS_UI_I18N);
+  const hidden = (k: string) => hiddenFields?.has(k) ?? false;
+  return (
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      {!hidden("machine_dimensions") && (
+      <div>
+        <FieldLabel icon={<RulerIcon className="h-3.5 w-3.5" />}>
+          {t("tech.machineDimsLwh", "Machine Dimensions (L × W × H)")}
+        </FieldLabel>
+        <input
+          type="text"
+          value={data.machine_dimensions}
+          onChange={(e) => onChange({ machine_dimensions: e.target.value })}
+          placeholder="e.g. 480 × 180 × 360 mm"
+          className="w-full h-10 px-4 rounded-lg bg-[var(--bg-inverted)]/[0.05] border border-[var(--border-subtle)] text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-dim)] outline-none focus:border-[var(--border-focus)] transition-colors"
+        />
+        <p className="text-[10px] text-[var(--text-ghost)] mt-1">
+          Footprint of the machine in operation. Free-text so you can use any unit / format.
+        </p>
+      </div>
       )}
+      {!hidden("machine_weight_kg") && (
+      <NumberUnit
+        label={t("tech.machineWeight", "Machine Weight")}
+        icon={<ScaleIcon className="h-3.5 w-3.5" />}
+        value={data.machine_weight_kg}
+        unit="kg"
+        placeholder="e.g. 32"
+        onChange={(v) => onChange({ machine_weight_kg: v })}
+        helpText="Bare-head weight. Packed crate weight is per-variant on Models."
+      />
+      )}
+    </div>
+  );
+}
 
-      {/* ── 3. Compliance & Customs ──
-            HS code, certifications, and product colors. These either
-            constrain where the product can be sold (CE, RoHS) or
-            classify it for customs (HS code). Colors land here as a
-            product-level visual attribute used in catalog filtering. */}
-      {compVisible && (
-      <SubCard
-        number={3}
-        title={t("tech.secCompliance", "Compliance & Customs")}
-        subtitle={t("tech.secComplianceSub", "Certifications, HS classification, and environmental ratings")}
-        accent={complianceAccent}
-        icon={<ShieldCheckIcon className="h-4 w-4" />}
-      >
-        {compTopVisible && (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {!hidden("hs_code") && (
-          <div>
-            <FieldLabel icon={<HashtagIcon className="h-3.5 w-3.5" />}>{t("logistics.hsCode", "HS Code")}</FieldLabel>
-            <input
-              type="text"
-              value={data.hs_code}
-              onChange={(e) => onChange({ hs_code: e.target.value })}
-              placeholder="e.g. 8452.21"
-              className="w-full h-10 px-4 rounded-lg bg-[var(--bg-inverted)]/[0.05] border border-[var(--border-subtle)] text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-dim)] outline-none focus:border-[var(--border-focus)] transition-colors"
-            />
-            <p className="text-[10px] text-[var(--text-ghost)] mt-1">
-              {t("logistics.hsHint", "Harmonized System tariff code.")}
-            </p>
-          </div>
-          )}
-          {!hidden("ip_rating") && (
-          <div>
-            <FieldLabel icon={<DropletsIcon className="h-3.5 w-3.5" />}>{t("tech.ipRating", "IP Rating")}</FieldLabel>
-            <input
-              type="text"
-              value={data.ip_rating}
-              onChange={(e) => onChange({ ip_rating: e.target.value })}
-              placeholder="e.g. IP44"
-              className="w-full h-10 px-4 rounded-lg bg-[var(--bg-inverted)]/[0.05] border border-[var(--border-subtle)] text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-dim)] outline-none focus:border-[var(--border-focus)] transition-colors"
-            />
-            <p className="text-[10px] text-[var(--text-ghost)] mt-1">
-              {t("tech.ipRatingHint", "Ingress protection (dust + water).")}
-            </p>
-          </div>
-          )}
-          {!hidden("operating_temp") && (
-          <div>
-            <FieldLabel icon={<SparklesIcon className="h-3.5 w-3.5" />}>{t("tech.operatingTemp", "Operating Temperature")}</FieldLabel>
-            <input
-              type="text"
-              value={data.operating_temp}
-              onChange={(e) => onChange({ operating_temp: e.target.value })}
-              placeholder="e.g. 0–40 °C"
-              className="w-full h-10 px-4 rounded-lg bg-[var(--bg-inverted)]/[0.05] border border-[var(--border-subtle)] text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-dim)] outline-none focus:border-[var(--border-focus)] transition-colors"
-            />
-            <p className="text-[10px] text-[var(--text-ghost)] mt-1">
-              {t("tech.operatingTempHint", "Recommended operating range.")}
-            </p>
-          </div>
-          )}
-        </div>
-        )}
-
-        {compTogglesVisible && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2 border-t border-[var(--border-subtle)]/40">
-          {/* CE Certified + RoHS Compliant now live on the Compliance &
-              Warranty tab (ProductForm) to keep all compliance in one place. */}
-          {/* Oil-mist filter — for cleanroom and light-fabric
-              production. Independent of drive type so a non-air-
-              purify head can still optionally have an after-market
-              filter retrofit. */}
-          {!hidden("oil_mist_filter") && (
-          <ToggleRow
-            label={t("tech.oilMist", "Oil-Mist Filter")}
-            icon={<DropletsIcon className="h-3.5 w-3.5" />}
-            helpText="Air-purify / mist filter — keeps oil mist out of cleanroom + light-fabric environments."
-            value={data.oil_mist_filter}
-            onChange={(v) => onChange({ oil_mist_filter: v })}
+export function ComplianceEnvFields({ data, onChange, hiddenFields }: {
+  data: { ip_rating: string; operating_temp: string; oil_mist_filter: boolean };
+  onChange: (updates: Partial<{ ip_rating: string; operating_temp: string; oil_mist_filter: boolean }>) => void;
+  hiddenFields?: Set<string>;
+}) {
+  const { t } = useTranslation(PRODUCTS_UI_I18N);
+  const hidden = (k: string) => hiddenFields?.has(k) ?? false;
+  return (
+    <div className="space-y-4">
+      {(!hidden("ip_rating") || !hidden("operating_temp")) && (
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {!hidden("ip_rating") && (
+        <div>
+          <FieldLabel icon={<DropletsIcon className="h-3.5 w-3.5" />}>{t("tech.ipRating", "IP Rating")}</FieldLabel>
+          <input
+            type="text"
+            value={data.ip_rating}
+            onChange={(e) => onChange({ ip_rating: e.target.value })}
+            placeholder="e.g. IP44"
+            className="w-full h-10 px-4 rounded-lg bg-[var(--bg-inverted)]/[0.05] border border-[var(--border-subtle)] text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-dim)] outline-none focus:border-[var(--border-focus)] transition-colors"
           />
-          )}
+          <p className="text-[10px] text-[var(--text-ghost)] mt-1">
+            {t("tech.ipRatingHint", "Ingress protection (dust + water).")}
+          </p>
         </div>
         )}
-
-      </SubCard>
+        {!hidden("operating_temp") && (
+        <div>
+          <FieldLabel icon={<SparklesIcon className="h-3.5 w-3.5" />}>{t("tech.operatingTemp", "Operating Temperature")}</FieldLabel>
+          <input
+            type="text"
+            value={data.operating_temp}
+            onChange={(e) => onChange({ operating_temp: e.target.value })}
+            placeholder="e.g. 0–40 °C"
+            className="w-full h-10 px-4 rounded-lg bg-[var(--bg-inverted)]/[0.05] border border-[var(--border-subtle)] text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-dim)] outline-none focus:border-[var(--border-focus)] transition-colors"
+          />
+          <p className="text-[10px] text-[var(--text-ghost)] mt-1">
+            {t("tech.operatingTempHint", "Recommended operating range.")}
+          </p>
+        </div>
+        )}
+      </div>
+      )}
+      {!hidden("oil_mist_filter") && (
+      <div className="pt-1">
+        <ToggleRow
+          label={t("tech.oilMist", "Oil-Mist Filter")}
+          icon={<DropletsIcon className="h-3.5 w-3.5" />}
+          helpText="Air-purify / mist filter — keeps oil mist out of cleanroom + light-fabric environments."
+          value={data.oil_mist_filter}
+          onChange={(v) => onChange({ oil_mist_filter: v })}
+        />
+      </div>
       )}
     </div>
   );
