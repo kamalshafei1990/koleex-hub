@@ -131,6 +131,7 @@ import FamilySpecGrid from "./form-sections/FamilySpecGrid";
 import { FamilyStrip, FamilySharedDivider, MemberPricingPanel, MemberLogisticsPanel } from "./form-sections/FamilyMemberPanels";
 import MediaSection from "./form-sections/MediaSection";
 import FeatureHighlightsSection from "./form-sections/FeatureHighlightsSection";
+import ProductOptionsSection from "./form-sections/ProductOptionsSection";
 import PricingIntelligenceCard from "./form-sections/PricingIntelligenceCard";
 import AccessoryOptionsSection, { type AccessoryOptionRow, axesForSubcategory } from "./form-sections/AccessoryOptionsSection";
 import BaseFobCard from "./form-sections/BaseFobCard";
@@ -221,6 +222,7 @@ const STEP_LABEL_KEY: Record<string, string> = {
   specs: "step.specifications",
   "sewing-specs": "step.machineSpecs",
   commercial: "step.modelsVariants",
+  options: "step.options",
   pricing: "step.costPrice",
   logistics: "step.logisticsCustoms",
   compliance: "step.complianceWarranty",
@@ -237,6 +239,7 @@ const STEP_SHORT_KEY: Record<string, string> = {
   specs: "step.specs",
   "sewing-specs": "step.specs",
   commercial: "step.models",
+  options: "step.optionsShort",
   pricing: "step.price",
   logistics: "step.logistics",
   compliance: "step.compliance",
@@ -381,6 +384,11 @@ function getSteps(): WizardStep[] {
     { id: "highlights", label: "Feature Highlights", shortLabel: "Highlights", icon: <ImageRawIcon className="h-4 w-4" /> },
     { id: "specs", label: "Specifications", shortLabel: "Specs", icon: <Settings2Icon className="h-4 w-4" /> },
     { id: "commercial", label: "Variants", shortLabel: "Variants", icon: <BoxesIcon className="h-4 w-4" /> },
+    /* Owner brief 2026-08-25: the buyer's configurator questions (stand,
+       thickness, wheels…). Sits right after Variants because the two answer
+       different questions — Variants = what we sell, Options = how a buyer
+       reaches it — and entering models teaches you which options remain. */
+    { id: "options", label: "Options", shortLabel: "Options", icon: <Settings2Icon className="h-4 w-4" /> },
     { id: "pricing", label: "Cost & Price", shortLabel: "Price", icon: <DollarSignIcon className="h-4 w-4" /> },
     { id: "logistics", label: "Logistics & Customs", shortLabel: "Logistics", icon: <GlobeIcon className="h-4 w-4" /> },
     { id: "compliance", label: "Compliance & Warranty", shortLabel: "Compliance", icon: <ShieldCheckIcon className="h-4 w-4" /> },
@@ -5071,6 +5079,18 @@ export default function ProductForm({ productId }: Props) {
                 productId={effectiveId ?? ""}
                 models={models.filter((m) => m.id).map((m) => ({ id: m.id as string, code: m.primary_model || m.model_name || "model" }))}
               />
+            </Section>
+          </div>
+        )}
+
+        {/* ═══════════════════════════════════════════════════════════
+           OPTIONS — the buyer-facing configurator questions. Self-
+           contained (own endpoint), needs a saved product id.
+           ═══════════════════════════════════════════════════════════ */}
+        {(onePage || steps[currentStep]?.id === "options") && (
+          <div id="sec-options" className="space-y-5 scroll-mt-28">
+            <Section id="product-options" icon={<Settings2Icon className="h-4 w-4" />} title={t("options.title", "Buyer Options")} badge={t("options.badge", "Configurator questions")}>
+              <ProductOptionsSection productId={effectiveId ?? ""} />
             </Section>
           </div>
         )}
