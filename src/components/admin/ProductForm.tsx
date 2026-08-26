@@ -391,7 +391,7 @@ function getSteps(): WizardStep[] {
        reaches it — and entering models teaches you which options remain. */
     { id: "options", label: "Options", shortLabel: "Options", icon: <Settings2Icon className="h-4 w-4" /> },
     { id: "pricing", label: "Cost & Price", shortLabel: "Price", icon: <DollarSignIcon className="h-4 w-4" /> },
-    { id: "logistics", label: "Packing & Logistics", shortLabel: "Logistics", icon: <GlobeIcon className="h-4 w-4" /> },
+    { id: "logistics", label: "Packing & Logistics", shortLabel: "Packing & Logistics", icon: <GlobeIcon className="h-4 w-4" /> },
     { id: "compliance", label: "Compliance & Warranty", shortLabel: "Compliance", icon: <ShieldCheckIcon className="h-4 w-4" /> },
     { id: "media", label: "Media & Documents", shortLabel: "Media", icon: <ImageRawIcon className="h-4 w-4" /> },
     { id: "knowledge", label: "Knowledge & Relationships", shortLabel: "Knowledge", icon: <BookOpenIcon className="h-4 w-4" /> },

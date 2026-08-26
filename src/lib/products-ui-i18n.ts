@@ -1219,7 +1219,7 @@ export const PRODUCTS_UI_I18N: Translations = {
   "step.knowledgeRel": { en: "Knowledge & Relationships", zh: "知识与关联", ar: "المعرفة والعلاقات" },
   "step.supplier": { en: "Supplier", zh: "供应商", ar: "المورّد" },
   "step.price": { en: "Price", zh: "价格", ar: "السعر" },
-  "step.logistics": { en: "Logistics", zh: "物流", ar: "اللوجستيات" },
+  "step.logistics": { en: "Packing & Logistics", zh: "包装与物流", ar: "التعبئة واللوجستيات" },
   "step.compliance": { en: "Compliance", zh: "合规", ar: "الامتثال" },
   "step.knowledge": { en: "Knowledge", zh: "知识", ar: "المعرفة" },
   /* ── legacy Technical Details block ── */
