@@ -60,6 +60,17 @@ interface Opt {
   values: OptValue[];
 }
 
+/* ── Unsaved-edit survival across tab switches ───────────────────────────────
+   The form's tab pane is KEYED on the current step (the Hub's route-tab
+   motion pattern), so switching to Variants and back REMOUNTS this whole
+   section — useState alone would silently discard unsaved questions, which is
+   exactly the kind of loss that makes people stop trusting an editor.
+   Mount-once inside the pane cannot help: the keyed pane remounts everything
+   in it. So unsaved drafts live OUTSIDE the tree, in this module-scoped map,
+   keyed by product. Restored on remount, discarded on save or clean load.
+   In-memory on purpose: a page reload drops it, same as any unsaved form. */
+const unsavedDrafts = new Map<string, Opt[]>();
+
 let seq = 0;
 const freshKey = () => `k${Date.now().toString(36)}${(seq++).toString(36)}`;
 
@@ -101,6 +112,14 @@ export default function ProductOptionsSection({ productId }: { productId: string
   /* ── load ── */
   useEffect(() => {
     if (!productId) return;
+    /* A remount with an unsaved draft resumes it — fetching would overwrite
+       the person's work with the database's older truth. */
+    const draft = unsavedDrafts.get(productId);
+    if (draft) {
+      setOptions(draft);
+      setDirty(true);
+      return;
+    }
     let alive = true;
     (async () => {
       try {
@@ -151,10 +170,15 @@ export default function ProductOptionsSection({ productId }: { productId: string
   }, [productId]);
 
   const patch = useCallback((updater: (prev: Opt[]) => Opt[]) => {
-    setOptions((prev) => (prev ? updater(prev) : prev));
+    setOptions((prev) => {
+      if (!prev) return prev;
+      const next = updater(prev);
+      unsavedDrafts.set(productId, next);
+      return next;
+    });
     setDirty(true);
     setSavedTick(false);
-  }, []);
+  }, [productId]);
 
   const patchOpt = (optKey: string, p: Partial<Opt>) =>
     patch((prev) => prev.map((o) => (o.key === optKey ? { ...o, ...p } : o)));
@@ -235,6 +259,7 @@ export default function ProductOptionsSection({ productId }: { productId: string
       });
       const json = (await res.json()) as { ok?: boolean; error?: string };
       if (!res.ok || !json.ok) throw new Error(json.error ?? "Save failed.");
+      unsavedDrafts.delete(productId);
       setDirty(false);
       setSavedTick(true);
     } catch (e) {
