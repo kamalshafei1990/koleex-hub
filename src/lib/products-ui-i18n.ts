@@ -1227,11 +1227,14 @@ export const PRODUCTS_UI_I18N: Translations = {
   "tech.ipRatingHint": { en: "Ingress protection (dust + water).", zh: "防尘防水等级。", ar: "درجة الحماية من الغبار والماء." },
   "tech.operatingTempHint": { en: "Recommended operating range.", zh: "建议工作温度范围。", ar: "نطاق التشغيل الموصى به." },
   "tech.secElectrical": { en: "Electrical", zh: "电气", ar: "الكهرباء" },
-  "tech.secElectricalSub": { en: "Voltage, frequency, motor power, phase, and the plug types this product ships with", zh: "电压、频率、电机功率、相数，以及本产品随附的插头类型", ar: "الجهد والتردد وقدرة المحرك والأطوار وأنواع القوابس المرفقة بالمنتج" },
+  /* Named voltage and plug types until 2026-08-25; both fields were retired
+     here in favour of the spec schema, and a subtitle that keeps promising
+     them is the same kind of lie the card would tell by showing an empty box. */
+  "tech.secElectricalSub": { en: "Frequency, motor power, phase, and the air supply this machine needs", zh: "频率、电机功率、相数，以及本机所需的气源", ar: "التردد وقدرة المحرك والأطوار وهواء التشغيل اللي الماكينة محتاجاه" },
   "tech.secPhysical": { en: "Physical (Bare Machine)", zh: "物理参数（裸机）", ar: "القياسات الفعلية (الماكينة وحدها)" },
   "tech.secPhysicalSub": { en: "Footprint and weight of the machine itself — packed shipment data lives on the Models step", zh: "机器本体的占地与重量——装箱运输数据在“型号”步骤中填写", ar: "مساحة ووزن الماكينة نفسها — بيانات التغليف والشحن مكانها خطوة الموديلات" },
   "tech.secCompliance": { en: "Compliance & Customs", zh: "合规与海关", ar: "المطابقة والجمارك" },
-  "tech.secComplianceSub": { en: "Certifications, HS classification, environmental ratings, and visual attributes", zh: "认证、HS 编码归类、环保等级与外观属性", ar: "الشهادات وتصنيف HS والتقييمات البيئية والخصائص المرئية" },
+  "tech.secComplianceSub": { en: "Certifications, HS classification, and environmental ratings", zh: "认证、HS 编码归类与环保等级", ar: "الشهادات وتصنيف HS والتقييمات البيئية" },
   "tech.frequency": { en: "Frequency (Hz)", zh: "频率（Hz）", ar: "التردد (Hz)" },
   "tech.motorPower": { en: "Motor Power", zh: "电机功率", ar: "قدرة الموتور" },
   "tech.powerConsumption": { en: "Power Consumption", zh: "功耗", ar: "استهلاك القدرة" },

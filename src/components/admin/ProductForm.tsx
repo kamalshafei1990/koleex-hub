@@ -655,7 +655,12 @@ export default function ProductForm({ productId }: Props) {
      Empty = built-in icons; a set entry wins. See /api/classification-icons. */
   const [classIcons, setClassIcons] = useState<Record<string, Record<string, string>>>({});
   const [allTags, setAllTags] = useState<string[]>([]);
-  const [attrSuggestions, setAttrSuggestions] = useState<{ voltage: string[]; plug_types: { name: string; image?: string | null }[]; colors: string[]; watt: string[]; levels: string[] }>({ voltage: [], plug_types: [], colors: [], watt: [], levels: [] });
+  /* Voltage / plug-type / colour / watt suggestion lists were dropped on
+     2026-08-25 with the fields they fed — the spec schema is the input for
+     those now. Tags stay: unlike the others, a free commercial label on a
+     PRODUCT is the right shape, it simply had not been used yet (0 of 272).
+     So the form still READS the attribute file for `tags`, and no longer
+     writes it at all — leaving the Visual Library as its single writer. */
 
   /* ── Form state ── */
   const [product, setProduct] = useState<ProductFormState>({ ...EMPTY_PRODUCT });
@@ -1057,14 +1062,6 @@ export default function ProductForm({ productId }: Props) {
       setCategoryLogos(catLogos);
       setSubcategoryLogos(subLogos);
       setClassIcons(classIconMap);
-      setAttrSuggestions({
-        voltage: attrCfg.voltage,
-        plug_types: attrCfg.plug_types,
-        colors: attrCfg.colors,
-        watt: attrCfg.watt,
-        levels: attrCfg.levels,
-      });
-
       if (isEdit && productId) {
         const [p, dbModels, dbMedia, dbTranslations, dbRelated, dbSewingSpecs, dbSuppliers, dbCerts, dbDocs] = await Promise.all([
           guard(fetchProductById(productId), null as Awaited<ReturnType<typeof fetchProductById>>),
@@ -5179,7 +5176,7 @@ export default function ProductForm({ productId }: Props) {
             )}
             {!isAccessory && (technicalHasVisibleField ? (
               <Section id="technical" icon={<ZapIcon className="h-4 w-4" />} title={t("technical.title", "Technical Details")} badge={t("technical.badge", "Electrical · Physical")}>
-                <TechnicalSection data={product} onChange={updateProduct_} suggestions={attrSuggestions} hiddenFields={schemaCoveredCols} />
+                <TechnicalSection data={product} onChange={updateProduct_} hiddenFields={schemaCoveredCols} />
               </Section>
             ) : (
               <div className="flex items-start gap-3 rounded-xl border border-dashed border-[var(--border-subtle)] bg-[var(--bg-surface)] px-4 py-3">
