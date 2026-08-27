@@ -289,7 +289,10 @@ export async function PATCH(
       .from("inbox_messages")
       .update({ read_at: new Date().toISOString() })
       .eq("category", "task")
-      .eq("metadata->>type", "todo_assignment")
+      /* Every notification about THIS todo, whatever its type — assignment,
+         recurring spawn, approval decision. The old todo_assignment-only
+         filter left 🔁 rows unread after the task was finished, which on an
+         all-recurring workload meant the bell never cleared itself. */
       .eq("metadata->>todo_id", id)
       .is("read_at", null);
     if (clearErr) console.error("[api/todos/[id] PATCH] clear task notifications:", clearErr.message);
@@ -450,7 +453,6 @@ export async function DELETE(
     .from("inbox_messages")
     .update({ archived_at: new Date().toISOString() })
     .eq("category", "task")
-    .eq("metadata->>type", "todo_assignment")
     .eq("metadata->>todo_id", id)
     .is("archived_at", null);
   if (clearErr) console.error("[api/todos/[id] DELETE] clear task notifications:", clearErr.message);

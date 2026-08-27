@@ -85,7 +85,14 @@ async function reconcileFinishedTaskNotifications(me: string): Promise<void> {
       .select("id, metadata")
       .eq("recipient_account_id", me)
       .eq("category", "task")
-      .eq("metadata->>type", "todo_assignment")
+      /* ⚠️ NO type filter — deliberately. This used to say
+         `metadata->>type = todo_assignment`, and that one line was the
+         owner's "the bell still doesn't work": his daily tasks are all
+         RECURRING, whose rows carry type=todo_recurring, so finishing every
+         task cleared nothing and the bell never went quiet on its own.
+         Approval-decision rows had the same hole. Every task notification
+         that names a todo_id reconciles against that todo, whatever its
+         type. */
       .is("read_at", null)
       .is("archived_at", null)
       .limit(500);
@@ -105,8 +112,10 @@ async function reconcileFinishedTaskNotifications(me: string): Promise<void> {
         .map((t) => t.id),
     );
 
+    /* Only rows that NAME a todo can be verified against one; a task row
+       without todo_id is left alone rather than guessed at. */
     const staleIds = rows
-      .filter((r) => !r.metadata?.todo_id || !stillOpen.has(r.metadata.todo_id))
+      .filter((r) => r.metadata?.todo_id && !stillOpen.has(r.metadata.todo_id))
       .map((r) => r.id);
     if (!staleIds.length) return;
 
@@ -199,7 +208,6 @@ export async function GET(req: Request) {
           .select("*", { count: "exact", head: true })
           .eq("recipient_account_id", me)
           .eq("category", "task")
-          .eq("metadata->>type", "todo_assignment")
           .is("read_at", null)
           .is("archived_at", null);
         if (error) throw new Error(error.message);
@@ -229,7 +237,10 @@ export async function GET(req: Request) {
           .is("archived_at", null);
         const [unreadRes, tasksRes] = await Promise.all([
           base(),
-          base().eq("category", "task").eq("metadata->>type", "todo_assignment"),
+          /* All task categories — the type filter here undercounted for the
+             same reason the reconcile under-cleared (recurring + approval
+             rows are tasks too). */
+          base().eq("category", "task"),
         ]);
         if (unreadRes.error) throw new Error(unreadRes.error.message);
         if (tasksRes.error) throw new Error(tasksRes.error.message);
