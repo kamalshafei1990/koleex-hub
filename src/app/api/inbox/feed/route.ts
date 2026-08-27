@@ -58,6 +58,26 @@ function flattenSender(raw: SenderJoin) {
    read their todo ids, ask which of those are still open, mark the rest read.
    Missing ids (deleted tasks) are stale by definition. Marked READ, never
    deleted — the message stays in the inbox history where it belongs. */
+/* ── RETENTION — the inbox must not become an archive ──────────────────────
+   2,010 rows had accumulated by the day the owner called the system broken;
+   they were wiped once (scripts/reset-notifications.mts), and this keeps the
+   table from growing back. A notification is a PROMPT, not a record — the
+   audit log and each module's own history hold the records. Read messages
+   older than 60 days and archived ones older than 30 are deleted whenever
+   this account loads its full inbox. Scoped to the caller's own rows,
+   fire-and-forget, and on the messages branch only — badge polls (the hot
+   path, every account each minute) never pay for it. */
+function pruneOldMessages(me: string): void {
+  const readCutoff = new Date(Date.now() - 60 * 86400_000).toISOString();
+  const archCutoff = new Date(Date.now() - 30 * 86400_000).toISOString();
+  void supabaseServer.from(INBOX).delete()
+    .eq("recipient_account_id", me).not("read_at", "is", null).lt("created_at", readCutoff)
+    .then(({ error }) => { if (error) console.error("[inbox prune read]", error.message); });
+  void supabaseServer.from(INBOX).delete()
+    .eq("recipient_account_id", me).not("archived_at", "is", null).lt("archived_at", archCutoff)
+    .then(({ error }) => { if (error) console.error("[inbox prune archived]", error.message); });
+}
+
 async function reconcileFinishedTaskNotifications(me: string): Promise<void> {
   try {
     const { data: pending } = await supabaseServer
@@ -114,6 +134,7 @@ export async function GET(req: Request) {
         /* Reconcile here too, so opening the list shows finished work as read
            rather than leaving the user to clear rows by hand. */
         await reconcileFinishedTaskNotifications(me);
+        pruneOldMessages(me);
         const includeArchived = url.searchParams.get("archived") === "1";
         /* 300 cap serves the bell's "Show all" view — slim rows are ~200B
            each, so the worst case stays ~60KB. */

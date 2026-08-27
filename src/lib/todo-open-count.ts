@@ -76,11 +76,21 @@ export async function openTodoItems(
   const ids = (mine ?? []).map((r) => (r as { todo_id: string }).todo_id);
   if (ids.length === 0) return [];
 
+  /* ⚠️ DONE ROWS ARE FETCHED ON PURPOSE — this line used to carry
+     `.neq("status","done")`, and that filter was the zombie bug the owner
+     reported as "the notifications system is not working": with dead periods
+     piled behind a recurring task, completing TODAY'S period removed it from
+     this result set, so yesterday's untouched period became "the newest" and
+     took its place in the count. The badge could not go down by doing the
+     work — only by doing every dead period one by one. The UI list computes
+     newest over ALL rows (done included) and never had the bug; this was the
+     second implementation of the one rule this file exists to unify. Done
+     rows now claim their series' newest slot below and are excluded from the
+     RESULT, not from the derivation. */
   let q = db
     .from("koleex_todos")
     .select("id, title, status, completed, approval_state, recurrence, recurrence_parent_id, recurrence_spawned_for, start_date, created_at")
-    .in("id", ids)
-    .neq("status", "done");
+    .in("id", ids);
   /* ⚠️ The tenant filter was missing from the badge's own version. `ids` comes
      from this account's assignments so it is mostly implied — but "mostly" is
      not a filter, and the corrected route had it. */
@@ -118,7 +128,7 @@ export async function openTodoItems(
     ({ id: r.id, title: r.title || "Untitled task", createdAt: r.created_at });
 
   const series = rows.filter((r) => cadenceOf(r));
-  if (series.length === 0) return rows.map(toItem);
+  if (series.length === 0) return rows.filter((r) => r.status !== "done").map(toItem);
 
   /* Only asked for when a series is involved — most callers never pay it. */
   const { data: noteRows } = await db
@@ -136,6 +146,9 @@ export async function openTodoItems(
   }
 
   return rows.filter((r) => {
+    /* Done rows have already claimed their series' newest slot above; they
+       are never open items themselves. */
+    if (r.status === "done") return false;
     if (!cadenceOf(r)) return true;
     const key = r.recurrence_parent_id ?? r.id;
     if (periodOf(r) === newestPerSeries.get(key)) return true;

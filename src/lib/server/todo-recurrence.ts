@@ -217,6 +217,47 @@ export async function spawnDueRecurringTodos(now: Date = new Date()): Promise<nu
       }).catch((e) => console.error("[todo-recurrence] push:", e));
     }
 
+    /* ── The spawn cleans up after itself ─────────────────────────────────
+       One row per period, forever, was the pile the owner finally called
+       "not working": 33 rows for one daily task, a list that resurrects
+       yesterday when today is finished, and a count that can only be beaten
+       by doing every dead day one by one. An untouched superseded period —
+       still 'todo', never completed, never sent to approval, no notes —
+       carries nothing the new period doesn't, so it is DELETED here, at the
+       exact moment it becomes dead (owner sign-off 2026-08-27: this data is
+       disposable). Assignee rows go with it via FK cascade; its inbox rows
+       were superseded a few lines up.
+
+       NEVER the template: `recurrence_parent_id` is non-null on every row
+       this touches, and the template row (parent itself) is the series'
+       definition — deleting it would kill the recurrence. Touched periods
+       are history and stay. */
+    try {
+      const { data: deadCandidates } = await supabaseServer
+        .from("koleex_todos")
+        .select("id")
+        .eq("recurrence_parent_id", t.id)
+        .neq("id", newId)
+        .eq("status", "todo")
+        .eq("completed", false)
+        .is("approval_state", null);
+      const deadIds = (deadCandidates ?? []).map((d) => (d as { id: string }).id);
+      if (deadIds.length) {
+        const { data: noted } = await supabaseServer
+          .from("koleex_todo_notes")
+          .select("todo_id")
+          .in("todo_id", deadIds);
+        const keep = new Set((noted ?? []).map((n) => (n as { todo_id: string }).todo_id));
+        const purge = deadIds.filter((id) => !keep.has(id));
+        if (purge.length) {
+          await supabaseServer.from("koleex_todos").delete().in("id", purge);
+        }
+      }
+    } catch (e) {
+      /* Best-effort: a failed purge must never fail the spawn. */
+      console.error("[todo-recurrence] purge superseded periods:", e instanceof Error ? e.message : e);
+    }
+
     spawned += 1;
   }
 
