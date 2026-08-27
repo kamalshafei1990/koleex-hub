@@ -122,12 +122,16 @@ export async function createTodo(input: {
     });
     if (res.ok) {
       const json = (await res.json()) as { todo: TodoRow | null };
-      if (typeof window !== "undefined" && json.todo) {
-        setTimeout(
-          () => window.dispatchEvent(new CustomEvent("inbox:force-recount")),
-          500,
-        );
-      }
+      /* ⚠️ THE ONE WRITE THAT NEVER ANNOUNCED ITSELF. update / toggle / delete
+         all call announceTodoChange() — which bumps the ?v= write version that
+         busts the list's 30-second HTTP cache — and CREATE did not. So the
+         refetch right after adding a task asked the same ?v= URL, the browser
+         answered from cache with the pre-create list, and the task the user
+         just added simply was not there: reproduced live 2026-08-28 (row in
+         the database, list and Active counter unmoved). announceTodoChange
+         also fires the force-recount event, so the old bare setTimeout event
+         is folded into it. */
+      if (json.todo) await announceTodoChange();
       return json.todo;
     }
     if (res.status !== 401 && res.status !== 403) {

@@ -316,8 +316,11 @@ export default function TaskExtras({
 /* Photo with initials fallback (mirrors MiniAvatar on the To-do page) —
    broken/blocked images degrade to initials, never the broken-image glyph. */
 function PickerAvatar({ info, size = 24 }: { info: TodoAssigneeInfo; size?: number }) {
-  const [failed, setFailed] = useState(false);
-  useEffect(() => setFailed(false), [info.avatar_url]);
+  /* The failure remembers WHICH src failed and is derived at render — no
+     reset effect needed, and a new avatar_url is automatically "not failed".
+     (The old reset-in-effect was a synchronous setState cascade.) */
+  const [failedSrc, setFailedSrc] = useState<string | null>(null);
+  const failed = failedSrc !== null && failedSrc === info.avatar_url;
 
   const initials = (info.full_name || info.username || "?")
     .split(/\s+/)
@@ -330,7 +333,7 @@ function PickerAvatar({ info, size = 24 }: { info: TodoAssigneeInfo; size?: numb
   return info.avatar_url && !failed ? (
     // eslint-disable-next-line @next/next/no-img-element
     <img src={fpAvatar(info.avatar_url)} alt="" className="rounded-full object-cover shrink-0"
-      style={{ width: size, height: size }} onError={() => setFailed(true)} />
+      style={{ width: size, height: size }} onError={() => setFailedSrc(info.avatar_url)} />
   ) : (
     <div className="rounded-full bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-dim)] shrink-0 font-bold"
       style={{ width: size, height: size, fontSize: size * 0.38 }}>
