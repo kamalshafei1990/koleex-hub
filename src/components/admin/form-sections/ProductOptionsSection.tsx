@@ -33,6 +33,7 @@ import PlusIcon from "@/components/icons/ui/PlusIcon";
 import TrashIcon from "@/components/icons/ui/TrashIcon";
 import CrossIcon from "@/components/icons/ui/CrossIcon";
 import SearchIcon from "@/components/icons/ui/SearchIcon";
+import ImageRawIcon from "@/components/icons/ui/ImageRawIcon";
 import { uploadProductFile } from "@/lib/products-admin";
 
 /* ── shapes ── */
@@ -438,76 +439,115 @@ export default function ProductOptionsSection({ productId }: { productId: string
             {/* ── answers ── */}
             <div className="space-y-2 p-3">
               {o.values.map((v) => (
-                <div key={v.key} className="flex flex-wrap items-center gap-2 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)]/40 px-2.5 py-2">
-                  {/* photo chip */}
-                  <button
-                    type="button"
-                    onClick={() => fileRefs.current[v.key]?.click()}
-                    onDragOver={(e) => e.preventDefault()}
-                    onDrop={(e) => { e.preventDefault(); void setImage(o.key, v.key, e.dataTransfer.files?.[0] ?? null); }}
-                    className="h-9 w-9 shrink-0 overflow-hidden rounded-md border border-[var(--border-subtle)] bg-white/90 text-[9px] text-gray-400"
-                    title="Click or drop a photo"
-                  >
-                    {v.image_url
-                      // eslint-disable-next-line @next/next/no-img-element
-                      ? <img src={v.image_url} alt="" className="h-full w-full object-cover" />
-                      : "img"}
-                  </button>
+                /* One answer = one card: a REAL photo tile on the left (the
+                   answers become visual cards in the buyer's chooser, so the
+                   photo is first-class here, not a 36px afterthought — owner:
+                   "the photo place is too small, I want it big"), and two
+                   rows beside it: identity, then pricing. Paste lands a
+                   screenshot straight in, same as the Feature Highlights
+                   cards. */
+                <div
+                  key={v.key}
+                  onPaste={(e) => {
+                    const item = [...(e.clipboardData?.items ?? [])].find((it) => it.type.startsWith("image/"));
+                    if (!item) return;
+                    e.preventDefault();
+                    void setImage(o.key, v.key, item.getAsFile());
+                  }}
+                  className="flex gap-3 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)]/40 p-2.5"
+                >
+                  <div className="relative shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => fileRefs.current[v.key]?.click()}
+                      onDragOver={(e) => e.preventDefault()}
+                      onDrop={(e) => { e.preventDefault(); void setImage(o.key, v.key, e.dataTransfer.files?.[0] ?? null); }}
+                      className="h-20 w-20 overflow-hidden rounded-lg border border-[var(--border-subtle)] bg-gradient-to-b from-white to-[#f4f5f7] flex flex-col items-center justify-center gap-1 text-gray-400 hover:border-[var(--border-strong)] transition-colors"
+                      title="Click, drop or paste a photo"
+                    >
+                      {v.image_url ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={v.image_url} alt={v.label || "option"} className="h-full w-full object-cover" />
+                      ) : (
+                        <>
+                          <ImageRawIcon className="h-6 w-6 text-gray-300" />
+                          <span className="px-1 text-center text-[8.5px] leading-tight">Click · drop · paste</span>
+                        </>
+                      )}
+                    </button>
+                    {/* A wrong photo needs a way OUT, not only a way in — the
+                        old chip could replace but never clear. */}
+                    {v.image_url && (
+                      <button
+                        type="button"
+                        onClick={() => patchVal(o.key, v.key, { image_url: null })}
+                        title="Remove photo"
+                        className="absolute -top-1.5 -end-1.5 inline-flex h-5 w-5 items-center justify-center rounded-full border border-white/25 bg-black/70 text-white/85 backdrop-blur-sm hover:bg-black/85 hover:text-red-400"
+                      >
+                        <CrossIcon size={9} />
+                      </button>
+                    )}
+                  </div>
                   <input
                     ref={(el) => { fileRefs.current[v.key] = el; }}
                     type="file" accept="image/*" className="hidden" aria-hidden tabIndex={-1}
                     onChange={(e) => void setImage(o.key, v.key, e.target.files?.[0] ?? null)}
                   />
 
-                  <input
-                    value={v.label}
-                    onChange={(e) => patchVal(o.key, v.key, { label: e.target.value })}
-                    placeholder={o.kind === "yes_no" ? "Yes" : 'Answer — e.g. "2 mm"'}
-                    className={`${INPUT} flex-1 min-w-[130px]`}
-                  />
+                  <div className="min-w-0 flex-1 space-y-2">
+                    {/* row 1 — identity */}
+                    <div className="flex flex-wrap items-center gap-2">
+                      <input
+                        value={v.label}
+                        onChange={(e) => patchVal(o.key, v.key, { label: e.target.value })}
+                        placeholder={o.kind === "yes_no" ? "Yes" : 'Answer — e.g. "2 mm"'}
+                        className={`${INPUT} flex-1 min-w-[130px]`}
+                      />
+                      <label className="inline-flex items-center gap-1 text-[11px] text-[var(--text-secondary)]">
+                        <input type="checkbox" checked={v.is_default}
+                          onChange={(e) => patch((prev) => prev.map((po) =>
+                            po.key !== o.key ? po : {
+                              ...po,
+                              /* one default per question */
+                              values: po.values.map((pv) => ({ ...pv, is_default: pv.key === v.key ? e.target.checked : false })),
+                            }))} />
+                        default
+                      </label>
+                      {o.kind !== "yes_no" && (
+                        <button type="button" onClick={() => removeValue(o.key, v.key)}
+                          className="rounded-md p-1 text-[var(--text-dim)] hover:text-red-400" title="Delete answer">
+                          <CrossIcon size={12} />
+                        </button>
+                      )}
+                    </div>
 
-                  {/* pricing: linked OR manual */}
-                  {v.linked_product_id ? (
-                    <span className="inline-flex items-center gap-1.5 rounded-md border border-emerald-500/30 bg-emerald-500/10 px-2 py-1 text-[11px] text-emerald-400">
-                      linked · {v.linked_name ?? "product"}
-                      <button type="button" title="Unlink"
-                        onClick={() => patchVal(o.key, v.key, { linked_product_id: null, linked_model_id: null, linked_name: null })}
-                        className="text-emerald-400/70 hover:text-emerald-300"><CrossIcon size={10} /></button>
-                    </span>
-                  ) : o.kind !== "info" ? (
-                    <>
-                      <button type="button" onClick={() => setLinkFor({ optKey: o.key, valKey: v.key })}
-                        className="rounded-md border border-[var(--border-subtle)] px-2 py-1 text-[11px] text-[var(--text-secondary)] hover:border-[var(--border-strong)] hover:text-[var(--text-primary)]">
-                        Link product…
-                      </button>
-                      <input value={v.price_delta_cny} onChange={(e) => patchVal(o.key, v.key, { price_delta_cny: e.target.value })}
-                        placeholder="+¥" className={`${NUM} w-20`} inputMode="decimal" />
-                      <input value={v.weight_delta_kg} onChange={(e) => patchVal(o.key, v.key, { weight_delta_kg: e.target.value })}
-                        placeholder="+kg" className={`${NUM} w-20`} inputMode="decimal" />
-                      <input value={v.cbm_delta} onChange={(e) => patchVal(o.key, v.key, { cbm_delta: e.target.value })}
-                        placeholder="+cbm" className={`${NUM} w-20`} inputMode="decimal" />
-                    </>
-                  ) : (
-                    <span className="text-[11px] text-[var(--text-dim)]">recorded on the document — not priced</span>
-                  )}
-
-                  <label className="inline-flex items-center gap-1 text-[11px] text-[var(--text-secondary)]">
-                    <input type="checkbox" checked={v.is_default}
-                      onChange={(e) => patch((prev) => prev.map((po) =>
-                        po.key !== o.key ? po : {
-                          ...po,
-                          /* one default per question */
-                          values: po.values.map((pv) => ({ ...pv, is_default: pv.key === v.key ? e.target.checked : false })),
-                        }))} />
-                    default
-                  </label>
-
-                  {o.kind !== "yes_no" && (
-                    <button type="button" onClick={() => removeValue(o.key, v.key)}
-                      className="rounded-md p-1 text-[var(--text-dim)] hover:text-red-400" title="Delete answer">
-                      <CrossIcon size={12} />
-                    </button>
-                  )}
+                    {/* row 2 — what choosing it adds */}
+                    <div className="flex flex-wrap items-center gap-2">
+                      {v.linked_product_id ? (
+                        <span className="inline-flex items-center gap-1.5 rounded-md border border-emerald-500/30 bg-emerald-500/10 px-2 py-1 text-[11px] text-emerald-400">
+                          linked · {v.linked_name ?? "product"}
+                          <button type="button" title="Unlink"
+                            onClick={() => patchVal(o.key, v.key, { linked_product_id: null, linked_model_id: null, linked_name: null })}
+                            className="text-emerald-400/70 hover:text-emerald-300"><CrossIcon size={10} /></button>
+                        </span>
+                      ) : o.kind !== "info" ? (
+                        <>
+                          <button type="button" onClick={() => setLinkFor({ optKey: o.key, valKey: v.key })}
+                            className="rounded-md border border-[var(--border-subtle)] px-2 py-1 text-[11px] text-[var(--text-secondary)] hover:border-[var(--border-strong)] hover:text-[var(--text-primary)]">
+                            Link product…
+                          </button>
+                          <input value={v.price_delta_cny} onChange={(e) => patchVal(o.key, v.key, { price_delta_cny: e.target.value })}
+                            placeholder="+¥" className={`${NUM} w-20`} inputMode="decimal" />
+                          <input value={v.weight_delta_kg} onChange={(e) => patchVal(o.key, v.key, { weight_delta_kg: e.target.value })}
+                            placeholder="+kg" className={`${NUM} w-20`} inputMode="decimal" />
+                          <input value={v.cbm_delta} onChange={(e) => patchVal(o.key, v.key, { cbm_delta: e.target.value })}
+                            placeholder="+cbm" className={`${NUM} w-20`} inputMode="decimal" />
+                        </>
+                      ) : (
+                        <span className="text-[11px] text-[var(--text-dim)]">recorded on the document — not priced</span>
+                      )}
+                    </div>
+                  </div>
                 </div>
               ))}
               {o.kind !== "yes_no" && (
