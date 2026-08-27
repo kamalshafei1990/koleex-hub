@@ -59,10 +59,9 @@ const bandCls: Record<string, string> = {
 type Summary = { score: number | null; priority: number | null; preferredProducts: number; blockedProducts: number; soleSource: boolean } | null;
 
 export default function SourcingSection({
-  supplierId, supplierName, sourcing, sourcingProfile, sourcingLinks, specializations, onSaved,
+  supplierId, sourcing, sourcingProfile, sourcingLinks, specializations, onSaved,
 }: {
   supplierId: string;
-  supplierName: string;
   sourcing: Summary;
   sourcingProfile: Row | null;
   sourcingLinks: Row[];

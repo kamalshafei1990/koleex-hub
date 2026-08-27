@@ -10,8 +10,8 @@ import "server-only";
 
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
-import { requireAuth, requireModuleAccess , requireModuleAction} from "@/lib/server/auth";
-import { logSupplierEvent, actorName } from "@/lib/suppliers/timeline";
+import { requireAuth, requireModuleAction} from "@/lib/server/auth";
+import { actorName } from "@/lib/suppliers/timeline";
 import { MANUAL_EVENT_TYPES } from "@/lib/suppliers/intelligence";
 
 const VISIBILITY = new Set(["public", "internal", "procurement", "finance", "management"]);
