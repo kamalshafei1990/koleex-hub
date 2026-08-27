@@ -50,6 +50,7 @@ interface Detail {
     route: string | null;
     severity: string;
     created_at: string;
+    doc_label?: string | null;
   }>;
   usage: { today_s: number; last7_s: number; last30_s: number };
   devices: Array<Record<string, unknown>>;
@@ -123,7 +124,10 @@ function buildJourney(events: Detail["day_events"]): JourneyRow[] {
        stopped; the row adds nothing. */
     if (e.event_type === "session_end") continue;
     if (e.event_type === "page_view") {
-      const mod = e.module || e.route || "App";
+      /* The document name splits the segment: an hour in Product Data across
+         three machines reads as three stretches, each naming its machine —
+         "what exactly", not just "which app". */
+      const mod = (e.module || e.route || "App") + (e.doc_label ? ` — ${e.doc_label}` : "");
       if (seg && seg.module === mod && new Date(e.created_at).getTime() - new Date(seg.last).getTime() < GAP_MS) {
         seg.last = e.created_at;
         continue;

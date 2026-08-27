@@ -59,6 +59,7 @@ interface PersonRow {
   sessions: OnlineSession[];
   current_route: string | null;
   current_module: string | null;
+  current_doc: string | null;
   signed_in_today_at: string | null;
   today_seconds: number;
   last_seen_at: string;
@@ -74,6 +75,7 @@ interface FeedRow {
   ip: string | null;
   country: string | null;
   created_at: string;
+  doc_label?: string | null;
 }
 interface Kpis {
   online_users: number;
@@ -546,7 +548,8 @@ export default function SuperAdminActivityPage() {
         prev.account.account_id === f.account.account_id &&
         prev.event_type === f.event_type &&
         prev.route === f.route &&
-        prev.title === f.title
+        prev.title === f.title &&
+        (prev.doc_label ?? null) === (f.doc_label ?? null)
       ) {
         prev.repeat += 1;
         continue;
@@ -680,8 +683,9 @@ export default function SuperAdminActivityPage() {
                           </div>
                         </div>
                         <div className="text-[10.5px] text-[var(--text-ghost)] shrink-0 text-end">
-                          <div className="text-[11px] font-medium text-[var(--text-secondary)]">
+                          <div className="text-[11px] font-medium text-[var(--text-secondary)] truncate max-w-[190px]">
                             {r.current_module || routeToModule(r.current_route) || "—"}
+                            {r.current_doc ? ` — ${r.current_doc}` : ""}
                           </div>
                           <div>{rel(r.last_seen_at)}</div>
                         </div>
@@ -754,7 +758,9 @@ export default function SuperAdminActivityPage() {
                             {f.severity !== "info" && <SeverityPill severity={f.severity} />}
                           </div>
                           <div className="text-[10.5px] text-[var(--text-dim)] truncate">
-                            {f.module || "—"}{f.route ? ` · ${f.route}` : ""}{f.country ? ` · ${f.country}` : ""}
+                            {f.module || "—"}
+                            {f.doc_label ? ` — ${f.doc_label}` : f.route ? ` · ${f.route}` : ""}
+                            {f.country ? ` · ${f.country}` : ""}
                           </div>
                         </div>
                         <span className="text-[10.5px] text-[var(--text-ghost)] shrink-0">{rel(f.created_at)}</span>
