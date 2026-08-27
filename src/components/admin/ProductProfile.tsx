@@ -27,7 +27,6 @@ import { useTranslation } from "@/lib/i18n";
 import { PRODUCTS_UI_I18N } from "@/lib/products-ui-i18n";
 import { fetchClassificationIcons } from "@/lib/products-admin";
 import { fetchIconBindings, type BindingsMap } from "@/lib/visual-bindings";
-import ArrowLeftIcon from "@/components/icons/ui/ArrowLeftIcon";
 import { BACK_CHROME } from "@/components/ui/PageHeader";
 import RrIcon from "@/components/ui/RrIcon";
 import PencilIcon from "@/components/icons/ui/PencilIcon";

@@ -52,8 +52,6 @@ interface MarketOpt { code: string; name: string }
 
 const usd = (n: number | null | undefined) =>
   n == null ? "—" : `$${Number(n).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-const cny = (n: number | null | undefined) =>
-  n == null ? "—" : `¥${Number(n).toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
 const pct = (n: number | null | undefined) =>
   n == null ? "—" : `${n > 0 ? "+" : ""}${Number(n).toLocaleString(undefined, { maximumFractionDigits: 1 })}%`;
 
@@ -143,7 +141,7 @@ export default function PricingIntelligenceCard({
       { k: market?.bandCode ? `Band ${market.bandCode}` : "Market", v: pct(market?.adjustmentPercent ?? 0), sub: `${country} · all channels` },
       { k: "End-user (market)", v: usd(market?.regionalFobUsd), sub: "retail + band", strong: true },
     ];
-  }, [base, market, data, country]);
+  }, [base, market, country]);
 
   /* ── States that aren't the full breakdown ── */
   if (!isCny) {

@@ -11,7 +11,7 @@
    duplicated or editable here.
    --------------------------------------------------------------------------- */
 
-import { useState, useEffect, useMemo, useRef, useCallback } from "react";
+import { useState, useEffect, useMemo, useRef, useCallback, useSyncExternalStore } from "react";
 import { LOCALES } from "@/types/product-form";
 import KdsSelect from "@/components/kds/Select";
 import { createPortal } from "react-dom";
@@ -101,7 +101,7 @@ const inp =
   "w-full h-9 px-3 rounded-lg bg-[var(--bg-inverted)]/[0.05] border border-[var(--border-subtle)] text-[12px] text-[var(--text-primary)] placeholder:text-[var(--text-dim)] outline-none focus:border-[var(--border-focus)]";
 
 export default function SupplierLinkSection({ links, suppliers, onChange, memberMode, productSpecs }: Props) {
-  const { t, lang } = useTranslation(PRODUCTS_UI_I18N);
+  const { t } = useTranslation(PRODUCTS_UI_I18N);
   const router = useRouter();
   const [pickerOpen, setPickerOpen] = useState(false);
   const [uploadingId, setUploadingId] = useState<string | null>(null);
@@ -1144,6 +1144,8 @@ function SupplierPhoto({
    Searchable supplier picker — modal with live filter + keyboard control.
    Esc closes, ↑/↓ move, Enter selects. Brand: monochrome + single blue accent.
    --------------------------------------------------------------------------- */
+const noopSubscribe = () => () => {};
+
 function SupplierPickerModal({
   suppliers,
   onPick,
@@ -1157,15 +1159,15 @@ function SupplierPickerModal({
   const [query, setQuery] = useState("");
   const [active, setActive] = useState(0);
   const [view, setView] = useState<"list" | "grid">("list");
-  const [mounted, setMounted] = useState(false);
+  /* "Am I on the client yet" without a setState-in-effect: SSR snapshot says
+     false, the client snapshot says true — one render each, no cascade. */
+  const mounted = useSyncExternalStore(noopSubscribe, () => true, () => false);
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
 
   /* Render via a portal on <body> so the fixed overlay is sized to the
      viewport — not clipped by a transformed ancestor (the form's animated
      step container), which was collapsing the supplier list to ~1 row. */
-  useEffect(() => { setMounted(true); }, []);
-
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q) return suppliers;

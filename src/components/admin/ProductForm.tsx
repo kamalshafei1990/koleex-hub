@@ -15,7 +15,6 @@ import { localizedName } from "@/lib/i18n-name";
 import { FieldHelp, IDENTIFIER_HELP } from "@/components/admin/form-sections/FieldHelp";
 import { PRODUCTS_UI_I18N } from "@/lib/products-ui-i18n";
 import { humanizeError } from "@/lib/ui/humanize-error";
-import ArrowLeftIcon from "@/components/icons/ui/ArrowLeftIcon";
 import PageHeader from "@/components/ui/PageHeader";
 import ProductDataIcon from "@/components/icons/ProductDataIcon";
 import ArrowUpRightIcon from "@/components/icons/ui/ArrowUpRightIcon";
@@ -39,7 +38,6 @@ import PackageIcon from "@/components/icons/ui/PackageIcon";
 import BookOpenIcon from "@/components/icons/ui/BookOpenIcon";
 import TriangleWarningIcon from "@/components/icons/ui/TriangleWarningIcon";
 import StarIcon from "@/components/icons/ui/StarIcon";
-import ArrowRightIcon from "@/components/icons/ui/ArrowRightIcon";
 import CircleDotIcon from "@/components/icons/ui/CircleDotIcon";
 import FactoryIcon from "@/components/icons/ui/FactoryIcon";
 import HashtagIcon from "@/components/icons/ui/HashtagIcon";
@@ -63,7 +61,6 @@ import Undo2Icon from "@/components/icons/ui/Undo2Icon";
 import PhoneCallIcon from "@/components/icons/ui/PhoneCallIcon";
 import TagsIcon from "@/components/icons/ui/TagsIcon";
 import SparklesIcon from "@/components/icons/ui/SparklesIcon";
-import LockIcon from "@/components/icons/ui/LockIcon";
 import {
   fetchTaxonomyAll,
   fetchProductById, fetchModelsByProductId, fetchMediaByProductId,
@@ -214,24 +211,7 @@ interface WizardStep {
    it keeps emitting stable English label / shortLabel for type-safety +
    any non-translated consumer. Translation happens at RENDER time by
    mapping the stable step `id` → dictionary keys via these maps, so the
-   StepNav + jump chips localize without `getSteps` ever calling a hook. */
-const STEP_LABEL_KEY: Record<string, string> = {
-  classify: "step.classification",
-  supplier: "step.supplierSourcing",
-  identity: "step.identity",
-  description: "step.description",
-  specs: "step.specifications",
-  "sewing-specs": "step.machineSpecs",
-  commercial: "step.modelsVariants",
-  options: "step.options",
-  pricing: "step.costPrice",
-  logistics: "step.logisticsCustoms",
-  compliance: "step.complianceWarranty",
-  technical: "step.technical",
-  media: "step.mediaDocuments",
-  knowledge: "step.knowledgeRel",
-  finalize: "step.reviewPublish",
-};
+   tab chips localize without `getSteps` ever calling a hook. */
 const STEP_SHORT_KEY: Record<string, string> = {
   classify: "step.classify",
   supplier: "step.supplier",
@@ -453,84 +433,6 @@ function SectionTabs({
 
 /* ═══════════════════════════════════════════════════════════════════
    STEP NAVIGATION BAR
-   ═══════════════════════════════════════════════════════════════════ */
-function StepNav({ steps, currentStep, onStepChange, completedSteps, lockedSteps, issueCounts, t }: {
-  steps: WizardStep[];
-  currentStep: number;
-  onStepChange: (i: number) => void;
-  completedSteps: Set<number>;
-  lockedSteps?: Set<number>;
-  /* P0 #3 · per-step count of unmet required fields → red badge */
-  issueCounts?: Map<number, number>;
-  /* P0 #5b · translator passed down so step labels localize at render */
-  t: (key: string, fallback?: string) => string;
-}) {
-  return (
-    <div className="bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] px-2 py-2 mb-6">
-      <div className="flex items-center gap-1 overflow-x-auto scrollbar-none">
-        {steps.map((step, i) => {
-          const isActive = i === currentStep;
-          const isCompleted = completedSteps.has(i);
-          const isPast = i < currentStep;
-          const isLocked = !!lockedSteps?.has(i);
-          /* P0 #3 · this step has unmet required fields. We only
-             surface it as an error AWAY from the active step — while
-             you're filling a step, a red badge on it is just noise. */
-          const issueCount = issueCounts?.get(i) || 0;
-          const hasIssue = issueCount > 0 && !isLocked && !isActive;
-          return (
-            <button
-              key={step.id}
-              onClick={() => { if (!isLocked) onStepChange(i); }}
-              disabled={isLocked}
-              title={
-                isLocked
-                  ? t("wizard.completeClassificationFirst", "Complete classification first")
-                  : hasIssue
-                  ? t("validation.missingCount", `${issueCount} required field(s) missing`).replace("{n}", String(issueCount))
-                  : t(STEP_LABEL_KEY[step.id] ?? "", step.label)
-              }
-              className={`group relative flex items-center gap-2 px-4 py-2.5 rounded-xl text-[12px] font-medium transition-all shrink-0 ${
-                isLocked
-                  ? "text-[var(--text-ghost)]/60 cursor-not-allowed"
-                  : isActive
-                  ? "bg-[var(--bg-inverted)] text-[var(--text-inverted)] shadow-lg"
-                  : hasIssue
-                  ? "text-amber-500 hover:bg-amber-500/[0.06]"
-                  : isPast || isCompleted
-                  ? "text-[var(--text-muted)] hover:bg-[var(--bg-surface-subtle)]"
-                  : "text-[var(--text-ghost)] hover:text-[var(--text-dim)] hover:bg-[var(--bg-surface-subtle)]"
-              }`}
-            >
-              <div className={`relative h-5 w-5 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0 ${
-                isLocked ? "bg-[var(--bg-surface)]/60 text-[var(--text-ghost)]/50" :
-                isActive ? "bg-white/20" :
-                hasIssue ? "bg-amber-500/15 text-amber-500 ring-1 ring-amber-500/40" :
-                isCompleted ? "bg-emerald-500/20 text-emerald-400" :
-                "bg-[var(--bg-surface)] text-[var(--text-ghost)]"
-              }`}>
-                {isLocked
-                  ? <LockIcon className="h-3 w-3" />
-                  : hasIssue
-                  ? "!"
-                  : (isCompleted && !isActive ? <CheckIcon className="h-3 w-3" /> : i + 1)}
-              </div>
-              <span className="hidden md:inline">{t(STEP_SHORT_KEY[step.id] ?? "", step.shortLabel)}</span>
-              {hasIssue && (
-                <span className="ml-0.5 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-amber-500 px-1 text-[9px] font-bold text-black">
-                  {issueCount}
-                </span>
-              )}
-              {i < steps.length - 1 && (
-                <AngleRightIcon className="h-3 w-3 text-[var(--text-ghost)] ml-1 hidden lg:block" />
-              )}
-            </button>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
 
 /* ═══════════════════════════════════════════════════════════════════
    TOGGLE COMPONENT
@@ -709,7 +611,6 @@ export default function ProductForm({ productId }: Props) {
   /* Directional pane swap (owner pick 3A): later tab slides in from the end,
      earlier tab from the start; RTL flips in CSS. */
   const tabMotion = useTabMotion(currentStep);
-  const [completedSteps, setCompletedSteps] = useState<Set<number>>(new Set());
 
   /* ── UI state ── */
   const [slugEdited, setSlugEdited] = useState(false);
@@ -2416,82 +2317,32 @@ export default function ProductForm({ productId }: Props) {
         ? "bg-[var(--bg-inverted)] text-[var(--text-inverted)]"
         : "bg-[var(--bg-surface)] text-[var(--text-primary)] border border-[var(--border-subtle)] hover:bg-[var(--bg-surface-subtle)]";
 
-  /* ── Classification-gated lock ──
-     Classification is complete at Division → Category → Subcategory.
-     The machine kind (4th tier inside Classify) is OPTIONAL — it
-     refines the spec template when chosen, but the operator can skip
-     it, so it does NOT gate the rest of the form. The kind slug rides
-     inside sewingSpecs.common_specs.machine_kind; template_slug is
-     kept as a back-compat fallback for products saved before the
-     kind selector shipped. */
-  const classificationComplete =
-    !!product.division_slug &&
-    !!product.category_slug &&
-    !!product.subcategory_slug;
-
-  const lockedSteps = useMemo(() => {
-    const set = new Set<number>();
-    steps.forEach((s, i) => {
-      // Everything after classify is locked until classification is complete
-      if (s.id !== "classify" && !classificationComplete) set.add(i);
-    });
-    return set;
-  }, [steps, classificationComplete]);
 
   /* ── Editor mode ──
-     `tabbed`: each section is its OWN screen, navigated freely via a clean
-     tab bar (only the active section renders) — no step numbers, no locks,
-     no forced Next/Back. The header "Save Product" button saves from any tab.
-     `onePage` (the all-sections-stacked scroll variant) and the original
-     numbered wizard are both kept behind their flags for fallback. */
-  const tabbed = true;
+     Tabbed only. The numbered wizard and the one-page scroll variant were
+     "kept behind their flags for fallback" — and the flags were const
+     true/false, which is not a fallback: it was ~200 lines of dead branches
+     parsed on every build and shipped in the editor chunk on every open.
+     Removed 2026-08-28. `onePage` stays as a const because the
+     section-render conditionals read it; the branches that could never run
+     are gone. */
   const onePage = false;
 
-  /* ── Step / tab navigation ── */
+  /* ── Tab navigation — free movement, no locks, no forced order ── */
   const goToStep = (idx: number) => {
     const safeIdx = Math.max(0, Math.min(idx, steps.length - 1));
-    if (tabbed) {
-      // free navigation between tabs — no lock gate
-      setError("");
-      setCurrentStep(safeIdx);
-      if (typeof window !== "undefined") window.scrollTo({ top: 0, behavior: "smooth" });
-      return;
-    }
-    if (onePage) {
-      const id = steps[safeIdx]?.id;
-      if (id && typeof document !== "undefined") {
-        document.getElementById(`sec-${id}`)?.scrollIntoView({ behavior: "smooth", block: "start" });
-      }
-      return;
-    }
-    if (lockedSteps.has(safeIdx)) {
-      const target = steps[safeIdx];
-      if (target?.id === "sewing-specs") {
-        setError(t("wizard.selectMachineTypeFirst", "Select a machine type before entering specs"));
-      } else {
-        setError(t("wizard.unlockStepHint", "Complete the classification first to unlock this step"));
-      }
-      return;
-    }
-    // Mark current step as completed when moving forward
-    if (safeIdx > currentStep) {
-      setCompletedSteps(prev => new Set([...prev, currentStep]));
-    }
     setError("");
     setCurrentStep(safeIdx);
-    window.scrollTo({ top: 0, behavior: "smooth" });
+    if (typeof window !== "undefined") window.scrollTo({ top: 0, behavior: "smooth" });
   };
-
-  const nextStep = () => goToStep(currentStep + 1);
-  const prevStep = () => goToStep(currentStep - 1);
 
   /* ── P0 #3 · Wizard Data Integrity — required-field source of truth ──
      ONE authoritative map of stepId → missing required-field labels.
-     It drives four consumers so they can never disagree:
-       1. the per-step "Next" gate (validateCurrentStep)
-       2. the StepNav error badges (visual-first count per step)
-       3. the publish guard inside save()
-       4. the finalize readiness banner
+     It drives two consumers so they can never disagree:
+       1. the publish guard inside save()
+       2. the finalize readiness banner
+     (The per-step "Next" gate and the StepNav badges were consumers of the
+      numbered-wizard path, removed 2026-08-28 as dead code.)
      Data-safety rule: this set is the *identity-critical* core only
      (name · classification · machine kind · primary model). Draft
      saves are never blocked on it — only publishing to `active` is
@@ -2517,18 +2368,6 @@ export default function ProductForm({ productId }: Props) {
     primaryModel?.primary_model,
     t,
   ]);
-
-  /* Map of step index → count of unmet required fields, for the
-     StepNav badge. Indexed by position so the nav can render it
-     without re-deriving anything. */
-  const stepIssueCount = useMemo(() => {
-    const m = new Map<number, number>();
-    steps.forEach((s, i) => {
-      const n = requiredIssues[s.id]?.length || 0;
-      if (n > 0) m.set(i, n);
-    });
-    return m;
-  }, [steps, requiredIssues]);
 
   const missingRequiredLabels = useMemo(
     () => Object.values(requiredIssues).flat(),
@@ -2556,30 +2395,6 @@ export default function ProductForm({ productId }: Props) {
     return gaps;
   }, [missingRequiredLabels, media, primaryModel?.global_price, translations, t]);
 
-  /* ── Validation per step ──
-     Generalised over the required-set above: leaving a step is
-     blocked only by that step's OWN unmet required fields, so the
-     admin can still skip ahead past steps whose gaps live elsewhere. */
-  const validateCurrentStep = (): string | null => {
-    const stepId = steps[currentStep]?.id;
-    const issues = stepId ? requiredIssues[stepId] : undefined;
-    if (issues && issues.length > 0) {
-      return issues.length === 1
-        ? t("validation.fieldRequiredToContinue").replace("{field}", issues[0])
-        : t("validation.completeRequiredList").replace("{fields}", issues.join(", "));
-    }
-    return null;
-  };
-
-  const handleNext = () => {
-    const err = validateCurrentStep();
-    if (err) {
-      setError(err);
-      return;
-    }
-    setError("");
-    nextStep();
-  };
 
   /* ═══════════════════════════════════════════════
      SAVE
@@ -3341,23 +3156,11 @@ export default function ProductForm({ productId }: Props) {
         {/* ═══ NAVIGATION ═══
               Tabbed → clean sticky tab bar (each tab is its own screen).
               One-page → scrolling section index. Legacy → numbered stepper. */}
-        {tabbed ? (
-          <SectionTabs
-            items={steps.map((s, i) => ({ index: i, id: s.id, label: t(STEP_SHORT_KEY[s.id] ?? "", s.shortLabel || s.label) }))}
-            activeIndex={currentStep}
-            onSelect={goToStep}
-          />
-        ) : (
-          <StepNav
-            steps={steps}
-            currentStep={currentStep}
-            onStepChange={goToStep}
-            completedSteps={completedSteps}
-            lockedSteps={lockedSteps}
-            issueCounts={stepIssueCount}
-            t={t}
-          />
-        )}
+        <SectionTabs
+          items={steps.map((s, i) => ({ index: i, id: s.id, label: t(STEP_SHORT_KEY[s.id] ?? "", s.shortLabel || s.label) }))}
+          activeIndex={currentStep}
+          onSelect={goToStep}
+        />
 
         {/* ═══ FAMILY STRIP — the second tab slider. Picks WHICH member the
             main tabs edit; "+" appends a member and jumps to Hero. ═══ */}
@@ -6441,45 +6244,6 @@ export default function ProductForm({ productId }: Props) {
           );
         })()}
         </div>
-
-        {/* ═══ STEP NAVIGATION BUTTONS ═══ */}
-        {!onePage && !tabbed && (
-        <div className="flex items-center justify-between mt-8 mb-4">
-          <button
-            onClick={prevStep}
-            disabled={currentStep === 0}
-            className="h-10 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[13px] font-semibold text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all disabled:opacity-30 disabled:cursor-not-allowed flex items-center gap-2"
-          >
-            <ArrowLeftIcon className="h-4 w-4" /> {t("wizard.previous", "Previous")}
-          </button>
-
-          <div className="text-[11px] text-[var(--text-ghost)]">
-            {t("wizard.stepOf", "Step {current} of {total}").replace("{current}", String(currentStep + 1)).replace("{total}", String(steps.length))}
-          </div>
-
-          {currentStep < steps.length - 1 ? (
-            <button
-              onClick={handleNext}
-              className="h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold transition-all flex items-center gap-2 shadow-lg"
-            >
-              {t("action.next", "Next")} <ArrowRightIcon className="h-4 w-4" />
-            </button>
-          ) : (
-            /* Smart Save: label + colour driven by the chosen
-               status. Matches the preview card on the Review step
-               so admins always see the same wording in both
-               places. */
-            <button
-              onClick={save}
-              disabled={saving}
-              className={`h-10 px-6 rounded-xl text-[13px] font-semibold transition-all disabled:opacity-50 flex items-center gap-2 shadow-lg ${saveBtnCls}`}
-            >
-              {saving ? <SpinnerIcon className="h-4 w-4" /> : <DiskIcon className="h-4 w-4" />}
-              {saving ? t("action.saving", "Saving...") : saveLabel}
-            </button>
-          )}
-        </div>
-        )}
 
         <div className="h-12" />
       </div>
