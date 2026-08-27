@@ -6789,9 +6789,15 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
           </div>
         )}
         {/* Compact KPI strip — stacked mode only (in split view the full
-            dashboard is the right panel, so this would be a duplicate) */}
+            dashboard is the right panel, so this would be a duplicate).
+            relative z-10 on every strip: the zero-height ramp above hangs a
+            2.5rem blur band over the top of the list (z-[5]) meant to frost
+            SCROLLING rows — the KPI strip sits statically inside that band,
+            so without a lift its numbers render permanently smeared. Same
+            treatment as the alphabet headers, and for the same reason: it is
+            content the reader scans, not passing rows. */}
         {moduleKpis && filterType === "customer" && (
-          <div className={`${splitView ? "hidden" : "grid"} grid-cols-4 gap-2 px-4 py-3 border-b border-[var(--border-color)]`}>
+          <div className={`${splitView ? "hidden" : "grid"} relative z-10 grid-cols-4 gap-2 px-4 py-3 border-b border-[var(--border-color)]`}>
             <div className="kx-stat bg-[var(--bg-primary)] border border-[var(--border-color)] rounded-lg p-2.5 text-center">
               <p className="text-lg font-bold text-[var(--text-primary)]">{moduleKpis.total}</p>
               <p className="text-[8px] font-semibold uppercase tracking-widest text-[var(--text-dim)]">{t("kpi.total")}</p>
@@ -6812,7 +6818,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
         )}
         {/* Compact KPI strip — stacked mode only (supplier variant) */}
         {supplierKpis && filterType === "supplier" && (
-          <div className={`${splitView ? "hidden" : "grid"} grid-cols-4 gap-2 px-4 py-3 border-b border-[var(--border-color)]`}>
+          <div className={`${splitView ? "hidden" : "grid"} relative z-10 grid-cols-4 gap-2 px-4 py-3 border-b border-[var(--border-color)]`}>
             <div className="kx-stat bg-[var(--bg-primary)] border border-[var(--border-color)] rounded-lg p-2.5 text-center">
               <p className="text-lg font-bold text-[var(--text-primary)]">{supplierKpis.total}</p>
               <p className="text-[8px] font-semibold uppercase tracking-widest text-[var(--text-dim)]">{t("kpi.total")}</p>
@@ -6834,7 +6840,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
 
         {/* Compact KPI strip — stacked mode only (employee/company/people) */}
         {moduleKpis && filterType && filterType !== "customer" && filterType !== "supplier" && (
-          <div className={`${splitView ? "hidden" : "grid"} grid-cols-4 gap-2 px-4 py-3 border-b border-[var(--border-color)]`}>
+          <div className={`${splitView ? "hidden" : "grid"} relative z-10 grid-cols-4 gap-2 px-4 py-3 border-b border-[var(--border-color)]`}>
             <div className="kx-stat bg-[var(--bg-primary)] border border-[var(--border-color)] rounded-lg p-2.5 text-center">
               <p className="text-lg font-bold text-[var(--text-primary)]">{moduleKpis.total}</p>
               <p className="text-[8px] font-semibold uppercase tracking-widest text-[var(--text-dim)]">{t("kpi.total")}</p>
