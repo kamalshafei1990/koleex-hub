@@ -5059,13 +5059,6 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
   /* ── i18n ── */
   const { t, lang } = useTranslation(contactsT);
   const aurora = useSkin() === "aurora";
-  /* True once the list has actually scrolled. Gates the edge-blur ramp:
-     at rest NOTHING is approaching the bar, so the band must not paint —
-     it was washing whatever static block sat in its 2.5rem tail (first the
-     KPI digits, then the A letterbar once the strip was lifted). The ref
-     keeps the per-frame scroll handler from re-setting state. */
-  const [listScrolled, setListScrolled] = useState(false);
-  const listScrolledRef = useRef(false);
   const router = useRouter();
   /** Translate a dropdown option value. Falls back to the raw value. */
   const tOpt = (val: string) => t("opt." + val, val);
@@ -6763,60 +6756,16 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
           their surface. This list is the Hub's longest (the scale target is
           6,000 contacts) — see the rule in globals for why repeated items
           never get a blur pass. */}
-        <div
-          className="kx-flat-items flex-1 overflow-y-auto will-change-scroll"
-          onScroll={(e) => {
-            const sc = e.currentTarget.scrollTop > 8;
-            if (sc !== listScrolledRef.current) { listScrolledRef.current = sc; setListScrolled(sc); }
-          }}
-        >
-        {/* LIST EDGE — the same ramp Purchase runs, moved to the surface that
-            actually scrolls.
-
-            This app fails the header-ramp entry test on purpose: its list
-            lives in this container, which starts ~150px below the header, so
-            nothing ever passes beneath the main header and a ramp up there
-            would frost empty air while softening the static title. The edge
-            belongs to the scrollport the content moves through — here.
-
-            Hosted on a sticky h-0 wrapper so it pins to the list's own top
-            edge and costs ZERO layout: kx-bar-prog is absolutely positioned
-            and `inset: 0 0 calc(var(--kx-ramp-ext) * -1) 0` grows it downward
-            out of a zero-height box. No new CSS — one recipe for every edge on
-            the Hub.
-
-            IT NEEDS A z-index, AND MY FIRST VERSION LEFT IT OUT. Without one
-            the rows — later siblings in the same stacking context — paint ON
-            TOP of the layer, so backdrop-filter samples the page behind the
-            list and the rows scroll past perfectly crisp. It looked mounted
-            and measured correct (0-height host, 40px band, four layers) while
-            doing nothing at all. Proved by lifting it live: the moment the
-            host got a z the rows entering the band went soft.
-
-            z-[5] puts it above the rows; the alphabet headers take z-10 to
-            stay above IT, since they pin into exactly this band and are the
-            one thing the reader scans for.
-
-            OPACITY-GATED ON SCROLL: at rest the band was washing whatever
-            static block sat inside its 2.5rem tail — first the KPI digits,
-            then (once those were lifted) the A letterbar. The frost exists
-            for rows APPROACHING the bar, and at scrollTop 0 nothing is
-            approaching, so the layer only appears once the list moves. */}
-        {aurora && (
-          <div aria-hidden className={`kx-bar-host sticky top-0 z-[5] h-0 pointer-events-none [--kx-ramp-ext:2.5rem] transition-opacity duration-200 ${listScrolled ? "opacity-100" : "opacity-0"}`}>
-            <div className="kx-glass-bar kx-bar-prog"><i /><i /><i /><i /></div>
-          </div>
-        )}
+        <div className="kx-flat-items flex-1 overflow-y-auto will-change-scroll">
+        {/* No edge-blur ramp on this list — owner decision (2026-08-28):
+            after three rounds it kept frosting whatever static block sat in
+            its resting tail (KPI digits, then the A letterbar). "remove edge
+            blur here if this will make a problem." The letterbars and rows
+            render plain; the sticky bars above carry their own surfaces. */}
         {/* Compact KPI strip — stacked mode only (in split view the full
-            dashboard is the right panel, so this would be a duplicate).
-            relative z-10 on every strip: the zero-height ramp above hangs a
-            2.5rem blur band over the top of the list (z-[5]) meant to frost
-            SCROLLING rows — the KPI strip sits statically inside that band,
-            so without a lift its numbers render permanently smeared. Same
-            treatment as the alphabet headers, and for the same reason: it is
-            content the reader scans, not passing rows. */}
+            dashboard is the right panel, so this would be a duplicate) */}
         {moduleKpis && filterType === "customer" && (
-          <div className={`${splitView ? "hidden" : "grid"} relative z-10 grid-cols-4 gap-2 px-4 py-3 border-b border-[var(--border-color)]`}>
+          <div className={`${splitView ? "hidden" : "grid"} grid-cols-4 gap-2 px-4 py-3 border-b border-[var(--border-color)]`}>
             <div className="kx-stat bg-[var(--bg-primary)] border border-[var(--border-color)] rounded-lg p-2.5 text-center">
               <p className="text-lg font-bold text-[var(--text-primary)]">{moduleKpis.total}</p>
               <p className="text-[8px] font-semibold uppercase tracking-widest text-[var(--text-dim)]">{t("kpi.total")}</p>
@@ -6837,7 +6786,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
         )}
         {/* Compact KPI strip — stacked mode only (supplier variant) */}
         {supplierKpis && filterType === "supplier" && (
-          <div className={`${splitView ? "hidden" : "grid"} relative z-10 grid-cols-4 gap-2 px-4 py-3 border-b border-[var(--border-color)]`}>
+          <div className={`${splitView ? "hidden" : "grid"} grid-cols-4 gap-2 px-4 py-3 border-b border-[var(--border-color)]`}>
             <div className="kx-stat bg-[var(--bg-primary)] border border-[var(--border-color)] rounded-lg p-2.5 text-center">
               <p className="text-lg font-bold text-[var(--text-primary)]">{supplierKpis.total}</p>
               <p className="text-[8px] font-semibold uppercase tracking-widest text-[var(--text-dim)]">{t("kpi.total")}</p>
@@ -6859,7 +6808,7 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
 
         {/* Compact KPI strip — stacked mode only (employee/company/people) */}
         {moduleKpis && filterType && filterType !== "customer" && filterType !== "supplier" && (
-          <div className={`${splitView ? "hidden" : "grid"} relative z-10 grid-cols-4 gap-2 px-4 py-3 border-b border-[var(--border-color)]`}>
+          <div className={`${splitView ? "hidden" : "grid"} grid-cols-4 gap-2 px-4 py-3 border-b border-[var(--border-color)]`}>
             <div className="kx-stat bg-[var(--bg-primary)] border border-[var(--border-color)] rounded-lg p-2.5 text-center">
               <p className="text-lg font-bold text-[var(--text-primary)]">{moduleKpis.total}</p>
               <p className="text-[8px] font-semibold uppercase tracking-widest text-[var(--text-dim)]">{t("kpi.total")}</p>
