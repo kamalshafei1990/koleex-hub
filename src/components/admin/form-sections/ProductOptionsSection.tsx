@@ -454,7 +454,10 @@ export default function ProductOptionsSection({ productId }: { productId: string
                     e.preventDefault();
                     void setImage(o.key, v.key, item.getAsFile());
                   }}
-                  className="flex gap-3 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)]/40 p-2.5"
+                  /* Column on phones: the 128px tile plus the input row cannot share
+                     375px, and shrinking the photo defeats the owner's whole request —
+                     so the photo sits ON TOP at full size and the rows follow. */
+                  className="flex flex-col sm:flex-row gap-3 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)]/40 p-2.5"
                 >
                   <div className="relative shrink-0">
                     <button
@@ -462,7 +465,7 @@ export default function ProductOptionsSection({ productId }: { productId: string
                       onClick={() => fileRefs.current[v.key]?.click()}
                       onDragOver={(e) => e.preventDefault()}
                       onDrop={(e) => { e.preventDefault(); void setImage(o.key, v.key, e.dataTransfer.files?.[0] ?? null); }}
-                      className="h-20 w-20 overflow-hidden rounded-lg border border-[var(--border-subtle)] bg-gradient-to-b from-white to-[#f4f5f7] flex flex-col items-center justify-center gap-1 text-gray-400 hover:border-[var(--border-strong)] transition-colors"
+                      className="h-32 w-32 overflow-hidden rounded-lg border border-[var(--border-subtle)] bg-gradient-to-b from-white to-[#f4f5f7] flex flex-col items-center justify-center gap-1.5 text-gray-400 hover:border-[var(--border-strong)] transition-colors"
                       title="Click, drop or paste a photo"
                     >
                       {v.image_url ? (
@@ -470,8 +473,8 @@ export default function ProductOptionsSection({ productId }: { productId: string
                         <img src={v.image_url} alt={v.label || "option"} className="h-full w-full object-cover" />
                       ) : (
                         <>
-                          <ImageRawIcon className="h-6 w-6 text-gray-300" />
-                          <span className="px-1 text-center text-[8.5px] leading-tight">Click · drop · paste</span>
+                          <ImageRawIcon className="h-9 w-9 text-gray-300" />
+                          <span className="px-1 text-center text-[10px] leading-tight">Click · drop · paste</span>
                         </>
                       )}
                     </button>
@@ -494,7 +497,9 @@ export default function ProductOptionsSection({ productId }: { productId: string
                     onChange={(e) => void setImage(o.key, v.key, e.target.files?.[0] ?? null)}
                   />
 
-                  <div className="min-w-0 flex-1 space-y-2">
+                  {/* justify-center: the tile is taller than the two content rows,
+                      and top-hung rows leave the card visually bottom-empty. */}
+                  <div className="min-w-0 flex-1 flex flex-col justify-center gap-2">
                     {/* row 1 — identity */}
                     <div className="flex flex-wrap items-center gap-2">
                       <input
