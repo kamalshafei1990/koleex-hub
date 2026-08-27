@@ -41,7 +41,8 @@ interface Detail {
     started_at: string;
     last_seen_at: string;
   }>;
-  recent_activity: Array<{
+  day: string;
+  day_events: Array<{
     id: string;
     event_type: string;
     title: string | null;
@@ -50,6 +51,7 @@ interface Detail {
     severity: string;
     created_at: string;
   }>;
+  usage: { today_s: number; last7_s: number; last30_s: number };
   devices: Array<Record<string, unknown>>;
   login_history: Array<Record<string, unknown>>;
   failed_logins: Array<Record<string, unknown>>;
@@ -66,6 +68,76 @@ const dot: Record<string, string> = {
   idle: "bg-[#FFCC00]",
   offline: "bg-[var(--text-ghost)]",
 };
+
+function shiftDay(day: string, delta: number): string {
+  return new Date(new Date(`${day}T00:00:00Z`).getTime() + delta * 86400_000).toISOString().slice(0, 10);
+}
+/* Day/Month/Year — the house date rule. */
+function dmyLabel(day: string): string {
+  const [y, m, d] = day.split("-");
+  return `${d}/${m}/${y}`;
+}
+function fmtDur(seconds: number): string {
+  if (!seconds) return "0m";
+  if (seconds < 3600) return `${Math.round(seconds / 60)}m`;
+  const h = seconds / 3600;
+  return `${h >= 10 ? Math.round(h) : h.toFixed(1)}h`;
+}
+
+type JourneyRow =
+  | { kind: "segment"; time: string; label: string; duration: string | null }
+  | { kind: "event"; time: string; label: string; severity: string };
+
+/* Fold a day's raw events (ascending) into a readable journey:
+   consecutive page views inside one module become a single "Quotations —
+   35m" segment; a gap longer than 15 minutes closes the segment (idle);
+   everything that is not a routine page view — logins, session ends,
+   warnings — interrupts as its own row. Pure derivation over data the
+   monitor already collects: no new tracking, no schema change. */
+function buildJourney(events: Detail["day_events"]): JourneyRow[] {
+  const GAP_MS = 15 * 60 * 1000;
+  const out: JourneyRow[] = [];
+  /* 24-hour, fixed width — "01:23 PM" wrapped the narrow time gutter onto
+     two lines and made every row twice as tall. */
+  const hhmm = (ts: string) =>
+    new Date(ts).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: false });
+  const durTxt = (ms: number) => {
+    const m = Math.round(ms / 60000);
+    if (m < 1) return null;
+    if (m < 60) return `${m}m`;
+    return `${Math.floor(m / 60)}h ${m % 60}m`;
+  };
+
+  let seg: { module: string; start: string; last: string } | null = null;
+  const flush = () => {
+    if (!seg) return;
+    const ms = new Date(seg.last).getTime() - new Date(seg.start).getTime();
+    out.push({ kind: "segment", time: hhmm(seg.start), label: seg.module, duration: durTxt(ms) });
+    seg = null;
+  };
+
+  for (const e of events) {
+    /* session_end fires on every tab close and idle timeout — ten "Left the
+       app" rows per afternoon, drowning the journey exactly the way raw page
+       views drowned the feed. The segments already end where the person
+       stopped; the row adds nothing. */
+    if (e.event_type === "session_end") continue;
+    if (e.event_type === "page_view") {
+      const mod = e.module || e.route || "App";
+      if (seg && seg.module === mod && new Date(e.created_at).getTime() - new Date(seg.last).getTime() < GAP_MS) {
+        seg.last = e.created_at;
+        continue;
+      }
+      flush();
+      seg = { module: mod, start: e.created_at, last: e.created_at };
+      continue;
+    }
+    flush();
+    out.push({ kind: "event", time: hhmm(e.created_at), label: eventLabel(e) || e.event_type, severity: e.severity });
+  }
+  flush();
+  return out;
+}
 
 function Section({ title, icon, children }: { title: string; icon: React.ReactNode; children: React.ReactNode }) {
   return (
@@ -91,15 +163,18 @@ export default function UserActivityDrawer({
   const [detail, setDetail] = useState<Detail | null>(null);
   const [loading, setLoading] = useState(true);
   const [revoking, setRevoking] = useState<string | null>(null);
+  /* Which (UTC) day's journey is shown — same day convention as usage_daily,
+     so the hour chips and the journey can never disagree about "today". */
+  const [day, setDay] = useState(() => new Date().toISOString().slice(0, 10));
 
   const load = useCallback(async () => {
     try {
-      const res = await fetch(`/api/super-admin/user/${accountId}`, { credentials: "include" });
+      const res = await fetch(`/api/super-admin/user/${accountId}?day=${day}`, { credentials: "include" });
       if (res.ok) setDetail((await res.json()) as Detail);
     } finally {
       setLoading(false);
     }
-  }, [accountId]);
+  }, [accountId, day]);
 
   useEffect(() => {
     void load();
@@ -194,20 +269,55 @@ export default function UserActivityDrawer({
               )}
             </Section>
 
-            {/* Recent activity timeline */}
-            <Section title="Recent activity" icon={<ActivityIcon className="h-3.5 w-3.5" />}>
-              {detail.recent_activity.length === 0 ? (
-                <p className="text-[12px] text-[var(--text-ghost)]">No activity yet.</p>
+            {/* The person's DAY, as a journey — the owner's question is
+                "what is he doing / what did he do", and fifty raw page-view
+                rows do not answer it. Same events, read as a story: page
+                views merge into "35m in Quotations" segments; logins,
+                warnings and anything non-routine stay as their own marked
+                rows inside the flow. */}
+            <Section title="Journey" icon={<ActivityIcon className="h-3.5 w-3.5" />}>
+              <div className="mb-2.5 flex items-center justify-between">
+                <div className="flex items-center gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => setDay(shiftDay(day, -1))}
+                    className="h-6 w-6 inline-flex items-center justify-center rounded-md border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)]"
+                    aria-label="Previous day"
+                  >‹</button>
+                  <span className="text-[11.5px] font-medium tabular-nums text-[var(--text-secondary)]">{dmyLabel(day)}</span>
+                  <button
+                    type="button"
+                    onClick={() => setDay(shiftDay(day, 1))}
+                    disabled={day >= new Date().toISOString().slice(0, 10)}
+                    className="h-6 w-6 inline-flex items-center justify-center rounded-md border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)] disabled:opacity-30"
+                    aria-label="Next day"
+                  >›</button>
+                </div>
+                <div className="flex items-center gap-1.5 text-[10.5px] text-[var(--text-dim)]">
+                  <span className="rounded-md border border-[var(--border-subtle)] px-1.5 py-0.5">Today {fmtDur(detail.usage.today_s)}</span>
+                  <span className="rounded-md border border-[var(--border-subtle)] px-1.5 py-0.5">7d {fmtDur(detail.usage.last7_s)}</span>
+                  <span className="rounded-md border border-[var(--border-subtle)] px-1.5 py-0.5">30d {fmtDur(detail.usage.last30_s)}</span>
+                </div>
+              </div>
+              {buildJourney(detail.day_events).length === 0 ? (
+                <p className="text-[12px] text-[var(--text-ghost)]">No activity on this day.</p>
               ) : (
-                <ul className="space-y-1.5">
-                  {detail.recent_activity.map((a) => (
-                    <li key={a.id} className="flex items-start gap-2 text-[12px]">
-                      <span className={`mt-1.5 h-1.5 w-1.5 rounded-full shrink-0 ${a.severity === "critical" ? "bg-[#FF3333]" : a.severity === "warning" ? "bg-[#FFCC00]" : "bg-[var(--text-ghost)]"}`} />
-                      <div className="flex-1 min-w-0">
-                        <span className="text-[var(--text-primary)]">{eventLabel(a)}</span>
-                        <span className="text-[var(--text-dim)]"> · {a.module || a.route || "—"}</span>
-                      </div>
-                      <span className="text-[10.5px] text-[var(--text-ghost)] shrink-0">{fmt(a.created_at)}</span>
+                <ul className="space-y-1">
+                  {buildJourney(detail.day_events).map((seg, i) => (
+                    <li key={i} className="flex items-start gap-2.5 text-[12px]">
+                      <span className="w-[38px] shrink-0 text-[10.5px] tabular-nums text-[var(--text-ghost)] pt-0.5">{seg.time}</span>
+                      {seg.kind === "segment" ? (
+                        <div className="flex-1 min-w-0 flex items-center gap-2">
+                          <span className="h-1.5 w-1.5 rounded-full bg-[var(--text-ghost)] shrink-0" />
+                          <span className="text-[var(--text-primary)] truncate">{seg.label}</span>
+                          {seg.duration && <span className="text-[10.5px] text-[var(--text-dim)] shrink-0">{seg.duration}</span>}
+                        </div>
+                      ) : (
+                        <div className="flex-1 min-w-0 flex items-center gap-2">
+                          <span className={`h-1.5 w-1.5 rounded-full shrink-0 ${seg.severity === "critical" ? "bg-[#FF3333]" : seg.severity === "warning" ? "bg-[#FFCC00]" : "bg-[#7FA9D6]"}`} />
+                          <span className={`truncate ${seg.severity === "critical" ? "text-[#FF6B6B]" : seg.severity === "warning" ? "text-[#FFCC00]" : "text-[var(--text-secondary)]"}`}>{seg.label}</span>
+                        </div>
+                      )}
                     </li>
                   ))}
                 </ul>

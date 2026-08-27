@@ -156,6 +156,87 @@ export async function onlineUsers(): Promise<OnlineUserRow[]> {
   }));
 }
 
+/* ── The person view of "who is online" ────────────────────────────────────
+   The session list answers "what connections exist"; the owner's questions
+   are about PEOPLE: who is on, when did they sign in, how long have they
+   been on today, what are they doing. One row per account, with the live
+   sessions folded in as a device count, today's accurate seconds joined
+   from usage_daily, and the first successful login of the (UTC) day — the
+   same day convention usage_daily itself uses, so the two numbers can never
+   disagree about what "today" means. */
+export interface OnlinePersonRow {
+  account: AccountInfo;
+  status: LiveStatus;
+  device_count: number;
+  sessions: OnlineUserRow[];
+  current_route: string | null;
+  current_module: string | null;
+  signed_in_today_at: string | null;
+  today_seconds: number;
+  last_seen_at: string;
+}
+
+export async function onlinePeople(): Promise<OnlinePersonRow[]> {
+  const sessions = await onlineUsers();
+  const byAccount = new Map<string, OnlineUserRow[]>();
+  for (const s of sessions) {
+    const arr = byAccount.get(s.account.account_id) ?? [];
+    arr.push(s);
+    byAccount.set(s.account.account_id, arr);
+  }
+  const ids = [...byAccount.keys()];
+  if (ids.length === 0) return [];
+
+  const todayStart = new Date().toISOString().slice(0, 10);
+  const [usageRes, loginRes] = await Promise.all([
+    supabaseServer
+      .from("usage_daily")
+      .select("account_id, active_seconds")
+      .eq("day", todayStart)
+      .in("account_id", ids),
+    supabaseServer
+      .from("account_login_history")
+      .select("account_id, created_at")
+      .eq("event_type", "login_success")
+      .gte("created_at", `${todayStart}T00:00:00Z`)
+      .in("account_id", ids)
+      .order("created_at", { ascending: true }),
+  ]);
+  const todayBy = new Map<string, number>();
+  for (const r of (usageRes.data ?? []) as Array<{ account_id: string; active_seconds: number }>) {
+    todayBy.set(r.account_id, (todayBy.get(r.account_id) ?? 0) + (r.active_seconds ?? 0));
+  }
+  /* ascending order → the FIRST row per account is the first login. */
+  const firstLogin = new Map<string, string>();
+  for (const r of (loginRes.data ?? []) as Array<{ account_id: string; created_at: string }>) {
+    if (!firstLogin.has(r.account_id)) firstLogin.set(r.account_id, r.created_at);
+  }
+
+  const rank: Record<LiveStatus, number> = { online: 0, idle: 1, offline: 2 };
+  return ids
+    .map((id) => {
+      /* onlineUsers is newest-activity-first, so [0] is the live session. */
+      const sess = byAccount.get(id)!;
+      const lead = sess[0];
+      const best = sess.reduce<LiveStatus>(
+        (acc, s) => (rank[s.status] < rank[acc] ? s.status : acc),
+        "offline",
+      );
+      return {
+        account: lead.account,
+        status: best,
+        device_count: sess.length,
+        sessions: sess,
+        current_route: lead.current_route,
+        current_module: lead.current_module,
+        signed_in_today_at: firstLogin.get(id) ?? null,
+        today_seconds: todayBy.get(id) ?? 0,
+        last_seen_at: lead.last_seen_at,
+      };
+    })
+    .sort((a, b) => rank[a.status] - rank[b.status] || (a.last_seen_at < b.last_seen_at ? 1 : -1));
+}
+
 export interface ActivityFilters {
   account_id?: string | null;
   module?: string | null;
@@ -309,16 +390,28 @@ export async function kpis(): Promise<Kpis> {
 export interface UserDetail {
   account: AccountInfo | null;
   sessions: OnlineUserRow[];
-  recent_activity: ActivityRow[];
+  /* The requested day's events, OLDEST first — the drawer reads them as a
+     journey (module → module with durations), which only makes sense in the
+     order it happened. */
+  day: string;
+  day_events: ActivityRow[];
+  usage: { today_s: number; last7_s: number; last30_s: number };
   devices: Array<Record<string, unknown>>;
   login_history: Array<Record<string, unknown>>;
   failed_logins: Array<Record<string, unknown>>;
 }
 
-/** Full activity detail for one account (for the drawer). */
-export async function userDetail(accountId: string): Promise<UserDetail> {
+/** Full activity detail for one account (for the drawer).
+    `day` — UTC day (YYYY-MM-DD, same convention as usage_daily) whose events
+    become the journey; defaults to today. */
+export async function userDetail(accountId: string, day?: string | null): Promise<UserDetail> {
+  const dayKey = day && /^\d{4}-\d{2}-\d{2}$/.test(day) ? day : new Date().toISOString().slice(0, 10);
+  const nextDay = new Date(new Date(`${dayKey}T00:00:00Z`).getTime() + 86400_000).toISOString().slice(0, 10);
+  const today = new Date().toISOString().slice(0, 10);
+  const d7 = new Date(Date.now() - 6 * 86400_000).toISOString().slice(0, 10);
+  const d30 = new Date(Date.now() - 29 * 86400_000).toISOString().slice(0, 10);
   const dir = await accountDirectory([accountId]);
-  const [sessRes, actRes, devRes, histRes, failRes] = await Promise.all([
+  const [sessRes, dayRes, usageRes, devRes, histRes, failRes] = await Promise.all([
     supabaseServer
       .from("app_sessions")
       .select(
@@ -327,7 +420,21 @@ export async function userDetail(accountId: string): Promise<UserDetail> {
       .eq("account_id", accountId)
       .order("last_seen_at", { ascending: false })
       .limit(50),
-    activityFeed({ account_id: accountId, limit: 50 }),
+    /* The whole day, ascending — a journey read newest-first is a story told
+       backwards. 500 caps a pathological day; a normal one is < 200 rows. */
+    supabaseServer
+      .from("activity_events")
+      .select("id, account_id, event_type, route, module, title, severity, ip, country, created_at")
+      .eq("account_id", accountId)
+      .gte("created_at", `${dayKey}T00:00:00Z`)
+      .lt("created_at", `${nextDay}T00:00:00Z`)
+      .order("created_at", { ascending: true })
+      .limit(500),
+    supabaseServer
+      .from("usage_daily")
+      .select("day, active_seconds")
+      .eq("account_id", accountId)
+      .gte("day", d30),
     supabaseServer
       .from("user_devices")
       .select("device_id, browser, os, device_type, last_ip, last_country, is_trusted, is_blocked, first_seen_at, last_seen_at")
@@ -388,10 +495,29 @@ export async function userDetail(accountId: string): Promise<UserDetail> {
     last_seen_at: r.last_seen_at,
   }));
 
+  const usageRows = (usageRes.data ?? []) as Array<{ day: string; active_seconds: number }>;
+  const sum = (from: string) =>
+    usageRows.filter((u) => u.day >= from).reduce((n, u) => n + (u.active_seconds ?? 0), 0);
+
+  const dayEvents = ((dayRes.data ?? []) as Array<Record<string, unknown>>).map((e) => ({
+    id: e.id as string,
+    account: acc ?? { account_id: accountId, email: null, name: null, username: null, role: null, avatar_url: null },
+    event_type: (e.event_type as string) ?? "event",
+    route: (e.route as string | null) ?? null,
+    module: (e.module as string | null) ?? null,
+    title: (e.title as string | null) ?? null,
+    severity: (e.severity as string) ?? "info",
+    ip: (e.ip as string | null) ?? null,
+    country: (e.country as string | null) ?? null,
+    created_at: e.created_at as string,
+  })) as ActivityRow[];
+
   return {
     account: acc,
     sessions,
-    recent_activity: actRes,
+    day: dayKey,
+    day_events: dayEvents,
+    usage: { today_s: sum(today), last7_s: sum(d7), last30_s: sum(d30) },
     devices: (devRes.data ?? []) as Array<Record<string, unknown>>,
     login_history: (histRes.data ?? []) as Array<Record<string, unknown>>,
     failed_logins: (failRes.data ?? []) as Array<Record<string, unknown>>,
