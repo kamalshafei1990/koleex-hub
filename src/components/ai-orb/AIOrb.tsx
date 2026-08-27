@@ -70,7 +70,9 @@ export default function AIOrb({
   useEffect(() => {
     try {
       const saved = window.localStorage.getItem("koleex-lang");
-      if (saved) setLang(saved);
+      /* microtask: keeps the read-after-mount behaviour (no SSR/hydration
+         mismatch) without a synchronous setState inside the effect body. */
+      if (saved) queueMicrotask(() => setLang(saved));
     } catch { /* ignore */ }
     const onLang = (e: Event) => setLang((e as CustomEvent<string>).detail || "en");
     window.addEventListener("langchange", onLang);

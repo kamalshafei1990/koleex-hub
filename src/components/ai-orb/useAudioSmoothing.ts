@@ -13,7 +13,9 @@ export function useAudioSmoothing(
   active: boolean,
 ) {
   const target = useRef(0);
-  target.current = clamp01(level);
+  useEffect(() => {
+    target.current = clamp01(level);
+  }, [level]);
 
   useEffect(() => {
     const el = ref.current;

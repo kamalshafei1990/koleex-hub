@@ -29,7 +29,7 @@ const inventoryNotAvailable: ToolDef<
   },
   requiredModule: "Inventory",
   requiredAction: "view",
-  handler: async (_ctx, _args): Promise<ToolResult<null>> => {
+  handler: async (): Promise<ToolResult<null>> => {
     return {
       ok: false,
       permissionStatus: "denied",

@@ -189,11 +189,6 @@ export function modeFor(intent: TaskIntent): TaskMode {
   return intent === "business" ? "business" : "chat";
 }
 
-/** Groq removed (owner decision, 2026-07-20): every mode → DeepSeek. */
-export function providerFor(_mode: TaskMode): ProviderName {
-  return "deepseek";
-}
-
 /** Build the correct prompt for a mode. Exposed so the voice pipeline
  *  and other callers can reuse it without importing prompt-builder
  *  directly. */

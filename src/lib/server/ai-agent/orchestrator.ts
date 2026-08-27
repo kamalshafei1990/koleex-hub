@@ -26,6 +26,7 @@ import type {
 } from "./types";
 import { openAiToolSchemas, dispatchTool } from "./tool-registry";
 import { brandKnowledgeFor, BRAND_EXCLUSIVITY_RULE, DIRECT_VOICE_RULE, EGYPTIAN_DIALECT_RULE, DATA_PROTECTION_RULE } from "./brand-knowledge";
+import { AI_PROVENANCE_RULE } from "../ai/prompt-builder";
 import { ENTITY_GUIDANCE_FULL } from "../ai/entity-scope";
 import { aiChat, aiProviderConfigured } from "@/lib/server/ai-provider";
 
@@ -320,11 +321,6 @@ function classifyBrandSection(msg: string): BrandSection {
   if (hitsAi) return "ai";
   if (hitsCompany) return "company";
   return "none";
-}
-
-/** Thin shim kept for callers that only need a bool. */
-function isBrandQuestion(msg: string): boolean {
-  return classifyBrandSection(msg) !== "none";
 }
 
 /* ─── Phase 7 exports for route-level streaming ───────────────────
@@ -687,8 +683,10 @@ export async function orchestrate(input: OrchestrateInput): Promise<AgentRespons
      until Groq is wired up. */
   if (!key) {
     if (!aiProviderConfigured()) {
+      /* User-facing copy: no vendor names (AI_PROVENANCE_RULE applies to
+         our own strings too — any signed-in employee can see this). */
       return fallback(
-        "Koleex AI isn't configured. Ask an admin to add an AI provider key (DeepSeek, Groq, Gemini, Anthropic, or OpenAI) in the Vercel env vars.",
+        "Koleex AI isn't configured yet. Ask an administrator to complete the AI setup in the deployment settings.",
         conversationId,
         userMessage,
       );
@@ -1346,6 +1344,8 @@ ${BRAND_EXCLUSIVITY_RULE}
 ${DIRECT_VOICE_RULE}
 
 ${DATA_PROTECTION_RULE}
+
+${AI_PROVENANCE_RULE}
 ${dialect === "egyptian" ? `\n${EGYPTIAN_DIALECT_RULE}\n` : ""}
 Current user: ${ctx.auth.username}.`;
 }
@@ -1467,6 +1467,8 @@ User: "who created you?"
 Reply: "I was built by Koleex International Group, with the vision driven by Mr. Kamal Shafei, the Founder and CEO. The goal behind me is to make communication and support easier across the Koleex ecosystem." (natural, first person, 2–4 sentences, no Q3/### markers).
 
 ---
+
+${AI_PROVENANCE_RULE}
 
 ${dialect === "egyptian" ? `${EGYPTIAN_DIALECT_RULE}\n\n` : ""}${brandKnowledgeFor(section)}`;
 }
@@ -1715,6 +1717,8 @@ You must follow these rules at all times:
 7. If you violate these rules, the system will override your response.
 
 Always prioritize correctness over completeness. Never hallucinate pricing.
+
+${AI_PROVENANCE_RULE}
 
 Current user: ${ctx.auth.username} (${ctx.auth.user_type}${ctx.isSuperAdmin ? ", super admin" : ""}).`;
 }
@@ -2849,8 +2853,10 @@ async function orchestrateNoGroq(
     `Reply concisely in the user's language (${userLang ?? "en"}). ` +
     "You currently do NOT have access to the company's live data (tool calls are disabled). " +
     "Be helpful for general questions and conversational turns. If asked to look up live data, " +
-    "explain that the tool-calling layer needs a Groq API key and offer to help with anything else. " +
-    BRAND_EXCLUSIVITY_RULE + "\n\n" + DIRECT_VOICE_RULE + "\n\n" + DATA_PROTECTION_RULE;
+    "say live-data lookups are temporarily unavailable and an administrator needs to finish the AI configuration — " +
+    "never name any provider, API or key — and offer to help with anything else. " +
+    BRAND_EXCLUSIVITY_RULE + "\n\n" + DIRECT_VOICE_RULE + "\n\n" + DATA_PROTECTION_RULE +
+    "\n\n" + AI_PROVENANCE_RULE;
 
   /* Trim history to the last few turns so the wire payload stays
      small — matches the Groq path which also caps history. */

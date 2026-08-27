@@ -64,6 +64,15 @@ export default function EmojiButton({
     ).slice(0, 200);
   }, [query]);
 
+  /* Closing resets search + tab so the next open starts fresh; done in
+     the close handlers (not an effect) so no setState runs inside an
+     effect body. */
+  const closePopover = useCallback(() => {
+    setOpen(false);
+    setQuery("");
+    setActiveCat(EMOJI_CATEGORIES[0].id);
+  }, []);
+
   /* Outside-click + Escape — same pattern as v1, both must close. */
   useEffect(() => {
     if (!open) return;
@@ -71,32 +80,29 @@ export default function EmojiButton({
       const target = e.target as Node;
       if (wrapperRef.current && wrapperRef.current.contains(target)) return;
       if (popoverRef.current && popoverRef.current.contains(target)) return;
-      setOpen(false);
+      closePopover();
     };
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
-  }, [open]);
+  }, [open, closePopover]);
 
   useEffect(() => {
     if (!open) return;
     const handler = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
-        setOpen(false);
+        closePopover();
         triggerRef.current?.focus();
       }
     };
     document.addEventListener("keydown", handler);
     return () => document.removeEventListener("keydown", handler);
-  }, [open]);
+  }, [open, closePopover]);
 
   /* When the popover opens, auto-focus the search input — matches
      iOS where the keyboard pops up ready to type. */
   useEffect(() => {
     if (open) {
       requestAnimationFrame(() => searchRef.current?.focus({ preventScroll: true }));
-    } else {
-      setQuery("");
-      setActiveCat(EMOJI_CATEGORIES[0].id);
     }
   }, [open]);
 
@@ -265,7 +271,7 @@ export default function EmojiButton({
       <button
         type="button"
         ref={triggerRef}
-        onClick={() => setOpen((v) => !v)}
+        onClick={() => (open ? closePopover() : setOpen(true))}
         aria-label={label}
         aria-expanded={open}
         aria-haspopup="dialog"

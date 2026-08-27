@@ -469,6 +469,8 @@ export default function KoleexAiApp() {
   const removeAttachment = useCallback((index: number) => {
     setAttachments((prev) => prev.filter((_, i) => i !== index));
   }, []);
+  /* Latest conversation id requested by openConversation — its stale-guard. */
+  const openReqRef = useRef<string | null>(null);
   /* Phase 12: AbortController for the in-flight send. Lets the user
      cancel a streaming reply mid-answer. Reset per-turn in send(). */
   const abortRef = useRef<AbortController | null>(null);
@@ -669,6 +671,10 @@ export default function KoleexAiApp() {
          currently-visible thread (silent dropped reply) and the
          server's keepalive timer keeps pinging until TCP drops. */
       abortRef.current?.abort();
+      /* Stale-guard: rapid A→B switching leaves two loads in flight; if
+         A resolves after B, its rows/error/spinner must not land on B. */
+      openReqRef.current = id;
+      const fresh = () => openReqRef.current === id;
       setActiveId(id);
       setMessages([]);
       setSidebarOpen(false);
@@ -677,6 +683,7 @@ export default function KoleexAiApp() {
         const res = await fetch(`/api/ai/conversations/${id}`, {
           credentials: "include",
         });
+        if (!fresh()) return;
         if (!res.ok) {
           /* Audit P1 #9 — surface a load error instead of silently
              showing the welcome card on an existing chat. */
@@ -684,11 +691,12 @@ export default function KoleexAiApp() {
           return;
         }
         const { messages: rows } = (await res.json()) as { messages: ChatMsg[] };
+        if (!fresh()) return;
         setMessages(rows ?? []);
       } catch (e) {
-        setError(humanizeError(e));
+        if (fresh()) setError(humanizeError(e));
       } finally {
-        setLoadingConv(false);
+        if (fresh()) setLoadingConv(false);
       }
     },
     [],
@@ -708,6 +716,9 @@ export default function KoleexAiApp() {
     });
     if (!res.ok) return;
     const { conversation } = (await res.json()) as { conversation: ConversationRow };
+    /* Invalidate any conversation load still in flight so its rows don't
+       land inside this fresh empty chat. */
+    openReqRef.current = conversation.id;
     setConversations((prev) => [conversation, ...prev]);
     setActiveId(conversation.id);
     setMessages([]);
@@ -1380,11 +1391,17 @@ export default function KoleexAiApp() {
   const confirmDeleteConversation = useCallback(async () => {
     const id = pendingDeleteId;
     if (!id) return;
+    /* ConfirmDialog never closes itself on confirm — the parent must.
+       Close first so a slow DELETE doesn't leave the dialog hanging. */
+    setPendingDeleteId(null);
     const res = await fetch(`/api/ai/conversations/${id}`, {
       method: "DELETE",
       credentials: "include",
     });
-    if (!res.ok) return;
+    if (!res.ok) {
+      setError(humanizeError(`HTTP ${res.status}`));
+      return;
+    }
     setConversations((prev) => prev.filter((c) => c.id !== id));
     if (activeId === id) {
       setActiveId(null);
@@ -1397,12 +1414,9 @@ export default function KoleexAiApp() {
     }
   }, [activeId, pendingDeleteId, activeIdKey]);
 
-  const renameConversation = useCallback(
-    (id: string, currentTitle: string) => {
-      askInput(copy.renamePrompt, (v) => void doRenameConversation(id, currentTitle, v), { initial: currentTitle, confirmLabel: copy.rename ?? "Rename" });
-    },
-    [askInput, copy],
-  );
+  /* Declared before renameConversation — a closure referencing a binding
+     declared later (TDZ) blocks React Compiler analysis for the whole
+     component. */
   const doRenameConversation = useCallback(
     async (id: string, currentTitle: string, next: string) => {
       if (!next || next.trim() === currentTitle) return;
@@ -1417,7 +1431,13 @@ export default function KoleexAiApp() {
         prev.map((c) => (c.id === id ? { ...c, title: next.trim() } : c)),
       );
     },
-    [copy.renamePrompt],
+    [],
+  );
+  const renameConversation = useCallback(
+    (id: string, currentTitle: string) => {
+      askInput(copy.renamePrompt, (v) => void doRenameConversation(id, currentTitle, v), { initial: currentTitle, confirmLabel: copy.rename ?? "Rename" });
+    },
+    [askInput, copy, doRenameConversation],
   );
 
   /* ── Pin / move a conversation ──
