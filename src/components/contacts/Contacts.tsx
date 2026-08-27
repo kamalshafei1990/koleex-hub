@@ -5059,6 +5059,13 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
   /* ── i18n ── */
   const { t, lang } = useTranslation(contactsT);
   const aurora = useSkin() === "aurora";
+  /* True once the list has actually scrolled. Gates the edge-blur ramp:
+     at rest NOTHING is approaching the bar, so the band must not paint —
+     it was washing whatever static block sat in its 2.5rem tail (first the
+     KPI digits, then the A letterbar once the strip was lifted). The ref
+     keeps the per-frame scroll handler from re-setting state. */
+  const [listScrolled, setListScrolled] = useState(false);
+  const listScrolledRef = useRef(false);
   const router = useRouter();
   /** Translate a dropdown option value. Falls back to the raw value. */
   const tOpt = (val: string) => t("opt." + val, val);
@@ -6756,7 +6763,13 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
           their surface. This list is the Hub's longest (the scale target is
           6,000 contacts) — see the rule in globals for why repeated items
           never get a blur pass. */}
-        <div className="kx-flat-items flex-1 overflow-y-auto will-change-scroll">
+        <div
+          className="kx-flat-items flex-1 overflow-y-auto will-change-scroll"
+          onScroll={(e) => {
+            const sc = e.currentTarget.scrollTop > 8;
+            if (sc !== listScrolledRef.current) { listScrolledRef.current = sc; setListScrolled(sc); }
+          }}
+        >
         {/* LIST EDGE — the same ramp Purchase runs, moved to the surface that
             actually scrolls.
 
@@ -6782,9 +6795,15 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
 
             z-[5] puts it above the rows; the alphabet headers take z-10 to
             stay above IT, since they pin into exactly this band and are the
-            one thing the reader scans for. */}
+            one thing the reader scans for.
+
+            OPACITY-GATED ON SCROLL: at rest the band was washing whatever
+            static block sat inside its 2.5rem tail — first the KPI digits,
+            then (once those were lifted) the A letterbar. The frost exists
+            for rows APPROACHING the bar, and at scrollTop 0 nothing is
+            approaching, so the layer only appears once the list moves. */}
         {aurora && (
-          <div aria-hidden className="kx-bar-host sticky top-0 z-[5] h-0 pointer-events-none [--kx-ramp-ext:2.5rem]">
+          <div aria-hidden className={`kx-bar-host sticky top-0 z-[5] h-0 pointer-events-none [--kx-ramp-ext:2.5rem] transition-opacity duration-200 ${listScrolled ? "opacity-100" : "opacity-0"}`}>
             <div className="kx-glass-bar kx-bar-prog"><i /><i /><i /><i /></div>
           </div>
         )}
