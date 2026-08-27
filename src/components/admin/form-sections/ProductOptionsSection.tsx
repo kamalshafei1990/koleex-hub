@@ -536,18 +536,32 @@ export default function ProductOptionsSection({ productId }: { productId: string
                             className="text-emerald-400/70 hover:text-emerald-300"><CrossIcon size={10} /></button>
                         </span>
                       ) : o.kind !== "info" ? (
-                        <>
+                        /* Each delta carries its TITLE above it: a placeholder
+                           names a box only until someone types, and then "80"
+                           and "4" are anonymous numbers — is that yuan or
+                           kilograms? items-end keeps the link button on the
+                           inputs' baseline under the added labels. */
+                        <div className="flex flex-wrap items-end gap-2">
                           <button type="button" onClick={() => setLinkFor({ optKey: o.key, valKey: v.key })}
-                            className="rounded-md border border-[var(--border-subtle)] px-2 py-1 text-[11px] text-[var(--text-secondary)] hover:border-[var(--border-strong)] hover:text-[var(--text-primary)]">
+                            className="rounded-md border border-[var(--border-subtle)] px-2 py-[7px] text-[11px] text-[var(--text-secondary)] hover:border-[var(--border-strong)] hover:text-[var(--text-primary)]">
                             Link product…
                           </button>
-                          <input value={v.price_delta_cny} onChange={(e) => patchVal(o.key, v.key, { price_delta_cny: e.target.value })}
-                            placeholder="+¥" className={`${NUM} w-20`} inputMode="decimal" />
-                          <input value={v.weight_delta_kg} onChange={(e) => patchVal(o.key, v.key, { weight_delta_kg: e.target.value })}
-                            placeholder="+kg" className={`${NUM} w-20`} inputMode="decimal" />
-                          <input value={v.cbm_delta} onChange={(e) => patchVal(o.key, v.key, { cbm_delta: e.target.value })}
-                            placeholder="+cbm" className={`${NUM} w-20`} inputMode="decimal" />
-                        </>
+                          <div>
+                            <span className="mb-1 block text-[9.5px] font-semibold uppercase tracking-wider text-[var(--text-dim)]">Price +¥</span>
+                            <input value={v.price_delta_cny} onChange={(e) => patchVal(o.key, v.key, { price_delta_cny: e.target.value })}
+                              placeholder="0" className={`${NUM} w-20`} inputMode="decimal" />
+                          </div>
+                          <div>
+                            <span className="mb-1 block text-[9.5px] font-semibold uppercase tracking-wider text-[var(--text-dim)]">Weight +kg</span>
+                            <input value={v.weight_delta_kg} onChange={(e) => patchVal(o.key, v.key, { weight_delta_kg: e.target.value })}
+                              placeholder="0" className={`${NUM} w-20`} inputMode="decimal" />
+                          </div>
+                          <div>
+                            <span className="mb-1 block text-[9.5px] font-semibold uppercase tracking-wider text-[var(--text-dim)]">Vol +cbm</span>
+                            <input value={v.cbm_delta} onChange={(e) => patchVal(o.key, v.key, { cbm_delta: e.target.value })}
+                              placeholder="0" className={`${NUM} w-20`} inputMode="decimal" />
+                          </div>
+                        </div>
                       ) : (
                         <span className="text-[11px] text-[var(--text-dim)]">recorded on the document — not priced</span>
                       )}
