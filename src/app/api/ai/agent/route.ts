@@ -60,12 +60,30 @@ import { buildEgyptianResponse, removeRepetition } from "@/lib/language/rewrite-
 import { detectEntityScope } from "@/lib/server/ai/entity-scope";
 import type { AgentResponse, AgentStep } from "@/lib/server/ai-agent/types";
 
-/* Hard cap on history we ship to the orchestrator. 6 messages = 3
-   user+assistant pairs; enough for short-term multi-turn context,
-   small enough to keep agent payloads tight (30–40% smaller than the
-   old 10-message cap). Pure performance/stability cap — does not
-   alter tool routing or business behaviour. */
-const HISTORY_LIMIT = 6;
+/* Conversation memory window. 6 messages (3 exchanges) turned out to be
+   the reason Koleex AI felt like a question-answerer rather than a
+   conversation partner — anything said four exchanges ago was simply gone
+   (owner: "make sure it has a memory and can remember the conversation").
+   24 messages = 12 exchanges, bounded below by HISTORY_CHAR_BUDGET so a
+   long-winded thread cannot blow the payload: messages are kept newest-
+   first until the budget runs out, so it degrades to exactly the old
+   behaviour under heavy load. Attachment embeds stay bounded separately —
+   resolveHistoryAttachEmbeds keeps only the newest document's text. */
+const HISTORY_LIMIT = 24;
+const HISTORY_CHAR_BUDGET = 24000;
+
+/** Newest-first char-budget trim, applied AFTER the chronological flip:
+ *  drop the OLDEST messages once the running total exceeds the budget. */
+function trimHistoryToBudget<T extends { content: string }>(history: T[]): T[] {
+  let total = 0;
+  const kept: T[] = [];
+  for (let i = history.length - 1; i >= 0; i--) {
+    total += history[i].content.length;
+    if (total > HISTORY_CHAR_BUDGET && kept.length > 0) break;
+    kept.unshift(history[i]);
+  }
+  return kept;
+}
 
 /* Canned fast-path mirror. Keep in sync with /api/ai/chat FAST_REPLIES
    and orchestrator.ts. Matched server-side before any provider call —
@@ -408,14 +426,16 @@ export async function POST(req: Request) {
             }),
           ]);
 
-          const history = resolveHistoryAttachEmbeds(
-            (historyRes.data ?? [])
-              .slice()
-              .reverse()
-              .map((m) => ({
-                role: m.role as "user" | "assistant",
-                content: m.content as string,
-              })),
+          const history = trimHistoryToBudget(
+            resolveHistoryAttachEmbeds(
+              (historyRes.data ?? [])
+                .slice()
+                .reverse()
+                .map((m) => ({
+                  role: m.role as "user" | "assistant",
+                  content: m.content as string,
+                })),
+            ),
           );
 
           /* Keepalive comments while orchestrate / fast-path runs.
@@ -829,14 +849,16 @@ export async function POST(req: Request) {
   /* Query pulled newest-first with a limit, then flipped back to
      chronological order for the orchestrator. Behaviour (tool routing,
      multi-turn context) is unchanged — only the window size is bounded. */
-  const history = resolveHistoryAttachEmbeds(
-    (historyRes.data ?? [])
-      .slice()
-      .reverse()
-      .map((m) => ({
-        role: m.role as "user" | "assistant",
-        content: m.content as string,
-      })),
+  const history = trimHistoryToBudget(
+    resolveHistoryAttachEmbeds(
+      (historyRes.data ?? [])
+        .slice()
+        .reverse()
+        .map((m) => ({
+          role: m.role as "user" | "assistant",
+          content: m.content as string,
+        })),
+    ),
   );
 
   const agent = await orchestrate({

@@ -2889,9 +2889,9 @@ async function orchestrateNoGroq(
     BRAND_EXCLUSIVITY_RULE + "\n\n" + DIRECT_VOICE_RULE + "\n\n" + DATA_PROTECTION_RULE +
     "\n\n" + AI_PROVENANCE_RULE;
 
-  /* Trim history to the last few turns so the wire payload stays
-     small — matches the Groq path which also caps history. */
-  const trimmed = history.slice(-10).map((m) => ({
+  /* The route already applies the 24-message / char-budget window;
+     mirror it here rather than silently narrowing memory on this path. */
+  const trimmed = history.slice(-24).map((m) => ({
     role: m.role as "user" | "assistant" | "system",
     content: m.content,
   }));
