@@ -908,8 +908,13 @@ export default function ProductProfile() {
                   <Row label={t("pp.f.supCode", "Supplier product code")} value={sup.supplier_product_code} mono />
                   <Row label={t("pp.f.supName", "Supplier product name")} value={sup.supplier_product_name} />
                   {data.costVisible && <Row label={t("pp.f.unitCost", "Unit cost (CNY)")} value={sup.unit_cost_cny} />}
-                  <Row label={t("pp.f.supplyType", "Supply type")} value={sup.supply_type} />
-                  <Row label={t("pp.f.incoterms", "Incoterms")} value={sup.incoterms} />
+                  {/* Supply type & incoterms are supplier-record facts (Suppliers
+                      app) — the link columns of the same name are legacy and
+                      always empty (incoterms removed from the form, owner
+                      2026-07-31), which made these rows read "Not set" forever.
+                      Read the supplier record first, old link value as fallback. */}
+                  <Row label={t("pp.f.supplyType", "Supply type")} value={(sup.supplier as { supply_type?: string | null } | null)?.supply_type ?? sup.supply_type} />
+                  <Row label={t("pp.f.incoterms", "Incoterms")} value={(sup.supplier as { incoterms?: string | null } | null)?.incoterms ?? sup.incoterms} />
                   <Row label={t("pp.f.sourcing", "Sourcing status")} value={sup.sourcing_status} />
                   <Row label={t("pp.f.sampleAvail", "Sample available")} value={sup.sample_available} />
                   <Row label={t("pp.f.supWarranty", "Supplier warranty (months)")} value={sup.supplier_warranty_months} />
