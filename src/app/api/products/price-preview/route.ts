@@ -58,6 +58,15 @@ export async function GET(req: Request) {
   const costCny = Number(url.searchParams.get("cost_cny"));
   const country = (url.searchParams.get("country") || "").toUpperCase() || null;
   const qty = Math.max(1, Number(url.searchParams.get("qty")) || 1);
+  /* Optional: extra cost points (the supplier's other price options, already
+     landed by the caller) → Base FOB each, so the ladder can price every
+     configuration, not just the main one. Capped to keep the engine loop
+     bounded. */
+  const extraCosts = (url.searchParams.get("extra_costs") || "")
+    .split(",")
+    .map((v) => Number(v))
+    .filter((v) => Number.isFinite(v) && v > 0)
+    .slice(0, 12);
 
   if (!Number.isFinite(costCny) || costCny <= 0) {
     return NextResponse.json({ error: "cost_cny must be a positive number" }, { status: 400 });
@@ -152,6 +161,15 @@ export async function GET(req: Request) {
     };
   });
 
+  /* Per-option Base FOB — one tier-agnostic engine run per extra cost. */
+  const extraFobs = extraCosts.map((c) => {
+    const r = computePolicyPrice(
+      { factoryCostCny: c, qty: 1, customerCountryCode: country, customerTierCode: tiers[0]?.code ?? null },
+      engineCtx,
+    );
+    return { cost: c, baseFobUsd: r.breakdown.globalFobUsd ?? null };
+  });
+
   return NextResponse.json(
     {
       ok: true,
@@ -181,6 +199,7 @@ export async function GET(req: Request) {
       },
       channels,
       markets,
+      extraFobs,
     },
     { headers: { "Cache-Control": "private, max-age=30, stale-while-revalidate=300" } },
   );

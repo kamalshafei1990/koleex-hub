@@ -132,6 +132,7 @@ import MediaSection from "./form-sections/MediaSection";
 import FeatureHighlightsSection from "./form-sections/FeatureHighlightsSection";
 import ProductOptionsSection from "./form-sections/ProductOptionsSection";
 import PricingIntelligenceCard from "./form-sections/PricingIntelligenceCard";
+import PriceOptionsFobList from "./form-sections/PriceOptionsFobList";
 import AccessoryOptionsSection, { type AccessoryOptionRow, axesForSubcategory } from "./form-sections/AccessoryOptionsSection";
 import BaseFobCard from "./form-sections/BaseFobCard";
 import TabStrip from "@/components/ui/TabStrip";
@@ -169,6 +170,17 @@ function sectionComponentName(title: string): string {
    shared landedCostCny math, used by the Price tab so Base FOB, the market
    grid and the tier table all price from the TRUE landed cost when the
    supplier's price is not full-landed/tax-in. */
+/* The cost the Price tab previews from: the selected option's landed cost
+   (same basis extras as the main price) or null when previewing the main. */
+function previewLandedFor(
+  link: ProductSupplierFormState | null | undefined,
+  previewRaw: number | null,
+): number | null {
+  if (previewRaw === null || !link) return null;
+  const r = landedFromFormLink({ ...link, unit_cost_cny: String(previewRaw) });
+  return r.landed;
+}
+
 function landedFromFormLink(link: ProductSupplierFormState | null | undefined): { landed: number | null; parts: { label: string; amount: number }[]; taxPercent: number | null; entered: number | null } {
   if (!link) return { landed: null, parts: [], taxPercent: null, entered: null };
   const entered = link.unit_cost_cny === "" ? null : Number(link.unit_cost_cny);
@@ -614,6 +626,9 @@ export default function ProductForm({ productId }: Props) {
   const [prices, setPrices] = useState<MarketPriceFormState[]>([]);
   const [related, setRelated] = useState<RelatedProductFormState[]>([]);
   const [productSuppliers, setProductSuppliers] = useState<ProductSupplierFormState[]>([]);
+  /* Price-tab preview: which supplier price OPTION (raw ¥) the whole tab is
+     priced from; null = the main price. Toggled from the Cost Price ladder. */
+  const [previewOptionCost, setPreviewOptionCost] = useState<number | null>(null);
   /* Stand / Table configurable options (their specs & variants). Held in form
      state so they can be entered before the product's first save, then
      persisted alongside everything else. */
@@ -5362,6 +5377,11 @@ export default function ProductForm({ productId }: Props) {
                           </p>
                         );
                       })()}
+                      {previewOptionCost !== null && (
+                        <p className="text-[10.5px] text-[var(--accent)] mt-1.5">
+                          ▸ {t("pricing.previewingOption", "Previewing the pricing below from option")} <b className="tabular-nums">¥{previewOptionCost.toLocaleString()}</b> — {t("pricing.previewingOptionHint", "the main price is unchanged; click the option again to switch back.")}
+                        </p>
+                      )}
                       {/* The price's own note (Supplier tab) rides along
                           wherever the price is shown — member note first. */}
                       {(() => {
@@ -5381,15 +5401,39 @@ export default function ProductForm({ productId }: Props) {
                             {note && (
                               <p className="text-[10.5px] italic leading-snug text-[var(--text-muted)] whitespace-pre-wrap">{note}</p>
                             )}
-                            {options.map((o, oi) => {
-                              const onote = ((o.note_i18n ?? {})[lang] || "").trim() || o.note;
+                            {/* Every option priced by the SAME engine, with
+                                the SAME cost-basis extras as the main price —
+                                answers "what about the other options?". Rows
+                                without a numeric price still render plain. */}
+                            {(() => {
+                              const priced = options
+                                .map((o) => {
+                                  const raw = o.price === "" ? NaN : Number(o.price);
+                                  if (!Number.isFinite(raw) || raw <= 0) return null;
+                                  const lr = landedFromFormLink(primaryLink ? { ...primaryLink, unit_cost_cny: String(raw) } : null);
+                                  return {
+                                    raw,
+                                    landed: lr.landed ?? raw,
+                                    label: (((o.note_i18n ?? {})[lang] || "").trim() || o.note || "").trim(),
+                                  };
+                                })
+                                .filter((x): x is { raw: number; landed: number; label: string } => x !== null);
+                              const unpriced = options.filter((o) => !(Number(o.price) > 0));
                               return (
-                                <p key={oi} className="text-[10.5px] leading-snug text-[var(--text-muted)]">
-                                  <span className="font-semibold text-[var(--text-subtle)] tabular-nums">¥{o.price || "—"}</span>
-                                  {onote ? <span className="italic"> — {onote}</span> : null}
-                                </p>
+                                <>
+                                  {priced.length > 0 && <PriceOptionsFobList items={priced} selectedRaw={previewOptionCost} onSelect={setPreviewOptionCost} />}
+                                  {unpriced.map((o, oi) => {
+                                    const onote = ((o.note_i18n ?? {})[lang] || "").trim() || o.note;
+                                    return (
+                                      <p key={`u${oi}`} className="text-[10.5px] leading-snug text-[var(--text-muted)]">
+                                        <span className="font-semibold text-[var(--text-subtle)] tabular-nums">¥—</span>
+                                        {onote ? <span className="italic"> — {onote}</span> : null}
+                                      </p>
+                                    );
+                                  })}
+                                </>
                               );
-                            })}
+                            })()}
                           </div>
                         );
                       })()}
@@ -5404,7 +5448,8 @@ export default function ProductForm({ productId }: Props) {
               {(() => {
                 const link = productSuppliers.find((s) => s.is_primary) || productSuppliers[0] || null;
                 const landedR = landedFromFormLink(link);
-                const costNum = landedR.landed ?? (link?.unit_cost_cny ? Number(link.unit_cost_cny) : (primaryModel?.cost_price ? Number(primaryModel.cost_price) : null));
+                const optLanded = previewLandedFor(link, previewOptionCost);
+                const costNum = optLanded ?? landedR.landed ?? (link?.unit_cost_cny ? Number(link.unit_cost_cny) : (primaryModel?.cost_price ? Number(primaryModel.cost_price) : null));
                 return <BaseFobCard costCny={Number.isFinite(costNum as number) ? (costNum as number) : null} currency="CNY" />;
               })()}
             </Section>
@@ -5414,7 +5459,8 @@ export default function ProductForm({ productId }: Props) {
               {(() => {
                 const link = productSuppliers.find((s) => s.is_primary) || productSuppliers[0] || null;
                 const landedR = landedFromFormLink(link);
-                const costNum = landedR.landed ?? (link?.unit_cost_cny ? Number(link.unit_cost_cny) : (primaryModel?.cost_price ? Number(primaryModel.cost_price) : null));
+                const optLanded = previewLandedFor(link, previewOptionCost);
+                const costNum = optLanded ?? landedR.landed ?? (link?.unit_cost_cny ? Number(link.unit_cost_cny) : (primaryModel?.cost_price ? Number(primaryModel.cost_price) : null));
                 return <PricingIntelligenceCard costCny={Number.isFinite(costNum as number) ? (costNum as number) : null} currency="CNY" subcategorySlug={product.subcategory_slug || null} supportsCompleteSet={!!product.supports_complete_set} />;
               })()}
             </Section>
