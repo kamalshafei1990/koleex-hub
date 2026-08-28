@@ -491,9 +491,19 @@ export interface ProductSupplierLinkRow {
   lead_time_days?: number | null;
   unit_cost_cny?: number | null;
   currency?: string | null;
-  /* What unit_cost_cny already includes (display + warning, no math yet). */
+  /* What unit_cost_cny already includes. */
   cost_basis?: "factory_only" | "packing" | "delivered" | null;
   cost_includes_tax?: boolean | null;
+  /* The missing pieces when the cost is NOT full-landed/tax-in, so pricing
+     can work from the TRUE landed cost (owner request 2026-08-28).
+     combined=true → packing+delivery entered as ONE number (combined_cny). */
+  cost_extras?: {
+    tax_rate_percent?: number | null;
+    delivery_cny?: number | null;
+    packing_cny?: number | null;
+    combined_cny?: number | null;
+    combined?: boolean | null;
+  } | null;
   payment_terms?: string | null;
   notes?: string | null;
   notes_i18n?: Record<string, string> | null;
@@ -851,4 +861,48 @@ export async function upsertSewingSpecs(specs: {
     `/api/products/${encodeURIComponent(specs.product_id)}/sewing-specs`, "PUT", specs,
   );
   return ok;
+}
+
+
+/* ── Landed cost ──────────────────────────────────────────────────────────
+   ONE place turns (unit_cost_cny, cost_basis, cost_includes_tax, cost_extras)
+   into the TRUE landed CNY cost the pricing engine should work from.
+   VAT applies AFTER the goods+packing+delivery subtotal, matching how the
+   supplier invoices. Missing pieces contribute 0 — the UI warns separately. */
+export interface LandedCostPart { label: string; amount: number }
+export function landedCostCny(link: {
+  unit_cost_cny?: number | string | null;
+  cost_basis?: string | null;
+  cost_includes_tax?: boolean | null;
+  cost_extras?: ProductSupplierLinkRow["cost_extras"];
+}): { landed: number | null; parts: LandedCostPart[]; taxPercent: number | null } {
+  const base = link.unit_cost_cny != null && link.unit_cost_cny !== "" ? Number(link.unit_cost_cny) : null;
+  if (base === null || !Number.isFinite(base) || base <= 0) return { landed: null, parts: [], taxPercent: null };
+  const ex = link.cost_extras ?? {};
+  const n = (v: unknown) => (typeof v === "number" && Number.isFinite(v) && v > 0 ? v : 0);
+  const parts: LandedCostPart[] = [];
+  if (link.cost_basis === "factory_only") {
+    if (ex.combined) {
+      const c = n(ex.combined_cny);
+      if (c) parts.push({ label: "packing+delivery", amount: c });
+    } else {
+      const pk = n(ex.packing_cny);
+      const dl = n(ex.delivery_cny);
+      if (pk) parts.push({ label: "packing", amount: pk });
+      if (dl) parts.push({ label: "delivery", amount: dl });
+    }
+  } else if (link.cost_basis === "packing") {
+    const dl = n(ex.delivery_cny);
+    if (dl) parts.push({ label: "delivery", amount: dl });
+  }
+  let landed = base + parts.reduce((t, p) => t + p.amount, 0);
+  let taxPercent: number | null = null;
+  if (link.cost_includes_tax === false) {
+    const rate = n(ex.tax_rate_percent);
+    if (rate) {
+      taxPercent = rate;
+      landed = landed * (1 + rate / 100);
+    }
+  }
+  return { landed: Math.round(landed * 100) / 100, parts, taxPercent };
 }

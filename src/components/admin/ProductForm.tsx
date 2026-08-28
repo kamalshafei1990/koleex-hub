@@ -79,6 +79,7 @@ import {
   fetchDivisionLogos, fetchCategoryLogos, fetchSubcategoryLogos, fetchClassificationIcons,
   fetchSewingSpecsByProductId, upsertSewingSpecs,
 } from "@/lib/products-admin";
+import { landedCostCny } from "@/lib/products-admin";
 import { fetchAttributeConfig } from "@/lib/product-attributes";
 import type { DivisionRow, CategoryRow, SubcategoryRow } from "@/types/supabase";
 import type {
@@ -161,6 +162,27 @@ function sectionComponentName(title: string): string {
     .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
     .join("");
   return `${pascal || "Product"}Section`;
+}
+
+
+/* Landed cost from a FORM link (inputs are strings). ONE bridge to the
+   shared landedCostCny math, used by the Price tab so Base FOB, the market
+   grid and the tier table all price from the TRUE landed cost when the
+   supplier's price is not full-landed/tax-in. */
+function landedFromFormLink(link: ProductSupplierFormState | null | undefined): { landed: number | null; parts: { label: string; amount: number }[]; taxPercent: number | null; entered: number | null } {
+  if (!link) return { landed: null, parts: [], taxPercent: null, entered: null };
+  const entered = link.unit_cost_cny === "" ? null : Number(link.unit_cost_cny);
+  const ex = link.cost_extras;
+  const num = (v: string | undefined) => (v === undefined || v === "" || !Number.isFinite(Number(v)) ? null : Number(v));
+  const r = landedCostCny({
+    unit_cost_cny: entered,
+    cost_basis: link.cost_basis,
+    cost_includes_tax: link.cost_includes_tax,
+    cost_extras: ex
+      ? { tax_rate_percent: num(ex.tax_rate_percent), delivery_cny: num(ex.delivery_cny), packing_cny: num(ex.packing_cny), combined_cny: num(ex.combined_cny), combined: ex.combined }
+      : null,
+  });
+  return { ...r, entered: entered !== null && Number.isFinite(entered) ? entered : null };
 }
 
 /* ═══════════════════════════════════════════════════════════════════
@@ -1200,6 +1222,17 @@ export default function ProductForm({ productId }: Props) {
           currency: s.currency || "CNY",
           cost_basis: (["factory_only", "packing", "delivered"].includes(s.cost_basis as string) ? s.cost_basis : "delivered") as ProductSupplierFormState["cost_basis"],
           cost_includes_tax: s.cost_includes_tax === undefined || s.cost_includes_tax === null ? true : !!s.cost_includes_tax,
+          cost_extras: (() => {
+            const ex = (s as { cost_extras?: Record<string, unknown> | null }).cost_extras ?? {};
+            const st = (v: unknown) => (typeof v === "number" && Number.isFinite(v) ? String(v) : "");
+            return {
+              tax_rate_percent: st(ex.tax_rate_percent),
+              delivery_cny: st(ex.delivery_cny),
+              packing_cny: st(ex.packing_cny),
+              combined_cny: st(ex.combined_cny),
+              combined: !!ex.combined,
+            };
+          })(),
           payment_terms: str(s.payment_terms),
           notes: str(s.notes),
           notes_i18n: Object.fromEntries(
@@ -2849,6 +2882,20 @@ export default function ProductForm({ productId }: Props) {
         currency: sup?.currency || null,
         cost_basis: s.cost_basis || "delivered",
         cost_includes_tax: s.cost_includes_tax,
+        cost_extras: (() => {
+          const ex = s.cost_extras;
+          if (!ex) return null;
+          const num = (v: string) => (v === "" || !Number.isFinite(Number(v)) ? null : Number(v));
+          const out = {
+            tax_rate_percent: num(ex.tax_rate_percent),
+            delivery_cny: num(ex.delivery_cny),
+            packing_cny: num(ex.packing_cny),
+            combined_cny: num(ex.combined_cny),
+            combined: !!ex.combined,
+          };
+          const any = out.tax_rate_percent !== null || out.delivery_cny !== null || out.packing_cny !== null || out.combined_cny !== null;
+          return any ? out : null;
+        })(),
         payment_terms: null,
         notes: s.notes || null,
         notes_i18n: (() => {
@@ -4783,7 +4830,7 @@ export default function ProductForm({ productId }: Props) {
                 const merged = { ...primaryLink, ...legacy, ...ov, _tempId: `member-${activeModel._tempId}`, is_primary: true } as typeof primaryLink;
                 const EDITABLE: (keyof typeof primaryLink)[] = [
                   "supplier_product_code", "moq", "lead_time_days", "unit_cost_cny", "currency",
-                  "cost_basis", "cost_includes_tax", "payment_terms", "notes", "notes_i18n", "price_options",
+                  "cost_basis", "cost_includes_tax", "cost_extras", "payment_terms", "notes", "notes_i18n", "price_options",
                   "supplier_product_name", "supplier_product_name_i18n", "supplier_product_photo",
                   "quotation_file_url", "quotation_file_name",
                 ];
@@ -5297,6 +5344,24 @@ export default function ProductForm({ productId }: Props) {
                           ? t("pricing.costPriceHintSynced", "Synced with the Supplier tab") + (sup?.name ? ` (${sup.name})` : "") + ". " + t("pricing.costPriceHint2", "Editing here updates the supplier cost too. The FOB Pricing below is derived from it via Commercial Setup.")
                           : t("pricing.costPriceHintNew", "The KOLEEX factory cost. Once you link a supplier it becomes the supplier cost (Supplier tab). The FOB Pricing below auto-detects level, margin, band and channel prices from Commercial Setup.")}
                       </p>
+                      {/* Cost basis breakdown (owner request 2026-08-28): when
+                          the supplier price is not full-landed/tax-in, show
+                          exactly how the landed cost pricing uses is built. */}
+                      {(() => {
+                        const lr = landedFromFormLink(primaryLink);
+                        if (lr.landed === null || lr.entered === null) return null;
+                        if (lr.parts.length === 0 && lr.taxPercent === null) {
+                          return (primaryLink && (primaryLink.cost_basis !== "delivered" || !primaryLink.cost_includes_tax))
+                            ? <p className="text-[10.5px] text-amber-400/90 mt-1.5">⚠ {t("pricing.basisIncomplete", "The supplier price is not full-landed/tax-in and the missing costs are not entered yet (Supplier tab) — pricing below uses the raw price.")}</p>
+                            : null;
+                        }
+                        return (
+                          <p className="text-[10.5px] text-emerald-400/90 mt-1.5">
+                            ✓ {t("pricing.landedUsed", "Pricing below uses the landed cost")} <b className="tabular-nums">¥{lr.landed.toLocaleString()}</b>
+                            <span className="text-[var(--text-ghost)]"> — ¥{lr.entered.toLocaleString()}{lr.parts.map((pt) => ` + ¥${pt.amount.toLocaleString()} ${pt.label}`).join("")}{lr.taxPercent !== null ? ` + ${lr.taxPercent}% VAT` : ""}</span>
+                          </p>
+                        );
+                      })()}
                       {/* The price's own note (Supplier tab) rides along
                           wherever the price is shown — member note first. */}
                       {(() => {
@@ -5338,7 +5403,8 @@ export default function ProductForm({ productId }: Props) {
             <Section id="base-fob" icon={<DollarSignIcon className="h-4 w-4" />} title={t("pricing.baseFobTitle", "Base FOB Price")} badge={t("pricing.baseFobBadge", "Auto · by product level")} defaultOpen>
               {(() => {
                 const link = productSuppliers.find((s) => s.is_primary) || productSuppliers[0] || null;
-                const costNum = link?.unit_cost_cny ? Number(link.unit_cost_cny) : (primaryModel?.cost_price ? Number(primaryModel.cost_price) : null);
+                const landedR = landedFromFormLink(link);
+                const costNum = landedR.landed ?? (link?.unit_cost_cny ? Number(link.unit_cost_cny) : (primaryModel?.cost_price ? Number(primaryModel.cost_price) : null));
                 return <BaseFobCard costCny={Number.isFinite(costNum as number) ? (costNum as number) : null} currency="CNY" />;
               })()}
             </Section>
@@ -5347,7 +5413,8 @@ export default function ProductForm({ productId }: Props) {
             <Section id="fob-pricing" icon={<DollarSignIcon className="h-4 w-4" />} title={t("pricing.fobTitle", "Market & Customer Pricing")} badge={t("pricing.fobBadge", "Live · from Commercial Setup")} defaultOpen>
               {(() => {
                 const link = productSuppliers.find((s) => s.is_primary) || productSuppliers[0] || null;
-                const costNum = link?.unit_cost_cny ? Number(link.unit_cost_cny) : (primaryModel?.cost_price ? Number(primaryModel.cost_price) : null);
+                const landedR = landedFromFormLink(link);
+                const costNum = landedR.landed ?? (link?.unit_cost_cny ? Number(link.unit_cost_cny) : (primaryModel?.cost_price ? Number(primaryModel.cost_price) : null));
                 return <PricingIntelligenceCard costCny={Number.isFinite(costNum as number) ? (costNum as number) : null} currency="CNY" subcategorySlug={product.subcategory_slug || null} supportsCompleteSet={!!product.supports_complete_set} />;
               })()}
             </Section>

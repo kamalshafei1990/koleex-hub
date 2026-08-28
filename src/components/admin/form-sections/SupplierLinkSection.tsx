@@ -52,6 +52,8 @@ import HandCoinsIcon from "@/components/icons/ui/HandCoinsIcon";
 import LanguagesIcon from "@/components/icons/ui/LanguagesIcon";
 import { FieldHelp, SUPPLIER_LINK_HELP as H } from "@/components/admin/form-sections/FieldHelp";
 import type { ProductSupplierFormState } from "@/types/product-form";
+import { landedCostCny } from "@/lib/products-admin";
+import DatePicker from "@/components/ui/DatePicker";
 
 const SOURCING_STATUS: { value: string; label: string }[] = [
   { value: "preferred", label: "Preferred" },
@@ -175,6 +177,7 @@ export default function SupplierLinkSection({ links, suppliers, onChange, member
         unit_cost_cny: "",
         currency: "CNY",
         cost_basis: "delivered",
+        cost_extras: { tax_rate_percent: "", delivery_cny: "", packing_cny: "", combined_cny: "", combined: false },
         cost_includes_tax: true,
         payment_terms: "",
         notes: "",
@@ -637,11 +640,99 @@ export default function SupplierLinkSection({ links, suppliers, onChange, member
                       </button>
                     </div>
                   </div>
-                  {(l.cost_basis !== "delivered" || !l.cost_includes_tax) && (
-                    <p className="mt-2 text-[10.5px] leading-relaxed text-amber-400/90">
-                      ⚠ {t("sup.costWarnA", "This cost is NOT full-landed/tax-in. Its margin isn\u2019t directly comparable to delivered costs — add the missing")} {l.cost_basis === "factory_only" ? t("sup.missPackDelivery", "packing + delivery") : l.cost_basis === "packing" ? t("sup.missDelivery", "delivery") : t("sup.missComponents", "components")}{!l.cost_includes_tax ? " + VAT" : ""} {t("sup.costWarnB", "before relying on the auto-detected level.")}
-                    </p>
-                  )}
+                  {/* Adjunct-cost inputs (owner request 2026-08-28): when the
+                      price is not full-landed/tax-in, the missing pieces are
+                      entered HERE and the pricing engine works from the
+                      computed landed cost instead of the raw price. */}
+                  {(l.cost_basis !== "delivered" || !l.cost_includes_tax) && (() => {
+                    const ex = l.cost_extras ?? { tax_rate_percent: "", delivery_cny: "", packing_cny: "", combined_cny: "", combined: false };
+                    const setEx = (patch: Partial<typeof ex>) => update(l._tempId, { cost_extras: { ...ex, ...patch } });
+                    const numInp = (val: string, on: (v: string) => void, ph: string, prefix: string) => (
+                      <div className="relative">
+                        <span className="absolute start-3 top-1/2 -translate-y-1/2 text-[11px] font-semibold text-[var(--text-ghost)]">{prefix}</span>
+                        <input inputMode="decimal" value={val} placeholder={ph}
+                          onChange={(e) => { const v = e.target.value; if (v === "" || /^\d*\.?\d*$/.test(v)) on(v); }}
+                          className={inp + " ps-7"} />
+                      </div>
+                    );
+                    const landedNow = landedCostCny({
+                      unit_cost_cny: l.unit_cost_cny,
+                      cost_basis: l.cost_basis,
+                      cost_includes_tax: l.cost_includes_tax,
+                      cost_extras: {
+                        tax_rate_percent: ex.tax_rate_percent === "" ? null : Number(ex.tax_rate_percent),
+                        delivery_cny: ex.delivery_cny === "" ? null : Number(ex.delivery_cny),
+                        packing_cny: ex.packing_cny === "" ? null : Number(ex.packing_cny),
+                        combined_cny: ex.combined_cny === "" ? null : Number(ex.combined_cny),
+                        combined: ex.combined,
+                      },
+                    });
+                    const missing: string[] = [];
+                    if (l.cost_basis === "factory_only") {
+                      if (ex.combined ? ex.combined_cny === "" : (ex.packing_cny === "" && ex.delivery_cny === "")) missing.push(t("sup.missPackDelivery", "packing + delivery"));
+                    } else if (l.cost_basis === "packing" && ex.delivery_cny === "") {
+                      missing.push(t("sup.missDelivery", "delivery"));
+                    }
+                    if (!l.cost_includes_tax && ex.tax_rate_percent === "") missing.push("VAT %");
+                    return (
+                      <div className="mt-2 rounded-lg border border-amber-500/25 bg-amber-500/[0.04] p-3 space-y-2.5">
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                          {l.cost_basis === "factory_only" && (
+                            <>
+                              <div className="sm:col-span-3 -mb-1">
+                                <button type="button"
+                                  onClick={() => setEx({ combined: !ex.combined })}
+                                  className="text-[10.5px] font-medium text-[var(--text-muted)] underline underline-offset-2 hover:text-[var(--text-primary)]">
+                                  {ex.combined
+                                    ? t("sup.splitPackDelivery", "Enter packing & delivery separately")
+                                    : t("sup.combinePackDelivery", "Enter packing + delivery as ONE cost")}
+                                </button>
+                              </div>
+                              {ex.combined ? (
+                                <div>
+                                  <label className={lbl}>{t("sup.packDeliveryCombined", "Packing + delivery (¥)")}</label>
+                                  {numInp(ex.combined_cny, (v) => setEx({ combined_cny: v }), "e.g. 1500", "¥")}
+                                </div>
+                              ) : (
+                                <>
+                                  <div>
+                                    <label className={lbl}>{t("sup.packingCost", "Packing (¥)")}</label>
+                                    {numInp(ex.packing_cny, (v) => setEx({ packing_cny: v }), "e.g. 500", "¥")}
+                                  </div>
+                                  <div>
+                                    <label className={lbl}>{t("sup.deliveryCost", "Delivery (¥)")}</label>
+                                    {numInp(ex.delivery_cny, (v) => setEx({ delivery_cny: v }), "e.g. 1000", "¥")}
+                                  </div>
+                                </>
+                              )}
+                            </>
+                          )}
+                          {l.cost_basis === "packing" && (
+                            <div>
+                              <label className={lbl}>{t("sup.deliveryCost", "Delivery (¥)")}</label>
+                              {numInp(ex.delivery_cny, (v) => setEx({ delivery_cny: v }), "e.g. 1000", "¥")}
+                            </div>
+                          )}
+                          {!l.cost_includes_tax && (
+                            <div>
+                              <label className={lbl}>{t("sup.taxRate", "VAT rate (%)")}</label>
+                              {numInp(ex.tax_rate_percent, (v) => setEx({ tax_rate_percent: v }), "e.g. 13", "%")}
+                            </div>
+                          )}
+                        </div>
+                        {landedNow.landed !== null && (landedNow.parts.length > 0 || landedNow.taxPercent !== null) ? (
+                          <p className="text-[10.5px] leading-relaxed text-emerald-400/90">
+                            ✓ {t("sup.landedNow", "Landed cost used by pricing:")} <b className="tabular-nums">¥{landedNow.landed.toLocaleString()}</b>
+                            <span className="text-[var(--text-ghost)]"> — {Number(l.unit_cost_cny).toLocaleString()}{landedNow.parts.map((pt) => ` + ${pt.amount.toLocaleString()} ${pt.label}`).join("")}{landedNow.taxPercent !== null ? ` + ${landedNow.taxPercent}% VAT` : ""}</span>
+                          </p>
+                        ) : missing.length > 0 ? (
+                          <p className="text-[10.5px] leading-relaxed text-amber-400/90">
+                            ⚠ {t("sup.costWarnA2", "This cost is NOT full-landed/tax-in — enter the missing")} {missing.join(" · ")} {t("sup.costWarnB2", "so pricing can work from the true landed cost.")}
+                          </p>
+                        ) : null}
+                      </div>
+                    );
+                  })()}
 
                 </div>
 
@@ -692,13 +783,15 @@ export default function SupplierLinkSection({ links, suppliers, onChange, member
                   <div className="grid grid-cols-2 gap-3">
                     <div>
                       <label className={lbl}><span className="inline-flex items-center gap-1.5"><CalendarRawIcon className="h-3 w-3" /> {t("sup.quotedOn", "Quoted on")}</span><FieldHelp {...H.quotedOn} /></label>
-                      <input type="date" className={inp} value={l.price_quoted_on}
-                        onChange={(e) => update(l._tempId, { price_quoted_on: e.target.value })} />
+                      {/* House picker — native date inputs render mm/dd/yyyy
+                          and Hub dates are Day/Month/Year everywhere. */}
+                      <DatePicker value={l.price_quoted_on}
+                        onChange={(iso) => update(l._tempId, { price_quoted_on: iso })} heightCls="h-9" />
                     </div>
                     <div>
                       <label className={lbl}><span className="inline-flex items-center gap-1.5"><TimerIcon className="h-3 w-3" /> {t("sup.validUntil", "Valid until")}</span><FieldHelp {...H.validUntil} /></label>
-                      <input type="date" className={inp} value={l.price_valid_until}
-                        onChange={(e) => update(l._tempId, { price_valid_until: e.target.value })} />
+                      <DatePicker value={l.price_valid_until}
+                        onChange={(iso) => update(l._tempId, { price_valid_until: iso })} heightCls="h-9" />
                     </div>
                   </div>
 
