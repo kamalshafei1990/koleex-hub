@@ -933,17 +933,25 @@ export async function orchestrate(input: OrchestrateInput): Promise<AgentRespons
         callFailedStatus = res.status;
         callFailedBody = await res.text().catch(() => "");
       } else {
-        const json = (await res.json()) as {
-          choices?: Array<{
-            message?: {
-              role: string;
-              content: string | null;
-              tool_calls?: WireMsg["tool_calls"];
-            };
-            finish_reason?: string;
-          }>;
-        };
-        choice = json.choices?.[0]?.message;
+        try {
+          const json = (await res.json()) as {
+            choices?: Array<{
+              message?: {
+                role: string;
+                content: string | null;
+                tool_calls?: WireMsg["tool_calls"];
+              };
+              finish_reason?: string;
+            }>;
+          };
+          choice = json.choices?.[0]?.message;
+        } catch (e) {
+          /* 200 with a truncated body (socket died mid-body) — treat as a
+             failed call so rescue/friendly copy handles it, not a raw 500. */
+          if (!isTransientNetError(e)) throw e;
+          callFailedStatus = 502;
+          callFailedBody = "response body terminated mid-read";
+        }
       }
     }
 
@@ -2935,6 +2943,34 @@ function fallback(
 const MAX_RETRIES = 3;
 const BACKOFF_CAP_MS = 8000;
 
+/* Transient NETWORK failures (socket terminated mid-request, connection
+   reset) reject the fetch promise instead of returning a status — they used
+   to escape every handler here and surface as a raw HTTP 500 to the user
+   (caught live twice in one 12-question probe). Convert them into a
+   synthetic 502 Response so the same failed-status paths (retry → rescue →
+   friendly copy) absorb them. */
+function isTransientNetError(e: unknown): boolean {
+  const seen = new Set<unknown>();
+  let cur: unknown = e;
+  while (cur && typeof cur === "object" && !seen.has(cur)) {
+    seen.add(cur);
+    const any = cur as { code?: string; message?: string; cause?: unknown };
+    if (
+      any.code === "UND_ERR_SOCKET" ||
+      any.code === "ECONNRESET" ||
+      any.code === "EPIPE" ||
+      /terminated|socket|network|fetch failed/i.test(any.message ?? "")
+    ) {
+      return true;
+    }
+    cur = any.cause;
+  }
+  return false;
+}
+
+const SYNTH_NET_FAIL = () =>
+  new Response("upstream socket error (network)", { status: 502 });
+
 function backoffWaitMs(res: Response, attempt: number): number {
   const ra = Number(res.headers.get("retry-after"));
   if (Number.isFinite(ra) && ra > 0) return Math.min(ra * 1000, BACKOFF_CAP_MS);
@@ -2954,19 +2990,29 @@ async function callGroqPlain(
      complete without truncation. The agent loop uses its own
      callGroqWithRetry with 2048 tokens. */
   const maxTokens = opts.maxTokens ?? 160;
-  const res = await fetch(AGENT_LLM_URL, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${key}`,
-    },
-    body: JSON.stringify({
-      model: AGENT_MODEL,
-      messages,
-      temperature: 0.3,
-      max_tokens: maxTokens,
-    }),
-  });
+  let res: Response;
+  try {
+    res = await fetch(AGENT_LLM_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${key}`,
+      },
+      body: JSON.stringify({
+        model: AGENT_MODEL,
+        messages,
+        temperature: 0.3,
+        max_tokens: maxTokens,
+      }),
+    });
+  } catch (e) {
+    if (isTransientNetError(e) && attempt < MAX_RETRIES) {
+      await new Promise((r) => setTimeout(r, Math.min(1000 * 2 ** attempt, BACKOFF_CAP_MS)));
+      return callGroqPlain(key, messages, opts, attempt + 1);
+    }
+    if (isTransientNetError(e)) return SYNTH_NET_FAIL();
+    throw e;
+  }
   if ((res.status === 429 || res.status === 503) && attempt < MAX_RETRIES) {
     await new Promise((r) => setTimeout(r, backoffWaitMs(res, attempt)));
     return callGroqPlain(key, messages, opts, attempt + 1);
@@ -3000,14 +3046,24 @@ async function callGroqStreamingOnce(
     body.tools = openAiToolSchemas();
     body.tool_choice = opts.toolChoice;
   }
-  const res = await fetch(AGENT_LLM_URL, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${key}`,
-    },
-    body: JSON.stringify(body),
-  });
+  let res: Response;
+  try {
+    res = await fetch(AGENT_LLM_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${key}`,
+      },
+      body: JSON.stringify(body),
+    });
+  } catch (e) {
+    /* Socket died before any byte arrived — nothing was emitted, so the
+       caller's failed-status path can retry/rescue safely. */
+    if (isTransientNetError(e)) {
+      return { ok: false, status: 502, bodyText: "upstream socket error (network)", content: "", toolCalls: [] };
+    }
+    throw e;
+  }
   if (!res.ok || !res.body) {
     return {
       ok: false,
@@ -3024,9 +3080,21 @@ async function callGroqStreamingOnce(
   let sawTool = false;
   const calls: Array<{ id: string; type: "function"; function: { name: string; arguments: string } }> = [];
   while (true) {
-    const { value, done } = await reader.read();
+    let step: { value?: Uint8Array; done: boolean };
+    try {
+      step = await reader.read();
+    } catch (e) {
+      /* Stream terminated mid-read. NO retry here — deltas may already be
+         on the user's screen and a re-run would duplicate them. Surface as
+         a failed status so rescue-first / friendly copy takes over. */
+      if (isTransientNetError(e)) {
+        return { ok: false, status: 502, bodyText: "stream terminated mid-read", content, toolCalls: [] };
+      }
+      throw e;
+    }
+    const { value, done } = step;
     if (done) break;
-    buf += decoder.decode(value, { stream: true });
+    if (value) buf += decoder.decode(value, { stream: true });
     const lines = buf.split("\n");
     buf = lines.pop() ?? "";
     for (const line of lines) {
@@ -3090,14 +3158,24 @@ async function callGroqWithRetry(
     body.tools = openAiToolSchemas();
     body.tool_choice = toolChoice;
   }
-  const res = await fetch(AGENT_LLM_URL, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${key}`,
-    },
-    body: JSON.stringify(body),
-  });
+  let res: Response;
+  try {
+    res = await fetch(AGENT_LLM_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${key}`,
+      },
+      body: JSON.stringify(body),
+    });
+  } catch (e) {
+    if (isTransientNetError(e) && attempt < MAX_RETRIES) {
+      await new Promise((r) => setTimeout(r, Math.min(1000 * 2 ** attempt, BACKOFF_CAP_MS)));
+      return callGroqWithRetry(key, messages, opts, attempt + 1);
+    }
+    if (isTransientNetError(e)) return SYNTH_NET_FAIL();
+    throw e;
+  }
   /* Retry budget: up to MAX_RETRIES with exponential backoff, capped
      by Groq's `retry-after` and BACKOFF_CAP_MS. Gives a brief Groq
      free-tier rate-limit window time to clear before we surface the
