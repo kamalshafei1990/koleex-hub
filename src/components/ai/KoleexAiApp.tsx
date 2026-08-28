@@ -376,6 +376,11 @@ export default function KoleexAiApp() {
      hooks come in follow-up phases. Keeping the affordance visible
      teaches users the model is becoming multimodal soon. */
   const [attachments, setAttachments] = useState<File[]>([]);
+  /* Visible upload/extract progress. A 35MB file spends real seconds in
+     flight after Send, and with no indicator the app read as FROZEN —
+     the owner hit exactly that. Set through the send() pipeline, cleared
+     when the attachment phase ends either way. */
+  const [attachStatus, setAttachStatus] = useState<string | null>(null);
   const [webSearch, setWebSearch] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const openFilePicker = useCallback(() => {
@@ -825,6 +830,8 @@ export default function KoleexAiApp() {
              URL, no serverless body cap) and the endpoint gets JSON refs.
              The platform body cap is ~4.5MB TOTAL, so the batch's SUM
              decides, with margin for the multipart envelope. */
+          const L_UPLOADING = lang === "ar" ? "جارٍ رفع" : lang === "zh" ? "正在上传" : "Uploading";
+          const L_READING = lang === "ar" ? "جارٍ قراءة المرفقات…" : lang === "zh" ? "正在读取附件…" : "Reading attachment…";
           const totalBytes = filesToSend.reduce((n, f) => n + f.size, 0);
           const useStorageHop = totalBytes > 3.5 * 1024 * 1024;
           let up: Response;
@@ -832,6 +839,7 @@ export default function KoleexAiApp() {
             const { uploadToStorage } = await import("@/lib/storage-client");
             const refs: Array<{ name: string; path: string; type: string; size: number }> = [];
             for (const f of filesToSend) {
+              setAttachStatus(`${L_UPLOADING} ${f.name} (${(f.size / 1048576).toFixed(1)}MB)…`);
               /* The storage KEY must stay ASCII — Supabase rejects e.g. a
                  Chinese filename with "Invalid key". The object is transport,
                  not storage, so the key carries no meaning: uuid + extension.
@@ -845,6 +853,7 @@ export default function KoleexAiApp() {
               }
               refs.push({ name: f.name, path: res.data.path, type: f.type || "", size: f.size });
             }
+            setAttachStatus(L_READING);
             up = await fetch("/api/ai/attachments", {
               method: "POST",
               credentials: "include",
@@ -852,6 +861,7 @@ export default function KoleexAiApp() {
               body: JSON.stringify({ files: refs }),
             });
           } else {
+            setAttachStatus(L_READING);
             const fd = new FormData();
             filesToSend.forEach((f) => fd.append("files", f, f.name));
             up = await fetch("/api/ai/attachments", {
@@ -903,6 +913,7 @@ export default function KoleexAiApp() {
             `Couldn't process the attachment(s): ${e instanceof Error ? e.message : "unknown error"}`,
           );
         }
+        setAttachStatus(null);
         setAttachments([]);
       }
       if (!text && attachPayload.length === 0 && filesToSend.length > 0) {
@@ -2352,6 +2363,12 @@ export default function KoleexAiApp() {
                 renders TypingIndicator inline (empty content = dots),
                 which gives the same feedback without stacking two
                 waiting indicators on top of each other. */}
+            {attachStatus && (
+              <div className="flex items-center gap-2 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] px-3 py-2 text-[12px] text-[var(--text-muted)]">
+                <span className="h-3 w-3 shrink-0 animate-spin rounded-full border-[1.5px] border-current border-t-transparent" aria-hidden />
+                {attachStatus}
+              </div>
+            )}
             {error && (
               <div className="rounded-xl border border-rose-500/30 bg-rose-500/10 text-rose-300 px-3 py-2 text-[12px]">
                 {error}

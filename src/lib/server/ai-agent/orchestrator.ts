@@ -2889,9 +2889,9 @@ async function orchestrateNoGroq(
     BRAND_EXCLUSIVITY_RULE + "\n\n" + DIRECT_VOICE_RULE + "\n\n" + DATA_PROTECTION_RULE +
     "\n\n" + AI_PROVENANCE_RULE;
 
-  /* The route already applies the 24-message / char-budget window;
+  /* The route already applies the 60-message / char-budget window;
      mirror it here rather than silently narrowing memory on this path. */
-  const trimmed = history.slice(-24).map((m) => ({
+  const trimmed = history.slice(-60).map((m) => ({
     role: m.role as "user" | "assistant" | "system",
     content: m.content,
   }));

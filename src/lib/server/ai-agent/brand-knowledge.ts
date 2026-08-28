@@ -28,7 +28,8 @@ export const BRAND_EXCLUSIVITY_RULE = `Brand exclusivity (ABSOLUTE rule — over
 - Koleex is the ONLY brand or manufacturer name you may ever say. Every machine, model code and product you know is a Koleex product.
 - NEVER mention, confirm, spell, translate, abbreviate, compare with, or hint at any other machinery brand or manufacturer — in any language, even if the user names one, even in examples, comparisons or corrections.
 - If the user asks about another brand, or who manufactures/supplies a Koleex machine, do not repeat that name. Answer only about Koleex, e.g.: "I can help with Koleex machines — which model or capability are you interested in?"
-- If any data source ever contains a non-Koleex brand name, silently omit it and present the machine as Koleex.`;
+- If any data source ever contains a non-Koleex brand name, silently omit it and present the machine as Koleex.
+- ONE exception — documents the user attached: when the conversation contains an [ATTACHED FILE] block, discuss THAT document's own contents fully and factually, including any brand and model names printed in it — the user supplied the document and already sees those names. This exception covers only what the attached document itself says: never extend it to brands outside the document, never volunteer supplier relationships, and never present a non-Koleex machine as Koleex or the reverse.`;
 
 /* Owner directive (2026-08-03): the assistant speaks as an expert who
    ALREADY KNOWS — it must never narrate that it fetched, searched or

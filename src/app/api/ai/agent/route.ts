@@ -64,13 +64,13 @@ import type { AgentResponse, AgentStep } from "@/lib/server/ai-agent/types";
    the reason Koleex AI felt like a question-answerer rather than a
    conversation partner — anything said four exchanges ago was simply gone
    (owner: "make sure it has a memory and can remember the conversation").
-   24 messages = 12 exchanges, bounded below by HISTORY_CHAR_BUDGET so a
+   60 messages = 30 exchanges, bounded by HISTORY_CHAR_BUDGET so a
    long-winded thread cannot blow the payload: messages are kept newest-
    first until the budget runs out, so it degrades to exactly the old
    behaviour under heavy load. Attachment embeds stay bounded separately —
    resolveHistoryAttachEmbeds keeps only the newest document's text. */
-const HISTORY_LIMIT = 24;
-const HISTORY_CHAR_BUDGET = 24000;
+const HISTORY_LIMIT = 60;
+const HISTORY_CHAR_BUDGET = 48000;
 
 /** Newest-first char-budget trim, applied AFTER the chronological flip:
  *  drop the OLDEST messages once the running total exceeds the budget. */
