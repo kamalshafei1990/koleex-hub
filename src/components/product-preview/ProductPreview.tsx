@@ -31,6 +31,7 @@ import {
 import VisualGlyph from "./VisualGlyph";
 import { useTranslation } from "@/lib/i18n";
 import { PRODUCTS_UI_I18N } from "@/lib/products-ui-i18n";
+import { SPEC_I18N } from "@/lib/product-schema/spec-i18n";
 
 interface ProductLocaleText {
   locale: string;
@@ -278,6 +279,11 @@ const Disclosure = ({
 
 export const ProductPreview = (props: ProductPreviewProps) => {
   const { t, lang } = useTranslation(PRODUCTS_UI_I18N);
+  /* Spec content (group titles, field labels, option labels) is localized by
+     the same dictionary the admin Specs editor uses. It used to be admin-only,
+     so the CUSTOMER page rendered every spec in English even in zh/ar — the
+     translations existed and were simply never read here. */
+  const { t: ts } = useTranslation(SPEC_I18N);
   const {
     productName,
     primaryModel,
@@ -285,7 +291,7 @@ export const ProductPreview = (props: ProductPreviewProps) => {
     posterUrl,
     translations,
     brand,
-    schema,
+    schema: rawSchema,
     values: familyValues,
     knowledge,
     mainImageUrl,
@@ -300,6 +306,33 @@ export const ProductPreview = (props: ProductPreviewProps) => {
     variants,
     siblings,
   } = props;
+
+  /* Localize the schema ONCE, at the source: every downstream read of
+     group.title / f.label / option.label then shows the reader's language
+     without touching the ~18 render sites. Keys and stored values stay
+     canonical English — this is display only.
+     Option keys are FIELD-SCOPED first (`o:<field>.<value>`) then shared
+     (`o:<value>`), the same order the admin editor uses: two fields can
+     legitimately share a value and mean different things (a `single` head
+     count once rendered as "single phase" in zh/ar). */
+  const schema = useMemo(() => {
+    if (!rawSchema?.groups) return rawSchema;
+    return {
+      ...rawSchema,
+      groups: rawSchema.groups.map((g) => ({
+        ...g,
+        title: ts(`g:${g.title}`, g.title),
+        fields: (g.fields ?? []).map((f) => ({
+          ...f,
+          label: ts(`f:${f.key}`, f.label ?? f.key),
+          options: f.options?.map((o) => ({
+            ...o,
+            label: ts(`o:${f.key}.${o.value}`, ts(`o:${o.value}`, o.label)),
+          })),
+        })),
+      })),
+    };
+  }, [rawSchema, ts]);
 
   /* Localized overlay: when the active language has a filled-in
      translation, show it; otherwise fall back to the English base.
@@ -453,12 +486,27 @@ export const ProductPreview = (props: ProductPreviewProps) => {
   const kbByType = useMemo(() => {
     const m = new Map<string, ProductKnowledgeBlock[]>();
     for (const b of visibleKnowledge) {
+      /* Overlay the reader's language when the block carries it; English
+         stays the fallback so a half-translated product still reads. One
+         swap here covers every knowledge surface below (hero chips,
+         highlights deck, overview, applications, FAQ …). */
+      const loc = lang === "zh" || lang === "ar"
+        ? {
+            ...b,
+            title: b.title_i18n?.[lang]?.trim() || b.title,
+            content: (() => {
+              const c = b.content_i18n?.[lang];
+              if (Array.isArray(c)) return c.length ? c : b.content;
+              return typeof c === "string" && c.trim() ? c : b.content;
+            })(),
+          }
+        : b;
       const arr = m.get(b.type) ?? [];
-      arr.push(b);
+      arr.push(loc);
       m.set(b.type, arr);
     }
     return m;
-  }, [visibleKnowledge]);
+  }, [visibleKnowledge, lang]);
   const firstKb = (t: string) => kbByType.get(t)?.[0];
 
   /* ── derived: anchors (schema-driven importance — any field type) ──

@@ -1060,6 +1060,27 @@ export const PRODUCTS_UI_I18N: Translations = {
   "preview.countVideos": { en: "{n} videos", zh: "{n} 个视频", ar: "{n} فيديو" },
   "preview.countDocuments": { en: "{n} documents", zh: "{n} 个文档", ar: "{n} مستند" },
 
+  /* ── 2026-08-29 sweep: the customer product page's own chrome. These 16
+     keys were called with an English default but never defined, so the
+     sticky pill, the section eyebrows and the model/compare copy stayed
+     English in zh/ar while the product's name and tagline switched. ── */
+  "preview.stickyOverview": { en: "Overview", zh: "概览", ar: "نظرة عامة" },
+  "preview.stickySpecs": { en: "Specs", zh: "参数", ar: "المواصفات" },
+  "preview.stickyGallery": { en: "Gallery", zh: "图库", ar: "الصور" },
+  "preview.getHighlights": { en: "Get the highlights.", zh: "核心亮点。", ar: "أبرز المميزات." },
+  "preview.eyebrowPerformance": { en: "Performance", zh: "性能", ar: "الأداء" },
+  "preview.eyebrowUpClose": { en: "Up close", zh: "细节", ar: "عن قرب" },
+  "preview.eyebrowLineup": { en: "Lineup", zh: "系列型号", ar: "الطُرز" },
+  "preview.eyebrowCompare": { en: "Compare", zh: "对比", ar: "مقارنة" },
+  "preview.takeCloserLook": { en: "Take a closer look.", zh: "细看每个细节。", ar: "شاهدها عن قرب." },
+  "preview.chooseModel": { en: "Choose your model.", zh: "选择您的型号。", ar: "اختر الطراز المناسب." },
+  "preview.compareTitle": { en: "How it stacks up.", zh: "同类对比。", ar: "كيف تتفوّق." },
+  "preview.compareWith": { en: "Compare with", zh: "对比", ar: "مقارنة مع" },
+  "preview.model": { en: "Model", zh: "型号", ar: "الطراز" },
+  "preview.viewProduct": { en: "View", zh: "查看", ar: "عرض" },
+  "preview.photo": { en: "Photo", zh: "图片", ar: "صورة" },
+  "preview.noImage": { en: "No image", zh: "暂无图片", ar: "لا توجد صورة" },
+
   /* ── 2026-07-30 full-translation sweep: keys that were falling back ── */
   "preview.eyebrowSafety": { en: "Before you run it", zh: "运行之前", ar: "قبل التشغيل" },
   "preview.warnings": { en: "Warnings & Safety", zh: "警告与安全", ar: "التحذيرات والسلامة" },

@@ -222,6 +222,13 @@ export interface ProductKnowledgeBlock {
   visibility: VisibilityFlags;
   aiWeight: number;
   relatedFields?: string[];
+  /* Display translations (2026-08-29). English above stays canonical — it is
+     what the AI layer and every export read; these overlay it for a zh/ar
+     reader. Blocks had NO place for translations, so knowledge was the one
+     part of a product page that stayed English in every language.
+     Lives inside the schema_knowledge jsonb, so no column was added. */
+  title_i18n?: Partial<Record<'zh' | 'ar', string>>;
+  content_i18n?: Partial<Record<'zh' | 'ar', string | string[]>>;
 }
 
 export interface ProductSchemaResolution {
