@@ -4,6 +4,7 @@ import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { requireAuth } from "@/lib/server/auth";
 import { requireInternalUser } from "@/lib/server/ai/require-internal";
+import { stripAttachEmbed } from "@/lib/server/ai/attach-embed";
 
 /* GET    /api/ai/conversations/:id — conversation + ordered messages
    PATCH  /api/ai/conversations/:id — rename
@@ -36,9 +37,16 @@ export async function GET(_req: Request, { params }: RouteCtx) {
   ]);
   if (cvRes.error) return NextResponse.json({ error: cvRes.error.message }, { status: 500 });
   if (!cvRes.data) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  /* Bubbles show the slim 📎 marker; the embedded extraction text after the
+     delimiter is transport for the agent's later turns, not display. */
+  const messages = (msgRes.data ?? []).map((m) =>
+    typeof (m as { content?: unknown }).content === "string"
+      ? { ...m, content: stripAttachEmbed((m as { content: string }).content) }
+      : m,
+  );
   return NextResponse.json({
     conversation: cvRes.data,
-    messages: msgRes.data ?? [],
+    messages,
   });
 }
 

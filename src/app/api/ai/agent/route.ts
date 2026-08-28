@@ -30,6 +30,7 @@ import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { requireAuth } from "@/lib/server/auth";
 import { requireInternalUser } from "@/lib/server/ai/require-internal";
+import { ATTACH_SPLIT, resolveHistoryAttachEmbeds } from "@/lib/server/ai/attach-embed";
 import { getTaughtAnswersBlock, getKnowledgeNudgeBlock } from "@/lib/server/ai-knowledge";
 import { buildUserContext } from "@/lib/server/ai-agent/permissions";
 import {
@@ -214,6 +215,7 @@ export async function POST(req: Request) {
         `\n\n[ATTACHED FILE: ${a.name}] (uploaded by the user — its extracted text follows; answer using it and never claim you cannot open files)\n"""\n${a.text}\n"""`,
     )
     .join("");
+
 
   /* Confirm the conversation is mine. Must stay sequential — a 404
      should be side-effect-free; no inserts fire if the conv isn't ours. */
@@ -402,17 +404,19 @@ export async function POST(req: Request) {
               tenant_id: auth.tenant_id,
               conversation_id: conversationId,
               role: "user",
-              content: content + attachMarker,
+              content: content + attachMarker + (attachBlock ? ATTACH_SPLIT + attachBlock : ""),
             }),
           ]);
 
-          const history = (historyRes.data ?? [])
-            .slice()
-            .reverse()
-            .map((m) => ({
-              role: m.role as "user" | "assistant",
-              content: m.content as string,
-            }));
+          const history = resolveHistoryAttachEmbeds(
+            (historyRes.data ?? [])
+              .slice()
+              .reverse()
+              .map((m) => ({
+                role: m.role as "user" | "assistant",
+                content: m.content as string,
+              })),
+          );
 
           /* Keepalive comments while orchestrate / fast-path runs.
              SSE treats lines starting with ":" as comments — they
@@ -817,7 +821,7 @@ export async function POST(req: Request) {
       tenant_id: auth.tenant_id,
       conversation_id: conversationId,
       role: "user",
-      content: content + attachMarker,
+      content: content + attachMarker + (attachBlock ? ATTACH_SPLIT + attachBlock : ""),
     }),
   ]);
   const tDeps = Date.now();
@@ -825,13 +829,15 @@ export async function POST(req: Request) {
   /* Query pulled newest-first with a limit, then flipped back to
      chronological order for the orchestrator. Behaviour (tool routing,
      multi-turn context) is unchanged — only the window size is bounded. */
-  const history = (historyRes.data ?? [])
-    .slice()
-    .reverse()
-    .map((m) => ({
-      role: m.role as "user" | "assistant",
-      content: m.content as string,
-    }));
+  const history = resolveHistoryAttachEmbeds(
+    (historyRes.data ?? [])
+      .slice()
+      .reverse()
+      .map((m) => ({
+        role: m.role as "user" | "assistant",
+        content: m.content as string,
+      })),
+  );
 
   const agent = await orchestrate({
     ctx,

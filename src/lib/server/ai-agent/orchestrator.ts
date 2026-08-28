@@ -666,6 +666,12 @@ export async function orchestrate(input: OrchestrateInput): Promise<AgentRespons
     ctx, history, userMessage, userLang, dialect, conversationId, onDelta,
     webSearchRequested = false, languageLock = "", taughtAnswers = "",
   } = input;
+  /* True when a user-uploaded document's extracted text is in play — this
+     turn or retained history. Gates the recital exemption in
+     sealFinalReply(). */
+  const attachedDocCtx =
+    userMessage.includes("[ATTACHED FILE:") ||
+    history.some((m) => m.content.includes("[ATTACHED FILE:"));
   const key = process.env.DEEPSEEK_API_KEY;
 
   /* Graceful Groq-missing fallback. The orchestrator's tool-calling
@@ -707,7 +713,7 @@ export async function orchestrate(input: OrchestrateInput): Promise<AgentRespons
       { kind: "answer", text: fastReply, permissionStatus: "allowed" },
     ];
     console.warn("[ai.agent.final.before]", fastReply);
-    const safeReply = sealFinalReply(fastReply, cannedSteps, userMessage);
+    const safeReply = sealFinalReply(fastReply, cannedSteps, userMessage, attachedDocCtx);
     console.warn("[ai.agent.final.after]", safeReply);
     return {
       steps: cannedSteps,
@@ -831,7 +837,7 @@ export async function orchestrate(input: OrchestrateInput): Promise<AgentRespons
       if (reply) {
         steps.push({ kind: "answer", text: reply, permissionStatus: "allowed" });
         console.warn("[ai.agent.final.before]", reply);
-        const safeReply = sealFinalReply(reply, steps, userMessage);
+        const safeReply = sealFinalReply(reply, steps, userMessage, attachedDocCtx);
         console.warn("[ai.agent.final.after]", safeReply);
         console.log(
           `[ai.agent.timing] fast=${isBrand ? "brand" : "small"} provider=${tPost - tPre}ms total=${Date.now() - tStart}ms`,
@@ -967,7 +973,7 @@ export async function orchestrate(input: OrchestrateInput): Promise<AgentRespons
       if (rescued) {
         steps.push({ kind: "answer", text: rescued, permissionStatus: "allowed" });
         console.warn("[ai.agent.final.before]", rescued);
-        const safeReply = sealFinalReply(rescued, steps, userMessage);
+        const safeReply = sealFinalReply(rescued, steps, userMessage, attachedDocCtx);
         console.warn("[ai.agent.final.after]", safeReply);
         return {
           steps,
@@ -987,7 +993,7 @@ export async function orchestrate(input: OrchestrateInput): Promise<AgentRespons
         : "I couldn't complete that request. Please try again.";
       steps.push({ kind: "answer", text: msg, permissionStatus: "denied" });
       console.warn("[ai.agent.final.before]", msg);
-      const safeReply = sealFinalReply(msg, steps, userMessage);
+      const safeReply = sealFinalReply(msg, steps, userMessage, attachedDocCtx);
       console.warn("[ai.agent.final.after]", safeReply);
       return {
         steps,
@@ -1004,7 +1010,7 @@ export async function orchestrate(input: OrchestrateInput): Promise<AgentRespons
       if (rescued) {
         steps.push({ kind: "answer", text: rescued, permissionStatus: "allowed" });
         console.warn("[ai.agent.final.before]", rescued);
-        const safeReply = sealFinalReply(rescued, steps, userMessage);
+        const safeReply = sealFinalReply(rescued, steps, userMessage, attachedDocCtx);
         console.warn("[ai.agent.final.after]", safeReply);
         return {
           steps,
@@ -1276,7 +1282,7 @@ export async function orchestrate(input: OrchestrateInput): Promise<AgentRespons
      reply to the route handler (which persists finalReply into
      ai_messages.content → the bubble the user sees). */
   console.warn("[ai.agent.final.before]", finalReply);
-  const safeReply = sealFinalReply(finalReply, steps, userMessage);
+  const safeReply = sealFinalReply(finalReply, steps, userMessage, attachedDocCtx);
   console.warn("[ai.agent.final.after]", safeReply);
 
   return {
@@ -2690,6 +2696,7 @@ function sealFinalReply(
   finalReply: string,
   steps: AgentStep[],
   userMessage?: string,
+  attachedDocContext?: boolean,
 ): string {
   // Start from the model's text. In quotation hard mode we replace
   // it entirely with a deterministic reply before running the guard
@@ -2702,9 +2709,22 @@ function sealFinalReply(
     );
   }
   sealed = sealExecutionSafety(sealed, steps);
-  sealed = sealExecutionSafetyV2(sealed, steps);
-  sealed = sealExecutionSafetyV3(sealed, steps);
-  sealed = sealPricingSafety(sealed, steps);
+  /* Document-recital exemption. The field-claim (v3) and pricing seals
+     exist to stop INVENTED customer/product/pricing details presented as
+     system facts. A file the user themselves attached is legitimate source
+     material — an invoice summary trips every pricing pattern by nature,
+     and v3 reads its "Total:" lines as ungrounded field claims. When an
+     [ATTACHED FILE] block is in this turn or in retained history, those two
+     seals stand down; the fake-workflow seals (v1/v2) and quotation hard
+     mode stay on — reciting a document never justifies claiming tools ran. */
+  if (!attachedDocContext) {
+    sealed = sealExecutionSafetyV2(sealed, steps);
+    sealed = sealExecutionSafetyV3(sealed, steps);
+    sealed = sealPricingSafety(sealed, steps);
+  } else {
+    sealed = sealExecutionSafetyV2(sealed, steps);
+    console.warn("[ai.agent.seals] attached-document context — v3/pricing recital exemption");
+  }
   syncLastAnswerStep(steps, sealed);
   return sealed;
 }
@@ -2853,6 +2873,9 @@ async function orchestrateNoGroq(
   tStart: number,
 ): Promise<AgentResponse> {
   const { history, userMessage, userLang, conversationId } = input;
+  const attachedDocCtx =
+    userMessage.includes("[ATTACHED FILE:") ||
+    history.some((m) => m.content.includes("[ATTACHED FILE:"));
   /* Lightweight system prompt — no tool schemas; the model is just
      answering naturally. Keeps the same language-anchoring as the
      full agent path. */
@@ -2884,7 +2907,7 @@ async function orchestrateNoGroq(
       result?.reply?.trim() ||
       "I couldn't reach the AI provider just now. Try again in a moment.";
     const steps: AgentStep[] = [{ kind: "answer", text: reply }];
-    const safeReply = sealFinalReply(reply, steps, userMessage);
+    const safeReply = sealFinalReply(reply, steps, userMessage, attachedDocCtx);
     console.log(
       `[ai.agent.timing] fast=no-groq provider=${result?.provider ?? "none"} total=${Date.now() - tStart}ms`,
     );
