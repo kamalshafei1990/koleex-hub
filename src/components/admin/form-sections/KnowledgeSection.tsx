@@ -20,6 +20,7 @@
  */
 
 import { useState } from "react";
+import { TRANSLATABLE_LANGS } from "@/lib/i18n";
 import BookOpenIcon from "@/components/icons/ui/BookOpenIcon";
 import PlusIcon from "@/components/icons/ui/PlusIcon";
 import TrashIcon from "@/components/icons/ui/TrashIcon";
@@ -292,18 +293,18 @@ export default function KnowledgeSection({ blocks, onChange }: Props) {
                         <p className="text-[10px] font-semibold uppercase tracking-wide text-[var(--text-ghost)]">
                           Translations · leave empty to show English
                         </p>
-                        {(["zh", "ar"] as const).map((lc) => {
+                        {TRANSLATABLE_LANGS.map(({ code: lc, label, nativeLabel, dir }) => {
                           const cur = b.content_i18n?.[lc];
                           const val = meta.shape === "list"
                             ? (Array.isArray(cur) ? cur.join("\n") : (cur ?? ""))
                             : (typeof cur === "string" ? cur : "");
                           return (
                             <div key={lc} className="flex items-start gap-2">
-                              <span className="mt-2 w-14 shrink-0 text-[10px] font-bold uppercase tracking-wider text-[var(--text-ghost)]">
-                                {lc === "zh" ? "Chinese" : "Arabic"}
+                              <span className="mt-2 w-14 shrink-0 text-[10px] font-bold uppercase tracking-wider text-[var(--text-ghost)]" title={nativeLabel}>
+                                {label}
                               </span>
                               <textarea
-                                dir={lc === "ar" ? "rtl" : "ltr"}
+                                dir={dir}
                                 value={val}
                                 onChange={(e) => {
                                   const raw = e.target.value;
@@ -321,9 +322,7 @@ export default function KnowledgeSection({ blocks, onChange }: Props) {
                                 }}
                                 rows={meta.shape === "list" ? Math.max(2, val.split("\n").length) : 2}
                                 className={inputCls + " resize-y leading-relaxed"}
-                                placeholder={meta.shape === "list"
-                                  ? (lc === "zh" ? "每行一条…" : "بند في كل سطر…")
-                                  : (lc === "zh" ? "中文内容…" : "المحتوى بالعربية…")}
+                                placeholder={`${nativeLabel}${meta.shape === "list" ? " · one item per line" : ""}`}
                               />
                             </div>
                           );

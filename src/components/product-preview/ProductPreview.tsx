@@ -490,8 +490,9 @@ export const ProductPreview = (props: ProductPreviewProps) => {
          stays the fallback so a half-translated product still reads. One
          swap here covers every knowledge surface below (hero chips,
          highlights deck, overview, applications, FAQ …). */
-      const loc = lang === "zh" || lang === "ar"
-        ? {
+      const loc = lang === "en"
+        ? b
+        : {
             ...b,
             title: b.title_i18n?.[lang]?.trim() || b.title,
             content: (() => {
@@ -499,8 +500,7 @@ export const ProductPreview = (props: ProductPreviewProps) => {
               if (Array.isArray(c)) return c.length ? c : b.content;
               return typeof c === "string" && c.trim() ? c : b.content;
             })(),
-          }
-        : b;
+          };
       const arr = m.get(b.type) ?? [];
       arr.push(loc);
       m.set(b.type, arr);
