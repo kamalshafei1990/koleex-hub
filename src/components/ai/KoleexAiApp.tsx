@@ -27,6 +27,7 @@ import { useInput } from "@/components/kds/useInput";
 import Link from "next/link";
 import { useSkin } from "@/lib/appearance";
 import { useTranslation, type Lang } from "@/lib/i18n";
+import { createPortal } from "react-dom";
 import ArrowLeftIcon from "@/components/icons/ui/ArrowLeftIcon";
 import PlusIcon from "@/components/icons/ui/PlusIcon";
 import PaperPlaneIcon from "@/components/icons/ui/PaperPlaneIcon";
@@ -3797,7 +3798,7 @@ function RowMenu({
         <MoreHorizontalIcon size={14} />
       </button>
 
-      {open && pos && (
+      {open && pos && createPortal(
         <>
           {/* Click-catcher. Transparent, not dimmed — this is a small row
               menu, not a modal, and the house rule about blurring backdrops
@@ -3807,9 +3808,15 @@ function RowMenu({
             onClick={(e) => { e.stopPropagation(); setOpen(false); }}
             onContextMenu={(e) => { e.preventDefault(); setOpen(false); }}
           />
+          {/* MN-5 canon: kx-pop-panel is the shell + (under aurora) the
+              frosted material. PORTALLED to <body>, and that part is
+              load-bearing: this menu used to render inside the sidebar,
+              whose .kx-glass-drawer backdrop-filter both starves any
+              descendant blur and made the "glass" read as a flat
+              see-through box (owner: "not frosted blurred glass"). */}
           <div
             role="menu"
-            className="fixed z-[61] w-52 overflow-y-auto rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] shadow-xl py-1"
+            className="kx-pop-panel fixed z-[61] w-52 overflow-y-auto py-1"
             style={{
               top: pos.top,
               bottom: pos.bottom,
@@ -3854,7 +3861,8 @@ function RowMenu({
               ),
             )}
           </div>
-        </>
+        </>,
+        document.body,
       )}
     </>
   );
