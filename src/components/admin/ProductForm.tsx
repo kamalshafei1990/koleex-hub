@@ -629,6 +629,8 @@ export default function ProductForm({ productId }: Props) {
   /* Price-tab preview: which supplier price OPTION (raw ¥) the whole tab is
      priced from; null = the main price. Toggled from the Cost Price ladder. */
   const [previewOptionCost, setPreviewOptionCost] = useState<number | null>(null);
+  /* "Add ladder as Buyer Options" one-click bridge status. */
+  const [ladderOptStatus, setLadderOptStatus] = useState<"idle" | "saving" | "done" | "error">("idle");
   /* Stand / Table configurable options (their specs & variants). Held in form
      state so they can be entered before the product's first save, then
      persisted alongside everything else. */
@@ -5447,6 +5449,82 @@ export default function ProductForm({ productId }: Props) {
                               return (
                                 <>
                                   {priced.length > 0 && <PriceOptionsFobList items={priced} selectedRaw={previewOptionCost} onSelect={setPreviewOptionCost} onEditPrice={editOptionPrice} />}
+                                  {/* One-click bridge (owner decision 2026-08-29):
+                                      the ladder rows become ONE Buyer-Option
+                                      choice group. Deltas are stored as COST
+                                      deltas in CNY — that is the Options
+                                      store's contract, and the SELLING delta
+                                      then emerges from Commercial Setup
+                                      exactly like the per-card FOB above.
+                                      Weight deltas are left empty on purpose
+                                      (not the supplier ladder's knowledge) —
+                                      filled on the Options tab. */}
+                                  {!usingOverrideOptions && priced.length > 0 && primaryLink && effectiveId && (
+                                    <div className="mt-2 flex items-center gap-2">
+                                      <button
+                                        type="button"
+                                        disabled={ladderOptStatus === "saving" || ladderOptStatus === "done"}
+                                        onClick={async () => {
+                                          setLadderOptStatus("saving");
+                                          try {
+                                            const mainRaw = Number(primaryLink.unit_cost_cny);
+                                            const res = await fetch(`/api/product-options?product_id=${effectiveId}`, { credentials: "include" });
+                                            const j = (await res.json()) as { options?: Array<Record<string, unknown> & { id?: string; title?: string; values?: Array<Record<string, unknown>> }> };
+                                            const existing = (j.options ?? []).map((o) => ({
+                                              key: String(o.id ?? ""),
+                                              title: o.title, title_i18n: o.title_i18n, kind: o.kind,
+                                              required: o.required, active: o.active,
+                                              values: (o.values ?? []).map((v) => ({
+                                                key: String(v.id ?? ""),
+                                                label: v.label, label_i18n: v.label_i18n, image_url: v.image_url,
+                                                linked_product_id: v.linked_product_id, linked_model_id: v.linked_model_id,
+                                                price_delta_cny: v.price_delta_cny, weight_delta_kg: v.weight_delta_kg,
+                                                cbm_delta: v.cbm_delta, is_default: v.is_default, active: v.active,
+                                              })),
+                                            }));
+                                            const GROUP_TITLE = "Configuration";
+                                            const kept = existing.filter((o) => o.title !== GROUP_TITLE);
+                                            const stdLabel = (primaryLink.notes || "").trim() || "Standard";
+                                            const group = {
+                                              key: crypto.randomUUID(),
+                                              title: GROUP_TITLE,
+                                              title_i18n: { zh: "配置", ar: "التهيئة" },
+                                              kind: "choice", required: true, active: true,
+                                              values: [
+                                                { key: crypto.randomUUID(), label: stdLabel, label_i18n: primaryLink.notes_i18n ?? null, price_delta_cny: null, weight_delta_kg: null, is_default: true, active: true },
+                                                ...priced.map((o2) => ({
+                                                  key: crypto.randomUUID(),
+                                                  label: (options[o2.idx]?.note || "").trim() || `Option ¥${o2.raw.toLocaleString()}`,
+                                                  label_i18n: options[o2.idx]?.note_i18n ?? null,
+                                                  price_delta_cny: Number.isFinite(mainRaw) ? o2.raw - mainRaw : null,
+                                                  weight_delta_kg: null, is_default: false, active: true,
+                                                })),
+                                              ],
+                                            };
+                                            const put = await fetch("/api/product-options", {
+                                              method: "PUT", credentials: "include",
+                                              headers: { "Content-Type": "application/json" },
+                                              body: JSON.stringify({ product_id: effectiveId, options: [...kept, group] }),
+                                            });
+                                            if (!put.ok) throw new Error(String(put.status));
+                                            setLadderOptStatus("done");
+                                          } catch {
+                                            setLadderOptStatus("error");
+                                          }
+                                        }}
+                                        className={`h-7 px-2.5 rounded-lg border text-[10.5px] font-medium transition-colors ${
+                                          ladderOptStatus === "done"
+                                            ? "border-emerald-500/40 bg-emerald-500/[0.08] text-emerald-400"
+                                            : "border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)]/40 text-[var(--text-muted)] hover:border-[var(--border-strong)] hover:text-[var(--text-primary)]"
+                                        }`}
+                                      >
+                                        {ladderOptStatus === "saving" ? t("pricing.ladder2optSaving", "Adding…")
+                                          : ladderOptStatus === "done" ? t("pricing.ladder2optDone", "✓ Added as Buyer Options — set the weight deltas on the Options tab")
+                                          : ladderOptStatus === "error" ? t("pricing.ladder2optError", "Failed — try again")
+                                          : t("pricing.ladder2opt", "Add these as Buyer Options (Options tab)")}
+                                      </button>
+                                    </div>
+                                  )}
                                   {unpriced.map((o, oi) => {
                                     const onote = ((o.note_i18n ?? {})[lang] || "").trim() || o.note;
                                     return (
