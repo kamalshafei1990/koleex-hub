@@ -345,6 +345,37 @@ export const ProductPreview = (props: ProductPreviewProps) => {
     () => (variants ?? []).find((v) => v.code === selectedCode) ?? null,
     [variants, selectedCode],
   );
+
+  /* ── Sticky-pill scroll spy ──────────────────────────────────────────
+     The pill's three anchors always scrolled correctly, but Gallery was
+     hard-styled as the filled pill, so it read as "selected" no matter
+     where the reader was — click Specs, Gallery stays lit, and the bar
+     looks like broken tabs. Track which section owns the viewport and
+     light THAT one. IntersectionObserver watches the viewport, so it is
+     immune to the app shell scrolling an inner container rather than the
+     document (a plain scroll listener on window would never fire here). */
+  const [activeSection, setActiveSection] = useState<string>("overview");
+  useEffect(() => {
+    const ids = ["overview", "specs", "gallery"];
+    const nodes = ids
+      .map((id) => document.getElementById(id))
+      .filter((n): n is HTMLElement => !!n);
+    if (nodes.length === 0) return;
+    /* Top-biased band: a section counts as current once its top passes
+       under the pinned header, so the highlight flips as a heading
+       arrives rather than when the section happens to fill the screen. */
+    const io = new IntersectionObserver(
+      (entries) => {
+        const hit = entries
+          .filter((e) => e.isIntersecting)
+          .sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top)[0];
+        if (hit?.target.id) setActiveSection(hit.target.id);
+      },
+      { rootMargin: "-120px 0px -65% 0px", threshold: 0 },
+    );
+    nodes.forEach((n) => io.observe(n));
+    return () => io.disconnect();
+  }, [surface]);
   /* Every consumer below reads `values` — the RESOLVED view of whichever
      member is selected; no selection = the family baseline. */
   const values = useMemo(
@@ -746,21 +777,38 @@ export const ProductPreview = (props: ProductPreviewProps) => {
             {displayName || productName}
           </span>
           <span className="flex shrink-0 items-center gap-1">
-            <a href="#overview" className="hidden sm:inline-flex items-center rounded-full px-3 py-1.5 text-[12px] font-medium text-[var(--text-muted)] transition-colors hover:text-[var(--text-primary)]">
-              {t("preview.stickyOverview", "Overview")}
-            </a>
-            <a href="#specs" className="hidden sm:inline-flex items-center rounded-full px-3 py-1.5 text-[12px] font-medium text-[var(--text-muted)] transition-colors hover:text-[var(--text-primary)]">
-              {t("preview.stickySpecs", "Specs")}
-            </a>
-            <a href="#gallery" className="inline-flex items-center rounded-full bg-[var(--bg-inverted)] px-4 py-1.5 text-[12px] font-semibold text-[var(--text-inverted)] transition-opacity hover:opacity-90">
-              {t("preview.stickyGallery", "Gallery")}
-            </a>
+            {([
+              { id: "overview", label: t("preview.stickyOverview", "Overview") },
+              { id: "specs", label: t("preview.stickySpecs", "Specs") },
+              { id: "gallery", label: t("preview.stickyGallery", "Gallery") },
+            ] as const).map((s) => {
+              const isActive = activeSection === s.id;
+              return (
+                <a
+                  key={s.id}
+                  href={`#${s.id}`}
+                  aria-current={isActive ? "true" : undefined}
+                  onClick={() => setActiveSection(s.id)}
+                  className={`items-center rounded-full py-1.5 text-[12px] transition-all ${
+                    /* Gallery stays visible on phones — the other two are the
+                       first to go when the pill runs out of room. */
+                    s.id === "gallery" ? "inline-flex" : "hidden sm:inline-flex"
+                  } ${
+                    isActive
+                      ? "bg-[var(--bg-inverted)] px-4 font-semibold text-[var(--text-inverted)] hover:opacity-90"
+                      : "px-3 font-medium text-[var(--text-muted)] hover:text-[var(--text-primary)]"
+                  }`}
+                >
+                  {s.label}
+                </a>
+              );
+            })}
           </span>
         </div>
       </div>
 
       {/* Anchor target for the poster "Learn more" CTA. */}
-      <div id="overview" className="scroll-mt-24" />
+      <div id="overview" className="scroll-mt-32" />
 
       {/* ═══ 2. AT A GLANCE — airy, glyph-forward stat band (no table lines) ═══ */}
       {coreAnchors.length > 0 ? (
@@ -859,12 +907,12 @@ export const ProductPreview = (props: ProductPreviewProps) => {
           ...asKnowledgeList(firstKb("selling_points")?.content),
           ...asKnowledgeList(firstKb("technical_advantages")?.content),
         ].slice(0, 5);
-        // Close-up detail shots lead the deck (they make the strongest
-        // cards); wide studio shots and the main render fill the rest.
-        const g = galleryUrls ?? [];
-        const detailShots = g.filter((u) => u.includes("/products/details/"));
-        const otherShots = g.filter((u) => !u.includes("/products/details/"));
-        const imgs = [...detailShots, ...otherShots, ...(mainImageUrl ? [mainImageUrl] : [])];
+        /* Owner rule (2026-08-29): a card shows a photo only when that photo
+           belongs to it. These points come from the knowledge lists, which
+           carry no image of their own — the deck used to borrow gallery and
+           main-render shots by index, pairing e.g. a detection-accuracy claim
+           with whatever photo landed at that position. Text-only cards
+           instead; per-highlight photos live in the Highlights tab. */
         if (points.length < 2) return null;
         return (
           <section className="space-y-8">
@@ -873,9 +921,8 @@ export const ProductPreview = (props: ProductPreviewProps) => {
             </h2>
             <SnapCarousel>
               {points.map((point, i) => {
-                const img = imgs.length > 0 ? imgs[i % imgs.length] : null;
                 // Apple shop-card anatomy: bold claim on the card surface,
-                // supporting clause below it, photo grounded at the bottom.
+                // supporting clause below it.
                 // Theme-aware surface so it reads right in light AND dark.
                 const parts = point.split(/\s+—\s+/);
                 const head = parts[0];
@@ -883,7 +930,9 @@ export const ProductPreview = (props: ProductPreviewProps) => {
                 return (
                   <div
                     key={i}
-                    className="flex h-[500px] md:h-[560px] w-[85%] shrink-0 snap-start flex-col overflow-hidden rounded-[28px] bg-[var(--bg-surface-subtle)] sm:w-[440px]"
+                    /* Text-only deck: sized to the copy (a photo-height box
+                       with no photo left a tall empty card). */
+                    className="flex min-h-[260px] w-[85%] shrink-0 snap-start flex-col overflow-hidden rounded-[28px] bg-[var(--bg-surface-subtle)] sm:w-[440px]"
                   >
                     <div className="p-7 md:p-8">
                       <h3 className="text-xl md:text-[24px] font-semibold leading-snug tracking-[-0.01em] text-[var(--text-primary)]">
@@ -897,12 +946,6 @@ export const ProductPreview = (props: ProductPreviewProps) => {
                         </p>
                       ) : null}
                     </div>
-                    {img ? (
-                      <div className="mt-auto h-[240px] md:h-[280px]">
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img src={img} alt="" className="h-full w-full object-cover" />
-                      </div>
-                    ) : null}
                   </div>
                 );
               })}
@@ -1270,7 +1313,7 @@ export const ProductPreview = (props: ProductPreviewProps) => {
           page reads simple-first, deep-on-demand. */}
       {specGroups.length > 0 ? (
 
-        <div id="specs" data-reveal className="scroll-mt-24">
+        <div id="specs" data-reveal className="scroll-mt-32">
           <SectionHead hero eyebrow={t("preview.eyebrowLayer3", "In depth")} title={t("preview.technicalSpecifications", "Technical Specifications")} />
           <div className="mt-3 border-t border-[var(--border-subtle)]">
           {specGroups.map(({ group, fields, emphasis }) => (
@@ -1492,7 +1535,7 @@ export const ProductPreview = (props: ProductPreviewProps) => {
 
       {/* ═══ 12. GALLERY ═══ */}
       {hasGallery ? (
-        <section id="gallery" className="scroll-mt-24 space-y-8">
+        <section id="gallery" className="scroll-mt-32 space-y-8">
           <SectionHead hero eyebrow={t("preview.eyebrowUpClose", "Up close")} title={t("view.gallery", "Gallery")} />
           {/* Apple "Up close" rail — large snap cards instead of a grid. */}
           <SnapCarousel>
