@@ -385,14 +385,31 @@ export default function KoleexAiApp() {
      the last time this filter lived in only one of them the other two were
      silently wrong for an hour. Every route now lands here. */
   const SUPPORTED_FILES = /\.(pdf|txt|md|markdown|csv|tsv|json|log|xlsx|xlsm|xls|png|jpe?g|webp|gif)$/i;
+  /* Size gates run HERE, at attach time — not after a 200MB upload has
+     already been attempted. Images go to the vision model as base64, so
+     their ceiling is small; documents ride the direct-to-storage hop and
+     can be big. */
+  const MAX_IMAGE_MB = 15;
+  const MAX_DOC_MB = 200;
   const addFiles = useCallback((incoming: File[]) => {
     if (incoming.length === 0) return;
-    const ok = incoming.filter(
+    const typeOk = incoming.filter(
       (f) => SUPPORTED_FILES.test(f.name) || (f.type || "").startsWith("image/"),
     );
-    if (ok.length < incoming.length) {
-      setError("Supported files: images, PDF, Excel, TXT, MD, CSV, JSON.");
+    const problems: string[] = [];
+    if (typeOk.length < incoming.length) {
+      problems.push("Supported files: images, PDF, Excel, TXT, MD, CSV, JSON.");
     }
+    const ok = typeOk.filter((f) => {
+      const isImage = (f.type || "").startsWith("image/") || /\.(png|jpe?g|webp|gif)$/i.test(f.name);
+      const capMb = isImage ? MAX_IMAGE_MB : MAX_DOC_MB;
+      if (f.size > capMb * 1024 * 1024) {
+        problems.push(`${f.name} is ${(f.size / 1048576).toFixed(0)}MB — the limit is ${capMb}MB for ${isImage ? "images" : "documents"}.`);
+        return false;
+      }
+      return true;
+    });
+    if (problems.length > 0) setError(problems.join(" · "));
     const picked = ok.slice(0, 6 - attachments.length);
     if (picked.length > 0) setAttachments((prev) => [...prev, ...picked]);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -803,16 +820,50 @@ export default function KoleexAiApp() {
       let displayText = typedText;
       if (filesToSend.length > 0) {
         try {
-          const fd = new FormData();
-          filesToSend.forEach((f) => fd.append("files", f, f.name));
-          const up = await fetch("/api/ai/attachments", {
-            method: "POST",
-            credentials: "include",
-            body: fd,
-          });
+          /* Two transports, one endpoint. Small batches ride the request
+             body; anything bigger goes browser → Storage directly (signed
+             URL, no serverless body cap) and the endpoint gets JSON refs.
+             The platform body cap is ~4.5MB TOTAL, so the batch's SUM
+             decides, with margin for the multipart envelope. */
+          const totalBytes = filesToSend.reduce((n, f) => n + f.size, 0);
+          const useStorageHop = totalBytes > 3.5 * 1024 * 1024;
+          let up: Response;
+          if (useStorageHop) {
+            const { uploadToStorage } = await import("@/lib/storage-client");
+            const refs: Array<{ name: string; path: string; type: string; size: number }> = [];
+            for (const f of filesToSend) {
+              const path = `ai-attachments/${crypto.randomUUID()}/${f.name}`;
+              const res = await uploadToStorage("media", path, f);
+              if (!res.ok) {
+                throw new Error(`${f.name}: ${res.error}`);
+              }
+              refs.push({ name: f.name, path: res.data.path, type: f.type || "", size: f.size });
+            }
+            up = await fetch("/api/ai/attachments", {
+              method: "POST",
+              credentials: "include",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ files: refs }),
+            });
+          } else {
+            const fd = new FormData();
+            filesToSend.forEach((f) => fd.append("files", f, f.name));
+            up = await fetch("/api/ai/attachments", {
+              method: "POST",
+              credentials: "include",
+              body: fd,
+            });
+          }
           const uj = (await up.json().catch(() => null)) as {
             files?: Array<{ name: string; text?: string; error?: string }>;
+            error?: string;
           } | null;
+          /* A failed extraction endpoint used to be indistinguishable from
+             "no files extracted" — the send just did nothing. Say what
+             happened. */
+          if (!up.ok || (uj && uj.error)) {
+            throw new Error(uj?.error || `attachment service error (${up.status})`);
+          }
           const results = uj?.files ?? [];
           attachPayload = results.filter(
             (f): f is { name: string; text: string } => typeof f.text === "string" && f.text.length > 0,
@@ -831,7 +882,7 @@ export default function KoleexAiApp() {
                        problem. */
                     f.error === "unreadable_image" ? "couldn't read this image — try a sharper photo"
                     : f.error === "no_text" ? "no readable text found"
-                    : f.error === "too_large" ? "over 10 MB"
+                    : f.error === "too_large" ? "over the size limit (15MB images / 200MB documents)"
                     : "file type not supported";
                   return `${f.name}: ${why}`;
                 })
@@ -841,8 +892,10 @@ export default function KoleexAiApp() {
           if (attachPayload.length > 0) {
             displayText = typedText + "\n\n" + attachPayload.map((f) => `📎 ${f.name}`).join("\n");
           }
-        } catch {
-          setError("Couldn't process the attachment(s).");
+        } catch (e) {
+          setError(
+            `Couldn't process the attachment(s): ${e instanceof Error ? e.message : "unknown error"}`,
+          );
         }
         setAttachments([]);
       }
