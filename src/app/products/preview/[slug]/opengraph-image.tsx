@@ -1,8 +1,9 @@
 /**
  * Generated social/share image for /products/preview/[slug].
  * ---------------------------------------------------------------------------
- * Branded KOLEEX card: black background, real KOLEEX logo (top), the product
- * photo (centre), and the product name + primary model (bottom). Next wires
+ * Branded KOLEEX card: white poster, real KOLEEX logo (top-left), the product
+ * name + primary model (left) and the product photo (right) — the same layout
+ * the admin Search & Social preview shows. Next wires
  * this as the page's og:image / twitter image automatically (file
  * convention), so WhatsApp / WeChat / Facebook / LinkedIn / X all show the
  * same branded card when the link is shared.
@@ -45,6 +46,23 @@ export default async function OgImage({
     const { slug } = await params;
     const loaded = await loadPublicSchemaProduct(slug);
     if (loaded) {
+      /* Operator-set Social/OG image wins over the generated poster — the
+         admin preview promises exactly this. Proxied (not redirected) so the
+         card still renders if the source needs our fetch. */
+      const customOg = (loaded.seo.ogImageUrl || "").trim();
+      if (customOg) {
+        try {
+          const res = await fetch(customOg);
+          if (res.ok) {
+            const buf = Buffer.from(await res.arrayBuffer());
+            return new Response(buf, {
+              headers: { "Content-Type": res.headers.get("content-type") || "image/jpeg" },
+            });
+          }
+        } catch {
+          /* unreachable custom image — fall through to the generated poster */
+        }
+      }
       name = loaded.productName || name;
       model = loaded.preview.primaryModel || "";
       photo = await toDataUri(loaded.preview.mainImageUrl);
@@ -108,7 +126,7 @@ export default async function OgImage({
           }}
         >
           {photo ? (
-            /* eslint-disable-next-line @next/next/no-img-element */
+             
             <img src={photo} alt="" style={{ maxWidth: "100%", maxHeight: 560, objectFit: "contain" }} width={620} height={560} />
           ) : (
             /* empty-photo fallback — faint KOLEEX watermark so the photo
