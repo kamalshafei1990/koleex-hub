@@ -350,6 +350,13 @@ function schemaColumnMirror(
     } else if (col === "operating_temp" && typeof v === "object" && !Array.isArray(v)) {
       const r = v as { min?: number; max?: number };
       out[col] = `${r.min ?? ""}–${r.max ?? ""} °C`;
+    } else if (sk === "power_consumption_w" && typeof v === "number") {
+      /* The schema field is kilowatts (decimal ratings like 6.5 kW are real —
+         see _shared-machine-groups suggestions), but this legacy column stores
+         integer WATTS and its readers render "${v} W". Mirroring the raw kW
+         value wrote 6.5 into an integer column and Postgres rejected the whole
+         save: invalid input syntax for type integer: "6.5". */
+      out[col] = Math.round(v * 1000);
     } else if (PRODUCT_ARRAY_COLUMNS.has(col)) {
       /* THE product-save killer (fixed 2026-08-03): these legacy columns
          are Postgres ARRAYs, but their schema fields are scalars —
