@@ -7,7 +7,7 @@
    Zone B: All Apps (category chips + flat grid)
    --------------------------------------------------------------------------- */
 
-import { useState, useEffect, useMemo, useCallback, useRef, memo } from "react";
+import { useState, useEffect, useMemo, useCallback, useRef, useSyncExternalStore, memo } from "react";
 import dynamic from "next/dynamic";
 import { useRouter, usePathname } from "next/navigation";
 import SearchIcon from "@/components/icons/ui/SearchIcon";
@@ -27,6 +27,7 @@ import {
 import { getCurrentAccountIdSync, useCurrentAccount } from "@/lib/identity";
 import AppLaunchLink from "@/components/layout/AppLaunchLink";
 import { useAppBadges } from "@/lib/app-badges";
+import { todoListUrl } from "@/lib/todo-list-url";
 import BoundIcon from "@/components/common/BoundIcon";
 import { idlePreloadApps, isPreloadAllowed, readNetworkContext } from "@/lib/app-prefetch";
 import { preloadAppChunk, hasChunkPreloader } from "@/lib/app-chunk-preload";
@@ -37,6 +38,27 @@ import { getMeBootstrapLastError, retryMeBootstrap, useMeBootstrap } from "@/lib
 import { useShortcutHint } from "@/lib/ui/use-shortcut-hint";
 /* Home dashboard is code-split: it only matters after the grid is usable,
    and keeping it out of the critical chunk protects the home budget. */
+/* Timezone label — computed once per client, cached at module level.
+   e.g. "Dubai (GMT+4)". */
+const noopSubscribe = () => () => {};
+let tzLabelCache: string | null = null;
+function getTzLabel(): string {
+  if (tzLabelCache === null) {
+    try {
+      const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+      const city = tz.split("/").pop()?.replace(/_/g, " ") || tz;
+      const offset = -new Date().getTimezoneOffset();
+      const sign = offset >= 0 ? "+" : "-";
+      const hrs = Math.floor(Math.abs(offset) / 60);
+      const mins = Math.abs(offset) % 60;
+      tzLabelCache = `${city} (GMT${sign}${hrs}${mins ? `:${mins.toString().padStart(2, "0")}` : ""})`;
+    } catch {
+      tzLabelCache = "";
+    }
+  }
+  return tzLabelCache;
+}
+
 const HomeDashboard = dynamic(() => import("@/components/home/HomeDashboard"), { ssr: false });
 /* ── DARK-LAUNCH SWITCH (owner rule, 2026-08-20; widened 2026-08-22) ──
    The dashboard is still being built and must NOT appear on production —
@@ -80,7 +102,7 @@ function getGreetingKey(): string {
    apps whose list endpoint sends max-age/stale-while-revalidate AND whose
    client fetches in the default (cacheable) mode, so the warm entry is actually
    reused. Fire-and-forget; a miss is harmless. */
-const APP_DATA_PREFETCH: Record<string, string> = {
+const APP_DATA_PREFETCH: Record<string, string | (() => string)> = {
   /* MUST match the catalogue's request BYTE FOR BYTE or the warm entry is a
      different cache key and the download is pure waste. It has been wrong
      twice now: first the bare /api/products (the full 80-column projection),
@@ -91,7 +113,9 @@ const APP_DATA_PREFETCH: Record<string, string> = {
   products: "/api/products?view=list&paged=1&pageSize=150&division=garment-machinery&status=active",
   "product-data": "/api/products?view=list&paged=1&pageSize=150",
   projects: "/api/projects",
-  todo: "/api/todos",
+  /* To-do appends ?v=<write version> (busts its 30s HTTP cache after a
+     write) — the prefetch must build the same key, hence the function. */
+  todo: todoListUrl,
   accounts: "/api/accounts",
   customers: "/api/contacts?type=customer",
   suppliers: "/api/contacts?type=supplier",
@@ -117,7 +141,10 @@ function ClockWidget({ dk = true }: { dk?: boolean }) {
     pm: false,
     blink: true,
   });
-  const [tzLabel, setTzLabel] = useState("");
+  /* Timezone never changes within a session: read once on the client via
+     useSyncExternalStore (server snapshot is "", matching the old initial
+     state, so the static prerender still hydrates cleanly). */
+  const tzLabel = useSyncExternalStore(noopSubscribe, getTzLabel, () => "");
   const [dateLabel, setDateLabel] = useState("");
 
   /* The clock, the date and the timezone label are all seeded in an EFFECT, not
@@ -159,20 +186,6 @@ function ClockWidget({ dk = true }: { dk?: boolean }) {
       if (document.visibilityState === "visible") tick();
     };
     document.addEventListener("visibilitychange", onClockVis);
-
-    /* Timezone label — e.g. "Dubai (GMT+4)" */
-    try {
-      const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
-      const city = tz.split("/").pop()?.replace(/_/g, " ") || tz;
-      const offset = -new Date().getTimezoneOffset();
-      const sign = offset >= 0 ? "+" : "-";
-      const hrs = Math.floor(Math.abs(offset) / 60);
-      const mins = Math.abs(offset) % 60;
-      const gmtStr = `GMT${sign}${hrs}${mins ? `:${mins.toString().padStart(2, "0")}` : ""}`;
-      setTzLabel(`${city} (${gmtStr})`);
-    } catch {
-      setTzLabel("");
-    }
 
     return () => {
       clearInterval(id);
@@ -574,10 +587,11 @@ export default function HomePage() {
   /* ── Search + filter ── */
   const shortcut = useShortcutHint(); // platform-aware ⌘K / Ctrl K label + tooltip
   const [search, setSearch] = useState("");
-  const [activeCategory, setActiveCategory] = useState("all");
+  /* Category chips were removed from the grid; the filter plumbing stays
+     for their return, pinned to "all" until then. */
+  const [activeCategory] = useState("all");
 
   /* ── Per-user data ── */
-  const [dataLoaded, setDataLoaded] = useState(false);
   const accountIdRef = useRef<string | null>(null);
   /* Unread Discuss messages → notification badge on the Discuss app tile.
      Mirrors the NotificationBell source of truth (fetchMyChannels +
@@ -600,7 +614,6 @@ export default function HomePage() {
   useEffect(() => {
     const id = getCurrentAccountIdSync();
     accountIdRef.current = id;
-    setDataLoaded(true);
   }, []);
 
   /* ── Discuss unread badge ──
@@ -730,7 +743,8 @@ export default function HomePage() {
       try { router.prefetch(app.route); } catch { /* ignore */ }
       /* Warm the app's data too (default cache mode → populates the browser
          HTTP cache), so the app's own fetch on mount is served from cache. */
-      const dataUrl = APP_DATA_PREFETCH[app.id];
+      const entry = APP_DATA_PREFETCH[app.id];
+      const dataUrl = typeof entry === "function" ? entry() : entry;
       if (dataUrl) {
         try { void fetch(dataUrl, { credentials: "include" }).catch(() => {}); } catch { /* ignore */ }
       }
@@ -824,13 +838,6 @@ export default function HomePage() {
     })).filter((g) => g.apps.length > 0);
   }, [isSearchOrFilter, visibleRegistry]);
 
-  const dateLocale = dateLocaleFor(lang);
-  const today = new Date().toLocaleDateString(dateLocale, {
-    weekday: "long", year: "numeric", month: "long", day: "numeric",
-  });
-
-  const activeCount = filteredApps.filter((a) => a.active).length;
-  const totalCount = filteredApps.length;
 
   /* Tier-A idle preload (evidence-based). Once the permitted set is known and
      the network/device permits, warm the few most-launched apps the user is
