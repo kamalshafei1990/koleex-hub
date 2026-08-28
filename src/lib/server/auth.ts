@@ -135,7 +135,9 @@ export async function resolveServerAuth(): Promise<ServerAuthContext | null> {
      round-trip in the common (no-override) path. Role-mode also needs
      to load the target role's flags. */
   const viewAsActive = !!overrideTargetAccountId || !!overrideTargetRoleId;
-  const [accountRes, empRes, realAccountRes, targetRoleRes] = await Promise.all([
+  /* eslint-disable-next-line prefer-const -- empRes is reassigned on the
+     revoked-SA fallback path below */
+  let [accountRes, empRes, realAccountRes, targetRoleRes] = await Promise.all([
     supabaseServer
       .from("accounts")
       .select(
@@ -167,7 +169,9 @@ export async function resolveServerAuth(): Promise<ServerAuthContext | null> {
   ]);
 
   _t.mark("db");
-  const { data, error } = accountRes;
+  /* eslint-disable-next-line prefer-const -- data is reassigned on the
+     revoked-SA fallback path below */
+  let { data, error } = accountRes;
   if (error) {
     /* Transient DB errors were previously swallowed and reported to
        the client as "Not signed in", which led the picker to a dead
@@ -185,10 +189,7 @@ export async function resolveServerAuth(): Promise<ServerAuthContext | null> {
   if (!data) { _t.done({ status: "no_account" }); return null; }
   if (data.status !== "active") { _t.done({ status: "inactive" }); return null; }
 
-  /* If view-as was requested, validate the real session is a SA. If
-     not, silently fall through (load the target row but don't flag
-     viewing_as) — refusing here would turn any cookie-tamper into a
-     500. */
+  /* If view-as was requested, validate the real session is a SA. */
   let viewingAs = false;
   if (viewAsActive && realAccountRes && "data" in realAccountRes) {
     const realData = realAccountRes.data as
@@ -201,6 +202,41 @@ export async function resolveServerAuth(): Promise<ServerAuthContext | null> {
     const realIsSA =
       (realData?.is_super_admin ?? false) || (realRole?.is_super_admin ?? false);
     if (realIsSA) viewingAs = true;
+  }
+
+  /* Real session is NOT a SA but a signature-valid override cookie exists —
+     the one way here is a SA whose flag was revoked while a view-as cookie
+     from their SA days is still alive. The old "silent fall-through" kept
+     `data` = the TARGET row, i.e. the demoted user kept operating AS the
+     target with viewing_as=false. Reload the caller's OWN account and build
+     the context from that instead. (Not a refusal: refusing would turn the
+     stale cookie into a logout loop; this just makes it inert.) Account-mode
+     only — role-mode already keeps `data` = the real SA's own row. */
+  if (viewAsActive && !viewingAs && overrideTargetAccountId) {
+    console.warn(
+      "[auth.getServerAuth] view-as cookie present but real session is not SA — ignoring override. account=",
+      realAccountId,
+    );
+    const [selfRes, selfEmpRes] = await Promise.all([
+      supabaseServer
+        .from("accounts")
+        .select(
+          `id, username, login_email, status, user_type,
+           tenant_id, role_id, is_super_admin,
+           roles:role_id(is_super_admin, can_view_private)`,
+        )
+        .eq("id", realAccountId)
+        .maybeSingle(),
+      supabaseServer
+        .from("koleex_employees")
+        .select("department")
+        .eq("account_id", realAccountId)
+        .maybeSingle(),
+    ]);
+    if (selfRes.error || !selfRes.data) { _t.done({ status: "no_account" }); return null; }
+    if (selfRes.data.status !== "active") { _t.done({ status: "inactive" }); return null; }
+    data = selfRes.data;
+    empRes = selfEmpRes;
   }
 
   const roleRaw = (data as { roles?: unknown }).roles;
