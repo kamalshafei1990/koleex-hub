@@ -21,6 +21,7 @@ import InfoIcon from "@/components/icons/ui/InfoIcon";
 import MapPinIcon from "@/components/icons/ui/MapPinIcon";
 import UsersIcon from "@/components/icons/ui/UsersIcon";
 import CompleteSetConfigurator from "./CompleteSetConfigurator";
+import { getCountryByCode } from "@/lib/commercial-policy/countries";
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 
 interface Preview {
@@ -285,15 +286,26 @@ export default function PricingIntelligenceCard({
               <h4 className="text-[12px] font-semibold text-[var(--text-primary)]">End-user price across key markets</h4>
             </div>
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
-              {(data?.markets ?? []).map((m) => (
+              {/* Alphabetical by the DISPLAYED name — the API list is sorted
+                  by ISO code, which reads as random once full names show
+                  (United Arab Emirates would lead as "AE"). */}
+              {[...(data?.markets ?? [])]
+                .sort((a, b) =>
+                  (getCountryByCode(a.code)?.name ?? a.code).localeCompare(
+                    getCountryByCode(b.code)?.name ?? b.code,
+                  ),
+                )
+                .map((m) => (
                 <button
                   type="button"
                   key={m.code}
                   onClick={() => setCountry(m.code)}
                   className={`text-left rounded-lg border px-2.5 py-2 transition-colors ${m.code === country ? "border-[var(--border-strong)] bg-[var(--bg-inverted)]/[0.04]" : "border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)]/40 hover:border-[var(--border-strong)]"}`}
                 >
-                  <div className="text-[10px] font-semibold text-[var(--text-primary)]"><span className="text-[12px]">{flagOf(m.code)}</span> {m.code} <span className="text-[var(--text-ghost)] font-normal">{m.bandCode ? `· ${m.bandCode}` : ""} {pct(m.adjustmentPercent)}</span></div>
-                  <div className="text-[13px] font-bold text-[var(--text-primary)] tabular-nums mt-0.5">{usd(m.regionalFobUsd)}</div>
+                  {/* Full country name (owner preference) — the ISO code was
+                      compact but unreadable at a glance across 39 tiles. */}
+                  <div className="text-[10px] font-semibold text-[var(--text-primary)]"><span className="text-[12px]">{flagOf(m.code)}</span> {getCountryByCode(m.code)?.name ?? m.code} <span className="text-[var(--text-ghost)] font-normal">{m.bandCode ? `· ${m.bandCode}` : ""} {pct(m.adjustmentPercent)}</span></div>
+                  <div className="text-[17px] font-bold text-[var(--text-primary)] tabular-nums mt-1 tracking-tight">{usd(m.regionalFobUsd)}</div>
                 </button>
               ))}
             </div>

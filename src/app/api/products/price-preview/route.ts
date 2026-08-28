@@ -34,9 +34,17 @@ async function callerHasPolicyAccess(roleId: string | null, isSuperAdmin: boolea
   return !!slug && POLICY_ADMIN_ROLES.has(slug);
 }
 
-/* A handful of representative markets so the tab can show "what this costs
-   into the main regions" without the operator picking each one. */
-const KEY_MARKETS = ["EG", "SA", "AE", "US", "DE", "CN", "NG", "IN", "BR", "TR"];
+/* The owner's market map (2026-08-28): every country Koleex actively sells
+   into, alphabetical by ISO code. Band per country still resolves from
+   Commercial Setup segmentation at compute time; a country with no explicit
+   band takes the default band, so extending this list never invents
+   pricing. */
+const KEY_MARKETS = [
+  "AE", "AF", "AR", "BD", "BR", "CN", "CO", "DE", "DZ", "EC",
+  "EG", "ES", "ET", "GR", "ID", "IN", "IR", "IT", "JO", "KH",
+  "KR", "LK", "LY", "MA", "NG", "PE", "PK", "PL", "PT", "RU",
+  "SA", "SN", "SY", "TH", "TN", "TR", "US", "UZ", "VN",
+];
 
 export async function GET(req: Request) {
   const auth = await requireAuth();
