@@ -950,8 +950,9 @@ export default function ProductForm({ productId }: Props) {
   const galleryInputRef = useRef<HTMLInputElement>(null);
   /* The main-photo tile always advertised "Click to browse or drag & drop"
      but only wired onClick — dropped files fell through to the browser and
-     navigated away from the form. */
+     navigated away from the form. Same for the little Gallery add button. */
   const [mainPhotoDragOver, setMainPhotoDragOver] = useState(false);
+  const [galleryDragOver, setGalleryDragOver] = useState(false);
 
   /* ── Derived: Stand / Table accessory? Its "specs & variants" are the
         configurable option axes (shape/size/quality · thickness/lifting/
@@ -3512,7 +3513,18 @@ export default function ProductForm({ productId }: Props) {
                       <button
                         type="button"
                         onClick={() => galleryInputRef.current?.click()}
-                        className="h-16 w-16 rounded-lg border-2 border-dashed border-[var(--border-subtle)] hover:border-[var(--border-focus)] text-[var(--text-ghost)] hover:text-[var(--text-dim)] flex flex-col items-center justify-center gap-0.5 transition-colors shrink-0"
+                        onDragOver={(e) => { e.preventDefault(); setGalleryDragOver(true); }}
+                        onDragLeave={() => setGalleryDragOver(false)}
+                        onDrop={(e) => {
+                          e.preventDefault();
+                          setGalleryDragOver(false);
+                          if (e.dataTransfer.files?.length) handleGalleryAdd(e.dataTransfer.files);
+                        }}
+                        className={`h-16 w-16 rounded-lg border-2 border-dashed text-[var(--text-ghost)] hover:text-[var(--text-dim)] flex flex-col items-center justify-center gap-0.5 transition-colors shrink-0 ${
+                          galleryDragOver
+                            ? "border-[var(--border-focus)] bg-[var(--bg-surface-subtle)]/60 text-[var(--text-dim)]"
+                            : "border-[var(--border-subtle)] hover:border-[var(--border-focus)]"
+                        }`}
                         title={t("hero.addPhotos", "Add more photos")}
                         aria-label={t("hero.addPhotos", "Add more photos")}
                       >
