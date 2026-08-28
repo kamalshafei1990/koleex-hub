@@ -22,6 +22,7 @@ import MapPinIcon from "@/components/icons/ui/MapPinIcon";
 import UsersIcon from "@/components/icons/ui/UsersIcon";
 import CompleteSetConfigurator from "./CompleteSetConfigurator";
 import { getCountryByCode } from "@/lib/commercial-policy/countries";
+import { getTierColor, tierTextStyle } from "@/lib/customer-tiers";
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 
 interface Preview {
@@ -250,7 +251,21 @@ export default function PricingIntelligenceCard({
                 <tbody>
                   {(data?.channels ?? []).map((c) => (
                     <tr key={c.tierCode} className="border-t border-[var(--border-subtle)]/60">
-                      <td className="px-3 py-2 text-[var(--text-primary)]">{c.tierName}</td>
+                      {/* Tier name in the SAME precious-metal colors the
+                          Customers app uses — one source of truth
+                          (customer-tiers.ts), gradient-clipped text with the
+                          kx-tier-metal sheen. Tiers outside the canon (custom
+                          names) keep the plain text color. */}
+                      <td className="px-3 py-2 text-[var(--text-primary)]">
+                        {(() => {
+                          const meta = getTierColor(c.tierName);
+                          return meta ? (
+                            <span className="kx-tier-metal font-semibold" style={tierTextStyle(meta)}>{c.tierName}</span>
+                          ) : (
+                            c.tierName
+                          );
+                        })()}
+                      </td>
                       <td className="px-3 py-2 text-right font-semibold text-[var(--text-primary)] tabular-nums">{usd(c.unitPriceUsd)}</td>
                       {/* PURE commercial margin — the governed number. */}
                       <td className="px-3 py-2 text-right tabular-nums">
