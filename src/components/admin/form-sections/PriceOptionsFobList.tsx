@@ -18,6 +18,8 @@
 import { useEffect, useState } from "react";
 
 export interface PriceOptionFobItem {
+  /** Index of this option in the link's price_options — edit target. */
+  idx: number;
   /** The supplier's entered option price (display). */
   raw: number;
   /** Landed cost actually sent to the engine (raw + extras + VAT). */
@@ -30,6 +32,7 @@ export default function PriceOptionsFobList({
   items,
   selectedRaw,
   onSelect,
+  onEditPrice,
 }: {
   items: PriceOptionFobItem[];
   /** Raw ¥ of the option the Price tab is previewing, or null = main price. */
@@ -37,6 +40,10 @@ export default function PriceOptionsFobList({
   /** Click an option to preview the whole Price tab from ITS cost; click
    *  again to return to the main price. */
   onSelect?: (raw: number | null) => void;
+  /** Edit the option's ¥ directly on the card — syncs to the Supplier
+   *  tab's price ladder (same contract as the main factory-cost input).
+   *  Absent = read-only price (member-override view). */
+  onEditPrice?: (idx: number, value: string) => void;
 }) {
   const [fobs, setFobs] = useState<Record<string, number | null>>({});
 
@@ -46,6 +53,8 @@ export default function PriceOptionsFobList({
     let cancelled = false;
     const costs = key.split(",").map(Number).filter((v) => Number.isFinite(v) && v > 0);
     if (costs.length === 0) return;
+    /* Debounced — inline price edits change the key on every keystroke. */
+    const timer = setTimeout(() => {
     fetch(
       `/api/products/price-preview?cost_cny=${costs[0]}&qty=1&extra_costs=${encodeURIComponent(costs.join(","))}`,
       { credentials: "include" },
@@ -58,7 +67,8 @@ export default function PriceOptionsFobList({
         setFobs(map);
       })
       .catch(() => undefined);
-    return () => { cancelled = true; };
+    }, 350);
+    return () => { cancelled = true; clearTimeout(timer); };
   }, [key]);
 
   const usd = (v: number | null | undefined) =>
@@ -82,7 +92,29 @@ export default function PriceOptionsFobList({
               <div className="min-h-[26px]" />
             )}
             <div className="mt-1 flex items-baseline justify-between gap-2 flex-wrap">
-              <span className={`text-[15px] font-bold tabular-nums ${active ? "text-[var(--accent)]" : "text-[var(--text-primary)]"}`}>¥{o.raw.toLocaleString()}</span>
+              {onEditPrice ? (
+                /* Inline-editable ¥ — the card still selects on click, so the
+                   input swallows its own events. Width tracks the digits. */
+                <span className={`inline-flex items-baseline gap-0.5 text-[15px] font-bold tabular-nums ${active ? "text-[var(--accent)]" : "text-[var(--text-primary)]"}`}>
+                  ¥
+                  <input
+                    inputMode="decimal"
+                    value={String(o.raw)}
+                    size={Math.max(3, String(o.raw).length)}
+                    onClick={(e) => e.stopPropagation()}
+                    onKeyDown={(e) => e.stopPropagation()}
+                    onChange={(e) => {
+                      const v = e.target.value;
+                      if (v === "" || /^\d*\.?\d*$/.test(v)) onEditPrice(o.idx, v);
+                    }}
+                    className="bg-transparent border-b border-dashed border-[var(--border-strong)] outline-none focus:border-[var(--accent)] text-inherit font-bold tabular-nums w-auto min-w-0"
+                    style={{ width: `${Math.max(3, String(o.raw).length) + 1}ch` }}
+                    title="Edit this option's price — syncs to the Supplier tab"
+                  />
+                </span>
+              ) : (
+                <span className={`text-[15px] font-bold tabular-nums ${active ? "text-[var(--accent)]" : "text-[var(--text-primary)]"}`}>¥{o.raw.toLocaleString()}</span>
+              )}
               {fob ? (
                 <span className="text-[13px] font-bold tabular-nums text-[var(--accent)]">FOB {fob}</span>
               ) : null}
@@ -101,15 +133,17 @@ export default function PriceOptionsFobList({
           return <div key={oi} className={cardCls}>{body}</div>;
         }
         return (
-          <button
+          <div
             key={oi}
-            type="button"
+            role="button"
+            tabIndex={0}
             onClick={() => onSelect!(active ? null : o.raw)}
+            onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onSelect!(active ? null : o.raw); } }}
             title={active ? "Click to price from the main price again" : "Click to price the whole tab from this option"}
-            className={cardCls}
+            className={`${cardCls} cursor-pointer select-none`}
           >
             {body}
-          </button>
+          </div>
         );
       })}
     </div>

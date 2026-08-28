@@ -5407,21 +5407,46 @@ export default function ProductForm({ productId }: Props) {
                                 without a numeric price still render plain. */}
                             {(() => {
                               const priced = options
-                                .map((o) => {
+                                .map((o, idx) => {
                                   const raw = o.price === "" ? NaN : Number(o.price);
                                   if (!Number.isFinite(raw) || raw <= 0) return null;
                                   const lr = landedFromFormLink(primaryLink ? { ...primaryLink, unit_cost_cny: String(raw) } : null);
                                   return {
+                                    idx,
                                     raw,
                                     landed: lr.landed ?? raw,
                                     label: (((o.note_i18n ?? {})[lang] || "").trim() || o.note || "").trim(),
                                   };
                                 })
-                                .filter((x): x is { raw: number; landed: number; label: string } => x !== null);
+                                .filter((x): x is { idx: number; raw: number; landed: number; label: string } => x !== null);
+                              /* Inline edits write to the PRIMARY link's ladder
+                                 (same store the Supplier tab edits). In member-
+                                 override view the options belong to the member
+                                 overrides — read-only here, edited on Supplier. */
+                              const usingOverrideOptions = !!(ov.price_options as unknown[] | undefined);
+                              const editOptionPrice = usingOverrideOptions
+                                ? undefined
+                                : (idx: number, value: string) => {
+                                    const primaryIdx = productSuppliers.findIndex((x) => x.is_primary);
+                                    const at = primaryIdx >= 0 ? primaryIdx : 0;
+                                    const oldRaw = Number(productSuppliers[at]?.price_options?.[idx]?.price ?? NaN);
+                                    setProductSuppliers((prev) => prev.map((x, i) =>
+                                      i === at
+                                        ? { ...x, price_options: (x.price_options ?? []).map((po, pi) => (pi === idx ? { ...po, price: value } : po)) }
+                                        : x,
+                                    ));
+                                    /* Keep the preview following the card being edited. */
+                                    const newRaw = Number(value);
+                                    setPreviewOptionCost((cur) =>
+                                      cur !== null && Number.isFinite(oldRaw) && cur === oldRaw
+                                        ? (Number.isFinite(newRaw) && newRaw > 0 ? newRaw : null)
+                                        : cur,
+                                    );
+                                  };
                               const unpriced = options.filter((o) => !(Number(o.price) > 0));
                               return (
                                 <>
-                                  {priced.length > 0 && <PriceOptionsFobList items={priced} selectedRaw={previewOptionCost} onSelect={setPreviewOptionCost} />}
+                                  {priced.length > 0 && <PriceOptionsFobList items={priced} selectedRaw={previewOptionCost} onSelect={setPreviewOptionCost} onEditPrice={editOptionPrice} />}
                                   {unpriced.map((o, oi) => {
                                     const onote = ((o.note_i18n ?? {})[lang] || "").trim() || o.note;
                                     return (
