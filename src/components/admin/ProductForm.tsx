@@ -948,6 +948,10 @@ export default function ProductForm({ productId }: Props) {
   /* ── Main image ref for hero ── */
   const mainImageRef = useRef<HTMLInputElement>(null);
   const galleryInputRef = useRef<HTMLInputElement>(null);
+  /* The main-photo tile always advertised "Click to browse or drag & drop"
+     but only wired onClick — dropped files fell through to the browser and
+     navigated away from the form. */
+  const [mainPhotoDragOver, setMainPhotoDragOver] = useState(false);
 
   /* ── Derived: Stand / Table accessory? Its "specs & variants" are the
         configurable option axes (shape/size/quality · thickness/lifting/
@@ -3407,12 +3411,23 @@ export default function ProductForm({ productId }: Props) {
                   />
                   <div
                     onClick={() => mainImageRef.current?.click()}
+                    onDragOver={(e) => { e.preventDefault(); setMainPhotoDragOver(true); }}
+                    onDragLeave={() => setMainPhotoDragOver(false)}
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      setMainPhotoDragOver(false);
+                      if (e.dataTransfer.files?.length) handleMainImage(e.dataTransfer.files);
+                    }}
                     /* Compact on narrow/stacked layouts (a full-width
                        aspect-square photo used to become a giant box that
                        buried Name + Code below the fold); only goes square on
                        lg where it sits in the 2/5 side column. No flex-1 so it
                        never stretches to match the tall fields column. */
-                    className="relative w-full h-44 sm:h-52 lg:h-auto lg:aspect-square rounded-2xl overflow-hidden cursor-pointer group border-2 border-dashed border-[var(--border-subtle)] hover:border-[var(--border-focus)] transition-all bg-gradient-to-br from-[var(--bg-surface-subtle)] to-[var(--bg-surface)]"
+                    className={`relative w-full h-44 sm:h-52 lg:h-auto lg:aspect-square rounded-2xl overflow-hidden cursor-pointer group border-2 border-dashed transition-all bg-gradient-to-br from-[var(--bg-surface-subtle)] to-[var(--bg-surface)] ${
+                      mainPhotoDragOver
+                        ? "border-[var(--border-focus)] bg-[var(--bg-surface-subtle)]/60"
+                        : "border-[var(--border-subtle)] hover:border-[var(--border-focus)]"
+                    }`}
                   >
                     {heroSrc ? (
                       <>
