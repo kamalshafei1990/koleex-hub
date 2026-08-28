@@ -399,12 +399,12 @@ function getSteps(): WizardStep[] {
     { id: "highlights", label: "Feature Highlights", shortLabel: "Highlights", icon: <ImageRawIcon className="h-4 w-4" /> },
     { id: "specs", label: "Specifications", shortLabel: "Specs", icon: <Settings2Icon className="h-4 w-4" /> },
     { id: "commercial", label: "Variants", shortLabel: "Variants", icon: <BoxesIcon className="h-4 w-4" /> },
-    /* Owner brief 2026-08-25: the buyer's configurator questions (stand,
-       thickness, wheels…). Sits right after Variants because the two answer
-       different questions — Variants = what we sell, Options = how a buyer
-       reaches it — and entering models teaches you which options remain. */
-    { id: "options", label: "Options", shortLabel: "Options", icon: <Settings2Icon className="h-4 w-4" /> },
     { id: "pricing", label: "Cost & Price", shortLabel: "Price", icon: <DollarSignIcon className="h-4 w-4" /> },
+    /* Owner brief 2026-08-25: the buyer's configurator questions (stand,
+       thickness, wheels…). Moved AFTER Price (owner, 2026-08-29): the
+       ladder→Buyer-Options bridge means options are often born FROM the
+       Price tab, so the flow reads cost → price → the choices built on it. */
+    { id: "options", label: "Options", shortLabel: "Options", icon: <Settings2Icon className="h-4 w-4" /> },
     { id: "logistics", label: "Packing & Logistics", shortLabel: "Packing & Logistics", icon: <GlobeIcon className="h-4 w-4" /> },
     { id: "compliance", label: "Compliance & Warranty", shortLabel: "Compliance", icon: <ShieldCheckIcon className="h-4 w-4" /> },
     { id: "media", label: "Media & Documents", shortLabel: "Media", icon: <ImageRawIcon className="h-4 w-4" /> },
