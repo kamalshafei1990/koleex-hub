@@ -2448,14 +2448,27 @@ export default function ProductForm({ productId }: Props) {
   const publishGaps = useMemo(() => {
     const gaps = [...missingRequiredLabels];
     if (!media.some((m) => m.type === "main_image")) gaps.push(t("publish.gapImage", "Main photo"));
-    if (!(primaryModel?.global_price || "").toString().trim()) gaps.push(t("publish.gapPrice", "Selling price"));
+    /* Owner rule (2026-08-29): pricing follows the LIVE Commercial Setup
+       engine at the daily FX rate — a manual Global price is only an
+       optional fixed override. So "has a selling price" means either that
+       override is set OR the FOB engine has a cost to quote from (landed
+       or unit cost on the primary supplier link, or the model's own cost). */
+    const gateLink = productSuppliers.find((s) => s.is_primary) || productSuppliers[0] || null;
+    const engineCost =
+      landedFromFormLink(gateLink).landed ??
+      (gateLink?.unit_cost_cny ? Number(gateLink.unit_cost_cny) : null) ??
+      (primaryModel?.cost_price ? Number(primaryModel.cost_price) : null);
+    const enginePriced = Number.isFinite(engineCost as number) && (engineCost as number) > 0;
+    if (!(primaryModel?.global_price || "").toString().trim() && !enginePriced) {
+      gaps.push(t("publish.gapPrice", "Selling price"));
+    }
     /* Export-market readiness: Chinese is the priority second locale — flag
        a missing zh product name so a product doesn't go live English-only. */
     if (!translations.some((tr) => tr.locale === "zh" && (tr.product_name || "").trim())) {
       gaps.push(t("publish.gapChineseName", "Chinese name"));
     }
     return gaps;
-  }, [missingRequiredLabels, media, primaryModel?.global_price, translations, t]);
+  }, [missingRequiredLabels, media, primaryModel?.global_price, primaryModel?.cost_price, productSuppliers, translations, t]);
 
 
   /* ═══════════════════════════════════════════════
