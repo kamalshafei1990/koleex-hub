@@ -832,7 +832,13 @@ export default function KoleexAiApp() {
             const { uploadToStorage } = await import("@/lib/storage-client");
             const refs: Array<{ name: string; path: string; type: string; size: number }> = [];
             for (const f of filesToSend) {
-              const path = `ai-attachments/${crypto.randomUUID()}/${f.name}`;
+              /* The storage KEY must stay ASCII — Supabase rejects e.g. a
+                 Chinese filename with "Invalid key". The object is transport,
+                 not storage, so the key carries no meaning: uuid + extension.
+                 The ORIGINAL name still travels in the JSON ref — display and
+                 extension-based extraction use that. */
+              const ext = (/\.[A-Za-z0-9]+$/.exec(f.name)?.[0] ?? "").toLowerCase();
+              const path = `ai-attachments/${crypto.randomUUID()}${ext}`;
               const res = await uploadToStorage("media", path, f);
               if (!res.ok) {
                 throw new Error(`${f.name}: ${res.error}`);
