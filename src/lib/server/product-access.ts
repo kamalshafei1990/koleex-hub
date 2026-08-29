@@ -137,6 +137,15 @@ export const SECRET_MODEL_FIELDS: readonly string[] = [
   "cost_price",   // purchase price from supplier
   "supplier",     // supplier name on the model row itself
   "moq",          // supplier minimum order qty
+  /* Cost PROVENANCE is as internal as the number: "cost set by Kamal from
+     the supplier quote on 12 Aug" tells a reader everything except the
+     digits. These four columns exist on product_models and were surviving
+     every strip, so a no-cost-permission account still learned where the
+     cost came from and who last touched it. */
+  "cost_source",
+  "cost_updated_at",
+  "cost_updated_by",
+  "cost_updated_by_name",
 ];
 
 /** The full COST-side surface of a model row: the secrets plus the cost

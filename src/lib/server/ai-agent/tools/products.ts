@@ -10,6 +10,7 @@ import "server-only";
 
 import { supabaseServer } from "../../supabase-server";
 import { hasProductCostAccess, stripSecrets, SECRET_MODEL_FIELDS } from "../../product-access";
+import { buildProductTabs, audienceOf } from "../product-knowledge";
 import type { ToolDef, ToolResult } from "../types";
 import { filterFieldsMany } from "../permissions";
 import { mainPhotoByProduct } from "../../product-photos";
@@ -388,7 +389,7 @@ const getProductFullDetails: ToolDef<
 > = {
   name: "getProductFullDetails",
   description:
-    "EVERYTHING Product Data knows about ONE product. Accepts a KOLEEX code (XPRS-190S), supplier model, slug or name — family member codes resolve to their family. Returns identity, classification, full specs (schema + technical columns), every family member with its overrides, packing & logistics, selling prices, media/documents/certifications — plus cost prices and supplier identity ONLY when this account holds Product Data cost permission (otherwise the result explicitly says the account lacks that permission; report that to the user instead of guessing). Use this for ANY detailed question about a saved product.",
+    "EVERYTHING Product Data knows about ONE product. Accepts a KOLEEX code (XPRS-190S), supplier model, slug or name — family member codes resolve to their family. Returns `tabs` organised exactly like the Product Data app: classify, hero (incl. every translated name/tagline/excerpt), specs (schema + legacy), variants (family members), options (buyer configurator groups and their values), packing (product + per-model figures) — plus supplier and price data ONLY when this account holds Product Data cost permission. `knowledge_withheld` lists any tab left out: say the account lacks that permission, never that the data does not exist. Everything is read live, so it always reflects the latest save. Use this for ANY detailed question about a saved product.",
   parameters: {
     type: "object",
     properties: {
@@ -556,8 +557,25 @@ const getProductFullDetails: ToolDef<
       };
     }
 
+    /* TAB-ORGANISED KNOWLEDGE (owner spec 2026-08-29). The flat fields below
+       stay for compatibility; `tabs` is the shape the operator thinks in —
+       Classify / Hero / Specs / Variants / Options / Packing — and it is the
+       only path that reaches product_translations, product_options and the
+       schema specs at all. Audience + cost permission decide the contents;
+       `knowledge_withheld` names what was left out so the model reports the
+       permission instead of inventing a gap. */
+    const { tabs, withheld } = await buildProductTabs({
+      productId,
+      product,
+      models: models as Array<Record<string, unknown>>,
+      who: audienceOf(ctx.auth),
+      costOk: canSeeCosts,
+    });
+
     const payload: Record<string, unknown> = {
       matched_model: matchedModel,
+      tabs,
+      ...(withheld.length ? { knowledge_withheld: withheld } : {}),
       product: canSeeCosts ? product : (() => { const c = { ...product }; delete c.moq; return c; })(),
       family: {
         is_family: models.length > 1,
