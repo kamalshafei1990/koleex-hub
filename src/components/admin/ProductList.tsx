@@ -560,10 +560,15 @@ const ProductCard = memo(function ProductCard({
             a session, and Hub accounts are issued by the owner personally. */}
         {!isInternal && (
           <div className="relative z-10 mt-3 pt-3 border-t border-[var(--border-subtle)] flex flex-col gap-2.5">
-            <div className="flex items-baseline justify-between gap-2">
+            {/* Label ABOVE the figure on a phone, beside it from sm. In the
+                2-up mobile grid the price block is ~147px: a shrink-0 label
+                plus a 22px figure came to ~156px, so the price was clipped
+                mid-digit ("$64,79"). Stacking gives the number the full width
+                at every card size. */}
+            <div className="flex flex-col items-start gap-0.5 sm:flex-row sm:items-baseline sm:justify-between sm:gap-2">
               {/* The label stays a quiet caption so the figure beside it is
                   unmistakably the thing being read. */}
-              <span className="text-[9.5px] uppercase tracking-[0.12em] text-[var(--text-ghost)] shrink-0">
+              <span className="text-[9.5px] uppercase tracking-[0.12em] text-[var(--text-ghost)] truncate max-w-full">
                 {t("card.globalFob", "Global FOB")}
               </span>
               {fobPending && fob === undefined ? (
@@ -3259,7 +3264,7 @@ export default function ProductList() {
                     <div className={`rounded-xl bg-white border border-[var(--border-subtle)] overflow-hidden shrink-0 flex items-center justify-center ${
                       isInternal
                         ? "h-12 w-12 md:h-14 md:w-14"
-                        : "h-16 w-16 md:h-20 md:w-20 lg:h-[120px] lg:w-[120px] xl:h-[136px] xl:w-[136px]"
+                        : "h-24 w-24 md:h-20 md:w-20 lg:h-[120px] lg:w-[120px] xl:h-[136px] xl:w-[136px]"
                     }`}>
                       {imgUrl ? (
                         <img
@@ -3284,7 +3289,7 @@ export default function ProductList() {
                             <>
                               <div className="flex items-center gap-2">
                                 <h3 className={`font-bold tracking-tight text-[var(--text-primary)] truncate group-hover:text-[var(--text-highlight)] transition-colors ${
-                                  isInternal ? "text-[14px] md:text-[16px]" : "text-[15px] md:text-[17px] xl:text-[19px]"
+                                  isInternal ? "text-[14px] md:text-[16px]" : "text-[16px] md:text-[17px] xl:text-[19px]"
                                 }`}>
                                   {mn}
                                 </h3>
@@ -3328,34 +3333,40 @@ export default function ProductList() {
                         </p>
                       )}
                       {/* Mobile: show all meta inline */}
-                      <div className="md:hidden flex items-center gap-2 mt-0.5 flex-wrap">
-                        <span className="text-[11px] text-[var(--text-dim)]">{catMap[p.category_slug] || p.category_slug}</span>
-                        {/* Brand on the catalogue row said "Koleex" on every
-                            product; the subcategory actually narrows it. */}
-                        {isInternal ? (p.brand && (
-                          <>
-                            <span className="text-[var(--text-ghost)]">·</span>
-                            <span className="text-[11px] text-[var(--text-dim)]">{p.brand}</span>
-                          </>
-                        )) : (p.subcategory_slug && subMap[p.subcategory_slug] && (
-                          <>
-                            <span className="text-[var(--text-ghost)]">·</span>
-                            <span className="text-[11px] text-[var(--text-dim)]">{subMap[p.subcategory_slug]}</span>
-                          </>
-                        ))}
-                        <span className="text-[var(--text-ghost)]">·</span>
-                        <span className="text-[11px] text-[var(--text-dim)]">{models} {models === 1 ? t("list.modelOne", "model") : t("list.modelMany", "models")}</span>
-                        {/* Price rides the same line on phones — the desktop
-                            price column does not exist at this width. */}
-                        {!isInternal && fobPrices[p.id]?.fobUsd != null && (
-                          <>
-                            <span className="text-[var(--text-ghost)]">·</span>
-                            <span className="text-[11px] font-bold tabular-nums text-[var(--text-primary)]">
+                      {/* Phone meta. It used to be one flex-wrap of values with
+                          "·" as separate children, so every wrap left a comma
+                          dangling at the end of a line and the price began with
+                          one. Category and its subcategory are now ONE line that
+                          can wrap as a unit, and the price is its own line —
+                          which is also the only place it appears on a phone,
+                          so it gets read at a real size instead of 11px. */}
+                      {isInternal ? (
+                        <div className="md:hidden flex items-center gap-2 mt-0.5 flex-wrap">
+                          <span className="text-[11px] text-[var(--text-dim)]">{catMap[p.category_slug] || p.category_slug}</span>
+                          {p.brand && (
+                            <>
+                              <span className="text-[var(--text-ghost)]">·</span>
+                              <span className="text-[11px] text-[var(--text-dim)]">{p.brand}</span>
+                            </>
+                          )}
+                          <span className="text-[var(--text-ghost)]">·</span>
+                          <span className="text-[11px] text-[var(--text-dim)]">{models} {models === 1 ? t("list.modelOne", "model") : t("list.modelMany", "models")}</span>
+                        </div>
+                      ) : (
+                        <div className="md:hidden mt-1.5 flex flex-col gap-1.5">
+                          <p className="text-[11.5px] leading-snug text-[var(--text-dim)]">
+                            {catMap[p.category_slug] || p.category_slug}
+                            {p.subcategory_slug && subMap[p.subcategory_slug] ? (
+                              <span className="text-[var(--text-ghost)]">{" · "}{subMap[p.subcategory_slug]}</span>
+                            ) : null}
+                          </p>
+                          {fobPrices[p.id]?.fobUsd != null ? (
+                            <p className="text-[17px] leading-none font-bold tabular-nums tracking-tight text-[var(--text-primary)]">
                               ${fobPrices[p.id]!.fobUsd!.toLocaleString(undefined, { maximumFractionDigits: 0 })}
-                            </span>
-                          </>
-                        )}
-                      </div>
+                            </p>
+                          ) : null}
+                        </div>
+                      )}
                       {/* Desktop: supplier line — internal only, with logo */}
                       {isInternal && (signals[p.id]?.supplier || suppliers.length > 0) && (() => {
                         const sup = signals[p.id]?.supplier;
