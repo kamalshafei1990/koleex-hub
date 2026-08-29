@@ -3247,7 +3247,7 @@ export default function ProductList() {
                        (category · subcategory · models · price) makes the text
                        block taller than the photo, and centering left the photo
                        floating beside the middle of it. */
-                    className={`group relative flex ${isInternal ? "items-center" : "items-start md:items-center"} gap-3 md:grid ${LIST_COLS} md:gap-4 px-4 md:px-5 py-3 hover:bg-[var(--bg-surface-subtle)] transition-colors`}
+                    className={`group relative flex ${isInternal ? "items-center" : "items-start md:items-center"} gap-3.5 md:grid ${LIST_COLS} md:gap-4 px-4 md:px-5 py-3.5 md:py-3 hover:bg-[var(--bg-surface-subtle)] transition-colors`}
                   >
                     {/* Stretched navigation link — only card-level anchor;
                         action links below are siblings (no nested <a>). */}
@@ -3295,8 +3295,14 @@ export default function ProductList() {
                                 </h3>
                                 {p.featured && <StarIcon className="h-3 w-3 text-amber-400 shrink-0" />}
                               </div>
-                              <p className={`text-[var(--text-muted)] truncate ${
-                                isInternal ? "text-[12px] md:text-[13px]" : "text-[13px] md:text-[14px] mt-0.5"
+                              <p className={`text-[var(--text-muted)] ${
+                                isInternal
+                                  ? "text-[12px] md:text-[13px] truncate"
+                                  /* Two lines on a phone: there is room for
+                                     them and "…Intelligent Fabric…" told a
+                                     buyer nothing. One line from md, where the
+                                     column has to stay a fixed height. */
+                                  : "text-[13px] md:text-[14px] mt-0.5 line-clamp-2 md:line-clamp-none md:truncate"
                               }`}>
                                 {p.product_name}
                               </p>
@@ -3327,7 +3333,7 @@ export default function ProductList() {
                         </p>
                       )}
                       {(modelNames[p.id]?.length ?? 0) > 1 && (
-                        <p className="text-[10px] font-medium tabular-nums text-[var(--text-ghost)] truncate mt-0.5">
+                        <p className="text-[10.5px] font-medium tabular-nums text-[var(--text-ghost)] truncate mt-1">
                           {modelNames[p.id].slice(0, 5).join(" · ")}
                           {modelNames[p.id].length > 5 ? ` · +${modelNames[p.id].length - 5}` : ""}
                         </p>
@@ -3353,15 +3359,21 @@ export default function ProductList() {
                           <span className="text-[11px] text-[var(--text-dim)]">{models} {models === 1 ? t("list.modelOne", "model") : t("list.modelMany", "models")}</span>
                         </div>
                       ) : (
-                        <div className="md:hidden mt-1.5 flex flex-col gap-1.5">
-                          <p className="text-[11.5px] leading-snug text-[var(--text-dim)]">
+                        /* Identity above, commerce below, with a rule between
+                           them: the phone row was one long left-aligned stack
+                           where the category and the price read as two more
+                           lines of the name. They now share a baseline row —
+                           category truncated to one line on the left, price
+                           anchored right — so the row scans in two beats. */
+                        <div className="md:hidden mt-2 pt-2 border-t border-[var(--border-subtle)] flex items-baseline justify-between gap-3">
+                          <p className="min-w-0 flex-1 text-[11.5px] leading-snug text-[var(--text-dim)] truncate">
                             {catMap[p.category_slug] || p.category_slug}
                             {p.subcategory_slug && subMap[p.subcategory_slug] ? (
                               <span className="text-[var(--text-ghost)]">{" · "}{subMap[p.subcategory_slug]}</span>
                             ) : null}
                           </p>
                           {fobPrices[p.id]?.fobUsd != null ? (
-                            <p className="text-[17px] leading-none font-bold tabular-nums tracking-tight text-[var(--text-primary)]">
+                            <p className="shrink-0 text-[17px] leading-none font-bold tabular-nums tracking-tight text-[var(--text-primary)]">
                               ${fobPrices[p.id]!.fobUsd!.toLocaleString(undefined, { maximumFractionDigits: 0 })}
                             </p>
                           ) : null}
