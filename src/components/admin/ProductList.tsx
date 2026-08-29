@@ -587,18 +587,37 @@ const ProductCard = memo(function ProductCard({
             {/* Three across on desktop; STACKED on phones — at the 2-column
                mobile grid a card is ~155px wide and "Compare" cannot fit in a
                third of that (measured at 360px: all three clipped to one
-               letter). Full-width rows also give a proper tap target. */}
+               letter). Full-width rows also give a proper tap target.
+
+               Each action reads as ITSELF (owner call 2026-08-29): Ask AI
+               wears the same travelling glow as every other AI control in the
+               Hub (kx-ai-glow — reused, never re-declared), Compare is amber
+               and Quote is green. Amber and green are the design system's
+               FUNCTIONAL state tokens, not new brand colours, so the card
+               stays inside the monochrome-plus-accent rule. */}
             <div className="grid grid-cols-3 max-sm:grid-cols-1 gap-1.5">
               {([
-                { key: "ask_ai", label: t("card.askAi", "Ask AI") },
-                { key: "compare", label: t("card.compare", "Compare") },
-                { key: "quote", label: t("card.addToQuotation", "Quote") },
+                {
+                  key: "ask_ai",
+                  label: t("card.askAi", "Ask AI"),
+                  cls: "kx-ai-glow border-[var(--accent,#0066FF)]/40 text-[var(--accent,#0066FF)] hover:bg-[var(--accent,#0066FF)]/10",
+                },
+                {
+                  key: "compare",
+                  label: t("card.compare", "Compare"),
+                  cls: "border-[var(--state-warning,#F59E0B)]/40 text-[var(--state-warning,#F59E0B)] hover:bg-[var(--state-warning,#F59E0B)]/10 hover:border-[var(--state-warning,#F59E0B)]/70",
+                },
+                {
+                  key: "quote",
+                  label: t("card.addToQuotation", "Quote"),
+                  cls: "border-[var(--state-success,#10B981)]/40 text-[var(--state-success,#10B981)] hover:bg-[var(--state-success,#10B981)]/10 hover:border-[var(--state-success,#10B981)]/70",
+                },
               ] as const).map((a) => (
                 <button
                   key={a.key}
                   type="button"
                   onClick={(e) => { e.preventDefault(); e.stopPropagation(); onCardAction?.(a.key, p); }}
-                  className="px-2 py-1.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] text-[10.5px] font-medium text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-colors truncate"
+                  className={`px-2 py-1.5 rounded-lg border bg-[var(--bg-surface-subtle)] text-[10.5px] font-bold transition-all truncate ${a.cls}`}
                   title={a.label}
                 >
                   {a.label}
