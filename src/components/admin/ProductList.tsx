@@ -959,7 +959,23 @@ export default function ProductList() {
      paginated and cached, while the price must reflect the DAY'S exchange
      rate, so baking it into a cached row would serve a stale number. The
      route returns the finished USD figure only — never the cost behind it. */
-  const [fobPrices, setFobPrices] = useState<Record<string, { fobUsd: number | null; mode: string }>>({});
+  /* Warm start for the price, same pattern the thumbnails use. Without it the
+     figure could only appear after products land AND a second round-trip
+     returns (~700ms warm, longer on a cold route), so every open showed an
+     empty price slot first.
+     DAY-STAMPED, deliberately: the price tracks a DAILY reference rate, so a
+     cache from yesterday must not paint. Same day = show instantly, then the
+     background fetch overwrites it anyway. */
+  const fobCacheKey = `kx_products_fob_v1:${currentScopeKey()}`;
+  const [fobPrices, setFobPrices] = useState<Record<string, { fobUsd: number | null; mode: string }>>(() => {
+    if (typeof window === "undefined" || isInternal) return {};
+    try {
+      const raw = window.localStorage.getItem(fobCacheKey);
+      if (!raw) return {};
+      const parsed = JSON.parse(raw) as { day?: string; prices?: Record<string, { fobUsd: number | null; mode: string }> };
+      return parsed.day === new Date().toDateString() ? (parsed.prices ?? {}) : {};
+    } catch { return {}; }
+  });
   const [fobPending, setFobPending] = useState(false);
 
   /* Card actions. The three flows (Ask AI · Compare · Add to Quotation) are
@@ -1606,8 +1622,14 @@ export default function ProductList() {
      asks for the new page only. */
   useEffect(() => {
     if (isInternal) return;
-    const missing = products.map((p) => p.id).filter((id) => !(id in fobPrices));
-    if (missing.length === 0) return;
+    const all = products.map((p) => p.id).filter((id) => !(id in fobPrices));
+    if (all.length === 0) return;
+    /* Ask for the first screen before the rest. The whole loaded page went in
+       one body — 271 ids measured ~700ms warm — so the ten rows a reader can
+       actually see waited on 261 they cannot. The tail follows in the next
+       pass of this effect, once these land. */
+    const FIRST_PAINT = 24;
+    const missing = all.slice(0, FIRST_PAINT);
     let cancelled = false;
     const ctrl = new AbortController();
     setFobPending(true);
@@ -1622,7 +1644,16 @@ export default function ProductList() {
       .then((j: { prices?: Record<string, { fobUsd: number | null; mode: string }> } | null) => {
         if (cancelled || !j?.prices) return;
         /* Merge, never replace — an earlier page's prices must survive. */
-        setFobPrices((prev) => ({ ...prev, ...j.prices }));
+        setFobPrices((prev) => {
+          const next = { ...prev, ...j.prices };
+          try {
+            const blob = JSON.stringify({ day: new Date().toDateString(), prices: next });
+            /* Tiny (~40 bytes a product) but still guarded: a full quota is
+               what silently kills warm start elsewhere in this app. */
+            if (blob.length < 500_000) window.localStorage.setItem(fobCacheKey, blob);
+          } catch { /* quota guard */ }
+          return next;
+        });
       })
       .catch(() => { /* price is optional on the card */ })
       .finally(() => { if (!cancelled) setFobPending(false); });
