@@ -146,7 +146,7 @@ export const IMG = {
    *  soft on retina. 240 covers 96px at 2.5x; `card`'s 480 would have been
    *  4x more pixels than the slot can paint, on every row of the list. */
   row: (url: string | null | undefined) =>
-    cdnImage(url, { width: narrowViewport() ? 160 : 240, quality: 75, resize: "contain" }),
+    cdnImage(url, { width: narrowViewport() ? 160 : 320, quality: 75, resize: "contain" }),
   /** Card grid thumbnail — products list, related products. */
   card: (url: string | null | undefined) =>
     cdnImage(url, { width: narrowViewport() ? 384 : 480, quality: 75, resize: "contain" }),

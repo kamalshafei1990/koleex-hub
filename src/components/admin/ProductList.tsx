@@ -976,7 +976,7 @@ export default function ProductList() {
        to nothing and the product name vanished from its own row. Below xl
        the Models count steps out (it is the least useful of the six) and the
        fixed widths tighten; from xl the full six columns fit comfortably. */
-    : "md:grid-cols-[88px_minmax(0,1fr)_112px_212px] lg:grid-cols-[104px_minmax(0,1fr)_160px_120px_220px] xl:grid-cols-[112px_minmax(0,1fr)_180px_130px_90px_232px]";
+    : "md:grid-cols-[88px_minmax(0,1fr)_118px_212px] lg:grid-cols-[128px_minmax(0,1fr)_160px_126px_210px] xl:grid-cols-[144px_minmax(0,1fr)_190px_140px_236px]";
 
   const onCardAction = useCallback((action: "ask_ai" | "compare" | "quote", product: ProductRow) => {
     void action; void product;
@@ -3213,9 +3213,14 @@ export default function ProductList() {
               <span className="text-[10px] font-semibold text-[var(--text-dim)] uppercase tracking-wider">
                 {isInternal ? t("list.colReady", "Ready") : t("card.globalFob", "Global FOB")}
               </span>
-              <span className={`text-[10px] font-semibold text-[var(--text-dim)] uppercase tracking-wider ${isInternal ? "" : "hidden xl:block"}`}>
-                {isInternal ? t("list.colCost", "Cost") : t("list.colModels")}
-              </span>
+              {/* Models: INTERNAL only. On the catalogue the family line under
+                  the name already spells out every member code, so a column
+                  repeating the count was a whole column of nothing new. */}
+              {isInternal && (
+                <span className="text-[10px] font-semibold text-[var(--text-dim)] uppercase tracking-wider">
+                  {t("list.colCost", "Cost")}
+                </span>
+              )}
               {/* Status is an internal concern — the catalogue row spends that
                   column on the actions instead. */}
               {isInternal && (
@@ -3252,7 +3257,9 @@ export default function ProductList() {
                         keeps off-screen rows from blocking the
                         first paint. */}
                     <div className={`rounded-xl bg-white border border-[var(--border-subtle)] overflow-hidden shrink-0 flex items-center justify-center ${
-                      isInternal ? "h-12 w-12 md:h-14 md:w-14" : "h-16 w-16 md:h-20 md:w-20 lg:h-24 lg:w-24"
+                      isInternal
+                        ? "h-12 w-12 md:h-14 md:w-14"
+                        : "h-16 w-16 md:h-20 md:w-20 lg:h-[120px] lg:w-[120px] xl:h-[136px] xl:w-[136px]"
                     }`}>
                       {imgUrl ? (
                         <img
@@ -3276,12 +3283,16 @@ export default function ProductList() {
                           return (
                             <>
                               <div className="flex items-center gap-2">
-                                <h3 className="text-[14px] md:text-[16px] font-bold tracking-tight text-[var(--text-primary)] truncate group-hover:text-[var(--text-highlight)] transition-colors">
+                                <h3 className={`font-bold tracking-tight text-[var(--text-primary)] truncate group-hover:text-[var(--text-highlight)] transition-colors ${
+                                  isInternal ? "text-[14px] md:text-[16px]" : "text-[15px] md:text-[17px] xl:text-[19px]"
+                                }`}>
                                   {mn}
                                 </h3>
                                 {p.featured && <StarIcon className="h-3 w-3 text-amber-400 shrink-0" />}
                               </div>
-                              <p className="text-[12px] md:text-[13px] text-[var(--text-muted)] truncate">
+                              <p className={`text-[var(--text-muted)] truncate ${
+                                isInternal ? "text-[12px] md:text-[13px]" : "text-[13px] md:text-[14px] mt-0.5"
+                              }`}>
                                 {p.product_name}
                               </p>
                             </>
@@ -3440,7 +3451,7 @@ export default function ProductList() {
                     {/* Cost + models (internal) / models (public) — desktop only.
                         Catalogue: from xl only, so the name column keeps its
                         width at laptop sizes. */}
-                    <div className={`hidden ${isInternal ? "md:flex" : "xl:flex"} items-center gap-1.5`}>
+                    <div className={`hidden ${isInternal ? "md:flex" : ""} items-center gap-1.5`}>
                       {isInternal && (() => {
                         const c = signals[p.id]?.cost;
                         return c != null ? (
