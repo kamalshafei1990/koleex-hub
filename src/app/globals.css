@@ -124,6 +124,15 @@
   --state-warning: #F59E0B;
   --state-error: #FF3333;
   --accent-hover: #0052CC;
+  /* Catalogue action buttons (2026-08-29). The state colours are tuned for
+     dark surfaces: on white, #F59E0B measured 2.15:1 and #10B981 2.54:1 for
+     10.5px bold text — both far under AA's 4.5. These aliases carry the same
+     three meanings at a weight that reads on EITHER ground; the light block
+     darkens them. Same precedent as the text tokens below, which were bumped
+     for exactly this reason. */
+  --action-ai: var(--accent);
+  --action-compare: var(--state-warning);
+  --action-quote: var(--state-success);
 }
 
 [data-theme="light"] {
@@ -173,6 +182,12 @@
   --text-dim: rgba(0,0,0,0.58);
   --text-ghost: rgba(0,0,0,0.48);
   --text-whisper: rgba(0,0,0,0.38);
+
+  /* Action buttons on white — measured AA at 10.5px bold:
+     ai 6.8:1 · compare 4.9:1 · quote 5.4:1 (were 4.14 / 2.15 / 2.54). */
+  --action-ai: #2F5C8A;
+  --action-compare: #B45309;
+  --action-quote: #047857;
   --text-barely: rgba(0,0,0,0.26);
 
   /* Inverted (buttons etc.) */

@@ -605,17 +605,17 @@ const ProductCard = memo(function ProductCard({
                 {
                   key: "ask_ai",
                   label: t("card.askAi", "Ask AI"),
-                  cls: "kx-ai-glow border-[var(--accent,#0066FF)]/40 text-[var(--accent,#0066FF)] hover:bg-[var(--accent,#0066FF)]/10",
+                  cls: "kx-ai-glow border-[var(--action-ai,#567FB2)]/45 text-[var(--action-ai,#567FB2)] hover:bg-[var(--action-ai,#567FB2)]/10",
                 },
                 {
                   key: "compare",
                   label: t("card.compare", "Compare"),
-                  cls: "border-[var(--state-warning,#F59E0B)]/40 text-[var(--state-warning,#F59E0B)] hover:bg-[var(--state-warning,#F59E0B)]/10 hover:border-[var(--state-warning,#F59E0B)]/70",
+                  cls: "border-[var(--action-compare,#F59E0B)]/45 text-[var(--action-compare,#F59E0B)] hover:bg-[var(--action-compare,#F59E0B)]/10 hover:border-[var(--action-compare,#F59E0B)]/70",
                 },
                 {
                   key: "quote",
                   label: t("card.addToQuotation", "Quote"),
-                  cls: "border-[var(--state-success,#10B981)]/40 text-[var(--state-success,#10B981)] hover:bg-[var(--state-success,#10B981)]/10 hover:border-[var(--state-success,#10B981)]/70",
+                  cls: "border-[var(--action-quote,#10B981)]/45 text-[var(--action-quote,#10B981)] hover:bg-[var(--action-quote,#10B981)]/10 hover:border-[var(--action-quote,#10B981)]/70",
                 },
               ] as const).map((a) => (
                 <button
@@ -3511,17 +3511,17 @@ export default function ProductList() {
                             {
                               key: "ask_ai",
                               label: t("card.askAi", "Ask AI"),
-                              cls: "kx-ai-glow border-[var(--accent,#0066FF)]/40 text-[var(--accent,#0066FF)] hover:bg-[var(--accent,#0066FF)]/10",
+                              cls: "kx-ai-glow border-[var(--action-ai,#567FB2)]/45 text-[var(--action-ai,#567FB2)] hover:bg-[var(--action-ai,#567FB2)]/10",
                             },
                             {
                               key: "compare",
                               label: t("card.compare", "Compare"),
-                              cls: "border-[var(--state-warning,#F59E0B)]/40 text-[var(--state-warning,#F59E0B)] hover:bg-[var(--state-warning,#F59E0B)]/10 hover:border-[var(--state-warning,#F59E0B)]/70",
+                              cls: "border-[var(--action-compare,#F59E0B)]/45 text-[var(--action-compare,#F59E0B)] hover:bg-[var(--action-compare,#F59E0B)]/10 hover:border-[var(--action-compare,#F59E0B)]/70",
                             },
                             {
                               key: "quote",
                               label: t("card.addToQuotation", "Quote"),
-                              cls: "border-[var(--state-success,#10B981)]/40 text-[var(--state-success,#10B981)] hover:bg-[var(--state-success,#10B981)]/10 hover:border-[var(--state-success,#10B981)]/70",
+                              cls: "border-[var(--action-quote,#10B981)]/45 text-[var(--action-quote,#10B981)] hover:bg-[var(--action-quote,#10B981)]/10 hover:border-[var(--action-quote,#10B981)]/70",
                             },
                           ] as const).map((a) => (
                             <button
