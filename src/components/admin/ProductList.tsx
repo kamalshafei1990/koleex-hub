@@ -963,7 +963,15 @@ export default function ProductList() {
      two complete strings rather than an interpolated one. */
   const LIST_COLS = isInternal
     ? "md:grid-cols-[56px_1fr_140px_120px_100px_80px_80px]"
-    : "md:grid-cols-[56px_1fr_150px_120px_84px_232px]";
+    /* Catalogue row: leads with a REAL product photo (96px + breathing room),
+       not the 56px chip the data table uses — a buyer scans pictures first.
+       Two templates, because one was not survivable: with the photo, price
+       and a 232px action block all fixed, the fixed columns alone came to
+       770px, so between ~900px and ~1200px the 1fr name column was squeezed
+       to nothing and the product name vanished from its own row. Below xl
+       the Models count steps out (it is the least useful of the six) and the
+       fixed widths tighten; from xl the full six columns fit comfortably. */
+    : "md:grid-cols-[88px_1fr_112px_212px] xl:grid-cols-[104px_1fr_150px_120px_84px_232px]";
 
   const onCardAction = useCallback((action: "ask_ai" | "compare" | "quote", product: ProductRow) => {
     void action; void product;
@@ -3191,11 +3199,11 @@ export default function ProductList() {
             <div className={`hidden md:grid ${LIST_COLS} gap-4 items-center px-5 py-3 border-b border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)]`}>
               <span />
               <span className="text-[10px] font-semibold text-[var(--text-dim)] uppercase tracking-wider">{t("list.colProduct")}</span>
-              <span className="text-[10px] font-semibold text-[var(--text-dim)] uppercase tracking-wider">{t("list.colCategory")}</span>
+              <span className={`text-[10px] font-semibold text-[var(--text-dim)] uppercase tracking-wider ${isInternal ? "" : "hidden xl:block"}`}>{t("list.colCategory")}</span>
               <span className="text-[10px] font-semibold text-[var(--text-dim)] uppercase tracking-wider">
                 {isInternal ? t("list.colReady", "Ready") : t("card.globalFob", "Global FOB")}
               </span>
-              <span className="text-[10px] font-semibold text-[var(--text-dim)] uppercase tracking-wider">
+              <span className={`text-[10px] font-semibold text-[var(--text-dim)] uppercase tracking-wider ${isInternal ? "" : "hidden xl:block"}`}>
                 {isInternal ? t("list.colCost", "Cost") : t("list.colModels")}
               </span>
               {/* Status is an internal concern — the catalogue row spends that
@@ -3215,7 +3223,11 @@ export default function ProductList() {
                 return (
                   <div
                     key={p.id}
-                    className={`group relative flex items-center gap-3 md:grid ${LIST_COLS} md:gap-4 px-4 md:px-5 py-3 hover:bg-[var(--bg-surface-subtle)] transition-colors`}
+                    /* items-start on phones: the catalogue row's meta line
+                       (category · subcategory · models · price) makes the text
+                       block taller than the photo, and centering left the photo
+                       floating beside the middle of it. */
+                    className={`group relative flex ${isInternal ? "items-center" : "items-start md:items-center"} gap-3 md:grid ${LIST_COLS} md:gap-4 px-4 md:px-5 py-3 hover:bg-[var(--bg-surface-subtle)] transition-colors`}
                   >
                     {/* Stretched navigation link — only card-level anchor;
                         action links below are siblings (no nested <a>). */}
@@ -3229,10 +3241,12 @@ export default function ProductList() {
                         instead of multi-MB originals). loading="lazy"
                         keeps off-screen rows from blocking the
                         first paint. */}
-                    <div className="h-12 w-12 md:h-14 md:w-14 rounded-xl bg-white border border-[var(--border-subtle)] overflow-hidden shrink-0 flex items-center justify-center">
+                    <div className={`rounded-xl bg-white border border-[var(--border-subtle)] overflow-hidden shrink-0 flex items-center justify-center ${
+                      isInternal ? "h-12 w-12 md:h-14 md:w-14" : "h-16 w-16 md:h-24 md:w-24"
+                    }`}>
                       {imgUrl ? (
                         <img
-                          src={IMG.thumb(imgUrl)}
+                          src={isInternal ? IMG.thumb(imgUrl) : IMG.row(imgUrl)}
                           alt={p.product_name}
                           className="w-full h-full object-contain p-1"
                           loading="lazy"
@@ -3274,6 +3288,18 @@ export default function ProductList() {
                       })()}
                       {/* Family roster — same visibility the grid chips give:
                           every member code readable from the list row. */}
+                      {/* Category caption — catalogue, md→xl only. Between
+                          those widths the category has no column of its own
+                          (the photo, price and actions need the room), so it
+                          rides under the name instead of disappearing. */}
+                      {!isInternal && (
+                        <p className="hidden md:block xl:hidden text-[11px] text-[var(--text-dim)] truncate mt-0.5">
+                          {catMap[p.category_slug] || p.category_slug}
+                          {p.subcategory_slug && subMap[p.subcategory_slug] ? (
+                            <span className="text-[var(--text-ghost)]"> · {subMap[p.subcategory_slug]}</span>
+                          ) : null}
+                        </p>
+                      )}
                       {(modelNames[p.id]?.length ?? 0) > 1 && (
                         <p className="text-[10px] font-medium tabular-nums text-[var(--text-ghost)] truncate mt-0.5">
                           {modelNames[p.id].slice(0, 5).join(" · ")}
@@ -3330,7 +3356,7 @@ export default function ProductList() {
                     {/* Category (desktop only) — show the division
                         below the category as a subtle caption when
                         the product is NOT in the flagship line. */}
-                    <div className="hidden md:flex flex-col min-w-0 gap-0.5">
+                    <div className={`hidden ${isInternal ? "md:flex" : "xl:flex"} flex-col min-w-0 gap-0.5`}>
                       <span className="flex items-center gap-1.5 text-[12px] text-[var(--text-muted)] truncate">
                         <LayersIcon className="h-3 w-3 text-[var(--text-ghost)] shrink-0" />
                         {catMap[p.category_slug] || p.category_slug}
@@ -3399,8 +3425,10 @@ export default function ProductList() {
                       })()}
                     </div>
 
-                    {/* Cost + models (internal) / models (public) — desktop only */}
-                    <div className="hidden md:flex items-center gap-1.5">
+                    {/* Cost + models (internal) / models (public) — desktop only.
+                        Catalogue: from xl only, so the name column keeps its
+                        width at laptop sizes. */}
+                    <div className={`hidden ${isInternal ? "md:flex" : "xl:flex"} items-center gap-1.5`}>
                       {isInternal && (() => {
                         const c = signals[p.id]?.cost;
                         return c != null ? (
