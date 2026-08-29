@@ -971,7 +971,7 @@ export default function ProductList() {
        to nothing and the product name vanished from its own row. Below xl
        the Models count steps out (it is the least useful of the six) and the
        fixed widths tighten; from xl the full six columns fit comfortably. */
-    : "md:grid-cols-[88px_1fr_112px_212px] xl:grid-cols-[104px_1fr_150px_120px_84px_232px]";
+    : "md:grid-cols-[88px_minmax(0,1fr)_112px_212px] lg:grid-cols-[104px_minmax(0,1fr)_160px_120px_220px] xl:grid-cols-[112px_minmax(0,1fr)_180px_130px_90px_232px]";
 
   const onCardAction = useCallback((action: "ask_ai" | "compare" | "quote", product: ProductRow) => {
     void action; void product;
@@ -3196,10 +3196,15 @@ export default function ProductList() {
             {/* Internal table trades the Brand column (always "Koleex")
                 for the two numbers an operator actually scans: readiness
                 and cost. Public table keeps Brand. */}
-            <div className={`hidden md:grid ${LIST_COLS} gap-4 items-center px-5 py-3 border-b border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)]`}>
+            {/* The gap utilities MUST match the row's exactly. They did not:
+                the header carried `gap-4` while the row carried
+                `gap-3 md:gap-4`, and the header's resolved to 12px against the
+                row's 16px — five columns of 4px drift, so every heading sat up
+                to 12px off the content beneath it. */}
+            <div className={`hidden md:grid ${LIST_COLS} gap-3 md:gap-4 items-center px-5 py-3 border-b border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)]`}>
               <span />
               <span className="text-[10px] font-semibold text-[var(--text-dim)] uppercase tracking-wider">{t("list.colProduct")}</span>
-              <span className={`text-[10px] font-semibold text-[var(--text-dim)] uppercase tracking-wider ${isInternal ? "" : "hidden xl:block"}`}>{t("list.colCategory")}</span>
+              <span className={`text-[10px] font-semibold text-[var(--text-dim)] uppercase tracking-wider ${isInternal ? "" : "hidden lg:block"}`}>{t("list.colCategory")}</span>
               <span className="text-[10px] font-semibold text-[var(--text-dim)] uppercase tracking-wider">
                 {isInternal ? t("list.colReady", "Ready") : t("card.globalFob", "Global FOB")}
               </span>
@@ -3242,7 +3247,7 @@ export default function ProductList() {
                         keeps off-screen rows from blocking the
                         first paint. */}
                     <div className={`rounded-xl bg-white border border-[var(--border-subtle)] overflow-hidden shrink-0 flex items-center justify-center ${
-                      isInternal ? "h-12 w-12 md:h-14 md:w-14" : "h-16 w-16 md:h-24 md:w-24"
+                      isInternal ? "h-12 w-12 md:h-14 md:w-14" : "h-16 w-16 md:h-20 md:w-20 lg:h-24 lg:w-24"
                     }`}>
                       {imgUrl ? (
                         <img
@@ -3293,7 +3298,7 @@ export default function ProductList() {
                           (the photo, price and actions need the room), so it
                           rides under the name instead of disappearing. */}
                       {!isInternal && (
-                        <p className="hidden md:block xl:hidden text-[11px] text-[var(--text-dim)] truncate mt-0.5">
+                        <p className="hidden md:block lg:hidden text-[11px] text-[var(--text-dim)] truncate mt-0.5">
                           {catMap[p.category_slug] || p.category_slug}
                           {p.subcategory_slug && subMap[p.subcategory_slug] ? (
                             <span className="text-[var(--text-ghost)]"> · {subMap[p.subcategory_slug]}</span>
@@ -3356,7 +3361,7 @@ export default function ProductList() {
                     {/* Category (desktop only) — show the division
                         below the category as a subtle caption when
                         the product is NOT in the flagship line. */}
-                    <div className={`hidden ${isInternal ? "md:flex" : "xl:flex"} flex-col min-w-0 gap-0.5`}>
+                    <div className={`hidden ${isInternal ? "md:flex" : "lg:flex"} flex-col min-w-0 gap-0.5`}>
                       <span className="flex items-center gap-1.5 text-[12px] text-[var(--text-muted)] truncate">
                         <LayersIcon className="h-3 w-3 text-[var(--text-ghost)] shrink-0" />
                         {catMap[p.category_slug] || p.category_slug}
@@ -3375,8 +3380,10 @@ export default function ProductList() {
                       )}
                     </div>
 
-                    {/* Readiness (internal) / Brand (public) — desktop only */}
-                    <div className="hidden md:flex items-center gap-1.5 min-w-0">
+                    {/* Readiness (internal) / Global FOB (catalogue) — desktop
+                        only. justify-start so the figure sits under its own
+                        column heading rather than drifting mid-cell. */}
+                    <div className="hidden md:flex items-center justify-start gap-1.5 min-w-0">
                       {isInternal ? (() => {
                         const sig = signals[p.id];
                         if (!sig) return <span className="text-[11px] text-[var(--text-ghost)]">—</span>;
