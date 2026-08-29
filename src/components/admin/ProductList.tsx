@@ -617,7 +617,12 @@ const ProductCard = memo(function ProductCard({
                   key={a.key}
                   type="button"
                   onClick={(e) => { e.preventDefault(); e.stopPropagation(); onCardAction?.(a.key, p); }}
-                  className={`px-2 py-1.5 rounded-lg border bg-[var(--bg-surface-subtle)] text-[10.5px] font-bold transition-all truncate ${a.cls}`}
+                  /* whitespace-nowrap, NOT truncate: the AI glow ring is drawn
+                     at inset -2px, i.e. OUTSIDE the button box, so truncate's
+                     overflow:hidden clipped the travelling beam away entirely —
+                     the button kept its blue rim and lost its motion. This is
+                     the same class the Auto-translate control uses. */
+                  className={`px-2 py-1.5 rounded-lg border bg-[var(--bg-surface-subtle)] text-[10.5px] font-bold whitespace-nowrap transition-all ${a.cls}`}
                   title={a.label}
                 >
                   {a.label}
