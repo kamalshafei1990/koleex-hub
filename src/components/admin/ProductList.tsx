@@ -561,16 +561,21 @@ const ProductCard = memo(function ProductCard({
         {!isInternal && (
           <div className="relative z-10 mt-3 pt-3 border-t border-[var(--border-subtle)] flex flex-col gap-2.5">
             <div className="flex items-baseline justify-between gap-2">
-              <span className="text-[10px] uppercase tracking-wider text-[var(--text-ghost)]">
+              {/* The label stays a quiet caption so the figure beside it is
+                  unmistakably the thing being read. */}
+              <span className="text-[9.5px] uppercase tracking-[0.12em] text-[var(--text-ghost)] shrink-0">
                 {t("card.globalFob", "Global FOB")}
               </span>
               {fobPending && fob === undefined ? (
                 /* Reserve the line rather than collapse it — a price that
-                   pops in later must not shift the whole grid. */
-                <span className="h-4 w-20 rounded bg-[var(--bg-surface-subtle)] animate-pulse" aria-hidden="true" />
+                   pops in later must not shift the whole grid. Height tracks
+                   the real figure's line box. */
+                <span className="h-6 w-24 rounded bg-[var(--bg-surface-subtle)] animate-pulse" aria-hidden="true" />
               ) : fob?.fobUsd != null ? (
+                /* The price is the card's headline number — it should read at
+                   a glance from across the grid, not sit at label size. */
                 <span
-                  className="text-[15px] font-bold tabular-nums tracking-tight text-[var(--text-primary)]"
+                  className="text-[22px] leading-none font-bold tabular-nums tracking-tight text-[var(--text-primary)]"
                   title={fxTitle}
                 >
                   ${fob.fobUsd.toLocaleString(undefined, { maximumFractionDigits: 0 })}
@@ -3415,11 +3420,11 @@ export default function ProductList() {
                            Global FOB the grid card shows. */
                         const f = fobPrices[p.id];
                         if (fobPending && f === undefined) {
-                          return <span className="h-4 w-16 rounded bg-[var(--bg-surface)] animate-pulse" aria-hidden="true" />;
+                          return <span className="h-5 w-20 rounded bg-[var(--bg-surface)] animate-pulse" aria-hidden="true" />;
                         }
                         return f?.fobUsd != null ? (
                           <span
-                            className="text-[14px] font-bold tabular-nums tracking-tight text-[var(--text-primary)]"
+                            className="text-[18px] leading-none font-bold tabular-nums tracking-tight text-[var(--text-primary)]"
                             title={fxTitle}
                           >
                             ${f.fobUsd.toLocaleString(undefined, { maximumFractionDigits: 0 })}
