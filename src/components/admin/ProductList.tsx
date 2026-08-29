@@ -956,6 +956,15 @@ export default function ProductList() {
      being specified by the owner separately, so this is the single seam they
      will land in — one handler, so no card needs to change when they do.
      Until then the buttons are inert BY DESIGN, not by oversight. */
+  /* List-view column template. The catalogue row and the internal row answer
+     different questions, so they do not share a grid: internally the columns
+     are readiness / cost / status; on the catalogue they are Global FOB /
+     models / actions. Tailwind needs the whole class literal, so these are
+     two complete strings rather than an interpolated one. */
+  const LIST_COLS = isInternal
+    ? "md:grid-cols-[56px_1fr_140px_120px_100px_80px_80px]"
+    : "md:grid-cols-[56px_1fr_150px_120px_84px_232px]";
+
   const onCardAction = useCallback((action: "ask_ai" | "compare" | "quote", product: ProductRow) => {
     void action; void product;
   }, []);
@@ -3179,17 +3188,21 @@ export default function ProductList() {
             {/* Internal table trades the Brand column (always "Koleex")
                 for the two numbers an operator actually scans: readiness
                 and cost. Public table keeps Brand. */}
-            <div className="hidden md:grid grid-cols-[56px_1fr_140px_120px_100px_80px_80px] gap-4 items-center px-5 py-3 border-b border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)]">
+            <div className={`hidden md:grid ${LIST_COLS} gap-4 items-center px-5 py-3 border-b border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)]`}>
               <span />
               <span className="text-[10px] font-semibold text-[var(--text-dim)] uppercase tracking-wider">{t("list.colProduct")}</span>
               <span className="text-[10px] font-semibold text-[var(--text-dim)] uppercase tracking-wider">{t("list.colCategory")}</span>
               <span className="text-[10px] font-semibold text-[var(--text-dim)] uppercase tracking-wider">
-                {isInternal ? t("list.colReady", "Ready") : t("list.colBrand")}
+                {isInternal ? t("list.colReady", "Ready") : t("card.globalFob", "Global FOB")}
               </span>
               <span className="text-[10px] font-semibold text-[var(--text-dim)] uppercase tracking-wider">
                 {isInternal ? t("list.colCost", "Cost") : t("list.colModels")}
               </span>
-              <span className="text-[10px] font-semibold text-[var(--text-dim)] uppercase tracking-wider">{t("list.colStatus")}</span>
+              {/* Status is an internal concern — the catalogue row spends that
+                  column on the actions instead. */}
+              {isInternal && (
+                <span className="text-[10px] font-semibold text-[var(--text-dim)] uppercase tracking-wider">{t("list.colStatus")}</span>
+              )}
               <span />
             </div>
             <div className="divide-y divide-[var(--border-subtle)]" style={{ contentVisibility: "auto", containIntrinsicSize: "1px 1200px" }}>
@@ -3202,7 +3215,7 @@ export default function ProductList() {
                 return (
                   <div
                     key={p.id}
-                    className="group relative flex items-center gap-3 md:grid md:grid-cols-[56px_1fr_140px_120px_100px_80px_80px] md:gap-4 px-4 md:px-5 py-3 hover:bg-[var(--bg-surface-subtle)] transition-colors"
+                    className={`group relative flex items-center gap-3 md:grid ${LIST_COLS} md:gap-4 px-4 md:px-5 py-3 hover:bg-[var(--bg-surface-subtle)] transition-colors`}
                   >
                     {/* Stretched navigation link — only card-level anchor;
                         action links below are siblings (no nested <a>). */}
@@ -3270,14 +3283,31 @@ export default function ProductList() {
                       {/* Mobile: show all meta inline */}
                       <div className="md:hidden flex items-center gap-2 mt-0.5 flex-wrap">
                         <span className="text-[11px] text-[var(--text-dim)]">{catMap[p.category_slug] || p.category_slug}</span>
-                        {p.brand && (
+                        {/* Brand on the catalogue row said "Koleex" on every
+                            product; the subcategory actually narrows it. */}
+                        {isInternal ? (p.brand && (
                           <>
                             <span className="text-[var(--text-ghost)]">·</span>
                             <span className="text-[11px] text-[var(--text-dim)]">{p.brand}</span>
                           </>
-                        )}
+                        )) : (p.subcategory_slug && subMap[p.subcategory_slug] && (
+                          <>
+                            <span className="text-[var(--text-ghost)]">·</span>
+                            <span className="text-[11px] text-[var(--text-dim)]">{subMap[p.subcategory_slug]}</span>
+                          </>
+                        ))}
                         <span className="text-[var(--text-ghost)]">·</span>
                         <span className="text-[11px] text-[var(--text-dim)]">{models} {models === 1 ? t("list.modelOne", "model") : t("list.modelMany", "models")}</span>
+                        {/* Price rides the same line on phones — the desktop
+                            price column does not exist at this width. */}
+                        {!isInternal && fobPrices[p.id]?.fobUsd != null && (
+                          <>
+                            <span className="text-[var(--text-ghost)]">·</span>
+                            <span className="text-[11px] font-bold tabular-nums text-[var(--text-primary)]">
+                              ${fobPrices[p.id]!.fobUsd!.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                            </span>
+                          </>
+                        )}
                       </div>
                       {/* Desktop: supplier line — internal only, with logo */}
                       {isInternal && (signals[p.id]?.supplier || suppliers.length > 0) && (() => {
@@ -3305,6 +3335,13 @@ export default function ProductList() {
                         <LayersIcon className="h-3 w-3 text-[var(--text-ghost)] shrink-0" />
                         {catMap[p.category_slug] || p.category_slug}
                       </span>
+                      {/* Subcategory — catalogue only. The internal table is
+                          already grouped by subcategory heading. */}
+                      {!isInternal && p.subcategory_slug && subMap[p.subcategory_slug] && (
+                        <span className="text-[11px] text-[var(--text-dim)] truncate pl-[18px]">
+                          {subMap[p.subcategory_slug]}
+                        </span>
+                      )}
                       {p.division_slug && p.division_slug !== FLAGSHIP_DIVISION_SLUG && divMap[p.division_slug] && (
                         <span className="text-[10px] text-[var(--text-ghost)] uppercase tracking-wider truncate pl-[18px]">
                           {divMap[p.division_slug]}
@@ -3339,13 +3376,27 @@ export default function ProductList() {
                             <span className="text-[11px] font-semibold tabular-nums text-[var(--text-subtle)] shrink-0">{sig.readiness}%</span>
                           </div>
                         );
-                      })() : p.brand ? (
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-[var(--bg-surface)] text-[11px] font-medium text-[var(--text-subtle)] truncate">
-                          <TagsIcon className="h-2.5 w-2.5 shrink-0" /> {p.brand}
-                        </span>
-                      ) : (
-                        <span className="text-[11px] text-[var(--text-ghost)]">—</span>
-                      )}
+                      })() : (() => {
+                        /* Catalogue: this column carries the price, not the
+                           brand — every product here is Koleex. Same live
+                           Global FOB the grid card shows. */
+                        const f = fobPrices[p.id];
+                        if (fobPending && f === undefined) {
+                          return <span className="h-4 w-16 rounded bg-[var(--bg-surface)] animate-pulse" aria-hidden="true" />;
+                        }
+                        return f?.fobUsd != null ? (
+                          <span
+                            className="text-[14px] font-bold tabular-nums tracking-tight text-[var(--text-primary)]"
+                            title={fxTitle}
+                          >
+                            ${f.fobUsd.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                          </span>
+                        ) : (
+                          <span className="text-[11px] text-[var(--text-dim)] truncate">
+                            {t("card.priceOnRequest", "Price on request")}
+                          </span>
+                        );
+                      })()}
                     </div>
 
                     {/* Cost + models (internal) / models (public) — desktop only */}
@@ -3364,16 +3415,22 @@ export default function ProductList() {
                       <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-[var(--bg-surface)] text-[11px] font-medium text-[var(--text-subtle)]">
                         <BoxesIcon className="h-2.5 w-2.5" /> {models}
                       </span>
-                      {p.level && (
+                      {/* Market level — INTERNAL only. It is a pricing-tier
+                          label, it is not in the catalogue row's six fields,
+                          and at this column width it pushed straight into the
+                          action buttons. */}
+                      {isInternal && p.level && (
                         <span className={`inline-flex items-center px-1.5 py-0.5 rounded-md text-[10px] font-semibold uppercase tracking-wider border ${lvl}`}>
                           {p.level}
                         </span>
                       )}
                     </div>
 
-                    {/* Status (desktop only) */}
-                    <div className="hidden md:flex items-center justify-center">
-                      {(() => {
+                    {/* Status (desktop only) — INTERNAL only: it is the
+                        publishing state of our record, and a customer reads
+                        it as stock. */}
+                    <div className={`hidden ${isInternal ? "md:flex" : ""} items-center justify-center`}>
+                      {isInternal && (() => {
                         const st = (p.status || "draft");
                         return (
                           <StatusPill tone={ST_TONE[st as keyof typeof ST_TONE] ?? "warning"} className="uppercase tracking-wider !text-[10px]">
@@ -3403,6 +3460,43 @@ export default function ProductList() {
                             <TrashIcon className="h-3.5 w-3.5" />
                           </button>
                         </>
+                      )}
+                      {/* Catalogue: the same three actions the grid card
+                          offers, so a customer is not forced back into grid
+                          view to use them. Hidden on phones — the row is
+                          already tight there and the card view carries them. */}
+                      {!isInternal && (
+                        <div className="hidden md:grid grid-cols-3 gap-1 w-full">
+                          {([
+                            {
+                              key: "ask_ai",
+                              label: t("card.askAi", "Ask AI"),
+                              cls: "kx-ai-glow border-[var(--accent,#0066FF)]/40 text-[var(--accent,#0066FF)] hover:bg-[var(--accent,#0066FF)]/10",
+                            },
+                            {
+                              key: "compare",
+                              label: t("card.compare", "Compare"),
+                              cls: "border-[var(--state-warning,#F59E0B)]/40 text-[var(--state-warning,#F59E0B)] hover:bg-[var(--state-warning,#F59E0B)]/10 hover:border-[var(--state-warning,#F59E0B)]/70",
+                            },
+                            {
+                              key: "quote",
+                              label: t("card.addToQuotation", "Quote"),
+                              cls: "border-[var(--state-success,#10B981)]/40 text-[var(--state-success,#10B981)] hover:bg-[var(--state-success,#10B981)]/10 hover:border-[var(--state-success,#10B981)]/70",
+                            },
+                          ] as const).map((a) => (
+                            <button
+                              key={a.key}
+                              type="button"
+                              onClick={(e) => { e.preventDefault(); e.stopPropagation(); onCardAction(a.key, p); }}
+                              /* whitespace-nowrap, never truncate — truncate's
+                                 overflow:hidden clips the AI glow ring away. */
+                              className={`px-1.5 py-1.5 rounded-lg border bg-[var(--bg-surface-subtle)] text-[10px] font-bold whitespace-nowrap transition-all ${a.cls}`}
+                              title={a.label}
+                            >
+                              {a.label}
+                            </button>
+                          ))}
+                        </div>
                       )}
                     </div>
                   </div>
