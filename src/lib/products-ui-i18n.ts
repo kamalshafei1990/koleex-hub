@@ -1060,6 +1060,20 @@ export const PRODUCTS_UI_I18N: Translations = {
   "preview.countVideos": { en: "{n} videos", zh: "{n} 个视频", ar: "{n} فيديو" },
   "preview.countDocuments": { en: "{n} documents", zh: "{n} 个文档", ar: "{n} مستند" },
 
+  /* ── Internal card strings that were falling back to English ── */
+  "card.hidden": { en: "Hidden from customers", zh: "对客户隐藏", ar: "مخفي عن العملاء" },
+  "card.hiddenShort": { en: "Hidden", zh: "已隐藏", ar: "مخفي" },
+  "card.noCostYet": { en: "Cost not set", zh: "未设置成本", ar: "التكلفة غير محددة" },
+  "card.noSupplier": { en: "No supplier linked", zh: "未关联供应商", ar: "لا يوجد مورّد مرتبط" },
+  "card.priceFrom": { en: "From", zh: "起", ar: "ابتداءً من" },
+
+  /* ── Catalogue card · commercial half (2026-08-29) ── */
+  "card.globalFob": { en: "Global FOB", zh: "全球 FOB 价", ar: "سعر FOB العالمي" },
+  "card.priceOnRequest": { en: "Price on request", zh: "价格面议", ar: "السعر عند الطلب" },
+  "card.askAi": { en: "Ask AI", zh: "问 AI", ar: "اسأل AI" },
+  "card.compare": { en: "Compare", zh: "对比", ar: "مقارنة" },
+  "card.addToQuotation": { en: "Quote", zh: "加入报价", ar: "عرض سعر" },
+
   /* ── 2026-08-29 sweep: the customer product page's own chrome. These 16
      keys were called with an English default but never defined, so the
      sticky pill, the section eyebrows and the model/compare copy stayed

@@ -285,7 +285,7 @@ function readModelCache(scopeKey: string): ModelMaps | null {
 }
 
 const ProductCard = memo(function ProductCard({
-  p, imgUrl, models, suppliers, lvl, baseRoute, isInternal, aurora, catMap, subMap, divMap, primaryModelNames, modelNamesList, signal, signalsPending, modelsPending, t, onAskDelete, fx, fxTitle,
+  p, imgUrl, models, suppliers, lvl, baseRoute, isInternal, aurora, catMap, subMap, divMap, primaryModelNames, modelNamesList, signal, signalsPending, modelsPending, t, onAskDelete, fx, fxTitle, fob, fobPending, onCardAction,
 }: {
   p: ProductRow;
   imgUrl?: string;
@@ -325,6 +325,11 @@ const ProductCard = memo(function ProductCard({
      also keeps the memo from busting on every render. */
   fx?: { rate: number; source: string; asOf: string | null } | null;
   fxTitle?: string;
+  /* Global FOB for THIS product (catalogue card only). undefined = not
+     fetched yet, null fobUsd = no cost on file or quoted per configuration. */
+  fob?: { fobUsd: number | null; mode: string };
+  fobPending?: boolean;
+  onCardAction?: (action: "ask_ai" | "compare" | "quote", product: ProductRow) => void;
 }) {
   return (
     <div
@@ -545,9 +550,72 @@ const ProductCard = memo(function ProductCard({
           </p>
         )}
 
-        {/* Meta row — publish status, brand, models. */}
-        <div className="flex items-center gap-2 mt-3 max-sm:mt-2 max-sm:gap-1.5 flex-wrap">
-          {(() => {
+        {/* ── Global FOB + actions — the CATALOGUE card's commercial half.
+            Price is the tier-agnostic Global FOB in USD, computed server-side
+            by /api/products/fob-prices from the landed factory cost through
+            Commercial Setup, converted at the DAY'S rate — so it re-prices
+            itself as the rate moves and can never go stale. The cost it is
+            derived from never reaches the browser.
+            Gated to Hub accounts (owner decision 2026-08-29): the route needs
+            a session, and Hub accounts are issued by the owner personally. */}
+        {!isInternal && (
+          <div className="relative z-10 mt-3 pt-3 border-t border-[var(--border-subtle)] flex flex-col gap-2.5">
+            <div className="flex items-baseline justify-between gap-2">
+              <span className="text-[10px] uppercase tracking-wider text-[var(--text-ghost)]">
+                {t("card.globalFob", "Global FOB")}
+              </span>
+              {fobPending && fob === undefined ? (
+                /* Reserve the line rather than collapse it — a price that
+                   pops in later must not shift the whole grid. */
+                <span className="h-4 w-20 rounded bg-[var(--bg-surface-subtle)] animate-pulse" aria-hidden="true" />
+              ) : fob?.fobUsd != null ? (
+                <span
+                  className="text-[15px] font-bold tabular-nums tracking-tight text-[var(--text-primary)]"
+                  title={fxTitle}
+                >
+                  ${fob.fobUsd.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                </span>
+              ) : (
+                <span className="text-[11px] font-medium text-[var(--text-dim)]">
+                  {t("card.priceOnRequest", "Price on request")}
+                </span>
+              )}
+            </div>
+
+            {/* Actions. Wired to onCardAction so the list owns the behaviour —
+                the three flows are specified separately by the owner. */}
+            {/* Three across on desktop; STACKED on phones — at the 2-column
+               mobile grid a card is ~155px wide and "Compare" cannot fit in a
+               third of that (measured at 360px: all three clipped to one
+               letter). Full-width rows also give a proper tap target. */}
+            <div className="grid grid-cols-3 max-sm:grid-cols-1 gap-1.5">
+              {([
+                { key: "ask_ai", label: t("card.askAi", "Ask AI") },
+                { key: "compare", label: t("card.compare", "Compare") },
+                { key: "quote", label: t("card.addToQuotation", "Quote") },
+              ] as const).map((a) => (
+                <button
+                  key={a.key}
+                  type="button"
+                  onClick={(e) => { e.preventDefault(); e.stopPropagation(); onCardAction?.(a.key, p); }}
+                  className="px-2 py-1.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] text-[10.5px] font-medium text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-colors truncate"
+                  title={a.label}
+                >
+                  {a.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Meta row — publish status, brand, models.
+            INTERNAL ONLY (owner spec 2026-08-29). The catalogue card carries
+            exactly six things: photo · model · family · category+subcategory ·
+            Global FOB · actions. "Active" is the publishing state of OUR
+            record and customers read it as stock; the brand chip says Koleex
+            on every Koleex product. Both were noise on a customer card. */}
+        <div className={`flex items-center gap-2 mt-3 max-sm:mt-2 max-sm:gap-1.5 flex-wrap ${isInternal ? "" : "hidden"}`}>
+          {isInternal && (() => {
             const st = (p.status || "draft");
             return (
               <StatusPill tone={ST_TONE[st as keyof typeof ST_TONE] ?? "warning"} className="uppercase tracking-wider !text-[10px]">
@@ -555,13 +623,6 @@ const ProductCard = memo(function ProductCard({
               </StatusPill>
             );
           })()}
-          {/* Brand chip: PUBLIC only. Internally every product is Koleex,
-              so the chip carried zero information and cost a whole row. */}
-          {!isInternal && p.brand && (
-            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-[var(--bg-surface)] text-[10px] font-medium text-[var(--text-subtle)]">
-              <TagsIcon className="h-2.5 w-2.5" /> {p.brand}
-            </span>
-          )}
           {/* Visibility — distinct from status: "active" says the record is
               live, this says customers can actually see it. */}
           {isInternal && signal && !signal.visible && (
@@ -859,6 +920,21 @@ export default function ProductList() {
   /* Internal work signals — fetched only under /product-data, in parallel
      with the meta round-trip, so the public catalogue payload is untouched. */
   const [signals, setSignals] = useState<Record<string, ProductSignal>>({});
+  /* Global FOB per product — CATALOGUE only, and deliberately a second,
+     narrow round-trip rather than a field on the list payload: the list is
+     paginated and cached, while the price must reflect the DAY'S exchange
+     rate, so baking it into a cached row would serve a stale number. The
+     route returns the finished USD figure only — never the cost behind it. */
+  const [fobPrices, setFobPrices] = useState<Record<string, { fobUsd: number | null; mode: string }>>({});
+  const [fobPending, setFobPending] = useState(false);
+
+  /* Card actions. The three flows (Ask AI · Compare · Add to Quotation) are
+     being specified by the owner separately, so this is the single seam they
+     will land in — one handler, so no card needs to change when they do.
+     Until then the buttons are inert BY DESIGN, not by oversight. */
+  const onCardAction = useCallback((action: "ask_ai" | "compare" | "quote", product: ProductRow) => {
+    void action; void product;
+  }, []);
   /* Factory costs are quoted and stored in CNY; the "≈ $" beside them is a
      reading aid so nobody converts in their head at a half-remembered rate.
      Fetched once for the whole grid and handed down to the cards. */
@@ -1469,6 +1545,38 @@ export default function ProductList() {
       setLoadingMore(false);
     }
   }, [serverParams]);
+
+  /* ── Global FOB for the catalogue cards ────────────────────────────────
+     Fires only under /products, only for ids we do not already hold, and in
+     ONE request for the whole visible batch — the same discipline the meta
+     round-trip follows. Fire-and-forget: a slow or failed price call must
+     never delay the grid, the cards just show "Price on request" until it
+     lands. Ids already priced are skipped, so scrolling a paginated list
+     asks for the new page only. */
+  useEffect(() => {
+    if (isInternal) return;
+    const missing = products.map((p) => p.id).filter((id) => !(id in fobPrices));
+    if (missing.length === 0) return;
+    let cancelled = false;
+    const ctrl = new AbortController();
+    setFobPending(true);
+    fetch("/api/products/fob-prices", {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ids: missing }),
+      signal: ctrl.signal,
+    })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((j: { prices?: Record<string, { fobUsd: number | null; mode: string }> } | null) => {
+        if (cancelled || !j?.prices) return;
+        /* Merge, never replace — an earlier page's prices must survive. */
+        setFobPrices((prev) => ({ ...prev, ...j.prices }));
+      })
+      .catch(() => { /* price is optional on the card */ })
+      .finally(() => { if (!cancelled) setFobPending(false); });
+    return () => { cancelled = true; ctrl.abort(); };
+  }, [isInternal, products, fobPrices]);
 
   useEffect(() => {
     if (loading || loadError || !hasMore) return;
@@ -3013,6 +3121,9 @@ export default function ProductList() {
                 suppliers={productSuppliers[p.id] || EMPTY_SUPPLIERS}
                 signalsPending={isInternal && !signalsReady}
                 modelsPending={isInternal && !modelsReady}
+                fob={fobPrices[p.id]}
+                fobPending={!isInternal && fobPending}
+                onCardAction={onCardAction}
                 lvl={levelColors[p.level || ""] || ""}
                 baseRoute={baseRoute}
                 isInternal={isInternal}
