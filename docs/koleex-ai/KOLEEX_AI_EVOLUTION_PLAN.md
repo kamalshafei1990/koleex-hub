@@ -699,6 +699,53 @@ Baseline from `MAINLAND_CHINA_READINESS_AUDIT.md` (Level 2, `hub.koleexgroup.com
 
 **Rules.** (1) Every tool declares its class in `ToolDef` — no default. (2) Confirmation is a **server-side ledger match**, never a model flag. (3) Untrusted content (documents, images, web, MCP) can never satisfy a confirmation. (4) Destructive prefers soft-delete via the existing `recycle-bin.ts`. (5) A new tool without a class fails registry validation at build time.
 
+
+---
+
+## S. Memory storage — the N12 fix, and what Phase 7 needs (decision pending)
+
+Two questions that look separate and are the same question. **Nothing has been created.**
+
+### The problem in one line
+
+AI memory lives in `accounts.preferences.ai_memory` — a shared JSONB column with three read-modify-write writers and no locking (finding N12).
+
+### Option A — atomic merge RPC · *smallest thing that fixes N12*
+
+One database function, `account_prefs_merge(p_account_id uuid, p_patch jsonb)`, doing a single `UPDATE accounts SET preferences = coalesce(preferences,'{}'::jsonb) || p_patch WHERE id = ...`. All three writers call it instead of reading first.
+
+| | |
+|---|---|
+| **Fixes** | The race, completely. `||` is applied inside one statement; there is no gap to lose a write in. |
+| **Does NOT fix** | The 25-fact cap (still bounded by JSONB size, not by anything meaningful), no per-fact timestamps, no queryability, no history. Phase 7's entity and episodic memory still have nowhere to live. |
+| **Schema** | One function. No table, no column, no index. |
+| **RLS** | Not applicable — a `SECURITY DEFINER` function callable by the service role only, matching the posture of `ai_rate_limit_hit()`. |
+| **Migration / rollback** | `CREATE OR REPLACE FUNCTION` / `DROP FUNCTION`. The callers fall back to today's code by reverting one commit; the function being present but unused is harmless. |
+| **Load** | Same write volume as today, one round-trip instead of two — strictly *less* database work. |
+| **Risk** | Low. The one thing to get right is that the patch must be shallow-merged at the top level only, so `{ai_memory:{…}}` REPLACES the memory object rather than deep-merging it — otherwise `forget_about_user` could never remove a key. |
+
+### Option B — `ai_memories` table · *fixes N12 and unblocks Phase 7*
+
+| | |
+|---|---|
+| **Columns** | `id` uuid pk · `account_id` uuid · `tenant_id` uuid · `kind` text (`fact` / `entity` / `episode`) · `key` text · `value` text · `source` text · `last_used_at` timestamptz null · `created_at` · `updated_at` |
+| **Fixes** | The race — one row per fact, `upsert` on `(account_id, key)`, no shared document to lose. And the 25-fact cap becomes a *policy* rather than a JSON-size limit. |
+| **Unblocks** | Phase 7's entity memory and episodic memory, which have nowhere to live today. `kind` is what lets one table carry all three rather than the plan's two. |
+| **Indexes** | Unique `(account_id, key)` — the upsert target. `(account_id, kind)` for retrieval. |
+| **RLS** | Enabled, zero policies, `anon`/`authenticated` revoked — service-role only, matching `ai_pending_actions` and `ai_rate_limits`. It holds personal facts users dictated, so it is the most sensitive table this subsystem would own. |
+| **Migration** | One table + two indexes + RLS, then a backfill copying existing `preferences.ai_memory` keys into rows. **Staging first, verified, then production.** |
+| **Rollback** | `DROP TABLE`. The JSONB column is *left in place and not deleted* during the migration precisely so rollback is a code revert, not a data restore. |
+| **Load** | One row per remembered fact — tens per user, not thousands. Reads are one indexed query per turn, replacing a column read that already happens. |
+| **Risk** | Medium, and concentrated in the backfill: a partial copy loses facts users dictated. Mitigated by leaving the JSONB in place and reading BOTH for one release. |
+
+### Recommendation
+
+**A now, B when Phase 7 is authorised.** A is small, fixes a live P1, and is not wasted work if B follows — B needs an atomic write path anyway during the dual-read release. Doing B first means shipping a table before the bug that justifies half of it is fixed.
+
+### What is NOT recommended
+
+Leaving N12 open. It silently discards something a user explicitly asked for, on a phrasing that is not unusual.
+
 ---
 
 # M. Subsystem strategies
@@ -1331,6 +1378,7 @@ On an iPhone `/todo?task=x` means nothing. **Phase 2 addition:** tools return a 
 | N3 | **`requireInternalUser` 403s every AI route** — correct today, incompatible with a general user who has no Hub account | 2 | **blocking for Mode B** |
 | N6 | ~~**Hub-relative deep links**~~ — **CLOSED in 2I**, and the count was wrong. The audit said six places; **five of them were not defects.** Every `/todo?task=` string in the tool layer is an `inbox_messages` row or a push-notification payload — Hub features consumed by the Hub, which never travel in a `ToolResult`. Rewriting them would have broken a working feature to fix a problem they do not have. The AI surface had **one** Hub-relative link: `review_url` on `createQuotationDraft`. | ✅ 2I | closed |
 | N10 | **`USE_DEEPSEEK` reads like a global kill-switch and is not one** — the evidence is under N8. Anyone reaching for it during a vendor incident would find the agent still talking to the vendor. Making it global is **one line** in the adapter and is deliberately NOT taken here: this environment cannot read production's variables, and if the key is set without the flag, that line takes Koleex AI down completely. **Owner decision, with the trace attached.** | **owner** | medium — a control that does not do what its name says |
+| N12 | **A real, reachable write race on `accounts.preferences`.** Found while surveying Phase 7. Three paths write that JSONB column — `remember_about_user` / `forget_about_user`, `setReplyLanguage`, and the user's own settings endpoint — and **all three read-modify-write the whole column**. Any write landing between another's read and its write is silently discarded. It is not theoretical: the language write is **`void setReplyLanguage(...)`**, deliberately un-awaited so it "must never delay the reply", so it runs concurrently with the entire turn. One message triggers it — *"reply in Arabic, and remember my birthday is 3 May"*: the un-awaited language write and the tool's memory write read the same `prefs`, and whichever lands second erases the other's key. The user asked for two things and one vanishes with no error, presenting as *"the assistant went back to English"* — which reads like a prompt problem and is not one. **Contained** by `validate:ai-prefs-race` (writer count pinned, so a fourth path cannot be added quietly), **not fixed**: the fix is an atomic merge, which is a schema decision. See §S. | **owner** | **P1 — silent data loss on a path users hit** |
 | N11 | **The `provider` label is shipped to the browser with no consumer.** `AgentResponse.provider` (e.g. `deepseek:deepseek-chat`) crosses the wire on every turn; `KoleexAiApp.tsx` declares it in the response type at two places and **never reads or renders it**. It is not product copy, so it does not breach the user-facing vendor-language rule, but it does disclose the vendor to anyone with devtools, and it is dead weight. Not removed here: `/api/v1/ai/*` re-exports the same handlers and the standalone-client amendment makes response shape a contract, so dropping a field is the owner's call, not a refactor. The label is genuinely needed **server-side** for the audit trail. | **owner** | low |
 | N9 | ~~**The client has no test harness**~~ — **CLOSED.** `validate:ai-client-render` renders components with `react-dom/server` and asserts on markup, with **no new dependency** and in the repo's existing tsx-script style. It found a real gap on its first run (see below). The remaining 2J extraction is now unblocked. | ✅ closed | — |
 | N8 | ~~**The agent route keeps its own provider call**~~ — **CLOSED in 4D**, and the reason it looked unclosable was a misreading that is now corrected with a trace. 3D recorded that the route's fast lane went through `providers/deepseek.ts`, gated on `USE_DEEPSEEK=true` **in addition to** the key, while the adapter gates on the key alone — so re-pointing the lane appeared to silently disable an operational control. Following the flag-off path end to end shows what actually happens: `deepseekChatStream()` yields `{type:"error"}` **before its first delta**, so the route's `gotFirst` is false, `fastReply` stays null, and the turn **falls through to `orchestrate()`** — which reaches the model through the registry, **on the key alone**. So: **`USE_DEEPSEEK` unset does NOT stop the agent calling DeepSeek.** It disables the streaming fast lane and the chat-route lanes. It makes the assistant *slower*, not *silent*. With that established, 4D routes the lane through `chatWithTools()` (gaining failover and the circuit breaker it never had) and moves the flag check up into `canFastPath` via `router/provider-policy.ts`, so behaviour is preserved in **both** switch positions. The assertion moved from a holding count (`≤ 1`) to the rule (`= 0`). | **4 — done** | closed |
