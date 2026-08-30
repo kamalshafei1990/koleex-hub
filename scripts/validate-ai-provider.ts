@@ -872,8 +872,39 @@ console.log("\n── The roster: an operator can check the fallback WITHOUT bre
     /Math\.min\(\s*MAX_SAMPLES/.test(routeSrc) && /const MAX_SAMPLES = \d+/.test(routeSrc));
   check("samples are floored, so \"3.9\" cannot become a fractional loop bound",
     /Math\.floor\(Number\(params\.get\("samples"\)\)\)/.test(routeSrc));
-  check("a wall-clock budget stops sampling before maxDuration kills the route",
-    /const SAMPLE_BUDGET_MS = /.test(routeSrc) && /Date\.now\(\) >= deadline/.test(routeSrc));
+  /* THE BUDGET IS ARITHMETIC, SO IT IS CHECKED AS ARITHMETIC. The first
+     version of this route timed out in production twice: it bounded when a
+     sample may START, not how long the run may TAKE, so a sample beginning at
+     19.9s ran past maxDuration and the operator got a 504 with none of the
+     completed samples. Asserting that the words "budget" and "deadline" appear
+     would have passed against that exact bug. These read the real constants
+     and check the relation between them. */
+  const num = (name: string): number => {
+    const m = routeSrc.match(new RegExp(`const ${name} = ([0-9_]+)`));
+    return m ? Number(m[1].replace(/_/g, "")) : NaN;
+  };
+  const maxDurationS = Number(routeSrc.match(/export const maxDuration = (\d+)/)?.[1] ?? NaN);
+  const budget = num("SAMPLE_BUDGET_MS");
+  const cap = num("PER_SAMPLE_CAP_MS");
+
+  check("the route's own constants are all readable", 
+    Number.isFinite(maxDurationS) && Number.isFinite(budget) && Number.isFinite(cap));
+  check("a single sample is capped, so one hung call cannot eat the run",
+    cap > 0 && cap < budget);
+  /* The worst case is a sample that starts at the last instant the predicate
+     allows and then runs for its entire cap. The predicate subtracts the cap,
+     so that worst case is exactly the budget — this is the invariant the old
+     version did not have. */
+  check("the worst case total is the budget, not the budget plus a sample",
+    budget <= maxDurationS * 1000);
+  check("the budget leaves headroom for auth and serialisation",
+    maxDurationS * 1000 - budget >= 5000);
+  check("the start predicate subtracts the cap rather than testing elapsed alone",
+    /Date\.now\(\) - startedRunAt \+ PER_SAMPLE_CAP_MS > SAMPLE_BUDGET_MS/.test(routeSrc));
+  check("every sample goes through the cap",
+    /withCap\(\s*\n?\s*chatWithToolsVia\(/.test(routeSrc));
+  check("a capped sample is reported, not silently averaged in as latency",
+    /timed_out: true/.test(routeSrc) && /out === TIMED_OUT/.test(routeSrc));
   check("`ms` still means the first call, so the field's old readers are unaffected",
     /ms:\s*ms\[0\]\s*\?\?\s*0/.test(routeSrc));
   check("sampling stops at the first failure rather than repeating it",
