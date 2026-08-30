@@ -9,7 +9,8 @@ import "server-only";
      2. Call the provider with `tools = openAiToolSchemas(ctx)` — only the
         tools THIS caller may run — and `tool_choice = auto`.
      3. If the model replies with tool_calls, dispatch them all in parallel
-        through dispatchTool() (permission guards + audit log apply),
+        through the Koleex Hub connector, which owns the permission
+        guards, the confirmation ledger and the audit log,
         attach results, loop.
      4. If the model replies with content, that's the final answer; stop.
      5. Hard-cap at MAX_ITERATIONS so a misbehaving model can't spin.
@@ -23,7 +24,10 @@ import type {
   AgentStep,
   AgentResponse,
 } from "./types";
-import { dispatchTool, openAiToolSchemas } from "./tool-registry";
+/* Phase 2H — Hub data is reached through the named connector, never by
+   calling the dispatcher directly. One door, so there is one place where the
+   permission guard, the confirmation ledger and the audit trail apply. */
+import { koleexHub } from "@/lib/server/ai/connectors/koleex-hub";
 import { aiProviderConfigured } from "@/lib/server/ai-provider";
 import { hasUntrustedContent } from "@/lib/server/ai/security/untrusted";
 import { logSealTransform } from "@/lib/server/ai/observability/reply-log";
@@ -124,7 +128,7 @@ export async function orchestrate(input: TurnInput): Promise<AgentResponse> {
      a Sales user offered 45 schemas will try the ones they cannot use and
      burn a turn being denied, and the schemas are most of the request body.
      dispatchTool still re-checks — a model can name a tool it was not given. */
-  const tools = openAiToolSchemas(input.ctx);
+  const tools = koleexHub.toolSchemas(input.ctx);
 
   /* Graceful Groq-missing fallback. The orchestrator's tool-calling
      features genuinely need Groq's OpenAI-style tool schema (and the
@@ -612,7 +616,7 @@ export async function orchestrate(input: TurnInput): Promise<AgentResponse> {
         }
 
         totalToolRuns++;
-        const result = await dispatchTool(ctx, tc.function.name, parsedArgs, {
+        const result = await koleexHub.invoke(ctx, tc.function.name, parsedArgs, {
           conversationId,
         });
         toolCache.set(cacheKey, { result: result.data, cached: false });
