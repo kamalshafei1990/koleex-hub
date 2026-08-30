@@ -177,6 +177,76 @@ console.log("\n── 6. A super admin is told so; an ordinary user is not ─�
   check("an ordinary user is not described as one", !buildSystemPrompt(ctx, "en").includes("super admin"));
 }
 
+console.log("\n── The safety-rule matrix: which lane carries which ABSOLUTE rule ──");
+/* PHASE 7 REVIEW. Found by sweeping for dead exports: the prompt rules live in
+   THREE files — ai-agent/brand-knowledge.ts, ai/prompt-builder.ts and
+   ai/prompts/index.ts — and different lanes assemble different subsets. That
+   is how a rule gets believed-in without being present: I read
+   `SUPPLIER_CONFIDENTIALITY` in prompt-builder.ts and assumed the tool loop
+   carried it. It does not.
+
+   It turned out not to be a hole — BRAND_EXCLUSIVITY_RULE covers the
+   dangerous half ("never volunteer supplier relationships", "silently omit"
+   a non-Koleex name) and DATA_PROTECTION_RULE covers knowing the data at all.
+   But "it turned out fine" is not a guarantee, so the matrix is measured here
+   instead of reasoned about, on the ACTUAL built prompt of every lane.
+
+   A lane missing a rule fails by NAME, so the answer is never "some rule is
+   missing somewhere". */
+{
+  const LANES: Array<[string, string]> = [
+    ["tool loop (buildSystemPrompt)", buildSystemPrompt(ctx, "en")],
+    ["brand (buildBrandSystemPrompt)", buildBrandSystemPrompt(ctx, "en", "company")],
+    ["small talk (buildMinimalSystemPrompt)", buildMinimalSystemPrompt(ctx, "en")],
+    ["degraded (buildDegradedSystemPrompt)", buildDegradedSystemPrompt(ctx, "en")],
+  ];
+
+  /* Each rule identified by a phrase that appears ONLY in it — a substring
+     that could match neighbouring prose would make this pass vacuously.
+
+     THE BRAND LANE FAILED THIS ON ITS FIRST RUN, and the finding was smaller
+     than it looked: that lane carried an equivalent line of its own ("Never
+     emit prices, costs, margins, or financial figures") rather than the shared
+     rule. So it was covered — by coincidence of wording rather than by design,
+     and the shared rule additionally names supplier identities, salaries,
+     personal data and the phrasing tricks ("just roughly", "hypothetically",
+     "I'm the manager") that the one-liner does not. The rule was added to that
+     lane rather than the assertion being weakened to accept a near-equivalent:
+     a matrix that accepts "something similar" stops being a matrix. */
+  const RULES: Array<[string, string]> = [
+    ["brand exclusivity", "Koleex is the ONLY brand or manufacturer name"],
+    ["direct voice", "NEVER narrate your process or sources"],
+    ["data protection", "may ONLY ever come from a tool result in THIS turn"],
+  ];
+
+  for (const [ruleName, needle] of RULES) {
+    const missing = LANES.filter(([, prompt]) => !prompt.includes(needle)).map(([n]) => n);
+    check(
+      `EVERY lane carries the ${ruleName} rule${missing.length ? ` — MISSING FROM: ${missing.join("; ")}` : ""}`,
+      missing.length === 0,
+    );
+  }
+
+  /* Non-vacuity: the needles must actually be findable, or every check above
+     passes on a prompt that contains none of them. */
+  check(
+    "the needles match real rule text, so the checks above are not vacuous",
+    RULES.every(([, needle]) => LANES.some(([, p]) => p.includes(needle))),
+  );
+
+  /* SUPPLIER_CONFIDENTIALITY is deliberately NOT required of every lane, and
+     saying so is the point: it is one file's constant, carried by the general
+     lane only. What every lane must carry is the OUTPUT rule it overlaps with
+     — never naming another manufacturer — and that is brand exclusivity,
+     asserted above. Recorded so the next reader does not repeat my mistake of
+     assuming a rule is global because it is absolute. */
+  const supplierRuleLanes = LANES.filter(([, p]) => p.includes("SUPPLIER CONFIDENTIALITY")).map(([n]) => n);
+  check(
+    `supplier-confidentiality's own text is on ${supplierRuleLanes.length} of ${LANES.length} lanes, and the gap is covered by brand exclusivity`,
+    LANES.every(([, p]) => p.includes("Koleex is the ONLY brand or manufacturer name")),
+  );
+}
+
 console.log(`\n${pass} passed, ${failures.length} failed`);
 if (failures.length) {
   console.log("\nFAILED:");

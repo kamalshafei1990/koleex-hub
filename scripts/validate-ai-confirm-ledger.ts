@@ -13,6 +13,7 @@
    proved separately at the SQL level.
    ========================================================================== */
 
+import { readFileSync } from "node:fs";
 import { normalizeArgs, hashArgs, riskClassFor, ledgerMode } from "../src/lib/server/ai/security/pending-actions";
 
 let pass = 0, fail = 0;
@@ -76,6 +77,73 @@ check("a NEW unknown write tool still gets a class (no silent gap)",
 console.log("\n── Mode ──");
 check("default mode is enforce, not observe", ledgerMode() === "enforce",
   "a mismatched confirm costs a retry; an unverified one can delete permanently");
+
+console.log("\n── The MECHANISM, not just the maths (Phase 7 review) ──");
+/* FOUND BY MUTATION TESTING, and it is the reason this section exists.
+   Replacing the dispatcher's guard with `if (false)` — disabling the entire
+   confirmation check, so any `confirm: true` from the model executes a write
+   with no pending row — was survived by ALL TWENTY-FOUR suites, this one
+   included.
+
+   Everything above tests the ARITHMETIC: hashing, normalisation, risk classes,
+   the default mode. All of it correct, and none of it noticing that the code
+   which CALLS it had been switched off. That is the classic shape of a test
+   suite that grows around pure functions: the parts that are easy to test are
+   tested, and the wiring that makes them matter is not.
+
+   The standing rule this protects is quoted verbatim from the project owner:
+   "A write tool must NOT execute merely because the model sends `confirm:
+   true`. The server must verify a matching pending action exists."
+
+   Three other critical guards were probed the same way and ARE caught — the
+   permission gate (ai-baseline), untrusted-document fencing (ai-untrusted) and
+   egress scanning (ai-egress). This was the one gap. */
+{
+  const registry = readFileSync("src/lib/server/ai-agent/tool-registry.ts", "utf8");
+  const code = registry.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
+  const dispatchStart = code.indexOf("export async function dispatchTool(");
+  const body = dispatchStart >= 0 ? code.slice(dispatchStart) : "";
+
+  check("dispatchTool is where this section expects it", body.length > 0,
+    "if this fails every assertion below compares against an empty string");
+
+  check(
+    "a confirm:true is checked against the ledger — the guard is REACHABLE, not commented out",
+    /if \(mode !== "off" && args\.confirm === true\) \{/.test(body),
+    "mutation `if (false)` survived all 24 suites before this assertion existed",
+  );
+  check(
+    "and the guard calls consumePendingAction, not just reads a flag",
+    /consumePendingAction\(\{/.test(body),
+  );
+  check(
+    "an UNMATCHED confirm refuses the write under enforce",
+    /if \(!consumed\.matched\)[\s\S]{0,400}mode === "enforce"[\s\S]{0,400}UNCONFIRMED_MESSAGE/.test(body),
+    "the whole point: no pending row means the tool must not run",
+  );
+  check(
+    "the refusal RETURNS, so execution cannot continue past it",
+    /UNCONFIRMED_MESSAGE[\s\S]{0,600}return result;/.test(body),
+  );
+  /* Ordering: the ledger must be consulted BEFORE the handler runs. A check
+     that happens after the write has already executed protects nothing. */
+  const ledgerIdx = body.indexOf("consumePendingAction({");
+  const handlerIdx = body.indexOf("tool.handler(ctx, args)");
+  check(
+    `the ledger is consulted BEFORE the handler runs (ledger@${ledgerIdx}, handler@${handlerIdx})`,
+    ledgerIdx > 0 && handlerIdx > 0 && ledgerIdx < handlerIdx,
+  );
+  check(
+    "an unmatched confirm is logged, so a refused write is visible in ops",
+    /ai\.ledger\.unmatched/.test(body),
+  );
+  /* The other half: a preview must RECORD a pending row, or there is never
+     anything for a later confirm to match and every write is refused. */
+  check(
+    "a tool returning a preview records a pending row for the follow-up confirm",
+    /recordPendingAction\(\{/.test(body) && /pendingAction/.test(body),
+  );
+}
 
 console.log(`\n${pass} passed, ${fail} failed\n`);
 process.exit(fail > 0 ? 1 : 0);

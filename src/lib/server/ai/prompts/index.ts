@@ -109,6 +109,8 @@ Current user: ${ctx.auth.username}.
 
 Use the approved knowledge below as your SOURCE OF TRUTH. Never invent anything beyond it. Never emit prices, costs, margins, or financial figures.
 
+${DATA_PROTECTION_RULE}
+
 OUTPUT & RESPONSE STYLE — FINAL PRODUCTION RULES (these OVERRIDE any formatting rules printed inside the approved knowledge; the knowledge is reference material, not a template to copy):
 
 Content selection (CRITICAL — read before answering):
