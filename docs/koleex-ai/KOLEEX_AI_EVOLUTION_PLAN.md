@@ -737,7 +737,7 @@ break Hub integration · remove a working tool · weaken permissions or verifica
 | Phase | Status | Evidence |
 |---|---|---|
 | **0 — Baseline & Tests** | 🟡 **IN PROGRESS** | Tenant-isolation guard ✅ · Incident-replay suite ✅ — both shipped and proven-to-fail (below). Baseline latency metrics: next (needs a running instance). |
-| **1 — Security Hardening** | 🟡 **IN PROGRESS** | Issues 3, 6, 7 ✅ · Issue 2 ✅ · Issue 1 ⏸ **migration awaiting sign-off** · rate limiting + injection fencing: next |
+| **1 — Security Hardening** | ✅ **COMPLETE** | All six audit issues in scope closed (1, 2, 3, 4, 5, 6) + Issue 7. Two migrations applied staging→production with sign-off. Six suites green. |
 | 2–20 | ⬜ Not started | Awaiting Phase 1 completion · **Amendment 1 (§P) folded in** — Phase 2 gains the connector interface + client-resolvable deep links |
 
 ### Phase 0 · Result 1 — AI tenant-isolation guard ✅
@@ -795,7 +795,7 @@ The four known-open P0s are **reported, not failed**, so the suite is green on t
 | **2 — web-search egress** | ✅ **CLOSED** | `scanEgress()` — deterministic, no model call, no network, no DB. Two tiers: **block** for data identifying a person/record/internal entity (email, phone, UUID, document number, model code, money + commercial context); **warn** for a bare amount. Default ON; `AI_EGRESS_SCAN=off` is an emergency rollback, not a setting. |
 | **1 — server-enforced confirmation** | ✅ **CLOSED** | `ai_pending_actions` applied to **staging first, then production**, both verified (14 cols, 4 indexes, RLS on, 0 policies, `anon` + `authenticated` denied). `dispatchTool` now **consumes** a matching unexpired pending row before any confirmed write, and **records** one when a tool returns a preview. **Zero tool changes** — the `pendingAction` the 15 write tools already returned, and nothing read, is now the mechanism. Modes: `enforce` (default) / `observe` / `off`. |
 | **5 — prompt-injection isolation** | ✅ **CLOSED** | Untrusted content is now **fenced with a per-turn nonce** instead of a constant `"""` a document could forge, with explicit *data-not-instructions* framing that also forbids it authorising an action. `attachedDocCtx` narrowed from *retained history* to **this turn only** — one attachment used to switch the field-grounding and pricing seals off for every later turn in the conversation, the widest blast radius in the seal chain. Both `attachedDocCtx` sites (the second was in `orchestrateNoGroq`) now share **one** detector. |
-| **4 — rate limiting** | ⏸ **BLOCKED — needs a store decision** | See §Q |
+| **4 — rate limiting** | ✅ **CLOSED** | Option B taken. `ai_rate_limits` + an atomic `ai_rate_limit_hit()` RPC, applied staging→production. Budgets: 30 turns/min per account, 200/min per tenant, **6 attachment requests/min** (that route can fan out to 18 vision calls each). Modes `enforce` (default) / `observe` / `off`; **fails open** if the counter store is unreachable — a limiter must not become an outage. |
 
 **Calibration matters more than coverage here.** A scanner that blocks `"Cairo weather today"` breaks the feature it protects, and one that lets a quotation total through protects nothing. `npm run validate:ai-egress` asserts **both** directions — **22 passed, 0 failed**: 12 legitimate queries from the tool's own description all allowed (including `"USD to CNY rate"`, which contains a currency code, and `"convert 5000 USD to CNY"`), 10 realistic leaks all blocked.
 
@@ -981,9 +981,9 @@ Default mode is **`enforce`**, not `observe`. A mismatched confirm costs the use
 
 Changing the fence format silently broke the seal chain's recital exemption, which keys on a marker in the turn text. `attachedDocCtx` would have been **false while a document was attached** — so the pricing guard would have replaced a legitimate invoice summary with its refusal message. The fix is one shared `hasUntrustedContent()` detector that matches both the new fence and the pre-fencing `[ATTACHED FILE:` marker, so conversations already in flight keep working. `npm run validate:ai-untrusted` asserts that exact case, plus the `"""` escape and forged-token neutralisation — **13 passed, 0 failed**.
 
-## Q. Open decision — rate-limiting store (audit Issue 4, P0)
+## Q. Rate-limiting store — decided: option B ✅
 
-Rate limiting is the one Phase 1 item with no correct zero-decision answer, because it needs shared state and Vercel functions are stateless.
+Rate limiting was the one Phase 1 item with no correct zero-decision answer, because it needs shared state and Vercel functions are stateless.
 
 | Option | Durable across instances? | New vendor | Cost | Notes |
 |---|---|---|---|---|
@@ -991,9 +991,11 @@ Rate limiting is the one Phase 1 item with no correct zero-decision answer, beca
 | **B · Postgres counter table** | ✅ yes | no | none | Reuses existing Supabase; precedent already in the tree (`login_attempts`). Adds one DB write per AI request. **[SCHEMA GATE]** |
 | **C · In-process only** | 🔴 **no** | no | none | Free and zero-risk, but per-instance: an attacker across N warm instances gets N× the limit. |
 
-**Recommendation: B**, then A if volume justifies it. B reuses infrastructure that already exists, follows a pattern already in this codebase, and needs no new vendor relationship.
+**Decision: B**, taken and shipped. Move to A if volume justifies it — the limiter is keyed by string and mode-flagged, so swapping the store touches one module.
 
-**On shipping C as a floor:** it would bound a *runaway client loop* — the most common real incident — but it does **not** bound an attacker. It is deliberately not being presented as "rate limiting is done". Stating otherwise would be the same class of error as the egress assertion that reported an open issue as fixed.
+**C was deliberately not shipped as a floor.** It would bound a *runaway client loop* — the most common real incident — but it does **not** bound an attacker: across N warm instances they get N× the limit. Presenting that as "rate limiting is done" would be the same class of error as the egress assertion that reported an open issue as fixed.
+
+**Fails open by design.** If the counter store is unreachable the request is allowed, with a log line. A limiter that takes the assistant down when the database hiccups converts a cost-control measure into an availability incident; `ai_tool_calls` still records everything either way.
 
 ---
 

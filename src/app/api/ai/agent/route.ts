@@ -31,6 +31,7 @@ import { supabaseServer } from "@/lib/server/supabase-server";
 import { requireAuth } from "@/lib/server/auth";
 import { requireInternalUser } from "@/lib/server/ai/require-internal";
 import { fenceUntrusted, newFenceId } from "@/lib/server/ai/security/untrusted";
+import { consumeBudget, limitMode, BUDGETS, subjectFor } from "@/lib/server/ai/security/rate-limit";
 import { ATTACH_SPLIT, resolveHistoryAttachEmbeds } from "@/lib/server/ai/attach-embed";
 import { getTaughtAnswersBlock, getKnowledgeNudgeBlock } from "@/lib/server/ai-knowledge";
 import { buildUserContext, checkModule } from "@/lib/server/ai-agent/permissions";
@@ -185,6 +186,31 @@ export async function POST(req: Request) {
   {
     const notInternal = requireInternalUser(auth);
     if (notInternal) return notInternal;
+  }
+
+  /* ── AUDIT ISSUE 4 (P0): rate limiting ────────────────────────────────
+     Nothing bounded AI volume before this. Authentication and
+     requireInternalUser stop strangers; they do nothing about a compromised
+     account or a client stuck in a retry loop, where each request costs four
+     model calls. Checked AFTER auth so the counter is keyed to a real
+     account, and before any provider work so a blocked request costs nothing.
+     Fails OPEN if the counter store is unreachable — see the module header. */
+  if (limitMode() !== "off") {
+    const [perAccount, perTenant] = await Promise.all([
+      consumeBudget(subjectFor.account(auth.account_id), BUDGETS.turnPerAccount()),
+      consumeBudget(subjectFor.tenant(auth.tenant_id), BUDGETS.turnPerTenant()),
+    ]);
+    const hit = !perAccount.allowed ? perAccount : !perTenant.allowed ? perTenant : null;
+    if (hit && !hit.allowed) {
+      const scope = !perAccount.allowed ? "account" : "tenant";
+      console.warn(`[ai.ratelimit] ep=agent scope=${scope} count=${hit.count} max=${hit.max} mode=${limitMode()}`);
+      if (limitMode() === "enforce") {
+        return NextResponse.json(
+          { error: "Koleex AI is handling a lot of requests from your account right now. Give it a moment and try again." },
+          { status: 429, headers: { "Retry-After": String(hit.retryAfterSec) } },
+        );
+      }
+    }
   }
 
   const body = (await req.json().catch(() => ({}))) as {
