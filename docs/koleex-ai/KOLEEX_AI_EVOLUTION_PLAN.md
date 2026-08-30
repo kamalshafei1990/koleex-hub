@@ -738,7 +738,7 @@ break Hub integration · remove a working tool · weaken permissions or verifica
 |---|---|---|
 | **0 — Baseline & Tests** | 🟡 **IN PROGRESS** | Tenant-isolation guard ✅ · Incident-replay suite ✅ — both shipped and proven-to-fail (below). Baseline latency metrics: next (needs a running instance). |
 | **1 — Security Hardening** | ✅ **COMPLETE** | All six audit issues in scope closed (1, 2, 3, 4, 5, 6) + Issue 7. Two migrations applied staging→production with sign-off. Six suites green. |
-| **2 — AI Core + Standalone Foundation** | 🟡 **2G ONLY** | **2A–2F, 2H, 2I, 2J shipped.** `orchestrator.ts` 3 220 → **734** with zero vendor references; `KoleexAiApp.tsx` 3 958 → **2 462**. **N6, N7, N9 and the 2D layering item closed.** **2G awaits owner decisions — design written, no code:** see [`PHASE_2G_DESIGN.md`](./PHASE_2G_DESIGN.md). Its headline: **the `ai_sessions` table proposed below should NOT be created**, because `account_sessions`, `account_api_keys`, `app_sessions` and `accounts.sessions_valid_after` already exist and a staged stateful-session rollout is in flight. |
+| **2 — AI Core + Standalone Foundation** | ✅ **COMPLETE** | 2A–2J all shipped. `orchestrator.ts` 3 220 → **734**, zero vendor references; `KoleexAiApp.tsx` 3 958 → **2 462**. **2G decided by the owner and built with no schema** — see [`PHASE_2G_DESIGN.md`](./PHASE_2G_DESIGN.md). `ai_sessions` **struck**; `requireInternalUser` unchanged (Option A) and one missing door closed. **N6, N7, N9 and the 2D layering item closed.** |
 | 3–20 | ⬜ Not started | **Amendment 1 (§P) folded in** — Phase 2 gains the connector interface + client-resolvable deep links |
 
 ### Phase 2 · Sub-stage 2A — the lane decision has one home ✅
@@ -969,6 +969,58 @@ If a future domain method earns its place, it belongs *behind* `invoke()`, not b
 **`tsc` did its job during the work.** The first slice was missing six imports (`Link`, `ProjectIcon`, `ProjectColor`, `PROJECT_ICONS`, `PROJECT_COLOR_KEYS`, `KoleexOrb`) because the dependency scan that preceded it was too narrow. The compiler named every one.
 
 **What was deliberately NOT moved.** `Bubble`, `BubbleActions` and the sidebar rows — roughly 1 250 lines — are more entangled and are where a silent visual regression would actually hide. Attempting them without a harness would be exactly the "claim it is complete because it compiles" the project rules forbid. **Recorded as finding N9**, with the harness as its prerequisite.
+
+### Phase 2 · Sub-stage 2G — a versioned API, and no new schema ✅
+
+`src/app/api/v1/ai/**` · `npm run validate:ai-api-v1` · **68 passed, 0 failed.**
+
+Built to the owner's decisions of 2026-08-30: **`ai_sessions` struck**,
+**`requireInternalUser` unchanged (Option A)**, **`/api/v1/ai/*` now**.
+
+**Ten versioned routes, and not one line of duplicated logic.** Each v1 file
+**re-exports** the legacy handler rather than re-implementing it, so the two
+URLs are not *kept in sync* — they are the same function. Auth, rate limits,
+the confirmation ledger and the seal chain cannot differ between them, because
+there is only one implementation to differ from.
+
+Route segment config is the one thing that **cannot** be re-exported — Next
+reads `maxDuration` and `dynamic` statically from the route file (checked in
+`node_modules/next/dist/docs`, as `AGENTS.md` requires). It is therefore
+restated literally, and the suite asserts it **matches the legacy route**: a v1
+attachments route that silently lost `maxDuration = 120` would time out at the
+platform default on the single endpoint that needs two minutes.
+
+**One real gap was found and closed.** Classifying all 15 AI routes by guard:
+10 carry `requireInternalUser`, 4 carry the stricter super-admin gate, and
+**one — `conversations/[id]/messages` — had neither**, relying on ownership
+scoping alone. That already held in practice (creating a conversation goes
+through a route that *does* have the door, so a non-internal account has none
+to post into), so it was defence in depth, not an open hole. It was closed
+anyway, because the 2026-08-03 directive behind `requireInternalUser` says
+exactly this: *"the tools would deny anyway" is not an acceptable exposure*.
+Publishing that handler under a second URL while leaving the gap would have
+been the wrong call. Two lines; trivially reversible.
+
+**A false security finding was avoided by reading the file.** The first pass
+grepped for `isSuperAdmin` — the `UserContext` field — while the routes use
+`auth.is_super_admin`, the auth field. It reported the knowledge approval
+bench as unguarded. Opening one file showed `if (!auth.is_super_admin) return
+403` on the first screen. The suite now checks the correct identifier, and the
+episode is recorded in it.
+
+**Two of this suite's own assertions were wrong first.** A count
+(*"at least 12 of 15 routes are guarded"*) passes while the wrong three are the
+unguarded ones — replaced by classifying **every** route and naming any that
+fails. And a filename match on `/ai_sessions/` flagged `qa_ai_sessions_phase8.sql`,
+an unrelated QA table months old — the same substring-matching mistake as the
+audit-Issue-2 false positive, now anchored on the table being **created**.
+
+**Proven to fail:** a v1 route growing its own handler → 2 failures · a v1
+route losing `maxDuration` → caught, both configs printed · the internal door
+removed from a legacy route → caught and named · an `ai_sessions` migration
+added anyway → caught and named.
+
+**Regression gate:** eighteen suites green, `tsc` clean, `eslint` clean.
 
 ### Phase 2 · Sub-stage 2J (completed) — proved by rendering both versions ✅
 
