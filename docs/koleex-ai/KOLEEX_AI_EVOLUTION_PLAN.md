@@ -375,6 +375,41 @@ The requested order is sound. Four deviations, each for a stated engineering rea
 | **Acceptance** | §I targets met at p50 and p95 on the measured network · cost attributable per user/tenant/feature/day |
 | **User-visible** | Noticeably faster first token; no more typewriter that isn't real. |
 
+#### Phase 5 — delivered, scored honestly
+
+| Acceptance criterion | Status | Evidence |
+|---|---|---|
+| Remove pseudo-streaming where genuine streaming exists | ✅ **but the premise was wrong** | There was no pseudo-stream to remove. Genuine streaming has been live since 3C; the chunking loop is guarded by `liveDeltaCount > 0`, so a real stream is never re-chunked, and a canned reply returns as ONE delta before reaching the loop. §I's row *"pseudo-streamed after full completion"* was **incorrect** and is corrected below. |
+| — the real defect found instead | ✅ **fixed** | An **unbounded artificial delay** in the fallback path: 28-char chunks with a 12 ms pause and no ceiling, sitting in FRONT of the `end` event, so it delayed the turn and not just the animation. Multiplied out: 1 200 ch → 504 ms, 9 000 ch → **3 852 ms**, 100 000 ch → 42 852 ms. `planReveal()` bounds the whole reveal to 400 ms at any length. Short replies keep the pace they had — the budget is a **ceiling, never a target**, a rule added after the first version made 120-char replies 8× slower. |
+| Every provider adapter reads `usage` | ✅ | It always parsed it; **nothing read it**, and the streaming path returned none at all — the SSE reader skipped the frame carrying it, because that frame has an empty `choices` array. Fixed. `stream_options` is deliberately **not** sent: a provider that rejects the option would fail the whole turn, and trading *"cannot measure"* for *"turn fails"* is the wrong direction. |
+| Cost meter | 🟡 **tokens yes, prices configured** | `cost/meter.ts` + `cost/prices.ts`. Tokens are **measured or null, never estimated**. Cost is derived **only** when a price is configured (`AI_MODEL_PRICES`) — prices are not hard-coded for the same reason the fallback endpoint is not: this environment cannot reach a pricing page, and a wrong price does not fail loudly, it produces a plausible figure somebody budgets against. `null` and `0` never collapse. |
+| Retrieval cache | ✅ **but the plan overstated it** | It removes **one** round-trip, on a repeat — not "2 per fast-lane turn". The other block (taught answers) has been cached per tenant since long before this phase. The cache's real content is its **key**: `tenant-cache.ts` takes the tenant as the first positional argument of every operation, because an unkeyed cache here leaks one tenant's approved knowledge into another's prompt for the TTL. |
+| `ai_usage` table + admin read endpoint | ⬜ **not built — awaiting a decision** | Schema needs its reason, indexes, RLS, migration, rollback and load put up first. The meter emits `[ai.usage]` in the exact shape those columns would take, so the writer is proved before the table is asked for. See §R. |
+| §I targets met at p50 and p95 | ❌ **not measured, not claimed** | The plan's own rule — *no phase may claim a latency improvement without a Phase 0 baseline* — still binds. That baseline needs a running instance with a provider key. The only latency number claimed here is **arithmetic**: two constants multiplied, which needs no network to verify. |
+
+**Riding along:** the 4B gap closed. `activeProviderLabel()` names the *first configured* adapter, and that string is what the audit trail stores — so it was wrong on exactly the turns that failed over. The registry now returns `servedBy` / `model` / `ms` / `failedOver` on the outcome, and all five `AgentResponse` sites use the **served** label.
+
+---
+
+## R. Proposed schema — `ai_usage` (NOT created; decision pending)
+
+Put up per the standing rule that no table arrives without this section. **Nothing has been created, and no migration file exists.**
+
+**Reason.** Cost is currently answerable only by log search. Log retention is finite and grep does not aggregate, so *"what did this tenant cost last month"* and *"which lane is expensive"* are not answerable at all past the retention window. Everything else in Phase 5 works without it — this buys retention and aggregation, nothing more.
+
+**Is it necessary?** Honestly: **not yet.** The `[ai.usage]` line answers today's questions from log search. The table earns its place when (a) someone needs per-tenant cost **beyond log retention**, or (b) budgets are to be **enforced**, which needs a queryable running total. If neither is true, the right decision is to not create it.
+
+| | |
+|---|---|
+| **Columns** | `id` uuid pk · `tenant_id` uuid null · `account_id` uuid null · `day` date · `lane` text · `provider` text · `model` text · `input_tokens` int null · `output_tokens` int null · `cost_usd` numeric(12,6) null · `ms` int · `trace_id` text null · `created_at` timestamptz default now() |
+| **Nullability** | `input_tokens` / `output_tokens` / `cost_usd` are **nullable on purpose**. NULL means *not reported*; 0 means *genuinely zero*. Defaulting to 0 would silently under-report every quiet provider. |
+| **Indexes** | `(tenant_id, day)` and `(account_id, day)` — the two aggregations named in the acceptance criterion. No index on `trace_id` until someone actually joins on it. |
+| **RLS** | Enabled, **zero policies**, `anon` and `authenticated` revoked — service-role only, matching `ai_pending_actions` and `ai_rate_limits`. It contains no message content, but it does reveal per-tenant volume and spend. |
+| **Migration** | One `CREATE TABLE` + two indexes + the RLS block. Additive; touches nothing existing. **Staging first, verified, then production** — same as Phase 1's two migrations. |
+| **Rollback** | `DROP TABLE ai_usage`. Nothing reads it on the request path; the meter keeps logging either way, so a rollback loses history and breaks no behaviour. |
+| **Expected load** | One INSERT per model call — so **1–2 rows per turn**, more on a long tool loop. At 5 000 turns/day that is ~10 k rows/day, ~3.6 M/year: small for Postgres, but it is the highest-write table the AI subsystem would own, so the write must stay **fire-and-forget** and must never block a reply. |
+| **Risk if wrong** | A blocking write on the request path would add provider-latency-scale delay to every turn. This is why it is proposed as fire-and-forget with the meter's existing fail-open posture, not as an awaited insert. |
+
 ---
 
 ### PHASE 6 — Skill Platform Hardening · P1 · Risk: **low–medium**
@@ -557,14 +592,14 @@ Engineering ranges on the measured network (CN→`hnd1` ≈ 50–80 ms leg; serv
 | Canned reply (greeting) | auth + writes only | **< 300 ms** | < 600 ms | Already fast — keep it |
 | **TTFB, simple chat** | fast lane streams; tool lane waits for the whole completion | **< 1.2 s** | < 2.0 s | FAST model class + slim prompt + real streaming |
 | Simple chat complete | — | < 3 s | < 6 s | |
-| **TTFB, tool turn** | pseudo-streamed after full completion | **< 2.0 s** | < 4 s | Stream the answer phase genuinely; emit tool chips immediately |
+| **TTFB, tool turn** | ~~pseudo-streamed after full completion~~ — **this row was wrong.** Phase 5 traced it: the answer phase HAS streamed genuinely since 3C, and the chunking loop is suppressed whenever a real stream ran. What existed was an unbounded artificial delay on the *fallback* path only, now capped at 400 ms | **< 2.0 s** | < 4 s | Already streaming; remaining work is measurement, not mechanism |
 | Agent start (first visible progress) | empty wait | **< 800 ms** | < 1.5 s | Emit `plan`/`step` frames before the first model call |
 | Single tool call | not measured per-tool | < 400 ms | < 1.2 s | Per-tool timeout + parallel independent calls |
 | RAG retrieval | 2 uncached Supabase round-trips per fast-lane turn | **< 250 ms** | < 600 ms | FTS + index + tenant-scoped cache |
 | Voice turn latency | n/a | **< 800 ms** | < 1.5 s | Regional realtime endpoint |
 | Image request start | n/a | < 2 s ack | — | Async job + progress |
 | **Provider fallback** | none | **< 3 s** | < 5 s | Circuit breaker + pre-warmed secondary |
-| Tokens/cost per turn | **not measured at all** | recorded 100% | — | Phase 5 meter |
+| Tokens/cost per turn | ~~not measured at all~~ — **meter shipped in 5B.** Tokens recorded whenever the provider reports them (null, never estimated, when it does not); cost derived only where a price is configured | recorded 100% | — | Coverage is now a provider-reporting question, not a code one |
 
 **Rule:** no phase may claim a latency improvement without a Phase 0 baseline and a Phase 1 trace to prove it.
 
