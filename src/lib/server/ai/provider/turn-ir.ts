@@ -26,6 +26,13 @@
    conversions, and it is unit-tested by calling it.
    --------------------------------------------------------------------------- */
 
+/* TYPE-ONLY, deliberately. model-classes.ts carries `import "server-only"`,
+   and turn-ir does not — it is a pure conversion module that the validation
+   suites import directly. A type import is erased at compile time, so this
+   costs no runtime dependency and cannot pull a server-only module into a
+   context that must not have one. */
+import type { ModelClass } from "@/lib/server/ai/router/model-classes";
+
 export type IrRole = "system" | "user" | "assistant" | "tool";
 
 export interface IrToolCall {
@@ -60,6 +67,11 @@ export type IrToolChoice = "auto" | "none" | { forceTool: string };
 
 export interface TurnRequest {
   messages: IrMessage[];
+  /** Which KIND of model should answer. Advisory: an adapter resolves it to a
+   *  concrete model id, or ignores it and uses its default. It is NOT part of
+   *  the wire body — toOpenAiBody never reads it — so adding it cannot change
+   *  the bytes the golden differential pins. */
+  modelClass?: ModelClass;
   tools?: IrTool[];
   toolChoice?: IrToolChoice;
   maxTokens: number;

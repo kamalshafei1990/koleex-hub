@@ -44,6 +44,7 @@ import {
 } from "@/lib/server/ai/core/transport";
 import { toOpenAiBody, type TurnRequest, type TurnResponse } from "../turn-ir";
 import type { ProviderAdapter, TurnOutcome } from "../types";
+import { modelForClass } from "@/lib/server/ai/router/model-classes";
 
 /** Parsed once at module load. `null` means "not configured", which is the
  *  normal state and is not an error. */
@@ -150,7 +151,7 @@ export const openAiCompatibleAdapter: ProviderAdapter = {
     if (!CONFIG || !key) {
       return { ok: false, status: 503, bodyText: "fallback provider not configured" };
     }
-    const body = toOpenAiBody(req, CONFIG.model);
+    const body = toOpenAiBody(req, modelForClass(CONFIG.label, CONFIG.model, req.modelClass));
 
     if (opts?.onDelta) {
       const s = await postChatStreaming(CONFIG.chatUrl, key, body, opts.onDelta);

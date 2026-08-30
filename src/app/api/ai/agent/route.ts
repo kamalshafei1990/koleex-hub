@@ -610,6 +610,9 @@ export async function POST(req: Request) {
                   messages: fastMessages.map((m) => ({ role: m.role, content: m.content })),
                   maxTokens,
                   temperature: 0.3,
+                  /* Small talk is the cheapest thing the assistant does; brand
+                     and general answers are prose but still tool-less. */
+                  modelClass: fastLane === "small" ? ("FAST" as const) : ("GENERAL" as const),
                   stream: true,
                 },
                 {

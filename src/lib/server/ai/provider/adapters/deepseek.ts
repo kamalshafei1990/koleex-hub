@@ -37,6 +37,7 @@ import {
 } from "@/lib/server/ai/core/transport";
 import { toOpenAiBody, type TurnRequest, type TurnResponse } from "../turn-ir";
 import type { ProviderAdapter, TurnOutcome } from "../types";
+import { modelForClass } from "@/lib/server/ai/router/model-classes";
 
 const DEEPSEEK_URL = "https://api.deepseek.com/v1/chat/completions";
 
@@ -101,7 +102,7 @@ export const deepseekAdapter: ProviderAdapter = {
        test pins against recorded goldens. Before 4A the streaming path and
        the tool path each hard-coded max_tokens: 2048 inside transport while
        the IR carried its own value — they agreed, but only by coincidence. */
-    const body = toOpenAiBody(req, DEEPSEEK_MODEL);
+    const body = toOpenAiBody(req, modelForClass("deepseek", DEEPSEEK_MODEL, req.modelClass));
 
     /* ── Streaming ────────────────────────────────────────────────────
        transport reassembles fragmented tool_calls by index — the behaviour
