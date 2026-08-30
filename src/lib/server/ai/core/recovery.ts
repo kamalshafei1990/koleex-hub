@@ -22,7 +22,7 @@ import { sealFinalReply } from "@/lib/server/ai/seals";
 import { buildDegradedSystemPrompt } from "@/lib/server/ai/prompts";
 import { hasUntrustedContent } from "@/lib/server/ai/security/untrusted";
 import { logSealTransform } from "@/lib/server/ai/observability/reply-log";
-import { providerLabel } from "./transport";
+import { activeProviderLabel } from "@/lib/server/ai/provider/registry";
 import type { TurnInput } from "./types";
 
 /* ── Provider-agnostic fallback ──
@@ -101,7 +101,7 @@ export function fallback(
   return {
     steps,
     finalReply: safeReply,
-    provider: providerLabel(),
+    provider: activeProviderLabel(),
     conversationId,
   };
 }

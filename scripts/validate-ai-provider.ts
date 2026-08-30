@@ -147,7 +147,31 @@ console.log("\n── 5. The adapter delegates; it does not re-implement the tra
   const adapter = readFileSync("src/lib/server/ai/provider/adapters/deepseek.ts", "utf8");
   const code = adapter.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
   check("the adapter makes no fetch of its own", !/\bfetch\s*\(/.test(code));
-  check("the adapter holds no endpoint or key", !/api\.deepseek\.com|DEEPSEEK_API_KEY|Authorization/.test(code));
+  /* Phase 4A INVERTS this one, deliberately. In 3B the adapter was a thin
+     delegate and the endpoint, model and key all lived in core/transport.ts —
+     so "the adapter holds no endpoint or key" was the right rule then. It was
+     also what made a second provider impossible: everything the adapter
+     delegated to was DeepSeek's. 4A moved vendor identity here, which is what
+     an adapter is FOR, and the transport kept only the HTTP.
+
+     So the rule flips, and a new obligation arrives with it. The key is now
+     READ in this file, which it was not before, so this is where it can leak.
+     Assert both halves: identity is present, and the key never reaches a log,
+     an error, or a template string. */
+  check(
+    "the adapter owns the vendor identity — endpoint, model and key",
+    /api\.deepseek\.com/.test(code) && /DEEPSEEK_API_KEY/.test(code),
+  );
+  check(
+    "and the key it now reads is never logged, thrown, or interpolated",
+    !/console\.[a-z]+\([^)]*\bkey\b/.test(code) &&
+      !/throw new Error\([^)]*\bkey\b/.test(code) &&
+      !/\$\{key\}/.test(code),
+  );
+  check(
+    "the Authorization header is still built by the transport, not here",
+    !/Authorization/.test(code),
+  );
   check("it goes through the transport that Phase 2D isolated", /from "@\/lib\/server\/ai\/core\/transport"/.test(code));
   /* The first version of this check matched the KEY `bodyText` and passed
      happily when every branch set it to "". The rescue path logs that body and
@@ -170,9 +194,11 @@ console.log("\n── 5. The adapter delegates; it does not re-implement the tra
 
 console.log("\n── 6. The interface is sufficient for a SECOND provider ──");
 /* Phase 3's acceptance criterion is that a second adapter needs no change to
-   the loop. A real one — Qwen/DashScope is the China-accessible candidate —
-   additionally needs core/transport.ts to take an endpoint and key rather than
-   hard-coding DeepSeek's, and needs a key to be reachable at runtime. Both are
+   the loop. Phase 4A cleared the structural half of what a REAL one still
+   needed: core/transport.ts now takes a URL and a key as arguments instead of
+   hard-coding DeepSeek's, so a second adapter is an object, not a refactor.
+   What is still outstanding is a key for one — an adapter with no credential
+   is inert by construction, since configured() gates on it. Both are
    Phase 4 work, and claiming a second provider "done" without either would be
    the "complete because it compiles" the project rules forbid.
    What CAN be proved now is that the interface admits one and that selection

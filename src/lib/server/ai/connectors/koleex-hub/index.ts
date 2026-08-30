@@ -41,7 +41,7 @@ import "server-only";
 
 import type { ToolDef, ToolResult, UserContext } from "@/lib/server/ai-agent/types";
 import { dispatchTool, toolsFor, openAiToolSchemas } from "@/lib/server/ai-agent/tool-registry";
-import type { ToolSchema } from "@/lib/server/ai/core/transport";
+import type { OpenAiTool } from "@/lib/server/ai/provider/turn-ir";
 
 export interface HubInvokeOptions {
   conversationId?: string | null;
@@ -63,7 +63,7 @@ export interface KoleexHubConnector {
   availableTools(ctx: UserContext): ReadonlyArray<ToolDef>;
 
   /** The same set as OpenAI-compatible schemas, ready for a model call. */
-  toolSchemas(ctx: UserContext): ToolSchema[];
+  toolSchemas(ctx: UserContext): OpenAiTool[];
 
   /** Does this caller have a Koleex Hub identity at all?
    *
@@ -91,7 +91,7 @@ class KoleexHubConnectorImpl implements KoleexHubConnector {
     return toolsFor(ctx);
   }
 
-  toolSchemas(ctx: UserContext): ToolSchema[] {
+  toolSchemas(ctx: UserContext): OpenAiTool[] {
     return openAiToolSchemas(ctx);
   }
 

@@ -1,156 +1,55 @@
 import "server-only";
 
 /* ---------------------------------------------------------------------------
-   ai/core/transport — the ONLY place that speaks to a model provider.
+   ai/core/transport — HTTP to a chat-completions endpoint. Nothing else.
 
-   Phase 2D. Every raw `fetch` to a completions endpoint, the endpoint URL, the
-   model id, the API key read, the retry/backoff policy and the streaming
-   `tool_calls` reassembly now live here and nowhere else. Before this they sat
-   in the middle of the tool loop, which is why "swap the provider" read as a
-   change to the orchestrator rather than a change to one module.
+   Phase 4A. Before this, "transport" meant three things at once: it built the
+   request body, it knew the vendor's URL/model/key, AND it did the HTTP. That
+   bundle is why a second provider was still not addable after Phase 3 — the
+   adapter could be swapped, but everything it delegated to was DeepSeek's.
 
-   This is deliberately the LAST thing extracted in the core refactor, because
-   it is the seam Phase 3 cuts along: the provider abstraction replaces the
-   inside of this file with adapters and a Turn IR, and nothing above it has to
-   move again. Isolating it first is what makes that a contained change.
+   What is left here is the part that is genuinely the same for every
+   OpenAI-compatible provider:
 
-   VENDOR SURFACE, stated plainly so it is auditable in one place:
-     · endpoint  AGENT_LLM_URL
-     · model     AGENT_MODEL (DEEPSEEK_AGENT_MODEL / DEEPSEEK_MODEL / default)
-     · key       DEEPSEEK_API_KEY, read via readProviderKey()
-     · label     providerLabel() — the string reported back as `provider`
-   The key is read here and passed as an argument; it is never logged, never
-   put in an error message, and never reaches the model or the client.
+     · POST a JSON body, with retry-after-aware backoff on 429/503
+     · turn a transient socket failure into a status instead of an exception
+     · read one SSE stream and re-assemble fragmented `tool_calls` by index
 
-   The layering item recorded in 2D is CLOSED (Phase 2F): tools are passed IN
-   as `opts.tools`, not fetched here. Transport no longer imports the tool
-   registry and has no opinion about which tools exist — which is what let
-   exposure become permission-scoped, since only the caller knows who is
-   asking.
+   What LEFT here, and where it went:
 
-   The helper names still say "Groq" — the provider changed in 2026-07 and the
-   names did not. Renaming them is churn that would obscure this diff; Phase 3
-   replaces the functions outright.
+     · the request body  → provider/turn-ir.ts `toOpenAiBody()`, which was
+       already proved byte-identical to the old builder and until 4A was DEAD
+       CODE: the IR produced the right body and nothing sent it. It sends it
+       now, so there is one body builder instead of two.
+     · endpoint, model id, API key → provider/adapters/deepseek.ts, which is
+       where vendor identity belongs. `core/` now contains no vendor string at
+       all, which is what Phase 3's acceptance criterion actually asked for.
+     · WireMsg / ToolSchema / ToolChoice → they were structural duplicates of
+       turn-ir's OpenAiMessage / OpenAiTool / OpenAiToolChoice, which is why the
+       adapter was full of `as unknown as` casts. One definition now.
+
+   The key is passed in as an argument. It is never logged, never put in an
+   error message, never interpolated into anything the model or the client can
+   see. That property is asserted by validate:ai-core-boundaries.
+
+   The helper names no longer say "Groq". They said it for a year after the
+   provider changed; 4A had to touch every signature anyway, so the rename
+   costs nothing here and stops the next reader chasing a vendor that left.
    --------------------------------------------------------------------------- */
 
-/* Agent LLM provider = DeepSeek ONLY (owner decision, 2026-07-20: Groq
-   removed). DeepSeek's HTTP API is OpenAI-compatible — same chat/completions
-   body, same `tools` + `tool_choice:"auto"` function-calling contract, same
-   `choices[].message.tool_calls` response shape — so the whole tool loop below
-   works against it unchanged. `DEEPSEEK_AGENT_MODEL`/`DEEPSEEK_MODEL` env can
-   override the default. The internal helper names still say "Groq" for now;
-   only the endpoint/model/key changed. */
-const AGENT_LLM_URL = "https://api.deepseek.com/v1/chat/completions";
-const AGENT_MODEL =
-  process.env.DEEPSEEK_AGENT_MODEL ||
-  process.env.DEEPSEEK_MODEL ||
-  "deepseek-chat";
-
-/* OpenAI-compatible message shapes — kept loose because the Groq API
-   accepts the whole family (system/user/assistant/tool). */
-export interface WireMsg {
-  role: "system" | "user" | "assistant" | "tool";
-  content: string | null;
-  tool_calls?: Array<{
-    id: string;
-    type: "function";
-    function: { name: string; arguments: string };
-  }>;
-  tool_call_id?: string;
-  name?: string;
-}
-
-
-/* OpenAI-shaped tool_choice. "auto" lets the model decide, "none" strips
-   the tools entirely, and the object form NAMES a function the model must
-   call on that one request. We use the third form for exactly one case —
-   see isChoiceShapedQuestion in core/decide-turn.ts. */
-/** The OpenAI-compatible tool schema, as the caller hands it in. Transport
- *  does not know or care which tools exist — Phase 2F made that the caller's
- *  business, because only the caller knows WHO is asking. */
-export interface ToolSchema {
-  type: "function";
-  function: { name: string; description: string; parameters: unknown };
-}
-
-export type ToolChoice = "auto" | "none" | { type: "function"; function: { name: string } };
-
-/** Read the provider key. Returns undefined when unconfigured, which is what
- *  puts a turn on the degraded lane rather than throwing. */
-export function readProviderKey(): string | undefined {
-  return process.env.DEEPSEEK_API_KEY;
-}
-
-/** The `provider` string reported back on every AgentResponse. It was written
- *  out as a template literal at seven separate return sites; one function
- *  means a provider change cannot leave six of them stale. */
-export function providerLabel(): string {
-  return `deepseek:${AGENT_MODEL}`;
-}
-
-/** The bare model id, without the provider prefix. The adapter needs it to
- *  report its own model; providerLabel() is the composed string the loop puts
- *  on an AgentResponse. Two callers, one source. */
-export function agentModel(): string {
-  return AGENT_MODEL;
-}
-
-/* ─── Groq call with retry-after aware backoff ────────────────────────
-   Groq's free tier is ~6k tokens / minute on Llama 3.3 70B. With the
-   agent loop invoking the model several times per user turn (tool
-   schemas alone cost 2-3k tokens each call), bursts can hit 429 even
-   on normal use. When that happens Groq returns a `retry-after`
-   header (seconds). We honour it up to 3 times before giving up so a
-   brief rate-limit doesn't surface as a scary error. */
-/** Same retry semantics as callGroqWithRetry but the model call does
- *  NOT include tools. Used for the small-talk fast-path so chit-chat
- *  doesn't burn the tool-schema token overhead on every turn. */
-/* Retry budget: up to 3 extra attempts with exponential backoff,
-   capped by Groq's `retry-after` when provided. Total wait stays
-   under ~10s so the UI doesn't feel frozen, but it's enough for a
-   typical Groq free-tier rate-limit window to clear. */
+/* Retry budget: up to 3 extra attempts with exponential backoff, capped by the
+   provider's `retry-after` when it sends one. Total wait stays under ~10s so
+   the UI does not feel frozen, but it is enough for a typical rate-limit
+   window to clear before we surface the friendly "handling a lot of requests"
+   copy. */
 const MAX_RETRIES = 3;
 const BACKOFF_CAP_MS = 8000;
 
-/* Transient NETWORK failures (socket terminated mid-request, connection
-   reset) reject the fetch promise instead of returning a status — they used
-   to escape every handler here and surface as a raw HTTP 500 to the user
-   (caught live twice in one 12-question probe). Convert them into a
-   synthetic 502 Response so the same failed-status paths (retry → rescue →
-   friendly copy) absorb them. */
-/* ── The request body, in ONE place ─────────────────────────────────────
-   Phase 3A. The three call sites below built this inline, which meant the
-   only way to check "does the new provider layer send exactly what we send
-   today?" was to read three fetch calls and believe the reading. It is a
-   function now, so the two can be DIFFED — validate:ai-turn-ir runs both over
-   a matrix of turns and compares the JSON.
-
-   Behaviour is unchanged and deliberately so, down to two details that look
-   like oversights and are not:
-     · `tools` is OMITTED entirely when tool_choice is "none", not sent empty.
-     · `stream` is present only on the streaming call, never `stream:false`.
-   Both reproduce what has been going over the wire; the golden test pins them. */
-export function buildChatBody(args: {
-  messages: WireMsg[];
-  maxTokens: number;
-  toolChoice?: ToolChoice;
-  tools?: ToolSchema[];
-  stream?: boolean;
-}): Record<string, unknown> {
-  const body: Record<string, unknown> = {
-    model: AGENT_MODEL,
-    messages: args.messages,
-    temperature: 0.3,
-    max_tokens: args.maxTokens,
-  };
-  if (args.stream) body.stream = true;
-  if (args.toolChoice !== undefined && args.toolChoice !== "none") {
-    body.tools = args.tools ?? [];
-    body.tool_choice = args.toolChoice;
-  }
-  return body;
-}
-
+/* Transient NETWORK failures (socket terminated mid-request, connection reset)
+   reject the fetch promise instead of returning a status — they used to escape
+   every handler here and surface as a raw HTTP 500 to the user (caught live
+   twice in one 12-question probe). Convert them into a synthetic 502 Response
+   so the same failed-status paths (retry → rescue → friendly copy) absorb them. */
 export function isTransientNetError(e: unknown): boolean {
   const seen = new Set<unknown>();
   let cur: unknown = e;
@@ -180,73 +79,75 @@ function backoffWaitMs(res: Response, attempt: number): number {
   return Math.min(1000 * 2 ** attempt, BACKOFF_CAP_MS);
 }
 
-export async function callGroqPlain(
+function authHeaders(key: string): Record<string, string> {
+  return {
+    "Content-Type": "application/json",
+    Authorization: `Bearer ${key}`,
+  };
+}
+
+/** One non-streaming chat-completions POST, with retry.
+ *
+ *  This is one function where there used to be two (`callGroqPlain` for the
+ *  tool-less fast path and `callGroqWithRetry` for the agent loop). They were
+ *  never actually different: identical retry rules, identical error handling,
+ *  and the ONLY thing that varied was the body each one built. Once the body
+ *  is built by the caller they collapse, and the fast path and the tool path
+ *  provably share one retry policy rather than two copies of it. */
+export async function postChat(
+  url: string,
   key: string,
-  messages: WireMsg[],
-  opts: { maxTokens?: number } = {},
+  body: unknown,
   attempt = 0,
 ): Promise<Response> {
-  /* Fast-path parameters. Caller passes maxTokens based on the
-     expected answer length — small-talk needs ~160; brand answers
-     are structured multi-paragraph responses that need ~1200 to
-     complete without truncation. The agent loop uses its own
-     callGroqWithRetry with 2048 tokens. */
-  const maxTokens = opts.maxTokens ?? 160;
   let res: Response;
   try {
-    res = await fetch(AGENT_LLM_URL, {
+    res = await fetch(url, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${key}`,
-      },
-      body: JSON.stringify(buildChatBody({ messages, maxTokens })),
+      headers: authHeaders(key),
+      body: JSON.stringify(body),
     });
   } catch (e) {
     if (isTransientNetError(e) && attempt < MAX_RETRIES) {
       await new Promise((r) => setTimeout(r, Math.min(1000 * 2 ** attempt, BACKOFF_CAP_MS)));
-      return callGroqPlain(key, messages, opts, attempt + 1);
+      return postChat(url, key, body, attempt + 1);
     }
     if (isTransientNetError(e)) return SYNTH_NET_FAIL();
     throw e;
   }
   if ((res.status === 429 || res.status === 503) && attempt < MAX_RETRIES) {
     await new Promise((r) => setTimeout(r, backoffWaitMs(res, attempt)));
-    return callGroqPlain(key, messages, opts, attempt + 1);
+    return postChat(url, key, body, attempt + 1);
   }
   return res;
 }
 
-/** One STREAMING chat-completions call. Content tokens are forwarded to
- *  onDelta live (until a tool_call appears — tool rounds stay silent);
- *  streamed tool_call fragments are re-assembled by index so the normal
- *  dispatch loop can run unchanged. */
-export async function callGroqStreamingOnce(
-  key: string,
-  messages: WireMsg[],
-  opts: { toolChoice: ToolChoice; onDelta: (t: string) => void; tools: ToolSchema[] },
-): Promise<{
+/** What one streaming call yields once the SSE frames are re-assembled. */
+export interface StreamOutcome {
   ok: boolean;
   status: number;
   bodyText: string;
   content: string;
   toolCalls: Array<{ id: string; type: "function"; function: { name: string; arguments: string } }>;
-}> {
-  const body = buildChatBody({
-    messages,
-    maxTokens: 2048,
-    stream: true,
-    toolChoice: opts.toolChoice,
-    tools: opts.tools,
-  });
+}
+
+/** One STREAMING chat-completions call. Content tokens are forwarded to
+ *  onDelta live (until a tool_call appears — tool rounds stay silent);
+ *  streamed tool_call fragments are re-assembled by index so the normal
+ *  dispatch loop can run unchanged. That reassembly is pinned by an incident
+ *  assertion in validate:ai-baseline; it is the reason this function exists
+ *  rather than the caller reading the stream itself. */
+export async function postChatStreaming(
+  url: string,
+  key: string,
+  body: unknown,
+  onDelta: (t: string) => void,
+): Promise<StreamOutcome> {
   let res: Response;
   try {
-    res = await fetch(AGENT_LLM_URL, {
+    res = await fetch(url, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${key}`,
-      },
+      headers: authHeaders(key),
       body: JSON.stringify(body),
     });
   } catch (e) {
@@ -324,7 +225,7 @@ export async function callGroqStreamingOnce(
         }
         if (typeof d.content === "string" && d.content) {
           content += d.content;
-          if (!sawTool) opts.onDelta(d.content);
+          if (!sawTool) onDelta(d.content);
         }
       } catch {
         /* partial frame across chunks — next iteration completes it */
@@ -332,46 +233,4 @@ export async function callGroqStreamingOnce(
     }
   }
   return { ok: true, status: 200, bodyText: "", content, toolCalls: calls.filter((c) => c.function.name) };
-}
-
-export async function callGroqWithRetry(
-  key: string,
-  messages: WireMsg[],
-  opts: { toolChoice?: ToolChoice; tools?: ToolSchema[] } = {},
-  attempt = 0,
-): Promise<Response> {
-  const toolChoice = opts.toolChoice ?? "auto";
-  const body = buildChatBody({
-    messages,
-    maxTokens: 2048,
-    toolChoice,
-    tools: opts.tools,
-  });
-  let res: Response;
-  try {
-    res = await fetch(AGENT_LLM_URL, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${key}`,
-      },
-      body: JSON.stringify(body),
-    });
-  } catch (e) {
-    if (isTransientNetError(e) && attempt < MAX_RETRIES) {
-      await new Promise((r) => setTimeout(r, Math.min(1000 * 2 ** attempt, BACKOFF_CAP_MS)));
-      return callGroqWithRetry(key, messages, opts, attempt + 1);
-    }
-    if (isTransientNetError(e)) return SYNTH_NET_FAIL();
-    throw e;
-  }
-  /* Retry budget: up to MAX_RETRIES with exponential backoff, capped
-     by Groq's `retry-after` and BACKOFF_CAP_MS. Gives a brief Groq
-     free-tier rate-limit window time to clear before we surface the
-     friendly "handling a lot of requests" message. */
-  if ((res.status === 429 || res.status === 503) && attempt < MAX_RETRIES) {
-    await new Promise((r) => setTimeout(r, backoffWaitMs(res, attempt)));
-    return callGroqWithRetry(key, messages, opts, attempt + 1);
-  }
-  return res;
 }

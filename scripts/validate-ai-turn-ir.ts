@@ -34,7 +34,6 @@ import {
   type IrToolChoice,
   type TurnRequest,
 } from "../src/lib/server/ai/provider/turn-ir";
-import { buildChatBody, type WireMsg, type ToolChoice, type ToolSchema } from "../src/lib/server/ai/core/transport";
 
 let pass = 0;
 const failures: string[] = [];
@@ -120,58 +119,96 @@ console.log("\n── 2. The details that would quietly break a tool loop ──
   );
 }
 
-console.log("\n── 3. Differential: the IR sends what the transport sends today ──");
-/* Same logical turn, built both ways, JSON compared. Not "equivalent" — the
-   same bytes, because Phase 3 must not change the wire while it changes the
-   layering. */
+console.log("\n── 3. Differential: the IR produces the bytes we have always sent ──");
+/* Until Phase 4A there were TWO body builders. `buildChatBody()` in the
+   transport was what actually went over the wire; `toOpenAiBody()` in the IR
+   produced the same thing and NOTHING CALLED IT. This section used to compare
+   the two against each other.
+
+   4A deleted the transport's builder and put the IR's one on the live path.
+   Comparing it against a re-implementation would now only prove that the
+   re-implementation agrees with itself, so the reference changed instead: the
+   strings below are RECORDED OUTPUT, dumped from `buildChatBody()` at commit
+   97e18e2 (the last commit before 4A) and pasted here verbatim.
+
+   That keeps this a real differential — against what the product actually
+   sent — while removing the duplicate builder. It also raises the stakes in
+   the right direction: editing a golden is now an explicit statement that the
+   wire format changed, which is precisely the decision that must never happen
+   by accident. */
 const MODEL = "deepseek-chat";
-type Case = { label: string; ir: TurnRequest; wire: { messages: WireMsg[]; maxTokens: number; toolChoice?: ToolChoice; tools?: ToolSchema[]; stream?: boolean } };
-const wireSimple = toOpenAiMessages(SIMPLE) as unknown as WireMsg[];
-const wireLoop = toOpenAiMessages(TOOL_LOOP) as unknown as WireMsg[];
-const wireTools = toOpenAiTools(TOOLS) as unknown as ToolSchema[];
+
+const GOLDEN: Record<string, string> = {
+  "plain small-talk call (no tools, 160 tokens)":
+    "{\"model\":\"deepseek-chat\",\"messages\":[{\"role\":\"system\",\"content\":\"You are Koleex AI.\"},{\"role\":\"user\",\"content\":\"hello\"}],\"temperature\":0.3,\"max_tokens\":160}",
+  "brand call (no tools, 1200 tokens)":
+    "{\"model\":\"deepseek-chat\",\"messages\":[{\"role\":\"system\",\"content\":\"You are Koleex AI.\"},{\"role\":\"user\",\"content\":\"hello\"}],\"temperature\":0.3,\"max_tokens\":1200}",
+  "agent loop, tools, auto, non-streaming":
+    "{\"model\":\"deepseek-chat\",\"messages\":[{\"role\":\"system\",\"content\":\"You are Koleex AI.\"},{\"role\":\"user\",\"content\":\"which spreading machine?\"},{\"role\":\"assistant\",\"content\":null,\"tool_calls\":[{\"id\":\"call_1\",\"type\":\"function\",\"function\":{\"name\":\"searchProducts\",\"arguments\":\"{\\\"q\\\":\\\"spreading\\\"}\"}},{\"id\":\"call_2\",\"type\":\"function\",\"function\":{\"name\":\"askUser\",\"arguments\":\"{\\\"question\\\":\\\"width?\\\"}\"}}]},{\"role\":\"tool\",\"content\":\"{\\\"rows\\\":3}\",\"tool_call_id\":\"call_1\",\"name\":\"searchProducts\"},{\"role\":\"tool\",\"content\":\"{\\\"asked\\\":true}\",\"tool_call_id\":\"call_2\",\"name\":\"askUser\"},{\"role\":\"assistant\",\"content\":\"Three widths are available.\"}],\"temperature\":0.3,\"max_tokens\":2048,\"tools\":[{\"type\":\"function\",\"function\":{\"name\":\"searchProducts\",\"description\":\"Find products.\",\"parameters\":{\"type\":\"object\",\"properties\":{\"q\":{\"type\":\"string\"}},\"required\":[\"q\"]}}},{\"type\":\"function\",\"function\":{\"name\":\"askUser\",\"description\":\"Ask a clarifying question.\",\"parameters\":{\"type\":\"object\",\"properties\":{\"question\":{\"type\":\"string\"}}}}}],\"tool_choice\":\"auto\"}",
+  "agent loop, tools, auto, STREAMING":
+    "{\"model\":\"deepseek-chat\",\"messages\":[{\"role\":\"system\",\"content\":\"You are Koleex AI.\"},{\"role\":\"user\",\"content\":\"which spreading machine?\"},{\"role\":\"assistant\",\"content\":null,\"tool_calls\":[{\"id\":\"call_1\",\"type\":\"function\",\"function\":{\"name\":\"searchProducts\",\"arguments\":\"{\\\"q\\\":\\\"spreading\\\"}\"}},{\"id\":\"call_2\",\"type\":\"function\",\"function\":{\"name\":\"askUser\",\"arguments\":\"{\\\"question\\\":\\\"width?\\\"}\"}}]},{\"role\":\"tool\",\"content\":\"{\\\"rows\\\":3}\",\"tool_call_id\":\"call_1\",\"name\":\"searchProducts\"},{\"role\":\"tool\",\"content\":\"{\\\"asked\\\":true}\",\"tool_call_id\":\"call_2\",\"name\":\"askUser\"},{\"role\":\"assistant\",\"content\":\"Three widths are available.\"}],\"temperature\":0.3,\"max_tokens\":2048,\"stream\":true,\"tools\":[{\"type\":\"function\",\"function\":{\"name\":\"searchProducts\",\"description\":\"Find products.\",\"parameters\":{\"type\":\"object\",\"properties\":{\"q\":{\"type\":\"string\"}},\"required\":[\"q\"]}}},{\"type\":\"function\",\"function\":{\"name\":\"askUser\",\"description\":\"Ask a clarifying question.\",\"parameters\":{\"type\":\"object\",\"properties\":{\"question\":{\"type\":\"string\"}}}}}],\"tool_choice\":\"auto\"}",
+  "tool_choice none \u2014 tools omitted entirely, not sent empty":
+    "{\"model\":\"deepseek-chat\",\"messages\":[{\"role\":\"system\",\"content\":\"You are Koleex AI.\"},{\"role\":\"user\",\"content\":\"which spreading machine?\"},{\"role\":\"assistant\",\"content\":null,\"tool_calls\":[{\"id\":\"call_1\",\"type\":\"function\",\"function\":{\"name\":\"searchProducts\",\"arguments\":\"{\\\"q\\\":\\\"spreading\\\"}\"}},{\"id\":\"call_2\",\"type\":\"function\",\"function\":{\"name\":\"askUser\",\"arguments\":\"{\\\"question\\\":\\\"width?\\\"}\"}}]},{\"role\":\"tool\",\"content\":\"{\\\"rows\\\":3}\",\"tool_call_id\":\"call_1\",\"name\":\"searchProducts\"},{\"role\":\"tool\",\"content\":\"{\\\"asked\\\":true}\",\"tool_call_id\":\"call_2\",\"name\":\"askUser\"},{\"role\":\"assistant\",\"content\":\"Three widths are available.\"}],\"temperature\":0.3,\"max_tokens\":2048}",
+  "forced tool (the askUser card)":
+    "{\"model\":\"deepseek-chat\",\"messages\":[{\"role\":\"system\",\"content\":\"You are Koleex AI.\"},{\"role\":\"user\",\"content\":\"which spreading machine?\"},{\"role\":\"assistant\",\"content\":null,\"tool_calls\":[{\"id\":\"call_1\",\"type\":\"function\",\"function\":{\"name\":\"searchProducts\",\"arguments\":\"{\\\"q\\\":\\\"spreading\\\"}\"}},{\"id\":\"call_2\",\"type\":\"function\",\"function\":{\"name\":\"askUser\",\"arguments\":\"{\\\"question\\\":\\\"width?\\\"}\"}}]},{\"role\":\"tool\",\"content\":\"{\\\"rows\\\":3}\",\"tool_call_id\":\"call_1\",\"name\":\"searchProducts\"},{\"role\":\"tool\",\"content\":\"{\\\"asked\\\":true}\",\"tool_call_id\":\"call_2\",\"name\":\"askUser\"},{\"role\":\"assistant\",\"content\":\"Three widths are available.\"}],\"temperature\":0.3,\"max_tokens\":2048,\"tools\":[{\"type\":\"function\",\"function\":{\"name\":\"searchProducts\",\"description\":\"Find products.\",\"parameters\":{\"type\":\"object\",\"properties\":{\"q\":{\"type\":\"string\"}},\"required\":[\"q\"]}}},{\"type\":\"function\",\"function\":{\"name\":\"askUser\",\"description\":\"Ask a clarifying question.\",\"parameters\":{\"type\":\"object\",\"properties\":{\"question\":{\"type\":\"string\"}}}}}],\"tool_choice\":{\"type\":\"function\",\"function\":{\"name\":\"askUser\"}}}",
+};
+
+type Case = { label: string; ir: TurnRequest };
 
 const CASES: Case[] = [
   {
     label: "plain small-talk call (no tools, 160 tokens)",
     ir: { messages: SIMPLE, maxTokens: 160, temperature: 0.3 },
-    wire: { messages: wireSimple, maxTokens: 160 },
   },
   {
     label: "brand call (no tools, 1200 tokens)",
     ir: { messages: SIMPLE, maxTokens: 1200, temperature: 0.3 },
-    wire: { messages: wireSimple, maxTokens: 1200 },
   },
   {
     label: "agent loop, tools, auto, non-streaming",
     ir: { messages: TOOL_LOOP, tools: TOOLS, toolChoice: "auto", maxTokens: 2048, temperature: 0.3 },
-    wire: { messages: wireLoop, maxTokens: 2048, toolChoice: "auto", tools: wireTools },
   },
   {
     label: "agent loop, tools, auto, STREAMING",
     ir: { messages: TOOL_LOOP, tools: TOOLS, toolChoice: "auto", maxTokens: 2048, temperature: 0.3, stream: true },
-    wire: { messages: wireLoop, maxTokens: 2048, toolChoice: "auto", tools: wireTools, stream: true },
   },
   {
-    label: "tool_choice none — tools omitted entirely, not sent empty",
+    label: "tool_choice none \u2014 tools omitted entirely, not sent empty",
     ir: { messages: TOOL_LOOP, tools: TOOLS, toolChoice: "none", maxTokens: 2048, temperature: 0.3 },
-    wire: { messages: wireLoop, maxTokens: 2048, toolChoice: "none", tools: wireTools },
   },
   {
     label: "forced tool (the askUser card)",
     ir: { messages: TOOL_LOOP, tools: TOOLS, toolChoice: { forceTool: "askUser" }, maxTokens: 2048, temperature: 0.3 },
-    wire: { messages: wireLoop, maxTokens: 2048, toolChoice: { type: "function", function: { name: "askUser" } }, tools: wireTools },
   },
 ];
 
 for (const c of CASES) {
-  const fromIr = toOpenAiBody(c.ir, MODEL);
-  const fromTransport = buildChatBody(c.wire);
-  /* buildChatBody reads AGENT_MODEL from env; normalise that one field so the
-     comparison is about SHAPE, which is what could drift. */
-  const a = { ...fromIr, model: MODEL };
-  const b = { ...fromTransport, model: MODEL };
-  const same = j(a) === j(b);
-  check(`${c.label}${same ? "" : `\n      ir:        ${j(a)}\n      transport: ${j(b)}`}`, same);
+  const got = JSON.stringify(toOpenAiBody(c.ir, MODEL));
+  const want = GOLDEN[c.label];
+  const same = got === want;
+  check(
+    `${c.label}${same ? "" : `\n      sent today: ${got}\n      recorded:   ${want ?? "(no golden for this label)"}`}`,
+    same,
+  );
+}
+
+/* Non-vacuity. A renamed case would look up an absent golden, and `got ===
+   undefined` is false so the case above WOULD fail — but a DELETED case would
+   simply stop being checked and the suite would still say all green. Pin the
+   two sets against each other so neither side can shrink quietly. */
+{
+  const caseLabels = new Set(CASES.map((c) => c.label));
+  const goldenLabels = new Set(Object.keys(GOLDEN));
+  const missing = [...goldenLabels].filter((l) => !caseLabels.has(l));
+  const extra = [...caseLabels].filter((l) => !goldenLabels.has(l));
+  check(
+    `every recorded golden is still exercised by a case${missing.length ? ` — orphaned: ${missing.join(", ")}` : ""}${extra.length ? ` — ungolden: ${extra.join(", ")}` : ""}`,
+    missing.length === 0 && extra.length === 0,
+  );
+  check(
+    "and there are still six of them, so the matrix cannot be emptied",
+    CASES.length === 6 && goldenLabels.size === 6,
+  );
 }
 
 console.log("\n── 4. Shape details the differential test is pinning ──");
@@ -196,4 +233,4 @@ if (failures.length) {
   for (const f of failures) console.log(`  · ${f}`);
   process.exit(1);
 }
-console.log("Section 3 is a differential against the live transport, not a description of it.");
+console.log("Section 3 compares the live body builder against bytes recorded from the pre-4A transport.");

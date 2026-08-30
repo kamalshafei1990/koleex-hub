@@ -3,36 +3,53 @@ import "server-only";
 /* ---------------------------------------------------------------------------
    ai/provider/adapters/deepseek — the first adapter, and the reference one.
 
-   Phase 3B. It does NOT re-implement the HTTP call. It delegates to
-   core/transport.ts, which Phase 2D isolated for exactly this moment: the
-   endpoint, key, retry policy and streaming reassembly stay where they are and
-   keep behaving identically, while the SHAPE the loop sees becomes neutral.
+   Phase 3B introduced it as a thin delegate. Phase 4A gave it the things that
+   actually make it an adapter rather than a wrapper: THIS file now owns the
+   endpoint URL, the model id and the API key. They used to live in
+   core/transport.ts, which meant "the core is vendor-neutral" was true of the
+   loop but not of the layer underneath it.
 
-   What is genuinely new here is the parsing. Two of the three call sites used
-   to parse the provider's JSON inside the agent loop; that parse lives here
-   now, so the loop no longer knows what a `choices[0].message` is. A
-   differential test pins the result against what the loop used to build.
+   Vendor surface, in one place so it is auditable:
+     · endpoint  https://api.deepseek.com/v1/chat/completions
+     · model     DEEPSEEK_AGENT_MODEL / DEEPSEEK_MODEL / "deepseek-chat"
+     · key       DEEPSEEK_API_KEY
+   The key is read here and handed to transport as an argument. It is never
+   logged, never put in an error message, and never reaches the model, the
+   prompt, or the client.
+
+   DeepSeek's HTTP API is OpenAI-compatible — same chat/completions body, same
+   `tools` + `tool_choice` function-calling contract, same
+   `choices[].message.tool_calls` response shape — so the shared Turn IR
+   conversions in ../turn-ir cover it without a vendor-specific body builder.
+
+   ON THE KILL-SWITCH: `USE_DEEPSEEK` is deliberately NOT consulted here. It
+   gates the chat lanes in providers/deepseek.ts and has never gated the agent
+   loop; honouring it here would silently take the agent down in any
+   environment that sets the key without the flag. That asymmetry is finding
+   N8 and it is resolved as policy in the router, not by this file quietly
+   picking a side. See router/provider-policy.ts.
    --------------------------------------------------------------------------- */
 
 import {
-  callGroqPlain,
-  callGroqStreamingOnce,
-  callGroqWithRetry,
-  readProviderKey,
+  postChat,
+  postChatStreaming,
   isTransientNetError,
-  agentModel,
-  type WireMsg,
-  type ToolSchema,
-  type ToolChoice,
 } from "@/lib/server/ai/core/transport";
-import {
-  toOpenAiMessages,
-  toOpenAiTools,
-  toOpenAiToolChoice,
-  type TurnRequest,
-  type TurnResponse,
-} from "../turn-ir";
+import { toOpenAiBody, type TurnRequest, type TurnResponse } from "../turn-ir";
 import type { ProviderAdapter, TurnOutcome } from "../types";
+
+const DEEPSEEK_URL = "https://api.deepseek.com/v1/chat/completions";
+
+/* Read at module scope, as it always has been. A key rotated without a
+   redeploy will not be picked up — true before 4A and unchanged by it. */
+const DEEPSEEK_MODEL =
+  process.env.DEEPSEEK_AGENT_MODEL ||
+  process.env.DEEPSEEK_MODEL ||
+  "deepseek-chat";
+
+function readKey(): string | undefined {
+  return process.env.DEEPSEEK_API_KEY;
+}
 
 /** The provider's answer shape. Parsed here so the loop never sees it. */
 interface OpenAiChatResponse {
@@ -72,33 +89,26 @@ export { toTurnResponse as parseOpenAiChatResponse };
 export const deepseekAdapter: ProviderAdapter = {
   name: "deepseek",
 
-  configured: () => Boolean(readProviderKey()),
+  configured: () => Boolean(readKey()),
 
-  model: () => agentModel(),
+  model: () => DEEPSEEK_MODEL,
 
   async chat(req: TurnRequest, opts): Promise<TurnOutcome> {
-    const key = readProviderKey();
+    const key = readKey();
     if (!key) return { ok: false, status: 503, bodyText: "no provider key configured" };
 
-    const messages = toOpenAiMessages(req.messages) as unknown as WireMsg[];
-    const tools = req.tools ? (toOpenAiTools(req.tools) as unknown as ToolSchema[]) : undefined;
-    const toolChoice = req.toolChoice ? (toOpenAiToolChoice(req.toolChoice) as ToolChoice) : undefined;
+    /* ONE body builder for both paths, and the same one the IR differential
+       test pins against recorded goldens. Before 4A the streaming path and
+       the tool path each hard-coded max_tokens: 2048 inside transport while
+       the IR carried its own value — they agreed, but only by coincidence. */
+    const body = toOpenAiBody(req, DEEPSEEK_MODEL);
 
     /* ── Streaming ────────────────────────────────────────────────────
-       transport already reassembles fragmented tool_calls by index — the
-       behaviour an incident pin in validate:ai-baseline protects — and
-       returns them parsed, so there is no JSON to read here. */
+       transport reassembles fragmented tool_calls by index — the behaviour
+       an incident pin in validate:ai-baseline protects — and returns them
+       parsed, so there is no JSON to read here. */
     if (opts?.onDelta) {
-      const s = await callGroqStreamingOnce(key, messages, {
-        toolChoice: toolChoice ?? "auto",
-        onDelta: opts.onDelta,
-        /* The streaming call site in the loop always supplies tools, so this
-           fallback does not fire today. It is `[]` rather than `undefined`
-           because that call sends `tools` whenever the choice is not "none" —
-           see toOpenAiBody, where an EMPTY tool list and NO tools are
-           deliberately different requests. */
-        tools: tools ?? [],
-      });
+      const s = await postChatStreaming(DEEPSEEK_URL, key, body, opts.onDelta);
       if (!s.ok) return { ok: false, status: s.status || 500, bodyText: s.bodyText };
       return {
         ok: true,
@@ -114,14 +124,7 @@ export const deepseekAdapter: ProviderAdapter = {
       };
     }
 
-    /* ── No tools: the small-talk / brand fast path ───────────────────
-       A turn with no tools goes through the plain call, which sends neither
-       `tools` nor `tool_choice` — see toOpenAiBody for why that distinction
-       is load-bearing. */
-    const res = req.tools === undefined
-      ? await callGroqPlain(key, messages, { maxTokens: req.maxTokens })
-      : await callGroqWithRetry(key, messages, { toolChoice: toolChoice ?? "auto", tools });
-
+    const res = await postChat(DEEPSEEK_URL, key, body);
     if (!res.ok) {
       return { ok: false, status: res.status, bodyText: await res.text().catch(() => "") };
     }

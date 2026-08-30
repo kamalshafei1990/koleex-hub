@@ -55,6 +55,7 @@ const sealsQuotation = readFileSync("src/lib/server/ai/seals/quotation.ts", "utf
    reassembly — into core/transport.ts. Same reasoning as the seals above:
    follow the code, name the file that owns the behaviour. */
 const transport = readFileSync("src/lib/server/ai/core/transport.ts", "utf8");
+const deepseekAdapter = readFileSync("src/lib/server/ai/provider/adapters/deepseek.ts", "utf8");
 /* Phase 2E split the two turn paths across two files: the tool loop stayed in
    orchestrator.ts, the no-provider path became core/recovery.ts. */
 const recovery = readFileSync("src/lib/server/ai/core/recovery.ts", "utf8");
@@ -139,10 +140,24 @@ check(
   /if \(wantsStream\)[\s\S]{0,900}type: "start"[\s\S]{0,600}type: "end"/.test(agentRoute),
   'the canned path used to return JSON, which crashed the uniform client parser into "No reply was received"',
 );
+/* Phase 4A split this pin, because what it was guarding split. The SSE
+   reassembly below still lives in the transport, so its location pin stays
+   pointed there — only the function name changed (callGroqStreamingOnce →
+   postChatStreaming). The ENDPOINT moved out of the transport entirely and
+   into the adapter, so the vendor half of this pin follows it rather than
+   being dropped: if it were simply deleted, nothing would notice a transport
+   that quietly grew its own hard-coded URL again. */
 check(
   "the transport layer is where these provider pins expect it",
-  transport.includes("api.deepseek.com") && transport.includes("callGroqStreamingOnce"),
+  transport.includes("postChatStreaming") && transport.includes("getReader()"),
   "if this fails, the pin beneath it is reading the wrong file — fix the path, do not delete the pin",
+);
+check(
+  "the vendor endpoint lives in the adapter, and the transport has none of its own",
+  deepseekAdapter.includes("api.deepseek.com") &&
+    deepseekAdapter.includes("DEEPSEEK_API_KEY") &&
+    !/https:\/\/[a-z0-9.-]*\/(v1|chat)/.test(transport),
+  "4A moved endpoint/model/key to the adapter so a second provider is addable; a URL back in the transport undoes that",
 );
 check(
   "streamed tool_calls are reassembled by index",

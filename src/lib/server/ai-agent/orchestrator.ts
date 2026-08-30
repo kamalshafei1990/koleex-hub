@@ -39,21 +39,17 @@ export type { TurnInput } from "@/lib/server/ai/core/types";
 import { toLlmSafe, humaniseCall } from "@/lib/server/ai/core/wire";
 import { preToolGuard } from "@/lib/server/ai/core/pre-tool-guard";
 import { runDegradedTurn, fallback } from "@/lib/server/ai/core/recovery";
-/* Phase 2D — everything that speaks to a provider lives in core/transport.
-   The loop below decides WHAT to send and what to do with the answer; it no
-   longer knows the endpoint, the model id, the key, or the retry policy. */
-import {
-  providerLabel,
-  type WireMsg,
-  type ToolChoice,
-} from "@/lib/server/ai/core/transport";
 /* Phase 3C — the loop reaches a model through ONE function. It no longer
    knows the endpoint, the retry policy, or what a `choices[0].message` is;
    the adapter owns all of that. Everything BELOW the call sites is unchanged:
    the provider's answer is mapped back into the same `choice` shape the loop
    already used, so the tool loop, the seals and the rescue path see exactly
    what they saw before. */
-import { chatWithTools, providerConfigured } from "@/lib/server/ai/provider/registry";
+/* Phase 4A — the provider LABEL comes from whichever adapter actually served
+   the turn, not from a constant that said "deepseek" no matter what. With
+   failover in the picture a hard-coded label would misreport every fallback
+   turn, and the label is what the audit trail records. */
+import { chatWithTools, providerConfigured, activeProviderLabel } from "@/lib/server/ai/provider/registry";
 import {
   fromOpenAiMessages,
   fromOpenAiTools,
@@ -116,7 +112,7 @@ const MAX_PARALLEL_TOOLS = 3;
 
    `tool_calls: undefined` when empty (not `[]`) reproduces exactly what the
    streaming branch built before. */
-function toChoice(r: TurnResponse): { role?: string; content: string | null; tool_calls?: WireMsg["tool_calls"] } {
+function toChoice(r: TurnResponse): { role?: string; content: string | null; tool_calls?: OpenAiMessage["tool_calls"] } {
   return {
     role: "assistant",
     content: r.content,
@@ -126,7 +122,7 @@ function toChoice(r: TurnResponse): { role?: string; content: string | null; too
             id: c.id,
             type: "function" as const,
             function: { name: c.name, arguments: c.argumentsJson },
-          })) as WireMsg["tool_calls"])
+          })) as OpenAiMessage["tool_calls"])
         : undefined,
   };
 }
@@ -288,7 +284,7 @@ export async function orchestrate(input: TurnInput): Promise<AgentResponse> {
      this path. Other paths keep the full sanitised history. */
   const effectiveHistory = isBrand ? [] : sanitisedHistory;
 
-  const messages: WireMsg[] = [
+  const messages: OpenAiMessage[] = [
     { role: "system", content: systemPrompt },
     ...effectiveHistory.map((m) => ({ role: m.role, content: m.content })),
     { role: "user", content: userMessage },
@@ -315,7 +311,7 @@ export async function orchestrate(input: TurnInput): Promise<AgentResponse> {
        token budget accordingly so brand answers complete instead of
        truncating. */
     const out = await chatWithTools({
-      messages: fromOpenAiMessages(messages as unknown as OpenAiMessage[]),
+      messages: fromOpenAiMessages(messages),
       maxTokens: isBrand ? 1200 : 160,
       temperature: 0.3,
     });
@@ -336,7 +332,7 @@ export async function orchestrate(input: TurnInput): Promise<AgentResponse> {
         return {
           steps,
           finalReply: safeReply,
-          provider: providerLabel(),
+          provider: activeProviderLabel(),
           conversationId,
         };
       }
@@ -393,7 +389,7 @@ export async function orchestrate(input: TurnInput): Promise<AgentResponse> {
     /* Trade-terms lookup on the first request — see wantsTradeTerms. */
     const forceTradeNow = wantsTradeTerms && !forcedTrade && totalToolRuns === 0;
     if (forceTradeNow) forcedTrade = true;
-    const toolChoice: ToolChoice =
+    const toolChoice: OpenAiToolChoice =
       totalToolRuns >= MAX_TOOLS_PER_TURN
         ? "none"
         : forceAskNow
@@ -407,7 +403,7 @@ export async function orchestrate(input: TurnInput): Promise<AgentResponse> {
        the whole completion. The first (tool-deciding) call stays
        non-streamed: it emits only compact tool_calls JSON. */
     let choice:
-      | { role?: string; content: string | null; tool_calls?: WireMsg["tool_calls"] }
+      | { role?: string; content: string | null; tool_calls?: OpenAiMessage["tool_calls"] }
       | undefined;
     let callFailedStatus = 0;
     let callFailedBody = "";
@@ -419,9 +415,9 @@ export async function orchestrate(input: TurnInput): Promise<AgentResponse> {
          path in charge instead of a raw 500. */
       const out = await chatWithTools(
         {
-          messages: fromOpenAiMessages(messages as unknown as OpenAiMessage[]),
+          messages: fromOpenAiMessages(messages),
           tools: fromOpenAiTools(tools as unknown as OpenAiTool[]),
-          toolChoice: fromOpenAiToolChoice(toolChoice as OpenAiToolChoice),
+          toolChoice: fromOpenAiToolChoice(toolChoice),
           maxTokens: 2048,
           temperature: 0.3,
           stream: Boolean(liveEmit),
@@ -452,7 +448,7 @@ export async function orchestrate(input: TurnInput): Promise<AgentResponse> {
         return {
           steps,
           finalReply: safeReply,
-          provider: providerLabel(),
+          provider: activeProviderLabel(),
           conversationId,
         };
       }
@@ -471,7 +467,7 @@ export async function orchestrate(input: TurnInput): Promise<AgentResponse> {
       return {
         steps,
         finalReply: safeReply,
-        provider: providerLabel(),
+        provider: activeProviderLabel(),
         conversationId,
       };
     }
@@ -487,7 +483,7 @@ export async function orchestrate(input: TurnInput): Promise<AgentResponse> {
         return {
           steps,
           finalReply: safeReply,
-          provider: providerLabel(),
+          provider: activeProviderLabel(),
           conversationId,
         };
       }
@@ -759,7 +755,7 @@ export async function orchestrate(input: TurnInput): Promise<AgentResponse> {
   return {
     steps,
     finalReply: safeReply,
-    provider: providerLabel(),
+    provider: activeProviderLabel(),
     conversationId,
   };
 }
