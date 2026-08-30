@@ -738,7 +738,7 @@ break Hub integration · remove a working tool · weaken permissions or verifica
 |---|---|---|
 | **0 — Baseline & Tests** | 🟡 **IN PROGRESS** | Tenant-isolation guard ✅ · Incident-replay suite ✅ — both shipped and proven-to-fail (below). Baseline latency metrics: next (needs a running instance). |
 | **1 — Security Hardening** | ✅ **COMPLETE** | All six audit issues in scope closed (1, 2, 3, 4, 5, 6) + Issue 7. Two migrations applied staging→production with sign-off. Six suites green. |
-| **2 — AI Core + Standalone Foundation** | 🟡 **IN PROGRESS** | **2A + 2B shipped** — lane decision extracted; seal chain extracted and, for the first time, tested by calling it. `orchestrator.ts` 3 220 → 1 716. 2C–2J to follow. |
+| **2 — AI Core + Standalone Foundation** | 🟡 **IN PROGRESS** | **2A + 2B + 2C shipped** — lane decision, seal chain and system prompts each extracted and tested by calling them. `orchestrator.ts` 3 220 → 1 269. 2D–2J to follow. |
 | 3–20 | ⬜ Not started | **Amendment 1 (§P) folded in** — Phase 2 gains the connector interface + client-resolvable deep links |
 
 ### Phase 2 · Sub-stage 2A — the lane decision has one home ✅
@@ -795,6 +795,37 @@ Cases that now have real coverage rather than a grep:
 **The incident pins were repointed, not relaxed.** Moving the seals broke **12 assertions** in `validate:ai-baseline` — the gate doing its job. Each was repointed at the specific seals module that owns the behaviour, **not** at a concatenated blob of the tree: a pin that any file can satisfy no longer pins anything. A *guard-the-guard* check was added first, so if the layer moves again the pins fail loudly instead of going quietly vacuous. Both repointed pins were re-proven to fail. Baseline is now **43 passed, 0 failed**.
 
 **Regression gate:** twelve suites green (`trade-terms`, `ai-seals`, `ai-core-boundaries`, `ai-tenant-isolation`, `ai-baseline`, `ai-egress`, `ai-untrusted`, `ai-confirm-ledger`, `ai-rate-limit`, `ai-orb`, `ai-platform`, `ai-quotation-guard`), `tsc` clean, `eslint` clean, and a full `next build` compiled successfully.
+
+### Phase 2 · Sub-stage 2C — the prompts are a layer, and every lane is checked ✅
+
+`src/lib/server/ai/prompts/{blocks,index}.ts` · `npm run validate:ai-prompts` · **47 passed, 0 failed.**
+
+**What moved.** The three system prompts and the two blocks they share left `orchestrator.ts`. `orchestrator.ts`: **1 714 → 1 269 lines.** The loop now *uses* a prompt; it is no longer also the place prompts are written. The measure of the split: after it, **all four knowledge-rule imports** (`BRAND_EXCLUSIVITY_RULE`, `DIRECT_VOICE_RULE`, `DATA_PROTECTION_RULE`, `AI_PROVENANCE_RULE`) became unused in the orchestrator, because it no longer builds any prompt at all.
+
+**A fourth prompt was found.** `orchestrateNoGroq()` assembled its own system prompt inline — the degraded lane used when no provider is configured. Inline is precisely how a lane ends up with a different set of rules from the other three, so it was moved into the layer as `buildDegradedSystemPrompt` and is now visible next to them.
+
+**Why the tests are worth more than the move.** These are built by calling each builder with one shared fixture and asserting on the produced **text**, and they are written as *every lane, without exception* rather than per-builder spot checks — because the historical failure was drift, an assistant that knew who you were on one lane and not another.
+
+| Property | Lanes |
+|---|---|
+| Names no model or provider | all 7 built prompts |
+| Carries `AI_PROVENANCE_RULE` | all |
+| Calls itself Koleex AI | all |
+| Carries the viewer block | all except the degraded lane (**N7**) |
+| Data-protection rule, no-invented-pricing rule | agent lane |
+| Super-admin status stated only when true | agent lane |
+
+**The vendor check needed the prompt, not the file.** The product rule is that Koleex AI never names the model behind it. Every vendor mention in the AI tree is a **code comment** — harmless, since a comment reaches neither the model nor the user. Grepping source cannot tell the two apart; the built prompt string contains no comments at all, so this test can.
+
+**Two assertions I wrote were wrong, and one was silently vacuous.**
+- *"an empty memory produces no dangling section"* searched for the word "remember", which appears in the unrelated instruction *"call remember_about_user"*. The **code was correct**; the test was not. Re-anchored on the section heading, plus a companion check so the negative case cannot pass vacuously.
+- *"every lane names the signed-in user"* passed even after the viewer block was deleted from a lane — every builder also ends with a bare `Current user: <username>` line. That is not the same thing: the bare line does not tell the model it may *use* the name, which is what produced *"I have no access to your identity"*. Now anchored on a sentence only `viewerBlockFor` emits — and re-proven to fail.
+
+**Proven to fail:** naming a vendor in prompt text → caught · deleting the viewer block from a lane → caught (only after the fix above) · making the now-block ignore the timezone → caught.
+
+**New finding N7**, recorded rather than quietly fixed — see the findings table.
+
+**Regression gate:** thirteen suites green, `tsc` clean, `eslint` clean, full `next build` green.
 
 ### Phase 0 · Result 1 — AI tenant-isolation guard ✅
 
@@ -919,6 +950,7 @@ On an iPhone `/todo?task=x` means nothing. **Phase 2 addition:** tools return a 
 | N2 | **No API version namespace** — response shapes coupled to current components | 2 | **blocking for shipped apps** |
 | N3 | **`requireInternalUser` 403s every AI route** — correct today, incompatible with a general user who has no Hub account | 2 | **blocking for Mode B** |
 | N6 | **Hub-relative deep links** (new, §P.3) | 2 | low, cheap now |
+| N7 | **The degraded lane does not know who it is talking to** (new, found in 2C) — `buildDegradedSystemPrompt` is the only one of four lanes that omits `viewerBlockFor`, so on the no-provider path a user asking *"do you know who I am?"* gets the pre-fix answer. `UserContext` is already available at the call site, so the fix is one line. Not made in 2C because that stage is code motion and changing what a lane says is not motion. | 2E | low; degraded path only |
 | — | **Agent jobs are request-scoped** — a task cannot survive the app closing | 17 | blocking for cross-device agents |
 | — | **Realtime/storage degraded ~19% in CN** (browser→Supabase) | R3 (existing) | affects file/image UX in CN |
 | — | **FCM push blocked in CN** | — | Android push in CN needs a CN vendor |

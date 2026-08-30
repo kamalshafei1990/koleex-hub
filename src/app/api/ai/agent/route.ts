@@ -35,11 +35,10 @@ import { consumeBudget, limitMode, BUDGETS, subjectFor } from "@/lib/server/ai/s
 import { ATTACH_SPLIT, resolveHistoryAttachEmbeds } from "@/lib/server/ai/attach-embed";
 import { getTaughtAnswersBlock, getKnowledgeNudgeBlock } from "@/lib/server/ai-knowledge";
 import { buildUserContext, checkModule } from "@/lib/server/ai-agent/permissions";
-import {
-  orchestrate,
-  buildBrandSystemPrompt,
-  buildMinimalSystemPrompt,
-} from "@/lib/server/ai-agent/orchestrator";
+import { orchestrate } from "@/lib/server/ai-agent/orchestrator";
+/* Phase 2C — the streaming lanes build their prompts from the prompt layer
+   directly, rather than reaching through the orchestrator for them. */
+import { buildBrandSystemPrompt, buildMinimalSystemPrompt } from "@/lib/server/ai/prompts";
 /* Phase 2B — the seals are their own layer now. The route applies the same
    two it always did; it just no longer reaches through the orchestrator to
    get them. */
