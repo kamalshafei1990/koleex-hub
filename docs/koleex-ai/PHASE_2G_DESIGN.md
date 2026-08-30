@@ -1,6 +1,18 @@
 # Phase 2G — design for review
 
-**Status: PROPOSAL. No code written, no schema created, nothing deployed.**
+**Status: DECIDED by the owner, 2026-08-30. Being implemented.**
+
+| Question | Owner's decision |
+|---|---|
+| 1. Strike `ai_sessions` from the plan? | **Yes.** The table is not created. Bearer auth rides the existing `account_sessions` programme when it reaches v3. |
+| 2. `requireInternalUser` | **Option A.** It stays exactly as it is on every route, `/api/v1/*` included. No permission is weakened, and the 2026-08-03 directive stands. |
+| 3. Build `/api/v1/ai/*` now? | **Yes.** |
+| 4. Phase 3 (provider abstraction) | **Go ahead** after 2G. |
+
+Everything below is the analysis those decisions were made from; it is left
+unedited as the record.
+
+---
 
 This document exists because of a standing rule: *before any new schema, explain
 the reason, schema, index, RLS, migration, rollback and expected load; never
