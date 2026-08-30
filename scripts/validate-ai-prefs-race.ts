@@ -43,6 +43,11 @@
    gap. Those were the two sides of the reachable-in-one-message case, so the
    scenario in the header can no longer happen.
 
+   AND THE FUNCTION IS DEPLOYED — staging 2026-08-30, production 2026-08-31.
+   Until then the fix was only half real: the code took the RPC path where it
+   existed and the old racy path everywhere else. It no longer does on either
+   deployed environment.
+
    THE THIRD WRITER IS DELIBERATELY UNCHANGED. `api/accounts/[id]/preferences`
    scopes its write with `.eq("tenant_id", auth.tenant_id)` — it takes an
    account id from the URL, and that clause is what stops a caller reaching

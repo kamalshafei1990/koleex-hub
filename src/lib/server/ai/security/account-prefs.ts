@@ -21,17 +21,21 @@ import "server-only";
    so there is no gap for a concurrent write to fall into. It lives in
    supabase/migrations/account_prefs_merge.sql.
 
-   WHY THERE IS STILL A FALLBACK. The migration is applied and verified on
-   STAGING; applying it to production was blocked by this environment's
-   permission model and is the owner's to run. Code that assumed the function
-   exists would break production the moment it shipped, so this tries the RPC
-   and falls back to the old read-modify-write when the function is absent.
+   DEPLOYED. The function is applied and verified on STAGING and on PRODUCTION
+   (2026-08-31, owner-applied; verified by querying pg_proc directly:
+   SECURITY DEFINER, search_path pinned empty, EXECUTE granted only to postgres
+   and service_role). So on both real environments the RPC is the path taken and
+   the fallback below is not reached.
 
-   Be clear about what the fallback is: it is the BUG, kept as a bridge. It
-   logs loudly on every use so a missing migration is visible rather than
-   silently degrading to the behaviour this file exists to remove. Once the
-   function is in production, the fallback stops being reached and can be
-   deleted.
+   WHY THE FALLBACK REMAINS ANYWAY. A local or newly-branched database will not
+   have the function until its migrations are run, and code that assumed the
+   function exists would fail a preference write there. Keeping it costs nothing
+   at runtime — it is only reached when the RPC reports the function missing.
+
+   Be clear about what the fallback is: it is the BUG, kept as a bridge. It logs
+   loudly on every use, so if it ever runs in a deployed environment that is a
+   signal the migration was lost, not a quiet degradation back to the behaviour
+   this file exists to remove.
 
    SHALLOW MERGE, DELIBERATELY. Top-level keys are REPLACED, not deep-merged.
    `forget_about_user` works by writing a SMALLER ai_memory object, and a deep
