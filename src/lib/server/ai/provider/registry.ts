@@ -38,22 +38,33 @@ import "server-only";
         identical failure and doubles the user's wait. Only "this provider
         cannot serve" is worth a second door.
 
-   WHAT THIS DOES NOT YET DO, stated rather than implied: the plan's acceptance
-   criterion is failover under 3 seconds, and this does not meet it for a
-   rate-limited primary. The primary's own retry ladder in core/transport.ts
-   (up to 3 attempts, backoff capped at 8s each) runs to exhaustion BEFORE the
-   second provider is tried, so a 429 can cost ~14s before failover begins.
-   That is not fixed by shortening the ladder — the ladder is what absorbs
-   ordinary rate limits. It is fixed by a circuit breaker that skips a provider
-   known to be failing, so the ladder never runs on the second request onward.
-   The breaker is the next piece of work; until it lands, the honest claim is
-   "failover works", not "failover is fast".
+   ON SPEED (Phase 4C). 4B shipped failover and recorded that it was slow: the
+   primary's own retry ladder in core/transport.ts (3 attempts, 8s cap) runs to
+   exhaustion BEFORE the second provider is tried, so a dead primary cost ~14s
+   on EVERY turn for the length of the outage. The circuit breaker in
+   router/circuit-breaker.ts fixes the repetition, not the first occurrence:
+   after `failureThreshold` health failures the primary is skipped outright, so
+   the ladder never starts. The first request of an outage still pays full
+   price; every one after it goes straight to the healthy provider.
+
+   Two properties of that breaker are what make it safe to put in front of the
+   only door: it FAILS OPEN, and it can never block the last provider — if
+   every candidate is broken, all of them are tried anyway, in preference
+   order. A breaker that can empty the candidate list is a breaker that can
+   take the product down by itself.
+
+   The breaker state is per-instance and dies with the instance; on serverless
+   that means a warm instance learns and a cold one starts over. Real
+   limitation, deliberately accepted here (the plan puts shared health state
+   behind "optional Redis later"), and it must not be described as a
+   cluster-wide health view.
    --------------------------------------------------------------------------- */
 
 import { deepseekAdapter } from "./adapters/deepseek";
 import { openAiCompatibleAdapter } from "./adapters/openai-compatible";
 import type { ProviderAdapter, TurnOutcome } from "./types";
 import type { TurnRequest } from "./turn-ir";
+import { providerBreaker, admissible, type Breaker } from "@/lib/server/ai/router/circuit-breaker";
 
 /* Ordered by preference. See the header on why DeepSeek is first. */
 const REGISTRY: ProviderAdapter[] = [deepseekAdapter, openAiCompatibleAdapter];
@@ -112,8 +123,9 @@ function failoverEnabled(): boolean {
 export async function chatWithToolsVia(
   adapters: ReadonlyArray<ProviderAdapter>,
   req: TurnRequest,
-  opts?: { onDelta?: (t: string) => void; failover?: boolean },
+  opts?: { onDelta?: (t: string) => void; failover?: boolean; breaker?: Breaker },
 ): Promise<TurnOutcome> {
+  const breaker = opts?.breaker ?? providerBreaker;
   const candidates = configuredAdapters(adapters);
   if (candidates.length === 0) {
     return { ok: false, status: 503, bodyText: "no AI provider configured" };
@@ -134,13 +146,32 @@ export async function chatWithToolsVia(
 
   const allowFailover = opts?.failover ?? failoverEnabled();
 
+  /* The breaker filters the candidate list; `allBlocked` means every provider
+     is currently considered down, in which case we try them all anyway rather
+     than reporting an outage we could have served through. */
+  const { tryThese } = admissible(candidates, breaker);
+
   let last: TurnOutcome = { ok: false, status: 503, bodyText: "no provider attempted" };
-  for (const adapter of candidates) {
+  for (const adapter of tryThese) {
+    breaker.beginAttempt(adapter.name);
     last = await adapter.chat(req, callOpts);
-    if (last.ok) return last;
+
+    if (last.ok) {
+      breaker.recordSuccess(adapter.name);
+      return last;
+    }
+
+    /* Only PROVIDER-health failures count against a provider. A 400 is our
+       malformed request; counting it would take a healthy provider out of
+       service because of a bug on our side. Same table as failover, on
+       purpose — "worth a second door" and "counts against this provider" are
+       the same question asked twice. */
+    const providerFault = shouldTryNextProvider(last.status);
+    if (providerFault) breaker.recordFailure(adapter.name);
+
     if (!allowFailover) break;
     if (emitted) break;
-    if (!shouldTryNextProvider(last.status)) break;
+    if (!providerFault) break;
   }
   return last;
 }
