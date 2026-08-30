@@ -737,7 +737,8 @@ break Hub integration · remove a working tool · weaken permissions or verifica
 | Phase | Status | Evidence |
 |---|---|---|
 | **0 — Baseline & Tests** | 🟡 **IN PROGRESS** | Tenant-isolation guard ✅ · Incident-replay suite ✅ — both shipped and proven-to-fail (below). Baseline latency metrics: next (needs a running instance). |
-| 1–20 | ⬜ Not started | Awaiting Phase 0 completion + owner approval |
+| **1 — Security Hardening** | 🟡 **IN PROGRESS** | Issues 3, 6, 7 ✅ · Issue 2 ✅ · Issue 1 ⏸ **migration awaiting sign-off** · rate limiting + injection fencing: next |
+| 2–20 | ⬜ Not started | Awaiting Phase 1 completion · **Amendment 1 (§P) folded in** — Phase 2 gains the connector interface + client-resolvable deep links |
 
 ### Phase 0 · Result 1 — AI tenant-isolation guard ✅
 
@@ -784,8 +785,183 @@ The four known-open P0s are **reported, not failed**, so the suite is green on t
 …OPEN  Issue 6 — audit rows identify the changed record (task_id/event_id absent from SAFE_LOG_KEYS)
 ```
 
+### Phase 1 · Progress
+
+| Audit issue | Status | How |
+|---|---|---|
+| **3 — full replies in logs** | ✅ **CLOSED** | `logSealTransform()` logs `changed=0\|1`, byte lengths and an 8-char fingerprint instead of the text. Full text only under `AI_DEBUG_REPLIES=true`, read per call so it flips without a rebuild. 14 call sites → 0. |
+| **6 — audit cannot identify the record** | ✅ **CLOSED** | The allowlist had `taskId`; every work tool takes `task_id`, and `event_id`/`item_id`/`project_id` were absent entirely — so every todo/calendar/planning write logged its target as `<redacted:36ch>`. Added those, the assignee id arrays, and `confirm`/`done` (which separate a preview from an execution). Free text and dates stay redacted. |
+| **7 — knowledge nudge bypassed its gate** | ✅ **CLOSED** | Both call sites now gated on `checkModule(ctx, "AI Knowledge", "view")` — a pure in-memory read of the context already built, so no extra round-trip. **Taught answers deliberately left ungated**: they are canonical replies the owner wrote for the assistant to *give* users; the nudge is document content with citations. Different thing, different rule. |
+| **2 — web-search egress** | ✅ **CLOSED** | `scanEgress()` — deterministic, no model call, no network, no DB. Two tiers: **block** for data identifying a person/record/internal entity (email, phone, UUID, document number, model code, money + commercial context); **warn** for a bare amount. Default ON; `AI_EGRESS_SCAN=off` is an emergency rollback, not a setting. |
+| **1 — server-enforced confirmation** | ⏸ **BLOCKED — awaiting sign-off** | Migration drafted at `docs/koleex-ai/migrations/PROPOSED_ai_pending_actions.sql` with reason, schema, indexes, RLS posture, expected load and rollback. **Not applied.** Code held until approved rather than shipped dead. |
+| 4 — rate limiting · 5 — injection fencing | ⬜ Next | No schema needed for fencing; rate limiting store TBD |
+
+**Calibration matters more than coverage here.** A scanner that blocks `"Cairo weather today"` breaks the feature it protects, and one that lets a quotation total through protects nothing. `npm run validate:ai-egress` asserts **both** directions — **22 passed, 0 failed**: 12 legitimate queries from the tool's own description all allowed (including `"USD to CNY rate"`, which contains a currency code, and `"convert 5000 USD to CNY"`), 10 realistic leaks all blocked.
+
+**Stated limit, not implied:** the scanner does **not** yet match queries against this tenant's actual customer and supplier *names*. That needs a cached per-tenant index — a round-trip on every search is exactly the latency this plan is trying to remove — so it lands with the Phase 5 cache work. This reduces exposure; it does not eliminate it.
+
+
+---
+
+# P. Amendment 1 — Standalone + Integrated deployment (2026-08-30)
+
+**Status: permanent architecture requirement.** This is an amendment to v1.0, not a restart. No completed work is undone.
+
+## P.1 What actually changed in the roadmap
+
+**The core requirement was already in v1.0** — §F.0 change #1 merged the Standalone Platform Foundation into **Phase 2**, for the stated reason that extracting the AI Core out of the routes *is* what makes it callable from a versioned API, and §N already carries the architecture plus 10 acceptance criteria. The amendment **confirms that decision**; it does not reverse it.
+
+What the amendment genuinely adds, and is now written into the plan:
+
+| # | Added | Where |
+|---|---|---|
+| 1 | **Product data as the flagship connector case**, with a one-source-of-truth rule | §P.6 |
+| 2 | **A cache contract** — scope, invalidation, TTL, tenant isolation, permission safety — so a cache can never become a second source of truth | §P.6 |
+| 3 | **General-user vs Hub-connected capability model** made explicit | §P.7 |
+| 4 | **Standalone acceptance criteria pushed into later phases**, not only Phase 2 | §P.8 |
+| 5 | One newly discovered blocker: **Hub-relative deep links** (§P.3, N6) | §P.3 |
+
+## P.2 Do Phase 0 or Phase 1 need additional work?
+
+**No.** Both were verified client-agnostic before answering:
+
+- **Phase 0** is static analysis over server source. It has no client dimension at all.
+- **Phase 1's four closed issues are all server-side and client-neutral.** Redacted logging, the audit allowlist, the knowledge gate and the egress scanner behave identically whichever client originated the turn — because none of them touches transport.
+- **Issue 1 (confirmation ledger, awaiting sign-off) becomes *more* important under this requirement**, not less: a mobile client's "confirm" tap must be verified server-side exactly like a web one. The drafted migration is already client-neutral — it keys on `conversation_id` + `account_id` + `tenant_id`, never on a session or a browser. **No change to the migration.**
+
+## P.3 Does Phase 2 need adjustment?
+
+**Fundamentals: no.** Two additions, both small, both cheaper now than later.
+
+**The good news, verified rather than assumed** — I grepped the tree rather than trusting the design:
+
+| Check | Result |
+|---|---|
+| Tools importing anything under `src/app` (route coupling) | **zero** |
+| Tools importing React / `next/navigation` / client code | **zero** |
+| AI core (`ai-agent/`, `ai/`) reading `next/headers` or `cookies()` | **zero** — confined to 3 session files |
+
+**All 45 tools are already frontend-independent.** They take `ctx: UserContext` plus args and return `ToolResult`. The Koleex Hub Connector is therefore not a rewrite — **the tools already are its implementation**; Phase 2 formalises the boundary around code that already respects it.
+
+**N6 — the one real coupling found (new).** Six strings assume a Hub web frontend:
+
+```
+tools/quotations.ts:512   review_url: `/quotations/${quote.id}`
+tools/todos.ts:424,556,562,854   link: `/todo?task=${id}`
+```
+
+On an iPhone `/todo?task=x` means nothing. **Phase 2 addition:** tools return a structured resource reference (`{ kind: "quotation", id }`) and each client resolves its own navigation — Hub to a route, mobile to a screen, web to a URL. Small, contained, and far cheaper before native clients exist than after.
+
+**Phase 2 addition 2:** formalise `KoleexHubConnector` as a named interface (§P.5) so the boundary is enforced by types, not by convention.
+
+## P.4 Current blockers for standalone deployment
+
+| # | Blocker | Phase | Severity |
+|---|---|---|---|
+| N1 | **Cookie-only auth** — no bearer, no refresh, no per-device revocation; `SESSION_SECRET` rotation kills every session at once | 2 | **blocking for native** |
+| N2 | **No API version namespace** — response shapes coupled to current components | 2 | **blocking for shipped apps** |
+| N3 | **`requireInternalUser` 403s every AI route** — correct today, incompatible with a general user who has no Hub account | 2 | **blocking for Mode B** |
+| N6 | **Hub-relative deep links** (new, §P.3) | 2 | low, cheap now |
+| — | **Agent jobs are request-scoped** — a task cannot survive the app closing | 17 | blocking for cross-device agents |
+| — | **Realtime/storage degraded ~19% in CN** (browser→Supabase) | R3 (existing) | affects file/image UX in CN |
+| — | **FCM push blocked in CN** | — | Android push in CN needs a CN vendor |
+
+## P.5 Koleex Hub Connector — proposed boundary
+
+```
+KOLEEX AI Core  (orchestrator · planner · model router · memory · RAG)
+        ↓  skill router selects a domain
+KoleexHubConnector          ← the named boundary Phase 2 formalises
+        ↓  dispatchTool: checkModule → minRole → handler → audit
+Existing 45 tools           ← UNCHANGED, already frontend-independent
+        ↓
+Koleex Hub services (pricing-engine, product-access, permissions)
+        ↓
+Database (service role; route/connector layer is the security boundary)
+```
+
+```ts
+/** The ONLY way the AI Core reaches Hub data. No client, on any platform,
+ *  ever holds a privileged credential — every call resolves permissions
+ *  server-side from the authenticated session, never from client claims. */
+interface KoleexHubConnector {
+  products(ctx: UserContext, q: ProductQuery): Promise<ToolResult>;
+  customers(ctx: UserContext, q: CustomerQuery): Promise<ToolResult>;
+  quotations(ctx: UserContext, q: QuotationQuery): Promise<ToolResult>;
+  tasks(ctx: UserContext, q: TaskQuery): Promise<ToolResult>;
+  calendar(ctx: UserContext, q: CalendarQuery): Promise<ToolResult>;
+  projects(ctx: UserContext, q: ProjectQuery): Promise<ToolResult>;
+  knowledge(ctx: UserContext, q: KnowledgeQuery): Promise<ToolResult>;
+  isConnected(ctx: UserContext): boolean;   // false ⇒ general-only user
+}
+```
+
+**Tools usable through the boundary with no modification: all 45.** Tools needing only the N6 link change: `createQuotationDraft`, `createTodo`, `completeTodo`, `reassignTodo`.
+
+## P.6 Product data — one source of truth
+
+The amendment's worked example — *"Tell me everything about model XSO-S800 MAX"* from the iPhone app — already has its implementation: `getProductFullDetails`. It resolves a KOLEEX code, a member/supplier model code, a slug or a name, and returns the Product-Data record tab by tab. Nothing new is needed except the transport.
+
+```
+iPhone → /api/v1/ai/turn (bearer)
+  → resolve account + tenant + role + entitlements SERVER-SIDE
+  → AI Core → skill router → KoleexHubConnector.products()
+  → getProductFullDetails → live query, no copy, no sync
+  → hasProductCostAccess(auth) decides whether the supplier/cost block is
+    EVEN QUERIED — not filtered afterwards, never issued at all
+  → filterFields() strips remaining sensitive columns
+  → answer
+```
+
+The amendment's permission example already holds today and must not regress: an employee without cost permission asking *"what is our supplier cost for this model?"* is denied because `hasProductCostAccess` = `canViewPrivate(auth) && hasProductDataAccess(auth)` prevents the `product_suppliers` query from being issued. **The data never enters the process.** The client is never consulted.
+
+**Cache contract** (binding — a cache must never become a second source of truth):
+
+| Property | Rule |
+|---|---|
+| Scope | keyed by `(tenant_id, product_id, permission_tier)` — **never** a shared entry across permission tiers |
+| What may be cached | only the neutral catalogue projection (`CATALOGUE_FIELDS`) |
+| What may **never** be cached | anything behind `hasProductCostAccess` — supplier identity, `unit_cost_cny`, margins |
+| TTL | short (≤60 s), matching the existing taught-answers cache convention |
+| Invalidation | on Product Data write; TTL is the backstop, not the mechanism |
+| Tenant isolation | tenant id in the key, always — the existing translation cache is the model |
+| Failure mode | a cache miss is a live query; a cache **never** answers when the permission tier is unknown |
+
+## P.7 General vs Hub-connected users
+
+```
+KOLEEX AI
+├── General AI capabilities      ← every user: chat, reasoning, writing, translation,
+│                                  research, files, images, coding, voice, memory
+├── Personal capabilities        ← memory, preferences, artifacts
+├── External connectors          ← Gmail, Drive, GitHub, MCP…
+└── First-party KOLEEX           ← Koleex Hub (products, customers, quotations, …)
+```
+
+`CAN_EXECUTE = capability_entitlement ∧ connector_available ∧ hub_permission ∧ confirmation_satisfied`
+
+A user with no Hub organisation gets the whole general product and `isConnected()` returns false — Hub tools are not merely denied, they are **not offered**, so the model is not tempted to try. This is also the Phase 2 replacement for `requireInternalUser` (N3).
+
+## P.8 Standalone acceptance criteria added to later phases
+
+| Phase | Added criterion |
+|---|---|
+| 3 — Provider abstraction | Region resolution comes from the authenticated session, not a client header |
+| 4 — Model router | A CN-resolved user gets CN-accessible providers on **every** client incl. APK |
+| 5 — Performance | Latency budgets measured on a mobile-shaped connection, not only desktop web |
+| 7 — Memory | Memory is server-side and reachable identically from every client |
+| 10 — Files | Upload works from camera, share sheet and file picker, not only drag-drop |
+| 13/15 — Image, Voice | Server-side generation; a device never runs model inference |
+| 16 — MCP/connectors | Tokens never reach the model **or any client** |
+| **17 — Long-running jobs** | **A job survives the originating app closing and is resumable from any other client** |
+
+## P.9 Client strategy (backend-first, deliberately)
+
+**Do not build native clients yet.** Order: (1) Phase 2 ships the versioned API + bearer auth + entitlements; (2) a standalone **web** app proves Mode B at the lowest cost; (3) **desktop is nearly free** — `desktop/` is an Electron shell that wraps a URL (`desktop/package.json`: *"native desktop shell around the live cloud app"*), so pointing a build at the standalone web app yields macOS and Windows almost immediately; (4) native mobile only after bearer auth exists, where camera, voice and share-sheet input are the real value. China distribution (CN Android stores, APK, CN push vendor) is a **regulatory** question flagged in §J — this document draws no legal conclusions.
+
 ---
 
 ## Change log
 
+- **2026-08-30 · v1.1** — **Amendment 1 (§P): standalone + integrated deployment** made a permanent requirement. The core of it was already Phase 2 in v1.0 (§F.0 #1, §N), so nothing was restarted and no completed work undone. Added: product data as the flagship connector case with a binding cache contract; the general-vs-Hub capability model; standalone acceptance criteria in phases 3–17; the `KoleexHubConnector` interface. Verified by grep, not assumed: **all 45 tools are already frontend-independent** (zero `src/app` imports, zero React, zero cookie reads in the core) — the connector formalises a boundary the code already respects. One new blocker found: **N6, Hub-relative deep links** in 6 places.
 - **2026-08-30 · v1.0** — Initial plan. Delta verified against `7c99778`: audit fully accurate, zero code drift. Five new findings (N1–N5) added for the general-purpose/standalone/China requirements. Awaiting approval for Phase 0.

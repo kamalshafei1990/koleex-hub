@@ -28,6 +28,7 @@ import "server-only";
 
 import type { ToolDef, ToolResult } from "../types";
 import { searchWeb, type WebResult } from "../../ai/web-search";
+import { scanEgress, egressRefusalMessage } from "../../ai/security/egress-scanner";
 
 interface SearchArgs {
   query: string;
@@ -71,7 +72,7 @@ const searchTheWeb: ToolDef<SearchArgs, SearchData> = {
   requiredModule: undefined,
   requiredAction: "view",
   minRole: "internal",
-  handler: async (_ctx, args): Promise<ToolResult<SearchData>> => {
+  handler: async (ctx, args): Promise<ToolResult<SearchData>> => {
     const query = String(args?.query ?? "").trim();
     if (!query) {
       return {
@@ -81,6 +82,42 @@ const searchTheWeb: ToolDef<SearchArgs, SearchData> = {
         message: "A search query is required.",
       };
     }
+
+    /* ── GUARD 1 (audit Issue 2, P0): data egress ──────────────────────────
+       Until now the prohibition above ("NEVER put Koleex's own data in the
+       query") lived ONLY in this description and the system prompt. A rule the
+       model follows only sometimes is not a rule, and a customer name reaching
+       a search vendor returns HTTP 200 — there is no error to notice later.
+       This is the deterministic check that makes the rule real.
+
+       Default ON. AI_EGRESS_SCAN=off is an emergency rollback, not a setting:
+       a security guard that defaults to off is not a guard. */
+    if (process.env.AI_EGRESS_SCAN !== "off") {
+      const verdict = scanEgress(query);
+      if (!verdict.allowed) {
+        /* Logged WITHOUT the query text — the whole point is that this string
+           should not be copied around. The audit row records the attempt via
+           dispatchTool; `matched` says which rule fired, which is what an
+           operator needs to tune it. */
+        console.warn(`[ai.egress.blocked] rule=${verdict.matched} len=${query.length}`);
+        return {
+          ok: false,
+          /* NOT "denied": a denial short-circuits the orchestrator and prints
+             `message` verbatim, which would show English to an Arabic speaker.
+             Reporting it as an ordinary unsuccessful result lets the model
+             relay the refusal in the user's own language — the same contract
+             the not-configured and empty-result paths below already use. */
+          permissionStatus: "allowed",
+          data: null,
+          message: egressRefusalMessage(verdict.reason),
+        };
+      }
+      if (verdict.warnings.length > 0) {
+        console.warn(`[ai.egress.warn] ${verdict.warnings.join(",")} len=${query.length}`);
+      }
+    }
+
+    void ctx; /* reserved: per-tenant name matching lands with the Phase 5 cache */
 
     const outcome = await searchWeb(query);
 
