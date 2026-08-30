@@ -166,6 +166,9 @@ export const openAiCompatibleAdapter: ProviderAdapter = {
             argumentsJson: c.function.arguments,
           })),
           finishReason: null,
+          /* Phase 5B. Present only when the provider volunteered it on an SSE
+             frame; null otherwise, and never estimated. */
+          usage: s.usage ?? { inputTokens: null, outputTokens: null },
         },
       };
     }

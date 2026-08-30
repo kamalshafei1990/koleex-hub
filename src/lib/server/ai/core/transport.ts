@@ -129,6 +129,20 @@ export interface StreamOutcome {
   bodyText: string;
   content: string;
   toolCalls: Array<{ id: string; type: "function"; function: { name: string; arguments: string } }>;
+  /** Token counts, when the provider volunteered them.
+   *
+   *  Phase 5B. Read OPPORTUNISTICALLY: OpenAI-compatible providers usually
+   *  put a `usage` object on one of the last SSE frames, but not all of them
+   *  do, and several require `stream_options:{include_usage:true}` to be asked
+   *  for. That option is NOT sent — a provider that does not recognise it can
+   *  reject the whole request with a 400, which would trade "we cannot measure
+   *  cost" for "the turn fails". Measuring must never break the thing being
+   *  measured.
+   *
+   *  So this is null on providers that stay quiet, and the meter records
+   *  tokens as unknown rather than guessing them. Said plainly because a
+   *  fabricated token count is worse than a missing one: someone budgets on it. */
+  usage: { inputTokens: number | null; outputTokens: number | null } | null;
 }
 
 /** One STREAMING chat-completions call. Content tokens are forwarded to
@@ -154,7 +168,7 @@ export async function postChatStreaming(
     /* Socket died before any byte arrived — nothing was emitted, so the
        caller's failed-status path can retry/rescue safely. */
     if (isTransientNetError(e)) {
-      return { ok: false, status: 502, bodyText: "upstream socket error (network)", content: "", toolCalls: [] };
+      return { ok: false, status: 502, bodyText: "upstream socket error (network)", content: "", toolCalls: [], usage: null };
     }
     throw e;
   }
@@ -165,6 +179,7 @@ export async function postChatStreaming(
       bodyText: await res.text().catch(() => ""),
       content: "",
       toolCalls: [],
+      usage: null,
     };
   }
   const reader = res.body.getReader();
@@ -172,6 +187,7 @@ export async function postChatStreaming(
   let buf = "";
   let content = "";
   let sawTool = false;
+  let usage: { inputTokens: number | null; outputTokens: number | null } | null = null;
   const calls: Array<{ id: string; type: "function"; function: { name: string; arguments: string } }> = [];
   while (true) {
     let step: { value?: Uint8Array; done: boolean };
@@ -182,7 +198,7 @@ export async function postChatStreaming(
          on the user's screen and a re-run would duplicate them. Surface as
          a failed status so rescue-first / friendly copy takes over. */
       if (isTransientNetError(e)) {
-        return { ok: false, status: 502, bodyText: "stream terminated mid-read", content, toolCalls: [] };
+        return { ok: false, status: 502, bodyText: "stream terminated mid-read", content, toolCalls: [], usage: null };
       }
       throw e;
     }
@@ -208,7 +224,18 @@ export async function postChatStreaming(
               }>;
             };
           }>;
+          usage?: { prompt_tokens?: number; completion_tokens?: number } | null;
         };
+        /* Usage arrives on its own frame, typically the last one before
+           [DONE], and that frame usually has an EMPTY choices array — so this
+           must be read BEFORE the `if (!d) continue` below, or it is skipped
+           on exactly the frame that carries it. */
+        if (j.usage && (typeof j.usage.prompt_tokens === "number" || typeof j.usage.completion_tokens === "number")) {
+          usage = {
+            inputTokens: typeof j.usage.prompt_tokens === "number" ? j.usage.prompt_tokens : null,
+            outputTokens: typeof j.usage.completion_tokens === "number" ? j.usage.completion_tokens : null,
+          };
+        }
         const d = j.choices?.[0]?.delta;
         if (!d) continue;
         if (d.tool_calls) {
@@ -232,5 +259,5 @@ export async function postChatStreaming(
       }
     }
   }
-  return { ok: true, status: 200, bodyText: "", content, toolCalls: calls.filter((c) => c.function.name) };
+  return { ok: true, status: 200, bodyText: "", content, toolCalls: calls.filter((c) => c.function.name), usage };
 }

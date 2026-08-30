@@ -26,13 +26,40 @@ import "server-only";
 
 import type { TurnRequest, TurnResponse } from "./turn-ir";
 
+/** Which adapter actually handled the turn, and what it cost.
+ *
+ *  Phase 5B. Filled in by the registry, not by the adapters — only the
+ *  registry knows which one ended up serving after a failover. It closes two
+ *  gaps at once, which is why they are one field set:
+ *
+ *    · the `provider` label on an AgentResponse came from
+ *      activeProviderLabel(), i.e. the FIRST CONFIGURED adapter, which
+ *      misreported every failover turn. That label is what the audit trail
+ *      records, so it was wrong exactly when it mattered most.
+ *    · the cost meter needs to attribute tokens to the model that billed
+ *      them, and after a failover that is not the model the registry would
+ *      have picked.
+ *
+ *  Optional on both branches because a failure before any adapter ran has no
+ *  server to name. */
+export interface TurnMeta {
+  /** The adapter that handled it, e.g. "deepseek". */
+  servedBy?: string;
+  /** The concrete model id it used — the granularity billing has. */
+  model?: string;
+  /** Wall-clock across every attempt, including a failover. */
+  ms?: number;
+  /** True when an earlier adapter failed and a later one was tried. */
+  failedOver?: boolean;
+}
+
 export type TurnOutcome =
-  | { ok: true; response: TurnResponse }
+  | ({ ok: true; response: TurnResponse } & TurnMeta)
   /** status is the HTTP status where there was one, or a synthesised 5xx for
    *  a socket that died before any byte arrived. bodyText is whatever the
    *  provider said — never shown to a user, but the loop logs it and the
    *  rescue path branches on it. */
-  | { ok: false; status: number; bodyText: string };
+  | ({ ok: false; status: number; bodyText: string } & TurnMeta);
 
 export interface ProviderAdapter {
   /** Stable identifier used in the `provider` field of an AgentResponse and
