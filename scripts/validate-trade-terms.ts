@@ -15,7 +15,7 @@
 
 import { getTool } from "../src/lib/server/ai-agent/tool-registry";
 import { TRADE_TERMS_KNOWLEDGE } from "../src/lib/server/ai-agent/trade-terms-knowledge";
-import { isBusinessDataQuery } from "../src/lib/server/ai-agent/orchestrator";
+import { isBusinessDataQuery } from "../src/lib/server/ai/core/decide-turn";
 
 type Case = {
   q: string;

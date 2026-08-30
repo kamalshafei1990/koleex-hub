@@ -738,7 +738,33 @@ break Hub integration · remove a working tool · weaken permissions or verifica
 |---|---|---|
 | **0 — Baseline & Tests** | 🟡 **IN PROGRESS** | Tenant-isolation guard ✅ · Incident-replay suite ✅ — both shipped and proven-to-fail (below). Baseline latency metrics: next (needs a running instance). |
 | **1 — Security Hardening** | ✅ **COMPLETE** | All six audit issues in scope closed (1, 2, 3, 4, 5, 6) + Issue 7. Two migrations applied staging→production with sign-off. Six suites green. |
-| 2–20 | ⬜ Not started | Awaiting Phase 1 completion · **Amendment 1 (§P) folded in** — Phase 2 gains the connector interface + client-resolvable deep links |
+| **2 — AI Core + Standalone Foundation** | 🟡 **IN PROGRESS** | **2A shipped** — lane decision extracted, canned-answer duplication removed (below). 2B–2J to follow. |
+| 3–20 | ⬜ Not started | **Amendment 1 (§P) folded in** — Phase 2 gains the connector interface + client-resolvable deep links |
+
+### Phase 2 · Sub-stage 2A — the lane decision has one home ✅
+
+`src/lib/server/ai/core/decide-turn.ts` · `src/lib/server/ai/core/canned-replies.ts` · `npm run validate:ai-core-boundaries` · **48 passed, 0 failed.**
+
+**What moved.** Every regex that decides which lane a turn takes — `tryFastReply`, `isSmallTalk`, `classifyBrandSection`, `isChoiceShapedQuestion`, `isTradeTermQuestion`, `isBusinessDataQuery`, `isWorkDataQuery`, `isLiveInfoQuery`, `isMemoryIntentQuery` — left `orchestrator.ts` for `core/decide-turn.ts`. The two API routes now import the decision from the module that owns it instead of from the loop that happened to sit next to it. The orchestrator's own comment had asked for exactly this: *"If this list grows, collapse into a single exported `detectFastPath(msg)` helper."*
+
+`orchestrator.ts`: **3 220 → 2 703 lines.** Sliced line-for-line, not retyped — the only edits are `export` keywords and two comments reunited with the function they describe (the live-information comment sat above `isMemoryIntentQuery`; a brand-detector comment sat above the brand-name replacer).
+
+**What was de-duplicated, and what deliberately was not.** `tryFastReply` existed in **three** files. Two of those — `/api/ai/agent` and `/api/ai/chat` — carried a canned-answer table under a comment asking a human to *"keep in sync"*. They were compared entry by entry before anything was deleted: every regex and every Q1–Q10 string was identical and only the surrounding prose had drifted, so they are now one table in `core/canned-replies.ts` and unifying them changed nothing a user reads.
+
+The **third** table, the orchestrator's, is genuinely different — greetings and thanks only, with short replies. Merging it would have changed behaviour, so it stayed separate and the two lookups now have different names (`tryFastReply` vs `tryCannedReply`) so importing the wrong one is a compile error rather than a silent change. **The suite asserts the two tables stay different**, because the obvious future "cleanup" is to collapse them.
+
+**Purity.** `core/decide-turn.ts` has zero runtime imports and deliberately no `server-only` — the same choice `session-codec.ts` made, for the same reason: a pure decision function should be runnable in plain Node so its behaviour can be **tested**, not merely grepped for. There is nothing secret in a regex.
+
+**Evidence, not compilation.** Unlike the other suites here, `validate:ai-core-boundaries` imports both modules and asserts on **return values** — 13 of its 48 checks are real routing decisions. Purity is asserted on comment-stripped source, so prose in a header cannot satisfy it.
+
+**Proven to fail** (three negative tests, tree restored after each):
+- an `import` added to `decide-turn.ts` → 2 purity checks fail
+- the two tables collapsed into one → 2 checks fail
+- a route re-declaring its own table → 1 check fails
+
+And the pre-existing behavioural test was used as the real gate: `validate:trade-terms` (15 retrieval + 12 routing cases) passed before the move, was **made to fail** by breaking one regex in the new file, and passed again once restored — proving the moved code is genuinely covered rather than merely present.
+
+**Regression gate:** all nine `validate:ai-*` suites plus `validate:trade-terms` green, `tsc` clean, `eslint` clean.
 
 ### Phase 0 · Result 1 — AI tenant-isolation guard ✅
 
