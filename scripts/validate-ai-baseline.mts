@@ -162,6 +162,16 @@ check(
   "owner screenshot 2026-08-21: a reply ended in raw provider tool tokens",
 );
 check(
+  "the attached-document exemption is scoped to THIS TURN, not retained history (audit Issue 5)",
+  !/attachedDocCtx[\s\S]{0,200}history\.some/.test(orch),
+  "scanning history meant ONE attachment switched the field-grounding and pricing seals off for every later turn in the conversation — the widest blast radius in the seal chain",
+);
+check(
+  "both attachedDocCtx sites use the single shared detector",
+  (orch.match(/attachedDocCtx = hasUntrustedContent\(userMessage\)/g) ?? []).length === 2,
+  "orchestrate() and orchestrateNoGroq() each have one; two copies of a string test drift apart",
+);
+check(
   "the attached-document exemption keeps the fake-workflow seals ON",
   /attachedDocContext[\s\S]{0,400}sealExecutionSafetyV2\(sealed, steps\)/.test(orch),
   "reciting a document never justifies claiming tools ran — only v3/pricing stand down",

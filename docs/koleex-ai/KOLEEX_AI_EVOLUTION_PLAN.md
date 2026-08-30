@@ -794,7 +794,8 @@ The four known-open P0s are **reported, not failed**, so the suite is green on t
 | **7 — knowledge nudge bypassed its gate** | ✅ **CLOSED** | Both call sites now gated on `checkModule(ctx, "AI Knowledge", "view")` — a pure in-memory read of the context already built, so no extra round-trip. **Taught answers deliberately left ungated**: they are canonical replies the owner wrote for the assistant to *give* users; the nudge is document content with citations. Different thing, different rule. |
 | **2 — web-search egress** | ✅ **CLOSED** | `scanEgress()` — deterministic, no model call, no network, no DB. Two tiers: **block** for data identifying a person/record/internal entity (email, phone, UUID, document number, model code, money + commercial context); **warn** for a bare amount. Default ON; `AI_EGRESS_SCAN=off` is an emergency rollback, not a setting. |
 | **1 — server-enforced confirmation** | ⏸ **BLOCKED — awaiting sign-off** | Migration drafted at `docs/koleex-ai/migrations/PROPOSED_ai_pending_actions.sql` with reason, schema, indexes, RLS posture, expected load and rollback. **Not applied.** Code held until approved rather than shipped dead. |
-| 4 — rate limiting · 5 — injection fencing | ⬜ Next | No schema needed for fencing; rate limiting store TBD |
+| **5 — prompt-injection isolation** | ✅ **CLOSED** | Untrusted content is now **fenced with a per-turn nonce** instead of a constant `"""` a document could forge, with explicit *data-not-instructions* framing that also forbids it authorising an action. `attachedDocCtx` narrowed from *retained history* to **this turn only** — one attachment used to switch the field-grounding and pricing seals off for every later turn in the conversation, the widest blast radius in the seal chain. Both `attachedDocCtx` sites (the second was in `orchestrateNoGroq`) now share **one** detector. |
+| **4 — rate limiting** | ⏸ **BLOCKED — needs a store decision** | See §Q |
 
 **Calibration matters more than coverage here.** A scanner that blocks `"Cairo weather today"` breaks the feature it protects, and one that lets a quotation total through protects nothing. `npm run validate:ai-egress` asserts **both** directions — **22 passed, 0 failed**: 12 legitimate queries from the tool's own description all allowed (including `"USD to CNY rate"`, which contains a currency code, and `"convert 5000 USD to CNY"`), 10 realistic leaks all blocked.
 
@@ -958,6 +959,24 @@ A user with no Hub organisation gets the whole general product and `isConnected(
 ## P.9 Client strategy (backend-first, deliberately)
 
 **Do not build native clients yet.** Order: (1) Phase 2 ships the versioned API + bearer auth + entitlements; (2) a standalone **web** app proves Mode B at the lowest cost; (3) **desktop is nearly free** — `desktop/` is an Electron shell that wraps a URL (`desktop/package.json`: *"native desktop shell around the live cloud app"*), so pointing a build at the standalone web app yields macOS and Windows almost immediately; (4) native mobile only after bearer auth exists, where camera, voice and share-sheet input are the real value. China distribution (CN Android stores, APK, CN push vendor) is a **regulatory** question flagged in §J — this document draws no legal conclusions.
+
+### Phase 1 · A regression caught before it shipped
+
+Changing the fence format silently broke the seal chain's recital exemption, which keys on a marker in the turn text. `attachedDocCtx` would have been **false while a document was attached** — so the pricing guard would have replaced a legitimate invoice summary with its refusal message. The fix is one shared `hasUntrustedContent()` detector that matches both the new fence and the pre-fencing `[ATTACHED FILE:` marker, so conversations already in flight keep working. `npm run validate:ai-untrusted` asserts that exact case, plus the `"""` escape and forged-token neutralisation — **13 passed, 0 failed**.
+
+## Q. Open decision — rate-limiting store (audit Issue 4, P0)
+
+Rate limiting is the one Phase 1 item with no correct zero-decision answer, because it needs shared state and Vercel functions are stateless.
+
+| Option | Durable across instances? | New vendor | Cost | Notes |
+|---|---|---|---|---|
+| **A · Marketplace Redis** | ✅ yes | yes | small monthly | What `CLAUDE.md` points to (*"use Marketplace Redis/Postgres"*); provisioned with `vercel integration add`. The correct answer for a real limiter. |
+| **B · Postgres counter table** | ✅ yes | no | none | Reuses existing Supabase; precedent already in the tree (`login_attempts`). Adds one DB write per AI request. **[SCHEMA GATE]** |
+| **C · In-process only** | 🔴 **no** | no | none | Free and zero-risk, but per-instance: an attacker across N warm instances gets N× the limit. |
+
+**Recommendation: B**, then A if volume justifies it. B reuses infrastructure that already exists, follows a pattern already in this codebase, and needs no new vendor relationship.
+
+**On shipping C as a floor:** it would bound a *runaway client loop* — the most common real incident — but it does **not** bound an attacker. It is deliberately not being presented as "rate limiting is done". Stating otherwise would be the same class of error as the egress assertion that reported an open issue as fixed.
 
 ---
 
