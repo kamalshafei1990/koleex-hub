@@ -53,7 +53,8 @@ import {
   isLiveInfoQuery,
 } from "@/lib/server/ai/core/decide-turn";
 import { tryCannedReply } from "@/lib/server/ai/core/canned-replies";
-import { deepseekChatStream } from "@/lib/server/ai/providers/deepseek";
+import { chatWithTools, activeProviderLabel } from "@/lib/server/ai/provider/registry";
+import { streamingFastLaneEnabled } from "@/lib/server/ai/router/provider-policy";
 import { buildSmartPrompt } from "@/lib/server/ai/prompt-builder";
 import {
   detectLanguageDirective,
@@ -504,8 +505,13 @@ export async function POST(req: Request) {
           const isMidFlowReply =
             (assistantAskedConfirm || assistantAskedQuestion) &&
             normalizedContent.trim().length <= 300;
-          /* DeepSeek powers the fast lanes now (Groq fully removed).
-             USE_DEEPSEEK + DEEPSEEK_API_KEY gate it via the provider. */
+          /* Both halves of the gate, stated here rather than discovered two
+             call frames down. Until Phase 4D the flag was checked INSIDE
+             deepseekChatStream, so a flag-off request entered this lane,
+             received an immediate error chunk and fell through — the same
+             destination, reached the long way. streamingFastLaneEnabled()
+             makes that explicit; see router/provider-policy.ts, which also
+             records what the flag does NOT do. */
           const fastPathKey = process.env.DEEPSEEK_API_KEY;
           /* Owner-taught canonical answers ride EVERY lane — the fast
              paths too, since brand-ish questions are exactly what gets
@@ -543,7 +549,7 @@ export async function POST(req: Request) {
              question ("which overlock models does Koleex have?") — the
              tool loop must answer those from real data, not prose. */
           const canFastPath =
-            fastPathKey && !isBusinessData && !isWorkData && !isLiveInfo && !isMemoryIntent && !isMidFlowReply;
+            fastPathKey && streamingFastLaneEnabled() && !isBusinessData && !isWorkData && !isLiveInfo && !isMemoryIntent && !isMidFlowReply;
 
           if (canFastPath) {
             fastLane = isBrand ? "brand" : isSmall ? "small" : "general";
@@ -586,39 +592,57 @@ export async function POST(req: Request) {
               : 1400;
             let accumulated = "";
             let gotFirst = false;
+            /* PHASE 4D — audit finding N8 closed. This lane used to call
+               deepseekChatStream() directly: a second, parallel path to a
+               provider that bypassed the core entirely, so it had no failover,
+               no circuit breaker, and its own copy of the endpoint and the
+               retry rules. It goes through the same door as everything else
+               now, and inherits all three.
+
+               Behaviour is preserved in both switch positions, which is why
+               canFastPath gained streamingFastLaneEnabled() above — see
+               router/provider-policy.ts for the trace. The request shape is
+               the same one this lane always sent: no tools, streamed,
+               per-lane token budget. */
             try {
-              for await (const ch of deepseekChatStream(fastMessages, {
-                maxTokens,
-              })) {
-                if (ch.type === "delta" && ch.text) {
-                  if (!gotFirst) gotFirst = true;
-                  accumulated += ch.text;
-                  controller.enqueue(send({ type: "delta", text: ch.text }));
-                } else if (ch.type === "done") {
-                  fastReply = ch.text ?? accumulated;
-                  /* Lane-truthful label. deepseekChatStream reports the
-                     bare model id ("deepseek:deepseek-chat") — identical
-                     to orchestrate()'s label, which made ai_messages
-                     .provider useless for telling "tool loop ran" from
-                     "tool-less fast lane answered" (it cost a full
-                     mis-diagnosis on 2026-08-08). fast-<lane> keeps the
-                     distinction queryable. */
-                  fastProvider = `deepseek:fast-${fastLane}`;
-                } else if (ch.type === "error") {
-                  /* Drop what we have and fall through to orchestrate.
-                     Can't "un-emit" the deltas the client already got —
-                     but gotFirst will be false on TTFB-timeout / auth
-                     errors, which is the only realistic pre-first-
-                     token failure mode. */
-                  if (gotFirst) {
-                    fastReply = accumulated || null;
-                    fastProvider = `deepseek:fast-${fastLane}`;
-                  }
-                  break;
-                }
+              const out = await chatWithTools(
+                {
+                  messages: fastMessages.map((m) => ({ role: m.role, content: m.content })),
+                  maxTokens,
+                  temperature: 0.3,
+                  stream: true,
+                },
+                {
+                  onDelta: (text) => {
+                    if (!gotFirst) gotFirst = true;
+                    accumulated += text;
+                    controller.enqueue(send({ type: "delta", text }));
+                  },
+                },
+              );
+              /* Lane-truthful label. The registry reports the bare model id
+                 ("deepseek:deepseek-chat") — identical to orchestrate()'s
+                 label, which made ai_messages.provider useless for telling
+                 "tool loop ran" from "tool-less fast lane answered" (it cost a
+                 full mis-diagnosis on 2026-08-08). fast-<lane> keeps the
+                 distinction queryable, and the provider half now names
+                 whichever adapter actually served. */
+              if (out.ok) {
+                fastReply = out.response.content || accumulated;
+                fastProvider = `${activeProviderLabel()}:fast-${fastLane}`;
+              } else if (gotFirst) {
+                /* Failed after deltas were already on the client's screen. We
+                   cannot un-emit them, so keep what was said rather than
+                   letting orchestrate() append a second answer to it. The
+                   registry applies the same rule one level down: it does not
+                   fail over once a delta has been emitted. */
+                fastReply = accumulated || null;
+                fastProvider = `${activeProviderLabel()}:fast-${fastLane}`;
               }
+              /* Failed before any delta → fastReply stays null and the turn
+                 falls through to orchestrate(), exactly as before. */
             } catch {
-              /* Generator threw — fall through to orchestrate. */
+              /* Fall through to orchestrate. */
             }
           }
 
@@ -635,7 +659,7 @@ export async function POST(req: Request) {
                 { kind: "answer", text: sealed, permissionStatus: "allowed" },
               ],
               finalReply: sealed,
-              provider: fastProvider ?? "deepseek:stream",
+              provider: fastProvider ?? `${activeProviderLabel()}:fast-stream`,
               conversationId: conversationId!,
             };
             /* If sealPricingSafety redacted content, the client has
