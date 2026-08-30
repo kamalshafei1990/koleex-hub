@@ -280,6 +280,11 @@ console.log(`  ${egressScanned ? "✓ FIXED" : "…OPEN"}  audit Issue 2 — web
 const replyLogged = (orch.match(/ai\.agent\.final\.before/g) ?? []).length;
 console.log(`  ${replyLogged === 0 ? "✓ FIXED" : "…OPEN"}  audit Issue 3 — full reply in logs (${replyLogged} site(s))`);
 
+const rateLimited =
+  /consumeBudget\(/.test(agentRoute) &&
+  /consumeBudget\(/.test(readFileSync("src/app/api/ai/attachments/route.ts", "utf8"));
+console.log(`  ${rateLimited ? "✓ FIXED" : "…OPEN"}  audit Issue 4 — rate limiting${rateLimited ? "" : " (no budget check on the AI routes)"}`);
+
 const idsAudited = /"task_id"/.test(audit) && /"event_id"/.test(audit);
 console.log(`  ${idsAudited ? "✓ FIXED" : "…OPEN"}  audit Issue 6 — audit rows identify the changed record${idsAudited ? "" : " (task_id/event_id absent from SAFE_LOG_KEYS)"}`);
 

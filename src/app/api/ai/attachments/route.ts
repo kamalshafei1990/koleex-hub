@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireAuth } from "@/lib/server/auth";
 import { requireInternalUser } from "@/lib/server/ai/require-internal";
+import { consumeBudget, limitMode, BUDGETS, subjectFor } from "@/lib/server/ai/security/rate-limit";
 import { describeImage } from "@/lib/server/ai/vision";
 import { supabaseServer } from "@/lib/server/supabase-server";
 
@@ -289,6 +290,28 @@ export async function POST(req: Request) {
   {
     const notInternal = requireInternalUser(auth);
     if (notInternal) return notInternal;
+  }
+
+  /* ── AUDIT ISSUE 4 (P0): rate limiting ────────────────────────────────
+     This route is the most expensive surface in the product: 6 files per
+     request, and a scanned PDF rasterises up to PDF_VISION_PAGES pages, each
+     read by a REASONING vision model at max_tokens 2000 — up to 18 vision
+     calls per single HTTP request, with maxDuration 120. Its own budget,
+     tighter than the chat budget, for that reason. Fails open. */
+  if (limitMode() !== "off") {
+    const v = await consumeBudget(
+      subjectFor.account(auth.account_id),
+      BUDGETS.attachmentPerAccount(),
+    );
+    if (!v.allowed) {
+      console.warn(`[ai.ratelimit] ep=attachments count=${v.count} max=${v.max} mode=${limitMode()}`);
+      if (limitMode() === "enforce") {
+        return NextResponse.json(
+          { error: "Too many uploads in a short time. Give it a moment and try again." },
+          { status: 429, headers: { "Retry-After": String(v.retryAfterSec) } },
+        );
+      }
+    }
   }
 
   /* JSON mode: {files:[{name,path,type,size}]} — storage refs. */
