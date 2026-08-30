@@ -12,6 +12,7 @@
     "validate:session-codec": "tsx scripts/validate-session-codec.ts",
     "validate:apply-scope": "tsx scripts/validate-apply-scope.ts",
     "validate:ai-quotation-guard": "tsx scripts/validate-ai-quotation-guard.ts",
+    "validate:ai-tenant-isolation": "tsx scripts/validate-ai-tenant-isolation.mts",
     "validate:trade-terms": "tsx --conditions=react-server scripts/validate-trade-terms.ts",
     "validate:contract-terms": "tsx scripts/validate-contract-terms.ts",
     "validate:contract-contradictions": "tsx scripts/validate-contract-contradictions.ts",
