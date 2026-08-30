@@ -55,6 +55,9 @@ const sealsQuotation = readFileSync("src/lib/server/ai/seals/quotation.ts", "utf
    reassembly — into core/transport.ts. Same reasoning as the seals above:
    follow the code, name the file that owns the behaviour. */
 const transport = readFileSync("src/lib/server/ai/core/transport.ts", "utf8");
+/* Phase 2E split the two turn paths across two files: the tool loop stayed in
+   orchestrator.ts, the no-provider path became core/recovery.ts. */
+const recovery = readFileSync("src/lib/server/ai/core/recovery.ts", "utf8");
 
 /* ═══ 1. LANE ROUTING — the tool-less fast lane must never swallow a turn
        that needs tools. Each of these was a measured production failure:
@@ -198,11 +201,23 @@ check(
   !/attachedDocCtx[\s\S]{0,200}history\.some/.test(orch),
   "scanning history meant ONE attachment switched the field-grounding and pricing seals off for every later turn in the conversation — the widest blast radius in the seal chain",
 );
-check(
-  "both attachedDocCtx sites use the single shared detector",
-  (orch.match(/attachedDocCtx = hasUntrustedContent\(userMessage\)/g) ?? []).length === 2,
-  "orchestrate() and orchestrateNoGroq() each have one; two copies of a string test drift apart",
-);
+{
+  /* Asserted PER FILE, not as a total. A total of two would also be satisfied
+     by both sites landing in one file and the other path losing its check
+     entirely — which is exactly the failure this pin exists to catch. */
+  const inLoop = (orch.match(/attachedDocCtx = hasUntrustedContent\(userMessage\)/g) ?? []).length;
+  const inRecovery = (recovery.match(/attachedDocCtx = hasUntrustedContent\(userMessage\)/g) ?? []).length;
+  check(
+    `both turn paths use the single shared detector (loop=${inLoop}, recovery=${inRecovery})`,
+    inLoop === 1 && inRecovery === 1,
+    "the tool loop and the degraded path each have one; two copies of a string test drift apart",
+  );
+  check(
+    "the degraded path's exemption is also scoped to THIS TURN, not retained history",
+    !/attachedDocCtx[\s\S]{0,200}history\.some/.test(recovery),
+    "audit Issue 5 applied to both paths; only one of them was in orchestrator.ts after 2E",
+  );
+}
 check(
   "the attached-document exemption keeps the fake-workflow seals ON",
   /attachedDocContext[\s\S]{0,400}sealExecutionSafetyV2\(sealed, steps\)/.test(sealsIndex),

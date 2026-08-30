@@ -412,17 +412,22 @@ Current user: ${ctx.auth.username} (${ctx.auth.user_type}${ctx.isSuperAdmin ? ",
    data. Moved here in Phase 2C from inside orchestrateNoGroq(), where it was
    assembled inline and therefore invisible next to the other three.
 
-   KNOWN GAP (recorded as finding N7 in the evolution plan, scheduled with the
-   recovery-path work in 2E): this is the only lane that does NOT embed
-   viewerBlockFor(ctx). A user on this path asking "do you know who I am?"
-   gets the pre-fix answer. The UserContext is available on the call site, so
-   the fix is small — it is deliberately NOT made here because 2C is a motion
-   stage and changing what a lane says is not motion. It is left visible
-   rather than quietly asserted as correct.
+   FINDING N7, CLOSED IN 2E. This was the only lane that did not embed
+   viewerBlockFor(ctx): a user on the degraded path asking "do you know who I
+   am?" got the answer the viewer block was written to eliminate. Being unable
+   to reach a provider for live data is no reason to forget who is asking —
+   the identity comes from their own authenticated session, not from the model.
+   Found in 2C and deliberately left alone there, because 2C was code motion
+   and changing what a lane says is not motion. Fixed here, where the recovery
+   path is being touched anyway, and asserted with the other three lanes.
    --------------------------------------------------------------------------- */
-export function buildDegradedSystemPrompt(userLang: "en" | "zh" | "ar" | undefined): string {
+export function buildDegradedSystemPrompt(
+  ctx: UserContext,
+  userLang: "en" | "zh" | "ar" | undefined,
+): string {
   return (
     "You are Koleex AI, the assistant inside the Koleex Hub ERP. " +
+    `${viewerBlockFor(ctx)}\n` +
     `Reply concisely in the user's language (${userLang ?? "en"}). ` +
     "You currently do NOT have access to the company's live data (tool calls are disabled). " +
     "Be helpful for general questions and conversational turns. If asked to look up live data, " +

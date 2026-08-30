@@ -738,7 +738,7 @@ break Hub integration · remove a working tool · weaken permissions or verifica
 |---|---|---|
 | **0 — Baseline & Tests** | 🟡 **IN PROGRESS** | Tenant-isolation guard ✅ · Incident-replay suite ✅ — both shipped and proven-to-fail (below). Baseline latency metrics: next (needs a running instance). |
 | **1 — Security Hardening** | ✅ **COMPLETE** | All six audit issues in scope closed (1, 2, 3, 4, 5, 6) + Issue 7. Two migrations applied staging→production with sign-off. Six suites green. |
-| **2 — AI Core + Standalone Foundation** | 🟡 **IN PROGRESS** | **2A–2D shipped** — lane decision, seal chain, prompts and provider transport each extracted and tested by calling them. `orchestrator.ts` 3 220 → **988**, with **zero vendor references**. 2E–2J to follow. |
+| **2 — AI Core + Standalone Foundation** | 🟡 **IN PROGRESS** | **2A–2E shipped** — lane decision, seals, prompts, transport and the recovery paths each extracted and tested by calling them. `orchestrator.ts` 3 220 → **734** (below the ~800 target), zero vendor references. **N7 closed.** 2F–2J to follow. |
 | 3–20 | ⬜ Not started | **Amendment 1 (§P) folded in** — Phase 2 gains the connector interface + client-resolvable deep links |
 
 ### Phase 2 · Sub-stage 2A — the lane decision has one home ✅
@@ -857,6 +857,29 @@ grep -n "AGENT_LLM_URL|AGENT_MODEL|DEEPSEEK|api.deepseek|Authorization|process.e
 **One more incident pin followed the code**: the streamed-`tool_calls`-reassembly pin now reads `transport.ts`, behind its own guard-the-guard check, and was re-proven to fail there.
 
 **Regression gate:** thirteen suites green (`ai-baseline` now 44), `tsc` clean, `eslint` clean.
+
+### Phase 2 · Sub-stage 2E — the loop is only the loop, and N7 is closed ✅
+
+`src/lib/server/ai/core/{types,wire,pre-tool-guard,recovery}.ts` · **`orchestrator.ts` 988 → 734 lines.**
+
+**What moved.** Four things the loop was carrying but did not need to own:
+
+| Module | What it is |
+|---|---|
+| `core/types.ts` | `TurnInput` — the turn contract. It described one function's arguments while it lived in the orchestrator; now that the loop *and* the recovery paths both take it, it belongs to neither |
+| `core/wire.ts` | `toLlmSafe` / `humaniseCall` — what the **model** sees of a tool result, what the **user** sees of a call |
+| `core/pre-tool-guard.ts` | the pre-dispatch guard, so an invalid call never reaches the database or burns an audit row |
+| `core/recovery.ts` | `runDegradedTurn` (was `orchestrateNoGroq`) and `fallback` — the paths taken when the tool loop cannot run |
+
+Moving `TurnInput` was not tidiness: it removes the only import cycle the split would otherwise have created, since recovery needs the type and the loop needs recovery.
+
+**`orchestrator.ts` is now 734 lines**, below the ~800 the plan set, and contains the tool loop and nothing else.
+
+**Finding N7 is closed.** `buildDegradedSystemPrompt` now takes the `UserContext` and embeds the viewer block. Being unable to reach a provider for live data is no reason to forget who is asking — the identity comes from the user's own authenticated session, not from the model. The degraded lane was held apart in the prompt suite while the gap was open; it now sits in the same loops as the other three and is held to every property they are, **without exception**. Re-proven: removing the block again fails 2 assertions.
+
+**One more incident pin repointed — and made stricter.** The `attachedDocCtx` pin counted **two** occurrences in one file; after 2E the two turn paths live in two files. It now asserts **per file** (`loop=1, recovery=1`) rather than a total of two, because a total of two is also satisfied by both sites landing in one file while the other path loses its check entirely — which is precisely the failure the pin exists to catch. A companion assertion now applies audit Issue 5's *this-turn-only* rule to the recovery path as well. Re-proven to fail by making the recovery path scan history again.
+
+**Regression gate:** thirteen suites green (`ai-prompts` 49, `ai-baseline` 45), `tsc` clean, `eslint` clean.
 
 ### Phase 0 · Result 1 — AI tenant-isolation guard ✅
 
@@ -982,7 +1005,7 @@ On an iPhone `/todo?task=x` means nothing. **Phase 2 addition:** tools return a 
 | N3 | **`requireInternalUser` 403s every AI route** — correct today, incompatible with a general user who has no Hub account | 2 | **blocking for Mode B** |
 | N6 | **Hub-relative deep links** (new, §P.3) | 2 | low, cheap now |
 | N8 | **The agent route keeps its own provider call** (new, found in 2D) — the streaming fast lanes read `DEEPSEEK_API_KEY` and invoke `deepseekChatStream` directly, bypassing the core. Phase 3's acceptance criterion *"`chatWithTools()` is the only way the core reaches a model"* is not met until that lane goes through the same door. Asserted as a **count** meanwhile, so it cannot quietly grow. | 3 | medium — a second transport is a second place to fix a provider bug |
-| N7 | **The degraded lane does not know who it is talking to** (new, found in 2C) — `buildDegradedSystemPrompt` is the only one of four lanes that omits `viewerBlockFor`, so on the no-provider path a user asking *"do you know who I am?"* gets the pre-fix answer. `UserContext` is already available at the call site, so the fix is one line. Not made in 2C because that stage is code motion and changing what a lane says is not motion. | 2E | low; degraded path only |
+| N7 | ~~**The degraded lane does not know who it is talking to**~~ — **CLOSED in 2E.** Found in 2C: `buildDegradedSystemPrompt` was the only one of four lanes omitting `viewerBlockFor`, so on the no-provider path a user asking *"do you know who I am?"* got the pre-fix answer. Left alone in 2C on purpose (that stage was code motion); fixed in 2E where the recovery path was being touched anyway. The degraded lane now sits in the same assertion loops as the other three. | ✅ 2E | closed |
 | — | **Agent jobs are request-scoped** — a task cannot survive the app closing | 17 | blocking for cross-device agents |
 | — | **Realtime/storage degraded ~19% in CN** (browser→Supabase) | R3 (existing) | affects file/image UX in CN |
 | — | **FCM push blocked in CN** | — | Android push in CN needs a CN vendor |

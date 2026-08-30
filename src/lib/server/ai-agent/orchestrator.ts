@@ -21,13 +21,19 @@ import "server-only";
 import type {
   AgentStep,
   AgentResponse,
-  UserContext,
-  ToolResult,
 } from "./types";
 import { dispatchTool } from "./tool-registry";
-import { aiChat, aiProviderConfigured } from "@/lib/server/ai-provider";
+import { aiProviderConfigured } from "@/lib/server/ai-provider";
 import { hasUntrustedContent } from "@/lib/server/ai/security/untrusted";
 import { logSealTransform } from "@/lib/server/ai/observability/reply-log";
+/* Phase 2E — the loop is now only the loop. What the model sees of a tool
+   result, what the user sees of a call, the pre-dispatch guard, and the two
+   recovery paths each live in their own module under core/. */
+import type { TurnInput } from "@/lib/server/ai/core/types";
+export type { TurnInput } from "@/lib/server/ai/core/types";
+import { toLlmSafe, humaniseCall } from "@/lib/server/ai/core/wire";
+import { preToolGuard } from "@/lib/server/ai/core/pre-tool-guard";
+import { runDegradedTurn, fallback } from "@/lib/server/ai/core/recovery";
 /* Phase 2D — everything that speaks to a provider lives in core/transport.
    The loop below decides WHAT to send and what to do with the answer; it no
    longer knows the endpoint, the model id, the key, or the retry policy. */
@@ -47,7 +53,6 @@ import {
   buildSystemPrompt,
   buildMinimalSystemPrompt,
   buildBrandSystemPrompt,
-  buildDegradedSystemPrompt,
 } from "@/lib/server/ai/prompts";
 /* Phase 2B — the seal chain moved out. sealFinalReply is still THE one
    funnel; it simply no longer lives in the middle of the loop that calls it.
@@ -87,35 +92,7 @@ const MAX_TOOLS_PER_TURN = 6;
 /* Cap on parallel tool_calls in a single iteration — 8B will sometimes
    emit the same call three times in one step. */
 const MAX_PARALLEL_TOOLS = 3;
-
-export interface OrchestrateInput {
-  ctx: UserContext;
-  /** Conversation history — role/content pairs, oldest first. */
-  history: Array<{ role: "user" | "assistant"; content: string }>;
-  /** Latest user message (already persisted by the caller). */
-  userMessage: string;
-  userLang: "en" | "zh" | "ar";
-  /** Set when the language detector flags Egyptian dialect / Franco —
-   *  the model then generates natural Egyptian Arabic natively. */
-  dialect?: "egyptian" | null;
-  conversationId: string;
-  /** The composer's globe control was on for this turn. A nudge toward
-   *  search_web, never a command — the model still decides. */
-  webSearchRequested?: boolean;
-  /** Appended to whichever system prompt this turn builds when the user has
-   *  a stored "always answer me in X" preference. Built by the route, which
-   *  owns the preference, so every lane applies the identical text. */
-  languageLock?: string;
-  /** Owner-taught Q&A block (approved canonical replies) — appended to
-   *  every lane's system prompt; the model does the meaning-matching. */
-  taughtAnswers?: string;
-  /** Streaming hook: when set, the ANSWER-phase model call streams and
-   *  each content token is forwarded here in real time. */
-  onDelta?: (text: string) => void;
-}
-
-
-export async function orchestrate(input: OrchestrateInput): Promise<AgentResponse> {
+export async function orchestrate(input: TurnInput): Promise<AgentResponse> {
   const tStart = Date.now();
   const {
     ctx, history, userMessage, userLang, dialect, conversationId, onDelta,
@@ -165,7 +142,7 @@ export async function orchestrate(input: OrchestrateInput): Promise<AgentRespons
         userMessage,
       );
     }
-    return orchestrateNoGroq(input, tStart);
+    return runDegradedTurn(input, tStart);
   }
 
   /* Canned fast-reply — narrow EN/AR/ZH exact-match triggers for
@@ -755,234 +732,3 @@ export async function orchestrate(input: OrchestrateInput): Promise<AgentRespons
   };
 }
 
-/* ─── Helpers ─────────────────────────────────────────── */
-
-function toLlmSafe(result: ToolResult): Record<string, unknown> {
-  return {
-    ok: result.ok,
-    permissionStatus: result.permissionStatus,
-    message: result.message,
-    data: result.data,
-    filteredFields: result.filteredFields,
-    sources: result.sources,
-  };
-}
-
-function humaniseCall(toolName: string, args: Record<string, unknown>): string {
-  const q = (args.query as string | undefined) ?? (args.code as string | undefined);
-  if (q) return `Running ${toolName}("${q}")…`;
-  return `Running ${toolName}…`;
-}
-
-
-/* ─── Pre-tool guard ────────────────────────────────────────────────
-   Runs AFTER the model emits tool_calls but BEFORE dispatchTool().
-   Rejects calls that are clearly invalid — missing customer, missing
-   product, missing quantity — so we never hit the DB with junk and
-   never burn the audit trail on ghost calls.
-
-   Importantly, guard failures are INTERNAL:
-     · no `tool-call` step is pushed (no chip shown)
-     · no `tool-result` step is pushed (no red "denied" chip either)
-     · the rejection is fed only to the model via the tool-role
-       message that the outer loop emits for every toolRuns entry
-     · the next model iteration sees the guard message and rephrases
-       it as a natural question to the user
-
-   Missing input is NOT a permission denial. The user just sees the
-   assistant asking for the info it needs, in the same bubble style
-   as any other reply. No red lock chip, no "denied" state.
-   ───────────────────────────────────────────────────────────────── */
-
-/** Canonical v4 UUID shape. Blocks stub/hallucinated ids like
- *  "customer-1", "CUSTOMER", "00000000" that small models occasionally
- *  invent to satisfy a required field. */
-const UUID_RE =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-
-type GuardResult = { ok: true } | { ok: false; message: string };
-
-function preToolGuard(
-  name: string,
-  args: Record<string, unknown>,
-): GuardResult {
-  switch (name) {
-    /* Whitelisted — "list products" / counts / catalogue stats must
-       keep working with no args. */
-    case "searchProducts":
-    case "countProducts":
-    case "getCatalogStats":
-      return { ok: true };
-
-    case "getCustomerByName": {
-      const q = String(args.query ?? "").trim();
-      if (!q) {
-        return {
-          ok: false,
-          message:
-            "Which customer should I look up? You can send a name or customer code.",
-        };
-      }
-      return { ok: true };
-    }
-
-    case "getCustomerByCode": {
-      const code = String(args.code ?? "").trim();
-      if (!code) {
-        return { ok: false, message: "Which customer code should I use?" };
-      }
-      return { ok: true };
-    }
-
-    case "getProductByCode": {
-      const code = String(args.code ?? "").trim();
-      if (!code) {
-        return {
-          ok: false,
-          message: "Which product code should I look up?",
-        };
-      }
-      return { ok: true };
-    }
-
-    case "getProductDetails": {
-      const id = String(args.productId ?? "").trim();
-      if (!id || !UUID_RE.test(id)) {
-        return {
-          ok: false,
-          message: "I need a product first. Which product should I use?",
-        };
-      }
-      return { ok: true };
-    }
-
-    /* Quotation workflow — strictest gate.
-       Require (a) a syntactically-valid customerId UUID AND
-               (b) at least one line with a valid product UUID + qty > 0.
-       Both tools share the same arg shape, so the guard is identical. */
-    case "calculateQuotationPricing":
-    case "createQuotationDraft": {
-      const customerId = String(args.customerId ?? "").trim();
-      const rawLines = Array.isArray(args.lines) ? args.lines : [];
-      const validLines = rawLines.filter((l) => {
-        const rec = l as { productId?: unknown; qty?: unknown };
-        const pid = String(rec.productId ?? "").trim();
-        const qty = Number(rec.qty ?? 0);
-        return pid && UUID_RE.test(pid) && qty > 0;
-      });
-      const customerOk = customerId && UUID_RE.test(customerId);
-      const linesOk = validLines.length > 0;
-
-      if (!customerOk && !linesOk) {
-        /* Nothing usable at all — fully-generic ask. */
-        return {
-          ok: false,
-          message:
-            "To prepare a quotation, I need the customer name or code, plus the product and quantity.",
-        };
-      }
-      if (!customerOk) {
-        return {
-          ok: false,
-          message:
-            "Who is this quotation for? Please send the customer name or code.",
-        };
-      }
-      if (!linesOk) {
-        return {
-          ok: false,
-          message:
-            "Which product and quantity should I include in the quotation?",
-        };
-      }
-      return { ok: true };
-    }
-
-    default:
-      /* Unknown tool names fall through — the registry dispatcher is
-         still the enforcement point for unknown-tool and permission
-         checks. We only gate the specific arg shapes we know about. */
-      return { ok: true };
-  }
-}
-
-/* ── Provider-agnostic fallback ──
-   Runs when GROQ_API_KEY is missing but another provider IS configured.
-   We skip the tool-calling loop entirely and just produce a chat reply
-   via the shared aiChat() abstraction (which already supports Gemini /
-   Anthropic / OpenAI). The reply gets a one-line "Tools are off" tail
-   so operators know live-data answers aren't available until Groq is
-   wired. Same AgentResponse shape so the caller doesn't care which
-   path was taken. */
-async function orchestrateNoGroq(
-  input: OrchestrateInput,
-  tStart: number,
-): Promise<AgentResponse> {
-  const { history, userMessage, userLang, conversationId } = input;
-  /* Same current-turn-only scope as orchestrate() — see AUDIT ISSUE 5 note
-     there. This second copy still scanned retained history and would have
-     kept the old, wider exemption alive on the no-key fallback path. */
-  const attachedDocCtx = hasUntrustedContent(userMessage);
-  /* Phase 2C — this fourth prompt used to be assembled inline here, which is
-     precisely how a lane ends up with a different set of rules from the other
-     three. It now lives in the prompt layer with them. */
-  const systemPrompt = buildDegradedSystemPrompt(userLang);
-
-  /* The route already applies the 60-message / char-budget window;
-     mirror it here rather than silently narrowing memory on this path. */
-  const trimmed = history.slice(-60).map((m) => ({
-    role: m.role as "user" | "assistant" | "system",
-    content: m.content,
-  }));
-  const messages = [
-    { role: "system" as const, content: systemPrompt },
-    ...trimmed,
-    { role: "user" as const, content: userMessage },
-  ];
-
-  try {
-    const result = await aiChat(messages);
-    const reply =
-      result?.reply?.trim() ||
-      "I couldn't reach the AI provider just now. Try again in a moment.";
-    const steps: AgentStep[] = [{ kind: "answer", text: reply }];
-    const safeReply = sealFinalReply(reply, steps, userMessage, attachedDocCtx);
-    console.log(
-      `[ai.agent.timing] fast=no-groq provider=${result?.provider ?? "none"} total=${Date.now() - tStart}ms`,
-    );
-    return {
-      steps,
-      finalReply: safeReply,
-      provider: result?.provider ?? "fallback",
-      conversationId,
-    };
-  } catch (e) {
-    console.error("[ai.agent.no-groq]", e);
-    return fallback(
-      "Something went wrong reaching the AI provider. Please try again.",
-      conversationId,
-      userMessage,
-    );
-  }
-}
-
-function fallback(
-  msg: string,
-  conversationId: string,
-  userMessage?: string,
-): AgentResponse {
-  /* Defense-in-depth: even this helper — which today is only called
-     with fixed server-controlled strings — passes through the
-     pricing-safety gate. Keeps every AgentResponse exit consistent. */
-  const steps: AgentStep[] = [
-    { kind: "answer", text: msg, permissionStatus: "denied" },
-  ];
-  const safeReply = sealFinalReply(msg, steps, userMessage);
-  logSealTransform(msg, safeReply, "fallback");
-  return {
-    steps,
-    finalReply: safeReply,
-    provider: providerLabel(),
-    conversationId,
-  };
-}
