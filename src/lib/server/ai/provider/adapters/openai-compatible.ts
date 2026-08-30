@@ -145,6 +145,68 @@ export function parseFallbackConfig(env: {
   };
 }
 
+/** WHY the fallback did not configure — for an operator, never for a log.
+ *
+ *  `parseFallbackConfig` answers yes or no, and that is the right shape for a
+ *  hot path: the adapter needs a boolean, not a reason. But an operator who has
+ *  just set four environment variables and sees `configured: false` needs the
+ *  other question answered, and answering it by guessing is how an evening
+ *  disappears.
+ *
+ *  The four rejection paths are indistinguishable from outside — a missing
+ *  key, a missing url, a missing model and a plaintext url all produce the
+ *  same `null`. This names which one fired.
+ *
+ *  IT RETURNS VARIABLE NAMES, NEVER VALUES. "AI_FALLBACK_API_KEY is not set"
+ *  is safe to render in a browser; the key itself never is. The url is
+ *  reported only as a protocol judgement — "not https" — not as a string,
+ *  because a base url can carry a workspace id.
+ *
+ *  Returns an empty array when the config is fine. */
+export function diagnoseFallbackConfig(env: {
+  AI_FALLBACK_BASE_URL?: string;
+  AI_FALLBACK_API_KEY?: string;
+  AI_FALLBACK_MODEL?: string;
+}): string[] {
+  const problems: string[] = [];
+  const base = env.AI_FALLBACK_BASE_URL?.trim();
+  const model = env.AI_FALLBACK_MODEL?.trim();
+  const key = env.AI_FALLBACK_API_KEY?.trim();
+
+  if (!base) problems.push("AI_FALLBACK_BASE_URL is not set");
+  if (!model) problems.push("AI_FALLBACK_MODEL is not set");
+  if (!key) problems.push("AI_FALLBACK_API_KEY is not set");
+
+  /* Only worth checking once the value exists. Reported as a judgement, not
+     as the string, because a base url can carry a workspace identifier. */
+  if (base) {
+    let url: URL | null = null;
+    try {
+      url = new URL(base);
+    } catch {
+      problems.push("AI_FALLBACK_BASE_URL is not a valid URL");
+    }
+    if (url && url.protocol !== "https:") {
+      problems.push("AI_FALLBACK_BASE_URL is not https — the adapter refuses to send a key over plaintext");
+    }
+    /* The mistake this file's own docs warn about, and the one most likely
+       after following a vendor's quickstart, which shows the full path. */
+    if (url && /\/chat\/completions\/?$/.test(url.pathname)) {
+      problems.push("AI_FALLBACK_BASE_URL ends with /chat/completions — the adapter appends that itself, so it is duplicated");
+    }
+  }
+
+  /* All four present and well-formed, yet still not configured, means the
+     process did not see them: variables are read once when the function
+     starts, so setting them after a deploy does nothing until a redeploy. */
+  if (problems.length === 0) {
+    problems.push(
+      "All four variables look well-formed. If the adapter is still unconfigured, the running process started BEFORE they were set — redeploy.",
+    );
+  }
+  return problems;
+}
+
 /* Read explicitly rather than passing process.env: this project types
    ProcessEnv strictly, and naming the four variables here is also the only
    place a reader has to look to know what this adapter consumes. */

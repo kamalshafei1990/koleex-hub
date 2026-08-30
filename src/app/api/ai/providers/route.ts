@@ -36,7 +36,7 @@ import { requireAuth } from "@/lib/server/auth";
 import { providerRoster } from "@/lib/server/ai/provider/registry";
 import { chatWithToolsVia } from "@/lib/server/ai/provider/registry";
 import { deepseekAdapter } from "@/lib/server/ai/provider/adapters/deepseek";
-import { openAiCompatibleAdapter } from "@/lib/server/ai/provider/adapters/openai-compatible";
+import { openAiCompatibleAdapter, diagnoseFallbackConfig } from "@/lib/server/ai/provider/adapters/openai-compatible";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 30;
@@ -51,11 +51,24 @@ export async function GET(req: Request) {
   const roster = providerRoster();
   const configured = roster.filter((p) => p.configured);
 
+  /* When the fallback is NOT configured, say WHY. An operator who has just set
+     four variables and sees `configured: false` otherwise has to guess between
+     four indistinguishable causes; naming the one that fired is the difference
+     between a redeploy and an evening. Variable NAMES only — never values. */
+  const fallbackProblems = roster.some((p) => p.name === "fallback" && !p.configured)
+    ? diagnoseFallbackConfig({
+        AI_FALLBACK_BASE_URL: process.env.AI_FALLBACK_BASE_URL,
+        AI_FALLBACK_API_KEY: process.env.AI_FALLBACK_API_KEY,
+        AI_FALLBACK_MODEL: process.env.AI_FALLBACK_MODEL,
+      })
+    : null;
+
   const wantProbe = new URL(req.url).searchParams.get("probe") === "1";
   if (!wantProbe) {
     return NextResponse.json({
       providers: roster,
       configured_count: configured.length,
+      ...(fallbackProblems ? { fallback_not_configured_because: fallbackProblems } : {}),
       /* Said plainly, because "configured" reads as "working" and is not.
          An operator who stops at this line should know what they have. */
       note:
@@ -112,6 +125,7 @@ export async function GET(req: Request) {
   return NextResponse.json({
     providers: roster,
     configured_count: configured.length,
+    ...(fallbackProblems ? { fallback_not_configured_because: fallbackProblems } : {}),
     probes,
     note: probes.every((p) => p.ok)
       ? "Every configured provider answered."

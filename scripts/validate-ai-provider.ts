@@ -31,7 +31,7 @@ import {
   chatWithToolsVia,
   shouldTryNextProvider,
 } from "../src/lib/server/ai/provider/registry";
-import { openAiCompatibleAdapter, parseFallbackConfig, parseExtraBody } from "../src/lib/server/ai/provider/adapters/openai-compatible";
+import { openAiCompatibleAdapter, parseFallbackConfig, parseExtraBody, diagnoseFallbackConfig } from "../src/lib/server/ai/provider/adapters/openai-compatible";
 import { providerRoster } from "../src/lib/server/ai/provider/registry";
 import { createBreaker, admissible } from "../src/lib/server/ai/router/circuit-breaker";
 import { parseClassMap, resolveModel, MODEL_CLASSES } from "../src/lib/server/ai/router/model-classes";
@@ -714,7 +714,60 @@ async function asyncChecks() {
 }
 
 void asyncChecks().then(() => {
-  console.log("\n── The roster: an operator can check the fallback WITHOUT breaking the primary ──");
+  console.log("\n── Saying WHY the fallback is unconfigured, without saying what ──");
+/* The four rejection paths in parseFallbackConfig are indistinguishable from
+   outside: a missing key, a missing url, a missing model and a plaintext url
+   all produce the same null. An operator who has just set four variables and
+   sees `configured: false` would otherwise guess between them.
+
+   The assertions below are mostly about the SECOND half of that sentence —
+   this is rendered in a browser, so it may carry variable NAMES and never
+   values. */
+{
+  const OK = { AI_FALLBACK_BASE_URL: "https://gw.example/v1", AI_FALLBACK_MODEL: "m", AI_FALLBACK_API_KEY: "sk-super-secret-value" };
+
+  check("nothing set names all three required variables", diagnoseFallbackConfig({}).length === 3);
+  check(
+    "a single missing variable is named alone, not buried in a list",
+    diagnoseFallbackConfig({ ...OK, AI_FALLBACK_API_KEY: "" }).join("|") === "AI_FALLBACK_API_KEY is not set",
+  );
+  check(
+    "a plaintext url is diagnosed as the protocol, which is the actual rule",
+    /not https/.test(diagnoseFallbackConfig({ ...OK, AI_FALLBACK_BASE_URL: "http://gw.example/v1" }).join("|")),
+  );
+  check(
+    "a malformed url is diagnosed rather than throwing",
+    /not a valid URL/.test(diagnoseFallbackConfig({ ...OK, AI_FALLBACK_BASE_URL: "not a url" }).join("|")),
+  );
+  /* The mistake most likely after following a vendor quickstart, which shows
+     the full path including /chat/completions. */
+  check(
+    "a url that already ends in /chat/completions is called out — the adapter appends it",
+    /duplicated/.test(diagnoseFallbackConfig({ ...OK, AI_FALLBACK_BASE_URL: "https://gw.example/v1/chat/completions" }).join("|")),
+  );
+  /* All four present and still unconfigured means the process predates them.
+     Without this line an operator has a correct config and no next step. */
+  check(
+    "a well-formed config that still fails points at the redeploy",
+    /redeploy/i.test(diagnoseFallbackConfig(OK).join("|")),
+  );
+
+  /* THE SECURITY PROPERTY. Asserted as the absence of a class: no input value
+     may appear in the output, whatever it was. */
+  const secretish = ["sk-super-secret-value", "gw.example"];
+  const out = [
+    ...diagnoseFallbackConfig(OK),
+    ...diagnoseFallbackConfig({ ...OK, AI_FALLBACK_BASE_URL: "http://gw.example/v1" }),
+    ...diagnoseFallbackConfig({ ...OK, AI_FALLBACK_BASE_URL: "https://gw.example/v1/chat/completions" }),
+  ].join(" ");
+  const leaked = secretish.filter((v) => out.includes(v));
+  check(
+    `no VALUE is echoed back — only variable names${leaked.length ? ` — leaked: ${leaked.join(", ")}` : ""}`,
+    leaked.length === 0,
+  );
+}
+
+console.log("\n── The roster: an operator can check the fallback WITHOUT breaking the primary ──");
 /* A fallback is only ever contacted when the primary fails, so a mistake in
    configuring it is invisible until the moment there is no margin for it. The
    roster exists so "did my four env vars work?" has an answer that does not
