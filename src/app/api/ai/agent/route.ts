@@ -55,6 +55,7 @@ import {
 import { tryCannedReply } from "@/lib/server/ai/core/canned-replies";
 import { chatWithTools, activeProviderLabel } from "@/lib/server/ai/provider/registry";
 import { streamingFastLaneEnabled } from "@/lib/server/ai/router/provider-policy";
+import { planReveal } from "@/lib/server/ai/streaming/reveal";
 import { buildSmartPrompt } from "@/lib/server/ai/prompt-builder";
 import {
   detectLanguageDirective,
@@ -697,19 +698,30 @@ export async function POST(req: Request) {
               controller.enqueue(send({ type: "steps", steps: toolSteps }));
             }
 
-            /* Pseudo-stream the finalReply. Chunk size + delay
-               calibrated to feel natural without dragging the total
-               time out:
-                 · ~28 chars/chunk
-                 · 12 ms between chunks → ~2 200 chars/sec visible rate
-               A 200-word (~1 200 char) answer streams in ~520 ms. */
+            /* Reveal a reply that arrived COMPLETE, with no deltas of its
+               own — a degraded turn, a local-knowledge answer, a rescue
+               after a provider failure. When the turn streamed genuinely
+               `liveDeltaCount` is non-zero and none of this runs, so a real
+               stream is never re-chunked on top of itself.
+
+               PHASE 5A. This used to be a fixed 28-char chunk and a fixed
+               12 ms pause with NO CEILING, and that pause is real wall-clock
+               time sitting in front of the `end` event — so it delayed the
+               turn, not just the animation. Multiplied out, a 9 000-char
+               answer paid 3 852 ms of invented waiting after it was already
+               fully computed. planReveal() bounds the whole reveal to
+               REVEAL_BUDGET_MS at any length: long replies get bigger chunks
+               instead of more waiting. The gradual reveal survives, because
+               dropping the pause entirely would deliver every frame at once,
+               which is a block of text with extra steps. */
             const full = liveDeltaCount > 0 ? "" : (agent.finalReply ?? "");
-            const CHUNK = 28;
-            for (let i = 0; i < full.length; i += CHUNK) {
-              const text = full.slice(i, i + CHUNK);
-              controller.enqueue(send({ type: "delta", text }));
-              if (i + CHUNK < full.length) {
-                await new Promise((r) => setTimeout(r, 12));
+            if (full.length > 0) {
+              const plan = planReveal(full.length);
+              for (let i = 0; i < full.length; i += plan.chunkChars) {
+                controller.enqueue(send({ type: "delta", text: full.slice(i, i + plan.chunkChars) }));
+                if (i + plan.chunkChars < full.length && plan.delayMs > 0) {
+                  await new Promise((r) => setTimeout(r, plan.delayMs));
+                }
               }
             }
           }
