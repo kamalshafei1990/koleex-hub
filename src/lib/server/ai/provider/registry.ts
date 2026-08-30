@@ -99,15 +99,32 @@ export function providerConfigured(): boolean {
  *    5xx        the provider is broken or overloaded          → try the next
  *    429        the provider is rate-limiting US              → try the next
  *    401 / 403  our credential for THIS provider is bad       → try the next
+ *    402        this provider's ACCOUNT is out of credit      → try the next
  *    404        this provider's endpoint is wrong             → try the next
  *    4xx other  the REQUEST is bad (400, 413, 422, …)         → stop
  *
  *  The last line is the important one. Those failures are a property of what
  *  we sent, not of who we sent it to, so a second attempt is a second failure
- *  plus the latency of getting there. */
+ *  plus the latency of getting there.
+ *
+ *  402 WAS MISSING, and it was the wrong one to miss. It is not a statement
+ *  about the request at all — it says the ACCOUNT behind this provider has run
+ *  out of credit, which is exactly the condition a second provider exists to
+ *  survive. Under the old table it fell into "4xx other" and stopped the whole
+ *  turn, so a primary that ran out of balance would have taken the assistant
+ *  down WITH a healthy fallback configured and never contacted. Found while
+ *  setting a second provider up against an account whose console was already
+ *  warning that its balance was insufficient — the failure this line prevents
+ *  is not hypothetical, it is the next thing that would have happened. */
 export function shouldTryNextProvider(status: number): boolean {
   if (status >= 500) return true;
-  return status === 429 || status === 401 || status === 403 || status === 404;
+  return (
+    status === 429 ||
+    status === 401 ||
+    status === 402 ||
+    status === 403 ||
+    status === 404
+  );
 }
 
 function failoverEnabled(): boolean {
