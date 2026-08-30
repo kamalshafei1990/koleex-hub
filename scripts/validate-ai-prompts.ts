@@ -81,13 +81,13 @@ const LANES: Array<[string, string]> = [
 
 /* The degraded lane (no provider configured) is a FOURTH prompt, found only
    because Phase 2C pulled it out of orchestrateNoGroq() where it was
-   assembled inline. It is held separately from LANES because of one real
-   difference documented at its definition: it is the only lane that does not
-   embed the viewer block (finding N7, scheduled with 2E). Every OTHER
-   property is required of it identically — a degraded lane is still Koleex
-   AI talking to a user, and is exactly where a tired implementation would
-   name the provider it cannot reach. */
-const DEGRADED = buildDegradedSystemPrompt("en");
+   assembled inline. It was held apart while finding N7 was open — it was the
+   one lane missing the viewer block. N7 is closed in 2E, so it now joins the
+   others and is held to every property they are, without exception. It is
+   exactly the lane where a tired implementation would name the provider it
+   cannot reach, so it is the last one that should get a discount. */
+const DEGRADED = buildDegradedSystemPrompt(ctx, "en");
+LANES.push(["degraded (no provider)", DEGRADED]);
 
 console.log("\n── 1. No lane leaks the vendor ──");
 /* The built prompt contains no comments, so a match here is text the model is
@@ -98,7 +98,6 @@ for (const [lane, prompt] of LANES) {
   check(`${lane}: names no model or provider`, !VENDORS.test(prompt));
 }
 
-check("degraded lane: names no model or provider", !VENDORS.test(DEGRADED));
 check(
   "degraded lane: explicitly forbids naming the provider it cannot reach",
   /never name any provider/i.test(DEGRADED),
@@ -111,9 +110,6 @@ for (const [lane, prompt] of LANES) {
 for (const [lane, prompt] of LANES) {
   check(`${lane}: calls itself Koleex AI`, /Koleex AI/.test(prompt));
 }
-
-check("degraded lane: carries the provenance rule", DEGRADED.includes("YOUR IDENTITY (ABSOLUTE RULE)"));
-check("degraded lane: calls itself Koleex AI", /Koleex AI/.test(DEGRADED));
 
 console.log("\n── 3. Every lane knows who it is talking to ──");
 /* The incident: an agent running inside the user's own authenticated session
@@ -132,12 +128,6 @@ const VIEWER_BLOCK_MARKER = "Never say you don't know who they are.";
 for (const [lane, prompt] of LANES) {
   check(`${lane}: carries the viewer block, not just a bare username line`, prompt.includes(VIEWER_BLOCK_MARKER));
 }
-
-console.log(
-  `  · NOTE: the degraded lane is excluded from this section. It does not embed\n` +
-  `    the viewer block (finding N7). Recorded, not asserted as correct — the\n` +
-  `    gap is real and is scheduled with the recovery-path work in 2E.`,
-);
 
 console.log("\n── 4. Blocks behave ──");
 check("the viewer block names the person, not just the login", viewerBlockFor(ctx).includes("Mona Adel"));
