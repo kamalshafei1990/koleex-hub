@@ -19,7 +19,7 @@
    values. A grep proves a regex is present; calling it proves it still works.
    --------------------------------------------------------------------------- */
 
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import {
   tryFastReply,
   isSmallTalk,
@@ -50,6 +50,7 @@ const CANNED = "src/lib/server/ai/core/canned-replies.ts";
 const ORCH = "src/lib/server/ai-agent/orchestrator.ts";
 const AGENT_ROUTE = "src/app/api/ai/agent/route.ts";
 const CHAT_ROUTE = "src/app/api/ai/chat/route.ts";
+const TRANSPORT = "src/lib/server/ai/core/transport.ts";
 const read = (p: string) => readFileSync(p, "utf8");
 
 const decide = read(DECIDE);
@@ -57,6 +58,7 @@ const canned = read(CANNED);
 const orch = read(ORCH);
 const agentRoute = read(AGENT_ROUTE);
 const chatRoute = read(CHAT_ROUTE);
+const transport = read(TRANSPORT);
 
 /* Strip comments so a prose mention of "supabase" in a header can never be
    mistaken for an import. Every purity check below runs on stripped code —
@@ -226,6 +228,67 @@ check(
 );
 check("brand: an ordinary question needs no brand section", classifyBrandSection("how do I reset my password") === "none");
 check("canned: a real question is NOT canned-answered", tryCannedReply("what is our MOQ for spreading machines") === null);
+
+console.log("\n── 7. The vendor surface has exactly one home (Phase 2D) ──");
+/* Phase 3 replaces the inside of core/transport.ts with provider adapters.
+   That is a contained change only while the endpoint, the model id, the API
+   key and the Authorization header exist in that ONE file. The moment a
+   second file in the core starts talking to a provider, "swap the provider"
+   goes back to being a change to the orchestrator. */
+{
+  const VENDOR_SURFACE = /api\.deepseek\.com|DEEPSEEK_API_KEY|Authorization/;
+  const CORE_DIRS = [
+    "src/lib/server/ai-agent",
+    "src/lib/server/ai/core",
+    "src/lib/server/ai/seals",
+    "src/lib/server/ai/prompts",
+  ];
+  const offenders: string[] = [];
+  const walk = (dir: string) => {
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+      const full = `${dir}/${entry.name}`;
+      if (entry.isDirectory()) walk(full);
+      else if (entry.name.endsWith(".ts") && full !== TRANSPORT) {
+        if (VENDOR_SURFACE.test(stripComments(read(full)))) offenders.push(full);
+      }
+    }
+  };
+  for (const d of CORE_DIRS) walk(d);
+  check(
+    `the endpoint, key and auth header appear ONLY in core/transport.ts${offenders.length ? ` — found in ${offenders.join(", ")}` : ""}`,
+    offenders.length === 0,
+  );
+}
+check(
+  "transport.ts really does hold the vendor surface (so the check above is not vacuous)",
+  /api\.deepseek\.com/.test(transport) && /DEEPSEEK_API_KEY/.test(transport),
+);
+check(
+  "the orchestrator reads the key through the transport, not from the environment",
+  /readProviderKey\(\)/.test(orch) && !/process\.env/.test(stripComments(orch)),
+);
+check(
+  "the provider label is built in one place, not repeated at every return site",
+  /providerLabel\(\)/.test(orch) && !/deepseek:\$\{/.test(orch),
+);
+check(
+  "the API key is never logged, thrown or interpolated into a message",
+  !/console\.[a-z]+\([^)]*\bkey\b/.test(stripComments(transport)) &&
+    !/throw new Error\([^)]*\bkey\b/.test(stripComments(transport)),
+);
+/* KNOWN, recorded as finding N8: the agent route keeps its OWN provider call
+   for the streaming fast lanes — it reads DEEPSEEK_API_KEY and invokes
+   deepseekChatStream directly, bypassing the core entirely. Phase 3's
+   acceptance criterion ("chatWithTools is the only way the core reaches a
+   model") is not met until that lane goes through the same door. Asserted as
+   a COUNT so the situation cannot quietly get worse while it waits. */
+{
+  const routeProviderCalls = (agentRoute.match(/deepseekChatStream\(/g) ?? []).length;
+  check(
+    `the route's parallel provider path has not grown (N8: expected 1 call site, found ${routeProviderCalls})`,
+    routeProviderCalls <= 1,
+  );
+}
 
 console.log(`\n${pass} passed, ${failures.length} failed`);
 if (failures.length) {
