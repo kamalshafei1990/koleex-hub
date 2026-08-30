@@ -17,6 +17,7 @@
     "validate:ai-egress": "NODE_OPTIONS=--conditions=react-server tsx scripts/validate-ai-egress.ts",
     "validate:ai-untrusted": "NODE_OPTIONS=--conditions=react-server tsx scripts/validate-ai-untrusted.ts",
     "validate:ai-confirm-ledger": "NODE_OPTIONS=--conditions=react-server tsx scripts/validate-ai-confirm-ledger.ts",
+    "validate:ai-seals": "NODE_OPTIONS=--conditions=react-server tsx scripts/validate-ai-seals.ts",
     "validate:ai-core-boundaries": "tsx scripts/validate-ai-core-boundaries.ts",
     "validate:ai-rate-limit": "NODE_OPTIONS=--conditions=react-server tsx scripts/validate-ai-rate-limit.ts",
     "validate:trade-terms": "tsx --conditions=react-server scripts/validate-trade-terms.ts",

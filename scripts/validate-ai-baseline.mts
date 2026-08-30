@@ -42,6 +42,16 @@ const todos = readFileSync("src/lib/server/ai-agent/tools/todos.ts", "utf8");
 const audit = readFileSync("src/lib/server/ai-agent/audit.ts", "utf8");
 const webSearch = readFileSync("src/lib/server/ai-agent/tools/web-search.ts", "utf8");
 
+/* Phase 2B moved the seal chain out of orchestrator.ts into its own layer.
+   These pins follow the CODE, not the filename: each assertion below reads the
+   specific seals module that owns the behaviour it pins. Deliberately NOT one
+   concatenated blob of the whole tree — a pin that can be satisfied by a match
+   in some unrelated file is a pin that no longer pins anything. */
+const sealsIndex = readFileSync("src/lib/server/ai/seals/index.ts", "utf8");
+const sealsPricing = readFileSync("src/lib/server/ai/seals/pricing.ts", "utf8");
+const sealsText = readFileSync("src/lib/server/ai/seals/text.ts", "utf8");
+const sealsQuotation = readFileSync("src/lib/server/ai/seals/quotation.ts", "utf8");
+
 /* ═══ 1. LANE ROUTING — the tool-less fast lane must never swallow a turn
        that needs tools. Each of these was a measured production failure:
        the model apologised for having no access while the tool sat one
@@ -131,34 +141,47 @@ check(
 /* ═══ 5. THE SEAL CHAIN — the verification engine. Order matters. ═══ */
 section("Verification seal chain");
 
-const sealFnIdx = orch.indexOf("function sealFinalReply");
+/* Guard the guard. Every pin below reads the seals layer by path. If that layer
+   moves again and the reads return an empty or unrelated file, the pins would
+   pass or fail for the wrong reason — so assert the layer is really there and
+   really the seal chain BEFORE asserting anything about its contents. */
+check(
+  "the seals layer is where these pins expect it",
+  sealsIndex.includes("sealFinalReply") &&
+    sealsPricing.includes("PRICING_TOOLS") &&
+    sealsText.includes("TOOL_LEAK_RE") &&
+    sealsQuotation.includes("buildSafeQuotationReply"),
+  "if this fails, the pins beneath it are reading the wrong files — fix the paths, do not delete the pins",
+);
+
+const sealFnIdx = sealsIndex.indexOf("function sealFinalReply");
 check("sealFinalReply exists as the single funnel", sealFnIdx > 0);
 /* Body = from the definition to the next top-level `\n}` — anchoring on the
    first textual occurrence of the name matched a comment hundreds of lines
    earlier and produced a vacuous window. */
-const sealBody = sealFnIdx > 0 ? orch.slice(sealFnIdx, orch.indexOf("\n}", sealFnIdx) + 2) : "";
+const sealBody = sealFnIdx > 0 ? sealsIndex.slice(sealFnIdx, sealsIndex.indexOf("\n}", sealFnIdx) + 2) : "";
 for (const seal of ["scrubLeakedToolMarkup", "sealExecutionSafety", "sealExecutionSafetyV2", "sealExecutionSafetyV3", "sealPricingSafety", "syncLastAnswerStep"]) {
   check(`${seal} is called inside sealFinalReply`, new RegExp(`${seal}\\(`).test(sealBody));
 }
 check(
   "quotation hard mode discards the model's text entirely",
-  /isQuotationRequest\(userMessage\)[\s\S]{0,200}buildSafeQuotationReply\(steps\)/.test(orch),
+  /isQuotationRequest\(userMessage\)[\s\S]{0,200}buildSafeQuotationReply\(steps\)/.test(sealsIndex),
   "the reply is rebuilt from tool payloads; the model's prose is not trusted for money",
 );
 check(
   "createQuotationDraft is NOT accepted as pricing evidence",
-  /PRICING_TOOLS[\s\S]{0,300}calculateQuotationPricing/.test(orch) &&
-    !/PRICING_TOOLS\s*=\s*new Set<string>\(\[[\s\S]{0,200}createQuotationDraft/.test(orch),
+  /PRICING_TOOLS[\s\S]{0,300}calculateQuotationPricing/.test(sealsPricing) &&
+    !/PRICING_TOOLS\s*=\s*new Set<string>\(\[[\s\S]{0,200}createQuotationDraft/.test(sealsPricing),
   "the model used its presence as cover to emit invented numbers",
 );
 check(
   "pricing evidence requires a positive finite NUMBER, not a numeric-looking string",
-  /typeof v === "number" && Number\.isFinite\(v\) && v > 0/.test(orch),
+  /typeof v === "number" && Number\.isFinite\(v\) && v > 0/.test(sealsPricing),
   "a string that looks numeric is a placeholder or a fabrication",
 );
 check(
   "raw provider tool markup is scrubbed from the final reply",
-  /TOOL_LEAK_RE[\s\S]{0,200}DSML/.test(orch),
+  /TOOL_LEAK_RE[\s\S]{0,200}DSML/.test(sealsText),
   "owner screenshot 2026-08-21: a reply ended in raw provider tool tokens",
 );
 check(
@@ -173,7 +196,7 @@ check(
 );
 check(
   "the attached-document exemption keeps the fake-workflow seals ON",
-  /attachedDocContext[\s\S]{0,400}sealExecutionSafetyV2\(sealed, steps\)/.test(orch),
+  /attachedDocContext[\s\S]{0,400}sealExecutionSafetyV2\(sealed, steps\)/.test(sealsIndex),
   "reciting a document never justifies claiming tools ran — only v3/pricing stand down",
 );
 

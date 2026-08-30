@@ -738,7 +738,7 @@ break Hub integration · remove a working tool · weaken permissions or verifica
 |---|---|---|
 | **0 — Baseline & Tests** | 🟡 **IN PROGRESS** | Tenant-isolation guard ✅ · Incident-replay suite ✅ — both shipped and proven-to-fail (below). Baseline latency metrics: next (needs a running instance). |
 | **1 — Security Hardening** | ✅ **COMPLETE** | All six audit issues in scope closed (1, 2, 3, 4, 5, 6) + Issue 7. Two migrations applied staging→production with sign-off. Six suites green. |
-| **2 — AI Core + Standalone Foundation** | 🟡 **IN PROGRESS** | **2A shipped** — lane decision extracted, canned-answer duplication removed (below). 2B–2J to follow. |
+| **2 — AI Core + Standalone Foundation** | 🟡 **IN PROGRESS** | **2A + 2B shipped** — lane decision extracted; seal chain extracted and, for the first time, tested by calling it. `orchestrator.ts` 3 220 → 1 716. 2C–2J to follow. |
 | 3–20 | ⬜ Not started | **Amendment 1 (§P) folded in** — Phase 2 gains the connector interface + client-resolvable deep links |
 
 ### Phase 2 · Sub-stage 2A — the lane decision has one home ✅
@@ -765,6 +765,36 @@ The **third** table, the orchestrator's, is genuinely different — greetings an
 And the pre-existing behavioural test was used as the real gate: `validate:trade-terms` (15 retrieval + 12 routing cases) passed before the move, was **made to fail** by breaking one regex in the new file, and passed again once restored — proving the moved code is genuinely covered rather than merely present.
 
 **Regression gate:** all nine `validate:ai-*` suites plus `validate:trade-terms` green, `tsc` clean, `eslint` clean.
+
+### Phase 2 · Sub-stage 2B — the seal chain is its own layer, and is now tested ✅
+
+`src/lib/server/ai/seals/{text,pricing,execution,quotation,index}.ts` · `npm run validate:ai-seals` · **32 passed, 0 failed.**
+
+**What moved.** The whole verification engine — the component the audit scored **8.5/10**, the highest in the system — left `orchestrator.ts` for `ai/seals/`. Five modules along the boundaries the code already had: text seals, pricing, execution (v1/v2/v3), Quotation Hard Mode, and `index.ts` holding `sealFinalReply`, which remains **the one funnel**. `orchestrator.ts`: **2 703 → 1 716 lines** (3 220 → 1 716 across 2A + 2B).
+
+**Why this was worth the risk.** Before this, the seal chain was the least-defended part of the system *in test terms*: the only coverage was a handful of greps confirming its regexes were present in a file. A grep cannot tell you a guard still blocks anything. The chain turned out to be **pure and synchronous** — 18 references to `AgentStep`, 2 to `ToolResult`, and zero `await`, Supabase, `process.env` or `UserContext` — so once extracted it could be **called**. `validate:ai-seals` builds fabricated steps and asserts on real outputs.
+
+Cases that now have real coverage rather than a grep:
+
+| Failure mode | Asserted behaviour |
+|---|---|
+| Invented pricing | `$6,200 / $12,400` with no pricing tool this turn → replaced by the guard message |
+| `createQuotationDraft` used as cover | still **not** pricing evidence — the exact audit incident |
+| Denied or empty pricing result | not evidence |
+| Fake workflow narration | *"I found the customer in our database"* with no tool result → replaced |
+| Placeholders | `[Insert Customer Name]` blocked **even with** a successful customer lookup |
+| Leaked provider markup | reply cut at the first marker, legitimate prose kept |
+| Transcript divergence | the answer step is synced to the sealed text, so `steps[]` cannot differ from what the user read |
+
+**The exemption is scoped, and that is now asserted.** A user's own invoice trips every pricing pattern by nature, so v3 and the pricing seal stand down when a turn recites an attachment. v1 and v2 must **not** — reciting a document never justifies claiming a tool ran. This is the regression that was nearly shipped in Phase 1; there are now two tests that fail if the exemption widens.
+
+**Two of the first tests written were wrong, and the suite said so.** One tested `scrubLeakedToolMarkup` with `<function=…>` syntax, which that function does not handle (`cleanAssistantText` does) — and the failure exposed that the *next* assertion had passed **vacuously**, because unmatched text simply returns unchanged. The other asserted guard order with a character window, which really measures how long the comments are; it is now asserted by call **position**. Both were errors in the test, not the code, and both are documented in the file.
+
+**Proven to fail** (three negative tests, tree restored after each): re-admitting `createQuotationDraft` as pricing evidence → 1 failure; running the pricing seal before the execution seal → 4 failures; widening the attachment exemption to skip v1/v2 → 2 failures.
+
+**The incident pins were repointed, not relaxed.** Moving the seals broke **12 assertions** in `validate:ai-baseline` — the gate doing its job. Each was repointed at the specific seals module that owns the behaviour, **not** at a concatenated blob of the tree: a pin that any file can satisfy no longer pins anything. A *guard-the-guard* check was added first, so if the layer moves again the pins fail loudly instead of going quietly vacuous. Both repointed pins were re-proven to fail. Baseline is now **43 passed, 0 failed**.
+
+**Regression gate:** twelve suites green (`trade-terms`, `ai-seals`, `ai-core-boundaries`, `ai-tenant-isolation`, `ai-baseline`, `ai-egress`, `ai-untrusted`, `ai-confirm-ledger`, `ai-rate-limit`, `ai-orb`, `ai-platform`, `ai-quotation-guard`), `tsc` clean, `eslint` clean, and a full `next build` compiled successfully.
 
 ### Phase 0 · Result 1 — AI tenant-isolation guard ✅
 
