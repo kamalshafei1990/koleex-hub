@@ -22,6 +22,7 @@
    --------------------------------------------------------------------------- */
 
 import { readFileSync } from "node:fs";
+import { latencyStats } from "../src/lib/server/ai/observability/latency-stats";
 import { parseOpenAiChatResponse } from "../src/lib/server/ai/provider/adapters/deepseek";
 import {
   selectAdapter,
@@ -811,6 +812,72 @@ console.log("\n── The roster: an operator can check the fallback WITHOUT bre
     threw = true;
   }
   check("an adapter that throws is reported, not propagated", !threw && out[0]?.configured === false && out[0]?.model === "unknown");
+}
+
+/* ── Latency sampling on /api/ai/providers ────────────────────────────────
+   Two things are held here, and they fail for different reasons.
+
+   The STATS are real arithmetic and are tested as such — the even-length
+   branch of a median is exactly the code that stays wrong because nobody
+   measures an even number of things on the day they read it.
+
+   The BREAKER ISOLATION is held by reading the route source, because the bug
+   it prevents cannot be reproduced from outside: the probe used the shared
+   `providerBreaker`, so probing a sick provider recorded failures against LIVE
+   traffic (three opens it) and probing a recovering one recorded a success
+   that reset a breaker live turns had legitimately opened. A diagnostic that
+   changes what it diagnoses. The assertion is that the probe call passes its
+   own breaker — stated as the presence of the isolated one AND the absence of
+   any call that omits it. */
+{
+  console.log("\nSection 9 — probe latency sampling");
+
+  check("no samples → null, not zero", latencyStats([]) === null);
+  check("one sample is its own min/median/max",
+    JSON.stringify(latencyStats([700])) === JSON.stringify({ min: 700, median: 700, max: 700 }));
+  check("odd length takes the middle value",
+    latencyStats([900, 100, 500])?.median === 500);
+  check("even length averages the two middle values",
+    latencyStats([100, 200, 300, 500])?.median === 250);
+  check("even-length average is rounded, not truncated",
+    latencyStats([100, 201])?.median === 151);
+  check("input order does not matter",
+    JSON.stringify(latencyStats([4000, 400, 2200])) === JSON.stringify(latencyStats([400, 2200, 4000])));
+  check("the caller's array is not mutated by sorting", (() => {
+    const given = [3, 1, 2];
+    latencyStats(given);
+    return given[0] === 3 && given[1] === 1 && given[2] === 2;
+  })());
+  /* Spread is why all three are reported. These two lists share a median and
+     are not the same provider; if the route ever reported the median alone,
+     this is the fact that would be lost. */
+  check("min and max separate a steady provider from an erratic one", (() => {
+    const erratic = latencyStats([400, 2200, 4000]);
+    const steady = latencyStats([2100, 2200, 2300]);
+    return erratic?.median === steady?.median && erratic!.max - erratic!.min > steady!.max - steady!.min;
+  })());
+
+  const routeSrc = readFileSync("src/app/api/ai/providers/route.ts", "utf8");
+
+  check("the probe uses a breaker of its own",
+    /const\s+probeBreaker\s*=\s*createBreaker\(\)/.test(routeSrc));
+  /* The absence check is the one that matters. Adding an isolated breaker and
+     leaving a second call site that omits it would pass the presence check
+     while the live breaker is still being written to. */
+  check("every chatWithToolsVia call in the route passes that breaker", (() => {
+    const calls = routeSrc.split("chatWithToolsVia(").slice(1);
+    return calls.length > 0 && calls.every((tail) => tail.slice(0, 1200).includes("breaker: probeBreaker"));
+  })());
+  check("samples are capped, so a browser cannot ask for an unbounded run",
+    /Math\.min\(\s*MAX_SAMPLES/.test(routeSrc) && /const MAX_SAMPLES = \d+/.test(routeSrc));
+  check("samples are floored, so \"3.9\" cannot become a fractional loop bound",
+    /Math\.floor\(Number\(params\.get\("samples"\)\)\)/.test(routeSrc));
+  check("a wall-clock budget stops sampling before maxDuration kills the route",
+    /const SAMPLE_BUDGET_MS = /.test(routeSrc) && /Date\.now\(\) >= deadline/.test(routeSrc));
+  check("`ms` still means the first call, so the field's old readers are unaffected",
+    /ms:\s*ms\[0\]\s*\?\?\s*0/.test(routeSrc));
+  check("sampling stops at the first failure rather than repeating it",
+    /if \(!ok\) break;/.test(routeSrc));
 }
 
 console.log(`\n${pass} passed, ${failures.length} failed`);
