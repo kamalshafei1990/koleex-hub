@@ -14,6 +14,7 @@
     "validate:ai-quotation-guard": "tsx scripts/validate-ai-quotation-guard.ts",
     "validate:ai-tenant-isolation": "tsx scripts/validate-ai-tenant-isolation.mts",
     "validate:ai-baseline": "tsx scripts/validate-ai-baseline.mts",
+    "validate:ai-egress": "NODE_OPTIONS=--conditions=react-server tsx scripts/validate-ai-egress.ts",
     "validate:trade-terms": "tsx --conditions=react-server scripts/validate-trade-terms.ts",
     "validate:contract-terms": "tsx scripts/validate-contract-terms.ts",
     "validate:contract-contradictions": "tsx scripts/validate-contract-contradictions.ts",
