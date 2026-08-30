@@ -18,6 +18,7 @@
    gate (owner decision, Phase 1 scope).
    --------------------------------------------------------------------------- */
 
+import { createTenantCache } from "@/lib/server/ai/cache/tenant-cache";
 import { supabaseServer } from "@/lib/server/supabase-server";
 
 export interface RefinerySegment {
@@ -202,6 +203,30 @@ export interface ApprovedHit {
 
 const SEARCH_STOP = new Set(["the","a","an","of","in","on","for","and","or","to","is","are","what","how","does","do","about","with","من","في","على","ما","هل","عن","的","是","了"]);
 
+/* Phase 5C. This runs on EVERY fast-lane turn for anyone with knowledge
+   access, and it is not a cheap query: an `ilike` OR-chain that pulls up to
+   200 full rows — bodies included — and ranks them in Node.
+
+   The cache is keyed on the extracted WORDS, not the raw message, so
+   "what is the warranty?" and "warranty — what is it" hit the same entry.
+   Sorted, so word order does not fragment it either.
+
+   The tenant is the first argument of every cache operation and cannot be
+   omitted. That is the whole reason this uses tenant-cache rather than a bare
+   Map: an unkeyed cache here would serve one tenant's approved knowledge —
+   with source titles and page numbers — into another tenant's prompt, for the
+   length of the TTL. See the header of ai/cache/tenant-cache.ts.
+
+   NOT claimed: the plan says this removes "2 Supabase round-trips per
+   fast-lane turn". It removes ONE, and only on a repeat. The other block the
+   fast lane loads (taught answers) has been cached per tenant for a minute
+   since long before this phase. */
+const approvedSearchCache = createTenantCache<ApprovedHit[]>({ ttlMs: 60_000, maxEntries: 300 });
+
+export function invalidateApprovedSearchCache(tenantId: string | null) {
+  approvedSearchCache.invalidateTenant(tenantId);
+}
+
 export async function searchApprovedUnits(
   tenantId: string | null,
   queryText: string,
@@ -214,6 +239,13 @@ export async function searchApprovedUnits(
     .slice(0, 8);
   if (words.length === 0) return [];
 
+  /* The limit is part of the key: the same words with a different limit are a
+     different result set, and returning the shorter one would silently drop
+     hits. */
+  const cacheK = `approved:${limit}:${[...words].sort().join(",")}`;
+  const cached = approvedSearchCache.get(tenantId, cacheK);
+  if (cached) return cached;
+
   const ors = words.map((w) => `body.ilike.%${w}%,title.ilike.%${w}%`).join(",");
   let q = supabaseServer
     .from("ai_knowledge_units")
@@ -225,7 +257,7 @@ export async function searchApprovedUnits(
   const { data, error } = await q;
   if (error || !data) return [];
 
-  return (data as Array<{
+  const ranked = (data as Array<{
     title: string | null; body: string; locator: { page?: number } | null;
     domains: string[] | null; ai_sources: { title: string } | { title: string }[] | null;
   }>)
@@ -249,6 +281,12 @@ export async function searchApprovedUnits(
     .filter((h) => h.score > 0)
     .sort((a, b) => b.score - a.score)
     .slice(0, limit);
+
+  /* Only a SUCCESSFUL query is cached. The error paths above return [] early
+     and never reach here, so a transient Supabase failure cannot pin an empty
+     result in front of a tenant's knowledge for the next minute. */
+  approvedSearchCache.set(tenantId, cacheK, ranked);
+  return ranked;
 }
 
 /* Fast-lane nudge: top approved hits as a compact prompt block. Empty
