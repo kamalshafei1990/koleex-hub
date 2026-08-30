@@ -793,7 +793,7 @@ The four known-open P0s are **reported, not failed**, so the suite is green on t
 | **6 — audit cannot identify the record** | ✅ **CLOSED** | The allowlist had `taskId`; every work tool takes `task_id`, and `event_id`/`item_id`/`project_id` were absent entirely — so every todo/calendar/planning write logged its target as `<redacted:36ch>`. Added those, the assignee id arrays, and `confirm`/`done` (which separate a preview from an execution). Free text and dates stay redacted. |
 | **7 — knowledge nudge bypassed its gate** | ✅ **CLOSED** | Both call sites now gated on `checkModule(ctx, "AI Knowledge", "view")` — a pure in-memory read of the context already built, so no extra round-trip. **Taught answers deliberately left ungated**: they are canonical replies the owner wrote for the assistant to *give* users; the nudge is document content with citations. Different thing, different rule. |
 | **2 — web-search egress** | ✅ **CLOSED** | `scanEgress()` — deterministic, no model call, no network, no DB. Two tiers: **block** for data identifying a person/record/internal entity (email, phone, UUID, document number, model code, money + commercial context); **warn** for a bare amount. Default ON; `AI_EGRESS_SCAN=off` is an emergency rollback, not a setting. |
-| **1 — server-enforced confirmation** | ⏸ **BLOCKED — awaiting sign-off** | Migration drafted at `docs/koleex-ai/migrations/PROPOSED_ai_pending_actions.sql` with reason, schema, indexes, RLS posture, expected load and rollback. **Not applied.** Code held until approved rather than shipped dead. |
+| **1 — server-enforced confirmation** | ✅ **CLOSED** | `ai_pending_actions` applied to **staging first, then production**, both verified (14 cols, 4 indexes, RLS on, 0 policies, `anon` + `authenticated` denied). `dispatchTool` now **consumes** a matching unexpired pending row before any confirmed write, and **records** one when a tool returns a preview. **Zero tool changes** — the `pendingAction` the 15 write tools already returned, and nothing read, is now the mechanism. Modes: `enforce` (default) / `observe` / `off`. |
 | **5 — prompt-injection isolation** | ✅ **CLOSED** | Untrusted content is now **fenced with a per-turn nonce** instead of a constant `"""` a document could forge, with explicit *data-not-instructions* framing that also forbids it authorising an action. `attachedDocCtx` narrowed from *retained history* to **this turn only** — one attachment used to switch the field-grounding and pricing seals off for every later turn in the conversation, the widest blast radius in the seal chain. Both `attachedDocCtx` sites (the second was in `orchestrateNoGroq`) now share **one** detector. |
 | **4 — rate limiting** | ⏸ **BLOCKED — needs a store decision** | See §Q |
 
@@ -959,6 +959,23 @@ A user with no Hub organisation gets the whole general product and `isConnected(
 ## P.9 Client strategy (backend-first, deliberately)
 
 **Do not build native clients yet.** Order: (1) Phase 2 ships the versioned API + bearer auth + entitlements; (2) a standalone **web** app proves Mode B at the lowest cost; (3) **desktop is nearly free** — `desktop/` is an Electron shell that wraps a URL (`desktop/package.json`: *"native desktop shell around the live cloud app"*), so pointing a build at the standalone web app yields macOS and Windows almost immediately; (4) native mobile only after bearer auth exists, where camera, voice and share-sheet input are the real value. China distribution (CN Android stores, APK, CN push vendor) is a **regulatory** question flagged in §J — this document draws no legal conclusions.
+
+### Phase 1 · Result — the confirmation ledger
+
+**The security property is hash stability, in both directions.** If the same intent hashed differently between preview and confirm, every legitimate write would be refused and the feature would break. If different intents hashed the same, a preview for *"delete task A"* would authorise *"delete task B"* — a confirmation bypass wearing the ledger's own uniform. `npm run validate:ai-confirm-ledger` asserts both: **18 passed, 0 failed** (key order and `confirm` ignored; array order, added/removed fields, changed values and types all separating).
+
+**Atomicity proved at SQL level on staging**, because the single `UPDATE … WHERE status='pending' AND expires_at > now() RETURNING` *is* the safety property:
+
+| Attempt | Result |
+|---|---|
+| legitimate confirm | ✅ matched 1 |
+| **replay of the same confirm** | **0** — cannot be consumed twice |
+| expired preview | **0** |
+| **confirm with no preview at all** | **0** — the core fix |
+
+Default mode is **`enforce`**, not `observe`. A mismatched confirm costs the user a retry; an unverified one can delete a record permanently. For a destructive action that trade is not close.
+
+`riskClassFor()` derives the class from the tool's **declared action** rather than a hand-kept list, so a write tool added tomorrow is classified the moment it is registered — a list would silently miss it.
 
 ### Phase 1 · A regression caught before it shipped
 

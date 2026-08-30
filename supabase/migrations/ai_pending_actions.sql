@@ -1,5 +1,10 @@
 -- ===========================================================================
--- PROPOSED — NOT APPLIED. Awaiting owner sign-off per the standing schema gate.
+-- APPLIED 2026-08-30, with owner sign-off.
+--   staging    gmtjbshjsuexqayqumix  → verified 14 cols, 4 indexes, RLS on,
+--                                      0 policies, anon + authenticated denied
+--   production yxyizbnfjrwrnmwhkvme  → same verification, 0 rows
+-- Atomic-consume proved on staging: legitimate confirm 1, replay 0,
+-- expired 0, fabricated-without-preview 0. Test rows removed.
 --
 -- Phase 1 · audit Issue 1 (P0) — server-enforced write confirmation.
 --

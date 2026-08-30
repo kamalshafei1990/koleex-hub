@@ -16,6 +16,7 @@
     "validate:ai-baseline": "tsx scripts/validate-ai-baseline.mts",
     "validate:ai-egress": "NODE_OPTIONS=--conditions=react-server tsx scripts/validate-ai-egress.ts",
     "validate:ai-untrusted": "NODE_OPTIONS=--conditions=react-server tsx scripts/validate-ai-untrusted.ts",
+    "validate:ai-confirm-ledger": "NODE_OPTIONS=--conditions=react-server tsx scripts/validate-ai-confirm-ledger.ts",
     "validate:trade-terms": "tsx --conditions=react-server scripts/validate-trade-terms.ts",
     "validate:contract-terms": "tsx scripts/validate-contract-terms.ts",
     "validate:contract-contradictions": "tsx scripts/validate-contract-contradictions.ts",
