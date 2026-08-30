@@ -20,6 +20,7 @@
 import { readFileSync } from "node:fs";
 import { parsePriceTable, priceFor, costUsd, type PriceTable } from "../src/lib/server/ai/cost/prices";
 import { buildUsageRecord, formatUsageLine, recordUsage } from "../src/lib/server/ai/cost/meter";
+import { publicProviderLabel, withPublicProvider } from "../src/lib/server/ai/observability/public-provider";
 
 let pass = 0;
 const failures: string[] = [];
@@ -191,6 +192,55 @@ console.log("\n── 6. The turn reports who ACTUALLY served it ──");
   check(
     "and it does not send stream_options to ask for it — a provider that rejects the option would fail the whole turn",
     !/stream_options/.test(transportCode),
+  );
+}
+
+console.log("\n── 7. The browser is told the lane, not the vendor (N11) ──");
+/* The field crosses the wire on every turn and the client NEVER READS IT — a
+   vendor name visible in devtools for no consumer. It was not deleted because
+   /api/v1/ai/* re-exports these handlers and the standalone-client amendment
+   makes response shape a contract; the VALUE changed instead, which breaks
+   nothing. The server keeps the truth. */
+{
+  check('a lane suffix survives — it is true and discloses nothing', publicProviderLabel("deepseek:fast-brand") === "fast-brand");
+  check("a bare model id collapses — it carries no routing information, only a vendor's product name", publicProviderLabel("deepseek:deepseek-chat") === "model");
+  check("a label with no vendor half passes through", publicProviderLabel("fast-path") === "fast-path" && publicProviderLabel("fallback") === "fallback");
+  check("a fallback provider's label is stripped too, not just DeepSeek's", publicProviderLabel("some-gateway.example:some-model") === "model");
+  check("null, empty and whitespace never yield a blank the client would render", publicProviderLabel(null) === "unknown" && publicProviderLabel("") === "unknown" && publicProviderLabel("   ") === "unknown");
+  check("a trailing colon does not produce an empty label", publicProviderLabel("deepseek:") === "model");
+
+  /* No vendor name may survive ANY input shape. Checked as a property rather
+     than case by case, because the point is the absence of a class of leak. */
+  const VENDORS = ["deepseek", "dashscope", "qwen", "openai"];
+  const inputs = ["deepseek:deepseek-chat", "deepseek:fast-small", "deepseek:fast-brand", "dashscope.aliyuncs.com:qwen-plus", "openai:gpt-x", "deepseek", "deepseek:"];
+  const leaked = inputs.filter((i) => VENDORS.some((v) => publicProviderLabel(i).toLowerCase().includes(v)));
+  check(
+    `no vendor name survives any input shape${leaked.length ? ` — leaked from: ${leaked.join(", ")}` : ""}`,
+    leaked.length === 0,
+  );
+
+  /* withPublicProvider must not mutate: the object handed to it is the SAME
+     object that was persisted a few lines earlier in the route. */
+  const original = { provider: "deepseek:deepseek-chat", finalReply: "x" };
+  const publicCopy = withPublicProvider(original);
+  check("it returns a copy — the persisted object keeps the real label", original.provider === "deepseek:deepseek-chat" && publicCopy.provider === "model");
+  check("an object with no provider field is returned untouched", withPublicProvider({ a: 1 } as never) !== undefined);
+
+  /* Reachability: every send site must use it, or the leak survives on the
+     path nobody remembered. The persisted ROW is sent too, and it carries the
+     column verbatim — sanitising only `agent` would have left it exposed. */
+  const route = readFileSync("src/app/api/ai/agent/route.ts", "utf8");
+  const code = route.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
+  const sanitised = (code.match(/withPublicProvider\(/g) ?? []).length;
+  const rawAgentSends = (code.match(/^\s+agent,$/gm) ?? []).length;
+  const rawRowSends = (code.match(/message: assistantInsert\.data,/g) ?? []).length;
+  check(
+    `every send site is sanitised (${sanitised} calls, ${rawAgentSends} raw agent sends, ${rawRowSends} raw row sends)`,
+    rawAgentSends === 0 && rawRowSends === 0 && sanitised >= 8,
+  );
+  check(
+    "and the DB write still stores the REAL label — the audit trail is not the browser",
+    /provider: agent\.provider,/.test(code),
   );
 }
 

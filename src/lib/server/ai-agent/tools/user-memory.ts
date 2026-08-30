@@ -15,6 +15,7 @@ import "server-only";
    table: it is per-account by definition, tiny, and needs no migration.
    --------------------------------------------------------------------------- */
 
+import { mergeAccountPrefs } from "@/lib/server/ai/security/account-prefs";
 import type { ToolDef, ToolResult } from "../types";
 import { supabaseServer } from "../../supabase-server";
 
@@ -57,6 +58,17 @@ const rememberAboutUser: ToolDef<
         message: "Both a key and a value are required." };
     }
 
+    /* PHASE 7 / finding N12. This still READS the current facts, because the
+       25-cap needs to know what is already there — but it no longer writes the
+       whole preferences document back. The write is one atomic merge of the
+       `ai_memory` key alone, so a concurrent setReplyLanguage can no longer be
+       erased by it (or erase it).
+
+       A narrower race remains and is worth naming rather than implying it is
+       gone: two remember_about_user calls landing together can still lose one
+       fact, because the cap is computed from a read. That needs one row per
+       fact — the `ai_memories` table in plan §S — and it is far less reachable
+       than the one this fixes, which a single message could trigger. */
     const { data, error } = await supabaseServer
       .from("accounts").select("preferences").eq("id", ctx.auth.account_id).maybeSingle();
     if (error) {
@@ -74,11 +86,8 @@ const rememberAboutUser: ToolDef<
       for (const k of keys.slice(0, keys.length - MAX_FACTS)) delete next[k];
     }
 
-    const { error: wErr } = await supabaseServer
-      .from("accounts")
-      .update({ preferences: { ...prefs, ai_memory: next } })
-      .eq("id", ctx.auth.account_id);
-    if (wErr) {
+    const merged = await mergeAccountPrefs(ctx.auth.account_id, { ai_memory: next });
+    if (!merged) {
       return { ok: false, permissionStatus: "denied", data: null, message: "Couldn't save that." };
     }
 
@@ -108,9 +117,10 @@ const forgetAboutUser: ToolDef<{ key: string }, { remembered: Record<string, str
     const prefs = ((data?.preferences ?? {}) as Record<string, unknown>);
     const next = { ...((prefs.ai_memory ?? {}) as Record<string, string>) };
     delete next[key];
-    await supabaseServer
-      .from("accounts").update({ preferences: { ...prefs, ai_memory: next } })
-      .eq("id", ctx.auth.account_id);
+    /* The merge is SHALLOW at the top level, which is what makes removal work:
+       writing a smaller ai_memory object REPLACES the old one rather than
+       deep-merging the deleted key back in. Verified on staging. */
+    await mergeAccountPrefs(ctx.auth.account_id, { ai_memory: next });
     return { ok: true, permissionStatus: "allowed", data: { remembered: next } };
   },
 };

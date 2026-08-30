@@ -367,13 +367,31 @@ check(
       /const canFastPath[\s\S]{0,400}?streamingFastLaneEnabled\(\)/.test(agentRoute),
   );
   /* Non-vacuity: the policy must be a real read of the flag, not a stub that
-     returns true. This is the one line whose value decides whether the lane
-     runs at all. */
+     returns true. Phase 7 changed the TEST (absence now means enabled), so
+     this is anchored on the variable rather than on one comparison. */
   {
     const policy = read("src/lib/server/ai/router/provider-policy.ts");
     check(
       "the kill-switch policy actually reads the environment variable",
-      /process\.env\.USE_DEEPSEEK === "true"/.test(stripComments(policy)),
+      /process\.env\.USE_DEEPSEEK/.test(stripComments(policy)),
+    );
+    /* And it is now the ONE place that reads it — 4D left the flag checked in
+       two files with different semantics, which is what made it mean nothing.
+       A second reader would re-open exactly that. */
+    const readers: string[] = [];
+    const walk = (dir: string) => {
+      for (const entry of readdirSync(dir, { withFileTypes: true })) {
+        const full = `${dir}/${entry.name}`;
+        if (entry.isDirectory()) walk(full);
+        else if (/\.tsx?$/.test(entry.name) && /process\.env\.USE_DEEPSEEK/.test(stripComments(read(full)))) {
+          readers.push(full);
+        }
+      }
+    };
+    walk("src");
+    check(
+      `USE_DEEPSEEK is read in exactly one file${readers.length !== 1 ? ` — found in ${readers.join(", ")}` : ` (${readers[0]})`}`,
+      readers.length === 1 && readers[0] === "src/lib/server/ai/router/provider-policy.ts",
     );
   }
 }

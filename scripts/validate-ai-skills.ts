@@ -25,6 +25,7 @@ import {
   type RiskClass,
 } from "../src/lib/server/ai/skills/catalog";
 import { riskClassFor } from "../src/lib/server/ai/security/pending-actions";
+import { deepseekEnabled, streamingFastLaneEnabled } from "../src/lib/server/ai/router/provider-policy";
 import { validateArgs, validationMode, isBlocking, formatValidationLine } from "../src/lib/server/ai/skills/validate";
 import { timeoutFor, raceTimeout, DEFAULT_TOOL_TIMEOUT_MS } from "../src/lib/server/ai/skills/timeout";
 import type { UserContext } from "../src/lib/server/ai-agent/types";
@@ -366,6 +367,42 @@ async function asyncChecks() {
     check("the dispatcher races the handler rather than awaiting it unbounded", /raceTimeout\(tool\.handler\(/.test(regCode));
     check("a timeout produces the same denied ToolResult shape a thrown handler does", /timed out after/.test(reg) && /permissionStatus: "denied"/.test(regCode));
     check("validation runs BEFORE the confirmation ledger, so a malformed confirm never consumes a pending row", regCode.indexOf("validateArgs(tool.parameters") < regCode.indexOf("consumePendingAction({"));
+  }
+
+  console.log("\n── 12. The kill-switch, proved by behaviour not by grep (Phase 7) ──");
+  /* 4D found that USE_DEEPSEEK did not do what its name says: with the flag
+     unset the agent still called DeepSeek. It was left alone because the OLD
+     test — `=== "true"` — made an UNSET variable mean DISABLED, so honouring
+     it everywhere would have taken the product down wherever the key was set
+     without the flag.
+
+     Inverting the default removes that risk without knowing production's
+     value, so the switch is global now. The table below is every state an
+     environment can be in, and the middle row is a BUG this also fixes. */
+  {
+    const original = process.env.USE_DEEPSEEK;
+    const set = (v: string | undefined) => {
+      if (v === undefined) delete process.env.USE_DEEPSEEK;
+      else process.env.USE_DEEPSEEK = v;
+    };
+    try {
+      set(undefined);
+      check("UNSET means ENABLED — so no environment is newly broken", deepseekEnabled() === true);
+      set("");
+      check("empty means enabled too — a blank variable is not a decision", deepseekEnabled() === true);
+      set("true");
+      check('"true" means enabled — the value production almost certainly holds', deepseekEnabled() === true);
+      for (const off of ["false", "FALSE", "0", "off", "no", " Off "]) {
+        set(off);
+        check(`${JSON.stringify(off)} means DISABLED — case and spacing insensitive`, deepseekEnabled() === false);
+      }
+      set("yes");
+      check("an unrecognised value means enabled — a typo must not silently disable the product", deepseekEnabled() === true);
+      set(undefined);
+      check("the streaming fast lane follows the same one switch", streamingFastLaneEnabled() === deepseekEnabled());
+    } finally {
+      set(original);
+    }
   }
 }
 

@@ -56,6 +56,7 @@ import { tryCannedReply } from "@/lib/server/ai/core/canned-replies";
 import { chatWithTools, activeProviderLabel } from "@/lib/server/ai/provider/registry";
 import { streamingFastLaneEnabled } from "@/lib/server/ai/router/provider-policy";
 import { planReveal } from "@/lib/server/ai/streaming/reveal";
+import { withPublicProvider } from "@/lib/server/ai/observability/public-provider";
 import { buildSmartPrompt } from "@/lib/server/ai/prompt-builder";
 import {
   detectLanguageDirective,
@@ -317,8 +318,12 @@ export async function POST(req: Request) {
           controller.enqueue(
             send({
               type: "end",
-              agent,
-              message: assistantInsert.data,
+              /* PHASE 7 / finding N11 — the browser is told the LANE, not the
+                 vendor. The row persisted above keeps the real label, because
+                 the audit trail is not the browser. See
+                 observability/public-provider.ts. */
+              agent: withPublicProvider(agent),
+              message: withPublicProvider(assistantInsert.data),
               conversation: { id: conversationId, title: finalTitle },
               total_ms: tEnd - t0,
             }),
@@ -337,8 +342,8 @@ export async function POST(req: Request) {
     }
 
     return NextResponse.json({
-      agent,
-      message: assistantInsert.data,
+      agent: withPublicProvider(agent),
+      message: withPublicProvider(assistantInsert.data),
       conversation: { id: conversationId, title: finalTitle },
     });
   }
@@ -800,8 +805,12 @@ export async function POST(req: Request) {
           controller.enqueue(
             send({
               type: "end",
-              agent,
-              message: assistantInsert.data,
+              /* PHASE 7 / finding N11 — the browser is told the LANE, not the
+                 vendor. The row persisted above keeps the real label, because
+                 the audit trail is not the browser. See
+                 observability/public-provider.ts. */
+              agent: withPublicProvider(agent),
+              message: withPublicProvider(assistantInsert.data),
               conversation: { id: conversationId, title: finalTitle },
               total_ms: tEnd - t0,
             }),
@@ -943,8 +952,8 @@ export async function POST(req: Request) {
   );
 
   return NextResponse.json({
-    agent,
-    message: assistantInsert.data,
+    agent: withPublicProvider(agent),
+    message: withPublicProvider(assistantInsert.data),
     conversation: { id: conversationId, title: finalTitle },
   });
 }
