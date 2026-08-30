@@ -646,6 +646,18 @@ Baseline from `MAINLAND_CHINA_READINESS_AUDIT.md` (Level 2, `hub.koleexgroup.com
 | **Mobile push (CN Android)** | 🔴 needs CN vendor | FCM blocked | in-app + polling | medium |
 | **App distribution (CN)** | ⚠️ needs review | iOS CN App Store · APK · CN Android stores | APK direct | **regulatory, not technical — out of engineering scope** |
 
+**AUDIENCE CORRECTION (2026-08-31).** This matrix was built on the assumption that the
+users are in mainland China. The owner has since stated the actual shape: **staff and
+company in China, customers in many countries, and Koleex AI is intended to be global.**
+
+The no-VPN guarantee for mainland China is unchanged and non-negotiable. What changes
+is that it is now a *floor*, not the whole requirement — a capability that works
+beautifully in China and badly everywhere else is no longer acceptable either. Phase 15
+is the first phase where this bites, and its design carries the consequence
+([`PHASE_15_VOICE_DESIGN.md`](./PHASE_15_VOICE_DESIGN.md) §4): a China-native provider
+serves the staff, and a second configurable provider serves customers — the same
+two-provider shape Phase 4 built for text.
+
 **Governing rule:** *no phase ships a capability that silently breaks the no-VPN guarantee.* A capability with no China-accessible provider is either (a) regionally disabled with an honest user-facing message, or (b) held until a provider is verified. It is never shipped as a silent failure.
 
 **Explicitly not concluded here:** ICP filing, CN CDN, and legal/regulatory questions around China distribution require local regulatory review. This document flags them and draws no legal conclusions.

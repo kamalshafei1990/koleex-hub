@@ -10,6 +10,18 @@
 
 > *"talk to Koleex AI same as I talk to ChatGPT … in a clean way and the AI can talk with me in a fast way not slow"*
 
+> *"yes am in china and the company in china and employees in China but the customers in different countries and they will also use Koleex AI. Koleex AI will be Globally"*
+
+**The second quote arrived after the first draft of this document and invalidated part
+of it.** v1 assumed every user was in mainland China, because every user discussed up
+to that point was. They are not: the staff are in China, the customers are not, and
+the product is meant to be global.
+
+That is not a detail — it decides the hosting topology (§4) and forces a second voice
+provider (§4.3). It is recorded here rather than quietly folded in, because a
+requirement that changes a design after it is written is exactly the kind of thing
+that gets lost and then rediscovered halfway through the build.
+
 Two words carry the whole design: **clean** and **fast**. Everything below is judged
 against them, and where they conflict the conflict is stated rather than smoothed over.
 
@@ -118,33 +130,106 @@ already knows how.
 
 ## 4. ⚠️ THE DECISION THAT DETERMINES SPEED
 
-Latency is decided by where the relay runs, not by how the code is written. The user
-is in mainland China; the model is in mainland China. A relay outside China puts two
-international round-trips into every exchange.
+Latency in a voice call is decided by geography, not by how the code is written. Two
+distances matter and they are not the same distance:
 
-| Relay location | User → Relay | Relay → Qwen | Verdict |
-|---|---|---|---|
-| **Alibaba Cloud ECS, mainland China** | short | **same cloud as the model** | **Fastest. Recommended.** |
-| Hong Kong | moderate | moderate | Acceptable |
-| Tokyo (`hnd1`, where Koleex runs today) | moderate | moderate | Works, noticeably slower |
-| Europe / US | long | long | Unusable for realtime |
+```
+   user ──── A ────▶ relay ──── B ────▶ model
+```
 
-**Recommendation: Alibaba Cloud ECS in mainland China.** The relay then sits on the
-same cloud as the model, which is the shortest hop available. The owner already holds
-an Alibaba Cloud account, so no new vendor relationship is required.
+**A** is set by where the relay runs. **B** is set by where the *model* runs, and no
+amount of relay placement can shorten it.
 
-*Estimates are not given as numbers here on purpose.* Real figures need a measurement
-from the user's own network, and inventing them would be exactly the kind of
+### 4.1 Two populations, not one
+
+| | Staff | Customers |
+|---|---|---|
+| Where | mainland China | many countries |
+| Nearest relay | China | their own region |
+| Distance to Qwen (China) | **short** | **long — unavoidable** |
+
+A single relay cannot serve both well. One in China leaves every customer paying a
+round-trip to China on **A** *and* on **B**. One abroad does the same to the staff, and
+puts the mainland-China guarantee at risk.
+
+### 4.2 Relay placement
+
+| Location | Serves | Note |
+|---|---|---|
+| **Alibaba Cloud ECS, mainland China** | staff | Same cloud as Qwen — shortest possible **B** |
+| **A second region** (EU or US, chosen by where customers actually are) | customers | Added when customers are onboarded, not before |
+
+The relay is stateless: it authenticates, bridges, and forwards. Running two of them is
+a deployment concern, not a second codebase.
+
+### 4.3 The harder half — the model is in China
+
+Even a perfectly placed relay cannot fix **B** for a customer in Europe: the model
+itself is in China.
+
+**This is the same problem Phase 4 already solved for text, and it takes the same
+shape.** DeepSeek is China-native and excellent there; the fallback adapter exists so a
+second provider can serve where DeepSeek does not. Voice needs the identical structure:
+
+```
+Phase 4  · text   →  DeepSeek (CN)  +  configurable second provider
+Phase 15 · voice  →  Qwen (CN)      +  configurable second provider
+```
+
+**The provider abstraction built in Phase 4 is what makes this cheap.** Voice gets its
+own small registry with the same rule: no vendor identity in the core, endpoints and
+model ids as configuration.
+
+**Candidate second providers are NOT named here.** This environment cannot reach any
+vendor to verify an endpoint, a model id, or whether it offers an ephemeral token — and
+the one thing this project has learned repeatedly is that a constant written from
+memory in a failover path is worse than no failover. They are researched when a
+customer actually needs one.
+
+### 4.4 Which path a user gets is decided BY THE SERVER
+
+The standing rule applies unchanged:
+
+> *"The client application must never determine this permission. The server determines it."*
+
+A browser must not choose its own voice endpoint. The server resolves it from an
+explicit per-tenant or per-account setting, defaulting from request geography, and
+hands back only the relay URL the user is allowed to use. A client that could pick
+would be a client that could route itself to a cheaper or an unmetered path.
+
+### 4.5 Start with one region — recommended
+
+**Ship China-only first.** The staff are the first users, they are in China, and Qwen
+serves them best. Real usage will answer the questions this document cannot:
+
+- Is the latency good enough to keep using?
+- What does a real conversation actually cost?
+- Which tools do people reach for by voice?
+
+Adding the second region afterwards is configuration plus a deployment, because the
+provider layer was built for it. Building both at once means guessing twice.
+
+**A customer outside China during that first stage is not broken** — they can still use
+Qwen through the China relay. It will be slower. That is a stated, visible limitation,
+not a silent failure, and it is honest to ship it that way while the feature proves
+itself.
+
+### 4.6 One product consequence worth stating
+
+Two providers means two voices. A customer in Europe on a different model will not
+sound like the assistant a staff member in China hears. That is a **product** decision —
+consistency of persona versus latency — and it belongs to the owner, not to this design.
+
+### 4.7 This is a new operational surface, stated honestly
+
+Each relay is a thing that can break, needs patching, needs monitoring, and costs money
+monthly. That is a real cost, not hidden by calling the service "small". If the owner
+is not willing to run one, **this feature cannot ship** — and saying so now is cheaper
+than discovering it later.
+
+*No latency figures are given anywhere in this section on purpose.* Real numbers need
+measurement from real networks, and inventing them would be exactly the kind of
 unverifiable claim this project's plan forbids.
-
-### 4.1 This is a new operational surface, stated honestly
-
-A second deployment target means a second thing that can break, needs patching, needs
-monitoring, and costs money monthly. That is a real cost. It is not hidden by calling
-the service "small". If the owner is not willing to run a second service, **this
-feature cannot ship** — and saying so now is cheaper than discovering it later.
-
----
 
 ## 5. The 40 K context problem, measured
 
@@ -217,12 +302,12 @@ must never become a failure to answer.
 
 ## 9. Open questions for the owner
 
-1. **Will you run a second small service?** If no, this feature stops here, and the
-   honest alternative is §10.
-2. **Where?** Alibaba Cloud ECS in China is the fast answer.
+1. **Will you run one small service?** If no, this feature stops here and §10 is the
+   honest alternative.
+2. **China first, or both regions at once?** §4.5 recommends China first.
 3. **Which tools should voice reach?** Needed for §5.
-
----
+4. **When customers do get their own region — same voice or lowest latency?** §4.6. Not
+   needed to start; needed before a second provider is chosen.
 
 ## 10. The honest alternative, if the answer to §9.1 is no
 
