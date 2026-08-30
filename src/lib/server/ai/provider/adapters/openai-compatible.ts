@@ -56,6 +56,62 @@ interface FallbackConfig {
 
 /** Exported for the test: the validation rules are the security-bearing part
  *  of this file, so they are proved directly rather than through env fiddling. */
+/* EXTRA BODY FIELDS, and why a generic adapter needs them.
+
+   "OpenAI-compatible" is a family resemblance, not a specification. Services
+   in this family agree on model/messages/tools and then differ on one or two
+   switches of their own — Qwen exposes `enable_thinking`, others expose their
+   own. A fallback that cannot set such a field is a fallback that works with
+   whichever vendor happened to be tried first.
+
+   Hard-coding one vendor's switch into this file would be exactly the coupling
+   the provider layer exists to prevent, so it is CONFIGURATION: a JSON object
+   in AI_FALLBACK_EXTRA_BODY, merged into every request to this provider.
+
+   IT CANNOT OVERWRITE THE REQUEST. `model`, `messages`, `tools`,
+   `tool_choice` and `stream` are the turn itself — a typo in an env var must
+   not be able to send an empty conversation, silently drop the tools (which
+   would present as the model refusing to act rather than as a config error),
+   or flip streaming and desync the reader. Those keys are dropped with a
+   warning rather than applied.
+
+   Malformed JSON is ignored, loudly. A fallback that refuses to load because
+   its optional tuning field has a stray comma would turn a small mistake into
+   no failover at all — which is the failure this whole file exists to
+   prevent. */
+const PROTECTED_BODY_KEYS = new Set([
+  "model",
+  "messages",
+  "tools",
+  "tool_choice",
+  "stream",
+]);
+
+export function parseExtraBody(raw: string | undefined): Record<string, unknown> {
+  const text = raw?.trim();
+  if (!text) return {};
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(text);
+  } catch {
+    console.warn("[ai.fallback] AI_FALLBACK_EXTRA_BODY is not valid JSON — ignored");
+    return {};
+  }
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+    console.warn("[ai.fallback] AI_FALLBACK_EXTRA_BODY must be a JSON object — ignored");
+    return {};
+  }
+  const out: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(parsed as Record<string, unknown>)) {
+    if (PROTECTED_BODY_KEYS.has(k)) {
+      console.warn(`[ai.fallback] AI_FALLBACK_EXTRA_BODY may not set "${k}" — dropped`);
+      continue;
+    }
+    out[k] = v;
+  }
+  return out;
+}
+
 export function parseFallbackConfig(env: {
   AI_FALLBACK_BASE_URL?: string;
   AI_FALLBACK_API_KEY?: string;
@@ -102,6 +158,8 @@ const CONFIG = parseFallbackConfig({
 function readKey(): string | undefined {
   return process.env.AI_FALLBACK_API_KEY?.trim() || undefined;
 }
+
+const EXTRA_BODY = parseExtraBody(process.env.AI_FALLBACK_EXTRA_BODY);
 
 interface OpenAiChatResponse {
   choices?: Array<{
@@ -151,7 +209,12 @@ export const openAiCompatibleAdapter: ProviderAdapter = {
     if (!CONFIG || !key) {
       return { ok: false, status: 503, bodyText: "fallback provider not configured" };
     }
-    const body = toOpenAiBody(req, modelForClass(CONFIG.label, CONFIG.model, req.modelClass));
+    /* The turn first, the vendor's own switches second — and the merge cannot
+       reach the turn's own keys, so the order here is belt and braces. */
+    const body = {
+      ...toOpenAiBody(req, modelForClass(CONFIG.label, CONFIG.model, req.modelClass)),
+      ...EXTRA_BODY,
+    };
 
     if (opts?.onDelta) {
       const s = await postChatStreaming(CONFIG.chatUrl, key, body, opts.onDelta);

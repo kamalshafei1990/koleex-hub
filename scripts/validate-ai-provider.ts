@@ -31,7 +31,7 @@ import {
   chatWithToolsVia,
   shouldTryNextProvider,
 } from "../src/lib/server/ai/provider/registry";
-import { openAiCompatibleAdapter, parseFallbackConfig } from "../src/lib/server/ai/provider/adapters/openai-compatible";
+import { openAiCompatibleAdapter, parseFallbackConfig, parseExtraBody } from "../src/lib/server/ai/provider/adapters/openai-compatible";
 import { createBreaker, admissible } from "../src/lib/server/ai/router/circuit-breaker";
 import { parseClassMap, resolveModel, MODEL_CLASSES } from "../src/lib/server/ai/router/model-classes";
 import type { ProviderAdapter, TurnOutcome } from "../src/lib/server/ai/provider/types";
@@ -467,6 +467,31 @@ async function asyncChecks() {
       "with nothing set at all it is inert — which is every environment today",
       parseFallbackConfig({}) === null && openAiCompatibleAdapter.configured() === false,
     );
+
+    /* EXTRA BODY. "OpenAI-compatible" is a family resemblance, not a spec —
+       services agree on the turn and differ on one or two switches of their
+       own. This is the escape hatch for that, and the assertions are about
+       what it must NOT be able to do. */
+    check("no extra body is the normal case and yields an empty object", Object.keys(parseExtraBody(undefined)).length === 0 && Object.keys(parseExtraBody("  ")).length === 0);
+    check("a vendor switch passes through", parseExtraBody('{"enable_thinking":false}').enable_thinking === false);
+    check("several pass through together", Object.keys(parseExtraBody('{"a":1,"b":"x"}')).length === 2);
+
+    /* The turn's own keys are the whole conversation, the tool list and the
+       streaming mode. A typo in an env var must not be able to send an empty
+       conversation, silently drop the tools — which would present as the model
+       refusing to act — or flip streaming and desync the reader. */
+    for (const key of ["model", "messages", "tools", "tool_choice", "stream"]) {
+      const out = parseExtraBody(`{"${key}":"hijacked","safe":1}`);
+      check(`extra body cannot set "${key}" — it is the turn, not a tuning knob`, !(key in out) && out.safe === 1);
+    }
+
+    /* Malformed input must never take the fallback provider out of service:
+       a stray comma in an optional tuning field turning into NO FAILOVER is a
+       far worse outcome than the field being ignored. */
+    check("malformed JSON is ignored rather than throwing", Object.keys(parseExtraBody("{not json")).length === 0);
+    check("a JSON array is rejected — the merge target is an object", Object.keys(parseExtraBody('[1,2]')).length === 0);
+    check("a JSON scalar is rejected too", Object.keys(parseExtraBody('"hello"')).length === 0 && Object.keys(parseExtraBody("42")).length === 0);
+    check("null is rejected without throwing", Object.keys(parseExtraBody("null")).length === 0);
     /* Non-vacuity: an adapter that is always unconfigured would pass every
        check above while being incapable of ever serving. Prove the object is
        real and satisfies the same contract the loop calls. */
