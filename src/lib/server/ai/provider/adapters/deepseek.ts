@@ -27,7 +27,7 @@ import "server-only";
    loop; honouring it here would silently take the agent down in any
    environment that sets the key without the flag. That asymmetry is finding
    N8 and it is resolved as policy in the router, not by this file quietly
-   picking a side. See router/provider-policy.ts.
+   picking a side.
    --------------------------------------------------------------------------- */
 
 import {
