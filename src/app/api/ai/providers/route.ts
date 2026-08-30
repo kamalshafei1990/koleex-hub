@@ -57,14 +57,50 @@ import { latencyStats } from "@/lib/server/ai/observability/latency-stats";
 export const dynamic = "force-dynamic";
 export const maxDuration = 30;
 
-/* Both bounds exist to keep this route inside maxDuration. A slow provider at
-   ~4.5s per turn spends 22.5s on five samples, and a route that dies at 30s
-   returns NOTHING — the operator loses the samples that already completed as
-   well as the ones that did not. So: a hard cap on how many may be asked for,
-   and a wall-clock budget checked before each additional sample, which stops
-   sampling early and reports what it has. Never a partial-but-silent result. */
+/* THE FIRST VERSION OF THIS TIMED OUT IN PRODUCTION, twice, and the reason is
+   worth keeping: it bounded when a sample may START, not how long the run may
+   TAKE. `elapsed < 20s` happily begins a sample at 19.9s that then runs for
+   ten more, and 30s later Vercel kills the function and the operator gets a
+   504 with none of the samples that did complete — the exact outcome the
+   budget was written to prevent.
+
+   The bad assumption underneath was that one sample is one round trip. It is
+   not. core/transport.ts retries up to MAX_RETRIES=3 with backoff capped at
+   8s, and 429 is one of the statuses it retries — which is precisely what
+   five back-to-back calls to a rate-limiting provider produce. One "sample"
+   can therefore consume 24s on its own.
+
+   So the rule is now a bound on the TOTAL: a sample may only start if it could
+   run for its full cap and still finish inside the budget. With a cap of 8s
+   and a budget of 24s the worst case is 24s, comfortably inside maxDuration=30
+   with room for auth and serialisation — and when samples are fast (600ms)
+   the predicate is satisfied every time, so all five still run. */
 const MAX_SAMPLES = 5;
-const SAMPLE_BUDGET_MS = 20_000;
+const SAMPLE_BUDGET_MS = 24_000;
+
+/* A ceiling on ONE sample, enforced by racing rather than by cancelling: the
+   shared transport takes no AbortSignal, and threading one through it is a
+   change to the live turn path that does not belong in a status route. The
+   fetch it abandons keeps running until the function ends, which costs
+   nothing here and is not worth the hot-path edit to avoid.
+
+   Eight seconds is also a judgement, not just a guard. A five-token turn that
+   has not answered in 8s is not reporting latency any more — it is reporting
+   retries and backoff — and letting it run would quietly inflate the median
+   with sleep time. Better to mark it and say so. */
+const PER_SAMPLE_CAP_MS = 8_000;
+
+/** Resolves to `TIMED_OUT` rather than rejecting, so a capped sample is a
+ *  reported outcome and never an exception that loses the samples before it. */
+const TIMED_OUT = Symbol("probe-sample-timed-out");
+function withCap<T>(work: Promise<T>): Promise<T | typeof TIMED_OUT> {
+  return Promise.race([
+    work,
+    new Promise<typeof TIMED_OUT>((resolve) =>
+      setTimeout(() => resolve(TIMED_OUT), PER_SAMPLE_CAP_MS),
+    ),
+  ]);
+}
 
 export async function GET(req: Request) {
   const auth = await requireAuth();
@@ -150,40 +186,53 @@ export async function GET(req: Request) {
         return false;
       }
     }).map(async (adapter) => {
-      const deadline = Date.now() + SAMPLE_BUDGET_MS;
+      const startedRunAt = Date.now();
       const ms: number[] = [];
       let ok = false;
       let status: number | null = null;
       let detail: string | null = null;
+      let capped = false;
 
       for (let i = 0; i < samples; i++) {
-        /* Checked before every sample after the first, so a run always yields
-           at least one measurement no matter how slow the provider is. */
-        if (i > 0 && Date.now() >= deadline) break;
+        /* The bound that matters: only begin a sample that could run for its
+           whole cap and still land inside the budget. The first is exempt so a
+           run always yields at least one measurement. */
+        if (i > 0 && Date.now() - startedRunAt + PER_SAMPLE_CAP_MS > SAMPLE_BUDGET_MS) break;
 
         const startedAt = Date.now();
         try {
-          const out = await chatWithToolsVia(
-            [adapter],
-            {
-              messages: [{ role: "user", content: "Reply with the single word: ok" }],
-              /* Deliberately tiny. This proves the credential and the endpoint,
-                 not the model's quality — and it is the TRANSPORT FLOOR, not
-                 what a user waits: a real turn carries the tool schemas and
-                 generates a real answer, both of which dwarf five tokens. */
-              maxTokens: 5,
-              temperature: 0,
-            },
-            { breaker: probeBreaker },
+          const out = await withCap(
+            chatWithToolsVia(
+              [adapter],
+              {
+                messages: [{ role: "user", content: "Reply with the single word: ok" }],
+                /* Deliberately tiny. This proves the credential and the endpoint,
+                   not the model's quality — and it is the TRANSPORT FLOOR, not
+                   what a user waits: a real turn carries the tool schemas and
+                   generates a real answer, both of which dwarf five tokens. */
+                maxTokens: 5,
+                temperature: 0,
+              },
+              { breaker: probeBreaker },
+            ),
           );
           ms.push(Date.now() - startedAt);
-          ok = out.ok === true;
-          /* The status is the useful half on a failure: 401 is a bad key,
-             402 is an empty balance, 404 is a wrong url or model id. */
-          status = out.ok ? 200 : (out.status ?? null);
-          /* Truncated hard. A provider error body can echo request content,
-             and this response is read by a human in a browser. */
-          detail = out.ok ? null : (out.bodyText ?? "").slice(0, 200) || null;
+          if (out === TIMED_OUT) {
+            /* NOT recorded as a latency figure by omission — it is in `ms`,
+               but the flag says the number is a cap, not a measurement. */
+            capped = true;
+            ok = false;
+            status = null;
+            detail = `no answer within ${PER_SAMPLE_CAP_MS}ms — at this size that is retries and backoff, not latency (transport retries 429 up to 3 times)`;
+          } else {
+            ok = out.ok === true;
+            /* The status is the useful half on a failure: 401 is a bad key,
+               402 is an empty balance, 404 is a wrong url or model id. */
+            status = out.ok ? 200 : (out.status ?? null);
+            /* Truncated hard. A provider error body can echo request content,
+               and this response is read by a human in a browser. */
+            detail = out.ok ? null : (out.bodyText ?? "").slice(0, 200) || null;
+          }
         } catch (e) {
           ms.push(Date.now() - startedAt);
           ok = false;
@@ -200,6 +249,7 @@ export async function GET(req: Request) {
         name: adapter.name,
         ok,
         status,
+        ...(capped ? { timed_out: true } : {}),
         /* `ms` keeps its original meaning exactly — the FIRST call, setup cost
            included — so a caller reading this field before samples existed
            reads the same thing now. */
