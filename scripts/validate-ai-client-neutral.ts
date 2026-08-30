@@ -118,8 +118,30 @@ console.log("\n── 2. The quotation draft is resolvable by any client ──"
     "it ALSO still returns review_url — removing it would break the Hub UI that reads it",
     /review_url: `\/quotations\/\$\{quote\.id\}`/.test(q),
   );
-  const app = readFileSync("src/components/ai/KoleexAiApp.tsx", "utf8");
-  check("the Hub UI still reads review_url, which is why it is kept", /review_url/.test(app));
+  /* The point is that SOME client component actually reads the field — that is
+     the reason it is kept. Phase 2J moved the reader out of KoleexAiApp.tsx
+     into DraftCard.tsx and this assertion failed on the path, correctly. It
+     now scans the client directory for a real property READ (payload.review_url
+     or href={…review_url}), not a mention: a comment naming the field must not
+     satisfy an assertion about the field being used. */
+  const clientFiles = readdirSync("src/components/ai")
+    .filter((f) => f.endsWith(".tsx") || f.endsWith(".ts"))
+    .map((f) => `src/components/ai/${f}`);
+  /* A PROPERTY ACCESS, not a mention. `review_url: string;` in types.ts is a
+     declaration, not a reader, and a first attempt at this check counted it —
+     so the negative test (deleting the actual use) still passed. Anchored on
+     `.review_url` instead, which a type declaration cannot produce. */
+  const readers = clientFiles.filter((f) =>
+    /\.review_url\b/.test(readFileSync(f, "utf8").replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "")),
+  );
+  check(
+    `a client component still READS review_url, which is why it is kept (${readers.map((f) => f.split("/").pop()).join(", ") || "none"})`,
+    readers.length > 0,
+  );
+  check(
+    "the card that renders the link is one of them",
+    /payload\.review_url/.test(readFileSync("src/components/ai/DraftCard.tsx", "utf8")),
+  );
 }
 
 console.log("\n── 3. The reference itself behaves ──");

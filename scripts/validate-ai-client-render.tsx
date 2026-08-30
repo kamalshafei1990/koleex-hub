@@ -25,6 +25,8 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import type { ReactElement } from "react";
 import DraftCard from "../src/components/ai/DraftCard";
+import { Bubble, isRtl } from "../src/components/ai/Bubble";
+import { SectionHeader, SidebarRow, groupByDate } from "../src/components/ai/Sidebar";
 import WelcomeCard from "../src/components/ai/WelcomeCard";
 import ProjectDialog from "../src/components/ai/ProjectDialog";
 import { COPY } from "../src/components/ai/copy";
@@ -151,6 +153,47 @@ console.log("\n── 6. The client can read the client-neutral pointer (Phase 2
     "a conversation persisted BEFORE 2I still renders — resource is optional, not required",
     text(html(<DraftCard payload={legacy} />)).includes("Q-260830-001"),
   );
+}
+
+console.log("\n── 7. The transcript bubble (Phase 2J, completed) ──");
+/* These components were extracted only after this harness existed. The move
+   itself was proved by rendering the PRE-SPLIT component and the new one with
+   identical props and diffing the HTML — 8 cases, byte-identical, including a
+   question card at 19 489 bytes. That comparison needed the old file and is
+   not reproducible here; what remains is to hold the behaviour it proved. */
+{
+  /* eslint-disable @typescript-eslint/no-explicit-any */
+  const msg: any = { id: "m1", role: "assistant", content: "Three widths are available.", created_at: "2026-08-30T10:00:00Z" };
+  const assistant = html(<Bubble {...({ msg, userInitial: "M", isLast: true, lang: "en" } as any)} />);
+  const user = html(<Bubble {...({ msg: { ...msg, role: "user", content: "which widths?" }, userInitial: "M", lang: "en" } as any)} />);
+  check("an assistant message renders its content", text(assistant).includes("Three widths are available."));
+  check("a user message renders differently from an assistant one", assistant !== user);
+  check("Arabic text is detected as RTL", isRtl("مرحبا") && !isRtl("hello"));
+
+  const withQuestion: any = { msg: { ...msg, steps: [
+    { kind: "question", payload: { question: "Which spreading machine?", lang: "en", options: [
+      { label: "KX-180", detail: "1.8 m", recommended: true },
+      { label: "KX-220", detail: "2.2 m" },
+    ] } },
+  ] }, userInitial: "M", isLast: true, lang: "en" };
+  const card = html(<Bubble {...withQuestion} />);
+  check("a question step renders the options as a card", text(card).includes("KX-180") && text(card).includes("KX-220"));
+  check("the card replaces the plain markdown rather than printing both", !text(card).includes("Three widths are available."));
+  check("the recommended option is marked", card !== html(<Bubble {...({ ...withQuestion, msg: { ...withQuestion.msg, steps: [{ kind: "question", payload: { question: "Which spreading machine?", lang: "en", options: [{ label: "KX-180", detail: "1.8 m" }, { label: "KX-220", detail: "2.2 m" }] } }] } } as any)} />));
+}
+
+console.log("\n── 8. The sidebar rows ──");
+{
+  /* eslint-disable @typescript-eslint/no-explicit-any */
+  const row: any = { id: "c1", title: "China sourcing", last_preview: "hello", message_count: 3, created_at: "2026-08-29T10:00:00Z", updated_at: "2026-08-29T10:00:00Z", pinned: false, project_id: null };
+  const base: any = { row, active: false, projects: [], copy: COPY.en, onOpen: () => {}, onRename: () => {}, onDelete: () => {}, onTogglePin: () => {}, onMove: () => {} };
+  const plain = html(<SidebarRow {...base} />);
+  check("a row renders its title", text(plain).includes("China sourcing"));
+  check("the active row renders differently", plain !== html(<SidebarRow {...({ ...base, active: true } as any)} />));
+  check("a pinned row renders differently", plain !== html(<SidebarRow {...({ ...base, row: { ...row, pinned: true } } as any)} />));
+  check("a section heading renders its label", text(html(<SectionHeader {...({ label: "Yesterday" } as any)} />)).includes("Yesterday"));
+  const groups = groupByDate([row] as any, COPY.en as any);
+  check("groupByDate buckets a row under a labelled group", groups.length === 1 && typeof groups[0].label === "string" && groups[0].rows.length === 1);
 }
 
 console.log(`\n${pass} passed, ${failures.length} failed`);
