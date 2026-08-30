@@ -27,10 +27,22 @@ import type { TurnRequest } from "./turn-ir";
 /* Ordered by preference. See the header on why DeepSeek is first. */
 const REGISTRY: ProviderAdapter[] = [deepseekAdapter];
 
+/** Pure selection, over any list. Exported so the rule — first CONFIGURED
+ *  adapter wins, order is preference — can be tested with fakes rather than
+ *  only with whatever happens to have a key in this environment.
+ *
+ *  A real second provider (Qwen/DashScope is the China-accessible candidate)
+ *  additionally needs core/transport.ts to take an endpoint and key instead of
+ *  hard-coding DeepSeek's, and needs a key to be testable at runtime. Both are
+ *  Phase 4 work; this function is what makes the interface provable now. */
+export function pickAdapter(adapters: ReadonlyArray<ProviderAdapter>): ProviderAdapter | null {
+  return adapters.find((a) => a.configured()) ?? null;
+}
+
 /** The adapter that will serve a turn right now, or null if none is
  *  configured. Exported so the degraded lane can ask before committing. */
 export function selectAdapter(): ProviderAdapter | null {
-  return REGISTRY.find((a) => a.configured()) ?? null;
+  return pickAdapter(REGISTRY);
 }
 
 export function providerConfigured(): boolean {

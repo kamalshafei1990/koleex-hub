@@ -23,7 +23,8 @@
 
 import { readFileSync } from "node:fs";
 import { parseOpenAiChatResponse } from "../src/lib/server/ai/provider/adapters/deepseek";
-import { selectAdapter, providerConfigured, activeProviderLabel } from "../src/lib/server/ai/provider/registry";
+import { selectAdapter, providerConfigured, activeProviderLabel, pickAdapter } from "../src/lib/server/ai/provider/registry";
+import type { ProviderAdapter, TurnOutcome } from "../src/lib/server/ai/provider/types";
 
 let pass = 0;
 const failures: string[] = [];
@@ -129,7 +130,12 @@ console.log("\n── 4. The registry has one door, and its order is a decision 
     "DeepSeek is first in the registry — it is the China-accessible provider, and that ordering is load-bearing",
     /REGISTRY: ProviderAdapter\[\] = \[deepseekAdapter/.test(registry),
   );
-  check("selection is by configuration, not by a hard-coded name", /REGISTRY\.find\(\(a\) => a\.configured\(\)\)/.test(registry));
+  /* This was pinned to `REGISTRY.find((a) => a.configured())` and broke when
+     that line moved into pickAdapter() — a check tied to a code SHAPE rather
+     than to the rule it protects. The rule is now proved behaviourally in
+     section 6 with fakes; what remains here is only that the live selector
+     goes through that same pure function rather than growing its own logic. */
+  check("selection is by configuration, through one pure selector", /adapters\.find\(\(a\) => a\.configured\(\)\)/.test(registry) && /return pickAdapter\(REGISTRY\)/.test(registry));
   check(
     "an unconfigured system reports it rather than throwing",
     providerConfigured() === (selectAdapter() !== null) && typeof activeProviderLabel() === "string",
@@ -160,6 +166,41 @@ console.log("\n── 5. The adapter delegates; it does not re-implement the tra
     "a failure always reports a status too",
     (code.match(/ok: false, status:/g) ?? []).length >= 3,
   );
+}
+
+console.log("\n── 6. The interface is sufficient for a SECOND provider ──");
+/* Phase 3's acceptance criterion is that a second adapter needs no change to
+   the loop. A real one — Qwen/DashScope is the China-accessible candidate —
+   additionally needs core/transport.ts to take an endpoint and key rather than
+   hard-coding DeepSeek's, and needs a key to be reachable at runtime. Both are
+   Phase 4 work, and claiming a second provider "done" without either would be
+   the "complete because it compiles" the project rules forbid.
+   What CAN be proved now is that the interface admits one and that selection
+   behaves — so that is proved, with fakes, rather than asserted. */
+{
+  const make = (name: string, configured: boolean, content: string): ProviderAdapter => ({
+    name,
+    configured: () => configured,
+    model: () => `${name}-1`,
+    chat: async (): Promise<TurnOutcome> => ({ ok: true, response: { content, toolCalls: [] } }),
+  });
+  const primary = make("primary", true, "from primary");
+  const secondary = make("secondary", true, "from secondary");
+  const unconfigured = make("unconfigured", false, "never");
+
+  check("the first CONFIGURED adapter wins, and order is preference", pickAdapter([primary, secondary])?.name === "primary");
+  check("an unconfigured adapter is skipped, not selected and failed", pickAdapter([unconfigured, secondary])?.name === "secondary");
+  check("no configured adapter yields null rather than throwing", pickAdapter([unconfigured]) === null);
+  check("an empty registry yields null", pickAdapter([]) === null);
+  check(
+    "a second adapter satisfies the interface with no loop change — it is just an object",
+    typeof secondary.chat === "function" && typeof secondary.configured === "function" && typeof secondary.model === "function",
+  );
+  /* The failure branch is part of the contract, not an afterthought: an
+     adapter that could only succeed would push error handling back into the
+     loop, which is what Phase 3 removed. */
+  const failing: ProviderAdapter = { ...make("failing", true, ""), chat: async () => ({ ok: false, status: 503, bodyText: "down" }) };
+  check("an adapter may report failure through the same contract", pickAdapter([failing])?.name === "failing");
 }
 
 console.log(`\n${pass} passed, ${failures.length} failed`);
