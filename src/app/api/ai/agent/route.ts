@@ -30,6 +30,7 @@ import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { requireAuth } from "@/lib/server/auth";
 import { requireInternalUser } from "@/lib/server/ai/require-internal";
+import { fenceUntrusted, newFenceId } from "@/lib/server/ai/security/untrusted";
 import { ATTACH_SPLIT, resolveHistoryAttachEmbeds } from "@/lib/server/ai/attach-embed";
 import { getTaughtAnswersBlock, getKnowledgeNudgeBlock } from "@/lib/server/ai-knowledge";
 import { buildUserContext, checkModule } from "@/lib/server/ai-agent/permissions";
@@ -227,11 +228,16 @@ export async function POST(req: Request) {
   const attachMarker = attFinal.length
     ? "\n\n" + attFinal.map((a) => `📎 ${a.name}`).join("\n")
     : "";
+  /* AUDIT ISSUE 5 (P0) — extracted text is fenced, not pasted.
+     The previous framing said "answer using it" with a CONSTANT `"""`
+     delimiter: a document containing its own `"""` line closed the fence
+     early and everything after it read as top-level conversation. The fence
+     id is now a per-turn nonce the document cannot have been written to
+     contain. Images arrive through this same path (vision output is text),
+     so this covers photographed instructions too. */
+  const fenceId = newFenceId();
   const attachBlock = attFinal
-    .map(
-      (a) =>
-        `\n\n[ATTACHED FILE: ${a.name}] (uploaded by the user — its extracted text follows; answer using it and never claim you cannot open files)\n"""\n${a.text}\n"""`,
-    )
+    .map((a) => fenceUntrusted(a.text, "document", a.name, fenceId))
     .join("");
 
 

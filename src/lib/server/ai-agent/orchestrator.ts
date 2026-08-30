@@ -29,6 +29,7 @@ import { brandKnowledgeFor, BRAND_EXCLUSIVITY_RULE, DIRECT_VOICE_RULE, EGYPTIAN_
 import { AI_PROVENANCE_RULE } from "../ai/prompt-builder";
 import { ENTITY_GUIDANCE_FULL } from "../ai/entity-scope";
 import { aiChat, aiProviderConfigured } from "@/lib/server/ai-provider";
+import { hasUntrustedContent } from "@/lib/server/ai/security/untrusted";
 import { logSealTransform } from "@/lib/server/ai/observability/reply-log";
 
 /* Agent LLM provider = DeepSeek ONLY (owner decision, 2026-07-20: Groq
@@ -670,9 +671,22 @@ export async function orchestrate(input: OrchestrateInput): Promise<AgentRespons
   /* True when a user-uploaded document's extracted text is in play — this
      turn or retained history. Gates the recital exemption in
      sealFinalReply(). */
-  const attachedDocCtx =
-    userMessage.includes("[ATTACHED FILE:") ||
-    history.some((m) => m.content.includes("[ATTACHED FILE:"));
+  /* AUDIT ISSUE 5 (P0) — scope narrowed to THIS TURN.
+
+     The recital exemption exists for a real reason: an invoice summary trips
+     every pricing pattern by nature, and v3 reads its "Total:" lines as
+     ungrounded field claims. But the old condition also scanned RETAINED
+     HISTORY — so one attachment anywhere in the 60-message window switched
+     the field-grounding and pricing seals OFF for every subsequent turn in
+     that conversation, long after the document stopped being the subject.
+
+     That is the widest blast radius in the seal chain, and it compounds with
+     document injection: text inside an uploaded file is untrusted, and the
+     turn that carries it was also the turn with the fewest guards.
+
+     A document being recited is a property of the CURRENT turn. If the user
+     asks about it again, they attach it again or it is in this message. */
+  const attachedDocCtx = hasUntrustedContent(userMessage);
   const key = process.env.DEEPSEEK_API_KEY;
 
   /* Graceful Groq-missing fallback. The orchestrator's tool-calling
@@ -2868,9 +2882,10 @@ async function orchestrateNoGroq(
   tStart: number,
 ): Promise<AgentResponse> {
   const { history, userMessage, userLang, conversationId } = input;
-  const attachedDocCtx =
-    userMessage.includes("[ATTACHED FILE:") ||
-    history.some((m) => m.content.includes("[ATTACHED FILE:"));
+  /* Same current-turn-only scope as orchestrate() — see AUDIT ISSUE 5 note
+     there. This second copy still scanned retained history and would have
+     kept the old, wider exemption alive on the no-key fallback path. */
+  const attachedDocCtx = hasUntrustedContent(userMessage);
   /* Lightweight system prompt — no tool schemas; the model is just
      answering naturally. Keeps the same language-anchoring as the
      full agent path. */
