@@ -263,9 +263,21 @@ check(
   "transport.ts really does hold the vendor surface (so the check above is not vacuous)",
   /api\.deepseek\.com/.test(transport) && /DEEPSEEK_API_KEY/.test(transport),
 );
+/* Phase 3C moved the bar. The orchestrator used to read the key through
+   readProviderKey(); now it does not read the key AT ALL — it asks the
+   provider registry whether one is available. That is strictly further from
+   the environment, so the assertion tightens rather than relaxes: the loop
+   must touch neither process.env nor the key itself. */
 check(
-  "the orchestrator reads the key through the transport, not from the environment",
-  /readProviderKey\(\)/.test(orch) && !/process\.env/.test(stripComments(orch)),
+  "the orchestrator reads no key and no environment — it asks the registry",
+  /providerConfigured\(\)/.test(orch) &&
+    !/process\.env/.test(stripComments(orch)) &&
+    !/readProviderKey/.test(stripComments(orch)),
+);
+check(
+  "and it reaches a model through the one door, not the transport",
+  /chatWithTools\(/.test(orch) &&
+    !/callGroqPlain\(|callGroqWithRetry\(|callGroqStreamingOnce\(/.test(stripComments(orch)),
 );
 check(
   "the provider label is built in one place, not repeated at every return site",
