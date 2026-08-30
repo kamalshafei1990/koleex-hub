@@ -43,6 +43,11 @@
 --
 -- LOAD. Strictly less than today: one round-trip instead of two, at the same
 -- write volume.
+--
+-- APPLIED. Staging 2026-08-30, production 2026-08-31 (owner-applied). Verified
+-- on production by querying pg_proc rather than by trusting the editor's
+-- success message: SECURITY DEFINER on, search_path pinned to '', and EXECUTE
+-- held only by postgres and service_role — anon and authenticated absent.
 -- ============================================================================
 
 CREATE OR REPLACE FUNCTION public.account_prefs_merge(
