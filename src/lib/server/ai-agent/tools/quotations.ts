@@ -1,3 +1,4 @@
+import { resourceRef, type ResourceRef } from "@/lib/server/ai/core/resource-ref";
 import "server-only";
 
 /* ---------------------------------------------------------------------------
@@ -353,7 +354,11 @@ interface QuotationDraftResult {
   status: "draft";
   line_count: number;
   approval_required: boolean;
-  review_url: string; // deep link into /quotations/[id]
+  /** Hub-relative deep link. Read by the Hub web UI; kept for it. */
+  review_url: string;
+  /** Client-neutral pointer to the same record (finding N6). Any client —
+   *  Hub, web, native — resolves this into its own navigation. */
+  resource: ResourceRef;
 }
 
 const createQuotationDraft: ToolDef<QuotationDraftInput, QuotationDraftResult> = {
@@ -510,6 +515,7 @@ const createQuotationDraft: ToolDef<QuotationDraftInput, QuotationDraftResult> =
         line_count: pricing.lines.length,
         approval_required: pricing.approvalRequired,
         review_url: `/quotations/${quote.id}`,
+        resource: resourceRef("quotation", quote.id),
       },
       message: pricing.approvalRequired
         ? `Draft ${quote.quote_no} created — review & approve in the Quotations app (flagged for approval).`

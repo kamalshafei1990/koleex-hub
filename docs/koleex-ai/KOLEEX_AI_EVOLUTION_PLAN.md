@@ -738,7 +738,7 @@ break Hub integration · remove a working tool · weaken permissions or verifica
 |---|---|---|
 | **0 — Baseline & Tests** | 🟡 **IN PROGRESS** | Tenant-isolation guard ✅ · Incident-replay suite ✅ — both shipped and proven-to-fail (below). Baseline latency metrics: next (needs a running instance). |
 | **1 — Security Hardening** | ✅ **COMPLETE** | All six audit issues in scope closed (1, 2, 3, 4, 5, 6) + Issue 7. Two migrations applied staging→production with sign-off. Six suites green. |
-| **2 — AI Core + Standalone Foundation** | 🟡 **IN PROGRESS** | **2A–2F shipped** — core extracted and tested by calling it; tool exposure is now permission-scoped. `orchestrator.ts` 3 220 → **734**, zero vendor references. **N7 and the 2D layering item closed.** 2G–2J to follow. |
+| **2 — AI Core + Standalone Foundation** | 🟡 **IN PROGRESS** | **2A–2F + 2I shipped** — core extracted and tested by calling it, tool exposure permission-scoped, tool results client-neutral. `orchestrator.ts` 3 220 → **734**, zero vendor references. **N6, N7 and the 2D layering item closed.** **2G awaiting owner review** (auth + new schema). 2H, 2J to follow. |
 | 3–20 | ⬜ Not started | **Amendment 1 (§P) folded in** — Phase 2 gains the connector interface + client-resolvable deep links |
 
 ### Phase 2 · Sub-stage 2A — the lane decision has one home ✅
@@ -913,6 +913,22 @@ Roughly **22 KB** removed from a typical scoped user's request, not 3 KB.
 
 **Regression gate:** fourteen suites green (`ai-baseline` 46), `tsc` clean, `eslint` clean.
 
+### Phase 2 · Sub-stage 2I — a tool result any client can act on ✅
+
+`src/lib/server/ai/core/resource-ref.ts` · `npm run validate:ai-client-neutral` · **8 passed, 0 failed.**
+
+**The finding was smaller than the audit said, and that is the useful part.** N6 was recorded as *"six places"*. Checked before changing anything: **five of the six are not defects.** Every `/todo?task=` string in the tool layer is an `inbox_messages` row or a push-notification payload — Hub features, written to a Hub table, consumed by the Hub inbox, and **never returned in a `ToolResult`**. Rewriting them would have broken a working feature to fix a problem they do not have, in direct conflict with *"do not break current Koleex Hub integration"*.
+
+The AI surface had exactly **one** Hub-relative link: `review_url` on `createQuotationDraft`, rendered as an `href` by `KoleexAiApp.tsx`. On an iPhone `/quotations/abc` is not a destination — it is a string.
+
+**The fix is additive, not a replacement.** `createQuotationDraft` now also returns `resource: { kind: "quotation", id }` — a `ResourceRef` that says *what* the record is, not *where the Hub keeps it*, so each client resolves its own navigation. `review_url` stays, because the Hub UI reads it and deleting it to "clean up" would break a working feature for no benefit.
+
+**Hub paths are not banned — they are declared.** The suite requires every Hub-relative literal in the tool layer to be either on a named allowlist **with a reason**, or paired with a `ResourceRef`. Same pattern as `SHARED_BY_DESIGN` in the tenant-isolation validator: an exception a human agreed to, never a blanket exemption. The next tool that adds an undeclared one fails the build.
+
+**Proven to fail:** adding a second Hub link with no `ResourceRef` → caught, both offending lines named · deleting `review_url` → caught, because that would break the Hub UI.
+
+**Regression gate:** fifteen suites green, `tsc` clean, `eslint` clean.
+
 ### Phase 0 · Result 1 — AI tenant-isolation guard ✅
 
 `scripts/validate-ai-tenant-isolation.mts` · `npm run validate:ai-tenant-isolation` · **39 passed, 0 failed, 7 documented pre-verified patterns.**
@@ -1035,7 +1051,7 @@ On an iPhone `/todo?task=x` means nothing. **Phase 2 addition:** tools return a 
 | N1 | **Cookie-only auth** — no bearer, no refresh, no per-device revocation; `SESSION_SECRET` rotation kills every session at once | 2 | **blocking for native** |
 | N2 | **No API version namespace** — response shapes coupled to current components | 2 | **blocking for shipped apps** |
 | N3 | **`requireInternalUser` 403s every AI route** — correct today, incompatible with a general user who has no Hub account | 2 | **blocking for Mode B** |
-| N6 | **Hub-relative deep links** (new, §P.3) | 2 | low, cheap now |
+| N6 | ~~**Hub-relative deep links**~~ — **CLOSED in 2I**, and the count was wrong. The audit said six places; **five of them were not defects.** Every `/todo?task=` string in the tool layer is an `inbox_messages` row or a push-notification payload — Hub features consumed by the Hub, which never travel in a `ToolResult`. Rewriting them would have broken a working feature to fix a problem they do not have. The AI surface had **one** Hub-relative link: `review_url` on `createQuotationDraft`. | ✅ 2I | closed |
 | N8 | **The agent route keeps its own provider call** (new, found in 2D) — the streaming fast lanes read `DEEPSEEK_API_KEY` and invoke `deepseekChatStream` directly, bypassing the core. Phase 3's acceptance criterion *"`chatWithTools()` is the only way the core reaches a model"* is not met until that lane goes through the same door. Asserted as a **count** meanwhile, so it cannot quietly grow. | 3 | medium — a second transport is a second place to fix a provider bug |
 | N7 | ~~**The degraded lane does not know who it is talking to**~~ — **CLOSED in 2E.** Found in 2C: `buildDegradedSystemPrompt` was the only one of four lanes omitting `viewerBlockFor`, so on the no-provider path a user asking *"do you know who I am?"* got the pre-fix answer. Left alone in 2C on purpose (that stage was code motion); fixed in 2E where the recovery path was being touched anyway. The degraded lane now sits in the same assertion loops as the other three. | ✅ 2E | closed |
 | — | **Agent jobs are request-scoped** — a task cannot survive the app closing | 17 | blocking for cross-device agents |
