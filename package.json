@@ -25,6 +25,7 @@
     "validate:ai-client-neutral": "NODE_OPTIONS=--conditions=react-server tsx scripts/validate-ai-client-neutral.ts",
     "validate:ai-tool-exposure": "NODE_OPTIONS=--conditions=react-server tsx scripts/validate-ai-tool-exposure.ts",
     "validate:ai-prompts": "NODE_OPTIONS=--conditions=react-server tsx scripts/validate-ai-prompts.ts",
+    "validate:ai-streaming": "NODE_OPTIONS=--conditions=react-server tsx scripts/validate-ai-streaming.ts",
     "validate:ai-seals": "NODE_OPTIONS=--conditions=react-server tsx scripts/validate-ai-seals.ts",
     "validate:ai-core-boundaries": "tsx scripts/validate-ai-core-boundaries.ts",
     "validate:ai-rate-limit": "NODE_OPTIONS=--conditions=react-server tsx scripts/validate-ai-rate-limit.ts",
