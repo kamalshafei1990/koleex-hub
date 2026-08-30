@@ -51,6 +51,7 @@ const ORCH = "src/lib/server/ai-agent/orchestrator.ts";
 const AGENT_ROUTE = "src/app/api/ai/agent/route.ts";
 const CHAT_ROUTE = "src/app/api/ai/chat/route.ts";
 const TRANSPORT = "src/lib/server/ai/core/transport.ts";
+const DEEPSEEK_ADAPTER = "src/lib/server/ai/provider/adapters/deepseek.ts";
 const read = (p: string) => readFileSync(p, "utf8");
 
 const decide = read(DECIDE);
@@ -229,40 +230,78 @@ check(
 check("brand: an ordinary question needs no brand section", classifyBrandSection("how do I reset my password") === "none");
 check("canned: a real question is NOT canned-answered", tryCannedReply("what is our MOQ for spreading machines") === null);
 
-console.log("\n── 7. The vendor surface has exactly one home (Phase 2D) ──");
+console.log("\n── 7. The core carries no vendor identity at all (Phase 2D → tightened 4A) ──");
 /* Phase 3 replaces the inside of core/transport.ts with provider adapters.
    That is a contained change only while the endpoint, the model id, the API
    key and the Authorization header exist in that ONE file. The moment a
    second file in the core starts talking to a provider, "swap the provider"
    goes back to being a change to the orchestrator. */
+/* Phase 4A TIGHTENED this. Until 4A the sweep exempted core/transport.ts,
+   because that file legitimately held the endpoint, the model and the key —
+   "one home for the vendor" rather than "no vendor". 4A moved all three into
+   provider/adapters/deepseek.ts, so the bar moves up with them: vendor
+   IDENTITY must now appear nowhere in the core at all, transport included.
+
+   `Authorization` is deliberately NOT in this set. It is a mechanism, not an
+   identity — every OpenAI-compatible provider uses the same header — and it
+   still belongs in the transport. It gets its own narrower check below, which
+   is the one that used to cover it, so nothing is dropped by splitting them. */
 {
-  const VENDOR_SURFACE = /api\.deepseek\.com|DEEPSEEK_API_KEY|Authorization/;
+  const VENDOR_IDENTITY = /api\.deepseek\.com|DEEPSEEK_API_KEY|DEEPSEEK_MODEL|dashscope|DASHSCOPE_API_KEY/;
   const CORE_DIRS = [
     "src/lib/server/ai-agent",
     "src/lib/server/ai/core",
     "src/lib/server/ai/seals",
     "src/lib/server/ai/prompts",
   ];
-  const offenders: string[] = [];
+  const coreFiles: string[] = [];
   const walk = (dir: string) => {
     for (const entry of readdirSync(dir, { withFileTypes: true })) {
       const full = `${dir}/${entry.name}`;
       if (entry.isDirectory()) walk(full);
-      else if (entry.name.endsWith(".ts") && full !== TRANSPORT) {
-        if (VENDOR_SURFACE.test(stripComments(read(full)))) offenders.push(full);
-      }
+      else if (entry.name.endsWith(".ts")) coreFiles.push(full);
+    }
+  };
+  for (const d of CORE_DIRS) walk(d);
+  const offenders = coreFiles.filter((f) => VENDOR_IDENTITY.test(stripComments(read(f))));
+  check(
+    `no vendor endpoint, key or model id anywhere in the core — transport included${offenders.length ? ` — found in ${offenders.join(", ")}` : ""}`,
+    offenders.length === 0,
+  );
+  /* Non-vacuity for the sweep itself: it must actually be reading files, and
+     it must be reading the transport. A walk over an empty or wrong directory
+     also reports zero offenders. */
+  check(
+    `the sweep really read the core (${coreFiles.length} files, transport among them)`,
+    coreFiles.length > 10 && coreFiles.includes(TRANSPORT),
+  );
+  /* Non-vacuity for the RULE: the regex must be capable of matching. If the
+     vendor identity has genuinely vanished from the repo, the check above
+     passes for the wrong reason. It has to be somewhere — the adapter. */
+  check(
+    "and the vendor identity is where it moved to, the adapter (so the sweep is not passing vacuously)",
+    VENDOR_IDENTITY.test(read(DEEPSEEK_ADAPTER)),
+  );
+}
+{
+  /* The auth header is still a one-home rule, unchanged in intent from the
+     pre-4A check — only separated from vendor identity now that the two live
+     in different files. */
+  const CORE_DIRS = ["src/lib/server/ai-agent", "src/lib/server/ai/core", "src/lib/server/ai/seals", "src/lib/server/ai/prompts"];
+  const withAuth: string[] = [];
+  const walk = (dir: string) => {
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+      const full = `${dir}/${entry.name}`;
+      if (entry.isDirectory()) walk(full);
+      else if (entry.name.endsWith(".ts") && /Authorization/.test(stripComments(read(full)))) withAuth.push(full);
     }
   };
   for (const d of CORE_DIRS) walk(d);
   check(
-    `the endpoint, key and auth header appear ONLY in core/transport.ts${offenders.length ? ` — found in ${offenders.join(", ")}` : ""}`,
-    offenders.length === 0,
+    `the Authorization header is built in exactly one core file${withAuth.length ? ` — ${withAuth.join(", ")}` : " — NONE, which means the check found nothing to guard"}`,
+    withAuth.length === 1 && withAuth[0] === TRANSPORT,
   );
 }
-check(
-  "transport.ts really does hold the vendor surface (so the check above is not vacuous)",
-  /api\.deepseek\.com/.test(transport) && /DEEPSEEK_API_KEY/.test(transport),
-);
 /* Phase 3C moved the bar. The orchestrator used to read the key through
    readProviderKey(); now it does not read the key AT ALL — it asks the
    provider registry whether one is available. That is strictly further from
@@ -274,14 +313,24 @@ check(
     !/process\.env/.test(stripComments(orch)) &&
     !/readProviderKey/.test(stripComments(orch)),
 );
+/* Both the pre-4A names and the post-4A ones are listed. The old ones cannot
+   come back by accident, and the new ones cannot be introduced — a rename is
+   not a way around this rule. */
 check(
   "and it reaches a model through the one door, not the transport",
   /chatWithTools\(/.test(orch) &&
-    !/callGroqPlain\(|callGroqWithRetry\(|callGroqStreamingOnce\(/.test(stripComments(orch)),
+    !/callGroqPlain\(|callGroqWithRetry\(|callGroqStreamingOnce\(|postChat\(|postChatStreaming\(/.test(stripComments(orch)),
 );
+/* This assertion USED to read /providerLabel\(\)/, which after 4A would have
+   matched `activeProviderLabel()` as a substring and passed without anyone
+   choosing that. Anchored now, and pointed at the function that actually
+   reports the serving adapter: a constant label would misreport every
+   failover turn, and the label is what the audit trail records. */
 check(
-  "the provider label is built in one place, not repeated at every return site",
-  /providerLabel\(\)/.test(orch) && !/deepseek:\$\{/.test(orch),
+  "the provider label comes from the adapter that served the turn, in one place",
+  /\bactiveProviderLabel\(\)/.test(stripComments(orch)) &&
+    !/\bproviderLabel\(\)/.test(stripComments(orch).replace(/activeProviderLabel\(\)/g, "")) &&
+    !/deepseek:\$\{/.test(orch),
 );
 check(
   "the API key is never logged, thrown or interpolated into a message",
