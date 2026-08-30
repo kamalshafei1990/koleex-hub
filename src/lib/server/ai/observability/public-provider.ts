@@ -18,6 +18,16 @@
    and changing its VALUE breaks nothing: it is still a string, still present,
    still describes the turn.
 
+   IT IS NOT ONE ROUTE. The first fix covered /api/ai/agent and the suite that
+   proved it read that one file, so it asserted "every send site" over a search
+   space of one. The review that followed swept every AI route and found the
+   same leak on two more paths: /api/ai/chat returned the vendor label in four
+   places (two SSE `end` frames, two JSON bodies), and
+   /api/ai/conversations/[id]/messages returned the PERSISTED ROW, which carries
+   the provider column verbatim — the exact failure mode the agent-route fix had
+   already named and fixed there. All of them are re-exported under /api/v1/ai/*,
+   so they are contract surfaces for clients this repository cannot see.
+
    AND THE SERVER KEEPS THE TRUTH. `ai_messages.provider` still records
    "deepseek:deepseek-chat", because that column is how a mis-diagnosis on
    2026-08-08 was eventually explained — the audit trail needs to know which
@@ -50,7 +60,12 @@
    on this list, or does not carry a `fast-` lane suffix, becomes "model". A
    new vendor name is therefore neutralised the day it appears, without anyone
    remembering to add it to a list of things to hide. */
-const PASSTHROUGH_LANES = new Set(["fast-path", "fallback", "none", "unknown"]);
+/* `local` is on the list for the same reason `fast-path` is: it names a lane
+   that answered WITHOUT a provider (the local-knowledge table), which is true
+   and discloses nothing. It is here because /api/ai/chat sends it as a literal,
+   and a label the routes emit but this function would collapse to "model" is a
+   disagreement between the two that a reader has to hold in their head. */
+const PASSTHROUGH_LANES = new Set(["fast-path", "fallback", "local", "none", "unknown"]);
 
 export function publicProviderLabel(label: string | null | undefined): string {
   const raw = (label ?? "").trim();
