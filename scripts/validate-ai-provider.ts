@@ -33,7 +33,9 @@ import {
 } from "../src/lib/server/ai/provider/registry";
 import { openAiCompatibleAdapter, parseFallbackConfig } from "../src/lib/server/ai/provider/adapters/openai-compatible";
 import { createBreaker, admissible } from "../src/lib/server/ai/router/circuit-breaker";
+import { parseClassMap, resolveModel, MODEL_CLASSES } from "../src/lib/server/ai/router/model-classes";
 import type { ProviderAdapter, TurnOutcome } from "../src/lib/server/ai/provider/types";
+import { toOpenAiBody } from "../src/lib/server/ai/provider/turn-ir";
 
 let pass = 0;
 const failures: string[] = [];
@@ -567,6 +569,101 @@ async function asyncChecks() {
     check(
       "and the breaker only counts provider faults, so a 400 would not have tripped it",
       shouldTryNextProvider(503) === true && shouldTryNextProvider(400) === false,
+    );
+  }
+
+  console.log("\n── 10. Model classes: selectable, and safe when unset (Phase 4E) ──");
+  /* The plan asks for selectable classes and names nine. Six exist here, and
+     the three that do not are the point: EMBEDDING, REALTIME_VOICE and IMAGE
+     are not chat completions. They take no `messages` array and return no
+     `choices[].message`, so they cannot travel through the Turn IR or the one
+     door. An enum listing them that resolved to a chat model would look
+     complete and be incapable of working. */
+  {
+    check(
+      `six chat-completion classes are defined (${MODEL_CLASSES.join(", ")})`,
+      MODEL_CLASSES.length === 6 && MODEL_CLASSES.includes("FAST") && MODEL_CLASSES.includes("REASONING"),
+    );
+    check(
+      "and the non-chat capabilities are NOT pretended to be routable here",
+      !(MODEL_CLASSES as ReadonlyArray<string>).includes("EMBEDDING") &&
+        !(MODEL_CLASSES as ReadonlyArray<string>).includes("IMAGE") &&
+        !(MODEL_CLASSES as ReadonlyArray<string>).includes("REALTIME_VOICE"),
+    );
+
+    const MAP = parseClassMap('{"deepseek":{"REASONING":"deepseek-reasoner","FAST":"deepseek-chat"}}');
+    check("a well-formed map parses per adapter", MAP.deepseek?.REASONING === "deepseek-reasoner");
+    check("a class with a mapping resolves to it", resolveModel(MAP, "deepseek", "default-model", "REASONING") === "deepseek-reasoner");
+    check("a class WITHOUT a mapping falls back to the adapter default", resolveModel(MAP, "deepseek", "default-model", "VISION") === "default-model");
+    check("an unknown adapter falls back to its default", resolveModel(MAP, "some-gateway", "default-model", "REASONING") === "default-model");
+    check("no class at all is the adapter default", resolveModel(MAP, "deepseek", "default-model") === "default-model");
+
+    /* Every rejection path must land on {} rather than a partial map. A
+       half-understood map is worse than none: it routes some classes and
+       silently drops others, which shows up as a provider 400 in production
+       rather than as a config error at boot. */
+    for (const [label, raw] of [
+      ["malformed JSON", "{not json"],
+      ["a JSON array", "[1,2,3]"],
+      ["a bare string", '"deepseek"'],
+      ["null", "null"],
+      ["an empty string", ""],
+    ] as const) {
+      check(`${label} yields an empty map, not a partial one`, Object.keys(parseClassMap(raw)).length === 0);
+    }
+    check("undefined (the variable is unset) yields an empty map", Object.keys(parseClassMap(undefined)).length === 0);
+    check(
+      "an unset map means every class resolves to the adapter default — today's behaviour exactly",
+      MODEL_CLASSES.every((c) => resolveModel({}, "deepseek", "default-model", c) === "default-model"),
+    );
+    /* Typos and wrong types are dropped, not coerced. `String(undefined)` as a
+       model id would reach the provider as the literal "undefined". */
+    const dirty = parseClassMap('{"deepseek":{"REASONNING":"typo","FAST":123,"GENERAL":"  ","REASONING":"  spaced  "}}');
+    check("an unknown class name is dropped", dirty.deepseek?.["REASONING" as const] !== "typo");
+    check("a non-string model id is dropped", resolveModel(dirty, "deepseek", "default-model", "FAST") === "default-model");
+    check("a whitespace-only model id is dropped", resolveModel(dirty, "deepseek", "default-model", "GENERAL") === "default-model");
+    check("a valid entry alongside bad ones still works, and is trimmed", resolveModel(dirty, "deepseek", "default-model", "REASONING") === "spaced");
+
+    /* The class must not leak into the wire body: adding it cannot be allowed
+       to change the bytes the golden differential pins. */
+    const withClass = toOpenAiBody(
+      { messages: [{ role: "user", content: "hi" }], maxTokens: 10, temperature: 0.3, modelClass: "REASONING" },
+      "m",
+    );
+    const withoutClass = toOpenAiBody(
+      { messages: [{ role: "user", content: "hi" }], maxTokens: 10, temperature: 0.3 },
+      "m",
+    );
+    check(
+      "modelClass never reaches the request body — the adapter resolves it to `model` instead",
+      JSON.stringify(withClass) === JSON.stringify(withoutClass) && !("modelClass" in withClass),
+    );
+
+    /* REACHABILITY. Everything above proves the resolver works; none of it
+       proves anything CALLS it. A class layer that no turn site sets is a
+       feature that exists only in its own test — the "complete because it
+       compiles" the project rules forbid. Assert the three real turn sites
+       and both adapters. */
+    const orchSrc = readFileSync("src/lib/server/ai-agent/orchestrator.ts", "utf8");
+    const routeSrc = readFileSync("src/app/api/ai/agent/route.ts", "utf8");
+    const dsSrc = readFileSync("src/lib/server/ai/provider/adapters/deepseek.ts", "utf8");
+    const fbSrc = readFileSync("src/lib/server/ai/provider/adapters/openai-compatible.ts", "utf8");
+    const strip = (t: string) => t.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
+    check(
+      "the tool loop asks for REASONING",
+      /modelClass: "REASONING"/.test(strip(orchSrc)),
+    );
+    check(
+      "the tool-less fast path asks for FAST or GENERAL by lane",
+      /modelClass: isBrand \? "GENERAL" : "FAST"/.test(strip(orchSrc)),
+    );
+    check(
+      "the route's streaming fast lane asks for a class too",
+      /modelClass:/.test(strip(routeSrc)),
+    );
+    check(
+      "and BOTH adapters resolve the class rather than one silently ignoring it",
+      /modelForClass\(/.test(strip(dsSrc)) && /modelForClass\(/.test(strip(fbSrc)),
     );
   }
 }

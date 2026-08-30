@@ -314,6 +314,10 @@ export async function orchestrate(input: TurnInput): Promise<AgentResponse> {
       messages: fromOpenAiMessages(messages),
       maxTokens: isBrand ? 1200 : 160,
       temperature: 0.3,
+      /* Phase 4E. A greeting must not pay reasoning-model latency — the plan's
+         primary speed lever. Advisory: with no AI_MODEL_CLASSES entry every
+         class resolves to the adapter's default, which is today's behaviour. */
+      modelClass: isBrand ? "GENERAL" : "FAST",
     });
     const tPost = Date.now();
     if (out.ok) {
@@ -420,6 +424,9 @@ export async function orchestrate(input: TurnInput): Promise<AgentResponse> {
           toolChoice: fromOpenAiToolChoice(toolChoice),
           maxTokens: 2048,
           temperature: 0.3,
+          /* The tool loop is the multi-step, evidence-gathering path — the one
+             turn where a slower, stronger model is worth its latency. */
+          modelClass: "REASONING",
           stream: Boolean(liveEmit),
         },
         liveEmit ? { onDelta: liveEmit } : undefined,
