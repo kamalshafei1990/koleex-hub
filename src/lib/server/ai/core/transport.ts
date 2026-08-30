@@ -22,17 +22,16 @@ import "server-only";
    The key is read here and passed as an argument; it is never logged, never
    put in an error message, and never reaches the model or the client.
 
-   KNOWN LAYERING ITEM for Phase 3: callGroqWithRetry() still calls
-   openAiToolSchemas() itself, so transport imports the tool registry. Tools
-   should be passed IN, not fetched here. Not changed in 2D because this stage
-   is code motion; Phase 3's chatWithTools() takes them as a parameter.
+   The layering item recorded in 2D is CLOSED (Phase 2F): tools are passed IN
+   as `opts.tools`, not fetched here. Transport no longer imports the tool
+   registry and has no opinion about which tools exist — which is what let
+   exposure become permission-scoped, since only the caller knows who is
+   asking.
 
    The helper names still say "Groq" — the provider changed in 2026-07 and the
    names did not. Renaming them is churn that would obscure this diff; Phase 3
    replaces the functions outright.
    --------------------------------------------------------------------------- */
-
-import { openAiToolSchemas } from "@/lib/server/ai-agent/tool-registry";
 
 /* Agent LLM provider = DeepSeek ONLY (owner decision, 2026-07-20: Groq
    removed). DeepSeek's HTTP API is OpenAI-compatible — same chat/completions
@@ -66,6 +65,14 @@ export interface WireMsg {
    the tools entirely, and the object form NAMES a function the model must
    call on that one request. We use the third form for exactly one case —
    see isChoiceShapedQuestion in core/decide-turn.ts. */
+/** The OpenAI-compatible tool schema, as the caller hands it in. Transport
+ *  does not know or care which tools exist — Phase 2F made that the caller's
+ *  business, because only the caller knows WHO is asking. */
+export interface ToolSchema {
+  type: "function";
+  function: { name: string; description: string; parameters: unknown };
+}
+
 export type ToolChoice = "auto" | "none" | { type: "function"; function: { name: string } };
 
 /** Read the provider key. Returns undefined when unconfigured, which is what
@@ -182,7 +189,7 @@ export async function callGroqPlain(
 export async function callGroqStreamingOnce(
   key: string,
   messages: WireMsg[],
-  opts: { toolChoice: ToolChoice; onDelta: (t: string) => void },
+  opts: { toolChoice: ToolChoice; onDelta: (t: string) => void; tools: ToolSchema[] },
 ): Promise<{
   ok: boolean;
   status: number;
@@ -198,7 +205,7 @@ export async function callGroqStreamingOnce(
     stream: true,
   };
   if (opts.toolChoice !== "none") {
-    body.tools = openAiToolSchemas();
+    body.tools = opts.tools ?? [];
     body.tool_choice = opts.toolChoice;
   }
   let res: Response;
@@ -299,7 +306,7 @@ export async function callGroqStreamingOnce(
 export async function callGroqWithRetry(
   key: string,
   messages: WireMsg[],
-  opts: { toolChoice?: ToolChoice } = {},
+  opts: { toolChoice?: ToolChoice; tools?: ToolSchema[] } = {},
   attempt = 0,
 ): Promise<Response> {
   const toolChoice = opts.toolChoice ?? "auto";
@@ -310,7 +317,7 @@ export async function callGroqWithRetry(
     max_tokens: 2048,
   };
   if (toolChoice !== "none") {
-    body.tools = openAiToolSchemas();
+    body.tools = opts.tools ?? [];
     body.tool_choice = toolChoice;
   }
   let res: Response;

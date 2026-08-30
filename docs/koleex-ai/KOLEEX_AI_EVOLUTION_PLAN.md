@@ -738,7 +738,7 @@ break Hub integration · remove a working tool · weaken permissions or verifica
 |---|---|---|
 | **0 — Baseline & Tests** | 🟡 **IN PROGRESS** | Tenant-isolation guard ✅ · Incident-replay suite ✅ — both shipped and proven-to-fail (below). Baseline latency metrics: next (needs a running instance). |
 | **1 — Security Hardening** | ✅ **COMPLETE** | All six audit issues in scope closed (1, 2, 3, 4, 5, 6) + Issue 7. Two migrations applied staging→production with sign-off. Six suites green. |
-| **2 — AI Core + Standalone Foundation** | 🟡 **IN PROGRESS** | **2A–2E shipped** — lane decision, seals, prompts, transport and the recovery paths each extracted and tested by calling them. `orchestrator.ts` 3 220 → **734** (below the ~800 target), zero vendor references. **N7 closed.** 2F–2J to follow. |
+| **2 — AI Core + Standalone Foundation** | 🟡 **IN PROGRESS** | **2A–2F shipped** — core extracted and tested by calling it; tool exposure is now permission-scoped. `orchestrator.ts` 3 220 → **734**, zero vendor references. **N7 and the 2D layering item closed.** 2G–2J to follow. |
 | 3–20 | ⬜ Not started | **Amendment 1 (§P) folded in** — Phase 2 gains the connector interface + client-resolvable deep links |
 
 ### Phase 2 · Sub-stage 2A — the lane decision has one home ✅
@@ -880,6 +880,38 @@ Moving `TurnInput` was not tidiness: it removes the only import cycle the split 
 **One more incident pin repointed — and made stricter.** The `attachedDocCtx` pin counted **two** occurrences in one file; after 2E the two turn paths live in two files. It now asserts **per file** (`loop=1, recovery=1`) rather than a total of two, because a total of two is also satisfied by both sites landing in one file while the other path loses its check entirely — which is precisely the failure the pin exists to catch. A companion assertion now applies audit Issue 5's *this-turn-only* rule to the recovery path as well. Re-proven to fail by making the recovery path scan history again.
 
 **Regression gate:** thirteen suites green (`ai-prompts` 49, `ai-baseline` 45), `tsc` clean, `eslint` clean.
+
+### Phase 2 · Sub-stage 2F — the model is offered only what the caller may run ✅
+
+`openAiToolSchemas(ctx)` · `staticToolDenial(ctx, tool)` · `npm run validate:ai-tool-exposure` · **26 passed, 0 failed.**
+
+**What changed.** Until now the model was handed all **45** tool schemas regardless of who was asking. A Sales user saw every schema, tried the ones they could not use, and burned a turn being denied.
+
+**The risk was never the filtering — it was disagreement.** If the filter and the dispatcher ever decide differently, *both* directions are bugs: hiding a permitted tool silently breaks a feature; offering a forbidden one wastes a turn and teaches the model to try things that never work. So the two static gates (module + action, and role tier) were pulled out of `dispatchTool` into **`staticToolDenial(ctx, tool)`**, and exposure is derived from that same function. They cannot drift, because there is only one of them.
+
+**Deliberately NOT in the filter:** the confirmation ledger. That gate depends on arguments and conversation state, so it cannot be decided at exposure time — a write tool is still *offered* to someone entitled to use it, and still *stopped* at dispatch until a matching pending action exists.
+
+**Defence in depth is unchanged.** `dispatchTool` still re-checks every call, because a model can name a tool it was never handed.
+
+**Measured, and the plan's estimate was wrong — in our favour.** §F said permission-scoped exposure would remove *"~3 KB from every prompt"*. Actual, measured by the suite:
+
+| Caller | Tools offered | Schema bytes | vs. super admin |
+|---|---:|---:|---:|
+| Super admin | 45 | 35 178 | — |
+| Sales rep | 21 | 13 147 | **−63 %** |
+| No module grants | 7 | 6 581 | **−81 %** |
+
+Roughly **22 KB** removed from a typical scoped user's request, not 3 KB.
+
+**Closes the layering item recorded in 2D.** Tools are now passed *into* the transport as `opts.tools`; `core/transport.ts` no longer imports the tool registry and has no opinion about which tools exist — which is exactly what made permission-scoping possible, since only the caller knows who is asking.
+
+**Proven to fail:** exposure bypassing the shared predicate → **13 failures**, naming every divergent tool · a filter that checks the module but ignores the action → view-only grant leaks 5 To-do write tools · role tier no longer enforced → an external account is offered internal-only tools.
+
+**Two existing pins were repaired, one of them because this refactor quietly weakened it.** The `checkModule` ordering pin compared indexes across the whole file; moving the gate into a function defined *above* `dispatchTool` made it pass for a structural reason rather than the intended one. Both ordering pins are now scoped to the dispatcher's own body, behind a guard-the-guard check.
+
+**One limit is stated rather than implied.** The "denials are audited" pin proves the audit call is *present* in the denial branch, not that it is *reachable* — a negative test that wrapped it in `if (false)` still passed. Deleting the call is caught; disabling it in place is not. That note now lives in the assertion itself. Behavioural coverage needs a database and arrives with Phase 20.
+
+**Regression gate:** fourteen suites green (`ai-baseline` 46), `tsc` clean, `eslint` clean.
 
 ### Phase 0 · Result 1 — AI tenant-isolation guard ✅
 

@@ -227,6 +227,19 @@ check(
 /* ═══ 6. PERMISSIONS ═══ */
 section("Permission invariants");
 
+/* Phase 2F moved the two static gates into staticToolDenial(), which is
+   DEFINED above dispatchTool in the file. A whole-file index comparison would
+   therefore pass for a structural reason rather than the intended one — the
+   refactor made the pin weaker without anyone touching it. Scope the ordering
+   pins to the dispatcher's own body so they mean what they say again. */
+const dispatchStart = registry.indexOf("export async function dispatchTool(");
+const dispatchBody = dispatchStart >= 0 ? registry.slice(dispatchStart) : "";
+check(
+  "dispatchTool is where these ordering pins expect it",
+  dispatchBody.includes("staticToolDenial(") && dispatchBody.includes("await tool.handler("),
+  "if this fails the pins beneath it compare -1 against -1 and pass vacuously",
+);
+
 check(
   "the knowledge nudge is gated on the AI Knowledge module (audit Issue 7)",
   /checkModule\(ctx, "AI Knowledge", "view"\)[\s\S]{0,300}getKnowledgeNudgeBlock/.test(agentRoute) ||
@@ -247,12 +260,13 @@ check(
 
 check(
   "dispatchTool checks the module guard BEFORE running the handler",
-  orch.length > 0 && registry.indexOf("checkModule(") < registry.indexOf("await tool.handler("),
+  orch.length > 0 && dispatchBody.indexOf("staticToolDenial(") < dispatchBody.indexOf("await tool.handler("),
   "the cheapest rejection path must come first, and no DB hit may precede it",
 );
 check(
   "dispatchTool audits denials, not just successes",
-  /decision\.allowed[\s\S]{0,600}await logToolCall/.test(registry),
+  /const denial = staticToolDenial\([\s\S]{0,600}await logToolCall/.test(dispatchBody),
+  "STATIC LIMIT, stated rather than implied: this proves the audit call is PRESENT in the denial branch, not that it is reachable — a negative test that wrapped it in `if (false)` still passed. Deleting the call is caught; disabling it in place is not. Behavioural coverage needs a database and arrives with Phase 20.",
 );
 check(
   'SENSITIVE_FIELDS registers the real column name "customers.notes"',
