@@ -431,6 +431,21 @@ Put up per the standing rule that no table arrives without this section. **Nothi
 | **Acceptance** | Every tool has domain + risk class + validated schema; no behaviour change in any existing tool |
 | **User-visible** | Fewer wrong tool calls. |
 
+#### Phase 6 — delivered, scored honestly
+
+| Acceptance criterion | Status | Evidence |
+|---|---|---|
+| Every tool has a **domain** | ✅ | `skills/catalog.ts`. Eight domains mirroring the Hub modules — not invented taxonomy; a domain a user cannot point at in the product is one nobody can reason about. Distribution: work 21, products 10, knowledge 5, quotations 3, customers 2, system 2, inventory 1, web 1. |
+| Every tool has a **risk class** | ✅ | All 45 declared against §L. Risk was previously **inferred from the tool's NAME**, which cannot express the matrix: `search_web` came out `high_risk_write` rather than an external side effect, `remember_about_user` the same, and `calculateQuotationPricing` matched `/price/i` and came out `financial` despite writing nothing. Distribution: read_only 25, high_risk_write 11, destructive 4, low_risk_write 3, financial 1, external_side_effect 1. |
+| §L rule 5 — a tool without a class **fails validation** | ✅ | `validate:ai-skills` asserts a **bijection** between registry and catalogue, so a new tool with no class fails and an orphaned declaration fails too. Verified non-vacuous by removing a tool and by mis-declaring one. |
+| Per-tool **timeouts** | ✅ **with the limitation stated** | 15 s default, 25 s for the one tool that leaves our network. `Promise.race` frees the **caller**; it cannot cancel the work. Real cancellation needs an `AbortSignal` through all 45 handlers, which Phase 6 excludes by design ("metadata only"). This bounds how long the **turn** waits, not how long the query runs. |
+| Runtime **input validation** | 🟡 **log-only by default** | `skills/validate.ts`, reading the tool's **own** `parameters` schema. **Not zod**, which the plan names: a second schema per tool drifts from the advertised one, and the drift rejects a call the model was *told* to make. Default is log-only because these schemas have never been enforced — `AI_TOOL_VALIDATION=enforce` flips it. **Until then this measures; it does not protect.** |
+| — and enforcement is *safe to turn on* | ✅ **checked, not assumed** | A `required` entry naming a property absent from `properties` would fail **every** call under enforcement. None exist, at either nesting level; all 12 no-argument tools accept `{}`; and `confirm: true` is never blocking on any of the 16 ledger-bearing tools — which would otherwise have broken the confirmation step itself. |
+| Output validation | ⬜ **not built** | The phase header says "input/output"; only input is done. Tool *results* are still shaped by `filterFields` and the seals, which is real but is not schema validation. |
+| **All 45 tools function identically** | ✅ | The only consumer of the risk class is the `risk_class` **column**; `consumePendingAction` matches on tool name, args hash, tenant, account and conversation — never on risk — so a more accurate value lands in the audit trail and nothing branches on it. Two baseline ordering pins were **repointed, not relaxed**, and two added: validation must run **after** the permission gate and **before** the ledger. |
+
+**Noted, not changed:** the agent route declares no `maxDuration`, so a whole turn — several model calls plus tools — runs on the platform default. Out of scope for a metadata phase; worth an operational decision.
+
 ---
 
 ### PHASE 7 — Advanced Memory · P2 · Risk: medium
