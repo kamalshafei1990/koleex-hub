@@ -738,7 +738,7 @@ break Hub integration · remove a working tool · weaken permissions or verifica
 |---|---|---|
 | **0 — Baseline & Tests** | 🟡 **IN PROGRESS** | Tenant-isolation guard ✅ · Incident-replay suite ✅ — both shipped and proven-to-fail (below). Baseline latency metrics: next (needs a running instance). |
 | **1 — Security Hardening** | ✅ **COMPLETE** | All six audit issues in scope closed (1, 2, 3, 4, 5, 6) + Issue 7. Two migrations applied staging→production with sign-off. Six suites green. |
-| **2 — AI Core + Standalone Foundation** | 🟡 **IN PROGRESS** | **2A–2F, 2H, 2I shipped** — core extracted and tested by calling it, tool exposure permission-scoped, tool results client-neutral, the Hub boundary named and enforced. `orchestrator.ts` 3 220 → **734**, zero vendor references. **N6, N7 and the 2D layering item closed.** **2G awaiting owner review** (auth + new schema). 2J to follow. |
+| **2 — AI Core + Standalone Foundation** | 🟡 **IN PROGRESS** | **2A–2F, 2H, 2I, 2J(part) shipped.** `orchestrator.ts` 3 220 → **734** with zero vendor references; `KoleexAiApp.tsx` 3 958 → **3 466**. **N6, N7 and the 2D layering item closed. N9 opened.** **2G awaiting owner review** (auth + new schema). |
 | 3–20 | ⬜ Not started | **Amendment 1 (§P) folded in** — Phase 2 gains the connector interface + client-resolvable deep links |
 
 ### Phase 2 · Sub-stage 2A — the lane decision has one home ✅
@@ -950,6 +950,28 @@ If a future domain method earns its place, it belongs *behind* `invoke()`, not b
 
 **Regression gate:** sixteen suites green, `tsc` clean, `eslint` clean.
 
+### Phase 2 · Sub-stage 2J (part) — the client split, as far as it can be verified 🟡
+
+`components/ai/{types,copy,ProjectDialog,DraftCard,WelcomeCard}` · **`KoleexAiApp.tsx` 3 958 → 3 466 lines.**
+
+**This sub-stage is different from every other one in Phase 2, and it is worth saying why.** Every suite in this repo is server-side. There is **no client test harness** — so a frontend change is gated only by `tsc`, `eslint` and the production build. Those catch a wrong prop type or a missing import; they do **not** catch a dropped class name, a reordered sibling, or a changed default. That is a real limit on what "verified" can mean here, so the split was scoped to what could be proven rather than what could be compiled.
+
+**What was moved, and why each is provably safe:**
+
+| Module | Why it cannot change behaviour |
+|---|---|
+| `types.ts` | Types only — it compiles away entirely, leaving no runtime footprint |
+| `copy.ts` | A frozen data table, moved verbatim; no logic to behave differently |
+| `ProjectDialog`, `DraftCard`, `WelcomeCard` | Module-level leaves that take props and nothing else — no parent-state closure |
+
+**The three component bodies were diffed against the originals and are byte-identical.** That is the strongest evidence available without a runtime harness, and it is stronger than "it compiles": the code was *sliced*, never retyped.
+
+**`tsc` did its job during the work.** The first slice was missing six imports (`Link`, `ProjectIcon`, `ProjectColor`, `PROJECT_ICONS`, `PROJECT_COLOR_KEYS`, `KoleexOrb`) because the dependency scan that preceded it was too narrow. The compiler named every one.
+
+**What was deliberately NOT moved.** `Bubble`, `BubbleActions` and the sidebar rows — roughly 1 250 lines — are more entangled and are where a silent visual regression would actually hide. Attempting them without a harness would be exactly the "claim it is complete because it compiles" the project rules forbid. **Recorded as finding N9**, with the harness as its prerequisite.
+
+**Regression gate:** sixteen suites green, `tsc` clean, `eslint` clean.
+
 ### Phase 0 · Result 1 — AI tenant-isolation guard ✅
 
 `scripts/validate-ai-tenant-isolation.mts` · `npm run validate:ai-tenant-isolation` · **39 passed, 0 failed, 7 documented pre-verified patterns.**
@@ -1073,6 +1095,7 @@ On an iPhone `/todo?task=x` means nothing. **Phase 2 addition:** tools return a 
 | N2 | **No API version namespace** — response shapes coupled to current components | 2 | **blocking for shipped apps** |
 | N3 | **`requireInternalUser` 403s every AI route** — correct today, incompatible with a general user who has no Hub account | 2 | **blocking for Mode B** |
 | N6 | ~~**Hub-relative deep links**~~ — **CLOSED in 2I**, and the count was wrong. The audit said six places; **five of them were not defects.** Every `/todo?task=` string in the tool layer is an `inbox_messages` row or a push-notification payload — Hub features consumed by the Hub, which never travel in a `ToolResult`. Rewriting them would have broken a working feature to fix a problem they do not have. The AI surface had **one** Hub-relative link: `review_url` on `createQuotationDraft`. | ✅ 2I | closed |
+| N9 | **The client has no test harness** (new, found in 2J) — every suite in this repo is server-side. A frontend change is gated only by `tsc`, `eslint` and the build, which catch type and import errors but not a dropped class name or a reordered sibling. That is why 2J stopped after the provably-safe cuts: types, the copy table, and three leaf components verified **byte-identical** to their originals. The entangled part (`Bubble`, `BubbleActions`, the sidebar rows — ~1 250 lines) is not attempted until a client harness exists. | before finishing 2J | medium — it bounds how much frontend work can be verified at all |
 | N8 | **The agent route keeps its own provider call** (new, found in 2D) — the streaming fast lanes read `DEEPSEEK_API_KEY` and invoke `deepseekChatStream` directly, bypassing the core. Phase 3's acceptance criterion *"`chatWithTools()` is the only way the core reaches a model"* is not met until that lane goes through the same door. Asserted as a **count** meanwhile, so it cannot quietly grow. | 3 | medium — a second transport is a second place to fix a provider bug |
 | N7 | ~~**The degraded lane does not know who it is talking to**~~ — **CLOSED in 2E.** Found in 2C: `buildDegradedSystemPrompt` was the only one of four lanes omitting `viewerBlockFor`, so on the no-provider path a user asking *"do you know who I am?"* got the pre-fix answer. Left alone in 2C on purpose (that stage was code motion); fixed in 2E where the recovery path was being touched anyway. The degraded lane now sits in the same assertion loops as the other three. | ✅ 2E | closed |
 | — | **Agent jobs are request-scoped** — a task cannot survive the app closing | 17 | blocking for cross-device agents |
