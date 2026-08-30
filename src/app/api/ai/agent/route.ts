@@ -32,7 +32,7 @@ import { requireAuth } from "@/lib/server/auth";
 import { requireInternalUser } from "@/lib/server/ai/require-internal";
 import { ATTACH_SPLIT, resolveHistoryAttachEmbeds } from "@/lib/server/ai/attach-embed";
 import { getTaughtAnswersBlock, getKnowledgeNudgeBlock } from "@/lib/server/ai-knowledge";
-import { buildUserContext } from "@/lib/server/ai-agent/permissions";
+import { buildUserContext, checkModule } from "@/lib/server/ai-agent/permissions";
 import {
   orchestrate,
   classifyBrandSection,
@@ -551,7 +551,25 @@ export async function POST(req: Request) {
              question ride the fast lanes too — the fast paths carry no
              tools, so without this the curated knowledge base was
              invisible exactly where most casual questions land. */
-          const knowledgeNudge = await getKnowledgeNudgeBlock(auth.tenant_id ?? null, normalizedContent);
+          /* AUDIT ISSUE 7 (P1) — the nudge bypassed its own permission gate.
+             `search_knowledge` is gated on the "AI Knowledge" module precisely
+             so that someone who cannot open Knowledge cannot read ingested
+             documents (with source title and page) by asking the agent. This
+             block surfaces THE SAME corpus with THE SAME citations, and it was
+             injected unconditionally on every fast lane for every internal
+             user — the exact exposure the tool's gate was written to prevent,
+             through a different door. Same module, same action.
+
+             NOT gated: the taught-answers block above. That distinction is
+             deliberate. Taught Q&A are canonical answers the owner WROTE FOR
+             THE ASSISTANT TO GIVE to users; withholding them defeats their
+             purpose. The nudge is document content with citations. Different
+             thing, different rule. checkModule() is a pure in-memory read of
+             the ctx we already built — no extra round-trip. */
+          const canReadKnowledge = checkModule(ctx, "AI Knowledge", "view").allowed;
+          const knowledgeNudge = canReadKnowledge
+            ? await getKnowledgeNudgeBlock(auth.tenant_id ?? null, normalizedContent)
+            : "";
           let fastReply: string | null = null;
           let fastProvider: string | null = null;
           let fastLane: "brand" | "small" | "general" | null = null;
@@ -868,7 +886,12 @@ export async function POST(req: Request) {
     userLang,
     conversationId,
     webSearchRequested: body.web_search === true,
-    taughtAnswers: (await getTaughtAnswersBlock(auth.tenant_id ?? null)) + (await getKnowledgeNudgeBlock(auth.tenant_id ?? null, content)),
+    /* Same gate as the streaming path — see AUDIT ISSUE 7 note above. */
+    taughtAnswers:
+      (await getTaughtAnswersBlock(auth.tenant_id ?? null)) +
+      (checkModule(ctx, "AI Knowledge", "view").allowed
+        ? await getKnowledgeNudgeBlock(auth.tenant_id ?? null, content)
+        : ""),
     languageLock: langLock,
   });
   const tOrch = Date.now();

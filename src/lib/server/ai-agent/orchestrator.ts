@@ -29,6 +29,7 @@ import { brandKnowledgeFor, BRAND_EXCLUSIVITY_RULE, DIRECT_VOICE_RULE, EGYPTIAN_
 import { AI_PROVENANCE_RULE } from "../ai/prompt-builder";
 import { ENTITY_GUIDANCE_FULL } from "../ai/entity-scope";
 import { aiChat, aiProviderConfigured } from "@/lib/server/ai-provider";
+import { logSealTransform } from "@/lib/server/ai/observability/reply-log";
 
 /* Agent LLM provider = DeepSeek ONLY (owner decision, 2026-07-20: Groq
    removed). DeepSeek's HTTP API is OpenAI-compatible — same chat/completions
@@ -712,9 +713,8 @@ export async function orchestrate(input: OrchestrateInput): Promise<AgentRespons
     const cannedSteps: AgentStep[] = [
       { kind: "answer", text: fastReply, permissionStatus: "allowed" },
     ];
-    console.warn("[ai.agent.final.before]", fastReply);
     const safeReply = sealFinalReply(fastReply, cannedSteps, userMessage, attachedDocCtx);
-    console.warn("[ai.agent.final.after]", safeReply);
+    logSealTransform(fastReply, safeReply, "canned");
     return {
       steps: cannedSteps,
       finalReply: safeReply,
@@ -836,9 +836,8 @@ export async function orchestrate(input: OrchestrateInput): Promise<AgentRespons
       const reply = normaliseBrandName(cleanAssistantText(rawReply));
       if (reply) {
         steps.push({ kind: "answer", text: reply, permissionStatus: "allowed" });
-        console.warn("[ai.agent.final.before]", reply);
         const safeReply = sealFinalReply(reply, steps, userMessage, attachedDocCtx);
-        console.warn("[ai.agent.final.after]", safeReply);
+        logSealTransform(reply, safeReply, "brand-fast");
         console.log(
           `[ai.agent.timing] fast=${isBrand ? "brand" : "small"} provider=${tPost - tPre}ms total=${Date.now() - tStart}ms`,
         );
@@ -972,9 +971,8 @@ export async function orchestrate(input: OrchestrateInput): Promise<AgentRespons
       const rescued = rescueFromToolResults(steps);
       if (rescued) {
         steps.push({ kind: "answer", text: rescued, permissionStatus: "allowed" });
-        console.warn("[ai.agent.final.before]", rescued);
         const safeReply = sealFinalReply(rescued, steps, userMessage, attachedDocCtx);
-        console.warn("[ai.agent.final.after]", safeReply);
+        logSealTransform(rescued, safeReply, "rescue-after-call-failure");
         return {
           steps,
           finalReply: safeReply,
@@ -992,9 +990,8 @@ export async function orchestrate(input: OrchestrateInput): Promise<AgentRespons
         ? "Koleex AI is handling a lot of requests right now. Give it a moment and try again."
         : "I couldn't complete that request. Please try again.";
       steps.push({ kind: "answer", text: msg, permissionStatus: "denied" });
-      console.warn("[ai.agent.final.before]", msg);
       const safeReply = sealFinalReply(msg, steps, userMessage, attachedDocCtx);
-      console.warn("[ai.agent.final.after]", safeReply);
+      logSealTransform(msg, safeReply, "call-failed");
       return {
         steps,
         finalReply: safeReply,
@@ -1009,9 +1006,8 @@ export async function orchestrate(input: OrchestrateInput): Promise<AgentRespons
       const rescued = rescueFromToolResults(steps);
       if (rescued) {
         steps.push({ kind: "answer", text: rescued, permissionStatus: "allowed" });
-        console.warn("[ai.agent.final.before]", rescued);
         const safeReply = sealFinalReply(rescued, steps, userMessage, attachedDocCtx);
-        console.warn("[ai.agent.final.after]", safeReply);
+        logSealTransform(rescued, safeReply, "rescue-no-choice");
         return {
           steps,
           finalReply: safeReply,
@@ -1281,9 +1277,8 @@ export async function orchestrate(input: OrchestrateInput): Promise<AgentRespons
      funnels through sealFinalReply so no path can leak an unsealed
      reply to the route handler (which persists finalReply into
      ai_messages.content → the bubble the user sees). */
-  console.warn("[ai.agent.final.before]", finalReply);
   const safeReply = sealFinalReply(finalReply, steps, userMessage, attachedDocCtx);
-  console.warn("[ai.agent.final.after]", safeReply);
+  logSealTransform(finalReply, safeReply, "main");
 
   return {
     steps,
@@ -2938,9 +2933,8 @@ function fallback(
   const steps: AgentStep[] = [
     { kind: "answer", text: msg, permissionStatus: "denied" },
   ];
-  console.warn("[ai.agent.final.before]", msg);
   const safeReply = sealFinalReply(msg, steps, userMessage);
-  console.warn("[ai.agent.final.after]", safeReply);
+  logSealTransform(msg, safeReply, "fallback");
   return {
     steps,
     finalReply: safeReply,
