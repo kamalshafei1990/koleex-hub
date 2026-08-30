@@ -19,6 +19,13 @@ import "server-only";
 import type { ToolDef, UserContext, ToolResult, PermissionStatus } from "./types";
 import { checkModule } from "./permissions";
 import { logToolCall } from "./audit";
+import {
+  ledgerMode,
+  recordPendingAction,
+  consumePendingAction,
+  riskClassFor,
+  UNCONFIRMED_MESSAGE,
+} from "../ai/security/pending-actions";
 
 /* ─────────────────────────────────────────────────────────────────────
    Import individual tool modules. Each file exports its own tool(s)
@@ -191,6 +198,53 @@ export async function dispatchTool(
     }
   }
 
+  /* ── AUDIT ISSUE 1 (P0): server-enforced write confirmation ──────────────
+     Until now the ONLY thing separating a preview from an execution was the
+     model choosing to omit `confirm: true`. Nothing here inspected it, and
+     `pendingAction` — returned by 15 tools — was read by nothing.
+
+     A confirm must now match an unexpired pending row this same conversation
+     caused to be written. The model cannot fabricate one. A confirm carrying
+     DIFFERENT arguments hashes differently and is refused: a changed action
+     needs a new preview, which is the correct answer, not a bug. */
+  const mode = ledgerMode();
+  if (mode !== "off" && args.confirm === true) {
+    const consumed = await consumePendingAction({
+      ctx,
+      conversationId: opts.conversationId ?? null,
+      toolName: name,
+      args,
+    });
+    if (!consumed.matched) {
+      console.warn(
+        `[ai.ledger.unmatched] tool=${name} reason=${consumed.reason} mode=${mode}`,
+      );
+      if (mode === "enforce") {
+        const result: ToolResult = {
+          ok: false,
+          /* NOT "denied": a denial short-circuits the orchestrator and prints
+             `message` verbatim, which would show English to an Arabic speaker.
+             As an ordinary unsuccessful result the model relays it in the
+             user's language and re-asks — the contract search_web already uses. */
+          permissionStatus: "allowed",
+          data: null,
+          message: UNCONFIRMED_MESSAGE,
+        };
+        await logToolCall({
+          ctx,
+          conversationId: opts.conversationId ?? null,
+          toolName: name,
+          args,
+          result,
+          latencyMs: Date.now() - startedAt,
+        });
+        return result;
+      }
+      /* observe: fall through and execute, having logged what enforce would
+         have blocked. Mirrors this repo's AUTH_RATELIMIT staging pattern. */
+    }
+  }
+
   // Execute the tool. Any thrown error becomes a typed denial so the
   // LLM never sees a stack trace and nothing leaks via error messages.
   let result: ToolResult;
@@ -207,6 +261,22 @@ export async function dispatchTool(
       message: "Something went wrong while running that tool.",
     };
     statusOverride = "error";
+  }
+
+  /* The tool returned a PREVIEW — record it so the follow-up confirm has
+     something to match. No tool changed: `pendingAction` was already being
+     returned by all 15 write tools and read by nothing. */
+  const pending = (result as { pendingAction?: { tool: string; args: Record<string, unknown> } })
+    .pendingAction;
+  if (mode !== "off" && pending && result.ok) {
+    await recordPendingAction({
+      ctx,
+      conversationId: opts.conversationId ?? null,
+      toolName: pending.tool ?? name,
+      args: pending.args ?? {},
+      preview: result.data,
+      riskClass: riskClassFor(name, tool.requiredAction),
+    });
   }
 
   await logToolCall({

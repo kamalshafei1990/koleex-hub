@@ -259,7 +259,11 @@ check(
        fixed assertion and the incident is closed. ═══ */
 section("Known-open P0s (audit Issues 1-3, 6) — tracked, flip in Phase 1");
 
-const confirmServerEnforced = /confirm/.test(registry);
+/* Was a presence test for the word "confirm"; now asserts the real mechanism:
+   dispatchTool must CONSUME a pending action before a confirmed write runs,
+   and must RECORD one when a tool returns a preview. */
+const confirmServerEnforced =
+  /consumePendingAction\(/.test(registry) && /recordPendingAction\(/.test(registry);
 console.log(`  ${confirmServerEnforced ? "✓ FIXED" : "…OPEN"}  audit Issue 1 — server-enforced write confirmation${confirmServerEnforced ? "" : " (dispatchTool still never inspects `confirm`)"}`);
 
 /* WAS A FALSE POSITIVE: /redact/i matched "requi[redAct]ion" and reported an
