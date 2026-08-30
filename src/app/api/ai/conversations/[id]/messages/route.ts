@@ -5,6 +5,10 @@ import { supabaseServer } from "@/lib/server/supabase-server";
 import { requireAuth } from "@/lib/server/auth";
 import { requireInternalUser } from "@/lib/server/ai/require-internal";
 import { aiChat, aiProviderConfigured, getLastAiError, type ChatMessage } from "@/lib/server/ai-provider";
+/* The persisted row carries ai_messages.provider verbatim, so returning it
+   returns the vendor label. Finding N11 — see
+   ai/observability/public-provider.ts. */
+import { withPublicProvider } from "@/lib/server/ai/observability/public-provider";
 
 /* POST /api/ai/conversations/:id/messages
      body: { content: string, user_lang?: 'en'|'zh'|'ar' }
@@ -177,7 +181,11 @@ Current user: ${auth.username} (${auth.user_type}).`;
     .eq("account_id", auth.account_id);
 
   return NextResponse.json({
-    message: assistantRow,
+    /* The row was written with the REAL label a few lines above and keeps it
+       in the database; only the copy crossing the wire is neutralised.
+       A failed insert still yields null here, exactly as before — the
+       transform returns a non-object untouched rather than inventing a row. */
+    message: assistantRow ? withPublicProvider(assistantRow) : assistantRow,
     conversation: { id, title: finalTitle },
   });
 }

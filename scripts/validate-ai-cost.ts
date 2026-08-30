@@ -18,6 +18,7 @@
    --------------------------------------------------------------------------- */
 
 import { readFileSync } from "node:fs";
+import { execSync } from "node:child_process";
 import { parsePriceTable, priceFor, costUsd, type PriceTable } from "../src/lib/server/ai/cost/prices";
 import { buildUsageRecord, formatUsageLine, recordUsage } from "../src/lib/server/ai/cost/meter";
 import { publicProviderLabel, withPublicProvider } from "../src/lib/server/ai/observability/public-provider";
@@ -242,6 +243,115 @@ console.log("\n── 7. The browser is told the lane, not the vendor (N11) ─�
     "and the DB write still stores the REAL label — the audit trail is not the browser",
     /provider: agent\.provider,/.test(code),
   );
+}
+
+console.log("\n── 7b. EVERY AI route, not just the one the fix touched (N11, review) ──");
+/* WHY THIS SECTION EXISTS. Section 7 asserts "every send site is sanitised"
+   over a search space of ONE FILE. It passed, and it was true of that file —
+   while /api/ai/chat returned the vendor label in four places and
+   /api/ai/conversations/[id]/messages returned the persisted ROW, carrying the
+   provider column verbatim. That second one is the exact failure section 7
+   names and guards against, on a route it never looked at.
+
+   So the check is now a SWEEP: find every `provider` value that leaves an AI
+   route towards a client, and require each to be either sanitised or a literal
+   that names no vendor. The search space is the directory, so a new route
+   inherits the rule without anyone remembering it. */
+{
+  const routes = execSync(
+    `find src/app/api/ai src/app/api/v1/ai -name route.ts | sort`,
+    { encoding: "utf8" },
+  ).split("\n").map((l) => l.trim()).filter(Boolean);
+
+  check(`the sweep found the AI routes (${routes.length}), so it is not passing on an empty list`, routes.length >= 15);
+
+  /* A `provider:` line inside a DB write is not a leak — it is the audit trail
+     the fix deliberately preserves. Those are identified by the insert/upsert
+     they sit in, so they are excluded by CONTEXT rather than by trusting a
+     comment. */
+  const offenders: string[] = [];
+  for (const file of routes) {
+    const raw = readFileSync(file, "utf8");
+    const src = raw.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
+    const lines = src.split("\n");
+    for (let i = 0; i < lines.length; i++) {
+      /* MATCH ANYWHERE ON THE LINE, not just at its start. The first version
+         anchored to `^\s*provider:` and a mutation proved it hollow: restoring
+         `return NextResponse.json({ reply, provider: result.provider });` — one
+         line, the exact shape two of the four real leaks had — passed the
+         suite. An assertion that only sees leaks formatted a particular way is
+         not a guard, and the formatting is the author's choice, not the rule's. */
+      const m = /(?:^\s*|[{,(]\s*)provider:\s*([^,;}]+)/.exec(lines[i]);
+      if (!m) continue;
+      const value = m[1].replace(/[,)]+$/, "").trim();
+
+      /* TWO EXCLUSIONS, both by reason rather than by loosening the rule.
+
+         (a) A DB write. `provider` in an insert/upsert IS the audit trail the
+             fix deliberately preserves — the whole point is that the server
+             keeps the truth. Identified by BALANCED PARENS from the nearest
+             write call: a regex over the preceding lines was tried first and
+             missed `.upsert(\n  {`, which is how translate/route.ts writes it. */
+      const head = lines.slice(0, i).join("\n");
+      const writeAt = Math.max(
+        head.lastIndexOf(".insert("),
+        head.lastIndexOf(".upsert("),
+        head.lastIndexOf(".update("),
+      );
+      if (writeAt !== -1) {
+        const span = head.slice(writeAt);
+        let depth = 0;
+        for (const ch of span) {
+          if (ch === "(") depth++;
+          else if (ch === ")") depth--;
+        }
+        if (depth > 0) continue;
+      }
+
+      /*   (b) Building an AgentResponse in a local variable. That object is
+             persisted with the real label and sanitised at every send site —
+             which section 7 proves for the agent route by counting raw sends.
+             Recognised by the sibling fields of the shape, so an ordinary
+             response body cannot pretend to be one. */
+      const around = lines.slice(Math.max(0, i - 6), Math.min(lines.length, i + 6)).join("\n");
+      if (/\bfinalReply:/.test(around) && /\bsteps:/.test(around)) continue;
+
+      const sanitised = /^publicProviderLabel\(/.test(value);
+      const safeLiteral = /^"[a-z0-9-]+"$/.test(value) && !/deepseek|groq|gemini|openai|qwen|dashscope|anthropic|moonshot|zhipu/i.test(value);
+      if (!sanitised && !safeLiteral) offenders.push(`${file}:${i + 1} → ${value}`);
+    }
+  }
+  check(
+    `no AI route sends an unsanitised provider value to a client${offenders.length ? ` — ${offenders.join("; ")}` : ""}`,
+    offenders.length === 0,
+  );
+
+  /* The whole-object send is the other shape of the same leak: a persisted row
+     carries the column even when no `provider:` line is visible. Any route
+     returning a row selected from ai_messages must pass it through the
+     transform. */
+  const rowSenders: string[] = [];
+  for (const file of routes) {
+    const raw = readFileSync(file, "utf8");
+    const src = raw.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
+    if (!/from\("ai_messages"\)/.test(src)) continue;
+    /* A route that reads or writes ai_messages and returns a row must show the
+       transform somewhere. Routes that never return one (they only insert) are
+       caught by the value sweep above instead. */
+    const returnsARow = /message:\s*\w|messages:\s*\w|data\s*\}\)/.test(src);
+    if (returnsARow && !/withPublicProvider\(/.test(src)) rowSenders.push(file);
+  }
+  check(
+    `every route that returns an ai_messages row passes it through the transform${rowSenders.length ? ` — ${rowSenders.join(", ")}` : ""}`,
+    rowSenders.length === 0,
+  );
+
+  /* The literals the routes DO emit must agree with the transform: a value a
+     route sends directly, but which publicProviderLabel would collapse, is a
+     disagreement between two places that both claim to decide this. */
+  for (const lane of ["fast-path", "local", "fallback"]) {
+    check(`the literal lane "${lane}" survives the transform unchanged`, publicProviderLabel(lane) === lane);
+  }
 }
 
 console.log(`\n${pass} passed, ${failures.length} failed`);

@@ -16,6 +16,9 @@ import { tryCannedReply } from "@/lib/server/ai/core/canned-replies";
 import { buildUserContext } from "@/lib/server/ai-agent/permissions";
 import { findLocalAnswer, pickLocalAnswer } from "@/lib/server/ai/local-knowledge";
 import { detectLanguage } from "@/lib/server/ai/detect-language";
+/* The browser is told the LANE, not the vendor — see
+   ai/observability/public-provider.ts (finding N11). */
+import { publicProviderLabel } from "@/lib/server/ai/observability/public-provider";
 import { preprocessUserQuery } from "@/lib/server/ai/preprocess";
 import { analyzeIntent } from "@/lib/server/ai/analyze-intent";
 import { buildEgyptianResponse, removeRepetition } from "@/lib/language/rewrite-egyptian";
@@ -29,12 +32,17 @@ import { buildEgyptianResponse, removeRepetition } from "@/lib/language/rewrite-
      · business → DeepSeek  (gated behind USE_DEEPSEEK + DEEPSEEK_API_KEY)
      · unknown  → Groq      (fallback per router spec)
 
-   Response contract is unchanged: { reply, provider }. Callers continue
-   to read `reply`; we translate the router's stable ProviderName
-   ("groq" | "deepseek") into that field. The only previously-visible
-   detail we drop is the ":model-id" suffix on the provider string —
-   no caller in the app uses it, and keeping it out of the public
-   contract keeps the future free to swap models without a UI change.
+   Response contract is unchanged in SHAPE: { reply, provider }. Callers
+   continue to read `reply`; no caller in the app reads `provider` at all.
+
+   WHAT `provider` CARRIES CHANGED (finding N11, review pass). It used to be
+   the router's ProviderName — "groq", "deepseek" — which named the vendor to
+   anyone with devtools for no consumer. It now goes through
+   publicProviderLabel(), which keeps the LANE and drops the vendor half. The
+   field is still present and still a string, so a standalone client that pins
+   this response shape is unaffected; only the value is neutral. The real label
+   is still written to ai_messages.provider, because the audit trail is not the
+   browser.
 
    /api/ai/agent is untouched by this change. Its orchestrator remains
    the authoritative agent path with its own tool-loop behaviour.
@@ -314,7 +322,7 @@ export async function POST(req: Request) {
             controller.enqueue(
               send({
                 type: "end",
-                provider: agent.provider,
+                provider: publicProviderLabel(agent.provider),
                 lane: "AGENT",
                 intent: "work",
                 reply: finalReply,
@@ -369,7 +377,7 @@ export async function POST(req: Request) {
         ` in_bytes=${lastUser.length} hist=${historyForAgent.length}` +
         ` ms=${Date.now() - t0} stream=0 reply_bytes=${reply.length}`,
     );
-    return NextResponse.json({ reply, provider: agent.provider });
+    return NextResponse.json({ reply, provider: publicProviderLabel(agent.provider) });
   }
 
   /* ─── Streaming branch (Phase 2) ─────────────────────────────────
@@ -460,7 +468,7 @@ export async function POST(req: Request) {
               controller.enqueue(
                 send({
                   type: "end",
-                  provider: ev.provider,
+                  provider: publicProviderLabel(ev.provider),
                   lane: ev.lane,
                   intent: ev.intent,
                   reply: sealed,
@@ -558,10 +566,9 @@ export async function POST(req: Request) {
       ` fallback=${result.provider === "fallback" ? 1 : 0}` +
       ` in_bytes=${lastUser.length} hist=0 ms=${tEnd - t0}`,
   );
-  /* Backward-compatible response: existing callers only read `reply`
-     and (optionally) `provider`. We expose the stable ProviderName
-     ("groq" | "deepseek") rather than "groq:llama-…" so future model
-     swaps don't change the wire contract. */
+  /* Backward-compatible response: existing callers only read `reply`.
+     `provider` is kept in the shape but carries the lane, not the vendor —
+     publicProviderLabel() turns "groq:llama-…" into "model". */
   /* Chat-mode pricing guard. Chat mode has no tool-call steps, so
      hasValidPricingEvidence (inside sealPricingSafety) always returns
      false for this route — effective semantic: chat-mode replies
@@ -576,5 +583,5 @@ export async function POST(req: Request) {
       `[ai.chat.pricing-guard] replaced hallucinated pricing mode=${result.mode}`,
     );
   }
-  return NextResponse.json({ reply: safeReply, provider: result.provider });
+  return NextResponse.json({ reply: safeReply, provider: publicProviderLabel(result.provider) });
 }

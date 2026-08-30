@@ -126,7 +126,8 @@
     "db:apply": "node --import tsx scripts/apply-migration.mts",
     "validate:invitations": "node --import tsx scripts/validate-invitations.mts",
     "budgets": "node --import tsx scripts/validate-budgets.mts --report",
-    "validate:mobile-width": "node --import tsx scripts/validate-mobile-width.mts"
+    "validate:mobile-width": "node --import tsx scripts/validate-mobile-width.mts",
+    "validate:ai-plan-claims": "NODE_OPTIONS=--conditions=react-server tsx scripts/validate-ai-plan-claims.ts"
   },
   "dependencies": {
     "@napi-rs/canvas": "^0.1.100",
