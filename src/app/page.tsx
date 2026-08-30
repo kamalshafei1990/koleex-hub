@@ -1313,20 +1313,43 @@ function BootstrapErrorBanner({ dk, onRetry }: { dk: boolean; onRetry: () => voi
           {/* Elected primary (R-2) — the old emerald chip predated the
               element election and matched nothing in the system. */}
           {isAuth ? (
-            /* eslint-disable-next-line @next/next/no-html-link-for-pages --
-               A FULL page load is the point. The session just failed, so the
-               client state is the thing we are trying to discard; <Link> would
-               soft-navigate and carry it straight back. */
-            <a
-              /* The root IS the sign-in screen: AdminAuth renders the username
-                 + password form in place when there is no session. This used to
-                 point at /login, a second form that asked for an EMAIL and
-                 belonged to an auth system that is switched off. */
-              href="/"
+            /* THIS BUTTON USED TO BE `<a href="/">`, AND IT COULD NOT WORK.
+               A full page load was the right instinct — the client state is
+               what we are discarding — but a reload alone leaves the REJECTED
+               COOKIE in place. The root only renders the sign-in form when
+               there is NO session cookie; with a cookie the server refuses,
+               the page decides you are signed in, renders the Hub, every API
+               call 401s, this banner reappears, and pressing the button
+               returns you to the exact same state. A closed loop with no way
+               out from inside the product.
+
+               Observed in production, not theorised: 560 responses of 401
+               across every API route in three hours, and ZERO requests to
+               /api/auth/signin in the same window — the owner pressed this
+               button repeatedly and it never once attempted a sign-in.
+
+               So it signs out FIRST. `keepalive` lets the request survive the
+               navigation, and the reload happens whether or not the POST
+               succeeds: a cleanup that can strand the user when it fails is
+               worse than the bug it fixes. */
+            <button
+              type="button"
+              onClick={async () => {
+                try {
+                  await fetch("/api/auth/signout", { method: "POST", keepalive: true });
+                } catch {
+                  /* Offline, blocked, mid-deploy — the reload still has to
+                     happen. Worst case the cookie survives and the user is
+                     where they already were. */
+                }
+                /* location.assign, not <Link>: a soft navigation would carry
+                   the client state we are trying to throw away. */
+                window.location.assign("/");
+              }}
               className="inline-flex items-center gap-2 h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold hover:opacity-90 transition-all shadow-lg"
             >
               Sign in again
-            </a>
+            </button>
           ) : (
             <button
               type="button"
