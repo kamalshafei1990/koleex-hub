@@ -738,7 +738,7 @@ break Hub integration · remove a working tool · weaken permissions or verifica
 |---|---|---|
 | **0 — Baseline & Tests** | 🟡 **IN PROGRESS** | Tenant-isolation guard ✅ · Incident-replay suite ✅ — both shipped and proven-to-fail (below). Baseline latency metrics: next (needs a running instance). |
 | **1 — Security Hardening** | ✅ **COMPLETE** | All six audit issues in scope closed (1, 2, 3, 4, 5, 6) + Issue 7. Two migrations applied staging→production with sign-off. Six suites green. |
-| **2 — AI Core + Standalone Foundation** | 🟡 **IN PROGRESS** | **2A–2F + 2I shipped** — core extracted and tested by calling it, tool exposure permission-scoped, tool results client-neutral. `orchestrator.ts` 3 220 → **734**, zero vendor references. **N6, N7 and the 2D layering item closed.** **2G awaiting owner review** (auth + new schema). 2H, 2J to follow. |
+| **2 — AI Core + Standalone Foundation** | 🟡 **IN PROGRESS** | **2A–2F, 2H, 2I shipped** — core extracted and tested by calling it, tool exposure permission-scoped, tool results client-neutral, the Hub boundary named and enforced. `orchestrator.ts` 3 220 → **734**, zero vendor references. **N6, N7 and the 2D layering item closed.** **2G awaiting owner review** (auth + new schema). 2J to follow. |
 | 3–20 | ⬜ Not started | **Amendment 1 (§P) folded in** — Phase 2 gains the connector interface + client-resolvable deep links |
 
 ### Phase 2 · Sub-stage 2A — the lane decision has one home ✅
@@ -928,6 +928,27 @@ The AI surface had exactly **one** Hub-relative link: `review_url` on `createQuo
 **Proven to fail:** adding a second Hub link with no `ResourceRef` → caught, both offending lines named · deleting `review_url` → caught, because that would break the Hub UI.
 
 **Regression gate:** fifteen suites green, `tsc` clean, `eslint` clean.
+
+### Phase 2 · Sub-stage 2H — the Hub boundary has a name ✅
+
+`src/lib/server/ai/connectors/koleex-hub/index.ts` · `npm run validate:ai-hub-connector` · **17 passed, 0 failed.**
+
+**The boundary already existed; what it lacked was a name.** Every Hub read and write already went through `dispatchTool()`, which owns the permission guard, the confirmation ledger and the audit trail. But it was held together by convention, and a boundary held together by convention is one an honest mistake walks around. It is now a type — `KoleexHubConnector` — with a single `invoke()`, the caller's available tool set, and `isConnected()`.
+
+**A deliberate departure from §P.5, stated rather than quietly made.** The plan sketched eight domain methods (`products()`, `customers()`, `quotations()`, …). That shape is **not** implemented, for two reasons:
+
+1. All 45 tools already have the signature `(ctx, args) → ToolResult`. Eight methods that re-dispatch to them add a second surface with **no new guarantee**, and one that must be kept in sync with the tools by hand — the exact "keep in sync" failure mode this whole refactor has been removing.
+2. Worse, a domain method is a plausible place for someone to later "optimise" by calling a tool handler directly. That would bypass the guard, the ledger and the audit log in one step. **A door is only a door while there is one of it.**
+
+If a future domain method earns its place, it belongs *behind* `invoke()`, not beside it.
+
+**`isConnected(ctx)`** is the genuinely new capability §P.5 asked for: a caller with no Hub identity gets the general-purpose assistant, and Hub tools are **not offered** rather than merely denied — so the model is never tempted to try one and the user never reads an apology for a capability they were shown. It is derived from what the server already resolved at authentication (an internal account inside a tenant), **not** a new flag and **not** a new table: a second source of truth for "is this a Hub user" is a second thing to get wrong. It mirrors `requireInternalUser()` at the route door and loosens nothing; replacing that gate is **2G**, still open.
+
+**It can only narrow.** The signal decides what is *offered*; `dispatchTool` re-checks what may *run*. Asserted: an unconnected caller is denied all **41** Hub-gated tools at dispatch regardless of the signal.
+
+**Proven to fail:** the core calling `dispatchTool` directly → 2 failures naming the file · the connector re-implementing the permission guard → caught · `isConnected` trusting a client-supplied field → caught · a tenant-less internal account counted as connected → 2 failures.
+
+**Regression gate:** sixteen suites green, `tsc` clean, `eslint` clean.
 
 ### Phase 0 · Result 1 — AI tenant-isolation guard ✅
 

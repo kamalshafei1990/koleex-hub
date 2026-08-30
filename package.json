@@ -17,6 +17,7 @@
     "validate:ai-egress": "NODE_OPTIONS=--conditions=react-server tsx scripts/validate-ai-egress.ts",
     "validate:ai-untrusted": "NODE_OPTIONS=--conditions=react-server tsx scripts/validate-ai-untrusted.ts",
     "validate:ai-confirm-ledger": "NODE_OPTIONS=--conditions=react-server tsx scripts/validate-ai-confirm-ledger.ts",
+    "validate:ai-hub-connector": "NODE_OPTIONS=--conditions=react-server tsx scripts/validate-ai-hub-connector.ts",
     "validate:ai-client-neutral": "NODE_OPTIONS=--conditions=react-server tsx scripts/validate-ai-client-neutral.ts",
     "validate:ai-tool-exposure": "NODE_OPTIONS=--conditions=react-server tsx scripts/validate-ai-tool-exposure.ts",
     "validate:ai-prompts": "NODE_OPTIONS=--conditions=react-server tsx scripts/validate-ai-prompts.ts",
