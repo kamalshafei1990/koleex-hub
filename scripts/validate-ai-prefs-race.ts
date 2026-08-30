@@ -36,18 +36,31 @@
    "the assistant went back to English", which reads like a prompt problem and
    is not one.
 
-   WHAT THIS SUITE DOES, AND DOES NOT. It does not fix the race — the fix is an
-   atomic merge (a small RPC doing one `preferences || patch` statement, or a
-   dedicated table), which is a schema change and belongs to a decision, not to
-   a test. What it does is CONTAIN it: the writer count is pinned, so a fourth
-   read-modify-write path cannot be added without this failing and someone
-   reading the above.
+   PHASE 7 — TWO OF THE THREE ARE FIXED, and this suite changed with them.
 
-   The same posture as finding N8 before Phase 4D: assert the count so the
-   situation cannot quietly get worse while it waits for its decision.
+   `remember_about_user`, `forget_about_user` and `setReplyLanguage` all write
+   through `account_prefs_merge`, one SQL statement with no read-then-write
+   gap. Those were the two sides of the reachable-in-one-message case, so the
+   scenario in the header can no longer happen.
+
+   THE THIRD WRITER IS DELIBERATELY UNCHANGED. `api/accounts/[id]/preferences`
+   scopes its write with `.eq("tenant_id", auth.tenant_id)` — it takes an
+   account id from the URL, and that clause is what stops a caller reaching
+   another tenant's row. The RPC takes only an account id, so routing this path
+   through it would REMOVE a tenant check to fix a race. Weakening verification
+   to fix a concurrency bug is the wrong trade, and the standing rules forbid
+   it outright. Closing this one properly means giving the function a tenant
+   parameter, which is another migration.
+
+   So the residual exposure, stated plainly rather than implied away: a Settings
+   save landing inside an AI turn can still overwrite a fact. It is far less
+   reachable than what was fixed — it needs a human clicking Save at the same
+   moment — and it is now the ONLY remaining path, where before it was one of
+   three that could clobber each other.
    --------------------------------------------------------------------------- */
 
 import { readFileSync } from "node:fs";
+import { execSync } from "node:child_process";
 
 let pass = 0;
 const failures: string[] = [];
@@ -65,38 +78,55 @@ const strip = (t: string) => t.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\
 
 /* The three known writers, named individually. A path list rather than a glob
    so a NEW writer in a new file is not silently absorbed into the count. */
-const KNOWN_WRITERS = [
-  "src/lib/server/ai-agent/tools/user-memory.ts",
-  "src/lib/server/ai/reply-language.ts",
+/* Phase 7 fixed the two AI writers. The settings route is exempt BY REASON,
+   not by omission — see the header — and is the only path still permitted to
+   write the column directly. */
+const REMAINING_DIRECT_WRITERS = [
   "src/app/api/accounts/[id]/preferences/route.ts",
+  /* account-prefs.ts contains the OLD pattern on purpose, as the bridge for
+     environments where the function is not deployed yet. The suite flagged it
+     on the first run, which is the check working: it is exempt only while the
+     RPC is the primary path, and section 1 asserts exactly that. */
+  "src/lib/server/ai/security/account-prefs.ts",
 ] as const;
 
-console.log("\n── 1. The defect is still exactly where it was recorded ──");
+console.log("\n── 1. The two AI writers go through the atomic merge ──");
 {
-  /* Non-vacuity first: if these files stop containing the pattern, the count
-     check below would pass for the wrong reason. */
-  const stillReadModifyWrite = KNOWN_WRITERS.filter((f) => {
-    const code = strip(readFileSync(f, "utf8"));
-    return /\.select\("preferences"\)/.test(code) && /update\(\{\s*preferences/.test(code);
-  });
+  const memory = strip(readFileSync("src/lib/server/ai-agent/tools/user-memory.ts", "utf8"));
+  const language = strip(readFileSync("src/lib/server/ai/reply-language.ts", "utf8"));
+
+  check("remember/forget write through mergeAccountPrefs", /mergeAccountPrefs\(/.test(memory));
+  check("setReplyLanguage writes through mergeAccountPrefs", /mergeAccountPrefs\(/.test(language));
   check(
-    `all three known writers still read-modify-write the column (${stillReadModifyWrite.length}/3)` +
-      (stillReadModifyWrite.length === 3 ? "" : " — if this dropped, N12 may be FIXED; re-read the header before editing this suite"),
-    stillReadModifyWrite.length === 3,
+    "and NEITHER writes the preferences column directly any more",
+    !/update\(\{\s*preferences/.test(memory) && !/update\(\{\s*preferences/.test(language),
+  );
+  /* The scenario from the header, gone: the un-awaited language write can
+     still run concurrently — that is a latency decision, not a bug — but it no
+     longer carries the whole document with it. */
+  check(
+    "the language write is still un-awaited, and that is now SAFE rather than the bug",
+    /void setReplyLanguage\(/.test(strip(readFileSync("src/app/api/ai/agent/route.ts", "utf8"))),
   );
 
+  const merge = strip(readFileSync("src/lib/server/ai/security/account-prefs.ts", "utf8"));
+  check("the merge calls the RPC, not a read-then-write", /rpc\("account_prefs_merge"/.test(merge));
+  /* The fallback is the OLD bug, kept as a bridge until the function is in
+     production. It must announce itself — a silent fallback is the race
+     returning with nobody noticing. */
+  check("a missing function falls back rather than throwing", /legacyReadModifyWrite/.test(merge));
+  check("and the fallback logs loudly, so a missing migration is visible", /NOT DEPLOYED/.test(readFileSync("src/lib/server/ai/security/account-prefs.ts", "utf8")));
   check(
-    "the language write is still un-awaited, which is what makes the race reachable in one turn",
-    /void setReplyLanguage\(/.test(strip(readFileSync("src/app/api/ai/agent/route.ts", "utf8"))),
+    "a REAL rpc error does not silently fall back to the racy path",
+    /if \(!missing\)/.test(merge),
   );
 }
 
-console.log("\n── 2. No FOURTH writer may be added while this is open ──");
+console.log("\n── 2. No NEW direct writer may be added ──");
 {
   /* Sweep the whole server tree. A new path writing this column the same way
      widens a known race, and must be a deliberate decision rather than a
      side effect of some unrelated feature. */
-  const { execSync } = require("node:child_process") as typeof import("node:child_process");
   const hits = execSync(
     `grep -rl 'update({ *preferences\\|update({preferences' src/ --include=*.ts --include=*.tsx || true`,
     { encoding: "utf8" },
@@ -105,14 +135,32 @@ console.log("\n── 2. No FOURTH writer may be added while this is open ──
     .map((s) => s.trim())
     .filter(Boolean);
 
-  const unexpected = hits.filter((f) => !(KNOWN_WRITERS as ReadonlyArray<string>).includes(f));
+  const unexpected = hits.filter((f) => !(REMAINING_DIRECT_WRITERS as ReadonlyArray<string>).includes(f));
   check(
-    `exactly the three known writers touch accounts.preferences${unexpected.length ? ` — NEW WRITER: ${unexpected.join(", ")}` : ""}`,
+    `only the two exempt files write the column directly${unexpected.length ? ` — NEW WRITER: ${unexpected.join(", ")}` : ""}`,
     unexpected.length === 0,
   );
   check(
-    `and the sweep really found them (${hits.length} files), so the check above is not passing on an empty search`,
-    hits.length >= 2,
+    `and the sweep really found them (${hits.length} files), so this is not passing on an empty search`,
+    hits.length === 2,
+  );
+  /* The bridge is exempt only while it IS a bridge. If the RPC call were ever
+     removed from that file, the exemption would be covering the bug itself. */
+  {
+    const bridge = strip(readFileSync("src/lib/server/ai/security/account-prefs.ts", "utf8"));
+    const rpcIdx = bridge.indexOf('rpc("account_prefs_merge"');
+    const legacyIdx = bridge.indexOf("async function legacyReadModifyWrite");
+    check(
+      "the bridge file's exemption holds: the RPC is the PRIMARY path and the old pattern is below it",
+      rpcIdx !== -1 && legacyIdx !== -1 && rpcIdx < legacyIdx,
+    );
+  }
+  /* The reason it is exempt, asserted rather than trusted to a comment: if the
+     tenant clause were removed, routing it through the RPC would no longer
+     weaken anything and the exemption would need re-arguing. */
+  check(
+    "its exemption holds because it scopes the write by tenant, which the RPC cannot",
+    /\.eq\("tenant_id", auth\.tenant_id\)/.test(strip(readFileSync(REMAINING_DIRECT_WRITERS[0], "utf8"))),
   );
 }
 
@@ -137,4 +185,4 @@ if (failures.length) {
   for (const f of failures) console.log(`  · ${f}`);
   process.exit(1);
 }
-console.log("N12 is CONTAINED, not fixed. The fix is an atomic merge and needs a schema decision.");
+console.log("N12: the reachable-in-one-message case is FIXED. One tenant-scoped writer remains, exempt by reason.");

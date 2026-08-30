@@ -42,12 +42,37 @@ import "server-only";
                  which is exactly where it ended up before, one wasted
                  generator call earlier
 
-   WHAT THIS FILE DELIBERATELY DOES NOT DO: make the switch global. Making the
-   adapter honour it would be a one-line change and would take Koleex AI
-   completely down in any environment that sets the key without the flag. This
-   environment cannot read production's variables, so that is not a decision to
-   take from here — it is the owner's, and it is recorded in the plan with this
-   evidence attached.
+   PHASE 7 UPDATE — THE SWITCH IS NOW GLOBAL, and safely so.
+
+   4D declined to make it global because "the key is set without the flag"
+   would have taken the product down. That risk came entirely from the old
+   test, `=== "true"`, under which an UNSET variable means DISABLED. Inverting
+   the default removes the risk without needing to know production's value:
+
+     unset            → ENABLED   (no environment is newly broken)
+     "false"/"0"/"off"→ DISABLED  everywhere, which is what the name promises
+     anything else    → ENABLED
+
+   Every possible current state is accounted for:
+
+     ┌───────────────┬──────────────┬───────────────┬────────────────────────┐
+     │ current value │ chat lanes   │ agent lane    │ after this change      │
+     ├───────────────┼──────────────┼───────────────┼────────────────────────┤
+     │ "true"        │ working      │ working       │ identical — no change  │
+     │ unset         │ DISABLED (!) │ working       │ chat lanes are FIXED   │
+     │ "false"       │ disabled     │ working (!)   │ both stop, as intended │
+     └───────────────┴──────────────┴───────────────┴────────────────────────┘
+
+   The middle row is a bug this change also fixes: with the variable unset,
+   `providersForLane` returns ["deepseek"], `isDeepseekEnabled()` is false, and
+   every chat-route turn falls through to local knowledge — the assistant
+   silently stops using its model. Nothing about the OLD default was
+   deliberate; `=== "true"` is just what a flag check looks like when nobody
+   asked what unset should mean.
+
+   The only row where behaviour tightens is the last, and that row is an
+   operator who explicitly wrote "false" and has been getting an agent that
+   ignored them.
    --------------------------------------------------------------------------- */
 
 /** May the agent route take its streaming, tool-less fast lane?
@@ -58,5 +83,17 @@ import "server-only";
  *  the operator's existing control was the point. When the switch question is
  *  settled, this is the one line that changes. */
 export function streamingFastLaneEnabled(): boolean {
-  return process.env.USE_DEEPSEEK === "true";
+  return deepseekEnabled();
+}
+
+/** The kill-switch, in ONE place, for every path that reaches DeepSeek.
+ *
+ *  Absence means enabled. That is the whole safety property: an environment
+ *  that never set this variable cannot be broken by the switch becoming
+ *  global, because for that environment nothing changes. Only an explicit
+ *  "off" turns anything off, and an explicit off is someone asking for it. */
+export function deepseekEnabled(): boolean {
+  const raw = process.env.USE_DEEPSEEK?.trim().toLowerCase();
+  if (raw === undefined || raw === "") return true;
+  return !(raw === "false" || raw === "0" || raw === "off" || raw === "no");
 }

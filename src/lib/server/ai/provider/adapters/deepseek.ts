@@ -22,12 +22,19 @@ import "server-only";
    `choices[].message.tool_calls` response shape — so the shared Turn IR
    conversions in ../turn-ir cover it without a vendor-specific body builder.
 
-   ON THE KILL-SWITCH: `USE_DEEPSEEK` is deliberately NOT consulted here. It
-   gates the chat lanes in providers/deepseek.ts and has never gated the agent
-   loop; honouring it here would silently take the agent down in any
-   environment that sets the key without the flag. That asymmetry is finding
-   N8 and it is resolved as policy in the router, not by this file quietly
-   picking a side.
+   ON THE KILL-SWITCH: `USE_DEEPSEEK` IS consulted here, as of Phase 7.
+
+   4D deliberately did not, because under the old test — `=== "true"` — an
+   UNSET variable meant disabled, so honouring it would have taken the agent
+   down in any environment holding the key without the flag. The switch now
+   lives in router/provider-policy.ts where ABSENCE MEANS ENABLED, which
+   removes that risk entirely: an environment that never set the variable is
+   unaffected, and only an explicit "false"/"0"/"off" turns anything off.
+
+   So the flag finally does what its name says, on every path. `configured()`
+   is where it belongs rather than inside `chat()`: an adapter that is switched
+   off should not be SELECTED, so the registry skips it and fails over to the
+   next provider instead of returning a failure from a provider nobody wanted.
    --------------------------------------------------------------------------- */
 
 import {
@@ -38,6 +45,7 @@ import {
 import { toOpenAiBody, type TurnRequest, type TurnResponse } from "../turn-ir";
 import type { ProviderAdapter, TurnOutcome } from "../types";
 import { modelForClass } from "@/lib/server/ai/router/model-classes";
+import { deepseekEnabled } from "@/lib/server/ai/router/provider-policy";
 
 const DEEPSEEK_URL = "https://api.deepseek.com/v1/chat/completions";
 
@@ -90,7 +98,7 @@ export { toTurnResponse as parseOpenAiChatResponse };
 export const deepseekAdapter: ProviderAdapter = {
   name: "deepseek",
 
-  configured: () => Boolean(readKey()),
+  configured: () => deepseekEnabled() && Boolean(readKey()),
 
   model: () => DEEPSEEK_MODEL,
 
