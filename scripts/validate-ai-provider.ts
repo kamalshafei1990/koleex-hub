@@ -23,7 +23,15 @@
 
 import { readFileSync } from "node:fs";
 import { parseOpenAiChatResponse } from "../src/lib/server/ai/provider/adapters/deepseek";
-import { selectAdapter, providerConfigured, activeProviderLabel, pickAdapter } from "../src/lib/server/ai/provider/registry";
+import {
+  selectAdapter,
+  providerConfigured,
+  activeProviderLabel,
+  pickAdapter,
+  chatWithToolsVia,
+  shouldTryNextProvider,
+} from "../src/lib/server/ai/provider/registry";
+import { openAiCompatibleAdapter, parseFallbackConfig } from "../src/lib/server/ai/provider/adapters/openai-compatible";
 import type { ProviderAdapter, TurnOutcome } from "../src/lib/server/ai/provider/types";
 
 let pass = 0;
@@ -199,10 +207,13 @@ console.log("\n── 6. The interface is sufficient for a SECOND provider ─�
    hard-coding DeepSeek's, so a second adapter is an object, not a refactor.
    What is still outstanding is a key for one — an adapter with no credential
    is inert by construction, since configured() gates on it. Both are
-   Phase 4 work, and claiming a second provider "done" without either would be
-   the "complete because it compiles" the project rules forbid.
-   What CAN be proved now is that the interface admits one and that selection
-   behaves — so that is proved, with fakes, rather than asserted. */
+   Phase 4B added the second adapter (adapters/openai-compatible.ts) and the
+   failover loop; section 7 below proves both. What is STILL outstanding is a
+   key for a real fallback service, so the vendor half remains untested against
+   anything live — claiming otherwise would be the "complete because it
+   compiles" the project rules forbid.
+   What is proved here is that the interface admits a second adapter and that
+   selection behaves — with fakes, rather than asserted. */
 {
   const make = (name: string, configured: boolean, content: string): ProviderAdapter => ({
     name,
@@ -229,10 +240,228 @@ console.log("\n── 6. The interface is sufficient for a SECOND provider ─�
   check("an adapter may report failure through the same contract", pickAdapter([failing])?.name === "failing");
 }
 
-console.log(`\n${pass} passed, ${failures.length} failed`);
-if (failures.length) {
-  console.log("\nFAILED:");
-  for (const f of failures) console.log(`  · ${f}`);
-  process.exit(1);
+
+/* Sections 7 and 8 await. tsx compiles these scripts to CJS, where top-level
+   await is unavailable, so they run inside one async function and the summary
+   waits on it — otherwise the process would print "0 failed" before the async
+   checks had run, which is the worst possible failure mode for a test. */
+async function asyncChecks() {
+  console.log("\n── 7. Failover: the rules, proved with fakes (Phase 4B) ──");
+  /* router.ts has carried this comment for months: "If DeepSeek is down, Koleex
+     AI is down." Failover is the answer, but a WRONG failover is worse than
+     none — it can duplicate a half-written answer on screen, or double the wait
+     before showing the same error. Those two rules are the ones proved here.
+
+     Fakes, not the live registry, and deliberately: making a real provider
+     return 503 on demand is not something a static suite can do, and a rule this
+     consequential should not rest on reading the loop and believing it. */
+  {
+    type Log = string[];
+    const mk = (
+      name: string,
+      configured: boolean,
+      outcome: TurnOutcome | ((onDelta?: (t: string) => void) => TurnOutcome),
+      log: Log,
+    ): ProviderAdapter => ({
+      name,
+      configured: () => configured,
+      model: () => `${name}-1`,
+      chat: async (_req, opts) => {
+        log.push(name);
+        return typeof outcome === "function" ? outcome(opts?.onDelta) : outcome;
+      },
+    });
+    const REQ = { messages: [{ role: "user" as const, content: "hi" }], maxTokens: 10, temperature: 0.3 };
+    const OK = (c: string): TurnOutcome => ({ ok: true, response: { content: c, toolCalls: [] } });
+    const ERR = (status: number): TurnOutcome => ({ ok: false, status, bodyText: `status ${status}` });
+
+    /* The status table, checked directly rather than inferred from the loop. */
+    for (const s of [500, 502, 503, 504, 429, 401, 403, 404]) {
+      check(`status ${s} is worth a second provider`, shouldTryNextProvider(s) === true);
+    }
+    for (const s of [400, 413, 422]) {
+      check(`status ${s} is NOT — the request is bad, not the provider`, shouldTryNextProvider(s) === false);
+    }
+
+    {
+      const log: Log = [];
+      const out = await chatWithToolsVia(
+        [mk("a", true, ERR(503), log), mk("b", true, OK("from b"), log)],
+        REQ,
+        { failover: true },
+      );
+      check(
+        `a 503 on the primary falls through to the secondary (tried: ${log.join(" → ") || "none"})`,
+        out.ok && out.response.content === "from b" && log.join(",") === "a,b",
+      );
+    }
+    {
+      const log: Log = [];
+      const out = await chatWithToolsVia(
+        [mk("a", true, ERR(400), log), mk("b", true, OK("from b"), log)],
+        REQ,
+        { failover: true },
+      );
+      check(
+        `a 400 stops at the primary — the secondary is never called (tried: ${log.join(" → ")})`,
+        !out.ok && out.status === 400 && log.join(",") === "a",
+      );
+    }
+    {
+      /* THE ONE THAT MATTERS MOST. The primary streamed two tokens onto the
+         user's screen and then died. Failing over here would append a complete
+         second answer to a half-written one. */
+      const log: Log = [];
+      const seen: string[] = [];
+      const out = await chatWithToolsVia(
+        [
+          mk("a", true, (onDelta) => {
+            onDelta?.("Three ");
+            onDelta?.("widths ");
+            return ERR(502);
+          }, log),
+          mk("b", true, OK("A COMPLETELY DIFFERENT ANSWER"), log),
+        ],
+        REQ,
+        { failover: true, onDelta: (t) => seen.push(t) },
+      );
+      check(
+        `a stream that already emitted tokens does NOT fail over (tried: ${log.join(" → ")}, user saw: ${JSON.stringify(seen.join(""))})`,
+        !out.ok && log.join(",") === "a" && seen.join("") === "Three widths ",
+      );
+    }
+    {
+      /* …but a stream that died before its FIRST token is safe to retry, and
+         must be, or streaming turns would lose failover entirely. */
+      const log: Log = [];
+      const seen: string[] = [];
+      const out = await chatWithToolsVia(
+        [mk("a", true, ERR(502), log), mk("b", true, OK("from b"), log)],
+        REQ,
+        { failover: true, onDelta: (t) => seen.push(t) },
+      );
+      check(
+        `a stream that emitted NOTHING still fails over (tried: ${log.join(" → ")})`,
+        out.ok && log.join(",") === "a,b" && seen.length === 0,
+      );
+    }
+    {
+      const log: Log = [];
+      const out = await chatWithToolsVia(
+        [mk("a", true, ERR(503), log), mk("b", true, OK("from b"), log)],
+        REQ,
+        { failover: false },
+      );
+      check(
+        `the kill-switch really stops at one provider (tried: ${log.join(" → ")})`,
+        !out.ok && out.status === 503 && log.join(",") === "a",
+      );
+    }
+    {
+      const log: Log = [];
+      const out = await chatWithToolsVia(
+        [mk("skipped", false, OK("never"), log), mk("b", true, OK("from b"), log)],
+        REQ,
+        { failover: true },
+      );
+      check(
+        `an unconfigured adapter is not even attempted (tried: ${log.join(" → ")})`,
+        out.ok && log.join(",") === "b",
+      );
+    }
+    {
+      const log: Log = [];
+      const out = await chatWithToolsVia([mk("x", false, OK("never"), log)], REQ, { failover: true });
+      check(
+        "no configured provider reports 503 rather than throwing, and calls nobody",
+        !out.ok && out.status === 503 && out.bodyText === "no AI provider configured" && log.length === 0,
+      );
+    }
+    {
+      /* Exhaustion must surface the LAST provider's failure, not a synthetic one
+         — the rescue path branches on that status and body. */
+      const log: Log = [];
+      const out = await chatWithToolsVia(
+        [mk("a", true, ERR(503), log), mk("b", true, ERR(429), log)],
+        REQ,
+        { failover: true },
+      );
+      check(
+        `when every provider fails, the LAST real failure is returned (tried: ${log.join(" → ")})`,
+        !out.ok && out.status === 429 && out.bodyText === "status 429" && log.join(",") === "a,b",
+      );
+    }
+  }
+
+  console.log("\n── 8. The fallback adapter is configuration, not a hard-coded vendor ──");
+  /* The plan named Qwen/DashScope. This environment's egress policy refuses
+     CONNECT to dashscope.aliyuncs.com, so its URL and model ids could only have
+     been written from memory. A wrong constant in a failover path is worse than
+     no failover: it looks configured and it fails exactly when the primary is
+     already down. So the vendor became four environment variables, and what is
+     asserted here is the VALIDATION — which is the security-bearing part. */
+  {
+    const OKCFG = {
+      AI_FALLBACK_BASE_URL: "https://example-gateway.invalid/compatible-mode/v1",
+      AI_FALLBACK_API_KEY: "k",
+      AI_FALLBACK_MODEL: "some-model",
+    };
+    const good = parseFallbackConfig(OKCFG);
+    check("a complete config parses", good !== null);
+    check(
+      "and the chat path is appended to the base url",
+      good?.chatUrl === "https://example-gateway.invalid/compatible-mode/v1/chat/completions",
+    );
+    check(
+      "a trailing slash on the base url does not produce a double slash",
+      parseFallbackConfig({ ...OKCFG, AI_FALLBACK_BASE_URL: "https://example-gateway.invalid/v1/" })?.chatUrl ===
+        "https://example-gateway.invalid/v1/chat/completions",
+    );
+    check("the label defaults to the host, not to a vendor name", good?.label === "example-gateway.invalid");
+    check(
+      "an explicit label wins",
+      parseFallbackConfig({ ...OKCFG, AI_FALLBACK_LABEL: "cn-gateway" })?.label === "cn-gateway",
+    );
+    /* The one that protects a credential: an http:// base would put the API key
+       on the wire in plaintext. Refuse, do not downgrade. */
+    check(
+      "a PLAINTEXT base url disables the adapter — the key never travels unencrypted",
+      parseFallbackConfig({ ...OKCFG, AI_FALLBACK_BASE_URL: "http://example-gateway.invalid/v1" }) === null,
+    );
+    check("a malformed url disables it rather than throwing", parseFallbackConfig({ ...OKCFG, AI_FALLBACK_BASE_URL: "not a url" }) === null);
+    for (const missing of ["AI_FALLBACK_BASE_URL", "AI_FALLBACK_API_KEY", "AI_FALLBACK_MODEL"] as const) {
+      const partial = { ...OKCFG, [missing]: "" };
+      check(`without ${missing} the adapter stays unconfigured`, parseFallbackConfig(partial) === null);
+    }
+    check(
+      "with nothing set at all it is inert — which is every environment today",
+      parseFallbackConfig({}) === null && openAiCompatibleAdapter.configured() === false,
+    );
+    /* Non-vacuity: an adapter that is always unconfigured would pass every
+       check above while being incapable of ever serving. Prove the object is
+       real and satisfies the same contract the loop calls. */
+    check(
+      "and it is nonetheless a real adapter, not a stub",
+      typeof openAiCompatibleAdapter.chat === "function" &&
+        typeof openAiCompatibleAdapter.model === "function" &&
+        typeof openAiCompatibleAdapter.name === "string",
+    );
+    {
+      const out = await openAiCompatibleAdapter.chat({ messages: [{ role: "user", content: "x" }], maxTokens: 4, temperature: 0.3 });
+      check(
+        "an unconfigured call reports 503 through the contract rather than throwing or fetching",
+        !out.ok && out.status === 503,
+      );
+    }
+  }
 }
-console.log("Section 1 compares against the loop's own parse expression, copied verbatim — not against a description of it.");
+
+void asyncChecks().then(() => {
+  console.log(`\n${pass} passed, ${failures.length} failed`);
+  if (failures.length) {
+    console.log("\nFAILED:");
+    for (const f of failures) console.log(`  · ${f}`);
+    process.exit(1);
+  }
+  console.log("Section 1 compares against the loop's own parse expression, copied verbatim — not against a description of it.");
+});
