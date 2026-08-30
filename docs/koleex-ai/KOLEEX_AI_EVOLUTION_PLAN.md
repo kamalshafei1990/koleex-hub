@@ -739,7 +739,8 @@ break Hub integration · remove a working tool · weaken permissions or verifica
 | **0 — Baseline & Tests** | 🟡 **IN PROGRESS** | Tenant-isolation guard ✅ · Incident-replay suite ✅ — both shipped and proven-to-fail (below). Baseline latency metrics: next (needs a running instance). |
 | **1 — Security Hardening** | ✅ **COMPLETE** | All six audit issues in scope closed (1, 2, 3, 4, 5, 6) + Issue 7. Two migrations applied staging→production with sign-off. Six suites green. |
 | **2 — AI Core + Standalone Foundation** | ✅ **COMPLETE** | 2A–2J all shipped. `orchestrator.ts` 3 220 → **734**, zero vendor references; `KoleexAiApp.tsx` 3 958 → **2 462**. **2G decided by the owner and built with no schema** — see [`PHASE_2G_DESIGN.md`](./PHASE_2G_DESIGN.md). `ai_sessions` **struck**; `requireInternalUser` unchanged (Option A) and one missing door closed. **N6, N7, N9 and the 2D layering item closed.** |
-| 3–20 | ⬜ Not started | **Amendment 1 (§P) folded in** — Phase 2 gains the connector interface + client-resolvable deep links |
+| **3 — Provider Abstraction + Turn IR** | 🟡 **IN PROGRESS** | **3A shipped** — the Turn IR and its OpenAI conversions, proved by a **differential** against the live transport. It caught a real fast-path regression before any wiring changed (below). 3B (adapter + registry) next. |
+| 4–20 | ⬜ Not started | — |
 
 ### Phase 2 · Sub-stage 2A — the lane decision has one home ✅
 
@@ -1021,6 +1022,31 @@ removed from a legacy route → caught and named · an `ai_sessions` migration
 added anyway → caught and named.
 
 **Regression gate:** eighteen suites green, `tsc` clean, `eslint` clean.
+
+---
+
+### Phase 3 · Sub-stage 3A — the Turn IR, proved by differential ✅
+
+`src/lib/server/ai/provider/turn-ir.ts` · `npm run validate:ai-turn-ir` · **24 passed, 0 failed.** Additive: no wiring changed.
+
+**The IR is not the wire format with different names.** Where the OpenAI shape carries an accident of history, the IR says what is meant:
+
+| wire | IR |
+|---|---|
+| `tool_choice: { type:"function", function:{ name:"askUser" } }` | `toolChoice: { forceTool: "askUser" }` |
+| `tools: [{ type:"function", function:{ name, description, parameters } }]` | `tools: [{ name, description, parameters }]` |
+
+One thing is carried over **unchanged on purpose**: tool-call arguments stay a JSON **string** (`argumentsJson`), never parsed. A model can and does emit invalid JSON, and the loop has guards that depend on seeing it. An IR that parsed eagerly would throw inside the transport or silently swallow a malformed call.
+
+**The differential is the point.** `buildChatBody` was extracted from `core/transport.ts` — where the request body had been built inline inside three `fetch` calls and could only be checked by *reading* — so the two can now be run over a matrix of turns and their JSON **compared**, not described.
+
+**It caught a real regression on its first run, before any wiring changed.** The IR defaulted a missing `toolChoice` to `"auto"`, which added `tools: []` and `tool_choice: "auto"` to the **small-talk and brand fast path** — a lane that today sends neither key. Phase 3's whole premise is that the DeepSeek path stays byte-identical while the layering changes; that silent addition would have been attributed to "the new provider layer" and hunted in the wrong place. **The IR was wrong, not the transport**, and the fix is now documented at the function.
+
+**One of this suite's own assertions had encoded the bug** — it claimed a tool-less call *should* default to auto with an empty list. Replaced, and an explicitly-empty tool list is now distinguished from no tools at all.
+
+**Proven to fail:** the IR parsing tool arguments → caught, *and the assertion was rewritten to survive it*: an unguarded call killed the whole suite with a stack trace instead of naming the regression, which is a worse failure than a red line · the transport gaining `stream: false` → 5 cases fail · a tool result losing its `tool_call_id` → 2 fail.
+
+**Regression gate:** nineteen suites green, `tsc` clean, `eslint` clean.
 
 ### Phase 2 · Sub-stage 2J (completed) — proved by rendering both versions ✅
 

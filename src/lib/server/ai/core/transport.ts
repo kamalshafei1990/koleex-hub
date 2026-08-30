@@ -111,6 +111,39 @@ const BACKOFF_CAP_MS = 8000;
    (caught live twice in one 12-question probe). Convert them into a
    synthetic 502 Response so the same failed-status paths (retry → rescue →
    friendly copy) absorb them. */
+/* ── The request body, in ONE place ─────────────────────────────────────
+   Phase 3A. The three call sites below built this inline, which meant the
+   only way to check "does the new provider layer send exactly what we send
+   today?" was to read three fetch calls and believe the reading. It is a
+   function now, so the two can be DIFFED — validate:ai-turn-ir runs both over
+   a matrix of turns and compares the JSON.
+
+   Behaviour is unchanged and deliberately so, down to two details that look
+   like oversights and are not:
+     · `tools` is OMITTED entirely when tool_choice is "none", not sent empty.
+     · `stream` is present only on the streaming call, never `stream:false`.
+   Both reproduce what has been going over the wire; the golden test pins them. */
+export function buildChatBody(args: {
+  messages: WireMsg[];
+  maxTokens: number;
+  toolChoice?: ToolChoice;
+  tools?: ToolSchema[];
+  stream?: boolean;
+}): Record<string, unknown> {
+  const body: Record<string, unknown> = {
+    model: AGENT_MODEL,
+    messages: args.messages,
+    temperature: 0.3,
+    max_tokens: args.maxTokens,
+  };
+  if (args.stream) body.stream = true;
+  if (args.toolChoice !== undefined && args.toolChoice !== "none") {
+    body.tools = args.tools ?? [];
+    body.tool_choice = args.toolChoice;
+  }
+  return body;
+}
+
 export function isTransientNetError(e: unknown): boolean {
   const seen = new Set<unknown>();
   let cur: unknown = e;
@@ -160,12 +193,7 @@ export async function callGroqPlain(
         "Content-Type": "application/json",
         Authorization: `Bearer ${key}`,
       },
-      body: JSON.stringify({
-        model: AGENT_MODEL,
-        messages,
-        temperature: 0.3,
-        max_tokens: maxTokens,
-      }),
+      body: JSON.stringify(buildChatBody({ messages, maxTokens })),
     });
   } catch (e) {
     if (isTransientNetError(e) && attempt < MAX_RETRIES) {
@@ -197,17 +225,13 @@ export async function callGroqStreamingOnce(
   content: string;
   toolCalls: Array<{ id: string; type: "function"; function: { name: string; arguments: string } }>;
 }> {
-  const body: Record<string, unknown> = {
-    model: AGENT_MODEL,
+  const body = buildChatBody({
     messages,
-    temperature: 0.3,
-    max_tokens: 2048,
+    maxTokens: 2048,
     stream: true,
-  };
-  if (opts.toolChoice !== "none") {
-    body.tools = opts.tools ?? [];
-    body.tool_choice = opts.toolChoice;
-  }
+    toolChoice: opts.toolChoice,
+    tools: opts.tools,
+  });
   let res: Response;
   try {
     res = await fetch(AGENT_LLM_URL, {
@@ -310,16 +334,12 @@ export async function callGroqWithRetry(
   attempt = 0,
 ): Promise<Response> {
   const toolChoice = opts.toolChoice ?? "auto";
-  const body: Record<string, unknown> = {
-    model: AGENT_MODEL,
+  const body = buildChatBody({
     messages,
-    temperature: 0.3,
-    max_tokens: 2048,
-  };
-  if (toolChoice !== "none") {
-    body.tools = opts.tools ?? [];
-    body.tool_choice = toolChoice;
-  }
+    maxTokens: 2048,
+    toolChoice,
+    tools: opts.tools,
+  });
   let res: Response;
   try {
     res = await fetch(AGENT_LLM_URL, {
