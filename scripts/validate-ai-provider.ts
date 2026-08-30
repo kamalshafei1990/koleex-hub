@@ -32,6 +32,7 @@ import {
   shouldTryNextProvider,
 } from "../src/lib/server/ai/provider/registry";
 import { openAiCompatibleAdapter, parseFallbackConfig } from "../src/lib/server/ai/provider/adapters/openai-compatible";
+import { createBreaker, admissible } from "../src/lib/server/ai/router/circuit-breaker";
 import type { ProviderAdapter, TurnOutcome } from "../src/lib/server/ai/provider/types";
 
 let pass = 0;
@@ -254,7 +255,15 @@ async function asyncChecks() {
 
      Fakes, not the live registry, and deliberately: making a real provider
      return 503 on demand is not something a static suite can do, and a rule this
-     consequential should not rest on reading the loop and believing it. */
+     consequential should not rest on reading the loop and believing it.
+
+     EVERY case gets a FRESH breaker. Without one they share the module-scope
+     breaker, and the failures each case deliberately injects accumulate into
+     the next — which is exactly what happened when 4C was wired in: two cases
+     started reporting "tried: b" because adapter "a" had been tripped by
+     earlier cases. The suite caught it. Shared mutable state between test
+     cases makes a suite report the wrong thing in whichever direction is
+     least convenient. */
   {
     type Log = string[];
     const mk = (
@@ -288,7 +297,7 @@ async function asyncChecks() {
       const out = await chatWithToolsVia(
         [mk("a", true, ERR(503), log), mk("b", true, OK("from b"), log)],
         REQ,
-        { failover: true },
+        { failover: true, breaker: createBreaker() },
       );
       check(
         `a 503 on the primary falls through to the secondary (tried: ${log.join(" → ") || "none"})`,
@@ -300,7 +309,7 @@ async function asyncChecks() {
       const out = await chatWithToolsVia(
         [mk("a", true, ERR(400), log), mk("b", true, OK("from b"), log)],
         REQ,
-        { failover: true },
+        { failover: true, breaker: createBreaker() },
       );
       check(
         `a 400 stops at the primary — the secondary is never called (tried: ${log.join(" → ")})`,
@@ -323,7 +332,7 @@ async function asyncChecks() {
           mk("b", true, OK("A COMPLETELY DIFFERENT ANSWER"), log),
         ],
         REQ,
-        { failover: true, onDelta: (t) => seen.push(t) },
+        { failover: true, breaker: createBreaker(), onDelta: (t) => seen.push(t) },
       );
       check(
         `a stream that already emitted tokens does NOT fail over (tried: ${log.join(" → ")}, user saw: ${JSON.stringify(seen.join(""))})`,
@@ -338,7 +347,7 @@ async function asyncChecks() {
       const out = await chatWithToolsVia(
         [mk("a", true, ERR(502), log), mk("b", true, OK("from b"), log)],
         REQ,
-        { failover: true, onDelta: (t) => seen.push(t) },
+        { failover: true, breaker: createBreaker(), onDelta: (t) => seen.push(t) },
       );
       check(
         `a stream that emitted NOTHING still fails over (tried: ${log.join(" → ")})`,
@@ -350,7 +359,7 @@ async function asyncChecks() {
       const out = await chatWithToolsVia(
         [mk("a", true, ERR(503), log), mk("b", true, OK("from b"), log)],
         REQ,
-        { failover: false },
+        { failover: false, breaker: createBreaker() },
       );
       check(
         `the kill-switch really stops at one provider (tried: ${log.join(" → ")})`,
@@ -362,7 +371,7 @@ async function asyncChecks() {
       const out = await chatWithToolsVia(
         [mk("skipped", false, OK("never"), log), mk("b", true, OK("from b"), log)],
         REQ,
-        { failover: true },
+        { failover: true, breaker: createBreaker() },
       );
       check(
         `an unconfigured adapter is not even attempted (tried: ${log.join(" → ")})`,
@@ -371,7 +380,7 @@ async function asyncChecks() {
     }
     {
       const log: Log = [];
-      const out = await chatWithToolsVia([mk("x", false, OK("never"), log)], REQ, { failover: true });
+      const out = await chatWithToolsVia([mk("x", false, OK("never"), log)], REQ, { failover: true, breaker: createBreaker() });
       check(
         "no configured provider reports 503 rather than throwing, and calls nobody",
         !out.ok && out.status === 503 && out.bodyText === "no AI provider configured" && log.length === 0,
@@ -384,7 +393,7 @@ async function asyncChecks() {
       const out = await chatWithToolsVia(
         [mk("a", true, ERR(503), log), mk("b", true, ERR(429), log)],
         REQ,
-        { failover: true },
+        { failover: true, breaker: createBreaker() },
       );
       check(
         `when every provider fails, the LAST real failure is returned (tried: ${log.join(" → ")})`,
@@ -453,6 +462,112 @@ async function asyncChecks() {
         !out.ok && out.status === 503,
       );
     }
+  }
+
+  console.log("\n── 9. The circuit breaker: what makes failover fast (Phase 4C) ──");
+  /* 4B's honest caveat was that a dead primary cost ~14s on EVERY turn,
+     because its retry ladder ran to exhaustion before the second provider was
+     tried. The breaker does not make the FIRST failure fast — nothing can,
+     short of removing the ladder that absorbs ordinary rate limits. It makes
+     every failure after the first fast, by not starting the ladder at all.
+
+     Time is injected. A breaker tested with real sleeps is a slow test that
+     someone eventually marks skip. */
+  {
+    let clock = 1_000_000;
+    const b = createBreaker({ failureThreshold: 3, openMs: 30_000, now: () => clock });
+
+    check("a provider starts closed and is allowed", b.stateOf("p") === "closed" && b.allow("p"));
+    b.recordFailure("p");
+    b.recordFailure("p");
+    check("two failures below the threshold do not open it — a blip is not an outage", b.stateOf("p") === "closed" && b.allow("p"));
+    b.recordFailure("p");
+    check("the third consecutive failure opens it", b.stateOf("p") === "open" && b.allow("p") === false);
+
+    clock += 29_000;
+    check("it stays open for the full cooldown", b.stateOf("p") === "open" && b.allow("p") === false);
+
+    clock += 2_000;
+    check("after the cooldown it goes half-open and admits a trial", b.stateOf("p") === "half-open" && b.allow("p") === true);
+
+    /* THE BUG THIS SPLIT EXISTS FOR. Asking must not consume. An earlier
+       version took the trial slot inside allow(), so merely FILTERING the
+       candidate list spent the one chance a recovering provider had to prove
+       itself — on a provider that was then never contacted. */
+    check("asking twice is still allowed, because asking does not consume the trial", b.allow("p") === true);
+    b.beginAttempt("p");
+    check("but TAKING the trial closes the door on a concurrent second request", b.allow("p") === false);
+
+    b.recordFailure("p");
+    check("a failed trial re-opens immediately, without re-counting to the threshold", b.stateOf("p") === "open");
+
+    clock += 31_000;
+    b.beginAttempt("p");
+    b.recordSuccess("p");
+    check("a successful trial closes it and clears the count", b.stateOf("p") === "closed" && b.snapshot().p.consecutiveFailures === 0);
+
+    /* Non-consecutive failures must not accumulate into an outage. */
+    b.recordFailure("p");
+    b.recordFailure("p");
+    b.recordSuccess("p");
+    b.recordFailure("p");
+    b.recordFailure("p");
+    check("a success in between resets the count — only CONSECUTIVE failures open it", b.stateOf("p") === "closed");
+  }
+
+  {
+    /* Decision 2: the breaker must never be able to take the product down by
+       itself. If everything is open, everything is tried anyway. */
+    const b = createBreaker({ failureThreshold: 1, openMs: 30_000, now: () => 1_000_000 });
+    const cands = [{ name: "a" }, { name: "b" }];
+    b.recordFailure("a");
+    const partial = admissible(cands, b);
+    check(
+      `with one provider open, only the healthy one is tried (${partial.tryThese.map((c) => c.name).join(",")})`,
+      partial.tryThese.length === 1 && partial.tryThese[0].name === "b" && partial.allBlocked === false,
+    );
+    b.recordFailure("b");
+    const blocked = admissible(cands, b);
+    check(
+      `with EVERY provider open, all of them are tried anyway rather than reporting an outage (${blocked.tryThese.map((c) => c.name).join(",")})`,
+      blocked.tryThese.length === 2 && blocked.allBlocked === true,
+    );
+    check("and preference order is preserved when the breaker is bypassed", blocked.tryThese[0].name === "a");
+  }
+
+  {
+    /* The property that actually matters, end to end: once the primary has
+       tripped, a later turn does not touch it at all. That is the ~14s the
+       user stops paying on every subsequent request. */
+    const log: string[] = [];
+    const mk2 = (name: string, out: TurnOutcome): ProviderAdapter => ({
+      name,
+      configured: () => true,
+      model: () => `${name}-1`,
+      chat: async () => {
+        log.push(name);
+        return out;
+      },
+    });
+    const REQ2 = { messages: [{ role: "user" as const, content: "hi" }], maxTokens: 10, temperature: 0.3 };
+    const adapters = [
+      mk2("dead", { ok: false, status: 503, bodyText: "down" }),
+      mk2("live", { ok: true, response: { content: "served", toolCalls: [] } }),
+    ];
+    const b = createBreaker({ failureThreshold: 2, openMs: 30_000, now: () => 1 });
+    await chatWithToolsVia(adapters, REQ2, { failover: true, breaker: b });
+    await chatWithToolsVia(adapters, REQ2, { failover: true, breaker: b });
+    const afterTrip = log.length;
+    const out = await chatWithToolsVia(adapters, REQ2, { failover: true, breaker: b });
+    const thirdTurn = log.slice(afterTrip);
+    check(
+      `once tripped, the dead provider is not contacted again (third turn tried: ${thirdTurn.join(" → ")})`,
+      out.ok && thirdTurn.join(",") === "live",
+    );
+    check(
+      "and the breaker only counts provider faults, so a 400 would not have tripped it",
+      shouldTryNextProvider(503) === true && shouldTryNextProvider(400) === false,
+    );
   }
 }
 
