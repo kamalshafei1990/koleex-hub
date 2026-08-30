@@ -739,7 +739,7 @@ break Hub integration · remove a working tool · weaken permissions or verifica
 | **0 — Baseline & Tests** | 🟡 **IN PROGRESS** | Tenant-isolation guard ✅ · Incident-replay suite ✅ — both shipped and proven-to-fail (below). Baseline latency metrics: next (needs a running instance). |
 | **1 — Security Hardening** | ✅ **COMPLETE** | All six audit issues in scope closed (1, 2, 3, 4, 5, 6) + Issue 7. Two migrations applied staging→production with sign-off. Six suites green. |
 | **2 — AI Core + Standalone Foundation** | ✅ **COMPLETE** | 2A–2J all shipped. `orchestrator.ts` 3 220 → **734**, zero vendor references; `KoleexAiApp.tsx` 3 958 → **2 462**. **2G decided by the owner and built with no schema** — see [`PHASE_2G_DESIGN.md`](./PHASE_2G_DESIGN.md). `ai_sessions` **struck**; `requireInternalUser` unchanged (Option A) and one missing door closed. **N6, N7, N9 and the 2D layering item closed.** |
-| **3 — Provider Abstraction + Turn IR** | 🟡 **IN PROGRESS** | **3A shipped** — the Turn IR and its OpenAI conversions, proved by a **differential** against the live transport. It caught a real fast-path regression before any wiring changed (below). 3B (adapter + registry) next. |
+| **3 — Provider Abstraction + Turn IR** | 🟡 **IN PROGRESS** | **3A + 3B shipped** — the Turn IR, the adapter interface, the DeepSeek adapter and the registry, each proved by differential. **NOT YET WIRED into the agent loop** — that is 3C, and until then `chatWithTools()` is unreachable at runtime. |
 | 4–20 | ⬜ Not started | — |
 
 ### Phase 2 · Sub-stage 2A — the lane decision has one home ✅
@@ -1047,6 +1047,36 @@ One thing is carried over **unchanged on purpose**: tool-call arguments stay a J
 **Proven to fail:** the IR parsing tool arguments → caught, *and the assertion was rewritten to survive it*: an unguarded call killed the whole suite with a stack trace instead of naming the regression, which is a worse failure than a red line · the transport gaining `stream: false` → 5 cases fail · a tool result losing its `tool_call_id` → 2 fail.
 
 **Regression gate:** nineteen suites green, `tsc` clean, `eslint` clean.
+
+### Phase 3 · Sub-stage 3B — the adapter and the one door ✅ (not yet wired)
+
+`provider/{types,registry}.ts` · `provider/adapters/deepseek.ts` · `npm run validate:ai-provider` · **31 passed, 0 failed.**
+
+**Stated plainly: this is not reachable at runtime yet.** The agent loop still calls the transport directly; `chatWithTools()` exists, is tested, and is used by nothing. Wiring it is **3C**. Calling 3B "provider abstraction, done" would be exactly the *"complete because it compiles"* the project rules forbid.
+
+**The adapter delegates; it does not re-implement.** Phase 2D isolated the endpoint, key, retry policy and streaming reassembly into `core/transport.ts` for this moment. The adapter holds no `fetch`, no endpoint and no key — asserted, and proven by adding a real `fetch` and watching two checks fail.
+
+**What genuinely moved is the PARSE.** Two of the three call sites parsed the provider's JSON inside the agent loop. That parse lives in the adapter now, and the suite compares it against **the loop's own expression, copied verbatim**:
+
+```
+choice    = json.choices?.[0]?.message;
+toolCalls = choice.tool_calls ?? [];
+content   = choice.content ?? "";
+```
+
+Those two `??` are load-bearing: a tool-only turn arrives with `content: null`, and a turn with no calls has no `tool_calls` key at all. Seven canned provider responses — plain answer, tool-only, both together, empty `choices`, no `choices`, malformed arguments, usage present — are run through both.
+
+**A failure carries status AND body**, because the rescue path reads both. That is not decoration: an adapter that threw, or flattened failures to null, would delete behaviour that exists because of real incidents.
+
+**The registry order is a decision, not an accident.** DeepSeek is first because it is the China-accessible provider and *mainland China without a VPN* is a stated architectural requirement. A future adapter inserted above it would silently change that, so the position is asserted.
+
+**Two of this suite's own assertions were too weak, and the negative tests found them:**
+- *"the failure branch carries status and body"* matched the **key** `bodyText` and passed happily when every branch set it to `""` — which, for a path that logs and branches on that text, is the same as deleting it. Re-anchored on the **sources** (`await res.text()`, `s.bodyText`).
+- The no-`fetch` check only catches an actual **call**; the first negative test wrote `void fetch;`, which is not one. The test was wrong, not the check — redone with a real call, and it fails.
+
+**Proven to fail:** dropping the null-content normalisation → **6** failures · a second provider inserted above DeepSeek → caught · a real `fetch` in the adapter → 2 failures · the failure branch emptying its body → 2 failures.
+
+**Regression gate:** twenty suites green, `tsc` clean, `eslint` clean.
 
 ### Phase 2 · Sub-stage 2J (completed) — proved by rendering both versions ✅
 
