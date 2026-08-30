@@ -88,6 +88,13 @@ export function providerLabel(): string {
   return `deepseek:${AGENT_MODEL}`;
 }
 
+/** The bare model id, without the provider prefix. The adapter needs it to
+ *  report its own model; providerLabel() is the composed string the loop puts
+ *  on an AgentResponse. Two callers, one source. */
+export function agentModel(): string {
+  return AGENT_MODEL;
+}
+
 /* ─── Groq call with retry-after aware backoff ────────────────────────
    Groq's free tier is ~6k tokens / minute on Llama 3.3 70B. With the
    agent loop invoking the model several times per user turn (tool
