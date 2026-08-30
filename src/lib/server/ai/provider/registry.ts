@@ -81,6 +81,45 @@ export function configuredAdapters(adapters: ReadonlyArray<ProviderAdapter> = RE
   return adapters.filter((a) => a.configured());
 }
 
+/** EVERY registered adapter and whether it would serve — including the ones
+ *  that would not.
+ *
+ *  WHY THIS EXISTS. A fallback provider is only ever contacted when the
+ *  primary fails, so a mistake in configuring it — a wrong model id, a typo in
+ *  the base url, a key pasted into the wrong field — stays invisible until the
+ *  exact moment it is needed. That is the failure mode this whole layer was
+ *  built to remove, and shipping a fallback nobody can check reintroduces it
+ *  one level up.
+ *
+ *  `configuredAdapters` cannot answer the question, because an adapter that
+ *  failed to configure simply is not in its result: absence looks identical to
+ *  "not registered". This returns the full list so a missing one is visible.
+ *
+ *  NOTHING SECRET CROSSES THIS BOUNDARY. Only the adapter's own name, its
+ *  model id, and a boolean. Keys are never read here — `configured()` reads
+ *  them, and returns only whether one was present. */
+export function providerRoster(
+  adapters: ReadonlyArray<ProviderAdapter> = REGISTRY,
+): Array<{ name: string; model: string; configured: boolean }> {
+  return adapters.map((a) => {
+    /* An adapter is free to throw from model() when unconfigured; a status
+       endpoint must not 500 because one provider is in a bad state. */
+    let model = "unknown";
+    try {
+      model = a.model();
+    } catch {
+      /* keep "unknown" */
+    }
+    let configured = false;
+    try {
+      configured = a.configured();
+    } catch {
+      /* keep false — an adapter that throws while deciding is not usable */
+    }
+    return { name: a.name, model, configured };
+  });
+}
+
 /** The adapter that will serve a turn right now, or null if none is
  *  configured. Exported so the degraded lane can ask before committing. */
 export function selectAdapter(): ProviderAdapter | null {

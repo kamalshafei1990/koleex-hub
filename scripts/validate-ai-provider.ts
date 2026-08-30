@@ -32,6 +32,7 @@ import {
   shouldTryNextProvider,
 } from "../src/lib/server/ai/provider/registry";
 import { openAiCompatibleAdapter, parseFallbackConfig, parseExtraBody } from "../src/lib/server/ai/provider/adapters/openai-compatible";
+import { providerRoster } from "../src/lib/server/ai/provider/registry";
 import { createBreaker, admissible } from "../src/lib/server/ai/router/circuit-breaker";
 import { parseClassMap, resolveModel, MODEL_CLASSES } from "../src/lib/server/ai/router/model-classes";
 import type { ProviderAdapter, TurnOutcome } from "../src/lib/server/ai/provider/types";
@@ -713,7 +714,53 @@ async function asyncChecks() {
 }
 
 void asyncChecks().then(() => {
-  console.log(`\n${pass} passed, ${failures.length} failed`);
+  console.log("\n── The roster: an operator can check the fallback WITHOUT breaking the primary ──");
+/* A fallback is only ever contacted when the primary fails, so a mistake in
+   configuring it is invisible until the moment there is no margin for it. The
+   roster exists so "did my four env vars work?" has an answer that does not
+   require taking DeepSeek down. Its security property is what it does NOT
+   carry. */
+{
+  const ok = { name: "x", configured: () => true, model: () => "m", chat: async () => ({ ok: false, status: 0, bodyText: "" }) };
+  const off = { name: "y", configured: () => false, model: () => "unconfigured", chat: async () => ({ ok: false, status: 0, bodyText: "" }) };
+  const roster = providerRoster([ok, off] as never);
+
+  check("it lists EVERY adapter, not only the configured ones", roster.length === 2);
+  check(
+    "an unconfigured adapter is present and marked false — absence would read as 'not registered'",
+    roster[1]?.name === "y" && roster[1]?.configured === false,
+  );
+  check("a configured adapter reports its model", roster[0]?.configured === true && roster[0]?.model === "m");
+
+  /* The whole security property, asserted as the absence of a class rather
+     than by checking the fields I happened to think of. */
+  const SECRETISH = ["key", "token", "secret", "authorization", "bearer", "password", "url"];
+  const leaked = JSON.stringify(roster).toLowerCase();
+  const found = SECRETISH.filter((k) => leaked.includes(k));
+  check(
+    `the roster carries no key-shaped field${found.length ? ` — found: ${found.join(", ")}` : ""}`,
+    found.length === 0,
+  );
+
+  /* An adapter in a bad state must not take the status endpoint down with it —
+     the one time an operator needs this route is when something is wrong. */
+  const throws = {
+    name: "z",
+    configured: () => { throw new Error("boom"); },
+    model: () => { throw new Error("boom"); },
+    chat: async () => ({ ok: false, status: 0, bodyText: "" }),
+  };
+  let threw = false;
+  let out: ReturnType<typeof providerRoster> = [];
+  try {
+    out = providerRoster([throws] as never);
+  } catch {
+    threw = true;
+  }
+  check("an adapter that throws is reported, not propagated", !threw && out[0]?.configured === false && out[0]?.model === "unknown");
+}
+
+console.log(`\n${pass} passed, ${failures.length} failed`);
   if (failures.length) {
     console.log("\nFAILED:");
     for (const f of failures) console.log(`  · ${f}`);
