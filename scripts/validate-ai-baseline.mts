@@ -249,9 +249,15 @@ section("Permission invariants");
    pins to the dispatcher's own body so they mean what they say again. */
 const dispatchStart = registry.indexOf("export async function dispatchTool(");
 const dispatchBody = dispatchStart >= 0 ? registry.slice(dispatchStart) : "";
+/* Phase 6B wrapped the handler call: `await tool.handler(...)` became
+   `await raceTimeout(tool.handler(...), timeoutFor(name))`. This pin matched
+   the OLD spelling and failed on a change that did not touch the rule it
+   guards — the module gate still precedes the handler. Repointed to the
+   handler INVOCATION rather than the await that happened to precede it, which
+   is what the pin was always about. */
 check(
   "dispatchTool is where these ordering pins expect it",
-  dispatchBody.includes("staticToolDenial(") && dispatchBody.includes("await tool.handler("),
+  dispatchBody.includes("staticToolDenial(") && dispatchBody.includes("tool.handler(ctx, args)"),
   "if this fails the pins beneath it compare -1 against -1 and pass vacuously",
 );
 
@@ -275,8 +281,22 @@ check(
 
 check(
   "dispatchTool checks the module guard BEFORE running the handler",
-  orch.length > 0 && dispatchBody.indexOf("staticToolDenial(") < dispatchBody.indexOf("await tool.handler("),
+  orch.length > 0 && dispatchBody.indexOf("staticToolDenial(") < dispatchBody.indexOf("tool.handler(ctx, args)"),
   "the cheapest rejection path must come first, and no DB hit may precede it",
+);
+/* Phase 6B and 6C both inserted work into the dispatcher. Neither may sit in
+   front of the cheapest rejection: a malformed-argument check or a timeout
+   setup that ran before the permission gate would spend effort on a call the
+   user was never allowed to make. */
+check(
+  "argument validation runs AFTER the permission gate, not before it",
+  dispatchBody.indexOf("staticToolDenial(") < dispatchBody.indexOf("validateArgs(tool.parameters"),
+  "the cheapest rejection path must stay first",
+);
+check(
+  "the handler is bounded by a timeout rather than awaited unbounded",
+  /raceTimeout\(tool\.handler\(/.test(dispatchBody),
+  "a hanging handler used to hold the agent loop until the whole invocation was killed",
 );
 check(
   "dispatchTool audits denials, not just successes",
