@@ -287,11 +287,30 @@ async function asyncChecks() {
     const ERR = (status: number): TurnOutcome => ({ ok: false, status, bodyText: `status ${status}` });
 
     /* The status table, checked directly rather than inferred from the loop. */
-    for (const s of [500, 502, 503, 504, 429, 401, 403, 404]) {
+    for (const s of [500, 502, 503, 504, 429, 401, 402, 403, 404]) {
       check(`status ${s} is worth a second provider`, shouldTryNextProvider(s) === true);
     }
     for (const s of [400, 413, 422]) {
       check(`status ${s} is NOT — the request is bad, not the provider`, shouldTryNextProvider(s) === false);
+    }
+
+    /* 402 END TO END, not just in the table. It says the account behind this
+       provider is out of credit — the single condition a fallback most exists
+       to survive — and it was absent from the table, so it stopped the turn
+       with a healthy second provider configured and never contacted. Asserted
+       through the real loop, because a table entry proves the value and this
+       proves the behaviour. */
+    {
+      const log: Log = [];
+      const out = await chatWithToolsVia(
+        [mk("primary", true, ERR(402), log), mk("secondary", true, OK("from secondary"), log)],
+        REQ,
+        { breaker: createBreaker({ failureThreshold: 3, openMs: 30_000, now: () => 0 }) },
+      );
+      check(
+        `an out-of-credit primary hands the turn to the fallback (tried: ${log.join(", ")})`,
+        out.ok === true && out.response?.content === "from secondary" && log.length === 2,
+      );
     }
 
     {
