@@ -337,18 +337,45 @@ check(
   !/console\.[a-z]+\([^)]*\bkey\b/.test(stripComments(transport)) &&
     !/throw new Error\([^)]*\bkey\b/.test(stripComments(transport)),
 );
-/* KNOWN, recorded as finding N8: the agent route keeps its OWN provider call
-   for the streaming fast lanes — it reads DEEPSEEK_API_KEY and invokes
-   deepseekChatStream directly, bypassing the core entirely. Phase 3's
-   acceptance criterion ("chatWithTools is the only way the core reaches a
-   model") is not met until that lane goes through the same door. Asserted as
-   a COUNT so the situation cannot quietly get worse while it waits. */
+/* FINDING N8 — CLOSED in Phase 4D, so the assertion changes from a holding
+   count to the real rule. The agent route used to invoke deepseekChatStream
+   directly for its streaming fast lane: a second path to a provider that
+   bypassed the core entirely, with no failover, no circuit breaker, and its
+   own copy of the endpoint. It was asserted as `<= 1` so it could not grow
+   while it waited. It is zero now, and the count is replaced by the rule it
+   was standing in for — a tolerance nobody needs any more is a tolerance that
+   quietly permits a regression. */
 {
-  const routeProviderCalls = (agentRoute.match(/deepseekChatStream\(/g) ?? []).length;
+  /* Comment-stripped, like every other purity check here: the header above
+     this lane NAMES deepseekChatStream to explain what it replaced, and a
+     rule about calls that a comment can violate is not a rule. */
+  const routeProviderCalls = (stripComments(agentRoute).match(/deepseekChatStream\(/g) ?? []).length;
   check(
-    `the route's parallel provider path has not grown (N8: expected 1 call site, found ${routeProviderCalls})`,
-    routeProviderCalls <= 1,
+    `the route has NO parallel provider path (N8 closed: found ${routeProviderCalls})`,
+    routeProviderCalls === 0,
   );
+  check(
+    "the fast lane reaches a model through the same door as the loop",
+    /chatWithTools\(/.test(stripComments(agentRoute)),
+  );
+  /* The switch must still be honoured, or closing N8 would have silently
+     removed an operator's control. It is checked in the route now instead of
+     two call frames down inside the provider. */
+  check(
+    "and the streaming fast lane still honours the operator's kill-switch",
+    /streamingFastLaneEnabled\(\)/.test(stripComments(agentRoute)) &&
+      /const canFastPath[\s\S]{0,400}?streamingFastLaneEnabled\(\)/.test(agentRoute),
+  );
+  /* Non-vacuity: the policy must be a real read of the flag, not a stub that
+     returns true. This is the one line whose value decides whether the lane
+     runs at all. */
+  {
+    const policy = read("src/lib/server/ai/router/provider-policy.ts");
+    check(
+      "the kill-switch policy actually reads the environment variable",
+      /process\.env\.USE_DEEPSEEK === "true"/.test(stripComments(policy)),
+    );
+  }
 }
 
 console.log(`\n${pass} passed, ${failures.length} failed`);
