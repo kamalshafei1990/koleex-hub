@@ -50,6 +50,8 @@ import { runDegradedTurn, fallback } from "@/lib/server/ai/core/recovery";
    failover in the picture a hard-coded label would misreport every fallback
    turn, and the label is what the audit trail records. */
 import { chatWithTools, providerConfigured, activeProviderLabel } from "@/lib/server/ai/provider/registry";
+import { recordUsage } from "@/lib/server/ai/cost/meter";
+import type { TurnMeta } from "@/lib/server/ai/provider/types";
 import {
   fromOpenAiMessages,
   fromOpenAiTools,
@@ -112,6 +114,14 @@ const MAX_PARALLEL_TOOLS = 3;
 
    `tool_calls: undefined` when empty (not `[]`) reproduces exactly what the
    streaming branch built before. */
+/* Phase 5B. The label for a turn that HAPPENED comes from the outcome, not
+   from activeProviderLabel() — after a failover those differ, and the outcome
+   is the one telling the truth. Falls back to the predicted label only when
+   the registry did not name a server (no adapter ran at all). */
+function servedLabel(meta: TurnMeta): string {
+  return meta.servedBy && meta.model ? `${meta.servedBy}:${meta.model}` : activeProviderLabel();
+}
+
 function toChoice(r: TurnResponse): { role?: string; content: string | null; tool_calls?: OpenAiMessage["tool_calls"] } {
   return {
     role: "assistant",
@@ -320,6 +330,17 @@ export async function orchestrate(input: TurnInput): Promise<AgentResponse> {
       modelClass: isBrand ? "GENERAL" : "FAST",
     });
     const tPost = Date.now();
+    recordUsage({
+      tenantId: ctx.auth.tenant_id ?? null,
+      accountId: ctx.auth.account_id ?? null,
+      lane: isBrand ? "brand" : "fast",
+      provider: out.servedBy ?? "none",
+      model: out.model ?? "unknown",
+      inputTokens: out.ok ? (out.response.usage?.inputTokens ?? null) : null,
+      outputTokens: out.ok ? (out.response.usage?.outputTokens ?? null) : null,
+      ms: out.ms ?? tPost - tPre,
+      traceId: conversationId,
+    });
     if (out.ok) {
       const rawReply = out.response.content.trim();
       /* Strip any leaked tool-call markers BEFORE brand-name
@@ -336,7 +357,7 @@ export async function orchestrate(input: TurnInput): Promise<AgentResponse> {
         return {
           steps,
           finalReply: safeReply,
-          provider: activeProviderLabel(),
+          provider: servedLabel(out),
           conversationId,
         };
       }
@@ -349,6 +370,13 @@ export async function orchestrate(input: TurnInput): Promise<AgentResponse> {
      tool_choice on the first request — measured, it answered with another
      lookup and only called askUser on the next pass. Two attempts absorbs
      that without ever becoming a loop. */
+  /* Phase 5B — declared at TURN scope, not per round, because the label it
+     feeds is read after the loop has finished. It records the LAST model call
+     of the turn, which is the one that produced the answer being returned.
+     Everything here used to call activeProviderLabel(), which names the first
+     CONFIGURED adapter and is therefore wrong on any turn that failed over —
+     and that label is what the audit trail stores. */
+  let turnMeta: TurnMeta = {};
   let forcedAsk = 0;
   /* Set when a choice-shaped turn came back as PROSE with no tool calls at
      all. Measured on prod: the model answered "which spreading machine should
@@ -431,6 +459,18 @@ export async function orchestrate(input: TurnInput): Promise<AgentResponse> {
         },
         liveEmit ? { onDelta: liveEmit } : undefined,
       );
+      turnMeta = { servedBy: out.servedBy, model: out.model, ms: out.ms, failedOver: out.failedOver };
+      recordUsage({
+        tenantId: ctx.auth.tenant_id ?? null,
+        accountId: ctx.auth.account_id ?? null,
+        lane: "agent",
+        provider: out.servedBy ?? "none",
+        model: out.model ?? "unknown",
+        inputTokens: out.ok ? (out.response.usage?.inputTokens ?? null) : null,
+        outputTokens: out.ok ? (out.response.usage?.outputTokens ?? null) : null,
+        ms: out.ms ?? 0,
+        traceId: conversationId,
+      });
       if (!out.ok) {
         callFailedStatus = out.status || 500;
         callFailedBody = out.bodyText;
@@ -455,7 +495,7 @@ export async function orchestrate(input: TurnInput): Promise<AgentResponse> {
         return {
           steps,
           finalReply: safeReply,
-          provider: activeProviderLabel(),
+          provider: servedLabel(turnMeta),
           conversationId,
         };
       }
@@ -474,7 +514,7 @@ export async function orchestrate(input: TurnInput): Promise<AgentResponse> {
       return {
         steps,
         finalReply: safeReply,
-        provider: activeProviderLabel(),
+        provider: servedLabel(turnMeta),
         conversationId,
       };
     }
@@ -490,7 +530,7 @@ export async function orchestrate(input: TurnInput): Promise<AgentResponse> {
         return {
           steps,
           finalReply: safeReply,
-          provider: activeProviderLabel(),
+          provider: servedLabel(turnMeta),
           conversationId,
         };
       }
@@ -762,7 +802,7 @@ export async function orchestrate(input: TurnInput): Promise<AgentResponse> {
   return {
     steps,
     finalReply: safeReply,
-    provider: activeProviderLabel(),
+    provider: servedLabel(turnMeta),
     conversationId,
   };
 }

@@ -14,6 +14,7 @@
     "validate:ai-quotation-guard": "tsx scripts/validate-ai-quotation-guard.ts",
     "validate:ai-tenant-isolation": "tsx scripts/validate-ai-tenant-isolation.mts",
     "validate:ai-baseline": "tsx scripts/validate-ai-baseline.mts",
+    "validate:ai-cost": "NODE_OPTIONS=--conditions=react-server tsx scripts/validate-ai-cost.ts",
     "validate:ai-egress": "NODE_OPTIONS=--conditions=react-server tsx scripts/validate-ai-egress.ts",
     "validate:ai-untrusted": "NODE_OPTIONS=--conditions=react-server tsx scripts/validate-ai-untrusted.ts",
     "validate:ai-confirm-ledger": "NODE_OPTIONS=--conditions=react-server tsx scripts/validate-ai-confirm-ledger.ts",

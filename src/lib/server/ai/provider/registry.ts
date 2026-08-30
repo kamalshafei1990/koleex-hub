@@ -151,10 +151,24 @@ export async function chatWithToolsVia(
      than reporting an outage we could have served through. */
   const { tryThese } = admissible(candidates, breaker);
 
+  /* Phase 5B — who served, and how long it took, travel back with the
+     outcome. Only this loop knows: after a failover the serving adapter is
+     not the one selectAdapter() would name, which is why the label on an
+     AgentResponse used to be wrong on exactly the turns that mattered. */
+  const t0 = Date.now();
+  let attempts = 0;
+
   let last: TurnOutcome = { ok: false, status: 503, bodyText: "no provider attempted" };
   for (const adapter of tryThese) {
+    attempts += 1;
     breaker.beginAttempt(adapter.name);
-    last = await adapter.chat(req, callOpts);
+    const meta = () => ({
+      servedBy: adapter.name,
+      model: adapter.model(),
+      ms: Date.now() - t0,
+      failedOver: attempts > 1,
+    });
+    last = { ...(await adapter.chat(req, callOpts)), ...meta() };
 
     if (last.ok) {
       breaker.recordSuccess(adapter.name);
@@ -186,13 +200,13 @@ export async function chatWithTools(
 
 /** The `provider` string reported on an AgentResponse, e.g. "deepseek:deepseek-chat".
  *
- *  NOTE the limitation, since the label is what the audit trail records: this
- *  reports the adapter that would be selected FIRST, not necessarily the one
- *  that ended up serving after a failover. Making it exact means returning the
- *  serving adapter out of chatWithTools and threading it back to every call
- *  site — a change to the loop's shape, which belongs with the router work
- *  rather than smuggled into the registry. Recorded so the next reader does not
- *  mistake it for accuracy it does not have. */
+ *  THIS IS THE PREDICTED LABEL, NOT THE SERVED ONE. It names the adapter that
+ *  would be selected first, which is right for a turn that has not happened
+ *  yet — the degraded lane asking "is anything configured", a rescue path with
+ *  no outcome to hand. For a turn that DID happen, use the `servedBy`/`model`
+ *  on its TurnOutcome: after a failover they differ, and the outcome is the
+ *  one telling the truth. Phase 5B added those fields precisely because this
+ *  function was being used where they were needed. */
 export function activeProviderLabel(): string {
   const a = selectAdapter();
   return a ? `${a.name}:${a.model()}` : "none";
