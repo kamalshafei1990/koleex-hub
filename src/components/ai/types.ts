@@ -56,7 +56,18 @@ export interface QuotationDraftPayload {
   status: "draft";
   line_count: number;
   approval_required: boolean;
+  /** Hub-relative deep link. The Hub web UI renders this today. */
   review_url: string;
+  /** Client-neutral pointer to the same record (Phase 2I). Optional because
+   *  a conversation persisted BEFORE 2I shipped has a payload without it —
+   *  the client must keep rendering those. Any new client resolves this into
+   *  its own navigation instead of the Hub path above.
+   *
+   *  This field was missing from the client type until the render harness
+   *  (N9) made it a compile error: the server had been returning it since
+   *  2I and the header comment here claimed it, but the interface did not
+   *  declare it, so no client could read it. */
+  resource?: { kind: string; id: string };
 }
 
 export type MenuItem = {
