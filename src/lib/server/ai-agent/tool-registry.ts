@@ -91,13 +91,72 @@ export function getTool(name: string): ToolDef | undefined {
   return REGISTRY[name];
 }
 
+/* ─────────────────────────────────────────────────────────────────────
+   The STATIC gates — the ones that depend only on (ctx, tool), never on
+   arguments or conversation state.
+
+   Phase 2F. These used to exist only inside dispatchTool(), which meant the
+   model was offered all 45 tools regardless of who was asking: a Sales user
+   saw every schema, tried the ones they could not use, and burned a turn
+   being denied. Exposure is now derived from this same function, so the set
+   the model can SEE and the set it can RUN cannot drift apart. That is the
+   whole point of it being one function rather than two lists — a filter that
+   reimplements the guard is a filter that will disagree with it eventually,
+   and both directions of disagreement are bugs: hiding a permitted tool
+   breaks a feature, offering a forbidden one wastes a turn.
+
+   NOT included here, deliberately: the confirmation ledger. That gate depends
+   on arguments and on conversation state, so it cannot be decided at exposure
+   time — a write tool is still OFFERED to someone allowed to use it, and is
+   still stopped at dispatch until a matching pending action exists.
+   ───────────────────────────────────────────────────────────────────── */
+export function staticToolDenial(
+  ctx: UserContext,
+  tool: ToolDef,
+): { status: PermissionStatus; message: string } | null {
+  if (tool.requiredModule) {
+    const decision = checkModule(ctx, tool.requiredModule, tool.requiredAction ?? "view");
+    if (!decision.allowed) {
+      return { status: decision.status, message: decision.reason ?? "Permission denied." };
+    }
+  }
+
+  if (tool.minRole && tool.minRole !== "any") {
+    const ut = (ctx.auth.user_type ?? "").toLowerCase();
+    const tier =
+      ctx.isSuperAdmin ? 3 :
+      ut === "admin" ? 2 :
+      ut === "internal" ? 1 :
+      0;
+    const needed =
+      tool.minRole === "super_admin" ? 3 :
+      tool.minRole === "admin" ? 2 :
+      tool.minRole === "internal" ? 1 :
+      0;
+    if (tier < needed) {
+      /* Don't leak role-tier naming (super_admin, admin, internal)
+         to end users. The audit record still captures the real
+         reason. */
+      return { status: "denied", message: "You do not have access to that action." };
+    }
+  }
+
+  return null;
+}
+
+/** The tools this particular user may actually run. */
+export function toolsFor(ctx: UserContext): ReadonlyArray<ToolDef> {
+  return listTools().filter((t) => staticToolDenial(ctx, t) === null);
+}
+
 /* OpenAI-compatible schema — Groq accepts this shape on its
-   /openai/v1/chat/completions endpoint when tool-calling is enabled. */
-export function openAiToolSchemas(): Array<{
+   /openai/v1/chat/completions endpoint when tool-calling is enabled.
+   Phase 2F: takes the caller's context and offers only what they may run. */
+export function openAiToolSchemas(ctx: UserContext): Array<{
   type: "function";
   function: { name: string; description: string; parameters: unknown };
 }> {
-  return listTools().map((t) => ({
+  return toolsFor(ctx).map((t) => ({
     type: "function",
     function: {
       name: t.name,
@@ -137,54 +196,18 @@ export async function dispatchTool(
     return result;
   }
 
-  // Module / action guard first — cheapest rejection path.
-  if (tool.requiredModule) {
-    const decision = checkModule(
-      ctx,
-      tool.requiredModule,
-      tool.requiredAction ?? "view",
-    );
-    if (!decision.allowed) {
+  /* Phase 2F — the two static gates now come from staticToolDenial(), the
+     same function openAiToolSchemas() filters with. Defence in depth is
+     unchanged: a tool the model was never offered is still denied here if it
+     asks for it anyway, because a model can name a tool it was not given. */
+  {
+    const denial = staticToolDenial(ctx, tool);
+    if (denial) {
       const result: ToolResult = {
         ok: false,
-        permissionStatus: decision.status,
+        permissionStatus: denial.status,
         data: null,
-        message: decision.reason ?? "Permission denied.",
-      };
-      await logToolCall({
-        ctx,
-        conversationId: opts.conversationId ?? null,
-        toolName: name,
-        args,
-        result,
-        latencyMs: Date.now() - startedAt,
-      });
-      return result;
-    }
-  }
-
-  // Min-role guard — super_admin, admin, internal, any.
-  if (tool.minRole && tool.minRole !== "any") {
-    const ut = (ctx.auth.user_type ?? "").toLowerCase();
-    const tier =
-      ctx.isSuperAdmin ? 3 :
-      ut === "admin" ? 2 :
-      ut === "internal" ? 1 :
-      0;
-    const needed =
-      tool.minRole === "super_admin" ? 3 :
-      tool.minRole === "admin" ? 2 :
-      tool.minRole === "internal" ? 1 :
-      0;
-    if (tier < needed) {
-      const result: ToolResult = {
-        ok: false,
-        permissionStatus: "denied",
-        data: null,
-        /* Don't leak role-tier naming (super_admin, admin, internal)
-           to end users. The audit record still captures the real
-           reason. */
-        message: "You do not have access to that action.",
+        message: denial.message,
       };
       await logToolCall({
         ctx,

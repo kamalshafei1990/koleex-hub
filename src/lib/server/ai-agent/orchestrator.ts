@@ -6,7 +6,8 @@ import "server-only";
    Pipeline per user turn:
 
      1. Build the message list for Groq (system prompt + history + user msg).
-     2. Call Groq with `tools = openAiToolSchemas()` and `tool_choice = auto`.
+     2. Call the provider with `tools = openAiToolSchemas(ctx)` — only the
+        tools THIS caller may run — and `tool_choice = auto`.
      3. If the model replies with tool_calls, dispatch them all in parallel
         through dispatchTool() (permission guards + audit log apply),
         attach results, loop.
@@ -22,7 +23,7 @@ import type {
   AgentStep,
   AgentResponse,
 } from "./types";
-import { dispatchTool } from "./tool-registry";
+import { dispatchTool, openAiToolSchemas } from "./tool-registry";
 import { aiProviderConfigured } from "@/lib/server/ai-provider";
 import { hasUntrustedContent } from "@/lib/server/ai/security/untrusted";
 import { logSealTransform } from "@/lib/server/ai/observability/reply-log";
@@ -118,6 +119,12 @@ export async function orchestrate(input: TurnInput): Promise<AgentResponse> {
      asks about it again, they attach it again or it is in this message. */
   const attachedDocCtx = hasUntrustedContent(userMessage);
   const key = readProviderKey();
+  /* Phase 2F — the tools this caller may actually run, resolved ONCE per turn
+     and handed to every model call in it. Two reasons this is not "all tools":
+     a Sales user offered 45 schemas will try the ones they cannot use and
+     burn a turn being denied, and the schemas are most of the request body.
+     dispatchTool still re-checks — a model can name a tool it was not given. */
+  const tools = openAiToolSchemas(input.ctx);
 
   /* Graceful Groq-missing fallback. The orchestrator's tool-calling
      features genuinely need Groq's OpenAI-style tool schema (and the
@@ -365,7 +372,7 @@ export async function orchestrate(input: TurnInput): Promise<AgentResponse> {
     let callFailedBody = "";
     const liveEmit = totalToolRuns > 0 ? onDelta : undefined;
     if (liveEmit) {
-      const sres = await callGroqStreamingOnce(key, messages, { toolChoice, onDelta: liveEmit });
+      const sres = await callGroqStreamingOnce(key, messages, { toolChoice, onDelta: liveEmit, tools });
       if (!sres.ok) {
         callFailedStatus = sres.status || 500;
         callFailedBody = sres.bodyText;
@@ -377,7 +384,7 @@ export async function orchestrate(input: TurnInput): Promise<AgentResponse> {
         };
       }
     } else {
-      const res = await callGroqWithRetry(key, messages, { toolChoice });
+      const res = await callGroqWithRetry(key, messages, { toolChoice, tools });
       if (!res.ok) {
         callFailedStatus = res.status;
         callFailedBody = await res.text().catch(() => "");
