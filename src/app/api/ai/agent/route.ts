@@ -39,9 +39,11 @@ import {
   orchestrate,
   buildBrandSystemPrompt,
   buildMinimalSystemPrompt,
-  sealPricingSafety,
-  stripProcessNarration,
 } from "@/lib/server/ai-agent/orchestrator";
+/* Phase 2B — the seals are their own layer now. The route applies the same
+   two it always did; it just no longer reaches through the orchestrator to
+   get them. */
+import { sealPricingSafety, stripProcessNarration } from "@/lib/server/ai/seals";
 /* Phase 2A — the lane decision now comes from the module that owns it,
    not from the orchestrator that used to re-export it. */
 import {

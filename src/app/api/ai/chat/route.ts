@@ -6,11 +6,9 @@ import { requireInternalUser } from "@/lib/server/ai/require-internal";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { aiProviderConfigured, type ChatMessage } from "@/lib/server/ai-provider";
 import { routeAi, streamRouteAi } from "@/lib/server/ai/router";
-import {
-  sealPricingSafety,
-  orchestrate,
-  stripProcessNarration,
-} from "@/lib/server/ai-agent/orchestrator";
+import { orchestrate } from "@/lib/server/ai-agent/orchestrator";
+/* Phase 2B — seals imported from the seal layer, not through the orchestrator. */
+import { sealPricingSafety, stripProcessNarration } from "@/lib/server/ai/seals";
 /* Phase 2A — lane decision and the approved canned answers now come from
    core/, so this route no longer carries its own copy of either. */
 import { isWorkDataQuery } from "@/lib/server/ai/core/decide-turn";
