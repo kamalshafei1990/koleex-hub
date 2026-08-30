@@ -51,6 +51,10 @@ const sealsIndex = readFileSync("src/lib/server/ai/seals/index.ts", "utf8");
 const sealsPricing = readFileSync("src/lib/server/ai/seals/pricing.ts", "utf8");
 const sealsText = readFileSync("src/lib/server/ai/seals/text.ts", "utf8");
 const sealsQuotation = readFileSync("src/lib/server/ai/seals/quotation.ts", "utf8");
+/* Phase 2D moved every provider call — including the streaming tool_calls
+   reassembly — into core/transport.ts. Same reasoning as the seals above:
+   follow the code, name the file that owns the behaviour. */
+const transport = readFileSync("src/lib/server/ai/core/transport.ts", "utf8");
 
 /* ═══ 1. LANE ROUTING — the tool-less fast lane must never swallow a turn
        that needs tools. Each of these was a measured production failure:
@@ -133,8 +137,13 @@ check(
   'the canned path used to return JSON, which crashed the uniform client parser into "No reply was received"',
 );
 check(
+  "the transport layer is where these provider pins expect it",
+  transport.includes("api.deepseek.com") && transport.includes("callGroqStreamingOnce"),
+  "if this fails, the pin beneath it is reading the wrong file — fix the path, do not delete the pin",
+);
+check(
   "streamed tool_calls are reassembled by index",
-  /tc\.index \?\? 0[\s\S]{0,400}function\.arguments \+=/.test(orch),
+  /tc\.index \?\? 0[\s\S]{0,400}function\.arguments \+=/.test(transport),
   "providers fragment tool_calls across SSE frames",
 );
 

@@ -738,7 +738,7 @@ break Hub integration · remove a working tool · weaken permissions or verifica
 |---|---|---|
 | **0 — Baseline & Tests** | 🟡 **IN PROGRESS** | Tenant-isolation guard ✅ · Incident-replay suite ✅ — both shipped and proven-to-fail (below). Baseline latency metrics: next (needs a running instance). |
 | **1 — Security Hardening** | ✅ **COMPLETE** | All six audit issues in scope closed (1, 2, 3, 4, 5, 6) + Issue 7. Two migrations applied staging→production with sign-off. Six suites green. |
-| **2 — AI Core + Standalone Foundation** | 🟡 **IN PROGRESS** | **2A + 2B + 2C shipped** — lane decision, seal chain and system prompts each extracted and tested by calling them. `orchestrator.ts` 3 220 → 1 269. 2D–2J to follow. |
+| **2 — AI Core + Standalone Foundation** | 🟡 **IN PROGRESS** | **2A–2D shipped** — lane decision, seal chain, prompts and provider transport each extracted and tested by calling them. `orchestrator.ts` 3 220 → **988**, with **zero vendor references**. 2E–2J to follow. |
 | 3–20 | ⬜ Not started | **Amendment 1 (§P) folded in** — Phase 2 gains the connector interface + client-resolvable deep links |
 
 ### Phase 2 · Sub-stage 2A — the lane decision has one home ✅
@@ -826,6 +826,37 @@ Cases that now have real coverage rather than a grep:
 **New finding N7**, recorded rather than quietly fixed — see the findings table.
 
 **Regression gate:** thirteen suites green, `tsc` clean, `eslint` clean, full `next build` green.
+
+### Phase 2 · Sub-stage 2D — the vendor surface has exactly one home ✅
+
+`src/lib/server/ai/core/transport.ts` · asserted by `npm run validate:ai-core-boundaries` · **54 passed, 0 failed.**
+
+**What moved.** Every raw `fetch` to a completions endpoint, the endpoint URL, the model id, the API-key read, the retry/backoff policy and the streaming `tool_calls` reassembly. `orchestrator.ts`: **1 269 → 988 lines**, and — the number that matters — **zero vendor references**:
+
+```
+grep -n "AGENT_LLM_URL|AGENT_MODEL|DEEPSEEK|api.deepseek|Authorization|process.env" orchestrator.ts
+  (none)
+```
+
+**Why this was extracted last.** It is the seam Phase 3 cuts along. The provider abstraction replaces the *inside* of this one file with adapters and a Turn IR, and nothing above it moves again. Isolating it first is what turns Phase 3 from "edit the orchestrator" into "edit one module".
+
+**One real de-duplication on the way.** The `provider` string was written out as `` `deepseek:${AGENT_MODEL}` `` at **six** separate return sites; it is now `providerLabel()`. Six copies of a vendor string is five chances to leave one stale on the day the provider changes.
+
+**Asserted, and each proven to fail:**
+
+| Assertion | Broken by |
+|---|---|
+| the endpoint, key and auth header appear ONLY in `core/transport.ts` (directory walk over all four core dirs) | reading `process.env.DEEPSEEK_API_KEY` in the orchestrator |
+| `transport.ts` really holds the surface — so the check above is not vacuous | — |
+| the orchestrator reads the key through the transport, never from the environment | same as above |
+| the provider label is built in one place | restoring one inline literal |
+| the API key is never logged, thrown, or interpolated into a message | adding one `console.warn` |
+
+**New finding N8**, recorded rather than hidden. The agent route keeps a **parallel transport**: its streaming fast lanes read the key and call `deepseekChatStream` directly, bypassing the core. That contradicts Phase 3's *"one way to reach a model"* criterion. It is asserted as a **count** (currently 1 call site) so the situation cannot silently get worse while it waits for Phase 3.
+
+**One more incident pin followed the code**: the streamed-`tool_calls`-reassembly pin now reads `transport.ts`, behind its own guard-the-guard check, and was re-proven to fail there.
+
+**Regression gate:** thirteen suites green (`ai-baseline` now 44), `tsc` clean, `eslint` clean.
 
 ### Phase 0 · Result 1 — AI tenant-isolation guard ✅
 
@@ -950,6 +981,7 @@ On an iPhone `/todo?task=x` means nothing. **Phase 2 addition:** tools return a 
 | N2 | **No API version namespace** — response shapes coupled to current components | 2 | **blocking for shipped apps** |
 | N3 | **`requireInternalUser` 403s every AI route** — correct today, incompatible with a general user who has no Hub account | 2 | **blocking for Mode B** |
 | N6 | **Hub-relative deep links** (new, §P.3) | 2 | low, cheap now |
+| N8 | **The agent route keeps its own provider call** (new, found in 2D) — the streaming fast lanes read `DEEPSEEK_API_KEY` and invoke `deepseekChatStream` directly, bypassing the core. Phase 3's acceptance criterion *"`chatWithTools()` is the only way the core reaches a model"* is not met until that lane goes through the same door. Asserted as a **count** meanwhile, so it cannot quietly grow. | 3 | medium — a second transport is a second place to fix a provider bug |
 | N7 | **The degraded lane does not know who it is talking to** (new, found in 2C) — `buildDegradedSystemPrompt` is the only one of four lanes that omits `viewerBlockFor`, so on the no-provider path a user asking *"do you know who I am?"* gets the pre-fix answer. `UserContext` is already available at the call site, so the fix is one line. Not made in 2C because that stage is code motion and changing what a lane says is not motion. | 2E | low; degraded path only |
 | — | **Agent jobs are request-scoped** — a task cannot survive the app closing | 17 | blocking for cross-device agents |
 | — | **Realtime/storage degraded ~19% in CN** (browser→Supabase) | R3 (existing) | affects file/image UX in CN |

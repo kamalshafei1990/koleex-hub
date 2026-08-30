@@ -24,10 +24,23 @@ import type {
   UserContext,
   ToolResult,
 } from "./types";
-import { openAiToolSchemas, dispatchTool } from "./tool-registry";
+import { dispatchTool } from "./tool-registry";
 import { aiChat, aiProviderConfigured } from "@/lib/server/ai-provider";
 import { hasUntrustedContent } from "@/lib/server/ai/security/untrusted";
 import { logSealTransform } from "@/lib/server/ai/observability/reply-log";
+/* Phase 2D — everything that speaks to a provider lives in core/transport.
+   The loop below decides WHAT to send and what to do with the answer; it no
+   longer knows the endpoint, the model id, the key, or the retry policy. */
+import {
+  callGroqPlain,
+  callGroqStreamingOnce,
+  callGroqWithRetry,
+  isTransientNetError,
+  readProviderKey,
+  providerLabel,
+  type WireMsg,
+  type ToolChoice,
+} from "@/lib/server/ai/core/transport";
 /* Phase 2C — the system prompts moved out. The loop builds a prompt; it is
    no longer also the place prompts are written. */
 import {
@@ -64,18 +77,6 @@ import {
   isMemoryIntentQuery,
 } from "@/lib/server/ai/core/decide-turn";
 
-/* Agent LLM provider = DeepSeek ONLY (owner decision, 2026-07-20: Groq
-   removed). DeepSeek's HTTP API is OpenAI-compatible — same chat/completions
-   body, same `tools` + `tool_choice:"auto"` function-calling contract, same
-   `choices[].message.tool_calls` response shape — so the whole tool loop below
-   works against it unchanged. `DEEPSEEK_AGENT_MODEL`/`DEEPSEEK_MODEL` env can
-   override the default. The internal helper names still say "Groq" for now;
-   only the endpoint/model/key changed. */
-const AGENT_LLM_URL = "https://api.deepseek.com/v1/chat/completions";
-const AGENT_MODEL =
-  process.env.DEEPSEEK_AGENT_MODEL ||
-  process.env.DEEPSEEK_MODEL ||
-  "deepseek-chat";
 const MAX_ITERATIONS = 4;
 /* Hard ceiling on total tool executions per user turn. Prevents small
    models from loop-calling the same tool 50 times and blowing past
@@ -86,20 +87,6 @@ const MAX_TOOLS_PER_TURN = 6;
 /* Cap on parallel tool_calls in a single iteration — 8B will sometimes
    emit the same call three times in one step. */
 const MAX_PARALLEL_TOOLS = 3;
-
-/* OpenAI-compatible message shapes — kept loose because the Groq API
-   accepts the whole family (system/user/assistant/tool). */
-interface WireMsg {
-  role: "system" | "user" | "assistant" | "tool";
-  content: string | null;
-  tool_calls?: Array<{
-    id: string;
-    type: "function";
-    function: { name: string; arguments: string };
-  }>;
-  tool_call_id?: string;
-  name?: string;
-}
 
 export interface OrchestrateInput {
   ctx: UserContext;
@@ -128,13 +115,6 @@ export interface OrchestrateInput {
 }
 
 
-/* OpenAI-shaped tool_choice. "auto" lets the model decide, "none" strips
-   the tools entirely, and the object form NAMES a function the model must
-   call on that one request. We use the third form for exactly one case —
-   see isChoiceShapedQuestion in core/decide-turn.ts. */
-type ToolChoice = "auto" | "none" | { type: "function"; function: { name: string } };
-
-
 export async function orchestrate(input: OrchestrateInput): Promise<AgentResponse> {
   const tStart = Date.now();
   const {
@@ -160,7 +140,7 @@ export async function orchestrate(input: OrchestrateInput): Promise<AgentRespons
      A document being recited is a property of the CURRENT turn. If the user
      asks about it again, they attach it again or it is in this message. */
   const attachedDocCtx = hasUntrustedContent(userMessage);
-  const key = process.env.DEEPSEEK_API_KEY;
+  const key = readProviderKey();
 
   /* Graceful Groq-missing fallback. The orchestrator's tool-calling
      features genuinely need Groq's OpenAI-style tool schema (and the
@@ -331,7 +311,7 @@ export async function orchestrate(input: OrchestrateInput): Promise<AgentRespons
         return {
           steps,
           finalReply: safeReply,
-          provider: `deepseek:${AGENT_MODEL}`,
+          provider: providerLabel(),
           conversationId,
         };
       }
@@ -463,7 +443,7 @@ export async function orchestrate(input: OrchestrateInput): Promise<AgentRespons
         return {
           steps,
           finalReply: safeReply,
-          provider: `deepseek:${AGENT_MODEL}`,
+          provider: providerLabel(),
           conversationId,
         };
       }
@@ -482,7 +462,7 @@ export async function orchestrate(input: OrchestrateInput): Promise<AgentRespons
       return {
         steps,
         finalReply: safeReply,
-        provider: `deepseek:${AGENT_MODEL}`,
+        provider: providerLabel(),
         conversationId,
       };
     }
@@ -498,7 +478,7 @@ export async function orchestrate(input: OrchestrateInput): Promise<AgentRespons
         return {
           steps,
           finalReply: safeReply,
-          provider: `deepseek:${AGENT_MODEL}`,
+          provider: providerLabel(),
           conversationId,
         };
       }
@@ -770,7 +750,7 @@ export async function orchestrate(input: OrchestrateInput): Promise<AgentRespons
   return {
     steps,
     finalReply: safeReply,
-    provider: `deepseek:${AGENT_MODEL}`,
+    provider: providerLabel(),
     conversationId,
   };
 }
@@ -1002,268 +982,7 @@ function fallback(
   return {
     steps,
     finalReply: safeReply,
-    provider: `deepseek:${AGENT_MODEL}`,
+    provider: providerLabel(),
     conversationId,
   };
-}
-
-/* ─── Groq call with retry-after aware backoff ────────────────────────
-   Groq's free tier is ~6k tokens / minute on Llama 3.3 70B. With the
-   agent loop invoking the model several times per user turn (tool
-   schemas alone cost 2-3k tokens each call), bursts can hit 429 even
-   on normal use. When that happens Groq returns a `retry-after`
-   header (seconds). We honour it up to 3 times before giving up so a
-   brief rate-limit doesn't surface as a scary error. */
-/** Same retry semantics as callGroqWithRetry but the model call does
- *  NOT include tools. Used for the small-talk fast-path so chit-chat
- *  doesn't burn the tool-schema token overhead on every turn. */
-/* Retry budget: up to 3 extra attempts with exponential backoff,
-   capped by Groq's `retry-after` when provided. Total wait stays
-   under ~10s so the UI doesn't feel frozen, but it's enough for a
-   typical Groq free-tier rate-limit window to clear. */
-const MAX_RETRIES = 3;
-const BACKOFF_CAP_MS = 8000;
-
-/* Transient NETWORK failures (socket terminated mid-request, connection
-   reset) reject the fetch promise instead of returning a status — they used
-   to escape every handler here and surface as a raw HTTP 500 to the user
-   (caught live twice in one 12-question probe). Convert them into a
-   synthetic 502 Response so the same failed-status paths (retry → rescue →
-   friendly copy) absorb them. */
-function isTransientNetError(e: unknown): boolean {
-  const seen = new Set<unknown>();
-  let cur: unknown = e;
-  while (cur && typeof cur === "object" && !seen.has(cur)) {
-    seen.add(cur);
-    const any = cur as { code?: string; message?: string; cause?: unknown };
-    if (
-      any.code === "UND_ERR_SOCKET" ||
-      any.code === "ECONNRESET" ||
-      any.code === "EPIPE" ||
-      /terminated|socket|network|fetch failed/i.test(any.message ?? "")
-    ) {
-      return true;
-    }
-    cur = any.cause;
-  }
-  return false;
-}
-
-const SYNTH_NET_FAIL = () =>
-  new Response("upstream socket error (network)", { status: 502 });
-
-function backoffWaitMs(res: Response, attempt: number): number {
-  const ra = Number(res.headers.get("retry-after"));
-  if (Number.isFinite(ra) && ra > 0) return Math.min(ra * 1000, BACKOFF_CAP_MS);
-  // 1s, 2s, 4s, …
-  return Math.min(1000 * 2 ** attempt, BACKOFF_CAP_MS);
-}
-
-async function callGroqPlain(
-  key: string,
-  messages: WireMsg[],
-  opts: { maxTokens?: number } = {},
-  attempt = 0,
-): Promise<Response> {
-  /* Fast-path parameters. Caller passes maxTokens based on the
-     expected answer length — small-talk needs ~160; brand answers
-     are structured multi-paragraph responses that need ~1200 to
-     complete without truncation. The agent loop uses its own
-     callGroqWithRetry with 2048 tokens. */
-  const maxTokens = opts.maxTokens ?? 160;
-  let res: Response;
-  try {
-    res = await fetch(AGENT_LLM_URL, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${key}`,
-      },
-      body: JSON.stringify({
-        model: AGENT_MODEL,
-        messages,
-        temperature: 0.3,
-        max_tokens: maxTokens,
-      }),
-    });
-  } catch (e) {
-    if (isTransientNetError(e) && attempt < MAX_RETRIES) {
-      await new Promise((r) => setTimeout(r, Math.min(1000 * 2 ** attempt, BACKOFF_CAP_MS)));
-      return callGroqPlain(key, messages, opts, attempt + 1);
-    }
-    if (isTransientNetError(e)) return SYNTH_NET_FAIL();
-    throw e;
-  }
-  if ((res.status === 429 || res.status === 503) && attempt < MAX_RETRIES) {
-    await new Promise((r) => setTimeout(r, backoffWaitMs(res, attempt)));
-    return callGroqPlain(key, messages, opts, attempt + 1);
-  }
-  return res;
-}
-
-/** One STREAMING chat-completions call. Content tokens are forwarded to
- *  onDelta live (until a tool_call appears — tool rounds stay silent);
- *  streamed tool_call fragments are re-assembled by index so the normal
- *  dispatch loop can run unchanged. */
-async function callGroqStreamingOnce(
-  key: string,
-  messages: WireMsg[],
-  opts: { toolChoice: ToolChoice; onDelta: (t: string) => void },
-): Promise<{
-  ok: boolean;
-  status: number;
-  bodyText: string;
-  content: string;
-  toolCalls: Array<{ id: string; type: "function"; function: { name: string; arguments: string } }>;
-}> {
-  const body: Record<string, unknown> = {
-    model: AGENT_MODEL,
-    messages,
-    temperature: 0.3,
-    max_tokens: 2048,
-    stream: true,
-  };
-  if (opts.toolChoice !== "none") {
-    body.tools = openAiToolSchemas();
-    body.tool_choice = opts.toolChoice;
-  }
-  let res: Response;
-  try {
-    res = await fetch(AGENT_LLM_URL, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${key}`,
-      },
-      body: JSON.stringify(body),
-    });
-  } catch (e) {
-    /* Socket died before any byte arrived — nothing was emitted, so the
-       caller's failed-status path can retry/rescue safely. */
-    if (isTransientNetError(e)) {
-      return { ok: false, status: 502, bodyText: "upstream socket error (network)", content: "", toolCalls: [] };
-    }
-    throw e;
-  }
-  if (!res.ok || !res.body) {
-    return {
-      ok: false,
-      status: res.status,
-      bodyText: await res.text().catch(() => ""),
-      content: "",
-      toolCalls: [],
-    };
-  }
-  const reader = res.body.getReader();
-  const decoder = new TextDecoder();
-  let buf = "";
-  let content = "";
-  let sawTool = false;
-  const calls: Array<{ id: string; type: "function"; function: { name: string; arguments: string } }> = [];
-  while (true) {
-    let step: { value?: Uint8Array; done: boolean };
-    try {
-      step = await reader.read();
-    } catch (e) {
-      /* Stream terminated mid-read. NO retry here — deltas may already be
-         on the user's screen and a re-run would duplicate them. Surface as
-         a failed status so rescue-first / friendly copy takes over. */
-      if (isTransientNetError(e)) {
-        return { ok: false, status: 502, bodyText: "stream terminated mid-read", content, toolCalls: [] };
-      }
-      throw e;
-    }
-    const { value, done } = step;
-    if (done) break;
-    if (value) buf += decoder.decode(value, { stream: true });
-    const lines = buf.split("\n");
-    buf = lines.pop() ?? "";
-    for (const line of lines) {
-      const t = line.trim();
-      if (!t.startsWith("data:")) continue;
-      const payload = t.slice(5).trim();
-      if (!payload || payload === "[DONE]") continue;
-      try {
-        const j = JSON.parse(payload) as {
-          choices?: Array<{
-            delta?: {
-              content?: string;
-              tool_calls?: Array<{
-                index?: number;
-                id?: string;
-                function?: { name?: string; arguments?: string };
-              }>;
-            };
-          }>;
-        };
-        const d = j.choices?.[0]?.delta;
-        if (!d) continue;
-        if (d.tool_calls) {
-          sawTool = true;
-          for (const tc of d.tool_calls) {
-            const i = tc.index ?? 0;
-            while (calls.length <= i) {
-              calls.push({ id: "", type: "function", function: { name: "", arguments: "" } });
-            }
-            if (tc.id) calls[i].id = tc.id;
-            if (tc.function?.name) calls[i].function.name += tc.function.name;
-            if (tc.function?.arguments) calls[i].function.arguments += tc.function.arguments;
-          }
-        }
-        if (typeof d.content === "string" && d.content) {
-          content += d.content;
-          if (!sawTool) opts.onDelta(d.content);
-        }
-      } catch {
-        /* partial frame across chunks — next iteration completes it */
-      }
-    }
-  }
-  return { ok: true, status: 200, bodyText: "", content, toolCalls: calls.filter((c) => c.function.name) };
-}
-
-async function callGroqWithRetry(
-  key: string,
-  messages: WireMsg[],
-  opts: { toolChoice?: ToolChoice } = {},
-  attempt = 0,
-): Promise<Response> {
-  const toolChoice = opts.toolChoice ?? "auto";
-  const body: Record<string, unknown> = {
-    model: AGENT_MODEL,
-    messages,
-    temperature: 0.3,
-    max_tokens: 2048,
-  };
-  if (toolChoice !== "none") {
-    body.tools = openAiToolSchemas();
-    body.tool_choice = toolChoice;
-  }
-  let res: Response;
-  try {
-    res = await fetch(AGENT_LLM_URL, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${key}`,
-      },
-      body: JSON.stringify(body),
-    });
-  } catch (e) {
-    if (isTransientNetError(e) && attempt < MAX_RETRIES) {
-      await new Promise((r) => setTimeout(r, Math.min(1000 * 2 ** attempt, BACKOFF_CAP_MS)));
-      return callGroqWithRetry(key, messages, opts, attempt + 1);
-    }
-    if (isTransientNetError(e)) return SYNTH_NET_FAIL();
-    throw e;
-  }
-  /* Retry budget: up to MAX_RETRIES with exponential backoff, capped
-     by Groq's `retry-after` and BACKOFF_CAP_MS. Gives a brief Groq
-     free-tier rate-limit window time to clear before we surface the
-     friendly "handling a lot of requests" message. */
-  if ((res.status === 429 || res.status === 503) && attempt < MAX_RETRIES) {
-    await new Promise((r) => setTimeout(r, backoffWaitMs(res, attempt)));
-    return callGroqWithRetry(key, messages, opts, attempt + 1);
-  }
-  return res;
 }
