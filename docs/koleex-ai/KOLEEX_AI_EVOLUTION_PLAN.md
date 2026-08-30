@@ -739,7 +739,7 @@ break Hub integration · remove a working tool · weaken permissions or verifica
 | **0 — Baseline & Tests** | 🟡 **IN PROGRESS** | Tenant-isolation guard ✅ · Incident-replay suite ✅ — both shipped and proven-to-fail (below). Baseline latency metrics: next (needs a running instance). |
 | **1 — Security Hardening** | ✅ **COMPLETE** | All six audit issues in scope closed (1, 2, 3, 4, 5, 6) + Issue 7. Two migrations applied staging→production with sign-off. Six suites green. |
 | **2 — AI Core + Standalone Foundation** | ✅ **COMPLETE** | 2A–2J all shipped. `orchestrator.ts` 3 220 → **734**, zero vendor references; `KoleexAiApp.tsx` 3 958 → **2 462**. **2G decided by the owner and built with no schema** — see [`PHASE_2G_DESIGN.md`](./PHASE_2G_DESIGN.md). `ai_sessions` **struck**; `requireInternalUser` unchanged (Option A) and one missing door closed. **N6, N7, N9 and the 2D layering item closed.** |
-| **3 — Provider Abstraction + Turn IR** | 🟡 **IN PROGRESS** | **3A + 3B shipped** — the Turn IR, the adapter interface, the DeepSeek adapter and the registry, each proved by differential. **NOT YET WIRED into the agent loop** — that is 3C, and until then `chatWithTools()` is unreachable at runtime. |
+| **3 — Provider Abstraction + Turn IR** | 🟡 **IN PROGRESS** | **3A–3C shipped.** The agent loop now reaches a model **only** through `chatWithTools()`; it reads no key, no environment, and no `choices[0].message`. **N8 still open** — the agent route's streaming fast lane uses an async-generator contract the adapter does not yet expose; that is 3D. |
 | 4–20 | ⬜ Not started | — |
 
 ### Phase 2 · Sub-stage 2A — the lane decision has one home ✅
@@ -1075,6 +1075,24 @@ Those two `??` are load-bearing: a tool-only turn arrives with `content: null`, 
 - The no-`fetch` check only catches an actual **call**; the first negative test wrote `void fetch;`, which is not one. The test was wrong, not the check — redone with a real call, and it fails.
 
 **Proven to fail:** dropping the null-content normalisation → **6** failures · a second provider inserted above DeepSeek → caught · a real `fetch` in the adapter → 2 failures · the failure branch emptying its body → 2 failures.
+
+**Regression gate:** twenty suites green, `tsc` clean, `eslint` clean.
+
+### Phase 3 · Sub-stage 3C — the loop goes through the one door ✅
+
+`orchestrator.ts` **734 → 766 lines** (it grew by the mapper below, and that is the right trade).
+
+**Three call sites became one.** The loop previously called `callGroqPlain`, `callGroqStreamingOnce` or `callGroqWithRetry` and parsed the provider's JSON itself at two of them. It now calls `chatWithTools()` once, streaming or not, and never sees a `choices[0].message`.
+
+**What deliberately did NOT change: everything below the call site.** The provider's answer is mapped back into the same `choice` shape the loop already used — including `tool_calls: undefined` rather than `[]` when empty, reproducing exactly what the streaming branch built. So the tool loop, the dedupe, the seals and the rescue path are untouched by Phase 3 and **cannot** have been changed by it. Two hundred lines of the most incident-scarred code in the system were left alone on purpose.
+
+**The loop no longer reads the key or the environment.** It asks the registry `providerConfigured()`. With one adapter that is the same boolean it always was, but the question it asks is now the one it means.
+
+**An existing assertion was tightened, not relaxed.** `validate:ai-core-boundaries` required the orchestrator to read the key *through the transport*; it now reads no key at all, so the check became: touches neither `process.env` nor `readProviderKey`, **and** reaches a model only through `chatWithTools`. Proven by putting a real transport call back (1 failure) and by reading the env again (2 failures).
+
+**Two negative tests of mine were wrong before they were right** — `void callGroqPlain;` and `void fetch;` are not calls, so a check that targets *calls* correctly ignored them. The check was right; the test was lazy. Redone with real calls.
+
+**N8 remains open, and 3C is not the place to close it.** The agent route's streaming fast lane consumes `deepseekChatStream` as an **async generator** (`yield {type:"delta"|"done"|"error"}`) — a different contract from `chatWithTools({ onDelta })`, with its own `gotFirst` partial-answer semantics on error. It is also the path most users actually hit. Squeezing it into this commit would have put a user-visible streaming change behind a proof built for something else. **3D** gives the adapter a generator method and closes it with its own differential.
 
 **Regression gate:** twenty suites green, `tsc` clean, `eslint` clean.
 

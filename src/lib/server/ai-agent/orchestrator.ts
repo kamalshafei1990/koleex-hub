@@ -43,15 +43,26 @@ import { runDegradedTurn, fallback } from "@/lib/server/ai/core/recovery";
    The loop below decides WHAT to send and what to do with the answer; it no
    longer knows the endpoint, the model id, the key, or the retry policy. */
 import {
-  callGroqPlain,
-  callGroqStreamingOnce,
-  callGroqWithRetry,
-  isTransientNetError,
-  readProviderKey,
   providerLabel,
   type WireMsg,
   type ToolChoice,
 } from "@/lib/server/ai/core/transport";
+/* Phase 3C — the loop reaches a model through ONE function. It no longer
+   knows the endpoint, the retry policy, or what a `choices[0].message` is;
+   the adapter owns all of that. Everything BELOW the call sites is unchanged:
+   the provider's answer is mapped back into the same `choice` shape the loop
+   already used, so the tool loop, the seals and the rescue path see exactly
+   what they saw before. */
+import { chatWithTools, providerConfigured } from "@/lib/server/ai/provider/registry";
+import {
+  fromOpenAiMessages,
+  fromOpenAiTools,
+  fromOpenAiToolChoice,
+  type OpenAiMessage,
+  type OpenAiTool,
+  type OpenAiToolChoice,
+  type TurnResponse,
+} from "@/lib/server/ai/provider/turn-ir";
 /* Phase 2C — the system prompts moved out. The loop builds a prompt; it is
    no longer also the place prompts are written. */
 import {
@@ -97,6 +108,29 @@ const MAX_TOOLS_PER_TURN = 6;
 /* Cap on parallel tool_calls in a single iteration — 8B will sometimes
    emit the same call three times in one step. */
 const MAX_PARALLEL_TOOLS = 3;
+/* Phase 3C. The provider layer returns a neutral TurnResponse; the loop below
+   was written against the wire-shaped `choice`. Rather than rewrite two
+   hundred lines of loop, the answer is mapped back into that shape at the one
+   place it enters — so the tool loop, the seals, the dedupe and the rescue
+   path are untouched by Phase 3 and cannot have been changed by it.
+
+   `tool_calls: undefined` when empty (not `[]`) reproduces exactly what the
+   streaming branch built before. */
+function toChoice(r: TurnResponse): { role?: string; content: string | null; tool_calls?: WireMsg["tool_calls"] } {
+  return {
+    role: "assistant",
+    content: r.content,
+    tool_calls:
+      r.toolCalls.length > 0
+        ? (r.toolCalls.map((c) => ({
+            id: c.id,
+            type: "function" as const,
+            function: { name: c.name, arguments: c.argumentsJson },
+          })) as WireMsg["tool_calls"])
+        : undefined,
+  };
+}
+
 export async function orchestrate(input: TurnInput): Promise<AgentResponse> {
   const tStart = Date.now();
   const {
@@ -122,7 +156,11 @@ export async function orchestrate(input: TurnInput): Promise<AgentResponse> {
      A document being recited is a property of the CURRENT turn. If the user
      asks about it again, they attach it again or it is in this message. */
   const attachedDocCtx = hasUntrustedContent(userMessage);
-  const key = readProviderKey();
+  /* Phase 3C: ask the registry rather than the environment. With a single
+     adapter this is the same boolean it always was — Boolean(DEEPSEEK_API_KEY)
+     — but the question the loop asks is now "is a provider available?", which
+     is the one it actually means. */
+  const providerReady = providerConfigured();
   /* Phase 2F — the tools this caller may actually run, resolved ONCE per turn
      and handed to every model call in it. Two reasons this is not "all tools":
      a Sales user offered 45 schemas will try the ones they cannot use and
@@ -143,7 +181,7 @@ export async function orchestrate(input: TurnInput): Promise<AgentResponse> {
      language answer; they just won't read live data. The reply also
      includes a one-line note so the operator knows tools are off
      until Groq is wired up. */
-  if (!key) {
+  if (!providerReady) {
     if (!aiProviderConfigured()) {
       /* User-facing copy: no vendor names (AI_PROVENANCE_RULE applies to
          our own strings too — any signed-in employee can see this). */
@@ -276,15 +314,14 @@ export async function orchestrate(input: TurnInput): Promise<AgentResponse> {
        ~200 words); small-talk is one or two sentences. Size the
        token budget accordingly so brand answers complete instead of
        truncating. */
-    const res = await callGroqPlain(key, messages, {
+    const out = await chatWithTools({
+      messages: fromOpenAiMessages(messages as unknown as OpenAiMessage[]),
       maxTokens: isBrand ? 1200 : 160,
+      temperature: 0.3,
     });
     const tPost = Date.now();
-    if (res.ok) {
-      const json = (await res.json()) as {
-        choices?: Array<{ message?: { content?: string } }>;
-      };
-      const rawReply = (json.choices?.[0]?.message?.content ?? "").trim();
+    if (out.ok) {
+      const rawReply = out.response.content.trim();
       /* Strip any leaked tool-call markers BEFORE brand-name
          normalisation so we never ship raw <function=…> syntax to
          the user even on the fast path. */
@@ -375,43 +412,27 @@ export async function orchestrate(input: TurnInput): Promise<AgentResponse> {
     let callFailedStatus = 0;
     let callFailedBody = "";
     const liveEmit = totalToolRuns > 0 ? onDelta : undefined;
-    if (liveEmit) {
-      const sres = await callGroqStreamingOnce(key, messages, { toolChoice, onDelta: liveEmit, tools });
-      if (!sres.ok) {
-        callFailedStatus = sres.status || 500;
-        callFailedBody = sres.bodyText;
+    {
+      /* One call, streaming or not. The truncated-body case that used to be
+         caught here is now the adapter's — it still comes back as a FAILED
+         call (502) rather than an exception, which is what keeps the rescue
+         path in charge instead of a raw 500. */
+      const out = await chatWithTools(
+        {
+          messages: fromOpenAiMessages(messages as unknown as OpenAiMessage[]),
+          tools: fromOpenAiTools(tools as unknown as OpenAiTool[]),
+          toolChoice: fromOpenAiToolChoice(toolChoice as OpenAiToolChoice),
+          maxTokens: 2048,
+          temperature: 0.3,
+          stream: Boolean(liveEmit),
+        },
+        liveEmit ? { onDelta: liveEmit } : undefined,
+      );
+      if (!out.ok) {
+        callFailedStatus = out.status || 500;
+        callFailedBody = out.bodyText;
       } else {
-        choice = {
-          role: "assistant",
-          content: sres.content,
-          tool_calls: sres.toolCalls.length > 0 ? (sres.toolCalls as WireMsg["tool_calls"]) : undefined,
-        };
-      }
-    } else {
-      const res = await callGroqWithRetry(key, messages, { toolChoice, tools });
-      if (!res.ok) {
-        callFailedStatus = res.status;
-        callFailedBody = await res.text().catch(() => "");
-      } else {
-        try {
-          const json = (await res.json()) as {
-            choices?: Array<{
-              message?: {
-                role: string;
-                content: string | null;
-                tool_calls?: WireMsg["tool_calls"];
-              };
-              finish_reason?: string;
-            }>;
-          };
-          choice = json.choices?.[0]?.message;
-        } catch (e) {
-          /* 200 with a truncated body (socket died mid-body) — treat as a
-             failed call so rescue/friendly copy handles it, not a raw 500. */
-          if (!isTransientNetError(e)) throw e;
-          callFailedStatus = 502;
-          callFailedBody = "response body terminated mid-read";
-        }
+        choice = toChoice(out.response);
       }
     }
 
