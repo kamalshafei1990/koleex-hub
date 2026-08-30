@@ -171,6 +171,24 @@ check(
 section("Permission invariants");
 
 check(
+  "the knowledge nudge is gated on the AI Knowledge module (audit Issue 7)",
+  /checkModule\(ctx, "AI Knowledge", "view"\)[\s\S]{0,300}getKnowledgeNudgeBlock/.test(agentRoute) ||
+    /canReadKnowledge[\s\S]{0,200}getKnowledgeNudgeBlock/.test(agentRoute),
+  "search_knowledge is gated on that module so a user who cannot open Knowledge cannot read ingested documents by asking the agent; the nudge surfaced the same corpus with the same citations, ungated",
+);
+check(
+  "every getKnowledgeNudgeBlock call site is gated",
+  (agentRoute.match(/getKnowledgeNudgeBlock\(/g) ?? []).length ===
+    (agentRoute.match(/(canReadKnowledge\s*\n?\s*\?|"AI Knowledge", "view"\)\.allowed\s*\n?\s*\?)\s*\n?\s*await getKnowledgeNudgeBlock/g) ?? []).length,
+  "one ungated call site is the whole leak",
+);
+check(
+  "taught answers stay UNgated (deliberate — they are answers written to be given)",
+  /getTaughtAnswersBlock\(auth\.tenant_id \?\? null\)/.test(agentRoute),
+  "taught Q&A are canonical replies the owner wrote for the assistant to give users; gating them defeats their purpose. Only document content with citations is gated.",
+);
+
+check(
   "dispatchTool checks the module guard BEFORE running the handler",
   orch.length > 0 && registry.indexOf("checkModule(") < registry.indexOf("await tool.handler("),
   "the cheapest rejection path must come first, and no DB hit may precede it",
