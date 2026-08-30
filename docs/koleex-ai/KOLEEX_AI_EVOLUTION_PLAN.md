@@ -738,7 +738,7 @@ break Hub integration · remove a working tool · weaken permissions or verifica
 |---|---|---|
 | **0 — Baseline & Tests** | 🟡 **IN PROGRESS** | Tenant-isolation guard ✅ · Incident-replay suite ✅ — both shipped and proven-to-fail (below). Baseline latency metrics: next (needs a running instance). |
 | **1 — Security Hardening** | ✅ **COMPLETE** | All six audit issues in scope closed (1, 2, 3, 4, 5, 6) + Issue 7. Two migrations applied staging→production with sign-off. Six suites green. |
-| **2 — AI Core + Standalone Foundation** | 🟡 **IN PROGRESS** | **2A–2F, 2H, 2I, 2J(part) shipped.** `orchestrator.ts` 3 220 → **734** with zero vendor references; `KoleexAiApp.tsx` 3 958 → **3 466**. **N6, N7, N9 and the 2D layering item closed.** **2G awaiting owner review** (auth + new schema). |
+| **2 — AI Core + Standalone Foundation** | 🟡 **2G ONLY** | **2A–2F, 2H, 2I, 2J shipped.** `orchestrator.ts` 3 220 → **734** with zero vendor references; `KoleexAiApp.tsx` 3 958 → **2 462**. **N6, N7, N9 and the 2D layering item closed.** **2G is the only sub-stage left and awaits owner review** (auth + new schema). |
 | 3–20 | ⬜ Not started | **Amendment 1 (§P) folded in** — Phase 2 gains the connector interface + client-resolvable deep links |
 
 ### Phase 2 · Sub-stage 2A — the lane decision has one home ✅
@@ -969,6 +969,31 @@ If a future domain method earns its place, it belongs *behind* `invoke()`, not b
 **`tsc` did its job during the work.** The first slice was missing six imports (`Link`, `ProjectIcon`, `ProjectColor`, `PROJECT_ICONS`, `PROJECT_COLOR_KEYS`, `KoleexOrb`) because the dependency scan that preceded it was too narrow. The compiler named every one.
 
 **What was deliberately NOT moved.** `Bubble`, `BubbleActions` and the sidebar rows — roughly 1 250 lines — are more entangled and are where a silent visual regression would actually hide. Attempting them without a harness would be exactly the "claim it is complete because it compiles" the project rules forbid. **Recorded as finding N9**, with the harness as its prerequisite.
+
+### Phase 2 · Sub-stage 2J (completed) — proved by rendering both versions ✅
+
+`components/ai/{Bubble,Sidebar}.tsx` · **`KoleexAiApp.tsx` 3 466 → 2 462 lines** (3 958 → 2 462 overall).
+
+With the harness in place, the entangled part became provable rather than merely compilable. `Bubble`, `isRtl`, `BubbleActions`, `SectionHeader`, `ProjectRow`, `SidebarRow`, `RowMenu` and `groupByDate` moved out.
+
+**The proof.** The pre-split component was checked out from git into a temporary module, its sub-components exported, and **both versions rendered with identical props and their HTML diffed**:
+
+| Case | Result |
+|---|---|
+| Bubble — assistant, last message | identical, 18 054 bytes |
+| Bubble — user message, Arabic (RTL) | identical, 655 bytes |
+| Bubble — question card with options | identical, 19 489 bytes |
+| SectionHeader | identical, 178 bytes |
+| SidebarRow — default | identical, 2 186 bytes |
+| SidebarRow — active + pinned | identical, 2 120 bytes |
+| groupByDate — data, not markup | identical |
+| isRtl — Arabic vs Latin | identical |
+
+**8 identical, 0 differing.** The comparison harness was then deleted; the cases it proved are kept as assertions in `validate:ai-client-render` (**38 passed**).
+
+**One case was caught being vacuous.** The first "with tool steps" fixture rendered byte-for-byte the same as the no-steps case — it proved nothing. Replaced with a **question step carrying options**, which renders the choice card instead of plain markdown: a genuinely distinct path, and 1 435 bytes larger.
+
+**A 2I assertion failed, correctly, and was repaired at the intent rather than the path.** `validate:ai-client-neutral` asserted that `KoleexAiApp.tsx` reads `review_url`; 2J moved the reader into `DraftCard.tsx`. The first repair scanned the client directory for the string — and its negative test still passed, because `types.ts` **declares** the field and a declaration is not a reader. Re-anchored on a property access (`.review_url`), which a type declaration cannot produce, plus a specific check on the card that renders the link. Re-proven to fail.
 
 ### Finding N9 — the client test harness ✅
 
