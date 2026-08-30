@@ -50,6 +50,7 @@ import "server-only";
    action that trade is not close.
    --------------------------------------------------------------------------- */
 
+import { skillMeta } from "@/lib/server/ai/skills/catalog";
 import { createHash } from "node:crypto";
 import { supabaseServer } from "../../supabase-server";
 import type { UserContext } from "../../ai-agent/types";
@@ -83,10 +84,25 @@ export function hashArgs(args: Record<string, unknown>): string {
   return createHash("sha256").update(JSON.stringify(normalizeArgs(args))).digest("hex");
 }
 
-/** Risk class for the agent safety matrix. Derived from the tool's declared
- *  action rather than a hand-kept list, so a NEW write tool is classified the
- *  moment it is registered — a list would silently miss it. */
+/** Risk class for the agent safety matrix.
+ *
+ *  PHASE 6A. This used to infer the class from the tool's NAME, which was the
+ *  right place to start and cannot express §L: `search_web` came out as
+ *  "high_risk_write" rather than an external side effect, `remember_about_user`
+ *  — reversible and self-scoped — came out the same, and a future
+ *  `archiveCustomer` would come out as a write rather than destructive. The
+ *  class is a property of what a tool DOES; its name is a coincidence.
+ *
+ *  The declared catalogue is authoritative now. The old inference survives as
+ *  the fallback for an UNDECLARED tool, and it is kept precisely because its
+ *  default is the strict one: an unknown tool is treated as a high-risk write,
+ *  never as harmless. validate:ai-skills fails the build before that path can
+ *  be reached in practice — this is the belt behind the braces, not the
+ *  mechanism. */
 export function riskClassFor(toolName: string, requiredAction?: string): string {
+  const declared = skillMeta(toolName);
+  if (declared) return declared.risk;
+  /* Undeclared: fall back to the strict inference rather than guessing low. */
   if (requiredAction === "delete" || /^delete/i.test(toolName)) return "destructive";
   if (/quotation|invoice|price/i.test(toolName)) return "financial";
   return "high_risk_write";

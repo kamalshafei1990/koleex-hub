@@ -26,6 +26,8 @@ import {
   riskClassFor,
   UNCONFIRMED_MESSAGE,
 } from "../ai/security/pending-actions";
+import { raceTimeout, timeoutFor } from "../ai/skills/timeout";
+import { validateArgs, validationMode, formatValidationLine } from "../ai/skills/validate";
 
 /* ─────────────────────────────────────────────────────────────────────
    Import individual tool modules. Each file exports its own tool(s)
@@ -221,6 +223,45 @@ export async function dispatchTool(
     }
   }
 
+  /* ── PHASE 6C: argument validation against the tool's OWN schema ────────
+     LOG-ONLY unless AI_TOOL_VALIDATION=enforce. These schemas have never been
+     enforced, so the first enforcing release is also the first time anyone
+     learns whether they describe the calls tools actually receive — enforcing
+     on day one would turn every inaccuracy across 45 schemas into a
+     user-visible failure. Until the flag is set this MEASURES; it does not
+     protect, and it is not described as a guard.
+
+     Unknown properties never block, in either mode: models add stray keys,
+     and a handler that does not read a key is unaffected by it. */
+  {
+    const vMode = validationMode();
+    if (vMode !== "off") {
+      const v = validateArgs(tool.parameters, args);
+      if (v.issues.length > 0) {
+        console.warn(formatValidationLine(name, v, vMode));
+      }
+      if (vMode === "enforce" && !v.valid) {
+        const result: ToolResult = {
+          ok: false,
+          permissionStatus: "denied",
+          data: null,
+          /* Names no field and no value — the model gets told to retry, the
+             detail is in the log where it cannot reach a user. */
+          message: "That request was missing something I need. Could you rephrase it?",
+        };
+        await logToolCall({
+          ctx,
+          conversationId: opts.conversationId ?? null,
+          toolName: name,
+          args,
+          result,
+          latencyMs: Date.now() - startedAt,
+        });
+        return result;
+      }
+    }
+  }
+
   /* ── AUDIT ISSUE 1 (P0): server-enforced write confirmation ──────────────
      Until now the ONLY thing separating a preview from an execution was the
      model choosing to omit `confirm: true`. Nothing here inspected it, and
@@ -273,7 +314,32 @@ export async function dispatchTool(
   let result: ToolResult;
   let statusOverride: PermissionStatus | "error" | undefined;
   try {
-    result = await tool.handler(ctx, args);
+    /* PHASE 6B — bounded wait. A handler that hangs used to hold the agent
+       loop until the whole invocation was killed: the user saw nothing, then
+       a failure with no explanation, and the audit row below was never
+       written because it sits downstream of this await.
+
+       This bounds how long the TURN waits, NOT how long the query runs —
+       Promise.race frees the caller and cannot cancel the work. Real
+       cancellation needs an AbortSignal through all 45 handlers, and Phase 6
+       is metadata-only by design. See skills/timeout.ts, which says the same
+       thing at greater length rather than implying more than it delivers. */
+    const raced = await raceTimeout(tool.handler(ctx, args), timeoutFor(name));
+    if (raced.timedOut) {
+      console.error(`[ai.tool.${name}] timed out after ${timeoutFor(name)}ms`);
+      result = {
+        ok: false,
+        permissionStatus: "denied",
+        data: null,
+        /* Same shape a thrown handler already produces, so the loop's existing
+           error path handles it unchanged. The user-facing copy names no tool
+           and no internal detail. */
+        message: "That took too long to look up. Please try again.",
+      };
+      statusOverride = "error";
+    } else {
+      result = raced.value as ToolResult;
+    }
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     console.error(`[ai.tool.${name}]`, msg);
