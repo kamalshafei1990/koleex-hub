@@ -135,6 +135,10 @@ export default function VoiceCallButton({
   /* Mirrors the session's flag. Kept in state because the screen renders from
      it; the session stays the source of truth for the tracks themselves. */
   const [muted, setMuted] = useState(false);
+  /* A lookup takes a second or two of real silence. The model is told to say
+     "let me check" first, but it does not always, and a screen that says
+     nothing during it reads as a frozen call. */
+  const [searching, setSearching] = useState(false);
   /* Read inside the session callbacks, which outlive any single render. */
   const voiceKeyRef = useRef<string | null>(null);
   useEffect(() => { voiceKeyRef.current = voiceKey; }, [voiceKey]);
@@ -211,6 +215,7 @@ export default function VoiceCallButton({
     setPhase(null);
     setState("idle");
     setMuted(false);
+    setSearching(false);
     onLiveChangeRef.current?.(false);
     /* The transcript SURVIVES hang-up on purpose: what was said is what the
        user came for, and clearing it the instant the call ends throws away
@@ -258,6 +263,24 @@ export default function VoiceCallButton({
           });
         }
       },
+      onToolCall: () => {
+        setSearching(true);
+        /* Cleared on the next thing the far side says, and on a timer as a
+           floor: a failed lookup still ends, and an indicator that never
+           clears is worse than none. */
+        window.setTimeout(() => setSearching(false), 12_000);
+      },
+      onToolProtocolMismatch: (eventType) => {
+        /* THE ONE PLACE THIS BECOMES VISIBLE. If the vendor names its
+           function-call events differently, every lookup silently does
+           nothing and the model answers from memory sounding just as certain.
+           This is the line that turns that into a minute of work instead of a
+           bug report about the assistant being out of date. */
+        console.warn(
+          `[voice] a tool call arrived in an unrecognised shape: ${eventType}. ` +
+            `Search during a call will not work until src/lib/voice/tool-calls.ts handles it.`,
+        );
+      },
       onMessage: (data) => {
         /* Raw first, and unconditionally: the tool bridge will read this
            stream and must not depend on whether a caption was produced. */
@@ -268,6 +291,10 @@ export default function VoiceCallButton({
            on it, and the parser only ever returns strings. */
         const parsed = parseVoiceEvent(data);
         if (parsed.phase) {
+          /* The far side is talking again, so whatever it was checking is
+             done. Clearing here rather than on the tool result keeps the
+             indicator honest: what ends the wait is the answer being spoken. */
+          if (parsed.phase === "speaking") setSearching(false);
           setPhase(parsed.phase);
           onPhaseRef.current?.(parsed.phase);
         }
@@ -348,6 +375,7 @@ export default function VoiceCallButton({
           onEnd={hangUp}
           muted={muted}
           onToggleMute={toggleMute}
+          searching={searching}
           voices={voices}
           selectedVoice={voiceKey}
           onSelectVoice={selectVoice}

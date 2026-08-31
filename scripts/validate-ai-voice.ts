@@ -25,6 +25,7 @@ import { verdictForStatus, probeVoice } from "../src/lib/server/ai/voice/probe";
 import { parseVoiceOptions, resolveVoice } from "../src/lib/server/ai/voice/config";
 import { buildSessionUpdate, publicVoiceList } from "../src/lib/server/ai/voice/session-config";
 import { AI_PROVENANCE_RULE } from "../src/lib/server/ai/prompt-builder";
+import { VOICE_TOOL_NAMES } from "../src/lib/server/ai/voice/tools";
 
 let pass = 0;
 const failures: string[] = [];
@@ -391,8 +392,34 @@ void (async () => {
     check("it asks for spoken style rather than markdown",
       /No markdown/.test(instructions) && /heard, not read/.test(instructions));
 
-    check("still no tool definitions — acting by voice is a later step",
-      !("tools" in withVoice.session) && !("tool_choice" in withVoice.session));
+    /* THIS USED TO READ "still no tool definitions — acting by voice is a
+       later step", and it was the right assertion while voice could not act
+       at all. Voice can now look things up, so the safety property is no
+       longer "no tools": it is that voice may only ever run READ-ONLY tools
+       the SERVER chose, because a call has no confirmation step and a spoken
+       "yes" is audio the model transcribed on the same channel as the
+       request.
+
+       Deleting the check when the feature landed would have removed the only
+       thing standing between "voice can search" and "voice can draft a
+       quotation nobody approved". It is narrowed, not dropped. */
+    {
+      const declared = (withVoice.session as { tools?: Array<{ name?: string }> }).tools ?? [];
+      const names = declared.map((t) => String(t?.name ?? ""));
+      check("voice declares only tools on the server's own allow-list",
+        names.length > 0 && names.every((n) => VOICE_TOOL_NAMES.includes(n)));
+      const WRITEY = /^(create|update|delete|complete|reassign|remember|forget|suggest)/i;
+      const writes = names.filter((n) => WRITEY.test(n));
+      check(
+        writes.length === 0
+          ? "and not one of them is a write — a call cannot act, only look up"
+          : `A WRITE TOOL IS REACHABLE BY VOICE: ${writes.join(", ")}`,
+        writes.length === 0,
+      );
+      /* The client must not be able to widen it: the list is server-side. */
+      check("the allow-list lives on the server, not in the browser bundle",
+        /server-only/.test(readFileSync("src/lib/server/ai/voice/tools.ts", "utf8")));
+    }
     check("no endpoint, model, key or workspace travels in the session",
       !/aliyun|maas|qwen|dashscope|sk-|ws-pl|Bearer/i.test(JSON.stringify(withVoice)));
   }
