@@ -32,7 +32,7 @@ import "server-only";
    --------------------------------------------------------------------------- */
 
 import { AI_PROVENANCE_RULE } from "@/lib/server/ai/prompt-builder";
-import { AI_IDENTITY_STORY, AI_IDENTITY_BRIEF, AI_CAPABILITIES_ANSWER } from "@/lib/server/ai/identity";
+import { AI_IDENTITY_BRIEF, AI_CAPABILITIES_BRIEF, KOLEEX_COMPANY_BRIEF } from "@/lib/server/ai/identity";
 import { type VoiceOption } from "./config";
 
 /* Transport settings. The formats follow from what a browser can capture and
@@ -74,11 +74,22 @@ const TRANSPORT = {
 const VOICE_INSTRUCTIONS =
   "You are Koleex AI, speaking with a colleague by voice." +
   AI_PROVENANCE_RULE +
-  AI_IDENTITY_STORY +
-  /* Both self-descriptions, because a voice session is configured before
-     anyone has said anything — there is no message to classify, and "what can
-     you do" is one of the first things a person tries out loud. */
-  AI_CAPABILITIES_ANSWER +
+  /* BOTH SELF-DESCRIPTIONS, IN THEIR SPOKEN FORM. A voice session is
+     configured before anyone has said a word, so there is no message to
+     classify and both questions have to be answered for — "what can you do"
+     is one of the first things a person tries out loud.
+
+     THE BRIEFS, NOT THE WRITTEN DIRECTIVES. Carrying the full pair pushed
+     these instructions to 8.6 KB, on the one transport in the product with a
+     hard message-size limit and a documented history of exactly this breaking
+     every call. They were also the wrong text: both are written for a reader
+     and ask for paragraphs, which is not how anyone wants to be spoken to. */
+  AI_IDENTITY_BRIEF +
+  AI_CAPABILITIES_BRIEF +
+  /* The group's one-line floor. A listener cannot check a spoken answer
+     against a source, so the instruction not to invent a company fact matters
+     more here, not less — and it costs 418 characters. */
+  KOLEEX_COMPANY_BRIEF +
   " SPOKEN STYLE: keep answers short and natural — this is a conversation, not a document." +
   " No markdown, no lists, no headings: everything you say is heard, not read." +
   " SPOKEN LENGTH OVERRIDES THE WRITTEN SHAPE: when the identity question comes up, give the same facts —" +

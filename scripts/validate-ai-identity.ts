@@ -27,6 +27,10 @@ import {
   AI_IDENTITY_STORY,
   AI_IDENTITY_BRIEF,
   AI_CAPABILITIES_ANSWER,
+  AI_CAPABILITIES_BRIEF,
+  KOLEEX_COMPANY,
+  KOLEEX_COMPANY_ANSWER,
+  KOLEEX_COMPANY_BRIEF,
   KOLEEX_IDENTITY,
   NAME_DRIFT,
 } from "../src/lib/server/ai/identity";
@@ -380,8 +384,18 @@ console.log("\n── 6a. The full story is paid for only when it is asked for �
 
   /* A voice session is configured ONCE, before anyone has said anything, so
      there is no message to classify — the spoken lane carries it outright. */
-  check("the voice session carries it outright — nothing to classify at setup time",
-    String(buildVoiceSessionPayload(null).full.session.instructions ?? "").includes(AI_IDENTITY_STORY.trim()));
+  /* VOICE CARRIES THE SPOKEN FORMS, NOT THE WRITTEN ONES. Both directives ask
+     for paragraphs, which is not how anyone wants to be spoken to — and
+     carrying the pair pushed the voice instructions to 8.6 KB on the one
+     transport in the product with a hard message-size limit and a documented
+     history of exactly that breaking every call. The FACTS are asserted
+     (section 6 requires the developer and originator on this lane); the size
+     is asserted here, because a regression to the written pair is silent. */
+  const voiceFull = String(buildVoiceSessionPayload(null).full.session.instructions ?? "");
+  check("the voice session carries the spoken identity form outright — nothing to classify at setup time",
+    voiceFull.includes(AI_IDENTITY_BRIEF.trim()));
+  check("and stays small enough for a size-limited transport",
+    voiceFull.length < 4_000);
 }
 
 console.log("\n── 7. No lane contradicts the canonical facts ──");
@@ -668,11 +682,191 @@ console.log("\n── 10. The right answer reaches the right question ──");
   check("the brand identity lane carries both — its section IS the classification, and covers both questions",
     buildBrandSystemPrompt(ctx3, "en", "ai").includes(AI_CAPABILITIES_ANSWER.trim()) &&
     buildBrandSystemPrompt(ctx3, "en", "ai").includes(AI_IDENTITY_STORY.trim()));
-  check("the voice session carries both — nothing to classify before anyone speaks",
-    String(buildVoiceSessionPayload(null).full.session.instructions ?? "").includes(AI_CAPABILITIES_ANSWER.trim()));
+  check("the voice session answers the capability question too, in its spoken form",
+    String(buildVoiceSessionPayload(null).full.session.instructions ?? "").includes(AI_CAPABILITIES_BRIEF.trim()));
   check("and the company lane, a different question again, carries neither",
     !buildBrandSystemPrompt(ctx3, "en", "company").includes(AI_CAPABILITIES_ANSWER.trim()) &&
     !buildBrandSystemPrompt(ctx3, "en", "company").includes(AI_IDENTITY_STORY.trim()));
+}
+
+
+console.log("\n── 11. \"What is Koleex?\" — the third question ──");
+{
+  /* THE KNOWLEDGE WAS NEVER MISSING. The approved brand knowledge carries ten
+     written Q&As on the group. Twelve of thirty natural company questions
+     simply never routed to the lane that loads them: anything phrased as "the
+     company" or "your company" without the brand name, most Chinese company
+     questions, and several Arabic ones. */
+  const COMPANY: Array<[string, string]> = [
+    ["en", "What is Koleex?"],
+    ["en", "what does Koleex do"],
+    ["en", "where is Koleex based"],
+    ["en", "where are you located"],
+    ["en", "when was Koleex established"],
+    ["en", "when was the company founded"],
+    ["en", "is Koleex a manufacturer or a trading company"],
+    ["en", "what industries do you serve"],
+    ["en", "do you have international clients"],
+    ["en", "who are your customers"],
+    ["en", "what makes Koleex different"],
+    ["en", "why should I choose Koleex"],
+    ["en", "tell me about the company"],
+    ["en", "introduce your company"],
+    ["en", "company profile"],
+    ["en", "what is your mission"],
+    ["ar", "ما هي شركة كوليكس؟"],
+    ["ar", "أين تقع كوليكس"],
+    ["ar", "متى تأسست الشركة"],
+    ["ar", "ما هي رؤية الشركة"],
+    ["ar", "نبذة عن الشركة"],
+    ["ar-eg", "الشركة بتعمل ايه"],
+    ["ar-eg", "احكيلي عن الشركة"],
+    ["ar-eg", "مين المدير التنفيذي"],
+    ["zh", "Koleex 是什么公司"],
+    ["zh", "介绍一下你们公司"],
+    ["zh", "公司在哪里"],
+    ["zh", "公司什么时候成立的"],
+    ["zh", "你们服务哪些行业"],
+    ["zh", "你们有哪些客户"],
+  ];
+  const notRouted = COMPANY.filter(([, q]) => {
+    const r = classifyBrandSection(q);
+    return r !== "company" && r !== "both";
+  });
+  check(
+    notRouted.length === 0
+      ? `all ${COMPANY.length} company questions reach the lane that answers them`
+      : `these company questions do NOT route: ${notRouted.map(([l, q]) => `${l}: ${q}`).join(" | ")}`,
+    notRouted.length === 0,
+  );
+
+  /* AND THE THREE QUESTIONS STAY APART. "Who made you" is about the assistant,
+     not the group — a company profile is a non-answer to it. */
+  for (const q of ["who are you", "who made you", "من أنت", "مين عملك", "你是谁"]) {
+    check(`"${q}" is still an identity question, not a company one`,
+      classifyBrandSection(q) === "ai");
+  }
+  for (const q of ["what can you do", "تقدر تعمل ايه", "你能做什么"]) {
+    check(`"${q}" is still a capability question`, isCapabilityQuestion(q));
+  }
+  const NOT_COMPANY = [
+    "how many overdue invoices do we have?",
+    "send the quotation to the customer",
+    "اعملي عرض سعر للعميل ده",
+    "给我一个报价",
+  ];
+  const falsePositives = NOT_COMPANY.filter((q) => classifyBrandSection(q) !== "none");
+  check(
+    falsePositives.length === 0
+      ? "and ordinary business turns are not mistaken for company questions"
+      : `these route as brand turns but should not: ${falsePositives.join(" | ")}`,
+    falsePositives.length === 0,
+  );
+
+  /* THE FACTS, and the rule that outranks them. */
+  check("the answer carries the facts a person actually asks for",
+    KOLEEX_COMPANY_ANSWER.includes(KOLEEX_COMPANY.base) &&
+    KOLEEX_COMPANY_ANSWER.includes(KOLEEX_COMPANY.brandEstablished) &&
+    KOLEEX_COMPANY_ANSWER.includes(KOLEEX_COMPANY.originsFrom) &&
+    KOLEEX_COMPANY.offices.every((o) => KOLEEX_COMPANY_ANSWER.includes(o)));
+  check("it answers manufacturer-or-trader without picking one",
+    /BOTH A MANUFACTURER AND A TRADER/.test(KOLEEX_COMPANY_ANSWER) &&
+    /not one or the other/.test(KOLEEX_COMPANY_ANSWER));
+  /* A model handed a company question with no material will invent a head
+     office. That is the failure this guards, and it outranks every fact
+     above — which is why it is asserted on BOTH the answer and the floor. */
+  for (const [label, text] of [["the answer", KOLEEX_COMPANY_ANSWER], ["the floor", KOLEEX_COMPANY_BRIEF]] as const) {
+    check(`${label} forbids inventing a company fact`,
+      /never invent a company fact|state no company\s+fact you were not given/i.test(text) ||
+      /Beyond this, state no company/.test(text));
+    check(`${label} points the user to Koleex rather than guessing`,
+      /point (?:them|the user) to Koleex International Group/i.test(text));
+  }
+  /* EVERY CONSTANT IS CORROBORATED BY THE APPROVED KNOWLEDGE IT CAME FROM.
+     These facts were copied out of the brand knowledge by hand; a copy nobody
+     checks is a copy that drifts, and "Koleex is based in <wrong city>" is
+     precisely the confident falsehood the do-not-invent rule exists to stop.
+     Changing the head office in the constants used to pass every assertion
+     here. Now the source has to agree. */
+  {
+    const knowledge = readFileSync("src/lib/server/ai-agent/brand-knowledge.ts", "utf8");
+    const claims: Array<[string, string]> = [
+      ["head office", KOLEEX_COMPANY.base],
+      ["brand established", KOLEEX_COMPANY.brandEstablished],
+      ["origins", KOLEEX_COMPANY.originsFrom],
+      ...KOLEEX_COMPANY.offices.map((o) => [`office: ${o}`, o] as [string, string]),
+    ];
+    const uncorroborated = claims.filter(([, v]) => !knowledge.includes(v)).map(([l]) => l);
+    check(
+      uncorroborated.length === 0
+        ? `every company constant is corroborated by the approved knowledge (${claims.length} checked)`
+        : `these company facts appear nowhere in the approved knowledge: ${uncorroborated.join(", ")}`,
+      uncorroborated.length === 0,
+    );
+    /* Non-vacuity: a knowledge file that failed to load would make every
+       includes() false and fail loudly — but an empty claims list would not. */
+    check("the corroboration check is looking at real claims and real knowledge",
+      claims.length >= 7 && knowledge.length > 10_000);
+  }
+
+  check("the answer names the specific figures it must not produce",
+    /revenue, headcount, factory or office counts/.test(KOLEEX_COMPANY_ANSWER) &&
+    /certifications/.test(KOLEEX_COMPANY_ANSWER) &&
+    /never quote prices/.test(KOLEEX_COMPANY_ANSWER));
+}
+
+console.log("\n── 11a. The company answer reaches the lanes, and only when asked ──");
+{
+  const ctx4 = {
+    auth: { username: "mona", user_id: "u1", account_id: "a1", role_id: "r1", view_as_role_id: null },
+    modulePermissions: {}, allowedSensitiveFields: new Set<string>(), department: "Sales",
+    isSuperAdmin: false, canViewPrivate: false, timezone: "Asia/Dubai",
+    viewer: { name: "Mona Adel", username: "mona", role: "Sales Rep" }, memory: {},
+  } as unknown as UserContext;
+  const say = (f: (m: string, c: object) => Array<{ content: string }>, msg: string) =>
+    f(msg, {}).map((m) => m.content).join("");
+
+  for (const [name, f] of [
+    ["fast", buildFastPrompt], ["smart", buildSmartPrompt],
+    ["chat", buildChatPrompt], ["business", buildBusinessPrompt],
+  ] as const) {
+    const asked = say(f, "what is Koleex?");
+    check(`${name}: a company question gets the company answer`,
+      asked.includes(KOLEEX_COMPANY_ANSWER.trim()));
+    check(`${name}: and not the assistant's own story`,
+      !asked.includes(AI_IDENTITY_STORY.trim()) && !asked.includes(AI_CAPABILITIES_ANSWER.trim()));
+    check(`${name}: an ordinary turn does not pay for it`,
+      !say(f, "how many overdue invoices do we have?").includes(KOLEEX_COMPANY_ANSWER.trim()));
+  }
+
+  /* THE FLOOR IS EVERYWHERE, because the risk it guards is invention — which
+     happens on exactly the turn the classifier missed. */
+  const LANES: Array<[string, string]> = [
+    ["agent", buildSystemPrompt(ctx4, "en")],
+    ["small talk", buildMinimalSystemPrompt(ctx4, "en")],
+    ["degraded", buildDegradedSystemPrompt(ctx4, "en")],
+    ["brand · company", buildBrandSystemPrompt(ctx4, "en", "company")],
+    ["brand · ai", buildBrandSystemPrompt(ctx4, "en", "ai")],
+    ["fast", say(buildFastPrompt, "hi")],
+    ["chat", say(buildChatPrompt, "hi")],
+    ["voice · full", String(buildVoiceSessionPayload(null).full.session.instructions ?? "")],
+  ];
+  const noFloor = LANES.filter(([, p]) =>
+    !p.includes(KOLEEX_COMPANY_BRIEF.trim()) && !p.includes(KOLEEX_COMPANY_ANSWER.trim())).map(([n]) => n);
+  check(
+    noFloor.length === 0
+      ? "every lane carries a company floor, so no lane can invent one"
+      : `no company floor on: ${noFloor.join(", ")}`,
+    noFloor.length === 0,
+  );
+
+  /* The brand company lane answers from the approved knowledge AND carries the
+     directive; it is the lane that exists for this question. */
+  check("the brand company lane carries the full company answer",
+    buildBrandSystemPrompt(ctx4, "en", "company").includes(KOLEEX_COMPANY_ANSWER.trim()));
+  check("and still loads the approved knowledge behind it",
+    /Taizhou/.test(buildBrandSystemPrompt(ctx4, "en", "company")) &&
+    buildBrandSystemPrompt(ctx4, "en", "company").length > 20_000);
 }
 
 console.log(`\n${pass} passed, ${failures.length} failed`);

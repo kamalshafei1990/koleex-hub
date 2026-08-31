@@ -135,6 +135,86 @@ export const AI_IDENTITY_BRIEF =
   " wording. Never claim Koleex trained your whole model from scratch. Answer in the user's own language and register.";
 
 /* ---------------------------------------------------------------------------
+   "What is Koleex?" — the third question, and the one with an answer already.
+
+   THE KNOWLEDGE WAS NEVER THE PROBLEM. The approved brand knowledge carries
+   ten written Q&As on the group — what it is, what it does, where it is based,
+   manufacturer or trader, when it was established, what makes it different,
+   why choose it, industries, international clients, main focus. Good material,
+   loaded by the brand lane.
+
+   REACHING IT WAS THE PROBLEM. Twelve of thirty natural company questions
+   never routed there: anything phrased as "the company" or "your company"
+   without the word Koleex, most Chinese company questions, and several Arabic
+   ones. The answer existed and the question could not find it.
+
+   THIS DIRECTIVE IS NOT A SECOND COPY OF THAT KNOWLEDGE. The brand lane still
+   loads the full text. This is what the OTHER lanes get — the general chat
+   lane has no brand knowledge at all — so it carries the facts a person
+   actually asks for and, more importantly, the instruction not to invent the
+   ones it does not have. A model asked "where is Koleex based?" with nothing
+   in front of it will guess, and a guessed head office is worse than "I don't
+   have that here".
+   --------------------------------------------------------------------------- */
+
+/** Canonical company facts, drawn from the approved brand knowledge. */
+export const KOLEEX_COMPANY = {
+  name: "Koleex International Group",
+  base: "Taizhou, Zhejiang, China",
+  offices: ["Shanghai", "Hangzhou", "Hong Kong", "Dubai", "Cairo"] as const,
+  brandEstablished: "2012",
+  originsFrom: "1955",
+} as const;
+
+export const KOLEEX_COMPANY_ANSWER =
+  " ABOUT KOLEEX INTERNATIONAL GROUP — answer this whenever the user asks what Koleex is, what the company or group" +
+  " does, where it is based, when it was established, who its customers are, which industries it serves, whether it" +
+  " manufactures or trades, what makes it different, or asks you to introduce or tell them about the company." +
+  " Any language, however phrased." +
+  ` ${KOLEEX_COMPANY.name} is a global company working across three connected areas: manufacturing, international` +
+  " trade, and technology development. Its core focus is the garment and textile industry — garment and sewing" +
+  " machinery above all — alongside smart technologies and digital systems, and it is built on the integration of" +
+  " engineering, design and digital intelligence." +
+  " IT IS BOTH A MANUFACTURER AND A TRADER, and the distinction matters to customers who ask: it designs and develops" +
+  " its own products and works with specialised factories to produce them, and it also sources and supplies machines," +
+  " products and components internationally. An integrated model, not one or the other." +
+  ` Its main operational base is ${KOLEEX_COMPANY.base} — the centre for manufacturing, product development and supply` +
+  ` chain — with a presence in ${KOLEEX_COMPANY.offices.join(", ")} supporting regional sales, business development,` +
+  " logistics and customer service across Asia, the Middle East, Africa and beyond." +
+  ` Koleex was established as a brand in ${KOLEEX_COMPANY.brandEstablished}, but its origins go back to` +
+  ` ${KOLEEX_COMPANY.originsFrom} and a family tradition in sewing and garment machinery carried across generations —` +
+  " long industry experience behind a young brand, which is part of what distinguishes it." +
+  " Its customers are international: manufacturers, distributors and partners in many markets, served through complete" +
+  " solutions rather than single products, and through global reach with local market understanding." +
+  /* The rule that matters more than any fact above. */
+  " NEVER INVENT A COMPANY FACT. What you have is what is written here and in any approved knowledge you were given" +
+  " for this turn. Do not produce revenue, headcount, factory or office counts, production volumes, certifications," +
+  " award names, client names or dates you were not given, and never quote prices. If the user asks something the" +
+  " material does not cover, say plainly that you do not have that detail and point them to Koleex International" +
+  " Group — an invented head office or founding date is far worse than an honest gap." +
+  " SHAPE: two to four short paragraphs, in the user's own language and register, varying the wording between" +
+  " answers. Lead with what the person asked rather than reciting the whole profile.";
+
+/* The spoken-channel form of the capability answer. Voice is a transport with
+   a message-size limit and a listener who cannot skim, so it gets the same
+   substance in a fraction of the words — see AI_IDENTITY_BRIEF for the
+   history that makes this a rule here rather than a preference. */
+export const AI_CAPABILITIES_BRIEF =
+  " IF ASKED WHAT YOU CAN DO: say the useful question is what they want to achieve, then answer honestly for THIS" +
+  " conversation. You always help with thinking, writing, analysis, research, translation, planning, coding and" +
+  " business decisions, across Koleex's work and everyday topics alike. What needs a connected tool — reading" +
+  " attached documents and images, looking things up online, Koleex catalogue and inventory information, drafting" +
+  " work in the Hub — say as a condition, never as a promise, and never claim a tool you were not given. If" +
+  " something is beyond you, say so plainly. Two or three spoken sentences, not a list.";
+
+/** The one-line floor, so a lane with no company material still cannot guess. */
+export const KOLEEX_COMPANY_BRIEF =
+  ` ABOUT THE GROUP: ${KOLEEX_COMPANY.name} is a global manufacturing, international-trade and technology group whose` +
+  ` core focus is the garment and textile industry, based in ${KOLEEX_COMPANY.base}. Beyond this, state no company` +
+  " fact you were not given — no figures, dates, offices, certifications or client names. Say you do not have the" +
+  " detail and point the user to Koleex International Group instead of guessing.";
+
+/* ---------------------------------------------------------------------------
    "What can you do?" — the other question people ask a new assistant.
 
    A DIFFERENT QUESTION FROM "who are you", and it wants a different answer.
@@ -221,10 +301,17 @@ import { classifyBrandSection, isCapabilityQuestion } from "@/lib/server/ai/core
 /**
  * The self-description this turn needs, or nothing.
  *
- * Capability first: it is the narrower, unambiguous test, and the identity
- * net is wide enough to swallow it.
+ * THREE QUESTIONS, THREE ANSWERS. "Who are you", "what can you do" and "what
+ * is Koleex" are different asks that a single test would collapse into one.
+ * Capability is checked first because it is the narrowest and least ambiguous;
+ * the identity net is wide enough to swallow it otherwise. The company answer
+ * is last, and only for turns the identity net did NOT claim — asked "who
+ * made you", a person wants the assistant's story, not the group's profile.
  */
 export function identityDepthFor(userMsg: string): string {
   if (isCapabilityQuestion(userMsg)) return AI_CAPABILITIES_ANSWER;
-  return classifyBrandSection(userMsg) === "ai" ? AI_IDENTITY_STORY : "";
+  const section = classifyBrandSection(userMsg);
+  if (section === "ai") return AI_IDENTITY_STORY;
+  if (section === "company" || section === "both") return KOLEEX_COMPANY_ANSWER;
+  return "";
 }

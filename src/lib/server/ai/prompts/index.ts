@@ -24,7 +24,13 @@ import {
   DATA_PROTECTION_RULE,
 } from "@/lib/server/ai-agent/brand-knowledge";
 import { AI_PROVENANCE_RULE } from "@/lib/server/ai/prompt-builder";
-import { AI_IDENTITY_STORY, AI_IDENTITY_BRIEF, AI_CAPABILITIES_ANSWER } from "@/lib/server/ai/identity";
+import {
+  AI_IDENTITY_STORY,
+  AI_IDENTITY_BRIEF,
+  AI_CAPABILITIES_ANSWER,
+  KOLEEX_COMPANY_ANSWER,
+  KOLEEX_COMPANY_BRIEF,
+} from "@/lib/server/ai/identity";
 import { ENTITY_GUIDANCE_FULL } from "@/lib/server/ai/entity-scope";
 import { viewerBlockFor, buildNowBlock } from "./blocks";
 
@@ -61,7 +67,7 @@ ${DIRECT_VOICE_RULE}
 
 ${DATA_PROTECTION_RULE}
 
-${AI_PROVENANCE_RULE}${AI_IDENTITY_BRIEF}
+${AI_PROVENANCE_RULE}${AI_IDENTITY_BRIEF}${KOLEEX_COMPANY_BRIEF}
 ${dialect === "egyptian" ? `\n${EGYPTIAN_DIALECT_RULE}\n` : ""}
 Current user: ${ctx.auth.username}.`;
 }
@@ -75,6 +81,20 @@ Current user: ${ctx.auth.username}.`;
  *  "### Identity" which the model was dumping verbatim. These rules
  *  tell the model to treat the block as source material and rewrite
  *  into natural prose. */
+
+/* WHICH SELF-DESCRIPTION THIS LANE NEEDS. `section` IS the classification —
+   this lane never has to guess — so each of the three questions gets its own
+   answer at full depth, and the two it is not about get only their floor.
+
+   THE FLOOR ON THE "ai" BRANCH IS NOT DECORATION: a conversation that opened
+   with "who are you" carries on, and the next turn is often "so what does the
+   company do?". Without the company floor that turn has nothing in front of
+   it, and a model with nothing in front of it invents a head office. */
+function selfDescriptionForSection(section: "company" | "ai" | "both"): string {
+  if (section === "company") return AI_IDENTITY_BRIEF + KOLEEX_COMPANY_ANSWER;
+  if (section === "both") return AI_IDENTITY_STORY + AI_CAPABILITIES_ANSWER + KOLEEX_COMPANY_ANSWER;
+  return AI_IDENTITY_STORY + AI_CAPABILITIES_ANSWER + KOLEEX_COMPANY_BRIEF;
+}
 
 export function buildBrandSystemPrompt(
   ctx: UserContext,
@@ -187,7 +207,7 @@ Reply: "I was built by Koleex International Group as part of its digital transfo
 
 ---
 
-${AI_PROVENANCE_RULE}${section === "company" ? AI_IDENTITY_BRIEF : AI_IDENTITY_STORY + AI_CAPABILITIES_ANSWER}
+${AI_PROVENANCE_RULE}${selfDescriptionForSection(section)}
 
 ${dialect === "egyptian" ? `${EGYPTIAN_DIALECT_RULE}\n\n` : ""}${brandKnowledgeFor(section)}`;
 }
@@ -405,7 +425,7 @@ You must follow these rules at all times:
 
 Always prioritize correctness over completeness. Never hallucinate pricing.
 
-${AI_PROVENANCE_RULE}${AI_IDENTITY_BRIEF}
+${AI_PROVENANCE_RULE}${AI_IDENTITY_BRIEF}${KOLEEX_COMPANY_BRIEF}
 
 Current user: ${ctx.auth.username} (${ctx.auth.user_type}${ctx.isSuperAdmin ? ", super admin" : ""}).`;
 }
@@ -437,6 +457,6 @@ export function buildDegradedSystemPrompt(
     "say live-data lookups are temporarily unavailable and an administrator needs to finish the AI configuration — " +
     "never name any provider, API or key — and offer to help with anything else. " +
     BRAND_EXCLUSIVITY_RULE + "\n\n" + DIRECT_VOICE_RULE + "\n\n" + DATA_PROTECTION_RULE +
-    "\n\n" + AI_PROVENANCE_RULE + AI_IDENTITY_BRIEF
+    "\n\n" + AI_PROVENANCE_RULE + AI_IDENTITY_BRIEF + KOLEEX_COMPANY_BRIEF
   );
 }

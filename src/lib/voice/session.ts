@@ -60,6 +60,13 @@ export type VoiceFailure =
   /** The connection was established and then lost for good — a network that
    *  changed underneath the call rather than one that never worked. */
   | "connection-lost"
+  /* The voice service did not answer at all: the route timed out or could not
+     reach it. Network, region or egress — nothing the caller did. */
+  | "service-unreachable"
+  /* The voice service answered and REFUSED: credential, quota, workspace or
+     model. Nothing the caller can retry their way out of, and the one class
+     an owner can actually fix. */
+  | "service-refused"
   /** Connected, but the far side would not accept the session configuration —
    *  distinguished from a failed handshake because the two need different
    *  fixes and the first version reported both the same way. */
@@ -189,6 +196,8 @@ export class VoiceSession {
   private sessionUpdateCompact: string | null = null;
   /* Cleared when the connection recovers, fires when it does not. */
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+  /** Has ICE ever actually connected? Decides whether "failed" is final. */
+  private iceEverConnected = false;
   private state: VoiceState = "idle";
 
   constructor(
@@ -360,11 +369,33 @@ export class VoiceSession {
           return;
         }
         if (st === "failed") {
+          /* "FAILED" IS NOT FINAL UNTIL THE CALL HAS ACTUALLY BEEN UP, and
+             conflating the two broke every call on some networks.
+
+             The session goes `live` as soon as the SDP is exchanged — ICE is
+             still working at that moment. So this watcher runs with the state
+             already "live" while the connection is being ESTABLISHED, and ICE
+             legitimately reports "failed" mid-setup when the first candidate
+             pairs lose and later ones (trickled in with the answer) have not
+             been tried yet. Killing the call there turns a routine retry into
+             "could not start the call" — which is exactly what it did.
+
+             Before this watcher existed, nothing looked at ICE and those calls
+             connected. So the pre-connection case gets the same grace window a
+             mid-call wobble gets: honest state, bounded wait, and a real
+             failure only if it never comes up. */
+          if (!this.iceEverConnected) {
+            if (this.state === "live") this.setState("reconnecting");
+            this.armReconnectTimer();
+            return;
+          }
           this.clearReconnectTimer();
           this.fail("connection-lost");
           return;
         }
         if (st === "connected" || st === "completed") {
+          /* From here on, "failed" means a call that WAS up has gone down. */
+          this.iceEverConnected = true;
           this.clearReconnectTimer();
           if (this.state === "reconnecting") this.setState("live");
         }
@@ -451,6 +482,15 @@ export class VoiceSession {
           : res.status === 401 ? "signed-out"
           : res.status === 429 ? "too-many-calls"
           : res.status === 503 ? "unavailable"
+          /* 504 AND 502 ARE DIFFERENT FAULTS AND WERE ONE MESSAGE. The route
+             returns 504 when the service did not answer and 502 when it
+             answered and refused — a dead endpoint versus a rejected
+             credential. Both read as "could not start the call", which sends
+             an owner looking for a WebRTC bug when the real answer is an
+             expired key. Exactly the mistake the comment above records about
+             429; made again one line below it. */
+          : res.status === 504 ? "service-unreachable"
+          : res.status === 502 ? "service-refused"
           : "handshake-failed",
         );
         return;

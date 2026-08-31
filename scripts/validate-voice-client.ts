@@ -281,7 +281,14 @@ async function main() {
       ["the user refuses the microphone", { micThrows: true }, "no-microphone"],
       ["the server refuses this account", { status: 403 }, "not-allowed"],
       ["voice is switched off server-side", { status: 503 }, "unavailable"],
-      ["the handshake is rejected", { status: 502 }, "handshake-failed"],
+      /* 502 AND 504 ARE DIFFERENT FAULTS. The route returns 504 when the
+         voice service did not answer and 502 when it answered and refused —
+         a dead endpoint versus a rejected credential or an exhausted quota.
+         Both used to read "could not start the call", which is what sent a
+         real outage to be investigated as a WebRTC bug. */
+      ["the service answers and refuses", { status: 502 }, "service-refused"],
+      ["the service does not answer at all", { status: 504 }, "service-unreachable"],
+      ["an unmapped status is still reported", { status: 418 }, "handshake-failed"],
       ["the answer is not an SDP", { body: "<html>nope</html>" }, "handshake-failed"],
       ["the peer connection cannot be created", { pcThrows: true }, "handshake-failed"],
     ];
@@ -495,9 +502,19 @@ async function main() {
       [403, "not-allowed"],
       [429, "too-many-calls"],
       [503, "unavailable"],
+      /* 502 AND 504 USED TO SIT HERE AS "handshake-failed", and this matrix
+         is where that conflation was written down and kept. The route returns
+         504 when the voice service did not answer and 502 when it answered
+         and REFUSED — a dead endpoint versus a rejected credential, an
+         exhausted quota or a wrong model. They need different actions from
+         different people, and one message for both is what sent a real
+         service outage to be investigated as a WebRTC bug. Same mistake as
+         429, recorded in the comment above, made again two lines below it. */
+      [502, "service-refused"],
+      [504, "service-unreachable"],
+      /* Anything genuinely unclassified still lands somewhere honest. */
       [500, "handshake-failed"],
-      [502, "handshake-failed"],
-      [504, "handshake-failed"],
+      [418, "handshake-failed"],
     ];
     for (const [status, expected] of cases) {
       const r = deps({ status });
@@ -507,9 +524,16 @@ async function main() {
       check(`${status} is reported as ${expected}`, seen.includes(expected));
     }
 
-    /* The four that need different actions must not share a message. */
-    const distinct = new Set(["signed-out", "not-allowed", "too-many-calls", "unavailable"]);
-    check("the four actionable statuses have four distinct reasons", distinct.size === 4);
+    /* THE STATUSES THAT NEED DIFFERENT ACTIONS MUST NOT SHARE A MESSAGE, and
+       this is asserted from the MAPPING rather than from a hand-written list:
+       a literal Set of names is true by construction and would have stayed
+       green through the whole 502/504 conflation. */
+    const actionable = cases.filter(([st]) => st !== 500 && st !== 418);
+    const reasons = new Set(actionable.map(([, r]) => r));
+    check(
+      `each status a person can act on has its own reason (${actionable.length} statuses, ${reasons.size} reasons)`,
+      reasons.size === actionable.length,
+    );
 
     /* And every reason must have copy in every language, or a user meets a
        blank. Enforced by the type, asserted here so a reader can see it. */
@@ -876,14 +900,57 @@ async function main() {
       check("  …and the connection is closed", r.pcCalls.closed === 1);
     }
 
+    /* 11c-bis — THE REGRESSION THIS SECTION SHIPPED, and the one that made
+       "could not start the call" the normal outcome on some networks.
+
+       The session goes `live` the moment the SDP is exchanged; ICE is still
+       working then. So this watcher runs with the state already "live" while
+       the connection is being ESTABLISHED — and ICE legitimately reports
+       "failed" mid-setup when the first candidate pairs lose and the ones
+       trickled in with the answer have not been tried yet. Treating that as
+       final killed calls that were about to connect. Before the watcher
+       existed, nothing looked at ICE and those same calls worked. */
+    {
+      const r = await run({});
+      check("the call is live once the SDP is exchanged, before ICE has connected",
+        r.session.getState() === "live");
+      r.ice("failed");
+      check("an ICE failure BEFORE the connection was ever up is not final",
+        r.session.getState() === "reconnecting");
+      check("  …the microphone is not released on it", !r.mic.allStopped());
+      check("  …and the connection is not closed", r.pcCalls.closed === 0);
+      /* And it still connects when the later candidates win. */
+      r.ice("connected");
+      check("and the call comes up when a later candidate pair succeeds",
+        r.session.getState() === "live");
+      check("with no failure ever shown to the user",
+        r.states.every(([st]) => st !== "failed"));
+      r.session.stop();
+    }
+
+    /* 11c-ter — but a pre-connection failure that never resolves still ends,
+       rather than leaving the user talking into a call that never came up. */
+    {
+      const r = await run({});
+      r.ice("failed");
+      await sleep(160);                 // grace is 80ms in the suite
+      const last = r.states[r.states.length - 1];
+      check("a connection that never comes up at all still ends honestly",
+        last[0] === "failed" && last[1] === "connection-lost");
+      check("  …and releases the microphone", r.mic.allStopped());
+    }
+
     /* 11d — a connection that fails outright is over now. Waiting out a
        recovery window for a state WebRTC has already called final is eight
        seconds of silence sold to the user as a call. */
     {
       const r = await run({ reconnectGraceMs: 5_000 });
+      /* CONNECT FIRST. Without this the case tests the pre-connection path
+         above instead, and would have passed on the broken behaviour. */
+      r.ice("connected");
       r.ice("failed");
       const last = r.states[r.states.length - 1];
-      check("an ICE failure ends the call without waiting out the recovery window",
+      check("an ICE failure AFTER the call was up ends it without waiting out the window",
         last[0] === "failed" && last[1] === "connection-lost");
       check("  …and the microphone is released", r.mic.allStopped());
     }
