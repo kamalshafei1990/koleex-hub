@@ -53,6 +53,8 @@ import { deepseekAdapter } from "@/lib/server/ai/provider/adapters/deepseek";
 import { openAiCompatibleAdapter, diagnoseFallbackConfig } from "@/lib/server/ai/provider/adapters/openai-compatible";
 import { createBreaker } from "@/lib/server/ai/router/circuit-breaker";
 import { latencyStats } from "@/lib/server/ai/observability/latency-stats";
+import { voiceConfigured, diagnoseVoiceConfig, type VoiceEnv } from "@/lib/server/ai/voice/config";
+import { probeVoice } from "@/lib/server/ai/voice/probe";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 30;
@@ -124,6 +126,23 @@ export async function GET(req: Request) {
       })
     : null;
 
+  /* VOICE IS REPORTED THE SAME WAY AND FOR A STRONGER REASON. The fallback can
+     at least be exercised by taking the primary down; voice cannot be
+     exercised at all without a browser, a microphone and a peer connection.
+     Four variables, a redeploy, and no way to answer "did that work?" is
+     exactly the position this route was written to end. */
+  const voiceEnv = (): VoiceEnv => ({
+    AI_VOICE_BASE_URL: process.env.AI_VOICE_BASE_URL,
+    AI_VOICE_API_KEY: process.env.AI_VOICE_API_KEY,
+    AI_VOICE_MODEL: process.env.AI_VOICE_MODEL,
+    AI_VOICE_REGION_LABEL: process.env.AI_VOICE_REGION_LABEL,
+  });
+  const voiceIsConfigured = voiceConfigured(voiceEnv());
+  const voiceStatus = {
+    configured: voiceIsConfigured,
+    ...(voiceIsConfigured ? {} : { not_configured_because: diagnoseVoiceConfig(voiceEnv()) }),
+  };
+
   const params = new URL(req.url).searchParams;
   const wantProbe = params.get("probe") === "1";
 
@@ -147,6 +166,7 @@ export async function GET(req: Request) {
       providers: roster,
       configured_count: configured.length,
       ...(fallbackProblems ? { fallback_not_configured_because: fallbackProblems } : {}),
+      voice: voiceStatus,
       /* Said plainly, because "configured" reads as "working" and is not.
          An operator who stops at this line should know what they have. */
       note:
@@ -178,6 +198,11 @@ export async function GET(req: Request) {
      different hosts, so the overlap costs little, but it is an overlap and the
      numbers should be read as such. */
   const ADAPTERS = [deepseekAdapter, openAiCompatibleAdapter];
+  /* Started BEFORE the provider probes are awaited so it overlaps them rather
+     than adding its 8s cap to the run. It is one request to a different host,
+     so the overlap costs effectively nothing against maxDuration=30. */
+  const voiceProbePromise = probeVoice(voiceEnv());
+
   const probes = await Promise.all(
     ADAPTERS.filter((a) => {
       try {
@@ -267,10 +292,13 @@ export async function GET(req: Request) {
     }),
   );
 
+  const voiceProbe = await voiceProbePromise;
+
   return NextResponse.json({
     providers: roster,
     configured_count: configured.length,
     ...(fallbackProblems ? { fallback_not_configured_because: fallbackProblems } : {}),
+    voice: { ...voiceStatus, ...(voiceProbe ? { probe: voiceProbe } : {}) },
     probes,
     ...(samples > 1
       ? {

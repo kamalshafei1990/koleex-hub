@@ -21,6 +21,7 @@ import {
   diagnoseVoiceConfig,
   voiceConfigured,
 } from "../src/lib/server/ai/voice/config";
+import { verdictForStatus, probeVoice } from "../src/lib/server/ai/voice/probe";
 
 let pass = 0;
 const failures: string[] = [];
@@ -149,10 +150,133 @@ console.log("\n── 3. The route, read — the surface a fetch cannot be teste
   check("the key is never logged", !/console\.\w+\([^)]*apiKey/.test(code));
 }
 
-console.log(`\n${pass} passed, ${failures.length} failed`);
-if (failures.length) {
-  console.log("\nFAILED:");
-  for (const f of failures) console.log(`  · ${f}`);
-  process.exit(1);
+console.log("\n── 3. The probe's verdict table separates the failures that matter ──");
+{
+  /* THE WHOLE POINT of the probe is that these three are DIFFERENT actions for
+     an operator: rotate the key, fix the workspace id, or stop looking because
+     it already works. A table that collapsed any two of them would still
+     "pass" a test that only checked it returned a string. */
+  const bad = verdictForStatus(401);
+  const forbidden = verdictForStatus(403);
+  const missing = verdictForStatus(404);
+  const rejected = verdictForStatus(400);
+
+  check("401 says the credential was rejected", bad.credential_ok === false);
+  check("403 is treated as a credential failure too", forbidden.credential_ok === false);
+  check("404 is NOT reported as a bad key", missing.credential_ok === false);
+  check("400 means the credential was ACCEPTED — the offer was ours to get wrong",
+    rejected.credential_ok === true);
+  check("422 is accepted the same way as 400", verdictForStatus(422).credential_ok === true);
+
+  /* Distinctness, not mere presence. Three failures that say the same words
+     are one failure with three status codes. */
+  check("401 and 404 do not give the same advice", bad.verdict !== missing.verdict);
+  check("401 names the key variable", bad.verdict.includes("AI_VOICE_API_KEY"));
+  check("404 names the base url and the model, which is where a wrong workspace id lives",
+    missing.verdict.includes("AI_VOICE_BASE_URL") && missing.verdict.includes("AI_VOICE_MODEL"));
+  check("400's verdict says configuration is correct",
+    /configured correctly/i.test(rejected.verdict));
+
+  check("429 is a credential success, not a config error",
+    verdictForStatus(429).credential_ok === true);
+  check("500 does not blame the configuration",
+    verdictForStatus(500).credential_ok === true && /vendor/i.test(verdictForStatus(500).verdict));
+  check("an unmapped status is reported rather than guessed",
+    verdictForStatus(418).credential_ok === false && verdictForStatus(418).verdict.includes("418"));
 }
-console.log("NOT proved here: the SDP exchange itself. This environment cannot reach the vendor — see the header.");
+
+/* Sections 4-6 exercise real async paths, so the rest of the suite runs
+   inside an async entry point. tsx compiles to CJS here — top-level await is
+   not available. */
+void (async () => {
+  console.log("\n── 4. The probe spends the key correctly and reports no vendor words ──");
+  {
+    let seenUrl = "";
+    let seenAuth = "";
+    let seenType = "";
+    let seenBody = "";
+    const fakeFetch = (async (url: string | URL, init?: RequestInit) => {
+      seenUrl = String(url);
+      const h = (init?.headers ?? {}) as Record<string, string>;
+      seenAuth = h["Authorization"] ?? "";
+      seenType = h["Content-Type"] ?? "";
+      seenBody = String(init?.body ?? "");
+      return new Response("workspace ws-SECRET-ID quota exceeded", { status: 400 });
+    }) as unknown as typeof fetch;
+
+    const out = await probeVoice(GOOD, fakeFetch);
+    check("a configured env produces a probe", out !== null);
+    check("the probe POSTs to the model-applied url", seenUrl.includes("model=some-model-id"));
+    check("the key travels in the Authorization header",
+      seenAuth === `Bearer ${GOOD.AI_VOICE_API_KEY}`);
+    check("the key is NOT in the url", !seenUrl.includes(GOOD.AI_VOICE_API_KEY));
+    check("the content type is SDP", seenType === "application/sdp");
+    check("the offer sent is deliberately incomplete — no session can open",
+      seenBody.startsWith("v=") && seenBody.length < 32);
+    check("a 400 is reported as reachable and credential-ok",
+      out!.reachable === true && out!.credential_ok === true && out!.status === 400);
+
+    /* THE VENDOR'S BODY MUST NOT COME BACK. The fake returned a workspace id in
+       its error text; none of it may appear in what we hand the operator. */
+    const asText = JSON.stringify(out);
+    check("the vendor's error body is not echoed", !asText.includes("ws-SECRET-ID"));
+    check("the key is not echoed", !asText.includes(GOOD.AI_VOICE_API_KEY));
+  }
+
+  console.log("\n── 5. Failure modes of the probe itself ──");
+  {
+    const unconfigured = await probeVoice({ AI_VOICE_BASE_URL: "https://x.invalid/a" });
+    check("an unconfigured env probes nothing rather than throwing", unconfigured === null);
+
+    const throwing = (async () => { throw new Error("connect ECONNREFUSED 10.1.2.3:443"); }) as unknown as typeof fetch;
+    const dead = await probeVoice(GOOD, throwing);
+    check("an unreachable host is reported, not thrown", dead !== null && dead.reachable === false);
+    check("an unreachable host is never credential-ok", dead!.credential_ok === false);
+    check("the thrown message — which can carry the resolved host — is not echoed",
+      !JSON.stringify(dead).includes("10.1.2.3"));
+    check("the unreachable verdict names the variable to check",
+      dead!.verdict.includes("AI_VOICE_BASE_URL"));
+  }
+
+  console.log("\n── 6. The status route reports voice, and reports it safely ──");
+  {
+    const code = readFileSync("src/app/api/ai/providers/route.ts", "utf8");
+    const bare = strip(code);
+    check("voice status is reported without ?probe=1 too",
+      /voice: voiceStatus/.test(bare));
+    check("the probe result is only attached under ?probe=1",
+      /voice: \{ \.\.\.voiceStatus, \.\.\.\(voiceProbe \? \{ probe: voiceProbe \} : \{\}\) \}/.test(bare));
+    check("the diagnosis is only sent when voice is NOT configured",
+      /voiceIsConfigured \? \{\} : \{ not_configured_because: diagnoseVoiceConfig/.test(bare));
+    /* The key must enter this file exactly once, to be handed to the probe, and
+     must never be read a second time into anything that gets serialised. */
+    const keyReads = bare.match(/process\.env\.AI_VOICE_API_KEY/g) ?? [];
+    check("the key is read from the environment exactly once", keyReads.length === 1);
+    check("that one read is the env getter passed to the probe",
+      /AI_VOICE_API_KEY: process\.env\.AI_VOICE_API_KEY/.test(bare) &&
+      /probeVoice\(voiceEnv\(\)\)/.test(bare));
+    check("no resolved config value is referenced by the route at all",
+      !/apiKey/.test(bare) && !/sdpUrl/.test(bare));
+    check("the voice probe overlaps the provider probes rather than serialising",
+      bare.indexOf("const voiceProbePromise") < bare.indexOf("const probes = await Promise.all") &&
+      bare.indexOf("await voiceProbePromise") > bare.indexOf("const probes = await Promise.all"));
+    check("this route is still super-admin only", /if \(!auth\.is_super_admin\)/.test(bare));
+  }
+
+  console.log(`\n${pass} passed, ${failures.length} failed`);
+  if (failures.length) {
+    console.log("\nFAILED:");
+    for (const f of failures) console.log(`  · ${f}`);
+    process.exit(1);
+  }
+  console.log("NOT proved here: the SDP exchange itself. This environment cannot reach the vendor — see the header.");
+
+})().catch((e) => {
+  /* An unexpected rejection must be a NAMED failure, not an uncaught exception.
+     A mutation that made probeVoice rethrow instead of reporting crashed this
+     suite with a Node stack trace — which fails CI, but tells whoever reads the
+     log nothing about which guarantee broke. */
+  console.log(`  ✗ the suite threw instead of asserting: ${e instanceof Error ? e.message : String(e)}`);
+  console.log("\nFAILED:\n  · an async section rejected — see above");
+  process.exit(1);
+});
