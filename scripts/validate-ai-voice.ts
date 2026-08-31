@@ -160,7 +160,12 @@ console.log("\n── 3. The route, read — the surface a fetch cannot be teste
      value that identifies the endpoint, the model or the account. */
   const successReturn = code.slice(code.lastIndexOf("return NextResponse.json("));
   check("the success path returns the answer and the authored session, nothing more",
-    /sdp: answer, session: buildSessionUpdate\(voice\)/.test(successReturn));
+    /sdp: answer, session: payload\.full, session_compact: payload\.compact/.test(successReturn));
+  /* BOTH LENGTHS, because only the client can see the channel's size limit but
+     shortening a policy is authoring one. Without the compact version there is
+     nothing to fall back to and a long policy simply breaks every call. */
+  check("and it offers the compact version the client may fall back to",
+    /buildVoiceSessionPayload\(voice\)/.test(code) && /session_compact/.test(successReturn));
   check("and carries no endpoint, model, key or region",
     !/sdpUrl/.test(successReturn) && !/apiKey/.test(successReturn) &&
     !/AI_VOICE_MODEL/.test(successReturn) && !/regionLabel/.test(successReturn));

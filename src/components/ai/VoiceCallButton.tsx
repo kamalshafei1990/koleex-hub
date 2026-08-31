@@ -52,18 +52,21 @@ const FAILURE_COPY: Record<Lang, Record<VoiceFailure, string>> = {
     "no-microphone": "No microphone available, or permission was declined.",
     "not-allowed": "You do not have access to voice calls.",
     unavailable: "Voice is unavailable right now. Please try again later.",
+    "config-rejected": "The call connected but could not be set up. Please try again.",
     "handshake-failed": "Could not start the call. Please try again.",
   },
   zh: {
     "no-microphone": "没有可用的麦克风，或者权限被拒绝。",
     "not-allowed": "您没有语音通话的权限。",
     unavailable: "语音服务当前不可用，请稍后再试。",
+    "config-rejected": "通话已连接，但会话配置失败，请重试。",
     "handshake-failed": "无法开始通话，请重试。",
   },
   ar: {
     "no-microphone": "لا يوجد ميكروفون متاح، أو تم رفض الإذن.",
     "not-allowed": "ليس لديك صلاحية استخدام المكالمات الصوتية.",
     unavailable: "الخدمة الصوتية غير متاحة حاليًا. حاول مرة أخرى لاحقًا.",
+    "config-rejected": "المكالمة اتصلت بس تعذّر إعدادها. حاول تاني.",
     "handshake-failed": "تعذّر بدء المكالمة. حاول مرة أخرى.",
   },
 };

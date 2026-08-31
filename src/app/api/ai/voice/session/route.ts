@@ -43,7 +43,7 @@ import { requireInternalUser } from "@/lib/server/ai/require-internal";
 import { buildUserContext, checkModule } from "@/lib/server/ai-agent/permissions";
 import { consumeBudget, limitMode, subjectFor } from "@/lib/server/ai/security/rate-limit";
 import { parseVoiceConfig, diagnoseVoiceConfig, resolveVoice, type VoiceEnv } from "@/lib/server/ai/voice/config";
-import { buildSessionUpdate, publicVoiceList } from "@/lib/server/ai/voice/session-config";
+import { buildVoiceSessionPayload, publicVoiceList } from "@/lib/server/ai/voice/session-config";
 
 export const dynamic = "force-dynamic";
 /* The handshake is one round trip to the vendor. It is not the call. */
@@ -74,6 +74,9 @@ function voiceEnv(): VoiceEnv {
     AI_VOICE_API_KEY: process.env.AI_VOICE_API_KEY,
     AI_VOICE_MODEL: process.env.AI_VOICE_MODEL,
     AI_VOICE_REGION_LABEL: process.env.AI_VOICE_REGION_LABEL,
+    /* Omitted when the catalogue was added, so a configured AI_VOICE_VOICES
+       was read by nothing and the picker could never appear. */
+    AI_VOICE_VOICES: process.env.AI_VOICE_VOICES,
   };
 }
 
@@ -219,8 +222,13 @@ export async function POST(req: Request) {
 
   /* Still no model id, no endpoint, no key, no region. What changed is that
      the answer now travels beside a configuration rather than alone. */
+  /* BOTH LENGTHS. A DataChannel refuses a message larger than the size it
+     negotiated and throws rather than truncating, and only the client can see
+     that limit — but shortening a policy is authoring one, so the server
+     writes both and the client only chooses between them. */
+  const payload = buildVoiceSessionPayload(voice);
   return NextResponse.json(
-    { sdp: answer, session: buildSessionUpdate(voice) },
+    { sdp: answer, session: payload.full, session_compact: payload.compact },
     { status: 200, headers: { "Cache-Control": "no-store" } },
   );
 }
