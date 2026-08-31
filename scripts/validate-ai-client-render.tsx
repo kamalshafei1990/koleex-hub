@@ -31,6 +31,7 @@ import WelcomeCard from "../src/components/ai/WelcomeCard";
 import ProjectDialog from "../src/components/ai/ProjectDialog";
 import { COPY } from "../src/components/ai/copy";
 import type { QuotationDraftPayload } from "../src/components/ai/types";
+import VoiceCallButton from "../src/components/ai/VoiceCallButton";
 
 let pass = 0;
 const failures: string[] = [];
@@ -194,6 +195,47 @@ console.log("\n── 8. The sidebar rows ──");
   check("a section heading renders its label", text(html(<SectionHeader {...({ label: "Yesterday" } as any)} />)).includes("Yesterday"));
   const groups = groupByDate([row] as any, COPY.en as any);
   check("groupByDate buckets a row under a labelled group", groups.length === 1 && typeof groups[0].label === "string" && groups[0].rows.length === 1);
+}
+
+console.log("\n── VoiceCallButton: first paint ──");
+{
+  const html = renderToStaticMarkup(<VoiceCallButton lang="en" /> as ReactElement);
+
+  /* The idle button must be reachable and describable. A control whose only
+     affordance is an unlabelled icon is not usable by a screen reader and not
+     findable by a test. */
+  check("renders a button with an accessible label",
+    /<button/.test(html) && /aria-label="Start voice call"/.test(html));
+  check("is not pressed while idle", /aria-pressed="false"/.test(html));
+
+  /* Playback element must exist at first paint — attaching a stream to an
+     element that has not rendered yet is a silent dead call. */
+  check("renders the audio element for playback", /<audio/.test(html));
+  check("the audio element is hidden — the button is the control",
+    /<audio[^>]*class="hidden"/.test(html));
+  check("the audio element autoplays and stays inline on mobile",
+    /<audio[^>]*autoplay/i.test(html) && /playsinline/i.test(html));
+
+  /* NO VENDOR IDENTITY MAY REACH THE BROWSER. The endpoint, the model and the
+     region are the server's business; §P.4's rule applies to anything that can
+     travel, and markup travels. */
+  const lowered = html.toLowerCase();
+  check("no vendor, endpoint or model name appears in the markup",
+    !lowered.includes("qwen") && !lowered.includes("aliyun") &&
+    !lowered.includes("maas") && !lowered.includes("realtime") &&
+    !lowered.includes("dashscope"));
+  check("no workspace identifier appears in the markup", !lowered.includes("ws-"));
+
+  /* Localisation is a compile-time guarantee in the source; this proves it
+     actually reaches the rendered label rather than falling back to English. */
+  const ar = renderToStaticMarkup(<VoiceCallButton lang="ar" /> as ReactElement);
+  const zh = renderToStaticMarkup(<VoiceCallButton lang="zh" /> as ReactElement);
+  check("the label is localised, not hard-coded English",
+    ar.includes("مكالمة") && zh.includes("语音") && !ar.includes("Start voice call"));
+
+  const off = renderToStaticMarkup(<VoiceCallButton lang="en" disabled /> as ReactElement);
+  check("disabled renders as actually disabled, not merely dimmed",
+    /disabled=""/.test(off) || /\sdisabled(\s|>)/.test(off));
 }
 
 console.log(`\n${pass} passed, ${failures.length} failed`);

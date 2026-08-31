@@ -278,6 +278,67 @@ async function main() {
       code.indexOf("getTracks().forEach((t) => t.stop())") < code.indexOf("this.pc?.close()"));
   }
 
+  console.log("\n── 7. The call button's cleanup contract (source read, not a browser) ──");
+  {
+    /* SAID PLAINLY: these are source assertions. The render harness cannot run
+       effects, so the guarantees below — the ones that decide whether a
+       microphone stays captured — cannot be exercised here. Reading for them
+       is worth more than not checking, and less than a browser test. */
+    const fs = await import("node:fs");
+    const src = fs.readFileSync("src/components/ai/VoiceCallButton.tsx", "utf8");
+
+    /* THE ONE THING HERE THAT CAN HURT SOMEONE. Navigating away from a live
+       call without stopping the session leaves the capture track running and
+       the browser's recording indicator lit. */
+    /* The stop must be the FIRST statement of the returned cleanup. A looser
+       pattern matched across the closing brace into hangUp's own stop call and
+       passed with the cleanup emptied — the exact regression it was written to
+       catch. Anchored, so only a real cleanup satisfies it. */
+    check("unmount stops the session",
+      /return \(\) => \{\s*sessionRef\.current\?\.stop\(\);/.test(src));
+    check("that cleanup belongs to a mount-only effect, so it cannot re-run early",
+      /useEffect\(\(\) => \{\s*return \(\) => \{\s*sessionRef\.current\?\.stop\(\);[\s\S]{0,80}?\}, \[\]\);/.test(src));
+
+    /* A failed session has already torn itself down. Keeping the handle would
+       make the next tap reuse a dead connection, which presents to a user as a
+       button that silently stopped working. */
+    check("a failure clears the session handle so a retry starts fresh",
+      /next === "failed"[\s\S]{0,400}?sessionRef\.current = null/.test(src));
+    check("hanging up clears the handle too",
+      /const hangUp[\s\S]{0,300}?sessionRef\.current = null/.test(src));
+    check("starting twice is refused rather than leaking the first session",
+      /if \(sessionRef\.current\) return;/.test(src));
+    check("hanging up detaches the stream from the audio element",
+      /audioRef\.current\.srcObject = null/.test(src));
+
+    /* Autoplay can be refused even after a gesture. A rejected play() nobody
+       reports is indistinguishable from a dead call. */
+    check("a refused autoplay is reported rather than swallowed",
+      /\.play\(\)\.catch\(\(\) => \{[\s\S]{0,200}?onErrorRef\.current/.test(src));
+
+    /* The session fires from network events and outlives any single render. */
+    check("callbacks are held in refs, so the session never calls a stale one",
+      /onErrorRef/.test(src) && /onMessageRef/.test(src) && /onLiveChangeRef/.test(src));
+
+    /* Tool calls arrive on the DataChannel. Routing them through the
+       permission engine is the next step; today this component must not act. */
+    check("DataChannel messages are passed through, never interpreted",
+      /onMessage: \(data\) => onMessageRef\.current\?\.\(data\)/.test(src));
+    check("the component dispatches no tool of its own",
+      !/tool_call/i.test(src) && !/executeTool/i.test(src));
+
+    /* Client source ships to the browser verbatim. */
+    check("no vendor, endpoint, model or key name in the client source",
+      !/dashscope|aliyun|qwen|maas|api[_-]?key|ws-pl/i.test(src));
+
+    /* The existing mic is a working tool and the standing rule keeps it. */
+    const app = fs.readFileSync("src/components/ai/KoleexAiApp.tsx", "utf8");
+    check("MicButton is still mounted — the call button is an addition, not a replacement",
+      /<MicButton/.test(app) && /<VoiceCallButton/.test(app));
+    check("a live call stops the page's own speech synthesis",
+      /onLiveChange=\{\(live\) => \{ if \(live\) stopTts\(\); \}\}/.test(app));
+  }
+
   console.log(`\n${pass} passed, ${failures.length} failed`);
   if (failures.length) {
     console.log("\nFAILED:");

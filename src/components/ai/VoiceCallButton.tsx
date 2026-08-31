@@ -1,0 +1,204 @@
+"use client";
+
+/* ---------------------------------------------------------------------------
+   VoiceCallButton — a real-time voice call, beside the existing mic.
+
+   WHY IT IS A SECOND BUTTON RATHER THAN A CHANGE TO MicButton. The mic is a
+   working tool and the standing rule is not to remove one. It is also a
+   genuinely different thing: MicButton transcribes in the browser, sends TEXT
+   through the normal chat path, and reads the reply back with speech
+   synthesis. It is turn-based, and its transcription depends on the browser's
+   own service — which in Chrome means a Google endpoint, so it is the part of
+   the product most likely to be unavailable in mainland China.
+
+   This opens a continuous audio connection to a region that is reachable
+   there, with no transcription round trip. Two different tools, both offered.
+
+   WHAT THIS COMPONENT DOES NOT DO. It does not interpret DataChannel messages.
+   Tool calls arrive on that channel and go to `onMessage` untouched; routing
+   them through the permission engine and the confirmation ledger is the next
+   step and deliberately not smuggled in here. A call today can talk and
+   listen; it cannot act.
+
+   WHY THE AUDIO ELEMENT LIVES HERE. VoiceSession touches no DOM on purpose —
+   it hands over a MediaStream and playback is the caller's business. That
+   keeps the session testable in Node, which is why its 40 assertions can run
+   at all.
+   --------------------------------------------------------------------------- */
+
+import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  VoiceSession,
+  browserVoiceDeps,
+  type VoiceState,
+  type VoiceFailure,
+} from "@/lib/voice/session";
+import { type Lang } from "@/lib/i18n";
+
+/* Every failure the session can report, in every language the app speaks.
+   `Record<Lang, Record<VoiceFailure, string>>` makes a missing translation a
+   compile error rather than a blank message a user has to interpret. */
+const FAILURE_COPY: Record<Lang, Record<VoiceFailure, string>> = {
+  en: {
+    "no-microphone": "No microphone available, or permission was declined.",
+    "not-allowed": "You do not have access to voice calls.",
+    unavailable: "Voice is unavailable right now. Please try again later.",
+    "handshake-failed": "Could not start the call. Please try again.",
+  },
+  zh: {
+    "no-microphone": "没有可用的麦克风，或者权限被拒绝。",
+    "not-allowed": "您没有语音通话的权限。",
+    unavailable: "语音服务当前不可用，请稍后再试。",
+    "handshake-failed": "无法开始通话，请重试。",
+  },
+  ar: {
+    "no-microphone": "لا يوجد ميكروفون متاح، أو تم رفض الإذن.",
+    "not-allowed": "ليس لديك صلاحية استخدام المكالمات الصوتية.",
+    unavailable: "الخدمة الصوتية غير متاحة حاليًا. حاول مرة أخرى لاحقًا.",
+    "handshake-failed": "تعذّر بدء المكالمة. حاول مرة أخرى.",
+  },
+};
+
+const LABEL_COPY: Record<Lang, { start: string; end: string; connecting: string }> = {
+  en: { start: "Start voice call", end: "End call", connecting: "Connecting…" },
+  zh: { start: "开始语音通话", end: "结束通话", connecting: "正在连接…" },
+  ar: { start: "ابدأ مكالمة صوتية", end: "إنهاء المكالمة", connecting: "جارٍ الاتصال…" },
+};
+
+export type VoiceCallButtonProps = {
+  size?: number;
+  lang?: Lang;
+  disabled?: boolean;
+  onError?: (message: string) => void;
+  /** One decoded DataChannel message, passed through untouched. */
+  onMessage?: (data: string) => void;
+  /** So the parent can mute its own speech synthesis while a call is live —
+   *  two voices talking over each other is the obvious failure here. */
+  onLiveChange?: (live: boolean) => void;
+};
+
+export default function VoiceCallButton({
+  size = 36,
+  lang = "en",
+  disabled = false,
+  onError,
+  onMessage,
+  onLiveChange,
+}: VoiceCallButtonProps) {
+  const [state, setState] = useState<VoiceState>("idle");
+  const sessionRef = useRef<VoiceSession | null>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+
+  /* Held in refs so the session's callbacks never close over a stale render.
+     The session outlives any single render and fires from network events. */
+  const onErrorRef = useRef(onError);
+  const onMessageRef = useRef(onMessage);
+  const onLiveChangeRef = useRef(onLiveChange);
+  const langRef = useRef(lang);
+  useEffect(() => {
+    onErrorRef.current = onError;
+    onMessageRef.current = onMessage;
+    onLiveChangeRef.current = onLiveChange;
+    langRef.current = lang;
+  }, [onError, onMessage, onLiveChange, lang]);
+
+  /* A call must not survive the component. Without this, navigating away
+     leaves the microphone captured and the recording indicator lit — the one
+     failure here a user would rightly call a betrayal. */
+  useEffect(() => {
+    return () => {
+      sessionRef.current?.stop();
+      sessionRef.current = null;
+    };
+  }, []);
+
+  const hangUp = useCallback(() => {
+    sessionRef.current?.stop();
+    sessionRef.current = null;
+    if (audioRef.current) audioRef.current.srcObject = null;
+    setState("idle");
+    onLiveChangeRef.current?.(false);
+  }, []);
+
+  const startCall = useCallback(async () => {
+    if (sessionRef.current) return;
+
+    const session = new VoiceSession(browserVoiceDeps(), {
+      onState: (next, failure) => {
+        setState(next);
+        onLiveChangeRef.current?.(next === "live");
+        if (next === "failed" && failure) {
+          onErrorRef.current?.(FAILURE_COPY[langRef.current][failure]);
+          /* The session has already torn itself down; drop our handle so the
+             next tap starts a fresh one rather than reusing a dead session. */
+          sessionRef.current = null;
+        }
+      },
+      onRemoteStream: (stream) => {
+        if (audioRef.current) {
+          audioRef.current.srcObject = stream;
+          /* Autoplay can still be refused even after a user gesture on some
+             browsers. Failing silently would look like a dead call, so it is
+             reported as one. */
+          void audioRef.current.play().catch(() => {
+            onErrorRef.current?.(FAILURE_COPY[langRef.current]["handshake-failed"]);
+          });
+        }
+      },
+      onMessage: (data) => onMessageRef.current?.(data),
+    });
+
+    sessionRef.current = session;
+    await session.start();
+  }, []);
+
+  const live = state === "live";
+  const busy = state === "requesting-mic" || state === "connecting";
+  const labels = LABEL_COPY[lang];
+  const label = live ? labels.end : busy ? labels.connecting : labels.start;
+
+  return (
+    <>
+      {/* Playback only. Never rendered visibly — the button is the control. */}
+      <audio ref={audioRef} autoPlay playsInline className="hidden" />
+      <button
+        type="button"
+        onClick={live || busy ? hangUp : () => void startCall()}
+        disabled={disabled && !live && !busy}
+        aria-label={label}
+        title={label}
+        aria-pressed={live}
+        style={{ height: size, width: size }}
+        className={`rounded-full inline-flex items-center justify-center shrink-0 transition-colors ${
+          live
+            ? "bg-rose-500/[0.16] text-rose-300 ring-1 ring-rose-400/50"
+            : busy
+              ? "bg-[var(--bg-surface-subtle)] text-[var(--text-dim)]"
+              : "text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-subtle)]"
+        } ${disabled && !live && !busy ? "opacity-40 cursor-not-allowed" : ""}`}
+      >
+        {live ? (
+          /* Hang up — a struck-through handset reads as "end" across locales
+             more reliably than a rotated one. */
+          <svg aria-hidden viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.36 1.9.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.9.34 1.85.57 2.81.7A2 2 0 0 1 22 16.92z" />
+            <line x1="2" y1="2" x2="22" y2="22" />
+          </svg>
+        ) : busy ? (
+          <svg aria-hidden viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" className="animate-spin">
+            <path d="M21 12a9 9 0 1 1-6.22-8.56" />
+          </svg>
+        ) : (
+          /* Waveform — a call you speak into, distinct from the mic beside it. */
+          <svg aria-hidden viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+            <line x1="4" y1="10" x2="4" y2="14" />
+            <line x1="8" y1="7" x2="8" y2="17" />
+            <line x1="12" y1="4" x2="12" y2="20" />
+            <line x1="16" y1="7" x2="16" y2="17" />
+            <line x1="20" y1="10" x2="20" y2="14" />
+          </svg>
+        )}
+      </button>
+    </>
+  );
+}
