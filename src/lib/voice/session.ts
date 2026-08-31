@@ -81,54 +81,18 @@ const ICE_GATHER_TIMEOUT_MS = 3_000;
 const DATA_CHANNEL_LABEL = "koleex-events";
 
 /* ---------------------------------------------------------------------------
-   THE SESSION CONFIGURATION, AND WHY IT CARRIES NO POLICY.
+   THE SESSION CONFIGURATION IS NO LONGER BUILT HERE.
 
-   A connected call is a SILENT call until the session is configured: the
-   vendor announces `session.created` on the channel and waits for a
-   `session.update` naming the audio formats and how turns are detected. We
-   sent nothing, so the line came up, the button went red, and neither side
-   ever spoke. That is the whole of the bug this constant fixes.
+   It used to be, and while it held nothing but audio formats that was
+   defensible. It stopped being defensible the moment a user could pick a
+   voice: the same `session.update` carries `instructions` and, soon, tool
+   definitions, so a browser that composes it is a browser that can compose
+   those too. The server now authors it and hands it over with the answer SDP;
+   this module relays an object it cannot extend.
 
-   WHAT IS DELIBERATELY ABSENT. The same event can carry `instructions` — the
-   system prompt — and, later, tool definitions. Both are POLICY, and the
-   standing rule is that *"the client application must never determine this
-   permission; the server determines it"*. A browser that composes its own
-   instructions is a browser that can rewrite them, which is the same opening
-   as letting external content override system policy.
-
-   So this object is transport only: what the audio is encoded as, and when a
-   turn ends. Those genuinely belong to the client — the formats follow from
-   what the browser can capture and play. When instructions and tools arrive,
-   they come from the server through the handshake and this client relays them
-   without composing them, which is why the shape below is a value rather than
-   a string built inline.
+   A connected call is still a SILENT call until it is sent — that has not
+   changed, only who writes it.
    --------------------------------------------------------------------------- */
-const TRANSPORT_SESSION_CONFIG = {
-  modalities: ["text", "audio"],
-  input_audio_format: "pcm",
-  output_audio_format: "pcm",
-  /* WITHOUT THIS THE USER'S OWN WORDS ARE NEVER TRANSCRIBED. The far side
-     still understands the audio and answers it, so a call sounds completely
-     correct while the screen shows only one half of the conversation — which
-     is exactly what the first version did. Asking for a transcript is opt-in,
-     and the omission is invisible until someone looks for their own words. */
-  input_audio_transcription: { enabled: true },
-  /* Server-side detection is the only mode this transport offers — there is no
-     push-to-talk here. `threshold` is the vendor's documented default; a noisy
-     room (a factory floor) wants it higher, which is a tuning question to
-     answer with a real room rather than a number invented at a desk. */
-  turn_detection: {
-    type: "server_vad",
-    threshold: 0.5,
-    silence_duration_ms: 800,
-  },
-} as const;
-
-/** The event that carries it. Exported so the suite asserts the exact bytes
- *  that go on the wire rather than a paraphrase of them. */
-export function sessionUpdateEvent(): string {
-  return JSON.stringify({ type: "session.update", session: TRANSPORT_SESSION_CONFIG });
-}
 
 /** Resolve when the connection has finished gathering candidates, or when the
  *  budget runs out. Never rejects — a timeout here is a degraded offer, not a
@@ -174,11 +138,17 @@ export class VoiceSession {
      channel opening and `session.created` arriving — because the order of
      those two is the vendor's business and not something to depend on. */
   private configSent = false;
+  /* Authored by the server, received with the answer, relayed unchanged. Null
+     until the handshake completes — there is nothing to send before then. */
+  private sessionUpdate: string | null = null;
   private state: VoiceState = "idle";
 
   constructor(
     private readonly deps: VoiceDeps,
     private readonly events: VoiceEvents = {},
+    /** Which voice to ask for. Opaque — this module never learns the vendor's
+     *  own identifier, and cannot ask for one that was not offered. */
+    private readonly voiceKey: string | null = null,
   ) {}
 
   getState(): VoiceState {
@@ -213,9 +183,13 @@ export class VoiceSession {
    *  down over a race that resolves itself a moment later. */
   private sendSessionConfig(channel: RTCDataChannel): void {
     if (this.configSent || channel.readyState !== "open") return;
+    /* Nothing to relay yet. Not a failure: the handshake has simply not landed,
+       and the open handler will be called again by `session.created` or by the
+       explicit send once it has. */
+    if (!this.sessionUpdate) return;
     this.configSent = true;
     try {
-      channel.send(sessionUpdateEvent());
+      channel.send(this.sessionUpdate);
     } catch {
       /* A failed send leaves a connected but unconfigured call, which is the
          silent line this exists to prevent. Reported as a failed handshake
@@ -322,7 +296,13 @@ export class VoiceSession {
          candidate information."* */
       await waitForIceGathering(pc, this.deps.iceTimeoutMs ?? ICE_GATHER_TIMEOUT_MS);
 
-      const res = await this.deps.fetchFn(HANDSHAKE_PATH, {
+      /* The client asks; the server decides. An unknown key is ignored server
+         side rather than rejected, so a stale preference degrades to the
+         default voice instead of refusing to place a call. */
+      const path = this.voiceKey
+        ? `${HANDSHAKE_PATH}?voice=${encodeURIComponent(this.voiceKey)}`
+        : HANDSHAKE_PATH;
+      const res = await this.deps.fetchFn(path, {
         method: "POST",
         headers: { "Content-Type": "application/sdp" },
         /* Read back from the connection, not from the offer object: the
@@ -341,7 +321,24 @@ export class VoiceSession {
         return;
       }
 
-      const answer = await res.text();
+      /* The response is now an envelope: the answer SDP beside a session
+         configuration the server authored. Read defensively — a proxy or an
+         older deployment could return something else, and a call that dies on
+         JSON.parse looks identical to a call the vendor refused. */
+      let answer = "";
+      try {
+        const body: unknown = await res.json();
+        const env = body as { sdp?: unknown; session?: unknown };
+        answer = typeof env.sdp === "string" ? env.sdp : "";
+        /* Serialised here, once, so what goes on the wire is exactly what the
+           server sent and this module never reshapes it. */
+        if (env.session && typeof env.session === "object") {
+          this.sessionUpdate = JSON.stringify(env.session);
+        }
+      } catch {
+        this.fail("handshake-failed");
+        return;
+      }
       if (!answer.startsWith("v=")) {
         this.fail("handshake-failed");
         return;
@@ -352,6 +349,10 @@ export class VoiceSession {
          line-ending problem. Normalised here for the same reason the vendor's
          own sample does it. */
       await pc.setRemoteDescription({ type: "answer", sdp: normalizeSdp(answer) });
+
+      /* The channel can have opened while the handshake was in flight, in
+         which case its `onopen` already fired and found nothing to relay. */
+      if (this.channel) this.sendSessionConfig(this.channel);
     } catch {
       this.fail("handshake-failed");
       return;

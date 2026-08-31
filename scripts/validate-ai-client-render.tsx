@@ -376,6 +376,53 @@ console.log("\n── VoiceCallScreen: the call is a mode, not a toggle ──")
   check("the call screen is localised", ar.includes("بيسمعك") && !ar.includes(">Listening<"));
 }
 
+console.log("\n── VoiceCallScreen: choosing a voice ──");
+{
+  const voices = [{ key: "v1", label: "Omar" }, { key: "v2", label: "Layla" }];
+  const withPicker = renderToStaticMarkup(
+    <VoiceCallScreen live phase="listening" audioLevel={0.2} lines={[]} lang="en"
+      onEnd={() => {}} voices={voices} selectedVoice="v1" onSelectVoice={() => {}} /> as ReactElement,
+  );
+
+  check("every configured voice is offered",
+    withPicker.includes("Omar") && withPicker.includes("Layla"));
+  /* Matched on the BUTTON ELEMENT rather than a proximity window: the class
+     attribute between the attribute and the label is long, and a window wide
+     enough to span it would also span the neighbouring button. */
+  check("the current one is marked as chosen",
+    /<button[^>]*aria-pressed="true"[^>]*>Omar</.test(withPicker));
+  check("and the other one is not",
+    /<button[^>]*aria-pressed="false"[^>]*>Layla</.test(withPicker));
+  check("exactly one is chosen at a time",
+    withPicker.split('aria-pressed="true"').length - 1 === 1);
+
+  /* THE VENDOR'S OWN IDS ARE NOT A MENU THE BROWSER HOLDS. Only keys and
+     labels reach it, so a browser cannot ask for a voice never offered. */
+  check("no vendor voice id appears in the markup",
+    !/Ethan|Chelsie|Aiden|Cherry/i.test(withPicker));
+
+  /* A control that cannot be used is noise. */
+  const noPicker = renderToStaticMarkup(
+    <VoiceCallScreen live phase="listening" audioLevel={0.2} lines={[]} lang="en" onEnd={() => {}} /> as ReactElement,
+  );
+  check("with no catalogue configured, no picker is drawn",
+    !noPicker.includes("Voice</span>") && !/aria-pressed/.test(noPicker.replace(/aria-pressed="false"/g, "")));
+
+  const arPicker = renderToStaticMarkup(
+    <VoiceCallScreen live phase="listening" audioLevel={0.2} lines={[]} lang="ar"
+      onEnd={() => {}} voices={voices} selectedVoice="v2" onSelectVoice={() => {}} /> as ReactElement,
+  );
+  check("the picker's own label is localised", arPicker.includes("الصوت"));
+  check("but the voice names are the owner's words, not translated",
+    arPicker.includes("Omar") && arPicker.includes("Layla"));
+
+  /* Brand: the picker introduces no new colour. */
+  const pickerHexes = [...withPicker.matchAll(/#[0-9A-Fa-f]{6}\b/g)].map((m) => m[0].toUpperCase());
+  const ok = new Set(["#0D0D0D", "#FF3333", "#0066FF", "#AAAAAA", "#666666", "#2E2E2E", "#FFFFFF", "#000000", "#567FB2", "#7FA9D6", "#BCD8F0", "#0B0D11"]);
+  check("the picker introduces no colour outside the palette",
+    pickerHexes.every((h) => ok.has(h)));
+}
+
 console.log(`\n${pass} passed, ${failures.length} failed`);
 if (failures.length) {
   console.log("\nFAILED:");

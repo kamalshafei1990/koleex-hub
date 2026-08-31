@@ -30,6 +30,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import {
   VoiceSession,
   browserVoiceDeps,
+  HANDSHAKE_PATH,
   type VoiceState,
   type VoiceFailure,
 } from "@/lib/voice/session";
@@ -108,6 +109,36 @@ export default function VoiceCallButton({
      dependency, so it must re-run when one arrives. */
   const [micStream, setMicStream] = useState<MediaStream | null>(null);
   const [farStream, setFarStream] = useState<MediaStream | null>(null);
+  /* The catalogue, as the server describes it: keys and labels, never vendor
+     ids. Empty until fetched, and empty forever if the owner configured none —
+     in which case no picker is drawn and the vendor's default voice is used. */
+  const [voices, setVoices] = useState<readonly { key: string; label: string }[]>([]);
+  const [voiceKey, setVoiceKey] = useState<string | null>(null);
+  /* Read inside the session callbacks, which outlive any single render. */
+  const voiceKeyRef = useRef<string | null>(null);
+  useEffect(() => { voiceKeyRef.current = voiceKey; }, [voiceKey]);
+
+  /* Fetched once on mount rather than per call: it is small, it rarely
+     changes, and asking for it while the user is waiting to talk would add a
+     round trip to the one moment that should feel immediate. A failure is
+     silent — no catalogue means no picker, which is the same as not having
+     configured one, and is not worth an error a user cannot act on. */
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const res = await fetch(HANDSHAKE_PATH, { credentials: "include" });
+        if (!res.ok) return;
+        const body = (await res.json()) as { voices?: { key: string; label: string }[] };
+        if (cancelled || !Array.isArray(body.voices)) return;
+        setVoices(body.voices);
+        setVoiceKey((cur) => cur ?? body.voices?.[0]?.key ?? null);
+      } catch {
+        /* No picker. The call still works on the default voice. */
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
   const sessionRef = useRef<VoiceSession | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
@@ -133,6 +164,10 @@ export default function VoiceCallButton({
      from a stale closure is how captions double or vanish. The parent owns
      the rendering; this owns the running total. */
   const linesRef = useRef<readonly TranscriptLine[]>([]);
+  /* startCall is declared below and selectVoice needs it. A ref rather than a
+     reorder: the declaration order here follows the call's lifecycle, and
+     shuffling it to satisfy a closure would make it harder to read. */
+  const startCallRef = useRef<(() => Promise<void>) | null>(null);
 
   /* A call must not survive the component. Without this, navigating away
      leaves the microphone captured and the recording indicator lit — the one
@@ -213,11 +248,12 @@ export default function VoiceCallButton({
           onTranscriptRef.current?.(linesRef.current);
         }
       },
-    });
+    }, voiceKeyRef.current);
 
     sessionRef.current = session;
     await session.start();
   }, []);
+  useEffect(() => { startCallRef.current = startCall; }, [startCall]);
 
   /* ONE METER PER SIDE, AND ONLY THE ACTIVE ONE RUNS. Measuring both at once
      would burn a frame loop and an audio context on silence, which on a phone
@@ -226,6 +262,20 @@ export default function VoiceCallButton({
   const micLevel = useStreamLevel(micStream, listening);
   const farLevel = useStreamLevel(farStream, state === "live" && phase === "speaking");
   const audioLevel = phase === "speaking" ? farLevel : micLevel;
+
+  /* THE CONFIGURATION IS SENT ONCE PER SESSION, so a new voice needs a new
+     session. Restarting is honest about that; silently storing the choice for
+     "next time" would look like a control that does nothing. */
+  const selectVoice = useCallback((key: string) => {
+    setVoiceKey(key);
+    voiceKeyRef.current = key;
+    if (sessionRef.current) {
+      hangUp();
+      /* After the teardown, not during it: start() refuses while a session
+         handle is still held. */
+      queueMicrotask(() => void startCallRef.current?.());
+    }
+  }, [hangUp]);
 
   const live = state === "live";
   const busy = state === "requesting-mic" || state === "connecting";
@@ -247,6 +297,9 @@ export default function VoiceCallButton({
           lines={lines}
           lang={lang}
           onEnd={hangUp}
+          voices={voices}
+          selectedVoice={voiceKey}
+          onSelectVoice={selectVoice}
         />
       )}
       <button

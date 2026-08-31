@@ -35,6 +35,7 @@ const COPY: Record<Lang, {
   end: string;
   title: string;
   hint: string;
+  voice: string;
 }> = {
   en: {
     connecting: "Connecting…",
@@ -44,6 +45,7 @@ const COPY: Record<Lang, {
     end: "End call",
     title: "Voice call",
     hint: "Speak, then pause. There is no button to hold.",
+    voice: "Voice",
   },
   zh: {
     connecting: "正在连接…",
@@ -53,6 +55,7 @@ const COPY: Record<Lang, {
     end: "结束通话",
     title: "语音通话",
     hint: "说完后停顿一下，无需按住任何按键。",
+    voice: "音色",
   },
   ar: {
     connecting: "جارٍ الاتصال…",
@@ -62,6 +65,7 @@ const COPY: Record<Lang, {
     end: "إنهاء المكالمة",
     title: "مكالمة صوتية",
     hint: "اتكلم وبعدين اسكت شوية. مفيش زرار تفضل ضاغط عليه.",
+    voice: "الصوت",
   },
 };
 
@@ -74,6 +78,14 @@ export type VoiceCallScreenProps = {
   lines: readonly TranscriptLine[];
   lang?: Lang;
   onEnd: () => void;
+  /** Keys and labels only — the server's catalogue, never the vendor's ids.
+   *  Empty means no picker is drawn: a control that cannot be used is noise. */
+  voices?: readonly { key: string; label: string }[];
+  selectedVoice?: string | null;
+  /** Changing a voice restarts the call: the configuration is sent once per
+   *  session, so a new one needs a new session. Said plainly in the UI rather
+   *  than silently doing nothing until the next call. */
+  onSelectVoice?: (key: string) => void;
 };
 
 export default function VoiceCallScreen({
@@ -83,6 +95,9 @@ export default function VoiceCallScreen({
   lines,
   lang = "en",
   onEnd,
+  voices = [],
+  selectedVoice = null,
+  onSelectVoice,
 }: VoiceCallScreenProps) {
   const copy = COPY[lang];
 
@@ -146,6 +161,34 @@ export default function VoiceCallScreen({
           {status}
         </p>
       </div>
+
+      {/* Voice picker — only when the owner has configured a catalogue. Plain
+          text buttons rather than a dropdown: two or three options read faster
+          than a control you have to open, and the brand's icon system has no
+          chevron worth adding for this. */}
+      {voices.length > 0 && (
+        <div className="shrink-0 flex items-center justify-center gap-2 px-6 pb-4">
+          <span className="text-[11px] uppercase tracking-wide text-[#666666]">{copy.voice}</span>
+          {voices.map((v) => {
+            const on = v.key === selectedVoice;
+            return (
+              <button
+                key={v.key}
+                type="button"
+                onClick={() => onSelectVoice?.(v.key)}
+                aria-pressed={on}
+                className={`px-3 py-1 rounded-full text-xs transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0066FF] ${
+                  on
+                    ? "bg-white text-[#0D0D0D]"
+                    : "text-[#AAAAAA] hover:text-white border border-[#2E2E2E]"
+                }`}
+              >
+                {v.label}
+              </button>
+            );
+          })}
+        </div>
+      )}
 
       {/* Captions, above the control so the eye travels orb → words → button. */}
       <div className="shrink-0 pb-6">

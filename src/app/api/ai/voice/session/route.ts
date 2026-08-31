@@ -42,7 +42,8 @@ import { requireAuth } from "@/lib/server/auth";
 import { requireInternalUser } from "@/lib/server/ai/require-internal";
 import { buildUserContext, checkModule } from "@/lib/server/ai-agent/permissions";
 import { consumeBudget, limitMode, subjectFor } from "@/lib/server/ai/security/rate-limit";
-import { parseVoiceConfig, diagnoseVoiceConfig, type VoiceEnv } from "@/lib/server/ai/voice/config";
+import { parseVoiceConfig, diagnoseVoiceConfig, resolveVoice, type VoiceEnv } from "@/lib/server/ai/voice/config";
+import { buildSessionUpdate, publicVoiceList } from "@/lib/server/ai/voice/session-config";
 
 export const dynamic = "force-dynamic";
 /* The handshake is one round trip to the vendor. It is not the call. */
@@ -76,7 +77,12 @@ function voiceEnv(): VoiceEnv {
   };
 }
 
-export async function POST(req: Request) {
+/* THE SAME GATE FOR BOTH VERBS, in one place. A second handler with its own
+   copy of this chain is a second place for a step to be dropped, and the step
+   most easily dropped is requireInternalUser — which was already omitted once
+   from this very route. Not exported: a Next.js route file may only export
+   route handlers. */
+async function authorize(req: Request): Promise<NextResponse | { accountId: string }> {
   const auth = await requireAuth(req);
   if (auth instanceof NextResponse) return auth;
 
@@ -101,6 +107,33 @@ export async function POST(req: Request) {
       { status: 403 },
     );
   }
+
+  return { accountId: auth.account_id };
+}
+
+/* GET — which voices this deployment offers.
+
+   KEYS AND LABELS ONLY. The vendor's own voice ids are never listed to a
+   client: a browser that cannot name a voice cannot ask for one that was not
+   offered, and the id is vendor identity besides. Behind the same gate as the
+   handshake, because which capabilities exist is not public either. */
+export async function GET(req: Request) {
+  const gate = await authorize(req);
+  if (gate instanceof NextResponse) return gate;
+
+  const cfg = parseVoiceConfig(voiceEnv());
+  /* Not configured is not an error here: no voice service means no voices to
+     choose between, and a picker that cannot be used should not be drawn. */
+  return NextResponse.json(
+    { voices: cfg ? publicVoiceList(cfg.voices) : [] },
+    { headers: { "Cache-Control": "no-store" } },
+  );
+}
+
+export async function POST(req: Request) {
+  const gate = await authorize(req);
+  if (gate instanceof NextResponse) return gate;
+  const auth = { account_id: gate.accountId };
 
   /* After auth so the counter is keyed to a real account, before any vendor
      work so a blocked request costs nothing. Fails OPEN, like every other
@@ -172,11 +205,22 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Could not start the call. Try again." }, { status: 502 });
   }
 
-  /* The answer SDP and nothing else. No model id, no endpoint, no region
-     beyond a neutral label the operator chose — the client needs none of it to
-     complete the handshake, and every one of them is vendor identity. */
-  return new Response(answer, {
-    status: 200,
-    headers: { "Content-Type": "application/sdp", "Cache-Control": "no-store" },
-  });
+  /* THE SESSION IS AUTHORED HERE AND RELAYED THERE. `session.update` carries
+     the voice today and will carry instructions and tool definitions; a
+     browser that composes it is a browser that can rewrite them. The client
+     receives an object it puts on the DataChannel unchanged.
+
+     An unknown or absent key resolves to null and the vendor's default voice
+     is used — the browser proposes, the server disposes, and a request for a
+     voice this deployment does not offer is quietly not honoured rather than
+     being an error the user has to understand. */
+  const requested = new URL(req.url).searchParams.get("voice");
+  const voice = resolveVoice(cfg.voices, requested);
+
+  /* Still no model id, no endpoint, no key, no region. What changed is that
+     the answer now travels beside a configuration rather than alone. */
+  return NextResponse.json(
+    { sdp: answer, session: buildSessionUpdate(voice) },
+    { status: 200, headers: { "Cache-Control": "no-store" } },
+  );
 }

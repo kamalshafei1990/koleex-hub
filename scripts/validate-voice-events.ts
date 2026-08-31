@@ -185,18 +185,28 @@ console.log("\n── 7. The session must ASK for the user's transcript ──")
   /* THE OTHER HALF OF THE EMPTY SCREEN, and the half no parser can fix. The
      far side only sends the user's words when the session configuration asks
      for them; without this the audio is understood and answered while the
-     user's own speech is never reported at all. */
-  const src = readFileSync("src/lib/voice/session.ts", "utf8");
-  check("the session configuration requests input transcription",
-    /input_audio_transcription:\s*\{[^}]*enabled:\s*true/.test(src));
+     user's own speech is never reported at all.
 
-  /* It must be inside the config that actually gets sent, not stranded in a
-     comment or a second object nobody serialises. */
-  const cfg = src.slice(src.indexOf("const TRANSPORT_SESSION_CONFIG"), src.indexOf("} as const;"));
+     ASSERTED AGAINST THE SERVER MODULE, because that is where the
+     configuration now lives: once a user could pick a voice, the browser could
+     no longer be the thing composing an event that also carries instructions.
+     The guarantee did not move, only its address. */
+  const src = readFileSync("src/lib/server/ai/voice/session-config.ts", "utf8");
+  check("the session configuration requests input transcription",
+    () => /input_audio_transcription:\s*\{[^}]*enabled:\s*true/.test(src));
+
+  const cfg = src.slice(src.indexOf("const TRANSPORT"), src.indexOf("} as const;"));
   check("and it is inside the object that is sent",
-    /input_audio_transcription/.test(cfg));
-  check("the config still carries no policy",
-    !/instructions/.test(cfg) && !/tools/.test(cfg));
+    () => /input_audio_transcription/.test(cfg));
+  check("the transport block still carries no policy",
+    () => !/instructions/.test(cfg) && !/tools:/.test(cfg));
+
+  /* And the client must no longer be composing one of its own. */
+  const client = readFileSync("src/lib/voice/session.ts", "utf8");
+  check("the client composes no session configuration at all",
+    () => !/input_audio_transcription/.test(client) && !/turn_detection/.test(client));
+  check("it relays what the server authored",
+    () => /this\.sessionUpdate/.test(client));
 }
 
 console.log(`\n${pass} passed, ${failures.length} failed`);
