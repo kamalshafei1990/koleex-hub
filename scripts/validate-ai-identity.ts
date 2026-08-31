@@ -27,6 +27,7 @@ import {
   AI_IDENTITY_STORY,
   AI_IDENTITY_BRIEF,
   AI_CAPABILITIES_ANSWER,
+  AI_CAPABILITIES_BRIEF,
   KOLEEX_IDENTITY,
   NAME_DRIFT,
 } from "../src/lib/server/ai/identity";
@@ -380,8 +381,18 @@ console.log("\n── 6a. The full story is paid for only when it is asked for �
 
   /* A voice session is configured ONCE, before anyone has said anything, so
      there is no message to classify — the spoken lane carries it outright. */
-  check("the voice session carries it outright — nothing to classify at setup time",
-    String(buildVoiceSessionPayload(null).full.session.instructions ?? "").includes(AI_IDENTITY_STORY.trim()));
+  /* VOICE CARRIES THE SPOKEN FORMS, NOT THE WRITTEN ONES. Both directives ask
+     for paragraphs, which is not how anyone wants to be spoken to — and
+     carrying the pair pushed the voice instructions to 8.6 KB on the one
+     transport in the product with a hard message-size limit and a documented
+     history of exactly that breaking every call. The FACTS are asserted
+     (section 6 requires the developer and originator on this lane); the size
+     is asserted here, because a regression to the written pair is silent. */
+  const voiceFull = String(buildVoiceSessionPayload(null).full.session.instructions ?? "");
+  check("the voice session carries the spoken identity form outright — nothing to classify at setup time",
+    voiceFull.includes(AI_IDENTITY_BRIEF.trim()));
+  check("and stays small enough for a size-limited transport",
+    voiceFull.length < 4_000);
 }
 
 console.log("\n── 7. No lane contradicts the canonical facts ──");
@@ -668,8 +679,8 @@ console.log("\n── 10. The right answer reaches the right question ──");
   check("the brand identity lane carries both — its section IS the classification, and covers both questions",
     buildBrandSystemPrompt(ctx3, "en", "ai").includes(AI_CAPABILITIES_ANSWER.trim()) &&
     buildBrandSystemPrompt(ctx3, "en", "ai").includes(AI_IDENTITY_STORY.trim()));
-  check("the voice session carries both — nothing to classify before anyone speaks",
-    String(buildVoiceSessionPayload(null).full.session.instructions ?? "").includes(AI_CAPABILITIES_ANSWER.trim()));
+  check("the voice session answers the capability question too, in its spoken form",
+    String(buildVoiceSessionPayload(null).full.session.instructions ?? "").includes(AI_CAPABILITIES_BRIEF.trim()));
   check("and the company lane, a different question again, carries neither",
     !buildBrandSystemPrompt(ctx3, "en", "company").includes(AI_CAPABILITIES_ANSWER.trim()) &&
     !buildBrandSystemPrompt(ctx3, "en", "company").includes(AI_IDENTITY_STORY.trim()));

@@ -189,6 +189,8 @@ export class VoiceSession {
   private sessionUpdateCompact: string | null = null;
   /* Cleared when the connection recovers, fires when it does not. */
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+  /** Has ICE ever actually connected? Decides whether "failed" is final. */
+  private iceEverConnected = false;
   private state: VoiceState = "idle";
 
   constructor(
@@ -360,11 +362,33 @@ export class VoiceSession {
           return;
         }
         if (st === "failed") {
+          /* "FAILED" IS NOT FINAL UNTIL THE CALL HAS ACTUALLY BEEN UP, and
+             conflating the two broke every call on some networks.
+
+             The session goes `live` as soon as the SDP is exchanged — ICE is
+             still working at that moment. So this watcher runs with the state
+             already "live" while the connection is being ESTABLISHED, and ICE
+             legitimately reports "failed" mid-setup when the first candidate
+             pairs lose and later ones (trickled in with the answer) have not
+             been tried yet. Killing the call there turns a routine retry into
+             "could not start the call" — which is exactly what it did.
+
+             Before this watcher existed, nothing looked at ICE and those calls
+             connected. So the pre-connection case gets the same grace window a
+             mid-call wobble gets: honest state, bounded wait, and a real
+             failure only if it never comes up. */
+          if (!this.iceEverConnected) {
+            if (this.state === "live") this.setState("reconnecting");
+            this.armReconnectTimer();
+            return;
+          }
           this.clearReconnectTimer();
           this.fail("connection-lost");
           return;
         }
         if (st === "connected" || st === "completed") {
+          /* From here on, "failed" means a call that WAS up has gone down. */
+          this.iceEverConnected = true;
           this.clearReconnectTimer();
           if (this.state === "reconnecting") this.setState("live");
         }

@@ -876,14 +876,57 @@ async function main() {
       check("  …and the connection is closed", r.pcCalls.closed === 1);
     }
 
+    /* 11c-bis — THE REGRESSION THIS SECTION SHIPPED, and the one that made
+       "could not start the call" the normal outcome on some networks.
+
+       The session goes `live` the moment the SDP is exchanged; ICE is still
+       working then. So this watcher runs with the state already "live" while
+       the connection is being ESTABLISHED — and ICE legitimately reports
+       "failed" mid-setup when the first candidate pairs lose and the ones
+       trickled in with the answer have not been tried yet. Treating that as
+       final killed calls that were about to connect. Before the watcher
+       existed, nothing looked at ICE and those same calls worked. */
+    {
+      const r = await run({});
+      check("the call is live once the SDP is exchanged, before ICE has connected",
+        r.session.getState() === "live");
+      r.ice("failed");
+      check("an ICE failure BEFORE the connection was ever up is not final",
+        r.session.getState() === "reconnecting");
+      check("  …the microphone is not released on it", !r.mic.allStopped());
+      check("  …and the connection is not closed", r.pcCalls.closed === 0);
+      /* And it still connects when the later candidates win. */
+      r.ice("connected");
+      check("and the call comes up when a later candidate pair succeeds",
+        r.session.getState() === "live");
+      check("with no failure ever shown to the user",
+        r.states.every(([st]) => st !== "failed"));
+      r.session.stop();
+    }
+
+    /* 11c-ter — but a pre-connection failure that never resolves still ends,
+       rather than leaving the user talking into a call that never came up. */
+    {
+      const r = await run({});
+      r.ice("failed");
+      await sleep(160);                 // grace is 80ms in the suite
+      const last = r.states[r.states.length - 1];
+      check("a connection that never comes up at all still ends honestly",
+        last[0] === "failed" && last[1] === "connection-lost");
+      check("  …and releases the microphone", r.mic.allStopped());
+    }
+
     /* 11d — a connection that fails outright is over now. Waiting out a
        recovery window for a state WebRTC has already called final is eight
        seconds of silence sold to the user as a call. */
     {
       const r = await run({ reconnectGraceMs: 5_000 });
+      /* CONNECT FIRST. Without this the case tests the pre-connection path
+         above instead, and would have passed on the broken behaviour. */
+      r.ice("connected");
       r.ice("failed");
       const last = r.states[r.states.length - 1];
-      check("an ICE failure ends the call without waiting out the recovery window",
+      check("an ICE failure AFTER the call was up ends it without waiting out the window",
         last[0] === "failed" && last[1] === "connection-lost");
       check("  …and the microphone is released", r.mic.allStopped());
     }
