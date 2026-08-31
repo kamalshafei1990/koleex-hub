@@ -112,10 +112,73 @@ console.log("\n── 3. The client cache is dropped on a 401, not just the cook
   check("and does not retry, since a 401 will not fix itself", /return null/.test(near));
 }
 
-console.log(`\n${pass} passed, ${failures.length} failed`);
-if (failures.length) {
-  console.log("\nFAILED:");
-  for (const f of failures) console.log(`  · ${f}`);
-  process.exit(1);
+async function main() {
+  /* ── Section 4: advice the user cannot act on is the loop, one level up ────
+     The lockout was a screen offering only an action that could not work. The
+     same shape existed in the message itself: four different server-side
+     failures reached the user as "Session expired — please sign in again",
+     including a failed database read (signing in again cannot repair that) and
+     a deactivated account (signing in again will never work; an administrator
+     must act).
+
+     These assertions run the REAL response builder rather than reading source,
+     because status codes and payload keys are behaviour. */
+  {
+    console.log("\nSection 4 — a failure the user cannot fix must not advise signing in");
+
+    const R = await import("../src/lib/server/auth");
+    const build = R.authFailureResponse as (r: string) => Response;
+
+    const backend = build("backend_unavailable");
+    const inactive = build("inactive");
+    const anon = build("anon");
+    const noAccount = build("no_account");
+
+    const body = async (r: Response) => (await r.json()) as { error?: string; code?: string };
+    const [bBody, iBody, aBody, nBody] = await Promise.all([body(backend), body(inactive), body(anon), body(noAccount)]);
+
+    /* THE CENTRAL ONE. A lookup that failed is not an authentication failure,
+       and 401 told every client to discard the session and offer a sign-in that
+       could not help. 503 is both true and retryable. */
+    check("a failed lookup is 503, not 401", backend.status === 503);
+    check("and never tells the user to sign in again", !/sign in/i.test(bBody.error ?? ""));
+
+    check("a deactivated account is still 401", inactive.status === 401);
+    check("but points at an administrator, not at the sign-in page",
+      /administrator/i.test(iBody.error ?? "") && !/sign in again/i.test(iBody.error ?? ""));
+
+    /* Deliberately indistinguishable. Telling an unauthenticated caller apart
+       from "no such account" answers a question they have not earned. */
+    check("anon and no_account are byte-identical to the caller",
+      anon.status === noAccount.status && JSON.stringify(aBody) === JSON.stringify(nBody));
+    check("and both keep the wording clients already read", aBody.error === "Not signed in");
+
+    check("every failure carries a machine-readable code",
+      [bBody, iBody, aBody].every((b) => typeof b.code === "string" && b.code.length > 0));
+
+    /* No account state may cross to a caller who has not proved they are that
+       account — the inactive branch is only reachable with a valid signed
+       cookie, and nothing else may name an account at all. */
+    check("no reason leaks an identifier", [bBody, iBody, aBody, nBody].every(
+      (b) => !/@/.test(b.error ?? "") && !/[0-9a-f]{8}-[0-9a-f]{4}/i.test(b.error ?? "")));
+
+    /* And the client has to actually branch on it, or the server's honesty
+       stops at the wire. */
+    const boot = readFileSync("src/lib/me-bootstrap.ts", "utf8");
+    check("the client reads the code rather than assuming every 401 is expiry",
+      /account_inactive/.test(boot) && /Contact an administrator/.test(boot));
+    check("and still falls back to the old message when no code is sent",
+      /Session expired — please sign in again\./.test(boot));
+  }
+
+  console.log(`\n${pass} passed, ${failures.length} failed`);
+  if (failures.length) {
+    console.log("\nFAILED:");
+    for (const f of failures) console.log(`  · ${f}`);
+    process.exit(1);
+  }
+  console.log("A user whose session is refused can recover from inside the product.");
+
 }
-console.log("A user whose session is refused can recover from inside the product.");
+
+main().catch((e) => { console.error(e); process.exit(1); });

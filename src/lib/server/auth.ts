@@ -85,7 +85,47 @@ const AUTH_CTX_TTL_MS = 15_000;
 const AUTH_CTX_MAX = 500;
 const authCtxCache = new Map<string, { ctx: ServerAuthContext; at: number }>();
 
-export async function resolveServerAuth(): Promise<ServerAuthContext | null> {
+/* ── WHY THE RESOLVER NOW REPORTS A REASON ────────────────────────────────
+   Every failure below used to collapse into one `null`, and requireAuth
+   turned every null into 401 "Not signed in". Four different things therefore
+   reached the user as the same sentence — "Session expired — please sign in
+   again." — including one that is not an authentication failure at all.
+
+   The comment on the `error` branch has said so since a previous incident:
+
+       "Transient DB errors were previously swallowed and reported to the
+        client as 'Not signed in', which led the picker to a dead end (the
+        user IS signed in — the lookup just failed)."
+
+   That fix logged the cause for us and left the user in the dead end. Signing
+   in again cannot repair a failed database read, so the advice is not merely
+   unhelpful, it is wrong — and it is the same closed loop that produced the
+   lockout on 2026-08-30: a screen that only offers an action which cannot
+   work. A deactivated account has the same problem from the other side, told
+   to sign in again forever when what it needs is an administrator.
+
+   WHAT IS AND IS NOT SAFE TO DISCLOSE. `backend_unavailable` describes OUR
+   infrastructure and says nothing about any account. `inactive` is only ever
+   reached by a caller holding a validly-signed session cookie for that
+   account, so it tells the account holder about their own account and no one
+   else. `anon` and `no_account` stay deliberately identical and generic:
+   distinguishing "no cookie" from "no such account" to an unauthenticated
+   caller would answer a question they have not earned. */
+export type AuthFailureReason =
+  /** No valid session cookie: absent, malformed, or its signature failed. */
+  | "anon"
+  /** Cookie verified, but no account row came back for it. */
+  | "no_account"
+  /** Account exists and is not active. The holder needs an administrator. */
+  | "inactive"
+  /** The lookup itself failed. NOT an authentication failure — retryable. */
+  | "backend_unavailable";
+
+export type AuthOutcome =
+  | { ok: true; auth: ServerAuthContext }
+  | { ok: false; reason: AuthFailureReason };
+
+export async function resolveServerAuthOutcome(): Promise<AuthOutcome> {
   /* SW-1: measure the universal auth prefix (runs on every authenticated
      request → sampled by stageTimer). Stages are code-authored names; the
      only tags are the coarse outcome status — never account ids, emails, or
@@ -94,7 +134,7 @@ export async function resolveServerAuth(): Promise<ServerAuthContext | null> {
   const _t = stageTimer("auth.resolve");
   const realAccountId = await getSessionAccountId();
   _t.mark("session");
-  if (!realAccountId) { _t.done({ status: "anon" }); return null; }
+  if (!realAccountId) { _t.done({ status: "anon" }); return { ok: false, reason: "anon" }; }
 
   /* ── View-as resolution ──────────────────────────────────────────
      Two flavours of view-as, both SA-only:
@@ -117,7 +157,7 @@ export async function resolveServerAuth(): Promise<ServerAuthContext | null> {
     const hit = authCtxCache.get(realAccountId);
     if (hit && Date.now() - hit.at < AUTH_CTX_TTL_MS) {
       _t.done({ status: "ok", view_as: false });
-      return hit.ctx;
+      return { ok: true, auth: hit.ctx };
     }
   }
 
@@ -184,10 +224,11 @@ export async function resolveServerAuth(): Promise<ServerAuthContext | null> {
       accountIdToLoad,
     );
     _t.done({ status: "error" });
-    return null;
+    /* The one failure here that is OURS, not the caller's. */
+    return { ok: false, reason: "backend_unavailable" };
   }
-  if (!data) { _t.done({ status: "no_account" }); return null; }
-  if (data.status !== "active") { _t.done({ status: "inactive" }); return null; }
+  if (!data) { _t.done({ status: "no_account" }); return { ok: false, reason: "no_account" }; }
+  if (data.status !== "active") { _t.done({ status: "inactive" }); return { ok: false, reason: "inactive" }; }
 
   /* If view-as was requested, validate the real session is a SA. */
   let viewingAs = false;
@@ -233,8 +274,8 @@ export async function resolveServerAuth(): Promise<ServerAuthContext | null> {
         .eq("account_id", realAccountId)
         .maybeSingle(),
     ]);
-    if (selfRes.error || !selfRes.data) { _t.done({ status: "no_account" }); return null; }
-    if (selfRes.data.status !== "active") { _t.done({ status: "inactive" }); return null; }
+    if (selfRes.error || !selfRes.data) { _t.done({ status: "no_account" }); return { ok: false, reason: "no_account" }; }
+    if (selfRes.data.status !== "active") { _t.done({ status: "inactive" }); return { ok: false, reason: "inactive" }; }
     data = selfRes.data;
     empRes = selfEmpRes;
   }
@@ -295,7 +336,7 @@ export async function resolveServerAuth(): Promise<ServerAuthContext | null> {
     }
     authCtxCache.set(realAccountId, { ctx, at: Date.now() });
   }
-  return ctx;
+  return { ok: true, auth: ctx };
 }
 
 /**
@@ -321,8 +362,58 @@ export async function resolveServerAuth(): Promise<ServerAuthContext | null> {
  *
  * Reversible: `export const getServerAuth = resolveServerAuth;`
  */
-export const getServerAuth: () => Promise<ServerAuthContext | null> =
-  cache(resolveServerAuth);
+/** The old shape, unchanged, for the many callers that only need "am I signed
+ *  in?" — and for validate:auth-equivalence, which compares this resolver
+ *  against the cached one and must keep comparing the same thing. */
+export async function resolveServerAuth(): Promise<ServerAuthContext | null> {
+  const out = await resolveServerAuthOutcome();
+  return out.ok ? out.auth : null;
+}
+
+/* MEMOIZE THE OUTCOME, NOT THE CONTEXT. Both getServerAuth and requireAuth
+   read it within one request; caching the richer value means the reason costs
+   nothing and, more importantly, that the two can never disagree about what
+   happened — they are reading one resolution, not two. */
+export const getServerAuthOutcome: () => Promise<AuthOutcome> =
+  cache(resolveServerAuthOutcome);
+
+export const getServerAuth: () => Promise<ServerAuthContext | null> = async () => {
+  const out = await getServerAuthOutcome();
+  return out.ok ? out.auth : null;
+};
+
+/** Turn a failure reason into the response the caller should actually get.
+ *
+ *  THE STATUS IS THE IMPORTANT PART, not the sentence. `backend_unavailable`
+ *  becomes 503 because it is not an authentication failure: the caller IS
+ *  signed in and our lookup failed. Sending 401 for it told every client to
+ *  discard the session and offer a sign-in that could not help — and the
+ *  bootstrap client already renders 5xx as "Server is having a moment. Tap
+ *  Retry", which is both true and actionable, so the correct status alone
+ *  fixes the message.
+ *
+ *  `code` is a stable machine-readable tag so a client can branch without
+ *  matching on English. `error` keeps its existing wording for the two
+ *  ordinary signed-out cases, because that string is what clients have been
+ *  reading and a contract change here reaches apps this repository cannot see.
+ */
+export function authFailureResponse(reason: AuthFailureReason): NextResponse {
+  if (reason === "backend_unavailable") {
+    return NextResponse.json(
+      { error: "Could not verify your session right now. Please retry.", code: "auth_backend_unavailable" },
+      { status: 503 },
+    );
+  }
+  if (reason === "inactive") {
+    return NextResponse.json(
+      { error: "This account is not active. Contact an administrator.", code: "account_inactive" },
+      { status: 401 },
+    );
+  }
+  /* anon and no_account are deliberately identical: an unauthenticated caller
+     learns only that they are not signed in. */
+  return NextResponse.json({ error: "Not signed in", code: "not_signed_in" }, { status: 401 });
+}
 
 /**
  * Convenience: get auth or return a 401 JSON Response. Route handlers
@@ -342,13 +433,9 @@ export const getServerAuth: () => Promise<ServerAuthContext | null> =
  * endpoints themselves) call `requireAuth()` without `req`.
  */
 export async function requireAuth(req?: Request): Promise<ServerAuthContext | NextResponse> {
-  const auth = await getServerAuth();
-  if (!auth) {
-    return NextResponse.json(
-      { error: "Not signed in" },
-      { status: 401 },
-    );
-  }
+  const outcome = await getServerAuthOutcome();
+  if (!outcome.ok) return authFailureResponse(outcome.reason);
+  const auth = outcome.auth;
   if (req && auth.viewing_as) {
     const method = req.method?.toUpperCase();
     if (method && method !== "GET" && method !== "HEAD" && method !== "OPTIONS") {
