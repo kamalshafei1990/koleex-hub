@@ -40,6 +40,14 @@ export type VoiceFailure =
   | "no-microphone"
   /** Signed in, but not permitted to use voice. */
   | "not-allowed"
+  /** Too many calls started in a short window. Its OWN reason because the
+   *  first version folded every unexpected status into "handshake failed",
+   *  and a rate limit reported as a broken handshake is a debugging session
+   *  spent in the wrong file — which is exactly what it cost. */
+  | "too-many-calls"
+  /** The session is no longer valid. Also folded in before, and also needs a
+   *  different action from the user: sign in again, not try again. */
+  | "signed-out"
   /** Voice is switched off on the server, or the vendor is unreachable. */
   | "unavailable"
   /** The handshake did not complete. */
@@ -362,7 +370,19 @@ export class VoiceSession {
            READ on a failure: our route already refuses to forward the
            vendor's, and reading it here would create a second place for one to
            reach a screen. */
-        this.fail(res.status === 403 ? "not-allowed" : res.status === 503 ? "unavailable" : "handshake-failed");
+        /* EVERY STATUS THIS ROUTE CAN RETURN, MAPPED. The first version handled
+           403 and 503 and swept the rest into "handshake failed" — so a 429
+           from our own rate limiter, and a 401 from an expired session, both
+           read as "could not start the call". Each of those needs a different
+           thing from the user, and telling all three the same story is how a
+           rate limit got investigated as a WebRTC bug. */
+        this.fail(
+          res.status === 403 ? "not-allowed"
+          : res.status === 401 ? "signed-out"
+          : res.status === 429 ? "too-many-calls"
+          : res.status === 503 ? "unavailable"
+          : "handshake-failed",
+        );
         return;
       }
 

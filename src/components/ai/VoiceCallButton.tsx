@@ -51,6 +51,8 @@ const FAILURE_COPY: Record<Lang, Record<VoiceFailure, string>> = {
   en: {
     "no-microphone": "No microphone available, or permission was declined.",
     "not-allowed": "You do not have access to voice calls.",
+    "too-many-calls": "Too many calls started just now. Wait about a minute and try again.",
+    "signed-out": "Your session has expired. Please sign in again.",
     unavailable: "Voice is unavailable right now. Please try again later.",
     "config-rejected": "The call connected but could not be set up. Please try again.",
     "handshake-failed": "Could not start the call. Please try again.",
@@ -58,6 +60,8 @@ const FAILURE_COPY: Record<Lang, Record<VoiceFailure, string>> = {
   zh: {
     "no-microphone": "没有可用的麦克风，或者权限被拒绝。",
     "not-allowed": "您没有语音通话的权限。",
+    "too-many-calls": "刚刚发起的通话过多，请等待约一分钟后再试。",
+    "signed-out": "登录已过期，请重新登录。",
     unavailable: "语音服务当前不可用，请稍后再试。",
     "config-rejected": "通话已连接，但会话配置失败，请重试。",
     "handshake-failed": "无法开始通话，请重试。",
@@ -65,6 +69,8 @@ const FAILURE_COPY: Record<Lang, Record<VoiceFailure, string>> = {
   ar: {
     "no-microphone": "لا يوجد ميكروفون متاح، أو تم رفض الإذن.",
     "not-allowed": "ليس لديك صلاحية استخدام المكالمات الصوتية.",
+    "too-many-calls": "بدأت مكالمات كتير في وقت قصير. استنى دقيقة وحاول تاني.",
+    "signed-out": "الجلسة انتهت. سجّل دخول تاني.",
     unavailable: "الخدمة الصوتية غير متاحة حاليًا. حاول مرة أخرى لاحقًا.",
     "config-rejected": "المكالمة اتصلت بس تعذّر إعدادها. حاول تاني.",
     "handshake-failed": "تعذّر بدء المكالمة. حاول مرة أخرى.",

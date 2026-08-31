@@ -452,6 +452,51 @@ async function main() {
     check("and the microphone is released", r.mic.allStopped());
   }
 
+  console.log("\n── 7a. Every status this route returns says something different ──");
+  {
+    /* THE FAILURE THAT COST A DEBUGGING SESSION. The route rate-limits voice
+       to a handful of calls a minute and returns 429. The first version of
+       this mapping handled 403 and 503 and swept everything else into
+       "handshake failed" — so a rate limit, an expired session and a genuinely
+       broken handshake all told the user the same thing, and the investigation
+       went looking at WebRTC for a problem that was a counter.
+
+       Each status needs a DIFFERENT action from the user, so each gets its own
+       reason. */
+    const cases: Array<[number, string]> = [
+      [401, "signed-out"],
+      [403, "not-allowed"],
+      [429, "too-many-calls"],
+      [503, "unavailable"],
+      [500, "handshake-failed"],
+      [502, "handshake-failed"],
+      [504, "handshake-failed"],
+    ];
+    for (const [status, expected] of cases) {
+      const r = deps({ status });
+      const seen: string[] = [];
+      const s = new VoiceSession(r.deps, { onState: (_st, f) => { if (f) seen.push(f); } });
+      await s.start();
+      check(`${status} is reported as ${expected}`, seen.includes(expected));
+    }
+
+    /* The four that need different actions must not share a message. */
+    const distinct = new Set(["signed-out", "not-allowed", "too-many-calls", "unavailable"]);
+    check("the four actionable statuses have four distinct reasons", distinct.size === 4);
+
+    /* And every reason must have copy in every language, or a user meets a
+       blank. Enforced by the type, asserted here so a reader can see it. */
+    const btn = (await import("node:fs")).readFileSync("src/components/ai/VoiceCallButton.tsx", "utf8");
+    for (const reason of ["too-many-calls", "signed-out", "config-rejected"]) {
+      check(`"${reason}" has copy in all three languages`,
+        (btn.match(new RegExp(`"${reason}":`, "g")) ?? []).length === 3);
+    }
+    /* A rate limit must tell the user to WAIT — "try again" invites the retry
+       that deepens the hole. */
+    check("the rate-limit message asks the user to wait rather than retry",
+      /Wait about a minute/.test(btn) && /استنى دقيقة/.test(btn));
+  }
+
   console.log("\n── 7b. A channel that will not carry the long configuration ──");
   {
     /* THE BUG THIS SECTION EXISTS FOR. The session configuration was about two
