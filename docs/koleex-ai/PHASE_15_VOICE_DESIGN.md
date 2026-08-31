@@ -1,8 +1,34 @@
-# Phase 15 — Realtime Voice · Design
+# Phase 15 — Realtime Voice · Design (v3)
 
-**Status:** design only. No code written. Owner decision required on §4 before anything is built.
+**Status:** design only. No code written.
 **Date:** 2026-08-31
-**Model chosen by the owner:** `qwen-audio-3.0-realtime-plus` (Qianwen AI Platform)
+**Model:** `qwen3.5-omni-plus-realtime` (Alibaba Cloud Model Studio)
+
+---
+
+## v3 — WHAT CHANGED, AND THAT I WAS WRONG
+
+v2 concluded that realtime voice **could not be built without a second service**, and
+put that to the owner as the decision the whole feature waited on. That conclusion was
+wrong, and the error was mine.
+
+It rested on one sentence in v2 §1.1 — *"There is no ephemeral token"* — followed by
+*"Everything below follows from that single fact."* It did follow. The fact was wrong.
+
+Two things I had not found when I wrote it:
+
+1. **The vendor offers three transport protocols, not one.** I designed around
+   WebSocket because it was the only one I had seen.
+2. **Two of the three keep the API key off the client**, which is the entire problem the
+   relay existed to solve.
+
+The relay requirement was real **for the model that had been chosen** — `qwen-audio-3.0-realtime-plus`
+supports WebSocket and nothing else. It was not a property of the vendor, and it was
+not a property of realtime voice. Changing the model removes it.
+
+Recorded rather than quietly edited, because a design that blocked a feature for days
+on a false premise is exactly the kind of thing that should leave a scar in the
+document.
 
 ---
 
@@ -12,317 +38,294 @@
 
 > *"yes am in china and the company in china and employees in China but the customers in different countries and they will also use Koleex AI. Koleex AI will be Globally"*
 
-**The second quote arrived after the first draft of this document and invalidated part
-of it.** v1 assumed every user was in mainland China, because every user discussed up
-to that point was. They are not: the staff are in China, the customers are not, and
-the product is meant to be global.
-
-That is not a detail — it decides the hosting topology (§4) and forces a second voice
-provider (§4.3). It is recorded here rather than quietly folded in, because a
-requirement that changes a design after it is written is exactly the kind of thing
-that gets lost and then rediscovered halfway through the build.
-
-Two words carry the whole design: **clean** and **fast**. Everything below is judged
-against them, and where they conflict the conflict is stated rather than smoothed over.
+Two words carry the whole design: **clean** and **fast**.
 
 **Clean** is not an aesthetic here. It means three specific things:
 
-1. The API key never reaches a browser.
+1. The API key never reaches a browser or an app binary.
 2. Every tool the voice model calls passes through the same permission gate and
    confirmation ledger as a typed turn. Voice must not become a hole in Phase 1.
 3. Koleex Hub is not rewritten. Whatever is added is additive and removable.
 
-**Fast** means the end-to-end delay between the user finishing a word and hearing a
-reply. It is dominated by geography, not by code — see §4.
+**Fast** means the delay between the user finishing a word and hearing a reply. It is
+dominated by geography, not by code — see §5.
 
 ---
 
-## 1. What the model actually is
+## 1. The three transports, and why the choice is the whole design
 
-Verified from the model's own page, not from memory:
+| | WebSocket | WebRTC | AOQ (AI over QUIC) |
+|---|---|---|---|
+| Browser | native | **native** | not supported |
+| Native app | yes | yes | **Android / iOS / HarmonyOS** |
+| How the client authenticates | **the real API key** | handshake brokered server-side | **temporary token** |
+| Key reaches the client? | **yes** | **no** | **no** |
+| Echo cancellation / noise suppression | none | built in | built in |
+| Weak-network resilience | poor | good | exceptional |
 
-| | |
-|---|---|
-| Model id | `qwen-audio-3.0-realtime-plus` |
-| Endpoint | `wss://dashscope.aliyuncs.com/api-ws/v1/realtime?model=…` |
-| Auth | `Authorization: Bearer $DASHSCOPE_API_KEY` — **in the WebSocket handshake header** |
-| Input | audio + text |
-| Output | audio + text |
-| Duplex | full — the user can interrupt mid-reply |
-| Function calling | ✅ supported |
-| Turn detection | `server_vad`, threshold `0.5`, `silence_duration_ms: 500` |
-| Audio format | 16 kHz in, 24 kHz out |
-| Voice | e.g. `longanqian` |
-| Context | **40 K** |
-| RPM | **60** |
-| Price | audio in ¥40/M · audio out **¥150/M** |
+The vendor's own security note, on the same page as the key instructions:
 
-### 1.1 There is no ephemeral token
+> *"Don't hard-code it in client code or commit it to a code repository. Manage it
+> through environment variables or **distribute it from a backend service**."*
 
-This was the question the whole architecture hung on, and the answer is no. The
-documented handshake carries the real key. That rules out the one option that would
-have let the browser connect directly at the lowest possible latency.
+**WebSocket is the one transport that cannot honour that**, because its credential *is*
+the key, checked during the handshake. That is why v2 needed a relay: something had to
+hold the key and sit between. With the other two, nothing does.
 
-Everything below follows from that single fact.
+### 1.1 Model support is what actually constrained this
+
+| Application type | Model | AOQ | WebRTC | WebSocket |
+|---|---|---|---|---|
+| Real-time omni | `qwen3.5-omni-plus-realtime` | ✅ | ✅ | ✅ |
+| | `qwen3.5-omni-flash-realtime` | ✅ | ✅ | ✅ |
+| Real-time voice conversation | `qwen-audio-3.0-realtime-plus` | ❌ | ❌ | ✅ only |
+
+The originally chosen model is the bottom row. **The relay was a consequence of the
+model, not of the requirement.**
 
 ---
 
-## 2. Why Vercel cannot host this
+## 2. What Vercel can and cannot do
 
-`CLAUDE.md` states the platform constraint plainly:
+v2 said Vercel could not host this, and quoted the house rule:
 
-> *Treat Vercel Functions as stateless + ephemeral (no durable RAM/FS, **no background daemons**)*
+> *Treat Vercel Functions as stateless + ephemeral (no durable RAM/FS, no background daemons)*
 
-A realtime voice call is a WebSocket held open for the duration of the conversation.
-A Vercel Function cannot hold one. This is not a limitation to engineer around — it is
-what the platform is.
+**Still true, and still decisive for WebSocket.** A Function cannot hold a socket open
+for the length of a conversation.
 
-**Therefore a small separate service is required.** That is the cost of this feature,
-and it should be accepted or the feature declined; there is no third answer.
+**Not decisive for WebRTC**, and that is the unlock. The WebRTC handshake is an SDP
+exchange: one HTTP POST carrying an offer, one HTTP response carrying an answer. That
+is an ordinary request/response — precisely the shape a Function is *for*. Once the
+handshake completes, the media path is browser ↔ vendor directly, and Vercel is not on
+it at all.
+
+**Nor for AOQ**, whose token issuance is also one HTTP POST.
 
 ---
 
 ## 3. The design
 
+### 3.1 Browser — WebRTC, key brokered
+
 ```
-  Browser (China)
-      │  ① WSS — Koleex session cookie/token, no vendor key
-      ▼
-  Koleex Voice Relay          ← new, small, single-purpose
-      │  ② WSS — Bearer DASHSCOPE_API_KEY
-      ▼
-  Qwen Realtime (dashscope.aliyuncs.com)
-
-  and, when the model calls a tool:
-
-  Relay ──③ HTTPS ──▶ Koleex Hub  /api/ai/voice/tool
-                        └─ resolveServerAuth → buildUserContext
-                           → dispatchTool → checkModule → ledger → audit
+browser                    Koleex Hub (Vercel)              Alibaba
+   │                              │                            │
+   │── offer SDP ────────────────▶│                            │
+   │   (normal session cookie)    │── offer + API key ────────▶│
+   │                              │◀───────── answer SDP ──────│
+   │◀──────────── answer SDP ─────│                            │
+   │                                                           │
+   │══════════ audio + DataChannel, direct ════════════════════│
 ```
 
-### 3.1 The relay does four things, and nothing else
+The Hub authenticates the user, decides whether they may use voice at all, chooses the
+region, adds the key, and forwards. **The key exists only inside the Function.**
 
-1. **Authenticate.** Verify the Koleex session before opening anything upstream. An
-   unauthenticated socket is closed without a single byte reaching the vendor.
-2. **Bridge.** Open the upstream socket with the key. The key exists only in this
-   process's environment; it is never sent downstream, never logged, never echoed.
-3. **Pass audio through, untouched.** No transcoding, no buffering beyond one frame,
-   no analysis. Every millisecond spent here is a millisecond the user hears as lag.
-4. **Intercept tool calls.** When the model emits a function call, the relay does NOT
-   execute it. It POSTs to Koleex Hub, which runs the existing `dispatchTool` path,
-   and returns the result upstream as a tool result.
+### 3.2 Native app — AOQ, temporary token
 
-Point 4 is the whole of "clean". A voice path that called tools directly would bypass
-`checkModule`, `filterFields`, the confirmation ledger and the audit trail in one
-stroke — every guard Phase 1 built, gone, on the newest surface. The relay is
-deliberately **not** trusted to make authorisation decisions; it asks the Hub, which
-already knows how.
+```
+app ──── request token ────▶ Koleex Hub ──── API key ────▶ Alibaba gateway
+    ◀─── aoqTokenForClient ─────┘         ◀── token + relay endpoints ──┘
+    ══════ audio, direct to the vendor's own relay ══════════════════════
+```
 
-### 3.2 What the relay must never do
+The gateway returns `aoqTokenForClient`, `clientRelayEndpoints`, a TLS certificate
+fingerprint, and `sidExpiresInSecs` (7200 in the documented example). **Alibaba runs
+the relay.** We do not.
 
-- Hold user data. It is a pipe; conversations persist through the Hub as they do today.
-- Decide permissions. It has no `UserContext` and must not build one.
-- Execute a write. `dispatchTool` is reached over HTTP, on the Hub, or not at all.
-- Log audio or transcripts. The standing rule — *no full prompts or replies in
-  production logs* — applies unchanged. Voice makes it more sensitive, not less.
+### 3.3 What the Hub does, and nothing else
+
+1. **Authenticate.** `requireAuth()`, exactly as every other route.
+2. **Authorise.** Voice is a capability like any other; the server decides, never the client.
+3. **Choose the region.** §5. Never the client's choice.
+4. **Broker the handshake.** Add the key, forward, return the answer.
+5. **Execute tool calls.** §4 — the part that matters most.
+
+### 3.4 What it must never do
+
+- Return the API key, any prefix of it, or its length.
+- Accept a vendor endpoint, region or model id **from the client**.
+- Let a voice session outlive the authorisation that opened it.
 
 ---
 
-## 4. ⚠️ THE DECISION THAT DETERMINES SPEED
+## 4. ⚠️ TOOL CALLS IN A LIVE CALL — the real security work
 
-Latency in a voice call is decided by geography, not by how the code is written. Two
-distances matter and they are not the same distance:
+`qwen3.5-omni-plus-realtime` does **function calling**. That is the feature that makes
+voice worth building for this product — Koleex AI has 45 tools, and a voice assistant
+that can only talk is a toy next to one that can quote, check stock and book. It is
+also where the new topology genuinely changes the threat model, so it gets said plainly.
+
+### 4.1 What changed
+
+Today the agent loop runs **on the server**. The server sees the model's tool calls
+directly.
+
+With WebRTC the model talks to the **browser** over the DataChannel. A tool call
+arrives at the client, which must hand it to the Hub to execute.
+
+**So the server no longer observes what the model asked. It observes what the client
+says the model asked.** That is a real degradation and it is not hand-waved here.
+
+### 4.2 Why it is nonetheless safe — and where it is not
+
+It is safe for authorisation, because **the client was never trusted for that anyway**.
+Every path already runs:
+
+| | |
+|---|---|
+| `requireAuth` | who is this |
+| `checkModule` | may they do this at all |
+| `filterFields` | what may they see |
+| `consumePendingAction` | a write runs only against a matching recorded preview |
+
+A fabricated tool call therefore does **exactly what the user could already do by
+typing**. The blast radius is the user's own authority, which is not a new hole. This is
+what the Phase 1 work bought.
+
+Two things it genuinely costs, both stated rather than dismissed:
+
+- **Audit fidelity.** "The model requested X" becomes a client claim. The audit trail
+  must record voice-originated calls as **client-relayed**, distinct from
+  server-observed, or it will assert something it cannot know.
+- **Confirmation quality.** See below.
+
+### 4.3 A spoken "yes" is not a confirmation
+
+The standing rule:
+
+> *"A write tool must NOT execute merely because the model sends `confirm: true`.
+> The server must verify a matching pending action exists."*
+
+That holds unchanged and the ledger enforces it. But voice adds a failure mode typing
+does not have: **a speech model can mishear, and a noisy factory floor can produce a
+"yes" nobody said.** Consent that was never given would still hash-match a real pending
+action.
+
+**Recommendation:** `HIGH_RISK_WRITE` and `EXTERNAL_SIDE_EFFECT` tools require an
+**on-screen** confirmation during a voice call, not a spoken one. Low-risk reads and
+routine writes may confirm by voice. This is a product decision with a security
+consequence, and it belongs to the owner — but the safe default is the one written
+here.
+
+### 4.4 The 45 tools are no longer a budget problem
+
+v2 measured the tool schemas at **9,772 tokens — 24% of a 40 K context**, and built a
+selection strategy around it. `qwen3.5-omni-plus-realtime` carries **256 K**. The same
+schemas are now under 4%.
+
+Domain narrowing (§M.4) stays anyway — not for tokens, but because a model offered
+fewer, more relevant tools chooses better.
+
+---
+
+## 5. Geography still decides speed
+
+The relay is gone; the distance is not. With WebRTC there is now **one** hop that
+matters, not two:
 
 ```
-   user ──── A ────▶ relay ──── B ────▶ model
+   user ──────────────▶ model region
 ```
 
-**A** is set by where the relay runs. **B** is set by where the *model* runs, and no
-amount of relay placement can shorten it.
-
-### 4.1 Two populations, not one
+### 5.1 Two populations, one unchanged fact
 
 | | Staff | Customers |
 |---|---|---|
 | Where | mainland China | many countries |
-| Nearest relay | China | their own region |
-| Distance to Qwen (China) | **short** | **long — unavoidable** |
+| Nearest vendor region | **Beijing** | **Singapore**, or far |
 
-A single relay cannot serve both well. One in China leaves every customer paying a
-round-trip to China on **A** *and* on **B**. One abroad does the same to the staff, and
-puts the mainland-China guarantee at risk.
+The vendor publishes regional endpoints — `cn-beijing` and `ap-southeast-1` — so region
+selection replaces relay placement, at no infrastructure cost to us. That is strictly
+better than v2, where both hops were ours to place.
 
-### 4.2 Relay placement
-
-| Location | Serves | Note |
-|---|---|---|
-| **Alibaba Cloud ECS, mainland China** | staff | Same cloud as Qwen — shortest possible **B** |
-| **A second region** (EU or US, chosen by where customers actually are) | customers | Added when customers are onboarded, not before |
-
-The relay is stateless: it authenticates, bridges, and forwards. Running two of them is
-a deployment concern, not a second codebase.
-
-### 4.3 The harder half — the model is in China
-
-Even a perfectly placed relay cannot fix **B** for a customer in Europe: the model
-itself is in China.
-
-**This is the same problem Phase 4 already solved for text, and it takes the same
-shape.** DeepSeek is China-native and excellent there; the fallback adapter exists so a
-second provider can serve where DeepSeek does not. Voice needs the identical structure:
+**It does not solve distance for Europe or the Americas.** Singapore is closer than
+Beijing and still far. The Phase 4 shape applies unchanged:
 
 ```
 Phase 4  · text   →  DeepSeek (CN)  +  configurable second provider
-Phase 15 · voice  →  Qwen (CN)      +  configurable second provider
+Phase 15 · voice  →  Qwen (CN/SG)   +  configurable second provider, when a customer needs one
 ```
 
-**The provider abstraction built in Phase 4 is what makes this cheap.** Voice gets its
-own small registry with the same rule: no vendor identity in the core, endpoints and
-model ids as configuration.
+**No second provider is named here.** This environment cannot verify a vendor's
+endpoints or model ids first-hand, and a constant written from memory in a failover
+path is worse than no failover.
 
-**Candidate second providers are NOT named here.** This environment cannot reach any
-vendor to verify an endpoint, a model id, or whether it offers an ephemeral token — and
-the one thing this project has learned repeatedly is that a constant written from
-memory in a failover path is worse than no failover. They are researched when a
-customer actually needs one.
-
-### 4.4 Which path a user gets is decided BY THE SERVER
-
-The standing rule applies unchanged:
+### 5.2 The server chooses the region
 
 > *"The client application must never determine this permission. The server determines it."*
 
-A browser must not choose its own voice endpoint. The server resolves it from an
-explicit per-tenant or per-account setting, defaulting from request geography, and
-hands back only the relay URL the user is allowed to use. A client that could pick
-would be a client that could route itself to a cheaper or an unmetered path.
+Resolved from an explicit per-tenant or per-account setting, defaulting from request
+geography. A client that could choose its own region could route itself to an unmetered
+one.
 
-### 4.5 Start with one region — recommended
+### 5.3 Ship China first
 
-**Ship China-only first.** The staff are the first users, they are in China, and Qwen
-serves them best. Real usage will answer the questions this document cannot:
+The staff are the first users, they are in China, and Beijing serves them best. Real
+usage answers what this document cannot: is it fast enough, what does a real
+conversation cost, which tools do people actually reach for by voice.
 
-- Is the latency good enough to keep using?
-- What does a real conversation actually cost?
-- Which tools do people reach for by voice?
+A customer outside China during that stage is **not broken** — they get Singapore, or
+Beijing, and it is slower. A stated, visible limitation, not a silent failure.
 
-Adding the second region afterwards is configuration plus a deployment, because the
-provider layer was built for it. Building both at once means guessing twice.
-
-**A customer outside China during that first stage is not broken** — they can still use
-Qwen through the China relay. It will be slower. That is a stated, visible limitation,
-not a silent failure, and it is honest to ship it that way while the feature proves
-itself.
-
-### 4.6 One product consequence worth stating
-
-Two providers means two voices. A customer in Europe on a different model will not
-sound like the assistant a staff member in China hears. That is a **product** decision —
-consistency of persona versus latency — and it belongs to the owner, not to this design.
-
-### 4.7 This is a new operational surface, stated honestly
-
-Each relay is a thing that can break, needs patching, needs monitoring, and costs money
-monthly. That is a real cost, not hidden by calling the service "small". If the owner
-is not willing to run one, **this feature cannot ship** — and saying so now is cheaper
-than discovering it later.
-
-*No latency figures are given anywhere in this section on purpose.* Real numbers need
-measurement from real networks, and inventing them would be exactly the kind of
-unverifiable claim this project's plan forbids.
-
-## 5. The 40 K context problem, measured
-
-Measured against this repository, not estimated:
-
-```
-45 tool schemas on the wire   9,772 tokens   ← 24% of the window
-system prompt                ~3,000 tokens
-──────────────────────────────────────────
-consumed before a word is spoken  ~13,000   (33%)
-left for the conversation itself  ~27,000
-```
-
-Audio consumes context far faster than text, so a call would run out mid-conversation.
-
-**Mitigation — a voice tool subset.** Voice does not need all 45 tools. A curated set
-of the ones people actually ask for out loud (lookups, status, reminders) cuts the
-tool budget by most of that 9.8 K and roughly doubles usable call length.
-
-This is a **product** decision as much as a technical one, and it has a security
-benefit: a smaller voice surface is a smaller surface. The subset must be declared
-explicitly — never derived by a filter that silently changes when a tool is renamed.
+*No latency figures appear anywhere in this section on purpose.* Real numbers need
+measurement from real networks.
 
 ---
 
 ## 6. Cost
 
-Audio output is ¥150/M tokens against ¥6.4/M for `qwen3.7-plus` — roughly **23×**.
+Audio output is the expensive half on any realtime model, and the owner has confirmed
+the published pricing is acceptable. Two controls belong in the build regardless:
 
-**No cost-per-conversation figure is given here.** Audio token accounting differs from
-text and this design will not invent a number. The free quota exists precisely so the
-first real conversation can be measured. **Measure before enabling this for a team.**
-
-The `[ai.usage]` meter from Phase 5B already records tokens whenever a provider
-reports them; the relay must report usage the same way so voice appears in the same
-place as everything else.
+- **A per-account and per-tenant minute budget**, enforced server-side at handshake
+  time. A voice call is the only feature in this product that spends money continuously
+  while a user says nothing.
+- **The existing rate limiter** applies to the handshake route like any other.
 
 ---
 
-## 7. Scope, in build order
+## 7. Build order
 
-| # | Step | Why it is separable |
-|---|---|---|
-| 1 | Relay service: auth, bridge, audio pass-through | Provable with a hardcoded prompt and no tools |
-| 2 | `/api/ai/voice/tool` on the Hub — the guarded door | Testable without any audio at all |
-| 3 | Tool-call interception in the relay | Only after 1 and 2 are each proven |
-| 4 | Browser client: mic capture, playback, barge-in | The user-visible half |
-| 5 | Voice tool subset, declared | Product decision, not code |
-| 6 | Usage + audit wired to the existing meters | Voice must not be invisible to cost or audit |
+1. **Handshake route** — authenticate, authorise, region, broker SDP. No UI.
+2. **Browser client** — microphone, WebRTC, playback, barge-in.
+3. **Tool bridge** — DataChannel call → Hub → permission engine → ledger → result back.
+   §4 is this step.
+4. **On-screen confirmation** for high-risk writes (§4.3).
+5. **Budgets and telemetry** (§6).
+6. **Native app via AOQ** — only if and when a real app is built. Nothing here blocks it.
 
-Steps 1 and 2 are independently verifiable. That ordering is deliberate: it means the
-security-bearing part (2) can be proved correct before any audio exists to rush it.
+Steps 1–3 are the feature. 4–5 are what make it shippable.
 
 ---
 
-## 8. What must be true before this is called done
+## 8. Done means
 
-- [ ] The key is provably absent from every byte sent downstream.
-- [ ] A voice tool call is refused when the user lacks the module permission — asserted, not assumed.
-- [ ] A voice write with no matching pending action is refused by the ledger, exactly as a typed one is.
-- [ ] Audio and transcripts appear in no production log.
-- [ ] Measured end-to-end latency from a real Chinese network, recorded.
-- [ ] Measured cost of one real conversation, recorded.
-- [ ] The relay failing degrades voice to the existing typed path — it must never take the assistant down.
-
-The last one is the standing rule of this whole project: a failure in a new capability
-must never become a failure to answer.
+- The key never appears in any client bundle, network response, or log. Asserted by a suite.
+- A voice tool call is refused for a user whose role forbids it — proven, not assumed.
+- A high-risk write cannot execute on a spoken "yes" alone.
+- The audit trail distinguishes client-relayed calls from server-observed ones.
+- Mainland China works with no VPN.
+- A measured latency figure exists. Not an estimate.
 
 ---
 
-## 9. Open questions for the owner
+## 9. Still unverified, and worth checking before code
 
-1. **Will you run one small service?** If no, this feature stops here and §10 is the
-   honest alternative.
-2. **China first, or both regions at once?** §4.5 recommends China first.
-3. **Which tools should voice reach?** Needed for §5.
-4. **When customers do get their own region — same voice or lowest latency?** §4.6. Not
-   needed to start; needed before a second provider is chosen.
+1. **Does `qwen3.5-omni-plus-realtime` support function calling over WebRTC's
+   DataChannel specifically**, or only over WebSocket? **Probably yes, not proven.**
 
-## 10. The honest alternative, if the answer to §9.1 is no
+   The evidence for: the WebRTC flow opens a DataChannel labelled `txt` and sends the
+   very same client events over it — `session.update` with the same fields — and the
+   vendor describes the WebRTC text path as *"Same as WebSocket. Receive streaming text
+   events through the DataChannel."* One event protocol over two transports.
 
-Without a relay, realtime duplex voice cannot be built safely — the only way to avoid
-the second service is to put the vendor key in the browser, which the owner's own
-rules forbid outright.
+   What is missing: no worked example of a **tool call** over WebRTC. So this is an
+   inference from the protocol being shared, not an observation of the feature.
+   **It is the one open question that could reshape §4**, and the cheapest way to
+   settle it is one throwaway call against the real endpoint before §7.3.
+2. Regional availability of the omni-realtime models in `ap-southeast-1`.
+3. Concurrency limits per workspace.
 
-What remains possible with no new infrastructure:
-
-- **Natural server TTS for replies.** ElevenLabs already exists in this repository at
-  `/api/qa/ai/tts` behind a super-admin check and wired only to the QA module. Freeing
-  it and connecting it to Koleex AI replaces the robotic browser voice with a human one.
-- **Server-side speech-to-text** on a normal HTTP request, which also fixes the Web
-  Speech API's dependence on Google — a dependency that is very likely broken in China
-  on Chrome today and is worth testing regardless of what is decided here.
-
-That combination is *press-to-talk with a human voice*, not a live conversation. It is
-a smaller thing, honestly described as a smaller thing.
+None of these blocks starting §7.1. All of them should be settled before §7.3.
