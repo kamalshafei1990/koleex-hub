@@ -109,6 +109,54 @@ export function isSmallTalk(msg: string): boolean {
    "Koleex AI" are Section-2-specific. */
 export type BrandSection = "none" | "company" | "ai" | "both";
 
+/* ---------------------------------------------------------------------------
+   "What can you do?" — its own question, and its own list.
+
+   It routes to the same Section 2 lane as "who are you", but it wants a
+   DIFFERENT answer, so the patterns are named and exported rather than buried
+   in aiPatterns: the prompt layer asks isCapabilityQuestion() to decide which
+   self-description to load, and loading the wrong one costs a paragraph about
+   a founder to someone who asked what the thing does.
+
+   NO \b ANYWHERE NEAR ARABIC. JavaScript's \b is defined against \w, which is
+   ASCII-only, so a boundary between a space and an Arabic letter never
+   matches — the defect that left every Arabic pattern in this file dead.
+   --------------------------------------------------------------------------- */
+const CAPABILITY_PATTERNS: RegExp[] = [
+  // English
+  /\bwhat\s+(?:can|do)\s+(?:you|u)\s+(?:do|know)\b/i,
+  /\bwhat\s+(?:you|u)\s+can\s+do\b/i,
+  /\bwhat\s+(?:can|could)\s+(?:you|u)\s+help\b/i,
+  /\bwhat\s+are\s+(?:your|ur)\s+(?:capabilities|features|abilities|limits|limitations|skills)\b/i,
+  /\bwhat\s+are\s+(?:you|u)\s+capable\s+of\b/i,
+  /\bhow\s+(?:can|could)\s+(?:you|u)\s+help\b/i,
+  /\bwhat\s+(?:can'?t|cannot|can\s+not)\s+(?:you|u)\s+do\b/i,
+  /\bwhat\s+do\s+(?:you|u)\s+do\b/i,
+
+  // Arabic — MSA and Egyptian
+  /(?:ماذا|ما\s*الذي)\s*(?:تستطيع|يمكنك|تقدر)/,
+  /ما\s*(?:هي\s*)?(?:قدراتك|إمكانياتك|امكانياتك|مهاراتك)/,
+  /(?:قدراتك|إمكانياتك|امكانياتك)\s*(?:ايه|إيه)/,
+  /(?:تقدر|بتقدر|ممكن)\s*(?:ت)?عمل\s*(?:ايه|إيه)/,
+  /(?:ايه|إيه)\s*(?:اللي\s*)?(?:تقدر|ممكن)\s*(?:ت)?عمل/,
+  /(?:كيف|إزاي|ازاي)\s*(?:يمكنك|تقدر|ممكن)\s*(?:تساعدني|تساعدنى|مساعدتي|مساعدتى)/,
+  /(?:تعرف|بتعرف)\s*(?:ت)?عمل\s*(?:ايه|إيه)/,
+  /(?:أنت|انت|إنت)\s*بتعمل\s*(?:ايه|إيه)/,
+
+  // Chinese
+  /你(?:能|可以|会)做什么/,
+  /你(?:能|可以)帮我(?:做)?什么/,
+  /你有什么(?:功能|能力|本事)/,
+  /你(?:的)?(?:能力|功能)(?:有哪些|是什么)/,
+  /你不能做什么/,
+];
+
+/** True when the turn asks what the assistant can DO rather than what it IS. */
+export function isCapabilityQuestion(msg: string): boolean {
+  const s = msg.trim();
+  return s.length > 0 && CAPABILITY_PATTERNS.some((re) => re.test(s));
+}
+
 export function classifyBrandSection(msg: string): BrandSection {
   const s = msg.trim().toLowerCase();
   if (!s) return "none";
@@ -129,9 +177,8 @@ export function classifyBrandSection(msg: string): BrandSection {
     // "what are you" / "what r u" / "what kind of ai"
     /\bwhat\s+(?:are|r)\s+(?:you|u)\b/i,
     /\bwhat\s+kind\s+of\s+ai\b/i,
-    // "what can you do" / "what do you know" / "what you can do"
-    /\bwhat\s+(?:can|do)\s+you\s+(?:do|know)\b/i,
-    /\bwhat\s+you\s+can\s+do\b/i,
+    // "what can you do" and everything shaped like it — see CAPABILITY_PATTERNS
+    ...CAPABILITY_PATTERNS,
 
     // Name questions — tolerate missing apostrophe, extra spaces
     /* "ur" was named in the comment above as a case this handles, and did not:
@@ -202,7 +249,6 @@ export function classifyBrandSection(msg: string): BrandSection {
     /你的名字/,
     /你是谁/,
     /你是(?:真人|人类)吗/,
-    /你(?:能|可以)做什么/,
     /谁(?:开发|创造|制造|发明|设计|做|研发)(?:了)?(?:你|您)/,
     /你是(?:谁|哪家|哪个公司)(?:开发|做|研发)的/,
     /(?:谁的主意|谁的想法|谁提出)/,

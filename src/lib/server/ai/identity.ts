@@ -135,6 +135,64 @@ export const AI_IDENTITY_BRIEF =
   " wording. Never claim Koleex trained your whole model from scratch. Answer in the user's own language and register.";
 
 /* ---------------------------------------------------------------------------
+   "What can you do?" — the other question people ask a new assistant.
+
+   A DIFFERENT QUESTION FROM "who are you", and it wants a different answer.
+   Answering it with the founder's story is a non-answer; answering it with a
+   feature list is a brochure. What works is a reframe — tell me what you want
+   to achieve — followed by an honest account of what is actually available.
+
+   WHERE THE HONESTY LINE IS, and why this was the careful part. Everything in
+   the first group is inherent: it is language and reasoning work, true in
+   every lane, with no tool involved. Everything in the second group depends on
+   what is connected to the turn, and it is written as a CONDITION rather than
+   a promise — because it genuinely varies:
+
+     · the general chat lane has NO tools, and its own prompt says so;
+     · the agent lane has ~30, including web search, catalogue and inventory
+       reads, and writes to todos, planning, calendar and quotation drafts;
+     · attachments are extracted BEFORE the turn — a PDF's text layer, a
+       scanned PDF rasterised and read, an image described by a vision model —
+       so reading documents and images is real, and it happens in the Hub;
+     · every record-level answer is filtered by the asker's own permissions.
+
+   Claiming the second group unconditionally would be the "features that are
+   not reachable at runtime" failure, in the one answer whose whole job is to
+   set expectations. So the condition is stated, and the model is told to
+   describe what is available in THIS conversation rather than in the product.
+   --------------------------------------------------------------------------- */
+export const AI_CAPABILITIES_ANSWER =
+  " WHAT YOU CAN DO — answer this whenever the user asks what you can do, what you are capable of, what you know," +
+  " what your features, skills or limits are, what you cannot do, or how you can help. Any language, however phrased." +
+  " OPEN BY REFRAMING: the more useful question is not what you can do but what they want to achieve — say so, lightly," +
+  " and invite them to tell you the goal." +
+  " THEN, WHAT IS TRUE IN EVERY CONVERSATION, because it needs no tool: you help people think, write, analyse," +
+  " research, translate, calculate, plan, create, organise, explain, compare, solve problems, generate ideas, work" +
+  " through documents and data, assist with coding, support business decisions, and communicate across languages." +
+  " The subjects run from business, international trade, products, sales, marketing, customer service, contracts," +
+  " quotations, reports, strategy and project management to programming, data analysis, education and creative work —" +
+  " and you are not restricted to business: everyday questions, learning and conversation are equally yours." +
+  " WHAT DEPENDS ON WHAT IS CONNECTED — say it as a condition, never as a promise: with the right tools available you" +
+  " also read documents and images the user attaches, look things up on the public internet, search Koleex knowledge," +
+  " work with Koleex catalogue, product and inventory information, help prepare and draft work inside the Hub, and" +
+  " speak with the user by voice. Inside Koleex Hub you use the information and tools made available to you, always" +
+  " within the permissions of the person asking — never more than they may see themselves." +
+  " YOUR ABILITIES ARE NOT ONE FIXED LIST: they grow as new models, tools and knowledge sources are connected." +
+  " CLOSE ON THE OFFER: if you can do it directly you will; if it needs a connected tool you will use it when it is" +
+  " available; and if it is beyond what you can currently do you will say so plainly." +
+  /* The clause that keeps this answer from becoming a brochure. */
+  " HONESTY — THE PART THAT MATTERS MOST HERE: describe what is actually available in THIS conversation, not what the" +
+  " product may offer somewhere else. Never present a capability that depends on a tool you have not been given as" +
+  " something you can do right now, and never promise a future one. If you have no tools in this turn, say plainly" +
+  " that you help directly with the thinking, writing, analysis and language work, and that record-level work lives" +
+  " in the Hub's own apps. When you genuinely cannot do something, say so early rather than attempting it and" +
+  " failing." +
+  " SHAPE: three to five short paragraphs — confident and warm, not a feature dump, and never a bare bulleted" +
+  " inventory. Vary the wording between answers. Reply in the user's own language and register." +
+  " This is what Koleex AI is for: one intelligent interface onto knowledge, creation, business, technology and the" +
+  " digital world around the person asking.";
+
+/* ---------------------------------------------------------------------------
    Paying for the story only when it is asked for.
 
    THE FULL STORY IS 3.9 KB, and putting it on every turn cost +33–49% on lanes
@@ -148,12 +206,25 @@ export const AI_IDENTITY_BRIEF =
    classifier ever misses a phrasing, the answer is still correct and still
    names Mr. Kamal El Shafei; it is only shorter than it should have been.
 
+   AND "WHO ARE YOU" IS NOT "WHAT CAN YOU DO". Both route to the same Section 2
+   lane, so a single "is this about the assistant" test would load the wrong
+   one half the time — the founder's story for someone asking what the thing
+   does. The capability question is checked FIRST and wins, because it is the
+   narrower test: "what can you do" is unambiguous, while the identity net is
+   wide enough to catch it in passing.
+
    It goes at the END of the system prompt on purpose: a prefix that changes
    with the user's message is a prefix no cache can reuse.
    --------------------------------------------------------------------------- */
-import { classifyBrandSection } from "@/lib/server/ai/core/decide-turn";
+import { classifyBrandSection, isCapabilityQuestion } from "@/lib/server/ai/core/decide-turn";
 
-/** The full story when this turn is an identity question, otherwise nothing. */
+/**
+ * The self-description this turn needs, or nothing.
+ *
+ * Capability first: it is the narrower, unambiguous test, and the identity
+ * net is wide enough to swallow it.
+ */
 export function identityDepthFor(userMsg: string): string {
+  if (isCapabilityQuestion(userMsg)) return AI_CAPABILITIES_ANSWER;
   return classifyBrandSection(userMsg) === "ai" ? AI_IDENTITY_STORY : "";
 }

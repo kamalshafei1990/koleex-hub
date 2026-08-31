@@ -32,7 +32,7 @@ import "server-only";
    --------------------------------------------------------------------------- */
 
 import { AI_PROVENANCE_RULE } from "@/lib/server/ai/prompt-builder";
-import { AI_IDENTITY_STORY, AI_IDENTITY_BRIEF } from "@/lib/server/ai/identity";
+import { AI_IDENTITY_STORY, AI_IDENTITY_BRIEF, AI_CAPABILITIES_ANSWER } from "@/lib/server/ai/identity";
 import { type VoiceOption } from "./config";
 
 /* Transport settings. The formats follow from what a browser can capture and
@@ -75,6 +75,10 @@ const VOICE_INSTRUCTIONS =
   "You are Koleex AI, speaking with a colleague by voice." +
   AI_PROVENANCE_RULE +
   AI_IDENTITY_STORY +
+  /* Both self-descriptions, because a voice session is configured before
+     anyone has said anything — there is no message to classify, and "what can
+     you do" is one of the first things a person tries out loud. */
+  AI_CAPABILITIES_ANSWER +
   " SPOKEN STYLE: keep answers short and natural — this is a conversation, not a document." +
   " No markdown, no lists, no headings: everything you say is heard, not read." +
   " SPOKEN LENGTH OVERRIDES THE WRITTEN SHAPE: when the identity question comes up, give the same facts —" +

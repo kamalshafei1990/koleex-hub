@@ -26,6 +26,7 @@ import { AI_PROVENANCE_RULE } from "../src/lib/server/ai/prompt-builder";
 import {
   AI_IDENTITY_STORY,
   AI_IDENTITY_BRIEF,
+  AI_CAPABILITIES_ANSWER,
   KOLEEX_IDENTITY,
   NAME_DRIFT,
 } from "../src/lib/server/ai/identity";
@@ -37,7 +38,8 @@ import {
 } from "../src/lib/server/ai/prompts";
 import { buildFastPrompt, buildSmartPrompt, buildChatPrompt, buildBusinessPrompt } from "../src/lib/server/ai/prompt-builder";
 import { buildVoiceSessionPayload } from "../src/lib/server/ai/voice/session-config";
-import { classifyBrandSection } from "../src/lib/server/ai/core/decide-turn";
+import { classifyBrandSection, isCapabilityQuestion } from "../src/lib/server/ai/core/decide-turn";
+import { listTools } from "../src/lib/server/ai-agent/tool-registry";
 import type { UserContext } from "../src/lib/server/ai-agent/types";
 
 let pass = 0;
@@ -498,6 +500,179 @@ console.log("\n── 8. The question actually reaches the lane that answers it 
       : `these are NOT identity questions but route as one: ${falsePositives.join(" | ")}`,
     falsePositives.length === 0,
   );
+}
+
+
+console.log("\n── 9. \"What can you do?\" is a different question ──");
+{
+  /* IT ROUTES TO THE SAME LANE AS "who are you" and wants a different answer.
+     A single "is this about the assistant" test would hand the founder's story
+     to someone asking what the thing does — which is a non-answer, delivered
+     confidently. */
+  check("the capability answer exists and is exported", AI_CAPABILITIES_ANSWER.length > 0);
+  check("it opens by reframing rather than reciting a feature list",
+    /OPEN BY REFRAMING/.test(AI_CAPABILITIES_ANSWER) &&
+    /what they want to achieve/.test(AI_CAPABILITIES_ANSWER));
+  check("it names the work that needs no tool",
+    /needs no tool/.test(AI_CAPABILITIES_ANSWER) &&
+    /translate/.test(AI_CAPABILITIES_ANSWER) && /assist with coding/.test(AI_CAPABILITIES_ANSWER));
+  check("and the subjects, including the ones outside business",
+    /international trade/.test(AI_CAPABILITIES_ANSWER) &&
+    /not restricted to business/.test(AI_CAPABILITIES_ANSWER));
+
+  /* THE LINE THAT MATTERS. Everything tool-dependent must read as a condition.
+     Claiming it flat is the "features that are not reachable at runtime"
+     failure, in the one answer whose entire job is setting expectations. */
+  check("tool-dependent abilities are stated as a condition, never as a promise",
+    /WHAT DEPENDS ON WHAT IS CONNECTED/.test(AI_CAPABILITIES_ANSWER) &&
+    /say it as a condition, never as a promise/.test(AI_CAPABILITIES_ANSWER));
+  check("and the model is told to describe THIS conversation, not the product",
+    /available in THIS conversation, not what the/.test(AI_CAPABILITIES_ANSWER) &&
+    /never present a capability that depends on a tool you have not been given/i.test(AI_CAPABILITIES_ANSWER) &&
+    /never promise a future one/i.test(AI_CAPABILITIES_ANSWER));
+  check("the permission ceiling is part of the answer, not an afterthought",
+    /within the permissions of the person asking/.test(AI_CAPABILITIES_ANSWER) &&
+    /never more than they may see themselves/.test(AI_CAPABILITIES_ANSWER));
+  check("it admits its own limits out loud",
+    /beyond what you can currently do you will say so plainly/.test(AI_CAPABILITIES_ANSWER) &&
+    /say so early rather than attempting it and failing/.test(AI_CAPABILITIES_ANSWER));
+  check("it asks for prose of a real length, and for variety",
+    /three to five short paragraphs/.test(AI_CAPABILITIES_ANSWER) &&
+    /never a bare bulleted/.test(AI_CAPABILITIES_ANSWER) &&
+    /Vary the wording between answers/.test(AI_CAPABILITIES_ANSWER));
+
+  /* EVERY TOOL-DEPENDENT ABILITY NAMED HERE MUST ACTUALLY EXIST. An answer
+     that promises what the codebase cannot do is the failure this whole
+     section guards, so the claims are checked against the shipped tool
+     surface rather than taken on trust. */
+  const attachments = readFileSync("src/app/api/ai/attachments/route.ts", "utf8");
+  /* THE REGISTRY, NOT THE PROSE. A first version tested the agent prompt for
+     the string "search_web", which a mutation that deleted the capability
+     survived — the prompt mentions the name in several sentences, so the
+     check was reading the advertisement rather than the product. listTools()
+     is what the model is actually handed. */
+  const tools = new Set(listTools().map((t) => t.name));
+
+  const BACKED_BY: Array<[string, boolean]> = [
+    /* CALLED, not merely imported: matching the import line let a mutation
+       that unhooked the vision call slip through, leaving the ability gone
+       from the product and still claimed in the answer. */
+    ["reading attached images (a vision model describes them)", /\bdescribeImage\s*\(/.test(attachments)],
+    ["reading attached documents (PDF text layer, and scans rasterised)", /unpdf|rasteris/i.test(attachments)],
+    ["looking things up on the public internet", tools.has("search_web")],
+    ["searching Koleex knowledge", tools.has("search_knowledge") || tools.has("searchMachineKnowledge")],
+    ["catalogue and product reads", tools.has("searchCatalog") && tools.has("searchProducts")],
+    ["inventory reads", tools.has("getInventoryStatus")],
+    ["helping prepare and draft work in the Hub", tools.has("createQuotationDraft") && tools.has("createTodo")],
+    ["speaking by voice", String(buildVoiceSessionPayload(null).full.session.instructions ?? "").length > 0],
+  ];
+  const unbacked = BACKED_BY.filter(([, ok]) => !ok).map(([n]) => n);
+  check(
+    unbacked.length === 0
+      ? `every tool-dependent ability the answer names is backed by something that ships (${tools.size} tools registered)`
+      : `the answer claims abilities with nothing behind them: ${unbacked.join("; ")}`,
+    unbacked.length === 0,
+  );
+
+  /* Non-vacuity: a registry that came back empty would make every has() false
+     and the check above would fail loudly — but an all-true stub would not.
+     Assert the set is real. */
+  check("the tool registry the check reads is populated, not a stub", tools.size > 20);
+
+  /* AND THE ANSWER MUST NOT CLAIM WHAT IS NOT THERE. Named individually
+     because each is a plausible thing to write and none of it is true. */
+  for (const forbidden of [
+    "send emails",
+    "make phone calls",
+    "browse on your behalf",
+    "train itself",
+    "modify its own",
+  ]) {
+    check(`the answer does not claim it can "${forbidden}"`,
+      !new RegExp(forbidden.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i").test(AI_CAPABILITIES_ANSWER));
+  }
+}
+
+console.log("\n── 10. The right answer reaches the right question ──");
+{
+  const CAPABILITY: Array<[string, string]> = [
+    ["en", "What can you do?"],
+    ["en", "what can u do"],
+    ["en", "what are your capabilities"],
+    ["en", "what are you capable of"],
+    ["en", "what can you help me with"],
+    ["en", "how can you help"],
+    ["en", "what are your limits"],
+    ["en", "what cant you do"],
+    ["en", "what do you do"],
+    ["ar", "ماذا تستطيع أن تفعل؟"],
+    ["ar", "ما هي قدراتك"],
+    ["ar", "ما الذي يمكنك فعله"],
+    ["ar", "كيف يمكنك مساعدتي"],
+    ["ar-eg", "تقدر تعمل ايه؟"],
+    ["ar-eg", "ايه اللي تقدر تعمله"],
+    ["ar-eg", "قدراتك ايه"],
+    ["ar-eg", "انت بتعمل ايه"],
+    ["zh", "你能做什么"],
+    ["zh", "你会做什么"],
+    ["zh", "你有什么功能"],
+    ["zh", "你能帮我做什么"],
+    ["zh", "你不能做什么"],
+  ];
+  const notDetected = CAPABILITY.filter(([, q]) => !isCapabilityQuestion(q));
+  check(
+    notDetected.length === 0
+      ? `all ${CAPABILITY.length} capability phrasings are recognised`
+      : `not recognised as capability questions: ${notDetected.map(([l, q]) => `${l}: ${q}`).join(" | ")}`,
+    notDetected.length === 0,
+  );
+  const notRouted = CAPABILITY.filter(([, q]) => classifyBrandSection(q) !== "ai");
+  check(
+    notRouted.length === 0
+      ? "and all of them still reach the lane that carries the approved knowledge"
+      : `these do not reach the identity lane: ${notRouted.map(([, q]) => q).join(" | ")}`,
+    notRouted.length === 0,
+  );
+
+  /* THE CROSS-WIRING IS THE POINT OF THIS SECTION. Each question must get its
+     OWN answer: the founder's story is a non-answer to "what can you do", and
+     a capability list is a non-answer to "who made you". */
+  const say = (f: (m: string, c: object) => Array<{ content: string }>, msg: string) =>
+    f(msg, {}).map((m) => m.content).join("");
+  for (const [name, f] of [
+    ["fast", buildFastPrompt], ["smart", buildSmartPrompt],
+    ["chat", buildChatPrompt], ["business", buildBusinessPrompt],
+  ] as const) {
+    const cap = say(f, "what can you do?");
+    const who = say(f, "who made you?");
+    check(`${name}: a capability question gets the capability answer, not the founder's story`,
+      cap.includes(AI_CAPABILITIES_ANSWER.trim()) && !cap.includes(AI_IDENTITY_STORY.trim()));
+    check(`${name}: an identity question gets the story, not the capability list`,
+      who.includes(AI_IDENTITY_STORY.trim()) && !who.includes(AI_CAPABILITIES_ANSWER.trim()));
+  }
+
+  /* An ordinary turn pays for neither. */
+  check("an ordinary business turn loads neither self-description",
+    (() => {
+      const ord = say(buildChatPrompt, "how many overdue invoices do we have?");
+      return !ord.includes(AI_CAPABILITIES_ANSWER.trim()) && !ord.includes(AI_IDENTITY_STORY.trim());
+    })());
+
+  /* The lanes with no message to classify carry both, and must. */
+  const ctx3 = {
+    auth: { username: "mona", user_id: "u1", account_id: "a1", role_id: "r1", view_as_role_id: null },
+    modulePermissions: {}, allowedSensitiveFields: new Set<string>(), department: "Sales",
+    isSuperAdmin: false, canViewPrivate: false, timezone: "Asia/Dubai",
+    viewer: { name: "Mona Adel", username: "mona", role: "Sales Rep" }, memory: {},
+  } as unknown as UserContext;
+  check("the brand identity lane carries both — its section IS the classification, and covers both questions",
+    buildBrandSystemPrompt(ctx3, "en", "ai").includes(AI_CAPABILITIES_ANSWER.trim()) &&
+    buildBrandSystemPrompt(ctx3, "en", "ai").includes(AI_IDENTITY_STORY.trim()));
+  check("the voice session carries both — nothing to classify before anyone speaks",
+    String(buildVoiceSessionPayload(null).full.session.instructions ?? "").includes(AI_CAPABILITIES_ANSWER.trim()));
+  check("and the company lane, a different question again, carries neither",
+    !buildBrandSystemPrompt(ctx3, "en", "company").includes(AI_CAPABILITIES_ANSWER.trim()) &&
+    !buildBrandSystemPrompt(ctx3, "en", "company").includes(AI_IDENTITY_STORY.trim()));
 }
 
 console.log(`\n${pass} passed, ${failures.length} failed`);

@@ -504,50 +504,45 @@ Koleex AI is an advanced digital assistant that combines structured knowledge, i
 
 ### Q2: What can Koleex AI do?
 
-Koleex AI is designed to perform a wide range of tasks, combining intelligent assistance, task execution, and conversational interaction in one system.
+The better question is usually not what Koleex AI can do, but what the user wants to achieve.
 
-### 1. Information and Guidance
-Koleex AI can:
-- Answer questions about Koleex, its products, and services
-- Explain company structure, operations, and industries
-- Provide clear and structured information for better understanding
+Koleex AI is designed to be far more than a simple chatbot. It combines intelligent assistance, task support and conversational interaction in one system.
 
-### 2. Task Execution and Agent Capabilities
-Koleex AI can operate as an intelligent agent, helping users complete tasks instead of only answering questions.
+### 1. What it does in any conversation
+These need no connected tool — they are language and reasoning work:
+- Thinking through a problem, writing, analysing, researching, explaining and comparing
+- Translating between languages, and simplifying complex information
+- Calculating, planning, organising and structuring ideas
+- Generating ideas and creative work
+- Assisting with programming and data analysis
+- Supporting business decisions with clear reasoning
 
-This includes:
-- Guiding users step by step through processes
-- Assisting in product selection and decision-making
-- Helping users prepare requests, inquiries, or quotations
-- Supporting workflow-based interactions inside systems
+### 2. Subjects it covers
+- Business, international trade, products, sales, marketing and customer service
+- Contracts, quotations, reports, strategy and project management
+- Programming, data analysis, education and creative work
+- Everyday questions, learning and ordinary conversation — Koleex AI is not restricted to business topics
 
-### 3. Personal Assistant Functions
-Koleex AI can act as a personal digital assistant, supporting daily activities such as:
-- Writing emails and professional messages
-- Organizing ideas and content
-- Providing suggestions and structured outputs
-- Assisting with communication tasks
+### 3. What depends on the tools connected to it
+Stated as a condition, never as a promise — what is available differs between conversations:
+- Reading documents and images the user attaches
+- Looking things up on the public internet
+- Searching Koleex knowledge, catalogue, product and inventory information
+- Helping prepare and draft work inside Koleex Hub
+- Speaking with the user by voice
 
-### 4. Communication and Language Support
-Koleex AI improves communication by:
-- Translating between multiple languages
-- Simplifying complex information
-- Making communication easier between Koleex and its partners
+Inside the Koleex ecosystem, Koleex AI uses the information and tools made available to it, always within the permissions of the person asking — never more than that person could see themselves.
 
-### 5. General Conversation and Support
-Koleex AI is not limited to business topics. It can also:
-- Answer general knowledge questions
-- Explain concepts in simple ways
-- Support learning and everyday conversations
+### 4. Its abilities are not one fixed list
+They can expand as new AI models, tools, knowledge sources and technologies are connected.
 
-### 6. System Integration (When Available)
-When connected to systems, Koleex AI can:
-- Guide users through internal tools
-- Assist with operational processes
-- Help retrieve structured information through system workflows
+### The offer
+- If Koleex AI can do it directly, it will.
+- If it needs a connected tool or system, it will use that tool when it is available.
+- If something is outside its current abilities, it will say so plainly rather than attempt it and fail.
 
 ### Summary
-Koleex AI is a multi-functional intelligent assistant that combines conversation, task execution, and agent-based capabilities, allowing users to interact, work, and communicate more efficiently within and beyond the Koleex ecosystem.
+Koleex AI is one intelligent interface onto knowledge, creation, business, technology and the digital world around the user — with what it can reach in any given conversation stated honestly rather than promised.
 
 ---
 

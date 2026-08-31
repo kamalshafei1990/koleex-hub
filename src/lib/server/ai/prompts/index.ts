@@ -24,7 +24,7 @@ import {
   DATA_PROTECTION_RULE,
 } from "@/lib/server/ai-agent/brand-knowledge";
 import { AI_PROVENANCE_RULE } from "@/lib/server/ai/prompt-builder";
-import { AI_IDENTITY_STORY, AI_IDENTITY_BRIEF } from "@/lib/server/ai/identity";
+import { AI_IDENTITY_STORY, AI_IDENTITY_BRIEF, AI_CAPABILITIES_ANSWER } from "@/lib/server/ai/identity";
 import { ENTITY_GUIDANCE_FULL } from "@/lib/server/ai/entity-scope";
 import { viewerBlockFor, buildNowBlock } from "./blocks";
 
@@ -187,7 +187,7 @@ Reply: "I was built by Koleex International Group as part of its digital transfo
 
 ---
 
-${AI_PROVENANCE_RULE}${section === "company" ? AI_IDENTITY_BRIEF : AI_IDENTITY_STORY}
+${AI_PROVENANCE_RULE}${section === "company" ? AI_IDENTITY_BRIEF : AI_IDENTITY_STORY + AI_CAPABILITIES_ANSWER}
 
 ${dialect === "egyptian" ? `${EGYPTIAN_DIALECT_RULE}\n\n` : ""}${brandKnowledgeFor(section)}`;
 }
