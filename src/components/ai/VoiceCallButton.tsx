@@ -54,6 +54,7 @@ const FAILURE_COPY: Record<Lang, Record<VoiceFailure, string>> = {
     "too-many-calls": "Too many calls started just now. Wait about a minute and try again.",
     "signed-out": "Your session has expired. Please sign in again.",
     unavailable: "Voice is unavailable right now. Please try again later.",
+    "connection-lost": "The connection dropped and did not come back. Please try again.",
     "config-rejected": "The call connected but could not be set up. Please try again.",
     "handshake-failed": "Could not start the call. Please try again.",
   },
@@ -63,6 +64,7 @@ const FAILURE_COPY: Record<Lang, Record<VoiceFailure, string>> = {
     "too-many-calls": "刚刚发起的通话过多，请等待约一分钟后再试。",
     "signed-out": "登录已过期，请重新登录。",
     unavailable: "语音服务当前不可用，请稍后再试。",
+    "connection-lost": "连接中断且没有恢复，请重试。",
     "config-rejected": "通话已连接，但会话配置失败，请重试。",
     "handshake-failed": "无法开始通话，请重试。",
   },
@@ -72,6 +74,7 @@ const FAILURE_COPY: Record<Lang, Record<VoiceFailure, string>> = {
     "too-many-calls": "بدأت مكالمات كتير في وقت قصير. استنى دقيقة وحاول تاني.",
     "signed-out": "الجلسة انتهت. سجّل دخول تاني.",
     unavailable: "الخدمة الصوتية غير متاحة حاليًا. حاول مرة أخرى لاحقًا.",
+    "connection-lost": "الاتصال اتقطع وما رجعش تاني. حاول مرة أخرى.",
     "config-rejected": "المكالمة اتصلت بس تعذّر إعدادها. حاول تاني.",
     "handshake-failed": "تعذّر بدء المكالمة. حاول مرة أخرى.",
   },
@@ -217,7 +220,11 @@ export default function VoiceCallButton({
     const session = new VoiceSession(browserVoiceDeps(), {
       onState: (next, failure) => {
         setState(next);
-        onLiveChangeRef.current?.(next === "live");
+        /* RECONNECTING COUNTS AS LIVE TO THE PARENT. The microphone is still
+           held and the far side may resume speaking at any moment, so a parent
+           that unmutes its own speech synthesis here would talk over the call
+           the instant it recovers. */
+        onLiveChangeRef.current?.(next === "live" || next === "reconnecting");
         if (next === "failed" && failure) {
           onErrorRef.current?.(FAILURE_COPY[langRef.current][failure]);
           /* The session has already torn itself down; drop our handle so the
@@ -267,9 +274,17 @@ export default function VoiceCallButton({
   /* ONE METER PER SIDE, AND ONLY THE ACTIVE ONE RUNS. Measuring both at once
      would burn a frame loop and an audio context on silence, which on a phone
      is battery for nothing. */
-  const listening = state === "live" && phase !== "speaking";
+  /* A DROPPED CONNECTION IS STILL AN OPEN CALL. `reconnecting` is not `live`
+     and it is not `idle`: the session is holding the microphone and is waiting
+     to recover, so every place that asks "is there a call on screen" must say
+     yes. Treating it as neither is how the call screen would have vanished
+     mid-sentence on the unstable network this was built for. */
+  const live = state === "live";
+  const reconnecting = state === "reconnecting";
+  const connected = live || reconnecting;
+  const listening = connected && phase !== "speaking";
   const micLevel = useStreamLevel(micStream, listening);
-  const farLevel = useStreamLevel(farStream, state === "live" && phase === "speaking");
+  const farLevel = useStreamLevel(farStream, connected && phase === "speaking");
   const audioLevel = phase === "speaking" ? farLevel : micLevel;
 
   /* THE CONFIGURATION IS SENT ONCE PER SESSION, so a new voice needs a new
@@ -286,10 +301,9 @@ export default function VoiceCallButton({
     }
   }, [hangUp]);
 
-  const live = state === "live";
   const busy = state === "requesting-mic" || state === "connecting";
   const labels = LABEL_COPY[lang];
-  const label = live ? labels.end : busy ? labels.connecting : labels.start;
+  const label = connected ? labels.end : busy ? labels.connecting : labels.start;
 
   return (
     <>
@@ -298,9 +312,10 @@ export default function VoiceCallButton({
 
       {/* A live call takes the screen. Mounted for `busy` too, so connecting
           is visible rather than a button that looks stuck. */}
-      {(live || busy) && (
+      {(connected || busy) && (
         <VoiceCallScreen
-          live={live}
+          live={connected}
+          reconnecting={reconnecting}
           phase={phase}
           audioLevel={audioLevel}
           lines={lines}
@@ -313,21 +328,21 @@ export default function VoiceCallButton({
       )}
       <button
         type="button"
-        onClick={live || busy ? hangUp : () => void startCall()}
-        disabled={disabled && !live && !busy}
+        onClick={connected || busy ? hangUp : () => void startCall()}
+        disabled={disabled && !connected && !busy}
         aria-label={label}
         title={label}
-        aria-pressed={live}
+        aria-pressed={connected}
         style={{ height: size, width: size }}
         className={`rounded-full inline-flex items-center justify-center shrink-0 transition-colors ${
-          live
+          connected
             ? "bg-[#FF3333]/[0.16] text-[#FF3333] ring-1 ring-[#FF3333]/50"
             : busy
               ? "bg-[var(--bg-surface-subtle)] text-[var(--text-dim)]"
               : "text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-subtle)]"
-        } ${disabled && !live && !busy ? "opacity-40 cursor-not-allowed" : ""}`}
+        } ${disabled && !connected && !busy ? "opacity-40 cursor-not-allowed" : ""}`}
       >
-        {live ? (
+        {connected ? (
           /* Hang up — a struck-through handset reads as "end" across locales
              more reliably than a rotated one. */
           <svg aria-hidden viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">

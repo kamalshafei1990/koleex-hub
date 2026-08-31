@@ -29,6 +29,7 @@ import { type Lang } from "@/lib/i18n";
 
 const COPY: Record<Lang, {
   connecting: string;
+  reconnecting: string;
   listening: string;
   speaking: string;
   ready: string;
@@ -39,6 +40,7 @@ const COPY: Record<Lang, {
 }> = {
   en: {
     connecting: "Connecting…",
+    reconnecting: "Connection unstable — reconnecting…",
     listening: "Listening",
     speaking: "Speaking",
     ready: "Go ahead",
@@ -49,6 +51,7 @@ const COPY: Record<Lang, {
   },
   zh: {
     connecting: "正在连接…",
+    reconnecting: "网络不稳定，正在重新连接…",
     listening: "正在聆听",
     speaking: "正在回答",
     ready: "请讲",
@@ -59,6 +62,7 @@ const COPY: Record<Lang, {
   },
   ar: {
     connecting: "جارٍ الاتصال…",
+    reconnecting: "الشبكة مش ثابتة — بنحاول نرجّع الاتصال…",
     listening: "بيسمعك",
     speaking: "بيتكلم",
     ready: "اتفضّل",
@@ -72,6 +76,11 @@ const COPY: Record<Lang, {
 export type VoiceCallScreenProps = {
   /** False while connecting — the orb wakes rather than pretending to listen. */
   live: boolean;
+  /** The call is up but the network dropped underneath it and may come back.
+   *  ITS OWN FLAG, not a shade of `live`: the screen must keep standing (the
+   *  microphone is still held and the call is not over) while telling the user
+   *  the truth, which "Listening" would not. */
+  reconnecting?: boolean;
   phase: VoicePhase;
   /** 0..1 from whichever side is currently making sound. */
   audioLevel: number;
@@ -90,6 +99,7 @@ export type VoiceCallScreenProps = {
 
 export default function VoiceCallScreen({
   live,
+  reconnecting = false,
   phase,
   audioLevel,
   lines,
@@ -123,7 +133,7 @@ export default function VoiceCallScreen({
 
      `listening` is also simply true: the microphone is open from the moment
      the call connects. That is what listening means. */
-  const orbState: AIOrbState = !live
+  const orbState: AIOrbState = !live || reconnecting
     ? "awakening"
     : phase === "speaking"
       ? "speaking"
@@ -132,7 +142,9 @@ export default function VoiceCallScreen({
   /* The CAPTION keeps the three-way distinction the orb does not need: the orb
      shows that it is live and reacting, while the words can still say whether
      anyone has spoken yet. */
-  const status = !live
+  const status = reconnecting
+    ? copy.reconnecting
+    : !live
     ? copy.connecting
     : phase === "speaking"
       ? copy.speaking

@@ -359,6 +359,26 @@ console.log("\n── VoiceCallScreen: the call is a mode, not a toggle ──")
   check("connecting says so rather than pretending to listen",
     connecting.includes("Connecting") && !connecting.includes("Listening"));
 
+  /* A CALL THAT LOSES ITS NETWORK IS STILL A CALL ON SCREEN. The screen mounts
+     on `live || busy` in the button; `reconnecting` is neither, so the first
+     version of the recovery work would have UNMOUNTED the whole call screen
+     mid-sentence when a VPN wobbled — a worse outcome than the freeze it was
+     meant to fix. The screen is asked to keep standing and tell the truth. */
+  const wobble = renderToStaticMarkup(
+    <VoiceCallScreen live reconnecting phase="listening" audioLevel={0.4} lines={lines} lang="en" onEnd={() => {}} /> as ReactElement,
+  );
+  check("a reconnecting call still renders the call screen",
+    wobble.includes("End call") && wobble.includes(lines[0].text));
+  check("and says the connection is unstable rather than claiming to listen",
+    /reconnecting/i.test(text(wobble)) && !/\bListening\b/.test(text(wobble)));
+  /* Every language, or the one that needed it most gets a blank. */
+  for (const [lang, needle] of [["zh", "重新连接"], ["ar", "الاتصال"]] as const) {
+    const w = renderToStaticMarkup(
+      <VoiceCallScreen live reconnecting phase="listening" audioLevel={0.4} lines={[]} lang={lang} onEnd={() => {}} /> as ReactElement,
+    );
+    check(`  …in ${lang} too`, text(w).includes(needle));
+  }
+
   /* Server-side turn detection has no push-to-talk. A user waiting for a
      button to hold waits forever, so it is said once, before any words. */
   check("with no transcript yet, the interaction is explained",
