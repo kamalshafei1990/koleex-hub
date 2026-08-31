@@ -109,6 +109,54 @@ export function isSmallTalk(msg: string): boolean {
    "Koleex AI" are Section-2-specific. */
 export type BrandSection = "none" | "company" | "ai" | "both";
 
+/* ---------------------------------------------------------------------------
+   "What can you do?" — its own question, and its own list.
+
+   It routes to the same Section 2 lane as "who are you", but it wants a
+   DIFFERENT answer, so the patterns are named and exported rather than buried
+   in aiPatterns: the prompt layer asks isCapabilityQuestion() to decide which
+   self-description to load, and loading the wrong one costs a paragraph about
+   a founder to someone who asked what the thing does.
+
+   NO \b ANYWHERE NEAR ARABIC. JavaScript's \b is defined against \w, which is
+   ASCII-only, so a boundary between a space and an Arabic letter never
+   matches — the defect that left every Arabic pattern in this file dead.
+   --------------------------------------------------------------------------- */
+const CAPABILITY_PATTERNS: RegExp[] = [
+  // English
+  /\bwhat\s+(?:can|do)\s+(?:you|u)\s+(?:do|know)\b/i,
+  /\bwhat\s+(?:you|u)\s+can\s+do\b/i,
+  /\bwhat\s+(?:can|could)\s+(?:you|u)\s+help\b/i,
+  /\bwhat\s+are\s+(?:your|ur)\s+(?:capabilities|features|abilities|limits|limitations|skills)\b/i,
+  /\bwhat\s+are\s+(?:you|u)\s+capable\s+of\b/i,
+  /\bhow\s+(?:can|could)\s+(?:you|u)\s+help\b/i,
+  /\bwhat\s+(?:can'?t|cannot|can\s+not)\s+(?:you|u)\s+do\b/i,
+  /\bwhat\s+do\s+(?:you|u)\s+do\b/i,
+
+  // Arabic — MSA and Egyptian
+  /(?:ماذا|ما\s*الذي)\s*(?:تستطيع|يمكنك|تقدر)/,
+  /ما\s*(?:هي\s*)?(?:قدراتك|إمكانياتك|امكانياتك|مهاراتك)/,
+  /(?:قدراتك|إمكانياتك|امكانياتك)\s*(?:ايه|إيه)/,
+  /(?:تقدر|بتقدر|ممكن)\s*(?:ت)?عمل\s*(?:ايه|إيه)/,
+  /(?:ايه|إيه)\s*(?:اللي\s*)?(?:تقدر|ممكن)\s*(?:ت)?عمل/,
+  /(?:كيف|إزاي|ازاي)\s*(?:يمكنك|تقدر|ممكن)\s*(?:تساعدني|تساعدنى|مساعدتي|مساعدتى)/,
+  /(?:تعرف|بتعرف)\s*(?:ت)?عمل\s*(?:ايه|إيه)/,
+  /(?:أنت|انت|إنت)\s*بتعمل\s*(?:ايه|إيه)/,
+
+  // Chinese
+  /你(?:能|可以|会)做什么/,
+  /你(?:能|可以)帮我(?:做)?什么/,
+  /你有什么(?:功能|能力|本事)/,
+  /你(?:的)?(?:能力|功能)(?:有哪些|是什么)/,
+  /你不能做什么/,
+];
+
+/** True when the turn asks what the assistant can DO rather than what it IS. */
+export function isCapabilityQuestion(msg: string): boolean {
+  const s = msg.trim();
+  return s.length > 0 && CAPABILITY_PATTERNS.some((re) => re.test(s));
+}
+
 export function classifyBrandSection(msg: string): BrandSection {
   const s = msg.trim().toLowerCase();
   if (!s) return "none";
@@ -129,16 +177,29 @@ export function classifyBrandSection(msg: string): BrandSection {
     // "what are you" / "what r u" / "what kind of ai"
     /\bwhat\s+(?:are|r)\s+(?:you|u)\b/i,
     /\bwhat\s+kind\s+of\s+ai\b/i,
-    // "what can you do" / "what do you know" / "what you can do"
-    /\bwhat\s+(?:can|do)\s+you\s+(?:do|know)\b/i,
-    /\bwhat\s+you\s+can\s+do\b/i,
+    // "what can you do" and everything shaped like it — see CAPABILITY_PATTERNS
+    ...CAPABILITY_PATTERNS,
 
     // Name questions — tolerate missing apostrophe, extra spaces
-    /\bwhat('?s| is| are)?\s+your\s+name\b/i,
-    /\byour\s+name\b/i,
+    /* "ur" was named in the comment above as a case this handles, and did not:
+       the pattern required the word "your". */
+    /\bwhat('?s| is| are)?\s+(?:your|ur)\s+name\b/i,
+    /\b(?:your|ur)\s+name\b/i,
 
     // Who created/made/built you — present OR past tense (fixes "who create you")
-    /\bwho\s+(?:create[sd]?|made?|build[ts]?|built|design[esd]?|developed?|trained?)\s+(?:you|u)\b/i,
+    /\bwho\s+(?:create[sd]?|made?|build[ts]?|built|design[esd]?|developed?|trained?|programm?ed?|invented?)\s+(?:you|u)\b/i,
+    // Who owns / runs / operates / is behind you
+    /\bwho\s+(?:owns?|operates?|runs?)\s+(?:you|u)\b/i,
+    /\bwho(?:'?s| is)\s+behind\s+(?:you|u)\b/i,
+    /\bwho\s+(?:is|are)\s+your\s+(?:creator|maker|makers|developer|developers|owner|owners)\b/i,
+    // Whose idea you were / who had the idea
+    /\bwhose\s+idea\s+(?:was|were|is)\s+(?:you|koleex)/i,
+    /\bwho\s+had\s+the\s+idea\s+(?:to\s+)?(?:create|make|build|develop)\b/i,
+    // "are you made by koleex" / "were you built by ..."
+    /\b(?:are|were)\s+(?:you|u)\s+(?:made|built|created|developed|designed)\s+by\b/i,
+    // "tell me about yourself" / "introduce yourself"
+    /\btell\s+me\s+about\s+(?:yourself|you)\b/i,
+    /\bintroduce\s+yourself\b/i,
 
     // "Are you a real person" / "are you human" / "are you real"
     /\bare\s+you\s+(?:a\s+)?(?:real|human)(?:\s+person)?\b/i,
@@ -157,22 +218,43 @@ export function classifyBrandSection(msg: string): BrandSection {
     // Open "can I talk to you"
     /\bcan\s+i\s+talk\s+to\s+you\b/i,
 
-    // Arabic
-    /\bما\s+اسمك\b/,
-    /\bما\s+هو\s+اسمك\b/,
-    /\bاسمك\b/,
-    /\bمن\s+(?:أنت|انت)\b/,
-    /\bمين\s+(?:أنت|انت)\b/,
-    /\bمن\s+(?:صنعك|طورك|بناك|أنشأك|انشأك)\b/,
-    /\bهل\s+(?:أنت|انت)\s+إنسان\b/,
-    /\bهل\s+(?:أنت|انت)\s+انسان\b/,
+    /* Arabic — MSA and Egyptian.
+
+       NO \\b ON ARABIC. JavaScript's \\b is defined against \\w, which is
+       ASCII-only, so a boundary between a space and an Arabic letter never
+       matches: /\\bمن\\s+انت\\b/ was FALSE for "من انت". Every Arabic pattern
+       in this file was written that way and every one of them was dead — so
+       no Arabic identity question has ever reached the brand lane. Found by
+       running them, not by reading them. */
+    /ما\s*(?:هو\s*)?اسمك/,
+    /اسمك\s*(?:ايه|إيه)/,
+    /(?:من|مين)\s*(?:أنت|انت|إنت)/,
+    /* Reversed order — "انت مين؟" is at least as common as "مين انت؟".
+       Only مين here, never من: "انت من مصر؟" (are you from Egypt) is not an
+       identity question, and من doubles as "from". */
+    /(?:أنت|انت|إنت)\s*مين/,
+    /(?:من|مين)\s*(?:صنعك|طورك|بناك|أنشأك|انشأك|عملك|برمجك|صممك|اخترعك|خلقك)/,
+    /(?:من|مين)\s*(?:اللي|الذي)\s*(?:عملك|صنعك|طورك|بناك|برمجك|فكر)/,
+    /(?:من|مين)\s*قام\s*بتطويرك/,
+    /معمول\s*من\s*(?:مين|من)/,
+    /(?:من|مين)\s*(?:صاحب|صاحبة)\s*(?:فكرة|الفكرة)/,
+    /فكرة\s*(?:مين|من)/,
+    /(?:من|مين)\s*(?:يملكك|بيملكك|بيشغلك|وراك|ورا)/,
+    /(?:احكيلي|قولي|كلمني|عرفني|حدثني)\s*(?:عن\s*)?(?:نفسك|بنفسك)/,
+    /هل\s*(?:أنت|انت|إنت)\s*(?:إنسان|انسان|بشر|حقيقي)/,
+    /(?:كوليكس|كولكس)\s*(?:اي\s*اي|إيه\s*آي|AI)/i,
 
     // Chinese
     /你叫什么名字/,
     /你的名字/,
     /你是谁/,
     /你是(?:真人|人类)吗/,
-    /你(?:能|可以)做什么/,
+    /谁(?:开发|创造|制造|发明|设计|做|研发)(?:了)?(?:你|您)/,
+    /你是(?:谁|哪家|哪个公司)(?:开发|做|研发)的/,
+    /(?:谁的主意|谁的想法|谁提出)/,
+    /(?:介绍|说说|讲讲)(?:一下)?(?:你自己|自己)/,
+    /谁(?:拥有|运营|管理)(?:你|您)/,
+    /(?:你|您)(?:的)?背后是谁/,
   ];
 
   /* Company-brand triggers — Section 1. Explicit brand / company
@@ -199,13 +281,14 @@ export function classifyBrandSection(msg: string): BrandSection {
     /\bwhen\s+(?:was|did)\s+koleex\b/i,
     /\bwhat\s+(?:is|does|industries)\s+koleex\b/i,
 
-    // Arabic
-    /\bكوليكس\b/,
-    /\bشافعي\b/,
-    /\b(?:مؤسس|المؤسس)\b/,
-    /\bالرئيس\s+التنفيذي\b/,
-    /\bالمدير\s+التنفيذي\b/,
-    /\b(?:رؤية|مهمة|رسالة|القيم|تاريخ|تراث)\b/,
+    /* Arabic — see the note in aiPatterns: \\b is ASCII-only, so every one of
+       these was dead too. */
+    /كوليكس/,
+    /شافعي/,
+    /(?:مؤسس|المؤسس)/,
+    /الرئيس\s*التنفيذي/,
+    /المدير\s*التنفيذي/,
+    /(?:رؤية|مهمة|رسالة|القيم|تاريخ|تراث)/,
 
     // Chinese
     /柯莱克斯/,

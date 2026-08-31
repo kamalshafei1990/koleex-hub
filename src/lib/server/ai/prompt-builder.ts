@@ -10,6 +10,7 @@ import { BRAND_EXCLUSIVITY_RULE, DIRECT_VOICE_RULE } from "../ai-agent/brand-kno
    --------------------------------------------------------------------------- */
 
 import type { AiContext, AiMessage } from "./types";
+import { AI_IDENTITY_BRIEF, identityDepthFor } from "./identity";
 import {
   ENTITY_GUIDANCE_SHORT,
   ENTITY_GUIDANCE_FULL,
@@ -211,6 +212,7 @@ export function buildFastPrompt(
         `You are Koleex AI, a friendly assistant inside Koleex Hub.${whoAmI}` +
         SUPPLIER_CONFIDENTIALITY +
         AI_PROVENANCE_RULE +
+        AI_IDENTITY_BRIEF +
         PRODUCT_PHOTO_RULE +
         ASK_WHEN_UNSURE_RULE +
         ` ${BRAND_EXCLUSIVITY_RULE}` +
@@ -229,7 +231,9 @@ export function buildFastPrompt(
         ` relevant app for specifics. This does NOT cover WHO THEY ARE: their own name, role and` +
         ` department are given to you above and you may always use them.` +
         ` (2) Do not emit specific commercial numbers (prices, totals,` +
-        ` discounts, margins, tax amounts, quotation values) unless the user supplied them this turn.`,
+        ` discounts, margins, tax amounts, quotation values) unless the user supplied them this turn.` +
+        /* Only on the turn that asks — see identityDepthFor. */
+        identityDepthFor(userMsg),
     },
     { role: "user", content: userMsg },
   ];
@@ -255,6 +259,7 @@ export function buildSmartPrompt(
         `You are Koleex AI, a helpful general-purpose assistant inside Koleex Hub.${whoAmI}\n\n` +
         SUPPLIER_CONFIDENTIALITY +
         AI_PROVENANCE_RULE +
+        AI_IDENTITY_BRIEF +
         PRODUCT_PHOTO_RULE +
         ASK_WHEN_UNSURE_RULE +
         ` ${BRAND_EXCLUSIVITY_RULE}` +
@@ -297,7 +302,9 @@ export function buildSmartPrompt(
         ` "deleted" or "done" — nothing you say here is saved anywhere. If the user asks for such an` +
         ` action, or is mid-way through one (giving you a task's details, confirming), do NOT pretend:` +
         ` ask them to resend the request as one message (e.g. "add a task: call the agent tomorrow,` +
-        ` high priority") so the assistant with live access picks it up.`,
+        ` high priority") so the assistant with live access picks it up.` +
+        /* Only on the turn that asks — see identityDepthFor. */
+        identityDepthFor(userMsg),
     },
     { role: "user", content: userMsg },
   ];
@@ -325,6 +332,7 @@ export function buildChatPrompt(
         `You are Koleex AI, a friendly general-purpose assistant living inside Koleex Hub.${whoAmI}` +
         SUPPLIER_CONFIDENTIALITY +
         AI_PROVENANCE_RULE +
+        AI_IDENTITY_BRIEF +
         PRODUCT_PHOTO_RULE +
         ASK_WHEN_UNSURE_RULE +
         ` ${BRAND_EXCLUSIVITY_RULE}` +
@@ -348,7 +356,9 @@ export function buildChatPrompt(
         ` Never emit "###" Markdown headers, "**bold**" labels, or "Q1/Q2" question numbers in your replies — keep formatting clean and natural. Use short plain titles on their own line when structure helps, with "- " bullets and a blank line between sections.` +
         ` Boundaries — only these two, everything else is open:` +
         ` (1) You do NOT have live access to the user's Koleex records (customers, invoices, inventory, products, orders, quotations). If they want specifics from those, tell them to open the relevant app in the hub.` +
-        ` (2) Do not emit specific commercial numbers (prices, totals, unit prices, discounts, margins, markups, tax amounts, quotation values) unless the user explicitly gave you the numbers to work with in this turn. General discussion of business concepts is fine; invented figures are not.`,
+        ` (2) Do not emit specific commercial numbers (prices, totals, unit prices, discounts, margins, markups, tax amounts, quotation values) unless the user explicitly gave you the numbers to work with in this turn. General discussion of business concepts is fine; invented figures are not.` +
+        /* Only on the turn that asks — see identityDepthFor. */
+        identityDepthFor(userMsg),
     },
     { role: "user", content: userMsg },
   ];
@@ -382,6 +392,7 @@ export function buildBusinessPrompt(
         `You are Koleex AI's business reasoning assistant for Koleex Hub.${whoAmI}` +
         SUPPLIER_CONFIDENTIALITY +
         AI_PROVENANCE_RULE +
+        AI_IDENTITY_BRIEF +
         PRODUCT_PHOTO_RULE +
         ASK_WHEN_UNSURE_RULE +
         ` ${BRAND_EXCLUSIVITY_RULE}` +
@@ -399,7 +410,9 @@ export function buildBusinessPrompt(
         ` (4) Margins, multipliers, band adjustments, discount caps, approval thresholds, and` +
         ` commission rates live in the Commercial Policy. Cite them only when they appear in` +
         ` the context above; otherwise direct the user to open the Commercial Policy app.` +
-        `${costRule}`,
+        `${costRule}` +
+        /* Only on the turn that asks — see identityDepthFor. */
+        identityDepthFor(userMsg),
     },
     { role: "user", content: userMsg },
   ];

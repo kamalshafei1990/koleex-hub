@@ -24,6 +24,7 @@ import {
   DATA_PROTECTION_RULE,
 } from "@/lib/server/ai-agent/brand-knowledge";
 import { AI_PROVENANCE_RULE } from "@/lib/server/ai/prompt-builder";
+import { AI_IDENTITY_STORY, AI_IDENTITY_BRIEF, AI_CAPABILITIES_ANSWER } from "@/lib/server/ai/identity";
 import { ENTITY_GUIDANCE_FULL } from "@/lib/server/ai/entity-scope";
 import { viewerBlockFor, buildNowBlock } from "./blocks";
 
@@ -60,7 +61,7 @@ ${DIRECT_VOICE_RULE}
 
 ${DATA_PROTECTION_RULE}
 
-${AI_PROVENANCE_RULE}
+${AI_PROVENANCE_RULE}${AI_IDENTITY_BRIEF}
 ${dialect === "egyptian" ? `\n${EGYPTIAN_DIALECT_RULE}\n` : ""}
 Current user: ${ctx.auth.username}.`;
 }
@@ -182,11 +183,11 @@ User: "what is your name?"
 Reply: "My name is Koleex AI — the official assistant built by Koleex International Group to help with information, tasks, and day-to-day support. You can give me a different name if you'd prefer a more personal touch."
 
 User: "who created you?"
-Reply: "I was built by Koleex International Group, with the vision driven by Mr. Kamal Shafei, the Founder and CEO. The goal behind me is to make communication and support easier across the Koleex ecosystem." (natural, first person, 2–4 sentences, no Q3/### markers).
+Reply: "I was built by Koleex International Group as part of its digital transformation, and the original idea came from Mr. Kamal El Shafei, CEO and owner of Koleex International Group. His vision was to bring AI, automation and connected systems into the Koleex ecosystem — so my role is to grow into an intelligent layer between people and Koleex's information, products and services, not just a chatbot." (natural, first person, 2–4 short paragraphs, no Q3/### markers).
 
 ---
 
-${AI_PROVENANCE_RULE}
+${AI_PROVENANCE_RULE}${section === "company" ? AI_IDENTITY_BRIEF : AI_IDENTITY_STORY + AI_CAPABILITIES_ANSWER}
 
 ${dialect === "egyptian" ? `${EGYPTIAN_DIALECT_RULE}\n\n` : ""}${brandKnowledgeFor(section)}`;
 }
@@ -404,7 +405,7 @@ You must follow these rules at all times:
 
 Always prioritize correctness over completeness. Never hallucinate pricing.
 
-${AI_PROVENANCE_RULE}
+${AI_PROVENANCE_RULE}${AI_IDENTITY_BRIEF}
 
 Current user: ${ctx.auth.username} (${ctx.auth.user_type}${ctx.isSuperAdmin ? ", super admin" : ""}).`;
 }
@@ -436,6 +437,6 @@ export function buildDegradedSystemPrompt(
     "say live-data lookups are temporarily unavailable and an administrator needs to finish the AI configuration — " +
     "never name any provider, API or key — and offer to help with anything else. " +
     BRAND_EXCLUSIVITY_RULE + "\n\n" + DIRECT_VOICE_RULE + "\n\n" + DATA_PROTECTION_RULE +
-    "\n\n" + AI_PROVENANCE_RULE
+    "\n\n" + AI_PROVENANCE_RULE + AI_IDENTITY_BRIEF
   );
 }

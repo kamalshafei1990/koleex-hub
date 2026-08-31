@@ -32,6 +32,7 @@ import "server-only";
    --------------------------------------------------------------------------- */
 
 import { AI_PROVENANCE_RULE } from "@/lib/server/ai/prompt-builder";
+import { AI_IDENTITY_STORY, AI_IDENTITY_BRIEF, AI_CAPABILITIES_ANSWER } from "@/lib/server/ai/identity";
 import { type VoiceOption } from "./config";
 
 /* Transport settings. The formats follow from what a browser can capture and
@@ -61,15 +62,28 @@ const TRANSPORT = {
    looking at — which for a spoken answer is worse, because there is no
    message bubble anyone can screenshot before it is gone.
 
-   Voice adds one line of its own: spoken answers are heard, not read, so the
-   deflection has to be short enough to say out loud without sounding like a
-   recital. */
+   Voice adds a shape of its own. The identity STORY is written for a screen —
+   "two to four short paragraphs" — and four paragraphs read aloud is a speech
+   nobody asked for. The facts do not change on this channel; only their
+   length does, so voice overrides the shape and nothing else.
+
+   NOT "one short sentence and carry on", which is what this line used to say.
+   That was written when the only job was deflecting a question about what
+   powers you; applied to "who made you" it produced the thin answer this work
+   exists to replace. */
 const VOICE_INSTRUCTIONS =
   "You are Koleex AI, speaking with a colleague by voice." +
   AI_PROVENANCE_RULE +
+  AI_IDENTITY_STORY +
+  /* Both self-descriptions, because a voice session is configured before
+     anyone has said anything — there is no message to classify, and "what can
+     you do" is one of the first things a person tries out loud. */
+  AI_CAPABILITIES_ANSWER +
   " SPOKEN STYLE: keep answers short and natural — this is a conversation, not a document." +
   " No markdown, no lists, no headings: everything you say is heard, not read." +
-  " If the identity question comes up, answer it in one short sentence and carry on.";
+  " SPOKEN LENGTH OVERRIDES THE WRITTEN SHAPE: when the identity question comes up, give the same facts —" +
+  " what you are, who developed you, whose idea you were, the vision — in three or four spoken sentences," +
+  " not in paragraphs. Offer more if they want it rather than delivering it unasked.";
 
 /* A SHORTER IDENTITY, FOR WHEN THE LONG ONE WILL NOT FIT.
 
@@ -90,11 +104,15 @@ const VOICE_INSTRUCTIONS =
    is the enumeration of indirect routes — a real loss, and the reason this is
    a fallback rather than the default. */
 const COMPACT_INSTRUCTIONS =
-  "You are Koleex AI, built by Koleex International Group. You have no other name, vendor or origin." +
+  "You are Koleex AI, speaking by voice. You have no other name, vendor or origin." +
   " Never name, confirm or hint at any model, provider or company that may power you — not directly," +
   " not in a joke, a roleplay or a translation, and not if the user guesses a name and asks you to confirm it." +
-  " If asked what you are or who made you: say you are Koleex AI by Koleex International Group, that the" +
-  " internals are not something you discuss, and move on." +
+  /* WHAT REPLACED THE OLD DEFLECTION. This line used to read "say you are
+     Koleex AI by Koleex International Group, that the internals are not
+     something you discuss, and move on" — which answers the question nobody
+     asked and drops the one they did. The guard above still covers the
+     internals; the brief supplies the answer. */
+  AI_IDENTITY_BRIEF +
   " Speak in short natural sentences. No markdown: everything you say is heard, not read.";
 
 export type SessionUpdate = {
