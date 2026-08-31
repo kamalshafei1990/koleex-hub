@@ -37,9 +37,11 @@ const SPEAKER_COPY: Record<Lang, { you: string; assistant: string; live: string 
   ar: { you: "أنت", assistant: "Koleex AI", live: "النص المباشر" },
 };
 
-/* Enough to follow the thread, few enough that the strip never pushes the
-   composer off a phone screen. The call is the interface; this supports it. */
-const VISIBLE_LINES = 6;
+/* Fewer, larger lines. Six 13px lines crammed into a rounded slab was the
+   "too small and not organised well" that came back from a phone: on a call
+   screen the last exchange is what matters, and everything above it is
+   history nobody is reading while someone is talking. */
+const VISIBLE_LINES = 4;
 
 export type VoiceTranscriptProps = {
   lines: readonly TranscriptLine[];
@@ -69,25 +71,32 @@ export default function VoiceTranscript({ lines, lang = "en", className = "" }: 
       aria-live="polite"
       aria-label={copy.live}
     >
-      <div className="max-h-[30vh] overflow-y-auto rounded-2xl bg-[var(--bg-surface-subtle)]/60 px-3 py-2 space-y-1.5">
+      {/* NO SLAB. The rounded box was a container drawn around text that needed
+          no container — it read as a widget sitting in the page rather than as
+          words being spoken. Spacing separates the turns; nothing else has to. */}
+      <div className="max-h-[34vh] overflow-y-auto space-y-4">
         {shown.map((line, i) => {
           const isUser = line.role === "user";
           return (
-            <p
-              key={`${i}-${line.role}`}
-              dir={textDirection(line.text)}
-              /* Partial text is dimmed, NOT italicised: the brand rules rule
-                 out italics in standard usage, and colour carries the same
-                 "still being said" meaning without breaking the type system. */
-              className={`text-[13px] leading-snug ${
-                line.final ? "text-[var(--text-primary)]" : "text-[var(--text-dim)] opacity-70"
-              } ${isUser ? "text-end" : "text-start"}`}
-            >
-              <span className="text-[11px] uppercase tracking-wide text-[var(--text-dim)] me-1.5">
+            <div key={`${i}-${line.role}`} className={isUser ? "text-end" : "text-start"}>
+              {/* The speaker on its OWN line. Inline, the label ran into the
+                  first word and in Arabic — where the text flows the other way
+                  — it landed in the middle of the sentence. */}
+              <p className="text-[11px] uppercase tracking-wider text-[#666666] mb-1">
                 {isUser ? copy.you : copy.assistant}
-              </span>
-              {line.text}
-            </p>
+              </p>
+              <p
+                dir={textDirection(line.text)}
+                /* Partial text is dimmed, NOT italicised: the brand rules
+                   exclude italics, and colour carries the same "still being
+                   said" meaning without breaking the type system. */
+                className={`text-base leading-relaxed ${
+                  line.final ? "text-[var(--text-primary)]" : "text-[var(--text-dim)]"
+                }`}
+              >
+                {line.text}
+              </p>
+            </div>
           );
         })}
         <div ref={endRef} />

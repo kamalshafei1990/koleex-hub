@@ -198,6 +198,9 @@ console.log("\n── 7. The session must ASK for the user's transcript ──")
   const cfg = src.slice(src.indexOf("const TRANSPORT"), src.indexOf("} as const;"));
   check("and it is inside the object that is sent",
     () => /input_audio_transcription/.test(cfg));
+  /* The TRANSPORT block still holds no policy — the identity instructions are
+     a sibling field added at build time, deliberately kept out of the block
+     that describes audio formats and turn detection. */
   check("the transport block still carries no policy",
     () => !/instructions/.test(cfg) && !/tools:/.test(cfg));
 

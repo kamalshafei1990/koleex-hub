@@ -22,8 +22,16 @@ import "server-only";
    there is no other way to put it on that channel. What does NOT travel is the
    ability to choose one that was not offered, or to add a field that was not
    authored here. The client relays an object it cannot extend.
+
+   AND THE INSTRUCTIONS ARE WHY THIS MATTERED. Shipped without them, the model
+   answered "who are you" with a vendor's name — the exact disclosure the
+   standing identity rule forbids, spoken aloud to a user. A voice session
+   carries no history and no system message unless this event supplies one, so
+   an empty `instructions` is not a neutral default: it is the model's own
+   idea of itself, which is not ours to leave to chance.
    --------------------------------------------------------------------------- */
 
+import { AI_PROVENANCE_RULE } from "@/lib/server/ai/prompt-builder";
 import { type VoiceOption } from "./config";
 
 /* Transport settings. The formats follow from what a browser can capture and
@@ -48,6 +56,21 @@ const TRANSPORT = {
   },
 } as const;
 
+/* THE SAME RULE THE TEXT PATH USES, imported rather than restated. Two copies
+   of an identity policy drift, and the copy that drifts is the one nobody is
+   looking at — which for a spoken answer is worse, because there is no
+   message bubble anyone can screenshot before it is gone.
+
+   Voice adds one line of its own: spoken answers are heard, not read, so the
+   deflection has to be short enough to say out loud without sounding like a
+   recital. */
+const VOICE_INSTRUCTIONS =
+  "You are Koleex AI, speaking with a colleague by voice." +
+  AI_PROVENANCE_RULE +
+  " SPOKEN STYLE: keep answers short and natural — this is a conversation, not a document." +
+  " No markdown, no lists, no headings: everything you say is heard, not read." +
+  " If the identity question comes up, answer it in one short sentence and carry on.";
+
 export type SessionUpdate = {
   type: "session.update";
   session: Record<string, unknown>;
@@ -65,6 +88,10 @@ export function buildSessionUpdate(voice: VoiceOption | null): SessionUpdate {
     type: "session.update",
     session: {
       ...TRANSPORT,
+      /* NOT OPTIONAL AND NOT CONFIGURABLE. An operator who could switch this
+         off could switch off the identity rule, so it is not an environment
+         variable — it is what the product is. */
+      instructions: VOICE_INSTRUCTIONS,
       ...(voice ? { voice: voice.vendorId } : {}),
     },
   };

@@ -32,8 +32,7 @@ import PlusIcon from "@/components/icons/ui/PlusIcon";
 import PaperPlaneIcon from "@/components/icons/ui/PaperPlaneIcon";
 import MicButton, { speakText, type TtsHandle } from "@/components/ai/MicButton";
 import VoiceCallButton from "@/components/ai/VoiceCallButton";
-import VoiceTranscript from "@/components/ai/VoiceTranscript";
-import { type TranscriptLine } from "@/lib/voice/events";
+
 import TrashIcon from "@/components/icons/ui/TrashIcon";
 import PencilIcon from "@/components/icons/ui/PencilIcon";
 import MenuBurgerIcon from "@/components/icons/ui/MenuBurgerIcon";
@@ -268,10 +267,6 @@ export default function KoleexAiApp() {
      call tools. Voice in, voice out works on every turn. TTS speaks
      only on voice-initiated replies; typed turns stay silent. */
   const [aiSpeaking, setAiSpeaking] = useState(false);
-  /* Live voice captions. Deliberately NOT folded into `messages`: nothing
-     persists them, and a message list that holds rows the server has never
-     seen breaks an assumption the rest of this app is entitled to make. */
-  const [voiceLines, setVoiceLines] = useState<readonly TranscriptLine[]>([]);
   const ttsHandleRef = useRef<TtsHandle | null>(null);
   const stopTts = useCallback(() => {
     ttsHandleRef.current?.cancel();
@@ -2174,10 +2169,19 @@ export default function KoleexAiApp() {
             composer sits above the bar on iPhones without a notch
             guard. env(safe-area-inset-bottom) is 34 px on modern
             devices, 0 on desktops — additive to the existing pb. */}
-        {/* Live captions sit ABOVE the composer, between the conversation and
-            the controls — where a user's eyes already are during a call. */}
-        <VoiceTranscript lines={voiceLines} lang={lang} className="pb-1" />
+        {/* THE TRANSCRIPT LIVES ON THE CALL SCREEN, NOT HERE.
 
+            It was rendered above the composer, and after hanging up it stayed:
+            a grey slab sitting in the conversation that was not a message,
+            could not be replied to, and vanished on reload. It read as
+            something broken, and it was — voice turns are not persisted, so
+            leaving them in the message area implies a permanence they do not
+            have.
+
+            The call screen shows them while the call is live, which is when
+            they are useful, and takes them with it when it closes. Keeping
+            them afterwards is a separate feature — writing spoken turns to a
+            conversation — and a database decision, not a layout one. */}
         <div
           className="shrink-0 bg-transparent"
           style={{ paddingBottom: "env(safe-area-inset-bottom, 0px)" }}
@@ -2410,7 +2414,6 @@ export default function KoleexAiApp() {
                       lang={lang}
                       disabled={sending}
                       onError={(msg) => setError(msg)}
-                      onTranscript={setVoiceLines}
                       onLiveChange={(live) => { if (live) stopTts(); }}
                     />
 
