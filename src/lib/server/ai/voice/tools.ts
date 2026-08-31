@@ -12,20 +12,45 @@ import "server-only";
 
    So: READ-ONLY, and only the reads whose worst case is a wasted second.
 
-     · search_web — the reason this exists. The model's knowledge has a
-       cut-off and a lot of ordinary questions do not. Asked about today's
-       weather or this week's rate, a voice call with no tools answers from
-       training data and sounds exactly as confident as if it knew.
+     · search_web — the model's knowledge has a cut-off and a lot of ordinary
+       questions do not. Asked about today's weather or this week's rate, a
+       call with no tools answers from training data and sounds exactly as
+       confident as if it knew.
 
-   NOT HERE, deliberately:
+     · search_knowledge — KOLEEX'S OWN APPROVED KNOWLEDGE, including what the
+       owner has taught it. This was the gap that made a call feel like a
+       different assistant: the same question answered in writing reached the
+       approved knowledge and in a call reached nothing.
+
+     · searchMachineKnowledge, searchCatalog, searchProducts,
+       getProductByCode, getProductDetails, listCatalogFamilies — Koleex
+       products. A Koleex assistant that cannot answer about Koleex machines
+       out loud is not the product.
+
+     · searchTradeTerms — Incoterms and trade vocabulary; reference material,
+       no tenant data at all.
+
+   WHY THE KOLEEX READS ARE HERE NOW, having been excluded when the bridge
+   was built. The reason given then was that they carry Koleex data into a
+   channel whose transcript is not persisted anywhere the owner can audit,
+   and that adding them without deciding that would be deciding it by
+   accident. The owner has since decided it — and the premise was weaker than
+   it read: dispatchTool writes an audit row for EVERY call, with the tool,
+   the arguments, the caller and the outcome. What is unaudited is the spoken
+   words, not the data access. Every one of these is read-only and
+   permission-filtered, so a caller hears only what they could already read
+   on their own screen.
+
+   NOT HERE, and these are the real line:
      · every create, update and delete tool — a write with no confirmation;
      · createQuotationDraft — a write, and a commercial one;
      · remember_about_user / forget_about_user — writes to the user's own
        record, and ones they cannot see happening;
-     · the customer, product, inventory and pricing reads — they are not
-       unsafe, but they carry Koleex data into a channel whose transcript is
-       not yet persisted anywhere the owner can audit. They can be added once
-       that is decided; adding them now would be deciding it by accident.
+     · getCustomerByName / getCustomerByCode — a customer's details read
+       aloud in a room the customer is not in;
+     · getPricingRules / calculateQuotationPricing / getInventoryStatus —
+       commercial figures. Spoken numbers cannot be checked against a source
+       by the person hearing them, and a misheard margin is worse than none.
 
    THIS LIST IS THE SECURITY BOUNDARY, and it lives on the server because the
    standing rule is that the client never determines a permission. The browser
@@ -39,7 +64,17 @@ import "server-only";
 import { getTool } from "@/lib/server/ai-agent/tool-registry";
 
 /** The only tool names a voice call may invoke. */
-export const VOICE_TOOL_NAMES: readonly string[] = ["search_web"];
+export const VOICE_TOOL_NAMES: readonly string[] = [
+  "search_web",
+  "search_knowledge",
+  "searchMachineKnowledge",
+  "searchCatalog",
+  "searchProducts",
+  "getProductByCode",
+  "getProductDetails",
+  "listCatalogFamilies",
+  "searchTradeTerms",
+];
 
 /**
  * How many tool calls one voice session may make.
@@ -52,7 +87,22 @@ export const VOICE_TOOL_NAMES: readonly string[] = ["search_web"];
  */
 export const VOICE_TOOL_CALLS_PER_SESSION = 12;
 
-/** True when a name may be invoked over voice. Nothing else may be. */
+/* THE TWO THAT SURVIVE THE CUT, when the session has to be small.
+   The compact session exists for a transport that refuses a large message,
+   and nine tool schemas are 5.4 KB of it. These two are the ones the product
+   is actually missing without: Koleex's own approved knowledge, and the
+   public web. The catalogue reads are a real loss and that is why this is a
+   fallback rather than the default. */
+const COMPACT_VOICE_TOOL_NAMES: readonly string[] = ["search_knowledge", "search_web"];
+
+/** True when a name may be invoked over voice. Nothing else may be.
+ *
+ *  DELIBERATELY NOT NARROWED FOR THE COMPACT SESSION: the allow-list is a
+ *  security boundary and the compact variant is a size decision. A model that
+ *  somehow asks for a catalogue read on a compact session is refused by
+ *  dispatchTool's permission gates like any other caller, not by this — and
+ *  making the boundary depend on which payload got sent would be one more
+ *  thing that has to be right. */
 export function isVoiceTool(name: string): boolean {
   return VOICE_TOOL_NAMES.includes(name);
 }
@@ -66,14 +116,15 @@ export function isVoiceTool(name: string): boolean {
  * registry is dropped rather than invented: this must never advertise a tool
  * that cannot run.
  */
-export function voiceToolSchemas(): Array<{
+export function voiceToolSchemas(variant: "full" | "compact" = "full"): Array<{
   type: "function";
   name: string;
   description: string;
   parameters: unknown;
 }> {
+  const names = variant === "compact" ? COMPACT_VOICE_TOOL_NAMES : VOICE_TOOL_NAMES;
   const out: Array<{ type: "function"; name: string; description: string; parameters: unknown }> = [];
-  for (const name of VOICE_TOOL_NAMES) {
+  for (const name of names) {
     const tool = getTool(name);
     if (!tool) continue;
     out.push({

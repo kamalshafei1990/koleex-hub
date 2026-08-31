@@ -57,7 +57,17 @@ const MAX_SDP_BYTES = 64 * 1024;
 /* A handshake that has not answered in this long is not going to. Short,
    because the user is staring at a "connecting…" state, and unlike a turn
    there is no partial result worth waiting for. */
-const HANDSHAKE_TIMEOUT_MS = 10_000;
+/* TWENTY, NOT TEN, and the change is a diagnosis rather than a preference.
+   "The voice service is not responding" is this route's 504, which fires when
+   the vendor did not answer IN TIME or could not be reached at all. Ten
+   seconds is a short budget for one round trip from Tokyo to Beijing carrying
+   an SDP offer, and a budget that is only sometimes too short produces
+   exactly what was reported: it works, then it does not, then it does.
+
+   Twenty leaves ten seconds of the function's 30s ceiling for everything
+   else. If a handshake genuinely needs longer than twenty, the service is not
+   healthy and saying so quickly is the better answer. */
+const HANDSHAKE_TIMEOUT_MS = 20_000;
 
 /* A voice call is the only feature in this product that spends money
    continuously while the user says nothing, so the budget is on SESSIONS
@@ -178,7 +188,11 @@ export async function POST(req: Request) {
   }
 
   let res: Response;
+  /* Set immediately before the fetch, so the elapsed time in the failure log
+     measures the round trip and not the work that preceded it. */
+  let startedAt = Date.now();
   try {
+    startedAt = Date.now();
     res = await fetch(cfg.sdpUrl, {
       method: "POST",
       headers: {
@@ -190,7 +204,17 @@ export async function POST(req: Request) {
     });
   } catch (e) {
     const timedOut = e instanceof Error && (e.name === "TimeoutError" || e.name === "AbortError");
-    console.error(`[ai.voice] handshake ${timedOut ? "timed out" : "failed"} region=${cfg.regionLabel}`);
+    /* THE ELAPSED TIME IS THE DIAGNOSIS, and it was missing. "Timed out" and
+       "could not connect" both land here and need opposite investigations: a
+       handshake that dies in 40ms is DNS, egress or a refused connection,
+       and one that runs the full budget is a service that is up and slow. The
+       log said which branch fired but never how long it took, so neither
+       could be told apart from a report of "it stopped working". */
+    console.error(
+      `[ai.voice] handshake ${timedOut ? "timed out" : "failed"} ` +
+        `region=${cfg.regionLabel} afterMs=${Date.now() - startedAt} budgetMs=${HANDSHAKE_TIMEOUT_MS} ` +
+        `cause=${e instanceof Error ? e.name : "unknown"}`,
+    );
     return NextResponse.json({ error: "Could not start the call. Try again." }, { status: 504 });
   }
 
