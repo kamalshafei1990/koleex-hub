@@ -31,6 +31,11 @@ export type VoiceState =
   | "requesting-mic"
   | "connecting"
   | "live"
+  /** The connection dropped and may come back on its own. WebRTC recovers
+   *  from a brief interruption without help, so this is not a failure yet —
+   *  but a call that silently freezes while the user keeps talking is worse
+   *  than one that says what is happening. */
+  | "reconnecting"
   | "ended"
   /** Reached the vendor or our route and was refused. `reason` says which. */
   | "failed";
@@ -52,6 +57,9 @@ export type VoiceFailure =
   | "unavailable"
   /** The handshake did not complete. */
   | "handshake-failed"
+  /** The connection was established and then lost for good — a network that
+   *  changed underneath the call rather than one that never worked. */
+  | "connection-lost"
   /** Connected, but the far side would not accept the session configuration —
    *  distinguished from a failed handshake because the two need different
    *  fixes and the first version reported both the same way. */
@@ -78,6 +86,10 @@ export type VoiceDeps = {
   fetchFn: typeof fetch;
   /** Test seam. Production uses the constant below. */
   iceTimeoutMs?: number;
+  /** Test seam. Eight real seconds per assertion would make the recovery
+   *  window the slowest thing in the suite, and a suite slow enough to skip
+   *  proves nothing. */
+  reconnectGraceMs?: number;
 };
 
 /* ICE gathering normally finishes in well under a second on a local network
@@ -86,7 +98,19 @@ export type VoiceDeps = {
    indefinitely. Sending a partial offer beats waiting forever: the candidates
    already collected are usually enough, and a call that never starts is worse
    than one that starts with fewer paths to try. */
-const ICE_GATHER_TIMEOUT_MS = 3_000;
+/* SIX SECONDS, NOT THREE, and the extra three are close to free. Gathering
+   finishes as soon as it is done — the timeout only bites on a network slow
+   enough not to have finished, which is exactly the tunnelled or congested
+   one this needs to tolerate. Cutting a slow network off early produces an
+   offer with too few candidates: it negotiates, and then connects to nothing. */
+const ICE_GATHER_TIMEOUT_MS = 6_000;
+
+/* HOW LONG A DROPPED CONNECTION MAY TRY TO COME BACK. `disconnected` is
+   routinely transient — a handover between networks, a VPN re-establishing a
+   tunnel — and WebRTC reconnects on its own without any help from us. Failing
+   instantly would end calls that were about to recover; waiting forever leaves
+   a user talking into a call that is never coming back. */
+const RECONNECT_GRACE_MS = 8_000;
 
 /* The label is ours to choose — the vendor's sample notes the name is
    customizable. Named for what travels on it rather than after any vendor. */
@@ -163,6 +187,8 @@ export class VoiceSession {
   /* The same session in fewer words, authored by the server for the case where
      the channel will not carry the long one. */
   private sessionUpdateCompact: string | null = null;
+  /* Cleared when the connection recovers, fires when it does not. */
+  private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
   private state: VoiceState = "idle";
 
   constructor(
@@ -185,6 +211,9 @@ export class VoiceSession {
   /** Give up the microphone and the connection. Safe to call at any point,
    *  including twice — every failure path calls it, and so does the caller. */
   stop(): void {
+    /* A pending timer on a call the user already ended would report a failure
+       for a connection nobody is waiting on. */
+    this.clearReconnectTimer();
     /* TRACKS FIRST, and the order matters. Closing the peer connection does
        not stop a capture track; the recording light stays on and the browser
        keeps the device held. */
@@ -261,7 +290,25 @@ export class VoiceSession {
     this.events.onMessage?.(raw);
   }
 
+  private armReconnectTimer(): void {
+    this.clearReconnectTimer();
+    this.reconnectTimer = setTimeout(() => {
+      this.reconnectTimer = null;
+      /* Still not back. A call that has been silent this long is over, and
+         saying so beats leaving a live-looking screen in front of someone. */
+      if (this.state === "reconnecting") this.fail("connection-lost");
+    }, this.deps.reconnectGraceMs ?? RECONNECT_GRACE_MS);
+  }
+
+  private clearReconnectTimer(): void {
+    if (this.reconnectTimer !== null) {
+      clearTimeout(this.reconnectTimer);
+      this.reconnectTimer = null;
+    }
+  }
+
   private fail(reason: VoiceFailure): void {
+    this.clearReconnectTimer();
     this.mic?.getTracks().forEach((t) => t.stop());
     this.mic = null;
     try {
@@ -299,6 +346,29 @@ export class VoiceSession {
       pc = this.deps.createPeerConnection();
       this.pc = pc;
       for (const track of this.mic.getTracks()) pc.addTrack(track, this.mic);
+
+      /* NOTHING WATCHED THE CONNECTION AFTER IT WENT LIVE, and on an unstable
+         network that is the failure a user actually meets: the call freezes,
+         the screen still says it is live, and they keep talking to a line that
+         died. WebRTC reports this and we were not listening. */
+      pc.oniceconnectionstatechange = () => {
+        const st = pc.iceConnectionState;
+        if (st === "disconnected") {
+          /* Transient until proven otherwise. */
+          if (this.state === "live") this.setState("reconnecting");
+          this.armReconnectTimer();
+          return;
+        }
+        if (st === "failed") {
+          this.clearReconnectTimer();
+          this.fail("connection-lost");
+          return;
+        }
+        if (st === "connected" || st === "completed") {
+          this.clearReconnectTimer();
+          if (this.state === "reconnecting") this.setState("live");
+        }
+      };
 
       /* The assistant's voice. Handed out as a stream rather than played here,
          so this module stays testable and the UI owns the audio element. */

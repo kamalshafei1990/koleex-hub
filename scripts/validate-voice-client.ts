@@ -46,6 +46,20 @@ async function within<T>(ms: number, work: Promise<T>): Promise<T | typeof HUNG>
   return Promise.race([work, new Promise<typeof HUNG>((r) => setTimeout(() => r(HUNG), ms))]);
 }
 
+const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
+
+/* A PENDING TIMER IS A RESOURCE, AND NODE WILL TELL YOU ABOUT IT. Needed
+   because the reconnect timer's disarming has NO effect on any state this
+   suite can read: arming self-clears the previous timer, and the callback
+   refuses to act unless the session is still reconnecting, so a leaked timer
+   fires into a no-op. Two mutations — "recovery does not clear the timer" and
+   "hanging up leaves it running" — survived every behavioural assertion for
+   exactly that reason. What leaks is the TIMER, so the timer is what gets
+   counted. Sample it synchronously: an await would let the suite's own
+   timers move underneath the reading. */
+const pendingTimers = () =>
+  process.getActiveResourcesInfo().filter((r) => r === "Timeout").length;
+
 /** A microphone whose tracks record whether they were stopped. */
 function fakeMic() {
   const tracks = [{ stopped: false, stop() { this.stopped = true; }, kind: "audio" }];
@@ -141,10 +155,20 @@ function fakePc(opts: { iceState?: string; gatherLater?: boolean; channelOpen?: 
     },
     setRemoteDescription: async (d: { sdp: string }) => { calls.remoteSdp = d.sdp; },
     close: () => { calls.closed++; },
+    /* A REAL CONNECTION REPORTS WHEN IT DROPS, and the first version of this
+       double did not — so a client that watched nothing after going live
+       passed every assertion here while freezing on a real unstable network. */
+    iceConnectionState: "new",
     ontrack: null,
     ondatachannel: null,
+    oniceconnectionstatechange: null,
   } as unknown as RTCPeerConnection;
-  return { pc, calls };
+  /** Drive the connection the way a browser does: set the state, then notify. */
+  const ice = (state: string) => {
+    (pc as unknown as { iceConnectionState: string }).iceConnectionState = state;
+    (pc as unknown as { oniceconnectionstatechange: (() => void) | null }).oniceconnectionstatechange?.();
+  };
+  return { pc, calls, ice };
 }
 
 type Recorded = { url: string; init?: RequestInit };
@@ -165,13 +189,15 @@ function deps(opts: {
   maxMessageSize?: number;
   enforceLimit?: boolean;
   voiceKey?: string | null;
-}): { deps: VoiceDeps; mic: ReturnType<typeof fakeMic>; pcCalls: { closed: number; added: number; remoteSdp: string; channels: string[]; sent: string[]; channel: FakeChannel | null } } {
+  reconnectGraceMs?: number;
+}): { deps: VoiceDeps; mic: ReturnType<typeof fakeMic>; ice: (state: string) => void; pcCalls: { closed: number; added: number; remoteSdp: string; channels: string[]; sent: string[]; channel: FakeChannel | null } } {
   const bodyReads: number[] = [];
   void bodyReads;
   const mic = fakeMic();
-  const { pc, calls } = fakePc({ iceState: opts.iceState, gatherLater: opts.gatherLater, channelOpen: opts.channelOpen, sendThrows: opts.sendThrows, maxMessageSize: opts.maxMessageSize, enforceLimit: opts.enforceLimit });
+  const { pc, calls, ice } = fakePc({ iceState: opts.iceState, gatherLater: opts.gatherLater, channelOpen: opts.channelOpen, sendThrows: opts.sendThrows, maxMessageSize: opts.maxMessageSize, enforceLimit: opts.enforceLimit });
   return {
     mic,
+    ice,
     pcCalls: calls,
     deps: {
       getMicrophone: async () => {
@@ -183,6 +209,7 @@ function deps(opts: {
         return pc;
       },
       iceTimeoutMs: 60,
+      reconnectGraceMs: opts.reconnectGraceMs ?? 80,
     fetchFn: (async (url: string, init?: RequestInit) => {
         opts.recorded?.push({ url: String(url), init });
         return {
@@ -669,6 +696,23 @@ async function main() {
     check("that cleanup belongs to a mount-only effect, so it cannot re-run early",
       /useEffect\(\(\) => \{\s*return \(\) => \{\s*sessionRef\.current\?\.stop\(\);[\s\S]{0,80}?\}, \[\]\);/.test(src));
 
+    /* A DROPPED CONNECTION IS STILL AN OPEN CALL, and the button decides what
+       is on screen. The call screen mounts on "live or busy"; `reconnecting`
+       is neither, so the recovery state would have UNMOUNTED the entire call
+       screen the moment a VPN wobbled — the screen vanishing mid-sentence,
+       with the microphone still held by a session nothing was rendering. A
+       worse outcome than the freeze the recovery state exists to fix. */
+    check("reconnecting counts as an open call, not as no call",
+      /const connected = live \|\| reconnecting;/.test(src));
+    check("so the call screen stays mounted through a wobble",
+      /\{\(connected \|\| busy\) && \(/.test(src));
+    check("and the control still ends the call rather than starting a second one",
+      /onClick=\{connected \|\| busy \? hangUp/.test(src));
+    /* A parent that unmutes its own speech synthesis mid-wobble talks over the
+       call the instant it recovers. */
+    check("the parent is not told the call ended when it is only recovering",
+      /onLiveChangeRef\.current\?\.\(next === "live" \|\| next === "reconnecting"\)/.test(src));
+
     /* A failed session has already torn itself down. Keeping the handle would
        make the next tap reuse a dead connection, which presents to a user as a
        button that silently stopped working. */
@@ -773,6 +817,141 @@ async function main() {
     check("only the side that is making sound is metered",
       /useStreamLevel\(micStream, listening\)/.test(btn) &&
       /phase === "speaking"/.test(btn));
+  }
+
+  console.log("\n── 11. A connection that drops AFTER the call is live ──");
+  {
+    /* THE GAP THIS SECTION EXISTS FOR. Every assertion above stops at the
+       handshake: they prove a call that never starts is reported honestly.
+       Nothing proved anything about a call that starts and then loses its
+       network — which is the failure a user on an unstable tunnel actually
+       meets. The screen said "live" while the line was dead and they kept
+       talking into it. WebRTC reports this; we were not listening. */
+
+    /* 11a — a wobble is not a failure yet. */
+    {
+      const r = await run({});
+      check("the call is live before anything drops", r.session.getState() === "live");
+      r.ice("disconnected");
+      check("a dropped connection is reported, not silently held as live",
+        r.session.getState() === "reconnecting");
+      /* AND IS NOT TORN DOWN. WebRTC recovers from a brief interruption on its
+         own; releasing the microphone here would end a call that was about to
+         come back. */
+      check("  …the microphone stays open for the recovery", !r.mic.allStopped());
+      check("  …and the connection is not closed", r.pcCalls.closed === 0);
+
+      r.ice("connected");
+      check("recovery puts the call back to live", r.session.getState() === "live");
+      check("with no failure ever reported to the UI",
+        r.states.every(([st]) => st !== "failed"));
+    }
+
+    /* 11b — THE RECOVERY MUST DISARM THE TIMER IT ARMED. Counted rather than
+       inferred from state, for the reason given at pendingTimers(): nothing
+       observable happens when this timer leaks, which is precisely why it
+       would leak unnoticed. A browser tab that survives fifty wobbles over a
+       long call would be holding fifty live callbacks over the session. */
+    {
+      const r = await run({ reconnectGraceMs: 5_000 });
+      const base = pendingTimers();
+      r.ice("disconnected");
+      check("a drop arms a recovery timer", pendingTimers() === base + 1);
+      r.ice("connected");
+      check("recovery disarms it rather than leaving it pending",
+        pendingTimers() === base);
+      r.session.stop();
+    }
+
+    /* 11c — but not forever. */
+    {
+      const r = await run({});
+      r.ice("disconnected");
+      await sleep(160);               // grace is 80ms in the suite
+      const last = r.states[r.states.length - 1];
+      check("a drop that never recovers ends the call rather than pretending",
+        last[0] === "failed" && last[1] === "connection-lost");
+      /* The privacy obligation applies to this exit path like every other. */
+      check("  …and the microphone is released", r.mic.allStopped());
+      check("  …and the connection is closed", r.pcCalls.closed === 1);
+    }
+
+    /* 11d — a connection that fails outright is over now. Waiting out a
+       recovery window for a state WebRTC has already called final is eight
+       seconds of silence sold to the user as a call. */
+    {
+      const r = await run({ reconnectGraceMs: 5_000 });
+      r.ice("failed");
+      const last = r.states[r.states.length - 1];
+      check("an ICE failure ends the call without waiting out the recovery window",
+        last[0] === "failed" && last[1] === "connection-lost");
+      check("  …and the microphone is released", r.mic.allStopped());
+    }
+
+    /* 11e — hanging up during a wobble must take the timer with it. The user
+       ended the call; nothing about it should still be scheduled. Counted for
+       the same reason as 11b. */
+    {
+      const r = await run({ reconnectGraceMs: 5_000 });
+      const base = pendingTimers();
+      r.ice("disconnected");
+      check("the recovery timer is pending mid-wobble", pendingTimers() === base + 1);
+      r.session.stop();
+      check("hanging up during a reconnect ends the call", r.session.getState() === "ended");
+      check("  …and takes the recovery timer with it", pendingTimers() === base);
+
+      /* And the call still works afterwards: the teardown that cancels a timer
+         must not have broken anything the next call needs. */
+      await r.session.start();
+      check("a second call still starts", r.session.getState() === "live");
+      r.session.stop();
+    }
+
+    /* 11f — a wobble DURING the handshake must not poison a call that then
+       succeeds. `disconnected` before the connection was ever up is normal. */
+    {
+      const r = await run({ reconnectGraceMs: 200 });
+      const last = r.states[r.states.length - 1];
+      check("a call that completed its handshake is live", last[0] === "live");
+    }
+
+    /* 11g — THE VALUES THAT ACTUALLY SHIP. Every case above injects its own
+       grace window so the suite does not spend eight seconds per assertion —
+       which means every case above also passes with a production window of
+       ZERO, where the first flicker of an unstable tunnel ends the call. That
+       mutation survived the whole section. This one call runs on the real
+       constant. */
+    {
+      const d = deps({});
+      const shipped: VoiceDeps = { ...d.deps };
+      delete shipped.reconnectGraceMs;
+      const s2 = new VoiceSession(shipped, {});
+      await s2.start();
+      check("a call on the shipped defaults goes live", s2.getState() === "live");
+      d.ice("disconnected");
+      /* Longer than the window the rest of the suite injects, so a default
+         that had quietly collapsed to it would be caught too. */
+      await sleep(120);
+      check("the SHIPPED recovery window is a real window — a brief wobble does not end the call",
+        s2.getState() === "reconnecting");
+      s2.stop();
+    }
+
+    /* 11h — and the gathering budget, pinned the only way it can be: read.
+       Waiting it out would make this suite the slowest thing in the gate, and
+       every case above passes it an injected 60ms, so a regression to the
+       original three seconds is invisible here. Three seconds is what an
+       earlier version shipped, and it cuts a slow network off mid-gather —
+       producing an offer with too few candidates, which negotiates and then
+       connects to nothing. That is the failure on a tunnelled connection. */
+    {
+      const src = (await import("node:fs")).readFileSync("src/lib/voice/session.ts", "utf8");
+      const budget = Number(
+        (/const ICE_GATHER_TIMEOUT_MS = ([\d_]+)/.exec(src)?.[1] ?? "0").replace(/_/g, ""),
+      );
+      check("the ICE gathering budget tolerates a slow or tunnelled network (source read)",
+        budget >= 5_000);
+    }
   }
 
   console.log(`\n${pass} passed, ${failures.length} failed`);
