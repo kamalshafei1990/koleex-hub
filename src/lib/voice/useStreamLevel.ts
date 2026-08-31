@@ -34,6 +34,10 @@ const FFT_SIZE = 512;
    measurement — nothing downstream treats it as an absolute level. */
 const DISPLAY_GAIN = 2.8;
 
+/* How much the level must move before React is told. Below this the change is
+   invisible and the render is pure cost. */
+const LEVEL_EPSILON = 0.02;
+
 /**
  * Returns 0..1 while `stream` is non-null and `active` is true, and 0
  * otherwise. Inactive means the meter is torn down, not merely ignored: a
@@ -78,6 +82,7 @@ export function useStreamLevel(stream: MediaStream | null, active: boolean): num
 
     const buf = new Uint8Array(analyser.fftSize);
     let stopped = false;
+    let lastPushed = -1;
 
     const tick = () => {
       if (stopped) return;
@@ -90,7 +95,17 @@ export function useStreamLevel(stream: MediaStream | null, active: boolean): num
         sum += v * v;
       }
       const rms = Math.sqrt(sum / buf.length);
-      setLevel(Math.min(1, rms * DISPLAY_GAIN));
+      const next = Math.min(1, rms * DISPLAY_GAIN);
+      /* ONLY WHEN IT MEANINGFULLY MOVED. Calling setState every animation
+         frame re-renders the whole call screen sixty times a second for
+         changes far below what an eye can see — on a phone that is the
+         difference between a call that feels calm and one that heats the
+         handset. The orb lerps toward whatever it is given, so a step of 2%
+         still reads as continuous motion. */
+      if (Math.abs(next - lastPushed) >= LEVEL_EPSILON) {
+        lastPushed = next;
+        setLevel(next);
+      }
       frameRef.current = requestAnimationFrame(tick);
     };
     frameRef.current = requestAnimationFrame(tick);

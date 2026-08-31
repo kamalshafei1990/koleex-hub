@@ -112,15 +112,26 @@ export default function VoiceCallScreen({
   }, [onEnd]);
 
   /* The orb's own vocabulary, mapped from the call's. `awakening` while
-     connecting is honest: it is starting, not yet hearing anything. */
+     connecting is honest: it is starting, not yet hearing anything.
+
+     A LIVE CALL DEFAULTS TO `listening`, and the first version's `idle` was
+     the bug behind "the orb didn't move at all". AIOrb only feeds `audioLevel`
+     into its motion while the state is listening or speaking — anything else
+     pins the level to zero — so an orb parked on `idle` until the far side
+     happened to send a speech event was a still orb for the whole call, or
+     for ever if that event never came.
+
+     `listening` is also simply true: the microphone is open from the moment
+     the call connects. That is what listening means. */
   const orbState: AIOrbState = !live
     ? "awakening"
     : phase === "speaking"
       ? "speaking"
-      : phase === "listening"
-        ? "listening"
-        : "idle";
+      : "listening";
 
+  /* The CAPTION keeps the three-way distinction the orb does not need: the orb
+     shows that it is live and reacting, while the words can still say whether
+     anyone has spoken yet. */
   const status = !live
     ? copy.connecting
     : phase === "speaking"
@@ -144,13 +155,38 @@ export default function VoiceCallScreen({
           interaction. Sized generously: this is the one moment the orb is the
           interface rather than an ornament beside text. */}
       <div className="flex-1 flex flex-col items-center justify-center gap-8 px-6 min-h-0">
-        <AIOrb
-          state={orbState}
-          audioLevel={audioLevel}
-          size={200}
-          interactive
-          className="shrink-0"
-        />
+        {/* A REACTIVE HALO AROUND THE ORB, and why it is not decoration.
+
+            AIOrb's own audio response is a 3% scale — tuned for the 38px
+            avatar beside a chat bubble, where 3% is plenty. At 200px on a
+            screen a user is staring at for a whole call, the same 3% reads as
+            "nothing is happening", which is what was reported. Rather than
+            change the shared orb's motion — it is drawn in five other places
+            and they are all correctly tuned — the call screen adds its own
+            ring, which exists only here.
+
+            It is feedback, not ornament: it is how a user knows the
+            microphone is hearing them. Monochrome, so it introduces no
+            colour. */}
+        <div className="relative shrink-0 flex items-center justify-center">
+          <div
+            aria-hidden
+            className="absolute rounded-full border border-white/20 transition-opacity duration-150"
+            style={{
+              width: 200,
+              height: 200,
+              transform: `scale(${(1 + audioLevel * 0.35).toFixed(3)})`,
+              opacity: live ? 0.15 + audioLevel * 0.5 : 0,
+            }}
+          />
+          <AIOrb
+            state={orbState}
+            audioLevel={audioLevel}
+            size={200}
+            interactive
+            className="shrink-0"
+          />
+        </div>
 
         {/* Status — one line, quiet. The orb already says most of this; the
             text is for anyone who cannot read motion. */}

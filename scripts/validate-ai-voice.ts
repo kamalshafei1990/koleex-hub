@@ -24,6 +24,7 @@ import {
 import { verdictForStatus, probeVoice } from "../src/lib/server/ai/voice/probe";
 import { parseVoiceOptions, resolveVoice } from "../src/lib/server/ai/voice/config";
 import { buildSessionUpdate, publicVoiceList } from "../src/lib/server/ai/voice/session-config";
+import { AI_PROVENANCE_RULE } from "../src/lib/server/ai/prompt-builder";
 
 let pass = 0;
 const failures: string[] = [];
@@ -350,10 +351,42 @@ void (async () => {
     check("it names both audio formats",
       withVoice.session.input_audio_format === "pcm" && withVoice.session.output_audio_format === "pcm");
 
-    /* POLICY IS STILL ABSENT — the point of moving this server-side was to make
-       that a decision taken here rather than one the browser could change. */
-    check("no instructions, and none composed by accident", !("instructions" in withVoice.session));
-    check("no tool definitions",
+    /* THE IDENTITY RULE, AND WHY THIS SECTION INVERTED.
+
+       Shipped with no instructions at all, the model answered "who are you"
+       with a vendor's name — spoken aloud, to a user. A voice session carries
+       no history and no system message unless this event supplies one, so an
+       empty `instructions` was never neutral: it was the model's own idea of
+       itself. */
+    const instructions = String(withVoice.session.instructions ?? "");
+    check("the session carries instructions at all", instructions.length > 0);
+    check("it names Koleex AI as what it is",
+      /Koleex AI/.test(instructions) && /Koleex International Group/.test(instructions));
+    check("it forbids naming any underlying model or provider",
+      /NEVER name, hint at, confirm/.test(instructions));
+    check("it covers the indirect routes, not just a direct question",
+      /joke|hypothetical|roleplay|translation/.test(instructions));
+    check("it forbids repeating a provider name that appears in tool output",
+      /Never repeat a model or provider name/.test(instructions));
+
+    /* IMPORTED, NOT RESTATED. Two copies of an identity policy drift, and the
+       copy that drifts is the one nobody is looking at. */
+    const cfgSrc = readFileSync("src/lib/server/ai/voice/session-config.ts", "utf8");
+    check("the rule is imported from the text path rather than re-typed",
+      /import \{ AI_PROVENANCE_RULE \}/.test(cfgSrc) && /AI_PROVENANCE_RULE \+/.test(cfgSrc));
+    check("and it is the SAME text the text path uses",
+      instructions.includes(AI_PROVENANCE_RULE));
+
+    /* An operator who could switch this off could switch off the identity
+       rule. It is what the product is, not a setting. */
+    check("the instructions are not configurable by environment",
+      !/process\.env/.test(cfgSrc) && !/AI_VOICE_INSTRUCTIONS/.test(cfgSrc));
+
+    /* Spoken answers are heard, not read. */
+    check("it asks for spoken style rather than markdown",
+      /No markdown/.test(instructions) && /heard, not read/.test(instructions));
+
+    check("still no tool definitions — acting by voice is a later step",
       !("tools" in withVoice.session) && !("tool_choice" in withVoice.session));
     check("no endpoint, model, key or workspace travels in the session",
       !/aliyun|maas|qwen|dashscope|sk-|ws-pl|Bearer/i.test(JSON.stringify(withVoice)));

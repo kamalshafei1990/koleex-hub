@@ -22,6 +22,7 @@
    "it compiles" and "it renders what it rendered before".
    --------------------------------------------------------------------------- */
 
+import { readFileSync } from "node:fs";
 import { renderToStaticMarkup } from "react-dom/server";
 import type { ReactElement } from "react";
 import DraftCard from "../src/components/ai/DraftCard";
@@ -327,6 +328,31 @@ console.log("\n── VoiceCallScreen: the call is a mode, not a toggle ──")
     /aria-label="Speaking…"/.test(speaking) && !/aria-label="Listening…"/.test(speaking));
   check("the status caption follows too", speaking.includes("Speaking"));
 
+  /* THE REPORTED BUG: "the orb didn't interact with voices or show any
+     motion". A live call with NO phase event yet mapped to `idle`, and AIOrb
+     only feeds audioLevel into its motion while listening or speaking — so
+     the orb sat still for the whole call, and for ever if the far side never
+     sent a speech event. The microphone is open from the moment the call
+     connects; `listening` is both the fix and the truth. */
+  const noPhase = renderToStaticMarkup(
+    <VoiceCallScreen live phase={null} audioLevel={0.5} lines={[]} lang="en" onEnd={() => {}} /> as ReactElement,
+  );
+  check("a live call with no speech event yet is still LISTENING, not idle",
+    /aria-label="Listening…"/.test(noPhase));
+  check("and never renders as idle while live", !/aria-label="Koleex AI"/.test(noPhase));
+
+  /* The halo that makes the level visible at 200px, where the shared orb's
+     own 3% scale reads as nothing. */
+  const loud = renderToStaticMarkup(
+    <VoiceCallScreen live phase="listening" audioLevel={0.9} lines={[]} lang="en" onEnd={() => {}} /> as ReactElement,
+  );
+  const quiet = renderToStaticMarkup(
+    <VoiceCallScreen live phase="listening" audioLevel={0.05} lines={[]} lang="en" onEnd={() => {}} /> as ReactElement,
+  );
+  check("a loud level renders differently from a quiet one", loud !== quiet);
+  check("the halo scales with the level",
+    /scale\(1\.3/.test(loud) && /scale\(1\.0/.test(quiet));
+
   const connecting = renderToStaticMarkup(
     <VoiceCallScreen live={false} phase={null} audioLevel={0} lines={[]} lang="en" onEnd={() => {}} /> as ReactElement,
   );
@@ -421,6 +447,33 @@ console.log("\n── VoiceCallScreen: choosing a voice ──");
   const ok = new Set(["#0D0D0D", "#FF3333", "#0066FF", "#AAAAAA", "#666666", "#2E2E2E", "#FFFFFF", "#000000", "#567FB2", "#7FA9D6", "#BCD8F0", "#0B0D11"]);
   check("the picker introduces no colour outside the palette",
     pickerHexes.every((h) => ok.has(h)));
+}
+
+console.log("\n── The transcript belongs to the call, not to the chat ──");
+{
+  /* THE REPORTED BUG: after hanging up, the captions stayed above the
+     composer — a grey slab in the conversation that was not a message, could
+     not be replied to, and vanished on reload. Voice turns are not persisted,
+     so leaving them in the message area implied a permanence they do not
+     have. Asserted as a source read, since the app shell is too large to
+     render here. */
+  const app = readFileSync("src/components/ai/KoleexAiApp.tsx", "utf8");
+  check("the chat does not render the voice transcript",
+    !/<VoiceTranscript/.test(app));
+  /* SCOPED TO THE CALL BUTTON. A blanket ban on `onTranscript=` also caught
+     MicButton's own prop — the working speech-to-text path, which legitimately
+     hands its transcript to send(). An assertion that condemns correct code is
+     worse than no assertion. */
+  const callButtonEl = app.slice(app.indexOf("<VoiceCallButton"), app.indexOf("/>", app.indexOf("<VoiceCallButton")));
+  check("and holds no transcript state that could outlive a call",
+    !/voiceLines/.test(app) && !/onTranscript/.test(callButtonEl));
+  check("the existing mic still hands its transcript to the chat",
+    /<MicButton[\s\S]{0,400}?onTranscript=\{\(t\) => send\(t, true\)\}/.test(app));
+  check("the call button is still mounted there", /<VoiceCallButton/.test(app));
+
+  /* It is rendered by the call screen, which closes with the call. */
+  const screen = readFileSync("src/components/ai/VoiceCallScreen.tsx", "utf8");
+  check("the call screen is what renders it", /<VoiceTranscript/.test(screen));
 }
 
 console.log(`\n${pass} passed, ${failures.length} failed`);
