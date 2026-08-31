@@ -166,7 +166,27 @@ console.log("\n── 3. The route, read — the surface a fetch cannot be teste
      shortening a policy is authoring one. Without the compact version there is
      nothing to fall back to and a long policy simply breaks every call. */
   check("and it offers the compact version the client may fall back to",
-    /buildVoiceSessionPayload\(voice\)/.test(code) && /session_compact/.test(successReturn));
+    /buildVoiceSessionPayload\(voice[,)]/.test(code) && /session_compact/.test(successReturn));
+  /* THE TAUGHT INDEX, AND THE THREE THINGS THAT MAKE IT SAFE TO ADD HERE.
+     It is what lets a call reach knowledge the owner taught after the session
+     was designed — but it is a database read bolted onto the one path in this
+     product with a history of timing out, so: it runs AFTER the vendor has
+     already answered, it is scoped to the caller's tenant, and it cannot fail
+     the call. Losing any one of those turns a nicety into an outage. */
+  const afterHandshake = code.slice(code.indexOf("const answer"));
+  check("the taught-question index is read after the handshake, never before it",
+    afterHandshake.includes("taughtQuestionIndex(") &&
+    code.indexOf("taughtQuestionIndex(") > code.indexOf("fetch(cfg.sdpUrl,"));
+  check("and it is scoped to the caller's tenant, not the platform",
+    /taughtQuestionIndex\(gate\.tenantId, TAUGHT_INDEX_BUDGET_BYTES\)/.test(code) &&
+    /tenantId: auth\.tenant_id \?\? null/.test(code));
+  check("and a slow or broken knowledge plane loses the index, not the call",
+    /Promise\.race\(/.test(code) &&
+    /setTimeout\(\(\) => resolve\(\[\]\), TAUGHT_INDEX_TIMEOUT_MS\)/.test(code) &&
+    /catch \{[\s\S]{0,400}?taught index unavailable/.test(code) &&
+    /let taughtQuestions: string\[\] = \[\];/.test(code));
+  check("and the index reaches the full session, never the compact fallback",
+    /buildVoiceSessionPayload\(voice, taughtQuestions\)/.test(code));
   check("and carries no endpoint, model, key or region",
     !/sdpUrl/.test(successReturn) && !/apiKey/.test(successReturn) &&
     !/AI_VOICE_MODEL/.test(successReturn) && !/regionLabel/.test(successReturn));

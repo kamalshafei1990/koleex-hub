@@ -9,7 +9,7 @@
 import { NextResponse } from "next/server";
 import { requireAuth, requireModuleAction } from "@/lib/server/auth";
 import { supabaseServer } from "@/lib/server/supabase-server";
-import { estimateTokens, invalidateTaughtAnswersCache } from "@/lib/server/ai-knowledge";
+import { estimateTokens, invalidateTaughtAnswersCache, invalidateApprovedSearchCache } from "@/lib/server/ai-knowledge";
 
 export const dynamic = "force-dynamic";
 
@@ -101,7 +101,14 @@ export async function POST(req: Request) {
     .select("id")
     .single();
   if (error || !data) return NextResponse.json({ error: error?.message || "insert failed" }, { status: 500 });
+  /* THE AI'S VIEW OF TRUTH JUST CHANGED, SO DROP WHAT IT CACHED.
+     Both planes, not one: taught pairs feed the written lanes' prompt and the
+     approved-search cache feeds search_knowledge, which is the ONLY route a
+     voice call has to any of this. Invalidating one left the owner teaching
+     something, hearing the chat box use it, and hearing a call not — for a
+     minute, which is long enough to look permanent and be reported as broken. */
   invalidateTaughtAnswersCache(tenantId);
+  invalidateApprovedSearchCache(tenantId);
   return NextResponse.json({ id: data.id });
 }
 
@@ -118,5 +125,6 @@ export async function DELETE(req: Request) {
     .eq("id", id);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   invalidateTaughtAnswersCache(auth.tenant_id ?? null);
+  invalidateApprovedSearchCache(auth.tenant_id ?? null);
   return NextResponse.json({ ok: true });
 }

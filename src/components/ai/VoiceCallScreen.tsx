@@ -41,6 +41,12 @@ const COPY: Record<Lang, {
   title: string;
   hint: string;
   voice: string;
+  /* SHORT FORMS FOR THE LABELS UNDER THE CONTROLS. Not the aria-labels: those
+     say what the control DOES ("Unmute microphone") because a screen reader
+     user has no icon to read. These name the control the way a phone does —
+     one or two words that survive being set at 11px under a 56px circle. */
+  micShort: string;
+  endShort: string;
 }> = {
   en: {
     connecting: "Connecting…",
@@ -56,6 +62,8 @@ const COPY: Record<Lang, {
     title: "Voice call",
     hint: "Speak, then pause. There is no button to hold.",
     voice: "Voice",
+    micShort: "Mic",
+    endShort: "End",
   },
   zh: {
     connecting: "正在连接…",
@@ -71,6 +79,8 @@ const COPY: Record<Lang, {
     title: "语音通话",
     hint: "说完后停顿一下，无需按住任何按键。",
     voice: "音色",
+    micShort: "麦克风",
+    endShort: "结束",
   },
   ar: {
     connecting: "جارٍ الاتصال…",
@@ -86,6 +96,8 @@ const COPY: Record<Lang, {
     title: "مكالمة صوتية",
     hint: "اتكلم وبعدين اسكت شوية. مفيش زرار تفضل ضاغط عليه.",
     voice: "الصوت",
+    micShort: "مايك",
+    endShort: "إنهاء",
   },
 };
 
@@ -199,7 +211,20 @@ export default function VoiceCallScreen({
       role="dialog"
       aria-modal="true"
       aria-label={copy.title}
-      className="fixed inset-0 z-50 flex flex-col bg-[#0D0D0D] text-white"
+      /* ABOVE THE APP CHROME, and it was not.
+
+         z-50 put this UNDER the main header (z-100) and under the floating
+         panel's dock button (z-90), so a call ran with the Hub's header bar
+         across the top of it and a stray chevron sitting on the transcript.
+         The orb was clipped by a header belonging to the page underneath. A
+         thing that declares aria-modal="true" and then lets other chrome
+         punch through it is not a modal — it is a div that covers most of
+         the screen.
+
+         200 is where this codebase's real dialogs live (SignInHelpDialog),
+         above the header and the dock. Deliberately BELOW ConfirmDialog's
+         300: a confirmation raised during a call has to be readable over it. */
+      className="fixed inset-0 z-[200] flex flex-col bg-[#0D0D0D] text-white"
       style={{
         paddingTop: "env(safe-area-inset-top, 0px)",
         paddingBottom: "env(safe-area-inset-bottom, 0px)",
@@ -257,7 +282,7 @@ export default function VoiceCallScreen({
           than a control you have to open, and the brand's icon system has no
           chevron worth adding for this. */}
       {voices.length > 0 && (
-        <div className="shrink-0 flex items-center justify-center gap-2 px-6 pb-4">
+        <div className="shrink-0 flex flex-wrap items-center justify-center gap-2 px-6 pb-4">
           <span className="text-[11px] uppercase tracking-wide text-[#666666]">{copy.voice}</span>
           {voices.map((v) => {
             const on = v.key === selectedVoice;
@@ -267,10 +292,15 @@ export default function VoiceCallScreen({
                 type="button"
                 onClick={() => onSelectVoice?.(v.key)}
                 aria-pressed={on}
-                className={`px-3 py-1 rounded-full text-xs transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0066FF] ${
+                /* SAME BUTTON FAMILY AS THE CONTROLS BELOW: same border
+                   value, same press feedback, same focus ring. It used to be
+                   24px tall with a border nobody could see — a control on a
+                   touch screen that you had to aim at. 40px is the grid step
+                   that is also a thumb. */
+                className={`h-10 px-4 rounded-full text-xs inline-flex items-center transition-[background-color,color,border-color,transform] duration-150 active:scale-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0066FF] focus-visible:ring-offset-2 focus-visible:ring-offset-[#0D0D0D] ${
                   on
-                    ? "bg-white text-[#0D0D0D]"
-                    : "text-[#AAAAAA] hover:text-white border border-[#2E2E2E]"
+                    ? "bg-white text-[#0D0D0D] border border-white"
+                    : "text-[#AAAAAA] hover:text-white border border-white/20 hover:border-white/30 bg-white/[0.04] hover:bg-white/[0.08]"
                 }`}
               >
                 {v.label}
@@ -292,46 +322,96 @@ export default function VoiceCallScreen({
           </p>
         )}
 
-        <div className="flex items-center justify-center gap-4">
-          {/* MUTE. Monochrome: it is not destructive, so it does not get the
-              red, and it is not the primary action, so it does not get the
-              size. `aria-pressed` rather than a second label, so a screen
-              reader hears one control with a state. */}
+        {/* ── THE CONTROLS ───────────────────────────────────────────────
+            WHAT WAS WRONG WITH THEM. Two bare circles with no labels, a mute
+            whose border (#2E2E2E on #0D0D0D) was very nearly invisible, and
+            two icons that were each a correct glyph with a line ruled across
+            the whole 24px box. That line is not a strike-through — it is a
+            diagonal over the top of a drawing, and at 20px it reads as
+            damage rather than state. On the end-call button it also said the
+            wrong thing: a handset with a line through it is the icon for a
+            call that FAILED, and this is the button you press when the call
+            went fine and you are done.
+
+            Both icons are now the real glyphs. Mic-off is drawn broken around
+            its slash, the way the shape is meant to be cut, so the diagonal
+            is part of the letterform instead of graffiti on it. End-call is
+            the handset turned down — the gesture of hanging up, universal on
+            every phone since they had cradles, and unambiguous inside a red
+            circle without needing any line at all.
+
+            LABELS, because an unlabelled icon pair is a guess. A caller who
+            has never been on this screen should not have to find out what
+            the grey circle does by pressing it while someone is listening. */}
+        <div className="flex items-end justify-center gap-8">
           {onToggleMute && (
+            <div className="flex flex-col items-center gap-2">
+              {/* MUTE. Monochrome: it is not destructive, so it does not get
+                  the red, and it is not the primary action, so it does not
+                  get the size. `aria-pressed` rather than a second label, so
+                  a screen reader hears one control with a state. */}
+              <button
+                type="button"
+                onClick={onToggleMute}
+                aria-pressed={muted}
+                aria-label={muted ? copy.unmute : copy.mute}
+                title={muted ? copy.unmute : copy.mute}
+                className={`h-14 w-14 rounded-full inline-flex items-center justify-center border transition-[background-color,color,border-color,transform] duration-150 active:scale-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0066FF] focus-visible:ring-offset-2 focus-visible:ring-offset-[#0D0D0D] ${
+                  muted
+                    /* FILLED WHEN OFF, and that is the louder of the two
+                       states on purpose: muted is the one a caller forgets
+                       they are in and then talks into nothing. */
+                    ? "bg-white text-[#0D0D0D] border-white"
+                    : "text-[#AAAAAA] hover:text-white border-white/20 hover:border-white/30 bg-white/[0.04] hover:bg-white/[0.08]"
+                }`}
+              >
+                {muted ? (
+                  /* Cut around the slash — one glyph, not a drawing with a
+                     line over it. */
+                  <svg aria-hidden viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M15 9.5V5a3 3 0 0 0-5.86-.88" />
+                    <path d="M9 9.9V12a3 3 0 0 0 4.6 2.54" />
+                    <path d="M18.4 13.4A7 7 0 0 0 19 10.5" />
+                    <path d="M5 10.5V12a7 7 0 0 0 10.9 5.8" />
+                    <line x1="12" y1="19" x2="12" y2="22" />
+                    <line x1="4" y1="3.5" x2="20" y2="20.5" />
+                  </svg>
+                ) : (
+                  <svg aria-hidden viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+                    <rect x="9" y="2" width="6" height="12" rx="3" />
+                    <path d="M5 10.5V12a7 7 0 0 0 14 0v-1.5" />
+                    <line x1="12" y1="19" x2="12" y2="22" />
+                  </svg>
+                )}
+              </button>
+              {/* aria-hidden: the button above already carries the accessible
+                  name, and a screen reader announcing both says it twice. */}
+              <span aria-hidden className={`text-[11px] tracking-wide transition-colors ${muted ? "text-white" : "text-[#666666]"}`}>
+                {copy.micShort}
+              </span>
+            </div>
+          )}
+
+          <div className="flex flex-col items-center gap-2">
             <button
               type="button"
-              onClick={onToggleMute}
-              aria-pressed={muted}
-              aria-label={muted ? copy.unmute : copy.mute}
-              title={muted ? copy.unmute : copy.mute}
-              className={`h-12 w-12 rounded-full inline-flex items-center justify-center border transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0066FF] focus-visible:ring-offset-2 focus-visible:ring-offset-[#0D0D0D] ${
-                muted
-                  ? "bg-white text-[#0D0D0D] border-white"
-                  : "text-[#AAAAAA] border-[#2E2E2E] hover:text-white"
-              }`}
+              onClick={onEnd}
+              aria-label={copy.end}
+              title={copy.end}
+              className="h-16 w-16 rounded-full inline-flex items-center justify-center bg-[#FF3333] text-white shadow-[0_4px_20px_-4px_rgba(255,51,51,0.5)] transition-[filter,transform] duration-150 hover:brightness-110 active:scale-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0066FF] focus-visible:ring-offset-2 focus-visible:ring-offset-[#0D0D0D]"
             >
-              <svg aria-hidden viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M12 1a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" />
-                <path d="M19 10v1a7 7 0 0 1-14 0v-1" />
-                <line x1="12" y1="18" x2="12" y2="22" />
-                {/* The struck-through variant reads as "off" across locales
-                    more reliably than a colour change alone. */}
-                {muted && <line x1="2" y1="2" x2="22" y2="22" />}
+              {/* The handset turned down. Outline, same stroke family as the
+                  mic so the pair reads as one icon set. */}
+              <svg aria-hidden viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+                <g transform="rotate(135 12 12)">
+                  <path d="M21 15.46v2.71a1.8 1.8 0 0 1-1.96 1.8 17.8 17.8 0 0 1-7.77-2.76 17.55 17.55 0 0 1-5.4-5.4A17.8 17.8 0 0 1 3.1 3.99 1.8 1.8 0 0 1 4.9 2.03h2.71a1.8 1.8 0 0 1 1.8 1.55c.11.86.32 1.71.63 2.52a1.8 1.8 0 0 1-.4 1.9L8.5 9.13a14.4 14.4 0 0 0 5.4 5.4l1.13-1.14a1.8 1.8 0 0 1 1.9-.4c.81.3 1.66.51 2.52.62a1.8 1.8 0 0 1 1.55 1.84z" />
+                </g>
               </svg>
             </button>
-          )}
-          <button
-            type="button"
-            onClick={onEnd}
-            aria-label={copy.end}
-            className="h-16 w-16 rounded-full inline-flex items-center justify-center bg-[#FF3333] text-white transition-opacity hover:opacity-90 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0066FF] focus-visible:ring-offset-2 focus-visible:ring-offset-[#0D0D0D]"
-          >
-            {/* Outline, consistent stroke, no fill — the icon system. */}
-            <svg aria-hidden viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.36 1.9.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.9.34 1.85.57 2.81.7A2 2 0 0 1 22 16.92z" />
-              <line x1="2" y1="2" x2="22" y2="22" />
-            </svg>
-          </button>
+            <span aria-hidden className="text-[11px] tracking-wide text-[#666666]">
+              {copy.endShort}
+            </span>
+          </div>
         </div>
       </div>
     </div>

@@ -43,6 +43,7 @@ import {
   DIRECT_VOICE_RULE,
 } from "@/lib/server/ai-agent/brand-knowledge";
 import { SUPPLIER_CONFIDENTIALITY } from "@/lib/server/ai/prompt-builder";
+import { EGYPTIAN_VOICE_RULE, EGYPTIAN_VOICE_BRIEF } from "./dialect";
 import { type VoiceOption } from "./config";
 import { voiceToolSchemas } from "./tools";
 
@@ -116,6 +117,16 @@ const VOICE_INSTRUCTIONS =
      near enough to answer "what does Koleex do" — which is part of why a call
      felt like a different assistant from the one in the chat box. */
   KOLEEX_COMPANY_ANSWER +
+  /* THE DIALECT RULE, and it had to be added because there was none.
+     Nothing in this session said a word about Egyptian, so every Arabic
+     sentence a call produced was the model's default — MSA-leaning, borrowing
+     from whichever dialect the phrasing suggested. The owner heard exactly
+     that and described it as "mixed with Arabic and Khaleji".
+
+     BEFORE THE STYLE RULES, deliberately: which language you are speaking is
+     a bigger decision than how long your sentences are, and the spelling rule
+     inside it changes what the voice literally pronounces. */
+  `\n\n${EGYPTIAN_VOICE_RULE}\n\n` +
   " SPOKEN STYLE: keep answers short and natural — this is a conversation, not a document." +
   " No markdown, no lists, no headings: everything you say is heard, not read." +
   " SPOKEN LENGTH OVERRIDES THE WRITTEN SHAPE: when the identity question comes up, give the same facts —" +
@@ -167,6 +178,12 @@ const COMPACT_INSTRUCTIONS =
      asked and drops the one they did. The guard above still covers the
      internals; the brief supplies the answer. */
   AI_IDENTITY_BRIEF +
+  /* ONE SENTENCE OF IT SURVIVES THE CUT. Almost nothing may be added to the
+     fallback — it exists because the full payload did not fit — but a call
+     that falls back and then speaks MSA is the complaint this answers, and
+     the brief carries the two things that decide the outcome: Egyptian by
+     default, and spelled the way it should be pronounced. */
+  EGYPTIAN_VOICE_BRIEF +
   " Speak in short natural sentences. No markdown: everything you say is heard, not read.";
 
 export type SessionUpdate = {
@@ -219,10 +236,62 @@ export function buildSessionUpdate(
   };
 }
 
-/** What the handshake returns: the same session in two lengths. */
-export function buildVoiceSessionPayload(voice: VoiceOption | null): VoiceSessionPayload {
+/* ---------------------------------------------------------------------------
+   THE TAUGHT-QUESTION INDEX, and why a voice call needs one at all.
+
+   The owner teaches Koleex AI an answer; the written lanes inline every taught
+   pair into their system prompt and let the model match on MEANING, which is
+   what makes "إيه سياسة الإرجاع؟" reach an answer taught in English. A voice
+   session cannot do that. Its configuration is one event sent before the first
+   word is spoken, and the taught corpus grows every time the owner teaches
+   something — inlining it would put an unbounded, ever-growing block into the
+   one payload in this product with a hard size limit.
+
+   So a call reaches taught knowledge through the search tool instead. That
+   works, and it has one hole: keyword search cannot cross languages. "return
+   policy" and "سياسة الإرجاع" share no characters, so a caller asking in
+   Arabic about something taught in English matches nothing — and the model,
+   with no reason to think there is anything to find, answers from general
+   memory sounding perfectly sure. From the caller's side that is
+   indistinguishable from never having taught it.
+
+   THE QUESTIONS ALONE CLOSE IT. The model reads "What is our return policy?"
+   here, hears the Arabic, recognises them as the same question — models are
+   good at precisely this — and calls the tool with wording that matches. The
+   ANSWERS stay out: they are the large, unbounded half, and they are exactly
+   what the tool already returns.
+
+   THE BUDGET IS NOT DECORATION. Past it, questions are dropped rather than the
+   session growing: a question missing from this index is still findable by
+   search, whereas a session too large for the channel falls back to the
+   compact one, which carries neither the catalogue tools nor this. Dropping a
+   line is a small loss; exceeding the limit is a broken call. */
+export const TAUGHT_INDEX_BUDGET_BYTES = 900;
+
+function taughtIndexBlock(questions: readonly string[]): string {
+  if (questions.length === 0) return "";
+  return (
+    " WHAT THE OWNER HAS TAUGHT YOU. Koleex's owner has taught you approved answers to these questions: " +
+    questions.join(" · ") +
+    ". When a caller asks any of them — in ANY language, however they word it — you already have an approved" +
+    " answer and you look it up before you speak, then give it in the caller's language. Never answer one of" +
+    " these from general memory: the taught answer is Koleex's own position and yours is a guess at it." +
+    " This list is not everything you have been taught, so search anyway when a question sounds like company" +
+    " policy, pricing practice or how Koleex does something."
+  );
+}
+
+/** What the handshake returns: the same session in two lengths.
+ *
+ *  `taughtQuestions` reaches only the FULL session. The compact one exists
+ *  because the full one did not fit; adding to it would be answering a size
+ *  problem by making the fallback bigger. */
+export function buildVoiceSessionPayload(
+  voice: VoiceOption | null,
+  taughtQuestions: readonly string[] = [],
+): VoiceSessionPayload {
   return {
-    full: buildSessionUpdate(voice),
+    full: buildSessionUpdate(voice, VOICE_INSTRUCTIONS + taughtIndexBlock(taughtQuestions)),
     compact: buildSessionUpdate(voice, COMPACT_INSTRUCTIONS, "compact"),
   };
 }
