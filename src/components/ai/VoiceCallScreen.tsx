@@ -34,6 +34,9 @@ const COPY: Record<Lang, {
   speaking: string;
   ready: string;
   end: string;
+  mute: string;
+  unmute: string;
+  muted: string;
   title: string;
   hint: string;
   voice: string;
@@ -45,6 +48,9 @@ const COPY: Record<Lang, {
     speaking: "Speaking",
     ready: "Go ahead",
     end: "End call",
+    mute: "Mute microphone",
+    unmute: "Unmute microphone",
+    muted: "Microphone off",
     title: "Voice call",
     hint: "Speak, then pause. There is no button to hold.",
     voice: "Voice",
@@ -56,6 +62,9 @@ const COPY: Record<Lang, {
     speaking: "正在回答",
     ready: "请讲",
     end: "结束通话",
+    mute: "关闭麦克风",
+    unmute: "打开麦克风",
+    muted: "麦克风已关闭",
     title: "语音通话",
     hint: "说完后停顿一下，无需按住任何按键。",
     voice: "音色",
@@ -67,6 +76,9 @@ const COPY: Record<Lang, {
     speaking: "بيتكلم",
     ready: "اتفضّل",
     end: "إنهاء المكالمة",
+    mute: "اكتم الميكروفون",
+    unmute: "شغّل الميكروفون",
+    muted: "الميكروفون مقفول",
     title: "مكالمة صوتية",
     hint: "اتكلم وبعدين اسكت شوية. مفيش زرار تفضل ضاغط عليه.",
     voice: "الصوت",
@@ -87,6 +99,10 @@ export type VoiceCallScreenProps = {
   lines: readonly TranscriptLine[];
   lang?: Lang;
   onEnd: () => void;
+  /** Nothing you say is transmitted. The microphone stays open — see
+   *  VoiceSession.setMuted for why that is the honest arrangement. */
+  muted?: boolean;
+  onToggleMute?: () => void;
   /** Keys and labels only — the server's catalogue, never the vendor's ids.
    *  Empty means no picker is drawn: a control that cannot be used is noise. */
   voices?: readonly { key: string; label: string }[];
@@ -105,6 +121,8 @@ export default function VoiceCallScreen({
   lines,
   lang = "en",
   onEnd,
+  muted = false,
+  onToggleMute,
   voices = [],
   selectedVoice = null,
   onSelectVoice,
@@ -137,12 +155,23 @@ export default function VoiceCallScreen({
     ? "awakening"
     : phase === "speaking"
       ? "speaking"
-      : "listening";
+      /* MUTED IS NOT LISTENING. AIOrb feeds audioLevel into its motion only
+         while listening or speaking, so leaving it on "listening" would leave
+         an orb reacting to a microphone whose audio goes nowhere — the same
+         class of lie as the caption above. */
+      : muted
+        ? "idle"
+        : "listening";
 
   /* The CAPTION keeps the three-way distinction the orb does not need: the orb
      shows that it is live and reacting, while the words can still say whether
      anyone has spoken yet. */
-  const status = reconnecting
+  const status = muted && live && !reconnecting
+    /* OUTRANKS listening/speaking. A user who forgot they muted, told
+       "Listening", concludes the product is broken — and they are right to,
+       because the screen said it was hearing them and it was not. */
+    ? copy.muted
+    : reconnecting
     ? copy.reconnecting
     : !live
     ? copy.connecting
@@ -250,7 +279,34 @@ export default function VoiceCallScreen({
           </p>
         )}
 
-        <div className="flex items-center justify-center">
+        <div className="flex items-center justify-center gap-4">
+          {/* MUTE. Monochrome: it is not destructive, so it does not get the
+              red, and it is not the primary action, so it does not get the
+              size. `aria-pressed` rather than a second label, so a screen
+              reader hears one control with a state. */}
+          {onToggleMute && (
+            <button
+              type="button"
+              onClick={onToggleMute}
+              aria-pressed={muted}
+              aria-label={muted ? copy.unmute : copy.mute}
+              title={muted ? copy.unmute : copy.mute}
+              className={`h-12 w-12 rounded-full inline-flex items-center justify-center border transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0066FF] focus-visible:ring-offset-2 focus-visible:ring-offset-[#0D0D0D] ${
+                muted
+                  ? "bg-white text-[#0D0D0D] border-white"
+                  : "text-[#AAAAAA] border-[#2E2E2E] hover:text-white"
+              }`}
+            >
+              <svg aria-hidden viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M12 1a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" />
+                <path d="M19 10v1a7 7 0 0 1-14 0v-1" />
+                <line x1="12" y1="18" x2="12" y2="22" />
+                {/* The struck-through variant reads as "off" across locales
+                    more reliably than a colour change alone. */}
+                {muted && <line x1="2" y1="2" x2="22" y2="22" />}
+              </svg>
+            </button>
+          )}
           <button
             type="button"
             onClick={onEnd}

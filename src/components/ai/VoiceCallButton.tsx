@@ -132,6 +132,9 @@ export default function VoiceCallButton({
      in which case no picker is drawn and the vendor's default voice is used. */
   const [voices, setVoices] = useState<readonly { key: string; label: string }[]>([]);
   const [voiceKey, setVoiceKey] = useState<string | null>(null);
+  /* Mirrors the session's flag. Kept in state because the screen renders from
+     it; the session stays the source of truth for the tracks themselves. */
+  const [muted, setMuted] = useState(false);
   /* Read inside the session callbacks, which outlive any single render. */
   const voiceKeyRef = useRef<string | null>(null);
   useEffect(() => { voiceKeyRef.current = voiceKey; }, [voiceKey]);
@@ -207,6 +210,7 @@ export default function VoiceCallButton({
     setFarStream(null);
     setPhase(null);
     setState("idle");
+    setMuted(false);
     onLiveChangeRef.current?.(false);
     /* The transcript SURVIVES hang-up on purpose: what was said is what the
        user came for, and clearing it the instant the call ends throws away
@@ -221,6 +225,9 @@ export default function VoiceCallButton({
     linesRef.current = [];
     setLines(linesRef.current);
     setPhase(null);
+    /* The session resets its own flag on start; this keeps the UI in step so a
+       second call never opens showing the last one's mute. */
+    setMuted(false);
     onTranscriptRef.current?.(linesRef.current);
 
     const session = new VoiceSession(browserVoiceDeps(), {
@@ -296,6 +303,18 @@ export default function VoiceCallButton({
   /* THE CONFIGURATION IS SENT ONCE PER SESSION, so a new voice needs a new
      session. Restarting is honest about that; silently storing the choice for
      "next time" would look like a control that does nothing. */
+  const toggleMute = useCallback(() => {
+    const session = sessionRef.current;
+    if (!session) return;
+    /* READ THE SESSION, NOT THE COMPONENT STATE. The session owns the tracks;
+       deriving the next value from a possibly-stale render would let the
+       button and the microphone disagree, which is the one thing a mute
+       control must never do. */
+    const next = !session.isMuted();
+    session.setMuted(next);
+    setMuted(next);
+  }, []);
+
   const selectVoice = useCallback((key: string) => {
     setVoiceKey(key);
     voiceKeyRef.current = key;
@@ -327,6 +346,8 @@ export default function VoiceCallButton({
           lines={lines}
           lang={lang}
           onEnd={hangUp}
+          muted={muted}
+          onToggleMute={toggleMute}
           voices={voices}
           selectedVoice={voiceKey}
           onSelectVoice={selectVoice}
