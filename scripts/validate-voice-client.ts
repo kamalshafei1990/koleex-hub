@@ -62,10 +62,18 @@ const pendingTimers = () =>
 
 /** A microphone whose tracks record whether they were stopped. */
 function fakeMic() {
-  const tracks = [{ stopped: false, stop() { this.stopped = true; }, kind: "audio" }];
+  /* `enabled` is what mute actually flips, and the first version of this
+     double had no such field — so a setMuted() that did nothing to the tracks
+     would have passed. */
+  const tracks = [{ stopped: false, enabled: true, stop() { this.stopped = true; }, kind: "audio" }];
   return {
-    stream: { getTracks: () => tracks } as unknown as MediaStream,
+    stream: {
+      getTracks: () => tracks,
+      getAudioTracks: () => tracks.filter((t) => t.kind === "audio"),
+    } as unknown as MediaStream,
     allStopped: () => tracks.every((t) => t.stopped),
+    allEnabled: () => tracks.every((t) => t.enabled),
+    noneEnabled: () => tracks.every((t) => !t.enabled),
   };
 }
 
@@ -1021,7 +1029,71 @@ async function main() {
     }
   }
 
-  console.log(`\n${pass} passed, ${failures.length} failed`);
+  
+console.log("\n── 12. Mute ──");
+{
+  /* WHAT MUTE MUST BE. Nothing the user says is transmitted, the call stays
+     up, and the far side keeps talking. That means track.enabled — not
+     track.stop(), which releases the microphone and needs a renegotiation to
+     undo, and not closing the connection, which ends the call. */
+  {
+    const r = await run({});
+    check("a call starts unmuted", r.session.isMuted() === false && r.mic.allEnabled());
+
+    r.session.setMuted(true);
+    check("muting reports muted", r.session.isMuted() === true);
+    check("  …and disables the microphone tracks", r.mic.noneEnabled());
+    /* THE THREE THINGS MUTE MUST NOT DO. */
+    check("  …without stopping them — the call is not over", !r.mic.allStopped());
+    check("  …without closing the connection", r.pcCalls.closed === 0);
+    check("  …and the call is still live", r.session.getState() === "live");
+
+    r.session.setMuted(false);
+    check("unmuting re-enables the tracks", r.mic.allEnabled() && r.session.isMuted() === false);
+    r.session.stop();
+    check("hanging up still releases the microphone after a mute cycle", r.mic.allStopped());
+  }
+
+  /* MUTE MUST NOT SURVIVE INTO THE NEXT CALL. A session that opens muted is a
+     user talking into a call that looks live, hearing nothing back, with no
+     reason to connect it to something they did minutes ago in a different
+     call. */
+  {
+    const r = await run({});
+    r.session.setMuted(true);
+    check("muted before hanging up", r.session.isMuted());
+    r.session.stop();
+    await r.session.start();
+    check("a second call opens unmuted", r.session.isMuted() === false);
+    check("  …with its tracks live", r.mic.allEnabled());
+    r.session.stop();
+  }
+
+  /* Muting before anything is connected must not throw: the control exists
+     from the moment the screen does. */
+  {
+    const d = deps({});
+    const s2 = new VoiceSession(d.deps, {});
+    check("muting before a call has started does not throw",
+      (() => { s2.setMuted(true); return s2.isMuted() === true; })());
+  }
+
+  /* SOURCE READ — the button must ask the SESSION for the current value.
+     Deriving the next state from a possibly-stale render is how a mute button
+     and a microphone come to disagree, which is the one thing this control
+     must never do. */
+  {
+    const fs = await import("node:fs");
+    const btn = fs.readFileSync("src/components/ai/VoiceCallButton.tsx", "utf8");
+    check("the toggle reads the session's own flag, not React state",
+      /const next = !session\.isMuted\(\);/.test(btn));
+    check("and it tells the session before it tells the screen",
+      /session\.setMuted\(next\);\s*\n\s*setMuted\(next\);/.test(btn));
+    check("hanging up clears the UI's mute too", /setMuted\(false\);/.test(btn));
+  }
+}
+
+console.log(`\n${pass} passed, ${failures.length} failed`);
   if (failures.length) {
     console.log("\nFAILED:");
     for (const f of failures) console.log(`  · ${f}`);

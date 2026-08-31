@@ -379,6 +379,43 @@ console.log("\n── VoiceCallScreen: the call is a mode, not a toggle ──")
     check(`  …in ${lang} too`, text(w).includes(needle));
   }
 
+  /* MUTE. The control is only drawn when the parent can act on it, and while
+     muted the screen must stop claiming to hear anyone — a caption reading
+     "Listening" over a dead microphone is what makes a user conclude the
+     product is broken, and they would be right. */
+  const mutedScreen = renderToStaticMarkup(
+    <VoiceCallScreen live phase="listening" audioLevel={0.4} lines={lines} lang="en"
+      onEnd={() => {}} muted onToggleMute={() => {}} /> as ReactElement,
+  );
+  const unmutedScreen = renderToStaticMarkup(
+    <VoiceCallScreen live phase="listening" audioLevel={0.4} lines={lines} lang="en"
+      onEnd={() => {}} muted={false} onToggleMute={() => {}} /> as ReactElement,
+  );
+  check("the mute control is drawn when the parent can act on it",
+    /aria-pressed="false"/.test(unmutedScreen) && unmutedScreen.includes("Mute microphone"));
+  check("and reads as pressed once muted",
+    /aria-pressed="true"/.test(mutedScreen) && mutedScreen.includes("Unmute microphone"));
+  check("muted stops the screen claiming to listen",
+    text(mutedScreen).includes("Microphone off") && !/\bListening\b/.test(text(mutedScreen)));
+  check("and unmuted still says Listening",
+    /\bListening\b/.test(text(unmutedScreen)));
+  /* One control, one state — not two buttons, and not a label that changes
+     without telling a screen reader anything. */
+  check("it is one control with a state, not two controls",
+    (mutedScreen.match(/aria-pressed=/g) ?? []).length === 1);
+  /* A screen with no handler must not draw a control that does nothing. */
+  const noMute = renderToStaticMarkup(
+    <VoiceCallScreen live phase="listening" audioLevel={0.4} lines={lines} lang="en" onEnd={() => {}} /> as ReactElement,
+  );
+  check("no mute control when the parent gave no handler", !/aria-pressed=/.test(noMute));
+  for (const [lang, needle] of [["zh", "关闭麦克风"], ["ar", "اكتم الميكروفون"]] as const) {
+    const m = renderToStaticMarkup(
+      <VoiceCallScreen live phase="listening" audioLevel={0.4} lines={[]} lang={lang}
+        onEnd={() => {}} muted={false} onToggleMute={() => {}} /> as ReactElement,
+    );
+    check(`  …labelled in ${lang} too`, m.includes(needle));
+  }
+
   /* Server-side turn detection has no push-to-talk. A user waiting for a
      button to hold waits forever, so it is said once, before any words. */
   check("with no transcript yet, the interaction is explained",

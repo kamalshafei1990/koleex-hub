@@ -198,6 +198,8 @@ export class VoiceSession {
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
   /** Has ICE ever actually connected? Decides whether "failed" is final. */
   private iceEverConnected = false;
+  /** Mirrors the mic tracks' enabled flag, so the UI has one thing to read. */
+  private muted = false;
   private state: VoiceState = "idle";
 
   constructor(
@@ -207,6 +209,32 @@ export class VoiceSession {
      *  own identifier, and cannot ask for one that was not offered. */
     private readonly voiceKey: string | null = null,
   ) {}
+
+  /* ---------------------------------------------------------------------
+     MUTE — track.enabled, not track.stop() and not a closed connection.
+
+     A disabled track stays in the peer connection and keeps sending silence,
+     so the call, the negotiated media and the far side's own audio all carry
+     on untouched; flipping it back is instant. Stopping the track instead
+     would release the microphone, drop the m-line and need a renegotiation
+     to undo, and would turn the browser's recording indicator off and on,
+     which reads as "the call ended".
+
+     THE INDICATOR STAYS LIT WHILE MUTED, and that is correct: the microphone
+     IS still open, and a UI implying otherwise would be lying about hardware.
+     What mute promises is that nothing you say is transmitted, and a disabled
+     track is exactly that promise.
+     --------------------------------------------------------------------- */
+  setMuted(muted: boolean): void {
+    this.muted = muted;
+    /* Audio tracks only. There is no video here today, and a future one
+       should not be silenced by a control labelled "mute". */
+    for (const track of this.mic?.getAudioTracks() ?? []) track.enabled = !muted;
+  }
+
+  isMuted(): boolean {
+    return this.muted;
+  }
 
   getState(): VoiceState {
     return this.state;
@@ -343,6 +371,14 @@ export class VoiceSession {
       this.fail("no-microphone");
       return;
     }
+
+    /* A NEW CALL ALWAYS STARTS UNMUTED. Without this the flag survives into
+       the next call: the user speaks into a session that looks live, hears
+       nothing back, and has no reason to connect it to a mute they set
+       minutes ago in a different call. Applied to the tracks too, because a
+       browser can hand back the same stream object. */
+    this.muted = false;
+    for (const track of this.mic.getAudioTracks()) track.enabled = true;
 
     /* Announced before the connection is attempted: the orb should react to
        the user's voice from the moment the microphone is live, not only once
