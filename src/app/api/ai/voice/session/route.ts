@@ -47,7 +47,10 @@ import { buildVoiceSessionPayload, publicVoiceList } from "@/lib/server/ai/voice
 
 export const dynamic = "force-dynamic";
 /* The handshake is one round trip to the vendor. It is not the call. */
-export const maxDuration = 30;
+/* Forty-five, because the handshake now gets two attempts. See ATTEMPTS
+   below: two 13s attempts plus the auth and permission work in front of them
+   has to fit, with room left over for the platform's own overhead. */
+export const maxDuration = 45;
 
 /* An SDP offer is a few kilobytes. The cap is not about correctness — it is
    that this route spends OUR key on the caller's behalf, so the caller must
@@ -57,17 +60,36 @@ const MAX_SDP_BYTES = 64 * 1024;
 /* A handshake that has not answered in this long is not going to. Short,
    because the user is staring at a "connecting…" state, and unlike a turn
    there is no partial result worth waiting for. */
-/* TWENTY, NOT TEN, and the change is a diagnosis rather than a preference.
-   "The voice service is not responding" is this route's 504, which fires when
-   the vendor did not answer IN TIME or could not be reached at all. Ten
-   seconds is a short budget for one round trip from Tokyo to Beijing carrying
-   an SDP offer, and a budget that is only sometimes too short produces
-   exactly what was reported: it works, then it does not, then it does.
+/* ---------------------------------------------------------------------------
+   TWO ATTEMPTS, NOT ONE, AND WHY THE SHAPE CHANGED.
 
-   Twenty leaves ten seconds of the function's 30s ceiling for everything
-   else. If a handshake genuinely needs longer than twenty, the service is not
-   healthy and saying so quickly is the better answer. */
-const HANDSHAKE_TIMEOUT_MS = 20_000;
+   The production logs, not a theory: every failure read
+
+     [ai.voice] handshake timed out region=cn-north
+
+   repeatedly, while our own auth work in the same request finished in 121ms.
+   The vendor was not refusing us and the key was not the problem — nothing
+   came back at all. This function runs in Tokyo and the voice endpoint is in
+   Beijing, so the handshake crosses a network boundary that drops and
+   recovers rather than one that is uniformly slow.
+
+   A SINGLE LONG WAIT IS THE WRONG SHAPE FOR THAT. If the path is merely slow,
+   one long attempt wins. If it drops and recovers — which is what an
+   intermittent "works, then does not, then does" looks like — a second
+   attempt beats a longer first one, because the second one gets a fresh
+   connection rather than continuing to wait on a dead one.
+
+   So: two attempts at 13s rather than one at 20s. Total 26s inside a 45s
+   ceiling, leaving room for the auth and permission work in front and the
+   platform's overhead around it.
+
+   NOT MORE THAN TWO. The caller is staring at "Connecting…", and a third
+   attempt buys less than it costs in the time a person will wait. If two
+   fresh connections both get nothing, the service is not reachable from here
+   and saying so is the honest answer.
+   --------------------------------------------------------------------------- */
+const HANDSHAKE_TIMEOUT_MS = 13_000;
+const HANDSHAKE_ATTEMPTS = 2;
 
 /* A voice call is the only feature in this product that spends money
    continuously while the user says nothing, so the budget is on SESSIONS
@@ -187,34 +209,48 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "A valid SDP offer is required." }, { status: 400 });
   }
 
-  let res: Response;
-  /* Set immediately before the fetch, so the elapsed time in the failure log
-     measures the round trip and not the work that preceded it. */
-  let startedAt = Date.now();
-  try {
-    startedAt = Date.now();
-    res = await fetch(cfg.sdpUrl, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/sdp",
-        Authorization: `Bearer ${cfg.apiKey}`,
-      },
-      body: offer,
-      signal: AbortSignal.timeout(HANDSHAKE_TIMEOUT_MS),
-    });
-  } catch (e) {
-    const timedOut = e instanceof Error && (e.name === "TimeoutError" || e.name === "AbortError");
-    /* THE ELAPSED TIME IS THE DIAGNOSIS, and it was missing. "Timed out" and
-       "could not connect" both land here and need opposite investigations: a
-       handshake that dies in 40ms is DNS, egress or a refused connection,
-       and one that runs the full budget is a service that is up and slow. The
-       log said which branch fired but never how long it took, so neither
-       could be told apart from a report of "it stopped working". */
-    console.error(
-      `[ai.voice] handshake ${timedOut ? "timed out" : "failed"} ` +
-        `region=${cfg.regionLabel} afterMs=${Date.now() - startedAt} budgetMs=${HANDSHAKE_TIMEOUT_MS} ` +
-        `cause=${e instanceof Error ? e.name : "unknown"}`,
-    );
+  let res: Response | null = null;
+  let lastCause = "unknown";
+  for (let attempt = 1; attempt <= HANDSHAKE_ATTEMPTS; attempt++) {
+    /* Set immediately before each fetch, so the elapsed time in the log
+       measures that round trip and not the work that preceded it. */
+    const startedAt = Date.now();
+    try {
+      res = await fetch(cfg.sdpUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/sdp",
+          Authorization: `Bearer ${cfg.apiKey}`,
+        },
+        body: offer,
+        /* A FRESH SIGNAL PER ATTEMPT. Reusing one AbortSignal.timeout across
+           the loop would abort the second attempt the instant it started,
+           because the signal fires on wall-clock time from when it was made —
+           the retry would look like an instant failure and prove nothing. */
+        signal: AbortSignal.timeout(HANDSHAKE_TIMEOUT_MS),
+      });
+      break;
+    } catch (e) {
+      const timedOut = e instanceof Error && (e.name === "TimeoutError" || e.name === "AbortError");
+      lastCause = e instanceof Error ? e.name : "unknown";
+      /* THE ELAPSED TIME IS THE DIAGNOSIS. "Timed out" and "could not
+         connect" both land here and need opposite investigations: a handshake
+         that dies in 40ms is DNS, egress or a refused connection, and one
+         that runs the full budget is a service that is up and slow. The
+         attempt number matters too — a first attempt that times out and a
+         second that succeeds is a dropping path, not a slow one. */
+      console.error(
+        `[ai.voice] handshake ${timedOut ? "timed out" : "failed"} ` +
+          `attempt=${attempt}/${HANDSHAKE_ATTEMPTS} region=${cfg.regionLabel} ` +
+          `afterMs=${Date.now() - startedAt} budgetMs=${HANDSHAKE_TIMEOUT_MS} cause=${lastCause}`,
+      );
+    }
+  }
+
+  /* Both attempts got nothing. The service is not reachable from here, and
+     the client turns this status into "the voice service is not responding" —
+     which is now a statement the logs above can back up. */
+  if (!res) {
     return NextResponse.json({ error: "Could not start the call. Try again." }, { status: 504 });
   }
 
