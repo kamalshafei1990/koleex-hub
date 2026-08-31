@@ -134,11 +134,25 @@ export function classifyBrandSection(msg: string): BrandSection {
     /\bwhat\s+you\s+can\s+do\b/i,
 
     // Name questions — tolerate missing apostrophe, extra spaces
-    /\bwhat('?s| is| are)?\s+your\s+name\b/i,
-    /\byour\s+name\b/i,
+    /* "ur" was named in the comment above as a case this handles, and did not:
+       the pattern required the word "your". */
+    /\bwhat('?s| is| are)?\s+(?:your|ur)\s+name\b/i,
+    /\b(?:your|ur)\s+name\b/i,
 
     // Who created/made/built you — present OR past tense (fixes "who create you")
-    /\bwho\s+(?:create[sd]?|made?|build[ts]?|built|design[esd]?|developed?|trained?)\s+(?:you|u)\b/i,
+    /\bwho\s+(?:create[sd]?|made?|build[ts]?|built|design[esd]?|developed?|trained?|programm?ed?|invented?)\s+(?:you|u)\b/i,
+    // Who owns / runs / operates / is behind you
+    /\bwho\s+(?:owns?|operates?|runs?)\s+(?:you|u)\b/i,
+    /\bwho(?:'?s| is)\s+behind\s+(?:you|u)\b/i,
+    /\bwho\s+(?:is|are)\s+your\s+(?:creator|maker|makers|developer|developers|owner|owners)\b/i,
+    // Whose idea you were / who had the idea
+    /\bwhose\s+idea\s+(?:was|were|is)\s+(?:you|koleex)/i,
+    /\bwho\s+had\s+the\s+idea\s+(?:to\s+)?(?:create|make|build|develop)\b/i,
+    // "are you made by koleex" / "were you built by ..."
+    /\b(?:are|were)\s+(?:you|u)\s+(?:made|built|created|developed|designed)\s+by\b/i,
+    // "tell me about yourself" / "introduce yourself"
+    /\btell\s+me\s+about\s+(?:yourself|you)\b/i,
+    /\bintroduce\s+yourself\b/i,
 
     // "Are you a real person" / "are you human" / "are you real"
     /\bare\s+you\s+(?:a\s+)?(?:real|human)(?:\s+person)?\b/i,
@@ -157,15 +171,31 @@ export function classifyBrandSection(msg: string): BrandSection {
     // Open "can I talk to you"
     /\bcan\s+i\s+talk\s+to\s+you\b/i,
 
-    // Arabic
-    /\bما\s+اسمك\b/,
-    /\bما\s+هو\s+اسمك\b/,
-    /\bاسمك\b/,
-    /\bمن\s+(?:أنت|انت)\b/,
-    /\bمين\s+(?:أنت|انت)\b/,
-    /\bمن\s+(?:صنعك|طورك|بناك|أنشأك|انشأك)\b/,
-    /\bهل\s+(?:أنت|انت)\s+إنسان\b/,
-    /\bهل\s+(?:أنت|انت)\s+انسان\b/,
+    /* Arabic — MSA and Egyptian.
+
+       NO \\b ON ARABIC. JavaScript's \\b is defined against \\w, which is
+       ASCII-only, so a boundary between a space and an Arabic letter never
+       matches: /\\bمن\\s+انت\\b/ was FALSE for "من انت". Every Arabic pattern
+       in this file was written that way and every one of them was dead — so
+       no Arabic identity question has ever reached the brand lane. Found by
+       running them, not by reading them. */
+    /ما\s*(?:هو\s*)?اسمك/,
+    /اسمك\s*(?:ايه|إيه)/,
+    /(?:من|مين)\s*(?:أنت|انت|إنت)/,
+    /* Reversed order — "انت مين؟" is at least as common as "مين انت؟".
+       Only مين here, never من: "انت من مصر؟" (are you from Egypt) is not an
+       identity question, and من doubles as "from". */
+    /(?:أنت|انت|إنت)\s*مين/,
+    /(?:من|مين)\s*(?:صنعك|طورك|بناك|أنشأك|انشأك|عملك|برمجك|صممك|اخترعك|خلقك)/,
+    /(?:من|مين)\s*(?:اللي|الذي)\s*(?:عملك|صنعك|طورك|بناك|برمجك|فكر)/,
+    /(?:من|مين)\s*قام\s*بتطويرك/,
+    /معمول\s*من\s*(?:مين|من)/,
+    /(?:من|مين)\s*(?:صاحب|صاحبة)\s*(?:فكرة|الفكرة)/,
+    /فكرة\s*(?:مين|من)/,
+    /(?:من|مين)\s*(?:يملكك|بيملكك|بيشغلك|وراك|ورا)/,
+    /(?:احكيلي|قولي|كلمني|عرفني|حدثني)\s*(?:عن\s*)?(?:نفسك|بنفسك)/,
+    /هل\s*(?:أنت|انت|إنت)\s*(?:إنسان|انسان|بشر|حقيقي)/,
+    /(?:كوليكس|كولكس)\s*(?:اي\s*اي|إيه\s*آي|AI)/i,
 
     // Chinese
     /你叫什么名字/,
@@ -173,6 +203,12 @@ export function classifyBrandSection(msg: string): BrandSection {
     /你是谁/,
     /你是(?:真人|人类)吗/,
     /你(?:能|可以)做什么/,
+    /谁(?:开发|创造|制造|发明|设计|做|研发)(?:了)?(?:你|您)/,
+    /你是(?:谁|哪家|哪个公司)(?:开发|做|研发)的/,
+    /(?:谁的主意|谁的想法|谁提出)/,
+    /(?:介绍|说说|讲讲)(?:一下)?(?:你自己|自己)/,
+    /谁(?:拥有|运营|管理)(?:你|您)/,
+    /(?:你|您)(?:的)?背后是谁/,
   ];
 
   /* Company-brand triggers — Section 1. Explicit brand / company
@@ -199,13 +235,14 @@ export function classifyBrandSection(msg: string): BrandSection {
     /\bwhen\s+(?:was|did)\s+koleex\b/i,
     /\bwhat\s+(?:is|does|industries)\s+koleex\b/i,
 
-    // Arabic
-    /\bكوليكس\b/,
-    /\bشافعي\b/,
-    /\b(?:مؤسس|المؤسس)\b/,
-    /\bالرئيس\s+التنفيذي\b/,
-    /\bالمدير\s+التنفيذي\b/,
-    /\b(?:رؤية|مهمة|رسالة|القيم|تاريخ|تراث)\b/,
+    /* Arabic — see the note in aiPatterns: \\b is ASCII-only, so every one of
+       these was dead too. */
+    /كوليكس/,
+    /شافعي/,
+    /(?:مؤسس|المؤسس)/,
+    /الرئيس\s*التنفيذي/,
+    /المدير\s*التنفيذي/,
+    /(?:رؤية|مهمة|رسالة|القيم|تاريخ|تراث)/,
 
     // Chinese
     /柯莱克斯/,

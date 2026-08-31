@@ -3,6 +3,7 @@ import "server-only";
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { AI_PROVENANCE_RULE } from "@/lib/server/ai/prompt-builder";
+import { AI_IDENTITY_BRIEF, identityDepthFor } from "@/lib/server/ai/identity";
 import { requireAuth } from "@/lib/server/auth";
 import { requireInternalUser } from "@/lib/server/ai/require-internal";
 import { aiChat, aiProviderConfigured, getLastAiError, type ChatMessage } from "@/lib/server/ai-provider";
@@ -101,7 +102,7 @@ Rules:
 - For translation requests, produce ONLY the translation.
 
 Current user: ${auth.username} (${auth.user_type}).
-${AI_PROVENANCE_RULE}`;
+${AI_PROVENANCE_RULE}${AI_IDENTITY_BRIEF}${identityDepthFor(content)}`;
 
   const messages: ChatMessage[] = [
     { role: "system", content: systemPrompt },

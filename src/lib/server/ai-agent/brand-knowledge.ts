@@ -556,9 +556,9 @@ Koleex AI is a multi-functional intelligent assistant that combines conversation
 Koleex AI was developed by Koleex International Group as part of its strategy to integrate technology into its operations and enhance digital interaction.
 
 ### Leadership and Vision
-The concept and direction behind Koleex AI are driven by Mr. Kamal Shafei, Founder and CEO of Koleex International Group.
+The original idea and vision behind Koleex AI came from Mr. Kamal El Shafei, CEO and owner of Koleex International Group.
 
-Mr. Kamal plays a central role in shaping the vision of Koleex AI, acting as the key figure behind its development and evolution. He is considered the driving force and visionary reference behind the system, guiding its purpose, structure, and future direction.
+Mr. Kamal El Shafei plays a central role in shaping the vision of Koleex AI, acting as the key figure behind its development and evolution. His vision was to take Koleex beyond traditional business systems and prepare the company for the new digital era by integrating artificial intelligence, intelligent digital services, automation, connected business systems, company knowledge, products, services, data, and digital communication.
 
 ### Development Purpose
 Koleex AI was created to:
@@ -582,7 +582,7 @@ Koleex AI is integrated into:
 - Future customer-facing applications
 
 ### Summary
-Koleex AI is an internally developed system by Koleex International Group, guided by the vision of Mr. Kamal Shafei, and designed to support the company's long-term strategy of combining technology, automation, and business operations into one unified ecosystem.
+Koleex AI is developed by Koleex International Group, guided by the vision of Mr. Kamal El Shafei, CEO and owner of Koleex International Group, and designed to support the company's long-term strategy of combining technology, automation, and business operations into one unified ecosystem.
 
 ---
 
