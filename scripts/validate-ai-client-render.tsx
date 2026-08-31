@@ -33,6 +33,7 @@ import { COPY } from "../src/components/ai/copy";
 import type { QuotationDraftPayload } from "../src/components/ai/types";
 import VoiceCallButton from "../src/components/ai/VoiceCallButton";
 import VoiceTranscript from "../src/components/ai/VoiceTranscript";
+import VoiceCallScreen from "../src/components/ai/VoiceCallScreen";
 import type { TranscriptLine } from "../src/lib/voice/events";
 
 let pass = 0;
@@ -257,7 +258,15 @@ console.log("\n── VoiceTranscript: captions on the screen ──");
   /* Partial text must be VISIBLE but visibly unsettled — withholding it until
      final means the caption arrives after it was useful. */
   check("partial text is rendered, not withheld", html.includes("Fourteen so far"));
-  check("and is styled as still-being-said", /italic/.test(html));
+  /* The GUARANTEE is that partial reads as unsettled — not the specific
+     mechanism. Italics were the first mechanism and the brand rules exclude
+     them, so this asserts that final and partial are styled DIFFERENTLY. */
+  const settledOnly = renderToStaticMarkup(
+    <VoiceTranscript lines={[{ role: "assistant", text: "Fourteen so far", final: true }]} lang="en" /> as ReactElement,
+  );
+  check("and is styled differently from settled text",
+    html.replace(/Fourteen so far/g, "") !== settledOnly.replace(/Fourteen so far/g, ""));
+  check("no italics — the brand rules exclude them", !/italic/.test(html));
 
   /* Captions are announced without interrupting a screen reader mid-sentence. */
   check("the strip is a polite live region",
@@ -289,6 +298,82 @@ console.log("\n── VoiceTranscript: captions on the screen ──");
   /* Localised, like every other user-facing string here. */
   const ar = renderToStaticMarkup(<VoiceTranscript lines={lines} lang="ar" /> as ReactElement);
   check("speaker labels are localised", ar.includes("أنت") && !ar.includes(">You<"));
+}
+
+console.log("\n── VoiceCallScreen: the call is a mode, not a toggle ──");
+{
+  const lines: TranscriptLine[] = [{ role: "user", text: "how many orders", final: true }];
+  const listening = renderToStaticMarkup(
+    <VoiceCallScreen live phase="listening" audioLevel={0.4} lines={lines} lang="en" onEnd={() => {}} /> as ReactElement,
+  );
+
+  check("it takes the screen as a modal dialog",
+    /role="dialog"/.test(listening) && /aria-modal="true"/.test(listening));
+  check("the orb is present", /aria-label/.test(listening) && listening.length > 500);
+  check("the state is announced in words too, for anyone who cannot read motion",
+    listening.includes("Listening"));
+  check("captions appear on the call screen", listening.includes("how many orders"));
+  check("there is a control to end the call", /aria-label="End call"/.test(listening));
+
+  const speaking = renderToStaticMarkup(
+    <VoiceCallScreen live phase="speaking" audioLevel={0.6} lines={lines} lang="en" onEnd={() => {}} /> as ReactElement,
+  );
+  /* NOT just "the markup differs" — that passed with the orb frozen, because
+     the status caption alone still changed. The ORB's own state is what makes
+     the screen feel like a call, so it is asserted through the orb's aria
+     label, which is generated from its state rather than from this file. */
+  check("the ORB itself is listening", /aria-label="Listening…"/.test(listening));
+  check("and switches to speaking when the far side answers",
+    /aria-label="Speaking…"/.test(speaking) && !/aria-label="Listening…"/.test(speaking));
+  check("the status caption follows too", speaking.includes("Speaking"));
+
+  const connecting = renderToStaticMarkup(
+    <VoiceCallScreen live={false} phase={null} audioLevel={0} lines={[]} lang="en" onEnd={() => {}} /> as ReactElement,
+  );
+  check("connecting says so rather than pretending to listen",
+    connecting.includes("Connecting") && !connecting.includes("Listening"));
+
+  /* Server-side turn detection has no push-to-talk. A user waiting for a
+     button to hold waits forever, so it is said once, before any words. */
+  check("with no transcript yet, the interaction is explained",
+    connecting.includes("no button to hold"));
+  check("and the hint gives way to the words once there are any",
+    !listening.includes("no button to hold"));
+
+  /* BRAND. Monochrome plus one functional red on the destructive control. */
+  /* SCOPED TO THE CHROME THIS SCREEN AUTHORS. AIOrb renders its own gradient
+     stops (#567FB2, #7FA9D6, #BCD8F0, #0B0D11) which are outside the brand
+     palette — but it is a shared component drawn identically in five other
+     places, so repainting it here would change the product far beyond this
+     screen. That is an owner's decision, raised rather than taken. What IS in
+     scope is every colour this file introduces. */
+  const ORB_OWN = new Set(["#567FB2", "#7FA9D6", "#BCD8F0", "#0B0D11", "#FFF"]);
+  const allowed = new Set(["#0D0D0D", "#FF3333", "#0066FF", "#AAAAAA", "#666666", "#FFFFFF", "#000000"]);
+  const hexes = [...listening.matchAll(/#[0-9A-Fa-f]{3,8}\b/g)]
+    .map((m) => m[0].toUpperCase())
+    .filter((h) => !ORB_OWN.has(h));
+  check("every colour this screen introduces is from the Koleex palette",
+    hexes.length > 0 && hexes.every((h) => allowed.has(h)));
+  check("the surface is the brand's dark ground", listening.includes("#0D0D0D"));
+  /* Blue is the one accent, and the rules say it may only be functional. Here
+     its single use is the keyboard focus ring — interaction, not decoration. */
+  check("the brand blue appears only as a focus indicator",
+    listening.includes("#0066FF") &&
+    /focus-visible:ring-\[#0066FF\]/.test(listening) &&
+    listening.split("#0066FF").length - 1 === 1);
+  check("the red appears only on the end-call control",
+    listening.split("#FF3333").length - 1 <= 4 && /aria-label="End call"[\s\S]{0,400}?#FF3333|#FF3333[\s\S]{0,400}?aria-label="End call"/.test(listening));
+  check("icons are outline, never filled", !/fill="(?!none)[^"]+"/.test(listening));
+
+  /* No vendor identity on a screen the user stares at for a whole call. */
+  const low = listening.toLowerCase();
+  check("no vendor, model or endpoint name is on the call screen",
+    !low.includes("qwen") && !low.includes("aliyun") && !low.includes("maas") && !low.includes("ws-"));
+
+  const ar = renderToStaticMarkup(
+    <VoiceCallScreen live phase="listening" audioLevel={0.4} lines={lines} lang="ar" onEnd={() => {}} /> as ReactElement,
+  );
+  check("the call screen is localised", ar.includes("بيسمعك") && !ar.includes(">Listening<"));
 }
 
 console.log(`\n${pass} passed, ${failures.length} failed`);

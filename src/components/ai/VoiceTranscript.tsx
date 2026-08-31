@@ -76,8 +76,11 @@ export default function VoiceTranscript({ lines, lang = "en", className = "" }: 
             <p
               key={`${i}-${line.role}`}
               dir={textDirection(line.text)}
+              /* Partial text is dimmed, NOT italicised: the brand rules rule
+                 out italics in standard usage, and colour carries the same
+                 "still being said" meaning without breaking the type system. */
               className={`text-[13px] leading-snug ${
-                line.final ? "text-[var(--text-primary)]" : "text-[var(--text-dim)] italic"
+                line.final ? "text-[var(--text-primary)]" : "text-[var(--text-dim)] opacity-70"
               } ${isUser ? "text-end" : "text-start"}`}
             >
               <span className="text-[11px] uppercase tracking-wide text-[var(--text-dim)] me-1.5">

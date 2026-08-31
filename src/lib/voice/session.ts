@@ -50,6 +50,11 @@ export type VoiceEvents = {
   /** The assistant's audio. The caller attaches it to an <audio> element —
    *  playback is DOM, and this module deliberately touches no DOM. */
   onRemoteStream?: (stream: MediaStream) => void;
+  /** The user's own microphone, handed out for METERING ONLY — an orb that
+   *  reacts to your voice needs the amplitude, and measuring it is Web Audio,
+   *  which is DOM. Never played back: routing a microphone to a speaker in the
+   *  same room is feedback, and the far side already hears it. */
+  onLocalStream?: (stream: MediaStream) => void;
   /** One decoded DataChannel message. Tool calls arrive here; step 3 handles
    *  them. Passed through untouched — this module does not interpret them. */
   onMessage?: (data: string) => void;
@@ -255,6 +260,11 @@ export class VoiceSession {
       this.fail("no-microphone");
       return;
     }
+
+    /* Announced before the connection is attempted: the orb should react to
+       the user's voice from the moment the microphone is live, not only once
+       a far-end connection exists. */
+    this.events.onLocalStream?.(this.mic);
 
     this.setState("connecting");
     let pc: RTCPeerConnection;

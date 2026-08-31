@@ -40,6 +40,8 @@ import {
   type TranscriptLine,
   type VoicePhase,
 } from "@/lib/voice/events";
+import { useStreamLevel } from "@/lib/voice/useStreamLevel";
+import VoiceCallScreen from "@/components/ai/VoiceCallScreen";
 
 /* Every failure the session can report, in every language the app speaks.
    `Record<Lang, Record<VoiceFailure, string>>` makes a missing translation a
@@ -100,6 +102,12 @@ export default function VoiceCallButton({
   onLiveChange,
 }: VoiceCallButtonProps) {
   const [state, setState] = useState<VoiceState>("idle");
+  const [phase, setPhase] = useState<VoicePhase>(null);
+  const [lines, setLines] = useState<readonly TranscriptLine[]>([]);
+  /* Kept in state rather than a ref: the meter hook takes the stream as a
+     dependency, so it must re-run when one arrives. */
+  const [micStream, setMicStream] = useState<MediaStream | null>(null);
+  const [farStream, setFarStream] = useState<MediaStream | null>(null);
   const sessionRef = useRef<VoiceSession | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
@@ -140,6 +148,11 @@ export default function VoiceCallButton({
     sessionRef.current?.stop();
     sessionRef.current = null;
     if (audioRef.current) audioRef.current.srcObject = null;
+    /* Dropped so the meters tear their audio contexts down. A retained stream
+       here would keep a hardware handle open for the life of the page. */
+    setMicStream(null);
+    setFarStream(null);
+    setPhase(null);
     setState("idle");
     onLiveChangeRef.current?.(false);
     /* The transcript SURVIVES hang-up on purpose: what was said is what the
@@ -153,6 +166,8 @@ export default function VoiceCallButton({
     /* A second call is a new conversation, not a continuation of the last
        one's captions. */
     linesRef.current = [];
+    setLines(linesRef.current);
+    setPhase(null);
     onTranscriptRef.current?.(linesRef.current);
 
     const session = new VoiceSession(browserVoiceDeps(), {
@@ -166,7 +181,9 @@ export default function VoiceCallButton({
           sessionRef.current = null;
         }
       },
+      onLocalStream: (stream) => setMicStream(stream),
       onRemoteStream: (stream) => {
+        setFarStream(stream);
         if (audioRef.current) {
           audioRef.current.srcObject = stream;
           /* Autoplay can still be refused even after a user gesture on some
@@ -185,10 +202,14 @@ export default function VoiceCallButton({
         /* UNTRUSTED TEXT. This came off a network socket and is about to be
            rendered. It is data, never instruction — nothing here dispatches
            on it, and the parser only ever returns strings. */
-        const { transcript, phase } = parseVoiceEvent(data);
-        if (phase) onPhaseRef.current?.(phase);
-        if (transcript) {
-          linesRef.current = appendTranscript(linesRef.current, transcript);
+        const parsed = parseVoiceEvent(data);
+        if (parsed.phase) {
+          setPhase(parsed.phase);
+          onPhaseRef.current?.(parsed.phase);
+        }
+        if (parsed.transcript) {
+          linesRef.current = appendTranscript(linesRef.current, parsed.transcript);
+          setLines(linesRef.current);
           onTranscriptRef.current?.(linesRef.current);
         }
       },
@@ -197,6 +218,14 @@ export default function VoiceCallButton({
     sessionRef.current = session;
     await session.start();
   }, []);
+
+  /* ONE METER PER SIDE, AND ONLY THE ACTIVE ONE RUNS. Measuring both at once
+     would burn a frame loop and an audio context on silence, which on a phone
+     is battery for nothing. */
+  const listening = state === "live" && phase !== "speaking";
+  const micLevel = useStreamLevel(micStream, listening);
+  const farLevel = useStreamLevel(farStream, state === "live" && phase === "speaking");
+  const audioLevel = phase === "speaking" ? farLevel : micLevel;
 
   const live = state === "live";
   const busy = state === "requesting-mic" || state === "connecting";
@@ -207,6 +236,19 @@ export default function VoiceCallButton({
     <>
       {/* Playback only. Never rendered visibly — the button is the control. */}
       <audio ref={audioRef} autoPlay playsInline className="hidden" />
+
+      {/* A live call takes the screen. Mounted for `busy` too, so connecting
+          is visible rather than a button that looks stuck. */}
+      {(live || busy) && (
+        <VoiceCallScreen
+          live={live}
+          phase={phase}
+          audioLevel={audioLevel}
+          lines={lines}
+          lang={lang}
+          onEnd={hangUp}
+        />
+      )}
       <button
         type="button"
         onClick={live || busy ? hangUp : () => void startCall()}
@@ -217,7 +259,7 @@ export default function VoiceCallButton({
         style={{ height: size, width: size }}
         className={`rounded-full inline-flex items-center justify-center shrink-0 transition-colors ${
           live
-            ? "bg-rose-500/[0.16] text-rose-300 ring-1 ring-rose-400/50"
+            ? "bg-[#FF3333]/[0.16] text-[#FF3333] ring-1 ring-[#FF3333]/50"
             : busy
               ? "bg-[var(--bg-surface-subtle)] text-[var(--text-dim)]"
               : "text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-subtle)]"

@@ -497,6 +497,47 @@ async function main() {
       /onLiveChange=\{\(live\) => \{ if \(live\) stopTts\(\); \}\}/.test(app));
   }
 
+  console.log("\n── 10. The audio meter releases what it opens ──");
+  {
+    /* AN AUDIOCONTEXT IS A HARDWARE HANDLE. Browsers cap how many may exist
+       at once, so one leaked per call ends with calls that cannot open a meter
+       at all — the same class of bug as leaving the microphone captured, and
+       just as invisible until the fourth or fifth call. */
+    const fs = await import("node:fs");
+    const src = fs.readFileSync("src/lib/voice/useStreamLevel.ts", "utf8");
+
+    check("the context is closed on cleanup", /ctx\.close\(\)/.test(src));
+    check("the frame loop is cancelled", /cancelAnimationFrame/.test(src));
+    check("the graph is disconnected", /source\.disconnect\(\)/.test(src));
+    check("cleanup runs when the stream changes, not only on unmount",
+      /\}, \[stream, active\]\)/.test(src));
+
+    /* Routing the microphone to the speakers is feedback, in a room where the
+       far side is already being played. */
+    check("the meter never connects to the output",
+      !/connect\(ctx\.destination\)/.test(src) && !/connect\(\s*ctx\.destination/.test(src));
+
+    /* A browser that refuses an AudioContext, or a stream with no audio track,
+       must mean a still orb — never a thrown error that takes the call down. */
+    check("a missing AudioContext is handled, not assumed away",
+      /webkitAudioContext/.test(src) && /if \(!Ctor\) return;/.test(src));
+    check("a refused context leaves the call running", /\} catch \{[\s\S]{0,200}?return;/.test(src));
+
+    /* An inactive meter must read as silence rather than the last value it
+       saw, or a new call opens showing the previous call's amplitude. */
+    check("an inactive meter reads as silence", /return stream && active \? level : 0;/.test(src));
+
+    /* The button must drop both streams on hang-up or the meters never tear
+       their contexts down, whatever the hook does. */
+    const btn = fs.readFileSync("src/components/ai/VoiceCallButton.tsx", "utf8");
+    const hangUp = btn.slice(btn.indexOf("const hangUp"), btn.indexOf("const startCall"));
+    check("hanging up drops the metered streams",
+      /setMicStream\(null\)/.test(hangUp) && /setFarStream\(null\)/.test(hangUp));
+    check("only the side that is making sound is metered",
+      /useStreamLevel\(micStream, listening\)/.test(btn) &&
+      /phase === "speaking"/.test(btn));
+  }
+
   console.log(`\n${pass} passed, ${failures.length} failed`);
   if (failures.length) {
     console.log("\nFAILED:");
