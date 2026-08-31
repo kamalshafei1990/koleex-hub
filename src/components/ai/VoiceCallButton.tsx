@@ -34,6 +34,12 @@ import {
   type VoiceFailure,
 } from "@/lib/voice/session";
 import { type Lang } from "@/lib/i18n";
+import {
+  parseVoiceEvent,
+  appendTranscript,
+  type TranscriptLine,
+  type VoicePhase,
+} from "@/lib/voice/events";
 
 /* Every failure the session can report, in every language the app speaks.
    `Record<Lang, Record<VoiceFailure, string>>` makes a missing translation a
@@ -70,8 +76,14 @@ export type VoiceCallButtonProps = {
   lang?: Lang;
   disabled?: boolean;
   onError?: (message: string) => void;
-  /** One decoded DataChannel message, passed through untouched. */
+  /** One decoded DataChannel message, passed through untouched. Still offered
+   *  because the tool bridge will need the raw stream, not the captions. */
   onMessage?: (data: string) => void;
+  /** The running conversation, rebuilt on every event. The parent renders it —
+   *  this component owns the call, not the layout. */
+  onTranscript?: (lines: readonly TranscriptLine[]) => void;
+  /** What the far side is doing: drives the orb's listening/speaking states. */
+  onPhase?: (phase: VoicePhase) => void;
   /** So the parent can mute its own speech synthesis while a call is live —
    *  two voices talking over each other is the obvious failure here. */
   onLiveChange?: (live: boolean) => void;
@@ -83,6 +95,8 @@ export default function VoiceCallButton({
   disabled = false,
   onError,
   onMessage,
+  onTranscript,
+  onPhase,
   onLiveChange,
 }: VoiceCallButtonProps) {
   const [state, setState] = useState<VoiceState>("idle");
@@ -93,14 +107,24 @@ export default function VoiceCallButton({
      The session outlives any single render and fires from network events. */
   const onErrorRef = useRef(onError);
   const onMessageRef = useRef(onMessage);
+  const onTranscriptRef = useRef(onTranscript);
+  const onPhaseRef = useRef(onPhase);
   const onLiveChangeRef = useRef(onLiveChange);
   const langRef = useRef(lang);
   useEffect(() => {
     onErrorRef.current = onError;
     onMessageRef.current = onMessage;
+    onTranscriptRef.current = onTranscript;
+    onPhaseRef.current = onPhase;
     onLiveChangeRef.current = onLiveChange;
     langRef.current = lang;
-  }, [onError, onMessage, onLiveChange, lang]);
+  }, [onError, onMessage, onTranscript, onPhase, onLiveChange, lang]);
+
+  /* The transcript accumulates across events and must not be React state HERE:
+     this component re-renders on every phase change, and rebuilding the fold
+     from a stale closure is how captions double or vanish. The parent owns
+     the rendering; this owns the running total. */
+  const linesRef = useRef<readonly TranscriptLine[]>([]);
 
   /* A call must not survive the component. Without this, navigating away
      leaves the microphone captured and the recording indicator lit — the one
@@ -118,10 +142,18 @@ export default function VoiceCallButton({
     if (audioRef.current) audioRef.current.srcObject = null;
     setState("idle");
     onLiveChangeRef.current?.(false);
+    /* The transcript SURVIVES hang-up on purpose: what was said is what the
+       user came for, and clearing it the instant the call ends throws away
+       the record at the moment they want to read it. */
+    onPhaseRef.current?.(null);
   }, []);
 
   const startCall = useCallback(async () => {
     if (sessionRef.current) return;
+    /* A second call is a new conversation, not a continuation of the last
+       one's captions. */
+    linesRef.current = [];
+    onTranscriptRef.current?.(linesRef.current);
 
     const session = new VoiceSession(browserVoiceDeps(), {
       onState: (next, failure) => {
@@ -145,7 +177,21 @@ export default function VoiceCallButton({
           });
         }
       },
-      onMessage: (data) => onMessageRef.current?.(data),
+      onMessage: (data) => {
+        /* Raw first, and unconditionally: the tool bridge will read this
+           stream and must not depend on whether a caption was produced. */
+        onMessageRef.current?.(data);
+
+        /* UNTRUSTED TEXT. This came off a network socket and is about to be
+           rendered. It is data, never instruction — nothing here dispatches
+           on it, and the parser only ever returns strings. */
+        const { transcript, phase } = parseVoiceEvent(data);
+        if (phase) onPhaseRef.current?.(phase);
+        if (transcript) {
+          linesRef.current = appendTranscript(linesRef.current, transcript);
+          onTranscriptRef.current?.(linesRef.current);
+        }
+      },
     });
 
     sessionRef.current = session;

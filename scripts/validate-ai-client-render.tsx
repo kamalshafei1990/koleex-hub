@@ -32,6 +32,8 @@ import ProjectDialog from "../src/components/ai/ProjectDialog";
 import { COPY } from "../src/components/ai/copy";
 import type { QuotationDraftPayload } from "../src/components/ai/types";
 import VoiceCallButton from "../src/components/ai/VoiceCallButton";
+import VoiceTranscript from "../src/components/ai/VoiceTranscript";
+import type { TranscriptLine } from "../src/lib/voice/events";
 
 let pass = 0;
 const failures: string[] = [];
@@ -236,6 +238,57 @@ console.log("\n── VoiceCallButton: first paint ──");
   const off = renderToStaticMarkup(<VoiceCallButton lang="en" disabled /> as ReactElement);
   check("disabled renders as actually disabled, not merely dimmed",
     /disabled=""/.test(off) || /\sdisabled(\s|>)/.test(off));
+}
+
+console.log("\n── VoiceTranscript: captions on the screen ──");
+{
+  const lines: TranscriptLine[] = [
+    { role: "user", text: "how many orders today", final: true },
+    { role: "assistant", text: "Fourteen so far", final: false },
+  ];
+  const html = renderToStaticMarkup(<VoiceTranscript lines={lines} lang="en" /> as ReactElement);
+
+  /* THE COMPLAINT THIS ANSWERS: both sides spoke and the screen stayed empty. */
+  check("the user's words reach the screen", html.includes("how many orders today"));
+  check("the assistant's words reach the screen", html.includes("Fourteen so far"));
+  check("each line is attributed to a speaker",
+    html.includes("You") && html.includes("Koleex AI"));
+
+  /* Partial text must be VISIBLE but visibly unsettled — withholding it until
+     final means the caption arrives after it was useful. */
+  check("partial text is rendered, not withheld", html.includes("Fourteen so far"));
+  check("and is styled as still-being-said", /italic/.test(html));
+
+  /* Captions are announced without interrupting a screen reader mid-sentence. */
+  check("the strip is a polite live region",
+    /aria-live="polite"/.test(html) && /role="log"/.test(html));
+
+  /* Nothing to show means nothing on screen — not an empty box. */
+  check("an empty transcript renders nothing at all",
+    renderToStaticMarkup(<VoiceTranscript lines={[]} lang="en" /> as ReactElement) === "");
+
+  /* TEXT OFF A NETWORK SOCKET IS ESCAPED, NOT INTERPRETED. */
+  const hostile: TranscriptLine[] = [
+    { role: "assistant", text: '<img src=x onerror="alert(1)">', final: true },
+  ];
+  const esc = renderToStaticMarkup(<VoiceTranscript lines={hostile} lang="en" /> as ReactElement);
+  check("transcript text is escaped, never rendered as markup",
+    !esc.includes("<img") && esc.includes("&lt;img"));
+
+  /* A long call must not push the composer off a phone. */
+  const many: TranscriptLine[] = Array.from({ length: 40 }, (_, i) => ({
+    role: (i % 2 ? "assistant" : "user") as TranscriptLine["role"],
+    text: `line ${i}`,
+    final: true,
+  }));
+  const long = renderToStaticMarkup(<VoiceTranscript lines={many} lang="en" /> as ReactElement);
+  check("only the most recent lines are shown", !long.includes("line 0") && long.includes("line 39"));
+  check("and the strip scrolls rather than growing without bound",
+    /overflow-y-auto/.test(long) && /max-h-/.test(long));
+
+  /* Localised, like every other user-facing string here. */
+  const ar = renderToStaticMarkup(<VoiceTranscript lines={lines} lang="ar" /> as ReactElement);
+  check("speaker labels are localised", ar.includes("أنت") && !ar.includes(">You<"));
 }
 
 console.log(`\n${pass} passed, ${failures.length} failed`);

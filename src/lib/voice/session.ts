@@ -102,6 +102,12 @@ const TRANSPORT_SESSION_CONFIG = {
   modalities: ["text", "audio"],
   input_audio_format: "pcm",
   output_audio_format: "pcm",
+  /* WITHOUT THIS THE USER'S OWN WORDS ARE NEVER TRANSCRIBED. The far side
+     still understands the audio and answers it, so a call sounds completely
+     correct while the screen shows only one half of the conversation — which
+     is exactly what the first version did. Asking for a transcript is opt-in,
+     and the omission is invisible until someone looks for their own words. */
+  input_audio_transcription: { enabled: true },
   /* Server-side detection is the only mode this transport offers — there is no
      push-to-talk here. `threshold` is the vendor's documented default; a noisy
      room (a factory floor) wants it higher, which is a tuning question to

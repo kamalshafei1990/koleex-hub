@@ -1,0 +1,94 @@
+"use client";
+
+/* ---------------------------------------------------------------------------
+   VoiceTranscript — what was just said, while it is being said.
+
+   WHY THIS IS NOT A CHAT BUBBLE. Voice turns are NOT persisted: nothing on the
+   server writes them to a conversation, and reloading the page loses them.
+   Rendering them as messages would make them look saved when they are not,
+   and a user who came back expecting to find yesterday's call in their history
+   would find an empty thread. A caption strip says what it is — live text that
+   belongs to this call and ends with it.
+
+   IT ALSO KEEPS TWO SEPARATE THINGS SEPARATE. The message list is the record
+   of a typed conversation. Splicing spoken turns into it would mean the list
+   sometimes holds things the server has never heard of, which every other part
+   of this app is entitled to assume is impossible.
+
+   PARTIAL TEXT IS SHOWN, NOT WITHHELD. A caption that only appears once a turn
+   is final arrives after the moment it was useful. Partial text is dimmed and
+   carries no speaker chrome, so it reads as "still being said" without
+   pretending to be settled.
+
+   EVERY STRING HERE CAME OFF A NETWORK SOCKET. It is rendered as text and
+   nothing else — no markdown, no html, no links. React escapes it, and the
+   standing rule that external content is data rather than instruction is why
+   this file has no formatting layer at all.
+   --------------------------------------------------------------------------- */
+
+import { useEffect, useRef } from "react";
+import { type TranscriptLine } from "@/lib/voice/events";
+import { type Lang } from "@/lib/i18n";
+import { textDirection } from "@/lib/text-direction";
+
+const SPEAKER_COPY: Record<Lang, { you: string; assistant: string; live: string }> = {
+  en: { you: "You", assistant: "Koleex AI", live: "Live transcript" },
+  zh: { you: "你", assistant: "Koleex AI", live: "实时字幕" },
+  ar: { you: "أنت", assistant: "Koleex AI", live: "النص المباشر" },
+};
+
+/* Enough to follow the thread, few enough that the strip never pushes the
+   composer off a phone screen. The call is the interface; this supports it. */
+const VISIBLE_LINES = 6;
+
+export type VoiceTranscriptProps = {
+  lines: readonly TranscriptLine[];
+  lang?: Lang;
+  className?: string;
+};
+
+export default function VoiceTranscript({ lines, lang = "en", className = "" }: VoiceTranscriptProps) {
+  const endRef = useRef<HTMLDivElement | null>(null);
+  const copy = SPEAKER_COPY[lang];
+
+  /* Follow the newest line. Captions that stop scrolling are captions that
+     stop being read. */
+  useEffect(() => {
+    endRef.current?.scrollIntoView({ block: "nearest" });
+  }, [lines]);
+
+  if (lines.length === 0) return null;
+  const shown = lines.slice(-VISIBLE_LINES);
+
+  return (
+    <div
+      className={`max-w-[820px] mx-auto px-4 md:px-6 ${className}`}
+      /* Announced politely: a caption that interrupts a screen reader mid
+         sentence is worse than one that arrives a beat late. */
+      role="log"
+      aria-live="polite"
+      aria-label={copy.live}
+    >
+      <div className="max-h-[30vh] overflow-y-auto rounded-2xl bg-[var(--bg-surface-subtle)]/60 px-3 py-2 space-y-1.5">
+        {shown.map((line, i) => {
+          const isUser = line.role === "user";
+          return (
+            <p
+              key={`${i}-${line.role}`}
+              dir={textDirection(line.text)}
+              className={`text-[13px] leading-snug ${
+                line.final ? "text-[var(--text-primary)]" : "text-[var(--text-dim)] italic"
+              } ${isUser ? "text-end" : "text-start"}`}
+            >
+              <span className="text-[11px] uppercase tracking-wide text-[var(--text-dim)] me-1.5">
+                {isUser ? copy.you : copy.assistant}
+              </span>
+              {line.text}
+            </p>
+          );
+        })}
+        <div ref={endRef} />
+      </div>
+    </div>
+  );
+}

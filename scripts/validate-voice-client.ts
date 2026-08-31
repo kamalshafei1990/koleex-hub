@@ -460,8 +460,28 @@ async function main() {
 
     /* Tool calls arrive on the DataChannel. Routing them through the
        permission engine is the next step; today this component must not act. */
-    check("DataChannel messages are passed through, never interpreted",
-      /onMessage: \(data\) => onMessageRef\.current\?\.\(data\)/.test(src));
+    /* THE GUARANTEE, NOT ITS SHAPE. The previous version of this pinned the
+       exact one-liner and went red the moment captions were added beside it,
+       even though the guarantee — the raw stream reaches the caller untouched
+       — was intact. What matters is that the pass-through is UNCONDITIONAL and
+       happens BEFORE any parsing: the tool bridge will read that stream and
+       must not depend on whether a caption was produced from it. */
+    const handler = src.slice(src.indexOf("onMessage: (data) =>"), src.indexOf("});", src.indexOf("onMessage: (data) =>")));
+    check("the raw message reaches the caller untouched",
+      /onMessageRef\.current\?\.\(data\)/.test(handler));
+    check("and does so BEFORE anything is parsed from it",
+      handler.indexOf("onMessageRef.current?.(data)") < handler.indexOf("parseVoiceEvent"));
+    check("the pass-through is not gated on a parse result",
+      !/if\s*\([^)]*\)\s*onMessageRef\.current/.test(handler));
+    /* An OR here accepted the phase alone and passed with the transcript
+       emission deleted — which is the empty screen this whole change exists to
+       fix. Both are required, by name. */
+    check("a parsed transcript is handed to the caller — the empty screen fix",
+      /onTranscriptRef\.current\?\.\(/.test(handler));
+    check("and the phase is reported for the orb",
+      /onPhaseRef\.current\?\.\(/.test(handler));
+    check("parsing feeds display state only — no dispatch",
+      !/fetch\(|execute|tool_call/i.test(handler));
     check("the component dispatches no tool of its own",
       !/tool_call/i.test(src) && !/executeTool/i.test(src));
 
