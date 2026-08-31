@@ -132,7 +132,8 @@
     "budgets": "node --import tsx scripts/validate-budgets.mts --report",
     "validate:mobile-width": "node --import tsx scripts/validate-mobile-width.mts",
     "validate:ai-plan-claims": "NODE_OPTIONS=--conditions=react-server tsx scripts/validate-ai-plan-claims.ts",
-    "validate:auth-recovery": "NODE_OPTIONS=--conditions=react-server tsx scripts/validate-auth-recovery.ts"
+    "validate:auth-recovery": "NODE_OPTIONS=--conditions=react-server tsx scripts/validate-auth-recovery.ts",
+    "validate:voice-tools": "NODE_OPTIONS=--conditions=react-server tsx scripts/validate-voice-tools.ts"
   },
   "dependencies": {
     "@napi-rs/canvas": "^0.1.100",

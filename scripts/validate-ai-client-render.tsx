@@ -416,6 +416,38 @@ console.log("\n── VoiceCallScreen: the call is a mode, not a toggle ──")
     check(`  …labelled in ${lang} too`, m.includes(needle));
   }
 
+  /* A LOOKUP IS TWO SECONDS OF REAL SILENCE. The model is told to say "let me
+     check" first and does not always; a screen that says nothing during it
+     reads as a frozen call. */
+  const searchingScreen = renderToStaticMarkup(
+    <VoiceCallScreen live phase="listening" audioLevel={0.2} lines={lines} lang="en"
+      onEnd={() => {}} searching /> as ReactElement,
+  );
+  check("a lookup says so rather than leaving a silence",
+    text(searchingScreen).includes("Looking it up"));
+  check("and it outranks Listening, which is not what is happening",
+    !/\bListening\b/.test(text(searchingScreen)));
+  /* But it must NOT outrank the two states that are about whether the call
+     works at all. A muted call that is also looking something up has a bigger
+     problem to report. */
+  const searchingMuted = renderToStaticMarkup(
+    <VoiceCallScreen live phase="listening" audioLevel={0.2} lines={lines} lang="en"
+      onEnd={() => {}} searching muted onToggleMute={() => {}} /> as ReactElement,
+  );
+  check("muted still wins over a lookup", text(searchingMuted).includes("Microphone off"));
+  const searchingWobble = renderToStaticMarkup(
+    <VoiceCallScreen live reconnecting phase="listening" audioLevel={0.2} lines={lines} lang="en"
+      onEnd={() => {}} searching /> as ReactElement,
+  );
+  check("and reconnecting wins over both", /reconnecting/i.test(text(searchingWobble)));
+  for (const [lang, needle] of [["zh", "正在查询"], ["ar", "بدوّر"]] as const) {
+    const w = renderToStaticMarkup(
+      <VoiceCallScreen live phase="listening" audioLevel={0.2} lines={[]} lang={lang}
+        onEnd={() => {}} searching /> as ReactElement,
+    );
+    check(`  …said in ${lang} too`, text(w).includes(needle));
+  }
+
   /* Server-side turn detection has no push-to-talk. A user waiting for a
      button to hold waits forever, so it is said once, before any words. */
   check("with no transcript yet, the interaction is explained",

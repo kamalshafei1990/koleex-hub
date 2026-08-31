@@ -26,6 +26,16 @@
    that can hurt someone.
    --------------------------------------------------------------------------- */
 
+/* The only import this module has, and it is a pure one: no DOM, no network,
+   no browser globals. Everything else arrives through VoiceDeps, which is
+   what makes this file testable in Node at all. */
+import {
+  parseToolCallEvent,
+  buildToolResultMessages,
+  ToolCallNames,
+  type VoiceToolCall,
+} from "./tool-calls";
+
 export type VoiceState =
   | "idle"
   | "requesting-mic"
@@ -82,9 +92,19 @@ export type VoiceEvents = {
    *  which is DOM. Never played back: routing a microphone to a speaker in the
    *  same room is feedback, and the far side already hears it. */
   onLocalStream?: (stream: MediaStream) => void;
-  /** One decoded DataChannel message. Tool calls arrive here; step 3 handles
-   *  them. Passed through untouched — this module does not interpret them. */
+  /** One decoded DataChannel message, passed through untouched. */
   onMessage?: (data: string) => void;
+  /** A tool call was made and answered — for a UI that wants to say
+   *  "checking…" rather than leaving a silence the caller cannot read. */
+  onToolCall?: (name: string) => void;
+  /** SOMETHING NAMED ITSELF A FUNCTION CALL AND COULD NOT BE READ.
+   *
+   *  This exists because the alternative is silence: if the vendor's event
+   *  names differ from the protocol ones, the model asks to search, nothing
+   *  happens, and it answers from memory sounding just as certain. A caller
+   *  that logs this turns a wrong guess into something findable in a minute
+   *  instead of a bug report about "the AI is out of date". */
+  onToolProtocolMismatch?: (eventType: string) => void;
 };
 
 export type VoiceDeps = {
@@ -97,6 +117,9 @@ export type VoiceDeps = {
    *  window the slowest thing in the suite, and a suite slow enough to skip
    *  proves nothing. */
   reconnectGraceMs?: number;
+  /** Test seam for the per-call cap, so the loop guard can be proved without
+   *  making a dozen round trips. */
+  maxToolCallsPerSession?: number;
 };
 
 /* ICE gathering normally finishes in well under a second on a local network
@@ -111,6 +134,13 @@ export type VoiceDeps = {
    one this needs to tolerate. Cutting a slow network off early produces an
    offer with too few candidates: it negotiates, and then connects to nothing. */
 const ICE_GATHER_TIMEOUT_MS = 6_000;
+
+/* THE LOOP GUARD, at source. Generous enough that a real conversation never
+   reaches it — a caller asking follow-up questions for ten minutes stays well
+   inside — and finite, because "no uncontrolled agent loops" has to be true
+   of the voice path too. The server enforces its own budget independently,
+   which is what survives a page that has been tampered with. */
+const MAX_TOOL_CALLS_PER_SESSION = 12;
 
 /* HOW LONG A DROPPED CONNECTION MAY TRY TO COME BACK. `disconnected` is
    routinely transient — a handover between networks, a VPN re-establishing a
@@ -176,6 +206,11 @@ export function normalizeSdp(sdp: string): string {
 /** Our own route. A constant, because the ONE thing a caller must never be
  *  able to influence is where the offer goes: that request carries the key on
  *  the other side of it. */
+/** Where the browser relays a tool call. Fixed, for the same reason the
+ *  handshake path is: a caller that could name this endpoint could route the
+ *  model's requests somewhere we did not choose. */
+export const TOOL_PATH = "/api/ai/voice/tool";
+
 export const HANDSHAKE_PATH = "/api/ai/voice/session";
 
 export class VoiceSession {
@@ -200,6 +235,18 @@ export class VoiceSession {
   private iceEverConnected = false;
   /** Mirrors the mic tracks' enabled flag, so the UI has one thing to read. */
   private muted = false;
+  /** call_id → tool name, because the protocol sends the two halves apart. */
+  private toolNames = new ToolCallNames();
+  /** Calls already answered, so a repeated event does not run a tool twice.
+   *  The protocol can deliver the same finished call on more than one event
+   *  (the streamed one and response.done), and running a search twice is
+   *  wasted money and a duplicated answer. */
+  private answeredCalls = new Set<string>();
+  /** THE LOOP GUARD. A model that can call a tool and then be asked to speak
+   *  again can do that forever; the standing rule is no uncontrolled agent
+   *  loops. The server caps this too — this one just stops the traffic at
+   *  source. */
+  private toolCallCount = 0;
   private state: VoiceState = "idle";
 
   constructor(
@@ -325,6 +372,89 @@ export class VoiceSession {
       this.sendSessionConfig(channel);
     }
     this.events.onMessage?.(raw);
+
+    /* UNTRUSTED. This came off a network socket and describes something the
+       model wants done. Nothing is executed here: the name is relayed to the
+       server, which decides against its own allow-list whether it may run. */
+    const parsed = parseToolCallEvent(raw, this.toolNames);
+    if (parsed.unreadable) {
+      this.events.onToolProtocolMismatch?.(parsed.unreadable);
+      return;
+    }
+    if (parsed.call) void this.runToolCall(parsed.call, channel);
+  }
+
+  /**
+   * Relay one tool call to the server and hand the answer back to the model.
+   *
+   * NEVER RUNS ANYTHING ITSELF. The browser is a courier: it carries the
+   * request to a route that authenticates, checks the name against the
+   * server's allow-list, checks the caller's permissions, and audits. That is
+   * the whole reason this is a round trip rather than a fetch to a search API
+   * from the page.
+   */
+  private async runToolCall(call: VoiceToolCall, channel: RTCDataChannel): Promise<void> {
+    /* Once per call_id. The protocol can deliver the same finished call on
+       more than one event, and a search run twice costs money and produces a
+       duplicated answer. */
+    if (this.answeredCalls.has(call.callId)) return;
+    this.answeredCalls.add(call.callId);
+    this.toolNames.forget(call.callId);
+
+    const cap = this.deps.maxToolCallsPerSession ?? MAX_TOOL_CALLS_PER_SESSION;
+    if (this.toolCallCount >= cap) {
+      /* ANSWERED, NOT IGNORED. A call left unanswered leaves the model waiting
+         and the caller in silence; telling it plainly lets it say so out loud
+         and carry on. */
+      this.sendToolResult(channel, call.callId, {
+        ok: false,
+        message: "That is as many lookups as one call can make. Ask again in a new call.",
+      });
+      return;
+    }
+    this.toolCallCount++;
+    this.events.onToolCall?.(call.name);
+
+    let output: unknown;
+    try {
+      const res = await this.deps.fetchFn(TOOL_PATH, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: call.name,
+          call_id: call.callId,
+          arguments: call.argumentsJson,
+        }),
+      });
+      if (!res.ok) {
+        /* The route's own body is not forwarded: it is written for a screen,
+           and on a refusal it may name a limit. The model gets something it
+           can say. */
+        output = { ok: false, message: "That lookup could not be completed just now." };
+      } else {
+        const body = (await res.json()) as { output?: unknown };
+        output = body.output ?? { ok: false, message: "That lookup returned nothing." };
+      }
+    } catch {
+      output = { ok: false, message: "That lookup could not be completed just now." };
+    }
+
+    this.sendToolResult(channel, call.callId, output);
+  }
+
+  /** Both protocol messages, in order, with the channel checked once. */
+  private sendToolResult(channel: RTCDataChannel, callId: string, output: unknown): void {
+    if (channel.readyState !== "open") return;
+    for (const message of buildToolResultMessages(callId, output)) {
+      try {
+        channel.send(message);
+      } catch {
+        /* The call may have ended while the lookup was in flight. Nothing to
+           recover: there is no longer anyone waiting for this answer. */
+        return;
+      }
+    }
   }
 
   private armReconnectTimer(): void {

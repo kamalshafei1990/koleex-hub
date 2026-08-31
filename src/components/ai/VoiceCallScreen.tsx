@@ -37,6 +37,7 @@ const COPY: Record<Lang, {
   mute: string;
   unmute: string;
   muted: string;
+  searching: string;
   title: string;
   hint: string;
   voice: string;
@@ -51,6 +52,7 @@ const COPY: Record<Lang, {
     mute: "Mute microphone",
     unmute: "Unmute microphone",
     muted: "Microphone off",
+    searching: "Looking it up…",
     title: "Voice call",
     hint: "Speak, then pause. There is no button to hold.",
     voice: "Voice",
@@ -65,6 +67,7 @@ const COPY: Record<Lang, {
     mute: "关闭麦克风",
     unmute: "打开麦克风",
     muted: "麦克风已关闭",
+    searching: "正在查询…",
     title: "语音通话",
     hint: "说完后停顿一下，无需按住任何按键。",
     voice: "音色",
@@ -79,6 +82,7 @@ const COPY: Record<Lang, {
     mute: "اكتم الميكروفون",
     unmute: "شغّل الميكروفون",
     muted: "الميكروفون مقفول",
+    searching: "بدوّر على المعلومة…",
     title: "مكالمة صوتية",
     hint: "اتكلم وبعدين اسكت شوية. مفيش زرار تفضل ضاغط عليه.",
     voice: "الصوت",
@@ -103,6 +107,9 @@ export type VoiceCallScreenProps = {
    *  VoiceSession.setMuted for why that is the honest arrangement. */
   muted?: boolean;
   onToggleMute?: () => void;
+  /** A lookup is running. Two seconds of silence on a call reads as a freeze;
+   *  this is the difference between waiting and wondering. */
+  searching?: boolean;
   /** Keys and labels only — the server's catalogue, never the vendor's ids.
    *  Empty means no picker is drawn: a control that cannot be used is noise. */
   voices?: readonly { key: string; label: string }[];
@@ -123,6 +130,7 @@ export default function VoiceCallScreen({
   onEnd,
   muted = false,
   onToggleMute,
+  searching = false,
   voices = [],
   selectedVoice = null,
   onSelectVoice,
@@ -166,7 +174,12 @@ export default function VoiceCallScreen({
   /* The CAPTION keeps the three-way distinction the orb does not need: the orb
      shows that it is live and reacting, while the words can still say whether
      anyone has spoken yet. */
-  const status = muted && live && !reconnecting
+  const status = searching && live && !reconnecting && !muted
+    /* Above listening, below muted and reconnecting: those two are about
+       whether the call works at all, and this one is only about why it is
+       quiet right now. */
+    ? copy.searching
+    : muted && live && !reconnecting
     /* OUTRANKS listening/speaking. A user who forgot they muted, told
        "Listening", concludes the product is broken — and they are right to,
        because the screen said it was hearing them and it was not. */
