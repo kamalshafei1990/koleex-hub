@@ -83,11 +83,29 @@ const strip = (t: string) => t.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\
 
 /* The three known writers, named individually. A path list rather than a glob
    so a NEW writer in a new file is not silently absorbed into the count. */
-/* Phase 7 fixed the two AI writers. The settings route is exempt BY REASON,
-   not by omission — see the header — and is the only path still permitted to
-   write the column directly. */
+/* THE SETTINGS ROUTE'S EXEMPTION IS WITHDRAWN, and the reason it was granted
+   is worth keeping because it was a real constraint, not an oversight:
+
+       "its exemption holds because it scopes the write by tenant,
+        which the RPC cannot"
+
+   True at the time. account_prefs_merge(uuid, jsonb) takes an account id and
+   no tenant, so swapping the UPDATE for the RPC would have dropped
+   `.eq("tenant_id", auth.tenant_id)` and silently widened what a super-admin
+   could write to. Losing a boundary to close a race is not a trade worth
+   making, so the race stayed.
+
+   What changed is that the choice was false. The tenant clause did not have to
+   live in the same statement as the merge — a super-admin editing someone
+   else's account can be checked against the tenant BEFORE the write, and a
+   self-edit needs no check at all because the id IS the session's account. The
+   route now does that and calls the RPC, so it has the boundary AND the atomic
+   write. Both properties are asserted below; neither is assumed.
+
+   Why it mattered enough to revisit: the migration named three writers, two
+   were converted, and this one silently discarded facts a user had asked the
+   assistant to remember whenever they also had a Settings tab open. */
 const REMAINING_DIRECT_WRITERS = [
-  "src/app/api/accounts/[id]/preferences/route.ts",
   /* account-prefs.ts contains the OLD pattern on purpose, as the bridge for
      environments where the function is not deployed yet. The suite flagged it
      on the first run, which is the check working: it is exempt only while the
@@ -142,12 +160,12 @@ console.log("\n── 2. No NEW direct writer may be added ──");
 
   const unexpected = hits.filter((f) => !(REMAINING_DIRECT_WRITERS as ReadonlyArray<string>).includes(f));
   check(
-    `only the two exempt files write the column directly${unexpected.length ? ` — NEW WRITER: ${unexpected.join(", ")}` : ""}`,
+    `only the one exempt file writes the column directly${unexpected.length ? ` — NEW WRITER: ${unexpected.join(", ")}` : ""}`,
     unexpected.length === 0,
   );
   check(
-    `and the sweep really found them (${hits.length} files), so this is not passing on an empty search`,
-    hits.length === 2,
+    `and the sweep really found it (${hits.length} file), so this is not passing on an empty search`,
+    hits.length === 1,
   );
   /* The bridge is exempt only while it IS a bridge. If the RPC call were ever
      removed from that file, the exemption would be covering the bug itself. */
@@ -160,13 +178,29 @@ console.log("\n── 2. No NEW direct writer may be added ──");
       rpcIdx !== -1 && legacyIdx !== -1 && rpcIdx < legacyIdx,
     );
   }
-  /* The reason it is exempt, asserted rather than trusted to a comment: if the
-     tenant clause were removed, routing it through the RPC would no longer
-     weaken anything and the exemption would need re-arguing. */
-  check(
-    "its exemption holds because it scopes the write by tenant, which the RPC cannot",
-    /\.eq\("tenant_id", auth\.tenant_id\)/.test(strip(readFileSync(REMAINING_DIRECT_WRITERS[0], "utf8"))),
-  );
+  /* THE SETTINGS ROUTE, NOW CONVERTED. Two properties, because the whole point
+     is that it kept the one the old exemption was protecting while gaining the
+     one the exemption cost. Checking only the first would let a future edit
+     drop the tenant guard and still pass. */
+  {
+    const settings = strip(readFileSync("src/app/api/accounts/[id]/preferences/route.ts", "utf8"));
+    check(
+      "the settings route merges through the RPC rather than read-modify-write",
+      /mergeAccountPrefs\(/.test(settings) && !/update\(\{ *preferences/.test(settings),
+    );
+    /* The boundary moved out of the UPDATE and must still exist. It is only
+       needed when a super-admin edits someone else — a self-edit's id IS the
+       session's account. */
+    check(
+      "and still refuses a cross-tenant write, which is what its old exemption bought",
+      /!editingSelf/.test(settings) &&
+        /target\.tenant_id !== auth\.tenant_id/.test(settings),
+    );
+    check(
+      "a target outside the tenant is reported, not answered with a false ok",
+      /status: 404/.test(settings),
+    );
+  }
 }
 
 console.log("\n── 3. The memory cap still behaves, whatever the storage ──");
@@ -190,4 +224,4 @@ if (failures.length) {
   for (const f of failures) console.log(`  · ${f}`);
   process.exit(1);
 }
-console.log("N12: the reachable-in-one-message case is FIXED. One tenant-scoped writer remains, exempt by reason.");
+console.log("N12: all three writers named in the migration now merge atomically. Only the bridge writes directly, and only while it is a bridge.");
