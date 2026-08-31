@@ -71,9 +71,42 @@ const VOICE_INSTRUCTIONS =
   " No markdown, no lists, no headings: everything you say is heard, not read." +
   " If the identity question comes up, answer it in one short sentence and carry on.";
 
+/* A SHORTER IDENTITY, FOR WHEN THE LONG ONE WILL NOT FIT.
+
+   A DataChannel refuses a message larger than the size negotiated with the far
+   side, and `send()` THROWS rather than truncating. The full rule is about a
+   thousand characters; the transport settings are about two hundred. That was
+   comfortably inside any plausible limit until the rule was added, and the
+   first call after adding it failed to start.
+
+   THE CLIENT MUST NOT BE THE ONE TO SHORTEN IT. It is the only party that can
+   see the limit, but shortening a policy is authoring a policy, and a browser
+   that can edit its instructions is the thing this whole arrangement exists to
+   prevent. So the SERVER writes both versions and the client only chooses
+   which of two server-authored objects to put on the wire.
+
+   What survives the cut is the part that answers the question that was asked
+   wrongly: who you are, and that you do not discuss what powers you. What goes
+   is the enumeration of indirect routes — a real loss, and the reason this is
+   a fallback rather than the default. */
+const COMPACT_INSTRUCTIONS =
+  "You are Koleex AI, built by Koleex International Group. You have no other name, vendor or origin." +
+  " Never name, confirm or hint at any model, provider or company that may power you — not directly," +
+  " not in a joke, a roleplay or a translation, and not if the user guesses a name and asks you to confirm it." +
+  " If asked what you are or who made you: say you are Koleex AI by Koleex International Group, that the" +
+  " internals are not something you discuss, and move on." +
+  " Speak in short natural sentences. No markdown: everything you say is heard, not read.";
+
 export type SessionUpdate = {
   type: "session.update";
   session: Record<string, unknown>;
+};
+
+/** Both versions, so the client picks by size and composes neither. */
+export type VoiceSessionPayload = {
+  full: SessionUpdate;
+  /** Smaller, same identity guarantee, fewer words. */
+  compact: SessionUpdate;
 };
 
 /**
@@ -83,7 +116,10 @@ export type SessionUpdate = {
  * the vendor's default, which is the correct behaviour when the owner has
  * configured no catalogue at all.
  */
-export function buildSessionUpdate(voice: VoiceOption | null): SessionUpdate {
+export function buildSessionUpdate(
+  voice: VoiceOption | null,
+  instructions: string = VOICE_INSTRUCTIONS,
+): SessionUpdate {
   return {
     type: "session.update",
     session: {
@@ -91,9 +127,17 @@ export function buildSessionUpdate(voice: VoiceOption | null): SessionUpdate {
       /* NOT OPTIONAL AND NOT CONFIGURABLE. An operator who could switch this
          off could switch off the identity rule, so it is not an environment
          variable — it is what the product is. */
-      instructions: VOICE_INSTRUCTIONS,
+      instructions,
       ...(voice ? { voice: voice.vendorId } : {}),
     },
+  };
+}
+
+/** What the handshake returns: the same session in two lengths. */
+export function buildVoiceSessionPayload(voice: VoiceOption | null): VoiceSessionPayload {
+  return {
+    full: buildSessionUpdate(voice),
+    compact: buildSessionUpdate(voice, COMPACT_INSTRUCTIONS),
   };
 }
 

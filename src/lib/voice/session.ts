@@ -40,10 +40,22 @@ export type VoiceFailure =
   | "no-microphone"
   /** Signed in, but not permitted to use voice. */
   | "not-allowed"
+  /** Too many calls started in a short window. Its OWN reason because the
+   *  first version folded every unexpected status into "handshake failed",
+   *  and a rate limit reported as a broken handshake is a debugging session
+   *  spent in the wrong file — which is exactly what it cost. */
+  | "too-many-calls"
+  /** The session is no longer valid. Also folded in before, and also needs a
+   *  different action from the user: sign in again, not try again. */
+  | "signed-out"
   /** Voice is switched off on the server, or the vendor is unreachable. */
   | "unavailable"
   /** The handshake did not complete. */
-  | "handshake-failed";
+  | "handshake-failed"
+  /** Connected, but the far side would not accept the session configuration —
+   *  distinguished from a failed handshake because the two need different
+   *  fixes and the first version reported both the same way. */
+  | "config-rejected";
 
 export type VoiceEvents = {
   onState?: (state: VoiceState, failure?: VoiceFailure) => void;
@@ -118,6 +130,13 @@ export function waitForIceGathering(pc: RTCPeerConnection, timeoutMs: number): P
 
 /** SDP requires CRLF line endings. An answer that arrived as a text body may
  *  carry bare newlines, and setRemoteDescription rejects those. */
+/** Bytes, not characters. A limit is in bytes and the identity rule is not
+ *  ASCII in every language — measuring `.length` would under-count exactly
+ *  where the message is largest. */
+function byteLength(s: string): number {
+  return typeof TextEncoder !== "undefined" ? new TextEncoder().encode(s).length : s.length;
+}
+
 export function normalizeSdp(sdp: string): string {
   const out = String(sdp).trim().replace(/\r?\n/g, "\r\n");
   return out.endsWith("\r\n") ? out : out + "\r\n";
@@ -141,6 +160,9 @@ export class VoiceSession {
   /* Authored by the server, received with the answer, relayed unchanged. Null
      until the handshake completes — there is nothing to send before then. */
   private sessionUpdate: string | null = null;
+  /* The same session in fewer words, authored by the server for the case where
+     the channel will not carry the long one. */
+  private sessionUpdateCompact: string | null = null;
   private state: VoiceState = "idle";
 
   constructor(
@@ -188,15 +210,46 @@ export class VoiceSession {
        explicit send once it has. */
     if (!this.sessionUpdate) return;
     this.configSent = true;
+
+    /* CHOOSE BY THE NEGOTIATED LIMIT, and choose only between the two objects
+       the server wrote. A DataChannel refuses a message larger than the size
+       agreed with the far side, and `send()` THROWS rather than truncating —
+       which is how adding a thousand characters of identity policy turned a
+       working call into "could not start the call".
+
+       `maxMessageSize` is not implemented everywhere, so a missing value means
+       "no reason to think it will not fit" rather than a guess at a number. */
+    const limit = (channel as { maxMessageSize?: number }).maxMessageSize;
+    const preferCompact =
+      typeof limit === "number" && limit > 0 &&
+      byteLength(this.sessionUpdate) > limit &&
+      this.sessionUpdateCompact !== null;
+
+    const first = preferCompact && this.sessionUpdateCompact ? this.sessionUpdateCompact : this.sessionUpdate;
+    const second = first === this.sessionUpdate ? this.sessionUpdateCompact : null;
+
     try {
-      channel.send(this.sessionUpdate);
+      channel.send(first);
+      return;
     } catch {
-      /* A failed send leaves a connected but unconfigured call, which is the
-         silent line this exists to prevent. Reported as a failed handshake
-         because that is what the user experiences. */
-      this.configSent = false;
-      this.fail("handshake-failed");
+      /* Fall through. The limit may be unreported, or reported wrongly, or the
+         far side may simply have refused this payload. */
     }
+
+    if (second) {
+      try {
+        channel.send(second);
+        return;
+      } catch {
+        /* Both refused — the size was not the problem. */
+      }
+    }
+
+    /* A connected but unconfigured call is the silent line this exists to
+       prevent, so it is still a failure — but its OWN failure, because
+       "the handshake did not complete" sent us looking in the wrong place. */
+    this.configSent = false;
+    this.fail("config-rejected");
   }
 
   /** The vendor announces the session before it will accept configuration.
@@ -317,7 +370,19 @@ export class VoiceSession {
            READ on a failure: our route already refuses to forward the
            vendor's, and reading it here would create a second place for one to
            reach a screen. */
-        this.fail(res.status === 403 ? "not-allowed" : res.status === 503 ? "unavailable" : "handshake-failed");
+        /* EVERY STATUS THIS ROUTE CAN RETURN, MAPPED. The first version handled
+           403 and 503 and swept the rest into "handshake failed" — so a 429
+           from our own rate limiter, and a 401 from an expired session, both
+           read as "could not start the call". Each of those needs a different
+           thing from the user, and telling all three the same story is how a
+           rate limit got investigated as a WebRTC bug. */
+        this.fail(
+          res.status === 403 ? "not-allowed"
+          : res.status === 401 ? "signed-out"
+          : res.status === 429 ? "too-many-calls"
+          : res.status === 503 ? "unavailable"
+          : "handshake-failed",
+        );
         return;
       }
 
@@ -328,12 +393,15 @@ export class VoiceSession {
       let answer = "";
       try {
         const body: unknown = await res.json();
-        const env = body as { sdp?: unknown; session?: unknown };
+        const env = body as { sdp?: unknown; session?: unknown; session_compact?: unknown };
         answer = typeof env.sdp === "string" ? env.sdp : "";
         /* Serialised here, once, so what goes on the wire is exactly what the
            server sent and this module never reshapes it. */
         if (env.session && typeof env.session === "object") {
           this.sessionUpdate = JSON.stringify(env.session);
+        }
+        if (env.session_compact && typeof env.session_compact === "object") {
+          this.sessionUpdateCompact = JSON.stringify(env.session_compact);
         }
       } catch {
         this.fail("handshake-failed");

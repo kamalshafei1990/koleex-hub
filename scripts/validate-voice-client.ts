@@ -61,6 +61,12 @@ function fakeMic() {
 type FakeChannel = {
   label?: string;
   readyState: string;
+  /* A real channel refuses anything larger than the size negotiated with the
+     far side, and THROWS rather than truncating. The first version of this
+     double had no limit at all, so a payload that could never be delivered
+     looked identical to one that could — which is how a thousand characters of
+     identity policy shipped and broke every call. */
+  maxMessageSize?: number;
   onopen: (() => void) | null;
   onmessage: ((m: { data: unknown }) => void) | null;
   send: (data: string) => void;
@@ -68,13 +74,31 @@ type FakeChannel = {
   open: () => void;
 };
 
-function makeChannel(sink: { sent: string[] }, startOpen: boolean, sendThrows: boolean): FakeChannel {
+function makeChannel(
+  sink: { sent: string[] },
+  startOpen: boolean,
+  sendThrows: boolean,
+  maxMessageSize?: number,
+  enforceLimit = true,
+): FakeChannel {
   const ch: FakeChannel = {
     readyState: startOpen ? "open" : "connecting",
+    maxMessageSize,
     onopen: null,
     onmessage: null,
     send: (data: string) => {
       if (sendThrows) throw new Error("channel closed");
+      /* The real error a browser raises when a message exceeds the negotiated
+         size. Modelled, because this is the failure that shipped.
+
+         `enforceLimit: false` reports a limit without enforcing it, which is
+         how the SIZE CHECK can be tested apart from the catch-and-retry — the
+         two recover the same call, so each hides the other's absence unless
+         one of them is isolated. */
+      if (enforceLimit && typeof maxMessageSize === "number" &&
+          new TextEncoder().encode(data).length > maxMessageSize) {
+        throw new Error("Message too large");
+      }
       sink.sent.push(data);
     },
     open: () => { ch.readyState = "open"; ch.onopen?.(); },
@@ -82,7 +106,7 @@ function makeChannel(sink: { sent: string[] }, startOpen: boolean, sendThrows: b
   return ch;
 }
 
-function fakePc(opts: { iceState?: string; gatherLater?: boolean; channelOpen?: boolean; sendThrows?: boolean } = {}) {
+function fakePc(opts: { iceState?: string; gatherLater?: boolean; channelOpen?: boolean; sendThrows?: boolean; maxMessageSize?: number; enforceLimit?: boolean } = {}) {
   const calls = {
     closed: 0, added: 0, remoteSdp: "", channels: [] as string[],
     /* Everything the client puts on the wire, in order. A connected call that
@@ -102,7 +126,7 @@ function fakePc(opts: { iceState?: string; gatherLater?: boolean; channelOpen?: 
     addTrack: () => { calls.added++; },
     createDataChannel: (label: string) => {
       calls.channels.push(label);
-      const ch = makeChannel(calls, opts.channelOpen ?? false, opts.sendThrows ?? false);
+      const ch = makeChannel(calls, opts.channelOpen ?? false, opts.sendThrows ?? false, opts.maxMessageSize, opts.enforceLimit ?? true);
       calls.channel = ch;
       return ch as unknown as RTCDataChannel;
     },
@@ -137,12 +161,15 @@ function deps(opts: {
   sendThrows?: boolean;
   envelope?: unknown;
   session?: unknown;
+  sessionCompact?: unknown;
+  maxMessageSize?: number;
+  enforceLimit?: boolean;
   voiceKey?: string | null;
 }): { deps: VoiceDeps; mic: ReturnType<typeof fakeMic>; pcCalls: { closed: number; added: number; remoteSdp: string; channels: string[]; sent: string[]; channel: FakeChannel | null } } {
   const bodyReads: number[] = [];
   void bodyReads;
   const mic = fakeMic();
-  const { pc, calls } = fakePc({ iceState: opts.iceState, gatherLater: opts.gatherLater, channelOpen: opts.channelOpen, sendThrows: opts.sendThrows });
+  const { pc, calls } = fakePc({ iceState: opts.iceState, gatherLater: opts.gatherLater, channelOpen: opts.channelOpen, sendThrows: opts.sendThrows, maxMessageSize: opts.maxMessageSize, enforceLimit: opts.enforceLimit });
   return {
     mic,
     pcCalls: calls,
@@ -167,6 +194,7 @@ function deps(opts: {
           json: async () =>
             opts.envelope ?? {
               sdp: opts.body ?? ANSWER,
+              session_compact: opts.sessionCompact ?? { type: "session.update", session: { modalities: ["text", "audio"] } },
               session: opts.session ?? {
                 type: "session.update",
                 session: {
@@ -421,6 +449,163 @@ async function main() {
     const s5 = new VoiceSession(r.deps, { onState: (st) => states.push(st) });
     await s5.start();
     check("an envelope with no sdp is a failed handshake", states.includes("failed"));
+    check("and the microphone is released", r.mic.allStopped());
+  }
+
+  console.log("\n── 7a. Every status this route returns says something different ──");
+  {
+    /* THE FAILURE THAT COST A DEBUGGING SESSION. The route rate-limits voice
+       to a handful of calls a minute and returns 429. The first version of
+       this mapping handled 403 and 503 and swept everything else into
+       "handshake failed" — so a rate limit, an expired session and a genuinely
+       broken handshake all told the user the same thing, and the investigation
+       went looking at WebRTC for a problem that was a counter.
+
+       Each status needs a DIFFERENT action from the user, so each gets its own
+       reason. */
+    const cases: Array<[number, string]> = [
+      [401, "signed-out"],
+      [403, "not-allowed"],
+      [429, "too-many-calls"],
+      [503, "unavailable"],
+      [500, "handshake-failed"],
+      [502, "handshake-failed"],
+      [504, "handshake-failed"],
+    ];
+    for (const [status, expected] of cases) {
+      const r = deps({ status });
+      const seen: string[] = [];
+      const s = new VoiceSession(r.deps, { onState: (_st, f) => { if (f) seen.push(f); } });
+      await s.start();
+      check(`${status} is reported as ${expected}`, seen.includes(expected));
+    }
+
+    /* The four that need different actions must not share a message. */
+    const distinct = new Set(["signed-out", "not-allowed", "too-many-calls", "unavailable"]);
+    check("the four actionable statuses have four distinct reasons", distinct.size === 4);
+
+    /* And every reason must have copy in every language, or a user meets a
+       blank. Enforced by the type, asserted here so a reader can see it. */
+    const btn = (await import("node:fs")).readFileSync("src/components/ai/VoiceCallButton.tsx", "utf8");
+    for (const reason of ["too-many-calls", "signed-out", "config-rejected"]) {
+      check(`"${reason}" has copy in all three languages`,
+        (btn.match(new RegExp(`"${reason}":`, "g")) ?? []).length === 3);
+    }
+    /* A rate limit must tell the user to WAIT — "try again" invites the retry
+       that deepens the hole. */
+    check("the rate-limit message asks the user to wait rather than retry",
+      /Wait about a minute/.test(btn) && /استنى دقيقة/.test(btn));
+  }
+
+  console.log("\n── 7b. A channel that will not carry the long configuration ──");
+  {
+    /* THE BUG THIS SECTION EXISTS FOR. The session configuration was about two
+       hundred bytes until a thousand characters of identity policy were added
+       to it. A DataChannel refuses anything larger than the size it negotiated
+       and THROWS rather than truncating — so the first call after that change
+       reported "could not start the call", and the reason was a byte count. */
+    const long = { type: "session.update", session: { instructions: "x".repeat(2000) } };
+    const short = { type: "session.update", session: { instructions: "short" } };
+
+    const r = deps({ status: 200, session: long, sessionCompact: short, maxMessageSize: 256 });
+    const s1 = new VoiceSession(r.deps);
+    await s1.start();
+    r.pcCalls.channel!.open();
+
+    check("something is sent even though the long one will not fit",
+      () => r.pcCalls.sent.length === 1);
+    check("and it is the SERVER's compact version, not a truncation",
+      () => r.pcCalls.sent[0] === JSON.stringify(short));
+    check("the client never edits a configuration to make it fit",
+      () => !r.pcCalls.sent[0].includes("x".repeat(50)));
+
+    /* The identity guarantee must survive the cut — a compact policy that
+       dropped the rule would be worse than a failed call. */
+    const compactSrc = (await import("node:fs")).readFileSync("src/lib/server/ai/voice/session-config.ts", "utf8");
+    const compact = compactSrc.slice(compactSrc.indexOf("const COMPACT_INSTRUCTIONS"), compactSrc.indexOf("export type SessionUpdate"));
+    check("the compact version still names Koleex AI and its maker",
+      /Koleex AI/.test(compact) && /Koleex International Group/.test(compact));
+    check("and still forbids naming any model or provider",
+      /Never name, confirm or hint at any model, provider or company/.test(compact));
+    check("and still closes the guess-and-confirm route",
+      /guesses a name and asks you to confirm/.test(compact));
+  }
+
+  {
+    /* THE SIZE CHECK, ALONE. This channel reports a small limit and accepts
+       anything — so nothing throws, the fallback can never run, and only the
+       pre-check can choose correctly. Without this case, deleting the size
+       check passed: the catch-and-retry quietly recovered the same call. */
+    const long = { type: "session.update", session: { instructions: "x".repeat(2000) } };
+    const short = { type: "session.update", session: { instructions: "short" } };
+    const r = deps({ status: 200, session: long, sessionCompact: short, maxMessageSize: 256, enforceLimit: false });
+    const s = new VoiceSession(r.deps);
+    await s.start();
+    r.pcCalls.channel!.open();
+    check("a reported limit is respected BEFORE anything is thrown",
+      () => r.pcCalls.sent[0] === JSON.stringify(short));
+  }
+
+  {
+    /* THE FALLBACK, ALONE. No limit is reported, so the pre-check cannot fire,
+       but the channel still refuses the long one. Only catching the throw and
+       retrying can save this call. Without this case, deleting the fallback
+       passed: the pre-check had already chosen compact. */
+    const long = { type: "session.update", session: { instructions: "x".repeat(2000) } };
+    const short = { type: "session.update", session: { instructions: "short" } };
+    const r = deps({ status: 200, session: long, sessionCompact: short });
+    const ch = r.pcCalls;
+    const s = new VoiceSession(r.deps);
+    await s.start();
+    /* Refuse the long one without ever having advertised a size. */
+    const real = ch.channel!.send;
+    ch.channel!.send = (d: string) => {
+      if (d.length > 500) throw new Error("Message too large");
+      real(d);
+    };
+    ch.channel!.open();
+    check("an unadvertised refusal is recovered by falling back",
+      () => ch.sent.length === 1 && ch.sent[0] === JSON.stringify(short));
+  }
+
+  {
+    /* A generous limit must not downgrade anyone: the full policy is the
+       default and the short one is a fallback, not a replacement. */
+    const long = { type: "session.update", session: { instructions: "x".repeat(2000) } };
+    const short = { type: "session.update", session: { instructions: "short" } };
+    const r = deps({ status: 200, session: long, sessionCompact: short, maxMessageSize: 65536 });
+    const s2 = new VoiceSession(r.deps);
+    await s2.start();
+    r.pcCalls.channel!.open();
+    check("with room to spare, the FULL configuration is sent",
+      () => r.pcCalls.sent[0] === JSON.stringify(long));
+  }
+
+  {
+    /* A browser that does not report the limit must not be guessed at. */
+    const long = { type: "session.update", session: { instructions: "x".repeat(2000) } };
+    const r = deps({ status: 200, session: long });
+    const s3 = new VoiceSession(r.deps);
+    await s3.start();
+    r.pcCalls.channel!.open();
+    check("an unreported limit means send the full one rather than assume a number",
+      () => r.pcCalls.sent[0] === JSON.stringify(long));
+  }
+
+  {
+    /* When BOTH are refused the size was not the problem, and saying
+       "the handshake did not complete" sent us looking in the wrong place. */
+    const r = deps({ status: 200, sendThrows: true });
+    const states: string[] = [];
+    const failures: string[] = [];
+    const s4 = new VoiceSession(r.deps, {
+      onState: (st, f) => { states.push(st); if (f) failures.push(f); },
+    });
+    await s4.start();
+    r.pcCalls.channel!.open();
+    check("a configuration nothing will accept is still a failure", states.includes("failed"));
+    check("and it is reported as its OWN failure, not as a failed handshake",
+      failures.includes("config-rejected") && !failures.includes("handshake-failed"));
     check("and the microphone is released", r.mic.allStopped());
   }
 
