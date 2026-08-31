@@ -2,6 +2,7 @@ import "server-only";
 
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
+import { AI_PROVENANCE_RULE } from "@/lib/server/ai/prompt-builder";
 import { requireAuth } from "@/lib/server/auth";
 import { requireInternalUser } from "@/lib/server/ai/require-internal";
 import { aiChat, aiProviderConfigured, getLastAiError, type ChatMessage } from "@/lib/server/ai-provider";
@@ -99,7 +100,8 @@ Rules:
 - Never invent invoice numbers, customer names, or any other data you haven't been given. Hallucinating business data is unacceptable.
 - For translation requests, produce ONLY the translation.
 
-Current user: ${auth.username} (${auth.user_type}).`;
+Current user: ${auth.username} (${auth.user_type}).
+${AI_PROVENANCE_RULE}`;
 
   const messages: ChatMessage[] = [
     { role: "system", content: systemPrompt },
