@@ -256,17 +256,37 @@ console.log("\n── 2c. A failed handshake says how long it took ──");
   check("and still distinguishes a timeout from a connection that failed",
     /timedOut \? "timed out" : "failed"/.test(route));
 
-  /* A budget only sometimes too short produces exactly what was reported:
-     it works, then it does not, then it does. Tokyo to Beijing with an SDP
-     offer is not a ten-second round trip on a bad day. */
+  /* TWO ATTEMPTS, AND THE ARITHMETIC THAT MAKES THEM SAFE. The production
+     logs showed "handshake timed out" repeatedly while our own auth work in
+     the same request finished in 121ms — nothing came back at all. A path
+     that drops and recovers is answered by a second fresh connection, not by
+     waiting longer on a dead one. */
   const budget = Number((/const HANDSHAKE_TIMEOUT_MS = ([\d_]+)/.exec(route)?.[1] ?? "0").replace(/_/g, ""));
+  const attempts = Number((/const HANDSHAKE_ATTEMPTS = (\d+)/.exec(route)?.[1] ?? "0"));
   const ceiling = Number((/export const maxDuration = (\d+)/.exec(route)?.[1] ?? "0"));
-  check(`the handshake budget is generous enough for a slow round trip (${budget}ms)`,
-    budget >= 15_000);
-  /* And must still leave room inside the function's own ceiling, or the
-     platform kills the request before the route can report anything. */
-  check(`and fits inside the function ceiling with room to spare (${ceiling}s)`,
-    ceiling * 1000 - budget >= 5_000);
+
+  check(`the handshake retries a dropped connection (${attempts} attempts)`,
+    attempts >= 2 && attempts <= 3);
+  check(`each attempt is long enough for a Tokyo-to-Beijing round trip (${budget}ms)`,
+    budget >= 10_000);
+  /* THE WHOLE BUDGET MUST FIT, not just one attempt. Two 13s attempts inside
+     a 30s ceiling would leave three seconds for auth, permissions and the
+     platform — and the function would be killed mid-retry, which reads to the
+     caller as the same failure it is trying to survive. */
+  check(`and all ${attempts} fit inside the function ceiling with room for the rest (${ceiling}s)`,
+    ceiling * 1000 - budget * attempts >= 10_000);
+
+  /* A FRESH SIGNAL PER ATTEMPT, or the retry proves nothing: one
+     AbortSignal.timeout made outside the loop fires on wall-clock time from
+     when it was created, so the second attempt would abort the instant it
+     began and look like an instant failure. */
+  check("each attempt gets its own timeout signal",
+    /for \(let attempt = 1[\s\S]{0,900}?signal: AbortSignal\.timeout\(HANDSHAKE_TIMEOUT_MS\)/.test(route));
+  check("and the attempt number is logged, so a drop can be told from slowness",
+    /attempt=\$\{attempt\}\/\$\{HANDSHAKE_ATTEMPTS\}/.test(route));
+  /* A successful attempt must stop the loop, or every call pays for two. */
+  check("a successful attempt stops retrying",
+    /res = await fetch\(cfg\.sdpUrl[\s\S]{0,700}?\n      break;/.test(route));
 }
 
 console.log("\n── 3. Reading the protocol ──");
