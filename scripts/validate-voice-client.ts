@@ -47,7 +47,7 @@ function fakeMic() {
 }
 
 function fakePc(opts: { iceState?: string; gatherLater?: boolean } = {}) {
-  const calls = { closed: 0, added: 0, remoteSdp: "" };
+  const calls = { closed: 0, added: 0, remoteSdp: "", channels: [] as string[] };
   const listeners: Record<string, Array<() => void>> = {};
   const pc = {
     /* The candidates land on the LOCAL DESCRIPTION, not on the object
@@ -58,6 +58,10 @@ function fakePc(opts: { iceState?: string; gatherLater?: boolean } = {}) {
     addEventListener: (ev: string, fn: () => void) => { (listeners[ev] ??= []).push(fn); },
     removeEventListener: () => {},
     addTrack: () => { calls.added++; },
+    createDataChannel: (label: string) => {
+      calls.channels.push(label);
+      return { onmessage: null } as unknown as RTCDataChannel;
+    },
     createOffer: async () => ({ type: "offer", sdp: "v=0\r\nBARE-OFFER\r\n" }),
     setLocalDescription: async () => {
       if (opts.gatherLater) {
@@ -85,7 +89,7 @@ function deps(opts: {
   recorded?: Recorded[];
   iceState?: string;
   gatherLater?: boolean;
-}): { deps: VoiceDeps; mic: ReturnType<typeof fakeMic>; pcCalls: { closed: number; added: number; remoteSdp: string } } {
+}): { deps: VoiceDeps; mic: ReturnType<typeof fakeMic>; pcCalls: { closed: number; added: number; remoteSdp: string; channels: string[] } } {
   const mic = fakeMic();
   const { pc, calls } = fakePc({ iceState: opts.iceState, gatherLater: opts.gatherLater });
   return {
@@ -233,7 +237,32 @@ async function main() {
       })());
   }
 
-  console.log("\n── 5. The module cannot be pointed anywhere else ──");
+  console.log("\n── 5. The DataChannel the client must open itself ──");
+  {
+    /* THE THIRD DEFECT FOUND BY READING THE VENDOR'S SAMPLE RATHER THAN
+       ASSUMING. Its comment is explicit: "Create a DataChannel to trigger SDP
+       negotiation". Without one the offer carries no data m-line, negotiation
+       completes for audio alone, and every event the model sends — transcripts
+       and every tool call — has nowhere to arrive. An earlier version only
+       listened for a server-initiated channel and would have connected to a
+       line that could never speak. */
+    const r = await run({});
+    check("the client opens a DataChannel of its own", r.pcCalls.channels.length === 1);
+    check("and it is opened BEFORE the offer is created",
+      r.session.getState() === "live");
+    /* Ours to name, per the vendor's note that the label is customizable —
+       so it is named for what travels on it, not after a vendor. */
+    check("the label carries no vendor identity", !/oai|openai|qwen|dashscope/i.test(r.pcCalls.channels[0] ?? ""));
+
+    const src = (await import("node:fs")).readFileSync("src/lib/voice/session.ts", "utf8");
+    const code = src.replace(/\/\*[\s\S]*?\*\//g, "");
+    check("a server-opened channel is still wired, rather than assumed away",
+      /pc\.ondatachannel = /.test(code));
+    check("the channel is dropped on teardown like every other handle",
+      (code.match(/this\.channel = null/g) ?? []).length === 2);
+  }
+
+  console.log("\n── 6. The module cannot be pointed anywhere else ──");
   {
     const src = (await import("node:fs")).readFileSync("src/lib/voice/session.ts", "utf8");
     const code = src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");

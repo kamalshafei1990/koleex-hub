@@ -311,10 +311,63 @@ Steps 1–3 are the feature. 4–5 are what make it shippable.
 
 ---
 
+## 8b. The wire, now that the vendor's own page has been read
+
+Settled from the Model Studio documentation on 2026-08-31, and recorded here
+so the next reader does not have to find it again.
+
+| | |
+|---|---|
+| Endpoint (Beijing) | `https://{WorkspaceId}.cn-beijing.maas.aliyuncs.com/api/v1/webrtc/realtime` |
+| Endpoint (Singapore) | `https://{WorkspaceId}.ap-southeast-1.maas.aliyuncs.com/api/v1/webrtc/realtime` |
+| Query | `?model=qwen3.5-omni-plus-realtime` |
+| Method / type | `POST`, `Content-Type: application/sdp` |
+| Auth | `Authorization: Bearer <key>` — **each region needs its own key** |
+| Body / response | Offer SDP in, Answer SDP out (`200`); `4xx` carries a JSON error |
+
+That is exactly the shape `ai/voice/config.ts` already builds, so the endpoint
+stays a variable rather than a constant.
+
+### Three client details that were NOT guessable, and one that was wrong
+
+1. **The client must OPEN a DataChannel**, not merely listen for one. The
+   vendor's sample says why: *"Create a DataChannel to trigger SDP
+   negotiation"*. Without it the offer carries no data m-line, negotiation
+   completes for audio alone, and every event the model sends — transcripts and
+   **every tool call** — has nowhere to arrive. The first client did only
+   listen, and would have connected to a line that could never speak.
+2. **Wait for ICE gathering** before sending the offer, and read the SDP back
+   from `localDescription`.
+3. **Normalise the answer to CRLF** before `setRemoteDescription`.
+4. **No ICE servers** — *"the server handles NAT traversal."*
+
+### What this fixes about §4, and what it constrains
+
+**Tool calls do work over WebRTC.** The open question in §9.1 is closed: text
+events, including function calls, travel on the DataChannel, and the vendor
+describes that path as *"Same as WebSocket."* Audio does not — it rides RTP
+tracks directly, with no `response.audio.delta` and no
+`input_audio_buffer.append` to manage.
+
+**WebRTC supports server-side VAD only** — `server_vad` or `semantic_vad`.
+Manual push-to-talk mode is **not available on this transport**. That is a
+product consequence, not a detail: a live call cannot fall back to
+press-to-talk on the same connection. `MicButton`'s press-to-talk stays what it
+is, on its own path, unchanged.
+
+`semantic_vad` is the vendor's recommendation over `server_vad`, and its
+threshold is documented as worth **raising in noisy environments** — which
+describes the factory floor these users work on, and is the first knob to reach
+for if the assistant starts interrupting itself there.
+
 ## 9. Still unverified, and worth checking before code
 
-1. **Does `qwen3.5-omni-plus-realtime` support function calling over WebRTC's
-   DataChannel specifically**, or only over WebSocket? **Probably yes, not proven.**
+1. ~~**Does `qwen3.5-omni-plus-realtime` support function calling over WebRTC's
+   DataChannel specifically?**~~ — **CLOSED, see §8b.** Text events travel on the
+   DataChannel and the vendor calls that path *"Same as WebSocket."* The
+   inference below was right; it is now read rather than inferred.
+
+   <details><summary>The reasoning while it was still open</summary>
 
    The evidence for: the WebRTC flow opens a DataChannel labelled `txt` and sends the
    very same client events over it — `session.update` with the same fields — and the
@@ -323,8 +376,8 @@ Steps 1–3 are the feature. 4–5 are what make it shippable.
 
    What is missing: no worked example of a **tool call** over WebRTC. So this is an
    inference from the protocol being shared, not an observation of the feature.
-   **It is the one open question that could reshape §4**, and the cheapest way to
-   settle it is one throwaway call against the real endpoint before §7.3.
+   **It was the one open question that could reshape §4.**
+   </details>
 2. Regional availability of the omni-realtime models in `ap-southeast-1`.
 3. Concurrency limits per workspace.
 
