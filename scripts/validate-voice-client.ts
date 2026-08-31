@@ -14,7 +14,7 @@
    rather than on the happy one.
    --------------------------------------------------------------------------- */
 
-import { VoiceSession, HANDSHAKE_PATH, type VoiceDeps, type VoiceState, type VoiceFailure } from "../src/lib/voice/session";
+import { VoiceSession, HANDSHAKE_PATH, waitForIceGathering, normalizeSdp, type VoiceDeps, type VoiceState, type VoiceFailure } from "../src/lib/voice/session";
 
 let pass = 0;
 const failures: string[] = [];
@@ -25,6 +25,18 @@ function check(label: string, cond: boolean) {
 
 const ANSWER = "v=0\r\no=- 0 0 IN IP4 127.0.0.1\r\n";
 
+/* A SUITE THAT ASSERTS "BOUNDED" MUST NOT ITSELF HANG. Removing the ICE
+   timeout — the exact defect the bounded-wait assertion exists for — made an
+   earlier version of this file run until CI killed it, which is
+   indistinguishable from a stuck machine and diagnoses nothing. The assertion
+   could never fire because the code never returned to reach it. Every start()
+   that could block is raced against a watchdog; losing that race IS the
+   failure. Learned the same way in validate:ai-transport-timeout. */
+const HUNG = Symbol("start() did not return");
+async function within<T>(ms: number, work: Promise<T>): Promise<T | typeof HUNG> {
+  return Promise.race([work, new Promise<typeof HUNG>((r) => setTimeout(() => r(HUNG), ms))]);
+}
+
 /** A microphone whose tracks record whether they were stopped. */
 function fakeMic() {
   const tracks = [{ stopped: false, stop() { this.stopped = true; }, kind: "audio" }];
@@ -34,13 +46,28 @@ function fakeMic() {
   };
 }
 
-function fakePc() {
-  const calls = { closed: 0, added: 0 };
+function fakePc(opts: { iceState?: string; gatherLater?: boolean } = {}) {
+  const calls = { closed: 0, added: 0, remoteSdp: "" };
+  const listeners: Record<string, Array<() => void>> = {};
   const pc = {
+    /* The candidates land on the LOCAL DESCRIPTION, not on the object
+       createOffer returned. A client that posts the latter sends an offer
+       with no candidates — the bug this fake exists to expose. */
+    localDescription: { sdp: "v=0\r\nOFFER-WITH-CANDIDATES\r\n" },
+    iceGatheringState: opts.iceState ?? "complete",
+    addEventListener: (ev: string, fn: () => void) => { (listeners[ev] ??= []).push(fn); },
+    removeEventListener: () => {},
     addTrack: () => { calls.added++; },
-    createOffer: async () => ({ type: "offer", sdp: "v=0\r\nOFFER\r\n" }),
-    setLocalDescription: async () => {},
-    setRemoteDescription: async () => {},
+    createOffer: async () => ({ type: "offer", sdp: "v=0\r\nBARE-OFFER\r\n" }),
+    setLocalDescription: async () => {
+      if (opts.gatherLater) {
+        setTimeout(() => {
+          (pc as unknown as { iceGatheringState: string }).iceGatheringState = "complete";
+          for (const fn of listeners["icegatheringstatechange"] ?? []) fn();
+        }, 5);
+      }
+    },
+    setRemoteDescription: async (d: { sdp: string }) => { calls.remoteSdp = d.sdp; },
     close: () => { calls.closed++; },
     ontrack: null,
     ondatachannel: null,
@@ -56,9 +83,11 @@ function deps(opts: {
   body?: string;
   pcThrows?: boolean;
   recorded?: Recorded[];
-}): { deps: VoiceDeps; mic: ReturnType<typeof fakeMic>; pcCalls: { closed: number; added: number } } {
+  iceState?: string;
+  gatherLater?: boolean;
+}): { deps: VoiceDeps; mic: ReturnType<typeof fakeMic>; pcCalls: { closed: number; added: number; remoteSdp: string } } {
   const mic = fakeMic();
-  const { pc, calls } = fakePc();
+  const { pc, calls } = fakePc({ iceState: opts.iceState, gatherLater: opts.gatherLater });
   return {
     mic,
     pcCalls: calls,
@@ -71,7 +100,8 @@ function deps(opts: {
         if (opts.pcThrows) throw new Error("no webrtc");
         return pc;
       },
-      fetchFn: (async (url: string, init?: RequestInit) => {
+      iceTimeoutMs: 60,
+    fetchFn: (async (url: string, init?: RequestInit) => {
         opts.recorded?.push({ url: String(url), init });
         return {
           ok: (opts.status ?? 200) < 400,
@@ -83,12 +113,12 @@ function deps(opts: {
   };
 }
 
-async function run(opts: Parameters<typeof deps>[0]) {
+async function run(opts: Parameters<typeof deps>[0] & { watchdogMs?: number }) {
   const d = deps(opts);
   const states: Array<[VoiceState, VoiceFailure | undefined]> = [];
   const s = new VoiceSession(d.deps, { onState: (st, f) => states.push([st, f]) });
-  await s.start();
-  return { session: s, states, ...d };
+  const outcome = await within(opts.watchdogMs ?? 4000, s.start());
+  return { session: s, states, hung: outcome === HUNG, ...d };
 }
 
 async function main() {
@@ -102,7 +132,12 @@ async function main() {
     check("the offer goes to OUR route and nowhere else",
       recorded.length === 1 && recorded[0].url === HANDSHAKE_PATH);
     check("the request carries the session cookie", recorded[0].init?.credentials === "include");
-    check("the body is the generated offer, unmodified", recorded[0].init?.body === "v=0\r\nOFFER\r\n");
+    /* THE BUG THIS CATCHES. The first version posted `offer.sdp` — the value
+       createOffer returned, before any candidate was gathered. The candidates
+       land on localDescription, so that offer described a peer nobody could
+       reach. */
+    check("the posted offer is the GATHERED one, not the bare createOffer result",
+      recorded[0].init?.body === "v=0\r\nOFFER-WITH-CANDIDATES\r\n");
     check("the state sequence is legible to a UI",
       r.states.map(([s]) => s).join(">") === "requesting-mic>connecting>live");
 
@@ -158,7 +193,47 @@ async function main() {
     check("and still releases the microphone", mic.allStopped());
   }
 
-  console.log("\n── 4. The module cannot be pointed anywhere else ──");
+    console.log("\n── 4. ICE gathering and SDP shape — the two the vendor's guide is explicit about ──");
+  {
+    /* Explicit vendor guidance: "Wait for iceGatheringState === 'complete'
+       before using the SDP." Skipping it produces an offer with no candidates,
+       which negotiates and then connects to nothing. */
+    const started = Date.now();
+    const r = await run({ iceState: "gathering", gatherLater: true });
+    check("it waits for gathering to complete before posting",
+      r.session.getState() === "live" && Date.now() - started >= 5);
+
+    /* And never forever. A candidate that hangs leaves the state at
+       "gathering" indefinitely; a partial offer beats a call that never
+       starts. */
+    const t0 = Date.now();
+    const stuck = await run({ iceState: "gathering", watchdogMs: 1500 });
+    const waited = Date.now() - t0;
+    /* The watchdog is the assertion. Without it, an unbounded wait does not
+       FAIL this check — it prevents the check from ever running. */
+    check("a connection that never finishes gathering still returns", !stuck.hung);
+    check("and proceeds rather than giving up", stuck.session.getState() === "live");
+    check("on a bounded wait, not forever", waited < 1500);
+
+    /* SDP requires CRLF. An answer carrying bare newlines is rejected by
+       setRemoteDescription, and the failure looks like a bad answer. */
+    check("normalizeSdp converts bare newlines to CRLF",
+      normalizeSdp("v=0\no=- 0 0") === "v=0\r\no=- 0 0\r\n");
+    check("and leaves an already-correct SDP alone",
+      normalizeSdp("v=0\r\no=- 0 0\r\n") === "v=0\r\no=- 0 0\r\n");
+    const norm = await run({ body: "v=0\nANSWER" });
+    check("the answer is normalised before it reaches the connection",
+      norm.pcCalls.remoteSdp === "v=0\r\nANSWER\r\n");
+
+    check("waiting on an already-complete gathering resolves without hanging",
+      await (async () => {
+        const { pc } = fakePc({ iceState: "complete" });
+        await waitForIceGathering(pc, 50);
+        return true;
+      })());
+  }
+
+  console.log("\n── 5. The module cannot be pointed anywhere else ──");
   {
     const src = (await import("node:fs")).readFileSync("src/lib/voice/session.ts", "utf8");
     const code = src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
