@@ -281,7 +281,14 @@ async function main() {
       ["the user refuses the microphone", { micThrows: true }, "no-microphone"],
       ["the server refuses this account", { status: 403 }, "not-allowed"],
       ["voice is switched off server-side", { status: 503 }, "unavailable"],
-      ["the handshake is rejected", { status: 502 }, "handshake-failed"],
+      /* 502 AND 504 ARE DIFFERENT FAULTS. The route returns 504 when the
+         voice service did not answer and 502 when it answered and refused —
+         a dead endpoint versus a rejected credential or an exhausted quota.
+         Both used to read "could not start the call", which is what sent a
+         real outage to be investigated as a WebRTC bug. */
+      ["the service answers and refuses", { status: 502 }, "service-refused"],
+      ["the service does not answer at all", { status: 504 }, "service-unreachable"],
+      ["an unmapped status is still reported", { status: 418 }, "handshake-failed"],
       ["the answer is not an SDP", { body: "<html>nope</html>" }, "handshake-failed"],
       ["the peer connection cannot be created", { pcThrows: true }, "handshake-failed"],
     ];
@@ -495,9 +502,19 @@ async function main() {
       [403, "not-allowed"],
       [429, "too-many-calls"],
       [503, "unavailable"],
+      /* 502 AND 504 USED TO SIT HERE AS "handshake-failed", and this matrix
+         is where that conflation was written down and kept. The route returns
+         504 when the voice service did not answer and 502 when it answered
+         and REFUSED — a dead endpoint versus a rejected credential, an
+         exhausted quota or a wrong model. They need different actions from
+         different people, and one message for both is what sent a real
+         service outage to be investigated as a WebRTC bug. Same mistake as
+         429, recorded in the comment above, made again two lines below it. */
+      [502, "service-refused"],
+      [504, "service-unreachable"],
+      /* Anything genuinely unclassified still lands somewhere honest. */
       [500, "handshake-failed"],
-      [502, "handshake-failed"],
-      [504, "handshake-failed"],
+      [418, "handshake-failed"],
     ];
     for (const [status, expected] of cases) {
       const r = deps({ status });
@@ -507,9 +524,16 @@ async function main() {
       check(`${status} is reported as ${expected}`, seen.includes(expected));
     }
 
-    /* The four that need different actions must not share a message. */
-    const distinct = new Set(["signed-out", "not-allowed", "too-many-calls", "unavailable"]);
-    check("the four actionable statuses have four distinct reasons", distinct.size === 4);
+    /* THE STATUSES THAT NEED DIFFERENT ACTIONS MUST NOT SHARE A MESSAGE, and
+       this is asserted from the MAPPING rather than from a hand-written list:
+       a literal Set of names is true by construction and would have stayed
+       green through the whole 502/504 conflation. */
+    const actionable = cases.filter(([st]) => st !== 500 && st !== 418);
+    const reasons = new Set(actionable.map(([, r]) => r));
+    check(
+      `each status a person can act on has its own reason (${actionable.length} statuses, ${reasons.size} reasons)`,
+      reasons.size === actionable.length,
+    );
 
     /* And every reason must have copy in every language, or a user meets a
        blank. Enforced by the type, asserted here so a reader can see it. */

@@ -301,10 +301,17 @@ import { classifyBrandSection, isCapabilityQuestion } from "@/lib/server/ai/core
 /**
  * The self-description this turn needs, or nothing.
  *
- * Capability first: it is the narrower, unambiguous test, and the identity
- * net is wide enough to swallow it.
+ * THREE QUESTIONS, THREE ANSWERS. "Who are you", "what can you do" and "what
+ * is Koleex" are different asks that a single test would collapse into one.
+ * Capability is checked first because it is the narrowest and least ambiguous;
+ * the identity net is wide enough to swallow it otherwise. The company answer
+ * is last, and only for turns the identity net did NOT claim — asked "who
+ * made you", a person wants the assistant's story, not the group's profile.
  */
 export function identityDepthFor(userMsg: string): string {
   if (isCapabilityQuestion(userMsg)) return AI_CAPABILITIES_ANSWER;
-  return classifyBrandSection(userMsg) === "ai" ? AI_IDENTITY_STORY : "";
+  const section = classifyBrandSection(userMsg);
+  if (section === "ai") return AI_IDENTITY_STORY;
+  if (section === "company" || section === "both") return KOLEEX_COMPANY_ANSWER;
+  return "";
 }

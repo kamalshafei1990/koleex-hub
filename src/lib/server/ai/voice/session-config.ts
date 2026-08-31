@@ -32,7 +32,7 @@ import "server-only";
    --------------------------------------------------------------------------- */
 
 import { AI_PROVENANCE_RULE } from "@/lib/server/ai/prompt-builder";
-import { AI_IDENTITY_BRIEF, AI_CAPABILITIES_BRIEF } from "@/lib/server/ai/identity";
+import { AI_IDENTITY_BRIEF, AI_CAPABILITIES_BRIEF, KOLEEX_COMPANY_BRIEF } from "@/lib/server/ai/identity";
 import { type VoiceOption } from "./config";
 
 /* Transport settings. The formats follow from what a browser can capture and
@@ -86,6 +86,10 @@ const VOICE_INSTRUCTIONS =
      and ask for paragraphs, which is not how anyone wants to be spoken to. */
   AI_IDENTITY_BRIEF +
   AI_CAPABILITIES_BRIEF +
+  /* The group's one-line floor. A listener cannot check a spoken answer
+     against a source, so the instruction not to invent a company fact matters
+     more here, not less — and it costs 418 characters. */
+  KOLEEX_COMPANY_BRIEF +
   " SPOKEN STYLE: keep answers short and natural — this is a conversation, not a document." +
   " No markdown, no lists, no headings: everything you say is heard, not read." +
   " SPOKEN LENGTH OVERRIDES THE WRITTEN SHAPE: when the identity question comes up, give the same facts —" +

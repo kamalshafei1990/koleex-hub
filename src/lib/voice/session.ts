@@ -60,6 +60,13 @@ export type VoiceFailure =
   /** The connection was established and then lost for good — a network that
    *  changed underneath the call rather than one that never worked. */
   | "connection-lost"
+  /* The voice service did not answer at all: the route timed out or could not
+     reach it. Network, region or egress — nothing the caller did. */
+  | "service-unreachable"
+  /* The voice service answered and REFUSED: credential, quota, workspace or
+     model. Nothing the caller can retry their way out of, and the one class
+     an owner can actually fix. */
+  | "service-refused"
   /** Connected, but the far side would not accept the session configuration —
    *  distinguished from a failed handshake because the two need different
    *  fixes and the first version reported both the same way. */
@@ -475,6 +482,15 @@ export class VoiceSession {
           : res.status === 401 ? "signed-out"
           : res.status === 429 ? "too-many-calls"
           : res.status === 503 ? "unavailable"
+          /* 504 AND 502 ARE DIFFERENT FAULTS AND WERE ONE MESSAGE. The route
+             returns 504 when the service did not answer and 502 when it
+             answered and refused — a dead endpoint versus a rejected
+             credential. Both read as "could not start the call", which sends
+             an owner looking for a WebRTC bug when the real answer is an
+             expired key. Exactly the mistake the comment above records about
+             429; made again one line below it. */
+          : res.status === 504 ? "service-unreachable"
+          : res.status === 502 ? "service-refused"
           : "handshake-failed",
         );
         return;

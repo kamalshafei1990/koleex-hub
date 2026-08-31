@@ -10,7 +10,7 @@ import { BRAND_EXCLUSIVITY_RULE, DIRECT_VOICE_RULE } from "../ai-agent/brand-kno
    --------------------------------------------------------------------------- */
 
 import type { AiContext, AiMessage } from "./types";
-import { AI_IDENTITY_BRIEF, identityDepthFor } from "./identity";
+import { AI_IDENTITY_BRIEF, KOLEEX_COMPANY_BRIEF, identityDepthFor } from "./identity";
 import {
   ENTITY_GUIDANCE_SHORT,
   ENTITY_GUIDANCE_FULL,
@@ -213,6 +213,7 @@ export function buildFastPrompt(
         SUPPLIER_CONFIDENTIALITY +
         AI_PROVENANCE_RULE +
         AI_IDENTITY_BRIEF +
+        KOLEEX_COMPANY_BRIEF +
         PRODUCT_PHOTO_RULE +
         ASK_WHEN_UNSURE_RULE +
         ` ${BRAND_EXCLUSIVITY_RULE}` +
@@ -260,6 +261,7 @@ export function buildSmartPrompt(
         SUPPLIER_CONFIDENTIALITY +
         AI_PROVENANCE_RULE +
         AI_IDENTITY_BRIEF +
+        KOLEEX_COMPANY_BRIEF +
         PRODUCT_PHOTO_RULE +
         ASK_WHEN_UNSURE_RULE +
         ` ${BRAND_EXCLUSIVITY_RULE}` +
@@ -333,6 +335,7 @@ export function buildChatPrompt(
         SUPPLIER_CONFIDENTIALITY +
         AI_PROVENANCE_RULE +
         AI_IDENTITY_BRIEF +
+        KOLEEX_COMPANY_BRIEF +
         PRODUCT_PHOTO_RULE +
         ASK_WHEN_UNSURE_RULE +
         ` ${BRAND_EXCLUSIVITY_RULE}` +
@@ -393,6 +396,7 @@ export function buildBusinessPrompt(
         SUPPLIER_CONFIDENTIALITY +
         AI_PROVENANCE_RULE +
         AI_IDENTITY_BRIEF +
+        KOLEEX_COMPANY_BRIEF +
         PRODUCT_PHOTO_RULE +
         ASK_WHEN_UNSURE_RULE +
         ` ${BRAND_EXCLUSIVITY_RULE}` +

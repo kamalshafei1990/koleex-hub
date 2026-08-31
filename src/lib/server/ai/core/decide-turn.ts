@@ -276,10 +276,29 @@ export function classifyBrandSection(msg: string): BrandSection {
 
     // Where / when / what / who for the company
     /\bwhere\s+is\s+koleex\b/i,
-    /\bwhere\s+(?:are|is)\s+you\s+based\b/i,
+    /\bwhere\s+(?:are|is)\s+you\s+(?:based|located)\b/i,
     /\bheadquarters\b/i,
     /\bwhen\s+(?:was|did)\s+koleex\b/i,
     /\bwhat\s+(?:is|does|industries)\s+koleex\b/i,
+
+    /* THE COMPANY WITHOUT THE WORD "KOLEEX". Twelve of thirty natural company
+       questions used to fall through here — "tell me about the company",
+       "what industries do you serve", "introduce your company" — because
+       every English pattern above needs the brand name. The approved
+       knowledge answering all of them was one routing decision away. */
+    /\b(?:tell|talk)\s+(?:me\s+)?about\s+(?:your|the)\s+(?:company|group|business)\b/i,
+    /\bintroduce\s+(?:your|the)\s+(?:company|group)\b/i,
+    /\bcompany\s+profile\b/i,
+    /\byour\s+(?:company|group|business|organisation|organization)\b/i,
+    /\bwhat\s+industries\b/i,
+    /\bindustries\s+do\s+you\s+(?:serve|cover|work)/i,
+    /\bdo\s+you\s+have\s+(?:any\s+)?(?:international\s+)?(?:clients|customers)\b/i,
+    /\bwho\s+are\s+your\s+(?:clients|customers|partners)\b/i,
+    /\bare\s+you\s+a\s+(?:manufacturer|trading\s+company|factory|trader)\b/i,
+    /\bmanufacturer\s+or\s+(?:a\s+)?trad(?:ing|er)\b/i,
+    /\bwhy\s+should\s+i\s+choose\b/i,
+    /\bwhat\s+makes\s+(?:you|koleex)\s+different\b/i,
+    /\bwhen\s+(?:was|were)\s+(?:you|the\s+company|the\s+group)\s+(?:founded|established|started)\b/i,
 
     /* Arabic — see the note in aiPatterns: \\b is ASCII-only, so every one of
        these was dead too. */
@@ -289,6 +308,14 @@ export function classifyBrandSection(msg: string): BrandSection {
     /الرئيس\s*التنفيذي/,
     /المدير\s*التنفيذي/,
     /(?:رؤية|مهمة|رسالة|القيم|تاريخ|تراث)/,
+    // The company without the brand name — MSA and Egyptian.
+    /(?:احكيلي|قولي|كلمني|عرفني|حدثني|اخبرني|أخبرني)\s*(?:عن\s*)?(?:الشركة|شركتكم|المجموعة)/,
+    /نبذة\s*عن\s*(?:الشركة|المجموعة|شركتكم)/,
+    /(?:الشركة|شركتكم|المجموعة)\s*(?:بتعمل|تعمل|بتشتغل|بتنتج|بتصنع)/,
+    /(?:متى|إمتى|امتى)\s*(?:تأسست|اتأسست|تم\s*تأسيس|بدأت)/,
+    /(?:أين|فين|وين)\s*(?:تقع|مقر|موقع|مكان)\s*(?:الشركة|المجموعة|شركتكم)?/,
+    /(?:ما|إيه|ايه)\s*(?:هي\s*)?(?:الصناعات|المجالات|القطاعات)/,
+    /(?:عملاء|عملائكم|زبائن|شركاء)/,
 
     // Chinese
     /柯莱克斯/,
@@ -296,6 +323,14 @@ export function classifyBrandSection(msg: string): BrandSection {
     /创始人/,
     /首席执行官/,
     /(?:愿景|使命|价值观|历史)/,
+    // The company itself — the forms above needed the brand or a leader.
+    /(?:介绍|说说|讲讲)(?:一下)?(?:你们|贵)?(?:的)?公司/,
+    /(?:你们|贵)公司(?:是什么|做什么|在哪|什么时候|怎么样)/,
+    /公司(?:在哪|位于|地址|总部)/,
+    /公司(?:什么时候|何时)(?:成立|创立|建立|起步)/,
+    /(?:你们|贵公司)?(?:服务|面向)(?:哪些)?(?:行业|领域|客户)/,
+    /你们(?:是做什么|做什么|经营什么|生产什么)/,
+    /(?:你们|贵公司)(?:有哪些|的)(?:客户|产品|工厂)/,
   ];
 
   const hitsAi = aiPatterns.some((re) => re.test(s));
