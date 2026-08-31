@@ -49,6 +49,7 @@ import {
   TAUGHT_INDEX_BUDGET_BYTES,
 } from "@/lib/server/ai/voice/session-config";
 import { taughtQuestionIndex } from "@/lib/server/ai-knowledge";
+import { describeFetchFailure } from "@/lib/server/ai/voice/fetch-cause";
 
 export const dynamic = "force-dynamic";
 /* The handshake is one round trip to the vendor. It is not the call. */
@@ -66,6 +67,10 @@ const MAX_SDP_BYTES = 64 * 1024;
    It gets a ceiling measured against that: long enough that a cold cache is
    not thrown away, short enough that nobody waits on it. */
 const TAUGHT_INDEX_TIMEOUT_MS = 1_500;
+
+/* The reason a fetch failed, in a form that is safe to log. Extracted so the
+   hostname-suppression can be RUN rather than eyeballed — see fetch-cause.ts
+   for what a bare `TypeError` was costing this investigation. */
 
 /* A handshake that has not answered in this long is not going to. Short,
    because the user is staring at a "connecting…" state, and unlike a turn
@@ -245,13 +250,23 @@ export async function POST(req: Request) {
       break;
     } catch (e) {
       const timedOut = e instanceof Error && (e.name === "TimeoutError" || e.name === "AbortError");
-      lastCause = e instanceof Error ? e.name : "unknown";
+      lastCause = describeFetchFailure(e);
       /* THE ELAPSED TIME IS THE DIAGNOSIS. "Timed out" and "could not
          connect" both land here and need opposite investigations: a handshake
          that dies in 40ms is DNS, egress or a refused connection, and one
          that runs the full budget is a service that is up and slow. The
          attempt number matters too — a first attempt that times out and a
-         second that succeeds is a dropping path, not a slow one. */
+         second that succeeds is a dropping path, not a slow one.
+
+         AND THE THIRD CASE THIS COMMENT DID NOT ANTICIPATE, which is the one
+         production is actually in: neither. Both attempts died at ~10.4s
+         against a 13s budget, with cause=TypeError. Dying BELOW your own
+         budget is not a timeout you set — it is something underneath giving
+         up first, and `fetch` reports every one of those the same way: a bare
+         `TypeError`, whose real reason is in `.cause`. Reading only `e.name`
+         turned "DNS does not resolve", "connection refused", "TLS rejected"
+         and "the TCP connection never opened" into one indistinguishable
+         word, and sent this investigation to the wrong place twice. */
       console.error(
         `[ai.voice] handshake ${timedOut ? "timed out" : "failed"} ` +
           `attempt=${attempt}/${HANDSHAKE_ATTEMPTS} region=${cfg.regionLabel} ` +

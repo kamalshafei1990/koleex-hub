@@ -44,6 +44,7 @@ import {
   TAUGHT_INDEX_BUDGET_BYTES,
 } from "../src/lib/server/ai/voice/session-config";
 import { capQuestionsToBudget } from "../src/lib/server/ai-knowledge";
+import { describeFetchFailure } from "../src/lib/server/ai/voice/fetch-cause";
 
 let pass = 0;
 const failures: string[] = [];
@@ -380,6 +381,87 @@ console.log("\n── 2d. What the owner teaches, a call learns too ──");
     check(`approving ${label} drops BOTH caches, not just the prompt block`,
       taughtCalls > 0 && searchCalls === taughtCalls);
   }
+}
+
+console.log("\n── 2f. A failed handshake says WHY, not just that it failed ──");
+{
+  /* WHAT THIS COST, stated plainly because the tests exist to stop it
+     happening a third time. Production showed both handshake attempts dying
+     at ~10.4s against a 13s budget with `cause=TypeError`. Failing BELOW your
+     own budget is not a timeout you set — something underneath gave up first
+     — but `fetch` names every transport failure `TypeError`, so that read as
+     "the vendor is slow" and the fix applied was a retry. A retry could never
+     have helped. The reason was one level down, on `.cause`. */
+
+  /* ── The five failures that used to be one word ───────────────────────*/
+  const withCause = (code: unknown) => {
+    const e = new TypeError("fetch failed");
+    (e as unknown as { cause: unknown }).cause = { code };
+    return e;
+  };
+  for (const code of ["UND_ERR_CONNECT_TIMEOUT", "ENOTFOUND", "ECONNREFUSED",
+                      "ECONNRESET", "CERT_HAS_EXPIRED"]) {
+    check(`  ${code} survives to the log`,
+      describeFetchFailure(withCause(code)) === `TypeError/${code}`);
+  }
+  /* NON-VACUITY: the five above must be DISTINGUISHABLE, which is the entire
+     point. A function returning a constant would pass every check that only
+     looked at one of them. */
+  const codes = ["UND_ERR_CONNECT_TIMEOUT", "ENOTFOUND", "ECONNREFUSED", "ECONNRESET"];
+  check("and they are distinguishable from one another, not one word again",
+    new Set(codes.map((c) => describeFetchFailure(withCause(c)))).size === codes.length);
+
+  /* ── The hostname must never ride along ──────────────────────────────
+     A cause's message is free text and routinely embeds the endpoint it
+     failed to reach. The endpoint is vendor identity and a log an operator
+     reads is still somewhere it did not need to go. */
+  const hostish = new TypeError("fetch failed");
+  (hostish as unknown as { cause: unknown }).cause = {
+    code: "ENOTFOUND",
+    message: "getaddrinfo ENOTFOUND voice.vendor-host.example.cn",
+    hostname: "voice.vendor-host.example.cn",
+  };
+  const described = describeFetchFailure(hostish);
+  check("the cause's message and hostname never reach the log",
+    described === "TypeError/ENOTFOUND" &&
+    !described.includes("vendor-host") && !described.includes("getaddrinfo"));
+
+  /* ── `cause` is a value from outside, so it is filtered, not trusted ──
+     Being wrong about its shape is what started this; assuming we are now
+     right about its format would be the same mistake in a smaller box. */
+  check("a code carrying a host is rejected rather than printed",
+    describeFetchFailure(withCause("ENOTFOUND voice.vendor-host.example.cn")) ===
+      "TypeError/unreadable");
+  check("a code carrying a URL is rejected rather than printed",
+    describeFetchFailure(withCause("https://voice.vendor-host.example.cn/x")) ===
+      "TypeError/unreadable");
+  check("an absurdly long code cannot flood the log",
+    describeFetchFailure(withCause("A".repeat(500))).length < 60);
+  /* AND THE LENGTH CAP MUST NOT BECOME A LEAK OF ITS OWN: truncating a
+     hostname to 40 characters would still print most of a hostname. It is
+     the character check that has to catch it, at whatever length. */
+  check("  …and truncation never turns a host into an allowed code",
+    describeFetchFailure(withCause("host." + "a".repeat(200))) === "TypeError/unreadable");
+
+  /* ── The shapes that are simply absent ───────────────────────────────*/
+  check("an error with no cause still reports its name",
+    describeFetchFailure(new TypeError("fetch failed")) === "TypeError");
+  check("a timeout is still recognisable as itself",
+    describeFetchFailure(Object.assign(new Error("x"), { name: "TimeoutError" })) === "TimeoutError");
+  check("a cause that is not an object does not throw",
+    describeFetchFailure(Object.assign(new TypeError("x"), { cause: "boom" })) === "TypeError");
+  check("a non-Error is not guessed at", describeFetchFailure("nope") === "unknown");
+
+  /* ── And the route actually uses it ──────────────────────────────────*/
+  const route = readFileSync("src/app/api/ai/voice/session/route.ts", "utf8");
+  check("the handshake logs the described cause, not the bare error name",
+    /lastCause = describeFetchFailure\(e\);/.test(route) &&
+    !/lastCause = e instanceof Error \? e\.name : "unknown";/.test(route));
+  /* The elapsed time and the budget together are what said "this is not your
+     timeout" — losing either sends the next investigation back to guessing. */
+  check("and still logs the elapsed time beside the budget it was given",
+    /afterMs=\$\{Date\.now\(\) - startedAt\}/.test(route) &&
+    /budgetMs=\$\{HANDSHAKE_TIMEOUT_MS\}/.test(route));
 }
 
 console.log("\n── 2e. The Arabic a call speaks is Egyptian, and only Egyptian ──");
