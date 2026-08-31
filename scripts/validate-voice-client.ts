@@ -18,8 +18,17 @@ import { VoiceSession, HANDSHAKE_PATH, waitForIceGathering, normalizeSdp, type V
 
 let pass = 0;
 const failures: string[] = [];
-function check(label: string, cond: boolean) {
-  if (cond) { pass++; console.log(`  ✓ ${label}`); }
+/* A CONDITION MAY THROW, AND A THROW MUST BE A NAMED FAILURE — the same guard
+   the other voice suites carry, for the same reason. */
+function check(label: string, cond: boolean | (() => boolean)) {
+  let ok: boolean;
+  try {
+    ok = typeof cond === "function" ? cond() : cond;
+  } catch (e) {
+    ok = false;
+    label = `${label} — threw: ${e instanceof Error ? e.message : String(e)}`;
+  }
+  if (ok) { pass++; console.log(`  ✓ ${label}`); }
   else { failures.push(label); console.log(`  ✗ ${label}`); }
 }
 
@@ -126,7 +135,12 @@ function deps(opts: {
   gatherLater?: boolean;
   channelOpen?: boolean;
   sendThrows?: boolean;
+  envelope?: unknown;
+  session?: unknown;
+  voiceKey?: string | null;
 }): { deps: VoiceDeps; mic: ReturnType<typeof fakeMic>; pcCalls: { closed: number; added: number; remoteSdp: string; channels: string[]; sent: string[]; channel: FakeChannel | null } } {
+  const bodyReads: number[] = [];
+  void bodyReads;
   const mic = fakeMic();
   const { pc, calls } = fakePc({ iceState: opts.iceState, gatherLater: opts.gatherLater, channelOpen: opts.channelOpen, sendThrows: opts.sendThrows });
   return {
@@ -147,8 +161,25 @@ function deps(opts: {
         return {
           ok: (opts.status ?? 200) < 400,
           status: opts.status ?? 200,
-          text: async () => opts.body ?? ANSWER,
-        } as Response;
+          /* THE ENVELOPE THE SERVER NOW RETURNS: the answer SDP beside a
+             session configuration the server authored. The client relays the
+             latter; it no longer composes one. */
+          json: async () =>
+            opts.envelope ?? {
+              sdp: opts.body ?? ANSWER,
+              session: opts.session ?? {
+                type: "session.update",
+                session: {
+                  modalities: ["text", "audio"],
+                  input_audio_format: "pcm",
+                  output_audio_format: "pcm",
+                  input_audio_transcription: { enabled: true },
+                  turn_detection: { type: "server_vad", threshold: 0.5, silence_duration_ms: 800 },
+                },
+              },
+            },
+          text: async () => { bodyReads.push(1); return opts.body ?? ANSWER; },
+        } as unknown as Response;
       }) as unknown as typeof fetch,
     },
   };
@@ -303,9 +334,17 @@ async function main() {
   {
     const src = (await import("node:fs")).readFileSync("src/lib/voice/session.ts", "utf8");
     const code = src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
-    check("the handshake path is a constant, not an argument",
+    /* THE GUARANTEE, not its old shape. A voice choice is now appended as a
+       query parameter, so the call is no longer literally `fetchFn(CONST,`.
+       What must remain true is that the BASE is a constant this module owns —
+       nothing a caller passes can point the handshake somewhere else. */
+    check("the handshake path is built from a constant, never from an argument",
       /export const HANDSHAKE_PATH = "\/api\/ai\/voice\/session"/.test(code) &&
-      /fetchFn\(HANDSHAKE_PATH,/.test(code));
+      /HANDSHAKE_PATH\}\?voice=/.test(code) &&
+      /: HANDSHAKE_PATH;/.test(code) &&
+      /fetchFn\(path,/.test(code));
+    check("the voice key is url-encoded rather than interpolated raw",
+      /encodeURIComponent\(this\.voiceKey\)/.test(code));
     /* Vendor identity has no field to arrive in, and the absence is the check. */
     check("no vendor concept appears anywhere in the client",
       !/dashscope|aliyun|qwen|api[_-]?key|Bearer/i.test(code));
@@ -315,66 +354,74 @@ async function main() {
       code.indexOf("getTracks().forEach((t) => t.stop())") < code.indexOf("this.pc?.close()"));
   }
 
-  console.log("\n── 7. A connected call must be CONFIGURED, or it is a silent line ──");
+  console.log("\n── 7. The client RELAYS a configuration; it no longer writes one ──");
   {
-    /* THE BUG THIS SECTION EXISTS FOR. The handshake succeeded, the button
-       went red, and neither side ever spoke. Everything about the media path
-       was right; we simply never told the far side what session to run. The
-       previous channel double had no send() at all, so "sends nothing" was
-       indistinguishable from "sends the right thing". */
-    const r = deps({ status: 200, body: "v=0\r\nANSWER\r\n" });
+    /* A connected call is still a silent call until the configuration is sent.
+       What changed is who authors it: `session.update` carries the voice today
+       and `instructions` tomorrow, so a browser that composes it is a browser
+       that can compose those. The server authors; this relays. */
+    const authored = {
+      type: "session.update",
+      session: { modalities: ["text", "audio"], voice: "SomeVendorVoice" },
+    };
+    const r = deps({ status: 200, session: authored });
     const s1 = new VoiceSession(r.deps);
     await s1.start();
 
     check("nothing is sent while the channel is still connecting",
-      r.pcCalls.sent.length === 0);
+      () => r.pcCalls.sent.length === 0);
 
     r.pcCalls.channel!.open();
-    check("the configuration is sent as soon as the channel opens",
-      r.pcCalls.sent.length === 1);
+    check("the configuration is relayed once the channel opens",
+      () => r.pcCalls.sent.length === 1);
+    check("and it is EXACTLY what the server sent, byte for byte",
+      () => r.pcCalls.sent[0] === JSON.stringify(authored));
 
-    /* PARSE ONLY WHAT EXISTS. Reading sent[0] unconditionally turned "sent
-       nothing" — the very bug this section is about — into a JSON SyntaxError
-       and a Node stack trace instead of a named failure. It failed CI either
-       way; only one of the two says which guarantee broke. */
-    const raw = r.pcCalls.sent[0];
-    let evt: { type?: string; session?: Record<string, unknown> } = {};
-    if (typeof raw === "string") {
-      try {
-        evt = JSON.parse(raw) as typeof evt;
-      } catch {
-        check("the configuration is valid JSON", false);
-      }
-    }
-    const session = evt.session ?? {};
-    check("it is a session.update", evt.type === "session.update");
-    check("it asks for audio, not text alone — a text-only session is silent too",
-      JSON.stringify(session.modalities) === JSON.stringify(["text", "audio"]));
-    check("it names both audio formats",
-      session.input_audio_format === "pcm" && session.output_audio_format === "pcm");
+    /* A relayed object this module can extend is a composed object wearing a
+       disguise. */
+    check("the client adds no field of its own", () => {
+      const parsed = JSON.parse(r.pcCalls.sent[0]) as { session: Record<string, unknown> };
+      return Object.keys(parsed.session).sort().join(",") === "modalities,voice";
+    });
 
-    /* Without turn detection the far side never decides the user has stopped
-       talking, and never answers — the same silent line by another route. */
-    const td = session.turn_detection as Record<string, unknown> | undefined;
-    check("it configures server-side turn detection", td?.type === "server_vad");
-    check("turn detection carries a threshold and a silence window",
-      typeof td?.threshold === "number" && typeof td?.silence_duration_ms === "number");
-
-    /* NO POLICY MAY BE COMPOSED IN THE BROWSER. instructions is the system
-       prompt and tools are what the model may do; a client that writes either
-       is a client that can rewrite them. Both come from the server when they
-       come at all. */
-    check("no instructions — the system prompt is not the browser's to write",
-      !("instructions" in session) && Object.keys(session).length > 0);
-    check("no tool definitions — what the model may do is not the browser's to decide",
-      !("tools" in session) && !("tool_choice" in session) && Object.keys(session).length > 0);
-    check("no vendor, model, key or endpoint travels in the configuration",
-      typeof raw === "string" && !/qwen|dashscope|aliyun|maas|api[_-]?key|Bearer|ws-pl/i.test(raw));
-
-    /* Opening again must not resend: a second session.update would reset the
-       session mid-call. */
     r.pcCalls.channel!.open();
-    check("the configuration is sent once, not on every open", r.pcCalls.sent.length === 1);
+    check("it is relayed once, not on every open", () => r.pcCalls.sent.length === 1);
+  }
+
+  {
+    /* An envelope with no configuration must send NOTHING rather than invent
+       one — a fabricated default is this module composing policy by another
+       name. */
+    const r = deps({ status: 200, envelope: { sdp: "v=0\r\nANSWER\r\n" } });
+    const s2 = new VoiceSession(r.deps);
+    await s2.start();
+    r.pcCalls.channel!.open();
+    check("with no configuration from the server, nothing is invented",
+      () => r.pcCalls.sent.length === 0);
+  }
+
+  {
+    const recorded: Recorded[] = [];
+    const r = deps({ status: 200, recorded });
+    const s3 = new VoiceSession(r.deps, {}, "v2");
+    await s3.start();
+    check("the requested voice reaches the server", recorded[0]?.url.includes("voice=v2") === true);
+
+    const recorded2: Recorded[] = [];
+    const r2 = deps({ status: 200, recorded: recorded2 });
+    const s4 = new VoiceSession(r2.deps);
+    await s4.start();
+    check("and with no choice, no voice parameter is sent",
+      recorded2[0]?.url.includes("voice=") === false);
+  }
+
+  {
+    const r = deps({ status: 200, envelope: { nothing: true } });
+    const states: string[] = [];
+    const s5 = new VoiceSession(r.deps, { onState: (st) => states.push(st) });
+    await s5.start();
+    check("an envelope with no sdp is a failed handshake", states.includes("failed"));
+    check("and the microphone is released", r.mic.allStopped());
   }
 
   console.log("\n── 8. The two orderings of that handshake, and a failed send ──");
@@ -460,8 +507,28 @@ async function main() {
 
     /* Tool calls arrive on the DataChannel. Routing them through the
        permission engine is the next step; today this component must not act. */
-    check("DataChannel messages are passed through, never interpreted",
-      /onMessage: \(data\) => onMessageRef\.current\?\.\(data\)/.test(src));
+    /* THE GUARANTEE, NOT ITS SHAPE. The previous version of this pinned the
+       exact one-liner and went red the moment captions were added beside it,
+       even though the guarantee — the raw stream reaches the caller untouched
+       — was intact. What matters is that the pass-through is UNCONDITIONAL and
+       happens BEFORE any parsing: the tool bridge will read that stream and
+       must not depend on whether a caption was produced from it. */
+    const handler = src.slice(src.indexOf("onMessage: (data) =>"), src.indexOf("});", src.indexOf("onMessage: (data) =>")));
+    check("the raw message reaches the caller untouched",
+      /onMessageRef\.current\?\.\(data\)/.test(handler));
+    check("and does so BEFORE anything is parsed from it",
+      handler.indexOf("onMessageRef.current?.(data)") < handler.indexOf("parseVoiceEvent"));
+    check("the pass-through is not gated on a parse result",
+      !/if\s*\([^)]*\)\s*onMessageRef\.current/.test(handler));
+    /* An OR here accepted the phase alone and passed with the transcript
+       emission deleted — which is the empty screen this whole change exists to
+       fix. Both are required, by name. */
+    check("a parsed transcript is handed to the caller — the empty screen fix",
+      /onTranscriptRef\.current\?\.\(/.test(handler));
+    check("and the phase is reported for the orb",
+      /onPhaseRef\.current\?\.\(/.test(handler));
+    check("parsing feeds display state only — no dispatch",
+      !/fetch\(|execute|tool_call/i.test(handler));
     check("the component dispatches no tool of its own",
       !/tool_call/i.test(src) && !/executeTool/i.test(src));
 
@@ -475,6 +542,52 @@ async function main() {
       /<MicButton/.test(app) && /<VoiceCallButton/.test(app));
     check("a live call stops the page's own speech synthesis",
       /onLiveChange=\{\(live\) => \{ if \(live\) stopTts\(\); \}\}/.test(app));
+  }
+
+  console.log("\n── 10. The audio meter releases what it opens ──");
+  {
+    /* AN AUDIOCONTEXT IS A HARDWARE HANDLE. Browsers cap how many may exist
+       at once, so one leaked per call ends with calls that cannot open a meter
+       at all — the same class of bug as leaving the microphone captured, and
+       just as invisible until the fourth or fifth call. */
+    const fs = await import("node:fs");
+    const src = fs.readFileSync("src/lib/voice/useStreamLevel.ts", "utf8");
+
+    check("the context is closed on cleanup", /ctx\.close\(\)/.test(src));
+    check("the frame loop is cancelled", /cancelAnimationFrame/.test(src));
+    check("the graph is disconnected", /source\.disconnect\(\)/.test(src));
+    check("cleanup runs when the stream changes, not only on unmount",
+      /\}, \[stream, active\]\)/.test(src));
+
+    /* Routing the microphone to the speakers is feedback, in a room where the
+       far side is already being played. */
+    check("the meter never connects to the output",
+      !/connect\(ctx\.destination\)/.test(src) && !/connect\(\s*ctx\.destination/.test(src));
+
+    /* A browser that refuses an AudioContext, or a stream with no audio track,
+       must mean a still orb — never a thrown error that takes the call down. */
+    check("a missing AudioContext is handled, not assumed away",
+      /webkitAudioContext/.test(src) && /if \(!Ctor\) return;/.test(src));
+    check("a refused context leaves the call running", /\} catch \{[\s\S]{0,200}?return;/.test(src));
+
+    /* An inactive meter must read as silence rather than the last value it
+       saw, or a new call opens showing the previous call's amplitude. */
+    check("an inactive meter reads as silence", /return stream && active \? level : 0;/.test(src));
+
+    /* The button must drop both streams on hang-up or the meters never tear
+       their contexts down, whatever the hook does. */
+    const btn = fs.readFileSync("src/components/ai/VoiceCallButton.tsx", "utf8");
+    /* Sliced to the END OF THE FUNCTION rather than to the next declaration
+       by name: `const startCallRef` was later added ABOVE this one, so the old
+       boundary produced an empty slice and the assertion failed on correct
+       code. `}, [` closes a useCallback and is the real end. */
+    const hangUpAt = btn.indexOf("const hangUp");
+    const hangUp = btn.slice(hangUpAt, btn.indexOf("}, [", hangUpAt));
+    check("hanging up drops the metered streams",
+      /setMicStream\(null\)/.test(hangUp) && /setFarStream\(null\)/.test(hangUp));
+    check("only the side that is making sound is metered",
+      /useStreamLevel\(micStream, listening\)/.test(btn) &&
+      /phase === "speaking"/.test(btn));
   }
 
   console.log(`\n${pass} passed, ${failures.length} failed`);

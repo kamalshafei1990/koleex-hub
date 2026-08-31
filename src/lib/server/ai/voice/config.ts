@@ -24,6 +24,18 @@ import "server-only";
    second region exists would be config nobody sets and code nobody runs.
    --------------------------------------------------------------------------- */
 
+/** One selectable voice, as the SERVER knows it. */
+export type VoiceOption = {
+  /** What the client sends back. Opaque and ours — never the vendor's id, so a
+   *  browser cannot ask for a voice this deployment did not offer. */
+  key: string;
+  /** What a user reads. The owner's words, set in configuration. */
+  label: string;
+  /** The vendor's own identifier. Never sent to a client as a menu; it travels
+   *  only inside a session configuration the server has authored. */
+  vendorId: string;
+};
+
 export type VoiceConfig = {
   /** The SDP-exchange URL with the model applied. Built here so the CLIENT
    *  never learns the endpoint or the model id — both are vendor identity, and
@@ -35,6 +47,10 @@ export type VoiceConfig = {
    *  log an operator reads, and §P.4's rule about vendor labels applies to
    *  anything that can travel. */
   regionLabel: string;
+  /** Empty when the owner has configured none — the vendor's default voice is
+   *  then used and no picker is offered. An empty list is a valid state, not a
+   *  broken one. */
+  voices: VoiceOption[];
 };
 
 export type VoiceEnv = {
@@ -42,7 +58,50 @@ export type VoiceEnv = {
   AI_VOICE_API_KEY?: string;
   AI_VOICE_MODEL?: string;
   AI_VOICE_REGION_LABEL?: string;
+  /** `vendorId:Label` pairs, comma separated — e.g. `Ethan:Omar,Chelsie:Layla`.
+   *  CONFIGURATION RATHER THAN CODE for two reasons. The vendor's voice list
+   *  changes without asking us, so a hard-coded array is a deploy every time it
+   *  does. And the LABEL is the owner's product language: §P.4 says vendor
+   *  names must not appear in user-facing Koleex AI copy, so whether a voice is
+   *  called "Chelsie" or "Layla" is a decision for the owner, not for this
+   *  file. A bare id with no label is allowed and shows as itself. */
+  AI_VOICE_VOICES?: string;
 };
+
+/* An opaque key the client sends back. Deliberately not the vendor id and not
+   the label: ids are vendor identity, and labels change without the stored
+   preference having to. Positional, so it is stable for a given configuration
+   and meaningless outside it. */
+const voiceKeyAt = (index: number) => `v${index + 1}`;
+
+/** Parse the catalogue. Never throws, and never yields a half-formed entry: a
+ *  malformed pair is dropped rather than offered as a voice that would be
+ *  rejected the moment someone picked it. */
+export function parseVoiceOptions(raw: string | undefined): VoiceOption[] {
+  if (!raw) return [];
+  const out: VoiceOption[] = [];
+  for (const part of raw.split(",")) {
+    const trimmed = part.trim();
+    if (!trimmed) continue;
+    /* Split on the FIRST colon only: a label may contain one, an id may not. */
+    const at = trimmed.indexOf(":");
+    const vendorId = (at === -1 ? trimmed : trimmed.slice(0, at)).trim();
+    const label = (at === -1 ? trimmed : trimmed.slice(at + 1)).trim() || vendorId;
+    if (!vendorId) continue;
+    /* A duplicate id would give two keys the same voice and make the picker
+       lie about what is on offer. */
+    if (out.some((v) => v.vendorId === vendorId)) continue;
+    out.push({ key: voiceKeyAt(out.length), label, vendorId });
+  }
+  return out;
+}
+
+/** Resolve a client's choice. Returns null for anything not offered — which is
+ *  the whole point: the browser proposes, the server disposes. */
+export function resolveVoice(voices: readonly VoiceOption[], key: string | null): VoiceOption | null {
+  if (!key) return null;
+  return voices.find((v) => v.key === key) ?? null;
+}
 
 /** Returns a usable config, or null. Null means "voice is off" — never a
  *  half-configured state, because a handshake that reaches a real endpoint
@@ -72,6 +131,7 @@ export function parseVoiceConfig(env: VoiceEnv): VoiceConfig | null {
     sdpUrl: url.toString(),
     apiKey: key,
     regionLabel: env.AI_VOICE_REGION_LABEL?.trim() || "default",
+    voices: parseVoiceOptions(env.AI_VOICE_VOICES),
   };
 }
 

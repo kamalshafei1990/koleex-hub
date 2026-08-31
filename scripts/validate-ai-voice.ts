@@ -22,11 +22,23 @@ import {
   voiceConfigured,
 } from "../src/lib/server/ai/voice/config";
 import { verdictForStatus, probeVoice } from "../src/lib/server/ai/voice/probe";
+import { parseVoiceOptions, resolveVoice } from "../src/lib/server/ai/voice/config";
+import { buildSessionUpdate, publicVoiceList } from "../src/lib/server/ai/voice/session-config";
 
 let pass = 0;
 const failures: string[] = [];
-function check(label: string, cond: boolean) {
-  if (cond) { pass++; console.log(`  ✓ ${label}`); }
+/* A CONDITION MAY THROW, AND A THROW MUST BE A NAMED FAILURE. Applied here for
+   the same reason as the other voice suites: a mutation that breaks the
+   product should say which guarantee broke, not produce a Node stack trace. */
+function check(label: string, cond: boolean | (() => boolean)) {
+  let ok: boolean;
+  try {
+    ok = typeof cond === "function" ? cond() : cond;
+  } catch (e) {
+    ok = false;
+    label = `${label} — threw: ${e instanceof Error ? e.message : String(e)}`;
+  }
+  if (ok) { pass++; console.log(`  ✓ ${label}`); }
   else { failures.push(label); console.log(`  ✗ ${label}`); }
 }
 
@@ -129,15 +141,28 @@ console.log("\n── 3. The route, read — the surface a fetch cannot be teste
      only from the config module. */
   check("the url comes from the config, never from the request",
     /fetch\(cfg\.sdpUrl,/.test(code));
-  check("no request field is read into the url or headers",
-    !/body\.(url|endpoint|region|model)/.test(code) && !/searchParams\.get/.test(code));
+  /* A voice choice IS now read from the request — but it can only select from
+     a server-side catalogue, and it never reaches the vendor url or a header.
+     The blanket "no searchParams" ban was the old proxy for that; the
+     guarantee is that the fetch is built from the config alone. */
+  const vendorCall = code.slice(code.indexOf("fetch(cfg.sdpUrl,"), code.indexOf("} catch (e)", code.indexOf("fetch(cfg.sdpUrl,")));
+  check("nothing from the request reaches the vendor url or headers",
+    !/searchParams|req\.url|body\./.test(vendorCall));
+  check("the only request field read is a voice KEY, resolved against the catalogue",
+    (code.match(/searchParams\.get/g) ?? []).length === 1 &&
+    /searchParams\.get\("voice"\)/.test(code) &&
+    /resolveVoice\(cfg\.voices, requested\)/.test(code));
 
-  /* NOTHING VENDOR-SHAPED MAY TRAVEL BACK. Absence of a class again: the
-     success path returns the answer body and constructs no JSON at all. */
-  const successReturn = code.slice(code.lastIndexOf("return new Response(answer"));
-  check("the success path returns the answer SDP and nothing else",
-    /return new Response\(answer, \{/.test(successReturn) &&
-    !/model/.test(successReturn) && !/sdpUrl/.test(successReturn) && !/apiKey/.test(successReturn));
+  /* NOTHING VENDOR-SHAPED MAY TRAVEL BACK. The success path now returns the
+     answer BESIDE a session the server authored — deliberately, because the
+     browser must not compose that event. What must still be absent is every
+     value that identifies the endpoint, the model or the account. */
+  const successReturn = code.slice(code.lastIndexOf("return NextResponse.json("));
+  check("the success path returns the answer and the authored session, nothing more",
+    /sdp: answer, session: buildSessionUpdate\(voice\)/.test(successReturn));
+  check("and carries no endpoint, model, key or region",
+    !/sdpUrl/.test(successReturn) && !/apiKey/.test(successReturn) &&
+    !/AI_VOICE_MODEL/.test(successReturn) && !/regionLabel/.test(successReturn));
   check("the vendor's error body is logged, never forwarded",
     /detail=\$\{detail\}/.test(code) && !/error: detail/.test(code) && !/error: `.*\$\{detail\}/.test(code));
   check("the config diagnosis goes to the log, not to the caller",
@@ -261,6 +286,120 @@ void (async () => {
       bare.indexOf("const voiceProbePromise") < bare.indexOf("const probes = await Promise.all") &&
       bare.indexOf("await voiceProbePromise") > bare.indexOf("const probes = await Promise.all"));
     check("this route is still super-admin only", /if \(!auth\.is_super_admin\)/.test(bare));
+  }
+
+  console.log("\n── 7. The voice catalogue is configuration, and the server owns it ──");
+  {
+    const v = parseVoiceOptions("Ethan:Omar, Chelsie:Layla");
+    check("pairs parse into id and label",
+      v.length === 2 && v[0].vendorId === "Ethan" && v[0].label === "Omar");
+    check("keys are ours, not the vendor's",
+      v[0].key === "v1" && v[1].key === "v2" && !v.some((o) => o.key === o.vendorId));
+    check("a bare id with no label shows as itself",
+      () => parseVoiceOptions("Ethan")[0].label === "Ethan");
+    check("whitespace around entries is tolerated",
+      () => parseVoiceOptions("  Ethan : Omar  ")[0].vendorId === "Ethan");
+    check("a label may contain a colon — only the first splits",
+      () => parseVoiceOptions("Ethan:Omar: warm")[0].label === "Omar: warm");
+
+    /* A malformed entry must be DROPPED, not offered: a voice in the picker
+       the server would reject is a menu item that fails when chosen. */
+    check("an empty entry is dropped", parseVoiceOptions("Ethan:Omar,,Chelsie:Layla").length === 2);
+    check("an entry with no id is dropped", parseVoiceOptions(":Nameless,Ethan:Omar").length === 1);
+    check("a duplicate id is dropped", parseVoiceOptions("Ethan:Omar,Ethan:Other").length === 1);
+    check("no configuration is an empty list, not a failure",
+      parseVoiceOptions(undefined).length === 0 && parseVoiceOptions("").length === 0);
+
+    /* THE BROWSER PROPOSES, THE SERVER DISPOSES. */
+    check("a known key resolves", resolveVoice(v, "v1")?.vendorId === "Ethan");
+    check("an unknown key resolves to nothing", resolveVoice(v, "v9") === null);
+    check("no key resolves to nothing", resolveVoice(v, null) === null);
+    check("a VENDOR id is not accepted as a key — the client never learns them",
+      resolveVoice(v, "Ethan") === null);
+  }
+
+  console.log("\n── 8. What the client may know, and what it may not ──");
+  {
+    const v = parseVoiceOptions("Ethan:Omar,Chelsie:Layla");
+    const listed = publicVoiceList(v);
+    check("the list carries a key and a label",
+      () => listed[0].key === "v1" && listed[0].label === "Omar");
+    check("the vendor id never appears in the public list",
+      !JSON.stringify(listed).includes("Ethan") && !JSON.stringify(listed).includes("Chelsie"));
+    check("and nothing else rides along",
+      () => Object.keys(listed[0]).sort().join(",") === "key,label");
+  }
+
+  console.log("\n── 9. The session the server authors ──");
+  {
+    const v = parseVoiceOptions("Ethan:Omar");
+    const withVoice = buildSessionUpdate(v[0]);
+    const without = buildSessionUpdate(null);
+
+    check("it is a session.update", withVoice.type === "session.update");
+    check("a chosen voice is applied as the VENDOR id — the one place it travels",
+      withVoice.session.voice === "Ethan");
+    check("no choice means no voice field, so the vendor's default is used",
+      !("voice" in without.session));
+    check("it asks for audio, not text alone",
+      JSON.stringify(withVoice.session.modalities) === JSON.stringify(["text", "audio"]));
+    check("it requests the user's transcript",
+      JSON.stringify(withVoice.session.input_audio_transcription) === JSON.stringify({ enabled: true }));
+    check("it configures server-side turn detection",
+      (withVoice.session.turn_detection as { type?: string })?.type === "server_vad");
+    check("it names both audio formats",
+      withVoice.session.input_audio_format === "pcm" && withVoice.session.output_audio_format === "pcm");
+
+    /* POLICY IS STILL ABSENT — the point of moving this server-side was to make
+       that a decision taken here rather than one the browser could change. */
+    check("no instructions, and none composed by accident", !("instructions" in withVoice.session));
+    check("no tool definitions",
+      !("tools" in withVoice.session) && !("tool_choice" in withVoice.session));
+    check("no endpoint, model, key or workspace travels in the session",
+      !/aliyun|maas|qwen|dashscope|sk-|ws-pl|Bearer/i.test(JSON.stringify(withVoice)));
+  }
+
+  console.log("\n── 10. The route gates GET exactly as it gates POST ──");
+  {
+    const code2 = readFileSync("src/app/api/ai/voice/session/route.ts", "utf8");
+    const bare = strip(code2);
+
+    /* ONE GATE, SHARED. A second handler with its own copy of the chain is a
+       second place for a step to be dropped — and requireInternalUser was
+       already omitted from this very route once. */
+    check("the auth chain lives in one function", /async function authorize\(/.test(bare));
+    /* SLICED TO EACH HANDLER'S OWN BODY. A lazy window of N characters after
+       `export async function GET` runs past the end of GET and into POST,
+       which does call the gate — so removing GET's gate entirely still
+       matched. Each body is now examined alone. */
+    const bodyOf = (verb: string) => {
+      const at = bare.indexOf(`export async function ${verb}(`);
+      if (at === -1) return "";
+      const next = ["GET", "POST"]
+        .map((v) => bare.indexOf(`export async function ${v}(`, at + 1))
+        .filter((i) => i > -1);
+      return bare.slice(at, next.length ? Math.min(...next) : bare.length);
+    };
+    check("GET goes through the gate", /authorize\(req\)/.test(bodyOf("GET")));
+    check("GET returns nothing before the gate has passed",
+      /if \(gate instanceof NextResponse\) return gate;/.test(bodyOf("GET")));
+    check("POST goes through the gate", /authorize\(req\)/.test(bodyOf("POST")));
+    check("POST returns nothing before the gate has passed",
+      /if \(gate instanceof NextResponse\) return gate;/.test(bodyOf("POST")));
+    check("the chain still has all three steps in order",
+      bare.indexOf("requireAuth(req)") < bare.indexOf("requireInternalUser(auth)") &&
+      bare.indexOf("requireInternalUser(auth)") < bare.indexOf('checkModule(ctx, "AI Voice", "view")'));
+    /* CALLED once, not merely NAMED once — the import mentions it too, and
+       counting mentions made this assertion fail on a correct file. */
+    check("neither verb re-implements a gate",
+      (bare.match(/requireInternalUser\(auth\)/g) ?? []).length === 1 &&
+      (bare.match(/requireAuth\(req\)/g) ?? []).length === 1 &&
+      (bare.match(/checkModule\(ctx, "AI Voice", "view"\)/g) ?? []).length === 1);
+
+    check("GET returns the public list, never the raw catalogue",
+      /publicVoiceList\(cfg\.voices\)/.test(bare) && !/voices: cfg\.voices/.test(bare));
+    check("an unconfigured deployment offers an empty list rather than an error",
+      /cfg \? publicVoiceList\(cfg\.voices\) : \[\]/.test(bare));
   }
 
   console.log(`\n${pass} passed, ${failures.length} failed`);
