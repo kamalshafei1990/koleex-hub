@@ -135,6 +135,15 @@ function fakePc(opts: { iceState?: string; gatherLater?: boolean; channelOpen?: 
        sends nothing is the exact bug this records. */
     sent: [] as string[],
     channel: null as FakeChannel | null,
+    /* ORDERING, NOT WALL-CLOCK. The assertion this feeds used to read
+       `Date.now() - started >= 5` against a gathering timer that also fires
+       at 5ms — the two raced, and the suite failed roughly one run in ten on
+       a loaded machine for no reason connected to the product. What the test
+       actually means is "the offer was not posted until gathering finished",
+       which is an ORDER. Recording the order says it exactly, and says it the
+       same way every time. */
+    gathered: false,
+    postedAfterGathering: null as boolean | null,
   };
   const listeners: Record<string, Array<() => void>> = {};
   const pc = {
@@ -157,6 +166,7 @@ function fakePc(opts: { iceState?: string; gatherLater?: boolean; channelOpen?: 
       if (opts.gatherLater) {
         setTimeout(() => {
           (pc as unknown as { iceGatheringState: string }).iceGatheringState = "complete";
+          calls.gathered = true;
           for (const fn of listeners["icegatheringstatechange"] ?? []) fn();
         }, 5);
       }
@@ -198,7 +208,7 @@ function deps(opts: {
   enforceLimit?: boolean;
   voiceKey?: string | null;
   reconnectGraceMs?: number;
-}): { deps: VoiceDeps; mic: ReturnType<typeof fakeMic>; ice: (state: string) => void; pcCalls: { closed: number; added: number; remoteSdp: string; channels: string[]; sent: string[]; channel: FakeChannel | null } } {
+}): { deps: VoiceDeps; mic: ReturnType<typeof fakeMic>; ice: (state: string) => void; pcCalls: { closed: number; added: number; remoteSdp: string; channels: string[]; sent: string[]; channel: FakeChannel | null; gathered: boolean; postedAfterGathering: boolean | null } } {
   const bodyReads: number[] = [];
   void bodyReads;
   const mic = fakeMic();
@@ -220,6 +230,8 @@ function deps(opts: {
       reconnectGraceMs: opts.reconnectGraceMs ?? 80,
     fetchFn: (async (url: string, init?: RequestInit) => {
         opts.recorded?.push({ url: String(url), init });
+        /* First post only: later ones (the tool relay) are not this question. */
+        if (calls.postedAfterGathering === null) calls.postedAfterGathering = calls.gathered;
         return {
           ok: (opts.status ?? 200) < 400,
           status: opts.status ?? 200,
@@ -340,10 +352,9 @@ async function main() {
     /* Explicit vendor guidance: "Wait for iceGatheringState === 'complete'
        before using the SDP." Skipping it produces an offer with no candidates,
        which negotiates and then connects to nothing. */
-    const started = Date.now();
     const r = await run({ iceState: "gathering", gatherLater: true });
     check("it waits for gathering to complete before posting",
-      r.session.getState() === "live" && Date.now() - started >= 5);
+      r.session.getState() === "live" && r.pcCalls.postedAfterGathering === true);
 
     /* And never forever. A candidate that hangs leaves the state at
        "gathering" indefinitely; a partial offer beats a call that never

@@ -43,7 +43,12 @@ import { requireInternalUser } from "@/lib/server/ai/require-internal";
 import { buildUserContext, checkModule } from "@/lib/server/ai-agent/permissions";
 import { consumeBudget, limitMode, subjectFor } from "@/lib/server/ai/security/rate-limit";
 import { parseVoiceConfig, diagnoseVoiceConfig, resolveVoice, type VoiceEnv } from "@/lib/server/ai/voice/config";
-import { buildVoiceSessionPayload, publicVoiceList } from "@/lib/server/ai/voice/session-config";
+import {
+  buildVoiceSessionPayload,
+  publicVoiceList,
+  TAUGHT_INDEX_BUDGET_BYTES,
+} from "@/lib/server/ai/voice/session-config";
+import { taughtQuestionIndex } from "@/lib/server/ai-knowledge";
 
 export const dynamic = "force-dynamic";
 /* The handshake is one round trip to the vendor. It is not the call. */
@@ -56,6 +61,11 @@ export const maxDuration = 45;
    that this route spends OUR key on the caller's behalf, so the caller must
    not be able to make us forward an arbitrarily large body. */
 const MAX_SDP_BYTES = 64 * 1024;
+
+/* The taught-question index is a nicety on top of a call that already works.
+   It gets a ceiling measured against that: long enough that a cold cache is
+   not thrown away, short enough that nobody waits on it. */
+const TAUGHT_INDEX_TIMEOUT_MS = 1_500;
 
 /* A handshake that has not answered in this long is not going to. Short,
    because the user is staring at a "connecting…" state, and unlike a turn
@@ -117,7 +127,7 @@ function voiceEnv(): VoiceEnv {
    most easily dropped is requireInternalUser — which was already omitted once
    from this very route. Not exported: a Next.js route file may only export
    route handlers. */
-async function authorize(req: Request): Promise<NextResponse | { accountId: string }> {
+async function authorize(req: Request): Promise<NextResponse | { accountId: string; tenantId: string | null }> {
   const auth = await requireAuth(req);
   if (auth instanceof NextResponse) return auth;
 
@@ -143,7 +153,10 @@ async function authorize(req: Request): Promise<NextResponse | { accountId: stri
     );
   }
 
-  return { accountId: auth.account_id };
+  /* THE TENANT TRAVELS WITH THE ACCOUNT, and it is not an afterthought: every
+     knowledge read this route makes is scoped by it, and a null passed where a
+     tenant belongs is one tenant's taught knowledge read into another's call. */
+  return { accountId: auth.account_id, tenantId: auth.tenant_id ?? null };
 }
 
 /* GET — which voices this deployment offers.
@@ -286,7 +299,35 @@ export async function POST(req: Request) {
      negotiated and throws rather than truncating, and only the client can see
      that limit — but shortening a policy is authoring one, so the server
      writes both and the client only chooses between them. */
-  const payload = buildVoiceSessionPayload(voice);
+  /* WHAT THE OWNER HAS TAUGHT, as a list of questions the model can recognise
+     across languages. See TAUGHT_INDEX_BUDGET_BYTES for why the questions
+     travel and the answers do not.
+
+     AFTER THE VENDOR HAS ALREADY ANSWERED, deliberately. This is a database
+     read on the one path in this product with a history of timing out, and
+     putting it in front of the handshake would spend part of that budget
+     before the attempt that actually matters. Here it costs the caller a few
+     milliseconds of a round trip that has already succeeded.
+
+     AND IT CANNOT TAKE THE CALL DOWN. A call with no taught index is a call
+     that finds taught answers by search alone — the product before this
+     change, which worked. A call that fails because a knowledge query was slow
+     is a regression. So: a hard ceiling, and any failure means an empty list
+     rather than an error. */
+  let taughtQuestions: string[] = [];
+  try {
+    taughtQuestions = await Promise.race([
+      taughtQuestionIndex(gate.tenantId, TAUGHT_INDEX_BUDGET_BYTES),
+      new Promise<string[]>((resolve) => setTimeout(() => resolve([]), TAUGHT_INDEX_TIMEOUT_MS)),
+    ]);
+  } catch {
+    /* Logged, not raised: the call is fine without it and the caller is
+       waiting. A silent empty list would hide a knowledge plane that has
+       stopped answering, which is worth knowing about. */
+    console.error("[ai.voice] taught index unavailable — continuing without it");
+  }
+
+  const payload = buildVoiceSessionPayload(voice, taughtQuestions);
   return NextResponse.json(
     { sdp: answer, session: payload.full, session_compact: payload.compact },
     { status: 200, headers: { "Cache-Control": "no-store" } },

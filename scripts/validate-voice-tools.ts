@@ -39,7 +39,11 @@ import {
   voiceToolSchemas,
 } from "../src/lib/server/ai/voice/tools";
 import { listTools, getTool } from "../src/lib/server/ai-agent/tool-registry";
-import { buildVoiceSessionPayload } from "../src/lib/server/ai/voice/session-config";
+import {
+  buildVoiceSessionPayload,
+  TAUGHT_INDEX_BUDGET_BYTES,
+} from "../src/lib/server/ai/voice/session-config";
+import { capQuestionsToBudget } from "../src/lib/server/ai-knowledge";
 
 let pass = 0;
 const failures: string[] = [];
@@ -238,6 +242,144 @@ console.log("\n── 2b. A call reaches the same knowledge the chat box does �
     JSON.stringify(payload.compact).length < JSON.stringify(payload.full).length * 0.4);
   /* Non-vacuity: a compact that dropped every tool would pass both above. */
   check("without dropping tools altogether", compactTools.length >= 2);
+}
+
+console.log("\n── 2d. What the owner teaches, a call learns too ──");
+{
+  /* THE OWNER'S REQUEST, and the gap behind it: he teaches Koleex AI an
+     answer, the chat box uses it, and a call does not. The chat box inlines
+     every taught pair into its system prompt and lets the model match on
+     MEANING. A call cannot — its configuration is one event sent before
+     anyone has spoken, and the taught corpus grows every time he teaches
+     something. So a call reaches taught answers through the search tool, and
+     the index below is what makes the model reach for it across languages. */
+
+  /* ── The budget, run rather than read ──────────────────────────────────
+     This is the half where a mistake would actually live. */
+  const budget = capQuestionsToBudget(["aaaa", "bbbb", "cccc"], 7 + 7);
+  check("the index takes questions until the budget is spent",
+    budget.length === 2 && budget[0] === "aaaa" && budget[1] === "bbbb");
+  check("and drops the tail, not the head — newest taught is kept",
+    !budget.includes("cccc"));
+  /* PREFIX, NOT BEST-FIT, and the case above could not tell the two apart —
+     every question there was the same size, so `break` and `continue` gave
+     the identical answer. This one separates them: the newest question does
+     not fit and an older, shorter one would. Stopping is the right answer.
+     The index is "the questions most recently taught", which stays stable as
+     the owner teaches more; a greedy fit would reshuffle which questions
+     appear every time he adds one, for the sake of a line that is findable
+     by search anyway. */
+  check("and it stops at the first question that will not fit, rather than picking over the rest",
+    capQuestionsToBudget(["aaaaaaaaaa", "bb"], 6).length === 0);
+
+  /* BYTES, NOT CHARACTERS, and this is the assertion that says so. Six Arabic
+     characters are twelve bytes; a `.length` implementation would fit both of
+     these in a 14-byte budget and the block would ship at double its size.
+     The owner teaches in Arabic — this is his case, not an edge one. */
+  const ARABIC_BUDGET = 16;
+  const arabic = capQuestionsToBudget(["سياسة", "الشحن"], ARABIC_BUDGET);
+  check("and it measures BYTES, so an Arabic index is not silently double-size",
+    arabic.length === 1);
+  /* THE COUNTERFACTUAL, or the check above is just "one fits in sixteen".
+     Each question costs its size plus a three-byte separator. Counted in
+     CHARACTERS both fit exactly; counted in BYTES the first alone spends
+     thirteen and the second cannot follow. The budget is chosen to sit
+     between those two answers, so only a byte-counting implementation
+     passes. */
+  const charCost = ("سياسة".length + 3) + ("الشحن".length + 3);
+  const byteCost = (Buffer.byteLength("سياسة") + 3) + (Buffer.byteLength("الشحن") + 3);
+  check("  …where the same budget counted in characters would have fitted both",
+    charCost <= ARABIC_BUDGET && byteCost > ARABIC_BUDGET);
+
+  check("a budget too small for even one question yields an empty index, not a broken one",
+    capQuestionsToBudget(["a question"], 3).length === 0);
+  check("blank questions are skipped rather than costing budget",
+    capQuestionsToBudget(["", "   ", "real"], 20).join("") === "real");
+
+  /* ── What the session actually carries ─────────────────────────────────*/
+  const taught = ["What is our return policy?", "How long is the warranty?"];
+  const withIndex = buildVoiceSessionPayload(null, taught);
+  const instr = String(withIndex.full.session.instructions ?? "");
+  check("a taught question reaches the call's instructions",
+    instr.includes("What is our return policy?") && instr.includes("How long is the warranty?"));
+  /* THE POINT OF SHIPPING THE QUESTIONS AT ALL. Without this line the model
+     has a list and no reason to act on it, and the whole thing is decoration:
+     it must know the answer exists and that looking it up beats remembering. */
+  check("and is told to look the answer up rather than answer from memory",
+    /WHAT THE OWNER HAS TAUGHT YOU/.test(instr) &&
+    /in ANY language, however they word it/.test(instr) &&
+    /Never answer one of\s+these from general memory/.test(instr));
+  /* The list is a hint, not a manifest — a question dropped by the budget is
+     still findable, and the model must not conclude the list is everything. */
+  check("and that the list is not everything it has been taught",
+    /This list is not everything you have been taught/.test(instr));
+
+  /* THE ANSWERS STAY OUT. They are the large, unbounded half and the tool
+     already returns them; putting them here is how this becomes the payload
+     that does not fit. */
+  check("the ANSWERS never travel in the session — only the questions",
+    !instr.includes("A1:") && !/TAUGHT KNOWLEDGE \(owner-approved reference answers/.test(instr));
+
+  /* THE COMPACT SESSION IS THE SIZE FALLBACK. Adding to it would be answering
+     a size problem by making the fallback bigger. */
+  const compactInstr = String(withIndex.compact.session.instructions ?? "");
+  check("and the compact fallback carries none of it",
+    !compactInstr.includes("What is our return policy?") &&
+    !/WHAT THE OWNER HAS TAUGHT YOU/.test(compactInstr));
+
+  /* NON-VACUITY. Every check above would also pass if the block were never
+     built at all, so: nothing taught must cost nothing. */
+  const none = String(buildVoiceSessionPayload(null, []).full.session.instructions ?? "");
+  check("a deployment with nothing taught pays nothing for the feature",
+    !/WHAT THE OWNER HAS TAUGHT YOU/.test(none) &&
+    none.length < instr.length);
+
+  /* AND THE BUDGET IS REAL AT THE CALL SITE. A generous constant here is a
+     session that quietly grows past the channel limit and falls back to the
+     compact one — losing the catalogue tools to gain an index. */
+  check("the shipped budget is bounded, not unbounded",
+    TAUGHT_INDEX_BUDGET_BYTES > 0 && TAUGHT_INDEX_BUDGET_BYTES <= 1200);
+
+  /* ── The tool the call reaches them through ────────────────────────────*/
+  const ks = readFileSync("src/lib/server/ai-agent/tools/knowledge-search.ts", "utf8");
+  check("search_knowledge searches taught answers as well as the corpus",
+    /searchTaughtAnswers\(tenantId, q, 3\)/.test(ks) &&
+    /searchApprovedUnits\(tenantId, q, 6\)/.test(ks));
+  check("and both reads are scoped to the caller's tenant",
+    /const tenantId = ctx\.auth\.tenant_id \?\? null;/.test(ks) &&
+    !/searchTaughtAnswers\(null/.test(ks));
+  /* A TAUGHT ANSWER IS NOT AN EXCERPT. Told to cite it, the model says
+     "according to unknown source" — the taught unit's source is the owner. */
+  check("a taught answer is handed over as a reference reply, not as evidence to cite",
+    /Do NOT cite a source for these/.test(ks) &&
+    /LEARN from them, don't recite them/.test(ks) &&
+    /stays EXACTLY as taught/.test(ks));
+  check("and it outranks the document corpus when both match",
+    /these outrank everything else here/.test(ks) &&
+    ks.indexOf("TAUGHT ANSWER(S)") < ks.indexOf("approved knowledge unit(s). Ground your answer"));
+  check("the two planes stay separable in the result, not flattened into one list",
+    /data: \{ taught, hits \}/.test(ks));
+
+  /* ── Teaching something must not wait out a cache ──────────────────────
+     The owner teaches, hears the chat box use it, and hears a call not — for
+     a minute, which is long enough to be reported as broken. Both planes,
+     on every path that changes what the AI treats as true. */
+  for (const [label, file] of [
+    ["taught Q&A", "src/app/api/ai/knowledge/qa/route.ts"],
+    ["a single unit", "src/app/api/ai/knowledge/units/[id]/route.ts"],
+    ["a whole source", "src/app/api/ai/knowledge/sources/[id]/route.ts"],
+  ] as const) {
+    const r = readFileSync(file, "utf8");
+    /* COUNTED, NOT MERELY PRESENT. The Q&A route has two write paths — teach
+       and retire — and asserting the call appears "somewhere in the file"
+       passed with it deleted from one of them. The invariant is that the two
+       invalidations travel TOGETHER: wherever one fires, so does the other,
+       or a lane goes stale while the owner watches another lane update. */
+    const taughtCalls = (r.match(/invalidateTaughtAnswersCache\(/g) ?? []).length;
+    const searchCalls = (r.match(/invalidateApprovedSearchCache\(/g) ?? []).length;
+    check(`approving ${label} drops BOTH caches, not just the prompt block`,
+      taughtCalls > 0 && searchCalls === taughtCalls);
+  }
 }
 
 console.log("\n── 2c. A failed handshake says how long it took ──");

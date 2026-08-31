@@ -144,10 +144,33 @@ export async function persistUnits(opts: {
    pairs, trimmed); cached for a minute per tenant. */
 const qaCache = new Map<string, { at: number; block: string }>();
 
-export async function getTaughtAnswersBlock(tenantId: string | null): Promise<string> {
+/* ── Taught Q&A: ONE fetch, three consumers ───────────────────────────────
+   The owner teaches a question and one or more reply variants; the units land
+   approved and tagged "qa". Three different lanes need them and used to be
+   able to disagree about what "taught" means, so they now read the same rows:
+
+     · getTaughtAnswersBlock — the written lanes, which inline every pair into
+       the system prompt and let the model do the meaning-matching.
+     · searchTaughtAnswers  — the search_knowledge tool, which is the ONLY way
+       a voice call can reach them: a call is configured once, before anyone
+       has spoken, so it cannot inline a corpus that grows every time the
+       owner teaches something.
+     · taughtQuestionIndex  — the bridge between those two, explained where it
+       is defined.
+
+   WHY THE ROWS ARE CACHED AND NOT JUST THE BLOCK. The block cache came first
+   and served one consumer. Adding two more on top of it would have meant two
+   more queries for rows that were already in memory, on the handshake path of
+   all places. */
+type TaughtRow = { question: string; answers: string[] };
+
+const taughtRowsCache = new Map<string, { at: number; rows: TaughtRow[] }>();
+const TAUGHT_TTL_MS = 60_000;
+
+async function taughtRows(tenantId: string | null): Promise<TaughtRow[]> {
   const key = tenantId ?? "platform";
-  const hit = qaCache.get(key);
-  if (hit && Date.now() - hit.at < 60_000) return hit.block;
+  const hit = taughtRowsCache.get(key);
+  if (hit && Date.now() - hit.at < TAUGHT_TTL_MS) return hit.rows;
 
   let q = supabaseServer
     .from("ai_knowledge_units")
@@ -159,15 +182,29 @@ export async function getTaughtAnswersBlock(tenantId: string | null): Promise<st
   q = tenantId === null ? q.is("tenant_id", null) : q.eq("tenant_id", tenantId);
   const { data } = await q;
 
+  const rows: TaughtRow[] = ((data ?? []) as Array<{
+    title: string | null; body: string; meta: { answers?: string[] } | null;
+  }>).map((r) => ({
+    question: (r.title || "").slice(0, 200),
+    answers: [r.body, ...((r.meta?.answers ?? []).filter((a) => a && a !== r.body))].slice(0, 4),
+  }));
+
+  taughtRowsCache.set(key, { at: Date.now(), rows });
+  return rows;
+}
+
+export async function getTaughtAnswersBlock(tenantId: string | null): Promise<string> {
+  const key = tenantId ?? "platform";
+  const hit = qaCache.get(key);
+  if (hit && Date.now() - hit.at < TAUGHT_TTL_MS) return hit.block;
+
+  const rows = await taughtRows(tenantId);
+
   let block = "";
-  const rows = (data ?? []) as Array<{ title: string | null; body: string; meta: { answers?: string[] } | null }>;
   if (rows.length) {
     const pairs = rows.map((r) => {
-      const answers = [r.body, ...((r.meta?.answers ?? []).filter((a) => a && a !== r.body))]
-        .slice(0, 4)
-        .map((a, i) => `A${i + 1}: ${a.slice(0, 400)}`)
-        .join("\n");
-      return `Q: ${(r.title || "").slice(0, 200)}\n${answers}`;
+      const answers = r.answers.map((a, i) => `A${i + 1}: ${a.slice(0, 400)}`).join("\n");
+      return `Q: ${r.question}\n${answers}`;
     });
     block =
       "\n\nTAUGHT KNOWLEDGE (owner-approved reference answers — LEARN from them, don't recite them). " +
@@ -182,8 +219,127 @@ export async function getTaughtAnswersBlock(tenantId: string | null): Promise<st
   return block;
 }
 
+/** One taught pair, as the search tool hands it to the model. */
+export interface TaughtHit {
+  question: string;
+  /** Every variant the owner approved — the model composes, it does not pick. */
+  answers: string[];
+  score: number;
+}
+
+/**
+ * Find the taught pairs that answer a question.
+ *
+ * WHY THIS EXISTS AT ALL, when the written lanes just inline everything: a
+ * voice session carries its configuration in ONE event sent before the first
+ * word is spoken. Thirty taught pairs with four variants each is tens of
+ * kilobytes that would have to be in that event, would grow every time the
+ * owner teaches something, and would push the call towards the size fallback
+ * that strips the catalogue tools. Search is the shape that scales here.
+ *
+ * SAME SCORER AS THE APPROVED CORPUS, deliberately — a taught question is
+ * matched the way everything else is, with the title weighted because for a
+ * taught unit the title IS the question. What it CANNOT do is match across
+ * languages: "return policy" and "سياسة الإرجاع" share no characters. That is
+ * not a flaw to fix here with a translation table — it is why
+ * taughtQuestionIndex exists.
+ */
+export async function searchTaughtAnswers(
+  tenantId: string | null,
+  queryText: string,
+  limit = 3,
+): Promise<TaughtHit[]> {
+  const words = queryText
+    .toLowerCase()
+    .split(/[^\p{L}\p{N}]+/u)
+    .filter((w) => w.length >= 3 && !SEARCH_STOP.has(w))
+    .slice(0, 8);
+  if (words.length === 0) return [];
+
+  const rows = await taughtRows(tenantId);
+  const scored: TaughtHit[] = [];
+  for (const r of rows) {
+    const q = r.question.toLowerCase();
+    const a = r.answers.join(" ").toLowerCase();
+    let score = 0;
+    for (const w of words) {
+      score += (q.split(w).length - 1) * 3;
+      score += a.split(w).length - 1;
+    }
+    if (score > 0) scored.push({ question: r.question, answers: r.answers, score });
+  }
+  return scored.sort((x, y) => y.score - x.score).slice(0, limit);
+}
+
+/**
+ * The taught QUESTIONS only — no answers — small enough to travel in a voice
+ * session's instructions.
+ *
+ * THE PROBLEM IT SOLVES. A caller asks in Egyptian Arabic about something the
+ * owner taught in English. The model has a search tool, but nothing tells it
+ * there is anything to search FOR, and keyword search cannot bridge the two
+ * languages even if it tried: the words do not overlap. So the model answers
+ * from general memory, confidently, and the taught answer never surfaces —
+ * which is indistinguishable, from the caller's side, from never having been
+ * taught at all.
+ *
+ * Showing it the list of questions closes that. It reads "What is our return
+ * policy?" in its instructions, hears the Arabic question, recognises the two
+ * as the same question — models are good at exactly this — and calls the tool
+ * with wording that will actually match.
+ *
+ * BOUNDED, AND THE BUDGET IS THE POINT. This goes into the one payload in the
+ * product with a hard size limit and a fallback that strips the catalogue
+ * tools when it is exceeded. Questions are added newest-first until the budget
+ * is spent and the rest are dropped — a truncated index still works, because a
+ * question that is missing from it is still findable by search; an oversized
+ * session is not.
+ */
+export async function taughtQuestionIndex(
+  tenantId: string | null,
+  budgetBytes: number,
+): Promise<string[]> {
+  const rows = await taughtRows(tenantId);
+  return capQuestionsToBudget(rows.map((r) => r.question), budgetBytes);
+}
+
+/**
+ * Take questions until the byte budget is spent.
+ *
+ * SPLIT OUT SO IT CAN BE RUN, not just read. The half above needs a database
+ * and cannot be exercised in the suite; this half is where the mistake would
+ * actually live — an off-by-one that lets the block exceed its budget, or a
+ * `.length` where a byte count belongs.
+ *
+ * BYTES, NOT CHARACTERS, and that is the whole reason this is not a one-liner.
+ * The taught questions are Arabic and Chinese as often as English, and those
+ * are two and three bytes per character. Counting characters would have
+ * measured an Arabic index at a third of its real size — which is exactly the
+ * kind of budget that holds in testing and is exceeded in Cairo.
+ */
+export function capQuestionsToBudget(
+  questions: readonly string[],
+  budgetBytes: number,
+): string[] {
+  const out: string[] = [];
+  let used = 0;
+  for (const raw of questions) {
+    const q = raw.trim();
+    if (!q) continue;
+    const cost = Buffer.byteLength(q) + 3; /* the separator it will be joined with */
+    if (used + cost > budgetBytes) break;
+    out.push(q);
+    used += cost;
+  }
+  return out;
+}
+
 export function invalidateTaughtAnswersCache(tenantId: string | null) {
-  qaCache.delete(tenantId ?? "platform");
+  const key = tenantId ?? "platform";
+  qaCache.delete(key);
+  /* THE ROWS TOO, or the block is rebuilt from the stale rows it was just
+     dropped for. */
+  taughtRowsCache.delete(key);
 }
 
 

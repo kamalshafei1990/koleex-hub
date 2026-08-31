@@ -491,6 +491,102 @@ console.log("\n── VoiceCallScreen: the call is a mode, not a toggle ──")
   check("the call screen is localised", ar.includes("بيسمعك") && !ar.includes(">Listening<"));
 }
 
+console.log("\n── VoiceCallScreen: it is a modal, so it has to cover the app ──");
+{
+  /* THE REPORTED SYMPTOM, from a screenshot taken mid-call: the Hub's own
+     header sat across the top of the call, clipping the orb, and the floating
+     panel's dock button hovered over the transcript. The call screen declared
+     aria-modal="true" and then let two pieces of app chrome punch straight
+     through it, because it was drawn at z-50 while the header is z-100 and
+     the dock is z-90.
+
+     ASSERTED AGAINST THE REAL NUMBERS, read from the components that own
+     them, rather than against a constant retyped here. A header that is
+     restacked later must fail this, not quietly climb back on top. */
+  const zOf = (file: string, re: RegExp): number => {
+    const m = readFileSync(file, "utf8").match(re);
+    return m ? Number(m[1]) : NaN;
+  };
+  const callZ = zOf("src/components/ai/VoiceCallScreen.tsx", /fixed inset-0 z-\[(\d+)\] flex flex-col/);
+  const headerZ = zOf("src/components/layout/MainHeader.tsx", /kx-mainheader fixed top-0 left-0 right-0 z-\[(\d+)\]/);
+  const dockZ = zOf("src/components/layout/FloatingPanel.tsx", /fab-root fixed \$\{fabPosClass\} z-\[(\d+)\]/);
+  check("the call screen is stacked above the main header",
+    Number.isFinite(callZ) && Number.isFinite(headerZ) && callZ > headerZ);
+  check("and above the floating panel's dock button",
+    Number.isFinite(dockZ) && callZ > dockZ);
+  /* AND NOT ABOVE EVERYTHING. A confirmation raised during a call has to be
+     readable over it — a modal that outranks the confirm dialog is the same
+     class of bug in the other direction. */
+  const confirmZ = zOf("src/components/ui/ConfirmDialog.tsx", /z-\[(\d+)\]/);
+  check("but below the confirm dialog, which must still be readable over a call",
+    Number.isFinite(confirmZ) && callZ < confirmZ);
+}
+
+console.log("\n── VoiceCallScreen: the two controls ──");
+{
+  const controls = renderToStaticMarkup(
+    <VoiceCallScreen live phase="listening" audioLevel={0.3} lines={[]} lang="en"
+      onEnd={() => {}} muted={false} onToggleMute={() => {}} /> as ReactElement,
+  );
+  const mutedControls = renderToStaticMarkup(
+    <VoiceCallScreen live phase="listening" audioLevel={0.3} lines={[]} lang="en"
+      onEnd={() => {}} muted onToggleMute={() => {}} /> as ReactElement,
+  );
+
+  /* LABELS. An unlabelled icon pair is a guess, and this is a screen where
+     guessing wrong is pressing "end" on a live call. */
+  check("both controls are labelled in words, not icon-only", 
+    controls.includes(">Mic<") && controls.includes(">End<"));
+  check("  …and the visible labels are localised", 
+    renderToStaticMarkup(
+      <VoiceCallScreen live phase="listening" audioLevel={0.3} lines={[]} lang="ar"
+        onEnd={() => {}} muted={false} onToggleMute={() => {}} /> as ReactElement,
+    ).includes("إنهاء"));
+  /* The visible label must NOT also be announced: the button already carries
+     the accessible name, and two of them means a screen reader says it twice. */
+  check("the visible label is hidden from screen readers, which have the aria-label",
+    /aria-hidden="true"[^>]*>Mic</.test(controls) || /aria-hidden[^>]*>Mic</.test(controls));
+
+  /* THE ICONS THEMSELVES. What was there was a correct glyph with a line
+     ruled corner-to-corner across the whole 24px box — at 20px that reads as
+     damage, not state. And on the end-call button it said the wrong thing
+     entirely: a handset struck through is the icon for a call that FAILED,
+     and this is the button you press when the call went fine. */
+  check("no icon is a glyph with a line ruled across the whole box",
+    !/x1="2" y1="2" x2="22" y2="22"/.test(controls) &&
+    !/x1="2" y1="2" x2="22" y2="22"/.test(mutedControls));
+  check("the end-call icon is the handset turned down, not one struck through",
+    /rotate\(135 12 12\)/.test(controls));
+  /* Non-vacuity: it must still BE a handset, not an empty rotation. */
+  check("  …and it is still a handset", /d="M21 15\.46v2\.71/.test(controls));
+  /* Mic-off is drawn broken around its slash — the shape is cut, so the
+     diagonal is part of the letterform rather than graffiti over it. */
+  check("muting swaps in a mic-off glyph rather than overdrawing the mic",
+    /line x1="4" y1="3\.5" x2="20" y2="20\.5"/.test(mutedControls) &&
+    !/<rect x="9" y="2" width="6" height="12"/.test(mutedControls));
+  check("  …and unmuted draws the plain mic, with no slash at all",
+    /<rect x="9" y="2" width="6" height="12"/.test(controls) &&
+    !/y2="20\.5"/.test(controls));
+
+  /* TOUCH. This screen is used on a phone; the picker pills were 24px tall.
+     Every control on it is now at least 40px, on the 8px grid. */
+  for (const [what, re] of [
+    ["the mute control", /h-14 w-14 rounded-full/],
+    ["the end-call control", /h-16 w-16 rounded-full/],
+  ] as const) {
+    check(`${what} is a comfortable touch target`, re.test(controls));
+  }
+  /* HIERARCHY: ending a call is the primary action and is the larger of the
+     two. A mute the same size as the hang-up is a mis-press waiting to
+     happen. */
+  check("and ending the call is the larger, primary control",
+    controls.indexOf("h-16 w-16") > 0 && controls.indexOf("h-14 w-14") > 0);
+  /* The red still belongs to exactly one control. */
+  check("the red is still only on the control that ends the call",
+    (controls.match(/#FF3333/g) ?? []).length >= 1 &&
+    !/aria-label="Mute microphone"[^>]*#FF3333/.test(controls));
+}
+
 console.log("\n── VoiceCallScreen: choosing a voice ──");
 {
   const voices = [{ key: "v1", label: "Omar" }, { key: "v2", label: "Layla" }];

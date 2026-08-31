@@ -219,10 +219,62 @@ export function buildSessionUpdate(
   };
 }
 
-/** What the handshake returns: the same session in two lengths. */
-export function buildVoiceSessionPayload(voice: VoiceOption | null): VoiceSessionPayload {
+/* ---------------------------------------------------------------------------
+   THE TAUGHT-QUESTION INDEX, and why a voice call needs one at all.
+
+   The owner teaches Koleex AI an answer; the written lanes inline every taught
+   pair into their system prompt and let the model match on MEANING, which is
+   what makes "إيه سياسة الإرجاع؟" reach an answer taught in English. A voice
+   session cannot do that. Its configuration is one event sent before the first
+   word is spoken, and the taught corpus grows every time the owner teaches
+   something — inlining it would put an unbounded, ever-growing block into the
+   one payload in this product with a hard size limit.
+
+   So a call reaches taught knowledge through the search tool instead. That
+   works, and it has one hole: keyword search cannot cross languages. "return
+   policy" and "سياسة الإرجاع" share no characters, so a caller asking in
+   Arabic about something taught in English matches nothing — and the model,
+   with no reason to think there is anything to find, answers from general
+   memory sounding perfectly sure. From the caller's side that is
+   indistinguishable from never having taught it.
+
+   THE QUESTIONS ALONE CLOSE IT. The model reads "What is our return policy?"
+   here, hears the Arabic, recognises them as the same question — models are
+   good at precisely this — and calls the tool with wording that matches. The
+   ANSWERS stay out: they are the large, unbounded half, and they are exactly
+   what the tool already returns.
+
+   THE BUDGET IS NOT DECORATION. Past it, questions are dropped rather than the
+   session growing: a question missing from this index is still findable by
+   search, whereas a session too large for the channel falls back to the
+   compact one, which carries neither the catalogue tools nor this. Dropping a
+   line is a small loss; exceeding the limit is a broken call. */
+export const TAUGHT_INDEX_BUDGET_BYTES = 900;
+
+function taughtIndexBlock(questions: readonly string[]): string {
+  if (questions.length === 0) return "";
+  return (
+    " WHAT THE OWNER HAS TAUGHT YOU. Koleex's owner has taught you approved answers to these questions: " +
+    questions.join(" · ") +
+    ". When a caller asks any of them — in ANY language, however they word it — you already have an approved" +
+    " answer and you look it up before you speak, then give it in the caller's language. Never answer one of" +
+    " these from general memory: the taught answer is Koleex's own position and yours is a guess at it." +
+    " This list is not everything you have been taught, so search anyway when a question sounds like company" +
+    " policy, pricing practice or how Koleex does something."
+  );
+}
+
+/** What the handshake returns: the same session in two lengths.
+ *
+ *  `taughtQuestions` reaches only the FULL session. The compact one exists
+ *  because the full one did not fit; adding to it would be answering a size
+ *  problem by making the fallback bigger. */
+export function buildVoiceSessionPayload(
+  voice: VoiceOption | null,
+  taughtQuestions: readonly string[] = [],
+): VoiceSessionPayload {
   return {
-    full: buildSessionUpdate(voice),
+    full: buildSessionUpdate(voice, VOICE_INSTRUCTIONS + taughtIndexBlock(taughtQuestions)),
     compact: buildSessionUpdate(voice, COMPACT_INSTRUCTIONS, "compact"),
   };
 }

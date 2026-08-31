@@ -157,7 +157,13 @@ console.log("\n── 5. No bare cache may creep back in beside it ──");
   /* qaCache predates this phase and IS tenant-keyed — it stores by
      `tenantId ?? "platform"`. It is named here rather than pattern-matched, so
      a NEW Map cannot inherit its exemption by looking similar. */
-  const KNOWN_TENANT_KEYED = ["qaCache"];
+  /* taughtRowsCache joins it for the same reason and under the same terms: it
+     holds the owner's taught Q&A rows, it is keyed by `tenantId ?? "platform"`
+     exactly as qaCache is, and it exists so the three lanes that need those
+     rows — the written prompt block, the search tool a voice call reaches them
+     through, and the taught-question index — share ONE query instead of three.
+     The check below is what stops that being taken on trust. */
+  const KNOWN_TENANT_KEYED = ["qaCache", "taughtRowsCache"];
   const unknown = maps.filter((m) => !KNOWN_TENANT_KEYED.includes(m));
   check(
     `every cache in ai-knowledge is accounted for${unknown.length ? ` — unreviewed: ${unknown.join(", ")}` : ""}`,
@@ -166,6 +172,24 @@ console.log("\n── 5. No bare cache may creep back in beside it ──");
   check(
     "and the allowlisted one really is keyed by tenant (so the exemption is not vacuous)",
     /qaCache\.get\(key\)/.test(code) && /const key = tenantId \?\? "platform"/.test(code),
+  );
+  /* THE SAME PROOF FOR THE SECOND ONE. An allowlist entry with no assertion
+     behind it is a hole with a comment over it: the whole point of this
+     section is that a bare Map in this file cannot serve one tenant's
+     knowledge into another's prompt, and "we reviewed it" is not that proof.
+     Both the read and the write must go through a tenant-derived key. */
+  check(
+    "and so is the second — its read AND its write are keyed by tenant",
+    /taughtRowsCache\.get\(key\)/.test(code) &&
+      /taughtRowsCache\.set\(key, \{ at: Date\.now\(\), rows \}\)/.test(code) &&
+      (code.match(/const key = tenantId \?\? "platform"/g) ?? []).length >= 2,
+  );
+  /* AND THAT INVALIDATION CLEARS BOTH. They hold the same rows in two shapes;
+     dropping only the derived one rebuilds it from the stale source, which
+     looks exactly like the bug it was meant to fix. */
+  check(
+    "invalidating taught knowledge drops the rows as well as the block",
+    /qaCache\.delete\(key\)/.test(code) && /taughtRowsCache\.delete\(key\)/.test(code),
   );
 }
 
