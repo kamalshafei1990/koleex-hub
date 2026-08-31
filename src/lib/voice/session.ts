@@ -59,7 +59,46 @@ export type VoiceDeps = {
   createPeerConnection: () => RTCPeerConnection;
   getMicrophone: () => Promise<MediaStream>;
   fetchFn: typeof fetch;
+  /** Test seam. Production uses the constant below. */
+  iceTimeoutMs?: number;
 };
+
+/* ICE gathering normally finishes in well under a second on a local network
+   and can take a few seconds behind a restrictive one. It can also never
+   finish at all — a candidate that hangs leaves the state at "gathering"
+   indefinitely. Sending a partial offer beats waiting forever: the candidates
+   already collected are usually enough, and a call that never starts is worse
+   than one that starts with fewer paths to try. */
+const ICE_GATHER_TIMEOUT_MS = 3_000;
+
+/** Resolve when the connection has finished gathering candidates, or when the
+ *  budget runs out. Never rejects — a timeout here is a degraded offer, not a
+ *  failed call. */
+export function waitForIceGathering(pc: RTCPeerConnection, timeoutMs: number): Promise<void> {
+  if (pc.iceGatheringState === "complete") return Promise.resolve();
+  return new Promise<void>((resolve) => {
+    let done = false;
+    const finish = () => {
+      if (done) return;
+      done = true;
+      clearTimeout(timer);
+      pc.removeEventListener?.("icegatheringstatechange", onChange);
+      resolve();
+    };
+    const onChange = () => {
+      if (pc.iceGatheringState === "complete") finish();
+    };
+    const timer = setTimeout(finish, timeoutMs);
+    pc.addEventListener?.("icegatheringstatechange", onChange);
+  });
+}
+
+/** SDP requires CRLF line endings. An answer that arrived as a text body may
+ *  carry bare newlines, and setRemoteDescription rejects those. */
+export function normalizeSdp(sdp: string): string {
+  const out = String(sdp).trim().replace(/\r?\n/g, "\r\n");
+  return out.endsWith("\r\n") ? out : out + "\r\n";
+}
 
 /** Our own route. A constant, because the ONE thing a caller must never be
  *  able to influence is where the offer goes: that request carries the key on
@@ -150,11 +189,24 @@ export class VoiceSession {
       const offer = await pc.createOffer({ offerToReceiveAudio: true });
       await pc.setLocalDescription(offer);
 
+      /* WAIT FOR ICE GATHERING, and this is not optional. The SDP produced by
+         setLocalDescription does not yet carry the candidates — the addresses
+         the far side needs to reach this browser. Sending it early produces an
+         offer that negotiates and then connects to nothing.
+
+         The first version of this file did exactly that. The vendor's own
+         guidance is explicit: *"Wait for iceGatheringState === 'complete'
+         before using the SDP. At that point, the SDP contains all ICE
+         candidate information."* */
+      await waitForIceGathering(pc, this.deps.iceTimeoutMs ?? ICE_GATHER_TIMEOUT_MS);
+
       const res = await this.deps.fetchFn(HANDSHAKE_PATH, {
         method: "POST",
         headers: { "Content-Type": "application/sdp" },
-        /* The generated offer, and nothing added to it. */
-        body: offer.sdp ?? "",
+        /* Read back from the connection, not from the offer object: the
+           candidates were added to the local description, not to the value
+           createOffer returned. */
+        body: pc.localDescription?.sdp ?? offer.sdp ?? "",
         credentials: "include",
       });
 
@@ -172,7 +224,12 @@ export class VoiceSession {
         this.fail("handshake-failed");
         return;
       }
-      await pc.setRemoteDescription({ type: "answer", sdp: answer });
+      /* SDP REQUIRES CRLF, and an answer that has travelled through a proxy,
+         a log or a text body may arrive with bare newlines. setRemoteDescription
+         rejects those, and the failure looks like a bad answer rather than a
+         line-ending problem. Normalised here for the same reason the vendor's
+         own sample does it. */
+      await pc.setRemoteDescription({ type: "answer", sdp: normalizeSdp(answer) });
     } catch {
       this.fail("handshake-failed");
       return;
