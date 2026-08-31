@@ -394,8 +394,23 @@ console.log("\n── 6a. The full story is paid for only when it is asked for �
   const voiceFull = String(buildVoiceSessionPayload(null).full.session.instructions ?? "");
   check("the voice session carries the spoken identity form outright — nothing to classify at setup time",
     voiceFull.includes(AI_IDENTITY_BRIEF.trim()));
-  check("and stays small enough for a size-limited transport",
-    voiceFull.length < 4_000);
+  /* THE SIZE BOUND MOVED, and saying why matters more than the number.
+     4 KB was right when the session carried identity text and nothing else.
+     It now also carries brand exclusivity, supplier confidentiality and the
+     direct-knowledge voice — three rules the written lanes call absolute and
+     that voice was missing entirely — plus the company answer and nine tool
+     schemas.
+
+     The real ceiling is the DataChannel's negotiated message size (64 KB and
+     up in every browser that ships), and this is sent ONCE per call rather
+     than per turn. So the guarantee that matters is not that the full session
+     is small: it is that the COMPACT one is, because that is the fallback for
+     a transport that refuses the large one. Both are asserted. */
+  check("the full session stays well inside a DataChannel message",
+    voiceFull.length < 32_000);
+  const voiceCompact = String(buildVoiceSessionPayload(null).compact.session.instructions ?? "");
+  check("and the compact fallback is genuinely small",
+    voiceCompact.length < 3_000 && voiceCompact.length < voiceFull.length * 0.4);
 }
 
 console.log("\n── 7. No lane contradicts the canonical facts ──");

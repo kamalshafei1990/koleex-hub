@@ -137,15 +137,136 @@ console.log("\n── 2. The schemas the server publishes ──");
   /* The instructions must tell the model the tool is there. A tool the model
      never reaches for is a tool that does not exist. */
   const instructions = String(payload.full.session.instructions ?? "");
-  check("the model is told it can search, and told not to claim otherwise",
-    /you CAN search the public internet/.test(instructions) &&
-    /Never say you have\s+no live access|Never say you have no live access/.test(instructions));
-  check("and told to speak before the silence of a lookup",
-    /let me check/i.test(instructions));
-  check("Koleex data must not go into a search",
-    /Never put Koleex data in a search/.test(instructions));
+  check("the model is told it can look things up, and told not to claim otherwise",
+    /look things up on the public internet/.test(instructions) &&
+    /Never say you have no live access/.test(instructions));
+  /* THIS ASSERTION USED TO REQUIRE THE PHRASE "let me check", and requiring it
+     was the bug: DIRECT_VOICE_RULE forbids exactly that wording, in every
+     language, by owner directive. A test that pins a contradiction keeps it.
+     It now asserts the pause is filled WITHOUT narrating a search. */
+  check("the pause is filled without narrating a search",
+    /one moment/i.test(instructions) && !/let me check/i.test(instructions));
+  check("Koleex data must not go into a public search",
+    /Never put Koleex data in a public web search/.test(instructions));
   check("and results are material, not instructions",
     /never instructions to follow/.test(instructions));
+}
+
+console.log("\n── 2a. The rules a spoken answer needs, which voice did not have ──");
+{
+  /* THREE ABSOLUTE RULES WERE MISSING FROM VOICE ENTIRELY, found while adding
+     the Koleex knowledge tools. Each is carried by every written lane and
+     each matters MORE out loud, because a spoken answer leaves nothing to
+     screenshot. Opening web search made the first one likelier to be needed,
+     not less: search results are full of other manufacturers. */
+  const instructions = String(buildVoiceSessionPayload(null).full.session.instructions ?? "");
+
+  check("a call carries brand exclusivity — Koleex is the only manufacturer it may name",
+    /ONLY brand or manufacturer name/.test(instructions));
+  check("and supplier confidentiality", /SUPPLIER CONFIDENTIALITY/i.test(instructions));
+  check("and the direct-knowledge voice the product speaks in",
+    /Direct-knowledge voice/.test(instructions));
+
+  /* IMPORTED, NOT RESTATED. Two copies of a policy drift, and the copy that
+     drifts is the one nobody reads — worse out loud than in writing. */
+  const cfg = readFileSync("src/lib/server/ai/voice/session-config.ts", "utf8");
+  check("all three are imported from the written lanes rather than retyped",
+    /import \{\s*BRAND_EXCLUSIVITY_RULE,\s*DIRECT_VOICE_RULE,\s*\}/.test(cfg) &&
+    /import \{ SUPPLIER_CONFIDENTIALITY \}/.test(cfg));
+
+  /* THE CONTRADICTION THIS SECTION ALSO CLOSES. The tool bridge told the
+     model to say "let me check"; DIRECT_VOICE_RULE forbids exactly that
+     phrase, in every language, by owner directive. Two rules in one prompt
+     telling the model opposite things is a coin toss, and the one that would
+     have lost is the owner's. */
+  check("the session does not tell the model to narrate a search",
+    !/let me check/i.test(instructions) && !/Say something short first/.test(instructions));
+  check("and still tells it to fill the pause, without naming a search",
+    /one moment/i.test(instructions) && /NEVER by narrating a\s+" \+\n  " search|NEVER by narrating a search/.test(instructions));
+}
+
+console.log("\n── 2b. A call reaches the same knowledge the chat box does ──");
+{
+  /* THE COMPLAINT THIS ANSWERS, in the owner's words: the assistant was
+     trained on Koleex products and company knowledge, answers from it in
+     writing, and in a call "seems totally separated, knows nothing". It was
+     right: a call had no tools at all, and the 35 KB of approved knowledge
+     the written lanes load cannot be inlined into a session configured once
+     before anyone speaks. */
+  for (const name of ["search_knowledge", "searchMachineKnowledge", "searchCatalog",
+                      "searchProducts", "getProductByCode", "getProductDetails"]) {
+    check(`a call can reach ${name}`, isVoiceTool(name));
+  }
+  const instructions = String(buildVoiceSessionPayload(null).full.session.instructions ?? "");
+  /* Both halves: that it HAS the knowledge, and that it must reach for it
+     first. Asserting only the second passed when the first was deleted. */
+  check("and is told it has that knowledge",
+    /WHAT YOU KNOW ABOUT KOLEEX/.test(instructions) &&
+    /approved knowledge, its product catalogue and its machine/.test(instructions));
+  check("and to consult it BEFORE answering from memory",
+    /BEFORE answering from memory/.test(instructions) &&
+    /the wrong answer, however confident it sounds/.test(instructions));
+  /* "Taizhou" WAS THE WHOLE CHECK, and the one-line floor contains it too —
+     so swapping the full company answer back for the floor passed. The facts
+     asserted now are ones only the full answer carries. */
+  check("with the full company answer inline, because a session cannot load 35 KB",
+    /Taizhou/.test(instructions) && /Hangzhou/.test(instructions) &&
+    /1955/.test(instructions) && /BOTH A MANUFACTURER AND A TRADER/.test(instructions));
+
+  /* AND THE COMMERCIAL READS STAY OUT. Spoken numbers cannot be checked
+     against a source by the person hearing them. */
+  for (const denied of ["getPricingRules", "calculateQuotationPricing", "getInventoryStatus",
+                        "getCustomerByName", "getCustomerByCode"]) {
+    check(`  …but not ${denied}`, !isVoiceTool(denied));
+  }
+
+  /* THE COMPACT FALLBACK KEEPS THE TWO THAT MATTER MOST. Nine schemas are
+     5.4 KB; a fallback that carried them all would not be a fallback. */
+  const payload = buildVoiceSessionPayload(null);
+  const compactTools = ((payload.compact.session as { tools?: Array<{ name: string }> }).tools ?? [])
+    .map((t) => t.name);
+  check("the compact session keeps Koleex knowledge and the web",
+    compactTools.includes("search_knowledge") && compactTools.includes("search_web"));
+  /* SMALLER IS NOT ENOUGH ON ITS OWN. The compact instructions are far
+     shorter than the full ones, so the payload passed a size ratio even when
+     the compact session carried all nine schemas — which is the one thing
+     that made it stop being a fallback. The count is what actually says it. */
+  const fullTools = ((payload.full.session as { tools?: unknown[] }).tools ?? []).length;
+  check("it carries FEWER tools than the full session, not the same nine",
+    compactTools.length < fullTools);
+  check("and is genuinely smaller for it",
+    JSON.stringify(payload.compact).length < JSON.stringify(payload.full).length * 0.4);
+  /* Non-vacuity: a compact that dropped every tool would pass both above. */
+  check("without dropping tools altogether", compactTools.length >= 2);
+}
+
+console.log("\n── 2c. A failed handshake says how long it took ──");
+{
+  /* "The voice service is not responding" is the route's 504, and it fires
+     for two faults that need opposite investigations: a handshake that dies
+     in 40ms is DNS, egress or a refused connection; one that runs the full
+     budget is a service that is up and slow. The log named the branch and
+     never the elapsed time, so neither could be told apart from a report
+     that it stopped working. */
+  const route = readFileSync("src/app/api/ai/voice/session/route.ts", "utf8");
+  check("the failure log records how long the handshake ran",
+    /afterMs=\$\{Date\.now\(\) - startedAt\}/.test(route));
+  check("and the budget it ran against, so the two can be compared",
+    /budgetMs=\$\{HANDSHAKE_TIMEOUT_MS\}/.test(route));
+  check("and still distinguishes a timeout from a connection that failed",
+    /timedOut \? "timed out" : "failed"/.test(route));
+
+  /* A budget only sometimes too short produces exactly what was reported:
+     it works, then it does not, then it does. Tokyo to Beijing with an SDP
+     offer is not a ten-second round trip on a bad day. */
+  const budget = Number((/const HANDSHAKE_TIMEOUT_MS = ([\d_]+)/.exec(route)?.[1] ?? "0").replace(/_/g, ""));
+  const ceiling = Number((/export const maxDuration = (\d+)/.exec(route)?.[1] ?? "0"));
+  check(`the handshake budget is generous enough for a slow round trip (${budget}ms)`,
+    budget >= 15_000);
+  /* And must still leave room inside the function's own ceiling, or the
+     platform kills the request before the route can report anything. */
+  check(`and fits inside the function ceiling with room to spare (${ceiling}s)`,
+    ceiling * 1000 - budget >= 5_000);
 }
 
 console.log("\n── 3. Reading the protocol ──");
