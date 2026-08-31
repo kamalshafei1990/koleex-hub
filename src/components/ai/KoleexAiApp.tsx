@@ -31,6 +31,7 @@ import ArrowLeftIcon from "@/components/icons/ui/ArrowLeftIcon";
 import PlusIcon from "@/components/icons/ui/PlusIcon";
 import PaperPlaneIcon from "@/components/icons/ui/PaperPlaneIcon";
 import MicButton, { speakText, type TtsHandle } from "@/components/ai/MicButton";
+import VoiceCallButton from "@/components/ai/VoiceCallButton";
 import TrashIcon from "@/components/icons/ui/TrashIcon";
 import PencilIcon from "@/components/icons/ui/PencilIcon";
 import MenuBurgerIcon from "@/components/icons/ui/MenuBurgerIcon";
@@ -2389,6 +2390,17 @@ export default function KoleexAiApp() {
                       onStopSpeaking={stopTts}
                       disabled={sending}
                       lang={lang}
+                    />
+
+                    {/* Live call — beside the mic, not instead of it. The mic
+                        transcribes and sends text; this opens a continuous
+                        audio connection. Two tools, both kept. */}
+                    <VoiceCallButton
+                      size={36}
+                      lang={lang}
+                      disabled={sending}
+                      onError={(msg) => setError(msg)}
+                      onLiveChange={(live) => { if (live) stopTts(); }}
                     />
 
                     {/* Send / Stop — inverted bg circle, anchors the row. */}
