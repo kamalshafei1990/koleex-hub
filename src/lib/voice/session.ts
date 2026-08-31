@@ -75,6 +75,50 @@ const ICE_GATHER_TIMEOUT_MS = 3_000;
    customizable. Named for what travels on it rather than after any vendor. */
 const DATA_CHANNEL_LABEL = "koleex-events";
 
+/* ---------------------------------------------------------------------------
+   THE SESSION CONFIGURATION, AND WHY IT CARRIES NO POLICY.
+
+   A connected call is a SILENT call until the session is configured: the
+   vendor announces `session.created` on the channel and waits for a
+   `session.update` naming the audio formats and how turns are detected. We
+   sent nothing, so the line came up, the button went red, and neither side
+   ever spoke. That is the whole of the bug this constant fixes.
+
+   WHAT IS DELIBERATELY ABSENT. The same event can carry `instructions` — the
+   system prompt — and, later, tool definitions. Both are POLICY, and the
+   standing rule is that *"the client application must never determine this
+   permission; the server determines it"*. A browser that composes its own
+   instructions is a browser that can rewrite them, which is the same opening
+   as letting external content override system policy.
+
+   So this object is transport only: what the audio is encoded as, and when a
+   turn ends. Those genuinely belong to the client — the formats follow from
+   what the browser can capture and play. When instructions and tools arrive,
+   they come from the server through the handshake and this client relays them
+   without composing them, which is why the shape below is a value rather than
+   a string built inline.
+   --------------------------------------------------------------------------- */
+const TRANSPORT_SESSION_CONFIG = {
+  modalities: ["text", "audio"],
+  input_audio_format: "pcm",
+  output_audio_format: "pcm",
+  /* Server-side detection is the only mode this transport offers — there is no
+     push-to-talk here. `threshold` is the vendor's documented default; a noisy
+     room (a factory floor) wants it higher, which is a tuning question to
+     answer with a real room rather than a number invented at a desk. */
+  turn_detection: {
+    type: "server_vad",
+    threshold: 0.5,
+    silence_duration_ms: 800,
+  },
+} as const;
+
+/** The event that carries it. Exported so the suite asserts the exact bytes
+ *  that go on the wire rather than a paraphrase of them. */
+export function sessionUpdateEvent(): string {
+  return JSON.stringify({ type: "session.update", session: TRANSPORT_SESSION_CONFIG });
+}
+
 /** Resolve when the connection has finished gathering candidates, or when the
  *  budget runs out. Never rejects — a timeout here is a degraded offer, not a
  *  failed call. */
@@ -115,6 +159,10 @@ export class VoiceSession {
   /** The channel we opened. Step 3 sends session.update and tool results
    *  through it; nothing writes to it yet. */
   private channel: RTCDataChannel | null = null;
+  /* The configuration is sent exactly once. Two triggers race to send it — the
+     channel opening and `session.created` arriving — because the order of
+     those two is the vendor's business and not something to depend on. */
+  private configSent = false;
   private state: VoiceState = "idle";
 
   constructor(
@@ -147,6 +195,32 @@ export class VoiceSession {
     this.pc = null;
     this.channel = null;
     if (this.state !== "failed") this.setState("ended");
+  }
+
+  /** Send the session configuration, at most once, and only on an open
+   *  channel. A send on a connecting channel throws and would take the call
+   *  down over a race that resolves itself a moment later. */
+  private sendSessionConfig(channel: RTCDataChannel): void {
+    if (this.configSent || channel.readyState !== "open") return;
+    this.configSent = true;
+    try {
+      channel.send(sessionUpdateEvent());
+    } catch {
+      /* A failed send leaves a connected but unconfigured call, which is the
+         silent line this exists to prevent. Reported as a failed handshake
+         because that is what the user experiences. */
+      this.configSent = false;
+      this.fail("handshake-failed");
+    }
+  }
+
+  /** The vendor announces the session before it will accept configuration.
+   *  Wired alongside the open handler rather than instead of it. */
+  private onChannelMessage(raw: string, channel: RTCDataChannel): void {
+    if (!this.configSent && raw.includes("session.created")) {
+      this.sendSessionConfig(channel);
+    }
+    this.events.onMessage?.(raw);
   }
 
   private fail(reason: VoiceFailure): void {
@@ -198,17 +272,24 @@ export class VoiceSession {
          would have connected to a silent line. */
       const local = pc.createDataChannel?.(DATA_CHANNEL_LABEL);
       if (local) {
+        /* A CONNECTED CALL IS A SILENT CALL UNTIL THIS IS SENT. */
+        local.onopen = () => this.sendSessionConfig(local);
         local.onmessage = (m: MessageEvent) => {
-          if (typeof m.data === "string") this.events.onMessage?.(m.data);
+          if (typeof m.data === "string") this.onChannelMessage(m.data, local);
         };
+        /* Already open is possible in a test double and cheap to cover. */
+        this.sendSessionConfig(local);
         this.channel = local;
       }
       /* The server may also open its own. Both are wired to the same handler
          rather than assuming which one carries the events. */
       pc.ondatachannel = (ev: RTCDataChannelEvent) => {
-        ev.channel.onmessage = (m: MessageEvent) => {
-          if (typeof m.data === "string") this.events.onMessage?.(m.data);
+        const remote = ev.channel;
+        remote.onopen = () => this.sendSessionConfig(remote);
+        remote.onmessage = (m: MessageEvent) => {
+          if (typeof m.data === "string") this.onChannelMessage(m.data, remote);
         };
+        this.sendSessionConfig(remote);
       };
 
       const offer = await pc.createOffer({ offerToReceiveAudio: true });
