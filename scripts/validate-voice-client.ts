@@ -46,8 +46,41 @@ function fakeMic() {
   };
 }
 
-function fakePc(opts: { iceState?: string; gatherLater?: boolean } = {}) {
-  const calls = { closed: 0, added: 0, remoteSdp: "", channels: [] as string[] };
+/* A DataChannel double with the two things the real one has that matter here:
+   a readyState that gates sending, and a send() that records. The previous
+   double had neither, so a client that sent nothing at all passed. */
+type FakeChannel = {
+  label?: string;
+  readyState: string;
+  onopen: (() => void) | null;
+  onmessage: ((m: { data: unknown }) => void) | null;
+  send: (data: string) => void;
+  /** Test helper: transition to open and fire the handler, as a browser does. */
+  open: () => void;
+};
+
+function makeChannel(sink: { sent: string[] }, startOpen: boolean, sendThrows: boolean): FakeChannel {
+  const ch: FakeChannel = {
+    readyState: startOpen ? "open" : "connecting",
+    onopen: null,
+    onmessage: null,
+    send: (data: string) => {
+      if (sendThrows) throw new Error("channel closed");
+      sink.sent.push(data);
+    },
+    open: () => { ch.readyState = "open"; ch.onopen?.(); },
+  };
+  return ch;
+}
+
+function fakePc(opts: { iceState?: string; gatherLater?: boolean; channelOpen?: boolean; sendThrows?: boolean } = {}) {
+  const calls = {
+    closed: 0, added: 0, remoteSdp: "", channels: [] as string[],
+    /* Everything the client puts on the wire, in order. A connected call that
+       sends nothing is the exact bug this records. */
+    sent: [] as string[],
+    channel: null as FakeChannel | null,
+  };
   const listeners: Record<string, Array<() => void>> = {};
   const pc = {
     /* The candidates land on the LOCAL DESCRIPTION, not on the object
@@ -60,7 +93,9 @@ function fakePc(opts: { iceState?: string; gatherLater?: boolean } = {}) {
     addTrack: () => { calls.added++; },
     createDataChannel: (label: string) => {
       calls.channels.push(label);
-      return { onmessage: null } as unknown as RTCDataChannel;
+      const ch = makeChannel(calls, opts.channelOpen ?? false, opts.sendThrows ?? false);
+      calls.channel = ch;
+      return ch as unknown as RTCDataChannel;
     },
     createOffer: async () => ({ type: "offer", sdp: "v=0\r\nBARE-OFFER\r\n" }),
     setLocalDescription: async () => {
@@ -89,9 +124,11 @@ function deps(opts: {
   recorded?: Recorded[];
   iceState?: string;
   gatherLater?: boolean;
-}): { deps: VoiceDeps; mic: ReturnType<typeof fakeMic>; pcCalls: { closed: number; added: number; remoteSdp: string; channels: string[] } } {
+  channelOpen?: boolean;
+  sendThrows?: boolean;
+}): { deps: VoiceDeps; mic: ReturnType<typeof fakeMic>; pcCalls: { closed: number; added: number; remoteSdp: string; channels: string[]; sent: string[]; channel: FakeChannel | null } } {
   const mic = fakeMic();
-  const { pc, calls } = fakePc({ iceState: opts.iceState, gatherLater: opts.gatherLater });
+  const { pc, calls } = fakePc({ iceState: opts.iceState, gatherLater: opts.gatherLater, channelOpen: opts.channelOpen, sendThrows: opts.sendThrows });
   return {
     mic,
     pcCalls: calls,
@@ -278,7 +315,108 @@ async function main() {
       code.indexOf("getTracks().forEach((t) => t.stop())") < code.indexOf("this.pc?.close()"));
   }
 
-  console.log("\n── 7. The call button's cleanup contract (source read, not a browser) ──");
+  console.log("\n── 7. A connected call must be CONFIGURED, or it is a silent line ──");
+  {
+    /* THE BUG THIS SECTION EXISTS FOR. The handshake succeeded, the button
+       went red, and neither side ever spoke. Everything about the media path
+       was right; we simply never told the far side what session to run. The
+       previous channel double had no send() at all, so "sends nothing" was
+       indistinguishable from "sends the right thing". */
+    const r = deps({ status: 200, body: "v=0\r\nANSWER\r\n" });
+    const s1 = new VoiceSession(r.deps);
+    await s1.start();
+
+    check("nothing is sent while the channel is still connecting",
+      r.pcCalls.sent.length === 0);
+
+    r.pcCalls.channel!.open();
+    check("the configuration is sent as soon as the channel opens",
+      r.pcCalls.sent.length === 1);
+
+    /* PARSE ONLY WHAT EXISTS. Reading sent[0] unconditionally turned "sent
+       nothing" — the very bug this section is about — into a JSON SyntaxError
+       and a Node stack trace instead of a named failure. It failed CI either
+       way; only one of the two says which guarantee broke. */
+    const raw = r.pcCalls.sent[0];
+    let evt: { type?: string; session?: Record<string, unknown> } = {};
+    if (typeof raw === "string") {
+      try {
+        evt = JSON.parse(raw) as typeof evt;
+      } catch {
+        check("the configuration is valid JSON", false);
+      }
+    }
+    const session = evt.session ?? {};
+    check("it is a session.update", evt.type === "session.update");
+    check("it asks for audio, not text alone — a text-only session is silent too",
+      JSON.stringify(session.modalities) === JSON.stringify(["text", "audio"]));
+    check("it names both audio formats",
+      session.input_audio_format === "pcm" && session.output_audio_format === "pcm");
+
+    /* Without turn detection the far side never decides the user has stopped
+       talking, and never answers — the same silent line by another route. */
+    const td = session.turn_detection as Record<string, unknown> | undefined;
+    check("it configures server-side turn detection", td?.type === "server_vad");
+    check("turn detection carries a threshold and a silence window",
+      typeof td?.threshold === "number" && typeof td?.silence_duration_ms === "number");
+
+    /* NO POLICY MAY BE COMPOSED IN THE BROWSER. instructions is the system
+       prompt and tools are what the model may do; a client that writes either
+       is a client that can rewrite them. Both come from the server when they
+       come at all. */
+    check("no instructions — the system prompt is not the browser's to write",
+      !("instructions" in session) && Object.keys(session).length > 0);
+    check("no tool definitions — what the model may do is not the browser's to decide",
+      !("tools" in session) && !("tool_choice" in session) && Object.keys(session).length > 0);
+    check("no vendor, model, key or endpoint travels in the configuration",
+      typeof raw === "string" && !/qwen|dashscope|aliyun|maas|api[_-]?key|Bearer|ws-pl/i.test(raw));
+
+    /* Opening again must not resend: a second session.update would reset the
+       session mid-call. */
+    r.pcCalls.channel!.open();
+    check("the configuration is sent once, not on every open", r.pcCalls.sent.length === 1);
+  }
+
+  console.log("\n── 8. The two orderings of that handshake, and a failed send ──");
+  {
+    /* The vendor announces `session.created` first. Whether that arrives
+       before or after the channel reports open is its business, so both
+       trigger the send and a guard keeps it to one. */
+    const r = deps({ status: 200, body: "v=0\r\nANSWER\r\n" });
+    const seen: string[] = [];
+    const s2 = new VoiceSession(r.deps, { onMessage: (d) => seen.push(d) });
+    await s2.start();
+
+    const ch = r.pcCalls.channel!;
+    ch.readyState = "open";
+    ch.onmessage?.({ data: JSON.stringify({ type: "session.created" }) });
+    check("session.created triggers the configuration even if onopen never fired",
+      r.pcCalls.sent.length === 1);
+    check("and the announcement still reaches the caller untouched",
+      seen.length === 1 && seen[0].includes("session.created"));
+
+    ch.open();
+    check("a later open does not send it a second time", r.pcCalls.sent.length === 1);
+
+    /* An ordinary message must not be mistaken for the announcement. */
+    ch.onmessage?.({ data: JSON.stringify({ type: "response.audio.delta" }) });
+    check("an unrelated event sends nothing", r.pcCalls.sent.length === 1);
+    check("but is still passed through", seen.length === 2);
+  }
+
+  {
+    /* A send that throws leaves a connected, unconfigured, silent call. That
+       is the failure this whole section is about, so it must surface. */
+    const r = deps({ status: 200, body: "v=0\r\nANSWER\r\n", channelOpen: true, sendThrows: true });
+    const states: string[] = [];
+    const s3 = new VoiceSession(r.deps, { onState: (st) => states.push(st) });
+    await s3.start();
+    check("a failed configuration send is reported, not left as a silent call",
+      states.includes("failed"));
+    check("and the microphone is released when it fails", r.mic.allStopped());
+  }
+
+  console.log("\n── 9. The call button's cleanup contract (source read, not a browser) ──");
   {
     /* SAID PLAINLY: these are source assertions. The render harness cannot run
        effects, so the guarantees below — the ones that decide whether a
@@ -348,4 +486,11 @@ async function main() {
   console.log("NOT proved here: a real WebRTC negotiation. Node has no WebRTC — see the header.");
 }
 
-main();
+main().catch((e) => {
+  /* An unexpected rejection must NAME the break. A mutation that removed the
+     configuration send crashed this suite with a Node stack trace, which fails
+     CI without telling anyone what regressed. */
+  console.log(`  \u2717 the suite threw instead of asserting: ${e instanceof Error ? e.message : String(e)}`);
+  console.log("\nFAILED:\n  \u00b7 an async section rejected — see above");
+  process.exit(1);
+});
