@@ -43,6 +43,7 @@ import {
   DIRECT_VOICE_RULE,
 } from "@/lib/server/ai-agent/brand-knowledge";
 import { SUPPLIER_CONFIDENTIALITY } from "@/lib/server/ai/prompt-builder";
+import { EGYPTIAN_VOICE_RULE, EGYPTIAN_VOICE_BRIEF } from "./dialect";
 import { type VoiceOption } from "./config";
 import { voiceToolSchemas } from "./tools";
 
@@ -116,6 +117,16 @@ const VOICE_INSTRUCTIONS =
      near enough to answer "what does Koleex do" — which is part of why a call
      felt like a different assistant from the one in the chat box. */
   KOLEEX_COMPANY_ANSWER +
+  /* THE DIALECT RULE, and it had to be added because there was none.
+     Nothing in this session said a word about Egyptian, so every Arabic
+     sentence a call produced was the model's default — MSA-leaning, borrowing
+     from whichever dialect the phrasing suggested. The owner heard exactly
+     that and described it as "mixed with Arabic and Khaleji".
+
+     BEFORE THE STYLE RULES, deliberately: which language you are speaking is
+     a bigger decision than how long your sentences are, and the spelling rule
+     inside it changes what the voice literally pronounces. */
+  `\n\n${EGYPTIAN_VOICE_RULE}\n\n` +
   " SPOKEN STYLE: keep answers short and natural — this is a conversation, not a document." +
   " No markdown, no lists, no headings: everything you say is heard, not read." +
   " SPOKEN LENGTH OVERRIDES THE WRITTEN SHAPE: when the identity question comes up, give the same facts —" +
@@ -167,6 +178,12 @@ const COMPACT_INSTRUCTIONS =
      asked and drops the one they did. The guard above still covers the
      internals; the brief supplies the answer. */
   AI_IDENTITY_BRIEF +
+  /* ONE SENTENCE OF IT SURVIVES THE CUT. Almost nothing may be added to the
+     fallback — it exists because the full payload did not fit — but a call
+     that falls back and then speaks MSA is the complaint this answers, and
+     the brief carries the two things that decide the outcome: Egyptian by
+     default, and spelled the way it should be pronounced. */
+  EGYPTIAN_VOICE_BRIEF +
   " Speak in short natural sentences. No markdown: everything you say is heard, not read.";
 
 export type SessionUpdate = {

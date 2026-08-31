@@ -382,6 +382,115 @@ console.log("\n── 2d. What the owner teaches, a call learns too ──");
   }
 }
 
+console.log("\n── 2e. The Arabic a call speaks is Egyptian, and only Egyptian ──");
+{
+  /* THE OWNER'S REPORT: the Arabic in a call was "mixed with Arabic and
+     Khaleji" — Egyptian underneath, drifting into MSA and Gulf. The cause was
+     not subtle: the session carried NO dialect instruction at all, so every
+     Arabic sentence was the model's default. */
+  const instr = String(buildVoiceSessionPayload(null, []).full.session.instructions ?? "");
+
+  /* ── Grammar, not a word list ──────────────────────────────────────────
+     The written rule this could have imported offers vocabulary, and a model
+     given only vocabulary writes MSA sentences with Egyptian words dropped in
+     — which IS the "mixed" being reported. These five are the structures that
+     make a sentence Egyptian rather than decorated. */
+  for (const [feature, egyptian, msa] of [
+    ["negation", "مش", "ليس"],
+    ["future", "هبعتلك", "سوف"],
+    ["ongoing action", "بيشتغل", ""],
+    ["relative pronoun", "اللي", "الذي"],
+    ["demonstrative after the noun", "الماكينة دي", "هذه"],
+  ] as const) {
+    check(`the rule fixes ${feature}, not just word choice`,
+      instr.includes(egyptian) && (msa === "" || instr.includes(msa)));
+  }
+  /* NON-VACUITY FOR THE PAIRS ABOVE: an MSA form must appear as something to
+     move AWAY from, never as an instruction. If "never" stopped being said
+     next to them, the rule would read as permission for both. */
+  check("and the MSA forms are named as what NOT to say",
+    /never لا\/ليس\/لا يوجد/.test(instr) &&
+    /never الذي\/التي\/الذين/.test(instr) &&
+    /never ماذا\/أين\/متى\/كيف\/لماذا\/مَن/.test(instr));
+
+  /* ── The Gulf words he actually heard ─────────────────────────────────*/
+  const GULF = ["شنو", "وش", "وين", "الحين", "أبغى", "شلون", "ليش", "زين", "مو", "ماكو"];
+  for (const w of GULF) check(`  the Gulf word ${w} is named`, instr.includes(w));
+  /* AND NAMED AS FORBIDDEN, which is the whole point. Listing them without
+     that turns a blocklist into a glossary — so every one of them must fall
+     inside the sentence that forbids them, and none may appear loose
+     elsewhere in the instructions. */
+  const gulfSentence = (instr.match(/NEVER use Gulf\/Levantine words[^.]*\./) ?? [""])[0];
+  /* WHOLE WORDS, and the first version of this check was wrong in a way worth
+     keeping a note about. It counted SUBSTRINGS, so "مو" matched inside
+     "موديل" in an unrelated sentence and the assertion failed on correct
+     instructions. JavaScript's \b is ASCII-only and matches nothing useful
+     next to an Arabic letter — a trap this codebase has been caught by
+     before — so the boundary has to be spelled out as "not a letter" with
+     Unicode lookarounds. */
+  const wholeWord = (hay: string, w: string) =>
+    (hay.match(new RegExp(`(?<!\\p{L})${w}(?!\\p{L})`, "gu")) ?? []).length;
+  check("every Gulf word appears inside the sentence that forbids them, nowhere else",
+    gulfSentence.length > 0 &&
+    GULF.every((w) => wholeWord(gulfSentence, w) === 1) &&
+    GULF.every((w) => wholeWord(instr, w) === wholeWord(gulfSentence, w)));
+
+  /* ── The lever that exists only because this is spoken ────────────────
+     A voice pronounces what it is given: "ثلاثة" is read *thalatha* and
+     "تلاتة" is read *talata*. The model's spelling IS the accent, and this
+     has no equivalent in the chat box, where both look equally fine. */
+  check("the rule says the spelling is what gets pronounced",
+    /YOUR SPELLING IS YOUR ACCENT/.test(instr) &&
+    instr.includes("تلاتة") && instr.includes("اتنين"));
+  check("and forbids the case endings that make a voice sound like a broadcast",
+    /إعراب/.test(instr) && /NO tashkeel/.test(instr));
+  check("and gives numbers an Egyptian spoken form",
+    /تلاتة وعشرين/.test(instr));
+
+  /* ── Mirroring is preserved; blending is what is banned ───────────────
+     The product already mirrors a caller's dialect and that is not changed
+     here. A rule that simply forced Egyptian on a Gulf customer would be a
+     different, worse product. */
+  check("a caller in another dialect is still mirrored, not overridden",
+    /mirror THEM instead/.test(instr));
+  check("but the two are never blended, which is the actual defect",
+    /NEVER blend two/.test(instr));
+
+  /* ── It must not fight the rules it sits beside ───────────────────────*/
+  check("model codes and units stay Latin, only the Arabic around them changes",
+    /Koleex, XF-A10, mm, rpm/.test(instr));
+  /* DIRECT_VOICE_RULE is an owner directive: never narrate a search. A new
+     register rule is exactly where that quietly gets undone. */
+  check("and Egyptian is a register, not a licence to narrate a search",
+    /not a licence to narrate/.test(instr) && /holds in every dialect/.test(instr));
+
+  /* ── The written rule was NOT imported, and why that matters ──────────
+     EGYPTIAN_DIALECT_RULE is written for a page: "keep the same clean
+     structure (headings, numbered stages, bullets, tables)". Carried into a
+     call it would be advice about tables on a telephone. */
+  check("the page-shaped written rule did not come along with it",
+    !/numbered stages, bullets, tables/.test(instr));
+
+  /* ── The fallback session ─────────────────────────────────────────────
+     A call that falls back to compact and then speaks MSA is the complaint
+     this answers, so one sentence survives the cut. */
+  const compact = String(buildVoiceSessionPayload(null, []).compact.session.instructions ?? "");
+  check("the compact fallback still defaults to Egyptian",
+    /عامية مصرية/.test(compact) && compact.includes("مش") && compact.includes("اللي"));
+  check("  …including the spelling rule, since that is what is pronounced",
+    compact.includes("تلاتة") && /read\s+aloud as written/.test(compact));
+  /* AND IT IS STILL A FALLBACK. The reason it exists is size; a brief that
+     grew to the length of the full rule would defeat it. */
+  check("but the fallback stays a fallback, not a second full rule",
+    Buffer.byteLength(compact) < Buffer.byteLength(instr) * 0.25);
+
+  /* ── The whole payload still fits the channel it travels on ───────────
+     Every one of these bytes rides in the single session.update message. */
+  const fullBytes = Buffer.byteLength(JSON.stringify(buildVoiceSessionPayload(null, []).full));
+  check("the full session still fits comfortably inside a DataChannel message",
+    fullBytes < 60_000);
+}
+
 console.log("\n── 2c. A failed handshake says how long it took ──");
 {
   /* "The voice service is not responding" is the route's 504, and it fires
