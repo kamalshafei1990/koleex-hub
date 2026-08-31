@@ -71,6 +71,10 @@ export type VoiceDeps = {
    than one that starts with fewer paths to try. */
 const ICE_GATHER_TIMEOUT_MS = 3_000;
 
+/* The label is ours to choose — the vendor's sample notes the name is
+   customizable. Named for what travels on it rather than after any vendor. */
+const DATA_CHANNEL_LABEL = "koleex-events";
+
 /** Resolve when the connection has finished gathering candidates, or when the
  *  budget runs out. Never rejects — a timeout here is a degraded offer, not a
  *  failed call. */
@@ -108,6 +112,9 @@ export const HANDSHAKE_PATH = "/api/ai/voice/session";
 export class VoiceSession {
   private pc: RTCPeerConnection | null = null;
   private mic: MediaStream | null = null;
+  /** The channel we opened. Step 3 sends session.update and tool results
+   *  through it; nothing writes to it yet. */
+  private channel: RTCDataChannel | null = null;
   private state: VoiceState = "idle";
 
   constructor(
@@ -138,6 +145,7 @@ export class VoiceSession {
       /* already closed — teardown must not throw over a cleanup detail */
     }
     this.pc = null;
+    this.channel = null;
     if (this.state !== "failed") this.setState("ended");
   }
 
@@ -148,6 +156,7 @@ export class VoiceSession {
       this.pc?.close();
     } catch { /* see stop() */ }
     this.pc = null;
+    this.channel = null;
     this.setState("failed", reason);
   }
 
@@ -180,6 +189,22 @@ export class VoiceSession {
         const stream = ev.streams?.[0];
         if (stream) this.events.onRemoteStream?.(stream);
       };
+      /* THE CLIENT CREATES THE CHANNEL. This is not a convenience — the
+         vendor's own sample calls it out: *"Create a DataChannel to trigger
+         SDP negotiation"*. Without one the offer carries no data m-line, the
+         negotiation completes for audio alone, and every event the model sends
+         — transcripts, and every tool call — has nowhere to arrive. The first
+         version of this file only listened for a server-initiated channel and
+         would have connected to a silent line. */
+      const local = pc.createDataChannel?.(DATA_CHANNEL_LABEL);
+      if (local) {
+        local.onmessage = (m: MessageEvent) => {
+          if (typeof m.data === "string") this.events.onMessage?.(m.data);
+        };
+        this.channel = local;
+      }
+      /* The server may also open its own. Both are wired to the same handler
+         rather than assuming which one carries the events. */
       pc.ondatachannel = (ev: RTCDataChannelEvent) => {
         ev.channel.onmessage = (m: MessageEvent) => {
           if (typeof m.data === "string") this.events.onMessage?.(m.data);
@@ -243,7 +268,10 @@ export class VoiceSession {
  *  mention a browser global, which is what lets the suite drive it in Node. */
 export function browserVoiceDeps(): VoiceDeps {
   return {
-    createPeerConnection: () => new RTCPeerConnection(),
+    createPeerConnection: () =>
+      /* Empty on purpose, and the vendor says why: "No ICE servers need to be
+         configured (the server handles NAT traversal)." */
+      new RTCPeerConnection({ iceServers: [] }),
     getMicrophone: () =>
       navigator.mediaDevices.getUserMedia({
         /* Audio only. A voice call has no reason to ask for a camera, and
