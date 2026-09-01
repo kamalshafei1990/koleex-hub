@@ -189,9 +189,15 @@ export function modeFor(intent: TaskIntent): TaskMode {
   return intent === "business" ? "business" : "chat";
 }
 
-/** Build the correct prompt for a mode. Exposed so the voice pipeline
- *  and other callers can reuse it without importing prompt-builder
- *  directly. */
+/** Build the correct prompt for a mode.
+ *
+ *  THE COMMENT HERE USED TO SAY "exposed so the voice pipeline and other
+ *  callers can reuse it". The voice pipeline does not: a voice session is
+ *  configured once, before anyone speaks, and composes its own instructions
+ *  in ai/voice/session-config.ts. Nothing outside this module calls this at
+ *  all. Left exported because it is the honest pairing of modeFor above and
+ *  costs nothing — but described accurately, because a comment claiming a
+ *  caller that does not exist is how someone later "fixes" the wrong file. */
 export function buildPromptFor(
   mode: TaskMode,
   userMessage: string,

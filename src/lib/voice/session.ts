@@ -35,6 +35,25 @@ import {
   ToolCallNames,
   type VoiceToolCall,
 } from "./tool-calls";
+import { EV_SESSION_CREATED } from "./events";
+
+/** True when a DataChannel message is exactly this event.
+ *
+ *  Malformed JSON is not an event: the far side sends well-formed messages,
+ *  and guessing at a broken one is how a substring match got here in the
+ *  first place. */
+function isEventType(raw: string, type: string): boolean {
+  try {
+    const payload: unknown = JSON.parse(raw);
+    return (
+      !!payload &&
+      typeof payload === "object" &&
+      (payload as { type?: unknown }).type === type
+    );
+  } catch {
+    return false;
+  }
+}
 
 export type VoiceState =
   | "idle"
@@ -368,7 +387,15 @@ export class VoiceSession {
   /** The vendor announces the session before it will accept configuration.
    *  Wired alongside the open handler rather than instead of it. */
   private onChannelMessage(raw: string, channel: RTCDataChannel): void {
-    if (!this.configSent && raw.includes("session.created")) {
+    /* THE EVENT'S `type`, NOT A SUBSTRING OF THE WHOLE MESSAGE. This read
+       `raw.includes("session.created")`, which is true of any message that
+       happens to contain those characters anywhere — an error body naming
+       the event, a transcript of someone reading it aloud. Everything else
+       in this file parses the JSON and switches on `type`; this one line
+       did not, and it was also why the shared EV_SESSION_CREATED constant
+       existed while nothing used it. Two copies of an event name is how one
+       of them gets updated alone. */
+    if (!this.configSent && isEventType(raw, EV_SESSION_CREATED)) {
       this.sendSessionConfig(channel);
     }
     this.events.onMessage?.(raw);

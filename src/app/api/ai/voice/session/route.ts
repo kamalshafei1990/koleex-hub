@@ -51,6 +51,37 @@ import {
 import { taughtQuestionIndex } from "@/lib/server/ai-knowledge";
 import { describeFetchFailure } from "@/lib/server/ai/voice/fetch-cause";
 
+/* ---------------------------------------------------------------------------
+   THIS FUNCTION RUNS IN A DIFFERENT REGION FROM THE REST OF THE APP, and the
+   reason is in vercel.json rather than here — so it is written down here too,
+   because a lone region override is otherwise indistinguishable from a
+   mistake.
+
+   Production said, on both attempts and repeatedly:
+
+     cause=TypeError/UND_ERR_CONNECT_TIMEOUT  afterMs=10389  budgetMs=13000
+
+   UND_ERR_CONNECT_TIMEOUT is the TCP connection never opening. Not DNS —
+   that is ENOTFOUND. Not a refusal — that is ECONNREFUSED. Not TLS, not a
+   reset. The packets left and nothing came back, in ~10.4s, every time,
+   from Tokyo to the vendor's Beijing endpoint.
+
+   Nothing this route can do fixes an unroutable path, so the route moved
+   instead: Hong Kong, which peers into mainland China in a way Tokyo does
+   not. ONLY THIS FUNCTION MOVES. Everything else stays in hnd1.
+
+   AND IT DOES NOT WEAKEN THE CHINA REQUIREMENT — this is the part worth
+   being explicit about, because it looks at first glance as though it
+   might. The AUDIO never touches this server: it is browser ↔ vendor
+   directly, and for a caller inside mainland China that path is
+   China-to-China and unchanged. The only leg that moves is the SDP exchange
+   our server brokers on their behalf, which was the one leg that was
+   broken.
+
+   THE COST, stated: this function's own auth and knowledge reads now cross
+   Hong Kong → wherever the database lives, instead of Tokyo → there. That is
+   tens of milliseconds in front of a call that otherwise spends ten seconds
+   failing. */
 export const dynamic = "force-dynamic";
 /* The handshake is one round trip to the vendor. It is not the call. */
 /* Forty-five, because the handshake now gets two attempts. See ATTEMPTS
@@ -267,9 +298,15 @@ export async function POST(req: Request) {
          turned "DNS does not resolve", "connection refused", "TLS rejected"
          and "the TCP connection never opened" into one indistinguishable
          word, and sent this investigation to the wrong place twice. */
+      /* `region` is the VENDOR's label and always was. `from` is where OUR
+         function actually ran, and without it the region move this failure
+         prompted could not be confirmed: a handshake still failing would be
+         indistinguishable from a handshake that never moved. Vercel sets
+         VERCEL_REGION; anywhere else it is simply absent. */
       console.error(
         `[ai.voice] handshake ${timedOut ? "timed out" : "failed"} ` +
-          `attempt=${attempt}/${HANDSHAKE_ATTEMPTS} region=${cfg.regionLabel} ` +
+          `attempt=${attempt}/${HANDSHAKE_ATTEMPTS} from=${process.env.VERCEL_REGION ?? "local"} ` +
+          `region=${cfg.regionLabel} ` +
           `afterMs=${Date.now() - startedAt} budgetMs=${HANDSHAKE_TIMEOUT_MS} cause=${lastCause}`,
       );
     }

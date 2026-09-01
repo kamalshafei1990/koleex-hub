@@ -139,6 +139,21 @@ export default function VoiceCallButton({
      "let me check" first, but it does not always, and a screen that says
      nothing during it reads as a frozen call. */
   const [searching, setSearching] = useState(false);
+  /* ONE TIMER, NOT ONE PER LOOKUP — and the bug that made this necessary.
+     The floor timer was created bare on every tool call, so a call that
+     looked two things up had two of them running. The FIRST one then fired
+     while the SECOND lookup was still in flight and cleared the indicator,
+     so the screen went quiet and the caller was told nothing was happening
+     while something was. Holding the handle lets each new lookup replace the
+     previous floor instead of racing it — and lets hang-up cancel it, which
+     nothing did before. */
+  const searchTimerRef = useRef<number | null>(null);
+  const clearSearchTimer = useCallback(() => {
+    if (searchTimerRef.current !== null) {
+      window.clearTimeout(searchTimerRef.current);
+      searchTimerRef.current = null;
+    }
+  }, []);
   /* Read inside the session callbacks, which outlive any single render. */
   const voiceKeyRef = useRef<string | null>(null);
   useEffect(() => { voiceKeyRef.current = voiceKey; }, [voiceKey]);
@@ -215,13 +230,16 @@ export default function VoiceCallButton({
     setPhase(null);
     setState("idle");
     setMuted(false);
+    clearSearchTimer();
     setSearching(false);
     onLiveChangeRef.current?.(false);
     /* The transcript SURVIVES hang-up on purpose: what was said is what the
        user came for, and clearing it the instant the call ends throws away
        the record at the moment they want to read it. */
     onPhaseRef.current?.(null);
-  }, []);
+    /* clearSearchTimer is a stable useCallback([]) — naming it here satisfies
+       the exhaustive-deps rule without making this callback churn. */
+  }, [clearSearchTimer]);
 
   const startCall = useCallback(async () => {
     if (sessionRef.current) return;
@@ -267,8 +285,14 @@ export default function VoiceCallButton({
         setSearching(true);
         /* Cleared on the next thing the far side says, and on a timer as a
            floor: a failed lookup still ends, and an indicator that never
-           clears is worse than none. */
-        window.setTimeout(() => setSearching(false), 12_000);
+           clears is worse than none. The previous floor is cancelled first,
+           so a second lookup extends the indicator rather than inheriting
+           the deadline of the first one. */
+        clearSearchTimer();
+        searchTimerRef.current = window.setTimeout(() => {
+          searchTimerRef.current = null;
+          setSearching(false);
+        }, 12_000);
       },
       onToolProtocolMismatch: (eventType) => {
         /* THE ONE PLACE THIS BECOMES VISIBLE. If the vendor names its
@@ -308,7 +332,7 @@ export default function VoiceCallButton({
 
     sessionRef.current = session;
     await session.start();
-  }, []);
+  }, [clearSearchTimer]);
   useEffect(() => { startCallRef.current = startCall; }, [startCall]);
 
   /* ONE METER PER SIDE, AND ONLY THE ACTIVE ONE RUNS. Measuring both at once

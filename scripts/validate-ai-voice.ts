@@ -187,6 +187,50 @@ console.log("\n── 3. The route, read — the surface a fetch cannot be teste
     /let taughtQuestions: string\[\] = \[\];/.test(code));
   check("and the index reaches the full session, never the compact fallback",
     /buildVoiceSessionPayload\(voice, taughtQuestions\)/.test(code));
+  /* ── WHERE THIS FUNCTION RUNS, and why it is not where everything else
+     runs ────────────────────────────────────────────────────────────────
+     Production, on both attempts and repeatedly:
+
+       cause=TypeError/UND_ERR_CONNECT_TIMEOUT afterMs=10389 budgetMs=13000
+
+     That is the TCP connection never opening — not DNS (ENOTFOUND), not a
+     refusal (ECONNREFUSED), not TLS, not a reset. An unroutable path is not
+     something a route can fix, so the route moved instead.
+
+     A LONE REGION OVERRIDE IS INDISTINGUISHABLE FROM A MISTAKE once the
+     person who added it is gone, which is what these assertions are for. */
+  {
+    const vercelCfg = JSON.parse(readFileSync("vercel.json", "utf8")) as {
+      regions?: string[];
+      functions?: Record<string, { regions?: string[] }>;
+      crons?: unknown[];
+    };
+    const VOICE_FN = "src/app/api/ai/voice/session/route.ts";
+    const pinned = vercelCfg.functions?.[VOICE_FN]?.regions ?? [];
+    check("the voice handshake is pinned to its own region",
+      pinned.length === 1);
+    check("  …and it is NOT the project default it was failing from",
+      pinned[0] !== (vercelCfg.regions ?? [])[0]);
+    /* ONLY THIS ONE MOVES. The whole app relocating to chase one endpoint
+       would be a far larger change than the evidence supports. */
+    check("no other function was moved along with it",
+      Object.keys(vercelCfg.functions ?? {}).length === 1);
+    check("and the project default is untouched",
+      JSON.stringify(vercelCfg.regions) === JSON.stringify(["hnd1"]));
+    /* Non-vacuity: rewriting vercel.json is how the scheduled work gets
+       dropped by accident. */
+    check("  …as are the cron jobs that share this file",
+      Array.isArray(vercelCfg.crons) && vercelCfg.crons.length === 5);
+
+    /* THE MOVE HAS TO BE OBSERVABLE OR IT CANNOT BE CONFIRMED. `region=` in
+       this log is the VENDOR's label; without our own execution region a
+       still-failing handshake looks identical to one that never moved. */
+    check("a failed handshake reports the region OUR function ran in",
+      /from=\$\{process\.env\.VERCEL_REGION \?\? "local"\}/.test(code));
+    check("  …distinctly from the vendor's own region label",
+      /from=\$\{[^}]*\}[\s\S]{0,60}region=\$\{cfg\.regionLabel\}/.test(code));
+  }
+
   check("and carries no endpoint, model, key or region",
     !/sdpUrl/.test(successReturn) && !/apiKey/.test(successReturn) &&
     !/AI_VOICE_MODEL/.test(successReturn) && !/regionLabel/.test(successReturn));

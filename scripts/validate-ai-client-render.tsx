@@ -491,6 +491,188 @@ console.log("\n── VoiceCallScreen: the call is a mode, not a toggle ──")
   check("the call screen is localised", ar.includes("بيسمعك") && !ar.includes(">Listening<"));
 }
 
+console.log("\n── The AI interface speaks the user's language, all of it ──");
+{
+  /* WHAT THIS FOUND, and why it is worth a permanent guard. Thirty-four
+     control labels across the AI surface were hardcoded English literals in
+     a product whose every visible word is translated. Two different people
+     were getting an English interface out of it:
+
+       · a screen-reader user on Arabic heard "Regenerate response" and
+         "Close sidebar" in the middle of an Arabic conversation;
+       · and because `title` is a tooltip rather than an accessibility
+         affordance, EVERY Arabic and Chinese user saw English the moment
+         they hovered a toolbar button.
+
+     They were not missing for want of a system — copy.ts is the system, and
+     they simply never got added to it. BubbleActions was the clearest case:
+     it already received `lang` as a prop and its first statement was
+     `void lang;`. The language was being handed to it and thrown away. */
+
+  const AI_TSX = [
+    "src/components/ai/Bubble.tsx",
+    "src/components/ai/KoleexAiApp.tsx",
+    "src/components/ai/EmojiButton.tsx",
+    "src/components/ai/TypingIndicator.tsx",
+    "src/components/ai/VoiceCallButton.tsx",
+    "src/components/ai/VoiceCallScreen.tsx",
+    "src/components/ai/WelcomeCard.tsx",
+    "src/components/ai/ProjectDialog.tsx",
+    "src/components/ai/Sidebar.tsx",
+    "src/components/ai/MessageMarkdown.tsx",
+  ];
+  const offenders: string[] = [];
+  for (const f of AI_TSX) {
+    let src = "";
+    try { src = readFileSync(f, "utf8"); } catch { continue; }
+    for (const m of src.matchAll(/(aria-label|title|placeholder)="([A-Za-z][^"]{2,60})"/g)) {
+      offenders.push(`${f.split("/").pop()}: ${m[1]}="${m[2]}"`);
+    }
+  }
+  check(`no control label is a hardcoded English literal${offenders.length ? " — " + offenders.slice(0, 3).join("; ") : ""}`,
+    offenders.length === 0);
+  /* NON-VACUITY: the files must actually exist and carry labels, or the
+     check above passes by reading nothing. */
+  const labelled = AI_TSX.filter((f) => {
+    try { return /(aria-label|title)=\{/.test(readFileSync(f, "utf8")); } catch { return false; }
+  });
+  check("  …checked against files that really do carry labels", labelled.length >= 6);
+
+  /* EVERY KEY, EVERY LANGUAGE. A key added to `en` alone type-checks (the
+     Record is keyed by Lang, but a missing member is a compile error only
+     if the type lists it) and then renders `undefined` for Arabic. */
+  const langs = ["en", "zh", "ar"] as const;
+  const keysOf = (l: (typeof langs)[number]) =>
+    Object.keys(COPY[l]).filter((k) => typeof (COPY[l] as Record<string, unknown>)[k] === "string").sort();
+  check("all three languages define the same string keys",
+    JSON.stringify(keysOf("en")) === JSON.stringify(keysOf("ar")) &&
+    JSON.stringify(keysOf("en")) === JSON.stringify(keysOf("zh")));
+  const empties: string[] = [];
+  for (const l of langs) {
+    for (const [k, v] of Object.entries(COPY[l])) {
+      if (typeof v === "string" && v.trim() === "") empties.push(`${l}.${k}`);
+    }
+  }
+  check(`no translation is blank${empties.length ? " — " + empties.join(", ") : ""}`, empties.length === 0);
+  /* AND ARABIC IS ACTUALLY ARABIC. A key copy-pasted from `en` into `ar`
+     passes both checks above and still shows English to an Arabic user. */
+  const untranslated = (["ar", "zh"] as const).flatMap((l) =>
+    Object.entries(COPY[l])
+      .filter(([k, v]) =>
+        typeof v === "string" && v.length > 3 &&
+        v === (COPY.en as Record<string, unknown>)[k] &&
+        /^[\x00-\x7F]+$/.test(v) && !/Koleex|Hub/.test(v))
+      .map(([k]) => `${l}.${k}`));
+  check(`no key was left as its English text${untranslated.length ? " — " + untranslated.join(", ") : ""}`,
+    untranslated.length === 0);
+
+  /* THE WIRING, NOT JUST THE DICTIONARY. A translated dictionary that no
+     component reads is the same product as no dictionary — and both new
+     `lang` props default to English, so an unwired caller would leave this
+     entire change inert. Rendering is the only thing that proves it. */
+  const msg = { id: "m1", role: "assistant", content: "تمام", createdAt: Date.now() };
+  const arBubble = renderToStaticMarkup(
+    <Bubble {...({ msg, userInitial: "M", isLast: true, lang: "ar",
+                   onRegenerate: () => {}, onSpeak: () => {}, onFeedback: () => {} } as any)} /> as ReactElement,
+  );
+  check("an Arabic message renders Arabic control labels, not English",
+    arBubble.includes(COPY.ar.regenerate) && !arBubble.includes("Regenerate"));
+  const enBubble = renderToStaticMarkup(
+    <Bubble {...({ msg: { ...msg, content: "ok" }, userInitial: "M", isLast: true, lang: "en",
+                   onRegenerate: () => {}, onSpeak: () => {}, onFeedback: () => {} } as any)} /> as ReactElement,
+  );
+  check("  …and English still renders English", enBubble.includes(COPY.en.regenerate));
+
+  /* THE TYPING INDICATOR IS ITS OWN RENDER PATH — it replaces the message
+     body rather than sitting beside it, so an assistant bubble WITH content
+     never draws it. A mutation that stopped passing `lang` to it survived
+     every check above for exactly that reason: the component defaults to
+     English, so an unwired caller is silently monolingual again. */
+  const arThinking = renderToStaticMarkup(
+    <Bubble {...({ msg: { ...msg, content: "" }, userInitial: "M", isLast: true, lang: "ar" } as any)} /> as ReactElement,
+  );
+  check("a message still being composed announces itself in Arabic too",
+    arThinking.includes(COPY.ar.thinkingAria) && !arThinking.includes("Koleex AI is thinking"));
+
+  /* THE COMPONENTS THAT DEFAULT TO ENGLISH MUST BE HANDED A LANGUAGE AT
+     EVERY CALL SITE. Both new `lang` props are optional with an English
+     default — deliberately, so that adding them did not force every caller
+     to change at once — but that same default is what makes an unwired
+     caller silently monolingual instead of broken. EmojiButton sits inside
+     KoleexAiApp, which is far too large to render here, so this is checked
+     at the source: weaker than rendering, and the only thing that catches
+     it at all. */
+  for (const comp of ["EmojiButton", "TypingIndicator"]) {
+    const sites: string[] = [];
+    for (const f of AI_TSX) {
+      let src = "";
+      try { src = readFileSync(f, "utf8"); } catch { continue; }
+      for (const m of src.matchAll(new RegExp(`<${comp}(\\s[^>]*?)?/?>`, "gs"))) {
+        if (!/\blang=/.test(m[0])) sites.push(`${f.split("/").pop()}`);
+      }
+    }
+    check(`every <${comp}> is given a language${sites.length ? " — missing in " + sites.join(", ") : ""}`,
+      sites.length === 0);
+  }
+  /* Non-vacuity: there must BE call sites, or the loop proved nothing. */
+  const anySite = AI_TSX.some((f) => {
+    try { return /<EmojiButton|<TypingIndicator/.test(readFileSync(f, "utf8")); } catch { return false; }
+  });
+  check("  …and those components really are used somewhere", anySite);
+
+  /* ACCESSIBLE NAMES. A placeholder is not a label — it disappears the
+     moment anyone types — and the edit box has no placeholder at all. */
+  const appSrc = readFileSync("src/components/ai/KoleexAiApp.tsx", "utf8");
+  check("the composer has an accessible name, not just a placeholder",
+    /aria-label=\{copy\.composerLabel\}/.test(appSrc));
+  const bubbleSrc = readFileSync("src/components/ai/Bubble.tsx", "utf8");
+  check("the edit box has one too", /aria-label=\{copy\.editMessageLabel\}/.test(bubbleSrc));
+  /* The regression that made all of this necessary. */
+  check("BubbleActions uses the language it is given rather than discarding it",
+    !/void lang;/.test(bubbleSrc) && /const copy = COPY\[lang\]/.test(bubbleSrc));
+}
+
+console.log("\n── The 'looking it up' indicator tells the truth ──");
+{
+  /* THE BUG: the floor timer was created bare on every tool call, so a call
+     that looked two things up had two running. The FIRST fired while the
+     SECOND lookup was still in flight, cleared the indicator, and the screen
+     went quiet while something was genuinely happening — the exact reading
+     ("nothing is going on") that the indicator exists to prevent. Nothing
+     cancelled it on hang-up either. */
+  const src = readFileSync("src/components/ai/VoiceCallButton.tsx", "utf8");
+  check("the search indicator's timer is held, not created and forgotten",
+    /searchTimerRef\s*=\s*useRef<number \| null>\(null\)/.test(src));
+  check("a new lookup cancels the previous floor before arming its own",
+    /clearSearchTimer\(\);\s*\n\s*searchTimerRef\.current = window\.setTimeout\(/.test(src));
+  check("and hanging up cancels it rather than leaving it to fire",
+    /clearSearchTimer\(\);\s*\n\s*setSearching\(false\);/.test(src));
+  /* Non-vacuity: a bare setTimeout must not have crept back beside it. */
+  const bare = src.match(/(?<!searchTimerRef\.current = )window\.setTimeout\(\(\) => setSearching/g);
+  check("no bare, unowned timer sets the indicator any more", bare === null);
+}
+
+console.log("\n── A DataChannel event is read by its type, not by substring ──");
+{
+  /* `raw.includes("session.created")` was true of ANY message containing
+     those characters anywhere — an error body naming the event would have
+     done it. Everything else in that file parses the JSON and switches on
+     `type`; this one line did not, which is also why the shared
+     EV_SESSION_CREATED constant existed with nothing using it. */
+  const raw = readFileSync("src/lib/voice/session.ts", "utf8");
+  /* COMMENTS STRIPPED FIRST. The comment explaining this fix necessarily
+     QUOTES the old code, so an assertion run over the raw file matches its
+     own explanation and fails on correct source. Assertions are about what
+     runs, not about what is written beside it. */
+  const src = raw.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
+  check("the session-created check parses the event instead of scanning the text",
+    !/raw\.includes\("session\.created"\)/.test(src) &&
+    /isEventType\(raw, EV_SESSION_CREATED\)/.test(src));
+  check("and the event name comes from the shared constant, not a second copy",
+    /import \{ EV_SESSION_CREATED \} from "\.\/events"/.test(src) &&
+    (src.match(/"session\.created"/g) ?? []).length === 0);
+}
+
 console.log("\n── VoiceCallScreen: it is a modal, so it has to cover the app ──");
 {
   /* THE REPORTED SYMPTOM, from a screenshot taken mid-call: the Hub's own

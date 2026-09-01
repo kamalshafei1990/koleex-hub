@@ -1660,7 +1660,7 @@ export default function KoleexAiApp() {
       {sidebarOpen && (
         <button
           type="button"
-          aria-label="Close sidebar"
+          aria-label={copy.closeSidebar}
           onClick={() => setSidebarOpen(false)}
           className="md:hidden fixed inset-0 z-[39] bg-black/50 backdrop-blur-sm"
         />
@@ -1701,7 +1701,7 @@ export default function KoleexAiApp() {
           <Link
             href="/"
             className="h-8 w-8 flex items-center justify-center rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] shrink-0"
-            title="Back"
+            title={copy.back}
           >
             <ArrowLeftIcon className="h-4 w-4" />
           </Link>
@@ -1716,7 +1716,7 @@ export default function KoleexAiApp() {
             <Link
               href="/ai/knowledge"
               className="kx-ai-glow h-8 w-8 flex items-center justify-center rounded-lg border border-[var(--accent,#0066FF)]/40 text-[var(--accent,#0066FF)] hover:bg-[var(--accent,#0066FF)]/10 shrink-0"
-              title="AI Knowledge"
+              title={copy.aiKnowledge}
             >
               <BookOpenIcon className="h-4 w-4" />
             </Link>
@@ -1729,8 +1729,8 @@ export default function KoleexAiApp() {
             type="button"
             onClick={() => setSidebarOpen(false)}
             className="md:hidden h-8 w-8 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] items-center justify-center shrink-0 flex"
-            title="Close sidebar"
-            aria-label="Close sidebar"
+            title={copy.closeSidebar}
+            aria-label={copy.closeSidebar}
           >
             <CrossIcon size={14} />
           </button>
@@ -1738,8 +1738,8 @@ export default function KoleexAiApp() {
             type="button"
             onClick={() => setSidebarCollapsed(true)}
             className="hidden md:flex h-8 w-8 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] items-center justify-center shrink-0"
-            title="Collapse sidebar"
-            aria-label="Collapse sidebar"
+            title={copy.collapseSidebar}
+            aria-label={copy.collapseSidebar}
           >
             <MenuBurgerIcon size={14} />
           </button>
@@ -1755,7 +1755,7 @@ export default function KoleexAiApp() {
               onChange={(e) => setSidebarQuery(e.target.value)}
               placeholder={copy.searchChats ?? "Search chats…"}
               className="w-full h-8 px-2.5 rounded-md bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[12px] text-[var(--text-primary)] placeholder:text-[var(--text-dim)] outline-none focus:border-[var(--border-focus)]"
-              aria-label="Search conversations"
+              aria-label={copy.searchChats ?? "Search chats"}
             />
           </div>
         )}
@@ -2013,15 +2013,15 @@ export default function KoleexAiApp() {
               type="button"
               onClick={() => setSidebarCollapsed(false)}
               className="h-8 w-8 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] flex items-center justify-center shrink-0"
-              title="Expand sidebar"
-              aria-label="Expand sidebar"
+              title={copy.expandSidebar}
+              aria-label={copy.expandSidebar}
             >
               <MenuBurgerIcon size={14} />
             </button>
           )}
           <Link
             href="/"
-            aria-label="Back to Hub"
+            aria-label={copy.backToHub}
             className="h-8 w-8 shrink-0 flex items-center justify-center rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[var(--text-dim)] hover:text-[var(--text-primary)]"
           >
             <ArrowLeftIcon className="h-4 w-4" />
@@ -2149,7 +2149,7 @@ export default function KoleexAiApp() {
                     userFollowingRef.current = true;
                     setShowJumpToBottom(false);
                   }}
-                  aria-label="Jump to latest"
+                  aria-label={copy.jumpToLatest}
                   className="kx-glass-pop pointer-events-auto h-8 -translate-y-full px-3 rounded-full bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[11.5px] text-[var(--text-primary)] hover:bg-[var(--bg-surface-subtle)] flex items-center gap-1.5 shadow-lg"
                 >
                   ↓ Latest
@@ -2303,6 +2303,11 @@ export default function KoleexAiApp() {
                     action row picks up just below it. */}
                 <textarea
                   ref={composerRef}
+                  /* A PLACEHOLDER IS NOT A LABEL. It is the only thing this
+                     control had, and it disappears the moment anyone types —
+                     so a screen-reader user who tabbed back to a half-written
+                     message was told nothing about what the field was. */
+                  aria-label={copy.composerLabel}
                   value={input}
                   onChange={(e) => {
                     setInput(e.target.value);
@@ -2348,8 +2353,8 @@ export default function KoleexAiApp() {
                       type="button"
                       onClick={openFilePicker}
                       className="h-8 w-8 rounded-full inline-flex items-center justify-center text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-subtle)] transition-colors"
-                      aria-label="Attach file"
-                      title="Attach file"
+                      aria-label={copy.attachFile}
+                      title={copy.attachFile}
                     >
                       <svg aria-hidden viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                         <line x1="12" y1="5" x2="12" y2="19" />
@@ -2369,6 +2374,7 @@ export default function KoleexAiApp() {
 
                     {/* Emoji picker (iOS-style). */}
                     <EmojiButton
+                      lang={lang}
                       onSelect={insertEmoji}
                       className="h-8 w-8 rounded-full inline-flex items-center justify-center text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-subtle)] transition-colors"
                     />
@@ -2378,7 +2384,7 @@ export default function KoleexAiApp() {
                       type="button"
                       onClick={() => setWebSearch((v) => !v)}
                       aria-pressed={webSearch}
-                      aria-label="Search the web"
+                      aria-label={copy.searchWeb}
                       title={webSearch ? copy.webSearchOn : copy.webSearchOff}
                       className={`h-8 w-8 rounded-full inline-flex items-center justify-center transition-colors ${
                         webSearch
@@ -2423,8 +2429,8 @@ export default function KoleexAiApp() {
                         type="button"
                         onClick={handleStop}
                         className="h-9 w-9 rounded-full bg-[var(--bg-inverted)] text-[var(--text-inverted)] inline-flex items-center justify-center shrink-0 transition-opacity"
-                        aria-label="Stop generating"
-                        title="Stop generating"
+                        aria-label={copy.stopGenerating}
+                        title={copy.stopGenerating}
                       >
                         <span aria-hidden className="block h-2.5 w-2.5 rounded-[2px] bg-[var(--text-inverted)]" />
                       </button>
@@ -2433,7 +2439,7 @@ export default function KoleexAiApp() {
                         type="submit"
                         disabled={!input.trim() && attachments.length === 0}
                         className="h-9 w-9 rounded-full bg-[var(--bg-inverted)] text-[var(--text-inverted)] inline-flex items-center justify-center disabled:opacity-30 shrink-0 transition-opacity"
-                        aria-label="Send"
+                        aria-label={copy.send}
                       >
                         <PaperPlaneIcon className="h-4 w-4" />
                       </button>
