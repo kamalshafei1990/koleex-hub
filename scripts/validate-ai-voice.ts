@@ -136,7 +136,11 @@ console.log("\n── 3. The route, read — the surface a fetch cannot be teste
     code.indexOf("consumeBudget") < code.indexOf("fetch("));
   check("the body is size-capped, because we spend our key on it",
     /MAX_SDP_BYTES/.test(code) && /offer\.length > MAX_SDP_BYTES/.test(code));
-  check("the handshake has a deadline", /AbortSignal\.timeout\(HANDSHAKE_TIMEOUT_MS\)/.test(code));
+  /* PER ATTEMPT, from the staged table — see validate-voice-tools §2c for why
+     the budgets differ by attempt. */
+  check("the handshake has a deadline",
+    /AbortSignal\.timeout\(budgetMs\)/.test(code) &&
+    /const budgetMs = HANDSHAKE_ATTEMPT_BUDGETS_MS\[attempt - 1\]/.test(code));
 
   /* THE CLIENT MUST NOT NAME THE ENDPOINT. A client that could would be a
      client that could send our key somewhere we did not choose. The url comes
