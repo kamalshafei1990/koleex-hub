@@ -63,6 +63,50 @@ export const COPY: Record<Lang, {
   webSearchOff: string;
   save: string;
   cancel: string;
+  /* ── CONTROL LABELS ────────────────────────────────────────────────────
+     Every one of these was a hardcoded English literal sitting inside an
+     `aria-label` or a `title`, in a product whose every visible word is
+     translated. Two different people were getting an English interface: a
+     screen-reader user on Arabic heard "Regenerate response" in the middle
+     of an Arabic conversation, and — because `title` is a tooltip, not an
+     accessibility affordance — EVERY Arabic and Chinese user saw English
+     the moment they hovered a toolbar button.
+
+     They were not missing because there was no system for them. The system
+     is this file; they simply never got added to it. */
+  readAloud: string;
+  regenerate: string;
+  goodResponse: string;
+  badResponse: string;
+  messageActions: string;
+  editAndRetry: string;
+  saveAndRetry: string;
+  cancelEdit: string;
+  emojiPicker: string;
+  searchEmoji: string;
+  closeSidebar: string;
+  collapseSidebar: string;
+  expandSidebar: string;
+  aiKnowledge: string;
+  backToHub: string;
+  jumpToLatest: string;
+  attachFile: string;
+  searchWeb: string;
+  stopGenerating: string;
+  send: string;
+  /* The composer and the edit box have no visible label — a placeholder is
+     not one, and it disappears the moment anyone types. */
+  composerLabel: string;
+  editMessageLabel: string;
+  /* `thinking` is the words on screen; this is what a screen reader
+     announces for the same state, which needs a subject to make sense. */
+  thinkingAria: string;
+  /* THE EMOJI PICKER'S CATEGORY NAMES, keyed by the id in emojiData.
+     They live here rather than in that file because emojiData is 700 lines
+     of emoji and adding three languages to every category row would bury
+     the eight strings that actually need translating. */
+  emojiCategories: Record<string, string>;
+  insertEmoji: string;
   prompts: string[];
 }> = {
   en: {
@@ -115,6 +159,31 @@ export const COPY: Record<Lang, {
     webSearchOff: "Web search: off",
     save: "Save",
     cancel: "Cancel",
+    readAloud: "Read aloud",
+    regenerate: "Regenerate response",
+    goodResponse: "Good response",
+    badResponse: "Bad response",
+    messageActions: "Message actions",
+    editAndRetry: "Edit and retry",
+    saveAndRetry: "Save and retry",
+    cancelEdit: "Cancel edit",
+    emojiPicker: "Emoji picker",
+    searchEmoji: "Search emoji",
+    closeSidebar: "Close sidebar",
+    collapseSidebar: "Collapse sidebar",
+    expandSidebar: "Expand sidebar",
+    aiKnowledge: "AI Knowledge",
+    backToHub: "Back to Hub",
+    jumpToLatest: "Jump to latest",
+    attachFile: "Attach file",
+    searchWeb: "Search the web",
+    stopGenerating: "Stop generating",
+    send: "Send",
+    composerLabel: "Message Koleex AI",
+    editMessageLabel: "Edit your message",
+    thinkingAria: "Koleex AI is thinking",
+    emojiCategories: { smileys: "Smileys & People", nature: "Animals & Nature", food: "Food & Drink", activity: "Activity", travel: "Travel & Places", objects: "Objects", symbols: "Symbols", flags: "Flags" },
+    insertEmoji: "Insert",
     prompts: [
       "What's a good way to start my day at work?",
       "Help me write a polite reply to a customer email.",
@@ -171,6 +240,31 @@ export const COPY: Record<Lang, {
     webSearchOff: "联网搜索：关",
     save: "保存",
     cancel: "取消",
+    readAloud: "朗读",
+    regenerate: "重新生成回答",
+    goodResponse: "回答很好",
+    badResponse: "回答不佳",
+    messageActions: "消息操作",
+    editAndRetry: "编辑并重新发送",
+    saveAndRetry: "保存并重新发送",
+    cancelEdit: "取消编辑",
+    emojiPicker: "表情选择器",
+    searchEmoji: "搜索表情",
+    closeSidebar: "关闭侧边栏",
+    collapseSidebar: "收起侧边栏",
+    expandSidebar: "展开侧边栏",
+    aiKnowledge: "AI 知识库",
+    backToHub: "返回 Hub",
+    jumpToLatest: "跳到最新",
+    attachFile: "添加文件",
+    searchWeb: "联网搜索",
+    stopGenerating: "停止生成",
+    send: "发送",
+    composerLabel: "给 Koleex AI 发送消息",
+    editMessageLabel: "编辑你的消息",
+    thinkingAria: "Koleex AI 正在思考",
+    emojiCategories: { smileys: "笑脸与人物", nature: "动物与自然", food: "食物与饮料", activity: "活动", travel: "旅行与地点", objects: "物品", symbols: "符号", flags: "旗帜" },
+    insertEmoji: "插入",
     prompts: [
       "早上开始工作的好方法是什么？",
       "帮我给客户写一封礼貌的回复邮件。",
@@ -228,6 +322,31 @@ export const COPY: Record<Lang, {
     webSearchOff: "البحث في الويب: متوقّف",
     save: "حفظ",
     cancel: "إلغاء",
+    readAloud: "استماع",
+    regenerate: "إعادة توليد الرد",
+    goodResponse: "إجابة جيدة",
+    badResponse: "إجابة سيئة",
+    messageActions: "إجراءات الرسالة",
+    editAndRetry: "تعديل وإعادة الإرسال",
+    saveAndRetry: "حفظ وإعادة الإرسال",
+    cancelEdit: "إلغاء التعديل",
+    emojiPicker: "اختيار الرموز",
+    searchEmoji: "ابحث عن رمز",
+    closeSidebar: "إغلاق الشريط الجانبي",
+    collapseSidebar: "طيّ الشريط الجانبي",
+    expandSidebar: "توسيع الشريط الجانبي",
+    aiKnowledge: "معرفة Koleex AI",
+    backToHub: "العودة إلى Hub",
+    jumpToLatest: "الانتقال إلى الأحدث",
+    attachFile: "إرفاق ملف",
+    searchWeb: "البحث في الويب",
+    stopGenerating: "إيقاف التوليد",
+    send: "إرسال",
+    composerLabel: "اكتب رسالة إلى Koleex AI",
+    editMessageLabel: "تعديل رسالتك",
+    thinkingAria: "Koleex AI يفكّر",
+    emojiCategories: { smileys: "الوجوه والأشخاص", nature: "الحيوانات والطبيعة", food: "الطعام والشراب", activity: "الأنشطة", travel: "السفر والأماكن", objects: "الأشياء", symbols: "الرموز", flags: "الأعلام" },
+    insertEmoji: "إدراج",
     prompts: [
       "ما طريقة جيدة لبدء يومي في العمل؟",
       "ساعدني في كتابة رد مهذب على رسالة من عميل.",

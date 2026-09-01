@@ -178,7 +178,7 @@ export function Bubble({
         {/* Assistant bubble with no content yet → show typing indicator
             (Phase 6). Replaced by the streamed text as deltas arrive. */}
         {!isUser && !msg.content ? (
-          <TypingIndicator />
+          <TypingIndicator lang={lang} />
         ) : (
           <div
             /* Direction is MEASURED from the whole message, not guessed from
@@ -232,6 +232,10 @@ export function Bubble({
                       el.setSelectionRange(len, len);
                     }
                   }}
+                  /* No placeholder either — this box opens already full of
+                     the message being edited, so there was nothing at all to
+                     announce it. */
+                  aria-label={copy.editMessageLabel}
                   value={editValue}
                   onChange={(e) => setEditValue(e.target.value)}
                   onKeyDown={(e) => {
@@ -455,7 +459,7 @@ export function Bubble({
                   type="button"
                   onClick={submitEdit}
                   className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-[var(--bg-inverted)] text-[var(--text-inverted)] transition-opacity"
-                  aria-label="Save and retry"
+                  aria-label={copy.saveAndRetry}
                 >
                   Save & retry
                 </button>
@@ -463,7 +467,7 @@ export function Bubble({
                   type="button"
                   onClick={cancelEdit}
                   className="inline-flex items-center gap-1 px-2 py-1 rounded-md hover:bg-[var(--bg-surface-subtle)] hover:text-[var(--text-primary)] transition-colors"
-                  aria-label="Cancel edit"
+                  aria-label={copy.cancelEdit}
                 >
                   Cancel
                 </button>
@@ -476,7 +480,7 @@ export function Bubble({
                   setEditing(true);
                 }}
                 className="inline-flex items-center gap-1 px-2 py-1 rounded-md hover:bg-[var(--bg-surface-subtle)] hover:text-[var(--text-primary)] transition-colors"
-                aria-label="Edit and retry"
+                aria-label={copy.editAndRetry}
               >
                 ✎ Edit
               </button>
@@ -548,7 +552,11 @@ export function BubbleActions({
   onFeedback?: (msgId: string, value: "up" | "down") => void;
   lang: Lang;
 }) {
-  void lang;
+  /* THE LANGUAGE WAS ALREADY BEING PASSED IN AND THROWN AWAY — `void lang`
+     is what that line said. Every control in this toolbar carried a
+     hardcoded English aria-label and title as a result: an Arabic user
+     hovering "Regenerate" saw English, and a screen-reader user heard it. */
+  const copy = COPY[lang] ?? COPY.en;
   const [vote, setVote] = useState<"up" | "down" | null>(null);
   const sendVote = (v: "up" | "down") => {
     setVote(v);
@@ -562,7 +570,7 @@ export function BubbleActions({
   const btnCls = "inline-flex items-center justify-center h-7 w-7 rounded-md hover:bg-[var(--bg-surface-subtle)] hover:text-[var(--text-primary)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed";
   const ICON = 14;
   return (
-    <div role="toolbar" aria-label="Message actions" className="mt-1 flex items-center gap-1 text-[11px] text-[var(--text-dim)]">
+    <div role="toolbar" aria-label={copy.messageActions} className="mt-1 flex items-center gap-1 text-[11px] text-[var(--text-dim)]">
       <button
         type="button"
         onClick={onCopy}
@@ -589,8 +597,8 @@ export function BubbleActions({
           type="button"
           onClick={() => onSpeak(msg.content)}
           className={btnCls}
-          aria-label="Read aloud"
-          title="Read aloud"
+          aria-label={copy.readAloud}
+          title={copy.readAloud}
         >
           {/* Lucide volume-2 redrawn on a 20×20 viewBox so the
               speaker triangle + arc waves actually fill the box.
@@ -610,8 +618,8 @@ export function BubbleActions({
           onClick={onRegenerate}
           disabled={!canRegenerate}
           className={btnCls}
-          aria-label="Regenerate response"
-          title="Regenerate"
+          aria-label={copy.regenerate}
+          title={copy.regenerate}
         >
           <svg aria-hidden viewBox="0 0 24 24" width={ICON} height={ICON} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <path d="M3 12a9 9 0 0 1 15.5-6.36L21 8" />
@@ -628,8 +636,8 @@ export function BubbleActions({
             type="button"
             onClick={() => sendVote("up")}
             className={`${btnCls} ${vote === "up" ? "text-emerald-300" : ""}`}
-            aria-label="Good response"
-            title="Good response"
+            aria-label={copy.goodResponse}
+            title={copy.goodResponse}
           >
             <svg aria-hidden viewBox="0 0 24 24" width={ICON} height={ICON} fill={vote === "up" ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3zM7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3" />
@@ -639,8 +647,8 @@ export function BubbleActions({
             type="button"
             onClick={() => sendVote("down")}
             className={`${btnCls} ${vote === "down" ? "text-rose-300" : ""}`}
-            aria-label="Bad response"
-            title="Bad response"
+            aria-label={copy.badResponse}
+            title={copy.badResponse}
           >
             <svg aria-hidden viewBox="0 0 24 24" width={ICON} height={ICON} fill={vote === "down" ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M10 15v4a3 3 0 0 0 3 3l4-9V2H5.72a2 2 0 0 0-2 1.7l-1.38 9a2 2 0 0 0 2 2.3zM17 2h2.67A2.31 2.31 0 0 1 22 4v7a2.31 2.31 0 0 1-2.33 2H17" />
