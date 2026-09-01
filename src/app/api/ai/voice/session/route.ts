@@ -134,8 +134,40 @@ const TAUGHT_INDEX_TIMEOUT_MS = 1_500;
    fresh connections both get nothing, the service is not reachable from here
    and saying so is the honest answer.
    --------------------------------------------------------------------------- */
-const HANDSHAKE_TIMEOUT_MS = 13_000;
-const HANDSHAKE_ATTEMPTS = 2;
+/* ---------------------------------------------------------------------------
+   THE BUDGETS, AND WHY THEY ARE NOT ALL THE SAME.
+
+   The logs settled what this failure actually is, and it is not what the two
+   previous changes assumed. Over ten hours production shows the handshake
+   both succeeding and failing repeatedly — and this pair, 32 seconds apart,
+   from the SAME region, is the whole story:
+
+     00:50:02  POST 504  UND_ERR_CONNECT_TIMEOUT
+     00:50:34  POST 200
+
+   So the endpoint is not unreachable. The path to it works perhaps half the
+   time, in bursts, and a retry a little later lands on a good one.
+
+   WHY TWO EQUAL ATTEMPTS DID NOT HELP. Both used the full budget, and both
+   died at undici's own ~10.4s connect timeout — so "two attempts" was really
+   two samples taken 21 seconds apart at the cost of the caller's whole wait.
+   Against a path that comes and goes, what matters is HOW MANY TIMES you
+   sample it, not how long you stare at it once.
+
+   SO: ONE LONG ATTEMPT, THEN SEVERAL SHORT ONES. The first keeps the full
+   budget, which means a healthy-but-slow handshake succeeds exactly as it
+   does today and this change can never be slower than what it replaces. Only
+   once that has failed — which is itself evidence the path is bad right now —
+   do the short samples start, and they buy three more chances inside the same
+   total wait instead of one.
+
+   THE SHORT BUDGET IS A GUESS UNTIL THE NEXT LOG, and that is deliberate: a
+   successful handshake's duration was never recorded, so there is no data yet
+   for what "long enough" is. That is fixed below — success is now logged with
+   its own timing — and these numbers should be re-tuned from it rather than
+   from reasoning. */
+const HANDSHAKE_ATTEMPT_BUDGETS_MS = [13_000, 3_000, 3_000, 3_000] as const;
+const HANDSHAKE_ATTEMPTS = HANDSHAKE_ATTEMPT_BUDGETS_MS.length;
 
 /* A voice call is the only feature in this product that spends money
    continuously while the user says nothing, so the budget is on SESSIONS
@@ -264,6 +296,7 @@ export async function POST(req: Request) {
     /* Set immediately before each fetch, so the elapsed time in the log
        measures that round trip and not the work that preceded it. */
     const startedAt = Date.now();
+    const budgetMs = HANDSHAKE_ATTEMPT_BUDGETS_MS[attempt - 1];
     try {
       res = await fetch(cfg.sdpUrl, {
         method: "POST",
@@ -276,8 +309,19 @@ export async function POST(req: Request) {
            the loop would abort the second attempt the instant it started,
            because the signal fires on wall-clock time from when it was made —
            the retry would look like an instant failure and prove nothing. */
-        signal: AbortSignal.timeout(HANDSHAKE_TIMEOUT_MS),
+        signal: AbortSignal.timeout(budgetMs),
       });
+      /* SUCCESS IS EVIDENCE TOO, and its absence is why the budgets above are
+         still partly a guess. Only failures were ever logged, so nothing
+         recorded how long a WORKING handshake takes — which is exactly the
+         number needed to decide how long a short attempt should wait before
+         giving up on a bad window. Logged at info: it is one line per call
+         and it carries no vendor detail. */
+      console.log(
+        `[ai.voice] handshake ok attempt=${attempt}/${HANDSHAKE_ATTEMPTS} ` +
+          `from=${process.env.VERCEL_REGION ?? "local"} region=${cfg.regionLabel} ` +
+          `afterMs=${Date.now() - startedAt} budgetMs=${budgetMs}`,
+      );
       break;
     } catch (e) {
       const timedOut = e instanceof Error && (e.name === "TimeoutError" || e.name === "AbortError");
@@ -307,7 +351,7 @@ export async function POST(req: Request) {
         `[ai.voice] handshake ${timedOut ? "timed out" : "failed"} ` +
           `attempt=${attempt}/${HANDSHAKE_ATTEMPTS} from=${process.env.VERCEL_REGION ?? "local"} ` +
           `region=${cfg.regionLabel} ` +
-          `afterMs=${Date.now() - startedAt} budgetMs=${HANDSHAKE_TIMEOUT_MS} cause=${lastCause}`,
+          `afterMs=${Date.now() - startedAt} budgetMs=${budgetMs} cause=${lastCause}`,
       );
     }
   }

@@ -461,7 +461,7 @@ console.log("\n── 2f. A failed handshake says WHY, not just that it failed �
      timeout" — losing either sends the next investigation back to guessing. */
   check("and still logs the elapsed time beside the budget it was given",
     /afterMs=\$\{Date\.now\(\) - startedAt\}/.test(route) &&
-    /budgetMs=\$\{HANDSHAKE_TIMEOUT_MS\}/.test(route));
+    /budgetMs=\$\{budgetMs\}/.test(route));
 }
 
 console.log("\n── 2e. The Arabic a call speaks is Egyptian, and only Egyptian ──");
@@ -585,41 +585,80 @@ console.log("\n── 2c. A failed handshake says how long it took ──");
   check("the failure log records how long the handshake ran",
     /afterMs=\$\{Date\.now\(\) - startedAt\}/.test(route));
   check("and the budget it ran against, so the two can be compared",
-    /budgetMs=\$\{HANDSHAKE_TIMEOUT_MS\}/.test(route));
+    /budgetMs=\$\{budgetMs\}/.test(route));
   check("and still distinguishes a timeout from a connection that failed",
     /timedOut \? "timed out" : "failed"/.test(route));
 
-  /* TWO ATTEMPTS, AND THE ARITHMETIC THAT MAKES THEM SAFE. The production
-     logs showed "handshake timed out" repeatedly while our own auth work in
-     the same request finished in 121ms — nothing came back at all. A path
-     that drops and recovers is answered by a second fresh connection, not by
-     waiting longer on a dead one. */
-  const budget = Number((/const HANDSHAKE_TIMEOUT_MS = ([\d_]+)/.exec(route)?.[1] ?? "0").replace(/_/g, ""));
-  const attempts = Number((/const HANDSHAKE_ATTEMPTS = (\d+)/.exec(route)?.[1] ?? "0"));
-  const ceiling = Number((/export const maxDuration = (\d+)/.exec(route)?.[1] ?? "0"));
+  /* ── THE SHAPE OF THE RETRY, and the evidence that set it ──────────────
+     Ten hours of production logs showed the handshake both succeeding and
+     failing, and this pair — 32 seconds apart, same region — is the whole
+     story:
 
-  check(`the handshake retries a dropped connection (${attempts} attempts)`,
-    attempts >= 2 && attempts <= 3);
-  check(`each attempt is long enough for a Tokyo-to-Beijing round trip (${budget}ms)`,
-    budget >= 10_000);
-  /* THE WHOLE BUDGET MUST FIT, not just one attempt. Two 13s attempts inside
-     a 30s ceiling would leave three seconds for auth, permissions and the
-     platform — and the function would be killed mid-retry, which reads to the
-     caller as the same failure it is trying to survive. */
-  check(`and all ${attempts} fit inside the function ceiling with room for the rest (${ceiling}s)`,
-    ceiling * 1000 - budget * attempts >= 10_000);
+       00:50:02  POST 504  UND_ERR_CONNECT_TIMEOUT
+       00:50:34  POST 200
+
+     The endpoint is not unreachable. The path works part of the time, in
+     bursts. Two EQUAL attempts did not help because both spent the full
+     budget and both died at the runtime's own ~10.4s connect timeout — two
+     samples, 21 seconds, one caller waiting. Against a path that comes and
+     goes, the number of samples is what matters, not the length of one.
+
+     SO THE FIRST ATTEMPT KEEPS THE LONG BUDGET and the rest are short. That
+     ordering is the safety property: a healthy-but-slow handshake still
+     succeeds on attempt one exactly as before, so this can never be slower
+     than what it replaced. Only after that has failed do the cheap samples
+     begin. */
+  const budgets = (/const HANDSHAKE_ATTEMPT_BUDGETS_MS = \[([^\]]+)\]/.exec(route)?.[1] ?? "")
+    .split(",").map((n) => Number(n.trim().replace(/_/g, ""))).filter((n) => n > 0);
+  const ceiling = Number((/export const maxDuration = (\d+)/.exec(route)?.[1] ?? "0"));
+  const total = budgets.reduce((a, b) => a + b, 0);
+
+  check(`the handshake samples the path more than twice (${budgets.length} attempts)`,
+    budgets.length >= 3 && budgets.length <= 6);
+  /* NEVER SLOWER THAN WHAT IT REPLACED. If a short attempt came first, a
+     handshake that is merely slow would be cut off and the caller would wait
+     longer than before for the same success. */
+  check(`the FIRST attempt carries the longest budget (${budgets[0]}ms)`,
+    budgets.length > 0 && budgets[0] === Math.max(...budgets));
+  check(`and it is long enough for a slow cross-border round trip (${budgets[0]}ms)`,
+    budgets[0] >= 10_000);
+  /* The later ones must be genuinely SHORT, or they are not extra samples —
+     they are just a longer wait wearing a different name. */
+  check("the later attempts are short samples, not more long stares",
+    budgets.slice(1).every((b) => b <= budgets[0] / 3));
+  /* THE WHOLE BUDGET MUST FIT, not just one attempt: a function killed
+     mid-retry reads to the caller as the failure it is trying to survive. */
+  check(`and all ${budgets.length} fit inside the function ceiling with room for the rest (${ceiling}s)`,
+    total > 0 && ceiling * 1000 - total >= 10_000);
+  check("the attempt count is derived from the table, not typed twice",
+    /const HANDSHAKE_ATTEMPTS = HANDSHAKE_ATTEMPT_BUDGETS_MS\.length/.test(route));
 
   /* A FRESH SIGNAL PER ATTEMPT, or the retry proves nothing: one
      AbortSignal.timeout made outside the loop fires on wall-clock time from
      when it was created, so the second attempt would abort the instant it
      began and look like an instant failure. */
-  check("each attempt gets its own timeout signal",
-    /for \(let attempt = 1[\s\S]{0,900}?signal: AbortSignal\.timeout\(HANDSHAKE_TIMEOUT_MS\)/.test(route));
+  check("each attempt gets its own timeout signal, at its own budget",
+    /for \(let attempt = 1[\s\S]{0,1200}?signal: AbortSignal\.timeout\(budgetMs\)/.test(route) &&
+    /const budgetMs = HANDSHAKE_ATTEMPT_BUDGETS_MS\[attempt - 1\]/.test(route));
   check("and the attempt number is logged, so a drop can be told from slowness",
     /attempt=\$\{attempt\}\/\$\{HANDSHAKE_ATTEMPTS\}/.test(route));
-  /* A successful attempt must stop the loop, or every call pays for two. */
+
+  /* SUCCESS IS EVIDENCE TOO. Only failures were ever logged, so nothing
+     recorded how long a WORKING handshake takes — which is precisely the
+     number needed to choose the short budget above. Until it exists, that
+     number is reasoning rather than data. */
+  check("a successful handshake logs its own duration, not just failures",
+    /handshake ok attempt=\$\{attempt\}/.test(route) &&
+    /handshake ok[\s\S]{0,300}?afterMs=\$\{Date\.now\(\) - startedAt\}/.test(route));
+  check("  …and says which region it succeeded from",
+    /handshake ok[\s\S]{0,300}?from=\$\{process\.env\.VERCEL_REGION/.test(route));
+
+  /* A successful attempt must stop the loop, or every call pays for all four.
+     Anchored on the success LOG rather than on a byte distance from the
+     fetch: the previous form counted characters, so adding that log pushed
+     the `break` out of range and failed on correct code. */
   check("a successful attempt stops retrying",
-    /res = await fetch\(cfg\.sdpUrl[\s\S]{0,700}?\n      break;/.test(route));
+    /handshake ok attempt[\s\S]{0,400}?\n      break;/.test(route));
 }
 
 console.log("\n── 3. Reading the protocol ──");
