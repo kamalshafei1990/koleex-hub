@@ -52,36 +52,31 @@ import { taughtQuestionIndex } from "@/lib/server/ai-knowledge";
 import { describeFetchFailure } from "@/lib/server/ai/voice/fetch-cause";
 
 /* ---------------------------------------------------------------------------
-   THIS FUNCTION RUNS IN A DIFFERENT REGION FROM THE REST OF THE APP, and the
-   reason is in vercel.json rather than here — so it is written down here too,
-   because a lone region override is otherwise indistinguishable from a
-   mistake.
+   THIS FUNCTION RUNS WHERE THE REST OF THE APP RUNS, and it briefly did not.
 
-   Production said, on both attempts and repeatedly:
+   For a day it was pinned to Hong Kong, on the reasoning that Hong Kong peers
+   into mainland China in a way Tokyo does not, and that the endpoint was
+   therefore unroutable from Tokyo. The log then showed the move had really
+   taken effect (`from=hkg1`) and the handshake still failed — from which I
+   concluded that the region was eliminated as a cause.
 
-     cause=TypeError/UND_ERR_CONNECT_TIMEOUT  afterMs=10389  budgetMs=13000
+   THAT CONCLUSION WAS DRAWN FROM ONE FAILURE, and more data reversed it:
 
-   UND_ERR_CONNECT_TIMEOUT is the TCP connection never opening. Not DNS —
-   that is ENOTFOUND. Not a refusal — that is ECONNREFUSED. Not TLS, not a
-   reset. The packets left and nothing came back, in ~10.4s, every time,
-   from Tokyo to the vendor's Beijing endpoint.
+     hnd1 (Tokyo)      38 successful handshakes, 23 failures
+     hkg1 (Hong Kong)   0 successful handshakes,  9 failures
 
-   Nothing this route can do fixes an unroutable path, so the route moved
-   instead: Hong Kong, which peers into mainland China in a way Tokyo does
-   not. ONLY THIS FUNCTION MOVES. Everything else stays in hnd1.
+   Tokyo was working about six times in ten. Hong Kong has never once
+   completed a handshake. So the region was not neutral — the move made it
+   worse, and "it still fails there" was not evidence that where we run does
+   not matter. It was one sample.
 
-   AND IT DOES NOT WEAKEN THE CHINA REQUIREMENT — this is the part worth
-   being explicit about, because it looks at first glance as though it
-   might. The AUDIO never touches this server: it is browser ↔ vendor
-   directly, and for a caller inside mainland China that path is
-   China-to-China and unchanged. The only leg that moves is the SDP exchange
-   our server brokers on their behalf, which was the one leg that was
-   broken.
+   The pin is gone. This function is back in the project's own region, and
+   the vercel.json `functions` override with it.
 
-   THE COST, stated: this function's own auth and knowledge reads now cross
-   Hong Kong → wherever the database lives, instead of Tokyo → there. That is
-   tens of milliseconds in front of a call that otherwise spends ten seconds
-   failing. */
+   WHAT THIS DOES NOT EXPLAIN, and is still open with the vendor: why the
+   connection is refused at the TCP layer at all — UND_ERR_CONNECT_TIMEOUT,
+   no HTTP response of any kind, from either region. Tokyo is the better of
+   two bad paths, not a working one. */
 export const dynamic = "force-dynamic";
 /* The handshake is one round trip to the vendor. It is not the call. */
 /* Forty-five, because the handshake now gets two attempts. See ATTEMPTS

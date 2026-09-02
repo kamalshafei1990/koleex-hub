@@ -191,18 +191,26 @@ console.log("\n── 3. The route, read — the surface a fetch cannot be teste
     /let taughtQuestions: string\[\] = \[\];/.test(code));
   check("and the index reaches the full session, never the compact fallback",
     /buildVoiceSessionPayload\(voice, taughtQuestions\)/.test(code));
-  /* ── WHERE THIS FUNCTION RUNS, and why it is not where everything else
-     runs ────────────────────────────────────────────────────────────────
-     Production, on both attempts and repeatedly:
+  /* ── WHERE THIS FUNCTION RUNS, and why it is no longer pinned ─────────
+     For a day this asserted the OPPOSITE: that the handshake was pinned away
+     from the project's region, to Hong Kong, because the endpoint looked
+     unroutable from Tokyo. The log then confirmed the move had really taken
+     effect (from=hkg1) and the handshake still failed — and I read that as
+     the region being eliminated as a cause.
 
-       cause=TypeError/UND_ERR_CONNECT_TIMEOUT afterMs=10389 budgetMs=13000
+     THAT WAS ONE SAMPLE, and more of them reversed it:
 
-     That is the TCP connection never opening — not DNS (ENOTFOUND), not a
-     refusal (ECONNREFUSED), not TLS, not a reset. An unroutable path is not
-     something a route can fix, so the route moved instead.
+       hnd1 (Tokyo)      38 successful handshakes, 23 failures
+       hkg1 (Hong Kong)   0 successful handshakes,  9 failures
 
-     A LONE REGION OVERRIDE IS INDISTINGUISHABLE FROM A MISTAKE once the
-     person who added it is gone, which is what these assertions are for. */
+     Tokyo worked about six times in ten. Hong Kong never completed a single
+     handshake. "It still fails there" was never evidence that where we run
+     does not matter, and the pin made a bad path worse.
+
+     THE ASSERTIONS ARE INVERTED RATHER THAN DELETED. Deleting them would
+     leave nothing standing between the next person and the same idea, which
+     is superficially very reasonable. Anyone re-pinning this function now has
+     to come here, change this, and read the numbers first. */
   {
     const vercelCfg = JSON.parse(readFileSync("vercel.json", "utf8")) as {
       regions?: string[];
@@ -210,29 +218,28 @@ console.log("\n── 3. The route, read — the surface a fetch cannot be teste
       crons?: unknown[];
     };
     const VOICE_FN = "src/app/api/ai/voice/session/route.ts";
-    const pinned = vercelCfg.functions?.[VOICE_FN]?.regions ?? [];
-    check("the voice handshake is pinned to its own region",
-      pinned.length === 1);
-    check("  …and it is NOT the project default it was failing from",
-      pinned[0] !== (vercelCfg.regions ?? [])[0]);
-    /* ONLY THIS ONE MOVES. The whole app relocating to chase one endpoint
-       would be a far larger change than the evidence supports. */
-    check("no other function was moved along with it",
-      Object.keys(vercelCfg.functions ?? {}).length === 1);
-    check("and the project default is untouched",
+    check("the voice handshake is NOT pinned away from the project's region",
+      vercelCfg.functions?.[VOICE_FN]?.regions === undefined);
+    check("  …and no per-function region override survives at all",
+      Object.keys(vercelCfg.functions ?? {}).length === 0);
+    check("the project default is the region that actually completes handshakes",
       JSON.stringify(vercelCfg.regions) === JSON.stringify(["hnd1"]));
     /* Non-vacuity: rewriting vercel.json is how the scheduled work gets
-       dropped by accident. */
-    check("  …as are the cron jobs that share this file",
+       dropped by accident, and it has been rewritten twice now. */
+    check("  …and the cron jobs sharing this file survived the edit",
       Array.isArray(vercelCfg.crons) && vercelCfg.crons.length === 5);
 
-    /* THE MOVE HAS TO BE OBSERVABLE OR IT CANNOT BE CONFIRMED. `region=` in
-       this log is the VENDOR's label; without our own execution region a
-       still-failing handshake looks identical to one that never moved. */
+    /* THE FIELD THAT MADE THE REVERSAL POSSIBLE, and the reason it stays.
+       `region=` in this log is the VENDOR's label. Without our own execution
+       region there was no way to tell a handshake that moved and still failed
+       from one that never moved — and no way to count successes per region,
+       which is the comparison that settled it. */
     check("a failed handshake reports the region OUR function ran in",
       /from=\$\{process\.env\.VERCEL_REGION \?\? "local"\}/.test(code));
     check("  …distinctly from the vendor's own region label",
       /from=\$\{[^}]*\}[\s\S]{0,60}region=\$\{cfg\.regionLabel\}/.test(code));
+    check("  …and a SUCCESSFUL one reports it too, or successes cannot be counted per region",
+      /handshake ok[\s\S]{0,200}?from=\$\{process\.env\.VERCEL_REGION/.test(code));
   }
 
   check("and carries no endpoint, model, key or region",
