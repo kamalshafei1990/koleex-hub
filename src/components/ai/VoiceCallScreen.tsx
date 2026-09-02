@@ -25,6 +25,7 @@ import AIOrb from "@/components/ai-orb/AIOrb";
 import type { AIOrbState } from "@/components/ai-orb/ai-orb-types";
 import VoiceTranscript from "@/components/ai/VoiceTranscript";
 import { type TranscriptLine, type VoicePhase } from "@/lib/voice/events";
+import { type ProductPhoto } from "@/lib/voice/photos";
 import { type Lang } from "@/lib/i18n";
 
 const COPY: Record<Lang, {
@@ -52,6 +53,9 @@ const COPY: Record<Lang, {
   typePlaceholder: string;
   sendTyped: string;
   typedNotLive: string;
+  /* The group name for the photo strip, and the alt text when a product has
+     no name — a screen reader should hear what the pictures are. */
+  photos: string;
 }> = {
   en: {
     connecting: "Connecting…",
@@ -72,6 +76,7 @@ const COPY: Record<Lang, {
     typePlaceholder: "Type something into the call…",
     sendTyped: "Send typed message",
     typedNotLive: "The call is still connecting — try again in a moment.",
+    photos: "Product photos",
   },
   zh: {
     connecting: "正在连接…",
@@ -92,6 +97,7 @@ const COPY: Record<Lang, {
     typePlaceholder: "在通话中输入文字…",
     sendTyped: "发送文字",
     typedNotLive: "通话仍在连接中，请稍后再试。",
+    photos: "产品图片",
   },
   ar: {
     connecting: "جارٍ الاتصال…",
@@ -112,6 +118,7 @@ const COPY: Record<Lang, {
     typePlaceholder: "اكتب حاجة في المكالمة…",
     sendTyped: "ابعت الرسالة المكتوبة",
     typedNotLive: "المكالمة لسه بتتصل — حاول كمان لحظة.",
+    photos: "صور المنتج",
   },
 };
 
@@ -136,6 +143,9 @@ export type VoiceCallScreenProps = {
   /** A lookup is running. Two seconds of silence on a call reads as a freeze;
    *  this is the difference between waiting and wondering. */
   searching?: boolean;
+  /** What the last lookup showed: product photos, https only, at most a
+   *  handful. Empty draws nothing. */
+  photos?: readonly ProductPhoto[];
   /** Keys and labels only — the server's catalogue, never the vendor's ids.
    *  Empty means no picker is drawn: a control that cannot be used is noise. */
   voices?: readonly { key: string; label: string }[];
@@ -161,6 +171,7 @@ export default function VoiceCallScreen({
   muted = false,
   onToggleMute,
   searching = false,
+  photos = [],
   voices = [],
   selectedVoice = null,
   onSelectVoice,
@@ -320,6 +331,37 @@ export default function VoiceCallScreen({
           {status}
         </p>
       </div>
+
+      {/* THE PRODUCT, SHOWN. A lookup that returned photos puts them here,
+          under the orb and above the words: the caller hears "the KX-180"
+          and sees it. Thumbnails on the 8px grid, the same hairline border
+          as every control on this screen, the name under each in the same
+          quiet grey as the labels. No lightbox: a call is not the place to
+          study a picture, and the saved message carries it full size. */}
+      {photos.length > 0 && (
+        <div className="shrink-0 px-6 pb-4" role="group" aria-label={copy.photos}>
+          <div className="max-w-[820px] mx-auto flex items-start justify-center gap-4 overflow-x-auto">
+            {photos.map((p) => (
+              <figure key={p.url} className="shrink-0 w-28 m-0">
+                {/* Remote product photos from whatever host the catalogue names — next/image needs a fixed allowlist. Same call as Bubble. */}
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={p.url}
+                  alt={p.label || copy.photos}
+                  loading="lazy"
+                  decoding="async"
+                  className="block w-28 h-28 object-cover rounded-2xl border border-white/20 bg-white/[0.04]"
+                />
+                {p.label && (
+                  <figcaption className="mt-2 text-center text-[11px] leading-snug text-[#AAAAAA] truncate" title={p.label}>
+                    {p.label}
+                  </figcaption>
+                )}
+              </figure>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Voice picker — only when the owner has configured a catalogue. Plain
           text buttons rather than a dropdown: two or three options read faster

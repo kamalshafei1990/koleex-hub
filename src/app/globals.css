@@ -4322,6 +4322,23 @@ html[data-kx-tabslide] #main-scroll-container { overflow-x: clip; }
   font-weight: 650;
   white-space: nowrap;
 }
+/* Product photos inside an answer: bounded, rounded, a hairline edge, and
+   room around them so a picture sits between sentences rather than on one. */
+.koleex-md .koleex-md-img-link {
+  display: inline-block;
+  margin: 8px 0;
+  line-height: 0;
+}
+.koleex-md img.koleex-md-img {
+  display: block;
+  max-width: min(100%, 320px);
+  max-height: 320px;
+  height: auto;
+  border-radius: 12px;
+  border: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.08));
+  background: rgba(255, 255, 255, 0.04);
+  object-fit: cover;
+}
 
 /* Code blocks inside AI answers (was also dead styled-jsx). */
 .koleex-code-block {

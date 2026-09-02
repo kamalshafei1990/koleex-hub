@@ -165,6 +165,20 @@ console.log("\n── 5b. How the words got in — spoken or typed — survives 
     () => typed.length === 1 && typed[0].via === "text");
 }
 
+console.log("\n── 5c. A photo attaches to the turn that showed it, and stays ──");
+{
+  const pic = [{ url: "https://cdn.example/kx180.jpg", label: "KX-180" }];
+  let lines: TranscriptLine[] = [];
+  lines = appendTranscript(lines, { role: "assistant", text: "The KX", final: false, photos: pic });
+  check("photos ride on the new line", () => lines[0].photos?.[0].url === pic[0].url);
+  lines = appendTranscript(lines, { role: "assistant", text: "The KX-180 spreads 1.8 m.", final: true });
+  check("  …and survive the deltas and the final that omit them", () => lines[0].photos?.length === 1 && lines[0].final);
+  lines = appendTranscript(lines, { role: "user", text: "and the price?", final: true });
+  check("the next turn carries none", () => lines[1].photos === undefined && !("photos" in lines[1]));
+  const bare = appendTranscript([], { role: "assistant", text: "hi", final: false, photos: [] });
+  check("an empty list adds no field", () => !("photos" in bare[0]));
+}
+
 console.log("\n── 6. The awkward cases a live call actually produces ──");
 {
   /* A repeated event — a retransmit, or React replaying a handler — must not
