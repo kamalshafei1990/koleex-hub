@@ -135,6 +135,22 @@ export function parseVoiceConfig(env: VoiceEnv): VoiceConfig | null {
   };
 }
 
+/** The five variables, read from the process.
+ *
+ *  Two route files carry a private copy of this because a Next.js route file
+ *  may only export handlers. This is the one that can be imported. A third
+ *  private copy is how one of them quietly forgets a field — which is exactly
+ *  how AI_VOICE_VOICES went unread for a release. */
+export function readVoiceEnv(): VoiceEnv {
+  return {
+    AI_VOICE_BASE_URL: process.env.AI_VOICE_BASE_URL,
+    AI_VOICE_API_KEY: process.env.AI_VOICE_API_KEY,
+    AI_VOICE_MODEL: process.env.AI_VOICE_MODEL,
+    AI_VOICE_REGION_LABEL: process.env.AI_VOICE_REGION_LABEL,
+    AI_VOICE_VOICES: process.env.AI_VOICE_VOICES,
+  };
+}
+
 /** Whether voice would serve, without building anything. */
 export function voiceConfigured(env: VoiceEnv): boolean {
   return parseVoiceConfig(env) !== null;

@@ -44,6 +44,18 @@ function check(label: string, cond: boolean | (() => boolean)) {
   else { failures.push(label); console.log(`  ✗ ${label}`); }
 }
 
+/* A SUITE THAT STOPS EARLY MUST NOT PASS. The first run of section 11 ended
+   with exit code 0 and no summary: an awaited promise waited on nothing but
+   an AbortSignal.timeout, whose timer Node unrefs, so the loop drained and
+   the process simply left — every assertion after it unrun, CI green. */
+let summarised = false;
+process.on("exit", (code) => {
+  if (!summarised && code === 0) {
+    console.log("\n  ✗ the suite exited before reaching its summary — assertions were never run");
+    process.exitCode = 1;
+  }
+});
+
 const strip = (t: string) => t.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
 
 const GOOD = {
@@ -227,7 +239,7 @@ console.log("\n── 3. The route, read — the surface a fetch cannot be teste
     /* Non-vacuity: rewriting vercel.json is how the scheduled work gets
        dropped by accident, and it has been rewritten twice now. */
     check("  …and the cron jobs sharing this file survived the edit",
-      Array.isArray(vercelCfg.crons) && vercelCfg.crons.length === 5);
+      Array.isArray(vercelCfg.crons) && vercelCfg.crons.length === 6);
 
     /* THE FIELD THAT MADE THE REVERSAL POSSIBLE, and the reason it stays.
        `region=` in this log is the VENDOR's label. Without our own execution
@@ -343,6 +355,53 @@ void (async () => {
       !JSON.stringify(dead).includes("10.1.2.3"));
     check("the unreachable verdict names the variable to check",
       dead!.verdict.includes("AI_VOICE_BASE_URL"));
+
+    /* THE CODE SURVIVES, THE MESSAGE DOES NOT. A bare Error has no cause, so
+       the probe reports the error's NAME; a fetch failure carries undici's
+       code in .cause, and THAT is what separates "DNS" from "TCP never
+       opened" — the distinction this investigation lost twice. */
+    check("a failure with no cause reports the error name and nothing more",
+      dead!.cause === "Error");
+    const withCode = (async () => {
+      const err = new TypeError("fetch failed");
+      (err as { cause?: unknown }).cause = Object.assign(
+        new Error("connect timeout to 10.1.2.3:443"), { code: "UND_ERR_CONNECT_TIMEOUT" });
+      throw err;
+    }) as unknown as typeof fetch;
+    const timedOut = await probeVoice(GOOD, withCode);
+    check("a fetch failure reports the transport code",
+      timedOut!.cause === "TypeError/UND_ERR_CONNECT_TIMEOUT");
+    check("  …and still not the host inside the cause's message",
+      !JSON.stringify(timedOut).includes("10.1.2.3"));
+    const okProbe = await probeVoice(GOOD, (async () => new Response("", { status: 400 })) as unknown as typeof fetch);
+    check("an HTTP answer has no cause — the field means transport failure only",
+      okProbe!.cause === null);
+
+    /* THE TIMEOUT IS THE CALLER'S TO SET. The watchdog needs the real route's
+       budget; the admin page keeps the old default. A probe that ignored the
+       argument would make the watchdog measure the wrong thing silently. */
+    let seenTimeout: AbortSignal | undefined;
+    const capturing = (async (_u: string | URL, init?: RequestInit) => {
+      seenTimeout = init?.signal ?? undefined;
+      return new Response("", { status: 400 });
+    }) as unknown as typeof fetch;
+    await probeVoice(GOOD, capturing, 50);
+    check("the probe carries an abort signal", seenTimeout instanceof AbortSignal);
+    /* Node unrefs the timer behind AbortSignal.timeout: a promise waiting on
+       nothing BUT that signal lets the process exit silently, mid-suite, with
+       code 0 — which is exactly what happened the first time this ran. The
+       ref'd fallback timer keeps the loop alive; the abort wins at 50ms. */
+    const stalling = ((_u: string | URL, init?: RequestInit) =>
+      new Promise<Response>((_res, rej) => {
+        const fallback = setTimeout(() => rej(new Error("fallback: abort never fired")), 5_000);
+        init?.signal?.addEventListener("abort", () => { clearTimeout(fallback); rej(init.signal!.reason); });
+      })) as unknown as typeof fetch;
+    const t0 = Date.now();
+    const gaveUp = await probeVoice(GOOD, stalling, 50);
+    check("a stalled connection is abandoned at the timeout the caller chose",
+      gaveUp!.reachable === false && Date.now() - t0 < 2_000);
+    check("  …and reported as the timeout it was",
+      gaveUp!.cause === "TimeoutError");
   }
 
   console.log("\n── 6. The status route reports voice, and reports it safely ──");
@@ -542,6 +601,88 @@ void (async () => {
       /cfg \? publicVoiceList\(cfg\.voices\) : \[\]/.test(bare));
   }
 
+  console.log("\n── 11. The watchdog measures the real path, on the real budget, and says so safely ──");
+  {
+    /* WHY A SUITE SECTION FOR A CRON. Every earlier diagnosis of the voice
+       504 waited on the owner pressing the button. This route is what makes
+       the path's health a NUMBER instead of a complaint — and a watchdog that
+       silently measured the wrong endpoint, the wrong budget, or nothing at
+       all would be worse than none, because it would be believed. */
+    const WATCH = "src/app/api/cron/voice-watch/route.ts";
+    const code = readFileSync(WATCH, "utf8");
+    const bare = strip(code);
+    const session = strip(readFileSync("src/app/api/ai/voice/session/route.ts", "utf8"));
+    const vercelCfg = JSON.parse(readFileSync("vercel.json", "utf8")) as {
+      crons?: { path: string; schedule: string }[];
+    };
+
+    /* Scheduled, at a cadence that yields a per-region success RATE within
+       hours rather than days. */
+    const cron = (vercelCfg.crons ?? []).find((c) => c.path === "/api/cron/voice-watch");
+    check("vercel.json schedules the watchdog", cron !== undefined);
+    check("  …every fifteen minutes — 96 samples a day", cron?.schedule === "*/15 * * * *");
+
+    /* Guarded like every other cron, and BEFORE anything is spent. */
+    const guardAt = bare.indexOf("process.env.CRON_SECRET");
+    const probeAt = bare.indexOf("await probeVoice(");
+    check("the watchdog is gated by the cron bearer", guardAt !== -1 &&
+      /authz !== `Bearer \$\{secret\}`/.test(bare) && /status: 401/.test(bare));
+    check("  …before the probe runs", guardAt < probeAt);
+
+    /* THE SAME REQUEST A CALL MAKES. Not a HEAD, not a ping to the host,
+       not a second hand-rolled fetch — the probe module, with the shared
+       env reader, so a field the session route reads cannot be one the
+       watchdog forgets. */
+    check("it probes through the shared probe module",
+      /import \{ probeVoice \} from "@\/lib\/server\/ai\/voice\/probe"/.test(bare) &&
+      /probeVoice\(env, fetch, WATCH_TIMEOUT_MS\)/.test(bare));
+    check("  …with the shared env reader, not a private copy of the variable list",
+      /readVoiceEnv\(\)/.test(bare) && !/process\.env\.AI_VOICE_/.test(bare));
+    check("  …and never calls fetch itself", !/\bfetch\(/.test(bare));
+
+    /* THE SAME BUDGET A CALL GETS. Read both constants out of the source and
+       compare the numbers: a probe that gives up sooner reports failures
+       callers never see; one that waits longer hides the ones they do. */
+    const watchBudget = Number((bare.match(/const WATCH_TIMEOUT_MS = ([\d_]+)/)?.[1] ?? "").replace(/_/g, ""));
+    const routeBudgets = (session.match(/HANDSHAKE_ATTEMPT_BUDGETS_MS = \[([^\]]+)\]/)?.[1] ?? "")
+      .split(",").map((n) => Number(n.trim().replace(/_/g, ""))).filter((n) => Number.isFinite(n));
+    check("the watchdog waits exactly as long as the route's longest attempt",
+      routeBudgets.length > 0 && watchBudget === Math.max(...routeBudgets));
+    const maxDur = Number(bare.match(/export const maxDuration = (\d+)/)?.[1] ?? "0");
+    check("  …and the function's own ceiling clears that budget",
+      maxDur * 1000 > watchBudget);
+
+    /* THE SAME VOCABULARY. One log query must cover real calls and probes. */
+    check("the log line carries the tag, our region, the vendor label, the duration and the cause",
+      /\[ai\.voice\.watch\]/.test(bare) &&
+      /from=\$\{from\}/.test(bare) && /from = process\.env\.VERCEL_REGION \?\? "local"/.test(bare) &&
+      /region=\$\{region\}/.test(bare) && /afterMs=\$\{probe\.ms\}/.test(bare) &&
+      /cause=\$\{probe\.cause \?\? "none"\}/.test(bare));
+    check("  …with the same field names the session route logs",
+      /from=\$\{/.test(session) && /region=\$\{/.test(session) && /afterMs=/.test(session) && /cause=/.test(session));
+    check("a failure is logged at error level, a success is not",
+      /if \(probe\.reachable\) console\.log\(line\)/.test(bare) && /else console\.error\(line\)/.test(bare));
+    check("a lost configuration is said once, and answered quietly",
+      /console\.warn\("\[ai\.voice\.watch\] not configured/.test(bare) &&
+      /configured: false/.test(bare));
+
+    /* NEVER THE URL, NEVER THE KEY, NEVER THE VENDOR'S WORDS. */
+    check("no endpoint, key or vendor text can reach the log or the response",
+      !/sdpUrl/.test(bare) && !/apiKey/.test(bare) && !/AI_VOICE_API_KEY/.test(bare) &&
+      !/AI_VOICE_BASE_URL/.test(bare) && !/verdict/.test(bare));
+    check("route files export handlers and config only",
+      (bare.match(/^export /gm) ?? []).length === 3 &&
+      /export const dynamic/.test(bare) && /export const maxDuration/.test(bare) &&
+      /export async function GET/.test(bare));
+
+    /* THE ADMIN PAGE IS UNCHANGED. Adding a parameter must not have moved
+       the page that was already measuring at its own, shorter budget. */
+    const providers = strip(readFileSync("src/app/api/ai/providers/route.ts", "utf8"));
+    check("the status page still probes at the default budget",
+      /probeVoice\(voiceEnv\(\)\)/.test(providers));
+  }
+
+  summarised = true;
   console.log(`\n${pass} passed, ${failures.length} failed`);
   if (failures.length) {
     console.log("\nFAILED:");

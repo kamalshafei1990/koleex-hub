@@ -1,0 +1,91 @@
+import "server-only";
+
+/* ---------------------------------------------------------------------------
+   GET /api/cron/voice-watch — does the voice endpoint answer RIGHT NOW?
+
+   WHY THIS EXISTS. For several days the only way anyone learned the voice
+   handshake was failing was the owner pressing the call button, watching it
+   fail, and reporting it. Every diagnosis then waited on him to try again.
+   A region change that took the success rate from six-in-ten to zero ran for
+   a full day before anyone counted, because nothing was counting.
+
+   THIS COUNTS. Every fifteen minutes it makes the same request a real call
+   makes — to the same endpoint, with the same budget — and writes one line
+   saying whether the connection opened and how long it took. Over a day that
+   is 96 samples of the path's health that cost the owner nothing and spend no
+   vendor tokens: the offer is deliberately invalid, so no session ever
+   starts (see ai/voice/probe.ts).
+
+   WHAT IT IS NOT. It does not make voice work and does not retry. It is a
+   measurement. A watchdog that also tried to fix things would be one more
+   place a change could quietly make the path worse — and we have had enough
+   of those.
+
+   SAME VOCABULARY AS THE REAL HANDSHAKE, ON PURPOSE. The line it logs uses the
+   same fields the session route logs on a real call — from=, region=,
+   afterMs=, cause= — so one log query answers "how healthy is the path" across
+   both real calls and probes, and a probe result is directly comparable to a
+   call result.
+
+   PROTECTED THE SAME WAY EVERY CRON HERE IS: the CRON_SECRET bearer Vercel
+   attaches to scheduled invocations. Not user-facing, no session, no tenant.
+   --------------------------------------------------------------------------- */
+
+import { NextResponse } from "next/server";
+import { readVoiceEnv } from "@/lib/server/ai/voice/config";
+import { probeVoice } from "@/lib/server/ai/voice/probe";
+
+export const dynamic = "force-dynamic";
+/* One probe at the route's own first-attempt budget, plus headroom. */
+export const maxDuration = 25;
+
+/* THE REAL ROUTE'S FIRST-ATTEMPT BUDGET. Kept equal to the longest entry in
+   HANDSHAKE_ATTEMPT_BUDGETS_MS in ai/voice/session/route.ts, and asserted
+   equal by the suite: a probe that gives up sooner than the route does
+   reports failures callers never see, and one that waits longer hides the
+   ones they do. */
+const WATCH_TIMEOUT_MS = 13_000;
+
+export async function GET(req: Request) {
+  const secret = process.env.CRON_SECRET;
+  if (secret) {
+    const authz = req.headers.get("authorization");
+    if (authz !== `Bearer ${secret}`) {
+      return NextResponse.json({ error: "Unauthorised" }, { status: 401 });
+    }
+  }
+
+  const env = readVoiceEnv();
+  const probe = await probeVoice(env, fetch, WATCH_TIMEOUT_MS);
+
+  /* Nothing to watch is not a failure. It is logged once so a deployment that
+     LOST its configuration is visible, then answered quietly. */
+  if (!probe) {
+    console.warn("[ai.voice.watch] not configured — nothing to probe");
+    return NextResponse.json({ configured: false });
+  }
+
+  const from = process.env.VERCEL_REGION ?? "local";
+  const region = env.AI_VOICE_REGION_LABEL?.trim() || "default";
+
+  /* ONE LINE, ONE VERDICT. `ok` means the endpoint ANSWERED — an HTTP status
+     came back, so DNS, routing and TCP all worked. That is the thing that has
+     been failing; whether the status was the expected 400 is the second,
+     separate question probe.verdict already answers. Never the URL, never the
+     key, never the vendor's own words. */
+  const line =
+    `[ai.voice.watch] ${probe.reachable ? "ok" : "fail"} from=${from} region=${region} ` +
+    `status=${probe.status ?? "none"} afterMs=${probe.ms} cause=${probe.cause ?? "none"}`;
+  if (probe.reachable) console.log(line);
+  else console.error(line);
+
+  return NextResponse.json({
+    configured: true,
+    reachable: probe.reachable,
+    credential_ok: probe.credential_ok,
+    status: probe.status,
+    ms: probe.ms,
+    cause: probe.cause,
+    from,
+  });
+}
