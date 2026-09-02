@@ -160,15 +160,26 @@ check(
      for the camelCase name, found nothing, and nearly reported the knowledge
      approval bench as unguarded — a false security finding avoided only by
      opening the file. */
+  /* THE VOICE ROUTES GO THROUGH ONE SHARED GATE (ai/voice/gate.ts) rather than
+     each carrying the chain, because a second copy of the chain is how the
+     door got dropped from the session route once. The scan recognises that
+     gate as the door ONLY because the next check proves the gate carries it —
+     a recognised name with nothing behind it would be a hole with a label. */
+  const gateSrc = read("src/lib/server/ai/voice/gate.ts");
+  check(
+    "the shared voice gate carries the internal door itself",
+    /requireInternalUser\(auth\)/.test(gateSrc) && /export async function authorizeVoice\(/.test(gateSrc),
+  );
+  const hasInternalDoor = (c: string) => /requireInternalUser\(/.test(c) || /await authorizeVoice\(req\)|const authorize = authorizeVoice;/.test(c);
   const ungated = legacyRoutes.filter((f) => {
     const c = read(f);
-    return !/requireInternalUser\(/.test(c) && !/auth\.is_super_admin/.test(c);
+    return !hasInternalDoor(c) && !/auth\.is_super_admin/.test(c);
   });
   check(
     `every legacy AI route carries the internal door or the super-admin gate${ungated.length ? ` — ungated: ${ungated.map((f) => relative(LEGACY_ROOT, f)).join(", ")}` : ""}`,
     ungated.length === 0,
   );
-  const superAdminOnly = legacyRoutes.filter((f) => !/requireInternalUser\(/.test(read(f)));
+  const superAdminOnly = legacyRoutes.filter((f) => !hasInternalDoor(read(f)));
   check(
     `the knowledge approval bench is super-admin gated, stricter than internal (${superAdminOnly.length} routes)`,
     superAdminOnly.every((f) => /auth\.is_super_admin/.test(read(f))),

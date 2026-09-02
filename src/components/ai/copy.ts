@@ -107,6 +107,8 @@ export const COPY: Record<Lang, {
      the eight strings that actually need translating. */
   emojiCategories: Record<string, string>;
   insertEmoji: string;
+  /** The mark on a message that was spoken on a call rather than typed. */
+  voiceMessage: string;
   prompts: string[];
 }> = {
   en: {
@@ -184,6 +186,7 @@ export const COPY: Record<Lang, {
     thinkingAria: "Koleex AI is thinking",
     emojiCategories: { smileys: "Smileys & People", nature: "Animals & Nature", food: "Food & Drink", activity: "Activity", travel: "Travel & Places", objects: "Objects", symbols: "Symbols", flags: "Flags" },
     insertEmoji: "Insert",
+    voiceMessage: "Spoken on a call",
     prompts: [
       "What's a good way to start my day at work?",
       "Help me write a polite reply to a customer email.",
@@ -265,6 +268,7 @@ export const COPY: Record<Lang, {
     thinkingAria: "Koleex AI 正在思考",
     emojiCategories: { smileys: "笑脸与人物", nature: "动物与自然", food: "食物与饮料", activity: "活动", travel: "旅行与地点", objects: "物品", symbols: "符号", flags: "旗帜" },
     insertEmoji: "插入",
+    voiceMessage: "语音通话中说的",
     prompts: [
       "早上开始工作的好方法是什么？",
       "帮我给客户写一封礼貌的回复邮件。",
@@ -347,6 +351,7 @@ export const COPY: Record<Lang, {
     thinkingAria: "Koleex AI يفكّر",
     emojiCategories: { smileys: "الوجوه والأشخاص", nature: "الحيوانات والطبيعة", food: "الطعام والشراب", activity: "الأنشطة", travel: "السفر والأماكن", objects: "الأشياء", symbols: "الرموز", flags: "الأعلام" },
     insertEmoji: "إدراج",
+    voiceMessage: "اتقالت في مكالمة",
     prompts: [
       "ما طريقة جيدة لبدء يومي في العمل؟",
       "ساعدني في كتابة رد مهذب على رسالة من عميل.",

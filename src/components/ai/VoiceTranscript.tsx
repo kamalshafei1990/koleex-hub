@@ -3,17 +3,17 @@
 /* ---------------------------------------------------------------------------
    VoiceTranscript — what was just said, while it is being said.
 
-   WHY THIS IS NOT A CHAT BUBBLE. Voice turns are NOT persisted: nothing on the
-   server writes them to a conversation, and reloading the page loses them.
-   Rendering them as messages would make them look saved when they are not,
-   and a user who came back expecting to find yesterday's call in their history
-   would find an empty thread. A caption strip says what it is — live text that
-   belongs to this call and ends with it.
+   WHY THIS IS NOT A CHAT BUBBLE. This is the LIVE view: partial text that
+   rewrites itself as a person speaks. Settled turns are written into the
+   conversation as real messages by src/lib/voice/persist.ts — through a route
+   that checks the caller owns the thread — and appear in the message list
+   with a voice mark once the server has them. So the caption strip and the
+   bubbles are the same words at two moments: here while they are being said,
+   there once they are saved. Rendering the live half as bubbles would make a
+   half-spoken sentence look like a record.
 
-   IT ALSO KEEPS TWO SEPARATE THINGS SEPARATE. The message list is the record
-   of a typed conversation. Splicing spoken turns into it would mean the list
-   sometimes holds things the server has never heard of, which every other part
-   of this app is entitled to assume is impossible.
+   (This header used to say voice turns were not persisted and drew the same
+   conclusion from the opposite fact. The conclusion survived the fact.)
 
    PARTIAL TEXT IS SHOWN, NOT WITHHELD. A caption that only appears once a turn
    is final arrives after the moment it was useful. Partial text is dimmed and

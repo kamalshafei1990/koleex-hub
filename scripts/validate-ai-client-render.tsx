@@ -187,6 +187,25 @@ console.log("\n── 7. The transcript bubble (Phase 2J, completed) ──");
   check("the recommended option is marked", card !== html(<Bubble {...({ ...withQuestion, msg: { ...withQuestion.msg, steps: [{ kind: "question", payload: { question: "Which spreading machine?", lang: "en", options: [{ label: "KX-180", detail: "1.8 m" }, { label: "KX-220", detail: "2.2 m" }] } }] } } as any)} />));
 }
 
+console.log("\n── 7b. A spoken message wears a mark; a typed one does not ──");
+{
+  /* eslint-disable @typescript-eslint/no-explicit-any */
+  const base: any = { id: "v1", role: "assistant", content: "Fourteen orders today.", created_at: "2026-09-02T10:00:00Z" };
+  const spoken = html(<Bubble {...({ msg: { ...base, source: "voice" }, userInitial: "M", lang: "en" } as any)} />);
+  const typed = html(<Bubble {...({ msg: { ...base, source: "text" }, userInitial: "M", lang: "en" } as any)} />);
+  const legacy = html(<Bubble {...({ msg: base, userInitial: "M", lang: "en" } as any)} />);
+  check("a voice row shows the spoken mark", text(spoken).includes("Spoken on a call"));
+  check("a typed row shows none", !text(typed).includes("Spoken on a call"));
+  check("a row from before the column existed shows none either", !text(legacy).includes("Spoken on a call") && legacy === typed);
+  check("the mark is on user turns too — both sides of a call were spoken",
+    text(html(<Bubble {...({ msg: { ...base, role: "user", source: "voice" }, userInitial: "M", lang: "en" } as any)} />)).includes("Spoken on a call"));
+  check("the mark is localised", text(html(<Bubble {...({ msg: { ...base, source: "voice" }, userInitial: "M", lang: "ar" } as any)} />)).includes(COPY.ar.voiceMessage) &&
+    COPY.ar.voiceMessage !== COPY.en.voiceMessage && COPY.zh.voiceMessage !== COPY.en.voiceMessage);
+  /* An empty placeholder bubble is the typing indicator; a mark under it would
+     announce a spoken message that has not been spoken. */
+  check("no mark on an empty placeholder", !text(html(<Bubble {...({ msg: { ...base, content: "", source: "voice" }, userInitial: "M", lang: "en" } as any)} />)).includes("Spoken on a call"));
+}
+
 console.log("\n── 8. The sidebar rows ──");
 {
   /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -841,6 +860,45 @@ console.log("\n── The transcript belongs to the call, not to the chat ──
   /* It is rendered by the call screen, which closes with the call. */
   const screen = readFileSync("src/components/ai/VoiceCallScreen.tsx", "utf8");
   check("the call screen is what renders it", /<VoiceTranscript/.test(screen));
+}
+
+console.log("\n── VoiceCallScreen: typing into the call ──");
+{
+  const lines: TranscriptLine[] = [{ role: "user", text: "hi", final: true }];
+  const withComposer = renderToStaticMarkup(
+    <VoiceCallScreen live phase="listening" audioLevel={0} lines={lines} lang="en" onEnd={() => {}} onSendText={() => true} /> as ReactElement,
+  );
+  const without = renderToStaticMarkup(
+    <VoiceCallScreen live phase="listening" audioLevel={0} lines={lines} lang="en" onEnd={() => {}} /> as ReactElement,
+  );
+  check("a composer is drawn when the parent can send text",
+    /<input[^>]*placeholder="Type something into the call…"/.test(withComposer));
+  check("  …and not otherwise — a control that cannot be used is noise", !/<input/.test(without));
+  check("the field is labelled for a screen reader", /aria-label="Type something into the call…"/.test(withComposer));
+  check("the send control is named, and disabled while there is nothing to send",
+    /<button[^>]*type="submit"[^>]*disabled=""[^>]*aria-label="Send typed message"/.test(withComposer) ||
+    /<button[^>]*aria-label="Send typed message"[^>]*disabled=""/.test(withComposer) ||
+    (/aria-label="Send typed message"/.test(withComposer) && /type="submit"[^>]*disabled/.test(withComposer)));
+  check("the mobile keyboard's return key says send", /enterkeyhint="send"/i.test(withComposer));
+  check("a single line, not a document", !/<textarea/.test(withComposer));
+  /* Every colour the composer introduces is from the palette. */
+  const hexes = [...withComposer.matchAll(/#[0-9A-Fa-f]{3,8}\b/g)].map((m) => m[0].toUpperCase())
+    .filter((h) => !new Set(["#567FB2", "#7FA9D6", "#BCD8F0", "#0B0D11", "#FFF"]).has(h));
+  const allowed = new Set(["#0D0D0D", "#FF3333", "#0066FF", "#AAAAAA", "#666666", "#FFFFFF", "#000000"]);
+  check("the composer introduces no colour outside the Koleex palette", hexes.every((h) => allowed.has(h)));
+  check("the composer is localised",
+    /placeholder="اكتب حاجة في المكالمة…"/.test(renderToStaticMarkup(<VoiceCallScreen live phase="listening" audioLevel={0} lines={lines} lang="ar" onEnd={() => {}} onSendText={() => true} /> as ReactElement)) &&
+    /placeholder="在通话中输入文字…"/.test(renderToStaticMarkup(<VoiceCallScreen live phase="listening" audioLevel={0} lines={lines} lang="zh" onEnd={() => {}} onSendText={() => true} /> as ReactElement)));
+  /* Escape must leave the field, not end the call: read from source, since a
+     keydown is not a first paint. */
+  const screenSrc = readFileSync("src/components/ai/VoiceCallScreen.tsx", "utf8");
+  check("Escape inside the composer blurs it instead of ending the call",
+    /if \(typedRef\.current && e\.target === typedRef\.current\) \{\s*typedRef\.current\.blur\(\);\s*return;/.test(screenSrc));
+  /* The clear happens ONLY on the success branch; the failure branch sets the
+     notice and leaves `typed` alone. */
+  check("text that could not be sent stays in the box with a notice, rather than vanishing",
+    /if \(onSendText\(text\)\) \{\s*setTyped\(""\);\s*setTypedNotice\(null\);\s*\} else \{[\s\S]{0,300}?setTypedNotice\(copy\.typedNotLive\);\s*\}/.test(screenSrc) &&
+    (screenSrc.match(/setTyped\(""\)/g) ?? []).length === 1);
 }
 
 console.log(`\n${pass} passed, ${failures.length} failed`);

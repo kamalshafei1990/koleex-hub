@@ -26,6 +26,16 @@ import { parseVoiceOptions, resolveVoice } from "../src/lib/server/ai/voice/conf
 import { buildSessionUpdate, publicVoiceList } from "../src/lib/server/ai/voice/session-config";
 import { AI_PROVENANCE_RULE } from "../src/lib/server/ai/prompt-builder";
 import { VOICE_TOOL_NAMES } from "../src/lib/server/ai/voice/tools";
+import {
+  capTurnsToBudget,
+  historyBlock,
+  parseConversationParam,
+  HISTORY_BUDGET_BYTES,
+  HISTORY_MAX_CHARS_PER_TURN,
+  type RecentTurn,
+} from "../src/lib/server/ai/voice/history";
+import { buildVoiceSessionPayload } from "../src/lib/server/ai/voice/session-config";
+import { BUDGETS } from "../src/lib/server/ai/security/rate-limit";
 
 let pass = 0;
 const failures: string[] = [];
@@ -129,23 +139,33 @@ console.log("\n── 3. The route, read — the surface a fetch cannot be teste
   const src = readFileSync("src/app/api/ai/voice/session/route.ts", "utf8");
   const code = strip(src);
 
-  check("it authenticates before anything else", /requireAuth\(req\)/.test(code));
+  /* THE GATE MOVED TO ai/voice/gate.ts, shared with the transcript route, and
+     these assertions followed it: the property is that the CHAIN exists and
+     this route goes through it, not that the chain's text lives in this file. */
+  const gateSrc = strip(readFileSync("src/lib/server/ai/voice/gate.ts", "utf8"));
+  check("the route goes through the shared voice gate",
+    /import \{ authorizeVoice \} from "@\/lib\/server\/ai\/voice\/gate"/.test(code) &&
+    /const authorize = authorizeVoice;/.test(code));
+  check("it authenticates before anything else", /requireAuth\(req\)/.test(gateSrc) &&
+    gateSrc.indexOf("requireAuth(req)") < gateSrc.indexOf("requireInternalUser(auth)"));
   /* THE DOOR THIS ROUTE'S FIRST DRAFT MISSED. Owner directive 2026-08-03 —
      Koleex AI must not be REACHABLE by a non-internal account type, because
      customer-portal logins share the accounts table and "the tools would deny
      anyway" is not acceptable exposure. validate:ai-api-v1 caught it; it is
      asserted here too, so the route that has it is the one that proves it. */
   check("the internal-account door is closed before any permission reasoning",
-    /requireInternalUser\(auth\)/.test(code) &&
-    code.indexOf("requireInternalUser") < code.indexOf("checkModule"));
+    /requireInternalUser\(auth\)/.test(gateSrc) &&
+    gateSrc.indexOf("requireInternalUser(auth)") < gateSrc.indexOf("checkModule(ctx"));
   /* Deny-by-default. checkModule has no open-access fallback, so a user with
      no row is refused — the correct default for a capability that spends
      money per minute. */
   check("access is a permission decision, not a hard-coded role",
-    /checkModule\(ctx, "AI Voice", "view"\)/.test(code) && /!decision\.allowed/.test(code));
+    /checkModule\(ctx, "AI Voice", "view"\)/.test(gateSrc) && /!decision\.allowed/.test(gateSrc));
+  /* THE CALLS, not the imports: an import line sits above every handler and
+     satisfies an index comparison for the wrong reason. */
   check("a budget is consumed after auth and before the vendor",
-    code.indexOf("consumeBudget") > code.indexOf("requireAuth") &&
-    code.indexOf("consumeBudget") < code.indexOf("fetch("));
+    code.indexOf("consumeBudget(") > code.indexOf("await authorize(req)") &&
+    code.indexOf("consumeBudget(") < code.indexOf("fetch(cfg.sdpUrl"));
   check("the body is size-capped, because we spend our key on it",
     /MAX_SDP_BYTES/.test(code) && /offer\.length > MAX_SDP_BYTES/.test(code));
   /* PER ATTEMPT, from the staged table — see validate-voice-tools §2c for why
@@ -166,10 +186,15 @@ console.log("\n── 3. The route, read — the surface a fetch cannot be teste
   const vendorCall = code.slice(code.indexOf("fetch(cfg.sdpUrl,"), code.indexOf("} catch (e)", code.indexOf("fetch(cfg.sdpUrl,")));
   check("nothing from the request reaches the vendor url or headers",
     !/searchParams|req\.url|body\./.test(vendorCall));
-  check("the only request field read is a voice KEY, resolved against the catalogue",
-    (code.match(/searchParams\.get/g) ?? []).length === 1 &&
+  /* TWO request fields now, each resolved against something the SERVER owns:
+     the voice key against the catalogue, the conversation id against the
+     caller's own conversations (inside loadRecentTurns). Neither reaches the
+     vendor — the assertion above this one still holds that. */
+  check("the only request fields read are a voice KEY and a conversation ID",
+    (code.match(/searchParams\.get/g) ?? []).length === 2 &&
     /searchParams\.get\("voice"\)/.test(code) &&
-    /resolveVoice\(cfg\.voices, requested\)/.test(code));
+    /resolveVoice\(cfg\.voices, requested\)/.test(code) &&
+    /parseConversationParam\(new URL\(req\.url\)\.searchParams\.get\("conversation"\)\)/.test(code));
 
   /* NOTHING VENDOR-SHAPED MAY TRAVEL BACK. The success path now returns the
      answer BESIDE a session the server authored — deliberately, because the
@@ -195,14 +220,14 @@ console.log("\n── 3. The route, read — the surface a fetch cannot be teste
     code.indexOf("taughtQuestionIndex(") > code.indexOf("fetch(cfg.sdpUrl,"));
   check("and it is scoped to the caller's tenant, not the platform",
     /taughtQuestionIndex\(gate\.tenantId, TAUGHT_INDEX_BUDGET_BYTES\)/.test(code) &&
-    /tenantId: auth\.tenant_id \?\? null/.test(code));
+    /tenantId: auth\.tenant_id \?\? null/.test(gateSrc));
   check("and a slow or broken knowledge plane loses the index, not the call",
     /Promise\.race\(/.test(code) &&
     /setTimeout\(\(\) => resolve\(\[\]\), TAUGHT_INDEX_TIMEOUT_MS\)/.test(code) &&
     /catch \{[\s\S]{0,400}?taught index unavailable/.test(code) &&
     /let taughtQuestions: string\[\] = \[\];/.test(code));
   check("and the index reaches the full session, never the compact fallback",
-    /buildVoiceSessionPayload\(voice, taughtQuestions\)/.test(code));
+    /buildVoiceSessionPayload\(voice, taughtQuestions, recentTurns\)/.test(code));
   /* ── WHERE THIS FUNCTION RUNS, and why it is no longer pinned ─────────
      For a day this asserted the OPPOSITE: that the handshake was pinned away
      from the project's region, to Hong Kong, because the endpoint looked
@@ -558,19 +583,21 @@ void (async () => {
       !/aliyun|maas|qwen|dashscope|sk-|ws-pl|Bearer/i.test(JSON.stringify(withVoice)));
   }
 
-  console.log("\n── 10. The route gates GET exactly as it gates POST ──");
+  console.log("\n── 10. The route gates GET exactly as it gates POST — through ONE shared gate ──");
   {
     const code2 = readFileSync("src/app/api/ai/voice/session/route.ts", "utf8");
     const bare = strip(code2);
+    const gate = strip(readFileSync("src/lib/server/ai/voice/gate.ts", "utf8"));
 
-    /* ONE GATE, SHARED. A second handler with its own copy of the chain is a
-       second place for a step to be dropped — and requireInternalUser was
-       already omitted from this very route once. */
-    check("the auth chain lives in one function", /async function authorize\(/.test(bare));
-    /* SLICED TO EACH HANDLER'S OWN BODY. A lazy window of N characters after
-       `export async function GET` runs past the end of GET and into POST,
-       which does call the gate — so removing GET's gate entirely still
-       matched. Each body is now examined alone. */
+    /* ONE GATE, SHARED — and now shared across FILES. The chain used to be a
+       private function in this route; the transcript route made a second copy
+       the likely outcome, and a copied chain is how requireInternalUser was
+       dropped from this very file once. So the chain lives in gate.ts, both
+       routes import it, and neither may carry a step of its own. */
+    check("the auth chain lives in one exported function",
+      /export async function authorizeVoice\(/.test(gate) &&
+      (gate.match(/export async function/g) ?? []).length === 1);
+    check("the gate module is server-only", /^import "server-only";/m.test(gate));
     const bodyOf = (verb: string) => {
       const at = bare.indexOf(`export async function ${verb}(`);
       if (at === -1) return "";
@@ -586,14 +613,17 @@ void (async () => {
     check("POST returns nothing before the gate has passed",
       /if \(gate instanceof NextResponse\) return gate;/.test(bodyOf("POST")));
     check("the chain still has all three steps in order",
-      bare.indexOf("requireAuth(req)") < bare.indexOf("requireInternalUser(auth)") &&
-      bare.indexOf("requireInternalUser(auth)") < bare.indexOf('checkModule(ctx, "AI Voice", "view")'));
-    /* CALLED once, not merely NAMED once — the import mentions it too, and
-       counting mentions made this assertion fail on a correct file. */
+      gate.indexOf("requireAuth(req)") < gate.indexOf("requireInternalUser(auth)") &&
+      gate.indexOf("requireInternalUser(auth)") < gate.indexOf('checkModule(ctx, "AI Voice", "view")'));
+    check("each step appears exactly once in the gate",
+      (gate.match(/requireInternalUser\(auth\)/g) ?? []).length === 1 &&
+      (gate.match(/requireAuth\(req\)/g) ?? []).length === 1 &&
+      (gate.match(/checkModule\(ctx, "AI Voice", "view"\)/g) ?? []).length === 1);
+    /* THE ROUTE MAY NOT RE-IMPLEMENT A STEP. A route that imported requireAuth
+       beside the gate would be a route where someone could one day call it
+       INSTEAD of the gate. */
     check("neither verb re-implements a gate",
-      (bare.match(/requireInternalUser\(auth\)/g) ?? []).length === 1 &&
-      (bare.match(/requireAuth\(req\)/g) ?? []).length === 1 &&
-      (bare.match(/checkModule\(ctx, "AI Voice", "view"\)/g) ?? []).length === 1);
+      !/requireAuth|requireInternalUser|checkModule|buildUserContext/.test(bare));
 
     check("GET returns the public list, never the raw catalogue",
       /publicVoiceList\(cfg\.voices\)/.test(bare) && !/voices: cfg\.voices/.test(bare));
@@ -680,6 +710,167 @@ void (async () => {
     const providers = strip(readFileSync("src/app/api/ai/providers/route.ts", "utf8"));
     check("the status page still probes at the default budget",
       /probeVoice\(voiceEnv\(\)\)/.test(providers));
+  }
+
+  console.log("\n── 12. The call knows what was typed before it ──");
+  {
+    const t = (role: RecentTurn["role"], content: string): RecentTurn => ({ role, content });
+    const chat = [t("user", "first"), t("assistant", "second"), t("user", "third"), t("assistant", "fourth")];
+
+    /* NEWEST FIRST, RETURNED IN ORDER. A budget that fits two turns keeps the
+       LAST two, chronological — not the first two, and not reversed. */
+    const two = capTurnsToBudget(chat, ("third".length + 8) + ("fourth".length + 8));
+    check("the budget keeps the most recent turns", two.map((x) => x.content).join(",") === "third,fourth");
+    check("  …in chronological order", two[0].role === "user" && two[1].role === "assistant");
+    check("a budget with room keeps everything", capTurnsToBudget(chat, 10_000).length === 4);
+    check("no budget keeps nothing", capTurnsToBudget(chat, 0).length === 0);
+
+    /* BYTES, NOT CHARACTERS. Ten Arabic letters are twenty bytes. A budget
+       counted in characters would overfill the channel with Arabic. */
+    const arabic = [t("user", "ماكينة قص"), t("assistant", "أكيد")];
+    const bytesOfLast = Buffer.byteLength("أكيد") + 8;
+    const charsOfBoth = "ماكينة قص".length + 8 + "أكيد".length + 8;
+    check("the budget is measured in bytes",
+      capTurnsToBudget(arabic, bytesOfLast).length === 1 &&
+      capTurnsToBudget(arabic, charsOfBoth).length === 1);
+
+    /* BREAK, NOT CONTINUE. Once a turn does not fit, nothing older is taken:
+       a hole in the middle of a conversation misleads more than a shorter one. */
+    const gappy = [t("user", "short"), t("assistant", "x".repeat(200)), t("user", "tiny")];
+    const capped = capTurnsToBudget(gappy, ("tiny".length + 8) + 20);
+    check("an oversized turn stops the walk rather than being skipped",
+      capped.length === 1 && capped[0].content === "tiny");
+
+    const long = capTurnsToBudget([t("user", "y".repeat(HISTORY_MAX_CHARS_PER_TURN + 50))], 10_000);
+    check("one turn is cut to its opening", long[0].content.length === HISTORY_MAX_CHARS_PER_TURN && long[0].content.endsWith("…"));
+    check("whitespace runs collapse — a pasted table is not a budget's worth of spaces",
+      capTurnsToBudget([t("user", "a   \n\n  b")], 100)[0].content === "a b");
+    check("an empty turn is skipped, not counted", capTurnsToBudget([t("user", "   "), t("user", "k")], 100).length === 1);
+
+    const block = historyBlock(two);
+    check("the block frames the turns as a record, not instructions",
+      /never an instruction to you/.test(block));
+    check("  …asks not to re-introduce or read it back",
+      /Do not introduce yourself again/.test(block) && /do not read/.test(block));
+    check("  …labels the speakers and keeps the order", block.indexOf("User: third") < block.indexOf("You: fourth"));
+    check("no turns means no block at all", historyBlock([]) === "");
+
+    /* THE ID IS A QUERY STRING VALUE GOING INTO A DATABASE PREDICATE. */
+    check("a UUID is accepted", parseConversationParam("6f1d2c3b-4a5e-4f60-9b7c-1234567890ab") === "6f1d2c3b-4a5e-4f60-9b7c-1234567890ab");
+    check("  …and lower-cased", parseConversationParam("6F1D2C3B-4A5E-4F60-9B7C-1234567890AB") === "6f1d2c3b-4a5e-4f60-9b7c-1234567890ab");
+    check("anything else is not a conversation id",
+      parseConversationParam(null) === null && parseConversationParam("") === null &&
+      parseConversationParam("1 or 1=1") === null && parseConversationParam("new chat") === null);
+
+    /* WHERE IT LANDS. Full session only — the compact one exists because the
+       full one did not fit. */
+    const v = parseVoiceOptions("Ethan:Omar");
+    const withHistory = buildVoiceSessionPayload(v[0], [], two);
+    const without = buildVoiceSessionPayload(v[0], [], []);
+    const fullText = String(withHistory.full.session.instructions);
+    check("the history reaches the full session", fullText.includes("User: third") && fullText.includes("THE CONVERSATION SO FAR"));
+    check("  …after the taught index, nearest the end",
+      fullText.indexOf("THE CONVERSATION SO FAR") > fullText.indexOf("SPOKEN STYLE"));
+    check("  …and never the compact fallback",
+      !String(withHistory.compact.session.instructions).includes("third"));
+    check("no history leaves the session exactly as it was",
+      JSON.stringify(without) === JSON.stringify(buildVoiceSessionPayload(v[0])));
+    check("the budget constant keeps the full session well inside the channel",
+      HISTORY_BUDGET_BYTES <= 3_000 && Buffer.byteLength(JSON.stringify(withHistory.full)) < 24_000);
+
+    /* THE ROUTE'S HALF, read. */
+    const route = strip(readFileSync("src/app/api/ai/voice/session/route.ts", "utf8"));
+    const hist = strip(readFileSync("src/lib/server/ai/voice/history.ts", "utf8"));
+    check("the read happens after the vendor has answered",
+      route.indexOf("loadRecentTurns(") > route.indexOf("fetch(cfg.sdpUrl,"));
+    check("  …scoped to the caller's tenant AND account",
+      /loadRecentTurns\(supabaseServer, conversationId, gate\.tenantId, gate\.accountId\)/.test(route));
+    check("  …with a ceiling and a fail-open",
+      /setTimeout\(\(\) => resolve\(\[\]\), HISTORY_TIMEOUT_MS\)/.test(route) &&
+      /let recentTurns: RecentTurn\[\] = \[\];/.test(route) &&
+      /conversation history unavailable/.test(route));
+    /* THE OWNERSHIP CHECK IS IN THE LOADER, BEFORE THE MESSAGE READ. */
+    const ownAt = hist.indexOf('.from("ai_conversations")');
+    const msgAt = hist.indexOf('.from("ai_messages")');
+    check("the loader checks ownership before reading a single message",
+      ownAt !== -1 && msgAt !== -1 && ownAt < msgAt &&
+      /\.eq\("tenant_id", tenantId\)[\s\S]{0,80}\.eq\("account_id", accountId\)/.test(hist) &&
+      /if \(!owned\) return \[\];/.test(hist));
+    check("  …strips embedded attachment text and drops system rows",
+      /stripAttachEmbed\(content\)/.test(hist) && /role !== "user" && role !== "assistant"/.test(hist));
+    check("  …and reads a bounded number, newest first",
+      /\.order\("created_at", \{ ascending: false \}\)[\s\S]{0,40}\.limit\(HISTORY_MAX_TURNS\)/.test(hist));
+  }
+
+  console.log("\n── 13. Spoken turns become messages — through the server, never around it ──");
+  {
+    const route = strip(readFileSync("src/app/api/ai/voice/transcript/route.ts", "utf8"));
+    check("the transcript route exists and is server-only", /^import "server-only";/m.test(route));
+    check("it goes through the same voice gate as the handshake",
+      /import \{ authorizeVoice \} from "@\/lib\/server\/ai\/voice\/gate"/.test(route) &&
+      /const gate = await authorizeVoice\(req\);/.test(route) &&
+      /if \(gate instanceof NextResponse\) return gate;/.test(route));
+    check("  …before the body is even read",
+      route.indexOf("authorizeVoice(req)") < route.indexOf("req.json()"));
+    check("  …and re-implements no step of it",
+      !/requireAuth|requireInternalUser|checkModule/.test(route));
+
+    check("a budget is consumed, from the shared table, before any write",
+      /BUDGETS\.voiceTranscriptPerAccount\(\)/.test(route) &&
+      route.indexOf("consumeBudget") < route.indexOf(".insert("));
+    const b = BUDGETS.voiceTranscriptPerAccount();
+    check("  …and that budget is real: its own bucket, a minute window, a ceiling",
+      b.bucket === "voice_transcript" && b.windowSec === 60 && b.max > 0 && b.max <= 120);
+
+    /* THE CONVERSATION MUST BE THE CALLER'S. Same triple predicate as every
+       other conversation mutation, and before the insert. */
+    const ownAt = route.indexOf('.from("ai_conversations")');
+    /* ANCHORED TO THE SELECT. The update further down carries the same three
+       predicates, and a regex that could match either let a mutation drop the
+       account check from the ownership read while the suite stayed green. */
+    check("ownership is checked with the tenant+account predicate before the write",
+      ownAt !== -1 && ownAt < route.indexOf(".insert(") &&
+      /\.select\("id, title, message_count"\)\s*\.eq\("id", conversationId\)\s*\.eq\("tenant_id", gate\.tenantId\)\s*\.eq\("account_id", gate\.accountId\)\s*\.maybeSingle\(\)/.test(route) &&
+      /if \(!conv\) return NextResponse\.json\(\{ error: "Not found" \}, \{ status: 404 \}\);/.test(route));
+    check("  …and the summary update is scoped the same way",
+      (route.match(/\.eq\("account_id", gate\.accountId\)/g) ?? []).length === 2 &&
+      (route.match(/\.eq\("tenant_id", gate\.tenantId\)/g) ?? []).length === 2);
+    check("the conversation id is parsed as a UUID, not trusted as a string",
+      /parseConversationParam\(/.test(route));
+
+    /* THE BODY IS A CLOSED SHAPE. */
+    check("roles come from a closed set", /role !== "user" && role !== "assistant"/.test(route));
+    check("the batch and each turn are capped",
+      /const MAX_TURNS = 20;/.test(route) && /list\.length > MAX_TURNS/.test(route) &&
+      /trimmed\.length > MAX_TURN_CHARS/.test(route));
+    check("empty text is refused", /if \(!trimmed \|\| /.test(route));
+    check("via is voice or text and nothing else",
+      /via !== "voice" && via !== "text"/.test(route) && /source: t\.via/.test(route));
+
+    /* WHAT IS WRITTEN, AND WHAT IS NOT. */
+    check("rows carry the tenant and the conversation",
+      /tenant_id: gate\.tenantId,[\s\S]{0,40}conversation_id: conversationId,/.test(route));
+    check("no model is called — a title is cut from the first user turn",
+      !/aiChat|aiProviderConfigured|runAgent/.test(route) && /firstUser\.text\.slice\(0, TITLE_CHARS\)/.test(route));
+    check("the conversation summary rolls by the number of turns written",
+      /message_count: \(conv\.message_count \?\? 0\) \+ turns\.length/.test(route));
+    check("rows go back through the provider mask like every other message",
+      /withPublicProvider\(r\)/.test(route));
+    /* Production must not log prompts or replies. Every console call here
+       carries a count, a status or a Postgres message — never a turn. */
+    const logs = route.match(/console\.\w+\([^)]*\)/g) ?? [];
+    check("nothing logged names the text of a turn",
+      logs.length > 0 && logs.every((l) => !/\btext\b|content|turns\[|batch/.test(l)));
+    check("the vendor is not involved at all", !/sdpUrl|apiKey|AI_VOICE_/.test(route));
+
+    /* THE COLUMN THE ROWS LAND IN, in the repo. */
+    const mig = readFileSync("supabase/migrations/ai_messages_source.sql", "utf8");
+    check("the migration adds ONE column with a default, so existing rows are 'text'",
+      /add column if not exists source text not null default 'text'/.test(mig));
+    check("  …constrained to the two values the code writes",
+      /check \(source in \('text', 'voice'\)\)/.test(mig));
+    check("  …with the rollback written down", /drop column source/.test(mig));
+    check("  …and no new table", !/create table/i.test(mig));
   }
 
   summarised = true;

@@ -26,7 +26,7 @@
    that can hurt someone.
    --------------------------------------------------------------------------- */
 
-/* The only import this module has, and it is a pure one: no DOM, no network,
+/* The only imports this module has are pure ones: no DOM, no network,
    no browser globals. Everything else arrives through VoiceDeps, which is
    what makes this file testable in Node at all. */
 import {
@@ -36,6 +36,7 @@ import {
   type VoiceToolCall,
 } from "./tool-calls";
 import { EV_SESSION_CREATED } from "./events";
+import { buildTextTurnMessages } from "./text-turn";
 
 /** True when a DataChannel message is exactly this event.
  *
@@ -274,7 +275,34 @@ export class VoiceSession {
     /** Which voice to ask for. Opaque — this module never learns the vendor's
      *  own identifier, and cannot ask for one that was not offered. */
     private readonly voiceKey: string | null = null,
+    /** The conversation this call continues, if it continues one. Sent to the
+     *  server, which decides whether the caller owns it and what of it the
+     *  call may hear; nothing of the thread is read here. */
+    private readonly conversationId: string | null = null,
   ) {}
+
+  /* ---------------------------------------------------------------------
+     TYPE INTO THE CALL. A model code, a quantity, a name in another alphabet
+     — some things are easier typed than said. The text goes on the same
+     DataChannel the configuration went on, as the user's turn, followed by
+     the request to answer it (turn detection fires on audio only, so a typed
+     turn would otherwise sit unanswered).
+
+     RETURNS WHETHER IT WENT. False when there is no open channel yet or the
+     text was empty, so the screen can say so rather than swallow it.
+     --------------------------------------------------------------------- */
+  sendText(text: string): boolean {
+    const channel = this.channel;
+    if (!channel || channel.readyState !== "open") return false;
+    const messages = buildTextTurnMessages(text);
+    if (!messages) return false;
+    try {
+      for (const m of messages) channel.send(m);
+      return true;
+    } catch {
+      return false;
+    }
+  }
 
   /* ---------------------------------------------------------------------
      MUTE — track.enabled, not track.stop() and not a closed connection.
@@ -646,9 +674,13 @@ export class VoiceSession {
       /* The client asks; the server decides. An unknown key is ignored server
          side rather than rejected, so a stale preference degrades to the
          default voice instead of refusing to place a call. */
-      const path = this.voiceKey
-        ? `${HANDSHAKE_PATH}?voice=${encodeURIComponent(this.voiceKey)}`
-        : HANDSHAKE_PATH;
+      const query = new URLSearchParams();
+      if (this.voiceKey) query.set("voice", this.voiceKey);
+      /* The id only. The server checks ownership and reads the thread itself;
+         a browser that sent the messages could send any messages. */
+      if (this.conversationId) query.set("conversation", this.conversationId);
+      const qs = query.toString();
+      const path = qs ? `${HANDSHAKE_PATH}?${qs}` : HANDSHAKE_PATH;
       const res = await this.deps.fetchFn(path, {
         method: "POST",
         headers: { "Content-Type": "application/sdp" },

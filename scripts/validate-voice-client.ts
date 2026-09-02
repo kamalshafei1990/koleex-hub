@@ -15,6 +15,9 @@
    --------------------------------------------------------------------------- */
 
 import { VoiceSession, HANDSHAKE_PATH, waitForIceGathering, normalizeSdp, type VoiceDeps, type VoiceState, type VoiceFailure } from "../src/lib/voice/session";
+import { TranscriptPersister, TRANSCRIPT_PATH, MAX_TURNS_PER_POST, MAX_POST_FAILURES, type SavedTurn } from "../src/lib/voice/persist";
+import { buildTextTurnMessages, EV_ITEM_CREATE, EV_RESPONSE_CREATE, MAX_TYPED_TURN_CHARS } from "../src/lib/voice/text-turn";
+import { type TranscriptLine } from "../src/lib/voice/events";
 
 let pass = 0;
 const failures: string[] = [];
@@ -421,11 +424,15 @@ async function main() {
        nothing a caller passes can point the handshake somewhere else. */
     check("the handshake path is built from a constant, never from an argument",
       /export const HANDSHAKE_PATH = "\/api\/ai\/voice\/session"/.test(code) &&
-      /HANDSHAKE_PATH\}\?voice=/.test(code) &&
+      /`\$\{HANDSHAKE_PATH\}\?\$\{qs\}`/.test(code) &&
       /: HANDSHAKE_PATH;/.test(code) &&
       /fetchFn\(path,/.test(code));
-    check("the voice key is url-encoded rather than interpolated raw",
-      /encodeURIComponent\(this\.voiceKey\)/.test(code));
+    /* Both query values go through URLSearchParams, which encodes; section 13
+       proves the encoding on a real session rather than naming the function. */
+    check("the query is built by URLSearchParams, never by interpolating a value",
+      /new URLSearchParams\(\)/.test(code) && /query\.set\("voice", this\.voiceKey\)/.test(code) &&
+      /query\.set\("conversation", this\.conversationId\)/.test(code) &&
+      !/\$\{this\.voiceKey\}|\$\{this\.conversationId\}/.test(code));
     /* Vendor identity has no field to arrive in, and the absence is the check. */
     check("no vendor concept appears anywhere in the client",
       !/dashscope|aliyun|qwen|api[_-]?key|Bearer/i.test(code));
@@ -737,7 +744,10 @@ async function main() {
     check("unmount stops the session",
       /return \(\) => \{\s*sessionRef\.current\?\.stop\(\);/.test(src));
     check("that cleanup belongs to a mount-only effect, so it cannot re-run early",
-      /useEffect\(\(\) => \{\s*return \(\) => \{\s*sessionRef\.current\?\.stop\(\);[\s\S]{0,80}?\}, \[\]\);/.test(src));
+      /useEffect\(\(\) => \{\s*return \(\) => \{\s*sessionRef\.current\?\.stop\(\);[\s\S]{0,400}?\}, \[\]\);/.test(src));
+    /* THE LAST TURN IS OFTEN STILL QUEUED WHEN THE SCREEN GOES. */
+    check("  …and that same cleanup flushes the transcript writer",
+      /return \(\) => \{\s*sessionRef\.current\?\.stop\(\);[\s\S]{0,300}?persisterRef\.current\?\.finish\(\);[\s\S]{0,120}?\}, \[\]\);/.test(src));
 
     /* A DROPPED CONNECTION IS STILL AN OPEN CALL, and the button decides what
        is on screen. The call screen mounts on "live or busy"; `reconnecting`
@@ -1103,6 +1113,221 @@ console.log("\n── 12. Mute ──");
     check("hanging up clears the UI's mute too", /setMuted\(false\);/.test(btn));
   }
 }
+
+  console.log("\n── 13. Typing into a live call ──");
+  {
+    const msgs = buildTextTurnMessages("  KX-180, quantity two  ");
+    check("a typed turn becomes two protocol messages", msgs !== null && msgs.length === 2);
+    const item = JSON.parse(msgs![0]) as { type: string; item: { type: string; role: string; content: Array<{ type: string; text: string }> } };
+    const go = JSON.parse(msgs![1]) as { type: string };
+    check("the first puts the text into the conversation as the USER's turn",
+      item.type === EV_ITEM_CREATE && item.item.type === "message" && item.item.role === "user" &&
+      item.item.content[0].type === "input_text" && item.item.content[0].text === "KX-180, quantity two");
+    check("the second asks for an answer — turn detection fires on audio only",
+      go.type === EV_RESPONSE_CREATE && Object.keys(go).length === 1);
+    check("the names are the protocol's", EV_ITEM_CREATE === "conversation.item.create" && EV_RESPONSE_CREATE === "response.create");
+    check("blank text sends nothing", buildTextTurnMessages("   ") === null && buildTextTurnMessages("") === null);
+    const huge = JSON.parse(buildTextTurnMessages("z".repeat(MAX_TYPED_TURN_CHARS + 500))![0]) as { item: { content: Array<{ text: string }> } };
+    check("a pasted document is cut to the cap", huge.item.content[0].text.length === MAX_TYPED_TURN_CHARS);
+
+    /* ON A REAL SESSION: after the configuration, through the same channel. */
+    const r = deps({ status: 200, channelOpen: true });
+    const s = new VoiceSession(r.deps);
+    await s.start();
+    const before = r.pcCalls.sent.length;
+    check("sendText goes when the channel is open", s.sendText("hello") === true);
+    check("  …as exactly the two messages, after the configuration",
+      before >= 1 && r.pcCalls.sent.length === before + 2 &&
+      (JSON.parse(r.pcCalls.sent[before]) as { type: string }).type === EV_ITEM_CREATE &&
+      (JSON.parse(r.pcCalls.sent[before + 1]) as { type: string }).type === EV_RESPONSE_CREATE);
+    check("  …and blank text still sends nothing", s.sendText("  ") === false && r.pcCalls.sent.length === before + 2);
+
+    const closed = deps({ status: 200, channelOpen: false });
+    const s2 = new VoiceSession(closed.deps);
+    await s2.start();
+    check("sendText refuses while the channel is not open, rather than throwing or queueing",
+      s2.sendText("hello") === false && closed.pcCalls.sent.length === 0);
+
+    const fresh = new VoiceSession(deps({ status: 200 }).deps);
+    check("sendText before start is a plain false", fresh.sendText("hello") === false);
+
+    /* THE CONVERSATION TRAVELS WITH THE HANDSHAKE — as an id only. */
+    const recorded: Recorded[] = [];
+    const r3 = deps({ status: 200, recorded });
+    const s3 = new VoiceSession(r3.deps, {}, "v1", "6f1d2c3b-4a5e-4f60-9b7c-1234567890ab");
+    await s3.start();
+    check("the conversation id reaches the server beside the voice key",
+      recorded[0]?.url === `${HANDSHAKE_PATH}?voice=v1&conversation=6f1d2c3b-4a5e-4f60-9b7c-1234567890ab`);
+    const recorded4: Recorded[] = [];
+    const s4 = new VoiceSession(deps({ status: 200, recorded: recorded4 }).deps, {}, null, null);
+    await s4.start();
+    check("no conversation, no parameter", recorded4[0]?.url === HANDSHAKE_PATH);
+    const recorded5: Recorded[] = [];
+    const s5 = new VoiceSession(deps({ status: 200, recorded: recorded5 }).deps, {}, "a b&c=d");
+    await s5.start();
+    check("values are encoded, so a key cannot smuggle a second parameter",
+      recorded5[0]?.url === `${HANDSHAKE_PATH}?voice=a+b%26c%3Dd`);
+    check("nothing of the thread itself leaves the browser — the body is still the offer alone",
+      String(recorded[0]?.init?.body ?? "").startsWith("v=0"));
+  }
+
+  console.log("\n── 14. Settled turns leave for the conversation; partial ones do not ──");
+  {
+    type Post = { body: { conversation_id: string; turns: Array<{ role: string; text: string; via: string }> }; keepalive: boolean | undefined };
+    const CONV = "6f1d2c3b-4a5e-4f60-9b7c-1234567890ab";
+    const harness = (opts: { status?: number | ((n: number) => number); ensure?: () => Promise<string | null>; conv?: string | null } = {}) => {
+      const posts: Post[] = [];
+      const saved: SavedTurn[][] = [];
+      const errors: string[] = [];
+      let ensured = 0;
+      const fetchFn = (async (url: string, init?: RequestInit) => {
+        if (url !== TRANSCRIPT_PATH) throw new Error(`unexpected url ${url}`);
+        const body = JSON.parse(String(init?.body)) as Post["body"];
+        posts.push({ body, keepalive: (init as { keepalive?: boolean } | undefined)?.keepalive });
+        const status = typeof opts.status === "function" ? opts.status(posts.length) : (opts.status ?? 200);
+        return {
+          ok: status < 400,
+          status,
+          json: async () => ({
+            messages: body.turns.map((t, i) => ({ id: `row-${posts.length}-${i}`, role: t.role, content: t.text, created_at: "now", source: t.via })),
+            conversation: { id: body.conversation_id, title: "T" },
+          }),
+        } as unknown as Response;
+      }) as unknown as typeof fetch;
+      const p = new TranscriptPersister(
+        {
+          fetchFn,
+          ensureConversation: opts.ensure ?? (async () => { ensured++; return CONV; }),
+          onSaved: (rows) => { saved.push(rows); },
+          onError: (reason) => { errors.push(reason); },
+        },
+        opts.conv === undefined ? CONV : opts.conv,
+      );
+      return { p, posts, saved, errors, ensured: () => ensured };
+    };
+    const L = (role: "user" | "assistant", text: string, final: boolean, via?: "voice" | "text"): TranscriptLine =>
+      ({ role, text, final, ...(via ? { via } : {}) });
+
+    {
+      const h = harness();
+      h.p.observe([L("user", "how ma", false)]);
+      await h.p.flush();
+      check("a partial line is never posted", h.posts.length === 0 && h.p.pending() === 0);
+      h.p.observe([L("user", "how many orders", true)]);
+      await h.p.flush();
+      check("a settled line is posted at once", h.posts.length === 1 && h.posts[0].body.turns[0].text === "how many orders");
+      check("  …into the conversation it was given", h.posts[0].body.conversation_id === CONV);
+      check("  …marked as spoken when the line carries no via", h.posts[0].body.turns[0].via === "voice");
+      check("  …and the rows come back to the caller", h.saved.length === 1 && h.saved[0][0].id === "row-1-0");
+      h.p.observe([L("user", "how many orders", true), L("assistant", "Fourt", false)]);
+      await h.p.flush();
+      check("the same settled line is not posted twice", h.posts.length === 1);
+      h.p.observe([L("user", "how many orders", true), L("assistant", "Fourteen.", true)]);
+      await h.p.flush();
+      check("the assistant's settled turn follows", h.posts.length === 2 && h.posts[1].body.turns[0].role === "assistant");
+      check("  …not with keepalive — the page is still here", h.posts[1].keepalive === false);
+      h.p.observe([L("user", "how many orders", true), L("assistant", "Fourteen.", true), L("user", "KX-180", true, "text")]);
+      await h.p.flush();
+      check("a typed turn keeps its via", h.posts[2].body.turns[0].via === "text");
+    }
+
+    {
+      /* A CALL THAT BEGINS ON AN EMPTY SCREEN. The conversation is made when
+         the first settled turn needs it — not at construction, so a call that
+         never connects leaves no empty chat behind. */
+      const h = harness({ conv: null });
+      check("nothing is created for a call with no words yet", h.ensured() === 0);
+      h.p.observe([L("user", "hello", false)]);
+      await h.p.flush();
+      check("  …nor for a partial", h.ensured() === 0 && h.posts.length === 0);
+      h.p.observe([L("user", "hello there", true)]);
+      await h.p.flush();
+      check("the first settled turn creates the conversation once", h.ensured() === 1 && h.p.conversation() === CONV);
+      h.p.observe([L("user", "hello there", true), L("assistant", "hi", true)]);
+      await h.p.flush();
+      check("  …and later turns reuse it", h.ensured() === 1 && h.posts.length === 2);
+    }
+
+    {
+      const h = harness({ conv: null, ensure: async () => null });
+      for (let i = 0; i < MAX_POST_FAILURES; i++) {
+        h.p.observe([L("user", "turn", true)].concat(Array.from({ length: i }, (_, k) => L("assistant", `a${k}`, true))));
+        await h.p.flush();
+      }
+      check("a conversation that cannot be made is given up on after the cap, with one word to the UI",
+        h.posts.length === 0 && h.errors.length === 1 && h.errors[0] === "failed");
+    }
+
+    {
+      const h = harness({ status: 401 });
+      h.p.observe([L("user", "x", true)]);
+      await h.p.flush();
+      h.p.observe([L("user", "x", true), L("user", "y", true)]);
+      await h.p.flush();
+      check("a 401 stops the writer for the call and says so once",
+        h.posts.length === 1 && h.errors.join(",") === "unauthorised" && h.p.pending() === 0);
+      const h4 = harness({ status: 404 });
+      h4.p.observe([L("user", "x", true)]);
+      await h4.p.flush();
+      check("a 404 — the conversation is gone — has its own word", h4.errors.join(",") === "not-found");
+    }
+
+    {
+      /* A BAD MOMENT ON THE SERVER. The batch is kept, but the retry waits for
+         the next settled turn rather than firing three times in a burst. */
+      let n = 0;
+      const h = harness({ status: () => (++n === 1 ? 500 : 200) });
+      h.p.observe([L("user", "first", true)]);
+      await h.p.flush();
+      check("a 500 keeps the turn queued", h.posts.length === 1 && h.p.pending() === 1 && h.errors.length === 0);
+      await h.p.flush();
+      check("  …and retries on the next flush, first turn first",
+        h.posts.length === 2 && h.posts[1].body.turns[0].text === "first" && h.p.pending() === 0);
+    }
+
+    {
+      const h = harness({ status: 400 });
+      h.p.observe([L("user", "x", true)]);
+      await h.p.flush();
+      check("a 400 — our own shape refused — is dropped, not retried and not fatal",
+        h.posts.length === 1 && h.p.pending() === 0 && h.errors.length === 0);
+    }
+
+    {
+      const h = harness();
+      const many = Array.from({ length: MAX_TURNS_PER_POST + 5 }, (_, i) => L(i % 2 ? "assistant" : "user", `t${i}`, true));
+      h.p.observe(many);
+      await h.p.flush();
+      await h.p.flush();
+      check("a burst is split at the server's batch size",
+        h.posts.length === 2 && h.posts[0].body.turns.length === MAX_TURNS_PER_POST && h.posts[1].body.turns.length === 5);
+    }
+
+    {
+      const h = harness();
+      h.p.observe([L("user", "   ", true), L("user", "real", true)]);
+      await h.p.flush();
+      check("an empty settled turn is skipped but counted, so it never blocks the ones after it",
+        h.posts.length === 1 && h.posts[0].body.turns.length === 1 && h.posts[0].body.turns[0].text === "real");
+    }
+
+    {
+      /* A turn still QUEUED at hang-up — here because its first post failed —
+         goes out from finish() with keepalive, so it survives the screen
+         closing. A turn already in flight when finish() is called simply
+         completes; nothing is sent twice. */
+      let n = 0;
+      const h = harness({ status: () => (++n === 1 ? 500 : 200) });
+      h.p.observe([L("user", "bye", true)]);
+      await h.p.flush();
+      check("a turn is waiting at hang-up", h.p.pending() === 1 && h.posts[0].keepalive === false);
+      await h.p.finish();
+      check("finish posts it with keepalive, so hang-up does not lose the last turn",
+        h.posts.length === 2 && h.posts[1].keepalive === true && h.p.pending() === 0);
+      await h.p.finish();
+      check("  …and a second finish sends nothing more", h.posts.length === 2);
+    }
+  }
 
 console.log(`\n${pass} passed, ${failures.length} failed`);
   if (failures.length) {
