@@ -14,11 +14,17 @@
    This opens a continuous audio connection to a region that is reachable
    there, with no transcription round trip. Two different tools, both offered.
 
-   WHAT THIS COMPONENT DOES NOT DO. It does not interpret DataChannel messages.
-   Tool calls arrive on that channel and go to `onMessage` untouched; routing
-   them through the permission engine and the confirmation ledger is the next
-   step and deliberately not smuggled in here. A call today can talk and
-   listen; it cannot act.
+   WHAT THIS COMPONENT DOES NOT DO. It does not interpret DataChannel messages
+   beyond what the pure modules in lib/voice parse for it. A call can talk,
+   listen and look things up; it cannot act — the tools are read-only and the
+   server chooses them.
+
+   WHAT IT NOW ALSO DOES. Two things that make a call part of the
+   conversation rather than a thing beside it: settled turns are handed to a
+   TranscriptPersister, which posts them to a route that writes them into the
+   open thread (lib/voice/persist.ts); and the conversation's id travels with
+   the handshake so the server can read its recent turns into the session.
+   Neither happens in this file — it wires them.
 
    WHY THE AUDIO ELEMENT LIVES HERE. VoiceSession touches no DOM on purpose —
    it hands over a MediaStream and playback is the caller's business. That
@@ -42,6 +48,7 @@ import {
   type VoicePhase,
 } from "@/lib/voice/events";
 import { useStreamLevel } from "@/lib/voice/useStreamLevel";
+import { TranscriptPersister, type SavedTurn, type PersistFailure } from "@/lib/voice/persist";
 import VoiceCallScreen from "@/components/ai/VoiceCallScreen";
 
 /* Every failure the session can report, in every language the app speaks.
@@ -86,6 +93,26 @@ const FAILURE_COPY: Record<Lang, Record<VoiceFailure, string>> = {
   },
 };
 
+/* When the transcript could not be saved. One line, once per call, and the
+   call itself is unaffected — the words were still heard and answered. */
+const PERSIST_COPY: Record<Lang, Record<PersistFailure, string>> = {
+  en: {
+    failed: "This call's transcript could not be saved to the conversation.",
+    unauthorised: "This call's transcript could not be saved — you are no longer allowed to.",
+    "not-found": "This call's transcript could not be saved — the conversation is gone.",
+  },
+  zh: {
+    failed: "本次通话的文字记录无法保存到对话中。",
+    unauthorised: "本次通话的文字记录无法保存——您已没有权限。",
+    "not-found": "本次通话的文字记录无法保存——该对话已不存在。",
+  },
+  ar: {
+    failed: "ما قدرناش نحفظ كلام المكالمة دي في المحادثة.",
+    unauthorised: "ما قدرناش نحفظ كلام المكالمة — ما بقالكش صلاحية.",
+    "not-found": "ما قدرناش نحفظ كلام المكالمة — المحادثة اتمسحت.",
+  },
+};
+
 const LABEL_COPY: Record<Lang, { start: string; end: string; connecting: string }> = {
   en: { start: "Start voice call", end: "End call", connecting: "Connecting…" },
   zh: { start: "开始语音通话", end: "结束通话", connecting: "正在连接…" },
@@ -108,6 +135,16 @@ export type VoiceCallButtonProps = {
   /** So the parent can mute its own speech synthesis while a call is live —
    *  two voices talking over each other is the obvious failure here. */
   onLiveChange?: (live: boolean) => void;
+  /** The conversation this call continues. Sent with the handshake so the
+   *  server can read its recent turns into the session, and the thread the
+   *  spoken turns are written into. Null on an empty screen. */
+  conversationId?: string | null;
+  /** Makes a conversation when there is none — called by the persister the
+   *  first time a settled turn needs somewhere to go, never at call start, so
+   *  a call that fails to connect leaves no empty chat behind. */
+  ensureConversation?: () => Promise<string | null>;
+  /** The rows the server wrote, so the parent can show them in the thread. */
+  onTurnsSaved?: (rows: SavedTurn[], conversation: { id: string; title: string | null }) => void;
 };
 
 export default function VoiceCallButton({
@@ -119,6 +156,9 @@ export default function VoiceCallButton({
   onTranscript,
   onPhase,
   onLiveChange,
+  conversationId = null,
+  ensureConversation,
+  onTurnsSaved,
 }: VoiceCallButtonProps) {
   const [state, setState] = useState<VoiceState>("idle");
   const [phase, setPhase] = useState<VoicePhase>(null);
@@ -190,6 +230,9 @@ export default function VoiceCallButton({
   const onPhaseRef = useRef(onPhase);
   const onLiveChangeRef = useRef(onLiveChange);
   const langRef = useRef(lang);
+  const conversationIdRef = useRef(conversationId);
+  const ensureConversationRef = useRef(ensureConversation);
+  const onTurnsSavedRef = useRef(onTurnsSaved);
   useEffect(() => {
     onErrorRef.current = onError;
     onMessageRef.current = onMessage;
@@ -197,7 +240,14 @@ export default function VoiceCallButton({
     onPhaseRef.current = onPhase;
     onLiveChangeRef.current = onLiveChange;
     langRef.current = lang;
-  }, [onError, onMessage, onTranscript, onPhase, onLiveChange, lang]);
+    conversationIdRef.current = conversationId;
+    ensureConversationRef.current = ensureConversation;
+    onTurnsSavedRef.current = onTurnsSaved;
+  }, [onError, onMessage, onTranscript, onPhase, onLiveChange, lang, conversationId, ensureConversation, onTurnsSaved]);
+
+  /* One per call, made with the session and finished with it. Holds the
+     count of turns already queued, which is why it cannot outlive a call. */
+  const persisterRef = useRef<TranscriptPersister | null>(null);
 
   /* The transcript accumulates across events and must not be React state HERE:
      this component re-renders on every phase change, and rebuilding the fold
@@ -216,12 +266,18 @@ export default function VoiceCallButton({
     return () => {
       sessionRef.current?.stop();
       sessionRef.current = null;
+      /* The last settled turn is often still queued at the moment the screen
+         goes. `finish` posts with keepalive so it outlives the unmount. */
+      void persisterRef.current?.finish();
+      persisterRef.current = null;
     };
   }, []);
 
   const hangUp = useCallback(() => {
     sessionRef.current?.stop();
     sessionRef.current = null;
+    void persisterRef.current?.finish();
+    persisterRef.current = null;
     if (audioRef.current) audioRef.current.srcObject = null;
     /* Dropped so the meters tear their audio contexts down. A retained stream
        here would keep a hardware handle open for the life of the page. */
@@ -252,6 +308,21 @@ export default function VoiceCallButton({
        second call never opens showing the last one's mute. */
     setMuted(false);
     onTranscriptRef.current?.(linesRef.current);
+
+    /* THE WRITER FOR THIS CALL. `fetch` is wrapped rather than passed: a bare
+       reference to window.fetch throws "Illegal invocation" when called off
+       the window. A missing ensureConversation means turns wait on an id that
+       never comes and are dropped at the failure cap — a parent that does not
+       wire persistence gets none, with no error. */
+    persisterRef.current = new TranscriptPersister(
+      {
+        fetchFn: (input, init) => fetch(input, init),
+        ensureConversation: () => ensureConversationRef.current?.() ?? Promise.resolve(null),
+        onSaved: (rows, conversation) => onTurnsSavedRef.current?.(rows, conversation),
+        onError: (reason) => onErrorRef.current?.(PERSIST_COPY[langRef.current][reason]),
+      },
+      conversationIdRef.current,
+    );
 
     const session = new VoiceSession(browserVoiceDeps(), {
       onState: (next, failure) => {
@@ -326,9 +397,13 @@ export default function VoiceCallButton({
           linesRef.current = appendTranscript(linesRef.current, parsed.transcript);
           setLines(linesRef.current);
           onTranscriptRef.current?.(linesRef.current);
+          /* Settled turns leave for the conversation from here. The
+             persister reads the same list the screen renders, so what is
+             saved is exactly what was shown. */
+          persisterRef.current?.observe(linesRef.current);
         }
       },
-    }, voiceKeyRef.current);
+    }, voiceKeyRef.current, conversationIdRef.current);
 
     sessionRef.current = session;
     await session.start();
@@ -364,6 +439,27 @@ export default function VoiceCallButton({
     const next = !session.isMuted();
     session.setMuted(next);
     setMuted(next);
+  }, []);
+
+  /* TYPE INTO THE CALL. The text goes to the session as the user's turn and
+     into the transcript as a settled user line marked `via: "text"`, so the
+     screen shows it at once and the persister writes it as a TYPED message —
+     it was typed, and the thread should say so. */
+  const sendTyped = useCallback((text: string): boolean => {
+    const session = sessionRef.current;
+    if (!session) return false;
+    const trimmed = text.trim();
+    if (!trimmed || !session.sendText(trimmed)) return false;
+    linesRef.current = appendTranscript(linesRef.current, {
+      role: "user",
+      text: trimmed,
+      final: true,
+      via: "text",
+    });
+    setLines(linesRef.current);
+    onTranscriptRef.current?.(linesRef.current);
+    persisterRef.current?.observe(linesRef.current);
+    return true;
   }, []);
 
   const selectVoice = useCallback((key: string) => {
@@ -403,6 +499,7 @@ export default function VoiceCallButton({
           voices={voices}
           selectedVoice={voiceKey}
           onSelectVoice={selectVoice}
+          onSendText={sendTyped}
         />
       )}
       <button

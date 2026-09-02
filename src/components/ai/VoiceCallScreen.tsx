@@ -20,7 +20,7 @@
    functional danger colour and is used only on the control that ends the call.
    --------------------------------------------------------------------------- */
 
-import { useEffect } from "react";
+import { useEffect, useRef, useState } from "react";
 import AIOrb from "@/components/ai-orb/AIOrb";
 import type { AIOrbState } from "@/components/ai-orb/ai-orb-types";
 import VoiceTranscript from "@/components/ai/VoiceTranscript";
@@ -47,6 +47,11 @@ const COPY: Record<Lang, {
      one or two words that survive being set at 11px under a 56px circle. */
   micShort: string;
   endShort: string;
+  /* THE TYPED LANE INSIDE THE CALL. A placeholder, the send control's name,
+     and what the screen says when text was typed before the call was up. */
+  typePlaceholder: string;
+  sendTyped: string;
+  typedNotLive: string;
 }> = {
   en: {
     connecting: "Connecting…",
@@ -64,6 +69,9 @@ const COPY: Record<Lang, {
     voice: "Voice",
     micShort: "Mic",
     endShort: "End",
+    typePlaceholder: "Type something into the call…",
+    sendTyped: "Send typed message",
+    typedNotLive: "The call is still connecting — try again in a moment.",
   },
   zh: {
     connecting: "正在连接…",
@@ -81,6 +89,9 @@ const COPY: Record<Lang, {
     voice: "音色",
     micShort: "麦克风",
     endShort: "结束",
+    typePlaceholder: "在通话中输入文字…",
+    sendTyped: "发送文字",
+    typedNotLive: "通话仍在连接中，请稍后再试。",
   },
   ar: {
     connecting: "جارٍ الاتصال…",
@@ -98,6 +109,9 @@ const COPY: Record<Lang, {
     voice: "الصوت",
     micShort: "مايك",
     endShort: "إنهاء",
+    typePlaceholder: "اكتب حاجة في المكالمة…",
+    sendTyped: "ابعت الرسالة المكتوبة",
+    typedNotLive: "المكالمة لسه بتتصل — حاول كمان لحظة.",
   },
 };
 
@@ -130,6 +144,10 @@ export type VoiceCallScreenProps = {
    *  session, so a new one needs a new session. Said plainly in the UI rather
    *  than silently doing nothing until the next call. */
   onSelectVoice?: (key: string) => void;
+  /** Type into the call. Returns whether it went — false while the channel is
+   *  not up yet, which the screen says rather than swallowing the text. Absent
+   *  means no composer is drawn. */
+  onSendText?: (text: string) => boolean;
 };
 
 export default function VoiceCallScreen({
@@ -146,18 +164,44 @@ export default function VoiceCallScreen({
   voices = [],
   selectedVoice = null,
   onSelectVoice,
+  onSendText,
 }: VoiceCallScreenProps) {
   const copy = COPY[lang];
+  const [typed, setTyped] = useState("");
+  const [typedNotice, setTypedNotice] = useState<string | null>(null);
+  const typedRef = useRef<HTMLInputElement | null>(null);
 
   /* Escape ends the call. A full-screen mode with no keyboard exit is a trap,
-     and this one is holding the microphone open. */
+     and this one is holding the microphone open.
+
+     EXCEPT INSIDE THE COMPOSER. Escape while typing means "leave the field",
+     on every keyboard on every platform; ending a live call because someone
+     backed out of a text box would be the worst surprise on this screen. */
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onEnd();
+      if (e.key !== "Escape") return;
+      if (typedRef.current && e.target === typedRef.current) {
+        typedRef.current.blur();
+        return;
+      }
+      onEnd();
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [onEnd]);
+
+  const submitTyped = () => {
+    const text = typed.trim();
+    if (!text || !onSendText) return;
+    if (onSendText(text)) {
+      setTyped("");
+      setTypedNotice(null);
+    } else {
+      /* Kept in the box. The text is theirs and the call will be up shortly;
+         losing it would make them type it again. */
+      setTypedNotice(copy.typedNotLive);
+    }
+  };
 
   /* The orb's own vocabulary, mapped from the call's. `awakening` while
      connecting is honest: it is starting, not yet hearing anything.
@@ -320,6 +364,57 @@ export default function VoiceCallScreen({
           <p className="max-w-[820px] mx-auto px-6 pb-6 text-center text-xs text-[#666666]">
             {copy.hint}
           </p>
+        )}
+
+        {/* ── TYPE INTO THE CALL ────────────────────────────────────────
+            A model code, a quantity, a name in another alphabet: some things
+            are easier typed than said. One pill on the 8px grid, the same
+            border family as every other control here, the send button
+            inverted only once there is something to send — a control that
+            cannot be used should not look ready. Not a textarea: this is a
+            line into a conversation, not a document. */}
+        {onSendText && (
+          <form
+            className="max-w-[820px] mx-auto px-6 pb-6"
+            onSubmit={(e) => {
+              e.preventDefault();
+              submitTyped();
+            }}
+          >
+            <div className="flex items-center gap-2 h-12 pl-4 pr-1.5 rounded-full border border-white/20 bg-white/[0.04] focus-within:border-white/40 transition-colors">
+              <input
+                ref={typedRef}
+                type="text"
+                value={typed}
+                onChange={(e) => {
+                  setTyped(e.target.value);
+                  if (typedNotice) setTypedNotice(null);
+                }}
+                placeholder={copy.typePlaceholder}
+                aria-label={copy.typePlaceholder}
+                enterKeyHint="send"
+                autoComplete="off"
+                className="flex-1 min-w-0 bg-transparent text-sm text-white placeholder:text-[#666666] outline-none"
+              />
+              <button
+                type="submit"
+                disabled={!typed.trim()}
+                aria-label={copy.sendTyped}
+                title={copy.sendTyped}
+                className="h-9 w-9 rounded-full inline-flex items-center justify-center shrink-0 bg-white text-[#0D0D0D] disabled:bg-white/[0.08] disabled:text-[#666666] transition-[background-color,color,transform] duration-150 active:scale-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0066FF] focus-visible:ring-offset-2 focus-visible:ring-offset-[#0D0D0D]"
+              >
+                <svg aria-hidden viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="12" y1="19" x2="12" y2="5" />
+                  <polyline points="6 11 12 5 18 11" />
+                </svg>
+              </button>
+            </div>
+            {typedNotice && (
+              <p role="status" className="mt-2 text-center text-xs text-[#AAAAAA]">
+                {typedNotice}
+              </p>
+            )}
+          </form>
         )}
 
         {/* ── THE CONTROLS ───────────────────────────────────────────────

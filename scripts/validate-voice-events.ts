@@ -147,6 +147,24 @@ console.log("\n── 5. Folding fragments into lines ──");
   check("the user's open line is left intact", () => lines[0].text === "how many orders");
 }
 
+console.log("\n── 5b. How the words got in — spoken or typed — survives the fold ──");
+{
+  /* A typed turn is appended as a settled user line marked via:"text", and the
+     persister writes it as a TYPED message. A spoken one carries no via and is
+     written as voice. The fold must keep each as it began. */
+  let lines: TranscriptLine[] = [];
+  lines = appendTranscript(lines, { role: "user", text: "KX-180", final: true, via: "text" });
+  check("a typed turn keeps its via on the new line", () => lines[0].via === "text");
+  lines = appendTranscript(lines, { role: "assistant", text: "Sure", final: false });
+  check("a spoken turn carries no via", () => lines[1].via === undefined && !("via" in lines[1]));
+  lines = appendTranscript(lines, { role: "assistant", text: "Sure, the KX-180.", final: true });
+  check("  …and gains none when it settles", () => lines[1].via === undefined && lines[1].final);
+  let typed: TranscriptLine[] = [{ role: "user", text: "KX", final: false, via: "text" }];
+  typed = appendTranscript(typed, { role: "user", text: "KX-180", final: true });
+  check("a line that began typed stays typed when a later update omits the field",
+    () => typed.length === 1 && typed[0].via === "text");
+}
+
 console.log("\n── 6. The awkward cases a live call actually produces ──");
 {
   /* A repeated event — a retransmit, or React replaying a handler — must not

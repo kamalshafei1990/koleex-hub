@@ -75,6 +75,14 @@ export const BUDGETS = {
     windowSec: 60,
     max: num(process.env.AI_LIMIT_ATTACHMENTS_PER_MIN, 6),
   }),
+  /* A call posts each settled turn as it lands — a lively exchange is one or
+     two a minute per side, so 60 is far above a person and cheap to hit from
+     a loop. Each post is a database write and nothing more. */
+  voiceTranscriptPerAccount: (): Budget => ({
+    bucket: "voice_transcript",
+    windowSec: 60,
+    max: num(process.env.AI_LIMIT_VOICE_TRANSCRIPTS_PER_MIN, 60),
+  }),
 } as const;
 
 export type LimitResult =

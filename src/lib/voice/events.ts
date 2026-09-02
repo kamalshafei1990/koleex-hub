@@ -31,8 +31,14 @@
 /** Who said it. The UI colours and aligns on this and nothing else. */
 export type TranscriptRole = "user" | "assistant";
 
+/** How the words got into the call. Spoken is the default and the common
+ *  case; `text` marks a turn the caller TYPED into a live call, which is
+ *  persisted as an ordinary typed message rather than a voice one. */
+export type TranscriptVia = "voice" | "text";
+
 export type TranscriptUpdate = {
   role: TranscriptRole;
+  via?: TranscriptVia;
   /** The text so far for this turn. Always the WHOLE turn, never a fragment —
    *  see `append` below for why the caller is not asked to accumulate. */
   text: string;
@@ -147,7 +153,7 @@ export function parseVoiceEvent(raw: string): ParsedEvent {
    in a function the suite can drive one event at a time.
    --------------------------------------------------------------------------- */
 
-export type TranscriptLine = { role: TranscriptRole; text: string; final: boolean };
+export type TranscriptLine = { role: TranscriptRole; text: string; final: boolean; via?: TranscriptVia };
 
 /**
  * Fold one update into the running list.
@@ -169,7 +175,10 @@ export function appendTranscript(
     /* An empty partial opens nothing — a stray delta with no text would
        otherwise leave a blank bubble on screen for the rest of the call. */
     if (!update.text && !update.final) return [...lines];
-    return [...lines, { role: update.role, text: update.text, final: update.final }];
+    return [
+      ...lines,
+      { role: update.role, text: update.text, final: update.final, ...(update.via ? { via: update.via } : {}) },
+    ];
   }
 
   /* A delta carries the whole turn so far, not the increment. Replacing rather
@@ -181,6 +190,9 @@ export function appendTranscript(
        rather than blanking a caption the user was reading. */
     text: update.text || last.text,
     final: update.final,
+    /* The line keeps how it began. A spoken turn does not become a typed one
+       because a later event omitted the field. */
+    ...(last.via ?? update.via ? { via: last.via ?? update.via } : {}),
   };
   return [...lines.slice(0, -1), merged];
 }

@@ -29,6 +29,11 @@ import "server-only";
    carries no history and no system message unless this event supplies one, so
    an empty `instructions` is not a neutral default: it is the model's own
    idea of itself, which is not ours to leave to chance.
+
+   THE SAME EVENT NOW CARRIES THE END OF THE TYPED CONVERSATION (see
+   ./history.ts): a call opened from a thread continues that thread instead
+   of starting from nothing. Loaded by the route, owner-checked, budgeted,
+   and appended to the FULL instructions only.
    --------------------------------------------------------------------------- */
 
 import { AI_PROVENANCE_RULE } from "@/lib/server/ai/prompt-builder";
@@ -44,6 +49,7 @@ import {
 } from "@/lib/server/ai-agent/brand-knowledge";
 import { SUPPLIER_CONFIDENTIALITY } from "@/lib/server/ai/prompt-builder";
 import { EGYPTIAN_VOICE_RULE, EGYPTIAN_VOICE_BRIEF } from "./dialect";
+import { historyBlock, type RecentTurn } from "./history";
 import { type VoiceOption } from "./config";
 import { voiceToolSchemas } from "./tools";
 
@@ -283,15 +289,24 @@ function taughtIndexBlock(questions: readonly string[]): string {
 
 /** What the handshake returns: the same session in two lengths.
  *
- *  `taughtQuestions` reaches only the FULL session. The compact one exists
- *  because the full one did not fit; adding to it would be answering a size
- *  problem by making the fallback bigger. */
+ *  `taughtQuestions` and `recentTurns` reach only the FULL session. The
+ *  compact one exists because the full one did not fit; adding to it would be
+ *  answering a size problem by making the fallback bigger.
+ *
+ *  THE HISTORY COMES LAST, after the taught index. Both are context rather
+ *  than policy, and the conversation is the more recent of the two — what a
+ *  caller means by "as I was saying" — so it sits nearest the end, where a
+ *  model's attention on a long prompt is most reliable. */
 export function buildVoiceSessionPayload(
   voice: VoiceOption | null,
   taughtQuestions: readonly string[] = [],
+  recentTurns: readonly RecentTurn[] = [],
 ): VoiceSessionPayload {
   return {
-    full: buildSessionUpdate(voice, VOICE_INSTRUCTIONS + taughtIndexBlock(taughtQuestions)),
+    full: buildSessionUpdate(
+      voice,
+      VOICE_INSTRUCTIONS + taughtIndexBlock(taughtQuestions) + historyBlock(recentTurns),
+    ),
     compact: buildSessionUpdate(voice, COMPACT_INSTRUCTIONS, "compact"),
   };
 }

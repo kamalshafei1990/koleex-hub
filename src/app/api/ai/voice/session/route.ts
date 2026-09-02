@@ -38,10 +38,10 @@ import "server-only";
    --------------------------------------------------------------------------- */
 
 import { NextResponse } from "next/server";
-import { requireAuth } from "@/lib/server/auth";
-import { requireInternalUser } from "@/lib/server/ai/require-internal";
-import { buildUserContext, checkModule } from "@/lib/server/ai-agent/permissions";
+import { authorizeVoice } from "@/lib/server/ai/voice/gate";
 import { consumeBudget, limitMode, subjectFor } from "@/lib/server/ai/security/rate-limit";
+import { supabaseServer } from "@/lib/server/supabase-server";
+import { loadRecentTurns, parseConversationParam, type RecentTurn } from "@/lib/server/ai/voice/history";
 import { parseVoiceConfig, diagnoseVoiceConfig, resolveVoice, type VoiceEnv } from "@/lib/server/ai/voice/config";
 import {
   buildVoiceSessionPayload,
@@ -93,6 +93,9 @@ const MAX_SDP_BYTES = 64 * 1024;
    It gets a ceiling measured against that: long enough that a cold cache is
    not thrown away, short enough that nobody waits on it. */
 const TAUGHT_INDEX_TIMEOUT_MS = 1_500;
+/* The typed conversation behind the call, same posture: two small indexed
+   reads, and a call with no history is the product before this change. */
+const HISTORY_TIMEOUT_MS = 1_500;
 
 /* The reason a fetch failed, in a form that is safe to log. Extracted so the
    hostname-suppression can be RUN rather than eyeballed — see fetch-cause.ts
@@ -185,42 +188,11 @@ function voiceEnv(): VoiceEnv {
   };
 }
 
-/* THE SAME GATE FOR BOTH VERBS, in one place. A second handler with its own
-   copy of this chain is a second place for a step to be dropped, and the step
-   most easily dropped is requireInternalUser — which was already omitted once
-   from this very route. Not exported: a Next.js route file may only export
-   route handlers. */
-async function authorize(req: Request): Promise<NextResponse | { accountId: string; tenantId: string | null }> {
-  const auth = await requireAuth(req);
-  if (auth instanceof NextResponse) return auth;
-
-  /* THE DOOR, BEFORE ANY PERMISSION REASONING. Owner directive 2026-08-03:
-     Koleex AI must not be REACHABLE by a non-internal account type at all,
-     because customer-portal logins share the accounts table and "the tools
-     would deny anyway" is not acceptable exposure. This route omitted it in
-     its first draft and validate:ai-api-v1 named it — a customer-portal
-     account holding an "AI Voice" permission row could have opened a call. */
-  const internal = requireInternalUser(auth);
-  if (internal) return internal;
-
-  /* DENY BY DEFAULT, and that is the point. checkModule has no open-access
-     fallback: a user with no row for this module is refused. For a new,
-     costly, security-sensitive capability that is the correct default — a
-     super-admin can use it immediately, everyone else when an admin decides. */
-  const ctx = await buildUserContext(auth);
-  const decision = checkModule(ctx, "AI Voice", "view");
-  if (!decision.allowed) {
-    return NextResponse.json(
-      { error: decision.reason ?? "You don't have access to voice." },
-      { status: 403 },
-    );
-  }
-
-  /* THE TENANT TRAVELS WITH THE ACCOUNT, and it is not an afterthought: every
-     knowledge read this route makes is scoped by it, and a null passed where a
-     tenant belongs is one tenant's taught knowledge read into another's call. */
-  return { accountId: auth.account_id, tenantId: auth.tenant_id ?? null };
-}
+/* THE GATE LIVES IN ai/voice/gate.ts NOW, shared with the transcript route.
+   It used to be a private function here; a second voice route made a second
+   copy the likelier outcome, and a copied chain is how requireInternalUser
+   was dropped from this very file once. */
+const authorize = authorizeVoice;
 
 /* GET — which voices this deployment offers.
 
@@ -418,7 +390,27 @@ export async function POST(req: Request) {
     console.error("[ai.voice] taught index unavailable — continuing without it");
   }
 
-  const payload = buildVoiceSessionPayload(voice, taughtQuestions);
+  /* THE CONVERSATION THIS CALL CONTINUES, if the browser named one. The id is
+     a query parameter and is treated as such: parsed strictly, then checked
+     against the caller's own tenant and account inside loadRecentTurns
+     before a single message is read. An id that is not theirs yields an
+     empty list, identical to naming none. Same ceiling and same fail-open
+     as the taught index, for the same reason: this can improve a call and
+     must never prevent one. */
+  let recentTurns: RecentTurn[] = [];
+  const conversationId = parseConversationParam(new URL(req.url).searchParams.get("conversation"));
+  if (conversationId) {
+    try {
+      recentTurns = await Promise.race([
+        loadRecentTurns(supabaseServer, conversationId, gate.tenantId, gate.accountId),
+        new Promise<RecentTurn[]>((resolve) => setTimeout(() => resolve([]), HISTORY_TIMEOUT_MS)),
+      ]);
+    } catch {
+      console.error("[ai.voice] conversation history unavailable — continuing without it");
+    }
+  }
+
+  const payload = buildVoiceSessionPayload(voice, taughtQuestions, recentTurns);
   return NextResponse.json(
     { sdp: answer, session: payload.full, session_compact: payload.compact },
     { status: 200, headers: { "Cache-Control": "no-store" } },

@@ -32,6 +32,7 @@ import PlusIcon from "@/components/icons/ui/PlusIcon";
 import PaperPlaneIcon from "@/components/icons/ui/PaperPlaneIcon";
 import MicButton, { speakText, type TtsHandle } from "@/components/ai/MicButton";
 import VoiceCallButton from "@/components/ai/VoiceCallButton";
+import { type SavedTurn } from "@/lib/voice/persist";
 
 import TrashIcon from "@/components/icons/ui/TrashIcon";
 import PencilIcon from "@/components/icons/ui/PencilIcon";
@@ -516,6 +517,86 @@ export default function KoleexAiApp() {
 
      `viaVoice` — when true the assistant reply is also read aloud
      via speechSynthesis. Typed turns stay silent. */
+  /* ONE PLACE THAT MAKES A CONVERSATION. Typed turns needed it first; a voice
+     call that begins on an empty screen needs it too, the moment its first
+     settled turn wants somewhere to go. The restore-race note inside applies
+     to both callers equally, which is why this is one function and not two. */
+  const createConversation = useCallback(async (): Promise<string | null> => {
+    const res = await fetch("/api/ai/conversations", {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({}),
+    });
+    if (!res.ok) return null;
+    const { conversation } = (await res.json()) as { conversation: ConversationRow };
+    setConversations((prev) => [conversation, ...prev]);
+    setActiveId(conversation.id);
+    /* Fix: mark auto-restore as done so it doesn't race us on
+       the first-ever send. Without this, the effect that watches
+       `conversations` would fire post-render, read the activeId
+       we just wrote to localStorage, match the brand-new conv,
+       and call openConversation(newId) — which resets messages
+       to [] and fetches server state (empty because we haven't
+       POSTed to /api/ai/agent yet). End result: the user's
+       message + placeholder get wiped, and the SSE stream has
+       no placeholder to update, so the send appears to vanish. */
+    restoredRef.current = true;
+    return conversation.id;
+  }, []);
+
+  /* A call writes into the OPEN conversation, or makes one. Read through the
+     ref: the persister calls this from a network callback long after the
+     render that created it. */
+  const ensureVoiceConversation = useCallback(
+    () => (activeIdRef.current ? Promise.resolve(activeIdRef.current) : createConversation()),
+    [createConversation],
+  );
+
+  /* THE ROWS THE SERVER WROTE FOR A CALL, appended to the thread as they land
+     — so when the call screen closes, the exchange is already there, the way
+     it is in ChatGPT. Guarded by the conversation they belong to: a user who
+     opened another chat mid-call must not see spoken turns land in it. Rows
+     the thread already holds (a retried post) are not added twice. */
+  const onVoiceTurnsSaved = useCallback(
+    (rows: SavedTurn[], conversation: { id: string; title: string | null }) => {
+      if (rows.length === 0) return;
+      if (activeIdRef.current === conversation.id) {
+        setMessages((prev) => {
+          const seen = new Set(prev.map((m) => m.id));
+          const fresh: ChatMsg[] = rows
+            .filter((r) => !seen.has(r.id))
+            .map((r) => ({
+              id: r.id,
+              role: (r.role === "assistant" ? "assistant" : "user") as ChatMsg["role"],
+              content: r.content,
+              created_at: r.created_at,
+              source: r.source === "voice" ? "voice" : "text",
+            }));
+          return fresh.length ? [...prev, ...fresh] : prev;
+        });
+      }
+      const last = rows[rows.length - 1];
+      const bumpNow = new Date().toISOString();
+      setConversations((prev) => {
+        const next = prev.map((c) =>
+          c.id === conversation.id
+            ? {
+                ...c,
+                title: conversation.title ?? c.title,
+                last_preview: last.content.slice(0, 180),
+                message_count: c.message_count + rows.length,
+                updated_at: bumpNow,
+              }
+            : c,
+        );
+        next.sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime());
+        return next;
+      });
+    },
+    [],
+  );
+
   const send = useCallback(
     async (textOverride?: string, viaVoice = false) => {
       const text = (textOverride ?? input).trim();
@@ -540,34 +621,14 @@ export default function KoleexAiApp() {
       let conversationId = activeId;
       const turnConversationId = activeId;
       if (!conversationId) {
-        const res = await fetch("/api/ai/conversations", {
-          method: "POST",
-          credentials: "include",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({}),
-        });
-        if (!res.ok) {
+        const created = await createConversation();
+        if (!created) {
           setError("Couldn't start a new chat.");
           sendingRef.current = false;
           setSending(false);
           return;
         }
-        const { conversation } = (await res.json()) as {
-          conversation: ConversationRow;
-        };
-        setConversations((prev) => [conversation, ...prev]);
-        conversationId = conversation.id;
-        setActiveId(conversationId);
-        /* Fix: mark auto-restore as done so it doesn't race us on
-           the first-ever send. Without this, the effect that watches
-           `conversations` would fire post-render, read the activeId
-           we just wrote to localStorage, match the brand-new conv,
-           and call openConversation(newId) — which resets messages
-           to [] and fetches server state (empty because we haven't
-           POSTed to /api/ai/agent yet). End result: the user's
-           message + placeholder get wiped, and the SSE stream has
-           no placeholder to update, so the send appears to vanish. */
-        restoredRef.current = true;
+        conversationId = created;
       }
 
       setError(null);
@@ -1022,7 +1083,7 @@ export default function KoleexAiApp() {
         setSending(false);
       }
     },
-    [input, activeId, lang, stopTts, attachments, webSearch],
+    [input, activeId, lang, stopTts, attachments, webSearch, createConversation],
   );
 
   /* ── Phase 12: message-level actions ────────────────────────── */
@@ -2169,19 +2230,15 @@ export default function KoleexAiApp() {
             composer sits above the bar on iPhones without a notch
             guard. env(safe-area-inset-bottom) is 34 px on modern
             devices, 0 on desktops — additive to the existing pb. */}
-        {/* THE TRANSCRIPT LIVES ON THE CALL SCREEN, NOT HERE.
+        {/* THE LIVE TRANSCRIPT LIVES ON THE CALL SCREEN, NOT HERE.
 
-            It was rendered above the composer, and after hanging up it stayed:
-            a grey slab sitting in the conversation that was not a message,
-            could not be replied to, and vanished on reload. It read as
-            something broken, and it was — voice turns are not persisted, so
-            leaving them in the message area implies a permanence they do not
-            have.
-
-            The call screen shows them while the call is live, which is when
-            they are useful, and takes them with it when it closes. Keeping
-            them afterwards is a separate feature — writing spoken turns to a
-            conversation — and a database decision, not a layout one. */}
+            It was once rendered above the composer as a grey slab that was
+            not a message and vanished on reload. What replaced that is not a
+            layout change but a data one: settled turns are now written into
+            the conversation by the server (see lib/voice/persist.ts and
+            onVoiceTurnsSaved above) and arrive in the message list as real
+            rows with a voice mark. The call screen keeps only the half that
+            is still being said. */}
         <div
           className="shrink-0 bg-transparent"
           style={{ paddingBottom: "env(safe-area-inset-bottom, 0px)" }}
@@ -2421,6 +2478,12 @@ export default function KoleexAiApp() {
                       disabled={sending}
                       onError={(msg) => setError(msg)}
                       onLiveChange={(live) => { if (live) stopTts(); }}
+                      /* The call continues THIS thread: the server reads its
+                         recent turns into the session, and the spoken turns
+                         are written back into it as messages. */
+                      conversationId={activeId}
+                      ensureConversation={ensureVoiceConversation}
+                      onTurnsSaved={onVoiceTurnsSaved}
                     />
 
                     {/* Send / Stop — inverted bg circle, anchors the row. */}
