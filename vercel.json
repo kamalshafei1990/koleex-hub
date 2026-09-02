@@ -3,13 +3,6 @@
   "regions": [
     "hnd1"
   ],
-  "functions": {
-    "src/app/api/ai/voice/session/route.ts": {
-      "regions": [
-        "hkg1"
-      ]
-    }
-  },
   "crons": [
     {
       "path": "/api/cron/fx-refresh",
