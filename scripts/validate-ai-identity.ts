@@ -33,7 +33,9 @@ import {
   KOLEEX_COMPANY_BRIEF,
   KOLEEX_IDENTITY,
   NAME_DRIFT,
+  identityDepthFor,
 } from "../src/lib/server/ai/identity";
+import { identityFacetFor, identityAngleFor } from "../src/lib/server/ai/identity-angle";
 import {
   buildSystemPrompt,
   buildMinimalSystemPrompt,
@@ -882,6 +884,106 @@ console.log("\n── 11a. The company answer reaches the lanes, and only when a
   check("and still loads the approved knowledge behind it",
     /Taizhou/.test(buildBrandSystemPrompt(ctx4, "en", "company")) &&
     buildBrandSystemPrompt(ctx4, "en", "company").length > 20_000);
+}
+
+console.log("\n── 12. The same facts, a different answer each time ──");
+{
+  /* THE DEFECT. "Who are you", "what's your name", "who made you" all came
+     back as one paragraph, in the same words, every time. Three causes, three
+     fixes, each asserted here: the finished example replies are gone from the
+     brand prompt; identity turns keep a clipped history so "do not repeat"
+     is followable; and each question is answered for its own FACET, in a
+     voice and with an opening that rotate. */
+
+  /* 1. The facet is read from the question, in every language. */
+  const facets: Array<[string, ReturnType<typeof identityFacetFor>]> = [
+    ["what is your name?", "name"], ["whats ur name", "name"], ["what should I call you?", "name"],
+    ["اسمك إيه؟", "name"], ["ما هو اسمك", "name"], ["你叫什么名字", "name"],
+    ["who made you?", "maker"], ["who create you", "maker"], ["whose idea were you?", "maker"],
+    ["مين عملك؟", "maker"], ["من قام بتطويرك", "maker"], ["谁开发了你", "maker"],
+    ["what are you?", "nature"], ["are you a robot?", "nature"], ["are you human", "nature"],
+    ["إنت إيه؟", "nature"], ["هل أنت إنسان", "nature"], ["你是机器人吗", "nature"],
+    ["tell me about yourself", "self"], ["introduce yourself", "self"], ["عرفني بنفسك", "self"], ["介绍一下你自己", "self"],
+    ["how were you built?", "technical"], ["which model are you running on?", "technical"], ["إزاي بتشتغل؟", "technical"],
+    ["who are you?", "who"], ["من انت", "who"], ["你是谁", "who"],
+  ];
+  for (const [q, want] of facets) {
+    const got = identityFacetFor(q);
+    check(`"${q}" → ${want}`, got === want);
+  }
+  /* Order matters: "how were you built" contains "built" and must not read as maker. */
+  check("a technical question wins over the maker words inside it", identityFacetFor("how were you built and by whom?") === "technical");
+
+  /* 2. Each facet leads with its own thing, at its own length. */
+  const name = identityAngleFor("what is your name?", 1);
+  const maker = identityAngleFor("who made you?", 1);
+  const nature = identityAngleFor("what are you?", 1);
+  const tech = identityAngleFor("how do you work?", 1);
+  check("a name question leads with the name and stays short",
+    /NAME question/.test(name) && /Koleex AI/.test(name) && /one to three lines/.test(name));
+  check("a maker question leads with the developer and the vision",
+    /MAKER question/.test(maker) && /Koleex International Group/.test(maker) && /whose idea/.test(maker));
+  check("a what-are-you question leads with what it is, and stays honest",
+    /WHAT-ARE-YOU/.test(nature) && /not a person/.test(nature) && /do not claim feelings/.test(nature));
+  check("a technical question answers about Koleex's own system and names no supplier",
+    /TECHNICAL/.test(tech) && /server-side/.test(tech) && /never name an engine or supplier/.test(tech));
+  check("the four leads are four different directives", new Set([name, maker, nature, tech]).size === 4);
+
+  /* 3. The voice and the opening rotate with the seed, and the facts do not. */
+  const seeds = Array.from({ length: 48 }, (_, i) => identityAngleFor("who are you?", i));
+  check("the same seed gives the same directive", identityAngleFor("who are you?", 7) === identityAngleFor("who are you?", 7));
+  check("forty-eight consecutive turns get forty-eight different directives", new Set(seeds).size === 48);
+  const voices = new Set(seeds.map((a) => /Voice for this answer: ([^.]+)\./.exec(a)?.[1]));
+  const openings = new Set(seeds.map((a) => /Open with ([^.]+)\./.exec(a)?.[1]));
+  check("  …walking the whole voice menu", voices.size >= 8);
+  check("  …and the whole opening menu", openings.size >= 6);
+  check("no seed is a bad seed", identityAngleFor("who are you?", -3).length > 0 && identityAngleFor("who are you?", 2.7).length > 0);
+  check("every directive asks for fresh words and fixed facts",
+    seeds.every((a) => /fresh words/.test(a) && /facts stay exactly the same/.test(a)));
+  check("the default seed is random — two calls without one differ often enough to count",
+    new Set(Array.from({ length: 12 }, () => identityAngleFor("who are you?"))).size > 1);
+
+  /* 4. The angle reaches the lanes, and only on identity turns. */
+  const ctx3 = {
+    auth: { username: "mona", user_id: "u1", account_id: "a1", role_id: "r1", view_as_role_id: null },
+    modulePermissions: {}, allowedSensitiveFields: new Set<string>(), department: "Sales",
+    isSuperAdmin: false, canViewPrivate: false, timezone: "Asia/Dubai",
+    viewer: { name: "Mona Adel", username: "mona", role: "Sales Rep" }, memory: {},
+  } as unknown as UserContext;
+  const brandName = buildBrandSystemPrompt(ctx3, "en", "ai", null, "what is your name?");
+  const brandMaker = buildBrandSystemPrompt(ctx3, "en", "ai", null, "who made you?");
+  check("the brand lane answers a name question as a name question", /THIS ANSWER, SPECIFICALLY: This is a NAME question/.test(brandName));
+  check("  …and a maker question as a maker question", /This is a MAKER question/.test(brandMaker));
+  check("  …so the two prompts differ", brandName !== brandMaker);
+  check("the company lane carries no angle — it answers a different question",
+    !/THIS ANSWER, SPECIFICALLY/.test(buildBrandSystemPrompt(ctx3, "en", "company", null, "what is koleex?")));
+  check("the general lanes carry the angle on an identity turn",
+    /THIS ANSWER, SPECIFICALLY/.test(identityDepthFor("who made you?")) &&
+    !/THIS ANSWER, SPECIFICALLY/.test(identityDepthFor("how many overdue invoices?")));
+  check("  …after the story, at the end, so the cacheable prefix is untouched",
+    identityDepthFor("who made you?").indexOf(AI_IDENTITY_STORY) < identityDepthFor("who made you?").indexOf("THIS ANSWER, SPECIFICALLY"));
+
+  /* 5. THE FINISHED EXAMPLES ARE GONE. A model given a complete sentence
+     copies it; the two example replies WERE the one answer. */
+  check("the brand prompt carries no finished identity reply to copy",
+    !brandName.includes("You can give me a different name") &&
+    !brandName.includes("My name is Koleex AI —") &&
+    !brandName.includes("I was built by Koleex International Group as part of its digital transformation, and the original idea"));
+  check("  …but still describes the shapes", /shapes only/i.test(brandName) && /A name question →/.test(brandName));
+
+  /* 6. THE ORCHESTRATOR LETS IT HAPPEN: history on identity turns, warmth. */
+  const orch = readFileSync("src/lib/server/ai-agent/orchestrator.ts", "utf8").replace(/\/\*[\s\S]*?\*\//g, "");
+  check("identity turns keep a clipped tail of the conversation",
+    /const isIdentityTurn = brandSection === "ai" \|\| brandSection === "both";/.test(orch) &&
+    /sanitisedHistory\.slice\(-IDENTITY_HISTORY_TURNS\)/.test(orch) &&
+    /\.slice\(0, IDENTITY_HISTORY_CHARS\)/.test(orch));
+  check("  …bounded: a handful of turns, each cut short",
+    /const IDENTITY_HISTORY_TURNS = 6;/.test(orch) && /const IDENTITY_HISTORY_CHARS = 400;/.test(orch));
+  check("  …while the company lane still drops it", /:\s*\[\]\s*:\s*sanitisedHistory;/.test(orch));
+  check("the identity turn runs warmer, everything else unchanged",
+    /temperature: isIdentityTurn \? 0\.85 : 0\.3,/.test(orch));
+  check("the message reaches the brand prompt builder",
+    /buildBrandSystemPrompt\(\s*ctx,\s*userLang,\s*brandSection as "company" \| "ai" \| "both",\s*dialect,\s*userMessage,\s*\)/.test(orch));
 }
 
 console.log(`\n${pass} passed, ${failures.length} failed`);

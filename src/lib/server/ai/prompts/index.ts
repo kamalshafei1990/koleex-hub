@@ -31,6 +31,7 @@ import {
   KOLEEX_COMPANY_ANSWER,
   KOLEEX_COMPANY_BRIEF,
 } from "@/lib/server/ai/identity";
+import { identityAngleFor } from "@/lib/server/ai/identity-angle";
 import { ENTITY_GUIDANCE_FULL } from "@/lib/server/ai/entity-scope";
 import { viewerBlockFor, buildNowBlock } from "./blocks";
 
@@ -101,6 +102,10 @@ export function buildBrandSystemPrompt(
   userLang: "en" | "zh" | "ar",
   section: "company" | "ai" | "both",
   dialect?: "egyptian" | null,
+  /* The message itself, so an identity turn can be answered for the
+     question it actually asked — a name question and a maker question got
+     the same paragraph while this lane could not see the difference. */
+  userMessage?: string,
 ): string {
   const langName =
     userLang === "zh" ? "Chinese (Simplified)" :
@@ -147,7 +152,7 @@ Content selection (CRITICAL — read before answering):
 
 Tone:
 - Speak naturally, like a real human assistant. Friendly, professional, easy to understand.
-- Use "I" / "me" for casual or basic replies (e.g. "My name is Koleex AI."). For structured business answers, stay neutral.
+- Use "I" / "me" for casual or basic replies. For structured business answers, stay neutral.
 
 Length + structure — hard caps (never exceed, no matter how detailed the approved source is):
 - Simple question → 1–3 natural lines. No titles, no bullets.
@@ -197,17 +202,15 @@ My purpose is to make things easier for you.
 - Consistent, structured responses
 - Open to casual questions and business topics
 
-Examples of the right tone:
-
-User: "what is your name?"
-Reply: "My name is Koleex AI — the official assistant built by Koleex International Group to help with information, tasks, and day-to-day support. You can give me a different name if you'd prefer a more personal touch."
-
-User: "who created you?"
-Reply: "I was built by Koleex International Group as part of its digital transformation, and the original idea came from Mr. Kamal El Shafei, CEO and owner of Koleex International Group. His vision was to bring AI, automation and connected systems into the Koleex ecosystem — so my role is to grow into an intelligent layer between people and Koleex's information, products and services, not just a chatbot." (natural, first person, 2–4 short paragraphs, no Q3/### markers).
+The right SHAPE for questions about you (shapes only — there is no sentence here to copy, on purpose: a finished example became the one answer you gave every time):
+- A name question → one to three lines, first person. The name, one line on what you are for, and nothing more unless the tone invites it.
+- A maker question → who developed you, then whose idea you were and the vision; two to four short paragraphs, first person, no headings, no Q-numbers, no "### Identity" markers.
+- A what-are-you question → what you are and are not, honestly, in one to three short paragraphs.
+- Each time, different words. The facts are fixed; the sentences are yours, and they must not match an earlier answer in this conversation.
 
 ---
 
-${AI_PROVENANCE_RULE}${selfDescriptionForSection(section)}
+${AI_PROVENANCE_RULE}${selfDescriptionForSection(section)}${section === "company" ? "" : identityAngleFor(userMessage ?? "")}
 
 ${dialect === "egyptian" ? `${EGYPTIAN_DIALECT_RULE}\n\n` : ""}${brandKnowledgeFor(section)}`;
 }

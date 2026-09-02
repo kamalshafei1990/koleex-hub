@@ -297,6 +297,7 @@ export const AI_CAPABILITIES_ANSWER =
    with the user's message is a prefix no cache can reuse.
    --------------------------------------------------------------------------- */
 import { classifyBrandSection, isCapabilityQuestion } from "@/lib/server/ai/core/decide-turn";
+import { identityAngleFor } from "@/lib/server/ai/identity-angle";
 
 /**
  * The self-description this turn needs, or nothing.
@@ -311,7 +312,12 @@ import { classifyBrandSection, isCapabilityQuestion } from "@/lib/server/ai/core
 export function identityDepthFor(userMsg: string): string {
   if (isCapabilityQuestion(userMsg)) return AI_CAPABILITIES_ANSWER;
   const section = classifyBrandSection(userMsg);
-  if (section === "ai") return AI_IDENTITY_STORY;
+  /* THE STORY PLUS THE ANGLE. The story is the facts; the angle is which of
+     them to lead with, in what voice, for THIS question — the difference
+     between an assistant with one answer and one with a way of answering.
+     See identity-angle.ts. The angle sits after the story, at the very end
+     of the prompt, so the cacheable prefix is untouched. */
+  if (section === "ai") return AI_IDENTITY_STORY + identityAngleFor(userMsg);
   if (section === "company" || section === "both") return KOLEEX_COMPANY_ANSWER;
   return "";
 }

@@ -96,6 +96,11 @@ import {
   isMemoryIntentQuery,
 } from "@/lib/server/ai/core/decide-turn";
 
+/* How much of the thread an identity turn sees — enough to avoid repeating
+   itself, not enough to matter to the request size. */
+const IDENTITY_HISTORY_TURNS = 6;
+const IDENTITY_HISTORY_CHARS = 400;
+
 const MAX_ITERATIONS = 4;
 /* Hard ceiling on total tool executions per user turn. Prevents small
    models from loop-calling the same tool 50 times and blowing past
@@ -262,6 +267,7 @@ export async function orchestrate(input: TurnInput): Promise<AgentResponse> {
           userLang,
           brandSection as "company" | "ai" | "both",
           dialect,
+          userMessage,
         )
       : useFastPath && isSmall
         ? buildMinimalSystemPrompt(ctx, userLang, dialect)
@@ -291,8 +297,23 @@ export async function orchestrate(input: TurnInput): Promise<AgentResponse> {
   /* Brand fast-path: the approved knowledge is self-contained and
      brand questions are rarely multi-turn, so history just burns
      payload bytes and risks another 413. Drop history entirely on
-     this path. Other paths keep the full sanitised history. */
-  const effectiveHistory = isBrand ? [] : sanitisedHistory;
+     the COMPANY path. Other paths keep the full sanitised history.
+
+     IDENTITY TURNS KEEP A CLIPPED TAIL. "Never repeat an identity answer
+     word for word in one conversation" was an instruction the model could
+     not follow with no history in front of it — and it repeated, every
+     time. The last few turns, each cut short, are enough to know what was
+     already said and cost a few hundred bytes, not the 413 the full thread
+     risked. */
+  const isIdentityTurn = brandSection === "ai" || brandSection === "both";
+  const effectiveHistory = isBrand
+    ? isIdentityTurn
+      ? sanitisedHistory.slice(-IDENTITY_HISTORY_TURNS).map((m) => ({
+          ...m,
+          content: (m.content ?? "").slice(0, IDENTITY_HISTORY_CHARS),
+        }))
+      : []
+    : sanitisedHistory;
 
   const messages: OpenAiMessage[] = [
     { role: "system", content: systemPrompt },
@@ -323,7 +344,10 @@ export async function orchestrate(input: TurnInput): Promise<AgentResponse> {
     const out = await chatWithTools({
       messages: fromOpenAiMessages(messages),
       maxTokens: isBrand ? 1200 : 160,
-      temperature: 0.3,
+      /* WARMER FOR IDENTITY. At 0.3 the same prompt yields the same
+         paragraph; the facts are pinned by the prompt and checked by the
+         seal, so the words can afford to move. Everything else keeps 0.3. */
+      temperature: isIdentityTurn ? 0.85 : 0.3,
       /* Phase 4E. A greeting must not pay reasoning-model latency — the plan's
          primary speed lever. Advisory: with no AI_MODEL_CLASSES entry every
          class resolves to the adapter's default, which is today's behaviour. */
