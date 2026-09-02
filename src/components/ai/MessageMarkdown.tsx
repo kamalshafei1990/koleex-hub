@@ -113,6 +113,28 @@ export default function MessageMarkdown({
             return <CodeBlock language={language}>{text}</CodeBlock>;
           },
           pre: ({ children }) => <>{children}</>,
+          /* PRODUCT PHOTOS, DRAWN LIKE PART OF THE ANSWER. The model embeds a
+             product's photo as markdown (PRODUCT_PHOTO_RULE); without this
+             the image landed as a bare <img> at its natural size with no
+             edge, no spacing and nothing to tap. Now: bounded, rounded,
+             hairline border, and a tap opens the full picture in a new tab.
+
+             https ONLY. A markdown image is a URL the model wrote, and a
+             URL that is not https is rendered as its alt text rather than
+             fetched — the same rule the call screen applies to photos it
+             reads out of a tool result. */
+          img: ({ src, alt }) => {
+            const url = typeof src === "string" ? src : "";
+            if (!/^https:\/\//i.test(url)) return <span>{alt ?? ""}</span>;
+            return (
+              <a href={url} target="_blank" rel="noreferrer noopener" className="koleex-md-img-link">
+                {/* Remote product photo from whatever host the catalogue names;
+                    next/image needs a fixed allowlist. Same call as Bubble. */}
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={url} alt={alt ?? ""} loading="lazy" decoding="async" className="koleex-md-img" />
+              </a>
+            );
+          },
           table: ({ children, ...rest }) => (
             <div className="koleex-md-table-wrap">
               <table {...rest}>{children}</table>

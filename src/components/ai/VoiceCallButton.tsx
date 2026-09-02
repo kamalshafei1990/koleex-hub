@@ -47,6 +47,7 @@ import {
   type TranscriptLine,
   type VoicePhase,
 } from "@/lib/voice/events";
+import { extractProductPhotos, type ProductPhoto } from "@/lib/voice/photos";
 import { useStreamLevel } from "@/lib/voice/useStreamLevel";
 import { TranscriptPersister, type SavedTurn, type PersistFailure } from "@/lib/voice/persist";
 import VoiceCallScreen from "@/components/ai/VoiceCallScreen";
@@ -179,6 +180,13 @@ export default function VoiceCallButton({
      "let me check" first, but it does not always, and a screen that says
      nothing during it reads as a frozen call. */
   const [searching, setSearching] = useState(false);
+  /* WHAT THE LAST LOOKUP SHOWED. A product search on a call used to be heard
+     and never seen; these are the photos out of its result, drawn on the
+     call screen until the next lookup replaces them or the call ends. */
+  const [photos, setPhotos] = useState<readonly ProductPhoto[]>([]);
+  /* Held until the assistant's next turn, then attached to THAT line so the
+     saved message carries the picture with the words that described it. */
+  const pendingPhotosRef = useRef<readonly ProductPhoto[]>([]);
   /* ONE TIMER, NOT ONE PER LOOKUP — and the bug that made this necessary.
      The floor timer was created bare on every tool call, so a call that
      looked two things up had two of them running. The FIRST one then fired
@@ -288,6 +296,8 @@ export default function VoiceCallButton({
     setMuted(false);
     clearSearchTimer();
     setSearching(false);
+    setPhotos([]);
+    pendingPhotosRef.current = [];
     onLiveChangeRef.current?.(false);
     /* The transcript SURVIVES hang-up on purpose: what was said is what the
        user came for, and clearing it the instant the call ends throws away
@@ -307,6 +317,8 @@ export default function VoiceCallButton({
     /* The session resets its own flag on start; this keeps the UI in step so a
        second call never opens showing the last one's mute. */
     setMuted(false);
+    setPhotos([]);
+    pendingPhotosRef.current = [];
     onTranscriptRef.current?.(linesRef.current);
 
     /* THE WRITER FOR THIS CALL. `fetch` is wrapped rather than passed: a bare
@@ -365,6 +377,16 @@ export default function VoiceCallButton({
           setSearching(false);
         }, 12_000);
       },
+      onToolResult: (_name, output) => {
+        /* DATA, READ FOR PICTURES AND NOTHING ELSE. https URLs only, capped,
+           deduplicated — see voice/photos.ts. An empty result leaves the
+           screen as it was: a lookup that found no photo should not blank
+           the one from the lookup before it. */
+        const found = extractProductPhotos(output);
+        if (found.length === 0) return;
+        setPhotos(found);
+        pendingPhotosRef.current = found;
+      },
       onToolProtocolMismatch: (eventType) => {
         /* THE ONE PLACE THIS BECOMES VISIBLE. If the vendor names its
            function-call events differently, every lookup silently does
@@ -394,7 +416,15 @@ export default function VoiceCallButton({
           onPhaseRef.current?.(parsed.phase);
         }
         if (parsed.transcript) {
-          linesRef.current = appendTranscript(linesRef.current, parsed.transcript);
+          /* The photos ride on the assistant turn that follows the lookup —
+             the answer that describes them. Attached once; appendTranscript
+             keeps them on the line through every later delta. */
+          const update =
+            parsed.transcript.role === "assistant" && pendingPhotosRef.current.length > 0
+              ? { ...parsed.transcript, photos: pendingPhotosRef.current }
+              : parsed.transcript;
+          if (update !== parsed.transcript) pendingPhotosRef.current = [];
+          linesRef.current = appendTranscript(linesRef.current, update);
           setLines(linesRef.current);
           onTranscriptRef.current?.(linesRef.current);
           /* Settled turns leave for the conversation from here. The
@@ -496,6 +526,7 @@ export default function VoiceCallButton({
           muted={muted}
           onToggleMute={toggleMute}
           searching={searching}
+          photos={photos}
           voices={voices}
           selectedVoice={voiceKey}
           onSelectVoice={selectVoice}

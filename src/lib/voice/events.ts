@@ -36,9 +36,14 @@ export type TranscriptRole = "user" | "assistant";
  *  persisted as an ordinary typed message rather than a voice one. */
 export type TranscriptVia = "voice" | "text";
 
+/** A product photo a lookup returned during the turn. Kept on the line so the
+ *  saved message can carry it; see voice/photos.ts for where it comes from. */
+export type TranscriptPhoto = { url: string; label: string };
+
 export type TranscriptUpdate = {
   role: TranscriptRole;
   via?: TranscriptVia;
+  photos?: readonly TranscriptPhoto[];
   /** The text so far for this turn. Always the WHOLE turn, never a fragment —
    *  see `append` below for why the caller is not asked to accumulate. */
   text: string;
@@ -153,7 +158,13 @@ export function parseVoiceEvent(raw: string): ParsedEvent {
    in a function the suite can drive one event at a time.
    --------------------------------------------------------------------------- */
 
-export type TranscriptLine = { role: TranscriptRole; text: string; final: boolean; via?: TranscriptVia };
+export type TranscriptLine = {
+  role: TranscriptRole;
+  text: string;
+  final: boolean;
+  via?: TranscriptVia;
+  photos?: readonly TranscriptPhoto[];
+};
 
 /**
  * Fold one update into the running list.
@@ -177,7 +188,13 @@ export function appendTranscript(
     if (!update.text && !update.final) return [...lines];
     return [
       ...lines,
-      { role: update.role, text: update.text, final: update.final, ...(update.via ? { via: update.via } : {}) },
+      {
+        role: update.role,
+        text: update.text,
+        final: update.final,
+        ...(update.via ? { via: update.via } : {}),
+        ...(update.photos && update.photos.length > 0 ? { photos: update.photos } : {}),
+      },
     ];
   }
 
@@ -193,6 +210,10 @@ export function appendTranscript(
     /* The line keeps how it began. A spoken turn does not become a typed one
        because a later event omitted the field. */
     ...(last.via ?? update.via ? { via: last.via ?? update.via } : {}),
+    /* Photos attach once, to the turn the lookup belonged to, and stay. */
+    ...((last.photos?.length ? last.photos : update.photos?.length ? update.photos : null)
+      ? { photos: last.photos?.length ? last.photos : update.photos }
+      : {}),
   };
   return [...lines.slice(0, -1), merged];
 }

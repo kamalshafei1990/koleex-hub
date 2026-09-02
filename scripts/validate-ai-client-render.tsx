@@ -35,6 +35,7 @@ import type { QuotationDraftPayload } from "../src/components/ai/types";
 import VoiceCallButton from "../src/components/ai/VoiceCallButton";
 import VoiceTranscript from "../src/components/ai/VoiceTranscript";
 import VoiceCallScreen from "../src/components/ai/VoiceCallScreen";
+import MessageMarkdown from "../src/components/ai/MessageMarkdown";
 import type { TranscriptLine } from "../src/lib/voice/events";
 
 let pass = 0;
@@ -860,6 +861,48 @@ console.log("\n── The transcript belongs to the call, not to the chat ──
   /* It is rendered by the call screen, which closes with the call. */
   const screen = readFileSync("src/components/ai/VoiceCallScreen.tsx", "utf8");
   check("the call screen is what renders it", /<VoiceTranscript/.test(screen));
+}
+
+console.log("\n── The product, shown: on the call screen and in the answer ──");
+{
+  const lines: TranscriptLine[] = [{ role: "assistant", text: "The KX-180.", final: true }];
+  const photos = [{ url: "https://cdn.example/kx180.jpg", label: "KX-180 Spreader" }];
+  const withPhotos = renderToStaticMarkup(
+    <VoiceCallScreen live phase="speaking" audioLevel={0} lines={lines} lang="en" onEnd={() => {}} photos={photos} /> as ReactElement,
+  );
+  const without = renderToStaticMarkup(
+    <VoiceCallScreen live phase="speaking" audioLevel={0} lines={lines} lang="en" onEnd={() => {}} /> as ReactElement,
+  );
+  check("a lookup's photos are drawn on the call screen", /<img[^>]*src="https:\/\/cdn\.example\/kx180\.jpg"/.test(withPhotos));
+  check("  …named, for the eye and for a screen reader",
+    /alt="KX-180 Spreader"/.test(withPhotos) && withPhotos.includes("KX-180 Spreader</figcaption>"));
+  check("  …as a labelled group", /role="group"[^>]*aria-label="Product photos"/.test(withPhotos));
+  check("  …lazily", /loading="lazy"/.test(withPhotos));
+  check("and nothing is drawn when there are none — not even the empty group",
+    !/<img/.test(without) && !/<figure/.test(without) && !/role="group"/.test(without) && !without.includes("Product photos"));
+  const hexes = [...withPhotos.matchAll(/#[0-9A-Fa-f]{3,8}\b/g)].map((m) => m[0].toUpperCase())
+    .filter((h) => !new Set(["#567FB2", "#7FA9D6", "#BCD8F0", "#0B0D11", "#FFF"]).has(h));
+  check("the strip introduces no colour outside the palette",
+    hexes.every((h) => new Set(["#0D0D0D", "#FF3333", "#0066FF", "#AAAAAA", "#666666", "#FFFFFF", "#000000"]).has(h)));
+  check("the group name is localised",
+    /aria-label="صور المنتج"/.test(renderToStaticMarkup(<VoiceCallScreen live phase="speaking" audioLevel={0} lines={lines} lang="ar" onEnd={() => {}} photos={photos} /> as ReactElement)));
+
+  /* THE ANSWER IN THE THREAD. */
+  const md = (content: string) => renderToStaticMarkup(<MessageMarkdown content={content} /> as ReactElement);
+  const shown = md("The KX-180.\n\n![KX-180](https://cdn.example/kx180.jpg)");
+  check("a markdown image renders as a bounded, styled picture",
+    /<img[^>]*class="koleex-md-img"[^>]*src="https:\/\/cdn\.example\/kx180\.jpg"/.test(shown) || /<img[^>]*src="https:\/\/cdn\.example\/kx180\.jpg"[^>]*class="koleex-md-img"/.test(shown));
+  check("  …that opens full size in a new tab",
+    /<a[^>]*href="https:\/\/cdn\.example\/kx180\.jpg"[^>]*target="_blank"[^>]*rel="noreferrer noopener"/.test(shown));
+  check("  …with the product name as alt text", /alt="KX-180"/.test(shown));
+  check("  …lazily", /loading="lazy"/.test(shown));
+  const plainHttp = md("![KX-180](http://cdn.example/kx180.jpg)");
+  check("a non-https image is not fetched — its alt text stands in", !/<img/.test(plainHttp) && plainHttp.includes("KX-180"));
+  const js = md("![x](javascript:alert(1))");
+  check("a javascript: image is never an img", !/<img/.test(js));
+  const css = readFileSync("src/app/globals.css", "utf8");
+  check("the picture is bounded and rounded by the answer's own stylesheet",
+    /\.koleex-md img\.koleex-md-img \{[^}]*max-width: min\(100%, 320px\)[^}]*border-radius: 12px/.test(css));
 }
 
 console.log("\n── VoiceCallScreen: typing into the call ──");

@@ -31,6 +31,7 @@
    --------------------------------------------------------------------------- */
 
 import { type TranscriptLine } from "./events";
+import { photosMarkdown } from "./photos";
 
 export const TRANSCRIPT_PATH = "/api/ai/voice/transcript";
 /** One POST carries at most this many turns; the server refuses more. */
@@ -93,7 +94,14 @@ export class TranscriptPersister {
     const settled = last && !last.final ? lines.length - 1 : lines.length;
     for (let i = this.settledCount; i < settled; i++) {
       const line = lines[i];
-      const text = line.text.trim();
+      const spoken = line.text.trim();
+      /* THE PHOTOS GO WITH THE ANSWER. An assistant turn that showed a product
+         is saved with the same picture, as markdown the bubble already
+         renders — so the thread after a call looks like the thread after a
+         typed question about the same machine. Only assistant turns: a user
+         does not "show" anything. */
+      const pictures = line.role === "assistant" ? photosMarkdown(line.photos ?? []) : "";
+      const text = pictures ? (spoken ? `${spoken}\n\n${pictures}` : pictures) : spoken;
       /* An empty final — a turn the vendor closed with no words — is counted
          as seen and not sent: the route refuses empty content, rightly. */
       if (text) this.queue.push({ role: line.role, text, via: line.via ?? "voice" });

@@ -14,10 +14,13 @@
    rather than on the happy one.
    --------------------------------------------------------------------------- */
 
-import { VoiceSession, HANDSHAKE_PATH, waitForIceGathering, normalizeSdp, type VoiceDeps, type VoiceState, type VoiceFailure } from "../src/lib/voice/session";
+import { VoiceSession, HANDSHAKE_PATH, waitForIceGathering, normalizeSdp, type VoiceDeps, type VoiceState, type VoiceFailure,
+  TOOL_PATH,
+} from "../src/lib/voice/session";
 import { TranscriptPersister, TRANSCRIPT_PATH, MAX_TURNS_PER_POST, MAX_POST_FAILURES, type SavedTurn } from "../src/lib/voice/persist";
 import { buildTextTurnMessages, EV_ITEM_CREATE, EV_RESPONSE_CREATE, MAX_TYPED_TURN_CHARS } from "../src/lib/voice/text-turn";
 import { type TranscriptLine } from "../src/lib/voice/events";
+import { extractProductPhotos, photosMarkdown, MAX_PHOTOS_PER_RESULT } from "../src/lib/voice/photos";
 
 let pass = 0;
 const failures: string[] = [];
@@ -1327,6 +1330,87 @@ console.log("\n── 12. Mute ──");
       await h.p.finish();
       check("  …and a second finish sends nothing more", h.posts.length === 2);
     }
+  }
+
+  console.log("\n── 15. What a lookup showed is read out of its result — https only, capped, and kept ──");
+  {
+    const search = {
+      ok: true, status: "allowed",
+      data: { products: [
+        { id: "1", product_name: "KX-180 Spreader", primary_model: "KX-180", photo_url: "https://cdn.example/a.jpg" },
+        { id: "2", product_name: "KX-220", photo_url: "http://cdn.example/b.jpg" },
+        { id: "3", product_name: "No photo" },
+        { id: "4", product_name: "KX-260", photo_url: "https://cdn.example/a.jpg" },
+      ] },
+    };
+    const got = extractProductPhotos(search);
+    check("a search result yields one photo per product that has one", got.length === 1);
+    check("  …labelled with the product's name", got[0].label === "KX-180 Spreader");
+    check("  …https only — a plain http URL is dropped", !got.some((p) => p.url.startsWith("http:")));
+    check("  …and deduplicated by URL", extractProductPhotos({ data: [{ photo_url: "https://x/1.jpg" }, { photo_url: "https://x/1.jpg" }] }).length === 1);
+
+    const details = { ok: true, data: { product: { product_name: "KX-180" }, main_photo_url: "https://cdn.example/main.jpg", photo_urls: ["https://cdn.example/g1.jpg", "https://cdn.example/g2.jpg"] } };
+    const d = extractProductPhotos(details);
+    check("a details result yields the main photo and the first of the gallery, not the whole gallery",
+      d.map((p) => p.url).join(",") === "https://cdn.example/main.jpg,https://cdn.example/g1.jpg");
+
+    const many = { data: Array.from({ length: 20 }, (_, i) => ({ name: `P${i}`, photo_url: `https://cdn.example/${i}.jpg` })) };
+    check("a catalogue is capped", extractProductPhotos(many).length === MAX_PHOTOS_PER_RESULT);
+    check("nothing photo-shaped means nothing", extractProductPhotos({ ok: false, message: "no" }).length === 0 && extractProductPhotos(null).length === 0 && extractProductPhotos("x").length === 0);
+    check("a javascript: or data: URL never becomes a photo",
+      extractProductPhotos({ photo_url: "javascript:alert(1)" }).length === 0 &&
+      extractProductPhotos({ photo_url: "data:image/png;base64,AAAA" }).length === 0);
+    check("a URL with a quote in it is dropped rather than rendered", extractProductPhotos({ photo_url: 'https://x/"onerror' }).length === 0);
+
+    check("the saved markdown uses the URL exactly and the name as alt",
+      photosMarkdown([{ url: "https://cdn.example/a.jpg", label: "KX-180" }]) === "![KX-180](https://cdn.example/a.jpg)");
+    check("  …brackets in a name cannot break the markdown",
+      photosMarkdown([{ url: "https://x/a.jpg", label: "K[X]" }]) === "![KX](https://x/a.jpg)");
+    check("  …and no photos is no markdown at all", photosMarkdown([]) === "");
+
+    /* THE SESSION HANDS THE RESULT TO THE SCREEN as the model hears it. */
+    const seen: Array<[string, unknown]> = [];
+    const r = deps({ status: 200, channelOpen: true });
+    const toolFetch = r.deps.fetchFn;
+    r.deps.fetchFn = (async (url: string, init?: RequestInit) => {
+      if (String(url) === TOOL_PATH) {
+        return { ok: true, status: 200, json: async () => ({ output: { ok: true, data: { photo_url: "https://cdn.example/a.jpg", name: "KX-180" } } }) } as unknown as Response;
+      }
+      return toolFetch(url, init);
+    }) as unknown as typeof fetch;
+    const s = new VoiceSession(r.deps, { onToolResult: (name, output) => seen.push([name, output]) });
+    await s.start();
+    r.pcCalls.channel!.onmessage?.({ data: JSON.stringify({ type: "response.output_item.added", item: { type: "function_call", call_id: "c1", name: "searchProducts" } }) } as MessageEvent);
+    r.pcCalls.channel!.onmessage?.({ data: JSON.stringify({ type: "response.function_call_arguments.done", call_id: "c1", arguments: "{\"q\":\"KX\"}" }) } as MessageEvent);
+    await new Promise((res) => setTimeout(res, 20));
+    check("onToolResult fires with the tool's name and the server's output",
+      seen.length === 1 && seen[0][0] === "searchProducts" && extractProductPhotos(seen[0][1]).length === 1);
+    check("  …before the result is relayed to the model, so the screen and the model see the same thing",
+      r.pcCalls.sent.some((m) => m.includes("function_call_output")));
+
+    /* THE PERSISTER SAVES THE PICTURE WITH THE WORDS. */
+    type Post = { body: { turns: Array<{ role: string; text: string }> } };
+    const posts: Post[] = [];
+    const persister = new TranscriptPersister({
+      fetchFn: (async (_u: string, init?: RequestInit) => {
+        posts.push({ body: JSON.parse(String(init?.body)) as Post["body"] });
+        return { ok: true, status: 200, json: async () => ({ messages: [], conversation: { id: "c", title: null } }) } as unknown as Response;
+      }) as unknown as typeof fetch,
+      ensureConversation: async () => "6f1d2c3b-4a5e-4f60-9b7c-1234567890ab",
+    }, "6f1d2c3b-4a5e-4f60-9b7c-1234567890ab");
+    const pic = [{ url: "https://cdn.example/a.jpg", label: "KX-180" }];
+    persister.observe([
+      { role: "user", text: "show me the KX-180", final: true, photos: pic },
+      { role: "assistant", text: "Here it is.", final: true, photos: pic },
+      { role: "assistant", text: "", final: true, photos: pic },
+    ]);
+    await persister.flush();
+    const turns = posts[0]?.body.turns ?? [];
+    check("an assistant turn is saved with its photo as markdown after the words",
+      turns[1]?.text === "Here it is.\n\n![KX-180](https://cdn.example/a.jpg)");
+    check("a user turn never carries a picture, whatever the line says", turns[0]?.text === "show me the KX-180");
+    check("an assistant turn with a photo and no words is still saved — the picture IS the answer",
+      turns[2]?.text === "![KX-180](https://cdn.example/a.jpg)");
   }
 
 console.log(`\n${pass} passed, ${failures.length} failed`);

@@ -117,6 +117,11 @@ export type VoiceEvents = {
   /** A tool call was made and answered — for a UI that wants to say
    *  "checking…" rather than leaving a silence the caller cannot read. */
   onToolCall?: (name: string) => void;
+  /** What the server answered a tool call with, as the model is about to
+   *  hear it. For a screen that wants to SHOW what was looked up — a product
+   *  photo — rather than only let the model describe it. Data, not
+   *  instruction: nothing here acts on it. */
+  onToolResult?: (name: string, output: unknown) => void;
   /** SOMETHING NAMED ITSELF A FUNCTION CALL AND COULD NOT BE READ.
    *
    *  This exists because the alternative is silence: if the vendor's event
@@ -495,6 +500,8 @@ export class VoiceSession {
       output = { ok: false, message: "That lookup could not be completed just now." };
     }
 
+    /* The screen sees it as the model does, and at the same moment. */
+    this.events.onToolResult?.(call.name, output);
     this.sendToolResult(channel, call.callId, output);
   }
 
