@@ -79,13 +79,23 @@ export async function GET(req: Request) {
   if (probe.reachable) console.log(line);
   else console.error(line);
 
-  return NextResponse.json({
-    configured: true,
-    reachable: probe.reachable,
-    credential_ok: probe.credential_ok,
-    status: probe.status,
-    ms: probe.ms,
-    cause: probe.cause,
-    from,
-  });
+  /* THE STATUS CODE IS THE COUNTABLE SIGNAL. The first four runs of this
+     watchdog all returned 200 whatever the probe found, and the log query
+     tools surface error-level lines far more reliably than info ones — so
+     four green requests said nothing about the path. A 503 on an unreachable
+     endpoint makes the verdict visible in the status-code breakdown and in
+     the platform's own cron history, where a failed run is a failed run.
+     The body is unchanged; only the code carries the verdict now. */
+  return NextResponse.json(
+    {
+      configured: true,
+      reachable: probe.reachable,
+      credential_ok: probe.credential_ok,
+      status: probe.status,
+      ms: probe.ms,
+      cause: probe.cause,
+      from,
+    },
+    { status: probe.reachable ? 200 : 503 },
+  );
 }
