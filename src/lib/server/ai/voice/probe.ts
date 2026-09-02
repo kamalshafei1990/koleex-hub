@@ -39,6 +39,7 @@ import "server-only";
    --------------------------------------------------------------------------- */
 
 import { parseVoiceConfig, type VoiceEnv } from "./config";
+import { describeFetchFailure } from "./fetch-cause";
 
 /* Long enough for a cold TLS handshake to a distant region, short enough that
    an operator refreshing a status page is not left waiting on a dead host. */
@@ -58,6 +59,17 @@ export type VoiceProbe = {
   /** Plain words for an operator. Never the vendor's own error text. */
   verdict: string;
   ms: number;
+  /** WHY a fetch failed, as a short machine code — ENOTFOUND, ECONNREFUSED,
+   *  UND_ERR_CONNECT_TIMEOUT — or null when there was an HTTP response.
+   *
+   *  This field did not exist, on the reasoning that a fetch error can carry
+   *  the resolved host in its message. That reasoning was right about the
+   *  MESSAGE and wrong to throw away the CODE with it: the code is what
+   *  separates "DNS does not resolve" from "the TCP connection never opened",
+   *  and losing that distinction sent the voice investigation to the wrong
+   *  place twice. describeFetchFailure keeps the code and filters everything
+   *  else — see fetch-cause.ts for the guarantee. */
+  cause: string | null;
 };
 
 /** The whole decision table, as a pure function, so the suite can walk every
@@ -119,6 +131,12 @@ export function verdictForStatus(status: number): {
 export async function probeVoice(
   env: VoiceEnv,
   fetchImpl: typeof fetch = fetch,
+  /* THE WATCHDOG PASSES THE REAL ROUTE'S BUDGET HERE, so that what it
+     measures every fifteen minutes is the same thing a caller experiences.
+     A probe that gives up at 8s against a route that waits 13s would report
+     failures the route does not have. The default keeps the admin page's
+     behaviour exactly as it was. */
+  timeoutMs: number = PROBE_TIMEOUT_MS,
 ): Promise<VoiceProbe | null> {
   const cfg = parseVoiceConfig(env);
   if (!cfg) return null;
@@ -132,7 +150,7 @@ export async function probeVoice(
         Authorization: `Bearer ${cfg.apiKey}`,
       },
       body: DELIBERATELY_INVALID_OFFER,
-      signal: AbortSignal.timeout(PROBE_TIMEOUT_MS),
+      signal: AbortSignal.timeout(timeoutMs),
     });
     const { credential_ok, verdict } = verdictForStatus(res.status);
     return {
@@ -141,11 +159,12 @@ export async function probeVoice(
       status: res.status,
       verdict,
       ms: Date.now() - startedAt,
+      cause: null,
     };
-  } catch {
-    /* The reason is deliberately not reported. A fetch failure here can carry
-       the resolved host in its message, and "could not reach it" is the whole
-       of what an operator can act on. */
+  } catch (e) {
+    /* The MESSAGE is deliberately not reported — a fetch failure can carry
+       the resolved host in it. The CODE is: it names the kind of failure and
+       nothing else, which is precisely the part an operator needs. */
     return {
       reachable: false,
       credential_ok: false,
@@ -153,6 +172,7 @@ export async function probeVoice(
       verdict:
         "Could not reach the voice endpoint at all — no response within the timeout. Check that AI_VOICE_BASE_URL names a host this deployment's region can resolve.",
       ms: Date.now() - startedAt,
+      cause: describeFetchFailure(e),
     };
   }
 }
