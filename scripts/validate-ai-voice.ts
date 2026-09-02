@@ -692,6 +692,11 @@ void (async () => {
       /from=\$\{/.test(session) && /region=\$\{/.test(session) && /afterMs=/.test(session) && /cause=/.test(session));
     check("a failure is logged at error level, a success is not",
       /if \(probe\.reachable\) console\.log\(line\)/.test(bare) && /else console\.error\(line\)/.test(bare));
+    /* FOUR GREEN RUNS THAT SAID NOTHING. The verdict has to be in the status
+       code, because that is what the status-code breakdown and the cron
+       history count; a log line at info level is not reliably surfaced. */
+    check("an unreachable endpoint is a 503, so the verdict is countable by status",
+      /\{ status: probe\.reachable \? 200 : 503 \}/.test(bare));
     check("a lost configuration is said once, and answered quietly",
       /console\.warn\("\[ai\.voice\.watch\] not configured/.test(bare) &&
       /configured: false/.test(bare));
