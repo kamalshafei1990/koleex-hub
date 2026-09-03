@@ -1603,13 +1603,20 @@ console.log("\n── 12. Mute ──");
     thrower.prime(); thrower.ready();
     check("  …and a library that throws is a silent library, never an exception", true);
     const ns = await import("../src/lib/notificationSound");
-    check("the default call tone is one of the recorded library tones, enabled", ns.getSoundPrefs().call.tone === "confirm" && ns.getSoundPrefs().call.enabled === true && (ns.SOUND_LIBRARY as readonly string[]).includes("confirm"));
+    check("the default call tone is one of the recorded library tones, enabled — 'arrive', a line opening, not 'confirm'", ns.getSoundPrefs().call.tone === "arrive" && ns.getSoundPrefs().call.enabled === true && (ns.SOUND_LIBRARY as readonly string[]).includes("arrive") && ns.LEGACY_CALL_TONE === "confirm");
+    /* THE OLD DEFAULT FOLLOWS THE NEW ONE — unless somebody chose it. */
+    check("a stored 'confirm' nobody chose becomes the new default; a chosen 'confirm', or any other tone, stays",
+      ns.migrateCallTone({ enabled: true, tone: "confirm" }).tone === "arrive" &&
+      ns.migrateCallTone({ enabled: true, tone: "confirm", chosen: true }).tone === "confirm" &&
+      ns.migrateCallTone({ enabled: true, tone: "sparkle" }).tone === "sparkle" &&
+      ns.migrateCallTone({ enabled: false, tone: "confirm" }).enabled === false);
     check("  …outside a browser the engine reports itself unavailable rather than pretending", ns.playCallSound() === "unavailable");
     const nsSrc = fsT.readFileSync("src/lib/notificationSound.ts", "utf8");
     check("  …do-not-disturb silences arrivals, not the cue for a call the caller just started",
       /if \(!prefs\.master \|\| \(prefs\.dnd && category !== "call"\)\) return;/.test(nsSrc));
     check("  …the call tone is warmed with the others on boot and merged from storage like the others",
-      /p\.call\.tone,/.test(nsSrc) && /call: \{ \.\.\.DEFAULT_PREFS\.call, \.\.\.\(stored\.call \?\? \{\}\) \}/.test(nsSrc) && /call: \{ \.\.\.cur\.call, \.\.\.\(patch\.call \?\? \{\}\) \}/.test(nsSrc));
+      /p\.call\.tone,/.test(nsSrc) && /call: migrateCallTone\(\{ \.\.\.DEFAULT_PREFS\.call, \.\.\.\(stored\.call \?\? \{\}\) \}\)/.test(nsSrc) &&
+      /call: \{ \.\.\.cur\.call, \.\.\.\(patch\.call \?\? \{\}\), \.\.\.\(patch\.call\?\.tone !== undefined \? \{ chosen: true \} : \{\}\) \}/.test(nsSrc));
     const tab = fsT.readFileSync("src/components/settings/tabs/SoundsTab.tsx", "utf8");
     check("Settings → Sounds offers the call cue as its own switch and tone, so the owner can change it",
       /checked=\{prefs\.call\.enabled\}/.test(tab) && /setPicker\(\{ kind: "category", category: "call" \}\)/.test(tab) && /call: "sounds\.cat\.call"/.test(tab));

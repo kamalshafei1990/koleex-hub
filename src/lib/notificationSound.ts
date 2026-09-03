@@ -119,8 +119,11 @@ export interface SoundPrefs {
   };
   message: { enabled: boolean; tone: SoundTone };      // Discuss messages
   /** The voice call's "connected" cue. Not silenced by do-not-disturb: the
-   *  caller started the call themselves a moment ago. */
-  call: { enabled: boolean; tone: SoundTone };
+   *  caller started the call themselves a moment ago. `chosen` is set the
+   *  first time someone picks a call tone in Settings; without it, a stored
+   *  tone that merely equals an old default is still the default and moves
+   *  when the default does (see migrateCallTone). */
+  call: { enabled: boolean; tone: SoundTone; chosen?: boolean };
 }
 
 /** Classify an inbox message into an activity key from its metadata.type
@@ -148,10 +151,21 @@ const DEFAULT_PREFS: SoundPrefs = {
   volume: 0.8,
   notification: { enabled: true, tone: "classic" },
   message: { enabled: true, tone: "classic" },
-  /* "confirm": the shortest of the recorded tones that reads as "done,
-     yours" rather than as a message arriving. Changeable in Settings. */
-  call: { enabled: true, tone: "confirm" },
+  /* "arrive": the recorded tone that reads as "someone is here" — the
+     right word for a line that has just opened. "confirm" was first, and
+     the owner asked twice for something else. Changeable in Settings. */
+  call: { enabled: true, tone: "arrive" },
 };
+
+/** The call tone the defaults used before "arrive". A stored copy of it that
+ *  nobody chose (no `chosen` flag) is the old default written back by a
+ *  save of some other setting, so it follows the default. A tone someone
+ *  picked — any tone, even this one — is theirs and stays. */
+export const LEGACY_CALL_TONE: SoundTone = "confirm";
+export function migrateCallTone(call: SoundPrefs["call"]): SoundPrefs["call"] {
+  if (!call.chosen && call.tone === LEGACY_CALL_TONE) return { ...call, tone: DEFAULT_PREFS.call.tone };
+  return call;
+}
 
 let prefsCache: SoundPrefs | null = null;
 const prefListeners = new Set<(p: SoundPrefs) => void>();
@@ -182,7 +196,7 @@ export function getSoundPrefs(): SoundPrefs {
     ...stored,
     notification: { ...DEFAULT_PREFS.notification, ...(stored.notification ?? {}) },
     message: { ...DEFAULT_PREFS.message, ...(stored.message ?? {}) },
-    call: { ...DEFAULT_PREFS.call, ...(stored.call ?? {}) },
+    call: migrateCallTone({ ...DEFAULT_PREFS.call, ...(stored.call ?? {}) }),
   };
   return prefsCache;
 }
@@ -207,7 +221,9 @@ export function setSoundPrefs(patch: {
       },
     },
     message: { ...cur.message, ...(patch.message ?? {}) },
-    call: { ...cur.call, ...(patch.call ?? {}) },
+    /* A picked tone is marked as such, so a later change of default leaves
+       it alone. */
+    call: { ...cur.call, ...(patch.call ?? {}), ...(patch.call?.tone !== undefined ? { chosen: true } : {}) },
   };
   prefsCache = next;
   try { localStorage.setItem(PREFS_KEY, JSON.stringify(next)); } catch { /* private mode */ }

@@ -773,10 +773,12 @@ console.log("\n── VoiceCallScreen: the two controls ──");
   check("no icon is a glyph with a line ruled across the whole box",
     !/x1="2" y1="2" x2="22" y2="22"/.test(controls) &&
     !/x1="2" y1="2" x2="22" y2="22"/.test(mutedControls));
-  check("the end-call icon is the handset turned down, not one struck through",
-    /rotate\(135 12 12\)/.test(controls));
-  /* Non-vacuity: it must still BE a handset, not an empty rotation. */
-  check("  …and it is still a handset", /d="M21 15\.46v2\.71/.test(controls));
+  /* THE OWNER: "the end button should be X, not like a close-a-call icon".
+     Leaving a mode is a cross everywhere in the Hub; the red circle still
+     says which control ends things. */
+  check("the end-call icon is a plain X inside the red circle — not a handset",
+    /bg-\[#FF3333\][^>]*>[\s\S]{0,400}?<line x1="6" y1="6" x2="18" y2="18"><\/line><line x1="18" y1="6" x2="6" y2="18">/.test(controls) &&
+    !/rotate\(135 12 12\)/.test(controls) && !/d="M21 15\.46v2\.71/.test(controls));
   /* Mic-off is drawn broken around its slash — the shape is cut, so the
      diagonal is part of the letterform rather than graffiti over it. */
   check("muting swaps in a mic-off glyph rather than overdrawing the mic",
