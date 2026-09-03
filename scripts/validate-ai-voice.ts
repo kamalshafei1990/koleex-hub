@@ -993,6 +993,30 @@ void (async () => {
     delete process.env.AI_VOICE_ALT_BASE_URL; delete process.env.AI_VOICE_ALT_API_KEY; delete process.env.AI_VOICE_ALT_MODEL; delete process.env.AI_VOICE_ALT_REGION_LABEL; delete process.env.AI_VOICE_VOICES;
     check("absent ALT variables are simply no second region", parseVoiceConfig(readAltVoiceEnv()) === null);
 
+    const { inheritFromPrimary } = await import("../src/lib/server/ai/voice/config");
+    const primaryEnv = { AI_VOICE_BASE_URL: "https://main.example/api/v1/realtime?x=1", AI_VOICE_API_KEY: "main-key", AI_VOICE_MODEL: "main-model", AI_VOICE_REGION_LABEL: "cn" };
+    const hostOnly = inheritFromPrimary({ AI_VOICE_BASE_URL: "https://ws-abc.other.example", AI_VOICE_API_KEY: "alt-key" }, primaryEnv);
+    check("an ALT base that names only a host takes the primary's path and query — the owner copies nothing",
+      hostOnly.AI_VOICE_BASE_URL === "https://ws-abc.other.example/api/v1/realtime?x=1");
+    check("  …a trailing slash is still 'host only'",
+      inheritFromPrimary({ AI_VOICE_BASE_URL: "https://ws-abc.other.example/", AI_VOICE_API_KEY: "k" }, primaryEnv).AI_VOICE_BASE_URL === "https://ws-abc.other.example/api/v1/realtime?x=1");
+    check("  …an unset ALT_MODEL is the primary's model", hostOnly.AI_VOICE_MODEL === "main-model");
+    check("  …an unset ALT_REGION_LABEL is the word 'alt', not the primary's label", hostOnly.AI_VOICE_REGION_LABEL === "alt");
+    check("  …THE KEY IS NEVER INHERITED: no ALT key means no second region, whatever the primary has",
+      inheritFromPrimary({ AI_VOICE_BASE_URL: "https://ws-abc.other.example" }, primaryEnv).AI_VOICE_API_KEY === undefined
+      && parseVoiceConfig(inheritFromPrimary({ AI_VOICE_BASE_URL: "https://ws-abc.other.example" }, primaryEnv)) === null);
+    const ownPath = inheritFromPrimary({ AI_VOICE_BASE_URL: "https://vendor2.example/v2/rtc", AI_VOICE_API_KEY: "k", AI_VOICE_MODEL: "m2", AI_VOICE_REGION_LABEL: "eu" }, primaryEnv);
+    check("  …an ALT base with its own path, model and label is left exactly as written",
+      ownPath.AI_VOICE_BASE_URL === "https://vendor2.example/v2/rtc" && ownPath.AI_VOICE_MODEL === "m2" && ownPath.AI_VOICE_REGION_LABEL === "eu");
+    check("  …and the inherited env parses into a working config: alt host, primary path, model applied",
+      parseVoiceConfig(hostOnly)?.sdpUrl === "https://ws-abc.other.example/api/v1/realtime?x=1&model=main-model");
+    check("  …a primary with no path lends nothing (nothing to lend)",
+      inheritFromPrimary({ AI_VOICE_BASE_URL: "https://ws-abc.other.example", AI_VOICE_API_KEY: "k" }, { ...primaryEnv, AI_VOICE_BASE_URL: "https://main.example" }).AI_VOICE_BASE_URL === "https://ws-abc.other.example");
+    check("  …an ALT base that is not a url is passed through for the parser to refuse by name",
+      inheritFromPrimary({ AI_VOICE_BASE_URL: "not a url", AI_VOICE_API_KEY: "k" }, primaryEnv).AI_VOICE_BASE_URL === "not a url");
+    check("readAltVoiceEnv goes through the inheritance, so every caller (route, watchdog, providers) sees the same second region",
+      /export function readAltVoiceEnv\(\): VoiceEnv \{\s*return inheritFromPrimary\(/.test(readFileSync("src/lib/server/ai/voice/config.ts", "utf8")));
+
     check("the region hint is two words and nothing else", parseRegionHint("alt") === "alt" && parseRegionHint("primary") === "primary" && parseRegionHint("cn-north") === null && parseRegionHint("https://x") === null && parseRegionHint("") === null && parseRegionHint(null) === null);
 
     const route = readFileSync("src/app/api/ai/voice/session/route.ts", "utf8").replace(/\/\*[\s\S]*?\*\//g, "");
