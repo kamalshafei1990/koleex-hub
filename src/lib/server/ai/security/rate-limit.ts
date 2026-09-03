@@ -83,6 +83,14 @@ export const BUDGETS = {
     windowSec: 60,
     max: num(process.env.AI_LIMIT_VOICE_TRANSCRIPTS_PER_MIN, 60),
   }),
+  /* A call summary is one model call at hang-up. A person ends a handful of
+     calls an hour; six a minute is far above that and stops a loop from
+     turning hang-up into a bill. */
+  voiceSummaryPerAccount: (): Budget => ({
+    bucket: "voice_summary",
+    windowSec: 60,
+    max: num(process.env.AI_LIMIT_VOICE_SUMMARIES_PER_MIN, 6),
+  }),
   /* A generated picture is paid per call — the one AI surface where a loop
      is a bill rather than a load. Per account per HOUR, and per tenant per
      DAY, because a whole company's allowance is the number the owner
