@@ -708,12 +708,14 @@ export default function VoiceCallScreen({
               title={copy.end}
               className="h-16 w-16 rounded-full inline-flex items-center justify-center bg-[#FF3333] text-white shadow-[0_4px_20px_-4px_rgba(255,51,51,0.5)] transition-[filter,transform] duration-150 hover:brightness-110 active:scale-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0066FF] focus-visible:ring-offset-2 focus-visible:ring-offset-[#0D0D0D]"
             >
-              {/* The handset turned down. Outline, same stroke family as the
-                  mic so the pair reads as one icon set. */}
-              <svg aria-hidden viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
-                <g transform="rotate(135 12 12)">
-                  <path d="M21 15.46v2.71a1.8 1.8 0 0 1-1.96 1.8 17.8 17.8 0 0 1-7.77-2.76 17.55 17.55 0 0 1-5.4-5.4A17.8 17.8 0 0 1 3.1 3.99 1.8 1.8 0 0 1 4.9 2.03h2.71a1.8 1.8 0 0 1 1.8 1.55c.11.86.32 1.71.63 2.52a1.8 1.8 0 0 1-.4 1.9L8.5 9.13a14.4 14.4 0 0 0 5.4 5.4l1.13-1.14a1.8 1.8 0 0 1 1.9-.4c.81.3 1.66.51 2.52.62a1.8 1.8 0 0 1 1.55 1.84z" />
-                </g>
+              {/* AN X, NOT A HANDSET. The owner: "the end button should be X, not
+                  like a close-a-call icon". The screen is a mode you leave, and
+                  the glyph for leaving a mode is the same everywhere in the Hub:
+                  a plain cross. Same stroke family as the mic; the red circle
+                  still says this is the one that ends things. */}
+              <svg aria-hidden viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                <line x1="6" y1="6" x2="18" y2="18" />
+                <line x1="18" y1="6" x2="6" y2="18" />
               </svg>
             </button>
             <span aria-hidden className="text-[11px] tracking-wide text-[#666666]">
