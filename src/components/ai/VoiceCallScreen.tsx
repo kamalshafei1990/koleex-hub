@@ -345,6 +345,9 @@ export default function VoiceCallScreen({
          above the header and the dock. Deliberately BELOW ConfirmDialog's
          300: a confirmation raised during a call has to be readable over it. */
       className="fixed inset-0 z-[200] flex flex-col bg-[#0D0D0D] text-white"
+      /* Read by UpdateWatcher: a live call is never interrupted by a reload
+         onto a new build — the stale bundle waits until the call ends. */
+      data-kx-call-active="1"
       style={{
         paddingTop: "env(safe-area-inset-top, 0px)",
         paddingBottom: "env(safe-area-inset-bottom, 0px)",

@@ -1902,6 +1902,14 @@ console.log("\n── 12. Mute ──");
   /* THE PICTURE EXPANDS IN PLACE. */
   check("a photo in the conversation is a button that opens the lightbox, not a link out of the app",
     /onClick=\{\(\) => onOpen\(photo\)\}/.test(fs18.readFileSync("src/components/ai/VoiceTranscript.tsx", "utf8")) && !/<a href=\{p\.url\}/.test(scr) && /<PhotoLightbox photo=\{openPhoto\} onClose=\{closePhoto\} closeLabel=\{copy\.closePhoto\} \/>/.test(scr));
+  /* THE CALL THAT ENDED BY ITSELF: the installed app reloading onto a new
+     build mid-call. */
+  const uw18 = fs18.readFileSync("src/components/pwa/UpdateWatcher.tsx", "utf8");
+  check("the call screen marks itself as uninterruptible, and the update watcher never reloads over it — on heal or on hide",
+    /data-kx-call-active="1"/.test(scr) &&
+    /export function busyWithSomethingUninterruptible\(\): boolean \{\s*return Boolean\(document\.querySelector\("\[data-kx-unsaved='1'\], \[data-kx-call-active='1'\]"\)\);/.test(uw18) &&
+    (uw18.match(/if \(busyWithSomethingUninterruptible\(\)\) return;/g) ?? []).length === 2 &&
+    !/document\.querySelector\("\[data-kx-unsaved='1'\]"\)/.test(uw18));
   const md18 = fs18.readFileSync("src/components/ai/MessageMarkdown.tsx", "utf8");
   check("  …and in the written thread a picture that fails to load becomes its words, never a broken icon in a frame",
     /onError=\{\(\) => setBroken\(true\)\}/.test(md18) && /if \(broken\) return <span className="koleex-md-img-fallback">\{alt\}<\/span>;/.test(md18));

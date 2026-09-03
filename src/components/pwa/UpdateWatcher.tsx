@@ -71,12 +71,22 @@ function isInstalledApp(): boolean {
   );
 }
 
+/* NEVER MID-CALL. A voice call is WebRTC held by the page; a reload ends it
+   and drops the caller into the text chat with no explanation — which is
+   exactly what the owner met, twice, on the evening several builds shipped
+   while he was talking: the installed app healed itself onto the new bundle
+   the moment it saw one. Unsaved work and a live call are the same kind of
+   thing: a reason a stale bundle can wait. The call screen marks itself. */
+export function busyWithSomethingUninterruptible(): boolean {
+  return Boolean(document.querySelector("[data-kx-unsaved='1'], [data-kx-call-active='1']"));
+}
+
 function healInstalledApp(id: string): void {
   if (!isInstalledApp()) return;
   if (document.visibilityState !== "visible") return;
-  /* Never interrupt unsaved work — the same guard onHide and the exit
-     prompts use. A stale bundle can wait for the next resume. */
-  if (document.querySelector("[data-kx-unsaved='1']")) return;
+  /* Never interrupt unsaved work or a live call — the same guard onHide and
+     the exit prompts use. A stale bundle can wait for the next resume. */
+  if (busyWithSomethingUninterruptible()) return;
   try {
     if (sessionStorage.getItem("kx-healed-build") === id) return;
     sessionStorage.setItem("kx-healed-build", id);
@@ -151,8 +161,9 @@ export default function UpdateWatcher() {
       if (document.visibilityState !== "hidden") return;
       const g = globalThis as typeof globalThis & { __kxStaleBuild?: boolean };
       if (!g.__kxStaleBuild) return;
-      /* Never interrupt unsaved work — the same guard the exit prompts use. */
-      if (document.querySelector("[data-kx-unsaved='1']")) return;
+      /* Never interrupt unsaved work or a live call — the same guard the
+         exit prompts use. */
+      if (busyWithSomethingUninterruptible()) return;
       window.location.reload();
     };
     document.addEventListener("visibilitychange", onHide);
