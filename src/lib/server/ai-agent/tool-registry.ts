@@ -59,6 +59,9 @@ import { knowledgeSearchTools } from "./tools/knowledge-search";
 /* The agent's only route to the public internet — see tools/web-search.ts
    for the public-information-only and brand guards. */
 import { webSearchTools } from "./tools/web-search";
+/* A picture made to order — budgeted per call, stored in the Hub's own
+   bucket, never shown as a product. See tools/image-gen.ts. */
+import { imageGenTools } from "./tools/image-gen";
 
 /** Flat registry: name → definition. Frozen so handlers can't be swapped at runtime. */
 const REGISTRY: Readonly<Record<string, ToolDef>> = Object.freeze(
@@ -81,6 +84,7 @@ const REGISTRY: Readonly<Record<string, ToolDef>> = Object.freeze(
   ...teamKnowledgeTools,
   ...knowledgeSearchTools,
       ...webSearchTools,
+      ...imageGenTools,
     ].map((t) => [t.name, t]),
   ),
 );

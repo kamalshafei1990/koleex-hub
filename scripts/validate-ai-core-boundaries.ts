@@ -27,6 +27,7 @@ import {
   isBusinessDataQuery,
   isWorkDataQuery,
   isLiveInfoQuery,
+  isImageCreationRequest,
   isMemoryIntentQuery,
   isTradeTermQuestion,
   isChoiceShapedQuestion,
@@ -110,6 +111,7 @@ const DETECTORS = [
   "isBusinessDataQuery",
   "isWorkDataQuery",
   "isLiveInfoQuery",
+  "isImageCreationRequest",
   "isMemoryIntentQuery",
   "isTradeTermQuestion",
   "isChoiceShapedQuestion",
@@ -224,6 +226,11 @@ check(
     isLiveInfoQuery("شكل ميناء شنغهاي إيه") &&
     isLiveInfoQuery("给我看看苏伊士运河的图片") &&
     isLiveInfoQuery("龙门吊长什么样"),
+);
+check(
+  "image creation: 'draw me a poster' leaves the tool-less lane, 'make a task' does not",
+  isImageCreationRequest("draw me a poster for the stand") && isImageCreationRequest("ارسملي بانر") && isImageCreationRequest("画一张海报") &&
+    !isImageCreationRequest("make a task for tomorrow") && !isImageCreationRequest("show me a picture of Port Said"),
 );
 check(
   "live info: 'picture' inside an ordinary sentence does not fire",

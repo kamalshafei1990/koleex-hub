@@ -93,6 +93,7 @@ import {
   isBusinessDataQuery,
   isWorkDataQuery,
   isLiveInfoQuery,
+  isImageCreationRequest,
   isMemoryIntentQuery,
 } from "@/lib/server/ai/core/decide-turn";
 
@@ -248,6 +249,8 @@ export async function orchestrate(input: TurnInput): Promise<AgentResponse> {
        having no live access — with search_web sitting one layer away. */
     webSearchRequested ||
     isLiveInfoQuery(userMessage) ||
+    /* A picture to MAKE needs generate_image, which only the tool loop has. */
+    isImageCreationRequest(userMessage) ||
     isMemoryIntentQuery(userMessage);
   const brandSection = isDataQuery ? "none" : classifyBrandSection(userMessage);
   const isBrand = brandSection !== "none";

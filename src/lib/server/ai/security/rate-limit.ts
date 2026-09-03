@@ -83,6 +83,20 @@ export const BUDGETS = {
     windowSec: 60,
     max: num(process.env.AI_LIMIT_VOICE_TRANSCRIPTS_PER_MIN, 60),
   }),
+  /* A generated picture is paid per call — the one AI surface where a loop
+     is a bill rather than a load. Per account per HOUR, and per tenant per
+     DAY, because a whole company's allowance is the number the owner
+     actually reasons about. Both are checked before the vendor is paid. */
+  imagePerAccount: (): Budget => ({
+    bucket: "image",
+    windowSec: 3600,
+    max: num(process.env.AI_LIMIT_IMAGES_PER_HOUR, 10),
+  }),
+  imagePerTenant: (): Budget => ({
+    bucket: "image:tenant",
+    windowSec: 86_400,
+    max: num(process.env.AI_LIMIT_TENANT_IMAGES_PER_DAY, 100),
+  }),
 } as const;
 
 export type LimitResult =

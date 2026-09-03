@@ -131,7 +131,7 @@ console.log("\n── 2. The classes match what the tools actually do ──");
   console.log(`      distribution: ${RISK_CLASSES.map((c) => `${c}=${byClass[c]}`).join(" ")}`);
   check(
     "most tools are read-only, and every write class has at least the tools §L names",
-    byClass.read_only > 20 && byClass.destructive === 4 && byClass.financial === 1 && byClass.external_side_effect === 1,
+    byClass.read_only > 20 && byClass.destructive === 4 && byClass.financial === 1 && byClass.external_side_effect === 2,
   );
 }
 
@@ -175,7 +175,8 @@ console.log("\n── 5. Domains partition the registry ──");
   const covered = DOMAINS.flatMap((d) => toolsInDomain(d));
   check("every declared tool lands in exactly one domain", covered.length === Object.keys(SKILL_CATALOG).length);
   check("no domain is empty — an unused domain is a taxonomy nobody asked for", DOMAINS.every((d) => toolsInDomain(d).length > 0));
-  check("domain filtering returns a real subset, not everything", toolsInDomain("web").length === 1 && toolsInDomain("work").length > 5);
+  check("domain filtering returns a real subset, not everything", toolsInDomain("web").length === 2 && toolsInDomain("work").length > 5);
+  check("  …the web domain is exactly the two tools that leave our network", toolsInDomain("web").sort().join(",") === "generate_image,search_web");
   console.log(`      by domain: ${DOMAINS.map((d) => `${d}=${toolsInDomain(d).length}`).join(" ")}`);
 }
 
@@ -207,7 +208,8 @@ async function asyncChecks() {
   {
     check("every tool has a bound", registeredNames.every((n) => timeoutFor(n) > 0));
     check("the default is generous enough not to trip on a slow day", DEFAULT_TOOL_TIMEOUT_MS >= 10_000);
-    check("the only tool that leaves our network gets longer, and is still bounded", timeoutFor("search_web") > DEFAULT_TOOL_TIMEOUT_MS && timeoutFor("search_web") <= 30_000);
+    check("the tools that leave our network get longer, and are still bounded", timeoutFor("search_web") > DEFAULT_TOOL_TIMEOUT_MS && timeoutFor("search_web") <= 30_000);
+    check("  …a generation waits on a vendor's GPU: above the adapter's own 45 s bound, under a minute", timeoutFor("generate_image") > 45_000 && timeoutFor("generate_image") <= 60_000);
     check("an unlisted tool gets the default, never MORE time by accident", timeoutFor("someUnlistedTool") === DEFAULT_TOOL_TIMEOUT_MS);
   }
 

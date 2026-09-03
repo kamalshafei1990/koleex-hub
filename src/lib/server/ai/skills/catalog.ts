@@ -154,6 +154,10 @@ export const SKILL_CATALOG: Readonly<Record<string, SkillMeta>> = Object.freeze(
      nothing, and what makes it risky is EGRESS. Its guard is the egress
      scanner, not a ledger. */
   search_web: { domain: "web", risk: "external_side_effect" },
+  /* Same class for the same reason, plus money: the prompt leaves the
+     network and the vendor is paid per call. Its guards are the egress
+     scanner and the per-account / per-tenant budget, not a ledger. */
+  generate_image: { domain: "web", risk: "external_side_effect" },
 
   /* ── system ────────────────────────────────────────────────────────── */
   getUserPermissions: { domain: "system", risk: "read_only" },

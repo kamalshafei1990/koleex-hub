@@ -655,6 +655,26 @@ export function isLiveInfoQuery(msg: string): boolean {
 
 /* Memory/teaching intents must never take a tool-less lane — the model
    would hallucinate "saved ✓" (observed). Mirrors the agent-route guard. */
+/* ─── Picture-making detector ─────────────────────────────────────
+   "Draw me a poster for the stand", "ارسملي بانر", "画一张海报": the
+   answer is a picture that does not exist yet, which only generate_image
+   can make — and the tool-less lanes would answer with a paragraph
+   describing one, or worse, a made-up image url. Same law as the live-info
+   detector: a false positive costs one tool-loop turn, a false negative is
+   a wrong answer. A creation VERB and a picture NOUN are both required, so
+   "the image is clear" and "make a task" do not fire. */
+export function isImageCreationRequest(msg: string): boolean {
+  const s = (msg ?? "").toLowerCase();
+  if (!s) return false;
+  if (
+    /\b(draw|sketch|paint|generate|create|make|design|render|illustrate|produce)\b[^.?!]{0,40}\b(picture|image|photo|illustration|logo|poster|banner|drawing|artwork|graphic|mock-?up|visual|icon|wallpaper|thumbnail)s?\b/.test(s)
+  ) return true;
+  if (/\b(an?\s+)?(illustration|poster|banner|logo|drawing|sketch)\s+(of|for)\b/.test(s)) return true;
+  if (/(ارسم|ارسملي|ارسمي|اعمل|اعملي|اعمللي|صمم|صممي|صمملي|صمّم|ولّد|ولد|اطلع|اطلعلي|جهز|جهزلي)\s*(لي\s*)?(صورة|صوره|رسمة|رسمه|بوستر|بانر|لوجو|لوغو|تصميم|رسم)/.test(msg)) return true;
+  if (/(画|生成|做|设计|制作|创建)(一张|一个|一幅|张|个)?(图片|图像|图|海报|横幅|插图|插画|标志|logo|画)/i.test(msg)) return true;
+  return false;
+}
+
 export function isMemoryIntentQuery(msg: string): boolean {
   return (
     /\b(remember|memoriz|save (this|that|it|for)|note (this|that) down|add (this|to) .*knowledge|knowledge base|don'?t forget)\b/i.test(msg) ||
