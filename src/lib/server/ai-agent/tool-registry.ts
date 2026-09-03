@@ -37,6 +37,9 @@ import { validateArgs, validationMode, formatValidationLine } from "../ai/skills
 
 import { customerTools } from "./tools/customers";
 import { productTools } from "./tools/products";
+/* The selling price, from the engine — the one figure a call may say aloud.
+   See tools/product-price.ts. */
+import { productPriceTools } from "./tools/product-price";
 import { catalogTools } from "./tools/catalog";
 import { machineKnowledgeTools } from "./tools/machine-knowledge-tool";
 /* Published standards knowledge (ICC Incoterms 2020 / UCP 600 / URC 522) —
@@ -69,6 +72,7 @@ const REGISTRY: Readonly<Record<string, ToolDef>> = Object.freeze(
     [
       ...customerTools,
       ...productTools,
+      ...productPriceTools,
       ...catalogTools,
       ...machineKnowledgeTools,
       ...tradeTermsTools,

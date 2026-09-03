@@ -27,7 +27,7 @@ import type { AgentStep } from "@/lib/server/ai-agent/types";
    count — that's real numbers that just need sign-off.
    ───────────────────────────────────────────────────────────────── */
 
-/** The ONLY tool whose success counts as real pricing evidence.
+/** The ONLY tools whose success counts as real pricing evidence.
  *  createQuotationDraft is intentionally EXCLUDED — the model was
  *  using its presence as a cover to emit invented numbers. The draft
  *  handler internally re-prices, but for the guard's purposes we
@@ -35,6 +35,11 @@ import type { AgentStep } from "@/lib/server/ai-agent/types";
  *  payload is the authoritative pricing engine output. */
 const PRICING_TOOLS = new Set<string>([
   "calculateQuotationPricing",
+  /* The engine's selling price for one product (FOB, or for a country and
+     customer type). Its payload carries `unit_price` and `price` as
+     positive numbers when it priced something, and nulls when the product
+     is on request — so an on-request answer is still no evidence. */
+  "getProductPrice",
 ]);
 
 /** Numeric fields in a pricing-tool payload that count as "real

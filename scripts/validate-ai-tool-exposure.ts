@@ -108,7 +108,7 @@ const PROFILES: Array<[string, UserContext]> = [
 const ALL = listTools();
 
 console.log("\n── 1. The registry is intact ──");
-check("all 46 tools are still registered", ALL.length === 46);
+check("all 47 tools are still registered", ALL.length === 47);
 check("every tool has a name and a description", ALL.every((t) => !!t.name && !!t.description));
 
 console.log("\n── 2. Exposure and dispatch agree, for every tool × every profile ──");
