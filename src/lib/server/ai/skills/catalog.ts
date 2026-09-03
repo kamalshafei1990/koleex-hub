@@ -85,6 +85,10 @@ export const SKILL_CATALOG: Readonly<Record<string, SkillMeta>> = Object.freeze(
   searchProducts: { domain: "products", risk: "read_only" },
   getProductByCode: { domain: "products", risk: "read_only" },
   getProductDetails: { domain: "products", risk: "read_only" },
+  /* READ_ONLY for the same reason calculateQuotationPricing is: a pure
+     computation over the policy tables, guarded on the OUTPUT by the pricing
+     seal. It returns a selling price and never a cost. */
+  getProductPrice: { domain: "products", risk: "read_only" },
   countProducts: { domain: "products", risk: "read_only" },
   getCatalogStats: { domain: "products", risk: "read_only" },
   searchCatalog: { domain: "products", risk: "read_only" },

@@ -173,6 +173,15 @@ const VOICE_INSTRUCTIONS =
   " for any product or model question use searchProducts first, then getProductByCode or getProductDetails for one" +
   " model. searchCatalog is an OLDER printed range reference: use it only after searchProducts found nothing, and" +
   " then say the model is not in the current products." +
+  /* The owner: "when I ask any price it gives a wrong price. The prices
+     should be the FOB selling price, or I can ask for country and customer
+     type, or Koleex AI itself can ask me which price I need, where and for
+     whom." A call with no price tool answered from memory. */
+  " PRICES: for the price of a Koleex product call getProductPrice — never say a price from memory, never estimate," +
+  " never round one you remember. By default it gives the FOB selling price in US dollars: say the number, say it is" +
+  " the FOB price, and offer the exact price — then ASK which country and which customer type (end user, dealer," +
+  " distributor, agent, sole agent) and call it again with both. If the caller already said the country or the type," +
+  " pass them the first time. If the tool has no price, say it is on request and that sales can send a quotation." +
   " You can also look things up on the public internet when the answer depends on the world today — weather, news," +
   " rates, shipping conditions, public specifications. Never say you have no live access." +
   " A lookup takes a moment. ALWAYS SAY A SHORT FILLER ALOUD FIRST, before the lookup — \"one moment\", \"let me think\"," +

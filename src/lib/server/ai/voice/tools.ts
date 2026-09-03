@@ -51,6 +51,13 @@ import "server-only";
      · getPricingRules / calculateQuotationPricing / getInventoryStatus —
        commercial figures. Spoken numbers cannot be checked against a source
        by the person hearing them, and a misheard margin is worse than none.
+       THE ONE EXCEPTION, by the owner's decision: getProductPrice — the
+       SELLING price in USD, FOB, straight from the engine, with no cost, no
+       margin and no level in its payload. "When I ask any price of any of
+       Koleex products it gives a wrong price": a call with no price tool
+       answered from memory, and memory is worse than a spoken engine figure.
+       The exact price for a country and customer type is still gated on
+       Quotations/view inside the tool, as calculateQuotationPricing is.
 
    THIS LIST IS THE SECURITY BOUNDARY, and it lives on the server because the
    standing rule is that the client never determines a permission. The browser
@@ -74,6 +81,7 @@ export const VOICE_TOOL_NAMES: readonly string[] = [
   "searchProducts",
   "getProductByCode",
   "getProductDetails",
+  "getProductPrice",
   "searchCatalog",
   "listCatalogFamilies",
   "searchTradeTerms",
