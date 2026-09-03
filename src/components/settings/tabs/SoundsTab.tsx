@@ -70,6 +70,7 @@ function toneLabel(tone: SoundTone | undefined, t: (k: string) => string): strin
 const CATEGORY_KEYS: Record<SoundCategory, string> = {
   notification: "sounds.cat.notification",
   message: "sounds.cat.message",
+  call: "sounds.cat.call",
 };
 const ACTIVITY_KEYS: Record<SoundActivity, string> = {
   mentions: "act.mentions",
@@ -182,6 +183,20 @@ export default function SoundsTab() {
           label={t("sounds.msgTone")}
           value={toneLabel(prefs.message.tone, t)}
           onClick={() => setPicker({ kind: "category", category: "message" })}
+        />
+        {/* THE VOICE CALL'S "CONNECTED" CUE. The owner asked for one of the
+            recorded tones here instead of the synthesised notes; it is a
+            category like the others so it can be changed or silenced. */}
+        <SwitchRow
+          label={t("sounds.callSounds")}
+          hint={t("sounds.callSounds.hint")}
+          checked={prefs.call.enabled}
+          onChange={(on) => setSoundPrefs({ call: { enabled: on } })}
+        />
+        <NavRow
+          label={t("sounds.callTone")}
+          value={toneLabel(prefs.call.tone, t)}
+          onClick={() => setPicker({ kind: "category", category: "call" })}
           last
         />
       </SettingsCard>

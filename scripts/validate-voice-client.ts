@@ -1580,6 +1580,43 @@ console.log("\n── 12. Mute ──");
     f.events.filter((e) => e.kind === "gain" && e.v === 0).length === READY_TONE.length && f.events.filter((e) => e.kind === "ramp" && e.v === 0).length === READY_TONE.length);
   check("the recovered tone is one note, so it is not mistaken for a new call", RECOVERED_TONE.length === 1);
 
+  /* THE OWNER'S CHOICE FIRST: the cue is a library tone from Settings →
+     Sounds, through the Hub's one engine; the synthesised notes are only
+     the fallback for an engine that is not there. */
+  {
+    const fsT = await import("node:fs");
+    const calls: string[] = [];
+    const mk = (outcome: "played" | "silenced" | "unavailable") => {
+      const g = fakeCtx();
+      const t = new CallTones(() => g.ctx, { prime: () => calls.push("prime"), play: () => { calls.push("play:" + outcome); return outcome; } });
+      return { g, t };
+    };
+    const played = mk("played"); played.t.prime(); played.t.ready();
+    check("prime() warms the library tone inside the gesture, and ready() plays it — no synthesised note when the library played",
+      calls.includes("prime") && calls.includes("play:played") && played.g.events.filter((e) => e.kind === "start").length === 0);
+    calls.length = 0;
+    const silenced = mk("silenced"); silenced.t.prime(); silenced.t.ready();
+    check("  …a caller who silenced the cue in Settings gets silence — never the fallback", silenced.g.events.filter((e) => e.kind === "start").length === 0);
+    const gone = mk("unavailable"); gone.t.prime(); gone.t.ready();
+    check("  …only an engine that is not there gets the synthesised cue", gone.g.events.filter((e) => e.kind === "start").length === READY_TONE.length);
+    const thrower = new CallTones(() => fakeCtx().ctx, { prime: () => { throw new Error("x"); }, play: () => { throw new Error("y"); } });
+    thrower.prime(); thrower.ready();
+    check("  …and a library that throws is a silent library, never an exception", true);
+    const ns = await import("../src/lib/notificationSound");
+    check("the default call tone is one of the recorded library tones, enabled", ns.getSoundPrefs().call.tone === "confirm" && ns.getSoundPrefs().call.enabled === true && (ns.SOUND_LIBRARY as readonly string[]).includes("confirm"));
+    check("  …outside a browser the engine reports itself unavailable rather than pretending", ns.playCallSound() === "unavailable");
+    const nsSrc = fsT.readFileSync("src/lib/notificationSound.ts", "utf8");
+    check("  …do-not-disturb silences arrivals, not the cue for a call the caller just started",
+      /if \(!prefs\.master \|\| \(prefs\.dnd && category !== "call"\)\) return;/.test(nsSrc));
+    check("  …the call tone is warmed with the others on boot and merged from storage like the others",
+      /p\.call\.tone,/.test(nsSrc) && /call: \{ \.\.\.DEFAULT_PREFS\.call, \.\.\.\(stored\.call \?\? \{\}\) \}/.test(nsSrc) && /call: \{ \.\.\.cur\.call, \.\.\.\(patch\.call \?\? \{\}\) \}/.test(nsSrc));
+    const tab = fsT.readFileSync("src/components/settings/tabs/SoundsTab.tsx", "utf8");
+    check("Settings → Sounds offers the call cue as its own switch and tone, so the owner can change it",
+      /checked=\{prefs\.call\.enabled\}/.test(tab) && /setPicker\(\{ kind: "category", category: "call" \}\)/.test(tab) && /call: "sounds\.cat\.call"/.test(tab));
+    const i18n = fsT.readFileSync("src/lib/translations/settings.ts", "utf8");
+    check("  …with copy in all three languages", ["sounds.callSounds", "sounds.callSounds.hint", "sounds.callTone", "sounds.cat.call"].every((k) => new RegExp('"' + k.replace(/\./g, "\\.") + '":\\s*\\{ en: "[^"]+", zh: "[^"]+", ar: "[^"]+" \\}').test(i18n)));
+  }
+
   const g = fakeCtx("suspended");
   const tones = new CallTones(() => g.ctx);
   tones.ready();
