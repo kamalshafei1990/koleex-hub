@@ -208,7 +208,12 @@ export function Bubble({
                      dropped 0 frames, and the low-power arm strips blur on
                      weak machines. User bubbles keep the inverted fill — the
                      contrast IS their identity. */
-                  "kx-glass bg-[var(--bg-secondary)] border border-[var(--border-subtle)] text-[var(--text-primary)]"
+                  /* `relative`, because the Aurora rim is a ::before with
+                     position:absolute; inset:0 — drawn against the nearest
+                     positioned ancestor. Without this it was drawn against
+                     the chat column, a stray hairline across the text: the
+                     owner's "hidden border covering the text". */
+                  "kx-glass relative bg-[var(--bg-secondary)] border border-[var(--border-subtle)] text-[var(--text-primary)]"
             }`}
             style={{
               ...(rtl

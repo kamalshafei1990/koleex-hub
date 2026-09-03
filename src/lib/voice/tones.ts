@@ -34,18 +34,29 @@ export interface ToneNote {
   at: number;
   /** Seconds the note sounds for, fades included. */
   dur: number;
+  /** Hz at the end of the note, when it should slide there rather than hold.
+   *  A glide is what makes a plain sine sound like a signal rather than a
+   *  doorbell. Omitted, the note holds `freq`. */
+  glideTo?: number;
 }
 
-/* Two rising notes — E5 then A5 — a small "go ahead". Rising because a
-   falling pair reads as "ended", and this is the opposite moment. */
+/* THE OWNER, after the first version: "the sound when it connects is not good
+   enough — choose one little futuristic one". The first was two plain notes,
+   a doorbell. This is three short notes stepping up a major triad (G6, C7,
+   E7), the last of them sliding up a further third as it fades — the shape
+   of a device coming online rather than a bell. Still rising (a falling
+   figure reads as "ended"), still sine, still quiet, still under half a
+   second. */
 export const READY_TONE: readonly ToneNote[] = [
-  { freq: 659.25, at: 0, dur: 0.11 },
-  { freq: 880, at: 0.12, dur: 0.16 },
+  { freq: 783.99, at: 0, dur: 0.07 },
+  { freq: 1046.5, at: 0.075, dur: 0.07 },
+  { freq: 1318.51, at: 0.15, dur: 0.24, glideTo: 1567.98 },
 ];
 
-/* One note, when a dropped connection comes back: the call is yours again.
-   Single so it is not confused with the start of a call. */
-export const RECOVERED_TONE: readonly ToneNote[] = [{ freq: 880, at: 0, dur: 0.14 }];
+/* One sliding note, when a dropped connection comes back: the call is yours
+   again. Single so it is not confused with the start of a call; the same
+   upward slide so it is unmistakably the same family. */
+export const RECOVERED_TONE: readonly ToneNote[] = [{ freq: 1046.5, at: 0, dur: 0.18, glideTo: 1318.51 }];
 
 /** Peak gain. A voice on the call sits far above this. */
 export const TONE_GAIN = 0.12;
@@ -94,6 +105,7 @@ export function scheduleTone(ctx: ToneContextLike, notes: readonly ToneNote[], g
     const start = t0 + n.at;
     const stop = start + n.dur;
     osc.frequency.setValueAtTime(n.freq, start);
+    if (n.glideTo !== undefined) osc.frequency.linearRampToValueAtTime(n.glideTo, stop);
     /* Envelope: silent → gain → silent, ramps at both ends. */
     g.gain.setValueAtTime(0, start);
     g.gain.linearRampToValueAtTime(gain, start + RAMP_S);

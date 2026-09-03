@@ -508,7 +508,11 @@ console.log("\n── VoiceCallScreen: the call is a mode, not a toggle ──")
     listening.split("#0066FF").length - 1 === 1);
   check("the red appears only on the end-call control",
     listening.split("#FF3333").length - 1 <= 4 && /aria-label="End call"[\s\S]{0,400}?#FF3333|#FF3333[\s\S]{0,400}?aria-label="End call"/.test(listening));
-  check("icons are outline, never filled", !/fill="(?!none)[^"]+"/.test(listening));
+  /* The KOLEEX wordmark is lettering, not an icon: its paths are filled by
+     nature. Everything else on the screen stays outline. */
+  const wordmark = /<svg[^>]*viewBox="0 0 719\.83 107\.57"[\s\S]*?<\/svg>/;
+  check("the wordmark is on the screen, above the orb", wordmark.test(listening) && listening.search(wordmark) < listening.indexOf("kx-call-orb"));
+  check("icons are outline, never filled", !/fill="(?!none)[^"]+"/.test(listening.replace(wordmark, "")));
 
   /* No vendor identity on a screen the user stares at for a whole call. */
   const low = listening.toLowerCase();
@@ -876,6 +880,26 @@ console.log("\n── The transcript belongs to the call, not to the chat ──
 
 console.log("\n── The product, shown: on the call screen and in the answer ──");
 {
+  /* WHICH LANGUAGE THE CALLER SPEAKS: three chips in their own scripts. */
+  const withStt = renderToStaticMarkup(
+    <VoiceCallScreen live phase={null} audioLevel={0} lines={[]} lang="en" onEnd={() => {}} sttLanguage="ar" onSelectSttLanguage={() => {}} /> as ReactElement,
+  );
+  check("the speaking-language chips are drawn when the parent tracks the choice",
+    /role="group"[^>]*aria-label="I speak"/.test(withStt) && /<button[^>]*lang="ar"[^>]*aria-pressed="true"[^>]*>عربي<\/button>/.test(withStt) && /lang="en"[^>]*aria-pressed="false"[^>]*>English</.test(withStt) && /lang="zh"[^>]*>中文</.test(withStt));
+  check("  …and not when it does not",
+    !/I speak/.test(renderToStaticMarkup(<VoiceCallScreen live phase={null} audioLevel={0} lines={[]} lang="en" onEnd={() => {}} /> as ReactElement)));
+  check("  …the group name is localised",
+    /aria-label="بتكلم"/.test(renderToStaticMarkup(<VoiceCallScreen live phase={null} audioLevel={0} lines={[]} lang="ar" onEnd={() => {}} sttLanguage="ar" onSelectSttLanguage={() => {}} /> as ReactElement)));
+  /* THE HIDDEN BORDER. The Aurora rim is a ::before with inset:0 against
+     the nearest positioned ancestor; a glass surface that is not itself
+     positioned lends the rim to its column. */
+  const bubbleSrc = readFileSync("src/components/ai/Bubble.tsx", "utf8");
+  const welcomeSrc = readFileSync("src/components/ai/WelcomeCard.tsx", "utf8");
+  check("every glass surface in the chat is its own positioning context, so the rim stays on it and off the text",
+    /"kx-glass relative bg-\[var\(--bg-secondary\)\]/.test(bubbleSrc) && /className="kx-glass relative group flex/.test(welcomeSrc));
+}
+
+{
   const lines: TranscriptLine[] = [{ role: "assistant", text: "The KX-180.", final: true }];
   const photos = [{ url: "https://cdn.example/kx180.jpg", label: "KX-180 Spreader" }];
   const withPhotos = renderToStaticMarkup(
@@ -888,7 +912,9 @@ console.log("\n── The product, shown: on the call screen and in the answer �
   check("  …named, for the eye and for a screen reader",
     /alt="KX-180 Spreader"/.test(withPhotos) && withPhotos.includes("KX-180 Spreader</figcaption>"));
   check("  …as a labelled group", /role="group"[^>]*aria-label="Product photos"/.test(withPhotos));
-  check("  …lazily", /loading="lazy"/.test(withPhotos));
+  check("  …eagerly — it is on screen the instant it mounts — with its box reserved and a high fetch priority",
+    !/loading="lazy"/.test(withPhotos) && /<img[^>]*width="160"[^>]*height="160"/.test(withPhotos) && /fetchpriority="high"/i.test(withPhotos));
+  check("  …a non-storage URL passes through the pipeline untouched", /src="https:\/\/cdn\.example\/kx180\.jpg"/.test(withPhotos));
   check("and nothing is drawn when there are none — not even the empty group",
     !/<img/.test(without) && !/<figure/.test(without) && !/role="group"/.test(without) && !without.includes("Product photos"));
   const hexes = [...withPhotos.matchAll(/#[0-9A-Fa-f]{3,8}\b/g)].map((m) => m[0].toUpperCase())
