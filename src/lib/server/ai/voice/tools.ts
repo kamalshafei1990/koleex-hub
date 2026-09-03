@@ -68,10 +68,13 @@ export const VOICE_TOOL_NAMES: readonly string[] = [
   "search_web",
   "search_knowledge",
   "searchMachineKnowledge",
-  "searchCatalog",
+  /* THE HUB'S PRODUCTS BEFORE THE PRINTED INDEX. The order a model reads
+     tools in is the order it reaches for them; the older reference used to
+     sit above the live products and was what a call answered from. */
   "searchProducts",
   "getProductByCode",
   "getProductDetails",
+  "searchCatalog",
   "listCatalogFamilies",
   "searchTradeTerms",
   /* THE CALLER'S OWN WORK, READ ONLY — added after the owner, a super admin,

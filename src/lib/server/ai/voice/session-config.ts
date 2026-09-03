@@ -61,6 +61,19 @@ import { voiceToolSchemas } from "./tools";
    `threshold` is the vendor's documented default. A noisy room — a factory
    floor — wants it higher, which is a number to find in a real room rather
    than invent at a desk, so it is left at the default and noted. */
+/* The languages a caller's speech may be transcribed as. The Hub's three
+   UI languages, as ISO-639-1 codes — an allow-list, because the value comes
+   off a query string and goes into a session the far side runs. Egyptian
+   Arabic is "ar": the transcriber has no dialect code, and "ar" is what stops
+   it guessing Chinese at an Egyptian sentence, which the saved transcript
+   shows it doing. */
+export const STT_LANGUAGES = ["ar", "en", "zh"] as const;
+export type SttLanguage = (typeof STT_LANGUAGES)[number];
+export function parseSttLanguage(raw: string | null): SttLanguage | null {
+  const v = (raw ?? "").trim().toLowerCase();
+  return (STT_LANGUAGES as readonly string[]).includes(v) ? (v as SttLanguage) : null;
+}
+
 const TRANSPORT = {
   modalities: ["text", "audio"],
   input_audio_format: "pcm",
@@ -146,6 +159,13 @@ const VOICE_INSTRUCTIONS =
   " knowledge, and you consult them BEFORE answering from memory whenever the question touches Koleex, its products," +
   " machines, models, capabilities or trade terms. Answering a Koleex question from general memory when the approved" +
   " knowledge holds the answer is the wrong answer, however confident it sounds." +
+  /* The owner heard the older printed range read back to him as if it were
+     the current one. The Hub's products are the range; the printed index is
+     a fallback, and the model must be told which is which. */
+  " WHICH PRODUCTS ARE CURRENT: the products saved in Koleex Hub are the current range and the source of truth —" +
+  " for any product or model question use searchProducts first, then getProductByCode or getProductDetails for one" +
+  " model. searchCatalog is an OLDER printed range reference: use it only after searchProducts found nothing, and" +
+  " then say the model is not in the current products." +
   " You can also look things up on the public internet when the answer depends on the world today — weather, news," +
   " rates, shipping conditions, public specifications. Never say you have no live access." +
   " A lookup takes a moment. Fill it the way an expert does — \"one moment\", \"\u062f\u0642\u064a\u0642\u0629 \u0648\u0627\u062d\u062f\u0629\" — and NEVER by narrating a" +
@@ -216,12 +236,21 @@ export function buildSessionUpdate(
   voice: VoiceOption | null,
   instructions: string = VOICE_INSTRUCTIONS,
   variant: "full" | "compact" = "full",
+  /* THE FULL SESSION ONLY. A language hint the far side does not know is a
+     refused configuration; the client answers that refusal with the compact
+     one, so the compact one must never carry the same field. */
+  sttLanguage: SttLanguage | null = null,
 ): SessionUpdate {
   const tools = voiceToolSchemas(variant);
+  const transcription =
+    variant === "full" && sttLanguage
+      ? { ...TRANSPORT.input_audio_transcription, language: sttLanguage }
+      : TRANSPORT.input_audio_transcription;
   return {
     type: "session.update",
     session: {
       ...TRANSPORT,
+      input_audio_transcription: transcription,
       /* NOT OPTIONAL AND NOT CONFIGURABLE. An operator who could switch this
          off could switch off the identity rule, so it is not an environment
          variable — it is what the product is. */
@@ -303,11 +332,14 @@ export function buildVoiceSessionPayload(
   taughtQuestions: readonly string[] = [],
   recentTurns: readonly RecentTurn[] = [],
   viewer: VoiceViewer | null = null,
+  sttLanguage: SttLanguage | null = null,
 ): VoiceSessionPayload {
   return {
     full: buildSessionUpdate(
       voice,
       VOICE_INSTRUCTIONS + voiceViewerBlock(viewer) + taughtIndexBlock(taughtQuestions) + historyBlock(recentTurns),
+      "full",
+      sttLanguage,
     ),
     /* The one addition the compact session takes: a line about who is on the
        call. Not knowing the caller is the failure that made a super admin

@@ -35,7 +35,7 @@ import {
   ToolCallNames,
   type VoiceToolCall,
 } from "./tool-calls";
-import { EV_SESSION_CREATED } from "./events";
+import { EV_SESSION_CREATED, EV_SESSION_UPDATED, EV_ERROR } from "./events";
 import { buildTextTurnMessages } from "./text-turn";
 
 /** True when a DataChannel message is exactly this event.
@@ -234,6 +234,11 @@ export function normalizeSdp(sdp: string): string {
 /** Where the browser relays a tool call. Fixed, for the same reason the
  *  handshake path is: a caller that could name this endpoint could route the
  *  model's requests somewhere we did not choose. */
+/* How long after sending the full configuration an `error` is read as its
+   refusal. The far side answers a session.update within a round trip; a
+   refusal that took longer than this is something else's. */
+const CONFIG_ACK_WINDOW_MS = 5_000;
+
 export const TOOL_PATH = "/api/ai/voice/tool";
 
 export const HANDSHAKE_PATH = "/api/ai/voice/session";
@@ -248,6 +253,17 @@ export class VoiceSession {
      channel opening and `session.created` arriving — because the order of
      those two is the vendor's business and not something to depend on. */
   private configSent = false;
+  /* THE FULL CONFIGURATION CAN BE REFUSED FOR ITS CONTENT, not only its size.
+     A field the far side does not know — a transcription language hint, say
+     — comes back as an `error` event, not a thrown send(), and the size
+     fallback never saw it: the call stayed up, unconfigured, with the model's
+     own idea of itself. So: after the full configuration goes out, an error
+     that arrives before the far side has acknowledged it, or shown any
+     progress, gets the compact configuration once. Any later error is the
+     call's business, not the configuration's. */
+  private configAckPending = false;
+  private compactRetried = false;
+  private configSentAt = 0;
   /* Authored by the server, received with the answer, relayed unchanged. Null
      until the handshake completes — there is nothing to send before then. */
   private sessionUpdate: string | null = null;
@@ -284,6 +300,9 @@ export class VoiceSession {
      *  server, which decides whether the caller owns it and what of it the
      *  call may hear; nothing of the thread is read here. */
     private readonly conversationId: string | null = null,
+    /** The caller's UI language, as a hint for transcribing their speech.
+     *  Sent as a code the server allow-lists; the server writes the session. */
+    private readonly sttLanguage: string | null = null,
   ) {}
 
   /* ---------------------------------------------------------------------
@@ -395,6 +414,9 @@ export class VoiceSession {
 
     try {
       channel.send(first);
+      /* Only a FULL send can be refused for content and answered with compact. */
+      this.configAckPending = first === this.sessionUpdate && this.sessionUpdateCompact !== null;
+      this.configSentAt = Date.now();
       return;
     } catch {
       /* Fall through. The limit may be unreported, or reported wrongly, or the
@@ -430,6 +452,25 @@ export class VoiceSession {
        of them gets updated alone. */
     if (!this.configSent && isEventType(raw, EV_SESSION_CREATED)) {
       this.sendSessionConfig(channel);
+    }
+    if (this.configAckPending) {
+      if (isEventType(raw, EV_ERROR)) {
+        /* Refused for content, inside the window, and not yet retried: the
+           compact configuration goes out once. Outside the window the error
+           belongs to something else and the configuration stands. */
+        if (!this.compactRetried && this.sessionUpdateCompact && Date.now() - this.configSentAt <= CONFIG_ACK_WINDOW_MS) {
+          this.compactRetried = true;
+          this.configAckPending = false;
+          try {
+            channel.send(this.sessionUpdateCompact);
+          } catch {
+            /* Nothing further to try; the size path already covers this. */
+          }
+        }
+      } else if (isEventType(raw, EV_SESSION_UPDATED) || !isEventType(raw, EV_SESSION_CREATED)) {
+        /* An acknowledgement, or any progress at all, means it was accepted. */
+        this.configAckPending = false;
+      }
     }
     this.events.onMessage?.(raw);
 
@@ -686,6 +727,8 @@ export class VoiceSession {
       /* The id only. The server checks ownership and reads the thread itself;
          a browser that sent the messages could send any messages. */
       if (this.conversationId) query.set("conversation", this.conversationId);
+      /* A hint, not a setting: the server allow-lists the code and decides. */
+      if (this.sttLanguage) query.set("stt", this.sttLanguage);
       const qs = query.toString();
       const path = qs ? `${HANDSHAKE_PATH}?${qs}` : HANDSHAKE_PATH;
       const res = await this.deps.fetchFn(path, {

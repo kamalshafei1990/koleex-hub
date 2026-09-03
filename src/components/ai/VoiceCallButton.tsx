@@ -433,7 +433,7 @@ export default function VoiceCallButton({
           persisterRef.current?.observe(linesRef.current);
         }
       },
-    }, voiceKeyRef.current, conversationIdRef.current);
+    }, voiceKeyRef.current, conversationIdRef.current, langRef.current);
 
     sessionRef.current = session;
     await session.start();

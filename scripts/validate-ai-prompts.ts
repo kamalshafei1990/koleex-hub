@@ -20,6 +20,7 @@
    earlier suite could not make.
    --------------------------------------------------------------------------- */
 
+import { readFileSync } from "node:fs";
 import type { UserContext } from "../src/lib/server/ai-agent/types";
 import {
   buildSystemPrompt,
@@ -245,6 +246,19 @@ console.log("\n── The safety-rule matrix: which lane carries which ABSOLUTE 
     `supplier-confidentiality's own text is on ${supplierRuleLanes.length} of ${LANES.length} lanes, and the gap is covered by brand exclusivity`,
     LANES.every(([, p]) => p.includes("Koleex is the ONLY brand or manufacturer name")),
   );
+}
+
+console.log("\n── The Hub's products are the current range; the printed index is a fallback ──");
+{
+  const src = readFileSync("src/lib/server/ai/prompts/index.ts", "utf8");
+  check("product and model questions route to the Hub's products first",
+    /PRODUCT and MODEL questions[^\n]*searchProducts\(query=\.\.\.\) first/.test(src));
+  check("  …and the printed index only when the Hub has no match, said plainly",
+    /Only when the Hub has NO match[^\n]*searchCatalog[^\n]*say plainly that this model is not in the current products/.test(src));
+  check("  …never presented as the current range",
+    /Never present the older reference as the current range when the Hub has the product/.test(src));
+  check("the old wording that sent every model question to the printed index is gone",
+    !/richer than the products DB/.test(src));
 }
 
 console.log(`\n${pass} passed, ${failures.length} failed`);

@@ -1174,6 +1174,62 @@ console.log("\n── 12. Mute ──");
       String(recorded[0]?.init?.body ?? "").startsWith("v=0"));
   }
 
+  console.log("\n── 13b. A configuration refused for its CONTENT gets the compact one, once ──");
+  {
+    /* The size fallback catches a send() that throws. A field the far side
+       does not know comes back as an `error` EVENT instead, with the call up
+       and unconfigured. This is the second fallback: an error within the
+       window after the full configuration, before any acknowledgement or
+       progress, sends the compact one — once, and never later. */
+    const authored = { type: "session.update", session: { modalities: ["text", "audio"], input_audio_transcription: { enabled: true, language: "ar" } } };
+    const compact = { type: "session.update", session: { modalities: ["text", "audio"] } };
+    const r = deps({ status: 200, session: authored, sessionCompact: compact, channelOpen: true });
+    const s = new VoiceSession(r.deps);
+    await s.start();
+    check("the full configuration went first", r.pcCalls.sent.length === 1 && r.pcCalls.sent[0] === JSON.stringify(authored));
+    r.pcCalls.channel!.onmessage?.({ data: JSON.stringify({ type: "error", error: { message: "unknown field: language" } }) } as MessageEvent);
+    check("an error right after it sends the compact configuration",
+      r.pcCalls.sent.length === 2 && r.pcCalls.sent[1] === JSON.stringify(compact));
+    r.pcCalls.channel!.onmessage?.({ data: JSON.stringify({ type: "error", error: { message: "again" } }) } as MessageEvent);
+    check("  …once — a second error sends nothing more", r.pcCalls.sent.length === 2);
+    check("  …and the call is still up", s.getState() === "live");
+
+    /* Acknowledged, then an error: the error is something else's. */
+    const r2 = deps({ status: 200, session: authored, sessionCompact: compact, channelOpen: true });
+    const s2 = new VoiceSession(r2.deps);
+    await s2.start();
+    r2.pcCalls.channel!.onmessage?.({ data: JSON.stringify({ type: "session.updated" }) } as MessageEvent);
+    r2.pcCalls.channel!.onmessage?.({ data: JSON.stringify({ type: "error", error: { message: "tool failed" } }) } as MessageEvent);
+    check("after session.updated an error does NOT touch the configuration", r2.pcCalls.sent.length === 1);
+
+    /* Progress without an explicit ack counts as accepted too. */
+    const r3 = deps({ status: 200, session: authored, sessionCompact: compact, channelOpen: true });
+    const s3 = new VoiceSession(r3.deps);
+    await s3.start();
+    r3.pcCalls.channel!.onmessage?.({ data: JSON.stringify({ type: "input_audio_buffer.speech_started" }) } as MessageEvent);
+    r3.pcCalls.channel!.onmessage?.({ data: JSON.stringify({ type: "error" }) } as MessageEvent);
+    check("after any progress an error does not touch it either", r3.pcCalls.sent.length === 1);
+
+    /* session.created is not progress — it can arrive right after the send. */
+    const r4 = deps({ status: 200, session: authored, sessionCompact: compact, channelOpen: true });
+    const s4 = new VoiceSession(r4.deps);
+    await s4.start();
+    r4.pcCalls.channel!.onmessage?.({ data: JSON.stringify({ type: "session.created" }) } as MessageEvent);
+    r4.pcCalls.channel!.onmessage?.({ data: JSON.stringify({ type: "error" }) } as MessageEvent);
+    check("session.created between the send and the error does not mask the refusal", r4.pcCalls.sent.length === 2);
+
+    /* The hint travels as a query value the server allow-lists. */
+    const recorded: Recorded[] = [];
+    const s5 = new VoiceSession(deps({ status: 200, recorded }).deps, {}, null, null, "ar");
+    await s5.start();
+    check("the caller's language reaches the server as a hint", recorded[0]?.url === `${HANDSHAKE_PATH}?stt=ar`);
+    const recorded6: Recorded[] = [];
+    const s6 = new VoiceSession(deps({ status: 200, recorded: recorded6 }).deps, {}, null, null, null);
+    await s6.start();
+    check("  …and without one, no parameter", recorded6[0]?.url === HANDSHAKE_PATH);
+    void s; void s2; void s3; void s4; void s5; void s6;
+  }
+
   console.log("\n── 14. Settled turns leave for the conversation; partial ones do not ──");
   {
     type Post = { body: { conversation_id: string; turns: Array<{ role: string; text: string; via: string }> }; keepalive: boolean | undefined };

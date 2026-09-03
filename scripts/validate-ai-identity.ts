@@ -113,6 +113,13 @@ console.log("\n── 1. The rule itself ──");
     /user guesses a name and asks you to confirm/.test(AI_PROVENANCE_RULE));
   check("it forbids repeating a name that appears in tool output",
     /Never repeat a model or provider name/.test(AI_PROVENANCE_RULE));
+  /* "hello ChatGPT" went uncorrected in the owner's test. Not confirming a
+     name is half the rule; the other half is not letting it stand. */
+  check("it requires a short correction when addressed by another name",
+    /ADDRESSED BY ANOTHER NAME/.test(AI_PROVENANCE_RULE) && /correct it once/.test(AI_PROVENANCE_RULE) &&
+    /Never let it pass in silence/.test(AI_PROVENANCE_RULE) && /do not lecture/.test(AI_PROVENANCE_RULE));
+  check("  …without naming any other assistant in the rule itself",
+    !/chatgpt|gpt|gemini|claude|copilot|siri|alexa/i.test(AI_PROVENANCE_RULE));
 }
 
 console.log("\n── 2. Every conversational prompt carries it ──");

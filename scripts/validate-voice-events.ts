@@ -17,6 +17,8 @@ import {
   EV_ASSISTANT_DONE,
   EV_USER_DELTA,
   EV_USER_DONE,
+  EV_SESSION_UPDATED,
+  EV_ERROR,
   EV_SPEECH_STARTED,
   type TranscriptLine,
 } from "../src/lib/voice/events";
@@ -56,6 +58,11 @@ console.log("\n── 1. The event names, pinned to literals ──");
      would silently merge two speakers into one. */
   const names = [EV_ASSISTANT_DELTA, EV_ASSISTANT_DONE, EV_USER_DELTA, EV_USER_DONE];
   check("the four transcript names are all different", new Set(names).size === 4);
+}
+
+{
+  check("the acknowledgement and error names are pinned to literals",
+    EV_SESSION_UPDATED === "session.updated" && EV_ERROR === "error");
 }
 
 console.log("\n── 2. Each event produces the right side of the conversation ──");

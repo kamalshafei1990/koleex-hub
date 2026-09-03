@@ -46,6 +46,7 @@ import { parseVoiceConfig, diagnoseVoiceConfig, resolveVoice, type VoiceEnv } fr
 import {
   buildVoiceSessionPayload,
   publicVoiceList,
+  parseSttLanguage,
   TAUGHT_INDEX_BUDGET_BYTES,
 } from "@/lib/server/ai/voice/session-config";
 import { taughtQuestionIndex } from "@/lib/server/ai-knowledge";
@@ -410,7 +411,12 @@ export async function POST(req: Request) {
     }
   }
 
-  const payload = buildVoiceSessionPayload(voice, taughtQuestions, recentTurns, gate.viewer);
+  /* The caller's UI language, as a hint for transcribing their speech. Three
+     values are known; anything else is no hint. The transcript this session
+     was saving had an Egyptian sentence come back as Chinese characters, and
+     a transcriber that is told the language does not do that. */
+  const sttLanguage = parseSttLanguage(new URL(req.url).searchParams.get("stt"));
+  const payload = buildVoiceSessionPayload(voice, taughtQuestions, recentTurns, gate.viewer, sttLanguage);
   return NextResponse.json(
     { sdp: answer, session: payload.full, session_compact: payload.compact },
     { status: 200, headers: { "Cache-Control": "no-store" } },
