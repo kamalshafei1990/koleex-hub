@@ -4415,3 +4415,63 @@ html[data-kx-tabslide] #main-scroll-container { overflow-x: clip; }
 
 
 
+
+/* ── Voice call: the rings around the orb, and the orb tuned for a call ──
+   The shared AIOrb is drawn at 38px beside chat bubbles and at 200px here,
+   and the two sizes want different things from it. These rules apply ONLY
+   inside .kx-call-orb, so the five other places the orb is drawn are
+   untouched. See lib/voice/level.ts for the glitch this replaces. */
+.kx-call-orb { --kx-call-level: 0; }
+.kx-call-ring {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 200px;
+  height: 200px;
+  margin: -100px 0 0 -100px;
+  border-radius: 9999px;
+  border: 1.5px solid rgba(255, 255, 255, 0.22);
+  opacity: 0;
+  pointer-events: none;
+  will-change: transform, opacity;
+  transition: opacity 0.35s ease, border-color 0.35s ease;
+  transform: scale(1);
+}
+/* Each ring swells a little more than the one inside it, and fades as it
+   grows, so a loud syllable reads as a wave leaving the orb. */
+.kx-call-orb.is-live .kx-call-ring-1 {
+  opacity: calc(0.18 + var(--kx-call-level) * 0.55);
+  transform: scale(calc(1.04 + var(--kx-call-level) * 0.16));
+}
+.kx-call-orb.is-live .kx-call-ring-2 {
+  opacity: calc(0.08 + var(--kx-call-level) * 0.35);
+  transform: scale(calc(1.10 + var(--kx-call-level) * 0.30));
+}
+.kx-call-orb.is-live .kx-call-ring-3 {
+  opacity: calc(var(--kx-call-level) * 0.22);
+  transform: scale(calc(1.16 + var(--kx-call-level) * 0.46));
+}
+/* Koleex AI's voice is the Hub's blue; the caller's is white. */
+.kx-call-orb.is-far .kx-call-ring { border-color: rgba(0, 102, 255, 0.55); }
+.kx-call-orb.is-near .kx-call-ring { border-color: rgba(255, 255, 255, 0.28); }
+
+/* The orb itself, at call size. Two per-frame costs the 38px avatar never
+   pays are removed here: a brightness FILTER on the indicators that changes
+   every frame (a filter re-rasterises its layer), and a 140ms transition on
+   a transform that is itself updated every frame (the two fight, which is
+   the stutter). The indicators still scale ≤5% with the voice, as the
+   geometry lock allows; only how the browser gets there changes. */
+.kx-call-aiorb .ind { transition: opacity 0.5s ease, filter 0.4s ease; }
+.kx-call-aiorb.is-listening .ind,
+.kx-call-aiorb.is-speaking .ind { filter: none; }
+/* The inner circulation stays on through both halves of a turn rather than
+   fading out and in at every change of speaker. */
+.kx-call-aiorb.is-speaking .inner { opacity: 1; }
+.kx-call-aiorb .aura { will-change: opacity; }
+
+@media (prefers-reduced-motion: reduce) {
+  .kx-call-ring { transition: opacity 0.3s ease; transform: none !important; }
+  .kx-call-orb.is-live .kx-call-ring-1 { opacity: 0.25; }
+  .kx-call-orb.is-live .kx-call-ring-2,
+  .kx-call-orb.is-live .kx-call-ring-3 { opacity: 0; }
+}

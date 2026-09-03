@@ -49,6 +49,7 @@ import {
 } from "@/lib/voice/events";
 import { extractProductPhotos, type ProductPhoto } from "@/lib/voice/photos";
 import { useStreamLevel } from "@/lib/voice/useStreamLevel";
+import { CallTones } from "@/lib/voice/tones";
 import { TranscriptPersister, type SavedTurn, type PersistFailure } from "@/lib/voice/persist";
 import VoiceCallScreen from "@/components/ai/VoiceCallScreen";
 
@@ -114,6 +115,11 @@ const PERSIST_COPY: Record<Lang, Record<PersistFailure, string>> = {
   },
 };
 
+/* How long a live call may go unacknowledged before it is called ready
+   anyway. Long enough for a slow session.update round trip on a mainland
+   network; short enough that nobody waits on a vendor that never answers. */
+const READY_FALLBACK_MS = 2_500;
+
 const LABEL_COPY: Record<Lang, { start: string; end: string; connecting: string }> = {
   en: { start: "Start voice call", end: "End call", connecting: "Connecting…" },
   zh: { start: "开始语音通话", end: "结束通话", connecting: "正在连接…" },
@@ -176,6 +182,20 @@ export default function VoiceCallButton({
   /* Mirrors the session's flag. Kept in state because the screen renders from
      it; the session stays the source of truth for the tracks themselves. */
   const [muted, setMuted] = useState(false);
+  /* READY IS NOT LIVE. `live` is the transport standing; `ready` is the far
+     side having accepted the session configuration, which is when it listens
+     as Koleex AI. The caption says "go ahead" and the tone sounds on READY —
+     a caller told to go ahead a beat too early speaks to a session that has
+     not yet been told who it is. A vendor that never acknowledges is covered
+     by a fallback timer, so the call can never be stuck on "connecting". */
+  const [ready, setReady] = useState(false);
+  /* One per call, made INSIDE the tap that starts it (browsers unlock audio
+     only in a gesture) and closed with it. */
+  const tonesRef = useRef<CallTones | null>(null);
+  /* The tone plays once per call, and once per recovery — never on a
+     re-render. */
+  const chimedRef = useRef(false);
+  const prevStateRef = useRef<VoiceState>("idle");
   /* A lookup takes a second or two of real silence. The model is told to say
      "let me check" first, but it does not always, and a screen that says
      nothing during it reads as a frozen call. */
@@ -278,6 +298,8 @@ export default function VoiceCallButton({
          goes. `finish` posts with keepalive so it outlives the unmount. */
       void persisterRef.current?.finish();
       persisterRef.current = null;
+      tonesRef.current?.close();
+      tonesRef.current = null;
     };
   }, []);
 
@@ -286,6 +308,10 @@ export default function VoiceCallButton({
     sessionRef.current = null;
     void persisterRef.current?.finish();
     persisterRef.current = null;
+    tonesRef.current?.close();
+    tonesRef.current = null;
+    chimedRef.current = false;
+    setReady(false);
     if (audioRef.current) audioRef.current.srcObject = null;
     /* Dropped so the meters tear their audio contexts down. A retained stream
        here would keep a hardware handle open for the life of the page. */
@@ -320,6 +346,13 @@ export default function VoiceCallButton({
     setPhotos([]);
     pendingPhotosRef.current = [];
     onTranscriptRef.current?.(linesRef.current);
+    setReady(false);
+    chimedRef.current = false;
+    /* Primed HERE, in the tap: the context a browser will let play later is
+       the one created while the gesture is current. */
+    tonesRef.current?.close();
+    tonesRef.current = new CallTones();
+    tonesRef.current.prime();
 
     /* THE WRITER FOR THIS CALL. `fetch` is wrapped rather than passed: a bare
        reference to window.fetch throws "Illegal invocation" when called off
@@ -351,6 +384,7 @@ export default function VoiceCallButton({
           sessionRef.current = null;
         }
       },
+      onReady: () => setReady(true),
       onLocalStream: (stream) => setMicStream(stream),
       onRemoteStream: (stream) => {
         setFarStream(stream);
@@ -451,6 +485,31 @@ export default function VoiceCallButton({
   const live = state === "live";
   const reconnecting = state === "reconnecting";
   const connected = live || reconnecting;
+
+  /* THE FALLBACK FOR READY. A vendor that never acknowledges the session
+     configuration would otherwise leave a working call saying "connecting"
+     for ever. Live for this long with no word from the far side is treated
+     as ready — the transport is up and the microphone is open. */
+  useEffect(() => {
+    if (!live || ready) return;
+    const t = window.setTimeout(() => setReady(true), READY_FALLBACK_MS);
+    return () => window.clearTimeout(t);
+  }, [live, ready]);
+
+  /* THE SOUND. Once when the call becomes ready, once more each time a
+     dropped connection comes back — the two moments a caller may start
+     talking again and may not be looking at the screen. */
+  useEffect(() => {
+    if (live && ready && !chimedRef.current) {
+      chimedRef.current = true;
+      tonesRef.current?.ready();
+    }
+  }, [live, ready]);
+  useEffect(() => {
+    const prev = prevStateRef.current;
+    prevStateRef.current = state;
+    if (prev === "reconnecting" && state === "live") tonesRef.current?.recovered();
+  }, [state]);
   const listening = connected && phase !== "speaking";
   const micLevel = useStreamLevel(micStream, listening);
   const farLevel = useStreamLevel(farStream, connected && phase === "speaking");
@@ -517,6 +576,7 @@ export default function VoiceCallButton({
       {(connected || busy) && (
         <VoiceCallScreen
           live={connected}
+          ready={ready}
           reconnecting={reconnecting}
           phase={phase}
           audioLevel={audioLevel}

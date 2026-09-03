@@ -361,17 +361,27 @@ console.log("\n── VoiceCallScreen: the call is a mode, not a toggle ──")
     /aria-label="Listening…"/.test(noPhase));
   check("and never renders as idle while live", !/aria-label="Koleex AI"/.test(noPhase));
 
-  /* The halo that makes the level visible at 200px, where the shared orb's
-     own 3% scale reads as nothing. */
-  const loud = renderToStaticMarkup(
-    <VoiceCallScreen live phase="listening" audioLevel={0.9} lines={[]} lang="en" onEnd={() => {}} /> as ReactElement,
+  /* THE RINGS that make the level visible at 200px, where the shared orb's
+     own 3% scale reads as nothing. The level itself no longer reaches the
+     markup — it is written to a CSS variable each frame by useCallLevel, with
+     attack and release, which is what removed the twitch a per-render
+     transform produced — so what is asserted is the structure the variable
+     drives: three rings, live only when the call is ready, coloured by who
+     is speaking. */
+  const rings = (html: string) => (html.match(/kx-call-ring-\d/g) ?? []).length;
+  check("a live call draws three rings around the orb", rings(listening) === 3);
+  check("  …live, so they can move", /kx-call-orb[^"]*is-live/.test(listening));
+  check("  …white while the caller speaks, the Hub's blue while Koleex AI does",
+    /kx-call-orb[^"]*is-near/.test(listening) && /kx-call-orb[^"]*is-far/.test(speaking) && !/is-near/.test(speaking.slice(speaking.indexOf("kx-call-orb"), speaking.indexOf("kx-call-orb") + 120)));
+  const notReady = renderToStaticMarkup(
+    <VoiceCallScreen live ready={false} phase={null} audioLevel={0.5} lines={[]} lang="en" onEnd={() => {}} /> as ReactElement,
   );
-  const quiet = renderToStaticMarkup(
-    <VoiceCallScreen live phase="listening" audioLevel={0.05} lines={[]} lang="en" onEnd={() => {}} /> as ReactElement,
+  check("a live call that is not yet READY still says connecting, its rings still, its orb waking",
+    notReady.includes("Connecting") && !/kx-call-orb[^"]*is-live/.test(notReady) && !/aria-label="Listening…"/.test(notReady));
+  const mutedCall = renderToStaticMarkup(
+    <VoiceCallScreen live phase="listening" audioLevel={0.9} lines={[]} lang="en" onEnd={() => {}} muted onToggleMute={() => {}} /> as ReactElement,
   );
-  check("a loud level renders differently from a quiet one", loud !== quiet);
-  check("the halo scales with the level",
-    /scale\(1\.3/.test(loud) && /scale\(1\.0/.test(quiet));
+  check("a muted call's rings are still: nothing it hears goes anywhere", !/kx-call-orb[^"]*is-live/.test(mutedCall));
 
   const connecting = renderToStaticMarkup(
     <VoiceCallScreen live={false} phase={null} audioLevel={0} lines={[]} lang="en" onEnd={() => {}} /> as ReactElement,
