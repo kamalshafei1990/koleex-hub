@@ -1003,6 +1003,14 @@ void (async () => {
     check("  …a hint can only reorder endpoints the server owns — it never becomes a url", !/hint[^\n]*sdpUrl|sdpUrl[^\n]*hint/.test(route));
     check("a region that fails every attempt hands over to the next; a success stops everything",
       /regions: for \(const region of candidates\)/.test(route) && /break regions;/.test(route));
+    check("a region that ANSWERS AND REFUSES hands over to the next as well — a refusal belongs to that region's account",
+      /if \(!res\.ok\) \{[\s\S]*?rejected = true;\s*res = null;\s*continue regions;\s*\}/.test(route));
+    check("  …the refusal is logged with its slot, truncated, and its body never reaches the caller",
+      /handshake rejected status=\$\{res\.status\} slot=\$\{region\.slot\}/.test(route) && /\.slice\(0, 300\)/.test(route) && !/NextResponse\.json\([^)]*detail/.test(route));
+    check("  …the ok line is written only for an answer that is a call, not for any HTTP status",
+      (() => { const i = route.indexOf("if (!res.ok) {"); const j = route.indexOf("[ai.voice] handshake ok"); return i > 0 && j > i; })());
+    check("  …every region refused → 502 (the client says refused); none answered → 504 (not responding)",
+      /status: rejected \? 502 : 504/.test(route) && (route.match(/handshake rejected/g) ?? []).length === 1);
     check("with two regions each gets the long attempt and one short one, inside the ceiling",
       (() => { const m = route.match(/const TWO_REGION_ATTEMPT_BUDGETS_MS = \[([\d_, ]+)\]/); const b = m ? m[1].split(",").map((x) => Number(x.replace(/_/g, ""))) : []; const ceiling = Number(route.match(/export const maxDuration = (\d+)/)?.[1]); return b.length === 2 && b[0] === 13_000 && 2 * b.reduce((a, c) => a + c, 0) + 10_000 <= ceiling * 1000; })());
     check("the log names the slot beside the vendor label, on success and on failure",

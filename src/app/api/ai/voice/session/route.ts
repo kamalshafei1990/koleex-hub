@@ -291,6 +291,11 @@ export async function POST(req: Request) {
 
   let res: Response | null = null;
   let lastCause = "unknown";
+  /* Set when a region ANSWERED and refused. A refusal and a silence need
+     different words for the caller (the client maps 502 to "the service
+     refused" and 504 to "the service did not answer") and different
+     investigations for us. */
+  let rejected = false;
   /* The config that SERVED, once one has. Reassigned per region as the loop
      moves on, so after the loop it names the region whose answer we hold. */
   let cfg: VoiceConfig = candidates[0].cfg;
@@ -317,6 +322,29 @@ export async function POST(req: Request) {
            the retry would look like an instant failure and prove nothing. */
         signal: AbortSignal.timeout(budgetMs),
       });
+      if (!res.ok) {
+        /* A REFUSAL IS AN ANSWER, BUT IT IS NOT A CALL. The loop below this
+           one was written for a region that could not be REACHED, and it
+           treated any HTTP status as "the path works, stop here". Then the
+           mainland account's model entitlement lapsed: every handshake came
+           back 403 inside a second, the loop stopped on the first region as
+           designed, and the second region — its own account, its own key,
+           its own entitlement — was never asked. A refusal belongs to the
+           account that refused; the next region is a different account, so
+           it is tried, at the cost of the one request it takes to ask.
+
+           The body can name hosts, workspace ids and quota state. It is read
+           for the log — truncated — and never forwarded. Read here so the
+           Response can be dropped; nothing below reads it again. */
+        const detail = (await res.text().catch(() => "")).slice(0, 300);
+        console.error(
+          `[ai.voice] handshake rejected status=${res.status} slot=${region.slot} ` +
+            `from=${process.env.VERCEL_REGION ?? "local"} region=${cfg.regionLabel} detail=${detail}`,
+        );
+        rejected = true;
+        res = null;
+        continue regions;
+      }
       /* SUCCESS IS EVIDENCE TOO, and its absence is why the budgets above are
          still partly a guess. Only failures were ever logged, so nothing
          recorded how long a WORKING handshake takes — which is exactly the
@@ -363,19 +391,14 @@ export async function POST(req: Request) {
   }
   }
 
-  /* Both attempts got nothing. The service is not reachable from here, and
-     the client turns this status into "the voice service is not responding" —
-     which is now a statement the logs above can back up. */
+  /* Every region has been asked and none answered with a call. Which WORD the
+     client gets depends on what happened: a 502 when at least one region
+     answered and refused (the client says "the service refused"), a 504 when
+     none answered at all ("the service is not responding"). Both messages are
+     the same generic sentence; the reason is in the logs above, where each
+     region wrote its own line. */
   if (!res) {
-    return NextResponse.json({ error: "Could not start the call. Try again." }, { status: 504 });
-  }
-
-  if (!res.ok) {
-    /* The vendor's body can name hosts, workspace ids and quota state. It is
-       read for the log — truncated — and never forwarded. */
-    const detail = (await res.text().catch(() => "")).slice(0, 300);
-    console.error(`[ai.voice] handshake rejected status=${res.status} region=${cfg.regionLabel} detail=${detail}`);
-    return NextResponse.json({ error: "Could not start the call. Try again." }, { status: 502 });
+    return NextResponse.json({ error: "Could not start the call. Try again." }, { status: rejected ? 502 : 504 });
   }
 
   const answer = await res.text().catch(() => "");
