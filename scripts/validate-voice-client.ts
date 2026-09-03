@@ -2144,7 +2144,7 @@ console.log("\n── 12. Mute ──");
     talkPref.parseTalkMode("hold") === "hold" && talkPref.parseTalkMode("hands-free") === "hands-free" &&
     talkPref.parseTalkMode("push") === null && talkPref.parseTalkMode(null) === null && talkPref.parseTalkMode(undefined) === null &&
     talkPref.DEFAULT_TALK_MODE === "hands-free" && talkPref.TALK_MODE_STORAGE_KEY === "koleex-voice-talk" &&
-    talkPref.TALK_MODE_STORAGE_KEY !== talkPref.VOICE_STORAGE_KEY && talkPref.TALK_MODE_STORAGE_KEY !== talkPref.REGION_STORAGE_KEY);
+    new Set<string>([talkPref.TALK_MODE_STORAGE_KEY, talkPref.VOICE_STORAGE_KEY, talkPref.REGION_STORAGE_KEY]).size === 3);
   {
     const g = globalThis as unknown as { window?: unknown };
     const had = "window" in g; const prev = g.window;
