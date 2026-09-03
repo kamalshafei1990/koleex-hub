@@ -80,3 +80,39 @@ export function saveRegion(slot: RegionSlot): void {
     /* Private mode or a full store: the memory lasts for this page. */
   }
 }
+
+/* ── How the caller talks: hands-free or hold to talk ────────────────────
+   Roadmap B2. Server-side turn detection listens to the room the whole
+   time, and in a loud room — a factory floor, a trade-show hall — the room
+   gets turns of its own: phantom turns that cut Koleex AI off, and answers
+   to nobody. A caller there wants the microphone open only while they hold
+   a button. That is a device-side choice about the microphone, not a session
+   setting, so it needs no new handshake and no vendor field: the call
+   button gates the mic tracks (VoiceSession.setMuted) around the hold.
+   Remembered like the voice: chosen once, kept until changed. */
+
+export const TALK_MODE_STORAGE_KEY = "koleex-voice-talk";
+export type TalkMode = "hands-free" | "hold";
+export const DEFAULT_TALK_MODE: TalkMode = "hands-free";
+
+export function parseTalkMode(raw: string | null | undefined): TalkMode | null {
+  return raw === "hands-free" || raw === "hold" ? raw : null;
+}
+
+/** Read the device's memory; hands-free when nothing was chosen. Never throws. */
+export function readSavedTalkMode(): TalkMode {
+  try {
+    return parseTalkMode(window.localStorage.getItem(TALK_MODE_STORAGE_KEY)) ?? DEFAULT_TALK_MODE;
+  } catch {
+    return DEFAULT_TALK_MODE;
+  }
+}
+
+/** Remember how the caller talks. Never throws. */
+export function saveTalkMode(mode: TalkMode): void {
+  try {
+    window.localStorage.setItem(TALK_MODE_STORAGE_KEY, mode);
+  } catch {
+    /* Private mode or a full store: the choice lasts for this page. */
+  }
+}
