@@ -184,17 +184,68 @@ export type VoiceRegionSlot = "primary" | "alt";
 /** The ALT variables, mapped into the ordinary VoiceEnv shape so one
  *  parser and one diagnosis serve both regions. */
 export function readAltVoiceEnv(): VoiceEnv {
-  return {
-    AI_VOICE_BASE_URL: process.env.AI_VOICE_ALT_BASE_URL,
-    AI_VOICE_API_KEY: process.env.AI_VOICE_ALT_API_KEY,
-    AI_VOICE_MODEL: process.env.AI_VOICE_ALT_MODEL,
-    AI_VOICE_REGION_LABEL: process.env.AI_VOICE_ALT_REGION_LABEL,
-    /* The catalogue is the owner's product language and belongs to the
-       call, not to a region: the same voices are offered whichever
-       endpoint serves. A vendor that does not know a voice id uses its
-       default, which is the existing behaviour for an unknown key. */
-    AI_VOICE_VOICES: process.env.AI_VOICE_VOICES,
-  };
+  return inheritFromPrimary(
+    {
+      AI_VOICE_BASE_URL: process.env.AI_VOICE_ALT_BASE_URL,
+      AI_VOICE_API_KEY: process.env.AI_VOICE_ALT_API_KEY,
+      AI_VOICE_MODEL: process.env.AI_VOICE_ALT_MODEL,
+      AI_VOICE_REGION_LABEL: process.env.AI_VOICE_ALT_REGION_LABEL,
+      /* The catalogue is the owner's product language and belongs to the
+         call, not to a region: the same voices are offered whichever
+         endpoint serves. A vendor that does not know a voice id uses its
+         default, which is the existing behaviour for an unknown key. */
+      AI_VOICE_VOICES: process.env.AI_VOICE_VOICES,
+    },
+    readVoiceEnv(),
+  );
+}
+
+/** What the second region may borrow from the first, and what it never may.
+
+    The second region is, in practice, the SAME vendor's other host: the
+    same realtime path, the same model, a different hostname and a key
+    issued for that hostname. Asking the owner to copy the path out of one
+    variable into another — on a phone, from a console that shows the host
+    and nothing else — produced a base url with no path, which the parser
+    would have accepted and the vendor would have answered with 404.
+
+    So, when the ALT base names a host and nothing else, it takes the
+    primary's path (and query); when ALT_MODEL is unset it takes the
+    primary's model; when ALT_REGION_LABEL is unset it is "alt". An ALT
+    base that carries its own path is left alone — a second vendor keeps
+    its own shape.
+
+    THE KEY IS NEVER INHERITED. A key belongs to the account and region
+    that issued it; the primary's key on the alt host is at best a 401
+    and at worst a request signed by the wrong account. No ALT key, no
+    second region — the parser refuses it as before.
+
+    Pure: env in, env out, so the suite can drive it without touching
+    process.env. */
+export function inheritFromPrimary(alt: VoiceEnv, primary: VoiceEnv): VoiceEnv {
+  const out: VoiceEnv = { ...alt };
+  if (!out.AI_VOICE_MODEL?.trim() && primary.AI_VOICE_MODEL?.trim()) {
+    out.AI_VOICE_MODEL = primary.AI_VOICE_MODEL;
+  }
+  if (!out.AI_VOICE_REGION_LABEL?.trim()) out.AI_VOICE_REGION_LABEL = "alt";
+  const altBase = out.AI_VOICE_BASE_URL?.trim();
+  const primaryBase = primary.AI_VOICE_BASE_URL?.trim();
+  if (altBase && primaryBase) {
+    try {
+      const a = new URL(altBase);
+      const p = new URL(primaryBase);
+      const hostOnly = (a.pathname === "/" || a.pathname === "") && !a.search;
+      if (hostOnly && p.pathname !== "/") {
+        a.pathname = p.pathname;
+        a.search = p.search;
+        out.AI_VOICE_BASE_URL = a.toString();
+      }
+    } catch {
+      /* Not a url. Left as it is: parseVoiceConfig refuses it and
+         diagnoseVoiceConfig says why, both by name and never by value. */
+    }
+  }
+  return out;
 }
 
 /** The browser's hint, allow-listed to two words. Anything else is no hint. */
