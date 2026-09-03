@@ -783,7 +783,7 @@ async function main() {
     check("a failure clears the session handle so a retry starts fresh",
       /next === "failed"[\s\S]{0,1200}?sessionRef\.current = null/.test(src));
     check("hanging up clears the handle too — through the release it is built on",
-      /const releaseCall[\s\S]{0,400}?sessionRef\.current = null/.test(src) && /const hangUp = useCallback\(\(\) => \{\s*releaseCall\(\);/.test(src));
+      /const releaseCall[\s\S]{0,400}?sessionRef\.current = null/.test(src) && /const hangUp = useCallback\(\(\) => \{[\s\S]{0,900}?releaseCall\(\);\s*setState\("idle"\);/.test(src));
     check("starting twice is refused rather than leaking the first session",
       /if \(sessionRef\.current\) return;/.test(src));
     check("hanging up detaches the stream from the audio element",
@@ -1972,7 +1972,7 @@ console.log("\n── 12. Mute ──");
     !/hangUp\(\);\s*\/\*[^*]*\*\/\s*queueMicrotask/.test(btn19) &&
     /\{\(connected \|\| busy \|\| swapping\) && typeof document !== "undefined" && createPortal\(/.test(btn19));
   check("  …hangUp is the release plus idle — the same teardown, one more step",
-    /const hangUp = useCallback\(\(\) => \{\s*releaseCall\(\);\s*setState\("idle"\);\s*\}, \[releaseCall\]\);/.test(btn19) &&
+    /const hangUp = useCallback\(\(\) => \{[\s\S]{0,900}?releaseCall\(\);\s*setState\("idle"\);/.test(btn19) &&
     /const releaseCall = useCallback\(\(\) => \{\s*sessionRef\.current\?\.stop\(\);/.test(btn19) &&
     (btn19.match(/setState\("idle"\)/g) ?? []).length === 1);
   check("  …and says so in the log: a voice-switched beacon with the old call's diagnostics, before the release",
@@ -2105,6 +2105,34 @@ console.log("\n── 12. Mute ──");
     /@keyframes kx-orb-fly-in-rtl\s*\{ from \{ transform: translate\(-36vw, 30vh\) scale\(0\.36\)/.test(css21));
   check("  …the leaving copy stays opaque for most of the flight, so the travelling orb is never see-through",
     /@keyframes kx-view-out \{ 0% \{ opacity: 1; \} 70% \{ opacity: 1; \} 100% \{ opacity: 0; \} \}/.test(css21));
+}
+
+{
+  console.log("\n── 22. What the call came to — asked for at hang-up ──");
+  const fs22 = await import("node:fs");
+  const sum = await import("../src/lib/voice/summary");
+  check("a call is worth a summary after two settled caller turns and one reply — never before, never on drafts",
+    sum.shouldSummarise([{ role: "user", text: "a", final: true }, { role: "assistant", text: "b", final: true }, { role: "user", text: "c", final: true }]) &&
+    !sum.shouldSummarise([{ role: "user", text: "a", final: true }, { role: "assistant", text: "b", final: true }]) &&
+    !sum.shouldSummarise([{ role: "user", text: "a", final: true }, { role: "user", text: "c", final: true }]) &&
+    !sum.shouldSummarise([{ role: "user", text: "a", final: false }, { role: "assistant", text: "b", final: true }, { role: "user", text: "c", final: false }]) &&
+    !sum.shouldSummarise([{ role: "user", text: "  ", final: true }, { role: "assistant", text: "b", final: true }, { role: "user", text: "c", final: true }]) &&
+    sum.SUMMARY_MIN_USER_LINES === 2 && sum.SUMMARY_PATH === "/api/ai/voice/summary");
+  const calls: Array<{ url: string; init?: RequestInit }> = [];
+  const fakeFetch = (status: number, body: unknown) => (async (url: string | URL | Request, init?: RequestInit) => { calls.push({ url: String(url), init }); return new Response(JSON.stringify(body), { status }); }) as typeof fetch;
+  const ok = await sum.requestCallSummary("6f1d2c3b-4a5e-4f60-9b7c-1234567890ab", "ar", fakeFetch(200, { message: { id: "m1", role: "assistant", content: "**ملخص**", created_at: "t" }, conversation: { id: "c", title: "T" } }));
+  check("the request posts the conversation id and the UI language with the session cookie, and returns the row",
+    ok?.message.id === "m1" && ok.conversation.id === "c" && calls[0].url === sum.SUMMARY_PATH && calls[0].init?.method === "POST" && calls[0].init?.credentials === "include" &&
+    calls[0].init?.body === JSON.stringify({ conversation_id: "6f1d2c3b-4a5e-4f60-9b7c-1234567890ab", lang: "ar" }));
+  check("  …too little to summarise (message null), a refusal, and a network failure are all null — nothing on screen",
+    (await sum.requestCallSummary("c", "en", fakeFetch(200, { message: null, conversation: { id: "c", title: null } }))) === null &&
+    (await sum.requestCallSummary("c", "en", fakeFetch(429, { message: { id: "m9", role: "assistant", content: "x", created_at: "t" }, conversation: { id: "c", title: null } }))) === null &&
+    (await sum.requestCallSummary("c", "en", (async () => { throw new Error("offline"); }) as unknown as typeof fetch)) === null);
+  const btn22 = fs22.readFileSync("src/components/ai/VoiceCallButton.tsx", "utf8");
+  check("hang-up takes the writer, the thread and the words BEFORE the release, then asks after the last turns landed, and the row joins the thread; a voice switch never asks",
+    /const persister = persisterRef\.current;\s*const conversation = conversationIdRef\.current;\s*const lines = linesRef\.current;\s*releaseCall\(\);\s*setState\("idle"\);\s*if \(conversation && shouldSummarise\(lines\)\) \{/.test(btn22) &&
+    /Promise\.resolve\(persister\?\.finish\(\)\)\s*\.then\(\(\) => requestCallSummary\(conversation, langRef\.current\)\)\s*\.then\(\(res\) => \{ if \(res\) onTurnsSavedRef\.current\?\.\(\[res\.message\], res\.conversation\); \}\)/.test(btn22) &&
+    (btn22.match(/requestCallSummary\(/g) ?? []).length === 1 && !/selectVoice[\s\S]{0,1200}?requestCallSummary/.test(btn22.slice(btn22.indexOf("const selectVoice"), btn22.indexOf("const selectVoice") + 1500)));
 }
 
 console.log(`\n${pass} passed, ${failures.length} failed`);

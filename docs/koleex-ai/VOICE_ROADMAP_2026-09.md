@@ -13,15 +13,15 @@ nothing is called done until it is reachable and tested at runtime.
 
 | # | Item | Why (evidence) | How | Status |
 |---|------|----------------|-----|--------|
-| A1 | No re-greeting on a continued call | Transcript 18:14–18:17 UTC: "أهلاً بك يا أستاذ كمال…" four times across reconnects | History block tells the model the call was already under way; a greeting after a reconnect gets a one-word answer, not a restart | in progress |
-| A2 | Start from the region that served this device last | Every cold handshake still spends 13 s on the mainland endpoint before Singapore; the server's memory (#340) dies with the warm instance | The client remembers the served slot (localStorage) and sends it as the allow-listed hint on every call; the server still decides | in progress |
-| A3 | Better transcription of Egyptian Arabic | Saved user turns read "إزاي كخ بركة إيه؟" for "إزيك أخبارك إيه"; the model heard it right, the transcript did not | Ask the session for the vendor's dedicated realtime ASR model (`input_audio_transcription.model`) alongside the language hint; full session only, compact fallback untouched | in progress |
+| A1 | No re-greeting on a continued call | Transcript 18:14–18:17 UTC: "أهلاً بك يا أستاذ كمال…" four times across reconnects | History block tells the model the call was already under way; a greeting after a reconnect gets a one-word answer, not a restart | done (#345) |
+| A2 | Start from the region that served this device last | Every cold handshake still spends 13 s on the mainland endpoint before Singapore; the server's memory (#340) dies with the warm instance | The client remembers the served slot (localStorage) and sends it as the allow-listed hint on every call; the server still decides | done (#345) |
+| A3 | Better transcription of Egyptian Arabic | Saved user turns read "إزاي كخ بركة إيه؟" for "إزيك أخبارك إيه"; the model heard it right, the transcript did not | Ask the session for the vendor's dedicated realtime ASR model (`input_audio_transcription.model`) alongside the language hint; full session only, compact fallback untouched | done (#345) |
 
 ## Phase B — inside the call
 
 | # | Item | How |
 |---|------|-----|
-| B1 | End-of-call summary card | When the call ends with ≥ 2 exchanges, summarise the transcript (existing chat lane, no new provider) into 3–5 bullets + numbers said; show a card with Copy and "Save as task" (confirmed) |
+| B1 | End-of-call summary (in progress) | When the call ends with ≥ 2 exchanges, summarise the transcript (existing chat lane, no new provider) into 3–5 bullets + numbers said; show a card with Copy and "Save as task" (confirmed) |
 | B2 | Push-to-talk and noise mode | A mode in the voice sheet: hold to talk (mic track enabled only while held), plus a higher VAD threshold preset for noisy rooms — tuned in a real room, as session-config.ts already notes |
 | B3 | Barge-in check | Verify the client stops local playback on `input_audio_buffer.speech_started`; fix if the far side keeps talking over the caller |
 | B4 | One voice everywhere | The "listen" button in text chat uses the browser's synthesis today; route it through the vendor's TTS so the character has one voice (mainland-reachable endpoint required) |

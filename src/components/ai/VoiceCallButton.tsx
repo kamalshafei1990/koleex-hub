@@ -53,6 +53,7 @@ import { useStreamLevel } from "@/lib/voice/useStreamLevel";
 import { CallTones } from "@/lib/voice/tones";
 import { pickSttLang, readSavedSttLang, saveSttLang, learnSttLang, type SttLang } from "@/lib/voice/stt-lang";
 import { pickVoiceKey, readSavedVoiceKey, saveVoiceKey, readSavedRegion, saveRegion } from "@/lib/voice/voice-pref";
+import { requestCallSummary, shouldSummarise } from "@/lib/voice/summary";
 import { sendVoiceTelemetry } from "@/lib/voice/telemetry";
 import { TranscriptPersister, type SavedTurn, type PersistFailure } from "@/lib/voice/persist";
 import VoiceCallScreen from "@/components/ai/VoiceCallScreen";
@@ -399,8 +400,23 @@ export default function VoiceCallButton({
   }, [clearSearchTimer]);
 
   const hangUp = useCallback(() => {
+    /* WHAT THE CALL CAME TO, written down (roadmap B1). Taken before the
+       release drops the handles: the writer, the thread, the words. After
+       the last turns have landed, the server is asked for a summary of the
+       call and its row joins the thread like any other saved turn. Only a
+       call the caller ENDED, with a real exchange in it — a voice switch
+       releases and rebuilds, and a two-second call has nothing to say. */
+    const persister = persisterRef.current;
+    const conversation = conversationIdRef.current;
+    const lines = linesRef.current;
     releaseCall();
     setState("idle");
+    if (conversation && shouldSummarise(lines)) {
+      void Promise.resolve(persister?.finish())
+        .then(() => requestCallSummary(conversation, langRef.current))
+        .then((res) => { if (res) onTurnsSavedRef.current?.([res.message], res.conversation); })
+        .catch(() => { /* a summary that did not come is nothing on screen */ });
+    }
   }, [releaseCall]);
 
   const startCall = useCallback(async (opts?: { resume?: boolean }) => {
