@@ -42,7 +42,16 @@ import { authorizeVoice } from "@/lib/server/ai/voice/gate";
 import { consumeBudget, limitMode, subjectFor } from "@/lib/server/ai/security/rate-limit";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { loadRecentTurns, parseConversationParam, type RecentTurn } from "@/lib/server/ai/voice/history";
-import { parseVoiceConfig, diagnoseVoiceConfig, resolveVoice, type VoiceEnv } from "@/lib/server/ai/voice/config";
+import {
+  parseVoiceConfig,
+  diagnoseVoiceConfig,
+  resolveVoice,
+  readAltVoiceEnv,
+  parseRegionHint,
+  type VoiceEnv,
+  type VoiceConfig,
+  type VoiceRegionSlot,
+} from "@/lib/server/ai/voice/config";
 import {
   buildVoiceSessionPayload,
   publicVoiceList,
@@ -166,7 +175,11 @@ const HISTORY_TIMEOUT_MS = 1_500;
    its own timing — and these numbers should be re-tuned from it rather than
    from reasoning. */
 const HANDSHAKE_ATTEMPT_BUDGETS_MS = [13_000, 3_000, 3_000, 3_000] as const;
-const HANDSHAKE_ATTEMPTS = HANDSHAKE_ATTEMPT_BUDGETS_MS.length;
+/* WITH A SECOND REGION CONFIGURED, each region gets the long attempt and one
+   short one: 13+3 twice is 32s, inside the same 45s ceiling. Two samples of
+   a path that is dead right now buy less than one attempt at a different
+   path — which is the whole reason the second region exists. */
+const TWO_REGION_ATTEMPT_BUDGETS_MS = [13_000, 3_000] as const;
 
 /* A voice call is the only feature in this product that spends money
    continuously while the user says nothing, so the budget is on SESSIONS
@@ -188,6 +201,10 @@ function voiceEnv(): VoiceEnv {
     AI_VOICE_VOICES: process.env.AI_VOICE_VOICES,
   };
 }
+
+/* The second region's four variables, read the same way. See config.ts for
+   why a second region exists at all. */
+const altVoiceEnv = readAltVoiceEnv;
 
 /* THE GATE LIVES IN ai/voice/gate.ts NOW, shared with the transcript route.
    It used to be a private function here; a second voice route made a second
@@ -239,14 +256,28 @@ export async function POST(req: Request) {
     }
   }
 
-  const cfg = parseVoiceConfig(voiceEnv());
-  if (!cfg) {
+  const primary = parseVoiceConfig(voiceEnv());
+  const alt = parseVoiceConfig(altVoiceEnv());
+  if (!primary && !alt) {
     /* The REASON goes to the log, not to the caller. diagnoseVoiceConfig names
        variables rather than values, but an ordinary user has no business
        learning which of our environment variables is unset. */
     console.error(`[ai.voice] not configured: ${diagnoseVoiceConfig(voiceEnv()).join(" · ")}`);
     return NextResponse.json({ error: "Voice is not available right now." }, { status: 503 });
   }
+
+  /* WHICH REGION FIRST. The primary, unless the browser has said "the other
+     one" — which it says only after a call served by the primary never
+     connected its media, the failure a VPN produces and this function cannot
+     see. The hint is two allow-listed words that select between endpoints
+     the SERVER owns; it can neither name one nor invent one, and it is
+     ignored when there is no second region to select. */
+  const hint = parseRegionHint(new URL(req.url).searchParams.get("region"));
+  const candidates: Array<{ slot: VoiceRegionSlot; cfg: VoiceConfig }> = [];
+  if (hint === "alt" && alt) candidates.push({ slot: "alt", cfg: alt });
+  if (primary) candidates.push({ slot: "primary", cfg: primary });
+  if (alt && !candidates.some((c) => c.slot === "alt")) candidates.push({ slot: "alt", cfg: alt });
+  const budgets: readonly number[] = candidates.length > 1 ? TWO_REGION_ATTEMPT_BUDGETS_MS : HANDSHAKE_ATTEMPT_BUDGETS_MS;
 
   /* Read as TEXT. An SDP offer is not JSON, and parsing it would mean
      understanding it — this route does not need to and should not. */
@@ -260,11 +291,18 @@ export async function POST(req: Request) {
 
   let res: Response | null = null;
   let lastCause = "unknown";
-  for (let attempt = 1; attempt <= HANDSHAKE_ATTEMPTS; attempt++) {
+  /* The config that SERVED, once one has. Reassigned per region as the loop
+     moves on, so after the loop it names the region whose answer we hold. */
+  let cfg: VoiceConfig = candidates[0].cfg;
+  let served: VoiceRegionSlot = candidates[0].slot;
+  regions: for (const region of candidates) {
+  cfg = region.cfg;
+  served = region.slot;
+  for (let attempt = 1; attempt <= budgets.length; attempt++) {
     /* Set immediately before each fetch, so the elapsed time in the log
        measures that round trip and not the work that preceded it. */
     const startedAt = Date.now();
-    const budgetMs = HANDSHAKE_ATTEMPT_BUDGETS_MS[attempt - 1];
+    const budgetMs = budgets[attempt - 1];
     try {
       res = await fetch(cfg.sdpUrl, {
         method: "POST",
@@ -286,11 +324,11 @@ export async function POST(req: Request) {
          giving up on a bad window. Logged at info: it is one line per call
          and it carries no vendor detail. */
       console.log(
-        `[ai.voice] handshake ok attempt=${attempt}/${HANDSHAKE_ATTEMPTS} ` +
+        `[ai.voice] handshake ok attempt=${attempt}/${budgets.length} slot=${region.slot} ` +
           `from=${process.env.VERCEL_REGION ?? "local"} region=${cfg.regionLabel} ` +
           `afterMs=${Date.now() - startedAt} budgetMs=${budgetMs}`,
       );
-      break;
+      break regions;
     } catch (e) {
       const timedOut = e instanceof Error && (e.name === "TimeoutError" || e.name === "AbortError");
       lastCause = describeFetchFailure(e);
@@ -317,11 +355,12 @@ export async function POST(req: Request) {
          VERCEL_REGION; anywhere else it is simply absent. */
       console.error(
         `[ai.voice] handshake ${timedOut ? "timed out" : "failed"} ` +
-          `attempt=${attempt}/${HANDSHAKE_ATTEMPTS} from=${process.env.VERCEL_REGION ?? "local"} ` +
+          `attempt=${attempt}/${budgets.length} slot=${region.slot} from=${process.env.VERCEL_REGION ?? "local"} ` +
           `region=${cfg.regionLabel} ` +
           `afterMs=${Date.now() - startedAt} budgetMs=${budgetMs} cause=${lastCause}`,
       );
     }
+  }
   }
 
   /* Both attempts got nothing. The service is not reachable from here, and
@@ -418,7 +457,11 @@ export async function POST(req: Request) {
   const sttLanguage = parseSttLanguage(new URL(req.url).searchParams.get("stt"));
   const payload = buildVoiceSessionPayload(voice, taughtQuestions, recentTurns, gate.viewer, sttLanguage);
   return NextResponse.json(
-    { sdp: answer, session: payload.full, session_compact: payload.compact },
+    /* WHICH SLOT SERVED, and whether another exists — two neutral words, so
+       the browser can ask for "the other one" if this one's media never
+       connects. Not a label, not a host, not a vendor: `alt` says nothing
+       about where it is. */
+    { sdp: answer, session: payload.full, session_compact: payload.compact, region: served, alt_available: candidates.length > 1 },
     { status: 200, headers: { "Cache-Control": "no-store" } },
   );
 }

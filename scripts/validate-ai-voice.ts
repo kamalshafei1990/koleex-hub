@@ -172,7 +172,8 @@ console.log("\n── 3. The route, read — the surface a fetch cannot be teste
      the budgets differ by attempt. */
   check("the handshake has a deadline",
     /AbortSignal\.timeout\(budgetMs\)/.test(code) &&
-    /const budgetMs = HANDSHAKE_ATTEMPT_BUDGETS_MS\[attempt - 1\]/.test(code));
+    /const budgetMs = budgets\[attempt - 1\]/.test(code) &&
+    /const budgets: readonly number\[\] = candidates\.length > 1 \? TWO_REGION_ATTEMPT_BUDGETS_MS : HANDSHAKE_ATTEMPT_BUDGETS_MS;/.test(code));
 
   /* THE CLIENT MUST NOT NAME THE ENDPOINT. A client that could would be a
      client that could send our key somewhere we did not choose. The url comes
@@ -190,8 +191,11 @@ console.log("\n── 3. The route, read — the surface a fetch cannot be teste
      the voice key against the catalogue, the conversation id against the
      caller's own conversations (inside loadRecentTurns). Neither reaches the
      vendor — the assertion above this one still holds that. */
-  check("the only request fields read are a voice KEY, a conversation ID and a transcription LANGUAGE — each allow-listed",
-    (code.match(/searchParams\.get/g) ?? []).length === 3 &&
+  /* FOUR now: the fourth is a REGION HINT of two allow-listed words, which
+     selects between endpoints the server owns and can name neither. */
+  check("the only request fields read are a voice KEY, a conversation ID, a transcription LANGUAGE and a two-word REGION HINT — each allow-listed",
+    (code.match(/searchParams\.get/g) ?? []).length === 4 &&
+    /parseRegionHint\(new URL\(req\.url\)\.searchParams\.get\("region"\)\)/.test(code) &&
     /searchParams\.get\("voice"\)/.test(code) &&
     /resolveVoice\(cfg\.voices, requested\)/.test(code) &&
     /parseConversationParam\(new URL\(req\.url\)\.searchParams\.get\("conversation"\)\)/.test(code) &&
@@ -437,7 +441,8 @@ void (async () => {
     check("voice status is reported without ?probe=1 too",
       /voice: voiceStatus/.test(bare));
     check("the probe result is only attached under ?probe=1",
-      /voice: \{ \.\.\.voiceStatus, \.\.\.\(voiceProbe \? \{ probe: voiceProbe \} : \{\}\) \}/.test(bare));
+      /voice: \{\s*\.\.\.voiceStatus,\s*\.\.\.\(voiceProbe \? \{ probe: voiceProbe \} : \{\}\),/.test(bare) &&
+      /alt: \{ \.\.\.altStatus, \.\.\.\(altProbe \? \{ probe: altProbe \} : \{\}\) \}/.test(bare));
     check("the diagnosis is only sent when voice is NOT configured",
       /voiceIsConfigured \? \{\} : \{ not_configured_because: diagnoseVoiceConfig/.test(bare));
     /* The key must enter this file exactly once, to be handed to the probe, and
@@ -664,9 +669,10 @@ void (async () => {
        not a second hand-rolled fetch — the probe module, with the shared
        env reader, so a field the session route reads cannot be one the
        watchdog forgets. */
-    check("it probes through the shared probe module",
+    check("it probes through the shared probe module — both regions",
       /import \{ probeVoice \} from "@\/lib\/server\/ai\/voice\/probe"/.test(bare) &&
-      /probeVoice\(env, fetch, WATCH_TIMEOUT_MS\)/.test(bare));
+      /probeVoice\(r\.env, fetch, WATCH_TIMEOUT_MS\)/.test(bare) &&
+      /readAltVoiceEnv\(\)/.test(bare));
     check("  …with the shared env reader, not a private copy of the variable list",
       /readVoiceEnv\(\)/.test(bare) && !/process\.env\.AI_VOICE_/.test(bare));
     check("  …and never calls fetch itself", !/\bfetch\(/.test(bare));
@@ -696,8 +702,9 @@ void (async () => {
     /* FOUR GREEN RUNS THAT SAID NOTHING. The verdict has to be in the status
        code, because that is what the status-code breakdown and the cron
        history count; a log line at info level is not reliably surfaced. */
-    check("an unreachable endpoint is a 503, so the verdict is countable by status",
-      /\{ status: probe\.reachable \? 200 : 503 \}/.test(bare));
+    check("no region reachable is a 503, so the verdict is countable by status — one reachable region is a served caller",
+      /\{ status: anyReachable \? 200 : 503 \}/.test(bare) && /const anyReachable = rows\.some\(\(r\) => r\.reachable\)/.test(bare));
+    check("  …and each region logs its own line, with its slot", /slot=\$\{r\.slot\}/.test(bare));
     check("a lost configuration is said once, and answered quietly",
       /console\.warn\("\[ai\.voice\.watch\] not configured/.test(bare) &&
       /configured: false/.test(bare));
@@ -961,6 +968,48 @@ void (async () => {
   }
 
   summarised = true;
+  console.log("\n── 16. A second region: configuration, order, the hint, and what the browser learns ──");
+  {
+    const { readAltVoiceEnv, parseRegionHint } = await import("../src/lib/server/ai/voice/config");
+    process.env.AI_VOICE_ALT_BASE_URL = "https://alt.example/realtime";
+    process.env.AI_VOICE_ALT_API_KEY = "alt-key";
+    process.env.AI_VOICE_ALT_MODEL = "alt-model";
+    process.env.AI_VOICE_ALT_REGION_LABEL = "intl";
+    process.env.AI_VOICE_VOICES = "Ethan:Omar";
+    const altEnv = readAltVoiceEnv();
+    check("the ALT variables map into the ordinary env shape, so one parser serves both regions",
+      altEnv.AI_VOICE_BASE_URL === "https://alt.example/realtime" && altEnv.AI_VOICE_API_KEY === "alt-key" && altEnv.AI_VOICE_MODEL === "alt-model" && altEnv.AI_VOICE_REGION_LABEL === "intl");
+    check("  …and the voice catalogue is shared, not per region", altEnv.AI_VOICE_VOICES === "Ethan:Omar");
+    const altCfg = parseVoiceConfig(altEnv);
+    check("  …parsed by the same rules: https, model applied, label kept", altCfg !== null && altCfg.sdpUrl === "https://alt.example/realtime?model=alt-model" && altCfg.regionLabel === "intl");
+    check("  …and refused by the same rules", parseVoiceConfig({ ...altEnv, AI_VOICE_BASE_URL: "http://alt.example" }) === null);
+    delete process.env.AI_VOICE_ALT_BASE_URL; delete process.env.AI_VOICE_ALT_API_KEY; delete process.env.AI_VOICE_ALT_MODEL; delete process.env.AI_VOICE_ALT_REGION_LABEL; delete process.env.AI_VOICE_VOICES;
+    check("absent ALT variables are simply no second region", parseVoiceConfig(readAltVoiceEnv()) === null);
+
+    check("the region hint is two words and nothing else", parseRegionHint("alt") === "alt" && parseRegionHint("primary") === "primary" && parseRegionHint("cn-north") === null && parseRegionHint("https://x") === null && parseRegionHint("") === null && parseRegionHint(null) === null);
+
+    const route = readFileSync("src/app/api/ai/voice/session/route.ts", "utf8").replace(/\/\*[\s\S]*?\*\//g, "");
+    check("both regions are parsed, and voice is off only when NEITHER serves",
+      /const primary = parseVoiceConfig\(voiceEnv\(\)\);\s*const alt = parseVoiceConfig\(altVoiceEnv\(\)\);\s*if \(!primary && !alt\)/.test(route));
+    check("the primary is tried first unless the browser asked for the other one",
+      /if \(hint === "alt" && alt\) candidates\.push\(\{ slot: "alt", cfg: alt \}\);\s*if \(primary\) candidates\.push\(\{ slot: "primary", cfg: primary \}\);\s*if \(alt && !candidates\.some\(\(c\) => c\.slot === "alt"\)\) candidates\.push\(\{ slot: "alt", cfg: alt \}\);/.test(route));
+    check("  …a hint can only reorder endpoints the server owns — it never becomes a url", !/hint[^\n]*sdpUrl|sdpUrl[^\n]*hint/.test(route));
+    check("a region that fails every attempt hands over to the next; a success stops everything",
+      /regions: for \(const region of candidates\)/.test(route) && /break regions;/.test(route));
+    check("with two regions each gets the long attempt and one short one, inside the ceiling",
+      (() => { const m = route.match(/const TWO_REGION_ATTEMPT_BUDGETS_MS = \[([\d_, ]+)\]/); const b = m ? m[1].split(",").map((x) => Number(x.replace(/_/g, ""))) : []; const ceiling = Number(route.match(/export const maxDuration = (\d+)/)?.[1]); return b.length === 2 && b[0] === 13_000 && 2 * b.reduce((a, c) => a + c, 0) + 10_000 <= ceiling * 1000; })());
+    check("the log names the slot beside the vendor label, on success and on failure",
+      /handshake ok attempt=\$\{attempt\}\/\$\{budgets\.length\} slot=\$\{region\.slot\}/.test(route) && /attempt=\$\{attempt\}\/\$\{budgets\.length\} slot=\$\{region\.slot\} from=/.test(route));
+    const successReturn16 = route.slice(route.lastIndexOf("return NextResponse.json("));
+    check("the browser learns the SLOT that served and whether another exists — two neutral words, no label, no host",
+      /region: served, alt_available: candidates\.length > 1/.test(successReturn16) && !/regionLabel|sdpUrl/.test(successReturn16));
+    check("the key is still referenced once, in the header", (route.match(/cfg\.apiKey/g) ?? []).length === 1);
+
+    const providers = readFileSync("src/app/api/ai/providers/route.ts", "utf8");
+    check("the status route reports the second region in the same shape, naming ALT variables",
+      /alt: altStatus/.test(providers) && /readAltVoiceEnv\(\)/.test(providers) && /replace\("AI_VOICE_", "AI_VOICE_ALT_"\)/.test(providers));
+  }
+
   console.log(`\n${pass} passed, ${failures.length} failed`);
   if (failures.length) {
     console.log("\nFAILED:");

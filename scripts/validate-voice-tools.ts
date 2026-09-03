@@ -654,8 +654,8 @@ console.log("\n── 2c. A failed handshake says how long it took ──");
      mid-retry reads to the caller as the failure it is trying to survive. */
   check(`and all ${budgets.length} fit inside the function ceiling with room for the rest (${ceiling}s)`,
     total > 0 && ceiling * 1000 - total >= 10_000);
-  check("the attempt count is derived from the table, not typed twice",
-    /const HANDSHAKE_ATTEMPTS = HANDSHAKE_ATTEMPT_BUDGETS_MS\.length/.test(route));
+  check("the attempt count is derived from the table in use, not typed twice",
+    /attempt <= budgets\.length/.test(route) && !/HANDSHAKE_ATTEMPTS\b/.test(route));
 
   /* A FRESH SIGNAL PER ATTEMPT, or the retry proves nothing: one
      AbortSignal.timeout made outside the loop fires on wall-clock time from
@@ -663,9 +663,9 @@ console.log("\n── 2c. A failed handshake says how long it took ──");
      began and look like an instant failure. */
   check("each attempt gets its own timeout signal, at its own budget",
     /for \(let attempt = 1[\s\S]{0,1200}?signal: AbortSignal\.timeout\(budgetMs\)/.test(route) &&
-    /const budgetMs = HANDSHAKE_ATTEMPT_BUDGETS_MS\[attempt - 1\]/.test(route));
+    /const budgetMs = budgets\[attempt - 1\]/.test(route));
   check("and the attempt number is logged, so a drop can be told from slowness",
-    /attempt=\$\{attempt\}\/\$\{HANDSHAKE_ATTEMPTS\}/.test(route));
+    /attempt=\$\{attempt\}\/\$\{budgets\.length\}/.test(route));
 
   /* SUCCESS IS EVIDENCE TOO. Only failures were ever logged, so nothing
      recorded how long a WORKING handshake takes — which is precisely the
@@ -681,8 +681,8 @@ console.log("\n── 2c. A failed handshake says how long it took ──");
      Anchored on the success LOG rather than on a byte distance from the
      fetch: the previous form counted characters, so adding that log pushed
      the `break` out of range and failed on correct code. */
-  check("a successful attempt stops retrying",
-    /handshake ok attempt[\s\S]{0,400}?\n      break;/.test(route));
+  check("a successful attempt stops retrying — every region",
+    /handshake ok attempt[\s\S]{0,400}?\n      break regions;/.test(route));
 }
 
 console.log("\n── 3. Reading the protocol ──");

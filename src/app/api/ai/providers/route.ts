@@ -53,7 +53,7 @@ import { deepseekAdapter } from "@/lib/server/ai/provider/adapters/deepseek";
 import { openAiCompatibleAdapter, diagnoseFallbackConfig } from "@/lib/server/ai/provider/adapters/openai-compatible";
 import { createBreaker } from "@/lib/server/ai/router/circuit-breaker";
 import { latencyStats } from "@/lib/server/ai/observability/latency-stats";
-import { voiceConfigured, diagnoseVoiceConfig, type VoiceEnv } from "@/lib/server/ai/voice/config";
+import { voiceConfigured, diagnoseVoiceConfig, readAltVoiceEnv, type VoiceEnv } from "@/lib/server/ai/voice/config";
 import { probeVoice } from "@/lib/server/ai/voice/probe";
 import { imageGenConfigured, diagnoseImageConfig, readImageEnv } from "@/lib/server/ai/image-gen";
 
@@ -139,9 +139,19 @@ export async function GET(req: Request) {
     AI_VOICE_REGION_LABEL: process.env.AI_VOICE_REGION_LABEL,
   });
   const voiceIsConfigured = voiceConfigured(voiceEnv());
+  /* THE SECOND REGION, reported beside the first in the same shape. Not
+     configured is the normal state until the owner sets the ALT variables,
+     and is said with the variable names so setting them is not guesswork. */
+  const altEnv = readAltVoiceEnv();
+  const altIsConfigured = voiceConfigured(altEnv);
+  const altStatus = {
+    configured: altIsConfigured,
+    ...(altIsConfigured ? {} : { not_configured_because: diagnoseVoiceConfig(altEnv).map((p) => p.replace("AI_VOICE_", "AI_VOICE_ALT_")) }),
+  };
   const voiceStatus = {
     configured: voiceIsConfigured,
     ...(voiceIsConfigured ? {} : { not_configured_because: diagnoseVoiceConfig(voiceEnv()) }),
+    alt: altStatus,
   };
 
   /* IMAGE CREATION, the same way. Not probed: a probe would be a paid
@@ -213,6 +223,7 @@ export async function GET(req: Request) {
      than adding its 8s cap to the run. It is one request to a different host,
      so the overlap costs effectively nothing against maxDuration=30. */
   const voiceProbePromise = probeVoice(voiceEnv());
+  const altProbePromise = probeVoice(altEnv);
 
   const probes = await Promise.all(
     ADAPTERS.filter((a) => {
@@ -304,12 +315,17 @@ export async function GET(req: Request) {
   );
 
   const voiceProbe = await voiceProbePromise;
+  const altProbe = await altProbePromise;
 
   return NextResponse.json({
     providers: roster,
     configured_count: configured.length,
     ...(fallbackProblems ? { fallback_not_configured_because: fallbackProblems } : {}),
-    voice: { ...voiceStatus, ...(voiceProbe ? { probe: voiceProbe } : {}) },
+    voice: {
+      ...voiceStatus,
+      ...(voiceProbe ? { probe: voiceProbe } : {}),
+      alt: { ...altStatus, ...(altProbe ? { probe: altProbe } : {}) },
+    },
     image: imageStatus,
     probes,
     ...(samples > 1
