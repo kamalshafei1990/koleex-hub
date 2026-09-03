@@ -1744,6 +1744,13 @@ console.log("\n── 12. Mute ──");
   const tr = fs18.readFileSync("src/components/ai/VoiceTranscript.tsx", "utf8");
   check("the transcript can fill the part it is given instead of a fixed share of the viewport",
     /fill \? "flex-1 min-h-0" : "max-h-\[34vh\]"/.test(tr));
+  /* "NOT MOVING LIKE ON THE HOME PAGE": the same orb, kept alive at call
+     size the way idle keeps it alive on the home page. */
+  const css18 = fs18.readFileSync("src/app/globals.css", "utf8");
+  check("on a call the eyes look around and blink in listening and speaking, as they do idle on the home page",
+    /\.kx-call-aiorb\.is-listening \.gaze,\s*\.kx-call-aiorb\.is-speaking \.gaze \{ animation: kxA-look 7s ease-in-out infinite; \}/.test(css18) &&
+    /\.kx-call-aiorb\.is-listening \.ind,\s*\.kx-call-aiorb\.is-speaking \.ind \{ animation: kxA-blink 6\.4s infinite; \}/.test(css18));
+  check("  …and the aura breathes at its idle pace", /\.kx-call-aiorb\.is-speaking \.aura \{ animation-duration: 7s, 2\.2s; \}/.test(css18));
 }
 
 console.log(`\n${pass} passed, ${failures.length} failed`);

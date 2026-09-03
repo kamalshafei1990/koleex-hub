@@ -4472,6 +4472,24 @@ html[data-kx-tabslide] #main-scroll-container { overflow-x: clip; }
 .kx-call-aiorb.is-speaking .inner { opacity: 1; }
 .kx-call-aiorb .aura { will-change: opacity; }
 
+/* "THE ORB IS NOT MOVING LIKE ON THE HOME PAGE." It is the same orb. On the
+   home page it is idle, and idle is where the shared component keeps the
+   character alive: the eyes look around (gaze), blink, and the aura breathes
+   at its quicker idle pace. On a call the orb sits in listening or speaking,
+   where the shared file stills the eyes and slows the aura — tuned for a
+   38px avatar beside text, where a looking-around eye is a distraction. At
+   200px, for a whole call, a still face reads as dead. Call-scoped: the same
+   idle life, at call size only. The blink keyframe owns the bars' transform
+   here, so the voice is shown by the rings around the orb, not by the bars —
+   which is the geometry lock's own allowance (scaleY only, from its own
+   keyframe). */
+.kx-call-aiorb.is-listening .gaze,
+.kx-call-aiorb.is-speaking .gaze { animation: kxA-look 7s ease-in-out infinite; }
+.kx-call-aiorb.is-listening .ind,
+.kx-call-aiorb.is-speaking .ind { animation: kxA-blink 6.4s infinite; }
+.kx-call-aiorb.is-listening .aura,
+.kx-call-aiorb.is-speaking .aura { animation-duration: 7s, 2.2s; }
+
 @media (prefers-reduced-motion: reduce) {
   .kx-call-ring { transition: opacity 0.3s ease; transform: none !important; }
   .kx-call-orb.is-live .kx-call-ring-1 { opacity: 0.25; }
