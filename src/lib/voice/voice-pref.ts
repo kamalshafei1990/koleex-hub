@@ -46,3 +46,37 @@ export function saveVoiceKey(key: string): void {
     /* Private mode or a full store: the choice lasts for this page. */
   }
 }
+
+/* ── The region that served this device last ─────────────────────────────
+   The server remembers which region answered (#340), but only while its
+   instance is warm; the first call after a quiet spell still spent 13 s on
+   a mainland endpoint that had not answered all day. The DEVICE remembers
+   too: the slot that served its last call is sent as the two-word hint the
+   server allow-lists ("primary" | "alt") on every call. The server still
+   decides — a hint names an endpoint the server owns, never a url — and a
+   stale hint costs one attempt, which is what a wrong guess costs today. */
+
+export const REGION_STORAGE_KEY = "koleex-voice-region";
+export type RegionSlot = "primary" | "alt";
+
+export function parseRegionSlot(raw: string | null | undefined): RegionSlot | null {
+  return raw === "primary" || raw === "alt" ? raw : null;
+}
+
+/** Read the device's memory. Never throws. */
+export function readSavedRegion(): RegionSlot | null {
+  try {
+    return parseRegionSlot(window.localStorage.getItem(REGION_STORAGE_KEY));
+  } catch {
+    return null;
+  }
+}
+
+/** Remember the slot that served. Never throws. */
+export function saveRegion(slot: RegionSlot): void {
+  try {
+    window.localStorage.setItem(REGION_STORAGE_KEY, slot);
+  } catch {
+    /* Private mode or a full store: the memory lasts for this page. */
+  }
+}

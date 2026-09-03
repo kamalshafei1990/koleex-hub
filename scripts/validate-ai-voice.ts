@@ -232,7 +232,7 @@ console.log("\n── 3. The route, read — the surface a fetch cannot be teste
     /catch \{[\s\S]{0,400}?taught index unavailable/.test(code) &&
     /let taughtQuestions: string\[\] = \[\];/.test(code));
   check("and the index reaches the full session, never the compact fallback",
-    /buildVoiceSessionPayload\(voice, taughtQuestions, recentTurns, gate\.viewer, sttLanguage\)/.test(code));
+    /buildVoiceSessionPayload\(voice, taughtQuestions, recentTurns, gate\.viewer, sttLanguage, sttModelFor\(cfg\.model\)\)/.test(code));
   /* ── WHERE THIS FUNCTION RUNS, and why it is no longer pinned ─────────
      For a day this asserted the OPPOSITE: that the handshake was pinned away
      from the project's region, to Hong Kong, because the endpoint looked
@@ -819,13 +819,15 @@ void (async () => {
     check("no history leaves the session exactly as it was",
       JSON.stringify(without) === JSON.stringify(buildVoiceSessionPayload(v[0])));
     /* THE BOUND MOVED FROM 24 000 TO 30 000 when the caller's own read tools
-       (eight schemas, ~5.5 KB) joined the voice list. The real ceiling is the
+       (eight schemas, ~5.5 KB) joined the voice list, and to 32 000 when the
+       history block learned to say that a rebuilt line is the same call and
+       the transcriber gained a model field. The real ceiling is the
        DataChannel's negotiated message size — 64 KB and up in every shipping
        browser — and the compact fallback covers a transport that refuses the
-       full one. Measured with the viewer block, a taught question and a full
-       history: 27.8 KB. */
+       full one. Measured with the viewer block, three taught questions, a
+       history at its full byte budget and the transcriber named: 35.0 KB. */
     check("the budget constant keeps the full session well inside the channel",
-      HISTORY_BUDGET_BYTES <= 3_000 && Buffer.byteLength(JSON.stringify(withHistory.full)) < 30_000);
+      HISTORY_BUDGET_BYTES <= 3_000 && Buffer.byteLength(JSON.stringify(withHistory.full)) < 32_000);
 
     /* THE ROUTE'S HALF, read. */
     const route = strip(readFileSync("src/app/api/ai/voice/session/route.ts", "utf8"));
@@ -956,7 +958,7 @@ void (async () => {
     const route = strip(readFileSync("src/app/api/ai/voice/session/route.ts", "utf8"));
     const gate = strip(readFileSync("src/lib/server/ai/voice/gate.ts", "utf8"));
     check("the route passes the gate's viewer into the session",
-      /buildVoiceSessionPayload\(voice, taughtQuestions, recentTurns, gate\.viewer, sttLanguage\)/.test(route));
+      /buildVoiceSessionPayload\(voice, taughtQuestions, recentTurns, gate\.viewer, sttLanguage, sttModelFor\(cfg\.model\)\)/.test(route));
     check("the gate takes the viewer from the permission context, not from the request",
       /viewer: \{\s*name: ctx\.viewer\.name,/.test(gate) && /isSuperAdmin: ctx\.viewer\.isSuperAdmin,/.test(gate) &&
       !/req\.(json|text|headers)/.test(gate.slice(gate.indexOf("viewer: {"))));
@@ -992,6 +994,30 @@ void (async () => {
        compact one is what answers a refusal of exactly that field. */
     const compactDirect = buildSessionUpdate(v[0], "x", "compact", "ar").session as { input_audio_transcription?: Record<string, unknown> };
     check("  …even when handed one directly", !("language" in (compactDirect.input_audio_transcription ?? {})));
+    /* THE TRANSCRIBER, NAMED — the vendor's dedicated realtime ASR model for
+       the caller's transcript, chosen from the configured model's family. */
+    const { sttModelFor } = await import("../src/lib/server/ai/voice/session-config");
+    check("the transcriber follows the model family: a qwen realtime model gets the realtime ASR model, anything else gets none",
+      sttModelFor("qwen3.5-omni-plus-realtime") === "qwen3-asr-flash-realtime" && sttModelFor("Qwen-Omni-Turbo-Realtime") === "qwen3-asr-flash-realtime" &&
+      sttModelFor("qwen-plus") === null && sttModelFor("gpt-4o-realtime-preview") === null && sttModelFor("") === null && sttModelFor(null) === null);
+    const withModel = buildSessionUpdate(v[0], "x", "full", "ar", "qwen3-asr-flash-realtime").session as { input_audio_transcription?: Record<string, unknown> };
+    const modelOnly = buildSessionUpdate(v[0], "x", "full", null, "qwen3-asr-flash-realtime").session as { input_audio_transcription?: Record<string, unknown> };
+    const compactModel = buildSessionUpdate(v[0], "x", "compact", "ar", "qwen3-asr-flash-realtime").session as { input_audio_transcription?: Record<string, unknown> };
+    check("  …the full session carries model and language together, or the model alone; the compact one carries neither",
+      JSON.stringify(withModel.input_audio_transcription) === JSON.stringify({ enabled: true, language: "ar", model: "qwen3-asr-flash-realtime" }) &&
+      JSON.stringify(modelOnly.input_audio_transcription) === JSON.stringify({ enabled: true, model: "qwen3-asr-flash-realtime" }) &&
+      JSON.stringify(compactModel.input_audio_transcription) === JSON.stringify({ enabled: true }));
+    const payloadWithModel = buildVoiceSessionPayload(v[0], [], [], null, "ar", "qwen3-asr-flash-realtime");
+    check("  …and the payload hands it to the full session only",
+      (payloadWithModel.full.session as { input_audio_transcription?: Record<string, unknown> }).input_audio_transcription?.model === "qwen3-asr-flash-realtime" &&
+      !("model" in ((payloadWithModel.compact.session as { input_audio_transcription?: Record<string, unknown> }).input_audio_transcription ?? {})));
+    check("  …the route derives it from the model the serving config names — never from the client",
+      /sttModelFor\(cfg\.model\)/.test(readFileSync("src/app/api/ai/voice/session/route.ts", "utf8")) && /model,\n/.test(readFileSync("src/lib/server/ai/voice/config.ts", "utf8")));
+    /* A CALL THAT RECONNECTED IS THE SAME CALL. */
+    const { historyBlock: hb } = await import("../src/lib/server/ai/voice/history");
+    const continued = hb([{ role: "user", content: "hi" }, { role: "assistant", content: "hello" }]);
+    check("the history block tells the model a rebuilt line is the same call: a second greeting gets a word, never a fresh welcome",
+      /A CALL THAT RECONNECTED IS THE SAME CALL/.test(continued) && /never restart/.test(continued) && /spoken on this very call before the line was rebuilt/.test(continued) && hb([]) === "");
     check("no hint leaves both sessions exactly as they were",
       JSON.stringify(without) === JSON.stringify(buildVoiceSessionPayload(v[0])) &&
       !("language" in ((without.full.session as { input_audio_transcription?: object }).input_audio_transcription ?? {})));

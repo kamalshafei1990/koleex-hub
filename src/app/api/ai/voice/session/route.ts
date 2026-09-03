@@ -59,6 +59,7 @@ import {
   publicVoiceList,
   parseSttLanguage,
   TAUGHT_INDEX_BUDGET_BYTES,
+  sttModelFor,
 } from "@/lib/server/ai/voice/session-config";
 import { taughtQuestionIndex } from "@/lib/server/ai-knowledge";
 import { describeFetchFailure } from "@/lib/server/ai/voice/fetch-cause";
@@ -513,7 +514,8 @@ export async function POST(req: Request) {
      replies yet and the client's guess stands. */
   const fromHistory = detectConversationLang(recentTurns);
   const sttLanguage = fromHistory ?? parseSttLanguage(new URL(req.url).searchParams.get("stt"));
-  const payload = buildVoiceSessionPayload(voice, taughtQuestions, recentTurns, gate.viewer, sttLanguage);
+  /* The transcriber that belongs to the configured model's family, or none. */
+  const payload = buildVoiceSessionPayload(voice, taughtQuestions, recentTurns, gate.viewer, sttLanguage, sttModelFor(cfg.model));
   return NextResponse.json(
     /* WHICH SLOT SERVED, and whether another exists — two neutral words, so
        the browser can ask for "the other one" if this one's media never

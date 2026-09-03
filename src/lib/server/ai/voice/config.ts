@@ -43,6 +43,10 @@ export type VoiceConfig = {
   sdpUrl: string;
   /** Never logged, never returned, never in an error. */
   apiKey: string;
+  /** The realtime model id, as configured. Vendor identity: it never reaches
+   *  a client and is used server-side only to pick companions that belong
+   *  to the same family (session-config.ts sttModelFor). */
+  model: string;
   /** A neutral label for telemetry. Not a vendor name: this string may reach a
    *  log an operator reads, and §P.4's rule about vendor labels applies to
    *  anything that can travel. */
@@ -160,6 +164,7 @@ export function parseVoiceConfig(env: VoiceEnv): VoiceConfig | null {
   return {
     sdpUrl: url.toString(),
     apiKey: key,
+    model,
     regionLabel: env.AI_VOICE_REGION_LABEL?.trim() || "default",
     voices: voiceCatalogue(env.AI_VOICE_VOICES),
   };

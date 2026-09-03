@@ -1853,7 +1853,7 @@ console.log("\n── 12. Mute ──");
   check("  …and there are no chips: nothing in the module names a label or asks", !("STT_LANG_LABELS" in stt));
   const btn18 = fs18.readFileSync("src/components/ai/VoiceCallButton.tsx", "utf8");
   check("the session is given the SPEAKING language, never the UI language, as the transcription hint",
-    /\}, voiceKeyRef\.current, conversationIdRef\.current, sttLangRef\.current,\s*(\/\*[^*]*\*\/\s*)?opts\?\.resume \? regionHintRef\.current : null\);/.test(btn18) && !/conversationIdRef\.current, langRef\.current\)/.test(btn18));
+    /\}, voiceKeyRef\.current, conversationIdRef\.current, sttLangRef\.current,\s*(\/\*[^*]*\*\/\s*)?regionHintRef\.current \?\? readSavedRegion\(\)\);/.test(btn18) && !/conversationIdRef\.current, langRef\.current\)/.test(btn18));
   check("  …picked after mount (learned, device, UI) and never shown as a control",
     /sttLangRef\.current = pickSttLang\(readSavedSttLang\(\), typeof navigator !== "undefined" \? navigator\.language : null, lang\);/.test(btn18) && !/sttLanguage=\{/.test(btn18) && !/onSelectSttLanguage/.test(btn18) && !/onSelectSttLanguage|STT_LANGS/.test(scr));
   check("  …and each settled reply from Koleex AI teaches the device the caller's language for next time",
@@ -1981,7 +1981,32 @@ console.log("\n── 12. Mute ──");
   check("a continued call (resume or switch) asks first for the region that served the last one; a fresh call leaves it to the server",
     /regionHintRef\.current = diag\.region === "alt" \? "alt" : "primary";/.test(btn19) &&
     /if \(diag\) regionHintRef\.current = diag\.region === "alt" \? "alt" : "primary";/.test(btn19) &&
-    /sttLangRef\.current,\s*(\/\*[^*]*\*\/\s*)?opts\?\.resume \? regionHintRef\.current : null\);/.test(btn19));
+    /sttLangRef\.current,\s*(\/\*[^*]*\*\/\s*)?regionHintRef\.current \?\? readSavedRegion\(\)\);/.test(btn19));
+  /* THE DEVICE REMEMBERS THE REGION TOO — the server's memory dies with its warm instance. */
+  const regionPref = await import("../src/lib/voice/voice-pref");
+  check("the region memory is two allow-listed words, read and written without ever throwing",
+    regionPref.parseRegionSlot("alt") === "alt" && regionPref.parseRegionSlot("primary") === "primary" && regionPref.parseRegionSlot("cn-north") === null && regionPref.parseRegionSlot(null) === null &&
+    regionPref.REGION_STORAGE_KEY === "koleex-voice-region");
+  {
+    const g = globalThis as unknown as { window?: unknown };
+    const had = "window" in g; const prev = g.window;
+    const store = new Map<string, string>();
+    g.window = { localStorage: { getItem: (k: string) => store.get(k) ?? null, setItem: (k: string, v: string) => { store.set(k, v); } } };
+    const before = regionPref.readSavedRegion();
+    regionPref.saveRegion("alt");
+    const after = regionPref.readSavedRegion();
+    store.set(regionPref.REGION_STORAGE_KEY, "junk");
+    const junk = regionPref.readSavedRegion();
+    g.window = { localStorage: { getItem: () => { throw new Error("x"); }, setItem: () => { throw new Error("x"); } } };
+    let threw = false; try { regionPref.saveRegion("primary"); } catch { threw = true; }
+    const refused = regionPref.readSavedRegion();
+    if (had) g.window = prev; else delete g.window;
+    check("  …nothing → null, saved → read back, junk → null, a refusing store → null and silent",
+      before === null && after === "alt" && junk === null && !threw && refused === null);
+  }
+  check("  …the button remembers the served slot the moment a call is live, and asks for it first on EVERY call",
+    /if \(next === "live"\) \{\s*const region = sessionRef\.current\?\.diagnostics\(\)\.region;\s*if \(region === "alt" \|\| region === "primary"\) \{\s*regionHintRef\.current = region;\s*saveRegion\(region\);/.test(btn19) &&
+    !/opts\?\.resume \? regionHintRef\.current : null/.test(btn19));
   const recordedR: Recorded[] = [];
   const sR = new VoiceSession(deps({ status: 200, recorded: recordedR }).deps, {}, "v1", null, null, "alt");
   await sR.start();
