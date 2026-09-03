@@ -1106,6 +1106,24 @@ console.log("\n── VoiceCallScreen: typing into the call ──");
       !/data-search-hint/.test(without) && without.includes("Ningbo shipment"));
   }
 
+
+  /* ── ROADMAP C4: today's brief, one chip before the first word ─────────── */
+  console.log("\n── VoiceCallScreen: today's brief ──");
+  {
+    const ready = renderToStaticMarkup(<VoiceCallScreen live ready phase="listening" audioLevel={0} lines={[]} lang="en" onEnd={() => {}} onSendText={() => true} /> as ReactElement);
+    const spoken = renderToStaticMarkup(<VoiceCallScreen live ready phase="listening" audioLevel={0} lines={lines} lang="en" onEnd={() => {}} onSendText={() => true} /> as ReactElement);
+    const connecting = renderToStaticMarkup(<VoiceCallScreen live ready={false} phase={null} audioLevel={0} lines={[]} lang="en" onEnd={() => {}} onSendText={() => true} /> as ReactElement);
+    const noComposer = renderToStaticMarkup(<VoiceCallScreen live ready phase="listening" audioLevel={0} lines={[]} lang="en" onEnd={() => {}} /> as ReactElement);
+    check("the chip shows once the line is listening and nothing has been said, and only where the call can be typed into",
+      /data-brief-chip/.test(ready) && text(ready).includes("Today's brief") &&
+      !/data-brief-chip/.test(spoken) && !/data-brief-chip/.test(connecting) && !/data-brief-chip/.test(noComposer));
+    check("the chip is localised",
+      text(renderToStaticMarkup(<VoiceCallScreen live ready phase="listening" audioLevel={0} lines={[]} lang="ar" onEnd={() => {}} onSendText={() => true} /> as ReactElement)).includes("موجز النهاردة") &&
+      text(renderToStaticMarkup(<VoiceCallScreen live ready phase="listening" audioLevel={0} lines={[]} lang="zh" onEnd={() => {}} onSendText={() => true} /> as ReactElement)).includes("今日简报"));
+    check("the chip types the brief request into the call — the same path a typed message takes",
+      /onClick=\{\(\) => onSendText\(copy\.briefRequest\)\}/.test(screenSrc));
+  }
+
 }
 
 console.log(`\n${pass} passed, ${failures.length} failed`);
