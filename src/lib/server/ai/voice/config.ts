@@ -47,9 +47,9 @@ export type VoiceConfig = {
    *  log an operator reads, and §P.4's rule about vendor labels applies to
    *  anything that can travel. */
   regionLabel: string;
-  /** Empty when the owner has configured none — the vendor's default voice is
-   *  then used and no picker is offered. An empty list is a valid state, not a
-   *  broken one. */
+  /** The default catalogue unless the owner overrides it; empty when they
+   *  set `none` — the vendor's default voice is then used and no picker is
+   *  offered. An empty list is a valid state, not a broken one. */
   voices: VoiceOption[];
 };
 
@@ -59,14 +59,44 @@ export type VoiceEnv = {
   AI_VOICE_MODEL?: string;
   AI_VOICE_REGION_LABEL?: string;
   /** `vendorId:Label` pairs, comma separated — e.g. `Ethan:Omar,Chelsie:Layla`.
-   *  CONFIGURATION RATHER THAN CODE for two reasons. The vendor's voice list
-   *  changes without asking us, so a hard-coded array is a deploy every time it
-   *  does. And the LABEL is the owner's product language: §P.4 says vendor
-   *  names must not appear in user-facing Koleex AI copy, so whether a voice is
-   *  called "Chelsie" or "Layla" is a decision for the owner, not for this
-   *  file. A bare id with no label is allowed and shows as itself. */
+   *  OPTIONAL: unset, DEFAULT_VOICE_CATALOGUE below is offered; the word
+   *  `none` offers no picker at all. Set, it REPLACES the default — the
+   *  vendor's voice list changes without asking us, and the LABEL is the
+   *  owner's product language: §P.4 says vendor names must not appear in
+   *  user-facing Koleex AI copy, so whether a voice is called "Chelsie" or
+   *  "Layla" is a decision the owner can take without a deploy. A bare id
+   *  with no label is allowed and shows as itself. */
   AI_VOICE_VOICES?: string;
 };
+
+/* THE VOICES OFFERED WHEN NOTHING IS CONFIGURED.
+
+   The picker shipped as configuration only, and for a release nobody set it:
+   the owner asked whether the voice could be changed at all, then asked for
+   it to be done for him. So the catalogue has a default, and the variable
+   became an override rather than a switch.
+
+   Ids are the vendor's, from its published list for the realtime model this
+   deployment runs. Labels are OURS — names, not descriptions, because a
+   label is one string in every UI language, and not the vendor's names,
+   because the identity rule says the product never wears them. The FIRST
+   entry is the voice the vendor uses when none is asked for, so a caller who
+   never touches the picker hears exactly what they heard before; the client
+   pre-selects it. Positional keys mean reordering this list moves a saved
+   preference — append, do not reorder. */
+export const DEFAULT_VOICE_CATALOGUE = "Tina:Nour,Serena:Layla,Ethan:Omar,Andre:Adam,Katerina:Sara";
+
+/** The one value of AI_VOICE_VOICES that means "offer nothing". */
+export const NO_VOICE_CATALOGUE = "none";
+
+/** The catalogue this deployment offers: the override when set, `none` for
+ *  an empty one, the default otherwise. Whitespace is not a configuration. */
+export function voiceCatalogue(raw: string | undefined): VoiceOption[] {
+  const trimmed = raw?.trim() ?? "";
+  if (!trimmed) return parseVoiceOptions(DEFAULT_VOICE_CATALOGUE);
+  if (trimmed.toLowerCase() === NO_VOICE_CATALOGUE) return [];
+  return parseVoiceOptions(trimmed);
+}
 
 /* An opaque key the client sends back. Deliberately not the vendor id and not
    the label: ids are vendor identity, and labels change without the stored
@@ -131,7 +161,7 @@ export function parseVoiceConfig(env: VoiceEnv): VoiceConfig | null {
     sdpUrl: url.toString(),
     apiKey: key,
     regionLabel: env.AI_VOICE_REGION_LABEL?.trim() || "default",
-    voices: parseVoiceOptions(env.AI_VOICE_VOICES),
+    voices: voiceCatalogue(env.AI_VOICE_VOICES),
   };
 }
 

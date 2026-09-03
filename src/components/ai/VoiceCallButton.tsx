@@ -52,6 +52,7 @@ import { extractProductPhotos, type ProductPhoto } from "@/lib/voice/photos";
 import { useStreamLevel } from "@/lib/voice/useStreamLevel";
 import { CallTones } from "@/lib/voice/tones";
 import { pickSttLang, readSavedSttLang, saveSttLang, learnSttLang, type SttLang } from "@/lib/voice/stt-lang";
+import { pickVoiceKey, readSavedVoiceKey, saveVoiceKey } from "@/lib/voice/voice-pref";
 import { sendVoiceTelemetry } from "@/lib/voice/telemetry";
 import { TranscriptPersister, type SavedTurn, type PersistFailure } from "@/lib/voice/persist";
 import VoiceCallScreen from "@/components/ai/VoiceCallScreen";
@@ -269,8 +270,11 @@ export default function VoiceCallButton({
         if (!res.ok) return;
         const body = (await res.json()) as { voices?: { key: string; label: string }[] };
         if (cancelled || !Array.isArray(body.voices)) return;
-        setVoices(body.voices);
-        setVoiceKey((cur) => cur ?? body.voices?.[0]?.key ?? null);
+        const offered = body.voices;
+        setVoices(offered);
+        /* The device's remembered choice, if the catalogue still offers it;
+           else the first voice, which is the one the vendor uses unasked. */
+        setVoiceKey((cur) => cur ?? pickVoiceKey(readSavedVoiceKey(), offered));
       } catch {
         /* No picker. The call still works on the default voice. */
       }
@@ -610,6 +614,7 @@ export default function VoiceCallButton({
   const selectVoice = useCallback((key: string) => {
     setVoiceKey(key);
     voiceKeyRef.current = key;
+    saveVoiceKey(key);
     if (sessionRef.current) {
       hangUp();
       /* After the teardown, not during it: start() refuses while a session
