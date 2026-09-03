@@ -27,7 +27,7 @@ import "server-only";
    --------------------------------------------------------------------------- */
 
 import type { ToolDef, ToolResult } from "../types";
-import { searchWeb, type WebResult, type WebImage } from "../../ai/web-search";
+import { searchWeb, isMachineQuery, type WebResult, type WebImage } from "../../ai/web-search";
 import { scanEgress, egressRefusalMessage } from "../../ai/security/egress-scanner";
 
 interface SearchArgs {
@@ -62,6 +62,15 @@ const IMAGE_NOTE =
   "photo from the product tools, not a web picture. Say where a picture is " +
   "from if the user asks. Some hosts do not load from mainland China; a " +
   "picture that fails to load is not an error to apologise for.";
+
+/* THE NOTE A MACHINE QUERY GETS INSTEAD OF PICTURES. Sent beside the text
+   results so the model reads it where it is about to answer. */
+const MACHINE_NOTE =
+  "NO PICTURES FOR MACHINES FROM THE WEB. This query names a machine or " +
+  "equipment — that is a KOLEEX PRODUCT question. Use searchProducts (then " +
+  "getProductDetails) and show the product's OWN photo from that result. " +
+  "These web results are reference text only; NEVER show, link or describe " +
+  "another manufacturer's machine as an option.";
 
 const searchTheWeb: ToolDef<SearchArgs, SearchData> = {
   name: "search_web",
@@ -165,14 +174,22 @@ const searchTheWeb: ToolDef<SearchArgs, SearchData> = {
       };
     }
 
+    /* ── GUARD 2, DETERMINISTIC: a machine query never carries pictures,
+       whatever the provider sent, and says why. The provider is not asked
+       for them either (searchWeb); this is the second lock on the same
+       door, because the door is the one the owner found open. ──────── */
+    const machine = isMachineQuery(query);
+    const images = machine ? [] : outcome.images;
     return {
       ok: true,
       permissionStatus: "allowed",
       data: {
         answer: outcome.answer,
         results: outcome.results,
-        ...(outcome.images.length > 0 ? { images: outcome.images } : {}),
-        usage_note: outcome.images.length > 0 ? `${BRAND_NOTE} ${IMAGE_NOTE}` : BRAND_NOTE,
+        ...(images.length > 0 ? { images } : {}),
+        usage_note: machine
+          ? `${BRAND_NOTE} ${MACHINE_NOTE}`
+          : images.length > 0 ? `${BRAND_NOTE} ${IMAGE_NOTE}` : BRAND_NOTE,
       },
       /* Surfaced to the UI as the "Sources" line under the reply. */
       sources: outcome.results.map((r) => r.url),

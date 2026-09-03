@@ -28,6 +28,7 @@
 
 import { useEffect, useRef } from "react";
 import { type TranscriptLine } from "@/lib/voice/events";
+import { stripImageMarkdown } from "@/lib/voice/photos";
 import { type Lang } from "@/lib/i18n";
 import { textDirection } from "@/lib/text-direction";
 
@@ -86,7 +87,7 @@ export default function VoiceTranscript({ lines, lang = "en", className = "" }: 
                 {isUser ? copy.you : copy.assistant}
               </p>
               <p
-                dir={textDirection(line.text)}
+                dir={textDirection(stripImageMarkdown(line.text) || line.text)}
                 /* Partial text is dimmed, NOT italicised: the brand rules
                    exclude italics, and colour carries the same "still being
                    said" meaning without breaking the type system. */
@@ -94,7 +95,10 @@ export default function VoiceTranscript({ lines, lang = "en", className = "" }: 
                   line.final ? "text-[var(--text-primary)]" : "text-[var(--text-dim)]"
                 }`}
               >
-                {line.text}
+                {/* A markdown image the model wrote into its words is NOT a
+                    caption: the picture is in the strip, and the file name
+                    is not something to print. See stripImageMarkdown. */}
+                {stripImageMarkdown(line.text)}
               </p>
             </div>
           );

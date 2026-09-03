@@ -20,6 +20,11 @@ export type ProductPhoto = { url: string; label: string };
 
 /** More than this on a call screen is a catalogue, not an answer. */
 export const MAX_PHOTOS_PER_RESULT = 4;
+/* WEB PICTURES ARE FEWER. A product lookup can honestly show four of the
+   Hub's own machines; a web search showing four pictures is a gallery, and
+   a gallery was what a call put on screen for "a heat press" — from other
+   manufacturers. Two is what the text rule allows too. */
+export const MAX_WEB_PHOTOS_PER_RESULT = 2;
 
 const NAME_KEYS = ["product_name", "primary_model", "model_name", "name", "code", "primary_code"] as const;
 
@@ -68,10 +73,14 @@ export function extractProductPhotos(output: unknown): ProductPhoto[] {
     /* A web search's pictures: `{ url, description }` entries. The caption
        is the label, so the strip says what the picture is. */
     if (Array.isArray(o.images)) {
+      let taken = 0;
       for (const img of o.images) {
+        if (taken >= MAX_WEB_PHOTOS_PER_RESULT) break;
         if (!img || typeof img !== "object") continue;
         const i = img as Record<string, unknown>;
+        const before = found.length;
         add(httpsOnly(i.url), str(i.description).slice(0, 80));
+        if (found.length > before) taken++;
       }
     }
     for (const [k, child] of Object.entries(o)) {
@@ -89,4 +98,23 @@ export function extractProductPhotos(output: unknown): ProductPhoto[] {
 export function photosMarkdown(photos: readonly ProductPhoto[]): string {
   if (photos.length === 0) return "";
   return photos.map((p) => `![${(p.label || "Koleex product").replace(/[\[\]]/g, "")}](${p.url})`).join("\n");
+}
+
+/* A markdown image, as the model sometimes writes one INTO a spoken turn:
+   `![alt](https://…)`. On a call that text is read out and shown as a
+   caption — a file name spoken aloud and printed under the orb — while the
+   picture itself is drawn in the strip. Strip them for display; the saved
+   message keeps the markdown, which the chat renders as the picture. */
+const IMAGE_MARKDOWN = /!\[[^\]]*\]\([^)\s]+\)/g;
+
+export function stripImageMarkdown(text: string): string {
+  return String(text ?? "").replace(IMAGE_MARKDOWN, "").replace(/[ \t]+\n/g, "\n").replace(/\n{3,}/g, "\n\n").trim();
+}
+
+/** The https URLs of every markdown image in a text — what a saved turn
+ *  already shows, so the same picture is not appended a second time. */
+export function imageUrlsIn(text: string): Set<string> {
+  const out = new Set<string>();
+  for (const m of String(text ?? "").matchAll(/!\[[^\]]*\]\((https:\/\/[^)\s]+)\)/g)) out.add(m[1]);
+  return out;
 }

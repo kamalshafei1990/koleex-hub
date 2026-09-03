@@ -31,7 +31,7 @@
    --------------------------------------------------------------------------- */
 
 import { type TranscriptLine } from "./events";
-import { photosMarkdown } from "./photos";
+import { photosMarkdown, imageUrlsIn } from "./photos";
 
 export const TRANSCRIPT_PATH = "/api/ai/voice/transcript";
 /** One POST carries at most this many turns; the server refuses more. */
@@ -100,7 +100,12 @@ export class TranscriptPersister {
          renders — so the thread after a call looks like the thread after a
          typed question about the same machine. Only assistant turns: a user
          does not "show" anything. */
-      const pictures = line.role === "assistant" ? photosMarkdown(line.photos ?? []) : "";
+      /* NOT TWICE. The model sometimes writes the picture into its own words
+         as markdown; appending the same URL again put the same product photo
+         under the answer two times. What the words already show is not
+         appended. */
+      const already = imageUrlsIn(spoken);
+      const pictures = line.role === "assistant" ? photosMarkdown((line.photos ?? []).filter((p) => !already.has(p.url))) : "";
       const text = pictures ? (spoken ? `${spoken}\n\n${pictures}` : pictures) : spoken;
       /* An empty final — a turn the vendor closed with no words — is counted
          as seen and not sent: the route refuses empty content, rightly. */

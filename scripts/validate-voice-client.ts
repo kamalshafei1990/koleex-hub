@@ -20,7 +20,7 @@ import { VoiceSession, HANDSHAKE_PATH, waitForIceGathering, normalizeSdp, type V
 import { TranscriptPersister, TRANSCRIPT_PATH, MAX_TURNS_PER_POST, MAX_POST_FAILURES, type SavedTurn } from "../src/lib/voice/persist";
 import { buildTextTurnMessages, EV_ITEM_CREATE, EV_RESPONSE_CREATE, MAX_TYPED_TURN_CHARS } from "../src/lib/voice/text-turn";
 import { type TranscriptLine } from "../src/lib/voice/events";
-import { extractProductPhotos, photosMarkdown, MAX_PHOTOS_PER_RESULT } from "../src/lib/voice/photos";
+import { extractProductPhotos, photosMarkdown, stripImageMarkdown, imageUrlsIn, MAX_PHOTOS_PER_RESULT, MAX_WEB_PHOTOS_PER_RESULT } from "../src/lib/voice/photos";
 import { CallTones, scheduleTone, READY_TONE, RECOVERED_TONE, TONE_GAIN, type ToneContextLike, type ToneOscillatorLike, type ToneGainLike } from "../src/lib/voice/tones";
 import { stepLevel, LEVEL_ATTACK, LEVEL_RELEASE } from "../src/lib/voice/level";
 
@@ -1443,6 +1443,22 @@ console.log("\n── 12. Mute ──");
     check("  …a long caption is cut for the strip", w[1].label.length === 80);
     check("  …and a bare string in images[] is not walked into a photo", !w.some((p) => p.url === "https://img.example/bare.jpg"));
     check("  …the page URLs in results[] are never mistaken for pictures", !w.some((p) => p.url.includes("en.example")));
+    /* A GALLERY IS NOT AN ANSWER. Four web pictures of other makers' presses
+       went on a call screen for "a heat press"; web pictures are capped at
+       two, below the product cap. */
+    const gallery = { data: { images: Array.from({ length: 6 }, (_, i) => ({ url: `https://img.example/${i}.jpg`, description: `p${i}` })) } };
+    check("web pictures are capped at two, below the product cap", extractProductPhotos(gallery).length === MAX_WEB_PHOTOS_PER_RESULT && MAX_WEB_PHOTOS_PER_RESULT < MAX_PHOTOS_PER_RESULT);
+
+    /* THE FILE NAME UNDER THE ORB. The model wrote its picture into its own
+       words as markdown; the caption strip printed the URL and the persister
+       appended the same picture again. */
+    const spoken = "دي صورة الماكينة\n\n![Pneumatic press](https://cdn.example/1787301737295_CH_80100.png)\nمقاس كبير.";
+    check("a markdown image is stripped from what a caption shows", stripImageMarkdown(spoken) === "دي صورة الماكينة\n\nمقاس كبير.");
+    check("  …and a turn that is only a picture shows nothing", stripImageMarkdown("![x](https://cdn.example/a.png)") === "");
+    check("  …ordinary text is untouched", stripImageMarkdown("hello [link](https://x.example)") === "hello [link](https://x.example)");
+    check("the URLs a turn already shows are read out of it", [...imageUrlsIn(spoken)].join(",") === "https://cdn.example/1787301737295_CH_80100.png" && imageUrlsIn("no pictures").size === 0);
+    const tr = (await import("node:fs")).readFileSync("src/components/ai/VoiceTranscript.tsx", "utf8");
+    check("the live captions render the stripped text", /\{stripImageMarkdown\(line\.text\)\}/.test(tr));
 
     /* THE SESSION HANDS THE RESULT TO THE SCREEN as the model hears it. */
     const seen: Array<[string, unknown]> = [];
@@ -1487,6 +1503,22 @@ console.log("\n── 12. Mute ──");
     check("a user turn never carries a picture, whatever the line says", turns[0]?.text === "show me the KX-180");
     check("an assistant turn with a photo and no words is still saved — the picture IS the answer",
       turns[2]?.text === "![KX-180](https://cdn.example/a.jpg)");
+
+    /* NOT TWICE: a picture the words already carry is not appended again. */
+    const posts2: Post[] = [];
+    const p2 = new TranscriptPersister({
+      fetchFn: (async (_url: string, init?: RequestInit) => {
+        posts2.push({ body: JSON.parse(String(init?.body)) as Post["body"] });
+        return { ok: true, status: 200, json: async () => ({ messages: [], conversation: { id: "c", title: null } }) } as unknown as Response;
+      }) as unknown as typeof fetch,
+      ensureConversation: async () => "6f1d2c3b-4a5e-4f60-9b7c-1234567890ab",
+    }, "6f1d2c3b-4a5e-4f60-9b7c-1234567890ab");
+    p2.observe([
+      { role: "assistant", text: "Here it is.\n\n![KX-180](https://cdn.example/a.jpg)", final: true, photos: [{ url: "https://cdn.example/a.jpg", label: "KX-180" }, { url: "https://cdn.example/b.jpg", label: "KX-220" }] },
+    ]);
+    await p2.flush();
+    check("a photo the spoken words already show is not appended a second time; a new one still is",
+      posts2[0]?.body.turns[0]?.text === "Here it is.\n\n![KX-180](https://cdn.example/a.jpg)\n\n![KX-220](https://cdn.example/b.jpg)");
   }
 
 {
