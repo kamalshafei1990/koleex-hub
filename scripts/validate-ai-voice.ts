@@ -269,7 +269,7 @@ console.log("\n── 3. The route, read — the surface a fetch cannot be teste
       JSON.stringify(Object.keys(vercelCfg.functions ?? {})) === JSON.stringify(["src/app/api/cron/voice-watch-sin1/route.ts"]) &&
       JSON.stringify(vercelCfg.functions?.["src/app/api/cron/voice-watch-sin1/route.ts"]?.regions) === JSON.stringify(["sin1"]));
     check("  …which re-exports the watchdog unchanged and is scheduled between the Tokyo runs",
-      /export \{ GET, dynamic, maxDuration \} from "\.\.\/voice-watch\/route";/.test(readFileSync("src/app/api/cron/voice-watch-sin1/route.ts", "utf8")) &&
+      (() => { const sin = readFileSync("src/app/api/cron/voice-watch-sin1/route.ts", "utf8"); const tokyo = readFileSync("src/app/api/cron/voice-watch/route.ts", "utf8"); return /export \{ GET \} from "\.\.\/voice-watch\/route";/.test(sin) && /export const dynamic = "force-dynamic";/.test(sin) && (sin.match(/export const maxDuration = (\d+);/) ?? [])[1] === (tokyo.match(/export const maxDuration = (\d+);/) ?? [])[1]; })() &&
       (vercelCfg.crons as Array<{ path: string; schedule: string }>).some((c) => c.path === "/api/cron/voice-watch-sin1" && c.schedule === "7-59/15 * * * *"));
     check("the project default is the region that actually completes handshakes",
       JSON.stringify(vercelCfg.regions) === JSON.stringify(["hnd1"]));
