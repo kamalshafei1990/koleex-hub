@@ -877,9 +877,13 @@ console.log("\n── 8. What the client may know, and what it may not ──");
        DataChannel's negotiated message size — 64 KB and up in every shipping
        browser — and the compact fallback covers a transport that refuses the
        full one. Measured with the viewer block, three taught questions, a
-       history at its full byte budget and the transcriber named: 35.0 KB. */
+       history at its full byte budget and the transcriber named: 35.0 KB;
+       AND TO 36 000 when the customer and pricing reads (three schemas) and
+       the brief joined (roadmap C1/C4): history-only 34.5 KB, worst case
+       with a full personalization block 36.6 KB — still well under the
+       channel's 64 KB. */
     check("the budget constant keeps the full session well inside the channel",
-      HISTORY_BUDGET_BYTES <= 3_000 && Buffer.byteLength(JSON.stringify(withHistory.full)) < 32_000);
+      HISTORY_BUDGET_BYTES <= 3_000 && Buffer.byteLength(JSON.stringify(withHistory.full)) < 36_000);
 
     /* THE ROUTE'S HALF, read. */
     const route = strip(readFileSync("src/app/api/ai/voice/session/route.ts", "utf8"));

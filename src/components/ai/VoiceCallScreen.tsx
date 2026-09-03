@@ -56,6 +56,10 @@ const COPY: Record<Lang, {
      between holds, the hint under the orb, and the mode picker's words. */
   holdToTalk: string;
   holdRelease: string;
+  /* TODAY'S BRIEF (roadmap C4): the chip and the request it types into
+     the call. */
+  brief: string;
+  briefRequest: string;
   holdHint: string;
   modePick: string;
   modeHandsFree: string;
@@ -115,6 +119,8 @@ const COPY: Record<Lang, {
     close: "Close",
     holdToTalk: "Hold to talk",
     holdRelease: "Let go when done",
+    brief: "Today's brief",
+    briefRequest: "Give me my brief for today: my meetings, tasks due, and what needs me first.",
     holdHint: "Hold the button while you speak, let go when you are done.",
     modePick: "How you talk",
     modeHandsFree: "Hands-free",
@@ -150,6 +156,8 @@ const COPY: Record<Lang, {
     close: "关闭",
     holdToTalk: "按住说话",
     holdRelease: "说完松开",
+    brief: "今日简报",
+    briefRequest: "给我今天的简报：我的会议、到期的任务、以及最需要我先处理的事。",
     holdHint: "说话时按住按钮，说完松开。",
     modePick: "说话方式",
     modeHandsFree: "免提",
@@ -185,6 +193,8 @@ const COPY: Record<Lang, {
     close: "اقفل",
     holdToTalk: "اضغط واتكلم",
     holdRelease: "سيب لما تخلص",
+    brief: "موجز النهاردة",
+    briefRequest: "قولّي موجز النهاردة: اجتماعاتي، والمهام اللي مواعيدها النهاردة، وإيه اللي محتاجني الأول.",
     holdHint: "اضغط على الزرار وانت بتتكلم، وسيبه لما تخلص.",
     modePick: "طريقة الكلام",
     modeHandsFree: "كلام حر",
@@ -538,7 +548,27 @@ export default function VoiceCallScreen({
           /* Told once, plainly: server-side turn detection has no
              push-to-talk, and a user waiting for a button to hold will
              wait forever. */
-          <p className="max-w-[820px] mx-auto text-center text-xs text-[#666666]">{talkMode === "hold" ? copy.holdHint : copy.hint}</p>
+          <div className="flex flex-col items-center gap-3">
+            {/* TODAY'S BRIEF (roadmap C4): one chip, only before the first
+                word and only once the far side is listening. It types the
+                request into the call, so the model answers it exactly as it
+                would a spoken one — the transcript shows what was asked. */}
+            {onSendText && live && ready && !reconnecting && (
+              <button
+                type="button"
+                onClick={() => onSendText(copy.briefRequest)}
+                data-brief-chip
+                className="h-9 px-4 rounded-full text-xs font-semibold inline-flex items-center gap-1.5 text-white border border-white/25 bg-white/[0.06] hover:bg-white/[0.1] transition-[background-color,transform] duration-150 active:scale-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0066FF] focus-visible:ring-offset-2 focus-visible:ring-offset-[#0D0D0D]"
+              >
+                <svg aria-hidden viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="12" cy="12" r="4" />
+                  <path d="M12 2v2M12 20v2M2 12h2M20 12h2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4" />
+                </svg>
+                {copy.brief}
+              </button>
+            )}
+            <p className="max-w-[820px] mx-auto text-center text-xs text-[#666666]">{talkMode === "hold" ? copy.holdHint : copy.hint}</p>
+          </div>
         )}
       </div>
   );

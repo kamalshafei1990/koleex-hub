@@ -224,6 +224,10 @@ console.log("\n── 2b. A call reaches the same knowledge the chat box does �
   check("the catalogue reads still come before the customer reads in the order the model sees",
     VOICE_TOOL_NAMES.indexOf("searchProducts") < VOICE_TOOL_NAMES.indexOf("getCustomerByName") &&
     VOICE_TOOL_NAMES.indexOf("getProductPrice") < VOICE_TOOL_NAMES.indexOf("getPricingRules"));
+  check("the instructions carry today's brief (roadmap C4): the caller's own calendar and tasks, about twenty seconds, then ask where to start",
+    /TODAY'S BRIEF: when the caller asks what they have today[\s\S]{0,400}?call listMyCalendar and listMyTodos/.test(String(buildVoiceSessionPayload(null).full.session.instructions ?? "")) &&
+    /Only their own items, only what the tools return/.test(String(buildVoiceSessionPayload(null).full.session.instructions ?? "")) &&
+    isVoiceTool("listMyCalendar") && isVoiceTool("listMyTodos") && isVoiceTool("listMyPlanning"));
   check("the instructions tell the model to read customer and pricing figures exactly and offer to write them down",
     /CUSTOMERS AND PRICING RULES: getCustomerByName or getCustomerByCode/.test(String(buildVoiceSessionPayload(null).full.session.instructions ?? "")) &&
     /Read every figure EXACTLY as returned/.test(String(buildVoiceSessionPayload(null).full.session.instructions ?? "")) &&
