@@ -29,6 +29,8 @@ import { useSkin } from "@/lib/appearance";
 import { useTranslation, type Lang } from "@/lib/i18n";
 import ArrowLeftIcon from "@/components/icons/ui/ArrowLeftIcon";
 import PlusIcon from "@/components/icons/ui/PlusIcon";
+import PictureIcon from "@/components/icons/ui/PictureIcon";
+import LibraryPanel from "@/components/ai/LibraryPanel";
 import PaperPlaneIcon from "@/components/icons/ui/PaperPlaneIcon";
 import MicButton, { speakText, type TtsHandle } from "@/components/ai/MicButton";
 import VoiceCallButton from "@/components/ai/VoiceCallButton";
@@ -444,8 +446,13 @@ export default function KoleexAiApp() {
   }, [conversations, activeIdKey]);
 
   /* ── Load a conversation's messages ── */
+  /* THE LIBRARY (roadmap C3) takes the main pane while open; opening any
+     chat, or starting one, puts the chat back. */
+  const [libraryOpen, setLibraryOpen] = useState(false);
+
   const openConversation = useCallback(
     async (id: string) => {
+      setLibraryOpen(false);
       /* Audit P0 #1 — abort any in-flight send before switching
          conversations. Without this, the SSE reader keeps consuming
          deltas into a placeholder that no longer exists in the
@@ -485,6 +492,7 @@ export default function KoleexAiApp() {
 
   /* ── New chat — create row, become active, reset messages ── */
   const startNewChat = useCallback(async () => {
+    setLibraryOpen(false);
     /* Same abort as openConversation — audit P0 #1. */
     abortRef.current?.abort();
     /* Starting a chat while standing inside a folder files it there — the
@@ -1860,6 +1868,24 @@ export default function KoleexAiApp() {
           </div>
         )}
 
+        {/* THE LIBRARY (roadmap C3): every picture from the caller's chats,
+            one row in the sidebar, the gallery in the main pane. */}
+        <div className="px-2 pb-1">
+          <button
+            type="button"
+            onClick={() => { setLibraryOpen(true); setSidebarOpen(false); }}
+            aria-pressed={libraryOpen}
+            className={`w-full h-8 px-2 rounded-lg text-start text-[13px] flex items-center gap-2 ${
+              libraryOpen
+                ? "bg-[var(--bg-surface)] text-[var(--text-primary)]"
+                : "text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-subtle)]"
+            }`}
+          >
+            <PictureIcon size={14} />
+            {copy.library}
+          </button>
+        </div>
+
         <div className="flex-1 overflow-y-auto pb-2">
           {/* A project is a place you GO, not a drawer you unfold in a list.
               Opening one takes the whole panel — its own header with a way
@@ -2169,7 +2195,9 @@ export default function KoleexAiApp() {
         >
 
           <div className="relative z-[1] max-w-[820px] mx-auto px-4 md:px-6 py-6 space-y-4">
-            {loadingConv ? (
+            {libraryOpen ? (
+              <LibraryPanel copy={copy} onOpenConversation={(id) => void openConversation(id)} />
+            ) : loadingConv ? (
               <div className="flex items-center justify-center py-20">
                 <SpinnerIcon className="h-5 w-5 text-[var(--text-dim)]" />
               </div>

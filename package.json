@@ -25,6 +25,7 @@
     "validate:voice-events": "tsx scripts/validate-voice-events.ts",
     "validate:ai-voice": "NODE_OPTIONS=--conditions=react-server tsx scripts/validate-ai-voice.ts",
     "validate:ai-conversations": "NODE_OPTIONS=--conditions=react-server tsx scripts/validate-ai-conversations.ts",
+    "validate:ai-library": "NODE_OPTIONS=--conditions=react-server tsx scripts/validate-ai-library.ts",
     "validate:ai-identity": "NODE_OPTIONS=--conditions=react-server tsx scripts/validate-ai-identity.ts",
     "validate:ai-provider": "NODE_OPTIONS=--conditions=react-server tsx scripts/validate-ai-provider.ts",
     "validate:ai-transport-timeout": "NODE_OPTIONS=--conditions=react-server tsx scripts/validate-ai-transport-timeout.ts",

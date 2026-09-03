@@ -56,6 +56,10 @@ export const COPY: Record<Lang, {
   noProject: string;
   more: string;
   recents: string;
+  /* Roadmap C3 — the picture gallery. */
+  library: string;
+  libraryEmpty: string;
+  openChat: string;
   back: string;
   seeMore: string;
   seeLess: string;
@@ -156,6 +160,9 @@ export const COPY: Record<Lang, {
     noProject: "No project",
     more: "More",
     recents: "Recents",
+    library: "Library",
+    libraryEmpty: "No pictures yet. Pictures from your chats will appear here.",
+    openChat: "Open chat",
     back: "Back",
     seeMore: "See more",
     seeLess: "See less",
@@ -239,6 +246,9 @@ export const COPY: Record<Lang, {
     noProject: "无项目",
     more: "更多",
     recents: "最近",
+    library: "图库",
+    libraryEmpty: "还没有图片。聊天中出现的图片会显示在这里。",
+    openChat: "打开对话",
     back: "返回",
     seeMore: "查看更多",
     seeLess: "收起",
@@ -323,6 +333,9 @@ export const COPY: Record<Lang, {
     noProject: "بدون مشروع",
     more: "المزيد",
     recents: "الأحدث",
+    library: "المكتبة",
+    libraryEmpty: "مفيش صور لسه. الصور اللي ظهرت في محادثاتك هتتجمع هنا.",
+    openChat: "افتح المحادثة",
     back: "رجوع",
     seeMore: "عرض المزيد",
     seeLess: "عرض أقل",
