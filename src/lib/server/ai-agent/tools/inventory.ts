@@ -32,7 +32,7 @@ const inventoryNotAvailable: ToolDef<
   handler: async (): Promise<ToolResult<null>> => {
     return {
       ok: false,
-      permissionStatus: "denied",
+      permissionStatus: "allowed",
       data: null,
       message:
         "Real-time inventory tracking isn't wired up in Koleex Hub yet. " +

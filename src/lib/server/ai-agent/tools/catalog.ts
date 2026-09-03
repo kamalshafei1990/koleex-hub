@@ -38,7 +38,7 @@ const searchCatalog: ToolDef<
     const q = norm(String(args.query ?? ""));
     const limit = Math.min(Math.max(Number(args.limit ?? 8) || 8, 1), 25);
     if (!q) {
-      return { ok: false, permissionStatus: "denied", data: null, message: "Provide a search query." };
+      return { ok: false, permissionStatus: "allowed", data: null, message: "Provide a search query." };
     }
     const words = q.split(/\s+/).filter(Boolean);
     const scored = CATALOG_ENTRIES.map((e) => {

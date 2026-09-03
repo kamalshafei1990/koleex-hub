@@ -410,7 +410,7 @@ export async function POST(req: Request) {
     }
   }
 
-  const payload = buildVoiceSessionPayload(voice, taughtQuestions, recentTurns);
+  const payload = buildVoiceSessionPayload(voice, taughtQuestions, recentTurns, gate.viewer);
   return NextResponse.json(
     { sdp: answer, session: payload.full, session_compact: payload.compact },
     { status: 200, headers: { "Cache-Control": "no-store" } },

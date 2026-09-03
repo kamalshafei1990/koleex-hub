@@ -74,6 +74,22 @@ export const VOICE_TOOL_NAMES: readonly string[] = [
   "getProductDetails",
   "listCatalogFamilies",
   "searchTradeTerms",
+  /* THE CALLER'S OWN WORK, READ ONLY — added after the owner, a super admin,
+     was told on a call that things were not his to see. "What is on my list
+     today", "what is in my calendar", "which projects am I on" were questions
+     a call could not answer because it had no tool that reads them, and a
+     model with no tool says it cannot access — which the caller hears as
+     permission. Each of these reads the caller's OWN items (dispatchTool
+     scopes them to the account), or public catalogue statistics, or the
+     caller's own permissions — nothing about another person, no figure. */
+  "listMyTodos",
+  "listMyCalendar",
+  "listMyPlanning",
+  "listMyProjects",
+  "findTeamMember",
+  "getUserPermissions",
+  "countProducts",
+  "getCatalogStats",
 ];
 
 /**

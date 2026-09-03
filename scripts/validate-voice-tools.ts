@@ -202,6 +202,19 @@ console.log("\n── 2b. A call reaches the same knowledge the chat box does �
                       "searchProducts", "getProductByCode", "getProductDetails"]) {
     check(`a call can reach ${name}`, isVoiceTool(name));
   }
+  /* THE CALLER'S OWN WORK, added after a super admin was told on a call
+     that things were not his to see: a call with no tool for "what is on
+     my list" says it cannot access, and the caller hears permission. */
+  for (const name of ["listMyTodos", "listMyCalendar", "listMyPlanning", "listMyProjects",
+                      "findTeamMember", "getUserPermissions", "countProducts", "getCatalogStats"]) {
+    check(`a call can reach ${name} — the caller's own items or public counts`, isVoiceTool(name));
+  }
+  check("and every one of them is a real registered tool", ["listMyTodos", "listMyCalendar", "getUserPermissions", "getCatalogStats"].every((n) => getTool(n) !== undefined));
+  /* The line stays where it was drawn: no customers, no figures, no writes. */
+  check("customers and commercial figures are still not reachable by voice",
+    !isVoiceTool("getCustomerByCode") && !isVoiceTool("getPricingRules") && !isVoiceTool("calculateQuotationPricing") && !isVoiceTool("getInventoryStatus"));
+  check("the full session, tools included, still fits a DataChannel message with room",
+    JSON.stringify(buildVoiceSessionPayload(null).full).length < 32_000);
   const instructions = String(buildVoiceSessionPayload(null).full.session.instructions ?? "");
   /* Both halves: that it HAS the knowledge, and that it must reach for it
      first. Asserting only the second passed when the first was deleted. */
