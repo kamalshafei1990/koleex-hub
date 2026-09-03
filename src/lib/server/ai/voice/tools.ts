@@ -46,12 +46,25 @@ import "server-only";
      · createQuotationDraft — a write, and a commercial one;
      · remember_about_user / forget_about_user — writes to the user's own
        record, and ones they cannot see happening;
+     · calculateQuotationPricing — a quotation figure, and quotations by
+       voice are off the list by the owner's decision (roadmap, Sept 2026);
+     · getInventoryStatus — today a stub that answers "not available"; a
+       schema for it would only cost session bytes and a wasted lookup.
+   MOVED ONTO THE LIST BY THE OWNER'S PLAN (roadmap C1, 2026-09-03), and
+   the reasons they were kept off are still true and still written here so
+   the move is a decision, not drift:
      · getCustomerByName / getCustomerByCode — a customer's details read
-       aloud in a room the customer is not in;
-     · getPricingRules / calculateQuotationPricing / getInventoryStatus —
-       commercial figures. Spoken numbers cannot be checked against a source
-       by the person hearing them, and a misheard margin is worse than none.
-       THE ONE EXCEPTION, by the owner's decision: getProductPrice — the
+       aloud in a room the customer is not in. The caller chooses the room;
+       the data is what their own screen shows them, field-filtered by the
+       same permissions (Customers/view, private fields only with
+       can_view_private), and dispatchTool audits the read.
+     · getPricingRules — margin and discount caps. Spoken numbers cannot be
+       checked against a source by the person hearing them, and a misheard
+       margin is worse than none — so the instructions make the model say
+       the figures exactly as returned, name what each is, and offer to put
+       them in the chat; margins are withheld inside the tool for accounts
+       without private-data permission, as they are in writing.
+       THE FIRST EXCEPTION, by the owner's decision: getProductPrice — the
        SELLING price in USD, FOB, straight from the engine, with no cost, no
        margin and no level in its payload. "When I ask any price of any of
        Koleex products it gives a wrong price": a call with no price tool
@@ -101,6 +114,13 @@ export const VOICE_TOOL_NAMES: readonly string[] = [
   "getUserPermissions",
   "countProducts",
   "getCatalogStats",
+  /* ROADMAP C1 — customers and pricing rules, read only, under the caller's
+     own module permissions. See the header for why they were off the list
+     and what changed. Last, so the catalogue reads stay first in the order
+     the model reaches for tools. */
+  "getCustomerByName",
+  "getCustomerByCode",
+  "getPricingRules",
 ];
 
 /**

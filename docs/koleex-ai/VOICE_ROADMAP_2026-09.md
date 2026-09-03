@@ -41,7 +41,7 @@ covers the loud room in the meantime.
 
 | # | Item | How |
 |---|------|-----|
-| C1 | Customers, inventory and pricing rules on a call | Read-only, under the caller's own module permissions (the same `checkModule` gates the text lane uses); still no writes without confirmation |
+| C1 | Customers and pricing rules on a call — **done (#350)** | `getCustomerByName`, `getCustomerByCode` and `getPricingRules` join the voice allow-list, last in the order, each gated on dispatch by its own module (Customers/view; Quotations/view with margins withheld without private-data permission) and audited like every tool call. The instructions make the model read every figure exactly, name what it is, and offer to write it into the chat. **Inventory is not added**: the tool is a stub that answers "not available" today, so a schema for it would only cost bytes. Quotation figures stay off (owner's decision) |
 | C2 | Search across conversations — **done (#349)** | The sidebar box already matched titles and the last preview locally; it now also asks `GET /api/ai/conversations/search?q=` (owner-scoped by construction: messages are matched inside the caller's own conversation ids; budgeted; two characters or more; debounced and aborted on the client) and shows a snippet of the match under each hit. No new table or index: a filtered ILIKE over today's volume is far cheaper than the network hop; pg_trgm is installed if that ever changes |
 | C3 | Library | A gallery of every picture that appeared in the caller's conversations |
 | C4 | Morning voice brief | Open a call in the morning: tasks due, quotations awaiting approval, new customers — built on the existing tools, spoken in the caller's language |

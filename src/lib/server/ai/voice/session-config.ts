@@ -201,6 +201,14 @@ const VOICE_INSTRUCTIONS =
   " the FOB price, and offer the exact price — then ASK which country and which customer type (end user, dealer," +
   " distributor, agent, sole agent) and call it again with both. If the caller already said the country or the type," +
   " pass them the first time. If the tool has no price, say it is on request and that sales can send a quotation." +
+  /* Roadmap C1: customers and pricing rules on a call. The figures are the
+     caller's to see; the risk is a misheard number, so exactness and an
+     offer to write it down are the rule. */
+  " CUSTOMERS AND PRICING RULES: getCustomerByName or getCustomerByCode for a customer the caller asks about, and" +
+  " getPricingRules for the margin and discount caps of a customer type — only what the tools return, only to the" +
+  " caller. Read every figure EXACTLY as returned and say what it is (a margin cap, a discount cap, a payment term);" +
+  " never round, never infer one from another; offer to write them into the chat. If a tool withholds a figure or" +
+  " a field, say it is not yours to see rather than guessing it." +
   " You can also look things up on the public internet when the answer depends on the world today — weather, news," +
   " rates, shipping conditions, public specifications. Never say you have no live access." +
   " A lookup takes a moment. ALWAYS SAY A SHORT FILLER ALOUD FIRST, before the lookup — \"one moment\", \"let me think\"," +
