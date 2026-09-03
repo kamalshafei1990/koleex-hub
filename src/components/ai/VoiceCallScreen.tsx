@@ -365,16 +365,20 @@ export default function VoiceCallScreen({
         <div className="shrink-0 px-6 pb-4" role="group" aria-label={copy.photos}>
           <div className="max-w-[820px] mx-auto flex items-start justify-center gap-4 overflow-x-auto">
             {photos.map((p) => (
-              <figure key={p.url} className="shrink-0 w-28 m-0">
+              <figure key={p.url} className="shrink-0 w-40 m-0">
                 {/* Remote product photos from whatever host the catalogue names — next/image needs a fixed allowlist. Same call as Bubble. */}
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={p.url}
-                  alt={p.label || copy.photos}
-                  loading="lazy"
-                  decoding="async"
-                  className="block w-28 h-28 object-cover rounded-2xl border border-white/20 bg-white/[0.04]"
-                />
+                {/* TAPPABLE. A 112px thumbnail was "too small"; it is now
+                    160px and opens the full picture in a new tab. */}
+                <a href={p.url} target="_blank" rel="noreferrer noopener" className="block">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={p.url}
+                    alt={p.label || copy.photos}
+                    loading="lazy"
+                    decoding="async"
+                    className="w-40 h-40 rounded-2xl object-cover border border-white/10 bg-white/5"
+                  />
+                </a>
                 {p.label && (
                   <figcaption className="mt-2 text-center text-[11px] leading-snug text-[#AAAAAA] truncate" title={p.label}>
                     {p.label}

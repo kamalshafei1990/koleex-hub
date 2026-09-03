@@ -4331,8 +4331,11 @@ html[data-kx-tabslide] #main-scroll-container { overflow-x: clip; }
 }
 .koleex-md img.koleex-md-img {
   display: block;
-  max-width: min(100%, 320px);
-  max-height: 320px;
+  /* 320px read as a thumbnail on a phone ("the photo size is too small").
+     A product photo is the answer, not an illustration of it: as wide as
+     the bubble on a phone, capped where it stops adding detail. */
+  max-width: min(100%, 520px);
+  max-height: 440px;
   height: auto;
   border-radius: 12px;
   border: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.08));

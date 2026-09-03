@@ -65,7 +65,7 @@ async function main() {
     });
     const out = await searchWeb("Port Said port picture");
     const body = JSON.parse(String(lastRequest?.init.body ?? "{}")) as Record<string, unknown>;
-    check("the request asks Tavily for pictures with descriptions", body.include_images === true && body.include_image_descriptions === true);
+    check("the request asks Tavily for pictures — and NOT for generated descriptions, which is where the timeouts went", body.include_images === true && body.include_image_descriptions === false);
     check("  …on the ONE search call — no second request", lastRequest?.url === "https://api.tavily.com/search");
     check("the outcome is Tavily's with results and an answer", out.provider === "tavily" && out.results.length === 1 && out.answer?.startsWith("Port Said") === true);
     check("pictures are read whether Tavily sends strings or objects", out.images.some((i) => i.url === "https://img.example/a.jpg") && out.images.some((i) => i.url === "https://img.example/b.jpg"));
@@ -157,6 +157,66 @@ async function main() {
     check("  …the product rule sits on the PRODUCT routing line, where searchProducts is explained", /this is your own knowledge\.\$\{PRODUCT_PHOTO_RULE\}/.test(src));
   }
 
+  console.log("\n── 4b. A MACHINE IS NEVER A WEB PICTURE — the deterministic lock ──");
+  {
+    const { isMachineQuery } = await import("../src/lib/server/ai/web-search");
+    check("machine vocabulary is recognised in three languages",
+      ["manual heat press machine 40x40", "sublimation press", "40x40 press price", "fabric cutter price", "overlock sewing", "DTF printer", "ماكينة تطريز", "مكبس حراري يدوي", "معدات خياطة", "热转印机", "裁床", "缝纫设备"].every(isMachineQuery));
+    check("  …and public things are not machines", !["Cairo International Stadium", "Zamalek SC jersey", "USD to CNY rate", "weather in Guangzhou", "Port Said harbour"].some(isMachineQuery));
+    process.env.TAVILY_API_KEY = "test-key";
+    stubFetch({
+      results: [{ title: "Heat presses", url: "https://x.example/presses", content: "A press." }],
+      images: [{ url: "https://img.example/press.jpg", description: "another maker's press" }],
+    });
+    const out = await searchWeb("manual heat press machine 40x40");
+    const body = JSON.parse(String(lastRequest?.init.body ?? "{}")) as Record<string, unknown>;
+    check("a machine query does not even ASK the provider for pictures", body.include_images === false);
+    check("  …and the text results still come back as reference", out.results.length === 1);
+    const r = await searchTheWeb.handler(ctx, { query: "manual heat press machine 40x40" });
+    const data = r.data as { images?: unknown; usage_note: string } | null;
+    check("the tool result for a machine carries NO images key, whatever the provider sent", r.ok && data !== null && !("images" in data));
+    check("  …and the note sends the model to the product tools, never another manufacturer", /NO PICTURES FOR MACHINES/.test(data?.usage_note ?? "") && /searchProducts/.test(data?.usage_note ?? "") && /NEVER show, link or describe another manufacturer's machine/.test(data?.usage_note ?? ""));
+    check("  …with the brand rule still first", (data?.usage_note ?? "").startsWith("These are public web results"));
+    /* And a public thing still gets its picture. */
+    stubFetch({ results: [{ title: "Stadium", url: "https://x.example/stadium", content: "c" }], images: ["https://img.example/stadium.jpg"] });
+    const r2 = await searchTheWeb.handler(ctx, { query: "Cairo International Stadium" });
+    const d2 = r2.data as { images?: unknown[] } | null;
+    check("a stadium is not a machine: it still gets its picture", r2.ok && Array.isArray(d2?.images) && d2!.images.length === 1);
+  }
+
+  console.log("\n── 4c. A search that times out WITH pictures is asked again for the text alone ──");
+  {
+    process.env.TAVILY_API_KEY = "test-key";
+    const calls: Array<Record<string, unknown>> = [];
+    global.fetch = (async (url: string | URL | Request, init?: RequestInit) => {
+      const body = JSON.parse(String(init?.body ?? "{}")) as Record<string, unknown>;
+      calls.push(body);
+      if (body.include_images === true) {
+        const err = new Error("This operation was aborted"); err.name = "AbortError"; throw err;
+      }
+      return new Response(JSON.stringify({ results: [{ title: "Stadium", url: "https://x.example/stadium", content: "c" }] }), { status: 200, headers: { "Content-Type": "application/json" } });
+    }) as typeof fetch;
+    const out = await searchWeb("Cairo International Stadium");
+    check("the first attempt asked for pictures and timed out; the second asked for text only", calls.length === 2 && calls[0].include_images === true && calls[1].include_images === false);
+    check("  …and the caller gets the answer rather than 'nothing came back'", out.configured && !out.error && out.results.length === 1 && out.images.length === 0);
+    const calls2: Array<Record<string, unknown>> = [];
+    global.fetch = (async (url: string | URL | Request, init?: RequestInit) => {
+      calls2.push(JSON.parse(String(init?.body ?? "{}")) as Record<string, unknown>);
+      const err = new Error("This operation was aborted"); err.name = "AbortError"; throw err;
+    }) as typeof fetch;
+    const out2 = await searchWeb("Cairo International Stadium");
+    check("a second timeout is reported honestly, and there is no third attempt", calls2.length === 2 && Boolean(out2.error) && out2.results.length === 0);
+    const calls3: Array<Record<string, unknown>> = [];
+    global.fetch = (async (url: string | URL | Request, init?: RequestInit) => {
+      calls3.push(JSON.parse(String(init?.body ?? "{}")) as Record<string, unknown>);
+      return new Response("{}", { status: 500 });
+    }) as typeof fetch;
+    await searchWeb("Cairo International Stadium");
+    check("a provider ERROR is not retried — only a timeout is", calls3.length === 1);
+    const src = readFileSync("src/lib/server/ai/web-search.ts", "utf8");
+    check("the retry has its own, shorter ceiling", /const RETRY_TIMEOUT_MS = 6_000;/.test(src) && /searchTavily\(tavily, query, false, RETRY_TIMEOUT_MS\)/.test(src));
+  }
+
   console.log("\n── 5. Reading the source: the picture never comes from anywhere but the search reply ──");
   {
     const src = readFileSync("src/lib/server/ai/web-search.ts", "utf8");
@@ -164,7 +224,7 @@ async function main() {
     check("the cap is four", /const MAX_IMAGES = 4;/.test(src));
     check("no image proxy: nothing in the module fetches an image URL", !/fetch\([^)]*image/i.test(src));
     const tool = readFileSync("src/lib/server/ai-agent/tools/web-search.ts", "utf8");
-    check("the tool spreads images in only when non-empty", /\.\.\.\(outcome\.images\.length > 0 \? \{ images: outcome\.images \} : \{\}\)/.test(tool));
+    check("the tool spreads images in only when non-empty — and never for a machine query", /const images = machine \? \[\] : outcome\.images;/.test(tool) && /\.\.\.\(images\.length > 0 \? \{ images \} : \{\}\)/.test(tool));
   }
 
   console.log(`\n${pass} passed, ${fail} failed\n`);

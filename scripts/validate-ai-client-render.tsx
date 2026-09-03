@@ -913,7 +913,7 @@ console.log("\n── The product, shown: on the call screen and in the answer �
   check("a javascript: image is never an img", !/<img/.test(js));
   const css = readFileSync("src/app/globals.css", "utf8");
   check("the picture is bounded and rounded by the answer's own stylesheet",
-    /\.koleex-md img\.koleex-md-img \{[^}]*max-width: min\(100%, 320px\)[^}]*border-radius: 12px/.test(css));
+    /\.koleex-md img\.koleex-md-img \{[^}]*max-width: min\(100%, 520px\)[^}]*border-radius: 12px/.test(css));
 }
 
 console.log("\n── VoiceCallScreen: typing into the call ──");

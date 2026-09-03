@@ -1008,6 +1008,15 @@ void (async () => {
     const providers = readFileSync("src/app/api/ai/providers/route.ts", "utf8");
     check("the status route reports the second region in the same shape, naming ALT variables",
       /alt: altStatus/.test(providers) && /readAltVoiceEnv\(\)/.test(providers) && /replace\("AI_VOICE_", "AI_VOICE_ALT_"\)/.test(providers));
+
+    /* PICTURES ON A CALL. The owner's call for "a heat press photo" got four
+       other manufacturers' presses from the web, and the model wrote a
+       markdown link into its spoken words. The session it is handed says
+       which pictures come from where, and that it never writes one. */
+    const sc = readFileSync("src/lib/server/ai/voice/session-config.ts", "utf8");
+    check("the voice session says a machine picture is a product question, never a web picture",
+      /PICTURES ON A CALL/.test(sc) && /A picture of a MACHINE, a press or any equipment is ALWAYS a Koleex[\s"+]*product question: searchProducts/.test(sc) && /never search_web, and never another[\s"+]*manufacturer's machine/.test(sc));
+    check("  …and that it never writes a link, a file name or markdown into what it says", /you never write a link, a file name or[\s"+]*markdown into what you say/.test(sc));
   }
 
   console.log(`\n${pass} passed, ${failures.length} failed`);
