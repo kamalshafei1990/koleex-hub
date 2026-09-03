@@ -65,8 +65,17 @@ export function extractProductPhotos(output: unknown): ProductPhoto[] {
     add(httpsOnly(o.main_photo_url), label);
     add(httpsOnly(o.photo_url), label);
     if (Array.isArray(o.photo_urls)) add(httpsOnly(o.photo_urls[0]), label);
+    /* A web search's pictures: `{ url, description }` entries. The caption
+       is the label, so the strip says what the picture is. */
+    if (Array.isArray(o.images)) {
+      for (const img of o.images) {
+        if (!img || typeof img !== "object") continue;
+        const i = img as Record<string, unknown>;
+        add(httpsOnly(i.url), str(i.description).slice(0, 80));
+      }
+    }
     for (const [k, child] of Object.entries(o)) {
-      if (k === "photo_urls") continue;
+      if (k === "photo_urls" || k === "images") continue;
       walk(child, depth + 1);
     }
   };

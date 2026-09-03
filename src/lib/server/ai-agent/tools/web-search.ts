@@ -27,7 +27,7 @@ import "server-only";
    --------------------------------------------------------------------------- */
 
 import type { ToolDef, ToolResult } from "../types";
-import { searchWeb, type WebResult } from "../../ai/web-search";
+import { searchWeb, type WebResult, type WebImage } from "../../ai/web-search";
 import { scanEgress, egressRefusalMessage } from "../../ai/security/egress-scanner";
 
 interface SearchArgs {
@@ -37,6 +37,9 @@ interface SearchArgs {
 interface SearchData {
   answer?: string;
   results: WebResult[];
+  /** Pictures the search found. Present only when there are any, so a
+   *  result with none says nothing about pictures at all. */
+  images?: WebImage[];
   /** Repeated into the model's context on every call — a system prompt read
    *  20 messages ago loses to fresh text sitting next to the data. */
   usage_note: string;
@@ -48,13 +51,26 @@ const BRAND_NOTE =
   "machines. Cite the source URL for any figure you take from here, and say " +
   "how fresh it is when a date is given.";
 
+/* Repeated beside the pictures, where the model reads it, for the same
+   reason BRAND_NOTE is: a rule in the data beats a rule twenty messages up. */
+const IMAGE_NOTE =
+  "PICTURES: show one when the user asked to SEE something, or when a picture " +
+  "answers better than words (what a thing looks like), as markdown " +
+  "![description](url) with the url EXACTLY as given — at most two, never a " +
+  "gallery, and never for a question words answer fine. NEVER show another " +
+  "manufacturer's machine or logo; for Koleex products use the product's own " +
+  "photo from the product tools, not a web picture. Say where a picture is " +
+  "from if the user asks. Some hosts do not load from mainland China; a " +
+  "picture that fails to load is not an error to apologise for.";
+
 const searchTheWeb: ToolDef<SearchArgs, SearchData> = {
   name: "search_web",
   description:
     "Search the public internet for CURRENT or PUBLIC information the model cannot know: today's weather, news, exchange rates, shipping or port conditions, public standards and specifications, or any fact that may have changed since training. " +
     "Call this whenever the user asks something time-sensitive instead of saying you have no live access. " +
     "NEVER put Koleex's own data in the query — no customer names, prices, quotation contents, employee details or internal codes; those have their own tools. " +
-    "Never use it to find or suggest machines from other manufacturers.",
+    "Never use it to find or suggest machines from other manufacturers. " +
+    "Also the way to SHOW a picture of a public thing the user asks to see (a port, a fabric, a tool, a place): results carry pictures you may embed as markdown.",
   parameters: {
     type: "object",
     properties: {
@@ -155,7 +171,8 @@ const searchTheWeb: ToolDef<SearchArgs, SearchData> = {
       data: {
         answer: outcome.answer,
         results: outcome.results,
-        usage_note: BRAND_NOTE,
+        ...(outcome.images.length > 0 ? { images: outcome.images } : {}),
+        usage_note: outcome.images.length > 0 ? `${BRAND_NOTE} ${IMAGE_NOTE}` : BRAND_NOTE,
       },
       /* Surfaced to the UI as the "Sources" line under the reply. */
       sources: outcome.results.map((r) => r.url),

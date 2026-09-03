@@ -1424,6 +1424,22 @@ console.log("\n── 12. Mute ──");
       photosMarkdown([{ url: "https://x/a.jpg", label: "K[X]" }]) === "![KX](https://x/a.jpg)");
     check("  …and no photos is no markdown at all", photosMarkdown([]) === "");
 
+    /* Option 2 of the photos plan: a web search's pictures ride the same
+       strip, captioned with what the picture is rather than a product. */
+    const web = { ok: true, data: { results: [{ url: "https://en.example/port-said" }], images: [
+      { url: "https://img.example/a.jpg", description: "Port Said harbour at dusk" },
+      { url: "http://img.example/b.jpg", description: "not https" },
+      { url: "https://img.example/a.jpg", description: "duplicate" },
+      "https://img.example/bare.jpg",
+      { url: "https://img.example/c.jpg", description: "c".repeat(200) },
+    ] } };
+    const w = extractProductPhotos(web);
+    check("a web search's images[] become photos, https only and deduplicated", w.map((p) => p.url).join(",") === "https://img.example/a.jpg,https://img.example/c.jpg");
+    check("  …captioned with the picture's description", w[0].label === "Port Said harbour at dusk");
+    check("  …a long caption is cut for the strip", w[1].label.length === 80);
+    check("  …and a bare string in images[] is not walked into a photo", !w.some((p) => p.url === "https://img.example/bare.jpg"));
+    check("  …the page URLs in results[] are never mistaken for pictures", !w.some((p) => p.url.includes("en.example")));
+
     /* THE SESSION HANDS THE RESULT TO THE SCREEN as the model hears it. */
     const seen: Array<[string, unknown]> = [];
     const r = deps({ status: 200, channelOpen: true });
