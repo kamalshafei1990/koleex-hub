@@ -16,6 +16,7 @@ import "server-only";
    --------------------------------------------------------------------------- */
 
 import { mergeAccountPrefs } from "@/lib/server/ai/security/account-prefs";
+import { readPersonalization } from "@/lib/server/ai/personalization-prompt";
 import type { ToolDef, ToolResult } from "../types";
 import { supabaseServer } from "../../supabase-server";
 
@@ -76,6 +77,14 @@ const rememberAboutUser: ToolDef<
     }
 
     const prefs = ((data?.preferences ?? {}) as Record<string, unknown>);
+    /* Memory switched off in Settings → Koleex AI: nothing is stored, and
+       the user is told where the switch is rather than left believing the
+       fact was kept. Existing facts are untouched — off means "do not
+       read or write", not "erase"; erasing is its own button. */
+    if (!readPersonalization(prefs).memory) {
+      return { ok: false, permissionStatus: "allowed", data: null,
+        message: "Memory is turned off in Settings → Koleex AI, so this was not saved. Tell the user they can turn it on there." };
+    }
     const current = (prefs.ai_memory ?? {}) as Record<string, string>;
     const next: Record<string, string> = { ...current, [key]: value };
 

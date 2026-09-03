@@ -1,4 +1,5 @@
 import "server-only";
+import type { AiPersonalization } from "@/lib/ai-personalization";
 
 /* ---------------------------------------------------------------------------
    Koleex AI Agent — shared types.
@@ -78,6 +79,10 @@ export interface UserContext {
      accounts.preferences.ai_memory (no new table). Key → value, e.g.
      { birthday: "3 March", prefers: "short answers" }. */
   memory: Record<string, string>;
+  /* How this user asked to be spoken to — accounts.preferences.ai, read by
+     buildUserContext and rendered by prompts/blocks.ts. Optional so older
+     fixtures still type; the builder always sets it. */
+  personalization?: AiPersonalization | null;
 }
 
 /* ─────────────────────────────────────────────────────────────────────

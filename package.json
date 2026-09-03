@@ -35,6 +35,7 @@
     "validate:ai-tool-exposure": "NODE_OPTIONS=--conditions=react-server tsx scripts/validate-ai-tool-exposure.ts",
     "validate:ai-prefs-race": "NODE_OPTIONS=--conditions=react-server tsx scripts/validate-ai-prefs-race.ts",
     "validate:ai-prompts": "NODE_OPTIONS=--conditions=react-server tsx scripts/validate-ai-prompts.ts",
+    "validate:ai-personalization": "NODE_OPTIONS=--conditions=react-server tsx scripts/validate-ai-personalization.ts",
     "validate:ai-skills": "NODE_OPTIONS=--conditions=react-server tsx scripts/validate-ai-skills.ts",
     "validate:ai-streaming": "NODE_OPTIONS=--conditions=react-server tsx scripts/validate-ai-streaming.ts",
     "validate:ai-seals": "NODE_OPTIONS=--conditions=react-server tsx scripts/validate-ai-seals.ts",

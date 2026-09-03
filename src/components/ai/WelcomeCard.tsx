@@ -18,10 +18,14 @@ export default function WelcomeCard({
   copy,
   onPick,
   firstName,
+  showPrompts = true,
 }: {
   copy: typeof COPY["en"];
   onPick: (prompt: string) => void;
   firstName: string;
+  /** Settings → Koleex AI → Suggested prompts. Off hides the tiles; the
+   *  greeting stays. */
+  showPrompts?: boolean;
 }) {
   /* Hub-native welcome — same layout vocabulary as FinanceHome.
      Small icon mark in a Hub-themed tile, a tight h2 + caption pair,
@@ -47,6 +51,7 @@ export default function WelcomeCard({
         {copy.welcomeSub}
       </p>
 
+      {showPrompts && (
       <div className="grid w-full max-w-2xl grid-cols-1 gap-2 sm:grid-cols-2">
         {copy.prompts.map((p, i) => (
           <button
@@ -63,6 +68,7 @@ export default function WelcomeCard({
           </button>
         ))}
       </div>
+      )}
     </div>
   );
 }

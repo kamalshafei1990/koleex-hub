@@ -1,4 +1,5 @@
 import "server-only";
+import type { AiPersonalization } from "@/lib/ai-personalization";
 
 /* ---------------------------------------------------------------------------
    ai/voice/gate — who may use voice at all, decided once, used everywhere.
@@ -37,6 +38,8 @@ export type VoiceViewer = {
   role: string | null;
   department: string | null;
   isSuperAdmin: boolean;
+  /** Their Settings → Koleex AI preferences; null in older fixtures. */
+  personalization?: AiPersonalization | null;
 };
 
 export type VoiceGate = { accountId: string; tenantId: string | null; viewer: VoiceViewer };
@@ -71,6 +74,7 @@ export async function authorizeVoice(req: Request): Promise<NextResponse | Voice
       role: ctx.viewer.role,
       department: ctx.viewer.department,
       isSuperAdmin: ctx.viewer.isSuperAdmin,
+      personalization: ctx.personalization ?? null,
     },
   };
 }

@@ -43,6 +43,7 @@ import KoleexOrb from "@/components/ai/KoleexGlowOrb";
 import { toolActivity } from "@/components/ai-orb/ai-orb-tool-map";
 import type { AIOrbActivity } from "@/components/ai-orb/ai-orb-types";
 import BookOpenIcon from "@/components/icons/ui/BookOpenIcon";
+import SparklesIcon from "@/components/icons/ui/SparklesIcon";
 import { markdownToPlainText, bubbleHtmlForClipboard } from "@/lib/markdown-clipboard";
 import EmojiButton from "@/components/ai/EmojiButton";
 import { useCurrentAccount } from "@/lib/identity";
@@ -72,6 +73,7 @@ import { COPY } from "@/components/ai/copy";
    and nothing else, so the split is behaviour-neutral by construction. */
 import ProjectDialog from "@/components/ai/ProjectDialog";
 import WelcomeCard from "@/components/ai/WelcomeCard";
+import { normalizeAiPersonalization } from "@/lib/ai-personalization";
 /* Phase 2J (completed) — the transcript bubble and the sidebar rows moved to
    their own files. Both were held back until the render harness existed; the
    extraction was then proved by rendering the pre-split component and the new
@@ -2025,6 +2027,18 @@ export default function KoleexAiApp() {
             </>
           )}
         </div>
+        {/* Settings → Koleex AI: style, standing instructions, memory. A quiet
+            footer row rather than another icon in the crowded header — the
+            place ChatGPT keeps it too (behind the account, not on the bar). */}
+        <div className="kx-ai-side-sep shrink-0 border-t border-[var(--border-subtle)] p-2">
+          <Link
+            href="/settings?tab=ai"
+            className="flex h-9 items-center gap-2 rounded-lg px-2 text-[12px] text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)]"
+          >
+            <SparklesIcon size={14} className="shrink-0" />
+            <span className="truncate">{copy.personalize}</span>
+          </Link>
+        </div>
         </div>
       </aside>
 
@@ -2125,6 +2139,7 @@ export default function KoleexAiApp() {
               <WelcomeCard
                 copy={copy}
                 onPick={(p) => send(p)}
+                showPrompts={normalizeAiPersonalization(account?.preferences?.ai).suggestions}
                 firstName={(account?.person?.full_name || account?.username || "")
                   .trim()
                   .split(/\s+/)

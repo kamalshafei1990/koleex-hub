@@ -1,4 +1,5 @@
 import "server-only";
+import { personalizationBlock } from "@/lib/server/ai/personalization-prompt";
 
 /* ---------------------------------------------------------------------------
    ai/prompts/blocks — the shared fragments every system prompt embeds.
@@ -43,7 +44,15 @@ Anything personal NOT listed above (birthday, preferences, family, plans) you ge
 do not know. Don't guess and don't invent it — ASK them, in one short question. When they
 answer, call remember_about_user to save it so you still know it next time. Facts about
 OTHER people and company data stay governed by their permissions — this changes nothing there.
-`;
+${personalizationParagraph(ctx)}`;
+}
+
+/* The user's own settings, rendered by the one shared block so the agent
+   lane and the chat lane cannot disagree about what a preference means.
+   Empty for a user who never opened the tab. */
+function personalizationParagraph(ctx: UserContext): string {
+  const block = personalizationBlock(ctx.personalization);
+  return block ? `\n${block.trim()}\n` : "";
 }
 
 export function buildNowBlock(timezone: string): string {

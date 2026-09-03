@@ -1,4 +1,5 @@
 import "server-only";
+import { memoryFor, readPersonalization } from "@/lib/server/ai/personalization-prompt";
 
 /* ---------------------------------------------------------------------------
    ai-agent/permissions — the single point of truth for what a user is
@@ -119,7 +120,9 @@ export async function buildUserContext(auth: ServerAuthContext): Promise<UserCon
   const prefs = (prefsRes.data?.preferences ?? {}) as {
     calendar?: { timezone?: string };
     ai_memory?: Record<string, string>;
+    ai?: unknown;
   };
+  const personalization = readPersonalization(prefs);
   const timezone = prefs.calendar?.timezone || "Asia/Dubai";
 
   /* Identity of the person actually typing. Supabase returns an embedded
@@ -141,12 +144,14 @@ export async function buildUserContext(auth: ServerAuthContext): Promise<UserCon
   };
 
   /* Only well-formed string facts — never let arbitrary JSON reach the prompt. */
-  const memory: Record<string, string> = {};
+  const facts: Record<string, string> = {};
   for (const [k, v] of Object.entries(prefs.ai_memory ?? {})) {
     if (typeof k === "string" && typeof v === "string" && k.length <= 40 && v.length <= 200) {
-      memory[k] = v;
+      facts[k] = v;
     }
   }
+  /* And none of them when the user turned memory off in Settings. */
+  const memory = memoryFor(personalization, facts);
 
   const modulePermissions: UserContext["modulePermissions"] = {};
 
@@ -202,6 +207,7 @@ export async function buildUserContext(auth: ServerAuthContext): Promise<UserCon
     timezone,
     viewer,
     memory,
+    personalization,
   };
 }
 

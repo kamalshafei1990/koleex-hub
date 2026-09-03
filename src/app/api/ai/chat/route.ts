@@ -1,4 +1,5 @@
 import "server-only";
+import { memoryFor, readPersonalization } from "@/lib/server/ai/personalization-prompt";
 
 import { NextResponse } from "next/server";
 import { requireAuth } from "@/lib/server/auth";
@@ -82,7 +83,7 @@ export async function POST(req: Request) {
     username?: string;
     person?: { full_name?: string | null } | Array<{ full_name?: string | null }> | null;
     role?: { name?: string | null } | Array<{ name?: string | null }> | null;
-    preferences?: { ai_memory?: Record<string, string> } | null;
+    preferences?: { ai_memory?: Record<string, string>; ai?: unknown } | null;
   } | null;
   const pickOne = <T,>(v: T | T[] | null | undefined): T | null =>
     Array.isArray(v) ? (v[0] ?? null) : (v ?? null);
@@ -92,12 +93,16 @@ export async function POST(req: Request) {
     role: pickOne(vRow?.role)?.name ?? null,
     department: auth.department ?? null,
   };
-  const memory: Record<string, string> = {};
+  const personalization = readPersonalization(vRow?.preferences);
+  const facts: Record<string, string> = {};
   for (const [k, val] of Object.entries(vRow?.preferences?.ai_memory ?? {})) {
     if (typeof k === "string" && typeof val === "string" && k.length <= 40 && val.length <= 200) {
-      memory[k] = val;
+      facts[k] = val;
     }
   }
+  /* Memory the user switched off is not shown — the same gate the agent
+     lane applies in buildUserContext. */
+  const memory = memoryFor(personalization, facts);
 
   const body = (await req.json()) as {
     messages?: ChatMessage[];
@@ -414,7 +419,7 @@ export async function POST(req: Request) {
         try {
           for await (const ev of streamRouteAi({
             messages: [{ role: "user", content: clampedUser }],
-            context: { userLang, viewer, memory },
+            context: { userLang, viewer, memory, personalization },
           })) {
             if (ev.type === "start") {
               lane = ev.lane;
@@ -524,7 +529,7 @@ export async function POST(req: Request) {
   const tPre = Date.now();
   const result = await routeAi({
     messages: [{ role: "user", content: clamp(lastUser, MAX_MESSAGE_CHARS) }],
-    context: { userLang, viewer, memory },
+    context: { userLang, viewer, memory, personalization },
   });
   const tPost = Date.now();
 

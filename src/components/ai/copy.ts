@@ -88,6 +88,8 @@ export const COPY: Record<Lang, {
   collapseSidebar: string;
   expandSidebar: string;
   aiKnowledge: string;
+  /* Sidebar link to Settings → Koleex AI. */
+  personalize: string;
   backToHub: string;
   jumpToLatest: string;
   attachFile: string;
@@ -175,6 +177,7 @@ export const COPY: Record<Lang, {
     collapseSidebar: "Collapse sidebar",
     expandSidebar: "Expand sidebar",
     aiKnowledge: "AI Knowledge",
+    personalize: "Personalize Koleex AI",
     backToHub: "Back to Hub",
     jumpToLatest: "Jump to latest",
     attachFile: "Attach file",
@@ -257,6 +260,7 @@ export const COPY: Record<Lang, {
     collapseSidebar: "收起侧边栏",
     expandSidebar: "展开侧边栏",
     aiKnowledge: "AI 知识库",
+    personalize: "个性化 Koleex AI",
     backToHub: "返回 Hub",
     jumpToLatest: "跳到最新",
     attachFile: "添加文件",
@@ -340,6 +344,7 @@ export const COPY: Record<Lang, {
     collapseSidebar: "طيّ الشريط الجانبي",
     expandSidebar: "توسيع الشريط الجانبي",
     aiKnowledge: "معرفة Koleex AI",
+    personalize: "تخصيص Koleex AI",
     backToHub: "العودة إلى Hub",
     jumpToLatest: "الانتقال إلى الأحدث",
     attachFile: "إرفاق ملف",
