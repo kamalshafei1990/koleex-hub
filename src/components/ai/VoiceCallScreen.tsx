@@ -20,7 +20,7 @@
    functional danger colour and is used only on the control that ends the call.
    --------------------------------------------------------------------------- */
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import AIOrb from "@/components/ai-orb/AIOrb";
 import { useCallLevel } from "./useCallLevel";
 import type { AIOrbState } from "@/components/ai-orb/ai-orb-types";
@@ -28,7 +28,7 @@ import VoiceTranscript from "@/components/ai/VoiceTranscript";
 import { type TranscriptLine, type VoicePhase } from "@/lib/voice/events";
 import { type ProductPhoto } from "@/lib/voice/photos";
 import { type Lang } from "@/lib/i18n";
-import { STT_LANGS, STT_LANG_LABELS, type SttLang } from "@/lib/voice/stt-lang";
+import PhotoLightbox from "@/components/ai/PhotoLightbox";
 import KoleexLogo from "@/components/layout/KoleexLogo";
 import { cdnImage } from "@/lib/cdn";
 
@@ -52,8 +52,9 @@ const COPY: Record<Lang, {
      one or two words that survive being set at 11px under a 56px circle. */
   micShort: string;
   endShort: string;
-  /* The speaking-language chips' group name: "I speak", in the UI language. */
-  speakLang: string;
+  /* The far side has the turn and is composing — the gap the orb fills. */
+  thinking: string;
+  closePhoto: string;
   /* THE TYPED LANE INSIDE THE CALL. A placeholder, the send control's name,
      and what the screen says when text was typed before the call was up. */
   typePlaceholder: string;
@@ -77,7 +78,8 @@ const COPY: Record<Lang, {
     title: "Voice call",
     hint: "Speak, then pause. There is no button to hold.",
     voice: "Voice",
-    speakLang: "I speak",
+    thinking: "Thinking…",
+    closePhoto: "Close photo",
     micShort: "Mic",
     endShort: "End",
     typePlaceholder: "Type something into the call…",
@@ -99,7 +101,8 @@ const COPY: Record<Lang, {
     title: "语音通话",
     hint: "说完后停顿一下，无需按住任何按键。",
     voice: "音色",
-    speakLang: "我说",
+    thinking: "思考中…",
+    closePhoto: "关闭图片",
     micShort: "麦克风",
     endShort: "结束",
     typePlaceholder: "在通话中输入文字…",
@@ -121,7 +124,8 @@ const COPY: Record<Lang, {
     title: "مكالمة صوتية",
     hint: "اتكلم وبعدين اسكت شوية. مفيش زرار تفضل ضاغط عليه.",
     voice: "الصوت",
-    speakLang: "بتكلم",
+    thinking: "بفكّر…",
+    closePhoto: "اقفل الصورة",
     micShort: "مايك",
     endShort: "إنهاء",
     typePlaceholder: "اكتب حاجة في المكالمة…",
@@ -168,11 +172,6 @@ export type VoiceCallScreenProps = {
    *  session, so a new one needs a new session. Said plainly in the UI rather
    *  than silently doing nothing until the next call. */
   onSelectVoice?: (key: string) => void;
-  /** The language the caller speaks, for the transcript of their own words.
-   *  Changing it restarts the call, like a voice change. Absent means the
-   *  chips are not drawn. */
-  sttLanguage?: SttLang | null;
-  onSelectSttLanguage?: (lang: SttLang) => void;
   /** Type into the call. Returns whether it went — false while the channel is
    *  not up yet, which the screen says rather than swallowing the text. Absent
    *  means no composer is drawn. */
@@ -195,11 +194,12 @@ export default function VoiceCallScreen({
   voices = [],
   selectedVoice = null,
   onSelectVoice,
-  sttLanguage = null,
-  onSelectSttLanguage,
   onSendText,
 }: VoiceCallScreenProps) {
   const copy = COPY[lang];
+  /* The picture being looked at, if any. Inside the app, over the call. */
+  const [openPhoto, setOpenPhoto] = useState<ProductPhoto | null>(null);
+  const closePhoto = useCallback(() => setOpenPhoto(null), []);
   const [typed, setTyped] = useState("");
   const [typedNotice, setTypedNotice] = useState<string | null>(null);
   const typedRef = useRef<HTMLInputElement | null>(null);
@@ -261,7 +261,10 @@ export default function VoiceCallScreen({
        or action, and get the answer at the end — we need a motion so I know
        it is thinking". The orb's processing state with the searching
        activity is exactly that motion; the caption already said the words. */
-    : searching && !muted
+    /* AND THE GAP BETWEEN TURNS. The caller has stopped and the far side is
+       composing — the pause ChatGPT fills with motion and this screen used
+       to fill with nothing. Same state as a lookup: it is the same wait. */
+    : (searching || phase === "thinking") && !muted
       ? "thinking"
     : phase === "speaking"
       ? "speaking"
@@ -292,6 +295,8 @@ export default function VoiceCallScreen({
     ? copy.connecting
     : phase === "speaking"
       ? copy.speaking
+      : phase === "thinking"
+      ? copy.thinking
       : phase === "listening"
         ? copy.listening
         : copy.ready;
@@ -320,6 +325,7 @@ export default function VoiceCallScreen({
         paddingBottom: "env(safe-area-inset-bottom, 0px)",
       }}
     >
+      <PhotoLightbox photo={openPhoto} onClose={closePhoto} closeLabel={copy.closePhoto} />
       {/* ── THE SCREEN IN TWO PARTS, on purpose. The owner: "split the screen
           — a part for Koleex AI and a part for the conversation text — so
           they are not mixed together, especially on a phone". Above the
@@ -346,7 +352,7 @@ export default function VoiceCallScreen({
                is in `thinking` — the shared component's own considering
                state — rather than `processing`, whose rim arc the owner read
                as "not good" at 200px. */
-            searching && live && !muted ? "is-thinking" : "",
+            (searching || phase === "thinking") && live && !muted ? "is-thinking" : "",
           ].join(" ")}
           style={{ width: 200, height: 200 }}
         >
@@ -393,7 +399,11 @@ export default function VoiceCallScreen({
                 {/* Remote product photos from whatever host the catalogue names — next/image needs a fixed allowlist. Same call as Bubble. */}
                 {/* TAPPABLE. A 112px thumbnail was "too small"; it is now
                     160px and opens the full picture in a new tab. */}
-                <a href={p.url} target="_blank" rel="noreferrer noopener" className="block">
+                {/* EXPANDS IN PLACE. It was a link to the raw file in a new
+                    tab — in the installed app, a trip out of the app to a
+                    bare JPEG. Now a button that opens PhotoLightbox over the
+                    call, as ChatGPT does. */}
+                <button type="button" onClick={() => setOpenPhoto(p)} className="block rounded-2xl focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0066FF] focus-visible:ring-offset-2 focus-visible:ring-offset-[#0D0D0D]" aria-label={p.label || copy.photos}>
                   {/* "THE PHOTO TOOK VERY LONG TO APPEAR." Three reasons,
                       all here. The full-size original (a multi-megabyte
                       product PNG) was fetched to paint 160px: now the
@@ -412,7 +422,7 @@ export default function VoiceCallScreen({
                     fetchPriority="high"
                     className="w-40 h-40 rounded-2xl object-cover border border-white/10 bg-white/5"
                   />
-                </a>
+                </button>
                 {p.label && (
                   <figcaption className="mt-2 text-center text-[11px] leading-snug text-[#AAAAAA] truncate" title={p.label}>
                     {p.label}
@@ -451,35 +461,6 @@ export default function VoiceCallScreen({
                 }`}
               >
                 {v.label}
-              </button>
-            );
-          })}
-        </div>
-      )}
-
-      {/* WHICH LANGUAGE THE CALLER SPEAKS. Always drawn when the parent tracks
-          it, because it is the fix for a transcript that wrote Egyptian
-          speech down as English: the app's language and the caller's are two
-          different facts. Same chip family as the voice picker. */}
-      {sttLanguage && onSelectSttLanguage && (
-        <div className="shrink-0 flex flex-wrap items-center justify-center gap-2 px-6 pb-4" role="group" aria-label={copy.speakLang}>
-          <span className="text-[11px] uppercase tracking-wide text-[#666666]">{copy.speakLang}</span>
-          {STT_LANGS.map((code) => {
-            const on = code === sttLanguage;
-            return (
-              <button
-                key={code}
-                type="button"
-                lang={code}
-                onClick={() => onSelectSttLanguage(code)}
-                aria-pressed={on}
-                className={`h-10 px-4 rounded-full text-xs inline-flex items-center transition-[background-color,color,border-color,transform] duration-150 active:scale-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0066FF] focus-visible:ring-offset-2 focus-visible:ring-offset-[#0D0D0D] ${
-                  on
-                    ? "bg-white text-[#0D0D0D] border border-white"
-                    : "text-[#AAAAAA] hover:text-white border border-white/20 hover:border-white/30 bg-white/[0.04] hover:bg-white/[0.08]"
-                }`}
-              >
-                {STT_LANG_LABELS[code]}
               </button>
             );
           })}

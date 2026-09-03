@@ -279,7 +279,7 @@ export const getProductPrice: ToolDef<
           ...base, pricing_mode: pricingMode, fob_price_usd: fobUsd, unit_price: fobUsd, price: fobUsd, specific: null,
           ask: "If they want the exact price for a deal, ask which country and which customer type (end user, dealer, distributor, agent, sole agent).",
         },
-        message: `${row.product_name}: FOB list price USD ${fobUsd.toFixed(2)} (global FOB, before country and customer-type adjustments). Say it is the FOB price in US dollars. For an exact price, ask the country and the customer type.`,
+        message: `${row.product_name}: FOB list price USD ${fobUsd.toFixed(2)} (global FOB, before country and customer-type adjustments). SAY the number as the FOB price in US dollars, THEN ASK in the same breath: "for which country, and for which customer type — end user, dealer, distributor, agent or sole agent?" — and call this tool again with the answer.`,
       };
     }
 

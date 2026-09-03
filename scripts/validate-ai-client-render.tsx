@@ -35,6 +35,7 @@ import type { QuotationDraftPayload } from "../src/components/ai/types";
 import VoiceCallButton from "../src/components/ai/VoiceCallButton";
 import VoiceTranscript from "../src/components/ai/VoiceTranscript";
 import VoiceCallScreen from "../src/components/ai/VoiceCallScreen";
+import PhotoLightbox from "../src/components/ai/PhotoLightbox";
 import MessageMarkdown from "../src/components/ai/MessageMarkdown";
 import type { TranscriptLine } from "../src/lib/voice/events";
 
@@ -880,16 +881,22 @@ console.log("\n── The transcript belongs to the call, not to the chat ──
 
 console.log("\n── The product, shown: on the call screen and in the answer ──");
 {
-  /* WHICH LANGUAGE THE CALLER SPEAKS: three chips in their own scripts. */
-  const withStt = renderToStaticMarkup(
-    <VoiceCallScreen live phase={null} audioLevel={0} lines={[]} lang="en" onEnd={() => {}} sttLanguage="ar" onSelectSttLanguage={() => {}} /> as ReactElement,
+  /* THINKING, SHOWN. The gap between the caller's last word and the first
+     word back used to be nothing on screen. */
+  const thinking = renderToStaticMarkup(
+    <VoiceCallScreen live phase="thinking" audioLevel={0} lines={[]} lang="en" onEnd={() => {}} /> as ReactElement,
   );
-  check("the speaking-language chips are drawn when the parent tracks the choice",
-    /role="group"[^>]*aria-label="I speak"/.test(withStt) && /<button[^>]*lang="ar"[^>]*aria-pressed="true"[^>]*>عربي<\/button>/.test(withStt) && /lang="en"[^>]*aria-pressed="false"[^>]*>English</.test(withStt) && /lang="zh"[^>]*>中文</.test(withStt));
-  check("  …and not when it does not",
-    !/I speak/.test(renderToStaticMarkup(<VoiceCallScreen live phase={null} audioLevel={0} lines={[]} lang="en" onEnd={() => {}} /> as ReactElement)));
-  check("  …the group name is localised",
-    /aria-label="بتكلم"/.test(renderToStaticMarkup(<VoiceCallScreen live phase={null} audioLevel={0} lines={[]} lang="ar" onEnd={() => {}} sttLanguage="ar" onSelectSttLanguage={() => {}} /> as ReactElement)));
+  check("the far side composing reads as thinking — on the caption, the orb and the rings",
+    text(thinking).includes("Thinking…") && /kx-call-orb[^"]*is-thinking/.test(thinking) && /kx-aiorb[^"]*is-thinking/.test(thinking));
+  check("  …localised", text(renderToStaticMarkup(<VoiceCallScreen live phase="thinking" audioLevel={0} lines={[]} lang="ar" onEnd={() => {}} /> as ReactElement)).includes("بفكّر…"));
+  /* NO LANGUAGE CHIPS. The caller is not asked which language they speak. */
+  check("nothing on the screen asks the caller which language they speak",
+    !/I speak|بتكلم|我说/.test(thinking) && !/lang="ar"[^>]*aria-pressed/.test(thinking));
+  /* THE PICTURE EXPANDS IN PLACE. */
+  const lb = renderToStaticMarkup(<PhotoLightbox photo={{ url: "https://cdn.example/kx180.jpg", label: "KX-180" }} onClose={() => {}} closeLabel="Close photo" /> as ReactElement);
+  check("the lightbox is a dialog with the picture fitted whole, its name, and a close control",
+    /role="dialog"/.test(lb) && /aria-modal="true"/.test(lb) && /<img[^>]*src="https:\/\/cdn\.example\/kx180\.jpg"[^>]*object-contain/.test(lb) && /aria-label="Close photo"/.test(lb) && lb.includes("KX-180</p>"));
+  check("  …and draws nothing when there is no picture", renderToStaticMarkup(<PhotoLightbox photo={null} onClose={() => {}} /> as ReactElement) === "");
   /* THE HIDDEN BORDER. The Aurora rim is a ::before with inset:0 against
      the nearest positioned ancestor; a glass surface that is not itself
      positioned lends the rim to its column. */
@@ -912,6 +919,8 @@ console.log("\n── The product, shown: on the call screen and in the answer �
   check("  …named, for the eye and for a screen reader",
     /alt="KX-180 Spreader"/.test(withPhotos) && withPhotos.includes("KX-180 Spreader</figcaption>"));
   check("  …as a labelled group", /role="group"[^>]*aria-label="Product photos"/.test(withPhotos));
+  check("  …as a button that expands it in place, not a link that leaves the app",
+    /<button type="button"[^>]*aria-label="KX-180 Spreader"[^>]*>\s*<img/.test(withPhotos) && !/<a[^>]*href="https:\/\/cdn\.example\/kx180\.jpg"/.test(withPhotos) && !/z-\[260\]/.test(withPhotos));
   check("  …eagerly — it is on screen the instant it mounts — with its box reserved and a high fetch priority",
     !/loading="lazy"/.test(withPhotos) && /<img[^>]*width="160"[^>]*height="160"/.test(withPhotos) && /fetchpriority="high"/i.test(withPhotos));
   check("  …a non-storage URL passes through the pipeline untouched", /src="https:\/\/cdn\.example\/kx180\.jpg"/.test(withPhotos));
@@ -929,8 +938,8 @@ console.log("\n── The product, shown: on the call screen and in the answer �
   const shown = md("The KX-180.\n\n![KX-180](https://cdn.example/kx180.jpg)");
   check("a markdown image renders as a bounded, styled picture",
     /<img[^>]*class="koleex-md-img"[^>]*src="https:\/\/cdn\.example\/kx180\.jpg"/.test(shown) || /<img[^>]*src="https:\/\/cdn\.example\/kx180\.jpg"[^>]*class="koleex-md-img"/.test(shown));
-  check("  …that opens full size in a new tab",
-    /<a[^>]*href="https:\/\/cdn\.example\/kx180\.jpg"[^>]*target="_blank"[^>]*rel="noreferrer noopener"/.test(shown));
+  check("  …that a tap expands in place — a button, not a link out of the app",
+    /<button[^>]*class="koleex-md-img-link"[^>]*>\s*<img/.test(shown) && !/<a[^>]*href="https:\/\/cdn\.example\/kx180\.jpg"/.test(shown) && !/z-\[260\]/.test(shown));
   check("  …with the product name as alt text", /alt="KX-180"/.test(shown));
   check("  …lazily", /loading="lazy"/.test(shown));
   const plainHttp = md("![KX-180](http://cdn.example/kx180.jpg)");

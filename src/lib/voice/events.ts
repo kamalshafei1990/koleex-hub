@@ -86,8 +86,14 @@ export const EV_SPEECH_STARTED = "input_audio_buffer.speech_started";
 export const EV_SPEECH_STOPPED = "input_audio_buffer.speech_stopped";
 export const EV_RESPONSE_DONE = "response.done";
 
-/** What the far side is doing right now, for the orb. */
-export type VoicePhase = "listening" | "speaking" | null;
+/** What the far side is doing right now, for the orb.
+ *
+ *  `thinking` is the gap between the caller's last word and the assistant's
+ *  first — the vendor has the turn and is composing. It used to be shown as
+ *  nothing at all, so a two-second pause read as a frozen call and the owner
+ *  asked for "a motion so I know it is thinking". The orb shows it. */
+export type VoicePhase = "listening" | "thinking" | "speaking" | null;
+export const EV_RESPONSE_CREATED = "response.created";
 
 export type ParsedEvent = {
   /** Null when this event says nothing about the transcript. */
@@ -169,7 +175,11 @@ export function parseVoiceEvent(raw: string): ParsedEvent {
       };
     case EV_SPEECH_STARTED:
       return { transcript: null, phase: "listening" };
+    /* The caller stopped; the far side has the turn. Composing — a lookup, a
+       sentence — is what the orb shows until the first word comes back. */
     case EV_SPEECH_STOPPED:
+    case EV_RESPONSE_CREATED:
+      return { transcript: null, phase: "thinking" };
     case EV_RESPONSE_DONE:
       return NOTHING;
     default:
