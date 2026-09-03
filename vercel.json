@@ -27,6 +27,17 @@
     {
       "path": "/api/cron/voice-watch",
       "schedule": "*/15 * * * *"
+    },
+    {
+      "path": "/api/cron/voice-watch-sin1",
+      "schedule": "7-59/15 * * * *"
     }
-  ]
+  ],
+  "functions": {
+    "src/app/api/cron/voice-watch-sin1/route.ts": {
+      "regions": [
+        "sin1"
+      ]
+    }
+  }
 }

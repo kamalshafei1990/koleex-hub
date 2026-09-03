@@ -262,14 +262,21 @@ console.log("\n── 3. The route, read — the surface a fetch cannot be teste
     const VOICE_FN = "src/app/api/ai/voice/session/route.ts";
     check("the voice handshake is NOT pinned away from the project's region",
       vercelCfg.functions?.[VOICE_FN]?.regions === undefined);
-    check("  …and no per-function region override survives at all",
-      Object.keys(vercelCfg.functions ?? {}).length === 0);
+    /* ONE override is allowed, and it is a measurement: the watchdog
+       re-exported from Singapore, so the two regions can be compared in
+       the log before any handshake is ever pinned again. Nothing else. */
+    check("  …and the only per-function region override is the Singapore MEASUREMENT probe",
+      JSON.stringify(Object.keys(vercelCfg.functions ?? {})) === JSON.stringify(["src/app/api/cron/voice-watch-sin1/route.ts"]) &&
+      JSON.stringify(vercelCfg.functions?.["src/app/api/cron/voice-watch-sin1/route.ts"]?.regions) === JSON.stringify(["sin1"]));
+    check("  …which re-exports the watchdog unchanged and is scheduled between the Tokyo runs",
+      (() => { const sin = readFileSync("src/app/api/cron/voice-watch-sin1/route.ts", "utf8"); const tokyo = readFileSync("src/app/api/cron/voice-watch/route.ts", "utf8"); return /export \{ GET \} from "\.\.\/voice-watch\/route";/.test(sin) && /export const dynamic = "force-dynamic";/.test(sin) && (sin.match(/export const maxDuration = (\d+);/) ?? [])[1] === (tokyo.match(/export const maxDuration = (\d+);/) ?? [])[1]; })() &&
+      (vercelCfg.crons as Array<{ path: string; schedule: string }>).some((c) => c.path === "/api/cron/voice-watch-sin1" && c.schedule === "7-59/15 * * * *"));
     check("the project default is the region that actually completes handshakes",
       JSON.stringify(vercelCfg.regions) === JSON.stringify(["hnd1"]));
     /* Non-vacuity: rewriting vercel.json is how the scheduled work gets
        dropped by accident, and it has been rewritten twice now. */
     check("  …and the cron jobs sharing this file survived the edit",
-      Array.isArray(vercelCfg.crons) && vercelCfg.crons.length === 6);
+      Array.isArray(vercelCfg.crons) && vercelCfg.crons.length === 7);
 
     /* THE FIELD THAT MADE THE REVERSAL POSSIBLE, and the reason it stays.
        `region=` in this log is the VENDOR's label. Without our own execution
