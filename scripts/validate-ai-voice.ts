@@ -22,7 +22,7 @@ import {
   voiceConfigured,
 } from "../src/lib/server/ai/voice/config";
 import { verdictForStatus, probeVoice } from "../src/lib/server/ai/voice/probe";
-import { parseVoiceOptions, resolveVoice } from "../src/lib/server/ai/voice/config";
+import { parseVoiceOptions, resolveVoice, voiceCatalogue, DEFAULT_VOICE_CATALOGUE, NO_VOICE_CATALOGUE } from "../src/lib/server/ai/voice/config";
 import { buildSessionUpdate, publicVoiceList } from "../src/lib/server/ai/voice/session-config";
 import { AI_PROVENANCE_RULE } from "../src/lib/server/ai/prompt-builder";
 import { VOICE_TOOL_NAMES } from "../src/lib/server/ai/voice/tools";
@@ -495,6 +495,29 @@ void (async () => {
     check("no key resolves to nothing", resolveVoice(v, null) === null);
     check("a VENDOR id is not accepted as a key — the client never learns them",
       resolveVoice(v, "Ethan") === null);
+
+    /* THE DEFAULT CATALOGUE. Unset for a release, so nobody could change the
+       voice; now the variable overrides a list that is always there. */
+    const dflt = voiceCatalogue(undefined);
+    check("no configuration offers the default catalogue, not nothing",
+      dflt.length >= 3 && voiceCatalogue("").length === dflt.length && voiceCatalogue("   ").length === dflt.length &&
+      JSON.stringify(dflt) === JSON.stringify(parseVoiceOptions(DEFAULT_VOICE_CATALOGUE)));
+    check("  …its first voice is the vendor's own default, so an untouched picker changes nothing the caller hears",
+      dflt[0].vendorId === "Tina" && dflt[0].key === "v1");
+    const vendorNames = ["Tina", "Serena", "Ethan", "Andre", "Katerina", "Cherry", "Chelsie", "Harvey", "Jennifer"];
+    check("  …and every label is ours: no label is a vendor voice name, or any entry's vendor id",
+      dflt.every((o) => o.label !== o.vendorId && !vendorNames.includes(o.label) && !dflt.some((p) => p.vendorId === o.label)));
+    check("  …ids are distinct and every entry has a label", new Set(dflt.map((o) => o.vendorId)).size === dflt.length && dflt.every((o) => o.label.length > 0));
+    check("a configured catalogue REPLACES the default rather than extending it",
+      () => { const c = voiceCatalogue("Ethan:Omar"); return c.length === 1 && c[0].vendorId === "Ethan" && c[0].label === "Omar"; });
+    check("the word `none` offers no picker at all — in any case, with whitespace",
+      voiceCatalogue(NO_VOICE_CATALOGUE).length === 0 && voiceCatalogue(" None ").length === 0 && NO_VOICE_CATALOGUE === "none");
+    check("parseVoiceConfig offers the default catalogue when the variable is unset",
+      () => {
+        const cfg = parseVoiceConfig({ AI_VOICE_BASE_URL: "https://voice.example/api/v1/realtime", AI_VOICE_API_KEY: "k", AI_VOICE_MODEL: "m" });
+        const off = parseVoiceConfig({ AI_VOICE_BASE_URL: "https://voice.example/api/v1/realtime", AI_VOICE_API_KEY: "k", AI_VOICE_MODEL: "m", AI_VOICE_VOICES: "none" });
+        return cfg !== null && cfg.voices.length === dflt.length && cfg.voices[0].vendorId === "Tina" && off !== null && off.voices.length === 0;
+      });
   }
 
   console.log("\n── 8. What the client may know, and what it may not ──");

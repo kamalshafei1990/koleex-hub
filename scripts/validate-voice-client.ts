@@ -1918,6 +1918,47 @@ console.log("\n── 12. Mute ──");
     /z-\[260\]/.test(lb) && /object-contain/.test(lb) && /e\.stopPropagation\(\);\s*e\.preventDefault\(\);\s*onClose\(\);/.test(lb) && /window\.addEventListener\("keydown", onKey, true\)/.test(lb));
 }
 
+{
+  console.log("\n── 19. The voice can be changed, and the choice is kept ──");
+  const fs19 = await import("node:fs");
+  const pref = await import("../src/lib/voice/voice-pref");
+  const offered = [{ key: "v1", label: "Nour" }, { key: "v2", label: "Layla" }];
+  check("the saved key is pre-selected when the catalogue still offers it",
+    pref.pickVoiceKey("v2", offered) === "v2" && pref.pickVoiceKey(" v2 ", offered) === "v2");
+  check("  …a key no longer offered, junk, or nothing saved falls back to the FIRST voice — the vendor's own default",
+    pref.pickVoiceKey("v9", offered) === "v1" && pref.pickVoiceKey("Tina", offered) === "v1" && pref.pickVoiceKey(null, offered) === "v1" && pref.pickVoiceKey(undefined, offered) === "v1");
+  check("  …and no catalogue means no selection, whatever was saved", pref.pickVoiceKey("v1", []) === null);
+  /* Storage: present, absent, refusing. */
+  const g = globalThis as unknown as { window?: unknown };
+  const hadWindow = "window" in g;
+  const prevWindow = g.window;
+  const store = new Map<string, string>();
+  g.window = { localStorage: { getItem: (k: string) => store.get(k) ?? null, setItem: (k: string, v: string) => { store.set(k, v); } } };
+  check("nothing saved reads as null, and a saved choice reads back under the voice key",
+    pref.readSavedVoiceKey() === null && (pref.saveVoiceKey("v2"), store.get(pref.VOICE_STORAGE_KEY) === "v2" && pref.readSavedVoiceKey() === "v2"));
+  check("  …the key is the voice's own, not the speaking-language key", pref.VOICE_STORAGE_KEY === "koleex-voice-voice");
+  store.set(pref.VOICE_STORAGE_KEY, "   ");
+  check("  …a blank stored value is no value", pref.readSavedVoiceKey() === null);
+  g.window = { localStorage: { getItem: () => { throw new Error("refused"); }, setItem: () => { throw new Error("refused"); } } };
+  let threw = false;
+  try { pref.saveVoiceKey("v1"); } catch { threw = true; }
+  check("a refusing store never throws: reading is null, saving is silent", !threw && pref.readSavedVoiceKey() === null);
+  delete g.window;
+  let threw2 = false;
+  try { pref.saveVoiceKey("v1"); } catch { threw2 = true; }
+  check("  …and no window at all (server render) is the same", !threw2 && pref.readSavedVoiceKey() === null);
+  if (hadWindow) g.window = prevWindow;
+  const btn19 = fs19.readFileSync("src/components/ai/VoiceCallButton.tsx", "utf8");
+  check("the button pre-selects the remembered voice from the server's list, and remembers every choice",
+    /const offered = body\.voices;\s*setVoices\(offered\);/.test(btn19) &&
+    /setVoiceKey\(\(cur\) => cur \?\? pickVoiceKey\(readSavedVoiceKey\(\), offered\)\);/.test(btn19) &&
+    !/body\.voices\?\.\[0\]\?\.key/.test(btn19) &&
+    /const selectVoice = useCallback\(\(key: string\) => \{\s*setVoiceKey\(key\);\s*voiceKeyRef\.current = key;\s*saveVoiceKey\(key\);/.test(btn19));
+  const cfg19 = fs19.readFileSync("src/lib/server/ai/voice/config.ts", "utf8");
+  check("the server offers a default catalogue, so the picker exists without anyone setting a variable",
+    /voices: voiceCatalogue\(env\.AI_VOICE_VOICES\),/.test(cfg19) && !/voices: parseVoiceOptions\(env\.AI_VOICE_VOICES\)/.test(cfg19));
+}
+
 console.log(`\n${pass} passed, ${failures.length} failed`);
   if (failures.length) {
     console.log("\nFAILED:");

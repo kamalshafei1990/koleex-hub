@@ -451,7 +451,8 @@ export default function VoiceCallScreen({
         </div>
       )}
 
-      {/* Voice picker — only when the owner has configured a catalogue. Plain
+      {/* Voice picker — whenever the server offers a catalogue (it has a
+          default; the owner may set `none`). Plain
           text buttons rather than a dropdown: two or three options read faster
           than a control you have to open, and the brand's icon system has no
           chevron worth adding for this. */}
