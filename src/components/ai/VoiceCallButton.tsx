@@ -33,6 +33,7 @@
    --------------------------------------------------------------------------- */
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import {
   VoiceSession,
   browserVoiceDeps,
@@ -573,7 +574,14 @@ export default function VoiceCallButton({
 
       {/* A live call takes the screen. Mounted for `busy` too, so connecting
           is visible rather than a button that looks stuck. */}
-      {(connected || busy) && (
+      {/* THROUGH A PORTAL, TO THE BODY. The owner: "the orb is always covered
+          by the main header". The screen is position:fixed at z-200, above
+          the header's z-100 — on paper. In the tree it sat inside the chat
+          column, under ancestors with transforms and backdrop filters, and a
+          fixed element inside a transformed ancestor is fixed to THAT
+          ancestor and stacked inside it: its z-index never competes with the
+          header at all. Rendered at the body it is what it claims to be. */}
+      {(connected || busy) && typeof document !== "undefined" && createPortal(
         <VoiceCallScreen
           live={connected}
           ready={ready}
@@ -591,7 +599,8 @@ export default function VoiceCallButton({
           selectedVoice={voiceKey}
           onSelectVoice={selectVoice}
           onSendText={sendTyped}
-        />
+        />,
+        document.body,
       )}
       <button
         type="button"

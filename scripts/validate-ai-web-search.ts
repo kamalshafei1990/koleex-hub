@@ -63,7 +63,7 @@ async function main() {
         { url: "https://img.example/e.jpg", description: "fifth — over the cap" },
       ],
     });
-    const out = await searchWeb("Port Said port picture");
+    const out = await searchWeb("Port Said port picture", { images: true });
     const body = JSON.parse(String(lastRequest?.init.body ?? "{}")) as Record<string, unknown>;
     check("the request asks Tavily for pictures — and NOT for generated descriptions, which is where the timeouts went", body.include_images === true && body.include_image_descriptions === false);
     check("  …on the ONE search call — no second request", lastRequest?.url === "https://api.tavily.com/search");
@@ -112,7 +112,7 @@ async function main() {
       results: [{ title: "Port Said", url: "https://en.example/port-said", content: "A port city." }],
       images: [{ url: "https://img.example/a.jpg", description: "Port Said harbour" }],
     });
-    const r = await searchTheWeb.handler(ctx, { query: "Port Said port picture" });
+    const r = await searchTheWeb.handler(ctx, { query: "Port Said port picture", want_images: true });
     const data = r.data as { images?: unknown[]; usage_note: string } | null;
     check("a search with pictures returns them in the data", r.ok && Array.isArray(data?.images) && data!.images.length === 1);
     check("  …and the usage note tells the model how to show one", /PICTURES:/.test(data?.usage_note ?? "") && /at most two/.test(data?.usage_note ?? ""));
@@ -179,9 +179,19 @@ async function main() {
     check("  …with the brand rule still first", (data?.usage_note ?? "").startsWith("These are public web results"));
     /* And a public thing still gets its picture. */
     stubFetch({ results: [{ title: "Stadium", url: "https://x.example/stadium", content: "c" }], images: ["https://img.example/stadium.jpg"] });
-    const r2 = await searchTheWeb.handler(ctx, { query: "Cairo International Stadium" });
+    const r2 = await searchTheWeb.handler(ctx, { query: "Cairo International Stadium", want_images: true });
     const d2 = r2.data as { images?: unknown[] } | null;
     check("a stadium is not a machine: it still gets its picture", r2.ok && Array.isArray(d2?.images) && d2!.images.length === 1);
+    /* PICTURES ARE OPT-IN. "What is the date today" came back with two
+       calendar pictures; the model must say the user asked to SEE something
+       before a picture is fetched or shown. */
+    stubFetch({ results: [{ title: "Date", url: "https://x.example/date", content: "c" }], images: ["https://img.example/calendar.jpg"] });
+    const r3 = await searchTheWeb.handler(ctx, { query: "what is the date today" });
+    const b3 = JSON.parse(String(lastRequest?.init.body ?? "{}")) as Record<string, unknown>;
+    const d3 = r3.data as Record<string, unknown> | null;
+    check("without want_images the provider is not asked for pictures", b3.include_images === false);
+    check("  …and none are shown even if the provider sent some", r3.ok && d3 !== null && !("images" in d3) && !/PICTURES:/.test(String(d3?.usage_note)));
+    check("  …the schema offers want_images as a boolean the model must set deliberately", (searchTheWeb.parameters.properties as Record<string, { type: string }>).want_images?.type === "boolean" && !(searchTheWeb.parameters.required ?? []).includes("want_images"));
   }
 
   console.log("\n── 4c. A search that times out WITH pictures is asked again for the text alone ──");
@@ -196,7 +206,7 @@ async function main() {
       }
       return new Response(JSON.stringify({ results: [{ title: "Stadium", url: "https://x.example/stadium", content: "c" }] }), { status: 200, headers: { "Content-Type": "application/json" } });
     }) as typeof fetch;
-    const out = await searchWeb("Cairo International Stadium");
+    const out = await searchWeb("Cairo International Stadium", { images: true });
     check("the first attempt asked for pictures and timed out; the second asked for text only", calls.length === 2 && calls[0].include_images === true && calls[1].include_images === false);
     check("  …and the caller gets the answer rather than 'nothing came back'", out.configured && !out.error && out.results.length === 1 && out.images.length === 0);
     const calls2: Array<Record<string, unknown>> = [];
@@ -204,8 +214,15 @@ async function main() {
       calls2.push(JSON.parse(String(init?.body ?? "{}")) as Record<string, unknown>);
       const err = new Error("This operation was aborted"); err.name = "AbortError"; throw err;
     }) as typeof fetch;
-    const out2 = await searchWeb("Cairo International Stadium");
+    const out2 = await searchWeb("Cairo International Stadium", { images: true });
     check("a second timeout is reported honestly, and there is no third attempt", calls2.length === 2 && Boolean(out2.error) && out2.results.length === 0);
+    const calls4: Array<Record<string, unknown>> = [];
+    global.fetch = (async (url: string | URL | Request, init?: RequestInit) => {
+      calls4.push(JSON.parse(String(init?.body ?? "{}")) as Record<string, unknown>);
+      const err = new Error("This operation was aborted"); err.name = "AbortError"; throw err;
+    }) as typeof fetch;
+    await searchWeb("Cairo International Stadium");
+    check("a text-only search that times out is not retried — there is nothing to drop", calls4.length === 1);
     const calls3: Array<Record<string, unknown>> = [];
     global.fetch = (async (url: string | URL | Request, init?: RequestInit) => {
       calls3.push(JSON.parse(String(init?.body ?? "{}")) as Record<string, unknown>);
@@ -224,7 +241,7 @@ async function main() {
     check("the cap is four", /const MAX_IMAGES = 4;/.test(src));
     check("no image proxy: nothing in the module fetches an image URL", !/fetch\([^)]*image/i.test(src));
     const tool = readFileSync("src/lib/server/ai-agent/tools/web-search.ts", "utf8");
-    check("the tool spreads images in only when non-empty — and never for a machine query", /const images = machine \? \[\] : outcome\.images;/.test(tool) && /\.\.\.\(images\.length > 0 \? \{ images \} : \{\}\)/.test(tool));
+    check("the tool spreads images in only when non-empty — never for a machine query, never unless asked", /const images = machine \|\| !wantImages \? \[\] : outcome\.images;/.test(tool) && /\.\.\.\(images\.length > 0 \? \{ images \} : \{\}\)/.test(tool));
   }
 
   console.log(`\n${pass} passed, ${fail} failed\n`);

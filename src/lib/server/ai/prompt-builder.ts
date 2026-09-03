@@ -198,8 +198,8 @@ export const PRODUCT_PHOTO_RULE =
    not load — some hosts are unreachable from mainland China, and that is a
    network fact, not a mistake. */
 export const WEB_IMAGE_RULE =
-  " SHOWING A PICTURE FROM THE WEB: when the user asks to SEE something public — a place, a fabric, a tool, a port, what a thing looks like — call search_web;" +
-  " its result carries `images` (url + description). Show at most TWO as markdown ![<description>](<the exact url>), only when the user asked to see or a picture answers better than words, never a gallery, never for a question words answer fine." +
+  " SHOWING A PICTURE FROM THE WEB: when the user asks to SEE something public — a place, a fabric, a port, a stadium, what a thing looks like — call search_web with want_images: true;" +
+  " its result then carries `images` (url + description). Without that flag — a date, a rate, the news, any question words answer — there are no pictures, and none should be shown. Show at most TWO as markdown ![<description>](<the exact url>), only when the user asked to see or a picture answers better than words, never a gallery, never for a question words answer fine." +
   " Use the URL EXACTLY as returned, never invent or edit one. NEVER show another manufacturer's machine or logo from the web, and never use a web picture for a Koleex product — those come from the product tools' own photos." +
   " A picture of a MACHINE, a press, a cutter or any equipment is ALWAYS a Koleex product question — call searchProducts and show the product's own photo; search_web is never the answer to it." +
   " If a picture does not load for the user, that is their network, not an error: do not apologise, just describe in words.";

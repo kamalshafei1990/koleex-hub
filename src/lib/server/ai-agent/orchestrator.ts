@@ -146,7 +146,7 @@ function toChoice(r: TurnResponse): { role?: string; content: string | null; too
 export async function orchestrate(input: TurnInput): Promise<AgentResponse> {
   const tStart = Date.now();
   const {
-    ctx, history, userMessage, userLang, dialect, conversationId, onDelta,
+    ctx, history, userMessage, userLang, dialect, conversationId, onDelta, onStep,
     webSearchRequested = false, languageLock = "", taughtAnswers = "",
   } = input;
   /* True when a user-uploaded document's extracted text is in play — this
@@ -682,6 +682,14 @@ export async function orchestrate(input: TurnInput): Promise<AgentResponse> {
           text: humaniseCall(tc.function.name, parsedArgs),
           payload: parsedArgs,
         });
+        /* Announced NOW, before the tool runs: this is what lets the screen
+           show what is being looked up during the seconds it takes. A copy,
+           so a listener cannot reach into the loop's own list. */
+        try {
+          onStep?.(steps.slice());
+        } catch {
+          /* A listener that throws must not take the turn down. */
+        }
 
         /* Serve cached result when the model asks for the same thing
            twice in one turn. Counts against MAX_TOOLS_PER_TURN but

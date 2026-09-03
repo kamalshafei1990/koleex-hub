@@ -242,6 +242,12 @@ export default function VoiceCallScreen({
 
   const orbState: AIOrbState = !live || reconnecting || !ready
     ? "awakening"
+    /* LOOKING SOMETHING UP IS VISIBLE. The owner: "I can't see any response
+       or action, and get the answer at the end — we need a motion so I know
+       it is thinking". The orb's processing state with the searching
+       activity is exactly that motion; the caption already said the words. */
+    : searching && !muted
+      ? "processing"
     : phase === "speaking"
       ? "speaking"
       /* MUTED IS NOT LISTENING. AIOrb feeds audioLevel into its motion only
@@ -299,23 +305,14 @@ export default function VoiceCallScreen({
         paddingBottom: "env(safe-area-inset-bottom, 0px)",
       }}
     >
-      {/* Orb — the centre of the screen, because it is the centre of the
-          interaction. Sized generously: this is the one moment the orb is the
-          interface rather than an ornament beside text. */}
-      <div className="flex-1 flex flex-col items-center justify-center gap-8 px-6 min-h-0">
-        {/* A REACTIVE HALO AROUND THE ORB, and why it is not decoration.
-
-            AIOrb's own audio response is a 3% scale — tuned for the 38px
-            avatar beside a chat bubble, where 3% is plenty. At 200px on a
-            screen a user is staring at for a whole call, the same 3% reads as
-            "nothing is happening", which is what was reported. Rather than
-            change the shared orb's motion — it is drawn in five other places
-            and they are all correctly tuned — the call screen adds its own
-            ring, which exists only here.
-
-            It is feedback, not ornament: it is how a user knows the
-            microphone is hearing them. Monochrome, so it introduces no
-            colour. */}
+      {/* ── THE SCREEN IN TWO PARTS, on purpose. The owner: "split the screen
+          — a part for Koleex AI and a part for the conversation text — so
+          they are not mixed together, especially on a phone". Above the
+          divider: the orb, its status line and the pictures. Below it: the
+          words, scrolling on their own, then the composer and the controls.
+          The top part has a fixed share of the height so the orb never
+          moves when the transcript grows. ── */}
+      <div className="shrink-0 h-[42dvh] min-h-[280px] flex flex-col items-center justify-center gap-6 px-6 border-b border-white/10">
         <div
           ref={orbWrapRef}
           className={[
@@ -325,19 +322,15 @@ export default function VoiceCallScreen({
           ].join(" ")}
           style={{ width: 200, height: 200 }}
         >
-          {/* THE VOICE, AS RINGS. Three concentric rings that swell with the
-              level and settle after it — white while the caller speaks, the
-              Hub's blue while Koleex AI does, so which side is talking is
-              visible before it is audible. Driven by --kx-call-level, which
-              useCallLevel writes each frame with attack and release, so the
-              motion is the voice's own shape rather than a meter's steps.
-              Transform and opacity only: nothing here forces a repaint of the
-              blurred orb beneath. */}
+          {/* THE VOICE, AS RINGS — see lib/voice/level.ts. Transform and
+              opacity only: nothing here forces a repaint of the blurred orb
+              beneath. */}
           <span aria-hidden className="kx-call-ring kx-call-ring-1" />
           <span aria-hidden className="kx-call-ring kx-call-ring-2" />
           <span aria-hidden className="kx-call-ring kx-call-ring-3" />
           <AIOrb
             state={orbState}
+            activity={searching && live && !muted ? "searching" : "none"}
             audioLevel={audioLevel}
             size={200}
             interactive
@@ -423,10 +416,11 @@ export default function VoiceCallScreen({
         </div>
       )}
 
-      {/* Captions, above the control so the eye travels orb → words → button. */}
-      <div className="shrink-0 pb-6">
+      {/* THE WORDS, in their own part of the screen: they scroll here and
+          nowhere else, so a long answer never pushes the orb or the controls. */}
+      <div className="flex-1 min-h-0 flex flex-col pt-4">
         {lines.length > 0 ? (
-          <VoiceTranscript lines={lines} lang={lang} className="pb-6" />
+          <VoiceTranscript lines={lines} lang={lang} className="flex-1 min-h-0 pb-4" fill />
         ) : (
           /* Told once, plainly: server-side turn detection has no push-to-talk,
              and a user waiting for a button to hold will wait forever. */

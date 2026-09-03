@@ -1019,6 +1019,19 @@ void (async () => {
     check("  …and that it never writes a link, a file name or markdown into what it says", /you never write a link, a file name or[\s"+]*markdown into what you say/.test(sc));
   }
 
+  console.log("\n── 17. Tuned from a real call: phantom turns, the filler, and the calendar pictures ──");
+  {
+    const sc = readFileSync("src/lib/server/ai/voice/session-config.ts", "utf8");
+    check("turn detection takes more than a breath to interrupt: threshold up, padding, longer silence",
+      /threshold: 0\.65,\s*prefix_padding_ms: 300,\s*silence_duration_ms: 900,/.test(sc));
+    check("a turn with no words is not a question — never 'you're welcome', and a cut-off answer continues",
+      /A TURN WITH NO WORDS IN IT/.test(sc) && /Never answer it with[\s"+]*\\"you're welcome\\"/.test(sc) && /CONTINUE that answer from where you stopped/.test(sc));
+    check("the pause is filled with 'let me think' aloud, before the lookup — and never a search word",
+      /ALWAYS SAY A SHORT FILLER ALOUD FIRST, before the lookup/.test(sc) && /let me think/.test(sc) && !/let me check/i.test(sc));
+    check("web pictures on a call are opt-in: want_images, only when the caller asked to see one",
+      /call search_web with want_images true; otherwise never/.test(sc));
+  }
+
   console.log(`\n${pass} passed, ${failures.length} failed`);
   if (failures.length) {
     console.log("\nFAILED:");
