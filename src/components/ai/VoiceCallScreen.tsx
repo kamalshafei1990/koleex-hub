@@ -28,6 +28,9 @@ import VoiceTranscript from "@/components/ai/VoiceTranscript";
 import { type TranscriptLine, type VoicePhase } from "@/lib/voice/events";
 import { type ProductPhoto } from "@/lib/voice/photos";
 import { type Lang } from "@/lib/i18n";
+import { STT_LANGS, STT_LANG_LABELS, type SttLang } from "@/lib/voice/stt-lang";
+import KoleexLogo from "@/components/layout/KoleexLogo";
+import { cdnImage } from "@/lib/cdn";
 
 const COPY: Record<Lang, {
   connecting: string;
@@ -49,6 +52,8 @@ const COPY: Record<Lang, {
      one or two words that survive being set at 11px under a 56px circle. */
   micShort: string;
   endShort: string;
+  /* The speaking-language chips' group name: "I speak", in the UI language. */
+  speakLang: string;
   /* THE TYPED LANE INSIDE THE CALL. A placeholder, the send control's name,
      and what the screen says when text was typed before the call was up. */
   typePlaceholder: string;
@@ -72,6 +77,7 @@ const COPY: Record<Lang, {
     title: "Voice call",
     hint: "Speak, then pause. There is no button to hold.",
     voice: "Voice",
+    speakLang: "I speak",
     micShort: "Mic",
     endShort: "End",
     typePlaceholder: "Type something into the call…",
@@ -93,6 +99,7 @@ const COPY: Record<Lang, {
     title: "语音通话",
     hint: "说完后停顿一下，无需按住任何按键。",
     voice: "音色",
+    speakLang: "我说",
     micShort: "麦克风",
     endShort: "结束",
     typePlaceholder: "在通话中输入文字…",
@@ -114,6 +121,7 @@ const COPY: Record<Lang, {
     title: "مكالمة صوتية",
     hint: "اتكلم وبعدين اسكت شوية. مفيش زرار تفضل ضاغط عليه.",
     voice: "الصوت",
+    speakLang: "بتكلم",
     micShort: "مايك",
     endShort: "إنهاء",
     typePlaceholder: "اكتب حاجة في المكالمة…",
@@ -160,6 +168,11 @@ export type VoiceCallScreenProps = {
    *  session, so a new one needs a new session. Said plainly in the UI rather
    *  than silently doing nothing until the next call. */
   onSelectVoice?: (key: string) => void;
+  /** The language the caller speaks, for the transcript of their own words.
+   *  Changing it restarts the call, like a voice change. Absent means the
+   *  chips are not drawn. */
+  sttLanguage?: SttLang | null;
+  onSelectSttLanguage?: (lang: SttLang) => void;
   /** Type into the call. Returns whether it went — false while the channel is
    *  not up yet, which the screen says rather than swallowing the text. Absent
    *  means no composer is drawn. */
@@ -182,6 +195,8 @@ export default function VoiceCallScreen({
   voices = [],
   selectedVoice = null,
   onSelectVoice,
+  sttLanguage = null,
+  onSelectSttLanguage,
   onSendText,
 }: VoiceCallScreenProps) {
   const copy = COPY[lang];
@@ -247,7 +262,7 @@ export default function VoiceCallScreen({
        it is thinking". The orb's processing state with the searching
        activity is exactly that motion; the caption already said the words. */
     : searching && !muted
-      ? "processing"
+      ? "thinking"
     : phase === "speaking"
       ? "speaking"
       /* MUTED IS NOT LISTENING. AIOrb feeds audioLevel into its motion only
@@ -312,13 +327,26 @@ export default function VoiceCallScreen({
           words, scrolling on their own, then the composer and the controls.
           The top part has a fixed share of the height so the orb never
           moves when the transcript grows. ── */}
-      <div className="shrink-0 h-[42dvh] min-h-[280px] flex flex-col items-center justify-center gap-6 px-6 border-b border-white/10">
+      <div className="shrink-0 h-[42dvh] min-h-[300px] flex flex-col items-center justify-center gap-4 px-6 border-b border-white/10">
+        {/* THE BRAND, ABOVE THE ORB. The owner: "the first half of the page
+            should have the Koleex logo, in the right position, the right
+            size". The wordmark, white, 24px tall on the 8px grid — the same
+            mark the header carries, drawn here in the screen's own colour
+            rather than as a theme-swapped bitmap. Decorative: the screen's
+            title already names the product for assistive tech. */}
+        <KoleexLogo className="h-6 w-auto shrink-0 text-white" />
         <div
           ref={orbWrapRef}
           className={[
             "kx-call-orb relative shrink-0 flex items-center justify-center",
             phase === "speaking" ? "is-far" : "is-near",
             live && ready && !reconnecting && !muted ? "is-live" : "",
+            /* A LOOKUP IN PROGRESS, on the rings: slow blue waves leaving the
+               orb, one after another, until the answer comes. The orb itself
+               is in `thinking` — the shared component's own considering
+               state — rather than `processing`, whose rim arc the owner read
+               as "not good" at 200px. */
+            searching && live && !muted ? "is-thinking" : "",
           ].join(" ")}
           style={{ width: 200, height: 200 }}
         >
@@ -334,7 +362,10 @@ export default function VoiceCallScreen({
             audioLevel={audioLevel}
             size={200}
             interactive
-            className="shrink-0 kx-call-aiorb"
+            /* `is-lively` is the orb's own opt-in (see AIOrb.tsx): at call
+               size, in the audio states, the face keeps the home page's
+               life — the gaze, the blink, the aura's idle pace. */
+            className="shrink-0 kx-call-aiorb is-lively"
           />
         </div>
 
@@ -363,12 +394,22 @@ export default function VoiceCallScreen({
                 {/* TAPPABLE. A 112px thumbnail was "too small"; it is now
                     160px and opens the full picture in a new tab. */}
                 <a href={p.url} target="_blank" rel="noreferrer noopener" className="block">
+                  {/* "THE PHOTO TOOK VERY LONG TO APPEAR." Three reasons,
+                      all here. The full-size original (a multi-megabyte
+                      product PNG) was fetched to paint 160px: now the
+                      first-party image pipeline serves a 384px copy, which
+                      is also the copy a phone in mainland China can reach.
+                      `loading="lazy"` deferred the request on an element
+                      that is on screen the instant it mounts: gone. And
+                      width/height reserve the box so nothing shifts. */}
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
-                    src={p.url}
+                    src={cdnImage(p.url, { width: 384, quality: 75, resize: "contain" })}
                     alt={p.label || copy.photos}
-                    loading="lazy"
+                    width={160}
+                    height={160}
                     decoding="async"
+                    fetchPriority="high"
                     className="w-40 h-40 rounded-2xl object-cover border border-white/10 bg-white/5"
                   />
                 </a>
@@ -410,6 +451,35 @@ export default function VoiceCallScreen({
                 }`}
               >
                 {v.label}
+              </button>
+            );
+          })}
+        </div>
+      )}
+
+      {/* WHICH LANGUAGE THE CALLER SPEAKS. Always drawn when the parent tracks
+          it, because it is the fix for a transcript that wrote Egyptian
+          speech down as English: the app's language and the caller's are two
+          different facts. Same chip family as the voice picker. */}
+      {sttLanguage && onSelectSttLanguage && (
+        <div className="shrink-0 flex flex-wrap items-center justify-center gap-2 px-6 pb-4" role="group" aria-label={copy.speakLang}>
+          <span className="text-[11px] uppercase tracking-wide text-[#666666]">{copy.speakLang}</span>
+          {STT_LANGS.map((code) => {
+            const on = code === sttLanguage;
+            return (
+              <button
+                key={code}
+                type="button"
+                lang={code}
+                onClick={() => onSelectSttLanguage(code)}
+                aria-pressed={on}
+                className={`h-10 px-4 rounded-full text-xs inline-flex items-center transition-[background-color,color,border-color,transform] duration-150 active:scale-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0066FF] focus-visible:ring-offset-2 focus-visible:ring-offset-[#0D0D0D] ${
+                  on
+                    ? "bg-white text-[#0D0D0D] border border-white"
+                    : "text-[#AAAAAA] hover:text-white border border-white/20 hover:border-white/30 bg-white/[0.04] hover:bg-white/[0.08]"
+                }`}
+              >
+                {STT_LANG_LABELS[code]}
               </button>
             );
           })}

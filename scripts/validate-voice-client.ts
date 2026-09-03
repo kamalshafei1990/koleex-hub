@@ -1541,7 +1541,7 @@ console.log("\n── 12. Mute ──");
         let f = 0;
         const o: ToneOscillatorLike & { dest?: unknown } = {
           type: "",
-          frequency: { setValueAtTime: (v, t) => { f = v; events.push({ kind: "freq", freq: v, t }); }, linearRampToValueAtTime: () => {} },
+          frequency: { setValueAtTime: (v, t) => { f = v; events.push({ kind: "freq", freq: v, t }); }, linearRampToValueAtTime: (v, t) => events.push({ kind: "glide", freq: v, t }) },
           connect: (d) => { o.dest = d; },
           start: (t) => events.push({ kind: "start", t, freq: f }),
           stop: (t) => events.push({ kind: "stop", t, freq: f }),
@@ -1565,7 +1565,12 @@ console.log("\n── 12. Mute ──");
   const f = fakeCtx();
   const end = scheduleTone(f.ctx, READY_TONE);
   const starts = f.events.filter((e) => e.kind === "start");
-  check("the ready tone is two notes, the second higher than the first", starts.length === 2 && (starts[1].freq ?? 0) > (starts[0].freq ?? 0));
+  check("the ready tone is three short notes, each higher than the last — a device coming online, not a doorbell",
+    starts.length === 3 && (starts[1].freq ?? 0) > (starts[0].freq ?? 0) && (starts[2].freq ?? 0) > (starts[1].freq ?? 0) && READY_TONE.every((n) => n.dur <= 0.25) && end - 10 < 0.5);
+  const glides = f.events.filter((e) => e.kind === "glide");
+  check("  …and the last note slides further up as it fades; the earlier notes hold",
+    glides.length === 1 && (glides[0].freq ?? 0) > (starts[2].freq ?? 0) && READY_TONE[2].glideTo !== undefined && READY_TONE[0].glideTo === undefined);
+  check("  …the recovered tone slides too, so it is unmistakably the same family", RECOVERED_TONE[0].glideTo !== undefined && (RECOVERED_TONE[0].glideTo ?? 0) > RECOVERED_TONE[0].freq);
   check("  …scheduled from the context's clock, in order", starts[0].t === 10 && (starts[1].t ?? 0) > 10 && end > (starts[1].t ?? 0));
   check("  …every oscillator is a sine, routed through its own gain to the output",
     f.oscs.every((o) => o.type === "sine") && f.oscs.every((o) => typeof o.dest === "object" && o.dest !== null && "gain" in o.dest));
@@ -1644,9 +1649,13 @@ console.log("\n── 12. Mute ──");
   const css = fs16.readFileSync("src/app/globals.css", "utf8");
   check("the rings read --kx-call-level with transform and opacity only", /\.kx-call-orb\.is-live \.kx-call-ring-3 \{\s*opacity: calc\(var\(--kx-call-level\)[^}]*transform: scale\(calc\(1\.16 \+ var\(--kx-call-level\)/.test(css));
   check("  …Koleex AI's voice is the Hub's blue, the caller's is white", /\.kx-call-orb\.is-far \.kx-call-ring \{ border-color: rgba\(0, 102, 255/.test(css) && /\.kx-call-orb\.is-near \.kx-call-ring \{ border-color: rgba\(255, 255, 255/.test(css));
-  check("the orb overrides are scoped to the call and touch no indicator geometry",
-    /\.kx-call-aiorb \.ind \{ transition: opacity 0\.5s ease, filter 0\.4s ease; \}/.test(css) && !/\.kx-call-aiorb[^{]*\.ind \{[^}]*(width|height|border-radius|top|left)/.test(css));
-  check("  …the per-frame brightness filter is off at call size", /\.kx-call-aiorb\.is-speaking \.ind \{ filter: none; \}/.test(css));
+  const orbSrc16 = fs16.readFileSync("src/components/ai-orb/AIOrb.tsx", "utf8");
+  const lively = orbSrc16.match(/\.kx-aiorb\.is-lively\.is-listening \.ind,\s*\.kx-aiorb\.is-lively\.is-speaking \.ind \{([^}]*)\}/);
+  check("the call's orb overrides live in the orb's OWN sheet (is-lively), where they can win — a global rule lost the tie",
+    lively !== null && !/\.kx-call-aiorb/.test(css));
+  check("  …and touch no indicator geometry: blink, no per-frame filter, the lock's own transition",
+    lively !== null && /animation: kxA-blink 6\.4s infinite;/.test(lively[1]) && /filter: none;/.test(lively[1]) && !/(width|height|border-radius|top|left|transform)/.test(lively[1]));
+  check("  …the lively rules come AFTER the stilling rules they override", orbSrc16.indexOf(".kx-aiorb.is-lively.is-listening .ind") > orbSrc16.indexOf(".kx-aiorb.is-sleeping .ind { animation: none; }"));
   check("reduced motion stills the rings", /prefers-reduced-motion: reduce\) \{\s*\.kx-call-ring \{[^}]*transform: none !important/.test(css));
   const hook = fs16.readFileSync("src/components/ai/useCallLevel.ts", "utf8");
   check("the frame loop uses stepLevel, cancels on cleanup, and resets the variable", /stepLevel\(current, target\.current\)/.test(hook) && /cancelAnimationFrame\(raf\)/.test(hook) && /setProperty\(CALL_LEVEL_VAR, "0"\)/.test(hook));
@@ -1737,20 +1746,51 @@ console.log("\n── 12. Mute ──");
     /const JITTER_BUFFER_TARGET_MS = 400;/.test(sess) && /if \("jitterBufferTarget" in r\) r\.jitterBufferTarget = JITTER_BUFFER_TARGET_MS;/.test(sess) && /else if \("playoutDelayHint" in r\) r\.playoutDelayHint = JITTER_BUFFER_TARGET_MS \/ 1000;/.test(sess));
   check("  …best-effort: inside a try, before the stream is handed out", /try \{\s*const r = ev\.receiver as unknown as Record<string, unknown>;[\s\S]{0,400}?\} catch \{[\s\S]{0,200}?const stream = ev\.streams\?\.\[0\];/.test(sess));
   const scr = fs18.readFileSync("src/components/ai/VoiceCallScreen.tsx", "utf8");
+  const css18 = fs18.readFileSync("src/app/globals.css", "utf8");
   check("the call screen is two parts: a fixed-height top for the orb, a scrolling bottom for the words",
-    /h-\[42dvh\] min-h-\[280px\][^"]*border-b border-white\/10/.test(scr) && /<VoiceTranscript lines=\{lines\} lang=\{lang\} className="flex-1 min-h-0 pb-4" fill \/>/.test(scr));
-  check("  …and a lookup is shown on the orb itself, as processing with the searching activity",
-    /: searching && !muted\s*\? "processing"/.test(scr) && /activity=\{searching && live && !muted \? "searching" : "none"\}/.test(scr));
+    /h-\[42dvh\] min-h-\[300px\][^"]*border-b border-white\/10/.test(scr) && /<VoiceTranscript lines=\{lines\} lang=\{lang\} className="flex-1 min-h-0 pb-4" fill \/>/.test(scr));
+  check("  …and a lookup is shown on the orb itself, as THINKING (not processing's rim arc) with the searching activity",
+    /: searching && !muted\s*\? "thinking"/.test(scr) && /activity=\{searching && live && !muted \? "searching" : "none"\}/.test(scr));
+  check("  …and on the rings: slow blue waves while a lookup runs, transform and opacity only",
+    /searching && live && !muted \? "is-thinking" : ""/.test(scr) &&
+    /\.kx-call-orb\.is-thinking \.kx-call-ring \{\s*border-color: rgba\(0, 102, 255[^}]*animation: kx-call-think/.test(css18) &&
+    /@keyframes kx-call-think \{\s*0% \{ transform: scale\([\d.]+\); opacity: [\d.]+; \}\s*100% \{ transform: scale\([\d.]+\); opacity: 0; \}/.test(css18) &&
+    /\.kx-call-orb\.is-thinking \.kx-call-ring-3 \{ animation-delay: 1\.6s; \}/.test(css18));
+  check("  …reduced motion stills the waves and leaves one quiet ring", /prefers-reduced-motion: reduce\) \{[^}]*animation: none !important/.test(css18) && /\.kx-call-orb\.is-thinking \.kx-call-ring-1 \{ opacity: 0\.35; \}/.test(css18));
+  check("the wordmark stands above the orb in the top part, white, 24px on the grid",
+    /import KoleexLogo from "@\/components\/layout\/KoleexLogo";/.test(scr) && /<KoleexLogo className="h-6 w-auto shrink-0 text-white" \/>/.test(scr) && scr.indexOf("<KoleexLogo") < scr.indexOf("ref={orbWrapRef}"));
+  check("a lookup's photo goes through the image pipeline at 384px, eagerly, with its box reserved",
+    (() => { const m = scr.match(/<img\s[^>]*src=\{cdnImage\(p\.url, \{ width: 384, quality: 75, resize: "contain" \}\)\}[^>]*\/>/); return m !== null && !/loading=/.test(m[0]) && /width=\{160\}\s*height=\{160\}/.test(m[0]) && /fetchPriority="high"/.test(m[0]); })());
+  const prodTool = fs18.readFileSync("src/lib/server/ai-agent/tools/products.ts", "utf8");
+  check("  …and the catalogue lookup no longer fetches the same photo row twice", !/\(await mainPhotoByProduct\(\[productId\]\)\)\[productId\]/.test(prodTool) && /main_photo_url: mainPhoto,/.test(prodTool));
   const tr = fs18.readFileSync("src/components/ai/VoiceTranscript.tsx", "utf8");
   check("the transcript can fill the part it is given instead of a fixed share of the viewport",
     /fill \? "flex-1 min-h-0" : "max-h-\[34vh\]"/.test(tr));
   /* "NOT MOVING LIKE ON THE HOME PAGE": the same orb, kept alive at call
-     size the way idle keeps it alive on the home page. */
-  const css18 = fs18.readFileSync("src/app/globals.css", "utf8");
+     size the way idle keeps it alive on the home page — by the orb's own
+     opt-in class, because the first attempt (a global rule) lost the tie. */
+  const orb18 = fs18.readFileSync("src/components/ai-orb/AIOrb.tsx", "utf8");
   check("on a call the eyes look around and blink in listening and speaking, as they do idle on the home page",
-    /\.kx-call-aiorb\.is-listening \.gaze,\s*\.kx-call-aiorb\.is-speaking \.gaze \{ animation: kxA-look 7s ease-in-out infinite; \}/.test(css18) &&
-    /\.kx-call-aiorb\.is-listening \.ind,\s*\.kx-call-aiorb\.is-speaking \.ind \{ animation: kxA-blink 6\.4s infinite; \}/.test(css18));
-  check("  …and the aura breathes at its idle pace", /\.kx-call-aiorb\.is-speaking \.aura \{ animation-duration: 7s, 2\.2s; \}/.test(css18));
+    /\.kx-aiorb\.is-lively\.is-listening \.gaze,\s*\.kx-aiorb\.is-lively\.is-speaking \.gaze \{ animation: kxA-look 7s ease-in-out infinite; \}/.test(orb18) &&
+    /\.kx-aiorb\.is-lively\.is-listening \.ind,\s*\.kx-aiorb\.is-lively\.is-speaking \.ind \{[^}]*animation: kxA-blink 6\.4s infinite;/.test(orb18) &&
+    /className="shrink-0 kx-call-aiorb is-lively"/.test(scr));
+  check("  …and the aura breathes at its idle pace", /\.kx-aiorb\.is-lively\.is-listening \.aura,\s*\.kx-aiorb\.is-lively\.is-speaking \.aura \{ animation-duration: 7s, 2\.2s; \}/.test(orb18));
+
+  /* WHICH LANGUAGE THE CALLER SPEAKS — not which language the app is in. */
+  const stt = await import("../src/lib/voice/stt-lang");
+  check("the speaking language is allow-listed to the three the transcriber and the server know",
+    stt.parseSttLang("ar") === "ar" && stt.parseSttLang("EN ") === "en" && stt.parseSttLang("zh") === "zh" && stt.parseSttLang("ar-EG") === null && stt.parseSttLang("fr") === null && stt.parseSttLang(null) === null);
+  check("the caller's saved choice wins over the device, which wins over the UI language",
+    stt.pickSttLang("zh", "ar-EG", "en") === "zh" && stt.pickSttLang(null, "ar-EG", "en") === "ar" && stt.pickSttLang("junk", "fr-FR", "zh") === "zh" && stt.pickSttLang(null, null, null) === "en");
+  check("  …the labels read in their own script", stt.STT_LANG_LABELS.ar === "عربي" && stt.STT_LANG_LABELS.zh === "中文" && stt.STT_LANG_LABELS.en === "English");
+  const btn18 = fs18.readFileSync("src/components/ai/VoiceCallButton.tsx", "utf8");
+  check("the session is given the SPEAKING language, never the UI language, as the transcription hint",
+    /\}, voiceKeyRef\.current, conversationIdRef\.current, sttLangRef\.current\);/.test(btn18) && !/conversationIdRef\.current, langRef\.current\)/.test(btn18));
+  check("  …read from the device after mount (saved choice, device language, UI language), so first render matches the server",
+    /pickSttLang\(readSavedSttLang\(\), typeof navigator !== "undefined" \? navigator\.language : null, lang\)/.test(btn18));
+  check("  …changing it saves the choice and restarts the call, exactly as a voice change does",
+    /const selectSttLang = useCallback\(\(next: SttLang\) => \{\s*saveSttLang\(next\);\s*setSttLang\(next\);\s*sttLangRef\.current = next;\s*if \(sessionRef\.current\) \{\s*hangUp\(\);\s*queueMicrotask\(\(\) => void startCallRef\.current\?\.\(\)\);/.test(btn18) &&
+    /sttLanguage=\{sttLang\}\s*onSelectSttLanguage=\{selectSttLang\}/.test(btn18));
 }
 
 console.log(`\n${pass} passed, ${failures.length} failed`);

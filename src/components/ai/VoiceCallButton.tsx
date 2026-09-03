@@ -51,6 +51,7 @@ import {
 import { extractProductPhotos, type ProductPhoto } from "@/lib/voice/photos";
 import { useStreamLevel } from "@/lib/voice/useStreamLevel";
 import { CallTones } from "@/lib/voice/tones";
+import { pickSttLang, readSavedSttLang, saveSttLang, type SttLang } from "@/lib/voice/stt-lang";
 import { TranscriptPersister, type SavedTurn, type PersistFailure } from "@/lib/voice/persist";
 import VoiceCallScreen from "@/components/ai/VoiceCallScreen";
 
@@ -190,6 +191,19 @@ export default function VoiceCallButton({
      not yet been told who it is. A vendor that never acknowledges is covered
      by a fallback timer, so the call can never be stuck on "connecting". */
   const [ready, setReady] = useState(false);
+  /* WHICH LANGUAGE THE CALLER SPEAKS — not which language the app is in. The
+     UI language used to be sent as the transcription hint, and an English
+     UI over Egyptian speech produced English nonsense in the transcript
+     while Koleex AI (which hears the audio) answered correctly. Chosen on
+     the screen, remembered on the device, read after mount so the server
+     and the browser render the same first frame. See lib/voice/stt-lang. */
+  const [sttLang, setSttLang] = useState<SttLang>(() => pickSttLang(null, null, lang));
+  const sttLangRef = useRef<SttLang>(sttLang);
+  useEffect(() => {
+    const picked = pickSttLang(readSavedSttLang(), typeof navigator !== "undefined" ? navigator.language : null, lang);
+    sttLangRef.current = picked;
+    queueMicrotask(() => setSttLang(picked));
+  }, [lang]);
   /* One per call, made INSIDE the tap that starts it (browsers unlock audio
      only in a gesture) and closed with it. */
   const tonesRef = useRef<CallTones | null>(null);
@@ -468,7 +482,7 @@ export default function VoiceCallButton({
           persisterRef.current?.observe(linesRef.current);
         }
       },
-    }, voiceKeyRef.current, conversationIdRef.current, langRef.current);
+    }, voiceKeyRef.current, conversationIdRef.current, sttLangRef.current);
 
     sessionRef.current = session;
     await session.start();
@@ -563,6 +577,19 @@ export default function VoiceCallButton({
     }
   }, [hangUp]);
 
+  /* THE SAME RESTART AS A VOICE CHANGE: the transcription language is part of
+     the session configuration, sent once, so a new one needs a new session.
+     Saved first, so the next call on this device starts in the right one. */
+  const selectSttLang = useCallback((next: SttLang) => {
+    saveSttLang(next);
+    setSttLang(next);
+    sttLangRef.current = next;
+    if (sessionRef.current) {
+      hangUp();
+      queueMicrotask(() => void startCallRef.current?.());
+    }
+  }, [hangUp]);
+
   const busy = state === "requesting-mic" || state === "connecting";
   const labels = LABEL_COPY[lang];
   const label = connected ? labels.end : busy ? labels.connecting : labels.start;
@@ -598,6 +625,8 @@ export default function VoiceCallButton({
           voices={voices}
           selectedVoice={voiceKey}
           onSelectVoice={selectVoice}
+          sttLanguage={sttLang}
+          onSelectSttLanguage={selectSttLang}
           onSendText={sendTyped}
         />,
         document.body,

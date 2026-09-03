@@ -4458,40 +4458,28 @@ html[data-kx-tabslide] #main-scroll-container { overflow-x: clip; }
 .kx-call-orb.is-far .kx-call-ring { border-color: rgba(0, 102, 255, 0.55); }
 .kx-call-orb.is-near .kx-call-ring { border-color: rgba(255, 255, 255, 0.28); }
 
-/* The orb itself, at call size. Two per-frame costs the 38px avatar never
-   pays are removed here: a brightness FILTER on the indicators that changes
-   every frame (a filter re-rasterises its layer), and a 140ms transition on
-   a transform that is itself updated every frame (the two fight, which is
-   the stutter). The indicators still scale ≤5% with the voice, as the
-   geometry lock allows; only how the browser gets there changes. */
-.kx-call-aiorb .ind { transition: opacity 0.5s ease, filter 0.4s ease; }
-.kx-call-aiorb.is-listening .ind,
-.kx-call-aiorb.is-speaking .ind { filter: none; }
-/* The inner circulation stays on through both halves of a turn rather than
-   fading out and in at every change of speaker. */
-.kx-call-aiorb.is-speaking .inner { opacity: 1; }
-.kx-call-aiorb .aura { will-change: opacity; }
+/* The orb itself, at call size, keeps its face alive: those rules live in
+   AIOrb.tsx under `.is-lively`, beside the rules they override — a rule here
+   loses to the component's inline sheet at equal specificity, which is how
+   the first attempt at this silently did nothing. */
 
-/* "THE ORB IS NOT MOVING LIKE ON THE HOME PAGE." It is the same orb. On the
-   home page it is idle, and idle is where the shared component keeps the
-   character alive: the eyes look around (gaze), blink, and the aura breathes
-   at its quicker idle pace. On a call the orb sits in listening or speaking,
-   where the shared file stills the eyes and slows the aura — tuned for a
-   38px avatar beside text, where a looking-around eye is a distraction. At
-   200px, for a whole call, a still face reads as dead. Call-scoped: the same
-   idle life, at call size only. The blink keyframe owns the bars' transform
-   here, so the voice is shown by the rings around the orb, not by the bars —
-   which is the geometry lock's own allowance (scaleY only, from its own
-   keyframe). */
-.kx-call-aiorb.is-listening .gaze,
-.kx-call-aiorb.is-speaking .gaze { animation: kxA-look 7s ease-in-out infinite; }
-.kx-call-aiorb.is-listening .ind,
-.kx-call-aiorb.is-speaking .ind { animation: kxA-blink 6.4s infinite; }
-.kx-call-aiorb.is-listening .aura,
-.kx-call-aiorb.is-speaking .aura { animation-duration: 7s, 2.2s; }
+/* A LOOKUP IN PROGRESS: slow blue waves leaving the orb, one ring after
+   another, until the answer comes. Transform and opacity only, like the voice
+   rings; the animation owns both while it runs. */
+.kx-call-orb.is-thinking .kx-call-ring {
+  border-color: rgba(0, 102, 255, 0.6);
+  animation: kx-call-think 2.4s ease-out infinite;
+}
+.kx-call-orb.is-thinking .kx-call-ring-2 { animation-delay: 0.8s; }
+.kx-call-orb.is-thinking .kx-call-ring-3 { animation-delay: 1.6s; }
+@keyframes kx-call-think {
+  0% { transform: scale(1.02); opacity: 0.5; }
+  100% { transform: scale(1.34); opacity: 0; }
+}
 
 @media (prefers-reduced-motion: reduce) {
-  .kx-call-ring { transition: opacity 0.3s ease; transform: none !important; }
+  .kx-call-ring { transition: opacity 0.3s ease; transform: none !important; animation: none !important; }
+  .kx-call-orb.is-thinking .kx-call-ring-1 { opacity: 0.35; }
   .kx-call-orb.is-live .kx-call-ring-1 { opacity: 0.25; }
   .kx-call-orb.is-live .kx-call-ring-2,
   .kx-call-orb.is-live .kx-call-ring-3 { opacity: 0; }

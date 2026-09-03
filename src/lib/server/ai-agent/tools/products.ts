@@ -547,7 +547,10 @@ const getProductFullDetails: ToolDef<
               .map((m) => (m.primary_model as string) || (m.model_name as string))
               .filter(Boolean),
           },
-          main_photo_url: (await mainPhotoByProduct([productId]))[productId] ?? null,
+          /* Already fetched above as `mainPhoto`; this was a second round
+             trip for the same row on every catalogue lookup — on a call,
+             a second of silence bought nothing. */
+          main_photo_url: mainPhoto,
           certifications: certsRes.data ?? [],
           feature_highlights: featRes.error ? [] : (featRes.data ?? []),
         },
