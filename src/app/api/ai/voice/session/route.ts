@@ -52,6 +52,7 @@ import {
   type VoiceEnv,
   type VoiceConfig,
   type VoiceRegionSlot,
+  orderRegionSlots,
 } from "@/lib/server/ai/voice/config";
 import {
   buildVoiceSessionPayload,
@@ -191,6 +192,24 @@ const VOICE_SESSIONS_PER_MIN = Number(process.env.AI_LIMIT_VOICE_SESSIONS_PER_MI
 /* Named explicitly rather than passing `process.env`. The config module takes
    the four variables it is allowed to see and nothing else, so a future
    variable added to the environment cannot silently become an input to it. */
+/* THE REGION THAT SERVED LAST — per warm instance, not durable, on purpose.
+
+   A Vercel function keeps module state only while its instance is warm, so
+   this is a hint with a short life: the first call after a cold start still
+   tries the configured order, and a call a moment later starts where that
+   one succeeded. That is enough. The failure it removes is the 13 seconds
+   every handshake spent on a mainland endpoint that had not answered all
+   afternoon before asking the region that does — and the same 13 seconds
+   again on every resume, heard as a call that "stopped". A durable store
+   (Edge Config, a table) would be a dependency for a value that is wrong the
+   moment the network changes; the TTL below bounds how long a stale memory
+   can cost, and one attempt is all it costs when it is stale. */
+let lastServed: { slot: VoiceRegionSlot; at: number } | null = null;
+const LAST_SERVED_TTL_MS = 30 * 60_000;
+function rememberedSlot(): VoiceRegionSlot | null {
+  return lastServed && Date.now() - lastServed.at < LAST_SERVED_TTL_MS ? lastServed.slot : null;
+}
+
 function voiceEnv(): VoiceEnv {
   return {
     AI_VOICE_BASE_URL: process.env.AI_VOICE_BASE_URL,
@@ -274,10 +293,16 @@ export async function POST(req: Request) {
      the SERVER owns; it can neither name one nor invent one, and it is
      ignored when there is no second region to select. */
   const hint = parseRegionHint(new URL(req.url).searchParams.get("region"));
-  const candidates: Array<{ slot: VoiceRegionSlot; cfg: VoiceConfig }> = [];
-  if (hint === "alt" && alt) candidates.push({ slot: "alt", cfg: alt });
-  if (primary) candidates.push({ slot: "primary", cfg: primary });
-  if (alt && !candidates.some((c) => c.slot === "alt")) candidates.push({ slot: "alt", cfg: alt });
+  /* The hint first, then the slot that served the last call from this
+     instance, then the configured order. See orderRegionSlots for why the
+     memory exists: it is the difference between a call that connects in a
+     second and one that spends thirteen seconds timing out on a region that
+     has not answered all day. */
+  const order = orderRegionSlots(hint, rememberedSlot(), { primary: primary !== null, alt: alt !== null });
+  const candidates: Array<{ slot: VoiceRegionSlot; cfg: VoiceConfig }> = order.map((slot) => ({
+    slot,
+    cfg: (slot === "alt" ? alt : primary) as VoiceConfig,
+  }));
   const budgets: readonly number[] = candidates.length > 1 ? TWO_REGION_ATTEMPT_BUDGETS_MS : HANDSHAKE_ATTEMPT_BUDGETS_MS;
 
   /* Read as TEXT. An SDP offer is not JSON, and parsing it would mean
@@ -355,8 +380,12 @@ export async function POST(req: Request) {
       console.log(
         `[ai.voice] handshake ok attempt=${attempt}/${budgets.length} slot=${region.slot} ` +
           `from=${process.env.VERCEL_REGION ?? "local"} region=${cfg.regionLabel} ` +
-          `afterMs=${Date.now() - startedAt} budgetMs=${budgetMs}`,
+          `afterMs=${Date.now() - startedAt} budgetMs=${budgetMs} first=${candidates[0].slot}`,
       );
+      /* Remembered for the next call this instance serves. Set only on an
+         answer that is a call: a refusal or a timeout teaches nothing about
+         where to start. */
+      lastServed = { slot: region.slot, at: Date.now() };
       break regions;
     } catch (e) {
       const timedOut = e instanceof Error && (e.name === "TimeoutError" || e.name === "AbortError");

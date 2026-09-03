@@ -1000,7 +1000,7 @@ void (async () => {
   summarised = true;
   console.log("\n── 16. A second region: configuration, order, the hint, and what the browser learns ──");
   {
-    const { readAltVoiceEnv, parseRegionHint } = await import("../src/lib/server/ai/voice/config");
+    const { readAltVoiceEnv, parseRegionHint, orderRegionSlots } = await import("../src/lib/server/ai/voice/config");
     process.env.AI_VOICE_ALT_BASE_URL = "https://alt.example/realtime";
     process.env.AI_VOICE_ALT_API_KEY = "alt-key";
     process.env.AI_VOICE_ALT_MODEL = "alt-model";
@@ -1045,8 +1045,29 @@ void (async () => {
     const route = readFileSync("src/app/api/ai/voice/session/route.ts", "utf8").replace(/\/\*[\s\S]*?\*\//g, "");
     check("both regions are parsed, and voice is off only when NEITHER serves",
       /const primary = parseVoiceConfig\(voiceEnv\(\)\);\s*const alt = parseVoiceConfig\(altVoiceEnv\(\)\);\s*if \(!primary && !alt\)/.test(route));
-    check("the primary is tried first unless the browser asked for the other one",
-      /if \(hint === "alt" && alt\) candidates\.push\(\{ slot: "alt", cfg: alt \}\);\s*if \(primary\) candidates\.push\(\{ slot: "primary", cfg: primary \}\);\s*if \(alt && !candidates\.some\(\(c\) => c\.slot === "alt"\)\) candidates\.push\(\{ slot: "alt", cfg: alt \}\);/.test(route));
+    /* WHICH REGION FIRST: the hint, then the slot that served last, then the
+       configured order. The memory is the fix for thirteen seconds of
+       mainland connect timeouts on every call and every resume. */
+    check("the order is the pure function's: hint, then memory, then configured order — and only slots that exist",
+      JSON.stringify(orderRegionSlots(null, null, { primary: true, alt: true })) === '["primary","alt"]' &&
+      JSON.stringify(orderRegionSlots(null, "alt", { primary: true, alt: true })) === '["alt","primary"]' &&
+      JSON.stringify(orderRegionSlots("primary", "alt", { primary: true, alt: true })) === '["primary","alt"]' &&
+      JSON.stringify(orderRegionSlots("alt", null, { primary: true, alt: true })) === '["alt","primary"]' &&
+      JSON.stringify(orderRegionSlots("alt", null, { primary: true, alt: false })) === '["primary"]' &&
+      JSON.stringify(orderRegionSlots(null, "primary", { primary: false, alt: true })) === '["alt"]' &&
+      JSON.stringify(orderRegionSlots(null, null, { primary: false, alt: false })) === "[]");
+    check("the route builds its candidates from that order, slots mapped back to the server's own configs",
+      /const order = orderRegionSlots\(hint, rememberedSlot\(\), \{ primary: primary !== null, alt: alt !== null \}\);/.test(route) &&
+      /order\.map\(\(slot\) => \(\{\s*slot,\s*cfg: \(slot === "alt" \? alt : primary\) as VoiceConfig,\s*\}\)\)/.test(route));
+    check("  …the memory is set only on an answer that is a call, after the ok line, and expires",
+      (() => { const ok = route.indexOf("[ai.voice] handshake ok"); const set = route.indexOf("lastServed = { slot: region.slot, at: Date.now() };"); const brk = route.indexOf("break regions;"); return ok > 0 && set > ok && brk > set; })() &&
+      /const LAST_SERVED_TTL_MS = 30 \* 60_000;/.test(route) && /return lastServed && Date\.now\(\) - lastServed\.at < LAST_SERVED_TTL_MS \? lastServed\.slot : null;/.test(route) &&
+      (route.match(/lastServed = /g) ?? []).length === 1);
+    check("  …and the ok line says which slot was asked first, so the log shows the memory working",
+      /budgetMs=\$\{budgetMs\} first=\$\{candidates\[0\]\.slot\}/.test(route));
+    const telemetryRoute = readFileSync("src/app/api/ai/voice/telemetry/route.ts", "utf8");
+    check("the beacon route accepts the three exits that are not failures — voice switch, unmount, page hidden",
+      /"voice-switched", "unmounted", "page-hidden",/.test(telemetryRoute));
     check("  …a hint can only reorder endpoints the server owns — it never becomes a url", !/hint[^\n]*sdpUrl|sdpUrl[^\n]*hint/.test(route));
     check("a region that fails every attempt hands over to the next; a success stops everything",
       /regions: for \(const region of candidates\)/.test(route) && /break regions;/.test(route));

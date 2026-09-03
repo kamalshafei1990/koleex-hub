@@ -28,6 +28,14 @@ export const maxDuration = 10;
 const REASONS = new Set([
   "connection-lost", "handshake-failed", "config-rejected", "service-unreachable", "service-refused",
   "unavailable", "no-microphone", "not-allowed", "signed-out", "resumed", "resume-failed",
+  /* THE EXITS THAT ARE NOT FAILURES. A call that ended with no failure
+     beacon was invisible here — and the owner met exactly that: five
+     handshakes in four minutes, a transcript that kept going, and not one
+     line saying why. These name the three ways a live call ends without
+     fail(): the caller switched voice (the call is rebuilt), the screen was
+     unmounted under it, or the page itself went away (a reload, a killed
+     tab). One warn line each, states and counts only, like the rest. */
+  "voice-switched", "unmounted", "page-hidden",
 ]);
 const short = (v: unknown, max: number) => (typeof v === "string" ? v.replace(/[^\w.:-]/g, "").slice(0, max) : "");
 const num = (v: unknown) => (typeof v === "number" && Number.isFinite(v) ? Math.max(0, Math.round(v)) : 0);

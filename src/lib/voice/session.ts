@@ -358,7 +358,16 @@ export class VoiceSession {
     /** The caller's UI language, as a hint for transcribing their speech.
      *  Sent as a code the server allow-lists; the server writes the session. */
     private readonly sttLanguage: string | null = null,
-  ) {}
+    /** Where the LAST call from this screen was served, when this one
+     *  continues it (a resume after a drop, a voice switch). Two allow-listed
+     *  words the server maps to endpoints it owns; the server may still
+     *  choose otherwise. Without it a resume started from the configured
+     *  order and could spend the whole reconnect budget timing out on a
+     *  region the previous call had already found unreachable. */
+    initialRegion: "primary" | "alt" | null = null,
+  ) {
+    if (initialRegion) this.regionHint = initialRegion;
+  }
 
   /* ---------------------------------------------------------------------
      TYPE INTO THE CALL. A model code, a quantity, a name in another alphabet

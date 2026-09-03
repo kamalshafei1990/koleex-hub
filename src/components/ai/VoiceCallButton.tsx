@@ -179,6 +179,13 @@ export default function VoiceCallButton({
   onTurnsSaved,
 }: VoiceCallButtonProps) {
   const [state, setState] = useState<VoiceState>("idle");
+  /* True from a voice switch until the rebuilt call is up or has failed. The
+     screen stays mounted on it — see the portal condition — because the
+     session goes `ended` and then `requesting-mic` in between, and either
+     alone would unmount the call the caller is still on. */
+  const [swapping, setSwapping] = useState(false);
+  /* Where the last session was served, for a call that continues it. */
+  const regionHintRef = useRef<"primary" | "alt" | null>(null);
   const [phase, setPhase] = useState<VoicePhase>(null);
   const [lines, setLines] = useState<readonly TranscriptLine[]>([]);
   /* Kept in state rather than a ref: the meter hook takes the stream as a
@@ -325,7 +332,22 @@ export default function VoiceCallButton({
      leaves the microphone captured and the recording indicator lit — the one
      failure here a user would rightly call a betrayal. */
   useEffect(() => {
+    /* THE EXITS NOTHING REPORTED. A live call ended by a reload, a killed
+       tab, or a parent unmounting this button left no line in the log —
+       the failure beacon fires only from fail(). One beacon each, before
+       the teardown, so the next "it just stopped" has a reason beside it. */
+    const beacon = (reason: "unmounted" | "page-hidden") => {
+      const s = sessionRef.current;
+      if (!s) return;
+      const st = s.getState();
+      if (st !== "live" && st !== "reconnecting") return;
+      sendVoiceTelemetry({ reason, resumes: resumesRef.current, ...s.diagnostics() });
+    };
+    const onPageHide = () => beacon("page-hidden");
+    window.addEventListener("pagehide", onPageHide);
     return () => {
+      window.removeEventListener("pagehide", onPageHide);
+      beacon("unmounted");
       sessionRef.current?.stop();
       sessionRef.current = null;
       /* The last settled turn is often still queued at the moment the screen
@@ -337,7 +359,11 @@ export default function VoiceCallButton({
     };
   }, []);
 
-  const hangUp = useCallback(() => {
+  /* THE RELEASE, WITHOUT THE EXIT. Everything a finished call gives back —
+     microphone, connection, writer, tones, streams — but not the step to
+     `idle`, so a caller who is about to start the next session (a voice
+     switch) can do so with the screen still up. hangUp is this plus idle. */
+  const releaseCall = useCallback(() => {
     sessionRef.current?.stop();
     sessionRef.current = null;
     void persisterRef.current?.finish();
@@ -353,7 +379,6 @@ export default function VoiceCallButton({
     setMicStream(null);
     setFarStream(null);
     setPhase(null);
-    setState("idle");
     setMuted(false);
     clearSearchTimer();
     setSearching(false);
@@ -366,6 +391,11 @@ export default function VoiceCallButton({
     /* clearSearchTimer is a stable useCallback([]) — naming it here satisfies
        the exhaustive-deps rule without making this callback churn. */
   }, [clearSearchTimer]);
+
+  const hangUp = useCallback(() => {
+    releaseCall();
+    setState("idle");
+  }, [releaseCall]);
 
   const startCall = useCallback(async (opts?: { resume?: boolean }) => {
     if (sessionRef.current) return;
@@ -418,6 +448,7 @@ export default function VoiceCallButton({
         if (next === "live" && liveSinceRef.current === null) liveSinceRef.current = Date.now();
         if (next === "failed" && failure) {
           const diag = sessionRef.current?.diagnostics();
+          if (diag) regionHintRef.current = diag.region === "alt" ? "alt" : "primary";
           const wasUp = liveSinceRef.current !== null && Date.now() - liveSinceRef.current >= RESUME_MIN_LIVE_MS;
           const canResume = failure === "connection-lost" && wasUp && resumesRef.current < MAX_RESUMES;
           sendVoiceTelemetry({ reason: canResume ? "resumed" : failure, resumes: resumesRef.current, ...diag });
@@ -527,7 +558,10 @@ export default function VoiceCallButton({
           persisterRef.current?.observe(linesRef.current);
         }
       },
-    }, voiceKeyRef.current, conversationIdRef.current, sttLangRef.current);
+    }, voiceKeyRef.current, conversationIdRef.current, sttLangRef.current,
+    /* A continued call starts where the last one was served; a new call
+       leaves the choice to the server. */
+    opts?.resume ? regionHintRef.current : null);
 
     sessionRef.current = session;
     await session.start();
@@ -615,13 +649,28 @@ export default function VoiceCallButton({
     setVoiceKey(key);
     voiceKeyRef.current = key;
     saveVoiceKey(key);
-    if (sessionRef.current) {
-      hangUp();
-      /* After the teardown, not during it: start() refuses while a session
-         handle is still held. */
-      queueMicrotask(() => void startCallRef.current?.());
-    }
-  }, [hangUp]);
+    const current = sessionRef.current;
+    if (!current) return;
+    /* THE CALL IS REBUILT WITH THE SCREEN STILL UP. The first version hung
+       up and started again: the state went idle, the portal unmounted the
+       call screen, and the caller was back in the text chat for the whole
+       handshake — the owner's "the conversation stopped and took me out of
+       the voice chat", the day the picker appeared. Now the screen stays,
+       says connecting, keeps the words, and the new session asks for the
+       region that served the old one first. The beacon is what makes the
+       next such report answerable from the log. */
+    const diag = current.diagnostics();
+    sendVoiceTelemetry({ reason: "voice-switched", resumes: resumesRef.current, ...diag });
+    regionHintRef.current = diag.region === "alt" ? "alt" : "primary";
+    setSwapping(true);
+    releaseCall();
+    /* After the teardown, not during it: start() refuses while a session
+       handle is still held. */
+    queueMicrotask(() => {
+      const started = startCallRef.current?.({ resume: true });
+      void (started ?? Promise.resolve()).finally(() => setSwapping(false));
+    });
+  }, [releaseCall]);
 
   const busy = state === "requesting-mic" || state === "connecting";
   const labels = LABEL_COPY[lang];
@@ -641,7 +690,7 @@ export default function VoiceCallButton({
           fixed element inside a transformed ancestor is fixed to THAT
           ancestor and stacked inside it: its z-index never competes with the
           header at all. Rendered at the body it is what it claims to be. */}
-      {(connected || busy) && typeof document !== "undefined" && createPortal(
+      {(connected || busy || swapping) && typeof document !== "undefined" && createPortal(
         <VoiceCallScreen
           live={connected}
           ready={ready}
