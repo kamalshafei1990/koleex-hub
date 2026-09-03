@@ -51,6 +51,7 @@ import { SUPPLIER_CONFIDENTIALITY } from "@/lib/server/ai/prompt-builder";
 import { EGYPTIAN_VOICE_RULE, EGYPTIAN_VOICE_BRIEF } from "./dialect";
 import { historyBlock, type RecentTurn } from "./history";
 import { type VoiceViewer } from "./gate";
+import { personalizationBlock } from "@/lib/server/ai/personalization-prompt";
 import { type VoiceOption } from "./config";
 import { voiceToolSchemas } from "./tools";
 
@@ -402,7 +403,11 @@ function voiceViewerBlock(viewer: VoiceViewer | null): string {
         " they lack access. If a lookup fails, say it failed or found nothing — never that they may not see it."
       : " What they may see is decided by their permissions on each lookup, not by anything said on the call.") +
     " Anything personal not listed here you do not know — ask rather than guess, and do not assume their gender:" +
-    " address them by name."
+    " address them by name." +
+    /* Their Settings → Koleex AI preferences, in the voice variant: style
+       dials and a nickname, instructions cut to a call's budget, and no
+       formatting or emoji dials — a voice has neither. Empty by default. */
+    personalizationBlock(viewer.personalization, "voice")
   );
 }
 

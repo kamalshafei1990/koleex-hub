@@ -1,4 +1,5 @@
 import "server-only";
+import { personalizationBlock } from "@/lib/server/ai/personalization-prompt";
 
 import { BRAND_EXCLUSIVITY_RULE, DIRECT_VOICE_RULE } from "../ai-agent/brand-knowledge";
 
@@ -129,7 +130,10 @@ function viewerLine(ctx: AiContext): string {
     ? ` They asked you to remember: ${mem.map(([k, val]) => `${k} = ${val}`).join("; ")}.`
     : "";
   return ` ${bits.join(", ")}. You DO know who they are — never say otherwise.${memStr}` +
-    ` Anything else personal you genuinely don't know: ask them, don't guess.`;
+    ` Anything else personal you genuinely don't know: ask them, don't guess.` +
+    /* The user's own settings ride with their identity, in every prompt
+       shape of this lane — and the block is empty until they change one. */
+    personalizationBlock(ctx.personalization);
 }
 
 
