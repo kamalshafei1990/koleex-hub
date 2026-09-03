@@ -43,6 +43,10 @@ export const TOOL_TIMEOUT_OVERRIDES: Readonly<Record<string, number>> = Object.f
      bounded, because "the internet is slow" is not a reason to hold the turn
      open indefinitely. */
   search_web: 25_000,
+  /* A generation is tens of seconds of a vendor's GPU. The adapter's own
+     bound is 45 s (IMAGE_TIMEOUT_MS); this sits just above it so the
+     adapter's cause, not a bare timeout, is what the model relays. */
+  generate_image: 50_000,
 });
 
 export function timeoutFor(toolName: string): number {

@@ -51,6 +51,7 @@ import {
   isBusinessDataQuery,
   isWorkDataQuery,
   isLiveInfoQuery,
+  isImageCreationRequest,
 } from "@/lib/server/ai/core/decide-turn";
 import { tryCannedReply } from "@/lib/server/ai/core/canned-replies";
 import { chatWithTools, activeProviderLabel } from "@/lib/server/ai/provider/registry";
@@ -481,7 +482,10 @@ export async function POST(req: Request) {
              too. Any future tool that answers everyday questions needs the
              same treatment or this lane will swallow it. */
           const isLiveInfo =
-            isLiveInfoQuery(normalizedContent) || body.web_search === true;
+            isLiveInfoQuery(normalizedContent) ||
+            /* "Draw me…" needs generate_image, which only the tool loop has. */
+            isImageCreationRequest(normalizedContent) ||
+            body.web_search === true;
           /* Memory/teaching intents ("remember this", "save for the team",
              "احفظ", "تذكر", "记住") MUST reach the tool loop — the fast
              lanes carry no tools, so they can only HALLUCINATE a saved

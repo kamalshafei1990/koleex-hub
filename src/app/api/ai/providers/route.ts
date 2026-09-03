@@ -55,6 +55,7 @@ import { createBreaker } from "@/lib/server/ai/router/circuit-breaker";
 import { latencyStats } from "@/lib/server/ai/observability/latency-stats";
 import { voiceConfigured, diagnoseVoiceConfig, type VoiceEnv } from "@/lib/server/ai/voice/config";
 import { probeVoice } from "@/lib/server/ai/voice/probe";
+import { imageGenConfigured, diagnoseImageConfig, readImageEnv } from "@/lib/server/ai/image-gen";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 30;
@@ -143,6 +144,15 @@ export async function GET(req: Request) {
     ...(voiceIsConfigured ? {} : { not_configured_because: diagnoseVoiceConfig(voiceEnv()) }),
   };
 
+  /* IMAGE CREATION, the same way. Not probed: a probe would be a paid
+     picture, and "configured" plus the variable names is what an operator
+     needs to finish the setup. The first real request is the probe. */
+  const imageIsConfigured = imageGenConfigured(readImageEnv());
+  const imageStatus = {
+    configured: imageIsConfigured,
+    ...(imageIsConfigured ? {} : { not_configured_because: diagnoseImageConfig(readImageEnv()) }),
+  };
+
   const params = new URL(req.url).searchParams;
   const wantProbe = params.get("probe") === "1";
 
@@ -167,6 +177,7 @@ export async function GET(req: Request) {
       configured_count: configured.length,
       ...(fallbackProblems ? { fallback_not_configured_because: fallbackProblems } : {}),
       voice: voiceStatus,
+      image: imageStatus,
       /* Said plainly, because "configured" reads as "working" and is not.
          An operator who stops at this line should know what they have. */
       note:
@@ -299,6 +310,7 @@ export async function GET(req: Request) {
     configured_count: configured.length,
     ...(fallbackProblems ? { fallback_not_configured_because: fallbackProblems } : {}),
     voice: { ...voiceStatus, ...(voiceProbe ? { probe: voiceProbe } : {}) },
+    image: imageStatus,
     probes,
     ...(samples > 1
       ? {
