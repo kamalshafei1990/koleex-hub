@@ -415,8 +415,10 @@ async function main() {
     const code = src.replace(/\/\*[\s\S]*?\*\//g, "");
     check("a server-opened channel is still wired, rather than assumed away",
       /pc\.ondatachannel = /.test(code));
+    /* THREE: stop, fail, and the re-handshake on the other region, which
+       discards the first connection's channel before negotiating a new one. */
     check("the channel is dropped on teardown like every other handle",
-      (code.match(/this\.channel = null/g) ?? []).length === 2);
+      (code.match(/this\.channel = null/g) ?? []).length === 3);
   }
 
   console.log("\n── 6. The module cannot be pointed anywhere else ──");
@@ -1612,6 +1614,83 @@ console.log("\n── 12. Mute ──");
   check("reduced motion stills the rings", /prefers-reduced-motion: reduce\) \{\s*\.kx-call-ring \{[^}]*transform: none !important/.test(css));
   const hook = fs16.readFileSync("src/components/ai/useCallLevel.ts", "utf8");
   check("the frame loop uses stepLevel, cancels on cleanup, and resets the variable", /stepLevel\(current, target\.current\)/.test(hook) && /cancelAnimationFrame\(raf\)/.test(hook) && /setProperty\(CALL_LEVEL_VAR, "0"\)/.test(hook));
+}
+
+{
+  console.log("\n── 17. A call whose media never connects tries the other region — once ──");
+  /* THE VPN CASE. The handshake succeeds (our server reached a vendor), the
+     answer is applied, the call is "live" — and ICE never connects, because
+     the browser's media path leaves the country and never reaches the
+     mainland host. Before this, that ended as "connection-lost" after the
+     grace window. Now, if the server said another region exists, the
+     handshake is done once more asking for it. */
+  const twoRegion = (region: "primary" | "alt", alt_available: boolean) =>
+    ({ sdp: ANSWER, session: { type: "session.update", session: {} }, session_compact: { type: "session.update", session: {} }, region, alt_available });
+  {
+    const recorded: Recorded[] = [];
+    const r = await run({ recorded, envelope: twoRegion("primary", true) });
+    check("the call is live after the first handshake", r.session.getState() === "live" && recorded.length === 1);
+    check("  …which carried no region hint", !/region=/.test(recorded[0].url));
+    r.pcCalls.channel?.open();
+    const sentBefore = r.pcCalls.sent.length;
+    check("  …and the configuration went out on the first channel", sentBefore === 1 && /session\.update/.test(r.pcCalls.sent[0]));
+    r.ice("failed");
+    check("media that never connects is a recovery state first, not a failure", r.session.getState() === "reconnecting");
+    await sleep(160);
+    check("after the grace window the handshake is done AGAIN, asking for the other slot",
+      recorded.length === 2 && /[?&]region=alt(&|$)/.test(recorded[1].url));
+    check("  …through connecting back to live, with no failure shown", r.states.some(([st]) => st === "connecting") && r.session.getState() === "live" && r.states.every(([st]) => st !== "failed"));
+    check("  …the first connection was closed and a new one negotiated", r.pcCalls.closed === 1 && r.pcCalls.remoteSdp.length > 0);
+    check("  …and the microphone was KEPT across it — no second permission prompt", !r.mic.allStopped());
+    r.pcCalls.channel?.open();
+    check("  …and the session configuration is sent AFRESH on the new channel — a connected call is silent until it is",
+      r.pcCalls.channels.length === 2 && r.pcCalls.sent.length === sentBefore + 1 && /session\.update/.test(r.pcCalls.sent[sentBefore]));
+    r.ice("failed");
+    await sleep(160);
+    const last = r.states[r.states.length - 1];
+    check("a second failure is final — the other region is tried once, never in a loop", recorded.length === 2 && last[0] === "failed" && last[1] === "connection-lost");
+    check("  …and the microphone is released then", r.mic.allStopped());
+  }
+  {
+    const recorded: Recorded[] = [];
+    const r = await run({ recorded, envelope: twoRegion("alt", true) });
+    r.ice("failed");
+    await sleep(160);
+    check("a call served by the alt asks for the primary", recorded.length === 2 && /[?&]region=primary(&|$)/.test(recorded[1].url));
+    r.session.stop();
+  }
+  {
+    const recorded: Recorded[] = [];
+    const r = await run({ recorded, envelope: twoRegion("primary", false) });
+    r.ice("failed");
+    await sleep(160);
+    const last = r.states[r.states.length - 1];
+    check("with no other region there is no second handshake, and the failure is reported as before", recorded.length === 1 && last[0] === "failed" && last[1] === "connection-lost");
+  }
+  {
+    const recorded: Recorded[] = [];
+    const r = await run({ recorded });
+    r.ice("failed");
+    await sleep(160);
+    check("an envelope without the fields reads as primary with no alternative", recorded.length === 1 && r.session.getState() === "failed");
+  }
+  {
+    const recorded: Recorded[] = [];
+    const r = await run({ recorded, envelope: twoRegion("primary", true) });
+    r.ice("connected");
+    r.ice("disconnected");
+    await sleep(160);
+    const last = r.states[r.states.length - 1];
+    check("a call that was up and dropped does not switch region — the network went, not the endpoint", recorded.length === 1 && last[0] === "failed" && last[1] === "connection-lost");
+  }
+  {
+    const recorded: Recorded[] = [];
+    const r = await run({ recorded, envelope: twoRegion("primary", true) });
+    r.ice("failed");
+    r.session.stop();
+    await sleep(160);
+    check("hanging up during the grace window ends the call — no handshake is started afterwards", recorded.length === 1 && r.session.getState() === "ended" && r.mic.allStopped());
+  }
 }
 
 console.log(`\n${pass} passed, ${failures.length} failed`);

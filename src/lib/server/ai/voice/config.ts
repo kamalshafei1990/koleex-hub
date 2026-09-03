@@ -157,6 +157,52 @@ export function voiceConfigured(env: VoiceEnv): boolean {
 }
 
 /* ---------------------------------------------------------------------------
+   THE SECOND REGION. The design said the seam for it existed and that a
+   second region would be configuration rather than a rewrite; this is that
+   seam being used, and the reason is in the log rather than in a plan:
+
+     watchdog, one day:  21 handshakes reached the vendor, 11 did not
+     12:04 UTC, a real call: 504, UND_ERR_CONNECT_TIMEOUT, four attempts
+
+   The mainland endpoint answers our Tokyo function about two times in
+   three. And a caller on a VPN has a second problem the server never sees:
+   the browser's media path leaves the country and may never reach a
+   mainland RTC host at all. One region cannot serve both a caller in
+   Shenzhen without a VPN and the same caller with one.
+
+   So: the same four variables, prefixed ALT, name a second endpoint — the
+   vendor's international region, or a second vendor entirely. It is parsed
+   by the SAME parser and refused by the same rules; nothing about it is
+   special except that it is tried second (or first, when the browser has
+   found the other unreachable). Absent, everything behaves as before.
+
+   THE CLIENT NEVER NAMES A REGION. It may say "the other one", as a hint
+   the server allow-lists to two words; which endpoint that is, and whether
+   it exists, stays here. */
+export type VoiceRegionSlot = "primary" | "alt";
+
+/** The ALT variables, mapped into the ordinary VoiceEnv shape so one
+ *  parser and one diagnosis serve both regions. */
+export function readAltVoiceEnv(): VoiceEnv {
+  return {
+    AI_VOICE_BASE_URL: process.env.AI_VOICE_ALT_BASE_URL,
+    AI_VOICE_API_KEY: process.env.AI_VOICE_ALT_API_KEY,
+    AI_VOICE_MODEL: process.env.AI_VOICE_ALT_MODEL,
+    AI_VOICE_REGION_LABEL: process.env.AI_VOICE_ALT_REGION_LABEL,
+    /* The catalogue is the owner's product language and belongs to the
+       call, not to a region: the same voices are offered whichever
+       endpoint serves. A vendor that does not know a voice id uses its
+       default, which is the existing behaviour for an unknown key. */
+    AI_VOICE_VOICES: process.env.AI_VOICE_VOICES,
+  };
+}
+
+/** The browser's hint, allow-listed to two words. Anything else is no hint. */
+export function parseRegionHint(raw: string | null | undefined): VoiceRegionSlot | null {
+  return raw === "alt" || raw === "primary" ? raw : null;
+}
+
+/* ---------------------------------------------------------------------------
    WHY WHICH ONE FAILED IS WORTH REPORTING SEPARATELY.
 
    parseVoiceConfig has five rejection paths and every one of them returns the

@@ -282,6 +282,16 @@ export class VoiceSession {
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
   /** Has ICE ever actually connected? Decides whether "failed" is final. */
   private iceEverConnected = false;
+  /* THE OTHER REGION. The server may hold a second endpoint (see the
+     server's voice/config.ts for why). It tells this client two things with
+     the answer: which SLOT served — a neutral word, never a host — and
+     whether another exists. If this call's media never connects, which is
+     what a VPN does to a mainland endpoint, the handshake is done ONCE more
+     asking for the other slot. The server decides what that is. */
+  private servedRegion: "primary" | "alt" = "primary";
+  private altAvailable = false;
+  private regionHint: "primary" | "alt" | null = null;
+  private regionRetried = false;
   /** Mirrors the mic tracks' enabled flag, so the UI has one thing to read. */
   private muted = false;
   /** call_id → tool name, because the protocol sends the two halves apart. */
@@ -576,9 +586,21 @@ export class VoiceSession {
     this.clearReconnectTimer();
     this.reconnectTimer = setTimeout(() => {
       this.reconnectTimer = null;
+      if (this.state !== "reconnecting") return;
+      /* NEVER UP, AND THERE IS ANOTHER REGION: try it, once. A call whose
+         media never connected through this endpoint is the shape a VPN
+         produces, and the other endpoint is the one thing that changes it. A
+         call that WAS up and dropped is a different failure — the network
+         went away — and a second region does not bring it back. */
+      if (!this.iceEverConnected && this.altAvailable && !this.regionRetried) {
+        this.regionRetried = true;
+        this.regionHint = this.servedRegion === "alt" ? "primary" : "alt";
+        void this.reconnectViaOtherRegion();
+        return;
+      }
       /* Still not back. A call that has been silent this long is over, and
          saying so beats leaving a live-looking screen in front of someone. */
-      if (this.state === "reconnecting") this.fail("connection-lost");
+      this.fail("connection-lost");
     }, this.deps.reconnectGraceMs ?? RECONNECT_GRACE_MS);
   }
 
@@ -630,6 +652,37 @@ export class VoiceSession {
        a far-end connection exists. */
     this.events.onLocalStream?.(this.mic);
 
+    await this.connect();
+  }
+
+  /** The handshake again, on the other region, with the microphone kept.
+   *  Everything the first connection negotiated is discarded: a new peer
+   *  connection, a new channel, a session configuration to be sent afresh. */
+  private async reconnectViaOtherRegion(): Promise<void> {
+    if (!this.mic || this.state === "ended" || this.state === "failed") return;
+    try {
+      this.pc?.close();
+    } catch { /* see stop() */ }
+    this.pc = null;
+    this.channel = null;
+    this.configSent = false;
+    this.configAckPending = false;
+    this.compactRetried = false;
+    this.readyFired = false;
+    this.sessionUpdate = null;
+    this.sessionUpdateCompact = null;
+    this.iceEverConnected = false;
+    await this.connect();
+  }
+
+  /** Negotiate one connection: peer connection, offer, our route, answer.
+   *  Resolves when the answer is applied or after failing — the outcome is
+   *  the STATE. Requires the microphone to be held already. */
+  private async connect(): Promise<void> {
+    if (!this.mic) {
+      this.fail("no-microphone");
+      return;
+    }
     this.setState("connecting");
     let pc: RTCPeerConnection;
     try {
@@ -741,6 +794,10 @@ export class VoiceSession {
       if (this.conversationId) query.set("conversation", this.conversationId);
       /* A hint, not a setting: the server allow-lists the code and decides. */
       if (this.sttLanguage) query.set("stt", this.sttLanguage);
+      /* "The other one" — two allow-listed words the server maps to endpoints
+         it owns. Sent only after a call through the served region never
+         connected its media. */
+      if (this.regionHint) query.set("region", this.regionHint);
       const qs = query.toString();
       const path = qs ? `${HANDSHAKE_PATH}?${qs}` : HANDSHAKE_PATH;
       const res = await this.deps.fetchFn(path, {
@@ -790,8 +847,13 @@ export class VoiceSession {
       let answer = "";
       try {
         const body: unknown = await res.json();
-        const env = body as { sdp?: unknown; session?: unknown; session_compact?: unknown };
+        const env = body as { sdp?: unknown; session?: unknown; session_compact?: unknown; region?: unknown; alt_available?: unknown };
         answer = typeof env.sdp === "string" ? env.sdp : "";
+        /* Which slot served, and whether there is another. Two words; a
+           value that is neither reads as the primary with no alternative,
+           which is the behaviour before the second region existed. */
+        this.servedRegion = env.region === "alt" ? "alt" : "primary";
+        this.altAvailable = env.alt_available === true;
         /* Serialised here, once, so what goes on the wire is exactly what the
            server sent and this module never reshapes it. */
         if (env.session && typeof env.session === "object") {

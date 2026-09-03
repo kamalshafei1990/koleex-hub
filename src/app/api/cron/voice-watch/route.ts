@@ -32,7 +32,7 @@ import "server-only";
    --------------------------------------------------------------------------- */
 
 import { NextResponse } from "next/server";
-import { readVoiceEnv } from "@/lib/server/ai/voice/config";
+import { readVoiceEnv, readAltVoiceEnv } from "@/lib/server/ai/voice/config";
 import { probeVoice } from "@/lib/server/ai/voice/probe";
 
 export const dynamic = "force-dynamic";
@@ -55,47 +55,74 @@ export async function GET(req: Request) {
     }
   }
 
-  const env = readVoiceEnv();
-  const probe = await probeVoice(env, fetch, WATCH_TIMEOUT_MS);
+  /* BOTH REGIONS, EACH ON ITS OWN LINE. The second region exists because the
+     first answers our function two times in three (see config.ts); a watchdog
+     that measured only the first would say nothing about whether the
+     fallback a caller lands on is any better. Probed in parallel so the run
+     still fits its ceiling; a second region that is not configured is simply
+     not a row. */
+  const regions = [
+    { slot: "primary", env: readVoiceEnv() },
+    { slot: "alt", env: readAltVoiceEnv() },
+  ] as const;
+  const probed = await Promise.all(
+    regions.map(async (r) => ({ ...r, probe: await probeVoice(r.env, fetch, WATCH_TIMEOUT_MS) })),
+  );
+  const configured = probed.filter((r) => r.probe !== null);
 
   /* Nothing to watch is not a failure. It is logged once so a deployment that
      LOST its configuration is visible, then answered quietly. */
-  if (!probe) {
+  if (configured.length === 0) {
     console.warn("[ai.voice.watch] not configured — nothing to probe");
     return NextResponse.json({ configured: false });
   }
 
   const from = process.env.VERCEL_REGION ?? "local";
-  const region = env.AI_VOICE_REGION_LABEL?.trim() || "default";
 
-  /* ONE LINE, ONE VERDICT. `ok` means the endpoint ANSWERED — an HTTP status
-     came back, so DNS, routing and TCP all worked. That is the thing that has
-     been failing; whether the status was the expected 400 is the second,
-     separate question probe.verdict already answers. Never the URL, never the
-     key, never the vendor's own words. */
-  const line =
-    `[ai.voice.watch] ${probe.reachable ? "ok" : "fail"} from=${from} region=${region} ` +
-    `status=${probe.status ?? "none"} afterMs=${probe.ms} cause=${probe.cause ?? "none"}`;
-  if (probe.reachable) console.log(line);
-  else console.error(line);
-
-  /* THE STATUS CODE IS THE COUNTABLE SIGNAL. The first four runs of this
-     watchdog all returned 200 whatever the probe found, and the log query
-     tools surface error-level lines far more reliably than info ones — so
-     four green requests said nothing about the path. A 503 on an unreachable
-     endpoint makes the verdict visible in the status-code breakdown and in
-     the platform's own cron history, where a failed run is a failed run.
-     The body is unchanged; only the code carries the verdict now. */
-  return NextResponse.json(
-    {
-      configured: true,
+  /* ONE LINE PER REGION, ONE VERDICT EACH. `ok` means the endpoint ANSWERED —
+     an HTTP status came back, so DNS, routing and TCP all worked. That is the
+     thing that has been failing; whether the status was the expected 400 is
+     the second, separate question probe.verdict already answers. Never the
+     URL, never the key, never the vendor's own words. */
+  const rows = configured.map((r) => {
+    const probe = r.probe!;
+    const region = r.env.AI_VOICE_REGION_LABEL?.trim() || "default";
+    const line =
+      `[ai.voice.watch] ${probe.reachable ? "ok" : "fail"} slot=${r.slot} from=${from} region=${region} ` +
+      `status=${probe.status ?? "none"} afterMs=${probe.ms} cause=${probe.cause ?? "none"}`;
+    if (probe.reachable) console.log(line);
+    else console.error(line);
+    return {
+      slot: r.slot,
       reachable: probe.reachable,
       credential_ok: probe.credential_ok,
       status: probe.status,
       ms: probe.ms,
       cause: probe.cause,
+    };
+  });
+  const anyReachable = rows.some((r) => r.reachable);
+  const primary = rows.find((r) => r.slot === "primary") ?? rows[0];
+
+  /* THE STATUS CODE IS THE COUNTABLE SIGNAL. The first four runs of this
+     watchdog all returned 200 whatever the probe found, and the log query
+     tools surface error-level lines far more reliably than info ones — so
+     four green requests said nothing about the path. A 503 when NO region is
+     reachable makes the verdict visible in the status-code breakdown and in
+     the platform's own cron history, where a failed run is a failed run. A
+     primary that is down while the alt answers is a 200 with a failing row:
+     callers are being served, and the row says by whom. */
+  return NextResponse.json(
+    {
+      configured: true,
+      reachable: primary.reachable,
+      credential_ok: primary.credential_ok,
+      status: primary.status,
+      ms: primary.ms,
+      cause: primary.cause,
       from,
+      regions: rows,
     },
-    { status: probe.reachable ? 200 : 503 },
+    { status: anyReachable ? 200 : 503 },
   );
 }
