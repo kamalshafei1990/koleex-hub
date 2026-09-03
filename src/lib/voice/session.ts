@@ -36,6 +36,16 @@ import {
   type VoiceToolCall,
 } from "./tool-calls";
 import { EV_SESSION_CREATED, EV_SESSION_UPDATED, EV_ERROR } from "./events";
+
+/** The event's `type`, for the diagnostics line — or "" when it has none. */
+function eventTypeOf(raw: string): string {
+  try {
+    const v: unknown = JSON.parse(raw);
+    return v && typeof v === "object" && typeof (v as { type?: unknown }).type === "string" ? (v as { type: string }).type : "";
+  } catch {
+    return "";
+  }
+}
 import { buildTextTurnMessages } from "./text-turn";
 
 /** True when a DataChannel message is exactly this event.
@@ -101,6 +111,16 @@ export type VoiceFailure =
    *  distinguished from a failed handshake because the two need different
    *  fixes and the first version reported both the same way. */
   | "config-rejected";
+
+export type VoiceDiagnostics = {
+  elapsed_ms: number;
+  ice: string;
+  dc: string;
+  last_event: string;
+  tool_calls: number;
+  region: "primary" | "alt";
+  ice_ever_connected: boolean;
+};
 
 export type VoiceEvents = {
   onState?: (state: VoiceState, failure?: VoiceFailure) => void;
@@ -171,7 +191,14 @@ const ICE_GATHER_TIMEOUT_MS = 6_000;
    inside — and finite, because "no uncontrolled agent loops" has to be true
    of the voice path too. The server enforces its own budget independently,
    which is what survives a page that has been tampered with. */
-const MAX_TOOL_CALLS_PER_SESSION = 12;
+/* SIXTY, NOT TWELVE. Twelve was spent in four minutes of one real call: the
+   model reaches for three or four tools per question (a search that finds
+   nothing, a broader one, the product's details, its price), and after the
+   twelfth every "show me its picture" was answered from memory — the caller
+   heard "the picture shows a small machine" and saw no picture, then "no
+   photo" for a stadium. The server's per-minute budget is the rate limit;
+   this is only the ceiling that keeps a runaway loop finite. */
+const MAX_TOOL_CALLS_PER_SESSION = 60;
 
 /* HOW LONG A DROPPED CONNECTION MAY TRY TO COME BACK. `disconnected` is
    routinely transient — a handover between networks, a VPN re-establishing a
@@ -311,6 +338,12 @@ export class VoiceSession {
    *  source. */
   private toolCallCount = 0;
   private state: VoiceState = "idle";
+  /* FOR THE BEACON. When a call ends by itself nobody can say why from the
+     server: the audio never touched it. These few facts travel with the
+     failure so the next "it stopped by itself" has a cause attached. No
+     content, no transcript — states and counts only. */
+  private startedAt = 0;
+  private lastEventType = "";
 
   constructor(
     private readonly deps: VoiceDeps,
@@ -378,6 +411,19 @@ export class VoiceSession {
 
   getState(): VoiceState {
     return this.state;
+  }
+
+  /** States and counts only — what a log line needs to explain a failure. */
+  diagnostics(): VoiceDiagnostics {
+    return {
+      elapsed_ms: this.startedAt ? Date.now() - this.startedAt : 0,
+      ice: this.pc?.iceConnectionState ?? "none",
+      dc: this.channel?.readyState ?? "none",
+      last_event: this.lastEventType.slice(0, 60),
+      tool_calls: this.toolCallCount,
+      region: this.servedRegion,
+      ice_ever_connected: this.iceEverConnected,
+    };
   }
 
   private setState(next: VoiceState, failure?: VoiceFailure) {
@@ -498,6 +544,7 @@ export class VoiceSession {
         }
       }
     }
+    this.lastEventType = eventTypeOf(raw);
     this.events.onMessage?.(raw);
 
     /* UNTRUSTED. This came off a network socket and describes something the
@@ -535,7 +582,7 @@ export class VoiceSession {
          and carry on. */
       this.sendToolResult(channel, call.callId, {
         ok: false,
-        message: "That is as many lookups as one call can make. Ask again in a new call.",
+        message: "This call has used all its lookups. Tell the caller plainly that you cannot look anything else up on this call and that a new call resets it — never answer from memory as if you had looked.",
       });
       return;
     }
@@ -608,6 +655,13 @@ export class VoiceSession {
     }, this.deps.reconnectGraceMs ?? RECONNECT_GRACE_MS);
   }
 
+  /** The data channel closed under a call that was up. */
+  private onChannelClosed(): void {
+    if (this.state !== "live" && this.state !== "reconnecting") return;
+    if (this.state === "live") this.setState("reconnecting");
+    this.armReconnectTimer();
+  }
+
   private clearReconnectTimer(): void {
     if (this.reconnectTimer !== null) {
       clearTimeout(this.reconnectTimer);
@@ -634,6 +688,7 @@ export class VoiceSession {
     if (this.state === "connecting" || this.state === "live") return;
 
     this.setState("requesting-mic");
+    this.startedAt = Date.now();
     try {
       this.mic = await this.deps.getMicrophone();
     } catch {
@@ -773,6 +828,13 @@ export class VoiceSession {
         local.onmessage = (m: MessageEvent) => {
           if (typeof m.data === "string") this.onChannelMessage(m.data, local);
         };
+        /* THE FAR SIDE CAN CLOSE THE CHANNEL WITH THE AUDIO STILL UP — a
+           session the vendor ended, a limit reached on its side. Nothing
+           watched for it: the screen said live, the model heard nothing, and
+           the call "stopped by itself". Treated like a dropped connection:
+           reconnecting, the grace window, then a failure the button can
+           resume from — never a live-looking dead line. */
+        local.onclose = () => this.onChannelClosed();
         /* Already open is possible in a test double and cheap to cover. */
         this.sendSessionConfig(local);
         this.channel = local;

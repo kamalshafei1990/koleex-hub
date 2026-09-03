@@ -109,10 +109,13 @@ export const VOICE_TOOL_NAMES: readonly string[] = [
  * A CAP, NOT A RATE LIMIT, and it is here because a model that can call a
  * tool and then be asked to speak again can do that forever. The standing
  * rule is no uncontrolled agent loops; this is what makes it true for voice.
- * Generous enough that a real conversation never notices — a caller asking
- * follow-up questions for ten minutes stays well inside it.
+ * Generous enough that a real conversation never notices. Twelve was not:
+ * one real call spent it in four minutes (three or four tools per question
+ * — a search, a broader search, the details, the price) and every picture
+ * asked for after that was described from memory. The per-minute budget on
+ * the tool route is the rate limit; this is the ceiling on a runaway loop.
  */
-export const VOICE_TOOL_CALLS_PER_SESSION = 12;
+export const VOICE_TOOL_CALLS_PER_SESSION = 60;
 
 /* THE TWO THAT SURVIVE THE CUT, when the session has to be small.
    The compact session exists for a transport that refuses a large message,

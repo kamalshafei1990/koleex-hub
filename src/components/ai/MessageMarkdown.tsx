@@ -29,6 +29,7 @@
 import { useCallback, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import PhotoLightbox, { type LightboxPhoto } from "@/components/ai/PhotoLightbox";
 
 interface Props {
   content: string;
@@ -80,6 +81,8 @@ export default function MessageMarkdown({
   content,
   className,
 }: Props): React.ReactElement {
+  const [lightbox, setLightbox] = useState<LightboxPhoto | null>(null);
+  const closeLightbox = useCallback(() => setLightbox(null), []);
   return (
     <div className={`koleex-md ${className ?? ""}`}>
       <ReactMarkdown
@@ -126,13 +129,15 @@ export default function MessageMarkdown({
           img: ({ src, alt }) => {
             const url = typeof src === "string" ? src : "";
             if (!/^https:\/\//i.test(url)) return <span>{alt ?? ""}</span>;
+            /* A TAP EXPANDS THE PICTURE IN PLACE (PhotoLightbox) rather than
+               leaving the app for a bare file in a new tab. */
             return (
-              <a href={url} target="_blank" rel="noreferrer noopener" className="koleex-md-img-link">
+              <button type="button" onClick={() => setLightbox({ url, label: alt ?? "" })} className="koleex-md-img-link" aria-label={alt || "Photo"}>
                 {/* Remote product photo from whatever host the catalogue names;
                     next/image needs a fixed allowlist. Same call as Bubble. */}
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={url} alt={alt ?? ""} loading="lazy" decoding="async" className="koleex-md-img" />
-              </a>
+              </button>
             );
           },
           table: ({ children, ...rest }) => (
@@ -144,7 +149,7 @@ export default function MessageMarkdown({
       >
         {content}
       </ReactMarkdown>
-      
+      <PhotoLightbox photo={lightbox} onClose={closeLightbox} />
     </div>
   );
 }

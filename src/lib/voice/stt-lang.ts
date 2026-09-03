@@ -10,23 +10,21 @@
    answered him correctly in Arabic. The two languages are different facts
    and only the caller knows the second one.
 
-   So: a choice the caller makes, remembered on the device, defaulting to
-   the best guess available (the device's own language when it is one the
-   transcriber supports, else the UI language). Three codes, allow-listed
-   here AND on the server (session-config.ts STT_LANGUAGES) — the value
-   travels on a query string and a server writes it into a session.
+   So: LEARNED, not asked. The first version put three language chips on the
+   call screen; the owner did not want to be asked. Koleex AI hears the audio
+   and answers in the caller's language, so its own replies say which
+   language the caller speaks: the device remembers what it learned from the
+   last call, and the server reads the same thing off the conversation's
+   history before the client's guess. Until anything is learned, the device's
+   language, then the UI language. Three codes, allow-listed here AND on the
+   server (session-config.ts STT_LANGUAGES) — the value travels on a query
+   string and a server writes it into a session.
    --------------------------------------------------------------------------- */
+
+import { detectConversationLang } from "./script-lang";
 
 export const STT_LANGS = ["ar", "en", "zh"] as const;
 export type SttLang = (typeof STT_LANGS)[number];
-
-/** How each option reads on the chip — in its own script, because the person
- *  choosing it reads that script. Not the product language; the caller's. */
-export const STT_LANG_LABELS: Record<SttLang, string> = {
-  ar: "عربي",
-  en: "English",
-  zh: "中文",
-};
 
 export const STT_STORAGE_KEY = "koleex-voice-stt";
 
@@ -70,4 +68,15 @@ export function saveSttLang(lang: SttLang): void {
   } catch {
     /* Private mode or a full store: the choice lasts for this page. */
   }
+}
+
+/**
+ * What a call taught us: the language Koleex AI answered in. Null when it has
+ * not answered yet. Read from the transcript the screen already holds, so no
+ * new event is needed — and from the assistant's lines only, for the reason
+ * detectConversationLang gives.
+ */
+export function learnSttLang(lines: readonly { role: string; text: string; final?: boolean }[]): SttLang | null {
+  const turns = lines.filter((l) => l.final !== false).map((l) => ({ role: l.role, content: l.text }));
+  return detectConversationLang(turns);
 }

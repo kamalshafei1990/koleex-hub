@@ -42,6 +42,7 @@ import { authorizeVoice } from "@/lib/server/ai/voice/gate";
 import { consumeBudget, limitMode, subjectFor } from "@/lib/server/ai/security/rate-limit";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { loadRecentTurns, parseConversationParam, type RecentTurn } from "@/lib/server/ai/voice/history";
+import { detectConversationLang } from "@/lib/voice/script-lang";
 import {
   parseVoiceConfig,
   diagnoseVoiceConfig,
@@ -477,7 +478,12 @@ export async function POST(req: Request) {
      values are known; anything else is no hint. The transcript this session
      was saving had an Egyptian sentence come back as Chinese characters, and
      a transcriber that is told the language does not do that. */
-  const sttLanguage = parseSttLanguage(new URL(req.url).searchParams.get("stt"));
+  /* THE CONVERSATION KNOWS BEST. Koleex AI's own replies in this thread are
+     in the language the caller speaks (it hears the audio); a client that
+     guessed from the UI language is overruled by them. A new thread has no
+     replies yet and the client's guess stands. */
+  const fromHistory = detectConversationLang(recentTurns);
+  const sttLanguage = fromHistory ?? parseSttLanguage(new URL(req.url).searchParams.get("stt"));
   const payload = buildVoiceSessionPayload(voice, taughtQuestions, recentTurns, gate.viewer, sttLanguage);
   return NextResponse.json(
     /* WHICH SLOT SERVED, and whether another exists — two neutral words, so

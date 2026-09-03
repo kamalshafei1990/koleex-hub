@@ -781,7 +781,7 @@ async function main() {
        make the next tap reuse a dead connection, which presents to a user as a
        button that silently stopped working. */
     check("a failure clears the session handle so a retry starts fresh",
-      /next === "failed"[\s\S]{0,400}?sessionRef\.current = null/.test(src));
+      /next === "failed"[\s\S]{0,1200}?sessionRef\.current = null/.test(src));
     check("hanging up clears the handle too",
       /const hangUp[\s\S]{0,300}?sessionRef\.current = null/.test(src));
     check("starting twice is refused rather than leaking the first session",
@@ -1750,9 +1750,9 @@ console.log("\n── 12. Mute ──");
   check("the call screen is two parts: a fixed-height top for the orb, a scrolling bottom for the words",
     /h-\[42dvh\] min-h-\[300px\][^"]*border-b border-white\/10/.test(scr) && /<VoiceTranscript lines=\{lines\} lang=\{lang\} className="flex-1 min-h-0 pb-4" fill \/>/.test(scr));
   check("  …and a lookup is shown on the orb itself, as THINKING (not processing's rim arc) with the searching activity",
-    /: searching && !muted\s*\? "thinking"/.test(scr) && /activity=\{searching && live && !muted \? "searching" : "none"\}/.test(scr));
+    /\(searching \|\| phase === "thinking"\) && !muted\s*\? "thinking"/.test(scr) && /activity=\{searching && live && !muted \? "searching" : "none"\}/.test(scr));
   check("  …and on the rings: slow blue waves while a lookup runs, transform and opacity only",
-    /searching && live && !muted \? "is-thinking" : ""/.test(scr) &&
+    /\(searching \|\| phase === "thinking"\) && live && !muted \? "is-thinking" : ""/.test(scr) &&
     /\.kx-call-orb\.is-thinking \.kx-call-ring \{\s*border-color: rgba\(0, 102, 255[^}]*animation: kx-call-think/.test(css18) &&
     /@keyframes kx-call-think \{\s*0% \{ transform: scale\([\d.]+\); opacity: [\d.]+; \}\s*100% \{ transform: scale\([\d.]+\); opacity: 0; \}/.test(css18) &&
     /\.kx-call-orb\.is-thinking \.kx-call-ring-3 \{ animation-delay: 1\.6s; \}/.test(css18));
@@ -1782,15 +1782,81 @@ console.log("\n── 12. Mute ──");
     stt.parseSttLang("ar") === "ar" && stt.parseSttLang("EN ") === "en" && stt.parseSttLang("zh") === "zh" && stt.parseSttLang("ar-EG") === null && stt.parseSttLang("fr") === null && stt.parseSttLang(null) === null);
   check("the caller's saved choice wins over the device, which wins over the UI language",
     stt.pickSttLang("zh", "ar-EG", "en") === "zh" && stt.pickSttLang(null, "ar-EG", "en") === "ar" && stt.pickSttLang("junk", "fr-FR", "zh") === "zh" && stt.pickSttLang(null, null, null) === "en");
-  check("  …the labels read in their own script", stt.STT_LANG_LABELS.ar === "عربي" && stt.STT_LANG_LABELS.zh === "中文" && stt.STT_LANG_LABELS.en === "English");
+  /* LEARNED, NOT ASKED — from the script of Koleex AI's own replies. */
+  const sl = await import("../src/lib/voice/script-lang");
+  check("a script says the language: Arabic letters, CJK, Latin — and no letters is null",
+    sl.detectScriptLang("إزيك يا أستاذ كمال") === "ar" && sl.detectScriptLang("我想一下") === "zh" && sl.detectScriptLang("Hello there") === "en" && sl.detectScriptLang("123 !!") === null && sl.detectScriptLang("") === null);
+  check("  …mixed text goes to the majority script", sl.detectScriptLang("الموديل CH-4040S من Koleex بمقاس 40×40") === "ar" && sl.detectScriptLang("Model CH-4040S بس") === "en");
+  check("a conversation's language is read from the ASSISTANT's turns only — the caller's transcript was written under the hint being judged",
+    sl.detectConversationLang([{ role: "user", content: "On the autism spectrum, they were" }, { role: "assistant", content: "أهلاً بك، إزاي أقدر أساعدك؟" }]) === "ar" &&
+    sl.detectConversationLang([{ role: "user", content: "مرحبا" }]) === null && sl.detectConversationLang([]) === null);
+  check("  …the majority of recent replies wins, so a caller who switches is followed",
+    sl.detectConversationLang([{ role: "assistant", content: "Hello" }, { role: "assistant", content: "你好" }, { role: "assistant", content: "很高兴" }]) === "zh");
+  check("learnSttLang reads the same thing off the screen's transcript, settled lines only",
+    stt.learnSttLang([{ role: "user", text: "Is that a cash at GPT?", final: true }, { role: "assistant", text: "أهلاً بك", final: true }, { role: "assistant", text: "Hel", final: false }]) === "ar" &&
+    stt.learnSttLang([{ role: "user", text: "hi", final: true }]) === null);
+  check("  …and there are no chips: nothing in the module names a label or asks", !("STT_LANG_LABELS" in stt));
   const btn18 = fs18.readFileSync("src/components/ai/VoiceCallButton.tsx", "utf8");
   check("the session is given the SPEAKING language, never the UI language, as the transcription hint",
     /\}, voiceKeyRef\.current, conversationIdRef\.current, sttLangRef\.current\);/.test(btn18) && !/conversationIdRef\.current, langRef\.current\)/.test(btn18));
-  check("  …read from the device after mount (saved choice, device language, UI language), so first render matches the server",
-    /pickSttLang\(readSavedSttLang\(\), typeof navigator !== "undefined" \? navigator\.language : null, lang\)/.test(btn18));
-  check("  …changing it saves the choice and restarts the call, exactly as a voice change does",
-    /const selectSttLang = useCallback\(\(next: SttLang\) => \{\s*saveSttLang\(next\);\s*setSttLang\(next\);\s*sttLangRef\.current = next;\s*if \(sessionRef\.current\) \{\s*hangUp\(\);\s*queueMicrotask\(\(\) => void startCallRef\.current\?\.\(\)\);/.test(btn18) &&
-    /sttLanguage=\{sttLang\}\s*onSelectSttLanguage=\{selectSttLang\}/.test(btn18));
+  check("  …picked after mount (learned, device, UI) and never shown as a control",
+    /sttLangRef\.current = pickSttLang\(readSavedSttLang\(\), typeof navigator !== "undefined" \? navigator\.language : null, lang\);/.test(btn18) && !/sttLanguage=\{/.test(btn18) && !/onSelectSttLanguage/.test(btn18) && !/onSelectSttLanguage|STT_LANGS/.test(scr));
+  check("  …and each settled reply from Koleex AI teaches the device the caller's language for next time",
+    /if \(update\.role === "assistant" && update\.final\) \{\s*const learned = learnSttLang\(linesRef\.current\);\s*if \(learned && learned !== sttLangRef\.current\) \{\s*sttLangRef\.current = learned;\s*saveSttLang\(learned\);/.test(btn18));
+  const route18 = fs18.readFileSync("src/app/api/ai/voice/session/route.ts", "utf8");
+  check("the server reads the conversation's language off its history FIRST, and takes the client's guess only for a new thread",
+    /const fromHistory = detectConversationLang\(recentTurns\);\s*const sttLanguage = fromHistory \?\? parseSttLanguage\(new URL\(req\.url\)\.searchParams\.get\("stt"\)\);/.test(route18));
+
+  /* THINKING — the gap between turns, shown. */
+  const ev18 = await import("../src/lib/voice/events");
+  check("the caller stopping, and the far side opening a response, both read as THINKING",
+    ev18.parseVoiceEvent(JSON.stringify({ type: "input_audio_buffer.speech_stopped" })).phase === "thinking" &&
+    ev18.parseVoiceEvent(JSON.stringify({ type: "response.created" })).phase === "thinking");
+  check("  …the first word back is speaking, the caller speaking is listening, and done says nothing",
+    ev18.parseVoiceEvent(JSON.stringify({ type: "response.audio_transcript.delta", delta: "أ" })).phase === "speaking" &&
+    ev18.parseVoiceEvent(JSON.stringify({ type: "input_audio_buffer.speech_started" })).phase === "listening" &&
+    ev18.parseVoiceEvent(JSON.stringify({ type: "response.done" })).phase === null);
+  check("  …the screen shows thinking on the orb and the rings and in the caption",
+    /\(searching \|\| phase === "thinking"\) && !muted\s*\? "thinking"/.test(scr) && /\(searching \|\| phase === "thinking"\) && live && !muted \? "is-thinking" : ""/.test(scr) && /phase === "thinking"\s*\? copy\.thinking/.test(scr));
+
+  /* THE LOOKUP CEILING — sixty, after twelve was spent in four minutes. */
+  check("a call may make sixty lookups, not twelve, and the server's constant agrees",
+    /const MAX_TOOL_CALLS_PER_SESSION = 60;/.test(sess) && /export const VOICE_TOOL_CALLS_PER_SESSION = 60;/.test(fs18.readFileSync("src/lib/server/ai/voice/tools.ts", "utf8")));
+  check("  …and at the ceiling the model is told to say so, never to answer as if it had looked",
+    /never answer from memory as if you had looked/.test(sess));
+
+  /* THE CHANNEL CLOSING UNDER A LIVE CALL, and the call coming back. */
+  check("the data channel's close is watched and treated as a dropped connection",
+    /local\.onclose = \(\) => this\.onChannelClosed\(\);/.test(sess) && /private onChannelClosed\(\): void \{\s*if \(this\.state !== "live" && this\.state !== "reconnecting"\) return;\s*if \(this\.state === "live"\) this\.setState\("reconnecting"\);\s*this\.armReconnectTimer\(\);/.test(sess));
+  check("a call that was up for five seconds and is lost is started again in place, twice at most, keeping the words",
+    /export const RESUME_MIN_LIVE_MS = 5_000;/.test(btn18) && /export const MAX_RESUMES = 2;/.test(btn18) &&
+    /const canResume = failure === "connection-lost" && wasUp && resumesRef\.current < MAX_RESUMES;/.test(btn18) &&
+    /queueMicrotask\(\(\) => void startCallRef\.current\?\.\(\{ resume: true \}\)\);/.test(btn18) &&
+    /if \(!opts\?\.resume\) \{\s*linesRef\.current = \[\];/.test(btn18));
+  check("  …and only when it cannot come back does the caller hear the failure",
+    /if \(canResume\) \{[\s\S]*?return;\s*\}\s*onErrorRef\.current\?\.\(FAILURE_COPY\[langRef\.current\]\[failure\]\);/.test(btn18));
+  const tel = await import("../src/lib/voice/telemetry");
+  const posted: Array<[string, string]> = [];
+  tel.sendVoiceTelemetry({ reason: "connection-lost", elapsed_ms: 1234, ice: "failed", tool_calls: 3 }, (p, b) => posted.push([p, b]));
+  check("the beacon carries states and counts to the telemetry route", posted.length === 1 && posted[0][0] === "/api/ai/voice/telemetry" && JSON.parse(posted[0][1]).ice === "failed" && JSON.parse(posted[0][1]).elapsed_ms === 1234);
+  tel.sendVoiceTelemetry({ reason: "x" }, () => { throw new Error("offline"); });
+  check("  …and never throws", true);
+  check("  …the button sends it on every failure, with the session's diagnostics, before deciding to resume",
+    /sendVoiceTelemetry\(\{ reason: canResume \? "resumed" : failure, resumes: resumesRef\.current, \.\.\.diag \}\);/.test(btn18) && /const diag = sessionRef\.current\?\.diagnostics\(\);/.test(btn18));
+  const telRoute = fs18.readFileSync("src/app/api/ai/voice/telemetry/route.ts", "utf8");
+  check("the telemetry route is authenticated, allow-lists the reason, bounds every field, logs one line and stores nothing",
+    /const auth = await requireAuth\(req\);/.test(telRoute) && /const REASONS = new Set\(/.test(telRoute) && /if \(!REASONS\.has\(reason\)\) return NextResponse\.json/.test(telRoute) &&
+    /console\.warn\(\s*`\[ai\.voice\.client\]/.test(telRoute) && !/supabase|insert\(/.test(telRoute) && /new NextResponse\(null, \{ status: 204 \}\)/.test(telRoute));
+  const diagS = new VoiceSession(deps({ status: 200 }).deps);
+  const dg = diagS.diagnostics();
+  check("diagnostics are states and counts only", Object.keys(dg).sort().join(",") === "dc,elapsed_ms,ice,ice_ever_connected,last_event,region,tool_calls" && dg.tool_calls === 0 && dg.elapsed_ms === 0);
+
+  /* THE PICTURE EXPANDS IN PLACE. */
+  check("a photo on the call screen is a button that opens the lightbox, not a link out of the app",
+    /<button type="button" onClick=\{\(\) => setOpenPhoto\(p\)\}/.test(scr) && !/<a href=\{p\.url\}/.test(scr) && /<PhotoLightbox photo=\{openPhoto\} onClose=\{closePhoto\} closeLabel=\{copy\.closePhoto\} \/>/.test(scr));
+  const lb = fs18.readFileSync("src/components/ai/PhotoLightbox.tsx", "utf8");
+  check("  …the lightbox sits above the call and below confirmations, fits the picture whole, and eats Escape before the call screen sees it",
+    /z-\[260\]/.test(lb) && /object-contain/.test(lb) && /e\.stopPropagation\(\);\s*e\.preventDefault\(\);\s*onClose\(\);/.test(lb) && /window\.addEventListener\("keydown", onKey, true\)/.test(lb));
 }
 
 console.log(`\n${pass} passed, ${failures.length} failed`);

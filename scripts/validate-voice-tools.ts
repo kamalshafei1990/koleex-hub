@@ -100,7 +100,9 @@ console.log("\n── 1. The allow-list is the security boundary ──");
 
   /* THE LOOP GUARD. "No uncontrolled agent loops" has to be true here too. */
   check("a session has a finite tool budget",
-    VOICE_TOOL_CALLS_PER_SESSION > 0 && VOICE_TOOL_CALLS_PER_SESSION <= 50);
+    /* Sixty: twelve was spent in four minutes of one real call (three or
+       four tools per question). Still finite — a runaway loop still ends. */
+    VOICE_TOOL_CALLS_PER_SESSION >= 60 && VOICE_TOOL_CALLS_PER_SESSION <= 100);
 }
 
 console.log("\n── 2. The schemas the server publishes ──");
@@ -823,7 +825,7 @@ console.log("\n── 5. The browser is a courier, not an authority (source read
   /* The loop guard, both halves. */
   check("the client caps calls per session", /MAX_TOOL_CALLS_PER_SESSION = \d+/.test(client));
   check("and answers the model when the cap is hit rather than going silent",
-    /as many lookups as one call can make/.test(client));
+    /This call has used all its lookups/.test(client) && /never answer from memory as if you had looked/.test(client));
   check("a repeated call_id does not run the tool twice",
     /answeredCalls\.has\(call\.callId\)/.test(client));
   check("an unreadable event is surfaced rather than swallowed",

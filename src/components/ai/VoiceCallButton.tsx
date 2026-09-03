@@ -51,7 +51,8 @@ import {
 import { extractProductPhotos, type ProductPhoto } from "@/lib/voice/photos";
 import { useStreamLevel } from "@/lib/voice/useStreamLevel";
 import { CallTones } from "@/lib/voice/tones";
-import { pickSttLang, readSavedSttLang, saveSttLang, type SttLang } from "@/lib/voice/stt-lang";
+import { pickSttLang, readSavedSttLang, saveSttLang, learnSttLang, type SttLang } from "@/lib/voice/stt-lang";
+import { sendVoiceTelemetry } from "@/lib/voice/telemetry";
 import { TranscriptPersister, type SavedTurn, type PersistFailure } from "@/lib/voice/persist";
 import VoiceCallScreen from "@/components/ai/VoiceCallScreen";
 
@@ -121,6 +122,13 @@ const PERSIST_COPY: Record<Lang, Record<PersistFailure, string>> = {
    anyway. Long enough for a slow session.update round trip on a mainland
    network; short enough that nobody waits on a vendor that never answers. */
 const READY_FALLBACK_MS = 2_500;
+/* A call that was up for at least this long and then lost its connection is
+   started again in place. Shorter than this and the "drop" is the connection
+   never really working, which a retry does not fix. */
+export const RESUME_MIN_LIVE_MS = 5_000;
+/* Twice, then the truth: a line that drops three times in one call is not
+   coming back, and the caller should hear so rather than watch it try. */
+export const MAX_RESUMES = 2;
 
 const LABEL_COPY: Record<Lang, { start: string; end: string; connecting: string }> = {
   en: { start: "Start voice call", end: "End call", connecting: "Connecting…" },
@@ -191,19 +199,27 @@ export default function VoiceCallButton({
      not yet been told who it is. A vendor that never acknowledges is covered
      by a fallback timer, so the call can never be stuck on "connecting". */
   const [ready, setReady] = useState(false);
-  /* WHICH LANGUAGE THE CALLER SPEAKS — not which language the app is in. The
-     UI language used to be sent as the transcription hint, and an English
-     UI over Egyptian speech produced English nonsense in the transcript
-     while Koleex AI (which hears the audio) answered correctly. Chosen on
-     the screen, remembered on the device, read after mount so the server
-     and the browser render the same first frame. See lib/voice/stt-lang. */
-  const [sttLang, setSttLang] = useState<SttLang>(() => pickSttLang(null, null, lang));
-  const sttLangRef = useRef<SttLang>(sttLang);
+  /* WHICH LANGUAGE THE CALLER SPEAKS — not which language the app is in, and
+     LEARNED rather than asked. The UI language used to be sent as the
+     transcription hint, and an English UI over Egyptian speech produced
+     English nonsense while Koleex AI (which hears the audio) answered
+     correctly. The first fix asked the caller to choose; the owner did not
+     want to be asked. Now: what the device learned from Koleex AI's own
+     replies on the last call, else the device's language, else the UI's —
+     and the server overrules all of it with the conversation's history.
+     Read after mount so the server and the browser render the same frame. */
+  const sttLangRef = useRef<SttLang>(pickSttLang(null, null, lang));
   useEffect(() => {
-    const picked = pickSttLang(readSavedSttLang(), typeof navigator !== "undefined" ? navigator.language : null, lang);
-    sttLangRef.current = picked;
-    queueMicrotask(() => setSttLang(picked));
+    sttLangRef.current = pickSttLang(readSavedSttLang(), typeof navigator !== "undefined" ? navigator.language : null, lang);
   }, [lang]);
+  /* A CALL THAT DROPS COMES BACK BY ITSELF. "The voice stopped and closed the
+     conversation by itself": a lost connection used to end the call with an
+     error. Now a call that was up and is lost is started again — same
+     screen, same transcript — up to twice, and what the browser saw at the
+     moment it dropped is sent to the server's log, because the server never
+     sees the audio path and could not say why. */
+  const resumesRef = useRef(0);
+  const liveSinceRef = useRef<number | null>(null);
   /* One per call, made INSIDE the tap that starts it (browsers unlock audio
      only in a gesture) and closed with it. */
   const tonesRef = useRef<CallTones | null>(null);
@@ -300,7 +316,7 @@ export default function VoiceCallButton({
   /* startCall is declared below and selectVoice needs it. A ref rather than a
      reorder: the declaration order here follows the call's lifecycle, and
      shuffling it to satisfy a closure would make it harder to read. */
-  const startCallRef = useRef<(() => Promise<void>) | null>(null);
+  const startCallRef = useRef<((opts?: { resume?: boolean }) => Promise<void>) | null>(null);
 
   /* A call must not survive the component. Without this, navigating away
      leaves the microphone captured and the recording indicator lit — the one
@@ -327,6 +343,7 @@ export default function VoiceCallButton({
     tonesRef.current = null;
     chimedRef.current = false;
     setReady(false);
+    liveSinceRef.current = null;
     if (audioRef.current) audioRef.current.srcObject = null;
     /* Dropped so the meters tear their audio contexts down. A retained stream
        here would keep a hardware handle open for the life of the page. */
@@ -348,12 +365,17 @@ export default function VoiceCallButton({
        the exhaustive-deps rule without making this callback churn. */
   }, [clearSearchTimer]);
 
-  const startCall = useCallback(async () => {
+  const startCall = useCallback(async (opts?: { resume?: boolean }) => {
     if (sessionRef.current) return;
     /* A second call is a new conversation, not a continuation of the last
-       one's captions. */
-    linesRef.current = [];
-    setLines(linesRef.current);
+       one's captions — unless it is the SAME call coming back after a drop,
+       in which case the words stay where the caller can see them. */
+    if (!opts?.resume) {
+      linesRef.current = [];
+      setLines(linesRef.current);
+      resumesRef.current = 0;
+    }
+    liveSinceRef.current = null;
     setPhase(null);
     /* The session resets its own flag on start; this keeps the UI in step so a
        second call never opens showing the last one's mute. */
@@ -392,11 +414,25 @@ export default function VoiceCallButton({
            that unmutes its own speech synthesis here would talk over the call
            the instant it recovers. */
         onLiveChangeRef.current?.(next === "live" || next === "reconnecting");
+        if (next === "live" && liveSinceRef.current === null) liveSinceRef.current = Date.now();
         if (next === "failed" && failure) {
-          onErrorRef.current?.(FAILURE_COPY[langRef.current][failure]);
+          const diag = sessionRef.current?.diagnostics();
+          const wasUp = liveSinceRef.current !== null && Date.now() - liveSinceRef.current >= RESUME_MIN_LIVE_MS;
+          const canResume = failure === "connection-lost" && wasUp && resumesRef.current < MAX_RESUMES;
+          sendVoiceTelemetry({ reason: canResume ? "resumed" : failure, resumes: resumesRef.current, ...diag });
           /* The session has already torn itself down; drop our handle so the
-             next tap starts a fresh one rather than reusing a dead session. */
+             next start makes a fresh one rather than reusing a dead session. */
           sessionRef.current = null;
+          if (canResume) {
+            resumesRef.current += 1;
+            setReady(false);
+            chimedRef.current = false;
+            /* After the teardown, not during it: start() refuses while a
+               session handle is still held. */
+            queueMicrotask(() => void startCallRef.current?.({ resume: true }));
+            return;
+          }
+          onErrorRef.current?.(FAILURE_COPY[langRef.current][failure]);
         }
       },
       onReady: () => setReady(true),
@@ -476,6 +512,15 @@ export default function VoiceCallButton({
           linesRef.current = appendTranscript(linesRef.current, update);
           setLines(linesRef.current);
           onTranscriptRef.current?.(linesRef.current);
+          /* WHAT THIS CALL TEACHES: Koleex AI answered in the caller's
+             language. Remembered for the next call's transcriber. */
+          if (update.role === "assistant" && update.final) {
+            const learned = learnSttLang(linesRef.current);
+            if (learned && learned !== sttLangRef.current) {
+              sttLangRef.current = learned;
+              saveSttLang(learned);
+            }
+          }
           /* Settled turns leave for the conversation from here. The
              persister reads the same list the screen renders, so what is
              saved is exactly what was shown. */
@@ -577,19 +622,6 @@ export default function VoiceCallButton({
     }
   }, [hangUp]);
 
-  /* THE SAME RESTART AS A VOICE CHANGE: the transcription language is part of
-     the session configuration, sent once, so a new one needs a new session.
-     Saved first, so the next call on this device starts in the right one. */
-  const selectSttLang = useCallback((next: SttLang) => {
-    saveSttLang(next);
-    setSttLang(next);
-    sttLangRef.current = next;
-    if (sessionRef.current) {
-      hangUp();
-      queueMicrotask(() => void startCallRef.current?.());
-    }
-  }, [hangUp]);
-
   const busy = state === "requesting-mic" || state === "connecting";
   const labels = LABEL_COPY[lang];
   const label = connected ? labels.end : busy ? labels.connecting : labels.start;
@@ -625,8 +657,6 @@ export default function VoiceCallButton({
           voices={voices}
           selectedVoice={voiceKey}
           onSelectVoice={selectVoice}
-          sttLanguage={sttLang}
-          onSelectSttLanguage={selectSttLang}
           onSendText={sendTyped}
         />,
         document.body,
