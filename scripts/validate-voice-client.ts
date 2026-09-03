@@ -21,6 +21,8 @@ import { TranscriptPersister, TRANSCRIPT_PATH, MAX_TURNS_PER_POST, MAX_POST_FAIL
 import { buildTextTurnMessages, EV_ITEM_CREATE, EV_RESPONSE_CREATE, MAX_TYPED_TURN_CHARS } from "../src/lib/voice/text-turn";
 import { type TranscriptLine } from "../src/lib/voice/events";
 import { extractProductPhotos, photosMarkdown, MAX_PHOTOS_PER_RESULT } from "../src/lib/voice/photos";
+import { CallTones, scheduleTone, READY_TONE, RECOVERED_TONE, TONE_GAIN, type ToneContextLike, type ToneOscillatorLike, type ToneGainLike } from "../src/lib/voice/tones";
+import { stepLevel, LEVEL_ATTACK, LEVEL_RELEASE } from "../src/lib/voice/level";
 
 let pass = 0;
 const failures: string[] = [];
@@ -1484,6 +1486,133 @@ console.log("\n── 12. Mute ──");
     check("an assistant turn with a photo and no words is still saved — the picture IS the answer",
       turns[2]?.text === "![KX-180](https://cdn.example/a.jpg)");
   }
+
+{
+  console.log("\n── 16. The call says it is ready — with a sound — and the orb moves like a voice ──");
+  /* THE TONE, on a fake Web Audio graph that records what was scheduled. */
+  type Ev = { kind: string; v?: number; t?: number; freq?: number };
+  function fakeCtx(state = "running") {
+    const events: Ev[] = [];
+    const oscs: Array<ToneOscillatorLike & { dest?: unknown }> = [];
+    let resumed = 0, closed = 0;
+    const ctx: ToneContextLike = {
+      currentTime: 10,
+      destination: { dest: true },
+      get state() { return state; },
+      createOscillator: () => {
+        let f = 0;
+        const o: ToneOscillatorLike & { dest?: unknown } = {
+          type: "",
+          frequency: { setValueAtTime: (v, t) => { f = v; events.push({ kind: "freq", freq: v, t }); }, linearRampToValueAtTime: () => {} },
+          connect: (d) => { o.dest = d; },
+          start: (t) => events.push({ kind: "start", t, freq: f }),
+          stop: (t) => events.push({ kind: "stop", t, freq: f }),
+        };
+        oscs.push(o);
+        return o;
+      },
+      createGain: () => {
+        const g: ToneGainLike & { dest?: unknown } = {
+          gain: { setValueAtTime: (v, t) => events.push({ kind: "gain", v, t }), linearRampToValueAtTime: (v, t) => events.push({ kind: "ramp", v, t }) },
+          connect: (d) => { g.dest = d; },
+        };
+        return g;
+      },
+      resume: async () => { resumed++; },
+      close: async () => { closed++; },
+    };
+    return { ctx, events, oscs, counts: () => ({ resumed, closed }) };
+  }
+
+  const f = fakeCtx();
+  const end = scheduleTone(f.ctx, READY_TONE);
+  const starts = f.events.filter((e) => e.kind === "start");
+  check("the ready tone is two notes, the second higher than the first", starts.length === 2 && (starts[1].freq ?? 0) > (starts[0].freq ?? 0));
+  check("  …scheduled from the context's clock, in order", starts[0].t === 10 && (starts[1].t ?? 0) > 10 && end > (starts[1].t ?? 0));
+  check("  …every oscillator is a sine, routed through its own gain to the output",
+    f.oscs.every((o) => o.type === "sine") && f.oscs.every((o) => typeof o.dest === "object" && o.dest !== null && "gain" in o.dest));
+  const peak = Math.max(...f.events.filter((e) => e.kind === "ramp" || e.kind === "gain").map((e) => e.v ?? 0));
+  check("  …quiet: the peak gain is a cue, not an alarm", peak === TONE_GAIN && TONE_GAIN <= 0.2);
+  check("  …and every note begins at zero gain and ends at zero (no click)",
+    f.events.filter((e) => e.kind === "gain" && e.v === 0).length === READY_TONE.length && f.events.filter((e) => e.kind === "ramp" && e.v === 0).length === READY_TONE.length);
+  check("the recovered tone is one note, so it is not mistaken for a new call", RECOVERED_TONE.length === 1);
+
+  const g = fakeCtx("suspended");
+  const tones = new CallTones(() => g.ctx);
+  tones.ready();
+  check("before prime() nothing plays and nothing throws", g.events.length === 0);
+  tones.prime();
+  check("prime() creates the context and resumes it inside the gesture", g.counts().resumed === 1);
+  tones.prime();
+  check("  …and a second prime() does not open a second context", g.counts().resumed === 1);
+  tones.ready();
+  check("ready() after prime schedules the tone, resuming a suspended context first", g.events.some((e) => e.kind === "start") && g.counts().resumed === 2);
+  tones.close();
+  check("close() releases the context", g.counts().closed === 1);
+  tones.ready();
+  check("  …after which nothing plays and nothing throws", g.events.filter((e) => e.kind === "start").length === READY_TONE.length);
+  const none = new CallTones(() => null);
+  none.prime(); none.ready(); none.recovered(); none.close();
+  check("no AudioContext at all is a silent cue, never an error", true);
+  const thrower = new CallTones(() => { throw new Error("blocked"); });
+  thrower.prime(); thrower.ready();
+  check("a factory that throws is a silent cue too", true);
+
+  /* THE LEVEL, the shape of a voice: quick up, slow down. */
+  const up = stepLevel(0, 1);
+  const down = stepLevel(1, 0);
+  check("a louder target is approached faster than a quieter one", up > 1 - down && LEVEL_ATTACK > LEVEL_RELEASE);
+  check("  …neither step overshoots", up <= 1 && down >= 0);
+  let v = 0;
+  for (let i = 0; i < 6; i++) v = stepLevel(v, 1);
+  check("  …six frames of a syllable reach most of the way", v > 0.85);
+  let w = 1;
+  for (let i = 0; i < 6; i++) w = stepLevel(w, 0);
+  check("  …six frames of silence have not yet faded out", w > 0.5);
+  for (let i = 0; i < 200; i++) w = stepLevel(w, 0);
+  check("  …but silence settles to exactly zero rather than trembling for ever", w === 0);
+  check("garbage in reads as silence, never NaN", stepLevel(NaN, NaN) === 0 && stepLevel(0.5, Infinity) <= 1 && stepLevel(-4, 2) <= 1);
+
+  /* THE WIRING, read from the source (the render harness runs no effects). */
+  const fs16 = await import("node:fs");
+  const sess = fs16.readFileSync("src/lib/voice/session.ts", "utf8");
+  check("the session reports READY once, when the configuration is acknowledged",
+    /this\.configAckPending = false;\s*if \(!this\.readyFired\) \{\s*this\.readyFired = true;\s*this\.events\.onReady\?\.\(\);/.test(sess));
+  check("  …and not on the compact resend path, which has no acknowledgement to wait on",
+    !/compactRetried = true;[\s\S]{0,200}?onReady/.test(sess));
+  const btn = fs16.readFileSync("src/components/ai/VoiceCallButton.tsx", "utf8");
+  const startAt = btn.indexOf("const startCall = useCallback");
+  const startBody = btn.slice(startAt, btn.indexOf("await session.start();", startAt));
+  check("the tones are made and primed INSIDE startCall — the tap that unlocks audio",
+    /tonesRef\.current = new CallTones\(\);\s*tonesRef\.current\.prime\(\);/.test(startBody));
+  check("  …before the session is created, so a slow handshake cannot outlive the gesture", startBody.indexOf("tonesRef.current.prime()") < startBody.indexOf("new VoiceSession("));
+  check("ready is set by the session's onReady", /onReady: \(\) => setReady\(true\)/.test(btn));
+  check("  …with a fallback timer so a silent vendor cannot leave the call on connecting",
+    /if \(!live \|\| ready\) return;\s*const t = window\.setTimeout\(\(\) => setReady\(true\), READY_FALLBACK_MS\);/.test(btn) && /const READY_FALLBACK_MS = 2_500;/.test(btn));
+  check("the tone plays once, when live AND ready, guarded by a ref so a re-render cannot repeat it",
+    /if \(live && ready && !chimedRef\.current\) \{\s*chimedRef\.current = true;\s*tonesRef\.current\?\.ready\(\);/.test(btn));
+  check("  …and a recovered connection plays its own single note", /prev === "reconnecting" && state === "live"\) tonesRef\.current\?\.recovered\(\)/.test(btn));
+  const hangUpAt16 = btn.indexOf("const hangUp");
+  const hangUpBody = btn.slice(hangUpAt16, btn.indexOf("}, [", hangUpAt16));
+  check("hanging up closes the tone context and resets ready", /tonesRef\.current\?\.close\(\)/.test(hangUpBody) && /setReady\(false\)/.test(hangUpBody) && /chimedRef\.current = false/.test(hangUpBody));
+  check("  …and so does unmount", /persisterRef\.current = null;\s*tonesRef\.current\?\.close\(\);\s*tonesRef\.current = null;\s*\};\s*\}, \[\]\);/.test(btn));
+  check("the screen is told ready separately from live", /ready=\{ready\}/.test(btn));
+  const scr = fs16.readFileSync("src/components/ai/VoiceCallScreen.tsx", "utf8");
+  check("the screen says connecting until READY, not merely live", /: !live \|\| !ready\s*\? copy\.connecting/.test(scr));
+  check("  …and the orb stays awakening until then", /!live \|\| reconnecting \|\| !ready\s*\? "awakening"/.test(scr));
+  check("  …ready defaults to true so other callers are unchanged", /ready = true,/.test(scr));
+  check("the rings are driven by the smoothed level, not by a per-render transform", /useCallLevel\(orbWrapRef, audioLevel, live && ready && !reconnecting && !muted\)/.test(scr) && !/audioLevel \* 0\.35/.test(scr));
+  check("  …three rings, colour by who is speaking", (scr.match(/kx-call-ring-\d/g) ?? []).length === 3 && /phase === "speaking" \? "is-far" : "is-near"/.test(scr));
+  const css = fs16.readFileSync("src/app/globals.css", "utf8");
+  check("the rings read --kx-call-level with transform and opacity only", /\.kx-call-orb\.is-live \.kx-call-ring-3 \{\s*opacity: calc\(var\(--kx-call-level\)[^}]*transform: scale\(calc\(1\.16 \+ var\(--kx-call-level\)/.test(css));
+  check("  …Koleex AI's voice is the Hub's blue, the caller's is white", /\.kx-call-orb\.is-far \.kx-call-ring \{ border-color: rgba\(0, 102, 255/.test(css) && /\.kx-call-orb\.is-near \.kx-call-ring \{ border-color: rgba\(255, 255, 255/.test(css));
+  check("the orb overrides are scoped to the call and touch no indicator geometry",
+    /\.kx-call-aiorb \.ind \{ transition: opacity 0\.5s ease, filter 0\.4s ease; \}/.test(css) && !/\.kx-call-aiorb[^{]*\.ind \{[^}]*(width|height|border-radius|top|left)/.test(css));
+  check("  …the per-frame brightness filter is off at call size", /\.kx-call-aiorb\.is-speaking \.ind \{ filter: none; \}/.test(css));
+  check("reduced motion stills the rings", /prefers-reduced-motion: reduce\) \{\s*\.kx-call-ring \{[^}]*transform: none !important/.test(css));
+  const hook = fs16.readFileSync("src/components/ai/useCallLevel.ts", "utf8");
+  check("the frame loop uses stepLevel, cancels on cleanup, and resets the variable", /stepLevel\(current, target\.current\)/.test(hook) && /cancelAnimationFrame\(raf\)/.test(hook) && /setProperty\(CALL_LEVEL_VAR, "0"\)/.test(hook));
+}
 
 console.log(`\n${pass} passed, ${failures.length} failed`);
   if (failures.length) {

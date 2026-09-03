@@ -114,6 +114,12 @@ export type VoiceEvents = {
   onLocalStream?: (stream: MediaStream) => void;
   /** One decoded DataChannel message, passed through untouched. */
   onMessage?: (data: string) => void;
+  /** THE FAR SIDE ACCEPTED THE SESSION CONFIGURATION, so it is now listening
+   *  as Koleex AI and not as a blank vendor session. `live` is the transport;
+   *  this is the moment the caller may actually speak. Fired once per call.
+   *  Not fired when the configuration had to be resent in its compact form —
+   *  the caller's own fallback timer covers that path. */
+  onReady?: () => void;
   /** A tool call was made and answered — for a UI that wants to say
    *  "checking…" rather than leaving a silence the caller cannot read. */
   onToolCall?: (name: string) => void;
@@ -263,6 +269,8 @@ export class VoiceSession {
      call's business, not the configuration's. */
   private configAckPending = false;
   private compactRetried = false;
+  /** onReady is once per call: a second acknowledgement is not a second call. */
+  private readyFired = false;
   private configSentAt = 0;
   /* Authored by the server, received with the answer, relayed unchanged. Null
      until the handshake completes — there is nothing to send before then. */
@@ -470,6 +478,10 @@ export class VoiceSession {
       } else if (isEventType(raw, EV_SESSION_UPDATED) || !isEventType(raw, EV_SESSION_CREATED)) {
         /* An acknowledgement, or any progress at all, means it was accepted. */
         this.configAckPending = false;
+        if (!this.readyFired) {
+          this.readyFired = true;
+          this.events.onReady?.();
+        }
       }
     }
     this.events.onMessage?.(raw);

@@ -22,6 +22,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import AIOrb from "@/components/ai-orb/AIOrb";
+import { useCallLevel } from "./useCallLevel";
 import type { AIOrbState } from "@/components/ai-orb/ai-orb-types";
 import VoiceTranscript from "@/components/ai/VoiceTranscript";
 import { type TranscriptLine, type VoicePhase } from "@/lib/voice/events";
@@ -125,6 +126,11 @@ const COPY: Record<Lang, {
 export type VoiceCallScreenProps = {
   /** False while connecting — the orb wakes rather than pretending to listen. */
   live: boolean;
+  /** The far side has accepted the session configuration and is listening as
+   *  Koleex AI. Until then a live call still reads "connecting": the caption
+   *  says "go ahead" at the same instant the tone sounds, not a beat before.
+   *  Defaults to true for callers that do not track it. */
+  ready?: boolean;
   /** The call is up but the network dropped underneath it and may come back.
    *  ITS OWN FLAG, not a shade of `live`: the screen must keep standing (the
    *  microphone is still held and the call is not over) while telling the user
@@ -162,6 +168,7 @@ export type VoiceCallScreenProps = {
 
 export default function VoiceCallScreen({
   live,
+  ready = true,
   reconnecting = false,
   phase,
   audioLevel,
@@ -226,7 +233,14 @@ export default function VoiceCallScreen({
 
      `listening` is also simply true: the microphone is open from the moment
      the call connects. That is what listening means. */
-  const orbState: AIOrbState = !live || reconnecting
+  /* THE RINGS' LEVEL, written to a CSS variable each frame with attack and
+     release — see lib/voice/level.ts for the glitch this replaces. Active
+     while the call is up; a connecting or reconnecting call has no voice to
+     show. */
+  const orbWrapRef = useRef<HTMLDivElement>(null);
+  useCallLevel(orbWrapRef, audioLevel, live && ready && !reconnecting && !muted);
+
+  const orbState: AIOrbState = !live || reconnecting || !ready
     ? "awakening"
     : phase === "speaking"
       ? "speaking"
@@ -253,7 +267,7 @@ export default function VoiceCallScreen({
     ? copy.muted
     : reconnecting
     ? copy.reconnecting
-    : !live
+    : !live || !ready
     ? copy.connecting
     : phase === "speaking"
       ? copy.speaking
@@ -302,23 +316,32 @@ export default function VoiceCallScreen({
             It is feedback, not ornament: it is how a user knows the
             microphone is hearing them. Monochrome, so it introduces no
             colour. */}
-        <div className="relative shrink-0 flex items-center justify-center">
-          <div
-            aria-hidden
-            className="absolute rounded-full border border-white/20 transition-opacity duration-150"
-            style={{
-              width: 200,
-              height: 200,
-              transform: `scale(${(1 + audioLevel * 0.35).toFixed(3)})`,
-              opacity: live ? 0.15 + audioLevel * 0.5 : 0,
-            }}
-          />
+        <div
+          ref={orbWrapRef}
+          className={[
+            "kx-call-orb relative shrink-0 flex items-center justify-center",
+            phase === "speaking" ? "is-far" : "is-near",
+            live && ready && !reconnecting && !muted ? "is-live" : "",
+          ].join(" ")}
+          style={{ width: 200, height: 200 }}
+        >
+          {/* THE VOICE, AS RINGS. Three concentric rings that swell with the
+              level and settle after it — white while the caller speaks, the
+              Hub's blue while Koleex AI does, so which side is talking is
+              visible before it is audible. Driven by --kx-call-level, which
+              useCallLevel writes each frame with attack and release, so the
+              motion is the voice's own shape rather than a meter's steps.
+              Transform and opacity only: nothing here forces a repaint of the
+              blurred orb beneath. */}
+          <span aria-hidden className="kx-call-ring kx-call-ring-1" />
+          <span aria-hidden className="kx-call-ring kx-call-ring-2" />
+          <span aria-hidden className="kx-call-ring kx-call-ring-3" />
           <AIOrb
             state={orbState}
             audioLevel={audioLevel}
             size={200}
             interactive
-            className="shrink-0"
+            className="shrink-0 kx-call-aiorb"
           />
         </div>
 
