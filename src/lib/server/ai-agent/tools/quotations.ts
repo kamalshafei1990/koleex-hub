@@ -80,7 +80,7 @@ const getProductDetails: ToolDef<
     if (!productId) {
       return {
         ok: false,
-        permissionStatus: "denied",
+        permissionStatus: "allowed",
         data: null,
         message: "I need a product first. Which product should I use?",
       };
@@ -95,7 +95,7 @@ const getProductDetails: ToolDef<
       .maybeSingle();
     if (error) {
       console.error("[tool.getProductDetails]", error);
-      return { ok: false, permissionStatus: "denied", data: null, message: "Couldn't fetch product." };
+      return { ok: false, permissionStatus: "allowed", data: null, message: "Couldn't fetch product." };
     }
     if (!product) {
       return {
@@ -304,7 +304,7 @@ const calculateQuotationPricing: ToolDef<
     if (!customerId || lines.length === 0) {
       return {
         ok: false,
-        permissionStatus: "denied",
+        permissionStatus: "allowed",
         data: null,
         message: "I need a customer and at least one product with quantity before I can prepare a quotation.",
       };
@@ -397,7 +397,7 @@ const createQuotationDraft: ToolDef<QuotationDraftInput, QuotationDraftResult> =
     if (!customerId || lines.length === 0) {
       return {
         ok: false,
-        permissionStatus: "denied",
+        permissionStatus: "allowed",
         data: null,
         message: "I need a customer and at least one product with quantity before I can prepare a quotation.",
       };
@@ -473,7 +473,7 @@ const createQuotationDraft: ToolDef<QuotationDraftInput, QuotationDraftResult> =
       console.error("[tool.createQuotationDraft]", quoteErr);
       return {
         ok: false,
-        permissionStatus: "denied",
+        permissionStatus: "allowed",
         data: null,
         message: "Couldn't create the draft right now.",
       };
@@ -496,7 +496,7 @@ const createQuotationDraft: ToolDef<QuotationDraftInput, QuotationDraftResult> =
       console.error("[tool.createQuotationDraft.items]", itemsErr);
       return {
         ok: false,
-        permissionStatus: "denied",
+        permissionStatus: "allowed",
         data: null,
         message: "Couldn't save the draft lines — nothing was saved.",
       };

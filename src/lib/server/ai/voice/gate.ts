@@ -29,7 +29,17 @@ import { requireAuth } from "@/lib/server/auth";
 import { requireInternalUser } from "@/lib/server/ai/require-internal";
 import { buildUserContext, checkModule } from "@/lib/server/ai-agent/permissions";
 
-export type VoiceGate = { accountId: string; tenantId: string | null };
+/** Who is on the call, as the text lanes already know them (the viewer
+ *  block every written prompt carries). Null name means "use the username". */
+export type VoiceViewer = {
+  name: string | null;
+  username: string;
+  role: string | null;
+  department: string | null;
+  isSuperAdmin: boolean;
+};
+
+export type VoiceGate = { accountId: string; tenantId: string | null; viewer: VoiceViewer };
 
 export async function authorizeVoice(req: Request): Promise<NextResponse | VoiceGate> {
   const auth = await requireAuth(req);
@@ -47,5 +57,20 @@ export async function authorizeVoice(req: Request): Promise<NextResponse | Voice
     );
   }
 
-  return { accountId: auth.account_id, tenantId: auth.tenant_id ?? null };
+  return {
+    accountId: auth.account_id,
+    tenantId: auth.tenant_id ?? null,
+    /* FROM THE SIGNED-IN SESSION, not from what the caller says. A voice
+       session used to carry nothing about who was speaking: asked "do you
+       know who I am", it did not, and told a super admin it could not tell
+       what they were allowed to see. The text lanes fixed this as finding
+       N7; the call gets the same block, from the same context. */
+    viewer: {
+      name: ctx.viewer.name,
+      username: ctx.viewer.username,
+      role: ctx.viewer.role,
+      department: ctx.viewer.department,
+      isSuperAdmin: ctx.viewer.isSuperAdmin,
+    },
+  };
 }

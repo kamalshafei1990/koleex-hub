@@ -89,7 +89,7 @@ const searchProducts: ToolDef<
       console.error("[tool.searchProducts]", error);
       return {
         ok: false,
-        permissionStatus: "denied",
+        permissionStatus: "allowed",
         data: null,
         message: "Couldn't search products right now.",
       };
@@ -175,7 +175,7 @@ const countProducts: ToolDef<
       console.error("[tool.countProducts]", error);
       return {
         ok: false,
-        permissionStatus: "denied",
+        permissionStatus: "allowed",
         data: null,
         message: "Couldn't count products right now.",
       };
@@ -216,7 +216,7 @@ const getCatalogStats: ToolDef<
       console.error("[tool.getCatalogStats]", prodRes.error ?? modelRes.error);
       return {
         ok: false,
-        permissionStatus: "denied",
+        permissionStatus: "allowed",
         data: null,
         message: "Couldn't load catalog stats.",
       };
@@ -293,7 +293,7 @@ const getProductByCode: ToolDef<
     if (!code) {
       return {
         ok: false,
-        permissionStatus: "denied",
+        permissionStatus: "allowed",
         data: null,
         message: "Please provide a product code or name.",
       };
@@ -311,7 +311,7 @@ const getProductByCode: ToolDef<
       console.error("[tool.getProductByCode]", error);
       return {
         ok: false,
-        permissionStatus: "denied",
+        permissionStatus: "allowed",
         data: null,
         message: "Couldn't fetch that product right now.",
       };
@@ -402,7 +402,7 @@ const getProductFullDetails: ToolDef<
   handler: async (ctx, args): Promise<ToolResult<Record<string, unknown> | null>> => {
     const code = sanitizePostgrestLike(String(args.code ?? ""));
     if (!code) {
-      return { ok: false, permissionStatus: "denied", data: null, message: "Provide a product code or name." };
+      return { ok: false, permissionStatus: "allowed", data: null, message: "Provide a product code or name." };
     }
 
     /* Resolve product id: product slug/name first, then any MODEL code
@@ -525,7 +525,7 @@ const getProductFullDetails: ToolDef<
       if (!isActive) {
         return {
           ok: false,
-          permissionStatus: "denied",
+          permissionStatus: "allowed",
           data: null,
           message:
             "That product is not published in the catalogue. Tell the user you don't have a product by that name — do NOT mention drafts, internal records or Product Data.",
@@ -653,7 +653,7 @@ const auditProductData: ToolDef<
     ]);
     if (prodRes.error || modelRes.error || mediaRes.error || certRes.error || linkRes.error) {
       console.error("[tool.auditProductData]", prodRes.error ?? modelRes.error ?? mediaRes.error ?? certRes.error ?? linkRes.error);
-      return { ok: false, permissionStatus: "denied", data: null, message: "Couldn't run the product data audit right now." };
+      return { ok: false, permissionStatus: "allowed", data: null, message: "Couldn't run the product data audit right now." };
     }
 
     const products = (prodRes.data ?? []) as Array<{ id: string; product_name: string | null; status: string | null; description: string | null; hs_code: string | null }>;

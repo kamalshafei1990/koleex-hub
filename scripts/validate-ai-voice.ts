@@ -227,7 +227,7 @@ console.log("\n── 3. The route, read — the surface a fetch cannot be teste
     /catch \{[\s\S]{0,400}?taught index unavailable/.test(code) &&
     /let taughtQuestions: string\[\] = \[\];/.test(code));
   check("and the index reaches the full session, never the compact fallback",
-    /buildVoiceSessionPayload\(voice, taughtQuestions, recentTurns\)/.test(code));
+    /buildVoiceSessionPayload\(voice, taughtQuestions, recentTurns, gate\.viewer\)/.test(code));
   /* ── WHERE THIS FUNCTION RUNS, and why it is no longer pinned ─────────
      For a day this asserted the OPPOSITE: that the handshake was pinned away
      from the project's region, to Hong Kong, because the endpoint looked
@@ -780,8 +780,14 @@ void (async () => {
       !String(withHistory.compact.session.instructions).includes("third"));
     check("no history leaves the session exactly as it was",
       JSON.stringify(without) === JSON.stringify(buildVoiceSessionPayload(v[0])));
+    /* THE BOUND MOVED FROM 24 000 TO 30 000 when the caller's own read tools
+       (eight schemas, ~5.5 KB) joined the voice list. The real ceiling is the
+       DataChannel's negotiated message size — 64 KB and up in every shipping
+       browser — and the compact fallback covers a transport that refuses the
+       full one. Measured with the viewer block, a taught question and a full
+       history: 27.8 KB. */
     check("the budget constant keeps the full session well inside the channel",
-      HISTORY_BUDGET_BYTES <= 3_000 && Buffer.byteLength(JSON.stringify(withHistory.full)) < 24_000);
+      HISTORY_BUDGET_BYTES <= 3_000 && Buffer.byteLength(JSON.stringify(withHistory.full)) < 30_000);
 
     /* THE ROUTE'S HALF, read. */
     const route = strip(readFileSync("src/app/api/ai/voice/session/route.ts", "utf8"));
@@ -876,6 +882,52 @@ void (async () => {
       /check \(source in \('text', 'voice'\)\)/.test(mig));
     check("  …with the rollback written down", /drop column source/.test(mig));
     check("  …and no new table", !/create table/i.test(mig));
+  }
+
+  console.log("\n── 14. The call knows who is on it — from the session, never from the audio ──");
+  {
+    /* FROM THE SAVED TRANSCRIPT: the caller told the assistant his name and
+       that he was a super admin, and the assistant still could not say what
+       he was allowed to see. The written lanes carry a viewer block (finding
+       N7); the voice session carried nothing about the caller. */
+    const v = parseVoiceOptions("Ethan:Omar");
+    const owner = { name: "Kamal El Shafei", username: "kamal", role: "Owner", department: "Management", isSuperAdmin: true };
+    const rep = { name: null, username: "mona", role: "Sales Rep", department: null, isSuperAdmin: false };
+    const withOwner = String(buildVoiceSessionPayload(v[0], [], [], owner).full.session.instructions);
+    const withRep = String(buildVoiceSessionPayload(v[0], [], [], rep).full.session.instructions);
+    const nobody = String(buildVoiceSessionPayload(v[0], [], [], null).full.session.instructions);
+    check("the full session names the caller from the session",
+      /WHO YOU ARE TALKING TO/.test(withOwner) && withOwner.includes("Kamal El Shafei") && withOwner.includes("username kamal"));
+    check("  …with role and department", withOwner.includes("role: Owner, super admin") && withOwner.includes("department: Management"));
+    check("a super admin is told never to be denied",
+      /never tell them they lack access/.test(withOwner) && /never that they may not see it/.test(withOwner));
+    check("an ordinary user is told their permissions decide, not the call",
+      !/never tell them they lack access/.test(withRep) && /decided by their permissions on each lookup/.test(withRep));
+    check("a caller with no display name is addressed by username", withRep.includes(": mona (username mona)"));
+    check("the block says the claim made out loud changes nothing",
+      /from their signed-in session/.test(withOwner) && /never say you do not know who they are/.test(withOwner));
+    check("  …and not to guess their gender", /do not assume their gender/.test(withOwner));
+    check("no viewer, no block — the fixture sessions are unchanged", !/WHO YOU ARE TALKING TO/.test(nobody) &&
+      JSON.stringify(buildVoiceSessionPayload(v[0], [], [], null)) === JSON.stringify(buildVoiceSessionPayload(v[0])));
+    const compact = String(buildVoiceSessionPayload(v[0], [], [], owner).compact.session.instructions);
+    check("the compact fallback carries one line about the caller",
+      compact.includes("You are speaking with Kamal El Shafei") && /never say they lack permission/.test(compact));
+    check("  …and stays small", compact.length < 3_200);
+
+    /* THE ROUTE FEEDS IT FROM THE GATE, and the gate from buildUserContext. */
+    const route = strip(readFileSync("src/app/api/ai/voice/session/route.ts", "utf8"));
+    const gate = strip(readFileSync("src/lib/server/ai/voice/gate.ts", "utf8"));
+    check("the route passes the gate's viewer into the session",
+      /buildVoiceSessionPayload\(voice, taughtQuestions, recentTurns, gate\.viewer\)/.test(route));
+    check("the gate takes the viewer from the permission context, not from the request",
+      /viewer: \{\s*name: ctx\.viewer\.name,/.test(gate) && /isSuperAdmin: ctx\.viewer\.isSuperAdmin,/.test(gate) &&
+      !/req\.(json|text|headers)/.test(gate.slice(gate.indexOf("viewer: {"))));
+
+    /* HOW THE CALLER IS ADDRESSED. Also from the transcript: "يا حبيبي",
+       "يا ماما", and a man addressed in the feminine. */
+    check("the dialect rule bans pet names and gender guessing",
+      /never حبيبي/.test(withOwner) && /Do NOT guess gender from a voice/.test(withOwner) &&
+      /switch fully and at once/.test(withOwner));
   }
 
   summarised = true;

@@ -62,7 +62,7 @@ const searchTradeTerms: ToolDef<
     const q = String(args.query ?? "").toLowerCase().trim();
     const limit = Math.min(Math.max(Number(args.limit ?? 2) || 2, 1), 4);
     if (!q) {
-      return { ok: false, permissionStatus: "denied", data: null, message: "Provide a search query." };
+      return { ok: false, permissionStatus: "allowed", data: null, message: "Provide a search query." };
     }
 
     const codes = new Set((q.match(CODE_RE) ?? []).map((c) => c.toLowerCase()));

@@ -179,6 +179,66 @@ console.log("\n── 5c. A photo attaches to the turn that showed it, and stays
   check("an empty list adds no field", () => !("photos" in bare[0]));
 }
 
+console.log("\n── 5d. The assistant's transcript arrives in PIECES, and the pieces add up ──");
+{
+  /* FOUND IN THE SAVED TRANSCRIPT, NOT IN A TEST. Every assistant turn was
+     saved as its last fragment — "تمام", "ولي بس." — because the vendor's
+     assistant delta carries `delta` (the next few characters) and the fold
+     treated it as the whole turn. The fixture had always used cumulative
+     text, so the suite was green while every caption was one word long. */
+  let lines: TranscriptLine[] = [];
+  const feed = (raw: string) => { const t = parseVoiceEvent(raw).transcript; if (t) lines = appendTranscript(lines, t); };
+  feed(ev({ type: EV_ASSISTANT_DELTA, delta: "The KX" }));
+  feed(ev({ type: EV_ASSISTANT_DELTA, delta: "-180 spreads" }));
+  feed(ev({ type: EV_ASSISTANT_DELTA, delta: " 1.8 metres." }));
+  check("assistant deltas ACCUMULATE", () => lines.length === 1 && lines[0].text === "The KX-180 spreads 1.8 metres.");
+  check("  …and the update says so", parseVoiceEvent(ev({ type: EV_ASSISTANT_DELTA, delta: "x" })).transcript?.incremental === true);
+  feed(ev({ type: EV_ASSISTANT_DONE }));
+  check("a done event with no transcript keeps what the pieces built", () => lines[0].final && lines[0].text === "The KX-180 spreads 1.8 metres.");
+  feed(ev({ type: EV_ASSISTANT_DONE }));
+  check("  …and a repeated done neither doubles nor blanks it", () => lines.length === 1 && lines[0].text === "The KX-180 spreads 1.8 metres.");
+
+  /* A vendor that sends the WHOLE turn as `text` is still handled: text is
+     cumulative, delta is a piece. */
+  let cum: TranscriptLine[] = [];
+  const feedC = (raw: string) => { const t = parseVoiceEvent(raw).transcript; if (t) cum = appendTranscript(cum, t); };
+  feedC(ev({ type: EV_ASSISTANT_DELTA, text: "Hel" }));
+  feedC(ev({ type: EV_ASSISTANT_DELTA, text: "Hello there" }));
+  check("a cumulative assistant delta still replaces", () => cum[0].text === "Hello there");
+  check("  …and is not marked incremental", parseVoiceEvent(ev({ type: EV_ASSISTANT_DELTA, text: "Hello" })).transcript?.incremental !== true);
+  feedC(ev({ type: EV_ASSISTANT_DONE, transcript: "Hello there." }));
+  check("a done event WITH a transcript is authoritative", () => cum[0].text === "Hello there.");
+
+  /* The user's transcription is unchanged: confirmed prefix plus tail,
+     replaced each time. */
+  let usr: TranscriptLine[] = [];
+  const feedU = (raw: string) => { const t = parseVoiceEvent(raw).transcript; if (t) usr = appendTranscript(usr, t); };
+  feedU(ev({ type: EV_USER_DELTA, text: "how many", stash: " ord" }));
+  feedU(ev({ type: EV_USER_DELTA, text: "how many orders" }));
+  check("the user's deltas still replace — they were never fragments", () => usr[0].text === "how many orders");
+}
+
+console.log("\n── 5e. The same final twice is one turn ──");
+{
+  /* Also from the saved transcript: the user's question and the assistant's
+     "تمام" each appeared twice, back to back, because the protocol delivered
+     the completed event twice and each copy opened a new line. */
+  let lines: TranscriptLine[] = [];
+  const feed = (raw: string) => { const t = parseVoiceEvent(raw).transcript; if (t) lines = appendTranscript(lines, t); };
+  feed(ev({ type: EV_USER_DONE, transcript: "كلميني بالمصري" }));
+  feed(ev({ type: EV_USER_DONE, transcript: "كلميني بالمصري" }));
+  check("a repeated user final adds no line", () => lines.length === 1);
+  feed(ev({ type: EV_ASSISTANT_DELTA, delta: "تمام" }));
+  feed(ev({ type: EV_ASSISTANT_DONE, transcript: "تمام" }));
+  feed(ev({ type: EV_ASSISTANT_DONE, transcript: "تمام" }));
+  check("nor a repeated assistant final", () => lines.length === 2 && lines[1].text === "تمام");
+  feed(ev({ type: EV_USER_DONE, transcript: "كلميني بالمصري" }));
+  check("but the same words said AGAIN later are a new turn — only a back-to-back copy is dropped",
+    () => lines.length === 3);
+  feed(ev({ type: EV_USER_DONE, transcript: "" }));
+  check("an empty final is not mistaken for a duplicate", () => lines.length === 3);
+}
+
 console.log("\n── 6. The awkward cases a live call actually produces ──");
 {
   /* A repeated event — a retransmit, or React replaying a handler — must not

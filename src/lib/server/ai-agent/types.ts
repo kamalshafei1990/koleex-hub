@@ -140,6 +140,16 @@ export interface ToolDef<TArgs = Record<string, unknown>, TResult = unknown> {
    - "limited"         — some fields were filtered out (tool succeeded)
    - "denied"          — user lacks module/action permission
    - "approval_required" — draft or action awaiting human sign-off
+
+   "DENIED" MEANS A PERMISSION, NOT A FAILURE. For a long time tools answered
+   every failure with it — a product that did not exist, a calendar that did
+   not load, a missing query — and the model, reading `status: denied`, told
+   a super admin he was not allowed to see things. A tool's own failure is
+   `ok: false` with permissionStatus "allowed" (nothing was withheld by
+   permission) and a message that says what happened. "denied" is written
+   only when the answer really is "you may not": the permission gates, an
+   ownership rule (someone else's task or calendar), or view-as. The suite
+   validate:ai-tool-exposure reads every tool and holds this line.
    ───────────────────────────────────────────────────────────────────── */
 
 export type PermissionStatus =

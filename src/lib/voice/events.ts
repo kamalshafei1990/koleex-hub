@@ -44,9 +44,19 @@ export type TranscriptUpdate = {
   role: TranscriptRole;
   via?: TranscriptVia;
   photos?: readonly TranscriptPhoto[];
-  /** The text so far for this turn. Always the WHOLE turn, never a fragment —
-   *  see `append` below for why the caller is not asked to accumulate. */
+  /** The text of this update. The WHOLE turn so far when `incremental` is
+   *  false (the user's transcription: a confirmed prefix plus a tail), and
+   *  ONE MORE PIECE of it when `incremental` is true (the assistant's
+   *  transcript arrives as increments). See `appendTranscript` for the fold. */
   text: string;
+  /** True when `text` is a fragment to be appended to the open turn, not a
+   *  replacement for it. THIS FLAG IS WHY THE ASSISTANT'S ANSWERS WERE ONE
+   *  WORD LONG: every assistant delta was treated as the whole turn, so each
+   *  one replaced the last, and the caption, the saved message and the next
+   *  call's "conversation so far" all held the final fragment — "تمام", "ولي
+   *  بس." — of answers that were sentences. Found in the saved transcript,
+   *  not in a test: the fixture had always used cumulative deltas. */
+  incremental?: boolean;
   /** False while more is coming. A caller may render partial text differently
    *  (dimmed, no timestamp) but must never drop it: partial text arriving as
    *  the user speaks is the entire point of showing it live. */
@@ -121,8 +131,21 @@ export function parseVoiceEvent(raw: string): ParsedEvent {
   if (!type) return NOTHING;
 
   switch (type) {
-    case EV_ASSISTANT_DELTA:
-      return { transcript: { role: "assistant", text: deltaText(msg), final: false }, phase: "speaking" };
+    case EV_ASSISTANT_DELTA: {
+      /* THE ASSISTANT'S DELTA IS A PIECE, NOT THE WHOLE. The vendor sends the
+         user's transcription as `text` (confirmed so far) + `stash`, and the
+         assistant's as `delta` — the next few characters only. A payload
+         carrying `text` is still read as cumulative, so a vendor that sends
+         the whole turn is handled too; only a bare `delta` is appended. */
+      const cumulative = str(msg.text);
+      if (cumulative) {
+        return { transcript: { role: "assistant", text: cumulative + str(msg.stash), final: false }, phase: "speaking" };
+      }
+      return {
+        transcript: { role: "assistant", text: str(msg.delta), final: false, incremental: true },
+        phase: "speaking",
+      };
+    }
     case EV_ASSISTANT_DONE:
       /* `transcript` is the field the done event names; the delta fields are
          accepted too so a turn that only ever produced deltas still finishes
@@ -182,6 +205,22 @@ export function appendTranscript(
   const last = lines[lines.length - 1];
   const extendsOpenTurn = last && !last.final && last.role === update.role;
 
+  /* THE SAME FINAL TWICE IS ONE TURN. The protocol can deliver a completed
+     transcript on more than one event, and each copy used to open a new
+     line — so the saved conversation held the user's question twice and the
+     assistant's "تمام" twice, back to back. A final that matches the last
+     settled line of the same speaker is the same turn, and changes nothing. */
+  if (update.final && last && last.final && last.role === update.role && update.text && last.text === update.text) {
+    return [...lines];
+  }
+  /* AN EMPTY FINAL WITH NO OPEN TURN IS NOTHING. A repeated `done` after the
+     turn has already closed used to open a new, blank, final line — a row
+     with no words in the saved conversation. There is no turn for it to
+     close, so there is nothing to record. */
+  if (update.final && !update.text && (!last || last.final)) {
+    return [...lines];
+  }
+
   if (!extendsOpenTurn) {
     /* An empty partial opens nothing — a stray delta with no text would
        otherwise leave a blank bubble on screen for the rest of the call. */
@@ -198,14 +237,14 @@ export function appendTranscript(
     ];
   }
 
-  /* A delta carries the whole turn so far, not the increment. Replacing rather
-     than concatenating is therefore correct AND idempotent: a repeated event
-     leaves the caption identical instead of doubling it. */
+  /* A CUMULATIVE update carries the whole turn so far, so replacing is
+     correct and idempotent: a repeated event leaves the caption identical.
+     An INCREMENTAL one is a piece, and is appended. */
   const merged: TranscriptLine = {
     role: update.role,
     /* A final with no text of its own keeps what the deltas already built,
        rather than blanking a caption the user was reading. */
-    text: update.text || last.text,
+    text: update.incremental ? last.text + update.text : update.text || last.text,
     final: update.final,
     /* The line keeps how it began. A spoken turn does not become a typed one
        because a later event omitted the field. */

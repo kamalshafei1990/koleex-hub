@@ -17,6 +17,7 @@
    reintroduces a second list.
    --------------------------------------------------------------------------- */
 
+import { readFileSync, readdirSync } from "node:fs";
 import type { UserContext } from "../src/lib/server/ai-agent/types";
 import {
   listTools,
@@ -206,6 +207,56 @@ console.log("\n── 8. The payload claim, measured rather than asserted ──
     `  · schema bytes — super admin ${sa}, sales ${sales} (−${(((sa - sales) / sa) * 100).toFixed(0)}%), no grants ${none} (−${(((sa - none) / sa) * 100).toFixed(0)}%)`,
   );
   check("a scoped user's tool payload is genuinely smaller", sales < sa && none < sales);
+}
+
+console.log("\n── 9. \"denied\" is a permission, never a failure ──");
+{
+  /* THE DEFECT, from the saved transcript of a super admin's call: a product
+     lookup failed (the code did not exist), the tool answered
+     `permissionStatus: "denied"`, and the model told the owner he was not
+     allowed to see the product. 111 of the 120 "denied" returns in the tools
+     were failures — not found, could not load, missing argument — wearing a
+     permission label. They are "allowed" + ok:false now, and this holds the
+     line: every "denied" a tool writes must READ as a permission. */
+  const dir = "src/lib/server/ai-agent/tools";
+  const PERMISSION_WORDS = /(only|yours\b|your own|own calendar|viewing as another user|in your workspace|permission|not allowed|access)/i;
+  const FAILURE_WORDS = /(couldn'?t|can'?t find|right now|try again|provide a|which |what'?s the|when is|required|need a|nothing to change)/i;
+  let denied = 0;
+  const mislabelled: string[] = [];
+  let failuresAllowed = 0;
+  for (const f of readdirSync(dir).filter((n) => n.endsWith(".ts"))) {
+    const src = readFileSync(`${dir}/${f}`, "utf8");
+    const re = /permissionStatus:\s*"(denied|allowed)"[\s\S]{0,260}?message:\s*(`[^`]*`|"[^"]*")/g;
+    let m: RegExpExecArray | null;
+    while ((m = re.exec(src))) {
+      const status = m[1];
+      const msg = m[2];
+      if (status === "denied") {
+        denied++;
+        if (!PERMISSION_WORDS.test(msg)) mislabelled.push(`${f}: ${msg.slice(0, 60)}`);
+      } else if (FAILURE_WORDS.test(msg)) {
+        failuresAllowed++;
+      }
+    }
+  }
+  check(`every "denied" a tool writes reads as a permission${mislabelled.length ? ` — not these: ${mislabelled.join(" | ")}` : ""}`,
+    mislabelled.length === 0);
+  check("the genuine ones survive — ownership and view-as, in the files that have them",
+    denied >= 8 && denied <= 12);
+  check("and the failures now answer allowed + ok:false, in numbers, not by accident",
+    failuresAllowed >= 60);
+  /* The sites that actually bit the owner, by name. */
+  const products = readFileSync(`${dir}/products.ts`, "utf8");
+  check("a product that cannot be fetched is not a permission denial",
+    /permissionStatus: "allowed",[\s\S]{0,120}?Couldn't fetch that product right now/.test(products) &&
+    !/permissionStatus: "denied",[\s\S]{0,120}?Couldn't fetch that product right now/.test(products));
+  check("nor is a product that is simply not in the catalogue",
+    !/permissionStatus: "denied",[\s\S]{0,400}?not published in the catalogue/.test(products));
+  const calendar = readFileSync(`${dir}/calendar.ts`, "utf8");
+  check("but someone else's calendar still is",
+    /permissionStatus: "denied", data: null, message: "You can only edit events on your own calendar."/.test(calendar));
+  check("the contract says so where the type lives",
+    /"DENIED" MEANS A PERMISSION, NOT A FAILURE/.test(readFileSync("src/lib/server/ai-agent/types.ts", "utf8")));
 }
 
 console.log(`\n${pass} passed, ${failures.length} failed`);

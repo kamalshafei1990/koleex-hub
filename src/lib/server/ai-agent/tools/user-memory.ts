@@ -54,7 +54,7 @@ const rememberAboutUser: ToolDef<
     const key = String(args.key ?? "").trim().toLowerCase().replace(/[^a-z0-9_]+/g, "_").slice(0, MAX_KEY);
     const value = String(args.value ?? "").trim().slice(0, MAX_VALUE);
     if (!key || !value) {
-      return { ok: false, permissionStatus: "denied", data: null,
+      return { ok: false, permissionStatus: "allowed", data: null,
         message: "Both a key and a value are required." };
     }
 
@@ -72,7 +72,7 @@ const rememberAboutUser: ToolDef<
     const { data, error } = await supabaseServer
       .from("accounts").select("preferences").eq("id", ctx.auth.account_id).maybeSingle();
     if (error) {
-      return { ok: false, permissionStatus: "denied", data: null, message: "Couldn't read your profile." };
+      return { ok: false, permissionStatus: "allowed", data: null, message: "Couldn't read your profile." };
     }
 
     const prefs = ((data?.preferences ?? {}) as Record<string, unknown>);
@@ -88,7 +88,7 @@ const rememberAboutUser: ToolDef<
 
     const merged = await mergeAccountPrefs(ctx.auth.account_id, { ai_memory: next });
     if (!merged) {
-      return { ok: false, permissionStatus: "denied", data: null, message: "Couldn't save that." };
+      return { ok: false, permissionStatus: "allowed", data: null, message: "Couldn't save that." };
     }
 
     return { ok: true, permissionStatus: "allowed", data: { remembered: next } };

@@ -55,7 +55,7 @@ const searchKnowledge: ToolDef<{ query: string }, { taught: TaughtOut[]; hits: H
   requiredAction: "view",
   handler: async (ctx, args): Promise<ToolResult<{ taught: TaughtOut[]; hits: Hit[] }>> => {
     const q = String(args.query ?? "").trim();
-    if (!q) return { ok: false, permissionStatus: "denied", data: null, message: "query required" };
+    if (!q) return { ok: false, permissionStatus: "allowed", data: null, message: "query required" };
     const tenantId = ctx.auth.tenant_id ?? null;
 
     /* Both planes, in parallel — they are independent reads and the caller of

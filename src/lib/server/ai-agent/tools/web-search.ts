@@ -77,7 +77,7 @@ const searchTheWeb: ToolDef<SearchArgs, SearchData> = {
     if (!query) {
       return {
         ok: false,
-        permissionStatus: "denied",
+        permissionStatus: "allowed",
         data: null,
         message: "A search query is required.",
       };
