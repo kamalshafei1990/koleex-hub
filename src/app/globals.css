@@ -1436,6 +1436,23 @@ html[data-kx-tabslide] #main-scroll-container { overflow-x: clip; }
   40%      { opacity: 1;    transform: translateY(-2px); }
 }
 
+/* ── The call screen's two views, crossfaded (VoiceCallScreen) ──
+   The arriving view fades and settles in from 8px below; the leaving copy
+   fades out over it, a touch faster, so there is never a blank frame and
+   never a flash. Both still under reduced motion. */
+@media (prefers-reduced-motion: no-preference) {
+  .kx-view-in  { animation: kx-view-in 0.32s cubic-bezier(0.16, 1, 0.3, 1) both; }
+  .kx-view-out { animation: kx-view-out 0.26s ease-in both; }
+}
+@keyframes kx-view-in {
+  from { opacity: 0; transform: translateY(8px) scale(0.985); }
+  to   { opacity: 1; transform: none; }
+}
+@keyframes kx-view-out {
+  from { opacity: 1; transform: none; }
+  to   { opacity: 0; transform: scale(1.01); }
+}
+
 /* Bottom-sheet entrance (NotificationBell mobile). On md+ the same class
    gives the dropdown a subtle rise-in. Disabled under reduced motion. */
 @media (prefers-reduced-motion: no-preference) {

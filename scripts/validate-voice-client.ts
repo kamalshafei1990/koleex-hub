@@ -1785,10 +1785,10 @@ console.log("\n── 12. Mute ──");
   const scr = fs18.readFileSync("src/components/ai/VoiceCallScreen.tsx", "utf8");
   const css18 = fs18.readFileSync("src/app/globals.css", "utf8");
   check("the call screen is TWO VIEWS, the way ChatGPT does it: the orb alone, or the conversation with a small orb floating over it",
-    /const view: "orb" \| "chat" = chosenView \?\? \(hasPhotos \? "chat" : "orb"\);/.test(scr) && /\{view === "orb" \? \(/.test(scr) &&
+    /const view: "orb" \| "chat" = chosenView \?\? \(hasPhotos \? "chat" : "orb"\);/.test(scr) && /\{view === "orb" \? orbView : chatView\}/.test(scr) &&
     /<VoiceTranscript lines=\{lines\} lang=\{lang\} className="flex-1 min-h-0 pb-28" fill onOpenPhoto=\{setOpenPhoto\} \/>/.test(scr) && /size=\{72\}/.test(scr));
   check("  …a tap on the big orb or the quiet button opens the words; a tap on the small orb comes back",
-    (scr.match(/onClick=\{\(\) => setView\("chat"\)\}/g) ?? []).length === 2 && /onClick=\{\(\) => setView\("orb"\)\}/.test(scr));
+    (scr.match(/onClick=\{\(\) => switchView\("chat"\)\}/g) ?? []).length === 2 && /onClick=\{\(\) => switchView\("orb"\)\}/.test(scr));
   check("  …a picture opens the conversation by itself, derived rather than synchronised — no effect writes state — and the caller's own tap wins",
     /const hasPhotos = lines\.some\(\(l\) => \(l\.photos\?\.length \?\? 0\) > 0\);/.test(scr) && /useState<"orb" \| "chat" \| null>\(null\)/.test(scr) && !/useEffect\(\(\) => \{[^}]*setView/.test(scr));
   check("  …and the last thing said is a caption under the orb, so the orb view still shows the words",
@@ -2034,6 +2034,26 @@ console.log("\n── 12. Mute ──");
   check("  …the caption moves only while something is pending",
     /const working = !live \|\| !ready \|\| reconnecting \|\| \(searching && !muted\) \|\| \(phase === "thinking" && !muted\);/.test(scr20) &&
     /\{working \? \(\s*<>\s*<span className="kx-activity-text">\{status\.replace\(\/…\$\/, ""\)\}<\/span>/.test(scr20));
+}
+
+{
+  console.log("\n── 21. The switch between the orb and the words is a crossfade, not a cut ──");
+  const fs21 = await import("node:fs");
+  const scr21 = fs21.readFileSync("src/components/ai/VoiceCallScreen.tsx", "utf8");
+  const css21 = fs21.readFileSync("src/app/globals.css", "utf8");
+  check("a tap goes through switchView: the current view becomes the leaving one, the next arrives — nothing when it is already shown",
+    /const switchView = useCallback\(\(next: "orb" \| "chat"\) => \{\s*if \(next === view\) return;/.test(scr21) &&
+    /if \(!reduced\) setLeaving\(view\);\s*setView\(next\);/.test(scr21));
+  check("  …the leaving copy is cleared by a timer matching the CSS, never in render",
+    /const t = window\.setTimeout\(\(\) => setLeaving\(null\), VIEW_FADE_MS\);/.test(scr21) && /const VIEW_FADE_MS = 260;/.test(scr21) &&
+    /\.kx-view-out \{ animation: kx-view-out 0\.26s/.test(css21));
+  check("  …the arriving view is keyed so its entrance replays; the leaving copy is inert and hidden from readers, on top",
+    /<div key=\{view\} className="kx-view-in flex-1 min-h-0 flex flex-col">\s*\{view === "orb" \? orbView : chatView\}/.test(scr21) &&
+    /\{leaving && leaving !== view && \(\s*<div aria-hidden className="kx-view-out pointer-events-none absolute inset-0 flex flex-col">\s*\{leaving === "orb" \? orbView : chatView\}/.test(scr21));
+  check("  …reduced motion: no leaving copy is kept, and the CSS animates only when motion is welcome",
+    /window\.matchMedia\?\.\("\(prefers-reduced-motion: reduce\)"\)\.matches/.test(scr21) &&
+    /@media \(prefers-reduced-motion: no-preference\) \{\s*\.kx-view-in\s*\{ animation: kx-view-in/.test(css21) &&
+    /@keyframes kx-view-in \{\s*from \{ opacity: 0; transform: translateY\(8px\) scale\(0\.985\); \}/.test(css21));
 }
 
 console.log(`\n${pass} passed, ${failures.length} failed`);

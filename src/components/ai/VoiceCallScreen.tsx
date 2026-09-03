@@ -32,6 +32,11 @@ import KoleexLogo from "@/components/layout/KoleexLogo";
 import { textDirection } from "@/lib/text-direction";
 import { stripImageMarkdown } from "@/lib/voice/photos";
 
+/** How long the leaving view stays while the arriving one settles — matches
+ *  .kx-view-out in globals.css; the entrance is a little longer so nothing
+ *  is ever blank. */
+const VIEW_FADE_MS = 260;
+
 const COPY: Record<Lang, {
   connecting: string;
   reconnecting: string;
@@ -260,6 +265,21 @@ export default function VoiceCallScreen({
      effect writes state, so nothing can cascade or fight the caller's tap. */
   const [chosenView, setView] = useState<"orb" | "chat" | null>(null);
   const view: "orb" | "chat" = chosenView ?? (hasPhotos ? "chat" : "orb");
+  /* The view on its way out, kept for the length of the crossfade. Set by a
+     tap (switchView); the automatic switch a picture makes gets the entrance
+     alone — no tap, no cut to soften. Cleared by a timer, never in render. */
+  const [leaving, setLeaving] = useState<"orb" | "chat" | null>(null);
+  const switchView = useCallback((next: "orb" | "chat") => {
+    if (next === view) return;
+    const reduced = typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+    if (!reduced) setLeaving(view);
+    setView(next);
+  }, [view]);
+  useEffect(() => {
+    if (!leaving) return;
+    const t = window.setTimeout(() => setLeaving(null), VIEW_FADE_MS);
+    return () => window.clearTimeout(t);
+  }, [leaving]);
   /* THE LAST THING SAID, as a caption under the orb: a caller on the orb view
      still sees the words, one turn at a time, the way subtitles work. */
   const lastLine = lines.length > 0 ? lines[lines.length - 1] : null;
@@ -367,6 +387,118 @@ export default function VoiceCallScreen({
   /* Pending, as opposed to settled: the caption gets motion only here. */
   const working = !live || !ready || reconnecting || (searching && !muted) || (phase === "thinking" && !muted);
 
+  /* THE TWO VIEWS, built once each so the crossfade below can show the
+     one leaving beside the one arriving. */
+  const orbView = (
+      /* ── ORB VIEW: Koleex AI alone, large, centred. ── */
+      <div className="flex-1 min-h-0 flex flex-col items-center justify-center gap-4 px-6">
+        <KoleexLogo className="h-6 w-auto shrink-0 text-white" />
+        <button
+          type="button"
+          onClick={() => switchView("chat")}
+          aria-label={copy.showChat}
+          title={copy.showChat}
+          className="block rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0066FF] focus-visible:ring-offset-4 focus-visible:ring-offset-[#0D0D0D]"
+        >
+          <div
+            ref={orbWrapRef}
+            className={[
+              "kx-call-orb relative shrink-0 flex items-center justify-center",
+              phase === "speaking" ? "is-far" : "is-near",
+              live && ready && !reconnecting && !muted ? "is-live" : "",
+              /* A LOOKUP IN PROGRESS, on the rings: slow blue waves leaving
+                 the orb until the answer comes. The orb itself is in
+                 `thinking` — the shared component's own considering state. */
+              (searching || phase === "thinking") && live && !muted ? "is-thinking" : "",
+            ].join(" ")}
+            style={{ width: 200, height: 200 }}
+          >
+            {/* THE VOICE, AS RINGS — see lib/voice/level.ts. Transform and
+                opacity only: nothing here forces a repaint of the blurred
+                orb beneath. */}
+            <span aria-hidden className="kx-call-ring kx-call-ring-1" />
+            <span aria-hidden className="kx-call-ring kx-call-ring-2" />
+            <span aria-hidden className="kx-call-ring kx-call-ring-3" />
+            <AIOrb
+              state={orbState}
+              activity={searching && live && !muted ? "searching" : "none"}
+              audioLevel={audioLevel}
+              size={200}
+              interactive
+              /* `is-lively` is the orb's own opt-in (see AIOrb.tsx): at
+                 call size, in the audio states, the face keeps the home
+                 page's life — the gaze, the blink, the aura's idle pace. */
+              className="shrink-0 kx-call-aiorb is-lively"
+            />
+          </div>
+        </button>
+
+        {/* Status — one line, quiet. The orb already says most of this;
+            the text is for anyone who cannot read motion. */}
+        {/* WORKING STATES MOVE. Connecting, reconnecting, thinking and looking
+            something up get the same light sweep and breathing dots as the
+            chat's activity line (globals.css .kx-activity-*): the owner asked
+            for "a small title with a simple motion" wherever the AI is busy.
+            Listening / speaking / ready stand still — nothing is pending. */}
+        <p className="text-sm font-normal tracking-wide text-[#AAAAAA] inline-flex items-center justify-center gap-1.5" aria-live="polite">
+          {working ? (
+            <>
+              <span className="kx-activity-text">{status.replace(/…$/, "")}</span>
+              <span className="kx-activity-dots" aria-hidden><i /><i /><i /></span>
+            </>
+          ) : status}
+        </p>
+        {lastLine && (
+          <p
+            dir={textDirection(stripImageMarkdown(lastLine.text) || lastLine.text)}
+            className={`max-w-[820px] px-2 text-center text-base leading-relaxed line-clamp-3 ${lastLine.final ? "text-white" : "text-[#AAAAAA]"}`}
+          >
+            {stripImageMarkdown(lastLine.text)}
+          </p>
+        )}
+        {lines.length > 0 ? (
+          <button
+            type="button"
+            onClick={() => switchView("chat")}
+            className="h-10 px-4 rounded-full text-xs inline-flex items-center text-[#AAAAAA] hover:text-white border border-white/20 hover:border-white/30 bg-white/[0.04] hover:bg-white/[0.08] transition-[background-color,color,border-color,transform] duration-150 active:scale-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0066FF] focus-visible:ring-offset-2 focus-visible:ring-offset-[#0D0D0D]"
+          >
+            {copy.showChat}
+          </button>
+        ) : (
+          /* Told once, plainly: server-side turn detection has no
+             push-to-talk, and a user waiting for a button to hold will
+             wait forever. */
+          <p className="max-w-[820px] mx-auto text-center text-xs text-[#666666]">{copy.hint}</p>
+        )}
+      </div>
+  );
+  const chatView = (
+      /* ── CHAT VIEW: the conversation, pictures in it, the orb small. ── */
+      <div className="relative flex-1 min-h-0 flex flex-col pt-4">
+        <VoiceTranscript lines={lines} lang={lang} className="flex-1 min-h-0 pb-28" fill onOpenPhoto={setOpenPhoto} />
+        {/* THE SMALL ORB, floating over the words, still alive and still
+            showing who is speaking. A tap brings the big one back. */}
+        <button
+          type="button"
+          onClick={() => switchView("orb")}
+          aria-label={copy.showOrb}
+          title={copy.showOrb}
+          className="absolute bottom-4 end-6 rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0066FF] focus-visible:ring-offset-2 focus-visible:ring-offset-[#0D0D0D]"
+        >
+          <span className="sr-only">{status}</span>
+          <AIOrb
+            state={orbState}
+            activity={searching && live && !muted ? "searching" : "none"}
+            audioLevel={audioLevel}
+            size={72}
+            className="shrink-0 kx-call-aiorb is-lively"
+          />
+        </button>
+      </div>
+    
+  );
+
+
   return (
     <div
       role="dialog"
@@ -395,112 +527,24 @@ export default function VoiceCallScreen({
       }}
     >
       <PhotoLightbox photo={openPhoto} onClose={closePhoto} closeLabel={copy.closePhoto} />
-      {view === "orb" ? (
-        /* ── ORB VIEW: Koleex AI alone, large, centred. ── */
-        <div className="flex-1 min-h-0 flex flex-col items-center justify-center gap-4 px-6">
-          <KoleexLogo className="h-6 w-auto shrink-0 text-white" />
-          <button
-            type="button"
-            onClick={() => setView("chat")}
-            aria-label={copy.showChat}
-            title={copy.showChat}
-            className="block rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0066FF] focus-visible:ring-offset-4 focus-visible:ring-offset-[#0D0D0D]"
-          >
-            <div
-              ref={orbWrapRef}
-              className={[
-                "kx-call-orb relative shrink-0 flex items-center justify-center",
-                phase === "speaking" ? "is-far" : "is-near",
-                live && ready && !reconnecting && !muted ? "is-live" : "",
-                /* A LOOKUP IN PROGRESS, on the rings: slow blue waves leaving
-                   the orb until the answer comes. The orb itself is in
-                   `thinking` — the shared component's own considering state. */
-                (searching || phase === "thinking") && live && !muted ? "is-thinking" : "",
-              ].join(" ")}
-              style={{ width: 200, height: 200 }}
-            >
-              {/* THE VOICE, AS RINGS — see lib/voice/level.ts. Transform and
-                  opacity only: nothing here forces a repaint of the blurred
-                  orb beneath. */}
-              <span aria-hidden className="kx-call-ring kx-call-ring-1" />
-              <span aria-hidden className="kx-call-ring kx-call-ring-2" />
-              <span aria-hidden className="kx-call-ring kx-call-ring-3" />
-              <AIOrb
-                state={orbState}
-                activity={searching && live && !muted ? "searching" : "none"}
-                audioLevel={audioLevel}
-                size={200}
-                interactive
-                /* `is-lively` is the orb's own opt-in (see AIOrb.tsx): at
-                   call size, in the audio states, the face keeps the home
-                   page's life — the gaze, the blink, the aura's idle pace. */
-                className="shrink-0 kx-call-aiorb is-lively"
-              />
-            </div>
-          </button>
-
-          {/* Status — one line, quiet. The orb already says most of this;
-              the text is for anyone who cannot read motion. */}
-          {/* WORKING STATES MOVE. Connecting, reconnecting, thinking and looking
-              something up get the same light sweep and breathing dots as the
-              chat's activity line (globals.css .kx-activity-*): the owner asked
-              for "a small title with a simple motion" wherever the AI is busy.
-              Listening / speaking / ready stand still — nothing is pending. */}
-          <p className="text-sm font-normal tracking-wide text-[#AAAAAA] inline-flex items-center justify-center gap-1.5" aria-live="polite">
-            {working ? (
-              <>
-                <span className="kx-activity-text">{status.replace(/…$/, "")}</span>
-                <span className="kx-activity-dots" aria-hidden><i /><i /><i /></span>
-              </>
-            ) : status}
-          </p>
-          {lastLine && (
-            <p
-              dir={textDirection(stripImageMarkdown(lastLine.text) || lastLine.text)}
-              className={`max-w-[820px] px-2 text-center text-base leading-relaxed line-clamp-3 ${lastLine.final ? "text-white" : "text-[#AAAAAA]"}`}
-            >
-              {stripImageMarkdown(lastLine.text)}
-            </p>
-          )}
-          {lines.length > 0 ? (
-            <button
-              type="button"
-              onClick={() => setView("chat")}
-              className="h-10 px-4 rounded-full text-xs inline-flex items-center text-[#AAAAAA] hover:text-white border border-white/20 hover:border-white/30 bg-white/[0.04] hover:bg-white/[0.08] transition-[background-color,color,border-color,transform] duration-150 active:scale-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0066FF] focus-visible:ring-offset-2 focus-visible:ring-offset-[#0D0D0D]"
-            >
-              {copy.showChat}
-            </button>
-          ) : (
-            /* Told once, plainly: server-side turn detection has no
-               push-to-talk, and a user waiting for a button to hold will
-               wait forever. */
-            <p className="max-w-[820px] mx-auto text-center text-xs text-[#666666]">{copy.hint}</p>
-          )}
+      {/* ── THE TWO VIEWS, CROSSFADED. The switch used to be a cut: one
+          render the orb, the next the words — the owner: "make this motion
+          smooth and ease, not a flash action". Now the arriving view fades and
+          settles in (kx-view-in, keyed so the entrance replays each switch)
+          while a copy of the leaving view fades out on top of it for a
+          quarter second, inert and hidden from readers. Under reduced motion
+          no leaving copy is kept and the entrance does not animate — the
+          switch is instant, as those users asked. */}
+      <div className="relative flex-1 min-h-0 flex flex-col">
+        <div key={view} className="kx-view-in flex-1 min-h-0 flex flex-col">
+          {view === "orb" ? orbView : chatView}
         </div>
-      ) : (
-        /* ── CHAT VIEW: the conversation, pictures in it, the orb small. ── */
-        <div className="relative flex-1 min-h-0 flex flex-col pt-4">
-          <VoiceTranscript lines={lines} lang={lang} className="flex-1 min-h-0 pb-28" fill onOpenPhoto={setOpenPhoto} />
-          {/* THE SMALL ORB, floating over the words, still alive and still
-              showing who is speaking. A tap brings the big one back. */}
-          <button
-            type="button"
-            onClick={() => setView("orb")}
-            aria-label={copy.showOrb}
-            title={copy.showOrb}
-            className="absolute bottom-4 end-6 rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0066FF] focus-visible:ring-offset-2 focus-visible:ring-offset-[#0D0D0D]"
-          >
-            <span className="sr-only">{status}</span>
-            <AIOrb
-              state={orbState}
-              activity={searching && live && !muted ? "searching" : "none"}
-              audioLevel={audioLevel}
-              size={72}
-              className="shrink-0 kx-call-aiorb is-lively"
-            />
-          </button>
-        </div>
-      )}
+        {leaving && leaving !== view && (
+          <div aria-hidden className="kx-view-out pointer-events-none absolute inset-0 flex flex-col">
+            {leaving === "orb" ? orbView : chatView}
+          </div>
+        )}
+      </div>
 
       {/* ── THE BOTTOM BAR, in both views: type, mute, end. ── */}
       <div className="shrink-0 flex flex-col pt-2">
