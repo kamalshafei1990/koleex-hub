@@ -17,6 +17,7 @@ import { type OrbState } from "@/components/ai/KoleexOrb";
 import KoleexOrb from "@/components/ai/KoleexGlowOrb";
 import type { AIOrbActivity } from "@/components/ai-orb/ai-orb-types";
 import TypingIndicator from "@/components/ai/TypingIndicator";
+import ActivityLine from "@/components/ai/ActivityLine";
 import MessageMarkdown from "@/components/ai/MessageMarkdown";
 import { textDirection } from "@/lib/text-direction";
 import DraftCard from "@/components/ai/DraftCard";
@@ -175,10 +176,21 @@ export function Bubble({
         {draftStep && (
           <DraftCard payload={draftStep.payload as QuotationDraftPayload} />
         )}
-        {/* Assistant bubble with no content yet → show typing indicator
-            (Phase 6). Replaced by the streamed text as deltas arrive. */}
+        {/* WHAT IT IS DOING, IN WORDS. The three anonymous dots said only
+            "wait"; this line says why — Thinking, Searching the web, Checking
+            the records — from the same activity the orb already shows (the
+            latest tool-call step). Shown while the bubble is still empty,
+            and again above a reply that is streaming while a lookup runs.
+            Owner, looking at Grok: a small title with a simple motion. */}
+        {!isUser && msg.content && orbState === "typing" && orbActivity !== "none" && (
+          <ActivityLine activity={orbActivity} lang={lang} className="px-1" />
+        )}
         {!isUser && !msg.content ? (
-          <TypingIndicator lang={lang} />
+          orbState === "loading" || orbState === "typing" ? (
+            <ActivityLine activity={orbActivity} lang={lang} className="px-1 py-1" />
+          ) : (
+            <TypingIndicator lang={lang} />
+          )
         ) : (
           <div
             /* Direction is MEASURED from the whole message, not guessed from

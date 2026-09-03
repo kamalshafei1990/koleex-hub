@@ -808,22 +808,35 @@ console.log("\n── VoiceCallScreen: the two controls ──");
 console.log("\n── VoiceCallScreen: choosing a voice ──");
 {
   const voices = [{ key: "v1", label: "Omar" }, { key: "v2", label: "Layla" }];
-  const withPicker = renderToStaticMarkup(
+  /* THE SHEET IS CLOSED BY DEFAULT: the bar shows a Voice control named
+     after the current voice, and nothing else about the catalogue. */
+  const closedSheet = renderToStaticMarkup(
     <VoiceCallScreen live phase="listening" audioLevel={0.2} lines={[]} lang="en"
       onEnd={() => {}} voices={voices} selectedVoice="v1" onSelectVoice={() => {}} /> as ReactElement,
   );
+  check("closed: a Voice control that opens a dialog, labelled with the voice now speaking, and no tiles",
+    /aria-haspopup="dialog"/.test(closedSheet) && /aria-expanded="false"/.test(closedSheet) && />Omar</.test(closedSheet) &&
+    !closedSheet.includes("Layla") && !/aria-pressed=/.test(closedSheet) && !/z-\[250\]/.test(closedSheet));
+  check("  …and the old chip row is gone: no 'Voice' caption with buttons beside it", !/uppercase tracking-wide[^>]*>Voice</.test(closedSheet));
+  const withPicker = renderToStaticMarkup(
+    <VoiceCallScreen live phase="listening" audioLevel={0.2} lines={[]} lang="en"
+      onEnd={() => {}} voices={voices} selectedVoice="v1" onSelectVoice={() => {}} defaultVoiceSheetOpen /> as ReactElement,
+  );
 
-  check("every configured voice is offered",
-    withPicker.includes("Omar") && withPicker.includes("Layla"));
-  /* Matched on the BUTTON ELEMENT rather than a proximity window: the class
-     attribute between the attribute and the label is long, and a window wide
-     enough to span it would also span the neighbouring button. */
-  check("the current one is marked as chosen",
-    /<button[^>]*aria-pressed="true"[^>]*>Omar</.test(withPicker));
-  check("and the other one is not",
-    /<button[^>]*aria-pressed="false"[^>]*>Layla</.test(withPicker));
+  check("open: every configured voice is offered, as an orb tile with its name",
+    withPicker.includes("Omar") && withPicker.includes("Layla") && /z-\[250\]/.test(withPicker) && /kx-sheet-in/.test(withPicker) &&
+    (withPicker.match(/kx-aiorb/g) ?? []).length >= 3 /* the call's orb + one per voice */);
+  /* Each tile is one <button …aria-pressed…> whose label sits in a span at
+     the end; split on the opening tags and read the state off the chunk
+     that carries the name. */
+  const pressedOf = (label: string) => /aria-pressed="(true|false)"/.exec(withPicker.split("<button").find((c) => c.includes(`>${label}</span>`) && /aria-pressed=/.test(c)) ?? "")?.[1];
+  check("the current one is marked as chosen, awake and ringed in Hub Blue",
+    pressedOf("Omar") === "true" && /ring-\[#0066FF\]/.test(withPicker));
+  check("and the other one is not", pressedOf("Layla") === "false");
   check("exactly one is chosen at a time",
     withPicker.split('aria-pressed="true"').length - 1 === 1);
+  check("the sheet has a title, a Close, a backdrop, and the note that the call carries on",
+    /Choose a voice/.test(withPicker) && /aria-label="Close"/.test(withPicker) && /bg-black\/60/.test(withPicker) && /The conversation carries on/.test(withPicker));
 
   /* THE VENDOR'S OWN IDS ARE NOT A MENU THE BROWSER HOLDS. Only keys and
      labels reach it, so a browser cannot ask for a voice never offered. */
@@ -842,12 +855,16 @@ console.log("\n── VoiceCallScreen: choosing a voice ──");
       onEnd={() => {}} voices={voices} selectedVoice="v2" onSelectVoice={() => {}} /> as ReactElement,
   );
   check("the picker's own label is localised", arPicker.includes("الصوت"));
+  const arSheet = renderToStaticMarkup(
+    <VoiceCallScreen live phase="listening" audioLevel={0.2} lines={[]} lang="ar"
+      onEnd={() => {}} voices={voices} selectedVoice="v2" onSelectVoice={() => {}} defaultVoiceSheetOpen /> as ReactElement,
+  );
   check("but the voice names are the owner's words, not translated",
-    arPicker.includes("Omar") && arPicker.includes("Layla"));
+    arSheet.includes("Omar") && arSheet.includes("Layla") && arSheet.includes("اختار الصوت"));
 
   /* Brand: the picker introduces no new colour. */
   const pickerHexes = [...withPicker.matchAll(/#[0-9A-Fa-f]{6}\b/g)].map((m) => m[0].toUpperCase());
-  const ok = new Set(["#0D0D0D", "#FF3333", "#0066FF", "#AAAAAA", "#666666", "#2E2E2E", "#FFFFFF", "#000000", "#567FB2", "#7FA9D6", "#BCD8F0", "#0B0D11"]);
+  const ok = new Set(["#0D0D0D", "#FF3333", "#0066FF", "#AAAAAA", "#666666", "#2E2E2E", "#FFFFFF", "#000000", "#567FB2", "#7FA9D6", "#BCD8F0", "#0B0D11", "#141414" /* the sheet's own dark grey */]);
   check("the picker introduces no colour outside the palette",
     pickerHexes.every((h) => ok.has(h)));
 }
@@ -886,9 +903,17 @@ console.log("\n── The product, shown: on the call screen and in the answer �
   const thinking = renderToStaticMarkup(
     <VoiceCallScreen live phase="thinking" audioLevel={0} lines={[]} lang="en" onEnd={() => {}} /> as ReactElement,
   );
+  /* THE CAPTION MOVES WHILE SOMETHING IS PENDING: the word, without its
+     ellipsis, in the sweeping-light class, followed by three breathing dots
+     — the same motion as the chat's activity line. */
   check("the far side composing reads as thinking — on the caption, the orb and the rings",
-    text(thinking).includes("Thinking…") && /kx-call-orb[^"]*is-thinking/.test(thinking) && /kx-aiorb[^"]*is-thinking/.test(thinking));
-  check("  …localised", text(renderToStaticMarkup(<VoiceCallScreen live phase="thinking" audioLevel={0} lines={[]} lang="ar" onEnd={() => {}} /> as ReactElement)).includes("بفكّر…"));
+    /kx-activity-text[^>]*>Thinking</.test(thinking) && /kx-activity-dots/.test(thinking) && /kx-call-orb[^"]*is-thinking/.test(thinking) && /kx-aiorb[^"]*is-thinking/.test(thinking));
+  check("  …localised", /kx-activity-text[^>]*>بفكّر</.test(renderToStaticMarkup(<VoiceCallScreen live phase="thinking" audioLevel={0} lines={[]} lang="ar" onEnd={() => {}} /> as ReactElement)));
+  const settled = renderToStaticMarkup(<VoiceCallScreen live ready phase="listening" audioLevel={0} lines={[]} lang="en" onEnd={() => {}} /> as ReactElement);
+  check("  …and a settled state (listening) stands still: plain text, no sweep, no dots",
+    text(settled).includes("Listening") && !/kx-activity-text/.test(settled) && !/kx-activity-dots/.test(settled));
+  const connecting = renderToStaticMarkup(<VoiceCallScreen live={false} phase={null} audioLevel={0} lines={[]} lang="en" onEnd={() => {}} /> as ReactElement);
+  check("  …connecting moves too", /kx-activity-text[^>]*>Connecting</.test(connecting));
   /* NO LANGUAGE CHIPS. The caller is not asked which language they speak. */
   check("nothing on the screen asks the caller which language they speak",
     !/I speak|بتكلم|我说/.test(thinking) && !/lang="ar"[^>]*aria-pressed/.test(thinking));

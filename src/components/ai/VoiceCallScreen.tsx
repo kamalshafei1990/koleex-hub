@@ -66,6 +66,10 @@ const COPY: Record<Lang, {
   /* The group name for the photo strip, and the alt text when a product has
      no name — a screen reader should hear what the pictures are. */
   photos: string;
+  /* THE VOICE SHEET: its title, the note under the choices, and Close. */
+  voicePick: string;
+  voiceHint: string;
+  close: string;
 }> = {
   en: {
     connecting: "Connecting…",
@@ -91,6 +95,9 @@ const COPY: Record<Lang, {
     sendTyped: "Send typed message",
     typedNotLive: "The call is still connecting — try again in a moment.",
     photos: "Product photos",
+    voicePick: "Choose a voice",
+    voiceHint: "Switching takes a moment. The conversation carries on.",
+    close: "Close",
   },
   zh: {
     connecting: "正在连接…",
@@ -116,6 +123,9 @@ const COPY: Record<Lang, {
     sendTyped: "发送文字",
     typedNotLive: "通话仍在连接中，请稍后再试。",
     photos: "产品图片",
+    voicePick: "选择音色",
+    voiceHint: "切换需要一点时间，对话会继续。",
+    close: "关闭",
   },
   ar: {
     connecting: "جارٍ الاتصال…",
@@ -141,6 +151,9 @@ const COPY: Record<Lang, {
     sendTyped: "ابعت الرسالة المكتوبة",
     typedNotLive: "المكالمة لسه بتتصل — حاول كمان لحظة.",
     photos: "صور المنتج",
+    voicePick: "اختار الصوت",
+    voiceHint: "التبديل بياخد لحظة، والمحادثة بتكمل.",
+    close: "اقفل",
   },
 };
 
@@ -178,6 +191,9 @@ export type VoiceCallScreenProps = {
    *  session, so a new one needs a new session. Said plainly in the UI rather
    *  than silently doing nothing until the next call. */
   onSelectVoice?: (key: string) => void;
+  /** Open the voice sheet from the first render — for tests and deep links;
+   *  the caller opens it from the Voice control otherwise. */
+  defaultVoiceSheetOpen?: boolean;
   /** Type into the call. Returns whether it went — false while the channel is
    *  not up yet, which the screen says rather than swallowing the text. Absent
    *  means no composer is drawn. */
@@ -200,8 +216,30 @@ export default function VoiceCallScreen({
   selectedVoice = null,
   onSelectVoice,
   onSendText,
+  defaultVoiceSheetOpen = false,
 }: VoiceCallScreenProps) {
   const copy = COPY[lang];
+  /* THE VOICE SHEET — open or not. Chips in the bottom bar were the first
+     picker; the owner: "I don't like this style, we need something more
+     creative". Now a Voice control beside Mute opens a sheet where each
+     voice is a small Koleex orb with its name — the product's own face,
+     not a row of grey pills. */
+  const [voiceSheet, setVoiceSheet] = useState(defaultVoiceSheetOpen);
+  const closeVoiceSheet = useCallback(() => setVoiceSheet(false), []);
+  /* Escape closes the sheet, and ONLY the sheet: captured before the
+     screen's own Escape (which ends the call) can see it. */
+  useEffect(() => {
+    if (!voiceSheet) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      e.stopPropagation();
+      e.preventDefault();
+      setVoiceSheet(false);
+    };
+    window.addEventListener("keydown", onKey, true);
+    return () => window.removeEventListener("keydown", onKey, true);
+  }, [voiceSheet]);
+  const selectedVoiceLabel = voices.find((v) => v.key === selectedVoice)?.label ?? copy.voice;
   /* The picture being looked at, if any. Inside the app, over the call. */
   const [openPhoto, setOpenPhoto] = useState<TranscriptPhoto | null>(null);
   const closePhoto = useCallback(() => setOpenPhoto(null), []);
@@ -326,6 +364,9 @@ export default function VoiceCallScreen({
         ? copy.listening
         : copy.ready;
 
+  /* Pending, as opposed to settled: the caption gets motion only here. */
+  const working = !live || !ready || reconnecting || (searching && !muted) || (phase === "thinking" && !muted);
+
   return (
     <div
       role="dialog"
@@ -400,8 +441,18 @@ export default function VoiceCallScreen({
 
           {/* Status — one line, quiet. The orb already says most of this;
               the text is for anyone who cannot read motion. */}
-          <p className="text-sm font-normal tracking-wide text-[#AAAAAA]" aria-live="polite">
-            {status}
+          {/* WORKING STATES MOVE. Connecting, reconnecting, thinking and looking
+              something up get the same light sweep and breathing dots as the
+              chat's activity line (globals.css .kx-activity-*): the owner asked
+              for "a small title with a simple motion" wherever the AI is busy.
+              Listening / speaking / ready stand still — nothing is pending. */}
+          <p className="text-sm font-normal tracking-wide text-[#AAAAAA] inline-flex items-center justify-center gap-1.5" aria-live="polite">
+            {working ? (
+              <>
+                <span className="kx-activity-text">{status.replace(/…$/, "")}</span>
+                <span className="kx-activity-dots" aria-hidden><i /><i /><i /></span>
+              </>
+            ) : status}
           </p>
           {lastLine && (
             <p
@@ -448,35 +499,6 @@ export default function VoiceCallScreen({
               className="shrink-0 kx-call-aiorb is-lively"
             />
           </button>
-        </div>
-      )}
-
-      {/* Voice picker — whenever the server offers a catalogue (it has a
-          default; the owner may set `none`). Plain
-          text buttons rather than a dropdown: two or three options read faster
-          than a control you have to open, and the brand's icon system has no
-          chevron worth adding for this. */}
-      {voices.length > 0 && (
-        <div className="shrink-0 flex flex-wrap items-center justify-center gap-2 px-6 pb-4">
-          <span className="text-[11px] uppercase tracking-wide text-[#666666]">{copy.voice}</span>
-          {voices.map((v) => {
-            const on = v.key === selectedVoice;
-            return (
-              <button
-                key={v.key}
-                type="button"
-                onClick={() => onSelectVoice?.(v.key)}
-                aria-pressed={on}
-                className={`h-10 px-4 rounded-full text-xs inline-flex items-center transition-[background-color,color,border-color,transform] duration-150 active:scale-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0066FF] focus-visible:ring-offset-2 focus-visible:ring-offset-[#0D0D0D] ${
-                  on
-                    ? "bg-white text-[#0D0D0D] border border-white"
-                    : "text-[#AAAAAA] hover:text-white border border-white/20 hover:border-white/30 bg-white/[0.04] hover:bg-white/[0.08]"
-                }`}
-              >
-                {v.label}
-              </button>
-            );
-          })}
         </div>
       )}
 
@@ -603,6 +625,34 @@ export default function VoiceCallScreen({
             </div>
           )}
 
+          {voices.length > 0 && (
+            <div className="flex flex-col items-center gap-2">
+              {/* VOICE. The same family as Mute — a circle on the grid, the
+                  name under it is the voice currently speaking, so the state
+                  is readable without opening anything. */}
+              <button
+                type="button"
+                onClick={() => setVoiceSheet(true)}
+                aria-haspopup="dialog"
+                aria-expanded={voiceSheet}
+                aria-label={copy.voicePick}
+                title={copy.voicePick}
+                className="h-14 w-14 rounded-full inline-flex items-center justify-center border text-[#AAAAAA] hover:text-white border-white/20 hover:border-white/30 bg-white/[0.04] hover:bg-white/[0.08] transition-[background-color,color,border-color,transform] duration-150 active:scale-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0066FF] focus-visible:ring-offset-2 focus-visible:ring-offset-[#0D0D0D]"
+              >
+                <svg aria-hidden viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round">
+                  <line x1="4" y1="10" x2="4" y2="14" />
+                  <line x1="8" y1="7" x2="8" y2="17" />
+                  <line x1="12" y1="4" x2="12" y2="20" />
+                  <line x1="16" y1="7" x2="16" y2="17" />
+                  <line x1="20" y1="10" x2="20" y2="14" />
+                </svg>
+              </button>
+              <span aria-hidden className="text-[11px] tracking-wide text-[#666666] max-w-[72px] truncate">
+                {selectedVoiceLabel}
+              </span>
+            </div>
+          )}
+
           <div className="flex flex-col items-center gap-2">
             <button
               type="button"
@@ -625,6 +675,55 @@ export default function VoiceCallScreen({
           </div>
         </div>
       </div>
+
+      {/* ── THE VOICE SHEET ─────────────────────────────────────────────
+          Above the call, below a photo (z-250 < z-260). A backdrop that
+          closes, a handle, a title with Close, and the voices as a row of
+          small orbs — the chosen one awake and ringed in Hub Blue, the
+          others asleep. Choosing closes the sheet; the call rebuilds in
+          place with the words kept (VoiceCallButton.selectVoice). */}
+      {voiceSheet && voices.length > 0 && (
+        <div className="fixed inset-0 z-[250] flex flex-col justify-end" role="dialog" aria-modal="true" aria-label={copy.voicePick}>
+          <button type="button" aria-label={copy.close} onClick={closeVoiceSheet} className="absolute inset-0 bg-black/60" />
+          <div className="kx-sheet-in relative rounded-t-[28px] border-t border-white/10 bg-[#141414] px-6 pt-3 pb-8 text-white">
+            <div aria-hidden className="mx-auto mb-4 h-1 w-10 rounded-full bg-white/20" />
+            <div className="flex items-center justify-between mb-5">
+              <h2 className="text-[15px] font-semibold">{copy.voicePick}</h2>
+              <button
+                type="button"
+                onClick={closeVoiceSheet}
+                aria-label={copy.close}
+                title={copy.close}
+                className="h-9 w-9 rounded-full inline-flex items-center justify-center text-[#AAAAAA] hover:text-white bg-white/[0.06] hover:bg-white/[0.1] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0066FF] focus-visible:ring-offset-2 focus-visible:ring-offset-[#141414]"
+              >
+                <svg aria-hidden viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                  <line x1="6" y1="6" x2="18" y2="18" /><line x1="18" y1="6" x2="6" y2="18" />
+                </svg>
+              </button>
+            </div>
+            <div className="flex gap-4 overflow-x-auto pb-2 -mx-2 px-2 snap-x">
+              {voices.map((v) => {
+                const on = v.key === selectedVoice;
+                return (
+                  <button
+                    key={v.key}
+                    type="button"
+                    aria-pressed={on}
+                    onClick={() => { onSelectVoice?.(v.key); closeVoiceSheet(); }}
+                    className="group flex flex-col items-center gap-2 shrink-0 snap-start focus:outline-none"
+                  >
+                    <span className={`rounded-full p-1 transition-[box-shadow,transform] duration-150 group-active:scale-95 ${on ? "ring-2 ring-[#0066FF] ring-offset-2 ring-offset-[#141414]" : "ring-1 ring-white/10 group-hover:ring-white/30"}`}>
+                      <AIOrb size={64} state={on ? "listening" : "idle"} />
+                    </span>
+                    <span className={`text-[12px] ${on ? "text-white font-semibold" : "text-[#AAAAAA] group-hover:text-white"}`}>{v.label}</span>
+                  </button>
+                );
+              })}
+            </div>
+            <p className="mt-3 text-[12px] text-[#666666]">{copy.voiceHint}</p>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

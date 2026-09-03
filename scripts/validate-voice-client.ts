@@ -1993,6 +1993,49 @@ console.log("\n── 12. Mute ──");
     /voices: voiceCatalogue\(env\.AI_VOICE_VOICES\),/.test(cfg19) && !/voices: parseVoiceOptions\(env\.AI_VOICE_VOICES\)/.test(cfg19));
 }
 
+{
+  console.log("\n── 20. The Speak pill, the activity line, the voice sheet ──");
+  const fs20 = await import("node:fs");
+  const btn20 = fs20.readFileSync("src/components/ai/VoiceCallButton.tsx", "utf8");
+  const app20 = fs20.readFileSync("src/components/ai/KoleexAiApp.tsx", "utf8");
+  /* GROK'S SHAPE, THE OWNER'S ASK: on an empty composer the call is a named,
+     inverted pill and Send stands down; with a draft, Send is back and the
+     call shrinks to its icon. */
+  check("the call button has a pill variant: inverted, named Speak in three languages, only while idle",
+    /variant\?: "icon" \| "pill";/.test(btn20) && /\{variant === "pill" && !connected && !busy \? \(/.test(btn20) &&
+    /bg-\[var\(--bg-inverted\)\] text-\[var\(--text-inverted\)\] text-\[13px\] font-semibold/.test(btn20) && /\{labels\.speak\}/.test(btn20) &&
+    /speak: "Speak"/.test(btn20) && /speak: "语音"/.test(btn20) && /speak: "اتكلم"/.test(btn20));
+  check("  …the composer uses it when there is nothing to send, and shows Send only when there is",
+    /const hasDraft = input\.trim\(\)\.length > 0 \|\| attachments\.length > 0;/.test(app20) &&
+    /variant=\{hasDraft \|\| sending \? "icon" : "pill"\}/.test(app20) && /\) : hasDraft && \(\s*<button\s*type="submit"/.test(app20));
+  /* WHAT IT IS DOING, IN WORDS. */
+  const bubble20 = fs20.readFileSync("src/components/ai/Bubble.tsx", "utf8");
+  const line20 = fs20.readFileSync("src/components/ai/ActivityLine.tsx", "utf8");
+  check("the empty assistant bubble shows the activity line (Thinking / Searching the web / …) instead of anonymous dots, and again above a reply while a lookup runs",
+    /orbState === "loading" \|\| orbState === "typing" \? \(\s*<ActivityLine activity=\{orbActivity\} lang=\{lang\}/.test(bubble20) &&
+    /msg\.content && orbState === "typing" && orbActivity !== "none" && \(\s*<ActivityLine/.test(bubble20));
+  check("  …the line is a status region with the shared sweep-and-dots classes, and no tool name ever reaches it",
+    /role="status"/.test(line20) && /kx-activity-text/.test(line20) && /kx-activity-dots/.test(line20) && /activityLabel\(activity, lang\)/.test(line20));
+  const ac = await import("../src/components/ai/activity-copy");
+  check("  …every activity has words in all three languages, and the web says where the lookup goes",
+    (["en", "zh", "ar"] as const).every((l) => Object.values(ac.ACTIVITY_COPY[l]).every((v) => typeof v === "string" && v.length > 0)) &&
+    ac.activityLabel("browsing", "en") === "Searching the web" && ac.activityLabel("none", "ar") === "بفكّر" && ac.activityLabel(undefined, "zh") === "思考中" &&
+    !Object.values(ac.ACTIVITY_COPY.en).some((v) => /_|[a-z][A-Z]/.test(v)));
+  const map20 = fs20.readFileSync("src/components/ai-orb/ai-orb-tool-map.ts", "utf8");
+  check("  …and the web search tool is mapped to browsing so the caption can say so", /search_web: "browsing",/.test(map20));
+  /* THE VOICE SHEET. */
+  const scr20 = fs20.readFileSync("src/components/ai/VoiceCallScreen.tsx", "utf8");
+  check("the chips are gone; a Voice control beside Mute opens a sheet of orb tiles, Escape closes the sheet before the screen can end the call",
+    !/voices\.map\(\(v\) => \{\s*const on = v\.key === selectedVoice;\s*return \(\s*<button\s*key=\{v\.key\}\s*type="button"\s*onClick=\{\(\) => onSelectVoice\?\.\(v\.key\)\}/.test(scr20) &&
+    /onClick=\{\(\) => setVoiceSheet\(true\)\}/.test(scr20) && /aria-haspopup="dialog"/.test(scr20) &&
+    /<AIOrb size=\{64\} state=\{on \? "listening" : "idle"\} \/>/.test(scr20) &&
+    /onClick=\{\(\) => \{ onSelectVoice\?\.\(v\.key\); closeVoiceSheet\(\); \}\}/.test(scr20) &&
+    /window\.addEventListener\("keydown", onKey, true\);/.test(scr20) && /e\.stopPropagation\(\);\s*e\.preventDefault\(\);\s*setVoiceSheet\(false\);/.test(scr20));
+  check("  …the caption moves only while something is pending",
+    /const working = !live \|\| !ready \|\| reconnecting \|\| \(searching && !muted\) \|\| \(phase === "thinking" && !muted\);/.test(scr20) &&
+    /\{working \? \(\s*<>\s*<span className="kx-activity-text">\{status\.replace\(\/…\$\/, ""\)\}<\/span>/.test(scr20));
+}
+
 console.log(`\n${pass} passed, ${failures.length} failed`);
   if (failures.length) {
     console.log("\nFAILED:");
