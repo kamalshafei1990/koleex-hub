@@ -26,16 +26,17 @@
    this file has no formatting layer at all.
    --------------------------------------------------------------------------- */
 
-import { useEffect, useRef } from "react";
-import { type TranscriptLine } from "@/lib/voice/events";
+import { useEffect, useRef, useState } from "react";
+import { type TranscriptLine, type TranscriptPhoto } from "@/lib/voice/events";
 import { stripImageMarkdown } from "@/lib/voice/photos";
+import { cdnImage } from "@/lib/cdn";
 import { type Lang } from "@/lib/i18n";
 import { textDirection } from "@/lib/text-direction";
 
-const SPEAKER_COPY: Record<Lang, { you: string; assistant: string; live: string }> = {
-  en: { you: "You", assistant: "Koleex AI", live: "Live transcript" },
-  zh: { you: "你", assistant: "Koleex AI", live: "实时字幕" },
-  ar: { you: "أنت", assistant: "Koleex AI", live: "النص المباشر" },
+const SPEAKER_COPY: Record<Lang, { you: string; assistant: string; live: string; photos: string }> = {
+  en: { you: "You", assistant: "Koleex AI", live: "Live transcript", photos: "Photos" },
+  zh: { you: "你", assistant: "Koleex AI", live: "实时字幕", photos: "图片" },
+  ar: { you: "أنت", assistant: "Koleex AI", live: "النص المباشر", photos: "الصور" },
 };
 
 /* Fewer, larger lines. Six 13px lines crammed into a rounded slab was the
@@ -49,11 +50,48 @@ export type VoiceTranscriptProps = {
   lang?: Lang;
   className?: string;
   /** Take the height the parent gives, instead of a fixed share of the
-   *  viewport — for the call screen's own transcript part. */
+   *  viewport — for the call screen's own transcript part. In this mode the
+   *  WHOLE conversation is shown and scrolls: the owner could not scroll back
+   *  when only the last four lines existed. */
   fill?: boolean;
+  /** A tap on a picture. Absent means pictures are drawn but not tappable. */
+  onOpenPhoto?: (photo: TranscriptPhoto) => void;
 };
 
-export default function VoiceTranscript({ lines, lang = "en", className = "", fill = false }: VoiceTranscriptProps) {
+/* A PICTURE IN THE CONVERSATION, where it was said — not in a strip pinned
+   above the words that pushed them off the screen. Tiles on the 8px grid,
+   tappable, and a tile whose picture fails to load REMOVES ITSELF: a broken
+   image icon in a frame is worse than no picture. */
+function PhotoTile({ photo, onOpen, label }: { photo: TranscriptPhoto; onOpen?: (p: TranscriptPhoto) => void; label: string }) {
+  const [broken, setBroken] = useState(false);
+  if (broken) return null;
+  const img = (
+    /* eslint-disable-next-line @next/next/no-img-element */
+    <img
+      src={cdnImage(photo.url, { width: 384, quality: 75, resize: "contain" })}
+      alt={photo.label || label}
+      width={120}
+      height={120}
+      decoding="async"
+      className="h-[120px] w-[120px] rounded-2xl object-cover border border-white/10 bg-white/5"
+      onError={() => setBroken(true)}
+    />
+  );
+  if (!onOpen) return <span className="inline-block">{img}</span>;
+  return (
+    <button
+      type="button"
+      onClick={() => onOpen(photo)}
+      aria-label={photo.label || label}
+      title={photo.label || label}
+      className="inline-block rounded-2xl focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0066FF] focus-visible:ring-offset-2 focus-visible:ring-offset-[#0D0D0D]"
+    >
+      {img}
+    </button>
+  );
+}
+
+export default function VoiceTranscript({ lines, lang = "en", className = "", fill = false, onOpenPhoto }: VoiceTranscriptProps) {
   const endRef = useRef<HTMLDivElement | null>(null);
   const copy = SPEAKER_COPY[lang];
 
@@ -64,7 +102,9 @@ export default function VoiceTranscript({ lines, lang = "en", className = "", fi
   }, [lines]);
 
   if (lines.length === 0) return null;
-  const shown = lines.slice(-VISIBLE_LINES);
+  /* Filling the call screen: everything, scrolling. Beside a chat: the last
+     four, which is all a glance wants. */
+  const shown = fill ? lines : lines.slice(-VISIBLE_LINES);
 
   return (
     <div
@@ -103,6 +143,13 @@ export default function VoiceTranscript({ lines, lang = "en", className = "", fi
                     is not something to print. See stripImageMarkdown. */}
                 {stripImageMarkdown(line.text)}
               </p>
+              {line.photos && line.photos.length > 0 && (
+                <div className="mt-3 flex flex-wrap gap-3" role="group" aria-label={copy.photos}>
+                  {line.photos.map((p) => (
+                    <PhotoTile key={p.url} photo={p} onOpen={onOpenPhoto} label={copy.photos} />
+                  ))}
+                </div>
+              )}
             </div>
           );
         })}

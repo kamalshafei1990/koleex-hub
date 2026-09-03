@@ -88,6 +88,46 @@ function parseImages(raw: unknown, fallbackLabel: string): WebImage[] {
   return out;
 }
 
+/* A PICTURE THAT DOES NOT LOAD IS WORSE THAN NO PICTURE. Two of the stadium
+   pictures a call showed were broken icons: a dead link and a host that
+   refuses hot-linking. The provider does not check its image URLs, so we do
+   — one HEAD per candidate, in parallel, a short deadline, and only a 2xx
+   with an image content-type survives. The whole check is bounded so a slow
+   host costs the answer at most this long, once. Injectable for the suite. */
+export const IMAGE_CHECK_TIMEOUT_MS = 1_500;
+export async function filterLoadableImages(
+  images: WebImage[],
+  fetchFn: (url: string, init: RequestInit) => Promise<{ ok: boolean; headers: { get(name: string): string | null } }> = fetch,
+  timeoutMs = IMAGE_CHECK_TIMEOUT_MS,
+): Promise<WebImage[]> {
+  if (images.length === 0) return images;
+  const checks = images.map(async (img) => {
+    const ctrl = new AbortController();
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    /* THE DEADLINE IS RACED, NOT ONLY SIGNALLED. A fetch that ignores its
+       abort signal (a proxy, a test double, an odd runtime) would otherwise
+       hold the whole answer hostage; at the deadline the picture is simply
+       dropped, whatever the request is still doing. */
+    const deadline = new Promise<null>((resolve) => {
+      timer = setTimeout(() => { ctrl.abort(); resolve(null); }, timeoutMs);
+    });
+    try {
+      const res = await Promise.race([
+        fetchFn(img.url, { method: "HEAD", signal: ctrl.signal, redirect: "follow", cache: "no-store" }),
+        deadline,
+      ]);
+      if (!res) return null;
+      const type = (res.headers.get("content-type") ?? "").toLowerCase();
+      return res.ok && type.startsWith("image/") ? img : null;
+    } catch {
+      return null;
+    } finally {
+      if (timer) clearTimeout(timer);
+    }
+  });
+  return (await Promise.all(checks)).filter((i): i is WebImage => i !== null);
+}
+
 function isAbort(e: unknown): boolean {
   return e instanceof Error && (e.name === "AbortError" || e.name === "TimeoutError" || /aborted/i.test(e.message));
 }
@@ -153,7 +193,7 @@ async function searchTavily(key: string, query: string, withImages: boolean, tim
     configured: true,
     provider: "tavily",
     answer: trim(json.answer, MAX_SNIPPET) || undefined,
-    images: parseImages(json.images, query),
+    images: await filterLoadableImages(parseImages(json.images, query)),
     results: (json.results ?? [])
       .filter((r) => typeof r.url === "string" && r.url)
       .slice(0, MAX_RESULTS)

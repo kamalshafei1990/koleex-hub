@@ -506,7 +506,7 @@ console.log("\n── VoiceCallScreen: the call is a mode, not a toggle ──")
   check("the brand blue appears only as a focus indicator",
     listening.includes("#0066FF") &&
     /focus-visible:ring-\[#0066FF\]/.test(listening) &&
-    listening.split("#0066FF").length - 1 === 1);
+    listening.split("#0066FF").length - 1 === (listening.match(/focus-visible:ring-\[#0066FF\]/g) ?? []).length);
   check("the red appears only on the end-call control",
     listening.split("#FF3333").length - 1 <= 4 && /aria-label="End call"[\s\S]{0,400}?#FF3333|#FF3333[\s\S]{0,400}?aria-label="End call"/.test(listening));
   /* The KOLEEX wordmark is lettering, not an icon: its paths are filled by
@@ -907,31 +907,38 @@ console.log("\n── The product, shown: on the call screen and in the answer �
 }
 
 {
-  const lines: TranscriptLine[] = [{ role: "assistant", text: "The KX-180.", final: true }];
+  /* PICTURES LIVE IN THE CONVERSATION, the way ChatGPT shows them — not in a
+     strip pinned above the words. A line that carries photos opens the
+     conversation view; the orb view draws no pictures at all. */
   const photos = [{ url: "https://cdn.example/kx180.jpg", label: "KX-180 Spreader" }];
+  const lines: TranscriptLine[] = [{ role: "assistant", text: "The KX-180.", final: true, photos }];
   const withPhotos = renderToStaticMarkup(
-    <VoiceCallScreen live phase="speaking" audioLevel={0} lines={lines} lang="en" onEnd={() => {}} photos={photos} /> as ReactElement,
-  );
-  const without = renderToStaticMarkup(
     <VoiceCallScreen live phase="speaking" audioLevel={0} lines={lines} lang="en" onEnd={() => {}} /> as ReactElement,
   );
-  check("a lookup's photos are drawn on the call screen", /<img[^>]*src="https:\/\/cdn\.example\/kx180\.jpg"/.test(withPhotos));
-  check("  …named, for the eye and for a screen reader",
-    /alt="KX-180 Spreader"/.test(withPhotos) && withPhotos.includes("KX-180 Spreader</figcaption>"));
-  check("  …as a labelled group", /role="group"[^>]*aria-label="Product photos"/.test(withPhotos));
+  const without = renderToStaticMarkup(
+    <VoiceCallScreen live phase="speaking" audioLevel={0} lines={[{ role: "assistant", text: "The KX-180.", final: true }]} lang="en" onEnd={() => {}} /> as ReactElement,
+  );
+  check("a lookup's photos are drawn in the conversation, under the words that named them",
+    /<img[^>]*src="https:\/\/cdn\.example\/kx180\.jpg"/.test(withPhotos) && withPhotos.indexOf("The KX-180.") < withPhotos.indexOf("<img"));
+  check("  …named, for the eye and for a screen reader", /alt="KX-180 Spreader"/.test(withPhotos) && /aria-label="KX-180 Spreader"/.test(withPhotos));
+  check("  …as a labelled group", /role="group"[^>]*aria-label="Photos"/.test(withPhotos));
   check("  …as a button that expands it in place, not a link that leaves the app",
     /<button type="button"[^>]*aria-label="KX-180 Spreader"[^>]*>\s*<img/.test(withPhotos) && !/<a[^>]*href="https:\/\/cdn\.example\/kx180\.jpg"/.test(withPhotos) && !/z-\[260\]/.test(withPhotos));
-  check("  …eagerly — it is on screen the instant it mounts — with its box reserved and a high fetch priority",
-    !/loading="lazy"/.test(withPhotos) && /<img[^>]*width="160"[^>]*height="160"/.test(withPhotos) && /fetchpriority="high"/i.test(withPhotos));
+  check("  …eagerly, with its box reserved", !/loading="lazy"/.test(withPhotos) && /<img[^>]*width="120"[^>]*height="120"/.test(withPhotos));
   check("  …a non-storage URL passes through the pipeline untouched", /src="https:\/\/cdn\.example\/kx180\.jpg"/.test(withPhotos));
-  check("and nothing is drawn when there are none — not even the empty group",
-    !/<img/.test(without) && !/<figure/.test(without) && !/role="group"/.test(without) && !without.includes("Product photos"));
+  check("  …and a picture opens the CONVERSATION view: the small orb, the words, no big orb",
+    /aria-label="Back to Koleex AI"/.test(withPhotos) && !/aria-label="Show conversation"/.test(withPhotos));
+  check("without pictures the screen opens on the ORB view: the big orb, the wordmark, a way to the words, no pictures",
+    !/<img/.test(without) && !/role="group"[^>]*aria-label="Photos"/.test(without) && /aria-label="Show conversation"/.test(without) && />Show conversation</.test(without) && !/aria-label="Back to Koleex AI"/.test(without));
+  check("  …and the bottom bar is in both views", /aria-label="End call"/.test(withPhotos) && /aria-label="End call"/.test(without));
   const hexes = [...withPhotos.matchAll(/#[0-9A-Fa-f]{3,8}\b/g)].map((m) => m[0].toUpperCase())
     .filter((h) => !new Set(["#567FB2", "#7FA9D6", "#BCD8F0", "#0B0D11", "#FFF"]).has(h));
-  check("the strip introduces no colour outside the palette",
+  check("the pictures introduce no colour outside the palette",
     hexes.every((h) => new Set(["#0D0D0D", "#FF3333", "#0066FF", "#AAAAAA", "#666666", "#FFFFFF", "#000000"]).has(h)));
   check("the group name is localised",
-    /aria-label="صور المنتج"/.test(renderToStaticMarkup(<VoiceCallScreen live phase="speaking" audioLevel={0} lines={lines} lang="ar" onEnd={() => {}} photos={photos} /> as ReactElement)));
+    /aria-label="الصور"/.test(renderToStaticMarkup(<VoiceCallScreen live phase="speaking" audioLevel={0} lines={lines} lang="ar" onEnd={() => {}} /> as ReactElement)));
+  check("the conversation view shows the WHOLE conversation, not the last four lines",
+    (() => { const many: TranscriptLine[] = Array.from({ length: 9 }, (_, i) => ({ role: i % 2 ? "assistant" : "user", text: `Line ${i}`, final: true })); many[8] = { ...many[8], photos }; const html = renderToStaticMarkup(<VoiceCallScreen live phase="speaking" audioLevel={0} lines={many} lang="en" onEnd={() => {}} /> as ReactElement); return html.includes("Line 0") && html.includes("Line 8"); })());
 
   /* THE ANSWER IN THE THREAD. */
   const md = (content: string) => renderToStaticMarkup(<MessageMarkdown content={content} /> as ReactElement);
