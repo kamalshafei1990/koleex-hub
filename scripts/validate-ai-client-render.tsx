@@ -35,8 +35,6 @@ import type { QuotationDraftPayload } from "../src/components/ai/types";
 import VoiceCallButton from "../src/components/ai/VoiceCallButton";
 import VoiceTranscript from "../src/components/ai/VoiceTranscript";
 import VoiceCallScreen from "../src/components/ai/VoiceCallScreen";
-import { SidebarRow } from "../src/components/ai/Sidebar";
-import { COPY as SIDEBAR_COPY } from "../src/components/ai/copy";
 import PhotoLightbox from "../src/components/ai/PhotoLightbox";
 import MessageMarkdown from "../src/components/ai/MessageMarkdown";
 import type { TranscriptLine } from "../src/lib/voice/events";
@@ -1100,7 +1098,7 @@ console.log("\n── VoiceCallScreen: typing into the call ──");
   console.log("\n── SidebarRow: the search hint ──");
   {
     const row = { id: "c1", title: "Ningbo shipment", last_preview: null, message_count: 3, created_at: "2026-09-01T00:00:00Z", updated_at: "2026-09-01T00:00:00Z" };
-    const base = { active: false, projects: [], copy: SIDEBAR_COPY.en, onOpen: () => {}, onRename: () => {}, onDelete: () => {}, onTogglePin: () => {}, onMove: () => {} };
+    const base = { active: false, projects: [], copy: COPY.en, onOpen: () => {}, onRename: () => {}, onDelete: () => {}, onTogglePin: () => {}, onMove: () => {} };
     const withHint = renderToStaticMarkup(<SidebarRow row={row} {...base} hint="…price for KX-200 was 1,250 USD…" /> as ReactElement);
     const without = renderToStaticMarkup(<SidebarRow row={row} {...base} /> as ReactElement);
     check("a matched row shows the snippet under its title, dim and on one line; a row without a hint is unchanged",
