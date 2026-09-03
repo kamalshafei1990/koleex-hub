@@ -1436,22 +1436,43 @@ html[data-kx-tabslide] #main-scroll-container { overflow-x: clip; }
   40%      { opacity: 1;    transform: translateY(-2px); }
 }
 
-/* ── The call screen's two views, crossfaded (VoiceCallScreen) ──
-   The arriving view fades and settles in from 8px below; the leaving copy
-   fades out over it, a touch faster, so there is never a blank frame and
-   never a flash. Both still under reduced motion. */
+/* ── The call screen's two views, and the orb that travels between them ──
+   (VoiceCallScreen). Opening the words: the big orb flies to the bottom-end
+   corner and shrinks to the size of the small one while the transcript rises
+   from below and the small orb lands, a beat later, where the big one went.
+   Coming back: the words sink away and the orb grows from that corner into
+   the centre. The leaving copy stays opaque for most of the flight so the
+   travelling orb is never see-through, then lets go. The corner is an
+   approximation in viewport units (the small orb sits at bottom-end of the
+   words); the arriving small orb covers the last few pixels. RTL flips the
+   horizontal leg. Everything stands still under reduced motion. */
 @media (prefers-reduced-motion: no-preference) {
-  .kx-view-in  { animation: kx-view-in 0.32s cubic-bezier(0.16, 1, 0.3, 1) both; }
-  .kx-view-out { animation: kx-view-out 0.26s ease-in both; }
+  .kx-view-in  { animation: kx-view-in 0.32s ease-out both; }
+  .kx-view-out { animation: kx-view-out 0.42s ease-in both; }
+  /* orb → words */
+  .kx-view-out.kx-to-chat .kx-orb-stage { animation: kx-orb-fly-out 0.42s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+  .kx-view-in.kx-to-chat  .kx-transcript { animation: kx-rise-in 0.42s cubic-bezier(0.16, 1, 0.3, 1) both; }
+  .kx-view-in.kx-to-chat  .kx-mini-orb { animation: kx-land-in 0.3s cubic-bezier(0.16, 1, 0.3, 1) 0.18s both; }
+  /* words → orb */
+  .kx-view-out.kx-to-orb .kx-transcript { animation: kx-sink-out 0.3s ease-in both; }
+  .kx-view-out.kx-to-orb .kx-mini-orb { animation: kx-fade-out 0.2s ease-in both; }
+  .kx-view-in.kx-to-orb  .kx-orb-stage { animation: kx-orb-fly-in 0.42s cubic-bezier(0.16, 1, 0.3, 1) both; }
+  [dir="rtl"] .kx-view-out.kx-to-chat .kx-orb-stage { animation-name: kx-orb-fly-out-rtl; }
+  [dir="rtl"] .kx-view-in.kx-to-orb  .kx-orb-stage { animation-name: kx-orb-fly-in-rtl; }
+  /* the chosen voice's signature breathes */
+  .kx-voice-glyph.is-on rect { animation: kx-voice-bar 1.6s ease-in-out infinite; }
 }
-@keyframes kx-view-in {
-  from { opacity: 0; transform: translateY(8px) scale(0.985); }
-  to   { opacity: 1; transform: none; }
-}
-@keyframes kx-view-out {
-  from { opacity: 1; transform: none; }
-  to   { opacity: 0; transform: scale(1.01); }
-}
+@keyframes kx-view-in  { from { opacity: 0; } to { opacity: 1; } }
+@keyframes kx-view-out { 0% { opacity: 1; } 70% { opacity: 1; } 100% { opacity: 0; } }
+@keyframes kx-orb-fly-out     { from { transform: none; } to { transform: translate(36vw, 30vh) scale(0.36); } }
+@keyframes kx-orb-fly-out-rtl { from { transform: none; } to { transform: translate(-36vw, 30vh) scale(0.36); } }
+@keyframes kx-orb-fly-in      { from { transform: translate(36vw, 30vh) scale(0.36); opacity: 0.4; } to { transform: none; opacity: 1; } }
+@keyframes kx-orb-fly-in-rtl  { from { transform: translate(-36vw, 30vh) scale(0.36); opacity: 0.4; } to { transform: none; opacity: 1; } }
+@keyframes kx-rise-in  { from { opacity: 0; transform: translateY(28px); } to { opacity: 1; transform: none; } }
+@keyframes kx-sink-out { from { opacity: 1; transform: none; } to { opacity: 0; transform: translateY(24px); } }
+@keyframes kx-land-in  { from { opacity: 0; transform: scale(0.55); } to { opacity: 1; transform: none; } }
+@keyframes kx-fade-out { to { opacity: 0; } }
+@keyframes kx-voice-bar { 0%, 100% { transform: scaleY(1); } 50% { transform: scaleY(0.55); } }
 
 /* Bottom-sheet entrance (NotificationBell mobile). On md+ the same class
    gives the dropdown a subtle rise-in. Disabled under reduced motion. */

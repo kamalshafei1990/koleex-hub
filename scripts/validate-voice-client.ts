@@ -1786,7 +1786,7 @@ console.log("\n── 12. Mute ──");
   const css18 = fs18.readFileSync("src/app/globals.css", "utf8");
   check("the call screen is TWO VIEWS, the way ChatGPT does it: the orb alone, or the conversation with a small orb floating over it",
     /const view: "orb" \| "chat" = chosenView \?\? \(hasPhotos \? "chat" : "orb"\);/.test(scr) && /\{view === "orb" \? orbView : chatView\}/.test(scr) &&
-    /<VoiceTranscript lines=\{lines\} lang=\{lang\} className="flex-1 min-h-0 pb-28" fill onOpenPhoto=\{setOpenPhoto\} \/>/.test(scr) && /size=\{72\}/.test(scr));
+    /<VoiceTranscript lines=\{lines\} lang=\{lang\} className="kx-transcript flex-1 min-h-0 pb-28" fill onOpenPhoto=\{setOpenPhoto\} \/>/.test(scr) && /size=\{72\}/.test(scr));
   check("  …a tap on the big orb or the quiet button opens the words; a tap on the small orb comes back",
     (scr.match(/onClick=\{\(\) => switchView\("chat"\)\}/g) ?? []).length === 2 && /onClick=\{\(\) => switchView\("orb"\)\}/.test(scr));
   check("  …a picture opens the conversation by itself, derived rather than synchronised — no effect writes state — and the caller's own tap wins",
@@ -2028,9 +2028,15 @@ console.log("\n── 12. Mute ──");
   check("the chips are gone; a Voice control beside Mute opens a sheet of orb tiles, Escape closes the sheet before the screen can end the call",
     !/voices\.map\(\(v\) => \{\s*const on = v\.key === selectedVoice;\s*return \(\s*<button\s*key=\{v\.key\}\s*type="button"\s*onClick=\{\(\) => onSelectVoice\?\.\(v\.key\)\}/.test(scr20) &&
     /onClick=\{\(\) => setVoiceSheet\(true\)\}/.test(scr20) && /aria-haspopup="dialog"/.test(scr20) &&
-    /<AIOrb size=\{64\} state=\{on \? "listening" : "idle"\} \/>/.test(scr20) &&
+    /<VoiceGlyph index=\{i\} on=\{on\} \/>/.test(scr20) && !/<AIOrb size=\{64\}/.test(scr20) &&
     /onClick=\{\(\) => \{ onSelectVoice\?\.\(v\.key\); closeVoiceSheet\(\); \}\}/.test(scr20) &&
     /window\.addEventListener\("keydown", onKey, true\);/.test(scr20) && /e\.stopPropagation\(\);\s*e\.preventDefault\(\);\s*setVoiceSheet\(false\);/.test(scr20));
+  /* A VOICE IS A SHAPE. Six distinct five-bar signatures; the chosen one is
+     Hub Blue and breathes; off is monochrome. */
+  check("each voice has its own waveform signature — six fixed patterns, all different, none derived from the label",
+    (() => { const m = /const GLYPH_PATTERNS[^=]*= \[([\s\S]*?)\n\];/.exec(scr20); if (!m) return false; const rows = m[1].trim().split("\n").map((r) => r.trim().replace(/,$/, "")); return rows.length === 6 && new Set(rows).size === 6 && rows.every((r) => /^\[\d+(, \d+){4}\]$/.test(r)); })() &&
+    /GLYPH_PATTERNS\[index % GLYPH_PATTERNS\.length\]/.test(scr20) &&
+    /fill=\{on \? "#0066FF" : "rgba\(255,255,255,0\.72\)"\}/.test(scr20) && /\.kx-voice-glyph\.is-on rect \{ animation: kx-voice-bar/.test(fs20.readFileSync("src/app/globals.css", "utf8")));
   check("  …the caption moves only while something is pending",
     /const working = !live \|\| !ready \|\| reconnecting \|\| \(searching && !muted\) \|\| \(phase === "thinking" && !muted\);/.test(scr20) &&
     /\{working \? \(\s*<>\s*<span className="kx-activity-text">\{status\.replace\(\/…\$\/, ""\)\}<\/span>/.test(scr20));
@@ -2045,15 +2051,28 @@ console.log("\n── 12. Mute ──");
     /const switchView = useCallback\(\(next: "orb" \| "chat"\) => \{\s*if \(next === view\) return;/.test(scr21) &&
     /if \(!reduced\) setLeaving\(view\);\s*setView\(next\);/.test(scr21));
   check("  …the leaving copy is cleared by a timer matching the CSS, never in render",
-    /const t = window\.setTimeout\(\(\) => setLeaving\(null\), VIEW_FADE_MS\);/.test(scr21) && /const VIEW_FADE_MS = 260;/.test(scr21) &&
-    /\.kx-view-out \{ animation: kx-view-out 0\.26s/.test(css21));
+    /const t = window\.setTimeout\(\(\) => setLeaving\(null\), VIEW_FADE_MS\);/.test(scr21) && /const VIEW_FADE_MS = 420;/.test(scr21) &&
+    /\.kx-view-out \{ animation: kx-view-out 0\.42s/.test(css21));
   check("  …the arriving view is keyed so its entrance replays; the leaving copy is inert and hidden from readers, on top",
-    /<div key=\{view\} className="kx-view-in flex-1 min-h-0 flex flex-col">\s*\{view === "orb" \? orbView : chatView\}/.test(scr21) &&
-    /\{leaving && leaving !== view && \(\s*<div aria-hidden className="kx-view-out pointer-events-none absolute inset-0 flex flex-col">\s*\{leaving === "orb" \? orbView : chatView\}/.test(scr21));
+    /<div key=\{view\} className=\{`kx-view-in kx-to-\$\{view\} flex-1 min-h-0 flex flex-col`\}>\s*\{view === "orb" \? orbView : chatView\}/.test(scr21) &&
+    /\{leaving && leaving !== view && \(\s*<div aria-hidden className=\{`kx-view-out kx-to-\$\{view\} pointer-events-none absolute inset-0 flex flex-col`\}>\s*\{leaving === "orb" \? orbView : chatView\}/.test(scr21));
   check("  …reduced motion: no leaving copy is kept, and the CSS animates only when motion is welcome",
     /window\.matchMedia\?\.\("\(prefers-reduced-motion: reduce\)"\)\.matches/.test(scr21) &&
     /@media \(prefers-reduced-motion: no-preference\) \{\s*\.kx-view-in\s*\{ animation: kx-view-in/.test(css21) &&
-    /@keyframes kx-view-in \{\s*from \{ opacity: 0; transform: translateY\(8px\) scale\(0\.985\); \}/.test(css21));
+    /@keyframes kx-view-in\s*\{ from \{ opacity: 0; \} to \{ opacity: 1; \} \}/.test(css21));
+  /* THE CHOREOGRAPHY: not a fade. The owner: "animated in a creative way". */
+  check("the orb travels: opening the words it flies to the corner and shrinks, the transcript rises, the small orb lands a beat later",
+    /className="kx-orb-stage block rounded-full/.test(scr21) && /className="kx-mini-orb absolute bottom-4 end-6/.test(scr21) && /className="kx-transcript flex-1 min-h-0 pb-28"/.test(scr21) &&
+    /\.kx-view-out\.kx-to-chat \.kx-orb-stage \{ animation: kx-orb-fly-out 0\.42s/.test(css21) &&
+    /\.kx-view-in\.kx-to-chat\s+\.kx-transcript \{ animation: kx-rise-in 0\.42s/.test(css21) &&
+    /\.kx-view-in\.kx-to-chat\s+\.kx-mini-orb \{ animation: kx-land-in 0\.3s cubic-bezier\([^)]*\) 0\.18s both; \}/.test(css21) &&
+    /@keyframes kx-orb-fly-out\s*\{ from \{ transform: none; \} to \{ transform: translate\(36vw, 30vh\) scale\(0\.36\); \} \}/.test(css21));
+  check("  …and coming back the words sink away while the orb grows from that corner into the centre; RTL flips the horizontal leg",
+    /\.kx-view-out\.kx-to-orb \.kx-transcript \{ animation: kx-sink-out/.test(css21) && /\.kx-view-in\.kx-to-orb\s+\.kx-orb-stage \{ animation: kx-orb-fly-in 0\.42s/.test(css21) &&
+    /\[dir="rtl"\] \.kx-view-out\.kx-to-chat \.kx-orb-stage \{ animation-name: kx-orb-fly-out-rtl; \}/.test(css21) &&
+    /@keyframes kx-orb-fly-in-rtl\s*\{ from \{ transform: translate\(-36vw, 30vh\) scale\(0\.36\)/.test(css21));
+  check("  …the leaving copy stays opaque for most of the flight, so the travelling orb is never see-through",
+    /@keyframes kx-view-out \{ 0% \{ opacity: 1; \} 70% \{ opacity: 1; \} 100% \{ opacity: 0; \} \}/.test(css21));
 }
 
 console.log(`\n${pass} passed, ${failures.length} failed`);
