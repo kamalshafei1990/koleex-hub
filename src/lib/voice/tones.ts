@@ -27,6 +27,8 @@
    working. The call is the product; the tone is a courtesy.
    --------------------------------------------------------------------------- */
 
+import { playCallSound, primeCallSound, type CallSoundOutcome } from "@/lib/notificationSound";
+
 export interface ToneNote {
   /** Hz. */
   freq: number;
@@ -141,10 +143,21 @@ export function browserToneContext(): ToneContextLike | null {
 export class CallTones {
   private ctx: ToneContextLike | null = null;
 
-  constructor(private readonly create: () => ToneContextLike | null = browserToneContext) {}
+  constructor(
+    private readonly create: () => ToneContextLike | null = browserToneContext,
+    /* THE OWNER'S CHOICE FIRST. "Change the sound of the starting chat —
+       we already have sounds in Settings → Notifications, choose a good
+       one." The cue is now a library tone the caller can change in
+       Settings → Sounds, played through the Hub's one sound engine. The
+       synthesised notes below stay as the fallback for an engine that is
+       not there (no AudioContext, no window) — never for a caller who
+       chose silence. */
+    private readonly library: { prime: () => void; play: () => CallSoundOutcome } = { prime: primeCallSound, play: playCallSound },
+  ) {}
 
   /** Call INSIDE the user gesture that starts the call. */
   prime(): void {
+    try { this.library.prime(); } catch { /* the fallback still works */ }
     if (this.ctx) return;
     try {
       this.ctx = this.create();
@@ -158,6 +171,11 @@ export class CallTones {
 
   /** The call is ready to hear you. */
   ready(): void {
+    let outcome: CallSoundOutcome = "unavailable";
+    try { outcome = this.library.play(); } catch { outcome = "unavailable"; }
+    /* "silenced" is the caller's choice and is honoured. Only an engine
+       that is not there gets the synthesised fallback. */
+    if (outcome !== "unavailable") return;
     this.play(READY_TONE);
   }
 
