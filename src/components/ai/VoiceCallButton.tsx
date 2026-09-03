@@ -52,7 +52,7 @@ import { extractProductPhotos, type ProductPhoto } from "@/lib/voice/photos";
 import { useStreamLevel } from "@/lib/voice/useStreamLevel";
 import { CallTones } from "@/lib/voice/tones";
 import { pickSttLang, readSavedSttLang, saveSttLang, learnSttLang, type SttLang } from "@/lib/voice/stt-lang";
-import { pickVoiceKey, readSavedVoiceKey, saveVoiceKey } from "@/lib/voice/voice-pref";
+import { pickVoiceKey, readSavedVoiceKey, saveVoiceKey, readSavedRegion, saveRegion } from "@/lib/voice/voice-pref";
 import { sendVoiceTelemetry } from "@/lib/voice/telemetry";
 import { TranscriptPersister, type SavedTurn, type PersistFailure } from "@/lib/voice/persist";
 import VoiceCallScreen from "@/components/ai/VoiceCallScreen";
@@ -452,6 +452,16 @@ export default function VoiceCallButton({
            the instant it recovers. */
         onLiveChangeRef.current?.(next === "live" || next === "reconnecting");
         if (next === "live" && liveSinceRef.current === null) liveSinceRef.current = Date.now();
+        /* THE REGION THAT SERVED, remembered on the device the moment the call
+           is up, so the next call from here — after a drop, a switch, or
+           tomorrow morning — asks for it first. */
+        if (next === "live") {
+          const region = sessionRef.current?.diagnostics().region;
+          if (region === "alt" || region === "primary") {
+            regionHintRef.current = region;
+            saveRegion(region);
+          }
+        }
         if (next === "failed" && failure) {
           const diag = sessionRef.current?.diagnostics();
           if (diag) regionHintRef.current = diag.region === "alt" ? "alt" : "primary";
@@ -565,9 +575,11 @@ export default function VoiceCallButton({
         }
       },
     }, voiceKeyRef.current, conversationIdRef.current, sttLangRef.current,
-    /* A continued call starts where the last one was served; a new call
-       leaves the choice to the server. */
-    opts?.resume ? regionHintRef.current : null);
+    /* Every call asks first for the region that served this device last —
+       this session's, or the one the device remembered from an earlier call.
+       The server still decides; a device with no memory leaves it to the
+       server's own. */
+    regionHintRef.current ?? readSavedRegion());
 
     sessionRef.current = session;
     await session.start();

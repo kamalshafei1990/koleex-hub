@@ -69,6 +69,24 @@ import { voiceToolSchemas } from "./tools";
    it guessing Chinese at an Egyptian sentence, which the saved transcript
    shows it doing. */
 export const STT_LANGUAGES = ["ar", "en", "zh"] as const;
+
+/* THE TRANSCRIBER, NAMED. The realtime model understands the caller's audio
+   and answers it well; the TRANSCRIPT it writes of that audio is another
+   matter — the saved user turns of an Egyptian Arabic call read "إزاي كخ
+   بركة إيه؟" for "إزيك أخبارك إيه". The vendor's session accepts a dedicated
+   realtime ASR model for that transcript (`input_audio_transcription.model`),
+   which is what its own samples set. It belongs to the same model family as
+   the realtime model, so it is chosen from the configured model's name
+   rather than from another variable: a deployment on a different family
+   gets no model field, exactly as before. Full session only — the compact
+   fallback answers a refused configuration and must never carry the same
+   field (see buildSessionUpdate). */
+export function sttModelFor(realtimeModel: string | null | undefined): string | null {
+  const m = (realtimeModel ?? "").trim().toLowerCase();
+  if (!m) return null;
+  if (m.startsWith("qwen") && m.includes("realtime")) return "qwen3-asr-flash-realtime";
+  return null;
+}
 export type SttLanguage = (typeof STT_LANGUAGES)[number];
 export function parseSttLanguage(raw: string | null): SttLanguage | null {
   const v = (raw ?? "").trim().toLowerCase();
@@ -266,11 +284,17 @@ export function buildSessionUpdate(
      refused configuration; the client answers that refusal with the compact
      one, so the compact one must never carry the same field. */
   sttLanguage: SttLanguage | null = null,
+  /* Same rule as the language: full session only. */
+  sttModel: string | null = null,
 ): SessionUpdate {
   const tools = voiceToolSchemas(variant);
   const transcription =
-    variant === "full" && sttLanguage
-      ? { ...TRANSPORT.input_audio_transcription, language: sttLanguage }
+    variant === "full" && (sttLanguage || sttModel)
+      ? {
+          ...TRANSPORT.input_audio_transcription,
+          ...(sttLanguage ? { language: sttLanguage } : {}),
+          ...(sttModel ? { model: sttModel } : {}),
+        }
       : TRANSPORT.input_audio_transcription;
   return {
     type: "session.update",
@@ -359,6 +383,7 @@ export function buildVoiceSessionPayload(
   recentTurns: readonly RecentTurn[] = [],
   viewer: VoiceViewer | null = null,
   sttLanguage: SttLanguage | null = null,
+  sttModel: string | null = null,
 ): VoiceSessionPayload {
   return {
     full: buildSessionUpdate(
@@ -366,6 +391,7 @@ export function buildVoiceSessionPayload(
       VOICE_INSTRUCTIONS + voiceViewerBlock(viewer) + taughtIndexBlock(taughtQuestions) + historyBlock(recentTurns),
       "full",
       sttLanguage,
+      sttModel,
     ),
     /* The one addition the compact session takes: a line about who is on the
        call. Not knowing the caller is the failure that made a super admin
