@@ -86,7 +86,7 @@ console.log("\n── 1. The allow-list is the security boundary ──");
   for (const denied of [
     "createQuotationDraft", "createTodo", "updateTodo", "deleteTodo",
     "createCalendarEvent", "remember_about_user", "forget_about_user",
-    "getCustomerByName", "getInventoryStatus", "getPricingRules",
+    "getInventoryStatus", "calculateQuotationPricing",
   ]) {
     check(`  …and ${denied} is not reachable from a call`, !isVoiceTool(denied));
   }
@@ -212,9 +212,22 @@ console.log("\n── 2b. A call reaches the same knowledge the chat box does �
     check(`a call can reach ${name} — the caller's own items or public counts`, isVoiceTool(name));
   }
   check("and every one of them is a real registered tool", ["listMyTodos", "listMyCalendar", "getUserPermissions", "getCatalogStats"].every((n) => getTool(n) !== undefined));
-  /* The line stays where it was drawn: no customers, no figures, no writes. */
-  check("customers and commercial figures are still not reachable by voice",
-    !isVoiceTool("getCustomerByCode") && !isVoiceTool("getPricingRules") && !isVoiceTool("calculateQuotationPricing") && !isVoiceTool("getInventoryStatus"));
+  /* ROADMAP C1 moved customers and pricing rules onto the list, read only,
+     under the caller's own module permissions; quotation figures and the
+     inventory stub stay off. No writes, still. */
+  check("customers and pricing rules are reachable by voice (roadmap C1), each gated by its own module on dispatch",
+    isVoiceTool("getCustomerByName") && isVoiceTool("getCustomerByCode") && isVoiceTool("getPricingRules") &&
+    getTool("getCustomerByName")?.requiredModule === "Customers" && getTool("getCustomerByCode")?.requiredModule === "Customers" &&
+    getTool("getPricingRules")?.requiredModule === "Quotations" && getTool("getPricingRules")?.requiredAction === "view");
+  check("quotation figures and the inventory stub are still not reachable by voice",
+    !isVoiceTool("calculateQuotationPricing") && !isVoiceTool("getInventoryStatus") && !isVoiceTool("createQuotationDraft"));
+  check("the catalogue reads still come before the customer reads in the order the model sees",
+    VOICE_TOOL_NAMES.indexOf("searchProducts") < VOICE_TOOL_NAMES.indexOf("getCustomerByName") &&
+    VOICE_TOOL_NAMES.indexOf("getProductPrice") < VOICE_TOOL_NAMES.indexOf("getPricingRules"));
+  check("the instructions tell the model to read customer and pricing figures exactly and offer to write them down",
+    /CUSTOMERS AND PRICING RULES: getCustomerByName or getCustomerByCode/.test(String(buildVoiceSessionPayload(null).full.session.instructions ?? "")) &&
+    /Read every figure EXACTLY as returned/.test(String(buildVoiceSessionPayload(null).full.session.instructions ?? "")) &&
+    /offer to write them into the chat/.test(String(buildVoiceSessionPayload(null).full.session.instructions ?? "")));
   check("the full session, tools included, still fits a DataChannel message with room",
     JSON.stringify(buildVoiceSessionPayload(null).full).length < 32_000);
   const instructions = String(buildVoiceSessionPayload(null).full.session.instructions ?? "");
@@ -244,10 +257,8 @@ console.log("\n── 2b. A call reaches the same knowledge the chat box does �
     /Taizhou/.test(instructions) && /Hangzhou/.test(instructions) &&
     /1955/.test(instructions) && /BOTH A MANUFACTURER AND A TRADER/.test(instructions));
 
-  /* AND THE COMMERCIAL READS STAY OUT. Spoken numbers cannot be checked
-     against a source by the person hearing them. */
-  for (const denied of ["getPricingRules", "calculateQuotationPricing", "getInventoryStatus",
-                        "getCustomerByName", "getCustomerByCode"]) {
+  /* AND THE QUOTATION FIGURE AND THE INVENTORY STUB STAY OUT. */
+  for (const denied of ["calculateQuotationPricing", "getInventoryStatus"]) {
     check(`  …but not ${denied}`, !isVoiceTool(denied));
   }
 
@@ -684,7 +695,8 @@ console.log("\n── 2c. A failed handshake says how long it took ──");
      fetch: the previous form counted characters, so adding that log pushed
      the `break` out of range and failed on correct code. */
   check("a successful attempt stops retrying — every region",
-    /handshake ok attempt[\s\S]{0,400}?\n      break regions;/.test(route));
+    /handshake ok attempt[\s\S]{0,900}?lastServed = \{ slot: region\.slot, at: Date\.now\(\) \};\s*break regions;/.test(route) &&
+    !/break regions;[\s\S]{0,900}?handshake ok attempt/.test(route.slice(route.indexOf("regions: for"))));
 }
 
 console.log("\n── 3. Reading the protocol ──");
