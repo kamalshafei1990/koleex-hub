@@ -32,10 +32,10 @@ import KoleexLogo from "@/components/layout/KoleexLogo";
 import { textDirection } from "@/lib/text-direction";
 import { stripImageMarkdown } from "@/lib/voice/photos";
 
-/** How long the leaving view stays while the arriving one settles — matches
- *  .kx-view-out in globals.css; the entrance is a little longer so nothing
- *  is ever blank. */
-const VIEW_FADE_MS = 260;
+/** How long the leaving view stays while the arriving one settles — the
+ *  length of the orb's flight in globals.css (.kx-view-out and the
+ *  kx-orb-fly-* keyframes); nothing is ever blank in between. */
+const VIEW_FADE_MS = 420;
 
 const COPY: Record<Lang, {
   connecting: string;
@@ -398,7 +398,7 @@ export default function VoiceCallScreen({
           onClick={() => switchView("chat")}
           aria-label={copy.showChat}
           title={copy.showChat}
-          className="block rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0066FF] focus-visible:ring-offset-4 focus-visible:ring-offset-[#0D0D0D]"
+          className="kx-orb-stage block rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0066FF] focus-visible:ring-offset-4 focus-visible:ring-offset-[#0D0D0D]"
         >
           <div
             ref={orbWrapRef}
@@ -475,7 +475,7 @@ export default function VoiceCallScreen({
   const chatView = (
       /* ── CHAT VIEW: the conversation, pictures in it, the orb small. ── */
       <div className="relative flex-1 min-h-0 flex flex-col pt-4">
-        <VoiceTranscript lines={lines} lang={lang} className="flex-1 min-h-0 pb-28" fill onOpenPhoto={setOpenPhoto} />
+        <VoiceTranscript lines={lines} lang={lang} className="kx-transcript flex-1 min-h-0 pb-28" fill onOpenPhoto={setOpenPhoto} />
         {/* THE SMALL ORB, floating over the words, still alive and still
             showing who is speaking. A tap brings the big one back. */}
         <button
@@ -483,7 +483,7 @@ export default function VoiceCallScreen({
           onClick={() => switchView("orb")}
           aria-label={copy.showOrb}
           title={copy.showOrb}
-          className="absolute bottom-4 end-6 rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0066FF] focus-visible:ring-offset-2 focus-visible:ring-offset-[#0D0D0D]"
+          className="kx-mini-orb absolute bottom-4 end-6 rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0066FF] focus-visible:ring-offset-2 focus-visible:ring-offset-[#0D0D0D]"
         >
           <span className="sr-only">{status}</span>
           <AIOrb
@@ -527,20 +527,23 @@ export default function VoiceCallScreen({
       }}
     >
       <PhotoLightbox photo={openPhoto} onClose={closePhoto} closeLabel={copy.closePhoto} />
-      {/* ── THE TWO VIEWS, CROSSFADED. The switch used to be a cut: one
-          render the orb, the next the words — the owner: "make this motion
-          smooth and ease, not a flash action". Now the arriving view fades and
-          settles in (kx-view-in, keyed so the entrance replays each switch)
-          while a copy of the leaving view fades out on top of it for a
-          quarter second, inert and hidden from readers. Under reduced motion
-          no leaving copy is kept and the entrance does not animate — the
-          switch is instant, as those users asked. */}
+      {/* ── THE TWO VIEWS, AND THE ORB THAT TRAVELS BETWEEN THEM. The switch
+          used to be a cut, then a plain fade — the owner: "not a fade, animated
+          in a creative way". Now it is choreography (globals.css, the
+          kx-to-chat / kx-to-orb rules): opening the words, the big orb flies
+          to the corner and shrinks while the transcript rises from below and
+          the small orb lands where the big one went; coming back, the words
+          sink away and the orb grows back into the centre from that corner.
+          The arriving view is keyed so the entrance replays each switch; a
+          copy of the leaving view plays its exit on top, inert and hidden
+          from readers, for the length of the flight. Under reduced motion no
+          leaving copy is kept and nothing animates — the switch is instant. */}
       <div className="relative flex-1 min-h-0 flex flex-col">
-        <div key={view} className="kx-view-in flex-1 min-h-0 flex flex-col">
+        <div key={view} className={`kx-view-in kx-to-${view} flex-1 min-h-0 flex flex-col`}>
           {view === "orb" ? orbView : chatView}
         </div>
         {leaving && leaving !== view && (
-          <div aria-hidden className="kx-view-out pointer-events-none absolute inset-0 flex flex-col">
+          <div aria-hidden className={`kx-view-out kx-to-${view} pointer-events-none absolute inset-0 flex flex-col`}>
             {leaving === "orb" ? orbView : chatView}
           </div>
         )}
@@ -746,7 +749,7 @@ export default function VoiceCallScreen({
               </button>
             </div>
             <div className="flex gap-4 overflow-x-auto pb-2 -mx-2 px-2 snap-x">
-              {voices.map((v) => {
+              {voices.map((v, i) => {
                 const on = v.key === selectedVoice;
                 return (
                   <button
@@ -756,8 +759,14 @@ export default function VoiceCallScreen({
                     onClick={() => { onSelectVoice?.(v.key); closeVoiceSheet(); }}
                     className="group flex flex-col items-center gap-2 shrink-0 snap-start focus:outline-none"
                   >
-                    <span className={`rounded-full p-1 transition-[box-shadow,transform] duration-150 group-active:scale-95 ${on ? "ring-2 ring-[#0066FF] ring-offset-2 ring-offset-[#141414]" : "ring-1 ring-white/10 group-hover:ring-white/30"}`}>
-                      <AIOrb size={64} state={on ? "listening" : "idle"} />
+                    {/* A VOICE IS A SHAPE, NOT A FACE. Five identical orbs said
+                        nothing about which was which (the owner: "icons or
+                        shapes or just names"). Each voice gets its own
+                        waveform signature — a fixed pattern of five bars —
+                        so the row reads as five different voices at a glance;
+                        the chosen one is in Hub Blue and breathes. */}
+                    <span className={`h-16 w-16 rounded-full inline-flex items-center justify-center border transition-[background-color,border-color,transform] duration-150 group-active:scale-95 ${on ? "border-[#0066FF] bg-[#0066FF]/10 ring-2 ring-[#0066FF]/40 ring-offset-2 ring-offset-[#141414]" : "border-white/15 bg-white/[0.04] group-hover:border-white/30"}`}>
+                      <VoiceGlyph index={i} on={on} />
                     </span>
                     <span className={`text-[12px] ${on ? "text-white font-semibold" : "text-[#AAAAAA] group-hover:text-white"}`}>{v.label}</span>
                   </button>
@@ -769,5 +778,38 @@ export default function VoiceCallScreen({
         </div>
       )}
     </div>
+  );
+}
+
+/* ── The voice signatures ─────────────────────────────────────────────
+   Six bar patterns, one per catalogue position (the catalogue is small; a
+   seventh voice would reuse the first). Fixed, not derived from the label,
+   so a renamed voice keeps its shape. Monochrome off, Hub Blue on. */
+const GLYPH_PATTERNS: readonly (readonly number[])[] = [
+  [8, 16, 24, 16, 8],
+  [18, 10, 22, 10, 18],
+  [6, 14, 10, 20, 12],
+  [22, 14, 8, 14, 22],
+  [12, 20, 16, 24, 10],
+  [10, 8, 18, 12, 20],
+];
+
+function VoiceGlyph({ index, on }: { index: number; on: boolean }) {
+  const bars = GLYPH_PATTERNS[index % GLYPH_PATTERNS.length];
+  return (
+    <svg aria-hidden viewBox="0 0 40 40" width="36" height="36" className={`kx-voice-glyph ${on ? "is-on" : ""}`}>
+      {bars.map((h, i) => (
+        <rect
+          key={i}
+          x={6 + i * 7}
+          y={20 - h / 2}
+          width="3"
+          height={h}
+          rx="1.5"
+          fill={on ? "#0066FF" : "rgba(255,255,255,0.72)"}
+          style={{ transformOrigin: `${7.5 + i * 7}px 20px`, animationDelay: `${i * 90}ms` }}
+        />
+      ))}
+    </svg>
   );
 }

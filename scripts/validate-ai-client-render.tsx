@@ -825,13 +825,14 @@ console.log("\n── VoiceCallScreen: choosing a voice ──");
 
   check("open: every configured voice is offered, as an orb tile with its name",
     withPicker.includes("Omar") && withPicker.includes("Layla") && /z-\[250\]/.test(withPicker) && /kx-sheet-in/.test(withPicker) &&
-    (withPicker.match(/kx-aiorb/g) ?? []).length >= 3 /* the call's orb + one per voice */);
+    (withPicker.match(/kx-voice-glyph/g) ?? []).length === 2 /* one signature per voice */ &&
+    (() => { const glyphs = withPicker.split("kx-voice-glyph").slice(1).map((g) => (g.match(/height="(\d+)"/g) ?? []).slice(0, 5).join(",")); return glyphs.length === 2 && glyphs[0] !== glyphs[1]; })());
   /* Each tile is one <button …aria-pressed…> whose label sits in a span at
      the end; split on the opening tags and read the state off the chunk
      that carries the name. */
   const pressedOf = (label: string) => /aria-pressed="(true|false)"/.exec(withPicker.split("<button").find((c) => c.includes(`>${label}</span>`) && /aria-pressed=/.test(c)) ?? "")?.[1];
   check("the current one is marked as chosen, awake and ringed in Hub Blue",
-    pressedOf("Omar") === "true" && /ring-\[#0066FF\]/.test(withPicker));
+    pressedOf("Omar") === "true" && /ring-\[#0066FF\]\/40/.test(withPicker) && (withPicker.match(/kx-voice-glyph is-on/g) ?? []).length === 1);
   check("and the other one is not", pressedOf("Layla") === "false");
   check("exactly one is chosen at a time",
     withPicker.split('aria-pressed="true"').length - 1 === 1);
