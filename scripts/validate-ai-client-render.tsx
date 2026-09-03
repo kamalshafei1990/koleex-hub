@@ -1023,6 +1023,76 @@ console.log("\n── VoiceCallScreen: typing into the call ──");
   check("text that could not be sent stays in the box with a notice, rather than vanishing",
     /if \(onSendText\(text\)\) \{\s*setTyped\(""\);\s*setTypedNotice\(null\);\s*\} else \{[\s\S]{0,300}?setTypedNotice\(copy\.typedNotLive\);\s*\}/.test(screenSrc) &&
     (screenSrc.match(/setTyped\(""\)/g) ?? []).length === 1);
+
+  /* ── ROADMAP B2: HOLD TO TALK on the screen ──────────────────────────── */
+  console.log("\n── VoiceCallScreen: hold to talk ──");
+  const holdScreen = renderToStaticMarkup(
+    <VoiceCallScreen live phase="listening" audioLevel={0.4} lines={lines} lang="en" onEnd={() => {}}
+      muted onToggleMute={() => {}} talkMode="hold" onSelectTalkMode={() => {}} onHold={() => {}} /> as ReactElement,
+  );
+  check("in hold mode the Hold-to-talk button stands where Mute was, not pressed, and Mute is gone",
+    holdScreen.includes('aria-label="Hold to talk"') && /aria-pressed="false"/.test(holdScreen) &&
+    !holdScreen.includes("Mute microphone") && !holdScreen.includes("Unmute microphone"));
+  check("between holds the caption says what to do, not that the microphone is off",
+    text(holdScreen).includes("Hold to talk") && !text(holdScreen).includes("Microphone off") && !/\bListening\b/.test(text(holdScreen)));
+  /* The hint stands where a caller waits before the first line, so it is
+     rendered with an empty transcript. */
+  const holdEmpty = renderToStaticMarkup(
+    <VoiceCallScreen live phase="listening" audioLevel={0.4} lines={[]} lang="en" onEnd={() => {}}
+      muted onToggleMute={() => {}} talkMode="hold" onSelectTalkMode={() => {}} onHold={() => {}} /> as ReactElement,
+  );
+  const handsFreeEmpty = renderToStaticMarkup(
+    <VoiceCallScreen live phase="listening" audioLevel={0.4} lines={[]} lang="en" onEnd={() => {}}
+      muted={false} onToggleMute={() => {}} talkMode="hands-free" onSelectTalkMode={() => {}} onHold={() => {}} /> as ReactElement,
+  );
+  check("the hint under the orb explains the hold instead of saying there is no button to hold — and hands-free keeps the old hint",
+    text(holdEmpty).includes("Hold the button while you speak") && !text(holdEmpty).includes("There is no button to hold") &&
+    text(handsFreeEmpty).includes("There is no button to hold") && !text(handsFreeEmpty).includes("Hold the button while you speak"));
+  check("the long press is protected from the browser: touch-action none, no callout, no selection",
+    /touch-action:\s*none/.test(holdScreen) && /-webkit-touch-callout:\s*none/.test(holdScreen) && /user-select:\s*none/.test(holdScreen));
+  const handsFreeScreen = renderToStaticMarkup(
+    <VoiceCallScreen live phase="listening" audioLevel={0.4} lines={lines} lang="en" onEnd={() => {}}
+      muted={false} onToggleMute={() => {}} talkMode="hands-free" onSelectTalkMode={() => {}} onHold={() => {}} /> as ReactElement,
+  );
+  check("hands-free keeps Mute; the Voice control shows even with no voice catalogue, because the mode lives in its sheet",
+    handsFreeScreen.includes("Mute microphone") && !handsFreeScreen.includes('aria-label="Hold to talk"') &&
+    handsFreeScreen.includes('aria-haspopup="dialog"'));
+  const modeSheet = renderToStaticMarkup(
+    <VoiceCallScreen live phase="listening" audioLevel={0.4} lines={lines} lang="en" onEnd={() => {}}
+      muted={false} onToggleMute={() => {}} talkMode="hold" onSelectTalkMode={() => {}} onHold={() => {}} defaultVoiceSheetOpen /> as ReactElement,
+  );
+  {
+    const group = modeSheet.slice(modeSheet.indexOf('role="group"'));
+    const handsFree = /data-talk-mode="hands-free"/.test(group) && /aria-pressed="false"[^>]*data-talk-mode="hands-free"|data-talk-mode="hands-free"[^>]*aria-pressed="false"/.test(group);
+    const hold = /aria-pressed="true"[^>]*data-talk-mode="hold"|data-talk-mode="hold"[^>]*aria-pressed="true"/.test(group);
+    check("the sheet offers the two ways to talk, the current one pressed, with the noisy-room hint — and no voices row when there is no catalogue",
+      modeSheet.includes("How you talk") && handsFree && hold && text(modeSheet).includes("In a noisy place use Hold to talk") &&
+      !text(modeSheet).includes("Switching takes a moment"));
+  }
+  check("hold to talk is localised",
+    text(renderToStaticMarkup(<VoiceCallScreen live phase="listening" audioLevel={0} lines={lines} lang="ar" onEnd={() => {}} muted onToggleMute={() => {}} talkMode="hold" onHold={() => {}} /> as ReactElement)).includes("اضغط واتكلم") &&
+    text(renderToStaticMarkup(<VoiceCallScreen live phase="listening" audioLevel={0} lines={lines} lang="zh" onEnd={() => {}} muted onToggleMute={() => {}} talkMode="hold" onHold={() => {}} /> as ReactElement)).includes("按住说话"));
+  {
+    /* The orb's own gradient stops are excluded, as the composer check does. */
+    const orbOwn = new Set(["#567FB2", "#7FA9D6", "#BCD8F0", "#0B0D11", "#FFF"]);
+    const holdHexes = [...holdScreen.matchAll(/#[0-9A-Fa-f]{3,8}\b/g)].map((m) => m[0].toUpperCase()).filter((h) => !orbOwn.has(h));
+    check("the hold button introduces no colour outside the Koleex palette", holdHexes.length > 0 && holdHexes.every((h) => allowed.has(h)));
+  }
+  /* EVERY WAY A PRESS CAN END RELEASES IT — from source, since a release is
+     not a first paint. A microphone left open by a press that never "ended"
+     is the one failure this control cannot have. */
+  check("every way a press can end releases the hold: pointer up, cancel, capture lost, key up, page hidden, window blur, unmount",
+    /onPointerUp=\{\(\) => hold\(false\)\}/.test(screenSrc) && /onPointerCancel=\{\(\) => hold\(false\)\}/.test(screenSrc) &&
+    /onLostPointerCapture=\{\(\) => hold\(false\)\}/.test(screenSrc) && /onKeyUp=\{\(e\) => \{ if \(e\.key === " " \|\| e\.key === "Enter"\) \{ e\.preventDefault\(\); hold\(false\); \} \}\}/.test(screenSrc) &&
+    /if \(document\.visibilityState === "hidden"\) hold\(false\)/.test(screenSrc) && /window\.addEventListener\("blur", onBlur\)/.test(screenSrc) &&
+    /window\.removeEventListener\("blur", onBlur\);\s*hold\(false\);\s*\};/.test(screenSrc));
+  check("a held key does not re-fire the press, and the press captures the pointer so a finger that slides off still releases",
+    /onKeyDown=\{\(e\) => \{ if \(\(e\.key === " " \|\| e\.key === "Enter"\) && !e\.repeat\)/.test(screenSrc) &&
+    /onPointerDown=\{\(e\) => \{ e\.preventDefault\(\); e\.currentTarget\.setPointerCapture\?\.\(e\.pointerId\); hold\(true\); \}\}/.test(screenSrc));
+  check("the hold reports each change once, through onHold, and the parent — not the screen — owns the microphone",
+    /const hold = useCallback\(\(held: boolean\) => \{\s*if \(holdRef\.current === held\) return;\s*holdRef\.current = held;\s*setHolding\(held\);\s*onHold\?\.\(held\);\s*\}, \[onHold\]\);/.test(screenSrc) &&
+    !/setMuted\(/.test(screenSrc));
+
 }
 
 console.log(`\n${pass} passed, ${failures.length} failed`);

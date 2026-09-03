@@ -52,7 +52,10 @@ import { extractProductPhotos, type ProductPhoto } from "@/lib/voice/photos";
 import { useStreamLevel } from "@/lib/voice/useStreamLevel";
 import { CallTones } from "@/lib/voice/tones";
 import { pickSttLang, readSavedSttLang, saveSttLang, learnSttLang, type SttLang } from "@/lib/voice/stt-lang";
-import { pickVoiceKey, readSavedVoiceKey, saveVoiceKey, readSavedRegion, saveRegion } from "@/lib/voice/voice-pref";
+import {
+  pickVoiceKey, readSavedVoiceKey, saveVoiceKey, readSavedRegion, saveRegion,
+  readSavedTalkMode, saveTalkMode, type TalkMode,
+} from "@/lib/voice/voice-pref";
 import { requestCallSummary, shouldSummarise } from "@/lib/voice/summary";
 import { sendVoiceTelemetry } from "@/lib/voice/telemetry";
 import { TranscriptPersister, type SavedTurn, type PersistFailure } from "@/lib/voice/persist";
@@ -207,6 +210,16 @@ export default function VoiceCallButton({
   /* Mirrors the session's flag. Kept in state because the screen renders from
      it; the session stays the source of truth for the tracks themselves. */
   const [muted, setMuted] = useState(false);
+  /* HOW THE CALLER TALKS (roadmap B2). Hands-free is the call as it was:
+     the far side detects turns from the room. Hold to talk gates the mic
+     tracks around a held button, for rooms where the room itself would get
+     turns. A ref beside the state because the session's own handlers — the
+     mic arriving, the line coming back after a drop — read it outside a
+     render. Read lazily: the reader never throws, answers hands-free where
+     there is no window, and nothing in the idle markup depends on it, so
+     the server's frame and the browser's still match. */
+  const [talkMode, setTalkMode] = useState<TalkMode>(readSavedTalkMode);
+  const talkModeRef = useRef<TalkMode>(talkMode);
   /* READY IS NOT LIVE. `live` is the transport standing; `ready` is the far
      side having accepted the session configuration, which is when it listens
      as Koleex AI. The caption says "go ahead" and the tone sounds on READY —
@@ -500,7 +513,20 @@ export default function VoiceCallButton({
         }
       },
       onReady: () => setReady(true),
-      onLocalStream: (stream) => setMicStream(stream),
+      onLocalStream: (stream) => {
+        setMicStream(stream);
+        /* HOLD TO TALK STARTS WITH THE MICROPHONE CLOSED. A session always
+           opens its tracks (see VoiceSession: a new call starts unmuted);
+           in hold mode the caller opens them by holding, so the tracks are
+           closed here, the moment they exist — before the line is up, so
+           nothing said while connecting goes anywhere either. Applied per
+           session, so a rebuilt line (voice switch, auto-resume) keeps the
+           mode without the caller noticing a change. */
+        if (talkModeRef.current === "hold") {
+          session.setMuted(true);
+          setMuted(true);
+        }
+      },
       onRemoteStream: (stream) => {
         setFarStream(stream);
         if (audioRef.current) {
@@ -658,6 +684,34 @@ export default function VoiceCallButton({
     setMuted(next);
   }, []);
 
+  /* THE HOLD (roadmap B2). Pressed: the tracks open; released: they close.
+     The same setMuted the mute control uses, so the session stays the one
+     owner of the tracks and the screen's `muted` keeps telling the truth
+     between holds ("Hold to talk", not "Listening"). Ignored outside hold
+     mode: a hands-free call has no button to hold, and a stray event from
+     one must not close the microphone. */
+  const setHolding = useCallback((held: boolean) => {
+    const session = sessionRef.current;
+    if (!session || talkModeRef.current !== "hold") return;
+    session.setMuted(!held);
+    setMuted(!held);
+  }, []);
+
+  /* CHOOSING HOW TO TALK takes effect on the live call at once — no new
+     session, because nothing about the session changes: hold mode closes
+     the tracks until the next hold, hands-free opens them. Remembered on
+     the device like the voice. */
+  const selectTalkMode = useCallback((mode: TalkMode) => {
+    talkModeRef.current = mode;
+    setTalkMode(mode);
+    saveTalkMode(mode);
+    const session = sessionRef.current;
+    if (!session) return;
+    const closed = mode === "hold";
+    session.setMuted(closed);
+    setMuted(closed);
+  }, []);
+
   /* TYPE INTO THE CALL. The text goes to the session as the user's turn and
      into the transcript as a settled user line marked `via: "text"`, so the
      screen shows it at once and the persister writes it as a TYPED message —
@@ -736,6 +790,9 @@ export default function VoiceCallButton({
           onEnd={hangUp}
           muted={muted}
           onToggleMute={toggleMute}
+          talkMode={talkMode}
+          onSelectTalkMode={selectTalkMode}
+          onHold={setHolding}
           searching={searching}
           voices={voices}
           selectedVoice={voiceKey}

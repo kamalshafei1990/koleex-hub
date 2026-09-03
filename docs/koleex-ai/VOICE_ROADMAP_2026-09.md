@@ -21,8 +21,8 @@ nothing is called done until it is reachable and tested at runtime.
 
 | # | Item | How |
 |---|------|-----|
-| B1 | End-of-call summary (in progress) | When the call ends with ≥ 2 exchanges, summarise the transcript (existing chat lane, no new provider) into 3–5 bullets + numbers said; show a card with Copy and "Save as task" (confirmed) |
-| B2 | Push-to-talk and noise mode | A mode in the voice sheet: hold to talk (mic track enabled only while held), plus a higher VAD threshold preset for noisy rooms — tuned in a real room, as session-config.ts already notes |
+| B1 | End-of-call summary — **done (#346)** | When the call ends with ≥ 2 exchanges, the server summarises the saved spoken turns (existing chat lane, no new provider) into 3–5 bullets with every number as said, and writes it into the thread under "Call summary" in the call's language. Copy and "Save as task" (confirmed) still to come |
+| B2 | Hold to talk — **done (#347)** | "How you talk" in the voice sheet: Hands-free (as before) or Hold to talk — the microphone tracks open only while the button is held, closed the moment a session's mic exists, remembered on the device. No new handshake or vendor field. The higher VAD threshold preset is deliberately **not** shipped: its number has to come from a real noisy room, and hold-to-talk is the honest answer there until it does |
 | B3 | Barge-in check | Verify the client stops local playback on `input_audio_buffer.speech_started`; fix if the far side keeps talking over the caller |
 | B4 | One voice everywhere | The "listen" button in text chat uses the browser's synthesis today; route it through the vendor's TTS so the character has one voice (mainland-reachable endpoint required) |
 | B5 | Survive a locked screen | Investigate wake lock / audio session options for the installed iOS app; document what the platform allows |

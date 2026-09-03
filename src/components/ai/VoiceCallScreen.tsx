@@ -27,6 +27,7 @@ import type { AIOrbState } from "@/components/ai-orb/ai-orb-types";
 import VoiceTranscript from "@/components/ai/VoiceTranscript";
 import { type TranscriptLine, type TranscriptPhoto, type VoicePhase } from "@/lib/voice/events";
 import { type Lang } from "@/lib/i18n";
+import { type TalkMode } from "@/lib/voice/voice-pref";
 import PhotoLightbox from "@/components/ai/PhotoLightbox";
 import KoleexLogo from "@/components/layout/KoleexLogo";
 import { textDirection } from "@/lib/text-direction";
@@ -51,6 +52,15 @@ const COPY: Record<Lang, {
   title: string;
   hint: string;
   voice: string;
+  /* HOLD TO TALK (roadmap B2): the button, its held state, the caption
+     between holds, the hint under the orb, and the mode picker's words. */
+  holdToTalk: string;
+  holdRelease: string;
+  holdHint: string;
+  modePick: string;
+  modeHandsFree: string;
+  modeHold: string;
+  modeHint: string;
   /* SHORT FORMS FOR THE LABELS UNDER THE CONTROLS. Not the aria-labels: those
      say what the control DOES ("Unmute microphone") because a screen reader
      user has no icon to read. These name the control the way a phone does —
@@ -103,6 +113,13 @@ const COPY: Record<Lang, {
     voicePick: "Choose a voice",
     voiceHint: "Switching takes a moment. The conversation carries on.",
     close: "Close",
+    holdToTalk: "Hold to talk",
+    holdRelease: "Let go when done",
+    holdHint: "Hold the button while you speak, let go when you are done.",
+    modePick: "How you talk",
+    modeHandsFree: "Hands-free",
+    modeHold: "Hold to talk",
+    modeHint: "In a noisy place use Hold to talk: the microphone is open only while you hold.",
   },
   zh: {
     connecting: "正在连接…",
@@ -131,6 +148,13 @@ const COPY: Record<Lang, {
     voicePick: "选择音色",
     voiceHint: "切换需要一点时间，对话会继续。",
     close: "关闭",
+    holdToTalk: "按住说话",
+    holdRelease: "说完松开",
+    holdHint: "说话时按住按钮，说完松开。",
+    modePick: "说话方式",
+    modeHandsFree: "免提",
+    modeHold: "按住说话",
+    modeHint: "环境嘈杂时用「按住说话」：只有按住时麦克风才打开。",
   },
   ar: {
     connecting: "جارٍ الاتصال…",
@@ -159,6 +183,13 @@ const COPY: Record<Lang, {
     voicePick: "اختار الصوت",
     voiceHint: "التبديل بياخد لحظة، والمحادثة بتكمل.",
     close: "اقفل",
+    holdToTalk: "اضغط واتكلم",
+    holdRelease: "سيب لما تخلص",
+    holdHint: "اضغط على الزرار وانت بتتكلم، وسيبه لما تخلص.",
+    modePick: "طريقة الكلام",
+    modeHandsFree: "كلام حر",
+    modeHold: "اضغط واتكلم",
+    modeHint: "في المكان الدوشة استخدم «اضغط واتكلم»: الميكروفون بيفتح بس وانت ضاغط.",
   },
 };
 
@@ -185,6 +216,14 @@ export type VoiceCallScreenProps = {
    *  VoiceSession.setMuted for why that is the honest arrangement. */
   muted?: boolean;
   onToggleMute?: () => void;
+  /** How the caller talks (roadmap B2). "hold" swaps the Mute control for a
+   *  Hold-to-talk button and reads `muted` between holds as "Hold to talk"
+   *  rather than "Microphone off": the microphone is closed on purpose. */
+  talkMode?: TalkMode;
+  onSelectTalkMode?: (mode: TalkMode) => void;
+  /** The hold: true on press, false on release. The parent gates the
+   *  microphone; the screen only reports the gesture. */
+  onHold?: (held: boolean) => void;
   /** A lookup is running. Two seconds of silence on a call reads as a freeze;
    *  this is the difference between waiting and wondering. */
   searching?: boolean;
@@ -216,6 +255,9 @@ export default function VoiceCallScreen({
   onEnd,
   muted = false,
   onToggleMute,
+  talkMode = "hands-free",
+  onSelectTalkMode,
+  onHold,
   searching = false,
   voices = [],
   selectedVoice = null,
@@ -230,6 +272,32 @@ export default function VoiceCallScreen({
      voice is a small Koleex orb with its name — the product's own face,
      not a row of grey pills. */
   const [voiceSheet, setVoiceSheet] = useState(defaultVoiceSheetOpen);
+  /* THE HOLD. Local, because it is a gesture in progress, not call state:
+     the parent learns of it through onHold and owns the microphone. Every
+     way a press can end releases it — pointer up, pointer cancel, capture
+     lost, the key going up, the page going hidden — because a microphone
+     left open by a press that never "ended" is the one failure this control
+     cannot have. */
+  const [holding, setHolding] = useState(false);
+  const holdRef = useRef(false);
+  const hold = useCallback((held: boolean) => {
+    if (holdRef.current === held) return;
+    holdRef.current = held;
+    setHolding(held);
+    onHold?.(held);
+  }, [onHold]);
+  useEffect(() => {
+    if (talkMode !== "hold") return;
+    const onHidden = () => { if (document.visibilityState === "hidden") hold(false); };
+    const onBlur = () => hold(false);
+    document.addEventListener("visibilitychange", onHidden);
+    window.addEventListener("blur", onBlur);
+    return () => {
+      document.removeEventListener("visibilitychange", onHidden);
+      window.removeEventListener("blur", onBlur);
+      hold(false);
+    };
+  }, [talkMode, hold]);
   const closeVoiceSheet = useCallback(() => setVoiceSheet(false), []);
   /* Escape closes the sheet, and ONLY the sheet: captured before the
      screen's own Escape (which ends the call) can see it. */
@@ -370,8 +438,10 @@ export default function VoiceCallScreen({
     : muted && live && !reconnecting
     /* OUTRANKS listening/speaking. A user who forgot they muted, told
        "Listening", concludes the product is broken — and they are right to,
-       because the screen said it was hearing them and it was not. */
-    ? copy.muted
+       because the screen said it was hearing them and it was not. In hold
+       mode the closed microphone is the resting state, so the caption
+       says what to do rather than what is off. */
+    ? (talkMode === "hold" ? copy.holdToTalk : copy.muted)
     : reconnecting
     ? copy.reconnecting
     : !live || !ready
@@ -468,7 +538,7 @@ export default function VoiceCallScreen({
           /* Told once, plainly: server-side turn detection has no
              push-to-talk, and a user waiting for a button to hold will
              wait forever. */
-          <p className="max-w-[820px] mx-auto text-center text-xs text-[#666666]">{copy.hint}</p>
+          <p className="max-w-[820px] mx-auto text-center text-xs text-[#666666]">{talkMode === "hold" ? copy.holdHint : copy.hint}</p>
         )}
       </div>
   );
@@ -624,7 +694,47 @@ export default function VoiceCallScreen({
             has never been on this screen should not have to find out what
             the grey circle does by pressing it while someone is listening. */}
         <div className="flex items-end justify-center gap-8">
-          {onToggleMute && (
+          {talkMode === "hold" && onHold ? (
+            /* HOLD TO TALK (roadmap B2), in Mute's place: the one control a
+               caller in a loud room uses, so it is the widest thing on the
+               bar and says what it does. Pointer events, captured, so a
+               finger that slides off still releases; the touch-action and
+               callout styles stop iOS selecting text or offering a menu on
+               the long press it is designed for. Filled in Hub Blue while
+               held — the open microphone is the loud state, as muted is
+               for the other control. */
+            <div className="flex flex-col items-center gap-2">
+              <button
+                type="button"
+                aria-pressed={holding}
+                aria-label={copy.holdToTalk}
+                title={copy.holdToTalk}
+                onPointerDown={(e) => { e.preventDefault(); e.currentTarget.setPointerCapture?.(e.pointerId); hold(true); }}
+                onPointerUp={() => hold(false)}
+                onPointerCancel={() => hold(false)}
+                onLostPointerCapture={() => hold(false)}
+                onKeyDown={(e) => { if ((e.key === " " || e.key === "Enter") && !e.repeat) { e.preventDefault(); hold(true); } }}
+                onKeyUp={(e) => { if (e.key === " " || e.key === "Enter") { e.preventDefault(); hold(false); } }}
+                onContextMenu={(e) => e.preventDefault()}
+                style={{ touchAction: "none", WebkitTouchCallout: "none", userSelect: "none", WebkitUserSelect: "none" }}
+                className={`h-14 min-w-[160px] px-6 rounded-full inline-flex items-center justify-center gap-2 border text-[14px] font-semibold select-none transition-[background-color,color,border-color,transform] duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0066FF] focus-visible:ring-offset-2 focus-visible:ring-offset-[#0D0D0D] ${
+                  holding
+                    ? "bg-[#0066FF] text-white border-[#0066FF] scale-[1.03]"
+                    : "text-white border-white/25 bg-white/[0.06] hover:bg-white/[0.1]"
+                }`}
+              >
+                <svg aria-hidden viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+                  <rect x="9" y="2" width="6" height="12" rx="3" />
+                  <path d="M5 10.5V12a7 7 0 0 0 14 0v-1.5" />
+                  <line x1="12" y1="19" x2="12" y2="22" />
+                </svg>
+                {holding ? copy.holdRelease : copy.holdToTalk}
+              </button>
+              <span aria-hidden className={`text-[11px] tracking-wide transition-colors ${holding ? "text-white" : "text-[#666666]"}`}>
+                {copy.micShort}
+              </span>
+            </div>
+          ) : onToggleMute && (
             <div className="flex flex-col items-center gap-2">
               {/* MUTE. Monochrome: it is not destructive, so it does not get
                   the red, and it is not the primary action, so it does not
@@ -672,7 +782,7 @@ export default function VoiceCallScreen({
             </div>
           )}
 
-          {voices.length > 0 && (
+          {(voices.length > 0 || onSelectTalkMode) && (
             <div className="flex flex-col items-center gap-2">
               {/* VOICE. The same family as Mute — a circle on the grid, the
                   name under it is the voice currently speaking, so the state
@@ -731,7 +841,7 @@ export default function VoiceCallScreen({
           small orbs — the chosen one awake and ringed in Hub Blue, the
           others asleep. Choosing closes the sheet; the call rebuilds in
           place with the words kept (VoiceCallButton.selectVoice). */}
-      {voiceSheet && voices.length > 0 && (
+      {voiceSheet && (voices.length > 0 || onSelectTalkMode) && (
         <div className="fixed inset-0 z-[250] flex flex-col justify-end" role="dialog" aria-modal="true" aria-label={copy.voicePick}>
           <button type="button" aria-label={copy.close} onClick={closeVoiceSheet} className="absolute inset-0 bg-black/60" />
           <div className="kx-sheet-in relative rounded-t-[28px] border-t border-white/10 bg-[#141414] px-6 pt-3 pb-8 text-white">
@@ -750,6 +860,7 @@ export default function VoiceCallScreen({
                 </svg>
               </button>
             </div>
+            {voices.length > 0 && (
             <div className="flex gap-4 overflow-x-auto pb-2 -mx-2 px-2 snap-x">
               {voices.map((v, i) => {
                 const on = v.key === selectedVoice;
@@ -775,7 +886,38 @@ export default function VoiceCallScreen({
                 );
               })}
             </div>
-            <p className="mt-3 text-[12px] text-[#666666]">{copy.voiceHint}</p>
+            )}
+            {voices.length > 0 && <p className="mt-3 text-[12px] text-[#666666]">{copy.voiceHint}</p>}
+
+            {/* HOW YOU TALK (roadmap B2). Two choices, one pressed. Choosing
+                does not close the sheet or rebuild the call — the parent
+                gates the microphone at once — so the hint under it can be
+                read after choosing. */}
+            {onSelectTalkMode && (
+              <div className={voices.length > 0 ? "mt-6 pt-5 border-t border-white/10" : ""}>
+                <h3 className="text-[13px] font-semibold text-[#AAAAAA] mb-3">{copy.modePick}</h3>
+                <div role="group" aria-label={copy.modePick} className="grid grid-cols-2 gap-2 rounded-2xl bg-white/[0.04] p-1">
+                  {(["hands-free", "hold"] as const).map((mode) => {
+                    const on = talkMode === mode;
+                    return (
+                      <button
+                        key={mode}
+                        type="button"
+                        aria-pressed={on}
+                        data-talk-mode={mode}
+                        onClick={() => onSelectTalkMode(mode)}
+                        className={`h-11 rounded-xl text-[13px] font-semibold transition-[background-color,color] duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0066FF] ${
+                          on ? "bg-white text-[#0D0D0D]" : "text-[#AAAAAA] hover:text-white"
+                        }`}
+                      >
+                        {mode === "hold" ? copy.modeHold : copy.modeHandsFree}
+                      </button>
+                    );
+                  })}
+                </div>
+                <p className="mt-3 text-[12px] text-[#666666]">{copy.modeHint}</p>
+              </div>
+            )}
           </div>
         </div>
       )}

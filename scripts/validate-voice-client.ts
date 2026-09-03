@@ -2133,6 +2133,51 @@ console.log("\n── 12. Mute ──");
     /const persister = persisterRef\.current;\s*const conversation = conversationIdRef\.current;\s*const lines = linesRef\.current;\s*releaseCall\(\);\s*setState\("idle"\);\s*if \(conversation && shouldSummarise\(lines\)\) \{/.test(btn22) &&
     /Promise\.resolve\(persister\?\.finish\(\)\)\s*\.then\(\(\) => requestCallSummary\(conversation, langRef\.current\)\)\s*\.then\(\(res\) => \{ if \(res\) onTurnsSavedRef\.current\?\.\(\[res\.message\], res\.conversation\); \}\)/.test(btn22) &&
     (btn22.match(/requestCallSummary\(/g) ?? []).length === 1 && !/selectVoice[\s\S]{0,1200}?requestCallSummary/.test(btn22.slice(btn22.indexOf("const selectVoice"), btn22.indexOf("const selectVoice") + 1500)));
+
+  /* ── ROADMAP B2: HOLD TO TALK ──────────────────────────────────────────
+     A loud room gets turns of its own under server-side detection. The
+     answer is a device-side choice about the microphone — the tracks open
+     only while a button is held — so no handshake, no vendor field, and
+     the mute path is reused rather than a second owner of the tracks. */
+  const talkPref = await import("../src/lib/voice/voice-pref");
+  check("the talk mode is two allow-listed words, hands-free by default, under its own storage key",
+    talkPref.parseTalkMode("hold") === "hold" && talkPref.parseTalkMode("hands-free") === "hands-free" &&
+    talkPref.parseTalkMode("push") === null && talkPref.parseTalkMode(null) === null && talkPref.parseTalkMode(undefined) === null &&
+    talkPref.DEFAULT_TALK_MODE === "hands-free" && talkPref.TALK_MODE_STORAGE_KEY === "koleex-voice-talk" &&
+    new Set<string>([talkPref.TALK_MODE_STORAGE_KEY, talkPref.VOICE_STORAGE_KEY, talkPref.REGION_STORAGE_KEY]).size === 3);
+  {
+    const g = globalThis as unknown as { window?: unknown };
+    const had = "window" in g; const prev = g.window;
+    const store = new Map<string, string>();
+    g.window = { localStorage: { getItem: (k: string) => store.get(k) ?? null, setItem: (k: string, v: string) => { store.set(k, v); } } };
+    const before = talkPref.readSavedTalkMode();
+    talkPref.saveTalkMode("hold");
+    const after = talkPref.readSavedTalkMode();
+    const written = store.get(talkPref.TALK_MODE_STORAGE_KEY);
+    store.set(talkPref.TALK_MODE_STORAGE_KEY, "junk");
+    const junk = talkPref.readSavedTalkMode();
+    g.window = { localStorage: { getItem: () => { throw new Error("x"); }, setItem: () => { throw new Error("x"); } } };
+    let threw = false; try { talkPref.saveTalkMode("hold"); } catch { threw = true; }
+    const refused = talkPref.readSavedTalkMode();
+    if (had) g.window = prev; else delete g.window;
+    const noWindow = talkPref.readSavedTalkMode();
+    check("  …nothing → hands-free, saved → read back, junk → hands-free, a refusing store and no window → hands-free and silent",
+      before === "hands-free" && after === "hold" && written === "hold" && junk === "hands-free" && !threw && refused === "hands-free" && noWindow === "hands-free");
+  }
+  const btn23 = fs22.readFileSync("src/components/ai/VoiceCallButton.tsx", "utf8");
+  check("the button reads the saved mode lazily (no effect, no hydration frame that differs) and keeps a ref beside the state for the session's handlers",
+    /const \[talkMode, setTalkMode\] = useState<TalkMode>\(readSavedTalkMode\);\s*const talkModeRef = useRef<TalkMode>\(talkMode\);/.test(btn23) &&
+    !/useEffect\(\(\) => \{\s*const saved = readSavedTalkMode\(\)/.test(btn23));
+  check("hold mode CLOSES the tracks the moment the microphone exists — per session, so a rebuilt line keeps the mode — through the session's own mute",
+    /onLocalStream: \(stream\) => \{\s*setMicStream\(stream\);[\s\S]{0,900}?if \(talkModeRef\.current === "hold"\) \{\s*session\.setMuted\(true\);\s*setMuted\(true\);\s*\}\s*\},/.test(btn23));
+  check("the hold opens the tracks while held and closes them on release, and is IGNORED outside hold mode (a stray event must not close a hands-free microphone)",
+    /const setHolding = useCallback\(\(held: boolean\) => \{\s*const session = sessionRef\.current;\s*if \(!session \|\| talkModeRef\.current !== "hold"\) return;\s*session\.setMuted\(!held\);\s*setMuted\(!held\);\s*\}, \[\]\);/.test(btn23));
+  check("choosing a mode is remembered on the device and applied to the live call at once — closed for hold, open for hands-free — without a new session",
+    /const selectTalkMode = useCallback\(\(mode: TalkMode\) => \{\s*talkModeRef\.current = mode;\s*setTalkMode\(mode\);\s*saveTalkMode\(mode\);\s*const session = sessionRef\.current;\s*if \(!session\) return;\s*const closed = mode === "hold";\s*session\.setMuted\(closed\);\s*setMuted\(closed\);\s*\}, \[\]\);/.test(btn23) &&
+    !/selectTalkMode[\s\S]{0,600}?releaseCall\(\)/.test(btn23.slice(btn23.indexOf("const selectTalkMode"), btn23.indexOf("const selectTalkMode") + 700)));
+  check("the screen is handed the mode, the chooser and the hold",
+    /talkMode=\{talkMode\}\s*onSelectTalkMode=\{selectTalkMode\}\s*onHold=\{setHolding\}/.test(btn23));
+
 }
 
 console.log(`\n${pass} passed, ${failures.length} failed`);
