@@ -1458,15 +1458,48 @@ export default function KoleexAiApp() {
      scanning is quicker — users who typed a query want hits, not
      chronology. */
   const [sidebarQuery, setSidebarQuery] = useState("");
+  /* WHAT WAS SAID, NOT ONLY WHAT IT WAS CALLED (roadmap C2). Titles and the
+     last preview are matched here, at once, over the rows already loaded;
+     message bodies are matched on the server, owner-scoped, a beat later,
+     and their conversations join the same list with a snippet under the
+     title. Debounced so a typist makes one request, not one per key;
+     aborted so a slow answer never overwrites a newer one; two characters
+     or more, the server's own floor. Never throws: a failed search leaves
+     the local matches standing. */
+  const [contentHits, setContentHits] = useState<Record<string, string>>({});
+  useEffect(() => {
+    const q = sidebarQuery.replace(/\s+/g, " ").trim();
+    if (q.length < 2) {
+      setContentHits({});
+      return;
+    }
+    const ctl = new AbortController();
+    const timer = window.setTimeout(() => {
+      fetch(`/api/ai/conversations/search?q=${encodeURIComponent(q)}`, { credentials: "include", signal: ctl.signal })
+        .then((r) => (r.ok ? r.json() : null))
+        .then((body: { hits?: { conversation_id: string; snippet: string }[] } | null) => {
+          if (ctl.signal.aborted) return;
+          const next: Record<string, string> = {};
+          for (const h of body?.hits ?? []) next[h.conversation_id] = h.snippet;
+          setContentHits(next);
+        })
+        .catch(() => { /* the local matches stand */ });
+    }, 350);
+    return () => {
+      window.clearTimeout(timer);
+      ctl.abort();
+    };
+  }, [sidebarQuery]);
+
   const filteredConversations = useMemo(() => {
     const q = sidebarQuery.trim().toLowerCase();
     if (!q) return conversations;
     return conversations.filter((c) => {
       const title = (c.title || "").toLowerCase();
       const preview = (c.last_preview || "").toLowerCase();
-      return title.includes(q) || preview.includes(q);
+      return title.includes(q) || preview.includes(q) || c.id in contentHits;
     });
-  }, [conversations, sidebarQuery]);
+  }, [conversations, sidebarQuery, contentHits]);
 
   /* ── Sidebar sections ──
      Every conversation appears in EXACTLY ONE place, which is the whole
@@ -2017,6 +2050,7 @@ export default function KoleexAiApp() {
                           active={c.id === activeId}
                           projects={projects}
                           copy={copy}
+                          hint={searching ? contentHits[c.id] : undefined}
                           onOpen={() => openConversation(c.id)}
                           onRename={() => renameConversation(c.id, c.title)}
                           onDelete={() => requestDeleteConversation(c.id)}

@@ -1093,6 +1093,19 @@ console.log("\n── VoiceCallScreen: typing into the call ──");
     /const hold = useCallback\(\(held: boolean\) => \{\s*if \(holdRef\.current === held\) return;\s*holdRef\.current = held;\s*setHolding\(held\);\s*onHold\?\.\(held\);\s*\}, \[onHold\]\);/.test(screenSrc) &&
     !/setMuted\(/.test(screenSrc));
 
+
+  /* ── ROADMAP C2: where the search matched, under the title ─────────────── */
+  console.log("\n── SidebarRow: the search hint ──");
+  {
+    const row = { id: "c1", title: "Ningbo shipment", last_preview: null, message_count: 3, created_at: "2026-09-01T00:00:00Z", updated_at: "2026-09-01T00:00:00Z" };
+    const base = { active: false, projects: [], copy: COPY.en, onOpen: () => {}, onRename: () => {}, onDelete: () => {}, onTogglePin: () => {}, onMove: () => {} };
+    const withHint = renderToStaticMarkup(<SidebarRow row={row} {...base} hint="…price for KX-200 was 1,250 USD…" /> as ReactElement);
+    const without = renderToStaticMarkup(<SidebarRow row={row} {...base} /> as ReactElement);
+    check("a matched row shows the snippet under its title, dim and on one line; a row without a hint is unchanged",
+      /data-search-hint/.test(withHint) && withHint.includes("KX-200") && withHint.includes("Ningbo shipment") &&
+      !/data-search-hint/.test(without) && without.includes("Ningbo shipment"));
+  }
+
 }
 
 console.log(`\n${pass} passed, ${failures.length} failed`);
