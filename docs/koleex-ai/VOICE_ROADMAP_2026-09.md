@@ -23,9 +23,19 @@ nothing is called done until it is reachable and tested at runtime.
 |---|------|-----|
 | B1 | End-of-call summary — **done (#346)** | When the call ends with ≥ 2 exchanges, the server summarises the saved spoken turns (existing chat lane, no new provider) into 3–5 bullets with every number as said, and writes it into the thread under "Call summary" in the call's language. Copy and "Save as task" (confirmed) still to come |
 | B2 | Hold to talk — **done (#347)** | "How you talk" in the voice sheet: Hands-free (as before) or Hold to talk — the microphone tracks open only while the button is held, closed the moment a session's mic exists, remembered on the device. No new handshake or vendor field. The higher VAD threshold preset is deliberately **not** shipped: its number has to come from a real noisy room, and hold-to-talk is the honest answer there until it does |
-| B3 | Barge-in check | Verify the client stops local playback on `input_audio_buffer.speech_started`; fix if the far side keeps talking over the caller |
-| B4 | One voice everywhere | The "listen" button in text chat uses the browser's synthesis today; route it through the vendor's TTS so the character has one voice (mainland-reachable endpoint required) |
+| B3 | Barge-in — **done (#348)** | Read against the vendor's WebRTC sample, which clears its playback buffer on `input_audio_buffer.speech_started`: the far side stops sending when the caller interrupts, but the receiver's jitter buffer (400 ms) still played out over the caller's first words. The element is now muted on a speech start that lands while the far side is speaking, and unmuted the moment the caller falls silent or the far side has the turn again (`events.ts` playbackGate). A start in a pause changes nothing. Runtime confirmation: interrupt Koleex AI mid-sentence on a real call |
+| B4 | One voice everywhere — **deferred** | The vendor's non-realtime TTS (`qwen3-tts-flash`, HTTP, mainland and Singapore endpoints) lists ten `language_type` values and **Arabic is not one of them**; Arabic text would go through `Auto`, which the vendor itself says it cannot guarantee. Egyptian Arabic is the owner's call language, so routing the "listen" button there today would give the character a worse voice, not one voice. Revisit when the TTS family lists Arabic, or when the realtime voice can be borrowed for short read-outs |
 | B5 | Survive a locked screen | Investigate wake lock / audio session options for the installed iOS app; document what the platform allows |
+
+### Candidate from the vendor's own guidance (needs a real-room test first)
+
+The vendor recommends `semantic_vad` over `server_vad` for the realtime model
+and says its threshold is the knob to raise in a noisy room. Today's session
+uses `server_vad` at 0.65, tuned from a real call's phantom turns. Switching
+detection type is a runtime-behaviour change that no suite can prove, so it
+is not shipped blind: the right shape is a server-side environment switch
+tried on one deployment while the owner is on a real call. Hold to talk (B2)
+covers the loud room in the meantime.
 
 ## Phase C — capabilities
 

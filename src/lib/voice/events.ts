@@ -129,6 +129,57 @@ function deltaText(payload: Record<string, unknown>): string {
  * A call must not fall over because one event of forty was a shape we had not
  * seen; the audio keeps flowing and the caption simply does not advance.
  */
+/* ---------------------------------------------------------------------------
+   BARGE-IN — what happens to the far side's audio when the caller speaks.
+
+   Over WebRTC the answer's audio rides an RTP track, not the data channel,
+   and the receiver holds a few hundred milliseconds of it in a jitter
+   buffer (session.ts, JITTER_BUFFER_TARGET_MS). When the caller interrupts,
+   the far side stops sending — the vendor's turn detection cancels the
+   response — but what is already buffered still plays out over the caller's
+   first words. The vendor's own WebRTC sample clears its playback buffer on
+   `input_audio_buffer.speech_started` for exactly this reason. A browser
+   cannot clear a jitter buffer, but it can silence the element until the
+   far side has something new to say — which is what this decides.
+
+   PURE: an event name and the phase the call was in, to one of three words.
+   `cut` only while the far side was SPEAKING — a speech start during a
+   pause silences nothing, so a phantom start (a cough, the room) in a quiet
+   moment changes nothing. `restore` on any sign the far side has the turn
+   again, and on the caller falling silent, so the element can never be
+   left muted by a start that had no end.
+   --------------------------------------------------------------------------- */
+export type PlaybackGate = "cut" | "restore" | null;
+
+export function playbackGate(eventType: string | null, phase: VoicePhase): PlaybackGate {
+  if (!eventType) return null;
+  if (eventType === EV_SPEECH_STARTED) return phase === "speaking" ? "cut" : null;
+  if (
+    eventType === EV_SPEECH_STOPPED ||
+    eventType === EV_RESPONSE_CREATED ||
+    eventType === EV_ASSISTANT_DELTA ||
+    eventType === EV_ASSISTANT_DONE ||
+    eventType === EV_RESPONSE_DONE
+  ) {
+    return "restore";
+  }
+  return null;
+}
+
+/** The event's `type`, or null for anything that is not a JSON object with a
+ *  string type — the same reading parseVoiceEvent does, exposed so a caller
+ *  can dispatch on the name without re-parsing. Never throws. */
+export function voiceEventType(raw: string): string | null {
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return null;
+    const type = (parsed as Record<string, unknown>).type;
+    return typeof type === "string" && type ? type : null;
+  } catch {
+    return null;
+  }
+}
+
 export function parseVoiceEvent(raw: string): ParsedEvent {
   let msg: Record<string, unknown>;
   try {

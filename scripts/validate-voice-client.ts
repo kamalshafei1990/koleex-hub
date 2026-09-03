@@ -2178,6 +2178,17 @@ console.log("\n── 12. Mute ──");
   check("the screen is handed the mode, the chooser and the hold",
     /talkMode=\{talkMode\}\s*onSelectTalkMode=\{selectTalkMode\}\s*onHold=\{setHolding\}/.test(btn23));
 
+
+  /* ── ROADMAP B3: BARGE-IN WIRING ──────────────────────────────────────── */
+  const btn24 = fs22.readFileSync("src/components/ai/VoiceCallButton.tsx", "utf8");
+  check("every data-channel event runs the playback gate against the phase the channel last reported, BEFORE the caption parse, and mutes or unmutes the far side's element",
+    /onMessageRef\.current\?\.\(data\);[\s\S]{0,700}?const gate = playbackGate\(voiceEventType\(data\), phaseRef\.current\);\s*if \(gate && audioRef\.current\) audioRef\.current\.muted = gate === "cut";[\s\S]{0,600}?const parsed = parseVoiceEvent\(data\);/.test(btn24) &&
+    /phaseRef\.current = parsed\.phase;\s*setPhase\(parsed\.phase\);/.test(btn24));
+  check("the element starts every line audible and is left audible on release, so a start with no end can never silence the next call",
+    /audioRef\.current\.srcObject = stream;[\s\S]{0,300}?audioRef\.current\.muted = false;/.test(btn24) &&
+    /audioRef\.current\.srcObject = null;\s*audioRef\.current\.muted = false;\s*\}\s*phaseRef\.current = null;/.test(btn24) &&
+    (btn24.match(/phaseRef\.current = null;/g) ?? []).length >= 2);
+
 }
 
 console.log(`\n${pass} passed, ${failures.length} failed`);
