@@ -748,13 +748,13 @@ async function main() {
        pattern matched across the closing brace into hangUp's own stop call and
        passed with the cleanup emptied — the exact regression it was written to
        catch. Anchored, so only a real cleanup satisfies it. */
-    check("unmount stops the session",
-      /return \(\) => \{\s*sessionRef\.current\?\.stop\(\);/.test(src));
+    check("unmount stops the session — after the beacon that says it happened",
+      /return \(\) => \{\s*window\.removeEventListener\("pagehide", onPageHide\);\s*beacon\("unmounted"\);\s*sessionRef\.current\?\.stop\(\);/.test(src));
     check("that cleanup belongs to a mount-only effect, so it cannot re-run early",
-      /useEffect\(\(\) => \{\s*return \(\) => \{\s*sessionRef\.current\?\.stop\(\);[\s\S]{0,400}?\}, \[\]\);/.test(src));
+      /window\.addEventListener\("pagehide", onPageHide\);\s*return \(\) => \{[\s\S]{0,200}?sessionRef\.current\?\.stop\(\);[\s\S]{0,400}?\}, \[\]\);/.test(src));
     /* THE LAST TURN IS OFTEN STILL QUEUED WHEN THE SCREEN GOES. */
     check("  …and that same cleanup flushes the transcript writer",
-      /return \(\) => \{\s*sessionRef\.current\?\.stop\(\);[\s\S]{0,300}?persisterRef\.current\?\.finish\(\);[\s\S]{0,120}?\}, \[\]\);/.test(src));
+      /beacon\("unmounted"\);\s*sessionRef\.current\?\.stop\(\);[\s\S]{0,300}?persisterRef\.current\?\.finish\(\);[\s\S]{0,120}?\}, \[\]\);/.test(src));
 
     /* A DROPPED CONNECTION IS STILL AN OPEN CALL, and the button decides what
        is on screen. The call screen mounts on "live or busy"; `reconnecting`
@@ -767,7 +767,7 @@ async function main() {
     /* Through a portal to the body now — see the button for why a fixed
        screen inside a transformed ancestor was sitting under the header. */
     check("so the call screen stays mounted through a wobble",
-      /\{\(connected \|\| busy\) && typeof document !== "undefined" && createPortal\(/.test(src));
+      /\{\(connected \|\| busy \|\| swapping\) && typeof document !== "undefined" && createPortal\(/.test(src));
     check("  …and it is rendered at the document body, above every piece of app chrome",
       /createPortal\(\s*<VoiceCallScreen[\s\S]{0,1200}?document\.body,/.test(src) && /import \{ createPortal \} from "react-dom";/.test(src));
     check("and the control still ends the call rather than starting a second one",
@@ -782,8 +782,8 @@ async function main() {
        button that silently stopped working. */
     check("a failure clears the session handle so a retry starts fresh",
       /next === "failed"[\s\S]{0,1200}?sessionRef\.current = null/.test(src));
-    check("hanging up clears the handle too",
-      /const hangUp[\s\S]{0,300}?sessionRef\.current = null/.test(src));
+    check("hanging up clears the handle too — through the release it is built on",
+      /const releaseCall[\s\S]{0,400}?sessionRef\.current = null/.test(src) && /const hangUp = useCallback\(\(\) => \{\s*releaseCall\(\);/.test(src));
     check("starting twice is refused rather than leaking the first session",
       /if \(sessionRef\.current\) return;/.test(src));
     check("hanging up detaches the stream from the audio element",
@@ -874,7 +874,7 @@ async function main() {
        by name: `const startCallRef` was later added ABOVE this one, so the old
        boundary produced an empty slice and the assertion failed on correct
        code. `}, [` closes a useCallback and is the real end. */
-    const hangUpAt = btn.indexOf("const hangUp");
+    const hangUpAt = btn.indexOf("const releaseCall");
     const hangUp = btn.slice(hangUpAt, btn.indexOf("}, [", hangUpAt));
     check("hanging up drops the metered streams",
       /setMicStream\(null\)/.test(hangUp) && /setFarStream\(null\)/.test(hangUp));
@@ -1672,7 +1672,7 @@ console.log("\n── 12. Mute ──");
   check("the tone plays once, when live AND ready, guarded by a ref so a re-render cannot repeat it",
     /if \(live && ready && !chimedRef\.current\) \{\s*chimedRef\.current = true;\s*tonesRef\.current\?\.ready\(\);/.test(btn));
   check("  …and a recovered connection plays its own single note", /prev === "reconnecting" && state === "live"\) tonesRef\.current\?\.recovered\(\)/.test(btn));
-  const hangUpAt16 = btn.indexOf("const hangUp");
+  const hangUpAt16 = btn.indexOf("const releaseCall");
   const hangUpBody = btn.slice(hangUpAt16, btn.indexOf("}, [", hangUpAt16));
   check("hanging up closes the tone context and resets ready", /tonesRef\.current\?\.close\(\)/.test(hangUpBody) && /setReady\(false\)/.test(hangUpBody) && /chimedRef\.current = false/.test(hangUpBody));
   check("  …and so does unmount", /persisterRef\.current = null;\s*tonesRef\.current\?\.close\(\);\s*tonesRef\.current = null;\s*\};\s*\}, \[\]\);/.test(btn));
@@ -1846,7 +1846,7 @@ console.log("\n── 12. Mute ──");
   check("  …and there are no chips: nothing in the module names a label or asks", !("STT_LANG_LABELS" in stt));
   const btn18 = fs18.readFileSync("src/components/ai/VoiceCallButton.tsx", "utf8");
   check("the session is given the SPEAKING language, never the UI language, as the transcription hint",
-    /\}, voiceKeyRef\.current, conversationIdRef\.current, sttLangRef\.current\);/.test(btn18) && !/conversationIdRef\.current, langRef\.current\)/.test(btn18));
+    /\}, voiceKeyRef\.current, conversationIdRef\.current, sttLangRef\.current,\s*(\/\*[^*]*\*\/\s*)?opts\?\.resume \? regionHintRef\.current : null\);/.test(btn18) && !/conversationIdRef\.current, langRef\.current\)/.test(btn18));
   check("  …picked after mount (learned, device, UI) and never shown as a control",
     /sttLangRef\.current = pickSttLang\(readSavedSttLang\(\), typeof navigator !== "undefined" \? navigator\.language : null, lang\);/.test(btn18) && !/sttLanguage=\{/.test(btn18) && !/onSelectSttLanguage/.test(btn18) && !/onSelectSttLanguage|STT_LANGS/.test(scr));
   check("  …and each settled reply from Koleex AI teaches the device the caller's language for next time",
@@ -1954,6 +1954,40 @@ console.log("\n── 12. Mute ──");
     /setVoiceKey\(\(cur\) => cur \?\? pickVoiceKey\(readSavedVoiceKey\(\), offered\)\);/.test(btn19) &&
     !/body\.voices\?\.\[0\]\?\.key/.test(btn19) &&
     /const selectVoice = useCallback\(\(key: string\) => \{\s*setVoiceKey\(key\);\s*voiceKeyRef\.current = key;\s*saveVoiceKey\(key\);/.test(btn19));
+
+  /* THE SWITCH THAT THREW THE CALLER OUT. Picking a voice hung up (idle → the
+     portal unmounted the screen) and started again: the owner was back in the
+     text chat for the whole handshake. The rebuild now keeps the screen up. */
+  check("a voice switch rebuilds the call with the screen still mounted: swapping is set, the call is released (not hung up), and the new one RESUMES",
+    /const current = sessionRef\.current;\s*if \(!current\) return;/.test(btn19) &&
+    /setSwapping\(true\);\s*releaseCall\(\);/.test(btn19) &&
+    /startCallRef\.current\?\.\(\{ resume: true \}\);\s*void \(started \?\? Promise\.resolve\(\)\)\.finally\(\(\) => setSwapping\(false\)\);/.test(btn19) &&
+    !/hangUp\(\);\s*\/\*[^*]*\*\/\s*queueMicrotask/.test(btn19) &&
+    /\{\(connected \|\| busy \|\| swapping\) && typeof document !== "undefined" && createPortal\(/.test(btn19));
+  check("  …hangUp is the release plus idle — the same teardown, one more step",
+    /const hangUp = useCallback\(\(\) => \{\s*releaseCall\(\);\s*setState\("idle"\);\s*\}, \[releaseCall\]\);/.test(btn19) &&
+    /const releaseCall = useCallback\(\(\) => \{\s*sessionRef\.current\?\.stop\(\);/.test(btn19) &&
+    (btn19.match(/setState\("idle"\)/g) ?? []).length === 1);
+  check("  …and says so in the log: a voice-switched beacon with the old call's diagnostics, before the release",
+    (() => { const b = btn19.indexOf('sendVoiceTelemetry({ reason: "voice-switched", resumes: resumesRef.current, ...diag });'); const r = btn19.indexOf("setSwapping(true);\n    releaseCall();"); return b > 0 && r > b; })());
+  /* WHERE TO START THE NEXT CALL: the region that served this one. */
+  check("a continued call (resume or switch) asks first for the region that served the last one; a fresh call leaves it to the server",
+    /regionHintRef\.current = diag\.region === "alt" \? "alt" : "primary";/.test(btn19) &&
+    /if \(diag\) regionHintRef\.current = diag\.region === "alt" \? "alt" : "primary";/.test(btn19) &&
+    /sttLangRef\.current,\s*(\/\*[^*]*\*\/\s*)?opts\?\.resume \? regionHintRef\.current : null\);/.test(btn19));
+  const recordedR: Recorded[] = [];
+  const sR = new VoiceSession(deps({ status: 200, recorded: recordedR }).deps, {}, "v1", null, null, "alt");
+  await sR.start();
+  check("  …the session sends it as the two-word hint the server allow-lists", recordedR[0]?.url === `${HANDSHAKE_PATH}?voice=v1&region=alt`);
+  const recordedR2: Recorded[] = [];
+  const sR2 = new VoiceSession(deps({ status: 200, recorded: recordedR2 }).deps, {}, "v1", null, null, null);
+  await sR2.start();
+  check("  …and nothing when there is none", recordedR2[0]?.url === `${HANDSHAKE_PATH}?voice=v1`);
+  /* THE EXITS NOTHING REPORTED. */
+  check("a live call that ends by unmount or by the page going away sends one beacon each, before the teardown",
+    /const onPageHide = \(\) => beacon\("page-hidden"\);\s*window\.addEventListener\("pagehide", onPageHide\);/.test(btn19) &&
+    /window\.removeEventListener\("pagehide", onPageHide\);\s*beacon\("unmounted"\);\s*sessionRef\.current\?\.stop\(\);/.test(btn19) &&
+    /if \(st !== "live" && st !== "reconnecting"\) return;\s*sendVoiceTelemetry\(\{ reason, resumes: resumesRef\.current, \.\.\.s\.diagnostics\(\) \}\);/.test(btn19));
   const cfg19 = fs19.readFileSync("src/lib/server/ai/voice/config.ts", "utf8");
   check("the server offers a default catalogue, so the picker exists without anyone setting a variable",
     /voices: voiceCatalogue\(env\.AI_VOICE_VOICES\),/.test(cfg19) && !/voices: parseVoiceOptions\(env\.AI_VOICE_VOICES\)/.test(cfg19));

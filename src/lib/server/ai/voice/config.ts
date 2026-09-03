@@ -283,6 +283,31 @@ export function parseRegionHint(raw: string | null | undefined): VoiceRegionSlot
   return raw === "alt" || raw === "primary" ? raw : null;
 }
 
+/** In which order to try the regions this deployment has.
+
+    THE REGION THAT SERVED LAST GOES FIRST. Every handshake used to start
+    with the primary, and while the mainland endpoint was unreachable from
+    Tokyo that meant 13 seconds of connect timeouts before the region that
+    actually answers was asked — on every call, and on every resume, which
+    to a caller is thirteen seconds of silence after "connecting". So the
+    route remembers which slot served (per warm instance, see the route) and
+    asks it first. The browser's hint — "the other one", sent after a call
+    whose media never connected — still wins over memory: it knows something
+    about THIS caller's network that the server does not.
+
+    Only slots that exist are returned, in a stable order, so the caller can
+    map slots back to configs without a second lookup. */
+export function orderRegionSlots(
+  hint: VoiceRegionSlot | null,
+  remembered: VoiceRegionSlot | null,
+  have: { primary: boolean; alt: boolean },
+): VoiceRegionSlot[] {
+  const base = (["primary", "alt"] as const).filter((s) => have[s]);
+  const first = hint && have[hint] ? hint : remembered && have[remembered] ? remembered : null;
+  if (!first) return base;
+  return [first, ...base.filter((s) => s !== first)];
+}
+
 /* ---------------------------------------------------------------------------
    WHY WHICH ONE FAILED IS WORTH REPORTING SEPARATELY.
 
