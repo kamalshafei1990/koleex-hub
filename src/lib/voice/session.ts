@@ -179,6 +179,10 @@ const MAX_TOOL_CALLS_PER_SESSION = 12;
    instantly would end calls that were about to recover; waiting forever leaves
    a user talking into a call that is never coming back. */
 const RECONNECT_GRACE_MS = 8_000;
+/* Milliseconds of audio the receiver is asked to hold before playing. 400
+   is a third of a second of steadiness against a jittery tunnel, and well
+   under what a person notices as a delay in a conversation. */
+const JITTER_BUFFER_TARGET_MS = 400;
 
 /* The label is ours to choose — the vendor's sample notes the name is
    customizable. Named for what travels on it rather than after any vendor. */
@@ -738,6 +742,20 @@ export class VoiceSession {
       /* The assistant's voice. Handed out as a stream rather than played here,
          so this module stays testable and the UI owns the audio element. */
       pc.ontrack = (ev: RTCTrackEvent) => {
+        /* THE VOICE THAT SPEEDS UP AND SLOWS DOWN. The owner: "the speed of
+           the voice suddenly changes, too slow or too quick". That is the
+           browser's jitter buffer catching up and holding back on a link
+           whose packets arrive unevenly — a tunnel out of the country is
+           exactly that link. A larger buffer target trades a little delay
+           for steady playback. Best-effort: older engines have neither
+           property, and a missing setter must never touch the call. */
+        try {
+          const r = ev.receiver as unknown as Record<string, unknown>;
+          if ("jitterBufferTarget" in r) r.jitterBufferTarget = JITTER_BUFFER_TARGET_MS;
+          else if ("playoutDelayHint" in r) r.playoutDelayHint = JITTER_BUFFER_TARGET_MS / 1000;
+        } catch {
+          /* A browser that refuses the hint plays as it did before. */
+        }
         const stream = ev.streams?.[0];
         if (stream) this.events.onRemoteStream?.(stream);
       };

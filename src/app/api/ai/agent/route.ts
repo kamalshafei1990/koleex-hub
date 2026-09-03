@@ -695,6 +695,15 @@ export async function POST(req: Request) {
               webSearchRequested: body.web_search === true,
               languageLock: langLock,
               taughtAnswers: taughtBlock + knowledgeNudge,
+              /* LIVE. The owner: "when I ask a question that needs the
+                 internet I can't see any response or action until the end".
+                 Each tool call is sent the moment it is recorded, so the orb
+                 shows searching and the chip appears while it runs. The
+                 same frame the end-of-turn emit below sends, sent earlier. */
+              onStep: (steps) => {
+                const live = steps.filter((s) => s.kind !== "answer");
+                if (live.length > 0) controller.enqueue(send({ type: "steps", steps: live }));
+              },
             });
 
             /* Emit tool-chip steps up front so the UI can render them

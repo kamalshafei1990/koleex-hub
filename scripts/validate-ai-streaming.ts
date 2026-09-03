@@ -170,6 +170,20 @@ check(
   "and the old unbounded constants are gone from the route",
   !/const CHUNK = 28/.test(routeCode) && !/setTimeout\(r, 12\)/.test(routeCode),
 );
+console.log("\n── Live tool steps: the screen learns what is being looked up while it runs ──");
+{
+  const rf = readFileSync;
+  const orch = rf("src/lib/server/ai-agent/orchestrator.ts", "utf8");
+  check("the orchestrator announces each tool call the moment it is recorded, with a copy of the steps",
+    /steps\.push\(\{\s*kind: "tool-call",[\s\S]{0,300}?\}\);\s*\/\*[\s\S]{0,400}?\*\/\s*try \{\s*onStep\?\.\(steps\.slice\(\)\);/.test(orch));
+  check("  …and a listener that throws cannot take the turn down", /onStep\?\.\(steps\.slice\(\)\);\s*\} catch \{/.test(orch));
+  const route = rf("src/app/api/ai/agent/route.ts", "utf8");
+  check("the agent route streams a steps frame from that hook, answer steps excluded",
+    /onStep: \(steps\) => \{\s*const live = steps\.filter\(\(s\) => s\.kind !== "answer"\);\s*if \(live\.length > 0\) controller\.enqueue\(send\(\{ type: "steps", steps: live \}\)\);/.test(route));
+  const types = rf("src/lib/server/ai/core/types.ts", "utf8");
+  check("  …through a typed, optional hook on the turn input", /onStep\?: \(steps: AgentStep\[\]\) => void;/.test(types));
+}
+
 
 console.log(`\n${pass} passed, ${failures.length} failed`);
 if (failures.length) {

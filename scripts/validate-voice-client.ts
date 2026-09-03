@@ -764,8 +764,12 @@ async function main() {
        worse outcome than the freeze the recovery state exists to fix. */
     check("reconnecting counts as an open call, not as no call",
       /const connected = live \|\| reconnecting;/.test(src));
+    /* Through a portal to the body now — see the button for why a fixed
+       screen inside a transformed ancestor was sitting under the header. */
     check("so the call screen stays mounted through a wobble",
-      /\{\(connected \|\| busy\) && \(/.test(src));
+      /\{\(connected \|\| busy\) && typeof document !== "undefined" && createPortal\(/.test(src));
+    check("  …and it is rendered at the document body, above every piece of app chrome",
+      /createPortal\(\s*<VoiceCallScreen[\s\S]{0,1200}?document\.body,/.test(src) && /import \{ createPortal \} from "react-dom";/.test(src));
     check("and the control still ends the call rather than starting a second one",
       /onClick=\{connected \|\| busy \? hangUp/.test(src));
     /* A parent that unmutes its own speech synthesis mid-wobble talks over the
@@ -1723,6 +1727,23 @@ console.log("\n── 12. Mute ──");
     await sleep(160);
     check("hanging up during the grace window ends the call — no handshake is started afterwards", recorded.length === 1 && r.session.getState() === "ended" && r.mic.allStopped());
   }
+}
+
+{
+  console.log("\n── 18. Steady playback, a screen in two parts, and a visible lookup ──");
+  const fs18 = await import("node:fs");
+  const sess = fs18.readFileSync("src/lib/voice/session.ts", "utf8");
+  check("the remote track's receiver is asked to hold 400ms against jitter — the speed changes the owner heard",
+    /const JITTER_BUFFER_TARGET_MS = 400;/.test(sess) && /if \("jitterBufferTarget" in r\) r\.jitterBufferTarget = JITTER_BUFFER_TARGET_MS;/.test(sess) && /else if \("playoutDelayHint" in r\) r\.playoutDelayHint = JITTER_BUFFER_TARGET_MS \/ 1000;/.test(sess));
+  check("  …best-effort: inside a try, before the stream is handed out", /try \{\s*const r = ev\.receiver as unknown as Record<string, unknown>;[\s\S]{0,400}?\} catch \{[\s\S]{0,200}?const stream = ev\.streams\?\.\[0\];/.test(sess));
+  const scr = fs18.readFileSync("src/components/ai/VoiceCallScreen.tsx", "utf8");
+  check("the call screen is two parts: a fixed-height top for the orb, a scrolling bottom for the words",
+    /h-\[42dvh\] min-h-\[280px\][^"]*border-b border-white\/10/.test(scr) && /<VoiceTranscript lines=\{lines\} lang=\{lang\} className="flex-1 min-h-0 pb-4" fill \/>/.test(scr));
+  check("  …and a lookup is shown on the orb itself, as processing with the searching activity",
+    /: searching && !muted\s*\? "processing"/.test(scr) && /activity=\{searching && live && !muted \? "searching" : "none"\}/.test(scr));
+  const tr = fs18.readFileSync("src/components/ai/VoiceTranscript.tsx", "utf8");
+  check("the transcript can fill the part it is given instead of a fixed share of the viewport",
+    /fill \? "flex-1 min-h-0" : "max-h-\[34vh\]"/.test(tr));
 }
 
 console.log(`\n${pass} passed, ${failures.length} failed`);

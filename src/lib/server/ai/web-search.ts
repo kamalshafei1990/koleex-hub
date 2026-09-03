@@ -204,7 +204,14 @@ export function webSearchConfigured(): boolean {
   return Boolean(process.env.TAVILY_API_KEY || process.env.BRAVE_SEARCH_API_KEY);
 }
 
-export async function searchWeb(rawQuery: string): Promise<WebSearchOutcome> {
+export interface WebSearchOptions {
+  /** Ask the provider for pictures. OFF unless the caller says the user asked
+   *  to SEE something: "what is the date today" came back with two calendar
+   *  pictures and a slower search, for a question words answer in one line. */
+  images?: boolean;
+}
+
+export async function searchWeb(rawQuery: string, opts: WebSearchOptions = {}): Promise<WebSearchOutcome> {
   const query = trim(rawQuery, MAX_QUERY);
   if (!query) {
     return { configured: webSearchConfigured(), provider: null, results: [], images: [], error: "empty query" };
@@ -221,7 +228,7 @@ export async function searchWeb(rawQuery: string): Promise<WebSearchOutcome> {
     /* MACHINES GET NO PICTURES AT SOURCE — see isMachineQuery. Everything
        else asks for them once; if that attempt runs out the ceiling, the
        text is asked for again, alone, so the caller still gets an answer. */
-    const withImages = !isMachineQuery(query);
+    const withImages = opts.images === true && !isMachineQuery(query);
     try {
       return await searchTavily(tavily, query, withImages, TIMEOUT_MS);
     } catch (first) {

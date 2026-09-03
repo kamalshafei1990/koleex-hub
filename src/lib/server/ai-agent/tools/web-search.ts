@@ -32,6 +32,9 @@ import { scanEgress, egressRefusalMessage } from "../../ai/security/egress-scann
 
 interface SearchArgs {
   query: string;
+  /** True only when the user asked to SEE a picture. Pictures cost seconds
+   *  on the provider's side and are noise on a question words answer. */
+  want_images?: boolean;
 }
 
 interface SearchData {
@@ -79,7 +82,7 @@ const searchTheWeb: ToolDef<SearchArgs, SearchData> = {
     "Call this whenever the user asks something time-sensitive instead of saying you have no live access. " +
     "NEVER put Koleex's own data in the query — no customer names, prices, quotation contents, employee details or internal codes; those have their own tools. " +
     "Never use it to find or suggest machines from other manufacturers. " +
-    "Also the way to SHOW a picture of a public thing the user asks to see (a port, a fabric, a tool, a place): results carry pictures you may embed as markdown.",
+    "Also the way to SHOW a picture of a public thing the user asks to see (a port, a fabric, a place, a stadium): set want_images to true ONLY when the user asked to see a picture, and results then carry pictures you may embed as markdown. Never for machines or equipment — those are Koleex products, shown from the product tools.",
   parameters: {
     type: "object",
     properties: {
@@ -87,6 +90,11 @@ const searchTheWeb: ToolDef<SearchArgs, SearchData> = {
         type: "string",
         description:
           "A short public-web search query, e.g. 'Cairo weather today' or 'USD to CNY rate'. Public terms only.",
+      },
+      want_images: {
+        type: "boolean",
+        description:
+          "true ONLY when the user asked to SEE a picture of a public thing. Leave out otherwise — a date, a rate, the news need no pictures.",
       },
     },
     required: ["query"],
@@ -144,7 +152,10 @@ const searchTheWeb: ToolDef<SearchArgs, SearchData> = {
 
     void ctx; /* reserved: per-tenant name matching lands with the Phase 5 cache */
 
-    const outcome = await searchWeb(query);
+    /* PICTURES ARE OPT-IN, and the opt-in is the model saying the user asked
+       to see something. A search for today's date is not that. */
+    const wantImages = args?.want_images === true;
+    const outcome = await searchWeb(query, { images: wantImages });
 
     /* NOT permissionStatus "denied", even though this is a failure. A denial
        short-circuits the orchestrator and prints `message` to the user
@@ -179,7 +190,7 @@ const searchTheWeb: ToolDef<SearchArgs, SearchData> = {
        for them either (searchWeb); this is the second lock on the same
        door, because the door is the one the owner found open. ──────── */
     const machine = isMachineQuery(query);
-    const images = machine ? [] : outcome.images;
+    const images = machine || !wantImages ? [] : outcome.images;
     return {
       ok: true,
       permissionStatus: "allowed",

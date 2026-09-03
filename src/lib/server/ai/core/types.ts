@@ -10,7 +10,7 @@ import "server-only";
    the loop needs recovery).
    --------------------------------------------------------------------------- */
 
-import type { UserContext } from "@/lib/server/ai-agent/types";
+import type { AgentStep, UserContext } from "@/lib/server/ai-agent/types";
 
 export interface TurnInput {
   ctx: UserContext;
@@ -36,6 +36,10 @@ export interface TurnInput {
   /** Streaming hook: when set, the ANSWER-phase model call streams and
    *  each content token is forwarded here in real time. */
   onDelta?: (text: string) => void;
+  /** THE STEPS AS THEY HAPPEN. Called each time a tool call is recorded,
+   *  with every step so far, so a route can show "looking it up…" while the
+   *  lookup runs rather than after the answer has arrived. */
+  onStep?: (steps: AgentStep[]) => void;
 }
 
 

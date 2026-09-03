@@ -48,9 +48,12 @@ export type VoiceTranscriptProps = {
   lines: readonly TranscriptLine[];
   lang?: Lang;
   className?: string;
+  /** Take the height the parent gives, instead of a fixed share of the
+   *  viewport — for the call screen's own transcript part. */
+  fill?: boolean;
 };
 
-export default function VoiceTranscript({ lines, lang = "en", className = "" }: VoiceTranscriptProps) {
+export default function VoiceTranscript({ lines, lang = "en", className = "", fill = false }: VoiceTranscriptProps) {
   const endRef = useRef<HTMLDivElement | null>(null);
   const copy = SPEAKER_COPY[lang];
 
@@ -65,7 +68,7 @@ export default function VoiceTranscript({ lines, lang = "en", className = "" }: 
 
   return (
     <div
-      className={`max-w-[820px] mx-auto px-4 md:px-6 ${className}`}
+      className={`w-full max-w-[820px] mx-auto px-4 md:px-6 ${fill ? "flex flex-col min-h-0" : ""} ${className}`}
       /* Announced politely: a caption that interrupts a screen reader mid
          sentence is worse than one that arrives a beat late. */
       role="log"
@@ -75,7 +78,7 @@ export default function VoiceTranscript({ lines, lang = "en", className = "" }: 
       {/* NO SLAB. The rounded box was a container drawn around text that needed
           no container — it read as a widget sitting in the page rather than as
           words being spoken. Spacing separates the turns; nothing else has to. */}
-      <div className="max-h-[34vh] overflow-y-auto space-y-4">
+      <div className={`${fill ? "flex-1 min-h-0" : "max-h-[34vh]"} overflow-y-auto space-y-4`}>
         {shown.map((line, i) => {
           const isUser = line.role === "user";
           return (
