@@ -76,6 +76,12 @@ export const EV_USER_DONE = "conversation.item.input_audio_transcription.complet
  *  the ones a screen reacts to are named; everything else is ignored rather
  *  than guessed at. */
 export const EV_SESSION_CREATED = "session.created";
+/** The far side accepted the configuration. Its absence within a moment of
+ *  sending, followed by an error, is how a rejected configuration shows. */
+export const EV_SESSION_UPDATED = "session.updated";
+/** The far side refused something. Read only by the client's config
+ *  fallback; never rendered, never acted on beyond that. */
+export const EV_ERROR = "error";
 export const EV_SPEECH_STARTED = "input_audio_buffer.speech_started";
 export const EV_SPEECH_STOPPED = "input_audio_buffer.speech_stopped";
 export const EV_RESPONSE_DONE = "response.done";

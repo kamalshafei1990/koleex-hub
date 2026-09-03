@@ -34,7 +34,7 @@ import {
   HISTORY_MAX_CHARS_PER_TURN,
   type RecentTurn,
 } from "../src/lib/server/ai/voice/history";
-import { buildVoiceSessionPayload } from "../src/lib/server/ai/voice/session-config";
+import { buildVoiceSessionPayload, parseSttLanguage } from "../src/lib/server/ai/voice/session-config";
 import { BUDGETS } from "../src/lib/server/ai/security/rate-limit";
 
 let pass = 0;
@@ -190,11 +190,12 @@ console.log("\n── 3. The route, read — the surface a fetch cannot be teste
      the voice key against the catalogue, the conversation id against the
      caller's own conversations (inside loadRecentTurns). Neither reaches the
      vendor — the assertion above this one still holds that. */
-  check("the only request fields read are a voice KEY and a conversation ID",
-    (code.match(/searchParams\.get/g) ?? []).length === 2 &&
+  check("the only request fields read are a voice KEY, a conversation ID and a transcription LANGUAGE — each allow-listed",
+    (code.match(/searchParams\.get/g) ?? []).length === 3 &&
     /searchParams\.get\("voice"\)/.test(code) &&
     /resolveVoice\(cfg\.voices, requested\)/.test(code) &&
-    /parseConversationParam\(new URL\(req\.url\)\.searchParams\.get\("conversation"\)\)/.test(code));
+    /parseConversationParam\(new URL\(req\.url\)\.searchParams\.get\("conversation"\)\)/.test(code) &&
+    /parseSttLanguage\(new URL\(req\.url\)\.searchParams\.get\("stt"\)\)/.test(code));
 
   /* NOTHING VENDOR-SHAPED MAY TRAVEL BACK. The success path now returns the
      answer BESIDE a session the server authored — deliberately, because the
@@ -227,7 +228,7 @@ console.log("\n── 3. The route, read — the surface a fetch cannot be teste
     /catch \{[\s\S]{0,400}?taught index unavailable/.test(code) &&
     /let taughtQuestions: string\[\] = \[\];/.test(code));
   check("and the index reaches the full session, never the compact fallback",
-    /buildVoiceSessionPayload\(voice, taughtQuestions, recentTurns, gate\.viewer\)/.test(code));
+    /buildVoiceSessionPayload\(voice, taughtQuestions, recentTurns, gate\.viewer, sttLanguage\)/.test(code));
   /* ── WHERE THIS FUNCTION RUNS, and why it is no longer pinned ─────────
      For a day this asserted the OPPOSITE: that the handshake was pinned away
      from the project's region, to Hong Kong, because the endpoint looked
@@ -918,7 +919,7 @@ void (async () => {
     const route = strip(readFileSync("src/app/api/ai/voice/session/route.ts", "utf8"));
     const gate = strip(readFileSync("src/lib/server/ai/voice/gate.ts", "utf8"));
     check("the route passes the gate's viewer into the session",
-      /buildVoiceSessionPayload\(voice, taughtQuestions, recentTurns, gate\.viewer\)/.test(route));
+      /buildVoiceSessionPayload\(voice, taughtQuestions, recentTurns, gate\.viewer, sttLanguage\)/.test(route));
     check("the gate takes the viewer from the permission context, not from the request",
       /viewer: \{\s*name: ctx\.viewer\.name,/.test(gate) && /isSuperAdmin: ctx\.viewer\.isSuperAdmin,/.test(gate) &&
       !/req\.(json|text|headers)/.test(gate.slice(gate.indexOf("viewer: {"))));
@@ -928,6 +929,35 @@ void (async () => {
     check("the dialect rule bans pet names and gender guessing",
       /never حبيبي/.test(withOwner) && /Do NOT guess gender from a voice/.test(withOwner) &&
       /switch fully and at once/.test(withOwner));
+  }
+
+  console.log("\n── 15. The caller's language is a hint for the transcriber — full session only, allow-listed ──");
+  {
+    /* THE SAVED TRANSCRIPT HAD AN EGYPTIAN SENTENCE COME BACK AS CHINESE
+       CHARACTERS. A transcriber told the language does not do that. The hint
+       rides only on the FULL session, because a field the far side does not
+       know is a refused configuration — and the compact one is the answer to
+       a refusal, so it must never carry the same field. */
+    check("the three UI languages are accepted", parseSttLanguage("ar") === "ar" && parseSttLanguage("EN") === "en" && parseSttLanguage(" zh ") === "zh");
+    check("anything else is no hint",
+      parseSttLanguage(null) === null && parseSttLanguage("") === null && parseSttLanguage("ar-EG") === null &&
+      parseSttLanguage("fr") === null && parseSttLanguage("ar; drop table") === null);
+    const v = parseVoiceOptions("Ethan:Omar");
+    const withHint = buildVoiceSessionPayload(v[0], [], [], null, "ar");
+    const without = buildVoiceSessionPayload(v[0], [], [], null, null);
+    const fullT = (withHint.full.session as { input_audio_transcription?: Record<string, unknown> }).input_audio_transcription;
+    const compactT = (withHint.compact.session as { input_audio_transcription?: Record<string, unknown> }).input_audio_transcription;
+    check("the full session carries the language beside the existing flag",
+      fullT?.enabled === true && fullT?.language === "ar");
+    check("the compact session never carries it", compactT?.enabled === true && !("language" in (compactT ?? {})));
+    /* Directly, not only through the payload builder: a compact session built
+       with a language handed to it must still refuse the field, because the
+       compact one is what answers a refusal of exactly that field. */
+    const compactDirect = buildSessionUpdate(v[0], "x", "compact", "ar").session as { input_audio_transcription?: Record<string, unknown> };
+    check("  …even when handed one directly", !("language" in (compactDirect.input_audio_transcription ?? {})));
+    check("no hint leaves both sessions exactly as they were",
+      JSON.stringify(without) === JSON.stringify(buildVoiceSessionPayload(v[0])) &&
+      !("language" in ((without.full.session as { input_audio_transcription?: object }).input_audio_transcription ?? {})));
   }
 
   summarised = true;

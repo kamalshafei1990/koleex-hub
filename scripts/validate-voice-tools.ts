@@ -221,6 +221,17 @@ console.log("\n── 2b. A call reaches the same knowledge the chat box does �
   check("and is told it has that knowledge",
     /WHAT YOU KNOW ABOUT KOLEEX/.test(instructions) &&
     /approved knowledge, its product catalogue and its machine/.test(instructions));
+  /* THE OWNER HEARD THE OLD PRINTED RANGE. The Hub's products are current;
+     the printed index is a fallback, and the session and the tool order
+     both have to say so. */
+  check("the session names the Hub's products as the current range and the printed index as a fallback",
+    /WHICH PRODUCTS ARE CURRENT/.test(instructions) && /use searchProducts first/.test(instructions) &&
+    /searchCatalog is an OLDER printed range reference/.test(instructions) && /only after searchProducts found nothing/.test(instructions));
+  check("  …and the live products come before the printed index in the tool order",
+    VOICE_TOOL_NAMES.indexOf("searchProducts") < VOICE_TOOL_NAMES.indexOf("searchCatalog") &&
+    VOICE_TOOL_NAMES.indexOf("getProductDetails") < VOICE_TOOL_NAMES.indexOf("searchCatalog"));
+  check("  …and the catalogue tool's own description says when NOT to use it",
+    /use ONLY AFTER searchProducts found nothing/.test(String(getTool("searchCatalog")?.description ?? "")));
   check("and to consult it BEFORE answering from memory",
     /BEFORE answering from memory/.test(instructions) &&
     /the wrong answer, however confident it sounds/.test(instructions));

@@ -688,9 +688,10 @@ console.log("\n── A DataChannel event is read by its type, not by substring 
   check("the session-created check parses the event instead of scanning the text",
     !/raw\.includes\("session\.created"\)/.test(src) &&
     /isEventType\(raw, EV_SESSION_CREATED\)/.test(src));
-  check("and the event name comes from the shared constant, not a second copy",
-    /import \{ EV_SESSION_CREATED \} from "\.\/events"/.test(src) &&
-    (src.match(/"session\.created"/g) ?? []).length === 0);
+  check("and the event names come from the shared constants, not second copies",
+    /import \{[^}]*EV_SESSION_CREATED[^}]*\} from "\.\/events"/.test(src) &&
+    /import \{[^}]*EV_SESSION_UPDATED[^}]*EV_ERROR[^}]*\} from "\.\/events"/.test(src) &&
+    (src.match(/"session\.created"|"session\.updated"/g) ?? []).length === 0);
 }
 
 console.log("\n── VoiceCallScreen: it is a modal, so it has to cover the app ──");
