@@ -1635,6 +1635,10 @@ export default function KoleexAiApp() {
       )
     : "none";
 
+  /* Whether the composer holds anything to send — decides which control
+     anchors the row (see the composer below). */
+  const hasDraft = input.trim().length > 0 || attachments.length > 0;
+
   const [orbPulse, setOrbPulse] = useState<null | "success" | "error">(null);
   const prevSendingRef = useRef(false);
   useEffect(() => {
@@ -2489,6 +2493,12 @@ export default function KoleexAiApp() {
                         audio connection. Two tools, both kept. */}
                     <VoiceCallButton
                       size={36}
+                      /* Grok's shape, the owner's ask: on an empty composer
+                         the call is the named, inverted pill and the send
+                         button stands down; the moment there is something
+                         to send, the pill shrinks to its icon and Send takes
+                         the anchor back. One primary action at a time. */
+                      variant={hasDraft || sending ? "icon" : "pill"}
                       lang={lang}
                       disabled={sending}
                       onError={(msg) => setError(msg)}
@@ -2512,7 +2522,7 @@ export default function KoleexAiApp() {
                       >
                         <span aria-hidden className="block h-2.5 w-2.5 rounded-[2px] bg-[var(--text-inverted)]" />
                       </button>
-                    ) : (
+                    ) : hasDraft && (
                       <button
                         type="submit"
                         disabled={!input.trim() && attachments.length === 0}

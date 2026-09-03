@@ -131,14 +131,19 @@ export const RESUME_MIN_LIVE_MS = 5_000;
    coming back, and the caller should hear so rather than watch it try. */
 export const MAX_RESUMES = 2;
 
-const LABEL_COPY: Record<Lang, { start: string; end: string; connecting: string }> = {
-  en: { start: "Start voice call", end: "End call", connecting: "Connecting…" },
-  zh: { start: "开始语音通话", end: "结束通话", connecting: "正在连接…" },
-  ar: { start: "ابدأ مكالمة صوتية", end: "إنهاء المكالمة", connecting: "جارٍ الاتصال…" },
+const LABEL_COPY: Record<Lang, { start: string; end: string; connecting: string; speak: string }> = {
+  en: { start: "Start voice call", end: "End call", connecting: "Connecting…", speak: "Speak" },
+  zh: { start: "开始语音通话", end: "结束通话", connecting: "正在连接…", speak: "语音" },
+  ar: { start: "ابدأ مكالمة صوتية", end: "إنهاء المكالمة", connecting: "جارٍ الاتصال…", speak: "اتكلم" },
 };
 
 export type VoiceCallButtonProps = {
   size?: number;
+  /** "icon": the round waveform button beside the mic. "pill": the inverted
+   *  Speak pill the owner asked for (Grok's shape) — the same control with
+   *  its name on it, for the moment the composer is empty and talking is
+   *  the obvious next thing to do. */
+  variant?: "icon" | "pill";
   lang?: Lang;
   disabled?: boolean;
   onError?: (message: string) => void;
@@ -167,6 +172,7 @@ export type VoiceCallButtonProps = {
 
 export default function VoiceCallButton({
   size = 36,
+  variant = "icon",
   lang = "en",
   disabled = false,
   onError,
@@ -710,6 +716,31 @@ export default function VoiceCallButton({
         />,
         document.body,
       )}
+      {variant === "pill" && !connected && !busy ? (
+        /* THE SPEAK PILL. Inverted, named, on the 8px grid: the one control
+           in the composer that says what it does, because on an empty
+           composer it is the primary thing to do. Only while idle — a live
+           or connecting call has the screen, and the composer's copy of the
+           control goes back to the small round one. */
+        <button
+          type="button"
+          onClick={() => void startCall()}
+          disabled={disabled}
+          aria-label={labels.start}
+          title={labels.start}
+          style={{ height: size }}
+          className={`rounded-full px-3.5 inline-flex items-center gap-1.5 shrink-0 bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold transition-[opacity,transform] duration-150 active:scale-95 ${disabled ? "opacity-40 cursor-not-allowed" : ""}`}
+        >
+          <svg aria-hidden viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+            <line x1="4" y1="10" x2="4" y2="14" />
+            <line x1="8" y1="7" x2="8" y2="17" />
+            <line x1="12" y1="4" x2="12" y2="20" />
+            <line x1="16" y1="7" x2="16" y2="17" />
+            <line x1="20" y1="10" x2="20" y2="14" />
+          </svg>
+          {labels.speak}
+        </button>
+      ) : (
       <button
         type="button"
         onClick={connected || busy ? hangUp : () => void startCall()}
@@ -748,6 +779,7 @@ export default function VoiceCallButton({
           </svg>
         )}
       </button>
+      )}
     </>
   );
 }
