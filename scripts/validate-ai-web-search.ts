@@ -35,6 +35,15 @@ function check(label: string, ok: boolean): void {
 let lastRequest: { url: string; init: RequestInit } | null = null;
 function stubFetch(body: unknown, status = 200): void {
   global.fetch = (async (url: string | URL | Request, init?: RequestInit) => {
+    /* Picture checks are HEAD requests to the picture hosts: answered as an
+       image unless the URL says otherwise, and never recorded as "the"
+       request — that is the search call. */
+    if (init?.method === "HEAD") {
+      const u = String(url);
+      if (u.includes("dead")) return new Response(null, { status: 404 });
+      if (u.includes("notimage")) return new Response(null, { status: 200, headers: { "Content-Type": "text/html" } });
+      return new Response(null, { status: 200, headers: { "Content-Type": "image/jpeg" } });
+    }
     lastRequest = { url: String(url), init: init ?? {} };
     return new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
   }) as typeof fetch;
@@ -75,6 +84,24 @@ async function main() {
     check("http, javascript: and a URL with a quote are all dropped", !out.images.some((i) => !/^https:/.test(i.url) || i.url.includes('"')));
     check("a duplicate URL appears once", out.images.filter((i) => i.url === "https://img.example/a.jpg").length === 1);
     check("at most four pictures come back", out.images.length === 4 && !out.images.some((i) => i.url === "https://img.example/e.jpg"));
+  }
+  {
+    /* A PICTURE THAT DOES NOT LOAD IS NOT SHOWN. */
+    stubFetch({ results: [], images: ["https://img.example/dead.jpg", "https://img.example/notimage.jpg", "https://img.example/ok.jpg"] });
+    const out = await searchWeb("Cairo stadium picture", { images: true });
+    check("a dead link and a non-image are dropped before the model ever sees them; the one that loads survives",
+      out.images.length === 1 && out.images[0].url === "https://img.example/ok.jpg");
+    const { filterLoadableImages } = await import("../src/lib/server/ai/web-search");
+    const imgs = [{ url: "https://a.example/1.jpg", description: "a" }, { url: "https://a.example/2.jpg", description: "b" }, { url: "https://a.example/3.jpg", description: "c" }];
+    const kept = await filterLoadableImages(imgs, async (u) => {
+      if (u.endsWith("1.jpg")) throw new Error("refused");
+      if (u.endsWith("2.jpg")) return new Promise(() => {}) as never; /* never answers */
+      return { ok: true, headers: { get: () => "image/png" } };
+    }, 60);
+    check("  …a host that refuses and a host that never answers are both dropped, within the deadline", kept.length === 1 && kept[0].url === "https://a.example/3.jpg");
+    check("  …an empty list costs nothing", (await filterLoadableImages([], async () => { throw new Error("must not be called"); })).length === 0);
+    const src = readFileSync("src/lib/server/ai/web-search.ts", "utf8");
+    check("  …the search awaits the check on its own pictures, bounded to a second and a half", /images: await filterLoadableImages\(parseImages\(json\.images, query\)\)/.test(src) && /export const IMAGE_CHECK_TIMEOUT_MS = 1_500;/.test(src));
   }
   {
     stubFetch({ results: [{ title: "t", url: "https://x.example/1", content: "c" }] });

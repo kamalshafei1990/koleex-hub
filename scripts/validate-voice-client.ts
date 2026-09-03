@@ -1784,8 +1784,16 @@ console.log("\n── 12. Mute ──");
   check("  …best-effort: inside a try, before the stream is handed out", /try \{\s*const r = ev\.receiver as unknown as Record<string, unknown>;[\s\S]{0,400}?\} catch \{[\s\S]{0,200}?const stream = ev\.streams\?\.\[0\];/.test(sess));
   const scr = fs18.readFileSync("src/components/ai/VoiceCallScreen.tsx", "utf8");
   const css18 = fs18.readFileSync("src/app/globals.css", "utf8");
-  check("the call screen is two parts: a fixed-height top for the orb, a scrolling bottom for the words",
-    /h-\[42dvh\] min-h-\[300px\][^"]*border-b border-white\/10/.test(scr) && /<VoiceTranscript lines=\{lines\} lang=\{lang\} className="flex-1 min-h-0 pb-4" fill \/>/.test(scr));
+  check("the call screen is TWO VIEWS, the way ChatGPT does it: the orb alone, or the conversation with a small orb floating over it",
+    /const view: "orb" \| "chat" = chosenView \?\? \(hasPhotos \? "chat" : "orb"\);/.test(scr) && /\{view === "orb" \? \(/.test(scr) &&
+    /<VoiceTranscript lines=\{lines\} lang=\{lang\} className="flex-1 min-h-0 pb-28" fill onOpenPhoto=\{setOpenPhoto\} \/>/.test(scr) && /size=\{72\}/.test(scr));
+  check("  …a tap on the big orb or the quiet button opens the words; a tap on the small orb comes back",
+    (scr.match(/onClick=\{\(\) => setView\("chat"\)\}/g) ?? []).length === 2 && /onClick=\{\(\) => setView\("orb"\)\}/.test(scr));
+  check("  …a picture opens the conversation by itself, derived rather than synchronised — no effect writes state — and the caller's own tap wins",
+    /const hasPhotos = lines\.some\(\(l\) => \(l\.photos\?\.length \?\? 0\) > 0\);/.test(scr) && /useState<"orb" \| "chat" \| null>\(null\)/.test(scr) && !/useEffect\(\(\) => \{[^}]*setView/.test(scr));
+  check("  …and the last thing said is a caption under the orb, so the orb view still shows the words",
+    /const lastLine = lines\.length > 0 \? lines\[lines\.length - 1\] : null;/.test(scr) && /\{stripImageMarkdown\(lastLine\.text\)\}/.test(scr) && /line-clamp-3/.test(scr));
+  check("  …and the pinned photo strip is gone: no `photos` prop, pictures come with the lines", !/photos\?: readonly/.test(scr) && !/photos\.map\(/.test(scr));
   check("  …and a lookup is shown on the orb itself, as THINKING (not processing's rim arc) with the searching activity",
     /\(searching \|\| phase === "thinking"\) && !muted\s*\? "thinking"/.test(scr) && /activity=\{searching && live && !muted \? "searching" : "none"\}/.test(scr));
   check("  …and on the rings: slow blue waves while a lookup runs, transform and opacity only",
@@ -1796,8 +1804,11 @@ console.log("\n── 12. Mute ──");
   check("  …reduced motion stills the waves and leaves one quiet ring", /prefers-reduced-motion: reduce\) \{[^}]*animation: none !important/.test(css18) && /\.kx-call-orb\.is-thinking \.kx-call-ring-1 \{ opacity: 0\.35; \}/.test(css18));
   check("the wordmark stands above the orb in the top part, white, 24px on the grid",
     /import KoleexLogo from "@\/components\/layout\/KoleexLogo";/.test(scr) && /<KoleexLogo className="h-6 w-auto shrink-0 text-white" \/>/.test(scr) && scr.indexOf("<KoleexLogo") < scr.indexOf("ref={orbWrapRef}"));
-  check("a lookup's photo goes through the image pipeline at 384px, eagerly, with its box reserved",
-    (() => { const m = scr.match(/<img\s[^>]*src=\{cdnImage\(p\.url, \{ width: 384, quality: 75, resize: "contain" \}\)\}[^>]*\/>/); return m !== null && !/loading=/.test(m[0]) && /width=\{160\}\s*height=\{160\}/.test(m[0]) && /fetchPriority="high"/.test(m[0]); })());
+  const tr18 = fs18.readFileSync("src/components/ai/VoiceTranscript.tsx", "utf8");
+  check("a picture in the conversation goes through the image pipeline at 384px, eagerly, box reserved, and removes itself when it fails to load",
+    /cdnImage\(photo\.url, \{ width: 384, quality: 75, resize: "contain" \}\)/.test(tr18) && /width=\{120\}\s*height=\{120\}/.test(tr18) && !/loading="lazy"/.test(tr18) &&
+    /onError=\{\(\) => setBroken\(true\)\}/.test(tr18) && /if \(broken\) return null;/.test(tr18));
+  check("  …the conversation view shows every line, the chat-side transcript the last four", /const shown = fill \? lines : lines\.slice\(-VISIBLE_LINES\);/.test(tr18));
   const prodTool = fs18.readFileSync("src/lib/server/ai-agent/tools/products.ts", "utf8");
   check("  …and the catalogue lookup no longer fetches the same photo row twice", !/\(await mainPhotoByProduct\(\[productId\]\)\)\[productId\]/.test(prodTool) && /main_photo_url: mainPhoto,/.test(prodTool));
   const tr = fs18.readFileSync("src/components/ai/VoiceTranscript.tsx", "utf8");
@@ -1889,8 +1900,19 @@ console.log("\n── 12. Mute ──");
   check("diagnostics are states and counts only", Object.keys(dg).sort().join(",") === "dc,elapsed_ms,ice,ice_ever_connected,last_event,region,tool_calls" && dg.tool_calls === 0 && dg.elapsed_ms === 0);
 
   /* THE PICTURE EXPANDS IN PLACE. */
-  check("a photo on the call screen is a button that opens the lightbox, not a link out of the app",
-    /<button type="button" onClick=\{\(\) => setOpenPhoto\(p\)\}/.test(scr) && !/<a href=\{p\.url\}/.test(scr) && /<PhotoLightbox photo=\{openPhoto\} onClose=\{closePhoto\} closeLabel=\{copy\.closePhoto\} \/>/.test(scr));
+  check("a photo in the conversation is a button that opens the lightbox, not a link out of the app",
+    /onClick=\{\(\) => onOpen\(photo\)\}/.test(fs18.readFileSync("src/components/ai/VoiceTranscript.tsx", "utf8")) && !/<a href=\{p\.url\}/.test(scr) && /<PhotoLightbox photo=\{openPhoto\} onClose=\{closePhoto\} closeLabel=\{copy\.closePhoto\} \/>/.test(scr));
+  /* THE CALL THAT ENDED BY ITSELF: the installed app reloading onto a new
+     build mid-call. */
+  const uw18 = fs18.readFileSync("src/components/pwa/UpdateWatcher.tsx", "utf8");
+  check("the call screen marks itself as uninterruptible, and the update watcher never reloads over it — on heal or on hide",
+    /data-kx-call-active="1"/.test(scr) &&
+    /export function busyWithSomethingUninterruptible\(\): boolean \{\s*return Boolean\(document\.querySelector\("\[data-kx-unsaved='1'\], \[data-kx-call-active='1'\]"\)\);/.test(uw18) &&
+    (uw18.match(/if \(busyWithSomethingUninterruptible\(\)\) return;/g) ?? []).length === 2 &&
+    !/document\.querySelector\("\[data-kx-unsaved='1'\]"\)/.test(uw18));
+  const md18 = fs18.readFileSync("src/components/ai/MessageMarkdown.tsx", "utf8");
+  check("  …and in the written thread a picture that fails to load becomes its words, never a broken icon in a frame",
+    /onError=\{\(\) => setBroken\(true\)\}/.test(md18) && /if \(broken\) return <span className="koleex-md-img-fallback">\{alt\}<\/span>;/.test(md18));
   const lb = fs18.readFileSync("src/components/ai/PhotoLightbox.tsx", "utf8");
   check("  …the lightbox sits above the call and below confirmations, fits the picture whole, and eats Escape before the call screen sees it",
     /z-\[260\]/.test(lb) && /object-contain/.test(lb) && /e\.stopPropagation\(\);\s*e\.preventDefault\(\);\s*onClose\(\);/.test(lb) && /window\.addEventListener\("keydown", onKey, true\)/.test(lb));

@@ -25,12 +25,12 @@ import AIOrb from "@/components/ai-orb/AIOrb";
 import { useCallLevel } from "./useCallLevel";
 import type { AIOrbState } from "@/components/ai-orb/ai-orb-types";
 import VoiceTranscript from "@/components/ai/VoiceTranscript";
-import { type TranscriptLine, type VoicePhase } from "@/lib/voice/events";
-import { type ProductPhoto } from "@/lib/voice/photos";
+import { type TranscriptLine, type TranscriptPhoto, type VoicePhase } from "@/lib/voice/events";
 import { type Lang } from "@/lib/i18n";
 import PhotoLightbox from "@/components/ai/PhotoLightbox";
 import KoleexLogo from "@/components/layout/KoleexLogo";
-import { cdnImage } from "@/lib/cdn";
+import { textDirection } from "@/lib/text-direction";
+import { stripImageMarkdown } from "@/lib/voice/photos";
 
 const COPY: Record<Lang, {
   connecting: string;
@@ -55,6 +55,9 @@ const COPY: Record<Lang, {
   /* The far side has the turn and is composing — the gap the orb fills. */
   thinking: string;
   closePhoto: string;
+  /* The two views, and how to get from one to the other. */
+  showChat: string;
+  showOrb: string;
   /* THE TYPED LANE INSIDE THE CALL. A placeholder, the send control's name,
      and what the screen says when text was typed before the call was up. */
   typePlaceholder: string;
@@ -79,6 +82,8 @@ const COPY: Record<Lang, {
     hint: "Speak, then pause. There is no button to hold.",
     voice: "Voice",
     thinking: "Thinking…",
+    showChat: "Show conversation",
+    showOrb: "Back to Koleex AI",
     closePhoto: "Close photo",
     micShort: "Mic",
     endShort: "End",
@@ -102,6 +107,8 @@ const COPY: Record<Lang, {
     hint: "说完后停顿一下，无需按住任何按键。",
     voice: "音色",
     thinking: "思考中…",
+    showChat: "显示对话",
+    showOrb: "返回 Koleex AI",
     closePhoto: "关闭图片",
     micShort: "麦克风",
     endShort: "结束",
@@ -125,6 +132,8 @@ const COPY: Record<Lang, {
     hint: "اتكلم وبعدين اسكت شوية. مفيش زرار تفضل ضاغط عليه.",
     voice: "الصوت",
     thinking: "بفكّر…",
+    showChat: "عرض المحادثة",
+    showOrb: "الرجوع لـ Koleex AI",
     closePhoto: "اقفل الصورة",
     micShort: "مايك",
     endShort: "إنهاء",
@@ -161,9 +170,6 @@ export type VoiceCallScreenProps = {
   /** A lookup is running. Two seconds of silence on a call reads as a freeze;
    *  this is the difference between waiting and wondering. */
   searching?: boolean;
-  /** What the last lookup showed: product photos, https only, at most a
-   *  handful. Empty draws nothing. */
-  photos?: readonly ProductPhoto[];
   /** Keys and labels only — the server's catalogue, never the vendor's ids.
    *  Empty means no picker is drawn: a control that cannot be used is noise. */
   voices?: readonly { key: string; label: string }[];
@@ -190,7 +196,6 @@ export default function VoiceCallScreen({
   muted = false,
   onToggleMute,
   searching = false,
-  photos = [],
   voices = [],
   selectedVoice = null,
   onSelectVoice,
@@ -198,8 +203,28 @@ export default function VoiceCallScreen({
 }: VoiceCallScreenProps) {
   const copy = COPY[lang];
   /* The picture being looked at, if any. Inside the app, over the call. */
-  const [openPhoto, setOpenPhoto] = useState<ProductPhoto | null>(null);
+  const [openPhoto, setOpenPhoto] = useState<TranscriptPhoto | null>(null);
   const closePhoto = useCallback(() => setOpenPhoto(null), []);
+
+  /* TWO VIEWS, THE WAY CHATGPT DOES IT — the owner asked to look at its
+     layout. ORB: the orb alone, large, centred, the caption under it; the
+     conversation is out of the way. CHAT: the whole conversation, pictures
+     where they were said, scrolling, with the orb shrunk to a small floating
+     one in the corner so the call never looks ended. The pinned photo strip
+     that pushed the words off a phone screen is gone: pictures live in the
+     conversation. A tap on the big orb (or the quiet button under it) opens
+     the conversation; a tap on the small orb comes back. The first picture
+     to arrive opens the conversation by itself, once — a picture nobody can
+     see is not shown. */
+  const hasPhotos = lines.some((l) => (l.photos?.length ?? 0) > 0);
+  /* DERIVED, NOT SYNCHRONISED: the caller's own choice when they have made
+     one, else the conversation as soon as it has a picture, else the orb. No
+     effect writes state, so nothing can cascade or fight the caller's tap. */
+  const [chosenView, setView] = useState<"orb" | "chat" | null>(null);
+  const view: "orb" | "chat" = chosenView ?? (hasPhotos ? "chat" : "orb");
+  /* THE LAST THING SAID, as a caption under the orb: a caller on the orb view
+     still sees the words, one turn at a time, the way subtitles work. */
+  const lastLine = lines.length > 0 ? lines[lines.length - 1] : null;
   const [typed, setTyped] = useState("");
   const [typedNotice, setTypedNotice] = useState<string | null>(null);
   const typedRef = useRef<HTMLInputElement | null>(null);
@@ -320,117 +345,109 @@ export default function VoiceCallScreen({
          above the header and the dock. Deliberately BELOW ConfirmDialog's
          300: a confirmation raised during a call has to be readable over it. */
       className="fixed inset-0 z-[200] flex flex-col bg-[#0D0D0D] text-white"
+      /* Read by UpdateWatcher: a live call is never interrupted by a reload
+         onto a new build — the stale bundle waits until the call ends. */
+      data-kx-call-active="1"
       style={{
         paddingTop: "env(safe-area-inset-top, 0px)",
         paddingBottom: "env(safe-area-inset-bottom, 0px)",
       }}
     >
       <PhotoLightbox photo={openPhoto} onClose={closePhoto} closeLabel={copy.closePhoto} />
-      {/* ── THE SCREEN IN TWO PARTS, on purpose. The owner: "split the screen
-          — a part for Koleex AI and a part for the conversation text — so
-          they are not mixed together, especially on a phone". Above the
-          divider: the orb, its status line and the pictures. Below it: the
-          words, scrolling on their own, then the composer and the controls.
-          The top part has a fixed share of the height so the orb never
-          moves when the transcript grows. ── */}
-      <div className="shrink-0 h-[42dvh] min-h-[300px] flex flex-col items-center justify-center gap-4 px-6 border-b border-white/10">
-        {/* THE BRAND, ABOVE THE ORB. The owner: "the first half of the page
-            should have the Koleex logo, in the right position, the right
-            size". The wordmark, white, 24px tall on the 8px grid — the same
-            mark the header carries, drawn here in the screen's own colour
-            rather than as a theme-swapped bitmap. Decorative: the screen's
-            title already names the product for assistive tech. */}
-        <KoleexLogo className="h-6 w-auto shrink-0 text-white" />
-        <div
-          ref={orbWrapRef}
-          className={[
-            "kx-call-orb relative shrink-0 flex items-center justify-center",
-            phase === "speaking" ? "is-far" : "is-near",
-            live && ready && !reconnecting && !muted ? "is-live" : "",
-            /* A LOOKUP IN PROGRESS, on the rings: slow blue waves leaving the
-               orb, one after another, until the answer comes. The orb itself
-               is in `thinking` — the shared component's own considering
-               state — rather than `processing`, whose rim arc the owner read
-               as "not good" at 200px. */
-            (searching || phase === "thinking") && live && !muted ? "is-thinking" : "",
-          ].join(" ")}
-          style={{ width: 200, height: 200 }}
-        >
-          {/* THE VOICE, AS RINGS — see lib/voice/level.ts. Transform and
-              opacity only: nothing here forces a repaint of the blurred orb
-              beneath. */}
-          <span aria-hidden className="kx-call-ring kx-call-ring-1" />
-          <span aria-hidden className="kx-call-ring kx-call-ring-2" />
-          <span aria-hidden className="kx-call-ring kx-call-ring-3" />
-          <AIOrb
-            state={orbState}
-            activity={searching && live && !muted ? "searching" : "none"}
-            audioLevel={audioLevel}
-            size={200}
-            interactive
-            /* `is-lively` is the orb's own opt-in (see AIOrb.tsx): at call
-               size, in the audio states, the face keeps the home page's
-               life — the gaze, the blink, the aura's idle pace. */
-            className="shrink-0 kx-call-aiorb is-lively"
-          />
+      {view === "orb" ? (
+        /* ── ORB VIEW: Koleex AI alone, large, centred. ── */
+        <div className="flex-1 min-h-0 flex flex-col items-center justify-center gap-4 px-6">
+          <KoleexLogo className="h-6 w-auto shrink-0 text-white" />
+          <button
+            type="button"
+            onClick={() => setView("chat")}
+            aria-label={copy.showChat}
+            title={copy.showChat}
+            className="block rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0066FF] focus-visible:ring-offset-4 focus-visible:ring-offset-[#0D0D0D]"
+          >
+            <div
+              ref={orbWrapRef}
+              className={[
+                "kx-call-orb relative shrink-0 flex items-center justify-center",
+                phase === "speaking" ? "is-far" : "is-near",
+                live && ready && !reconnecting && !muted ? "is-live" : "",
+                /* A LOOKUP IN PROGRESS, on the rings: slow blue waves leaving
+                   the orb until the answer comes. The orb itself is in
+                   `thinking` — the shared component's own considering state. */
+                (searching || phase === "thinking") && live && !muted ? "is-thinking" : "",
+              ].join(" ")}
+              style={{ width: 200, height: 200 }}
+            >
+              {/* THE VOICE, AS RINGS — see lib/voice/level.ts. Transform and
+                  opacity only: nothing here forces a repaint of the blurred
+                  orb beneath. */}
+              <span aria-hidden className="kx-call-ring kx-call-ring-1" />
+              <span aria-hidden className="kx-call-ring kx-call-ring-2" />
+              <span aria-hidden className="kx-call-ring kx-call-ring-3" />
+              <AIOrb
+                state={orbState}
+                activity={searching && live && !muted ? "searching" : "none"}
+                audioLevel={audioLevel}
+                size={200}
+                interactive
+                /* `is-lively` is the orb's own opt-in (see AIOrb.tsx): at
+                   call size, in the audio states, the face keeps the home
+                   page's life — the gaze, the blink, the aura's idle pace. */
+                className="shrink-0 kx-call-aiorb is-lively"
+              />
+            </div>
+          </button>
+
+          {/* Status — one line, quiet. The orb already says most of this;
+              the text is for anyone who cannot read motion. */}
+          <p className="text-sm font-normal tracking-wide text-[#AAAAAA]" aria-live="polite">
+            {status}
+          </p>
+          {lastLine && (
+            <p
+              dir={textDirection(stripImageMarkdown(lastLine.text) || lastLine.text)}
+              className={`max-w-[820px] px-2 text-center text-base leading-relaxed line-clamp-3 ${lastLine.final ? "text-white" : "text-[#AAAAAA]"}`}
+            >
+              {stripImageMarkdown(lastLine.text)}
+            </p>
+          )}
+          {lines.length > 0 ? (
+            <button
+              type="button"
+              onClick={() => setView("chat")}
+              className="h-10 px-4 rounded-full text-xs inline-flex items-center text-[#AAAAAA] hover:text-white border border-white/20 hover:border-white/30 bg-white/[0.04] hover:bg-white/[0.08] transition-[background-color,color,border-color,transform] duration-150 active:scale-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0066FF] focus-visible:ring-offset-2 focus-visible:ring-offset-[#0D0D0D]"
+            >
+              {copy.showChat}
+            </button>
+          ) : (
+            /* Told once, plainly: server-side turn detection has no
+               push-to-talk, and a user waiting for a button to hold will
+               wait forever. */
+            <p className="max-w-[820px] mx-auto text-center text-xs text-[#666666]">{copy.hint}</p>
+          )}
         </div>
-
-        {/* Status — one line, quiet. The orb already says most of this; the
-            text is for anyone who cannot read motion. */}
-        <p
-          className="text-sm font-normal tracking-wide text-[#AAAAAA]"
-          aria-live="polite"
-        >
-          {status}
-        </p>
-      </div>
-
-      {/* THE PRODUCT, SHOWN. A lookup that returned photos puts them here,
-          under the orb and above the words: the caller hears "the KX-180"
-          and sees it. Thumbnails on the 8px grid, the same hairline border
-          as every control on this screen, the name under each in the same
-          quiet grey as the labels. No lightbox: a call is not the place to
-          study a picture, and the saved message carries it full size. */}
-      {photos.length > 0 && (
-        <div className="shrink-0 px-6 pb-4" role="group" aria-label={copy.photos}>
-          <div className="max-w-[820px] mx-auto flex items-start justify-center gap-4 overflow-x-auto">
-            {photos.map((p) => (
-              <figure key={p.url} className="shrink-0 w-40 m-0">
-                {/* Remote product photos from whatever host the catalogue names — next/image needs a fixed allowlist. Same call as Bubble. */}
-                {/* TAPPABLE. A 112px thumbnail was "too small"; it is now
-                    160px and opens the full picture in a new tab. */}
-                {/* EXPANDS IN PLACE. It was a link to the raw file in a new
-                    tab — in the installed app, a trip out of the app to a
-                    bare JPEG. Now a button that opens PhotoLightbox over the
-                    call, as ChatGPT does. */}
-                <button type="button" onClick={() => setOpenPhoto(p)} className="block rounded-2xl focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0066FF] focus-visible:ring-offset-2 focus-visible:ring-offset-[#0D0D0D]" aria-label={p.label || copy.photos}>
-                  {/* "THE PHOTO TOOK VERY LONG TO APPEAR." Three reasons,
-                      all here. The full-size original (a multi-megabyte
-                      product PNG) was fetched to paint 160px: now the
-                      first-party image pipeline serves a 384px copy, which
-                      is also the copy a phone in mainland China can reach.
-                      `loading="lazy"` deferred the request on an element
-                      that is on screen the instant it mounts: gone. And
-                      width/height reserve the box so nothing shifts. */}
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={cdnImage(p.url, { width: 384, quality: 75, resize: "contain" })}
-                    alt={p.label || copy.photos}
-                    width={160}
-                    height={160}
-                    decoding="async"
-                    fetchPriority="high"
-                    className="w-40 h-40 rounded-2xl object-cover border border-white/10 bg-white/5"
-                  />
-                </button>
-                {p.label && (
-                  <figcaption className="mt-2 text-center text-[11px] leading-snug text-[#AAAAAA] truncate" title={p.label}>
-                    {p.label}
-                  </figcaption>
-                )}
-              </figure>
-            ))}
-          </div>
+      ) : (
+        /* ── CHAT VIEW: the conversation, pictures in it, the orb small. ── */
+        <div className="relative flex-1 min-h-0 flex flex-col pt-4">
+          <VoiceTranscript lines={lines} lang={lang} className="flex-1 min-h-0 pb-28" fill onOpenPhoto={setOpenPhoto} />
+          {/* THE SMALL ORB, floating over the words, still alive and still
+              showing who is speaking. A tap brings the big one back. */}
+          <button
+            type="button"
+            onClick={() => setView("orb")}
+            aria-label={copy.showOrb}
+            title={copy.showOrb}
+            className="absolute bottom-4 end-6 rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0066FF] focus-visible:ring-offset-2 focus-visible:ring-offset-[#0D0D0D]"
+          >
+            <span className="sr-only">{status}</span>
+            <AIOrb
+              state={orbState}
+              activity={searching && live && !muted ? "searching" : "none"}
+              audioLevel={audioLevel}
+              size={72}
+              className="shrink-0 kx-call-aiorb is-lively"
+            />
+          </button>
         </div>
       )}
 
@@ -449,11 +466,6 @@ export default function VoiceCallScreen({
                 type="button"
                 onClick={() => onSelectVoice?.(v.key)}
                 aria-pressed={on}
-                /* SAME BUTTON FAMILY AS THE CONTROLS BELOW: same border
-                   value, same press feedback, same focus ring. It used to be
-                   24px tall with a border nobody could see — a control on a
-                   touch screen that you had to aim at. 40px is the grid step
-                   that is also a thumb. */
                 className={`h-10 px-4 rounded-full text-xs inline-flex items-center transition-[background-color,color,border-color,transform] duration-150 active:scale-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0066FF] focus-visible:ring-offset-2 focus-visible:ring-offset-[#0D0D0D] ${
                   on
                     ? "bg-white text-[#0D0D0D] border border-white"
@@ -467,19 +479,8 @@ export default function VoiceCallScreen({
         </div>
       )}
 
-      {/* THE WORDS, in their own part of the screen: they scroll here and
-          nowhere else, so a long answer never pushes the orb or the controls. */}
-      <div className="flex-1 min-h-0 flex flex-col pt-4">
-        {lines.length > 0 ? (
-          <VoiceTranscript lines={lines} lang={lang} className="flex-1 min-h-0 pb-4" fill />
-        ) : (
-          /* Told once, plainly: server-side turn detection has no push-to-talk,
-             and a user waiting for a button to hold will wait forever. */
-          <p className="max-w-[820px] mx-auto px-6 pb-6 text-center text-xs text-[#666666]">
-            {copy.hint}
-          </p>
-        )}
-
+      {/* ── THE BOTTOM BAR, in both views: type, mute, end. ── */}
+      <div className="shrink-0 flex flex-col pt-2">
         {/* ── TYPE INTO THE CALL ────────────────────────────────────────
             A model code, a quantity, a name in another alphabet: some things
             are easier typed than said. One pill on the 8px grid, the same

@@ -18,6 +18,31 @@ import { hasProductDataAccess } from "../../product-access";
 
 const PRODUCT_MODULE = "Products";
 
+/* THE WORDS OF A SEARCH, as the catalogue can match them.
+
+   · Latin words and model codes when the query has any — a caller's Arabic
+     or Chinese words beside them ("فحص قماش fabric inspection") are the
+     same idea said twice, and the product names are English; when the
+     query has NO Latin at all, the words are kept as they are (a family or
+     description may carry them).
+   · Plurals fold to the singular STEM ("machines" → "machine", "presses" →
+     "press"), because a substring match on the singular finds both.
+   · Noise words that name nothing ("machine", "the", "for", …) are dropped
+     when other words remain — "heat press machine" should find a heat
+     press, not everything that is a machine. Two characters is the floor,
+     so codes like "4040" and "KX" still count. */
+const SEARCH_NOISE = new Set(["the", "a", "an", "and", "for", "with", "of", "in", "to", "machine", "machines", "model", "models", "product", "products", "koleex"]);
+export function queryTokens(q: string): string[] {
+  const raw = q.toLowerCase().split(/[\s,;/|()"'“”«»،]+/).map((t) => t.trim()).filter((t) => t.length >= 2);
+  if (raw.length === 0) return [];
+  const latin = raw.filter((t) => /^[a-z0-9][a-z0-9.+-]*$/i.test(t));
+  const pool = latin.length > 0 ? latin : raw;
+  const meaningful = pool.filter((t) => !SEARCH_NOISE.has(t));
+  const chosen = meaningful.length > 0 ? meaningful : pool;
+  const stem = (t: string) => (/(ss|sh|ch|x)es$/.test(t) ? t.slice(0, -2) : t.length >= 5 && t.endsWith("s") && !t.endsWith("ss") ? t.slice(0, -1) : t);
+  return [...new Set(chosen.map(stem))].slice(0, 6);
+}
+
 /* Columns we select. Sensitive cost-side fields (cost_price,
    supplier_price, landed_cost, margin, internal_notes) live on other
    tables (product_suppliers, landed_cost_calculations, etc.) — they're
@@ -75,13 +100,21 @@ const searchProducts: ToolDef<
       .limit(limit);
 
     if (q) {
-      /* PostgREST `.or()` uses commas + parens as structural syntax —
-         raw user input has to be sanitised before embedding or Supabase
-         builds an invalid URL and throws "string did not match pattern". */
-      const safeQ = sanitizePostgrestLike(q);
-      rowsQuery = rowsQuery.or(
-        `product_name.ilike.%${safeQ}%,slug.ilike.%${safeQ}%,brand.ilike.%${safeQ}%,family.ilike.%${safeQ}%,description.ilike.%${safeQ}%`,
-      );
+      /* ONE GROUP PER WORD, ANDed. The whole phrase used to be matched as
+         one substring, so "Fabric Inspection Machines" found none of the
+         twelve "Fabric Inspection Machine" rows (the plural), and a call's
+         "فحص قماش fabric inspection" found nothing at all (the Arabic words
+         are not in any English product name). Now each word is matched on
+         its own — see queryTokens — and a row must carry all of them.
+         PostgREST `.or()` uses commas + parens as structural syntax — raw
+         user input has to be sanitised before embedding or Supabase builds
+         an invalid URL and throws "string did not match pattern". */
+      for (const token of queryTokens(q)) {
+        const safeQ = sanitizePostgrestLike(token);
+        rowsQuery = rowsQuery.or(
+          `product_name.ilike.%${safeQ}%,slug.ilike.%${safeQ}%,brand.ilike.%${safeQ}%,family.ilike.%${safeQ}%,description.ilike.%${safeQ}%`,
+        );
+      }
     }
 
     const { data, error } = await rowsQuery;

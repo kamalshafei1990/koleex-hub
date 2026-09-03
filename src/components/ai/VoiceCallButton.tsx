@@ -234,7 +234,6 @@ export default function VoiceCallButton({
   /* WHAT THE LAST LOOKUP SHOWED. A product search on a call used to be heard
      and never seen; these are the photos out of its result, drawn on the
      call screen until the next lookup replaces them or the call ends. */
-  const [photos, setPhotos] = useState<readonly ProductPhoto[]>([]);
   /* Held until the assistant's next turn, then attached to THAT line so the
      saved message carries the picture with the words that described it. */
   const pendingPhotosRef = useRef<readonly ProductPhoto[]>([]);
@@ -354,7 +353,6 @@ export default function VoiceCallButton({
     setMuted(false);
     clearSearchTimer();
     setSearching(false);
-    setPhotos([]);
     pendingPhotosRef.current = [];
     onLiveChangeRef.current?.(false);
     /* The transcript SURVIVES hang-up on purpose: what was said is what the
@@ -380,7 +378,6 @@ export default function VoiceCallButton({
     /* The session resets its own flag on start; this keeps the UI in step so a
        second call never opens showing the last one's mute. */
     setMuted(false);
-    setPhotos([]);
     pendingPhotosRef.current = [];
     onTranscriptRef.current?.(linesRef.current);
     setReady(false);
@@ -469,7 +466,6 @@ export default function VoiceCallButton({
            the one from the lookup before it. */
         const found = extractProductPhotos(output);
         if (found.length === 0) return;
-        setPhotos(found);
         pendingPhotosRef.current = found;
       },
       onToolProtocolMismatch: (eventType) => {
@@ -653,7 +649,6 @@ export default function VoiceCallButton({
           muted={muted}
           onToggleMute={toggleMute}
           searching={searching}
-          photos={photos}
           voices={voices}
           selectedVoice={voiceKey}
           onSelectVoice={selectVoice}

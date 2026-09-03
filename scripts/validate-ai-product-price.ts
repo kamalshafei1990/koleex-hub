@@ -89,7 +89,26 @@ async function main() {
   check("the call is told: never a price from memory; FOB in USD by default; then ask country and customer type",
     /PRICES: for the price of a Koleex product call getProductPrice — never say a price from memory, never estimate/.test(session) && /ASK which country and which customer type \(end user, dealer,[\s"+]*distributor, agent, sole agent\)/.test(session) && /say it is on request and that sales can send a quotation/.test(session));
 
-  console.log(`\n${pass} passed, ${failures.length} failed`);
+  {
+  console.log("\n── Product search: one word at a time, plurals folded, the caller's own language beside English ──");
+  const { queryTokens } = await import("../src/lib/server/ai-agent/tools/products");
+  check("a plural finds the singular rows: 'Fabric Inspection Machines' → fabric, inspection (machine is noise)",
+    JSON.stringify(queryTokens("Fabric Inspection Machines")) === JSON.stringify(["fabric", "inspection"]));
+  check("Arabic beside English is the same idea twice — the English words are what the names carry",
+    JSON.stringify(queryTokens("فحص قماش fabric inspection")) === JSON.stringify(["fabric", "inspection"]));
+  check("  …Arabic alone is kept as it is, for families and descriptions that carry it", JSON.stringify(queryTokens("مكبس حراري")) === JSON.stringify(["مكبس", "حراري"]));
+  check("presses → press, and a code survives: 'heat presses 4040' → heat, press, 4040",
+    JSON.stringify(queryTokens("heat presses 4040")) === JSON.stringify(["heat", "press", "4040"]));
+  check("noise alone is still a search: 'machines' → machine (rather than nothing)", JSON.stringify(queryTokens("machines")) === JSON.stringify(["machine"]));
+  check("a code with a dash and dots is one token: 'KX-9000 v2.1' → kx-9000, v2.1", JSON.stringify(queryTokens("KX-9000 v2.1")) === JSON.stringify(["kx-9000", "v2.1"]));
+  check("empty and one-letter queries are no tokens", queryTokens("").length === 0 && queryTokens("a").length === 0);
+  check("at most six words, deduplicated", queryTokens("one two three four five six seven eight one").length === 6);
+  const src = readFileSync("src/lib/server/ai-agent/tools/products.ts", "utf8");
+  check("searchProducts ANDs one ilike group per token instead of matching the whole phrase",
+    /for \(const token of queryTokens\(q\)\) \{\s*const safeQ = sanitizePostgrestLike\(token\);\s*rowsQuery = rowsQuery\.or\(/.test(src) && !/sanitizePostgrestLike\(q\)/.test(src));
+}
+
+console.log(`\n${pass} passed, ${failures.length} failed`);
   if (failures.length) { console.log("FAILED:\n" + failures.map((f) => "  · " + f).join("\n")); process.exit(1); }
   console.log("NOT proved here: an engine run over real policy tables — computePolicyPrice has its own suite; the handler's SQL needs a database.");
 }
