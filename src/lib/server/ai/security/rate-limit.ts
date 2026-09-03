@@ -98,6 +98,12 @@ export const BUDGETS = {
     windowSec: 60,
     max: num(process.env.AI_LIMIT_CONVERSATION_SEARCHES_PER_MIN, 30),
   }),
+  /* The picture gallery, opened. One read per opening. */
+  libraryPerAccount: (): Budget => ({
+    bucket: "library",
+    windowSec: 60,
+    max: num(process.env.AI_LIMIT_LIBRARY_PER_MIN, 20),
+  }),
   /* A generated picture is paid per call — the one AI surface where a loop
      is a bill rather than a load. Per account per HOUR, and per tenant per
      DAY, because a whole company's allowance is the number the owner
