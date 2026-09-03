@@ -2189,6 +2189,16 @@ console.log("\n── 12. Mute ──");
     /audioRef\.current\.srcObject = null;\s*audioRef\.current\.muted = false;\s*\}\s*phaseRef\.current = null;/.test(btn24) &&
     (btn24.match(/phaseRef\.current = null;/g) ?? []).length >= 2);
 
+
+  /* ── ROADMAP B5: THE SCREEN STAYS AWAKE ON A CALL ─────────────────────── */
+  const btn25 = fs22.readFileSync("src/components/ai/VoiceCallButton.tsx", "utf8");
+  check("the screen wake lock is feature-detected, asked for when the call goes live, released with the call, and asked for again when the page returns",
+    /if \(!wl \|\| wakeLockRef\.current\) return;\s*wl\.request\("screen"\)\.then\(\(lock\) => \{ wakeLockRef\.current = lock; \}\)\.catch\(/.test(btn25) &&
+    /if \(next === "live"\) acquireWakeLock\(\);/.test(btn25) &&
+    /phaseRef\.current = null;\s*releaseWakeLock\(\);/.test(btn25) &&
+    /if \(document\.visibilityState === "visible"\) \{ wakeLockRef\.current = null; acquireWakeLock\(\); \}/.test(btn25) &&
+    /\}, \[live, acquireWakeLock\]\);/.test(btn25));
+
 }
 
 console.log(`\n${pass} passed, ${failures.length} failed`);

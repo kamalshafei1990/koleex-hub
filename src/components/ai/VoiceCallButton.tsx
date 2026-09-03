@@ -199,6 +199,28 @@ export default function VoiceCallButton({
   /* Where the last session was served, for a call that continues it. */
   const regionHintRef = useRef<"primary" | "alt" | null>(null);
   const [phase, setPhase] = useState<VoicePhase>(null);
+  /* THE SCREEN STAYS AWAKE ON A CALL (roadmap B5). A phone that locks itself
+     mid-call suspends the installed app — audio, microphone, the line — and
+     nothing in a web page can hold a call through a locked screen. What a
+     page CAN do is ask the screen not to lock while the call is up: the
+     Screen Wake Lock, where the platform offers it (iOS 16.4+, Android,
+     desktop). Released with the call. The platform drops it when the page
+     is hidden, so it is asked for again when the page comes back while the
+     call is still live. Feature-detected and never thrown: a platform
+     without it behaves as before. */
+  const wakeLockRef = useRef<{ release: () => Promise<void> } | null>(null);
+  const acquireWakeLock = useCallback(() => {
+    const wl = (typeof navigator !== "undefined"
+      ? (navigator as { wakeLock?: { request: (type: "screen") => Promise<{ release: () => Promise<void> }> } }).wakeLock
+      : undefined);
+    if (!wl || wakeLockRef.current) return;
+    wl.request("screen").then((lock) => { wakeLockRef.current = lock; }).catch(() => { /* not granted: the call goes on */ });
+  }, []);
+  const releaseWakeLock = useCallback(() => {
+    const lock = wakeLockRef.current;
+    wakeLockRef.current = null;
+    void lock?.release().catch(() => {});
+  }, []);
   /* The phase as the data channel last reported it, for handlers that run
      outside a render (roadmap B3: the playback gate reads it per event). */
   const phaseRef = useRef<VoicePhase>(null);
@@ -403,6 +425,7 @@ export default function VoiceCallButton({
       audioRef.current.muted = false;
     }
     phaseRef.current = null;
+    releaseWakeLock();
     /* Dropped so the meters tear their audio contexts down. A retained stream
        here would keep a hardware handle open for the life of the page. */
     setMicStream(null);
@@ -417,9 +440,10 @@ export default function VoiceCallButton({
        user came for, and clearing it the instant the call ends throws away
        the record at the moment they want to read it. */
     onPhaseRef.current?.(null);
-    /* clearSearchTimer is a stable useCallback([]) — naming it here satisfies
-       the exhaustive-deps rule without making this callback churn. */
-  }, [clearSearchTimer]);
+    /* clearSearchTimer and releaseWakeLock are stable useCallback([])s —
+       naming them here satisfies the exhaustive-deps rule without making
+       this callback churn. */
+  }, [clearSearchTimer, releaseWakeLock]);
 
   const hangUp = useCallback(() => {
     /* WHAT THE CALL CAME TO, written down (roadmap B1). Taken before the
@@ -494,6 +518,7 @@ export default function VoiceCallButton({
         /* THE REGION THAT SERVED, remembered on the device the moment the call
            is up, so the next call from here — after a drop, a switch, or
            tomorrow morning — asks for it first. */
+        if (next === "live") acquireWakeLock();
         if (next === "live") {
           const region = sessionRef.current?.diagnostics().region;
           if (region === "alt" || region === "primary") {
@@ -646,7 +671,7 @@ export default function VoiceCallButton({
 
     sessionRef.current = session;
     await session.start();
-  }, [clearSearchTimer]);
+  }, [clearSearchTimer, acquireWakeLock]);
   useEffect(() => { startCallRef.current = startCall; }, [startCall]);
 
   /* ONE METER PER SIDE, AND ONLY THE ACTIVE ONE RUNS. Measuring both at once
@@ -658,6 +683,14 @@ export default function VoiceCallButton({
      yes. Treating it as neither is how the call screen would have vanished
      mid-sentence on the unstable network this was built for. */
   const live = state === "live";
+  /* The platform releases the lock when the page is hidden; asked for again
+     when the page returns while the call is still up. */
+  useEffect(() => {
+    if (!live) return;
+    const onVisible = () => { if (document.visibilityState === "visible") { wakeLockRef.current = null; acquireWakeLock(); } };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => document.removeEventListener("visibilitychange", onVisible);
+  }, [live, acquireWakeLock]);
   const reconnecting = state === "reconnecting";
   const connected = live || reconnecting;
 

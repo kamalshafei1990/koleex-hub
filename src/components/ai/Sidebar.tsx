@@ -110,6 +110,7 @@ export function SidebarRow({
   onDelete,
   onTogglePin,
   onMove,
+  hint,
 }: {
   row: ConversationRow;
   active: boolean;
@@ -120,6 +121,10 @@ export function SidebarRow({
   onDelete: () => void;
   onTogglePin: () => void;
   onMove: (projectId: string | null) => void;
+  /** Where the search matched inside the chat (roadmap C2): one dim line
+   *  under the title, only while searching. Absent means the row is as it
+   *  always was. */
+  hint?: string;
 }) {
   const pinned = !!row.pinned;
   const inProject = row.project_id ?? null;
@@ -176,7 +181,10 @@ export function SidebarRow({
           : "hover:bg-[var(--bg-surface-subtle)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
       }`}
     >
-      <div className="text-[13px] truncate flex-1 min-w-0">{row.title}</div>
+      <div className="flex-1 min-w-0">
+        <div className="text-[13px] truncate">{row.title}</div>
+        {hint && <div className="text-[11px] truncate text-[var(--text-dim)]" data-search-hint>{hint}</div>}
+      </div>
       {/* The pin marks the row while it is pinned and hides again on hover so
           it can't be mistaken for a button you have to press to keep it. */}
       <button

@@ -91,6 +91,13 @@ export const BUDGETS = {
     windowSec: 60,
     max: num(process.env.AI_LIMIT_VOICE_SUMMARIES_PER_MIN, 6),
   }),
+  /* A search box, typed into. Debounced on the client; this is the floor
+     under a client that is not. */
+  conversationSearchPerAccount: (): Budget => ({
+    bucket: "conv_search",
+    windowSec: 60,
+    max: num(process.env.AI_LIMIT_CONVERSATION_SEARCHES_PER_MIN, 30),
+  }),
   /* A generated picture is paid per call — the one AI surface where a loop
      is a bill rather than a load. Per account per HOUR, and per tenant per
      DAY, because a whole company's allowance is the number the owner
