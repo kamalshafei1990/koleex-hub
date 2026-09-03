@@ -635,6 +635,13 @@ export function isLiveInfoQuery(msg: string): boolean {
   /* Explicit requests to go and look. */
   if (/\b(search|google|look\s+up|check\s+online|on\s+the\s+(web|internet))\b/.test(s)) return true;
 
+  /* A request to SEE something. Koleex products have their own photos in
+     the product tools; anything else — a port, a fabric, a tool, a place —
+     is a web picture, and the lane with no tools can only describe it. */
+  if (/\b(show\s+me\s+(a\s+)?(picture|photo|image|pic)|(picture|photo|image|pics?|photos|images)\s+of\b|what\s+does\s+.+\s+look\s+like)/.test(s)) return true;
+  if (/(وريني|ورّيني|عايز\s*أشوف|عايز\s*اشوف|ابعتلي)\s*(صورة|صور)|صورة\s*(ل|لل|بتاعة)|شكل\s*.+\s*(إيه|ايه)/.test(msg)) return true;
+  if (/(给我看|看看|发一张)?(图片|照片|图)|长什么样/.test(msg)) return true;
+
   /* "current / latest / today's X" framings. */
   if (/\b(current|latest|today'?s|right\s+now|as\s+of\s+today|this\s+week'?s)\b/.test(s)) return true;
 

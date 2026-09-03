@@ -32,10 +32,20 @@ export interface WebResult {
   published?: string;
 }
 
+/** A picture the search found, for a user who asked to SEE something. https
+ *  only: it will be loaded by the user's browser straight from its host. */
+export interface WebImage {
+  url: string;
+  /** The provider's caption when it offers one; otherwise the query. */
+  description: string;
+}
+
 export interface WebSearchOutcome {
   configured: boolean;
   provider: "tavily" | "brave" | null;
   results: WebResult[];
+  /** Empty for a provider that returns none (Brave, today). */
+  images: WebImage[];
   /** Tavily's own one-line synthesis, when it offers one. */
   answer?: string;
   error?: string;
@@ -45,6 +55,32 @@ const TIMEOUT_MS = 8_000;
 const MAX_RESULTS = 6;
 const MAX_QUERY = 300;
 const MAX_SNIPPET = 500;
+/* Pictures are for a person who asked to see something, not a gallery. The
+   answer shows at most two; the model chooses from these. */
+const MAX_IMAGES = 4;
+
+/** https only, and nothing a URL could smuggle into a markdown image. */
+function imageUrl(v: unknown): string | null {
+  const s = typeof v === "string" ? v.trim() : "";
+  return /^https:\/\/[^\s"'<>()]+$/i.test(s) ? s : null;
+}
+
+/** Tavily returns `images` as bare URL strings, or as objects when
+ *  descriptions were asked for. Both shapes are read; neither is trusted. */
+function parseImages(raw: unknown, fallbackLabel: string): WebImage[] {
+  if (!Array.isArray(raw)) return [];
+  const out: WebImage[] = [];
+  const seen = new Set<string>();
+  for (const item of raw) {
+    const url = imageUrl(typeof item === "string" ? item : (item as { url?: unknown })?.url);
+    if (!url || seen.has(url)) continue;
+    seen.add(url);
+    const desc = typeof item === "object" && item ? trim((item as { description?: unknown }).description, 160) : "";
+    out.push({ url, description: desc || fallbackLabel });
+    if (out.length >= MAX_IMAGES) break;
+  }
+  return out;
+}
 
 function trim(s: unknown, max: number): string {
   return typeof s === "string" ? s.replace(/\s+/g, " ").trim().slice(0, max) : "";
@@ -72,16 +108,22 @@ async function searchTavily(key: string, query: string): Promise<WebSearchOutcom
       max_results: MAX_RESULTS,
       search_depth: "basic",
       include_answer: true,
+      /* Pictures ride along on the same call — no second provider, no
+         second request, no second key. */
+      include_images: true,
+      include_image_descriptions: true,
     }),
   })) as {
     answer?: string;
     results?: Array<{ title?: string; url?: string; content?: string; published_date?: string }>;
+    images?: unknown;
   };
 
   return {
     configured: true,
     provider: "tavily",
     answer: trim(json.answer, MAX_SNIPPET) || undefined,
+    images: parseImages(json.images, query),
     results: (json.results ?? [])
       .filter((r) => typeof r.url === "string" && r.url)
       .slice(0, MAX_RESULTS)
@@ -109,6 +151,9 @@ async function searchBrave(key: string, query: string): Promise<WebSearchOutcome
   return {
     configured: true,
     provider: "brave",
+    /* Brave's web endpoint carries no pictures; its image endpoint is a
+       second request and a second quota, deliberately not taken here. */
+    images: [],
     results: (json.web?.results ?? [])
       .filter((r) => typeof r.url === "string" && r.url)
       .slice(0, MAX_RESULTS)
@@ -132,13 +177,13 @@ export function webSearchConfigured(): boolean {
 export async function searchWeb(rawQuery: string): Promise<WebSearchOutcome> {
   const query = trim(rawQuery, MAX_QUERY);
   if (!query) {
-    return { configured: webSearchConfigured(), provider: null, results: [], error: "empty query" };
+    return { configured: webSearchConfigured(), provider: null, results: [], images: [], error: "empty query" };
   }
 
   const tavily = process.env.TAVILY_API_KEY;
   const brave = process.env.BRAVE_SEARCH_API_KEY;
   if (!tavily && !brave) {
-    return { configured: false, provider: null, results: [] };
+    return { configured: false, provider: null, results: [], images: [] };
   }
 
   try {
@@ -152,6 +197,7 @@ export async function searchWeb(rawQuery: string): Promise<WebSearchOutcome> {
       configured: true,
       provider: tavily ? "tavily" : "brave",
       results: [],
+      images: [],
       error: msg,
     };
   }

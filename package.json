@@ -16,6 +16,7 @@
     "validate:ai-baseline": "tsx scripts/validate-ai-baseline.mts",
     "validate:ai-cost": "NODE_OPTIONS=--conditions=react-server tsx scripts/validate-ai-cost.ts",
     "validate:ai-egress": "NODE_OPTIONS=--conditions=react-server tsx scripts/validate-ai-egress.ts",
+    "validate:ai-web-search": "NODE_OPTIONS=--conditions=react-server tsx scripts/validate-ai-web-search.ts",
     "validate:ai-untrusted": "NODE_OPTIONS=--conditions=react-server tsx scripts/validate-ai-untrusted.ts",
     "validate:ai-confirm-ledger": "NODE_OPTIONS=--conditions=react-server tsx scripts/validate-ai-confirm-ledger.ts",
     "validate:voice-client": "tsx scripts/validate-voice-client.ts",

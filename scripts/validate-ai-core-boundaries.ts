@@ -215,6 +215,21 @@ check(
 check("business data: a trade-term question routes to tools", isBusinessDataQuery("What does DDP mean?"));
 check("live info: 'weather in Cairo' bypasses the tool-less lane", isLiveInfoQuery("what is the weather in Cairo"));
 check(
+  "live info: asking to SEE something is a lookup, in three languages",
+  isLiveInfoQuery("show me a picture of Port Said port") &&
+    isLiveInfoQuery("what does a Jacquard loom look like") &&
+    isLiveInfoQuery("photo of the Suez canal") &&
+    isLiveInfoQuery("وريني صورة ميناء بورسعيد") &&
+    isLiveInfoQuery("عايز أشوف صورة القماش ده") &&
+    isLiveInfoQuery("شكل ميناء شنغهاي إيه") &&
+    isLiveInfoQuery("给我看看苏伊士运河的图片") &&
+    isLiveInfoQuery("龙门吊长什么样"),
+);
+check(
+  "live info: 'picture' inside an ordinary sentence does not fire",
+  !isLiveInfoQuery("the picture is clear, let's proceed") && !isLiveInfoQuery("explain agile project management"),
+);
+check(
   "memory intent: 'remember that our MOQ is 500' never takes a tool-less lane",
   isMemoryIntentQuery("remember that our MOQ is 500"),
 );
