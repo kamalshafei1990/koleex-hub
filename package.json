@@ -22,6 +22,7 @@
     "validate:ai-untrusted": "NODE_OPTIONS=--conditions=react-server tsx scripts/validate-ai-untrusted.ts",
     "validate:ai-confirm-ledger": "NODE_OPTIONS=--conditions=react-server tsx scripts/validate-ai-confirm-ledger.ts",
     "validate:voice-client": "tsx scripts/validate-voice-client.ts",
+    "validate:voice-events": "tsx scripts/validate-voice-events.ts",
     "validate:ai-voice": "NODE_OPTIONS=--conditions=react-server tsx scripts/validate-ai-voice.ts",
     "validate:ai-identity": "NODE_OPTIONS=--conditions=react-server tsx scripts/validate-ai-identity.ts",
     "validate:ai-provider": "NODE_OPTIONS=--conditions=react-server tsx scripts/validate-ai-provider.ts",

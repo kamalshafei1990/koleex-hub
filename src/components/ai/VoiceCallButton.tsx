@@ -45,6 +45,8 @@ import { type Lang } from "@/lib/i18n";
 import {
   parseVoiceEvent,
   appendTranscript,
+  playbackGate,
+  voiceEventType,
   type TranscriptLine,
   type VoicePhase,
 } from "@/lib/voice/events";
@@ -197,6 +199,9 @@ export default function VoiceCallButton({
   /* Where the last session was served, for a call that continues it. */
   const regionHintRef = useRef<"primary" | "alt" | null>(null);
   const [phase, setPhase] = useState<VoicePhase>(null);
+  /* The phase as the data channel last reported it, for handlers that run
+     outside a render (roadmap B3: the playback gate reads it per event). */
+  const phaseRef = useRef<VoicePhase>(null);
   const [lines, setLines] = useState<readonly TranscriptLine[]>([]);
   /* Kept in state rather than a ref: the meter hook takes the stream as a
      dependency, so it must re-run when one arrives. */
@@ -393,7 +398,11 @@ export default function VoiceCallButton({
     chimedRef.current = false;
     setReady(false);
     liveSinceRef.current = null;
-    if (audioRef.current) audioRef.current.srcObject = null;
+    if (audioRef.current) {
+      audioRef.current.srcObject = null;
+      audioRef.current.muted = false;
+    }
+    phaseRef.current = null;
     /* Dropped so the meters tear their audio contexts down. A retained stream
        here would keep a hardware handle open for the life of the page. */
     setMicStream(null);
@@ -444,6 +453,7 @@ export default function VoiceCallButton({
     }
     liveSinceRef.current = null;
     setPhase(null);
+    phaseRef.current = null;
     /* The session resets its own flag on start; this keeps the UI in step so a
        second call never opens showing the last one's mute. */
     setMuted(false);
@@ -531,6 +541,9 @@ export default function VoiceCallButton({
         setFarStream(stream);
         if (audioRef.current) {
           audioRef.current.srcObject = stream;
+          /* A new line starts audible: the gate below may have left the
+             element muted on a line that dropped mid-interruption. */
+          audioRef.current.muted = false;
           /* Autoplay can still be refused even after a user gesture on some
              browsers. Failing silently would look like a dead call, so it is
              reported as one. */
@@ -577,6 +590,13 @@ export default function VoiceCallButton({
            stream and must not depend on whether a caption was produced. */
         onMessageRef.current?.(data);
 
+        /* BARGE-IN (roadmap B3). When the caller starts speaking over an
+           answer, the far side stops sending but the jitter buffer still
+           plays out; the element is silenced until the far side has the
+           turn again. See events.ts playbackGate for the rule. */
+        const gate = playbackGate(voiceEventType(data), phaseRef.current);
+        if (gate && audioRef.current) audioRef.current.muted = gate === "cut";
+
         /* UNTRUSTED TEXT. This came off a network socket and is about to be
            rendered. It is data, never instruction — nothing here dispatches
            on it, and the parser only ever returns strings. */
@@ -586,6 +606,7 @@ export default function VoiceCallButton({
              done. Clearing here rather than on the tool result keeps the
              indicator honest: what ends the wait is the answer being spoken. */
           if (parsed.phase === "speaking") setSearching(false);
+          phaseRef.current = parsed.phase;
           setPhase(parsed.phase);
           onPhaseRef.current?.(parsed.phase);
         }

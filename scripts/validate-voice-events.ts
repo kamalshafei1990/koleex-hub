@@ -20,6 +20,12 @@ import {
   EV_SESSION_UPDATED,
   EV_ERROR,
   EV_SPEECH_STARTED,
+  EV_SPEECH_STOPPED,
+  EV_SESSION_CREATED,
+  EV_RESPONSE_CREATED,
+  EV_RESPONSE_DONE,
+  playbackGate,
+  voiceEventType,
   type TranscriptLine,
 } from "../src/lib/voice/events";
 
@@ -309,6 +315,28 @@ console.log("\n── 7. The session must ASK for the user's transcript ──")
     () => !/input_audio_transcription/.test(client) && !/turn_detection/.test(client));
   check("it relays what the server authored",
     () => /this\.sessionUpdate/.test(client));
+}
+
+console.log("\n── 8. Barge-in: the far side's buffered audio is cut when the caller speaks ──");
+{
+  /* The vendor's own WebRTC sample clears its playback buffer on
+     speech_started. A browser silences the element instead, and only while
+     the far side was SPEAKING — a start in a quiet moment cuts nothing. */
+  check("speech_started over a speaking far side → cut",
+    playbackGate(EV_SPEECH_STARTED, "speaking") === "cut");
+  check("speech_started while listening, thinking or idle → nothing (a phantom start in a pause changes nothing)",
+    playbackGate(EV_SPEECH_STARTED, "listening") === null && playbackGate(EV_SPEECH_STARTED, "thinking") === null && playbackGate(EV_SPEECH_STARTED, null) === null);
+  check("the caller falling silent, a new response, the first word, the last word and response.done all → restore, whatever the phase",
+    (["speaking", "listening", "thinking", null] as const).every((ph) =>
+      playbackGate(EV_SPEECH_STOPPED, ph) === "restore" && playbackGate(EV_RESPONSE_CREATED, ph) === "restore" &&
+      playbackGate(EV_ASSISTANT_DELTA, ph) === "restore" && playbackGate(EV_ASSISTANT_DONE, ph) === "restore" && playbackGate(EV_RESPONSE_DONE, ph) === "restore"));
+  check("every other event, and no event, leaves the element alone",
+    playbackGate(EV_USER_DELTA, "speaking") === null && playbackGate(EV_SESSION_CREATED, "speaking") === null &&
+    playbackGate("response.function_call_arguments.done", "speaking") === null && playbackGate(null, "speaking") === null && playbackGate("", "speaking") === null);
+  check("voiceEventType reads the type and nothing else, and never throws",
+    voiceEventType(JSON.stringify({ type: EV_SPEECH_STARTED })) === EV_SPEECH_STARTED &&
+    voiceEventType(JSON.stringify({ type: "" })) === null && voiceEventType(JSON.stringify({ type: 7 })) === null &&
+    voiceEventType("[]") === null && voiceEventType("null") === null && voiceEventType("not json") === null && voiceEventType("") === null);
 }
 
 console.log(`\n${pass} passed, ${failures.length} failed`);
