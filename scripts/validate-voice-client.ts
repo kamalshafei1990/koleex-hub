@@ -17,7 +17,7 @@
 import { VoiceSession, HANDSHAKE_PATH, waitForIceGathering, normalizeSdp, type VoiceDeps, type VoiceState, type VoiceFailure,
   TOOL_PATH,
 } from "../src/lib/voice/session";
-import { TranscriptPersister, TRANSCRIPT_PATH, MAX_TURNS_PER_POST, MAX_POST_FAILURES, type SavedTurn } from "../src/lib/voice/persist";
+import { TranscriptPersister, TRANSCRIPT_PATH, MAX_TURNS_PER_POST, MAX_POST_FAILURES, isCutOffFragment, type SavedTurn } from "../src/lib/voice/persist";
 import { buildTextTurnMessages, EV_ITEM_CREATE, EV_RESPONSE_CREATE, MAX_TYPED_TURN_CHARS } from "../src/lib/voice/text-turn";
 import { type TranscriptLine } from "../src/lib/voice/events";
 import { extractProductPhotos, photosMarkdown, stripImageMarkdown, imageUrlsIn, MAX_PHOTOS_PER_RESULT, MAX_WEB_PHOTOS_PER_RESULT } from "../src/lib/voice/photos";
@@ -1310,9 +1310,23 @@ console.log("\n── 12. Mute ──");
       h.p.observe([L("user", "hello there", true)]);
       await h.p.flush();
       check("the first settled turn creates the conversation once", h.ensured() === 1 && h.p.conversation() === CONV);
-      h.p.observe([L("user", "hello there", true), L("assistant", "hi", true)]);
+      h.p.observe([L("user", "hello there", true), L("assistant", "hi there", true)]);
       await h.p.flush();
       check("  …and later turns reuse it", h.ensured() === 1 && h.posts.length === 2);
+    }
+
+    {
+      /* Two saved calls (2026-09-04) carried assistant rows "I", "I", "خل",
+         "بال" — replies interrupted at their first syllable. Not turns. */
+      check("a one-syllable cut-off assistant final is a fragment; a Chinese two-character answer, a user fragment and a pictured turn are not",
+        isCutOffFragment("assistant", "I", "") && isCutOffFragment("assistant", "خل", "") && isCutOffFragment("assistant", " بال ", "") &&
+        !isCutOffFragment("assistant", "好的", "") && !isCutOffFragment("user", "I", "") && !isCutOffFragment("assistant", "I", "![p](https://x/y.jpg)") &&
+        !isCutOffFragment("assistant", "Sure", "") && !isCutOffFragment("assistant", "", ""));
+      const h = harness({});
+      h.p.observe([L("user", "show me a", true), L("assistant", "I", true), L("user", "show me a photo", true), L("assistant", "好的", true)]);
+      await h.p.flush();
+      const sent = h.posts.flatMap((b) => b.body.turns.map((t) => t.text));
+      check("the fragment is counted as seen and never posted; the real turns around it are", JSON.stringify(sent) === JSON.stringify(["show me a", "show me a photo", "好的"]));
     }
 
     {
@@ -1362,7 +1376,7 @@ console.log("\n── 12. Mute ──");
 
     {
       const h = harness();
-      const many = Array.from({ length: MAX_TURNS_PER_POST + 5 }, (_, i) => L(i % 2 ? "assistant" : "user", `t${i}`, true));
+      const many = Array.from({ length: MAX_TURNS_PER_POST + 5 }, (_, i) => L(i % 2 ? "assistant" : "user", `turn ${i}`, true));
       h.p.observe(many);
       await h.p.flush();
       await h.p.flush();
