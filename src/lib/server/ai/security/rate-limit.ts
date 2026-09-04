@@ -75,6 +75,14 @@ export const BUDGETS = {
     windowSec: 60,
     max: num(process.env.AI_LIMIT_ATTACHMENTS_PER_MIN, 6),
   }),
+  /* One piece of a big document, relayed through our server (3.5 MB each).
+     A 200 MB catalogue is ~60 pieces, so the budget is per piece and far
+     above the attachment budget; each piece is one storage write. */
+  attachmentChunkPerAccount: (): Budget => ({
+    bucket: "attachment:chunk",
+    windowSec: 60,
+    max: num(process.env.AI_LIMIT_ATTACHMENT_CHUNKS_PER_MIN, 120),
+  }),
   /* A call posts each settled turn as it lands — a lively exchange is one or
      two a minute per side, so 60 is far above a person and cheap to hit from
      a loop. Each post is a database write and nothing more. */

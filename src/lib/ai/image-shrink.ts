@@ -20,8 +20,11 @@
    --------------------------------------------------------------------------- */
 
 /** Longest side after shrinking. Enough for any label, plate or model code
- *  a vision model can read; well above what it is given internally. */
-export const MAX_EDGE = 2048;
+ *  a vision model can read; well above what it is given internally. Was
+ *  2048; 1600 on 2026-09-04, when "the AI takes a long time to understand
+ *  the photo" — a vision model's input cost grows with the pixels, and a
+ *  phone photo at 1600 px still shows a type plate. */
+export const MAX_EDGE = 1600;
 /** Below this an image is attached as it is — shrinking a small picture
  *  only costs a decode and can make it worse. */
 export const SHRINK_ABOVE_BYTES = 1_500_000;

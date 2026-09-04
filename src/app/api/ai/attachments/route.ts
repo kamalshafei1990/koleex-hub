@@ -2,8 +2,9 @@ import { NextResponse } from "next/server";
 import { requireAuth } from "@/lib/server/auth";
 import { requireInternalUser } from "@/lib/server/ai/require-internal";
 import { consumeBudget, limitMode, BUDGETS, subjectFor } from "@/lib/server/ai/security/rate-limit";
-import { describeImage } from "@/lib/server/ai/vision";
+import { describeImage, questionForPrompt } from "@/lib/server/ai/vision";
 import { supabaseServer } from "@/lib/server/supabase-server";
+import { assembleParts, partsFolder, removeParts, sweepStaleParts, MAX_PARTS_SERVER, UPLOAD_ID_RE } from "@/lib/server/ai/attachment-parts";
 
 /* ---------------------------------------------------------------------------
    POST /api/ai/attachments — turn whatever the user attached in Koleex AI
@@ -85,7 +86,7 @@ async function readWorkbook(bytes: Uint8Array): Promise<string | null> {
    Render, then read. Best-effort throughout: a PDF that will not rasterise
    returns null and the caller falls back to the honest "no text" answer
    rather than failing the upload. */
-async function readScannedPdf(bytes: Uint8Array): Promise<string | null> {
+async function readScannedPdf(bytes: Uint8Array, question: string): Promise<string | null> {
   try {
     /* Rasterise with pdf.js + @napi-rs/canvas DIRECTLY. This path was broken
        three ways in a row: unpdf's renderPageAsImage demanded a canvasImport
@@ -153,7 +154,7 @@ async function readScannedPdf(bytes: Uint8Array): Promise<string | null> {
       } as unknown as Parameters<typeof page.render>[0]).promise;
       const png = canvas.toBuffer("image/png");
       if (!png?.length) continue;
-      const seen = await describeImage(new Uint8Array(png), "image/png");
+      const seen = await describeImage(new Uint8Array(png), "image/png", { question });
       if (seen) pages.push(`--- Page ${p} ---\n${seen.text}`);
     }
     const out = pages.join("\n\n").trim();
@@ -171,7 +172,10 @@ interface IncomingFile {
   bytes: () => Promise<Uint8Array>;
 }
 
-async function extractOne(file: IncomingFile): Promise<ExtractResult> {
+/* `question` is the user's own typed words for this turn (capped, one
+   line): the vision model reads the picture FOR that question, which is what
+   made the reading short enough to be quick (2026-09-04). */
+async function extractOne(file: IncomingFile, question: string): Promise<ExtractResult> {
   const name = (file.name || "file").slice(0, 120);
   const isImage = IMAGE_EXT.test(name) || (file.type || "").startsWith("image/");
   if (file.size > (isImage ? MAX_IMAGE_BYTES : MAX_DOC_BYTES)) {
@@ -180,7 +184,7 @@ async function extractOne(file: IncomingFile): Promise<ExtractResult> {
 
   try {
     if (isImage) {
-      const seen = await describeImage(await file.bytes(), file.type || "image/png");
+      const seen = await describeImage(await file.bytes(), file.type || "image/png", { question });
       if (!seen) return { name, error: "unreadable_image" };
       /* Labelled as a reading, not passed off as the user's own words. The
          model downstream must know it is looking at a description of a
@@ -213,7 +217,7 @@ async function extractOne(file: IncomingFile): Promise<ExtractResult> {
          the end of the road ("no_text"), which is exactly the case the owner
          asked for: photographed invoices and documents. Rasterise the first
          few pages and read them the same way an image is read. */
-      const scanned = await readScannedPdf(scanCopy);
+      const scanned = await readScannedPdf(scanCopy, question);
       if (scanned) {
         const t = `[Scanned PDF: ${name}] — read by Koleex AI:\n${scanned}`;
         return { name, chars: t.length, text: t.slice(0, MAX_CHARS) };
@@ -245,9 +249,9 @@ async function extractOne(file: IncomingFile): Promise<ExtractResult> {
    "read, described, and forgotten", and the hop must not quietly turn into
    a store. Paths are restricted to the caller's own ai-attachments prefix
    so a ref cannot point this endpoint at an arbitrary object. */
-interface StorageRef { name?: unknown; path?: unknown; type?: unknown; size?: unknown }
+interface StorageRef { name?: unknown; path?: unknown; type?: unknown; size?: unknown; upload?: unknown; parts?: unknown }
 
-async function extractFromStorage(ref: StorageRef): Promise<ExtractResult> {
+async function extractFromStorage(ref: StorageRef, question: string): Promise<ExtractResult> {
   const name = (typeof ref.name === "string" && ref.name ? ref.name : "file").slice(0, 120);
   const path = typeof ref.path === "string" ? ref.path : "";
   if (!path || path.includes("..") || !/(^|\/)ai-attachments\//.test(path)) {
@@ -276,11 +280,39 @@ async function extractFromStorage(ref: StorageRef): Promise<ExtractResult> {
       type: typeof ref.type === "string" ? ref.type : "",
       size: buf.byteLength,
       bytes: async () => buf!,
-    });
+    }, question);
   } finally {
     /* Best-effort cleanup, success or failure — the object was transport,
        not storage. */
     void supabaseServer.storage.from("media").remove([path]).catch(() => undefined);
+  }
+}
+
+/* ── Relay mode (2026-09-04) ──────────────────────────────────────────────
+   The pieces came through /api/ai/attachments/chunk into the CALLER's own
+   transport folder — composed here from the signed-in account id, never
+   from the ref — so a ref can only name the caller's uploads. Every piece
+   is read, joined, extracted, and removed, success or failure. */
+async function extractFromParts(ref: StorageRef, accountId: string, question: string): Promise<ExtractResult> {
+  const name = (typeof ref.name === "string" && ref.name ? ref.name : "file").slice(0, 120);
+  const upload = typeof ref.upload === "string" ? ref.upload : "";
+  const parts = typeof ref.parts === "number" ? ref.parts : Number(ref.parts);
+  if (!UPLOAD_ID_RE.test(upload) || !Number.isInteger(parts) || parts < 1 || parts > MAX_PARTS_SERVER) {
+    return { name, error: "read_failed" };
+  }
+  const folder = partsFolder(accountId, upload);
+  try {
+    const isImage = IMAGE_EXT.test(name) || (typeof ref.type === "string" && ref.type.startsWith("image/"));
+    const buf = await assembleParts(folder, parts, isImage ? MAX_IMAGE_BYTES : MAX_DOC_BYTES);
+    if (!buf) return { name, error: "read_failed" };
+    return await extractOne({
+      name,
+      type: typeof ref.type === "string" ? ref.type : "",
+      size: buf.byteLength,
+      bytes: async () => buf,
+    }, question);
+  } finally {
+    void removeParts(folder, parts);
   }
 }
 
@@ -314,16 +346,36 @@ export async function POST(req: Request) {
     }
   }
 
-  /* JSON mode: {files:[{name,path,type,size}]} — storage refs. */
+  const t0 = Date.now();
+  const finish = (results: ExtractResult[], mode: string) => {
+    /* Counts and timing only — never a name, never a byte of content. */
+    console.log(`[ai.attachments] ok mode=${mode} files=${results.length} read=${results.filter((r) => "text" in r).length} ms=${Date.now() - t0}`);
+    return NextResponse.json({ files: results });
+  };
+
+  /* JSON mode: {files:[{name,path,type,size} | {name,upload,parts,type,size}], question?}
+     — storage refs (the direct road) or relayed pieces. Big files, so one at
+     a time: two catalogues joined in parallel is twice the memory. */
   const ctype = (req.headers.get("content-type") || "").toLowerCase();
   if (ctype.includes("application/json")) {
-    const body = (await req.json().catch(() => null)) as { files?: StorageRef[] } | null;
+    const body = (await req.json().catch(() => null)) as { files?: StorageRef[]; question?: unknown } | null;
     const refs = Array.isArray(body?.files) ? body.files.slice(0, MAX_FILES) : [];
     if (refs.length === 0) {
       return NextResponse.json({ error: "no files" }, { status: 400 });
     }
-    const results = await Promise.all(refs.map(extractFromStorage));
-    return NextResponse.json({ files: results });
+    const question = questionForPrompt(typeof body?.question === "string" ? body.question : "");
+    const results: ExtractResult[] = [];
+    const keep = new Set<string>();
+    for (const ref of refs) {
+      if (typeof ref.upload === "string") {
+        keep.add(ref.upload.toLowerCase());
+        results.push(await extractFromParts(ref, auth.account_id, question));
+      } else {
+        results.push(await extractFromStorage(ref, question));
+      }
+    }
+    if (keep.size > 0) void sweepStaleParts(auth.account_id, keep);
+    return finish(results, "refs");
   }
 
   /* Multipart mode: small files still ride the request body. When parsing
@@ -343,6 +395,7 @@ export async function POST(req: Request) {
   if (files.length === 0) {
     return NextResponse.json({ error: "no files" }, { status: 400 });
   }
+  const question = questionForPrompt(String(form.get("question") ?? ""));
 
   const results = await Promise.all(
     files.map((f) =>
@@ -351,8 +404,8 @@ export async function POST(req: Request) {
         type: f.type,
         size: f.size,
         bytes: async () => new Uint8Array(await f.arrayBuffer()),
-      }),
+      }, question),
     ),
   );
-  return NextResponse.json({ files: results });
+  return finish(results, "inline");
 }

@@ -32,6 +32,7 @@ import PlusIcon from "@/components/icons/ui/PlusIcon";
 import PictureIcon from "@/components/icons/ui/PictureIcon";
 import LibraryPanel from "@/components/ai/LibraryPanel";
 import { shrinkImage } from "@/lib/ai/image-shrink";
+import { needsChunking, uploadInChunks, type ChunkedRef } from "@/lib/ai/attachment-chunks";
 import CallsPanel from "@/components/ai/CallsPanel";
 import PhoneCallIcon from "@/components/icons/ui/PhoneCallIcon";
 import PaperPlaneIcon from "@/components/icons/ui/PaperPlaneIcon";
@@ -736,33 +737,35 @@ export default function KoleexAiApp() {
         let partial: string | null = null;
         try {
           /* Two transports, one endpoint. Small batches ride the request
-             body; anything bigger goes browser → Storage directly (signed
-             URL, no serverless body cap) and the endpoint gets JSON refs.
-             The platform body cap is ~4.5MB TOTAL, so the batch's SUM
-             decides, with margin for the multipart envelope. Pictures are
-             shrunk on the device (image-shrink), so they take the first
-             road; only big documents take the second. */
+             body whole; anything bigger is cut into pieces and relayed
+             through OUR server (/api/ai/attachments/chunk), and the endpoint
+             gets JSON refs to put back together. The platform body cap is
+             ~4.5MB per request, so the batch's SUM decides, with margin for
+             the multipart envelope. Pictures are shrunk on the device
+             (image-shrink), so they take the first road; big documents take
+             the second.
+
+             The second road used to hand the browser a signed URL and PUT
+             the bytes straight to the storage host — a hop that never
+             touched our server and, from mainland China, did not reliably
+             arrive (test round 2026-09-04: "Network error preparing upload
+             (62.5MB, direct)"). Every piece now travels the same route the
+             rest of the app already relies on.
+
+             The user's own words ride with the files: the picture is read
+             FOR the question, which keeps the reading short and quick. */
           const L_UPLOADING = lang === "ar" ? "جارٍ رفع" : lang === "zh" ? "正在上传" : "Uploading";
-          const totalBytes = filesToSend.reduce((n, f) => n + f.size, 0);
-          const useStorageHop = totalBytes > 3.5 * 1024 * 1024;
           let request: () => Promise<Response>;
-          if (useStorageHop) {
-            const { uploadToStorage } = await import("@/lib/storage-client");
-            const refs: Array<{ name: string; path: string; type: string; size: number }> = [];
+          if (needsChunking(filesToSend)) {
+            const refs: ChunkedRef[] = [];
             for (const f of filesToSend) {
-              setAttachStatus(`${L_UPLOADING} ${f.name} (${(f.size / 1048576).toFixed(1)}MB)…`);
-              /* The storage KEY must stay ASCII — Supabase rejects e.g. a
-                 Chinese filename with "Invalid key". The object is transport,
-                 not storage, so the key carries no meaning: uuid + extension.
-                 The ORIGINAL name still travels in the JSON ref — display and
-                 extension-based extraction use that. */
-              const ext = (/\.[A-Za-z0-9]+$/.exec(f.name)?.[0] ?? "").toLowerCase();
-              const path = `ai-attachments/${crypto.randomUUID()}${ext}`;
-              const res = await uploadToStorage("media", path, f);
-              if (!res.ok) {
-                throw new Error(`${f.name}: ${res.error}`);
-              }
-              refs.push({ name: f.name, path: res.data.path, type: f.type || "", size: f.size });
+              const mb = (f.size / 1048576).toFixed(1);
+              setAttachStatus(`${L_UPLOADING} ${f.name} (${mb}MB)…`);
+              refs.push(
+                await uploadInChunks(f, (fraction) => {
+                  setAttachStatus(`${L_UPLOADING} ${f.name} (${mb}MB) · ${Math.round(fraction * 100)}%`);
+                }),
+              );
             }
             setAttachStatus(null);
             request = () =>
@@ -770,12 +773,13 @@ export default function KoleexAiApp() {
                 method: "POST",
                 credentials: "include",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ files: refs }),
+                body: JSON.stringify({ files: refs, question: typedText }),
               });
           } else {
             request = () => {
               const fd = new FormData();
               filesToSend.forEach((f) => fd.append("files", f, f.name));
+              fd.append("question", typedText);
               return fetch("/api/ai/attachments", { method: "POST", credentials: "include", body: fd });
             };
           }
