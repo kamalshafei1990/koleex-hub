@@ -30,6 +30,7 @@
     "validate:ai-usage": "NODE_OPTIONS=--conditions=react-server tsx scripts/validate-ai-usage.ts",
     "validate:ai-export": "NODE_OPTIONS=--conditions=react-server tsx scripts/validate-ai-export.ts",
     "validate:ai-attach": "tsx scripts/validate-ai-attach.ts",
+    "validate:ai-vision": "NODE_OPTIONS=--conditions=react-server tsx scripts/validate-ai-vision.ts",
     "validate:ai-identity": "NODE_OPTIONS=--conditions=react-server tsx scripts/validate-ai-identity.ts",
     "validate:ai-provider": "NODE_OPTIONS=--conditions=react-server tsx scripts/validate-ai-provider.ts",
     "validate:ai-transport-timeout": "NODE_OPTIONS=--conditions=react-server tsx scripts/validate-ai-transport-timeout.ts",
