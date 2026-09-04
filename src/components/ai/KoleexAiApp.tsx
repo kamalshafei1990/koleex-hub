@@ -31,6 +31,7 @@ import ArrowLeftIcon from "@/components/icons/ui/ArrowLeftIcon";
 import PlusIcon from "@/components/icons/ui/PlusIcon";
 import PictureIcon from "@/components/icons/ui/PictureIcon";
 import LibraryPanel from "@/components/ai/LibraryPanel";
+import { shrinkImage } from "@/lib/ai/image-shrink";
 import CallsPanel from "@/components/ai/CallsPanel";
 import PhoneCallIcon from "@/components/icons/ui/PhoneCallIcon";
 import PaperPlaneIcon from "@/components/icons/ui/PaperPlaneIcon";
@@ -159,8 +160,7 @@ export default function KoleexAiApp() {
      can be big. */
   const MAX_IMAGE_MB = 15;
   const MAX_DOC_MB = 200;
-  const addFiles = useCallback((incoming: File[]) => {
-    if (incoming.length === 0) return;
+  const addFilesSized = useCallback((incoming: File[]) => {
     const typeOk = incoming.filter(
       (f) => SUPPORTED_FILES.test(f.name) || (f.type || "").startsWith("image/"),
     );
@@ -180,6 +180,15 @@ export default function KoleexAiApp() {
     if (problems.length > 0) setError(problems.join(" · "));
     const picked = ok.slice(0, 6 - attachments.length);
     if (picked.length > 0) setAttachments((prev) => [...prev, ...picked]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [attachments.length]);
+
+  const addFiles = useCallback((incoming: File[]) => {
+    if (incoming.length === 0) return;
+    /* PHOTOS ARE SHRUNK ON THE DEVICE FIRST (ai/image-shrink): a 17 MB
+       camera-roll PNG becomes a JPEG of a megabyte or two before the size
+       gate below ever sees it. The gate then judges what will be sent. */
+    void Promise.all(incoming.map((f) => shrinkImage(f))).then((files) => addFilesSized(files));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [attachments.length]);
 
