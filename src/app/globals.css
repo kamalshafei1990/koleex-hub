@@ -3,6 +3,50 @@
 /* ── Tailwind v4 dark variant — keyed off our data-theme attribute ── */
 @custom-variant dark (&:where([data-theme="dark"] *, [data-theme="dark"]));
 
+/* ═══ KOLEEX MOTION TOKENS (owner-approved motion system, 2026-08-21) ═══
+   The Hub's five durations and five curves, NAMED. These are the values the
+   codebase already speaks (measured across ~2,600 transition sites before
+   tokenising) — new motion MUST reference these instead of literals, so a
+   retime is one edit, not a repo-wide hunt. Theme- and skin-independent.
+   Law: exits run ≈60% of their entrance, on --kx-ease-exit. */
+:root {
+  --kx-dur-press: 80ms;   /* button press-down */
+  --kx-dur-fast: 160ms;   /* hovers, colour shifts */
+  --kx-dur-base: 240ms;   /* popovers, small entrances */
+  --kx-dur-slow: 320ms;   /* tabs, sheets, drawers */
+  --kx-dur-flight: 460ms; /* the big flights (bloom, sign-in card) */
+  --kx-ease-out: cubic-bezier(0.22, 1, 0.36, 1);      /* soft general out */
+  --kx-ease-expo: cubic-bezier(0.16, 1, 0.3, 1);      /* entrances / flights */
+  /* Glide — the gentlest curve in the set, and the one tab switching uses.
+     expo covers ~80% of its distance in the first third of its time, which
+     reads as a snap with a long tail; glide spreads the movement evenly and
+     lands on a long, soft finish. Owner: "more smooth and ease". */
+  --kx-ease-glide: cubic-bezier(0.32, 0.72, 0, 1);
+  --kx-ease-standard: cubic-bezier(0.4, 0, 0.2, 1);   /* position & size morphs */
+  --kx-ease-pop: cubic-bezier(0.34, 1.3, 0.5, 1);     /* menus, faint spring */
+  --kx-ease-exit: cubic-bezier(0.4, 0, 1, 1);         /* dismissals, accelerate away */
+}
+
+/* ── Press feedback (pick 1A: the quiet sink) ─────────────────────────────
+   ONE rule gives all ~2,500 raw <button>s a physical press. The independent
+   `scale` property, NOT `transform`, so it never fights a component's own
+   transform utilities; the transition lives on :active only, so it never
+   clobbers an element's transition-colors — soft press-in, crisp release.
+   Opt-out: data-no-press. Opt-in for non-buttons: .kx-press. */
+@media (prefers-reduced-motion: no-preference) {
+  /* Compact controls only: full-width buttons (section headers, master
+     rows, list rows) visibly WOBBLE at scale — they are excluded, and can
+     opt in with .kx-press if a surface wants it.
+     `active:scale-*` holders are excluded too: their utility animates
+     TRANSFORM while this rule animates the independent `scale` property,
+     and the two MULTIPLY (0.95 × 0.97 = 0.92 — a visible over-shrink). */
+  button:not([data-no-press]):not(.w-full):not([class*="active:scale"]):active,
+  .kx-press:not([data-no-press]):not([class*="active:scale"]):active {
+    scale: 0.97;
+    transition: scale var(--kx-dur-press) var(--kx-ease-out);
+  }
+}
+
 /* ── Theme-aware design tokens ── */
 :root,
 [data-theme="dark"] {
@@ -80,6 +124,15 @@
   --state-warning: #F59E0B;
   --state-error: #FF3333;
   --accent-hover: #0052CC;
+  /* Catalogue action buttons (2026-08-29). The state colours are tuned for
+     dark surfaces: on white, #F59E0B measured 2.15:1 and #10B981 2.54:1 for
+     10.5px bold text — both far under AA's 4.5. These aliases carry the same
+     three meanings at a weight that reads on EITHER ground; the light block
+     darkens them. Same precedent as the text tokens below, which were bumped
+     for exactly this reason. */
+  --action-ai: var(--accent);
+  --action-compare: var(--state-warning);
+  --action-quote: var(--state-success);
 }
 
 [data-theme="light"] {
@@ -129,6 +182,12 @@
   --text-dim: rgba(0,0,0,0.58);
   --text-ghost: rgba(0,0,0,0.48);
   --text-whisper: rgba(0,0,0,0.38);
+
+  /* Action buttons on white — measured AA at 10.5px bold:
+     ai 6.8:1 · compare 4.9:1 · quote 5.4:1 (were 4.14 / 2.15 / 2.54). */
+  --action-ai: #2F5C8A;
+  --action-compare: #B45309;
+  --action-quote: #047857;
   --text-barely: rgba(0,0,0,0.26);
 
   /* Inverted (buttons etc.) */
@@ -640,10 +699,125 @@ body {
     animation: kx-vt-in 300ms cubic-bezier(0.22, 1, 0.36, 1) both;
   }
 }
+/* ── THE SLIDING DOOR — the one rule the live-DOM edition needs ──────────
+   The door itself is WAAPI on the live scroller (ViewTransitions.tsx); CSS
+   only has to make the 112% travel physically unable to grow a horizontal
+   scrollbar: while the flight flag is up, the shell clips X. Set on the
+   shell, not the scroller — clipping the scroller would also clip its own
+   sticky/hover paint. (The VT-snapshot door that lived here was retired:
+   capturing a full page + rendering Home inside the transition callback
+   stalls frame one, and no curve hides a first-frame hitch.) */
+html[data-kx-door="1"] .kx-shell-top { overflow-x: clip; }
+
 @keyframes kx-vt-out { to { opacity: 0; } }
 @keyframes kx-vt-in {
   from { opacity: 0; transform: translateY(6px); }
   to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ── Directional page push (owner pick 4A, motion system 2026-08-21) ─────
+   Going DEEPER in an app (list → record) the CONTENT AREA pushes in from
+   the side while the old page slides under with a parallax dim; coming
+   back it pops the other way. The scroll container gets its own
+   view-transition group so the shell header never moves; lateral
+   navigations (no data-kx-nav) keep the plain cross-fade above. The 24%
+   under-slide matches the samples the owner picked from. RTL flips. */
+@media (prefers-reduced-motion: no-preference) {
+  /* The content area becomes its own transition group ONLY while a
+     directional nav is in flight. Naming it unconditionally gave every
+     plain navigation a second cross-fading snapshot on top of the root
+     fade — a double-exposure ghost on every click. */
+  html[data-kx-nav] #main-scroll-container { view-transition-name: kx-main; }
+
+  /* HOLD THE SHELL PERFECTLY STILL FOR THE WHOLE TRANSITION.
+     The root snapshot is everything EXCEPT the named content group — the
+     header, the sidebar, the ground. Silencing its cross-fade was not
+     enough: the UA still runs a GROUP animation that interpolates the
+     root snapshot's geometry from the old page's to the new one's, so any
+     route whose page height differs made the header and sidebar visibly
+     stretch and snap back inside 320ms. Owner: "when I switch from tab to
+     other it makes like a flash and the header and the sidebar disappear
+     for a very short time".
+     ⚠️ ZERO DURATION, NEVER `animation: none`. Removing the animations
+     outright made the browser treat the transition as having no work and
+     skip it entirely — measured: the direction attribute stamped, then no
+     ::view-transition animation ever ran and the content stopped sliding
+     either. Keeping the animations and collapsing their duration holds
+     the shell perfectly still while the transition itself stays alive. */
+  html[data-kx-nav]::view-transition-group(root),
+  html[data-kx-nav]::view-transition-old(root),
+  html[data-kx-nav]::view-transition-new(root) { animation-duration: 0s !important; }
+
+  html[data-kx-nav="fwd"]::view-transition-new(kx-main) {
+    animation: kx-page-enter-fwd 360ms var(--kx-ease-expo, cubic-bezier(0.16, 1, 0.3, 1)) both;
+  }
+  html[data-kx-nav="fwd"]::view-transition-old(kx-main) {
+    animation: kx-page-under-fwd 360ms var(--kx-ease-expo, cubic-bezier(0.16, 1, 0.3, 1)) both;
+  }
+  /* Back pop: the OLD (deeper) page must ride on top while it leaves. */
+  html[data-kx-nav="back"]::view-transition-old(kx-main) {
+    animation: kx-page-leave-back 360ms var(--kx-ease-expo, cubic-bezier(0.16, 1, 0.3, 1)) both;
+    z-index: 2;
+  }
+  html[data-kx-nav="back"]::view-transition-new(kx-main) {
+    animation: kx-page-return-back 360ms var(--kx-ease-expo, cubic-bezier(0.16, 1, 0.3, 1)) both;
+  }
+  /* RTL: the push comes from the other side. */
+  html[dir="rtl"][data-kx-nav="fwd"]::view-transition-new(kx-main) { animation-name: kx-page-enter-fwd-rtl; }
+  html[dir="rtl"][data-kx-nav="fwd"]::view-transition-old(kx-main) { animation-name: kx-page-under-fwd-rtl; }
+  html[dir="rtl"][data-kx-nav="back"]::view-transition-old(kx-main) { animation-name: kx-page-leave-back-rtl; }
+  html[dir="rtl"][data-kx-nav="back"]::view-transition-new(kx-main) { animation-name: kx-page-return-back-rtl; }
+}
+@keyframes kx-page-enter-fwd  { from { transform: translateX(100%); } }
+@keyframes kx-page-under-fwd  { to { transform: translateX(-24%); opacity: 0.5; } }
+@keyframes kx-page-leave-back { to { transform: translateX(100%); } }
+@keyframes kx-page-return-back { from { transform: translateX(-24%); opacity: 0.5; } }
+/* Route-based tab switches do NOT use view transitions — see
+   src/components/ui/RouteTabPane.tsx. The browser captures the "new"
+   snapshot before the App Router has rendered the page, so the thing that
+   slid in was routinely the old screen. Those tabs now animate on MOUNT
+   with the same kx-tab-in-fwd/back the in-component tabs use. */
+
+@keyframes kx-page-enter-fwd-rtl  { from { transform: translateX(-100%); } }
+@keyframes kx-page-under-fwd-rtl  { to { transform: translateX(24%); opacity: 0.5; } }
+@keyframes kx-page-leave-back-rtl { to { transform: translateX(-100%); } }
+@keyframes kx-page-return-back-rtl { from { transform: translateX(24%); opacity: 0.5; } }
+
+/* ── Master→detail push, phone width (owner yes, motion system) ──────────
+   The iOS pattern for split screens (Settings first): on a phone the two
+   panes share one grid cell; opening a section slides the detail in over
+   the list, which recedes with a parallax dim — Back reverses it. The
+   end states hide the inactive pane with `visibility` (delayed to the
+   animation's end), so with reduced motion — where the global nuke zeroes
+   every duration — this degrades to exactly the old instant swap.
+   Desktop (md+) is untouched: the classes only exist under 767px. */
+@media (max-width: 767px) {
+  .kx-md-split { display: grid; grid-template-columns: minmax(0, 1fr); overflow-x: clip; }
+  .kx-md-split > .kx-md-list,
+  .kx-md-split > .kx-md-detail {
+    grid-area: 1 / 1;
+    transition:
+      transform var(--kx-dur-slow, 320ms) var(--kx-ease-expo, cubic-bezier(0.16, 1, 0.3, 1)),
+      opacity var(--kx-dur-slow, 320ms) var(--kx-ease-expo, cubic-bezier(0.16, 1, 0.3, 1)),
+      visibility 0s linear var(--kx-dur-slow, 320ms);
+  }
+  .kx-md-split > .kx-md-detail { transform: translateX(103%); visibility: hidden; pointer-events: none; }
+  [dir="rtl"] .kx-md-split > .kx-md-detail { transform: translateX(-103%); }
+  .kx-md-split.kx-md-pushed > .kx-md-detail {
+    transform: none; visibility: visible; pointer-events: auto; transition-delay: 0s;
+  }
+  .kx-md-split.kx-md-pushed > .kx-md-list {
+    transform: translateX(-28%); opacity: 0.5; visibility: hidden; pointer-events: none;
+  }
+  [dir="rtl"] .kx-md-split.kx-md-pushed > .kx-md-list { transform: translateX(28%); }
+  .kx-md-split:not(.kx-md-pushed) > .kx-md-list { transition-delay: 0s; }
+  /* OS-level reduced motion: kill the whole transition (including the
+     visibility DELAY — the app-pref nuke only zeroes durations, and a
+     surviving 320ms delay would make the detail pane appear late). */
+  @media (prefers-reduced-motion: reduce) {
+    .kx-md-split > .kx-md-list,
+    .kx-md-split > .kx-md-detail { transition: none; }
+  }
 }
 
 /* DECLARE THE PAGE'S OWN SCHEME, OR A PHONE BROWSER WILL INVENT ONE.
@@ -900,6 +1074,127 @@ input[type="number"]:not(.kx-spinner) {
   from { opacity: 0; }
   to   { opacity: 1; }
 }
+/* kx-tab-in and kx-tab-in-soft are the same event as the directional slide —
+   a tab body arriving — so they take the same softened timing. The tokens
+   below let any single strip override without touching the language. */
+:root {
+  --kx-tab-in-dur: 0.42s;
+  --kx-tab-in-ease: var(--kx-ease-glide, cubic-bezier(0.32, 0.72, 0, 1));
+}
+/* Directional pane swap (owner pick 3A, motion system 2026-08-21): the new
+   pane enters FROM the travel direction — going to a later tab it slides in
+   from the end, going back it slides in from the start — so tab rows read
+   like turning pages. Same fill-mode discipline as kx-tab-in below
+   (`backwards`, no will-change): no lingering transform, so fixed-position
+   descendants keep the viewport as their containing block once settled.
+   Under RTL the names swap, keeping the spatial story true. Use via
+   useTabMotion(index); first mount falls back to the plain rise. */
+/* SHORTER TRAVEL, LONGER TIME, AND THE FADE FINISHES FIRST — the three
+   things that separate "smooth" from "quick" (owner: "more smooth and
+   ease", asked for every app at once).
+     · 20px, not 24: a longer animation over a shorter distance reads
+       unhurried; the same time over the old distance reads slow.
+     · the opacity stop at 55% means the pane is fully opaque while the
+       last few pixels are still easing home, so the arrival is a settle
+       rather than a fade that is somehow still running after it lands.
+     · translate3d keeps the whole thing on the compositor. */
+@keyframes kx-tab-in-fwd {
+  from { opacity: 0; transform: translate3d(20px, 0, 0); }
+  55%  { opacity: 1; }
+  to   { opacity: 1; transform: translate3d(0, 0, 0); }
+}
+@keyframes kx-tab-in-back {
+  from { opacity: 0; transform: translate3d(-20px, 0, 0); }
+  55%  { opacity: 1; }
+  to   { opacity: 1; transform: translate3d(0, 0, 0); }
+}
+/* Tabs own their duration rather than borrowing --kx-dur-slow: that token
+   also drives sheets and drawers, which are correct at 320ms and would be
+   dragged along by a change meant for tabs alone. */
+.kx-tab-fwd {
+  animation: kx-tab-in-fwd var(--kx-tab-in-dur, 0.42s)
+             var(--kx-tab-in-ease, var(--kx-ease-glide, cubic-bezier(0.32, 0.72, 0, 1))) backwards;
+}
+.kx-tab-back {
+  animation: kx-tab-in-back var(--kx-tab-in-dur, 0.42s)
+             var(--kx-tab-in-ease, var(--kx-ease-glide, cubic-bezier(0.32, 0.72, 0, 1))) backwards;
+}
+[dir="rtl"] .kx-tab-fwd { animation-name: kx-tab-in-back; }
+[dir="rtl"] .kx-tab-back { animation-name: kx-tab-in-fwd; }
+/* While a slide is in flight (useTabMotion stamps the attr for 420ms) the
+   scroller clips X so the 24px overshoot can never flash a horizontal
+   scrollbar. Transient by design — a permanent clip on the scroller would
+   clip sticky/hover paint (the door's lesson). */
+html[data-kx-tabslide] #main-scroll-container { overflow-x: clip; }
+
+/* ── The header tab bar's selection GLIDES ───────────────────────────────
+   The bar was named SlidingPillNav and did not slide: the dark fill lived on
+   the active tab itself, so switching cross-faded one solid block out and
+   another in — a blink, a hundred pixels from where the eye was looking. It
+   is the most visible half of "switching a tab", and no amount of easing on
+   the content pane can cover for it (owner: "more smooth and ease").
+   One pill, moved. Geometry is measured in the track's own coordinates so it
+   stays glued to its tab while the bar scrolls; `left: 0` plus a transform
+   means the movement is compositor-only.
+   The width transition is what sells it between tabs of different label
+   lengths — without it the pill would arrive and then visibly grow. */
+.kx-ph-pill {
+  position: absolute;
+  top: 6px;
+  bottom: 6px;
+  left: 0;
+  z-index: 0;
+  border-radius: 0.5rem;
+  pointer-events: none;
+  background: var(--bg-inverted);
+  transition:
+    transform var(--kx-dur-slow, 320ms) var(--kx-ease-glide, cubic-bezier(0.32, 0.72, 0, 1)),
+    width var(--kx-dur-slow, 320ms) var(--kx-ease-glide, cubic-bezier(0.32, 0.72, 0, 1)),
+    opacity var(--kx-dur-fast, 160ms) linear;
+}
+/* Before the first measurement, and on a resize, the pill must JUMP: an
+   unmeasured pill animating from x=0 would streak across the whole bar on
+   load. */
+.kx-ph-pill[data-kx-instant="1"] { transition: none; }
+@media (prefers-reduced-motion: reduce) {
+  .kx-ph-pill { transition: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .kx-tab-fwd, .kx-tab-back { animation: none; }
+}
+
+/* ── Collapse (owner yes, motion system 2026-08-21) ──────────────────────
+   Accordion bodies unfold instead of snapping: the grid-template-rows
+   0fr↔1fr trick — the ONE sanctioned layout animation, because an
+   accordion's whole job is to move the content below it. The body stays
+   conditionally mounted (heavy section editors must not render while
+   closed); the open leg animates on mount, the close leg is played by
+   usePresence before unmount. */
+.kx-collapse { display: grid; grid-template-rows: 1fr; }
+@media (prefers-reduced-motion: no-preference) {
+  /* Clip ONLY while a leg is playing — a steady-state overflow:hidden cut
+     every inline-absolute dropdown inside form sections (SelectWithCreate is
+     not portalled). At rest the body must clip nothing.
+     ⚠️ The clip lives INSIDE this guard on purpose: with OS reduced motion
+     there is no animation, so `animationend` never fires and the -opening
+     class would stay on the node forever — re-creating the permanent clip
+     via a class that can no longer be cleared. No animation ⇒ no clip. */
+  /* min-height:0 lets the 0fr row actually collapse — but this file is
+     UNLAYERED, so a permanent rule here would outrank any Tailwind
+     min-h-* utility a body sets on itself. Scoped to the flight, like
+     the clip. */
+  .kx-collapse-opening > *, .kx-collapse-closing > * { overflow: hidden; min-height: 0; }
+  .kx-collapse-opening { animation: kx-collapse-open 280ms var(--kx-ease-standard, cubic-bezier(0.4, 0, 0.2, 1)); }
+  .kx-collapse-closing { animation: kx-collapse-close 220ms var(--kx-ease-standard, cubic-bezier(0.4, 0, 0.2, 1)) both; }
+}
+@keyframes kx-collapse-open {
+  from { grid-template-rows: 0fr; opacity: 0; }
+  to   { grid-template-rows: 1fr; opacity: 1; }
+}
+@keyframes kx-collapse-close {
+  from { grid-template-rows: 1fr; opacity: 1; }
+  to   { grid-template-rows: 0fr; opacity: 0; }
+}
 .kx-tab-in-soft {
   animation: kx-tab-in-soft var(--kx-tab-in-dur, 0.32s)
              var(--kx-tab-in-ease, cubic-bezier(0.22, 1, 0.36, 1)) backwards;
@@ -913,7 +1208,7 @@ input[type="number"]:not(.kx-spinner) {
      ends, and a transformed element becomes the containing block for every
      `position: fixed` descendant — which silently drags modals inside the tab
      pane and under the app header. `backwards` still prevents the opening
-     flash; once the 0.32s is up the element returns to its natural styles,
+     flash; once the run is up the element returns to its natural styles,
      which are visually identical to the final keyframe. */
   /* Timing comes from two custom properties so a screen can retime the
      entrance on itself without forking the class. The defaults ARE the
@@ -1018,6 +1313,15 @@ input[type="number"]:not(.kx-spinner) {
   animation-duration: 0.001ms !important;
   animation-iteration-count: 1 !important;
   transition-duration: 0.001ms !important;
+  /* Delays too: the master-detail push hides/shows panes with a DELAYED
+     visibility flip timed to the flight — with only durations zeroed the
+     pane would still appear 320ms late under reduced motion. */
+  transition-delay: 0s !important;
+  animation-delay: 0s !important;
+  /* The press sink is the independent `scale` property, which a zeroed
+     duration would still apply — instantly. "Reduce motion" must mean no
+     shrink at all, not an instant one. */
+  scale: none !important;
   scroll-behavior: auto !important;
 }
 
@@ -1100,6 +1404,75 @@ input[type="number"]:not(.kx-spinner) {
   --text-dim: #333333;
   --text-faint: #555555;
 }
+
+/* ── What Koleex AI is doing, as a line of text with a little life in it ──
+   ActivityLine (chat) and the voice caption share these. The words are the
+   information; the motion only says "still happening": a soft light sweeps
+   through the letters every 2.4 s and three dots breathe after them. Both
+   stand still under reduced motion. Colours are inherited so the same class
+   works on the light chat surface and the black call screen. */
+.kx-activity-text {
+  background-image: linear-gradient(90deg, currentColor 0%, currentColor 38%, rgba(255,255,255,0.95) 50%, currentColor 62%, currentColor 100%);
+  background-size: 220% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: inherit;
+}
+.kx-activity-dots { display: inline-flex; align-items: flex-end; gap: 2px; height: 1em; }
+.kx-activity-dots i { display: block; width: 3px; height: 3px; border-radius: 9999px; background: currentColor; opacity: 0.35; }
+@media (prefers-reduced-motion: no-preference) {
+  .kx-activity-text { animation: kx-activity-sweep 2.4s ease-in-out infinite; }
+  .kx-activity-dots i { animation: kx-activity-dot 1.4s ease-in-out infinite; }
+  .kx-activity-dots i:nth-child(2) { animation-delay: 0.18s; }
+  .kx-activity-dots i:nth-child(3) { animation-delay: 0.36s; }
+}
+@keyframes kx-activity-sweep {
+  0%   { background-position: 120% 0; }
+  100% { background-position: -120% 0; }
+}
+@keyframes kx-activity-dot {
+  0%, 100% { opacity: 0.35; transform: translateY(0); }
+  40%      { opacity: 1;    transform: translateY(-2px); }
+}
+
+/* ── The call screen's two views, and the orb that travels between them ──
+   (VoiceCallScreen). Opening the words: the big orb flies to the bottom-end
+   corner and shrinks to the size of the small one while the transcript rises
+   from below and the small orb lands, a beat later, where the big one went.
+   Coming back: the words sink away and the orb grows from that corner into
+   the centre. The leaving copy stays opaque for most of the flight so the
+   travelling orb is never see-through, then lets go. The corner is an
+   approximation in viewport units (the small orb sits at bottom-end of the
+   words); the arriving small orb covers the last few pixels. RTL flips the
+   horizontal leg. Everything stands still under reduced motion. */
+@media (prefers-reduced-motion: no-preference) {
+  .kx-view-in  { animation: kx-view-in 0.32s ease-out both; }
+  .kx-view-out { animation: kx-view-out 0.42s ease-in both; }
+  /* orb → words */
+  .kx-view-out.kx-to-chat .kx-orb-stage { animation: kx-orb-fly-out 0.42s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+  .kx-view-in.kx-to-chat  .kx-transcript { animation: kx-rise-in 0.42s cubic-bezier(0.16, 1, 0.3, 1) both; }
+  .kx-view-in.kx-to-chat  .kx-mini-orb { animation: kx-land-in 0.3s cubic-bezier(0.16, 1, 0.3, 1) 0.18s both; }
+  /* words → orb */
+  .kx-view-out.kx-to-orb .kx-transcript { animation: kx-sink-out 0.3s ease-in both; }
+  .kx-view-out.kx-to-orb .kx-mini-orb { animation: kx-fade-out 0.2s ease-in both; }
+  .kx-view-in.kx-to-orb  .kx-orb-stage { animation: kx-orb-fly-in 0.42s cubic-bezier(0.16, 1, 0.3, 1) both; }
+  [dir="rtl"] .kx-view-out.kx-to-chat .kx-orb-stage { animation-name: kx-orb-fly-out-rtl; }
+  [dir="rtl"] .kx-view-in.kx-to-orb  .kx-orb-stage { animation-name: kx-orb-fly-in-rtl; }
+  /* the chosen voice's signature breathes */
+  .kx-voice-glyph.is-on rect { animation: kx-voice-bar 1.6s ease-in-out infinite; }
+}
+@keyframes kx-view-in  { from { opacity: 0; } to { opacity: 1; } }
+@keyframes kx-view-out { 0% { opacity: 1; } 70% { opacity: 1; } 100% { opacity: 0; } }
+@keyframes kx-orb-fly-out     { from { transform: none; } to { transform: translate(36vw, 30vh) scale(0.36); } }
+@keyframes kx-orb-fly-out-rtl { from { transform: none; } to { transform: translate(-36vw, 30vh) scale(0.36); } }
+@keyframes kx-orb-fly-in      { from { transform: translate(36vw, 30vh) scale(0.36); opacity: 0.4; } to { transform: none; opacity: 1; } }
+@keyframes kx-orb-fly-in-rtl  { from { transform: translate(-36vw, 30vh) scale(0.36); opacity: 0.4; } to { transform: none; opacity: 1; } }
+@keyframes kx-rise-in  { from { opacity: 0; transform: translateY(28px); } to { opacity: 1; transform: none; } }
+@keyframes kx-sink-out { from { opacity: 1; transform: none; } to { opacity: 0; transform: translateY(24px); } }
+@keyframes kx-land-in  { from { opacity: 0; transform: scale(0.55); } to { opacity: 1; transform: none; } }
+@keyframes kx-fade-out { to { opacity: 0; } }
+@keyframes kx-voice-bar { 0%, 100% { transform: scaleY(1); } 50% { transform: scaleY(0.55); } }
 
 /* Bottom-sheet entrance (NotificationBell mobile). On md+ the same class
    gives the dropdown a subtle rise-in. Disabled under reduced motion. */
@@ -1202,6 +1575,15 @@ input[type="number"]:not(.kx-spinner) {
   from { transform: translateX(-100%); }
   to   { transform: translateX(0); }
 }
+/* Departure leg (owner-approved motion system): the drawer leaves the way
+   it came, faster, on the exit curve. Applied by usePresence. */
+@keyframes kx-slide-out-end { to { transform: translateX(100%); } }
+@keyframes kx-slide-out-end-rtl { to { transform: translateX(-100%); } }
+.kx-slide-closing { animation: kx-slide-out-end 200ms var(--kx-ease-exit, cubic-bezier(0.4, 0, 1, 1)) both !important; }
+[dir="rtl"] .kx-slide-closing { animation-name: kx-slide-out-end-rtl; }
+@media (prefers-reduced-motion: reduce) {
+  .kx-slide-closing { animation: none !important; }
+}
 
 /* ── Loading language (owner pick 2026-08-08: "bar + shimmer") ──
    ONE loading vocabulary for the whole Hub: an indeterminate Hub Blue
@@ -1261,6 +1643,38 @@ input[type="number"]:not(.kx-spinner) {
    hop to point the OTHER way in RTL. Custom properties inherit, so one flip
    at the rtl root covers every consumer. */
 :root { --kx-flip: 100%; }
+
+/* ── --kx-bleed ────────────────────────────────────────────────────────────
+   How far a full-bleed section may hang outside its container: EXACTLY the
+   container's own horizontal padding, so the section's outer edge lands on
+   the container's outer edge and never past the viewport.
+
+   App shells wrap content in `px-4 md:px-6 lg:px-8`. A section that wanted to
+   bleed used a hardcoded -24px margin, which is correct from md up and 8px
+   too much on a phone — and 8px of overhang is a horizontally scrolling page,
+   which is what the owner reported as the app "dancing" on mobile. Deriving
+   both from the same breakpoints makes disagreement impossible. */
+/* ── .kx-below-ramp: DELETED, and this is the note it left ──
+   It padded content down by 3rem to clear the frosted header RAMP, because
+   on an iPhone the safe area grows the header, the ramp moves down with it,
+   and the first thing on the page landed inside the blur before any
+   scrolling — the owner photographed exactly that (the greeting on Home,
+   Discuss's "New" button).
+
+   Superseded: phones now hide BOTH header panes at rest, so at rest there is
+   no blur for content to sit inside and nothing to clear. The padding
+   outlived its cause and became a visible gap between the header and the
+   first content on Home — the owner's next report. Clearing space for a
+   thing that is no longer painted is dead space, so both the class and its
+   two usages are gone rather than left "harmless".
+
+   If a frosted ramp is ever restored at rest, restore the clearance WITH it
+   in the same change; the two only make sense together. */
+
+:root { --kx-bleed: 1rem; }           /* matches px-4  */
+@media (min-width: 768px)  { :root { --kx-bleed: 1.5rem; } }  /* md:px-6 */
+@media (min-width: 1024px) { :root { --kx-bleed: 2rem; } }    /* lg:px-8 */
+
 [dir="rtl"] { --kx-flip: -100%; }
 /* DIRECTION ISLANDS. The header is pinned dir="ltr" inside an Arabic page,
    and a dir attribute does NOT reset an inherited custom property — the
@@ -1378,6 +1792,21 @@ input[type="number"]:not(.kx-spinner) {
   backdrop-filter: none;
   background: transparent;
 }
+/* …AT REST. Once the page actually scrolls, the pane's flat frost comes
+   back even on owns-the-ramp screens (owner, on the product form: "the
+   blur edge not start from beginning, it just work when i scroll more").
+   The app's ramp rides its own sticky bar, and until that bar has
+   travelled up and pinned there is NOTHING filtered over y 0–56 — the
+   title row crossed the main header stone-crisp. The "one edge" rule this
+   stand-down exists for is a REST-state rule: at rest the pane stays
+   bare (one soft edge, the app's). While scrolled, the returning flat
+   frost's hard bottom edge lands INSIDE the pinned bar's taller ramp, so
+   the screen still reads as one edge — but everything crossing the top
+   strip now dissolves from the first scrolled pixel. */
+[data-kx-skin="aurora"][data-kx-topramp="app"][data-kx-scrolled] .kx-header-pane {
+  -webkit-backdrop-filter: blur(40px) saturate(150%);
+  backdrop-filter: blur(40px) saturate(150%);
+}
 
 /* No fill AND no hairline: with the bar reduced to pure blur, the border-b
    was the last thing drawing a line across the ground. border-color rather
@@ -1399,8 +1828,97 @@ input[type="number"]:not(.kx-spinner) {
      stretches with the pane instead of parking behind the status bar. */
   height: calc(var(--kx-header-h, 3.5rem) + 3rem);
 }
+
+/* ── PHONES: SOLID AT REST, FROSTED ON SCROLL ─────────────────────────────
+   The owner's call, after the blur-at-rest defect survived three fixes on a
+   17 Pro Max. Each of those moved the blur's geometry and each measured
+   clean in a desktop browser while the device still showed a smeared logo
+   and smeared top content — so the blur stops being present at rest at all.
+
+   At rest the bar is opaque page colour: the wordmark, bell and avatar sit
+   on a known ground, which cannot smear on any renderer. The moment content
+   starts moving under it (data-kx-scrolled, set by MainHeader from
+   #main-scroll-container), the fill fades out and the frosted ramp fades in
+   — so the glass edge the owner wanted is exactly where it is useful, over
+   moving content, and never over a still page.
+
+   Desktop is untouched: it keeps pure blur at every scroll position.
+
+   The transition is on the PANE and the BAR together so the two halves of
+   the swap cannot fall out of step. 180ms — long enough not to snap, short
+   enough that a fast flick does not lag behind the content. */
+@media (max-width: 767px) {
+  /* The bar carries the fill at rest… */
+  [data-kx-skin="aurora"] .kx-mainheader {
+    background: var(--bg-primary, #0A0A0A);
+    transition: background-color 180ms ease;
+  }
+  [data-kx-skin="aurora"][data-kx-scrolled] .kx-mainheader {
+    background: transparent;
+  }
+
+  /* …and the blur pane only exists once scrolled. `visibility` as well as
+     opacity: a backdrop-filter at opacity 0 still costs a compositing pass
+     on iOS, and this is the one element that must not cost anything while
+     the page is still. */
+  /* BOTH panes, not just the progressive one.
+
+     .kx-header-pane carries its OWN blur(40px) — the strongest filter in the
+     system — and .kx-pane-progressive only ADDS the four masked layers on
+     top of it. Four previous attempts hid or moved the LAYERS and left the
+     40px base untouched, which is why the header kept smearing on the device
+     no matter what the layer geometry said. This is the rule that was
+     actually painting over the logo. */
+  [data-kx-skin="aurora"] .kx-header-pane,
+  [data-kx-skin="aurora"] .kx-pane-progressive {
+    height: var(--kx-header-h, 3.5rem);
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 180ms ease, visibility 0s linear 180ms;
+  }
+  [data-kx-skin="aurora"][data-kx-scrolled] .kx-header-pane,
+  [data-kx-skin="aurora"][data-kx-scrolled] .kx-pane-progressive {
+    /* Scrolled: the glass returns — the effect the owner asked to keep. */
+    opacity: 1;
+    visibility: visible;
+    transition: opacity 180ms ease, visibility 0s;
+  }
+  [data-kx-skin="aurora"][data-kx-scrolled] .kx-pane-progressive {
+    /* …and the progressive one regains its full approach ramp, so content
+       fades as it rises rather than meeting a hard edge. */
+    height: calc(var(--kx-header-h, 3.5rem) + 3rem);
+  }
+}
+
+/* Motion preference: no fade, just an instant swap. */
+@media (max-width: 767px) and (prefers-reduced-motion: reduce) {
+  [data-kx-skin="aurora"] .kx-mainheader,
+  [data-kx-skin="aurora"] .kx-header-pane,
+  [data-kx-skin="aurora"] .kx-pane-progressive { transition: none; }
+}
 [data-kx-skin="aurora"] .kx-pane-progressive > i {
   position: absolute;
+  /* Start BELOW the safe area, not at 0.
+
+     `inset: 0` filled the whole pane, which is invisible on desktop because
+     the solid header covers the top of it. On a notched iPhone the safe area
+     is transparent chrome — so the blur painted right under the status bar
+     and washed over the KOLEEX hub logo sitting at y=73. The owner
+     photographed exactly that on a 17 Pro Max.
+
+     REVERTED to inset: 0 — and the reason matters, because moving it was
+     wrong in a way that measured as right.
+
+     The header bar has NO fill of its own (background: transparent, no
+     backdrop-filter): "the bar is now the ground itself, frosted", per the
+     rule below. Its frosting IS these layers. Starting them below the header
+     therefore did not stop a blur from covering the logo — it removed the
+     bar's own glass, leaving the wordmark sitting on raw scrolled content.
+     In a desktop browser that reads as clean; on the phone it reads as the
+     header washing over the logo, which is what the owner kept seeing after
+     the "fix".
+
+     The real defect was never these layers' top edge. */
   inset: 0;
   display: block;
   pointer-events: none;
@@ -1564,6 +2082,39 @@ input[type="number"]:not(.kx-spinner) {
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9),
               0 40px 80px -34px rgba(16, 24, 40, 0.28);
 }
+/* ── kx-pop-clear — the owner's pick for the header popovers (ballot "L",
+   2026-08-21, then "glass effect mean frosted transparent"): the SAME pop
+   surface pushed to genuinely see-through frost — film near zero, blur up,
+   brightness lifted so the dark ground still reads through the pane — plus
+   Hub-Blue neon hairlines on every internal divider (the L structure).
+   Declared BEFORE the lowpower/@supports arms below so those still win:
+   on weak machines the panel goes opaque like every other pop surface. */
+[data-kx-skin="aurora"] .kx-pop-clear {
+  background:
+    linear-gradient(157deg, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0.03) 34%, rgba(255, 255, 255, 0) 66%),
+    rgba(255, 255, 255, 0.02);
+  -webkit-backdrop-filter: blur(52px) saturate(185%) brightness(1.45);
+  backdrop-filter: blur(52px) saturate(185%) brightness(1.45);
+  border-color: rgba(255, 255, 255, 0.14);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.2),
+              0 40px 90px -30px rgba(0, 0, 0, 0.95);
+}
+[data-kx-skin="aurora"][data-theme="light"] .kx-pop-clear {
+  background:
+    linear-gradient(157deg, rgba(255, 255, 255, 0.5) 0%, rgba(255, 255, 255, 0.24) 34%, rgba(255, 255, 255, 0.08) 66%),
+    rgba(255, 255, 255, 0.35);
+  -webkit-backdrop-filter: blur(52px) saturate(185%) brightness(1.02);
+  backdrop-filter: blur(52px) saturate(185%) brightness(1.02);
+  border-color: rgba(16, 24, 40, 0.12);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9),
+              0 40px 90px -34px rgba(16, 24, 40, 0.3);
+}
+/* the L structure: every internal divider becomes a Hub-Blue neon hairline —
+   one rule, no per-divider markup edits (side borders on chips untouched) */
+[data-kx-skin="aurora"] .kx-pop-clear :is([class*="border-b"], [class*="border-t"]) {
+  border-color: rgba(127, 169, 214, 0.32);
+}
+
 [data-kx-skin="aurora"][data-kx-lowpower] .kx-glass-pop {
   -webkit-backdrop-filter: none;
   backdrop-filter: none;
@@ -1706,11 +2257,87 @@ input[type="number"]:not(.kx-spinner) {
    above it because it is neutral and covers the full row.
    Light theme uses the skin's light hover blue (62,103,150) at a lower alpha
    — the same colour the light Aurora hover puts on borders. */
-.kx-pop-panel button:hover {
+.kx-pop-panel :is(button, a):is(:hover, :active) {
+  /* :is(button, a) — a menu row is a menu row whichever element renders it.
+     The category jump menu's rows are ANCHORS and had no hover at all
+     (owner: "where is the hover in dropdown menu").
+     :active TOO, because the owner reviews on an iPhone — touch has no
+     hover, so without a pressed state a tap gives zero feedback and the
+     row "has no hover" is exactly what a phone user reports. The press
+     reads slightly stronger than the pointer hover on purpose: it is
+     confirmation, not focus. */
   background-color: rgba(127, 169, 214, 0.16);
 }
-[data-theme="light"] .kx-pop-panel button:hover {
+.kx-pop-panel :is(button, a):active {
+  background-color: rgba(127, 169, 214, 0.24);
+}
+[data-theme="light"] .kx-pop-panel :is(button, a):is(:hover, :active) {
   background-color: rgba(62, 103, 150, 0.1);
+}
+[data-theme="light"] .kx-pop-panel :is(button, a):active {
+  background-color: rgba(62, 103, 150, 0.16);
+}
+
+/* ── REPEATED ITEMS DO NOT GET A BLUR PASS ───────────────────────────────
+   `.kx-flat-items` on a CONTAINER strips the backdrop-filter from every
+   glass surface inside it, keeping the fill, the rim, the gradient edge
+   and every hover — the look survives, the per-element compositing cost
+   does not.
+
+   THE MEASUREMENT THAT EARNED THIS RULE: fast-scrolling the product grid
+   on the owner's phone made whole cards flash BLANK — iOS cannot
+   re-composite hundreds of live blur layers per frame and starts dropping
+   them. The first fix was phones-only and card-specific; this replaces it,
+   because the cost is not a phone problem and not a product problem. It
+   is what the perf rules already say in words — "blur is priced per
+   element" — hitting at grid scale on every screen that lists things,
+   and weak factory machines pay it on desktop too.
+
+   THE FILL IS NOT A NEW COLOUR. It is the value the low-power tier and
+   the no-backdrop-filter fallback already use Hub-wide, so a flattened
+   grid is pixel-identical to what those tiers have always rendered — one
+   surface language, three ways to arrive at it.
+
+   WHERE IT DOES *NOT* GO: the big chrome (header pane, drawers, modals,
+   dropdown panels) keeps real glass. Those are a handful of surfaces per
+   screen, they sit over moving content, and their blur is the skin. This
+   rule is for the many, not the few. */
+[data-kx-skin="aurora"] .kx-flat-items .kx-glass {
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  background: rgba(14, 17, 23, 0.92);
+}
+[data-kx-skin="aurora"][data-theme="light"] .kx-flat-items .kx-glass {
+  background: rgba(250, 251, 253, 0.95);
+}
+
+/* ── kx-pop-dense — the MN-5 look, held over BRIGHT content ──────────────
+   The signed-off pop material is brightness(1.5) glass tuned against a
+   near-black backdrop; over white product photos it white-out the menu
+   (owner, twice: "the colors and glass effects is wrong", "still not the
+   glass I want"). A black/50 dim behind it read as a grey wash — also
+   rejected. This variant keeps the SHELL (kx-pop-panel radius/border/
+   sheen) and swaps only the fill+filter: a dense dark film with the same
+   blur and saturation and NO brightness lift, so the panel looks exactly
+   like the Sales-Rep picker does over dark content — which is the look
+   the canon was signed off FOR — regardless of what is behind it.
+   Layered AFTER .kx-pop-panel on purpose: same specificity, later wins. */
+[data-kx-skin="aurora"] .kx-pop-dense {
+  /* OWNER-PICKED from five material samples (2026-08-20, sample 2 —
+     "solid dark, no blur"): over bright imagery the menu goes SOLID.
+     Cleanest read of the five, cheapest to composite (no blur pass over
+     a live scroller — the same property that froze phone scrolling
+     earlier today), and the values match the low-power / no-backdrop
+     fallbacks, so this menu looks identical on every tier of device.
+     The kx-pop-panel shell (radius, gradient border, shadow) stays. */
+  background: rgba(14, 17, 23, 0.985);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+[data-kx-skin="aurora"][data-theme="light"] .kx-pop-dense {
+  background: rgba(252, 253, 255, 0.99);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
 }
 [data-kx-skin="aurora"][data-kx-lowpower] .kx-pop-panel {
   -webkit-backdrop-filter: none;
@@ -1805,6 +2432,58 @@ input[type="number"]:not(.kx-spinner) {
 [data-kx-skin="aurora"][data-theme="light"] :is(.kx-ai-form, .kx-pd, .kx-app) input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="range"]):focus,
 [data-kx-skin="aurora"][data-theme="light"] :is(.kx-ai-form, .kx-pd, .kx-app) textarea:focus,
 [data-kx-skin="aurora"][data-theme="light"] :is(.kx-ai-form, .kx-pd, .kx-app) select:focus {
+  border-color: rgba(62, 103, 150, 0.75) !important;
+  box-shadow: inset 0 1.5px 4px rgba(16, 24, 40, 0.10), 0 0 0 3px rgba(86, 127, 178, 0.15);
+}
+
+/* ── THE AI COMPOSER IS A RECESSED WELL (owner pick "B", 2026-08-20) ──────
+   The Ask-Koleex-AI composer trades the pop-glass card for the Aurora field
+   grammar: carved into the page, Hub-Blue ring on focus-within. The element
+   KEEPS kx-glass-pop and its Core classes — Core renders the original card
+   untouched; these rules exist only under Aurora. The selector carries
+   .kx-glass-pop on purpose: it must outrank the pop-glass recipe AND its
+   lowpower/@supports arms at any position (0,4,0 vs their 0,3,0), and the
+   explicit backdrop-filter:none is what actually removes the pop blur — a
+   well is not glass. Focus mirrors the resting chain (the §F lesson). */
+[data-kx-skin="aurora"] .kx-ai-root .kx-ai-composer.kx-glass-pop {
+  background: rgba(3, 5, 9, 0.55);
+  border-color: rgba(255, 255, 255, 0.08);
+  box-shadow: inset 0 1.5px 4px rgba(0, 0, 0, 0.40);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+[data-kx-skin="aurora"] .kx-ai-root .kx-ai-composer.kx-glass-pop:focus-within {
+  border-color: rgba(86, 127, 178, 0.70) !important;
+  box-shadow: inset 0 1.5px 4px rgba(0, 0, 0, 0.40), 0 0 0 3px rgba(86, 127, 178, 0.18);
+}
+[data-kx-skin="aurora"][data-theme="light"] .kx-ai-root .kx-ai-composer.kx-glass-pop {
+  background: rgba(255, 255, 255, 0.70);
+  border-color: rgba(0, 0, 0, 0.10);
+  box-shadow: inset 0 1.5px 4px rgba(16, 24, 40, 0.10);
+}
+[data-kx-skin="aurora"][data-theme="light"] .kx-ai-root .kx-ai-composer.kx-glass-pop:focus-within {
+  border-color: rgba(62, 103, 150, 0.75) !important;
+  box-shadow: inset 0 1.5px 4px rgba(16, 24, 40, 0.10), 0 0 0 3px rgba(86, 127, 178, 0.15);
+}
+
+/* The Discuss AI chat's one-line composer wears the same well (owner:
+   "make Discuss AI composer same"). Its own hook — the element is NOT
+   glass-pop, so there are no material arms to outrank here. */
+[data-kx-skin="aurora"] .kx-ai-composer-mini {
+  background: rgba(3, 5, 9, 0.55);
+  border-color: rgba(255, 255, 255, 0.08);
+  box-shadow: inset 0 1.5px 4px rgba(0, 0, 0, 0.40);
+}
+[data-kx-skin="aurora"] .kx-ai-composer-mini:focus-within {
+  border-color: rgba(86, 127, 178, 0.70) !important;
+  box-shadow: inset 0 1.5px 4px rgba(0, 0, 0, 0.40), 0 0 0 3px rgba(86, 127, 178, 0.18);
+}
+[data-kx-skin="aurora"][data-theme="light"] .kx-ai-composer-mini {
+  background: rgba(255, 255, 255, 0.70);
+  border-color: rgba(0, 0, 0, 0.10);
+  box-shadow: inset 0 1.5px 4px rgba(16, 24, 40, 0.10);
+}
+[data-kx-skin="aurora"][data-theme="light"] .kx-ai-composer-mini:focus-within {
   border-color: rgba(62, 103, 150, 0.75) !important;
   box-shadow: inset 0 1.5px 4px rgba(16, 24, 40, 0.10), 0 0 0 3px rgba(86, 127, 178, 0.15);
 }
@@ -2093,6 +2772,27 @@ input[type="number"]:not(.kx-spinner) {
   [data-kx-skin="aurora"] .kx-bar-prog > i { display: none; }
 }
 
+/* ── PHONES: the PD toolbar carries its own fill ──────────────────────────
+   On desktop this sticky search bar deliberately has NO surface of its own:
+   the category nav below it is sticky too, and that nav's ramp reaches up
+   over the toolbar (one edge for the whole strip). On phones the category
+   grid went STATIC (owner's no-scroll grid, 2026-08-20), so the nav — and
+   its ramp — scroll away with the page, and the pinned toolbar sat fully
+   TRANSPARENT: product cards drove straight through the search field
+   (owner's phone screenshot). Solid fill below sm only, matching the
+   phone's solid-at-rest header language; desktop keeps the shared ramp. */
+@media (max-width: 639px) {
+  /* NEAR-SOLID, NOT FROSTED, and this is a retreat with a reason. The
+     frosted version (blur 16 on this sticky bar) shipped for one deploy
+     and the owner's next message was "I can't scroll the page" — a
+     backdrop-filter on a sticky INSIDE the Hub scroller is a known iOS
+     compositing freezer, and this bar is the only such element on the
+     route. 96% fill keeps the bar legible over passing cards; the frost
+     on phones belongs to the panes and popups, not to in-scroller bars. */
+  [data-kx-skin="aurora"] .kx-pd-toolbar { background: rgba(12, 14, 18, 0.96); }
+  [data-kx-skin="aurora"][data-theme="light"] .kx-pd-toolbar { background: rgba(250, 251, 253, 0.97); }
+}
+
 /* The sliding pill behind TabStrip's active tab (aurora only) — the
    dock/language-bar mechanic, measured because tab labels vary. */
 .kx-tabstrip-ind { display: none; }
@@ -2300,7 +3000,11 @@ input[type="number"]:not(.kx-spinner) {
 @media (prefers-reduced-motion: no-preference) {
   [data-kx-skin="aurora"] :is(.kx-pd, .kx-app)
     :is(button, a, [role="tab"], [role="switch"], summary):not(.transition-none) {
-    transition-property: color, background-color, border-color, box-shadow, transform, opacity;
+    /* `scale` is listed because the global press rule animates the
+       INDEPENDENT scale property, and this blanket (specificity 0,4,0)
+       outranks it — without scale here the press-down snapped instantly
+       inside every converted app while Core-skin screens sank properly. */
+    transition-property: color, background-color, border-color, box-shadow, transform, scale, opacity;
     transition-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
   }
 }
@@ -2430,20 +3134,52 @@ input[type="number"]:not(.kx-spinner) {
    Aurora the selected state is the Hub-Blue inset ring over a 10% fill, the
    same as every other segmented control in the Hub (canon D). Bound to
    .kx-app so the twenty-two apps still on Core keep their white pill. */
+/* THE FILL MOVED TO .kx-ph-pill, THE COLOUR STAYED. The selected tab used to
+   paint its own ring-over-fill, which is exactly what made switching read as
+   a blink — one block off, another on. The look is unchanged; it is now
+   carried by the one element that glides between tabs, so the skin still
+   decides WHAT the selection looks like and the pill decides HOW it moves. */
 [data-kx-skin="aurora"] :is(.kx-pd, .kx-app) .kx-ph-tabs [aria-selected="true"] {
-  background-color: rgba(86, 127, 178, 0.10);
-  box-shadow: inset 0 0 0 1px rgba(86, 127, 178, 0.70);
   color: var(--text-primary);
 }
-[data-kx-skin="aurora"][data-theme="light"] :is(.kx-pd, .kx-app) .kx-ph-tabs [aria-selected="true"] {
+[data-kx-skin="aurora"] :is(.kx-pd, .kx-app) .kx-ph-pill {
+  background: rgba(86, 127, 178, 0.10);
+  box-shadow: inset 0 0 0 1px rgba(86, 127, 178, 0.70);
+}
+[data-kx-skin="aurora"][data-theme="light"] :is(.kx-pd, .kx-app) .kx-ph-pill {
   box-shadow: inset 0 0 0 1px rgba(62, 103, 150, 0.75);
 }
-/* Hover on an unselected tab: the border/tint whisper, not a filled block. */
+/* Hover on an unselected tab: a tint whisper, not a filled block — but it
+   has to be FELT. Two problems were stacked here (owner, on the Inventory
+   tab bar: "here have a problem in hover"):
+   · the generic button-hover recipe below carries !important, so it beat
+     this rule and served tabs 3% instead of this 4% — a tab bar built out
+     of routes is a NAV, and it must not be styled by the button recipe;
+     the exclusion is added there.
+   · 3-4% white over the strip's own --bg-secondary fill is under the
+     threshold where the eye registers a change at all: measured against
+     the resting state, the tab looked completely inert under the cursor.
+   6% reads as a clear whisper and still sits far below the selected
+   tab's blue. The `!important` here is defensive: this rule is the tab's
+   own recipe and must not be re-stomped by a future blanket. */
 [data-kx-skin="aurora"] :is(.kx-pd, .kx-app) .kx-ph-tabs [aria-selected="false"]:hover {
-  background-color: rgba(255, 255, 255, 0.04);
+  background-color: rgba(255, 255, 255, 0.06) !important;
 }
 [data-kx-skin="aurora"][data-theme="light"] :is(.kx-pd, .kx-app) .kx-ph-tabs [aria-selected="false"]:hover {
-  background-color: rgba(0, 0, 0, 0.04);
+  background-color: rgba(0, 0, 0, 0.055) !important;
+}
+/* The SELECTED tab answers the cursor too — but by deepening its own blue,
+   never by changing colour. It is already the tab you are on; hover is an
+   acknowledgement, not a state change. */
+/* 6%, not 16%: this now paints ON TOP of the pill's own 10% rather than
+   replacing it, so the old value would land at roughly 24% and turn the
+   acknowledgement into a state change. 6% over 10% reproduces what the tab
+   looked like before the fill moved. */
+[data-kx-skin="aurora"] :is(.kx-pd, .kx-app) .kx-ph-tabs [aria-selected="true"]:hover {
+  background-color: rgba(86, 127, 178, 0.06) !important;
+}
+[data-kx-skin="aurora"][data-theme="light"] :is(.kx-pd, .kx-app) .kx-ph-tabs [aria-selected="true"]:hover {
+  background-color: rgba(86, 127, 178, 0.06) !important;
 }
 
 /* ── THE PRIMARY BUTTON STAYS WHITE. ONLY ITS HOVER WAS WRONG ──────────
@@ -2468,7 +3204,16 @@ input[type="number"]:not(.kx-spinner) {
    — SOLID WHITE in dark theme — the moment the pointer touched them. Owner, on
    the Supplier tab: "fix the hover and selected field UI issues, it becomes
    white." A tint is not a fill; `/` is what tells them apart. */
-[data-kx-skin="aurora"] :is(.kx-pd, .kx-app) [class*="bg-[var(--bg-inverted)]"]:not([class*="bg-[var(--bg-inverted)]/"]):not([data-kx-keep-inverted]):hover {
+/* ⚠️ A TAB IS NOT A PRIMARY BUTTON. The selected tab carries
+   `bg-[var(--bg-inverted)]` in its Tailwind classes, so it matched this rule
+   and, on hover, took `background-color: var(--bg-inverted) !important` —
+   flipping the selected tab to SOLID WHITE in dark mode and SOLID BLACK in
+   light mode, every time the cursor passed over it. Owner, on the Sales tab
+   bar: "the tab already selected, when I hover it, in dark mode becomes
+   white and in light mode becomes black". At rest the tab's own recipe
+   paints it Hub Blue; hover has no business overriding that. Tabs are
+   excluded here and governed by the .kx-ph-tabs rules above. */
+[data-kx-skin="aurora"] :is(.kx-pd, .kx-app) [class*="bg-[var(--bg-inverted)]"]:not([role="tab"]):not([class*="bg-[var(--bg-inverted)]/"]):not([data-kx-keep-inverted]):hover {
   /* NOTHING HERE MAY DARKEN THE BUTTON. Round one pinned the opacity but
      added `0 6px 18px -6px rgba(0,0,0,.45)` — a black drop shadow — and the
      owner said it was still dark, correctly: I had removed one way of dimming
@@ -2511,7 +3256,7 @@ input[type="number"]:not(.kx-spinner) {
    from the normal hover — which then fell through to the primary-button rule
    and went solid white. A `/` in the token means a tint, and a tint hovers
    like everything else. */
-[data-kx-skin="aurora"] :is(.kx-pd, .kx-app) :is(button, a, summary, [role="button"]):not([aria-selected="true"]):not(.kx-seg-on):not(.kx-chip-on):not([data-kx-keep-hover]):not(.kx-pop-panel *):is(:not([class*="bg-[var(--bg-inverted)]"]), [class*="bg-[var(--bg-inverted)]/"]):not([class*="bg-[var(--bg-inverted)]/"][class*="w-full"]):hover {
+[data-kx-skin="aurora"] :is(.kx-pd, .kx-app) :is(button, a, summary, [role="button"]):not([role="tab"]):not([aria-selected="true"]):not(.kx-seg-on):not(.kx-chip-on):not([data-kx-keep-hover]):not(.kx-pop-panel *):is(:not([class*="bg-[var(--bg-inverted)]"]), [class*="bg-[var(--bg-inverted)]/"]):not([class*="bg-[var(--bg-inverted)]/"][class*="w-full"]):hover {
   /* !important, and it is earned. Measured on prod with per-recipe clones:
      without it exactly the buttons carrying Tailwind's own
      `hover:border-[var(--border-color)]` kept the Core colour, while buttons
@@ -2538,7 +3283,7 @@ input[type="number"]:not(.kx-spinner) {
   background-color: rgba(255, 255, 255, 0.03) !important;
   translate: none;
 }
-[data-kx-skin="aurora"][data-theme="light"] :is(.kx-pd, .kx-app) :is(button, a, summary, [role="button"]):not([aria-selected="true"]):not(.kx-seg-on):not(.kx-chip-on):not([data-kx-keep-hover]):not(.kx-pop-panel *):is(:not([class*="bg-[var(--bg-inverted)]"]), [class*="bg-[var(--bg-inverted)]/"]):not([class*="bg-[var(--bg-inverted)]/"][class*="w-full"]):hover {
+[data-kx-skin="aurora"][data-theme="light"] :is(.kx-pd, .kx-app) :is(button, a, summary, [role="button"]):not([role="tab"]):not([aria-selected="true"]):not(.kx-seg-on):not(.kx-chip-on):not([data-kx-keep-hover]):not(.kx-pop-panel *):is(:not([class*="bg-[var(--bg-inverted)]"]), [class*="bg-[var(--bg-inverted)]/"]):not([class*="bg-[var(--bg-inverted)]/"][class*="w-full"]):hover {
   border-color: rgba(62, 103, 150, 0.6) !important;
   background-color: rgba(0, 0, 0, 0.03) !important;
 }
@@ -2694,12 +3439,16 @@ input[type="number"]:not(.kx-spinner) {
 /* Stat/metric mini-cards that were filled with `--bg-primary` — a token the
    app-scope remap turns TRANSPARENT, which left them as floating text with
    a border. They take a surface tint instead of a blur pass: there are a
-   dozen of them side by side, and blur is priced per element. */
+   dozen of them side by side, and blur is priced per element.
+   The tint is the PANEL fill (same value the bg-secondary remap uses), not
+   a 5% wash: at 5% the aurora ground's bright bands showed straight through
+   and washed out the digits and their /40-opacity labels (owner caught it
+   on the supplier KPI strip). Still zero blur passes. */
 [data-kx-skin="aurora"] :is(.kx-pd, .kx-app) .kx-stat {
-  background: rgba(255, 255, 255, 0.05);
+  background: rgba(13, 16, 22, 0.55);
 }
 [data-kx-skin="aurora"][data-theme="light"] :is(.kx-pd, .kx-app) .kx-stat {
-  background: rgba(0, 0, 0, 0.05);
+  background: rgba(255, 255, 255, 0.62);
 }
 
 /* Range sliders. The track paint lives HERE and not in an inline style so
@@ -2895,15 +3644,70 @@ input[type="number"]:not(.kx-spinner) {
   from { opacity: 0; transform: translateY(-8px) scale(0.95); }
   to   { opacity: 1; transform: translateY(0) scale(1); }
 }
-[data-kx-skin="aurora"] .kx-glass-pop {
-  animation: kx-pop-in 0.28s cubic-bezier(0.34, 1.3, 0.5, 1) both;
+/* Motion is SKIN-INDEPENDENT (owner-approved motion system): under the Core
+   skin every menu used to appear with zero animation because this arrival was
+   aurora-gated. The glass STYLING stays skin-scoped elsewhere; the movement
+   does not. */
+/* ⚠️ MOTION IS ITS OWN CLASS — never a styling class.
+   `.kx-glass-pop` is the glass MATERIAL and `.kx-pop-panel` is the dropdown
+   SHELL (the note at the top of the pop-glass block says so outright).
+   Hanging the arrival on either one gave an entrance to everything that
+   merely wanted the LOOK: Inventory's floating Shortcuts button re-popped
+   on every navigation, the AI composer popped on mount, and the eight
+   sidebar fly-outs — permanently mounted at opacity 0 — replayed an
+   invisible animation on every page. Owner, on Inventory and Purchases:
+   "the motion and navigation is totally wrong".
+   So the arrival is applied BY THE COMPONENT that decides when a surface
+   appears: PopoverPanel and Select add .kx-pop-arrive; dialogs use the
+   older .kx-pop-in settle. Persistent chrome carries neither. */
+.kx-pop-arrive {
+  /* `backwards`, NEVER `both`. `both` keeps the last keyframe's transform
+     applied FOREVER, and a transformed element becomes the containing block
+     for every position:fixed descendant — a non-portalled confirm dialog
+     opened inside a glass panel would then be centred on the PANEL and
+     clipped by it. The final keyframe equals the natural styles, so
+     `backwards` looks identical and leaves nothing behind. Same law as
+     kx-tab-in. */
+  animation: kx-pop-in var(--kx-dur-base, 0.24s) var(--kx-ease-pop, cubic-bezier(0.34, 1.3, 0.5, 1)) backwards;
   transform-origin: calc(100% - 28px) 0%;
 }
-[data-kx-skin="aurora"][dir="rtl"] .kx-glass-pop,
-[dir="rtl"] [data-kx-skin="aurora"] .kx-glass-pop { transform-origin: 28px 0%; }
-@media (prefers-reduced-motion: reduce) {
-  [data-kx-skin="aurora"] .kx-glass-pop { animation: none; }
+[dir="rtl"] .kx-pop-arrive { transform-origin: 28px 0%; }
+/* Exit choreography (pick 2A): dismissal shrinks away on the exit curve at
+   ~60% of the entrance. Applied by usePresence just before unmount. */
+@keyframes kx-pop-out {
+  to { opacity: 0; transform: translateY(-6px) scale(0.965); }
 }
+.kx-pop-closing { animation: kx-pop-out 140ms var(--kx-ease-exit, cubic-bezier(0.4, 0, 1, 1)) both !important; }
+/* Phone-sheet variant: a panel presented as a bottom/under-header sheet
+   leaves by sliding back down, not by shrinking. */
+@keyframes kx-sheet-out { to { opacity: 0; transform: translateY(28px); } }
+.kx-sheet-closing { animation: kx-sheet-out 200ms var(--kx-ease-exit, cubic-bezier(0.4, 0, 1, 1)) both !important; }
+
+/* ── Toast arrival & departure (owner pick, motion system) ──────────────
+   Rises in, falls away. Put these on an inner node, never on the node that
+   carries the centering translate. kx-toast-out is declared after -in so
+   holding both classes plays the exit. */
+@keyframes kx-toast-in {
+  from { opacity: 0; transform: translateY(14px) scale(0.97); }
+  to   { opacity: 1; transform: none; }
+}
+@keyframes kx-toast-out {
+  to { opacity: 0; transform: translateY(10px) scale(0.97); }
+}
+.kx-toast-in { animation: kx-toast-in var(--kx-dur-base, 240ms) var(--kx-ease-expo, cubic-bezier(0.16, 1, 0.3, 1)) both; }
+.kx-toast-out { animation: kx-toast-out 200ms var(--kx-ease-exit, cubic-bezier(0.4, 0, 1, 1)) both; }
+
+@media (prefers-reduced-motion: reduce) {
+  .kx-pop-arrive, .kx-pop-closing, .kx-sheet-closing, .kx-toast-in, .kx-toast-out { animation: none !important; }
+}
+
+/* Low-power tier: the DECORATIVE infinite loops pause (they were running
+   forever on weak devices while every glass arm was already dropped).
+   Loading indicators — the orb, the comet bar, the loadbar — keep moving:
+   a frozen loader reads as a hang. */
+[data-kx-lowpower] .kx-tier-metal,
+[data-kx-lowpower] .kx-update-capsule::before,
+[data-kx-lowpower] .kx-ai-glow::before { animation-play-state: paused; }
 
 /* ── The glow ring ──────────────────────────────────────────────────────
    A bright arc travelling slowly around the edge of a card.
@@ -3587,6 +4391,26 @@ input[type="number"]:not(.kx-spinner) {
   font-weight: 650;
   white-space: nowrap;
 }
+/* Product photos inside an answer: bounded, rounded, a hairline edge, and
+   room around them so a picture sits between sentences rather than on one. */
+.koleex-md .koleex-md-img-link {
+  display: inline-block;
+  margin: 8px 0;
+  line-height: 0;
+}
+.koleex-md img.koleex-md-img {
+  display: block;
+  /* 320px read as a thumbnail on a phone ("the photo size is too small").
+     A product photo is the answer, not an illustration of it: as wide as
+     the bubble on a phone, capped where it stops adding detail. */
+  max-width: min(100%, 520px);
+  max-height: 440px;
+  height: auto;
+  border-radius: 12px;
+  border: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.08));
+  background: rgba(255, 255, 255, 0.04);
+  object-fit: cover;
+}
 
 /* Code blocks inside AI answers (was also dead styled-jsx). */
 .koleex-code-block {
@@ -3662,3 +4486,70 @@ input[type="number"]:not(.kx-spinner) {
    it and must be ≤ the page gutter at every breakpoint, never a fixed 24px. */
 
 
+
+
+/* ── Voice call: the rings around the orb, and the orb tuned for a call ──
+   The shared AIOrb is drawn at 38px beside chat bubbles and at 200px here,
+   and the two sizes want different things from it. These rules apply ONLY
+   inside .kx-call-orb, so the five other places the orb is drawn are
+   untouched. See lib/voice/level.ts for the glitch this replaces. */
+.kx-call-orb { --kx-call-level: 0; }
+.kx-call-ring {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 200px;
+  height: 200px;
+  margin: -100px 0 0 -100px;
+  border-radius: 9999px;
+  border: 1.5px solid rgba(255, 255, 255, 0.22);
+  opacity: 0;
+  pointer-events: none;
+  will-change: transform, opacity;
+  transition: opacity 0.35s ease, border-color 0.35s ease;
+  transform: scale(1);
+}
+/* Each ring swells a little more than the one inside it, and fades as it
+   grows, so a loud syllable reads as a wave leaving the orb. */
+.kx-call-orb.is-live .kx-call-ring-1 {
+  opacity: calc(0.18 + var(--kx-call-level) * 0.55);
+  transform: scale(calc(1.04 + var(--kx-call-level) * 0.16));
+}
+.kx-call-orb.is-live .kx-call-ring-2 {
+  opacity: calc(0.08 + var(--kx-call-level) * 0.35);
+  transform: scale(calc(1.10 + var(--kx-call-level) * 0.30));
+}
+.kx-call-orb.is-live .kx-call-ring-3 {
+  opacity: calc(var(--kx-call-level) * 0.22);
+  transform: scale(calc(1.16 + var(--kx-call-level) * 0.46));
+}
+/* Koleex AI's voice is the Hub's blue; the caller's is white. */
+.kx-call-orb.is-far .kx-call-ring { border-color: rgba(0, 102, 255, 0.55); }
+.kx-call-orb.is-near .kx-call-ring { border-color: rgba(255, 255, 255, 0.28); }
+
+/* The orb itself, at call size, keeps its face alive: those rules live in
+   AIOrb.tsx under `.is-lively`, beside the rules they override — a rule here
+   loses to the component's inline sheet at equal specificity, which is how
+   the first attempt at this silently did nothing. */
+
+/* A LOOKUP IN PROGRESS: slow blue waves leaving the orb, one ring after
+   another, until the answer comes. Transform and opacity only, like the voice
+   rings; the animation owns both while it runs. */
+.kx-call-orb.is-thinking .kx-call-ring {
+  border-color: rgba(0, 102, 255, 0.6);
+  animation: kx-call-think 2.4s ease-out infinite;
+}
+.kx-call-orb.is-thinking .kx-call-ring-2 { animation-delay: 0.8s; }
+.kx-call-orb.is-thinking .kx-call-ring-3 { animation-delay: 1.6s; }
+@keyframes kx-call-think {
+  0% { transform: scale(1.02); opacity: 0.5; }
+  100% { transform: scale(1.34); opacity: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .kx-call-ring { transition: opacity 0.3s ease; transform: none !important; animation: none !important; }
+  .kx-call-orb.is-thinking .kx-call-ring-1 { opacity: 0.35; }
+  .kx-call-orb.is-live .kx-call-ring-1 { opacity: 0.25; }
+  .kx-call-orb.is-live .kx-call-ring-2,
+  .kx-call-orb.is-live .kx-call-ring-3 { opacity: 0; }
+}

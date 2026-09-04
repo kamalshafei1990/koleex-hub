@@ -12,7 +12,10 @@ import "server-only";
    exactly — same signature, same result shape, same null-on-failure
    contract — so swapping providers upstream is a trivial branch.
 
-   Kill-switch: USE_DEEPSEEK=true is REQUIRED in addition to
+   Kill-switch: see router/provider-policy.ts — one reader, absence means
+   enabled. This file used to test `=== "true"` in THREE places, which meant
+   an unset variable silently disabled every chat lane. Phase 7:
+   USE_DEEPSEEK=true was REQUIRED in addition to
    DEEPSEEK_API_KEY. When either is missing, deepseekChat() returns
    null with a descriptive lastDeepseekError set; the caller surfaces
    a clean error per the strict-fallback rule (no silent Groq
@@ -23,6 +26,7 @@ import "server-only";
    shifts we fail closed (null → error), never improvise.
    --------------------------------------------------------------------------- */
 
+import { deepseekEnabled } from "@/lib/server/ai/router/provider-policy";
 import type { ChatMessage, ChatResult } from "../../ai-provider";
 
 /** Default DeepSeek model. deepseek-chat is the production V3 chat
@@ -40,14 +44,16 @@ export function getLastDeepseekError(): string | null {
   return lastDeepseekError;
 }
 
-/** Whether DeepSeek is usable right now: both the kill-switch flag
- *  and the API key must be set. Exported so the router can make a
- *  fast client-side check without calling the provider and having
- *  it return null. */
+/** Whether DeepSeek is usable right now: the kill-switch must not be OFF and
+ *  the API key must be set.
+ *
+ *  PHASE 7. The test used to be `USE_DEEPSEEK === "true"`, under which an
+ *  UNSET variable meant DISABLED — so an environment that never set it had
+ *  every chat-route turn silently fall through to local knowledge. The switch
+ *  now lives in router/provider-policy.ts where absence means enabled, which
+ *  both fixes that and lets the same switch govern the agent. */
 export function isDeepseekEnabled(): boolean {
-  return (
-    process.env.USE_DEEPSEEK === "true" && !!process.env.DEEPSEEK_API_KEY
-  );
+  return deepseekEnabled() && !!process.env.DEEPSEEK_API_KEY;
 }
 
 /** Pull the human-readable `.error.message` out of an error body —
@@ -79,7 +85,7 @@ function stripThinking(text: string): string {
  *
  * Failure modes, each sets `lastDeepseekError` to a readable string
  * and returns null:
- *   · USE_DEEPSEEK flag not set     → "DeepSeek disabled"
+ *   · USE_DEEPSEEK explicitly off   → "DeepSeek disabled"
  *   · DEEPSEEK_API_KEY missing      → "DEEPSEEK_API_KEY not configured"
  *   · non-2xx response              → "DeepSeek ${status}: ${msg}"
  *   · empty reply body              → "DeepSeek returned an empty reply"
@@ -88,8 +94,8 @@ function stripThinking(text: string): string {
 export async function deepseekChat(
   messages: ChatMessage[],
 ): Promise<ChatResult | null> {
-  if (process.env.USE_DEEPSEEK !== "true") {
-    lastDeepseekError = "DeepSeek disabled (USE_DEEPSEEK flag not set to 'true')";
+  if (!deepseekEnabled()) {
+    lastDeepseekError = "DeepSeek disabled (USE_DEEPSEEK is off)";
     return null;
   }
   const key = process.env.DEEPSEEK_API_KEY;
@@ -164,8 +170,8 @@ export async function* deepseekChatStream(
   messages: ChatMessage[],
   opts: { maxTokens?: number; temperature?: number } = {},
 ): AsyncGenerator<DeepseekStreamChunk> {
-  if (process.env.USE_DEEPSEEK !== "true") {
-    lastDeepseekError = "DeepSeek disabled (USE_DEEPSEEK flag not set)";
+  if (!deepseekEnabled()) {
+    lastDeepseekError = "DeepSeek disabled (USE_DEEPSEEK is off)";
     yield { type: "error", error: lastDeepseekError };
     return;
   }

@@ -6,7 +6,7 @@ import "server-only";
 
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
-import { requireAuth, requireModuleAccess , requireModuleAction} from "@/lib/server/auth";
+import { requireAuth, requireModuleAction} from "@/lib/server/auth";
 import { resolveCallerTier } from "@/lib/suppliers/intelligence";
 
 export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {

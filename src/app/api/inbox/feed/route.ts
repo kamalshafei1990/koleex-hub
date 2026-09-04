@@ -58,6 +58,26 @@ function flattenSender(raw: SenderJoin) {
    read their todo ids, ask which of those are still open, mark the rest read.
    Missing ids (deleted tasks) are stale by definition. Marked READ, never
    deleted — the message stays in the inbox history where it belongs. */
+/* ── RETENTION — the inbox must not become an archive ──────────────────────
+   2,010 rows had accumulated by the day the owner called the system broken;
+   they were wiped once (scripts/reset-notifications.mts), and this keeps the
+   table from growing back. A notification is a PROMPT, not a record — the
+   audit log and each module's own history hold the records. Read messages
+   older than 60 days and archived ones older than 30 are deleted whenever
+   this account loads its full inbox. Scoped to the caller's own rows,
+   fire-and-forget, and on the messages branch only — badge polls (the hot
+   path, every account each minute) never pay for it. */
+function pruneOldMessages(me: string): void {
+  const readCutoff = new Date(Date.now() - 60 * 86400_000).toISOString();
+  const archCutoff = new Date(Date.now() - 30 * 86400_000).toISOString();
+  void supabaseServer.from(INBOX).delete()
+    .eq("recipient_account_id", me).not("read_at", "is", null).lt("created_at", readCutoff)
+    .then(({ error }) => { if (error) console.error("[inbox prune read]", error.message); });
+  void supabaseServer.from(INBOX).delete()
+    .eq("recipient_account_id", me).not("archived_at", "is", null).lt("archived_at", archCutoff)
+    .then(({ error }) => { if (error) console.error("[inbox prune archived]", error.message); });
+}
+
 async function reconcileFinishedTaskNotifications(me: string): Promise<void> {
   try {
     const { data: pending } = await supabaseServer
@@ -65,7 +85,14 @@ async function reconcileFinishedTaskNotifications(me: string): Promise<void> {
       .select("id, metadata")
       .eq("recipient_account_id", me)
       .eq("category", "task")
-      .eq("metadata->>type", "todo_assignment")
+      /* ⚠️ NO type filter — deliberately. This used to say
+         `metadata->>type = todo_assignment`, and that one line was the
+         owner's "the bell still doesn't work": his daily tasks are all
+         RECURRING, whose rows carry type=todo_recurring, so finishing every
+         task cleared nothing and the bell never went quiet on its own.
+         Approval-decision rows had the same hole. Every task notification
+         that names a todo_id reconciles against that todo, whatever its
+         type. */
       .is("read_at", null)
       .is("archived_at", null)
       .limit(500);
@@ -85,8 +112,10 @@ async function reconcileFinishedTaskNotifications(me: string): Promise<void> {
         .map((t) => t.id),
     );
 
+    /* Only rows that NAME a todo can be verified against one; a task row
+       without todo_id is left alone rather than guessed at. */
     const staleIds = rows
-      .filter((r) => !r.metadata?.todo_id || !stillOpen.has(r.metadata.todo_id))
+      .filter((r) => r.metadata?.todo_id && !stillOpen.has(r.metadata.todo_id))
       .map((r) => r.id);
     if (!staleIds.length) return;
 
@@ -114,6 +143,7 @@ export async function GET(req: Request) {
         /* Reconcile here too, so opening the list shows finished work as read
            rather than leaving the user to clear rows by hand. */
         await reconcileFinishedTaskNotifications(me);
+        pruneOldMessages(me);
         const includeArchived = url.searchParams.get("archived") === "1";
         /* 300 cap serves the bell's "Show all" view — slim rows are ~200B
            each, so the worst case stays ~60KB. */
@@ -178,7 +208,6 @@ export async function GET(req: Request) {
           .select("*", { count: "exact", head: true })
           .eq("recipient_account_id", me)
           .eq("category", "task")
-          .eq("metadata->>type", "todo_assignment")
           .is("read_at", null)
           .is("archived_at", null);
         if (error) throw new Error(error.message);
@@ -208,7 +237,10 @@ export async function GET(req: Request) {
           .is("archived_at", null);
         const [unreadRes, tasksRes] = await Promise.all([
           base(),
-          base().eq("category", "task").eq("metadata->>type", "todo_assignment"),
+          /* All task categories — the type filter here undercounted for the
+             same reason the reconcile under-cleared (recurring + approval
+             rows are tasks too). */
+          base().eq("category", "task"),
         ]);
         if (unreadRes.error) throw new Error(unreadRes.error.message);
         if (tasksRes.error) throw new Error(tasksRes.error.message);

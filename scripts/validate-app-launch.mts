@@ -22,6 +22,13 @@ const pf = await import(R("src/lib/app-prefetch.ts")) as typeof import("../src/l
 let pass = 0, fail = 0;
 const check = (n: string, c: boolean) => { c ? (pass++, console.log("  ✓ " + n)) : (fail++, console.error("  ✗ " + n)); };
 
+// ── (0) real-user measurement is mounted once, at the root, for every page ──
+{
+  const layout = read("src/app/layout.tsx");
+  check("root layout mounts Vercel Speed Insights (Core Web Vitals per route)", /<SpeedInsights \/>/.test(layout) && /@vercel\/speed-insights\/next/.test(layout));
+  check("root layout mounts Vercel Web Analytics (visitors by country and route)", /<Analytics \/>/.test(layout) && /@vercel\/analytics\/next/.test(layout));
+  check("  …both inside <Providers>, so they ride every page the shell renders", layout.indexOf("<Analytics />") > layout.indexOf("<Providers>") && layout.indexOf("<Analytics />") < layout.indexOf("</Providers>"));
+}
 // ── (A) tiers ──
 check("customers is Tier A (idle preload)", pf.prefetchTier("customers") === "A");
 check("suppliers is Tier A", pf.prefetchTier("suppliers") === "A");

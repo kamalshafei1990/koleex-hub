@@ -31,7 +31,8 @@ import type {
 const PRODUCT_PUBLIC_COLUMNS =
   "id, product_name, slug, brand, division_slug, category_slug, subcategory_slug, " +
   "schema_id, schema_version, schema_specs, schema_knowledge, schema_visibility, " +
-  "warranty, country_of_origin, status, visible, featured, hero_poster_url";
+  "warranty, country_of_origin, status, visible, featured, hero_poster_url, " +
+  "excerpt, meta_title, meta_description, og_image_url";
 
 interface PublicProductRow {
   id: string;
@@ -49,6 +50,10 @@ interface PublicProductRow {
   status: string | null;
   visible: boolean | null;
   hero_poster_url: string | null;
+  excerpt: string | null;
+  meta_title: string | null;
+  meta_description: string | null;
+  og_image_url: string | null;
 }
 
 interface MediaRow {
@@ -115,6 +120,16 @@ export interface SchemaProductPreviewProps {
 export interface LoadedSchemaProduct {
   productName: string;
   tagline: string | null;
+  /* What generateMetadata / the og:image route actually emit — the same
+     derivation the admin "Search & Social" preview shows, so the preview
+     stays a truthful mirror of the live page. */
+  seo: {
+    brand: string | null;
+    excerpt: string | null;
+    metaTitle: string | null;
+    metaDescription: string | null;
+    ogImageUrl: string | null;
+  };
   preview: SchemaProductPreviewProps;
 }
 
@@ -296,6 +311,13 @@ export async function loadPublicSchemaProduct(
   return {
     productName: product.product_name,
     tagline: model?.tagline ?? null,
+    seo: {
+      brand: product.brand,
+      excerpt: product.excerpt,
+      metaTitle: product.meta_title,
+      metaDescription: product.meta_description,
+      ogImageUrl: product.og_image_url,
+    },
     preview: {
       productName: product.product_name,
       primaryModel: model?.primary_model ?? null,

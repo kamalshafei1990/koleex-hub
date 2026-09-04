@@ -86,7 +86,12 @@ export type SoundTone =
   | LibraryTone // the owner's recorded tones in /public/sounds
   | "none";
 
-export type SoundCategory = "notification" | "message";
+/* `call` is the voice call's "connected, go ahead" cue. The owner: "change
+   the sound of the starting chat after connecting — we already have some
+   sounds in Settings → Notifications, choose a good one". So the cue is a
+   library tone, chosen here like any other, and the call plays it through
+   the same engine. */
+export type SoundCategory = "notification" | "message" | "call";
 
 /* The same activity keys as Settings → Notification preferences "By
    activity", so the two screens describe the same events. */
@@ -113,6 +118,12 @@ export interface SoundPrefs {
     activityTones?: Partial<Record<SoundActivity, SoundTone>>;
   };
   message: { enabled: boolean; tone: SoundTone };      // Discuss messages
+  /** The voice call's "connected" cue. Not silenced by do-not-disturb: the
+   *  caller started the call themselves a moment ago. `chosen` is set the
+   *  first time someone picks a call tone in Settings; without it, a stored
+   *  tone that merely equals an old default is still the default and moves
+   *  when the default does (see migrateCallTone). */
+  call: { enabled: boolean; tone: SoundTone; chosen?: boolean };
 }
 
 /** Classify an inbox message into an activity key from its metadata.type
@@ -140,7 +151,21 @@ const DEFAULT_PREFS: SoundPrefs = {
   volume: 0.8,
   notification: { enabled: true, tone: "classic" },
   message: { enabled: true, tone: "classic" },
+  /* "arrive": the recorded tone that reads as "someone is here" — the
+     right word for a line that has just opened. "confirm" was first, and
+     the owner asked twice for something else. Changeable in Settings. */
+  call: { enabled: true, tone: "arrive" },
 };
+
+/** The call tone the defaults used before "arrive". A stored copy of it that
+ *  nobody chose (no `chosen` flag) is the old default written back by a
+ *  save of some other setting, so it follows the default. A tone someone
+ *  picked — any tone, even this one — is theirs and stays. */
+export const LEGACY_CALL_TONE: SoundTone = "confirm";
+export function migrateCallTone(call: SoundPrefs["call"]): SoundPrefs["call"] {
+  if (!call.chosen && call.tone === LEGACY_CALL_TONE) return { ...call, tone: DEFAULT_PREFS.call.tone };
+  return call;
+}
 
 let prefsCache: SoundPrefs | null = null;
 const prefListeners = new Set<(p: SoundPrefs) => void>();
@@ -171,6 +196,7 @@ export function getSoundPrefs(): SoundPrefs {
     ...stored,
     notification: { ...DEFAULT_PREFS.notification, ...(stored.notification ?? {}) },
     message: { ...DEFAULT_PREFS.message, ...(stored.message ?? {}) },
+    call: migrateCallTone({ ...DEFAULT_PREFS.call, ...(stored.call ?? {}) }),
   };
   return prefsCache;
 }
@@ -179,6 +205,7 @@ export function setSoundPrefs(patch: {
   master?: boolean; dnd?: boolean; volume?: number;
   notification?: Partial<SoundPrefs["notification"]>;
   message?: Partial<SoundPrefs["message"]>;
+  call?: Partial<SoundPrefs["call"]>;
 }): SoundPrefs {
   const cur = getSoundPrefs();
   const next: SoundPrefs = {
@@ -194,6 +221,9 @@ export function setSoundPrefs(patch: {
       },
     },
     message: { ...cur.message, ...(patch.message ?? {}) },
+    /* A picked tone is marked as such, so a later change of default leaves
+       it alone. */
+    call: { ...cur.call, ...(patch.call ?? {}), ...(patch.call?.tone !== undefined ? { chosen: true } : {}) },
   };
   prefsCache = next;
   try { localStorage.setItem(PREFS_KEY, JSON.stringify(next)); } catch { /* private mode */ }
@@ -436,6 +466,7 @@ function selectedSrcs(): string[] {
   const tones: SoundTone[] = [
     p.notification.tone,
     p.message.tone,
+    p.call.tone,
     ...Object.values(p.notification.activityTones ?? {}),
   ];
   const srcs = new Set<string>();
@@ -514,7 +545,9 @@ export function playAppSound(category: SoundCategory, activity?: SoundActivity |
     return;
   }
   const prefs = getSoundPrefs();
-  if (!prefs.master || prefs.dnd) return;
+  /* Do-not-disturb silences what arrives uninvited. A call's cue answers a
+     tap the caller made seconds ago; it is not a disturbance. */
+  if (!prefs.master || (prefs.dnd && category !== "call")) return;
   const cat = prefs[category];
   if (!cat.enabled) return;
   /* Per-activity override (notifications only) — falls back to the
@@ -539,6 +572,36 @@ export function playAppSound(category: SoundCategory, activity?: SoundActivity |
  *  the context is already unlockable. */
 export function previewSound(tone: SoundTone, volume?: number) {
   playTone(tone, volume ?? getSoundPrefs().volume);
+}
+
+/** What the voice call's cue did, so the call can fall back when the engine
+ *  is not there: "played" (a tone went out or is decoding to go out),
+ *  "silenced" (the caller turned it off — respect it), "unavailable" (no
+ *  window or no AudioContext — the call synthesises its own cue). */
+export type CallSoundOutcome = "played" | "silenced" | "unavailable";
+
+/** Warm the call cue while the call is still connecting, INSIDE the tap that
+ *  starts it: creates the context, decodes the chosen file. By the time the
+ *  far side says "ready" the buffer is in memory and the cue costs no fetch. */
+export function primeCallSound(): void {
+  if (typeof window === "undefined") return;
+  attachUnlockListeners();
+  const ctx = ensureCtx();
+  if (!ctx) return;
+  if (ctx.state === "suspended") void ctx.resume().then(() => { unlocked = true; });
+  const src = toneSrc(getSoundPrefs().call.tone);
+  if (src) void decode(src);
+}
+
+/** The "connected, go ahead" cue, through the shared engine and the
+ *  caller's Settings → Sounds choice. */
+export function playCallSound(): CallSoundOutcome {
+  if (typeof window === "undefined") return "unavailable";
+  const prefs = getSoundPrefs();
+  if (!prefs.master || !prefs.call.enabled || prefs.call.tone === "none") return "silenced";
+  if (!ensureCtx()) return "unavailable";
+  playAppSound("call");
+  return "played";
 }
 
 /** Play the classic notification WAV. Prefer playAppSound(category) — this

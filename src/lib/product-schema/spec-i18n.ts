@@ -220,6 +220,11 @@ export const SPEC_I18N: Translations = {
   "g:Application": { en: "Application", zh: "应用", ar: "التطبيق" },
   "g:Automation": { en: "Automation", zh: "自动化", ar: "الأتمتة" },
   "g:Compliance & Customs": { en: "Compliance & Customs", zh: "合规与海关", ar: "الامتثال والجمارك" },
+  /* lockstitch 2026-08-25: customs (HS) moved to the Packing & Logistics tab,
+     so its old group split — Compliance stays on Specs, Customs went with the
+     shipping data. Both titles need entries or §G fails the build. */
+  "g:Compliance": { en: "Compliance", zh: "合规", ar: "الامتثال" },
+  "g:Customs": { en: "Customs", zh: "海关", ar: "الجمارك" },
   "g:Control & Automation": { en: "Control & Automation", zh: "控制与自动化", ar: "التحكم والأتمتة" },
   "g:Electrical": { en: "Electrical", zh: "电气", ar: "الكهرباء" },
   "g:Electrical & Utilities": { en: "Electrical & Utilities", zh: "电气与公用设施", ar: "الكهرباء والمرافق" },
@@ -801,6 +806,10 @@ export const SPEC_I18N: Translations = {
   "o:overheat_protection": { en: "Over-Heat Protection", zh: "过热保护", ar: "حماية من فرط الحرارة" },
   "o:overload_protection": { en: "Motor Overload Protection", zh: "电机过载保护", ar: "حماية الموتور من الحمل الزائد" },
   "o:pallet_film": { en: "Pallet + Stretch Film", zh: "托盘+缠绕膜", ar: "طبلية + فيلم تغليف" },
+  "o:wooden_pallet": { en: "Wooden Pallet (open)", zh: "木托盘（开放式）", ar: "طبلية خشبية (مكشوفة)" },
+  "o:foam_carton": { en: "Carton + Foam Inserts", zh: "纸箱+泡沫内衬", ar: "كرتونة ببطانة فوم" },
+  "o:metal_frame": { en: "Metal Frame Crate", zh: "金属框架箱", ar: "قفص بهيكل معدني" },
+  "o:bulk_loose": { en: "Container Bulk (unpacked)", zh: "集装箱散装（无包装）", ar: "تحميل مباشر في الحاوية (بدون تغليف)" },
   "o:paper_core_chuck": { en: "Paper-Core Chuck", zh: "纸管夹头", ar: "قابض أنبوب ورقي" },
   "o:photo_edge_sensor": { en: "Photoelectric Edge Sensor", zh: "光电对边传感器", ar: "حساس حافة كهروضوئي" },
   "o:photoelectric_flatting": { en: "Photoelectric Flatting Device", zh: "光电压平装置", ar: "جهاز تسوية كهروضوئي" },

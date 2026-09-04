@@ -1,17 +1,48 @@
 "use client";
 
 /* ---------------------------------------------------------------------------
-   useAiChat — the single source of truth for a Koleex AI conversation.
+   useAiChat — the single source of truth for the quick Koleex AI chat
+   (today: the "Koleex AI" conversation inside Discuss).
 
-   Extracted from FloatingPanel so the same streaming pipeline can back both
-   the floating Copilot panel and the "Koleex AI" chat that lives inside the
-   Discuss conversation list. It owns the message list, the composer input,
-   the SSE stream against /api/ai/chat, and optional text-to-speech for
-   voice-originated turns. UI is deliberately NOT here — consumers render it.
+   ⚠️ THE AGENT, NOT THE BARE MODEL. This used to stream /api/ai/chat — a
+   plain LLM with no tools — and it invented "1,247 products" for a catalog
+   of 205 (owner caught it, 2026-08-20). Every turn now goes through
+   /api/ai/agent: the orchestrator with permission-aware tools, so this chat
+   knows exactly what the AI app knows, gated by the same roles. The cost is
+   streaming (the agent replies as one JSON turn) — consumers already show a
+   "Thinking…" state via aiSending.
+
+   The agent needs an owned conversation row; a per-user quick-chat
+   conversation id is kept in localStorage (kx_ prefix — wiped on sign-out)
+   and recreated transparently if it was deleted.
    --------------------------------------------------------------------------- */
 
 import { useCallback, useRef, useState } from "react";
 import { speakText, type TtsHandle } from "@/components/ai/MicButton";
+
+const CONV_KEY = "kx_quick_ai_conv";
+
+async function ensureConversation(forceNew: boolean): Promise<string | null> {
+  if (!forceNew) {
+    try {
+      const saved = window.localStorage.getItem(CONV_KEY);
+      if (saved) return saved;
+    } catch { /* fall through */ }
+  }
+  const res = await fetch("/api/ai/conversations", {
+    method: "POST",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ title: "Quick chat" }),
+  });
+  if (!res.ok) return null;
+  const j = (await res.json()) as { id?: string; conversation?: { id?: string } };
+  const id = j.id ?? j.conversation?.id ?? null;
+  if (id) {
+    try { window.localStorage.setItem(CONV_KEY, id); } catch { /* fine */ }
+  }
+  return id;
+}
 
 export type AiChatMessage = { role: "user" | "ai"; text: string };
 
@@ -50,99 +81,44 @@ export function useAiChat() {
           ? (document.documentElement.lang as "en" | "zh" | "ar")
           : "en") || "en";
 
-      const wireMessages = [...aiMessages, { role: "user", text } as const].map(
-        (m) => ({
-          role: m.role === "ai" ? ("assistant" as const) : ("user" as const),
-          content: m.text,
-        }),
-      );
-
       try {
-        const res = await fetch("/api/ai/chat", {
-          method: "POST",
-          credentials: "include",
-          headers: {
-            "Content-Type": "application/json",
-            Accept: "text/event-stream",
-          },
-          body: JSON.stringify({
-            messages: wireMessages,
-            user_lang: uiLang,
-            stream: true,
-          }),
-        });
+        /* THE AGENT PATH. History lives server-side on the conversation row,
+           so each turn sends only the new text. */
+        const ask = (convId: string) =>
+          fetch("/api/ai/agent", {
+            method: "POST",
+            credentials: "include",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ conversationId: convId, content: text, user_lang: uiLang }),
+          });
 
-        if (!res.ok || !res.body) {
-          const msg = `AI is unavailable right now. (${res.status})`;
+        let convId = await ensureConversation(false);
+        let res = convId ? await ask(convId) : null;
+        /* The saved conversation can be deleted from the AI app's sidebar —
+           the agent 404s. Recreate ONCE, transparently, and retry. */
+        if (!res || res.status === 404) {
+          convId = await ensureConversation(true);
+          res = convId ? await ask(convId) : null;
+        }
+        if (!res || !res.ok) {
+          const msg = `AI is unavailable right now. (${res ? res.status : "no connection"})`;
           setAiMessages((prev) => [...prev, { role: "ai", text: msg }]);
           return;
         }
 
-        /* Placeholder assistant bubble so deltas visibly stream. */
-        let bubbleIndex = -1;
-        setAiMessages((prev) => {
-          bubbleIndex = prev.length;
-          return [...prev, { role: "ai", text: "" }];
-        });
+        const j = (await res.json()) as {
+          message?: { content?: string | null } | null;
+          agent?: { reply?: string | null } | null;
+        };
+        const reply = j.message?.content || j.agent?.reply || "";
+        setAiMessages((prev) => [
+          ...prev,
+          { role: "ai", text: reply || "AI returned an empty reply — try again." },
+        ]);
 
-        const reader = res.body.getReader();
-        const decoder = new TextDecoder();
-        let buf = "";
-        let accumulated = "";
-        let finalReply = "";
-        while (true) {
-          const { value, done } = await reader.read();
-          if (done) break;
-          buf += decoder.decode(value, { stream: true });
-          const events = buf.split("\n\n");
-          buf = events.pop() ?? "";
-          for (const ev of events) {
-            for (const line of ev.split("\n")) {
-              if (!line.startsWith("data:")) continue;
-              const payload = line.slice(5).trim();
-              if (!payload) continue;
-              try {
-                const json = JSON.parse(payload) as
-                  | { type: "start" }
-                  | { type: "delta"; text: string }
-                  | { type: "end"; reply: string }
-                  | { type: "error"; message?: string };
-                if (json.type === "delta") {
-                  accumulated += json.text;
-                  setAiMessages((prev) => {
-                    if (bubbleIndex < 0 || bubbleIndex >= prev.length) return prev;
-                    const next = prev.slice();
-                    next[bubbleIndex] = { role: "ai", text: accumulated };
-                    return next;
-                  });
-                } else if (json.type === "end") {
-                  finalReply = json.reply;
-                  setAiMessages((prev) => {
-                    if (bubbleIndex < 0 || bubbleIndex >= prev.length) return prev;
-                    const next = prev.slice();
-                    next[bubbleIndex] = { role: "ai", text: finalReply };
-                    return next;
-                  });
-                } else if (json.type === "error") {
-                  const msg = json.message || "AI is unavailable right now.";
-                  setAiMessages((prev) => {
-                    if (bubbleIndex < 0 || bubbleIndex >= prev.length) return prev;
-                    const next = prev.slice();
-                    next[bubbleIndex] = { role: "ai", text: msg };
-                    return next;
-                  });
-                }
-              } catch {
-                /* Malformed frame — skip, keep streaming. */
-              }
-            }
-          }
-        }
-
-        const spokenText = finalReply || accumulated;
-        if (viaVoice && spokenText) {
+        if (viaVoice && reply) {
           setAiSpeaking(true);
-          ttsHandleRef.current = speakText(spokenText, {
+          ttsHandleRef.current = speakText(reply, {
             lang: uiLang,
             onEnd: () => {
               ttsHandleRef.current = null;
@@ -160,7 +136,7 @@ export function useAiChat() {
         setAiSending(false);
       }
     },
-    [aiMessages, stopTts],
+    [stopTts],
   );
 
   const handleAiSend = useCallback(() => {

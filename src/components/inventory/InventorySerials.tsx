@@ -9,6 +9,7 @@
    --------------------------------------------------------------------------- */
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useWarmData } from "@/lib/warm-cache";
 import InventoryHeader from "@/components/inventory/InventoryHeader";
 import RrIcon from "@/components/ui/RrIcon";
 import { InventoryEmpty, Panel } from "@/components/inventory/InventoryUi";
@@ -91,20 +92,21 @@ function fmtTimeAgo(iso: string | null): string {
   return new Date(iso).toLocaleDateString();
 }
 
+type SerialsSnap = {
+  serials: SerialRow[];
+  warehouses: Warehouse[];
+  items: ItemRow[];
+};
+
 export default function InventorySerials() {
   const { t } = useTranslation(inventoryT);
 
-  const [serials, setSerials] = useState<SerialRow[]>([]);
-  const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
-  const [items, setItems] = useState<ItemRow[]>([]);
   const [tab, setTab] = useState<SerialStatus | "all">("all");
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [filterItem, setFilterItem] = useState<string>("");
   const [filterWarehouse, setFilterWarehouse] = useState<string>("");
   const [filterCondition, setFilterCondition] = useState<SerialCondition | "">("");
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
 
   /* Debounce search by 250ms. */
   useEffect(() => {
@@ -112,10 +114,7 @@ export default function InventorySerials() {
     return () => window.clearTimeout(handle);
   }, [search]);
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
+  const fetchAll = useCallback(async (): Promise<SerialsSnap> => {
       const params = new URLSearchParams();
       if (tab !== "all") params.set("status", tab);
       if (filterItem) params.set("item_id", filterItem);
@@ -129,17 +128,26 @@ export default function InventorySerials() {
         fetch(`/api/inventory/items?limit=500`).then((r) => r.json()),
       ]);
       if (sRes.error) throw new Error(sRes.error);
-      setSerials((sRes.serials ?? []) as SerialRow[]);
-      setWarehouses((wRes.warehouses ?? []) as Warehouse[]);
-      setItems((iRes.items ?? []) as ItemRow[]);
-    } catch (e) {
-      setError(humanizeError(e instanceof Error ? e.message : String(e)));
-    } finally {
-      setLoading(false);
-    }
+      return {
+        serials: (sRes.serials ?? []) as SerialRow[],
+        warehouses: (wRes.warehouses ?? []) as Warehouse[],
+        items: (iRes.items ?? []) as ItemRow[],
+      };
   }, [tab, filterItem, filterWarehouse, filterCondition, debouncedSearch]);
 
-  useEffect(() => { void load(); }, [load]);
+  /* ONLY THE DEFAULT VIEW IS WARMED. Status, item, warehouse, condition and
+     the search term all go to the server, so a cached filtered answer would
+     come back looking like the whole register. An empty key opts this render
+     out — a filtered view loads the honest way and shows nothing until it
+     has the truth. */
+  const isDefaultView =
+    tab === "all" && !filterItem && !filterWarehouse && !filterCondition && !debouncedSearch;
+  const { data, loading, error: loadError, reload: load } =
+    useWarmData<SerialsSnap>(isDefaultView ? "inv:serials" : "", fetchAll);
+  const serials = useMemo(() => data?.serials ?? [], [data]);
+  const warehouses = useMemo(() => data?.warehouses ?? [], [data]);
+  const items = useMemo(() => data?.items ?? [], [data]);
+  const error = loadError ? humanizeError(loadError instanceof Error ? loadError.message : String(loadError)) : null;
 
   const tabCounts = useMemo(() => {
     const counts: Record<string, number> = { all: serials.length };

@@ -105,7 +105,17 @@ export default function FinanceTreasuryForecast() {
      server" so the operator can always pull fresh data. */
   const [cachedInputs, setCachedInputs] = useState<ForecastInputs | null>(null);
 
-  /* Fetch fresh inputs from the server and run the base case. The
+  /* DELIBERATELY NOT WARM-CACHED — the one Finance tab left cold on
+     purpose, so the reasoning is here rather than discovered later.
+     Every other screen in the sweep serves a stored list and revalidates
+     behind it; this one is not a list. It POSTs a set of assumptions and
+     gets back a COMPUTATION, and its results are then recomputed locally as
+     the operator toggles presets. A cached answer here would be a forecast
+     produced from assumptions the operator can no longer see, presented as
+     the current scenario — and unlike a stale row count, a stale liquidity
+     projection is acted on. It waits, honestly.
+
+     Fetch fresh inputs from the server and run the base case. The
      server bundles `inputs` into the response when we ask for them,
      so subsequent preset toggles can recompute locally. */
   const refreshFromServer = useCallback(async (a: ScenarioAssumptions | null) => {

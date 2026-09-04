@@ -2,8 +2,15 @@ import "server-only";
 
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
+import { AI_PROVENANCE_RULE } from "@/lib/server/ai/prompt-builder";
+import { AI_IDENTITY_BRIEF, KOLEEX_COMPANY_BRIEF, identityDepthFor } from "@/lib/server/ai/identity";
 import { requireAuth } from "@/lib/server/auth";
+import { requireInternalUser } from "@/lib/server/ai/require-internal";
 import { aiChat, aiProviderConfigured, getLastAiError, type ChatMessage } from "@/lib/server/ai-provider";
+/* The persisted row carries ai_messages.provider verbatim, so returning it
+   returns the vendor label. Finding N11 — see
+   ai/observability/public-provider.ts. */
+import { withPublicProvider } from "@/lib/server/ai/observability/public-provider";
 
 /* POST /api/ai/conversations/:id/messages
      body: { content: string, user_lang?: 'en'|'zh'|'ar' }
@@ -16,6 +23,24 @@ type RouteCtx = { params: Promise<{ id: string }> };
 export async function POST(req: Request, { params }: RouteCtx) {
   const auth = await requireAuth();
   if (auth instanceof NextResponse) return auth;
+  /* Phase 2G. This was the ONE conversational AI route without the
+     internal-only door — it relied on ownership scoping alone
+     (.eq("account_id", auth.account_id)) to keep a non-internal account out.
+     In practice that already held, because creating a conversation goes
+     through /api/ai/conversations, which does have the door: a non-internal
+     account has no conversation to post into. So this closes a defence-in-
+     depth gap rather than an open hole, and it is a no-op for every account
+     that can reach the AI at all.
+
+     Added rather than left alone because the 2026-08-03 owner directive that
+     created requireInternalUser says exactly this: "the tools would deny
+     anyway" is not an acceptable exposure — block at the door. Leaving the
+     gap while publishing this handler under a second URL (/api/v1) would have
+     been the wrong call. Trivially reversible: delete these two lines. */
+  {
+    const notInternal = requireInternalUser(auth);
+    if (notInternal) return notInternal;
+  }
   const { id } = await params;
 
   if (!aiProviderConfigured()) {
@@ -76,7 +101,8 @@ Rules:
 - Never invent invoice numbers, customer names, or any other data you haven't been given. Hallucinating business data is unacceptable.
 - For translation requests, produce ONLY the translation.
 
-Current user: ${auth.username} (${auth.user_type}).`;
+Current user: ${auth.username} (${auth.user_type}).
+${AI_PROVENANCE_RULE}${AI_IDENTITY_BRIEF}${KOLEEX_COMPANY_BRIEF}${identityDepthFor(content)}`;
 
   const messages: ChatMessage[] = [
     { role: "system", content: systemPrompt },
@@ -158,7 +184,11 @@ Current user: ${auth.username} (${auth.user_type}).`;
     .eq("account_id", auth.account_id);
 
   return NextResponse.json({
-    message: assistantRow,
+    /* The row was written with the REAL label a few lines above and keeps it
+       in the database; only the copy crossing the wire is neutralised.
+       A failed insert still yields null here, exactly as before — the
+       transform returns a non-object untouched rather than inventing a row. */
+    message: assistantRow ? withPublicProvider(assistantRow) : assistantRow,
     conversation: { id, title: finalTitle },
   });
 }

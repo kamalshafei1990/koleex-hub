@@ -132,18 +132,16 @@ export default function MicButton({
      keep only the finalised ones so short pauses don't drop earlier
      parts of the user's sentence. */
   const finalTextRef = useRef<string>("");
-  /* Seconds since recording started. Tracked only while the listening
-     state is active; resets to 0 on every new recognition session. */
+  /* Seconds since recording started. Zeroed in recognition.onstart (an
+     event handler, so no setState inside an effect body); the interval
+     only runs while listening, and the pill is only rendered while
+     listening, so a stale value can never show. */
   const [elapsed, setElapsed] = useState(0);
 
   const computedState: MicState = speaking ? "speaking" : state;
 
   useEffect(() => {
-    if (state !== "listening") {
-      setElapsed(0);
-      return;
-    }
-    setElapsed(0);
+    if (state !== "listening") return;
     const tick = setInterval(() => setElapsed((s) => s + 1), 1000);
     return () => clearInterval(tick);
   }, [state]);
@@ -248,6 +246,7 @@ export default function MicButton({
       };
       recognition.onstart = () => {
         if (!aliveRef.current) return;
+        setElapsed(0);
         setState("listening");
       };
       recognition.start();

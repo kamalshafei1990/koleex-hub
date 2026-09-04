@@ -122,5 +122,24 @@ export async function POST(
     console.error("[api/todos/[id]/toggle]", error.message);
     return NextResponse.json({ error: "Failed to toggle" }, { status: 500 });
   }
+
+  /* THE LIFECYCLE CLEARER — the first one this system has ever had.
+     The audit counted 28 notification WRITERS and zero clearers, and the
+     owner's words are quoted in the feed route itself: "all of tasks as
+     done, nothing left, but it still have notifications." Completing a
+     task now closes the loop: every still-unread inbox row that POINTS AT
+     THIS TASK (reminders, recurring spawns, assignment notes — matched by
+     metadata.todo_id, all recipients) is marked read+archived. Un-completing
+     does NOT resurrect them: a notification whose moment passed is history,
+     and the un-complete itself is rare enough not to warrant new noise.
+     Best-effort: a failed cleanup must not fail the toggle. */
+  if (!t.completed) {
+    const { error: clearErr } = await supabaseServer
+      .from("inbox_messages")
+      .update({ read_at: now, archived_at: now })
+      .eq("metadata->>todo_id", id)
+      .is("read_at", null);
+    if (clearErr) console.error("[api/todos/[id]/toggle] clear:", clearErr.message);
+  }
   return NextResponse.json({ ok: true });
 }

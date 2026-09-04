@@ -33,6 +33,9 @@ import { docLabel, docLabels, type DocLabelKey, type DocLang } from "@/lib/doc-l
 import ArrowUpIcon from "@/components/icons/ui/ArrowUpIcon";
 import ArrowDownIcon from "@/components/icons/ui/ArrowDownIcon";
 import TrashIcon from "@/components/icons/ui/TrashIcon";
+import KoleexWordmark from "@/components/brand/KoleexWordmark";
+import DocumentBrandStrips, { KOLEEX_COMPANY } from "@/components/brand/DocumentBrandStrips";
+import { checkTradeDocument } from "@/lib/contracts/contradictions";
 import BoldIcon from "@/components/icons/ui/BoldIcon";
 import ItalicIcon from "@/components/icons/ui/ItalicIcon";
 import UnderlineIcon from "@/components/icons/ui/UnderlineIcon";
@@ -150,6 +153,28 @@ export interface Quotation {
      reads these so the picker dropdowns hydrate with the saved
      selection when an existing doc is opened. */
   paymentTermId?: string;
+  /* The heading this document prints under, chosen in the toolbar (see
+     DocTitlePicker). Stored ON the document rather than derived from the
+     page that opened it: the same record legitimately goes out as a
+     Proforma Invoice for L/C issuance and later as a Commercial Invoice
+     after shipment, and only the operator knows which. `docTitleText` is
+     copied at pick time so a title later renamed or deactivated in
+     settings cannot rewrite an already-issued document. Empty → fall back
+     to docKind, which is how every existing doc renders. */
+  docTitleId?: string;
+  docTitleText?: string;
+  /* How the REST of the sheet should read for this heading. Copied at pick
+     time next to the text, because the labels have to follow the title, not
+     the page: a document titled COMMERCIAL INVOICE was still printing
+     "Quotation No" and "Quotation To" since those came from docKind.
+       docTitleNoun     — the word in "<noun> No" / "<noun> To"
+       docTitleValidity — whether a "Valid Till" cell prints
+     doc_family alone cannot decide this: a Proforma Invoice is in the
+     quotation family (it precedes the sale, it expires) yet must read
+     "Invoice No". */
+  docTitleNoun?: string;
+  docTitleCode?: string;
+  docTitleValidity?: boolean;
   incotermId?: string;
   incotermCode?: string;
   incotermLocation?: string;
@@ -202,6 +227,12 @@ interface Props {
   /* Optional handler for the "Link customer" button on the
      QUOTATION TO header. Parent owns the modal. */
   onPickCustomer?: () => void;
+  /* Save the typed party details as a new CRM customer. Rendered only when
+     there is something to save and nothing already linked — a details card
+     filled by hand is otherwise a dead end: the operator retypes the same
+     buyer on the next document. */
+  onSaveCustomer?: () => void;
+  savingCustomer?: boolean;
   /* Doc kind — flips the visible labels for the same renderer:
        "quotation" → "QUOTATION" / "Quotation No" / "Valid Till" /
                      "Quotation To"
@@ -335,6 +366,8 @@ export default function QuotationA4Preview({
   addHeader,
   onPickFromCatalog,
   onPickCustomer,
+  onSaveCustomer,
+  savingCustomer,
   docKind = "quotation",
   savedStampUrl,
   savedSignatureUrl,
@@ -555,6 +588,74 @@ export default function QuotationA4Preview({
     return `(${code}${locationPart}, ${cur})`;
   }, [current.incotermCode, current.loadingPort, current.dischargePort, cur]);
 
+  /* The chosen title decides the sheet's wording; docKind is only the
+     fallback for documents saved before titles existed. */
+  const metaNoun =
+    current.docTitleNoun?.trim() ||
+    (docKind === "invoice" ? "Invoice" : "Quotation");
+  const showsValidity =
+    current.docTitleNoun ? current.docTitleValidity !== false : docKind !== "invoice";
+
+  /* ── Party labels on a proforma raised for a credit ────────────────────
+     A proforma invoice is what a buyer hands their bank to have the credit
+     issued, and UCP 600 calls the two sides the APPLICANT and the
+     BENEFICIARY. "From" and "Invoice To" are correct English and the wrong
+     words on that desk — they leave the bank clerk to work out which party
+     is which. The switch is deliberately narrow: it needs BOTH a proforma
+     title AND a letter-of-credit payment term, because on a proforma that is
+     going to be paid by T/T the plain wording is the right one.
+     The credit test reads leadTimeBasis, which the payment picker already
+     sets to "after_lc_opening" the moment an L/C term is chosen. That value
+     is ON the document — asking the payment-terms API here would add a
+     network round-trip to a component whose only job is to draw paper. */
+  const isCreditProforma =
+    current.docTitleCode === "proforma_invoice" && current.leadTimeBasis === "after_lc_opening";
+
+  /* ── Trade-terms check, live on the document ─────────────────────────────
+     Three of the five real invoices carried "FOB <the buyer's port>" —
+     FOB Alexandria, FOB Chittagong, FOB Benghazi — and every one had already
+     been sent. Read literally each obliges Koleex to carry the goods to the
+     buyer's country at its own cost. Nothing in the editor said a word.
+
+     The subset that a document can answer for on its own; no payment-shape
+     rules, because the category that decides those is not on the document.
+     Pure and cheap, so it runs on every keystroke. */
+  const tradeFindings = useMemo(
+    () =>
+      checkTradeDocument({
+        incotermCode: current.incotermCode,
+        incotermLocation: current.incotermLocation,
+        loadingPort: current.loadingPort,
+        dischargePort: current.dischargePort,
+        leadTimeDays: current.leadTimeDays,
+        leadTimeBasis: current.leadTimeBasis,
+        goods: current.items?.map((it) => ({ description: it.description })),
+      }),
+    [
+      current.incotermCode,
+      current.incotermLocation,
+      current.loadingPort,
+      current.dischargePort,
+      current.leadTimeDays,
+      current.leadTimeBasis,
+      current.items,
+    ],
+  );
+
+  const sellerLabel = isCreditProforma ? "Beneficiary / Seller" : L("party.from");
+  const buyerLabel = isCreditProforma ? "Applicant / Buyer" : `${metaNoun} To`;
+
+  /* ACID is NAFEZA's Advance Cargo Information Declaration reference —
+     Egyptian customs only. An invoice shipping to Bangladesh (or anywhere
+     else) has no ACID number and never will, so the field must not appear
+     just because docKind === "invoice"; it has to also read the shipment's
+     actual destination. Reuses the same "Port, Country" parsing the terms
+     card already does for the discharge-port country picker. */
+  const isEgyptShipment = useMemo(
+    () => deriveDischargeCountry(current.dischargePort) === "Egypt",
+    [current.dischargePort],
+  );
+
   /* Which item-description cell currently has the user's focus.
      The rich-text toolbar renders right above that cell so the user
      can hit B / I / U / colour / size without losing their text
@@ -623,45 +724,133 @@ export default function QuotationA4Preview({
      Items pages can now use the full ITEMS_MIDDLE budget on the
      LAST items page too (no need to leave room for the footer
      block, which lives on its own pages now). */
-  /* ITEMS_MIDDLE was 8 — fine for normal-length item descriptions
-     but item rows with very long descriptions (e.g. the "Flatbed
-     Steam Iron Press" entry with a 200-char spec sheet wrapped to
-     6-7 lines) are ~200 px tall instead of the usual 110. That
-     pushed the cumulative table height past the 270 mm page
-     boundary and the browser silently split the row across two
-     physical sheets — producing an extra mostly-blank page
-     containing only the tail of the row's last line.
-     7 rows × 110 = 770 px leaves 178 px of slack — enough for ONE
-     tall row of 280 px to fit, OR room for normal padding. */
-  const ITEMS_FIRST  = 4;   // header + thead leaves room for ~4 rows
-  const ITEMS_MIDDLE = 7;   // thead + 7 rows comfortably fits even with one tall row
+  /* ── How many rows fit, MEASURED rather than assumed ────────────────────
+     This used to be two constants — 4 on the first sheet, 7 after — and the
+     comment above them already knew why that was fragile: "item rows with
+     very long descriptions … are ~200 px tall instead of the usual 110",
+     which silently split a row across two physical sheets.
+
+     It also produced the defect the owner reported. A quotation with ELEVEN
+     items pages as 4 + 7 and both sheets are full; an invoice with FIVE pages
+     as 4 + 1, and the second sheet carries one row above 221 mm of white.
+     Nothing had broken — a fixed first-page count simply fills sheet one to
+     the brim and lets whatever is left be orphaned.
+
+     Now each row is costed from its own content and sheets are filled to a
+     measured budget, then BALANCED: if the last items sheet would come out
+     less than half full, the rows are spread evenly instead. Five items page
+     as 3 + 2 rather than 4 + 1.
+
+     Budgets are in px and were measured on the live sheet: page one gives the
+     table 527 px once the header, brand strips, meta strip and party cards
+     are placed (they measure 113 mm together), less 58 px of table head. A
+     continuation sheet has the full 978 px less the same head. */
+  const ITEMS_BUDGET_FIRST = 469;
+  const ITEMS_BUDGET_MIDDLE = 920;
+
+  /* A row is as tall as the tallest thing in it: the picture, or the text.
+     The 112 px picture box is what most rows cost; a long description with no
+     picture can pass it. Estimated rather than measured in the DOM, because
+     measuring means a layout read on every keystroke of the editor. */
+  const rowHeight = (it: QuotationItem): number => {
+    const hasImage = !!(it.image && it.image.trim());
+    const text = `${it.description ?? ""} ${it.model ?? ""}`.replace(/<[^>]+>/g, " ");
+    /* ~34 characters per line in the 206 px description column at 11 px. */
+    const lines = Math.max(1, Math.ceil(text.trim().length / 34));
+    const textHeight = 26 + lines * 15;
+    return Math.max(hasImage ? 112 : 44, textHeight);
+  };
 
   type PageKind = "items" | "footer-a" | "footer-b";
-  type PageEntry = { kind: PageKind; items: QuotationItem[]; startIdx: number };
+  type PageEntry = {
+    kind: PageKind;
+    items: QuotationItem[];
+    startIdx: number;
+    /* An items sheet that also carries the totals / T&C block below its
+       table, instead of that block taking a sheet of its own. */
+    withFooterA?: boolean;
+  };
   const pages = useMemo<PageEntry[]>(() => {
     const items = current.items;
     const out: PageEntry[] = [];
-    /* Items pages — page 1 (header + ITEMS_FIRST rows), then full
-       middle pages until exhausted. Even 0 items still gets a
-       header page so the doc has somewhere for the From / To /
-       items-thead to render. */
-    out.push({ kind: "items", items: items.slice(0, ITEMS_FIRST), startIdx: 0 });
-    let offset = ITEMS_FIRST;
-    while (offset < items.length) {
-      const chunk = Math.min(ITEMS_MIDDLE, items.length - offset);
-      out.push({ kind: "items", items: items.slice(offset, offset + chunk), startIdx: offset });
-      offset += chunk;
+
+    /* Fill by measured height. Even 0 items still gets a first sheet — it
+       carries the header, the parties and the table head. */
+    const chunks: QuotationItem[][] = [];
+    let budget = ITEMS_BUDGET_FIRST;
+    let chunk: QuotationItem[] = [];
+    for (const it of items) {
+      const h = rowHeight(it);
+      if (chunk.length > 0 && h > budget) {
+        chunks.push(chunk);
+        chunk = [];
+        budget = ITEMS_BUDGET_MIDDLE;
+      }
+      chunk.push(it);
+      budget -= h;
     }
-    /* Two footer pages, ALWAYS appended. Measured on an empty
-       draft the combined footer stack is ~963 px (fits in 978 px
-       page budget with 15 px headroom) — BUT on a real quote
-       with filled T&C copy and 14-field Shipment Details those
-       sections grow ~200-300 px each, easily pushing the combined
-       stack past the page budget. The two-page split keeps the
-       output reliable across any real-world content size. */
-    out.push({ kind: "footer-a", items: [], startIdx: items.length });
+    chunks.push(chunk);
+
+    /* BALANCE. A trailing sheet holding one row above 221 mm of white is what
+       the owner saw. If the last sheet came out less than half full and there
+       is an earlier sheet to borrow from, spread the rows evenly instead —
+       5 items become 3 + 2, not 4 + 1. Only ever moves rows LATER, so a sheet
+       can never end up over its budget. */
+    if (chunks.length > 1) {
+      const last = chunks[chunks.length - 1];
+      const lastHeight = last.reduce((n, it) => n + rowHeight(it), 0);
+      if (lastHeight < ITEMS_BUDGET_MIDDLE / 2) {
+        const flat = chunks.flat();
+        const per = Math.ceil(flat.length / chunks.length);
+        const rebalanced: QuotationItem[][] = [];
+        for (let i = 0; i < flat.length; i += per) rebalanced.push(flat.slice(i, i + per));
+        /* Keep the rebalance only if the first sheet still fits its smaller
+           budget — it is the one with the header above it. */
+        const firstFits =
+          (rebalanced[0] ?? []).reduce((n, it) => n + rowHeight(it), 0) <= ITEMS_BUDGET_FIRST;
+        if (firstFits && rebalanced.length === chunks.length) {
+          chunks.length = 0;
+          chunks.push(...rebalanced);
+        }
+      }
+    }
+
+    let startIdx = 0;
+    for (const c of chunks) {
+      out.push({ kind: "items", items: c, startIdx });
+      startIdx += c.length;
+    }
+
+    /* ── Footer-A rides the last items sheet when it fits ──────────────────
+       The two footer sheets stay SPLIT from each other: measured on the live
+       document, footer-A is 131 mm and footer-B is 138 mm, so together they
+       are 269.8 mm against a 270 mm sheet — they miss by 0.2 mm, and the
+       original comment here was right to separate them.
+
+       But footer-A does not need a sheet of its own. INV2026-0010 pages as
+       3 + 2 items, and that second items sheet has 191 mm of white below the
+       table while footer-A sits alone on the next one above 214 mm of it.
+       Dropping footer-A onto the last items sheet when the measured room is
+       there saves a whole page and touches nothing about how the goods are
+       drawn.
+
+       FOOTER_A_PX is deliberately generous: the T&C copy and the 14-field
+       Shipment Details grow with real content, and a footer that overflows
+       its sheet is far worse than one that took its own page. */
+    const FOOTER_A_PX = 560;
+    const lastItemsSheet = out[out.length - 1];
+    const usedOnLast = lastItemsSheet.items.reduce((n, it) => n + rowHeight(it), 0);
+    const budgetOnLast = out.length === 1 ? ITEMS_BUDGET_FIRST : ITEMS_BUDGET_MIDDLE;
+    const footerAFitsWithItems = items.length > 0 && budgetOnLast - usedOnLast >= FOOTER_A_PX;
+
+    if (!footerAFitsWithItems) {
+      out.push({ kind: "footer-a", items: [], startIdx: items.length });
+    } else {
+      lastItemsSheet.withFooterA = true;
+    }
     out.push({ kind: "footer-b", items: [], startIdx: items.length });
     return out;
+    /* eslint-disable-next-line react-hooks/exhaustive-deps */
   }, [current.items]);
 
   return (
@@ -687,7 +876,10 @@ export default function QuotationA4Preview({
       const pageItems    = page.items;
       const startItemIdx = page.startIdx;
       const isItemsPage  = page.kind === "items";
-      const isFooterA    = page.kind === "footer-a";
+      /* Footer-A renders on its own sheet OR under the last items table,
+         whichever the measurement chose. Everything downstream reads this
+         flag, so the block itself did not have to change. */
+      const isFooterA    = page.kind === "footer-a" || page.withFooterA === true;
       const isFooterB    = page.kind === "footer-b";
       /* True on the LAST page that actually has item rows — used to
          render the items-table tfoot summary (Total qty / Total
@@ -742,6 +934,35 @@ export default function QuotationA4Preview({
           </div>
         )}
 
+        {/* ── Trade-terms warnings ──
+            On the paper but no-print, like every other editor affordance, and
+            only on the first sheet. Sits ABOVE the header so it cannot be
+            scrolled past: the whole reason FOB Alexandria reached a customer
+            is that nothing was in the way of sending it. */}
+        {isFirstPage && tradeFindings.length > 0 && (
+          <div className="no-print" style={{ marginBottom: 12, display: "grid", gap: 6 }}>
+            {tradeFindings.map((f) => (
+              <div
+                key={f.id}
+                style={{
+                  border: `1px solid ${f.severity === "error" ? "#fca5a5" : "#fcd34d"}`,
+                  background: f.severity === "error" ? "#fef2f2" : "#fffbeb",
+                  borderRadius: 8,
+                  padding: "7px 10px",
+                  fontSize: 10,
+                  lineHeight: 1.45,
+                }}
+              >
+                <div style={{ fontWeight: 700, color: f.severity === "error" ? "#b91c1c" : "#b45309" }}>
+                  {f.severity === "error" ? "Check this before sending" : "Worth a look"}
+                </div>
+                <div style={{ color: T.ink }}>{f.message}</div>
+                <div style={{ color: T.inkSoft, marginTop: 2 }}>{f.fix}</div>
+              </div>
+            ))}
+          </div>
+        )}
+
         {isFirstPage && (<>
         {/* ═══════════════════════════════════════════════════════════════
             (a) HEADER — logo + QUOTATION wordmark
@@ -771,21 +992,7 @@ export default function QuotationA4Preview({
               ~1 px. Padding the viewBox by 4 units top + bottom and
               giving the SVG a hair more height fixes it without
               visually scaling the wordmark. */}
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            width="180"
-            height="28"
-            viewBox="-4 -4 727.83 115.57"
-            preserveAspectRatio="xMinYMid meet"
-            style={{ display: "block", overflow: "visible" }}
-          >
-            <path fill={T.black} d="M116.59,96.3v11.05h-10.6L14.66,62.47v44.88H0V1.58h14.66v43.53L105.99,1.58h10.6v11.05L28.42,53.9l88.18,42.4Z" />
-            <path fill={T.black} d="M242.65,71.04c0,20.07-14.21,36.54-34.28,36.54h-50.74c-20.52,0-35.18-16.01-35.18-36.54v-35.18C122.45,15.11,136.88.45,157.63.45h49.84c20.52,0,35.18,14.88,35.18,35.41v35.18ZM227.77,38.11c0-12.4-8.34-23.23-20.3-23.23h-49.84c-11.95,0-20.3,10.83-20.3,23.23v31.8c0,11.95,8.34,23,20.3,23h49.84c11.95,0,20.3-11.05,20.3-23v-31.8Z" />
-            <path fill={T.black} d="M363.07,107.57h-68.56c-20.52,0-35.18-16.01-35.18-36.54l.23-71.04h14.66v69.91c0,11.95,8.34,23,20.3,23h68.56v14.66h-.01Z" />
-            <path fill={T.black} d="M473.8,107.57h-68.56c-20.52,0-35.18-16.01-35.18-36.54v-34.51c0-20.52,14.66-34.96,35.18-34.96h68.56v14.88h-68.56c-11.73,0-20.3,9.7-20.3,21.2v10.6l88.18.23v14.66l-88.18-.23v6.99c0,11.95,8.57,23,20.3,23h68.56v14.68Z" />
-            <path fill={T.black} d="M585.42,107.57h-68.56c-20.52,0-35.18-16.01-35.18-36.54v-34.51c0-20.52,14.66-34.96,35.18-34.96h68.56v14.88h-68.56c-11.73,0-20.3,9.7-20.3,21.2v10.6l88.18.23v14.66l-88.18-.23v6.99c0,11.95,8.57,23,20.3,23h68.56v14.68Z" />
-            <path fill={T.black} d="M719.83,96.3v11.05h-10.6l-48.04-42.62-48.04,42.62h-10.37v-11.05l46.91-41.72-46.91-41.95V1.58h10.37l48.04,42.62L709.23,1.58h10.6v11.05l-47.13,41.95,47.13,41.72ZM661.19,71.04l40.59,36.31h-81.19l40.59-36.31Z" />
-          </svg>
+<KoleexWordmark fill={T.black} />
 
           <div
             className="pq-top-title"
@@ -796,7 +1003,26 @@ export default function QuotationA4Preview({
               letterSpacing: "0.08em",
             }}
           >
-            {L(docKind === "invoice" ? "title.invoice" : "title.quotation")}
+            {/* A heading chosen on the document wins; otherwise the page's
+                docKind decides, exactly as before this field existed. */}
+            {current.docTitleText?.trim() ||
+              L(docKind === "invoice" ? "title.invoice" : "title.quotation")}
+            {/* Says what the paper is FOR. A bank receiving a proforma with
+                no stated purpose treats it as an offer; this one is asking to
+                have a credit opened against it. */}
+            {isCreditProforma ? (
+              <div
+                style={{
+                  fontSize: 9,
+                  fontWeight: 600,
+                  letterSpacing: "0.1em",
+                  color: T.inkSoft,
+                  marginTop: 3,
+                }}
+              >
+                FOR LETTER OF CREDIT ISSUANCE
+              </div>
+            ) : null}
           </div>
         </div>
 
@@ -807,44 +1033,7 @@ export default function QuotationA4Preview({
             grouped header block (matches the rest of the document's
             rounded language).
             ═══════════════════════════════════════════════════════════════ */}
-        <div style={{ borderRadius: 12, overflow: "hidden", marginBottom: 16 }}>
-          <div
-            className="pq-strip-black"
-            style={{
-              background: T.black,
-              color: "#fff",
-              padding: "7px 16px",
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center",
-              fontSize: 9,
-              fontWeight: 600,
-              letterSpacing: "0.04em",
-            }}
-          >
-            <span style={{ color: "#fff" }}>
-              KOLEEX INTERNATIONAL CORPORATION TAIZHOU CO., LTD.
-            </span>
-            <span style={{ color: "#fff" }}>
-              {"科莱恪斯国际商业管理（台州）有限公司"}
-            </span>
-          </div>
-
-          <div
-            className="pq-strip-gray"
-            style={{
-              background: T.surface,
-              color: "#333",
-              padding: "5px 16px",
-              textAlign: "center",
-              fontSize: 9,
-              fontWeight: 600,
-              letterSpacing: "0.18em",
-            }}
-          >
-            SHAPING THE FUTURE.
-          </div>
-        </div>
+        <DocumentBrandStrips black={T.black} surface={T.surface} />
 
         {/* ═══════════════════════════════════════════════════════════════
             (d) Meta strip ABOVE the From / Quotation-To party row.
@@ -874,7 +1063,7 @@ export default function QuotationA4Preview({
         <div
           style={{
             display: "grid",
-            gridTemplateColumns: docKind === "invoice" ? "repeat(3, 1fr)" : "repeat(4, 1fr)",
+            gridTemplateColumns: showsValidity ? "repeat(4, 1fr)" : "repeat(3, 1fr)",
             border: `1px solid ${T.border}`,
             borderRadius: 12,
             overflow: "hidden",
@@ -891,7 +1080,7 @@ export default function QuotationA4Preview({
               style={{ ...inputResetStyle, fontSize: 11, fontVariantNumeric: "tabular-nums" }}
             />
           </MetaStripCell>
-          <MetaStripCell label={L(docKind === "invoice" ? "meta.invoiceNo" : "meta.quotationNo")}>
+          <MetaStripCell label={`${metaNoun} No`}>
             <span
               data-quote-no={current.invoiceNo || undefined}
               style={{ fontSize: 11, fontFamily: T.mono, letterSpacing: "0.02em" }}
@@ -899,7 +1088,7 @@ export default function QuotationA4Preview({
               {current.invoiceNo || "—"}
             </span>
           </MetaStripCell>
-          {docKind !== "invoice" && (
+          {showsValidity && (
             <MetaStripCell label={L("meta.validTill")}>
               <input
                 value={current.validTill}
@@ -947,7 +1136,7 @@ export default function QuotationA4Preview({
                 textTransform: "uppercase",
               }}
             >
-              {L("party.from")}
+              {sellerLabel}
             </div>
             <div style={{ padding: "10px 14px" }}>
               <div
@@ -981,13 +1170,13 @@ export default function QuotationA4Preview({
                 }}
               >
                 <span style={{ color: T.inkGhost, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em" }}>{L("party.phone")}</span>
-                <span style={{ fontFamily: T.mono, letterSpacing: "0.02em", color: T.ink }}>+86 0576 8892 7796</span>
+                <span style={{ fontFamily: T.mono, letterSpacing: "0.02em", color: T.ink }}>{KOLEEX_COMPANY.tel}</span>
                 <span style={{ color: T.inkGhost, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em" }}>{L("party.mobile")}</span>
-                <span style={{ fontFamily: T.mono, letterSpacing: "0.02em", color: T.ink }}>+86 130 7380 0720</span>
+                <span style={{ fontFamily: T.mono, letterSpacing: "0.02em", color: T.ink }}>{KOLEEX_COMPANY.mobile}</span>
                 <span style={{ color: T.inkGhost, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em" }}>{L("party.email")}</span>
-                <span style={{ color: T.ink }}>info@koleexgroup.com</span>
+                <span style={{ color: T.ink }}>{KOLEEX_COMPANY.email}</span>
                 <span style={{ color: T.inkGhost, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em" }}>{L("party.web")}</span>
-                <span style={{ color: T.ink }}>www.koleexgroup.com</span>
+                <span style={{ color: T.ink }}>{KOLEEX_COMPANY.web}</span>
               </div>
             </div>
           </div>
@@ -1021,7 +1210,7 @@ export default function QuotationA4Preview({
                 gap: 8,
               }}
             >
-              <span>{L(docKind === "invoice" ? "party.invoiceTo" : "party.quotationTo")}</span>
+              <span>{buyerLabel}</span>
               {/* Link-to-CRM button. Editor-only (`.no-print`) so the
                   black header strip stays clean on the printed PDF. */}
               {onPickCustomer && (
@@ -1046,6 +1235,34 @@ export default function QuotationA4Preview({
                   {current.customerContactId ? "Change" : "Link Customer"}
                 </button>
               )}
+              {/* Only when the card holds typed details that are not already a
+                  CRM record. Linking one hides it — there is nothing to add. */}
+              {onSaveCustomer &&
+                !current.customerContactId &&
+                (current.companyName?.trim() || current.customerName?.trim()) && (
+                  <button
+                    type="button"
+                    className="no-print"
+                    onClick={onSaveCustomer}
+                    disabled={savingCustomer}
+                    title="Add these details to the Customers app, so the next document can just link them."
+                    style={{
+                      background: "rgba(255,255,255,0.14)",
+                      color: "#fff",
+                      border: "1px solid rgba(255,255,255,0.25)",
+                      padding: "2px 8px",
+                      borderRadius: 5,
+                      fontSize: 9,
+                      fontWeight: 700,
+                      letterSpacing: "0.06em",
+                      textTransform: "uppercase",
+                      cursor: savingCustomer ? "default" : "pointer",
+                      opacity: savingCustomer ? 0.55 : 1,
+                    }}
+                  >
+                    {savingCustomer ? "Saving…" : "+ Save as Customer"}
+                  </button>
+                )}
             </div>
             <div style={{ padding: "10px 14px", display: "flex", flexDirection: "column", gap: 8 }}>
               {/* Company name — prominent at the top */}
@@ -1109,8 +1326,10 @@ export default function QuotationA4Preview({
                     (the number doesn't exist yet at quote stage).
                     Stored on toAcid in the doc data model — shared
                     between quotation + invoice so a number captured
-                    after the quote is preserved into the invoice. */}
-                {docKind === "invoice" && (
+                    after the quote is preserved into the invoice.
+                    Gated on isEgyptShipment too — a Bangladesh (or any
+                    non-Egypt) invoice has no ACID number and never will. */}
+                {docKind === "invoice" && isEgyptShipment && (
                   <>
                     <span style={{ color: T.inkGhost, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em", whiteSpace: "nowrap" }}>{L("party.acid")}</span>
                     <input
@@ -2314,15 +2533,18 @@ export default function QuotationA4Preview({
           </div>
         </div>
 
-        {/* ── Customer counter-signature block — INVOICE ONLY ──
+        {/* ── Customer counter-signature block — INVOICE ONLY, EGYPT ONLY ──
             A commercial invoice that crosses Egyptian customs needs a
             counter-signature + stamp from the buyer acknowledging
             receipt of goods. Quotations don't need this (the buyer
-            confirms intent by issuing the PO instead). Two blank
-            cards, sized to match the seller's row above, with the
-            same dark header strip and a centred placeholder line so
-            the customer can sign + stamp on the printed copy. */}
-        {docKind === "invoice" && (
+            confirms intent by issuing the PO instead), and neither does
+            an invoice bound anywhere but Egypt — same isEgyptShipment
+            gate as the ACID field above, confirmed with Kamal 2026-08-24
+            rather than assumed from the comment alone. Two blank cards,
+            sized to match the seller's row above, with the same dark
+            header strip and a centred placeholder line so the customer
+            can sign + stamp on the printed copy. */}
+        {docKind === "invoice" && isEgyptShipment && (
           <div
             style={{
               display: "grid",
@@ -3103,6 +3325,8 @@ function TermsToolbarButton({
 interface QuickFillPatch {
   fields: {
     paymentTermId?: string;
+    docTitleId?: string;
+    docTitleText?: string;
     incotermId?: string;
     incotermCode?: string;
     incotermLocation?: string;
@@ -4324,7 +4548,29 @@ function applyQuickFillToTerms(termsHtml: string, updates: Record<string, string
     "Cancellation Policy":["Cancellation Policy", "Cancellation policy", "Cancellation", "Cancel Policy"],
     "Governing Law":      ["Governing Law", "Governing law", "Applicable law", "Jurisdiction"],
     "Total Qty":          ["Total Qty", "Total Quantity", "Total qty", "Qty Total"],
+    /* L/C-only lines, written by the L/C auto-adjust below. They need
+       entries here or a second pick would append duplicates instead of
+       replacing what the first one wrote. */
+    "Latest shipment date": ["Latest shipment date", "Latest date of shipment", "Latest shipment", "Last shipment date", "Shipment deadline"],
+    "L/C validity":         ["L/C validity", "LC validity", "Credit validity", "Validity of credit", "L/C expiry", "LC expiry"],
+    "Presentation period":  ["Presentation period", "Document presentation", "Presentation of documents", "Document presentation period"],
+    "Partial shipment":     ["Partial shipment", "Partial shipments", "Part shipment", "Partial delivery"],
+    "Transhipment":         ["Transhipment", "Transshipment", "Trans-shipment"],
   };
+
+  /* Lines that exist only while a particular payment shape is selected.
+     Blanking one REMOVES the row; blanking a standard row (Payment terms,
+     Price Type, Bank Charges…) keeps it visible as a placeholder, which is
+     what the operator expects there. Without this, switching away from an
+     L/C left "Latest shipment date:" and four more empty labels printed on
+     the document — measured, not theorised. */
+  const OPTIONAL_LINES = new Set([
+    "Latest shipment date",
+    "L/C validity",
+    "Presentation period",
+    "Partial shipment",
+    "Transhipment",
+  ]);
 
   const keyMatches = (segText: string, key: string): boolean => {
     const plain = segText.replace(/<[^>]+>/g, "").trim().toLowerCase();
@@ -4369,6 +4615,8 @@ function applyQuickFillToTerms(termsHtml: string, updates: Record<string, string
         if (keyMatches(inner, key)) {
           usedKeys.add(key);
           const value = updates[key] ?? "";
+          /* A blanked conditional line leaves no empty label behind. */
+          if (!value && OPTIONAL_LINES.has(key)) return "";
           /* Rebuild the inner content in the canonical bold format
              — '<strong>Label:</strong> value'. The outer <div>
              with its border-bottom styling stays intact. */
@@ -4406,6 +4654,7 @@ function applyQuickFillToTerms(termsHtml: string, updates: Record<string, string
     for (const key of Object.keys(updates)) {
       if (!usedKeys.has(key) && keyMatches(seg, key)) {
         usedKeys.add(key);
+        if (!updates[key] && OPTIONAL_LINES.has(key)) return "";
         return rewriteSegment(seg, key, updates[key]);
       }
     }
@@ -6012,11 +6261,98 @@ function TermsQuickFillModal({
   };
 
   // Helpers to package up onPatch calls cleanly per field.
+
+  /* ── L/C auto-adjust ────────────────────────────────────────────────
+     A document quoted against a Letter of Credit is not the same document
+     quoted against T/T, and the differences are exactly the ones that get a
+     presentation rejected:
+
+       · "45 days after receipt of deposit" is meaningless under an L/C —
+         there is no deposit. The clock has to start at the OPERATIVE credit,
+         and a deposit-based cancellation clause describes money never paid.
+         Both of those shipped on a real Koleex invoice.
+       · the credit needs a latest shipment date, a validity and a
+         presentation period, or the issuing bank chooses them for you.
+       · partial shipment and transhipment must be stated, because under
+         UCP 600 silence is itself a rule.
+       · every extra required document is another chance of a discrepancy.
+         That same invoice listed eight — including "Photos" and "Manual",
+         which no bank can judge for compliance. Four is the working set;
+         the rest travel WITH the shipment.
+
+     Applied the moment an L/C term is picked (owner's call). Only lines the
+     L/C shape governs are touched; anything else the operator typed is left
+     alone. The test reads the master-list CATEGORY, so it never guesses
+     from free text. */
+  const LC_DOCUMENTS = [
+    "Signed Commercial Invoice",
+    "Full set 3/3 original clean on-board B/L",
+    "Packing List",
+    "Certificate of Origin",
+  ];
+  const LC_CANCELLATION =
+    "Order is firm once the operative L/C is received; amendments are at the applicant's cost";
+  const isLCTerm = (catName?: string) => /letter of credit|l\/c/i.test(catName ?? "");
+
   const onPickPayment = (id: string) => {
     const term = allPaymentTerms.find((t) => t.id === id);
+    if (!term) {
+      onPatch({ fields: { paymentTermId: undefined }, termsLineUpdates: { "Payment terms": "" } });
+      return;
+    }
+    if (isLCTerm(term.catName)) {
+      const days = current.leadTimeDays && current.leadTimeDays > 0 ? current.leadTimeDays : 45;
+      onPatch({
+        fields: {
+          paymentTermId: id,
+          leadTimeDays: days,
+          leadTimeBasis: "after_lc_opening",
+          documentsProvided: LC_DOCUMENTS,
+          cancellationPolicy: LC_CANCELLATION,
+        },
+        termsLineUpdates: {
+          "Payment terms": term.label,
+          "Lead time": `Within ${days} days after receipt of the operative L/C`,
+          "Latest shipment date": `${days + 30} days from L/C issuance`,
+          "L/C validity": "Valid for negotiation for at least 21 days after the latest shipment date",
+          "Presentation period":
+            "Documents to be presented within 15 days after B/L date, within L/C validity",
+          "Partial shipment": "Allowed",
+          "Transhipment": "Allowed",
+          "Documents Provided": LC_DOCUMENTS.join(", "),
+          "Cancellation Policy": LC_CANCELLATION,
+        },
+      });
+      return;
+    }
+    /* Leaving an L/C: clear what the L/C shape wrote, or the document keeps
+       clauses that contradict its own payment line — a T&C reading "30% T/T
+       deposit" above an "L/C validity" clause is the same class of internal
+       contradiction this feature exists to prevent. */
+    const wasLC = isLCTerm(
+      allPaymentTerms.find((t) => t.id === current.paymentTermId)?.catName,
+    );
     onPatch({
-      fields: { paymentTermId: id || undefined },
-      termsLineUpdates: { "Payment terms": term?.label ?? "" },
+      fields: {
+        paymentTermId: id,
+        ...(wasLC ? { leadTimeBasis: "after_deposit" as const, cancellationPolicy: "" } : {}),
+      },
+      termsLineUpdates: {
+        "Payment terms": term.label,
+        ...(wasLC
+          ? {
+              "Latest shipment date": "",
+              "L/C validity": "",
+              "Presentation period": "",
+              "Partial shipment": "",
+              "Transhipment": "",
+              "Cancellation Policy": "",
+              "Lead time": current.leadTimeDays
+                ? `${current.leadTimeDays} days after receipt of deposit`
+                : "",
+            }
+          : {}),
+      },
     });
   };
   const onPickIncoterm = (id: string) => {
@@ -7758,6 +8094,71 @@ export function StampSignatureBox({
   aspectSquare?: boolean;
   children?: React.ReactNode;
 }) {
+  /* ── The seal must print at its REAL diameter ─────────────────────────
+     A Chinese company seal (公章) is 40 mm by regulation, so the box is
+     40 mm — but `object-fit: contain` fits the IMAGE inside it, and an image
+     with white margin around the circle therefore renders the circle SMALLER
+     than 40 mm. Measured on the tenant's own stamp.png: 1236 × 1217 px with
+     the ink filling 92.2%, so the printed seal came out 37.3 mm.
+
+     The old comment knew this and made it the user's problem — "the uploaded
+     image needs to be a tight crop". That is not a reasonable thing to ask of
+     someone uploading a scan. The box now measures the ink itself, once per
+     image, and scales the render so the CIRCLE is 40 mm whatever margin the
+     file carries. */
+  const [inkScale, setInkScale] = useState(1);
+  useEffect(() => {
+    if (!imageUrl || !aspectSquare) {
+      setInkScale(1);
+      return;
+    }
+    let cancelled = false;
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+    img.onload = () => {
+      if (cancelled) return;
+      try {
+        /* Sample at a small fixed size — this is a bounding box, not a
+           rendering, so 200px is ample and keeps the pass under a
+           millisecond. */
+        const N = 200;
+        const c = document.createElement("canvas");
+        c.width = N;
+        c.height = N;
+        const ctx = c.getContext("2d", { willReadFrequently: true });
+        if (!ctx) return;
+        ctx.drawImage(img, 0, 0, N, N);
+        const { data } = ctx.getImageData(0, 0, N, N);
+        let minX = N, minY = N, maxX = 0, maxY = 0, found = false;
+        for (let y = 0; y < N; y++) {
+          for (let x = 0; x < N; x++) {
+            const i = (y * N + x) * 4;
+            const a = data[i + 3];
+            /* Ink = opaque and not near-white. */
+            if (a > 30 && !(data[i] > 235 && data[i + 1] > 235 && data[i + 2] > 235)) {
+              found = true;
+              if (x < minX) minX = x;
+              if (x > maxX) maxX = x;
+              if (y < minY) minY = y;
+              if (y > maxY) maxY = y;
+            }
+          }
+        }
+        if (!found) return;
+        const fill = Math.max((maxX - minX) / N, (maxY - minY) / N);
+        /* Clamped: a wildly wrong measurement must not blow the seal up past
+           its box, and a tight crop needs no correction at all. */
+        if (fill > 0.2 && fill < 1) setInkScale(Math.min(1 / fill, 1.6));
+      } catch {
+        /* A cross-origin image the canvas cannot read — leave it at 1. */
+      }
+    };
+    img.src = imageUrl;
+    return () => {
+      cancelled = true;
+    };
+  }, [imageUrl, aspectSquare]);
+
   /* Sizing rationale:
        · STAMP (aspectSquare=true) — locked to 40 mm × 40 mm using
          physical mm units. This is the Chinese mainland standard
@@ -7797,6 +8198,10 @@ export function StampSignatureBox({
             width: "100%",
             height: "100%",
             objectFit: "contain",
+            /* Scale up by exactly the margin the file carries, so the CIRCLE
+               lands on 40 mm rather than the file's outer edge. 1 for the
+               signature and for an already-tight crop. */
+            transform: inkScale === 1 ? undefined : `scale(${inkScale})`,
           }}
         />
       ) : (

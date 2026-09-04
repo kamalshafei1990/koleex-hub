@@ -177,10 +177,6 @@ function Eyes({ expr }: { expr: RobotExpression }) {
 
     case "angry": {
       // round eyes with angled inner brows (lens-coloured wedges)
-      const brow = (cx: number, inner: number, k: string) => (
-        <path key={k} d={`M ${cx - 36} ${CY - 40} L ${cx + 36} ${CY - 40} L ${inner > 0 ? cx + 38 : cx - 38} ${CY - 2} Z`}
-          fill="#10131a" />
-      );
       return (
         <>
           {circle(LX, CY + 4, R - 2, "l")}
@@ -358,7 +354,11 @@ export default function KoleexRobot({
   const calm = expr === "normal" || expr === "happy" || expr === "thinking" || expr === "bored";
   const blinkRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   useEffect(() => {
-    if (!animated || !calm) { setBlinkOn(false); return; }
+    if (!animated || !calm) {
+      let keep = true;
+      queueMicrotask(() => { if (keep) setBlinkOn(false); });
+      return () => { keep = false; };
+    }
     let alive = true;
     const loop = () => {
       if (!alive) return;

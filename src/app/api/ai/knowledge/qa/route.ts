@@ -7,9 +7,9 @@
    prompt and does the meaning-matching. */
 
 import { NextResponse } from "next/server";
-import { requireAuth } from "@/lib/server/auth";
+import { requireAuth, requireModuleAction } from "@/lib/server/auth";
 import { supabaseServer } from "@/lib/server/supabase-server";
-import { estimateTokens, invalidateTaughtAnswersCache } from "@/lib/server/ai-knowledge";
+import { estimateTokens, invalidateTaughtAnswersCache, invalidateApprovedSearchCache } from "@/lib/server/ai-knowledge";
 
 export const dynamic = "force-dynamic";
 
@@ -28,10 +28,15 @@ async function qaSourceId(tenantId: string | null, accountId: string | null): Pr
   return created.id as string;
 }
 
+  /* READ is grantable, WRITE is not. The super admin can hand "AI Knowledge"
+     to an account so it can open the bench and read the corpus; ingesting
+     sources and approving units stay his alone, because approval is what
+     decides what the AI treats as true. */
 export async function GET() {
   const auth = await requireAuth();
   if (auth instanceof NextResponse) return auth;
-  if (!auth.is_super_admin) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  const denied = await requireModuleAction(auth, "AI Knowledge", "view");
+  if (denied) return denied;
   let q = supabaseServer
     .from("ai_knowledge_units")
     .select("id, title, body, meta, status, created_at")
@@ -96,7 +101,14 @@ export async function POST(req: Request) {
     .select("id")
     .single();
   if (error || !data) return NextResponse.json({ error: error?.message || "insert failed" }, { status: 500 });
+  /* THE AI'S VIEW OF TRUTH JUST CHANGED, SO DROP WHAT IT CACHED.
+     Both planes, not one: taught pairs feed the written lanes' prompt and the
+     approved-search cache feeds search_knowledge, which is the ONLY route a
+     voice call has to any of this. Invalidating one left the owner teaching
+     something, hearing the chat box use it, and hearing a call not — for a
+     minute, which is long enough to look permanent and be reported as broken. */
   invalidateTaughtAnswersCache(tenantId);
+  invalidateApprovedSearchCache(tenantId);
   return NextResponse.json({ id: data.id });
 }
 
@@ -113,5 +125,6 @@ export async function DELETE(req: Request) {
     .eq("id", id);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   invalidateTaughtAnswersCache(auth.tenant_id ?? null);
+  invalidateApprovedSearchCache(auth.tenant_id ?? null);
   return NextResponse.json({ ok: true });
 }

@@ -29,6 +29,7 @@
 import { useCallback, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import PhotoLightbox, { type LightboxPhoto } from "@/components/ai/PhotoLightbox";
 
 interface Props {
   content: string;
@@ -80,6 +81,8 @@ export default function MessageMarkdown({
   content,
   className,
 }: Props): React.ReactElement {
+  const [lightbox, setLightbox] = useState<LightboxPhoto | null>(null);
+  const closeLightbox = useCallback(() => setLightbox(null), []);
   return (
     <div className={`koleex-md ${className ?? ""}`}>
       <ReactMarkdown
@@ -113,6 +116,23 @@ export default function MessageMarkdown({
             return <CodeBlock language={language}>{text}</CodeBlock>;
           },
           pre: ({ children }) => <>{children}</>,
+          /* PRODUCT PHOTOS, DRAWN LIKE PART OF THE ANSWER. The model embeds a
+             product's photo as markdown (PRODUCT_PHOTO_RULE); without this
+             the image landed as a bare <img> at its natural size with no
+             edge, no spacing and nothing to tap. Now: bounded, rounded,
+             hairline border, and a tap opens the full picture in a new tab.
+
+             https ONLY. A markdown image is a URL the model wrote, and a
+             URL that is not https is rendered as its alt text rather than
+             fetched — the same rule the call screen applies to photos it
+             reads out of a tool result. */
+          img: ({ src, alt }) => {
+            const url = typeof src === "string" ? src : "";
+            if (!/^https:\/\//i.test(url)) return <span>{alt ?? ""}</span>;
+            /* A TAP EXPANDS THE PICTURE IN PLACE (PhotoLightbox) rather than
+               leaving the app for a bare file in a new tab. */
+            return <MarkdownPhoto url={url} alt={alt ?? ""} onOpen={() => setLightbox({ url, label: alt ?? "" })} />;
+          },
           table: ({ children, ...rest }) => (
             <div className="koleex-md-table-wrap">
               <table {...rest}>{children}</table>
@@ -122,7 +142,24 @@ export default function MessageMarkdown({
       >
         {content}
       </ReactMarkdown>
-      
+      <PhotoLightbox photo={lightbox} onClose={closeLightbox} />
     </div>
+  );
+}
+
+/* A PICTURE THAT FAILS TO LOAD BECOMES ITS WORDS. A web image can be a dead
+   link or a host that refuses hot-linking, and the browser's broken-image
+   icon inside a bordered box is the worst of both — a frame around nothing.
+   The alt text is the product's or the place's name, which reads fine. */
+function MarkdownPhoto({ url, alt, onOpen }: { url: string; alt: string; onOpen: () => void }) {
+  const [broken, setBroken] = useState(false);
+  if (broken) return <span className="koleex-md-img-fallback">{alt}</span>;
+  return (
+    <button type="button" onClick={onOpen} className="koleex-md-img-link" aria-label={alt || "Photo"}>
+      {/* Remote product photo from whatever host the catalogue names;
+          next/image needs a fixed allowlist. Same call as Bubble. */}
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src={url} alt={alt} loading="lazy" decoding="async" className="koleex-md-img" onError={() => setBroken(true)} />
+    </button>
   );
 }

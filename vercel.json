@@ -1,12 +1,43 @@
 {
+  "$schema": "https://openapi.vercel.sh/vercel.json",
   "regions": [
     "hnd1"
   ],
   "crons": [
-    { "path": "/api/cron/fx-refresh", "schedule": "0 6 * * *" },
-    { "path": "/api/cron/todo-reminders", "schedule": "*/5 * * * *" },
-    { "path": "/api/cron/calendar-reminders", "schedule": "*/2 * * * *" },
-    { "path": "/api/cron/project-task-reminders", "schedule": "0 1 * * *" },
-    { "path": "/api/cron/hr-expiry-reminders", "schedule": "0 2 * * *" }
-  ]
+    {
+      "path": "/api/cron/fx-refresh",
+      "schedule": "0 6 * * *"
+    },
+    {
+      "path": "/api/cron/todo-reminders",
+      "schedule": "*/5 * * * *"
+    },
+    {
+      "path": "/api/cron/calendar-reminders",
+      "schedule": "*/2 * * * *"
+    },
+    {
+      "path": "/api/cron/project-task-reminders",
+      "schedule": "0 1 * * *"
+    },
+    {
+      "path": "/api/cron/hr-expiry-reminders",
+      "schedule": "0 2 * * *"
+    },
+    {
+      "path": "/api/cron/voice-watch",
+      "schedule": "*/15 * * * *"
+    },
+    {
+      "path": "/api/cron/voice-watch-sin1",
+      "schedule": "7-59/15 * * * *"
+    }
+  ],
+  "functions": {
+    "src/app/api/cron/voice-watch-sin1/route.ts": {
+      "regions": [
+        "sin1"
+      ]
+    }
+  }
 }

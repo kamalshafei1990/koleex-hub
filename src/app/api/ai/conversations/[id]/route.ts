@@ -4,6 +4,11 @@ import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { requireAuth } from "@/lib/server/auth";
 import { requireInternalUser } from "@/lib/server/ai/require-internal";
+import { stripAttachEmbed } from "@/lib/server/ai/attach-embed";
+/* Every persisted row carries ai_messages.provider verbatim, so returning
+   the history returns the vendor label once per message. Finding N11 —
+   see ai/observability/public-provider.ts. */
+import { withPublicProvider } from "@/lib/server/ai/observability/public-provider";
 
 /* GET    /api/ai/conversations/:id — conversation + ordered messages
    PATCH  /api/ai/conversations/:id — rename
@@ -36,9 +41,18 @@ export async function GET(_req: Request, { params }: RouteCtx) {
   ]);
   if (cvRes.error) return NextResponse.json({ error: cvRes.error.message }, { status: 500 });
   if (!cvRes.data) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  /* Bubbles show the slim 📎 marker; the embedded extraction text after the
+     delimiter is transport for the agent's later turns, not display. */
+  const messages = (msgRes.data ?? []).map((m) =>
+    withPublicProvider(
+      typeof (m as { content?: unknown }).content === "string"
+        ? { ...m, content: stripAttachEmbed((m as { content: string }).content) }
+        : m,
+    ),
+  );
   return NextResponse.json({
     conversation: cvRes.data,
-    messages: msgRes.data ?? [],
+    messages,
   });
 }
 

@@ -382,6 +382,28 @@ export const accountsT: Translations = {
   "acc.private.visaExpiry":          { en: "Visa Expiry Date",                                                   zh: "签证到期日",                                                          ar: "تاريخ انتهاء التأشيرة" },
 
   /* ── Security tab — Password & Sign-in ── */
+  /* ── Security tab: password reset, 2FA events, shared actions ──
+     These 15 keys rendered as RAW KEY NAMES in the UI ("acc.security.
+     changePassword" instead of "Change password"). The call sites use
+     `t("key") || "Fallback"`, which can never fire: t() returns the KEY
+     when it is missing, and a non-empty string is truthy. Owner saw the
+     raw keys on the Accounts security tab. */
+  "acc.security.changePassword":     { en: "Change password",                                                    zh: "更改密码",                                                            ar: "تغيير كلمة المرور" },
+  "acc.security.newPasswordPlaceholder": { en: "New password",                                                   zh: "新密码",                                                             ar: "كلمة المرور الجديدة" },
+  "acc.security.generate":           { en: "Generate",                                                           zh: "生成",                                                               ar: "إنشاء" },
+  "acc.security.savePassword":       { en: "Save password",                                                      zh: "保存密码",                                                            ar: "حفظ كلمة المرور" },
+  "acc.security.forceResetOnNextLogin": { en: "Require a new password at next sign-in",                          zh: "下次登录时要求设置新密码",                                              ar: "\u200Fطلب كلمة مرور جديدة عند تسجيل الدخول التالي" },
+  "acc.security.generatedTitle":     { en: "New password generated",                                             zh: "已生成新密码",                                                        ar: "تم إنشاء كلمة مرور جديدة" },
+  "acc.security.generatedNote":      { en: "Copy it now \u2014 it will not be shown again.",                      zh: "请立即复制，之后将不再显示。",                                           ar: "\u200Fانسخها الآن \u2014 لن تظهر مرة أخرى." },
+  "acc.err.passwordTooShort":        { en: "Password is too short",                                              zh: "密码太短",                                                            ar: "كلمة المرور قصيرة جدًا" },
+  "acc.msg.passwordChanged":         { en: "Password changed",                                                   zh: "密码已更改",                                                          ar: "تم تغيير كلمة المرور" },
+  "acc.event.twoFactorEnabled":      { en: "Two-factor enabled",                                                 zh: "已启用双重验证",                                                       ar: "تم تفعيل التحقق بخطوتين" },
+  "acc.event.twoFactorDisabled":     { en: "Two-factor disabled",                                                zh: "已停用双重验证",                                                       ar: "تم إيقاف التحقق بخطوتين" },
+  "common.cancel":                   { en: "Cancel",                                                             zh: "取消",                                                               ar: "إلغاء" },
+  "common.copy":                     { en: "Copy",                                                               zh: "复制",                                                               ar: "نسخ" },
+  "common.copied":                   { en: "Copied",                                                             zh: "已复制",                                                             ar: "تم النسخ" },
+  "common.done":                     { en: "Done",                                                               zh: "完成",                                                               ar: "تم" },
+
   "acc.security.passwordSignIn":     { en: "Password & Sign-in",                                                 zh: "密码和登录",                                                          ar: "كلمة المرور وتسجيل الدخول" },
   "acc.security.password":           { en: "Password",                                                           zh: "密码",                                                               ar: "كلمة المرور" },
   "acc.security.pwSet":              { en: "Set (temporary)",                                                    zh: "已设置（临时）",                                                       ar: "تم التعيين (مؤقت)" },

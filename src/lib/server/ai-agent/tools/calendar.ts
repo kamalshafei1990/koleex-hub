@@ -71,7 +71,7 @@ const listMyCalendar: ToolDef<
     const { data, error } = await q.order("start_at", { ascending: true }).limit(limit);
     if (error) {
       console.error("[tool.listMyCalendar]", error);
-      return { ok: false, permissionStatus: "denied", data: null, message: "Couldn't load your calendar right now." };
+      return { ok: false, permissionStatus: "allowed", data: null, message: "Couldn't load your calendar right now." };
     }
     const rows = (data ?? []) as Array<Record<string, unknown>>;
     return {
@@ -119,14 +119,14 @@ const createCalendarEvent: ToolDef<
     const title = String(args.title ?? "").trim();
     const startAt = String(args.start_at ?? "").trim();
     const endAt = String(args.end_at ?? "").trim();
-    if (!title) return { ok: false, permissionStatus: "denied", data: null, message: "What's the event called?" };
-    if (!startAt || !endAt) return { ok: false, permissionStatus: "denied", data: null, message: "When is it? I need a start and end time." };
+    if (!title) return { ok: false, permissionStatus: "allowed", data: null, message: "What's the event called?" };
+    if (!startAt || !endAt) return { ok: false, permissionStatus: "allowed", data: null, message: "When is it? I need a start and end time." };
     {
       // DB CHECK is end_at >= start_at; equal start/end is a zero-length
       // event the calendar accepts, so only inverted windows are blocked.
       const s = Date.parse(startAt), e = Date.parse(endAt);
       if (!Number.isNaN(s) && !Number.isNaN(e) && e < s) {
-        return { ok: false, permissionStatus: "denied", data: null, message: "The end time can't be before the start time." };
+        return { ok: false, permissionStatus: "allowed", data: null, message: "The end time can't be before the start time." };
       }
     }
 
@@ -166,7 +166,7 @@ const createCalendarEvent: ToolDef<
 
     if (error) {
       console.error("[tool.createCalendarEvent]", error);
-      return { ok: false, permissionStatus: "denied", data: null, message: "Couldn't create the event — please try again." };
+      return { ok: false, permissionStatus: "allowed", data: null, message: "Couldn't create the event — please try again." };
     }
     return {
       ok: true,
@@ -241,11 +241,11 @@ const updateCalendarEvent: ToolDef<
   requiredAction: "edit",
   handler: async (ctx, args): Promise<ToolResult<Record<string, unknown> | { preview: Record<string, unknown> }>> => {
     const id = String(args.event_id ?? "").trim();
-    if (!id) return { ok: false, permissionStatus: "denied", data: null, message: "Which event? Pick it from listMyCalendar first." };
-    if (!isUuid(id)) return { ok: false, permissionStatus: "denied", data: null, message: BAD_ID_MESSAGE };
+    if (!id) return { ok: false, permissionStatus: "allowed", data: null, message: "Which event? Pick it from listMyCalendar first." };
+    if (!isUuid(id)) return { ok: false, permissionStatus: "allowed", data: null, message: BAD_ID_MESSAGE };
 
     const ev = await loadEventRow(id, ctx.auth.tenant_id);
-    if (!ev) return { ok: false, permissionStatus: "denied", data: null, message: "I can't find that event — pick it again from listMyCalendar." };
+    if (!ev) return { ok: false, permissionStatus: "allowed", data: null, message: "I can't find that event — pick it again from listMyCalendar." };
     if (ev.account_id !== ctx.auth.account_id && !ctx.isSuperAdmin) {
       return { ok: false, permissionStatus: "denied", data: null, message: "You can only edit events on your own calendar." };
     }
@@ -258,13 +258,13 @@ const updateCalendarEvent: ToolDef<
     if (typeof args.description === "string") changes.description = args.description;
     if (typeof args.is_private === "boolean") changes.is_private = args.is_private;
     if (Object.keys(changes).length === 0) {
-      return { ok: false, permissionStatus: "denied", data: null, message: "Nothing to change — tell me what to update (title, times, description, all-day, or privacy)." };
+      return { ok: false, permissionStatus: "allowed", data: null, message: "Nothing to change — tell me what to update (title, times, description, all-day, or privacy)." };
     }
 
     const effStart = Date.parse((changes.start_at as string | undefined) ?? ev.start_at ?? "");
     const effEnd = Date.parse((changes.end_at as string | undefined) ?? ev.end_at ?? "");
     if (!Number.isNaN(effStart) && !Number.isNaN(effEnd) && effEnd < effStart) {
-      return { ok: false, permissionStatus: "denied", data: null, message: "The end time can't be before the start time." };
+      return { ok: false, permissionStatus: "allowed", data: null, message: "The end time can't be before the start time." };
     }
 
     const title = ev.title ?? "Event";
@@ -294,7 +294,7 @@ const updateCalendarEvent: ToolDef<
       .maybeSingle();
     if (error) {
       console.error("[tool.updateCalendarEvent]", error);
-      return { ok: false, permissionStatus: "denied", data: null, message: "Couldn't update the event — please try again." };
+      return { ok: false, permissionStatus: "allowed", data: null, message: "Couldn't update the event — please try again." };
     }
     return {
       ok: true,
@@ -327,11 +327,11 @@ const deleteCalendarEvent: ToolDef<
   requiredAction: "delete",
   handler: async (ctx, args): Promise<ToolResult<Record<string, unknown> | { preview: Record<string, unknown> }>> => {
     const id = String(args.event_id ?? "").trim();
-    if (!id) return { ok: false, permissionStatus: "denied", data: null, message: "Which event? Pick it from listMyCalendar first." };
-    if (!isUuid(id)) return { ok: false, permissionStatus: "denied", data: null, message: BAD_ID_MESSAGE };
+    if (!id) return { ok: false, permissionStatus: "allowed", data: null, message: "Which event? Pick it from listMyCalendar first." };
+    if (!isUuid(id)) return { ok: false, permissionStatus: "allowed", data: null, message: BAD_ID_MESSAGE };
 
     const ev = await loadEventRow(id, ctx.auth.tenant_id);
-    if (!ev) return { ok: false, permissionStatus: "denied", data: null, message: "I can't find that event — pick it again from listMyCalendar." };
+    if (!ev) return { ok: false, permissionStatus: "allowed", data: null, message: "I can't find that event — pick it again from listMyCalendar." };
     if (ev.account_id !== ctx.auth.account_id && !ctx.isSuperAdmin) {
       return { ok: false, permissionStatus: "denied", data: null, message: "You can only delete events on your own calendar." };
     }
@@ -351,7 +351,7 @@ const deleteCalendarEvent: ToolDef<
     const { error } = await supabaseServer.from("koleex_calendar_events").delete().eq("id", id);
     if (error) {
       console.error("[tool.deleteCalendarEvent]", error);
-      return { ok: false, permissionStatus: "denied", data: null, message: "Couldn't delete the event — please try again." };
+      return { ok: false, permissionStatus: "allowed", data: null, message: "Couldn't delete the event — please try again." };
     }
     return {
       ok: true,

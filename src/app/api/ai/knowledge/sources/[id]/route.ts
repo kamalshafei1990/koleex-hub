@@ -4,6 +4,7 @@
 import { NextResponse } from "next/server";
 import { requireAuth } from "@/lib/server/auth";
 import { supabaseServer } from "@/lib/server/supabase-server";
+import { invalidateTaughtAnswersCache, invalidateApprovedSearchCache } from "@/lib/server/ai-knowledge";
 
 export const dynamic = "force-dynamic";
 
@@ -46,6 +47,14 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
       .eq("source_id", id)
       .eq("status", "draft");
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    /* THE AI'S VIEW OF TRUTH JUST CHANGED, SO DROP WHAT IT CACHED.
+       Both planes, not one: taught pairs feed the written lanes' prompt and the
+       approved-search cache feeds search_knowledge, which is the ONLY route a
+       voice call has to any of this. Invalidating one left the owner teaching
+       something, hearing the chat box use it, and hearing a call not — for a
+       minute, which is long enough to look permanent and be reported as broken. */
+    invalidateTaughtAnswersCache(auth.tenant_id ?? null);
+    invalidateApprovedSearchCache(auth.tenant_id ?? null);
     return NextResponse.json({ updated: count ?? 0 });
   }
   if (body.status && ["archived", "ready"].includes(body.status)) {

@@ -7,6 +7,8 @@
    --------------------------------------------------------------------------- */
 
 import { usePathname } from "next/navigation";
+import RouteTabPane from "@/components/ui/RouteTabPane";
+import AuroraShell from "@/components/ui/AuroraShell";
 import DatabaseHeader from "@/components/database/DatabaseHeader";
 import { useTranslation, type Translations } from "@/lib/i18n";
 
@@ -57,13 +59,14 @@ export default function DatabaseLayout({ children }: { children: React.ReactNode
   const { t } = useTranslation(T);
   const meta = metaFor(pathname);
   return (
-    /* min-h-full — see the note in /purchase/layout.tsx: a 100vh floor inside
-       the Hub scroller is one header-height taller than the visible area. */
-    <div className="min-h-full bg-[var(--bg-primary)] pb-16 text-[var(--text-primary)] md:pb-6">
+    /* AuroraShell carries kx-app (the var-remap) + the ground; it already
+       provides the min-h-full floor this div used to declare. Core keeps the
+       original solid look — the class does nothing there. */
+    <AuroraShell className="pb-16 md:pb-6">
       <div className="mx-auto max-w-[1500px] space-y-5 px-4 py-6 sm:px-6">
         <DatabaseHeader title={t(meta.titleKey, meta.titleEn)} subtitle={t(meta.subKey, meta.subEn)} />
-        {children}
+        <RouteTabPane>{children}</RouteTabPane>
       </div>
-    </div>
+    </AuroraShell>
   );
 }

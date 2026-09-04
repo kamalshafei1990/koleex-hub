@@ -38,6 +38,42 @@ export const TOOL_ACTIVITY_MAP: Record<string, AIOrbActivity> = {
   /* todos.ts */
   listMyTodos: "retrieving-data",
   createTodo: "creating-record",
+  updateTodo: "updating-record",
+  completeTodo: "updating-record",
+  reassignTodo: "updating-record",
+  deleteTodo: "executing-action",
+  /* projects.ts, planning.ts, calendar.ts — the edits */
+  updateProjectTask: "updating-record",
+  completeProjectTask: "updating-record",
+  deleteProjectTask: "executing-action",
+  updatePlanningItem: "updating-record",
+  deletePlanningItem: "executing-action",
+  updateCalendarEvent: "updating-record",
+  deleteCalendarEvent: "executing-action",
+  /* products.ts, product-price.ts, catalog */
+  getProductFullDetails: "reading",
+  getProductPrice: "retrieving-data",
+  listCatalogFamilies: "retrieving-data",
+  searchCatalog: "searching",
+  auditProductData: "analyzing",
+  /* knowledge, web, machines, trade terms — the lookups. THE WEB IS
+     "browsing", so the line under the orb can say "Searching the web"
+     rather than a generic "Searching": the owner asked for the title to
+     say what is happening, and where a lookup goes is the useful part. */
+  search_web: "browsing",
+  search_knowledge: "searching",
+  searchMachineKnowledge: "searching",
+  searchTradeTerms: "searching",
+  suggest_team_knowledge: "creating-record",
+  /* people */
+  findTeamMember: "searching",
+  /* the user's own memory */
+  remember_about_user: "creating-record",
+  forget_about_user: "executing-action",
+  /* pictures */
+  generate_image: "generating",
+  /* a question back to the user is thinking, not doing */
+  askUser: "reasoning",
 };
 
 export function toolActivity(tool: string | undefined | null): AIOrbActivity {

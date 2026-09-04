@@ -4,9 +4,9 @@
    sent back. Tracks the return reason, refund amount, and which
    PO / receipt / bill the return offsets. */
 
-import { useEffect, useState } from "react";
-import type { PurchaseModuleProps } from "../shared";
-import { cardCls, formatMoney, formatDate, sectionTitleCls } from "../shared";
+import { useMemo } from "react";
+import type { PurchaseModuleProps, SupplierRef } from "../shared";
+import { cardCls, formatMoney, formatDate, sectionTitleCls, supplierNames, usePurchaseList } from "../shared";
 import CornerUpLeftIcon from "@/components/icons/ui/CornerUpLeftIcon";
 import { kxInspectAttrs } from "@/lib/qa/inspector";
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
@@ -27,29 +27,10 @@ const STATUS_TONE: Record<string, string> = {
 };
 
 export default function ReturnsModule({ t }: PurchaseModuleProps) {
-  const [rows, setRows] = useState<Return[]>([]);
-  const [supplierName, setSupplierName] = useState<Map<string, string>>(new Map());
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      /* RLS-5: gated tenant-scoped read (was a direct anon-client query). */
-      const res = await fetch("/api/purchase/list?resource=returns", { credentials: "include" });
-      const j = res.ok
-        ? ((await res.json()) as { rows?: Return[]; suppliers?: { id: string; display_name: string | null; company_name: string | null; full_name: string | null }[] })
-        : { rows: [], suppliers: [] };
-      if (cancelled) return;
-      setRows(j.rows ?? []);
-      const m = new Map<string, string>();
-      for (const c of j.suppliers ?? []) {
-        m.set(c.id, c.company_name || c.display_name || c.full_name || "—");
-      }
-      setSupplierName(m);
-      setLoading(false);
-    })();
-    return () => { cancelled = true; };
-  }, []);
+  /* RLS-5: gated tenant-scoped read (was a direct anon-client query). */
+  const { data, loading } = usePurchaseList<{ rows?: Return[]; suppliers?: SupplierRef[] }>("returns");
+  const rows = data?.rows ?? [];
+  const supplierName = useMemo(() => supplierNames(data?.suppliers), [data]);
 
   if (loading) return <div className="h-full flex items-center justify-center text-[var(--text-dim)]"><SpinnerIcon size={20} /></div>;
 

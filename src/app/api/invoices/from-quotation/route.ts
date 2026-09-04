@@ -3,6 +3,7 @@ import "server-only";
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { requireAuth, requireModuleAccess , requireModuleAction} from "@/lib/server/auth";
+import { ensureOrder } from "@/lib/server/orders";
 import { calcInvoiceTotals, type LineInput } from "@/lib/server/invoice-totals";
 import { assertScopeShadowForRow, toScopeContext } from "@/lib/server/apply-scope";
 import { getScopeMode } from "@/lib/server/scope-flags";
@@ -15,20 +16,68 @@ import { isCustomerEnforced, ownsQuotation } from "@/lib/server/customer-quotati
    invoice. Preserves customer, currency, notes, and discount. Returns
    the new invoice row. */
 
-async function nextInvoiceNumber(tenantId: string): Promise<string> {
-  const now = new Date();
-  const ym = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, "0")}`;
-  const prefix = `INV-${ym}-`;
-  const { data } = await supabaseServer
-    .from("invoices")
-    .select("inv_no")
-    .eq("tenant_id", tenantId)
-    .ilike("inv_no", `${prefix}%`)
-    .order("inv_no", { ascending: false })
-    .limit(1);
-  const last = data?.[0]?.inv_no as string | undefined;
-  const nextSeq = last ? Number(last.replace(prefix, "")) + 1 : 1;
-  return `${prefix}${String(nextSeq).padStart(4, "0")}`;
+/* ── Invoice numbering ──────────────────────────────────────────────────────
+   An invoice raised from a quotation INHERITS that quotation's deal number and
+   only swaps the document letters:
+
+       KL-QU-12349  →  KL-IN-12349
+
+   so the pair is recognisable at a glance and on paper. Owner asked for this
+   2026-08-24.
+
+   Only a quotation minted before the deal counter existed (deal_no null, an
+   old KL{YYYY}-{MMDD} number) needs a fresh number — it has nothing to
+   inherit. Those take a new deal number of their own rather than a
+   month-sequence, so every invoice from here on carries a linkable counter.
+
+   The old scheme read the highest INV-YYYYMM-NNNN and added one. Two
+   conversions at the same instant would have read the same "highest" and
+   produced the same number; the counter cannot. */
+async function invoiceNumberFor(
+  tenantId: string,
+  quotationDealNo: number | null,
+): Promise<{ inv_no: string; deal_no: number }> {
+  if (quotationDealNo != null) {
+    /* A deal can carry more than one invoice — the owner's own case is a
+       proforma issued for an L/C and the commercial invoice that follows it
+       after shipment, both kept. inv_no is unique, so the first invoice on a
+       deal takes the bare number and later ones are suffixed:
+
+           KL-IN-12350      first
+           KL-IN-12350-2    second
+           KL-IN-12350-3    third
+
+       Without this the second conversion died on a unique-key violation,
+       which is how this was found. */
+    const base = `KL-IN-${quotationDealNo}`;
+    const { data: siblings } = await supabaseServer
+      .from("invoices")
+      .select("inv_no")
+      .eq("tenant_id", tenantId)
+      .eq("deal_no", quotationDealNo);
+
+    const taken = new Set(
+      (siblings ?? [])
+        .map((r) => (r as { inv_no: string | null }).inv_no)
+        .filter((n): n is string => typeof n === "string"),
+    );
+    if (!taken.has(base)) return { inv_no: base, deal_no: quotationDealNo };
+    for (let n = 2; n < 1000; n++) {
+      const candidate = `${base}-${n}`;
+      if (!taken.has(candidate)) return { inv_no: candidate, deal_no: quotationDealNo };
+    }
+    throw new Error(`Deal ${quotationDealNo} already has 999 invoices.`);
+  }
+  const { data, error } = await supabaseServer.rpc("next_deal_number", {
+    p_tenant: tenantId,
+  });
+  if (error || data == null) {
+    /* Fatal on purpose: a duplicate invoice number breaks the link to every
+       document that follows and surfaces only much later. */
+    throw new Error(`Could not allocate an invoice number: ${error?.message ?? "no value returned"}`);
+  }
+  const n = Number(data);
+  return { inv_no: `KL-IN-${n}`, deal_no: n };
 }
 
 export async function POST(req: Request) {
@@ -49,7 +98,7 @@ export async function POST(req: Request) {
       // created_by is selected for DS1b-2a shadow scope evaluation only; it is
       // NOT echoed (the response is the new invoice). Used to read the source
       // quote's owner for the scope-shadow log.
-      .select("id, quote_no, customer_id, currency, discount_percent, notes, created_by, doc")
+      .select("id, quote_no, deal_no, customer_id, currency, discount_percent, notes, created_by, doc")
       .eq("id", body.quotation_id)
       .eq("tenant_id", auth.tenant_id)
       .maybeSingle(),
@@ -117,13 +166,38 @@ export async function POST(req: Request) {
   const { hydrated, subtotal, tax_total, discount_total, total } =
     calcInvoiceTotals(lines, quoteTaxPct, Number(quote.discount_percent ?? 0));
 
-  const inv_no = await nextInvoiceNumber(auth.tenant_id);
+  const { inv_no, deal_no } = await invoiceNumberFor(
+    auth.tenant_id,
+    (quote as { deal_no?: number | null }).deal_no ?? null,
+  );
+
+  /* ── The order ────────────────────────────────────────────────────────────
+     Created here rather than with the quotation: a quotation may go to ten
+     prospects and come back from none, and an order per quotation would bury
+     the real ones. Converting to an invoice is the moment the sale is real.
+
+     Idempotent by (tenant, deal_no) — converting the same quotation twice, or
+     raising a second invoice on the same deal (a commercial invoice replacing
+     a proforma), joins the existing order instead of making a rival one.
+
+     Customer identity is snapshotted so the orders list renders without
+     joining customers per row, and so the record shows who the buyer was when
+     the deal was struck. */
+  const orderId = await ensureOrder({
+    tenantId: auth.tenant_id,
+    dealNo: deal_no,
+    customerId: quote.customer_id ?? null,
+    currency: quote.currency ?? null,
+    total,
+    accountId: auth.account_id,
+  });
 
   const { data: invoice, error } = await supabaseServer
     .from("invoices")
     .insert({
       tenant_id: auth.tenant_id,
       inv_no,
+      deal_no,
       customer_id: quote.customer_id,
       currency: quote.currency,
       issue_date: new Date().toISOString().slice(0, 10),
@@ -138,6 +212,7 @@ export async function POST(req: Request) {
       amount_paid: 0,
       notes: quote.notes ?? null,
       linked_quotation_id: quote.id,
+      order_id: orderId,
       status: "draft",
       created_by_account_id: auth.account_id,
     })
@@ -152,6 +227,17 @@ export async function POST(req: Request) {
     await supabaseServer
       .from("invoice_items")
       .insert(hydrated.map((h) => ({ ...h, invoice_id: invoice.id })));
+  }
+
+  /* Attach the source quotation to the same order, so the order shows the
+     whole paper trail and not just what came after the sale. Best-effort:
+     the invoice already exists and is correct without it. */
+  if (orderId) {
+    await supabaseServer
+      .from("quotations")
+      .update({ order_id: orderId })
+      .eq("id", quote.id)
+      .is("order_id", null);
   }
 
   return NextResponse.json({ invoice });

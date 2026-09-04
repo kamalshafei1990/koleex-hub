@@ -29,8 +29,17 @@ import { useSkin } from "@/lib/appearance";
 import { useTranslation, type Lang } from "@/lib/i18n";
 import ArrowLeftIcon from "@/components/icons/ui/ArrowLeftIcon";
 import PlusIcon from "@/components/icons/ui/PlusIcon";
+import PictureIcon from "@/components/icons/ui/PictureIcon";
+import LibraryPanel from "@/components/ai/LibraryPanel";
+import { shrinkImage } from "@/lib/ai/image-shrink";
+import { needsChunking, uploadInChunks, type ChunkedRef } from "@/lib/ai/attachment-chunks";
+import CallsPanel from "@/components/ai/CallsPanel";
+import PhoneCallIcon from "@/components/icons/ui/PhoneCallIcon";
 import PaperPlaneIcon from "@/components/icons/ui/PaperPlaneIcon";
 import MicButton, { speakText, type TtsHandle } from "@/components/ai/MicButton";
+import VoiceCallButton from "@/components/ai/VoiceCallButton";
+import { type SavedTurn } from "@/lib/voice/persist";
+
 import TrashIcon from "@/components/icons/ui/TrashIcon";
 import PencilIcon from "@/components/icons/ui/PencilIcon";
 import MenuBurgerIcon from "@/components/icons/ui/MenuBurgerIcon";
@@ -39,264 +48,45 @@ import { type OrbState } from "@/components/ai/KoleexOrb";
 import KoleexOrb from "@/components/ai/KoleexGlowOrb";
 import { toolActivity } from "@/components/ai-orb/ai-orb-tool-map";
 import type { AIOrbActivity } from "@/components/ai-orb/ai-orb-types";
-import TypingIndicator from "@/components/ai/TypingIndicator";
-import MessageMarkdown from "@/components/ai/MessageMarkdown";
 import BookOpenIcon from "@/components/icons/ui/BookOpenIcon";
+import SparklesIcon from "@/components/icons/ui/SparklesIcon";
 import { markdownToPlainText, bubbleHtmlForClipboard } from "@/lib/markdown-clipboard";
 import EmojiButton from "@/components/ai/EmojiButton";
 import { useCurrentAccount } from "@/lib/identity";
 import { ConfirmDialog } from "@/components/notes/NotesDialog";
 import { humanizeError } from "@/lib/ui/humanize-error";
 import MoreHorizontalIcon from "@/components/icons/ui/MoreHorizontalIcon";
-import CheckIcon from "@/components/icons/ui/CheckIcon";
-import PinIcon from "@/components/icons/ui/PinIcon";
-import PinOffIcon from "@/components/icons/ui/PinOffIcon";
-import ProjectGlyph, { useProjectColorHex } from "@/components/ai/ProjectGlyph";
+import ProjectGlyph from "@/components/ai/ProjectGlyph";
 import {
   DEFAULT_PROJECT_COLOR,
   DEFAULT_PROJECT_ICON,
-  PROJECT_COLOR_KEYS,
-  PROJECT_ICONS,
   PROJECT_NAME_MAX,
   type AiProject,
   type ProjectColor,
   type ProjectIcon,
 } from "@/lib/ai-projects";
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
+/* Phase 2J — the render contract and the localised strings moved out. Types
+   compile away entirely and the copy table is frozen data, so neither can
+   change behaviour by living in another file. */
+import type {
+  AgentStep,
+  ChatMsg,
+  ConversationRow,
+} from "@/components/ai/types";
+import { COPY } from "@/components/ai/copy";
+/* Phase 2J — three leaf components moved to their own files. Each takes props
+   and nothing else, so the split is behaviour-neutral by construction. */
+import ProjectDialog from "@/components/ai/ProjectDialog";
+import WelcomeCard from "@/components/ai/WelcomeCard";
+import { normalizeAiPersonalization } from "@/lib/ai-personalization";
+/* Phase 2J (completed) — the transcript bubble and the sidebar rows moved to
+   their own files. Both were held back until the render harness existed; the
+   extraction was then proved by rendering the pre-split component and the new
+   one with identical props and diffing the HTML. */
+import { Bubble, isRtl } from "@/components/ai/Bubble";
+import { SectionHeader, ProjectRow, SidebarRow, RowMenu, groupByDate } from "@/components/ai/Sidebar";
 
-type MsgRole = "user" | "assistant" | "system";
-interface AgentStep {
-  kind: "answer" | "tool-call" | "tool-result" | "recommendation" | "draft" | "denied";
-  text?: string;
-  tool?: string;
-  payload?: unknown;
-  permissionStatus?: "allowed" | "limited" | "denied" | "approval_required";
-  sources?: string[];
-  filteredFields?: string[];
-}
-interface ChatMsg {
-  id: string;
-  role: MsgRole;
-  content: string;
-  created_at: string;
-  /** Set only on assistant messages from the live agent turn —
-   *  renders the tool-call / tool-result chips inline. Not persisted;
-   *  audit table is the permanent record. */
-  steps?: AgentStep[];
-}
-interface ConversationRow {
-  id: string;
-  title: string;
-  last_preview: string | null;
-  message_count: number;
-  created_at: string;
-  updated_at: string;
-  /* Both default on the server and are absent from any sessionStorage cache
-     written before this feature shipped — always read them defensively. */
-  pinned?: boolean;
-  project_id?: string | null;
-}
-
-/* ── Localised copy ── */
-const COPY: Record<Lang, {
-  newChat: string;
-  placeholder: string;
-  welcomeTitle: string;
-  welcomeSub: string;
-  thinking: string;
-  noChats: string;
-  today: string;
-  yesterday: string;
-  previous7: string;
-  previous30: string;
-  earlier: string;
-  delete: string;
-  rename: string;
-  confirmDelete: string;
-  renamePrompt: string;
-  footer: string;
-  stopped: string;
-  searchChats?: string;
-  noSearchResults?: string;
-  /* Projects + pinning */
-  projects: string;
-  newProject: string;
-  editProject: string;
-  projectName: string;
-  projectIcon: string;
-  projectColor: string;
-  deleteProject: string;
-  confirmDeleteProject: string;
-  emptyProject: string;
-  pin: string;
-  unpin: string;
-  pinned: string;
-  moveTo: string;
-  noProject: string;
-  more: string;
-  recents: string;
-  back: string;
-  seeMore: string;
-  seeLess: string;
-  webSearchOn: string;
-  webSearchOff: string;
-  save: string;
-  cancel: string;
-  prompts: string[];
-}> = {
-  en: {
-    newChat: "New chat",
-    placeholder: "Ask Koleex AI…",
-    welcomeTitle: "Hi",
-    welcomeSub: "What's on your mind? I'm Koleex AI — ask me anything, big or small.",
-    thinking: "Thinking…",
-    noChats: "No chats yet",
-    today: "Today",
-    yesterday: "Yesterday",
-    previous7: "Previous 7 days",
-    previous30: "Previous 30 days",
-    earlier: "Earlier",
-    delete: "Delete",
-    rename: "Rename",
-    confirmDelete: "Delete this conversation?",
-    renamePrompt: "New title",
-    footer: "Koleex AI — Powered by Koleex Technology Systems",
-    stopped: "Stopped",
-    searchChats: "Search chats…",
-    noSearchResults: "No chats match your search.",
-    projects: "Projects",
-    newProject: "New project",
-    editProject: "Edit project",
-    projectName: "Project name",
-    projectIcon: "Icon",
-    projectColor: "Colour",
-    deleteProject: "Delete project",
-    confirmDeleteProject:
-      "Delete this project? Its chats stay — they move back to the main list.",
-    emptyProject: "No chats in here yet",
-    pin: "Pin",
-    unpin: "Unpin",
-    pinned: "Pinned",
-    moveTo: "Move to",
-    noProject: "No project",
-    more: "More",
-    recents: "Recents",
-    back: "Back",
-    seeMore: "See more",
-    seeLess: "See less",
-    webSearchOn: "Web search: on",
-    webSearchOff: "Web search: off",
-    save: "Save",
-    cancel: "Cancel",
-    prompts: [
-      "What's a good way to start my day at work?",
-      "Help me write a polite reply to a customer email.",
-      "Explain how pricing bands generally work.",
-      "Translate to Chinese: Please confirm delivery by Friday.",
-    ],
-  },
-  zh: {
-    newChat: "新建对话",
-    placeholder: "向 Koleex AI 提问…",
-    welcomeTitle: "你好",
-    welcomeSub: "想聊点什么？我是 Koleex AI — 大事小事都可以问我。",
-    thinking: "思考中…",
-    noChats: "还没有对话",
-    today: "今天",
-    yesterday: "昨天",
-    previous7: "过去 7 天",
-    previous30: "过去 30 天",
-    earlier: "更早",
-    delete: "删除",
-    rename: "重命名",
-    confirmDelete: "删除这个对话？",
-    renamePrompt: "新标题",
-    footer: "Koleex AI — 由 Koleex 技术系统驱动",
-    stopped: "已停止",
-    searchChats: "搜索对话…",
-    noSearchResults: "没有匹配的对话。",
-    projects: "项目",
-    newProject: "新建项目",
-    editProject: "编辑项目",
-    projectName: "项目名称",
-    projectIcon: "图标",
-    projectColor: "颜色",
-    deleteProject: "删除项目",
-    confirmDeleteProject: "删除这个项目？其中的对话会保留，并移回主列表。",
-    emptyProject: "这里还没有对话",
-    pin: "置顶",
-    unpin: "取消置顶",
-    pinned: "已置顶",
-    moveTo: "移动到",
-    noProject: "无项目",
-    more: "更多",
-    recents: "最近",
-    back: "返回",
-    seeMore: "查看更多",
-    seeLess: "收起",
-    webSearchOn: "联网搜索：开",
-    webSearchOff: "联网搜索：关",
-    save: "保存",
-    cancel: "取消",
-    prompts: [
-      "早上开始工作的好方法是什么？",
-      "帮我给客户写一封礼貌的回复邮件。",
-      "简单解释一下价格区间是怎么运作的。",
-      "翻译成英文：请在周五前确认交货。",
-    ],
-  },
-  ar: {
-    newChat: "محادثة جديدة",
-    placeholder: "اسأل Koleex AI…",
-    welcomeTitle: "مرحبًا",
-    welcomeSub: "ما الذي يدور في بالك؟ أنا Koleex AI — اسألني عن أي شيء، صغيرًا كان أم كبيرًا.",
-    thinking: "جارٍ التفكير…",
-    noChats: "لا توجد محادثات بعد",
-    today: "اليوم",
-    yesterday: "أمس",
-    previous7: "آخر 7 أيام",
-    previous30: "آخر 30 يومًا",
-    earlier: "قبل ذلك",
-    delete: "حذف",
-    rename: "إعادة تسمية",
-    confirmDelete: "حذف هذه المحادثة؟",
-    renamePrompt: "عنوان جديد",
-    footer: "Koleex AI — بدعم من أنظمة Koleex التقنية",
-    stopped: "تم الإيقاف",
-    searchChats: "ابحث في المحادثات…",
-    noSearchResults: "لا توجد محادثات تطابق بحثك.",
-    projects: "المشاريع",
-    newProject: "مشروع جديد",
-    editProject: "تعديل المشروع",
-    projectName: "اسم المشروع",
-    projectIcon: "الأيقونة",
-    projectColor: "اللون",
-    deleteProject: "حذف المشروع",
-    confirmDeleteProject:
-      "حذف هذا المشروع؟ محادثاته تبقى — وتعود إلى القائمة الرئيسية.",
-    emptyProject: "لا توجد محادثات هنا بعد",
-    pin: "تثبيت",
-    unpin: "إلغاء التثبيت",
-    pinned: "مثبّتة",
-    moveTo: "نقل إلى",
-    noProject: "بدون مشروع",
-    more: "المزيد",
-    recents: "الأحدث",
-    back: "رجوع",
-    seeMore: "عرض المزيد",
-    seeLess: "عرض أقل",
-    webSearchOn: "البحث في الويب: مفعّل",
-    webSearchOff: "البحث في الويب: متوقّف",
-    save: "حفظ",
-    cancel: "إلغاء",
-    prompts: [
-      "ما طريقة جيدة لبدء يومي في العمل؟",
-      "ساعدني في كتابة رد مهذب على رسالة من عميل.",
-      "اشرح لي ببساطة كيف تعمل شرائح الأسعار.",
-      "ترجم إلى الإنجليزية: الرجاء تأكيد التسليم بحلول يوم الجمعة.",
-    ],
-  },
-};
 
 /* The chat list is titles, not prose — 280px was giving the thread pane less
    room than it needed without giving the titles more than they used. 248 is
@@ -351,31 +141,142 @@ export default function KoleexAiApp() {
      hooks come in follow-up phases. Keeping the affordance visible
      teaches users the model is becoming multimodal soon. */
   const [attachments, setAttachments] = useState<File[]>([]);
+  /* Visible upload/extract progress. A 35MB file spends real seconds in
+     flight after Send, and with no indicator the app read as FROZEN —
+     the owner hit exactly that. Set through the send() pipeline, cleared
+     when the attachment phase ends either way. */
+  const [attachStatus, setAttachStatus] = useState<string | null>(null);
+  /* True while this turn's files are being read on the server — the
+     assistant placeholder then says "Reading…" instead of plain thinking. */
+  const [attachReading, setAttachReading] = useState(false);
+  /* Preview URLs handed to user bubbles (ChatMsg.attachedFiles). Revoked
+     when the thread they belong to is left — a reloaded thread has none. */
+  const messagePreviewUrlsRef = useRef<string[]>([]);
+  const revokeMessagePreviews = useCallback(() => {
+    for (const u of messagePreviewUrlsRef.current) URL.revokeObjectURL(u);
+    messagePreviewUrlsRef.current = [];
+  }, []);
+  useEffect(() => revokeMessagePreviews, [revokeMessagePreviews]);
   const [webSearch, setWebSearch] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const openFilePicker = useCallback(() => {
     fileInputRef.current?.click();
   }, []);
-  const onFilesPicked = useCallback((ev: React.ChangeEvent<HTMLInputElement>) => {
-    const list = ev.target.files;
-    if (!list || list.length === 0) return;
-    /* V1 readable set: text-bearing files only. DeepSeek has no vision,
-       so images are rejected up-front with an honest message instead of
-       silently attaching something the model can't see. */
-    const SUPPORTED = /\.(pdf|txt|md|markdown|csv|tsv|json|log)$/i;
-    const all = Array.from(list);
-    const ok = all.filter((f) => SUPPORTED.test(f.name));
-    if (ok.length < all.length) {
-      setError("Supported files: PDF, TXT, MD, CSV, JSON. Images can't be read yet.");
+  /* ONE GATE, THREE DOORS. Files arrive by button, by drop and by paste, and
+     the last time this filter lived in only one of them the other two were
+     silently wrong for an hour. Every route now lands here. */
+  const SUPPORTED_FILES = /\.(pdf|txt|md|markdown|csv|tsv|json|log|xlsx|xlsm|xls|png|jpe?g|webp|gif)$/i;
+  /* Size gates run HERE, at attach time — not after a 200MB upload has
+     already been attempted. Images go to the vision model as base64, so
+     their ceiling is small; documents ride the direct-to-storage hop and
+     can be big. */
+  const MAX_IMAGE_MB = 15;
+  const MAX_DOC_MB = 200;
+  const addFilesSized = useCallback((incoming: File[]) => {
+    const typeOk = incoming.filter(
+      (f) => SUPPORTED_FILES.test(f.name) || (f.type || "").startsWith("image/"),
+    );
+    const problems: string[] = [];
+    if (typeOk.length < incoming.length) {
+      problems.push("Supported files: images, PDF, Excel, TXT, MD, CSV, JSON.");
     }
+    const ok = typeOk.filter((f) => {
+      const isImage = (f.type || "").startsWith("image/") || /\.(png|jpe?g|webp|gif)$/i.test(f.name);
+      const capMb = isImage ? MAX_IMAGE_MB : MAX_DOC_MB;
+      if (f.size > capMb * 1024 * 1024) {
+        problems.push(`${f.name} is ${(f.size / 1048576).toFixed(0)}MB — the limit is ${capMb}MB for ${isImage ? "images" : "documents"}.`);
+        return false;
+      }
+      return true;
+    });
+    if (problems.length > 0) setError(problems.join(" · "));
     const picked = ok.slice(0, 6 - attachments.length);
     if (picked.length > 0) setAttachments((prev) => [...prev, ...picked]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [attachments.length]);
+
+  const addFiles = useCallback((incoming: File[]) => {
+    if (incoming.length === 0) return;
+    /* PHOTOS ARE SHRUNK ON THE DEVICE FIRST (ai/image-shrink): a 17 MB
+       camera-roll PNG becomes a JPEG of a megabyte or two before the size
+       gate below ever sees it. The gate then judges what will be sent. */
+    void Promise.all(incoming.map((f) => shrinkImage(f))).then((files) => addFilesSized(files));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [attachments.length]);
+
+  const onFilesPicked = useCallback((ev: React.ChangeEvent<HTMLInputElement>) => {
+    addFiles(Array.from(ev.target.files ?? []));
     /* Allow re-picking the same file twice in a row. */
     ev.target.value = "";
-  }, [attachments.length]);
+  }, [addFiles]);
+
+  /* ── Image previews ────────────────────────────────────────────────────
+     A filename is the wrong thing to show someone who just handed you a
+     picture — they know what they attached, they want to confirm it is the
+     RIGHT one, and only the image itself answers that.
+
+     Object URLs are created once per batch and revoked when the batch
+     changes or the component unmounts. Skipping the revoke is the classic
+     leak here: every attach would pin its full-size bitmap in memory for the
+     life of the tab, and a few phone photos is tens of megabytes. */
+  const previews = useMemo(
+    () => attachments.map((f) => ((f.type || "").startsWith("image/") ? URL.createObjectURL(f) : null)),
+    [attachments],
+  );
+  useEffect(
+    () => () => { for (const u of previews) if (u) URL.revokeObjectURL(u); },
+    [previews],
+  );
+
+  /* ── Drag and drop ──────────────────────────────────────────────────────
+     dragCounter, not a boolean. Dragging over a composer fires dragenter and
+     dragleave for every child element it crosses, so a plain flag flickers
+     off the moment the cursor passes from the textarea to the button row.
+     Counting enters minus leaves is the only reading that survives a real
+     pointer path. */
+  const dragDepth = useRef(0);
+  const [dragging, setDragging] = useState(false);
+  const onDragEnter = useCallback((e: React.DragEvent) => {
+    if (!Array.from(e.dataTransfer?.types ?? []).includes("Files")) return;
+    e.preventDefault();
+    dragDepth.current += 1;
+    setDragging(true);
+  }, []);
+  const onDragOver = useCallback((e: React.DragEvent) => {
+    if (!Array.from(e.dataTransfer?.types ?? []).includes("Files")) return;
+    /* Both calls are required: without preventDefault the browser opens the
+       file instead of letting us have it, and dropEffect is what makes the
+       cursor say "copy" rather than the forbidden sign. */
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "copy";
+  }, []);
+  const onDragLeave = useCallback(() => {
+    dragDepth.current = Math.max(0, dragDepth.current - 1);
+    if (dragDepth.current === 0) setDragging(false);
+  }, []);
+  const onDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    dragDepth.current = 0;
+    setDragging(false);
+    addFiles(Array.from(e.dataTransfer?.files ?? []));
+  }, [addFiles]);
+
+  /* ── Paste ──────────────────────────────────────────────────────────────
+     A screenshot never becomes a file on disk — it goes to the clipboard, and
+     asking someone to save it first just to attach it is the long way round
+     the exact thing they are trying to show you. Only files are taken; a
+     normal text paste falls through untouched. */
+  const onPasteFiles = useCallback((e: React.ClipboardEvent) => {
+    const files = Array.from(e.clipboardData?.files ?? []);
+    if (files.length === 0) return;
+    e.preventDefault();
+    addFiles(files);
+  }, [addFiles]);
   const removeAttachment = useCallback((index: number) => {
     setAttachments((prev) => prev.filter((_, i) => i !== index));
   }, []);
+  /* Latest conversation id requested by openConversation — its stale-guard. */
+  const openReqRef = useRef<string | null>(null);
   /* Phase 12: AbortController for the in-flight send. Lets the user
      cancel a streaming reply mid-answer. Reset per-turn in send(). */
   const abortRef = useRef<AbortController | null>(null);
@@ -568,15 +469,33 @@ export default function KoleexAiApp() {
   }, [conversations, activeIdKey]);
 
   /* ── Load a conversation's messages ── */
+  /* THE LIBRARY (roadmap C3) takes the main pane while open; opening any
+     chat, or starting one, puts the chat back. */
+  const [libraryOpen, setLibraryOpen] = useState(false);
+  /* ONE CHAT AS A PAGE (roadmap D5): the server renders it for the owner,
+     the browser opens it, the phone's Share -> Print makes the PDF. */
+  const exportConversation = useCallback((id: string) => {
+    window.open(`/api/ai/conversations/${encodeURIComponent(id)}/export?lang=${lang}`, "_blank", "noopener");
+  }, [lang]);
+  /* THE CALLS HISTORY (roadmap D2), the same way. */
+  const [callsOpen, setCallsOpen] = useState(false);
+
   const openConversation = useCallback(
     async (id: string) => {
+      setLibraryOpen(false);
+      setCallsOpen(false);
       /* Audit P0 #1 — abort any in-flight send before switching
          conversations. Without this, the SSE reader keeps consuming
          deltas into a placeholder that no longer exists in the
          currently-visible thread (silent dropped reply) and the
          server's keepalive timer keeps pinging until TCP drops. */
       abortRef.current?.abort();
+      /* Stale-guard: rapid A→B switching leaves two loads in flight; if
+         A resolves after B, its rows/error/spinner must not land on B. */
+      openReqRef.current = id;
+      const fresh = () => openReqRef.current === id;
       setActiveId(id);
+      revokeMessagePreviews();
       setMessages([]);
       setSidebarOpen(false);
       setLoadingConv(true);
@@ -584,6 +503,7 @@ export default function KoleexAiApp() {
         const res = await fetch(`/api/ai/conversations/${id}`, {
           credentials: "include",
         });
+        if (!fresh()) return;
         if (!res.ok) {
           /* Audit P1 #9 — surface a load error instead of silently
              showing the welcome card on an existing chat. */
@@ -591,18 +511,21 @@ export default function KoleexAiApp() {
           return;
         }
         const { messages: rows } = (await res.json()) as { messages: ChatMsg[] };
+        if (!fresh()) return;
         setMessages(rows ?? []);
       } catch (e) {
-        setError(humanizeError(e));
+        if (fresh()) setError(humanizeError(e));
       } finally {
-        setLoadingConv(false);
+        if (fresh()) setLoadingConv(false);
       }
     },
-    [],
+    [revokeMessagePreviews],
   );
 
   /* ── New chat — create row, become active, reset messages ── */
   const startNewChat = useCallback(async () => {
+    setLibraryOpen(false);
+    setCallsOpen(false);
     /* Same abort as openConversation — audit P0 #1. */
     abortRef.current?.abort();
     /* Starting a chat while standing inside a folder files it there — the
@@ -615,15 +538,19 @@ export default function KoleexAiApp() {
     });
     if (!res.ok) return;
     const { conversation } = (await res.json()) as { conversation: ConversationRow };
+    /* Invalidate any conversation load still in flight so its rows don't
+       land inside this fresh empty chat. */
+    openReqRef.current = conversation.id;
     setConversations((prev) => [conversation, ...prev]);
     setActiveId(conversation.id);
+    revokeMessagePreviews();
     setMessages([]);
     setInput("");
     setError(null);
     setSidebarOpen(false);
     /* Same race guard as send() — see the comment there for why. */
     restoredRef.current = true;
-  }, [activeProjectId]);
+  }, [activeProjectId, revokeMessagePreviews]);
 
   /* ── Send a message ──
      Unified path: every turn runs through /api/ai/agent (the
@@ -634,6 +561,86 @@ export default function KoleexAiApp() {
 
      `viaVoice` — when true the assistant reply is also read aloud
      via speechSynthesis. Typed turns stay silent. */
+  /* ONE PLACE THAT MAKES A CONVERSATION. Typed turns needed it first; a voice
+     call that begins on an empty screen needs it too, the moment its first
+     settled turn wants somewhere to go. The restore-race note inside applies
+     to both callers equally, which is why this is one function and not two. */
+  const createConversation = useCallback(async (): Promise<string | null> => {
+    const res = await fetch("/api/ai/conversations", {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({}),
+    });
+    if (!res.ok) return null;
+    const { conversation } = (await res.json()) as { conversation: ConversationRow };
+    setConversations((prev) => [conversation, ...prev]);
+    setActiveId(conversation.id);
+    /* Fix: mark auto-restore as done so it doesn't race us on
+       the first-ever send. Without this, the effect that watches
+       `conversations` would fire post-render, read the activeId
+       we just wrote to localStorage, match the brand-new conv,
+       and call openConversation(newId) — which resets messages
+       to [] and fetches server state (empty because we haven't
+       POSTed to /api/ai/agent yet). End result: the user's
+       message + placeholder get wiped, and the SSE stream has
+       no placeholder to update, so the send appears to vanish. */
+    restoredRef.current = true;
+    return conversation.id;
+  }, []);
+
+  /* A call writes into the OPEN conversation, or makes one. Read through the
+     ref: the persister calls this from a network callback long after the
+     render that created it. */
+  const ensureVoiceConversation = useCallback(
+    () => (activeIdRef.current ? Promise.resolve(activeIdRef.current) : createConversation()),
+    [createConversation],
+  );
+
+  /* THE ROWS THE SERVER WROTE FOR A CALL, appended to the thread as they land
+     — so when the call screen closes, the exchange is already there, the way
+     it is in ChatGPT. Guarded by the conversation they belong to: a user who
+     opened another chat mid-call must not see spoken turns land in it. Rows
+     the thread already holds (a retried post) are not added twice. */
+  const onVoiceTurnsSaved = useCallback(
+    (rows: SavedTurn[], conversation: { id: string; title: string | null }) => {
+      if (rows.length === 0) return;
+      if (activeIdRef.current === conversation.id) {
+        setMessages((prev) => {
+          const seen = new Set(prev.map((m) => m.id));
+          const fresh: ChatMsg[] = rows
+            .filter((r) => !seen.has(r.id))
+            .map((r) => ({
+              id: r.id,
+              role: (r.role === "assistant" ? "assistant" : "user") as ChatMsg["role"],
+              content: r.content,
+              created_at: r.created_at,
+              source: r.source === "voice" ? "voice" : "text",
+            }));
+          return fresh.length ? [...prev, ...fresh] : prev;
+        });
+      }
+      const last = rows[rows.length - 1];
+      const bumpNow = new Date().toISOString();
+      setConversations((prev) => {
+        const next = prev.map((c) =>
+          c.id === conversation.id
+            ? {
+                ...c,
+                title: conversation.title ?? c.title,
+                last_preview: last.content.slice(0, 180),
+                message_count: c.message_count + rows.length,
+                updated_at: bumpNow,
+              }
+            : c,
+        );
+        next.sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime());
+        return next;
+      });
+    },
+    [],
+  );
+
   const send = useCallback(
     async (textOverride?: string, viaVoice = false) => {
       const text = (textOverride ?? input).trim();
@@ -658,112 +665,49 @@ export default function KoleexAiApp() {
       let conversationId = activeId;
       const turnConversationId = activeId;
       if (!conversationId) {
-        const res = await fetch("/api/ai/conversations", {
-          method: "POST",
-          credentials: "include",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({}),
-        });
-        if (!res.ok) {
+        const created = await createConversation();
+        if (!created) {
           setError("Couldn't start a new chat.");
           sendingRef.current = false;
           setSending(false);
           return;
         }
-        const { conversation } = (await res.json()) as {
-          conversation: ConversationRow;
-        };
-        setConversations((prev) => [conversation, ...prev]);
-        conversationId = conversation.id;
-        setActiveId(conversationId);
-        /* Fix: mark auto-restore as done so it doesn't race us on
-           the first-ever send. Without this, the effect that watches
-           `conversations` would fire post-render, read the activeId
-           we just wrote to localStorage, match the brand-new conv,
-           and call openConversation(newId) — which resets messages
-           to [] and fetches server state (empty because we haven't
-           POSTed to /api/ai/agent yet). End result: the user's
-           message + placeholder get wiped, and the SSE stream has
-           no placeholder to update, so the send appears to vanish. */
-        restoredRef.current = true;
+        conversationId = created;
       }
 
       setError(null);
 
-      /* ── Attachments: extract text server-side BEFORE the turn so it
-         can ride along with the message. Failures surface inline and
-         the turn continues with whatever extracted cleanly. */
       const typedText =
         text || "Please read the attached file(s) and give me the key points.";
-      let attachPayload: Array<{ name: string; text: string }> = [];
-      let displayText = typedText;
-      if (filesToSend.length > 0) {
-        try {
-          const fd = new FormData();
-          filesToSend.forEach((f) => fd.append("files", f, f.name));
-          const up = await fetch("/api/ai/attachments", {
-            method: "POST",
-            credentials: "include",
-            body: fd,
-          });
-          const uj = (await up.json().catch(() => null)) as {
-            files?: Array<{ name: string; text?: string; error?: string }>;
-          } | null;
-          const results = uj?.files ?? [];
-          attachPayload = results.filter(
-            (f): f is { name: string; text: string } => typeof f.text === "string" && f.text.length > 0,
-          );
-          const failed = results.filter((f) => !f.text);
-          if (failed.length > 0) {
-            setError(
-              failed
-                .map((f) => {
-                  const why =
-                    f.error === "image_not_supported" ? "images can't be read yet"
-                    : f.error === "no_text" ? "no readable text (scanned file?)"
-                    : f.error === "too_large" ? "over 10 MB"
-                    : "file type not supported";
-                  return `${f.name}: ${why}`;
-                })
-                .join(" · "),
-            );
-          }
-          if (attachPayload.length > 0) {
-            displayText = typedText + "\n\n" + attachPayload.map((f) => `📎 ${f.name}`).join("\n");
-          }
-        } catch {
-          setError("Couldn't process the attachment(s).");
-        }
-        setAttachments([]);
-      }
-      if (!text && attachPayload.length === 0 && filesToSend.length > 0) {
-        /* Attachment-only send where nothing extracted — nothing to ask. */
-        sendingRef.current = false;
-        setSending(false);
-        return;
-      }
 
+      /* ── THE TURN GOES INTO THE THREAD FIRST, files and all ──
+         Owner, 2026-09-04, watching a "Reading attachment…" bar hold the
+         composer hostage: "put it in the conversation, and show that Koleex
+         AI is thinking until it gives me the answer." So the user bubble is
+         posted at once — with the photo itself for a picture, a 📎 chip for
+         a document — and the assistant placeholder appears under it with the
+         thinking line, while the file is read on the server. The preview
+         URLs are this browser's; they are revoked when the thread changes. */
+      const attachedFiles = filesToSend.map((f) => ({
+        name: f.name,
+        url: (f.type || "").startsWith("image/") ? URL.createObjectURL(f) : null,
+      }));
+      for (const f of attachedFiles) if (f.url) messagePreviewUrlsRef.current.push(f.url);
       const optimistic: ChatMsg = {
         id: `tmp-${Date.now()}`,
         role: "user",
-        content: displayText,
+        content: typedText,
         created_at: new Date().toISOString(),
+        ...(attachedFiles.length > 0 ? { attachedFiles } : {}),
       };
-      setMessages((prev) => [...prev, optimistic]);
-      setInput("");
-      /* Autosize reset: onChange doesn't fire on programmatic clear,
-         so reset the textarea height manually after sending. */
-      if (composerRef.current) {
-        composerRef.current.style.height = "auto";
-      }
-
       /* Placeholder assistant bubble that mutates as deltas arrive.
-         We append it immediately so the TypingIndicator (keyed off
-         messages[last].role === "assistant" && empty content) can
-         appear without waiting for the first byte. */
+         Appended immediately so the TypingIndicator / ActivityLine (keyed
+         off messages[last].role === "assistant" && empty content) shows
+         without waiting for the first byte — or for the attachment. */
       const placeholderId = `tmp-ai-${Date.now()}`;
       setMessages((prev) => [
         ...prev,
+        optimistic,
         {
           id: placeholderId,
           role: "assistant",
@@ -772,6 +716,138 @@ export default function KoleexAiApp() {
           steps: [],
         },
       ]);
+      setInput("");
+      /* Autosize reset: onChange doesn't fire on programmatic clear,
+         so reset the textarea height manually after sending. */
+      if (composerRef.current) {
+        composerRef.current.style.height = "auto";
+      }
+      setAttachments([]);
+
+      /* ── Attachments: extract text server-side so it can ride along with
+         the message. The question is ABOUT the file, so when nothing could
+         be read the turn does not go out without it: the bubbles come back
+         out, the words and the files return to the composer, and the error
+         says why. (The old flow sent the bare question anyway — the owner
+         got a reply to "What is this?" with no picture attached.) */
+      let attachPayload: Array<{ name: string; text: string }> = [];
+      if (filesToSend.length > 0) {
+        setAttachReading(true);
+        let failure: string | null = null;
+        let partial: string | null = null;
+        try {
+          /* Two transports, one endpoint. Small batches ride the request
+             body whole; anything bigger is cut into pieces and relayed
+             through OUR server (/api/ai/attachments/chunk), and the endpoint
+             gets JSON refs to put back together. The platform body cap is
+             ~4.5MB per request, so the batch's SUM decides, with margin for
+             the multipart envelope. Pictures are shrunk on the device
+             (image-shrink), so they take the first road; big documents take
+             the second.
+
+             The second road used to hand the browser a signed URL and PUT
+             the bytes straight to the storage host — a hop that never
+             touched our server and, from mainland China, did not reliably
+             arrive (test round 2026-09-04: "Network error preparing upload
+             (62.5MB, direct)"). Every piece now travels the same route the
+             rest of the app already relies on.
+
+             The user's own words ride with the files: the picture is read
+             FOR the question, which keeps the reading short and quick. */
+          const L_UPLOADING = lang === "ar" ? "جارٍ رفع" : lang === "zh" ? "正在上传" : "Uploading";
+          let request: () => Promise<Response>;
+          if (needsChunking(filesToSend)) {
+            const refs: ChunkedRef[] = [];
+            for (const f of filesToSend) {
+              const mb = (f.size / 1048576).toFixed(1);
+              setAttachStatus(`${L_UPLOADING} ${f.name} (${mb}MB)…`);
+              refs.push(
+                await uploadInChunks(f, (fraction) => {
+                  setAttachStatus(`${L_UPLOADING} ${f.name} (${mb}MB) · ${Math.round(fraction * 100)}%`);
+                }),
+              );
+            }
+            setAttachStatus(null);
+            request = () =>
+              fetch("/api/ai/attachments", {
+                method: "POST",
+                credentials: "include",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ files: refs, question: typedText }),
+              });
+          } else {
+            request = () => {
+              const fd = new FormData();
+              filesToSend.forEach((f) => fd.append("files", f, f.name));
+              fd.append("question", typedText);
+              return fetch("/api/ai/attachments", { method: "POST", credentials: "include", body: fd });
+            };
+          }
+          /* One retry on a dropped connection ("Load failed", "Failed to
+             fetch") — on the owner's link a drop is routine, and the body
+             is rebuilt for the second try. A server answer, good or bad, is
+             never retried. */
+          let up: Response;
+          try {
+            up = await request();
+          } catch (first) {
+            if (!(first instanceof TypeError)) throw first;
+            await new Promise((r) => setTimeout(r, 1500));
+            up = await request();
+          }
+          const uj = (await up.json().catch(() => null)) as {
+            files?: Array<{ name: string; text?: string; error?: string }>;
+            error?: string;
+          } | null;
+          /* A failed extraction endpoint used to be indistinguishable from
+             "no files extracted" — the send just did nothing. Say what
+             happened. */
+          if (!up.ok || (uj && uj.error)) {
+            throw new Error(uj?.error || `attachment service error (${up.status})`);
+          }
+          const results = uj?.files ?? [];
+          attachPayload = results.filter(
+            (f): f is { name: string; text: string } => typeof f.text === "string" && f.text.length > 0,
+          );
+          const failed = results.filter((f) => !f.text);
+          if (failed.length > 0) {
+            partial = failed
+              .map((f) => {
+                const why =
+                  /* "couldn't read" — NOT "can't read images". The feature
+                     exists now; this branch means one particular picture
+                     defeated it (too blurry, or the vision model was
+                     unreachable), and telling the user the capability is
+                     missing would send them off to solve the wrong
+                     problem. */
+                  f.error === "unreadable_image" ? "couldn't read this image — try a sharper photo"
+                  : f.error === "no_text" ? "no readable text found"
+                  : f.error === "too_large" ? "over the size limit (15MB images / 200MB documents)"
+                  : "file type not supported";
+                return `${f.name}: ${why}`;
+              })
+              .join(" · ");
+          }
+        } catch (e) {
+          const raw = e instanceof Error ? e.message : "unknown error";
+          const isNetwork = e instanceof TypeError || /failed to fetch|networkerror|load failed/i.test(raw);
+          failure = isNetwork
+            ? humanizeError("NetworkError")
+            : `Couldn't process the attachment(s): ${raw}`;
+        }
+        setAttachStatus(null);
+        setAttachReading(false);
+        if (failure !== null || attachPayload.length === 0) {
+          setMessages((prev) => prev.filter((m) => m.id !== optimistic.id && m.id !== placeholderId));
+          setInput((cur) => (cur.trim() ? cur : text));
+          setAttachments((cur) => (cur.length > 0 ? cur : filesToSend));
+          setError(failure ?? partial ?? "Couldn't read the attachment(s).");
+          sendingRef.current = false;
+          setSending(false);
+          return;
+        }
+        if (partial) setError(partial);
+      }
 
       try {
         /* Phase 6: SSE streaming. Emits start → (steps) → delta* → end.
@@ -1086,7 +1162,7 @@ export default function KoleexAiApp() {
         setSending(false);
       }
     },
-    [input, activeId, lang, stopTts, attachments, webSearch],
+    [input, activeId, lang, stopTts, attachments, webSearch, createConversation],
   );
 
   /* ── Phase 12: message-level actions ────────────────────────── */
@@ -1281,11 +1357,17 @@ export default function KoleexAiApp() {
   const confirmDeleteConversation = useCallback(async () => {
     const id = pendingDeleteId;
     if (!id) return;
+    /* ConfirmDialog never closes itself on confirm — the parent must.
+       Close first so a slow DELETE doesn't leave the dialog hanging. */
+    setPendingDeleteId(null);
     const res = await fetch(`/api/ai/conversations/${id}`, {
       method: "DELETE",
       credentials: "include",
     });
-    if (!res.ok) return;
+    if (!res.ok) {
+      setError(humanizeError(`HTTP ${res.status}`));
+      return;
+    }
     setConversations((prev) => prev.filter((c) => c.id !== id));
     if (activeId === id) {
       setActiveId(null);
@@ -1298,12 +1380,9 @@ export default function KoleexAiApp() {
     }
   }, [activeId, pendingDeleteId, activeIdKey]);
 
-  const renameConversation = useCallback(
-    (id: string, currentTitle: string) => {
-      askInput(copy.renamePrompt, (v) => void doRenameConversation(id, currentTitle, v), { initial: currentTitle, confirmLabel: copy.rename ?? "Rename" });
-    },
-    [askInput, copy],
-  );
+  /* Declared before renameConversation — a closure referencing a binding
+     declared later (TDZ) blocks React Compiler analysis for the whole
+     component. */
   const doRenameConversation = useCallback(
     async (id: string, currentTitle: string, next: string) => {
       if (!next || next.trim() === currentTitle) return;
@@ -1318,7 +1397,13 @@ export default function KoleexAiApp() {
         prev.map((c) => (c.id === id ? { ...c, title: next.trim() } : c)),
       );
     },
-    [copy.renamePrompt],
+    [],
+  );
+  const renameConversation = useCallback(
+    (id: string, currentTitle: string) => {
+      askInput(copy.renamePrompt, (v) => void doRenameConversation(id, currentTitle, v), { initial: currentTitle, confirmLabel: copy.rename ?? "Rename" });
+    },
+    [askInput, copy, doRenameConversation],
   );
 
   /* ── Pin / move a conversation ──
@@ -1450,15 +1535,48 @@ export default function KoleexAiApp() {
      scanning is quicker — users who typed a query want hits, not
      chronology. */
   const [sidebarQuery, setSidebarQuery] = useState("");
+  /* WHAT WAS SAID, NOT ONLY WHAT IT WAS CALLED (roadmap C2). Titles and the
+     last preview are matched here, at once, over the rows already loaded;
+     message bodies are matched on the server, owner-scoped, a beat later,
+     and their conversations join the same list with a snippet under the
+     title. Debounced so a typist makes one request, not one per key;
+     aborted so a slow answer never overwrites a newer one; two characters
+     or more, the server's own floor. Never throws: a failed search leaves
+     the local matches standing. */
+  const [contentHits, setContentHits] = useState<Record<string, string>>({});
+  useEffect(() => {
+    const q = sidebarQuery.replace(/\s+/g, " ").trim();
+    if (q.length < 2) {
+      setContentHits({});
+      return;
+    }
+    const ctl = new AbortController();
+    const timer = window.setTimeout(() => {
+      fetch(`/api/ai/conversations/search?q=${encodeURIComponent(q)}`, { credentials: "include", signal: ctl.signal })
+        .then((r) => (r.ok ? r.json() : null))
+        .then((body: { hits?: { conversation_id: string; snippet: string }[] } | null) => {
+          if (ctl.signal.aborted) return;
+          const next: Record<string, string> = {};
+          for (const h of body?.hits ?? []) next[h.conversation_id] = h.snippet;
+          setContentHits(next);
+        })
+        .catch(() => { /* the local matches stand */ });
+    }, 350);
+    return () => {
+      window.clearTimeout(timer);
+      ctl.abort();
+    };
+  }, [sidebarQuery]);
+
   const filteredConversations = useMemo(() => {
     const q = sidebarQuery.trim().toLowerCase();
     if (!q) return conversations;
     return conversations.filter((c) => {
       const title = (c.title || "").toLowerCase();
       const preview = (c.last_preview || "").toLowerCase();
-      return title.includes(q) || preview.includes(q);
+      return title.includes(q) || preview.includes(q) || c.id in contentHits;
     });
-  }, [conversations, sidebarQuery]);
+  }, [conversations, sidebarQuery, contentHits]);
 
   /* ── Sidebar sections ──
      Every conversation appears in EXACTLY ONE place, which is the whole
@@ -1622,10 +1740,16 @@ export default function KoleexAiApp() {
      Central mapping turns it into an orb activity; unknown tools fall
      back to "executing-action". */
   const orbActivity: AIOrbActivity = sending
-    ? toolActivity(
-        (lastMsg?.steps ?? []).slice().reverse().find((st) => st.kind === "tool-call")?.tool,
-      )
+    ? attachReading
+      ? "reading"
+      : toolActivity(
+          (lastMsg?.steps ?? []).slice().reverse().find((st) => st.kind === "tool-call")?.tool,
+        )
     : "none";
+
+  /* Whether the composer holds anything to send — decides which control
+     anchors the row (see the composer below). */
+  const hasDraft = input.trim().length > 0 || attachments.length > 0;
 
   const [orbPulse, setOrbPulse] = useState<null | "success" | "error">(null);
   const prevSendingRef = useRef(false);
@@ -1715,7 +1839,7 @@ export default function KoleexAiApp() {
       {sidebarOpen && (
         <button
           type="button"
-          aria-label="Close sidebar"
+          aria-label={copy.closeSidebar}
           onClick={() => setSidebarOpen(false)}
           className="md:hidden fixed inset-0 z-[39] bg-black/50 backdrop-blur-sm"
         />
@@ -1756,7 +1880,7 @@ export default function KoleexAiApp() {
           <Link
             href="/"
             className="h-8 w-8 flex items-center justify-center rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] shrink-0"
-            title="Back"
+            title={copy.back}
           >
             <ArrowLeftIcon className="h-4 w-4" />
           </Link>
@@ -1771,7 +1895,7 @@ export default function KoleexAiApp() {
             <Link
               href="/ai/knowledge"
               className="kx-ai-glow h-8 w-8 flex items-center justify-center rounded-lg border border-[var(--accent,#0066FF)]/40 text-[var(--accent,#0066FF)] hover:bg-[var(--accent,#0066FF)]/10 shrink-0"
-              title="AI Knowledge"
+              title={copy.aiKnowledge}
             >
               <BookOpenIcon className="h-4 w-4" />
             </Link>
@@ -1784,8 +1908,8 @@ export default function KoleexAiApp() {
             type="button"
             onClick={() => setSidebarOpen(false)}
             className="md:hidden h-8 w-8 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] items-center justify-center shrink-0 flex"
-            title="Close sidebar"
-            aria-label="Close sidebar"
+            title={copy.closeSidebar}
+            aria-label={copy.closeSidebar}
           >
             <CrossIcon size={14} />
           </button>
@@ -1793,8 +1917,8 @@ export default function KoleexAiApp() {
             type="button"
             onClick={() => setSidebarCollapsed(true)}
             className="hidden md:flex h-8 w-8 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] items-center justify-center shrink-0"
-            title="Collapse sidebar"
-            aria-label="Collapse sidebar"
+            title={copy.collapseSidebar}
+            aria-label={copy.collapseSidebar}
           >
             <MenuBurgerIcon size={14} />
           </button>
@@ -1810,10 +1934,41 @@ export default function KoleexAiApp() {
               onChange={(e) => setSidebarQuery(e.target.value)}
               placeholder={copy.searchChats ?? "Search chats…"}
               className="w-full h-8 px-2.5 rounded-md bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[12px] text-[var(--text-primary)] placeholder:text-[var(--text-dim)] outline-none focus:border-[var(--border-focus)]"
-              aria-label="Search conversations"
+              aria-label={copy.searchChats ?? "Search chats"}
             />
           </div>
         )}
+
+        {/* THE LIBRARY (roadmap C3): every picture from the caller's chats,
+            one row in the sidebar, the gallery in the main pane. */}
+        <div className="px-2 pb-1">
+          <button
+            type="button"
+            onClick={() => { setLibraryOpen(true); setCallsOpen(false); setSidebarOpen(false); }}
+            aria-pressed={libraryOpen}
+            className={`w-full h-8 px-2 rounded-lg text-start text-[13px] flex items-center gap-2 ${
+              libraryOpen
+                ? "bg-[var(--bg-surface)] text-[var(--text-primary)]"
+                : "text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-subtle)]"
+            }`}
+          >
+            <PictureIcon size={14} />
+            {copy.library}
+          </button>
+          <button
+            type="button"
+            onClick={() => { setCallsOpen(true); setLibraryOpen(false); setSidebarOpen(false); }}
+            aria-pressed={callsOpen}
+            className={`w-full h-8 px-2 rounded-lg text-start text-[13px] flex items-center gap-2 ${
+              callsOpen
+                ? "bg-[var(--bg-surface)] text-[var(--text-primary)]"
+                : "text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-subtle)]"
+            }`}
+          >
+            <PhoneCallIcon size={14} />
+            {copy.calls}
+          </button>
+        </div>
 
         <div className="flex-1 overflow-y-auto pb-2">
           {/* A project is a place you GO, not a drawer you unfold in a list.
@@ -1882,6 +2037,7 @@ export default function KoleexAiApp() {
                     onDelete={() => requestDeleteConversation(c.id)}
                     onTogglePin={() => togglePin(c)}
                     onMove={(pid) => moveConversation(c, pid)}
+                      onExport={() => exportConversation(c.id)}
                   />
                 ))
               )}
@@ -1993,6 +2149,7 @@ export default function KoleexAiApp() {
                       onDelete={() => requestDeleteConversation(c.id)}
                       onTogglePin={() => togglePin(c)}
                       onMove={(pid) => moveConversation(c, pid)}
+                      onExport={() => exportConversation(c.id)}
                     />
                   ))}
                   {groups.map((g) => (
@@ -2005,11 +2162,13 @@ export default function KoleexAiApp() {
                           active={c.id === activeId}
                           projects={projects}
                           copy={copy}
+                          hint={searching ? contentHits[c.id] : undefined}
                           onOpen={() => openConversation(c.id)}
                           onRename={() => renameConversation(c.id, c.title)}
                           onDelete={() => requestDeleteConversation(c.id)}
                           onTogglePin={() => togglePin(c)}
                           onMove={(pid) => moveConversation(c, pid)}
+                      onExport={() => exportConversation(c.id)}
                         />
                       ))}
                     </div>
@@ -2018,6 +2177,18 @@ export default function KoleexAiApp() {
               )}
             </>
           )}
+        </div>
+        {/* Settings → Koleex AI: style, standing instructions, memory. A quiet
+            footer row rather than another icon in the crowded header — the
+            place ChatGPT keeps it too (behind the account, not on the bar). */}
+        <div className="kx-ai-side-sep shrink-0 border-t border-[var(--border-subtle)] p-2">
+          <Link
+            href="/settings?tab=ai"
+            className="flex h-9 items-center gap-2 rounded-lg px-2 text-[12px] text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)]"
+          >
+            <SparklesIcon size={14} className="shrink-0" />
+            <span className="truncate">{copy.personalize}</span>
+          </Link>
         </div>
         </div>
       </aside>
@@ -2068,15 +2239,15 @@ export default function KoleexAiApp() {
               type="button"
               onClick={() => setSidebarCollapsed(false)}
               className="h-8 w-8 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] flex items-center justify-center shrink-0"
-              title="Expand sidebar"
-              aria-label="Expand sidebar"
+              title={copy.expandSidebar}
+              aria-label={copy.expandSidebar}
             >
               <MenuBurgerIcon size={14} />
             </button>
           )}
           <Link
             href="/"
-            aria-label="Back to Hub"
+            aria-label={copy.backToHub}
             className="h-8 w-8 shrink-0 flex items-center justify-center rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[var(--text-dim)] hover:text-[var(--text-primary)]"
           >
             <ArrowLeftIcon className="h-4 w-4" />
@@ -2111,7 +2282,11 @@ export default function KoleexAiApp() {
         >
 
           <div className="relative z-[1] max-w-[820px] mx-auto px-4 md:px-6 py-6 space-y-4">
-            {loadingConv ? (
+            {libraryOpen ? (
+              <LibraryPanel copy={copy} onOpenConversation={(id) => void openConversation(id)} />
+            ) : callsOpen ? (
+              <CallsPanel copy={copy} lang={lang} onOpenConversation={(id) => void openConversation(id)} />
+            ) : loadingConv ? (
               <div className="flex items-center justify-center py-20">
                 <SpinnerIcon className="h-5 w-5 text-[var(--text-dim)]" />
               </div>
@@ -2119,6 +2294,7 @@ export default function KoleexAiApp() {
               <WelcomeCard
                 copy={copy}
                 onPick={(p) => send(p)}
+                showPrompts={normalizeAiPersonalization(account?.preferences?.ai).suggestions}
                 firstName={(account?.person?.full_name || account?.username || "")
                   .trim()
                   .split(/\s+/)
@@ -2135,6 +2311,11 @@ export default function KoleexAiApp() {
                     .charAt(0)
                     .toUpperCase()}
                   isLast={i === messages.length - 1}
+                  /* What the user replied to THIS message. When the message
+                     is a question card, that reply IS the chosen option, so
+                     the card can stay on screen with the pick marked instead
+                     of collapsing to a bare line of text once answered. */
+                  answeredWith={messages[i + 1]?.role === "user" ? messages[i + 1].content : null}
                   canRegenerate={!sending}
                   canEdit={!sending}
                   onCopy={handleCopy}
@@ -2142,6 +2323,12 @@ export default function KoleexAiApp() {
                   onEdit={(newText) => handleEditAndRetry(i, newText)}
                   onSpeak={handleSpeak}
                   onFeedback={handleFeedback}
+                  /* Tapping an option is exactly the same as typing it —
+                     it goes through send(), so the agent continues from a
+                     normal user message and the transcript reads honestly
+                     afterwards, with the choice visible as something the
+                     user said. */
+                  onAnswerQuestion={(answer) => { void send(answer, false); }}
                   lang={lang}
                   /* Only the latest AI bubble reacts to the live
                      conversation; older ones stay idle. */
@@ -2163,6 +2350,12 @@ export default function KoleexAiApp() {
                 renders TypingIndicator inline (empty content = dots),
                 which gives the same feedback without stacking two
                 waiting indicators on top of each other. */}
+            {attachStatus && (
+              <div className="flex items-center gap-2 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] px-3 py-2 text-[12px] text-[var(--text-muted)]">
+                <span className="h-3 w-3 shrink-0 animate-spin rounded-full border-[1.5px] border-current border-t-transparent" aria-hidden />
+                {attachStatus}
+              </div>
+            )}
             {error && (
               <div className="rounded-xl border border-rose-500/30 bg-rose-500/10 text-rose-300 px-3 py-2 text-[12px]">
                 {error}
@@ -2187,7 +2380,7 @@ export default function KoleexAiApp() {
                     userFollowingRef.current = true;
                     setShowJumpToBottom(false);
                   }}
-                  aria-label="Jump to latest"
+                  aria-label={copy.jumpToLatest}
                   className="kx-glass-pop pointer-events-auto h-8 -translate-y-full px-3 rounded-full bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[11.5px] text-[var(--text-primary)] hover:bg-[var(--bg-surface-subtle)] flex items-center gap-1.5 shadow-lg"
                 >
                   ↓ Latest
@@ -2207,6 +2400,15 @@ export default function KoleexAiApp() {
             composer sits above the bar on iPhones without a notch
             guard. env(safe-area-inset-bottom) is 34 px on modern
             devices, 0 on desktops — additive to the existing pb. */}
+        {/* THE LIVE TRANSCRIPT LIVES ON THE CALL SCREEN, NOT HERE.
+
+            It was once rendered above the composer as a grey slab that was
+            not a message and vanished on reload. What replaced that is not a
+            layout change but a data one: settled turns are now written into
+            the conversation by the server (see lib/voice/persist.ts and
+            onVoiceTurnsSaved above) and arrive in the message list as real
+            rows with a voice mark. The call screen keeps only the half that
+            is still being said. */}
         <div
           className="shrink-0 bg-transparent"
           style={{ paddingBottom: "env(safe-area-inset-bottom, 0px)" }}
@@ -2242,32 +2444,84 @@ export default function KoleexAiApp() {
                       the row's far end.
                   The whole pill is a single rounded-3xl surface with
                   a soft hairline border that brightens on focus. */}
-              {/* Aurora: the composer is the app's sign-in-card moment —
-                  kx-glass-pop (menus' dense glass + lighting rim + pop-in).
-                  Safe to carry backdrop-filter: the emoji picker portals to
-                  document.body, so nothing inside needs its own backdrop. */}
-              <div className="kx-glass-pop relative rounded-3xl bg-[var(--bg-secondary)] border border-[var(--border-subtle)] focus-within:border-[var(--border-focus)] transition-colors">
+              {/* Aurora: the composer is a RECESSED WELL (owner pick "B",
+                  2026-08-20) — the field grammar, carved into the page, with
+                  the Hub-Blue focus ring. kx-ai-composer is the identity
+                  hook; the paint lives in globals under the aurora scope, so
+                  Core keeps rendering the original kx-glass-pop card. */}
+              {/* The DROP TARGET is the composer itself, not a separate zone
+                  that only appears once you are already dragging — you should
+                  be able to aim at the thing you are talking into. The border
+                  lights in the same Hub-Blue as focus, because dropping a file
+                  and typing are the same act of addressing the assistant. */}
+              <div
+                onDragEnter={onDragEnter}
+                onDragOver={onDragOver}
+                onDragLeave={onDragLeave}
+                onDrop={onDrop}
+                className={`kx-ai-composer kx-glass-pop relative rounded-3xl bg-[var(--bg-secondary)] border transition-colors focus-within:border-[var(--border-focus)] ${
+                  dragging
+                    ? "border-[var(--border-focus)] bg-[var(--bg-surface-subtle)]"
+                    : "border-[var(--border-subtle)]"
+                }`}
+              >
+                {dragging && (
+                  /* pointer-events-none is load-bearing: an overlay that
+                     accepts the pointer swallows the drop it exists to
+                     announce, and the file lands on the page instead. */
+                  <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center rounded-3xl bg-[var(--bg-secondary)]/80 text-[13px] font-semibold text-[var(--text-primary)]">
+                    {copy.dropHere}
+                  </div>
+                )}
                 {/* Attachment chip row — only renders when there are files. */}
                 {attachments.length > 0 && (
                   <div className="flex flex-wrap items-center gap-1.5 px-4 pt-3">
-                    {attachments.map((file, i) => (
-                      <span
-                        key={`${file.name}-${i}`}
-                        className="inline-flex items-center gap-1.5 max-w-[200px] rounded-md border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-2 py-1 text-[11.5px] text-[var(--text-primary)]"
-                        title={file.name}
-                      >
-                        <span aria-hidden>📎</span>
-                        <span className="truncate">{file.name}</span>
-                        <button
-                          type="button"
-                          onClick={() => removeAttachment(i)}
-                          className="ms-0.5 text-[var(--text-dim)] hover:text-rose-300"
-                          aria-label={`Remove ${file.name}`}
+                    {attachments.map((file, i) => {
+                      const preview = previews[i];
+                      if (preview) {
+                        return (
+                          /* The picture IS the chip. The remove control sits
+                             on the corner rather than beside it, so the
+                             thumbnail stays square and the row reads as a
+                             strip of images — the shape people already know
+                             from every other assistant. */
+                          <span
+                            key={`${file.name}-${i}`}
+                            className="group relative inline-block h-16 w-16 overflow-hidden rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)]"
+                            title={file.name}
+                          >
+                            {/* eslint-disable-next-line @next/next/no-img-element -- a local blob: URL; next/image cannot optimise one and would only add a loader in front of bytes we already hold */}
+                            <img src={preview} alt={file.name} className="h-full w-full object-cover" />
+                            <button
+                              type="button"
+                              onClick={() => removeAttachment(i)}
+                              className="absolute end-0.5 top-0.5 inline-flex h-5 w-5 items-center justify-center rounded-full bg-black/60 text-white opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100"
+                              aria-label={`Remove ${file.name}`}
+                            >
+                              <CrossIcon size={9} />
+                            </button>
+                          </span>
+                        );
+                      }
+                      return (
+                        <span
+                          key={`${file.name}-${i}`}
+                          className="inline-flex items-center gap-1.5 max-w-[200px] rounded-md border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-2 py-1 text-[11.5px] text-[var(--text-primary)]"
+                          title={file.name}
                         >
-                          <CrossIcon size={10} />
-                        </button>
-                      </span>
-                    ))}
+                          <span aria-hidden>📎</span>
+                          <span className="truncate">{file.name}</span>
+                          <button
+                            type="button"
+                            onClick={() => removeAttachment(i)}
+                            className="ms-0.5 text-[var(--text-dim)] hover:text-rose-300"
+                            aria-label={`Remove ${file.name}`}
+                          >
+                            <CrossIcon size={10} />
+                          </button>
+                        </span>
+                      );
+                    })}
                   </div>
                 )}
 
@@ -2276,6 +2530,11 @@ export default function KoleexAiApp() {
                     action row picks up just below it. */}
                 <textarea
                   ref={composerRef}
+                  /* A PLACEHOLDER IS NOT A LABEL. It is the only thing this
+                     control had, and it disappears the moment anyone types —
+                     so a screen-reader user who tabbed back to a half-written
+                     message was told nothing about what the field was. */
+                  aria-label={copy.composerLabel}
                   value={input}
                   onChange={(e) => {
                     setInput(e.target.value);
@@ -2296,6 +2555,7 @@ export default function KoleexAiApp() {
                       send();
                     }
                   }}
+                  onPaste={onPasteFiles}
                   placeholder={copy.placeholder}
                   rows={1}
                   dir={isRtl(input) ? "rtl" : "auto"}
@@ -2320,8 +2580,8 @@ export default function KoleexAiApp() {
                       type="button"
                       onClick={openFilePicker}
                       className="h-8 w-8 rounded-full inline-flex items-center justify-center text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-subtle)] transition-colors"
-                      aria-label="Attach file"
-                      title="Attach file"
+                      aria-label={copy.attachFile}
+                      title={copy.attachFile}
                     >
                       <svg aria-hidden viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                         <line x1="12" y1="5" x2="12" y2="19" />
@@ -2331,7 +2591,7 @@ export default function KoleexAiApp() {
                     <input
                       ref={fileInputRef}
                       type="file"
-                      accept=".pdf,.txt,.md,.markdown,.csv,.tsv,.json,.log,application/pdf,text/plain,text/markdown,text/csv,application/json"
+                      accept=".pdf,.txt,.md,.markdown,.csv,.tsv,.json,.log,.xlsx,.xlsm,.xls,.png,.jpg,.jpeg,.webp,.gif,application/pdf,text/plain,text/markdown,text/csv,application/json,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel,image/*"
                       multiple
                       onChange={onFilesPicked}
                       className="hidden"
@@ -2341,6 +2601,7 @@ export default function KoleexAiApp() {
 
                     {/* Emoji picker (iOS-style). */}
                     <EmojiButton
+                      lang={lang}
                       onSelect={insertEmoji}
                       className="h-8 w-8 rounded-full inline-flex items-center justify-center text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-subtle)] transition-colors"
                     />
@@ -2350,7 +2611,7 @@ export default function KoleexAiApp() {
                       type="button"
                       onClick={() => setWebSearch((v) => !v)}
                       aria-pressed={webSearch}
-                      aria-label="Search the web"
+                      aria-label={copy.searchWeb}
                       title={webSearch ? copy.webSearchOn : copy.webSearchOff}
                       className={`h-8 w-8 rounded-full inline-flex items-center justify-center transition-colors ${
                         webSearch
@@ -2378,23 +2639,46 @@ export default function KoleexAiApp() {
                       lang={lang}
                     />
 
+                    {/* Live call — beside the mic, not instead of it. The mic
+                        transcribes and sends text; this opens a continuous
+                        audio connection. Two tools, both kept. */}
+                    <VoiceCallButton
+                      size={36}
+                      /* Grok's shape, the owner's ask: on an empty composer
+                         the call is the named, inverted pill and the send
+                         button stands down; the moment there is something
+                         to send, the pill shrinks to its icon and Send takes
+                         the anchor back. One primary action at a time. */
+                      variant={hasDraft || sending ? "icon" : "pill"}
+                      lang={lang}
+                      disabled={sending}
+                      onError={(msg) => setError(msg)}
+                      onLiveChange={(live) => { if (live) stopTts(); }}
+                      /* The call continues THIS thread: the server reads its
+                         recent turns into the session, and the spoken turns
+                         are written back into it as messages. */
+                      conversationId={activeId}
+                      ensureConversation={ensureVoiceConversation}
+                      onTurnsSaved={onVoiceTurnsSaved}
+                    />
+
                     {/* Send / Stop — inverted bg circle, anchors the row. */}
                     {sending ? (
                       <button
                         type="button"
                         onClick={handleStop}
                         className="h-9 w-9 rounded-full bg-[var(--bg-inverted)] text-[var(--text-inverted)] inline-flex items-center justify-center shrink-0 transition-opacity"
-                        aria-label="Stop generating"
-                        title="Stop generating"
+                        aria-label={copy.stopGenerating}
+                        title={copy.stopGenerating}
                       >
                         <span aria-hidden className="block h-2.5 w-2.5 rounded-[2px] bg-[var(--text-inverted)]" />
                       </button>
-                    ) : (
+                    ) : hasDraft && (
                       <button
                         type="submit"
                         disabled={!input.trim() && attachments.length === 0}
                         className="h-9 w-9 rounded-full bg-[var(--bg-inverted)] text-[var(--text-inverted)] inline-flex items-center justify-center disabled:opacity-30 shrink-0 transition-opacity"
-                        aria-label="Send"
+                        aria-label={copy.send}
                       >
                         <PaperPlaneIcon className="h-4 w-4" />
                       </button>
@@ -2446,1034 +2730,4 @@ export default function KoleexAiApp() {
   );
 }
 
-/* ── Project create / edit dialog ──
-   One dialog for both jobs: a null id means create. Name, icon and colour
-   are all decided in the same place so a folder is never half-configured. */
-function ProjectDialog({
-  draft,
-  copy,
-  saving,
-  onChange,
-  onSave,
-  onClose,
-}: {
-  draft: { id: string | null; name: string; icon: ProjectIcon; color: ProjectColor };
-  copy: typeof COPY["en"];
-  saving: boolean;
-  onChange: (next: { id: string | null; name: string; icon: ProjectIcon; color: ProjectColor }) => void;
-  onSave: () => void;
-  onClose: () => void;
-}) {
-  const colorHex = useProjectColorHex();
-  const canSave = draft.name.trim().length > 0 && !saving;
 
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [onClose]);
-
-  return (
-    <div className="fixed inset-0 z-[70] flex items-center justify-center p-4">
-      {/* House rule: a modal backdrop dims AND blurs — never dim alone. */}
-      <button
-        type="button"
-        aria-label={copy.cancel}
-        onClick={onClose}
-        className="absolute inset-0 bg-black/50 backdrop-blur-sm"
-      />
-      <div
-        role="dialog"
-        aria-modal="true"
-        className="kx-glass-pop relative w-full max-w-sm rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] shadow-2xl p-4"
-      >
-        <div className="flex items-center gap-2 mb-3">
-          <ProjectGlyph icon={draft.icon} color={draft.color} size={16} />
-          <h2 className="text-[14px] font-semibold text-[var(--text-primary)]">
-            {draft.id ? copy.editProject : copy.newProject}
-          </h2>
-        </div>
-
-        <label className="block text-[10px] uppercase tracking-[0.14em] font-semibold text-[var(--text-dim)] mb-1">
-          {copy.projectName}
-        </label>
-        <input
-          autoFocus
-          value={draft.name}
-          maxLength={PROJECT_NAME_MAX}
-          onChange={(e) => onChange({ ...draft, name: e.target.value })}
-          onKeyDown={(e) => { if (e.key === "Enter" && canSave) onSave(); }}
-          className="w-full h-9 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[13px] text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)]"
-          placeholder={copy.newProject}
-        />
-
-        <div className="mt-3 text-[10px] uppercase tracking-[0.14em] font-semibold text-[var(--text-dim)] mb-1.5">
-          {copy.projectIcon}
-        </div>
-        <div className="grid grid-cols-6 gap-1.5">
-          {PROJECT_ICONS.map((ic) => (
-            <button
-              key={ic}
-              type="button"
-              onClick={() => onChange({ ...draft, icon: ic })}
-              aria-pressed={draft.icon === ic}
-              aria-label={ic}
-              className={`h-9 rounded-lg border flex items-center justify-center ${
-                draft.icon === ic
-                  ? "border-[var(--text-primary)] bg-[var(--bg-surface-active)]"
-                  : "border-[var(--border-subtle)] bg-[var(--bg-surface)] hover:border-[var(--text-dim)]"
-              }`}
-            >
-              <ProjectGlyph icon={ic} color={draft.color} size={16} />
-            </button>
-          ))}
-        </div>
-
-        <div className="mt-3 text-[10px] uppercase tracking-[0.14em] font-semibold text-[var(--text-dim)] mb-1.5">
-          {copy.projectColor}
-        </div>
-        <div className="flex items-center gap-2 flex-wrap">
-          {PROJECT_COLOR_KEYS.map((ck) => (
-            <button
-              key={ck}
-              type="button"
-              onClick={() => onChange({ ...draft, color: ck })}
-              aria-pressed={draft.color === ck}
-              aria-label={ck}
-              className={`h-7 w-7 rounded-full flex items-center justify-center border-2 ${
-                draft.color === ck ? "border-[var(--text-primary)]" : "border-transparent"
-              }`}
-            >
-              <span
-                className="h-5 w-5 rounded-full block"
-                style={{ backgroundColor: colorHex(ck) }}
-              />
-            </button>
-          ))}
-        </div>
-
-        <div className="mt-4 flex items-center justify-end gap-2">
-          <button
-            type="button"
-            onClick={onClose}
-            className="h-9 px-4 rounded-lg text-[13px] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-subtle)]"
-          >
-            {copy.cancel}
-          </button>
-          <button
-            type="button"
-            onClick={onSave}
-            disabled={!canSave}
-            className="h-9 px-4 rounded-lg text-[13px] font-semibold bg-[var(--bg-inverted)] text-[var(--text-inverted)] disabled:opacity-40"
-          >
-            {copy.save}
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-/* ── Draft quotation card ──
-   Rendered when an assistant message has a tool-result step with
-   tool="createQuotationDraft". Shows the draft id, customer, total,
-   and a prominent "Review in Quotations" button that deep-links into
-   the existing Quotations app for the human to finalise. Never
-   surfaces cost / margin side — those never reach the client. */
-interface QuotationDraftPayload {
-  id: string;
-  quote_no: string;
-  customer_id: string;
-  total: number;
-  currency: string;
-  status: "draft";
-  line_count: number;
-  approval_required: boolean;
-  review_url: string;
-}
-function DraftCard({ payload }: { payload: QuotationDraftPayload }) {
-  const needsApproval = payload.approval_required;
-  return (
-    <div
-      className={`rounded-2xl border backdrop-blur-md px-4 py-3.5 ${
-        needsApproval
-          ? "border-amber-500/40 bg-amber-500/5"
-          : "border-[var(--border-subtle)] bg-[var(--bg-secondary)]/75"
-      }`}
-      style={{ maxWidth: 460 }}
-    >
-      <div className="flex items-center gap-2 mb-2">
-        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold tracking-wide uppercase ${
-          needsApproval
-            ? "bg-amber-500/20 text-amber-200 border border-amber-500/40"
-            : "bg-[var(--bg-surface)]/80 text-[var(--text-muted)] border border-[var(--border-subtle)]"
-        }`}>
-          {needsApproval ? "Draft · needs approval" : "Draft"}
-        </span>
-        <span className="text-[12px] font-semibold text-[var(--text-primary)]">
-          {payload.quote_no}
-        </span>
-      </div>
-      <div className="flex items-baseline gap-2 mb-2">
-        <span className="text-[22px] font-bold tracking-tight text-[var(--text-primary)]">
-          {payload.total.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-        </span>
-        <span className="text-[12px] text-[var(--text-muted)]">{payload.currency}</span>
-        <span className="text-[11px] text-[var(--text-dim)] ms-auto">
-          {payload.line_count} line{payload.line_count === 1 ? "" : "s"}
-        </span>
-      </div>
-      <Link
-        href={payload.review_url}
-        className="inline-flex items-center justify-center gap-1.5 h-9 px-4 rounded-full bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[12px] font-semibold"
-      >
-        Review in Quotations →
-      </Link>
-    </div>
-  );
-}
-
-/* ── Bubble ── */
-
-/** Arabic / Persian / Hebrew scripts → force RTL direction + slightly
- *  larger type (Arabic glyphs read smaller than Latin at the same px
- *  because of their narrower x-height). Works per-bubble so a Chinese
- *  user can still get an Arabic translation reply rendered correctly
- *  regardless of the surrounding UI language. */
-const RTL_RE = /[\u0590-\u05FF\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]/;
-function isRtl(text: string): boolean {
-  return RTL_RE.test(text);
-}
-
-function Bubble({
-  msg,
-  userAvatar,
-  userInitial,
-  isLast,
-  canRegenerate,
-  canEdit,
-  onCopy,
-  onRegenerate,
-  onEdit,
-  onSpeak,
-  onFeedback,
-  lang,
-  orbState = "idle",
-  orbActivity = "none",
-}: {
-  msg: ChatMsg;
-  userAvatar?: string | null;
-  userInitial: string;
-  isLast?: boolean;
-  /** Live orb reaction for THIS bubble — only the last assistant message
-      gets a non-idle value (thinking/typing/success/error); the rest stay
-      calm so the transcript doesn't twitch. */
-  orbState?: OrbState;
-  orbActivity?: AIOrbActivity;
-  canRegenerate?: boolean;
-  canEdit?: boolean;
-  onCopy?: (text: string, renderedEl?: HTMLElement | null) => Promise<boolean> | boolean;
-  onRegenerate?: () => void;
-  onEdit?: (newText: string) => void;
-  /** Per-message TTS replay — gets the bubble's text and the chosen
-   *  language; returns a handle the bubble can use to stop playback. */
-  onSpeak?: (text: string) => void;
-  /** Per-message 👍 / 👎 feedback. Fire-and-forget — the bubble shows
-   *  a brief confirmation chip; the parent decides where the signal
-   *  goes (server endpoint, local telemetry, …). */
-  onFeedback?: (msgId: string, value: "up" | "down") => void;
-  lang: Lang;
-}) {
-  const isUser = msg.role === "user";
-  const rtl = isRtl(msg.content);
-  /* Memoised so the `?? []` fallback doesn't mint a new array each render
-     and re-run everything downstream that depends on it. */
-  const steps = useMemo(() => msg.steps ?? [], [msg.steps]);
-  const [copied, setCopied] = useState(false);
-  const bubbleRef = useRef<HTMLDivElement | null>(null);
-  const handleCopyClick = useCallback(async () => {
-    if (!onCopy || !msg.content) return;
-    const ok = await onCopy(msg.content, bubbleRef.current);
-    if (ok) {
-      setCopied(true);
-      /* Hold the ✓ confirmation a bit longer so the swap is
-         clearly perceived. 2 s is the sweet spot in chat-app
-         copy buttons (ChatGPT / Linear / Notion all sit ~2 s). */
-      setTimeout(() => setCopied(false), 2000);
-    }
-  }, [onCopy, msg.content]);
-  /* Show the action row on assistant messages that have real
-     content. Placeholder bubbles (empty content = typing dots)
-     get no actions. */
-  const showActions = !isUser && !!msg.content;
-
-
-  /* Phase 13: edit-and-retry state. Only user messages can be
-     edited, and only when the parent allows it (not while another
-     send is in-flight). */
-  const [editing, setEditing] = useState(false);
-  const [editValue, setEditValue] = useState(msg.content);
-  const showEditButton = isUser && !!onEdit && canEdit !== false;
-  const submitEdit = useCallback(() => {
-    const next = editValue.trim();
-    if (!next || next === msg.content) {
-      setEditing(false);
-      setEditValue(msg.content);
-      return;
-    }
-    setEditing(false);
-    onEdit?.(next);
-  }, [editValue, msg.content, onEdit]);
-  const cancelEdit = useCallback(() => {
-    setEditing(false);
-    setEditValue(msg.content);
-  }, [msg.content]);
-  /* Surface any draft-quotation tool result as a full-sized branded
-     card instead of a tiny chip — the user's most important action is
-     "review the draft", so it deserves its own UI. */
-  const draftStep = !isUser
-    ? steps.find(
-        (s) =>
-          s.kind === "tool-result" &&
-          s.tool === "createQuotationDraft" &&
-          s.payload &&
-          typeof (s.payload as { review_url?: unknown }).review_url === "string",
-      )
-    : undefined;
-  /* Both sides now get an avatar so the transcript reads like a real
-     conversation — matches the ChatGPT / Gemini visual pattern Kamal
-     referenced. User side: real profile photo (or initial fallback).
-     AI side: the animated AI face icon with its neon gradient. */
-  return (
-    <div
-      /* Audit P1 #1 — let the row inherit the document direction so
-         screen readers walk avatar→bubble in the natural reading
-         order for Arabic users. The previous hardcoded dir="ltr"
-         kept the visual gap fine but broke a11y reading order.
-         flex-row-reverse on user bubbles below keeps the layout
-         "right-aligned" without forcing LTR on the document. */
-      className={`flex items-start gap-3 ${isUser ? "justify-end" : "justify-start"}`}
-    >
-      {!isUser && (
-        <KoleexOrb state={orbState} activity={orbActivity} size={38} className="shrink-0" />
-      )}
-      <div className={`flex flex-col gap-2 max-w-[85%] ${isUser ? "items-end" : "items-start"}`}>
-        {/* Tool-step chips are NOT rendered (owner directive 2026-08-03:
-            "just give the answer direct"). The steps still exist on the
-            message — the orb's activity label uses the latest tool-call,
-            and the quotation DraftCard below still surfaces its result. */}
-        {draftStep && (
-          <DraftCard payload={draftStep.payload as QuotationDraftPayload} />
-        )}
-        {/* Assistant bubble with no content yet → show typing indicator
-            (Phase 6). Replaced by the streamed text as deltas arrive. */}
-        {!isUser && !msg.content ? (
-          <TypingIndicator />
-        ) : (
-          <div
-            /* dir="auto" + unicode-bidi: plaintext together make the browser
-               apply the first-strong-character algorithm per paragraph AND
-               isolate embedded segments properly. That's what fixes Arabic
-               replies that also contain English words like "Koleex Hub" —
-               without this the hard dir="rtl" can flip the embedded English
-               into the wrong visual position. User bubbles keep the
-               whitespace-pre-wrap path (literal text only). Assistant
-               bubbles render markdown via MessageMarkdown for bullets,
-               headings, code blocks, tables, links. */
-            ref={bubbleRef}
-            dir="auto"
-            className={`rounded-2xl leading-relaxed ${
-              isUser ? "whitespace-pre-wrap px-4 py-2.5" : "px-5 py-3.5"
-            } ${
-              rtl ? "text-[15px]" : "text-[14px]"
-            } ${
-              isUser
-                ? "bg-[var(--bg-inverted)] text-[var(--text-inverted)]"
-                : /* Aurora: assistant bubbles wear the tile glass (owner ask).
-                     Measured safe: 140 glass tiles over the moving ground
-                     dropped 0 frames, and the low-power arm strips blur on
-                     weak machines. User bubbles keep the inverted fill — the
-                     contrast IS their identity. */
-                  "kx-glass bg-[var(--bg-secondary)] border border-[var(--border-subtle)] text-[var(--text-primary)]"
-            }`}
-            style={{
-              unicodeBidi: "plaintext",
-              ...(rtl
-                ? { fontFamily: '"SF Arabic","Geeza Pro","Noto Naskh Arabic",Arial,sans-serif' }
-                : {}),
-            }}
-          >
-            {isUser ? (
-              editing ? (
-                <textarea
-                  /* Phase 13.1: use ref + focus({preventScroll:true})
-                     instead of autoFocus. On iOS Safari autoFocus
-                     triggers the browser's "scroll focused element
-                     into view" which shoves the chat pane up in a
-                     jarring way. preventScroll keeps the scroll
-                     position stable while still taking focus. */
-                  ref={(el) => {
-                    if (el && document.activeElement !== el) {
-                      try { el.focus({ preventScroll: true }); } catch { el.focus(); }
-                      const len = el.value.length;
-                      el.setSelectionRange(len, len);
-                    }
-                  }}
-                  value={editValue}
-                  onChange={(e) => setEditValue(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" && !e.shiftKey) {
-                      e.preventDefault();
-                      submitEdit();
-                    } else if (e.key === "Escape") {
-                      e.preventDefault();
-                      cancelEdit();
-                    }
-                  }}
-                  rows={1}
-                  className="w-full bg-transparent outline-none resize-none text-inherit leading-relaxed min-w-[180px]"
-                  style={{ fontFamily: "inherit" }}
-                />
-              ) : (
-                msg.content
-              )
-            ) : (
-              <MessageMarkdown content={msg.content} />
-            )}
-          </div>
-        )}
-        {/* Phase 13: user-side action row — Edit (re-runs the turn
-            with new text) or Save/Cancel while editing. Only shown
-            when the parent supplied onEdit and allowed it. */}
-        {isUser && showEditButton && (
-          <div className="mt-1 flex items-center gap-2 text-[11px] text-[var(--text-dim)]">
-            {editing ? (
-              <>
-                <button
-                  type="button"
-                  onClick={submitEdit}
-                  className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-[var(--bg-inverted)] text-[var(--text-inverted)] transition-opacity"
-                  aria-label="Save and retry"
-                >
-                  Save & retry
-                </button>
-                <button
-                  type="button"
-                  onClick={cancelEdit}
-                  className="inline-flex items-center gap-1 px-2 py-1 rounded-md hover:bg-[var(--bg-surface-subtle)] hover:text-[var(--text-primary)] transition-colors"
-                  aria-label="Cancel edit"
-                >
-                  Cancel
-                </button>
-              </>
-            ) : (
-              <button
-                type="button"
-                onClick={() => {
-                  setEditValue(msg.content);
-                  setEditing(true);
-                }}
-                className="inline-flex items-center gap-1 px-2 py-1 rounded-md hover:bg-[var(--bg-surface-subtle)] hover:text-[var(--text-primary)] transition-colors"
-                aria-label="Edit and retry"
-              >
-                ✎ Edit
-              </button>
-            )}
-          </div>
-        )}
-        {/* No Sources row: the owner asked for the answer alone. The URLs
-            still travel in the tool step and stay in the audit trail — this
-            only stops them being drawn under the reply. */}
-        {/* Phase 12: assistant action row — Copy + (on last msg)
-            Regenerate. User bubbles get no actions. Rendered outside
-            the bubble div so it doesn't inherit the bubble's padding /
-            background. */}
-        {showActions && (
-          <BubbleActions
-            msg={msg}
-            isLast={!!isLast}
-            canRegenerate={!!canRegenerate}
-            copied={copied}
-            onCopy={handleCopyClick}
-            onRegenerate={onRegenerate}
-            onSpeak={onSpeak}
-            onFeedback={onFeedback}
-            lang={lang}
-          />
-        )}
-      </div>
-      {isUser && (
-        <div
-          className="h-8 w-8 rounded-full overflow-hidden flex items-center justify-center shrink-0 bg-[var(--bg-surface)] border border-[var(--border-subtle)]"
-          aria-hidden
-        >
-          {userAvatar ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={userAvatar} alt="" className="h-full w-full object-cover" />
-          ) : (
-            <span className="text-[11px] font-bold text-[var(--text-primary)]">
-              {userInitial}
-            </span>
-          )}
-        </div>
-      )}
-    </div>
-  );
-}
-
-/* ── Bubble action row ──
-   Per-message actions under each assistant bubble. Copy + (last only)
-   Regenerate were already here; Phase polish adds:
-
-     · 🔊 Speak — replay this specific reply aloud via TTS. Useful when
-       the user wants to re-hear a long answer or didn't catch the
-       voice-turn auto-playback.
-     · 👍 / 👎 — operator feedback. Fire-and-forget; the parent picks
-       where the signal goes (today: console.info + analytics ping
-       endpoint stub, tomorrow: server-side feedback table).
-   ──────────────────────────────────────────────────────────────────── */
-
-function BubbleActions({
-  msg, isLast, canRegenerate, copied, onCopy, onRegenerate, onSpeak, onFeedback, lang,
-}: {
-  msg: ChatMsg;
-  isLast: boolean;
-  canRegenerate: boolean;
-  copied: boolean;
-  onCopy: () => void;
-  onRegenerate?: () => void;
-  onSpeak?: (text: string) => void;
-  onFeedback?: (msgId: string, value: "up" | "down") => void;
-  lang: Lang;
-}) {
-  void lang;
-  const [vote, setVote] = useState<"up" | "down" | null>(null);
-  const sendVote = (v: "up" | "down") => {
-    setVote(v);
-    onFeedback?.(msg.id, v);
-  };
-  /* All five action buttons share the same 28×28 hit target and a
-     fixed 14×14 icon glyph so the row reads as a uniform strip
-     instead of "copy and regenerate are smaller than the speaker".
-     Earlier draft mixed 12 / 13 / 14 px icons which the user spotted
-     as a visible alignment bug. */
-  const btnCls = "inline-flex items-center justify-center h-7 w-7 rounded-md hover:bg-[var(--bg-surface-subtle)] hover:text-[var(--text-primary)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed";
-  const ICON = 14;
-  return (
-    <div role="toolbar" aria-label="Message actions" className="mt-1 flex items-center gap-1 text-[11px] text-[var(--text-dim)]">
-      <button
-        type="button"
-        onClick={onCopy}
-        className={`${btnCls} ${copied ? "text-emerald-300" : ""}`}
-        aria-label={copied ? "Copied" : "Copy message"}
-        title={copied ? "Copied" : "Copy"}
-      >
-        {copied ? (
-          <svg aria-hidden viewBox="0 0 24 24" width={ICON} height={ICON} fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
-            <polyline points="20 6 9 17 4 12" />
-          </svg>
-        ) : (
-          /* Lucide "copy" — two overlapping rounded rectangles. The
-             previous variant used a single rect + escape-path which
-             didn't read as a duplicate at small sizes. */
-          <svg aria-hidden viewBox="0 0 24 24" width={ICON} height={ICON} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
-            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
-          </svg>
-        )}
-      </button>
-      {onSpeak && msg.content && (
-        <button
-          type="button"
-          onClick={() => onSpeak(msg.content)}
-          className={btnCls}
-          aria-label="Read aloud"
-          title="Read aloud"
-        >
-          {/* Lucide volume-2 redrawn on a 20×20 viewBox so the
-              speaker triangle + arc waves actually fill the box.
-              The original 24×24 lucide path only used the left
-              ~17 units, which made the icon look noticeably
-              smaller next to copy / regenerate / 👍 / 👎. */}
-          <svg aria-hidden viewBox="0 0 20 20" width={ICON} height={ICON} fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
-            <polygon points="9 3 4 7 1 7 1 13 4 13 9 17 9 3" />
-            <path d="M13 6.5a4.5 4.5 0 0 1 0 7" />
-            <path d="M16 4a8 8 0 0 1 0 12" />
-          </svg>
-        </button>
-      )}
-      {isLast && onRegenerate && (
-        <button
-          type="button"
-          onClick={onRegenerate}
-          disabled={!canRegenerate}
-          className={btnCls}
-          aria-label="Regenerate response"
-          title="Regenerate"
-        >
-          <svg aria-hidden viewBox="0 0 24 24" width={ICON} height={ICON} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M3 12a9 9 0 0 1 15.5-6.36L21 8" />
-            <path d="M21 3v5h-5" />
-            <path d="M21 12a9 9 0 0 1-15.5 6.36L3 16" />
-            <path d="M3 21v-5h5" />
-          </svg>
-        </button>
-      )}
-      {onFeedback && (
-        <>
-          <span aria-hidden className="mx-1 h-3 w-px bg-[var(--border-subtle)]" />
-          <button
-            type="button"
-            onClick={() => sendVote("up")}
-            className={`${btnCls} ${vote === "up" ? "text-emerald-300" : ""}`}
-            aria-label="Good response"
-            title="Good response"
-          >
-            <svg aria-hidden viewBox="0 0 24 24" width={ICON} height={ICON} fill={vote === "up" ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3zM7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3" />
-            </svg>
-          </button>
-          <button
-            type="button"
-            onClick={() => sendVote("down")}
-            className={`${btnCls} ${vote === "down" ? "text-rose-300" : ""}`}
-            aria-label="Bad response"
-            title="Bad response"
-          >
-            <svg aria-hidden viewBox="0 0 24 24" width={ICON} height={ICON} fill={vote === "down" ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M10 15v4a3 3 0 0 0 3 3l4-9V2H5.72a2 2 0 0 0-2 1.7l-1.38 9a2 2 0 0 0 2 2.3zM17 2h2.67A2.31 2.31 0 0 1 22 4v7a2.31 2.31 0 0 1-2.33 2H17" />
-            </svg>
-          </button>
-        </>
-      )}
-    </div>
-  );
-}
-
-/* ── Sidebar section heading ──
-   A date, "Projects" and "Pinned" are all chrome, not content. The label used
-   to be 10px bold text at rgba(255,255,255,0.44) sitting directly above chat
-   rows at 0.66 — two greys a fifth of an alpha apart, same left edge, no
-   separator — so "Yesterday" scanned as just another chat. The hairline rule
-   and the sticky behaviour are what make it read as a divider; every section
-   in the sidebar now shares this one component so they cannot drift apart. */
-function SectionHeader({
-  label,
-  children,
-  muted,
-}: {
-  label: string;
-  children?: React.ReactNode;
-  /** Date sub-headings inside the history — quieter than "Projects" /
-   *  "Recents", which name the two halves of the panel. */
-  muted?: boolean;
-}) {
-  return (
-    <div className="px-4 pt-4 pb-1 flex items-center gap-2">
-      <span
-        className={`text-[12px] font-semibold shrink-0 ${
-          muted ? "text-[var(--text-dim)]" : "text-[var(--text-primary)]"
-        }`}
-      >
-        {label}
-      </span>
-      <span className="flex-1" />
-      {children}
-    </div>
-  );
-}
-
-/* ── A project folder row ──
-   Same shape as a chat row — icon, name, hover menu — because in the panel
-   they are peers: two kinds of thing you click to go somewhere. No chevron
-   and no count; the folder opens the panel rather than unfolding in place. */
-function ProjectRow({
-  project,
-  onOpen,
-  onEdit,
-  onDelete,
-  editLabel,
-  deleteLabel,
-  moreLabel,
-}: {
-  project: AiProject;
-  onOpen: () => void;
-  onEdit: () => void;
-  onDelete: () => void;
-  editLabel: string;
-  deleteLabel: string;
-  moreLabel: string;
-}) {
-  return (
-    <div
-      className="group px-2 py-1.5 mx-2 rounded-lg cursor-pointer transition-colors flex items-center gap-2 hover:bg-[var(--bg-surface-subtle)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
-      onClick={onOpen}
-      role="button"
-      tabIndex={0}
-      onKeyDown={(e) => {
-        if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onOpen(); }
-      }}
-    >
-      <ProjectGlyph icon={project.icon} color={project.color} size={15} className="shrink-0" />
-      <span className="text-[13px] truncate flex-1 min-w-0">{project.name}</span>
-      <RowMenu
-        label={moreLabel}
-        items={[
-          { key: "edit", label: editLabel, icon: <PencilIcon className="h-3 w-3" />, onSelect: onEdit },
-          { key: "delete", label: deleteLabel, icon: <TrashIcon className="h-3 w-3" />, danger: true, onSelect: onDelete },
-        ]}
-      />
-    </div>
-  );
-}
-
-/* ── Sidebar row with hover actions ── */
-
-function SidebarRow({
-  row,
-  active,
-  projects,
-  copy,
-  onOpen,
-  onRename,
-  onDelete,
-  onTogglePin,
-  onMove,
-}: {
-  row: ConversationRow;
-  active: boolean;
-  projects: AiProject[];
-  copy: typeof COPY["en"];
-  onOpen: () => void;
-  onRename: () => void;
-  onDelete: () => void;
-  onTogglePin: () => void;
-  onMove: (projectId: string | null) => void;
-}) {
-  const pinned = !!row.pinned;
-  const inProject = row.project_id ?? null;
-
-  /* Rename, pin, move and delete are four actions on a 248px row — as inline
-     buttons they would leave the title barely wider than a word. Pin stays
-     out (it is the one you reach for mid-thought, and it has to stay visible
-     when ON so you can see the chat is pinned); the rest live behind one
-     menu, which is also where "move to a folder" belongs since it needs the
-     project list. */
-  const items: MenuItem[] = [
-    {
-      key: "pin",
-      label: pinned ? copy.unpin : copy.pin,
-      icon: pinned ? <PinOffIcon className="h-3 w-3" /> : <PinIcon className="h-3 w-3" />,
-      onSelect: onTogglePin,
-    },
-    {
-      key: "rename",
-      label: copy.rename,
-      icon: <PencilIcon className="h-3 w-3" />,
-      onSelect: onRename,
-    },
-    { key: "sep-move", separator: true, label: copy.moveTo },
-    {
-      key: "none",
-      label: copy.noProject,
-      selected: inProject === null,
-      onSelect: () => onMove(null),
-    },
-    ...projects.map((p) => ({
-      key: `p-${p.id}`,
-      label: p.name,
-      icon: <ProjectGlyph icon={p.icon} color={p.color} size={12} />,
-      selected: inProject === p.id,
-      onSelect: () => onMove(p.id),
-    })),
-    { key: "sep-danger", separator: true },
-    {
-      key: "delete",
-      label: copy.delete,
-      icon: <TrashIcon className="h-3 w-3" />,
-      danger: true,
-      onSelect: onDelete,
-    },
-  ];
-
-  return (
-    <div
-      onClick={onOpen}
-      className={`group px-2 py-1.5 mx-2 rounded-lg cursor-pointer transition-colors flex items-center gap-1 ${
-        active
-          ? "bg-[var(--bg-surface-active)] text-[var(--text-primary)]"
-          : "hover:bg-[var(--bg-surface-subtle)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
-      }`}
-    >
-      <div className="text-[13px] truncate flex-1 min-w-0">{row.title}</div>
-      {/* The pin marks the row while it is pinned and hides again on hover so
-          it can't be mistaken for a button you have to press to keep it. */}
-      <button
-        type="button"
-        onClick={(e) => { e.stopPropagation(); onTogglePin(); }}
-        className={`h-6 w-6 rounded-md flex items-center justify-center shrink-0 ${
-          pinned
-            ? "text-[var(--text-dim)] group-hover:text-[var(--text-primary)]"
-            : "opacity-0 group-hover:opacity-100 text-[var(--text-dim)] hover:text-[var(--text-primary)]"
-        }`}
-        title={pinned ? copy.unpin : copy.pin}
-        aria-label={pinned ? copy.unpin : copy.pin}
-        aria-pressed={pinned}
-      >
-        <PinIcon className="h-3 w-3" />
-      </button>
-      <RowMenu label={copy.more} items={items} />
-    </div>
-  );
-}
-
-/* ── The one-button row menu ──
-   Rendered `position: fixed` against the trigger's own rectangle rather than
-   absolutely inside the row. The sidebar list is an overflow-y-auto column,
-   which clips on BOTH axes, so an absolutely-positioned panel would have its
-   edge sliced off — and a menu you cannot fully see is worse than no menu. */
-type MenuItem = {
-  key: string;
-  label?: string;
-  icon?: React.ReactNode;
-  danger?: boolean;
-  selected?: boolean;
-  separator?: boolean;
-  onSelect?: () => void;
-};
-
-function RowMenu({
-  label,
-  items,
-  alwaysVisible,
-}: {
-  label: string;
-  items: MenuItem[];
-  /** The project header's menu has no row to hover — it stays put. */
-  alwaysVisible?: boolean;
-}) {
-  const [open, setOpen] = useState(false);
-  const [pos, setPos] = useState<{
-    top?: number;
-    bottom?: number;
-    left: number;
-    maxHeight: number;
-  } | null>(null);
-  const btnRef = useRef<HTMLButtonElement | null>(null);
-
-  const place = useCallback(() => {
-    const el = btnRef.current;
-    if (!el) return;
-    const r = el.getBoundingClientRect();
-    const W = 208;
-    const GAP = 4;
-    const EDGE = 8;
-    const PREFERRED_H = 320;
-
-    const below = window.innerHeight - r.bottom - GAP - EDGE;
-    const above = r.top - GAP - EDGE;
-    /* Open downwards when there is room, otherwise flip above. When flipping
-       we anchor the panel's BOTTOM edge to the button instead of guessing a
-       top: the menu's height depends on how many projects exist, and a top
-       computed from the maximum height would leave a short menu floating a
-       hundred pixels away from the button that opened it. */
-    const dropDown = below >= Math.min(PREFERRED_H, above) || below >= 200;
-    const left = Math.min(Math.max(EDGE, r.right - W), window.innerWidth - W - EDGE);
-
-    setPos(
-      dropDown
-        ? { top: r.bottom + GAP, left, maxHeight: Math.max(120, below) }
-        : { bottom: window.innerHeight - r.top + GAP, left, maxHeight: Math.max(120, above) },
-    );
-  }, []);
-
-  useEffect(() => {
-    if (!open) return;
-    const close = () => setOpen(false);
-    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setOpen(false); };
-    /* Any scroll or resize invalidates a fixed position, and re-placing a
-       menu mid-scroll looks broken — closing is the honest response. */
-    window.addEventListener("scroll", close, true);
-    window.addEventListener("resize", close);
-    window.addEventListener("keydown", onKey);
-    return () => {
-      window.removeEventListener("scroll", close, true);
-      window.removeEventListener("resize", close);
-      window.removeEventListener("keydown", onKey);
-    };
-  }, [open]);
-
-  return (
-    <>
-      <button
-        ref={btnRef}
-        type="button"
-        onClick={(e) => {
-          e.stopPropagation();
-          if (!open) place();
-          setOpen((v) => !v);
-        }}
-        className={`h-6 w-6 rounded-md flex items-center justify-center shrink-0 text-[var(--text-dim)] hover:text-[var(--text-primary)] ${
-          open || alwaysVisible
-            ? "opacity-100"
-            : "opacity-0 group-hover:opacity-100"
-        } ${open ? "text-[var(--text-primary)]" : ""}`}
-        title={label}
-        aria-label={label}
-        aria-haspopup="menu"
-        aria-expanded={open}
-      >
-        <MoreHorizontalIcon size={14} />
-      </button>
-
-      {open && pos && (
-        <>
-          {/* Click-catcher. Transparent, not dimmed — this is a small row
-              menu, not a modal, and the house rule about blurring backdrops
-              is about dialogs that take over the screen. */}
-          <div
-            className="fixed inset-0 z-[60]"
-            onClick={(e) => { e.stopPropagation(); setOpen(false); }}
-            onContextMenu={(e) => { e.preventDefault(); setOpen(false); }}
-          />
-          <div
-            role="menu"
-            className="fixed z-[61] w-52 overflow-y-auto rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] shadow-xl py-1"
-            style={{
-              top: pos.top,
-              bottom: pos.bottom,
-              left: pos.left,
-              maxHeight: Math.min(320, pos.maxHeight),
-            }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            {items.map((it) =>
-              it.separator ? (
-                <div key={it.key} className="px-3 pt-2 pb-1">
-                  {it.label ? (
-                    <span className="text-[10px] uppercase tracking-[0.14em] font-semibold text-[var(--text-dim)]">
-                      {it.label}
-                    </span>
-                  ) : (
-                    <span className="block h-px bg-[var(--border-subtle)]" />
-                  )}
-                </div>
-              ) : (
-                <button
-                  key={it.key}
-                  type="button"
-                  role="menuitem"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setOpen(false);
-                    it.onSelect?.();
-                  }}
-                  className={`w-full px-3 py-1.5 text-[12px] flex items-center gap-2 text-start hover:bg-[var(--bg-surface-subtle)] ${
-                    it.danger
-                      ? "text-rose-400"
-                      : it.selected
-                        ? "text-[var(--text-primary)]"
-                        : "text-[var(--text-secondary)]"
-                  }`}
-                >
-                  <span className="w-3 shrink-0 flex justify-center">{it.icon}</span>
-                  <span className="truncate flex-1 min-w-0">{it.label}</span>
-                  {it.selected && <CheckIcon className="h-3 w-3 shrink-0" />}
-                </button>
-              ),
-            )}
-          </div>
-        </>
-      )}
-    </>
-  );
-}
-
-/* ── Welcome landing ── */
-
-function WelcomeCard({
-  copy,
-  onPick,
-  firstName,
-}: {
-  copy: typeof COPY["en"];
-  onPick: (prompt: string) => void;
-  firstName: string;
-}) {
-  /* Hub-native welcome — same layout vocabulary as FinanceHome.
-     Small icon mark in a Hub-themed tile, a tight h2 + caption pair,
-     then suggestion tiles in a 2-column grid (matching the
-     "What do you want to do?" pattern on /finance). No drop-shadow
-     halos, no glass blur, no centered-pill chips. */
-  const greeting = firstName ? `${copy.welcomeTitle}, ${firstName}.` : copy.welcomeTitle;
-  /* One-shot "jump" greet shortly after the welcome screen mounts, so the
-     orb waves hello when you open Koleex AI. greetKey starts at 0 (no fire
-     on mount) then flips to 1 → fires the jump reaction once. */
-  const [greet, setGreet] = useState(0);
-  useEffect(() => {
-    const t = setTimeout(() => setGreet(1), 350);
-    return () => clearTimeout(t);
-  }, []);
-  return (
-    <div className="flex flex-col items-center justify-center min-h-[50vh] text-center px-2 py-4 md:py-8">
-      <KoleexOrb state="idle" greetKey={greet} size={104} className="mb-4 md:mb-6" />
-      <h2 className="text-[22px] md:text-[26px] font-bold tracking-tight text-[var(--text-primary)] mb-2.5 leading-tight">
-        {greeting}
-      </h2>
-      <p className="text-[12.5px] text-[var(--text-dim)] mb-5 md:mb-9 max-w-md">
-        {copy.welcomeSub}
-      </p>
-
-      <div className="grid w-full max-w-2xl grid-cols-1 gap-2 sm:grid-cols-2">
-        {copy.prompts.map((p, i) => (
-          <button
-            key={i}
-            type="button"
-            onClick={() => onPick(p)}
-            /* Aurora: suggestion chips are mini app-tiles over the ground —
-               tile glass (owner: "this also can have the glass effect").
-               Solid var() bg stays for Core; hover keeps speaking in the
-               border (the glass fill owns the background under Aurora). */
-            className="kx-glass group flex min-h-[64px] items-center rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] px-3.5 py-3 text-start text-[12.5px] text-[var(--text-primary)] hover:border-[var(--border-focus)] hover:bg-[var(--bg-surface-subtle)] transition-colors"
-          >
-            <span className="flex-1 leading-snug">{p}</span>
-          </button>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-/* ── Date grouping ── */
-
-function groupByDate(
-  rows: ConversationRow[],
-  copy: typeof COPY["en"],
-): Array<{ label: string; rows: ConversationRow[] }> {
-  const now = new Date();
-  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
-  const oneDay = 86_400_000;
-  const bucket = {
-    today: [] as ConversationRow[],
-    yesterday: [] as ConversationRow[],
-    week: [] as ConversationRow[],
-    month: [] as ConversationRow[],
-    older: [] as ConversationRow[],
-  };
-  for (const r of rows) {
-    const t = new Date(r.updated_at).getTime();
-    const diff = today - t;
-    if (t >= today) bucket.today.push(r);
-    else if (diff < oneDay) bucket.yesterday.push(r);
-    else if (diff < 7 * oneDay) bucket.week.push(r);
-    else if (diff < 30 * oneDay) bucket.month.push(r);
-    else bucket.older.push(r);
-  }
-  const out: Array<{ label: string; rows: ConversationRow[] }> = [];
-  if (bucket.today.length) out.push({ label: copy.today, rows: bucket.today });
-  if (bucket.yesterday.length) out.push({ label: copy.yesterday, rows: bucket.yesterday });
-  if (bucket.week.length) out.push({ label: copy.previous7, rows: bucket.week });
-  if (bucket.month.length) out.push({ label: copy.previous30, rows: bucket.month });
-  if (bucket.older.length) out.push({ label: copy.earlier, rows: bucket.older });
-  return out;
-}

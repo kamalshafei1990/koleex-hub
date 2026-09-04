@@ -264,6 +264,16 @@ export interface ProductSupplierFormState {
   /* What unit_cost_cny already includes (display + warning only for now). */
   cost_basis: "factory_only" | "packing" | "delivered";
   cost_includes_tax: boolean;
+  /* The missing cost pieces when the price is NOT full-landed/tax-in —
+     entered manually so pricing can work from the TRUE landed cost.
+     combined=true → packing+delivery as ONE number (combined_cny). */
+  cost_extras: {
+    tax_rate_percent: string;
+    delivery_cny: string;
+    packing_cny: string;
+    combined_cny: string;
+    combined: boolean;
+  };
   payment_terms: string;
   notes: string;
   /* Locale-keyed translations of the price note. Base note above is the

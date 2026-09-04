@@ -8,6 +8,7 @@ import "server-only";
 
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
+import { supersedeUnread } from "@/lib/server/inbox-lifecycle";
 import { sendPushToAccounts } from "@/lib/server/web-push";
 
 export const dynamic = "force-dynamic";
@@ -58,6 +59,13 @@ export async function GET(req: Request) {
 
     const overdue = t.due_date < today;
     const subject = overdue ? `Task overdue: ${t.title}` : `Task due today: ${t.title}`;
+    /* The same-day guard above stops double-writes WITHIN a day; this stops
+       stacking ACROSS days — yesterday's unread "due today" is superseded
+       by today's "overdue" for the same task. */
+    await supersedeUnread({
+      recipients: [t.assignee_account_id],
+      meta: { type: "project_task_due", task_id: t.id },
+    });
     await supabaseServer.from("inbox_messages").insert({
       recipient_account_id: t.assignee_account_id,
       sender_account_id: null,

@@ -14,12 +14,19 @@
    the DOM cheap and the file obvious.
    --------------------------------------------------------------------------- */
 
-export default function TypingIndicator(): React.ReactElement {
+import { COPY } from "@/components/ai/copy";
+import { type Lang } from "@/lib/i18n";
+
+/* `lang` is optional and defaults to English: this is the announcement a
+   screen reader makes while the assistant is composing, and it was the one
+   string in this file — hardcoded, in a product that translates the rest. */
+export default function TypingIndicator({ lang = "en" }: { lang?: Lang } = {}): React.ReactElement {
+  const copy = COPY[lang] ?? COPY.en;
   return (
     <div
       className="koleex-typing-indicator"
       role="status"
-      aria-label="Koleex AI is thinking"
+      aria-label={copy.thinkingAria}
     >
       <span />
       <span />

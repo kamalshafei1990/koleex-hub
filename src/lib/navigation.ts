@@ -29,6 +29,8 @@ import CustomersIcon from "@/components/icons/CustomersIcon";
 import SuppliersIcon from "@/components/icons/SuppliersIcon";
 import ContactsIcon from "@/components/icons/ContactsIcon";
 import InvoicesIcon from "@/components/icons/InvoicesIcon";
+import OrdersIcon from "@/components/icons/OrdersIcon";
+import ContractIcon from "@/components/icons/ui/ContractIcon";
 import LandedCostIcon from "@/components/icons/LandedCostIcon";
 import CatalogsIcon from "@/components/icons/CatalogsIcon";
 import DocumentsIcon from "@/components/icons/DocumentsIcon";
@@ -215,6 +217,13 @@ export const APP_REGISTRY: AppDef[] = [
   { id: "crm",              tKey: "app.crm",              name: "CRM",               icon: CrmIcon,       route: "/crm",              active: true  },
   { id: "quotations",       tKey: "app.quotations",       name: "Quotations",        icon: QuotationIcon, route: "/quotations",       active: true  },
   { id: "invoices",         tKey: "app.invoices",         name: "Invoices",          icon: InvoicesIcon,  route: "/invoices",         active: true  },
+  /* A sales contract used to be reachable ONLY from the invoice it was
+     raised on, which answered "what did we agree on THIS invoice" and no
+     other question. It is an app because the questions people actually
+     ask are "what have we signed", "what is waiting for signature" and
+     "where is KL-CN-12351". */
+  { id: "contracts",        tKey: "app.contracts",        name: "Contracts",         icon: ContractIcon,  route: "/contracts",        active: true,  newSince: "2026-08-25" },
+  { id: "orders",           tKey: "app.orders",           name: "Orders",            icon: OrdersIcon,    route: "/orders",           active: true,  newSince: "2026-08-24" },
   { id: "customers",        tKey: "app.customers",        name: "Customers",         icon: CustomersIcon, route: "/customers",        active: true  },
   { id: "suppliers",        tKey: "app.suppliers",        name: "Suppliers",         icon: SuppliersIcon, route: "/suppliers",        active: true  },
   { id: "contacts",         tKey: "app.contacts",         name: "Contacts",          icon: ContactsIcon,  route: "/contacts",         active: true  },
@@ -254,6 +263,15 @@ export const APP_REGISTRY: AppDef[] = [
      redirects here so existing deep-links keep working). */
   { id: "issue-reports",    tKey: "app.issueReports",     name: "Issue Reports",     icon: ExclamationIcon, route: "/issues", active: true, newSince: "2026-08-07" },
   { id: "ai",               tKey: "app.ai",               name: "AI",                icon: KoleexOrbIcon,  route: "/ai",            active: true  },
+  /* AI KNOWLEDGE IS A MODULE, NOT A TILE. It is reached from inside the AI
+     app, so it must not appear in the launcher — but it needs a registry
+     entry all the same, because that is what makes it grantable in Roles &
+     Permissions. Without one the only expressible states were "super admin
+     only" or "every internal user", and the owner asked for the third:
+     his by default, and grantable to named accounts.
+     Deny-by-default like every other module (no openAccess): a role with no
+     row cannot read the AI's knowledge corpus, and super admins always can. */
+  { id: "ai-knowledge",     tKey: "app.aiKnowledge",      name: "AI Knowledge",      icon: KnowledgeIcon,  route: "/ai/knowledge",  active: true, hideFromLauncher: true },
 
   /* ── System ── */
   { id: "accounts",         tKey: "app.accounts",         name: "Accounts",          icon: AccountsIcon,  route: "/accounts",         active: true  },
@@ -268,7 +286,14 @@ export const APP_REGISTRY: AppDef[] = [
   { id: "price-calculator", tKey: "app.price-calculator", name: "Price Calculator",  icon: PriceCalculatorIcon, route: "/price-calculator", active: true  },
   /* Brands is NOT an app — it lives inside Database → Visual Library
      (/database/brands). Intentionally not registered here. */
-  { id: "dashboard",        tKey: "app.dashboard",        name: "Dashboard",         icon: AppsIcon,    route: "/dashboard",        active: false },
+  /* Dashboard — ACTIVE behind the same dark-launch gate as its page: the
+     registry flips with the flag, so a sibling push cannot expose it in
+     production (launcher entry + roles module + page all appear together).
+     openAccess: the app itself is open to everyone — every widget inside is
+     already gated per-module by /api/dashboard, so the app shows each person
+     only what their role can see. */
+  { id: "dashboard",        tKey: "app.dashboard",        name: "Dashboard",         icon: AppsIcon,    route: "/dashboard",
+    active: process.env.NEXT_PUBLIC_HOME_DASHBOARD === "1" || process.env.NODE_ENV === "development", openAccess: true },
 ];
 
 /* ═══════════════════════════════════════════════════
@@ -288,7 +313,7 @@ export const SIDEBAR_GROUPS: SidebarGroup[] = [
     tKey: "cat.commercial",
     label: "Commercial",
     icon: CommercialSidebarIcon,
-    appIds: ["customers", "suppliers", "quotations", "invoices", "sales", "travel", "crm", "contacts", "markets", "price-calculator", "website"],
+    appIds: ["customers", "suppliers", "quotations", "invoices", "contracts", "orders", "sales", "crm", "contacts", "markets", "price-calculator", "website"],
   },
   {
     id: "finance",
@@ -320,7 +345,7 @@ export const SIDEBAR_GROUPS: SidebarGroup[] = [
     tKey: "cat.planning",
     label: "Planning",
     icon: PlanningSidebarIcon,
-    appIds: ["planning", "projects"],
+    appIds: ["planning", "projects", "travel"],
   },
   {
     id: "knowledge",

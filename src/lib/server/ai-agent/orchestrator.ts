@@ -6,9 +6,11 @@ import "server-only";
    Pipeline per user turn:
 
      1. Build the message list for Groq (system prompt + history + user msg).
-     2. Call Groq with `tools = openAiToolSchemas()` and `tool_choice = auto`.
+     2. Call the provider with `tools = openAiToolSchemas(ctx)` — only the
+        tools THIS caller may run — and `tool_choice = auto`.
      3. If the model replies with tool_calls, dispatch them all in parallel
-        through dispatchTool() (permission guards + audit log apply),
+        through the Koleex Hub connector, which owns the permission
+        guards, the confirmation ledger and the audit log,
         attach results, loop.
      4. If the model replies with content, that's the final answer; stop.
      5. Hard-cap at MAX_ITERATIONS so a misbehaving model can't spin.
@@ -21,26 +23,85 @@ import "server-only";
 import type {
   AgentStep,
   AgentResponse,
-  UserContext,
-  ToolResult,
 } from "./types";
-import { openAiToolSchemas, dispatchTool } from "./tool-registry";
-import { brandKnowledgeFor, BRAND_EXCLUSIVITY_RULE, DIRECT_VOICE_RULE, EGYPTIAN_DIALECT_RULE, DATA_PROTECTION_RULE } from "./brand-knowledge";
-import { ENTITY_GUIDANCE_FULL } from "../ai/entity-scope";
-import { aiChat, aiProviderConfigured } from "@/lib/server/ai-provider";
+/* Phase 2H — Hub data is reached through the named connector, never by
+   calling the dispatcher directly. One door, so there is one place where the
+   permission guard, the confirmation ledger and the audit trail apply. */
+import { koleexHub } from "@/lib/server/ai/connectors/koleex-hub";
+import { aiProviderConfigured } from "@/lib/server/ai-provider";
+import { hasUntrustedContent } from "@/lib/server/ai/security/untrusted";
+import { logSealTransform } from "@/lib/server/ai/observability/reply-log";
+/* Phase 2E — the loop is now only the loop. What the model sees of a tool
+   result, what the user sees of a call, the pre-dispatch guard, and the two
+   recovery paths each live in their own module under core/. */
+import type { TurnInput } from "@/lib/server/ai/core/types";
+export type { TurnInput } from "@/lib/server/ai/core/types";
+import { toLlmSafe, humaniseCall } from "@/lib/server/ai/core/wire";
+import { preToolGuard } from "@/lib/server/ai/core/pre-tool-guard";
+import { runDegradedTurn, fallback } from "@/lib/server/ai/core/recovery";
+/* Phase 3C — the loop reaches a model through ONE function. It no longer
+   knows the endpoint, the retry policy, or what a `choices[0].message` is;
+   the adapter owns all of that. Everything BELOW the call sites is unchanged:
+   the provider's answer is mapped back into the same `choice` shape the loop
+   already used, so the tool loop, the seals and the rescue path see exactly
+   what they saw before. */
+/* Phase 4A — the provider LABEL comes from whichever adapter actually served
+   the turn, not from a constant that said "deepseek" no matter what. With
+   failover in the picture a hard-coded label would misreport every fallback
+   turn, and the label is what the audit trail records. */
+import { chatWithTools, providerConfigured, activeProviderLabel } from "@/lib/server/ai/provider/registry";
+import { recordUsage } from "@/lib/server/ai/cost/meter";
+import type { TurnMeta } from "@/lib/server/ai/provider/types";
+import {
+  fromOpenAiMessages,
+  fromOpenAiTools,
+  fromOpenAiToolChoice,
+  type OpenAiMessage,
+  type OpenAiTool,
+  type OpenAiToolChoice,
+  type TurnResponse,
+} from "@/lib/server/ai/provider/turn-ir";
+/* Phase 2C — the system prompts moved out. The loop builds a prompt; it is
+   no longer also the place prompts are written. */
+import {
+  buildSystemPrompt,
+  buildMinimalSystemPrompt,
+  buildBrandSystemPrompt,
+} from "@/lib/server/ai/prompts";
+/* Phase 2B — the seal chain moved out. sealFinalReply is still THE one
+   funnel; it simply no longer lives in the middle of the loop that calls it.
+   See ai/seals/index.ts for the order, which is asserted by a test. */
+import {
+  sealFinalReply,
+  cleanAssistantText,
+  looksLikeDebug,
+  rescueFromToolResults,
+  normaliseBrandName,
+  GENERIC_FOLLOWUP,
+  BANNED_ECHOES,
+} from "@/lib/server/ai/seals";
+/* Phase 2A — the lane decision moved out. Every detector below used to be
+   defined in this file and re-exported to the API routes; it now lives in
+   core/decide-turn.ts, which the routes import directly. The loop keeps only
+   what it uses. See that file's header for why it is import-free. */
+import {
+  tryFastReply,
+  isSmallTalk,
+  classifyBrandSection,
+  isChoiceShapedQuestion,
+  isTradeTermQuestion,
+  isBusinessDataQuery,
+  isWorkDataQuery,
+  isLiveInfoQuery,
+  isImageCreationRequest,
+  isMemoryIntentQuery,
+} from "@/lib/server/ai/core/decide-turn";
 
-/* Agent LLM provider = DeepSeek ONLY (owner decision, 2026-07-20: Groq
-   removed). DeepSeek's HTTP API is OpenAI-compatible — same chat/completions
-   body, same `tools` + `tool_choice:"auto"` function-calling contract, same
-   `choices[].message.tool_calls` response shape — so the whole tool loop below
-   works against it unchanged. `DEEPSEEK_AGENT_MODEL`/`DEEPSEEK_MODEL` env can
-   override the default. The internal helper names still say "Groq" for now;
-   only the endpoint/model/key changed. */
-const AGENT_LLM_URL = "https://api.deepseek.com/v1/chat/completions";
-const AGENT_MODEL =
-  process.env.DEEPSEEK_AGENT_MODEL ||
-  process.env.DEEPSEEK_MODEL ||
-  "deepseek-chat";
+/* How much of the thread an identity turn sees — enough to avoid repeating
+   itself, not enough to matter to the request size. */
+const IDENTITY_HISTORY_TURNS = 6;
+const IDENTITY_HISTORY_CHARS = 400;
+
 const MAX_ITERATIONS = 4;
 /* Hard ceiling on total tool executions per user turn. Prevents small
    models from loop-calling the same tool 50 times and blowing past
@@ -51,521 +112,73 @@ const MAX_TOOLS_PER_TURN = 6;
 /* Cap on parallel tool_calls in a single iteration — 8B will sometimes
    emit the same call three times in one step. */
 const MAX_PARALLEL_TOOLS = 3;
+/* Phase 3C. The provider layer returns a neutral TurnResponse; the loop below
+   was written against the wire-shaped `choice`. Rather than rewrite two
+   hundred lines of loop, the answer is mapped back into that shape at the one
+   place it enters — so the tool loop, the seals, the dedupe and the rescue
+   path are untouched by Phase 3 and cannot have been changed by it.
 
-/* OpenAI-compatible message shapes — kept loose because the Groq API
-   accepts the whole family (system/user/assistant/tool). */
-interface WireMsg {
-  role: "system" | "user" | "assistant" | "tool";
-  content: string | null;
-  tool_calls?: Array<{
-    id: string;
-    type: "function";
-    function: { name: string; arguments: string };
-  }>;
-  tool_call_id?: string;
-  name?: string;
+   `tool_calls: undefined` when empty (not `[]`) reproduces exactly what the
+   streaming branch built before. */
+/* Phase 5B. The label for a turn that HAPPENED comes from the outcome, not
+   from activeProviderLabel() — after a failover those differ, and the outcome
+   is the one telling the truth. Falls back to the predicted label only when
+   the registry did not name a server (no adapter ran at all). */
+function servedLabel(meta: TurnMeta): string {
+  return meta.servedBy && meta.model ? `${meta.servedBy}:${meta.model}` : activeProviderLabel();
 }
 
-export interface OrchestrateInput {
-  ctx: UserContext;
-  /** Conversation history — role/content pairs, oldest first. */
-  history: Array<{ role: "user" | "assistant"; content: string }>;
-  /** Latest user message (already persisted by the caller). */
-  userMessage: string;
-  userLang: "en" | "zh" | "ar";
-  /** Set when the language detector flags Egyptian dialect / Franco —
-   *  the model then generates natural Egyptian Arabic natively. */
-  dialect?: "egyptian" | null;
-  conversationId: string;
-  /** The composer's globe control was on for this turn. A nudge toward
-   *  search_web, never a command — the model still decides. */
-  webSearchRequested?: boolean;
-  /** Appended to whichever system prompt this turn builds when the user has
-   *  a stored "always answer me in X" preference. Built by the route, which
-   *  owns the preference, so every lane applies the identical text. */
-  languageLock?: string;
-  /** Owner-taught Q&A block (approved canonical replies) — appended to
-   *  every lane's system prompt; the model does the meaning-matching. */
-  taughtAnswers?: string;
-  /** Streaming hook: when set, the ANSWER-phase model call streams and
-   *  each content token is forwarded here in real time. */
-  onDelta?: (text: string) => void;
+function toChoice(r: TurnResponse): { role?: string; content: string | null; tool_calls?: OpenAiMessage["tool_calls"] } {
+  return {
+    role: "assistant",
+    content: r.content,
+    tool_calls:
+      r.toolCalls.length > 0
+        ? (r.toolCalls.map((c) => ({
+            id: c.id,
+            type: "function" as const,
+            function: { name: c.name, arguments: c.argumentsJson },
+          })) as OpenAiMessage["tool_calls"])
+        : undefined,
+  };
 }
 
-/** Small-talk / meta detector. Short greetings, identity questions,
- *  thanks, etc. never need a business-data lookup — we reply in one
- *  tool-less Groq call which uses ~500 tokens instead of ~4 000 (the
- *  tool schemas alone are most of the cost). Keeps the free-tier
- *  RPM/TPM allowance intact for the requests that actually need it. */
-/* ── Canned fast-reply table ────────────────────────────────
-   Narrow exact-match list: greetings, identity, "what can you do",
-   thanks — EN / AR / ZH. Hits return instantly without any Groq call.
-   Keep this tight; business prompts must NEVER match here. */
-/* Narrow canned fast-replies: only the truly trivial phrases
-   ("hi", "thanks") where a longer answer would feel performative.
-   Identity / capability questions ("who are you", "what can you do")
-   are deliberately NOT in this table anymore — they now hit the model
-   which gives a proper, substantive answer about what the assistant
-   can actually help with. */
-const FAST_REPLIES: Array<[RegExp, string]> = [
-  // English
-  [/^(hi|hello|hey)[\s,!.?]*$/i,              "Hi! How can I help?"],
-  [/^(thanks|thank\s+you|thx|ty)[\s!.?]*$/i,  "You're welcome."],
-  // Arabic
-  [/^(مرحبا|اهلا|أهلا|السلام)[\s,!.?]*$/,      "مرحبا! كيف أقدر أساعدك؟"],
-  [/^(شكرا|شكراً)[\s!.؟]*$/,                   "العفو."],
-  // Chinese
-  [/^(你好|您好|嗨)[\s,!.?]*$/,                "你好!有什么可以帮您的吗?"],
-  [/^谢谢[\s!。?？]*$/,                        "不客气。"],
-];
-
-function tryFastReply(msg: string): string | null {
-  const m = msg.trim();
-  if (!m) return null;
-  for (const [pat, reply] of FAST_REPLIES) {
-    if (pat.test(m)) return reply;
-  }
-  return null;
-}
-
-function isSmallTalk(msg: string): boolean {
-  const s = msg.trim().toLowerCase();
-  if (!s) return true;
-  if (s.length < 3) return true;
-  const patterns: RegExp[] = [
-    /^(hi|hello|hey|yo|hola|salam|salaam|مرحبا|اهلا|أهلا|السلام|你好|hi there)[\s,!.?؟]*$/i,
-    /^(good\s*(morning|afternoon|evening|night))[\s,!.?؟]*$/i,
-    /who\s+(are|r)\s+you\s*\??$/i,
-    /what\s+(are|r)\s+you\s*\??$/i,
-    /what\s+can\s+you\s+do\s*\??$/i,
-    /what\s+do\s+you\s+know\s*\??$/i,
-    /how\s+do\s+you\s+work\s*\??$/i,
-    /what\s+kind\s+of\s+ai\s+are\s+you\s*\??$/i,
-    /how\s+are\s+you[\s,!.?؟]*$/i,
-    /how's\s+it\s+going\s*[?!.]*$/i,
-    /^(thanks|thank\s+you|thx|ty|شكرا|谢谢)[\s!.؟]*$/i,
-    /^(ok|okay|good|great|nice|cool|got\s+it|understood)[\s!.؟]*$/i,
-    /^(bye|goodbye|see\s+you|مع السلامة|再见)[\s!.؟]*$/i,
-    /من\s+أنت\s*\??$/, // Arabic: "who are you?"
-    /你\s*是\s*谁/,        // Chinese: "who are you?"
-    /* Phase 9: broader casual check-in phrases that users expect a
-       snappy response to — these were hitting the full tool-loop
-       agent (3–8 s) because they don't match the patterns above.
-       Moving them to the fast-path drops latency to ~500 ms. */
-    /^(are|r)\s+(you|u)\s+(ok|okay|there|good|fine|alright|busy|still\s+there|still\s+here|awake|online|ready)\s*[?!.]*$/i,
-    /^(u|you)\s+(ok|okay|there|busy|still\s+there)\s*[?!.]*$/i,
-    /^(what'?s|wat'?s|wats)\s+up\s*[?!.]*$/i,
-    /^sup\s*[?!.]*$/i,
-    /^am\s+(testing|talking\s+to)\s+you\s*[?!.]*$/i,
-    /^(i'?m|im)\s+(just\s+)?(testing|talking\s+to)\s+you\s*[?!.]*$/i,
-    /^(test|testing|ping|check|hello\s+again)\s*[?!.]*$/i,
-    /^still\s+there\s*[?!.]*$/i,
-    /^you\s+there\s*[?!.]*$/i,
-    /* Arabic casual check-ins */
-    /^(كيف|كيفك|ازيك|إزيك|كيف\s+حالك)\s*[؟?!.]*$/,
-    /^(عامل\s+ايه|عامله\s+ايه|عاملة\s+ايه|تمام|كويس|اخبارك\s+ايه)\s*[؟?!.]*$/,
-    /^(انت\s+فين|انت\s+هنا|انت\s+موجود|شغال|شغالة)\s*[؟?!.]*$/,
-    /* Chinese casual */
-    /^(在吗|在么|还在吗|你在吗|忙吗|你好吗)\s*[?？!]*$/,
-  ];
-  return patterns.some((p) => p.test(s));
-}
-
-/** Brand / company-profile question detector. Matches requests that can
- *  be answered from BRAND_KNOWLEDGE alone (no DB lookup, no tool
- *  schemas). Routing these to the no-tools fast-path keeps the agent
- *  request under Groq's payload limit (413) while still giving full
- *  brand answers. Covers EN / AR / ZH keywords. */
-/** Post-process any model reply to enforce the brand-name rule:
- *  "Koleex" (and its sub-brand names) must appear in Latin letters in
- *  every language. Small models drift here — they echo the user's
- *  Arabic/Chinese transliteration even when the system prompt forbids
- *  it. A deterministic string-replace is the simplest guarantee. */
-const BRAND_NAME_REPLACEMENTS: Array<[RegExp, string]> = [
-  [/كوليكس/g, "Koleex"],
-  [/كوليكس جروب/g, "Koleex Group"],
-  [/مجموعة كوليكس/g, "Koleex Group"],
-  [/柯莱克斯/g, "Koleex"],
-  [/科莱克斯/g, "Koleex"],
-  [/كوليكس هاب/g, "Koleex Hub"],
-];
-function normaliseBrandName(text: string): string {
-  let out = text;
-  for (const [pattern, replacement] of BRAND_NAME_REPLACEMENTS) {
-    out = out.replace(pattern, replacement);
-  }
-  return out;
-}
-
-/* Classify which brand-knowledge section(s) a message needs.
-   Returns one of "none" | "company" | "ai" | "both". The orchestrator
-   injects only the relevant slice — loading both sections at once
-   exceeds Groq's request-size limit (413). AI-identity triggers win
-   over company triggers when both could match, since phrases like
-   "Koleex AI" are Section-2-specific. */
-export type BrandSection = "none" | "company" | "ai" | "both";
-
-function classifyBrandSection(msg: string): BrandSection {
-  const s = msg.trim().toLowerCase();
-  if (!s) return "none";
-
-  /* Regex-based matchers — tolerant to common typos, missing
-     punctuation, verb-tense variations, and word-order differences.
-     Rigid substring lists missed real user turns like "who create
-     you" (no 'd'), "whats ur name", etc. Each regex is tight to its
-     intent to avoid false positives on unrelated chat. */
-
-  /* AI-identity triggers — Section 2. */
-  const aiPatterns: RegExp[] = [
-    // The brand-AI product name (strongest signal for Section 2)
-    /\bkoleex\s+ai\b/i,
-
-    // "who are you" / "who r u" / "who you are"
-    /\bwho\s+(?:are|r|u|is)\s+(?:you|u)\b/i,
-    // "what are you" / "what r u" / "what kind of ai"
-    /\bwhat\s+(?:are|r)\s+(?:you|u)\b/i,
-    /\bwhat\s+kind\s+of\s+ai\b/i,
-    // "what can you do" / "what do you know" / "what you can do"
-    /\bwhat\s+(?:can|do)\s+you\s+(?:do|know)\b/i,
-    /\bwhat\s+you\s+can\s+do\b/i,
-
-    // Name questions — tolerate missing apostrophe, extra spaces
-    /\bwhat('?s| is| are)?\s+your\s+name\b/i,
-    /\byour\s+name\b/i,
-
-    // Who created/made/built you — present OR past tense (fixes "who create you")
-    /\bwho\s+(?:create[sd]?|made?|build[ts]?|built|design[esd]?|developed?|trained?)\s+(?:you|u)\b/i,
-
-    // "Are you a real person" / "are you human" / "are you real"
-    /\bare\s+you\s+(?:a\s+)?(?:real|human)(?:\s+person)?\b/i,
-    /\bare\s+you\s+real\b/i,
-
-    // Trust / reliability of answers
-    /\b(?:can\s+i\s+)?trust\s+your\s+(?:answer|reply|response)/i,
-
-    // Replace human support
-    /\breplace\s+humans?(?:\s+support)?\b/i,
-
-    // Data/order access
-    /\baccess\s+my\s+(?:data|order|orders|account|record)/i,
-    /\bsee\s+my\s+(?:order|orders|account|record)/i,
-
-    // Open "can I talk to you"
-    /\bcan\s+i\s+talk\s+to\s+you\b/i,
-
-    // Arabic
-    /\bما\s+اسمك\b/,
-    /\bما\s+هو\s+اسمك\b/,
-    /\bاسمك\b/,
-    /\bمن\s+(?:أنت|انت)\b/,
-    /\bمين\s+(?:أنت|انت)\b/,
-    /\bمن\s+(?:صنعك|طورك|بناك|أنشأك|انشأك)\b/,
-    /\bهل\s+(?:أنت|انت)\s+إنسان\b/,
-    /\bهل\s+(?:أنت|انت)\s+انسان\b/,
-
-    // Chinese
-    /你叫什么名字/,
-    /你的名字/,
-    /你是谁/,
-    /你是(?:真人|人类)吗/,
-    /你(?:能|可以)做什么/,
-  ];
-
-  /* Company-brand triggers — Section 1. Explicit brand / company
-     facts (history, mission, vision, CEO, founders, official brand
-     material). Word-boundary matching on "koleex" prevents stray
-     matches inside URLs or file paths. */
-  const companyPatterns: RegExp[] = [
-    // English
-    /\bkoleex\b/i,
-    /\bkoleex\s+(?:group|international|story|history)\b/i,
-    /\bcompany\s+history\b/i,
-    /\b(?:history|heritage|founded|founder|founders)\b/i,
-    /\bceo\b/i,
-    /\b(?:mission|vision|core\s+values)\b/i,
-    /\bvision\s+2035\b/i,
-    /\b(?:official\s+brand|brand\s+guidelines|brand\s+story)\b/i,
-    /\b(?:kas|eskn|nefertiti|shafei)\b/i,
-    /\bk-o-l-e-e-x\b/i,
-
-    // Where / when / what / who for the company
-    /\bwhere\s+is\s+koleex\b/i,
-    /\bwhere\s+(?:are|is)\s+you\s+based\b/i,
-    /\bheadquarters\b/i,
-    /\bwhen\s+(?:was|did)\s+koleex\b/i,
-    /\bwhat\s+(?:is|does|industries)\s+koleex\b/i,
-
-    // Arabic
-    /\bكوليكس\b/,
-    /\bشافعي\b/,
-    /\b(?:مؤسس|المؤسس)\b/,
-    /\bالرئيس\s+التنفيذي\b/,
-    /\bالمدير\s+التنفيذي\b/,
-    /\b(?:رؤية|مهمة|رسالة|القيم|تاريخ|تراث)\b/,
-
-    // Chinese
-    /柯莱克斯/,
-    /科莱克斯/,
-    /创始人/,
-    /首席执行官/,
-    /(?:愿景|使命|价值观|历史)/,
-  ];
-
-  const hitsAi = aiPatterns.some((re) => re.test(s));
-  const hitsCompany = companyPatterns.some((re) => re.test(s));
-
-  /* AI-identity wins when both match — e.g. "What is Koleex AI?"
-     matches both koleex-ai (ai) and koleex (company) but is
-     unambiguously a Section 2 question. */
-  if (hitsAi) return "ai";
-  if (hitsCompany) return "company";
-  return "none";
-}
-
-/** Thin shim kept for callers that only need a bool. */
-function isBrandQuestion(msg: string): boolean {
-  return classifyBrandSection(msg) !== "none";
-}
-
-/* ─── Phase 7 exports for route-level streaming ───────────────────
-   The /api/ai/agent streaming branch wants to attempt real token
-   streaming for brand + small-talk questions (the majority of turns
-   in production), because those paths only make a single Groq call.
-   Tool-loop turns still fall through to orchestrate() + pseudo-stream.
-
-   We export the detectors + prompt builders + the canned fast-reply
-   table so the route can replicate the fast-path decision without
-   re-implementing any logic here. If this list grows, collapse into
-   a single exported `detectFastPath(msg)` helper. */
-export {
-  classifyBrandSection,
-  isSmallTalk,
-  tryFastReply,
-  isBusinessDataQuery,
-  isWorkDataQuery,
-  isLiveInfoQuery,
-};
-
-/* ─── Phase 10: business-data detector ────────────────────────────
-   Returns true when the question clearly needs Koleex data (the
-   orchestrator's tool loop). Returns false when the question is
-   general — definitions, translations, explanations, history,
-   math, advice, "what's the capital of X", etc. The route uses
-   this to bypass the heavy business-agent prompt for general
-   questions, so the AI answers ANY question instead of trying to
-   route everything through the tool layer.
-
-   Intentionally conservative: when uncertain, return false so the
-   query goes to the open-assistant lane. If a general-looking query
-   actually needs data, the open-assistant prompt will naturally
-   fall back to "I don't have access to that — try opening the X
-   app" which is the right UX. The reverse (routing a general
-   question through the tool loop) is what users are complaining
-   about right now. */
-function isBusinessDataQuery(msg: string): boolean {
-  const s = (msg ?? "").toLowerCase();
-  if (!s) return false;
-
-  /* Explicit possessives + business nouns: "my customers",
-     "our products", "the invoice", "this quotation". */
-  if (
-    /\b(my|our|the|this|that|these|those)\s+(customer|client|buyer|product|item|inventory|stock|invoice|bill|receipt|quotation|quote|order|po|purchase\s*order|supplier|vendor|catalog|sales)s?\b/.test(
-      s,
-    )
-  )
-    return true;
-
-  /* Imperatives: "list / show / find / search / look up / get" +
-     business noun. Not triggered by "list the benefits of X" etc.
-     because those go to generic nouns. */
-  if (
-    /\b(list|show|display|find|search|look\s*up|get|pull|fetch|retrieve)\s+(all\s+|my\s+|our\s+|the\s+)?(customer|client|buyer|product|item|inventory|stock|invoice|bill|receipt|quotation|quote|order|po|supplier|vendor|catalog|contact)s?\b/.test(
-      s,
-    )
-  )
-    return true;
-
-  /* Commercial action verbs: create / draft / prepare a quotation,
-     invoice, order, RFQ, etc. */
-  if (
-    /\b(create|draft|prepare|generate|make|issue|send|build|raise)\s+(an?\s+|the\s+|a\s+new\s+)?(quotation|quote|invoice|bill|order|po|purchase\s*order|rfq|proposal|offer)\b/.test(
-      s,
-    )
-  )
-    return true;
-
-  /* Count queries over business data: "how many products",
-     "how many customers". Excludes general counts like "how many
-     languages" or "how many planets". */
-  if (
-    /\bhow\s+many\s+(product|item|customer|client|buyer|invoice|quotation|quote|order|supplier|vendor|stock|sale)s?\b/.test(
-      s,
-    )
-  )
-    return true;
-
-  /* Specific-entity lookups: "customer ABC Corp", "product SKU-123",
-     "invoice #42", etc. */
-  if (
-    /\b(customer|client|product|invoice|quotation|order)\s+(?:code\s+|number\s+|id\s+|#|no\.?\s*)?[a-z0-9-]{2,}/i.test(
-      msg,
-    )
-  )
-    return true;
-
-  /* Price / cost / margin / discount OF a specific product or
-     customer. "what's the price of product X" → business.
-     "what's the price of happiness" → NOT business. */
-  if (
-    /\b(price|cost|margin|commission|discount|markup|profit)\s+(for|of)\s+(product|item|customer|client|sku|model)\b/.test(
-      s,
-    )
-  )
-    return true;
-
-  /* Koleex-specific data prefixes. */
-  if (/\bkoleex\s+(product|customer|invoice|quotation|order|inventory|sales|data)/.test(s))
-    return true;
-
-  /* Machine-catalog questions → tool loop (searchCatalog /
-     listCatalogFamilies). A Koleex model code alone is a strong
-     signal ("tell me about XSL-8000A4"); so is any mention of the
-     catalog or a machine-family + machine/model pairing. */
-  if (/\bX(?:F|CC?|SL|SO|SI|SS|SE|SH|SU|A|PL?|PS|R)-[A-Z0-9]/i.test(msg)) return true;
-  if (/\b(catalog|catalogue)\b/.test(s)) return true;
-  if (
-    /\b(overlock|lockstitch|interlock|coverstitch|bartack\w*|buttonhol\w*|zigzag|spreading|fusing|blind\s*stitch|multi-?needle|heat\s*press|embroidery|cutting|hemming|inspection|relaxing|shrinking|sewing)\s+(machine|machines|model|models|series|unit|units)\b/.test(
-      s,
-    )
-  )
-    return true;
-  if (/الكتالوج|كتالوج|موديلات|ماكينات|ماكينة/.test(msg)) return true;
-  if (/目录|型号|机器|机型/.test(msg)) return true;
-
-  /* Arabic business terms. */
-  if (
-    /عملاء|عميل|زبون|زبائن|منتج|منتجات|مخزون|فاتورة|فواتير|عرض\s*سعر|عروض\s*أسعار|طلب|طلبات|مورد|موردين/.test(
-      msg,
-    )
-  )
-    return true;
-
-  /* Chinese business terms. */
-  if (/客户|产品|库存|发票|报价|订单|供应商/.test(msg)) return true;
-
-  return false;
-}
-
-/* ─── Work / schedule data detector ───────────────────────────────
-   Returns true when the question is about the user's OWN work data —
-   To-do / Projects / Planning / Calendar. These MUST reach the
-   tool-calling orchestrator (listMyTodos / listMyProjects /
-   listProjectTasks / listMyPlanning / listMyCalendar). The general
-   fast-path has NO tools, so any of these slipping through it makes
-   the model deflect ("check the app / please log in") instead of
-   reading the user's real tasks — exactly the bug users reported.
-
-   isBusinessDataQuery() deliberately does NOT cover these modules, so
-   the route checks BOTH: a query that is business OR work data bypasses
-   the tool-less fast-path.
-
-   Guarded to personal / temporal / status framing so pure general
-   chat ("explain agile project management", "what is a good meeting
-   agenda") stays on the fast lane. */
-function isWorkDataQuery(msg: string): boolean {
-  const s = (msg ?? "").toLowerCase();
-  if (!s) return false;
-
-  /* A work-module noun … */
-  const workNoun =
-    /\b(task|tasks|to-?do|to-?dos|todo|todos|assignment|assignments|project|projects|schedule|shift|shifts|calendar|meeting|meetings|event|events|appointment|appointments|deadline|deadlines|reminder|reminders|planning|agenda)\b/;
-  /* … combined with personal / temporal / status framing. */
-  const framing =
-    /\b(my|our|mine|assigned\s+to\s+me|assigned|today|tonight|tomorrow|this\s+(week|month)|next\s+(week|month)|due|overdue|upcoming|pending|open|do\s+i|does\s+i|i\s+have|have\s+any|remind\s+me)\b/;
-  if (workNoun.test(s) && framing.test(s)) return true;
-
-  /* Direct phrasings that don't need the noun+framing combo. */
-  if (/\bwhat('?s| is| are|'re)?\s+(due|on\s+my\s+(plate|calendar|schedule|agenda|list)|assigned\s+to\s+me|coming\s+up)\b/.test(s)) return true;
-  if (/\bwhat\s+am\s+i\s+(working\s+on|planned\s+for|doing\s+(today|this\s+week))\b/.test(s)) return true;
-  if (/\bremind\s+me\s+to\b/.test(s)) return true;
-  if (/\b(add|create)\s+(a\s+)?(task|to-?do|reminder|shift|event)\b/.test(s)) return true;
-
-  /* WRITE intents: a work-action verb + a work noun is work data even
-     WITHOUT personal/temporal framing — "set a meeting", "book a meeting
-     with the supplier", "cancel the meeting", "mark the task done". The
-     owner's live failure ("set a meeting for me in calendar" → "I can't
-     access your calendar") slipped this gate: "for me" isn't in the
-     framing list and the add|create rule above only knows task-ish nouns.
-     A false positive costs one tool-loop turn; a false negative is a
-     refusal or a hallucinated write. */
-  const writeVerb =
-    /\b(set(\s+up)?|schedule|book|arrange|plan|make|create|add|cancel|delete|remove|move|reschedule|postpone|push\s+back|complete|finish|mark|close|reopen|assign|reassign|transfer|update|change|rename|edit)\b/;
-  if (writeVerb.test(s) && workNoun.test(s)) return true;
-
-  /* Arabic: مهام/مهمة/جدول/مواعيد/اجتماع/تذكير/مشروع/أعمالي. */
-  if (/مهام|مهمة|مهامي|المهام|جدول|جدولي|مواعيد|موعد|اجتماع|اجتماعات|ميتنج|ميتينج|تذكير|ذكرني|فكرني|مشروع|مشاريع|أعمالي|اعمالي|شغلي/.test(msg)) return true;
-
-  /* Chinese: 任务/日程/日历/会议/提醒/待办/项目/安排. */
-  if (/任务|日程|日历|会议|提醒|待办|项目|安排/.test(msg)) return true;
-
-  return false;
-}
-
-/* ─── Live-information detector ───────────────────────────────────
-   Questions whose honest answer depends on the world TODAY, not on what
-   the model absorbed during training: weather, news, rates, prices of
-   public commodities, "latest"/"current"/"right now" framings.
-
-   These have to bypass the tool-less fast paths, or the model produces
-   the exact failure the owner screenshotted — a polite apology for
-   having no live access, while search_web sits one layer below it.
-
-   Deliberately keyword-driven and conservative in the same style as the
-   detectors above: a false positive only costs one extra tool-loop turn,
-   while a false negative is a wrong answer. Covers en / ar / zh because
-   all three are in daily use here. */
-/* Memory/teaching intents must never take a tool-less lane — the model
-   would hallucinate "saved ✓" (observed). Mirrors the agent-route guard. */
-export function isMemoryIntentQuery(msg: string): boolean {
-  return (
-    /\b(remember|memoriz|save (this|that|it|for)|note (this|that) down|add (this|to) .*knowledge|knowledge base|don'?t forget)\b/i.test(msg) ||
-    /احفظ|تذكّ?ر|لا تنسى?|أضف .*للمعرفة|سجّ?ل (هذه|هذا|ذلك)/.test(msg) ||
-    /记住|保存|别忘|加入知识库/.test(msg)
-  );
-}
-
-function isLiveInfoQuery(msg: string): boolean {
-  const s = (msg ?? "").toLowerCase();
-  if (!s) return false;
-
-  /* Subjects that are almost always time-sensitive. */
-  if (/\b(weather|forecast|temperature|humidity|rain|raining|snow|storm|wind)\b/.test(s)) return true;
-  if (/\b(news|headlines|happening|breaking)\b/.test(s)) return true;
-  if (/\b(exchange\s+rate|currency\s+rate|usd\s+to\s+|eur\s+to\s+|rmb|cny|forex|stock\s+price|share\s+price)\b/.test(s)) return true;
-  if (/\b(flight|flights)\s+(status|delay|delayed)\b/.test(s)) return true;
-  if (/\b(freight|shipping)\s+(rate|rates|cost)\b/.test(s)) return true;
-
-  /* Explicit requests to go and look. */
-  if (/\b(search|google|look\s+up|check\s+online|on\s+the\s+(web|internet))\b/.test(s)) return true;
-
-  /* "current / latest / today's X" framings. */
-  if (/\b(current|latest|today'?s|right\s+now|as\s+of\s+today|this\s+week'?s)\b/.test(s)) return true;
-
-  /* Arabic */
-  if (/الطقس|الجو|درجة\s*الحرارة|الأخبار|اخبار|سعر\s*الصرف|سعر\s*الدولار|آخر\s*الأخبار|ابحث\s*في\s*النت|ابحث\s*على\s*النت/.test(msg)) return true;
-  /* Chinese */
-  if (/天气|气温|新闻|汇率|股价|最新|搜索一下|查一下/.test(msg)) return true;
-
-  return false;
-}
-
-export async function orchestrate(input: OrchestrateInput): Promise<AgentResponse> {
+export async function orchestrate(input: TurnInput): Promise<AgentResponse> {
   const tStart = Date.now();
   const {
-    ctx, history, userMessage, userLang, dialect, conversationId, onDelta,
+    ctx, history, userMessage, userLang, dialect, conversationId, onDelta, onStep,
     webSearchRequested = false, languageLock = "", taughtAnswers = "",
   } = input;
-  const key = process.env.DEEPSEEK_API_KEY;
+  /* True when a user-uploaded document's extracted text is in play — this
+     turn or retained history. Gates the recital exemption in
+     sealFinalReply(). */
+  /* AUDIT ISSUE 5 (P0) — scope narrowed to THIS TURN.
+
+     The recital exemption exists for a real reason: an invoice summary trips
+     every pricing pattern by nature, and v3 reads its "Total:" lines as
+     ungrounded field claims. But the old condition also scanned RETAINED
+     HISTORY — so one attachment anywhere in the 60-message window switched
+     the field-grounding and pricing seals OFF for every subsequent turn in
+     that conversation, long after the document stopped being the subject.
+
+     That is the widest blast radius in the seal chain, and it compounds with
+     document injection: text inside an uploaded file is untrusted, and the
+     turn that carries it was also the turn with the fewest guards.
+
+     A document being recited is a property of the CURRENT turn. If the user
+     asks about it again, they attach it again or it is in this message. */
+  const attachedDocCtx = hasUntrustedContent(userMessage);
+  /* Phase 3C: ask the registry rather than the environment. With a single
+     adapter this is the same boolean it always was — Boolean(DEEPSEEK_API_KEY)
+     — but the question the loop asks is now "is a provider available?", which
+     is the one it actually means. */
+  const providerReady = providerConfigured();
+  /* Phase 2F — the tools this caller may actually run, resolved ONCE per turn
+     and handed to every model call in it. Two reasons this is not "all tools":
+     a Sales user offered 45 schemas will try the ones they cannot use and
+     burn a turn being denied, and the schemas are most of the request body.
+     dispatchTool still re-checks — a model can name a tool it was not given. */
+  const tools = koleexHub.toolSchemas(input.ctx);
 
   /* Graceful Groq-missing fallback. The orchestrator's tool-calling
      features genuinely need Groq's OpenAI-style tool schema (and the
@@ -580,15 +193,17 @@ export async function orchestrate(input: OrchestrateInput): Promise<AgentRespons
      language answer; they just won't read live data. The reply also
      includes a one-line note so the operator knows tools are off
      until Groq is wired up. */
-  if (!key) {
+  if (!providerReady) {
     if (!aiProviderConfigured()) {
+      /* User-facing copy: no vendor names (AI_PROVENANCE_RULE applies to
+         our own strings too — any signed-in employee can see this). */
       return fallback(
-        "Koleex AI isn't configured. Ask an admin to add an AI provider key (DeepSeek, Groq, Gemini, Anthropic, or OpenAI) in the Vercel env vars.",
+        "Koleex AI isn't configured yet. Ask an administrator to complete the AI setup in the deployment settings.",
         conversationId,
         userMessage,
       );
     }
-    return orchestrateNoGroq(input, tStart);
+    return runDegradedTurn(input, tStart);
   }
 
   /* Canned fast-reply — narrow EN/AR/ZH exact-match triggers for
@@ -603,9 +218,8 @@ export async function orchestrate(input: OrchestrateInput): Promise<AgentRespons
     const cannedSteps: AgentStep[] = [
       { kind: "answer", text: fastReply, permissionStatus: "allowed" },
     ];
-    console.warn("[ai.agent.final.before]", fastReply);
-    const safeReply = sealFinalReply(fastReply, cannedSteps, userMessage);
-    console.warn("[ai.agent.final.after]", safeReply);
+    const safeReply = sealFinalReply(fastReply, cannedSteps, userMessage, attachedDocCtx);
+    logSealTransform(fastReply, safeReply, "canned");
     return {
       steps: cannedSteps,
       finalReply: safeReply,
@@ -635,6 +249,8 @@ export async function orchestrate(input: OrchestrateInput): Promise<AgentRespons
        having no live access — with search_web sitting one layer away. */
     webSearchRequested ||
     isLiveInfoQuery(userMessage) ||
+    /* A picture to MAKE needs generate_image, which only the tool loop has. */
+    isImageCreationRequest(userMessage) ||
     isMemoryIntentQuery(userMessage);
   const brandSection = isDataQuery ? "none" : classifyBrandSection(userMessage);
   const isBrand = brandSection !== "none";
@@ -654,6 +270,7 @@ export async function orchestrate(input: OrchestrateInput): Promise<AgentRespons
           userLang,
           brandSection as "company" | "ai" | "both",
           dialect,
+          userMessage,
         )
       : useFastPath && isSmall
         ? buildMinimalSystemPrompt(ctx, userLang, dialect)
@@ -683,10 +300,25 @@ export async function orchestrate(input: OrchestrateInput): Promise<AgentRespons
   /* Brand fast-path: the approved knowledge is self-contained and
      brand questions are rarely multi-turn, so history just burns
      payload bytes and risks another 413. Drop history entirely on
-     this path. Other paths keep the full sanitised history. */
-  const effectiveHistory = isBrand ? [] : sanitisedHistory;
+     the COMPANY path. Other paths keep the full sanitised history.
 
-  const messages: WireMsg[] = [
+     IDENTITY TURNS KEEP A CLIPPED TAIL. "Never repeat an identity answer
+     word for word in one conversation" was an instruction the model could
+     not follow with no history in front of it — and it repeated, every
+     time. The last few turns, each cut short, are enough to know what was
+     already said and cost a few hundred bytes, not the 413 the full thread
+     risked. */
+  const isIdentityTurn = brandSection === "ai" || brandSection === "both";
+  const effectiveHistory = isBrand
+    ? isIdentityTurn
+      ? sanitisedHistory.slice(-IDENTITY_HISTORY_TURNS).map((m) => ({
+          ...m,
+          content: (m.content ?? "").slice(0, IDENTITY_HISTORY_CHARS),
+        }))
+      : []
+    : sanitisedHistory;
+
+  const messages: OpenAiMessage[] = [
     { role: "system", content: systemPrompt },
     ...effectiveHistory.map((m) => ({ role: m.role, content: m.content })),
     { role: "user", content: userMessage },
@@ -712,31 +344,47 @@ export async function orchestrate(input: OrchestrateInput): Promise<AgentRespons
        ~200 words); small-talk is one or two sentences. Size the
        token budget accordingly so brand answers complete instead of
        truncating. */
-    const res = await callGroqPlain(key, messages, {
+    const out = await chatWithTools({
+      messages: fromOpenAiMessages(messages),
       maxTokens: isBrand ? 1200 : 160,
+      /* WARMER FOR IDENTITY. At 0.3 the same prompt yields the same
+         paragraph; the facts are pinned by the prompt and checked by the
+         seal, so the words can afford to move. Everything else keeps 0.3. */
+      temperature: isIdentityTurn ? 0.85 : 0.3,
+      /* Phase 4E. A greeting must not pay reasoning-model latency — the plan's
+         primary speed lever. Advisory: with no AI_MODEL_CLASSES entry every
+         class resolves to the adapter's default, which is today's behaviour. */
+      modelClass: isBrand ? "GENERAL" : "FAST",
     });
     const tPost = Date.now();
-    if (res.ok) {
-      const json = (await res.json()) as {
-        choices?: Array<{ message?: { content?: string } }>;
-      };
-      const rawReply = (json.choices?.[0]?.message?.content ?? "").trim();
+    recordUsage({
+      tenantId: ctx.auth.tenant_id ?? null,
+      accountId: ctx.auth.account_id ?? null,
+      lane: isBrand ? "brand" : "fast",
+      provider: out.servedBy ?? "none",
+      model: out.model ?? "unknown",
+      inputTokens: out.ok ? (out.response.usage?.inputTokens ?? null) : null,
+      outputTokens: out.ok ? (out.response.usage?.outputTokens ?? null) : null,
+      ms: out.ms ?? tPost - tPre,
+      traceId: conversationId,
+    });
+    if (out.ok) {
+      const rawReply = out.response.content.trim();
       /* Strip any leaked tool-call markers BEFORE brand-name
          normalisation so we never ship raw <function=…> syntax to
          the user even on the fast path. */
       const reply = normaliseBrandName(cleanAssistantText(rawReply));
       if (reply) {
         steps.push({ kind: "answer", text: reply, permissionStatus: "allowed" });
-        console.warn("[ai.agent.final.before]", reply);
-        const safeReply = sealFinalReply(reply, steps, userMessage);
-        console.warn("[ai.agent.final.after]", safeReply);
+        const safeReply = sealFinalReply(reply, steps, userMessage, attachedDocCtx);
+        logSealTransform(reply, safeReply, "brand-fast");
         console.log(
           `[ai.agent.timing] fast=${isBrand ? "brand" : "small"} provider=${tPost - tPre}ms total=${Date.now() - tStart}ms`,
         );
         return {
           steps,
           finalReply: safeReply,
-          provider: `deepseek:${AGENT_MODEL}`,
+          provider: servedLabel(out),
           conversationId,
         };
       }
@@ -744,50 +392,117 @@ export async function orchestrate(input: OrchestrateInput): Promise<AgentRespons
     /* Fall through to the full agent loop on any failure. */
   }
 
+  const wantsChoiceCard = isChoiceShapedQuestion(userMessage);
+  /* Attempts, not a boolean: the provider does not always honour a named
+     tool_choice on the first request — measured, it answered with another
+     lookup and only called askUser on the next pass. Two attempts absorbs
+     that without ever becoming a loop. */
+  /* Phase 5B — declared at TURN scope, not per round, because the label it
+     feeds is read after the loop has finished. It records the LAST model call
+     of the turn, which is the one that produced the answer being returned.
+     Everything here used to call activeProviderLabel(), which names the first
+     CONFIGURED adapter and is therefore wrong on any turn that failed over —
+     and that label is what the audit trail stores. */
+  let turnMeta: TurnMeta = {};
+  let forcedAsk = 0;
+  /* Set when a choice-shaped turn came back as PROSE with no tool calls at
+     all. Measured on prod: the model answered "which spreading machine should
+     I choose?" with four numbered questions and never touched a tool, so the
+     force below — which waited for a lookup — never got its turn. Nothing had
+     streamed yet at that point, so the reply can be thrown away and re-asked. */
+  let proseRefused = false;
+
+  /* TRADE TERMS — force the lookup on the FIRST request of the turn.
+
+     Same lesson as the choice card above, arrived at the same way. The
+     system prompt tells the model to always call searchTradeTerms for
+     Incoterms and payment-term questions. Measured against the live model:
+     it obeyed for "What does CIF mean?" and for the Arabic payment-terms
+     question, then answered "explain a transferable letter of credit"
+     straight from memory with no tool call at all. A rule the model follows
+     only sometimes is not a rule, and "sometimes sourced" is the one
+     outcome this knowledge base exists to prevent — the whole point is that
+     the answer comes from ICC's own text rather than from whatever the
+     model absorbed, which still carries the "ship's rail" error deleted
+     from the rules in 2010.
+
+     Narrow and cheap: it fires only on a trade-terms question, only on the
+     first request (totalToolRuns === 0), and only once (forcedTrade), so a
+     turn that also needs a customer or pricing lookup is free to make it
+     immediately afterwards. */
+  const wantsTradeTerms = isTradeTermQuestion(userMessage);
+  let forcedTrade = false;
+
   for (let iter = 0; iter < MAX_ITERATIONS; iter++) {
     /* After the per-turn tool budget is spent, disable tools so the
        model can only produce a final answer. */
-    const toolChoice: "auto" | "none" = totalToolRuns >= MAX_TOOLS_PER_TURN ? "none" : "auto";
+    /* Force the card on choice-shaped turns once the lookups are done —
+       the model has candidates in hand and would otherwise write prose.
+       See CHOICE_OPENER. `forcedAsk` makes it strictly once per turn. */
+    const forceAskNow =
+      wantsChoiceCard &&
+      forcedAsk < 2 &&
+      (totalToolRuns > 0 || proseRefused) &&
+      totalToolRuns < MAX_TOOLS_PER_TURN;
+    if (forceAskNow) forcedAsk += 1;
+    /* Trade-terms lookup on the first request — see wantsTradeTerms. */
+    const forceTradeNow = wantsTradeTerms && !forcedTrade && totalToolRuns === 0;
+    if (forceTradeNow) forcedTrade = true;
+    const toolChoice: OpenAiToolChoice =
+      totalToolRuns >= MAX_TOOLS_PER_TURN
+        ? "none"
+        : forceAskNow
+          ? { type: "function", function: { name: "askUser" } }
+          : forceTradeNow
+            ? { type: "function", function: { name: "searchTradeTerms" } }
+            : "auto";
     /* REAL answer streaming (perf fix 2026-08-03): once tools have run,
        the next call is (almost always) the final answer — stream it so
        the user reads while it generates instead of waiting ~8-12s for
        the whole completion. The first (tool-deciding) call stays
        non-streamed: it emits only compact tool_calls JSON. */
     let choice:
-      | { role?: string; content: string | null; tool_calls?: WireMsg["tool_calls"] }
+      | { role?: string; content: string | null; tool_calls?: OpenAiMessage["tool_calls"] }
       | undefined;
     let callFailedStatus = 0;
     let callFailedBody = "";
     const liveEmit = totalToolRuns > 0 ? onDelta : undefined;
-    if (liveEmit) {
-      const sres = await callGroqStreamingOnce(key, messages, { toolChoice, onDelta: liveEmit });
-      if (!sres.ok) {
-        callFailedStatus = sres.status || 500;
-        callFailedBody = sres.bodyText;
+    {
+      /* One call, streaming or not. The truncated-body case that used to be
+         caught here is now the adapter's — it still comes back as a FAILED
+         call (502) rather than an exception, which is what keeps the rescue
+         path in charge instead of a raw 500. */
+      const out = await chatWithTools(
+        {
+          messages: fromOpenAiMessages(messages),
+          tools: fromOpenAiTools(tools as unknown as OpenAiTool[]),
+          toolChoice: fromOpenAiToolChoice(toolChoice),
+          maxTokens: 2048,
+          temperature: 0.3,
+          /* The tool loop is the multi-step, evidence-gathering path — the one
+             turn where a slower, stronger model is worth its latency. */
+          modelClass: "REASONING",
+          stream: Boolean(liveEmit),
+        },
+        liveEmit ? { onDelta: liveEmit } : undefined,
+      );
+      turnMeta = { servedBy: out.servedBy, model: out.model, ms: out.ms, failedOver: out.failedOver };
+      recordUsage({
+        tenantId: ctx.auth.tenant_id ?? null,
+        accountId: ctx.auth.account_id ?? null,
+        lane: "agent",
+        provider: out.servedBy ?? "none",
+        model: out.model ?? "unknown",
+        inputTokens: out.ok ? (out.response.usage?.inputTokens ?? null) : null,
+        outputTokens: out.ok ? (out.response.usage?.outputTokens ?? null) : null,
+        ms: out.ms ?? 0,
+        traceId: conversationId,
+      });
+      if (!out.ok) {
+        callFailedStatus = out.status || 500;
+        callFailedBody = out.bodyText;
       } else {
-        choice = {
-          role: "assistant",
-          content: sres.content,
-          tool_calls: sres.toolCalls.length > 0 ? (sres.toolCalls as WireMsg["tool_calls"]) : undefined,
-        };
-      }
-    } else {
-      const res = await callGroqWithRetry(key, messages, { toolChoice });
-      if (!res.ok) {
-        callFailedStatus = res.status;
-        callFailedBody = await res.text().catch(() => "");
-      } else {
-        const json = (await res.json()) as {
-          choices?: Array<{
-            message?: {
-              role: string;
-              content: string | null;
-              tool_calls?: WireMsg["tool_calls"];
-            };
-            finish_reason?: string;
-          }>;
-        };
-        choice = json.choices?.[0]?.message;
+        choice = toChoice(out.response);
       }
     }
 
@@ -802,13 +517,12 @@ export async function orchestrate(input: OrchestrateInput): Promise<AgentRespons
       const rescued = rescueFromToolResults(steps);
       if (rescued) {
         steps.push({ kind: "answer", text: rescued, permissionStatus: "allowed" });
-        console.warn("[ai.agent.final.before]", rescued);
-        const safeReply = sealFinalReply(rescued, steps, userMessage);
-        console.warn("[ai.agent.final.after]", safeReply);
+        const safeReply = sealFinalReply(rescued, steps, userMessage, attachedDocCtx);
+        logSealTransform(rescued, safeReply, "rescue-after-call-failure");
         return {
           steps,
           finalReply: safeReply,
-          provider: `deepseek:${AGENT_MODEL}`,
+          provider: servedLabel(turnMeta),
           conversationId,
         };
       }
@@ -822,13 +536,12 @@ export async function orchestrate(input: OrchestrateInput): Promise<AgentRespons
         ? "Koleex AI is handling a lot of requests right now. Give it a moment and try again."
         : "I couldn't complete that request. Please try again.";
       steps.push({ kind: "answer", text: msg, permissionStatus: "denied" });
-      console.warn("[ai.agent.final.before]", msg);
-      const safeReply = sealFinalReply(msg, steps, userMessage);
-      console.warn("[ai.agent.final.after]", safeReply);
+      const safeReply = sealFinalReply(msg, steps, userMessage, attachedDocCtx);
+      logSealTransform(msg, safeReply, "call-failed");
       return {
         steps,
         finalReply: safeReply,
-        provider: `deepseek:${AGENT_MODEL}`,
+        provider: servedLabel(turnMeta),
         conversationId,
       };
     }
@@ -839,13 +552,12 @@ export async function orchestrate(input: OrchestrateInput): Promise<AgentRespons
       const rescued = rescueFromToolResults(steps);
       if (rescued) {
         steps.push({ kind: "answer", text: rescued, permissionStatus: "allowed" });
-        console.warn("[ai.agent.final.before]", rescued);
-        const safeReply = sealFinalReply(rescued, steps, userMessage);
-        console.warn("[ai.agent.final.after]", safeReply);
+        const safeReply = sealFinalReply(rescued, steps, userMessage, attachedDocCtx);
+        logSealTransform(rescued, safeReply, "rescue-no-choice");
         return {
           steps,
           finalReply: safeReply,
-          provider: `deepseek:${AGENT_MODEL}`,
+          provider: servedLabel(turnMeta),
           conversationId,
         };
       }
@@ -872,6 +584,17 @@ export async function orchestrate(input: OrchestrateInput): Promise<AgentRespons
          text over GENERIC_FOLLOWUP, so a valid search/lookup answer
          isn't replaced with "Could you share a bit more so I can
          help?" just because the summariser returned nothing. */
+      /* CHOICE-SHAPED TURN THAT ANSWERED IN PROSE — reject it and ask again
+         with askUser named. Only while NOTHING has been streamed yet
+         (totalToolRuns === 0 means liveEmit was never armed), so we are
+         discarding a reply the user has not seen, not retracting one they
+         have. The messages array is left untouched: the very same request
+         goes back out, differing only in tool_choice. Bounded by forcedAsk. */
+      if (wantsChoiceCard && forcedAsk < 2 && totalToolRuns === 0) {
+        proseRefused = true;
+        continue;
+      }
+
       const cleaned = cleanAssistantText(content);
       const attempted = normaliseBrandName(cleaned);
       finalReply =
@@ -959,6 +682,14 @@ export async function orchestrate(input: OrchestrateInput): Promise<AgentRespons
           text: humaniseCall(tc.function.name, parsedArgs),
           payload: parsedArgs,
         });
+        /* Announced NOW, before the tool runs: this is what lets the screen
+           show what is being looked up during the seconds it takes. A copy,
+           so a listener cannot reach into the loop's own list. */
+        try {
+          onStep?.(steps.slice());
+        } catch {
+          /* A listener that throws must not take the turn down. */
+        }
 
         /* Serve cached result when the model asks for the same thing
            twice in one turn. Counts against MAX_TOOLS_PER_TURN but
@@ -984,7 +715,7 @@ export async function orchestrate(input: OrchestrateInput): Promise<AgentRespons
         }
 
         totalToolRuns++;
-        const result = await dispatchTool(ctx, tc.function.name, parsedArgs, {
+        const result = await koleexHub.invoke(ctx, tc.function.name, parsedArgs, {
           conversationId,
         });
         toolCache.set(cacheKey, { result: result.data, cached: false });
@@ -1036,6 +767,27 @@ export async function orchestrate(input: OrchestrateInput): Promise<AgentRespons
        means the model will see the guard message via the tool-role
        feed and rephrase it as a natural question to the user on the
        next iteration. */
+    /* A CLARIFYING QUESTION ENDS THE TURN. Without this the model would ask
+       and then answer itself on the next iteration, which is the exact
+       behaviour the tool exists to replace. The question becomes the reply;
+       the options ride along as a step the UI renders as buttons, and the
+       user's pick arrives as an ordinary next message. */
+    const asked = toolRuns.find(
+      (r) => r.tc.function.name === "askUser" && r.result.ok && r.result.data,
+    );
+    if (asked) {
+      const payload = asked.result.data as { question: string; options: unknown[] };
+      steps.push({
+        kind: "question",
+        text: payload.question,
+        tool: "askUser",
+        payload,
+        permissionStatus: "allowed",
+      });
+      finalReply = payload.question;
+      break;
+    }
+
     const toolExecutions = toolRuns.filter(
       (r) => !(r as { guarded?: boolean }).guarded,
     );
@@ -1079,1803 +831,14 @@ export async function orchestrate(input: OrchestrateInput): Promise<AgentRespons
      funnels through sealFinalReply so no path can leak an unsealed
      reply to the route handler (which persists finalReply into
      ai_messages.content → the bubble the user sees). */
-  console.warn("[ai.agent.final.before]", finalReply);
-  const safeReply = sealFinalReply(finalReply, steps, userMessage);
-  console.warn("[ai.agent.final.after]", safeReply);
+  const safeReply = sealFinalReply(finalReply, steps, userMessage, attachedDocCtx);
+  logSealTransform(finalReply, safeReply, "main");
 
   return {
     steps,
     finalReply: safeReply,
-    provider: `deepseek:${AGENT_MODEL}`,
+    provider: servedLabel(turnMeta),
     conversationId,
   };
 }
 
-/* ─── Helpers ─────────────────────────────────────────── */
-
-/** Minimal system prompt for small-talk that escaped the canned
- *  fast-reply table (e.g. "hey Koleex", "hi there Koleex AI"). Skips
- *  the tool-routing instructions + brand-knowledge block so the
- *  Groq request stays tiny and fast. Language mirror is kept — it's
- *  the only rule that matters for small-talk. */
-/* ─────────────────────────────────────────────────────────────────────
-   WHO THE AGENT IS TALKING TO.
-
-   Shared by EVERY prompt builder. The first version lived only in the full
-   prompt, so a short question — "do you know who I am?" — took the fast
-   path, hit the minimal prompt, and still answered "I don't have access to
-   your identity". The identity has to be present on every path or it is
-   present on none of the ones users actually hit.
-
-   Naming the SIGNED-IN user is not a disclosure: it is the one identity
-   they already own. Other people and company data stay behind the
-   permission layer, unchanged.
-   ───────────────────────────────────────────────────────────────────── */
-function viewerBlockFor(ctx: UserContext): string {
-  const v = ctx.viewer;
-  const memoryLines = Object.entries(ctx.memory);
-  return `
-Who you are talking to (from their signed-in session — you DO know this):
-- Name: ${v.name || v.username}
-- Username: ${v.username}
-- Role: ${v.role || "not set"}${v.isSuperAdmin ? " (super admin)" : ""}
-- Department: ${v.department || "not set"}
-Use their name naturally when it helps. Never say you don't know who they are.
-${memoryLines.length
-    ? `\nThings they asked you to remember:\n${memoryLines.map(([k, val]) => `- ${k}: ${val}`).join("\n")}`
-    : ""}
-Anything personal NOT listed above (birthday, preferences, family, plans) you genuinely
-do not know. Don't guess and don't invent it — ASK them, in one short question. When they
-answer, call remember_about_user to save it so you still know it next time. Facts about
-OTHER people and company data stay governed by their permissions — this changes nothing there.
-`;
-}
-
-export function buildMinimalSystemPrompt(
-  ctx: UserContext,
-  userLang: "en" | "zh" | "ar",
-  dialect?: "egyptian" | null,
-): string {
-  const uiLangHint =
-    userLang === "zh" ? "Chinese (Simplified)" :
-    userLang === "ar" ? "Arabic" :
-    "English";
-  return `You are Koleex AI, a friendly general-purpose assistant inside Koleex Hub.
-
-${viewerBlockFor(ctx)}
-
-Reply in the same language the user wrote in. If the message is too short to tell (e.g. "ok"), fall back to ${uiLangHint}.
-
-Style:
-- Be warm and personable. Match the user's tone.
-- Give substantive answers. For questions, a couple of paragraphs or a short list is usually right — explain context, give examples, anticipate follow-up. For small talk, a few natural sentences that invite more conversation work well.
-- Don't pad for length, but don't clip to one sentence either. Treat each question as worth a real answer.
-
-${BRAND_EXCLUSIVITY_RULE}
-
-${DIRECT_VOICE_RULE}
-
-${DATA_PROTECTION_RULE}
-${dialect === "egyptian" ? `\n${EGYPTIAN_DIALECT_RULE}\n` : ""}
-Current user: ${ctx.auth.username}.`;
-}
-
-/** Lean prompt used ONLY on the brand fast-path. Strips the tool /
- *  pricing / execution / field-grounding rules from the full agent
- *  prompt that bloat the request by ~4 KB. Instead it carries the
- *  FINAL PRODUCTION output-style rules that OVERRIDE any formatting
- *  rules printed inside the approved knowledge — Sections 1/2 carry
- *  their own headers like "### Q4: What is your name?" and
- *  "### Identity" which the model was dumping verbatim. These rules
- *  tell the model to treat the block as source material and rewrite
- *  into natural prose. */
-export function buildBrandSystemPrompt(
-  ctx: UserContext,
-  userLang: "en" | "zh" | "ar",
-  section: "company" | "ai" | "both",
-  dialect?: "egyptian" | null,
-): string {
-  const langName =
-    userLang === "zh" ? "Chinese (Simplified)" :
-    userLang === "ar" ? "Arabic" :
-    "English";
-  return `You are Koleex AI.
-
-${viewerBlockFor(ctx)}
-
-${ENTITY_GUIDANCE_FULL}
-
-Language rules (read carefully):
-- Default: reply in the user's current message language. If it's too short to tell, fall back to ${langName}.
-- Explicit override: if the user explicitly tells you which language to reply in (e.g. "reply in Arabic", "respond in Chinese", "answer me in English", "رد بالعربية", "请用中文回答"), honor that override for ALL subsequent replies, even if they keep asking you in a different language — until they ask you to switch again. The request-language and the reply-language can be different; this is intentional.
-- When the user writes in English but asks you to reply in Arabic / Chinese (or any other combination), keep their request as-is and answer in the language they asked for.
-
-Content-fidelity rule for languages other than English:
-- The approved knowledge below is written in English. When you answer in Arabic or Chinese (or any other language), translate it faithfully into natural, professional phrasing in that language. Do NOT shorten, paraphrase loosely, or drop structure. Your non-English answer should match the English answer's richness — same number of sections, same bullets, same tone.
-- Use native structure in the target language (e.g. proper RTL phrasing for Arabic, idiomatic connectors in Chinese). Do not leave English words untranslated unless they are brand names ("Koleex", "Koleex AI", product codes, etc., which always stay in Latin script in every language).
-
-Dialect + tone + messy-input handling:
-- Match the user's DIALECT and REGISTER, not just the language. Egyptian Arabic in → Egyptian Arabic out. Formal MSA in → formal MSA out. Casual English in → casual English out. Professional English in → professional English out.
-- Franco Arabic / Arabizi: if the user writes Arabic with Latin letters and numerals (3→ع, 7→ح, 2→ء, 5→خ, 6→ط, 9→ص), understand it as Arabic (usually Egyptian) and answer in proper Arabic script.
-- Tolerate typos, broken grammar, and partial sentences. If you are ~80% sure what they meant, answer that — never ask them to rephrase.
-
-Current user: ${ctx.auth.username}.
-
-Use the approved knowledge below as your SOURCE OF TRUTH. Never invent anything beyond it. Never emit prices, costs, margins, or financial figures.
-
-OUTPUT & RESPONSE STYLE — FINAL PRODUCTION RULES (these OVERRIDE any formatting rules printed inside the approved knowledge; the knowledge is reference material, not a template to copy):
-
-Content selection (CRITICAL — read before answering):
-- Less is better. Clarity beats completeness. The user should grasp the answer in under 5 seconds.
-- Do NOT include all available information from the approved knowledge. Select only the most important, most relevant points.
-- Lead with the MAIN idea. Surface only the key categories. Drop details that don't move the answer forward.
-- Before you write, run each candidate point through this filter:
-    · Essential → keep
-    · Secondary → remove
-    · Repetitive → remove
-    · Too detailed → remove
-- If you're not sure whether to include something, remove it.
-
-Tone:
-- Speak naturally, like a real human assistant. Friendly, professional, easy to understand.
-- Use "I" / "me" for casual or basic replies (e.g. "My name is Koleex AI."). For structured business answers, stay neutral.
-
-Length + structure — hard caps (never exceed, no matter how detailed the approved source is):
-- Simple question → 1–3 natural lines. No titles, no bullets.
-- Informative / complex question → AT MOST 1 short intro line, then MAX 4 sections, MAX 5 bullets per section.
-- Pick the 4 most important sections and drop the rest. Pick the 5 most important bullets in each section and drop the rest.
-
-Bullet rules:
-- One idea per bullet.
-- One line per bullet — keep them short.
-- Never cram multiple points into one bullet.
-- Never merge different categories into a single list.
-- No explanations inside bullets. If an idea needs explanation, put it in a short prose line above the bullets, not inside them.
-
-Strict prohibitions:
-- Do NOT list everything the approved knowledge mentions.
-- Do NOT mix separate categories into one combined list.
-- Do NOT pad with repetition or rephrasing of points already made.
-- Do NOT overload a single section with too many items.
-
-Visual layout (the chat renders FULL Markdown — format like ChatGPT):
-- Never output a dense block of text or bare unmarked lines.
-- Structure: short intro → "### Section title" → "- " bullets under it → BLANK LINE → next section.
-- Section titles MUST be Markdown headings ("### Title" on its own line) — never plain or bold-only text.
-- EVERY list item MUST start with "- " at the start of its own line. Never write list items as bare lines — without the "- " they render as a wall of text.
-- ALWAYS leave a blank line before each heading and before each list, and between sections.
-- Use **bold** for key terms inside sentences (names, numbers, dates).
-- No "---" separator lines; no code fences unless the user asks for code.
-
-Never include in your reply:
-- Question numbers or labels like "Q1", "Q4", "**Q4: What is your name?**"
-- Internal section markers copied from the approved content ("### Identity", "### Role", "#### Purpose", "#### Summary").
-- Any hint of how the answer was assembled ("according to the approved knowledge", "based on Section 2", etc.).
-
-Example layout for an informative answer (copy this SHAPE exactly — headings, bullets, blank lines):
-
-My purpose is to make things easier for you.
-
-### What I focus on
-
-- Finding information fast
-- Helping with tasks and workflows
-- Supporting clear communication
-
-### How I work
-
-- Always available, no waiting time
-- Consistent, structured responses
-- Open to casual questions and business topics
-
-Examples of the right tone:
-
-User: "what is your name?"
-Reply: "My name is Koleex AI — the official assistant built by Koleex International Group to help with information, tasks, and day-to-day support. You can give me a different name if you'd prefer a more personal touch."
-
-User: "who created you?"
-Reply: "I was built by Koleex International Group, with the vision driven by Mr. Kamal Shafei, the Founder and CEO. The goal behind me is to make communication and support easier across the Koleex ecosystem." (natural, first person, 2–4 sentences, no Q3/### markers).
-
----
-
-${dialect === "egyptian" ? `${EGYPTIAN_DIALECT_RULE}\n\n` : ""}${brandKnowledgeFor(section)}`;
-}
-
-/* Build the "current date/time" directive in the user's timezone. Server
-   runtime (not the workflow sandbox), so Date + Intl are available. Falls
-   back gracefully if an invalid tz string ever slips through. */
-function buildNowBlock(timezone: string): string {
-  const tz = timezone || "Asia/Dubai";
-  const now = new Date();
-  let human: string;
-  let isoDate: string;
-  let offset: string;
-  try {
-    human = new Intl.DateTimeFormat("en-US", {
-      timeZone: tz, weekday: "long", year: "numeric", month: "long",
-      day: "numeric", hour: "2-digit", minute: "2-digit", hour12: false,
-    }).format(now);
-    // en-CA renders as YYYY-MM-DD — exactly the ISO date part we want.
-    isoDate = new Intl.DateTimeFormat("en-CA", {
-      timeZone: tz, year: "numeric", month: "2-digit", day: "2-digit",
-    }).format(now);
-    const raw = new Intl.DateTimeFormat("en-US", {
-      timeZone: tz, timeZoneName: "longOffset",
-    }).formatToParts(now).find((p) => p.type === "timeZoneName")?.value ?? "GMT+00:00";
-    offset = raw.replace(/^GMT/, "") || "+00:00"; // "GMT+08:00" → "+08:00"
-    if (offset === "" || offset === "Z") offset = "+00:00";
-  } catch {
-    human = now.toUTCString();
-    isoDate = now.toISOString().slice(0, 10);
-    offset = "+00:00";
-  }
-  const year = isoDate.slice(0, 4);
-  return `Current date & time: ${human} (timezone ${tz}, UTC${offset}). TODAY is ${isoDate}.
-Date rules (critical — the model does NOT know the date on its own):
-- Resolve every relative date ("today", "tonight", "tomorrow", "this week", "next Monday", "in 3 days") from TODAY = ${isoDate}. NEVER use a date from your training data or assume a different year — the current year is ${year}.
-- When a tool needs start_at / end_at / due_date, output a full ISO-8601 datetime in the user's offset, e.g. 3 PM tomorrow → "${isoDate}T15:00:00${offset}" adjusted to the correct day. Always include the ${offset} offset so the time is stored correctly.
-- Before creating any dated item, state the resolved absolute date (e.g. "tomorrow, ${isoDate}") in your preview so the user can catch a mistake.`;
-}
-
-function buildSystemPrompt(
-  ctx: UserContext,
-  userLang: "en" | "zh" | "ar",
-  opts: { brandSection?: "company" | "ai" | "both" | null; dialect?: "egyptian" | null } = {},
-): string {
-  /* Hint from the client about the UI language. Not a hard rule — the
-     model is instructed to MIRROR the user's message language per turn,
-     which is what users actually expect. `userLang` is only used as a
-     fallback tiebreaker when a turn is too short to language-detect
-     (e.g. "ok", "thanks"). */
-  const uiLangHint =
-    userLang === "zh" ? "Chinese (Simplified)" :
-    userLang === "ar" ? "Arabic" :
-    "English";
-
-  /* Brand knowledge is large (~8k tokens for Section 2 alone). Only
-     inject the section the user is actually asking about — loading
-     both at once exceeds Groq's request-size limit (413). The fast
-     path also has no tool schemas so there's room for the section. */
-  const brandBlock = opts.brandSection
-    ? `\n\n${brandKnowledgeFor(opts.brandSection)}\n`
-    : "";
-
-  /* Current date/time in the user's timezone. Without this the model
-     resolves "today"/"tomorrow" from its stale training-cutoff notion of
-     "now" (e.g. answering "tomorrow is April 16, 2025" in mid-2026) and
-     creates calendar/task dates in the wrong year. Computed server-side
-     each turn from ctx.timezone (the user's Calendar preference). */
-  const nowBlock = buildNowBlock(ctx.timezone);
-
-  const viewerBlock = viewerBlockFor(ctx);
-
-  return `You are Koleex AI, the business agent inside Koleex Hub (a multilingual ERP).
-
-${viewerBlock}
-
-${BRAND_EXCLUSIVITY_RULE}
-
-${DIRECT_VOICE_RULE}
-
-${DATA_PROTECTION_RULE}
-${opts.dialect === "egyptian" ? `\n${EGYPTIAN_DIALECT_RULE}\n` : ""}
-${nowBlock}
-
-${ENTITY_GUIDANCE_FULL}
-
-Language rules (critical):
-- Detect the language of the user's latest message and REPLY IN THAT SAME LANGUAGE.
-- If the user writes in Arabic, reply in Arabic. If they write in Chinese, reply in Chinese. If they write in English, reply in English. Same for any other language.
-- Keep the language stable across the whole conversation — if the user opened in Arabic, keep replying in Arabic even if the system's UI language hint differs.
-- Only switch languages when the user explicitly asks ("answer in English from now on", "رد بالعربية", "请用中文回答"). Mirror the language they switched to, and keep using it until they switch again.
-- If the user's message is too short to classify (like "ok" or "thanks"), fall back to ${uiLangHint}.
-
-Answer style & FORMATTING (the chat renders full Markdown — USE IT like ChatGPT does):
-- STRUCTURE over walls of text. Never answer a multi-part question with one big paragraph. Break the answer into short paragraphs (2-3 sentences max), bullet lists, numbered steps, ### headings for distinct sections, and **bold** for key names/numbers/dates.
-- LISTS of records (tasks, products, events, customers) → render as a Markdown bullet list or a table, one item per line, key fields bolded. NEVER run items together in a sentence.
-- COMPARISONS, specs, multi-field previews → use a Markdown table (| Col | Col | header + separator row, each row on its OWN line).
-- STEPS / instructions → numbered list, one step per line.
-- PROCESSES / "how does X work" → ChatGPT-style numbered stages: "1. **Stage name**" then indented sub-bullets for the details of that stage. Put ONE blank line between every section. Never pack a whole process into one bullet list.
-- Single-fact answers stay short — one or two sentences, no forced structure.
-- For tool results, summarise the data in structured form, then add one line of useful context: what it means or what the user might want to do next.
-- For small talk, a few friendly sentences — no headings, no bullets.
-- Don't pad for length. Match structure to the question, exactly like ChatGPT would.
-
-Tool routing:
-- "how many products / how many X" → countProducts (optionally with brand/family filter) or getCatalogStats.
-- "what brands / categories / families exist" → getCatalogStats.
-- Machine-family / model-code questions ("what machines does Koleex make", "tell me about XSL-8000A4", "which overlock models do we have") → searchCatalog(query=...) or listCatalogFamilies. These cover ALL 544 Koleex machine models — richer than the products DB for machine-family questions. Every entry is a Koleex machine. NEVER mention catalogs, pages or any source in the reply — this is your own knowledge.
-- HOW-machines-WORK questions (functions, features, technologies, typical specs, "what does a spreading machine do", "difference between lockstitch and chainstitch", "what should I look for in a cutting machine") → searchMachineKnowledge(query=...). It returns generic machine-type engineering knowledge; combine with searchCatalog when the user also wants concrete Koleex models. Never attribute this knowledge to any manufacturer.
-- "list products" / "show products" / "what products do we have" → searchProducts with NO query (empty args). Do NOT pass the literal word "products" as the query.
-- "find / search products about Y" → searchProducts(query=Y).
-- "find customer Z" → getCustomerByName / getCustomerByCode.
-- Quotation drafting → follow the workflow below.
-- Work & schedule (these already return ONLY what THIS user is allowed to see — never say you lack access before trying):
-  · "my tasks" / "what tasks do I have" / "what's on my plate" / "what do I have today" → listMyTodos with filter:"open" and due:"any" (an active task with no due date is still a task the user HAS — do NOT set due:"today" for these, or you'll hide undated tasks and wrongly say "nothing"). Only set due:"today" when the user explicitly asks what is DUE today; due:"overdue" for overdue; due:"week" for this week.
-  · "my projects" / "what projects am I on" → listMyProjects; "my project tasks" / "assigned to me on projects" → listProjectTasks.
-  · "my schedule" / "my shifts" / "what am I planned for" / "open shifts" → listMyPlanning.
-  · "my calendar" / "meetings this week" / "am I free" → listMyCalendar.
-  · Creating: "add a task / remind me to…" → createTodo; "add a task to project X" → createProjectTask (resolve the project via listMyProjects first); "add … to my calendar / schedule a meeting / set (up) a meeting / book a meeting / اعمل ميتنج / 安排会议" → createCalendarEvent; "block time / add a shift" → createPlanningItem.
-  · Assigning to a colleague: "assign X to <name> / give <name> a task / كلّف فلان بـ…" → findTeamMember(<name>) FIRST, then createTodo with assign_to_account_ids. If findTeamMember returns MORE THAN ONE person, list them (name + department) and ask which one — NEVER pick for the user. The preview must name the assignee(s); they get notified only after the user confirms.
-  · Reassigning an EXISTING task: "move / transfer task X to <name>", "add <name> to task X", "take <name> off task X" → reassignTodo (task id via listMyTodos, people via findTeamMember, same multiple-match rule). Use add_account_ids / remove_account_ids for add/take-off, replace_with_account_ids for a full handover. The preview shows current → new assignees.
-  · Completing: "I finished X / mark X done / تم / خلصت X" → completeTodo; "reopen X / it's not done" → completeTodo with done:false. Resolve the task id via listMyTodos in the SAME turn (match the title; if several tasks match, ask which one before previewing). For a task INSIDE a project ("the design task in project Y") → completeProjectTask (id via listProjectTasks).
-  · Editing: "rename / change priority / postpone / move the due date of task X" → updateTodo (id via listMyTodos; owner-only). Project tasks → updateProjectTask (id via listProjectTasks). "move / reschedule / rename my meeting" → updateCalendarEvent (id via listMyCalendar). "change / cancel my shift" → updatePlanningItem (id via listMyPlanning; status:"cancelled" cancels).
-  · Deleting: "delete / remove task X" → deleteTodo; project tasks → deleteProjectTask; "cancel / delete my meeting" → deleteCalendarEvent; "delete my shift / planning item" → deletePlanningItem. Deletion is permanent — relay the tool's warning as-is.
-- CRITICAL — you CAN read the user's own tasks, projects, schedule and calendar directly via the tools above. When the user asks anything like "what tasks do I have", "what tasks do I have today", "what's due", "what's on my plate", "my to-dos", "what's on my calendar / schedule", "what am I working on", "أعمالي / مهامي النهاردة", "我今天有什么任务" — you MUST call the matching tool (listMyTodos / listMyProjects / listProjectTasks / listMyPlanning / listMyCalendar) and answer from its result. NEVER reply with "check Koleex Hub", "please log in", "you can see your tasks in the app", or any variation that tells the user to look it up themselves — that is a wrong answer; the user is already logged in and you have live access. If a tool returns zero rows, say they have nothing matching — do not deflect.
-- CRITICAL — the same applies to WRITING: you CAN create, complete, update, reassign and delete the user's own tasks and calendar events via the write tools above. When the user tells you to do one of those ("set a meeting", "add a task", "mark it done", "delete that event", "اعمل ميتنج", "ضيف مهمة", "安排会议") NEVER say "I can't access your calendar/tasks", "that's outside what I can do here", or tell them to open the app and do it themselves — that is a wrong answer; the write tools are right there. If required details are missing (title, date/time, which task), reply affirmatively and ASK for exactly what's missing — e.g. "Sure — what's the meeting about, and when should it start and end?" — then run the WRITE-WITH-CONFIRM flow once you have them. Refusing is only correct when a TOOL returned a denial (permissionStatus denied) — then relay that it needs permission, nothing else.
-- CRITICAL — you CAN look things up on the public internet with search_web. For anything that depends on the world TODAY (weather, news, exchange rates, shipping conditions, public specs, "latest"/"current" anything) you MUST call search_web and answer from the results. NEVER say "I don't have live access", "I can't browse the internet", "check a weather app", or any variation — that is a wrong answer, the tool is right there. If search_web itself reports it is unavailable or returns nothing, THEN say plainly you couldn't check right now; never fall back to answering from memory as though it were current. Cite the source URL for figures, and say how fresh they are when a date is given. NEVER put Koleex data (customer names, prices, quotations, employees, internal codes) into a search query, and NEVER use web results to suggest another manufacturer's machines — Koleex only ever recommends Koleex.
-- WRITE-WITH-CONFIRM (mandatory for EVERY write tool — createTodo / createProjectTask / createCalendarEvent / createPlanningItem / completeTodo / updateTodo / reassignTodo / deleteTodo / updateCalendarEvent / deleteCalendarEvent / completeProjectTask / updateProjectTask / deleteProjectTask / updatePlanningItem / deletePlanningItem):
-  · You MUST actually CALL the tool. NEVER hand-write a preview table, and NEVER say something was "created"/"added"/"scheduled"/"updated"/"deleted"/"done" unless the write tool CALL returned a successful result (ok) in THIS turn. Describing the action in text without calling the tool is a failure — nothing gets saved.
-  · Turn 1 (the request): call the tool WITHOUT the confirm argument. The TOOL returns the preview text — relay THAT to the user (don't invent your own) and ask them to confirm. Fill start_at/end_at/due_date using the current date from the "Current date & time" block above, as full ISO-8601 with the correct offset.
-  · Turn 2 (after the user explicitly says yes): call the SAME tool AGAIN with confirm:true and the same arguments. Only after that call returns ok do you tell the user it's done — echo the real values you sent.
-  · NEVER set confirm:true on the first call. Never invent a title/time to fill a required field — ask instead.
-  · NEVER guess or fabricate a task_id/event_id — always resolve it from the matching list tool (listMyTodos / listProjectTasks / listMyCalendar / listMyPlanning) in the same turn, passing q:"<words from the item's title>" — the plain lists are capped, so WITHOUT q a real item can be missing from the page and you'd wrongly conclude it doesn't exist. If more than one row matches, ask which one BEFORE calling the write tool. Only say an item doesn't exist after a q search returned nothing.
-  · Ids are full 36-character UUIDs — copy them EXACTLY from the list tool result, never shortened. If a tool answers that the id is malformed or truncated, re-run the list tool and copy the complete id.
-  · If a write tool returns an error, a denial, or "can't find" — RELAY that outcome honestly and stop. NEVER follow a failed tool call with your own hand-written preview or any claim that the action is ready/done.
-
-Ask-first rules (critical — never call a tool with empty or missing required arguments):
-- If the user says "search customer" / "find customer" / "look up a customer" WITHOUT naming one, do NOT call a tool. Ask: "Which customer should I look up? You can send a name or customer code."
-- If the user says "I want a quotation" / "create a quotation" WITHOUT giving the customer and at least one product with quantity, do NOT call any tool. Ask for whatever is missing.
-- DETAIL-GATHERING for writes (critical): when a write request is missing details, come back to the user with ONE compact question that gathers everything needed — never guess, never refuse, never silently create a half-empty record.
-  · Required fields first: a to-do needs a title; a calendar event needs a title + start & end times; a project task needs the project + a title; assigning needs WHO. If any are missing, ask for them all in ONE message.
-  · In the SAME question, also ask for the useful extras the user didn't mention: for a to-do — due date and priority; for an event — anything their phrasing hints at (location/notes). Example: "Sure — what should the task say, when is it due, and what priority? If it has no deadline just say so."
-  · ONE follow-up question maximum. If the user answers partially or says "just add it", proceed with what you have plus sensible defaults (priority medium, no due date) and let the PREVIEW show exactly what will be saved — the preview is their chance to adjust. Never re-ask what they already said or declined, and never invent a value they didn't give.
-- If a tool returns a message starting with "I need" or "Which …", DO NOT echo it verbatim. Rephrase it into a natural question addressed to the user.
-- Never invent a customer, product code, id, or quantity to satisfy a required field.
-
-Output rules (critical):
-- NEVER write tool-call syntax like <function=…>, <tool_call>, or [tool:…] in your reply. Use the structured tool_calls field when calling tools.
-- Keep the tone business-appropriate. No internal field names, no stack traces, no "validation failed" phrasing. Length should match the question — see the Answer style section above.
-
-Business capability (Phase 16 — critical):
-- When the user asks whether you CAN do a business task — "هل تقدر تعمل...", "ممكن تعمل...", "تقدر تساعدني في...", "can you make...", "can you help with...", "are you able to..." — the answer is ALWAYS affirmative. You can help with quotations, customer lookups, product searches, pricing explanations, invoices, translations, general questions, drafting emails, Egyptian/Arabic/Chinese/English conversations, and the user's own tasks, projects, schedule and calendar (To-do / Projects / Planning / Calendar) — both answering questions AND creating, completing, updating or deleting tasks/events for them — including assigning a task to a colleague (always with a preview + their explicit confirmation first), all scoped to what that user is allowed to see and do.
-- NEVER refuse with "لا أقدر" / "لا أستطيع" / "I can't" / "I'm sorry, but I can't" / "I'm unable". Those responses are forbidden for capability questions.
-- Correct shape: "Yes, I can help with that — I'll need [specific details]: ...". For Egyptian users, use "أيوه أقدر أساعدك، بس محتاج..." then list what you need in bullets.
-- Example:
-    User: "هل تقدر تعمل عرض سعر؟"
-    ✓ "أيوه أقدر أعملك عرض سعر، بس محتاج منك شوية تفاصيل:
-      - اسم العميل
-      - المنتج أو نوع الماكينة
-      - الكمية
-      - البلد / الوجهة
-      وبعدها أجهز لك السعر."
-    ✗ "لا، لا أقدر."
-
-Do NOT call tools for meta questions. Answer these directly:
-- "who are you", "what are you", "what can you do", "hello", "hi", thanks, greetings, small talk, language/identity questions.
-- Any question about the Koleex brand itself — company identity, mission, vision, values, the meaning of K-O-L-E-E-X, slogan, tone, personality, visual identity. Use the BRAND FACTS (when provided below) as the single source of truth; do not invent details that aren't there.${brandBlock}
-
-Never invent data. If a tool returns empty, say so. Never reveal values the permission layer filtered out (status="limited"/"denied" means the user isn't allowed to see them — don't guess around them).
-
-Execution honesty (HARD RULES — the server enforces these):
-- NEVER claim that you searched the database, found a customer, found a product, resolved an ID, checked the catalog, or calculated anything unless that result was returned by a successful tool in the current turn.
-- If no tool has run yet, ask for input or say you need to use system tools first — do not narrate fake internal workflow.
-- Do not write phrases like "I found the customer", "I found the product", "Product ID is …", "Customer ID is …", "Let me check", "checking the database", "I'll calculate", or "Please wait while I check" without matching tool evidence in this turn.
-
-Structured-section discipline (HARD RULES — the server enforces these):
-- NEVER output placeholder fields such as [Insert Price], [Insert Address], [Insert Contact Person], [TBD], [To be confirmed], or similar template text.
-- NEVER write structured sections like "Customer Resolution", "Product Resolution", "Order Details", "Quotation Details", "Customer Name: …", "Customer Code: …", "Product Name: …", "Product Code: …", "Contact Person: …", or "Address: …" unless the matching fields were returned by a successful tool in the current turn.
-- If a customer has not been resolved by a customer lookup tool, do not claim customer details.
-- If a product has not been resolved by a product lookup tool, do not claim product details.
-- If quotation pricing has not been resolved by a pricing tool, do not write quotation-detail or order-detail sections.
-- Keep the answer short. Do not narrate internal workflow.
-
-Field-level grounding (HARD RULES — the server enforces these):
-- Do NOT output named fields like Customer Name, Customer Code, Address, Contact Person, Phone, Email, Product Name, Product Code, Description, Specifications, Brand, Model, Quantity, Unit Price, Line Total, Subtotal, Total, Grand Total, Discount, Margin, or Markup UNLESS that exact field was returned by a successful tool in the current turn.
-- Partial evidence does NOT justify extra fields. A successful customer lookup does not authorise address/contact/phone/email. A successful product lookup does not authorise code/description/specs/brand/model. A successful pricing call does not authorise every quotation field — only the fields actually returned.
-- Keep the answer short and factual.
-
-Quotation drafting workflow (strict, only triggered when the user asks to create/draft/prepare a quotation):
-  1) Resolve the customer → getCustomerByName / getCustomerByCode.
-  2) Resolve each product → searchProducts / getProductByCode.
-  3) calculateQuotationPricing({ customerId, lines:[{productId, qty}] }) — you NEVER multiply numbers yourself.
-  4) Show the totals and ASK the user to confirm.
-  5) Only after confirmation, call createQuotationDraft. Status stays 'draft' — never sent, never final.
-
-If pricing is unresolved or out of policy, say so — don't hide it.
-
-Pricing Discipline Rules (STRICT) — the server enforces these; if you violate them, the server will override your response.
-
-You must follow these rules at all times:
-
-1. NEVER generate or suggest any numbers related to:
-   - price
-   - cost
-   - unit price
-   - total
-   - subtotal
-   - quotation value
-   - discount percentage
-   - margin
-   - markup
-
-2. You are ONLY allowed to show pricing if:
-   - You have just received a successful response from the tool "calculateQuotationPricing"
-   - AND the response contains real numeric pricing data.
-
-3. If pricing data is NOT available:
-   - DO NOT estimate
-   - DO NOT calculate manually
-   - DO NOT infer from context
-   - DO NOT reuse previous numbers
-
-4. If the user requests a quotation and pricing is not yet calculated:
-   - Ask for missing data (customer, product, quantity), OR
-   - Call the appropriate tool
-   - DO NOT generate any numbers in your response
-
-5. If you accidentally think of a number:
-   - DO NOT include it in the response
-
-6. These rules apply to:
-   - sentences
-   - bullet points
-   - tables
-   - summaries
-   - explanations
-
-7. If you violate these rules, the system will override your response.
-
-Always prioritize correctness over completeness. Never hallucinate pricing.
-
-Current user: ${ctx.auth.username} (${ctx.auth.user_type}${ctx.isSuperAdmin ? ", super admin" : ""}).`;
-}
-
-function toLlmSafe(result: ToolResult): Record<string, unknown> {
-  return {
-    ok: result.ok,
-    permissionStatus: result.permissionStatus,
-    message: result.message,
-    data: result.data,
-    filteredFields: result.filteredFields,
-    sources: result.sources,
-  };
-}
-
-function humaniseCall(toolName: string, args: Record<string, unknown>): string {
-  const q = (args.query as string | undefined) ?? (args.code as string | undefined);
-  if (q) return `Running ${toolName}("${q}")…`;
-  return `Running ${toolName}…`;
-}
-
-/* ─── Tool-syntax sanitizer ─────────────────────────────────────────
-   Llama 3.x models occasionally emit tool-call syntax inline in the
-   assistant `content` field instead of the structured `tool_calls`
-   array (known quirk on 8B-instant; also seen on 70B under load).
-   When that happens the raw markers flow into the chat bubble and
-   users see something like:
-       <function=searchProducts>{"query":"DD"}</function>
-   This helper strips those markers unconditionally before the reply
-   leaves the server. Three forms are covered:
-     · <function=NAME>…</function>
-     · <tool_call>…</tool_call>
-     · [tool:NAME(…)]
-   After stripping, whitespace is collapsed. If nothing is left we
-   return "" so callers can substitute a clean follow-up instead of
-   showing a blank message. */
-function cleanAssistantText(raw: string): string {
-  if (!raw) return "";
-  const stripped = raw
-    .replace(/<function[=\s][\s\S]*?<\/function>/gi, "")
-    .replace(/<function[=\s][^>]*\/?>/gi, "") // orphan open/self-close
-    .replace(/<tool_call>[\s\S]*?<\/tool_call>/gi, "")
-    .replace(/<tool_call[^>]*\/?>/gi, "")
-    .replace(/\[tool\s*:[^\]]*\]/gi, "")
-    /* MARKDOWN-SAFE collapse (2026-08-03 fix): the old /\s{2,}/ → " "
-       ate every blank line, so "…answer.\n\n## Heading\n\nBody…"
-       became "…answer. ## Heading Body…" and the whole reply rendered
-       as one crowded run-on paragraph. Collapse only runs of spaces/
-       tabs; cap newline runs at one blank line; keep structure. */
-    .replace(/[ \t]{2,}/g, " ")
-    .replace(/[ \t]+\n/g, "\n")
-    .replace(/\n{3,}/g, "\n\n")
-    .trim();
-  return stripped;
-}
-
-/** Text patterns that look like internal debug/validation strings
- *  and should NOT be promoted to the user's final reply. Keeps the
- *  safety-fallback picker from grabbing "(cached)" or a terse tool
- *  error message like "productId required." and showing it raw. */
-function looksLikeDebug(s: string): boolean {
-  const t = s.trim();
-  if (!t) return true;
-  if (t === "(cached)") return true;
-  if (/^[a-zA-Z_]+\s+(required|missing)\.?$/i.test(t)) return true;
-  if (/^(need|please provide)\b/i.test(t) && t.length < 80) return true;
-  return false;
-}
-
-/** Picked when we have nothing clean to surface — keeps the tone
- *  conversational rather than exposing internals. */
-const GENERIC_FOLLOWUP = "Could you share a bit more so I can help?";
-
-/** Best-effort rescue when the post-tool Groq call fails (429, 5xx,
- *  empty response). Scans steps[] from newest to oldest and returns
- *  the most recent successful tool-result text so the user sees the
- *  data the tools already fetched instead of a generic error banner.
- *
- *  Returns "" when nothing usable is in steps[] — the caller then
- *  falls back to its original error/follow-up message. */
-function rescueFromToolResults(steps: AgentStep[]): string {
-  for (let i = steps.length - 1; i >= 0; i--) {
-    const s = steps[i];
-    if (
-      s.kind === "tool-result" &&
-      s.permissionStatus !== "denied" &&
-      s.text
-    ) {
-      const cleaned = cleanAssistantText(s.text);
-      if (cleaned && !looksLikeDebug(cleaned)) {
-        return normaliseBrandName(cleaned);
-      }
-    }
-  }
-  return "";
-}
-
-/** Deprecated phrasings that older builds of the agent used to emit.
- *  They were removed from the code but still live inside ai_messages
- *  rows from past conversations. If we forward those turns to Groq
- *  as history, the model can quote them verbatim on the next turn —
- *  users then see "Need a customerId and at least one valid line"
- *  even though the code no longer produces that string anywhere.
- *
- *  The history sanitiser (applied before building the Groq message
- *  list) drops any ASSISTANT history row whose content matches one
- *  of these patterns. User turns are always preserved. */
-const BANNED_ECHOES: RegExp[] = [
-  /Need a customer[Ii]d and at least one valid line/i,
-  /productId required\.?$/i,
-  /customerId required\.?$/i,
-  /Please provide a search query\.?$/i,
-  /Please provide a customer code\.?$/i,
-  /\bUnknown tool\b/i,
-];
-
-/* ─── Pricing safety guard ──────────────────────────────────────────
-   The model CAN hallucinate prices — unit price, totals, discount %,
-   margin %, currency amounts. The system prompt tells it not to; this
-   server-side guard enforces it regardless of what the model does.
-
-   Before any finalReply leaves orchestrate(), it passes through
-   sealPricingSafety(). If the text contains pricing-like output AND
-   no pricing tool ran successfully THIS turn, the text is replaced
-   with a fixed safe message and the last "answer" step in steps[]
-   is updated to match so the UI bubble is consistent.
-
-   Only current-turn steps[] counts as evidence — history is NEVER
-   trusted. "denied" pricing-tool results don't count either (the
-   tool didn't actually price anything). "approval_required" DOES
-   count — that's real numbers that just need sign-off.
-   ───────────────────────────────────────────────────────────────── */
-
-/** The ONLY tool whose success counts as real pricing evidence.
- *  createQuotationDraft is intentionally EXCLUDED — the model was
- *  using its presence as a cover to emit invented numbers. The draft
- *  handler internally re-prices, but for the guard's purposes we
- *  only trust calculateQuotationPricing directly: that tool's
- *  payload is the authoritative pricing engine output. */
-const PRICING_TOOLS = new Set<string>([
-  "calculateQuotationPricing",
-]);
-
-/** Numeric fields in a pricing-tool payload that count as "real
- *  pricing data." Must be a positive finite number — strings that
- *  happen to look numeric do NOT qualify. The engine returns
- *  numbers; anything else is either a placeholder or fake. */
-const PRICING_PAYLOAD_KEYS: string[] = [
-  "total",
-  "subtotal",
-  "grand_total",
-  "grandTotal",
-  "unit_price",
-  "unitPrice",
-  "line_total",
-  "lineTotal",
-  "price",
-];
-
-function isPositiveNumber(v: unknown): boolean {
-  return typeof v === "number" && Number.isFinite(v) && v > 0;
-}
-
-/** Verify the pricing-tool payload actually contains pricing fields.
- *  Looks at top-level keys and then inside each `lines[]` row, so
- *  both aggregate-level and per-line prices count. Returns false if
- *  the payload is null, empty, or only has non-pricing metadata. */
-function payloadHasPricingFields(payload: unknown): boolean {
-  if (!payload || typeof payload !== "object") return false;
-  const root = payload as Record<string, unknown>;
-
-  for (const k of PRICING_PAYLOAD_KEYS) {
-    if (isPositiveNumber(root[k])) return true;
-  }
-
-  const lines = root.lines;
-  if (Array.isArray(lines)) {
-    for (const l of lines) {
-      if (!l || typeof l !== "object") continue;
-      const row = l as Record<string, unknown>;
-      for (const k of PRICING_PAYLOAD_KEYS) {
-        if (isPositiveNumber(row[k])) return true;
-      }
-    }
-  }
-
-  return false;
-}
-
-/** Patterns that flag assistant text as containing pricing output.
- *  Chosen conservatively — prefer false positives (block a valid but
- *  oddly-phrased reply) to false negatives (let a hallucinated
- *  number through). Ordered roughly from highest-signal to lowest. */
-const PRICING_PATTERNS: RegExp[] = [
-  // Currency symbol + amount:  $1,200 · €500 · ¥3,400 · £900
-  /[$€£¥]\s?\d[\d,]*(\.\d+)?/,
-  // Amount + currency symbol:  1,200$ · 500 €
-  /\d[\d,]*(\.\d+)?\s?[$€£¥]/,
-  // ISO code + amount:         USD 1,200 · EGP 50,000 · CNY 3400
-  /\b(USD|EGP|CNY|EUR|GBP|SAR|AED|TRY|BRL|IDR|JPY|KRW)\s?\d[\d,]*(\.\d+)?/i,
-  // Amount + ISO code:         1,200 USD · 50000 EGP · 3400CNY
-  /\d[\d,]*(\.\d+)?\s?(USD|EGP|CNY|EUR|GBP|SAR|AED|TRY|BRL|IDR|JPY|KRW)\b/i,
-  // Labelled totals near a number
-  /\b(unit\s+price|total\s+price|sub[- ]?total|grand\s+total|quotation\s+total|quote\s+total|line\s+total|extended\s+price|list\s+price)\b[^.\n]{0,40}\d/i,
-  // Numeric discount / margin / markup
-  /\b(discount|margin|markup)\b[^.\n]{0,20}\d+\s*%/i,
-  /\b\d+\s*%\s*(discount|margin|markup|off)\b/i,
-  // Direct labels with a number right after
-  /\b(price|cost|amount|subtotal|total)\s*[:=]\s*\d/i,
-
-  // v2 — bullet / list line starting with a pricing label. Fires on
-  // the LABEL alone so multi-line "* Unit Price\n  $1,200" shapes
-  // are blocked even when label and number are split across lines.
-  // Catches "* Unit Price: …", "- Total Price", "• Grand Total",
-  // "**Unit Price**", etc.
-  /^\s*(?:[*\-•]|\*\*)\s*(?:\*\*)?\s*(unit\s+price|total\s+price|sub[- ]?total|grand\s+total|line\s+total|quote\s+total|quotation\s+total|extended\s+price|list\s+price)\b/im,
-
-  // v2 — markdown table header naming a pricing column. Catches
-  // "| Product | Qty | Unit Price | Total |" where numbers sit in
-  // the row below without any currency adornment.
-  /\|\s*(unit\s+price|total\s+price|sub[- ]?total|grand\s+total|line\s+total|quote\s+total|quotation\s+total|extended\s+price|list\s+price|price|cost)\s*\|/i,
-
-  // v2 — bare pricing label alone on a line. Catches
-  //   Unit Price:
-  //     2,500
-  // where the label sits on its own line and the value on the next.
-  /^\s*(unit\s+price|total\s+price|grand\s+total|quotation\s+total|quote\s+total)\s*[:\-–]?\s*$/im,
-];
-
-function containsPricingOutput(text: string): boolean {
-  if (!text) return false;
-  return PRICING_PATTERNS.some((re) => re.test(text));
-}
-
-/** Evidence gate (v2): requires three ANDed conditions on a single
- *  step in THIS turn's steps[].
- *    1. kind === "tool-result"
- *    2. tool === "calculateQuotationPricing"   (see PRICING_TOOLS)
- *    3. permissionStatus !== "denied"
- *    4. payload contains a positive-number pricing field
- *       (top-level or inside a lines[] row).
- *  All four must hold on the same step. A pricing-tool row with a
- *  null/empty payload no longer counts — that was the v1 hole. */
-function hasValidPricingEvidence(steps: AgentStep[]): boolean {
-  for (const s of steps) {
-    if (s.kind !== "tool-result") continue;
-    if (!s.tool || !PRICING_TOOLS.has(s.tool)) continue;
-    if (s.permissionStatus === "denied") continue;
-    if (!payloadHasPricingFields(s.payload)) continue;
-    return true;
-  }
-  return false;
-}
-
-/** Fixed replacement text — the exact wording required by spec.
- *  "Customer and product" is slightly optimistic in the edge case
- *  where neither was resolved, but the guard's intent is to stop
- *  fabricated pricing, not to narrate flow state. */
-export const PRICING_GUARD_MESSAGE =
-  "I found the customer and product, but I cannot provide pricing until the pricing calculation completes successfully.";
-
-/** Single gate every orchestrate-return path calls. Returns the
- *  cleaned finalReply and mutates the last "answer" step's text in
- *  place so the UI matches. No-op when either (a) the reply has no
- *  pricing-like content or (b) a pricing tool ran successfully this
- *  turn. */
-/* Deterministic backstop for DIRECT_VOICE_RULE: the model occasionally
-   still opens with retrieval narration ("حصلت على المعلومات",
-   "لقيتلك التفاصيل", "I found what you need"). If the FIRST line is a
-   short standalone opener containing such a marker, drop that line —
-   the real answer always follows on the next line. Never touches
-   content beyond the first line. */
-const NARRATION_MARKERS =
-  /(حصلت على|لقيتلك|لقيت لك|جبتلك|جبت لك|دلوقتي عندي|عندي كل اللي|وجدت المعلومات|إليك ما وجدت|بعد البحث|هعرضلك اللي لقيته|I (?:found|got|gathered|now have)\b|here'?s what I found|based on (?:my|the) (?:search|results))/i;
-export function stripProcessNarration(reply: string): string {
-  if (!reply) return reply;
-  const nl = reply.indexOf("\n");
-  if (nl === -1 || nl > 120) return reply;
-  const first = reply.slice(0, nl).trim();
-  if (!NARRATION_MARKERS.test(first)) return reply;
-  return reply.slice(nl + 1).replace(/^\n+/, "");
-}
-
-export function sealPricingSafety(rawFinalReply: string, steps: AgentStep[]): string {
-  /* Central choke point every return path flows through — apply the
-     direct-voice narration strip here so BOTH the streaming and the
-     plain-JSON agent paths get it. */
-  const finalReply = stripProcessNarration(rawFinalReply);
-  if (!containsPricingOutput(finalReply)) return finalReply;
-  if (hasValidPricingEvidence(steps)) return finalReply;
-
-  for (let i = steps.length - 1; i >= 0; i--) {
-    if (steps[i].kind === "answer") {
-      steps[i] = {
-        ...steps[i],
-        text: PRICING_GUARD_MESSAGE,
-        permissionStatus: "allowed",
-      };
-      break;
-    }
-  }
-  console.warn(
-    "[ai.agent.pricing-guard] replaced hallucinated pricing; no pricing-tool evidence this turn.",
-  );
-  return PRICING_GUARD_MESSAGE;
-}
-
-/* ─── Execution safety guard ────────────────────────────────────────
-   Sibling of the pricing guard. Catches "fake workflow narration" —
-   the model claiming it searched the database, found a customer or
-   product, resolved an ID, or performed a calculation when no tool
-   has actually run in THIS turn's steps[].
-
-   Independent of the pricing guard: this one looks at execution-
-   claim phrasing ("I found the customer", "Product ID is …",
-   "checking the database") and asks "is there ANY successful tool
-   result in this turn?" If not, the narration is hallucinated and
-   gets replaced with a short "I need to use system tools" message.
-
-   Runs BEFORE sealPricingSafety at every return site so execution
-   hallucinations are caught before the pricing check sees them.
-   ───────────────────────────────────────────────────────────────── */
-
-const FAKE_EXECUTION_PATTERNS: RegExp[] = [
-  /\bI'?ll try to find\b/i,
-  /\bI found .* in (our|the) database\b/i,
-  /\bI found the product\b/i,
-  /\bI found the customer\b/i,
-  /\bProduct ID is\b/i,
-  /\bCustomer ID is\b/i,
-  /\bLet me check\b/i,
-  /\bNow I'?ll calculate\b/i,
-  /\bI'?ll calculate\b/i,
-  /\bchecking the database\b/i,
-  /\bchecking the catalog\b/i,
-  /\bI'?ll try to find .* in our database\b/i,
-  /\bI'?ll try to find .* in our catalog\b/i,
-  /\bPlease wait for a moment while I check\b/i,
-];
-
-function containsFakeExecution(text: string): boolean {
-  if (!text) return false;
-  return FAKE_EXECUTION_PATTERNS.some((re) => re.test(text));
-}
-
-/** Any non-denied tool-result in the current turn counts as real
- *  execution evidence. Intentionally tool-agnostic: if the agent
- *  actually ran something, narration is allowed. If no tool fired
- *  at all, any "I found…" / "Let me check…" phrasing is fabricated
- *  and gets replaced. */
-function hasRealToolEvidence(steps: AgentStep[]): boolean {
-  return steps.some(
-    (s) => s.kind === "tool-result" && s.permissionStatus !== "denied",
-  );
-}
-
-const EXECUTION_GUARD_MESSAGE =
-  "I need to use system tools to retrieve real data before proceeding.";
-
-function sealExecutionSafety(finalReply: string, steps: AgentStep[]): string {
-  if (!containsFakeExecution(finalReply)) return finalReply;
-  if (hasRealToolEvidence(steps)) return finalReply;
-
-  for (let i = steps.length - 1; i >= 0; i--) {
-    if (steps[i].kind === "answer") {
-      steps[i] = {
-        ...steps[i],
-        text: EXECUTION_GUARD_MESSAGE,
-        permissionStatus: "allowed",
-      };
-      break;
-    }
-  }
-  console.warn(
-    "[ai.agent.execution-guard] replaced hallucinated execution text; no tool evidence this turn.",
-  );
-  return EXECUTION_GUARD_MESSAGE;
-}
-
-/* ─── Execution safety guard v2 ─────────────────────────────────────
-   Sibling of v1. v1 catches fake workflow narration ("I'll check",
-   "Let me search"). v2 catches a different attack vector: fake
-   RESOLVED summaries and placeholder fields.
-
-   Targets:
-     · placeholder tokens like [Insert Price], [TBD], <insert X>
-     · structured sections the model writes as if tools succeeded
-       ("Customer Name: …", "Product Code: …", "Order Details")
-       when the matching tool did not actually run this turn
-
-   Unlike v1 (which allows any successful tool-result to authorise
-   any narration), v2 uses TOOL-FAMILY-SPECIFIC evidence:
-     · customer claims require a customer tool result
-     · product claims require a product tool result
-     · quotation/order-detail claims require a pricing/quotation
-       tool result
-   Placeholders are always blocked, even with evidence — a
-   hallucinated "[Insert Address]" is not legitimised by a
-   successful getCustomerByName call.
-
-   Runs AFTER v1, BEFORE sealPricingSafety at every return site. */
-
-const PLACEHOLDER_PATTERNS: RegExp[] = [
-  /\[Insert [^\]]+\]/i,
-  /\[Enter [^\]]+\]/i,
-  /\[Add [^\]]+\]/i,
-  /\[TBD\]/i,
-  /\[To be [^\]]+\]/i,
-  /<insert [^>]+>/i,
-];
-
-const FAKE_RESOLUTION_PATTERNS: RegExp[] = [
-  /\bwe have found the customer\b/i,
-  /\bwe have found the product\b/i,
-  /\bi found the customer\b/i,
-  /\bi found the product\b/i,
-  /\bcustomer resolution\b/i,
-  /\bproduct resolution\b/i,
-  /\bits details are as follows\b/i,
-  /\bdetails are as follows\b/i,
-  /\bquotation details\b/i,
-  /\border details\b/i,
-  /\bcustomer name\s*:/i,
-  /\bcustomer code\s*:/i,
-  /\bproduct name\s*:/i,
-  /\bproduct code\s*:/i,
-  /\bcontact person\s*:/i,
-  /\baddress\s*:/i,
-];
-
-function containsPlaceholders(text: string): boolean {
-  if (!text) return false;
-  return PLACEHOLDER_PATTERNS.some((re) => re.test(text));
-}
-
-function containsFakeResolvedSummary(text: string): boolean {
-  if (!text) return false;
-  return FAKE_RESOLUTION_PATTERNS.some((re) => re.test(text));
-}
-
-/** Customer-family evidence: a non-denied result from a customer
- *  lookup tool in the current turn. */
-function hasCustomerEvidence(steps: AgentStep[]): boolean {
-  return steps.some(
-    (s) =>
-      s.kind === "tool-result" &&
-      s.permissionStatus !== "denied" &&
-      (s.tool === "getCustomerByName" || s.tool === "getCustomerByCode"),
-  );
-}
-
-/** Product-family evidence: a non-denied result from any product
- *  lookup tool in the current turn. */
-function hasProductEvidence(steps: AgentStep[]): boolean {
-  return steps.some(
-    (s) =>
-      s.kind === "tool-result" &&
-      s.permissionStatus !== "denied" &&
-      (s.tool === "searchProducts" ||
-        s.tool === "getProductByCode" ||
-        s.tool === "getProductDetails"),
-  );
-}
-
-/** Quotation-family evidence: a non-denied pricing/draft result in
- *  the current turn. This is broader than PRICING_TOOLS (which is
- *  pricing-only); quotation-detail sections are allowed if EITHER
- *  pricing OR draft succeeded, while actual numeric pricing still
- *  requires PRICING_TOOLS evidence via the separate pricing guard. */
-function hasQuotationEvidence(steps: AgentStep[]): boolean {
-  return steps.some(
-    (s) =>
-      s.kind === "tool-result" &&
-      s.permissionStatus !== "denied" &&
-      (s.tool === "calculateQuotationPricing" ||
-        s.tool === "createQuotationDraft"),
-  );
-}
-
-const EXECUTION_GUARD_V2_MESSAGE =
-  "I need to use verified system results before I can confirm customer, product, or quotation details.";
-
-/** Helper: swap the text of the most recent "answer" step so the
- *  UI bubble matches a replaced finalReply. Shared by every branch
- *  below. */
-function replaceLastAnswerStep(steps: AgentStep[], text: string): void {
-  for (let i = steps.length - 1; i >= 0; i--) {
-    if (steps[i].kind === "answer") {
-      steps[i] = {
-        ...steps[i],
-        text,
-        permissionStatus: "allowed",
-      };
-      break;
-    }
-  }
-}
-
-function sealExecutionSafetyV2(
-  finalReply: string,
-  steps: AgentStep[],
-): string {
-  const text = finalReply || "";
-
-  const hasPlaceholder = containsPlaceholders(text);
-  const hasResolvedSummary = containsFakeResolvedSummary(text);
-  if (!hasPlaceholder && !hasResolvedSummary) return finalReply;
-
-  // Placeholders are always blocked, regardless of tool evidence.
-  if (hasPlaceholder) {
-    replaceLastAnswerStep(steps, EXECUTION_GUARD_V2_MESSAGE);
-    console.warn("[ai.agent.execution-guard-v2] replaced placeholder output.");
-    return EXECUTION_GUARD_V2_MESSAGE;
-  }
-
-  const customerOk = hasCustomerEvidence(steps);
-  const productOk = hasProductEvidence(steps);
-  const quotationOk = hasQuotationEvidence(steps);
-
-  // Customer summary without customer-family evidence → block.
-  if (/\bcustomer\b/i.test(text) && !customerOk) {
-    replaceLastAnswerStep(steps, EXECUTION_GUARD_V2_MESSAGE);
-    console.warn(
-      "[ai.agent.execution-guard-v2] replaced customer summary without evidence.",
-    );
-    return EXECUTION_GUARD_V2_MESSAGE;
-  }
-
-  // Product summary without product-family evidence → block.
-  if (/\bproduct\b/i.test(text) && !productOk) {
-    replaceLastAnswerStep(steps, EXECUTION_GUARD_V2_MESSAGE);
-    console.warn(
-      "[ai.agent.execution-guard-v2] replaced product summary without evidence.",
-    );
-    return EXECUTION_GUARD_V2_MESSAGE;
-  }
-
-  // Quotation/order-detail section without quotation-family evidence → block.
-  if (
-    /\b(quotation details|order details|quotation|quote)\b/i.test(text) &&
-    !quotationOk
-  ) {
-    replaceLastAnswerStep(steps, EXECUTION_GUARD_V2_MESSAGE);
-    console.warn(
-      "[ai.agent.execution-guard-v2] replaced quotation summary without evidence.",
-    );
-    return EXECUTION_GUARD_V2_MESSAGE;
-  }
-
-  return finalReply;
-}
-
-/* ─── Execution safety guard v3 ─────────────────────────────────────
-   FIELD-LEVEL grounding guard. v2 gates on tool-family evidence;
-   v3 gates on the exact field. Even if a customer tool ran
-   successfully, the model can only write "Customer Name: X" if
-   `customer_name` (or its alias) was present in that tool's payload.
-   Same for every labelled field across customer / product /
-   quotation families.
-
-   This is strictly stricter than v2. Partial evidence (a succeeded
-   search, an empty customer match, a list of products) does NOT
-   justify field claims — only fields actually returned in the
-   payload do. Address/contact/phone/email on a customer, code/brand/
-   description/model on a product, unit_price/total/discount on a
-   quotation — each must be grounded individually.
-
-   Runs AFTER v2, BEFORE sealPricingSafety at every return site. */
-
-type GroundedFields = {
-  customer: Set<string>;
-  product: Set<string>;
-  quotation: Set<string>;
-};
-
-function readObject(v: unknown): Record<string, unknown> | null {
-  return v && typeof v === "object" && !Array.isArray(v)
-    ? (v as Record<string, unknown>)
-    : null;
-}
-
-function addIfPresent(
-  set: Set<string>,
-  obj: Record<string, unknown>,
-  key: string,
-  alias?: string,
-): void {
-  const v = obj[key];
-  if (
-    v !== null &&
-    v !== undefined &&
-    !(typeof v === "string" && v.trim() === "")
-  ) {
-    set.add(alias ?? key);
-  }
-}
-
-function collectGroundedFields(steps: AgentStep[]): GroundedFields {
-  const grounded: GroundedFields = {
-    customer: new Set<string>(),
-    product: new Set<string>(),
-    quotation: new Set<string>(),
-  };
-
-  for (const s of steps) {
-    if (s.kind !== "tool-result") continue;
-    if (s.permissionStatus === "denied") continue;
-
-    const payload = readObject(s.payload);
-    if (!payload) continue;
-
-    // Customer tools
-    if (s.tool === "getCustomerByName" || s.tool === "getCustomerByCode") {
-      addIfPresent(grounded.customer, payload, "customer_name", "customer_name");
-      addIfPresent(grounded.customer, payload, "name", "customer_name");
-      addIfPresent(grounded.customer, payload, "customer_code", "customer_code");
-      addIfPresent(grounded.customer, payload, "code", "customer_code");
-      addIfPresent(grounded.customer, payload, "address", "address");
-      addIfPresent(grounded.customer, payload, "contact_person", "contact_person");
-      addIfPresent(grounded.customer, payload, "contact_name", "contact_person");
-      addIfPresent(grounded.customer, payload, "phone", "phone");
-      addIfPresent(grounded.customer, payload, "email", "email");
-    }
-
-    // Product tools
-    if (
-      s.tool === "searchProducts" ||
-      s.tool === "getProductByCode" ||
-      s.tool === "getProductDetails"
-    ) {
-      addIfPresent(grounded.product, payload, "product_name", "product_name");
-      addIfPresent(grounded.product, payload, "name", "product_name");
-      addIfPresent(grounded.product, payload, "product_code", "product_code");
-      addIfPresent(grounded.product, payload, "code", "product_code");
-      addIfPresent(grounded.product, payload, "description", "description");
-      addIfPresent(grounded.product, payload, "specifications", "specifications");
-      addIfPresent(grounded.product, payload, "specs", "specifications");
-      addIfPresent(grounded.product, payload, "brand", "brand");
-      addIfPresent(grounded.product, payload, "model", "model");
-    }
-
-    // Quotation / pricing tools
-    if (
-      s.tool === "calculateQuotationPricing" ||
-      s.tool === "createQuotationDraft"
-    ) {
-      addIfPresent(grounded.quotation, payload, "quantity", "quantity");
-      addIfPresent(grounded.quotation, payload, "qty", "quantity");
-      addIfPresent(grounded.quotation, payload, "unit_price", "unit_price");
-      addIfPresent(grounded.quotation, payload, "line_total", "line_total");
-      addIfPresent(grounded.quotation, payload, "subtotal", "subtotal");
-      addIfPresent(grounded.quotation, payload, "total", "total");
-      addIfPresent(grounded.quotation, payload, "grand_total", "grand_total");
-      addIfPresent(grounded.quotation, payload, "discount", "discount");
-      addIfPresent(grounded.quotation, payload, "margin", "margin");
-      addIfPresent(grounded.quotation, payload, "markup", "markup");
-    }
-  }
-
-  return grounded;
-}
-
-/** Labelled field claims the model might write. Each key is the
- *  canonical grounded-field name; each value is the regex that
- *  detects the corresponding label in assistant text. */
-const FIELD_CLAIM_PATTERNS: Record<string, RegExp> = {
-  customer_name:   /\bcustomer name\s*:/i,
-  customer_code:   /\bcustomer code\s*:/i,
-  address:         /\baddress\s*:/i,
-  contact_person:  /\bcontact person\s*:/i,
-  phone:           /\bphone\s*:/i,
-  email:           /\bemail\s*:/i,
-
-  product_name:    /\bproduct name\s*:/i,
-  product_code:    /\bproduct code\s*:/i,
-  description:     /\bdescription\s*:/i,
-  specifications:  /\b(specifications|specs)\s*:/i,
-  brand:           /\bbrand\s*:/i,
-  model:           /\bmodel\s*:/i,
-
-  quantity:        /\b(quantity|qty)\s*:/i,
-  unit_price:      /\bunit price\s*:/i,
-  line_total:      /\bline total\s*:/i,
-  subtotal:        /\bsubtotal\s*:/i,
-  total:           /\b(total|grand total)\s*:/i,
-  discount:        /\bdiscount\s*:/i,
-  margin:          /\bmargin\s*:/i,
-  markup:          /\bmarkup\s*:/i,
-};
-
-const EXECUTION_GUARD_V3_MESSAGE =
-  "I can only confirm fields that were returned by verified system results in this turn.";
-
-function sealExecutionSafetyV3(
-  finalReply: string,
-  steps: AgentStep[],
-): string {
-  const text = finalReply || "";
-  const grounded = collectGroundedFields(steps);
-
-  const claimedMissing: string[] = [];
-
-  for (const [field, re] of Object.entries(FIELD_CLAIM_PATTERNS)) {
-    if (!re.test(text)) continue;
-
-    // Field claim is allowed only if the EXACT canonical name is
-    // grounded in at least one of the three family sets.
-    if (
-      grounded.customer.has(field) ||
-      grounded.product.has(field) ||
-      grounded.quotation.has(field)
-    ) {
-      continue;
-    }
-
-    claimedMissing.push(field);
-  }
-
-  if (claimedMissing.length === 0) return finalReply;
-
-  replaceLastAnswerStep(steps, EXECUTION_GUARD_V3_MESSAGE);
-  console.warn(
-    "[ai.agent.execution-guard-v3] replaced field claims without grounding:",
-    claimedMissing.join(", "),
-  );
-  return EXECUTION_GUARD_V3_MESSAGE;
-}
-
-/* ─── Final-reply finalizer ─────────────────────────────────────────
-   Single entry point every orchestrate-return path must call. Runs
-   all four guards in the required order and then forcibly syncs the
-   last "answer" step in steps[] to match the sealed text — so the
-   chat-bubble text (which the route handler persists via
-   ai_messages.content = finalReply) and any downstream renderer
-   seeing steps[] can never diverge.
-
-   Before this helper, each return site chained the four guards
-   inline. A single site drifting (missing a guard, wrong order,
-   returning the pre-seal variable by mistake) was enough to leak
-   hallucinated output. Centralising in one helper makes drift
-   structurally impossible. */
-
-function syncLastAnswerStep(steps: AgentStep[], text: string): void {
-  for (let i = steps.length - 1; i >= 0; i--) {
-    if (steps[i].kind === "answer") {
-      steps[i] = {
-        ...steps[i],
-        text,
-        permissionStatus: "allowed",
-      };
-      return;
-    }
-  }
-}
-
-/* ─── Quotation Hard Mode ───────────────────────────────────────────
-   When the user asks for a quotation, we DO NOT trust the model's
-   final text at all. Instead we build the reply deterministically
-   from the tool-result payloads in steps[]. This is the only
-   correctness story for pricing — guards only reduce leak probability;
-   hard mode removes model authorship of the reply entirely.
-
-   Detection is pattern-based on the user's turn. If matched, the
-   orchestrator's final step replaces `finalReply` with
-   `buildSafeQuotationReply(steps)` and the full guard chain still
-   runs on the deterministic text as defence in depth. */
-
-const QUOTATION_REQUEST_PATTERNS: RegExp[] = [
-  /\b(create|make|draft|prepare|generate|issue|send|build|write)\s+(me\s+|us\s+)?(a\s+|the\s+|an\s+)?(quotation|quote)\b/i,
-  /\bquotation\s+for\b/i,
-  /\bquote\s+for\b/i,
-  /\bprice\s+quote\b/i,
-  /\bpricing\s+for\s+\d+\s*(units?|pcs|pieces|sets|boxes|machines)\b/i,
-  /\bquotation\s+draft\b/i,
-  /\bdraft\s+quotation\b/i,
-  /\bI\s+want\s+(a|to\s+(create|make|prepare|draft)\s+a?\s*)\s*(quotation|quote)\b/i,
-];
-
-function isQuotationRequest(userMessage: string): boolean {
-  const m = String(userMessage ?? "").trim();
-  if (!m) return false;
-  return QUOTATION_REQUEST_PATTERNS.some((re) => re.test(m));
-}
-
-/** Pick the most-specific resolved customer row from this turn.
- *  Priority: getCustomerByCode (single row) > getCustomerByName
- *  (first of up-to-5 matches). Returns null if no customer lookup
- *  succeeded with a populated payload. */
-function pickCustomerRow(steps: AgentStep[]): Record<string, unknown> | null {
-  let byNameFirst: Record<string, unknown> | null = null;
-  for (const s of steps) {
-    if (s.kind !== "tool-result" || s.permissionStatus === "denied") continue;
-    if (s.tool === "getCustomerByCode") {
-      const row = readObject(s.payload);
-      if (row) return row;
-    }
-    if (s.tool === "getCustomerByName" && !byNameFirst) {
-      if (Array.isArray(s.payload) && s.payload.length > 0) {
-        const first = readObject(s.payload[0]);
-        if (first) byNameFirst = first;
-      }
-    }
-  }
-  return byNameFirst;
-}
-
-/** Pick the most-specific resolved product row from this turn.
- *  Priority: getProductByCode / getProductDetails (single row) >
- *  searchProducts (first of .products[]). */
-function pickProductRow(steps: AgentStep[]): Record<string, unknown> | null {
-  let searchFirst: Record<string, unknown> | null = null;
-  for (const s of steps) {
-    if (s.kind !== "tool-result" || s.permissionStatus === "denied") continue;
-    if (s.tool === "getProductByCode" || s.tool === "getProductDetails") {
-      const row = readObject(s.payload);
-      if (row) return row;
-    }
-    if (s.tool === "searchProducts" && !searchFirst) {
-      const p = readObject(s.payload);
-      if (!p) continue;
-      const products = p.products;
-      if (Array.isArray(products) && products.length > 0) {
-        const first = readObject(products[0]);
-        if (first) searchFirst = first;
-      }
-    }
-  }
-  return searchFirst;
-}
-
-/** Pick the pricing-engine payload from this turn. Only counts when
- *  payloadHasPricingFields() agrees — empty-payload pricing calls
- *  (rare but possible) do NOT count as successful pricing. */
-function pickPricingPayload(
-  steps: AgentStep[],
-): Record<string, unknown> | null {
-  for (const s of steps) {
-    if (s.kind !== "tool-result" || s.permissionStatus === "denied") continue;
-    if (s.tool !== "calculateQuotationPricing") continue;
-    const p = readObject(s.payload);
-    if (p && payloadHasPricingFields(p)) return p;
-  }
-  return null;
-}
-
-function firstString(...vals: unknown[]): string | null {
-  for (const v of vals) {
-    if (typeof v === "string" && v.trim()) return v.trim();
-  }
-  return null;
-}
-
-function firstPositiveNumber(...vals: unknown[]): number | null {
-  for (const v of vals) {
-    if (typeof v === "number" && Number.isFinite(v) && v > 0) return v;
-  }
-  return null;
-}
-
-/** Deterministic quotation reply. Builds the text from tool payload
- *  fields ONLY — never from model prose. Follows the strict rule:
- *  output a field only if it exists in the payload (and only fields
- *  explicitly whitelisted here; address / contact / specs / discount
- *  / margin / markup / description / product_code are never output,
- *  per spec). Missing pieces fall back to short, fixed questions. */
-function buildSafeQuotationReply(steps: AgentStep[]): string {
-  const customer = pickCustomerRow(steps);
-  if (!customer) {
-    return "Who is this quotation for? Please send the customer name or code.";
-  }
-
-  const product = pickProductRow(steps);
-  if (!product) {
-    return "Which product should I include? You can send a product name or code.";
-  }
-
-  const pricing = pickPricingPayload(steps);
-  if (!pricing) {
-    return PRICING_GUARD_MESSAGE;
-  }
-
-  const customerName = firstString(customer.name, customer.customer_name);
-  const productName = firstString(product.product_name, product.name);
-  const currency = firstString(pricing.currency, pricing.currency_code) ?? "";
-
-  // Whitelisted per-line and aggregate pricing fields.
-  const pricingLines = Array.isArray(pricing.lines) ? pricing.lines : [];
-  const firstLine = pricingLines.length > 0 ? readObject(pricingLines[0]) : null;
-
-  const quantity = firstLine
-    ? firstPositiveNumber(firstLine.quantity, firstLine.qty)
-    : null;
-  const unitPrice = firstLine
-    ? firstPositiveNumber(firstLine.unit_price, firstLine.unitPrice, firstLine.price)
-    : null;
-  const lineTotal = firstLine
-    ? firstPositiveNumber(firstLine.line_total, firstLine.lineTotal)
-    : null;
-  const total = firstPositiveNumber(
-    pricing.total,
-    pricing.grand_total,
-    pricing.grandTotal,
-  );
-
-  const out: string[] = ["Quotation summary:"];
-  if (customerName) out.push(`- Customer: ${customerName}`);
-  if (productName) out.push(`- Product: ${productName}`);
-  if (quantity !== null) out.push(`- Quantity: ${quantity}`);
-  if (unitPrice !== null) {
-    out.push(`- Unit price: ${unitPrice}${currency ? " " + currency : ""}`);
-  }
-  if (lineTotal !== null) {
-    out.push(`- Line total: ${lineTotal}${currency ? " " + currency : ""}`);
-  }
-  if (total !== null) {
-    out.push(`- Total: ${total}${currency ? " " + currency : ""}`);
-  }
-  return out.join("\n");
-}
-
-/* ─── Final-reply sealer ───────────────────────────────────────────
-   Single funnel every orchestrate-return path calls. Two modes:
-
-     · Quotation hard mode: if the user turn was a quotation/pricing
-       request, the model's text is DISCARDED and the reply is built
-       deterministically from tool payloads via
-       buildSafeQuotationReply. The full guard chain still runs on
-       the deterministic output — defense in depth.
-
-     · Normal mode: v1 → v2 → v3 → pricing on the model's text.
-
-   Either way the last "answer" step is force-synced to the returned
-   text so steps[] and finalReply cannot diverge. */
-
-function sealFinalReply(
-  finalReply: string,
-  steps: AgentStep[],
-  userMessage?: string,
-): string {
-  // Start from the model's text. In quotation hard mode we replace
-  // it entirely with a deterministic reply before running the guard
-  // chain. The guards still run as belt-and-braces.
-  let sealed = finalReply;
-  if (userMessage && isQuotationRequest(userMessage)) {
-    sealed = buildSafeQuotationReply(steps);
-    console.warn(
-      "[ai.agent.quotation-hard-mode] model reply discarded; deterministic text used.",
-    );
-  }
-  sealed = sealExecutionSafety(sealed, steps);
-  sealed = sealExecutionSafetyV2(sealed, steps);
-  sealed = sealExecutionSafetyV3(sealed, steps);
-  sealed = sealPricingSafety(sealed, steps);
-  syncLastAnswerStep(steps, sealed);
-  return sealed;
-}
-
-/* ─── Pre-tool guard ────────────────────────────────────────────────
-   Runs AFTER the model emits tool_calls but BEFORE dispatchTool().
-   Rejects calls that are clearly invalid — missing customer, missing
-   product, missing quantity — so we never hit the DB with junk and
-   never burn the audit trail on ghost calls.
-
-   Importantly, guard failures are INTERNAL:
-     · no `tool-call` step is pushed (no chip shown)
-     · no `tool-result` step is pushed (no red "denied" chip either)
-     · the rejection is fed only to the model via the tool-role
-       message that the outer loop emits for every toolRuns entry
-     · the next model iteration sees the guard message and rephrases
-       it as a natural question to the user
-
-   Missing input is NOT a permission denial. The user just sees the
-   assistant asking for the info it needs, in the same bubble style
-   as any other reply. No red lock chip, no "denied" state.
-   ───────────────────────────────────────────────────────────────── */
-
-/** Canonical v4 UUID shape. Blocks stub/hallucinated ids like
- *  "customer-1", "CUSTOMER", "00000000" that small models occasionally
- *  invent to satisfy a required field. */
-const UUID_RE =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-
-type GuardResult = { ok: true } | { ok: false; message: string };
-
-function preToolGuard(
-  name: string,
-  args: Record<string, unknown>,
-): GuardResult {
-  switch (name) {
-    /* Whitelisted — "list products" / counts / catalogue stats must
-       keep working with no args. */
-    case "searchProducts":
-    case "countProducts":
-    case "getCatalogStats":
-      return { ok: true };
-
-    case "getCustomerByName": {
-      const q = String(args.query ?? "").trim();
-      if (!q) {
-        return {
-          ok: false,
-          message:
-            "Which customer should I look up? You can send a name or customer code.",
-        };
-      }
-      return { ok: true };
-    }
-
-    case "getCustomerByCode": {
-      const code = String(args.code ?? "").trim();
-      if (!code) {
-        return { ok: false, message: "Which customer code should I use?" };
-      }
-      return { ok: true };
-    }
-
-    case "getProductByCode": {
-      const code = String(args.code ?? "").trim();
-      if (!code) {
-        return {
-          ok: false,
-          message: "Which product code should I look up?",
-        };
-      }
-      return { ok: true };
-    }
-
-    case "getProductDetails": {
-      const id = String(args.productId ?? "").trim();
-      if (!id || !UUID_RE.test(id)) {
-        return {
-          ok: false,
-          message: "I need a product first. Which product should I use?",
-        };
-      }
-      return { ok: true };
-    }
-
-    /* Quotation workflow — strictest gate.
-       Require (a) a syntactically-valid customerId UUID AND
-               (b) at least one line with a valid product UUID + qty > 0.
-       Both tools share the same arg shape, so the guard is identical. */
-    case "calculateQuotationPricing":
-    case "createQuotationDraft": {
-      const customerId = String(args.customerId ?? "").trim();
-      const rawLines = Array.isArray(args.lines) ? args.lines : [];
-      const validLines = rawLines.filter((l) => {
-        const rec = l as { productId?: unknown; qty?: unknown };
-        const pid = String(rec.productId ?? "").trim();
-        const qty = Number(rec.qty ?? 0);
-        return pid && UUID_RE.test(pid) && qty > 0;
-      });
-      const customerOk = customerId && UUID_RE.test(customerId);
-      const linesOk = validLines.length > 0;
-
-      if (!customerOk && !linesOk) {
-        /* Nothing usable at all — fully-generic ask. */
-        return {
-          ok: false,
-          message:
-            "To prepare a quotation, I need the customer name or code, plus the product and quantity.",
-        };
-      }
-      if (!customerOk) {
-        return {
-          ok: false,
-          message:
-            "Who is this quotation for? Please send the customer name or code.",
-        };
-      }
-      if (!linesOk) {
-        return {
-          ok: false,
-          message:
-            "Which product and quantity should I include in the quotation?",
-        };
-      }
-      return { ok: true };
-    }
-
-    default:
-      /* Unknown tool names fall through — the registry dispatcher is
-         still the enforcement point for unknown-tool and permission
-         checks. We only gate the specific arg shapes we know about. */
-      return { ok: true };
-  }
-}
-
-/* ── Provider-agnostic fallback ──
-   Runs when GROQ_API_KEY is missing but another provider IS configured.
-   We skip the tool-calling loop entirely and just produce a chat reply
-   via the shared aiChat() abstraction (which already supports Gemini /
-   Anthropic / OpenAI). The reply gets a one-line "Tools are off" tail
-   so operators know live-data answers aren't available until Groq is
-   wired. Same AgentResponse shape so the caller doesn't care which
-   path was taken. */
-async function orchestrateNoGroq(
-  input: OrchestrateInput,
-  tStart: number,
-): Promise<AgentResponse> {
-  const { history, userMessage, userLang, conversationId } = input;
-  /* Lightweight system prompt — no tool schemas; the model is just
-     answering naturally. Keeps the same language-anchoring as the
-     full agent path. */
-  const systemPrompt =
-    "You are Koleex AI, the assistant inside the Koleex Hub ERP. " +
-    `Reply concisely in the user's language (${userLang ?? "en"}). ` +
-    "You currently do NOT have access to the company's live data (tool calls are disabled). " +
-    "Be helpful for general questions and conversational turns. If asked to look up live data, " +
-    "explain that the tool-calling layer needs a Groq API key and offer to help with anything else. " +
-    BRAND_EXCLUSIVITY_RULE + "\n\n" + DIRECT_VOICE_RULE + "\n\n" + DATA_PROTECTION_RULE;
-
-  /* Trim history to the last few turns so the wire payload stays
-     small — matches the Groq path which also caps history. */
-  const trimmed = history.slice(-10).map((m) => ({
-    role: m.role as "user" | "assistant" | "system",
-    content: m.content,
-  }));
-  const messages = [
-    { role: "system" as const, content: systemPrompt },
-    ...trimmed,
-    { role: "user" as const, content: userMessage },
-  ];
-
-  try {
-    const result = await aiChat(messages);
-    const reply =
-      result?.reply?.trim() ||
-      "I couldn't reach the AI provider just now. Try again in a moment.";
-    const steps: AgentStep[] = [{ kind: "answer", text: reply }];
-    const safeReply = sealFinalReply(reply, steps, userMessage);
-    console.log(
-      `[ai.agent.timing] fast=no-groq provider=${result?.provider ?? "none"} total=${Date.now() - tStart}ms`,
-    );
-    return {
-      steps,
-      finalReply: safeReply,
-      provider: result?.provider ?? "fallback",
-      conversationId,
-    };
-  } catch (e) {
-    console.error("[ai.agent.no-groq]", e);
-    return fallback(
-      "Something went wrong reaching the AI provider. Please try again.",
-      conversationId,
-      userMessage,
-    );
-  }
-}
-
-function fallback(
-  msg: string,
-  conversationId: string,
-  userMessage?: string,
-): AgentResponse {
-  /* Defense-in-depth: even this helper — which today is only called
-     with fixed server-controlled strings — passes through the
-     pricing-safety gate. Keeps every AgentResponse exit consistent. */
-  const steps: AgentStep[] = [
-    { kind: "answer", text: msg, permissionStatus: "denied" },
-  ];
-  console.warn("[ai.agent.final.before]", msg);
-  const safeReply = sealFinalReply(msg, steps, userMessage);
-  console.warn("[ai.agent.final.after]", safeReply);
-  return {
-    steps,
-    finalReply: safeReply,
-    provider: `deepseek:${AGENT_MODEL}`,
-    conversationId,
-  };
-}
-
-/* ─── Groq call with retry-after aware backoff ────────────────────────
-   Groq's free tier is ~6k tokens / minute on Llama 3.3 70B. With the
-   agent loop invoking the model several times per user turn (tool
-   schemas alone cost 2-3k tokens each call), bursts can hit 429 even
-   on normal use. When that happens Groq returns a `retry-after`
-   header (seconds). We honour it up to 3 times before giving up so a
-   brief rate-limit doesn't surface as a scary error. */
-/** Same retry semantics as callGroqWithRetry but the model call does
- *  NOT include tools. Used for the small-talk fast-path so chit-chat
- *  doesn't burn the tool-schema token overhead on every turn. */
-/* Retry budget: up to 3 extra attempts with exponential backoff,
-   capped by Groq's `retry-after` when provided. Total wait stays
-   under ~10s so the UI doesn't feel frozen, but it's enough for a
-   typical Groq free-tier rate-limit window to clear. */
-const MAX_RETRIES = 3;
-const BACKOFF_CAP_MS = 8000;
-
-function backoffWaitMs(res: Response, attempt: number): number {
-  const ra = Number(res.headers.get("retry-after"));
-  if (Number.isFinite(ra) && ra > 0) return Math.min(ra * 1000, BACKOFF_CAP_MS);
-  // 1s, 2s, 4s, …
-  return Math.min(1000 * 2 ** attempt, BACKOFF_CAP_MS);
-}
-
-async function callGroqPlain(
-  key: string,
-  messages: WireMsg[],
-  opts: { maxTokens?: number } = {},
-  attempt = 0,
-): Promise<Response> {
-  /* Fast-path parameters. Caller passes maxTokens based on the
-     expected answer length — small-talk needs ~160; brand answers
-     are structured multi-paragraph responses that need ~1200 to
-     complete without truncation. The agent loop uses its own
-     callGroqWithRetry with 2048 tokens. */
-  const maxTokens = opts.maxTokens ?? 160;
-  const res = await fetch(AGENT_LLM_URL, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${key}`,
-    },
-    body: JSON.stringify({
-      model: AGENT_MODEL,
-      messages,
-      temperature: 0.3,
-      max_tokens: maxTokens,
-    }),
-  });
-  if ((res.status === 429 || res.status === 503) && attempt < MAX_RETRIES) {
-    await new Promise((r) => setTimeout(r, backoffWaitMs(res, attempt)));
-    return callGroqPlain(key, messages, opts, attempt + 1);
-  }
-  return res;
-}
-
-/** One STREAMING chat-completions call. Content tokens are forwarded to
- *  onDelta live (until a tool_call appears — tool rounds stay silent);
- *  streamed tool_call fragments are re-assembled by index so the normal
- *  dispatch loop can run unchanged. */
-async function callGroqStreamingOnce(
-  key: string,
-  messages: WireMsg[],
-  opts: { toolChoice: "auto" | "none"; onDelta: (t: string) => void },
-): Promise<{
-  ok: boolean;
-  status: number;
-  bodyText: string;
-  content: string;
-  toolCalls: Array<{ id: string; type: "function"; function: { name: string; arguments: string } }>;
-}> {
-  const body: Record<string, unknown> = {
-    model: AGENT_MODEL,
-    messages,
-    temperature: 0.3,
-    max_tokens: 2048,
-    stream: true,
-  };
-  if (opts.toolChoice !== "none") {
-    body.tools = openAiToolSchemas();
-    body.tool_choice = "auto";
-  }
-  const res = await fetch(AGENT_LLM_URL, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${key}`,
-    },
-    body: JSON.stringify(body),
-  });
-  if (!res.ok || !res.body) {
-    return {
-      ok: false,
-      status: res.status,
-      bodyText: await res.text().catch(() => ""),
-      content: "",
-      toolCalls: [],
-    };
-  }
-  const reader = res.body.getReader();
-  const decoder = new TextDecoder();
-  let buf = "";
-  let content = "";
-  let sawTool = false;
-  const calls: Array<{ id: string; type: "function"; function: { name: string; arguments: string } }> = [];
-  while (true) {
-    const { value, done } = await reader.read();
-    if (done) break;
-    buf += decoder.decode(value, { stream: true });
-    const lines = buf.split("\n");
-    buf = lines.pop() ?? "";
-    for (const line of lines) {
-      const t = line.trim();
-      if (!t.startsWith("data:")) continue;
-      const payload = t.slice(5).trim();
-      if (!payload || payload === "[DONE]") continue;
-      try {
-        const j = JSON.parse(payload) as {
-          choices?: Array<{
-            delta?: {
-              content?: string;
-              tool_calls?: Array<{
-                index?: number;
-                id?: string;
-                function?: { name?: string; arguments?: string };
-              }>;
-            };
-          }>;
-        };
-        const d = j.choices?.[0]?.delta;
-        if (!d) continue;
-        if (d.tool_calls) {
-          sawTool = true;
-          for (const tc of d.tool_calls) {
-            const i = tc.index ?? 0;
-            while (calls.length <= i) {
-              calls.push({ id: "", type: "function", function: { name: "", arguments: "" } });
-            }
-            if (tc.id) calls[i].id = tc.id;
-            if (tc.function?.name) calls[i].function.name += tc.function.name;
-            if (tc.function?.arguments) calls[i].function.arguments += tc.function.arguments;
-          }
-        }
-        if (typeof d.content === "string" && d.content) {
-          content += d.content;
-          if (!sawTool) opts.onDelta(d.content);
-        }
-      } catch {
-        /* partial frame across chunks — next iteration completes it */
-      }
-    }
-  }
-  return { ok: true, status: 200, bodyText: "", content, toolCalls: calls.filter((c) => c.function.name) };
-}
-
-async function callGroqWithRetry(
-  key: string,
-  messages: WireMsg[],
-  opts: { toolChoice?: "auto" | "none" } = {},
-  attempt = 0,
-): Promise<Response> {
-  const toolChoice = opts.toolChoice ?? "auto";
-  const body: Record<string, unknown> = {
-    model: AGENT_MODEL,
-    messages,
-    temperature: 0.3,
-    max_tokens: 2048,
-  };
-  if (toolChoice !== "none") {
-    body.tools = openAiToolSchemas();
-    body.tool_choice = "auto";
-  }
-  const res = await fetch(AGENT_LLM_URL, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${key}`,
-    },
-    body: JSON.stringify(body),
-  });
-  /* Retry budget: up to MAX_RETRIES with exponential backoff, capped
-     by Groq's `retry-after` and BACKOFF_CAP_MS. Gives a brief Groq
-     free-tier rate-limit window time to clear before we surface the
-     friendly "handling a lot of requests" message. */
-  if ((res.status === 429 || res.status === 503) && attempt < MAX_RETRIES) {
-    await new Promise((r) => setTimeout(r, backoffWaitMs(res, attempt)));
-    return callGroqWithRetry(key, messages, opts, attempt + 1);
-  }
-  return res;
-}

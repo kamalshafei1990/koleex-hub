@@ -19,6 +19,7 @@
    --------------------------------------------------------------------------- */
 
 import dynamic from "next/dynamic";
+import RouteTabPane from "@/components/ui/RouteTabPane";
 import { useSkin } from "@/lib/appearance";
 
 /* ssr:false and mounted only under Aurora — a canvas is the one thing the skin
@@ -34,7 +35,7 @@ export default function FinanceLayout({ children }: { children: React.ReactNode 
           <WavyBackground topLight />
         </div>
       )}
-      {children}
+      <RouteTabPane>{children}</RouteTabPane>
     </div>
   );
 }

@@ -21,6 +21,8 @@ import InfoIcon from "@/components/icons/ui/InfoIcon";
 import MapPinIcon from "@/components/icons/ui/MapPinIcon";
 import UsersIcon from "@/components/icons/ui/UsersIcon";
 import CompleteSetConfigurator from "./CompleteSetConfigurator";
+import { getCountryByCode } from "@/lib/commercial-policy/countries";
+import { getTierColor, tierTextStyle } from "@/lib/customer-tiers";
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 
 interface Preview {
@@ -52,8 +54,6 @@ interface MarketOpt { code: string; name: string }
 
 const usd = (n: number | null | undefined) =>
   n == null ? "—" : `$${Number(n).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-const cny = (n: number | null | undefined) =>
-  n == null ? "—" : `¥${Number(n).toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
 const pct = (n: number | null | undefined) =>
   n == null ? "—" : `${n > 0 ? "+" : ""}${Number(n).toLocaleString(undefined, { maximumFractionDigits: 1 })}%`;
 
@@ -143,7 +143,7 @@ export default function PricingIntelligenceCard({
       { k: market?.bandCode ? `Band ${market.bandCode}` : "Market", v: pct(market?.adjustmentPercent ?? 0), sub: `${country} · all channels` },
       { k: "End-user (market)", v: usd(market?.regionalFobUsd), sub: "retail + band", strong: true },
     ];
-  }, [base, market, data, country]);
+  }, [base, market, country]);
 
   /* ── States that aren't the full breakdown ── */
   if (!isCny) {
@@ -251,7 +251,21 @@ export default function PricingIntelligenceCard({
                 <tbody>
                   {(data?.channels ?? []).map((c) => (
                     <tr key={c.tierCode} className="border-t border-[var(--border-subtle)]/60">
-                      <td className="px-3 py-2 text-[var(--text-primary)]">{c.tierName}</td>
+                      {/* Tier name in the SAME precious-metal colors the
+                          Customers app uses — one source of truth
+                          (customer-tiers.ts), gradient-clipped text with the
+                          kx-tier-metal sheen. Tiers outside the canon (custom
+                          names) keep the plain text color. */}
+                      <td className="px-3 py-2 text-[var(--text-primary)]">
+                        {(() => {
+                          const meta = getTierColor(c.tierName);
+                          return meta ? (
+                            <span className="kx-tier-metal font-semibold" style={tierTextStyle(meta)}>{c.tierName}</span>
+                          ) : (
+                            c.tierName
+                          );
+                        })()}
+                      </td>
                       <td className="px-3 py-2 text-right font-semibold text-[var(--text-primary)] tabular-nums">{usd(c.unitPriceUsd)}</td>
                       {/* PURE commercial margin — the governed number. */}
                       <td className="px-3 py-2 text-right tabular-nums">
@@ -287,15 +301,26 @@ export default function PricingIntelligenceCard({
               <h4 className="text-[12px] font-semibold text-[var(--text-primary)]">End-user price across key markets</h4>
             </div>
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
-              {(data?.markets ?? []).map((m) => (
+              {/* Alphabetical by the DISPLAYED name — the API list is sorted
+                  by ISO code, which reads as random once full names show
+                  (United Arab Emirates would lead as "AE"). */}
+              {[...(data?.markets ?? [])]
+                .sort((a, b) =>
+                  (getCountryByCode(a.code)?.name ?? a.code).localeCompare(
+                    getCountryByCode(b.code)?.name ?? b.code,
+                  ),
+                )
+                .map((m) => (
                 <button
                   type="button"
                   key={m.code}
                   onClick={() => setCountry(m.code)}
                   className={`text-left rounded-lg border px-2.5 py-2 transition-colors ${m.code === country ? "border-[var(--border-strong)] bg-[var(--bg-inverted)]/[0.04]" : "border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)]/40 hover:border-[var(--border-strong)]"}`}
                 >
-                  <div className="text-[10px] font-semibold text-[var(--text-primary)]"><span className="text-[12px]">{flagOf(m.code)}</span> {m.code} <span className="text-[var(--text-ghost)] font-normal">{m.bandCode ? `· ${m.bandCode}` : ""} {pct(m.adjustmentPercent)}</span></div>
-                  <div className="text-[13px] font-bold text-[var(--text-primary)] tabular-nums mt-0.5">{usd(m.regionalFobUsd)}</div>
+                  {/* Full country name (owner preference) — the ISO code was
+                      compact but unreadable at a glance across 39 tiles. */}
+                  <div className="text-[10px] font-semibold text-[var(--text-primary)]"><span className="text-[12px]">{flagOf(m.code)}</span> {getCountryByCode(m.code)?.name ?? m.code} <span className="text-[var(--text-ghost)] font-normal">{m.bandCode ? `· ${m.bandCode}` : ""} {pct(m.adjustmentPercent)}</span></div>
+                  <div className="text-[17px] font-bold text-[var(--text-primary)] tabular-nums mt-1 tracking-tight">{usd(m.regionalFobUsd)}</div>
                 </button>
               ))}
             </div>

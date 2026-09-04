@@ -22,26 +22,29 @@
    responses instead of re-fetching when it finally mounts.
    --------------------------------------------------------------------------- */
 
-import { useEffect, useState } from "react";
-import dynamic from "next/dynamic";
+import { useEffect, useState, type ComponentType } from "react";
 import BellIcon from "@/components/icons/ui/BellIcon";
 import { cachedGet } from "@/lib/client-cache";
 
-/* Loaded ONLY once the user opens it. `loading` renders nothing: the gate's
-   own button stays on screen underneath until the real one takes over, so the
-   header never flickers or shifts. */
-const NotificationBell = dynamic(() => import("./NotificationBell"), {
-  ssr: false,
-  loading: () => null,
-});
+/* ⚠️ NOT next/dynamic. The swap used to hand over to a `dynamic()` wrapper —
+   and even with the module ALREADY imported and awaited, that wrapper renders
+   its `loading` fallback (null) for its first few frames while it resolves
+   its own loadable state. Measured on the real click: the bell vanished from
+   the DOM for ~280ms, the header items beside it slid across, then the real
+   bell appeared — precisely the owner's "it disappears or changes position on
+   the first press". The wrapper added nothing here: handOver() already awaits
+   the raw import, so the RESOLVED component is held in state and rendered
+   directly — a mount with no intermediate null, ever. */
+type BellComponent = ComponentType<{ dk: boolean; defaultOpen?: boolean }>;
 
 interface Badges { data?: { unread?: number } }
 interface Channels { data?: { unread_count?: number }[] }
 
 export default function NotificationBellGate({ dk }: { dk: boolean }) {
-  const [opened, setOpened] = useState(false);
+  const [Bell, setBell] = useState<BellComponent | null>(null);
   const [pending, setPending] = useState(false);
   const [count, setCount] = useState(0);
+  const opened = Bell !== null;
 
   /* WAIT for the chunk before handing over. `loading: () => null` plus an
      immediate swap meant that on a cold click — no hover to prefetch, which is
@@ -70,14 +73,42 @@ export default function NotificationBellGate({ dk }: { dk: boolean }) {
        again in the meantime is free — import() de-dupes onto one request. */
     const settle = window.setTimeout(() => setPending(false), 4000);
     try {
-      await import("./NotificationBell");
-      setOpened(true);
+      const mod = await import("./NotificationBell");
+      /* setState with a function value: React would otherwise CALL the
+         component as an updater. */
+      setBell(() => mod.default as BellComponent);
     } catch {
       setPending(false); /* genuinely failed — leave a normal, pressable bell */
     } finally {
       window.clearTimeout(settle);
     }
   };
+
+  /* WARM THE CHUNK IN IDLE TIME — the first-press fix (owner, 2026-08-21:
+     "the notification bell have bug when I press it for the first time").
+     The gate exists to keep the bell's 184KB+ module out of BOOT, and it
+     still does: this waits for the browser's idle callback AND an 8s floor
+     after mount, so every boot metric the perf program watches is settled
+     long before the fetch starts. But without it, the very first press of a
+     session paid the whole download inside the press — on a phone over
+     mobile data that is seconds of a dead-looking button, which is
+     precisely what a first-press bug report looks like. Reproduced clean on
+     a warm desktop; the cold path is the one that hurts. Visible tab only:
+     background tabs must not spend the user's data warming a bell. */
+  useEffect(() => {
+    if (opened) return;
+    let cancelled = false;
+    const warm = () => {
+      if (cancelled || document.visibilityState !== "visible") return;
+      void import("./NotificationBell");
+    };
+    const t = window.setTimeout(() => {
+      const ric = (window as Window & { requestIdleCallback?: (cb: () => void, o?: { timeout: number }) => number }).requestIdleCallback;
+      if (ric) ric(warm, { timeout: 4000 });
+      else warm();
+    }, 8000);
+    return () => { cancelled = true; window.clearTimeout(t); };
+  }, [opened]);
 
   /* Poll the two counts while the panel is closed. Once it is open the real
      bell owns the numbers (and its own realtime), so this steps aside rather
@@ -106,9 +137,20 @@ export default function NotificationBellGate({ dk }: { dk: boolean }) {
           } catch { /* fall through to the endpoints */ }
         }
         if (!inbox && !channels) {
+          /* YIELD TO THE SCREEN FIRST. A request costs 400-920ms on this
+             network path (measured on prod 2026-08-22), so two badge reads
+             fired during a navigation compete with the data the operator is
+             actually waiting to see — measured landing on /products, which
+             does not own either of them. An unread count is never worth
+             delaying the page: wait for the screen's own fetching to go
+             quiet, with a ceiling so a chatty screen cannot starve the
+             badge forever. */
+          const { whenNetworkQuiet } = await import("@/lib/net-idle");
+          await whenNetworkQuiet({ quietMs: 500, maxWaitMs: 4000 });
+          if (!alive) return;
           [inbox, channels] = await Promise.all([
-            cachedGet<Badges>("/api/inbox/feed?resource=badges", 15_000).catch(() => null),
-            cachedGet<Channels>("/api/discuss/read?resource=myChannels", 15_000).catch(() => null),
+            cachedGet<Badges>("/api/inbox/feed?resource=badges", 45_000).catch(() => null),
+            cachedGet<Channels>("/api/discuss/read?resource=myChannels", 45_000).catch(() => null),
           ]);
         }
         if (!alive) return;
@@ -125,8 +167,10 @@ export default function NotificationBellGate({ dk }: { dk: boolean }) {
   }, [opened]);
 
   /* Handed over: the real bell renders its own button AND its panel, so the
-     stub must disappear or there would be two bells. */
-  if (opened) return <NotificationBell dk={dk} defaultOpen />;
+     stub must disappear or there would be two bells. Rendering the resolved
+     module directly means the stub's unmount and the real bell's mount happen
+     in ONE commit — no frame without a bell. */
+  if (Bell) return <Bell dk={dk} defaultOpen />;
 
   return (
     <button

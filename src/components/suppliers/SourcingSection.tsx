@@ -59,10 +59,9 @@ const bandCls: Record<string, string> = {
 type Summary = { score: number | null; priority: number | null; preferredProducts: number; blockedProducts: number; soleSource: boolean } | null;
 
 export default function SourcingSection({
-  supplierId, supplierName, sourcing, sourcingProfile, sourcingLinks, specializations, onSaved,
+  supplierId, sourcing, sourcingProfile, sourcingLinks, specializations, onSaved,
 }: {
   supplierId: string;
-  supplierName: string;
   sourcing: Summary;
   sourcingProfile: Row | null;
   sourcingLinks: Row[];
@@ -222,12 +221,20 @@ export default function SourcingSection({
                       {terms.length ? <div className="mt-1 flex flex-wrap gap-1.5">{terms.map((t, i) => <span key={i} className="rounded-full bg-[var(--bg-surface)] px-2 py-0.5 text-[11px] text-[var(--text-secondary)]">{t}</span>)}</div> : null}
                       {str(l, "risk_notes") ? <div className="mt-1 text-[11px] text-[var(--text-faint)]">{str(l, "risk_notes")}</div> : null}
                     </div>
+                    {l.derived ? (
+                      /* Derived from product_suppliers.sourcing_status (the
+                         product form's Supplier tab) — no roles-table row to
+                         PATCH/DELETE, so it renders read-only. Change it on
+                         the product, or assign a real role here to override. */
+                      <span className="shrink-0 self-center rounded-full bg-[var(--bg-surface)] px-2 py-0.5 text-[10px] text-[var(--text-faint)]">{t("srcg.fromProductForm", "from product form")}</span>
+                    ) : (
                     <div className="flex shrink-0 items-center gap-0.5">
                       <select value={str(l, "sourcing_role")} disabled={busyId === id} onChange={(e) => setRole(l, e.target.value)} className="rounded-md bg-[var(--bg-surface)] px-1.5 py-1 text-[11px] text-[var(--text-secondary)] outline-none">
                         {SOURCING_ROLE_ORDER.map((r) => <option key={r} value={r}>{SOURCING_ROLE_LABELS[r]}</option>)}
                       </select>
                       <button type="button" disabled={busyId === id} onClick={() => removeRole(l)} className="rounded-md p-1.5 text-[var(--text-faint)] hover:bg-[var(--bg-surface)] hover:text-rose-400 disabled:opacity-40" title={t("srcg.removeRole", "Remove role")}><TrashIcon className="h-3.5 w-3.5" /></button>
                     </div>
+                    )}
                   </div>
                 </div>
               );

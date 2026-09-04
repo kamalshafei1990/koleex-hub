@@ -13,6 +13,7 @@ import "server-only";
 
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
+import { supersedeUnread } from "@/lib/server/inbox-lifecycle";
 import { sendPushToAccounts } from "@/lib/server/web-push";
 import { nextOccurrenceStart, type CalendarRec } from "@/lib/calendar-recurrence";
 
@@ -81,7 +82,11 @@ export async function GET(req: Request) {
     );
 
     const whenStr = occ.toLocaleString();
-    await supabaseServer.from("inbox_messages").insert(
+    await supersedeUnread({
+        recipients: recipients,
+        meta: { type: "calendar_reminder", event_id: ev.id },
+      });
+      await supabaseServer.from("inbox_messages").insert(
       recipients.map((rid) => ({
         recipient_account_id: rid,
         sender_account_id: null,
