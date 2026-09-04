@@ -31,6 +31,8 @@ import ArrowLeftIcon from "@/components/icons/ui/ArrowLeftIcon";
 import PlusIcon from "@/components/icons/ui/PlusIcon";
 import PictureIcon from "@/components/icons/ui/PictureIcon";
 import LibraryPanel from "@/components/ai/LibraryPanel";
+import CallsPanel from "@/components/ai/CallsPanel";
+import PhoneCallIcon from "@/components/icons/ui/PhoneCallIcon";
 import PaperPlaneIcon from "@/components/icons/ui/PaperPlaneIcon";
 import MicButton, { speakText, type TtsHandle } from "@/components/ai/MicButton";
 import VoiceCallButton from "@/components/ai/VoiceCallButton";
@@ -449,10 +451,13 @@ export default function KoleexAiApp() {
   /* THE LIBRARY (roadmap C3) takes the main pane while open; opening any
      chat, or starting one, puts the chat back. */
   const [libraryOpen, setLibraryOpen] = useState(false);
+  /* THE CALLS HISTORY (roadmap D2), the same way. */
+  const [callsOpen, setCallsOpen] = useState(false);
 
   const openConversation = useCallback(
     async (id: string) => {
       setLibraryOpen(false);
+      setCallsOpen(false);
       /* Audit P0 #1 — abort any in-flight send before switching
          conversations. Without this, the SSE reader keeps consuming
          deltas into a placeholder that no longer exists in the
@@ -493,6 +498,7 @@ export default function KoleexAiApp() {
   /* ── New chat — create row, become active, reset messages ── */
   const startNewChat = useCallback(async () => {
     setLibraryOpen(false);
+    setCallsOpen(false);
     /* Same abort as openConversation — audit P0 #1. */
     abortRef.current?.abort();
     /* Starting a chat while standing inside a folder files it there — the
@@ -1873,7 +1879,7 @@ export default function KoleexAiApp() {
         <div className="px-2 pb-1">
           <button
             type="button"
-            onClick={() => { setLibraryOpen(true); setSidebarOpen(false); }}
+            onClick={() => { setLibraryOpen(true); setCallsOpen(false); setSidebarOpen(false); }}
             aria-pressed={libraryOpen}
             className={`w-full h-8 px-2 rounded-lg text-start text-[13px] flex items-center gap-2 ${
               libraryOpen
@@ -1883,6 +1889,19 @@ export default function KoleexAiApp() {
           >
             <PictureIcon size={14} />
             {copy.library}
+          </button>
+          <button
+            type="button"
+            onClick={() => { setCallsOpen(true); setLibraryOpen(false); setSidebarOpen(false); }}
+            aria-pressed={callsOpen}
+            className={`w-full h-8 px-2 rounded-lg text-start text-[13px] flex items-center gap-2 ${
+              callsOpen
+                ? "bg-[var(--bg-surface)] text-[var(--text-primary)]"
+                : "text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-subtle)]"
+            }`}
+          >
+            <PhoneCallIcon size={14} />
+            {copy.calls}
           </button>
         </div>
 
@@ -2197,6 +2216,8 @@ export default function KoleexAiApp() {
           <div className="relative z-[1] max-w-[820px] mx-auto px-4 md:px-6 py-6 space-y-4">
             {libraryOpen ? (
               <LibraryPanel copy={copy} onOpenConversation={(id) => void openConversation(id)} />
+            ) : callsOpen ? (
+              <CallsPanel copy={copy} lang={lang} onOpenConversation={(id) => void openConversation(id)} />
             ) : loadingConv ? (
               <div className="flex items-center justify-center py-20">
                 <SpinnerIcon className="h-5 w-5 text-[var(--text-dim)]" />

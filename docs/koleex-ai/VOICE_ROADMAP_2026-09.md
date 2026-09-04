@@ -51,7 +51,7 @@ covers the loud room in the meantime.
 | # | Item | How |
 |---|------|-----|
 | D1 | Tasks by voice, saved by a tap — **done (#353)** | "Save a task: follow up with X on Thursday" → the model previews `createTodo` (the same two-phase tool the text lane uses; the ledger records the preview), a card appears on the screen with the task in the caller's words, and only the caller's **tap** on Save carries the confirm to the server — the tool route refuses a confirm from the model's own call, because a spoken "yes" can be misheard and a tap cannot. The model is told the outcome in a note it does not answer. The one write on the voice list |
-| D2 | Calls history | The summaries exist (B1); a "Calls" view lists past calls with their summary and opens the chat |
+| D2 | Calls history — **done (#354)** | A "Calls" row in the sidebar lists the caller's past calls, newest first, each by the summary Koleex AI wrote when it ended (B1), with the time, the chat's title and "Open chat". The summary message is the record of the call: `GET /api/ai/calls` reads them owner-scoped; no table of calls, nothing stored twice |
 | D3 | Usage page for the owner | Calls, messages, searches, tool use and cost per day, no message content; from the tables that already exist |
 | D4 | Photo of a product → ask about it | Confirm the text lane's image attachments reach a model that can see; then wire the question |
 | D5 | Export a chat | PDF or share link of one conversation |
