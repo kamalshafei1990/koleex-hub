@@ -1470,8 +1470,13 @@ export const ProductPreview = (props: ProductPreviewProps) => {
           spec tables happily claimed the rest. The rail's job is to hold a
           readable photo, so its width is not negotiable; only the detail column
           flexes. */}
-      <div className="lg:grid lg:grid-cols-[288px_minmax(0,1fr)] xl:grid-cols-[340px_minmax(0,1fr)] lg:gap-12 xl:gap-20 lg:items-start">
-        <aside className="hidden lg:flex lg:sticky lg:top-24 flex-col gap-5">
+      <div className="md:grid md:grid-cols-[236px_minmax(0,1fr)] lg:grid-cols-[288px_minmax(0,1fr)] xl:grid-cols-[340px_minmax(0,1fr)] md:gap-8 lg:gap-12 xl:gap-20 md:items-start">
+        {/* From md, not lg. Gating the spine at 1024 meant a 900px laptop — and
+            the preview pane itself — saw the OLD single column and nothing of
+            this design at all. The rail narrows to 236px there instead of
+            disappearing; below md it does step out, where a sticky column
+            would eat the screen the detail needs. */}
+        <aside className="hidden md:flex md:sticky md:top-24 flex-col gap-4 lg:gap-5">
           {mainImageUrl ? (
             <div className="overflow-hidden rounded-2xl border border-[var(--border-subtle)] bg-white">
               {/* eslint-disable-next-line @next/next/no-img-element */}
