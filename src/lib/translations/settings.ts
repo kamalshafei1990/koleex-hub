@@ -181,6 +181,20 @@ export const settingsT: Translations = {
   "ai.saving":            { en: "Saving…", zh: "保存中…", ar: "جارٍ الحفظ…" },
   "ai.saved":             { en: "Saved", zh: "已保存", ar: "تم الحفظ" },
   "ai.error":             { en: "Could not save. Try again.", zh: "无法保存，请重试。", ar: "مقدرناش نحفظ. جرّب تاني." },
+  /* Roadmap D3 — usage, for the owner. Counts only; no content, no cost. */
+  "ai.usage.title":       { en: "Usage (last 14 days)", zh: "使用情况（最近 14 天）", ar: "الاستخدام (آخر 14 يوم)" },
+  "ai.usage.desc":        { en: "How much Koleex AI is used across the company. Counts only — no message content. Cost is not shown: token usage is logged per turn but not stored, so a figure here would be a guess.", zh: "全公司使用 Koleex AI 的情况。仅统计数量，不含消息内容。不显示费用：每轮的 token 用量只记录在日志中，未保存，这里的数字只会是猜测。", ar: "قد إيه الشركة بتستخدم Koleex AI. أرقام بس من غير محتوى الرسائل. التكلفة مش معروضة: استهلاك كل رسالة بيتسجل في اللوج بس مابيتحفظش، فأي رقم هنا هيبقى تخمين." },
+  "ai.usage.day":         { en: "Day", zh: "日期", ar: "اليوم" },
+  "ai.usage.chats":       { en: "Chats", zh: "对话", ar: "محادثات" },
+  "ai.usage.typed":       { en: "Typed", zh: "文字", ar: "مكتوب" },
+  "ai.usage.spoken":      { en: "Spoken", zh: "语音", ar: "منطوق" },
+  "ai.usage.calls":       { en: "Calls", zh: "通话", ar: "مكالمات" },
+  "ai.usage.tools":       { en: "Lookups", zh: "查询", ar: "استعلامات" },
+  "ai.usage.people":      { en: "People active", zh: "活跃人数", ar: "ناس نشطين" },
+  "ai.usage.topTools":    { en: "Most used lookups", zh: "最常用的查询", ar: "أكثر الاستعلامات استخدامًا" },
+  "ai.usage.ok":          { en: "succeeded", zh: "成功", ar: "نجحت" },
+  "ai.usage.empty":       { en: "Nothing yet in this window.", zh: "这段时间还没有记录。", ar: "مفيش حاجة لسه في الفترة دي." },
+  "ai.usage.failed":      { en: "Could not load usage.", zh: "无法加载使用情况。", ar: "مقدرناش نحمّل الاستخدام." },
 
   /* ── Sounds ── */
   "sounds.title":         { en: "Sound", zh: "声音", ar: "الصوت" },

@@ -252,6 +252,11 @@ export default function AiTab({ account, onChanged }: {
         </div>
       </SettingsGroup>
 
+      {/* ── USAGE, FOR THE OWNER (roadmap D3) ─────────────────────────────
+          Only a super admin sees it, and the server decides that again on
+          the request: this flag only saves a fetch that would be refused. */}
+      {account.is_super_admin && <UsageSection t={t} />}
+
       {/* Same bar as Profile: sticky, and clear of the floating dock's gutter. */}
       <div className="kx-bar-host sticky bottom-0 pt-2 pb-1 bg-gradient-to-t from-[var(--bg-primary)] via-[var(--bg-primary)] to-transparent">
         <div aria-hidden className="kx-glass-bar" />
@@ -270,5 +275,85 @@ export default function AiTab({ account, onChanged }: {
         </div>
       </div>
     </div>
+  );
+}
+
+
+/* ── The usage report: counts by day, top lookups, people active ────────
+   Fetched once when the tab opens. A table, not a chart: fourteen rows a
+   person can read on a phone, and nothing that needs a library. */
+type UsageReport = {
+  days: Array<{ day: string; typed: number; spoken: number; replies: number; chats: number; calls: number; tools: number }>;
+  tools: Array<{ name: string; count: number; okRate: number }>;
+  people: number;
+  totals: { typed: number; spoken: number; replies: number; chats: number; calls: number; tools: number };
+};
+
+function UsageSection({ t }: { t: (k: string) => string }) {
+  const [report, setReport] = useState<UsageReport | null | "failed">(null);
+  useEffect(() => {
+    const ctl = new AbortController();
+    fetch("/api/ai/usage?days=14", { credentials: "include", signal: ctl.signal })
+      .then((r) => (r.ok ? r.json() : Promise.reject(new Error(String(r.status)))))
+      .then((body: UsageReport) => { if (!ctl.signal.aborted) setReport(body); })
+      .catch(() => { if (!ctl.signal.aborted) setReport("failed"); });
+    return () => ctl.abort();
+  }, []);
+  const cols: Array<[string, keyof UsageReport["totals"]]> = [
+    [t("ai.usage.chats"), "chats"], [t("ai.usage.typed"), "typed"], [t("ai.usage.spoken"), "spoken"], [t("ai.usage.calls"), "calls"], [t("ai.usage.tools"), "tools"],
+  ];
+  return (
+    <SettingsGroup header={t("ai.usage.title")} footer={t("ai.usage.desc")} flush={false}>
+      <div className="px-4 py-3" data-usage-section>
+        {report === null ? (
+          <div className="flex justify-center py-6"><SpinnerIcon className="h-4 w-4 text-[var(--text-dim)]" /></div>
+        ) : report === "failed" ? (
+          <p className="text-[12px] text-[#FF3333]">{t("ai.usage.failed")}</p>
+        ) : (
+          <>
+            <div className="flex flex-wrap gap-x-6 gap-y-1 text-[12px] text-[var(--text-secondary)] mb-3">
+              <span><b className="text-[var(--text-primary)] tabular-nums">{report.people}</b> {t("ai.usage.people")}</span>
+              {cols.map(([label, key]) => (
+                <span key={key}><b className="text-[var(--text-primary)] tabular-nums">{report.totals[key]}</b> {label}</span>
+              ))}
+            </div>
+            <div className="overflow-x-auto -mx-1">
+              <table className="w-full text-[12px] tabular-nums">
+                <thead>
+                  <tr className="text-[var(--text-dim)] text-start">
+                    <th className="text-start font-medium py-1 px-1">{t("ai.usage.day")}</th>
+                    {cols.map(([label, key]) => <th key={key} className="text-end font-medium py-1 px-1">{label}</th>)}
+                  </tr>
+                </thead>
+                <tbody>
+                  {report.days.map((d) => (
+                    <tr key={d.day} className="border-t border-[var(--border-subtle)] text-[var(--text-primary)]">
+                      <td className="py-1 px-1 text-[var(--text-secondary)]">{d.day.slice(5)}</td>
+                      {cols.map(([, key]) => <td key={key} className="text-end py-1 px-1">{d[key] || <span className="text-[var(--text-dim)]">·</span>}</td>)}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            {report.tools.length > 0 && (
+              <div className="mt-4">
+                <div className="text-[12px] text-[var(--text-dim)] mb-1">{t("ai.usage.topTools")}</div>
+                <ul className="text-[12px] text-[var(--text-primary)] space-y-0.5">
+                  {report.tools.map((x) => (
+                    <li key={x.name} className="flex justify-between gap-3">
+                      <span className="truncate">{x.name}</span>
+                      <span className="tabular-nums text-[var(--text-secondary)]">{x.count} · {x.okRate}% {t("ai.usage.ok")}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            {report.totals.chats + report.totals.typed + report.totals.spoken + report.totals.tools === 0 && (
+              <p className="mt-2 text-[12px] text-[var(--text-dim)]">{t("ai.usage.empty")}</p>
+            )}
+          </>
+        )}
+      </div>
+    </SettingsGroup>
   );
 }
