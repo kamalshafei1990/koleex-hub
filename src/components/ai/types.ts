@@ -35,6 +35,13 @@ export interface ChatMsg {
    *  `voice` row was spoken on a call and relayed by the browser; the bubble
    *  wears a small mark so the thread says which words were said aloud. */
   source?: "text" | "voice";
+  /** The files attached to THIS turn, known only to the browser that sent
+   *  them: a local preview URL for a picture (so the bubble shows the photo
+   *  itself, not just its name) and null for a document. Never persisted —
+   *  the server keeps the slim 📎 marker, and a reloaded thread shows that.
+   *  The attachment is read, described and forgotten (see
+   *  /api/ai/attachments); this field does not change that contract. */
+  attachedFiles?: Array<{ name: string; url: string | null }>;
 }
 export interface ConversationRow {
   id: string;

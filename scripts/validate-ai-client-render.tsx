@@ -189,6 +189,19 @@ console.log("\n── 7. The transcript bubble (Phase 2J, completed) ──");
   check("the recommended option is marked", card !== html(<Bubble {...({ ...withQuestion, msg: { ...withQuestion.msg, steps: [{ kind: "question", payload: { question: "Which spreading machine?", lang: "en", options: [{ label: "KX-180", detail: "1.8 m" }, { label: "KX-220", detail: "2.2 m" }] } }] } } as any)} />));
 }
 
+console.log("\n── 7a. A user message carries its attached files (2026-09-04) ──");
+{
+  /* eslint-disable @typescript-eslint/no-explicit-any */
+  const withFiles: any = { id: "u9", role: "user", content: "What is this?", created_at: "2026-09-04T07:00:00Z",
+    attachedFiles: [{ name: "04.jpg", url: "blob:https://hub/abc" }, { name: "spec.pdf", url: null }] };
+  const out = html(<Bubble {...({ msg: withFiles, userInitial: "M", lang: "en" } as any)} />);
+  check("a picture is shown as an image from its preview URL, inside the bubble, above the words",
+    /<img src="blob:https:\/\/hub\/abc" alt="04.jpg"/.test(out) && out.indexOf("data-attached-files") < out.indexOf("What is this?"));
+  check("a document is a 📎 chip with its name; the words still render", text(out).includes("spec.pdf") && text(out).includes("What is this?"));
+  check("an assistant row ignores the field", !/<img src="blob:/.test(html(<Bubble {...({ msg: { ...withFiles, role: "assistant" }, userInitial: "M", lang: "en" } as any)} />)));
+  check("a row without the field renders as before", !/data-attached-files/.test(html(<Bubble {...({ msg: { ...withFiles, attachedFiles: undefined }, userInitial: "M", lang: "en" } as any)} />)));
+}
+
 console.log("\n── 7b. A spoken message wears a mark; a typed one does not ──");
 {
   /* eslint-disable @typescript-eslint/no-explicit-any */

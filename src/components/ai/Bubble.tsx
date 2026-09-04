@@ -21,6 +21,7 @@ import ActivityLine from "@/components/ai/ActivityLine";
 import MessageMarkdown from "@/components/ai/MessageMarkdown";
 import { textDirection } from "@/lib/text-direction";
 import DraftCard from "@/components/ai/DraftCard";
+import PhotoLightbox, { type LightboxPhoto } from "@/components/ai/PhotoLightbox";
 import type { ChatMsg, QuotationDraftPayload } from "@/components/ai/types";
 import { COPY } from "@/components/ai/copy";
 
@@ -81,6 +82,11 @@ export function Bubble({
   lang: Lang;
 }) {
   const isUser = msg.role === "user";
+  /* The photo a user attached, expanded in place on a tap — the same
+     lightbox product photos use, so a picture the user sent behaves like a
+     picture Koleex AI showed. Only this browser holds the preview URL. */
+  const [openPhoto, setOpenPhoto] = useState<LightboxPhoto | null>(null);
+  const attachedFiles = isUser ? (msg.attachedFiles ?? []) : [];
   /* One measurement drives layout, font and size, so they cannot disagree */
   const bubbleDir = textDirection(msg.content);
   const rtl = bubbleDir === "rtl";
@@ -269,7 +275,45 @@ export function Bubble({
                   style={{ fontFamily: "inherit" }}
                 />
               ) : (
-                msg.content
+                <>
+                  {attachedFiles.length > 0 && (
+                    /* THE PICTURE SITS IN THE BUBBLE, above the words, the
+                       moment the message is sent (owner ask, 2026-09-04:
+                       "shows in the chat as a photo, not just the file
+                       name"). Documents keep the 📎 chip. Object URLs are
+                       the browser's own, so next/image has nothing to
+                       optimise here. */
+                    <div className="mb-2 flex flex-wrap gap-1.5" data-attached-files>
+                      {attachedFiles.map((f, i) => {
+                        const url = f.url;
+                        return url ? (
+                          <button
+                            key={`${f.name}-${i}`}
+                            type="button"
+                            onClick={() => setOpenPhoto({ url, label: f.name })}
+                            className="block overflow-hidden rounded-xl border border-white/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0066FF]"
+                            aria-label={f.name}
+                            title={f.name}
+                          >
+                            {/* eslint-disable-next-line @next/next/no-img-element -- a local blob: URL held only by this browser */}
+                            <img src={url} alt={f.name} className="block h-36 max-w-[240px] object-cover" />
+                          </button>
+                        ) : (
+                          <span
+                            key={`${f.name}-${i}`}
+                            className="inline-flex max-w-[240px] items-center gap-1.5 rounded-md border border-white/15 px-2 py-1 text-[11.5px]"
+                            title={f.name}
+                          >
+                            <span aria-hidden>📎</span>
+                            <span className="truncate">{f.name}</span>
+                          </span>
+                        );
+                      })}
+                    </div>
+                  )}
+                  {msg.content}
+                  <PhotoLightbox photo={openPhoto} onClose={() => setOpenPhoto(null)} closeLabel={copy.back} />
+                </>
               )
             ) : (() => {
               /* THE QUESTION IS A CARD, not a paragraph with buttons under it.
