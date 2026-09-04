@@ -145,6 +145,17 @@ export default function KoleexAiApp() {
      the owner hit exactly that. Set through the send() pipeline, cleared
      when the attachment phase ends either way. */
   const [attachStatus, setAttachStatus] = useState<string | null>(null);
+  /* True while this turn's files are being read on the server — the
+     assistant placeholder then says "Reading…" instead of plain thinking. */
+  const [attachReading, setAttachReading] = useState(false);
+  /* Preview URLs handed to user bubbles (ChatMsg.attachedFiles). Revoked
+     when the thread they belong to is left — a reloaded thread has none. */
+  const messagePreviewUrlsRef = useRef<string[]>([]);
+  const revokeMessagePreviews = useCallback(() => {
+    for (const u of messagePreviewUrlsRef.current) URL.revokeObjectURL(u);
+    messagePreviewUrlsRef.current = [];
+  }, []);
+  useEffect(() => revokeMessagePreviews, [revokeMessagePreviews]);
   const [webSearch, setWebSearch] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const openFilePicker = useCallback(() => {
@@ -483,6 +494,7 @@ export default function KoleexAiApp() {
       openReqRef.current = id;
       const fresh = () => openReqRef.current === id;
       setActiveId(id);
+      revokeMessagePreviews();
       setMessages([]);
       setSidebarOpen(false);
       setLoadingConv(true);
@@ -506,7 +518,7 @@ export default function KoleexAiApp() {
         if (fresh()) setLoadingConv(false);
       }
     },
-    [],
+    [revokeMessagePreviews],
   );
 
   /* ── New chat — create row, become active, reset messages ── */
@@ -530,13 +542,14 @@ export default function KoleexAiApp() {
     openReqRef.current = conversation.id;
     setConversations((prev) => [conversation, ...prev]);
     setActiveId(conversation.id);
+    revokeMessagePreviews();
     setMessages([]);
     setInput("");
     setError(null);
     setSidebarOpen(false);
     /* Same race guard as send() — see the comment there for why. */
     restoredRef.current = true;
-  }, [activeProjectId]);
+  }, [activeProjectId, revokeMessagePreviews]);
 
   /* ── Send a message ──
      Unified path: every turn runs through /api/ai/agent (the
@@ -663,25 +676,76 @@ export default function KoleexAiApp() {
 
       setError(null);
 
-      /* ── Attachments: extract text server-side BEFORE the turn so it
-         can ride along with the message. Failures surface inline and
-         the turn continues with whatever extracted cleanly. */
       const typedText =
         text || "Please read the attached file(s) and give me the key points.";
+
+      /* ── THE TURN GOES INTO THE THREAD FIRST, files and all ──
+         Owner, 2026-09-04, watching a "Reading attachment…" bar hold the
+         composer hostage: "put it in the conversation, and show that Koleex
+         AI is thinking until it gives me the answer." So the user bubble is
+         posted at once — with the photo itself for a picture, a 📎 chip for
+         a document — and the assistant placeholder appears under it with the
+         thinking line, while the file is read on the server. The preview
+         URLs are this browser's; they are revoked when the thread changes. */
+      const attachedFiles = filesToSend.map((f) => ({
+        name: f.name,
+        url: (f.type || "").startsWith("image/") ? URL.createObjectURL(f) : null,
+      }));
+      for (const f of attachedFiles) if (f.url) messagePreviewUrlsRef.current.push(f.url);
+      const optimistic: ChatMsg = {
+        id: `tmp-${Date.now()}`,
+        role: "user",
+        content: typedText,
+        created_at: new Date().toISOString(),
+        ...(attachedFiles.length > 0 ? { attachedFiles } : {}),
+      };
+      /* Placeholder assistant bubble that mutates as deltas arrive.
+         Appended immediately so the TypingIndicator / ActivityLine (keyed
+         off messages[last].role === "assistant" && empty content) shows
+         without waiting for the first byte — or for the attachment. */
+      const placeholderId = `tmp-ai-${Date.now()}`;
+      setMessages((prev) => [
+        ...prev,
+        optimistic,
+        {
+          id: placeholderId,
+          role: "assistant",
+          content: "",
+          created_at: new Date().toISOString(),
+          steps: [],
+        },
+      ]);
+      setInput("");
+      /* Autosize reset: onChange doesn't fire on programmatic clear,
+         so reset the textarea height manually after sending. */
+      if (composerRef.current) {
+        composerRef.current.style.height = "auto";
+      }
+      setAttachments([]);
+
+      /* ── Attachments: extract text server-side so it can ride along with
+         the message. The question is ABOUT the file, so when nothing could
+         be read the turn does not go out without it: the bubbles come back
+         out, the words and the files return to the composer, and the error
+         says why. (The old flow sent the bare question anyway — the owner
+         got a reply to "What is this?" with no picture attached.) */
       let attachPayload: Array<{ name: string; text: string }> = [];
-      let displayText = typedText;
       if (filesToSend.length > 0) {
+        setAttachReading(true);
+        let failure: string | null = null;
+        let partial: string | null = null;
         try {
           /* Two transports, one endpoint. Small batches ride the request
              body; anything bigger goes browser → Storage directly (signed
              URL, no serverless body cap) and the endpoint gets JSON refs.
              The platform body cap is ~4.5MB TOTAL, so the batch's SUM
-             decides, with margin for the multipart envelope. */
+             decides, with margin for the multipart envelope. Pictures are
+             shrunk on the device (image-shrink), so they take the first
+             road; only big documents take the second. */
           const L_UPLOADING = lang === "ar" ? "جارٍ رفع" : lang === "zh" ? "正在上传" : "Uploading";
-          const L_READING = lang === "ar" ? "جارٍ قراءة المرفقات…" : lang === "zh" ? "正在读取附件…" : "Reading attachment…";
           const totalBytes = filesToSend.reduce((n, f) => n + f.size, 0);
           const useStorageHop = totalBytes > 3.5 * 1024 * 1024;
-          let up: Response;
+          let request: () => Promise<Response>;
           if (useStorageHop) {
             const { uploadToStorage } = await import("@/lib/storage-client");
             const refs: Array<{ name: string; path: string; type: string; size: number }> = [];
@@ -700,22 +764,32 @@ export default function KoleexAiApp() {
               }
               refs.push({ name: f.name, path: res.data.path, type: f.type || "", size: f.size });
             }
-            setAttachStatus(L_READING);
-            up = await fetch("/api/ai/attachments", {
-              method: "POST",
-              credentials: "include",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ files: refs }),
-            });
+            setAttachStatus(null);
+            request = () =>
+              fetch("/api/ai/attachments", {
+                method: "POST",
+                credentials: "include",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ files: refs }),
+              });
           } else {
-            setAttachStatus(L_READING);
-            const fd = new FormData();
-            filesToSend.forEach((f) => fd.append("files", f, f.name));
-            up = await fetch("/api/ai/attachments", {
-              method: "POST",
-              credentials: "include",
-              body: fd,
-            });
+            request = () => {
+              const fd = new FormData();
+              filesToSend.forEach((f) => fd.append("files", f, f.name));
+              return fetch("/api/ai/attachments", { method: "POST", credentials: "include", body: fd });
+            };
+          }
+          /* One retry on a dropped connection ("Load failed", "Failed to
+             fetch") — on the owner's link a drop is routine, and the body
+             is rebuilt for the second try. A server answer, good or bad, is
+             never retried. */
+          let up: Response;
+          try {
+            up = await request();
+          } catch (first) {
+            if (!(first instanceof TypeError)) throw first;
+            await new Promise((r) => setTimeout(r, 1500));
+            up = await request();
           }
           const uj = (await up.json().catch(() => null)) as {
             files?: Array<{ name: string; text?: string; error?: string }>;
@@ -733,72 +807,43 @@ export default function KoleexAiApp() {
           );
           const failed = results.filter((f) => !f.text);
           if (failed.length > 0) {
-            setError(
-              failed
-                .map((f) => {
-                  const why =
-                    /* "couldn't read" — NOT "can't read images". The feature
-                       exists now; this branch means one particular picture
-                       defeated it (too blurry, or the vision model was
-                       unreachable), and telling the user the capability is
-                       missing would send them off to solve the wrong
-                       problem. */
-                    f.error === "unreadable_image" ? "couldn't read this image — try a sharper photo"
-                    : f.error === "no_text" ? "no readable text found"
-                    : f.error === "too_large" ? "over the size limit (15MB images / 200MB documents)"
-                    : "file type not supported";
-                  return `${f.name}: ${why}`;
-                })
-                .join(" · "),
-            );
-          }
-          if (attachPayload.length > 0) {
-            displayText = typedText + "\n\n" + attachPayload.map((f) => `📎 ${f.name}`).join("\n");
+            partial = failed
+              .map((f) => {
+                const why =
+                  /* "couldn't read" — NOT "can't read images". The feature
+                     exists now; this branch means one particular picture
+                     defeated it (too blurry, or the vision model was
+                     unreachable), and telling the user the capability is
+                     missing would send them off to solve the wrong
+                     problem. */
+                  f.error === "unreadable_image" ? "couldn't read this image — try a sharper photo"
+                  : f.error === "no_text" ? "no readable text found"
+                  : f.error === "too_large" ? "over the size limit (15MB images / 200MB documents)"
+                  : "file type not supported";
+                return `${f.name}: ${why}`;
+              })
+              .join(" · ");
           }
         } catch (e) {
-          setError(
-            `Couldn't process the attachment(s): ${e instanceof Error ? e.message : "unknown error"}`,
-          );
+          const raw = e instanceof Error ? e.message : "unknown error";
+          const isNetwork = e instanceof TypeError || /failed to fetch|networkerror|load failed/i.test(raw);
+          failure = isNetwork
+            ? humanizeError("NetworkError")
+            : `Couldn't process the attachment(s): ${raw}`;
         }
         setAttachStatus(null);
-        setAttachments([]);
+        setAttachReading(false);
+        if (failure !== null || attachPayload.length === 0) {
+          setMessages((prev) => prev.filter((m) => m.id !== optimistic.id && m.id !== placeholderId));
+          setInput((cur) => (cur.trim() ? cur : text));
+          setAttachments((cur) => (cur.length > 0 ? cur : filesToSend));
+          setError(failure ?? partial ?? "Couldn't read the attachment(s).");
+          sendingRef.current = false;
+          setSending(false);
+          return;
+        }
+        if (partial) setError(partial);
       }
-      if (!text && attachPayload.length === 0 && filesToSend.length > 0) {
-        /* Attachment-only send where nothing extracted — nothing to ask. */
-        sendingRef.current = false;
-        setSending(false);
-        return;
-      }
-
-      const optimistic: ChatMsg = {
-        id: `tmp-${Date.now()}`,
-        role: "user",
-        content: displayText,
-        created_at: new Date().toISOString(),
-      };
-      setMessages((prev) => [...prev, optimistic]);
-      setInput("");
-      /* Autosize reset: onChange doesn't fire on programmatic clear,
-         so reset the textarea height manually after sending. */
-      if (composerRef.current) {
-        composerRef.current.style.height = "auto";
-      }
-
-      /* Placeholder assistant bubble that mutates as deltas arrive.
-         We append it immediately so the TypingIndicator (keyed off
-         messages[last].role === "assistant" && empty content) can
-         appear without waiting for the first byte. */
-      const placeholderId = `tmp-ai-${Date.now()}`;
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: placeholderId,
-          role: "assistant",
-          content: "",
-          created_at: new Date().toISOString(),
-          steps: [],
-        },
-      ]);
 
       try {
         /* Phase 6: SSE streaming. Emits start → (steps) → delta* → end.
@@ -1691,9 +1736,11 @@ export default function KoleexAiApp() {
      Central mapping turns it into an orb activity; unknown tools fall
      back to "executing-action". */
   const orbActivity: AIOrbActivity = sending
-    ? toolActivity(
-        (lastMsg?.steps ?? []).slice().reverse().find((st) => st.kind === "tool-call")?.tool,
-      )
+    ? attachReading
+      ? "reading"
+      : toolActivity(
+          (lastMsg?.steps ?? []).slice().reverse().find((st) => st.kind === "tool-call")?.tool,
+        )
     : "none";
 
   /* Whether the composer holds anything to send — decides which control

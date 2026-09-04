@@ -39,10 +39,38 @@ console.log("\n── 2. The composer, read ──");
     /if \(!blob \|\| blob\.size >= file\.size\) return file;/.test(shrink) && /catch \{\s*return file;\s*\}/.test(shrink) && /bitmap\?\.close\?\.\(\);/.test(shrink));
 }
 
+console.log("\n── 3. The turn goes into the thread first (owner ask, 2026-09-04) ──");
+{
+  const app = readFileSync("src/components/ai/KoleexAiApp.tsx", "utf8");
+  const send = app.slice(app.indexOf("const send = useCallback("), app.indexOf("/* ── Phase 12: message-level actions"));
+  const posted = send.indexOf("setMessages((prev) => [\n        ...prev,\n        optimistic,");
+  const read = send.indexOf('fetch("/api/ai/attachments"');
+  check("the user bubble and the thinking placeholder are posted BEFORE the attachment is read, and the composer is cleared at once",
+    posted > 0 && read > posted && send.indexOf("setAttachments([]);") > posted && send.indexOf("setAttachments([]);") < read);
+  check("a picture rides in the bubble as a local preview URL; a document as a name only",
+    /url: \(f\.type \|\| ""\)\.startsWith\("image\/"\) \? URL\.createObjectURL\(f\) : null,/.test(send) &&
+    /\.\.\.\(attachedFiles\.length > 0 \? \{ attachedFiles \} : \{\}\),/.test(send));
+  check("no blocking 'Reading attachment…' bar remains; the placeholder says it through the orb activity",
+    !/L_READING/.test(app) && /setAttachReading\(true\);/.test(send) && /setAttachReading\(false\);/.test(send) &&
+    /sending\s*\?\s*attachReading\s*\?\s*"reading"/.test(app));
+  check("when nothing could be read, the question is NOT sent without its file: both bubbles come out, words and files return to the composer, the error says why",
+    /if \(failure !== null \|\| attachPayload\.length === 0\) \{\s*setMessages\(\(prev\) => prev\.filter\(\(m\) => m\.id !== optimistic\.id && m\.id !== placeholderId\)\);\s*setInput\(\(cur\) => \(cur\.trim\(\) \? cur : text\)\);\s*setAttachments\(\(cur\) => \(cur\.length > 0 \? cur : filesToSend\)\);\s*setError\(failure \?\? partial \?\? "Couldn't read the attachment\(s\)\."\);\s*sendingRef\.current = false;\s*setSending\(false\);\s*return;/.test(send));
+  check("a dropped connection is retried once with a rebuilt body; a server answer never is",
+    /try \{\s*up = await request\(\);\s*\} catch \(first\) \{\s*if \(!\(first instanceof TypeError\)\) throw first;\s*await new Promise\(\(r\) => setTimeout\(r, 1500\)\);\s*up = await request\(\);\s*\}/.test(send) &&
+    /request = \(\) => \{\s*const fd = new FormData\(\);/.test(send));
+  check("preview URLs are revoked when the thread is left, and on unmount",
+    (app.match(/revokeMessagePreviews\(\);/g) ?? []).length >= 2 && /useEffect\(\(\) => revokeMessagePreviews, \[revokeMessagePreviews\]\);/.test(app));
+  const bubble = readFileSync("src/components/ai/Bubble.tsx", "utf8");
+  check("the user bubble shows the picture itself, tappable into the lightbox, and a 📎 chip for a document — only for user rows",
+    /const attachedFiles = isUser \? \(msg\.attachedFiles \?\? \[\]\) : \[\];/.test(bubble) &&
+    /onClick=\{\(\) => setOpenPhoto\(\{ url, label: f\.name \}\)\}/.test(bubble) &&
+    /<PhotoLightbox photo=\{openPhoto\} onClose=\{\(\) => setOpenPhoto\(null\)\} closeLabel=\{copy\.back\} \/>/.test(bubble));
+}
+
 console.log(`\n${pass} passed, ${failures.length} failed`);
 if (failures.length) {
   console.log("\nFAILED:");
   for (const f of failures) console.log(`  · ${f}`);
   process.exit(1);
 }
-console.log("NOT proved here: the canvas encode in a real browser — attaching a camera-roll photo is the test.");
+console.log("NOT proved here: the canvas encode and the blob preview in a real browser — attaching a camera-roll photo is the test.");
