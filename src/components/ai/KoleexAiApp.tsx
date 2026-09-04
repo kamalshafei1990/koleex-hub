@@ -451,6 +451,11 @@ export default function KoleexAiApp() {
   /* THE LIBRARY (roadmap C3) takes the main pane while open; opening any
      chat, or starting one, puts the chat back. */
   const [libraryOpen, setLibraryOpen] = useState(false);
+  /* ONE CHAT AS A PAGE (roadmap D5): the server renders it for the owner,
+     the browser opens it, the phone's Share -> Print makes the PDF. */
+  const exportConversation = useCallback((id: string) => {
+    window.open(`/api/ai/conversations/${encodeURIComponent(id)}/export?lang=${lang}`, "_blank", "noopener");
+  }, [lang]);
   /* THE CALLS HISTORY (roadmap D2), the same way. */
   const [callsOpen, setCallsOpen] = useState(false);
 
@@ -1972,6 +1977,7 @@ export default function KoleexAiApp() {
                     onDelete={() => requestDeleteConversation(c.id)}
                     onTogglePin={() => togglePin(c)}
                     onMove={(pid) => moveConversation(c, pid)}
+                      onExport={() => exportConversation(c.id)}
                   />
                 ))
               )}
@@ -2083,6 +2089,7 @@ export default function KoleexAiApp() {
                       onDelete={() => requestDeleteConversation(c.id)}
                       onTogglePin={() => togglePin(c)}
                       onMove={(pid) => moveConversation(c, pid)}
+                      onExport={() => exportConversation(c.id)}
                     />
                   ))}
                   {groups.map((g) => (
@@ -2101,6 +2108,7 @@ export default function KoleexAiApp() {
                           onDelete={() => requestDeleteConversation(c.id)}
                           onTogglePin={() => togglePin(c)}
                           onMove={(pid) => moveConversation(c, pid)}
+                      onExport={() => exportConversation(c.id)}
                         />
                       ))}
                     </div>
