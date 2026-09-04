@@ -63,6 +63,8 @@ export const COPY: Record<Lang, {
   /* Roadmap D2 — past calls by their summaries. */
   calls: string;
   callsEmpty: string;
+  /* Roadmap D5 — one chat as a printable page. */
+  exportChat: string;
   back: string;
   seeMore: string;
   seeLess: string;
@@ -168,6 +170,7 @@ export const COPY: Record<Lang, {
     openChat: "Open chat",
     calls: "Calls",
     callsEmpty: "No calls yet. When a call ends with a real exchange, its summary will appear here.",
+    exportChat: "Export / print",
     back: "Back",
     seeMore: "See more",
     seeLess: "See less",
@@ -256,6 +259,7 @@ export const COPY: Record<Lang, {
     openChat: "打开对话",
     calls: "通话",
     callsEmpty: "还没有通话。通话结束后，摘要会显示在这里。",
+    exportChat: "导出 / 打印",
     back: "返回",
     seeMore: "查看更多",
     seeLess: "收起",
@@ -345,6 +349,7 @@ export const COPY: Record<Lang, {
     openChat: "افتح المحادثة",
     calls: "المكالمات",
     callsEmpty: "مفيش مكالمات لسه. لما مكالمة تخلص بكلام حقيقي، ملخصها هيظهر هنا.",
+    exportChat: "تصدير / طباعة",
     back: "رجوع",
     seeMore: "عرض المزيد",
     seeLess: "عرض أقل",

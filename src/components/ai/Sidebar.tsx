@@ -14,6 +14,7 @@ import ProjectGlyph from "@/components/ai/ProjectGlyph";
 import type { AiProject } from "@/lib/ai-projects";
 import MoreHorizontalIcon from "@/components/icons/ui/MoreHorizontalIcon";
 import PinIcon from "@/components/icons/ui/PinIcon";
+import Share2Icon from "@/components/icons/ui/Share2Icon";
 import PinOffIcon from "@/components/icons/ui/PinOffIcon";
 import PencilIcon from "@/components/icons/ui/PencilIcon";
 import TrashIcon from "@/components/icons/ui/TrashIcon";
@@ -111,6 +112,7 @@ export function SidebarRow({
   onTogglePin,
   onMove,
   hint,
+  onExport,
 }: {
   row: ConversationRow;
   active: boolean;
@@ -125,6 +127,8 @@ export function SidebarRow({
    *  under the title, only while searching. Absent means the row is as it
    *  always was. */
   hint?: string;
+  /** One chat as a printable page (roadmap D5). Absent means no menu item. */
+  onExport?: () => void;
 }) {
   const pinned = !!row.pinned;
   const inProject = row.project_id ?? null;
@@ -162,6 +166,9 @@ export function SidebarRow({
       selected: inProject === p.id,
       onSelect: () => onMove(p.id),
     })),
+    ...(onExport
+      ? [{ key: "export", label: copy.exportChat, icon: <Share2Icon className="h-3 w-3" />, onSelect: onExport } as MenuItem]
+      : []),
     { key: "sep-danger", separator: true },
     {
       key: "delete",
