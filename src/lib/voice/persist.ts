@@ -34,6 +34,16 @@ import { type TranscriptLine } from "./events";
 import { photosMarkdown, imageUrlsIn } from "./photos";
 
 export const TRANSCRIPT_PATH = "/api/ai/voice/transcript";
+
+const CJK_RE = /[\u3400-\u9FFF]/;
+/** An assistant final so short it can only be the first syllable of a reply
+ *  that was interrupted: at most three characters, no picture, not Chinese
+ *  (where two characters are a whole answer). Pure. */
+export function isCutOffFragment(role: string, spoken: string, pictures: string): boolean {
+  if (role !== "assistant" || pictures) return false;
+  const t = spoken.trim();
+  return t.length > 0 && t.length <= 3 && !CJK_RE.test(t);
+}
 /** One POST carries at most this many turns; the server refuses more. */
 export const MAX_TURNS_PER_POST = 20;
 /** Consecutive failed posts before this module stops trying for the call. */
@@ -109,6 +119,14 @@ export class TranscriptPersister {
       const text = pictures ? (spoken ? `${spoken}\n\n${pictures}` : pictures) : spoken;
       /* An empty final — a turn the vendor closed with no words — is counted
          as seen and not sent: the route refuses empty content, rightly. */
+      /* A CUT-OFF FIRST SYLLABLE IS NOT A TURN EITHER. Two saved calls
+         (2026-09-04) carried assistant rows of "I", "I", "I", "خل" and "بال":
+         each a reply interrupted the moment it started, closed by the vendor
+         with the one token that got out. Saved, they litter the thread and
+         the end-of-call summary counts them as answers. An assistant final of
+         three characters or fewer, with no picture, is a fragment and is
+         skipped — except in Chinese, where 好的 is a whole answer. */
+      if (text && isCutOffFragment(line.role, spoken, pictures)) continue;
       if (text) this.queue.push({ role: line.role, text, via: line.via ?? "voice" });
     }
     if (settled > this.settledCount) this.settledCount = settled;

@@ -1199,6 +1199,15 @@ console.log("\n── 8. What the client may know, and what it may not ──");
       /ALWAYS SAY A SHORT FILLER ALOUD FIRST, before the lookup/.test(sc) && /let me think/.test(sc) && !/let me check/i.test(sc));
     check("web pictures on a call are opt-in: want_images, only when the caller asked to see one",
       /call search_web with want_images true; otherwise never/.test(sc));
+    /* Two saved calls, 2026-09-04: Arabic answered in English three times, and
+       a Tesla photo refused four times with the tool on the list. */
+    const built = String(buildVoiceSessionPayload(null).full.session.instructions);
+    check("the session says WHICH language to answer in, turn by turn — never English to an Arabic or Chinese turn",
+      /WHICH LANGUAGE: answer in the language the caller just SPOKE, turn by turn/.test(built) &&
+      /NEVER answer an Arabic or Chinese turn in English/.test(built) && /keep the language of the caller's last clear turn/.test(built) &&
+      built.indexOf("WHICH LANGUAGE:") > built.indexOf("SPEAKING ARABIC") && built.indexOf("WHICH LANGUAGE:") < built.indexOf("SPOKEN STYLE:"));
+    check("  …and that refusing a picture of a public thing is wrong: a car is looked up, never declined",
+      /a car, a place, a fabric, a stadium, a team/.test(built) && /NEVER say you cannot show a picture[\s"+]*of a car, a place or any public thing — look it up/.test(built));
   }
 
   console.log(`\n${pass} passed, ${failures.length} failed`);
