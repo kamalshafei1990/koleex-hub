@@ -2199,6 +2199,32 @@ console.log("\n── 12. Mute ──");
     /if \(document\.visibilityState === "visible"\) \{ wakeLockRef\.current = null; acquireWakeLock\(\); \}/.test(btn25) &&
     /\}, \[live, acquireWakeLock\]\);/.test(btn25));
 
+
+  /* ── ROADMAP D1: A TASK BY VOICE, SAVED BY A TAP ────────────────────────── */
+  const tt = await import("../src/lib/voice/text-turn");
+  {
+    const note = tt.buildNoteMessage("  the caller tapped Confirm ");
+    const parsed = note ? JSON.parse(note) as { type: string; item: { role: string; content: Array<{ type: string; text: string }> } } : null;
+    check("a note is ONE message — the text as the user's turn, no response asked for — trimmed and capped, null when empty",
+      parsed !== null && parsed.type === tt.EV_ITEM_CREATE && parsed.item.role === "user" && parsed.item.content[0].text === "the caller tapped Confirm" &&
+      tt.buildNoteMessage("   ") === null && (JSON.parse(tt.buildNoteMessage("x".repeat(5000))!) as { item: { content: Array<{ text: string }> } }).item.content[0].text.length === tt.MAX_TYPED_TURN_CHARS &&
+      !note!.includes(tt.EV_RESPONSE_CREATE));
+  }
+  const sess24 = fs22.readFileSync("src/lib/voice/session.ts", "utf8");
+  check("the session hands a write's preview to the screen only when the server put one beside the envelope, shaped as tool + object args, and can send a note without a response",
+    /const p = body\.pending;\s*if \(p && typeof p\.tool === "string" && p\.args && typeof p\.args === "object" && !Array\.isArray\(p\.args\)\) \{[\s\S]{0,400}?this\.events\.onPendingWrite\?\.\(call\.name, \{ tool: p\.tool, args: p\.args as Record<string, unknown> \},/.test(sess24) &&
+    /sendNote\(text: string\): boolean \{[\s\S]{0,300}?const message = buildNoteMessage\(text\);[\s\S]{0,200}?channel\.send\(message\);/.test(sess24));
+  const btn26 = fs22.readFileSync("src/components/ai/VoiceCallButton.tsx", "utf8");
+  check("the tap posts the previewed arguments with confirm:true marked via tap to the fixed tool path, then tells the model in a note; a cancel tells it too; hang-up clears the card",
+    /fetch\(TOOL_PATH, \{\s*method: "POST",\s*credentials: "include",[\s\S]{0,300}?name: pending\.tool,[\s\S]{0,120}?arguments: JSON\.stringify\(\{ \.\.\.pending\.args, confirm: true \}\),\s*via: "tap",/.test(btn26) &&
+    /if \(!body\?\.output\?\.ok\) \{\s*setWriteError\(true\);\s*return;\s*\}/.test(btn26) &&
+    /session\?\.sendNote\(`\(Screen: the caller tapped Confirm/.test(btn26) &&
+    /sessionRef\.current\?\.sendNote\("\(Screen: the caller cancelled the task card/.test(btn26) &&
+    /releaseWakeLock\(\);\s*setPendingWrite\(null\);/.test(btn26) &&
+    (btn26.match(/via: "tap"/g) ?? []).length === 1);
+  check("the model's own path never carries via: the relay body has name, call_id and arguments only",
+    /body: JSON\.stringify\(\{\s*name: call\.name,\s*call_id: call\.callId,\s*arguments: call\.argumentsJson,\s*\}\)/.test(sess24));
+
 }
 
 console.log(`\n${pass} passed, ${failures.length} failed`);

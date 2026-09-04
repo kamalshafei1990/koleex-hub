@@ -46,7 +46,7 @@ function eventTypeOf(raw: string): string {
     return "";
   }
 }
-import { buildTextTurnMessages } from "./text-turn";
+import { buildTextTurnMessages, buildNoteMessage } from "./text-turn";
 
 /** True when a DataChannel message is exactly this event.
  *
@@ -148,6 +148,10 @@ export type VoiceEvents = {
    *  photo — rather than only let the model describe it. Data, not
    *  instruction: nothing here acts on it. */
   onToolResult?: (name: string, output: unknown) => void;
+  /** A write tool answered with a PREVIEW (roadmap D1): the arguments its
+   *  confirming phase needs, for a card the caller can tap. The server put
+   *  them beside the model's envelope; nothing here acts on them. */
+  onPendingWrite?: (name: string, pending: { tool: string; args: Record<string, unknown> }, message: string) => void;
   /** SOMETHING NAMED ITSELF A FUNCTION CALL AND COULD NOT BE READ.
    *
    *  This exists because the alternative is silence: if the vendor's event
@@ -379,6 +383,21 @@ export class VoiceSession {
      RETURNS WHETHER IT WENT. False when there is no open channel yet or the
      text was empty, so the screen can say so rather than swallow it.
      --------------------------------------------------------------------- */
+  /** Tell the model something the screen did, without asking it to answer
+   *  (roadmap D1). Same channel, same cap, one message. */
+  sendNote(text: string): boolean {
+    const channel = this.channel;
+    if (!channel || channel.readyState !== "open") return false;
+    const message = buildNoteMessage(text);
+    if (!message) return false;
+    try {
+      channel.send(message);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
   sendText(text: string): boolean {
     const channel = this.channel;
     if (!channel || channel.readyState !== "open") return false;
@@ -616,8 +635,13 @@ export class VoiceSession {
            can say. */
         output = { ok: false, message: "That lookup could not be completed just now." };
       } else {
-        const body = (await res.json()) as { output?: unknown };
+        const body = (await res.json()) as { output?: unknown; pending?: { tool?: unknown; args?: unknown } };
         output = body.output ?? { ok: false, message: "That lookup returned nothing." };
+        const p = body.pending;
+        if (p && typeof p.tool === "string" && p.args && typeof p.args === "object" && !Array.isArray(p.args)) {
+          const msg = (output as { message?: unknown } | null)?.message;
+          this.events.onPendingWrite?.(call.name, { tool: p.tool, args: p.args as Record<string, unknown> }, typeof msg === "string" ? msg : "");
+        }
       }
     } catch {
       output = { ok: false, message: "That lookup could not be completed just now." };

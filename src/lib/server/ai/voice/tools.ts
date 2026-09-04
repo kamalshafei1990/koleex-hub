@@ -121,7 +121,26 @@ export const VOICE_TOOL_NAMES: readonly string[] = [
   "getCustomerByName",
   "getCustomerByCode",
   "getPricingRules",
+  /* ONE WRITE, AND ONLY WITH A TAP (roadmap D1). "Save a task: follow up
+     with X on Thursday" is the thing a person on a call most wants written
+     down, and the one thing a call could not do. createTodo is the tool the
+     text lane uses, with the same two phases: the model may only PREVIEW
+     (confirm unset), which the ledger records; the execution (confirm:true)
+     is accepted by the tool route ONLY from the caller's tap on the card the
+     preview put on screen (`via: "tap"`), never from the model's own
+     function call — a spoken "yes" can be misheard, a tap cannot. See
+     VOICE_WRITE_TOOLS and the route. */
+  "createTodo",
 ];
+
+/** The write tools a call may reach. Each is two-phase in the registry and
+ *  gated by the pending-actions ledger; on a call the confirming phase is
+ *  additionally reserved for the caller's tap (tool route). */
+export const VOICE_WRITE_TOOLS: readonly string[] = ["createTodo"];
+
+export function isVoiceWriteTool(name: string): boolean {
+  return VOICE_WRITE_TOOLS.includes(name);
+}
 
 /**
  * How many tool calls one voice session may make.

@@ -1124,6 +1124,36 @@ console.log("\n── VoiceCallScreen: typing into the call ──");
       /onClick=\{\(\) => onSendText\(copy\.briefRequest\)\}/.test(screenSrc));
   }
 
+
+  /* ── ROADMAP D1: the task card ────────────────────────────────────────── */
+  console.log("\n── VoiceCallScreen: a task waiting for a tap ──");
+  {
+    const pending = { tool: "createTodo", args: { title: "Follow up with Ahmed about the KX-200", due_date: "2026-09-05", priority: "high" }, message: "Ready" };
+    const card = renderToStaticMarkup(
+      <VoiceCallScreen live phase="listening" audioLevel={0.2} lines={lines} lang="en" onEnd={() => {}}
+        pendingWrite={pending} onConfirmWrite={() => {}} onCancelWrite={() => {}} /> as ReactElement,
+    );
+    check("the card shows the task in the caller's words, its due date and priority, and Save / Cancel",
+      /data-task-card/.test(card) && card.includes("Follow up with Ahmed about the KX-200") && text(card).includes("Due 2026-09-05") && text(card).includes("high") &&
+      text(card).includes("Save task") && text(card).includes("Cancel") && card.includes("bg-[#0066FF]"));
+    const saved = renderToStaticMarkup(
+      <VoiceCallScreen live phase="listening" audioLevel={0.2} lines={lines} lang="en" onEnd={() => {}} pendingWrite={null} writeSaved /> as ReactElement,
+    );
+    check("after the tap the card says saved and offers nothing to press",
+      /data-task-saved/.test(saved) && text(saved).includes("Task saved") && !text(saved).includes("Save task"));
+    const none = renderToStaticMarkup(
+      <VoiceCallScreen live phase="listening" audioLevel={0.2} lines={lines} lang="en" onEnd={() => {}} /> as ReactElement,
+    );
+    check("no card without a pending write", !/data-task-card/.test(none));
+    const failed = renderToStaticMarkup(
+      <VoiceCallScreen live phase="listening" audioLevel={0.2} lines={lines} lang="en" onEnd={() => {}} pendingWrite={pending} writeError onConfirmWrite={() => {}} onCancelWrite={() => {}} /> as ReactElement,
+    );
+    check("a failed save says so on the card and keeps the buttons", text(failed).includes("Could not save it") && text(failed).includes("Save task"));
+    check("the card is localised",
+      text(renderToStaticMarkup(<VoiceCallScreen live phase="listening" audioLevel={0} lines={lines} lang="ar" onEnd={() => {}} pendingWrite={pending} onConfirmWrite={() => {}} onCancelWrite={() => {}} /> as ReactElement)).includes("احفظ المهمة") &&
+      text(renderToStaticMarkup(<VoiceCallScreen live phase="listening" audioLevel={0} lines={lines} lang="zh" onEnd={() => {}} pendingWrite={pending} onConfirmWrite={() => {}} onCancelWrite={() => {}} /> as ReactElement)).includes("保存任务"));
+  }
+
 }
 
 console.log(`\n${pass} passed, ${failures.length} failed`);

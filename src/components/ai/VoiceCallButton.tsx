@@ -39,8 +39,7 @@ import {
   browserVoiceDeps,
   HANDSHAKE_PATH,
   type VoiceState,
-  type VoiceFailure,
-} from "@/lib/voice/session";
+  type VoiceFailure, TOOL_PATH, } from "@/lib/voice/session";
 import { type Lang } from "@/lib/i18n";
 import {
   parseVoiceEvent,
@@ -286,6 +285,14 @@ export default function VoiceCallButton({
      "let me check" first, but it does not always, and a screen that says
      nothing during it reads as a frozen call. */
   const [searching, setSearching] = useState(false);
+  /* A WRITE WAITING FOR A TAP (roadmap D1). The model previewed a task; the
+     exact arguments its confirming phase needs arrived beside the model's
+     envelope and sit here until the caller taps Confirm or Cancel on the
+     card. `saved` flashes the outcome for a moment. */
+  const [pendingWrite, setPendingWrite] = useState<{ tool: string; args: Record<string, unknown>; message: string } | null>(null);
+  const [writeSaved, setWriteSaved] = useState(false);
+  const [writeBusy, setWriteBusy] = useState(false);
+  const [writeError, setWriteError] = useState(false);
   /* WHAT THE LAST LOOKUP SHOWED. A product search on a call used to be heard
      and never seen; these are the photos out of its result, drawn on the
      call screen until the next lookup replaces them or the call ends. */
@@ -426,6 +433,8 @@ export default function VoiceCallButton({
     }
     phaseRef.current = null;
     releaseWakeLock();
+    setPendingWrite(null);
+    setWriteError(false);
     /* Dropped so the meters tear their audio contexts down. A retained stream
        here would keep a hardware handle open for the life of the page. */
     setMicStream(null);
@@ -444,6 +453,56 @@ export default function VoiceCallButton({
        naming them here satisfies the exhaustive-deps rule without making
        this callback churn. */
   }, [clearSearchTimer, releaseWakeLock]);
+
+  /* THE TAP (roadmap D1). The card's arguments go back to the tool route as
+     the confirming phase, marked as the caller's tap; the ledger on the
+     server still has to find the preview the model caused. The model is then
+     told in a note it does not answer, so the next thing the caller says is
+     answered knowing the task exists. Cancelling tells it the same way. */
+  const confirmWrite = useCallback(async () => {
+    const pending = pendingWrite;
+    const session = sessionRef.current;
+    if (!pending || writeBusy) return;
+    setWriteBusy(true);
+    setWriteError(false);
+    try {
+      const res = await fetch(TOOL_PATH, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: pending.tool,
+          call_id: `tap-${Date.now().toString(36)}`,
+          arguments: JSON.stringify({ ...pending.args, confirm: true }),
+          via: "tap",
+        }),
+      });
+      const body = res.ok ? ((await res.json()) as { output?: { ok?: boolean } }) : null;
+      if (!body?.output?.ok) {
+        setWriteError(true);
+        return;
+      }
+      const title = String(pending.args.title ?? "").slice(0, 200);
+      session?.sendNote(`(Screen: the caller tapped Confirm — the task "${title}" is saved. Acknowledge in a few words only if they ask.)`);
+      setPendingWrite(null);
+      setWriteSaved(true);
+      window.setTimeout(() => setWriteSaved(false), 3_000);
+    } catch {
+      setWriteError(true);
+    } finally {
+      setWriteBusy(false);
+    }
+  }, [pendingWrite, writeBusy]);
+
+  const cancelWrite = useCallback(() => {
+    const pending = pendingWrite;
+    setPendingWrite(null);
+    setWriteError(false);
+    if (!pending) return;
+    /* The preview row simply expires on the server; the model is told so it
+       does not keep asking for a confirmation that is not coming. */
+    sessionRef.current?.sendNote("(Screen: the caller cancelled the task card. Nothing was saved; drop it without comment.)");
+  }, [pendingWrite]);
 
   const hangUp = useCallback(() => {
     /* WHAT THE CALL CAME TO, written down (roadmap B1). Taken before the
@@ -589,6 +648,11 @@ export default function VoiceCallButton({
           searchTimerRef.current = null;
           setSearching(false);
         }, 12_000);
+      },
+      onPendingWrite: (_name, pending, message) => {
+        setWriteError(false);
+        setWriteSaved(false);
+        setPendingWrite({ tool: pending.tool, args: pending.args, message });
       },
       onToolResult: (_name, output) => {
         /* DATA, READ FOR PICTURES AND NOTHING ELSE. https URLs only, capped,
@@ -852,6 +916,12 @@ export default function VoiceCallButton({
           selectedVoice={voiceKey}
           onSelectVoice={selectVoice}
           onSendText={sendTyped}
+          pendingWrite={pendingWrite}
+          onConfirmWrite={() => void confirmWrite()}
+          onCancelWrite={cancelWrite}
+          writeBusy={writeBusy}
+          writeSaved={writeSaved}
+          writeError={writeError}
         />,
         document.body,
       )}

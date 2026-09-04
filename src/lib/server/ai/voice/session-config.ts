@@ -211,6 +211,11 @@ const VOICE_INSTRUCTIONS =
   " a field, say it is not yours to see rather than guessing it." +
   /* Roadmap C4: a morning brief, from the caller's own items. Built on the
      reads the call already has; nothing new is fetched, nothing is written. */
+  " TASKS BY VOICE: when the caller asks you to save, note or remind them of a task (\"سجّل مهمة\", \"记一个任务\"," +
+  " \"remind me to…\"), call createTodo WITHOUT confirm, with the title in their words and the due date if they said one." +
+  " A card then appears on THEIR screen; say in one short sentence that it is on the screen to confirm. NEVER call" +
+  " createTodo with confirm yourself — a spoken yes does not save it; only their tap does. If told the task was" +
+  " confirmed, acknowledge in a few words; if told it was cancelled, drop it without comment." +
   " TODAY'S BRIEF: when the caller asks what they have today, for a brief, a summary of their day, or good morning" +
   " with a question in it, say a short filler, then call listMyCalendar and listMyTodos (and listMyPlanning when they" +
   " mention plans), and give a brief of about twenty seconds in the caller's language: today's meetings in time order," +

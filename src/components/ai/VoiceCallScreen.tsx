@@ -60,6 +60,13 @@ const COPY: Record<Lang, {
      the call. */
   brief: string;
   briefRequest: string;
+  /* A task waiting for the caller's tap (roadmap D1). */
+  taskPreview: string;
+  saveTask: string;
+  cancelTask: string;
+  taskSaved: string;
+  taskFailed: string;
+  due: string;
   holdHint: string;
   modePick: string;
   modeHandsFree: string;
@@ -121,6 +128,12 @@ const COPY: Record<Lang, {
     holdRelease: "Let go when done",
     brief: "Today's brief",
     briefRequest: "Give me my brief for today: my meetings, tasks due, and what needs me first.",
+    taskPreview: "New task",
+    saveTask: "Save task",
+    cancelTask: "Cancel",
+    taskSaved: "Task saved",
+    taskFailed: "Could not save it. Try again.",
+    due: "Due",
     holdHint: "Hold the button while you speak, let go when you are done.",
     modePick: "How you talk",
     modeHandsFree: "Hands-free",
@@ -158,6 +171,12 @@ const COPY: Record<Lang, {
     holdRelease: "说完松开",
     brief: "今日简报",
     briefRequest: "给我今天的简报：我的会议、到期的任务、以及最需要我先处理的事。",
+    taskPreview: "新任务",
+    saveTask: "保存任务",
+    cancelTask: "取消",
+    taskSaved: "任务已保存",
+    taskFailed: "没保存成功，再试一次。",
+    due: "截止",
     holdHint: "说话时按住按钮，说完松开。",
     modePick: "说话方式",
     modeHandsFree: "免提",
@@ -195,6 +214,12 @@ const COPY: Record<Lang, {
     holdRelease: "سيب لما تخلص",
     brief: "موجز النهاردة",
     briefRequest: "قولّي موجز النهاردة: اجتماعاتي، والمهام اللي مواعيدها النهاردة، وإيه اللي محتاجني الأول.",
+    taskPreview: "مهمة جديدة",
+    saveTask: "احفظ المهمة",
+    cancelTask: "إلغاء",
+    taskSaved: "المهمة اتحفظت",
+    taskFailed: "ماتحفظتش. جرّب تاني.",
+    due: "موعدها",
     holdHint: "اضغط على الزرار وانت بتتكلم، وسيبه لما تخلص.",
     modePick: "طريقة الكلام",
     modeHandsFree: "كلام حر",
@@ -252,6 +277,15 @@ export type VoiceCallScreenProps = {
    *  not up yet, which the screen says rather than swallowing the text. Absent
    *  means no composer is drawn. */
   onSendText?: (text: string) => boolean;
+  /** A write the model previewed, waiting for the caller's tap (roadmap D1).
+   *  The screen shows what will be saved and two buttons; the parent carries
+   *  the tap to the server. Nothing here decides anything. */
+  pendingWrite?: { tool: string; args: Record<string, unknown>; message: string } | null;
+  onConfirmWrite?: () => void;
+  onCancelWrite?: () => void;
+  writeBusy?: boolean;
+  writeSaved?: boolean;
+  writeError?: boolean;
 };
 
 export default function VoiceCallScreen({
@@ -274,6 +308,12 @@ export default function VoiceCallScreen({
   onSelectVoice,
   onSendText,
   defaultVoiceSheetOpen = false,
+  pendingWrite = null,
+  onConfirmWrite,
+  onCancelWrite,
+  writeBusy = false,
+  writeSaved = false,
+  writeError = false,
 }: VoiceCallScreenProps) {
   const copy = COPY[lang];
   /* THE VOICE SHEET — open or not. Chips in the bottom bar were the first
@@ -648,6 +688,54 @@ export default function VoiceCallScreen({
           </div>
         )}
       </div>
+
+      {/* ── A TASK WAITING FOR A TAP (roadmap D1) ──────────────────────────
+          Above the bar, in both views: what will be saved, in the caller's
+          own words as the model heard them, and the two buttons. Save is
+          the one Hub Blue control on the screen while it is up — it is the
+          one thing that writes. */}
+      {(pendingWrite || writeSaved) && (
+        <div className="shrink-0 px-4 pb-2" data-task-card>
+          <div className="max-w-[560px] mx-auto rounded-2xl border border-white/15 bg-[#141414] px-4 py-3 text-white">
+            {pendingWrite ? (
+              <>
+                <div className="text-[11px] uppercase tracking-wide text-[#AAAAAA]">{copy.taskPreview}</div>
+                <div className="mt-1 text-[15px] font-semibold leading-snug" data-task-title>{String(pendingWrite.args.title ?? "")}</div>
+                {(pendingWrite.args.due_date || pendingWrite.args.priority || pendingWrite.args.label) && (
+                  <div className="mt-1 text-[12px] text-[#AAAAAA]">
+                    {pendingWrite.args.due_date ? `${copy.due} ${String(pendingWrite.args.due_date)}` : ""}
+                    {pendingWrite.args.due_date && (pendingWrite.args.priority || pendingWrite.args.label) ? " · " : ""}
+                    {pendingWrite.args.priority ? String(pendingWrite.args.priority) : ""}
+                    {pendingWrite.args.priority && pendingWrite.args.label ? " · " : ""}
+                    {pendingWrite.args.label ? String(pendingWrite.args.label) : ""}
+                  </div>
+                )}
+                {writeError && <div className="mt-2 text-[12px] text-[#FF3333]">{copy.taskFailed}</div>}
+                <div className="mt-3 flex gap-2">
+                  <button
+                    type="button"
+                    onClick={onConfirmWrite}
+                    disabled={writeBusy}
+                    className="h-10 flex-1 rounded-full bg-[#0066FF] text-white text-[13px] font-semibold active:scale-95 transition-transform disabled:opacity-60 focus:outline-none focus-visible:ring-2 focus-visible:ring-white"
+                  >
+                    {copy.saveTask}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={onCancelWrite}
+                    disabled={writeBusy}
+                    className="h-10 px-4 rounded-full border border-white/20 text-[#AAAAAA] hover:text-white text-[13px] active:scale-95 transition-transform disabled:opacity-60 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0066FF]"
+                  >
+                    {copy.cancelTask}
+                  </button>
+                </div>
+              </>
+            ) : (
+              <div className="text-[13px] font-semibold text-white" role="status" data-task-saved>✓ {copy.taskSaved}</div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* ── THE BOTTOM BAR, in both views: type, mute, end. ── */}
       <div className="shrink-0 flex flex-col pt-2">
