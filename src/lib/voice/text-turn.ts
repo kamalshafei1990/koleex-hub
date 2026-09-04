@@ -20,6 +20,19 @@ export const EV_ITEM_CREATE = "conversation.item.create";
 export const EV_RESPONSE_CREATE = "response.create";
 export const MAX_TYPED_TURN_CHARS = 2_000;
 
+/** ONE wire message: text into the session as the user's turn, with NO
+ *  response asked for. For what the screen did that the model should know
+ *  without answering — a task confirmed by a tap, a card dismissed. The
+ *  next thing the caller says is answered with this in view. */
+export function buildNoteMessage(text: string): string | null {
+  const trimmed = text.trim().slice(0, MAX_TYPED_TURN_CHARS);
+  if (!trimmed) return null;
+  return JSON.stringify({
+    type: EV_ITEM_CREATE,
+    item: { type: "message", role: "user", content: [{ type: "input_text", text: trimmed }] },
+  });
+}
+
 /** Both wire messages, in order, or null when there is nothing to send. */
 export function buildTextTurnMessages(text: string): string[] | null {
   const trimmed = text.trim().slice(0, MAX_TYPED_TURN_CHARS);

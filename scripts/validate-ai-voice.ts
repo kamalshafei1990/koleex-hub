@@ -657,11 +657,13 @@ console.log("\n── 8. What the client may know, and what it may not ──");
         names.length > 0 && names.every((n) => VOICE_TOOL_NAMES.includes(n)));
       const WRITEY = /^(create|update|delete|complete|reassign|remember|forget|suggest)/i;
       const writes = names.filter((n) => WRITEY.test(n));
+      /* Narrowed for roadmap D1: exactly one write, the one the tool route
+         reserves for the caller's tap. Anything else here is still a break. */
       check(
-        writes.length === 0
-          ? "and not one of them is a write — a call cannot act, only look up"
-          : `A WRITE TOOL IS REACHABLE BY VOICE: ${writes.join(", ")}`,
-        writes.length === 0,
+        writes.join(",") === "createTodo"
+          ? "and the only write among them is createTodo — saved by the caller's tap, never by the model"
+          : `AN UNDECLARED WRITE TOOL IS REACHABLE BY VOICE: ${writes.join(", ")}`,
+        writes.join(",") === "createTodo",
       );
       /* The client must not be able to widen it: the list is server-side. */
       check("the allow-list lives on the server, not in the browser bundle",
@@ -881,9 +883,11 @@ console.log("\n── 8. What the client may know, and what it may not ──");
        AND TO 36 000 when the customer and pricing reads (three schemas) and
        the brief joined (roadmap C1/C4): history-only 34.5 KB, worst case
        with a full personalization block 36.6 KB — still well under the
-       channel's 64 KB. */
+       channel's 64 KB; AND TO 40 000 for roadmap D1 (createTodo's schema and
+       the tasks-by-voice instructions): history-only 36.4 KB, worst case
+       38.6 KB. */
     check("the budget constant keeps the full session well inside the channel",
-      HISTORY_BUDGET_BYTES <= 3_000 && Buffer.byteLength(JSON.stringify(withHistory.full)) < 36_000);
+      HISTORY_BUDGET_BYTES <= 3_000 && Buffer.byteLength(JSON.stringify(withHistory.full)) < 40_000);
 
     /* THE ROUTE'S HALF, read. */
     const route = strip(readFileSync("src/app/api/ai/voice/session/route.ts", "utf8"));

@@ -34,6 +34,8 @@ import {
 } from "../src/lib/voice/tool-calls";
 import {
   VOICE_TOOL_NAMES,
+  VOICE_WRITE_TOOLS,
+  isVoiceWriteTool,
   VOICE_TOOL_CALLS_PER_SESSION,
   isVoiceTool,
   voiceToolSchemas,
@@ -74,17 +76,21 @@ console.log("\n── 1. The allow-list is the security boundary ──");
      name nobody predicted is exactly the one that would slip through. */
   const WRITE_PREFIX = /^(create|update|delete|complete|reassign|remember|forget|suggest|audit|calculate)/i;
   const writes = VOICE_TOOL_NAMES.filter((n) => WRITE_PREFIX.test(n));
+  /* ROADMAP D1 NARROWED THIS FROM "none" TO "exactly the declared write
+     list": a call now has ONE confirmation step — the caller's tap — and
+     the tool route reserves the confirming phase for it. Any write that is
+     not on VOICE_WRITE_TOOLS still fails here by name. */
   check(
-    writes.length === 0
-      ? "no tool on the voice list is a write — a call has no confirmation step"
-      : `WRITE TOOLS ON THE VOICE LIST: ${writes.join(", ")}`,
-    writes.length === 0,
+    writes.join(",") === [...VOICE_WRITE_TOOLS].sort().join(",") && writes.join(",") === "createTodo"
+      ? "the only write on the voice list is createTodo, and it is declared as such"
+      : `UNDECLARED WRITE TOOLS ON THE VOICE LIST: ${writes.filter((w) => !isVoiceWriteTool(w)).join(", ") || "(list mismatch)"}`,
+    writes.join(",") === [...VOICE_WRITE_TOOLS].sort().join(",") && writes.join(",") === "createTodo",
   );
 
   /* And the ones deliberately excluded stay excluded, by name, because each
      was a decision rather than an oversight. */
   for (const denied of [
-    "createQuotationDraft", "createTodo", "updateTodo", "deleteTodo",
+    "createQuotationDraft", "updateTodo", "deleteTodo",
     "createCalendarEvent", "remember_about_user", "forget_about_user",
     "getInventoryStatus", "calculateQuotationPricing",
   ]) {
@@ -93,7 +99,24 @@ console.log("\n── 1. The allow-list is the security boundary ──");
 
   /* Non-vacuity: those names must be REAL tools, or this asserts nothing. */
   check("the excluded names are real registered tools, not typos",
-    ["createQuotationDraft", "createTodo", "getInventoryStatus"].every((n) => getTool(n) !== undefined));
+    ["createQuotationDraft", "updateTodo", "getInventoryStatus"].every((n) => getTool(n) !== undefined));
+
+  /* ── ROADMAP D1: ONE WRITE, ONLY WITH A TAP ─────────────────────────────
+     createTodo's confirming phase is reserved for the caller's tap by the
+     tool route; the model's own function call may only preview. */
+  const voiceToolsSrc = readFileSync("src/lib/server/ai/voice/tools.ts", "utf8");
+  check("createTodo is reachable from a call, last on the list, and NOT in the compact fallback",
+    isVoiceTool("createTodo") && isVoiceWriteTool("createTodo") && !isVoiceWriteTool("createQuotationDraft") &&
+    /"getPricingRules",[\s\S]{0,900}?"createTodo",\s*\];/.test(voiceToolsSrc) &&
+    !((buildVoiceSessionPayload(null).compact.session as { tools?: Array<{ name: string }> }).tools ?? []).some((t) => t.name === "createTodo"));
+  const toolRoute = readFileSync("src/app/api/ai/voice/tool/route.ts", "utf8");
+  check("the tool route refuses a write's confirm from the model (not via tap) BEFORE dispatch, answering the model rather than erroring",
+    /const viaTap = body\.via === "tap";/.test(toolRoute) &&
+    /if \(isVoiceWriteTool\(name\) && args\.confirm === true && !viaTap\) \{[\s\S]{0,900}?call_id: callId,[\s\S]{0,300}?ok: false,[\s\S]{0,700}?\}\s*const result = await dispatchTool\(ctx, name, args\);/.test(toolRoute));
+  check("a write's PREVIEW arguments go to the client beside the model's envelope, never inside it, and only for a write tool awaiting approval",
+    /isVoiceWriteTool\(name\) && result\.permissionStatus === "approval_required" && result\.pendingAction\s*\?\s*\{ tool: result\.pendingAction\.tool, args: result\.pendingAction\.args \}/.test(toolRoute) &&
+    /\.\.\.\(pending \? \{ pending \} : \{\}\),/.test(toolRoute) &&
+    !/output: \{[^}]*pending/.test(toolRoute));
 
   check("nothing outside the list is allowed, including a plausible invention",
     !isVoiceTool("search_everything") && !isVoiceTool("") && !isVoiceTool("SEARCH_WEB"));
@@ -233,8 +256,13 @@ console.log("\n── 2b. A call reaches the same knowledge the chat box does �
     /Read every figure EXACTLY as returned/.test(String(buildVoiceSessionPayload(null).full.session.instructions ?? "")) &&
     /offer to write them into the chat/.test(String(buildVoiceSessionPayload(null).full.session.instructions ?? "")));
   check("the full session, tools included, still fits a DataChannel message with room",
-    JSON.stringify(buildVoiceSessionPayload(null).full).length < 32_000);
+    /* 40 000 since D1 (a write tool's schema and its instructions): measured
+       history-only 36.4 KB, worst case 38.6 KB, channel 64 KB and up. */
+    JSON.stringify(buildVoiceSessionPayload(null).full).length < 40_000);
   const instructions = String(buildVoiceSessionPayload(null).full.session.instructions ?? "");
+  check("the instructions tell the model to preview a task and never to confirm it itself; the tap does",
+    /TASKS BY VOICE: when the caller asks you to save, note or remind them of a task/.test(instructions) &&
+    /call createTodo WITHOUT confirm/.test(instructions) && /NEVER call createTodo with confirm yourself/.test(instructions));
   /* Both halves: that it HAS the knowledge, and that it must reach for it
      first. Asserting only the second passed when the first was deleted. */
   check("and is told it has that knowledge",

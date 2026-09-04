@@ -39,7 +39,7 @@ import { requireInternalUser } from "@/lib/server/ai/require-internal";
 import { buildUserContext, checkModule } from "@/lib/server/ai-agent/permissions";
 import { consumeBudget, limitMode, subjectFor } from "@/lib/server/ai/security/rate-limit";
 import { dispatchTool } from "@/lib/server/ai-agent/tool-registry";
-import { isVoiceTool } from "@/lib/server/ai/voice/tools";
+import { isVoiceTool, isVoiceWriteTool } from "@/lib/server/ai/voice/tools";
 
 export const dynamic = "force-dynamic";
 /* A lookup, not a conversation. The caller is mid-sentence waiting for it. */
@@ -70,7 +70,7 @@ export async function POST(req: Request) {
     );
   }
 
-  let body: { name?: unknown; arguments?: unknown; call_id?: unknown };
+  let body: { name?: unknown; arguments?: unknown; call_id?: unknown; via?: unknown };
   try {
     body = (await req.json()) as typeof body;
   } catch {
@@ -80,6 +80,12 @@ export async function POST(req: Request) {
   const name = typeof body.name === "string" ? body.name : "";
   const callId = typeof body.call_id === "string" ? body.call_id : "";
   const argsRaw = typeof body.arguments === "string" ? body.arguments : "";
+  /* WHO IS ASKING TO EXECUTE. "tap" is the client's card, pressed by the
+     caller; anything else is the model's own function call relayed by the
+     page. Only the word matters here: the ledger still has to find the
+     preview the model caused, so a page that says "tap" without one is
+     refused by dispatchTool like any fabricated confirm. */
+  const viaTap = body.via === "tap";
 
   if (!name || !callId) {
     return NextResponse.json({ error: "Invalid request." }, { status: 400 });
@@ -135,7 +141,40 @@ export async function POST(req: Request) {
     }
   }
 
+  /* A WRITE ON A CALL IS CONFIRMED BY A TAP, NEVER BY A WORD (roadmap D1).
+     The text lane lets the model send confirm:true after the user typed
+     "yes"; on a call that "yes" is a transcription of speech in a room, and
+     a misheard word must not create a record. So the model's own function
+     call may only ever PREVIEW: a confirm from it is answered — not
+     dispatched — with the reason, and the caller's tap on the on-screen
+     card is the only path that carries confirm:true to the registry, where
+     the ledger still has to match the preview. */
+  if (isVoiceWriteTool(name) && args.confirm === true && !viaTap) {
+    console.warn(`[ai.voice.tool] write confirm refused from the model tool=${name}`);
+    return NextResponse.json(
+      {
+        call_id: callId,
+        output: {
+          ok: false,
+          message:
+            "Not done: on a call, a task is saved only when the caller taps Confirm on the card on their screen — never by a spoken yes. " +
+            "The preview is on their screen; tell them to tap Confirm, and do not call this again with confirm.",
+        },
+      },
+      { headers: { "Cache-Control": "no-store" } },
+    );
+  }
+
   const result = await dispatchTool(ctx, name, args);
+
+  /* THE PREVIEW, FOR THE SCREEN ONLY. A write tool's first phase returns the
+     exact arguments its second phase needs; they go to the CLIENT beside
+     the model's envelope (not inside it), so the card can carry them back
+     with the tap. The model's output is unchanged. */
+  const pending =
+    isVoiceWriteTool(name) && result.permissionStatus === "approval_required" && result.pendingAction
+      ? { tool: result.pendingAction.tool, args: result.pendingAction.args }
+      : undefined;
 
   /* WHAT GOES BACK TO THE MODEL. The tool's own envelope, unchanged — it is
      already the shape every other lane hands the model, already
@@ -155,6 +194,7 @@ export async function POST(req: Request) {
         message: result.message,
         data: result.data,
       },
+      ...(pending ? { pending } : {}),
     },
     { headers: { "Cache-Control": "no-store" } },
   );
