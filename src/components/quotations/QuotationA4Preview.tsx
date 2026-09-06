@@ -753,12 +753,19 @@ export default function QuotationA4Preview({
      picture can pass it. Estimated rather than measured in the DOM, because
      measuring means a layout read on every keystroke of the editor. */
   const rowHeight = (it: QuotationItem): number => {
-    const hasImage = !!(it.image && it.image.trim());
     const text = `${it.description ?? ""} ${it.model ?? ""}`.replace(/<[^>]+>/g, " ");
     /* ~34 characters per line in the 206 px description column at 11 px. */
     const lines = Math.max(1, Math.ceil(text.trim().length / 34));
     const textHeight = 26 + lines * 15;
-    return Math.max(hasImage ? 112 : 44, textHeight);
+    /* 112 px is the FLOOR FOR EVERY ROW, not just rows with a picture. The
+       NO. cell below carries `height: 112` unconditionally (it has to — the
+       row-action cluster and the notes panel are both 112 px and live in
+       that row), so a picture-less row is 112 px tall too. Costing those at
+       44 px is what overflowed the sheet: five text-only rows measured 560 px
+       against a 469 px budget, and because .quot-a4-doc is overflow:visible
+       the surplus PAINTED OVER the next sheet — the owner's screenshot.
+       Measured on the live document before and after. */
+    return Math.max(112, textHeight);
   };
 
   type PageKind = "items" | "footer-a" | "footer-b";
