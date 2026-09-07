@@ -62,6 +62,7 @@ import {
   sttModelFor,
 } from "@/lib/server/ai/voice/session-config";
 import { taughtQuestionIndex } from "@/lib/server/ai-knowledge";
+import { parseGrokVoiceConfig, readGrokVoiceEnv, chooseVoiceLane } from "@/lib/server/ai/voice/grok";
 import { describeFetchFailure } from "@/lib/server/ai/voice/fetch-cause";
 
 /* ---------------------------------------------------------------------------
@@ -243,11 +244,19 @@ export async function GET(req: Request) {
   const gate = await authorize(req);
   if (gate instanceof NextResponse) return gate;
 
-  const cfg = parseVoiceConfig(voiceEnv());
+  const cfg = parseVoiceConfig(voiceEnv()) ?? parseVoiceConfig(altVoiceEnv());
+  /* THE LANE, decided here and only here (see ai/voice/grok.ts): mainland
+     callers take the WebRTC lane the product has always had; everyone
+     else takes the WebSocket lane when it is configured. The country is
+     what the platform stamps on the request — never a client claim. The
+     voices offered are the serving lane's, under the same product names. */
+  const grok = parseGrokVoiceConfig(readGrokVoiceEnv());
+  const lane = chooseVoiceLane({ country: req.headers.get("x-vercel-ip-country"), rtc: cfg !== null, ws: grok !== null });
+  const voices = lane === "ws" && grok ? grok.voices : cfg ? cfg.voices : [];
   /* Not configured is not an error here: no voice service means no voices to
      choose between, and a picker that cannot be used should not be drawn. */
   return NextResponse.json(
-    { voices: cfg ? publicVoiceList(cfg.voices) : [] },
+    { voices: publicVoiceList(voices), transport: lane ?? "rtc" },
     { headers: { "Cache-Control": "no-store" } },
   );
 }

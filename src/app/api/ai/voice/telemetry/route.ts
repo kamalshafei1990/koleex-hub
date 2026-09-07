@@ -64,7 +64,7 @@ export async function POST(req: Request) {
   console.warn(
     `[ai.voice.client] ${reason} elapsedMs=${num(body.elapsed_ms)} ice=${short(body.ice, 16) || "none"} ` +
       `dc=${short(body.dc, 16) || "none"} lastEvent=${short(body.last_event, 60) || "none"} toolCalls=${num(body.tool_calls)} ` +
-      `slot=${short(body.region, 8) || "none"} iceEverConnected=${body.ice_ever_connected === true} resumes=${num(body.resumes)}` +
+      `slot=${short(body.region, 8) || "none"} lane=${short(body.lane, 4) || "rtc"} fellBack=${body.fell_back === true} iceEverConnected=${body.ice_ever_connected === true} resumes=${num(body.resumes)}` +
       (cause(body.err) ? ` err="${cause(body.err)}"` : ""),
   );
   return new NextResponse(null, { status: 204 });

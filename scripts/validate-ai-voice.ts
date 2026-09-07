@@ -34,7 +34,11 @@ import {
   HISTORY_MAX_CHARS_PER_TURN,
   type RecentTurn,
 } from "../src/lib/server/ai/voice/history";
-import { buildVoiceSessionPayload, parseSttLanguage } from "../src/lib/server/ai/voice/session-config";
+import { buildVoiceSessionPayload, parseSttLanguage, OPENAI_WIRE, QWEN_WIRE } from "../src/lib/server/ai/voice/session-config";
+import {
+  parseGrokVoiceConfig, grokSocketUrl, grokProtocols, chooseVoiceLane, extractClientSecret, mintClientSecret,
+  GROK_DEFAULT_URL, GROK_DEFAULT_SECRETS_URL, GROK_SECRET_TTL_SEC,
+} from "../src/lib/server/ai/voice/grok";
 import { BUDGETS } from "../src/lib/server/ai/security/rate-limit";
 
 let pass = 0;
@@ -728,9 +732,9 @@ console.log("\n── 8. What the client may know, and what it may not ──");
       !/requireAuth|requireInternalUser|checkModule|buildUserContext/.test(bare));
 
     check("GET returns the public list, never the raw catalogue",
-      /publicVoiceList\(cfg\.voices\)/.test(bare) && !/voices: cfg\.voices/.test(bare));
+      /publicVoiceList\(voices\)/.test(bare) && !/voices: cfg\.voices/.test(bare) && !/voices: voices,/.test(bare));
     check("an unconfigured deployment offers an empty list rather than an error",
-      /cfg \? publicVoiceList\(cfg\.voices\) : \[\]/.test(bare));
+      /const voices = lane === "ws" && grok \? grok\.voices : cfg \? cfg\.voices : \[\];/.test(bare));
   }
 
   console.log("\n── 11. The watchdog measures the real path, on the real budget, and says so safely ──");
@@ -1222,6 +1226,84 @@ console.log("\n── 8. What the client may know, and what it may not ──");
       built.indexOf("WHICH LANGUAGE:") > built.indexOf("SPEAKING ARABIC") && built.indexOf("WHICH LANGUAGE:") < built.indexOf("SPOKEN STYLE:"));
     check("  …and that refusing a picture of a public thing is wrong: a car is looked up, never declined",
       /a car, a place, a fabric, a stadium, a team/.test(built) && /NEVER say you cannot show a picture[\s"+]*of a car, a place or any public thing — look it up/.test(built));
+  }
+
+  console.log("\n── 18. The second lane: a WebSocket vendor for callers outside mainland China ──");
+  {
+    /* ai/voice/grok.ts. The key is presence-only, the vendor is configuration,
+       mainland callers never meet it. */
+    const KEY = "xai-secret-key-000";
+    check("no key, no lane", parseGrokVoiceConfig({}) === null && parseGrokVoiceConfig({ AI_VOICE_GROK_API_KEY: "  " }) === null);
+    const cfg = parseGrokVoiceConfig({ AI_VOICE_GROK_API_KEY: KEY });
+    check("a key alone is a full lane on the vendor's documented defaults",
+      !!cfg && cfg.url === GROK_DEFAULT_URL && cfg.secretsUrl === GROK_DEFAULT_SECRETS_URL && cfg.model === null && cfg.sampleRate === 24_000 && cfg.protocolTemplate === "xai-client-secret.{token}");
+    check("  …with the SAME five product names in the SAME order as the mainland catalogue, so a saved voice key means the same voice on either lane",
+      !!cfg && cfg.voices.map((v) => v.label).join() === "Nour,Layla,Omar,Adam,Sara" && cfg.voices.map((v) => v.key).join() === "v1,v2,v3,v4,v5" &&
+      voiceCatalogue(undefined).map((v) => v.label).join() === "Nour,Layla,Omar,Adam,Sara");
+    check("  …and vendor ids in the vendor's own lowercase", !!cfg && cfg.voices.map((v) => v.vendorId).join() === "ara,eve,rex,leo,sal");
+    check("the config carries no key, in any field", !!cfg && !JSON.stringify(cfg).includes(KEY) && !JSON.stringify(cfg).includes("secret-key"));
+    check("AI_VOICE_GROK_LANE=off switches the lane off without removing the key", parseGrokVoiceConfig({ AI_VOICE_GROK_API_KEY: KEY, AI_VOICE_GROK_LANE: "off" }) === null);
+    check("an insecure socket or mint url is refused", parseGrokVoiceConfig({ AI_VOICE_GROK_API_KEY: KEY, AI_VOICE_GROK_URL: "ws://api.example/v1/realtime" }) === null &&
+      parseGrokVoiceConfig({ AI_VOICE_GROK_API_KEY: KEY, AI_VOICE_GROK_SECRETS_URL: "http://api.example/secrets" }) === null);
+    check("a protocol template without the token slot is refused — a socket with no secret cannot open", parseGrokVoiceConfig({ AI_VOICE_GROK_API_KEY: KEY, AI_VOICE_GROK_PROTOCOL: "realtime" }) === null);
+    const tuned = parseGrokVoiceConfig({ AI_VOICE_GROK_API_KEY: KEY, AI_VOICE_GROK_MODEL: "grok-voice-1", AI_VOICE_GROK_SAMPLE_RATE: "16000", AI_VOICE_GROK_VOICES: "eve:Nour,ara:Layla" });
+    check("model, rate and catalogue are configuration", !!tuned && tuned.model === "grok-voice-1" && tuned.sampleRate === 16_000 && tuned.voices.map((v) => v.vendorId).join() === "eve,ara");
+    check("  …an unusable rate falls back to the default", parseGrokVoiceConfig({ AI_VOICE_GROK_API_KEY: KEY, AI_VOICE_GROK_SAMPLE_RATE: "99" })?.sampleRate === 24_000);
+    check("the socket url carries the model only when one is configured", !!cfg && !!tuned && grokSocketUrl(cfg) === GROK_DEFAULT_URL && grokSocketUrl(tuned) === `${GROK_DEFAULT_URL}?model=grok-voice-1`);
+    check("the subprotocol carries the SECRET, composed from the template", !!cfg && grokProtocols(cfg, "tok-1").join() === "xai-client-secret.tok-1");
+
+    /* WHO TAKES THE LANE. */
+    check("mainland takes the mainland lane; everyone else the socket lane; no country reads as mainland",
+      chooseVoiceLane({ country: "CN", rtc: true, ws: true }) === "rtc" && chooseVoiceLane({ country: "cn", rtc: true, ws: true }) === "rtc" &&
+      chooseVoiceLane({ country: "EG", rtc: true, ws: true }) === "ws" && chooseVoiceLane({ country: "US", rtc: true, ws: true }) === "ws" && chooseVoiceLane({ country: "HK", rtc: true, ws: true }) === "ws" &&
+      chooseVoiceLane({ country: null, rtc: true, ws: true }) === "rtc" && chooseVoiceLane({ country: "", rtc: true, ws: true }) === "rtc");
+    check("  …one lane configured is the only lane, wherever the caller is", chooseVoiceLane({ country: "CN", rtc: false, ws: true }) === "ws" && chooseVoiceLane({ country: "EG", rtc: true, ws: false }) === "rtc" && chooseVoiceLane({ country: "EG", rtc: false, ws: false }) === null);
+
+    /* THE SECRET'S ENVELOPE, whichever shape the vendor uses. */
+    check("the client secret is read from the top, from client_secret as a string, or from client_secret.value",
+      extractClientSecret({ value: "a", expires_at: 5 })?.value === "a" && extractClientSecret({ value: "a", expires_at: 5 })?.expiresAt === 5 &&
+      extractClientSecret({ client_secret: "b" })?.value === "b" && extractClientSecret({ client_secret: { value: "c", expires_at: 9 } })?.expiresAt === 9 &&
+      extractClientSecret({ client_secret: {} }) === null && extractClientSecret("x") === null && extractClientSecret(null) === null);
+
+    /* MINTING: the one request the real key goes out in. */
+    const calls: Array<{ url: string; init: RequestInit }> = [];
+    const fetchOk = (async (url: string, init: RequestInit) => { calls.push({ url, init }); return { ok: true, status: 200, json: async () => ({ value: "xai-client-secret-abc", expires_at: 1 }) } as unknown as Response; }) as unknown as typeof fetch;
+    const minted = cfg ? await mintClientSecret(cfg, KEY, fetchOk) : null;
+    check("the mint posts to the secrets url with the real key as a bearer and a bounded lifetime",
+      minted?.value === "xai-client-secret-abc" && calls.length === 1 && calls[0].url === GROK_DEFAULT_SECRETS_URL &&
+      (calls[0].init.headers as Record<string, string>).Authorization === `Bearer ${KEY}` && JSON.parse(String(calls[0].init.body)).expires_after.seconds === GROK_SECRET_TTL_SEC && GROK_SECRET_TTL_SEC <= 900);
+    const fetchRefused = (async () => ({ ok: false, status: 401, json: async () => ({ error: "bad key" }) }) as unknown as Response) as unknown as typeof fetch;
+    const fetchDead = (async () => { throw Object.assign(new Error("aborted"), { name: "AbortError" }); }) as unknown as typeof fetch;
+    check("a refused or silent mint is null, never a throw", cfg !== null && (await mintClientSecret(cfg, KEY, fetchRefused)) === null && (await mintClientSecret(cfg, KEY, fetchDead)) === null);
+
+    /* THE WIRE. */
+    const full = buildVoiceSessionPayload(null, [], [], null, "ar", null, OPENAI_WIRE).full.session as Record<string, unknown>;
+    const compact = buildVoiceSessionPayload(null, [], [], null, "ar", null, OPENAI_WIRE).compact.session as Record<string, unknown>;
+    const mainland = buildVoiceSessionPayload(null, [], [], null, "ar", null).full.session as Record<string, unknown>;
+    check("on the OpenAI-style wire the session says pcm16 both ways and asks for transcription with the language, without the mainland vendor's flag",
+      full.input_audio_format === "pcm16" && full.output_audio_format === "pcm16" && JSON.stringify(full.input_audio_transcription) === JSON.stringify({ language: "ar" }));
+    check("  …the compact session on that wire asks for no transcription at all — a refused field costs the caption, not the call", !("input_audio_transcription" in compact) && compact.input_audio_format === "pcm16");
+    check("  …and the mainland wire is exactly what it was", mainland.input_audio_format === "pcm" && JSON.stringify(mainland.input_audio_transcription) === JSON.stringify({ enabled: true, language: "ar" }) && QWEN_WIRE.compactTranscription === true);
+    check("  …everything that is not the wire is shared: turn detection, instructions, tools", JSON.stringify(full.turn_detection) === JSON.stringify(mainland.turn_detection) && full.instructions === mainland.instructions && JSON.stringify(full.tools) === JSON.stringify(mainland.tools));
+
+    /* THE ROUTES, read. */
+    const wsRoute = readFileSync("src/app/api/ai/voice/ws-session/route.ts", "utf8");
+    check("the ws-session route stands behind the same voice gate and the same call budget as the SDP route",
+      /const gate = await authorizeVoice\(req\);/.test(wsRoute) && /bucket: "voice_session"/.test(wsRoute) && /AI_LIMIT_VOICE_SESSIONS_PER_MIN/.test(wsRoute));
+    check("  …the real key is read once, handed to the mint, and appears in no response",
+      (wsRoute.match(/process\.env\.AI_VOICE_GROK_API_KEY/g) ?? []).length === 1 && /mintClientSecret\(cfg, apiKey\)/.test(wsRoute) &&
+      !/apiKey/.test(wsRoute.slice(wsRoute.indexOf("return NextResponse.json(\n    {\n      transport"))));
+    check("  …a mint that fails is a 502 with the generic sentence; the vendor's body stays in the log", /if \(!secret\) \{[\s\S]{0,600}?status: 502/.test(wsRoute) && !/await res\.text\(\)/.test(wsRoute));
+    check("  …the session is built on the OpenAI-style wire with the caller's viewer, the taught index and the thread, like the other lane",
+      /buildVoiceSessionPayload\(voice, taughtQuestions, recentTurns, gate\.viewer, sttLanguage, null, OPENAI_WIRE\)/.test(wsRoute) && /loadRecentTurns\(supabaseServer, conversationId, gate\.tenantId, gate\.accountId\)/.test(wsRoute));
+    check("  …and returns url, protocols, audio rate and both sessions — nothing else the client could route a key with",
+      /url: grokSocketUrl\(cfg\),\s*protocols: grokProtocols\(cfg, secret\.value\),/.test(wsRoute) && /audio: \{ format: "pcm16", sample_rate: cfg\.sampleRate \}/.test(wsRoute) && !/model:/.test(wsRoute.slice(wsRoute.indexOf("return NextResponse.json(\n    {\n      transport"))));
+    const sdpRoute = readFileSync("src/app/api/ai/voice/session/route.ts", "utf8");
+    check("the voices GET decides the lane from the platform's country stamp and says which — the client never chooses",
+      /chooseVoiceLane\(\{ country: req\.headers\.get\("x-vercel-ip-country"\), rtc: cfg !== null, ws: grok !== null \}\)/.test(sdpRoute) && /transport: lane \?\? "rtc"/.test(sdpRoute));
+    check("  …offering the serving lane's voices under the product names", /const voices = lane === "ws" && grok \? grok\.voices : cfg \? cfg\.voices : \[\];/.test(sdpRoute));
+    const postBody = wsRoute.slice(wsRoute.indexOf("export async function POST"));
+    check("neither route carries a vendor host in code — the endpoint is configuration", !/api\.x\.ai|wss:\/\//.test(postBody) && !/api\.x\.ai|wss:\/\//.test(sdpRoute));
   }
 
   console.log(`\n${pass} passed, ${failures.length} failed`);

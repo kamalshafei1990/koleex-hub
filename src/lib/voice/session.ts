@@ -47,6 +47,7 @@ function eventTypeOf(raw: string): string {
   }
 }
 import { buildTextTurnMessages, buildNoteMessage } from "./text-turn";
+import { createBrowserWsAudio, type WsAudio } from "./ws-audio";
 
 /** True when a DataChannel message is exactly this event.
  *
@@ -165,10 +166,43 @@ export type VoiceEvents = {
   onToolProtocolMismatch?: (eventType: string) => void;
 };
 
+/** What the session needs of the thing it sends events on. An
+ *  RTCDataChannel satisfies it as it is; the WebSocket lane wraps its
+ *  socket into the same shape (a socket's readyState is a number). */
+export type VoiceChannel = {
+  readonly readyState: string;
+  send(data: string): void;
+};
+
+/** Which road the call takes: WebRTC through our SDP route (the mainland
+ *  lane, the product's original), or a WebSocket the browser opens to the
+ *  vendor with a short-lived secret our server minted (the lane for callers
+ *  outside mainland China — ai/voice/grok.ts). The SERVER says which, on
+ *  the voices GET; the client never chooses a vendor. */
+export type VoiceTransport = "rtc" | "ws";
+
+/** The socket, as the session sees it — the browser's WebSocket satisfies
+ *  this; the suite's double does too. */
+export type VoiceSocket = {
+  readonly readyState: number;
+  send(data: string): void;
+  close(): void;
+  onopen: ((ev: unknown) => void) | null;
+  onmessage: ((ev: { data: unknown }) => void) | null;
+  onclose: ((ev: unknown) => void) | null;
+  onerror: ((ev: unknown) => void) | null;
+};
+
 export type VoiceDeps = {
   createPeerConnection: () => RTCPeerConnection;
   getMicrophone: () => Promise<MediaStream>;
   fetchFn: typeof fetch;
+  /** The WebSocket lane. Absent means the lane cannot be used from this
+   *  runtime; the session then fails a "ws" call as unavailable. */
+  createWebSocket?: (url: string, protocols: string[]) => VoiceSocket;
+  /** The WebSocket lane's audio (ws-audio.ts). Absent in a runtime with no
+   *  Web Audio — the suite — and the call then carries events only. */
+  createWsAudio?: (sampleRate: number) => WsAudio;
   /** Test seam. Production uses the constant below. */
   iceTimeoutMs?: number;
   /** Test seam. Eight real seconds per assertion would make the recovery
@@ -317,13 +351,39 @@ const CONFIG_ACK_WINDOW_MS = 5_000;
 export const TOOL_PATH = "/api/ai/voice/tool";
 
 export const HANDSHAKE_PATH = "/api/ai/voice/session";
+/* The WebSocket lane's own three events — the ones that are audio rather
+   than protocol. Everything else on the socket is the shared protocol. */
+const EV_WS_AUDIO_DELTA = "response.audio.delta";
+const EV_WS_SPEECH_STARTED = "input_audio_buffer.speech_started";
+const EV_WS_RESPONSE_CANCELLED = "response.cancelled";
+
+/** The route's statuses, mapped to what the screen can act on — the same
+ *  table connect() applies inline (kept there so its pins hold). Pure. */
+export function failureForStatus(status: number): VoiceFailure {
+  return status === 403 ? "not-allowed"
+    : status === 401 ? "signed-out"
+    : status === 429 ? "too-many-calls"
+    : status === 503 ? "unavailable"
+    : status === 504 ? "service-unreachable"
+    : status === 502 ? "service-refused"
+    : "handshake-failed";
+}
+
+/** The WebSocket lane's handshake: no offer in, a socket and a secret out. */
+export const WS_SESSION_PATH = "/api/ai/voice/ws-session";
 
 export class VoiceSession {
   private pc: RTCPeerConnection | null = null;
   private mic: MediaStream | null = null;
   /** The channel we opened. Step 3 sends session.update and tool results
    *  through it; nothing writes to it yet. */
-  private channel: RTCDataChannel | null = null;
+  private channel: VoiceChannel | null = null;
+  /* THE WEBSOCKET LANE'S TWO OBJECTS — null on the WebRTC lane. */
+  private ws: VoiceSocket | null = null;
+  /** Identifies the in-flight WebSocket handshake, so a stop() during it is
+   *  honoured the way `this.pc !== pc` honours one on the other lane. */
+  private wsAttempt: object | null = null;
+  private wsAudio: WsAudio | null = null;
   /* The configuration is sent exactly once. Two triggers race to send it — the
      channel opening and `session.created` arriving — because the order of
      those two is the vendor's business and not something to depend on. */
@@ -405,6 +465,8 @@ export class VoiceSession {
      *  order and could spend the whole reconnect budget timing out on a
      *  region the previous call had already found unreachable. */
     initialRegion: "primary" | "alt" | null = null,
+    /** Which lane, as the server said on the voices GET. */
+    private readonly transport: VoiceTransport = "rtc",
   ) {
     if (initialRegion) this.regionHint = initialRegion;
   }
@@ -481,7 +543,7 @@ export class VoiceSession {
   diagnostics(): VoiceDiagnostics {
     return {
       elapsed_ms: this.startedAt ? Date.now() - this.startedAt : 0,
-      ice: this.pc?.iceConnectionState ?? "none",
+      ice: this.pc?.iceConnectionState ?? (this.ws ? `ws${this.ws.readyState}` : "none"),
       dc: this.channel?.readyState ?? "none",
       last_event: this.lastEventType.slice(0, 60),
       tool_calls: this.toolCallCount,
@@ -513,14 +575,38 @@ export class VoiceSession {
       /* already closed — teardown must not throw over a cleanup detail */
     }
     this.pc = null;
+    this.closeWs();
     this.channel = null;
     if (this.state !== "failed") this.setState("ended");
+  }
+
+  /** Tear down the WebSocket lane's objects, silently: a close the session
+   *  itself asked for must not read as the far side hanging up. */
+  private closeWs(): void {
+    const ws = this.ws;
+    this.ws = null;
+    if (ws) {
+      ws.onclose = null;
+      ws.onmessage = null;
+      ws.onerror = null;
+      ws.onopen = null;
+      try {
+        ws.close();
+      } catch { /* already closed */ }
+    }
+    const audio = this.wsAudio;
+    this.wsAudio = null;
+    if (audio) {
+      try {
+        audio.close();
+      } catch { /* teardown must not throw */ }
+    }
   }
 
   /** Send the session configuration, at most once, and only on an open
    *  channel. A send on a connecting channel throws and would take the call
    *  down over a race that resolves itself a moment later. */
-  private sendSessionConfig(channel: RTCDataChannel): void {
+  private sendSessionConfig(channel: VoiceChannel): void {
     if (this.configSent || channel.readyState !== "open") return;
     /* Nothing to relay yet. Not a failure: the handshake has simply not landed,
        and the open handler will be called again by `session.created` or by the
@@ -579,7 +665,7 @@ export class VoiceSession {
 
   /** The vendor announces the session before it will accept configuration.
    *  Wired alongside the open handler rather than instead of it. */
-  private onChannelMessage(raw: string, channel: RTCDataChannel): void {
+  private onChannelMessage(raw: string, channel: VoiceChannel): void {
     /* A message arrived, so the path it arrived on is up — whatever the ICE
        state property says (see markTransportUp). This is also what brings a
        "reconnecting" call back to live when the state watcher never says
@@ -642,7 +728,7 @@ export class VoiceSession {
    * the whole reason this is a round trip rather than a fetch to a search API
    * from the page.
    */
-  private async runToolCall(call: VoiceToolCall, channel: RTCDataChannel): Promise<void> {
+  private async runToolCall(call: VoiceToolCall, channel: VoiceChannel): Promise<void> {
     /* Once per call_id. The protocol can deliver the same finished call on
        more than one event, and a search run twice costs money and produces a
        duplicated answer. */
@@ -703,7 +789,7 @@ export class VoiceSession {
   }
 
   /** Both protocol messages, in order, with the channel checked once. */
-  private sendToolResult(channel: RTCDataChannel, callId: string, output: unknown): void {
+  private sendToolResult(channel: VoiceChannel, callId: string, output: unknown): void {
     if (channel.readyState !== "open") return;
     for (const message of buildToolResultMessages(callId, output)) {
       try {
@@ -728,6 +814,13 @@ export class VoiceSession {
          produces, and the other endpoint is the one thing that changes it. A
          call that WAS up and dropped is a different failure — the network
          went away — and a second region does not bring it back. */
+      /* A SOCKET THAT NEVER OPENED is the service not answering, not a
+         connection that dropped: the button must not offer to resume a
+         call that never was. */
+      if (!this.iceEverConnected && this.transport === "ws") {
+        this.fail("service-unreachable");
+        return;
+      }
       if (!this.iceEverConnected && this.altAvailable && !this.regionRetried) {
         this.regionRetried = true;
         this.regionHint = this.servedRegion === "alt" ? "primary" : "alt";
@@ -796,6 +889,7 @@ export class VoiceSession {
       this.pc?.close();
     } catch { /* see stop() */ }
     this.pc = null;
+    this.closeWs();
     this.channel = null;
     this.setState("failed", reason);
   }
@@ -830,7 +924,165 @@ export class VoiceSession {
        a far-end connection exists. */
     this.events.onLocalStream?.(this.mic);
 
-    await this.connect();
+    if (this.transport === "ws") await this.connectWs();
+    else await this.connect();
+  }
+
+  /* ---------------------------------------------------------------------
+     THE WEBSOCKET LANE. One POST to our route returns the socket url, the
+     subprotocol carrying a short-lived secret, the audio rate, and the same
+     server-authored session the other lane gets. The browser opens the
+     socket to the vendor; microphone frames go up as
+     `input_audio_buffer.append`, the voice comes down as
+     `response.audio.delta`, and every other event is the protocol the rest
+     of this class already speaks — the same onChannelMessage, the same
+     tool relay, the same config-and-acknowledge. Nothing above the
+     transport knows which lane it is on.
+     --------------------------------------------------------------------- */
+  private async connectWs(): Promise<void> {
+    if (!this.mic) {
+      this.fail("no-microphone");
+      return;
+    }
+    if (!this.deps.createWebSocket) {
+      this.fail("unavailable");
+      return;
+    }
+    this.setState("connecting");
+    const marker = {};
+    this.wsAttempt = marker;
+
+    let url = "";
+    let protocols: string[] = [];
+    let sampleRate = 24_000;
+    try {
+      const query = new URLSearchParams();
+      if (this.voiceKey) query.set("voice", this.voiceKey);
+      if (this.conversationId) query.set("conversation", this.conversationId);
+      if (this.sttLanguage) query.set("stt", this.sttLanguage);
+      const qs = query.toString();
+      const path = qs ? `${WS_SESSION_PATH}?${qs}` : WS_SESSION_PATH;
+      /* Same retry rule as the other lane: once, on a bare network error,
+         never on our own deadline, never after a hang-up. */
+      const post = () => this.deps.fetchFn(path, {
+        method: "POST",
+        ...(typeof AbortSignal !== "undefined" && "timeout" in AbortSignal ? { signal: AbortSignal.timeout(HANDSHAKE_TIMEOUT_MS) } : {}),
+        credentials: "include",
+      });
+      let res: Response;
+      try {
+        res = await post();
+      } catch (first) {
+        if (!(first instanceof TypeError) || isTimeoutError(first) || this.state !== "connecting" || this.wsAttempt !== marker) throw first;
+        await new Promise((r) => setTimeout(r, HANDSHAKE_RETRY_DELAY_MS));
+        if (this.state !== "connecting" || this.wsAttempt !== marker) throw first;
+        res = await post();
+      }
+      if (this.state !== "connecting" || this.wsAttempt !== marker) return;
+      if (!res.ok) {
+        this.fail(failureForStatus(res.status));
+        return;
+      }
+      const body = (await res.json()) as {
+        url?: unknown; protocols?: unknown; session?: unknown; session_compact?: unknown; audio?: { sample_rate?: unknown };
+      };
+      url = typeof body.url === "string" ? body.url : "";
+      protocols = Array.isArray(body.protocols) ? body.protocols.filter((p): p is string => typeof p === "string" && p.length > 0) : [];
+      const rate = body.audio?.sample_rate;
+      if (typeof rate === "number" && rate >= 8_000 && rate <= 48_000) sampleRate = rate;
+      if (body.session && typeof body.session === "object") this.sessionUpdate = JSON.stringify(body.session);
+      if (body.session_compact && typeof body.session_compact === "object") this.sessionUpdateCompact = JSON.stringify(body.session_compact);
+      /* Only a secure socket, only with a secret to present. */
+      if (!/^wss:\/\//i.test(url) || protocols.length === 0 || !this.sessionUpdate) {
+        this.fail("handshake-failed");
+        return;
+      }
+    } catch (e) {
+      this.fail(isTimeoutError(e) ? "service-unreachable" : "handshake-failed", e);
+      return;
+    }
+    if (this.state !== "connecting" || this.wsAttempt !== marker) return;
+
+    let ws: VoiceSocket;
+    try {
+      ws = this.deps.createWebSocket(url, protocols);
+    } catch (e) {
+      this.fail("handshake-failed", e);
+      return;
+    }
+    this.ws = ws;
+    const channel: VoiceChannel = {
+      get readyState() {
+        return ws.readyState === 1 ? "open" : ws.readyState === 0 ? "connecting" : "closed";
+      },
+      send: (data: string) => ws.send(data),
+    };
+    this.channel = channel;
+    const audio = this.deps.createWsAudio ? this.deps.createWsAudio(sampleRate) : null;
+    this.wsAudio = audio;
+
+    ws.onopen = () => {
+      if (this.ws !== ws) return;
+      /* An open socket IS the transport up — see markTransportUp. */
+      this.markTransportUp();
+      this.sendSessionConfig(channel);
+      if (audio) {
+        this.events.onRemoteStream?.(audio.stream);
+        if (this.mic) {
+          audio.startCapture(this.mic, (b64) => {
+            if (this.ws !== ws || ws.readyState !== 1) return;
+            try {
+              ws.send(JSON.stringify({ type: "input_audio_buffer.append", audio: b64 }));
+            } catch {
+              /* The socket closed under a frame; onclose handles the call. */
+            }
+          });
+        }
+      }
+    };
+    ws.onmessage = (m) => {
+      if (this.ws !== ws || typeof m.data !== "string") return;
+      this.onWsAudioEvent(m.data, audio);
+      this.onChannelMessage(m.data, channel);
+    };
+    ws.onclose = () => {
+      if (this.ws !== ws) return;
+      this.onChannelClosed();
+    };
+    ws.onerror = () => {
+      /* A close follows an error; the close is what the call acts on. */
+    };
+
+    this.setState("live");
+    /* The socket may never open (blocked, refused, a dead network): watched
+       from the start, like the other lane's media. */
+    if (!this.iceEverConnected) this.armReconnectTimer();
+  }
+
+  /** The two events that are SOUND on this lane and nothing else: a frame of
+   *  the far side's voice, and the caller starting to speak over it. */
+  private onWsAudioEvent(raw: string, audio: WsAudio | null): void {
+    if (!audio) return;
+    let v: unknown;
+    try {
+      v = JSON.parse(raw);
+    } catch {
+      return;
+    }
+    if (!v || typeof v !== "object") return;
+    const type = (v as { type?: unknown }).type;
+    if (type === EV_WS_AUDIO_DELTA) {
+      const delta = (v as { delta?: unknown }).delta;
+      if (typeof delta === "string" && delta) {
+        try {
+          audio.play(delta);
+        } catch {
+          /* One bad frame is a click, not a dropped call. */
+        }
+      }
+      return;
+    }
+    if (type === EV_WS_SPEECH_STARTED || type === EV_WS_RESPONSE_CANCELLED) audio.flush();
   }
 
   /** The handshake again, on the other region, with the microphone kept.
@@ -1159,5 +1411,7 @@ export function browserVoiceDeps(): VoiceDeps {
         video: false,
       }),
     fetchFn: (...args) => fetch(...args),
+    createWebSocket: (url, protocols) => new WebSocket(url, protocols) as unknown as VoiceSocket,
+    createWsAudio: (sampleRate) => createBrowserWsAudio(sampleRate),
   };
 }
