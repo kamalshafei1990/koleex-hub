@@ -185,16 +185,24 @@ function fakePc(opts: { iceState?: string; gatherLater?: boolean; channelOpen?: 
        double did not — so a client that watched nothing after going live
        passed every assertion here while freezing on a real unstable network. */
     iceConnectionState: "new",
+    /* The second property Safari keeps current when the first stays on
+       "checking" (session.ts markTransportUp). */
+    connectionState: "new",
     ontrack: null,
     ondatachannel: null,
     oniceconnectionstatechange: null,
+    onconnectionstatechange: null,
   } as unknown as RTCPeerConnection;
   /** Drive the connection the way a browser does: set the state, then notify. */
   const ice = (state: string) => {
     (pc as unknown as { iceConnectionState: string }).iceConnectionState = state;
     (pc as unknown as { oniceconnectionstatechange: (() => void) | null }).oniceconnectionstatechange?.();
   };
-  return { pc, calls, ice };
+  const conn = (state: string) => {
+    (pc as unknown as { connectionState: string }).connectionState = state;
+    (pc as unknown as { onconnectionstatechange: (() => void) | null }).onconnectionstatechange?.();
+  };
+  return { pc, calls, ice, conn };
 }
 
 type Recorded = { url: string; init?: RequestInit };
@@ -216,14 +224,16 @@ function deps(opts: {
   enforceLimit?: boolean;
   voiceKey?: string | null;
   reconnectGraceMs?: number;
-}): { deps: VoiceDeps; mic: ReturnType<typeof fakeMic>; ice: (state: string) => void; pcCalls: { closed: number; added: number; remoteSdp: string; channels: string[]; sent: string[]; channel: FakeChannel | null; gathered: boolean; postedAfterGathering: boolean | null } } {
+  liveGraceMs?: number;
+}): { deps: VoiceDeps; mic: ReturnType<typeof fakeMic>; ice: (state: string) => void; conn: (state: string) => void; pcCalls: { closed: number; added: number; remoteSdp: string; channels: string[]; sent: string[]; channel: FakeChannel | null; gathered: boolean; postedAfterGathering: boolean | null } } {
   const bodyReads: number[] = [];
   void bodyReads;
   const mic = fakeMic();
-  const { pc, calls, ice } = fakePc({ iceState: opts.iceState, gatherLater: opts.gatherLater, channelOpen: opts.channelOpen, sendThrows: opts.sendThrows, maxMessageSize: opts.maxMessageSize, enforceLimit: opts.enforceLimit });
+  const { pc, calls, ice, conn } = fakePc({ iceState: opts.iceState, gatherLater: opts.gatherLater, channelOpen: opts.channelOpen, sendThrows: opts.sendThrows, maxMessageSize: opts.maxMessageSize, enforceLimit: opts.enforceLimit });
   return {
     mic,
     ice,
+    conn,
     pcCalls: calls,
     deps: {
       getMicrophone: async () => {
@@ -236,6 +246,7 @@ function deps(opts: {
       },
       iceTimeoutMs: 60,
       reconnectGraceMs: opts.reconnectGraceMs ?? 80,
+      liveGraceMs: opts.liveGraceMs ?? opts.reconnectGraceMs ?? 80,
     fetchFn: (async (url: string, init?: RequestInit) => {
         opts.recorded?.push({ url: String(url), init });
         /* First post only: later ones (the tool relay) are not this question. */
@@ -1056,6 +1067,94 @@ async function main() {
       s2.stop();
     }
 
+    /* 11i — THE TRANSPORT IS UP BY WHICHEVER SIGN ARRIVES FIRST (owner,
+       2026-09-07: "when we talk suddenly it out of conversation"). The call
+       was judged by iceConnectionState alone; Safari does not always report
+       "connected" there for a connection that is plainly carrying audio and
+       data, so the never-connected watchdog took a working call for one
+       whose media had never come up, switched region onto the endpoint that
+       refuses this account, and ended a conversation mid-sentence. An open
+       DataChannel, a message on it, or connectionState "connected" is the
+       media path connected — each disarms the watchdog and makes "failed"
+       final. */
+    {
+      const r = await run({ reconnectGraceMs: 5_000 });
+      const before = pendingTimers();
+      r.pcCalls.channel?.open();
+      check("an open DataChannel disarms the never-connected watchdog — the media is up, whatever the ICE state says",
+        pendingTimers() === before - 1 && r.session.diagnostics().ice_ever_connected === true);
+      r.session.stop();
+    }
+    {
+      const r = await run({ reconnectGraceMs: 5_000 });
+      const before = pendingTimers();
+      r.conn("connected");
+      check("connectionState \"connected\" counts too — the property Safari keeps current", pendingTimers() === before - 1 && r.session.diagnostics().ice_ever_connected === true);
+      r.session.stop();
+    }
+    {
+      const r = await run({ reconnectGraceMs: 5_000 });
+      const before = pendingTimers();
+      r.pcCalls.channel?.open();
+      r.pcCalls.channel?.onmessage?.({ data: JSON.stringify({ type: "session.created" }) });
+      check("a message arriving on the channel counts — nothing arrives on a path that is down", pendingTimers() === before - 1);
+      r.session.stop();
+    }
+    {
+      /* THE CALL THAT WAS ENDED: two regions, ICE never says "connected",
+         the channel is open and events flow. Before: after the window, a
+         second handshake on the other region. Now: nothing — it is a call. */
+      const recorded: Recorded[] = [];
+      const r = await run({ recorded, envelope: { sdp: ANSWER, session: { type: "session.update", session: {} }, session_compact: { type: "session.update", session: {} }, region: "alt", alt_available: true } });
+      r.pcCalls.channel?.open();
+      await sleep(160);
+      check("a live call with an open channel is never failed over to the other region while ICE sits on \"checking\"",
+        recorded.length === 1 && r.session.getState() === "live" && r.states.every(([st]) => st !== "connecting" || r.states.indexOf([st, undefined]) === -1));
+      check("  …and is not ended either", r.states.every(([st]) => st !== "failed"));
+      r.session.stop();
+    }
+    {
+      const r = await run({ reconnectGraceMs: 5_000 });
+      r.pcCalls.channel?.open();
+      r.ice("failed");
+      const last = r.states[r.states.length - 1];
+      check("once the channel has been open, an ICE failure is final — a call that WAS up has gone down", last[0] === "failed" && last[1] === "connection-lost");
+    }
+    {
+      const r = await run({ reconnectGraceMs: 5_000 });
+      r.ice("connected");
+      r.ice("disconnected");
+      check("a wobble on a live call is reported as reconnecting", r.session.getState() === "reconnecting");
+      r.pcCalls.channel?.open();
+      r.pcCalls.channel?.onmessage?.({ data: JSON.stringify({ type: "response.audio_transcript.delta", delta: "hi" }) });
+      check("  …and the far side talking to us again brings it back to live, without waiting for ICE to say so", r.session.getState() === "live");
+      r.session.stop();
+    }
+    {
+      /* THE WINDOW A CALL THAT WAS UP GETS is longer than the one a call
+         that never came up gets: a handover between networks takes longer
+         than eight seconds and comes back. */
+      const r = await run({ reconnectGraceMs: 80, liveGraceMs: 300 });
+      r.ice("connected");
+      r.ice("disconnected");
+      await sleep(160);
+      check("a live call's wobble outlasts the never-connected window", r.session.getState() === "reconnecting");
+      await sleep(260);
+      const last = r.states[r.states.length - 1];
+      check("  …and still ends honestly when the live window runs out", last[0] === "failed" && last[1] === "connection-lost");
+    }
+    {
+      const src = (await import("node:fs")).readFileSync("src/lib/voice/session.ts", "utf8");
+      const live = Number((/const LIVE_GRACE_MS = ([\d_]+)/.exec(src)?.[1] ?? "0").replace(/_/g, ""));
+      const never = Number((/const RECONNECT_GRACE_MS = ([\d_]+)/.exec(src)?.[1] ?? "0").replace(/_/g, ""));
+      check("the shipped live window is twenty seconds, above the eight a call that never came up gets", live === 20_000 && never === 8_000 && live > never);
+      check("  …and is the one armed for a call that was up", /this\.iceEverConnected\s*\?\s*\(this\.deps\.liveGraceMs \?\? this\.deps\.reconnectGraceMs \?\? LIVE_GRACE_MS\)\s*:\s*\(this\.deps\.reconnectGraceMs \?\? RECONNECT_GRACE_MS\)/.test(src));
+      check("  …every sign of a connected transport goes through one place",
+        /local\.onopen = \(\) => \{\s*this\.markTransportUp\(\);/.test(src) && /remote\.onopen = \(\) => \{\s*this\.markTransportUp\(\);/.test(src) &&
+        /private onChannelMessage\(raw: string, channel: RTCDataChannel\): void \{[\s\S]{0,600}?this\.markTransportUp\(\);/.test(src) &&
+        /pc\.onconnectionstatechange = \(\) => \{[\s\S]{0,200}?if \(st === "connected"\) \{\s*this\.markTransportUp\(\);/.test(src));
+    }
+
     /* 11h — and the gathering budget, pinned the only way it can be: read.
        Waiting it out would make this suite the slowest thing in the gate, and
        every case above passes it an injected 60ms, so a regression to the
@@ -1308,6 +1407,23 @@ console.log("\n── 12. Mute ──");
       h.p.observe([L("user", "how many orders", true), L("assistant", "Fourteen.", true), L("user", "KX-180", true, "text")]);
       await h.p.flush();
       check("a typed turn keeps its via", h.posts[2].body.turns[0].via === "text");
+    }
+
+    {
+      /* A LINE LEFT OPEN BEHIND THE CONVERSATION. An answer whose `done`
+         never came, then two more turns: "everything up to the first open
+         line" stopped at it and nothing after it was ever saved (owner,
+         2026-09-07: the thread after a call "not complete"). A line the
+         fold can no longer reach is settled as it stands. */
+      const h = harness();
+      h.p.observe([L("user", "show me the pyramids", true), L("assistant", "One moment", false)]);
+      await h.p.flush();
+      check("an open answer is not posted while it can still grow", h.posts.length === 1);
+      h.p.observe([L("user", "show me the pyramids", true), L("assistant", "One moment", false), L("user", "and the sphinx", true), L("assistant", "Here they are.", true)]);
+      await h.p.flush();
+      const turns = h.posts.flatMap((x) => x.body.turns.map((t) => t.text));
+      check("  …but once two turns have followed it, it and everything after it are saved, in order",
+        turns.join("|") === "show me the pyramids|One moment|and the sphinx|Here they are.");
     }
 
     {
@@ -1752,7 +1868,7 @@ console.log("\n── 12. Mute ──");
   check("the screen says connecting until READY, not merely live — and says so differently when it is slow", /: !live \|\| !ready\s*\? \(connectingSlow \? copy\.connectingSlow : copy\.connecting\)/.test(scr) && /\{soundBlocked && onEnableSound && \(/.test(scr));
   check("  …and the orb stays awakening until then", /!live \|\| reconnecting \|\| !ready\s*\? "awakening"/.test(scr));
   check("  …ready defaults to true so other callers are unchanged", /ready = true,/.test(scr));
-  check("the rings are driven by the smoothed level, not by a per-render transform", /useCallLevel\(orbWrapRef, audioLevel, live && ready && !reconnecting && !muted, view\)/.test(scr) && !/audioLevel \* 0\.35/.test(scr));
+  check("the rings are driven by the smoothed level, not by a per-render transform", /useCallLevel\(orbWrapRef, audioLevel, live && ready && !reconnecting && !muted\)/.test(scr) && !/audioLevel \* 0\.35/.test(scr));
   check("  …three rings, colour by who is speaking", (scr.match(/kx-call-ring-\d/g) ?? []).length === 3 && /phase === "speaking" \? "is-far" : "is-near"/.test(scr));
   const css = fs16.readFileSync("src/app/globals.css", "utf8");
   check("the rings read --kx-call-level with transform and opacity only", /\.kx-call-orb\.is-live \.kx-call-ring-3 \{\s*opacity: calc\(var\(--kx-call-level\)[^}]*transform: scale\(calc\(1\.16 \+ var\(--kx-call-level\)/.test(css));
@@ -1784,9 +1900,12 @@ console.log("\n── 12. Mute ──");
     const r = await run({ recorded, envelope: twoRegion("primary", true) });
     check("the call is live after the first handshake", r.session.getState() === "live" && recorded.length === 1);
     check("  …which carried no region hint", !/region=/.test(recorded[0].url));
-    r.pcCalls.channel?.open();
+    /* THE CHANNEL NEVER OPENS on this endpoint — that is what "media never
+       connects" means; an open channel would be the media connected (see
+       the transport-up cases below), and this section is about the other
+       case. The first channel was created and nothing could go out on it. */
     const sentBefore = r.pcCalls.sent.length;
-    check("  …and the configuration went out on the first channel", sentBefore === 1 && /session\.update/.test(r.pcCalls.sent[0]));
+    check("  …a channel was created and, unopened, carried nothing", r.pcCalls.channels.length === 1 && sentBefore === 0);
     r.ice("failed");
     check("media that never connects is a recovery state first, not a failure", r.session.getState() === "reconnecting");
     await sleep(160);
@@ -1855,13 +1974,13 @@ console.log("\n── 12. Mute ──");
   check("  …best-effort: inside a try, before the stream is handed out", /try \{\s*const r = ev\.receiver as unknown as Record<string, unknown>;[\s\S]{0,400}?\} catch \{[\s\S]{0,200}?const stream = ev\.streams\?\.\[0\];/.test(sess));
   const scr = fs18.readFileSync("src/components/ai/VoiceCallScreen.tsx", "utf8");
   const css18 = fs18.readFileSync("src/app/globals.css", "utf8");
-  check("the call screen is TWO VIEWS, the way ChatGPT does it: the orb alone, or the conversation with a small orb floating over it",
-    /const view: "orb" \| "chat" = chosenView \?\? \(hasPhotos \? "chat" : "orb"\);/.test(scr) && /\{view === "orb" \? orbView : chatView\}/.test(scr) &&
-    /<VoiceTranscript lines=\{lines\} lang=\{lang\} className="kx-transcript flex-1 min-h-0 pb-28" fill onOpenPhoto=\{setOpenPhoto\} \/>/.test(scr) && /size=\{72\}/.test(scr));
-  check("  …a tap on the big orb or the quiet button opens the words; a tap on the small orb comes back",
-    (scr.match(/onClick=\{\(\) => switchView\("chat"\)\}/g) ?? []).length === 2 && /onClick=\{\(\) => switchView\("orb"\)\}/.test(scr));
-  check("  …a picture opens the conversation by itself, derived rather than synchronised — no effect writes state — and the caller's own tap wins",
-    /const hasPhotos = lines\.some\(\(l\) => \(l\.photos\?\.length \?\? 0\) > 0\);/.test(scr) && /useState<"orb" \| "chat" \| null>\(null\)/.test(scr) && !/useEffect\(\(\) => \{[^}]*setView/.test(scr));
+  check("the call screen is TWO VIEWS, the way ChatGPT does it: the orb alone, or the conversation with the same orb small in the corner",
+    /const view: "orb" \| "chat" = chosenView \?\? "orb";/.test(scr) && /\{wordsLayer\}\s*\{orbLayer\}/.test(scr) &&
+    /<VoiceTranscript lines=\{lines\} lang=\{lang\} className="kx-transcript flex-1 min-h-0 pb-28" fill onOpenPhoto=\{setOpenPhoto\} \/>/.test(scr) && /h-\[72px\] w-\[72px\]/.test(scr));
+  check("  …a tap on the orb toggles the views; the quiet button under it opens the words",
+    /onClick=\{\(\) => switchView\(view === "orb" \? "chat" : "orb"\)\}/.test(scr) && (scr.match(/onClick=\{\(\) => switchView\("chat"\)\}/g) ?? []).length === 1);
+  check("  …the view is the caller's choice alone, derived, no effect writes it — a picture no longer switches it (section 21)",
+    /useState<"orb" \| "chat" \| null>\(null\)/.test(scr) && !/useEffect\(\(\) => \{[^}]*setView/.test(scr) && !/hasPhotos/.test(scr));
   check("  …and the last thing said is a caption under the orb, so the orb view still shows the words",
     /const lastLine = lines\.length > 0 \? lines\[lines\.length - 1\] : null;/.test(scr) && /\{stripImageMarkdown\(lastLine\.text\)\}/.test(scr) && /line-clamp-3/.test(scr));
   check("  …and the pinned photo strip is gone: no `photos` prop, pictures come with the lines", !/photos\?: readonly/.test(scr) && !/photos\.map\(/.test(scr));
@@ -1874,10 +1993,10 @@ console.log("\n── 12. Mute ──");
     /\.kx-call-orb\.is-thinking \.kx-call-ring-3 \{ animation-delay: 1\.6s; \}/.test(css18));
   check("  …reduced motion stills the waves and leaves one quiet ring", /prefers-reduced-motion: reduce\) \{[^}]*animation: none !important/.test(css18) && /\.kx-call-orb\.is-thinking \.kx-call-ring-1 \{ opacity: 0\.35; \}/.test(css18));
   check("the wordmark stands above the orb in the top part, white, 24px on the grid",
-    /import KoleexLogo from "@\/components\/layout\/KoleexLogo";/.test(scr) && /<KoleexLogo className="h-6 w-auto shrink-0 text-white" \/>/.test(scr) && scr.indexOf("<KoleexLogo") < scr.indexOf("ref={orbWrapRef}"));
+    /import KoleexLogo from "@\/components\/layout\/KoleexLogo";/.test(scr) && /<KoleexLogo className="h-6 w-auto shrink-0 text-white" \/>/.test(scr) && scr.indexOf("<KoleexLogo") < scr.indexOf("{orb}"));
   const tr18 = fs18.readFileSync("src/components/ai/VoiceTranscript.tsx", "utf8");
   check("a picture in the conversation goes through the image pipeline at 384px, eagerly, box reserved, and removes itself when it fails to load",
-    /cdnImage\(photo\.url, \{ width: 384, quality: 75, resize: "contain" \}\)/.test(tr18) && /width=\{120\}\s*height=\{120\}/.test(tr18) && !/loading="lazy"/.test(tr18) &&
+    /cdnImage\(photo\.url, \{ width: 384, quality: 75, resize: "contain" \}\)/.test(tr18) && /width=\{size\}\s*height=\{size\}/.test(tr18) && /size = 120/.test(tr18) && !/loading="lazy"/.test(tr18) &&
     /onError=\{\(\) => setBroken\(true\)\}/.test(tr18) && /if \(broken\) return null;/.test(tr18));
   check("  …the conversation view shows every line, the chat-side transcript the last four", /const shown = fill \? lines : lines\.slice\(-VISIBLE_LINES\);/.test(tr18));
   const prodTool = fs18.readFileSync("src/lib/server/ai-agent/tools/products.ts", "utf8");
@@ -2159,36 +2278,56 @@ console.log("\n── 12. Mute ──");
 }
 
 {
-  console.log("\n── 21. The switch between the orb and the words is a crossfade, not a cut ──");
+  console.log("\n── 21. The switch between the orb and the words: one orb travels, nothing remounts, nothing switches by itself ──");
+  /* Owner, 2026-09-07: "the motion when I press show conversation or press
+     the orb is not smooth and ease enough, it has a glitch" and "suddenly
+     it out of conversation and show me the text conversation". The first
+     was two views remounted on every tap with a third, inert copy of the
+     leaving one on top; the second was a picture opening the conversation
+     by itself. Both layers now stay mounted, the orb is one element whose
+     flight is measured (FLIP), and only a tap changes the view. */
   const fs21 = await import("node:fs");
   const scr21 = fs21.readFileSync("src/components/ai/VoiceCallScreen.tsx", "utf8");
   const css21 = fs21.readFileSync("src/app/globals.css", "utf8");
-  check("a tap goes through switchView: the current view becomes the leaving one, the next arrives — nothing when it is already shown",
-    /const switchView = useCallback\(\(next: "orb" \| "chat"\) => \{\s*if \(next === view\) return;/.test(scr21) &&
-    /if \(!reduced\) setLeaving\(view\);\s*setView\(next\);/.test(scr21));
-  check("  …the leaving copy is cleared by a timer matching the CSS, never in render",
-    /const t = window\.setTimeout\(\(\) => setLeaving\(null\), VIEW_FADE_MS\);/.test(scr21) && /const VIEW_FADE_MS = 420;/.test(scr21) &&
-    /\.kx-view-out \{ animation: kx-view-out 0\.42s/.test(css21));
-  check("  …the arriving view is keyed so its entrance replays; the leaving copy is inert and hidden from readers, on top",
-    /<div key=\{view\} className=\{`kx-view-in kx-to-\$\{view\} flex-1 min-h-0 flex flex-col`\}>\s*\{view === "orb" \? orbView : chatView\}/.test(scr21) &&
-    /\{leaving && leaving !== view && \(\s*<div aria-hidden className=\{`kx-view-out kx-to-\$\{view\} pointer-events-none absolute inset-0 flex flex-col`\}>\s*\{leaving === "orb" \? orbView : chatView\}/.test(scr21));
-  check("  …reduced motion: no leaving copy is kept, and the CSS animates only when motion is welcome",
-    /window\.matchMedia\?\.\("\(prefers-reduced-motion: reduce\)"\)\.matches/.test(scr21) &&
-    /@media \(prefers-reduced-motion: no-preference\) \{\s*\.kx-view-in\s*\{ animation: kx-view-in/.test(css21) &&
-    /@keyframes kx-view-in\s*\{ from \{ opacity: 0; \} to \{ opacity: 1; \} \}/.test(css21));
-  /* THE CHOREOGRAPHY: not a fade. The owner: "animated in a creative way". */
-  check("the orb travels: opening the words it flies to the corner and shrinks, the transcript rises, the small orb lands a beat later",
-    /className="kx-orb-stage block rounded-full/.test(scr21) && /className="kx-mini-orb absolute bottom-4 end-6/.test(scr21) && /className="kx-transcript flex-1 min-h-0 pb-28"/.test(scr21) &&
-    /\.kx-view-out\.kx-to-chat \.kx-orb-stage \{ animation: kx-orb-fly-out 0\.42s/.test(css21) &&
-    /\.kx-view-in\.kx-to-chat\s+\.kx-transcript \{ animation: kx-rise-in 0\.42s/.test(css21) &&
-    /\.kx-view-in\.kx-to-chat\s+\.kx-mini-orb \{ animation: kx-land-in 0\.3s cubic-bezier\([^)]*\) 0\.18s both; \}/.test(css21) &&
-    /@keyframes kx-orb-fly-out\s*\{ from \{ transform: none; \} to \{ transform: translate\(36vw, 30vh\) scale\(0\.36\); \} \}/.test(css21));
-  check("  …and coming back the words sink away while the orb grows from that corner into the centre; RTL flips the horizontal leg",
-    /\.kx-view-out\.kx-to-orb \.kx-transcript \{ animation: kx-sink-out/.test(css21) && /\.kx-view-in\.kx-to-orb\s+\.kx-orb-stage \{ animation: kx-orb-fly-in 0\.42s/.test(css21) &&
-    /\[dir="rtl"\] \.kx-view-out\.kx-to-chat \.kx-orb-stage \{ animation-name: kx-orb-fly-out-rtl; \}/.test(css21) &&
-    /@keyframes kx-orb-fly-in-rtl\s*\{ from \{ transform: translate\(-36vw, 30vh\) scale\(0\.36\)/.test(css21));
-  check("  …the leaving copy stays opaque for most of the flight, so the travelling orb is never see-through",
-    /@keyframes kx-view-out \{ 0% \{ opacity: 1; \} 70% \{ opacity: 1; \} 100% \{ opacity: 0; \} \}/.test(css21));
+  check("only a tap changes the view — a picture no longer opens the conversation by itself",
+    /const view: "orb" \| "chat" = chosenView \?\? "orb";/.test(scr21) &&
+    /const switchView = useCallback\(\(next: "orb" \| "chat"\) => setView\(next\), \[\]\);/.test(scr21) &&
+    !/hasPhotos/.test(scr21));
+  check("  …and the latest pictures show under the orb instead, where the caller is looking",
+    /const latestPhotos: readonly TranscriptPhoto\[\]/.test(scr21) &&
+    /\{latestPhotos\.length > 0 && \(\s*<div className="flex flex-wrap justify-center gap-3" role="group" aria-label=\{copy\.photos\}>/.test(scr21) &&
+    /<PhotoTile key=\{p\.url\} photo=\{p\} onOpen=\{setOpenPhoto\} label=\{copy\.photos\} size=\{88\} \/>/.test(scr21));
+  check("both layers stay mounted: the words layer and the orb layer are always rendered, hidden by class, never keyed",
+    /<div ref=\{stageRef\} className="relative flex-1 min-h-0" data-view=\{view\}>\s*\{wordsLayer\}\s*\{orbLayer\}\s*<\/div>/.test(scr21) &&
+    !/key=\{view\}/.test(scr21) && !/leaving/.test(scr21.replace(/\/\*[\s\S]*?\*\//g, "")) &&
+    /className=\{`kx-call-words absolute inset-0 flex flex-col pt-4 \$\{view === "chat" \? "is-in" : ""\}`\}/.test(scr21));
+  check("  …the hidden layer is out of the accessibility tree and takes no taps; the orb alone stays tappable over the words",
+    /aria-hidden=\{view !== "chat"\}/.test(scr21) && /aria-hidden=\{view !== "orb"\}/.test(scr21) &&
+    /\$\{view === "orb" \? "" : "pointer-events-none"\}/.test(scr21) &&
+    /className="kx-orb-stage block rounded-full pointer-events-auto/.test(scr21));
+  check("one orb, drawn once: a single AIOrb at call size, no small second orb",
+    (scr21.match(/<AIOrb\b/g) ?? []).length === 1 && !/kx-mini-orb/.test(scr21) && /size=\{200\}/.test(scr21));
+  check("  …its flight is measured from its home to the corner slot (FLIP), so it lands exactly, in RTL too, and follows a resize",
+    /const home = orbHomeRef\.current\?\.getBoundingClientRect\(\);\s*const corner = cornerRef\.current\?\.getBoundingClientRect\(\);/.test(scr21) &&
+    /setTravel\(`translate\(\$\{dx\.toFixed\(1\)\}px, \$\{dy\.toFixed\(1\)\}px\) scale\(\$\{\(corner\.width \/ home\.width\)\.toFixed\(3\)\}\)`\);/.test(scr21) &&
+    /const ro = new ResizeObserver\(measure\);/.test(scr21) && /useLayoutEffect\(/.test(scr21) &&
+    /<div className="kx-orb-travel" style=\{\{ transform: travel \}\} data-travel=\{view\}>/.test(scr21) &&
+    /<div ref=\{cornerRef\} aria-hidden className="kx-orb-corner absolute bottom-4 end-6 h-\[72px\] w-\[72px\] pointer-events-none" \/>/.test(scr21));
+  check("  …the orb's home does not move with every caption: the block under it reserves a floor",
+    /ref=\{belowRef\}[\s\S]{0,120}min-h-\[176px\]/.test(scr21));
+  check("  …and the rings' level hook binds once — the ref never changes element now",
+    /useCallLevel\(orbWrapRef, audioLevel, live && ready && !reconnecting && !muted\);/.test(scr21));
+  check("the motion is transitions on transform and opacity, eased, and nothing animates under reduced motion",
+    /\.kx-orb-travel \{ transform-origin: 50% 50%; will-change: transform; \}/.test(css21) &&
+    /@media \(prefers-reduced-motion: no-preference\) \{\s*\.kx-orb-travel \{ transition: transform 0\.6s cubic-bezier\(0\.32, 0\.72, 0, 1\); \}/.test(css21) &&
+    /\.kx-call-words \{ transition: opacity 0\.35s ease-out, transform 0\.6s cubic-bezier\(0\.32, 0\.72, 0, 1\), visibility 0s linear 0\.35s; \}/.test(css21) &&
+    !/kx-view-in|kx-view-out|kx-orb-fly/.test(css21));
+  check("  …a layer that fades out becomes visibility:hidden after its fade, so it cannot take a tap once gone; the arriving one shows at once",
+    /\.kx-call-words \{ opacity: 0; visibility: hidden; transform: translateY\(24px\); \}/.test(css21) &&
+    /\.kx-call-words\.is-in \{ opacity: 1; visibility: visible; transform: none; \}/.test(css21) &&
+    /\.kx-call-fade \{ transition: opacity 0\.25s ease-out, visibility 0s linear 0\.25s; \}/.test(css21) &&
+    /\.kx-call-fade\.is-in \{ transition-delay: 0\.22s, 0s; \}/.test(css21) &&
+    /\.kx-call-words\.is-in \{ transition-delay: 0\.08s, 0s, 0s; \}/.test(css21));
 }
 
 {

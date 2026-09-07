@@ -949,8 +949,8 @@ console.log("\n── The product, shown: on the call screen and in the answer �
 
 {
   /* PICTURES LIVE IN THE CONVERSATION, the way ChatGPT shows them — not in a
-     strip pinned above the words. A line that carries photos opens the
-     conversation view; the orb view draws no pictures at all. */
+     strip pinned above the words — and the latest ones also under the orb,
+     so the view never has to switch by itself. */
   const photos = [{ url: "https://cdn.example/kx180.jpg", label: "KX-180 Spreader" }];
   const lines: TranscriptLine[] = [{ role: "assistant", text: "The KX-180.", final: true, photos }];
   const withPhotos = renderToStaticMarkup(
@@ -967,8 +967,14 @@ console.log("\n── The product, shown: on the call screen and in the answer �
     /<button type="button"[^>]*aria-label="KX-180 Spreader"[^>]*>\s*<img/.test(withPhotos) && !/<a[^>]*href="https:\/\/cdn\.example\/kx180\.jpg"/.test(withPhotos) && !/z-\[260\]/.test(withPhotos));
   check("  …eagerly, with its box reserved", !/loading="lazy"/.test(withPhotos) && /<img[^>]*width="120"[^>]*height="120"/.test(withPhotos));
   check("  …a non-storage URL passes through the pipeline untouched", /src="https:\/\/cdn\.example\/kx180\.jpg"/.test(withPhotos));
-  check("  …and a picture opens the CONVERSATION view: the small orb, the words, no big orb",
-    /aria-label="Back to Koleex AI"/.test(withPhotos) && !/aria-label="Show conversation"/.test(withPhotos));
+  /* A PICTURE DOES NOT SWITCH THE VIEW (owner, 2026-09-07: "suddenly it out
+     of conversation and show me the text conversation"). The screen stays
+     on the orb; the picture is drawn under the orb as well, where the
+     caller is looking, and the words layer is rendered but hidden. */
+  check("  …and a picture does NOT switch the view: the orb stays, the picture is also under it, the words layer is present but hidden",
+    /aria-label="Show conversation"/.test(withPhotos) && !/aria-label="Back to Koleex AI"/.test(withPhotos) &&
+    /class="kx-call-words absolute inset-0 flex flex-col pt-4 "[^>]*aria-hidden="true"/.test(withPhotos) &&
+    (withPhotos.match(/src="https:\/\/cdn\.example\/kx180\.jpg"/g) ?? []).length === 2 && /<img[^>]*width="88"[^>]*height="88"/.test(withPhotos));
   check("without pictures the screen opens on the ORB view: the big orb, the wordmark, a way to the words, no pictures",
     !/<img/.test(without) && !/role="group"[^>]*aria-label="Photos"/.test(without) && /aria-label="Show conversation"/.test(without) && />Show conversation</.test(without) && !/aria-label="Back to Koleex AI"/.test(without));
   check("  …and the bottom bar is in both views", /aria-label="End call"/.test(withPhotos) && /aria-label="End call"/.test(without));

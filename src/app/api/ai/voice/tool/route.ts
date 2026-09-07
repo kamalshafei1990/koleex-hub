@@ -39,7 +39,7 @@ import { requireInternalUser } from "@/lib/server/ai/require-internal";
 import { buildUserContext, checkModule } from "@/lib/server/ai-agent/permissions";
 import { consumeBudget, limitMode, subjectFor } from "@/lib/server/ai/security/rate-limit";
 import { dispatchTool } from "@/lib/server/ai-agent/tool-registry";
-import { isVoiceTool, isVoiceWriteTool } from "@/lib/server/ai/voice/tools";
+import { forVoice, isVoiceTool, isVoiceWriteTool } from "@/lib/server/ai/voice/tools";
 import { parseConversationParam } from "@/lib/server/ai/voice/history";
 
 export const dynamic = "force-dynamic";
@@ -179,7 +179,12 @@ export async function POST(req: Request) {
      account could be confirmed from any other). The id is parsed strictly;
      the ledger's predicate is still bounded by tenant and account. */
   const conversationId = parseConversationParam(typeof body.conversation_id === "string" ? body.conversation_id : null);
+  const t0 = Date.now();
   const result = await dispatchTool(ctx, name, args, { conversationId });
+  /* Name, outcome and milliseconds — never the arguments or the result.
+     The one line that says where a slow "show me a picture" spent its
+     time: here, or after this returned (owner, 2026-09-07). */
+  console.log(`[ai.voice.tool] ${name} ok=${result.ok} status=${result.permissionStatus} ms=${Date.now() - t0}`);
 
   /* THE PREVIEW, FOR THE SCREEN ONLY. A write tool's first phase returns the
      exact arguments its second phase needs; they go to the CLIENT beside
@@ -206,7 +211,7 @@ export async function POST(req: Request) {
         ok: result.ok,
         status: result.permissionStatus,
         message: result.message,
-        data: result.data,
+        data: forVoice(name, result.data),
       },
       ...(pending ? { pending } : {}),
     },

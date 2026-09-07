@@ -20,11 +20,11 @@
    functional danger colour and is used only on the control that ends the call.
    --------------------------------------------------------------------------- */
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import AIOrb from "@/components/ai-orb/AIOrb";
 import { useCallLevel } from "./useCallLevel";
 import type { AIOrbState } from "@/components/ai-orb/ai-orb-types";
-import VoiceTranscript from "@/components/ai/VoiceTranscript";
+import VoiceTranscript, { PhotoTile } from "@/components/ai/VoiceTranscript";
 import { type TranscriptLine, type TranscriptPhoto, type VoicePhase } from "@/lib/voice/events";
 import { type Lang } from "@/lib/i18n";
 import { type TalkMode } from "@/lib/voice/voice-pref";
@@ -33,10 +33,6 @@ import KoleexLogo from "@/components/layout/KoleexLogo";
 import { textDirection } from "@/lib/text-direction";
 import { stripImageMarkdown } from "@/lib/voice/photos";
 
-/** How long the leaving view stays while the arriving one settles — the
- *  length of the orb's flight in globals.css (.kx-view-out and the
- *  kx-orb-fly-* keyframes); nothing is ever blank in between. */
-const VIEW_FADE_MS = 420;
 
 const COPY: Record<Lang, {
   connecting: string;
@@ -383,37 +379,71 @@ export default function VoiceCallScreen({
   const [openPhoto, setOpenPhoto] = useState<TranscriptPhoto | null>(null);
   const closePhoto = useCallback(() => setOpenPhoto(null), []);
 
-  /* TWO VIEWS, THE WAY CHATGPT DOES IT — the owner asked to look at its
-     layout. ORB: the orb alone, large, centred, the caption under it; the
-     conversation is out of the way. CHAT: the whole conversation, pictures
-     where they were said, scrolling, with the orb shrunk to a small floating
-     one in the corner so the call never looks ended. The pinned photo strip
-     that pushed the words off a phone screen is gone: pictures live in the
-     conversation. A tap on the big orb (or the quiet button under it) opens
-     the conversation; a tap on the small orb comes back. The first picture
-     to arrive opens the conversation by itself, once — a picture nobody can
-     see is not shown. */
-  const hasPhotos = lines.some((l) => (l.photos?.length ?? 0) > 0);
-  /* DERIVED, NOT SYNCHRONISED: the caller's own choice when they have made
-     one, else the conversation as soon as it has a picture, else the orb. No
-     effect writes state, so nothing can cascade or fight the caller's tap. */
+  /* TWO VIEWS, ONE ORB. ORB: the orb alone, large, centred, the caption and
+     the latest pictures under it; the conversation is out of the way. CHAT:
+     the whole conversation, pictures where they were said, scrolling, with
+     the SAME orb shrunk into the corner so the call never looks ended.
+
+     THE ORB IS ONE ELEMENT THAT TRAVELS, not two that swap. The first
+     version remounted both views on every tap with a third, inert copy of
+     the leaving one playing an exit animation on top — two orbs, two
+     transcripts, and a ref that ended up on the copy about to be removed
+     (owner, 2026-09-07: "the motion not smooth and ease enough, it has a
+     glitch"). Now both layers stay mounted; the orb's flight is a single
+     transform measured from where it is to where the corner slot is (the
+     FLIP technique), so it lands exactly, and the words and the caption
+     cross-fade underneath. The transcript keeps its scroll position across
+     the switch, and the rings keep their level, because nothing remounts.
+
+     NOTHING SWITCHES BY ITSELF. A picture used to open the conversation
+     the moment it arrived — mid-sentence, the orb gone, the words in its
+     place (owner: "suddenly it out of conversation and show me the text
+     conversation"). Pictures now appear under the orb where the caller is
+     looking; the conversation opens on their tap and only their tap. */
   const [chosenView, setView] = useState<"orb" | "chat" | null>(null);
-  const view: "orb" | "chat" = chosenView ?? (hasPhotos ? "chat" : "orb");
-  /* The view on its way out, kept for the length of the crossfade. Set by a
-     tap (switchView); the automatic switch a picture makes gets the entrance
-     alone — no tap, no cut to soften. Cleared by a timer, never in render. */
-  const [leaving, setLeaving] = useState<"orb" | "chat" | null>(null);
-  const switchView = useCallback((next: "orb" | "chat") => {
-    if (next === view) return;
-    const reduced = typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
-    if (!reduced) setLeaving(view);
-    setView(next);
+  const view: "orb" | "chat" = chosenView ?? "orb";
+  const switchView = useCallback((next: "orb" | "chat") => setView(next), []);
+
+  /* THE FLIGHT. From the orb's own place in the orb layer to the corner
+     slot in the words layer: one translate and one scale, measured, so the
+     orb lands on the slot to the pixel in either direction and in RTL.
+     Re-measured when the screen or the block under the orb changes size —
+     a longer caption moves the orb's home, and the corner must follow. */
+  const stageRef = useRef<HTMLDivElement | null>(null);
+  const orbHomeRef = useRef<HTMLButtonElement | null>(null);
+  const cornerRef = useRef<HTMLDivElement | null>(null);
+  const belowRef = useRef<HTMLDivElement | null>(null);
+  const [travel, setTravel] = useState<string>("none");
+  useLayoutEffect(() => {
+    const measure = () => {
+      if (view !== "chat") {
+        setTravel("none");
+        return;
+      }
+      const home = orbHomeRef.current?.getBoundingClientRect();
+      const corner = cornerRef.current?.getBoundingClientRect();
+      if (!home || !corner || home.width === 0) return;
+      const dx = corner.left + corner.width / 2 - (home.left + home.width / 2);
+      const dy = corner.top + corner.height / 2 - (home.top + home.height / 2);
+      setTravel(`translate(${dx.toFixed(1)}px, ${dy.toFixed(1)}px) scale(${(corner.width / home.width).toFixed(3)})`);
+    };
+    measure();
+    if (typeof ResizeObserver === "undefined") return;
+    const ro = new ResizeObserver(measure);
+    if (stageRef.current) ro.observe(stageRef.current);
+    if (belowRef.current) ro.observe(belowRef.current);
+    return () => ro.disconnect();
   }, [view]);
-  useEffect(() => {
-    if (!leaving) return;
-    const t = window.setTimeout(() => setLeaving(null), VIEW_FADE_MS);
-    return () => window.clearTimeout(t);
-  }, [leaving]);
+
+  /* THE LATEST PICTURES, under the orb: the ones on the newest turn that
+     showed any. Older ones stay in the conversation. */
+  const latestPhotos: readonly TranscriptPhoto[] = (() => {
+    for (let i = lines.length - 1; i >= 0; i--) {
+      const p = lines[i].photos;
+      if (p && p.length > 0) return p;
+    }
+    return [];
+  })();
   /* THE LAST THING SAID, as a caption under the orb: a caller on the orb view
      still sees the words, one turn at a time, the way subtitles work. */
   const lastLine = lines.length > 0 ? lines[lines.length - 1] : null;
@@ -470,7 +500,7 @@ export default function VoiceCallScreen({
      while the call is up; a connecting or reconnecting call has no voice to
      show. */
   const orbWrapRef = useRef<HTMLDivElement>(null);
-  useCallLevel(orbWrapRef, audioLevel, live && ready && !reconnecting && !muted, view);
+  useCallLevel(orbWrapRef, audioLevel, live && ready && !reconnecting && !muted);
 
   const orbState: AIOrbState = !live || reconnecting || !ready
     ? "awakening"
@@ -523,52 +553,84 @@ export default function VoiceCallScreen({
   /* Pending, as opposed to settled: the caption gets motion only here. */
   const working = !live || !ready || reconnecting || (searching && !muted) || (phase === "thinking" && !muted);
 
-  /* THE TWO VIEWS, built once each so the crossfade below can show the
-     one leaving beside the one arriving. */
-  const orbView = (
-      /* ── ORB VIEW: Koleex AI alone, large, centred. ── */
-      <div className="flex-1 min-h-0 flex flex-col items-center justify-center gap-4 px-6">
-        <KoleexLogo className="h-6 w-auto shrink-0 text-white" />
-        <button
-          type="button"
-          onClick={() => switchView("chat")}
-          aria-label={copy.showChat}
-          title={copy.showChat}
-          className="kx-orb-stage block rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0066FF] focus-visible:ring-offset-4 focus-visible:ring-offset-[#0D0D0D]"
+  /* THE ORB, ONCE. Rings and face; the wrapper the rings read their level
+     from; the travelling element the flight is applied to. */
+  const orb = (
+    <button
+      ref={orbHomeRef}
+      type="button"
+      onClick={() => switchView(view === "orb" ? "chat" : "orb")}
+      aria-label={view === "orb" ? copy.showChat : copy.showOrb}
+      title={view === "orb" ? copy.showChat : copy.showOrb}
+      className="kx-orb-stage block rounded-full pointer-events-auto focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0066FF] focus-visible:ring-offset-4 focus-visible:ring-offset-[#0D0D0D]"
+    >
+      <div className="kx-orb-travel" style={{ transform: travel }} data-travel={view}>
+        <div
+          ref={orbWrapRef}
+          className={[
+            "kx-call-orb relative shrink-0 flex items-center justify-center",
+            phase === "speaking" ? "is-far" : "is-near",
+            live && ready && !reconnecting && !muted ? "is-live" : "",
+            /* A LOOKUP IN PROGRESS, on the rings: slow blue waves leaving
+               the orb until the answer comes. The orb itself is in
+               `thinking` — the shared component's own considering state. */
+            (searching || phase === "thinking") && live && !muted ? "is-thinking" : "",
+          ].join(" ")}
+          style={{ width: 200, height: 200 }}
         >
-          <div
-            ref={orbWrapRef}
-            className={[
-              "kx-call-orb relative shrink-0 flex items-center justify-center",
-              phase === "speaking" ? "is-far" : "is-near",
-              live && ready && !reconnecting && !muted ? "is-live" : "",
-              /* A LOOKUP IN PROGRESS, on the rings: slow blue waves leaving
-                 the orb until the answer comes. The orb itself is in
-                 `thinking` — the shared component's own considering state. */
-              (searching || phase === "thinking") && live && !muted ? "is-thinking" : "",
-            ].join(" ")}
-            style={{ width: 200, height: 200 }}
-          >
-            {/* THE VOICE, AS RINGS — see lib/voice/level.ts. Transform and
-                opacity only: nothing here forces a repaint of the blurred
-                orb beneath. */}
-            <span aria-hidden className="kx-call-ring kx-call-ring-1" />
-            <span aria-hidden className="kx-call-ring kx-call-ring-2" />
-            <span aria-hidden className="kx-call-ring kx-call-ring-3" />
-            <AIOrb
-              state={orbState}
-              activity={searching && live && !muted ? "searching" : "none"}
-              audioLevel={audioLevel}
-              size={200}
-              interactive
-              /* `is-lively` is the orb's own opt-in (see AIOrb.tsx): at
-                 call size, in the audio states, the face keeps the home
-                 page's life — the gaze, the blink, the aura's idle pace. */
-              className="shrink-0 kx-call-aiorb is-lively"
-            />
-          </div>
-        </button>
+          {/* THE VOICE, AS RINGS — see lib/voice/level.ts. Transform and
+              opacity only: nothing here forces a repaint of the blurred
+              orb beneath. */}
+          <span aria-hidden className="kx-call-ring kx-call-ring-1" />
+          <span aria-hidden className="kx-call-ring kx-call-ring-2" />
+          <span aria-hidden className="kx-call-ring kx-call-ring-3" />
+          <AIOrb
+            state={orbState}
+            activity={searching && live && !muted ? "searching" : "none"}
+            audioLevel={audioLevel}
+            size={200}
+            interactive
+            /* `is-lively` is the orb's own opt-in (see AIOrb.tsx): at
+               call size, in the audio states, the face keeps the home
+               page's life — the gaze, the blink, the aura's idle pace. */
+            className="shrink-0 kx-call-aiorb is-lively"
+          />
+        </div>
+      </div>
+    </button>
+  );
 
+  /* ── WORDS LAYER: the conversation, pictures in it, a slot in the corner
+     the orb flies to. Hidden (not unmounted) behind the orb view. ── */
+  const wordsLayer = (
+    <div
+      className={`kx-call-words absolute inset-0 flex flex-col pt-4 ${view === "chat" ? "is-in" : ""}`}
+      aria-hidden={view !== "chat"}
+    >
+      <VoiceTranscript lines={lines} lang={lang} className="kx-transcript flex-1 min-h-0 pb-28" fill onOpenPhoto={setOpenPhoto} />
+      {/* Where the small orb sits: measured, never drawn. The orb itself
+          lands here; a caption for readers travels with it. */}
+      <div ref={cornerRef} aria-hidden className="kx-orb-corner absolute bottom-4 end-6 h-[72px] w-[72px] pointer-events-none" />
+    </div>
+  );
+
+  /* ── ORB LAYER: the logo, the orb in the middle, the caption and the
+     pictures under it. Only the orb takes taps once the words are open. ── */
+  const orbLayer = (
+    <div className={`absolute inset-0 flex flex-col items-center px-6 ${view === "orb" ? "" : "pointer-events-none"}`}>
+      <div className={`kx-call-fade shrink-0 pt-2 ${view === "orb" ? "is-in" : ""}`} aria-hidden={view !== "orb"}>
+        <KoleexLogo className="h-6 w-auto shrink-0 text-white" />
+      </div>
+      <div className="flex-1 min-h-0 w-full flex items-center justify-center">
+        {orb}
+      </div>
+      {/* A FIXED FLOOR, so the orb's home does not move with every caption:
+          the block under it reserves its height and grows only past that. */}
+      <div
+        ref={belowRef}
+        className={`kx-call-fade shrink-0 min-h-[176px] w-full flex flex-col items-center gap-4 pb-2 ${view === "orb" ? "is-in" : ""}`}
+        aria-hidden={view !== "orb"}
+      >
         {/* Status — one line, quiet. The orb already says most of this;
             the text is for anyone who cannot read motion. */}
         {/* WORKING STATES MOVE. Connecting, reconnecting, thinking and looking
@@ -588,7 +650,7 @@ export default function VoiceCallScreen({
           <button
             type="button"
             onClick={onEnableSound}
-            className="mt-3 inline-flex h-10 items-center justify-center rounded-full bg-[#0066FF] px-5 text-sm font-semibold text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-white/70 active:scale-95 transition-transform"
+            className="inline-flex h-10 items-center justify-center rounded-full bg-[#0066FF] px-5 text-sm font-semibold text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-white/70 active:scale-95 transition-transform"
           >
             {copy.enableSound}
           </button>
@@ -635,32 +697,15 @@ export default function VoiceCallScreen({
             <p className="max-w-[820px] mx-auto text-center text-xs text-[#666666]">{talkMode === "hold" ? copy.holdHint : copy.hint}</p>
           </div>
         )}
+        {latestPhotos.length > 0 && (
+          <div className="flex flex-wrap justify-center gap-3" role="group" aria-label={copy.photos}>
+            {latestPhotos.map((p) => (
+              <PhotoTile key={p.url} photo={p} onOpen={setOpenPhoto} label={copy.photos} size={88} />
+            ))}
+          </div>
+        )}
       </div>
-  );
-  const chatView = (
-      /* ── CHAT VIEW: the conversation, pictures in it, the orb small. ── */
-      <div className="relative flex-1 min-h-0 flex flex-col pt-4">
-        <VoiceTranscript lines={lines} lang={lang} className="kx-transcript flex-1 min-h-0 pb-28" fill onOpenPhoto={setOpenPhoto} />
-        {/* THE SMALL ORB, floating over the words, still alive and still
-            showing who is speaking. A tap brings the big one back. */}
-        <button
-          type="button"
-          onClick={() => switchView("orb")}
-          aria-label={copy.showOrb}
-          title={copy.showOrb}
-          className="kx-mini-orb absolute bottom-4 end-6 rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0066FF] focus-visible:ring-offset-2 focus-visible:ring-offset-[#0D0D0D]"
-        >
-          <span className="sr-only">{status}</span>
-          <AIOrb
-            state={orbState}
-            activity={searching && live && !muted ? "searching" : "none"}
-            audioLevel={audioLevel}
-            size={72}
-            className="shrink-0 kx-call-aiorb is-lively"
-          />
-        </button>
-      </div>
-    
+    </div>
   );
 
 
@@ -692,26 +737,12 @@ export default function VoiceCallScreen({
       }}
     >
       <PhotoLightbox photo={openPhoto} onClose={closePhoto} closeLabel={copy.closePhoto} />
-      {/* ── THE TWO VIEWS, AND THE ORB THAT TRAVELS BETWEEN THEM. The switch
-          used to be a cut, then a plain fade — the owner: "not a fade, animated
-          in a creative way". Now it is choreography (globals.css, the
-          kx-to-chat / kx-to-orb rules): opening the words, the big orb flies
-          to the corner and shrinks while the transcript rises from below and
-          the small orb lands where the big one went; coming back, the words
-          sink away and the orb grows back into the centre from that corner.
-          The arriving view is keyed so the entrance replays each switch; a
-          copy of the leaving view plays its exit on top, inert and hidden
-          from readers, for the length of the flight. Under reduced motion no
-          leaving copy is kept and nothing animates — the switch is instant. */}
-      <div className="relative flex-1 min-h-0 flex flex-col">
-        <div key={view} className={`kx-view-in kx-to-${view} flex-1 min-h-0 flex flex-col`}>
-          {view === "orb" ? orbView : chatView}
-        </div>
-        {leaving && leaving !== view && (
-          <div aria-hidden className={`kx-view-out kx-to-${view} pointer-events-none absolute inset-0 flex flex-col`}>
-            {leaving === "orb" ? orbView : chatView}
-          </div>
-        )}
+      {/* ── THE STAGE: the words underneath, the orb layer on top, one orb
+          that travels between its home and the corner (see the state block:
+          nothing remounts, nothing switches by itself). ── */}
+      <div ref={stageRef} className="relative flex-1 min-h-0" data-view={view}>
+        {wordsLayer}
+        {orbLayer}
       </div>
 
       {/* ── A TASK WAITING FOR A TAP (roadmap D1) ──────────────────────────

@@ -100,6 +100,10 @@ export type ParsedEvent = {
   transcript: TranscriptUpdate | null;
   /** Null when this event does not change what the far side is doing. */
   phase: VoicePhase;
+  /** A speaker whose OPEN line this event closes, with the words it has.
+   *  The answer is over (`response.done`) or was interrupted (the caller
+   *  started speaking): whatever was said, was said. See settleOpenLine. */
+  settles?: TranscriptRole;
 };
 
 const NOTHING: ParsedEvent = { transcript: null, phase: null };
@@ -228,8 +232,13 @@ export function parseVoiceEvent(raw: string): ParsedEvent {
         transcript: { role: "user", text: str(msg.transcript) || deltaText(msg), final: true },
         phase: null,
       };
+    /* THE CALLER SPOKE OVER THE ANSWER. The far side cancels its response
+       and does not always send the transcript's `done` for it — the answer
+       stayed open on screen for the rest of the call, and nothing after it
+       was saved (persist.ts). What was said before the interruption is the
+       turn; it closes here. */
     case EV_SPEECH_STARTED:
-      return { transcript: null, phase: "listening" };
+      return { transcript: null, phase: "listening", settles: "assistant" };
     /* The caller stopped; the far side has the turn. Composing — a lookup, a
        sentence — is what the orb shows until the first word comes back. */
     case EV_SPEECH_STOPPED:
@@ -241,7 +250,7 @@ export function parseVoiceEvent(raw: string): ParsedEvent {
        meter stayed off, so the orb ignored the caller's first words until
        the vendor's turn detection confirmed speech (audit, 2026-09-07). */
     case EV_RESPONSE_DONE:
-      return { transcript: null, phase: "listening" };
+      return { transcript: null, phase: "listening", settles: "assistant" };
     default:
       return NOTHING;
   }
@@ -358,4 +367,49 @@ export function appendTranscript(
   const out = [...lines];
   out[openIdx] = merged;
   return out;
+}
+
+/**
+ * A line the fold can no longer reach is settled. appendTranscript looks
+ * back two lines for the open turn of a speaker; anything older is never
+ * extended or closed again, so an open line left there — an answer whose
+ * `done` never came, then two more turns — stayed dim on screen for the
+ * rest of the call and held the persister at that index for ever. It is
+ * closed with the words it has, or dropped when it has none. Applied by
+ * the caller after every fold; pure and idempotent.
+ */
+export function settleStaleLines(lines: readonly TranscriptLine[]): TranscriptLine[] {
+  let out: TranscriptLine[] | null = null;
+  for (let i = lines.length - 3; i >= 0; i--) {
+    const line = lines[i];
+    if (line.final) continue;
+    out ??= [...lines];
+    if (line.text.trim()) out[i] = { ...line, final: true };
+    else out.splice(i, 1);
+  }
+  return out ?? [...lines];
+}
+
+/**
+ * Close the open line of one speaker, keeping its words. The answer ended
+ * (`response.done`) or was cut off by the caller: either way no more of it
+ * is coming, and a line left open is a line the persister waits on for
+ * ever. A speaker with no open line, or an open line with no words, is
+ * left as it is — an empty open line is dropped, not settled into a blank
+ * row. Same two-line look-back as appendTranscript. Pure.
+ */
+export function settleOpenLine(lines: readonly TranscriptLine[], role: TranscriptRole): TranscriptLine[] {
+  for (let i = lines.length - 1; i >= 0 && i >= lines.length - 2; i--) {
+    const line = lines[i];
+    if (line.final) continue;
+    if (line.role !== role) continue;
+    const out = [...lines];
+    if (!line.text.trim()) {
+      out.splice(i, 1);
+      return out;
+    }
+    out[i] = { ...line, final: true };
+    return out;
+  }
+  return [...lines];
 }
