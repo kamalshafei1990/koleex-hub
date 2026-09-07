@@ -172,6 +172,8 @@ export type VoiceDeps = {
    *  window the slowest thing in the suite, and a suite slow enough to skip
    *  proves nothing. */
   reconnectGraceMs?: number;
+  /** Test seam for the window a call that WAS up gets to come back. */
+  liveGraceMs?: number;
   /** Test seam for the per-call cap, so the loop guard can be proved without
    *  making a dozen round trips. */
   maxToolCallsPerSession?: number;
@@ -210,6 +212,17 @@ const MAX_TOOL_CALLS_PER_SESSION = 60;
    instantly would end calls that were about to recover; waiting forever leaves
    a user talking into a call that is never coming back. */
 const RECONNECT_GRACE_MS = 8_000;
+/* HOW LONG A CALL THAT WAS UP MAY TRY TO COME BACK. Longer than the window
+   above, on purpose. The owner (2026-09-07): "when we talk suddenly it out
+   of conversation" — a call in progress, ended under them. ICE reports
+   `disconnected` on a phone for a handover between Wi-Fi and cellular, a
+   tunnel re-keying, a walk to the lift; the browser itself allows about
+   thirty seconds before it calls the pair failed, and most of those come
+   back inside ten. Eight seconds ended calls that were about to recover.
+   Twenty keeps the screen honest ("reconnecting") without ending a
+   conversation that a person is still having; a link that is truly gone
+   reports `failed` and ends the call at once, whatever this says. */
+const LIVE_GRACE_MS = 20_000;
 /** Our own deadline on the handshake POST; the route waits at most 45 s. */
 const HANDSHAKE_TIMEOUT_MS = 50_000;
 
@@ -550,6 +563,11 @@ export class VoiceSession {
   /** The vendor announces the session before it will accept configuration.
    *  Wired alongside the open handler rather than instead of it. */
   private onChannelMessage(raw: string, channel: RTCDataChannel): void {
+    /* A message arrived, so the path it arrived on is up — whatever the ICE
+       state property says (see markTransportUp). This is also what brings a
+       "reconnecting" call back to live when the state watcher never says
+       "connected" again: the far side is talking to us. */
+    this.markTransportUp();
     /* THE EVENT'S `type`, NOT A SUBSTRING OF THE WHOLE MESSAGE. This read
        `raw.includes("session.created")`, which is true of any message that
        happens to contain those characters anywhere — an error body naming
@@ -702,7 +720,33 @@ export class VoiceSession {
       /* Still not back. A call that has been silent this long is over, and
          saying so beats leaving a live-looking screen in front of someone. */
       this.fail("connection-lost");
-    }, this.deps.reconnectGraceMs ?? RECONNECT_GRACE_MS);
+    }, this.iceEverConnected
+      ? (this.deps.liveGraceMs ?? this.deps.reconnectGraceMs ?? LIVE_GRACE_MS)
+      : (this.deps.reconnectGraceMs ?? RECONNECT_GRACE_MS));
+  }
+
+  /** THE TRANSPORT IS UP — by whichever sign arrives first.
+
+      The call was watched through `iceConnectionState` alone, and that is
+      where a working call was ended (owner, 2026-09-07: "suddenly it out
+      of conversation"). Safari does not always report `connected` on that
+      property for a connection that is plainly carrying audio and data;
+      the never-connected watchdog then saw a "live" call whose media had
+      "never come up", switched region — onto the endpoint that refuses
+      this account — and ended a conversation that was mid-sentence.
+
+      A DataChannel cannot open, and no event can arrive on it, unless ICE,
+      DTLS and SCTP have all come up underneath: an open channel or a single
+      message IS the media path connected, whatever the state property says.
+      So every one of those signs marks the call connected: the ICE state,
+      the connection state, the channel opening, the first message. From
+      here, "failed" is final and "disconnected" gets the live window. */
+  private markTransportUp(): void {
+    if (!this.iceEverConnected) this.iceEverConnected = true;
+    if (this.state === "reconnecting" || (this.state === "live" && this.reconnectTimer !== null)) {
+      this.clearReconnectTimer();
+      if (this.state === "reconnecting") this.setState("live");
+    }
   }
 
   /** The data channel closed under a call that was up. */
@@ -838,9 +882,23 @@ export class VoiceSession {
         }
         if (st === "connected" || st === "completed") {
           /* From here on, "failed" means a call that WAS up has gone down. */
-          this.iceEverConnected = true;
+          this.markTransportUp();
+        }
+      };
+      /* THE SECOND OPINION. `connectionState` folds ICE and DTLS together and
+         is the property Safari keeps current; it says "connected" for calls
+         whose `iceConnectionState` never leaves "checking". Read for the
+         same two facts only: up, and gone. Optional, because the double the
+         suite drives (and one old engine) has no such property. */
+      pc.onconnectionstatechange = () => {
+        const st = pc.connectionState;
+        if (st === "connected") {
+          this.markTransportUp();
+          return;
+        }
+        if (st === "failed" && this.iceEverConnected) {
           this.clearReconnectTimer();
-          if (this.state === "reconnecting") this.setState("live");
+          this.fail("connection-lost");
         }
       };
 
@@ -873,8 +931,12 @@ export class VoiceSession {
          would have connected to a silent line. */
       const local = pc.createDataChannel?.(DATA_CHANNEL_LABEL);
       if (local) {
-        /* A CONNECTED CALL IS A SILENT CALL UNTIL THIS IS SENT. */
-        local.onopen = () => this.sendSessionConfig(local);
+        /* A CONNECTED CALL IS A SILENT CALL UNTIL THIS IS SENT. And an open
+           channel is a connected call — see markTransportUp. */
+        local.onopen = () => {
+          this.markTransportUp();
+          this.sendSessionConfig(local);
+        };
         local.onmessage = (m: MessageEvent) => {
           if (typeof m.data === "string") this.onChannelMessage(m.data, local);
         };
@@ -893,7 +955,10 @@ export class VoiceSession {
          rather than assuming which one carries the events. */
       pc.ondatachannel = (ev: RTCDataChannelEvent) => {
         const remote = ev.channel;
-        remote.onopen = () => this.sendSessionConfig(remote);
+        remote.onopen = () => {
+          this.markTransportUp();
+          this.sendSessionConfig(remote);
+        };
         remote.onmessage = (m: MessageEvent) => {
           if (typeof m.data === "string") this.onChannelMessage(m.data, remote);
         };

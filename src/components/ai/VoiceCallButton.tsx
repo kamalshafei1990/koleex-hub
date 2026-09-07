@@ -44,6 +44,8 @@ import { type Lang } from "@/lib/i18n";
 import {
   parseVoiceEvent,
   appendTranscript,
+  settleOpenLine,
+  settleStaleLines,
   playbackGate,
   voiceEventType,
   type TranscriptLine,
@@ -722,6 +724,19 @@ export default function VoiceCallButton({
            rendered. It is data, never instruction — nothing here dispatches
            on it, and the parser only ever returns strings. */
         const parsed = parseVoiceEvent(data);
+        /* THE ANSWER IS OVER, OR WAS CUT OFF: its open line closes with the
+           words it has, so the thread keeps it and the persister moves on
+           (events.ts settleOpenLine). Before the transcript of this same
+           event, so a new turn opens after a closed one. */
+        if (parsed.settles) {
+          const settled = settleOpenLine(linesRef.current, parsed.settles);
+          if (settled.length !== linesRef.current.length || settled.some((l, i) => l !== linesRef.current[i])) {
+            linesRef.current = settled;
+            setLines(settled);
+            onTranscriptRef.current?.(settled);
+            persisterRef.current?.observe(settled);
+          }
+        }
         if (parsed.phase) {
           /* The far side is talking again, so whatever it was checking is
              done. Clearing here rather than on the tool result keeps the
@@ -740,7 +755,11 @@ export default function VoiceCallButton({
               ? { ...parsed.transcript, photos: pendingPhotosRef.current }
               : parsed.transcript;
           if (update !== parsed.transcript) pendingPhotosRef.current = [];
-          linesRef.current = appendTranscript(linesRef.current, update);
+          /* Folded, then any line the fold can no longer reach is closed
+             (events.ts settleStaleLines): an answer whose `done` never came
+             must not stay dim for the rest of the call, nor hold the
+             persister at its index. */
+          linesRef.current = settleStaleLines(appendTranscript(linesRef.current, update));
           setLines(linesRef.current);
           onTranscriptRef.current?.(linesRef.current);
           /* WHAT THIS CALL TEACHES: Koleex AI answered in the caller's

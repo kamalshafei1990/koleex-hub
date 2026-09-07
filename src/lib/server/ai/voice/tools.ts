@@ -224,3 +224,29 @@ export function voiceToolSchemas(variant: "full" | "compact" = "full"): Array<{
   }
   return out;
 }
+
+/* WHAT A CALL NEEDS FROM A WEB SEARCH IS LESS. The text lane renders six
+   results with their snippets as a source list; a call renders nothing —
+   the model reads the whole payload and then speaks. A picture request came
+   back in three seconds and was heard a good while later (owner,
+   2026-09-07: "show me a photo takes very long time"): the seconds after
+   the lookup are the model working through six long snippets to say one
+   sentence about a picture the screen already shows. Fewer, shorter
+   results are read faster and spoken sooner; the pictures and the
+   provider's one-line answer are kept whole. Pure; exported for the suite. */
+export const VOICE_SEARCH_RESULTS = 3;
+export const VOICE_SNIPPET_CHARS = 200;
+export function forVoice(tool: string, data: unknown): unknown {
+  if (tool !== "search_web" || !data || typeof data !== "object" || Array.isArray(data)) return data;
+  const d = data as Record<string, unknown>;
+  if (!Array.isArray(d.results)) return data;
+  return {
+    ...d,
+    results: d.results.slice(0, VOICE_SEARCH_RESULTS).map((r) => {
+      if (!r || typeof r !== "object") return r;
+      const row = r as Record<string, unknown>;
+      const snippet = typeof row.snippet === "string" ? row.snippet : "";
+      return { ...row, snippet: snippet.length > VOICE_SNIPPET_CHARS ? `${snippet.slice(0, VOICE_SNIPPET_CHARS)}…` : snippet };
+    }),
+  };
+}

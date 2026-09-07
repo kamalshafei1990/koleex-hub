@@ -26,6 +26,8 @@ import {
   EV_RESPONSE_DONE,
   playbackGate,
   voiceEventType,
+  settleOpenLine,
+  settleStaleLines,
   type TranscriptLine,
 } from "../src/lib/voice/events";
 
@@ -358,6 +360,60 @@ console.log("\n── 8. Barge-in: the far side's buffered audio is cut when the
     voiceEventType(JSON.stringify({ type: EV_SPEECH_STARTED })) === EV_SPEECH_STARTED &&
     voiceEventType(JSON.stringify({ type: "" })) === null && voiceEventType(JSON.stringify({ type: 7 })) === null &&
     voiceEventType("[]") === null && voiceEventType("null") === null && voiceEventType("not json") === null && voiceEventType("") === null);
+}
+
+console.log("\n── 9. An answer that is over, or cut off, closes its line — and a line left behind is settled ──");
+{
+  /* Owner, 2026-09-07: after "show me a picture of the pyramids" not one
+     of the assistant's turns reached the thread. The answer's `done` never
+     came (a lookup, then the caller speaking over it), the line stayed
+     open, and the persister — "everything up to the first open line" —
+     stopped there for the rest of the call. Three rules close that hole. */
+  const p1 = parseVoiceEvent(ev({ type: "response.done" }));
+  check("response.done settles the assistant's open line", p1.settles === "assistant" && p1.phase === "listening");
+  const p2 = parseVoiceEvent(ev({ type: "input_audio_buffer.speech_started" }));
+  check("the caller starting to speak settles it too — what was said before the interruption is the turn", p2.settles === "assistant" && p2.phase === "listening");
+  check("a delta settles nothing", parseVoiceEvent(ev({ type: EV_ASSISTANT_DELTA, delta: "x" })).settles === undefined);
+
+  let lines: TranscriptLine[] = [{ role: "user", text: "show me the pyramids", final: true }, { role: "assistant", text: "One moment", final: false }];
+  lines = settleOpenLine(lines, "assistant");
+  check("settleOpenLine closes the open line with the words it has", () => lines[1].final === true && lines[1].text === "One moment");
+  check("  …and is idempotent", () => settleOpenLine(lines, "assistant")[1] === lines[1] || settleOpenLine(lines, "assistant").length === 2);
+  lines = settleOpenLine([{ role: "user", text: "hello", final: true }, { role: "assistant", text: "", final: false }], "assistant");
+  check("an open line with no words is dropped, not settled into a blank row", () => lines.length === 1);
+  lines = settleOpenLine([{ role: "assistant", text: "Fourteen.", final: true }, { role: "user", text: "and the", final: false }], "assistant");
+  check("the other speaker's open line is untouched", () => lines.length === 2 && lines[1].final === false);
+  lines = settleOpenLine([{ role: "assistant", text: "One mo", final: false }, { role: "user", text: "and the sphinx", final: true }], "assistant");
+  check("it looks back two lines, like the fold", () => lines[0].final === true);
+  const before: TranscriptLine[] = [{ role: "assistant", text: "a", final: false }];
+  const after = settleOpenLine(before, "assistant");
+  check("the input array is never mutated", before[0].final === false && after[0].final === true);
+
+  /* A line older than the two the fold can reach is never extended or
+     closed again: it is settled as it stands — so the screen stops showing
+     it dim and the persister moves on. */
+  const stale: TranscriptLine[] = [
+    { role: "assistant", text: "One moment", final: false },
+    { role: "user", text: "and the sphinx", final: true },
+    { role: "assistant", text: "Here", final: false },
+  ];
+  const settled = settleStaleLines(stale);
+  check("settleStaleLines closes an open line the fold can no longer reach", () => settled[0].final === true && settled[0].text === "One moment");
+  check("  …and leaves the last two lines alone", () => settled[2].final === false && settled.length === 3);
+  const staleEmpty: TranscriptLine[] = [{ role: "assistant", text: " ", final: false }, { role: "user", text: "a", final: true }, { role: "assistant", text: "b", final: false }];
+  check("  …an empty one is dropped", () => settleStaleLines(staleEmpty).length === 2);
+  check("  …nothing to do returns an equal copy", () => settleStaleLines(stale.map((l) => ({ ...l, final: true }))).every((l) => l.final) && stale[0].final === false);
+
+  /* And the button applies both, in this order. */
+  const btn = readFileSync("src/components/ai/VoiceCallButton.tsx", "utf8");
+  check("the call button settles on the event before folding its transcript, and normalises stale lines after every fold",
+    /if \(parsed\.settles\) \{\s*const settled = settleOpenLine\(linesRef\.current, parsed\.settles\);/.test(btn) &&
+    btn.indexOf("if (parsed.settles)") < btn.indexOf("if (parsed.phase)") &&
+    /linesRef\.current = settleStaleLines\(appendTranscript\(linesRef\.current, update\)\);/.test(btn) &&
+    /persisterRef\.current\?\.observe\(settled\);/.test(btn));
+  const persist = readFileSync("src/lib/voice/persist.ts", "utf8");
+  check("the persister settles everything older than the last two lines, whatever their state",
+    /for \(let i = Math\.max\(this\.settledCount, lines\.length - 2\); i < lines\.length; i\+\+\)/.test(persist));
 }
 
 console.log(`\n${pass} passed, ${failures.length} failed`);

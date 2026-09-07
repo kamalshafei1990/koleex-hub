@@ -39,6 +39,9 @@ import {
   VOICE_TOOL_CALLS_PER_SESSION,
   isVoiceTool,
   voiceToolSchemas,
+  forVoice,
+  VOICE_SEARCH_RESULTS,
+  VOICE_SNIPPET_CHARS,
 } from "../src/lib/server/ai/voice/tools";
 import { listTools, getTool } from "../src/lib/server/ai-agent/tool-registry";
 import {
@@ -883,6 +886,35 @@ console.log("\n── 5. The browser is a courier, not an authority (source read
     /answeredCalls\.has\(call\.callId\)/.test(client));
   check("an unreadable event is surfaced rather than swallowed",
     /onToolProtocolMismatch\?\.\(parsed\.unreadable\)/.test(client));
+}
+
+console.log("\n── 6. What a call gets back from a web search is shorter ──");
+{
+  /* Owner, 2026-09-07: "show me a photo takes very long time". The lookup
+     itself took three seconds (audit table); the wait after it was the
+     model reading six long snippets to say one sentence about a picture the
+     screen already showed. A call gets three results with short snippets;
+     the pictures and the provider's own one-line answer are kept whole. */
+  const long = "x".repeat(400);
+  const data = {
+    answer: "The pyramids are in Giza.",
+    results: Array.from({ length: 6 }, (_, i) => ({ title: `r${i}`, url: `https://ex.com/${i}`, snippet: long })),
+    images: [{ url: "https://ex.com/a.jpg", description: "pyramids" }],
+    usage_note: "note",
+  };
+  const out = forVoice("search_web", data) as typeof data;
+  check("a web search for a call keeps three results", out.results.length === VOICE_SEARCH_RESULTS && VOICE_SEARCH_RESULTS === 3);
+  check("  …with snippets cut to the cap, marked as cut", out.results.every((r) => r.snippet.length === VOICE_SNIPPET_CHARS + 1 && r.snippet.endsWith("…")) && VOICE_SNIPPET_CHARS === 200);
+  check("  …a short snippet is left alone", (forVoice("search_web", { results: [{ snippet: "short" }] }) as { results: Array<{ snippet: string }> }).results[0].snippet === "short");
+  check("  …the pictures, the answer and the note travel whole", out.images.length === 1 && out.answer === data.answer && out.usage_note === "note");
+  check("  …the input is not mutated", data.results.length === 6 && data.results[0].snippet.length === 400);
+  check("any other tool's data passes through untouched", forVoice("searchProducts", data) === data && forVoice("search_web", null) === null && forVoice("search_web", "s") === "s");
+  check("a search result without a results list passes through", forVoice("search_web", { answer: "a" }) !== null);
+  const route = readFileSync("src/app/api/ai/voice/tool/route.ts", "utf8");
+  check("the route hands the model the trimmed shape, and logs the tool's name, outcome and milliseconds — never its arguments or result",
+    /data: forVoice\(name, result\.data\),/.test(route) &&
+    /console\.log\(`\[ai\.voice\.tool\] \$\{name\} ok=\$\{result\.ok\} status=\$\{result\.permissionStatus\} ms=\$\{Date\.now\(\) - t0\}`\);/.test(route) &&
+    !/console\.log\([^)]*args/.test(route));
 }
 
 console.log(`\n${pass} passed, ${failures.length} failed`);

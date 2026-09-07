@@ -101,8 +101,17 @@ export class TranscriptPersister {
        caller's still-open question — and "everything but the last line"
        once posted an unfinished question and an unfinished answer as turns
        (audit, 2026-09-07). */
+    /* AND A LINE LEFT OPEN BEHIND THE CONVERSATION IS SETTLED TOO. A turn
+       the far side never closed — an answer cut off by a lookup or by the
+       caller speaking over it, with no `done` event after — sat open for
+       the rest of the call, and "everything up to the first open line"
+       then stopped there: every later turn was shown and NONE was saved
+       (owner, 2026-09-07: the thread after a call "not complete"; the
+       rows end at the question before the picture). appendTranscript
+       only ever touches the last two lines, so a line older than that
+       can never change again: it is written as it stands. */
     let settled = lines.length;
-    for (let i = this.settledCount; i < lines.length; i++) {
+    for (let i = Math.max(this.settledCount, lines.length - 2); i < lines.length; i++) {
       if (!lines[i].final) {
         settled = i;
         break;

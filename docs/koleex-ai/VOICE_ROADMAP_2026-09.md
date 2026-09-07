@@ -78,6 +78,28 @@ one PR, batch by batch (each batch is one commit):
 - The tool-only prompt rules still ride the tool-less lanes (a contradiction, not a hole); trimming them touches four pinned lanes and deserves its own pass.
 - A Latin-script caller line under an unknown hint still never votes; an explicit call-language choice in the voice sheet would remove the guess entirely.
 
+## Owner report, 2026-09-07 (evening) — three things on a call
+
+Reported after the deep check: the orb ↔ conversation motion "not smooth,
+has a glitch"; "show me a photo" slow; and "when we talk suddenly it out of
+conversation and show me the text conversation, and even not complete".
+Evidence: the audit table for the call at 11:15 UTC — three `search_web`
+rows at 3.1 s / 3.5 s / 2.1 s, and not one assistant turn saved after the
+picture request although the call went on for seven more minutes.
+
+| Symptom | Cause | Fix |
+|---|---|---|
+| Call ends by itself mid-sentence | The call was judged by `iceConnectionState` alone. Safari does not always report `connected` there for a connection carrying audio and data; the never-connected watchdog then failed a live call over to the other region (which refuses this account) and ended it. Separately, a call that WAS up got only 8 s to recover from a `disconnected` wobble | `markTransportUp()`: an open DataChannel, any message on it, `connectionState === "connected"` or ICE connected all count as up, disarm the watchdog and make `failed` final. A live call's wobble gets 20 s (`LIVE_GRACE_MS`), and a message arriving while "reconnecting" brings it straight back to live |
+| Thread after the call incomplete | An answer whose `done` never came (a lookup, or the caller speaking over it) stayed open; "settled = up to the first open line" stopped there, and nothing after it was ever saved | `response.done` and `speech_started` close the open answer (`settleOpenLine`); a line older than the last two is settled as it stands (`settleStaleLines`, and the persister's own rule) |
+| Screen jumps to the text view by itself | The first picture switched the view automatically | Only a tap switches; the latest pictures show under the orb |
+| Motion glitchy | Both views remounted on every tap with a third, inert copy of the leaving one; the level hook's ref landed on the copy | One orb that travels (measured FLIP transform, 0.6 s eased); both layers stay mounted and cross-fade; nothing remounts |
+| Photo lookup slow to be spoken | The lookup is ~3 s; the wait after it is the model reading six long snippets | A call gets three results with 200-char snippets (`forVoice`); the route logs `[ai.voice.tool] name ok ms` so the next report has a number beside it |
+
+Still open: Beijing voice activation (the failover target above is the one
+that refuses), and the 72 s between "show me the pyramids" and the first
+lookup in that call — a model decision, not transport; the trimmed payload
+and the logged latency are what will show whether it recurs.
+
 ## Owner-side (not code)
 
 - Activate the realtime voice model on the Beijing workspace (still `403 Unpurchased`), so mainland callers get the mainland endpoint.

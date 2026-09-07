@@ -62,7 +62,7 @@ export type VoiceTranscriptProps = {
    above the words that pushed them off the screen. Tiles on the 8px grid,
    tappable, and a tile whose picture fails to load REMOVES ITSELF: a broken
    image icon in a frame is worse than no picture. */
-function PhotoTile({ photo, onOpen, label }: { photo: TranscriptPhoto; onOpen?: (p: TranscriptPhoto) => void; label: string }) {
+export function PhotoTile({ photo, onOpen, label, size = 120 }: { photo: TranscriptPhoto; onOpen?: (p: TranscriptPhoto) => void; label: string; size?: number }) {
   const [broken, setBroken] = useState(false);
   if (broken) return null;
   const img = (
@@ -70,10 +70,11 @@ function PhotoTile({ photo, onOpen, label }: { photo: TranscriptPhoto; onOpen?: 
     <img
       src={cdnImage(photo.url, { width: 384, quality: 75, resize: "contain" })}
       alt={photo.label || label}
-      width={120}
-      height={120}
+      width={size}
+      height={size}
       decoding="async"
-      className="h-[120px] w-[120px] rounded-2xl object-cover border border-white/10 bg-white/5"
+      style={{ width: size, height: size }}
+      className="rounded-2xl object-cover border border-white/10 bg-white/5"
       onError={() => setBroken(true)}
     />
   );
