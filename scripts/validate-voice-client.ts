@@ -2306,8 +2306,8 @@ console.log("\n── 12. Mute ──");
     /sessionRef\.current\?\.sendNote\("\(Screen: the caller cancelled the task card/.test(btn26) &&
     /releaseWakeLock\(\);\s*setPendingWrite\(null\);/.test(btn26) &&
     (btn26.match(/via: "tap"/g) ?? []).length === 1);
-  check("the model's own path never carries via: the relay body has name, call_id and arguments only",
-    /body: JSON\.stringify\(\{\s*name: call\.name,\s*call_id: call\.callId,\s*arguments: call\.argumentsJson,\s*\}\)/.test(sess24));
+  check("the model's own path never carries via: the relay body has name, call_id, arguments and the call's conversation id only",
+    /body: JSON\.stringify\(\{\s*name: call\.name,\s*call_id: call\.callId,\s*arguments: call\.argumentsJson,[\s\S]{0,300}?\.\.\.\(this\.conversationId \? \{ conversation_id: this\.conversationId \} : \{\}\),\s*\}\)/.test(sess24) && !/via:/.test(sess24.slice(sess24.indexOf("TOOL_PATH, {"), sess24.indexOf("TOOL_PATH, {") + 600)));
 
 }
 

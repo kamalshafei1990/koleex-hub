@@ -82,6 +82,7 @@ import "server-only";
    --------------------------------------------------------------------------- */
 
 import { getTool } from "@/lib/server/ai-agent/tool-registry";
+import { skillMeta } from "@/lib/server/ai/skills/catalog";
 
 /** The only tool names a voice call may invoke. */
 export const VOICE_TOOL_NAMES: readonly string[] = [
@@ -139,7 +140,15 @@ export const VOICE_TOOL_NAMES: readonly string[] = [
 export const VOICE_WRITE_TOOLS: readonly string[] = ["createTodo"];
 
 export function isVoiceWriteTool(name: string): boolean {
-  return VOICE_WRITE_TOOLS.includes(name);
+  /* THE CATALOGUE DECIDES, NOT ONLY THE LIST (audit, 2026-09-07). A write
+     added to VOICE_TOOL_NAMES but not to VOICE_WRITE_TOOLS would have gone
+     straight to the registry, where the model's own preview satisfies the
+     ledger — a spoken yes would have written a record. Anything the skills
+     catalogue does not declare read-only is a write here, whatever the list
+     says; the list stays as the explicit, reviewed set. */
+  if (VOICE_WRITE_TOOLS.includes(name)) return true;
+  const meta = skillMeta(name);
+  return meta ? meta.risk !== "read_only" : true;
 }
 
 /**
@@ -185,6 +194,16 @@ export function isVoiceTool(name: string): boolean {
  * registry is dropped rather than invented: this must never advertise a tool
  * that cannot run.
  */
+/** A description written for the CALL where the text lane's contradicts the
+ *  voice instructions (audit, 2026-09-07): the text lane's createTodo says
+ *  "call again with confirm:true after they agree", the call says "never
+ *  confirm yourself — the caller taps". The model was given both. */
+const VOICE_DESCRIPTION_OVERRIDES: Record<string, string> = {
+  createTodo:
+    "Save a task for the caller. Call WITHOUT confirm with the title in their words and the due date if they said one:" +
+    " a card appears on their screen and only their tap saves it. Never call with confirm yourself.",
+};
+
 export function voiceToolSchemas(variant: "full" | "compact" = "full"): Array<{
   type: "function";
   name: string;
@@ -199,7 +218,7 @@ export function voiceToolSchemas(variant: "full" | "compact" = "full"): Array<{
     out.push({
       type: "function",
       name: tool.name,
-      description: tool.description,
+      description: VOICE_DESCRIPTION_OVERRIDES[tool.name] ?? tool.description,
       parameters: tool.parameters,
     });
   }

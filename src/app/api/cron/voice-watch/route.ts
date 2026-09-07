@@ -87,10 +87,14 @@ export async function GET(req: Request) {
   const rows = configured.map((r) => {
     const probe = r.probe!;
     const region = r.env.AI_VOICE_REGION_LABEL?.trim() || "default";
+    /* HEALTHY MEANS IT CAN SERVE A CALL: reachable AND the credential and
+       entitlement accepted (audit, 2026-09-07: a 403 "Unpurchased" primary
+       was logged "ok" for days because it answered). */
+    const healthy = probe.reachable && probe.credential_ok;
     const line =
-      `[ai.voice.watch] ${probe.reachable ? "ok" : "fail"} slot=${r.slot} from=${from} region=${region} ` +
-      `status=${probe.status ?? "none"} afterMs=${probe.ms} cause=${probe.cause ?? "none"}`;
-    if (probe.reachable) console.log(line);
+      `[ai.voice.watch] ${healthy ? "ok" : "fail"} slot=${r.slot} from=${from} region=${region} ` +
+      `status=${probe.status ?? "none"} afterMs=${probe.ms} credential=${probe.credential_ok ? "ok" : "refused"} cause=${probe.cause ?? "none"}`;
+    if (healthy) console.log(line);
     else console.error(line);
     return {
       slot: r.slot,
@@ -101,7 +105,7 @@ export async function GET(req: Request) {
       cause: probe.cause,
     };
   });
-  const anyReachable = rows.some((r) => r.reachable);
+  const anyHealthy = rows.some((r) => r.reachable && r.credential_ok);
   const primary = rows.find((r) => r.slot === "primary") ?? rows[0];
 
   /* THE STATUS CODE IS THE COUNTABLE SIGNAL. The first four runs of this
@@ -123,6 +127,6 @@ export async function GET(req: Request) {
       from,
       regions: rows,
     },
-    { status: anyReachable ? 200 : 503 },
+    { status: anyHealthy ? 200 : 503 },
   );
 }

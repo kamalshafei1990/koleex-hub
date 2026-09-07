@@ -220,17 +220,20 @@ console.log("\n── 3. The route, read — the surface a fetch cannot be teste
      already answered, it is scoped to the caller's tenant, and it cannot fail
      the call. Losing any one of those turns a nicety into an outage. */
   const afterHandshake = code.slice(code.indexOf("const answer"));
-  check("the taught-question index is read after the handshake, never before it",
-    afterHandshake.includes("taughtQuestionIndex(") &&
-    code.indexOf("taughtQuestionIndex(") > code.indexOf("fetch(cfg.sdpUrl,"));
+  /* Audit 2026-09-07: STARTED before the handshake so the read overlaps the
+     vendor's round trip, AWAITED only after it — the handshake budget is
+     never spent on it, and neither is the caller's wait. */
+  check("the taught-question index is started before the handshake and awaited after it",
+    code.indexOf("const taughtP: Promise<string[]>") < code.indexOf("fetch(cfg.sdpUrl,") &&
+    afterHandshake.includes("await taughtP") && code.indexOf("await taughtP") > code.indexOf("fetch(cfg.sdpUrl,"));
   check("and it is scoped to the caller's tenant, not the platform",
     /taughtQuestionIndex\(gate\.tenantId, TAUGHT_INDEX_BUDGET_BYTES\)/.test(code) &&
     /tenantId: auth\.tenant_id \?\? null/.test(gateSrc));
   check("and a slow or broken knowledge plane loses the index, not the call",
     /Promise\.race\(/.test(code) &&
     /setTimeout\(\(\) => resolve\(\[\]\), TAUGHT_INDEX_TIMEOUT_MS\)/.test(code) &&
-    /catch \{[\s\S]{0,400}?taught index unavailable/.test(code) &&
-    /let taughtQuestions: string\[\] = \[\];/.test(code));
+    /\.catch\(\(\) => \{[\s\S]{0,200}?taught index unavailable[\s\S]{0,120}?return \[\] as string\[\];/.test(code) &&
+    /const taughtQuestions = await taughtP;/.test(code));
   check("and the index reaches the full session, never the compact fallback",
     /buildVoiceSessionPayload\(voice, taughtQuestions, recentTurns, gate\.viewer, sttLanguage, sttModelFor\(cfg\.model\)\)/.test(code));
   /* ── WHERE THIS FUNCTION RUNS, and why it is no longer pinned ─────────
@@ -294,8 +297,10 @@ console.log("\n── 3. The route, read — the surface a fetch cannot be teste
   check("and carries no endpoint, model, key or region",
     !/sdpUrl/.test(successReturn) && !/apiKey/.test(successReturn) &&
     !/AI_VOICE_MODEL/.test(successReturn) && !/regionLabel/.test(successReturn));
-  check("the vendor's error body is logged, never forwarded",
-    /detail=\$\{detail\}/.test(code) && !/error: detail/.test(code) && !/error: `.*\$\{detail\}/.test(code));
+  /* Audit 2026-09-07: the body can carry workspace ids and quota strings; the
+     log gets a classification, and the caller still gets nothing of it. */
+  check("the vendor's error body is classified for the log, never quoted, never forwarded",
+    /why=\$\{why\}/.test(code) && !/detail=\$\{detail\}/.test(code) && !/error: detail/.test(code) && !/error: `.*\$\{detail\}/.test(code));
   check("the config diagnosis goes to the log, not to the caller",
     /console\.error\(`\[ai\.voice\] not configured/.test(code) &&
     !/error: diagnoseVoiceConfig/.test(code));
@@ -561,9 +566,16 @@ void (async () => {
     check("the summary route takes the transcript route's chain: the voice gate, its own budget, the owner's triple, and writes one assistant row with source 'voice'",
       /const gate = await authorizeVoice\(req\);/.test(sroute) && /BUDGETS\.voiceSummaryPerAccount\(\)/.test(sroute) &&
       /\.eq\("id", conversationId\)\s*\.eq\("tenant_id", gate\.tenantId\)\s*\.eq\("account_id", gate\.accountId\)/.test(sroute) &&
-      /role: "assistant",\s*content,\s*provider: result\.provider,\s*source: "voice",/.test(sroute));
-    check("  …one routeAi call in chat mode with the caller's identity and preferences — no new provider, no new table",
-      /forceMode: "chat"/.test(sroute) && /personalization: gate\.viewer\.personalization \?\? null/.test(sroute) && !/createTable|CREATE TABLE|\.rpc\(/.test(sroute));
+      /role: "assistant",\s*content,\s*provider: served,\s*source: "voice",/.test(sroute));
+    /* Audit 2026-09-07: through the chat router the summary rode the FAST
+       lane's ~11 KB chat prompt, which forbids saying prices. Now one call to
+       the provider chain with the summariser's own short system prompt. */
+    check("  …one call to the provider chain with the summariser's own short prompt and a token cap — no router, no new provider, no new table",
+      /chatWithTools\(\{\s*messages: \[\s*\{ role: "system", content: SUMMARY_SYSTEM_PROMPT \},/.test(sroute) && /maxTokens: SUMMARY_MAX_TOKENS/.test(sroute) &&
+      !/routeAi\(/.test(sroute) && !/forceMode/.test(sroute) && !/createTable|CREATE TABLE|\.rpc\(/.test(sroute) &&
+      /never round, never convert/.test(sm.SUMMARY_SYSTEM_PROMPT) && sm.SUMMARY_SYSTEM_PROMPT.length < 600);
+    check("  …and the quoted transcript is capped, newest turns kept",
+      (() => { const many = Array.from({ length: 40 }, (_, i) => ({ role: (i % 2 ? "assistant" : "user") as "user" | "assistant", content: `turn ${i} ` + "x".repeat(500) })); const req = sm.buildSummaryRequest(many, "en"); return req.length < sm.SUMMARY_TRANSCRIPT_CHARS + 900 && req.includes("turn 39") && !req.includes("turn 0 "); })());
     check("  …already summarised → the existing row; too little → message null; and the log carries counts only",
       /selection\.kind === "already"/.test(sroute) && /message: null/.test(sroute) &&
       (sroute.match(/console\.(log|error|warn)\(`\[ai\.voice\.summary\][^`]*`\)/g) ?? []).length === 4 &&
@@ -781,13 +793,15 @@ console.log("\n── 8. What the client may know, and what it may not ──");
       /cause=\$\{probe\.cause \?\? "none"\}/.test(bare));
     check("  …with the same field names the session route logs",
       /from=\$\{/.test(session) && /region=\$\{/.test(session) && /afterMs=/.test(session) && /cause=/.test(session));
-    check("a failure is logged at error level, a success is not",
-      /if \(probe\.reachable\) console\.log\(line\)/.test(bare) && /else console\.error\(line\)/.test(bare));
+    /* Audit 2026-09-07: a 403 "Unpurchased" primary was logged ok for days
+       because it answered. Healthy is reachable AND the credential accepted. */
+    check("a failure is logged at error level, a success is not — and healthy means reachable AND credential ok",
+      /const healthy = probe\.reachable && probe\.credential_ok;/.test(bare) && /if \(healthy\) console\.log\(line\)/.test(bare) && /else console\.error\(line\)/.test(bare));
     /* FOUR GREEN RUNS THAT SAID NOTHING. The verdict has to be in the status
        code, because that is what the status-code breakdown and the cron
        history count; a log line at info level is not reliably surfaced. */
-    check("no region reachable is a 503, so the verdict is countable by status — one reachable region is a served caller",
-      /\{ status: anyReachable \? 200 : 503 \}/.test(bare) && /const anyReachable = rows\.some\(\(r\) => r\.reachable\)/.test(bare));
+    check("no region healthy is a 503, so the verdict is countable by status — one healthy region is a served caller",
+      /\{ status: anyHealthy \? 200 : 503 \}/.test(bare) && /const anyHealthy = rows\.some\(\(r\) => r\.reachable && r\.credential_ok\)/.test(bare));
     check("  …and each region logs its own line, with its slot", /slot=\$\{r\.slot\}/.test(bare));
     check("a lost configuration is said once, and answered quietly",
       /console\.warn\("\[ai\.voice\.watch\] not configured/.test(bare) &&
@@ -892,13 +906,13 @@ console.log("\n── 8. What the client may know, and what it may not ──");
     /* THE ROUTE'S HALF, read. */
     const route = strip(readFileSync("src/app/api/ai/voice/session/route.ts", "utf8"));
     const hist = strip(readFileSync("src/lib/server/ai/voice/history.ts", "utf8"));
-    check("the read happens after the vendor has answered",
-      route.indexOf("loadRecentTurns(") > route.indexOf("fetch(cfg.sdpUrl,"));
+    check("the read is started before the handshake and awaited after the vendor has answered",
+      route.indexOf("loadRecentTurns(") < route.indexOf("fetch(cfg.sdpUrl,") && route.indexOf("await historyP") > route.indexOf("fetch(cfg.sdpUrl,"));
     check("  …scoped to the caller's tenant AND account",
       /loadRecentTurns\(supabaseServer, conversationId, gate\.tenantId, gate\.accountId\)/.test(route));
     check("  …with a ceiling and a fail-open",
       /setTimeout\(\(\) => resolve\(\[\]\), HISTORY_TIMEOUT_MS\)/.test(route) &&
-      /let recentTurns: RecentTurn\[\] = \[\];/.test(route) &&
+      /const recentTurns = await historyP;/.test(route) && /Promise\.resolve\(\[\] as RecentTurn\[\]\)/.test(route) &&
       /conversation history unavailable/.test(route));
     /* THE OWNERSHIP CHECK IS IN THE LOADER, BEFORE THE MESSAGE READ. */
     const ownAt = hist.indexOf('.from("ai_conversations")');

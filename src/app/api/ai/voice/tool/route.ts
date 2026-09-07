@@ -40,6 +40,7 @@ import { buildUserContext, checkModule } from "@/lib/server/ai-agent/permissions
 import { consumeBudget, limitMode, subjectFor } from "@/lib/server/ai/security/rate-limit";
 import { dispatchTool } from "@/lib/server/ai-agent/tool-registry";
 import { isVoiceTool, isVoiceWriteTool } from "@/lib/server/ai/voice/tools";
+import { parseConversationParam } from "@/lib/server/ai/voice/history";
 
 export const dynamic = "force-dynamic";
 /* A lookup, not a conversation. The caller is mid-sentence waiting for it. */
@@ -52,7 +53,11 @@ const MAX_ARGS_BYTES = 8 * 1024;
 /* Generous for a person talking, tight enough that a loop cannot run away.
    Complements the per-session cap the client enforces: this one survives a
    page that has been tampered with, which is the only reason it is here too. */
-const VOICE_TOOL_CALLS_PER_MIN = Number(process.env.AI_LIMIT_VOICE_TOOLS_PER_MIN) || 20;
+/* 40, not 20 (audit, 2026-09-07): the instructions themselves ask for three
+   or four lookups per product question and three for a morning brief, and a
+   real call burnt twelve in four minutes; at 20 the twentieth lookup came
+   back "could not be completed" and the model answered a price from memory. */
+const VOICE_TOOL_CALLS_PER_MIN = Number(process.env.AI_LIMIT_VOICE_TOOLS_PER_MIN) || 40;
 
 export async function POST(req: Request) {
   const auth = await requireAuth(req);
@@ -70,7 +75,7 @@ export async function POST(req: Request) {
     );
   }
 
-  let body: { name?: unknown; arguments?: unknown; call_id?: unknown; via?: unknown };
+  let body: { name?: unknown; arguments?: unknown; call_id?: unknown; via?: unknown; conversation_id?: unknown };
   try {
     body = (await req.json()) as typeof body;
   } catch {
@@ -108,18 +113,21 @@ export async function POST(req: Request) {
     );
   }
 
-  const hit = await consumeBudget(subjectFor.account(auth.account_id), {
-    bucket: "voice_tool",
-    windowSec: 60,
-    max: VOICE_TOOL_CALLS_PER_MIN,
-  });
-  if (!hit.allowed) {
-    console.warn(`[ai.voice.tool] ratelimit count=${hit.count} max=${hit.max} mode=${limitMode()}`);
-    if (limitMode() === "enforce") {
-      return NextResponse.json(
-        { error: "Too many lookups just now. Give it a moment." },
-        { status: 429, headers: { "Retry-After": String(hit.retryAfterSec) } },
-      );
+  /* Honours limitMode() === "off" like every other AI route. */
+  if (limitMode() !== "off") {
+    const hit = await consumeBudget(subjectFor.account(auth.account_id), {
+      bucket: "voice_tool",
+      windowSec: 60,
+      max: VOICE_TOOL_CALLS_PER_MIN,
+    });
+    if (!hit.allowed) {
+      console.warn(`[ai.voice.tool] ratelimit count=${hit.count} max=${hit.max} mode=${limitMode()}`);
+      if (limitMode() === "enforce") {
+        return NextResponse.json(
+          { error: "Too many lookups just now. Give it a moment." },
+          { status: 429, headers: { "Retry-After": String(hit.retryAfterSec) } },
+        );
+      }
     }
   }
 
@@ -165,7 +173,13 @@ export async function POST(req: Request) {
     );
   }
 
-  const result = await dispatchTool(ctx, name, args);
+  /* THE CALL'S CONVERSATION, so the ledger and the audit table know which
+     call a lookup or a preview belonged to (audit, 2026-09-07: with no id,
+     every voice row was conversation-blind and a preview from any tab of the
+     account could be confirmed from any other). The id is parsed strictly;
+     the ledger's predicate is still bounded by tenant and account. */
+  const conversationId = parseConversationParam(typeof body.conversation_id === "string" ? body.conversation_id : null);
+  const result = await dispatchTool(ctx, name, args, { conversationId });
 
   /* THE PREVIEW, FOR THE SCREEN ONLY. A write tool's first phase returns the
      exact arguments its second phase needs; they go to the CLIENT beside

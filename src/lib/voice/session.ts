@@ -639,6 +639,9 @@ export class VoiceSession {
           name: call.name,
           call_id: call.callId,
           arguments: call.argumentsJson,
+          /* Which call this lookup belongs to, for the ledger and the audit
+             table. The server checks ownership; an id is not a permission. */
+          ...(this.conversationId ? { conversation_id: this.conversationId } : {}),
         }),
       });
       if (!res.ok) {
