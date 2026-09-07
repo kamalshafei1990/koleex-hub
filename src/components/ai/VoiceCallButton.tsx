@@ -128,6 +128,8 @@ const PERSIST_COPY: Record<Lang, Record<PersistFailure, string>> = {
    anyway. Long enough for a slow session.update round trip on a mainland
    network; short enough that nobody waits on a vendor that never answers. */
 const READY_FALLBACK_MS = 2_500;
+/** After this long in "connecting" the caption says the service is slow. */
+const CONNECTING_SLOW_MS = 8_000;
 /* A call that was up for at least this long and then lost its connection is
    started again in place. Shorter than this and the "drop" is the connection
    never really working, which a retry does not fix. */
@@ -253,6 +255,15 @@ export default function VoiceCallButton({
      not yet been told who it is. A vendor that never acknowledges is covered
      by a fallback timer, so the call can never be stuck on "connecting". */
   const [ready, setReady] = useState(false);
+  /* The speaker is held back by autoplay policy on a call that is otherwise
+     up: the screen offers a tap that unlocks it. */
+  const [soundBlocked, setSoundBlocked] = useState(false);
+  const [connectingSlow, setConnectingSlow] = useState(false);
+  const enableSound = useCallback(() => {
+    const el = audioRef.current;
+    if (!el) return;
+    void el.play().then(() => setSoundBlocked(false)).catch(() => {});
+  }, []);
   /* WHICH LANGUAGE THE CALLER SPEAKS — not which language the app is in, and
      LEARNED rather than asked. The UI language used to be sent as the
      transcription hint, and an English UI over Egyptian speech produced
@@ -526,6 +537,11 @@ export default function VoiceCallButton({
 
   const startCall = useCallback(async (opts?: { resume?: boolean }) => {
     if (sessionRef.current) return;
+    /* UNLOCK THE SPEAKER INSIDE THE GESTURE. An element that has been asked
+       to play during a tap may later play a stream without a second tap on
+       browsers that gate autoplay; the far side's audio arrives well after
+       the tap. A rejection here means nothing — the element is still empty. */
+    if (!opts?.resume) void audioRef.current?.play().catch(() => {});
     /* A second call is a new conversation, not a continuation of the last
        one's captions — unless it is the SAME call coming back after a drop,
        in which case the words stay where the caller can see them. */
@@ -563,11 +579,23 @@ export default function VoiceCallButton({
         onError: (reason) => onErrorRef.current?.(PERSIST_COPY[langRef.current][reason]),
       },
       conversationIdRef.current,
+      /* A RESUMED CALL KEEPS ITS CAPTIONS; the new persister must not write
+         them again (audit, 2026-09-07: every auto-resume and voice switch
+         re-posted the whole call so far). */
+      opts?.resume ? linesRef.current.filter((l) => l.final).length : 0,
     );
 
     const session = new VoiceSession(browserVoiceDeps(), {
       onState: (next, failure) => {
         setState(next);
+        /* A NEW NEGOTIATION IS NOT READY. The session resets its own flag when
+           it reconnects through the other region; the screen must forget too,
+           or the alt-region call says "go ahead" the instant it goes live and
+           the tone never sounds (audit, 2026-09-07). */
+        if (next === "connecting") {
+          setReady(false);
+          chimedRef.current = false;
+        }
         /* RECONNECTING COUNTS AS LIVE TO THE PARENT. The microphone is still
            held and the far side may resume speaking at any moment, so a parent
            that unmutes its own speech synthesis here would talk over the call
@@ -631,8 +659,12 @@ export default function VoiceCallButton({
           /* Autoplay can still be refused even after a user gesture on some
              browsers. Failing silently would look like a dead call, so it is
              reported as one. */
-          void audioRef.current.play().catch(() => {
-            onErrorRef.current?.(FAILURE_COPY[langRef.current]["handshake-failed"]);
+          void audioRef.current.play().then(() => setSoundBlocked(false)).catch(() => {
+            /* The call is live and the far side can hear; only the speaker is
+               held back by autoplay policy. A "could not start" toast sent the
+               owner looking for a dead call (audit, 2026-09-07); what fixes it
+               is a tap, so the screen offers one. */
+            setSoundBlocked(true);
           });
         }
       },
@@ -714,7 +746,7 @@ export default function VoiceCallButton({
           /* WHAT THIS CALL TEACHES: Koleex AI answered in the caller's
              language. Remembered for the next call's transcriber. */
           if (update.role === "assistant" && update.final) {
-            const learned = learnSttLang(linesRef.current);
+            const learned = learnSttLang(linesRef.current, sttLangRef.current);
             if (learned && learned !== sttLangRef.current) {
               sttLangRef.current = learned;
               saveSttLang(learned);
@@ -764,9 +796,31 @@ export default function VoiceCallButton({
      as ready — the transport is up and the microphone is open. */
   useEffect(() => {
     if (!live || ready) return;
-    const t = window.setTimeout(() => setReady(true), READY_FALLBACK_MS);
-    return () => window.clearTimeout(t);
+    /* ONLY ON A TRANSPORT THAT EXISTS. "live" is set when the answer is
+       applied, before ICE and the data channel come up; on a network where
+       they never do, the timer alone said "go ahead" to a caller nobody
+       could hear (audit, 2026-09-07). The fallback waits for the channel to
+       be open or the media to have connected, then for the grace period. */
+    const startedAt = Date.now();
+    const t = window.setInterval(() => {
+      const d = sessionRef.current?.diagnostics();
+      const transportUp = !!d && (d.dc === "open" || d.ice_ever_connected === true);
+      if (transportUp && Date.now() - startedAt >= READY_FALLBACK_MS) setReady(true);
+    }, 250);
+    return () => window.clearInterval(t);
   }, [live, ready]);
+
+  /* STILL CONNECTING, SAID OUT LOUD. The handshake can legitimately take a
+     while when the voice service is slow; after this long the caption says
+     so and reminds the caller they can end and retry (audit, 2026-09-07). */
+  useEffect(() => {
+    if (state !== "connecting") {
+      setConnectingSlow(false);
+      return;
+    }
+    const t = window.setTimeout(() => setConnectingSlow(true), CONNECTING_SLOW_MS);
+    return () => window.clearTimeout(t);
+  }, [state]);
 
   /* THE SOUND. Once when the call becomes ready, once more each time a
      dropped connection comes back — the two moments a caller may start
@@ -922,6 +976,9 @@ export default function VoiceCallButton({
           writeBusy={writeBusy}
           writeSaved={writeSaved}
           writeError={writeError}
+          connectingSlow={connectingSlow}
+          soundBlocked={soundBlocked}
+          onEnableSound={enableSound}
         />,
         document.body,
       )}

@@ -210,6 +210,13 @@ const MAX_TOOL_CALLS_PER_SESSION = 60;
    instantly would end calls that were about to recover; waiting forever leaves
    a user talking into a call that is never coming back. */
 const RECONNECT_GRACE_MS = 8_000;
+/** Our own deadline on the handshake POST; the route waits at most 45 s. */
+const HANDSHAKE_TIMEOUT_MS = 50_000;
+
+function isTimeoutError(e: unknown): boolean {
+  const name = e && typeof e === "object" ? String((e as { name?: unknown }).name ?? "") : "";
+  return name === "TimeoutError" || name === "AbortError";
+}
 /* Milliseconds of audio the receiver is asked to hold before playing. 400
    is a third of a second of steadiness against a jittery tunnel, and well
    under what a person notices as a delay in a conversation. */
@@ -510,8 +517,13 @@ export class VoiceSession {
 
     try {
       channel.send(first);
-      /* Only a FULL send can be refused for content and answered with compact. */
-      this.configAckPending = first === this.sessionUpdate && this.sessionUpdateCompact !== null;
+      /* THE ACKNOWLEDGEMENT IS AWAITED FOR EITHER VERSION. It used to be
+         awaited only after a full send, so a call that went compact-first
+         never fired onReady and sat on "connecting" until the fallback timer
+         (audit, 2026-09-07). A compact-first send simply has no compact
+         retry left, which is what compactRetried records. */
+      this.configAckPending = true;
+      this.compactRetried = first !== this.sessionUpdate;
       this.configSentAt = Date.now();
       return;
     } catch {
@@ -670,7 +682,9 @@ export class VoiceSession {
     this.clearReconnectTimer();
     this.reconnectTimer = setTimeout(() => {
       this.reconnectTimer = null;
-      if (this.state !== "reconnecting") return;
+      /* Armed from "reconnecting", or from a "live" call whose media never
+         connected (the watchdog set at the end of connect()). */
+      if (this.state !== "reconnecting" && !(this.state === "live" && !this.iceEverConnected)) return;
       /* NEVER UP, AND THERE IS ANOTHER REGION: try it, once. A call whose
          media never connected through this endpoint is the shape a VPN
          produces, and the other endpoint is the one thing that changes it. A
@@ -916,6 +930,10 @@ export class VoiceSession {
       const res = await this.deps.fetchFn(path, {
         method: "POST",
         headers: { "Content-Type": "application/sdp" },
+        /* A ceiling on our own route, above the server's longest honest wait
+           (45 s across two regions): past it the caller is told the service
+           did not answer rather than left on "connecting" (audit, 2026-09-07). */
+        ...(typeof AbortSignal !== "undefined" && "timeout" in AbortSignal ? { signal: AbortSignal.timeout(HANDSHAKE_TIMEOUT_MS) } : {}),
         /* Read back from the connection, not from the offer object: the
            candidates were added to the local description, not to the value
            createOffer returned. */
@@ -993,12 +1011,22 @@ export class VoiceSession {
       /* The channel can have opened while the handshake was in flight, in
          which case its `onopen` already fired and found nothing to relay. */
       if (this.channel) this.sendSessionConfig(this.channel);
-    } catch {
-      this.fail("handshake-failed");
+    } catch (e) {
+      /* Our own deadline on the handshake reads as the service not answering
+         — which is what it is — rather than a bad handshake. */
+      this.fail(isTimeoutError(e) ? "service-unreachable" : "handshake-failed");
       return;
     }
 
     this.setState("live");
+    /* NEVER CONNECTED IS WATCHED FROM THE START. ICE can sit in "checking"
+       for ever on a network where the media path never arrives, and the
+       state watcher only arms the grace timer on "disconnected"/"failed" —
+       so a call whose ICE never transitioned at all was never failed over
+       and never ended (audit, 2026-09-07). The timer is cleared the moment
+       the media connects; if it never does, the other region is tried, then
+       the call is ended honestly. */
+    if (!this.iceEverConnected) this.armReconnectTimer();
   }
 }
 

@@ -158,6 +158,23 @@ console.log("\n── 5. Folding fragments into lines ──");
   check("a different speaker starts a NEW line even mid-turn", () => lines.length === 2);
   check("and the new line is the assistant's", () => lines[1].role === "assistant");
   check("the user's open line is left intact", () => lines[0].text === "how many orders");
+  /* THE REST OF THE OVERLAP (audit, 2026-09-07). The user's final lands
+     while the assistant's line is open on top of it: it must close the
+     user's own line where it stands, and the answer must keep extending
+     the assistant's — two lines, in order, not four. */
+  feed(ev({ type: EV_USER_DONE, transcript: "how many orders today" }));
+  check("the user's late final closes the user's line, not a third one", () => lines.length === 2 && lines[0].role === "user" && lines[0].final && lines[0].text === "how many orders today");
+  check("  …and the assistant's open line stays open on top of it", () => lines[1].role === "assistant" && !lines[1].final && lines[1].text === "Fourteen");
+  feed(ev({ type: EV_ASSISTANT_DELTA, delta: " orders so far." }));
+  check("  …and the next assistant delta extends it rather than opening a fourth line", () => lines.length === 2 && lines[1].text === "Fourteen orders so far.");
+  feed(ev({ type: EV_ASSISTANT_DONE, transcript: "Fourteen orders so far." }));
+  check("  …until its done closes it", () => lines.length === 2 && lines[1].final);
+  /* A user final arriving with NO open user line while the assistant is
+     answering (the user's partials never came) is placed BEFORE the answer. */
+  lines = [{ role: "user", text: "first question", final: true }, { role: "assistant", text: "Four", final: false }];
+  feed(ev({ type: EV_USER_DONE, transcript: "and the second?" }));
+  check("a settled user turn with no open line is inserted before the open answer", () => lines.length === 3 && lines[1].role === "user" && lines[1].text === "and the second?" && lines[2].role === "assistant" && !lines[2].final);
+  check("response.done hands the turn back: phase becomes listening", () => parseVoiceEvent(ev({ type: EV_RESPONSE_DONE })).phase === "listening");
 }
 
 console.log("\n── 5b. How the words got in — spoken or typed — survives the fold ──");
@@ -326,10 +343,14 @@ console.log("\n── 8. Barge-in: the far side's buffered audio is cut when the
     playbackGate(EV_SPEECH_STARTED, "speaking") === "cut");
   check("speech_started while listening, thinking or idle → nothing (a phantom start in a pause changes nothing)",
     playbackGate(EV_SPEECH_STARTED, "listening") === null && playbackGate(EV_SPEECH_STARTED, "thinking") === null && playbackGate(EV_SPEECH_STARTED, null) === null);
-  check("the caller falling silent, a new response, the first word, the last word and response.done all → restore, whatever the phase",
+  check("the caller falling silent, a new response and response.done → restore, whatever the phase",
     (["speaking", "listening", "thinking", null] as const).every((ph) =>
-      playbackGate(EV_SPEECH_STOPPED, ph) === "restore" && playbackGate(EV_RESPONSE_CREATED, ph) === "restore" &&
-      playbackGate(EV_ASSISTANT_DELTA, ph) === "restore" && playbackGate(EV_ASSISTANT_DONE, ph) === "restore" && playbackGate(EV_RESPONSE_DONE, ph) === "restore"));
+      playbackGate(EV_SPEECH_STOPPED, ph) === "restore" && playbackGate(EV_RESPONSE_CREATED, ph) === "restore" && playbackGate(EV_RESPONSE_DONE, ph) === "restore"));
+  /* Audit 2026-09-07: the cancelled answer's own in-flight deltas and done
+     used to unmute the element while its buffered audio was still playing. */
+  check("the cancelled answer's own deltas and done do NOT restore — only a new turn does",
+    (["speaking", "listening", "thinking", null] as const).every((ph) =>
+      playbackGate(EV_ASSISTANT_DELTA, ph) === null && playbackGate(EV_ASSISTANT_DONE, ph) === null));
   check("every other event, and no event, leaves the element alone",
     playbackGate(EV_USER_DELTA, "speaking") === null && playbackGate(EV_SESSION_CREATED, "speaking") === null &&
     playbackGate("response.function_call_arguments.done", "speaking") === null && playbackGate(null, "speaking") === null && playbackGate("", "speaking") === null);

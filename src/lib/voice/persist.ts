@@ -34,16 +34,6 @@ import { type TranscriptLine } from "./events";
 import { photosMarkdown, imageUrlsIn } from "./photos";
 
 export const TRANSCRIPT_PATH = "/api/ai/voice/transcript";
-
-const CJK_RE = /[\u3400-\u9FFF]/;
-/** An assistant final so short it can only be the first syllable of a reply
- *  that was interrupted: at most three characters, no picture, not Chinese
- *  (where two characters are a whole answer). Pure. */
-export function isCutOffFragment(role: string, spoken: string, pictures: string): boolean {
-  if (role !== "assistant" || pictures) return false;
-  const t = spoken.trim();
-  return t.length > 0 && t.length <= 3 && !CJK_RE.test(t);
-}
 /** One POST carries at most this many turns; the server refuses more. */
 export const MAX_TURNS_PER_POST = 20;
 /** Consecutive failed posts before this module stops trying for the call. */
@@ -82,7 +72,13 @@ export class TranscriptPersister {
      having a bad moment sees one request per turn, not three in a burst. */
   private lastPostOk = true;
 
-  constructor(private readonly deps: PersistDeps, private conversationId: string | null) {}
+  /** `initialSettled` — how many lines of the list handed to observe() are
+   *  already written. A call that RESUMES after a drop keeps its captions
+   *  and gets a new persister; counting from zero re-posted the whole call
+   *  so far on every resume and every voice switch (audit, 2026-09-07). */
+  constructor(private readonly deps: PersistDeps, private conversationId: string | null, initialSettled = 0) {
+    this.settledCount = Math.max(0, Math.floor(initialSettled));
+  }
 
   /** How many turns are waiting to be written. For the suite. */
   pending(): number {
@@ -100,8 +96,18 @@ export class TranscriptPersister {
    */
   observe(lines: readonly TranscriptLine[]): void {
     if (this.dead) return;
-    const last = lines[lines.length - 1];
-    const settled = last && !last.final ? lines.length - 1 : lines.length;
+    /* SETTLED MEANS EVERY LINE UP TO THE FIRST OPEN ONE. The open turn is
+       not always the last line — the far side opens its answer on top of the
+       caller's still-open question — and "everything but the last line"
+       once posted an unfinished question and an unfinished answer as turns
+       (audit, 2026-09-07). */
+    let settled = lines.length;
+    for (let i = this.settledCount; i < lines.length; i++) {
+      if (!lines[i].final) {
+        settled = i;
+        break;
+      }
+    }
     for (let i = this.settledCount; i < settled; i++) {
       const line = lines[i];
       const spoken = line.text.trim();
@@ -119,14 +125,6 @@ export class TranscriptPersister {
       const text = pictures ? (spoken ? `${spoken}\n\n${pictures}` : pictures) : spoken;
       /* An empty final — a turn the vendor closed with no words — is counted
          as seen and not sent: the route refuses empty content, rightly. */
-      /* A CUT-OFF FIRST SYLLABLE IS NOT A TURN EITHER. Two saved calls
-         (2026-09-04) carried assistant rows of "I", "I", "I", "خل" and "بال":
-         each a reply interrupted the moment it started, closed by the vendor
-         with the one token that got out. Saved, they litter the thread and
-         the end-of-call summary counts them as answers. An assistant final of
-         three characters or fewer, with no picture, is a fragment and is
-         skipped — except in Chinese, where 好的 is a whole answer. */
-      if (text && isCutOffFragment(line.role, spoken, pictures)) continue;
       if (text) this.queue.push({ role: line.role, text, via: line.via ?? "voice" });
     }
     if (settled > this.settledCount) this.settledCount = settled;
@@ -148,8 +146,15 @@ export class TranscriptPersister {
 
   /** The call is over. Flush with `keepalive` so the request survives the
    *  screen closing — hang-up is exactly when the last turn is still queued. */
-  finish(): Promise<void> {
-    return this.flush(true);
+  async finish(): Promise<void> {
+    /* DRAINED, NOT JUST FLUSHED. flush() returns the batch in flight, and
+       the remainder was posted afterwards in its finally — so the caller
+       asking for the end-of-call summary right after finish() had the last
+       batch still on its way (audit, 2026-09-07). */
+    while (!this.dead && (this.inflight || this.queue.length > 0)) {
+      await this.flush(true);
+      if (!this.lastPostOk) break;
+    }
   }
 
   private async post(keepalive: boolean): Promise<void> {

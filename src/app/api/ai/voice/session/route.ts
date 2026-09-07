@@ -512,8 +512,11 @@ export async function POST(req: Request) {
      in the language the caller speaks (it hears the audio); a client that
      guessed from the UI language is overruled by them. A new thread has no
      replies yet and the client's guess stands. */
-  const fromHistory = detectConversationLang(recentTurns);
-  const sttLanguage = fromHistory ?? parseSttLanguage(new URL(req.url).searchParams.get("stt"));
+  const clientHint = parseSttLanguage(new URL(req.url).searchParams.get("stt"));
+  /* The thread's caller lines were transcribed under the client's hint; a
+     line in that script may be its artefact and does not vote. */
+  const fromHistory = detectConversationLang(recentTurns, { hint: clientHint });
+  const sttLanguage = fromHistory ?? clientHint;
   /* The transcriber that belongs to the configured model's family, or none. */
   const payload = buildVoiceSessionPayload(voice, taughtQuestions, recentTurns, gate.viewer, sttLanguage, sttModelFor(cfg.model));
   return NextResponse.json(
