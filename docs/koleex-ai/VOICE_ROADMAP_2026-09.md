@@ -138,6 +138,17 @@ Environment (all optional but the key): `AI_VOICE_GROK_API_KEY`,
 `AI_VOICE_GROK_VOICES`, `AI_VOICE_GROK_SAMPLE_RATE`, `AI_VOICE_GROK_PROTOCOL`
 (`{token}` slot required), `AI_VOICE_GROK_LANE=off` as the kill switch.
 
+**First real call, 17:08 UTC, same day.** Connected; the caller was
+transcribed (three settled rows for one sentence — the vendor re-transcribes
+the whole utterance as its detector extends it, now folded into one line);
+the orb thought; no answer reached the screen or the speaker. No `error`
+beacon, so the configuration was not refused. The likeliest cause: the
+vendor speaks the protocol's GA revision, whose assistant events are
+`response.output_audio_transcript.*` and `response.output_audio.delta`; the
+client read only the older names. Both families are read now, and the
+ordinary hang-up beacons a histogram of every event name the far side sent
+(`events=`), so the next call names its protocol whatever it is.
+
 **Not proved before the first real call** — this environment cannot reach
 the vendor: the exact subprotocol format for the secret, whether the full
 session's `input_audio_transcription: {}` is accepted (if not, the compact

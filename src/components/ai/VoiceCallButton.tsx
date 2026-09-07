@@ -544,6 +544,17 @@ export default function VoiceCallButton({
     sessionRef.current?.sendNote("(Screen: the caller cancelled the task card. Nothing was saved; drop it without comment.)");
   }, [pendingWrite]);
 
+  /* THE ORDINARY END IS BEACONED TOO, with the event histogram: a call that
+     connected, heard the caller and answered nothing is otherwise
+     indistinguishable from one that went perfectly (2026-09-07). Read
+     before the release drops the session. */
+  const beaconHangUp = useCallback(() => {
+    const s = sessionRef.current;
+    if (s && (s.getState() === "live" || s.getState() === "reconnecting")) {
+      sendVoiceTelemetry({ reason: "hung-up", resumes: resumesRef.current, lane: transportRef.current, ...s.diagnostics() });
+    }
+  }, []);
+
   const hangUp = useCallback(() => {
     /* WHAT THE CALL CAME TO, written down (roadmap B1). Taken before the
        release drops the handles: the writer, the thread, the words. After
@@ -551,6 +562,7 @@ export default function VoiceCallButton({
        call and its row joins the thread like any other saved turn. Only a
        call the caller ENDED, with a real exchange in it — a voice switch
        releases and rebuilds, and a two-second call has nothing to say. */
+    beaconHangUp();
     const persister = persisterRef.current;
     const conversation = conversationIdRef.current;
     const lines = linesRef.current;
@@ -562,7 +574,7 @@ export default function VoiceCallButton({
         .then((res) => { if (res) onTurnsSavedRef.current?.([res.message], res.conversation); })
         .catch(() => { /* a summary that did not come is nothing on screen */ });
     }
-  }, [releaseCall]);
+  }, [releaseCall, beaconHangUp]);
 
   /* THE FIRST ERROR THE FAR SIDE SENDS, once per call, with its message: a
      refused field in the session configuration used to be invisible from

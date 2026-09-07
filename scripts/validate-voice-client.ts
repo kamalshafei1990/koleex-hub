@@ -2107,7 +2107,7 @@ console.log("\n── 12. Mute ──");
     /console\.warn\(\s*`\[ai\.voice\.client\]/.test(telRoute) && !/supabase|insert\(/.test(telRoute) && /new NextResponse\(null, \{ status: 204 \}\)/.test(telRoute));
   const diagS = new VoiceSession(deps({ status: 200 }).deps);
   const dg = diagS.diagnostics();
-  check("diagnostics are states and counts only", Object.keys(dg).sort().join(",") === "dc,elapsed_ms,err,ice,ice_ever_connected,last_event,region,tool_calls" && dg.tool_calls === 0 && dg.elapsed_ms === 0 && dg.err === "");
+  check("diagnostics are states and counts only", Object.keys(dg).sort().join(",") === "dc,elapsed_ms,err,events,ice,ice_ever_connected,last_event,region,tool_calls" && dg.tool_calls === 0 && dg.elapsed_ms === 0 && dg.err === "" && dg.events === "");
 
   /* THE PICTURE EXPANDS IN PLACE. */
   check("a photo in the conversation is a button that opens the lightbox, not a link out of the app",
@@ -2675,6 +2675,19 @@ function describeErrorCheck(): boolean {
     check("a runtime with no WebSocket fails the lane as unavailable, never by throwing", r.states[r.states.length - 1][1] === "unavailable" && !r.hung);
   }
   {
+    /* THE NEWER NAME FOR THE SAME FRAME. */
+    const r = await laneRun();
+    r.sockets[0].open();
+    r.sockets[0].message(JSON.stringify({ type: "response.output_audio.delta", delta: "R0E=" }));
+    check("a voice frame under the protocol's GA name is played too", r.audios[0].played.join() === "R0E=");
+    r.sockets[0].message(JSON.stringify({ type: "response.output_audio_transcript.delta", delta: "hi" }));
+    r.sockets[0].message(JSON.stringify({ type: "response.output_audio.delta", delta: "R0E=" }));
+    const dg = r.s.diagnostics();
+    check("every event name the far side sent is counted, names only, for the end-of-call beacon",
+      dg.events.split(",").sort().join("|") === "response.output_audio.delta:2|response.output_audio_transcript.delta:1" && !/R0E=|hi/.test(dg.events.replace(/response\.output_audio_transcript\.delta|response\.output_audio\.delta/g, "")));
+    r.s.stop();
+  }
+  {
     const r = await laneRun({ noAudio: true });
     r.sockets[0].open();
     r.sockets[0].message(JSON.stringify({ type: "response.audio.delta", delta: "QUJD" }));
@@ -2697,6 +2710,9 @@ function describeErrorCheck(): boolean {
       /if \(canFallBack\) \{\s*laneFellBackRef\.current = true;\s*transportRef\.current = "rtc";/.test(btn) && !/transportRef\.current = "ws";/.test(btn));
     check("  …the first `error` the far side sends is beaconed once with its bounded message, so a refused field on a new vendor names itself",
       /if \(voiceEventType\(data\) === "error"\) reportFirstError\(data\);/.test(btn) && /reason: "config-rejected", lane: transportRef\.current, err: errorMessageOf\(data\)/.test(btn));
+    check("hanging up a live call beacons `hung-up` with the lane and the diagnostics, before the release drops the session",
+      /if \(s && \(s\.getState\(\) === "live" \|\| s\.getState\(\) === "reconnecting"\)\) \{\s*sendVoiceTelemetry\(\{ reason: "hung-up", resumes: resumesRef\.current, lane: transportRef\.current, \.\.\.s\.diagnostics\(\) \}\);/.test(btn) &&
+      /const hangUp = useCallback\(\(\) => \{\s*(\/\*[\s\S]*?\*\/\s*)?beaconHangUp\(\);/.test(btn));
     check("the browser's socket and audio are the deps' defaults; the session itself names no vendor and no host",
       /createWebSocket: \(url, protocols\) => new WebSocket\(url, protocols\)/.test(sess) && /createWsAudio: \(sampleRate\) => createBrowserWsAudio\(sampleRate\)/.test(sess) &&
       !/api\.x\.ai|wss:\/\/[a-z]/i.test(sess));

@@ -1171,7 +1171,7 @@ console.log("\n── 8. What the client may know, and what it may not ──");
       /budgetMs=\$\{budgetMs\} first=\$\{candidates\[0\]\.slot\}/.test(route));
     const telemetryRoute = readFileSync("src/app/api/ai/voice/telemetry/route.ts", "utf8");
     check("the beacon route accepts the three exits that are not failures — voice switch, unmount, page hidden",
-      /"voice-switched", "unmounted", "page-hidden",/.test(telemetryRoute));
+      /"voice-switched", "unmounted", "page-hidden",/.test(telemetryRoute) && /"hung-up",/.test(telemetryRoute) && /events=\$\{body\.events\.replace\(/.test(telemetryRoute));
     check("  …a hint can only reorder endpoints the server owns — it never becomes a url", !/hint[^\n]*sdpUrl|sdpUrl[^\n]*hint/.test(route));
     check("a region that fails every attempt hands over to the next; a success stops everything",
       /regions: for \(const region of candidates\)/.test(route) && /break regions;/.test(route));
