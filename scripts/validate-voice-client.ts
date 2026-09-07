@@ -1841,7 +1841,7 @@ console.log("\n── 12. Mute ──");
   check("the tones are made and primed INSIDE startCall — the tap that unlocks audio",
     /tonesRef\.current = new CallTones\(\);\s*tonesRef\.current\.prime\(\);/.test(startBody));
   check("  …before the session is created, so a slow handshake cannot outlive the gesture", startBody.indexOf("tonesRef.current.prime()") < startBody.indexOf("new VoiceSession("));
-  check("ready is set by the session's onReady", /onReady: \(\) => setReady\(true\)/.test(btn));
+  check("ready is set by the session's onReady", /onReady: \(\) => \{\s*setReady\(true\);/.test(btn));
   /* Audit 2026-09-07: the fallback used to fire on a transport that never
      came up, telling a caller nobody could hear to "go ahead". */
   check("  …with a fallback so a silent vendor cannot leave the call on connecting — gated on a transport that exists",
@@ -2180,7 +2180,7 @@ console.log("\n── 12. Mute ──");
     /const releaseCall = useCallback\(\(\) => \{\s*sessionRef\.current\?\.stop\(\);/.test(btn19) &&
     (btn19.match(/setState\("idle"\)/g) ?? []).length === 1);
   check("  …and says so in the log: a voice-switched beacon with the old call's diagnostics, before the release",
-    (() => { const b = btn19.indexOf('sendVoiceTelemetry({ reason: "voice-switched", resumes: resumesRef.current, ...diag });'); const r = btn19.indexOf("setSwapping(true);\n    releaseCall();"); return b > 0 && r > b; })());
+    (() => { const b = btn19.indexOf('sendVoiceTelemetry({ reason: "voice-switched", resumes: resumesRef.current, lane: transportRef.current, ...diag });'); const r = btn19.indexOf("setSwapping(true);\n    releaseCall();"); return b > 0 && r > b; })());
   /* WHERE TO START THE NEXT CALL: the region that served this one. */
   check("a continued call (resume or switch) asks first for the region that served the last one; a fresh call leaves it to the server",
     /regionHintRef\.current = diag\.region === "alt" \? "alt" : "primary";/.test(btn19) &&
@@ -2737,7 +2737,11 @@ function describeErrorCheck(): boolean {
     r.sockets[0].message(JSON.stringify({ type: "response.cancelled" }));
     r.sockets[0].message(JSON.stringify({ type: "response.output_audio.delta", response_id: "r2", delta: "Rg==" }));
     check("  …a cancelled response is silenced the same way", r.audios[0].flushes === 2 && r.audios[0].played.join() === "QQ==,RA==");
+    const sentBefore = r.sockets[0].sent.length;
+    check("a response request goes out on the open socket as one response.create with instructions",
+      r.s.requestResponse("say hi") === true && r.sockets[0].sent.length === sentBefore + 1 && r.sockets[0].sent[sentBefore] === JSON.stringify({ type: "response.create", response: { instructions: "say hi" } }) && r.s.requestResponse("  ") === false);
     r.s.stop();
+    check("  …and not on a closed one", r.s.requestResponse("say hi") === false);
   }
 }
 
@@ -2852,30 +2856,56 @@ function describeErrorCheck(): boolean {
      page that holds the audio graph. And 18:10, the owner: "the voice of
      Grok not so stable" — frames butted 50 ms behind now, so every wire gap
      longer than that was a gap in the voice. */
-  const { nextFrameStart, JITTER_LEAD_S, JITTER_LEAD_STEP_S, JITTER_LEAD_MAX_S, CAPTURE_WORKLET_SOURCE, CAPTURE_WORKLET_NAME, FRAME_SAMPLES } = await import("../src/lib/voice/ws-audio");
+  const { JitterQueue, PREBUFFER_S, PREBUFFER_STEP_S, PREBUFFER_MAX_S, PREBUFFER_WAIT_MS, RUN_GAP_S, CAPTURE_WORKLET_SOURCE, CAPTURE_WORKLET_NAME, FRAME_SAMPLES } = await import("../src/lib/voice/ws-audio");
   const { aiImage, AI_IMAGE_PROXY_PATH } = await import("../src/lib/ai/image-url");
   {
-    const fresh = { nextStart: 0, lead: JITTER_LEAD_S };
-    const a = nextFrameStart(fresh, 10, 0.5);
-    check("a fresh run starts a fifth of a second behind now and queues the next frame right after it",
-      JITTER_LEAD_S === 0.2 && a.start === 10.2 && Math.abs(a.next.nextStart - 10.7) < 1e-9 && a.next.lead === 0.2 && !a.underrun);
-    const b = nextFrameStart(a.next, 10.3, 0.5);
-    check("  …a frame that arrives while the run is still ahead butts against the previous one — no gap, no growth",
-      b.start === a.next.nextStart && !b.underrun && b.next.lead === 0.2);
-    const c = nextFrameStart(b.next, 12, 0.5);
-    check("  …a frame that arrives after the run drained is an UNDERRUN: it starts a grown lead behind now",
-      c.underrun && Math.abs(c.next.lead - (JITTER_LEAD_S + JITTER_LEAD_STEP_S)) < 1e-9 && Math.abs(c.start - (12 + c.next.lead)) < 1e-9);
-    let st = { nextStart: 1, lead: JITTER_LEAD_S };
-    for (let i = 0; i < 20; i++) st = nextFrameStart(st, st.nextStart + 5, 0.1).next;
-    check("  …and the lead stops growing at the ceiling — a rough network buys delay, not unbounded delay",
-      JITTER_LEAD_MAX_S === 0.6 && Math.abs(st.lead - JITTER_LEAD_MAX_S) < 1e-9);
-    const d = nextFrameStart({ nextStart: 0, lead: 0.5 }, 3, 0.2);
-    check("  …a new run after a flush keeps the lead the call has settled on", d.start === 3.5 && !d.underrun);
+    /* A fake clock and a fake scheduler: frames are letters, starts are
+       recorded as "letter@time". */
+    let now = 10;
+    const starts: string[] = [];
+    let timers: Array<{ fn: () => void; ms: number; id: number }> = [];
+    let nextId = 1;
+    const q = new JitterQueue<string>({
+      now: () => now,
+      start: (node, at) => starts.push(`${node}@${at.toFixed(2)}`),
+      setTimer: (fn, ms) => { const id = nextId++; timers.push({ fn, ms, id }); return id; },
+      clearTimer: (h) => { timers = timers.filter((t) => t.id !== h); },
+    });
+    q.push({ node: "a", duration: 0.1 });
+    check("the first small frame of an answer is GATHERED, not played: nothing starts, a timer is armed for the short-answer case",
+      PREBUFFER_S === 0.3 && starts.length === 0 && q.buffered === 0.1 && timers.length === 1 && timers[0].ms === PREBUFFER_WAIT_MS && PREBUFFER_WAIT_MS === 350);
+    now = 10.2;
+    q.push({ node: "b", duration: 0.25 });
+    check("  …once a third of a second is held, everything plays back to back from now, and the timer is dropped",
+      starts.join() === "a@10.25,b@10.35" && timers.length === 0 && q.buffered === 0);
+    now = 10.4;
+    q.push({ node: "c", duration: 0.3 });
+    check("  …a frame arriving while the run is still ahead butts against it", starts[2] === "c@10.60");
+    /* The run ends at 10.90. A frame at 11.1 is 0.2 s late: an UNDERRUN. */
+    now = 11.1;
+    q.push({ node: "d", duration: 0.1 });
+    check("a frame that arrives shortly after the run drained is an underrun: it is gathered again and the target grows a step",
+      starts.length === 3 && q.underruns === 1 && Math.abs(q.target - (PREBUFFER_S + PREBUFFER_STEP_S)) < 1e-9 && timers.length === 1);
+    const fire = timers[0];
+    timers = [];
+    fire.fn();
+    check("  …and the short-answer timer releases what is held when the buffer never fills", starts[3] === "d@11.15");
+    /* The run ends at 11.25. The next answer comes 3 s later: not an underrun. */
+    now = 14.5;
+    q.push({ node: "e", duration: 0.5 });
+    check("a frame that arrives long after the run drained is the NEXT answer: gathered at the settled target, no growth",
+      RUN_GAP_S === 1.0 && q.underruns === 1 && Math.abs(q.target - 0.4) < 1e-9 && starts[4] === "e@14.55" /* 0.5 ≥ 0.4 releases at once */);
+    for (let i = 0; i < 20; i++) { now += 10; q.push({ node: "x", duration: 0.05 }); q.release(); now += 0.5; q.push({ node: "y", duration: 0.05 }); }
+    check("  …the target stops growing at the ceiling", PREBUFFER_MAX_S === 0.8 && Math.abs(q.target - PREBUFFER_MAX_S) < 1e-9 && q.underruns > 1);
+    const before = q.target;
+    q.push({ node: "held", duration: 0.01 });
+    const dropped = q.flush();
+    check("flush() hands back what was gathered and never started, forgets the run, and keeps the target", dropped.includes("held") && q.buffered === 0 && q.target === before);
     const fs29 = await import("node:fs");
     const wa = fs29.readFileSync("src/lib/voice/ws-audio.ts", "utf8");
-    check("the browser player places every frame with that arithmetic, and a drained queue or a flush starts a new run",
-      /const placed = nextFrameStart\(jitter, ctx\.currentTime, buffer\.duration\);\s*jitter = placed\.next;\s*node\.start\(placed\.start\);/.test(wa) &&
-      /if \(playing\.size === 0\) jitter = \{ nextStart: 0, lead: jitter\.lead \};/.test(wa) && /playing\.clear\(\);\s*jitter = \{ nextStart: 0, lead: jitter\.lead \};/.test(wa) && !/LEAD_S \/ 2/.test(wa));
+    check("the browser player feeds every decoded frame to the queue, starts nodes only when the queue says so, and a flush stops the started and disconnects the gathered",
+      /jitter\.push\(\{ node, duration: buffer\.duration \}\);/.test(wa) && /start: \(node, at\) => \{\s*node\.start\(at\);\s*playing\.add\(node\);/.test(wa) &&
+      /for \(const node of jitter\.flush\(\)\) \{[\s\S]{0,120}?node\.disconnect\(\);/.test(wa) && !/nextFrameStart|LEAD_S \/ 2/.test(wa));
     check("the microphone is read on the audio thread by a worklet loaded from a blob — no second file — and the processor is the fallback, never both",
       CAPTURE_WORKLET_NAME === "koleex-capture" && CAPTURE_WORKLET_SOURCE.includes(`registerProcessor("${CAPTURE_WORKLET_NAME}"`) && CAPTURE_WORKLET_SOURCE.includes(`new Float32Array(${FRAME_SAMPLES})`) &&
       CAPTURE_WORKLET_SOURCE.includes("this.port.postMessage(out, [out.buffer])") &&
@@ -2968,6 +2998,13 @@ function describeErrorCheck(): boolean {
       /const farWasMuted = far\?\.muted \?\? false;\s*if \(far\) far\.muted = true;/.test(btn) &&
       /finally \{\s*if \(far\) far\.muted = farWasMuted;\s*if \(micWasOpen && sessionRef\.current === session\) session\.setMuted\(false\);\s*\}/.test(btn) &&
       /onPreviewVoice=\{previewVoice\}\s*onStopPreview=\{stopPreview\}/.test(btn));
+    const tt = fs30.readFileSync("src/lib/voice/text-turn.ts", "utf8");
+    const { buildResponseRequest, VOICE_SWITCH_GREETING } = await import("../src/lib/voice/text-turn");
+    check("a switched voice speaks first: the switch arms a greeting, the rebuilt call's ready sends ONE response request with instructions and no user turn, and the beacon names the lane",
+      /greetOnReadyRef\.current = true;\s*setSwapping\(true\);/.test(btn) && /if \(greetOnReadyRef\.current\) \{\s*greetOnReadyRef\.current = false;\s*sessionRef\.current\?\.requestResponse\(VOICE_SWITCH_GREETING\);/.test(btn) &&
+      /reason: "voice-switched", resumes: resumesRef\.current, lane: transportRef\.current/.test(btn) &&
+      JSON.parse(buildResponseRequest(VOICE_SWITCH_GREETING)!).type === "response.create" && JSON.parse(buildResponseRequest(VOICE_SWITCH_GREETING)!).response.instructions === VOICE_SWITCH_GREETING &&
+      buildResponseRequest("  ") === null && /language of the conversation so far/.test(VOICE_SWITCH_GREETING) && !/grok|xai|qwen/i.test(tt));
     check("on the sheet a tap is 'let me hear it' and a separate button is 'this one' — off until a voice other than the current has been heard; closing the sheet stops the sample",
       /const tapVoice = useCallback\(\(key: string\) => \{/.test(scr) && /void onPreviewVoice\(key\)\.then\(\(ok\) => \{/.test(scr) &&
       /disabled=\{!candidate \|\| candidate === selectedVoice\}/.test(scr) && /if \(!candidate \|\| candidate === selectedVoice\) return;\s*onSelectVoice\?\.\(candidate\);\s*closeVoiceSheet\(\);/.test(scr) &&

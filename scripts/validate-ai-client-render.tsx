@@ -865,6 +865,7 @@ console.log("\n── VoiceCallScreen: choosing a voice ──");
     /<button[^>]*disabled=""[^>]*>Use this voice<\/button>/.test(auditioned) && /Tap a voice to hear it, then choose/.test(auditioned) &&
     auditioned.split('aria-pressed="true"').length - 1 === 1 && !/aria-busy/.test(auditioned));
   check("  …without samples, no such button and the old hint", !/Use this voice/.test(withPicker) && /The conversation carries on/.test(withPicker));
+  check("  …the current voice wears a check badge and the caption Current — exactly one of each", (auditioned.match(/data-voice-current/g) ?? []).length === 1 && (auditioned.match(/>Current</g) ?? []).length === 1);
   check("  …localised", /استخدم الصوت ده/.test(renderToStaticMarkup(<VoiceCallScreen live phase="listening" audioLevel={0.2} lines={[]} lang="ar" onEnd={() => {}} voices={voices} selectedVoice="v1" onSelectVoice={() => {}} onPreviewVoice={async () => true} defaultVoiceSheetOpen /> as ReactElement)));
 
   /* THE VENDOR'S OWN IDS ARE NOT A MENU THE BROWSER HOLDS. Only keys and

@@ -65,6 +65,7 @@ import { sendVoiceTelemetry } from "@/lib/voice/telemetry";
 import { probeWsLane } from "@/lib/voice/lane-probe";
 import { createPreviewPlayer, browserPreviewContext, VOICE_PREVIEW_PATH, PREVIEW_FETCH_TIMEOUT_MS, type PreviewPlayer } from "@/lib/voice/preview-player";
 import { TranscriptPersister, type SavedTurn, type PersistFailure } from "@/lib/voice/persist";
+import { VOICE_SWITCH_GREETING } from "@/lib/voice/text-turn";
 import VoiceCallScreen from "@/components/ai/VoiceCallScreen";
 
 /* Every failure the session can report, in every language the app speaks.
@@ -358,6 +359,8 @@ export default function VoiceCallButton({
   /* Read inside the session callbacks, which outlive any single render. */
   const voiceKeyRef = useRef<string | null>(null);
   useEffect(() => { voiceKeyRef.current = voiceKey; }, [voiceKey]);
+  /** Set by a voice switch; consumed by the next ready (a word from the new voice). */
+  const greetOnReadyRef = useRef(false);
 
   /* Fetched once on mount rather than per call: it is small, it rarely
      changes, and asking for it while the user is waiting to talk would add a
@@ -733,7 +736,16 @@ export default function VoiceCallButton({
           onErrorRef.current?.(FAILURE_COPY[langRef.current][failure]);
         }
       },
-      onReady: () => setReady(true),
+      onReady: () => {
+        setReady(true);
+        /* A WORD FROM THE NEW VOICE, the moment the rebuilt call is
+           acknowledged — see text-turn.ts VOICE_SWITCH_GREETING. Once, and
+           only after a switch; an ordinary call still waits to be spoken to. */
+        if (greetOnReadyRef.current) {
+          greetOnReadyRef.current = false;
+          sessionRef.current?.requestResponse(VOICE_SWITCH_GREETING);
+        }
+      },
       onLocalStream: (stream) => {
         setMicStream(stream);
         /* HOLD TO TALK STARTS WITH THE MICROPHONE CLOSED. A session always
@@ -1080,8 +1092,9 @@ export default function VoiceCallButton({
        region that served the old one first. The beacon is what makes the
        next such report answerable from the log. */
     const diag = current.diagnostics();
-    sendVoiceTelemetry({ reason: "voice-switched", resumes: resumesRef.current, ...diag });
+    sendVoiceTelemetry({ reason: "voice-switched", resumes: resumesRef.current, lane: transportRef.current, ...diag });
     regionHintRef.current = diag.region === "alt" ? "alt" : "primary";
+    greetOnReadyRef.current = true;
     setSwapping(true);
     releaseCall();
     /* After the teardown, not during it: start() refuses while a session

@@ -97,6 +97,9 @@ const COPY: Record<Lang, {
   voiceSampling: string;
   voiceSampleFailed: string;
   voiceUse: string;
+  /** "Use {name}" once a voice other than the current one has been heard. */
+  voiceUseNamed: string;
+  voiceCurrent: string;
   close: string;
 }> = {
   en: {
@@ -131,6 +134,8 @@ const COPY: Record<Lang, {
     voiceSampling: "Playing a sample…",
     voiceSampleFailed: "Couldn't play a sample right now.",
     voiceUse: "Use this voice",
+    voiceUseNamed: "Use {name}",
+    voiceCurrent: "Current",
     close: "Close",
     holdToTalk: "Hold to talk",
     holdRelease: "Let go when done",
@@ -180,6 +185,8 @@ const COPY: Record<Lang, {
     voiceSampling: "正在播放试听…",
     voiceSampleFailed: "现在无法播放试听。",
     voiceUse: "使用这个音色",
+    voiceUseNamed: "使用 {name}",
+    voiceCurrent: "当前",
     close: "关闭",
     holdToTalk: "按住说话",
     holdRelease: "说完松开",
@@ -229,6 +236,8 @@ const COPY: Record<Lang, {
     voiceSampling: "بيشغّل عيّنة…",
     voiceSampleFailed: "معرفتش أشغّل العيّنة دلوقتي.",
     voiceUse: "استخدم الصوت ده",
+    voiceUseNamed: "استخدم {name}",
+    voiceCurrent: "الحالي",
     close: "اقفل",
     holdToTalk: "اضغط واتكلم",
     holdRelease: "سيب لما تخلص",
@@ -1116,10 +1125,23 @@ export default function VoiceCallScreen({
                         waveform signature — a fixed pattern of five bars —
                         so the row reads as five different voices at a glance;
                         the chosen one is in Hub Blue and breathes. */}
-                    <span className={`h-16 w-16 rounded-full inline-flex items-center justify-center border transition-[background-color,border-color,transform] duration-150 group-active:scale-95 ${on ? "border-[#0066FF] bg-[#0066FF]/10 ring-2 ring-[#0066FF]/40 ring-offset-2 ring-offset-[#141414]" : "border-white/15 bg-white/[0.04] group-hover:border-white/30"}`}>
-                      <VoiceGlyph index={i} on={on || sampling === v.key} />
+                    <span className="relative">
+                      <span className={`h-16 w-16 rounded-full inline-flex items-center justify-center border transition-[background-color,border-color,transform] duration-150 group-active:scale-95 ${on ? "border-[#0066FF] bg-[#0066FF]/10 ring-2 ring-[#0066FF]/40 ring-offset-2 ring-offset-[#141414]" : "border-white/15 bg-white/[0.04] group-hover:border-white/30"}`}>
+                        <VoiceGlyph index={i} on={on || sampling === v.key} />
+                      </span>
+                      {/* THE CURRENT VOICE WEARS A CHECK, so it stays
+                          identifiable once the ring has moved to a voice
+                          being auditioned. */}
+                      {chosen && (
+                        <span aria-hidden data-voice-current className="absolute -top-0.5 -end-0.5 h-5 w-5 rounded-full bg-[#0066FF] ring-2 ring-[#141414] inline-flex items-center justify-center">
+                          <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="#FFFFFF" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5" /></svg>
+                        </span>
+                      )}
                     </span>
-                    <span className={`text-[12px] ${on ? "text-white font-semibold" : "text-[#AAAAAA] group-hover:text-white"}`}>{v.label}</span>
+                    <span className="flex flex-col items-center leading-tight">
+                      <span className={`text-[12px] ${on ? "text-white font-semibold" : "text-[#AAAAAA] group-hover:text-white"}`}>{v.label}</span>
+                      <span className="text-[10px] text-[#666666] h-[14px]">{chosen ? copy.voiceCurrent : sampling === v.key ? "•••" : ""}</span>
+                    </span>
                   </button>
                 );
               })}
@@ -1140,7 +1162,9 @@ export default function VoiceCallScreen({
                 disabled={!candidate || candidate === selectedVoice}
                 className="mt-4 h-12 w-full rounded-2xl bg-[#0066FF] text-[15px] font-semibold text-white disabled:bg-white/[0.06] disabled:text-[#666666] transition-[background-color,transform] duration-150 active:scale-[0.99] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0066FF] focus-visible:ring-offset-2 focus-visible:ring-offset-[#141414]"
               >
-                {copy.voiceUse}
+                {candidate && candidate !== selectedVoice
+                  ? copy.voiceUseNamed.replace("{name}", voices.find((v) => v.key === candidate)?.label ?? "")
+                  : copy.voiceUse}
               </button>
             )}
 

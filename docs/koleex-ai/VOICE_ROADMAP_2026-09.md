@@ -252,6 +252,31 @@ transcribed from the vendors' published guides, and one real tap answers
 each. The refusal's status is in the log (`[ai.voice.preview] synthesis
 refused status=…`).
 
+## Third pass on the socket lane's sound, 2026-09-07 (night)
+
+Owner: still "a strange voice when I speak or the AI listens", and choosing
+a voice "takes time until it talks". The hung-up beacon of that call shows
+two clean turns (2 speech_started, 2 responses, no cancels), so the sound
+was not late frames of a cut answer — it was how each answer STARTED: the
+vendor sends a small first frame fast and then streams, and the player
+started that blip 50 ms later, then sat in silence until the next frame.
+`JitterQueue` now gathers 300 ms of an answer (or 350 ms of waiting) before
+the first frame plays, then plays back to back; an underrun (a run drained
+under a second ago) grows the gathering 100 ms up to 800 ms; a gap over a
+second is simply the next answer.
+
+The switch: the rebuilt call waited to be spoken to. Now the switch arms a
+greeting and the rebuilt call's `session.updated` sends one
+`response.create` with instructions (`VOICE_SWITCH_GREETING`): one short
+sentence in the conversation's language, so the new voice is heard at once.
+The `voice-switched` beacon now carries the lane. The sheet: the current
+voice wears a check and the caption "Current"; the confirm button names the
+candidate ("Use Eve").
+
+Samples worked on the first tap (two `GET /api/ai/voice/preview 200` at
+18:56, the socket lane's vendor). The mainland lane's synthesiser is still
+unproven.
+
 ## Owner-side (not code)
 
 - Activate the realtime voice model on the Beijing workspace (still `403 Unpurchased`), so mainland callers get the mainland endpoint.
