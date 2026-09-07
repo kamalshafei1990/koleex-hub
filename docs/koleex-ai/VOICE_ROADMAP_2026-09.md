@@ -100,6 +100,18 @@ that refuses), and the 72 s between "show me the pyramids" and the first
 lookup in that call — a model decision, not transport; the trimmed payload
 and the logged latency are what will show whether it recurs.
 
+**Follow-up, the same evening — "AI can't be connected".** Two calls at
+15:00 and 15:08 UTC ended `handshake-failed` on a phone whose other sockets
+were flapping every second (the perf beacons show the discuss channel
+closing and reconnecting continuously). One beacon had no session behind
+it: the caller hung up while "connecting" and was then told the call could
+not start. Neither beacon carried a cause. Three changes in `session.ts`:
+the handshake POST is retried once on a bare network error (not on our
+own deadline, not after a hang-up); `fail()` is a no-op on an ended call;
+and the beacon now carries `err="Name: message"` so the next failure names
+itself. The retry does not make a dead link work — it makes a dropped
+request on a live one not end the call.
+
 ## Owner-side (not code)
 
 - Activate the realtime voice model on the Beijing workspace (still `403 Unpurchased`), so mainland callers get the mainland endpoint.

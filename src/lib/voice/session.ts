@@ -120,6 +120,9 @@ export type VoiceDiagnostics = {
   tool_calls: number;
   region: "primary" | "alt";
   ice_ever_connected: boolean;
+  /** The last failure's cause, `Name: message`, bounded — "handshake
+   *  failed" alone sent an investigation to the wrong place twice. */
+  err: string;
 };
 
 export type VoiceEvents = {
@@ -225,6 +228,17 @@ const RECONNECT_GRACE_MS = 8_000;
 const LIVE_GRACE_MS = 20_000;
 /** Our own deadline on the handshake POST; the route waits at most 45 s. */
 const HANDSHAKE_TIMEOUT_MS = 50_000;
+/** The pause before the one retry of a handshake the link dropped. */
+const HANDSHAKE_RETRY_DELAY_MS = 800;
+
+/** `Name: message`, bounded and without anything that is not a word — a
+ *  cause for the log line, never a body or a token. "" for no cause. */
+export function describeError(e: unknown): string {
+  if (!e) return "";
+  const name = e instanceof Error ? e.name : typeof e === "object" ? (e as { name?: unknown }).name : "";
+  const message = e instanceof Error ? e.message : typeof e === "string" ? e : "";
+  return `${String(name || "Error")}: ${String(message ?? "")}`.replace(/[^\w .:()/-]/g, "").slice(0, 100);
+}
 
 function isTimeoutError(e: unknown): boolean {
   const name = e && typeof e === "object" ? String((e as { name?: unknown }).name ?? "") : "";
@@ -337,6 +351,8 @@ export class VoiceSession {
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
   /** Has ICE ever actually connected? Decides whether "failed" is final. */
   private iceEverConnected = false;
+  /** `Name: message` of the exception behind the last fail(), if any. */
+  private lastError = "";
   /* THE OTHER REGION. The server may hold a second endpoint (see the
      server's voice/config.ts for why). It tells this client two things with
      the answer: which SLOT served — a neutral word, never a host — and
@@ -471,6 +487,7 @@ export class VoiceSession {
       tool_calls: this.toolCallCount,
       region: this.servedRegion,
       ice_ever_connected: this.iceEverConnected,
+      err: this.lastError,
     };
   }
 
@@ -763,7 +780,15 @@ export class VoiceSession {
     }
   }
 
-  private fail(reason: VoiceFailure): void {
+  private fail(reason: VoiceFailure, cause?: unknown): void {
+    /* A CALL THE USER ALREADY ENDED CANNOT FAIL. The handshake keeps running
+       after stop(): its fetch resolves, the answer is applied to a closed
+       connection, that throws — and the caller who hung up while
+       "connecting" was told "could not start the call" for a call they
+       ended themselves (production, 2026-09-07 15:01, a beacon with no
+       session behind it). Ended is final. */
+    if (this.state === "ended") return;
+    this.lastError = describeError(cause);
     this.clearReconnectTimer();
     this.mic?.getTracks().forEach((t) => t.stop());
     this.mic = null;
@@ -995,7 +1020,14 @@ export class VoiceSession {
       if (this.regionHint) query.set("region", this.regionHint);
       const qs = query.toString();
       const path = qs ? `${HANDSHAKE_PATH}?${qs}` : HANDSHAKE_PATH;
-      const res = await this.deps.fetchFn(path, {
+      /* ONE RETRY ON A LINK THAT DROPPED THE REQUEST. A handshake dies as a
+         bare TypeError when the connection underneath is cut — the network a
+         phone is on while its other sockets are flapping (production,
+         2026-09-07 15:08: a 200 from our route that never arrived whole).
+         The offer is still valid, the peer connection is still in
+         have-local-offer, so the same POST is made once more after a short
+         pause. A timeout, a refusal and a hang-up are not retried. */
+      const post = () => this.deps.fetchFn(path, {
         method: "POST",
         headers: { "Content-Type": "application/sdp" },
         /* A ceiling on our own route, above the server's longest honest wait
@@ -1008,6 +1040,18 @@ export class VoiceSession {
         body: pc.localDescription?.sdp ?? offer.sdp ?? "",
         credentials: "include",
       });
+      let res: Response;
+      try {
+        res = await post();
+      } catch (first) {
+        if (!(first instanceof TypeError) || isTimeoutError(first) || this.state !== "connecting" || this.pc !== pc) throw first;
+        await new Promise((r) => setTimeout(r, HANDSHAKE_RETRY_DELAY_MS));
+        if (this.state !== "connecting" || this.pc !== pc) throw first;
+        res = await post();
+      }
+      /* Hung up while the answer was on its way: nothing to apply, nothing
+         to report — the call is over, by the caller's hand. */
+      if (this.state !== "connecting" || this.pc !== pc) return;
 
       if (!res.ok) {
         /* Mapped to a reason the UI can act on. The RESPONSE BODY IS NEVER
@@ -1061,8 +1105,8 @@ export class VoiceSession {
         if (env.session_compact && typeof env.session_compact === "object") {
           this.sessionUpdateCompact = JSON.stringify(env.session_compact);
         }
-      } catch {
-        this.fail("handshake-failed");
+      } catch (e) {
+        this.fail("handshake-failed", e);
         return;
       }
       if (!answer.startsWith("v=")) {
@@ -1082,7 +1126,7 @@ export class VoiceSession {
     } catch (e) {
       /* Our own deadline on the handshake reads as the service not answering
          — which is what it is — rather than a bad handshake. */
-      this.fail(isTimeoutError(e) ? "service-unreachable" : "handshake-failed");
+      this.fail(isTimeoutError(e) ? "service-unreachable" : "handshake-failed", e);
       return;
     }
 

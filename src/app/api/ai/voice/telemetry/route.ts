@@ -39,6 +39,9 @@ const REASONS = new Set([
   "voice-switched", "unmounted", "page-hidden",
 ]);
 const short = (v: unknown, max: number) => (typeof v === "string" ? v.replace(/[^\w.:-]/g, "").slice(0, max) : "");
+/* The cause of a failure: a browser's own error name and message. Words,
+   spaces and a little punctuation; bounded; never a body or a token. */
+const cause = (v: unknown) => (typeof v === "string" ? v.replace(/[^\w .:()/-]/g, "").slice(0, 100) : "");
 const num = (v: unknown) => (typeof v === "number" && Number.isFinite(v) ? Math.max(0, Math.round(v)) : 0);
 
 export async function POST(req: Request) {
@@ -61,7 +64,8 @@ export async function POST(req: Request) {
   console.warn(
     `[ai.voice.client] ${reason} elapsedMs=${num(body.elapsed_ms)} ice=${short(body.ice, 16) || "none"} ` +
       `dc=${short(body.dc, 16) || "none"} lastEvent=${short(body.last_event, 60) || "none"} toolCalls=${num(body.tool_calls)} ` +
-      `slot=${short(body.region, 8) || "none"} iceEverConnected=${body.ice_ever_connected === true} resumes=${num(body.resumes)}`,
+      `slot=${short(body.region, 8) || "none"} iceEverConnected=${body.ice_ever_connected === true} resumes=${num(body.resumes)}` +
+      (cause(body.err) ? ` err="${cause(body.err)}"` : ""),
   );
   return new NextResponse(null, { status: 204 });
 }
