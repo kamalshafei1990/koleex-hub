@@ -17,6 +17,7 @@ export type VoiceTelemetry = {
   tool_calls?: number;
   region?: string;
   ice_ever_connected?: boolean;
+  err?: string;
 };
 
 export function sendVoiceTelemetry(t: VoiceTelemetry, post: (path: string, body: string) => void = defaultPost): void {

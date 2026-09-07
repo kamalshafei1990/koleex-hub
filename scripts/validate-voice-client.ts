@@ -14,7 +14,7 @@
    rather than on the happy one.
    --------------------------------------------------------------------------- */
 
-import { VoiceSession, HANDSHAKE_PATH, waitForIceGathering, normalizeSdp, type VoiceDeps, type VoiceState, type VoiceFailure,
+import { VoiceSession, describeError, HANDSHAKE_PATH, waitForIceGathering, normalizeSdp, type VoiceDeps, type VoiceState, type VoiceFailure,
   TOOL_PATH,
 } from "../src/lib/voice/session";
 import { TranscriptPersister, TRANSCRIPT_PATH, MAX_TURNS_PER_POST, MAX_POST_FAILURES, type SavedTurn } from "../src/lib/voice/persist";
@@ -1855,7 +1855,7 @@ console.log("\n── 12. Mute ──");
   check("  …the configuration acknowledgement is awaited for either version, so a compact-first call fires ready",
     /this\.configAckPending = true;\s*this\.compactRetried = first !== this\.sessionUpdate;/.test(sessWatch));
   check("  …and the handshake POST carries our own deadline, read as the service not answering",
-    /signal: AbortSignal\.timeout\(HANDSHAKE_TIMEOUT_MS\)/.test(sessWatch) && /this\.fail\(isTimeoutError\(e\) \? "service-unreachable" : "handshake-failed"\);/.test(sessWatch));
+    /signal: AbortSignal\.timeout\(HANDSHAKE_TIMEOUT_MS\)/.test(sessWatch) && /this\.fail\(isTimeoutError\(e\) \? "service-unreachable" : "handshake-failed", e\);/.test(sessWatch));
   check("the tone plays once, when live AND ready, guarded by a ref so a re-render cannot repeat it",
     /if \(live && ready && !chimedRef\.current\) \{\s*chimedRef\.current = true;\s*tonesRef\.current\?\.ready\(\);/.test(btn));
   check("  …and a recovered connection plays its own single note", /prev === "reconnecting" && state === "live"\) tonesRef\.current\?\.recovered\(\)/.test(btn));
@@ -2107,7 +2107,7 @@ console.log("\n── 12. Mute ──");
     /console\.warn\(\s*`\[ai\.voice\.client\]/.test(telRoute) && !/supabase|insert\(/.test(telRoute) && /new NextResponse\(null, \{ status: 204 \}\)/.test(telRoute));
   const diagS = new VoiceSession(deps({ status: 200 }).deps);
   const dg = diagS.diagnostics();
-  check("diagnostics are states and counts only", Object.keys(dg).sort().join(",") === "dc,elapsed_ms,ice,ice_ever_connected,last_event,region,tool_calls" && dg.tool_calls === 0 && dg.elapsed_ms === 0);
+  check("diagnostics are states and counts only", Object.keys(dg).sort().join(",") === "dc,elapsed_ms,err,ice,ice_ever_connected,last_event,region,tool_calls" && dg.tool_calls === 0 && dg.elapsed_ms === 0 && dg.err === "");
 
   /* THE PICTURE EXPANDS IN PLACE. */
   check("a photo in the conversation is a button that opens the lightbox, not a link out of the app",
@@ -2448,6 +2448,87 @@ console.log("\n── 12. Mute ──");
   check("the model's own path never carries via: the relay body has name, call_id, arguments and the call's conversation id only",
     /body: JSON\.stringify\(\{\s*name: call\.name,\s*call_id: call\.callId,\s*arguments: call\.argumentsJson,[\s\S]{0,300}?\.\.\.\(this\.conversationId \? \{ conversation_id: this\.conversationId \} : \{\}\),\s*\}\)/.test(sess24) && !/via:/.test(sess24.slice(sess24.indexOf("TOOL_PATH, {"), sess24.indexOf("TOOL_PATH, {") + 600)));
 
+}
+
+{
+  console.log("\n── 25. A handshake on a link that drops it, and a hang-up while it is in flight ──");
+  /* Production, 2026-09-07 15:00–15:08, after the owner's "AI can't be
+     connected": two calls, both `handshake-failed` on a network whose other
+     sockets were flapping every second. One beacon carried no session at
+     all — the caller had hung up while "connecting" and was then told the
+     call could not start. Neither had a cause in it. */
+  {
+    /* THE LINK DROPS THE FIRST POST. A bare TypeError is what fetch reports
+       for a connection cut underneath it; the offer is still good, so the
+       same POST goes once more. */
+    const recorded: Recorded[] = [];
+    const d = deps({ recorded });
+    const real = d.deps.fetchFn;
+    let n = 0;
+    d.deps.fetchFn = (async (url: string, init?: RequestInit) => {
+      if (n++ === 0) throw new TypeError("Load failed");
+      return real(url, init);
+    }) as unknown as typeof fetch;
+    const states: Array<[VoiceState, VoiceFailure | undefined]> = [];
+    const s = new VoiceSession(d.deps, { onState: (st, f) => states.push([st, f]) });
+    await within(4000, s.start());
+    check("a handshake the link dropped is posted once more, and the call is live", s.getState() === "live" && n === 2 && recorded.length === 1);
+    check("  …with no failure shown in between", states.every(([st]) => st !== "failed"));
+    s.stop();
+  }
+  {
+    const d = deps({});
+    d.deps.fetchFn = (async () => { throw new TypeError("Load failed"); }) as unknown as typeof fetch;
+    const states: Array<[VoiceState, VoiceFailure | undefined]> = [];
+    const s = new VoiceSession(d.deps, { onState: (st, f) => states.push([st, f]) });
+    await within(4000, s.start());
+    const last = states[states.length - 1];
+    check("a second drop is the failure it always was — one retry, never a loop", last[0] === "failed" && last[1] === "handshake-failed");
+    check("  …and the beacon now carries the cause", s.diagnostics().err === "TypeError: Load failed");
+  }
+  {
+    const d = deps({});
+    const err = Object.assign(new Error("signal timed out"), { name: "TimeoutError" });
+    let calls = 0;
+    d.deps.fetchFn = (async () => { calls++; throw err; }) as unknown as typeof fetch;
+    const states: Array<[VoiceState, VoiceFailure | undefined]> = [];
+    const s = new VoiceSession(d.deps, { onState: (st, f) => states.push([st, f]) });
+    await within(4000, s.start());
+    const last = states[states.length - 1];
+    check("our own deadline is not retried — the service did not answer, and is said to have not", calls === 1 && last[1] === "service-unreachable");
+  }
+  {
+    /* HUNG UP WHILE CONNECTING. The fetch resolves after stop(); the answer
+       must not be applied, and nothing may be reported as a failure. */
+    const d = deps({});
+    const real = d.deps.fetchFn;
+    const gate: { release: (() => void) | null } = { release: null };
+    d.deps.fetchFn = (async (url: string, init?: RequestInit) => {
+      await new Promise<void>((r) => { gate.release = r; });
+      return real(url, init);
+    }) as unknown as typeof fetch;
+    const states: Array<[VoiceState, VoiceFailure | undefined]> = [];
+    const s = new VoiceSession(d.deps, { onState: (st, f) => states.push([st, f]) });
+    const started = s.start();
+    await sleep(30);
+    s.stop();
+    gate.release?.();
+    await within(4000, started);
+    check("a call ended while its handshake was in flight stays ended — no late \"live\", no late failure",
+      s.getState() === "ended" && states.every(([st]) => st !== "failed" && st !== "live") && d.mic.allStopped());
+  }
+  {
+    const src = (await import("node:fs")).readFileSync("src/lib/voice/session.ts", "utf8");
+    const tele = (await import("node:fs")).readFileSync("src/app/api/ai/voice/telemetry/route.ts", "utf8");
+    check("fail() is a no-op on an ended call, and records the cause the beacon reads",
+      /private fail\(reason: VoiceFailure, cause\?: unknown\): void \{[\s\S]{0,700}?if \(this\.state === "ended"\) return;\s*this\.lastError = describeError\(cause\);/.test(src) &&
+      /err: this\.lastError,/.test(src) && /err="\$\{cause\(body\.err\)\}"/.test(tele));
+    check("  …the cause is words only, bounded", describeErrorCheck());
+  }
+}
+function describeErrorCheck(): boolean {
+  const d = describeError(new TypeError("Load <failed> \"x\""));
+  return d === "TypeError: Load failed x" && describeError(null) === "" && describeError("a".repeat(300)).length === 100;
 }
 
 console.log(`\n${pass} passed, ${failures.length} failed`);
