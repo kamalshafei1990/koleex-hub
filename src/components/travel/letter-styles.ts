@@ -406,7 +406,12 @@ export const LETTER_STYLES = `
     nextjs-portal { display: none !important; }
     .inv-stack { width: auto; margin: 0; }
     .inv-a4 {
-      margin: 0;
+      /* auto, not 0: a sheet that the print page shrank to fit (zoom < 1) is
+         narrower than the paper, and a flat zero margin would leave the whole
+         gap on one side. Centred, the shrink reads as a slightly smaller
+         letter
+         rather than a misaligned one. */
+      margin: 0 auto;
       box-shadow: none;
       page-break-after: always;
       break-after: page;

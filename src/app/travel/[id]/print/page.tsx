@@ -127,14 +127,38 @@ export default function InvitationPrintPage({
          a 2 mm tolerance absorbs sub-pixel rounding. */
       const MM = 96 / 25.4;
       const over: number[] = [];
-      document.querySelectorAll(".inv-a4").forEach((el, i) => {
-        /* 292, not 270. The sheet's MIN-height is 270mm, but the printed page
-           is 297mm (A4) — sheets legitimately sit at 275-281 since the stamp
-           took its real 40mm size, and warning at 270 cried wolf on letters
-           whose PDFs measured exactly three pages. 292 leaves 5mm of pagination
-           tolerance below the true limit, so the warning fires only when a
-           fourth page will actually exist. */
-        if (el.getBoundingClientRect().height > 292 * MM) over.push(i + 1);
+      /* 292, not 270. The sheet's MIN-height is 270mm, but the printed page
+         is 297mm (A4) — sheets legitimately sit at 275-281 since the stamp
+         took its real 40mm size, and 270 cried wolf on letters whose PDFs
+         measured exactly three pages. 292 leaves 5mm of pagination tolerance
+         below the true limit. */
+      const LIMIT = 292 * MM;
+      document.querySelectorAll<HTMLElement>(".inv-a4").forEach((el, i) => {
+        /* SHRINK TO FIT, don't just warn.
+           The English sheet measures 288mm against a 297mm page — nine
+           millimetres of slack — and the sheet's height depends on the FONT:
+           measured on the live letter, Helvetica Neue gives 288mm, Inter 293,
+           Courier 312. The dev machine has Helvetica Neue; the serverless
+           Chromium that renders the production PDF does not, so it falls back
+           to something wider and the letter spills its last three lines onto
+           an otherwise blank page — which is the export the owner received
+           while the same letter generated locally fitted perfectly.
+           Pinning a font would only move the problem (Inter already leaves
+           4mm). Instead the sheet is measured after fonts and images settle
+           and scaled down just enough to fit — Word's "shrink to fit", and it
+           does nothing at all when the letter already fits.
+           `zoom`, not `transform`: zoom changes the LAYOUT box, so print
+           pagination sees the smaller sheet. It scales width too, hence the
+           `margin: 0 auto` in the print stylesheet that keeps a shrunk sheet
+           centred on the paper. Floor at 0.82 so a genuinely over-long letter
+           still flows to another page (and still warns) instead of becoming
+           unreadable. */
+        el.style.zoom = "";
+        const h = el.getBoundingClientRect().height;
+        if (h > LIMIT) {
+          el.style.zoom = String(Math.max(0.82, LIMIT / h));
+          if (el.getBoundingClientRect().height > LIMIT) over.push(i + 1);
+        }
       });
       setOverflowing(over);
 
