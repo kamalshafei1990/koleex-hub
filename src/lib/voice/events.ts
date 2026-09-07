@@ -154,11 +154,15 @@ export type PlaybackGate = "cut" | "restore" | null;
 export function playbackGate(eventType: string | null, phase: VoicePhase): PlaybackGate {
   if (!eventType) return null;
   if (eventType === EV_SPEECH_STARTED) return phase === "speaking" ? "cut" : null;
+  /* NOT ON THE CANCELLED ANSWER'S OWN TAIL (audit, 2026-09-07). After the
+     cut, the transcript deltas and the `done` of the response being
+     cancelled are still in flight and still arrive; restoring on them
+     unmuted the element while the buffered audio was playing out — the
+     artefact this gate exists to stop. Only a NEW turn restores: the
+     caller falling silent, a new response, or the old one finishing. */
   if (
     eventType === EV_SPEECH_STOPPED ||
     eventType === EV_RESPONSE_CREATED ||
-    eventType === EV_ASSISTANT_DELTA ||
-    eventType === EV_ASSISTANT_DONE ||
     eventType === EV_RESPONSE_DONE
   ) {
     return "restore";
@@ -231,8 +235,13 @@ export function parseVoiceEvent(raw: string): ParsedEvent {
     case EV_SPEECH_STOPPED:
     case EV_RESPONSE_CREATED:
       return { transcript: null, phase: "thinking" };
+    /* THE ANSWER IS OVER; THE CALLER HAS THE TURN. This was NOTHING, which
+       left the phase at "speaking" through the silence after every answer:
+       the screen said "Speaking", the far-side meter stayed on and the mic
+       meter stayed off, so the orb ignored the caller's first words until
+       the vendor's turn detection confirmed speech (audit, 2026-09-07). */
     case EV_RESPONSE_DONE:
-      return NOTHING;
+      return { transcript: null, phase: "listening" };
     default:
       return NOTHING;
   }
@@ -264,44 +273,69 @@ export type TranscriptLine = {
  * assistant's answer from being glued onto the end of the user's question when
  * the two overlap, which they do — the far side starts answering before the
  * user's final transcript lands.
+ *
+ * THE OPEN TURN IS NOT ALWAYS THE LAST LINE (audit, 2026-09-07). With the
+ * user's line still open, the assistant's first delta opens a second line
+ * after it; the user's FINAL then arrives. Read only from the last line it
+ * belonged to nobody, so it opened a THIRD line — and two unfinished lines
+ * ("how many ord", "Fourt") were suddenly "settled", written to the thread
+ * as turns, while every later assistant delta opened yet another line. That
+ * is where the saved rows "I", "I", "خل", "بال" came from. So an update
+ * looks back for the open line of ITS speaker (two lines is the whole
+ * overlap), and closes or extends THAT one where it stands.
  */
 export function appendTranscript(
   lines: readonly TranscriptLine[],
   update: TranscriptUpdate,
 ): TranscriptLine[] {
   const last = lines[lines.length - 1];
-  const extendsOpenTurn = last && !last.final && last.role === update.role;
+  /* The open line of this speaker: the last line, or the one before it when
+     the other speaker has opened a line on top. */
+  let openIdx = -1;
+  for (let i = lines.length - 1; i >= 0 && i >= lines.length - 2; i--) {
+    if (!lines[i].final) {
+      if (lines[i].role === update.role) openIdx = i;
+      continue;
+    }
+    break;
+  }
+  const open = openIdx >= 0 ? lines[openIdx] : undefined;
 
   /* THE SAME FINAL TWICE IS ONE TURN. The protocol can deliver a completed
      transcript on more than one event, and each copy used to open a new
      line — so the saved conversation held the user's question twice and the
      assistant's "تمام" twice, back to back. A final that matches the last
      settled line of the same speaker is the same turn, and changes nothing. */
-  if (update.final && last && last.final && last.role === update.role && update.text && last.text === update.text) {
+  if (update.final && !open && last && last.final && last.role === update.role && update.text && last.text === update.text) {
     return [...lines];
   }
   /* AN EMPTY FINAL WITH NO OPEN TURN IS NOTHING. A repeated `done` after the
      turn has already closed used to open a new, blank, final line — a row
      with no words in the saved conversation. There is no turn for it to
      close, so there is nothing to record. */
-  if (update.final && !update.text && (!last || last.final)) {
+  if (update.final && !update.text && !open) {
     return [...lines];
   }
 
-  if (!extendsOpenTurn) {
+  if (!open) {
     /* An empty partial opens nothing — a stray delta with no text would
        otherwise leave a blank bubble on screen for the rest of the call. */
     if (!update.text && !update.final) return [...lines];
-    return [
-      ...lines,
-      {
-        role: update.role,
-        text: update.text,
-        final: update.final,
-        ...(update.via ? { via: update.via } : {}),
-        ...(update.photos && update.photos.length > 0 ? { photos: update.photos } : {}),
-      },
-    ];
+    const fresh: TranscriptLine = {
+      role: update.role,
+      text: update.text,
+      final: update.final,
+      ...(update.via ? { via: update.via } : {}),
+      ...(update.photos && update.photos.length > 0 ? { photos: update.photos } : {}),
+    };
+    /* A LATE USER FINAL GOES BEFORE THE ANSWER IT TRIGGERED. The assistant
+       has an open line and the user's turn lands settled with no open line
+       of its own: the question precedes its answer in the thread, so it is
+       placed before the open assistant line, not after it. */
+    if (update.final && update.role === "user" && last && !last.final && last.role === "assistant") {
+      return [...lines.slice(0, -1), fresh, last];
+    }
+    return [...lines, fresh];
   }
 
   /* A CUMULATIVE update carries the whole turn so far, so replacing is
@@ -311,15 +345,17 @@ export function appendTranscript(
     role: update.role,
     /* A final with no text of its own keeps what the deltas already built,
        rather than blanking a caption the user was reading. */
-    text: update.incremental ? last.text + update.text : update.text || last.text,
+    text: update.incremental ? open.text + update.text : update.text || open.text,
     final: update.final,
     /* The line keeps how it began. A spoken turn does not become a typed one
        because a later event omitted the field. */
-    ...(last.via ?? update.via ? { via: last.via ?? update.via } : {}),
+    ...(open.via ?? update.via ? { via: open.via ?? update.via } : {}),
     /* Photos attach once, to the turn the lookup belonged to, and stay. */
-    ...((last.photos?.length ? last.photos : update.photos?.length ? update.photos : null)
-      ? { photos: last.photos?.length ? last.photos : update.photos }
+    ...((open.photos?.length ? open.photos : update.photos?.length ? update.photos : null)
+      ? { photos: open.photos?.length ? open.photos : update.photos }
       : {}),
   };
-  return [...lines.slice(0, -1), merged];
+  const out = [...lines];
+  out[openIdx] = merged;
+  return out;
 }

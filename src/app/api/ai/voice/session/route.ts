@@ -316,6 +316,32 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "A valid SDP offer is required." }, { status: 400 });
   }
 
+  /* WHAT THE OWNER HAS TAUGHT, as a list of questions the model can recognise
+     across languages, and THE CONVERSATION THIS CALL CONTINUES, if the browser
+     named one — started NOW, so the two database reads overlap the vendor's
+     round trip rather than follow it. Neither can take the call down: a hard
+     ceiling each, and any failure is an empty list. The conversation id is a
+     query parameter and is treated as such: parsed strictly, then checked
+     against the caller's own tenant and account inside loadRecentTurns before
+     a single message is read. */
+  const taughtP: Promise<string[]> = Promise.race([
+    taughtQuestionIndex(gate.tenantId, TAUGHT_INDEX_BUDGET_BYTES),
+    new Promise<string[]>((resolve) => setTimeout(() => resolve([]), TAUGHT_INDEX_TIMEOUT_MS)),
+  ]).catch(() => {
+    console.error("[ai.voice] taught index unavailable — continuing without it");
+    return [] as string[];
+  });
+  const conversationId = parseConversationParam(new URL(req.url).searchParams.get("conversation"));
+  const historyP: Promise<RecentTurn[]> = conversationId
+    ? Promise.race([
+        loadRecentTurns(supabaseServer, conversationId, gate.tenantId, gate.accountId),
+        new Promise<RecentTurn[]>((resolve) => setTimeout(() => resolve([]), HISTORY_TIMEOUT_MS)),
+      ]).catch(() => {
+        console.error("[ai.voice] conversation history unavailable — continuing without it");
+        return [] as RecentTurn[];
+      })
+    : Promise.resolve([] as RecentTurn[]);
+
   let res: Response | null = null;
   let lastCause = "unknown";
   /* Set when a region ANSWERED and refused. A refusal and a silence need
@@ -364,9 +390,15 @@ export async function POST(req: Request) {
            for the log — truncated — and never forwarded. Read here so the
            Response can be dropped; nothing below reads it again. */
         const detail = (await res.text().catch(() => "")).slice(0, 300);
+        /* CLASSIFIED, NOT QUOTED (audit, 2026-09-07): the body can carry
+           workspace ids and quota strings; the log gets a word. */
+        const why = /unpurchased|not\s*purchased|entitle|eligib/i.test(detail) ? "entitlement"
+          : res.status === 401 || res.status === 403 ? "auth"
+          : res.status === 429 ? "quota"
+          : "other";
         console.error(
           `[ai.voice] handshake rejected status=${res.status} slot=${region.slot} ` +
-            `from=${process.env.VERCEL_REGION ?? "local"} region=${cfg.regionLabel} detail=${detail}`,
+            `from=${process.env.VERCEL_REGION ?? "local"} region=${cfg.regionLabel} why=${why}`,
         );
         rejected = true;
         res = null;
@@ -471,38 +503,14 @@ export async function POST(req: Request) {
      change, which worked. A call that fails because a knowledge query was slow
      is a regression. So: a hard ceiling, and any failure means an empty list
      rather than an error. */
-  let taughtQuestions: string[] = [];
-  try {
-    taughtQuestions = await Promise.race([
-      taughtQuestionIndex(gate.tenantId, TAUGHT_INDEX_BUDGET_BYTES),
-      new Promise<string[]>((resolve) => setTimeout(() => resolve([]), TAUGHT_INDEX_TIMEOUT_MS)),
-    ]);
-  } catch {
-    /* Logged, not raised: the call is fine without it and the caller is
-       waiting. A silent empty list would hide a knowledge plane that has
-       stopped answering, which is worth knowing about. */
-    console.error("[ai.voice] taught index unavailable — continuing without it");
-  }
-
-  /* THE CONVERSATION THIS CALL CONTINUES, if the browser named one. The id is
-     a query parameter and is treated as such: parsed strictly, then checked
-     against the caller's own tenant and account inside loadRecentTurns
-     before a single message is read. An id that is not theirs yields an
-     empty list, identical to naming none. Same ceiling and same fail-open
-     as the taught index, for the same reason: this can improve a call and
-     must never prevent one. */
-  let recentTurns: RecentTurn[] = [];
-  const conversationId = parseConversationParam(new URL(req.url).searchParams.get("conversation"));
-  if (conversationId) {
-    try {
-      recentTurns = await Promise.race([
-        loadRecentTurns(supabaseServer, conversationId, gate.tenantId, gate.accountId),
-        new Promise<RecentTurn[]>((resolve) => setTimeout(() => resolve([]), HISTORY_TIMEOUT_MS)),
-      ]);
-    } catch {
-      console.error("[ai.voice] conversation history unavailable — continuing without it");
-    }
-  }
+  /* BOTH READS WERE STARTED BEFORE THE HANDSHAKE (audit, 2026-09-07) and
+     are only awaited here, after the vendor has answered: they ran during
+     the round trip instead of after it, which was up to three seconds of
+     "Connecting…" on a slow database day. Each still has its own ceiling
+     and fails open to an empty list — a call with no taught index or no
+     history is the product before either existed, which worked. */
+  const taughtQuestions = await taughtP;
+  const recentTurns = await historyP;
 
   /* The caller's UI language, as a hint for transcribing their speech. Three
      values are known; anything else is no hint. The transcript this session
@@ -512,8 +520,11 @@ export async function POST(req: Request) {
      in the language the caller speaks (it hears the audio); a client that
      guessed from the UI language is overruled by them. A new thread has no
      replies yet and the client's guess stands. */
-  const fromHistory = detectConversationLang(recentTurns);
-  const sttLanguage = fromHistory ?? parseSttLanguage(new URL(req.url).searchParams.get("stt"));
+  const clientHint = parseSttLanguage(new URL(req.url).searchParams.get("stt"));
+  /* The thread's caller lines were transcribed under the client's hint; a
+     line in that script may be its artefact and does not vote. */
+  const fromHistory = detectConversationLang(recentTurns, { hint: clientHint });
+  const sttLanguage = fromHistory ?? clientHint;
   /* The transcriber that belongs to the configured model's family, or none. */
   const payload = buildVoiceSessionPayload(voice, taughtQuestions, recentTurns, gate.viewer, sttLanguage, sttModelFor(cfg.model));
   return NextResponse.json(

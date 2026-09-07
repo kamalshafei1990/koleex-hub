@@ -40,6 +40,8 @@ const VIEW_FADE_MS = 420;
 
 const COPY: Record<Lang, {
   connecting: string;
+  connectingSlow: string;
+  enableSound: string;
   reconnecting: string;
   listening: string;
   speaking: string;
@@ -99,6 +101,8 @@ const COPY: Record<Lang, {
 }> = {
   en: {
     connecting: "Connecting…",
+    connectingSlow: "Still connecting — the voice service is slow right now. You can end and try again…",
+    enableSound: "Turn on sound",
     reconnecting: "Connection unstable — reconnecting…",
     listening: "Listening",
     speaking: "Speaking",
@@ -142,6 +146,8 @@ const COPY: Record<Lang, {
   },
   zh: {
     connecting: "正在连接…",
+    connectingSlow: "仍在连接，语音服务现在有点慢。可以结束后再试…",
+    enableSound: "打开声音",
     reconnecting: "网络不稳定，正在重新连接…",
     listening: "正在聆听",
     speaking: "正在回答",
@@ -185,6 +191,8 @@ const COPY: Record<Lang, {
   },
   ar: {
     connecting: "جارٍ الاتصال…",
+    connectingSlow: "لسه بنحاول نتصل — خدمة الصوت بطيئة دلوقتي. ممكن تنهي وتجرب تاني…",
+    enableSound: "شغّل الصوت",
     reconnecting: "الشبكة مش ثابتة — بنحاول نرجّع الاتصال…",
     listening: "بيسمعك",
     speaking: "بيتكلم",
@@ -286,6 +294,11 @@ export type VoiceCallScreenProps = {
   writeBusy?: boolean;
   writeSaved?: boolean;
   writeError?: boolean;
+  /** The handshake has taken longer than usual: the caption says so. */
+  connectingSlow?: boolean;
+  /** The speaker is held back by autoplay policy; a tap unlocks it. */
+  soundBlocked?: boolean;
+  onEnableSound?: () => void;
 };
 
 export default function VoiceCallScreen({
@@ -314,6 +327,9 @@ export default function VoiceCallScreen({
   writeBusy = false,
   writeSaved = false,
   writeError = false,
+  connectingSlow = false,
+  soundBlocked = false,
+  onEnableSound,
 }: VoiceCallScreenProps) {
   const copy = COPY[lang];
   /* THE VOICE SHEET — open or not. Chips in the bottom bar were the first
@@ -454,7 +470,7 @@ export default function VoiceCallScreen({
      while the call is up; a connecting or reconnecting call has no voice to
      show. */
   const orbWrapRef = useRef<HTMLDivElement>(null);
-  useCallLevel(orbWrapRef, audioLevel, live && ready && !reconnecting && !muted);
+  useCallLevel(orbWrapRef, audioLevel, live && ready && !reconnecting && !muted, view);
 
   const orbState: AIOrbState = !live || reconnecting || !ready
     ? "awakening"
@@ -495,7 +511,7 @@ export default function VoiceCallScreen({
     : reconnecting
     ? copy.reconnecting
     : !live || !ready
-    ? copy.connecting
+    ? (connectingSlow ? copy.connectingSlow : copy.connecting)
     : phase === "speaking"
       ? copy.speaking
       : phase === "thinking"
@@ -568,6 +584,15 @@ export default function VoiceCallScreen({
             </>
           ) : status}
         </p>
+        {soundBlocked && onEnableSound && (
+          <button
+            type="button"
+            onClick={onEnableSound}
+            className="mt-3 inline-flex h-10 items-center justify-center rounded-full bg-[#0066FF] px-5 text-sm font-semibold text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-white/70 active:scale-95 transition-transform"
+          >
+            {copy.enableSound}
+          </button>
+        )}
         {lastLine && (
           <p
             dir={textDirection(stripImageMarkdown(lastLine.text) || lastLine.text)}

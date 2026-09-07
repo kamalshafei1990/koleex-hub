@@ -30,7 +30,7 @@ export type LibraryEntry = {
 
 export const LIBRARY_PATH = "/api/ai/library";
 
-type Copy = { library: string; libraryEmpty: string; openChat: string; back: string };
+type Copy = { library: string; libraryEmpty: string; openChat: string; back: string; loadFailed: string; retry: string };
 
 export default function LibraryPanel({
   copy,
@@ -45,6 +45,8 @@ export default function LibraryPanel({
   const [items, setItems] = useState<LibraryEntry[] | null>(null);
   const [failed, setFailed] = useState(false);
   const [open, setOpen] = useState<LibraryEntry | null>(null);
+  /* Bumped by the retry button; the effect re-runs the load. */
+  const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
     const ctl = new AbortController();
@@ -60,7 +62,7 @@ export default function LibraryPanel({
         setItems([]);
       });
     return () => ctl.abort();
-  }, [fetchFn]);
+  }, [fetchFn, reloadKey]);
 
   return (
     <section aria-label={copy.library} className="max-w-[820px] mx-auto px-4 md:px-6 py-6">
@@ -68,6 +70,11 @@ export default function LibraryPanel({
       {items === null ? (
         <div className="flex items-center justify-center py-20">
           <SpinnerIcon className="h-5 w-5 text-[var(--text-dim)]" />
+        </div>
+      ) : failed ? (
+        <div className="py-16 text-center text-[13px] text-[var(--text-dim)]" data-library-failed>
+          <p>{copy.loadFailed}</p>
+          <button type="button" onClick={() => { setFailed(false); setItems(null); setReloadKey((k) => k + 1); }} className="mt-3 h-9 px-4 rounded-full border border-[var(--border-subtle)] text-[var(--text-primary)] hover:bg-[var(--bg-surface-subtle)]">{copy.retry}</button>
         </div>
       ) : items.length === 0 ? (
         <p className="py-16 text-center text-[13px] text-[var(--text-dim)]" data-library-empty>
@@ -77,7 +84,7 @@ export default function LibraryPanel({
         <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-2" data-library-grid>
           {items.map((it) => (
             <button
-              key={it.url}
+              key={`${it.message_id}:${it.url}`}
               type="button"
               onClick={() => setOpen(it)}
               title={it.label || it.conversation_title || ""}

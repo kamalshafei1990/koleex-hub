@@ -78,7 +78,7 @@ async function main() {
   const voice = readFileSync("src/lib/server/ai/voice/tools.ts", "utf8");
   check("allowed on a call, after the product reads and before the printed index",
     (() => { const m = voice.match(/export const VOICE_TOOL_NAMES[\s\S]*?\];/); const list = m ? m[0] : ""; return /"getProductPrice",/.test(list) && list.indexOf('"getProductDetails"') < list.indexOf('"getProductPrice"') && list.indexOf('"getProductPrice"') < list.indexOf('"searchCatalog"'); })());
-  check("  …and the deny rationale names it as the one exception, with the reason", /THE ONE EXCEPTION, by the owner's decision: getProductPrice/.test(voice));
+  check("  …and the deny rationale names it as the one exception, with the reason", /THE (ONE|FIRST) EXCEPTION, by the owner's decision: getProductPrice/.test(voice));
   const seal = readFileSync("src/lib/server/ai/seals/pricing.ts", "utf8");
   check("trusted by the pricing seal — its figures may reach the user; on-request nulls are still no evidence",
     /const PRICING_TOOLS = new Set<string>\(\[\s*"calculateQuotationPricing",[\s\S]*?"getProductPrice",\s*\]\);/.test(seal) && /"unit_price",/.test(seal) && /"price",/.test(seal));

@@ -48,9 +48,16 @@ export function useStreamLevel(stream: MediaStream | null, active: boolean): num
   /* The rAF callback reads this rather than closing over `level`, so the loop
      never restarts and never sees a stale value. */
   const frameRef = useRef<number | null>(null);
+  /* ONE CONTEXT PER STREAM, not one per phase. `active` flips at every turn
+     boundary, and tearing the context down and building it again twice per
+     turn cost 50-150 ms each on an iPhone with a WebRTC session up — a click
+     or a level dip right where the caller starts talking (audit, 2026-09-07).
+     The analyser lives as long as the stream; `active` only runs or stops
+     the frame loop. */
+  const graphRef = useRef<{ ctx: AudioContext; source: MediaStreamAudioSourceNode; analyser: AnalyserNode } | null>(null);
 
   useEffect(() => {
-    if (!stream || !active) return;
+    if (!stream) return;
 
     /* Safari still ships the prefixed constructor. Feature-detected rather
        than assumed: a missing AudioContext must mean "no meter", never a
@@ -79,7 +86,28 @@ export function useStreamLevel(stream: MediaStream | null, active: boolean): num
          meter is a still orb; it is not a broken call. */
       return;
     }
+    graphRef.current = { ctx, source, analyser };
 
+    return () => {
+      graphRef.current = null;
+      try {
+        source.disconnect();
+        analyser.disconnect();
+      } catch {
+        /* Already torn down by a closing context — cleanup must not throw. */
+      }
+      /* An AudioContext is a hardware handle. Browsers cap how many may exist,
+         so one leaked per call ends with calls that cannot open a meter at
+         all. */
+      void ctx.close().catch(() => {});
+    };
+  }, [stream]);
+
+  useEffect(() => {
+    if (!stream || !active) return;
+    const graph = graphRef.current;
+    if (!graph) return;
+    const { analyser } = graph;
     const buf = new Uint8Array(analyser.fftSize);
     let stopped = false;
     let lastPushed = -1;
@@ -114,16 +142,6 @@ export function useStreamLevel(stream: MediaStream | null, active: boolean): num
       stopped = true;
       if (frameRef.current !== null) cancelAnimationFrame(frameRef.current);
       frameRef.current = null;
-      try {
-        source.disconnect();
-        analyser.disconnect();
-      } catch {
-        /* Already torn down by a closing context — cleanup must not throw. */
-      }
-      /* An AudioContext is a hardware handle. Browsers cap how many may exist,
-         so one leaked per call ends with calls that cannot open a meter at
-         all. */
-      void ctx.close().catch(() => {});
     };
   }, [stream, active]);
 

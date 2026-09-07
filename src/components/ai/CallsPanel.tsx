@@ -25,7 +25,7 @@ export type CallEntry = {
 
 export const CALLS_PATH = "/api/ai/calls";
 
-type Copy = { calls: string; callsEmpty: string; openChat: string };
+type Copy = { calls: string; callsEmpty: string; openChat: string; loadFailed: string; retry: string };
 
 const LOCALE: Record<Lang, string> = { en: "en-GB", zh: "zh-CN", ar: "ar-EG" };
 
@@ -52,6 +52,9 @@ export default function CallsPanel({
   fetchFn?: typeof fetch;
 }) {
   const [items, setItems] = useState<CallEntry[] | null>(null);
+  /* A failed load is said, not shown as "no calls yet" (audit, 2026-09-07). */
+  const [failed, setFailed] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
     const ctl = new AbortController();
@@ -62,10 +65,12 @@ export default function CallsPanel({
         setItems(Array.isArray(body.items) ? body.items : []);
       })
       .catch(() => {
-        if (!ctl.signal.aborted) setItems([]);
+        if (ctl.signal.aborted) return;
+        setFailed(true);
+        setItems([]);
       });
     return () => ctl.abort();
-  }, [fetchFn]);
+  }, [fetchFn, reloadKey]);
 
   return (
     <section aria-label={copy.calls} className="max-w-[820px] mx-auto px-4 md:px-6 py-6">
@@ -73,6 +78,11 @@ export default function CallsPanel({
       {items === null ? (
         <div className="flex items-center justify-center py-20">
           <SpinnerIcon className="h-5 w-5 text-[var(--text-dim)]" />
+        </div>
+      ) : failed ? (
+        <div className="py-16 text-center text-[13px] text-[var(--text-dim)]" data-calls-failed>
+          <p>{copy.loadFailed}</p>
+          <button type="button" onClick={() => { setFailed(false); setItems(null); setReloadKey((k) => k + 1); }} className="mt-3 h-9 px-4 rounded-full border border-[var(--border-subtle)] text-[var(--text-primary)] hover:bg-[var(--bg-surface-subtle)]">{copy.retry}</button>
         </div>
       ) : items.length === 0 ? (
         <p className="py-16 text-center text-[13px] text-[var(--text-dim)]" data-calls-empty>
@@ -89,7 +99,7 @@ export default function CallsPanel({
                 )}
               </div>
               <div className="mt-2 text-[13px] text-[var(--text-primary)]">
-                <MessageMarkdown content={it.summary} />
+                <MessageMarkdown content={it.summary} lang={lang} />
               </div>
               <div className="mt-3">
                 <button

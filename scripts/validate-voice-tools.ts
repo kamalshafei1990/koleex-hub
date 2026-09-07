@@ -106,13 +106,18 @@ console.log("\n── 1. The allow-list is the security boundary ──");
      tool route; the model's own function call may only preview. */
   const voiceToolsSrc = readFileSync("src/lib/server/ai/voice/tools.ts", "utf8");
   check("createTodo is reachable from a call, last on the list, and NOT in the compact fallback",
-    isVoiceTool("createTodo") && isVoiceWriteTool("createTodo") && !isVoiceWriteTool("createQuotationDraft") &&
+    isVoiceTool("createTodo") && isVoiceWriteTool("createTodo") && !isVoiceWriteTool("searchProducts") && !isVoiceWriteTool("getProductPrice") &&
+    /* Audit 2026-09-07: the catalogue decides — anything not read-only is a
+       write here even if the list forgot it, and an unknown name is a write. */
+    isVoiceWriteTool("createQuotationDraft") && isVoiceWriteTool("no-such-tool") &&
     /"getPricingRules",[\s\S]{0,900}?"createTodo",\s*\];/.test(voiceToolsSrc) &&
     !((buildVoiceSessionPayload(null).compact.session as { tools?: Array<{ name: string }> }).tools ?? []).some((t) => t.name === "createTodo"));
   const toolRoute = readFileSync("src/app/api/ai/voice/tool/route.ts", "utf8");
   check("the tool route refuses a write's confirm from the model (not via tap) BEFORE dispatch, answering the model rather than erroring",
     /const viaTap = body\.via === "tap";/.test(toolRoute) &&
-    /if \(isVoiceWriteTool\(name\) && args\.confirm === true && !viaTap\) \{[\s\S]{0,900}?call_id: callId,[\s\S]{0,300}?ok: false,[\s\S]{0,700}?\}\s*const result = await dispatchTool\(ctx, name, args\);/.test(toolRoute));
+    /if \(isVoiceWriteTool\(name\) && args\.confirm === true && !viaTap\) \{[\s\S]{0,900}?call_id: callId,[\s\S]{0,300}?ok: false,[\s\S]{0,1400}?const result = await dispatchTool\(ctx, name, args, \{ conversationId \}\);/.test(toolRoute));
+  check("  …and the call's conversation id reaches the registry, parsed strictly, so the ledger and the audit table know which call (audit, 2026-09-07)",
+    /const conversationId = parseConversationParam\(typeof body\.conversation_id === "string" \? body\.conversation_id : null\);/.test(toolRoute));
   check("a write's PREVIEW arguments go to the client beside the model's envelope, never inside it, and only for a write tool awaiting approval",
     /isVoiceWriteTool\(name\) && result\.permissionStatus === "approval_required" && result\.pendingAction\s*\?\s*\{ tool: result\.pendingAction\.tool, args: result\.pendingAction\.args \}/.test(toolRoute) &&
     /\.\.\.\(pending \? \{ pending \} : \{\}\),/.test(toolRoute) &&
@@ -140,8 +145,12 @@ console.log("\n── 2. The schemas the server publishes ──");
      the text lane and voice is a tool the model uses differently depending on
      how the user reached it. */
   const registry = new Map(listTools().map((t) => [t.name, t]));
-  check("every schema matches the registry's own text, character for character",
-    schemas.every((s) => s.description === registry.get(s.name)?.description));
+  /* Audit 2026-09-07: one exception — createTodo's text-lane description
+     says "call again with confirm:true after they agree", which contradicts
+     the call's tap rule; the voice schema says the call's own words. */
+  check("every schema matches the registry's own text, character for character — except createTodo, whose call description drops the confirm clause",
+    schemas.every((s) => s.name === "createTodo" || s.description === registry.get(s.name)?.description) &&
+    (() => { const d = schemas.find((s) => s.name === "createTodo")?.description ?? ""; return /Never call with confirm yourself/.test(d) && !/confirm:true/.test(d); })());
   check("and its parameters are the registry's, not a copy",
     schemas.every((s) => JSON.stringify(s.parameters) === JSON.stringify(registry.get(s.name)?.parameters)));
 
@@ -856,7 +865,7 @@ console.log("\n── 5. The browser is a courier, not an authority (source read
     /requireAuth\(/.test(route) && /requireInternalUser\(/.test(route) &&
     /checkModule\(ctx, "AI Voice", "view"\)/.test(route));
   check("permissions and audit come from dispatchTool, not from this route",
-    /dispatchTool\(ctx, name, args\)/.test(route));
+    /dispatchTool\(ctx, name, args, \{ conversationId \}\)/.test(route));
   check("and it has its own budget, which survives a tampered page",
     /consumeBudget\(/.test(route) && /bucket: "voice_tool"/.test(route));
   /* A refusal must still reach the model as an answer, or the call hangs on a

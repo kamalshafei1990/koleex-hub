@@ -120,6 +120,37 @@ export const COPY: Record<Lang, {
   insertEmoji: string;
   /** The mark on a message that was spoken on a call rather than typed. */
   voiceMessage: string;
+  /* Audit 2026-09-07: every string a person could READ was English on the
+     Arabic and Chinese screens — the attached-file default question (which
+     lands in the user's own bubble and in the database), the errors, the
+     small controls. Each is a key now, so a missing language is a compile
+     error rather than an English surprise. */
+  attachDefaultPrompt: string;
+  latest: string;
+  copied: string;
+  copyMessage: string;
+  copyCode: string;
+  codeLabel: string;
+  closePhoto: string;
+  loadFailed: string;
+  retry: string;
+  supportedFiles: string;
+  /** Template: {name}, {size}, {cap}, {kind}. */
+  fileTooLarge: string;
+  kindImages: string;
+  kindDocuments: string;
+  attachError: string;
+  attachNothingRead: string;
+  noReply: string;
+  aiUnavailable: string;
+  couldNotStartChat: string;
+  editShort: string;
+  draftNeedsApproval: string;
+  draftLabel: string;
+  /** Templates: {n}. */
+  lineOne: string;
+  linesCount: string;
+  reviewInQuotations: string;
   prompts: string[];
 }> = {
   en: {
@@ -205,6 +236,30 @@ export const COPY: Record<Lang, {
     emojiCategories: { smileys: "Smileys & People", nature: "Animals & Nature", food: "Food & Drink", activity: "Activity", travel: "Travel & Places", objects: "Objects", symbols: "Symbols", flags: "Flags" },
     insertEmoji: "Insert",
     voiceMessage: "Spoken on a call",
+    attachDefaultPrompt: "Please read the attached file(s) and give me the key points.",
+    latest: "Latest",
+    copied: "Copied",
+    copyMessage: "Copy message",
+    copyCode: "Copy code",
+    codeLabel: "code",
+    closePhoto: "Close photo",
+    loadFailed: "Couldn't load this right now. Check your connection and try again.",
+    retry: "Try again",
+    supportedFiles: "Supported files: images, PDF, Excel, TXT, MD, CSV, JSON.",
+    fileTooLarge: "{name} is {size}MB — the limit is {cap}MB for {kind}.",
+    kindImages: "images",
+    kindDocuments: "documents",
+    attachError: "Couldn't process the attachment(s)",
+    attachNothingRead: "Couldn't read the attachment(s).",
+    noReply: "No reply was received.",
+    aiUnavailable: "Koleex AI is unavailable right now.",
+    couldNotStartChat: "Couldn't start a new chat.",
+    editShort: "Edit",
+    draftNeedsApproval: "Draft · needs approval",
+    draftLabel: "Draft",
+    lineOne: "{n} line",
+    linesCount: "{n} lines",
+    reviewInQuotations: "Review in Quotations →",
     prompts: [
       "What's a good way to start my day at work?",
       "Help me write a polite reply to a customer email.",
@@ -293,7 +348,31 @@ export const COPY: Record<Lang, {
     thinkingAria: "Koleex AI 正在思考",
     emojiCategories: { smileys: "笑脸与人物", nature: "动物与自然", food: "食物与饮料", activity: "活动", travel: "旅行与地点", objects: "物品", symbols: "符号", flags: "旗帜" },
     insertEmoji: "插入",
-    voiceMessage: "语音通话中说的",
+    voiceMessage: "通话中所说",
+    attachDefaultPrompt: "请阅读附件并告诉我要点。",
+    latest: "最新",
+    copied: "已复制",
+    copyMessage: "复制消息",
+    copyCode: "复制代码",
+    codeLabel: "代码",
+    closePhoto: "关闭图片",
+    loadFailed: "现在加载不了，请检查网络后再试。",
+    retry: "重试",
+    supportedFiles: "支持的文件：图片、PDF、Excel、TXT、MD、CSV、JSON。",
+    fileTooLarge: "{name} 有 {size}MB，{kind}的上限是 {cap}MB。",
+    kindImages: "图片",
+    kindDocuments: "文档",
+    attachError: "附件处理失败",
+    attachNothingRead: "读不了这个附件。",
+    noReply: "没有收到回复。",
+    aiUnavailable: "Koleex AI 现在暂时不可用。",
+    couldNotStartChat: "无法开始新对话。",
+    editShort: "编辑",
+    draftNeedsApproval: "草稿 · 待审批",
+    draftLabel: "草稿",
+    lineOne: "{n} 行",
+    linesCount: "{n} 行",
+    reviewInQuotations: "在报价中查看 →",
     prompts: [
       "早上开始工作的好方法是什么？",
       "帮我给客户写一封礼貌的回复邮件。",
@@ -306,8 +385,8 @@ export const COPY: Record<Lang, {
     placeholder: "اسأل Koleex AI…",
     welcomeTitle: "مرحبًا",
     welcomeSub: "ما الذي يدور في بالك؟ أنا Koleex AI — اسألني عن أي شيء، صغيرًا كان أم كبيرًا.",
-    thinking: "جارٍ التفكير…",
-    noChats: "لا توجد محادثات بعد",
+    thinking: "بفكّر…",
+    noChats: "مفيش محادثات لسه",
     today: "اليوم",
     yesterday: "أمس",
     previous7: "آخر 7 أيام",
@@ -357,7 +436,7 @@ export const COPY: Record<Lang, {
     webSearchOff: "البحث في الويب: متوقّف",
     save: "حفظ",
     cancel: "إلغاء",
-    readAloud: "استماع",
+    readAloud: "اسمع الرد",
     regenerate: "إعادة توليد الرد",
     goodResponse: "إجابة جيدة",
     badResponse: "إجابة سيئة",
@@ -384,6 +463,30 @@ export const COPY: Record<Lang, {
     emojiCategories: { smileys: "الوجوه والأشخاص", nature: "الحيوانات والطبيعة", food: "الطعام والشراب", activity: "الأنشطة", travel: "السفر والأماكن", objects: "الأشياء", symbols: "الرموز", flags: "الأعلام" },
     insertEmoji: "إدراج",
     voiceMessage: "اتقالت في مكالمة",
+    attachDefaultPrompt: "اقرا الملف المرفق وقولي أهم النقط.",
+    latest: "الأحدث",
+    copied: "اتنسخ",
+    copyMessage: "انسخ الرسالة",
+    copyCode: "انسخ الكود",
+    codeLabel: "كود",
+    closePhoto: "اقفل الصورة",
+    loadFailed: "مش قادرين نحمّل ده دلوقتي. اتأكد من النت وجرّب تاني.",
+    retry: "جرّب تاني",
+    supportedFiles: "الملفات المدعومة: صور، PDF، Excel، TXT، MD، CSV، JSON.",
+    fileTooLarge: "{name} حجمه {size}MB — الحد {cap}MB لـ{kind}.",
+    kindImages: "الصور",
+    kindDocuments: "المستندات",
+    attachError: "مقدرناش نقرا المرفق",
+    attachNothingRead: "مقدرناش نقرا المرفق.",
+    noReply: "مفيش رد وصل.",
+    aiUnavailable: "Koleex AI مش متاح دلوقتي.",
+    couldNotStartChat: "مقدرناش نبدأ محادثة جديدة.",
+    editShort: "تعديل",
+    draftNeedsApproval: "مسودة · محتاجة اعتماد",
+    draftLabel: "مسودة",
+    lineOne: "بند واحد",
+    linesCount: "{n} بنود",
+    reviewInQuotations: "افتحها في عروض الأسعار ←",
     prompts: [
       "ما طريقة جيدة لبدء يومي في العمل؟",
       "ساعدني في كتابة رد مهذب على رسالة من عميل.",

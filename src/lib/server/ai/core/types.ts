@@ -40,6 +40,12 @@ export interface TurnInput {
    *  with every step so far, so a route can show "looking it up…" while the
    *  lookup runs rather than after the answer has arrived. */
   onStep?: (steps: AgentStep[]) => void;
+  /** THE STREAMED WORDS WERE NOT THE ANSWER. The first model call is now
+   *  streamed (audit, 2026-09-07) so a question the model answers without
+   *  tools starts arriving at once; when that call turns out to be a tool
+   *  call that narrated first, the route is told to clear what it showed
+   *  before the real answer streams. */
+  onRetract?: () => void;
 }
 
 

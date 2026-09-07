@@ -11,7 +11,7 @@
    one with identical props and diffing the HTML.
    --------------------------------------------------------------------------- */
 
-import { useCallback, useMemo, useRef, useState } from "react";
+import { memo, useCallback, useMemo, useRef, useState } from "react";
 import { type Lang } from "@/lib/i18n";
 import { type OrbState } from "@/components/ai/KoleexOrb";
 import KoleexOrb from "@/components/ai/KoleexGlowOrb";
@@ -37,7 +37,7 @@ export function isRtl(text: string): boolean {
   return RTL_RE.test(text);
 }
 
-export function Bubble({
+function BubbleImpl({
   msg,
   userAvatar,
   userInitial,
@@ -180,7 +180,7 @@ export function Bubble({
             message — the orb's activity label uses the latest tool-call,
             and the quotation DraftCard below still surfaces its result. */}
         {draftStep && (
-          <DraftCard payload={draftStep.payload as QuotationDraftPayload} />
+          <DraftCard payload={draftStep.payload as QuotationDraftPayload} lang={lang} />
         )}
         {/* WHAT IT IS DOING, IN WORDS. The three anonymous dots said only
             "wait"; this line says why — Thinking, Searching the web, Checking
@@ -262,6 +262,8 @@ export function Bubble({
                   value={editValue}
                   onChange={(e) => setEditValue(e.target.value)}
                   onKeyDown={(e) => {
+                    /* Confirming a pinyin candidate is Enter too: not a submit. */
+                    if (e.nativeEvent.isComposing || e.keyCode === 229) return;
                     if (e.key === "Enter" && !e.shiftKey) {
                       e.preventDefault();
                       submitEdit();
@@ -312,7 +314,7 @@ export function Bubble({
                     </div>
                   )}
                   {msg.content}
-                  <PhotoLightbox photo={openPhoto} onClose={() => setOpenPhoto(null)} closeLabel={copy.back} />
+                  <PhotoLightbox photo={openPhoto} onClose={() => setOpenPhoto(null)} closeLabel={copy.closePhoto} />
                 </>
               )
             ) : (() => {
@@ -337,7 +339,7 @@ export function Bubble({
                 | undefined;
               const options = q?.options ?? [];
               if (options.length === 0) {
-                return <MessageMarkdown content={msg.content} />;
+                return <MessageMarkdown content={msg.content} lang={lang} />;
               }
               /* The card OUTLIVES the answer. It stays in the transcript with
                  the chosen row marked and the rest faded, because the question
@@ -544,7 +546,7 @@ export function Bubble({
                   className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-[var(--bg-inverted)] text-[var(--text-inverted)] transition-opacity"
                   aria-label={copy.saveAndRetry}
                 >
-                  Save & retry
+                  {copy.saveAndRetry}
                 </button>
                 <button
                   type="button"
@@ -552,7 +554,7 @@ export function Bubble({
                   className="inline-flex items-center gap-1 px-2 py-1 rounded-md hover:bg-[var(--bg-surface-subtle)] hover:text-[var(--text-primary)] transition-colors"
                   aria-label={copy.cancelEdit}
                 >
-                  Cancel
+                  {copy.cancel}
                 </button>
               </>
             ) : (
@@ -565,7 +567,7 @@ export function Bubble({
                 className="inline-flex items-center gap-1 px-2 py-1 rounded-md hover:bg-[var(--bg-surface-subtle)] hover:text-[var(--text-primary)] transition-colors"
                 aria-label={copy.editAndRetry}
               >
-                ✎ Edit
+                ✎ {copy.editShort}
               </button>
             )}
           </div>
@@ -622,6 +624,12 @@ export function Bubble({
        endpoint stub, tomorrow: server-side feedback table).
    ──────────────────────────────────────────────────────────────────── */
 
+/* MEMOISED: the thread re-renders on every streamed token, and a bubble
+   whose props did not change must not re-render with it (audit, 2026-09-07).
+   Callers pass stable callbacks where they can; the markdown inside is
+   memoised on its text besides, so even a re-render is cheap. */
+export const Bubble = memo(BubbleImpl);
+
 export function BubbleActions({
   msg, isLast, canRegenerate, copied, onCopy, onRegenerate, onSpeak, onFeedback, lang,
 }: {
@@ -658,8 +666,8 @@ export function BubbleActions({
         type="button"
         onClick={onCopy}
         className={`${btnCls} ${copied ? "text-emerald-300" : ""}`}
-        aria-label={copied ? "Copied" : "Copy message"}
-        title={copied ? "Copied" : "Copy"}
+        aria-label={copied ? copy.copied : copy.copyMessage}
+        title={copied ? copy.copied : copy.copyMessage}
       >
         {copied ? (
           <svg aria-hidden viewBox="0 0 24 24" width={ICON} height={ICON} fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">

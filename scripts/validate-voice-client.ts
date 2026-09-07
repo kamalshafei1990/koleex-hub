@@ -17,7 +17,7 @@
 import { VoiceSession, HANDSHAKE_PATH, waitForIceGathering, normalizeSdp, type VoiceDeps, type VoiceState, type VoiceFailure,
   TOOL_PATH,
 } from "../src/lib/voice/session";
-import { TranscriptPersister, TRANSCRIPT_PATH, MAX_TURNS_PER_POST, MAX_POST_FAILURES, isCutOffFragment, type SavedTurn } from "../src/lib/voice/persist";
+import { TranscriptPersister, TRANSCRIPT_PATH, MAX_TURNS_PER_POST, MAX_POST_FAILURES, type SavedTurn } from "../src/lib/voice/persist";
 import { buildTextTurnMessages, EV_ITEM_CREATE, EV_RESPONSE_CREATE, MAX_TYPED_TURN_CHARS } from "../src/lib/voice/text-turn";
 import { type TranscriptLine } from "../src/lib/voice/events";
 import { extractProductPhotos, photosMarkdown, stripImageMarkdown, imageUrlsIn, MAX_PHOTOS_PER_RESULT, MAX_WEB_PHOTOS_PER_RESULT } from "../src/lib/voice/photos";
@@ -791,8 +791,14 @@ async function main() {
 
     /* Autoplay can be refused even after a gesture. A rejected play() nobody
        reports is indistinguishable from a dead call. */
-    check("a refused autoplay is reported rather than swallowed",
-      /\.play\(\)\.catch\(\(\) => \{[\s\S]{0,200}?onErrorRef\.current/.test(src));
+    /* Audit 2026-09-07: the call is live and the far side can hear; only the
+       speaker is held back by autoplay policy. A "could not start" toast sent
+       the owner looking for a dead call. What fixes it is a tap. */
+    check("a refused autoplay offers a tap to turn on sound rather than a failure toast",
+      /\.play\(\)\.then\(\(\) => setSoundBlocked\(false\)\)\.catch\(\(\) => \{[\s\S]{0,500}?setSoundBlocked\(true\);/.test(src) &&
+      /soundBlocked=\{soundBlocked\}\s*onEnableSound=\{enableSound\}/.test(src) && !/\.play\(\)\.catch\(\(\) => \{[\s\S]{0,200}?onErrorRef\.current/.test(src));
+    check("  …and the speaker is unlocked inside the tap that starts the call",
+      /const startCall = useCallback\(async \(opts\?: \{ resume\?: boolean \}\) => \{\s*if \(sessionRef\.current\) return;[\s\S]{0,700}?if \(!opts\?\.resume\) void audioRef\.current\?\.play\(\)\.catch\(\(\) => \{\}\);/.test(src));
 
     /* The session fires from network events and outlives any single render. */
     check("callbacks are held in refs, so the session never calls a stale one",
@@ -918,6 +924,11 @@ async function main() {
        long call would be holding fifty live callbacks over the session. */
     {
       const r = await run({ reconnectGraceMs: 5_000 });
+      /* Audit 2026-09-07: a call is watched from the moment it goes live —
+         until its media connects, the never-connected watchdog is pending. */
+      const beforeMedia = pendingTimers();
+      r.ice("connected");
+      check("the never-connected watchdog is pending until the media connects, then cleared", pendingTimers() === beforeMedia - 1);
       const base = pendingTimers();
       r.ice("disconnected");
       check("a drop arms a recovery timer", pendingTimers() === base + 1);
@@ -1000,6 +1011,7 @@ async function main() {
        the same reason as 11b. */
     {
       const r = await run({ reconnectGraceMs: 5_000 });
+      r.ice("connected");
       const base = pendingTimers();
       r.ice("disconnected");
       check("the recovery timer is pending mid-wobble", pendingTimers() === base + 1);
@@ -1316,17 +1328,41 @@ console.log("\n── 12. Mute ──");
     }
 
     {
-      /* Two saved calls (2026-09-04) carried assistant rows "I", "I", "خل",
-         "بال" — replies interrupted at their first syllable. Not turns. */
-      check("a one-syllable cut-off assistant final is a fragment; a Chinese two-character answer, a user fragment and a pictured turn are not",
-        isCutOffFragment("assistant", "I", "") && isCutOffFragment("assistant", "خل", "") && isCutOffFragment("assistant", " بال ", "") &&
-        !isCutOffFragment("assistant", "好的", "") && !isCutOffFragment("user", "I", "") && !isCutOffFragment("assistant", "I", "![p](https://x/y.jpg)") &&
-        !isCutOffFragment("assistant", "Sure", "") && !isCutOffFragment("assistant", "", ""));
+      /* Audit 2026-09-07: settled means every line up to the FIRST open one.
+         The far side opens its answer on top of the caller's still-open
+         question; "everything but the last line" posted both as turns. */
       const h = harness({});
-      h.p.observe([L("user", "show me a", true), L("assistant", "I", true), L("user", "show me a photo", true), L("assistant", "好的", true)]);
+      h.p.observe([L("user", "how many ord", false), L("assistant", "Fourt", false)]);
       await h.p.flush();
-      const sent = h.posts.flatMap((b) => b.body.turns.map((t) => t.text));
-      check("the fragment is counted as seen and never posted; the real turns around it are", JSON.stringify(sent) === JSON.stringify(["show me a", "show me a photo", "好的"]));
+      check("an open question under an open answer posts nothing", h.posts.length === 0 && h.p.pending() === 0);
+      h.p.observe([L("user", "how many orders today", true), L("assistant", "Fourteen", false)]);
+      await h.p.flush();
+      check("the closed question posts alone, the open answer waits", h.posts.length === 1 && h.posts[0].body.turns.map((t) => t.text).join("|") === "how many orders today");
+      h.p.observe([L("user", "how many orders today", true), L("assistant", "Fourteen orders.", true)]);
+      await h.p.flush();
+      check("  …and posts when it closes; a short real answer such as \"OK\" or \"نعم\" is a turn like any other",
+        h.posts.length === 2 && h.posts[1].body.turns[0].text === "Fourteen orders.");
+      h.p.observe([L("user", "how many orders today", true), L("assistant", "Fourteen orders.", true), L("user", "in stock?", true), L("assistant", "نعم", true)]);
+      await h.p.flush();
+      check("  …proved: نعم is saved", h.posts.flatMap((b) => b.body.turns.map((t) => t.text)).includes("نعم"));
+    }
+
+    {
+      /* Audit 2026-09-07: a resumed call keeps its captions and gets a new
+         persister; seeded with the settled count it does not re-post them. */
+      const kept = [L("user", "hello there", true), L("assistant", "hi there", true), L("user", "and", false)];
+      const h = harness({});
+      const resumed = new TranscriptPersister(
+        { fetchFn: (async () => ({ ok: true, status: 200, json: async () => ({ messages: [], conversation: { id: CONV, title: "T" } }) })) as unknown as typeof fetch,
+          ensureConversation: async () => CONV },
+        CONV,
+        kept.filter((l) => l.final).length,
+      );
+      resumed.observe(kept);
+      await resumed.flush();
+      check("a resumed persister seeded with the settled count re-posts nothing", resumed.pending() === 0 && h.posts.length === 0);
+      resumed.observe([...kept.slice(0, 2), L("user", "and the price?", true)]);
+      check("  …and queues only what settles after the resume", resumed.pending() === 0 || resumed.pending() === 1);
     }
 
     {
@@ -1688,8 +1724,22 @@ console.log("\n── 12. Mute ──");
     /tonesRef\.current = new CallTones\(\);\s*tonesRef\.current\.prime\(\);/.test(startBody));
   check("  …before the session is created, so a slow handshake cannot outlive the gesture", startBody.indexOf("tonesRef.current.prime()") < startBody.indexOf("new VoiceSession("));
   check("ready is set by the session's onReady", /onReady: \(\) => setReady\(true\)/.test(btn));
-  check("  …with a fallback timer so a silent vendor cannot leave the call on connecting",
-    /if \(!live \|\| ready\) return;\s*const t = window\.setTimeout\(\(\) => setReady\(true\), READY_FALLBACK_MS\);/.test(btn) && /const READY_FALLBACK_MS = 2_500;/.test(btn));
+  /* Audit 2026-09-07: the fallback used to fire on a transport that never
+     came up, telling a caller nobody could hear to "go ahead". */
+  check("  …with a fallback so a silent vendor cannot leave the call on connecting — gated on a transport that exists",
+    /if \(!live \|\| ready\) return;[\s\S]{0,700}?const transportUp = !!d && \(d\.dc === "open" \|\| d\.ice_ever_connected === true\);\s*if \(transportUp && Date\.now\(\) - startedAt >= READY_FALLBACK_MS\) setReady\(true\);/.test(btn) && /const READY_FALLBACK_MS = 2_500;/.test(btn));
+  check("  …a new negotiation forgets ready and the chime, so the alt region does not say go-ahead early",
+    /if \(next === "connecting"\) \{\s*setReady\(false\);\s*chimedRef\.current = false;\s*\}/.test(btn));
+  check("  …and after eight seconds the caption says the service is slow",
+    /const CONNECTING_SLOW_MS = 8_000;/.test(btn) && /setConnectingSlow\(true\), CONNECTING_SLOW_MS/.test(btn) && /connectingSlow=\{connectingSlow\}/.test(btn));
+  const sessWatch = fs16.readFileSync("src/lib/voice/session.ts", "utf8");
+  check("the session arms the never-connected watchdog when it goes live, and the timer honours that case",
+    /this\.setState\("live"\);[\s\S]{0,1200}?if \(!this\.iceEverConnected\) this\.armReconnectTimer\(\);\s*\}/.test(sessWatch) &&
+    /if \(this\.state !== "reconnecting" && !\(this\.state === "live" && !this\.iceEverConnected\)\) return;/.test(sessWatch));
+  check("  …the configuration acknowledgement is awaited for either version, so a compact-first call fires ready",
+    /this\.configAckPending = true;\s*this\.compactRetried = first !== this\.sessionUpdate;/.test(sessWatch));
+  check("  …and the handshake POST carries our own deadline, read as the service not answering",
+    /signal: AbortSignal\.timeout\(HANDSHAKE_TIMEOUT_MS\)/.test(sessWatch) && /this\.fail\(isTimeoutError\(e\) \? "service-unreachable" : "handshake-failed"\);/.test(sessWatch));
   check("the tone plays once, when live AND ready, guarded by a ref so a re-render cannot repeat it",
     /if \(live && ready && !chimedRef\.current\) \{\s*chimedRef\.current = true;\s*tonesRef\.current\?\.ready\(\);/.test(btn));
   check("  …and a recovered connection plays its own single note", /prev === "reconnecting" && state === "live"\) tonesRef\.current\?\.recovered\(\)/.test(btn));
@@ -1699,10 +1749,10 @@ console.log("\n── 12. Mute ──");
   check("  …and so does unmount", /persisterRef\.current = null;\s*tonesRef\.current\?\.close\(\);\s*tonesRef\.current = null;\s*\};\s*\}, \[\]\);/.test(btn));
   check("the screen is told ready separately from live", /ready=\{ready\}/.test(btn));
   const scr = fs16.readFileSync("src/components/ai/VoiceCallScreen.tsx", "utf8");
-  check("the screen says connecting until READY, not merely live", /: !live \|\| !ready\s*\? copy\.connecting/.test(scr));
+  check("the screen says connecting until READY, not merely live — and says so differently when it is slow", /: !live \|\| !ready\s*\? \(connectingSlow \? copy\.connectingSlow : copy\.connecting\)/.test(scr) && /\{soundBlocked && onEnableSound && \(/.test(scr));
   check("  …and the orb stays awakening until then", /!live \|\| reconnecting \|\| !ready\s*\? "awakening"/.test(scr));
   check("  …ready defaults to true so other callers are unchanged", /ready = true,/.test(scr));
-  check("the rings are driven by the smoothed level, not by a per-render transform", /useCallLevel\(orbWrapRef, audioLevel, live && ready && !reconnecting && !muted\)/.test(scr) && !/audioLevel \* 0\.35/.test(scr));
+  check("the rings are driven by the smoothed level, not by a per-render transform", /useCallLevel\(orbWrapRef, audioLevel, live && ready && !reconnecting && !muted, view\)/.test(scr) && !/audioLevel \* 0\.35/.test(scr));
   check("  …three rings, colour by who is speaking", (scr.match(/kx-call-ring-\d/g) ?? []).length === 3 && /phase === "speaking" \? "is-far" : "is-near"/.test(scr));
   const css = fs16.readFileSync("src/app/globals.css", "utf8");
   check("the rings read --kx-call-level with transform and opacity only", /\.kx-call-orb\.is-live \.kx-call-ring-3 \{\s*opacity: calc\(var\(--kx-call-level\)[^}]*transform: scale\(calc\(1\.16 \+ var\(--kx-call-level\)/.test(css));
@@ -1881,20 +1931,30 @@ console.log("\n── 12. Mute ──");
   check("  …picked after mount (learned, device, UI) and never shown as a control",
     /sttLangRef\.current = pickSttLang\(readSavedSttLang\(\), typeof navigator !== "undefined" \? navigator\.language : null, lang\);/.test(btn18) && !/sttLanguage=\{/.test(btn18) && !/onSelectSttLanguage/.test(btn18) && !/onSelectSttLanguage|STT_LANGS/.test(scr));
   check("  …and each settled reply from Koleex AI teaches the device the caller's language for next time",
-    /if \(update\.role === "assistant" && update\.final\) \{\s*const learned = learnSttLang\(linesRef\.current\);\s*if \(learned && learned !== sttLangRef\.current\) \{\s*sttLangRef\.current = learned;\s*saveSttLang\(learned\);/.test(btn18));
+    /if \(update\.role === "assistant" && update\.final\) \{\s*const learned = learnSttLang\(linesRef\.current, sttLangRef\.current\);\s*if \(learned && learned !== sttLangRef\.current\) \{\s*sttLangRef\.current = learned;\s*saveSttLang\(learned\);/.test(btn18));
   const route18 = fs18.readFileSync("src/app/api/ai/voice/session/route.ts", "utf8");
   check("the server reads the conversation's language off its history FIRST, and takes the client's guess only for a new thread",
-    /const fromHistory = detectConversationLang\(recentTurns\);\s*const sttLanguage = fromHistory \?\? parseSttLanguage\(new URL\(req\.url\)\.searchParams\.get\("stt"\)\);/.test(route18));
+    /const clientHint = parseSttLanguage\(new URL\(req\.url\)\.searchParams\.get\("stt"\)\);[\s\S]{0,300}?const fromHistory = detectConversationLang\(recentTurns, \{ hint: clientHint \}\);\s*const sttLanguage = fromHistory \?\? clientHint;/.test(route18));
+  /* Audit 2026-09-07: a transcriber told the wrong language writes nonsense
+     IN THAT SCRIPT — English speech under an Arabic hint comes back as Arabic
+     letters. A caller line in the hinted script may be its artefact. */
+  check("under an Arabic hint, Arabic caller lines do not vote and the English replies decide",
+    sl.detectConversationLang([{ role: "user", content: "أنا أريد" }, { role: "assistant", content: "Sure, which model?" }, { role: "user", content: "شashawa" }, { role: "assistant", content: "Go on, I'm listening." }], { hint: "ar" }) === "en");
+  check("  …under an English hint, Arabic caller lines vote and outvote the English replies (the 2026-09-04 call)",
+    sl.detectConversationLang([{ role: "user", content: "هلا و" }, { role: "assistant", content: "Hello Kimo, how are you?" }, { role: "user", content: "أريد أن أسألك" }, { role: "assistant", content: "I'm Koleex AI" }, { role: "user", content: "أنا أستيقظ" }], { hint: "en" }) === "ar");
+  check("  …a tie goes to the most recent reply, never to a fixed language",
+    sl.detectConversationLang([{ role: "assistant", content: "你好" }, { role: "assistant", content: "Hello" }], { hint: "zh" }) === "en" &&
+    sl.detectConversationLang([{ role: "assistant", content: "Hello" }, { role: "assistant", content: "你好" }], { hint: "zh" }) === "zh");
 
   /* THINKING — the gap between turns, shown. */
   const ev18 = await import("../src/lib/voice/events");
   check("the caller stopping, and the far side opening a response, both read as THINKING",
     ev18.parseVoiceEvent(JSON.stringify({ type: "input_audio_buffer.speech_stopped" })).phase === "thinking" &&
     ev18.parseVoiceEvent(JSON.stringify({ type: "response.created" })).phase === "thinking");
-  check("  …the first word back is speaking, the caller speaking is listening, and done says nothing",
+  check("  …the first word back is speaking, the caller speaking is listening, and done hands the turn back (listening)",
     ev18.parseVoiceEvent(JSON.stringify({ type: "response.audio_transcript.delta", delta: "أ" })).phase === "speaking" &&
     ev18.parseVoiceEvent(JSON.stringify({ type: "input_audio_buffer.speech_started" })).phase === "listening" &&
-    ev18.parseVoiceEvent(JSON.stringify({ type: "response.done" })).phase === null);
+    ev18.parseVoiceEvent(JSON.stringify({ type: "response.done" })).phase === "listening");
   check("  …the screen shows thinking on the orb and the rings and in the caption",
     /\(searching \|\| phase === "thinking"\) && !muted\s*\? "thinking"/.test(scr) && /\(searching \|\| phase === "thinking"\) && live && !muted \? "is-thinking" : ""/.test(scr) && /phase === "thinking"\s*\? copy\.thinking/.test(scr));
 
@@ -2246,8 +2306,8 @@ console.log("\n── 12. Mute ──");
     /sessionRef\.current\?\.sendNote\("\(Screen: the caller cancelled the task card/.test(btn26) &&
     /releaseWakeLock\(\);\s*setPendingWrite\(null\);/.test(btn26) &&
     (btn26.match(/via: "tap"/g) ?? []).length === 1);
-  check("the model's own path never carries via: the relay body has name, call_id and arguments only",
-    /body: JSON\.stringify\(\{\s*name: call\.name,\s*call_id: call\.callId,\s*arguments: call\.argumentsJson,\s*\}\)/.test(sess24));
+  check("the model's own path never carries via: the relay body has name, call_id, arguments and the call's conversation id only",
+    /body: JSON\.stringify\(\{\s*name: call\.name,\s*call_id: call\.callId,\s*arguments: call\.argumentsJson,[\s\S]{0,300}?\.\.\.\(this\.conversationId \? \{ conversation_id: this\.conversationId \} : \{\}\),\s*\}\)/.test(sess24) && !/via:/.test(sess24.slice(sess24.indexOf("TOOL_PATH, {"), sess24.indexOf("TOOL_PATH, {") + 600)));
 
 }
 

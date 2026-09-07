@@ -146,7 +146,7 @@ function toChoice(r: TurnResponse): { role?: string; content: string | null; too
 export async function orchestrate(input: TurnInput): Promise<AgentResponse> {
   const tStart = Date.now();
   const {
-    ctx, history, userMessage, userLang, dialect, conversationId, onDelta, onStep,
+    ctx, history, userMessage, userLang, dialect, conversationId, onDelta, onStep, onRetract,
     webSearchRequested = false, languageLock = "", taughtAnswers = "",
   } = input;
   /* True when a user-uploaded document's extracted text is in play — this
@@ -466,7 +466,25 @@ export async function orchestrate(input: TurnInput): Promise<AgentResponse> {
       | undefined;
     let callFailedStatus = 0;
     let callFailedBody = "";
-    const liveEmit = totalToolRuns > 0 ? onDelta : undefined;
+    /* THE FIRST CALL STREAMS TOO (audit, 2026-09-07). It used to be
+       non-streamed on the reasoning that it "emits only compact tool_calls
+       JSON" — but every business-shaped question the model answers WITHOUT
+       a tool was generated to completion and then re-chunked as a fake
+       reveal, so the first byte waited for the whole answer (2-8 s). Now it
+       streams whenever the model is free to answer in prose: not when a tool
+       is being forced (those calls emit no text), and not on a choice-shaped
+       turn (its prose is refused and re-asked, which requires that nothing
+       was shown). If a streamed first call narrates and then calls a tool,
+       the route is told to retract the narration before the answer. */
+    const firstCallStreamable = totalToolRuns === 0 && Boolean(onDelta) && toolChoice === "auto" && !wantsChoiceCard;
+    let emittedChars = 0;
+    const liveEmit =
+      onDelta && (totalToolRuns > 0 || firstCallStreamable)
+        ? (text: string) => {
+            emittedChars += text.length;
+            onDelta(text);
+          }
+        : undefined;
     {
       /* One call, streaming or not. The truncated-body case that used to be
          caught here is now the adapter's — it still comes back as a FAILED
@@ -503,6 +521,7 @@ export async function orchestrate(input: TurnInput): Promise<AgentResponse> {
         callFailedBody = out.bodyText;
       } else {
         choice = toChoice(out.response);
+        if (emittedChars > 0 && choice?.tool_calls && choice.tool_calls.length > 0) onRetract?.();
       }
     }
 

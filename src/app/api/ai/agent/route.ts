@@ -72,6 +72,11 @@ import { buildEgyptianResponse, removeRepetition } from "@/lib/language/rewrite-
 import { detectEntityScope } from "@/lib/server/ai/entity-scope";
 import type { AgentResponse, AgentStep } from "@/lib/server/ai-agent/types";
 
+/* A ceiling on a turn. Without one a hung provider call could hold the SSE
+   open, keepalives hiding the failure, for as long as the platform allows
+   (audit, 2026-09-07). Two minutes covers a long tool loop. */
+export const maxDuration = 120;
+
 /* Conversation memory window. 6 messages (3 exchanges) turned out to be
    the reason Koleex AI felt like a question-answerer rather than a
    conversation partner — anything said four exchanges ago was simply gone
@@ -131,6 +136,9 @@ export async function POST(req: Request) {
      model calls. Checked AFTER auth so the counter is keyed to a real
      account, and before any provider work so a blocked request costs nothing.
      Fails OPEN if the counter store is unreachable — see the module header. */
+  /* The body is parsed alongside the budget round trip — it needs nothing
+     from it (audit, 2026-09-07). */
+  const bodyP = req.json().catch(() => ({}));
   if (limitMode() !== "off") {
     const [perAccount, perTenant] = await Promise.all([
       consumeBudget(subjectFor.account(auth.account_id), BUDGETS.turnPerAccount()),
@@ -149,7 +157,7 @@ export async function POST(req: Request) {
     }
   }
 
-  const body = (await req.json().catch(() => ({}))) as {
+  const body = (await bodyP) as {
     conversationId?: string;
     content?: string;
     user_lang?: "en" | "zh" | "ar";
@@ -201,17 +209,31 @@ export async function POST(req: Request) {
   const attachBlock = attFinal
     .map((a) => fenceUntrusted(a.text, "document", a.name, fenceId))
     .join("");
+  /* The row this turn writes. The history SELECT runs beside the INSERT,
+     and when the insert lands first the select returns it — so the turn
+     was appended a second time and the model saw the question twice
+     (audit, 2026-09-07). The newest history row equal to it is dropped. */
+  const persistedUserContent = content + attachMarker + (attachBlock ? ATTACH_SPLIT + attachBlock : "");
+  const withoutThisTurn = <T extends { role: string; content: string }>(rows: T[]): T[] => {
+    const last = rows[rows.length - 1];
+    return last && last.role === "user" && last.content === persistedUserContent ? rows.slice(0, -1) : rows;
+  };
 
 
-  /* Confirm the conversation is mine. Must stay sequential — a 404
-     should be side-effect-free; no inserts fire if the conv isn't ours. */
-  const { data: conv } = await supabaseServer
-    .from("ai_conversations")
-    .select("id, title, message_count")
-    .eq("id", conversationId)
-    .eq("tenant_id", auth.tenant_id)
-    .eq("account_id", auth.account_id)
-    .maybeSingle();
+  /* Confirm the conversation is mine. Must stay BEFORE any insert — a 404
+     should be side-effect-free. The reply-language READ beside it needs
+     nothing from it and used to wait a full round trip for it (audit,
+     2026-09-07); a read on a 404 costs nothing. */
+  const [{ data: conv }, storedLang] = await Promise.all([
+    supabaseServer
+      .from("ai_conversations")
+      .select("id, title, message_count")
+      .eq("id", conversationId)
+      .eq("tenant_id", auth.tenant_id)
+      .eq("account_id", auth.account_id)
+      .maybeSingle(),
+    getReplyLanguage(auth.account_id),
+  ]);
   const tConv = Date.now();
   if (!conv) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
@@ -233,7 +255,7 @@ export async function POST(req: Request) {
     "en";
 
   const directive = detectLanguageDirective(content);
-  let lockedLang = await getReplyLanguage(auth.account_id);
+  let lockedLang = storedLang;
   if (directive === "clear") {
     lockedLang = null;
     void setReplyLanguage(auth.account_id, null);
@@ -382,7 +404,10 @@ export async function POST(req: Request) {
              as the JSON path — but emit a keepalive comment every
              ~1.5s so intermediate proxies don't close the connection
              and the client sees activity even when orchestrate is slow. */
-          const [historyRes, ctx] = await Promise.all([
+          /* The taught block rides the same batch: it needs only the tenant,
+             and it used to be a further round trip after these (audit,
+             2026-09-07). Cached 60 s in the lib. */
+          const [historyRes, ctx, , taughtBlock] = await Promise.all([
             supabaseServer
               .from("ai_messages")
               .select("role, content, created_at")
@@ -394,19 +419,22 @@ export async function POST(req: Request) {
               tenant_id: auth.tenant_id,
               conversation_id: conversationId,
               role: "user",
-              content: content + attachMarker + (attachBlock ? ATTACH_SPLIT + attachBlock : ""),
+              content: persistedUserContent,
             }),
+            getTaughtAnswersBlock(auth.tenant_id ?? null),
           ]);
 
           const history = trimHistoryToBudget(
             resolveHistoryAttachEmbeds(
-              (historyRes.data ?? [])
-                .slice()
-                .reverse()
-                .map((m) => ({
-                  role: m.role as "user" | "assistant",
-                  content: m.content as string,
-                })),
+              withoutThisTurn(
+                (historyRes.data ?? [])
+                  .slice()
+                  .reverse()
+                  .map((m) => ({
+                    role: m.role as "user" | "assistant",
+                    content: m.content as string,
+                  })),
+              ),
             ),
           );
 
@@ -525,8 +553,7 @@ export async function POST(req: Request) {
           const fastPathKey = process.env.DEEPSEEK_API_KEY;
           /* Owner-taught canonical answers ride EVERY lane — the fast
              paths too, since brand-ish questions are exactly what gets
-             taught. Cached 60s in the lib. */
-          const taughtBlock = await getTaughtAnswersBlock(auth.tenant_id ?? null);
+             taught. Loaded in the batch above. */
           /* Knowledge nudge: strongest approved-knowledge hits for THIS
              question ride the fast lanes too — the fast paths carry no
              tools, so without this the curated knowledge base was
@@ -686,6 +713,12 @@ export async function POST(req: Request) {
               onDelta: (text) => {
                 liveDeltaCount++;
                 controller.enqueue(send({ type: "delta", text }));
+              },
+              /* The streamed first call narrated and then called a tool: the
+                 client clears what it showed; the real answer follows. */
+              onRetract: () => {
+                liveDeltaCount = 0;
+                controller.enqueue(send({ type: "retract" }));
               },
               ctx,
               history,
@@ -884,7 +917,7 @@ export async function POST(req: Request) {
       tenant_id: auth.tenant_id,
       conversation_id: conversationId,
       role: "user",
-      content: content + attachMarker + (attachBlock ? ATTACH_SPLIT + attachBlock : ""),
+      content: persistedUserContent,
     }),
   ]);
   const tDeps = Date.now();
@@ -894,13 +927,15 @@ export async function POST(req: Request) {
      multi-turn context) is unchanged — only the window size is bounded. */
   const history = trimHistoryToBudget(
     resolveHistoryAttachEmbeds(
-      (historyRes.data ?? [])
-        .slice()
-        .reverse()
-        .map((m) => ({
-          role: m.role as "user" | "assistant",
-          content: m.content as string,
-        })),
+      withoutThisTurn(
+        (historyRes.data ?? [])
+          .slice()
+          .reverse()
+          .map((m) => ({
+            role: m.role as "user" | "assistant",
+            content: m.content as string,
+          })),
+      ),
     ),
   );
 

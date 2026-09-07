@@ -32,6 +32,7 @@ import PlusIcon from "@/components/icons/ui/PlusIcon";
 import PictureIcon from "@/components/icons/ui/PictureIcon";
 import LibraryPanel from "@/components/ai/LibraryPanel";
 import { shrinkImage } from "@/lib/ai/image-shrink";
+import { textDirection } from "@/lib/text-direction";
 import { needsChunking, uploadInChunks, type ChunkedRef } from "@/lib/ai/attachment-chunks";
 import CallsPanel from "@/components/ai/CallsPanel";
 import PhoneCallIcon from "@/components/icons/ui/PhoneCallIcon";
@@ -84,7 +85,7 @@ import { normalizeAiPersonalization } from "@/lib/ai-personalization";
    their own files. Both were held back until the render harness existed; the
    extraction was then proved by rendering the pre-split component and the new
    one with identical props and diffing the HTML. */
-import { Bubble, isRtl } from "@/components/ai/Bubble";
+import { Bubble } from "@/components/ai/Bubble";
 import { SectionHeader, ProjectRow, SidebarRow, RowMenu, groupByDate } from "@/components/ai/Sidebar";
 
 
@@ -178,22 +179,30 @@ export default function KoleexAiApp() {
     );
     const problems: string[] = [];
     if (typeOk.length < incoming.length) {
-      problems.push("Supported files: images, PDF, Excel, TXT, MD, CSV, JSON.");
+      problems.push(copy.supportedFiles);
     }
     const ok = typeOk.filter((f) => {
       const isImage = (f.type || "").startsWith("image/") || /\.(png|jpe?g|webp|gif)$/i.test(f.name);
       const capMb = isImage ? MAX_IMAGE_MB : MAX_DOC_MB;
       if (f.size > capMb * 1024 * 1024) {
-        problems.push(`${f.name} is ${(f.size / 1048576).toFixed(0)}MB — the limit is ${capMb}MB for ${isImage ? "images" : "documents"}.`);
+        problems.push(
+          copy.fileTooLarge
+            .replace("{name}", f.name)
+            .replace("{size}", (f.size / 1048576).toFixed(0))
+            .replace("{cap}", String(capMb))
+            .replace("{kind}", isImage ? copy.kindImages : copy.kindDocuments),
+        );
         return false;
       }
       return true;
     });
     if (problems.length > 0) setError(problems.join(" · "));
-    const picked = ok.slice(0, 6 - attachments.length);
-    if (picked.length > 0) setAttachments((prev) => [...prev, ...picked]);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [attachments.length]);
+    /* The cap is read from the list AS IT IS when the shrunk files arrive,
+       not from the count captured before the shrink (audit, 2026-09-07: two
+       quick picks could exceed six). */
+    if (ok.length > 0) setAttachments((prev) => [...prev, ...ok.slice(0, Math.max(0, 6 - prev.length))]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- SUPPORTED_FILES is a constant regex
+  }, [copy]);
 
   const addFiles = useCallback((incoming: File[]) => {
     if (incoming.length === 0) return;
@@ -302,6 +311,19 @@ export default function KoleexAiApp() {
     setAiSpeaking(false);
   }, []);
   const [loadingConv, setLoadingConv] = useState(false);
+  /* Read by openConversation without closing over state. */
+  const loadingConvRef = useRef(false);
+  /* Autosize after a PROGRAMMATIC change of the composer text: onChange
+     does not fire for one, so a restored multi-line message came back in a
+     one-line box (audit, 2026-09-07). */
+  const resizeComposer = useCallback(() => {
+    requestAnimationFrame(() => {
+      const ta = composerRef.current;
+      if (!ta) return;
+      ta.style.height = "auto";
+      ta.style.height = Math.min(ta.scrollHeight, 160) + "px";
+    });
+  }, []);
   const [error, setError] = useState<string | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false); // mobile
   /* Knowledge queue entry — super-admin only (D2: the approval bench
@@ -484,6 +506,13 @@ export default function KoleexAiApp() {
     async (id: string) => {
       setLibraryOpen(false);
       setCallsOpen(false);
+      /* THE CHAT THAT IS ALREADY OPEN STAYS AS IT IS. "Open drawer, tap the
+         highlighted chat to go back" used to abort the reply in flight and
+         reload the thread (audit, 2026-09-07). */
+      if (id === activeIdRef.current && !loadingConvRef.current) {
+        setSidebarOpen(false);
+        return;
+      }
       /* Audit P0 #1 — abort any in-flight send before switching
          conversations. Without this, the SSE reader keeps consuming
          deltas into a placeholder that no longer exists in the
@@ -497,8 +526,11 @@ export default function KoleexAiApp() {
       setActiveId(id);
       revokeMessagePreviews();
       setMessages([]);
+      /* Chat A's error must not appear under chat B. */
+      setError(null);
       setSidebarOpen(false);
       setLoadingConv(true);
+      loadingConvRef.current = true;
       try {
         const res = await fetch(`/api/ai/conversations/${id}`, {
           credentials: "include",
@@ -516,33 +548,27 @@ export default function KoleexAiApp() {
       } catch (e) {
         if (fresh()) setError(humanizeError(e));
       } finally {
-        if (fresh()) setLoadingConv(false);
+        if (fresh()) {
+          setLoadingConv(false);
+          loadingConvRef.current = false;
+        }
       }
     },
     [revokeMessagePreviews],
   );
 
-  /* ── New chat — create row, become active, reset messages ── */
+  /* ── New chat — an empty screen; the row is created on the first send ── */
   const startNewChat = useCallback(async () => {
     setLibraryOpen(false);
     setCallsOpen(false);
     /* Same abort as openConversation — audit P0 #1. */
     abortRef.current?.abort();
-    /* Starting a chat while standing inside a folder files it there — the
-       server verifies the id belongs to the caller before it uses it. */
-    const res = await fetch("/api/ai/conversations", {
-      method: "POST",
-      credentials: "include",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(activeProjectId ? { project_id: activeProjectId } : {}),
-    });
-    if (!res.ok) return;
-    const { conversation } = (await res.json()) as { conversation: ConversationRow };
-    /* Invalidate any conversation load still in flight so its rows don't
-       land inside this fresh empty chat. */
-    openReqRef.current = conversation.id;
-    setConversations((prev) => [conversation, ...prev]);
-    setActiveId(conversation.id);
+    /* NO ROW UNTIL THERE ARE WORDS. This used to POST a conversation on every
+       tap, so "+" a few times left a column of empty "New chat" rows in the
+       sidebar (audit, 2026-09-07). send() creates the row lazily — inside the
+       folder the screen is standing in, see createConversation. */
+    openReqRef.current = "";
+    setActiveId(null);
     revokeMessagePreviews();
     setMessages([]);
     setInput("");
@@ -550,7 +576,7 @@ export default function KoleexAiApp() {
     setSidebarOpen(false);
     /* Same race guard as send() — see the comment there for why. */
     restoredRef.current = true;
-  }, [activeProjectId, revokeMessagePreviews]);
+  }, [revokeMessagePreviews]);
 
   /* ── Send a message ──
      Unified path: every turn runs through /api/ai/agent (the
@@ -566,11 +592,13 @@ export default function KoleexAiApp() {
      settled turn wants somewhere to go. The restore-race note inside applies
      to both callers equally, which is why this is one function and not two. */
   const createConversation = useCallback(async (): Promise<string | null> => {
+    /* Starting a chat while standing inside a folder files it there — the
+       server verifies the id belongs to the caller before it uses it. */
     const res = await fetch("/api/ai/conversations", {
       method: "POST",
       credentials: "include",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({}),
+      body: JSON.stringify(activeProjectId ? { project_id: activeProjectId } : {}),
     });
     if (!res.ok) return null;
     const { conversation } = (await res.json()) as { conversation: ConversationRow };
@@ -587,7 +615,7 @@ export default function KoleexAiApp() {
        no placeholder to update, so the send appears to vanish. */
     restoredRef.current = true;
     return conversation.id;
-  }, []);
+  }, [activeProjectId]);
 
   /* A call writes into the OPEN conversation, or makes one. Read through the
      ref: the persister calls this from a network callback long after the
@@ -663,22 +691,30 @@ export default function KoleexAiApp() {
          instead of corrupting the freshly-opened thread. */
       // Ensure we have a conversation first
       let conversationId = activeId;
-      const turnConversationId = activeId;
+      let turnConversationId = activeId;
+      /* ONE CONTROLLER FOR THE WHOLE TURN, from the first byte uploaded to the
+         last byte streamed. It used to be made only before the model call, so
+         Stop did nothing while a 60 MB file was going up (audit, 2026-09-07). */
+      const aborter = new AbortController();
+      abortRef.current = aborter;
       if (!conversationId) {
         const created = await createConversation();
         if (!created) {
-          setError("Couldn't start a new chat.");
+          setError(copy.couldNotStartChat);
           sendingRef.current = false;
           setSending(false);
           return;
         }
         conversationId = created;
+        /* The stale-delta guard below compares against THIS turn's chat; a
+           first message used to compare against null and never guard. */
+        turnConversationId = created;
       }
 
       setError(null);
 
       const typedText =
-        text || "Please read the attached file(s) and give me the key points.";
+        text || copy.attachDefaultPrompt;
 
       /* ── THE TURN GOES INTO THE THREAD FIRST, files and all ──
          Owner, 2026-09-04, watching a "Reading attachment…" bar hold the
@@ -764,7 +800,7 @@ export default function KoleexAiApp() {
               refs.push(
                 await uploadInChunks(f, (fraction) => {
                   setAttachStatus(`${L_UPLOADING} ${f.name} (${mb}MB) · ${Math.round(fraction * 100)}%`);
-                }),
+                }, aborter.signal),
               );
             }
             setAttachStatus(null);
@@ -774,13 +810,14 @@ export default function KoleexAiApp() {
                 credentials: "include",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ files: refs, question: typedText }),
+                signal: aborter.signal,
               });
           } else {
             request = () => {
               const fd = new FormData();
               filesToSend.forEach((f) => fd.append("files", f, f.name));
               fd.append("question", typedText);
-              return fetch("/api/ai/attachments", { method: "POST", credentials: "include", body: fd });
+              return fetch("/api/ai/attachments", { method: "POST", credentials: "include", body: fd, signal: aborter.signal });
             };
           }
           /* One retry on a dropped connection ("Load failed", "Failed to
@@ -833,15 +870,22 @@ export default function KoleexAiApp() {
           const isNetwork = e instanceof TypeError || /failed to fetch|networkerror|load failed/i.test(raw);
           failure = isNetwork
             ? humanizeError("NetworkError")
-            : `Couldn't process the attachment(s): ${raw}`;
+            : `${copy.attachError}: ${raw}`;
         }
         setAttachStatus(null);
         setAttachReading(false);
-        if (failure !== null || attachPayload.length === 0) {
+        if (failure !== null || attachPayload.length === 0 || aborter.signal.aborted) {
           setMessages((prev) => prev.filter((m) => m.id !== optimistic.id && m.id !== placeholderId));
-          setInput((cur) => (cur.trim() ? cur : text));
-          setAttachments((cur) => (cur.length > 0 ? cur : filesToSend));
-          setError(failure ?? partial ?? "Couldn't read the attachment(s).");
+          /* Back into THIS chat's composer only — the user may have moved
+             on, and a draft must not land in the chat that is open now. */
+          if (activeIdRef.current === conversationId) {
+            setInput((cur) => (cur.trim() ? cur : text));
+            setAttachments((cur) => (cur.length > 0 ? cur : filesToSend));
+            resizeComposer();
+            /* A Stop is the user's own act; nothing to report. */
+            if (!aborter.signal.aborted) setError(failure ?? partial ?? copy.attachNothingRead);
+          }
+          abortRef.current = null;
           sendingRef.current = false;
           setSending(false);
           return;
@@ -854,11 +898,10 @@ export default function KoleexAiApp() {
            The client mutates the placeholder bubble as deltas arrive so
            the reply reveals progressively; the TypingIndicator shows
            while the content is still empty. */
-        /* Phase 12: new AbortController per turn. On user Stop click
-           we call .abort() which closes the fetch + reader, stops
+        /* Phase 12: the turn's controller (made at the top of send). On user
+           Stop click we call .abort() which closes the fetch + reader, stops
            the SSE loop, and lets the finally block clean up state. */
-        const aborter = new AbortController();
-        abortRef.current = aborter;
+        if (aborter.signal.aborted) return;
         const res = await fetch(`/api/ai/agent`, {
           method: "POST",
           credentials: "include",
@@ -964,7 +1007,7 @@ export default function KoleexAiApp() {
           }
           /* JSON with no usable reply — fall through to the error path. */
           setMessages((prev) => prev.filter((m) => m.id !== placeholderId));
-          setError(json?.error || "No reply was received.");
+          setError(json?.error ? humanizeError(json.error) : copy.noReply);
           return;
         }
 
@@ -1006,6 +1049,27 @@ export default function KoleexAiApp() {
           });
         };
 
+        let flushHandle: number | null = null;
+        let flushIsRaf = false;
+        const flushContentNow = () => {
+          if (flushHandle !== null) {
+            if (flushIsRaf) cancelAnimationFrame(flushHandle);
+            else clearTimeout(flushHandle);
+            flushHandle = null;
+          }
+          pushPatch({ content: accumulated });
+        };
+        const scheduleContentFlush = () => {
+          if (flushHandle !== null) return;
+          if (typeof requestAnimationFrame === "function") {
+            flushIsRaf = true;
+            flushHandle = requestAnimationFrame(() => { flushHandle = null; pushPatch({ content: accumulated }); });
+          } else {
+            flushIsRaf = false;
+            flushHandle = setTimeout(() => { flushHandle = null; pushPatch({ content: accumulated }); }, 16) as unknown as number;
+          }
+        };
+
         while (true) {
           const { value, done } = await reader.read();
           if (done) break;
@@ -1022,6 +1086,7 @@ export default function KoleexAiApp() {
                   | { type: "start" }
                   | { type: "steps"; steps: AgentStep[] }
                   | { type: "delta"; text: string }
+                  | { type: "retract" }
                   | {
                       type: "end";
                       agent: {
@@ -1039,14 +1104,23 @@ export default function KoleexAiApp() {
                   pushPatch({ steps: json.steps });
                 } else if (json.type === "delta") {
                   accumulated += json.text;
-                  pushPatch({ content: accumulated });
+                  /* ONE STATE WRITE PER FRAME, not one per token. The fast
+                     lane sends a frame per provider token, and each used to
+                     re-render the whole thread (audit, 2026-09-07). */
+                  scheduleContentFlush();
+                } else if (json.type === "retract") {
+                  /* What streamed so far was narration before a lookup, not
+                     the answer; the answer follows. */
+                  accumulated = "";
+                  flushContentNow();
                 } else if (json.type === "end") {
+                  flushContentNow();
                   finalMessage = json.message;
                   finalSteps = json.agent.steps;
                   convUpdateId = json.conversation.id;
                   convUpdateTitle = json.conversation.title;
                 } else if (json.type === "error") {
-                  setError(json.message || "AI is unavailable right now.");
+                  setError(json.message ? humanizeError(json.message) : copy.aiUnavailable);
                 }
               } catch {
                 /* Malformed frame — skip, keep streaming. */
@@ -1118,7 +1192,7 @@ export default function KoleexAiApp() {
         } else {
           /* Nothing useful came through — drop the placeholder. */
           setMessages((prev) => prev.filter((m) => m.id !== placeholderId));
-          setError((prev) => prev ?? "No reply was received.");
+          setError((prev) => prev ?? copy.noReply);
         }
       } catch (e) {
         /* Phase 12: user cancelled via Stop — keep whatever was
@@ -1154,7 +1228,10 @@ export default function KoleexAiApp() {
              stream lost the text as well as the answer, so the only recovery
              was retyping. On this link a drop is routine, so put the message
              back in the composer: one tap resends instead of rewriting. */
-          if (isNetwork) setInput((cur) => (cur.trim() ? cur : text));
+          if (isNetwork && activeIdRef.current === conversationId) {
+            setInput((cur) => (cur.trim() ? cur : text));
+            resizeComposer();
+          }
         }
       } finally {
         abortRef.current = null;
@@ -1162,7 +1239,7 @@ export default function KoleexAiApp() {
         setSending(false);
       }
     },
-    [input, activeId, lang, stopTts, attachments, webSearch, createConversation],
+    [input, activeId, lang, stopTts, attachments, webSearch, createConversation, copy, resizeComposer],
   );
 
   /* ── Phase 12: message-level actions ────────────────────────── */
@@ -1370,6 +1447,9 @@ export default function KoleexAiApp() {
     }
     setConversations((prev) => prev.filter((c) => c.id !== id));
     if (activeId === id) {
+      /* A reply still streaming into a chat that no longer exists would
+         leave the welcome screen stuck on "sending" (audit, 2026-09-07). */
+      abortRef.current?.abort();
       setActiveId(null);
       setMessages([]);
       /* Keep the persisted "last opened" key in sync so a refresh
@@ -1673,9 +1753,12 @@ export default function KoleexAiApp() {
       return;
     }
     if (countGrew) {
-      /* New turn (user send or reply finalised). Scroll smoothly to
-         bottom and resume following. */
-      el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
+      /* New turn (user send or reply finalised). Scroll to the bottom and
+         resume following. NOT smoothly while a turn is in flight: the first
+         delta lands mid-animation, the scroll ends short, handleScroll reads
+         that as "the user scrolled up", and the rest of the stream is never
+         followed (audit, 2026-09-07). */
+      el.scrollTo({ top: el.scrollHeight, behavior: sendingRef.current ? "auto" : "smooth" });
       userFollowingRef.current = true;
       return;
     }
@@ -1688,6 +1771,16 @@ export default function KoleexAiApp() {
       el.scrollTop = el.scrollHeight;
     }
   }, [messages, sending]);
+
+  /* AN ERROR IS SHOWN WHERE THE EYE IS. The banner sits at the bottom of the
+     scroller and nothing scrolled to it, so an attachment failure — which
+     also shrinks the list — left the user looking at the previous reply
+     (audit, 2026-09-07). */
+  useEffect(() => {
+    if (!error) return;
+    const el = scrollRef.current;
+    if (el) el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
+  }, [error]);
 
   /* Reset the "first scroll" flag when opening a different conversation
      so the jump-to-bottom behaviour is instant for each fresh load. */
@@ -1882,7 +1975,7 @@ export default function KoleexAiApp() {
             className="h-8 w-8 flex items-center justify-center rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] shrink-0"
             title={copy.back}
           >
-            <ArrowLeftIcon className="h-4 w-4" />
+            <ArrowLeftIcon className="h-4 w-4 rtl:rotate-180" />
           </Link>
           <button
             onClick={startNewChat}
@@ -2250,7 +2343,7 @@ export default function KoleexAiApp() {
             aria-label={copy.backToHub}
             className="h-8 w-8 shrink-0 flex items-center justify-center rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[var(--text-dim)] hover:text-[var(--text-primary)]"
           >
-            <ArrowLeftIcon className="h-4 w-4" />
+            <ArrowLeftIcon className="h-4 w-4 rtl:rotate-180" />
           </Link>
           <div className="min-w-0 flex-1">
             <h1 className="text-[16px] md:text-[17px] font-bold tracking-tight text-[var(--text-primary)] truncate leading-snug">
@@ -2383,7 +2476,7 @@ export default function KoleexAiApp() {
                   aria-label={copy.jumpToLatest}
                   className="kx-glass-pop pointer-events-auto h-8 -translate-y-full px-3 rounded-full bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[11.5px] text-[var(--text-primary)] hover:bg-[var(--bg-surface-subtle)] flex items-center gap-1.5 shadow-lg"
                 >
-                  ↓ Latest
+                  ↓ {copy.latest}
                 </button>
               </div>
             )}
@@ -2544,6 +2637,9 @@ export default function KoleexAiApp() {
                     ta.style.height = next + "px";
                   }}
                   onKeyDown={(e) => {
+                    /* Confirming a pinyin candidate is Enter too (keyCode 229
+                       on older engines): not a send (audit, 2026-09-07). */
+                    if (e.nativeEvent.isComposing || e.keyCode === 229) return;
                     if (e.key === "Enter" && !e.shiftKey) {
                       e.preventDefault();
                       if (
@@ -2558,7 +2654,9 @@ export default function KoleexAiApp() {
                   onPaste={onPasteFiles}
                   placeholder={copy.placeholder}
                   rows={1}
-                  dir={isRtl(input) ? "rtl" : "auto"}
+                  /* Measured like the bubbles: one Arabic word inside an
+                     English sentence no longer flips the whole box. */
+                  dir={textDirection(input)}
                   enterKeyHint="send"
                   inputMode="text"
                   autoComplete="off"
@@ -2700,6 +2798,7 @@ export default function KoleexAiApp() {
         title={copy.confirmDelete}
         variant="danger"
         confirmLabel={copy.delete}
+        cancelLabel={copy.cancel}
         onConfirm={confirmDeleteConversation}
         onClose={() => setPendingDeleteId(null)}
       />

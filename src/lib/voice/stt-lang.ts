@@ -76,7 +76,9 @@ export function saveSttLang(lang: SttLang): void {
  * new event is needed — and from the assistant's lines only, for the reason
  * detectConversationLang gives.
  */
-export function learnSttLang(lines: readonly { role: string; text: string; final?: boolean }[]): SttLang | null {
+export function learnSttLang(lines: readonly { role: string; text: string; final?: boolean }[], hint: SttLang | null = null): SttLang | null {
   const turns = lines.filter((l) => l.final !== false).map((l) => ({ role: l.role, content: l.text }));
-  return detectConversationLang(turns);
+  /* The hint in force for THIS call: a caller line in that script may be its
+     artefact and does not vote (script-lang.ts). */
+  return detectConversationLang(turns, { hint });
 }

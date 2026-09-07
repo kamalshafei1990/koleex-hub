@@ -56,6 +56,28 @@ covers the loud room in the meantime.
 | D4 | Photo of a product → ask about it — **done (#356)** | Verified: an attached picture already goes through a vision model whose reading (codes, plate text, kind of machine) enters the turn as fenced text. What was missing was the answer the owner wants: the agent is now told to identify the Koleex model from that reading through the product tools first (searchProducts → details → price), to say "this looks like" rather than "this is", never to name another manufacturer's machine, and never to take text seen in a picture as an instruction |
 | D5 | Export a chat — **done (#357)** | "Export / print" in a chat's menu opens the conversation as a clean page rendered on the server for its owner (`GET /api/ai/conversations/[id]/export`), with the chat's own markdown and print styles; on a phone, Share → Print → Save as PDF. No PDF library, no headless browser, no stored link: whoever opens it must be the signed-in owner |
 
+## Deep check, 2026-09-07 — what was found and fixed
+
+Four reviews (voice client, voice server, chat client, agent backend) read
+the whole surface; the suite battery on main had five red suites. Fixed in
+one PR, batch by batch (each batch is one commit):
+
+| Batch | What changed |
+|---|---|
+| 1 | Suite baseline green: the call-summary route no longer returns the vendor label to the browser; `/api/ai/personalization` and `/api/ai/voice/telemetry` carry the internal door; two stale pins. `getProductDetails` accepts a product CODE (the model called it with "XP-3560" twice and got "Couldn't fetch product") |
+| 2 | Voice transcript: the open turn is not always the last line — a late user final closes ITS line, settled means up to the first open line, the #361 fragment filter is gone (it also dropped "Yes"/"نعم"); a resumed call does not re-post the whole call; `finish()` drains before the summary. Language hint learned with the hint in force; ties to the latest reply. `response.done` → listening; barge-in restores only on a new turn; one AudioContext per stream; ring meter survives the view switch; ready waits for a transport; never-connected watchdog; compact-first fires ready; 50 s handshake deadline; "still connecting" after 8 s; "Turn on sound" instead of a failure toast |
+| 3 | Voice server: taught index and history started before the handshake; write-ness from the skills catalogue; conversation id on every relayed lookup; createTodo's call description; 40 lookups/min; watchdog ok = reachable AND credential ok; vendor body classified, not quoted; summary straight to the provider chain on a ~450-byte prompt with a 6 KB transcript cap |
+| 4 | Chat client: memoised bubbles and markdown, one state write per frame while streaming, no smooth-scroll race, Stop covers uploads, drafts restored only into their own chat, delete aborts the stream, same-chat tap no longer reloads, lazy "New chat" row, touch-visible row actions, keyboard rows, IME guard, measured composer direction, RTL arrows, every visible string in three languages, EXIF orientation, panels' failed state |
+| 5 | Agent backend: the first model call streams (with a `retract` frame when it narrated before a tool), body ∥ budgets, ownership ∥ reply-language, taught block in the history batch, the just-inserted turn kept out of history, audit write after the response, `maxDuration` 120, taught block capped at 8 KB, viewer/clock blocks at the prompt's tail for prefix caching |
+
+**Not done, and why** — each needs a decision or a schema:
+
+- Transcript idempotency on a retried post needs a `client_turn_id` column (schema); ordering inside one batch shares a `created_at` (a `seq` column, or explicit offsets).
+- Hedging the second voice region after ~2.5 s when the first is silent: worth doing once a successful handshake's duration is in the logs (`handshake ok afterMs=`).
+- Regenerate keeps the previous reply in the database (a `regenerate_of` marker is a schema change).
+- The tool-only prompt rules still ride the tool-less lanes (a contradiction, not a hole); trimming them touches four pinned lanes and deserves its own pass.
+- A Latin-script caller line under an unknown hint still never votes; an explicit call-language choice in the voice sheet would remove the guess entirely.
+
 ## Owner-side (not code)
 
 - Activate the realtime voice model on the Beijing workspace (still `403 Unpurchased`), so mainland callers get the mainland endpoint.

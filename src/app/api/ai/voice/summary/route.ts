@@ -20,11 +20,12 @@ import "server-only";
    --------------------------------------------------------------------------- */
 
 import { NextResponse } from "next/server";
+import { withPublicProvider } from "@/lib/server/ai/observability/public-provider";
 import { authorizeVoice } from "@/lib/server/ai/voice/gate";
 import { BUDGETS, consumeBudget, limitMode, subjectFor } from "@/lib/server/ai/security/rate-limit";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { parseConversationParam } from "@/lib/server/ai/voice/history";
-import { routeAi } from "@/lib/server/ai/router";
+import { chatWithTools } from "@/lib/server/ai/provider/registry";
 import {
   SUMMARY_ROWS,
   buildSummaryRequest,
@@ -32,6 +33,8 @@ import {
   selectCallTurns,
   summaryLanguage,
   type SummaryRow,
+  SUMMARY_SYSTEM_PROMPT,
+  SUMMARY_MAX_TOKENS,
 } from "@/lib/server/ai/voice/summary";
 import type { Lang } from "@/lib/i18n";
 
@@ -86,6 +89,8 @@ export async function POST(req: Request) {
 
   const selection = selectCallTurns((rows ?? []) as SummaryRow[]);
   if (selection.kind === "already") {
+    /* This select carries no provider column, so the row discloses nothing;
+       the freshly inserted row below does, and goes through the transform. */
     return NextResponse.json({ message: selection.row, conversation: { id: conv.id, title: conv.title } });
   }
   if (selection.kind === "none") {
@@ -94,25 +99,28 @@ export async function POST(req: Request) {
   }
 
   const lang = summaryLanguage(selection.turns, uiLang);
-  const result = await routeAi({
-    messages: [{ role: "user", content: buildSummaryRequest(selection.turns, lang) }],
-    context: {
-      userLang: lang,
-      viewer: {
-        name: gate.viewer.name,
-        username: gate.viewer.username,
-        role: gate.viewer.role,
-        department: gate.viewer.department,
-      },
-      personalization: gate.viewer.personalization ?? null,
-    },
-    forceMode: "chat",
+  /* STRAIGHT TO THE PROVIDER CHAIN, with the summariser's own short system
+     prompt (audit, 2026-09-07). Through the chat router this ran on the
+     FAST lane's ~11 KB chat prompt — which forbids saying prices, the very
+     figures a call summary must keep — plus the lane's classifiers over a
+     6 KB transcript, for nothing. Same failover, same provider order, a
+     fraction of the bytes, and no contradiction. */
+  const out = await chatWithTools({
+    messages: [
+      { role: "system", content: SUMMARY_SYSTEM_PROMPT },
+      { role: "user", content: buildSummaryRequest(selection.turns, lang) },
+    ],
+    maxTokens: SUMMARY_MAX_TOKENS,
+    temperature: 0.2,
+    modelClass: "FAST",
   });
-  if (result.status !== "success" || !result.message.trim()) {
-    console.error(`[ai.voice.summary] model failed turns=${selection.turns.length} provider=${result.provider}`);
+  const served = out.servedBy ? `${out.servedBy}${out.model ? `:${out.model}` : ""}` : "unknown";
+  const text = out.ok ? (out.response.content ?? "").trim() : "";
+  if (!out.ok || !text) {
+    console.error(`[ai.voice.summary] model failed turns=${selection.turns.length} provider=${served}`);
     return NextResponse.json({ error: "Could not summarise the call." }, { status: 502 });
   }
-  const content = formatSummary(result.message, lang);
+  const content = formatSummary(text, lang);
 
   const { data: inserted, error } = await supabaseServer
     .from("ai_messages")
@@ -121,7 +129,7 @@ export async function POST(req: Request) {
       conversation_id: conversationId,
       role: "assistant",
       content,
-      provider: result.provider,
+      provider: served,
       source: "voice",
     })
     .select("*")
@@ -142,5 +150,8 @@ export async function POST(req: Request) {
     .eq("account_id", gate.accountId);
 
   console.log(`[ai.voice.summary] ok turns=${selection.turns.length} chars=${content.length} lang=${lang}`);
-  return NextResponse.json({ message: inserted, conversation: { id: conv.id, title: conv.title } });
+  /* The inserted row carries ai_messages.provider verbatim — the audit
+     trail's truth, not the browser's. Same transform as every other route
+     that returns a row (finding N11). */
+  return NextResponse.json({ message: withPublicProvider(inserted), conversation: { id: conv.id, title: conv.title } });
 }

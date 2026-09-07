@@ -10,7 +10,12 @@ import { stepLevel } from "@/lib/voice/level";
 
 export const CALL_LEVEL_VAR = "--kx-call-level";
 
-export function useCallLevel(ref: RefObject<HTMLElement | null>, level: number, active: boolean): void {
+/** `bindKey` — anything whose change means the ref now points at a NEW
+ *  element. The call screen remounts its views with `key={view}`; read once
+ *  on mount, the loop kept writing the variable to the detached orb after
+ *  one round trip to the chat view, and the rings never moved again
+ *  (audit, 2026-09-07). */
+export function useCallLevel(ref: RefObject<HTMLElement | null>, level: number, active: boolean, bindKey?: unknown): void {
   const target = useRef(0);
   useEffect(() => {
     target.current = active ? level : 0;
@@ -31,5 +36,5 @@ export function useCallLevel(ref: RefObject<HTMLElement | null>, level: number, 
       cancelAnimationFrame(raf);
       el.style.setProperty(CALL_LEVEL_VAR, "0");
     };
-  }, [ref]);
+  }, [ref, bindKey]);
 }

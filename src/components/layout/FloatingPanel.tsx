@@ -528,10 +528,12 @@ export default function FloatingPanel() {
                   | { type: "start" }
                   | { type: "steps" }
                   | { type: "delta"; text: string }
+                  | { type: "retract" }
                   | { type: "end"; reply?: string; agent?: { finalReply?: string } }
                   | { type: "error"; message?: string };
-                if (json.type === "delta") {
-                  accumulated += json.text;
+                if (json.type === "delta" || json.type === "retract") {
+                  /* A retract clears narration that preceded a lookup. */
+                  accumulated = json.type === "retract" ? "" : accumulated + json.text;
                   setAiMessages(prev => {
                     if (bubbleIndex < 0 || bubbleIndex >= prev.length) return prev;
                     const next = prev.slice();

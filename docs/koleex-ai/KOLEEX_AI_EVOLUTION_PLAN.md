@@ -416,7 +416,7 @@ Put up per the standing rule that no table arrives without this section. **Nothi
 
 ### PHASE 6 — Skill Platform Hardening · P1 · Risk: **low–medium**
 
-**Objective.** Turn 45 tools into a validated, domain-organised skill platform.
+**Objective.** Turn 47 tools into a validated, domain-organised skill platform.
 
 | | |
 |---|---|
@@ -427,7 +427,7 @@ Put up per the standing rule that no table arrives without this section. **Nothi
 | **Security impact** | Runtime input/output validation (zod) replaces the 7-of-45 `preToolGuard`; every tool carries a declared risk class (§L). |
 | **Performance impact** | Per-tool timeouts stop one slow handler blocking a turn. |
 | **China impact** | None |
-| **Tests** | Malformed args rejected before the handler · timeout fires · domain filtering returns the right subset · **all 45 tools still function identically** |
+| **Tests** | Malformed args rejected before the handler · timeout fires · domain filtering returns the right subset · **all 47 tools still function identically** |
 | **Rollback** | Validation log-only for one release, then enforcing. |
 | **Dependencies** | Phase 2 |
 | **Acceptance** | Every tool has domain + risk class + validated schema; no behaviour change in any existing tool |
@@ -437,14 +437,14 @@ Put up per the standing rule that no table arrives without this section. **Nothi
 
 | Acceptance criterion | Status | Evidence |
 |---|---|---|
-| Every tool has a **domain** | ✅ | `skills/catalog.ts`. Eight domains mirroring the Hub modules — not invented taxonomy; a domain a user cannot point at in the product is one nobody can reason about. Distribution: work 21, products 10, knowledge 5, quotations 3, customers 2, system 2, inventory 1, web 1. |
-| Every tool has a **risk class** | ✅ | All 45 declared against §L. Risk was previously **inferred from the tool's NAME**, which cannot express the matrix: `search_web` came out `high_risk_write` rather than an external side effect, `remember_about_user` the same, and `calculateQuotationPricing` matched `/price/i` and came out `financial` despite writing nothing. Distribution: read_only 25, high_risk_write 11, destructive 4, low_risk_write 3, financial 1, external_side_effect 1. |
+| Every tool has a **domain** | ✅ | `skills/catalog.ts`. Eight domains mirroring the Hub modules — not invented taxonomy; a domain a user cannot point at in the product is one nobody can reason about. Distribution: work 21, products 11, knowledge 5, quotations 3, customers 2, system 2, inventory 1, web 2. |
+| Every tool has a **risk class** | ✅ | All 47 declared against §L. Risk was previously **inferred from the tool's NAME**, which cannot express the matrix: `search_web` came out `high_risk_write` rather than an external side effect, `remember_about_user` the same, and `calculateQuotationPricing` matched `/price/i` and came out `financial` despite writing nothing. Distribution: read_only 26, high_risk_write 11, destructive 4, low_risk_write 3, financial 1, external_side_effect 2. |
 | §L rule 5 — a tool without a class **fails validation** | ✅ | `validate:ai-skills` asserts a **bijection** between registry and catalogue, so a new tool with no class fails and an orphaned declaration fails too. Verified non-vacuous by removing a tool and by mis-declaring one. |
 | Per-tool **timeouts** | ✅ **with the limitation stated** | 15 s default, 25 s for the one tool that leaves our network. `Promise.race` frees the **caller**; it cannot cancel the work. Real cancellation needs an `AbortSignal` through all 45 handlers, which Phase 6 excludes by design ("metadata only"). This bounds how long the **turn** waits, not how long the query runs. |
 | Runtime **input validation** | 🟡 **log-only by default** | `skills/validate.ts`, reading the tool's **own** `parameters` schema. **Not zod**, which the plan names: a second schema per tool drifts from the advertised one, and the drift rejects a call the model was *told* to make. Default is log-only because these schemas have never been enforced — `AI_TOOL_VALIDATION=enforce` flips it. **Until then this measures; it does not protect.** |
 | — and enforcement is *safe to turn on* | ✅ **checked, not assumed** | A `required` entry naming a property absent from `properties` would fail **every** call under enforcement. None exist, at either nesting level; all 12 no-argument tools accept `{}`; and `confirm: true` is never blocking on any of the 16 ledger-bearing tools — which would otherwise have broken the confirmation step itself. |
 | Output validation | ⬜ **not built** | The phase header says "input/output"; only input is done. Tool *results* are still shaped by `filterFields` and the seals, which is real but is not schema validation. |
-| **All 45 tools function identically** | ✅ | The only consumer of the risk class is the `risk_class` **column**; `consumePendingAction` matches on tool name, args hash, tenant, account and conversation — never on risk — so a more accurate value lands in the audit trail and nothing branches on it. Two baseline ordering pins were **repointed, not relaxed**, and two added: validation must run **after** the permission gate and **before** the ledger. |
+| **All 47 tools function identically** | ✅ | The only consumer of the risk class is the `risk_class` **column**; `consumePendingAction` matches on tool name, args hash, tenant, account and conversation — never on risk — so a more accurate value lands in the audit trail and nothing branches on it. Two baseline ordering pins were **repointed, not relaxed**, and two added: validation must run **after** the permission gate and **before** the ledger. |
 
 **Noted, not changed:** the agent route declares no `maxDuration`, so a whole turn — several model calls plus tools — runs on the platform default. Out of scope for a metadata phase; worth an operational decision.
 
@@ -689,7 +689,7 @@ two-provider shape Phase 4 built for text.
 | Memory | 🟡 Partial (25 facts) | ✅ multi-layer | P7 |
 | Knowledge | ✅ Current (governance) | ✅ | P8 |
 | RAG | 🟡 Partial (**lexical only**) | ✅ hybrid | P8 |
-| Tools | ✅ Current (45) | ✅ | P6 |
+| Tools | ✅ Current (47) | ✅ | P6 |
 | Skills | 🔴 Missing (no domains) | ✅ | P6 |
 | MCP | 🔴 Missing | ✅ client | P16 |
 | External apps | 🔴 Missing | ✅ connectors | P16 |
@@ -853,7 +853,7 @@ Conversations, memory, artifacts and job state are server-side and canonical. A 
 **Never, during any phase:**
 break Hub integration · remove a working tool · weaken permissions or verification · expose sensitive data or put secrets in client code · hard-code one provider into the architecture · make a VPN-dependent service mandatory for core China functionality · introduce uncontrolled autonomous writes · execute arbitrary code on the app server · trust an uploaded document as instructions · let external content override policy · create uncontrolled agent loops · **delete an incident-driven safety comment without understanding it** · rewrite the project · add a framework for fashion · claim a feature is complete when it is not reachable and tested at runtime.
 
-**Preserve and evolve (audit §40):** the 45 tools · `ToolDef`/`ToolResult` · `dispatchTool` · `buildUserContext` · `SENSITIVE_FIELDS`/`filterFields` · the seal chain · `pricing-engine.ts` · the Egyptian-Arabic/Franco language engine · knowledge governance + Refinery + approval bench · the static corpora · the SSE protocol · forced-tool mechanisms · honest-failure behaviour · the attachment pipeline. **Move the comments with the code.**
+**Preserve and evolve (audit §40):** the 47 tools · `ToolDef`/`ToolResult` · `dispatchTool` · `buildUserContext` · `SENSITIVE_FIELDS`/`filterFields` · the seal chain · `pricing-engine.ts` · the Egyptian-Arabic/Franco language engine · knowledge governance + Refinery + approval bench · the static corpora · the SSE protocol · forced-tool mechanisms · honest-failure behaviour · the attachment pipeline. **Move the comments with the code.**
 
 **Method:** REUSE → REFACTOR → ISOLATE → STRENGTHEN. Small reviewable commits. Feature-flag every behavioural change. Every phase carries a rollback. No phase begins while the previous one's critical tests fail.
 
@@ -869,7 +869,7 @@ break Hub integration · remove a working tool · weaken permissions or verifica
 | **3 — Provider Abstraction + Turn IR** | ✅ **COMPLETE** | **3A–3D shipped.** The agent loop reaches a model **only** through `chatWithTools()`; it reads no key, no environment, and no `choices[0].message`. **N8 closed in 4D** — the streaming fast lane now goes through the same door, gaining failover and the circuit breaker it never had. See N8 in §P.4 for the trace that corrected the earlier reading. |
 | **4 — Model Router + Failover** | ✅ **COMPLETE** | Scored in full above. Two provider adapters, failover with two load-bearing rules, a circuit breaker that fails open, six model classes. **Not met and not claimed:** measured failover < 3 s. |
 | **5 — Performance, Cost & Real Streaming** | ✅ **COMPLETE** | Scored in full above. `planReveal()` bounds the reveal; the usage meter reads what the provider reports; a tenant-keyed retrieval cache. **Not met and not claimed:** §I latency targets, which need a Phase 0 baseline. |
-| **6 — Skill Platform Hardening** | ✅ **COMPLETE** | Scored in full above. All 45 tools declare a domain and a §L risk class, per-tool timeouts, argument validation. **Not built:** output validation. |
+| **6 — Skill Platform Hardening** | ✅ **COMPLETE** | Scored in full above. All 47 tools declare a domain and a §L risk class, per-tool timeouts, argument validation. **Not built:** output validation. |
 | **7 — Advanced Memory** | 🟡 **PART SHIPPED, NOT AUTHORISED** | Phase 7 proper is not started: it needs the `ai_memories` decision in §S. What shipped under its number is the **N12 fix** — `account_prefs_merge` — plus the N10 and N11 closures listed in §P.4. |
 | 8–20 | ⬜ Not started | — |
 
@@ -1071,7 +1071,7 @@ The AI surface had exactly **one** Hub-relative link: `review_url` on `createQuo
 
 **A deliberate departure from §P.5, stated rather than quietly made.** The plan sketched eight domain methods (`products()`, `customers()`, `quotations()`, …). That shape is **not** implemented, for two reasons:
 
-1. All 45 tools already have the signature `(ctx, args) → ToolResult`. Eight methods that re-dispatch to them add a second surface with **no new guarantee**, and one that must be kept in sync with the tools by hand — the exact "keep in sync" failure mode this whole refactor has been removing.
+1. All 47 tools already have the signature `(ctx, args) → ToolResult`. Eight methods that re-dispatch to them add a second surface with **no new guarantee**, and one that must be kept in sync with the tools by hand — the exact "keep in sync" failure mode this whole refactor has been removing.
 2. Worse, a domain method is a plausible place for someone to later "optimise" by calling a tool handler directly. That would bypass the guard, the ledger and the audit log in one step. **A door is only a door while there is one of it.**
 
 If a future domain method earns its place, it belongs *behind* `invoke()`, not beside it.
@@ -1376,7 +1376,7 @@ What the amendment genuinely adds, and is now written into the plan:
 | Tools importing React / `next/navigation` / client code | **zero** |
 | AI core (`ai-agent/`, `ai/`) reading `next/headers` or `cookies()` | **zero** — confined to 3 session files |
 
-**All 45 tools are already frontend-independent.** They take `ctx: UserContext` plus args and return `ToolResult`. The Koleex Hub Connector is therefore not a rewrite — **the tools already are its implementation**; Phase 2 formalises the boundary around code that already respects it.
+**All 47 tools are already frontend-independent.** They take `ctx: UserContext` plus args and return `ToolResult`. The Koleex Hub Connector is therefore not a rewrite — **the tools already are its implementation**; Phase 2 formalises the boundary around code that already respects it.
 
 **N6 — the one real coupling found (new).** Six strings assume a Hub web frontend:
 
@@ -1414,7 +1414,7 @@ KOLEEX AI Core  (orchestrator · planner · model router · memory · RAG)
         ↓  skill router selects a domain
 KoleexHubConnector          ← the named boundary Phase 2 formalises
         ↓  dispatchTool: checkModule → minRole → handler → audit
-Existing 45 tools           ← UNCHANGED, already frontend-independent
+Existing 47 tools           ← UNCHANGED, already frontend-independent
         ↓
 Koleex Hub services (pricing-engine, product-access, permissions)
         ↓
@@ -1542,5 +1542,5 @@ Rate limiting was the one Phase 1 item with no correct zero-decision answer, bec
 ## Change log
 
 - **2026-08-30 · v1.2** — **Documentation audited against the code**, in the same spirit as the two §I corrections Phase 5 made to this document. Six claims were no longer true and are corrected in place rather than deleted: the phase-status table listed Phases 4–6 as "not started" while carrying their scorecards, and called N8 open while §P.4 recorded it closed; three §P.4 blockers (N10, N11, N12) were marked *owner decision, not taken* after the decision had been taken and shipped; §B's four re-verification rows are now dated, with a "then / now" column, because three became false **because the plan did its job**; and line counts are dated instead of reading as current. **The audit also found a live defect, not just stale prose:** N11's vendor-label leak was closed on `/api/ai/agent` only, and the suite that proved it read that one file — so it asserted *every send site* over a search space of one. Three more paths were leaking, including the conversation history, one label per message, on the request made every time a user opens a conversation. Fixed, and the guard is now a sweep of the whole route tree, verified against seven restored leaks. New suite: `validate:ai-plan-claims`, which measures the checkable half of this document against the code and reads its figures **from the document**, so it cannot be satisfied by editing the suite to agree with itself.
-- **2026-08-30 · v1.1** — **Amendment 1 (§P): standalone + integrated deployment** made a permanent requirement. The core of it was already Phase 2 in v1.0 (§F.0 #1, §N), so nothing was restarted and no completed work undone. Added: product data as the flagship connector case with a binding cache contract; the general-vs-Hub capability model; standalone acceptance criteria in phases 3–17; the `KoleexHubConnector` interface. Verified by grep, not assumed: **all 45 tools are already frontend-independent** (zero `src/app` imports, zero React, zero cookie reads in the core) — the connector formalises a boundary the code already respects. One new blocker found: **N6, Hub-relative deep links** in 6 places.
+- **2026-08-30 · v1.1** — **Amendment 1 (§P): standalone + integrated deployment** made a permanent requirement. The core of it was already Phase 2 in v1.0 (§F.0 #1, §N), so nothing was restarted and no completed work undone. Added: product data as the flagship connector case with a binding cache contract; the general-vs-Hub capability model; standalone acceptance criteria in phases 3–17; the `KoleexHubConnector` interface. Verified by grep, not assumed: **all 47 tools are already frontend-independent** (zero `src/app` imports, zero React, zero cookie reads in the core) — the connector formalises a boundary the code already respects. One new blocker found: **N6, Hub-relative deep links** in 6 places.
 - **2026-08-30 · v1.0** — Initial plan. Delta verified against `7c99778`: audit fully accurate, zero code drift. Five new findings (N1–N5) added for the general-purpose/standalone/China requirements. Awaiting approval for Phase 0.

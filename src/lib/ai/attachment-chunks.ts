@@ -64,6 +64,7 @@ export interface ChunkedRef {
 export async function uploadInChunks(
   file: File,
   onProgress?: (fraction: number) => void,
+  signal?: AbortSignal,
 ): Promise<ChunkedRef> {
   const plan = planChunks(file.size);
   if (plan.length > MAX_PARTS) throw new Error(`${file.name}: over the size limit`);
@@ -75,12 +76,14 @@ export async function uploadInChunks(
       fd.append("index", String(part.index));
       fd.append("total", String(plan.length));
       fd.append("chunk", file.slice(part.start, part.end), `${part.index}`);
-      return fetch("/api/ai/attachments/chunk", { method: "POST", credentials: "include", body: fd });
+      return fetch("/api/ai/attachments/chunk", { method: "POST", credentials: "include", body: fd, signal });
     };
     let res: Response;
     try {
       res = await send();
     } catch (first) {
+      /* Stop means stop — a cancelled piece is not retried. */
+      if (signal?.aborted) throw first;
       if (!(first instanceof TypeError)) throw first;
       await new Promise((r) => setTimeout(r, 1200));
       res = await send();
