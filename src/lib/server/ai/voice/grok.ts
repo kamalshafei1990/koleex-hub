@@ -54,11 +54,13 @@ export type GrokVoiceEnv = {
 
 export const GROK_DEFAULT_URL = "wss://api.x.ai/v1/realtime";
 export const GROK_DEFAULT_SECRETS_URL = "https://api.x.ai/v1/realtime/client_secrets";
-/* THE SAME FIVE PRODUCT NAMES, IN THE SAME ORDER, as the mainland catalogue
-   (config.ts DEFAULT_VOICE_CATALOGUE): a voice key is positional (v1..v5),
-   and a caller who chose "Layla" keeps Layla whichever lane serves them.
-   The vendor's ids are lowercase, as its console shows them. */
-export const GROK_DEFAULT_VOICES = "ara:Nour,eve:Layla,rex:Omar,leo:Adam,sal:Sara";
+/* THE LANE'S OWN VOICES, UNDER THEIR OWN NAMES. The owner (2026-09-08):
+   "when I use Grok voice I want the Grok voice choices, not Qwen". Five
+   voices, the vendor's ids lowercase as its console shows them, labelled by
+   the names the voices themselves carry — neutral first names, nothing
+   that says which vendor. A voice key is positional (v1..v5) on either
+   lane, so a saved key still resolves to a voice when the lane changes. */
+export const GROK_DEFAULT_VOICES = "ara:Ara,eve:Eve,rex:Rex,leo:Leo,sal:Sal";
 export const GROK_DEFAULT_SAMPLE_RATE = 24_000;
 export const GROK_DEFAULT_PROTOCOL = "xai-client-secret.{token}";
 /** Long enough to open the socket after a slow handshake; short enough

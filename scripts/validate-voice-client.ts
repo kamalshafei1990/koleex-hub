@@ -2162,8 +2162,7 @@ console.log("\n── 12. Mute ──");
   if (hadWindow) g.window = prevWindow;
   const btn19 = fs19.readFileSync("src/components/ai/VoiceCallButton.tsx", "utf8");
   check("the button pre-selects the remembered voice from the server's list, and remembers every choice",
-    /const offered = body\.voices;\s*setVoices\(offered\);/.test(btn19) &&
-    /setVoiceKey\(\(cur\) => cur \?\? pickVoiceKey\(readSavedVoiceKey\(\), offered\)\);/.test(btn19) &&
+    /setVoices\(list\);\s*setVoiceKey\(\(cur\) => pickVoiceKey\(cur \?\? readSavedVoiceKey\(\), list\)\);/.test(btn19) &&
     !/body\.voices\?\.\[0\]\?\.key/.test(btn19) &&
     /const selectVoice = useCallback\(\(key: string\) => \{\s*setVoiceKey\(key\);\s*voiceKeyRef\.current = key;\s*saveVoiceKey\(key\);/.test(btn19));
 
@@ -2784,9 +2783,12 @@ function describeErrorCheck(): boolean {
     const btn = fs27.readFileSync("src/components/ai/VoiceCallButton.tsx", "utf8");
     const route = fs27.readFileSync("src/app/api/ai/voice/session/route.ts", "utf8");
     const sess = fs27.readFileSync("src/lib/voice/session.ts", "utf8");
+    check("the picker shows the lane's OWN voices, and follows the lane the device settles on — now, and again after the probe",
+      /const offerFor = \(lane: "rtc" \| "ws"\) => \{\s*const list = byLane\[lane\]\.length > 0 \? byLane\[lane\] : byLane\.rtc;\s*setVoices\(list\);\s*setVoiceKey\(\(cur\) => pickVoiceKey\(cur \?\? readSavedVoiceKey\(\), list\)\);/.test(btn) &&
+      /transportRef\.current = decided\.lane;\s*offerFor\(decided\.lane\);/.test(btn) && /transportRef\.current = ok \? "ws" : "rtc";\s*offerFor\(transportRef\.current\);/.test(btn));
     check("the button decides from the server's default and the device's verdict, probes in the background only when told the socket lane exists, and never moves a call already placed",
-      /const decided = decideLane\(server, readSavedLane\(\), Date\.now\(\)\);\s*transportRef\.current = decided\.lane;\s*if \(decided\.probe && body\.ws_available === true\) \{/.test(btn) &&
-      /saveLane\(ok \? "ws" : "rtc"\);\s*(\/\*[^*]*\*\/\s*)?if \(!sessionRef\.current\) transportRef\.current = ok \? "ws" : "rtc";/.test(btn));
+      /const decided = decideLane\(server, readSavedLane\(\), Date\.now\(\)\);\s*transportRef\.current = decided\.lane;\s*offerFor\(decided\.lane\);\s*if \(decided\.probe && body\.ws_available === true\) \{/.test(btn) &&
+      /saveLane\(ok \? "ws" : "rtc"\);\s*(\/\*[^*]*\*\/\s*)?if \(!sessionRef\.current\) \{\s*transportRef\.current = ok \? "ws" : "rtc";/.test(btn));
     check("  …a real call teaches the device too: live on the socket lane saves ws, a fall-back saves rtc",
       /if \(next === "live" && transportRef\.current === "ws"\) saveLane\("ws"\);/.test(btn) && /transportRef\.current = "rtc";\s*(\/\*[^*]*\*\/\s*)?saveLane\("rtc"\);/.test(btn));
     check("the voices GET says whether a socket lane exists and logs its decision with the country — nothing else", /ws_available: grok !== null/.test(route) && /\[ai\.voice\] lane=\$\{lane \?\? "none"\} country=/.test(route));

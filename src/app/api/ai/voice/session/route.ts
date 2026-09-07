@@ -263,8 +263,17 @@ export async function GET(req: Request) {
   console.log(`[ai.voice] lane=${lane ?? "none"} country=${country.replace(/[^A-Za-z]/g, "").slice(0, 2) || "none"} ws=${grok !== null} rtc=${cfg !== null}`);
   /* Not configured is not an error here: no voice service means no voices to
      choose between, and a picker that cannot be used should not be drawn. */
+  /* BOTH LANES' VOICES, BY LANE. The device may settle on the other lane
+     after its own probe (lane-probe.ts); the picker then shows that lane's
+     voices — the socket lane's under their own names — without a second
+     request. `voices` stays the serving lane's list for the older reading. */
   return NextResponse.json(
-    { voices: publicVoiceList(voices), transport: lane ?? "rtc", ws_available: grok !== null },
+    {
+      voices: publicVoiceList(voices),
+      transport: lane ?? "rtc",
+      ws_available: grok !== null,
+      voices_by_lane: { rtc: publicVoiceList(cfg?.voices ?? []), ws: publicVoiceList(grok?.voices ?? []) },
+    },
     { headers: { "Cache-Control": "no-store" } },
   );
 }

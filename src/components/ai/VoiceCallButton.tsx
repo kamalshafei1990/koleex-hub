@@ -369,8 +369,24 @@ export default function VoiceCallButton({
       try {
         const res = await fetch(HANDSHAKE_PATH, { credentials: "include" });
         if (!res.ok) return;
-        const body = (await res.json()) as { voices?: { key: string; label: string }[]; transport?: unknown; ws_available?: unknown };
+        const body = (await res.json()) as {
+          voices?: { key: string; label: string }[]; transport?: unknown; ws_available?: unknown;
+          voices_by_lane?: { rtc?: { key: string; label: string }[]; ws?: { key: string; label: string }[] };
+        };
         if (cancelled) return;
+        /* THE PICKER SHOWS THE LANE'S OWN VOICES (owner, 2026-09-08: "when I
+           use Grok voice I want the Grok voice choices"). Each lane's list
+           is kept, and the one on offer follows the lane the device settles
+           on — now, and again if the probe moves it. */
+        const byLane = {
+          rtc: Array.isArray(body.voices_by_lane?.rtc) ? body.voices_by_lane.rtc : Array.isArray(body.voices) ? body.voices : [],
+          ws: Array.isArray(body.voices_by_lane?.ws) ? body.voices_by_lane.ws : [],
+        };
+        const offerFor = (lane: "rtc" | "ws") => {
+          const list = byLane[lane].length > 0 ? byLane[lane] : byLane.rtc;
+          setVoices(list);
+          setVoiceKey((cur) => pickVoiceKey(cur ?? readSavedVoiceKey(), list));
+        };
         /* THE SERVER'S LANE IS A DEFAULT; THE DEVICE KNOWS ITS OWN NETWORK
            (lane-probe.ts). A fresh verdict from a probe or a real call
            overrides a mainland default; a stale one is re-checked, in the
@@ -378,20 +394,18 @@ export default function VoiceCallButton({
         const server: "rtc" | "ws" = body.transport === "ws" ? "ws" : "rtc";
         const decided = decideLane(server, readSavedLane(), Date.now());
         transportRef.current = decided.lane;
+        offerFor(decided.lane);
         if (decided.probe && body.ws_available === true) {
           void probeWsLane({ fetchFn: (...a) => fetch(...a), createWebSocket: (url, protocols) => new WebSocket(url, protocols) as unknown as VoiceSocket }).then((ok) => {
             if (cancelled) return;
             saveLane(ok ? "ws" : "rtc");
             /* Not under a call already placed on the other lane. */
-            if (!sessionRef.current) transportRef.current = ok ? "ws" : "rtc";
+            if (!sessionRef.current) {
+              transportRef.current = ok ? "ws" : "rtc";
+              offerFor(transportRef.current);
+            }
           });
         }
-        if (!Array.isArray(body.voices)) return;
-        const offered = body.voices;
-        setVoices(offered);
-        /* The device's remembered choice, if the catalogue still offers it;
-           else the first voice, which is the one the vendor uses unasked. */
-        setVoiceKey((cur) => cur ?? pickVoiceKey(readSavedVoiceKey(), offered));
       } catch {
         /* No picker. The call still works on the default voice. */
       }
