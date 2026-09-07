@@ -21,6 +21,7 @@ export type VoiceTelemetry = {
   /** Which lane the call was on, and whether this failure moved it. */
   lane?: string;
   fell_back?: boolean;
+  events?: string;
 };
 
 export function sendVoiceTelemetry(t: VoiceTelemetry, post: (path: string, body: string) => void = defaultPost): void {

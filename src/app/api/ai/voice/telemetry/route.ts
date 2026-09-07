@@ -37,6 +37,9 @@ const REASONS = new Set([
      unmounted under it, or the page itself went away (a reload, a killed
      tab). One warn line each, states and counts only, like the rest. */
   "voice-switched", "unmounted", "page-hidden",
+  /* The ordinary end: the caller hung up. Carries the event histogram, so
+     a call that connected and said nothing names the protocol it heard. */
+  "hung-up",
 ]);
 const short = (v: unknown, max: number) => (typeof v === "string" ? v.replace(/[^\w.:-]/g, "").slice(0, max) : "");
 /* The cause of a failure: a browser's own error name and message. Words,
@@ -65,7 +68,8 @@ export async function POST(req: Request) {
     `[ai.voice.client] ${reason} elapsedMs=${num(body.elapsed_ms)} ice=${short(body.ice, 16) || "none"} ` +
       `dc=${short(body.dc, 16) || "none"} lastEvent=${short(body.last_event, 60) || "none"} toolCalls=${num(body.tool_calls)} ` +
       `slot=${short(body.region, 8) || "none"} lane=${short(body.lane, 4) || "rtc"} fellBack=${body.fell_back === true} iceEverConnected=${body.ice_ever_connected === true} resumes=${num(body.resumes)}` +
-      (cause(body.err) ? ` err="${cause(body.err)}"` : ""),
+      (cause(body.err) ? ` err="${cause(body.err)}"` : "") +
+      (typeof body.events === "string" && body.events ? ` events=${body.events.replace(/[^\w.:,…-]/g, "").slice(0, 600)}` : ""),
   );
   return new NextResponse(null, { status: 204 });
 }

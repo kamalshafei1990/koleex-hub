@@ -13,6 +13,9 @@ import { readFileSync } from "node:fs";
 import {
   parseVoiceEvent,
   appendTranscript,
+  extendsUtterance,
+  EV_ASSISTANT_DELTA_GA,
+  EV_ASSISTANT_DONE_GA,
   EV_ASSISTANT_DELTA,
   EV_ASSISTANT_DONE,
   EV_USER_DELTA,
@@ -414,6 +417,39 @@ console.log("\n── 9. An answer that is over, or cut off, closes its line —
   const persist = readFileSync("src/lib/voice/persist.ts", "utf8");
   check("the persister settles everything older than the last two lines, whatever their state",
     /for \(let i = Math\.max\(this\.settledCount, lines\.length - 2\); i < lines\.length; i\+\+\)/.test(persist));
+}
+
+console.log("\n── 10. The protocol's newer names, and an utterance heard again ──");
+{
+  /* THE FIRST CALL ON A VENDOR ON THE GA REVISION (2026-09-07 17:08): the
+     caller was transcribed, the orb thought, and nothing came back — the
+     answer arrived as output_audio_transcript.* and output_audio.delta,
+     names nothing here read. Asserted against the literal strings, like
+     every other event name in this suite. */
+  check("the assistant's newer transcript names are the literal GA names",
+    EV_ASSISTANT_DELTA_GA === "response.output_audio_transcript.delta" && EV_ASSISTANT_DONE_GA === "response.output_audio_transcript.done");
+  const d = parseVoiceEvent(ev({ type: "response.output_audio_transcript.delta", delta: "Hel" }));
+  check("a GA delta is the assistant speaking, appended", d.phase === "speaking" && d.transcript?.role === "assistant" && d.transcript.text === "Hel" && d.transcript.incremental === true && d.transcript.final === false);
+  const done = parseVoiceEvent(ev({ type: "response.output_audio_transcript.done", transcript: "Hello there." }));
+  check("a GA done closes the assistant's turn with the transcript", done.transcript?.final === true && done.transcript.text === "Hello there." && done.transcript.role === "assistant");
+  check("the older names still read exactly as before", parseVoiceEvent(ev({ type: "response.audio_transcript.delta", delta: "x" })).transcript?.text === "x");
+
+  /* ONE THING SAID, THREE SETTLED EVENTS. */
+  let lines: TranscriptLine[] = [];
+  lines = appendTranscript(lines, { role: "user", text: "إزيك؟", final: true });
+  lines = appendTranscript(lines, { role: "user", text: "إزيك إيه الأخبار؟", final: true });
+  lines = appendTranscript(lines, { role: "user", text: "إزيك، إيه الأخبار؟", final: true });
+  check("a settled caller line that grows the previous settled caller line replaces it — one row, the fullest words",
+    () => lines.length === 1 && lines[0].text === "إزيك، إيه الأخبار؟" && lines[0].final === true);
+  lines = appendTranscript(lines, { role: "assistant", text: "تمام", final: true });
+  lines = appendTranscript(lines, { role: "user", text: "إزيك، إيه الأخبار؟ وإيه جديد", final: true });
+  check("  …but not across an answer: after the assistant spoke, a longer caller line is a new turn", () => lines.length === 3);
+  const two = appendTranscript([{ role: "user", text: "how many orders", final: true }], { role: "user", text: "what is the price", final: true });
+  check("  …and a different utterance is a new turn, not a replacement", two.length === 2);
+  check("the comparison ignores punctuation, spacing and case, and needs at least two letters",
+    extendsUtterance("Hello?", "hello, there") && extendsUtterance("إزيك؟", "إزيك، إيه الأخبار") && !extendsUtterance("a", "ab") && !extendsUtterance("hello there", "hello") && !extendsUtterance("", "x"));
+  const withPhoto = appendTranscript([{ role: "user", text: "show me", final: true }], { role: "user", text: "show me the KX-180", final: true, photos: [{ url: "https://x/y.jpg", label: "p" }] });
+  check("  …a replacement keeps the newer line's photos", withPhoto.length === 1 && withPhoto[0].photos?.length === 1);
 }
 
 console.log(`\n${pass} passed, ${failures.length} failed`);

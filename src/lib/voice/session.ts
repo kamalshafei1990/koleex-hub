@@ -124,6 +124,8 @@ export type VoiceDiagnostics = {
   /** The last failure's cause, `Name: message`, bounded — "handshake
    *  failed" alone sent an investigation to the wrong place twice. */
   err: string;
+  /** "type:count,…" — every event name the far side sent. Names only. */
+  events: string;
 };
 
 export type VoiceEvents = {
@@ -354,6 +356,11 @@ export const HANDSHAKE_PATH = "/api/ai/voice/session";
 /* The WebSocket lane's own three events — the ones that are audio rather
    than protocol. Everything else on the socket is the shared protocol. */
 const EV_WS_AUDIO_DELTA = "response.audio.delta";
+/* The same frame under the protocol's newer name (see events.ts, the GA
+   revision): a vendor on it sends this and never the one above. */
+const EV_WS_AUDIO_DELTA_GA = "response.output_audio.delta";
+/** How many distinct event types the histogram keeps. */
+const EVENT_TYPES_MAX = 40;
 const EV_WS_SPEECH_STARTED = "input_audio_buffer.speech_started";
 const EV_WS_RESPONSE_CANCELLED = "response.cancelled";
 
@@ -444,6 +451,14 @@ export class VoiceSession {
      content, no transcript — states and counts only. */
   private startedAt = 0;
   private lastEventType = "";
+  /* EVERY EVENT TYPE THE FAR SIDE SENT, COUNTED. Names only, never payloads.
+     A vendor on a different protocol revision is invisible from the
+     server and indistinguishable from a silent one on the screen; the
+     histogram in the end-of-call beacon is what says "it sent
+     response.output_audio.delta 212 times and we were listening for
+     response.audio.delta". Bounded: the first EVENT_TYPES_MAX distinct
+     names, the rest counted under "…". */
+  private eventCounts = new Map<string, number>();
 
   constructor(
     private readonly deps: VoiceDeps,
@@ -550,6 +565,7 @@ export class VoiceSession {
       region: this.servedRegion,
       ice_ever_connected: this.iceEverConnected,
       err: this.lastError,
+      events: [...this.eventCounts.entries()].map(([k, v]) => `${k}:${v}`).join(",").slice(0, 600),
     };
   }
 
@@ -706,6 +722,11 @@ export class VoiceSession {
       }
     }
     this.lastEventType = eventTypeOf(raw);
+    {
+      const t = this.lastEventType || "?";
+      const key = this.eventCounts.has(t) || this.eventCounts.size < EVENT_TYPES_MAX ? t : "…";
+      this.eventCounts.set(key, (this.eventCounts.get(key) ?? 0) + 1);
+    }
     this.events.onMessage?.(raw);
 
     /* UNTRUSTED. This came off a network socket and describes something the
@@ -1071,7 +1092,7 @@ export class VoiceSession {
     }
     if (!v || typeof v !== "object") return;
     const type = (v as { type?: unknown }).type;
-    if (type === EV_WS_AUDIO_DELTA) {
+    if (type === EV_WS_AUDIO_DELTA || type === EV_WS_AUDIO_DELTA_GA) {
       const delta = (v as { delta?: unknown }).delta;
       if (typeof delta === "string" && delta) {
         try {

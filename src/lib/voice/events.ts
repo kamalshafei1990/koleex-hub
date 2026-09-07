@@ -69,6 +69,14 @@ export type TranscriptUpdate = {
    can assert the exact strings. */
 export const EV_ASSISTANT_DELTA = "response.audio_transcript.delta";
 export const EV_ASSISTANT_DONE = "response.audio_transcript.done";
+/* THE SAME TWO EVENTS UNDER THEIR NEWER NAMES. The realtime protocol's
+   general-availability revision renamed the assistant's transcript events
+   (`output_audio_transcript`); a vendor on that revision sends these and
+   never the ones above. The first call on such a vendor (2026-09-07 17:08)
+   transcribed the caller, showed "thinking", and then nothing: the answer
+   arrived under names nothing here recognised. Both families are read. */
+export const EV_ASSISTANT_DELTA_GA = "response.output_audio_transcript.delta";
+export const EV_ASSISTANT_DONE_GA = "response.output_audio_transcript.done";
 export const EV_USER_DELTA = "conversation.item.input_audio_transcription.delta";
 export const EV_USER_DONE = "conversation.item.input_audio_transcription.completed";
 
@@ -202,7 +210,8 @@ export function parseVoiceEvent(raw: string): ParsedEvent {
   if (!type) return NOTHING;
 
   switch (type) {
-    case EV_ASSISTANT_DELTA: {
+    case EV_ASSISTANT_DELTA:
+    case EV_ASSISTANT_DELTA_GA: {
       /* THE ASSISTANT'S DELTA IS A PIECE, NOT THE WHOLE. The vendor sends the
          user's transcription as `text` (confirmed so far) + `stash`, and the
          assistant's as `delta` — the next few characters only. A payload
@@ -218,6 +227,7 @@ export function parseVoiceEvent(raw: string): ParsedEvent {
       };
     }
     case EV_ASSISTANT_DONE:
+    case EV_ASSISTANT_DONE_GA:
       /* `transcript` is the field the done event names; the delta fields are
          accepted too so a turn that only ever produced deltas still finishes
          with text rather than blanking. */
@@ -293,6 +303,21 @@ export type TranscriptLine = {
  * looks back for the open line of ITS speaker (two lines is the whole
  * overlap), and closes or extends THAT one where it stands.
  */
+/** Letters and digits only — punctuation and spacing are what a
+ *  re-transcription changes while saying the same thing. Pure. */
+function utteranceKey(text: string): string {
+  return text.replace(/[\s\p{P}\p{S}]+/gu, "").toLowerCase();
+}
+
+/** Whether `next` is the same utterance as `prev`, heard further: its
+ *  letters begin with prev's letters, and prev has at least a word in it.
+ *  Exported for the suite. Pure. */
+export function extendsUtterance(prev: string, next: string): boolean {
+  const a = utteranceKey(prev);
+  const b = utteranceKey(next);
+  return a.length >= 2 && b.length >= a.length && b.startsWith(a);
+}
+
 export function appendTranscript(
   lines: readonly TranscriptLine[],
   update: TranscriptUpdate,
@@ -317,6 +342,15 @@ export function appendTranscript(
      settled line of the same speaker is the same turn, and changes nothing. */
   if (update.final && !open && last && last.final && last.role === update.role && update.text && last.text === update.text) {
     return [...lines];
+  }
+  /* A FINAL THAT GROWS THE LAST ONE IS THE SAME TURN, RE-HEARD. A vendor
+     that re-transcribes the whole utterance as its detector extends it
+     delivers "إزيك؟", then "إزيك إيه الأخبار؟", then "إزيك، إيه الأخبار؟" —
+     three settled events, one thing said (2026-09-07 17:08, three rows in
+     the thread). A settled caller line whose words begin with the previous
+     settled caller line's words, with nothing said in between, replaces it. */
+  if (update.final && !open && last && last.final && last.role === "user" && update.role === "user" && update.text && extendsUtterance(last.text, update.text)) {
+    return [...lines.slice(0, -1), { ...last, text: update.text, ...(update.photos && update.photos.length > 0 ? { photos: update.photos } : {}) }];
   }
   /* AN EMPTY FINAL WITH NO OPEN TURN IS NOTHING. A repeated `done` after the
      turn has already closed used to open a new, blank, final line — a row
