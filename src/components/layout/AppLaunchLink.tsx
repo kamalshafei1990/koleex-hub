@@ -35,6 +35,7 @@ import { trackAppOpen } from "@/lib/app-launcher";
 import { markAppLaunch } from "@/lib/perf/client";
 import { prefetchTier, readNetworkContext, isPreloadAllowed } from "@/lib/app-prefetch";
 import { preloadAppChunk, wasChunkWarmed } from "@/lib/app-chunk-preload";
+import { busyWithSomethingUninterruptible } from "@/components/pwa/UpdateWatcher";
 
 /* Renders INSIDE the <Link>: while the navigation this link started is still
    in flight (RSC payload / chunk on a slow network), the tile itself speaks
@@ -150,7 +151,10 @@ export default function AppLaunchLink({
         __kxStaleBuild?: boolean;
         __kxStaleBuildId?: string;
       };
-      if (g.__kxStaleBuild) {
+      /* NEVER MID-CALL. A full navigation ends a voice call the way a
+         reload does; the same guard the update watcher uses. The soft
+         path below keeps the call. */
+      if (g.__kxStaleBuild && !busyWithSomethingUninterruptible()) {
         const target = g.__kxStaleBuildId ?? "unknown";
         let healed = "";
         try { healed = window.localStorage.getItem("kx_healed_build") ?? ""; } catch { /* ignore */ }
