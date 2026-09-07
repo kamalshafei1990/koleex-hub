@@ -130,6 +130,19 @@ const PERSIST_COPY: Record<Lang, Record<PersistFailure, string>> = {
    anyway. Long enough for a slow session.update round trip on a mainland
    network; short enough that nobody waits on a vendor that never answers. */
 const READY_FALLBACK_MS = 2_500;
+
+/** The far side's own words for an `error` event, bounded — for the beacon
+ *  only. Reads `error.message`, then `message`; anything else is "". Pure. */
+export function errorMessageOf(raw: string): string {
+  try {
+    const v = JSON.parse(raw) as { error?: { message?: unknown; code?: unknown }; message?: unknown };
+    const m = typeof v?.error?.message === "string" ? v.error.message : typeof v?.message === "string" ? v.message : "";
+    const code = typeof v?.error?.code === "string" ? `${v.error.code}: ` : "";
+    return `${code}${m}`.slice(0, 160);
+  } catch {
+    return "";
+  }
+}
 /** After this long in "connecting" the caption says the service is slow. */
 const CONNECTING_SLOW_MS = 8_000;
 /* A call that was up for at least this long and then lost its connection is
@@ -201,6 +214,18 @@ export default function VoiceCallButton({
   const [swapping, setSwapping] = useState(false);
   /* Where the last session was served, for a call that continues it. */
   const regionHintRef = useRef<"primary" | "alt" | null>(null);
+  /* WHICH LANE, as the server said on the voices GET (see ai/voice/grok.ts):
+     the WebRTC lane the product has always had, or the WebSocket lane for
+     callers outside mainland China. Held in a ref: it is read when a call
+     starts, not rendered. */
+  const transportRef = useRef<"rtc" | "ws">("rtc");
+  /* ONE FALL-BACK PER SCREEN. A WebSocket lane that never comes up — a
+     network that blocks the vendor's host, a refused secret — is retried
+     ONCE on the other lane, silently, before the caller sees a failure. */
+  const laneFellBackRef = useRef(false);
+  /* The first `error` event of a call is beaconed with its message: it is
+     how a refused session configuration on a new vendor gets diagnosed. */
+  const errorBeaconedRef = useRef(false);
   const [phase, setPhase] = useState<VoicePhase>(null);
   /* THE SCREEN STAYS AWAKE ON A CALL (roadmap B5). A phone that locks itself
      mid-call suspends the installed app — audio, microphone, the line — and
@@ -342,8 +367,10 @@ export default function VoiceCallButton({
       try {
         const res = await fetch(HANDSHAKE_PATH, { credentials: "include" });
         if (!res.ok) return;
-        const body = (await res.json()) as { voices?: { key: string; label: string }[] };
-        if (cancelled || !Array.isArray(body.voices)) return;
+        const body = (await res.json()) as { voices?: { key: string; label: string }[]; transport?: unknown };
+        if (cancelled) return;
+        transportRef.current = body.transport === "ws" ? "ws" : "rtc";
+        if (!Array.isArray(body.voices)) return;
         const offered = body.voices;
         setVoices(offered);
         /* The device's remembered choice, if the catalogue still offers it;
@@ -537,6 +564,17 @@ export default function VoiceCallButton({
     }
   }, [releaseCall]);
 
+  /* THE FIRST ERROR THE FAR SIDE SENDS, once per call, with its message: a
+     refused field in the session configuration used to be invisible from
+     the server and guessed at from the screen. States and one bounded
+     sentence — no transcript, no content. */
+  const reportFirstError = useCallback((data: string) => {
+    if (errorBeaconedRef.current) return;
+    errorBeaconedRef.current = true;
+    const diag = sessionRef.current?.diagnostics();
+    sendVoiceTelemetry({ reason: "config-rejected", lane: transportRef.current, err: errorMessageOf(data), ...(diag ?? {}) });
+  }, []);
+
   const startCall = useCallback(async (opts?: { resume?: boolean }) => {
     if (sessionRef.current) return;
     /* UNLOCK THE SPEAKER INSIDE THE GESTURE. An element that has been asked
@@ -620,10 +658,23 @@ export default function VoiceCallButton({
           if (diag) regionHintRef.current = diag.region === "alt" ? "alt" : "primary";
           const wasUp = liveSinceRef.current !== null && Date.now() - liveSinceRef.current >= RESUME_MIN_LIVE_MS;
           const canResume = failure === "connection-lost" && wasUp && resumesRef.current < MAX_RESUMES;
-          sendVoiceTelemetry({ reason: canResume ? "resumed" : failure, resumes: resumesRef.current, ...diag });
+          /* THE OTHER LANE, ONCE: a WebSocket lane that never came up is
+             retried on the mainland lane before the caller hears anything.
+             Never the other way round. */
+          const laneFailed = failure === "service-unreachable" || failure === "handshake-failed" || failure === "service-refused" || failure === "unavailable" || failure === "connection-lost";
+          const canFallBack = transportRef.current === "ws" && !wasUp && laneFailed && !laneFellBackRef.current;
+          sendVoiceTelemetry({ reason: canResume ? "resumed" : failure, resumes: resumesRef.current, lane: transportRef.current, fell_back: canFallBack, ...diag });
           /* The session has already torn itself down; drop our handle so the
              next start makes a fresh one rather than reusing a dead session. */
           sessionRef.current = null;
+          if (canFallBack) {
+            laneFellBackRef.current = true;
+            transportRef.current = "rtc";
+            setReady(false);
+            chimedRef.current = false;
+            queueMicrotask(() => void startCallRef.current?.({ resume: false }));
+            return;
+          }
           if (canResume) {
             resumesRef.current += 1;
             setReady(false);
@@ -724,6 +775,9 @@ export default function VoiceCallButton({
            rendered. It is data, never instruction — nothing here dispatches
            on it, and the parser only ever returns strings. */
         const parsed = parseVoiceEvent(data);
+        /* The first `error` the far side sends, once per call, beaconed with
+           its message — see reportFirstError. */
+        if (voiceEventType(data) === "error") reportFirstError(data);
         /* THE ANSWER IS OVER, OR WAS CUT OFF: its open line closes with the
            words it has, so the thread keeps it and the persister moves on
            (events.ts settleOpenLine). Before the transcript of this same
@@ -782,11 +836,14 @@ export default function VoiceCallButton({
        this session's, or the one the device remembered from an earlier call.
        The server still decides; a device with no memory leaves it to the
        server's own. */
-    regionHintRef.current ?? readSavedRegion());
+    regionHintRef.current ?? readSavedRegion(),
+    /* The lane the server chose; the fall-back below may have moved it. */
+    transportRef.current);
 
+    errorBeaconedRef.current = false;
     sessionRef.current = session;
     await session.start();
-  }, [clearSearchTimer, acquireWakeLock]);
+  }, [clearSearchTimer, acquireWakeLock, reportFirstError]);
   useEffect(() => { startCallRef.current = startCall; }, [startCall]);
 
   /* ONE METER PER SIDE, AND ONLY THE ACTIVE ONE RUNS. Measuring both at once

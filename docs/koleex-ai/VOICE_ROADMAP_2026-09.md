@@ -112,6 +112,41 @@ and the beacon now carries `err="Name: message"` so the next failure names
 itself. The retry does not make a dead link work — it makes a dropped
 request on a live one not end the call.
 
+## Two lanes, 2026-09-08 — the mainland lane and the WebSocket lane
+
+Owner: "I like Grok voice more than Qwen, but Grok can't work in China — so
+two: for China and out of China." Built as a second LANE, not a second
+product: the WebRTC lane the product has always had is untouched, and a
+mainland caller never meets the new one.
+
+| | Mainland lane (unchanged) | WebSocket lane (new) |
+|---|---|---|
+| Who | Requests stamped `x-vercel-ip-country: CN`, or no country | Everyone else (a VPN exit counts as where it exits) |
+| Transport | WebRTC, SDP through `/api/ai/voice/session` | Browser WebSocket to the vendor, opened with a client secret minted by `/api/ai/voice/ws-session` |
+| Key | Server-side only | Server-side only; the browser gets a secret that expires in 10 min |
+| Audio | Opus tracks, played by the engine | PCM16 frames in JSON (`ws-audio.ts`): mic → `input_audio_buffer.append`; `response.audio.delta` → a MediaStream the same `<audio>` element plays |
+| Events, tools, transcripts, session config | shared | shared (`VoiceChannel`; the vendor speaks the same protocol) |
+| Wire | `pcm`, `input_audio_transcription: {enabled: true}` | `pcm16`, `input_audio_transcription: {}` on the full session, none on the compact (`OPENAI_WIRE`) |
+| Voices | AI_VOICE_VOICES (Nour, Layla, Omar, Adam, Sara) | Same five names in the same order, vendor ids lowercase; a saved key (v1..v5) means the same voice on either lane |
+
+Decided by the server on the voices GET (`transport: "rtc" | "ws"`), read by
+the button, handed to the session. A WebSocket lane that never comes up falls
+back to the mainland lane once, silently; never the other way.
+
+Environment (all optional but the key): `AI_VOICE_GROK_API_KEY`,
+`AI_VOICE_GROK_URL`, `AI_VOICE_GROK_SECRETS_URL`, `AI_VOICE_GROK_MODEL`,
+`AI_VOICE_GROK_VOICES`, `AI_VOICE_GROK_SAMPLE_RATE`, `AI_VOICE_GROK_PROTOCOL`
+(`{token}` slot required), `AI_VOICE_GROK_LANE=off` as the kill switch.
+
+**Not proved before the first real call** — this environment cannot reach
+the vendor: the exact subprotocol format for the secret, whether the full
+session's `input_audio_transcription: {}` is accepted (if not, the compact
+session takes over and the caller's own captions are missing), and the
+24 kHz assumption. Each is one environment variable away, and the first
+`error` event of a call is now beaconed with its message
+(`[ai.voice.client] config-rejected … err="…"`) so the answer is in the log
+after one attempt.
+
 ## Owner-side (not code)
 
 - Activate the realtime voice model on the Beijing workspace (still `403 Unpurchased`), so mainland callers get the mainland endpoint.

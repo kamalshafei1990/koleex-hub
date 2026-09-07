@@ -14,7 +14,7 @@
    rather than on the happy one.
    --------------------------------------------------------------------------- */
 
-import { VoiceSession, describeError, HANDSHAKE_PATH, waitForIceGathering, normalizeSdp, type VoiceDeps, type VoiceState, type VoiceFailure,
+import { VoiceSession, describeError, HANDSHAKE_PATH, WS_SESSION_PATH, failureForStatus, type VoiceSocket, waitForIceGathering, normalizeSdp, type VoiceDeps, type VoiceState, type VoiceFailure,
   TOOL_PATH,
 } from "../src/lib/voice/session";
 import { TranscriptPersister, TRANSCRIPT_PATH, MAX_TURNS_PER_POST, MAX_POST_FAILURES, type SavedTurn } from "../src/lib/voice/persist";
@@ -792,7 +792,7 @@ async function main() {
        make the next tap reuse a dead connection, which presents to a user as a
        button that silently stopped working. */
     check("a failure clears the session handle so a retry starts fresh",
-      /next === "failed"[\s\S]{0,1200}?sessionRef\.current = null/.test(src));
+      /next === "failed"[\s\S]{0,1800}?sessionRef\.current = null/.test(src));
     check("hanging up clears the handle too — through the release it is built on",
       /const releaseCall[\s\S]{0,400}?sessionRef\.current = null/.test(src) && /const hangUp = useCallback\(\(\) => \{[\s\S]{0,900}?releaseCall\(\);\s*setState\("idle"\);/.test(src));
     check("starting twice is refused rather than leaking the first session",
@@ -1151,7 +1151,7 @@ async function main() {
       check("  …and is the one armed for a call that was up", /this\.iceEverConnected\s*\?\s*\(this\.deps\.liveGraceMs \?\? this\.deps\.reconnectGraceMs \?\? LIVE_GRACE_MS\)\s*:\s*\(this\.deps\.reconnectGraceMs \?\? RECONNECT_GRACE_MS\)/.test(src));
       check("  …every sign of a connected transport goes through one place",
         /local\.onopen = \(\) => \{\s*this\.markTransportUp\(\);/.test(src) && /remote\.onopen = \(\) => \{\s*this\.markTransportUp\(\);/.test(src) &&
-        /private onChannelMessage\(raw: string, channel: RTCDataChannel\): void \{[\s\S]{0,600}?this\.markTransportUp\(\);/.test(src) &&
+        /private onChannelMessage\(raw: string, channel: VoiceChannel\): void \{[\s\S]{0,600}?this\.markTransportUp\(\);/.test(src) &&
         /pc\.onconnectionstatechange = \(\) => \{[\s\S]{0,200}?if \(st === "connected"\) \{\s*this\.markTransportUp\(\);/.test(src));
     }
 
@@ -2046,7 +2046,7 @@ console.log("\n── 12. Mute ──");
   check("  …and there are no chips: nothing in the module names a label or asks", !("STT_LANG_LABELS" in stt));
   const btn18 = fs18.readFileSync("src/components/ai/VoiceCallButton.tsx", "utf8");
   check("the session is given the SPEAKING language, never the UI language, as the transcription hint",
-    /\}, voiceKeyRef\.current, conversationIdRef\.current, sttLangRef\.current,\s*(\/\*[^*]*\*\/\s*)?regionHintRef\.current \?\? readSavedRegion\(\)\);/.test(btn18) && !/conversationIdRef\.current, langRef\.current\)/.test(btn18));
+    /\}, voiceKeyRef\.current, conversationIdRef\.current, sttLangRef\.current,\s*(\/\*[^*]*\*\/\s*)?regionHintRef\.current \?\? readSavedRegion\(\),\s*(\/\*[^*]*\*\/\s*)?transportRef\.current\);/.test(btn18) && !/conversationIdRef\.current, langRef\.current\)/.test(btn18));
   check("  …picked after mount (learned, device, UI) and never shown as a control",
     /sttLangRef\.current = pickSttLang\(readSavedSttLang\(\), typeof navigator !== "undefined" \? navigator\.language : null, lang\);/.test(btn18) && !/sttLanguage=\{/.test(btn18) && !/onSelectSttLanguage/.test(btn18) && !/onSelectSttLanguage|STT_LANGS/.test(scr));
   check("  …and each settled reply from Koleex AI teaches the device the caller's language for next time",
@@ -2100,7 +2100,7 @@ console.log("\n── 12. Mute ──");
   tel.sendVoiceTelemetry({ reason: "x" }, () => { throw new Error("offline"); });
   check("  …and never throws", true);
   check("  …the button sends it on every failure, with the session's diagnostics, before deciding to resume",
-    /sendVoiceTelemetry\(\{ reason: canResume \? "resumed" : failure, resumes: resumesRef\.current, \.\.\.diag \}\);/.test(btn18) && /const diag = sessionRef\.current\?\.diagnostics\(\);/.test(btn18));
+    /sendVoiceTelemetry\(\{ reason: canResume \? "resumed" : failure, resumes: resumesRef\.current, lane: transportRef\.current, fell_back: canFallBack, \.\.\.diag \}\);/.test(btn18) && /const diag = sessionRef\.current\?\.diagnostics\(\);/.test(btn18));
   const telRoute = fs18.readFileSync("src/app/api/ai/voice/telemetry/route.ts", "utf8");
   check("the telemetry route is authenticated, allow-lists the reason, bounds every field, logs one line and stores nothing",
     /const auth = await requireAuth\(req\);/.test(telRoute) && /const REASONS = new Set\(/.test(telRoute) && /if \(!REASONS\.has\(reason\)\) return NextResponse\.json/.test(telRoute) &&
@@ -2184,7 +2184,7 @@ console.log("\n── 12. Mute ──");
   check("a continued call (resume or switch) asks first for the region that served the last one; a fresh call leaves it to the server",
     /regionHintRef\.current = diag\.region === "alt" \? "alt" : "primary";/.test(btn19) &&
     /if \(diag\) regionHintRef\.current = diag\.region === "alt" \? "alt" : "primary";/.test(btn19) &&
-    /sttLangRef\.current,\s*(\/\*[^*]*\*\/\s*)?regionHintRef\.current \?\? readSavedRegion\(\)\);/.test(btn19));
+    /sttLangRef\.current,\s*(\/\*[^*]*\*\/\s*)?regionHintRef\.current \?\? readSavedRegion\(\),\s*(\/\*[^*]*\*\/\s*)?transportRef\.current\);/.test(btn19));
   /* THE DEVICE REMEMBERS THE REGION TOO — the server's memory dies with its warm instance. */
   const regionPref = await import("../src/lib/voice/voice-pref");
   check("the region memory is two allow-listed words, read and written without ever throwing",
@@ -2529,6 +2529,178 @@ console.log("\n── 12. Mute ──");
 function describeErrorCheck(): boolean {
   const d = describeError(new TypeError("Load <failed> \"x\""));
   return d === "TypeError: Load failed x" && describeError(null) === "" && describeError("a".repeat(300)).length === 100;
+}
+
+{
+  console.log("\n── 26. The WebSocket lane: a socket the browser opens with a secret our server minted ──");
+  /* THE SECOND LANE (ai/voice/grok.ts). One POST to our route, no offer in;
+     out come the socket url, a subprotocol carrying a short-lived secret,
+     the audio rate and the same server-authored session. Everything above
+     the transport — configuration, acknowledgement, transcripts, tool relay
+     — is the same code the WebRTC lane runs, so what is proved here is the
+     transport: the handshake, the socket, the frames, the teardown. */
+  type FakeSocket = VoiceSocket & { sent: string[]; url: string; protocols: string[]; closed: number; open(): void; message(raw: string): void; drop(): void };
+  const makeSocket = (url: string, protocols: string[]): FakeSocket => {
+    const sock: FakeSocket = {
+      url, protocols, sent: [], closed: 0, readyState: 0,
+      onopen: null, onmessage: null, onclose: null, onerror: null,
+      send(d) { if (sock.readyState !== 1) throw new Error("not open"); sock.sent.push(d); },
+      close() { sock.closed++; (sock as { readyState: number }).readyState = 3; },
+      open() { (sock as { readyState: number }).readyState = 1; sock.onopen?.({}); },
+      message(raw) { sock.onmessage?.({ data: raw }); },
+      drop() { (sock as { readyState: number }).readyState = 3; sock.onclose?.({}); },
+    };
+    return sock;
+  };
+  type FakeAudio = { stream: MediaStream; played: string[]; flushes: number; closed: number; captureStarted: boolean; frame: ((b64: string) => void) | null; rate: number };
+  const wsEnvelope = (over: Record<string, unknown> = {}) => ({
+    transport: "ws", url: "wss://voice.example/v1/realtime", protocols: ["xai-client-secret.SECRET-1"], expires_at: 1,
+    audio: { format: "pcm16", sample_rate: 24_000 },
+    session: { type: "session.update", session: { modalities: ["text", "audio"], input_audio_format: "pcm16" } },
+    session_compact: { type: "session.update", session: { modalities: ["text", "audio"] } },
+    ...over,
+  });
+  const laneRun = async (opts: { envelope?: unknown; status?: number; noSocket?: boolean; noAudio?: boolean; reconnectGraceMs?: number; failFetch?: number } = {}) => {
+    const recorded: Recorded[] = [];
+    const d = deps({ recorded, reconnectGraceMs: opts.reconnectGraceMs });
+    const base = d.deps.fetchFn;
+    const sockets: FakeSocket[] = [];
+    const audios: FakeAudio[] = [];
+    let fetches = 0;
+    d.deps.fetchFn = (async (url: string, init?: RequestInit) => {
+      if (String(url).startsWith(WS_SESSION_PATH)) {
+        recorded.push({ url: String(url), init });
+        fetches++;
+        if (opts.failFetch && fetches <= opts.failFetch) throw new TypeError("Load failed");
+        const status = opts.status ?? 200;
+        return { ok: status < 400, status, json: async () => opts.envelope ?? wsEnvelope() } as unknown as Response;
+      }
+      if (String(url) === TOOL_PATH) {
+        recorded.push({ url: String(url), init });
+        return { ok: true, status: 200, json: async () => ({ call_id: "c1", output: { ok: true, data: { hits: 1 } } }) } as unknown as Response;
+      }
+      return base(url, init);
+    }) as unknown as typeof fetch;
+    if (!opts.noSocket) d.deps.createWebSocket = (url, protocols) => { const sock = makeSocket(url, protocols); sockets.push(sock); return sock; };
+    if (!opts.noAudio) d.deps.createWsAudio = (rate) => {
+      const a: FakeAudio = { stream: { id: "far" } as unknown as MediaStream, played: [], flushes: 0, closed: 0, captureStarted: false, frame: null, rate };
+      audios.push(a);
+      return {
+        stream: a.stream,
+        startCapture: (_mic, onFrame) => { a.captureStarted = true; a.frame = onFrame; },
+        play: (b64) => { a.played.push(b64); },
+        flush: () => { a.flushes++; },
+        close: () => { a.closed++; },
+      };
+    };
+    const states: Array<[VoiceState, VoiceFailure | undefined]> = [];
+    const remote: unknown[] = [];
+    let ready = 0;
+    const tools: string[] = [];
+    const s = new VoiceSession(d.deps, {
+      onState: (st, f) => states.push([st, f]),
+      onRemoteStream: (st) => remote.push(st),
+      onReady: () => { ready++; },
+      onToolCall: (name) => tools.push(name),
+    }, "v2", "6f1d2c3b-4a5e-4f60-9b7c-1234567890ab", "ar", null, "ws");
+    const outcome = await within(4000, s.start());
+    return { s, states, recorded, sockets, audios, remote, ready: () => ready, tools, hung: outcome === HUNG, mic: d.mic };
+  };
+
+  {
+    const r = await laneRun();
+    check("a ws call posts to OUR ws-session route, with the voice key, the conversation and the language hint — and no region, no offer",
+      r.recorded.length === 1 && r.recorded[0].url.startsWith(`${WS_SESSION_PATH}?`) && /voice=v2/.test(r.recorded[0].url) && /conversation=6f1d/.test(r.recorded[0].url) && /stt=ar/.test(r.recorded[0].url) && !/region=/.test(r.recorded[0].url) &&
+      r.recorded[0].init?.method === "POST" && r.recorded[0].init?.credentials === "include" && !r.recorded[0].init?.body);
+    check("  …and never the SDP route", !r.recorded.some((x) => x.url.startsWith(HANDSHAKE_PATH)));
+    check("the socket is opened to the url the server named, with the subprotocol the server composed — the secret travels there and nowhere else",
+      r.sockets.length === 1 && r.sockets[0].url === "wss://voice.example/v1/realtime" && r.sockets[0].protocols.join() === "xai-client-secret.SECRET-1");
+    check("the call is live once the socket is opening, with the microphone announced first", r.s.getState() === "live" && r.states.map(([st]) => st).join(">") === "requesting-mic>connecting>live");
+    check("  …nothing is sent on a socket that has not opened", r.sockets[0].sent.length === 0);
+    check("  …and the audio is built at the wire rate the server named", r.audios.length === 1 && r.audios[0].rate === 24_000);
+    const before = pendingTimers();
+    r.sockets[0].open();
+    check("an OPEN socket is the transport up: the watchdog is disarmed and the diagnostics say so", pendingTimers() === before - 1 && r.s.diagnostics().ice_ever_connected === true && r.s.diagnostics().ice === "ws1" && r.s.diagnostics().dc === "open");
+    check("  …the server's session goes out first, unchanged", r.sockets[0].sent.length === 1 && r.sockets[0].sent[0] === JSON.stringify(wsEnvelope().session));
+    check("  …the far side's stream is handed to the screen and the microphone reader starts", r.remote.length === 1 && r.remote[0] === r.audios[0].stream && r.audios[0].captureStarted);
+    r.audios[0].frame?.("AAAA");
+    check("a microphone frame goes up as input_audio_buffer.append", r.sockets[0].sent.length === 2 && r.sockets[0].sent[1] === JSON.stringify({ type: "input_audio_buffer.append", audio: "AAAA" }));
+    r.sockets[0].message(JSON.stringify({ type: "session.updated" }));
+    check("the acknowledgement fires ready, exactly as on the other lane", r.ready() === 1);
+    r.sockets[0].message(JSON.stringify({ type: "response.audio.delta", delta: "QUJD" }));
+    check("a voice frame from the far side is played", r.audios[0].played.join() === "QUJD");
+    r.sockets[0].message(JSON.stringify({ type: "input_audio_buffer.speech_started" }));
+    check("  …and the caller starting to speak flushes what was queued (barge-in)", r.audios[0].flushes === 1);
+    r.sockets[0].message(JSON.stringify({ type: "response.output_item.added", item: { type: "function_call", call_id: "c1", name: "search_knowledge" } }));
+    r.sockets[0].message(JSON.stringify({ type: "response.function_call_arguments.done", call_id: "c1", arguments: "{\"query\":\"x\"}" }));
+    await sleep(20);
+    check("a tool call on the socket is relayed to the same server route and its answer goes back on the socket",
+      r.tools.join() === "search_knowledge" && r.recorded.some((x) => x.url === TOOL_PATH) &&
+      r.sockets[0].sent.some((m) => /conversation\.item\.create/.test(m) && /function_call_output/.test(m)) && r.sockets[0].sent[r.sockets[0].sent.length - 1] === JSON.stringify({ type: "response.create" }));
+    r.s.stop();
+    check("hanging up closes the socket and the audio, and releases the microphone — with no failure reported", r.sockets[0].closed === 1 && r.audios[0].closed === 1 && r.mic.allStopped() && r.s.getState() === "ended" && r.states.every(([st]) => st !== "failed"));
+    r.sockets[0].drop();
+    check("  …and a close that follows the hang-up changes nothing", r.s.getState() === "ended");
+  }
+  {
+    const r = await laneRun({ reconnectGraceMs: 80 });
+    r.sockets[0].open();
+    r.sockets[0].drop();
+    check("a socket that closes under a live call is a recovery state first", r.s.getState() === "reconnecting");
+    await sleep(160);
+    const last = r.states[r.states.length - 1];
+    check("  …and after the window the call is over, honestly — a dropped connection the button may resume", last[0] === "failed" && last[1] === "connection-lost" && r.sockets[0].closed === 1 && r.audios[0].closed === 1);
+  }
+  {
+    const r = await laneRun({ reconnectGraceMs: 80 });
+    await sleep(160);
+    const last = r.states[r.states.length - 1];
+    check("a socket that never opens is the service not answering — not a dropped call to resume", last[0] === "failed" && last[1] === "service-unreachable" && r.mic.allStopped());
+  }
+  {
+    const r = await laneRun({ status: 502 });
+    check("the route's statuses are read the same way as on the other lane: 502 is the service refusing", r.states[r.states.length - 1][1] === "service-refused" && r.sockets.length === 0);
+    check("  …by one shared table", failureForStatus(403) === "not-allowed" && failureForStatus(401) === "signed-out" && failureForStatus(429) === "too-many-calls" && failureForStatus(503) === "unavailable" && failureForStatus(504) === "service-unreachable" && failureForStatus(500) === "handshake-failed");
+  }
+  {
+    const r = await laneRun({ envelope: wsEnvelope({ url: "ws://voice.example/v1/realtime" }) });
+    check("an insecure socket url is refused before any socket is opened", r.states[r.states.length - 1][1] === "handshake-failed" && r.sockets.length === 0);
+    const r2 = await laneRun({ envelope: wsEnvelope({ protocols: [] }) });
+    check("  …so is an envelope with no secret to present", r2.states[r2.states.length - 1][1] === "handshake-failed" && r2.sockets.length === 0);
+    const r3 = await laneRun({ envelope: wsEnvelope({ session: undefined }) });
+    check("  …and one with no session to send", r3.states[r3.states.length - 1][1] === "handshake-failed");
+  }
+  {
+    const r = await laneRun({ noSocket: true });
+    check("a runtime with no WebSocket fails the lane as unavailable, never by throwing", r.states[r.states.length - 1][1] === "unavailable" && !r.hung);
+  }
+  {
+    const r = await laneRun({ noAudio: true });
+    r.sockets[0].open();
+    r.sockets[0].message(JSON.stringify({ type: "response.audio.delta", delta: "QUJD" }));
+    check("without an audio implementation the socket still carries the protocol — no crash on a voice frame", r.s.getState() === "live" && r.sockets[0].sent.length === 1);
+    r.s.stop();
+  }
+  {
+    const r = await laneRun({ failFetch: 1 });
+    check("the handshake POST dropped by the link is posted once more, as on the other lane", r.recorded.filter((x) => x.url.startsWith(WS_SESSION_PATH)).length === 2 && r.s.getState() === "live");
+    r.s.stop();
+  }
+  {
+    const fs26 = await import("node:fs");
+    const btn = fs26.readFileSync("src/components/ai/VoiceCallButton.tsx", "utf8");
+    const sess = fs26.readFileSync("src/lib/voice/session.ts", "utf8");
+    check("the button takes the lane from the voices GET — the server's word — and hands it to the session; it never picks one",
+      /transportRef\.current = body\.transport === "ws" \? "ws" : "rtc";/.test(btn) && /transportRef\.current\);/.test(btn) && !/transportRef\.current = "ws"/.test(btn));
+    check("  …a ws lane that never came up falls back to the mainland lane ONCE, silently, and never the other way",
+      /const canFallBack = transportRef\.current === "ws" && !wasUp && laneFailed && !laneFellBackRef\.current;/.test(btn) &&
+      /if \(canFallBack\) \{\s*laneFellBackRef\.current = true;\s*transportRef\.current = "rtc";/.test(btn) && !/transportRef\.current = "ws";/.test(btn));
+    check("  …the first `error` the far side sends is beaconed once with its bounded message, so a refused field on a new vendor names itself",
+      /if \(voiceEventType\(data\) === "error"\) reportFirstError\(data\);/.test(btn) && /reason: "config-rejected", lane: transportRef\.current, err: errorMessageOf\(data\)/.test(btn));
+    check("the browser's socket and audio are the deps' defaults; the session itself names no vendor and no host",
+      /createWebSocket: \(url, protocols\) => new WebSocket\(url, protocols\)/.test(sess) && /createWsAudio: \(sampleRate\) => createBrowserWsAudio\(sampleRate\)/.test(sess) &&
+      !/api\.x\.ai|wss:\/\/[a-z]/i.test(sess));
+  }
 }
 
 console.log(`\n${pass} passed, ${failures.length} failed`);

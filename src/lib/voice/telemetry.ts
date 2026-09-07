@@ -18,6 +18,9 @@ export type VoiceTelemetry = {
   region?: string;
   ice_ever_connected?: boolean;
   err?: string;
+  /** Which lane the call was on, and whether this failure moved it. */
+  lane?: string;
+  fell_back?: boolean;
 };
 
 export function sendVoiceTelemetry(t: VoiceTelemetry, post: (path: string, body: string) => void = defaultPost): void {

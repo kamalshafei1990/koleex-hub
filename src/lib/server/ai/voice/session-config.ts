@@ -115,6 +115,41 @@ const TRANSPORT = {
   },
 } as const;
 
+const TRANSPORT_WITHOUT_TRANSCRIPTION = (() => {
+  const { input_audio_transcription: _omit, ...rest } = TRANSPORT;
+  void _omit;
+  return rest;
+})();
+
+/* THE WIRE — the three fields that differ between vendors' realtime
+   dialects: the audio formats and how transcription of the caller is
+   asked for. The mainland vendor (TRANSPORT above) says "pcm" and
+   `{ enabled: true }`; an OpenAI-Realtime-compatible vendor says "pcm16"
+   and names no flag. Everything else in the session — turn detection,
+   instructions, tools, voice — is the same sentence to both. The wire is
+   chosen by the route that knows which vendor it is talking to; the
+   compact session omits transcription on the OpenAI-style wire, so a
+   refused transcription field costs the caption and not the call. */
+export type VoiceWire = {
+  input_audio_format: string;
+  output_audio_format: string;
+  input_audio_transcription: Record<string, unknown>;
+  /** Whether the compact session asks for transcription at all. */
+  compactTranscription: boolean;
+};
+export const QWEN_WIRE: VoiceWire = {
+  input_audio_format: TRANSPORT.input_audio_format,
+  output_audio_format: TRANSPORT.output_audio_format,
+  input_audio_transcription: TRANSPORT.input_audio_transcription,
+  compactTranscription: true,
+};
+export const OPENAI_WIRE: VoiceWire = {
+  input_audio_format: "pcm16",
+  output_audio_format: "pcm16",
+  input_audio_transcription: {},
+  compactTranscription: false,
+};
+
 /* THE SAME RULE THE TEXT PATH USES, imported rather than restated. Two copies
    of an identity policy drift, and the copy that drifts is the one nobody is
    looking at — which for a spoken answer is worse, because there is no
@@ -323,21 +358,26 @@ export function buildSessionUpdate(
   sttLanguage: SttLanguage | null = null,
   /* Same rule as the language: full session only. */
   sttModel: string | null = null,
+  /* Which vendor dialect the audio fields speak. See VoiceWire. */
+  wire: VoiceWire = QWEN_WIRE,
 ): SessionUpdate {
   const tools = voiceToolSchemas(variant);
   const transcription =
     variant === "full" && (sttLanguage || sttModel)
       ? {
-          ...TRANSPORT.input_audio_transcription,
+          ...wire.input_audio_transcription,
           ...(sttLanguage ? { language: sttLanguage } : {}),
           ...(sttModel ? { model: sttModel } : {}),
         }
-      : TRANSPORT.input_audio_transcription;
+      : wire.input_audio_transcription;
+  const askTranscription = variant === "full" || wire.compactTranscription;
   return {
     type: "session.update",
     session: {
-      ...TRANSPORT,
-      input_audio_transcription: transcription,
+      ...TRANSPORT_WITHOUT_TRANSCRIPTION,
+      input_audio_format: wire.input_audio_format,
+      output_audio_format: wire.output_audio_format,
+      ...(askTranscription ? { input_audio_transcription: transcription } : {}),
       /* NOT OPTIONAL AND NOT CONFIGURABLE. An operator who could switch this
          off could switch off the identity rule, so it is not an environment
          variable — it is what the product is. */
@@ -421,6 +461,7 @@ export function buildVoiceSessionPayload(
   viewer: VoiceViewer | null = null,
   sttLanguage: SttLanguage | null = null,
   sttModel: string | null = null,
+  wire: VoiceWire = QWEN_WIRE,
 ): VoiceSessionPayload {
   return {
     full: buildSessionUpdate(
@@ -429,11 +470,12 @@ export function buildVoiceSessionPayload(
       "full",
       sttLanguage,
       sttModel,
+      wire,
     ),
     /* The one addition the compact session takes: a line about who is on the
        call. Not knowing the caller is the failure that made a super admin
        hear "you may not see that"; it is a hundred bytes. */
-    compact: buildSessionUpdate(voice, COMPACT_INSTRUCTIONS + voiceViewerBrief(viewer), "compact"),
+    compact: buildSessionUpdate(voice, COMPACT_INSTRUCTIONS + voiceViewerBrief(viewer), "compact", null, null, wire),
   };
 }
 
