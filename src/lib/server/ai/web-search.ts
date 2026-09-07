@@ -95,6 +95,10 @@ function parseImages(raw: unknown, fallbackLabel: string): WebImage[] {
    with an image content-type survives. The whole check is bounded so a slow
    host costs the answer at most this long, once. Injectable for the suite. */
 export const IMAGE_CHECK_TIMEOUT_MS = 1_500;
+/* A picture that says it weighs more than this is dropped before the model
+   sees it: the screen would only ever show it at tile or bubble width, and
+   the proxy that shrinks it has a ceiling of its own. */
+export const IMAGE_MAX_BYTES = 4_000_000;
 export async function filterLoadableImages(
   images: WebImage[],
   fetchFn: (url: string, init: RequestInit) => Promise<{ ok: boolean; headers: { get(name: string): string | null } }> = fetch,
@@ -118,6 +122,8 @@ export async function filterLoadableImages(
       ]);
       if (!res) return null;
       const type = (res.headers.get("content-type") ?? "").toLowerCase();
+      const length = Number(res.headers.get("content-length"));
+      if (Number.isFinite(length) && length > IMAGE_MAX_BYTES) return null;
       return res.ok && type.startsWith("image/") ? img : null;
     } catch {
       return null;

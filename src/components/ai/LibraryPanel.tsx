@@ -18,6 +18,7 @@
 import { useEffect, useState } from "react";
 import PhotoLightbox from "@/components/ai/PhotoLightbox";
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
+import { aiImage } from "@/lib/ai/image-url";
 
 export type LibraryEntry = {
   url: string;
@@ -92,7 +93,7 @@ export default function LibraryPanel({
             >
               {/* eslint-disable-next-line @next/next/no-img-element -- remote pictures from many hosts; next/image would need every host allow-listed */}
               <img
-                src={it.url}
+                src={aiImage(it.url, 384)}
                 alt={it.label}
                 loading="lazy"
                 decoding="async"

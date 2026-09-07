@@ -32,6 +32,7 @@ import type { Lang } from "@/lib/i18n";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import PhotoLightbox, { type LightboxPhoto } from "@/components/ai/PhotoLightbox";
+import { aiImage } from "@/lib/ai/image-url";
 
 interface Props {
   content: string;
@@ -181,10 +182,12 @@ function MarkdownPhoto({ url, alt, onOpen }: { url: string; alt: string; onOpen:
   if (broken) return <span className="koleex-md-img-fallback">{alt}</span>;
   return (
     <button type="button" onClick={onOpen} className="koleex-md-img-link" aria-label={alt || "Photo"}>
-      {/* Remote product photo from whatever host the catalogue names;
-          next/image needs a fixed allowlist. Same call as Bubble. */}
+      {/* A web photo at bubble width through the AI picture proxy, a
+          catalogue photo through the optimizer — never the original file:
+          a phone decoding camera-sized originals in a page that also holds
+          a live call is what got that page killed (2026-09-07). */}
       {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src={url} alt={alt} loading="lazy" decoding="async" className="koleex-md-img" onError={() => setBroken(true)} />
+      <img src={aiImage(url, 768)} alt={alt} loading="lazy" decoding="async" className="koleex-md-img" onError={() => setBroken(true)} />
     </button>
   );
 }

@@ -100,6 +100,18 @@ async function main() {
     }, 60);
     check("  …a host that refuses and a host that never answers are both dropped, within the deadline", kept.length === 1 && kept[0].url === "https://a.example/3.jpg");
     check("  …an empty list costs nothing", (await filterLoadableImages([], async () => { throw new Error("must not be called"); })).length === 0);
+    /* 2026-09-07: camera-sized originals got the page killed under a call.
+       A picture that declares more than four megabytes is dropped here,
+       before the model can offer it; one that declares nothing still passes
+       (the proxy that shrinks it has its own ceiling). */
+    const { IMAGE_MAX_BYTES } = await import("../src/lib/server/ai/web-search");
+    const sized = await filterLoadableImages(
+      [{ url: "https://a.example/big.jpg", description: "a" }, { url: "https://a.example/small.jpg", description: "b" }, { url: "https://a.example/unsized.jpg", description: "c" }],
+      async (u) => ({ ok: true, headers: { get: (n: string) => (n === "content-type" ? "image/jpeg" : u.includes("big") ? String(IMAGE_MAX_BYTES + 1) : u.includes("small") ? "120000" : null) } }),
+      60,
+    );
+    check("  …a picture that says it weighs more than four megabytes is dropped; a small one and an unsized one stay",
+      IMAGE_MAX_BYTES === 4_000_000 && sized.map((i) => i.url).join() === "https://a.example/small.jpg,https://a.example/unsized.jpg");
     const src = readFileSync("src/lib/server/ai/web-search.ts", "utf8");
     check("  …the search awaits the check on its own pictures, bounded to a second and a half", /images: await filterLoadableImages\(parseImages\(json\.images, query\)\)/.test(src) && /export const IMAGE_CHECK_TIMEOUT_MS = 1_500;/.test(src));
   }

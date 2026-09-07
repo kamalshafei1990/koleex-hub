@@ -29,7 +29,7 @@
 import { useEffect, useRef, useState } from "react";
 import { type TranscriptLine, type TranscriptPhoto } from "@/lib/voice/events";
 import { stripImageMarkdown } from "@/lib/voice/photos";
-import { cdnImage } from "@/lib/cdn";
+import { aiImage } from "@/lib/ai/image-url";
 import { type Lang } from "@/lib/i18n";
 import { textDirection } from "@/lib/text-direction";
 
@@ -56,27 +56,42 @@ export type VoiceTranscriptProps = {
   fill?: boolean;
   /** A tap on a picture. Absent means pictures are drawn but not tappable. */
   onOpenPhoto?: (photo: TranscriptPhoto) => void;
+  /** False while this transcript sits in a layer that is not showing: the
+   *  pictures keep their frames and give up their pixels (see PhotoTile). */
+  photosVisible?: boolean;
 };
 
 /* A PICTURE IN THE CONVERSATION, where it was said — not in a strip pinned
    above the words that pushed them off the screen. Tiles on the 8px grid,
    tappable, and a tile whose picture fails to load REMOVES ITSELF: a broken
-   image icon in a frame is worse than no picture. */
-export function PhotoTile({ photo, onOpen, label, size = 120 }: { photo: TranscriptPhoto; onOpen?: (p: TranscriptPhoto) => void; label: string; size?: number }) {
+   image icon in a frame is worse than no picture.
+
+   THE PICTURE IS FETCHED AT TILE SIZE, and only while the tile can be seen.
+   A web photo used to go into <img> at its original URL: a phone decoded a
+   camera-sized file for an 88-pixel tile, several per answer, in the page
+   that also holds a live call — twice in one evening (2026-09-07) that page
+   was killed under the call. Now every picture comes through aiImage at the
+   width of the slot, and a tile in a layer that is not showing (the words
+   layer behind the orb, the strip behind the words) draws an empty frame of
+   the same size instead of holding a decoded picture nobody is looking at. */
+export function PhotoTile({ photo, onOpen, label, size = 120, visible = true }: { photo: TranscriptPhoto; onOpen?: (p: TranscriptPhoto) => void; label: string; size?: number; visible?: boolean }) {
   const [broken, setBroken] = useState(false);
   if (broken) return null;
-  const img = (
+  const frame = "rounded-2xl border border-white/10 bg-white/5";
+  const img = visible ? (
     /* eslint-disable-next-line @next/next/no-img-element */
     <img
-      src={cdnImage(photo.url, { width: 384, quality: 75, resize: "contain" })}
+      src={aiImage(photo.url, 384)}
       alt={photo.label || label}
       width={size}
       height={size}
       decoding="async"
       style={{ width: size, height: size }}
-      className="rounded-2xl object-cover border border-white/10 bg-white/5"
+      className={`${frame} object-cover`}
       onError={() => setBroken(true)}
     />
+  ) : (
+    <span aria-hidden className={`block ${frame}`} style={{ width: size, height: size }} />
   );
   if (!onOpen) return <span className="inline-block">{img}</span>;
   return (
@@ -92,7 +107,7 @@ export function PhotoTile({ photo, onOpen, label, size = 120 }: { photo: Transcr
   );
 }
 
-export default function VoiceTranscript({ lines, lang = "en", className = "", fill = false, onOpenPhoto }: VoiceTranscriptProps) {
+export default function VoiceTranscript({ lines, lang = "en", className = "", fill = false, onOpenPhoto, photosVisible = true }: VoiceTranscriptProps) {
   const endRef = useRef<HTMLDivElement | null>(null);
   const copy = SPEAKER_COPY[lang];
 
@@ -147,7 +162,7 @@ export default function VoiceTranscript({ lines, lang = "en", className = "", fi
               {line.photos && line.photos.length > 0 && (
                 <div className="mt-3 flex flex-wrap gap-3" role="group" aria-label={copy.photos}>
                   {line.photos.map((p) => (
-                    <PhotoTile key={p.url} photo={p} onOpen={onOpenPhoto} label={copy.photos} />
+                    <PhotoTile key={p.url} photo={p} onOpen={onOpenPhoto} label={copy.photos} visible={photosVisible} />
                   ))}
                 </div>
               )}
