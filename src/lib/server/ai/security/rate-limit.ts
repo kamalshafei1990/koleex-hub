@@ -130,6 +130,15 @@ export const BUDGETS = {
     windowSec: 60,
     max: num(process.env.AI_LIMIT_IMAGE_PROXY_PER_MIN, 100),
   }),
+  /* A VOICE, AUDITIONED (api/ai/voice/preview): one short synthesis per
+     tap, cached by the browser for a week after. Five voices, a few taps
+     each, is a handful a minute; twenty is a floor under a loop, and each
+     one is a paid vendor call. */
+  voicePreviewPerAccount: (): Budget => ({
+    bucket: "voice_preview",
+    windowSec: 60,
+    max: num(process.env.AI_LIMIT_VOICE_PREVIEWS_PER_MIN, 20),
+  }),
   imagePerTenant: (): Budget => ({
     bucket: "image:tenant",
     windowSec: 86_400,

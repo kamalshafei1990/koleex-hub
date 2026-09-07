@@ -93,6 +93,10 @@ const COPY: Record<Lang, {
   /* THE VOICE SHEET: its title, the note under the choices, and Close. */
   voicePick: string;
   voiceHint: string;
+  voiceTapHint: string;
+  voiceSampling: string;
+  voiceSampleFailed: string;
+  voiceUse: string;
   close: string;
 }> = {
   en: {
@@ -123,6 +127,10 @@ const COPY: Record<Lang, {
     photos: "Product photos",
     voicePick: "Choose a voice",
     voiceHint: "Switching takes a moment. The conversation carries on.",
+    voiceTapHint: "Tap a voice to hear it, then choose. Switching takes a moment.",
+    voiceSampling: "Playing a sample…",
+    voiceSampleFailed: "Couldn't play a sample right now.",
+    voiceUse: "Use this voice",
     close: "Close",
     holdToTalk: "Hold to talk",
     holdRelease: "Let go when done",
@@ -168,6 +176,10 @@ const COPY: Record<Lang, {
     photos: "产品图片",
     voicePick: "选择音色",
     voiceHint: "切换需要一点时间，对话会继续。",
+    voiceTapHint: "点一下音色试听，再选择。切换需要一点时间。",
+    voiceSampling: "正在播放试听…",
+    voiceSampleFailed: "现在无法播放试听。",
+    voiceUse: "使用这个音色",
     close: "关闭",
     holdToTalk: "按住说话",
     holdRelease: "说完松开",
@@ -213,6 +225,10 @@ const COPY: Record<Lang, {
     photos: "صور المنتج",
     voicePick: "اختار الصوت",
     voiceHint: "التبديل بياخد لحظة، والمحادثة بتكمل.",
+    voiceTapHint: "دوس على صوت تسمعه، وبعدين اختاره. التبديل بياخد لحظة.",
+    voiceSampling: "بيشغّل عيّنة…",
+    voiceSampleFailed: "معرفتش أشغّل العيّنة دلوقتي.",
+    voiceUse: "استخدم الصوت ده",
     close: "اقفل",
     holdToTalk: "اضغط واتكلم",
     holdRelease: "سيب لما تخلص",
@@ -274,6 +290,13 @@ export type VoiceCallScreenProps = {
    *  session, so a new one needs a new session. Said plainly in the UI rather
    *  than silently doing nothing until the next call. */
   onSelectVoice?: (key: string) => void;
+  /** HEAR A VOICE BEFORE CHOOSING IT (owner, 2026-09-07). Present, a tap on a
+   *  voice plays a sample and marks it as the candidate; a separate "Use
+   *  this voice" confirms. Resolves once the sample has been heard, false
+   *  when it could not be. Absent, a tap chooses at once, as before. */
+  onPreviewVoice?: (key: string) => Promise<boolean>;
+  /** The sheet closed or another voice was tapped: stop the sample. */
+  onStopPreview?: () => void;
   /** Open the voice sheet from the first render — for tests and deep links;
    *  the caller opens it from the Voice control otherwise. */
   defaultVoiceSheetOpen?: boolean;
@@ -315,6 +338,8 @@ export default function VoiceCallScreen({
   voices = [],
   selectedVoice = null,
   onSelectVoice,
+  onPreviewVoice,
+  onStopPreview,
   onSendText,
   defaultVoiceSheetOpen = false,
   pendingWrite = null,
@@ -360,7 +385,42 @@ export default function VoiceCallScreen({
       hold(false);
     };
   }, [talkMode, hold]);
-  const closeVoiceSheet = useCallback(() => setVoiceSheet(false), []);
+  /* THE AUDITION. `candidate` is the voice last tapped and heard, drawn as
+     chosen-looking so the eye follows the ear; `sampling` is the one whose
+     sample is loading or playing; `sampleFailed` says so once, plainly. */
+  const [candidate, setCandidate] = useState<string | null>(null);
+  const [sampling, setSampling] = useState<string | null>(null);
+  const [sampleFailed, setSampleFailed] = useState(false);
+  const sampleRun = useRef(0);
+  const closeVoiceSheet = useCallback(() => {
+    setVoiceSheet(false);
+    setCandidate(null);
+    setSampling(null);
+    setSampleFailed(false);
+    sampleRun.current++;
+    onStopPreview?.();
+  }, [onStopPreview]);
+  const tapVoice = useCallback((key: string) => {
+    if (!onPreviewVoice) {
+      onSelectVoice?.(key);
+      closeVoiceSheet();
+      return;
+    }
+    const run = ++sampleRun.current;
+    setCandidate(key);
+    setSampling(key);
+    setSampleFailed(false);
+    void onPreviewVoice(key).then((ok) => {
+      if (sampleRun.current !== run) return;
+      setSampling(null);
+      if (!ok) setSampleFailed(true);
+    });
+  }, [onPreviewVoice, onSelectVoice, closeVoiceSheet]);
+  const confirmVoice = useCallback(() => {
+    if (!candidate || candidate === selectedVoice) return;
+    onSelectVoice?.(candidate);
+    closeVoiceSheet();
+  }, [candidate, selectedVoice, onSelectVoice, closeVoiceSheet]);
   /* Escape closes the sheet, and ONLY the sheet: captured before the
      screen's own Escape (which ends the call) can see it. */
   useEffect(() => {
@@ -1037,13 +1097,17 @@ export default function VoiceCallScreen({
             {voices.length > 0 && (
             <div className="flex gap-4 overflow-x-auto pb-2 -mx-2 px-2 snap-x">
               {voices.map((v, i) => {
-                const on = v.key === selectedVoice;
+                const chosen = v.key === selectedVoice;
+                /* Drawn as "on": the candidate being auditioned, or the
+                   chosen voice when nothing is. Pressed means CHOSEN. */
+                const on = candidate ? v.key === candidate : chosen;
                 return (
                   <button
                     key={v.key}
                     type="button"
-                    aria-pressed={on}
-                    onClick={() => { onSelectVoice?.(v.key); closeVoiceSheet(); }}
+                    aria-pressed={chosen}
+                    aria-busy={sampling === v.key || undefined}
+                    onClick={() => tapVoice(v.key)}
                     className="group flex flex-col items-center gap-2 shrink-0 snap-start focus:outline-none"
                   >
                     {/* A VOICE IS A SHAPE, NOT A FACE. Five identical orbs said
@@ -1053,7 +1117,7 @@ export default function VoiceCallScreen({
                         so the row reads as five different voices at a glance;
                         the chosen one is in Hub Blue and breathes. */}
                     <span className={`h-16 w-16 rounded-full inline-flex items-center justify-center border transition-[background-color,border-color,transform] duration-150 group-active:scale-95 ${on ? "border-[#0066FF] bg-[#0066FF]/10 ring-2 ring-[#0066FF]/40 ring-offset-2 ring-offset-[#141414]" : "border-white/15 bg-white/[0.04] group-hover:border-white/30"}`}>
-                      <VoiceGlyph index={i} on={on} />
+                      <VoiceGlyph index={i} on={on || sampling === v.key} />
                     </span>
                     <span className={`text-[12px] ${on ? "text-white font-semibold" : "text-[#AAAAAA] group-hover:text-white"}`}>{v.label}</span>
                   </button>
@@ -1061,7 +1125,24 @@ export default function VoiceCallScreen({
               })}
             </div>
             )}
-            {voices.length > 0 && <p className="mt-3 text-[12px] text-[#666666]">{copy.voiceHint}</p>}
+            {voices.length > 0 && (
+              <p className="mt-3 text-[12px] text-[#666666]" aria-live="polite">
+                {sampling ? copy.voiceSampling : sampleFailed ? copy.voiceSampleFailed : onPreviewVoice ? copy.voiceTapHint : copy.voiceHint}
+              </p>
+            )}
+            {/* THE CHOICE IS A SEPARATE TAP when voices can be heard first:
+                a tap on an orb is "let me hear it", this is "this one". Off
+                until a voice other than the current one has been heard. */}
+            {voices.length > 0 && onPreviewVoice && (
+              <button
+                type="button"
+                onClick={confirmVoice}
+                disabled={!candidate || candidate === selectedVoice}
+                className="mt-4 h-12 w-full rounded-2xl bg-[#0066FF] text-[15px] font-semibold text-white disabled:bg-white/[0.06] disabled:text-[#666666] transition-[background-color,transform] duration-150 active:scale-[0.99] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0066FF] focus-visible:ring-offset-2 focus-visible:ring-offset-[#141414]"
+              >
+                {copy.voiceUse}
+              </button>
+            )}
 
             {/* HOW YOU TALK (roadmap B2). Two choices, one pressed. Choosing
                 does not close the sheet or rebuild the call — the parent

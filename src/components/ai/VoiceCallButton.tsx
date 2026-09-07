@@ -63,6 +63,7 @@ import {
 import { requestCallSummary, shouldSummarise } from "@/lib/voice/summary";
 import { sendVoiceTelemetry } from "@/lib/voice/telemetry";
 import { probeWsLane } from "@/lib/voice/lane-probe";
+import { createPreviewPlayer, browserPreviewContext, VOICE_PREVIEW_PATH, PREVIEW_FETCH_TIMEOUT_MS, type PreviewPlayer } from "@/lib/voice/preview-player";
 import { TranscriptPersister, type SavedTurn, type PersistFailure } from "@/lib/voice/persist";
 import VoiceCallScreen from "@/components/ai/VoiceCallScreen";
 
@@ -965,6 +966,44 @@ export default function VoiceCallButton({
   /* THE CONFIGURATION IS SENT ONCE PER SESSION, so a new voice needs a new
      session. Restarting is honest about that; silently storing the choice for
      "next time" would look like a control that does nothing. */
+  /* HEARING A VOICE BEFORE CHOOSING IT (owner, 2026-09-07). The sheet asks
+     for a sample; this fetches it from our route and plays it through a
+     player primed inside the tap (preview-player.ts). While the sample
+     plays the microphone is closed and the far side is silenced, so the
+     sample is neither heard by the far side as the caller's words nor
+     talked over — and both are restored exactly as they were. */
+  const previewRef = useRef<PreviewPlayer | null>(null);
+  const previewVoice = useCallback(async (key: string): Promise<boolean> => {
+    const player = (previewRef.current ??= createPreviewPlayer(browserPreviewContext));
+    player.prime();
+    let bytes: ArrayBuffer;
+    try {
+      const q = new URLSearchParams({ voice: key, lane: transportRef.current, lang });
+      const res = await fetch(`${VOICE_PREVIEW_PATH}?${q.toString()}`, {
+        credentials: "include",
+        ...(typeof AbortSignal !== "undefined" && "timeout" in AbortSignal ? { signal: AbortSignal.timeout(PREVIEW_FETCH_TIMEOUT_MS) } : {}),
+      });
+      if (!res.ok) return false;
+      bytes = await res.arrayBuffer();
+    } catch {
+      return false;
+    }
+    const session = sessionRef.current;
+    const micWasOpen = !!session && !session.isMuted();
+    if (micWasOpen) session.setMuted(true);
+    const far = audioRef.current;
+    const farWasMuted = far?.muted ?? false;
+    if (far) far.muted = true;
+    try {
+      return await player.play(bytes);
+    } finally {
+      if (far) far.muted = farWasMuted;
+      if (micWasOpen && sessionRef.current === session) session.setMuted(false);
+    }
+  }, [lang]);
+  const stopPreview = useCallback(() => previewRef.current?.stop(), []);
+  useEffect(() => () => { previewRef.current?.close(); previewRef.current = null; }, []);
+
   const toggleMute = useCallback(() => {
     const session = sessionRef.current;
     if (!session) return;
@@ -1090,6 +1129,8 @@ export default function VoiceCallButton({
           voices={voices}
           selectedVoice={voiceKey}
           onSelectVoice={selectVoice}
+          onPreviewVoice={previewVoice}
+          onStopPreview={stopPreview}
           onSendText={sendTyped}
           pendingWrite={pendingWrite}
           onConfirmWrite={() => void confirmWrite()}
