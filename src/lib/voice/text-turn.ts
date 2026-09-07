@@ -49,3 +49,24 @@ export function buildTextTurnMessages(text: string): string[] | null {
     JSON.stringify({ type: EV_RESPONSE_CREATE }),
   ];
 }
+
+/* ── A word from the new voice ──────────────────────────────────────────
+   The owner (2026-09-07): choosing a voice "takes time until it talks". A
+   switch rebuilds the session, and the rebuilt call then WAITED for the
+   caller to speak before the new voice was heard at all — seconds of a
+   screen saying ready and a phone saying nothing. So the moment the new
+   session is acknowledged, one response is asked for with instructions and
+   no user turn: a single short sentence, in the conversation's language,
+   that the voice is here. The caller hears the choice at once and the
+   thread gains one honest line. Nothing about who is speaking is stated —
+   the product is Koleex AI on every voice. */
+export const VOICE_SWITCH_GREETING =
+  "The caller just switched to a different voice for you. Say ONE short, warm sentence in the language of the conversation so far (match the caller's last turn; Arabic in Egyptian dialect), letting them know you're here with this voice and ready to continue. No question, no summary, no mention of settings or technology.";
+
+/** ONE wire message: ask the far side for a response to these instructions,
+ *  with no user turn added. Null for empty instructions. */
+export function buildResponseRequest(instructions: string): string | null {
+  const trimmed = instructions.trim().slice(0, MAX_TYPED_TURN_CHARS);
+  if (!trimmed) return null;
+  return JSON.stringify({ type: EV_RESPONSE_CREATE, response: { instructions: trimmed } });
+}

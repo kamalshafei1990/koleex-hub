@@ -14,16 +14,15 @@
    barge-in gate on the element all work unchanged.
 
    A JITTER BUFFER, BECAUSE THE VOICE ARRIVED CHOPPED (owner, 2026-09-07
-   18:10: "the voice of Grok not so stable"). Frames come down a socket
-   across a VPN and a border, in bursts and with gaps; the first version
-   started each frame 50 ms after "now" and butted the next against it, so
-   every gap on the wire longer than 50 ms became a gap in the voice. Now a
-   fresh run of frames starts a fifth of a second behind, and every time the
-   queue still runs dry the lead grows a tenth, up to a ceiling: a lane with
-   a rough network buys itself a little more delay instead of stuttering
-   for the whole call. The lead is per run — a barge-in flush or a pause
-   starts a new run — so an answer never begins a second late. The
-   arithmetic is in nextFrameStart, pure, and tested.
+   18:10: "the voice of Grok not so stable"; 19:05: still "a strange voice").
+   Frames come down a socket across a VPN and a border, in bursts and with
+   gaps, and the first frame of an answer is small and early. Playing each
+   frame as it landed made every wire gap a gap in the voice and every
+   answer start as a blip, a silence, then the sentence. Now an answer is
+   GATHERED before it plays — a third of a second of sound, or whatever has
+   arrived after a third of a second — and then plays back to back; a run
+   that still drains mid-answer grows the gathering for the rest of the call,
+   up to a ceiling. The logic is JitterQueue, pure given a clock, and tested.
 
    THE MICROPHONE IS READ OFF THE MAIN THREAD when the engine allows it.
    A ScriptProcessorNode runs on the main thread, and the main thread of
@@ -112,41 +111,118 @@ export function base64ToBytes(b64: string): Uint8Array {
 
 /* ── The jitter buffer ──────────────────────────────────────────────────── */
 
-/** How far behind "now" a fresh run of frames starts playing. */
-export const JITTER_LEAD_S = 0.2;
-/** How much the lead grows each time the queue runs dry mid-run. */
-export const JITTER_LEAD_STEP_S = 0.1;
+/** How much of an answer is gathered before its first frame plays. */
+export const PREBUFFER_S = 0.3;
+/** How much the gathering grows each time a run still drains mid-answer. */
+export const PREBUFFER_STEP_S = 0.1;
 /** The most delay a rough network can buy itself. */
-export const JITTER_LEAD_MAX_S = 0.6;
+export const PREBUFFER_MAX_S = 0.8;
+/** A short answer ("Yes.") never fills the buffer: whatever has arrived
+ *  plays after this long regardless. */
+export const PREBUFFER_WAIT_MS = 350;
+/** A run that drained this long ago ended on its own — the answer was over,
+ *  not late. Shorter than this is an UNDERRUN and grows the buffer. */
+export const RUN_GAP_S = 1.0;
+/** Scheduling margin so a start time is never already in the past. */
+const START_MARGIN_S = 0.05;
 
-export type JitterState = {
-  /** Context time the next frame should start at; 0 = no run in progress. */
-  nextStart: number;
-  /** The lead this session has settled on, grown by underruns. */
-  lead: number;
+export type JitterFrame<T> = { node: T; duration: number };
+export type JitterDeps<T> = {
+  now(): number;
+  /** Start this frame at this context time. */
+  start(node: T, at: number): void;
+  setTimer(fn: () => void, ms: number): unknown;
+  clearTimer(handle: unknown): void;
 };
 
 /**
- * Where the frame that just arrived should start, and the state after it.
+ * Frames in, start times out.
  *
- *   · no run in progress (after a flush, or the first frame): now + lead
- *   · the run is still ahead of now: butt against the previous frame
- *   · the run fell behind now (an UNDERRUN — the gap on the wire outlasted
- *     the queue): start now + lead, and grow the lead for the next time
- *
- * Pure. `duration` is the frame's length in seconds.
+ * The first version butted each frame 50 ms behind "now": every gap on the
+ * wire longer than that was a gap in the voice, and the FIRST frame of an
+ * answer — the vendor sends a small one fast, then streams — was a blip, a
+ * silence, then the sentence. Now an answer is GATHERED first: frames queue
+ * until PREBUFFER_S of sound is held (or PREBUFFER_WAIT_MS has passed), then
+ * play back to back from a single start. A frame that arrives after the run
+ * drained is an underrun: the run stops, the target grows a step, and the
+ * frame begins a new gathering. A frame that arrives long after the run
+ * drained is simply the next answer, gathered at the target the call has
+ * settled on. Pure given its deps; the suite drives it with a fake clock.
  */
-export function nextFrameStart(state: JitterState, now: number, duration: number): { start: number; next: JitterState; underrun: boolean } {
-  if (state.nextStart === 0) {
-    const start = now + state.lead;
-    return { start, next: { nextStart: start + duration, lead: state.lead }, underrun: false };
+export class JitterQueue<T> {
+  target = PREBUFFER_S;
+  underruns = 0;
+  private nextStart = 0;
+  private running = false;
+  private pending: JitterFrame<T>[] = [];
+  private pendingDur = 0;
+  private timer: unknown = null;
+
+  constructor(private readonly deps: JitterDeps<T>) {}
+
+  push(frame: JitterFrame<T>): void {
+    if (this.running) {
+      const now = this.deps.now();
+      if (this.nextStart >= now) {
+        this.deps.start(frame.node, this.nextStart);
+        this.nextStart += frame.duration;
+        return;
+      }
+      /* The run drained before this frame arrived. */
+      this.running = false;
+      if (now - this.nextStart < RUN_GAP_S) {
+        this.underruns++;
+        this.target = Math.min(PREBUFFER_MAX_S, this.target + PREBUFFER_STEP_S);
+      }
+    }
+    this.pending.push(frame);
+    this.pendingDur += frame.duration;
+    if (this.pendingDur >= this.target) this.release();
+    else if (this.timer === null) {
+      this.timer = this.deps.setTimer(() => {
+        this.timer = null;
+        this.release();
+      }, PREBUFFER_WAIT_MS);
+    }
   }
-  if (state.nextStart >= now) {
-    return { start: state.nextStart, next: { nextStart: state.nextStart + duration, lead: state.lead }, underrun: false };
+
+  /** Play everything gathered, back to back, from now. */
+  release(): void {
+    if (this.timer !== null) {
+      this.deps.clearTimer(this.timer);
+      this.timer = null;
+    }
+    if (this.pending.length === 0) return;
+    let at = this.deps.now() + START_MARGIN_S;
+    for (const f of this.pending) {
+      this.deps.start(f.node, at);
+      at += f.duration;
+    }
+    this.pending = [];
+    this.pendingDur = 0;
+    this.nextStart = at;
+    this.running = true;
   }
-  const lead = Math.min(JITTER_LEAD_MAX_S, state.lead + JITTER_LEAD_STEP_S);
-  const start = now + lead;
-  return { start, next: { nextStart: start + duration, lead }, underrun: true };
+
+  /** Drop what is gathered and forget the run (barge-in). The target the
+   *  call has settled on is kept. */
+  flush(): T[] {
+    if (this.timer !== null) {
+      this.deps.clearTimer(this.timer);
+      this.timer = null;
+    }
+    const dropped = this.pending.map((f) => f.node);
+    this.pending = [];
+    this.pendingDur = 0;
+    this.running = false;
+    this.nextStart = 0;
+    return dropped;
+  }
+
+  /** How much sound is gathered and not yet playing, in seconds. */
+  get buffered(): number {
+    return this.pendingDur;
+  }
 }
 
 /* ── Capture ────────────────────────────────────────────────────────────── */
@@ -198,8 +274,17 @@ export function createBrowserWsAudio(wireRate: number): WsAudio {
   let silence: GainNode | null = null;
   let capturing = false;
   let closed = false;
-  let jitter: JitterState = { nextStart: 0, lead: JITTER_LEAD_S };
   const playing = new Set<AudioBufferSourceNode>();
+  const jitter = new JitterQueue<AudioBufferSourceNode>({
+    now: () => ctx.currentTime,
+    start: (node, at) => {
+      node.start(at);
+      playing.add(node);
+      node.onended = () => playing.delete(node);
+    },
+    setTimer: (fn, ms) => setTimeout(fn, ms),
+    clearTimer: (h) => clearTimeout(h as ReturnType<typeof setTimeout>),
+  });
 
   const emit = (onFrame: (b64: string) => void, input: Float32Array) => {
     const frame = resample(input, ctx.sampleRate, wireRate);
@@ -260,19 +345,18 @@ export function createBrowserWsAudio(wireRate: number): WsAudio {
       const node = ctx.createBufferSource();
       node.buffer = buffer;
       node.connect(out);
-      const placed = nextFrameStart(jitter, ctx.currentTime, buffer.duration);
-      jitter = placed.next;
-      node.start(placed.start);
-      playing.add(node);
-      node.onended = () => {
-        playing.delete(node);
-        /* The queue drained on its own (the answer ended): the next answer
-           is a fresh run, at the lead this call has settled on. */
-        if (playing.size === 0) jitter = { nextStart: 0, lead: jitter.lead };
-      };
+      jitter.push({ node, duration: buffer.duration });
       void ctx.resume().catch(() => {});
     },
     flush() {
+      /* Gathered frames were never started; started ones are stopped. */
+      for (const node of jitter.flush()) {
+        try {
+          node.disconnect();
+        } catch {
+          /* never connected */
+        }
+      }
       for (const node of playing) {
         try {
           node.stop();
@@ -281,7 +365,6 @@ export function createBrowserWsAudio(wireRate: number): WsAudio {
         }
       }
       playing.clear();
-      jitter = { nextStart: 0, lead: jitter.lead };
     },
     close() {
       closed = true;

@@ -46,7 +46,7 @@ function eventTypeOf(raw: string): string {
     return "";
   }
 }
-import { buildTextTurnMessages, buildNoteMessage } from "./text-turn";
+import { buildTextTurnMessages, buildNoteMessage, buildResponseRequest } from "./text-turn";
 import { createBrowserWsAudio, type WsAudio } from "./ws-audio";
 
 /** True when a DataChannel message is exactly this event.
@@ -517,6 +517,21 @@ export class VoiceSession {
     const channel = this.channel;
     if (!channel || channel.readyState !== "open") return false;
     const message = buildNoteMessage(text);
+    if (!message) return false;
+    try {
+      channel.send(message);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  /** Ask the far side to speak now, to these instructions, with no user
+   *  turn added — a word from a newly chosen voice (text-turn.ts). */
+  requestResponse(instructions: string): boolean {
+    const channel = this.channel;
+    if (!channel || channel.readyState !== "open") return false;
+    const message = buildResponseRequest(instructions);
     if (!message) return false;
     try {
       channel.send(message);
