@@ -122,17 +122,34 @@ export default function InvitationPrintPage({
       }
       if (cancelled) return;
 
+      /* The tab's title is what "Print → Save as PDF" proposes as the file
+         name, and the owner's save dialog offered "Claude" — the host app's
+         name, because nothing here ever set one. Name it after the letter so
+         the saved file arrives as KX-INV-2026-0002 - Invitation Letter.pdf.
+         (The Export PDF button names its own download server-side; this is
+         only for the browser-print path.) */
+      const ref = data.letter.reference || "Invitation Letter";
+      const who = (data.letter.visitor?.name || "").trim();
+      document.title = who ? `${ref} - ${who}` : `${ref} - Invitation Letter`;
+
       /* Measure each sheet now that images and fonts have settled — a stamp
-         that decoded late can be what pushes a page over. 270 mm at 96 dpi;
-         a 2 mm tolerance absorbs sub-pixel rounding. */
+         that decoded late can be what pushes a page over. */
       const MM = 96 / 25.4;
       const over: number[] = [];
-      /* 292, not 270. The sheet's MIN-height is 270mm, but the printed page
-         is 297mm (A4) — sheets legitimately sit at 275-281 since the stamp
-         took its real 40mm size, and 270 cried wolf on letters whose PDFs
-         measured exactly three pages. 292 leaves 5mm of pagination tolerance
-         below the true limit. */
-      const LIMIT = 292 * MM;
+      /* 270mm — the sheet's OWN design height, not the 292 the warning used.
+         The letter has to survive TWO printing paths, and they do not offer
+         the same room:
+           · Export PDF  → headless Chromium, margin 0 → 297mm usable.
+           · Print → Save as PDF → the operator's print dialog, which applies
+             its own paper margins (~13mm top and bottom on macOS) → about
+             271mm usable, and @page margin:0 does not override the system
+             dialog.
+         The owner printed through the second path and the letter's last two
+         lines — phones and reference — landed on a blank sheet, even though
+         the same letter exported perfectly through the first. Fitting to the
+         sheet's declared height satisfies both, and it is the height the
+         design already promises. */
+      const LIMIT = 270 * MM;
       document.querySelectorAll<HTMLElement>(".inv-a4").forEach((el, i) => {
         /* SHRINK TO FIT, don't just warn.
            The English sheet measures 288mm against a 297mm page — nine
@@ -146,7 +163,7 @@ export default function InvitationPrintPage({
            Pinning a font would only move the problem (Inter already leaves
            4mm). Instead the sheet is measured after fonts and images settle
            and scaled down just enough to fit — Word's "shrink to fit", and it
-           does nothing at all when the letter already fits.
+           does nothing at all when the letter already fits its own height.
            `zoom`, not `transform`: zoom changes the LAYOUT box, so print
            pagination sees the smaller sheet. It scales width too, hence the
            `margin: 0 auto` in the print stylesheet that keeps a shrunk sheet
