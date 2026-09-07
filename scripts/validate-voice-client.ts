@@ -1148,7 +1148,7 @@ async function main() {
       const live = Number((/const LIVE_GRACE_MS = ([\d_]+)/.exec(src)?.[1] ?? "0").replace(/_/g, ""));
       const never = Number((/const RECONNECT_GRACE_MS = ([\d_]+)/.exec(src)?.[1] ?? "0").replace(/_/g, ""));
       check("the shipped live window is twenty seconds, above the eight a call that never came up gets", live === 20_000 && never === 8_000 && live > never);
-      check("  …and is the one armed for a call that was up", /this\.iceEverConnected\s*\?\s*\(this\.deps\.liveGraceMs \?\? this\.deps\.reconnectGraceMs \?\? LIVE_GRACE_MS\)\s*:\s*\(this\.deps\.reconnectGraceMs \?\? RECONNECT_GRACE_MS\)/.test(src));
+      check("  …and is the one armed for a call that was up", /this\.iceEverConnected\s*\?\s*\(this\.deps\.liveGraceMs \?\? this\.deps\.reconnectGraceMs \?\? LIVE_GRACE_MS\)\s*:[\s\S]{0,600}?\(this\.deps\.reconnectGraceMs \?\? RECONNECT_GRACE_MS\)/.test(src));
       check("  …every sign of a connected transport goes through one place",
         /local\.onopen = \(\) => \{\s*this\.markTransportUp\(\);/.test(src) && /remote\.onopen = \(\) => \{\s*this\.markTransportUp\(\);/.test(src) &&
         /private onChannelMessage\(raw: string, channel: VoiceChannel\): void \{[\s\S]{0,600}?this\.markTransportUp\(\);/.test(src) &&
@@ -2704,7 +2704,7 @@ function describeErrorCheck(): boolean {
     const btn = fs26.readFileSync("src/components/ai/VoiceCallButton.tsx", "utf8");
     const sess = fs26.readFileSync("src/lib/voice/session.ts", "utf8");
     check("the button takes the lane from the voices GET — the server's word — and hands it to the session; it never picks one",
-      /transportRef\.current = body\.transport === "ws" \? "ws" : "rtc";/.test(btn) && /transportRef\.current\);/.test(btn) && !/transportRef\.current = "ws"/.test(btn));
+      /const server: "rtc" \| "ws" = body\.transport === "ws" \? "ws" : "rtc";/.test(btn) && /transportRef\.current\);/.test(btn) && !/transportRef\.current = "ws";/.test(btn));
     check("  …a ws lane that never came up falls back to the mainland lane ONCE, silently, and never the other way",
       /const canFallBack = transportRef\.current === "ws" && !wasUp && laneFailed && !laneFellBackRef\.current;/.test(btn) &&
       /if \(canFallBack\) \{\s*laneFellBackRef\.current = true;\s*transportRef\.current = "rtc";/.test(btn) && !/transportRef\.current = "ws";/.test(btn));
@@ -2716,6 +2716,79 @@ function describeErrorCheck(): boolean {
     check("the browser's socket and audio are the deps' defaults; the session itself names no vendor and no host",
       /createWebSocket: \(url, protocols\) => new WebSocket\(url, protocols\)/.test(sess) && /createWsAudio: \(sampleRate\) => createBrowserWsAudio\(sampleRate\)/.test(sess) &&
       !/api\.x\.ai|wss:\/\/[a-z]/i.test(sess));
+  }
+}
+
+{
+  console.log("\n── 27. The device finds out which lane works from its own network ──");
+  /* 2026-09-07 17:27: VPN on, mainland voice. A phone's VPN tunnels only
+     the blocked hosts; our host is not blocked, so our server saw a
+     mainland address and chose the mainland lane while the browser could
+     reach the vendor all along. The server's answer is a default; the
+     browser probes, once, ahead of the call, and remembers. */
+  const { decideLane, parseSavedLane, LANE_TTL_MS } = await import("../src/lib/voice/voice-pref");
+  const { probeWsLane, LANE_PROBE_TIMEOUT_MS } = await import("../src/lib/voice/lane-probe");
+  const now = 1_700_000_000_000;
+  check("the server saying the socket lane is final — no probe", JSON.stringify(decideLane("ws", { lane: "rtc", at: now }, now)) === JSON.stringify({ lane: "ws", probe: false }));
+  check("the server saying mainland with no device verdict: mainland now, and a probe", JSON.stringify(decideLane("rtc", null, now)) === JSON.stringify({ lane: "rtc", probe: true }));
+  check("  …a fresh device verdict overrides it, either way, with no probe",
+    JSON.stringify(decideLane("rtc", { lane: "ws", at: now - 60_000 }, now)) === JSON.stringify({ lane: "ws", probe: false }) &&
+    JSON.stringify(decideLane("rtc", { lane: "rtc", at: now - 60_000 }, now)) === JSON.stringify({ lane: "rtc", probe: false }));
+  check("  …a stale verdict is re-checked", decideLane("rtc", { lane: "ws", at: now - LANE_TTL_MS - 1 }, now).probe === true && LANE_TTL_MS === 6 * 60 * 60 * 1000);
+  check("  …a verdict from the future is not trusted", decideLane("rtc", { lane: "ws", at: now + 5_000 }, now).probe === true);
+  check("the saved verdict is read strictly", parseSavedLane('{"lane":"ws","at":5}')?.lane === "ws" && parseSavedLane('{"lane":"x","at":5}') === null && parseSavedLane("nonsense") === null && parseSavedLane(null) === null);
+
+  const probeDeps = (opts: { open?: boolean; error?: boolean; status?: number; bad?: boolean }) => {
+    const sockets: Array<{ url: string; protocols: string[]; closed: number }> = [];
+    return {
+      sockets,
+      deps: {
+        timeoutMs: 80,
+        fetchFn: (async () => ({
+          ok: (opts.status ?? 200) < 400, status: opts.status ?? 200,
+          json: async () => (opts.bad ? { url: "ws://plain", protocols: [] } : { url: "wss://voice.example/v1/realtime", protocols: ["xai-client-secret.S"] }),
+        }) as unknown as Response) as unknown as typeof fetch,
+        createWebSocket: (url: string, protocols: string[]) => {
+          const rec = { url, protocols, closed: 0 };
+          sockets.push(rec);
+          const sock: VoiceSocket = {
+            readyState: 0, onopen: null, onmessage: null, onclose: null, onerror: null,
+            send() {}, close() { rec.closed++; },
+          };
+          setTimeout(() => { if (opts.open) sock.onopen?.({}); else if (opts.error) { sock.onerror?.({}); sock.onclose?.({}); } }, 10);
+          return sock;
+        },
+      },
+    };
+  };
+  {
+    const h = probeDeps({ open: true });
+    const ok = await probeWsLane(h.deps);
+    check("a socket that opens is a lane that works — and is closed at once, no audio, no session", ok === true && h.sockets.length === 1 && h.sockets[0].closed === 1 && h.sockets[0].protocols.join() === "xai-client-secret.S");
+  }
+  {
+    const h = probeDeps({ error: true });
+    check("a socket that errors is a lane that does not", (await probeWsLane(h.deps)) === false && h.sockets[0].closed === 1);
+  }
+  {
+    const h = probeDeps({});
+    const t0 = Date.now();
+    check("a socket that never answers is a lane that does not, within the deadline", (await probeWsLane(h.deps)) === false && Date.now() - t0 < 1_000 && h.sockets[0].closed === 1);
+  }
+  check("a route refusal or a bad envelope opens no socket", (await probeWsLane(probeDeps({ status: 503 }).deps)) === false && (await probeWsLane(probeDeps({ bad: true }).deps)) === false);
+  check("the shipped deadline is three seconds", LANE_PROBE_TIMEOUT_MS === 3_000);
+  {
+    const fs27 = await import("node:fs");
+    const btn = fs27.readFileSync("src/components/ai/VoiceCallButton.tsx", "utf8");
+    const route = fs27.readFileSync("src/app/api/ai/voice/session/route.ts", "utf8");
+    const sess = fs27.readFileSync("src/lib/voice/session.ts", "utf8");
+    check("the button decides from the server's default and the device's verdict, probes in the background only when told the socket lane exists, and never moves a call already placed",
+      /const decided = decideLane\(server, readSavedLane\(\), Date\.now\(\)\);\s*transportRef\.current = decided\.lane;\s*if \(decided\.probe && body\.ws_available === true\) \{/.test(btn) &&
+      /saveLane\(ok \? "ws" : "rtc"\);\s*(\/\*[^*]*\*\/\s*)?if \(!sessionRef\.current\) transportRef\.current = ok \? "ws" : "rtc";/.test(btn));
+    check("  …a real call teaches the device too: live on the socket lane saves ws, a fall-back saves rtc",
+      /if \(next === "live" && transportRef\.current === "ws"\) saveLane\("ws"\);/.test(btn) && /transportRef\.current = "rtc";\s*(\/\*[^*]*\*\/\s*)?saveLane\("rtc"\);/.test(btn));
+    check("the voices GET says whether a socket lane exists and logs its decision with the country — nothing else", /ws_available: grok !== null/.test(route) && /\[ai\.voice\] lane=\$\{lane \?\? "none"\} country=/.test(route));
+    check("a socket lane waits four seconds for its socket, not eight — the fall-back is behind it", /const WS_OPEN_GRACE_MS = 4_000;/.test(sess) && /this\.transport === "ws" && this\.deps\.reconnectGraceMs === undefined[\s\S]{0,400}?\? WS_OPEN_GRACE_MS/.test(sess));
   }
 }
 

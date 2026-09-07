@@ -262,6 +262,9 @@ const RECONNECT_GRACE_MS = 8_000;
    conversation that a person is still having; a link that is truly gone
    reports `failed` and ends the call at once, whatever this says. */
 const LIVE_GRACE_MS = 20_000;
+/** How long the WebSocket lane waits for its socket to open before the
+ *  button's fall-back gets the call. See armReconnectTimer. */
+const WS_OPEN_GRACE_MS = 4_000;
 /** Our own deadline on the handshake POST; the route waits at most 45 s. */
 const HANDSHAKE_TIMEOUT_MS = 50_000;
 /** The pause before the one retry of a handshake the link dropped. */
@@ -853,7 +856,13 @@ export class VoiceSession {
       this.fail("connection-lost");
     }, this.iceEverConnected
       ? (this.deps.liveGraceMs ?? this.deps.reconnectGraceMs ?? LIVE_GRACE_MS)
-      : (this.deps.reconnectGraceMs ?? RECONNECT_GRACE_MS));
+      : this.transport === "ws" && this.deps.reconnectGraceMs === undefined
+        /* A SOCKET THAT WILL OPEN OPENS IN A SECOND. One that a network
+           blocks is reset at once or never answers; either way, four seconds
+           is enough to know, and the mainland lane is waiting behind the
+           fall-back. Eight was a caller staring at "connecting". */
+        ? WS_OPEN_GRACE_MS
+        : (this.deps.reconnectGraceMs ?? RECONNECT_GRACE_MS));
   }
 
   /** THE TRANSPORT IS UP — by whichever sign arrives first.
