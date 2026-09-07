@@ -37,7 +37,10 @@ export default function TypingIndicator({ lang = "en" }: { lang?: Lang } = {}): 
           align-items: center;
           gap: 6px;
           padding: 10px 14px;
-          background: var(--surface-subtle, rgba(0, 0, 0, 0.04));
+          /* --bg-surface-subtle is the defined token; the old --surface-subtle
+             never existed, so the dots sat on a 4% black that vanished on the
+             dark ground (audit, 2026-09-07). */
+          background: var(--bg-surface-subtle, rgba(0, 0, 0, 0.04));
           border-radius: 14px;
           min-height: 20px;
         }

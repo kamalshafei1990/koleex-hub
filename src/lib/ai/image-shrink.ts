@@ -69,7 +69,15 @@ export async function shrinkImage(file: File): Promise<File> {
   if (!shouldShrink(file) || typeof document === "undefined" || typeof createImageBitmap !== "function") return file;
   let bitmap: ImageBitmap | null = null;
   try {
-    bitmap = await createImageBitmap(file);
+    /* THE PHOTO STAYS UPRIGHT. The canvas re-encode drops EXIF, so a portrait
+       phone photo decoded without applying its orientation came out sideways
+       for the vision model (audit, 2026-09-07). Browsers that do not know the
+       option throw on it; those apply the orientation by default. */
+    try {
+      bitmap = await createImageBitmap(file, { imageOrientation: "from-image" });
+    } catch {
+      bitmap = await createImageBitmap(file);
+    }
     const plan = planShrink(bitmap.width, bitmap.height);
     const canvas = document.createElement("canvas");
     canvas.width = plan.width;

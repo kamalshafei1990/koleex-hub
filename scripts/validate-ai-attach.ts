@@ -55,7 +55,7 @@ console.log("\n── 3. The turn goes into the thread first (owner ask, 2026-09
     !/L_READING/.test(app) && /setAttachReading\(true\);/.test(send) && /setAttachReading\(false\);/.test(send) &&
     /sending\s*\?\s*attachReading\s*\?\s*"reading"/.test(app));
   check("when nothing could be read, the question is NOT sent without its file: both bubbles come out, words and files return to the composer, the error says why",
-    /if \(failure !== null \|\| attachPayload\.length === 0\) \{\s*setMessages\(\(prev\) => prev\.filter\(\(m\) => m\.id !== optimistic\.id && m\.id !== placeholderId\)\);\s*setInput\(\(cur\) => \(cur\.trim\(\) \? cur : text\)\);\s*setAttachments\(\(cur\) => \(cur\.length > 0 \? cur : filesToSend\)\);\s*setError\(failure \?\? partial \?\? "Couldn't read the attachment\(s\)\."\);\s*sendingRef\.current = false;\s*setSending\(false\);\s*return;/.test(send));
+    /if \(failure !== null \|\| attachPayload\.length === 0 \|\| aborter\.signal\.aborted\) \{\s*setMessages\(\(prev\) => prev\.filter\(\(m\) => m\.id !== optimistic\.id && m\.id !== placeholderId\)\);[\s\S]{0,300}?if \(activeIdRef\.current === conversationId\) \{\s*setInput\(\(cur\) => \(cur\.trim\(\) \? cur : text\)\);\s*setAttachments\(\(cur\) => \(cur\.length > 0 \? cur : filesToSend\)\);\s*resizeComposer\(\);[\s\S]{0,200}?if \(!aborter\.signal\.aborted\) setError\(failure \?\? partial \?\? copy\.attachNothingRead\);\s*\}\s*abortRef\.current = null;\s*sendingRef\.current = false;\s*setSending\(false\);\s*return;/.test(send));
   check("a dropped connection is retried once with a rebuilt body; a server answer never is",
     /try \{\s*up = await request\(\);\s*\} catch \(first\) \{\s*if \(!\(first instanceof TypeError\)\) throw first;\s*await new Promise\(\(r\) => setTimeout\(r, 1500\)\);\s*up = await request\(\);\s*\}/.test(send) &&
     /request = \(\) => \{\s*const fd = new FormData\(\);/.test(send));
@@ -65,7 +65,7 @@ console.log("\n── 3. The turn goes into the thread first (owner ask, 2026-09
   check("the user bubble shows the picture itself, tappable into the lightbox, and a 📎 chip for a document — only for user rows",
     /const attachedFiles = isUser \? \(msg\.attachedFiles \?\? \[\]\) : \[\];/.test(bubble) &&
     /onClick=\{\(\) => setOpenPhoto\(\{ url, label: f\.name \}\)\}/.test(bubble) &&
-    /<PhotoLightbox photo=\{openPhoto\} onClose=\{\(\) => setOpenPhoto\(null\)\} closeLabel=\{copy\.back\} \/>/.test(bubble));
+    /<PhotoLightbox photo=\{openPhoto\} onClose=\{\(\) => setOpenPhoto\(null\)\} closeLabel=\{copy\.closePhoto\} \/>/.test(bubble));
 }
 
 console.log("\n── 4. A big document travels through OUR server, in pieces (2026-09-04) ──");
@@ -82,7 +82,9 @@ console.log("\n── 4. A big document travels through OUR server, in pieces (2
     needsChunking([{ size: 2 * 1024 * 1024 }, { size: 2 * 1024 * 1024 }]));
   const lib = readFileSync("src/lib/ai/attachment-chunks.ts", "utf8");
   check("a piece is retried once on a dropped connection; a refusal is thrown with the server's reason",
-    /catch \(first\) \{\s*if \(!\(first instanceof TypeError\)\) throw first;/.test(lib) && /throw new Error\(`\$\{file\.name\}: \$\{j\?\.error \|\| `upload refused/.test(lib));
+    /catch \(first\) \{[\s\S]{0,200}?if \(signal\?\.aborted\) throw first;\s*if \(!\(first instanceof TypeError\)\) throw first;/.test(lib) && /throw new Error\(`\$\{file\.name\}: \$\{j\?\.error \|\| `upload refused/.test(lib));
+  check("  …and a Stop reaches every piece: the signal rides each chunk fetch (audit, 2026-09-07)",
+    /body: fd, signal \}\)/.test(lib));
   const app = readFileSync("src/components/ai/KoleexAiApp.tsx", "utf8");
   const send = app.slice(app.indexOf("const send = useCallback("), app.indexOf("/* ── Phase 12: message-level actions"));
   check("the composer no longer hands the browser a signed URL to the storage host; big files go piecewise and the question rides along both roads",

@@ -44,7 +44,7 @@ console.log("\n── 2. The route and the client, read ──");
   const panel = readFileSync("src/components/ai/CallsPanel.tsx", "utf8");
   check("the panel fetches from the fixed path, aborts on unmount, renders the summary as markdown and opens the chat",
     /fetchFn\(CALLS_PATH, \{ credentials: "include", signal: ctl\.signal \}\)/.test(panel) && /return \(\) => ctl\.abort\(\);/.test(panel) &&
-    /<MessageMarkdown content=\{it\.summary\} \/>/.test(panel) && /onOpenConversation\(it\.conversation_id\)/.test(panel) && !/dangerouslySetInnerHTML/.test(panel));
+    /<MessageMarkdown content=\{it\.summary\} lang=\{lang\} \/>/.test(panel) && /onOpenConversation\(it\.conversation_id\)/.test(panel) && !/dangerouslySetInnerHTML/.test(panel));
   const app = readFileSync("src/components/ai/KoleexAiApp.tsx", "utf8");
   check("the app shows the calls in the main pane while open, the library and calls views exclude each other, and opening or starting a chat closes both",
     /\) : callsOpen \? \(\s*<CallsPanel copy=\{copy\} lang=\{lang\} onOpenConversation=\{\(id\) => void openConversation\(id\)\} \/>/.test(app) &&

@@ -182,6 +182,17 @@ export function SidebarRow({
   return (
     <div
       onClick={onOpen}
+      /* A ROW IS A BUTTON. It had no role and no tab stop, so a keyboard
+         could not reach it (audit, 2026-09-07); Enter and Space open it. */
+      role="button"
+      tabIndex={0}
+      onKeyDown={(e) => {
+        if (e.target !== e.currentTarget) return;
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onOpen();
+        }
+      }}
       className={`group px-2 py-1.5 mx-2 rounded-lg cursor-pointer transition-colors flex items-center gap-1 ${
         active
           ? "bg-[var(--bg-surface-active)] text-[var(--text-primary)]"
@@ -189,7 +200,7 @@ export function SidebarRow({
       }`}
     >
       <div className="flex-1 min-w-0">
-        <div className="text-[13px] truncate">{row.title}</div>
+        <div className="text-[13px] truncate" dir="auto">{row.title}</div>
         {hint && <div className="text-[11px] truncate text-[var(--text-dim)]" data-search-hint>{hint}</div>}
       </div>
       {/* The pin marks the row while it is pinned and hides again on hover so
@@ -200,7 +211,10 @@ export function SidebarRow({
         className={`h-6 w-6 rounded-md flex items-center justify-center shrink-0 ${
           pinned
             ? "text-[var(--text-dim)] group-hover:text-[var(--text-primary)]"
-            : "opacity-0 group-hover:opacity-100 text-[var(--text-dim)] hover:text-[var(--text-primary)]"
+            /* VISIBLE WHERE THERE IS NO HOVER. On a phone a tap has no hover,
+               so an opacity-0 control was unreachable — the only tappable thing
+               was the row, which opened the chat (audit, 2026-09-07). */
+            : "opacity-0 group-hover:opacity-100 [@media(hover:none)]:opacity-100 focus-visible:opacity-100 text-[var(--text-dim)] hover:text-[var(--text-primary)]"
         }`}
         title={pinned ? copy.unpin : copy.pin}
         aria-label={pinned ? copy.unpin : copy.pin}
@@ -293,7 +307,7 @@ export function RowMenu({
         className={`h-6 w-6 rounded-md flex items-center justify-center shrink-0 text-[var(--text-dim)] hover:text-[var(--text-primary)] ${
           open || alwaysVisible
             ? "opacity-100"
-            : "opacity-0 group-hover:opacity-100"
+            : "opacity-0 group-hover:opacity-100 [@media(hover:none)]:opacity-100 focus-visible:opacity-100"
         } ${open ? "text-[var(--text-primary)]" : ""}`}
         title={label}
         aria-label={label}

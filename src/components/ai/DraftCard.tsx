@@ -13,6 +13,8 @@
 
 import Link from "next/link";
 import type { QuotationDraftPayload } from "@/components/ai/types";
+import { COPY } from "@/components/ai/copy";
+import type { Lang } from "@/lib/i18n";
 
 
 /* ── Draft quotation card ──
@@ -21,7 +23,8 @@ import type { QuotationDraftPayload } from "@/components/ai/types";
    and a prominent "Review in Quotations" button that deep-links into
    the existing Quotations app for the human to finalise. Never
    surfaces cost / margin side — those never reach the client. */
-export default function DraftCard({ payload }: { payload: QuotationDraftPayload }) {
+export default function DraftCard({ payload, lang = "en" }: { payload: QuotationDraftPayload; lang?: Lang }) {
+  const copy = COPY[lang];
   const needsApproval = payload.approval_required;
   return (
     <div
@@ -38,7 +41,7 @@ export default function DraftCard({ payload }: { payload: QuotationDraftPayload 
             ? "bg-amber-500/20 text-amber-200 border border-amber-500/40"
             : "bg-[var(--bg-surface)]/80 text-[var(--text-muted)] border border-[var(--border-subtle)]"
         }`}>
-          {needsApproval ? "Draft · needs approval" : "Draft"}
+          {needsApproval ? copy.draftNeedsApproval : copy.draftLabel}
         </span>
         <span className="text-[12px] font-semibold text-[var(--text-primary)]">
           {payload.quote_no}
@@ -50,14 +53,14 @@ export default function DraftCard({ payload }: { payload: QuotationDraftPayload 
         </span>
         <span className="text-[12px] text-[var(--text-muted)]">{payload.currency}</span>
         <span className="text-[11px] text-[var(--text-dim)] ms-auto">
-          {payload.line_count} line{payload.line_count === 1 ? "" : "s"}
+          {(payload.line_count === 1 ? copy.lineOne : copy.linesCount).replace("{n}", String(payload.line_count))}
         </span>
       </div>
       <Link
         href={payload.review_url}
         className="inline-flex items-center justify-center gap-1.5 h-9 px-4 rounded-full bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[12px] font-semibold"
       >
-        Review in Quotations →
+        {copy.reviewInQuotations}
       </Link>
     </div>
   );
