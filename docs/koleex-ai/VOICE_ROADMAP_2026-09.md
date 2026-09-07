@@ -221,6 +221,37 @@ Not proved here: the worklet path on iOS Safari (the fallback is what
 shipped before), and whether 200 ms is the right lead for the owner's link
 — the `hung-up` beacon's event histogram will show how many answers played.
 
+## Hear a voice before choosing it, and a cut answer stays cut (2026-09-07, late)
+
+**"When I press a voice it should say some sample words so I can listen
+before I select it."** `GET /api/ai/voice/preview?voice=<key>&lane&lang`
+synthesises one product sentence ("Hi, I'm Koleex AI…", in the UI
+language) in the SAME vendor voice id the call would use — the socket
+lane's vendor answers a POST with the bytes; the mainland lane's answers
+with an envelope naming a URL, fetched after the address check. Endpoints
+and the speech model are configuration with defaults
+(`AI_VOICE_GROK_TTS_URL`, `AI_VOICE_TTS_URL`, `AI_VOICE_TTS_MODEL`);
+budget `voice_preview` 20/min; the browser caches a sample a week. On the
+sheet a tap on an orb plays the sample and marks it; "Use this voice"
+confirms (off until a different voice was heard). The player is primed
+inside the tap so the phone lets the bytes play when they land a second
+later; while a sample plays the microphone is closed and the far side
+silenced, both restored after.
+
+**"When I speak I hear strange voices from Koleex AI, it seems to glitch."**
+A barge-in flushed the queue, but frames of the cut answer still in flight
+were played the instant they landed: half-syllables over the caller's
+words. Now every voice frame is dropped after a barge-in until the far
+side's next `response.created`; frames naming the cut response are dropped
+even after that.
+
+Not proved here: that either vendor's speech endpoint knows every voice id
+the realtime catalogue offers (a refusal is a 502 and the sheet says
+"couldn't play a sample"), and the exact request shape — both are
+transcribed from the vendors' published guides, and one real tap answers
+each. The refusal's status is in the log (`[ai.voice.preview] synthesis
+refused status=…`).
+
 ## Owner-side (not code)
 
 - Activate the realtime voice model on the Beijing workspace (still `403 Unpurchased`), so mainland callers get the mainland endpoint.

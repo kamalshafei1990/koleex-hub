@@ -1344,6 +1344,63 @@ console.log("\n── 8. What the client may know, and what it may not ──");
     check("  …and the encoder is a declared dependency, not a transitive one the framework might drop", typeof pkg.dependencies.sharp === "string");
   }
 
+  console.log("\n── 20. A voice, auditioned: the sample route and its two synthesisers ──");
+  {
+    const pv = await import("../src/lib/server/ai/voice/preview");
+    const KEY = "xai-secret-key-000";
+    const g = pv.planGrokTts({ AI_VOICE_GROK_API_KEY: KEY }, "eve", "ar");
+    check("the socket lane's synthesiser: a POST to the vendor's speech endpoint with the SAME voice id the call uses, the sample in the caller's language, and the key in the header only",
+      !!g && g.url === pv.GROK_DEFAULT_TTS_URL && g.answer === "binary" && g.headers.Authorization === `Bearer ${KEY}` &&
+      JSON.parse(g.body).voice_id === "eve" && JSON.parse(g.body).text === pv.PREVIEW_SAMPLE.ar && JSON.parse(g.body).language === "ar" && !g.url.includes(KEY) && !g.body.includes(KEY));
+    check("  …off with the lane, off without a key, refused over http, and the endpoint is configuration",
+      pv.planGrokTts({ AI_VOICE_GROK_API_KEY: KEY, AI_VOICE_GROK_LANE: "off" }, "eve", "en") === null && pv.planGrokTts({}, "eve", "en") === null &&
+      pv.planGrokTts({ AI_VOICE_GROK_API_KEY: KEY, AI_VOICE_GROK_TTS_URL: "http://x.example/tts" }, "eve", "en") === null &&
+      pv.planGrokTts({ AI_VOICE_GROK_API_KEY: KEY, AI_VOICE_GROK_TTS_URL: "https://tts.example/v2/speak" }, "eve", "en")?.url === "https://tts.example/v2/speak");
+    const m = pv.planMainlandTts({ AI_VOICE_BASE_URL: "https://voice.example/api-ws/v1/realtime?x=1", AI_VOICE_API_KEY: "sk-mainland", AI_VOICE_MODEL: "rt-model" }, "Serena", "zh");
+    check("the mainland lane's synthesiser: the realtime host with the vendor's synthesis path (the realtime path and query dropped), the default speech model, the same voice id, an envelope answer",
+      !!m && m.url === "https://voice.example" + pv.MAINLAND_TTS_PATH && m.answer === "json-url" && m.headers.Authorization === "Bearer sk-mainland" &&
+      JSON.parse(m.body).model === pv.MAINLAND_DEFAULT_TTS_MODEL && JSON.parse(m.body).input.voice === "Serena" && JSON.parse(m.body).input.text === pv.PREVIEW_SAMPLE.zh);
+    check("  …an explicit synthesis url and model win; no key or no base is no plan",
+      pv.planMainlandTts({ AI_VOICE_BASE_URL: "https://voice.example/x", AI_VOICE_API_KEY: "k", AI_VOICE_TTS_URL: "https://tts.example/synth", AI_VOICE_TTS_MODEL: "tts-2" }, "Ethan", "en")?.url === "https://tts.example/synth" &&
+      JSON.parse(pv.planMainlandTts({ AI_VOICE_BASE_URL: "https://voice.example/x", AI_VOICE_API_KEY: "k", AI_VOICE_TTS_MODEL: "tts-2" }, "Ethan", "en")!.body).model === "tts-2" &&
+      pv.planMainlandTts({ AI_VOICE_BASE_URL: "https://voice.example/x" }, "Ethan", "en") === null && pv.planMainlandTts({ AI_VOICE_API_KEY: "k" }, "Ethan", "en") === null);
+    check("the sample names the product in all three languages and never a vendor",
+      (["en", "zh", "ar"] as const).every((l) => pv.PREVIEW_SAMPLE[l].includes("Koleex AI") && !/grok|xai|qwen|alibaba|openai/i.test(pv.PREVIEW_SAMPLE[l])));
+    check("the envelope reader takes output.audio.url over https and nothing else",
+      pv.extractAudioUrl({ output: { audio: { url: "https://cdn.example/a.wav" } } }) === "https://cdn.example/a.wav" &&
+      pv.extractAudioUrl({ output: { audio: { url: "http://cdn.example/a.wav" } } }) === null && pv.extractAudioUrl({ output: { audio: { data: "..." } } }) === null && pv.extractAudioUrl(null) === null);
+    /* Running the plans against a fake vendor. */
+    const bin = pv.planGrokTts({ AI_VOICE_GROK_API_KEY: KEY }, "eve", "en")!;
+    const calls: string[] = [];
+    const audioRes = (bytes: number[], type: string | null) => ({ ok: true, status: 200, headers: { get: (n: string) => (n === "content-type" ? type : null) }, body: null, arrayBuffer: async () => new Uint8Array(bytes).buffer, json: async () => ({}) }) as unknown as Response;
+    const okBin = await pv.fetchPreviewAudio(bin, { fetchFn: (async (u: string, init?: RequestInit) => { calls.push(`${init?.method ?? "GET"} ${u}`); return audioRes([1, 2, 3], "audio/mpeg; charset=binary"); }) as unknown as typeof fetch, assertSafeUrl: async () => { throw new Error("not for binary"); } });
+    check("a binary answer is returned as its bytes with the vendor's type, from one POST", okBin?.bytes.byteLength === 3 && okBin?.type === "audio/mpeg" && calls.join() === `POST ${pv.GROK_DEFAULT_TTS_URL}`);
+    const refused = await pv.fetchPreviewAudio(bin, { fetchFn: (async () => ({ ok: false, status: 400, headers: { get: () => null } })) as unknown as typeof fetch, assertSafeUrl: async () => { throw new Error("x"); } });
+    check("  …a refusal is null, never a throw", refused === null);
+    const env = pv.planMainlandTts({ AI_VOICE_BASE_URL: "https://voice.example/x", AI_VOICE_API_KEY: "k" }, "Serena", "en")!;
+    const seen: string[] = [];
+    const okEnv = await pv.fetchPreviewAudio(env, {
+      fetchFn: (async (u: string, init?: RequestInit) => {
+        seen.push(`${init?.method ?? "GET"} ${u}`);
+        if (init?.method === "POST") return { ok: true, status: 200, headers: { get: () => "application/json" }, json: async () => ({ output: { audio: { url: "https://oss.example/s.wav" } } }) } as unknown as Response;
+        return audioRes([9, 9], null);
+      }) as unknown as typeof fetch,
+      assertSafeUrl: async (raw) => { seen.push(`check ${raw}`); return new URL(raw); },
+    });
+    check("an envelope answer: the named url passes the address check, then is fetched, and the bytes come back with the lane's fallback type when the host names none",
+      okEnv?.bytes.byteLength === 2 && okEnv?.type === "audio/wav" && seen.join("|") === `POST https://voice.example${pv.MAINLAND_TTS_PATH}|check https://oss.example/s.wav|GET https://oss.example/s.wav`);
+    const blocked = await pv.fetchPreviewAudio(env, {
+      fetchFn: (async () => ({ ok: true, status: 200, headers: { get: () => "application/json" }, json: async () => ({ output: { audio: { url: "https://10.0.0.5/s.wav" } } }) })) as unknown as typeof fetch,
+      assertSafeUrl: async () => { throw new Error("blocked_host"); },
+    });
+    check("  …a url the address check refuses is never fetched", blocked === null);
+    const route = readFileSync("src/app/api/ai/voice/preview/route.ts", "utf8");
+    check("the route is behind the voice gate and a budget, resolves the voice KEY against the lane's own catalogue (404 otherwise), and serves the bytes cached privately for a week",
+      /const gate = await authorizeVoice\(req\);/.test(route) && /BUDGETS\.voicePreviewPerAccount\(\)/.test(route) && BUDGETS.voicePreviewPerAccount().max === 20 &&
+      /resolveVoice\(grok\.voices, key\);\s*if \(!voice\) return refuse\(404\);/.test(route) && /resolveVoice\(cfg\.voices, key\);\s*if \(!voice\) return refuse\(404\);/.test(route) &&
+      /"Cache-Control": "private, max-age=604800"/.test(route) && /fetchPreviewAudio\(plan, \{ assertSafeUrl \}\)/.test(route) && !/api\.x\.ai|dashscope/.test(route));
+  }
+
   console.log(`\n${pass} passed, ${failures.length} failed`);
   if (failures.length) {
     console.log("\nFAILED:");

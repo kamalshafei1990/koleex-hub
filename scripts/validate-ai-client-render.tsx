@@ -854,6 +854,19 @@ console.log("\n── VoiceCallScreen: choosing a voice ──");
   check("the sheet has a title, a Close, a backdrop, and the note that the call carries on",
     /Choose a voice/.test(withPicker) && /aria-label="Close"/.test(withPicker) && /bg-black\/60/.test(withPicker) && /The conversation carries on/.test(withPicker));
 
+  /* HEAR IT FIRST (owner, 2026-09-07). With a preview handler the sheet
+     gains a "Use this voice" button, off until a different voice has been
+     heard, and the hint says to tap and listen. Without one it is as before. */
+  const auditioned = renderToStaticMarkup(
+    <VoiceCallScreen live phase="listening" audioLevel={0.2} lines={[]} lang="en"
+      onEnd={() => {}} voices={voices} selectedVoice="v1" onSelectVoice={() => {}} onPreviewVoice={async () => true} defaultVoiceSheetOpen /> as ReactElement,
+  );
+  check("with samples available: a disabled 'Use this voice' button and the tap-to-hear hint; the current voice still the one pressed",
+    /<button[^>]*disabled=""[^>]*>Use this voice<\/button>/.test(auditioned) && /Tap a voice to hear it, then choose/.test(auditioned) &&
+    auditioned.split('aria-pressed="true"').length - 1 === 1 && !/aria-busy/.test(auditioned));
+  check("  …without samples, no such button and the old hint", !/Use this voice/.test(withPicker) && /The conversation carries on/.test(withPicker));
+  check("  …localised", /استخدم الصوت ده/.test(renderToStaticMarkup(<VoiceCallScreen live phase="listening" audioLevel={0.2} lines={[]} lang="ar" onEnd={() => {}} voices={voices} selectedVoice="v1" onSelectVoice={() => {}} onPreviewVoice={async () => true} defaultVoiceSheetOpen /> as ReactElement)));
+
   /* THE VENDOR'S OWN IDS ARE NOT A MENU THE BROWSER HOLDS. Only keys and
      labels reach it, so a browser cannot ask for a voice never offered. */
   check("no vendor voice id appears in the markup",

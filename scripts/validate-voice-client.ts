@@ -2264,8 +2264,8 @@ console.log("\n── 12. Mute ──");
   check("the chips are gone; a Voice control beside Mute opens a sheet of orb tiles, Escape closes the sheet before the screen can end the call",
     !/voices\.map\(\(v\) => \{\s*const on = v\.key === selectedVoice;\s*return \(\s*<button\s*key=\{v\.key\}\s*type="button"\s*onClick=\{\(\) => onSelectVoice\?\.\(v\.key\)\}/.test(scr20) &&
     /onClick=\{\(\) => setVoiceSheet\(true\)\}/.test(scr20) && /aria-haspopup="dialog"/.test(scr20) &&
-    /<VoiceGlyph index=\{i\} on=\{on\} \/>/.test(scr20) && !/<AIOrb size=\{64\}/.test(scr20) &&
-    /onClick=\{\(\) => \{ onSelectVoice\?\.\(v\.key\); closeVoiceSheet\(\); \}\}/.test(scr20) &&
+    /<VoiceGlyph index=\{i\} on=\{on \|\| sampling === v\.key\} \/>/.test(scr20) && !/<AIOrb size=\{64\}/.test(scr20) &&
+    /onClick=\{\(\) => tapVoice\(v\.key\)\}/.test(scr20) && /if \(!onPreviewVoice\) \{\s*onSelectVoice\?\.\(key\);\s*closeVoiceSheet\(\);\s*return;\s*\}/.test(scr20) &&
     /window\.addEventListener\("keydown", onKey, true\);/.test(scr20) && /e\.stopPropagation\(\);\s*e\.preventDefault\(\);\s*setVoiceSheet\(false\);/.test(scr20));
   /* A VOICE IS A SHAPE. Six distinct five-bar signatures; the chosen one is
      Hub Blue and breathes; off is monochrome. */
@@ -2718,6 +2718,27 @@ function describeErrorCheck(): boolean {
       /createWebSocket: \(url, protocols\) => new WebSocket\(url, protocols\)/.test(sess) && /createWsAudio: \(sampleRate\) => createBrowserWsAudio\(sampleRate\)/.test(sess) &&
       !/api\.x\.ai|wss:\/\/[a-z]/i.test(sess));
   }
+  {
+    /* THE CUT ANSWER STAYS CUT. Frames of the answer being interrupted are
+       still on the wire after the flush; played, they are the "strange
+       voices" over the caller's words. */
+    const r = await laneRun();
+    r.sockets[0].open();
+    r.sockets[0].message(JSON.stringify({ type: "response.created", response: { id: "r1" } }));
+    r.sockets[0].message(JSON.stringify({ type: "response.output_audio.delta", response_id: "r1", delta: "QQ==" }));
+    r.sockets[0].message(JSON.stringify({ type: "input_audio_buffer.speech_started" }));
+    r.sockets[0].message(JSON.stringify({ type: "response.output_audio.delta", response_id: "r1", delta: "Qg==" }));
+    r.sockets[0].message(JSON.stringify({ type: "response.output_audio.delta", delta: "Qw==" }));
+    check("after a barge-in, late frames of the cut answer — named or unnamed — are dropped, not played", r.audios[0].flushes === 1 && r.audios[0].played.join() === "QQ==");
+    r.sockets[0].message(JSON.stringify({ type: "response.created", response: { id: "r2" } }));
+    r.sockets[0].message(JSON.stringify({ type: "response.output_audio.delta", response_id: "r2", delta: "RA==" }));
+    r.sockets[0].message(JSON.stringify({ type: "response.output_audio.delta", response_id: "r1", delta: "RQ==" }));
+    check("  …the NEXT answer plays from its first frame, and a straggler of the cut one is still dropped", r.audios[0].played.join() === "QQ==,RA==");
+    r.sockets[0].message(JSON.stringify({ type: "response.cancelled" }));
+    r.sockets[0].message(JSON.stringify({ type: "response.output_audio.delta", response_id: "r2", delta: "Rg==" }));
+    check("  …a cancelled response is silenced the same way", r.audios[0].flushes === 2 && r.audios[0].played.join() === "QQ==,RA==");
+    r.s.stop();
+  }
 }
 
 {
@@ -2882,6 +2903,76 @@ function describeErrorCheck(): boolean {
     check("a tile in a layer that is not showing holds no picture: the words layer's tiles are visible only on the chat view, the strip's only on the orb view",
       /visible = true \}/.test(tr) && /const img = visible \? \(/.test(tr) && /<span aria-hidden className=\{`block \$\{frame\}`\} style=\{\{ width: size, height: size \}\} \/>/.test(tr) &&
       /visible=\{photosVisible\}/.test(tr) && /photosVisible=\{view === "chat"\}/.test(scr) && /size=\{88\} visible=\{view === "orb"\}/.test(scr));
+  }
+}
+
+{
+  console.log("\n── 30. Hear a voice before choosing it, and a cut answer stays cut ──");
+  /* The owner, 2026-09-07: "when I press a voice it should say some sample
+     words so I can listen before I select it", and "when I speak I hear
+     strange voices from Koleex AI, it seems to glitch". */
+  const { createPreviewPlayer, VOICE_PREVIEW_PATH, PREVIEW_FETCH_TIMEOUT_MS } = await import("../src/lib/voice/preview-player");
+  {
+    type Src = { buffer: unknown; connect(d: unknown): void; start(): void; stop(): void; onended: (() => void) | null };
+    const log: string[] = [];
+    const sources: Src[] = [];
+    let state = "suspended";
+    let decodeFail = false;
+    const ctx = {
+      get state() { return state; },
+      destination: { id: "speaker" },
+      resume: async () => { state = "running"; log.push("resume"); },
+      decodeAudioData: async (b: ArrayBuffer) => { if (decodeFail) throw new Error("bad"); log.push(`decode:${b.byteLength}`); return { samples: b.byteLength }; },
+      createBufferSource: () => {
+        const src: Src = { buffer: null, connect: (d) => log.push(`connect:${(d as { id: string }).id}`), start: () => log.push("start"), stop: () => log.push("stop"), onended: null };
+        sources.push(src);
+        return src;
+      },
+      close: async () => { log.push("close"); },
+    };
+    let made = 0;
+    const player = createPreviewPlayer(() => { made++; return ctx; });
+    player.prime();
+    check("prime() creates the context and resumes it inside the tap — a context a gesture woke stays awake for the bytes that arrive later", made === 1 && state === "running" && log.join() === "resume");
+    const p1 = player.play(new ArrayBuffer(8));
+    await sleep(0);
+    check("play() decodes into that same context and starts one source into the speaker", made === 1 && log.slice(1).join() === "decode:8,connect:speaker,start" && sources.length === 1 && sources[0].buffer !== null);
+    sources[0].onended?.();
+    check("  …and resolves true when the sound ended on its own", (await p1) === true);
+    const p2 = player.play(new ArrayBuffer(4));
+    await sleep(0);
+    const p3 = player.play(new ArrayBuffer(2));
+    await sleep(0);
+    check("a second tap stops the sample still playing — one voice at a time — and the first resolves false", log.includes("stop") && (await p2) === false && sources.length === 3);
+    player.stop();
+    check("  …stop() ends the current one the same way", (await p3) === false);
+    decodeFail = true;
+    check("bytes that do not decode resolve false, never throw", (await player.play(new ArrayBuffer(1))) === false);
+    player.close();
+    check("close() releases the context", log[log.length - 1] === "close");
+    const none = createPreviewPlayer(() => null);
+    none.prime();
+    check("a runtime with no audio context plays nothing and throws nothing", (await none.play(new ArrayBuffer(1))) === false);
+    check("the route and the ceiling", VOICE_PREVIEW_PATH === "/api/ai/voice/preview" && PREVIEW_FETCH_TIMEOUT_MS === 15_000);
+  }
+  {
+    const fs30 = await import("node:fs");
+    const btn = fs30.readFileSync("src/components/ai/VoiceCallButton.tsx", "utf8");
+    const scr = fs30.readFileSync("src/components/ai/VoiceCallScreen.tsx", "utf8");
+    check("the button primes the player INSIDE the tap, fetches the sample from our route with the lane and the UI language, and hands the bytes to the player",
+      /const player = \(previewRef\.current \?\?= createPreviewPlayer\(browserPreviewContext\)\);\s*player\.prime\(\);/.test(btn) &&
+      /new URLSearchParams\(\{ voice: key, lane: transportRef\.current, lang \}\)/.test(btn) && /fetch\(`\$\{VOICE_PREVIEW_PATH\}\?\$\{q\.toString\(\)\}`/.test(btn) &&
+      /return await player\.play\(bytes\);/.test(btn));
+    check("  …while the sample plays the microphone is closed and the far side silenced, and both are restored exactly as they were",
+      /const micWasOpen = !!session && !session\.isMuted\(\);\s*if \(micWasOpen\) session\.setMuted\(true\);/.test(btn) &&
+      /const farWasMuted = far\?\.muted \?\? false;\s*if \(far\) far\.muted = true;/.test(btn) &&
+      /finally \{\s*if \(far\) far\.muted = farWasMuted;\s*if \(micWasOpen && sessionRef\.current === session\) session\.setMuted\(false\);\s*\}/.test(btn) &&
+      /onPreviewVoice=\{previewVoice\}\s*onStopPreview=\{stopPreview\}/.test(btn));
+    check("on the sheet a tap is 'let me hear it' and a separate button is 'this one' — off until a voice other than the current has been heard; closing the sheet stops the sample",
+      /const tapVoice = useCallback\(\(key: string\) => \{/.test(scr) && /void onPreviewVoice\(key\)\.then\(\(ok\) => \{/.test(scr) &&
+      /disabled=\{!candidate \|\| candidate === selectedVoice\}/.test(scr) && /if \(!candidate \|\| candidate === selectedVoice\) return;\s*onSelectVoice\?\.\(candidate\);\s*closeVoiceSheet\(\);/.test(scr) &&
+      /const closeVoiceSheet = useCallback\(\(\) => \{[\s\S]{0,200}?onStopPreview\?\.\(\);/.test(scr) &&
+      /aria-pressed=\{chosen\}/.test(scr) && /const on = candidate \? v\.key === candidate : chosen;/.test(scr));
   }
 }
 

@@ -366,6 +366,7 @@ const EV_WS_AUDIO_DELTA_GA = "response.output_audio.delta";
 const EVENT_TYPES_MAX = 40;
 const EV_WS_SPEECH_STARTED = "input_audio_buffer.speech_started";
 const EV_WS_RESPONSE_CANCELLED = "response.cancelled";
+const EV_WS_RESPONSE_CREATED = "response.created";
 
 /** The route's statuses, mapped to what the screen can act on — the same
  *  table connect() applies inline (kept there so its pins hold). Pure. */
@@ -394,6 +395,17 @@ export class VoiceSession {
    *  honoured the way `this.pc !== pc` honours one on the other lane. */
   private wsAttempt: object | null = null;
   private wsAudio: WsAudio | null = null;
+  /* THE CUT ANSWER MUST STAY CUT (owner, 2026-09-07: "when I speak I hear
+     strange voices from Koleex AI, it seems to glitch"). A barge-in flushes
+     what is queued — but frames of the answer being cut are still in flight
+     on the socket and kept arriving for a moment after the flush, each one
+     played the instant it landed: half-syllables of a sentence nobody is
+     finishing, over the caller's own words. So after a barge-in every voice
+     frame is dropped until the far side opens its NEXT response; frames that
+     name the cut response are dropped even after that. */
+  private wsResponseId: string | null = null;
+  private wsSilencedResponse: string | null = null;
+  private wsSilenced = false;
   /* The configuration is sent exactly once. Two triggers race to send it — the
      channel opening and `session.created` arriving — because the order of
      those two is the vendor's business and not something to depend on. */
@@ -1101,7 +1113,16 @@ export class VoiceSession {
     }
     if (!v || typeof v !== "object") return;
     const type = (v as { type?: unknown }).type;
+    if (type === EV_WS_RESPONSE_CREATED) {
+      const id = (v as { response?: { id?: unknown } }).response?.id;
+      this.wsResponseId = typeof id === "string" ? id : null;
+      this.wsSilenced = false;
+      return;
+    }
     if (type === EV_WS_AUDIO_DELTA || type === EV_WS_AUDIO_DELTA_GA) {
+      const rid = (v as { response_id?: unknown }).response_id;
+      /* A late frame of an answer the caller cut: not a sound. */
+      if (this.wsSilenced || (typeof rid === "string" && rid === this.wsSilencedResponse)) return;
       const delta = (v as { delta?: unknown }).delta;
       if (typeof delta === "string" && delta) {
         try {
@@ -1112,7 +1133,11 @@ export class VoiceSession {
       }
       return;
     }
-    if (type === EV_WS_SPEECH_STARTED || type === EV_WS_RESPONSE_CANCELLED) audio.flush();
+    if (type === EV_WS_SPEECH_STARTED || type === EV_WS_RESPONSE_CANCELLED) {
+      audio.flush();
+      this.wsSilencedResponse = this.wsResponseId;
+      this.wsSilenced = true;
+    }
   }
 
   /** The handshake again, on the other region, with the microphone kept.
