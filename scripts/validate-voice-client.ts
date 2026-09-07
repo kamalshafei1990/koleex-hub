@@ -1856,9 +1856,19 @@ console.log("\n── 12. Mute ──");
   check("a script says the language: Arabic letters, CJK, Latin — and no letters is null",
     sl.detectScriptLang("إزيك يا أستاذ كمال") === "ar" && sl.detectScriptLang("我想一下") === "zh" && sl.detectScriptLang("Hello there") === "en" && sl.detectScriptLang("123 !!") === null && sl.detectScriptLang("") === null);
   check("  …mixed text goes to the majority script", sl.detectScriptLang("الموديل CH-4040S من Koleex بمقاس 40×40") === "ar" && sl.detectScriptLang("Model CH-4040S بس") === "en");
-  check("a conversation's language is read from the ASSISTANT's turns only — the caller's transcript was written under the hint being judged",
+  check("a conversation's language: the assistant's turns always vote; a LATIN caller line never does — it was written under the hint being judged",
     sl.detectConversationLang([{ role: "user", content: "On the autism spectrum, they were" }, { role: "assistant", content: "أهلاً بك، إزاي أقدر أساعدك؟" }]) === "ar" &&
-    sl.detectConversationLang([{ role: "user", content: "مرحبا" }]) === null && sl.detectConversationLang([]) === null);
+    sl.detectConversationLang([{ role: "user", content: "hello there" }]) === null && sl.detectConversationLang([]) === null);
+  check("  …but a caller line in Arabic or Chinese script is the caller's own and votes (two saved calls, 2026-09-04: English replies to Arabic taught the device 'English')",
+    sl.detectConversationLang([{ role: "user", content: "مرحبا" }]) === "ar" && sl.detectConversationLang([{ role: "user", content: "我想一下" }]) === "zh" &&
+    sl.detectConversationLang([
+      { role: "user", content: "هلا و." }, { role: "assistant", content: "Hello Kimo, how are you doing?" },
+      { role: "user", content: "أريد أن أسألك، هل أنت أفضل أم شات جي بي تي أفضل؟" }, { role: "assistant", content: "I'm Koleex AI, made by Koleex International Group." },
+      { role: "user", content: "الشط" }, { role: "assistant", content: "بالطبع، ممكن نتكلم مصري." },
+      { role: "user", content: "أنا أستيقظ" }, { role: "assistant", content: "I hear you, Kimo." },
+      { role: "user", content: "شashawa" },
+    ]) === "ar" &&
+    sl.detectConversationLang([{ role: "user", content: "Show me a photo of Tesla car." }, { role: "assistant", content: "I can only show pictures of Koleex machines." }]) === "en");
   check("  …the majority of recent replies wins, so a caller who switches is followed",
     sl.detectConversationLang([{ role: "assistant", content: "Hello" }, { role: "assistant", content: "你好" }, { role: "assistant", content: "很高兴" }]) === "zh");
   check("learnSttLang reads the same thing off the screen's transcript, settled lines only",
