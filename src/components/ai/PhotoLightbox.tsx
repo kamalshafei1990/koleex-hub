@@ -16,6 +16,7 @@
    --------------------------------------------------------------------------- */
 
 import { useEffect } from "react";
+import { aiImage } from "@/lib/ai/image-url";
 
 export type LightboxPhoto = { url: string; label?: string | null };
 
@@ -66,7 +67,10 @@ export default function PhotoLightbox({
       </button>
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
-        src={photo.url}
+        /* The full view at 1200 wide — enough for any phone or laptop screen,
+           a fraction of a camera original's memory. A blob: the user attached
+           passes through untouched. */
+        src={aiImage(photo.url, 1200)}
         alt={photo.label || ""}
         decoding="async"
         className="max-h-[80dvh] max-w-full rounded-2xl object-contain select-none"

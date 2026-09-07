@@ -182,6 +182,45 @@ session takes over and the caller's own captions are missing), and the
 (`[ai.voice.client] config-rejected … err="…"`) so the answer is in the log
 after one attempt.
 
+## Fourth and fifth findings, 2026-09-07 (night) — the page killed under the call, and a chopped voice
+
+**The page was killed, twice, right after pictures** (17:33 and 18:03 UTC):
+a call answered a lookup that showed photos, and seconds later `/ai` cold
+loaded with a fresh perf session and no `page-hidden` beacon — the document
+was not reloaded, it was killed and restored. Catalogue photos already went
+through our optimizer at slot size; a WEB photo (search results, a markdown
+image the model wrote) went into `<img>` at its original URL — camera-sized
+files decoded for 88 px tiles, several per answer, in the page that also
+holds the audio graph, and the always-mounted words layer kept every one of
+them alive. Fixed:
+
+- `GET /api/ai/image?u=…&w=384|768|1200` — an authenticated, budgeted proxy
+  that fetches the picture server-side under the SSRF rules (the Translator's
+  address check, lifted into `lib/server/safe-url.ts`: https only, every
+  redirect hop re-checked, private ranges refused), with byte / time / pixel
+  ceilings, and returns a freshly encoded WebP at the slot's width. The
+  browser only ever talks to our host — which is also the mainland rule.
+- `lib/ai/image-url.ts` `aiImage(url, width)`: storage → optimizer, web →
+  proxy, blob/data → itself. Used by every AI picture: transcript tile 384,
+  orb strip 384, chat bubble 768, lightbox 1200, library 384.
+- A tile in a layer that is not showing draws an empty frame of the same
+  size and holds no picture (`PhotoTile visible`, `VoiceTranscript
+  photosVisible`).
+- The web search drops a picture that declares more than 4 MB before the
+  model sees it.
+
+**"The voice of Grok not so stable"** (18:10). Frames come down the socket
+across a VPN in bursts; the player butted each frame 50 ms behind now, so
+every wire gap longer than that was a gap in the voice. Now a run of frames
+starts 200 ms behind and the lead grows 100 ms on every underrun up to
+600 ms (`nextFrameStart`, pure). And the microphone is read by an
+AudioWorklet on the audio thread (module from a blob URL, ScriptProcessor
+fallback), so a busy main thread no longer drops the caller's frames.
+
+Not proved here: the worklet path on iOS Safari (the fallback is what
+shipped before), and whether 200 ms is the right lead for the owner's link
+— the `hung-up` beacon's event histogram will show how many answers played.
+
 ## Owner-side (not code)
 
 - Activate the realtime voice model on the Beijing workspace (still `403 Unpurchased`), so mainland callers get the mainland endpoint.

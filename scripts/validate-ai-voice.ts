@@ -1311,6 +1311,39 @@ console.log("\n── 8. What the client may know, and what it may not ──");
     check("neither route carries a vendor host in code — the endpoint is configuration", !/api\.x\.ai|wss:\/\//.test(postBody) && !/api\.x\.ai|wss:\/\//.test(sdpRoute));
   }
 
+  console.log("\n── 19. The picture proxy: a web photo made phone-sized, under the SSRF rules ──");
+  {
+    /* 2026-09-07, 17:33 and 18:03: two calls ended with the page killed
+       under them, right after web photos were shown at their original size.
+       api/ai/image fetches the picture server-side and returns it small. A
+       server fetching a URL a MODEL chose is the SSRF shape; the address
+       check is the Translator's, lifted into lib/server/safe-url.ts. */
+    const { isPrivateAddress } = await import("../src/lib/server/safe-url");
+    check("loopback, private, link-local (cloud metadata), CGNAT, multicast and the unspecified address are refused",
+      ["127.0.0.1", "10.1.2.3", "172.16.0.1", "172.31.255.255", "192.168.1.1", "169.254.169.254", "100.64.0.1", "224.0.0.1", "0.0.0.0", "::1", "::", "fe80::1", "fd00::1", "fc00::1", "::ffff:10.0.0.1", "not-an-ip"].every(isPrivateAddress));
+    check("  …a public address is not", ["8.8.8.8", "172.32.0.1", "104.18.0.1", "2606:4700::1111", "::ffff:8.8.8.8"].every((ip) => !isPrivateAddress(ip)));
+    const page = readFileSync("src/lib/server/fetch-page.ts", "utf8");
+    check("  …and the Translator's page fetch uses the SAME check, re-exported — one rule, two callers",
+      /import \{ assertSafeUrl, isPrivateAddress \} from "\.\/safe-url";/.test(page) && /export \{ isPrivateAddress, assertSafeUrl \};/.test(page) && !/function isPrivateAddress/.test(page));
+    const img = readFileSync("src/app/api/ai/image/route.ts", "utf8");
+    check("the proxy is behind the same doors as every Koleex AI route — a signed-in INTERNAL account — and a budget per account",
+      /const auth = await requireAuth\(req\);\s*if \(auth instanceof NextResponse\) return auth;/.test(img) && /requireInternalUser\(auth\)/.test(img) &&
+      /consumeBudget\(subjectFor\.account\(auth\.account_id\), BUDGETS\.imageProxyPerAccount\(\)\)/.test(img) && BUDGETS.imageProxyPerAccount().bucket === "image:proxy" && BUDGETS.imageProxyPerAccount().max === 100);
+    check("  …https only, every redirect hop re-checked, at most three hops, and a blocked host is a 403",
+      /await assertSafeUrl\(raw, \["https:"\]\)/.test(img) && /current = await assertSafeUrl\(new URL\(loc, current\)\.toString\(\), \["https:"\]\);/.test(img) &&
+      /redirect: "manual"/.test(img) && /export const AI_IMAGE_MAX_HOPS = 3;/.test(img) && /e\.message === "blocked_host" \? 403 : 400/.test(img));
+    check("  …a byte ceiling read from the stream (not trusted from the header), a time ceiling, a pixel ceiling, and the type must say image",
+      /export const AI_IMAGE_MAX_BYTES = 8_000_000;/.test(img) && /const bytes = await readCapped\(res, AI_IMAGE_MAX_BYTES\);\s*if \(!bytes\) return refuse\(413\);/.test(img) &&
+      /if \(total > max\) \{\s*await reader\.cancel\(\)\.catch\(\(\) => \{\}\);\s*return null;/.test(img) &&
+      /export const AI_IMAGE_TIMEOUT_MS = 6_000;/.test(img) && /limitInputPixels: AI_IMAGE_MAX_PIXELS/.test(img) && /if \(!type\.startsWith\("image\/"\)\) return refuse\(415\);/.test(img));
+    check("  …the answer is a freshly encoded WebP at one of three widths, never enlarged, never the host's bytes, cached privately for a day",
+      /\.rotate\(\)\s*\.resize\(\{ width, withoutEnlargement: true \}\)\s*\.webp\(\{ quality: AI_IMAGE_QUALITY \}\)/.test(img) && /"Content-Type": "image\/webp"/.test(img) &&
+      /"Cache-Control": "private, max-age=86400"/.test(img) && /export const AI_IMAGE_WIDTHS = \[384, 768, 1200\] as const;/.test(img) && /"X-Content-Type-Options": "nosniff"/.test(img));
+    check("  …the log carries the host and the sizes — never the full URL", /console\.log\(`\[ai\.image\] ok host=\$\{host\} w=\$\{width\} in=/.test(img) && !/\$\{raw\}|\$\{current\}/.test(img));
+    const pkg = JSON.parse(readFileSync("package.json", "utf8")) as { dependencies: Record<string, string> };
+    check("  …and the encoder is a declared dependency, not a transitive one the framework might drop", typeof pkg.dependencies.sharp === "string");
+  }
+
   console.log(`\n${pass} passed, ${failures.length} failed`);
   if (failures.length) {
     console.log("\nFAILED:");

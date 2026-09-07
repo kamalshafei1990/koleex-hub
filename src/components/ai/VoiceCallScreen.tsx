@@ -607,7 +607,7 @@ export default function VoiceCallScreen({
       className={`kx-call-words absolute inset-0 flex flex-col pt-4 ${view === "chat" ? "is-in" : ""}`}
       aria-hidden={view !== "chat"}
     >
-      <VoiceTranscript lines={lines} lang={lang} className="kx-transcript flex-1 min-h-0 pb-28" fill onOpenPhoto={setOpenPhoto} />
+      <VoiceTranscript lines={lines} lang={lang} className="kx-transcript flex-1 min-h-0 pb-28" fill onOpenPhoto={setOpenPhoto} photosVisible={view === "chat"} />
       {/* Where the small orb sits: measured, never drawn. The orb itself
           lands here; a caption for readers travels with it. */}
       <div ref={cornerRef} aria-hidden className="kx-orb-corner absolute bottom-4 end-6 h-[72px] w-[72px] pointer-events-none" />
@@ -700,7 +700,7 @@ export default function VoiceCallScreen({
         {latestPhotos.length > 0 && (
           <div className="flex flex-wrap justify-center gap-3" role="group" aria-label={copy.photos}>
             {latestPhotos.map((p) => (
-              <PhotoTile key={p.url} photo={p} onOpen={setOpenPhoto} label={copy.photos} size={88} />
+              <PhotoTile key={p.url} photo={p} onOpen={setOpenPhoto} label={copy.photos} size={88} visible={view === "orb"} />
             ))}
           </div>
         )}

@@ -936,7 +936,7 @@ console.log("\n── The product, shown: on the call screen and in the answer �
   /* THE PICTURE EXPANDS IN PLACE. */
   const lb = renderToStaticMarkup(<PhotoLightbox photo={{ url: "https://cdn.example/kx180.jpg", label: "KX-180" }} onClose={() => {}} closeLabel="Close photo" /> as ReactElement);
   check("the lightbox is a dialog with the picture fitted whole, its name, and a close control",
-    /role="dialog"/.test(lb) && /aria-modal="true"/.test(lb) && /<img[^>]*src="https:\/\/cdn\.example\/kx180\.jpg"[^>]*object-contain/.test(lb) && /aria-label="Close photo"/.test(lb) && lb.includes("KX-180</p>"));
+    /role="dialog"/.test(lb) && /aria-modal="true"/.test(lb) && /<img[^>]*src="\/api\/ai\/image\?u=https%3A%2F%2Fcdn\.example%2Fkx180\.jpg&amp;w=1200"[^>]*object-contain/.test(lb) && /aria-label="Close photo"/.test(lb) && lb.includes("KX-180</p>"));
   check("  …and draws nothing when there is no picture", renderToStaticMarkup(<PhotoLightbox photo={null} onClose={() => {}} /> as ReactElement) === "");
   /* THE HIDDEN BORDER. The Aurora rim is a ::before with inset:0 against
      the nearest positioned ancestor; a glass surface that is not itself
@@ -959,14 +959,20 @@ console.log("\n── The product, shown: on the call screen and in the answer �
   const without = renderToStaticMarkup(
     <VoiceCallScreen live phase="speaking" audioLevel={0} lines={[{ role: "assistant", text: "The KX-180.", final: true }]} lang="en" onEnd={() => {}} /> as ReactElement,
   );
+  /* THE PICTURE COMES THROUGH THE AI PICTURE PROXY at the width of the slot
+     (2026-09-07: camera-sized originals decoded for 88px tiles got the page
+     killed under a live call). In markup the query's & is &amp;. */
+  const TILE_SRC = 'src="/api/ai/image?u=https%3A%2F%2Fcdn.example%2Fkx180.jpg&amp;w=384"';
   check("a lookup's photos are drawn in the conversation, under the words that named them",
-    /<img[^>]*src="https:\/\/cdn\.example\/kx180\.jpg"/.test(withPhotos) && withPhotos.indexOf("The KX-180.") < withPhotos.indexOf("<img"));
+    withPhotos.includes(TILE_SRC) && withPhotos.indexOf("The KX-180.") < withPhotos.indexOf("<img"));
   check("  …named, for the eye and for a screen reader", /alt="KX-180 Spreader"/.test(withPhotos) && /aria-label="KX-180 Spreader"/.test(withPhotos));
   check("  …as a labelled group", /role="group"[^>]*aria-label="Photos"/.test(withPhotos));
   check("  …as a button that expands it in place, not a link that leaves the app",
     /<button type="button"[^>]*aria-label="KX-180 Spreader"[^>]*>\s*<img/.test(withPhotos) && !/<a[^>]*href="https:\/\/cdn\.example\/kx180\.jpg"/.test(withPhotos) && !/z-\[260\]/.test(withPhotos));
-  check("  …eagerly, with its box reserved", !/loading="lazy"/.test(withPhotos) && /<img[^>]*width="120"[^>]*height="120"/.test(withPhotos));
-  check("  …a non-storage URL passes through the pipeline untouched", /src="https:\/\/cdn\.example\/kx180\.jpg"/.test(withPhotos));
+  check("  …eagerly, with its box reserved", !/loading="lazy"/.test(withPhotos) && /<img[^>]*width="88"[^>]*height="88"/.test(withPhotos));
+  check("  …a web URL goes through the AI picture proxy at tile width — never the original file", withPhotos.includes(TILE_SRC) && !/src="https:\/\/cdn\.example\/kx180\.jpg"/.test(withPhotos));
+  check("  …a tile in the HIDDEN layer keeps its frame and gives up its pixels: an empty box of the same size, no <img>",
+    /<span aria-hidden="true" class="block rounded-2xl[^"]*" style="width:120px;height:120px"><\/span>/.test(withPhotos) && !/<img[^>]*width="120"/.test(withPhotos));
   /* A PICTURE DOES NOT SWITCH THE VIEW (owner, 2026-09-07: "suddenly it out
      of conversation and show me the text conversation"). The screen stays
      on the orb; the picture is drawn under the orb as well, where the
@@ -974,7 +980,7 @@ console.log("\n── The product, shown: on the call screen and in the answer �
   check("  …and a picture does NOT switch the view: the orb stays, the picture is also under it, the words layer is present but hidden",
     /aria-label="Show conversation"/.test(withPhotos) && !/aria-label="Back to Koleex AI"/.test(withPhotos) &&
     /class="kx-call-words absolute inset-0 flex flex-col pt-4 "[^>]*aria-hidden="true"/.test(withPhotos) &&
-    (withPhotos.match(/src="https:\/\/cdn\.example\/kx180\.jpg"/g) ?? []).length === 2 && /<img[^>]*width="88"[^>]*height="88"/.test(withPhotos));
+    withPhotos.split(TILE_SRC).length - 1 === 1 && /<img[^>]*width="88"[^>]*height="88"/.test(withPhotos));
   check("without pictures the screen opens on the ORB view: the big orb, the wordmark, a way to the words, no pictures",
     !/<img/.test(without) && !/role="group"[^>]*aria-label="Photos"/.test(without) && /aria-label="Show conversation"/.test(without) && />Show conversation</.test(without) && !/aria-label="Back to Koleex AI"/.test(without));
   check("  …and the bottom bar is in both views", /aria-label="End call"/.test(withPhotos) && /aria-label="End call"/.test(without));
@@ -990,8 +996,9 @@ console.log("\n── The product, shown: on the call screen and in the answer �
   /* THE ANSWER IN THE THREAD. */
   const md = (content: string) => renderToStaticMarkup(<MessageMarkdown content={content} /> as ReactElement);
   const shown = md("The KX-180.\n\n![KX-180](https://cdn.example/kx180.jpg)");
-  check("a markdown image renders as a bounded, styled picture",
-    /<img[^>]*class="koleex-md-img"[^>]*src="https:\/\/cdn\.example\/kx180\.jpg"/.test(shown) || /<img[^>]*src="https:\/\/cdn\.example\/kx180\.jpg"[^>]*class="koleex-md-img"/.test(shown));
+  const BUBBLE_SRC = 'src="/api/ai/image?u=https%3A%2F%2Fcdn.example%2Fkx180.jpg&amp;w=768"';
+  check("a markdown image renders as a bounded, styled picture, through the AI picture proxy at bubble width",
+    /<img[^>]*class="koleex-md-img"/.test(shown) && shown.includes(BUBBLE_SRC) && !/src="https:\/\/cdn\.example\/kx180\.jpg"/.test(shown));
   check("  …that a tap expands in place — a button, not a link out of the app",
     /<button[^>]*class="koleex-md-img-link"[^>]*>\s*<img/.test(shown) && !/<a[^>]*href="https:\/\/cdn\.example\/kx180\.jpg"/.test(shown) && !/z-\[260\]/.test(shown));
   check("  …with the product name as alt text", /alt="KX-180"/.test(shown));

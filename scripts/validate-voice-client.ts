@@ -1978,7 +1978,7 @@ console.log("\n── 12. Mute ──");
   const css18 = fs18.readFileSync("src/app/globals.css", "utf8");
   check("the call screen is TWO VIEWS, the way ChatGPT does it: the orb alone, or the conversation with the same orb small in the corner",
     /const view: "orb" \| "chat" = chosenView \?\? "orb";/.test(scr) && /\{wordsLayer\}\s*\{orbLayer\}/.test(scr) &&
-    /<VoiceTranscript lines=\{lines\} lang=\{lang\} className="kx-transcript flex-1 min-h-0 pb-28" fill onOpenPhoto=\{setOpenPhoto\} \/>/.test(scr) && /h-\[72px\] w-\[72px\]/.test(scr));
+    /<VoiceTranscript lines=\{lines\} lang=\{lang\} className="kx-transcript flex-1 min-h-0 pb-28" fill onOpenPhoto=\{setOpenPhoto\} photosVisible=\{view === "chat"\} \/>/.test(scr) && /h-\[72px\] w-\[72px\]/.test(scr));
   check("  …a tap on the orb toggles the views; the quiet button under it opens the words",
     /onClick=\{\(\) => switchView\(view === "orb" \? "chat" : "orb"\)\}/.test(scr) && (scr.match(/onClick=\{\(\) => switchView\("chat"\)\}/g) ?? []).length === 1);
   check("  …the view is the caller's choice alone, derived, no effect writes it — a picture no longer switches it (section 21)",
@@ -1998,7 +1998,7 @@ console.log("\n── 12. Mute ──");
     /import KoleexLogo from "@\/components\/layout\/KoleexLogo";/.test(scr) && /<KoleexLogo className="h-6 w-auto shrink-0 text-white" \/>/.test(scr) && scr.indexOf("<KoleexLogo") < scr.indexOf("{orb}"));
   const tr18 = fs18.readFileSync("src/components/ai/VoiceTranscript.tsx", "utf8");
   check("a picture in the conversation goes through the image pipeline at 384px, eagerly, box reserved, and removes itself when it fails to load",
-    /cdnImage\(photo\.url, \{ width: 384, quality: 75, resize: "contain" \}\)/.test(tr18) && /width=\{size\}\s*height=\{size\}/.test(tr18) && /size = 120/.test(tr18) && !/loading="lazy"/.test(tr18) &&
+    /src=\{aiImage\(photo\.url, 384\)\}/.test(tr18) && !/cdnImage\(/.test(tr18) && /width=\{size\}\s*height=\{size\}/.test(tr18) && /size = 120/.test(tr18) && !/loading="lazy"/.test(tr18) &&
     /onError=\{\(\) => setBroken\(true\)\}/.test(tr18) && /if \(broken\) return null;/.test(tr18));
   check("  …the conversation view shows every line, the chat-side transcript the last four", /const shown = fill \? lines : lines\.slice\(-VISIBLE_LINES\);/.test(tr18));
   const prodTool = fs18.readFileSync("src/lib/server/ai-agent/tools/products.ts", "utf8");
@@ -2297,7 +2297,7 @@ console.log("\n── 12. Mute ──");
   check("  …and the latest pictures show under the orb instead, where the caller is looking",
     /const latestPhotos: readonly TranscriptPhoto\[\]/.test(scr21) &&
     /\{latestPhotos\.length > 0 && \(\s*<div className="flex flex-wrap justify-center gap-3" role="group" aria-label=\{copy\.photos\}>/.test(scr21) &&
-    /<PhotoTile key=\{p\.url\} photo=\{p\} onOpen=\{setOpenPhoto\} label=\{copy\.photos\} size=\{88\} \/>/.test(scr21));
+    /<PhotoTile key=\{p\.url\} photo=\{p\} onOpen=\{setOpenPhoto\} label=\{copy\.photos\} size=\{88\} visible=\{view === "orb"\} \/>/.test(scr21));
   check("both layers stay mounted: the words layer and the orb layer are always rendered, hidden by class, never keyed",
     /<div ref=\{stageRef\} className="relative flex-1 min-h-0" data-view=\{view\}>\s*\{wordsLayer\}\s*\{orbLayer\}\s*<\/div>/.test(scr21) &&
     !/key=\{view\}/.test(scr21) && !/leaving/.test(scr21.replace(/\/\*[\s\S]*?\*\//g, "")) &&
@@ -2821,6 +2821,68 @@ function describeErrorCheck(): boolean {
   check("a stale build's full-page app launch is skipped mid-call — the same guard the update watcher uses",
     /import \{ busyWithSomethingUninterruptible \} from "@\/components\/pwa\/UpdateWatcher";/.test(launch) &&
     /if \(g\.__kxStaleBuild && !busyWithSomethingUninterruptible\(\)\) \{/.test(launch));
+}
+
+{
+  console.log("\n── 29. The page must not die under a call, and the voice must not chop ──");
+  /* 2026-09-07, 17:33 and 18:03: two calls ended with the page killed under
+     them, both right after pictures were shown — web photos into <img> at
+     their original URLs, camera-sized files decoded for 88px tiles in the
+     page that holds the audio graph. And 18:10, the owner: "the voice of
+     Grok not so stable" — frames butted 50 ms behind now, so every wire gap
+     longer than that was a gap in the voice. */
+  const { nextFrameStart, JITTER_LEAD_S, JITTER_LEAD_STEP_S, JITTER_LEAD_MAX_S, CAPTURE_WORKLET_SOURCE, CAPTURE_WORKLET_NAME, FRAME_SAMPLES } = await import("../src/lib/voice/ws-audio");
+  const { aiImage, AI_IMAGE_PROXY_PATH } = await import("../src/lib/ai/image-url");
+  {
+    const fresh = { nextStart: 0, lead: JITTER_LEAD_S };
+    const a = nextFrameStart(fresh, 10, 0.5);
+    check("a fresh run starts a fifth of a second behind now and queues the next frame right after it",
+      JITTER_LEAD_S === 0.2 && a.start === 10.2 && Math.abs(a.next.nextStart - 10.7) < 1e-9 && a.next.lead === 0.2 && !a.underrun);
+    const b = nextFrameStart(a.next, 10.3, 0.5);
+    check("  …a frame that arrives while the run is still ahead butts against the previous one — no gap, no growth",
+      b.start === a.next.nextStart && !b.underrun && b.next.lead === 0.2);
+    const c = nextFrameStart(b.next, 12, 0.5);
+    check("  …a frame that arrives after the run drained is an UNDERRUN: it starts a grown lead behind now",
+      c.underrun && Math.abs(c.next.lead - (JITTER_LEAD_S + JITTER_LEAD_STEP_S)) < 1e-9 && Math.abs(c.start - (12 + c.next.lead)) < 1e-9);
+    let st = { nextStart: 1, lead: JITTER_LEAD_S };
+    for (let i = 0; i < 20; i++) st = nextFrameStart(st, st.nextStart + 5, 0.1).next;
+    check("  …and the lead stops growing at the ceiling — a rough network buys delay, not unbounded delay",
+      JITTER_LEAD_MAX_S === 0.6 && Math.abs(st.lead - JITTER_LEAD_MAX_S) < 1e-9);
+    const d = nextFrameStart({ nextStart: 0, lead: 0.5 }, 3, 0.2);
+    check("  …a new run after a flush keeps the lead the call has settled on", d.start === 3.5 && !d.underrun);
+    const fs29 = await import("node:fs");
+    const wa = fs29.readFileSync("src/lib/voice/ws-audio.ts", "utf8");
+    check("the browser player places every frame with that arithmetic, and a drained queue or a flush starts a new run",
+      /const placed = nextFrameStart\(jitter, ctx\.currentTime, buffer\.duration\);\s*jitter = placed\.next;\s*node\.start\(placed\.start\);/.test(wa) &&
+      /if \(playing\.size === 0\) jitter = \{ nextStart: 0, lead: jitter\.lead \};/.test(wa) && /playing\.clear\(\);\s*jitter = \{ nextStart: 0, lead: jitter\.lead \};/.test(wa) && !/LEAD_S \/ 2/.test(wa));
+    check("the microphone is read on the audio thread by a worklet loaded from a blob — no second file — and the processor is the fallback, never both",
+      CAPTURE_WORKLET_NAME === "koleex-capture" && CAPTURE_WORKLET_SOURCE.includes(`registerProcessor("${CAPTURE_WORKLET_NAME}"`) && CAPTURE_WORKLET_SOURCE.includes(`new Float32Array(${FRAME_SAMPLES})`) &&
+      CAPTURE_WORKLET_SOURCE.includes("this.port.postMessage(out, [out.buffer])") &&
+      /URL\.createObjectURL\(new Blob\(\[CAPTURE_WORKLET_SOURCE\], \{ type: "application\/javascript" \}\)\)/.test(wa) && /URL\.revokeObjectURL\(url\);/.test(wa) &&
+      /void startWorklet\(mic, onFrame\)\.then\(\(ok\) => \{\s*if \(ok \|\| closed\) return;\s*startProcessor\(mic, onFrame\);/.test(wa) &&
+      /if \(!ctx\.audioWorklet \|\| typeof AudioWorkletNode === "undefined"\) return false;/.test(wa));
+    check("  …both readers keep the graph alive through a silent gain, and never play the microphone back", /silence\.gain\.value = 0;/.test(wa) && /keepAlive\(processor\)/.test(wa) && /keepAlive\(worklet\)/.test(wa));
+  }
+  {
+    check("a web picture's src is the AI picture proxy at the slot's width; a storage picture is the optimizer; a blob is itself",
+      AI_IMAGE_PROXY_PATH === "/api/ai/image" &&
+      aiImage("https://img.example/a.jpg?x=1&y=2", 384) === "/api/ai/image?u=https%3A%2F%2Fimg.example%2Fa.jpg%3Fx%3D1%26y%3D2&w=384" &&
+      aiImage("https://xyz.supabase.co/storage/v1/object/public/products/a.png", 768).startsWith("/_next/image?url=") &&
+      aiImage("blob:https://hub.koleexgroup.com/abc", 1200) === "blob:https://hub.koleexgroup.com/abc" && aiImage("", 384) === "" && aiImage(null, 384) === "");
+    check("  …and never http: an http URL is returned as-is, and the screens already refuse to draw it", aiImage("http://img.example/a.jpg", 384) === "http://img.example/a.jpg");
+    const fs29 = await import("node:fs");
+    const tr = fs29.readFileSync("src/components/ai/VoiceTranscript.tsx", "utf8");
+    const scr = fs29.readFileSync("src/components/ai/VoiceCallScreen.tsx", "utf8");
+    const md = fs29.readFileSync("src/components/ai/MessageMarkdown.tsx", "utf8");
+    const lb = fs29.readFileSync("src/components/ai/PhotoLightbox.tsx", "utf8");
+    const lib = fs29.readFileSync("src/components/ai/LibraryPanel.tsx", "utf8");
+    check("every AI screen draws a picture through aiImage: tile 384, bubble 768, full view 1200, library 384 — no original URL reaches an <img>",
+      /src=\{aiImage\(photo\.url, 384\)\}/.test(tr) && /src=\{aiImage\(url, 768\)\}/.test(md) && /src=\{aiImage\(photo\.url, 1200\)\}/.test(lb) && /src=\{aiImage\(it\.url, 384\)\}/.test(lib) &&
+      !/src=\{photo\.url\}/.test(tr) && !/src=\{url\}/.test(md) && !/src=\{photo\.url\}/.test(lb) && !/src=\{it\.url\}/.test(lib));
+    check("a tile in a layer that is not showing holds no picture: the words layer's tiles are visible only on the chat view, the strip's only on the orb view",
+      /visible = true \}/.test(tr) && /const img = visible \? \(/.test(tr) && /<span aria-hidden className=\{`block \$\{frame\}`\} style=\{\{ width: size, height: size \}\} \/>/.test(tr) &&
+      /visible=\{photosVisible\}/.test(tr) && /photosVisible=\{view === "chat"\}/.test(scr) && /size=\{88\} visible=\{view === "orb"\}/.test(scr));
+  }
 }
 
 console.log(`\n${pass} passed, ${failures.length} failed`);

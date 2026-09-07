@@ -121,6 +121,15 @@ export const BUDGETS = {
     windowSec: 3600,
     max: num(process.env.AI_LIMIT_IMAGES_PER_HOUR, 10),
   }),
+  /* A WEB PICTURE, MADE SMALL FOR A SCREEN (api/ai/image). One request per
+     picture per width, answered from the browser's cache after that. An
+     answer shows four pictures at most and a call a handful of answers; a
+     hundred a minute is far above a person and a floor under a loop. */
+  imageProxyPerAccount: (): Budget => ({
+    bucket: "image:proxy",
+    windowSec: 60,
+    max: num(process.env.AI_LIMIT_IMAGE_PROXY_PER_MIN, 100),
+  }),
   imagePerTenant: (): Budget => ({
     bucket: "image:tenant",
     windowSec: 86_400,

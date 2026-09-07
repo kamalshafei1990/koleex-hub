@@ -1,7 +1,6 @@
 import "server-only";
 
-import dns from "node:dns/promises";
-import net from "node:net";
+import { assertSafeUrl, isPrivateAddress } from "./safe-url";
 
 /* ---------------------------------------------------------------------------
    Safe outbound page fetch — for the Translator's Website tab.
@@ -36,65 +35,9 @@ export type FetchPageError =
   | "fetch_failed"
   | "empty_page";
 
-/** True for addresses that must never be reachable from a user-supplied URL. */
-function isPrivateAddress(ip: string): boolean {
-  const v = net.isIP(ip);
-  if (v === 4) {
-    const [a, b] = ip.split(".").map(Number);
-    if (a === 10 || a === 127 || a === 0) return true;
-    if (a === 172 && b >= 16 && b <= 31) return true;
-    if (a === 192 && b === 168) return true;
-    if (a === 169 && b === 254) return true;      // link-local incl. cloud metadata
-    if (a === 100 && b >= 64 && b <= 127) return true; // CGNAT
-    if (a >= 224) return true;                     // multicast / reserved
-    return false;
-  }
-  if (v === 6) {
-    const s = ip.toLowerCase();
-    if (s === "::1" || s === "::") return true;
-    if (s.startsWith("fe80") || s.startsWith("fc") || s.startsWith("fd")) return true;
-    // IPv4-mapped (::ffff:10.0.0.1) — unwrap and re-check.
-    const mapped = s.match(/^::ffff:(\d+\.\d+\.\d+\.\d+)$/);
-    if (mapped) return isPrivateAddress(mapped[1]);
-    return false;
-  }
-  return true; // not an IP at all → refuse
-}
-
-/** Validate one URL: scheme, hostname, and every address it resolves to. */
-async function assertSafeUrl(raw: string): Promise<URL> {
-  let url: URL;
-  try {
-    url = new URL(raw);
-  } catch {
-    throw new Error("bad_url" satisfies FetchPageError);
-  }
-  if (url.protocol !== "http:" && url.protocol !== "https:") {
-    throw new Error("bad_url" satisfies FetchPageError);
-  }
-
-  const host = url.hostname.replace(/^\[|\]$/g, "");
-  if (net.isIP(host)) {
-    if (isPrivateAddress(host)) throw new Error("blocked_host" satisfies FetchPageError);
-    return url;
-  }
-  if (/^localhost$/i.test(host) || host.endsWith(".local") || host.endsWith(".internal")) {
-    throw new Error("blocked_host" satisfies FetchPageError);
-  }
-
-  let addrs: Array<{ address: string }>;
-  try {
-    addrs = await dns.lookup(host, { all: true });
-  } catch {
-    throw new Error("fetch_failed" satisfies FetchPageError);
-  }
-  if (!addrs.length || addrs.some((a) => isPrivateAddress(a.address))) {
-    // ANY private answer disqualifies the host — a DNS round-robin must not
-    // be able to smuggle an internal address past us on a later attempt.
-    throw new Error("blocked_host" satisfies FetchPageError);
-  }
-  return url;
-}
+/* The address check lives in safe-url.ts (shared with Koleex AI's picture
+   proxy since 2026-09-07); the rules are the ones described above. */
+export { isPrivateAddress, assertSafeUrl };
 
 export interface FetchedPage {
   url: string;
