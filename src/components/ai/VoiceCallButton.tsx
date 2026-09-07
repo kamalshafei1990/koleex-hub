@@ -63,7 +63,7 @@ import {
 import { requestCallSummary, shouldSummarise } from "@/lib/voice/summary";
 import { sendVoiceTelemetry } from "@/lib/voice/telemetry";
 import { probeWsLane } from "@/lib/voice/lane-probe";
-import { createPreviewPlayer, browserPreviewContext, VOICE_PREVIEW_PATH, PREVIEW_FETCH_TIMEOUT_MS, type PreviewPlayer } from "@/lib/voice/preview-player";
+import { createPreviewPlayer, browserPreviewContext, VOICE_PREVIEW_PATH, PREVIEW_FETCH_TIMEOUT_MS, type PreviewPlayer, type PreviewContextLike } from "@/lib/voice/preview-player";
 import { TranscriptPersister, type SavedTurn, type PersistFailure } from "@/lib/voice/persist";
 import { VOICE_SWITCH_GREETING } from "@/lib/voice/text-turn";
 import VoiceCallScreen from "@/components/ai/VoiceCallScreen";
@@ -986,8 +986,15 @@ export default function VoiceCallButton({
      talked over — and both are restored exactly as they were. */
   const previewRef = useRef<PreviewPlayer | null>(null);
   const previewVoice = useCallback(async (key: string): Promise<boolean> => {
-    const player = (previewRef.current ??= createPreviewPlayer(browserPreviewContext));
-    player.prime();
+    /* NO SECOND AUDIO CONTEXT UNDER A LIVE CALL (owner, 2026-09-07 night:
+       "when I talk it has a noise"; the call's transcript read "[noise]"
+       right after two samples). A sample plays through the call's own
+       context: the socket lane's audio (session.previewAudio) or, on the
+       other lane, the tones' context. The standalone player — its own
+       context — is only for a sample with no call under it. */
+    const inCall = !!sessionRef.current;
+    const player = inCall ? null : (previewRef.current ??= createPreviewPlayer(browserPreviewContext));
+    player?.prime();
     let bytes: ArrayBuffer;
     try {
       const q = new URLSearchParams({ voice: key, lane: transportRef.current, lang });
@@ -1003,13 +1010,20 @@ export default function VoiceCallButton({
     const session = sessionRef.current;
     const micWasOpen = !!session && !session.isMuted();
     if (micWasOpen) session.setMuted(true);
+    /* On the socket lane the sample travels the far side's own stream and
+       element, so the element stays audible; elsewhere it is silenced so
+       the sample is not talked over. */
+    const viaCall = session?.previewAudio(bytes) ?? null;
     const far = audioRef.current;
     const farWasMuted = far?.muted ?? false;
-    if (far) far.muted = true;
+    if (far && !viaCall) far.muted = true;
     try {
-      return await player.play(bytes);
+      if (viaCall) return await viaCall;
+      const tones = tonesRef.current?.context() ?? null;
+      const p = player ?? (tones ? createPreviewPlayer(() => tones as unknown as PreviewContextLike) : (previewRef.current ??= createPreviewPlayer(browserPreviewContext)));
+      return await p.play(bytes);
     } finally {
-      if (far) far.muted = farWasMuted;
+      if (far && !viaCall) far.muted = farWasMuted;
       if (micWasOpen && sessionRef.current === session) session.setMuted(false);
     }
   }, [lang]);

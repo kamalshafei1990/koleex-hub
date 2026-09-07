@@ -179,6 +179,15 @@ export class CallTones {
     this.play(READY_TONE);
   }
 
+  /** The context this call's tones play in — for a sample on the lane that
+   *  has no audio context of its own (WebRTC carries the sound itself). A
+   *  SECOND context opened mid-call re-negotiates a phone's audio hardware
+   *  under the live microphone (ws-audio.ts playSample); reusing this one
+   *  does not. Null before prime() or after close(). */
+  context(): ToneContextLike | null {
+    return this.ctx && this.ctx.state !== "closed" ? this.ctx : null;
+  }
+
   /** A dropped connection is back. */
   recovered(): void {
     this.play(RECOVERED_TONE);

@@ -14,6 +14,7 @@ import {
   parseVoiceEvent,
   appendTranscript,
   extendsUtterance,
+  isNonSpeech,
   EV_ASSISTANT_DELTA_GA,
   EV_ASSISTANT_DONE_GA,
   EV_ASSISTANT_DELTA,
@@ -450,6 +451,18 @@ console.log("\n── 10. The protocol's newer names, and an utterance heard aga
     extendsUtterance("Hello?", "hello, there") && extendsUtterance("إزيك؟", "إزيك، إيه الأخبار") && !extendsUtterance("a", "ab") && !extendsUtterance("hello there", "hello") && !extendsUtterance("", "x"));
   const withPhoto = appendTranscript([{ role: "user", text: "show me", final: true }], { role: "user", text: "show me the KX-180", final: true, photos: [{ url: "https://x/y.jpg", label: "p" }] });
   check("  …a replacement keeps the newer line's photos", withPhoto.length === 1 && withPhoto[0].photos?.length === 1);
+}
+
+{
+  /* "[noise] ..." — a saved caller line, 2026-09-07 19:47. */
+  check("a transcript that is only non-speech markers is recognised — and words never are",
+    isNonSpeech("[noise] ...") && isNonSpeech("[inaudible]") && isNonSpeech("…") && isNonSpeech("(laughs)") &&
+    !isNonSpeech("[noise] hello") && !isNonSpeech("no") && !isNonSpeech("") && !isNonSpeech("إزيك؟"));
+  const base: TranscriptLine[] = [{ role: "assistant", text: "Hi.", final: true }];
+  check("a settled caller line of only markers is dropped, and the caption it had opened closes without a trace",
+    appendTranscript(base, { role: "user", text: "[noise] ...", final: true }).length === 1 &&
+    appendTranscript([...base, { role: "user", text: "[noi", final: false }], { role: "user", text: "[noise]", final: true }).length === 1 &&
+    appendTranscript(base, { role: "user", text: "[noise] hello", final: true }).length === 2);
 }
 
 console.log(`\n${pass} passed, ${failures.length} failed`);

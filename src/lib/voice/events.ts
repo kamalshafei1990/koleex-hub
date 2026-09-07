@@ -318,11 +318,29 @@ export function extendsUtterance(prev: string, next: string): boolean {
   return a.length >= 2 && b.length >= a.length && b.startsWith(a);
 }
 
+/** True for a transcript that is only the transcriber's markers for
+ *  non-speech — "[noise]", "[inaudible]", "…" — with no words of the
+ *  caller's in it. Pure. */
+export function isNonSpeech(text: string): boolean {
+  const t = text.trim();
+  if (!t) return false;
+  return /^(?:\[[^\]]{1,40}\]|\([^)]{1,40}\)|\.{2,}|…|[\s,.])+$/.test(t);
+}
+
 export function appendTranscript(
   lines: readonly TranscriptLine[],
   update: TranscriptUpdate,
 ): TranscriptLine[] {
   const last = lines[lines.length - 1];
+  /* "[noise] ..." IS NOT A TURN (a saved caller line, 2026-09-07 19:47).
+     A transcriber that heard nothing it could write marks it so; the mark
+     is not something the caller said, and a bubble of it in the thread is
+     noise about noise. A settled caller line that is only markers is
+     dropped — and a caption it had opened is closed without a trace. */
+  if (update.role === "user" && update.final && isNonSpeech(update.text)) {
+    const openIdx = lines.length > 0 && !last.final && last.role === "user" ? lines.length - 1 : -1;
+    return openIdx >= 0 ? lines.slice(0, openIdx) : [...lines];
+  }
   /* The open line of this speaker: the last line, or the one before it when
      the other speaker has opened a line on top. */
   let openIdx = -1;
