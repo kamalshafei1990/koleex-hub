@@ -121,6 +121,9 @@ export async function POST(req: Request) {
   const sttLanguage = detectConversationLang(recentTurns, { hint: clientHint }) ?? clientHint;
   /* No transcriber model on this wire: the vendor picks its own. */
   const payload = buildVoiceSessionPayload(voice, taughtQuestions, recentTurns, gate.viewer, sttLanguage, null, OPENAI_WIRE);
+  /* The voice the session will ask for, by key and vendor id, so "it only
+     has one voice" can be read from the log rather than guessed. */
+  console.log(`[ai.voice.ws] session voice=${requested ?? "default"} vendor=${voice?.vendorId ?? "none"}`);
 
   return NextResponse.json(
     {

@@ -2553,7 +2553,7 @@ function describeErrorCheck(): boolean {
     };
     return sock;
   };
-  type FakeAudio = { stream: MediaStream; played: string[]; flushes: number; closed: number; captureStarted: boolean; frame: ((b64: string) => void) | null; rate: number };
+  type FakeAudio = { stream: MediaStream; played: string[]; flushes: number; closed: number; captureStarted: boolean; frame: ((b64: string) => void) | null; rate: number; samples: number[] };
   const wsEnvelope = (over: Record<string, unknown> = {}) => ({
     transport: "ws", url: "wss://voice.example/v1/realtime", protocols: ["xai-client-secret.SECRET-1"], expires_at: 1,
     audio: { format: "pcm16", sample_rate: 24_000 },
@@ -2584,7 +2584,7 @@ function describeErrorCheck(): boolean {
     }) as unknown as typeof fetch;
     if (!opts.noSocket) d.deps.createWebSocket = (url, protocols) => { const sock = makeSocket(url, protocols); sockets.push(sock); return sock; };
     if (!opts.noAudio) d.deps.createWsAudio = (rate) => {
-      const a: FakeAudio = { stream: { id: "far" } as unknown as MediaStream, played: [], flushes: 0, closed: 0, captureStarted: false, frame: null, rate };
+      const a: FakeAudio = { stream: { id: "far" } as unknown as MediaStream, played: [], flushes: 0, closed: 0, captureStarted: false, frame: null, rate, samples: [] };
       audios.push(a);
       return {
         stream: a.stream,
@@ -2592,6 +2592,7 @@ function describeErrorCheck(): boolean {
         play: (b64) => { a.played.push(b64); },
         flush: () => { a.flushes++; },
         close: () => { a.closed++; },
+        playSample: async (bytes) => { a.samples.push(bytes.byteLength); return true; },
       };
     };
     const states: Array<[VoiceState, VoiceFailure | undefined]> = [];
@@ -2738,6 +2739,8 @@ function describeErrorCheck(): boolean {
     r.sockets[0].message(JSON.stringify({ type: "response.output_audio.delta", response_id: "r2", delta: "Rg==" }));
     check("  …a cancelled response is silenced the same way", r.audios[0].flushes === 2 && r.audios[0].played.join() === "QQ==,RA==");
     const sentBefore = r.sockets[0].sent.length;
+    check("a voice sample on the socket lane plays through the call's OWN audio (no second context under a live microphone)",
+      (() => { const pr = r.s.previewAudio(new ArrayBuffer(7)); return pr !== null && r.audios[0].samples.join() === "7"; })());
     check("a response request goes out on the open socket as one response.create with instructions",
       r.s.requestResponse("say hi") === true && r.sockets[0].sent.length === sentBefore + 1 && r.sockets[0].sent[sentBefore] === JSON.stringify({ type: "response.create", response: { instructions: "say hi" } }) && r.s.requestResponse("  ") === false);
     r.s.stop();
@@ -2990,14 +2993,18 @@ function describeErrorCheck(): boolean {
     const btn = fs30.readFileSync("src/components/ai/VoiceCallButton.tsx", "utf8");
     const scr = fs30.readFileSync("src/components/ai/VoiceCallScreen.tsx", "utf8");
     check("the button primes the player INSIDE the tap, fetches the sample from our route with the lane and the UI language, and hands the bytes to the player",
-      /const player = \(previewRef\.current \?\?= createPreviewPlayer\(browserPreviewContext\)\);\s*player\.prime\(\);/.test(btn) &&
+      /player\?\.prime\(\);/.test(btn) &&
       /new URLSearchParams\(\{ voice: key, lane: transportRef\.current, lang \}\)/.test(btn) && /fetch\(`\$\{VOICE_PREVIEW_PATH\}\?\$\{q\.toString\(\)\}`/.test(btn) &&
-      /return await player\.play\(bytes\);/.test(btn));
-    check("  …while the sample plays the microphone is closed and the far side silenced, and both are restored exactly as they were",
+      /return await p\.play\(bytes\);/.test(btn));
+    check("  …while the sample plays the microphone is closed, and restored exactly as it was; the far side is silenced only when the sample does not travel its own stream",
       /const micWasOpen = !!session && !session\.isMuted\(\);\s*if \(micWasOpen\) session\.setMuted\(true\);/.test(btn) &&
-      /const farWasMuted = far\?\.muted \?\? false;\s*if \(far\) far\.muted = true;/.test(btn) &&
-      /finally \{\s*if \(far\) far\.muted = farWasMuted;\s*if \(micWasOpen && sessionRef\.current === session\) session\.setMuted\(false\);\s*\}/.test(btn) &&
+      /const farWasMuted = far\?\.muted \?\? false;\s*if \(far && !viaCall\) far\.muted = true;/.test(btn) &&
+      /finally \{\s*if \(far && !viaCall\) far\.muted = farWasMuted;\s*if \(micWasOpen && sessionRef\.current === session\) session\.setMuted\(false\);\s*\}/.test(btn) &&
       /onPreviewVoice=\{previewVoice\}\s*onStopPreview=\{stopPreview\}/.test(btn));
+    check("  …and NO second audio context is opened under a live call: the socket lane's own audio plays the sample, the other lane borrows the tones' context; the standalone player only when there is no call",
+      /const inCall = !!sessionRef\.current;\s*const player = inCall \? null : \(previewRef\.current \?\?= createPreviewPlayer\(browserPreviewContext\)\);/.test(btn) &&
+      /const viaCall = session\?\.previewAudio\(bytes\) \?\? null;/.test(btn) && /if \(viaCall\) return await viaCall;/.test(btn) &&
+      /const tones = tonesRef\.current\?\.context\(\) \?\? null;/.test(btn));
     const tt = fs30.readFileSync("src/lib/voice/text-turn.ts", "utf8");
     const { buildResponseRequest, VOICE_SWITCH_GREETING } = await import("../src/lib/voice/text-turn");
     check("a switched voice speaks first: the switch arms a greeting, the rebuilt call's ready sends ONE response request with instructions and no user turn, and the beacon names the lane",

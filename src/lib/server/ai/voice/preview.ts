@@ -83,7 +83,10 @@ export function planGrokTts(env: GrokTtsEnv, vendorId: string, lang: Lang): TtsP
   return {
     url: url.toString(),
     headers: { "Content-Type": "application/json", Accept: "audio/mpeg, audio/*", Authorization: `Bearer ${key}` },
-    body: JSON.stringify({ text: PREVIEW_SAMPLE[lang], voice_id: vendorId, language: GROK_LANG[lang] }),
+    /* The speech endpoint's ids are lowercase (the vendor's console shows
+       `voice_id: "eve"`); the realtime session's are capitalised. One
+       catalogue, lowered here. */
+    body: JSON.stringify({ text: PREVIEW_SAMPLE[lang], voice_id: vendorId.toLowerCase(), language: GROK_LANG[lang] }),
     answer: "binary",
     fallbackType: "audio/mpeg",
   };

@@ -56,11 +56,20 @@ export const GROK_DEFAULT_URL = "wss://api.x.ai/v1/realtime";
 export const GROK_DEFAULT_SECRETS_URL = "https://api.x.ai/v1/realtime/client_secrets";
 /* THE LANE'S OWN VOICES, UNDER THEIR OWN NAMES. The owner (2026-09-08):
    "when I use Grok voice I want the Grok voice choices, not Qwen". Five
-   voices, the vendor's ids lowercase as its console shows them, labelled by
-   the names the voices themselves carry — neutral first names, nothing
-   that says which vendor. A voice key is positional (v1..v5) on either
-   lane, so a saved key still resolves to a voice when the lane changes. */
-export const GROK_DEFAULT_VOICES = "ara:Ara,eve:Eve,rex:Rex,leo:Leo,sal:Sal";
+   voices, labelled by the names the voices themselves carry — neutral first
+   names, nothing that says which vendor. A voice key is positional (v1..v5)
+   on either lane, so a saved key still resolves to a voice when the lane
+   changes.
+
+   CAPITALISED, BECAUSE THE REALTIME API KNOWS THEM SO (owner, 2026-09-07
+   night: "when I switch to a different voice the voice doesn't change — it
+   seems to have only one voice"). The first version copied the ids
+   lowercase from the vendor's speech console; the realtime session took
+   `voice: "eve"` without complaint and spoke in its default voice every
+   time. The vendor's own realtime clients default to "Ara" — capitalised —
+   and that is the form the session gets. The speech (sample) endpoint is
+   the one that wants lowercase; preview.ts lowers it there. */
+export const GROK_DEFAULT_VOICES = "Ara:Ara,Eve:Eve,Rex:Rex,Leo:Leo,Sal:Sal";
 export const GROK_DEFAULT_SAMPLE_RATE = 24_000;
 export const GROK_DEFAULT_PROTOCOL = "xai-client-secret.{token}";
 /** Long enough to open the socket after a slow handshake; short enough

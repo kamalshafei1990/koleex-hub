@@ -290,6 +290,30 @@ overflow-x container clips vertically); a sampling tile shows the same
 animated dots the activity line uses. The connected cue is `ping`; a stored
 `arrive` or `confirm` nobody chose follows it.
 
+## One voice, and "[noise]" (2026-09-07, late night)
+
+Owner: "a lot of bugs in the Grok voice conversation; when I switch to a
+different voice the voice doesn't change — it seems to have only one voice;
+when I talk it has a noise".
+
+**One voice.** The socket lane's catalogue carried the vendor ids
+lowercase, copied from the speech console (`eve`). The realtime session
+accepted `voice: "eve"` without an error and spoke its default voice every
+time; the vendor's own realtime clients default to `"Ara"`, capitalised.
+The catalogue is capitalised now (`Ara:Ara,…`); the sample endpoint, which
+wants lowercase, gets the id lowered. The socket route logs `session
+voice=<key> vendor=<id>`.
+
+**"[noise]".** The 19:47 call's transcript held a caller turn of `[noise]
+...` — right after two voice samples. The sample player opened its own
+AudioContext beside the call's; on a phone a second context started
+mid-call re-negotiates the audio hardware, and the first context's
+microphone reader went on at a rate that was no longer the hardware's. Now
+a sample plays through the call's own context — the socket lane's audio
+(`WsAudio.playSample`, through the far side's stream) or the tones'
+context on the WebRTC lane — and a caller line that is only transcriber
+markers (`[noise]`, `[inaudible]`, `…`) is dropped, not shown, not saved.
+
 ## Owner-side (not code)
 
 - Activate the realtime voice model on the Beijing workspace (still `403 Unpurchased`), so mainland callers get the mainland endpoint.

@@ -1243,7 +1243,10 @@ console.log("\n── 8. What the client may know, and what it may not ──");
     check("  …with the lane's OWN five voices under their own names, keyed positionally like the mainland catalogue",
       !!cfg && cfg.voices.map((v) => v.label).join() === "Ara,Eve,Rex,Leo,Sal" && cfg.voices.map((v) => v.key).join() === "v1,v2,v3,v4,v5" &&
       voiceCatalogue(undefined).map((v) => v.label).join() === "Nour,Layla,Omar,Adam,Sara" && !/grok|xai/i.test(cfg.voices.map((v) => v.label).join()));
-    check("  …and vendor ids in the vendor's own lowercase", !!cfg && cfg.voices.map((v) => v.vendorId).join() === "ara,eve,rex,leo,sal");
+    /* 2026-09-07 night: "when I switch to a different voice the voice
+       doesn't change". Lowercase ids were taken without complaint and
+       ignored; the realtime API knows the voices capitalised. */
+    check("  …and vendor ids CAPITALISED, as the realtime session knows them — lowercase was accepted and ignored", !!cfg && cfg.voices.map((v) => v.vendorId).join() === "Ara,Eve,Rex,Leo,Sal");
     check("the config carries no key, in any field", !!cfg && !JSON.stringify(cfg).includes(KEY) && !JSON.stringify(cfg).includes("secret-key"));
     check("AI_VOICE_GROK_LANE=off switches the lane off without removing the key", parseGrokVoiceConfig({ AI_VOICE_GROK_API_KEY: KEY, AI_VOICE_GROK_LANE: "off" }) === null);
     check("an insecure socket or mint url is refused", parseGrokVoiceConfig({ AI_VOICE_GROK_API_KEY: KEY, AI_VOICE_GROK_URL: "ws://api.example/v1/realtime" }) === null &&
@@ -1309,6 +1312,7 @@ console.log("\n── 8. What the client may know, and what it may not ──");
       /voices_by_lane: \{ rtc: publicVoiceList\(cfg\?\.voices \?\? \[\]\), ws: publicVoiceList\(grok\?\.voices \?\? \[\]\) \}/.test(sdpRoute));
     const postBody = wsRoute.slice(wsRoute.indexOf("export async function POST"));
     check("neither route carries a vendor host in code — the endpoint is configuration", !/api\.x\.ai|wss:\/\//.test(postBody) && !/api\.x\.ai|wss:\/\//.test(sdpRoute));
+    check("the socket route logs the voice it asks for, by key and vendor id — never the key material", /console\.log\(`\[ai\.voice\.ws\] session voice=\$\{requested \?\? "default"\} vendor=\$\{voice\?\.vendorId \?\? "none"\}`\);/.test(wsRoute) && !/apiKey\}/.test(wsRoute));
   }
 
   console.log("\n── 19. The picture proxy: a web photo made phone-sized, under the SSRF rules ──");
@@ -1348,10 +1352,10 @@ console.log("\n── 8. What the client may know, and what it may not ──");
   {
     const pv = await import("../src/lib/server/ai/voice/preview");
     const KEY = "xai-secret-key-000";
-    const g = pv.planGrokTts({ AI_VOICE_GROK_API_KEY: KEY }, "eve", "ar");
+    const g = pv.planGrokTts({ AI_VOICE_GROK_API_KEY: KEY }, "Eve", "ar");
     check("the socket lane's synthesiser: a POST to the vendor's speech endpoint with the SAME voice id the call uses, the sample in the caller's language, and the key in the header only",
       !!g && g.url === pv.GROK_DEFAULT_TTS_URL && g.answer === "binary" && g.headers.Authorization === `Bearer ${KEY}` &&
-      JSON.parse(g.body).voice_id === "eve" && JSON.parse(g.body).text === pv.PREVIEW_SAMPLE.ar && JSON.parse(g.body).language === "ar" && !g.url.includes(KEY) && !g.body.includes(KEY));
+      JSON.parse(g.body).voice_id === "eve" /* the speech endpoint's lowercase, from the catalogue's "Eve" */ && JSON.parse(g.body).text === pv.PREVIEW_SAMPLE.ar && JSON.parse(g.body).language === "ar" && !g.url.includes(KEY) && !g.body.includes(KEY));
     check("  …off with the lane, off without a key, refused over http, and the endpoint is configuration",
       pv.planGrokTts({ AI_VOICE_GROK_API_KEY: KEY, AI_VOICE_GROK_LANE: "off" }, "eve", "en") === null && pv.planGrokTts({}, "eve", "en") === null &&
       pv.planGrokTts({ AI_VOICE_GROK_API_KEY: KEY, AI_VOICE_GROK_TTS_URL: "http://x.example/tts" }, "eve", "en") === null &&

@@ -52,6 +52,15 @@ export type WsAudio = {
   flush(): void;
   /** Release the microphone reader and the output. */
   close(): void;
+  /** A VOICE SAMPLE THROUGH THIS SAME CONTEXT (owner, 2026-09-07 night:
+   *  "when I talk it has a noise"). The sample player used to open its own
+   *  AudioContext beside this one; on a phone a second context started
+   *  mid-call re-negotiates the audio hardware, and the first context's
+   *  microphone reader went on at a rate that was no longer the hardware's
+   *  — the far side transcribed "[noise]". So a sample decodes and plays
+   *  here, through the same output the voice uses. Resolves when it ended;
+   *  false when it could not be decoded or was stopped. */
+  playSample(bytes: ArrayBuffer): Promise<boolean>;
 };
 
 /* Linear resampling — a phone microphone into a speech model does not need
@@ -274,6 +283,7 @@ export function createBrowserWsAudio(wireRate: number): WsAudio {
   let silence: GainNode | null = null;
   let capturing = false;
   let closed = false;
+  let sample: { node: AudioBufferSourceNode; stop: () => void } | null = null;
   const playing = new Set<AudioBufferSourceNode>();
   const jitter = new JitterQueue<AudioBufferSourceNode>({
     now: () => ctx.currentTime,
@@ -366,9 +376,45 @@ export function createBrowserWsAudio(wireRate: number): WsAudio {
       }
       playing.clear();
     },
+    playSample(bytes) {
+      /* Whatever the far side was saying yields to the sample. */
+      this.flush();
+      sample?.stop();
+      sample = null;
+      return new Promise<boolean>((resolve) => {
+        let settled = false;
+        const done = (ok: boolean) => {
+          if (settled) return;
+          settled = true;
+          resolve(ok);
+        };
+        void ctx.decodeAudioData(bytes.slice(0)).then(
+          (buffer) => {
+            if (closed) return done(false);
+            const node = ctx.createBufferSource();
+            node.buffer = buffer;
+            node.connect(out);
+            node.onended = () => {
+              if (sample?.node === node) sample = null;
+              done(true);
+            };
+            sample = { node, stop: () => { try { node.stop(); } catch { /* ended */ } done(false); } };
+            try {
+              node.start();
+            } catch {
+              done(false);
+            }
+            void ctx.resume().catch(() => {});
+          },
+          () => done(false),
+        );
+      });
+    },
     close() {
       closed = true;
       this.flush();
+      sample?.stop();
+      sample = null;
       try {
         processor?.disconnect();
         worklet?.disconnect();

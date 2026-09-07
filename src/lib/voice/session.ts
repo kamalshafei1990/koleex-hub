@@ -526,6 +526,12 @@ export class VoiceSession {
     }
   }
 
+  /** Play a voice sample through the socket lane's own audio context —
+   *  see WsAudio.playSample. Null on the other lane, where there is none. */
+  previewAudio(bytes: ArrayBuffer): Promise<boolean> | null {
+    return this.wsAudio ? this.wsAudio.playSample(bytes) : null;
+  }
+
   /** Ask the far side to speak now, to these instructions, with no user
    *  turn added — a word from a newly chosen voice (text-turn.ts). */
   requestResponse(instructions: string): boolean {
