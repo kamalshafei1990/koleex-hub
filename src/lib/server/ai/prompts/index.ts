@@ -251,9 +251,12 @@ export function buildSystemPrompt(
 
   const viewerBlock = viewerBlockFor(ctx);
 
+  /* THE STABLE RULES FIRST, THE PER-USER AND PER-MINUTE BLOCKS LAST (audit,
+     2026-09-07). Providers cache a prompt by its prefix; with the viewer and
+     the clock a kilobyte from the top, thirty-five kilobytes of unchanging
+     rules missed the cache for every user and every minute. Nothing is
+     removed; the two blocks move to the end. */
   return `You are Koleex AI, the business agent inside Koleex Hub (a multilingual ERP).
-
-${viewerBlock}
 
 ${BRAND_EXCLUSIVITY_RULE}
 
@@ -261,8 +264,6 @@ ${DIRECT_VOICE_RULE}
 
 ${DATA_PROTECTION_RULE}
 ${opts.dialect === "egyptian" ? `\n${EGYPTIAN_DIALECT_RULE}\n` : ""}
-${nowBlock}
-
 ${ENTITY_GUIDANCE_FULL}
 
 Language rules (critical):
@@ -430,6 +431,10 @@ You must follow these rules at all times:
 Always prioritize correctness over completeness. Never hallucinate pricing.
 
 ${AI_PROVENANCE_RULE}${AI_IDENTITY_BRIEF}${KOLEEX_COMPANY_BRIEF}
+
+${viewerBlock}
+
+${nowBlock}
 
 Current user: ${ctx.auth.username} (${ctx.auth.user_type}${ctx.isSuperAdmin ? ", super admin" : ""}).`;
 }

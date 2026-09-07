@@ -193,6 +193,9 @@ async function taughtRows(tenantId: string | null): Promise<TaughtRow[]> {
   return rows;
 }
 
+/** The taught block's ceiling, in characters (~2 000 tokens). */
+export const TAUGHT_BLOCK_CHARS = 8_000;
+
 export async function getTaughtAnswersBlock(tenantId: string | null): Promise<string> {
   const key = tenantId ?? "platform";
   const hit = qaCache.get(key);
@@ -202,10 +205,18 @@ export async function getTaughtAnswersBlock(tenantId: string | null): Promise<st
 
   let block = "";
   if (rows.length) {
-    const pairs = rows.map((r) => {
+    const pairs: string[] = [];
+    /* CAPPED. Thirty pairs at five answers of 400 chars is 54 KB riding every
+       lane, small talk included (audit, 2026-09-07). The block stops at the
+       budget; the pairs come in the order taughtRows returns them. */
+    let size = 0;
+    for (const r of rows) {
       const answers = r.answers.map((a, i) => `A${i + 1}: ${a.slice(0, 400)}`).join("\n");
-      return `Q: ${r.question}\n${answers}`;
-    });
+      const pair = `Q: ${r.question}\n${answers}`;
+      if (size + pair.length > TAUGHT_BLOCK_CHARS && pairs.length > 0) break;
+      pairs.push(pair);
+      size += pair.length;
+    }
     block =
       "\n\nTAUGHT KNOWLEDGE (owner-approved reference answers — LEARN from them, don't recite them). " +
       "When the user's question matches the MEANING of a Q below — any wording, in ANY language you understand (Arabic, Chinese, English, Turkish, Russian, French… all of them) — ground your reply in that entry and ANSWER IN THE USER'S LANGUAGE: " +

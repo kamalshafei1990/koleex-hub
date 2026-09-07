@@ -19,6 +19,7 @@ import "server-only";
 import type { ToolDef, UserContext, ToolResult, PermissionStatus } from "./types";
 import { checkModule } from "./permissions";
 import { logToolCall } from "./audit";
+import { after } from "next/server";
 import {
   ledgerMode,
   recordPendingAction,
@@ -376,15 +377,26 @@ export async function dispatchTool(
     });
   }
 
-  await logToolCall({
-    ctx,
-    conversationId: opts.conversationId ?? null,
-    toolName: name,
-    args,
-    result,
-    latencyMs: Date.now() - startedAt,
-    statusOverride,
-  });
+  /* THE AUDIT ROW IS WRITTEN, NOT WAITED FOR. It sat on the model's critical
+     path — one database round trip between a tool's result and the next
+     model call, per tool (audit, 2026-09-07). Inside a request it is
+     scheduled to run after the response; outside one (the suites, a
+     script) after() throws, and the write is awaited as before. */
+  const audit = () =>
+    logToolCall({
+      ctx,
+      conversationId: opts.conversationId ?? null,
+      toolName: name,
+      args,
+      result,
+      latencyMs: Date.now() - startedAt,
+      statusOverride,
+    });
+  try {
+    after(audit);
+  } catch {
+    await audit();
+  }
 
   return result;
 }

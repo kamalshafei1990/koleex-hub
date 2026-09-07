@@ -1086,6 +1086,7 @@ export default function KoleexAiApp() {
                   | { type: "start" }
                   | { type: "steps"; steps: AgentStep[] }
                   | { type: "delta"; text: string }
+                  | { type: "retract" }
                   | {
                       type: "end";
                       agent: {
@@ -1107,6 +1108,11 @@ export default function KoleexAiApp() {
                      lane sends a frame per provider token, and each used to
                      re-render the whole thread (audit, 2026-09-07). */
                   scheduleContentFlush();
+                } else if (json.type === "retract") {
+                  /* What streamed so far was narration before a lookup, not
+                     the answer; the answer follows. */
+                  accumulated = "";
+                  flushContentNow();
                 } else if (json.type === "end") {
                   flushContentNow();
                   finalMessage = json.message;
