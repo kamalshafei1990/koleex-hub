@@ -116,3 +116,64 @@ export function saveTalkMode(mode: TalkMode): void {
     /* Private mode or a full store: the choice lasts for this page. */
   }
 }
+
+/* ---------------------------------------------------------------------------
+   WHICH LANE WORKS FROM THIS DEVICE — remembered, with an age.
+
+   The server's country-based answer is a default, not a fact about the
+   browser's network (see lane-probe.ts). What the probe or a real call
+   found is kept here so the next call starts on the right lane with no
+   probe, and forgotten after a while because networks change: a phone
+   that leaves the VPN, or the office, is a different network. Pure
+   helpers plus two storage wrappers that never throw.
+   --------------------------------------------------------------------------- */
+
+export const LANE_STORAGE_KEY = "koleex-voice-lane";
+/** How long a probe's or a call's verdict stands before it is re-checked. */
+export const LANE_TTL_MS = 6 * 60 * 60 * 1000;
+export type VoiceLane = "rtc" | "ws";
+export type SavedLane = { lane: VoiceLane; at: number };
+
+export function parseSavedLane(raw: string | null | undefined): SavedLane | null {
+  if (!raw) return null;
+  try {
+    const v = JSON.parse(raw) as { lane?: unknown; at?: unknown };
+    if ((v.lane === "rtc" || v.lane === "ws") && typeof v.at === "number" && Number.isFinite(v.at)) return { lane: v.lane, at: v.at };
+  } catch {
+    /* not ours */
+  }
+  return null;
+}
+
+/** THE LANE A CALL STARTS ON. The server's word wins when it says the
+ *  socket lane (a caller it already sends there needs no second opinion);
+ *  when it says mainland, a fresh device verdict overrides it in either
+ *  direction; a stale or absent verdict leaves the server's answer and
+ *  asks for a probe. Pure. */
+export function decideLane(
+  server: VoiceLane,
+  saved: SavedLane | null,
+  now: number,
+  ttlMs: number = LANE_TTL_MS,
+): { lane: VoiceLane; probe: boolean } {
+  if (server === "ws") return { lane: "ws", probe: false };
+  const fresh = saved !== null && now - saved.at >= 0 && now - saved.at < ttlMs;
+  if (fresh && saved) return { lane: saved.lane, probe: false };
+  return { lane: "rtc", probe: true };
+}
+
+export function readSavedLane(): SavedLane | null {
+  try {
+    return parseSavedLane(window.localStorage.getItem(LANE_STORAGE_KEY));
+  } catch {
+    return null;
+  }
+}
+
+export function saveLane(lane: VoiceLane, now: number = Date.now()): void {
+  try {
+    window.localStorage.setItem(LANE_STORAGE_KEY, JSON.stringify({ lane, at: now } satisfies SavedLane));
+  } catch {
+    /* storage refused — the next call probes again */
+  }
+}

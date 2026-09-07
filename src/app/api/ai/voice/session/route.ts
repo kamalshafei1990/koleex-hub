@@ -253,10 +253,18 @@ export async function GET(req: Request) {
   const grok = parseGrokVoiceConfig(readGrokVoiceEnv());
   const lane = chooseVoiceLane({ country: req.headers.get("x-vercel-ip-country"), rtc: cfg !== null, ws: grok !== null });
   const voices = lane === "ws" && grok ? grok.voices : cfg ? cfg.voices : [];
+  /* THE SERVER'S ANSWER IS A DEFAULT, NOT A VERDICT (lane-probe.ts): a
+     caller the country stamp sends to the mainland lane may still reach
+     the socket lane through a tunnel our host never sees. `ws_available`
+     tells the browser there is a socket lane to try for itself. One log
+     line — country and decision, no identity — so a wrong lane can be
+     read from the log rather than guessed from a screenshot. */
+  const country = req.headers.get("x-vercel-ip-country") ?? "";
+  console.log(`[ai.voice] lane=${lane ?? "none"} country=${country.replace(/[^A-Za-z]/g, "").slice(0, 2) || "none"} ws=${grok !== null} rtc=${cfg !== null}`);
   /* Not configured is not an error here: no voice service means no voices to
      choose between, and a picker that cannot be used should not be drawn. */
   return NextResponse.json(
-    { voices: publicVoiceList(voices), transport: lane ?? "rtc" },
+    { voices: publicVoiceList(voices), transport: lane ?? "rtc", ws_available: grok !== null },
     { headers: { "Cache-Control": "no-store" } },
   );
 }

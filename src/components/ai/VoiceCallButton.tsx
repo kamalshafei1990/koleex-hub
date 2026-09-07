@@ -39,7 +39,8 @@ import {
   browserVoiceDeps,
   HANDSHAKE_PATH,
   type VoiceState,
-  type VoiceFailure, TOOL_PATH, } from "@/lib/voice/session";
+  type VoiceFailure, TOOL_PATH,   type VoiceSocket,
+} from "@/lib/voice/session";
 import { type Lang } from "@/lib/i18n";
 import {
   parseVoiceEvent,
@@ -56,11 +57,12 @@ import { useStreamLevel } from "@/lib/voice/useStreamLevel";
 import { CallTones } from "@/lib/voice/tones";
 import { pickSttLang, readSavedSttLang, saveSttLang, learnSttLang, type SttLang } from "@/lib/voice/stt-lang";
 import {
-  pickVoiceKey, readSavedVoiceKey, saveVoiceKey, readSavedRegion, saveRegion,
+  pickVoiceKey, readSavedVoiceKey, saveVoiceKey, readSavedRegion, saveRegion, decideLane, readSavedLane, saveLane,
   readSavedTalkMode, saveTalkMode, type TalkMode,
 } from "@/lib/voice/voice-pref";
 import { requestCallSummary, shouldSummarise } from "@/lib/voice/summary";
 import { sendVoiceTelemetry } from "@/lib/voice/telemetry";
+import { probeWsLane } from "@/lib/voice/lane-probe";
 import { TranscriptPersister, type SavedTurn, type PersistFailure } from "@/lib/voice/persist";
 import VoiceCallScreen from "@/components/ai/VoiceCallScreen";
 
@@ -367,9 +369,23 @@ export default function VoiceCallButton({
       try {
         const res = await fetch(HANDSHAKE_PATH, { credentials: "include" });
         if (!res.ok) return;
-        const body = (await res.json()) as { voices?: { key: string; label: string }[]; transport?: unknown };
+        const body = (await res.json()) as { voices?: { key: string; label: string }[]; transport?: unknown; ws_available?: unknown };
         if (cancelled) return;
-        transportRef.current = body.transport === "ws" ? "ws" : "rtc";
+        /* THE SERVER'S LANE IS A DEFAULT; THE DEVICE KNOWS ITS OWN NETWORK
+           (lane-probe.ts). A fresh verdict from a probe or a real call
+           overrides a mainland default; a stale one is re-checked, in the
+           background, so the tap that starts a call never waits on it. */
+        const server: "rtc" | "ws" = body.transport === "ws" ? "ws" : "rtc";
+        const decided = decideLane(server, readSavedLane(), Date.now());
+        transportRef.current = decided.lane;
+        if (decided.probe && body.ws_available === true) {
+          void probeWsLane({ fetchFn: (...a) => fetch(...a), createWebSocket: (url, protocols) => new WebSocket(url, protocols) as unknown as VoiceSocket }).then((ok) => {
+            if (cancelled) return;
+            saveLane(ok ? "ws" : "rtc");
+            /* Not under a call already placed on the other lane. */
+            if (!sessionRef.current) transportRef.current = ok ? "ws" : "rtc";
+          });
+        }
         if (!Array.isArray(body.voices)) return;
         const offered = body.voices;
         setVoices(offered);
@@ -658,6 +674,7 @@ export default function VoiceCallButton({
            is up, so the next call from here — after a drop, a switch, or
            tomorrow morning — asks for it first. */
         if (next === "live") acquireWakeLock();
+        if (next === "live" && transportRef.current === "ws") saveLane("ws");
         if (next === "live") {
           const region = sessionRef.current?.diagnostics().region;
           if (region === "alt" || region === "primary") {
@@ -682,6 +699,8 @@ export default function VoiceCallButton({
           if (canFallBack) {
             laneFellBackRef.current = true;
             transportRef.current = "rtc";
+            /* The socket lane does not work from this network today. */
+            saveLane("rtc");
             setReady(false);
             chimedRef.current = false;
             queueMicrotask(() => void startCallRef.current?.({ resume: false }));

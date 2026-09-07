@@ -149,6 +149,17 @@ client read only the older names. Both families are read now, and the
 ordinary hang-up beacons a histogram of every event name the far side sent
 (`events=`), so the next call names its protocol whatever it is.
 
+**Second real call, 17:27 UTC, VPN on — mainland voice.** The lane was
+chosen from the country stamped on the request to OUR host; a phone's VPN
+tunnels only blocked hosts, ours is not blocked, so the request arrived
+from a mainland address while the browser could reach the vendor through
+the tunnel. The server's answer is now a default: when it says mainland
+and a socket lane exists, the browser probes the socket lane itself in the
+background (`lane-probe.ts`: mint, open, close on "open", three-second
+deadline), remembers the verdict on the device for six hours
+(`voice-pref.ts`), and a real call's outcome updates it. The socket lane's
+never-opened window is four seconds, with the mainland fall-back behind it.
+
 **Not proved before the first real call** — this environment cannot reach
 the vendor: the exact subprotocol format for the secret, whether the full
 session's `input_audio_transcription: {}` is accepted (if not, the compact
