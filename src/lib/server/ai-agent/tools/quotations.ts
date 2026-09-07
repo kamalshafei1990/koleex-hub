@@ -60,6 +60,35 @@ interface ProductDetails {
   margin?: number | null;
 }
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** Strip PostgREST metacharacters before embedding input into a .or()
+ *  filter — the same contract as products.ts / customers.ts. */
+function sanitizePostgrestLike(input: string, maxLen = 80): string {
+  return input.replace(/[,()"'?#]/g, " ").replace(/\s+/g, " ").trim().slice(0, maxLen);
+}
+
+/** The product a code names: its slug, its name or its legacy code, else a
+ *  model slug under it. Null when nothing matches. Reads only ids. */
+async function productIdForCode(code: string): Promise<string | null> {
+  const safe = sanitizePostgrestLike(code);
+  if (!safe) return null;
+  const { data: byProduct } = await supabaseServer
+    .from("products")
+    .select("id")
+    .or(`slug.ilike.${safe},product_name.ilike.${safe},legacy_code.ilike.${safe}`)
+    .limit(1)
+    .maybeSingle();
+  if (byProduct?.id) return String(byProduct.id);
+  const { data: byModel } = await supabaseServer
+    .from("product_models")
+    .select("product_id")
+    .ilike("slug", safe)
+    .limit(1)
+    .maybeSingle();
+  return byModel?.product_id ? String(byModel.product_id) : null;
+}
+
 const getProductDetails: ToolDef<
   { productId: string },
   ProductDetails | null
@@ -69,20 +98,36 @@ const getProductDetails: ToolDef<
   parameters: {
     type: "object",
     properties: {
-      productId: { type: "string", description: "Product UUID." },
+      productId: { type: "string", description: "Product UUID, or the product code / model code (e.g. XP-3560)." },
     },
     required: ["productId"],
   },
   requiredModule: PRODUCTS_MODULE,
   requiredAction: "view",
   handler: async (ctx, args): Promise<ToolResult<ProductDetails | null>> => {
-    const productId = String(args.productId ?? "").trim();
-    if (!productId) {
+    const requested = String(args.productId ?? "").trim();
+    if (!requested) {
       return {
         ok: false,
         permissionStatus: "allowed",
         data: null,
         message: "I need a product first. Which product should I use?",
+      };
+    }
+    /* A CODE IS ACCEPTED, NOT ONLY A UUID. The audit table (2026-09-03) shows
+       the model calling this with "XP-3560" and "XP-4040-D4-Y" — the codes it
+       had just read from searchProducts — and Postgres refusing the uuid
+       cast, which surfaced as "Couldn't fetch product." twice in a row. The
+       voice and chat instructions both say "getProductByCode or
+       getProductDetails for one model", so a code is a normal input here:
+       resolved by slug, name or legacy code, then by a model's slug. */
+    const productId = UUID_RE.test(requested) ? requested : await productIdForCode(requested);
+    if (!productId) {
+      return {
+        ok: true,
+        permissionStatus: "allowed",
+        data: null,
+        message: `Product not found (${requested}).`,
       };
     }
     const { data: product, error } = await supabaseServer

@@ -21,6 +21,7 @@ import "server-only";
 
 import { NextResponse } from "next/server";
 import { requireAuth } from "@/lib/server/auth";
+import { requireInternalUser } from "@/lib/server/ai/require-internal";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 10;
@@ -43,6 +44,11 @@ const num = (v: unknown) => (typeof v === "number" && Number.isFinite(v) ? Math.
 export async function POST(req: Request) {
   const auth = await requireAuth(req);
   if (auth instanceof NextResponse) return auth;
+  /* Calls are internal-only (the voice gate); a beacon about one is too. */
+  {
+    const notInternal = requireInternalUser(auth);
+    if (notInternal) return notInternal;
+  }
   let body: Record<string, unknown> = {};
   try {
     const parsed: unknown = await req.json();

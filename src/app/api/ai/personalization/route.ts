@@ -23,6 +23,7 @@ import "server-only";
 
 import { NextResponse } from "next/server";
 import { requireAuth } from "@/lib/server/auth";
+import { requireInternalUser } from "@/lib/server/ai/require-internal";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { mergeAccountPrefs } from "@/lib/server/ai/security/account-prefs";
 import { readPersonalization } from "@/lib/server/ai/personalization-prompt";
@@ -54,6 +55,11 @@ async function loadPrefs(accountId: string): Promise<Record<string, unknown> | n
 export async function GET(req: Request) {
   const auth = await requireAuth(req);
   if (auth instanceof NextResponse) return auth;
+  /* Koleex AI is internal-only (owner decision, Option A); its memory is too. */
+  {
+    const notInternal = requireInternalUser(auth);
+    if (notInternal) return notInternal;
+  }
 
   const prefs = await loadPrefs(auth.account_id);
   if (!prefs) return NextResponse.json({ error: "Couldn't read your preferences." }, { status: 500 });
@@ -73,6 +79,10 @@ type PutBody = {
 export async function PUT(req: Request) {
   const auth = await requireAuth(req);
   if (auth instanceof NextResponse) return auth;
+  {
+    const notInternal = requireInternalUser(auth);
+    if (notInternal) return notInternal;
+  }
   if (auth.viewing_as) {
     return NextResponse.json({ error: "Not while viewing as another user." }, { status: 403 });
   }

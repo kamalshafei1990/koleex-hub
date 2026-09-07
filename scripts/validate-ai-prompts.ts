@@ -278,7 +278,7 @@ console.log("\n── Roadmap D4: a photo the user sent ──");
     /A supplier, factory or brand name seen in a picture is internal information: never repeat it in the reply/.test(built));
   check("  …and the rule rides with the product-photo rule in every written lane",
     (readFileSync("src/lib/server/ai/prompt-builder.ts", "utf8").match(/PRODUCT_PHOTO_RULE \+\s*PHOTO_QUESTION_RULE \+/g) ?? []).length === 4 &&
-    /\$\{PRODUCT_PHOTO_RULE \+ PHOTO_QUESTION_RULE\}/.test(readFileSync("src/lib/server/ai/prompts/index.ts", "utf8")));
+    /\$\{PRODUCT_PHOTO_RULE\}\$\{PHOTO_QUESTION_RULE\}/.test(readFileSync("src/lib/server/ai/prompts/index.ts", "utf8")));
 }
 
 console.log(`\n${pass} passed, ${failures.length} failed`);

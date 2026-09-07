@@ -20,6 +20,7 @@ import "server-only";
    --------------------------------------------------------------------------- */
 
 import { NextResponse } from "next/server";
+import { withPublicProvider } from "@/lib/server/ai/observability/public-provider";
 import { authorizeVoice } from "@/lib/server/ai/voice/gate";
 import { BUDGETS, consumeBudget, limitMode, subjectFor } from "@/lib/server/ai/security/rate-limit";
 import { supabaseServer } from "@/lib/server/supabase-server";
@@ -86,6 +87,8 @@ export async function POST(req: Request) {
 
   const selection = selectCallTurns((rows ?? []) as SummaryRow[]);
   if (selection.kind === "already") {
+    /* This select carries no provider column, so the row discloses nothing;
+       the freshly inserted row below does, and goes through the transform. */
     return NextResponse.json({ message: selection.row, conversation: { id: conv.id, title: conv.title } });
   }
   if (selection.kind === "none") {
@@ -142,5 +145,8 @@ export async function POST(req: Request) {
     .eq("account_id", gate.accountId);
 
   console.log(`[ai.voice.summary] ok turns=${selection.turns.length} chars=${content.length} lang=${lang}`);
-  return NextResponse.json({ message: inserted, conversation: { id: conv.id, title: conv.title } });
+  /* The inserted row carries ai_messages.provider verbatim — the audit
+     trail's truth, not the browser's. Same transform as every other route
+     that returns a row (finding N11). */
+  return NextResponse.json({ message: withPublicProvider(inserted), conversation: { id: conv.id, title: conv.title } });
 }

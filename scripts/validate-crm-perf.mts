@@ -66,7 +66,7 @@ check("drag records drop ack + reconcile timings", /crm\.drag\.drop_ack_ms/.test
 check("drag records board rerender count", /crm\.board\.rerender_count/.test(crm));
 
 // ── (E) soft reload keeps the board on screen ──
-check("reload supports a soft (no-blank) mode", /opts\?\.soft/.test(crm) && /if \(!soft\) setLoading\(true\)/.test(crm));
+check("reload supports a soft (no-blank) mode", /opts\?\.soft/.test(crm) && /if \(!soft(?: && !warm)?\) setLoading\(true\)/.test(crm));
 check("modal save uses a soft reload", /reload\(\{ soft: true \}\)/.test(crm));
 
 // ── (F) memoised card ──
