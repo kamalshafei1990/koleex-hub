@@ -151,17 +151,18 @@ const DEFAULT_PREFS: SoundPrefs = {
   volume: 0.8,
   notification: { enabled: true, tone: "classic" },
   message: { enabled: true, tone: "classic" },
-  /* "arrive": the recorded tone that reads as "someone is here" — the
-     right word for a line that has just opened. "confirm" was first, and
-     the owner asked twice for something else. Changeable in Settings. */
-  call: { enabled: true, tone: "arrive" },
+  /* "confirm" — the owner's word for it (2026-09-08): "the sound of
+     connected: use the confirm sound from the sounds we have". It was the
+     first default, then "arrive" for a while; the owner chose confirm back.
+     Changeable in Settings. */
+  call: { enabled: true, tone: "confirm" },
 };
 
-/** The call tone the defaults used before "arrive". A stored copy of it that
- *  nobody chose (no `chosen` flag) is the old default written back by a
- *  save of some other setting, so it follows the default. A tone someone
- *  picked — any tone, even this one — is theirs and stays. */
-export const LEGACY_CALL_TONE: SoundTone = "confirm";
+/** The call tone the defaults used before "confirm" came back. A stored
+ *  copy of it that nobody chose (no `chosen` flag) is the old default
+ *  written back by a save of some other setting, so it follows the default.
+ *  A tone someone picked — any tone, even this one — is theirs and stays. */
+export const LEGACY_CALL_TONE: SoundTone = "arrive";
 export function migrateCallTone(call: SoundPrefs["call"]): SoundPrefs["call"] {
   if (!call.chosen && call.tone === LEGACY_CALL_TONE) return { ...call, tone: DEFAULT_PREFS.call.tone };
   return call;

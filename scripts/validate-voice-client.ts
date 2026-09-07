@@ -1769,13 +1769,15 @@ console.log("\n── 12. Mute ──");
     thrower.prime(); thrower.ready();
     check("  …and a library that throws is a silent library, never an exception", true);
     const ns = await import("../src/lib/notificationSound");
-    check("the default call tone is one of the recorded library tones, enabled — 'arrive', a line opening, not 'confirm'", ns.getSoundPrefs().call.tone === "arrive" && ns.getSoundPrefs().call.enabled === true && (ns.SOUND_LIBRARY as readonly string[]).includes("arrive") && ns.LEGACY_CALL_TONE === "confirm");
+    /* THE OWNER'S WORD (2026-09-08): "the sound of connected: use the
+       confirm sound from the sounds we have". */
+    check("the default call tone is one of the recorded library tones, enabled — 'confirm', the owner's choice", ns.getSoundPrefs().call.tone === "confirm" && ns.getSoundPrefs().call.enabled === true && (ns.SOUND_LIBRARY as readonly string[]).includes("confirm") && ns.LEGACY_CALL_TONE === "arrive");
     /* THE OLD DEFAULT FOLLOWS THE NEW ONE — unless somebody chose it. */
-    check("a stored 'confirm' nobody chose becomes the new default; a chosen 'confirm', or any other tone, stays",
-      ns.migrateCallTone({ enabled: true, tone: "confirm" }).tone === "arrive" &&
-      ns.migrateCallTone({ enabled: true, tone: "confirm", chosen: true }).tone === "confirm" &&
+    check("a stored 'arrive' nobody chose becomes the new default; a chosen 'arrive', or any other tone, stays",
+      ns.migrateCallTone({ enabled: true, tone: "arrive" }).tone === "confirm" &&
+      ns.migrateCallTone({ enabled: true, tone: "arrive", chosen: true }).tone === "arrive" &&
       ns.migrateCallTone({ enabled: true, tone: "sparkle" }).tone === "sparkle" &&
-      ns.migrateCallTone({ enabled: false, tone: "confirm" }).enabled === false);
+      ns.migrateCallTone({ enabled: false, tone: "arrive" }).enabled === false);
     check("  …outside a browser the engine reports itself unavailable rather than pretending", ns.playCallSound() === "unavailable");
     const nsSrc = fsT.readFileSync("src/lib/notificationSound.ts", "utf8");
     check("  …do-not-disturb silences arrivals, not the cue for a call the caller just started",
@@ -2790,6 +2792,33 @@ function describeErrorCheck(): boolean {
     check("the voices GET says whether a socket lane exists and logs its decision with the country — nothing else", /ws_available: grok !== null/.test(route) && /\[ai\.voice\] lane=\$\{lane \?\? "none"\} country=/.test(route));
     check("a socket lane waits four seconds for its socket, not eight — the fall-back is behind it", /const WS_OPEN_GRACE_MS = 4_000;/.test(sess) && /this\.transport === "ws" && this\.deps\.reconnectGraceMs === undefined[\s\S]{0,400}?\? WS_OPEN_GRACE_MS/.test(sess));
   }
+}
+
+{
+  console.log("\n── 28. The page that hosts the call must not die under it ──");
+  /* 2026-09-07 17:33: a call four minutes in, a lookup answered, and two
+     seconds later a cold load of /ai with a fresh perf session and NO
+     page-hidden beacon — the document was not reloaded, it was killed and
+     restored. The same page had reported a realtime channel closing and
+     rejoining every 0.8 s since 15:00: the backoff reset on every
+     SUBSCRIBED, and a channel that flaps subscribes fine before it closes.
+     And a stale build made the next app launch a FULL navigation, guarded
+     against nothing. Read pins, because both modules pull the browser and
+     the database client in. */
+  const fs28 = await import("node:fs");
+  const discuss = fs28.readFileSync("src/lib/discuss.ts", "utf8");
+  const launch = fs28.readFileSync("src/components/layout/AppLaunchLink.tsx", "utf8");
+  check("a rejoin's backoff climbs to a minute and only resets once a subscription has HELD for thirty seconds — a flap keeps climbing",
+    /export const REJOIN_STABLE_MS = 30_000;/.test(discuss) &&
+    /return Math\.min\(60_000, 1_000 \* 2 \*\* Math\.min\(retry, 6\)\) \* \(0\.8 \+ random\(\) \* 0\.4\);/.test(discuss) &&
+    /if \(created\.subscribedAt > 0 && performance\.now\(\) - created\.subscribedAt >= REJOIN_STABLE_MS\) created\.retry = 0;/.test(discuss) &&
+    /if \(created\.retry > 0 && created\.joins > 1\) \{[\s\S]{0,120}?\} else \{\s*created\.retry = 0;\s*\}/.test(discuss) &&
+    !/const delay = Math\.min\(15_000/.test(discuss));
+  check("  …and a hidden page schedules no rejoin at all; the visible/online nudge retries when it is back",
+    /if \(typeof document !== "undefined" && document\.visibilityState === "hidden"\) return;\s*const delay = rejoinDelayMs\(created\.retry\);/.test(discuss) && /const kickAll = \(\) => \{/.test(discuss));
+  check("a stale build's full-page app launch is skipped mid-call — the same guard the update watcher uses",
+    /import \{ busyWithSomethingUninterruptible \} from "@\/components\/pwa\/UpdateWatcher";/.test(launch) &&
+    /if \(g\.__kxStaleBuild && !busyWithSomethingUninterruptible\(\)\) \{/.test(launch));
 }
 
 console.log(`\n${pass} passed, ${failures.length} failed`);

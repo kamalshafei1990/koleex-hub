@@ -160,6 +160,19 @@ deadline), remembers the verdict on the device for six hours
 (`voice-pref.ts`), and a real call's outcome updates it. The socket lane's
 never-opened window is four seconds, with the mainland fall-back behind it.
 
+**Third call, 17:27–17:33 UTC — "suddenly the AI voice out", again.** Four
+minutes in, a product lookup answered, and two seconds later a cold load of
+`/ai` with a fresh perf session and NO page-hidden beacon: the document was
+not reloaded, it was killed and restored — the shape of an iOS WebView out
+of memory. The same page had reported the Discuss realtime channel closing
+and rejoining every 0.8 s since 15:00: the backoff reset on every
+SUBSCRIBED, and a flapping channel subscribes fine before it closes. Fixed
+in `discuss.ts` (a subscription counts as recovered only after 30 s; the
+backoff climbs to a minute; no rejoin while hidden). And a stale build's
+full-page app launch (`AppLaunchLink`) now honours the same mid-call guard
+the update watcher uses. The connected cue is the Hub's `confirm` sound
+again, by the owner's word.
+
 **Not proved before the first real call** — this environment cannot reach
 the vendor: the exact subprotocol format for the secret, whether the full
 session's `input_audio_transcription: {}` is accepted (if not, the compact
