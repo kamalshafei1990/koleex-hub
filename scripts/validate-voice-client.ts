@@ -1769,13 +1769,13 @@ console.log("\n── 12. Mute ──");
     thrower.prime(); thrower.ready();
     check("  …and a library that throws is a silent library, never an exception", true);
     const ns = await import("../src/lib/notificationSound");
-    /* THE OWNER'S WORD (2026-09-08): "the sound of connected: use the
-       confirm sound from the sounds we have". */
-    check("the default call tone is one of the recorded library tones, enabled — 'confirm', the owner's choice", ns.getSoundPrefs().call.tone === "confirm" && ns.getSoundPrefs().call.enabled === true && (ns.SOUND_LIBRARY as readonly string[]).includes("confirm") && ns.LEGACY_CALL_TONE === "arrive");
-    /* THE OLD DEFAULT FOLLOWS THE NEW ONE — unless somebody chose it. */
-    check("a stored 'arrive' nobody chose becomes the new default; a chosen 'arrive', or any other tone, stays",
-      ns.migrateCallTone({ enabled: true, tone: "arrive" }).tone === "confirm" &&
-      ns.migrateCallTone({ enabled: true, tone: "arrive", chosen: true }).tone === "arrive" &&
+    /* THE OWNER'S WORD (2026-09-07, night): "change the connected sound
+       to be ping from our sounds". */
+    check("the default call tone is one of the recorded library tones, enabled — 'ping', the owner's choice", ns.getSoundPrefs().call.tone === "ping" && ns.getSoundPrefs().call.enabled === true && (ns.SOUND_LIBRARY as readonly string[]).includes("ping") && ns.LEGACY_CALL_TONES.join() === "arrive,confirm");
+    /* THE OLD DEFAULTS FOLLOW THE NEW ONE — unless somebody chose them. */
+    check("a stored 'arrive' or 'confirm' nobody chose becomes the new default; a chosen one, or any other tone, stays",
+      ns.migrateCallTone({ enabled: true, tone: "arrive" }).tone === "ping" && ns.migrateCallTone({ enabled: true, tone: "confirm" }).tone === "ping" &&
+      ns.migrateCallTone({ enabled: true, tone: "arrive", chosen: true }).tone === "arrive" && ns.migrateCallTone({ enabled: true, tone: "confirm", chosen: true }).tone === "confirm" &&
       ns.migrateCallTone({ enabled: true, tone: "sparkle" }).tone === "sparkle" &&
       ns.migrateCallTone({ enabled: false, tone: "arrive" }).enabled === false);
     check("  …outside a browser the engine reports itself unavailable rather than pretending", ns.playCallSound() === "unavailable");

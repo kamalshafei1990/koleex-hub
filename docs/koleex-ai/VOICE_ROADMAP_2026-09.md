@@ -277,6 +277,19 @@ Samples worked on the first tap (two `GET /api/ai/voice/preview 200` at
 18:56, the socket lane's vendor). The mainland lane's synthesiser is still
 unproven.
 
+## The sheet, once more (2026-09-07, night)
+
+Owner: "this page still has glitches… use Koleex Hub colors… change the
+connected sound to ping". Fixed: the panel is the hub's own surface
+(`#111111`, `--bg-secondary`) and its bottom padding clears the home
+indicator (the panel stopped at 2rem and the indicator's strip showed as a
+black band under it); the chosen/candidate tile wears ONE Hub Blue border
+with a soft glow instead of a border plus an offset ring that read as a
+doubled circle; the tile row has room above for the badge and glow (an
+overflow-x container clips vertically); a sampling tile shows the same
+animated dots the activity line uses. The connected cue is `ping`; a stored
+`arrive` or `confirm` nobody chose follows it.
+
 ## Owner-side (not code)
 
 - Activate the realtime voice model on the Beijing workspace (still `403 Unpurchased`), so mainland callers get the mainland endpoint.

@@ -821,7 +821,7 @@ export default function VoiceCallScreen({
           one thing that writes. */}
       {(pendingWrite || writeSaved) && (
         <div className="shrink-0 px-4 pb-2" data-task-card>
-          <div className="max-w-[560px] mx-auto rounded-2xl border border-white/15 bg-[#141414] px-4 py-3 text-white">
+          <div className="max-w-[560px] mx-auto rounded-2xl border border-white/15 bg-[#111111] px-4 py-3 text-white">
             {pendingWrite ? (
               <>
                 <div className="text-[11px] uppercase tracking-wide text-[#AAAAAA]">{copy.taskPreview}</div>
@@ -1087,7 +1087,12 @@ export default function VoiceCallScreen({
       {voiceSheet && (voices.length > 0 || onSelectTalkMode) && (
         <div className="fixed inset-0 z-[250] flex flex-col justify-end" role="dialog" aria-modal="true" aria-label={copy.voicePick}>
           <button type="button" aria-label={copy.close} onClick={closeVoiceSheet} className="absolute inset-0 bg-black/60" />
-          <div className="kx-sheet-in relative rounded-t-[28px] border-t border-white/10 bg-[#141414] px-6 pt-3 pb-8 text-white">
+          {/* THE HUB'S OWN SURFACE (#111111 is --bg-secondary), and a bottom
+              padding that clears the home indicator: the panel used to stop
+              at 2rem and the indicator's strip showed through as a black
+              band under it. The container is viewport-fixed; the panel
+              simply reaches the edge now. */}
+          <div className="kx-sheet-in relative rounded-t-[28px] border-t border-white/10 bg-[#111111] px-6 pt-3 text-white" style={{ paddingBottom: "calc(2rem + env(safe-area-inset-bottom, 0px))" }}>
             <div aria-hidden className="mx-auto mb-4 h-1 w-10 rounded-full bg-white/20" />
             <div className="flex items-center justify-between mb-5">
               <h2 className="text-[15px] font-semibold">{copy.voicePick}</h2>
@@ -1096,15 +1101,17 @@ export default function VoiceCallScreen({
                 onClick={closeVoiceSheet}
                 aria-label={copy.close}
                 title={copy.close}
-                className="h-9 w-9 rounded-full inline-flex items-center justify-center text-[#AAAAAA] hover:text-white bg-white/[0.06] hover:bg-white/[0.1] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0066FF] focus-visible:ring-offset-2 focus-visible:ring-offset-[#141414]"
+                className="h-9 w-9 rounded-full inline-flex items-center justify-center text-[#AAAAAA] hover:text-white bg-white/[0.06] hover:bg-white/[0.1] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0066FF] focus-visible:ring-offset-2 focus-visible:ring-offset-[#111111]"
               >
                 <svg aria-hidden viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
                   <line x1="6" y1="6" x2="18" y2="18" /><line x1="18" y1="6" x2="6" y2="18" />
                 </svg>
               </button>
             </div>
+            {/* Room above the tiles (pt-2) for the badge and the glow: an
+                overflow-x container clips vertically too. */}
             {voices.length > 0 && (
-            <div className="flex gap-4 overflow-x-auto pb-2 -mx-2 px-2 snap-x">
+            <div className="flex gap-4 overflow-x-auto pt-2 pb-2 -mx-2 px-2 snap-x">
               {voices.map((v, i) => {
                 const chosen = v.key === selectedVoice;
                 /* Drawn as "on": the candidate being auditioned, or the
@@ -1126,21 +1133,28 @@ export default function VoiceCallScreen({
                         so the row reads as five different voices at a glance;
                         the chosen one is in Hub Blue and breathes. */}
                     <span className="relative">
-                      <span className={`h-16 w-16 rounded-full inline-flex items-center justify-center border transition-[background-color,border-color,transform] duration-150 group-active:scale-95 ${on ? "border-[#0066FF] bg-[#0066FF]/10 ring-2 ring-[#0066FF]/40 ring-offset-2 ring-offset-[#141414]" : "border-white/15 bg-white/[0.04] group-hover:border-white/30"}`}>
+                      {/* ONE ring, not two: a border plus an offset ring
+                          read as a doubled, misdrawn circle. A Hub Blue
+                          border with a soft glow says "this one". */}
+                      <span className={`h-16 w-16 rounded-full inline-flex items-center justify-center border transition-[background-color,border-color,box-shadow,transform] duration-150 group-active:scale-95 ${on ? "border-[#0066FF] bg-[#0066FF]/10 shadow-[0_0_0_4px_rgba(0,102,255,0.18)]" : "border-white/15 bg-white/[0.04] group-hover:border-white/30"}`}>
                         <VoiceGlyph index={i} on={on || sampling === v.key} />
                       </span>
                       {/* THE CURRENT VOICE WEARS A CHECK, so it stays
                           identifiable once the ring has moved to a voice
                           being auditioned. */}
                       {chosen && (
-                        <span aria-hidden data-voice-current className="absolute -top-0.5 -end-0.5 h-5 w-5 rounded-full bg-[#0066FF] ring-2 ring-[#141414] inline-flex items-center justify-center">
+                        <span aria-hidden data-voice-current className="absolute -top-0.5 -end-0.5 h-5 w-5 rounded-full bg-[#0066FF] ring-2 ring-[#111111] inline-flex items-center justify-center">
                           <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="#FFFFFF" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5" /></svg>
                         </span>
                       )}
                     </span>
                     <span className="flex flex-col items-center leading-tight">
                       <span className={`text-[12px] ${on ? "text-white font-semibold" : "text-[#AAAAAA] group-hover:text-white"}`}>{v.label}</span>
-                      <span className="text-[10px] text-[#666666] h-[14px]">{chosen ? copy.voiceCurrent : sampling === v.key ? "•••" : ""}</span>
+                      <span className="text-[10px] text-[#666666] h-[14px] inline-flex items-center justify-center">
+                        {chosen ? copy.voiceCurrent : sampling === v.key ? (
+                          <span className="kx-activity-dots text-[#0066FF]" aria-hidden><i /><i /><i /></span>
+                        ) : ""}
+                      </span>
                     </span>
                   </button>
                 );
@@ -1160,7 +1174,7 @@ export default function VoiceCallScreen({
                 type="button"
                 onClick={confirmVoice}
                 disabled={!candidate || candidate === selectedVoice}
-                className="mt-4 h-12 w-full rounded-2xl bg-[#0066FF] text-[15px] font-semibold text-white disabled:bg-white/[0.06] disabled:text-[#666666] transition-[background-color,transform] duration-150 active:scale-[0.99] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0066FF] focus-visible:ring-offset-2 focus-visible:ring-offset-[#141414]"
+                className="mt-4 h-12 w-full rounded-2xl bg-[#0066FF] text-[15px] font-semibold text-white disabled:bg-white/[0.06] disabled:text-[#666666] transition-[background-color,transform] duration-150 active:scale-[0.99] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0066FF] focus-visible:ring-offset-2 focus-visible:ring-offset-[#111111]"
               >
                 {candidate && candidate !== selectedVoice
                   ? copy.voiceUseNamed.replace("{name}", voices.find((v) => v.key === candidate)?.label ?? "")
