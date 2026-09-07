@@ -847,7 +847,7 @@ console.log("\n── VoiceCallScreen: choosing a voice ──");
      that carries the name. */
   const pressedOf = (label: string) => /aria-pressed="(true|false)"/.exec(withPicker.split("<button").find((c) => c.includes(`>${label}</span>`) && /aria-pressed=/.test(c)) ?? "")?.[1];
   check("the current one is marked as chosen, awake and ringed in Hub Blue",
-    pressedOf("Omar") === "true" && /ring-\[#0066FF\]\/40/.test(withPicker) && (withPicker.match(/kx-voice-glyph is-on/g) ?? []).length === 1);
+    pressedOf("Omar") === "true" && /shadow-\[0_0_0_4px_rgba\(0,102,255,0\.18\)\]/.test(withPicker) && !/ring-\[#0066FF\]\/40/.test(withPicker) && (withPicker.match(/kx-voice-glyph is-on/g) ?? []).length === 1);
   check("and the other one is not", pressedOf("Layla") === "false");
   check("exactly one is chosen at a time",
     withPicker.split('aria-pressed="true"').length - 1 === 1);
@@ -894,7 +894,8 @@ console.log("\n── VoiceCallScreen: choosing a voice ──");
 
   /* Brand: the picker introduces no new colour. */
   const pickerHexes = [...withPicker.matchAll(/#[0-9A-Fa-f]{6}\b/g)].map((m) => m[0].toUpperCase());
-  const ok = new Set(["#0D0D0D", "#FF3333", "#0066FF", "#AAAAAA", "#666666", "#2E2E2E", "#FFFFFF", "#000000", "#567FB2", "#7FA9D6", "#BCD8F0", "#0B0D11", "#141414" /* the sheet's own dark grey */]);
+  const ok = new Set(["#0D0D0D", "#FF3333", "#0066FF", "#AAAAAA", "#666666", "#2E2E2E", "#FFFFFF", "#000000", "#567FB2", "#7FA9D6", "#BCD8F0", "#0B0D11", "#111111" /* --bg-secondary, the sheet's surface */]);
+  check("the sheet is the hub's own surface and clears the home indicator", /bg-\[#111111\]/.test(withPicker) && !/#141414/.test(withPicker) && /padding-bottom:calc\(2rem \+ env\(safe-area-inset-bottom, 0px\)\)/.test(withPicker));
   check("the picker introduces no colour outside the palette",
     pickerHexes.every((h) => ok.has(h)));
 }
