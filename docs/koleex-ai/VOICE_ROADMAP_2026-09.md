@@ -127,7 +127,7 @@ mainland caller never meets the new one.
 | Audio | Opus tracks, played by the engine | PCM16 frames in JSON (`ws-audio.ts`): mic → `input_audio_buffer.append`; `response.audio.delta` → a MediaStream the same `<audio>` element plays |
 | Events, tools, transcripts, session config | shared | shared (`VoiceChannel`; the vendor speaks the same protocol) |
 | Wire | `pcm`, `input_audio_transcription: {enabled: true}` | `pcm16`, `input_audio_transcription: {}` on the full session, none on the compact (`OPENAI_WIRE`) |
-| Voices | AI_VOICE_VOICES (Nour, Layla, Omar, Adam, Sara) | Same five names in the same order, vendor ids lowercase; a saved key (v1..v5) means the same voice on either lane |
+| Voices | AI_VOICE_VOICES (Nour, Layla, Omar, Adam, Sara) | The lane's own five under their own names (Ara, Eve, Rex, Leo, Sal — owner's ask, 2026-09-08); keys positional (v1..v5), so a saved key still resolves when the lane changes; the picker follows the lane the device settles on (`voices_by_lane`) |
 
 Decided by the server on the voices GET (`transport: "rtc" | "ws"`), read by
 the button, handed to the session. A WebSocket lane that never comes up falls

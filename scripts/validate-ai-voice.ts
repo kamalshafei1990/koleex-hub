@@ -1237,9 +1237,12 @@ console.log("\n── 8. What the client may know, and what it may not ──");
     const cfg = parseGrokVoiceConfig({ AI_VOICE_GROK_API_KEY: KEY });
     check("a key alone is a full lane on the vendor's documented defaults",
       !!cfg && cfg.url === GROK_DEFAULT_URL && cfg.secretsUrl === GROK_DEFAULT_SECRETS_URL && cfg.model === null && cfg.sampleRate === 24_000 && cfg.protocolTemplate === "xai-client-secret.{token}");
-    check("  …with the SAME five product names in the SAME order as the mainland catalogue, so a saved voice key means the same voice on either lane",
-      !!cfg && cfg.voices.map((v) => v.label).join() === "Nour,Layla,Omar,Adam,Sara" && cfg.voices.map((v) => v.key).join() === "v1,v2,v3,v4,v5" &&
-      voiceCatalogue(undefined).map((v) => v.label).join() === "Nour,Layla,Omar,Adam,Sara");
+    /* THE OWNER (2026-09-08): "when I use Grok voice I want the Grok voice
+       choices, not Qwen". The lane's own five, under their own names —
+       neutral first names, nothing that says which vendor. */
+    check("  …with the lane's OWN five voices under their own names, keyed positionally like the mainland catalogue",
+      !!cfg && cfg.voices.map((v) => v.label).join() === "Ara,Eve,Rex,Leo,Sal" && cfg.voices.map((v) => v.key).join() === "v1,v2,v3,v4,v5" &&
+      voiceCatalogue(undefined).map((v) => v.label).join() === "Nour,Layla,Omar,Adam,Sara" && !/grok|xai/i.test(cfg.voices.map((v) => v.label).join()));
     check("  …and vendor ids in the vendor's own lowercase", !!cfg && cfg.voices.map((v) => v.vendorId).join() === "ara,eve,rex,leo,sal");
     check("the config carries no key, in any field", !!cfg && !JSON.stringify(cfg).includes(KEY) && !JSON.stringify(cfg).includes("secret-key"));
     check("AI_VOICE_GROK_LANE=off switches the lane off without removing the key", parseGrokVoiceConfig({ AI_VOICE_GROK_API_KEY: KEY, AI_VOICE_GROK_LANE: "off" }) === null);
@@ -1301,7 +1304,9 @@ console.log("\n── 8. What the client may know, and what it may not ──");
     const sdpRoute = readFileSync("src/app/api/ai/voice/session/route.ts", "utf8");
     check("the voices GET decides the lane from the platform's country stamp and says which — the client never chooses",
       /chooseVoiceLane\(\{ country: req\.headers\.get\("x-vercel-ip-country"\), rtc: cfg !== null, ws: grok !== null \}\)/.test(sdpRoute) && /transport: lane \?\? "rtc"/.test(sdpRoute));
-    check("  …offering the serving lane's voices under the product names", /const voices = lane === "ws" && grok \? grok\.voices : cfg \? cfg\.voices : \[\];/.test(sdpRoute));
+    check("  …offering the serving lane's voices, and BOTH lanes' lists by lane so the device can switch the picker after its own probe",
+      /const voices = lane === "ws" && grok \? grok\.voices : cfg \? cfg\.voices : \[\];/.test(sdpRoute) &&
+      /voices_by_lane: \{ rtc: publicVoiceList\(cfg\?\.voices \?\? \[\]\), ws: publicVoiceList\(grok\?\.voices \?\? \[\]\) \}/.test(sdpRoute));
     const postBody = wsRoute.slice(wsRoute.indexOf("export async function POST"));
     check("neither route carries a vendor host in code — the endpoint is configuration", !/api\.x\.ai|wss:\/\//.test(postBody) && !/api\.x\.ai|wss:\/\//.test(sdpRoute));
   }
