@@ -34,7 +34,7 @@ import "server-only";
 import { NextResponse } from "next/server";
 import { readVoiceEnv, readAltVoiceEnv } from "@/lib/server/ai/voice/config";
 import { probeVoice } from "@/lib/server/ai/voice/probe";
-import { parseGrokVoiceConfig, readGrokVoiceEnv } from "@/lib/server/ai/voice/grok";
+import { parseGrokVoiceConfig, readGrokVoiceEnv, relaySocketUrl, signRelayTicket, RELAY_TICKET_TTL_SEC } from "@/lib/server/ai/voice/grok";
 import { probeGrokSocket, SOCKET_PROBE_TIMEOUT_MS } from "@/lib/server/ai/voice/grok-probe";
 
 export const dynamic = "force-dynamic";
@@ -77,9 +77,20 @@ export async function GET(req: Request) {
   const grokCfg = parseGrokVoiceConfig(readGrokVoiceEnv());
   const grokKey = process.env.AI_VOICE_GROK_API_KEY?.trim() || "";
   const socketP = grokCfg && grokKey ? probeGrokSocket(grokCfg, grokKey, { timeoutMs: SOCKET_PROBE_TIMEOUT_MS }) : Promise.resolve(null);
-  const [probed, socket] = await Promise.all([
+  /* AND THROUGH THE RELAY, when there is one: the same probe, dialled at
+     the relay's url with a ticket, so the path a browser now takes is
+     measured beside the vendor's own. */
+  const relaySecret = process.env.AI_VOICE_RELAY_SECRET?.trim() || "";
+  const relayP = grokCfg && grokKey && grokCfg.relayUrl && relaySecret
+    ? probeGrokSocket(grokCfg, grokKey, {
+        timeoutMs: SOCKET_PROBE_TIMEOUT_MS,
+        dialUrl: (token) => relaySocketUrl(grokCfg, signRelayTicket(relaySecret, token, Math.floor(Date.now() / 1000) + RELAY_TICKET_TTL_SEC)) ?? "",
+      })
+    : Promise.resolve(null);
+  const [probed, socket, relay] = await Promise.all([
     Promise.all(regions.map(async (r) => ({ ...r, probe: await probeVoice(r.env, fetch, WATCH_TIMEOUT_MS) }))),
     socketP,
+    relayP,
   ]);
   const configured = probed.filter((r) => r.probe !== null);
 
@@ -126,11 +137,16 @@ export async function GET(req: Request) {
      healthy verdict; it is logged at info, the rest at error so the query
      tools surface them. It does not move the status code: the mainland
      lane is the one callers are served on. */
-  if (socket) {
+  for (const [name, p] of [["socket", socket], ["relay", relay]] as const) {
+    if (!p) continue;
     const line =
-      `[ai.voice.watch] socket ${socket.verdict === "spoke" ? "ok" : "fail"} from=${from} verdict=${socket.verdict} ` +
-      `afterMs=${socket.ms} openMs=${socket.openMs ?? "none"} first=${socket.first ?? "none"} close=${socket.closeCode ?? "none"}`;
-    if (socket.verdict === "spoke") console.log(line);
+      `[ai.voice.watch] ${name} ${p.verdict === "spoke" ? "ok" : "fail"} from=${from} verdict=${p.verdict} ` +
+      `afterMs=${p.ms} openMs=${p.openMs ?? "none"} first=${p.first ?? "none"} close=${p.closeCode ?? "none"}`;
+    /* Warn even when it spoke: the log query tools surface warn and error
+       lines and hide info ones (2026-09-08 07:15: the first run's verdict
+       could not be read back), and this line is the one that settles
+       "the vendor is silent" against "the path is". */
+    if (p.verdict === "spoke") console.warn(line);
     else console.error(line);
   }
 
@@ -153,6 +169,7 @@ export async function GET(req: Request) {
       from,
       regions: rows,
       socket,
+      relay,
     },
     { status: anyHealthy ? 200 : 503 },
   );

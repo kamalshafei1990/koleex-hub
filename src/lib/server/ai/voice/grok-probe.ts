@@ -72,6 +72,9 @@ export type SocketProbeDeps = {
   fetchFn?: typeof fetch;
   createWebSocket?: (url: string, protocols: string[]) => ProbeSocket;
   timeoutMs?: number;
+  /** The url to dial for a given minted secret; default the vendor's own.
+   *  The watchdog passes the relay's (with a ticket) to probe that path. */
+  dialUrl?: (token: string) => string;
 };
 
 /** The event's `type`, read the way the client reads it: parsed, never a
@@ -141,7 +144,7 @@ export async function probeGrokSocket(
     };
     const timer = setTimeout(() => finish(openMs === null ? "refused" : "silent"), timeoutMs);
     try {
-      sock = create(grokSocketUrl(cfg), grokProtocols(cfg, secret.value));
+      sock = create(deps.dialUrl ? deps.dialUrl(secret.value) : grokSocketUrl(cfg), grokProtocols(cfg, secret.value));
     } catch {
       finish("refused");
       return;

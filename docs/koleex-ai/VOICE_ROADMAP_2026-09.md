@@ -471,6 +471,59 @@ devices and the vendor — which no client change can fix, and which the
 fall-back now handles in seconds. `silent` from our function too would be
 the vendor's, and the next thing to raise with them.
 
+## The relay: the socket lane carried through our own domain (2026-09-08 07:10)
+
+Owner: "go ahead with the Railway relay. but if we do this so qwen will
+not be used at all??" — No: the relay changes the **path** of the socket
+lane, not which lane a caller gets. The mainland lane stays the default
+for mainland callers and the fall-back for everyone; both lanes' voices
+stay in the picker.
+
+`services/voice-relay/` is a small Node service (Railway, Singapore,
+project `koleex-voice-relay`, domain
+`voice-relay-production-2195.up.railway.app`). The browser opens ONE
+socket to it; it opens the vendor's and carries text frames both ways.
+What it refuses is the point:
+
+- **No key.** The browser presents the short-lived client secret the
+  route minted, in the subprotocol, exactly as it would to the vendor; the
+  relay forwards that subprotocol upstream and the vendor authenticates it.
+- **A ticket, or nothing.** `/api/ai/voice/ws-session` signs
+  `exp.HMAC-SHA256(relaySecret, token.exp)` over the client secret
+  (`signRelayTicket`, mirrored by the relay's `verifyTicket`,
+  constant-time). Someone with their own vendor secret cannot use our
+  relay; a ticket cannot be lent to another connection; it lives as long
+  as the secret (ten minutes).
+- **The upstream host is the relay's configuration**, never the client's;
+  the client may name a model (allow-listed characters). Origins are
+  suffix-matched to Koleex domains and Vercel previews. Text frames only,
+  bounded; sessions capped at an hour; per-address and total connection
+  caps; pings keep a border path alive; logs carry counts, durations and
+  close codes, never a secret, a ticket or a frame.
+
+Vercel side: `AI_VOICE_RELAY_URL` (wss) makes the route hand browsers the
+relay's url with a ticket (`browserSocketUrl`; the log says
+`socket=relay|direct`); `AI_VOICE_RELAY_SECRET` must equal the relay's
+`VOICE_RELAY_SECRET`. Unset, browsers dial the vendor directly as before.
+The watchdog probes the relay path beside the vendor's own (`[ai.voice.watch]
+relay …`). The device's lane probe now waits for the far side's first event
+(five seconds), not the socket's open.
+
+## "Thinking, and no answer at all" (2026-09-08 07:06)
+
+The call at 07:04 (mainland lane, other region, 290 s): the caller asked
+the distance between two cities at 07:06:24; the far side's response
+carried "one moment" and a tool call whose arguments finished at
+07:07:05 — **forty-two seconds** of "thinking" — then our tool route
+answered in a second and the answer was spoken at 07:07:13. The 06:26
+call was the same shape and the caller hung up at thirty-three seconds.
+The wait is on the far side, between the response's creation and the tool
+call's arguments; nothing of ours runs in that window. Diagnostics now
+carry `tool_wait_ms` (the longest such wait in a call) and the beacon logs
+`toolWaitMs=`, so the next report is a number. An `error` event mid-call
+(07:07:07, as the tool result and a barge-in crossed) is beaconed as
+`config-rejected` — a misnomer to fix.
+
 ## Owner-side (not code)
 
 - Activate the realtime voice model on the Beijing workspace (still `403 Unpurchased`), so mainland callers get the mainland endpoint.

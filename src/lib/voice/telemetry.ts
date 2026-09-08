@@ -31,6 +31,8 @@ export type VoiceTelemetryFields = {
    *  reason for an answer that did not complete (session.ts diagnostics). */
   canary?: string;
   resp_err?: string;
+  /** The longest wait a lookup made the caller sit through. */
+  tool_wait_ms?: number;
 };
 
 export type VoiceTelemetry = VoiceTelemetryFields;

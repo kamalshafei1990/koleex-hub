@@ -35,7 +35,7 @@ import {
   ToolCallNames,
   type VoiceToolCall,
 } from "./tool-calls";
-import { EV_SESSION_CREATED, EV_SESSION_UPDATED, EV_ERROR, EV_RESPONSE_DONE } from "./events";
+import { EV_SESSION_CREATED, EV_SESSION_UPDATED, EV_ERROR, EV_RESPONSE_DONE, EV_RESPONSE_CREATED } from "./events";
 
 /** The event's `type`, for the diagnostics line — or "" when it has none. */
 function eventTypeOf(raw: string): string {
@@ -135,6 +135,9 @@ export type VoiceDiagnostics = {
    *  without completing ("" when every answer completed). */
   canary: string;
   resp_err: string;
+  /** The longest wait, in one call, from a response's creation to the tool
+   *  call it carried being complete — the "thinking" the caller sat through. */
+  tool_wait_ms: number;
 };
 
 export type VoiceEvents = {
@@ -510,6 +513,12 @@ export class VoiceSession {
   /** What the far side said about the last answer that did not complete:
    *  its status_details, bounded. "" until one did not. */
   private lastResponseError = "";
+  /** THE WAIT FOR A LOOKUP (2026-09-08 07:06: forty-two seconds between the
+   *  caller's question and the far side finishing the tool call's
+   *  arguments — "thinking", and no answer). When the last response was
+   *  created, and the longest gap from there to a parsed tool call. */
+  private lastResponseCreatedAt = 0;
+  private toolWaitMs = 0;
   /* THE OTHER REGION. The server may hold a second endpoint (see the
      server's voice/config.ts for why). It tells this client two things with
      the answer: which SLOT served — a neutral word, never a host — and
@@ -687,6 +696,7 @@ export class VoiceSession {
       ws_close: this.wsCloseCode,
       canary: this.canary,
       resp_err: this.lastResponseError,
+      tool_wait_ms: this.toolWaitMs,
     };
   }
 
@@ -859,6 +869,7 @@ export class VoiceSession {
       this.eventCounts.set(key, (this.eventCounts.get(key) ?? 0) + 1);
     }
     if (this.lastEventType === EV_RESPONSE_DONE) this.noteResponseDone(raw);
+    if (this.lastEventType === EV_RESPONSE_CREATED) this.lastResponseCreatedAt = Date.now();
     this.events.onMessage?.(raw);
 
     /* UNTRUSTED. This came off a network socket and describes something the
@@ -869,7 +880,10 @@ export class VoiceSession {
       this.events.onToolProtocolMismatch?.(parsed.unreadable);
       return;
     }
-    if (parsed.call) void this.runToolCall(parsed.call, channel);
+    if (parsed.call) {
+      if (this.lastResponseCreatedAt) this.toolWaitMs = Math.max(this.toolWaitMs, Date.now() - this.lastResponseCreatedAt);
+      void this.runToolCall(parsed.call, channel);
+    }
   }
 
   /**

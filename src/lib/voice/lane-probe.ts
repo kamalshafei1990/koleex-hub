@@ -26,7 +26,12 @@
 
 import { WS_SESSION_PATH, type VoiceSocket } from "./session";
 
-export const LANE_PROBE_TIMEOUT_MS = 3_000;
+/* FIVE SECONDS FOR THE FAR SIDE'S FIRST WORD (2026-09-08: a socket that
+   opened and said nothing for ninety-six seconds passed a probe that only
+   asked whether it opened — session.ts WS_FIRST_EVENT_MS has the account).
+   The probe now waits for the first event, through the relay when there
+   is one: our route, the relay, the vendor, the vendor's hello. */
+export const LANE_PROBE_TIMEOUT_MS = 5_000;
 
 export type LaneProbeDeps = {
   fetchFn: typeof fetch;
@@ -35,8 +40,9 @@ export type LaneProbeDeps = {
 };
 
 /**
- * True when a socket to the vendor opens from this browser within the
- * deadline. Never throws; every failure is false.
+ * True when a socket to the vendor opens from this browser AND the far
+ * side sends its first event within the deadline. Never throws; every
+ * failure is false.
  */
 export async function probeWsLane(deps: LaneProbeDeps): Promise<boolean> {
   const timeoutMs = deps.timeoutMs ?? LANE_PROBE_TIMEOUT_MS;
@@ -86,7 +92,9 @@ export async function probeWsLane(deps: LaneProbeDeps): Promise<boolean> {
       finish(false);
       return;
     }
-    ws.onopen = () => finish(true);
+    /* Open is not enough: a stalled tunnel opens and says nothing. */
+    ws.onopen = () => {};
+    ws.onmessage = () => finish(true);
     ws.onerror = () => finish(false);
     ws.onclose = () => finish(false);
   });
