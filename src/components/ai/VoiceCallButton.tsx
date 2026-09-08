@@ -54,6 +54,7 @@ import {
 } from "@/lib/voice/events";
 import { extractProductPhotos, type ProductPhoto } from "@/lib/voice/photos";
 import { useStreamLevel } from "@/lib/voice/useStreamLevel";
+import { useSessionLevels } from "@/lib/voice/useSessionLevels";
 import { CallTones } from "@/lib/voice/tones";
 import { pickSttLang, readSavedSttLang, saveSttLang, learnSttLang, type SttLang } from "@/lib/voice/stt-lang";
 import {
@@ -221,6 +222,9 @@ export default function VoiceCallButton({
   onTurnsSaved,
 }: VoiceCallButtonProps) {
   const [state, setState] = useState<VoiceState>("idle");
+  /** The lane the current call is on, for render: the socket lane meters
+   *  inside its own audio (useSessionLevels), the other opens meters. */
+  const [laneState, setLaneState] = useState<"rtc" | "ws">("rtc");
   /* True from a voice switch until the rebuilt call is up or has failed. The
      screen stays mounted on it — see the portal condition — because the
      session goes `ended` and then `requesting-mic` in between, and either
@@ -639,6 +643,7 @@ export default function VoiceCallButton({
 
   const startCall = useCallback(async (opts?: { resume?: boolean; mic?: MediaStream | null }) => {
     if (sessionRef.current) return;
+    setLaneState(transportRef.current);
     /* UNLOCK THE SPEAKER INSIDE THE GESTURE. An element that has been asked
        to play during a tap may later play a stream without a second tap on
        browsers that gate autoplay; the far side's audio arrives well after
@@ -999,8 +1004,15 @@ export default function VoiceCallButton({
     if (prev === "reconnecting" && state === "live") tonesRef.current?.recovered();
   }, [state]);
   const listening = connected && phase !== "speaking";
-  const micLevel = useStreamLevel(micStream, listening);
-  const farLevel = useStreamLevel(farStream, connected && phase === "speaking");
+  /* ON THE SOCKET LANE NO SECOND CONTEXT TOUCHES THE MICROPHONE: the
+     stream meters get no stream at all, and the levels come from the
+     call's own audio (useSessionLevels / ws-audio.ts). */
+  const wsLane = laneState === "ws";
+  const micLevelRtc = useStreamLevel(wsLane ? null : micStream, listening);
+  const farLevelRtc = useStreamLevel(wsLane ? null : farStream, connected && phase === "speaking");
+  const wsLevels = useSessionLevels(sessionRef, wsLane && connected);
+  const micLevel = wsLane ? wsLevels.mic : micLevelRtc;
+  const farLevel = wsLane ? wsLevels.far : farLevelRtc;
   const audioLevel = phase === "speaking" ? farLevel : micLevel;
 
   /* THE CONFIGURATION IS SENT ONCE PER SESSION, so a new voice needs a new

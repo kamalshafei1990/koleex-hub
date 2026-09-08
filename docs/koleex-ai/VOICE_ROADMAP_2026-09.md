@@ -345,6 +345,24 @@ Fixed, as one mechanism rather than four patches:
   rejoin while `[data-kx-call-active]` is up; the call's end nudges it.
 - The beacon carries `ws_reconnects` and the last socket close code.
 
+## "Still a strange voice and noise while I am talking" (2026-09-08, later)
+
+After the sample player moved into the call's context, the noise stayed.
+The other contexts were the orb's meters: `useStreamLevel` opened its own
+AudioContext over the microphone stream and another over the far stream,
+beside the call's own — on the socket lane, two contexts on one live
+microphone, and the phone garbles the second one's reader exactly while
+the caller speaks. Now the socket lane's audio meters both sides inside
+its own context (`WsAudio.levels`, two analysers), the session hands them
+through (`VoiceSession.levels`), `useSessionLevels` polls them once a
+frame, and the button gives the stream meters no stream on that lane. The
+meter's arithmetic is one pure function (`rmsLevel`) shared by both. On
+the WebRTC lane nothing changes: the browser carries that call's audio
+itself and the stream meters are harmless there.
+
+Contexts under a socket-lane call now: the call's own, the tones', and the
+notification engine's. None reads the microphone but the call's.
+
 ## Owner-side (not code)
 
 - Activate the realtime voice model on the Beijing workspace (still `403 Unpurchased`), so mainland callers get the mainland endpoint.

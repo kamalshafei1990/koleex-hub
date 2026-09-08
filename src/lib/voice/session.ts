@@ -555,6 +555,12 @@ export class VoiceSession {
     }
   }
 
+  /** How loud each side is, measured inside the socket lane's own audio
+   *  context (WsAudio.levels). Null on the other lane. */
+  levels(): { mic: number; far: number } | null {
+    return this.wsAudio ? this.wsAudio.levels() : null;
+  }
+
   /** Play a voice sample through the socket lane's own audio context —
    *  see WsAudio.playSample. Null on the other lane, where there is none. */
   previewAudio(bytes: ArrayBuffer): Promise<boolean> | null {
