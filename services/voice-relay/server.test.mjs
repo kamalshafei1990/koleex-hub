@@ -36,5 +36,7 @@ test("origins: Koleex domains and Vercel previews, nothing else", () => {
   assert.equal(originAllowed("https://koleex-hub-git-x.vercel.app"), true);
   assert.equal(originAllowed("https://evil.com"), false);
   assert.equal(originAllowed("https://koleexgroup.com.evil.com"), false);
-  assert.equal(originAllowed(undefined), false);
+  assert.equal(originAllowed(undefined), true, "no Origin is not a browser: the watchdog's Node socket; the ticket still gates it");
+  assert.equal(originAllowed(""), true);
+  assert.equal(originAllowed("null"), false, "an opaque browser origin is a browser, and not ours");
 });

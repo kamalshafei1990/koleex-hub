@@ -92,8 +92,15 @@ export function upstreamUrlFor(model) {
   return u.toString();
 }
 
+/** Browsers always send Origin; a request WITHOUT one is not a browser —
+ *  our own watchdog dialling from a Vercel function (Node's WebSocket
+ *  cannot set the header; 2026-09-08 20:30: `refused origin code=403` on
+ *  every probe, so the path a caller takes was never measured). It is
+ *  admitted to the TICKET check, which is the real gate; the origin check
+ *  only ever narrowed browsers. A browser origin that is not ours is still
+ *  refused. */
 export function originAllowed(origin) {
-  if (!origin) return false;
+  if (origin === undefined || origin === null || origin === "") return true;
   let host = "";
   try {
     host = new URL(origin).hostname.toLowerCase();
