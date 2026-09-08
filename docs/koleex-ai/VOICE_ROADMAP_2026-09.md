@@ -419,6 +419,37 @@ middlebox) held or dropped the empty POSTs and passed the rest.
   `lane=ws` for this reason, and Try again moved it "back" to the lane it
   was already on.
 
+## "Still always like this", after #379 (2026-09-08 06:19–06:27)
+
+With #379 live, the socket-lane handshakes **arrive** (`POST
+/api/ai/voice/ws-session 200` at 06:21:40, 06:22:55, 06:23:08, 06:24:48).
+What happened next, from the beacons:
+
+- `retried elapsedMs=96793 ice=ws1 dc=open lastEvent=none lane=ws
+  canary=timeout5002ms`: the socket to the vendor **opened** (readyState 1)
+  and for ninety-six seconds not one event came down it, while the screen
+  said "Still connecting" and the caller waited; the canary to our own
+  origin timed out in the same seconds. A stalled tunnel keeps a
+  connection "open" and moves nothing on it. The lane counted an open
+  socket as the transport up (`markTransportUp` on `onopen`), so nothing
+  ended the wait.
+- The mainland lane's handshakes took 24–34 s on that network (`retried
+  elapsedMs=34118 ice=new dc=connecting lane=rtc`) — "too long to connect".
+- The call that worked (mainland lane, other region, 203 s) ended with
+  `lastEvent=response.function_call_arguments.delta … toolCalls=0`: the
+  far side began a tool call and never finished its arguments (33 s of
+  silence after the caller's last turn). Vendor-side; the histogram now
+  says so.
+
+The change: **on the socket lane the transport is up when the far side has
+spoken** — its first event — not when the socket says open
+(`WS_FIRST_EVENT_MS` = 7 s). A first dial whose socket has said nothing by
+then, or whose socket closes before a word, fails as `service-unreachable`,
+and the button's existing fall-back to the mainland lane runs; the caller
+is on a working call in seconds instead of staring at "Still connecting".
+A redial's open socket is likewise the call back only on its first event.
+The canary and `respErr` stay as they were.
+
 ## Owner-side (not code)
 
 - Activate the realtime voice model on the Beijing workspace (still `403 Unpurchased`), so mainland callers get the mainland endpoint.
