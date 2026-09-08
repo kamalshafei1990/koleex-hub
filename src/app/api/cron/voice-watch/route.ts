@@ -142,7 +142,11 @@ export async function GET(req: Request) {
     const line =
       `[ai.voice.watch] ${name} ${p.verdict === "spoke" ? "ok" : "fail"} from=${from} verdict=${p.verdict} ` +
       `afterMs=${p.ms} openMs=${p.openMs ?? "none"} first=${p.first ?? "none"} close=${p.closeCode ?? "none"}`;
-    if (p.verdict === "spoke") console.log(line);
+    /* Warn even when it spoke: the log query tools surface warn and error
+       lines and hide info ones (2026-09-08 07:15: the first run's verdict
+       could not be read back), and this line is the one that settles
+       "the vendor is silent" against "the path is". */
+    if (p.verdict === "spoke") console.warn(line);
     else console.error(line);
   }
 
