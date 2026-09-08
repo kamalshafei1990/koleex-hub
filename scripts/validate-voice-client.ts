@@ -3141,6 +3141,32 @@ function describeErrorCheck(): boolean {
   check("  …the session-levels hook polls once a frame, only while active, and tells React only when a level moved", /requestAnimationFrame\(tick\)/.test(sl) && /if \(!active\) return;/.test(sl) && /LEVEL_EPSILON/.test(sl) && !/new (Ctor|AudioContext)\(/.test(sl));
 }
 
+{
+  console.log("\n── 33. A slow socket-lane handshake fails in fifteen seconds and offers Try again; a beacon that fails to send is queued ──");
+  /* 2026-09-08 03:40: "Still connecting" for as long as the owner cared to
+     wait. The route had answered in seconds; the answer never reached the
+     phone; the handshake's ceiling was the mainland lane's fifty seconds. */
+  const { WS_HANDSHAKE_TIMEOUT_MS } = await import("../src/lib/voice/session");
+  const { readFileSync } = await import("node:fs");
+  const sess = readFileSync("src/lib/voice/session.ts", "utf8");
+  check("the socket lane's handshake waits fifteen seconds for our own route, not the mainland lane's fifty",
+    WS_HANDSHAKE_TIMEOUT_MS === 15_000 && /signal: AbortSignal\.timeout\(WS_HANDSHAKE_TIMEOUT_MS\)/.test(sess) && /const HANDSHAKE_TIMEOUT_MS = 50_000;/.test(sess));
+  const btn = readFileSync("src/components/ai/VoiceCallButton.tsx", "utf8");
+  check("Try again beacons `retried`, releases the call, moves a socket lane that never came up to the mainland lane once, and rebuilds with the words kept — inside the tap",
+    /const retryCall = useCallback\(\(\) => \{/.test(btn) && /sendVoiceTelemetry\(\{ reason: "retried", resumes: resumesRef\.current, lane: transportRef\.current/.test(btn) &&
+    /if \(transportRef\.current === "ws" && !wasUp && !laneFellBackRef\.current\) \{\s*laneFellBackRef\.current = true;\s*transportRef\.current = "rtc";\s*saveLane\("rtc"\);/.test(btn) &&
+    /queueMicrotask\(\(\) => void startCallRef\.current\?\.\(\{ resume: true \}\)\);\s*\}, \[releaseCall\]\);/.test(btn) && /onRetry=\{retryCall\}/.test(btn) &&
+    /setLaneState\(transportRef\.current\);\s*(\/\*[^*]*\*\/\s*)?flushVoiceTelemetry\(\);/.test(btn));
+  const tm = await import("../src/lib/voice/telemetry");
+  const store = new Map<string, string>();
+  const like = { getItem: (k: string) => store.get(k) ?? null, setItem: (k: string, v: string) => { store.set(k, v); }, removeItem: (k: string) => { store.delete(k); } };
+  tm.sendVoiceTelemetry({ reason: "connection-lost" }, (_p, _b, onFail) => onFail?.());
+  check("a beacon whose send FAILS is queued (the default post reports a failed fetch, a refused beacon, or a 5xx), not lost",
+    (() => { const src = readFileSync("src/lib/voice/telemetry.ts", "utf8"); return /post\(VOICE_TELEMETRY_PATH, JSON\.stringify\(t\), \(\) => queueVoiceTelemetry\(t\)\);/.test(src) && /\.then\(\(res\) => \{ if \(!res\.ok && res\.status >= 500\) onFail\?\.\(\); \}\)\s*\.catch\(\(\) => onFail\?\.\(\)\);/.test(src) && /const leaving = typeof document !== "undefined" && document\.visibilityState === "hidden";/.test(src) && /if \(!ok\) onFail\?\.\(\);/.test(src); })());
+  const route = readFileSync("src/app/api/ai/voice/telemetry/route.ts", "utf8");
+  check("the telemetry route accepts `retried`", /"retried",/.test(route));
+}
+
 console.log(`\n${pass} passed, ${failures.length} failed`);
   if (failures.length) {
     console.log("\nFAILED:");

@@ -363,6 +363,23 @@ itself and the stream meters are harmless there.
 Contexts under a socket-lane call now: the call's own, the tones', and the
 notification engine's. None reads the microphone but the call's.
 
+## "Still connecting", and the caption's place (2026-09-08 03:40)
+
+The route answered the socket-lane handshake in seconds (`POST
+/api/ai/voice/ws-session 200` at 03:39:46); the answer never reached the
+phone, and the handshake's ceiling was the mainland lane's fifty seconds —
+the screen said "Still connecting" for as long as the owner waited. The
+socket lane now waits fifteen (`WS_HANDSHAKE_TIMEOUT_MS`): its route mints
+a secret and reads two tables, nothing that takes longer. After that the
+existing fall-back to the mainland lane runs. A **Try again** control
+appears with the slow-handshake caption: one tap beacons `retried`,
+releases the call, moves a socket lane that never came up to the mainland
+lane, and rebuilds with the words kept. The caption is a centred block that
+wraps, with the dots inline after the last word (the flex row had left it
+ragged with the dots stranded at the far right). Beacons now go by fetch,
+whose failure is seen and queued; the beacon API is used only on a page on
+its way out.
+
 ## Owner-side (not code)
 
 - Activate the realtime voice model on the Beijing workspace (still `403 Unpurchased`), so mainland callers get the mainland endpoint.

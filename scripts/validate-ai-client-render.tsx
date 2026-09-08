@@ -945,6 +945,15 @@ console.log("\n── The product, shown: on the call screen and in the answer �
     text(settled).includes("Listening") && !/kx-activity-text/.test(settled) && !/kx-activity-dots/.test(settled));
   const connecting = renderToStaticMarkup(<VoiceCallScreen live={false} phase={null} audioLevel={0} lines={[]} lang="en" onEnd={() => {}} /> as ReactElement);
   check("  …connecting moves too", /kx-activity-text[^>]*>Connecting</.test(connecting));
+  /* A SLOW HANDSHAKE: the caption is a centred block that may wrap, the
+     dots ride inline after the last word, and a Try again control appears
+     when the parent offers one. */
+  const slow = renderToStaticMarkup(<VoiceCallScreen live={false} phase={null} audioLevel={0} lines={[]} lang="en" onEnd={() => {}} connectingSlow onRetry={() => {}} /> as ReactElement);
+  check("a slow handshake says so in a centred, wrapping caption with a Try again control; without a handler there is no control",
+    /Still connecting/.test(slow) && /<p class="max-w-\[340px\] px-2 text-center[^"]*"/.test(slow) && /<button[^>]*>Try again<\/button>/.test(slow) &&
+    !/Try again/.test(renderToStaticMarkup(<VoiceCallScreen live={false} phase={null} audioLevel={0} lines={[]} lang="en" onEnd={() => {}} connectingSlow /> as ReactElement)) &&
+    !/Try again/.test(connecting));
+  check("  …localised", /جرّب تاني/.test(renderToStaticMarkup(<VoiceCallScreen live={false} phase={null} audioLevel={0} lines={[]} lang="ar" onEnd={() => {}} connectingSlow onRetry={() => {}} /> as ReactElement)));
   /* NO LANGUAGE CHIPS. The caller is not asked which language they speak. */
   check("nothing on the screen asks the caller which language they speak",
     !/I speak|بتكلم|我说/.test(thinking) && !/lang="ar"[^>]*aria-pressed/.test(thinking));
