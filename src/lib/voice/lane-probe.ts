@@ -43,8 +43,12 @@ export async function probeWsLane(deps: LaneProbeDeps): Promise<boolean> {
   let url = "";
   let protocols: string[] = [];
   try {
+    /* With a body, like the call's own handshake (session.ts dialWs,
+       2026-09-08): the empty POST was the one request that never arrived. */
     const res = await deps.fetchFn(WS_SESSION_PATH, {
       method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ probe: true }),
       credentials: "include",
       ...(typeof AbortSignal !== "undefined" && "timeout" in AbortSignal ? { signal: AbortSignal.timeout(timeoutMs * 3) } : {}),
     });

@@ -35,7 +35,7 @@ import {
   ToolCallNames,
   type VoiceToolCall,
 } from "./tool-calls";
-import { EV_SESSION_CREATED, EV_SESSION_UPDATED, EV_ERROR } from "./events";
+import { EV_SESSION_CREATED, EV_SESSION_UPDATED, EV_ERROR, EV_RESPONSE_DONE } from "./events";
 
 /** The event's `type`, for the diagnostics line — or "" when it has none. */
 function eventTypeOf(raw: string): string {
@@ -130,6 +130,11 @@ export type VoiceDiagnostics = {
    *  the last close code the socket reported. */
   ws_reconnects: number;
   ws_close: string;
+  /** The canary GET's outcome beside a slow socket-lane handshake ("" when
+   *  none ran), and the far side's reason for the last answer that ended
+   *  without completing ("" when every answer completed). */
+  canary: string;
+  resp_err: string;
 };
 
 export type VoiceEvents = {
@@ -280,6 +285,18 @@ const HANDSHAKE_TIMEOUT_MS = 50_000;
    an answer that has not arrived in fifteen is not coming, and the caller
    is better served by the fall-back lane than by a longer wait. */
 export const WS_HANDSHAKE_TIMEOUT_MS = 15_000;
+/* A CANARY BESIDE A SLOW HANDSHAKE (2026-09-08 05:52–05:56: four socket-lane
+   handshakes from the owner's phone, and not one reached our route, while
+   the SDP handshake and the beacons — seconds apart, same origin — all did.
+   The beacons said "aborted after fifteen seconds" and nothing else, and
+   "our origin was unreachable" and "this one request went nowhere" are
+   different faults with different fixes). When the POST has had no answer
+   in four seconds, one small GET to our own origin runs beside it, and its
+   outcome rides in the failure beacon as `canary`: status and time, or
+   timeout, or error. */
+const WS_CANARY_AFTER_MS = 4_000;
+const WS_CANARY_TIMEOUT_MS = 5_000;
+export const CANARY_PATH = "/api/version";
 /** The pause before the one retry of a handshake the link dropped. */
 const HANDSHAKE_RETRY_DELAY_MS = 800;
 
@@ -473,6 +490,12 @@ export class VoiceSession {
   private iceEverConnected = false;
   /** `Name: message` of the exception behind the last fail(), if any. */
   private lastError = "";
+  /** The canary's outcome beside a slow socket-lane handshake (see
+   *  WS_CANARY_AFTER_MS): "" until one ran. */
+  private canary = "";
+  /** What the far side said about the last answer that did not complete:
+   *  its status_details, bounded. "" until one did not. */
+  private lastResponseError = "";
   /* THE OTHER REGION. The server may hold a second endpoint (see the
      server's voice/config.ts for why). It tells this client two things with
      the answer: which SLOT served — a neutral word, never a host — and
@@ -648,6 +671,8 @@ export class VoiceSession {
       events: [...this.eventCounts.entries()].map(([k, v]) => `${k}:${v}`).join(",").slice(0, 600),
       ws_reconnects: this.wsReconnects,
       ws_close: this.wsCloseCode,
+      canary: this.canary,
+      resp_err: this.lastResponseError,
     };
   }
 
@@ -819,6 +844,7 @@ export class VoiceSession {
       const key = this.eventCounts.has(t) || this.eventCounts.size < EVENT_TYPES_MAX ? t : "…";
       this.eventCounts.set(key, (this.eventCounts.get(key) ?? 0) + 1);
     }
+    if (this.lastEventType === EV_RESPONSE_DONE) this.noteResponseDone(raw);
     this.events.onMessage?.(raw);
 
     /* UNTRUSTED. This came off a network socket and describes something the
@@ -1105,21 +1131,44 @@ export class VoiceSession {
       if (this.sttLanguage) query.set("stt", this.sttLanguage);
       const qs = query.toString();
       const path = qs ? `${WS_SESSION_PATH}?${qs}` : WS_SESSION_PATH;
+      /* THE REQUEST CARRIES A BODY (2026-09-08 05:52–05:56: four handshakes
+         from the owner's phone, and not one of them reached our route — the
+         SDP handshake and the beacons, seconds apart on the same origin,
+         all did. The one difference on the wire: this POST carried nothing,
+         no body and no content type, and so did the lane probe's. Whatever
+         sits between that phone and us — a tunnel's local proxy, a
+         middlebox — held or dropped the empty POSTs and passed the rest.)
+         The same three fields as the query, as JSON; the route reads
+         either, so an older page keeps working. */
+      const handshakeBody = JSON.stringify({
+        ...(this.voiceKey ? { voice: this.voiceKey } : {}),
+        ...(this.conversationId ? { conversation: this.conversationId } : {}),
+        ...(this.sttLanguage ? { stt: this.sttLanguage } : {}),
+      });
       /* Same retry rule as the other lane: once, on a bare network error,
          never on our own deadline, never after a hang-up. */
       const post = () => this.deps.fetchFn(path, {
         method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: handshakeBody,
         ...(typeof AbortSignal !== "undefined" && "timeout" in AbortSignal ? { signal: AbortSignal.timeout(WS_HANDSHAKE_TIMEOUT_MS) } : {}),
         credentials: "include",
       });
+      /* The canary runs only beside the call's own handshake — a redial's
+         slowness is the outage the redial is already about. */
+      const disarmCanary = first ? this.armCanary() : () => {};
       let res: Response;
       try {
-        res = await post();
-      } catch (firstErr) {
-        if (!(firstErr instanceof TypeError) || isTimeoutError(firstErr) || !alive()) throw firstErr;
-        await new Promise((r) => setTimeout(r, HANDSHAKE_RETRY_DELAY_MS));
-        if (!alive()) throw firstErr;
-        res = await post();
+        try {
+          res = await post();
+        } catch (firstErr) {
+          if (!(firstErr instanceof TypeError) || isTimeoutError(firstErr) || !alive()) throw firstErr;
+          await new Promise((r) => setTimeout(r, HANDSHAKE_RETRY_DELAY_MS));
+          if (!alive()) throw firstErr;
+          res = await post();
+        }
+      } finally {
+        disarmCanary();
       }
       if (!alive()) return false;
       if (!res.ok) {
@@ -1230,6 +1279,50 @@ export class VoiceSession {
       if (!this.iceEverConnected) this.armReconnectTimer();
     }
     return true;
+  }
+
+  /** Arm the canary (WS_CANARY_AFTER_MS): after the delay, one GET to our
+   *  own origin, its outcome kept for the beacon. Returns the disarm; a
+   *  handshake that answers in time never sends one. A canary already in
+   *  flight finishes on its own — its answer is still worth having. */
+  private armCanary(): () => void {
+    const timer = setTimeout(() => {
+      const t0 = Date.now();
+      const took = () => `${Date.now() - t0}ms`;
+      Promise.resolve()
+        .then(() => this.deps.fetchFn(CANARY_PATH, {
+          method: "GET",
+          cache: "no-store",
+          ...(typeof AbortSignal !== "undefined" && "timeout" in AbortSignal ? { signal: AbortSignal.timeout(WS_CANARY_TIMEOUT_MS) } : {}),
+        }))
+        .then((r) => { this.canary = `${r.status}/${took()}`; })
+        .catch((e) => { this.canary = `${isTimeoutError(e) ? "timeout" : "error"}/${took()}`; });
+    }, WS_CANARY_AFTER_MS);
+    return () => clearTimeout(timer);
+  }
+
+  /** AN ANSWER THAT ENDED BADLY IS COUNTED BY HOW (2026-09-08 05:54, the
+   *  mainland lane's other region: four answers, three finished their
+   *  audio, the fourth ended with response.done and nothing after it —
+   *  and the histogram could not say whether the far side failed it, cut
+   *  it short or cancelled it). A status other than completed becomes one
+   *  more histogram key, `response.done.<status>`, and the far side's
+   *  reason — words, bounded — is kept for the beacon. */
+  private noteResponseDone(raw: string): void {
+    let v: unknown;
+    try {
+      v = JSON.parse(raw);
+    } catch {
+      return;
+    }
+    const resp = (v as { response?: { status?: unknown; status_details?: { type?: unknown; reason?: unknown; error?: { type?: unknown; code?: unknown; message?: unknown } } } } | null)?.response;
+    const status = typeof resp?.status === "string" ? resp.status.replace(/[^a-z_]/gi, "").slice(0, 16) : "";
+    if (!status || status === "completed") return;
+    const key = `${EV_RESPONSE_DONE}.${status}`;
+    this.eventCounts.set(key, (this.eventCounts.get(key) ?? 0) + 1);
+    const d = resp?.status_details;
+    const parts = [d?.reason, d?.type, d?.error?.code, d?.error?.message].filter((p): p is string => typeof p === "string" && p.length > 0);
+    if (parts.length) this.lastResponseError = parts.join(" ").slice(0, 120);
   }
 
   /** The next redial, after the outage's backoff — only on the socket lane,

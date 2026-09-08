@@ -380,6 +380,45 @@ ragged with the dots stranded at the far right). Beacons now go by fetch,
 whose failure is seen and queued; the beacon API is used only on a page on
 its way out.
 
+## "Still connecting again, Grok does not work, the voice cut after two minutes" (2026-09-08 05:52)
+
+Four socket-lane handshakes from the owner's phone between 05:52 and 05:56,
+and **not one reached our route**: the log has no `POST
+/api/ai/voice/ws-session` after 03:43, while the SDP handshake, the
+transcript writes and the beacons — seconds apart, on the same origin —
+all arrived. The beacons said `service-unreachable … err="AbortError:
+Fetch is aborted"` after fifteen seconds, then the fall-back to the
+mainland lane's other region, which is the "still Qwen voice" the owner
+heard with his VPN on. The one difference on the wire: this POST carried
+nothing — no body, no content type — and so did the lane probe's.
+Whatever sits between that phone and us (a tunnel's local proxy, a
+middlebox) held or dropped the empty POSTs and passed the rest.
+
+- The handshake and the probe now POST a JSON body (`voice`,
+  `conversation`, `stt`; `{probe:true}`), and the route reads the fields
+  from the body, else the query, after the gate and the budget, bounded,
+  allow-listed downstream as before. `[ai.voice.ws] session … via=body|query
+  probe=…` says which arrived.
+- A **canary** beside a slow handshake: when the socket lane's POST has
+  had no answer in four seconds, one small GET to `/api/version` runs
+  beside it and its outcome rides in the failure beacon as `canary=`
+  (status/time, `timeout`, `error`). "Our origin was unreachable" and
+  "this one request went nowhere" are different faults; the beacons of
+  05:52 could not tell them apart.
+- The call that connected (mainland lane, other region, 88 s, hung up):
+  four answers, three finished their audio, the fourth ended with
+  `response.done` and nothing after it — the "voice cut". The histogram
+  could not say whether the far side failed it, cut it short or cancelled
+  it. `response.done` with a status other than `completed` is now one more
+  histogram key (`response.done.failed`, `.incomplete`, `.cancelled`) and
+  the far side's reason travels in the beacon as `respErr=`.
+- The lane the voices GET names, when its answer arrives after the tap
+  that started a call (the tap came three seconds after the page opened),
+  no longer relabels the running call: it waits for the hang-up and sets
+  the lane of the next call. At 05:53:02 a mainland call was beaconed as
+  `lane=ws` for this reason, and Try again moved it "back" to the lane it
+  was already on.
+
 ## Owner-side (not code)
 
 - Activate the realtime voice model on the Beijing workspace (still `403 Unpurchased`), so mainland callers get the mainland endpoint.

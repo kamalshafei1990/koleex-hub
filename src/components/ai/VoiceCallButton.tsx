@@ -237,6 +237,9 @@ export default function VoiceCallButton({
      callers outside mainland China. Held in a ref: it is read when a call
      starts, not rendered. */
   const transportRef = useRef<"rtc" | "ws">("rtc");
+  /** The lane the server named while a call was already running, as the
+   *  step that applies it (lane and voices); run at that call's hang-up. */
+  const laneAfterCallRef = useRef<(() => void) | null>(null);
   /* ONE FALL-BACK PER SCREEN. A WebSocket lane that never comes up — a
      network that blocks the vendor's host, a refused secret — is retried
      ONCE on the other lane, silently, before the caller sees a failure. */
@@ -411,8 +414,19 @@ export default function VoiceCallButton({
            background, so the tap that starts a call never waits on it. */
         const server: "rtc" | "ws" = body.transport === "ws" ? "ws" : "rtc";
         const decided = decideLane(server, readSavedLane(), Date.now());
-        transportRef.current = decided.lane;
-        offerFor(decided.lane);
+        /* NOT UNDER A CALL (2026-09-08 05:52: the tap came three seconds
+           after the page opened and this answer came after the tap; moving
+           the lane then relabelled a running mainland call as the socket
+           lane — its beacons said so — and Try again moved it "back" to
+           the lane it was already on). A call in progress keeps its lane;
+           the answer waits for the hang-up and sets the lane of the next
+           call. */
+        const applyLane = () => {
+          transportRef.current = decided.lane;
+          offerFor(decided.lane);
+        };
+        if (sessionRef.current) laneAfterCallRef.current = applyLane;
+        else applyLane();
         if (decided.probe && body.ws_available === true) {
           void probeWsLane({ fetchFn: (...a) => fetch(...a), createWebSocket: (url, protocols) => new WebSocket(url, protocols) as unknown as VoiceSocket }).then((ok) => {
             if (cancelled) return;
@@ -641,6 +655,9 @@ export default function VoiceCallButton({
     const conversation = conversationIdRef.current;
     const lines = linesRef.current;
     releaseCall();
+    /* The lane the page learned during this call is the next call's. */
+    laneAfterCallRef.current?.();
+    laneAfterCallRef.current = null;
     setState("idle");
     if (conversation && shouldSummarise(lines)) {
       void Promise.resolve(persister?.finish())
