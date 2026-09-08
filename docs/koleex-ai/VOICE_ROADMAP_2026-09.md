@@ -526,6 +526,17 @@ carry `tool_wait_ms` (the longest such wait in a call) and the beacon logs
 
 ## Owner-side (not code)
 
+- 2026-09-08 19:30 UTC: the owner added `AI_VOICE_RELAY_URL` and
+  `AI_VOICE_RELAY_SECRET` to Vercel Production. A production deployment
+  made after that moment carries them; the watchdog's `relay` line is the
+  proof (`[ai.voice.watch] relay ok verdict=spoke …`).
+- The mainland lane's `403 AccessDenied.Unpurchased` on Beijing: the model
+  (`qwen3.5-omni-plus-realtime`) shows a full free quota in the owner's
+  Model Studio account, so the refusal is the KEY, not the model — the
+  vendor's error code means the Bailian service is not activated for the
+  account the key belongs to, and realtime calls must come from the
+  default workspace. Fix: a new API key from the default workspace of the
+  China-site account, into `AI_VOICE_API_KEY`, then a production redeploy.
 - Activate the realtime voice model on the Beijing workspace (still `403 Unpurchased`), so mainland callers get the mainland endpoint.
 - Enable Vercel Analytics and Speed Insights.
 
