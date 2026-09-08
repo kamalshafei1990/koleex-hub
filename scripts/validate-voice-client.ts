@@ -794,7 +794,7 @@ async function main() {
     check("a failure clears the session handle so a retry starts fresh",
       /next === "failed"[\s\S]{0,1800}?sessionRef\.current = null/.test(src));
     check("hanging up clears the handle too — through the release it is built on",
-      /const releaseCall[\s\S]{0,400}?sessionRef\.current = null/.test(src) && /const hangUp = useCallback\(\(\) => \{[\s\S]{0,900}?releaseCall\(\);\s*setState\("idle"\);/.test(src));
+      /const releaseCall[\s\S]{0,400}?sessionRef\.current = null/.test(src) && /const hangUp = useCallback\(\(\) => \{[\s\S]{0,900}?releaseCall\(\);\s*(\/\*[^*]*\*\/\s*)?laneAfterCallRef\.current\?\.\(\);\s*laneAfterCallRef\.current = null;\s*setState\("idle"\);/.test(src));
     check("starting twice is refused rather than leaking the first session",
       /if \(sessionRef\.current\) return;/.test(src));
     check("hanging up detaches the stream from the audio element",
@@ -2114,7 +2114,7 @@ console.log("\n── 12. Mute ──");
     /console\.warn\(\s*`\[ai\.voice\.client\]/.test(telRoute) && !/supabase|insert\(/.test(telRoute) && /new NextResponse\(null, \{ status: 204 \}\)/.test(telRoute));
   const diagS = new VoiceSession(deps({ status: 200 }).deps);
   const dg = diagS.diagnostics();
-  check("diagnostics are states and counts only", Object.keys(dg).sort().join(",") === "dc,elapsed_ms,err,events,ice,ice_ever_connected,last_event,region,tool_calls,ws_close,ws_reconnects" && dg.tool_calls === 0 && dg.ws_reconnects === 0 && dg.ws_close === "" && dg.elapsed_ms === 0 && dg.err === "" && dg.events === "");
+  check("diagnostics are states and counts only", Object.keys(dg).sort().join(",") === "canary,dc,elapsed_ms,err,events,ice,ice_ever_connected,last_event,region,resp_err,tool_calls,ws_close,ws_reconnects" && dg.canary === "" && dg.resp_err === "" && dg.tool_calls === 0 && dg.ws_reconnects === 0 && dg.ws_close === "" && dg.elapsed_ms === 0 && dg.err === "" && dg.events === "");
 
   /* THE PICTURE EXPANDS IN PLACE. */
   check("a photo in the conversation is a button that opens the lightbox, not a link out of the app",
@@ -2181,7 +2181,7 @@ console.log("\n── 12. Mute ──");
     !/hangUp\(\);\s*\/\*[^*]*\*\/\s*queueMicrotask/.test(btn19) &&
     /\{\(connected \|\| busy \|\| swapping\) && typeof document !== "undefined" && createPortal\(/.test(btn19));
   check("  …hangUp is the release plus idle — the same teardown, one more step",
-    /const hangUp = useCallback\(\(\) => \{[\s\S]{0,900}?releaseCall\(\);\s*setState\("idle"\);/.test(btn19) &&
+    /const hangUp = useCallback\(\(\) => \{[\s\S]{0,900}?releaseCall\(\);\s*(\/\*[^*]*\*\/\s*)?laneAfterCallRef\.current\?\.\(\);\s*laneAfterCallRef\.current = null;\s*setState\("idle"\);/.test(btn19) &&
     /const releaseCall = useCallback\(\(\) => \{\s*sessionRef\.current\?\.stop\(\);/.test(btn19) &&
     (btn19.match(/setState\("idle"\)/g) ?? []).length === 1);
   check("  …and says so in the log: a voice-switched beacon with the old call's diagnostics, before the release",
@@ -2359,7 +2359,7 @@ console.log("\n── 12. Mute ──");
     (await sum.requestCallSummary("c", "en", (async () => { throw new Error("offline"); }) as unknown as typeof fetch)) === null);
   const btn22 = fs22.readFileSync("src/components/ai/VoiceCallButton.tsx", "utf8");
   check("hang-up takes the writer, the thread and the words BEFORE the release, then asks after the last turns landed, and the row joins the thread; a voice switch never asks",
-    /const persister = persisterRef\.current;\s*const conversation = conversationIdRef\.current;\s*const lines = linesRef\.current;\s*releaseCall\(\);\s*setState\("idle"\);\s*if \(conversation && shouldSummarise\(lines\)\) \{/.test(btn22) &&
+    /const persister = persisterRef\.current;\s*const conversation = conversationIdRef\.current;\s*const lines = linesRef\.current;\s*releaseCall\(\);\s*(\/\*[^*]*\*\/\s*)?laneAfterCallRef\.current\?\.\(\);\s*laneAfterCallRef\.current = null;\s*setState\("idle"\);\s*if \(conversation && shouldSummarise\(lines\)\) \{/.test(btn22) &&
     /Promise\.resolve\(persister\?\.finish\(\)\)\s*\.then\(\(\) => requestCallSummary\(conversation, langRef\.current\)\)\s*\.then\(\(res\) => \{ if \(res\) onTurnsSavedRef\.current\?\.\(\[res\.message\], res\.conversation\); \}\)/.test(btn22) &&
     (btn22.match(/requestCallSummary\(/g) ?? []).length === 1 && !/selectVoice[\s\S]{0,1200}?requestCallSummary/.test(btn22.slice(btn22.indexOf("const selectVoice"), btn22.indexOf("const selectVoice") + 1500)));
 
@@ -2619,7 +2619,10 @@ function describeErrorCheck(): boolean {
     const r = await laneRun();
     check("a ws call posts to OUR ws-session route, with the voice key, the conversation and the language hint — and no region, no offer",
       r.recorded.length === 1 && r.recorded[0].url.startsWith(`${WS_SESSION_PATH}?`) && /voice=v2/.test(r.recorded[0].url) && /conversation=6f1d/.test(r.recorded[0].url) && /stt=ar/.test(r.recorded[0].url) && !/region=/.test(r.recorded[0].url) &&
-      r.recorded[0].init?.method === "POST" && r.recorded[0].init?.credentials === "include" && !r.recorded[0].init?.body);
+      r.recorded[0].init?.method === "POST" && r.recorded[0].init?.credentials === "include" &&
+      /* With a body — the empty POST was the one request that never arrived (section 34). */
+      (r.recorded[0].init?.headers as Record<string, string>)["Content-Type"] === "application/json" &&
+      JSON.stringify(JSON.parse(String(r.recorded[0].init?.body))) === JSON.stringify({ voice: "v2", conversation: "6f1d2c3b-4a5e-4f60-9b7c-1234567890ab", stt: "ar" }));
     check("  …and never the SDP route", !r.recorded.some((x) => x.url.startsWith(HANDSHAKE_PATH)));
     check("the socket is opened to the url the server named, with the subprotocol the server composed — the secret travels there and nowhere else",
       r.sockets.length === 1 && r.sockets[0].url === "wss://voice.example/v1/realtime" && r.sockets[0].protocols.join() === "xai-client-secret.SECRET-1");
@@ -2855,7 +2858,7 @@ function describeErrorCheck(): boolean {
       /const offerFor = \(lane: "rtc" \| "ws"\) => \{\s*const list = byLane\[lane\]\.length > 0 \? byLane\[lane\] : byLane\.rtc;\s*setVoices\(list\);\s*setVoiceKey\(\(cur\) => pickVoiceKey\(cur \?\? readSavedVoiceKey\(\), list\)\);/.test(btn) &&
       /transportRef\.current = decided\.lane;\s*offerFor\(decided\.lane\);/.test(btn) && /transportRef\.current = ok \? "ws" : "rtc";\s*offerFor\(transportRef\.current\);/.test(btn));
     check("the button decides from the server's default and the device's verdict, probes in the background only when told the socket lane exists, and never moves a call already placed",
-      /const decided = decideLane\(server, readSavedLane\(\), Date\.now\(\)\);\s*transportRef\.current = decided\.lane;\s*offerFor\(decided\.lane\);\s*if \(decided\.probe && body\.ws_available === true\) \{/.test(btn) &&
+      /const decided = decideLane\(server, readSavedLane\(\), Date\.now\(\)\);\s*(\/\*[^*]*\*\/\s*)?const applyLane = \(\) => \{\s*transportRef\.current = decided\.lane;\s*offerFor\(decided\.lane\);\s*\};\s*if \(sessionRef\.current\) laneAfterCallRef\.current = applyLane;\s*else applyLane\(\);\s*if \(decided\.probe && body\.ws_available === true\) \{/.test(btn) &&
       /saveLane\(ok \? "ws" : "rtc"\);\s*(\/\*[^*]*\*\/\s*)?if \(!sessionRef\.current\) \{\s*transportRef\.current = ok \? "ws" : "rtc";/.test(btn));
     check("  …a real call teaches the device too: live on the socket lane saves ws, a fall-back saves rtc",
       /if \(next === "live" && transportRef\.current === "ws"\) saveLane\("ws"\);/.test(btn) && /transportRef\.current = "rtc";\s*(\/\*[^*]*\*\/\s*)?saveLane\("rtc"\);/.test(btn));
@@ -3165,6 +3168,100 @@ function describeErrorCheck(): boolean {
     (() => { const src = readFileSync("src/lib/voice/telemetry.ts", "utf8"); return /post\(VOICE_TELEMETRY_PATH, JSON\.stringify\(t\), \(\) => queueVoiceTelemetry\(t\)\);/.test(src) && /\.then\(\(res\) => \{ if \(!res\.ok && res\.status >= 500\) onFail\?\.\(\); \}\)\s*\.catch\(\(\) => onFail\?\.\(\)\);/.test(src) && /const leaving = typeof document !== "undefined" && document\.visibilityState === "hidden";/.test(src) && /if \(!ok\) onFail\?\.\(\);/.test(src); })());
   const route = readFileSync("src/app/api/ai/voice/telemetry/route.ts", "utf8");
   check("the telemetry route accepts `retried`", /"retried",/.test(route));
+}
+
+{
+  console.log("\n── 34. The socket-lane handshake carries a body and a canary; an answer that ends badly is counted by how; a lane that arrives under a call waits ──");
+  /* 2026-09-08 05:52–05:56: four socket-lane handshakes from the owner's
+     phone, not one reached our route; the SDP handshake and the beacons —
+     seconds apart, same origin — all did. The empty POST was the one
+     request on the wire with no body and no content type. */
+  const { readFileSync } = await import("node:fs");
+  const sess = readFileSync("src/lib/voice/session.ts", "utf8");
+  const { VoiceSession, CANARY_PATH, WS_SESSION_PATH } = await import("../src/lib/voice/session");
+  check("the lane probe's POST carries the same kind of body",
+    (() => { const probe = readFileSync("src/lib/voice/lane-probe.ts", "utf8"); return /method: "POST",\s*headers: \{ "Content-Type": "application\/json" \},\s*body: JSON\.stringify\(\{ probe: true \}\),\s*credentials: "include",/.test(probe); })());
+  check("the ws-session route reads the three fields from the body, else the query — after the gate, allow-listed downstream as before",
+    (() => {
+      const route = readFileSync("src/app/api/ai/voice/ws-session/route.ts", "utf8");
+      return /const fields = await readFields\(req\);/.test(route) && route.indexOf("authorizeVoice(req)") < route.indexOf("readFields(req)") &&
+        /parseConversationParam\(fields\.conversation\)/.test(route) && /resolveVoice\(cfg\.voices, requested\)/.test(route) && /const requested = fields\.voice;/.test(route) &&
+        /parseSttLanguage\(fields\.stt\)/.test(route) && /voice: str\("voice"\) \?\? fromQuery\.voice,/.test(route) && /if \(!\/application\\\/json\/i\.test\(req\.headers\.get\("content-type"\) \?\? ""\)\) return fromQuery;/.test(route) &&
+        /via=\$\{fields\.via\} probe=\$\{fields\.probe\}/.test(route);
+    })());
+
+  /* THE CANARY: a handshake with no answer in four seconds sends one GET to
+     our origin; its outcome is in the diagnostics. Driven with a short
+     delay through the real timer: the constant is private, so the source
+     is pinned and the behaviour is shown with a fetch that never answers. */
+  check("the canary is armed four seconds into the call's own handshake, disarmed when the handshake answers, and never on a redial",
+    /const WS_CANARY_AFTER_MS = 4_000;/.test(sess) && /const WS_CANARY_TIMEOUT_MS = 5_000;/.test(sess) && CANARY_PATH === "/api/version" &&
+    /const disarmCanary = first \? this\.armCanary\(\) : \(\) => \{\};/.test(sess) && /\} finally \{\s*disarmCanary\(\);\s*\}/.test(sess) &&
+    /this\.canary = `\$\{r\.status\}\/\$\{took\(\)\}`;/.test(sess) && /this\.canary = `\$\{isTimeoutError\(e\) \? "timeout" : "error"\}\/\$\{took\(\)\}`;/.test(sess) &&
+    /canary: this\.canary,\s*resp_err: this\.lastResponseError,/.test(sess));
+  {
+    /* A handshake that answers at once never sends a canary. */
+    const recorded: Recorded[] = [];
+    const d = deps({ recorded });
+    const base = d.deps.fetchFn;
+    let canaries = 0;
+    d.deps.fetchFn = (async (url: string, init?: RequestInit) => {
+      if (String(url) === CANARY_PATH) { canaries++; return { ok: true, status: 200 } as unknown as Response; }
+      if (String(url).startsWith(WS_SESSION_PATH)) return { ok: true, status: 200, json: async () => ({ transport: "ws", url: "wss://voice.example/v1/realtime", protocols: ["xai-client-secret.S"], audio: { sample_rate: 24_000 }, session: { type: "session.update", session: {} } }) } as unknown as Response;
+      return base(url, init);
+    }) as unknown as typeof fetch;
+    let opened = 0;
+    d.deps.createWebSocket = () => {
+      opened++;
+      const sock: VoiceSocket = { readyState: 0, send: () => {}, close: () => {}, onopen: null, onmessage: null, onclose: null, onerror: null };
+      return sock;
+    };
+    d.deps.createWsAudio = () => ({ stream: {} as MediaStream, startCapture: () => {}, play: () => {}, flush: () => {}, close: () => {}, playSample: async () => true, levels: () => ({ mic: 0, far: 0 }) });
+    const s = new VoiceSession(d.deps, {}, null, null, null, null, "ws");
+    await within(2000, s.start());
+    await new Promise((r) => setTimeout(r, 30));
+    check("a handshake that answers opens its socket and sends no canary, and the diagnostics say so", opened === 1 && canaries === 0 && s.diagnostics().canary === "" && s.diagnostics().resp_err === "");
+    s.stop();
+  }
+
+  /* AN ANSWER THAT ENDED BADLY: response.done with a status other than
+     completed is one more histogram key, and its reason is kept. */
+  {
+    const d = deps({ status: 200, body: "v=0\r\nANSWER\r\n" });
+    const s = new VoiceSession(d.deps, {});
+    await within(2000, s.start());
+    const ch = d.pcCalls.channel!;
+    ch.readyState = "open";
+    const feed = (o: unknown) => ch.onmessage?.({ data: JSON.stringify(o) });
+    feed({ type: "session.created" });
+    feed({ type: "response.done", response: { id: "r1", status: "completed" } });
+    feed({ type: "response.done", response: { id: "r2", status: "failed", status_details: { type: "failed", error: { code: "server_error", message: "upstream hiccup" } } } });
+    feed({ type: "response.done", response: { id: "r3", status: "incomplete", status_details: { type: "incomplete", reason: "max_output_tokens" } } });
+    feed({ type: "response.done", response: { id: "r4", status: "cancelled", status_details: { type: "cancelled", reason: "turn_detected" } } });
+    feed({ type: "response.done", response: { id: "r5", status: "weird<script>" } });
+    const dg = s.diagnostics();
+    check("every response.done is counted as before, and the ones that did not complete are counted again by status — the status a name, nothing else",
+      /(^|,)response\.done:5(,|$)/.test(dg.events) && /response\.done\.failed:1/.test(dg.events) && /response\.done\.incomplete:1/.test(dg.events) && /response\.done\.cancelled:1/.test(dg.events) && /response\.done\.weirdscript:1/.test(dg.events) && !/completed/.test(dg.events));
+    check("the far side's reason for the LAST bad answer is kept, bounded, words only",
+      dg.resp_err === "turn_detected cancelled" && (() => { feed({ type: "response.done", response: { status: "failed", status_details: { error: { message: "x".repeat(400) } } } }); return s.diagnostics().resp_err.length === 120; })());
+    check("a response.done with no status, or that is not JSON, changes nothing",
+      (() => { const before = s.diagnostics().resp_err; feed({ type: "response.done", response: {} }); ch.onmessage?.({ data: "{not json" }); return s.diagnostics().resp_err === before; })());
+    s.stop();
+  }
+  check("the beacon carries the canary and the reason, and the route logs them",
+    (() => {
+      const t = readFileSync("src/lib/voice/telemetry.ts", "utf8");
+      const route = readFileSync("src/app/api/ai/voice/telemetry/route.ts", "utf8");
+      return /canary\?: string;\s*resp_err\?: string;/.test(t) && /\(short\(body\.canary, 24\) \? ` canary=\$\{short\(body\.canary, 24\)\}` : ""\)/.test(route) && /\(cause\(body\.resp_err\) \? ` respErr="\$\{cause\(body\.resp_err\)\}"` : ""\)/.test(route);
+    })());
+
+  /* THE LANE THAT ARRIVES UNDER A CALL WAITS: the mount effect's answer can
+     come after the tap; it must not relabel a running call. */
+  const btn = readFileSync("src/components/ai/VoiceCallButton.tsx", "utf8");
+  check("the server's lane is applied at once with no call up, and kept for the hang-up when a call is running",
+    /const applyLane = \(\) => \{\s*transportRef\.current = decided\.lane;\s*offerFor\(decided\.lane\);\s*\};\s*if \(sessionRef\.current\) laneAfterCallRef\.current = applyLane;\s*else applyLane\(\);/.test(btn) &&
+    /const laneAfterCallRef = useRef<\(\(\) => void\) \| null>\(null\);/.test(btn) &&
+    /releaseCall\(\);\s*\/\*[^*]*\*\/\s*laneAfterCallRef\.current\?\.\(\);\s*laneAfterCallRef\.current = null;/.test(btn));
 }
 
 console.log(`\n${pass} passed, ${failures.length} failed`);

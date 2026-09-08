@@ -1312,7 +1312,26 @@ console.log("\n── 8. What the client may know, and what it may not ──");
       /voices_by_lane: \{ rtc: publicVoiceList\(cfg\?\.voices \?\? \[\]\), ws: publicVoiceList\(grok\?\.voices \?\? \[\]\) \}/.test(sdpRoute));
     const postBody = wsRoute.slice(wsRoute.indexOf("export async function POST"));
     check("neither route carries a vendor host in code — the endpoint is configuration", !/api\.x\.ai|wss:\/\//.test(postBody) && !/api\.x\.ai|wss:\/\//.test(sdpRoute));
-    check("the socket route logs the voice it asks for, by key and vendor id — never the key material", /console\.log\(`\[ai\.voice\.ws\] session voice=\$\{requested \?\? "default"\} vendor=\$\{voice\?\.vendorId \?\? "none"\}`\);/.test(wsRoute) && !/apiKey\}/.test(wsRoute));
+    check("the socket route logs the voice it asks for, by key and vendor id — never the key material", /console\.log\(`\[ai\.voice\.ws\] session voice=\$\{requested \?\? "default"\} vendor=\$\{voice\?\.vendorId \?\? "none"\} via=\$\{fields\.via\} probe=\$\{fields\.probe\}`\);/.test(wsRoute) && !/apiKey\}/.test(wsRoute));
+  }
+
+  {
+    /* 2026-09-08 05:52–05:56: four socket-lane handshakes from the owner's
+       phone, not one reached this route — the SDP handshake and the beacons
+       did. The empty POST was the one request with no body. The client
+       now sends the three fields as JSON; the route reads them from the
+       body, else the query, after the gate, and allow-lists them as before. */
+    const wsRoute = readFileSync("src/app/api/ai/voice/ws-session/route.ts", "utf8");
+    check("the ws-session route reads voice, conversation and stt from a JSON body, else the query — after the gate and the budget, bounded, allow-listed downstream",
+      /const fields = await readFields\(req\);/.test(wsRoute) && wsRoute.indexOf("authorizeVoice(req)") < wsRoute.indexOf("readFields(req)") && wsRoute.indexOf('bucket: "voice_session"') < wsRoute.indexOf("readFields(req)") &&
+      /if \(!\/application\\\/json\/i\.test\(req\.headers\.get\("content-type"\) \?\? ""\)\) return fromQuery;/.test(wsRoute) && /const FIELD_MAX_CHARS = 200;/.test(wsRoute) &&
+      /parseConversationParam\(fields\.conversation\)/.test(wsRoute) && /resolveVoice\(cfg\.voices, requested\)/.test(wsRoute) && /const requested = fields\.voice;/.test(wsRoute) && /parseSttLanguage\(fields\.stt\)/.test(wsRoute) &&
+      !/searchParams\.get\("voice"\)\)/.test(wsRoute.slice(wsRoute.indexOf("export async function POST"))));
+    check("  …an unreadable body is the query; the log says which carried the fields and whether it was the probe",
+      /catch \{\s*\/\*[^*]*\*\/\s*return fromQuery;\s*\}/.test(wsRoute) && /via=\$\{fields\.via\} probe=\$\{fields\.probe\}/.test(wsRoute) && /probe: o\.probe === true,/.test(wsRoute));
+    const telemetryRoute = readFileSync("src/app/api/ai/voice/telemetry/route.ts", "utf8");
+    check("the beacon's canary and the far side's reason for a bad answer are logged, bounded, as the other fields are",
+      /\(short\(body\.canary, 24\) \? ` canary=\$\{short\(body\.canary, 24\)\}` : ""\)/.test(telemetryRoute) && /\(cause\(body\.resp_err\) \? ` respErr="\$\{cause\(body\.resp_err\)\}"` : ""\)/.test(telemetryRoute));
   }
 
   console.log("\n── 19. The picture proxy: a web photo made phone-sized, under the SSRF rules ──");

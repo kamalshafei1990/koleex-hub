@@ -54,6 +54,43 @@ export const maxDuration = 20;
 
 const TAUGHT_INDEX_TIMEOUT_MS = 1_500;
 const HISTORY_TIMEOUT_MS = 1_500;
+const FIELD_MAX_CHARS = 200;
+
+type WsSessionFields = { voice: string | null; conversation: string | null; stt: string | null; probe: boolean; via: "body" | "query" };
+
+/** The three fields a call names, from the JSON body when the client sent
+ *  one, else from the query (an older page). THE BODY EXISTS BECAUSE THE
+ *  EMPTY POST WAS THE ONE REQUEST THAT NEVER ARRIVED (2026-09-08 05:52,
+ *  four handshakes from the owner's phone; session.ts dialWs has the
+ *  account). Every value is still allow-listed downstream; this only reads
+ *  strings, bounded, and never trusts them. */
+async function readFields(req: Request): Promise<WsSessionFields> {
+  const url = new URL(req.url);
+  const fromQuery: WsSessionFields = {
+    voice: url.searchParams.get("voice"),
+    conversation: url.searchParams.get("conversation"),
+    stt: url.searchParams.get("stt"),
+    probe: false,
+    via: "query",
+  };
+  if (!/application\/json/i.test(req.headers.get("content-type") ?? "")) return fromQuery;
+  try {
+    const parsed: unknown = await req.json();
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return fromQuery;
+    const o = parsed as Record<string, unknown>;
+    const str = (k: string) => (typeof o[k] === "string" && o[k] !== "" && (o[k] as string).length <= FIELD_MAX_CHARS ? (o[k] as string) : null);
+    return {
+      voice: str("voice") ?? fromQuery.voice,
+      conversation: str("conversation") ?? fromQuery.conversation,
+      stt: str("stt") ?? fromQuery.stt,
+      probe: o.probe === true,
+      via: "body",
+    };
+  } catch {
+    /* An unreadable body is an empty one: the query, then the defaults. */
+    return fromQuery;
+  }
+}
 /* Shares the mainland lane's counter and ceiling: a call is a call. */
 const VOICE_SESSIONS_PER_MIN = Number(process.env.AI_LIMIT_VOICE_SESSIONS_PER_MIN) || 6;
 
@@ -84,6 +121,8 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Voice is not available right now." }, { status: 503 });
   }
 
+  const fields = await readFields(req);
+
   /* The two database reads overlap the mint, as they overlap the SDP
      exchange on the other lane; each has its own ceiling and fails open. */
   const taughtP: Promise<string[]> = Promise.race([
@@ -93,8 +132,7 @@ export async function POST(req: Request) {
     console.error("[ai.voice.ws] taught index unavailable — continuing without it");
     return [] as string[];
   });
-  const url = new URL(req.url);
-  const conversationId = parseConversationParam(url.searchParams.get("conversation"));
+  const conversationId = parseConversationParam(fields.conversation);
   const historyP: Promise<RecentTurn[]> = conversationId
     ? Promise.race([
         loadRecentTurns(supabaseServer, conversationId, gate.tenantId, gate.accountId),
@@ -113,17 +151,17 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Could not start the call. Try again." }, { status: 502 });
   }
 
-  const requested = url.searchParams.get("voice");
+  const requested = fields.voice;
   const voice = resolveVoice(cfg.voices, requested);
   const taughtQuestions = await taughtP;
   const recentTurns = await historyP;
-  const clientHint = parseSttLanguage(url.searchParams.get("stt"));
+  const clientHint = parseSttLanguage(fields.stt);
   const sttLanguage = detectConversationLang(recentTurns, { hint: clientHint }) ?? clientHint;
   /* No transcriber model on this wire: the vendor picks its own. */
   const payload = buildVoiceSessionPayload(voice, taughtQuestions, recentTurns, gate.viewer, sttLanguage, null, OPENAI_WIRE);
   /* The voice the session will ask for, by key and vendor id, so "it only
      has one voice" can be read from the log rather than guessed. */
-  console.log(`[ai.voice.ws] session voice=${requested ?? "default"} vendor=${voice?.vendorId ?? "none"}`);
+  console.log(`[ai.voice.ws] session voice=${requested ?? "default"} vendor=${voice?.vendorId ?? "none"} via=${fields.via} probe=${fields.probe}`);
 
   return NextResponse.json(
     {

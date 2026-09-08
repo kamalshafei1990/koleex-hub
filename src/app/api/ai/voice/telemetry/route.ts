@@ -78,6 +78,8 @@ export async function POST(req: Request) {
       (num(body.ws_reconnects) ? ` wsReconnects=${num(body.ws_reconnects)}` : "") +
       (short(body.ws_close, 6) ? ` wsClose=${short(body.ws_close, 6)}` : "") +
       (num(body.queued_at) ? ` queuedAt=${new Date(num(body.queued_at)).toISOString()}` : "") +
+      (short(body.canary, 24) ? ` canary=${short(body.canary, 24)}` : "") +
+      (cause(body.resp_err) ? ` respErr="${cause(body.resp_err)}"` : "") +
       (typeof body.events === "string" && body.events ? ` events=${body.events.replace(/[^\w.:,…-]/g, "").slice(0, 600)}` : ""),
   );
   return new NextResponse(null, { status: 204 });

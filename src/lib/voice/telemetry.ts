@@ -27,6 +27,10 @@ export type VoiceTelemetryFields = {
   ws_close?: string;
   /** A queued beacon carries when it was made. */
   queued_at?: number;
+  /** The canary beside a slow socket-lane handshake, and the far side's
+   *  reason for an answer that did not complete (session.ts diagnostics). */
+  canary?: string;
+  resp_err?: string;
 };
 
 export type VoiceTelemetry = VoiceTelemetryFields;
