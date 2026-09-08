@@ -34,6 +34,8 @@ import "server-only";
 import { NextResponse } from "next/server";
 import { readVoiceEnv, readAltVoiceEnv } from "@/lib/server/ai/voice/config";
 import { probeVoice } from "@/lib/server/ai/voice/probe";
+import { parseGrokVoiceConfig, readGrokVoiceEnv } from "@/lib/server/ai/voice/grok";
+import { probeGrokSocket, SOCKET_PROBE_TIMEOUT_MS } from "@/lib/server/ai/voice/grok-probe";
 
 export const dynamic = "force-dynamic";
 /* One probe at the route's own first-attempt budget, plus headroom. */
@@ -65,9 +67,20 @@ export async function GET(req: Request) {
     { slot: "primary", env: readVoiceEnv() },
     { slot: "alt", env: readAltVoiceEnv() },
   ] as const;
-  const probed = await Promise.all(
-    regions.map(async (r) => ({ ...r, probe: await probeVoice(r.env, fetch, WATCH_TIMEOUT_MS) })),
-  );
+  /* THE SOCKET LANE, BESIDE THEM (2026-09-08: from two devices through a
+     VPN the vendor's socket opened and said nothing; nothing of ours had
+     ever opened it from anywhere but a browser). One socket from this
+     function, a wait for the far side's first event, one line — so "the
+     vendor is silent for everyone" and "that path is a stalled tunnel" stop
+     being the same log. Runs in parallel with the region probes; its own
+     ceiling fits inside the route's. Absent configuration is simply no row. */
+  const grokCfg = parseGrokVoiceConfig(readGrokVoiceEnv());
+  const grokKey = process.env.AI_VOICE_GROK_API_KEY?.trim() || "";
+  const socketP = grokCfg && grokKey ? probeGrokSocket(grokCfg, grokKey, { timeoutMs: SOCKET_PROBE_TIMEOUT_MS }) : Promise.resolve(null);
+  const [probed, socket] = await Promise.all([
+    Promise.all(regions.map(async (r) => ({ ...r, probe: await probeVoice(r.env, fetch, WATCH_TIMEOUT_MS) }))),
+    socketP,
+  ]);
   const configured = probed.filter((r) => r.probe !== null);
 
   /* Nothing to watch is not a failure. It is logged once so a deployment that
@@ -108,6 +121,19 @@ export async function GET(req: Request) {
   const anyHealthy = rows.some((r) => r.reachable && r.credential_ok);
   const primary = rows.find((r) => r.slot === "primary") ?? rows[0];
 
+  /* The socket lane's line: the verdict, the times, the first event's type,
+     a close code. Never the host, never the secret. `spoke` is the only
+     healthy verdict; it is logged at info, the rest at error so the query
+     tools surface them. It does not move the status code: the mainland
+     lane is the one callers are served on. */
+  if (socket) {
+    const line =
+      `[ai.voice.watch] socket ${socket.verdict === "spoke" ? "ok" : "fail"} from=${from} verdict=${socket.verdict} ` +
+      `afterMs=${socket.ms} openMs=${socket.openMs ?? "none"} first=${socket.first ?? "none"} close=${socket.closeCode ?? "none"}`;
+    if (socket.verdict === "spoke") console.log(line);
+    else console.error(line);
+  }
+
   /* THE STATUS CODE IS THE COUNTABLE SIGNAL. The first four runs of this
      watchdog all returned 200 whatever the probe found, and the log query
      tools surface error-level lines far more reliably than info ones — so
@@ -126,6 +152,7 @@ export async function GET(req: Request) {
       cause: primary.cause,
       from,
       regions: rows,
+      socket,
     },
     { status: anyHealthy ? 200 : 503 },
   );
