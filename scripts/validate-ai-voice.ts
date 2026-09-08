@@ -774,7 +774,7 @@ console.log("\n── 8. What the client may know, and what it may not ──");
       /probeVoice\(r\.env, fetch, WATCH_TIMEOUT_MS\)/.test(bare) &&
       /readAltVoiceEnv\(\)/.test(bare));
     check("  …with the shared env reader, not a private copy of the variable list — the socket lane's key is the one variable read here, for its own probe",
-      /readVoiceEnv\(\)/.test(bare) && /readGrokVoiceEnv\(\)/.test(bare) && (bare.match(/process\.env\.AI_VOICE_/g) ?? []).length === 1 && /process\.env\.AI_VOICE_GROK_API_KEY\?\.trim\(\)/.test(bare));
+      /readVoiceEnv\(\)/.test(bare) && /readGrokVoiceEnv\(\)/.test(bare) && (bare.match(/process\.env\.AI_VOICE_/g) ?? []).length === 2 && /process\.env\.AI_VOICE_GROK_API_KEY\?\.trim\(\)/.test(bare) && /process\.env\.AI_VOICE_RELAY_SECRET\?\.trim\(\)/.test(bare));
     check("  …and never calls fetch itself", !/\bfetch\(/.test(bare));
 
     /* THE SAME BUDGET A CALL GETS. Read both constants out of the source and
@@ -814,10 +814,10 @@ console.log("\n── 8. What the client may know, and what it may not ──");
     /* NEVER THE URL, NEVER THE KEY, NEVER THE VENDOR'S WORDS. */
     check("no endpoint, key or vendor text can reach the log or the response — the socket lane's key goes to its probe and nowhere else",
       !/sdpUrl/.test(bare) && !/apiKey/.test(bare) && !/AI_VOICE_API_KEY/.test(bare) &&
-      !/AI_VOICE_BASE_URL/.test(bare) && !/probe\.verdict/.test(bare) && (bare.match(/grokKey/g) ?? []).length === 3 &&
+      !/AI_VOICE_BASE_URL/.test(bare) && !/probe\.verdict/.test(bare) && (bare.match(/grokKey/g) ?? []).length === 5 &&
       /probeGrokSocket\(grokCfg, grokKey, \{ timeoutMs: SOCKET_PROBE_TIMEOUT_MS \}\)/.test(bare) &&
-      /verdict=\$\{socket\.verdict\} `\s*\+\s*`afterMs=\$\{socket\.ms\} openMs=\$\{socket\.openMs \?\? "none"\} first=\$\{socket\.first \?\? "none"\} close=\$\{socket\.closeCode \?\? "none"\}/.test(bare) &&
-      !/secret\.value/.test(bare) && !/socketUrl|grokSocketUrl/.test(bare));
+      /verdict=\$\{p\.verdict\} `\s*\+\s*`afterMs=\$\{p\.ms\} openMs=\$\{p\.openMs \?\? "none"\} first=\$\{p\.first \?\? "none"\} close=\$\{p\.closeCode \?\? "none"\}/.test(bare) &&
+      !/secret\.value/.test(bare) && !/grokSocketUrl/.test(bare));
     check("route files export handlers and config only",
       (bare.match(/^export /gm) ?? []).length === 3 &&
       /export const dynamic/.test(bare) && /export const maxDuration/.test(bare) &&
@@ -1306,7 +1306,7 @@ console.log("\n── 8. What the client may know, and what it may not ──");
     check("  …the session is built on the OpenAI-style wire with the caller's viewer, the taught index and the thread, like the other lane",
       /buildVoiceSessionPayload\(voice, taughtQuestions, recentTurns, gate\.viewer, sttLanguage, null, OPENAI_WIRE\)/.test(wsRoute) && /loadRecentTurns\(supabaseServer, conversationId, gate\.tenantId, gate\.accountId\)/.test(wsRoute));
     check("  …and returns url, protocols, audio rate and both sessions — nothing else the client could route a key with",
-      /url: grokSocketUrl\(cfg\),\s*protocols: grokProtocols\(cfg, secret\.value\),/.test(wsRoute) && /audio: \{ format: "pcm16", sample_rate: cfg\.sampleRate \}/.test(wsRoute) && !/model:/.test(wsRoute.slice(wsRoute.indexOf("return NextResponse.json(\n    {\n      transport"))));
+      /url: socket\.url,\s*protocols: grokProtocols\(cfg, secret\.value\),/.test(wsRoute) && /audio: \{ format: "pcm16", sample_rate: cfg\.sampleRate \}/.test(wsRoute) && !/model:/.test(wsRoute.slice(wsRoute.indexOf("return NextResponse.json(\n    {\n      transport"))));
     const sdpRoute = readFileSync("src/app/api/ai/voice/session/route.ts", "utf8");
     check("the voices GET decides the lane from the platform's country stamp and says which — the client never chooses",
       /chooseVoiceLane\(\{ country: req\.headers\.get\("x-vercel-ip-country"\), rtc: cfg !== null, ws: grok !== null \}\)/.test(sdpRoute) && /transport: lane \?\? "rtc"/.test(sdpRoute));
@@ -1315,7 +1315,7 @@ console.log("\n── 8. What the client may know, and what it may not ──");
       /voices_by_lane: \{ rtc: publicVoiceList\(cfg\?\.voices \?\? \[\]\), ws: publicVoiceList\(grok\?\.voices \?\? \[\]\) \}/.test(sdpRoute));
     const postBody = wsRoute.slice(wsRoute.indexOf("export async function POST"));
     check("neither route carries a vendor host in code — the endpoint is configuration", !/api\.x\.ai|wss:\/\//.test(postBody) && !/api\.x\.ai|wss:\/\//.test(sdpRoute));
-    check("the socket route logs the voice it asks for, by key and vendor id — never the key material", /console\.log\(`\[ai\.voice\.ws\] session voice=\$\{requested \?\? "default"\} vendor=\$\{voice\?\.vendorId \?\? "none"\} via=\$\{fields\.via\} probe=\$\{fields\.probe\}`\);/.test(wsRoute) && !/apiKey\}/.test(wsRoute));
+    check("the socket route logs the voice it asks for, by key and vendor id — never the key material", /console\.log\(`\[ai\.voice\.ws\] session voice=\$\{requested \?\? "default"\} vendor=\$\{voice\?\.vendorId \?\? "none"\} via=\$\{fields\.via\} probe=\$\{fields\.probe\} socket=\$\{socket\.via\}`\);/.test(wsRoute) && !/apiKey\}/.test(wsRoute));
   }
 
   {
@@ -1491,8 +1491,58 @@ console.log("\n── 8. What the client may know, and what it may not ──");
       check("an unreadable first event is still `spoke`, its type `?` — never text from the wire", r6.verdict === "spoke" && r6.first === "?");
       const src = readFileSync("src/lib/server/ai/voice/grok-probe.ts", "utf8");
       check("the probe never logs, never returns the secret or the url, and has no WebSocket in the suite's runtime path unless handed one",
-        !/console\./.test(src) && /typeof WebSocket === "undefined"/.test(src) && (src.match(/secret\.value/g) ?? []).length === 1 && /grokProtocols\(cfg, secret\.value\)/.test(src) && !/resolve\(done\([^)]*secret/.test(src));
+        !/console\./.test(src) && /typeof WebSocket === "undefined"/.test(src) && (src.match(/secret\.value/g) ?? []).length === 2 && /grokProtocols\(cfg, secret\.value\)/.test(src) && /deps\.dialUrl \? deps\.dialUrl\(secret\.value\) : grokSocketUrl\(cfg\)/.test(src) && !/resolve\(done\([^)]*secret/.test(src));
     }
+  }
+
+  console.log("\n── 22. The relay: the socket lane carried through our own domain ──");
+  {
+    /* 2026-09-08: from mainland China the browser's direct socket to the
+       vendor opened and said nothing, while every request to OUR origin
+       went through. The socket goes to Koleex now: a relay on our domain
+       opens the vendor's socket. The vendor's key never leaves Vercel; the
+       relay admits a connection only with a ticket the route signed over
+       the client secret. */
+    const g = await import("../src/lib/server/ai/voice/grok");
+    const { createHmac } = await import("node:crypto");
+    const base = { AI_VOICE_GROK_API_KEY: "xai-REAL-KEY", AI_VOICE_GROK_MODEL: "grok-voice-1" };
+    const direct = g.parseGrokVoiceConfig(base as never);
+    const viaRelay = g.parseGrokVoiceConfig({ ...base, AI_VOICE_RELAY_URL: "wss://voice.koleexgroup.com/v1/realtime" } as never);
+    const plainRelay = g.parseGrokVoiceConfig({ ...base, AI_VOICE_RELAY_URL: "ws://voice.koleexgroup.com/v1/realtime" } as never);
+    const badRelay = g.parseGrokVoiceConfig({ ...base, AI_VOICE_RELAY_URL: "not a url" } as never);
+    check("the relay url is read from the env, wss: only; anything else is no relay and the lane keeps dialling the vendor directly",
+      direct?.relayUrl === null && viaRelay?.relayUrl === "wss://voice.koleexgroup.com/v1/realtime" && plainRelay?.relayUrl === null && badRelay?.relayUrl === null);
+    check("the env reader carries the relay url", /AI_VOICE_RELAY_URL: process\.env\.AI_VOICE_RELAY_URL,/.test(readFileSync("src/lib/server/ai/voice/grok.ts", "utf8")));
+    const exp = 1_800_000_300;
+    const ticket = g.signRelayTicket("relay-secret", "SECRET-1", exp);
+    check("the ticket is exp.sig with sig = HMAC-SHA256(relaySecret, `${token}.${exp}`) — the relay's verifyTicket is its mirror",
+      ticket === `${exp}.${createHmac("sha256", "relay-secret").update(`SECRET-1.${exp}`).digest("hex")}` && g.RELAY_TICKET_TTL_SEC === g.GROK_SECRET_TTL_SEC);
+    if (viaRelay && direct) {
+      const url = g.relaySocketUrl(viaRelay, ticket);
+      check("the relay url carries the ticket and the model, and never the vendor's host",
+        url === `wss://voice.koleexgroup.com/v1/realtime?t=${encodeURIComponent(ticket)}&model=grok-voice-1` && !/x\.ai/.test(String(url)) && g.relaySocketUrl(direct, ticket) === null);
+      const handed = g.browserSocketUrl(viaRelay, "SECRET-1", "relay-secret", 1_800_000_000);
+      check("with a relay and a relay secret the browser is handed the relay's url with a ticket that lives as long as the secret",
+        handed.via === "relay" && handed.url === g.relaySocketUrl(viaRelay, g.signRelayTicket("relay-secret", "SECRET-1", 1_800_000_000 + g.GROK_SECRET_TTL_SEC)));
+      check("without a relay secret, or without a relay, the browser dials the vendor as before",
+        g.browserSocketUrl(viaRelay, "SECRET-1", "", 1).via === "direct" && g.browserSocketUrl(viaRelay, "SECRET-1", "", 1).url === g.grokSocketUrl(viaRelay) &&
+        g.browserSocketUrl(direct, "SECRET-1", "relay-secret", 1).via === "direct");
+    }
+    const wsRoute = readFileSync("src/app/api/ai/voice/ws-session/route.ts", "utf8");
+    check("the ws-session route hands out browserSocketUrl, reads the relay secret once for it, and logs which path — never the secret",
+      /const socket = browserSocketUrl\(cfg, secret\.value, process\.env\.AI_VOICE_RELAY_SECRET\?\.trim\(\) \|\| "", Math\.floor\(Date\.now\(\) \/ 1000\)\);/.test(wsRoute) &&
+      (wsRoute.match(/AI_VOICE_RELAY_SECRET/g) ?? []).length === 1 && /url: socket\.url,/.test(wsRoute) && /socket=\$\{socket\.via\}/.test(wsRoute) && !/grokSocketUrl/.test(wsRoute));
+    const watch = readFileSync("src/app/api/cron/voice-watch/route.ts", "utf8");
+    check("the watchdog probes the relay path beside the vendor's own, with a ticket, and logs it as `relay`",
+      /dialUrl: \(token\) => relaySocketUrl\(grokCfg, signRelayTicket\(relaySecret, token, Math\.floor\(Date\.now\(\) \/ 1000\) \+ RELAY_TICKET_TTL_SEC\)\) \?\? "",/.test(watch) &&
+      /\[\["socket", socket\], \["relay", relay\]\] as const/.test(watch) && (watch.match(/AI_VOICE_RELAY_SECRET/g) ?? []).length === 1);
+    const relaySrc = readFileSync("services/voice-relay/server.mjs", "utf8");
+    check("the relay holds no vendor key, admits only a ticketed connection for THIS token, fixes the upstream host itself, and logs no secret",
+      !/AI_VOICE_GROK_API_KEY|Authorization/.test(relaySrc) && /verifyTicket\(SECRET, token, url\.searchParams\.get\("t"\)\)/.test(relaySrc) &&
+      /timingSafeEqual/.test(relaySrc) && /const UPSTREAM_URL = \(process\.env\.VOICE_UPSTREAM_URL/.test(relaySrc) && !/log\(`[^`]*\$\{token/.test(relaySrc) &&
+      /if \(!SECRET\) return refuse\(503, "unconfigured"\);/.test(relaySrc) && /originAllowed\(req\.headers\.origin\)/.test(relaySrc));
+    check("the relay's own tests cover the ticket, the protocol, the upstream url and the origins", /verifyTicket\(SECRET, "tok-2", t, now\), false/.test(readFileSync("services/voice-relay/server.test.mjs", "utf8")));
+    check("the relay is outside the app's lint and the app's build", /"services\/\*\*",/.test(readFileSync("eslint.config.mjs", "utf8")));
   }
 
   console.log(`\n${pass} passed, ${failures.length} failed`);

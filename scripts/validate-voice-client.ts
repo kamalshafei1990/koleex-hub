@@ -2116,7 +2116,7 @@ console.log("\n── 12. Mute ──");
     /console\.warn\(\s*`\[ai\.voice\.client\]/.test(telRoute) && !/supabase|insert\(/.test(telRoute) && /new NextResponse\(null, \{ status: 204 \}\)/.test(telRoute));
   const diagS = new VoiceSession(deps({ status: 200 }).deps);
   const dg = diagS.diagnostics();
-  check("diagnostics are states and counts only", Object.keys(dg).sort().join(",") === "canary,dc,elapsed_ms,err,events,ice,ice_ever_connected,last_event,region,resp_err,tool_calls,ws_close,ws_reconnects" && dg.canary === "" && dg.resp_err === "" && dg.tool_calls === 0 && dg.ws_reconnects === 0 && dg.ws_close === "" && dg.elapsed_ms === 0 && dg.err === "" && dg.events === "");
+  check("diagnostics are states and counts only", Object.keys(dg).sort().join(",") === "canary,dc,elapsed_ms,err,events,ice,ice_ever_connected,last_event,region,resp_err,tool_calls,tool_wait_ms,ws_close,ws_reconnects" && dg.canary === "" && dg.resp_err === "" && dg.tool_wait_ms === 0 && dg.tool_calls === 0 && dg.ws_reconnects === 0 && dg.ws_close === "" && dg.elapsed_ms === 0 && dg.err === "" && dg.events === "");
 
   /* THE PICTURE EXPANDS IN PLACE. */
   check("a photo in the conversation is a button that opens the lightbox, not a link out of the app",
@@ -2842,7 +2842,7 @@ function describeErrorCheck(): boolean {
   check("  …a verdict from the future is not trusted", decideLane("rtc", { lane: "ws", at: now + 5_000 }, now).probe === true);
   check("the saved verdict is read strictly", parseSavedLane('{"lane":"ws","at":5}')?.lane === "ws" && parseSavedLane('{"lane":"x","at":5}') === null && parseSavedLane("nonsense") === null && parseSavedLane(null) === null);
 
-  const probeDeps = (opts: { open?: boolean; error?: boolean; status?: number; bad?: boolean }) => {
+  const probeDeps = (opts: { open?: boolean; speak?: boolean; error?: boolean; status?: number; bad?: boolean }) => {
     const sockets: Array<{ url: string; protocols: string[]; closed: number }> = [];
     return {
       sockets,
@@ -2859,16 +2859,26 @@ function describeErrorCheck(): boolean {
             readyState: 0, onopen: null, onmessage: null, onclose: null, onerror: null,
             send() {}, close() { rec.closed++; },
           };
-          setTimeout(() => { if (opts.open) sock.onopen?.({}); else if (opts.error) { sock.onerror?.({}); sock.onclose?.({}); } }, 10);
+          setTimeout(() => {
+            if (opts.open || opts.speak) sock.onopen?.({});
+            if (opts.speak) sock.onmessage?.({ data: JSON.stringify({ type: "session.created" }) });
+            else if (opts.error) { sock.onerror?.({}); sock.onclose?.({}); }
+          }, 10);
           return sock;
         },
       },
     };
   };
   {
-    const h = probeDeps({ open: true });
+    const h = probeDeps({ speak: true });
     const ok = await probeWsLane(h.deps);
-    check("a socket that opens is a lane that works — and is closed at once, no audio, no session", ok === true && h.sockets.length === 1 && h.sockets[0].closed === 1 && h.sockets[0].protocols.join() === "xai-client-secret.S");
+    check("a socket on which the far side SPEAKS is a lane that works — and is closed at once, no audio, no session", ok === true && h.sockets.length === 1 && h.sockets[0].closed === 1 && h.sockets[0].protocols.join() === "xai-client-secret.S");
+  }
+  {
+    /* 2026-09-08: a socket that opened and said nothing for ninety-six
+       seconds had passed this probe. Open is not a verdict. */
+    const h = probeDeps({ open: true });
+    check("a socket that opens and says nothing is a lane that does NOT work", (await probeWsLane(h.deps)) === false && h.sockets[0].closed === 1);
   }
   {
     const h = probeDeps({ error: true });
@@ -2880,7 +2890,7 @@ function describeErrorCheck(): boolean {
     check("a socket that never answers is a lane that does not, within the deadline", (await probeWsLane(h.deps)) === false && Date.now() - t0 < 1_000 && h.sockets[0].closed === 1);
   }
   check("a route refusal or a bad envelope opens no socket", (await probeWsLane(probeDeps({ status: 503 }).deps)) === false && (await probeWsLane(probeDeps({ bad: true }).deps)) === false);
-  check("the shipped deadline is three seconds", LANE_PROBE_TIMEOUT_MS === 3_000);
+  check("the shipped deadline is five seconds — our route, the relay, the vendor, its hello", LANE_PROBE_TIMEOUT_MS === 5_000);
   {
     const fs27 = await import("node:fs");
     const btn = fs27.readFileSync("src/components/ai/VoiceCallButton.tsx", "utf8");
@@ -3278,13 +3288,19 @@ function describeErrorCheck(): boolean {
       dg.resp_err === "turn_detected cancelled" && (() => { feed({ type: "response.done", response: { status: "failed", status_details: { error: { message: "x".repeat(400) } } } }); return s.diagnostics().resp_err.length === 120; })());
     check("a response.done with no status, or that is not JSON, changes nothing",
       (() => { const before = s.diagnostics().resp_err; feed({ type: "response.done", response: {} }); ch.onmessage?.({ data: "{not json" }); return s.diagnostics().resp_err === before; })());
+    /* THE WAIT FOR A LOOKUP: from response.created to the parsed tool call. */
+    feed({ type: "response.created", response: { id: "r9" } });
+    await new Promise((r) => setTimeout(r, 25));
+    feed({ type: "response.output_item.added", item: { type: "function_call", call_id: "c9", name: "search_web" } });
+    feed({ type: "response.function_call_arguments.done", call_id: "c9", arguments: "{\"query\":\"x\"}" });
+    check("the wait from a response's creation to its tool call being complete is measured, and the longest kept", s.diagnostics().tool_wait_ms >= 20 && s.diagnostics().tool_calls === 1);
     s.stop();
   }
   check("the beacon carries the canary and the reason, and the route logs them",
     (() => {
       const t = readFileSync("src/lib/voice/telemetry.ts", "utf8");
       const route = readFileSync("src/app/api/ai/voice/telemetry/route.ts", "utf8");
-      return /canary\?: string;\s*resp_err\?: string;/.test(t) && /\(short\(body\.canary, 24\) \? ` canary=\$\{short\(body\.canary, 24\)\}` : ""\)/.test(route) && /\(cause\(body\.resp_err\) \? ` respErr="\$\{cause\(body\.resp_err\)\}"` : ""\)/.test(route);
+      return /canary\?: string;\s*resp_err\?: string;/.test(t) && /tool_wait_ms\?: number;/.test(t) && /\(short\(body\.canary, 24\) \? ` canary=\$\{short\(body\.canary, 24\)\}` : ""\)/.test(route) && /\(cause\(body\.resp_err\) \? ` respErr="\$\{cause\(body\.resp_err\)\}"` : ""\)/.test(route) && /\(num\(body\.tool_wait_ms\) \? ` toolWaitMs=\$\{num\(body\.tool_wait_ms\)\}` : ""\)/.test(route);
     })());
 
   /* THE LANE THAT ARRIVES UNDER A CALL WAITS: the mount effect's answer can

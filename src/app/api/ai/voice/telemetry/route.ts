@@ -80,6 +80,7 @@ export async function POST(req: Request) {
       (num(body.queued_at) ? ` queuedAt=${new Date(num(body.queued_at)).toISOString()}` : "") +
       (short(body.canary, 24) ? ` canary=${short(body.canary, 24)}` : "") +
       (cause(body.resp_err) ? ` respErr="${cause(body.resp_err)}"` : "") +
+      (num(body.tool_wait_ms) ? ` toolWaitMs=${num(body.tool_wait_ms)}` : "") +
       (typeof body.events === "string" && body.events ? ` events=${body.events.replace(/[^\w.:,…-]/g, "").slice(0, 600)}` : ""),
   );
   return new NextResponse(null, { status: 204 });

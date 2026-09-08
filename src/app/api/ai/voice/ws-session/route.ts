@@ -45,7 +45,7 @@ import {
   parseGrokVoiceConfig,
   readGrokVoiceEnv,
   mintClientSecret,
-  grokSocketUrl,
+  browserSocketUrl,
   grokProtocols,
 } from "@/lib/server/ai/voice/grok";
 
@@ -161,12 +161,17 @@ export async function POST(req: Request) {
   const payload = buildVoiceSessionPayload(voice, taughtQuestions, recentTurns, gate.viewer, sttLanguage, null, OPENAI_WIRE);
   /* The voice the session will ask for, by key and vendor id, so "it only
      has one voice" can be read from the log rather than guessed. */
-  console.log(`[ai.voice.ws] session voice=${requested ?? "default"} vendor=${voice?.vendorId ?? "none"} via=${fields.via} probe=${fields.probe}`);
+  /* THE RELAY, WHEN THERE IS ONE (2026-09-08): the browser's socket goes to
+     our own domain, with a ticket the relay checks; the vendor's url stays
+     with the relay. The relay secret is read here, handed to the signer,
+     and appears nowhere else. */
+  const socket = browserSocketUrl(cfg, secret.value, process.env.AI_VOICE_RELAY_SECRET?.trim() || "", Math.floor(Date.now() / 1000));
+  console.log(`[ai.voice.ws] session voice=${requested ?? "default"} vendor=${voice?.vendorId ?? "none"} via=${fields.via} probe=${fields.probe} socket=${socket.via}`);
 
   return NextResponse.json(
     {
       transport: "ws",
-      url: grokSocketUrl(cfg),
+      url: socket.url,
       protocols: grokProtocols(cfg, secret.value),
       expires_at: secret.expiresAt,
       audio: { format: "pcm16", sample_rate: cfg.sampleRate },

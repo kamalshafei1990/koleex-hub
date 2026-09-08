@@ -1,5 +1,7 @@
 import "server-only";
 
+import { createHmac } from "node:crypto";
+
 /* ---------------------------------------------------------------------------
    ai/voice/grok — the second voice lane: a realtime vendor reached over a
    WebSocket from the browser, for callers OUTSIDE mainland China.
@@ -50,6 +52,10 @@ export type GrokVoiceEnv = {
   AI_VOICE_GROK_PROTOCOL?: string;
   /** "off" disables the lane without removing the key. */
   AI_VOICE_GROK_LANE?: string;
+  /** THE RELAY (2026-09-08): when set, browsers open their socket to this
+   *  url — our own domain — and the relay opens the vendor's. The vendor's
+   *  url stays the upstream the relay is configured with. wss: only. */
+  AI_VOICE_RELAY_URL?: string;
 };
 
 export const GROK_DEFAULT_URL = "wss://api.x.ai/v1/realtime";
@@ -83,6 +89,8 @@ export type GrokVoiceConfig = {
   voices: VoiceOption[];
   sampleRate: number;
   protocolTemplate: string;
+  /** The relay's socket url, or null when browsers dial the vendor directly. */
+  relayUrl: string | null;
 };
 
 /** null means the lane is off — no key, a bad url, or an explicit off. The
@@ -108,6 +116,18 @@ export function parseGrokVoiceConfig(env: GrokVoiceEnv): GrokVoiceConfig | null 
   const rate = Number(env.AI_VOICE_GROK_SAMPLE_RATE);
   const sampleRate = Number.isInteger(rate) && rate >= 8_000 && rate <= 48_000 ? rate : GROK_DEFAULT_SAMPLE_RATE;
   const catalogue = (env.AI_VOICE_GROK_VOICES ?? "").trim();
+  /* A relay url that is not wss: is no relay: the lane keeps working
+     directly rather than handing browsers a url they would refuse. */
+  let relayUrl: string | null = null;
+  const relayRaw = (env.AI_VOICE_RELAY_URL ?? "").trim();
+  if (relayRaw) {
+    try {
+      const r = new URL(relayRaw);
+      if (r.protocol === "wss:") relayUrl = r.toString();
+    } catch {
+      relayUrl = null;
+    }
+  }
   return {
     url: u.toString(),
     secretsUrl: s.toString(),
@@ -115,6 +135,7 @@ export function parseGrokVoiceConfig(env: GrokVoiceEnv): GrokVoiceConfig | null 
     voices: parseVoiceOptions(catalogue || GROK_DEFAULT_VOICES),
     sampleRate,
     protocolTemplate,
+    relayUrl,
   };
 }
 
@@ -128,7 +149,46 @@ export function readGrokVoiceEnv(): GrokVoiceEnv {
     AI_VOICE_GROK_SAMPLE_RATE: process.env.AI_VOICE_GROK_SAMPLE_RATE,
     AI_VOICE_GROK_PROTOCOL: process.env.AI_VOICE_GROK_PROTOCOL,
     AI_VOICE_GROK_LANE: process.env.AI_VOICE_GROK_LANE,
+    AI_VOICE_RELAY_URL: process.env.AI_VOICE_RELAY_URL,
   };
+}
+
+/* ── The relay ──────────────────────────────────────────────────────────── */
+
+/** How long a relay ticket lives — the secret's own lifetime; a ticket
+ *  found later is worth nothing. */
+export const RELAY_TICKET_TTL_SEC = GROK_SECRET_TTL_SEC;
+
+/** The relay's admission ticket for one client secret: `exp.sig`, sig =
+ *  HMAC-SHA256(relaySecret, `${token}.${exp}`) as hex — the relay's
+ *  verifyTicket is the mirror (services/voice-relay/server.mjs). Signed
+ *  over the SECRET so a ticket cannot be lent to another connection. The
+ *  relay secret is read by the route and passed in; it lives in no config
+ *  object. Pure. */
+export function signRelayTicket(relaySecret: string, token: string, expSec: number): string {
+  const sig = createHmac("sha256", relaySecret).update(`${token}.${expSec}`).digest("hex");
+  return `${expSec}.${sig}`;
+}
+
+/** The socket url a browser opens when the relay is in use: the relay's
+ *  url with the ticket and, when configured, the model the relay passes to
+ *  the vendor. The vendor's own url is never in it. Pure. */
+export function relaySocketUrl(cfg: GrokVoiceConfig, ticket: string): string | null {
+  if (!cfg.relayUrl) return null;
+  const u = new URL(cfg.relayUrl);
+  u.searchParams.set("t", ticket);
+  if (cfg.model) u.searchParams.set("model", cfg.model);
+  return u.toString();
+}
+
+/** The url the browser is handed: the relay's when configured and a relay
+ *  secret is present, else the vendor's. The route logs which. Pure. */
+export function browserSocketUrl(cfg: GrokVoiceConfig, token: string, relaySecret: string, nowSec: number): { url: string; via: "relay" | "direct" } {
+  if (cfg.relayUrl && relaySecret) {
+    const url = relaySocketUrl(cfg, signRelayTicket(relaySecret, token, nowSec + RELAY_TICKET_TTL_SEC));
+    if (url) return { url, via: "relay" };
+  }
+  return { url: grokSocketUrl(cfg), via: "direct" };
 }
 
 /** The socket url the browser opens: the endpoint, with the model as a
