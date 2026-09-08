@@ -450,6 +450,27 @@ is on a working call in seconds instead of staring at "Still connecting".
 A redial's open socket is likewise the call back only on its first event.
 The canary and `respErr` stay as they were.
 
+## The vendor, opened from our own function (2026-09-08 06:47)
+
+After #380 the same shape came from the owner's Mac, through the VPN
+("Connected" in the menu bar): the handshake arrived (`POST ws-session
+200` at 06:47:39 and 06:47:52), the socket opened, nothing came down it.
+Two devices, one tunnel, one silence — and nothing of ours had ever
+opened that socket from anywhere but a browser, so "the vendor is silent
+for everyone" and "that path is a stalled tunnel" were the same log.
+
+The watchdog now opens the socket lane from our own function every
+fifteen minutes (`grok-probe.ts`, from Tokyo and Singapore): a secret is
+minted with the real key, the socket is dialled exactly as a browser dials
+it, and the line says whether the far side SPOKE — `[ai.voice.watch]
+socket ok|fail verdict=spoke|silent|refused|no-secret afterMs= openMs=
+first=<event type> close=<code>`. No audio is sent, no model answers; the
+socket is closed on the first event. `spoke` from our function beside
+`silent` from the owner's devices puts the fault on the path between those
+devices and the vendor — which no client change can fix, and which the
+fall-back now handles in seconds. `silent` from our function too would be
+the vendor's, and the next thing to raise with them.
+
 ## Owner-side (not code)
 
 - Activate the realtime voice model on the Beijing workspace (still `403 Unpurchased`), so mainland callers get the mainland endpoint.

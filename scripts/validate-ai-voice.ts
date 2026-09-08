@@ -773,8 +773,8 @@ console.log("\n── 8. What the client may know, and what it may not ──");
       /import \{ probeVoice \} from "@\/lib\/server\/ai\/voice\/probe"/.test(bare) &&
       /probeVoice\(r\.env, fetch, WATCH_TIMEOUT_MS\)/.test(bare) &&
       /readAltVoiceEnv\(\)/.test(bare));
-    check("  …with the shared env reader, not a private copy of the variable list",
-      /readVoiceEnv\(\)/.test(bare) && !/process\.env\.AI_VOICE_/.test(bare));
+    check("  …with the shared env reader, not a private copy of the variable list — the socket lane's key is the one variable read here, for its own probe",
+      /readVoiceEnv\(\)/.test(bare) && /readGrokVoiceEnv\(\)/.test(bare) && (bare.match(/process\.env\.AI_VOICE_/g) ?? []).length === 1 && /process\.env\.AI_VOICE_GROK_API_KEY\?\.trim\(\)/.test(bare));
     check("  …and never calls fetch itself", !/\bfetch\(/.test(bare));
 
     /* THE SAME BUDGET A CALL GETS. Read both constants out of the source and
@@ -812,9 +812,12 @@ console.log("\n── 8. What the client may know, and what it may not ──");
       /configured: false/.test(bare));
 
     /* NEVER THE URL, NEVER THE KEY, NEVER THE VENDOR'S WORDS. */
-    check("no endpoint, key or vendor text can reach the log or the response",
+    check("no endpoint, key or vendor text can reach the log or the response — the socket lane's key goes to its probe and nowhere else",
       !/sdpUrl/.test(bare) && !/apiKey/.test(bare) && !/AI_VOICE_API_KEY/.test(bare) &&
-      !/AI_VOICE_BASE_URL/.test(bare) && !/verdict/.test(bare));
+      !/AI_VOICE_BASE_URL/.test(bare) && !/probe\.verdict/.test(bare) && (bare.match(/grokKey/g) ?? []).length === 3 &&
+      /probeGrokSocket\(grokCfg, grokKey, \{ timeoutMs: SOCKET_PROBE_TIMEOUT_MS \}\)/.test(bare) &&
+      /verdict=\$\{socket\.verdict\} `\s*\+\s*`afterMs=\$\{socket\.ms\} openMs=\$\{socket\.openMs \?\? "none"\} first=\$\{socket\.first \?\? "none"\} close=\$\{socket\.closeCode \?\? "none"\}/.test(bare) &&
+      !/secret\.value/.test(bare) && !/socketUrl|grokSocketUrl/.test(bare));
     check("route files export handlers and config only",
       (bare.match(/^export /gm) ?? []).length === 3 &&
       /export const dynamic/.test(bare) && /export const maxDuration/.test(bare) &&
@@ -1425,6 +1428,71 @@ console.log("\n── 8. What the client may know, and what it may not ──");
       /const gate = await authorizeVoice\(req\);/.test(route) && /BUDGETS\.voicePreviewPerAccount\(\)/.test(route) && BUDGETS.voicePreviewPerAccount().max === 20 &&
       /resolveVoice\(grok\.voices, key\);\s*if \(!voice\) return refuse\(404\);/.test(route) && /resolveVoice\(cfg\.voices, key\);\s*if \(!voice\) return refuse\(404\);/.test(route) &&
       /"Cache-Control": "private, max-age=604800"/.test(route) && /fetchPreviewAudio\(plan, \{ assertSafeUrl \}\)/.test(route) && !/api\.x\.ai|dashscope/.test(route));
+  }
+
+  console.log("\n── 21. The socket lane, opened from our own function: does the vendor speak? ──");
+  {
+    /* 2026-09-08 06:21–06:47: from a phone and a Mac through a VPN the
+       vendor's socket opened and said nothing. Nothing of ours had opened
+       it from anywhere but a browser; now the watchdog does, and says
+       whether the far side SPOKE. */
+    const { probeGrokSocket, SOCKET_PROBE_TIMEOUT_MS } = await import("../src/lib/server/ai/voice/grok-probe");
+    const { parseGrokVoiceConfig, GROK_DEFAULT_URL } = await import("../src/lib/server/ai/voice/grok");
+    const cfg = parseGrokVoiceConfig({ AI_VOICE_GROK_API_KEY: "xai-REAL-KEY", AI_VOICE_GROK_URL: GROK_DEFAULT_URL, AI_VOICE_GROK_MODEL: "grok-voice-1" } as never);
+    const KEY = "xai-REAL-KEY";
+    type Sock = { url: string; protocols: string[]; closed: number; onopen: ((e: unknown) => void) | null; onmessage: ((e: { data: unknown }) => void) | null; onclose: ((e: unknown) => void) | null; onerror: ((e: unknown) => void) | null; send(): void; close(): void };
+    const socks: Sock[] = [];
+    const make = (url: string, protocols: string[]): Sock => {
+      const sock: Sock = { url, protocols, closed: 0, onopen: null, onmessage: null, onclose: null, onerror: null, send() {}, close() { sock.closed++; } };
+      socks.push(sock);
+      return sock;
+    };
+    const mint: Array<{ url: string; auth: string }> = [];
+    const fetchOk = (async (url: string, init: RequestInit) => { mint.push({ url, auth: String((init.headers as Record<string, string>).Authorization) }); return { ok: true, status: 200, json: async () => ({ value: "SECRET-1", expires_at: 1 }) } as unknown as Response; }) as unknown as typeof fetch;
+    check("the probe has a ceiling of its own that fits inside the watchdog's", SOCKET_PROBE_TIMEOUT_MS === 8_000 && cfg !== null);
+    if (cfg) {
+      /* SPOKE: the far side's first event, whatever it is. */
+      const p1 = probeGrokSocket(cfg, KEY, { fetchFn: fetchOk, createWebSocket: make, timeoutMs: 500 });
+      await new Promise((r) => setTimeout(r, 5));
+      const s1 = socks[0];
+      check("the socket is dialled exactly as a browser dials it: the composed url with the model, the subprotocol carrying the minted secret — the real key only ever in the mint",
+        mint.length === 1 && mint[0].auth === `Bearer ${KEY}` && s1.url === `${GROK_DEFAULT_URL}?model=grok-voice-1` && s1.protocols.join() === "xai-client-secret.SECRET-1");
+      s1.onopen?.({});
+      s1.onmessage?.({ data: JSON.stringify({ type: "session.created", session: { id: "sess_1" } }) });
+      const r1 = await p1;
+      check("a far side that speaks is `spoke`, with the first event's TYPE and the open time — and the socket is closed at once, nothing sent",
+        r1.verdict === "spoke" && r1.first === "session.created" && r1.openMs !== null && r1.openMs >= 0 && r1.closeCode === null && s1.closed === 1);
+      /* SILENT: open, and nothing by the deadline. */
+      const p2 = probeGrokSocket(cfg, KEY, { fetchFn: fetchOk, createWebSocket: make, timeoutMs: 60 });
+      await new Promise((r) => setTimeout(r, 5));
+      socks[1].onopen?.({});
+      const r2 = await p2;
+      check("a socket that opens and says nothing by the deadline is `silent` — the stalled-tunnel shape, told apart from a refusal", r2.verdict === "silent" && r2.openMs !== null && r2.first === null && socks[1].closed === 1);
+      /* REFUSED: closed before a word, with the code. */
+      const p3 = probeGrokSocket(cfg, KEY, { fetchFn: fetchOk, createWebSocket: make, timeoutMs: 500 });
+      await new Promise((r) => setTimeout(r, 5));
+      socks[2].onerror?.({});
+      socks[2].onclose?.({ code: 1008 });
+      const r3 = await p3;
+      check("a socket closed before a word is `refused`, with the close code", r3.verdict === "refused" && r3.closeCode === 1008 && r3.first === null);
+      /* NEVER OPENED by the deadline: refused too. */
+      const p4 = probeGrokSocket(cfg, KEY, { fetchFn: fetchOk, createWebSocket: make, timeoutMs: 60 });
+      const r4 = await p4;
+      check("a socket that never opens by the deadline is `refused` with no open time", r4.verdict === "refused" && r4.openMs === null);
+      /* NO SECRET: the mint failed; no socket is dialled. */
+      const before = socks.length;
+      const r5 = await probeGrokSocket(cfg, KEY, { fetchFn: (async () => ({ ok: false, status: 401, json: async () => ({}) })) as unknown as typeof fetch, createWebSocket: make, timeoutMs: 60 });
+      check("a mint that fails is `no-secret`, and no socket is dialled", r5.verdict === "no-secret" && socks.length === before);
+      /* UNREADABLE first event: a type, never a substring. */
+      const p6 = probeGrokSocket(cfg, KEY, { fetchFn: fetchOk, createWebSocket: make, timeoutMs: 500 });
+      await new Promise((r) => setTimeout(r, 5));
+      socks[socks.length - 1].onmessage?.({ data: "not json <session.created>" });
+      const r6 = await p6;
+      check("an unreadable first event is still `spoke`, its type `?` — never text from the wire", r6.verdict === "spoke" && r6.first === "?");
+      const src = readFileSync("src/lib/server/ai/voice/grok-probe.ts", "utf8");
+      check("the probe never logs, never returns the secret or the url, and has no WebSocket in the suite's runtime path unless handed one",
+        !/console\./.test(src) && /typeof WebSocket === "undefined"/.test(src) && (src.match(/secret\.value/g) ?? []).length === 1 && /grokProtocols\(cfg, secret\.value\)/.test(src) && !/resolve\(done\([^)]*secret/.test(src));
+    }
   }
 
   console.log(`\n${pass} passed, ${failures.length} failed`);
