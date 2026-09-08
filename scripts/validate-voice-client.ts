@@ -895,8 +895,8 @@ async function main() {
     const hangUp = btn.slice(hangUpAt, btn.indexOf("}, [", hangUpAt));
     check("hanging up drops the metered streams",
       /setMicStream\(null\)/.test(hangUp) && /setFarStream\(null\)/.test(hangUp));
-    check("only the side that is making sound is metered",
-      /useStreamLevel\(micStream, listening\)/.test(btn) &&
+    check("only the side that is making sound is metered — and on the socket lane the stream meters get no stream at all",
+      /useStreamLevel\(wsLane \? null : micStream, listening\)/.test(btn) &&
       /phase === "speaking"/.test(btn));
   }
 
@@ -2598,6 +2598,7 @@ function describeErrorCheck(): boolean {
         flush: () => { a.flushes++; },
         close: () => { a.closed++; },
         playSample: async (bytes) => { a.samples.push(bytes.byteLength); return true; },
+        levels: () => ({ mic: 0.25, far: 0.5 }),
       };
     };
     const states: Array<[VoiceState, VoiceFailure | undefined]> = [];
@@ -2744,6 +2745,8 @@ function describeErrorCheck(): boolean {
     r.sockets[0].message(JSON.stringify({ type: "response.output_audio.delta", response_id: "r2", delta: "Rg==" }));
     check("  …a cancelled response is silenced the same way", r.audios[0].flushes === 2 && r.audios[0].played.join() === "QQ==,RA==");
     const sentBefore = r.sockets[0].sent.length;
+    check("the orb's meters on the socket lane come from the call's own audio — the session hands them through, null on the other lane",
+      JSON.stringify(r.s.levels()) === JSON.stringify({ mic: 0.25, far: 0.5 }));
     check("a voice sample on the socket lane plays through the call's OWN audio (no second context under a live microphone)",
       (() => { const pr = r.s.previewAudio(new ArrayBuffer(7)); return pr !== null && r.audios[0].samples.join() === "7"; })());
     check("a response request goes out on the open socket as one response.create with instructions",
@@ -3106,6 +3109,36 @@ function describeErrorCheck(): boolean {
       /const keptMic = sessionRef\.current\?\.takeMicrophone\(\) \?\? null;\s*sessionRef\.current = null;\s*if \(keptMic && !canResume\) keptMic\.getTracks\(\)\.forEach\(\(t\) => t\.stop\(\)\);/.test(btn) &&
       /if \(kept && kept\.getAudioTracks\(\)\.some\(\(t\) => t\.readyState === "live"\)\) \{\s*deps\.getMicrophone = async \(\) => kept;/.test(btn));
   }
+}
+
+{
+  console.log("\n── 32. No second audio context touches the microphone on the socket lane ──");
+  /* 2026-09-08: "still a strange voice and noise while I am talking and
+     the AI is listening" — after the sample player was moved into the
+     call's context. The orb's meters were the other two contexts: one
+     over the microphone stream, one over the far stream, opened beside
+     the call's own. On a phone, two contexts on one live microphone
+     garble the second one's reader — noise exactly while the caller
+     speaks. */
+  const { rmsLevel, DISPLAY_GAIN, LEVEL_EPSILON } = await import("../src/lib/voice/level");
+  const { readFileSync } = await import("node:fs");
+  const silent = new Uint8Array(512).fill(128);
+  const loud = new Uint8Array(512).fill(128 + 64);
+  check("the meter's arithmetic is one pure function: silence is 0, a steady half-scale wave reads its RMS times the display gain, clamped to 1",
+    rmsLevel(silent) === 0 && Math.abs(rmsLevel(loud) - Math.min(1, 0.5 * DISPLAY_GAIN)) < 1e-9 && rmsLevel(new Uint8Array(0)) === 0 && rmsLevel(new Uint8Array(512).fill(255)) === 1 && DISPLAY_GAIN === 2.8 && LEVEL_EPSILON === 0.02);
+  const wa = readFileSync("src/lib/voice/ws-audio.ts", "utf8");
+  check("the socket lane's audio meters both sides INSIDE its own context: an analyser on the output, one on the microphone source, read on demand",
+    /const farMeter = ctx\.createAnalyser\(\);/.test(wa) && /out\.connect\?\.\(farMeter\);/.test(wa) && /micMeter = ctx\.createAnalyser\(\);[\s\S]{0,120}?source\.connect\(micMeter\);/.test(wa) &&
+    /levels\(\) \{\s*return \{ mic: read\(micMeter\), far: read\(farMeter\) \};/.test(wa) && /return rmsLevel\(meterBuf\);/.test(wa) && (wa.match(/meterMic\(\);/g) ?? []).length === 2);
+  const hook = readFileSync("src/lib/voice/useStreamLevel.ts", "utf8");
+  check("  …the stream meter shares the arithmetic and no longer carries its own copy", /const next = rmsLevel\(buf\);/.test(hook) && !/DISPLAY_GAIN = 2\.8/.test(hook));
+  const btn = readFileSync("src/components/ai/VoiceCallButton.tsx", "utf8");
+  check("the button gives the stream meters NO stream on the socket lane and reads the session's levels instead; the lane is state set when the call starts",
+    /const micLevelRtc = useStreamLevel\(wsLane \? null : micStream, listening\);/.test(btn) && /const farLevelRtc = useStreamLevel\(wsLane \? null : farStream, connected && phase === "speaking"\);/.test(btn) &&
+    /const wsLevels = useSessionLevels\(sessionRef, wsLane && connected\);/.test(btn) && /const micLevel = wsLane \? wsLevels\.mic : micLevelRtc;/.test(btn) &&
+    /if \(sessionRef\.current\) return;\s*setLaneState\(transportRef\.current\);/.test(btn));
+  const sl = readFileSync("src/lib/voice/useSessionLevels.ts", "utf8");
+  check("  …the session-levels hook polls once a frame, only while active, and tells React only when a level moved", /requestAnimationFrame\(tick\)/.test(sl) && /if \(!active\) return;/.test(sl) && /LEVEL_EPSILON/.test(sl) && !/new (Ctor|AudioContext)\(/.test(sl));
 }
 
 console.log(`\n${pass} passed, ${failures.length} failed`);

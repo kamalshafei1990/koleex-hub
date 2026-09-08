@@ -32,3 +32,24 @@ export function stepLevel(current: number, target: number, attack = LEVEL_ATTACK
      and the rings stop moving instead of trembling. */
   return Math.abs(next - t) < 0.002 ? t : next;
 }
+
+/* ── The meter itself ─────────────────────────────────────────────────── */
+
+/** Speech RMS sits well below 1.0 even when someone is speaking clearly, so
+ *  the raw value would leave the orb barely moving. A display gain, not a
+ *  measurement. */
+export const DISPLAY_GAIN = 2.8;
+/** How much the level must move before a render is worth it. */
+export const LEVEL_EPSILON = 0.02;
+
+/** 0..1 from an analyser's byte time-domain window: samples 0..255 centred
+ *  on 128, root-mean-square over the window, display gain, clamped. Pure. */
+export function rmsLevel(buf: Uint8Array, gain = DISPLAY_GAIN): number {
+  if (buf.length === 0) return 0;
+  let sum = 0;
+  for (let i = 0; i < buf.length; i++) {
+    const v = (buf[i] - 128) / 128;
+    sum += v * v;
+  }
+  return Math.min(1, Math.sqrt(sum / buf.length) * gain);
+}

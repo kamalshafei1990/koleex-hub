@@ -23,20 +23,22 @@
    --------------------------------------------------------------------------- */
 
 import { useEffect, useRef, useState } from "react";
+import { rmsLevel, LEVEL_EPSILON } from "./level";
 
 /* Small enough to feel immediate, large enough that one noisy sample does not
    move the number. 512 samples is ~11ms at 48kHz. */
-const FFT_SIZE = 512;
+export const FFT_SIZE = 512;
 
-/* Speech RMS sits well below 1.0 even when someone is speaking clearly, so the
-   raw value would leave the orb barely moving. This maps a realistic speaking
-   range onto the full 0..1 the orb expects. It is a display gain, not a
-   measurement — nothing downstream treats it as an absolute level. */
-const DISPLAY_GAIN = 2.8;
-
-/* How much the level must move before React is told. Below this the change is
-   invisible and the render is pure cost. */
-const LEVEL_EPSILON = 0.02;
+/* NOT ON THE SOCKET LANE (2026-09-08: "still a strange voice and noise
+   while I am talking and the AI is listening"). This hook opens its own
+   AudioContext over the microphone stream. On the WebRTC lane that is
+   harmless — the browser carries the call's audio itself. On the socket
+   lane the call's audio is ANOTHER AudioContext reading the same
+   microphone, and a phone with two contexts on one live microphone
+   garbles the second one's reader — heard as noise exactly while the
+   caller speaks. The socket lane meters inside its own context
+   (ws-audio.ts levels, useSessionLevels); the button passes this hook a
+   null stream there. */
 
 /**
  * Returns 0..1 while `stream` is non-null and `active` is true, and 0
@@ -115,15 +117,7 @@ export function useStreamLevel(stream: MediaStream | null, active: boolean): num
     const tick = () => {
       if (stopped) return;
       analyser.getByteTimeDomainData(buf);
-      /* Samples are 0..255 centred on 128. Subtract the centre, normalise,
-         then take the root-mean-square over the window. */
-      let sum = 0;
-      for (let i = 0; i < buf.length; i++) {
-        const v = (buf[i] - 128) / 128;
-        sum += v * v;
-      }
-      const rms = Math.sqrt(sum / buf.length);
-      const next = Math.min(1, rms * DISPLAY_GAIN);
+      const next = rmsLevel(buf);
       /* ONLY WHEN IT MEANINGFULLY MOVED. Calling setState every animation
          frame re-renders the whole call screen sixty times a second for
          changes far below what an eye can see — on a phone that is the

@@ -40,6 +40,8 @@
    Injectable, so the suite drives the session with a double.
    --------------------------------------------------------------------------- */
 
+import { rmsLevel } from "./level";
+
 export type WsAudio = {
   /** The far side, as a stream the UI can attach and meter. */
   readonly stream: MediaStream;
@@ -61,6 +63,11 @@ export type WsAudio = {
    *  here, through the same output the voice uses. Resolves when it ended;
    *  false when it could not be decoded or was stopped. */
   playSample(bytes: ArrayBuffer): Promise<boolean>;
+  /** HOW LOUD, BOTH WAYS, FROM THIS CONTEXT (2026-09-08). The orb's meters
+   *  used to open their own AudioContext over the microphone; on a phone
+   *  that garbled this context's reader. Two analysers here, one on the
+   *  microphone, one on everything played, read on demand. 0..1 each. */
+  levels(): { mic: number; far: number };
 };
 
 /* Linear resampling — a phone microphone into a speech model does not need
@@ -237,6 +244,8 @@ export class JitterQueue<T> {
 /* ── Capture ────────────────────────────────────────────────────────────── */
 
 export const FRAME_SAMPLES = 4096;
+/** The meters' window: ~11 ms at 48 kHz. */
+export const METER_FFT_SIZE = 512;
 
 /** The worklet, as source. It collects the input into frames of
  *  FRAME_SAMPLES and posts each as a Float32Array (transferred, not
@@ -285,6 +294,18 @@ export function createBrowserWsAudio(wireRate: number): WsAudio {
   let closed = false;
   let sample: { node: AudioBufferSourceNode; stop: () => void } | null = null;
   const playing = new Set<AudioBufferSourceNode>();
+  /* The two meters. The far one hangs off the output the voice and the
+     samples already go to; the microphone one is wired when capture starts. */
+  const farMeter = ctx.createAnalyser();
+  farMeter.fftSize = METER_FFT_SIZE;
+  out.connect?.(farMeter);
+  let micMeter: AnalyserNode | null = null;
+  const meterBuf = new Uint8Array(METER_FFT_SIZE);
+  const read = (a: AnalyserNode | null): number => {
+    if (!a) return 0;
+    a.getByteTimeDomainData(meterBuf);
+    return rmsLevel(meterBuf);
+  };
   const jitter = new JitterQueue<AudioBufferSourceNode>({
     now: () => ctx.currentTime,
     start: (node, at) => {
@@ -308,8 +329,15 @@ export function createBrowserWsAudio(wireRate: number): WsAudio {
     node.connect(silence);
     silence.connect(ctx.destination);
   };
+  const meterMic = () => {
+    if (!source || micMeter) return;
+    micMeter = ctx.createAnalyser();
+    micMeter.fftSize = METER_FFT_SIZE;
+    source.connect(micMeter);
+  };
   const startProcessor = (mic: MediaStream, onFrame: (b64: string) => void) => {
     source = ctx.createMediaStreamSource(mic);
+    meterMic();
     processor = ctx.createScriptProcessor(FRAME_SAMPLES, 1, 1);
     processor.onaudioprocess = (ev: AudioProcessingEvent) => emit(onFrame, ev.inputBuffer.getChannelData(0));
     source.connect(processor);
@@ -322,6 +350,7 @@ export function createBrowserWsAudio(wireRate: number): WsAudio {
       await ctx.audioWorklet.addModule(url);
       if (closed) return true;
       source = ctx.createMediaStreamSource(mic);
+      meterMic();
       worklet = new AudioWorkletNode(ctx, CAPTURE_WORKLET_NAME, { numberOfInputs: 1, numberOfOutputs: 1, channelCount: 1 });
       worklet.port.onmessage = (ev: MessageEvent) => {
         if (ev.data instanceof Float32Array) emit(onFrame, ev.data);
@@ -375,6 +404,9 @@ export function createBrowserWsAudio(wireRate: number): WsAudio {
         }
       }
       playing.clear();
+    },
+    levels() {
+      return { mic: read(micMeter), far: read(farMeter) };
     },
     playSample(bytes) {
       /* Whatever the far side was saying yields to the sample. */
