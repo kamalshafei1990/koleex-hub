@@ -225,6 +225,7 @@ function deps(opts: {
   voiceKey?: string | null;
   reconnectGraceMs?: number;
   liveGraceMs?: number;
+  wsFirstEventMs?: number;
 }): { deps: VoiceDeps; mic: ReturnType<typeof fakeMic>; ice: (state: string) => void; conn: (state: string) => void; pcCalls: { closed: number; added: number; remoteSdp: string; channels: string[]; sent: string[]; channel: FakeChannel | null; gathered: boolean; postedAfterGathering: boolean | null } } {
   const bodyReads: number[] = [];
   void bodyReads;
@@ -247,6 +248,7 @@ function deps(opts: {
       iceTimeoutMs: 60,
       reconnectGraceMs: opts.reconnectGraceMs ?? 80,
       liveGraceMs: opts.liveGraceMs ?? opts.reconnectGraceMs ?? 80,
+      ...(opts.wsFirstEventMs !== undefined ? { wsFirstEventMs: opts.wsFirstEventMs } : {}),
     fetchFn: (async (url: string, init?: RequestInit) => {
         opts.recorded?.push({ url: String(url), init });
         /* First post only: later ones (the tool relay) are not this question. */
@@ -2566,9 +2568,9 @@ function describeErrorCheck(): boolean {
     session_compact: { type: "session.update", session: { modalities: ["text", "audio"] } },
     ...over,
   });
-  const laneRun = async (opts: { envelope?: unknown; status?: number; noSocket?: boolean; noAudio?: boolean; reconnectGraceMs?: number; failFetch?: number } = {}) => {
+  const laneRun = async (opts: { envelope?: unknown; status?: number; noSocket?: boolean; noAudio?: boolean; reconnectGraceMs?: number; wsFirstEventMs?: number; failFetch?: number } = {}) => {
     const recorded: Recorded[] = [];
-    const d = deps({ recorded, reconnectGraceMs: opts.reconnectGraceMs });
+    const d = deps({ recorded, reconnectGraceMs: opts.reconnectGraceMs, wsFirstEventMs: opts.wsFirstEventMs });
     const base = d.deps.fetchFn;
     const sockets: FakeSocket[] = [];
     const audios: FakeAudio[] = [];
@@ -2626,18 +2628,20 @@ function describeErrorCheck(): boolean {
     check("  …and never the SDP route", !r.recorded.some((x) => x.url.startsWith(HANDSHAKE_PATH)));
     check("the socket is opened to the url the server named, with the subprotocol the server composed — the secret travels there and nowhere else",
       r.sockets.length === 1 && r.sockets[0].url === "wss://voice.example/v1/realtime" && r.sockets[0].protocols.join() === "xai-client-secret.SECRET-1");
-    check("the call is live once the socket is opening, with the microphone announced first", r.s.getState() === "live" && r.states.map(([st]) => st).join(">") === "requesting-mic>connecting>live");
+    /* 2026-09-08 06:21: a socket that opened and said nothing for ninety-six
+       seconds. Live is the far side's first word now, not the socket. */
+    check("the call is still connecting while the socket opens, with the microphone announced first — live is the far side's first event", r.s.getState() === "connecting" && r.states.map(([st]) => st).join(">") === "requesting-mic>connecting");
     check("  …nothing is sent on a socket that has not opened", r.sockets[0].sent.length === 0);
     check("  …and the audio is built at the wire rate the server named", r.audios.length === 1 && r.audios[0].rate === 24_000);
     const before = pendingTimers();
     r.sockets[0].open();
-    check("an OPEN socket is the transport up: the watchdog is disarmed and the diagnostics say so", pendingTimers() === before - 1 && r.s.diagnostics().ice_ever_connected === true && r.s.diagnostics().ice === "ws1" && r.s.diagnostics().dc === "open");
+    check("an OPEN socket is NOT the transport up: the wait for the first event stands, the diagnostics show the socket open and nothing heard", pendingTimers() === before && r.s.diagnostics().ice_ever_connected === false && r.s.getState() === "connecting" && r.s.diagnostics().ice === "ws1" && r.s.diagnostics().dc === "open");
     check("  …the server's session goes out first, unchanged", r.sockets[0].sent.length === 1 && r.sockets[0].sent[0] === JSON.stringify(wsEnvelope().session));
     check("  …the far side's stream is handed to the screen and the microphone reader starts", r.remote.length === 1 && r.remote[0] === r.audios[0].stream && r.audios[0].captureStarted);
     r.audios[0].frame?.("AAAA");
     check("a microphone frame goes up as input_audio_buffer.append", r.sockets[0].sent.length === 2 && r.sockets[0].sent[1] === JSON.stringify({ type: "input_audio_buffer.append", audio: "AAAA" }));
     r.sockets[0].message(JSON.stringify({ type: "session.updated" }));
-    check("the acknowledgement fires ready, exactly as on the other lane", r.ready() === 1);
+    check("the acknowledgement fires ready, exactly as on the other lane — and the far side's first word is what makes the call live", r.ready() === 1 && r.s.getState() === "live" && r.s.diagnostics().ice_ever_connected === true && pendingTimers() === before - 1);
     r.sockets[0].message(JSON.stringify({ type: "response.audio.delta", delta: "QUJD" }));
     check("a voice frame from the far side is played", r.audios[0].played.join() === "QUJD");
     r.sockets[0].message(JSON.stringify({ type: "input_audio_buffer.speech_started" }));
@@ -2656,6 +2660,7 @@ function describeErrorCheck(): boolean {
   {
     const r = await laneRun({ reconnectGraceMs: 80 });
     r.sockets[0].open();
+    r.sockets[0].message(JSON.stringify({ type: "session.created" }));
     r.sockets[0].drop();
     check("a socket that closes under a live call is a recovery state first", r.s.getState() === "reconnecting");
     await sleep(160);
@@ -2663,10 +2668,35 @@ function describeErrorCheck(): boolean {
     check("  …and after the window the call is over, honestly — a dropped connection the button may resume", last[0] === "failed" && last[1] === "connection-lost" && r.sockets[0].closed === 1 && r.audios[0].closed === 1);
   }
   {
-    const r = await laneRun({ reconnectGraceMs: 80 });
+    const r = await laneRun({ wsFirstEventMs: 80 });
     await sleep(160);
     const last = r.states[r.states.length - 1];
     check("a socket that never opens is the service not answering — not a dropped call to resume", last[0] === "failed" && last[1] === "service-unreachable" && r.mic.allStopped());
+  }
+  {
+    /* THE STALLED TUNNEL (2026-09-08 06:21): open, and silent. */
+    const r = await laneRun({ wsFirstEventMs: 80 });
+    r.sockets[0].open();
+    check("a socket that opens is still not a call", r.s.getState() === "connecting" && r.sockets[0].sent.length === 1);
+    await sleep(160);
+    const last = r.states[r.states.length - 1];
+    check("a socket that opens and says nothing by the deadline is the service not answering — the fall-back's shape, never 'connection-lost'", last[0] === "failed" && last[1] === "service-unreachable" && r.mic.allStopped() && r.sockets[0].closed === 1 && r.states.every(([st]) => st !== "live" && st !== "reconnecting"));
+  }
+  {
+    const r = await laneRun({ wsFirstEventMs: 5_000 });
+    r.sockets[0].open();
+    const armed = pendingTimers();
+    r.sockets[0].drop();
+    const last = r.states[r.states.length - 1];
+    check("a socket that closes before the far side's first word fails at once as the service not answering — no waiting out the deadline", last[0] === "failed" && last[1] === "service-unreachable" && pendingTimers() === armed - 1);
+  }
+  {
+    const r = await laneRun({ wsFirstEventMs: 80 });
+    r.sockets[0].open();
+    r.sockets[0].message(JSON.stringify({ type: "session.created" }));
+    await sleep(160);
+    check("the first event, whatever it is, makes the call live and ends the wait", r.s.getState() === "live" && r.s.diagnostics().ice_ever_connected === true && r.states.every(([st]) => st !== "failed"));
+    r.s.stop();
   }
   {
     const r = await laneRun({ status: 502 });
@@ -2707,7 +2737,7 @@ function describeErrorCheck(): boolean {
   }
   {
     const r = await laneRun({ failFetch: 1 });
-    check("the handshake POST dropped by the link is posted once more, as on the other lane", r.recorded.filter((x) => x.url.startsWith(WS_SESSION_PATH)).length === 2 && r.s.getState() === "live");
+    check("the handshake POST dropped by the link is posted once more, as on the other lane", r.recorded.filter((x) => x.url.startsWith(WS_SESSION_PATH)).length === 2 && r.s.getState() === "connecting" && r.sockets.length === 1);
     r.s.stop();
   }
   {
@@ -2773,7 +2803,9 @@ function describeErrorCheck(): boolean {
     check("  …a new secret is asked for and a NEW socket dialled at once, on the same microphone and audio",
       r.recorded.filter((x) => x.url.startsWith(WS_SESSION_PATH)).length === postsBefore + 1 && r.sockets.length === 2 && r.audios.length === 1 && !r.mic.allStopped() && r.s.diagnostics().ws_reconnects === 1);
     r.sockets[1].open();
-    check("  …and the open socket is the call back: live, the session configured afresh on the new socket, no failure shown",
+    check("  …an open redial is not yet the call back: reconnecting until the far side speaks on it", r.s.getState() === "reconnecting" && r.sockets[1].sent.length === 1);
+    r.sockets[1].message(JSON.stringify({ type: "ping" }));
+    check("  …and the far side's first word on the new socket is the call back: live, the session configured afresh on the new socket, no failure shown",
       r.s.getState() === "live" && r.sockets[1].sent.length === 1 && /session\.update/.test(r.sockets[1].sent[0]) && r.states.every(([st]) => st !== "failed"));
     r.sockets[1].message(JSON.stringify({ type: "response.output_audio.delta", delta: "QQ==" }));
     r.audios[0].frame?.("BBBB");

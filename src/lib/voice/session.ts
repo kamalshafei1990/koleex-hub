@@ -222,6 +222,8 @@ export type VoiceDeps = {
   reconnectGraceMs?: number;
   /** Test seam for the window a call that WAS up gets to come back. */
   liveGraceMs?: number;
+  /** Test seam for the socket lane's wait for the far side's first event. */
+  wsFirstEventMs?: number;
   /** Test seam for the per-call cap, so the loop guard can be proved without
    *  making a dozen round trips. */
   maxToolCallsPerSession?: number;
@@ -297,6 +299,16 @@ export const WS_HANDSHAKE_TIMEOUT_MS = 15_000;
 const WS_CANARY_AFTER_MS = 4_000;
 const WS_CANARY_TIMEOUT_MS = 5_000;
 export const CANARY_PATH = "/api/version";
+/* A SOCKET THAT OPENS AND SAYS NOTHING IS NOT A CALL (2026-09-08 06:21: the
+   socket to the vendor opened — readyState 1 — and for ninety-six seconds
+   not one event came down it, while the screen said "Still connecting" and
+   the caller waited; the canary to our own origin timed out in the same
+   seconds. A stalled tunnel keeps a connection "open" and moves nothing on
+   it.) On this lane the transport is up when the far side has SPOKEN — its
+   first event — not when the socket says open. A first dial whose socket
+   has said nothing in this long is the service not answering: the call
+   fails as such, and the button's fall-back to the mainland lane runs. */
+export const WS_FIRST_EVENT_MS = 7_000;
 /** The pause before the one retry of a handshake the link dropped. */
 const HANDSHAKE_RETRY_DELAY_MS = 800;
 
@@ -493,6 +505,8 @@ export class VoiceSession {
   /** The canary's outcome beside a slow socket-lane handshake (see
    *  WS_CANARY_AFTER_MS): "" until one ran. */
   private canary = "";
+  /** The socket lane's wait for the far side's first event (WS_FIRST_EVENT_MS). */
+  private wsFirstEventTimer: ReturnType<typeof setTimeout> | null = null;
   /** What the far side said about the last answer that did not complete:
    *  its status_details, bounded. "" until one did not. */
   private lastResponseError = "";
@@ -997,10 +1011,23 @@ export class VoiceSession {
       the connection state, the channel opening, the first message. From
       here, "failed" is final and "disconnected" gets the live window. */
   private markTransportUp(): void {
+    /* THE SOCKET LANE IS UP WHEN THE FAR SIDE HAS SPOKEN (WS_FIRST_EVENT_MS):
+       the first event ends the wait and makes the call live. An open socket
+       alone made nothing live — see the constant. */
+    if (this.transport === "ws" && this.state === "connecting") {
+      this.clearReconnectTimer();
+      this.wsOutageAttempt = 0;
+      this.iceEverConnected = true;
+      this.setState("live");
+      return;
+    }
     if (!this.iceEverConnected) this.iceEverConnected = true;
     if (this.state === "reconnecting" || (this.state === "live" && this.reconnectTimer !== null)) {
       this.clearReconnectTimer();
-      if (this.state === "reconnecting") this.setState("live");
+      if (this.state === "reconnecting") {
+        this.wsOutageAttempt = 0;
+        this.setState("live");
+      }
     }
   }
 
@@ -1019,6 +1046,10 @@ export class VoiceSession {
     if (this.wsReconnectTimer !== null) {
       clearTimeout(this.wsReconnectTimer);
       this.wsReconnectTimer = null;
+    }
+    if (this.wsFirstEventTimer !== null) {
+      clearTimeout(this.wsFirstEventTimer);
+      this.wsFirstEventTimer = null;
     }
   }
 
@@ -1234,9 +1265,11 @@ export class VoiceSession {
 
     ws.onopen = () => {
       if (this.ws !== ws) return;
-      /* An open socket IS the transport up — see markTransportUp. */
-      this.wsOutageAttempt = 0;
-      this.markTransportUp();
+      /* AN OPEN SOCKET IS NOT THE TRANSPORT UP. The far side's first event
+         is (markTransportUp, from onChannelMessage) — an open socket that
+         says nothing is what a stalled tunnel looks like (WS_FIRST_EVENT_MS).
+         The session goes out and the microphone reader starts now, so the
+         far side has something to answer. */
       this.sendSessionConfig(channel);
       if (audio && first) {
         this.events.onRemoteStream?.(audio.stream);
@@ -1262,6 +1295,13 @@ export class VoiceSession {
     ws.onclose = (ev) => {
       if (this.ws !== ws) return;
       this.wsCloseCode = closeCodeOf(ev);
+      /* The call's own socket, closed before the far side said a word: the
+         service did not answer (refused, blocked, a dead network). Said now,
+         not after the wait — the fall-back runs sooner. */
+      if (this.state === "connecting") {
+        this.fail("service-unreachable");
+        return;
+      }
       /* A LIVE call that drops starts the deadline (onChannelClosed) once;
          a redial that dies while already reconnecting must not push the
          deadline out — it simply schedules the next attempt. */
@@ -1273,10 +1313,14 @@ export class VoiceSession {
     };
 
     if (first) {
-      this.setState("live");
-      /* The socket may never open (blocked, refused, a dead network): watched
-         from the start, like the other lane's media. */
-      if (!this.iceEverConnected) this.armReconnectTimer();
+      /* NOT LIVE YET. Live is the far side's first event (markTransportUp);
+         a socket that has said nothing by the deadline — never opened, or
+         opened onto a stalled tunnel — is the service not answering. */
+      this.clearReconnectTimer();
+      this.wsFirstEventTimer = setTimeout(() => {
+        this.wsFirstEventTimer = null;
+        if (this.state === "connecting" && this.ws === ws) this.fail("service-unreachable");
+      }, this.deps.wsFirstEventMs ?? WS_FIRST_EVENT_MS);
     }
     return true;
   }
