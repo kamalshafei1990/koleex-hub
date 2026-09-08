@@ -31,19 +31,22 @@ export type VoiceTelemetryFields = {
 
 export type VoiceTelemetry = VoiceTelemetryFields;
 
-export function sendVoiceTelemetry(t: VoiceTelemetry, post: (path: string, body: string) => void = defaultPost): void {
+export type TelemetryPost = (path: string, body: string, onFail?: () => void) => void;
+
+export function sendVoiceTelemetry(t: VoiceTelemetry, post: TelemetryPost = defaultPost): void {
   try {
-    /* OFFLINE, THE BEACON WAITS (2026-09-08 02:40: the phone's network was
-       down for five seconds, the call died in those seconds, and the beacon
-       that would have said so died with it — the log had nothing). A beacon
-       sent while the browser says it is offline is queued on the device and
-       sent by flushVoiceTelemetry when the network is back or the page is
-       next loaded. Bounded, oldest dropped. */
+    /* A BEACON THAT CANNOT GO WAITS (2026-09-08 02:40: the phone's network
+       was down for five seconds, the call died in those seconds, and the
+       beacon that would have said so died with it — the log had nothing).
+       Offline by the browser's own account, or a send that fails, queues
+       the beacon on the device; flushVoiceTelemetry sends it when the
+       network is back, the next call starts, or the page is next loaded.
+       Bounded, oldest dropped. */
     if (typeof navigator !== "undefined" && navigator.onLine === false) {
       queueVoiceTelemetry(t);
       return;
     }
-    post(VOICE_TELEMETRY_PATH, JSON.stringify(t));
+    post(VOICE_TELEMETRY_PATH, JSON.stringify(t), () => queueVoiceTelemetry(t));
   } catch {
     /* Never an error. */
   }
@@ -76,7 +79,7 @@ export function queueVoiceTelemetry(t: VoiceTelemetry, store: QueueStorage | nul
 }
 
 /** Send what was queued while offline. Returns how many went. */
-export function flushVoiceTelemetry(post: (path: string, body: string) => void = defaultPost, store: QueueStorage | null = storage()): number {
+export function flushVoiceTelemetry(post: TelemetryPost = defaultPost, store: QueueStorage | null = storage()): number {
   if (!store) return 0;
   let arr: unknown[] = [];
   try {
@@ -101,13 +104,22 @@ export function flushVoiceTelemetry(post: (path: string, body: string) => void =
   return sent;
 }
 
-function defaultPost(path: string, body: string): void {
-  if (typeof navigator !== "undefined" && typeof navigator.sendBeacon === "function") {
-    /* A Blob with a JSON type is a "simple" request the beacon can carry. */
-    navigator.sendBeacon(path, new Blob([body], { type: "application/json" }));
+function defaultPost(path: string, body: string, onFail?: () => void): void {
+  /* A PAGE ON ITS WAY OUT gets the beacon API: it is the one send a
+     browser promises to carry past unload. Everywhere else a fetch, whose
+     failure can be SEEN and queued — a beacon that goes into the void on a
+     flaky link reports nothing. */
+  const leaving = typeof document !== "undefined" && document.visibilityState === "hidden";
+  if (leaving && typeof navigator !== "undefined" && typeof navigator.sendBeacon === "function") {
+    const ok = navigator.sendBeacon(path, new Blob([body], { type: "application/json" }));
+    if (!ok) onFail?.();
     return;
   }
   if (typeof fetch === "function") {
-    void fetch(path, { method: "POST", credentials: "include", headers: { "Content-Type": "application/json" }, body, keepalive: true }).catch(() => {});
+    void fetch(path, { method: "POST", credentials: "include", headers: { "Content-Type": "application/json" }, body, keepalive: true })
+      .then((res) => { if (!res.ok && res.status >= 500) onFail?.(); })
+      .catch(() => onFail?.());
+    return;
   }
+  onFail?.();
 }

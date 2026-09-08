@@ -37,6 +37,7 @@ import { stripImageMarkdown } from "@/lib/voice/photos";
 const COPY: Record<Lang, {
   connecting: string;
   connectingSlow: string;
+  tryAgain: string;
   enableSound: string;
   reconnecting: string;
   listening: string;
@@ -104,7 +105,8 @@ const COPY: Record<Lang, {
 }> = {
   en: {
     connecting: "Connecting…",
-    connectingSlow: "Still connecting — the voice service is slow right now. You can end and try again…",
+    connectingSlow: "Still connecting — the voice service is slow right now…",
+    tryAgain: "Try again",
     enableSound: "Turn on sound",
     reconnecting: "Connection unstable — reconnecting…",
     listening: "Listening",
@@ -155,7 +157,8 @@ const COPY: Record<Lang, {
   },
   zh: {
     connecting: "正在连接…",
-    connectingSlow: "仍在连接，语音服务现在有点慢。可以结束后再试…",
+    connectingSlow: "仍在连接，语音服务现在有点慢…",
+    tryAgain: "再试一次",
     enableSound: "打开声音",
     reconnecting: "网络不稳定，正在重新连接…",
     listening: "正在聆听",
@@ -206,7 +209,8 @@ const COPY: Record<Lang, {
   },
   ar: {
     connecting: "جارٍ الاتصال…",
-    connectingSlow: "لسه بنحاول نتصل — خدمة الصوت بطيئة دلوقتي. ممكن تنهي وتجرب تاني…",
+    connectingSlow: "لسه بنحاول نتصل — خدمة الصوت بطيئة دلوقتي…",
+    tryAgain: "جرّب تاني",
     enableSound: "شغّل الصوت",
     reconnecting: "الشبكة مش ثابتة — بنحاول نرجّع الاتصال…",
     listening: "بيسمعك",
@@ -324,6 +328,8 @@ export type VoiceCallScreenProps = {
   writeError?: boolean;
   /** The handshake has taken longer than usual: the caption says so. */
   connectingSlow?: boolean;
+  /** One tap rebuilds a call whose handshake is slow. Absent, no control. */
+  onRetry?: () => void;
   /** The speaker is held back by autoplay policy; a tap unlocks it. */
   soundBlocked?: boolean;
   onEnableSound?: () => void;
@@ -358,6 +364,7 @@ export default function VoiceCallScreen({
   writeSaved = false,
   writeError = false,
   connectingSlow = false,
+  onRetry,
   soundBlocked = false,
   onEnableSound,
 }: VoiceCallScreenProps) {
@@ -707,14 +714,31 @@ export default function VoiceCallScreen({
             chat's activity line (globals.css .kx-activity-*): the owner asked
             for "a small title with a simple motion" wherever the AI is busy.
             Listening / speaking / ready stand still — nothing is pending. */}
-        <p className="text-sm font-normal tracking-wide text-[#AAAAAA] inline-flex items-center justify-center gap-1.5" aria-live="polite">
+        {/* CENTRED AND ALLOWED TO WRAP (owner, 2026-09-08, "adjust the text
+            position"): as a flex row the long "still connecting" line
+            wrapped left-aligned with its dots stranded at the far right.
+            A block of centred text, the dots inline after the last word. */}
+        <p className="max-w-[340px] px-2 text-center text-sm font-normal leading-relaxed tracking-wide text-[#AAAAAA]" aria-live="polite">
           {working ? (
             <>
               <span className="kx-activity-text">{status.replace(/…$/, "")}</span>
-              <span className="kx-activity-dots" aria-hidden><i /><i /><i /></span>
+              {" "}
+              <span className="kx-activity-dots align-baseline" aria-hidden><i /><i /><i /></span>
             </>
           ) : status}
         </p>
+        {/* A SLOW HANDSHAKE OFFERS A WAY OUT THAT IS NOT "END": one tap
+            rebuilds the call — on the other lane when this one never came
+            up — with the words kept. */}
+        {connectingSlow && (!live || !ready) && onRetry && (
+          <button
+            type="button"
+            onClick={onRetry}
+            className="inline-flex h-10 items-center justify-center rounded-full border border-white/20 bg-white/[0.06] px-5 text-sm font-semibold text-white hover:bg-white/[0.1] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0066FF] active:scale-95 transition-[background-color,transform]"
+          >
+            {copy.tryAgain}
+          </button>
+        )}
         {soundBlocked && onEnableSound && (
           <button
             type="button"

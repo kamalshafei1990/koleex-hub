@@ -271,6 +271,15 @@ const LIVE_GRACE_MS = 20_000;
 const WS_OPEN_GRACE_MS = 4_000;
 /** Our own deadline on the handshake POST; the route waits at most 45 s. */
 const HANDSHAKE_TIMEOUT_MS = 50_000;
+/* THE SOCKET LANE'S HANDSHAKE IS OUR OWN ROUTE, NOT THE MAINLAND VENDOR
+   (2026-09-08 03:40: "Still connecting" on the screen for as long as the
+   owner cared to wait; the route had answered in seconds, the answer never
+   reached the phone). Fifty seconds is the mainland lane's allowance for
+   a slow SDP exchange across a border. This lane's route mints a secret
+   (eight seconds at most) and reads two tables (a second and a half):
+   an answer that has not arrived in fifteen is not coming, and the caller
+   is better served by the fall-back lane than by a longer wait. */
+export const WS_HANDSHAKE_TIMEOUT_MS = 15_000;
 /** The pause before the one retry of a handshake the link dropped. */
 const HANDSHAKE_RETRY_DELAY_MS = 800;
 
@@ -1100,7 +1109,7 @@ export class VoiceSession {
          never on our own deadline, never after a hang-up. */
       const post = () => this.deps.fetchFn(path, {
         method: "POST",
-        ...(typeof AbortSignal !== "undefined" && "timeout" in AbortSignal ? { signal: AbortSignal.timeout(HANDSHAKE_TIMEOUT_MS) } : {}),
+        ...(typeof AbortSignal !== "undefined" && "timeout" in AbortSignal ? { signal: AbortSignal.timeout(WS_HANDSHAKE_TIMEOUT_MS) } : {}),
         credentials: "include",
       });
       let res: Response;

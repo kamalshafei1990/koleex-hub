@@ -609,6 +609,26 @@ export default function VoiceCallButton({
     }
   }, []);
 
+  /* TRY AGAIN, ON A SLOW HANDSHAKE (owner, 2026-09-08 03:40). The call is
+     released and rebuilt with the words kept — on the mainland lane when
+     the socket lane never came up, since that is the lane that is not
+     answering. Inside the tap, so the rebuilt call may open its audio. */
+  const retryCall = useCallback(() => {
+    const s = sessionRef.current;
+    const diag = s?.diagnostics();
+    const wasUp = liveSinceRef.current !== null;
+    sendVoiceTelemetry({ reason: "retried", resumes: resumesRef.current, lane: transportRef.current, ...(diag ?? {}) });
+    releaseCall();
+    if (transportRef.current === "ws" && !wasUp && !laneFellBackRef.current) {
+      laneFellBackRef.current = true;
+      transportRef.current = "rtc";
+      saveLane("rtc");
+    }
+    setReady(false);
+    chimedRef.current = false;
+    queueMicrotask(() => void startCallRef.current?.({ resume: true }));
+  }, [releaseCall]);
+
   const hangUp = useCallback(() => {
     /* WHAT THE CALL CAME TO, written down (roadmap B1). Taken before the
        release drops the handles: the writer, the thread, the words. After
@@ -644,6 +664,8 @@ export default function VoiceCallButton({
   const startCall = useCallback(async (opts?: { resume?: boolean; mic?: MediaStream | null }) => {
     if (sessionRef.current) return;
     setLaneState(transportRef.current);
+    /* Beacons a flaky link held back go with the next call's first request. */
+    flushVoiceTelemetry();
     /* UNLOCK THE SPEAKER INSIDE THE GESTURE. An element that has been asked
        to play during a tap may later play a stream without a second tap on
        browsers that gate autoplay; the far side's audio arrives well after
@@ -1260,6 +1282,7 @@ export default function VoiceCallButton({
           writeSaved={writeSaved}
           writeError={writeError}
           connectingSlow={connectingSlow}
+          onRetry={retryCall}
           soundBlocked={soundBlocked}
           onEnableSound={enableSound}
         />,

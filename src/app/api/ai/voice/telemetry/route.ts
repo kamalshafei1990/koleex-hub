@@ -43,6 +43,9 @@ const REASONS = new Set([
   /* THE PAGE DIED UNDER THE CALL and the next load found its pulse
      (lib/voice/call-memory.ts). Sent by the page that came back. */
   "page-killed",
+  /* The caller tapped "Try again" on a slow handshake: the call is rebuilt,
+     on the other lane when the first one never came up. */
+  "retried",
 ]);
 const short = (v: unknown, max: number) => (typeof v === "string" ? v.replace(/[^\w.:-]/g, "").slice(0, max) : "");
 /* The cause of a failure: a browser's own error name and message. Words,
