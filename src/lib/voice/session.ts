@@ -126,6 +126,10 @@ export type VoiceDiagnostics = {
   err: string;
   /** "type:count,…" — every event name the far side sent. Names only. */
   events: string;
+  /** Socket lane: how many times the socket was redialled on this call, and
+   *  the last close code the socket reported. */
+  ws_reconnects: number;
+  ws_close: string;
 };
 
 export type VoiceEvents = {
@@ -382,6 +386,23 @@ export function failureForStatus(status: number): VoiceFailure {
 
 /** The WebSocket lane's handshake: no offer in, a socket and a secret out. */
 export const WS_SESSION_PATH = "/api/ai/voice/ws-session";
+/* THE SOCKET IS DIALLED AGAIN, AT ONCE, WHEN IT DROPS (owner, 2026-09-08
+   02:4x: "again and again when I talk suddenly it closes the conversation
+   by itself"). The metrics of that call show the phone's network going
+   offline for five seconds mid-call; the socket died with it, and the
+   session sat in "reconnecting" until the twenty-second deadline ended the
+   call — nothing ever tried to dial again. Now a dropped socket on a call
+   that WAS up is redialled immediately, then with a short backoff, for as
+   long as the deadline allows: a new secret, a new socket, the same
+   microphone, the same audio, the same screen. The far side's history
+   comes back from the server with the new session. */
+export const WS_RECONNECT_DELAYS_MS: readonly number[] = [0, 1_500, 3_000, 6_000];
+
+/** The close code a socket reports, as text for a beacon. Pure. */
+export function closeCodeOf(ev: unknown): string {
+  const code = ev && typeof ev === "object" ? (ev as { code?: unknown }).code : undefined;
+  return typeof code === "number" ? String(code) : "";
+}
 
 export class VoiceSession {
   private pc: RTCPeerConnection | null = null;
@@ -391,6 +412,14 @@ export class VoiceSession {
   private channel: VoiceChannel | null = null;
   /* THE WEBSOCKET LANE'S TWO OBJECTS — null on the WebRTC lane. */
   private ws: VoiceSocket | null = null;
+  /** Redial bookkeeping for a dropped socket (WS_RECONNECT_DELAYS_MS). */
+  private wsReconnectTimer: ReturnType<typeof setTimeout> | null = null;
+  private wsReconnects = 0;
+  private wsOutageAttempt = 0;
+  private wsCloseCode = "";
+  /** A microphone a failed call kept alive for the call that resumes it —
+   *  see fail(). A phone asks no second permission for a stream it holds. */
+  private orphanMic: MediaStream | null = null;
   /** Identifies the in-flight WebSocket handshake, so a stop() during it is
    *  honoured the way `this.pc !== pc` honours one on the other lane. */
   private wsAttempt: object | null = null;
@@ -602,7 +631,17 @@ export class VoiceSession {
       ice_ever_connected: this.iceEverConnected,
       err: this.lastError,
       events: [...this.eventCounts.entries()].map(([k, v]) => `${k}:${v}`).join(",").slice(0, 600),
+      ws_reconnects: this.wsReconnects,
+      ws_close: this.wsCloseCode,
     };
+  }
+
+  /** The microphone a call that lost its connection kept for the call that
+   *  resumes it. Taken once; null when there is none. */
+  takeMicrophone(): MediaStream | null {
+    const mic = this.orphanMic;
+    this.orphanMic = null;
+    return mic;
   }
 
   private setState(next: VoiceState, failure?: VoiceFailure) {
@@ -621,6 +660,8 @@ export class VoiceSession {
        keeps the device held. */
     this.mic?.getTracks().forEach((t) => t.stop());
     this.mic = null;
+    this.orphanMic?.getTracks().forEach((t) => t.stop());
+    this.orphanMic = null;
     try {
       this.pc?.close();
     } catch {
@@ -934,6 +975,10 @@ export class VoiceSession {
       clearTimeout(this.reconnectTimer);
       this.reconnectTimer = null;
     }
+    if (this.wsReconnectTimer !== null) {
+      clearTimeout(this.wsReconnectTimer);
+      this.wsReconnectTimer = null;
+    }
   }
 
   private fail(reason: VoiceFailure, cause?: unknown): void {
@@ -946,7 +991,16 @@ export class VoiceSession {
     if (this.state === "ended") return;
     this.lastError = describeError(cause);
     this.clearReconnectTimer();
-    this.mic?.getTracks().forEach((t) => t.stop());
+    /* A CALL THAT WAS UP AND LOST ITS LINE KEEPS THE MICROPHONE for the call
+       that resumes it (takeMicrophone): stopping the tracks here made the
+       resume ask the phone for the microphone again, outside any tap, and
+       a phone can refuse that — the resume died before it dialled. The
+       button either hands the stream to the next session or stops it. */
+    if (reason === "connection-lost" && this.iceEverConnected && this.mic) {
+      this.orphanMic = this.mic;
+    } else {
+      this.mic?.getTracks().forEach((t) => t.stop());
+    }
     this.mic = null;
     try {
       this.pc?.close();
@@ -1003,17 +1057,28 @@ export class VoiceSession {
      transport knows which lane it is on.
      --------------------------------------------------------------------- */
   private async connectWs(): Promise<void> {
+    await this.dialWs(true);
+  }
+
+  /** One dial of the socket lane: our route for a secret and a session,
+   *  then the socket to the vendor. `first` is the call's own handshake —
+   *  its failures END the call. A redial's failures do not: the caller
+   *  schedules the next attempt until the deadline (armReconnectTimer)
+   *  says the line is gone. Resolves true once a socket object exists;
+   *  whether it opens is the socket's own story (onopen / onclose). */
+  private async dialWs(first: boolean): Promise<boolean> {
     if (!this.mic) {
-      this.fail("no-microphone");
-      return;
+      if (first) this.fail("no-microphone");
+      return false;
     }
     if (!this.deps.createWebSocket) {
-      this.fail("unavailable");
-      return;
+      if (first) this.fail("unavailable");
+      return false;
     }
-    this.setState("connecting");
+    if (first) this.setState("connecting");
     const marker = {};
     this.wsAttempt = marker;
+    const alive = () => this.wsAttempt === marker && this.state === (first ? "connecting" : "reconnecting");
 
     let url = "";
     let protocols: string[] = [];
@@ -1035,16 +1100,16 @@ export class VoiceSession {
       let res: Response;
       try {
         res = await post();
-      } catch (first) {
-        if (!(first instanceof TypeError) || isTimeoutError(first) || this.state !== "connecting" || this.wsAttempt !== marker) throw first;
+      } catch (firstErr) {
+        if (!(firstErr instanceof TypeError) || isTimeoutError(firstErr) || !alive()) throw firstErr;
         await new Promise((r) => setTimeout(r, HANDSHAKE_RETRY_DELAY_MS));
-        if (this.state !== "connecting" || this.wsAttempt !== marker) throw first;
+        if (!alive()) throw firstErr;
         res = await post();
       }
-      if (this.state !== "connecting" || this.wsAttempt !== marker) return;
+      if (!alive()) return false;
       if (!res.ok) {
-        this.fail(failureForStatus(res.status));
-        return;
+        if (first) this.fail(failureForStatus(res.status));
+        return false;
       }
       const body = (await res.json()) as {
         url?: unknown; protocols?: unknown; session?: unknown; session_compact?: unknown; audio?: { sample_rate?: unknown };
@@ -1057,21 +1122,32 @@ export class VoiceSession {
       if (body.session_compact && typeof body.session_compact === "object") this.sessionUpdateCompact = JSON.stringify(body.session_compact);
       /* Only a secure socket, only with a secret to present. */
       if (!/^wss:\/\//i.test(url) || protocols.length === 0 || !this.sessionUpdate) {
-        this.fail("handshake-failed");
-        return;
+        if (first) this.fail("handshake-failed");
+        return false;
       }
     } catch (e) {
-      this.fail(isTimeoutError(e) ? "service-unreachable" : "handshake-failed", e);
-      return;
+      if (first) this.fail(isTimeoutError(e) ? "service-unreachable" : "handshake-failed", e);
+      return false;
     }
-    if (this.state !== "connecting" || this.wsAttempt !== marker) return;
+    if (!alive()) return false;
 
     let ws: VoiceSocket;
     try {
       ws = this.deps.createWebSocket(url, protocols);
     } catch (e) {
-      this.fail("handshake-failed", e);
-      return;
+      if (first) this.fail("handshake-failed", e);
+      return false;
+    }
+    /* A redial replaces the dead socket silently: its close is not news. */
+    const prev = this.ws;
+    if (prev && prev !== ws) {
+      prev.onclose = null;
+      prev.onmessage = null;
+      prev.onerror = null;
+      prev.onopen = null;
+      try {
+        prev.close();
+      } catch { /* already closed */ }
     }
     this.ws = ws;
     const channel: VoiceChannel = {
@@ -1081,21 +1157,32 @@ export class VoiceSession {
       send: (data: string) => ws.send(data),
     };
     this.channel = channel;
-    const audio = this.deps.createWsAudio ? this.deps.createWsAudio(sampleRate) : null;
-    this.wsAudio = audio;
+    /* THE AUDIO OUTLIVES THE SOCKET. One context, one microphone reader,
+       one far-side stream for the whole call; a redial changes only the
+       socket the frames travel on. (A second context under a live
+       microphone is what garbled the microphone — ws-audio.ts.) */
+    if (!this.wsAudio && this.deps.createWsAudio) this.wsAudio = this.deps.createWsAudio(sampleRate);
+    const audio = this.wsAudio;
+    /* The new session is configured afresh. */
+    this.configSent = false;
+    this.configAckPending = false;
+    this.compactRetried = false;
 
     ws.onopen = () => {
       if (this.ws !== ws) return;
       /* An open socket IS the transport up — see markTransportUp. */
+      this.wsOutageAttempt = 0;
       this.markTransportUp();
       this.sendSessionConfig(channel);
-      if (audio) {
+      if (audio && first) {
         this.events.onRemoteStream?.(audio.stream);
         if (this.mic) {
           audio.startCapture(this.mic, (b64) => {
-            if (this.ws !== ws || ws.readyState !== 1) return;
+            /* Whichever socket is current — a redial keeps the reader. */
+            const live = this.ws;
+            if (!live || live.readyState !== 1) return;
             try {
-              ws.send(JSON.stringify({ type: "input_audio_buffer.append", audio: b64 }));
+              live.send(JSON.stringify({ type: "input_audio_buffer.append", audio: b64 }));
             } catch {
               /* The socket closed under a frame; onclose handles the call. */
             }
@@ -1105,21 +1192,46 @@ export class VoiceSession {
     };
     ws.onmessage = (m) => {
       if (this.ws !== ws || typeof m.data !== "string") return;
-      this.onWsAudioEvent(m.data, audio);
+      this.onWsAudioEvent(m.data, this.wsAudio);
       this.onChannelMessage(m.data, channel);
     };
-    ws.onclose = () => {
+    ws.onclose = (ev) => {
       if (this.ws !== ws) return;
-      this.onChannelClosed();
+      this.wsCloseCode = closeCodeOf(ev);
+      /* A LIVE call that drops starts the deadline (onChannelClosed) once;
+         a redial that dies while already reconnecting must not push the
+         deadline out — it simply schedules the next attempt. */
+      if (this.state === "live") this.onChannelClosed();
+      this.scheduleWsReconnect();
     };
     ws.onerror = () => {
       /* A close follows an error; the close is what the call acts on. */
     };
 
-    this.setState("live");
-    /* The socket may never open (blocked, refused, a dead network): watched
-       from the start, like the other lane's media. */
-    if (!this.iceEverConnected) this.armReconnectTimer();
+    if (first) {
+      this.setState("live");
+      /* The socket may never open (blocked, refused, a dead network): watched
+         from the start, like the other lane's media. */
+      if (!this.iceEverConnected) this.armReconnectTimer();
+    }
+    return true;
+  }
+
+  /** The next redial, after the outage's backoff — only on the socket lane,
+   *  only for a call that was up, only while it is still reconnecting. */
+  private scheduleWsReconnect(): void {
+    if (this.transport !== "ws" || !this.iceEverConnected || this.state !== "reconnecting") return;
+    if (this.wsReconnectTimer !== null) return;
+    const delay = WS_RECONNECT_DELAYS_MS[Math.min(this.wsOutageAttempt, WS_RECONNECT_DELAYS_MS.length - 1)];
+    this.wsOutageAttempt++;
+    this.wsReconnectTimer = setTimeout(() => {
+      this.wsReconnectTimer = null;
+      if (this.state !== "reconnecting") return;
+      this.wsReconnects++;
+      void this.dialWs(false).then((dialled) => {
+        if (!dialled) this.scheduleWsReconnect();
+      });
+    }, delay);
   }
 
   /** The two events that are SOUND on this lane and nothing else: a frame of

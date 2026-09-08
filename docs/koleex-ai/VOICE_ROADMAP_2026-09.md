@@ -314,6 +314,37 @@ a sample plays through the call's own context — the socket lane's audio
 context on the WebRTC lane — and a caller line that is only transcriber
 markers (`[noise]`, `[inaudible]`, `…`) is dropped, not shown, not saved.
 
+## "Again and again it closes by itself" — the line that drops, and the exits that left no trace (2026-09-08)
+
+The 02:36 call's own metrics carry the answer: `net.offline` at 02:40:14
+and `net.reconnect_ms 5051` — the phone's network was gone for five
+seconds mid-call. The socket lane had no redial: a dropped socket sat in
+"reconnecting" until the twenty-second deadline ended the call. The beacon
+that would have said so was sent while the network was down and died with
+it, so the log had nothing — for the fourth time that evening.
+
+Fixed, as one mechanism rather than four patches:
+
+- **Redial in place.** `VoiceSession.dialWs` is one dial; a socket that
+  drops on a call that WAS up is redialled at once, then at 1.5 s, 3 s, 6 s
+  (`WS_RECONNECT_DELAYS_MS`) for as long as the deadline allows — a new
+  secret and socket, the same microphone, audio context and screen; the
+  session is configured afresh and the server's history comes with it.
+  Only a deadline with no socket open ends the call.
+- **The microphone survives a lost line.** `fail("connection-lost")` on a
+  call that was up keeps the stream (`takeMicrophone`); the button hands it
+  to the resumed call, so the phone is asked for nothing outside a tap.
+- **The pulse** (`lib/voice/call-memory.ts`): a live call writes its
+  diagnostics to the device every 5 s; a hang-up clears it. The next load
+  finds a pulse younger than 45 s nobody cleared, beacons `page-killed`
+  with those diagnostics, and tells the caller to tap to continue.
+- **Beacons wait for the network**: sent while `navigator.onLine` is false
+  they queue on the device (10 at most) and go on `online` or next load,
+  stamped with when they were made.
+- **No socket storm under a call**: Discuss's realtime channel does not
+  rejoin while `[data-kx-call-active]` is up; the call's end nudges it.
+- The beacon carries `ws_reconnects` and the last socket close code.
+
 ## Owner-side (not code)
 
 - Activate the realtime voice model on the Beijing workspace (still `403 Unpurchased`), so mainland callers get the mainland endpoint.

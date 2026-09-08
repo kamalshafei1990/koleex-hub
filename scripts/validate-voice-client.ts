@@ -809,7 +809,7 @@ async function main() {
       /\.play\(\)\.then\(\(\) => setSoundBlocked\(false\)\)\.catch\(\(\) => \{[\s\S]{0,500}?setSoundBlocked\(true\);/.test(src) &&
       /soundBlocked=\{soundBlocked\}\s*onEnableSound=\{enableSound\}/.test(src) && !/\.play\(\)\.catch\(\(\) => \{[\s\S]{0,200}?onErrorRef\.current/.test(src));
     check("  …and the speaker is unlocked inside the tap that starts the call",
-      /const startCall = useCallback\(async \(opts\?: \{ resume\?: boolean \}\) => \{\s*if \(sessionRef\.current\) return;[\s\S]{0,700}?if \(!opts\?\.resume\) void audioRef\.current\?\.play\(\)\.catch\(\(\) => \{\}\);/.test(src));
+      /const startCall = useCallback\(async \(opts\?: \{ resume\?: boolean; mic\?: MediaStream \| null \}\) => \{\s*if \(sessionRef\.current\) return;[\s\S]{0,700}?if \(!opts\?\.resume\) void audioRef\.current\?\.play\(\)\.catch\(\(\) => \{\}\);/.test(src));
 
     /* The session fires from network events and outlives any single render. */
     check("callbacks are held in refs, so the session never calls a stale one",
@@ -957,8 +957,13 @@ async function main() {
       const last = r.states[r.states.length - 1];
       check("a drop that never recovers ends the call rather than pretending",
         last[0] === "failed" && last[1] === "connection-lost");
-      /* The privacy obligation applies to this exit path like every other. */
-      check("  …and the microphone is released", r.mic.allStopped());
+      /* THE MICROPHONE IS KEPT FOR THE RESUME (2026-09-08): a lost line on a
+         call that was up hands its stream to the call that resumes it, so
+         the phone is asked for nothing outside a tap. Taken once; the
+         privacy obligation is met by whoever takes it — or by stop(). */
+      /* Never up — so nothing to resume, and the microphone is released as
+         on every other exit. (A call that WAS up keeps it: 11d, 17, 26.) */
+      check("  …and the microphone is released — the call was never up, there is nothing to resume", r.mic.allStopped() && r.session.takeMicrophone() === null);
       check("  …and the connection is closed", r.pcCalls.closed === 1);
     }
 
@@ -1014,7 +1019,7 @@ async function main() {
       const last = r.states[r.states.length - 1];
       check("an ICE failure AFTER the call was up ends it without waiting out the window",
         last[0] === "failed" && last[1] === "connection-lost");
-      check("  …and the microphone is released", r.mic.allStopped());
+      check("  …and the microphone is kept for the resume, and released by stop()", (() => { const kept = !r.mic.allStopped(); r.session.stop(); return kept && r.mic.allStopped(); })());
     }
 
     /* 11e — hanging up during a wobble must take the timer with it. The user
@@ -1923,7 +1928,7 @@ console.log("\n── 12. Mute ──");
     await sleep(160);
     const last = r.states[r.states.length - 1];
     check("a second failure is final — the other region is tried once, never in a loop", recorded.length === 2 && last[0] === "failed" && last[1] === "connection-lost");
-    check("  …and the microphone is released then", r.mic.allStopped());
+    check("  …and the microphone is kept for a resume then, released by stop()", (() => { const kept = !r.mic.allStopped(); r.session.stop(); return kept && r.mic.allStopped(); })());
   }
   {
     const recorded: Recorded[] = [];
@@ -2091,7 +2096,7 @@ console.log("\n── 12. Mute ──");
   check("a call that was up for five seconds and is lost is started again in place, twice at most, keeping the words",
     /export const RESUME_MIN_LIVE_MS = 5_000;/.test(btn18) && /export const MAX_RESUMES = 2;/.test(btn18) &&
     /const canResume = failure === "connection-lost" && wasUp && resumesRef\.current < MAX_RESUMES;/.test(btn18) &&
-    /queueMicrotask\(\(\) => void startCallRef\.current\?\.\(\{ resume: true \}\)\);/.test(btn18) &&
+    /queueMicrotask\(\(\) => void startCallRef\.current\?\.\(\{ resume: true, mic: keptMic \}\)\);/.test(btn18) &&
     /if \(!opts\?\.resume\) \{\s*linesRef\.current = \[\];/.test(btn18));
   check("  …and only when it cannot come back does the caller hear the failure",
     /if \(canResume\) \{[\s\S]*?return;\s*\}\s*onErrorRef\.current\?\.\(FAILURE_COPY\[langRef\.current\]\[failure\]\);/.test(btn18));
@@ -2109,7 +2114,7 @@ console.log("\n── 12. Mute ──");
     /console\.warn\(\s*`\[ai\.voice\.client\]/.test(telRoute) && !/supabase|insert\(/.test(telRoute) && /new NextResponse\(null, \{ status: 204 \}\)/.test(telRoute));
   const diagS = new VoiceSession(deps({ status: 200 }).deps);
   const dg = diagS.diagnostics();
-  check("diagnostics are states and counts only", Object.keys(dg).sort().join(",") === "dc,elapsed_ms,err,events,ice,ice_ever_connected,last_event,region,tool_calls" && dg.tool_calls === 0 && dg.elapsed_ms === 0 && dg.err === "" && dg.events === "");
+  check("diagnostics are states and counts only", Object.keys(dg).sort().join(",") === "dc,elapsed_ms,err,events,ice,ice_ever_connected,last_event,region,tool_calls,ws_close,ws_reconnects" && dg.tool_calls === 0 && dg.ws_reconnects === 0 && dg.ws_close === "" && dg.elapsed_ms === 0 && dg.err === "" && dg.events === "");
 
   /* THE PICTURE EXPANDS IN PLACE. */
   check("a photo in the conversation is a button that opens the lightbox, not a link out of the app",
@@ -2746,6 +2751,38 @@ function describeErrorCheck(): boolean {
     r.s.stop();
     check("  …and not on a closed one", r.s.requestResponse("say hi") === false);
   }
+  {
+    /* THE SOCKET IS DIALLED AGAIN WHEN IT DROPS (2026-09-08 02:40: the
+       phone's network went offline for five seconds mid-call; the socket
+       died with it, nothing redialled, the deadline ended the call). */
+    const { WS_RECONNECT_DELAYS_MS, closeCodeOf } = await import("../src/lib/voice/session");
+    check("the redial ladder starts at once and backs off; a close event's code is read as text", WS_RECONNECT_DELAYS_MS.join() === "0,1500,3000,6000" && closeCodeOf({ code: 1006 }) === "1006" && closeCodeOf({}) === "" && closeCodeOf(null) === "");
+    const r = await laneRun({ reconnectGraceMs: 400 });
+    r.sockets[0].open();
+    r.sockets[0].message(JSON.stringify({ type: "session.updated" }));
+    const postsBefore = r.recorded.filter((x) => x.url.startsWith(WS_SESSION_PATH)).length;
+    r.sockets[0].drop();
+    check("a dropped socket on a call that was up is 'reconnecting', not failed — and the deadline is armed once", r.s.getState() === "reconnecting" && r.s.diagnostics().ws_close === "");
+    await sleep(30);
+    check("  …a new secret is asked for and a NEW socket dialled at once, on the same microphone and audio",
+      r.recorded.filter((x) => x.url.startsWith(WS_SESSION_PATH)).length === postsBefore + 1 && r.sockets.length === 2 && r.audios.length === 1 && !r.mic.allStopped() && r.s.diagnostics().ws_reconnects === 1);
+    r.sockets[1].open();
+    check("  …and the open socket is the call back: live, the session configured afresh on the new socket, no failure shown",
+      r.s.getState() === "live" && r.sockets[1].sent.length === 1 && /session\.update/.test(r.sockets[1].sent[0]) && r.states.every(([st]) => st !== "failed"));
+    r.sockets[1].message(JSON.stringify({ type: "response.output_audio.delta", delta: "QQ==" }));
+    r.audios[0].frame?.("BBBB");
+    check("  …voice frames flow on the new socket both ways — the reader was kept, not restarted", r.audios[0].played.join() === "QQ==" && r.sockets[1].sent[r.sockets[1].sent.length - 1] === JSON.stringify({ type: "input_audio_buffer.append", audio: "BBBB" }) && r.audios[0].captureStarted);
+    /* A second outage whose redials all die: the deadline ends the call. */
+    r.sockets[1].drop();
+    await sleep(30);
+    check("a redial that dies before opening schedules the next — the deadline is not pushed out by it", r.s.getState() === "reconnecting" && r.sockets.length === 3);
+    r.sockets[2].drop();
+    await sleep(520);
+    const last = r.states[r.states.length - 1];
+    check("  …and when the deadline passes with no socket open, the call fails as connection-lost, keeping the microphone for a resume",
+      last[0] === "failed" && last[1] === "connection-lost" && !r.mic.allStopped() && r.s.takeMicrophone() !== null);
+    r.s.stop();
+  }
 }
 
 {
@@ -2845,7 +2882,10 @@ function describeErrorCheck(): boolean {
     /if \(created\.retry > 0 && created\.joins > 1\) \{[\s\S]{0,120}?\} else \{\s*created\.retry = 0;\s*\}/.test(discuss) &&
     !/const delay = Math\.min\(15_000/.test(discuss));
   check("  …and a hidden page schedules no rejoin at all; the visible/online nudge retries when it is back",
-    /if \(typeof document !== "undefined" && document\.visibilityState === "hidden"\) return;\s*const delay = rejoinDelayMs\(created\.retry\);/.test(discuss) && /const kickAll = \(\) => \{/.test(discuss));
+    /if \(typeof document !== "undefined" && document\.visibilityState === "hidden"\) return;[\s\S]{0,700}?const delay = rejoinDelayMs\(created\.retry\);/.test(discuss) && /const kickAll = \(\) => \{/.test(discuss));
+  check("  …nor under a live call: the channel's storm waits for the call to end, and the end nudges it",
+    /if \(typeof document !== "undefined" && document\.querySelector\("\[data-kx-call-active='1'\]"\)\) return;\s*const delay = rejoinDelayMs\(created\.retry\);/.test(discuss) &&
+    /window\.addEventListener\("kx-call-ended", kickAll\);/.test(discuss));
   check("a stale build's full-page app launch is skipped mid-call — the same guard the update watcher uses",
     /import \{ busyWithSomethingUninterruptible \} from "@\/components\/pwa\/UpdateWatcher";/.test(launch) &&
     /if \(g\.__kxStaleBuild && !busyWithSomethingUninterruptible\(\)\) \{/.test(launch));
@@ -3017,6 +3057,54 @@ function describeErrorCheck(): boolean {
       /disabled=\{!candidate \|\| candidate === selectedVoice\}/.test(scr) && /if \(!candidate \|\| candidate === selectedVoice\) return;\s*onSelectVoice\?\.\(candidate\);\s*closeVoiceSheet\(\);/.test(scr) &&
       /const closeVoiceSheet = useCallback\(\(\) => \{[\s\S]{0,200}?onStopPreview\?\.\(\);/.test(scr) &&
       /aria-pressed=\{chosen\}/.test(scr) && /const on = candidate \? v\.key === candidate : chosen;/.test(scr));
+  }
+}
+
+{
+  console.log("\n── 31. A call the page died under is found, reported and offered back; a beacon the network cannot carry waits ──");
+  /* 2026-09-08: four "it closed by itself" exits with no line in the log.
+     Two kinds: the page killed under the call (nothing can beacon from a
+     dead page), and a beacon sent while the phone's network was down. */
+  const cm = await import("../src/lib/voice/call-memory");
+  const tm = await import("../src/lib/voice/telemetry");
+  const { readFileSync } = await import("node:fs");
+  {
+    const store = new Map<string, string>();
+    const like = { getItem: (k: string) => store.get(k) ?? null, setItem: (k: string, v: string) => { store.set(k, v); }, removeItem: (k: string) => { store.delete(k); } };
+    const pulse = { at: 1_000_000, startedAt: 990_000, lane: "ws", voice: "v2", conversation: "c1", elapsed_ms: 10_000, events: "ping:3", last_event: "ping", ws_reconnects: 1, ws_close: "1006" };
+    cm.writeCallPulse(like, pulse);
+    check("a live call writes its pulse every five seconds, and a hang-up clears it", cm.CALL_PULSE_EVERY_MS === 5_000 && store.has(cm.CALL_PULSE_KEY) && (cm.clearCallPulse(like), !store.has(cm.CALL_PULSE_KEY)));
+    cm.writeCallPulse(like, pulse);
+    const found = cm.takeInterruptedCall(like, 1_000_000 + 20_000);
+    check("the next load finds a recent pulse nobody cleared — the call the page died under — with its diagnostics, once",
+      found?.lane === "ws" && found?.voice === "v2" && found?.ws_close === "1006" && found?.events === "ping:3" && cm.takeInterruptedCall(like, 1_000_000 + 20_000) === null);
+    cm.writeCallPulse(like, pulse);
+    check("  …a pulse older than forty-five seconds is a call long over, not reported; garbage is not reported", cm.INTERRUPTED_WITHIN_MS === 45_000 && cm.takeInterruptedCall(like, 1_000_000 + 60_000) === null && (like.setItem(cm.CALL_PULSE_KEY, "{not json"), cm.takeInterruptedCall(like, 0) === null));
+  }
+  {
+    const store = new Map<string, string>();
+    const like = { getItem: (k: string) => store.get(k) ?? null, setItem: (k: string, v: string) => { store.set(k, v); }, removeItem: (k: string) => { store.delete(k); } };
+    const posted: string[] = [];
+    for (let i = 0; i < 12; i++) tm.queueVoiceTelemetry({ reason: `r${i}` }, like);
+    const queued = JSON.parse(store.get(tm.TELEMETRY_QUEUE_KEY) ?? "[]") as Array<{ reason: string; queued_at: number }>;
+    check("a beacon queued offline is kept on the device with when it was made, ten at most, oldest dropped", queued.length === 10 && queued[0].reason === "r2" && typeof queued[0].queued_at === "number" && tm.TELEMETRY_QUEUE_MAX === 10);
+    const sent = tm.flushVoiceTelemetry((_p, body) => posted.push(body), like);
+    check("  …and flushed in order when the network is back, once", sent === 10 && posted.length === 10 && /"reason":"r2"/.test(posted[0]) && !store.has(tm.TELEMETRY_QUEUE_KEY) && tm.flushVoiceTelemetry((_p, body) => posted.push(body), like) === 0);
+    const src = readFileSync("src/lib/voice/telemetry.ts", "utf8");
+    check("  …sendVoiceTelemetry queues instead of posting while the browser says it is offline", /if \(typeof navigator !== "undefined" && navigator\.onLine === false\) \{\s*queueVoiceTelemetry\(t\);\s*return;\s*\}/.test(src));
+  }
+  {
+    const btn = readFileSync("src/components/ai/VoiceCallButton.tsx", "utf8");
+    check("the button writes the pulse while live or reconnecting, clears it on release, and nudges the page's other sockets",
+      /if \(state !== "live" && state !== "reconnecting"\) return;[\s\S]{0,900}?writeCallPulse\(store, \{/.test(btn) && /const t = window\.setInterval\(beat, CALL_PULSE_EVERY_MS\);/.test(btn) &&
+      /clearCallPulse\(browserStorage\(\)/.test(btn) && /window\.dispatchEvent\(new Event\("kx-call-ended"\)\);/.test(btn));
+    check("  …on load it flushes queued beacons, and a found pulse is beaconed as page-killed and told to the caller",
+      /const flush = \(\) => flushVoiceTelemetry\(\);\s*flush\(\);\s*window\.addEventListener\("online", flush\);/.test(btn) &&
+      /const dead = store \? takeInterruptedCall\(store\) : null;/.test(btn) && /reason: "page-killed",\s*lane: dead\.lane,/.test(btn) && /onErrorRef\.current\?\.\(INTERRUPTED_COPY\[langRef\.current\]\);/.test(btn) &&
+      (["en", "zh", "ar"] as const).every((l) => new RegExp(`${l}: "[^"]{20,}"`).test(btn.slice(btn.indexOf("const INTERRUPTED_COPY"), btn.indexOf("const INTERRUPTED_COPY") + 600))));
+    check("  …a resumed call is handed the microphone the lost one kept — and a microphone nobody resumes is released",
+      /const keptMic = sessionRef\.current\?\.takeMicrophone\(\) \?\? null;\s*sessionRef\.current = null;\s*if \(keptMic && !canResume\) keptMic\.getTracks\(\)\.forEach\(\(t\) => t\.stop\(\)\);/.test(btn) &&
+      /if \(kept && kept\.getAudioTracks\(\)\.some\(\(t\) => t\.readyState === "live"\)\) \{\s*deps\.getMicrophone = async \(\) => kept;/.test(btn));
   }
 }
 
