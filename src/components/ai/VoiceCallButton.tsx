@@ -61,7 +61,8 @@ import {
   readSavedTalkMode, saveTalkMode, type TalkMode,
 } from "@/lib/voice/voice-pref";
 import { requestCallSummary, shouldSummarise } from "@/lib/voice/summary";
-import { sendVoiceTelemetry } from "@/lib/voice/telemetry";
+import { sendVoiceTelemetry, flushVoiceTelemetry } from "@/lib/voice/telemetry";
+import { writeCallPulse, clearCallPulse, takeInterruptedCall, browserStorage, CALL_PULSE_EVERY_MS } from "@/lib/voice/call-memory";
 import { probeWsLane } from "@/lib/voice/lane-probe";
 import { createPreviewPlayer, browserPreviewContext, VOICE_PREVIEW_PATH, PREVIEW_FETCH_TIMEOUT_MS, type PreviewPlayer, type PreviewContextLike } from "@/lib/voice/preview-player";
 import { TranscriptPersister, type SavedTurn, type PersistFailure } from "@/lib/voice/persist";
@@ -128,6 +129,15 @@ const PERSIST_COPY: Record<Lang, Record<PersistFailure, string>> = {
     unauthorised: "ما قدرناش نحفظ كلام المكالمة — ما بقالكش صلاحية.",
     "not-found": "ما قدرناش نحفظ كلام المكالمة — المحادثة اتمسحت.",
   },
+};
+
+/* THE CALL THE PAGE DIED UNDER, told once when the page is back
+   (lib/voice/call-memory.ts). Plain words; the tap to continue is the
+   ordinary call button. */
+const INTERRUPTED_COPY: Record<Lang, string> = {
+  en: "The last call stopped without warning — the app was interrupted. Tap the call button to continue.",
+  zh: "上一次通话意外中断（应用被打断）。点一下通话按钮继续。",
+  ar: "المكالمة اللي فاتت اتقطعت فجأة — الأبلكيشن اتقفل من غيرك. دوس على زرار المكالمة عشان تكمل.",
 };
 
 /* How long a live call may go unacknowledged before it is called ready
@@ -454,7 +464,7 @@ export default function VoiceCallButton({
   /* startCall is declared below and selectVoice needs it. A ref rather than a
      reorder: the declaration order here follows the call's lifecycle, and
      shuffling it to satisfy a closure would make it harder to read. */
-  const startCallRef = useRef<((opts?: { resume?: boolean }) => Promise<void>) | null>(null);
+  const startCallRef = useRef<((opts?: { resume?: boolean; mic?: MediaStream | null }) => Promise<void>) | null>(null);
 
   /* A call must not survive the component. Without this, navigating away
      leaves the microphone captured and the recording indicator lit — the one
@@ -494,6 +504,12 @@ export default function VoiceCallButton({
   const releaseCall = useCallback(() => {
     sessionRef.current?.stop();
     sessionRef.current = null;
+    /* The call is over on purpose: no pulse to find later, and the page's
+       other sockets (Discuss) may rejoin now. */
+    clearCallPulse(browserStorage() ?? { getItem: () => null, setItem: () => {}, removeItem: () => {} });
+    try {
+      window.dispatchEvent(new Event("kx-call-ended"));
+    } catch { /* not a browser */ }
     void persisterRef.current?.finish();
     persisterRef.current = null;
     tonesRef.current?.close();
@@ -621,7 +637,7 @@ export default function VoiceCallButton({
     sendVoiceTelemetry({ reason: "config-rejected", lane: transportRef.current, err: errorMessageOf(data), ...(diag ?? {}) });
   }, []);
 
-  const startCall = useCallback(async (opts?: { resume?: boolean }) => {
+  const startCall = useCallback(async (opts?: { resume?: boolean; mic?: MediaStream | null }) => {
     if (sessionRef.current) return;
     /* UNLOCK THE SPEAKER INSIDE THE GESTURE. An element that has been asked
        to play during a tap may later play a stream without a second tap on
@@ -671,7 +687,16 @@ export default function VoiceCallButton({
       opts?.resume ? linesRef.current.filter((l) => l.final).length : 0,
     );
 
-    const session = new VoiceSession(browserVoiceDeps(), {
+    /* A RESUMED CALL KEEPS THE MICROPHONE IT HAD (VoiceSession.fail keeps
+       it; takeMicrophone hands it over): the phone is asked for nothing
+       outside a tap, which it can refuse. A stream whose tracks have ended
+       is not offered — the ordinary request runs instead. */
+    const deps = browserVoiceDeps();
+    const kept = opts?.mic ?? null;
+    if (kept && kept.getAudioTracks().some((t) => t.readyState === "live")) {
+      deps.getMicrophone = async () => kept;
+    }
+    const session = new VoiceSession(deps, {
       onState: (next, failure) => {
         setState(next);
         /* A NEW NEGOTIATION IS NOT READY. The session resets its own flag when
@@ -712,8 +737,11 @@ export default function VoiceCallButton({
           const canFallBack = transportRef.current === "ws" && !wasUp && laneFailed && !laneFellBackRef.current;
           sendVoiceTelemetry({ reason: canResume ? "resumed" : failure, resumes: resumesRef.current, lane: transportRef.current, fell_back: canFallBack, ...diag });
           /* The session has already torn itself down; drop our handle so the
-             next start makes a fresh one rather than reusing a dead session. */
+             next start makes a fresh one rather than reusing a dead session.
+             The microphone it kept goes to the resume, or is released. */
+          const keptMic = sessionRef.current?.takeMicrophone() ?? null;
           sessionRef.current = null;
+          if (keptMic && !canResume) keptMic.getTracks().forEach((t) => t.stop());
           if (canFallBack) {
             laneFellBackRef.current = true;
             transportRef.current = "rtc";
@@ -730,7 +758,7 @@ export default function VoiceCallButton({
             chimedRef.current = false;
             /* After the teardown, not during it: start() refuses while a
                session handle is still held. */
-            queueMicrotask(() => void startCallRef.current?.({ resume: true }));
+            queueMicrotask(() => void startCallRef.current?.({ resume: true, mic: keptMic }));
             return;
           }
           onErrorRef.current?.(FAILURE_COPY[langRef.current][failure]);
@@ -1029,6 +1057,60 @@ export default function VoiceCallButton({
   }, [lang]);
   const stopPreview = useCallback(() => previewRef.current?.stop(), []);
   useEffect(() => () => { previewRef.current?.close(); previewRef.current = null; }, []);
+
+  /* THE PULSE (lib/voice/call-memory.ts): while a call is up, its
+     diagnostics are written to the device every few seconds, so a page the
+     phone kills under the call leaves the next load something to report. */
+  useEffect(() => {
+    if (state !== "live" && state !== "reconnecting") return;
+    const store = browserStorage();
+    if (!store) return;
+    const beat = () => {
+      const s = sessionRef.current;
+      if (!s) return;
+      const d = s.diagnostics();
+      writeCallPulse(store, {
+        at: Date.now(),
+        startedAt: liveSinceRef.current ?? Date.now(),
+        lane: transportRef.current,
+        voice: voiceKeyRef.current,
+        conversation: conversationIdRef.current,
+        elapsed_ms: d.elapsed_ms,
+        events: d.events,
+        last_event: d.last_event,
+        ws_reconnects: d.ws_reconnects,
+        ws_close: d.ws_close,
+      });
+    };
+    beat();
+    const t = window.setInterval(beat, CALL_PULSE_EVERY_MS);
+    return () => window.clearInterval(t);
+  }, [state]);
+
+  /* THE PAGE IS BACK. Beacons the network could not carry go now; a pulse
+     nobody cleared is a call the page died under — reported once, to the
+     log and to the caller. */
+  useEffect(() => {
+    const flush = () => flushVoiceTelemetry();
+    flush();
+    window.addEventListener("online", flush);
+    const store = browserStorage();
+    const dead = store ? takeInterruptedCall(store) : null;
+    if (dead) {
+      sendVoiceTelemetry({
+        reason: "page-killed",
+        lane: dead.lane,
+        elapsed_ms: dead.elapsed_ms,
+        events: dead.events,
+        last_event: dead.last_event,
+        ws_reconnects: dead.ws_reconnects,
+        ws_close: dead.ws_close,
+        ice_ever_connected: true,
+      });
+      onErrorRef.current?.(INTERRUPTED_COPY[langRef.current]);
+    }
+    return () => window.removeEventListener("online", flush);
+  }, []);
 
   const toggleMute = useCallback(() => {
     const session = sessionRef.current;

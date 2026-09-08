@@ -40,6 +40,9 @@ const REASONS = new Set([
   /* The ordinary end: the caller hung up. Carries the event histogram, so
      a call that connected and said nothing names the protocol it heard. */
   "hung-up",
+  /* THE PAGE DIED UNDER THE CALL and the next load found its pulse
+     (lib/voice/call-memory.ts). Sent by the page that came back. */
+  "page-killed",
 ]);
 const short = (v: unknown, max: number) => (typeof v === "string" ? v.replace(/[^\w.:-]/g, "").slice(0, max) : "");
 /* The cause of a failure: a browser's own error name and message. Words,
@@ -69,6 +72,9 @@ export async function POST(req: Request) {
       `dc=${short(body.dc, 16) || "none"} lastEvent=${short(body.last_event, 60) || "none"} toolCalls=${num(body.tool_calls)} ` +
       `slot=${short(body.region, 8) || "none"} lane=${short(body.lane, 4) || "rtc"} fellBack=${body.fell_back === true} iceEverConnected=${body.ice_ever_connected === true} resumes=${num(body.resumes)}` +
       (cause(body.err) ? ` err="${cause(body.err)}"` : "") +
+      (num(body.ws_reconnects) ? ` wsReconnects=${num(body.ws_reconnects)}` : "") +
+      (short(body.ws_close, 6) ? ` wsClose=${short(body.ws_close, 6)}` : "") +
+      (num(body.queued_at) ? ` queuedAt=${new Date(num(body.queued_at)).toISOString()}` : "") +
       (typeof body.events === "string" && body.events ? ` events=${body.events.replace(/[^\w.:,…-]/g, "").slice(0, 600)}` : ""),
   );
   return new NextResponse(null, { status: 204 });

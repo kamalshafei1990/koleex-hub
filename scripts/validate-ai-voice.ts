@@ -1346,6 +1346,9 @@ console.log("\n── 8. What the client may know, and what it may not ──");
     check("  …the log carries the host and the sizes — never the full URL", /console\.log\(`\[ai\.image\] ok host=\$\{host\} w=\$\{width\} in=/.test(img) && !/\$\{raw\}|\$\{current\}/.test(img));
     const pkg = JSON.parse(readFileSync("package.json", "utf8")) as { dependencies: Record<string, string> };
     check("  …and the encoder is a declared dependency, not a transitive one the framework might drop", typeof pkg.dependencies.sharp === "string");
+    const tele = readFileSync("src/app/api/ai/voice/telemetry/route.ts", "utf8");
+    check("the telemetry route accepts page-killed and logs the socket lane's redials, close code and a queued beacon's own time — bounded, never a body",
+      /"page-killed",/.test(tele) && /wsReconnects=\$\{num\(body\.ws_reconnects\)\}/.test(tele) && /wsClose=\$\{short\(body\.ws_close, 6\)\}/.test(tele) && /queuedAt=\$\{new Date\(num\(body\.queued_at\)\)\.toISOString\(\)\}/.test(tele));
   }
 
   console.log("\n── 20. A voice, auditioned: the sample route and its two synthesisers ──");

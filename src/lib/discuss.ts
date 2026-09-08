@@ -720,6 +720,13 @@ function subscribeBroadcast(topic: string, onPing: (p: PingPayload) => void): ()
          socket storm going for hours; the visible/online nudge (kickAll)
          retries the moment the page is back. */
       if (typeof document !== "undefined" && document.visibilityState === "hidden") return;
+      /* NOT UNDER A LIVE CALL EITHER (2026-09-08). The metrics of a call
+         that died with the phone's network show this channel closing and
+         rejoining every second or two for the whole call — a socket storm
+         on the same flaky link the call's own socket was fighting for. A
+         call is the one thing on the page that matters while it is up; the
+         channel rejoins the moment it ends (the kx-call-ended nudge). */
+      if (typeof document !== "undefined" && document.querySelector("[data-kx-call-active='1']")) return;
       const delay = rejoinDelayMs(created.retry);
       created.retry += 1;
       created.rejoinTimer = window.setTimeout(() => {
@@ -767,6 +774,7 @@ if (typeof window !== "undefined") {
     }
   };
   window.addEventListener("online", kickAll);
+  window.addEventListener("kx-call-ended", kickAll);
   document.addEventListener("visibilitychange", () => {
     if (document.visibilityState === "visible") kickAll();
   });
