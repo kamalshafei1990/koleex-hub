@@ -555,6 +555,56 @@ What stays true: the socket-lane POSTs that never reached the route
 the mainland — the probe proved phone → relay → vendor works without a
 VPN. Beijing's 403 stays the key.
 
+## The first real conversation through the relay — and two calls that sent nothing (2026-09-09 03:06–03:09)
+
+After #386 the owner tested from the phone in mainland China. The relay's
+log, by session:
+
+| time (UTC) | what | relay line |
+|---|---|---|
+| 03:00:37 | page opened (lane probe) | `up=0 down=3 ms=903` |
+| 03:06:19 | call, **through the VPN** | `up=158 down=37 ms=14549` — speech in, transcript, answer, voice out; the beacon shows `speech_started … response.output_audio.delta:10 … response.done` |
+| 03:07:39 | page opened again (lane probe) | `up=0 down=3` |
+| 03:08:59 | call, **no VPN** | `up=1 down=5 ms=13929` — the session configuration went up, then NOTHING; beacon `events=session.created,conversation.created,ping:2,session.updated` |
+| 03:09:11 | call, **no VPN** | `up=1 down=4 ms=8632` — the same |
+
+So the socket lane works end to end from the mainland (the 03:06 call is a
+real conversation on it), and the two failing calls are NOT the network:
+the socket opened through the relay in ~410 ms, the vendor accepted the
+session, and the phone never sent one frame of microphone audio. The
+beacon could not say why — reader never started, context suspended, track
+muted or silent — and nothing about the network explains a microphone.
+
+**What this change does (diagnosis, no behaviour change):**
+
+- `ws-audio.ts` `stats()`: which reader took the microphone (`worklet` /
+  `processor` / `none` / `failed`), how many frames it handed out, the
+  loudest sample it saw (0..1), the context's state and sample rate. A
+  script-processor start that throws is now `failed` in stats rather than
+  an unhandled rejection.
+- `session.ts` diagnostics: `up_frames` (frames actually sent on the
+  socket), `capture` (`worklet:running:48000`), `mic_peak`, `mic`
+  (`live:open:on` — the track's readyState, muted or open, enabled or off).
+- The telemetry route prints ` upFrames= capture= micPeak= mic=` when a
+  capture was reported.
+- The two server lines that name the lane and the socket (`[ai.voice] lane=`
+  and `[ai.voice.ws] session … socket=relay|direct`) were `console.log`, which
+  the Vercel log tool never shows; they are `console.warn` now.
+
+**Next read:** the owner's next no-VPN call. `capture=none` → the reader was
+never started (onopen path); `…:suspended:…` → an AudioContext iOS would not
+run (created too long after the tap); `mic=live:muted:on` → iOS muted the
+track (another audio session took the microphone); `micPeak=0` with frames
+counted → a silent track; `upFrames>0` with no `speech_started` → the
+vendor's VAD never fired on what it received.
+
+**"Not Grok voice" (the 03:06 call):** on the socket lane the vendor is
+Grok by construction (`lane=ws`), and its audio came down
+(`response.output_audio.delta:10`). The ws-session line — visible from now
+on — will show which `voice=` key the call asked for and the vendor id it
+resolved to; the picker offers the socket lane's own names (Ara, Eve, Rex,
+Leo, Sal) once the device settles on that lane.
+
 ## Owner-side (not code)
 
 - 2026-09-08 19:30 UTC: the owner added `AI_VOICE_RELAY_URL` and

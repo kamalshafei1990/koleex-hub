@@ -166,7 +166,7 @@ export async function POST(req: Request) {
      with the relay. The relay secret is read here, handed to the signer,
      and appears nowhere else. */
   const socket = browserSocketUrl(cfg, secret.value, process.env.AI_VOICE_RELAY_SECRET?.trim() || "", Math.floor(Date.now() / 1000));
-  console.log(`[ai.voice.ws] session voice=${requested ?? "default"} vendor=${voice?.vendorId ?? "none"} via=${fields.via} probe=${fields.probe} socket=${socket.via}`);
+  console.warn(`[ai.voice.ws] session voice=${requested ?? "default"} vendor=${voice?.vendorId ?? "none"} via=${fields.via} probe=${fields.probe} socket=${socket.via}`);
 
   return NextResponse.json(
     {

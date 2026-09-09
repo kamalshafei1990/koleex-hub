@@ -260,7 +260,7 @@ export async function GET(req: Request) {
      line — country and decision, no identity — so a wrong lane can be
      read from the log rather than guessed from a screenshot. */
   const country = req.headers.get("x-vercel-ip-country") ?? "";
-  console.log(`[ai.voice] lane=${lane ?? "none"} country=${country.replace(/[^A-Za-z]/g, "").slice(0, 2) || "none"} ws=${grok !== null} rtc=${cfg !== null}`);
+  console.warn(`[ai.voice] lane=${lane ?? "none"} country=${country.replace(/[^A-Za-z]/g, "").slice(0, 2) || "none"} ws=${grok !== null} rtc=${cfg !== null}`);
   /* Not configured is not an error here: no voice service means no voices to
      choose between, and a picker that cannot be used should not be drawn. */
   /* BOTH LANES' VOICES, BY LANE. The device may settle on the other lane
