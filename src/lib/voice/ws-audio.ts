@@ -294,11 +294,23 @@ export function createBrowserWsAudio(wireRate: number): WsAudio {
   let closed = false;
   let sample: { node: AudioBufferSourceNode; stop: () => void } | null = null;
   const playing = new Set<AudioBufferSourceNode>();
-  /* The two meters. The far one hangs off the output the voice and the
-     samples already go to; the microphone one is wired when capture starts. */
+  /* THE FAR SIDE GOES THROUGH A BUS, and the meter hangs off the bus — NOT
+     off the destination. A MediaStreamAudioDestinationNode has NO outputs,
+     and `out.connect(analyser)` throws IndexSizeError in every browser. That
+     one line (2026-09-08 03:25, the meters change) threw out of this
+     factory, which threw out of the socket lane's dial after its socket
+     was created and BEFORE its handlers were attached: the socket opened,
+     the far side spoke, nothing was heard and nothing was sent, and the
+     screen said "Still connecting" for as long as anyone waited — from a
+     phone and a Mac, through a VPN and without one (the relay's log:
+     `upstream open … down=3 up=0`). The Node fakes had a `connect` on the
+     destination, so no suite caught it. Everything that plays connects to
+     the bus; the bus feeds the destination and the meter. */
+  const farBus = ctx.createGain();
+  farBus.connect(out);
   const farMeter = ctx.createAnalyser();
   farMeter.fftSize = METER_FFT_SIZE;
-  out.connect?.(farMeter);
+  farBus.connect(farMeter);
   let micMeter: AnalyserNode | null = null;
   const meterBuf = new Uint8Array(METER_FFT_SIZE);
   const read = (a: AnalyserNode | null): number => {
@@ -383,7 +395,7 @@ export function createBrowserWsAudio(wireRate: number): WsAudio {
       buffer.getChannelData(0).set(samples);
       const node = ctx.createBufferSource();
       node.buffer = buffer;
-      node.connect(out);
+      node.connect(farBus);
       jitter.push({ node, duration: buffer.duration });
       void ctx.resume().catch(() => {});
     },
@@ -425,7 +437,7 @@ export function createBrowserWsAudio(wireRate: number): WsAudio {
             if (closed) return done(false);
             const node = ctx.createBufferSource();
             node.buffer = buffer;
-            node.connect(out);
+            node.connect(farBus);
             node.onended = () => {
               if (sample?.node === node) sample = null;
               done(true);
