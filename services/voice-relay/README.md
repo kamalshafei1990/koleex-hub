@@ -21,3 +21,12 @@ makes `/api/ai/voice/ws-session` hand browsers the relay's url with a ticket
 instead of the vendor's url. Unset, browsers dial the vendor directly as before.
 
 `npm test` runs the pure checks (ticket, protocol, upstream url, origins).
+
+## Deploying
+
+Railway builds this directory from `main` (root directory `services/voice-relay`,
+watch pattern `services/voice-relay/**` — no leading slash: with one, Railway
+matched nothing and the merge of 2026-09-08 20:56 UTC produced no deployment
+at all, so the relay kept refusing the watchdog's Origin-less probe for hours
+after the fix had merged). A change anywhere under this directory deploys;
+a change elsewhere in the repository does not.
