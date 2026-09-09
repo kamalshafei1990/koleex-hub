@@ -2568,7 +2568,7 @@ function describeErrorCheck(): boolean {
     session_compact: { type: "session.update", session: { modalities: ["text", "audio"] } },
     ...over,
   });
-  const laneRun = async (opts: { envelope?: unknown; status?: number; noSocket?: boolean; noAudio?: boolean; reconnectGraceMs?: number; wsFirstEventMs?: number; failFetch?: number } = {}) => {
+  const laneRun = async (opts: { envelope?: unknown; status?: number; noSocket?: boolean; noAudio?: boolean; audioThrows?: boolean; reconnectGraceMs?: number; wsFirstEventMs?: number; failFetch?: number } = {}) => {
     const recorded: Recorded[] = [];
     const d = deps({ recorded, reconnectGraceMs: opts.reconnectGraceMs, wsFirstEventMs: opts.wsFirstEventMs });
     const base = d.deps.fetchFn;
@@ -2590,7 +2590,8 @@ function describeErrorCheck(): boolean {
       return base(url, init);
     }) as unknown as typeof fetch;
     if (!opts.noSocket) d.deps.createWebSocket = (url, protocols) => { const sock = makeSocket(url, protocols); sockets.push(sock); return sock; };
-    if (!opts.noAudio) d.deps.createWsAudio = (rate) => {
+    if (opts.audioThrows) d.deps.createWsAudio = () => { throw Object.assign(new Error("output index (0) exceeds number of outputs (0)"), { name: "IndexSizeError" }); };
+    else if (!opts.noAudio) d.deps.createWsAudio = (rate) => {
       const a: FakeAudio = { stream: { id: "far" } as unknown as MediaStream, played: [], flushes: 0, closed: 0, captureStarted: false, frame: null, rate, samples: [] };
       audios.push(a);
       return {
@@ -2681,6 +2682,13 @@ function describeErrorCheck(): boolean {
     await sleep(160);
     const last = r.states[r.states.length - 1];
     check("a socket that opens and says nothing by the deadline is the service not answering — the fall-back's shape, never 'connection-lost'", last[0] === "failed" && last[1] === "service-unreachable" && r.mic.allStopped() && r.sockets[0].closed === 1 && r.states.every(([st]) => st !== "live" && st !== "reconnecting"));
+  }
+  {
+    /* THE FACTORY THAT THROWS (2026-09-09 02:24): named, closed, never an
+       open silent socket the caller stares at. */
+    const t = await laneRun({ audioThrows: true, wsFirstEventMs: 5_000 });
+    const tl = t.states[t.states.length - 1];
+    check("an audio factory that throws on the call's own dial is handshake-failed WITH the cause — the socket closed, nothing left connecting", tl[0] === "failed" && tl[1] === "handshake-failed" && /IndexSizeError/.test(t.s.diagnostics().err) && t.sockets[0].closed === 1 && t.mic.allStopped());
   }
   {
     const r = await laneRun({ wsFirstEventMs: 5_000 });
@@ -3173,7 +3181,7 @@ function describeErrorCheck(): boolean {
     rmsLevel(silent) === 0 && Math.abs(rmsLevel(loud) - Math.min(1, 0.5 * DISPLAY_GAIN)) < 1e-9 && rmsLevel(new Uint8Array(0)) === 0 && rmsLevel(new Uint8Array(512).fill(255)) === 1 && DISPLAY_GAIN === 2.8 && LEVEL_EPSILON === 0.02);
   const wa = readFileSync("src/lib/voice/ws-audio.ts", "utf8");
   check("the socket lane's audio meters both sides INSIDE its own context: an analyser on the output, one on the microphone source, read on demand",
-    /const farMeter = ctx\.createAnalyser\(\);/.test(wa) && /out\.connect\?\.\(farMeter\);/.test(wa) && /micMeter = ctx\.createAnalyser\(\);[\s\S]{0,120}?source\.connect\(micMeter\);/.test(wa) &&
+    /const farMeter = ctx\.createAnalyser\(\);/.test(wa) && /const farBus = ctx\.createGain\(\);\s*farBus\.connect\(out\);/.test(wa) && /farBus\.connect\(farMeter\);/.test(wa) && !/^\s*out\.connect/m.test(wa) && (wa.match(/node\.connect\(farBus\);/g) ?? []).length === 2 && /micMeter = ctx\.createAnalyser\(\);[\s\S]{0,120}?source\.connect\(micMeter\);/.test(wa) &&
     /levels\(\) \{\s*return \{ mic: read\(micMeter\), far: read\(farMeter\) \};/.test(wa) && /return rmsLevel\(meterBuf\);/.test(wa) && (wa.match(/meterMic\(\);/g) ?? []).length === 2);
   const hook = readFileSync("src/lib/voice/useStreamLevel.ts", "utf8");
   check("  …the stream meter shares the arithmetic and no longer carries its own copy", /const next = rmsLevel\(buf\);/.test(hook) && !/DISPLAY_GAIN = 2\.8/.test(hook));
@@ -3310,6 +3318,81 @@ function describeErrorCheck(): boolean {
     /const applyLane = \(\) => \{\s*transportRef\.current = decided\.lane;\s*offerFor\(decided\.lane\);\s*\};\s*if \(sessionRef\.current\) laneAfterCallRef\.current = applyLane;\s*else applyLane\(\);/.test(btn) &&
     /const laneAfterCallRef = useRef<\(\(\) => void\) \| null>\(null\);/.test(btn) &&
     /releaseCall\(\);\s*\/\*[^*]*\*\/\s*laneAfterCallRef\.current\?\.\(\);\s*laneAfterCallRef\.current = null;/.test(btn));
+}
+
+
+{
+  console.log("\n── 35. The far meter hangs off a bus: a destination node has no outputs, and the factory that threw took the socket lane with it ──");
+  /* 2026-09-08 03:25 → 2026-09-09 02:24. `out.connect(farMeter)` on a
+     MediaStreamAudioDestinationNode throws IndexSizeError in every browser;
+     the factory threw out of dialWs after the socket was created and before
+     its handlers were attached. Socket open, far side speaking, nothing
+     heard, nothing sent, "Still connecting" for ever — from a phone and a
+     Mac, through a VPN and without one. The Node fake had a `connect` on the
+     destination, so nothing here caught it. This fake does what a browser
+     does. */
+  const { createBrowserWsAudio } = await import("../src/lib/voice/ws-audio");
+  const { readFileSync } = await import("node:fs");
+  const connections: Array<[string, string]> = [];
+  const mk = (kind: string, outputs = 1) => ({
+    kind,
+    fftSize: 0,
+    gain: { value: 1 },
+    buffer: null as unknown,
+    onended: null as null | (() => void),
+    connect(to: { kind: string }) {
+      if (outputs === 0) throw Object.assign(new Error("output index (0) exceeds number of outputs (0)"), { name: "IndexSizeError" });
+      connections.push([kind, to.kind]);
+      return to;
+    },
+    disconnect() {},
+    start() {},
+    stop() {},
+    getByteTimeDomainData(buf: Uint8Array) { buf.fill(128); },
+    stream: { id: "far" },
+  });
+  class FakeCtx {
+    currentTime = 0;
+    sampleRate = 48_000;
+    destination = mk("destination", 0);
+    audioWorklet = undefined;
+    createMediaStreamDestination() { return mk("streamDestination", 0); }
+    createGain() { return mk("gain"); }
+    createAnalyser() { return mk("analyser"); }
+    createBufferSource() { return mk("bufferSource"); }
+    createBuffer(_c: number, len: number) { return { duration: len / 24_000, getChannelData: () => new Float32Array(len) }; }
+    createMediaStreamSource() { return mk("micSource"); }
+    createScriptProcessor() { return mk("processor"); }
+    resume() { return Promise.resolve(); }
+    close() { return Promise.resolve(); }
+    decodeAudioData() { return Promise.reject(new Error("not in this fake")); }
+  }
+  const g = globalThis as unknown as { window?: unknown };
+  const hadWindow = g.window;
+  g.window = { AudioContext: FakeCtx };
+  let built: ReturnType<typeof createBrowserWsAudio> | null = null;
+  let threw = "";
+  try {
+    built = createBrowserWsAudio(24_000);
+  } catch (e) {
+    threw = e instanceof Error ? `${e.name}: ${e.message}` : String(e);
+  }
+  check("the factory is built against a destination that REFUSES connect, as a browser's does — and does not throw", threw === "" && built !== null);
+  check("  …the far bus feeds the destination and the meter; nothing is connected FROM the destination",
+    connections.some(([f, t]) => f === "gain" && t === "streamDestination") && connections.some(([f, t]) => f === "gain" && t === "analyser") && !connections.some(([f]) => f === "streamDestination"));
+  if (built) {
+    built.play(Buffer.from(new Int16Array([0, 1000, -1000, 0]).buffer).toString("base64"));
+    check("  …a voice frame connects to the bus, not to the destination", connections.some(([f, t]) => f === "bufferSource" && t === "gain") && !connections.some(([f, t]) => f === "bufferSource" && t === "streamDestination"));
+    check("  …and levels read from both meters without throwing", JSON.stringify(built.levels()) === JSON.stringify({ mic: 0, far: 0 }));
+    built.close();
+  }
+  if (hadWindow === undefined) delete g.window; else g.window = hadWindow;
+
+  /* THE DIAL, when the factory throws anyway: a named failure the beacon
+     carries and the button falls back on — never an open, silent socket. */
+  const sess = readFileSync("src/lib/voice/session.ts", "utf8");
+  check("the audio factory is built inside a catch; a throw on the call's own dial is handshake-failed with the cause, a redial's throw closes the socket",
+    /try \{\s*this\.wsAudio = this\.deps\.createWsAudio\(sampleRate\);\s*\} catch \(e\) \{\s*if \(first\) this\.fail\("handshake-failed", e\);\s*else this\.closeWs\(\);\s*return false;\s*\}/.test(sess));
 }
 
 console.log(`\n${pass} passed, ${failures.length} failed`);

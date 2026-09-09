@@ -524,6 +524,37 @@ carry `tool_wait_ms` (the longest such wait in a call) and the beacon logs
 (07:07:07, as the tool result and a barge-in crossed) is beaconed as
 `config-rejected` — a misnomer to fix.
 
+## The socket that opened and said nothing was OURS (2026-09-09 02:24)
+
+The relay's first real session from the owner's phone, mainland China,
+**no VPN**: the lane probe went phone → relay → vendor and heard the
+vendor's first event in 815 ms (`session=5 upstream open openMs=417
+down=3`, closed by the probe on its first frame). Four seconds later the
+call: `session=6 upstream open openMs=409 … down=3 up=0`, closed by the
+phone after 8.9 s. The vendor spoke three frames; the phone sent
+**nothing** — not even the session configuration that goes out on `open`.
+
+That is not a network. `createBrowserWsAudio` did `out.connect(farMeter)`
+on a MediaStreamAudioDestinationNode, which has no outputs: IndexSizeError
+in every browser, since the meters change of 2026-09-08 03:25 (#377). The
+factory threw out of `dialWs` after the socket was created and before its
+handlers were attached — the socket opened, the far side spoke, nothing
+was heard, nothing was sent, the call sat in "connecting". Every "open
+and silent" socket since (06:21 phone, 06:47 Mac, 07:03, 07:09, 02:24) was
+this line. The Node fakes had a `connect` on the destination, so no suite
+caught it; the suite's fake now refuses `connect` as a browser does.
+
+- The far side plays through a GainNode bus; the bus feeds the destination
+  and the meter. Nothing is connected from the destination.
+- The audio factory is built inside a catch: a throw on the call's own dial
+  is `handshake-failed` with the cause in the beacon, and the button's
+  fall-back to the mainland lane runs; a redial's throw closes the socket.
+
+What stays true: the socket-lane POSTs that never reached the route
+(05:52–05:56) were the network, and the relay is still the right path from
+the mainland — the probe proved phone → relay → vendor works without a
+VPN. Beijing's 403 stays the key.
+
 ## Owner-side (not code)
 
 - 2026-09-08 19:30 UTC: the owner added `AI_VOICE_RELAY_URL` and

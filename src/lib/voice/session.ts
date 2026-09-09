@@ -1269,8 +1269,23 @@ export class VoiceSession {
     /* THE AUDIO OUTLIVES THE SOCKET. One context, one microphone reader,
        one far-side stream for the whole call; a redial changes only the
        socket the frames travel on. (A second context under a live
-       microphone is what garbled the microphone — ws-audio.ts.) */
-    if (!this.wsAudio && this.deps.createWsAudio) this.wsAudio = this.deps.createWsAudio(sampleRate);
+       microphone is what garbled the microphone — ws-audio.ts.)
+
+       AND IT IS BUILT INSIDE A CATCH (2026-09-09 02:24). The factory threw
+       (ws-audio.ts has the line), this dial threw with it — after the
+       socket existed and before its handlers were attached — and the call
+       sat in "connecting" for ever with an open, silent socket. A factory
+       that fails is now a NAMED failure the beacon carries, and the button's
+       fall-back to the mainland lane runs; a redial keeps the audio it has. */
+    if (!this.wsAudio && this.deps.createWsAudio) {
+      try {
+        this.wsAudio = this.deps.createWsAudio(sampleRate);
+      } catch (e) {
+        if (first) this.fail("handshake-failed", e);
+        else this.closeWs();
+        return false;
+      }
+    }
     const audio = this.wsAudio;
     /* The new session is configured afresh. */
     this.configSent = false;
