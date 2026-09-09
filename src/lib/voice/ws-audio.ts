@@ -68,6 +68,25 @@ export type WsAudio = {
    *  that garbled this context's reader. Two analysers here, one on the
    *  microphone, one on everything played, read on demand. 0..1 each. */
   levels(): { mic: number; far: number };
+  /** WHAT THE MICROPHONE READER DID (2026-09-09 03:09: two calls from a
+   *  phone opened their socket, were configured, and sent NOT ONE frame of
+   *  audio in fourteen seconds — the relay's log read `up=1`, and the beacon
+   *  could not say whether the reader never started, ran on a suspended
+   *  context, or read a track that was silent). Which reader took the
+   *  microphone, how many frames it handed out, the loudest sample it saw,
+   *  and the context's state and rate — for the beacon, at hang-up. */
+  stats(): WsAudioStats;
+};
+
+export type WsAudioStats = {
+  /** "worklet" | "processor" | "none" | "failed" — none until startCapture,
+   *  failed when both readers refused. */
+  path: string;
+  frames: number;
+  /** 0..1, the loudest absolute sample across every frame handed out. */
+  peak: number;
+  ctx: string;
+  rate: number;
 };
 
 /* Linear resampling — a phone microphone into a speech model does not need
@@ -292,6 +311,9 @@ export function createBrowserWsAudio(wireRate: number): WsAudio {
   let silence: GainNode | null = null;
   let capturing = false;
   let closed = false;
+  let capturePath = "none";
+  let frames = 0;
+  let peak = 0;
   let sample: { node: AudioBufferSourceNode; stop: () => void } | null = null;
   const playing = new Set<AudioBufferSourceNode>();
   /* THE FAR SIDE GOES THROUGH A BUS, and the meter hangs off the bus — NOT
@@ -331,6 +353,11 @@ export function createBrowserWsAudio(wireRate: number): WsAudio {
 
   const emit = (onFrame: (b64: string) => void, input: Float32Array) => {
     const frame = resample(input, ctx.sampleRate, wireRate);
+    frames += 1;
+    for (let i = 0; i < frame.length; i++) {
+      const a = frame[i] < 0 ? -frame[i] : frame[i];
+      if (a > peak) peak = a;
+    }
     onFrame(bytesToBase64(floatToPcm16(frame)));
   };
   /* A processor with no destination is not driven by the graph; a silent
@@ -354,6 +381,7 @@ export function createBrowserWsAudio(wireRate: number): WsAudio {
     processor.onaudioprocess = (ev: AudioProcessingEvent) => emit(onFrame, ev.inputBuffer.getChannelData(0));
     source.connect(processor);
     keepAlive(processor);
+    capturePath = "processor";
   };
   const startWorklet = async (mic: MediaStream, onFrame: (b64: string) => void): Promise<boolean> => {
     if (!ctx.audioWorklet || typeof AudioWorkletNode === "undefined") return false;
@@ -369,6 +397,7 @@ export function createBrowserWsAudio(wireRate: number): WsAudio {
       };
       source.connect(worklet);
       keepAlive(worklet);
+      capturePath = "worklet";
       return true;
     } catch {
       return false;
@@ -385,7 +414,12 @@ export function createBrowserWsAudio(wireRate: number): WsAudio {
       void ctx.resume().catch(() => {});
       void startWorklet(mic, onFrame).then((ok) => {
         if (ok || closed) return;
-        startProcessor(mic, onFrame);
+        try {
+          startProcessor(mic, onFrame);
+        } catch {
+          /* Neither reader: said in stats(), carried by the beacon. */
+          capturePath = "failed";
+        }
       });
     },
     play(b64) {
@@ -419,6 +453,9 @@ export function createBrowserWsAudio(wireRate: number): WsAudio {
     },
     levels() {
       return { mic: read(micMeter), far: read(farMeter) };
+    },
+    stats() {
+      return { path: capturePath, frames, peak: Math.round(peak * 100) / 100, ctx: String(ctx.state ?? ""), rate: ctx.sampleRate };
     },
     playSample(bytes) {
       /* Whatever the far side was saying yields to the sample. */

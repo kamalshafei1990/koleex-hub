@@ -33,6 +33,12 @@ export type VoiceTelemetryFields = {
   resp_err?: string;
   /** The longest wait a lookup made the caller sit through. */
   tool_wait_ms?: number;
+  /** Socket lane, the microphone's side: frames sent up, the reader with
+   *  the context's state and rate, the loudest sample, the track's state. */
+  up_frames?: number;
+  capture?: string;
+  mic_peak?: number;
+  mic?: string;
 };
 
 export type VoiceTelemetry = VoiceTelemetryFields;

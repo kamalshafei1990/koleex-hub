@@ -1315,7 +1315,7 @@ console.log("\n── 8. What the client may know, and what it may not ──");
       /voices_by_lane: \{ rtc: publicVoiceList\(cfg\?\.voices \?\? \[\]\), ws: publicVoiceList\(grok\?\.voices \?\? \[\]\) \}/.test(sdpRoute));
     const postBody = wsRoute.slice(wsRoute.indexOf("export async function POST"));
     check("neither route carries a vendor host in code — the endpoint is configuration", !/api\.x\.ai|wss:\/\//.test(postBody) && !/api\.x\.ai|wss:\/\//.test(sdpRoute));
-    check("the socket route logs the voice it asks for, by key and vendor id — never the key material", /console\.log\(`\[ai\.voice\.ws\] session voice=\$\{requested \?\? "default"\} vendor=\$\{voice\?\.vendorId \?\? "none"\} via=\$\{fields\.via\} probe=\$\{fields\.probe\} socket=\$\{socket\.via\}`\);/.test(wsRoute) && !/apiKey\}/.test(wsRoute));
+    check("the socket route logs the voice it asks for, by key and vendor id — never the key material", /console\.warn\(`\[ai\.voice\.ws\] session voice=\$\{requested \?\? "default"\} vendor=\$\{voice\?\.vendorId \?\? "none"\} via=\$\{fields\.via\} probe=\$\{fields\.probe\} socket=\$\{socket\.via\}`\);/.test(wsRoute) && !/apiKey\}/.test(wsRoute));
   }
 
   {

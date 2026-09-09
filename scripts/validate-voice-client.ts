@@ -73,7 +73,7 @@ function fakeMic() {
   /* `enabled` is what mute actually flips, and the first version of this
      double had no such field — so a setMuted() that did nothing to the tracks
      would have passed. */
-  const tracks = [{ stopped: false, enabled: true, stop() { this.stopped = true; }, kind: "audio" }];
+  const tracks = [{ stopped: false, enabled: true, readyState: "live", muted: false, stop() { this.stopped = true; }, kind: "audio" }];
   return {
     stream: {
       getTracks: () => tracks,
@@ -2116,7 +2116,7 @@ console.log("\n── 12. Mute ──");
     /console\.warn\(\s*`\[ai\.voice\.client\]/.test(telRoute) && !/supabase|insert\(/.test(telRoute) && /new NextResponse\(null, \{ status: 204 \}\)/.test(telRoute));
   const diagS = new VoiceSession(deps({ status: 200 }).deps);
   const dg = diagS.diagnostics();
-  check("diagnostics are states and counts only", Object.keys(dg).sort().join(",") === "canary,dc,elapsed_ms,err,events,ice,ice_ever_connected,last_event,region,resp_err,tool_calls,tool_wait_ms,ws_close,ws_reconnects" && dg.canary === "" && dg.resp_err === "" && dg.tool_wait_ms === 0 && dg.tool_calls === 0 && dg.ws_reconnects === 0 && dg.ws_close === "" && dg.elapsed_ms === 0 && dg.err === "" && dg.events === "");
+  check("diagnostics are states and counts only", Object.keys(dg).sort().join(",") === "canary,capture,dc,elapsed_ms,err,events,ice,ice_ever_connected,last_event,mic,mic_peak,region,resp_err,tool_calls,tool_wait_ms,up_frames,ws_close,ws_reconnects" && dg.up_frames === 0 && dg.capture === "" && dg.mic_peak === 0 && dg.mic === "none" && dg.canary === "" && dg.resp_err === "" && dg.tool_wait_ms === 0 && dg.tool_calls === 0 && dg.ws_reconnects === 0 && dg.ws_close === "" && dg.elapsed_ms === 0 && dg.err === "" && dg.events === "");
 
   /* THE PICTURE EXPANDS IN PLACE. */
   check("a photo in the conversation is a button that opens the lightbox, not a link out of the app",
@@ -2602,6 +2602,7 @@ function describeErrorCheck(): boolean {
         close: () => { a.closed++; },
         playSample: async (bytes) => { a.samples.push(bytes.byteLength); return true; },
         levels: () => ({ mic: 0.25, far: 0.5 }),
+        stats: () => ({ path: a.captureStarted ? "worklet" : "none", frames: 0, peak: 0.42, ctx: "running", rate }),
       };
     };
     const states: Array<[VoiceState, VoiceFailure | undefined]> = [];
@@ -2829,6 +2830,31 @@ function describeErrorCheck(): boolean {
       last[0] === "failed" && last[1] === "connection-lost" && !r.mic.allStopped() && r.s.takeMicrophone() !== null);
     r.s.stop();
   }
+
+  /* THE MICROPHONE'S SIDE IS IN THE BEACON (2026-09-09 03:09, a phone in
+     mainland China, no VPN): two calls opened their socket through the
+     relay, were configured — session.updated came back — and in fourteen
+     seconds sent NOT ONE frame of audio; the relay read `up=1`. Three
+     minutes earlier the same phone, through a VPN, held a whole
+     conversation on this lane (`up=158`). The beacon could not say whether
+     the reader never started, ran on a suspended context, or read a track
+     that was muted. Frames are counted where they are SENT. */
+  {
+    const r = await laneRun();
+    const d0 = r.s.diagnostics();
+    check("before the socket opens: no frames up, a reader that has not started, a microphone track that is live, open and on",
+      d0.up_frames === 0 && d0.capture === "none:running:24000" && d0.mic === "live:open:on");
+    r.sockets[0].open();
+    r.audios[0].frame?.("AAAA");
+    r.audios[0].frame?.("BBBB");
+    const d1 = r.s.diagnostics();
+    check("two microphone frames sent are two frames up; the reader, the context's state and its rate are named; the loudest sample is the reader's",
+      d1.up_frames === 2 && d1.capture === "worklet:running:24000" && d1.mic_peak === 0.42 && r.sockets[0].sent.length === 3);
+    r.sockets[0].drop();
+    r.audios[0].frame?.("CCCC");
+    check("  …a frame under a closed socket is not sent and not counted", r.s.diagnostics().up_frames === 2);
+    r.s.stop();
+  }
 }
 
 {
@@ -3009,7 +3035,7 @@ function describeErrorCheck(): boolean {
       CAPTURE_WORKLET_NAME === "koleex-capture" && CAPTURE_WORKLET_SOURCE.includes(`registerProcessor("${CAPTURE_WORKLET_NAME}"`) && CAPTURE_WORKLET_SOURCE.includes(`new Float32Array(${FRAME_SAMPLES})`) &&
       CAPTURE_WORKLET_SOURCE.includes("this.port.postMessage(out, [out.buffer])") &&
       /URL\.createObjectURL\(new Blob\(\[CAPTURE_WORKLET_SOURCE\], \{ type: "application\/javascript" \}\)\)/.test(wa) && /URL\.revokeObjectURL\(url\);/.test(wa) &&
-      /void startWorklet\(mic, onFrame\)\.then\(\(ok\) => \{\s*if \(ok \|\| closed\) return;\s*startProcessor\(mic, onFrame\);/.test(wa) &&
+      /void startWorklet\(mic, onFrame\)\.then\(\(ok\) => \{\s*if \(ok \|\| closed\) return;\s*try \{\s*startProcessor\(mic, onFrame\);\s*\} catch \{[\s\S]{0,120}?capturePath = "failed";/.test(wa) &&
       /if \(!ctx\.audioWorklet \|\| typeof AudioWorkletNode === "undefined"\) return false;/.test(wa));
     check("  …both readers keep the graph alive through a silent gain, and never play the microphone back", /silence\.gain\.value = 0;/.test(wa) && /keepAlive\(processor\)/.test(wa) && /keepAlive\(worklet\)/.test(wa));
   }
@@ -3266,7 +3292,7 @@ function describeErrorCheck(): boolean {
       const sock: VoiceSocket = { readyState: 0, send: () => {}, close: () => {}, onopen: null, onmessage: null, onclose: null, onerror: null };
       return sock;
     };
-    d.deps.createWsAudio = () => ({ stream: {} as MediaStream, startCapture: () => {}, play: () => {}, flush: () => {}, close: () => {}, playSample: async () => true, levels: () => ({ mic: 0, far: 0 }) });
+    d.deps.createWsAudio = () => ({ stream: {} as MediaStream, startCapture: () => {}, play: () => {}, flush: () => {}, close: () => {}, playSample: async () => true, levels: () => ({ mic: 0, far: 0 }), stats: () => ({ path: "none", frames: 0, peak: 0, ctx: "running", rate: 24_000 }) });
     const s = new VoiceSession(d.deps, {}, null, null, null, null, "ws");
     await within(2000, s.start());
     await new Promise((r) => setTimeout(r, 30));
@@ -3395,6 +3421,72 @@ function describeErrorCheck(): boolean {
     /try \{\s*this\.wsAudio = this\.deps\.createWsAudio\(sampleRate\);\s*\} catch \(e\) \{\s*if \(first\) this\.fail\("handshake-failed", e\);\s*else this\.closeWs\(\);\s*return false;\s*\}/.test(sess));
 }
 
+{
+  console.log("\n── 36. The browser's microphone reader reports itself: which reader, how many frames, how loud — and the server's own lines are visible ──");
+  const { createBrowserWsAudio } = await import("../src/lib/voice/ws-audio");
+  const { readFileSync } = await import("node:fs");
+  {
+    const mkNode = (kind: string) => ({ kind, fftSize: 0, gain: { value: 1 }, onaudioprocess: null as null | ((ev: unknown) => void), connect(to: unknown) { return to; }, disconnect() {}, start() {}, stop() {}, getByteTimeDomainData(buf: Uint8Array) { buf.fill(128); }, stream: { id: "far" } });
+    class FakeCtx {
+      state = "running";
+      currentTime = 0;
+      sampleRate = 24_000;
+      destination = mkNode("destination");
+      audioWorklet = undefined;
+      processor = mkNode("processor");
+      createMediaStreamDestination() { return mkNode("streamDestination"); }
+      createGain() { return mkNode("gain"); }
+      createAnalyser() { return mkNode("analyser"); }
+      createBufferSource() { return mkNode("bufferSource"); }
+      createBuffer(_c: number, len: number) { return { duration: len / 24_000, getChannelData: () => new Float32Array(len) }; }
+      createMediaStreamSource() { return mkNode("micSource"); }
+      createScriptProcessor() { return this.processor; }
+      resume() { return Promise.resolve(); }
+      close() { return Promise.resolve(); }
+      decodeAudioData() { return Promise.reject(new Error("not in this fake")); }
+    }
+    const g = globalThis as unknown as { window?: unknown };
+    const hadWindow = g.window;
+    const made: FakeCtx[] = [];
+    g.window = { AudioContext: class extends FakeCtx { constructor() { super(); made.push(this); } } };
+    const ctx = () => made[0];
+    const audio = createBrowserWsAudio(24_000);
+    check("a reader that has not started says so: none, the context's state, its rate", JSON.stringify(audio.stats()) === JSON.stringify({ path: "none", frames: 0, peak: 0, ctx: "running", rate: 24_000 }));
+    const frames: string[] = [];
+    audio.startCapture({ getAudioTracks: () => [] } as unknown as MediaStream, (b64) => frames.push(b64));
+    await new Promise((res) => setTimeout(res, 0));
+    check("without a worklet the script processor is the reader, and stats() names it", audio.stats().path === "processor" && ctx().processor.onaudioprocess !== null);
+    const samples = new Float32Array(4096);
+    samples[7] = 0.5;
+    samples[9] = -0.25;
+    ctx().processor.onaudioprocess?.({ inputBuffer: { getChannelData: () => samples } });
+    ctx().processor.onaudioprocess?.({ inputBuffer: { getChannelData: () => new Float32Array(4096) } });
+    check("two frames read are two frames handed out, and the loudest sample across them is kept", frames.length === 2 && audio.stats().frames === 2 && audio.stats().peak === 0.5);
+    audio.close();
+
+    /* Both readers refusing is a named state, not an unhandled rejection. */
+    class RefusingCtx extends FakeCtx { createScriptProcessor(): never { throw new Error("no processor"); } }
+    g.window = { AudioContext: RefusingCtx };
+    const refused = createBrowserWsAudio(24_000);
+    refused.startCapture({ getAudioTracks: () => [] } as unknown as MediaStream, () => {});
+    await new Promise((res) => setTimeout(res, 0));
+    check("a graph with neither reader says failed — the beacon carries it, nothing throws", refused.stats().path === "failed" && refused.stats().frames === 0);
+    refused.close();
+    if (hadWindow === undefined) delete g.window; else g.window = hadWindow;
+  }
+
+  /* THE WIRE: the beacon type carries the four fields, the route prints them. */
+  const tel = readFileSync("src/lib/voice/telemetry.ts", "utf8");
+  const route = readFileSync("src/app/api/ai/voice/telemetry/route.ts", "utf8");
+  check("the beacon type carries up_frames, capture, mic_peak and mic", /up_frames\?: number;/.test(tel) && /capture\?: string;/.test(tel) && /mic_peak\?: number;/.test(tel) && /\bmic\?: string;/.test(tel));
+  check("  …and the telemetry route logs them, bounded and sanitised, only when a capture was reported",
+    route.includes('short(body.capture, 32) ? ` upFrames=${num(body.up_frames)} capture=${short(body.capture, 32)} micPeak=') && route.includes('mic=${short(body.mic, 24) || "none"}'));
+  /* THE SERVER'S OWN LINES ARE VISIBLE: the log tool never shows info. */
+  const wsRoute = readFileSync("src/app/api/ai/voice/ws-session/route.ts", "utf8");
+  const sdpRoute = readFileSync("src/app/api/ai/voice/session/route.ts", "utf8");
+  check("the ws-session line (voice, vendor, via, probe, socket) and the lane line (lane, country) are warn-level — the log tool shows nothing below it",
+    wsRoute.includes("console.warn(`[ai.voice.ws] session voice=") && !wsRoute.includes("console.log(`[ai.voice.ws] session") && sdpRoute.includes("console.warn(`[ai.voice] lane=") && !sdpRoute.includes("console.log(`[ai.voice] lane="));
+}
 console.log(`\n${pass} passed, ${failures.length} failed`);
   if (failures.length) {
     console.log("\nFAILED:");

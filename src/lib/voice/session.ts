@@ -47,7 +47,7 @@ function eventTypeOf(raw: string): string {
   }
 }
 import { buildTextTurnMessages, buildNoteMessage, buildResponseRequest } from "./text-turn";
-import { createBrowserWsAudio, type WsAudio } from "./ws-audio";
+import { createBrowserWsAudio, type WsAudio, type WsAudioStats } from "./ws-audio";
 
 /** True when a DataChannel message is exactly this event.
  *
@@ -138,6 +138,15 @@ export type VoiceDiagnostics = {
   /** The longest wait, in one call, from a response's creation to the tool
    *  call it carried being complete — the "thinking" the caller sat through. */
   tool_wait_ms: number;
+  /** SOCKET LANE, THE MICROPHONE'S SIDE (2026-09-09 03:09): frames this
+   *  call sent up, the reader that made them with the context's state and
+   *  rate ("worklet:running:48000"), the loudest sample the reader saw
+   *  (0..1), and the microphone track's own state ("live:open:on" —
+   *  readyState, muted or open, enabled or off). "" / 0 on the other lane. */
+  up_frames: number;
+  capture: string;
+  mic_peak: number;
+  mic: string;
 };
 
 export type VoiceEvents = {
@@ -519,6 +528,8 @@ export class VoiceSession {
    *  created, and the longest gap from there to a parsed tool call. */
   private lastResponseCreatedAt = 0;
   private toolWaitMs = 0;
+  /** Socket lane: `input_audio_buffer.append` frames sent on this call. */
+  private wsFramesUp = 0;
   /* THE OTHER REGION. The server may hold a second endpoint (see the
      server's voice/config.ts for why). It tells this client two things with
      the answer: which SLOT served — a neutral word, never a host — and
@@ -682,6 +693,7 @@ export class VoiceSession {
 
   /** States and counts only — what a log line needs to explain a failure. */
   diagnostics(): VoiceDiagnostics {
+    const capture = this.captureStats();
     return {
       elapsed_ms: this.startedAt ? Date.now() - this.startedAt : 0,
       ice: this.pc?.iceConnectionState ?? (this.ws ? `ws${this.ws.readyState}` : "none"),
@@ -697,7 +709,31 @@ export class VoiceSession {
       canary: this.canary,
       resp_err: this.lastResponseError,
       tool_wait_ms: this.toolWaitMs,
+      up_frames: this.wsFramesUp,
+      capture: capture ? `${capture.path}:${capture.ctx}:${capture.rate}` : "",
+      mic_peak: capture?.peak ?? 0,
+      mic: this.micState(),
     };
+  }
+
+  /** The socket-lane reader's own account (WsAudio.stats). Null on the
+   *  other lane, and null rather than a throw for a double without stats(). */
+  private captureStats(): WsAudioStats | null {
+    const audio = this.wsAudio;
+    if (!audio || typeof audio.stats !== "function") return null;
+    try {
+      return audio.stats();
+    } catch {
+      return null;
+    }
+  }
+
+  /** "live:open:on" — the first audio track's readyState, muted or open,
+   *  enabled or off. "none" without a microphone. */
+  private micState(): string {
+    const track = this.mic?.getAudioTracks?.()[0];
+    if (!track) return "none";
+    return `${track.readyState}:${track.muted ? "muted" : "open"}:${track.enabled ? "on" : "off"}`;
   }
 
   /** The microphone a call that lost its connection kept for the call that
@@ -1309,6 +1345,7 @@ export class VoiceSession {
             if (!live || live.readyState !== 1) return;
             try {
               live.send(JSON.stringify({ type: "input_audio_buffer.append", audio: b64 }));
+              this.wsFramesUp += 1;
             } catch {
               /* The socket closed under a frame; onclose handles the call. */
             }
