@@ -2602,7 +2602,7 @@ function describeErrorCheck(): boolean {
         close: () => { a.closed++; },
         playSample: async (bytes) => { a.samples.push(bytes.byteLength); return true; },
         levels: () => ({ mic: 0.25, far: 0.5 }),
-        stats: () => ({ path: a.captureStarted ? "worklet" : "none", frames: 0, peak: 0.42, ctx: "running", rate }),
+        stats: () => ({ path: a.captureStarted ? "worklet" : "none", frames: 0, peak: 0.42, ctx: "running", rate, start: a.captureStarted ? "running" : "", stalled: false }),
       };
     };
     const states: Array<[VoiceState, VoiceFailure | undefined]> = [];
@@ -2843,13 +2843,13 @@ function describeErrorCheck(): boolean {
     const r = await laneRun();
     const d0 = r.s.diagnostics();
     check("before the socket opens: no frames up, a reader that has not started, a microphone track that is live, open and on",
-      d0.up_frames === 0 && d0.capture === "none:running:24000" && d0.mic === "live:open:on");
+      d0.up_frames === 0 && d0.capture === "none:running:24000:f0:s" && d0.mic === "live:open:on");
     r.sockets[0].open();
     r.audios[0].frame?.("AAAA");
     r.audios[0].frame?.("BBBB");
     const d1 = r.s.diagnostics();
     check("two microphone frames sent are two frames up; the reader, the context's state and its rate are named; the loudest sample is the reader's",
-      d1.up_frames === 2 && d1.capture === "worklet:running:24000" && d1.mic_peak === 0.42 && r.sockets[0].sent.length === 3);
+      d1.up_frames === 2 && d1.capture === "worklet:running:24000:f0:srunning" && d1.mic_peak === 0.42 && r.sockets[0].sent.length === 3);
     r.sockets[0].drop();
     r.audios[0].frame?.("CCCC");
     check("  …a frame under a closed socket is not sent and not counted", r.s.diagnostics().up_frames === 2);
@@ -3035,7 +3035,7 @@ function describeErrorCheck(): boolean {
       CAPTURE_WORKLET_NAME === "koleex-capture" && CAPTURE_WORKLET_SOURCE.includes(`registerProcessor("${CAPTURE_WORKLET_NAME}"`) && CAPTURE_WORKLET_SOURCE.includes(`new Float32Array(${FRAME_SAMPLES})`) &&
       CAPTURE_WORKLET_SOURCE.includes("this.port.postMessage(out, [out.buffer])") &&
       /URL\.createObjectURL\(new Blob\(\[CAPTURE_WORKLET_SOURCE\], \{ type: "application\/javascript" \}\)\)/.test(wa) && /URL\.revokeObjectURL\(url\);/.test(wa) &&
-      /void startWorklet\(mic, onFrame\)\.then\(\(ok\) => \{\s*if \(ok \|\| closed\) return;\s*try \{\s*startProcessor\(mic, onFrame\);\s*\} catch \{[\s\S]{0,120}?capturePath = "failed";/.test(wa) &&
+      /void startWorklet\(mic, onFrame\)\.then\(\(ok\) => \{\s*if \(closed\) return;\s*if \(!ok\) \{\s*try \{\s*startProcessor\(mic, onFrame\);\s*\} catch \{[\s\S]{0,140}?capturePath = "failed";\s*return;\s*\}\s*\}\s*stallTimer = setTimeout\(\(\) => onStall\(mic, onFrame\), stallMs\);/.test(wa) &&
       /if \(!ctx\.audioWorklet \|\| typeof AudioWorkletNode === "undefined"\) return false;/.test(wa));
     check("  …both readers keep the graph alive through a silent gain, and never play the microphone back", /silence\.gain\.value = 0;/.test(wa) && /keepAlive\(processor\)/.test(wa) && /keepAlive\(worklet\)/.test(wa));
   }
@@ -3207,7 +3207,7 @@ function describeErrorCheck(): boolean {
     rmsLevel(silent) === 0 && Math.abs(rmsLevel(loud) - Math.min(1, 0.5 * DISPLAY_GAIN)) < 1e-9 && rmsLevel(new Uint8Array(0)) === 0 && rmsLevel(new Uint8Array(512).fill(255)) === 1 && DISPLAY_GAIN === 2.8 && LEVEL_EPSILON === 0.02);
   const wa = readFileSync("src/lib/voice/ws-audio.ts", "utf8");
   check("the socket lane's audio meters both sides INSIDE its own context: an analyser on the output, one on the microphone source, read on demand",
-    /const farMeter = ctx\.createAnalyser\(\);/.test(wa) && /const farBus = ctx\.createGain\(\);\s*farBus\.connect\(out\);/.test(wa) && /farBus\.connect\(farMeter\);/.test(wa) && !/^\s*out\.connect/m.test(wa) && (wa.match(/node\.connect\(farBus\);/g) ?? []).length === 2 && /micMeter = ctx\.createAnalyser\(\);[\s\S]{0,120}?source\.connect\(micMeter\);/.test(wa) &&
+    /const farMeter = ctx\.createAnalyser\(\);/.test(wa) && /const farBus = ctx\.createGain\(\);\s*farBus\.connect\(out\);/.test(wa) && /farBus\.connect\(farMeter\);/.test(wa) && !/^\s*out\.connect/m.test(wa) && (wa.match(/node\.connect\(farBus\);/g) ?? []).length === 2 && /micMeter = ctx\.createAnalyser\(\);[\s\S]{0,240}?source\.connect\(micMeter\);/.test(wa) &&
     /levels\(\) \{\s*return \{ mic: read\(micMeter\), far: read\(farMeter\) \};/.test(wa) && /return rmsLevel\(meterBuf\);/.test(wa) && (wa.match(/meterMic\(\);/g) ?? []).length === 2);
   const hook = readFileSync("src/lib/voice/useStreamLevel.ts", "utf8");
   check("  …the stream meter shares the arithmetic and no longer carries its own copy", /const next = rmsLevel\(buf\);/.test(hook) && !/DISPLAY_GAIN = 2\.8/.test(hook));
@@ -3292,7 +3292,7 @@ function describeErrorCheck(): boolean {
       const sock: VoiceSocket = { readyState: 0, send: () => {}, close: () => {}, onopen: null, onmessage: null, onclose: null, onerror: null };
       return sock;
     };
-    d.deps.createWsAudio = () => ({ stream: {} as MediaStream, startCapture: () => {}, play: () => {}, flush: () => {}, close: () => {}, playSample: async () => true, levels: () => ({ mic: 0, far: 0 }), stats: () => ({ path: "none", frames: 0, peak: 0, ctx: "running", rate: 24_000 }) });
+    d.deps.createWsAudio = () => ({ stream: {} as MediaStream, startCapture: () => {}, play: () => {}, flush: () => {}, close: () => {}, playSample: async () => true, levels: () => ({ mic: 0, far: 0 }), stats: () => ({ path: "none", frames: 0, peak: 0, ctx: "running", rate: 24_000, start: "", stalled: false }) });
     const s = new VoiceSession(d.deps, {}, null, null, null, null, "ws");
     await within(2000, s.start());
     await new Promise((r) => setTimeout(r, 30));
@@ -3451,7 +3451,7 @@ function describeErrorCheck(): boolean {
     g.window = { AudioContext: class extends FakeCtx { constructor() { super(); made.push(this); } } };
     const ctx = () => made[0];
     const audio = createBrowserWsAudio(24_000);
-    check("a reader that has not started says so: none, the context's state, its rate", JSON.stringify(audio.stats()) === JSON.stringify({ path: "none", frames: 0, peak: 0, ctx: "running", rate: 24_000 }));
+    check("a reader that has not started says so: none, the context's state, its rate", JSON.stringify(audio.stats()) === JSON.stringify({ path: "none", frames: 0, peak: 0, ctx: "running", rate: 24_000, start: "", stalled: false }));
     const frames: string[] = [];
     audio.startCapture({ getAudioTracks: () => [] } as unknown as MediaStream, (b64) => frames.push(b64));
     await new Promise((res) => setTimeout(res, 0));
@@ -3475,12 +3475,107 @@ function describeErrorCheck(): boolean {
     if (hadWindow === undefined) delete g.window; else g.window = hadWindow;
   }
 
+
+  /* THE READER THAT READ NOTHING (2026-09-10 17:22): on a fake graph whose
+     worklet never posts a frame, the processor takes the microphone after
+     the stall; a processor that is silent too is `stalled`; a worklet that
+     reads is left alone; the context's state at the start is kept apart
+     from its state at hang-up. */
+  {
+    const { CAPTURE_STALL_MS } = await import("../src/lib/voice/ws-audio");
+    check("the stall is judged after 2.5 s — long enough for a slow engine, short enough that the caller's first sentence is not lost", CAPTURE_STALL_MS === 2_500);
+    const mkNode = (kind: string) => ({ kind, fftSize: 0, gain: { value: 1 }, onaudioprocess: null as null | ((ev: unknown) => void), connected: [] as string[], connect(to: { kind: string }) { this.connected.push(to.kind); return to; }, disconnect() {}, start() {}, stop() {}, getByteTimeDomainData(buf: Uint8Array) { buf.fill(128); }, stream: { id: "far" }, port: { onmessage: null as null | ((ev: MessageEvent) => void), close() {} } });
+    const made: Array<{ state: string; processor: ReturnType<typeof mkNode>; sources: number; resumes: number }> = [];
+    class WorkletCtx {
+      state = "suspended";
+      currentTime = 0;
+      sampleRate = 48_000;
+      destination = mkNode("destination");
+      processor = mkNode("processor");
+      sources = 0;
+      resumes = 0;
+      audioWorklet = { addModule: async () => {} };
+      constructor() { made.push(this); }
+      createMediaStreamDestination() { return mkNode("streamDestination"); }
+      createGain() { return mkNode("gain"); }
+      createAnalyser() { return mkNode("analyser"); }
+      createBufferSource() { return mkNode("bufferSource"); }
+      createBuffer(_c: number, len: number) { return { duration: len / 24_000, getChannelData: () => new Float32Array(len) }; }
+      createMediaStreamSource() { this.sources++; return mkNode("micSource"); }
+      createScriptProcessor() { return this.processor; }
+      resume() { this.resumes++; this.state = "running"; return Promise.resolve(); }
+      close() { return Promise.resolve(); }
+      decodeAudioData() { return Promise.reject(new Error("not in this fake")); }
+    }
+    const workletNodes: Array<ReturnType<typeof mkNode>> = [];
+    const g = globalThis as unknown as { window?: unknown; AudioWorkletNode?: unknown };
+    const hadWindow = g.window;
+    const hadNode = g.AudioWorkletNode;
+    g.window = { AudioContext: WorkletCtx };
+    g.AudioWorkletNode = class { port = { onmessage: null as null | ((ev: MessageEvent) => void), close() {} }; connect() {} disconnect() {} constructor() { workletNodes.push(this as unknown as ReturnType<typeof mkNode>); } };
+    const tick = (ms: number) => new Promise((res) => setTimeout(res, ms));
+    const mic = { getAudioTracks: () => [] } as unknown as MediaStream;
+
+    /* 1. A silent worklet: the processor takes over, and a frame it reads counts. */
+    {
+      const frames: string[] = [];
+      const audio = createBrowserWsAudio(24_000, { stallMs: 30 });
+      audio.startCapture(mic, (b64) => frames.push(b64));
+      await tick(5);
+      const c = made[made.length - 1];
+      check("the worklet is the first reader, the context was resumed and its state at the start is recorded", audio.stats().path === "worklet" && audio.stats().start === "running" && c.resumes === 1);
+      await tick(40);
+      const s = audio.stats();
+      check("a worklet that read nothing for the stall time hands the microphone to the script processor — a second source, a second resume, the meter re-attached", s.path === "processor-after-stall" && !s.stalled && c.sources === 2 && c.resumes === 2 && c.processor.onaudioprocess !== null);
+      /* Two equal neighbours: the 48 k → 24 k resample lands between them. */
+      const samples = new Float32Array(4096);
+      samples[2] = 0.3;
+      samples[3] = 0.3;
+      c.processor.onaudioprocess?.({ inputBuffer: { getChannelData: () => samples } });
+      await tick(40);
+      const t = audio.stats();
+      check("  …a frame the processor reads is counted and the reader is NOT stalled", t.frames === 1 && t.peak === 0.3 && !t.stalled && frames.length === 1);
+      audio.close();
+    }
+    /* 2. Both silent: stalled, and said so. */
+    {
+      const audio = createBrowserWsAudio(24_000, { stallMs: 20 });
+      audio.startCapture(mic, () => {});
+      await tick(80);
+      check("a processor that is silent too is stalled — reported, never retried for ever", audio.stats().path === "processor-after-stall" && audio.stats().stalled === true);
+      audio.close();
+    }
+    /* 3. A worklet that reads is left alone. */
+    {
+      const audio = createBrowserWsAudio(24_000, { stallMs: 20 });
+      audio.startCapture(mic, () => {});
+      await tick(5);
+      const node = workletNodes[workletNodes.length - 1];
+      node.port.onmessage?.({ data: new Float32Array(4096) } as MessageEvent);
+      await tick(60);
+      check("a worklet that read a frame keeps the microphone: no switch, not stalled", audio.stats().path === "worklet" && audio.stats().frames === 1 && !audio.stats().stalled);
+      audio.close();
+    }
+    /* 4. close() before the stall: no switch after teardown. */
+    {
+      const audio = createBrowserWsAudio(24_000, { stallMs: 20 });
+      audio.startCapture(mic, () => {});
+      await tick(5);
+      const before = made[made.length - 1].sources;
+      audio.close();
+      await tick(50);
+      check("a call that ended before the stall check does not switch readers after teardown", made[made.length - 1].sources === before && audio.stats().path === "worklet");
+    }
+    if (hadWindow === undefined) delete g.window; else g.window = hadWindow;
+    if (hadNode === undefined) delete g.AudioWorkletNode; else g.AudioWorkletNode = hadNode;
+  }
+
   /* THE WIRE: the beacon type carries the four fields, the route prints them. */
   const tel = readFileSync("src/lib/voice/telemetry.ts", "utf8");
   const route = readFileSync("src/app/api/ai/voice/telemetry/route.ts", "utf8");
   check("the beacon type carries up_frames, capture, mic_peak and mic", /up_frames\?: number;/.test(tel) && /capture\?: string;/.test(tel) && /mic_peak\?: number;/.test(tel) && /\bmic\?: string;/.test(tel));
   check("  …and the telemetry route logs them, bounded and sanitised, only when a capture was reported",
-    route.includes('short(body.capture, 32) ? ` upFrames=${num(body.up_frames)} capture=${short(body.capture, 32)} micPeak=') && route.includes('mic=${short(body.mic, 24) || "none"}'));
+    route.includes('short(body.capture, 64) ? ` upFrames=${num(body.up_frames)} capture=${short(body.capture, 64)} micPeak=') && route.includes('mic=${short(body.mic, 24) || "none"}'));
   /* THE SERVER'S OWN LINES ARE VISIBLE: the log tool never shows info. */
   const wsRoute = readFileSync("src/app/api/ai/voice/ws-session/route.ts", "utf8");
   const sdpRoute = readFileSync("src/app/api/ai/voice/session/route.ts", "utf8");

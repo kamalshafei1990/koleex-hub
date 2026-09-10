@@ -605,6 +605,46 @@ on — will show which `voice=` key the call asked for and the vendor id it
 resolved to; the picker offers the socket lane's own names (Ara, Eve, Rex,
 Leo, Sal) once the device settles on that lane.
 
+## The beacon answered: the reader starts, the context runs, the track is live — and nothing is read (2026-09-10 17:22)
+
+The owner's calls after #387, from the phone in mainland China:
+
+| time (UTC) | VPN | upFrames | capture | micPeak | mic | outcome |
+|---|---|---|---|---|---|---|
+| 17:21:57 | on | 1512 | worklet:running:48000 | 1.0 | live:open:on | 136 s, six turns, two lookups |
+| 17:22:32 | off | 0 | worklet:running:48000 | 0 | live:open:on | 13 s, configured, nothing sent |
+| 17:22:46 | off | 0 | worklet:running:48000 | 0 | live:open:on | 10 s, the same (fresh page) |
+
+So without the VPN the worklet reader is started, the AudioContext reports
+`running` (at hang-up), the microphone track is `live`, not muted and
+enabled — and the worklet posts NOTHING. The relay confirms (`up=1`: the
+session configuration only). The network is not in this path: the socket is
+open and pinging, and the reader is local.
+
+Two readings remain, and this change separates them and acts on both:
+
+- **The context was suspended for the whole call and only the hang-up tap
+  resumed it** (`ctx` is sampled at hang-up). `stats().start` now records
+  the state right after the reader started and `resume()` came back; the
+  beacon carries it as `:s<state>`.
+- **The engine delivers nothing to this worklet on this context.** After
+  `CAPTURE_STALL_MS` (2.5 s) with zero frames, the reader resumes the context
+  once more and hands the microphone to the script processor — a different
+  engine path on the same context and track. A processor that is silent
+  too is `:stalled` in the beacon, and nothing local can fix that.
+
+Beacon format: `capture=worklet:running:48000:f1512:srunning` (reader,
+state at hang-up, rate, frames read, state at start), with
+`processor-after-stall` as the reader when the switch happened and
+`:stalled` when both were silent.
+
+**Next read:** `processor-after-stall` with `f>0` means the worklet is the
+broken piece on that phone without a VPN and the switch is the fix;
+`:ssuspended` means the context never ran — the fix is then to keep the
+context created inside the tap (before the handshake), not after it;
+`:stalled` with the track live means the OS delivers silence to the page
+and the microphone must be re-acquired.
+
 ## Owner-side (not code)
 
 - 2026-09-08 19:30 UTC: the owner added `AI_VOICE_RELAY_URL` and

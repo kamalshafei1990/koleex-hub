@@ -79,15 +79,32 @@ export type WsAudio = {
 };
 
 export type WsAudioStats = {
-  /** "worklet" | "processor" | "none" | "failed" — none until startCapture,
-   *  failed when both readers refused. */
+  /** "worklet" | "processor" | "processor-after-stall" | "none" | "failed"
+   *  — none until startCapture, failed when both readers refused,
+   *  processor-after-stall when the worklet read nothing and the processor
+   *  took the microphone (CAPTURE_STALL_MS). */
   path: string;
   frames: number;
   /** 0..1, the loudest absolute sample across every frame handed out. */
   peak: number;
   ctx: string;
   rate: number;
+  /** The context's state right after the reader started and resume() came
+   *  back ("running", "suspended", "resume-failed"); "" before then. The
+   *  state at hang-up is ctx — the hang-up tap itself may have resumed a
+   *  context that sat suspended for the whole call. */
+  start: string;
+  /** Both readers were given the microphone and neither read a frame. */
+  stalled: boolean;
 };
+
+/** A reader that has read NOTHING this long after it started is judged
+ *  stalled (2026-09-10 17:22, a phone in mainland China, no VPN: worklet
+ *  reader started, context "running", track live and unmuted, and zero
+ *  frames in twelve seconds — twice; the same phone through a VPN read 1512
+ *  frames a minute earlier). The context is resumed again and the other
+ *  reader takes the microphone; a second silence is reported as stalled. */
+export const CAPTURE_STALL_MS = 2_500;
 
 /* Linear resampling — a phone microphone into a speech model does not need
    better, and better would cost a filter on every frame. Pure. */
@@ -301,7 +318,8 @@ export const CAPTURE_WORKLET_NAME = "koleex-capture";
 
 /** The browser implementation. Created on a user gesture — the call
  *  button's tap — so the context is allowed to run. */
-export function createBrowserWsAudio(wireRate: number): WsAudio {
+export function createBrowserWsAudio(wireRate: number, opts: { stallMs?: number } = {}): WsAudio {
+  const stallMs = opts.stallMs ?? CAPTURE_STALL_MS;
   const Ctx = (window.AudioContext ?? (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext) as typeof AudioContext;
   const ctx = new Ctx();
   const out = ctx.createMediaStreamDestination();
@@ -314,6 +332,9 @@ export function createBrowserWsAudio(wireRate: number): WsAudio {
   let capturePath = "none";
   let frames = 0;
   let peak = 0;
+  let startState = "";
+  let stalled = false;
+  let stallTimer: ReturnType<typeof setTimeout> | null = null;
   let sample: { node: AudioBufferSourceNode; stop: () => void } | null = null;
   const playing = new Set<AudioBufferSourceNode>();
   /* THE FAR SIDE GOES THROUGH A BUS, and the meter hangs off the bus — NOT
@@ -369,9 +390,12 @@ export function createBrowserWsAudio(wireRate: number): WsAudio {
     silence.connect(ctx.destination);
   };
   const meterMic = () => {
-    if (!source || micMeter) return;
-    micMeter = ctx.createAnalyser();
-    micMeter.fftSize = METER_FFT_SIZE;
+    if (!source) return;
+    if (!micMeter) {
+      micMeter = ctx.createAnalyser();
+      micMeter.fftSize = METER_FFT_SIZE;
+    }
+    /* A reader that replaced another brings a new source; the meter follows. */
     source.connect(micMeter);
   };
   const startProcessor = (mic: MediaStream, onFrame: (b64: string) => void) => {
@@ -406,20 +430,64 @@ export function createBrowserWsAudio(wireRate: number): WsAudio {
     }
   };
 
+  /* THE READER THAT READ NOTHING (CAPTURE_STALL_MS after it started): the
+     context is resumed once more, and a silent worklet hands the microphone
+     to the script processor — a different code path in the engine, on the
+     same context and the same track. A processor that is silent too, or a
+     silent processor from the start, is `stalled`: nothing here can fix a
+     microphone the engine delivers nothing from, and the beacon says so. */
+  const onStall = (mic: MediaStream, onFrame: (b64: string) => void) => {
+    stallTimer = null;
+    if (closed || frames > 0) return;
+    void ctx.resume().catch(() => {});
+    if (capturePath !== "worklet") {
+      stalled = true;
+      return;
+    }
+    try {
+      worklet?.disconnect();
+      worklet?.port.close();
+      source?.disconnect();
+    } catch {
+      /* a node that was never connected */
+    }
+    worklet = null;
+    source = null;
+    try {
+      startProcessor(mic, onFrame);
+      capturePath = "processor-after-stall";
+    } catch {
+      capturePath = "failed";
+      stalled = true;
+      return;
+    }
+    stallTimer = setTimeout(() => {
+      stallTimer = null;
+      if (!closed && frames === 0) stalled = true;
+    }, stallMs);
+  };
+
   return {
     stream: out.stream,
     startCapture(mic, onFrame) {
       if (capturing) return;
       capturing = true;
-      void ctx.resume().catch(() => {});
+      void ctx.resume().then(
+        () => { startState = String(ctx.state ?? ""); },
+        () => { startState = "resume-failed"; },
+      );
       void startWorklet(mic, onFrame).then((ok) => {
-        if (ok || closed) return;
-        try {
-          startProcessor(mic, onFrame);
-        } catch {
-          /* Neither reader: said in stats(), carried by the beacon. */
-          capturePath = "failed";
+        if (closed) return;
+        if (!ok) {
+          try {
+            startProcessor(mic, onFrame);
+          } catch {
+            /* Neither reader: said in stats(), carried by the beacon. */
+            capturePath = "failed";
+            return;
+          }
         }
+        stallTimer = setTimeout(() => onStall(mic, onFrame), stallMs);
       });
     },
     play(b64) {
@@ -455,7 +523,7 @@ export function createBrowserWsAudio(wireRate: number): WsAudio {
       return { mic: read(micMeter), far: read(farMeter) };
     },
     stats() {
-      return { path: capturePath, frames, peak: Math.round(peak * 100) / 100, ctx: String(ctx.state ?? ""), rate: ctx.sampleRate };
+      return { path: capturePath, frames, peak: Math.round(peak * 100) / 100, ctx: String(ctx.state ?? ""), rate: ctx.sampleRate, start: startState, stalled };
     },
     playSample(bytes) {
       /* Whatever the far side was saying yields to the sample. */
@@ -493,6 +561,8 @@ export function createBrowserWsAudio(wireRate: number): WsAudio {
     },
     close() {
       closed = true;
+      if (stallTimer) clearTimeout(stallTimer);
+      stallTimer = null;
       this.flush();
       sample?.stop();
       sample = null;
