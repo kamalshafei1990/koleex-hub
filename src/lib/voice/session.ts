@@ -140,7 +140,9 @@ export type VoiceDiagnostics = {
   tool_wait_ms: number;
   /** SOCKET LANE, THE MICROPHONE'S SIDE (2026-09-09 03:09): frames this
    *  call sent up, the reader that made them with the context's state and
-   *  rate ("worklet:running:48000"), the loudest sample the reader saw
+   *  rate, the frames it read and the context's state when it started
+   *  ("worklet:running:48000:f1512:srunning", ":stalled" when both readers
+   *  read nothing), the loudest sample the reader saw
    *  (0..1), and the microphone track's own state ("live:open:on" —
    *  readyState, muted or open, enabled or off). "" / 0 on the other lane. */
   up_frames: number;
@@ -710,7 +712,7 @@ export class VoiceSession {
       resp_err: this.lastResponseError,
       tool_wait_ms: this.toolWaitMs,
       up_frames: this.wsFramesUp,
-      capture: capture ? `${capture.path}:${capture.ctx}:${capture.rate}` : "",
+      capture: capture ? `${capture.path}:${capture.ctx}:${capture.rate}:f${capture.frames}:s${capture.start}${capture.stalled ? ":stalled" : ""}` : "",
       mic_peak: capture?.peak ?? 0,
       mic: this.micState(),
     };
