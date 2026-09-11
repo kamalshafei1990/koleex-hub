@@ -658,7 +658,16 @@ and the microphone must be re-acquired.
   account the key belongs to, and realtime calls must come from the
   default workspace. Fix: a new API key from the default workspace of the
   China-site account, into `AI_VOICE_API_KEY`, then a production redeploy.
-- Activate the realtime voice model on the Beijing workspace (still `403 Unpurchased`), so mainland callers get the mainland endpoint.
+- 2026-09-11 08:12 UTC: the 403 was a WORKSPACE MISMATCH, not a quota. The
+  China-site account's default workspace is `ws-ajesekz9dt6z6sal` (its
+  API-Key page shows the workspace-specific domain), and it had NO API key;
+  `AI_VOICE_BASE_URL` pointed at `ws-pl9r1rv87m0hqnl5`, another account's
+  workspace, with a key issued elsewhere. The owner created a key in the
+  default workspace and set `AI_VOICE_API_KEY` and
+  `AI_VOICE_BASE_URL=https://ws-ajesekz9dt6z6sal.cn-beijing.maas.aliyuncs.com/api/v1/webrtc/realtime`
+  in Vercel Production. This commit exists to make the production
+  deployment that carries them; the watchdog's `slot=primary` line is the
+  proof (`ok` instead of `403`).
 - Enable Vercel Analytics and Speed Insights.
 
 ## Done today, for reference
