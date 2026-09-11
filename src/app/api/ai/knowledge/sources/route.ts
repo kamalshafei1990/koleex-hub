@@ -19,6 +19,7 @@ import { requireAuth, requireModuleAction } from "@/lib/server/auth";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { refine, persistUnits, type RefinerySegment } from "@/lib/server/ai-knowledge";
 import { assertSafeUrl } from "@/lib/server/safe-url";
+import { dbError } from "@/lib/server/ai/http/api-error";
 
 /* THE PAGE FETCH IS BOUNDED. A page is read up to this many bytes and then
    cut off — a host that streams for ever must not fill the function's
@@ -253,7 +254,7 @@ export async function POST(req: Request) {
     })
     .select("id")
     .single();
-  if (srcErr || !src) return NextResponse.json({ error: srcErr?.message || "insert failed" }, { status: 500 });
+  if (srcErr || !src) return dbError("knowledge/sources insert", srcErr ?? "no row");
 
   try {
     const units = refine(segments);

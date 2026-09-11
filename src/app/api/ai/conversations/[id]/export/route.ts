@@ -16,6 +16,7 @@ import { requireInternalUser } from "@/lib/server/ai/require-internal";
 import { parseConversationParam } from "@/lib/server/ai/voice/history";
 import { renderExportHtml, type ExportMessage } from "@/lib/server/ai/export-html";
 import type { Lang } from "@/lib/i18n";
+import { dbError } from "@/lib/server/ai/http/api-error";
 
 export const dynamic = "force-dynamic";
 
@@ -54,7 +55,7 @@ export async function GET(req: Request, { params }: RouteCtx) {
     .eq("conversation_id", conversationId)
     .order("created_at", { ascending: true })
     .limit(MESSAGE_CAP);
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return dbError("conversations/id/export", error);
 
   const html = renderExportHtml({ title: (conv.title as string | null) ?? null, lang, messages: (rows ?? []) as ExportMessage[] });
   console.log(`[ai.conversations.export] ok messages=${rows?.length ?? 0} lang=${lang}`);

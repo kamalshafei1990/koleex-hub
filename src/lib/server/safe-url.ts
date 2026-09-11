@@ -22,6 +22,15 @@ import net from "node:net";
 
    Redirects are the caller's business: follow them MANUALLY and pass each
    hop back through assertSafeUrl, so a public URL cannot 302 inward.
+
+   ACCEPTED RESIDUAL (audit, 2026-09-11): the check resolves the name and the
+   platform's fetch resolves it again, so a host that answers public first
+   and private second could slip a request inward within that window. Every
+   caller is gated to signed-in internal users or the super admin and
+   re-checks each redirect hop; closing the window would mean connecting to
+   the vetted address with our own TLS/SNI handling, which the platform's
+   fetch does not expose. Recorded here so it is a known shape, not a
+   surprise.
    --------------------------------------------------------------------------- */
 
 export type SafeUrlError = "bad_url" | "blocked_host" | "fetch_failed";

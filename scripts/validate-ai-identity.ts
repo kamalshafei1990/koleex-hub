@@ -153,7 +153,9 @@ console.log("\n── 2. Every conversational prompt carries it ──");
 
   /* The suite must actually be looking at something. A refactor that renamed
      `systemPrompt` would otherwise leave this passing over an empty set. */
-  check("and the scan found conversational prompts to check", covered.length >= 2);
+  /* One written prompt since /api/ai/conversations/[id]/messages was retired
+     (audit, 2026-09-11); the voice session is pinned by name in section 3. */
+  check(`and the scan found conversational prompts to check (${covered.length})`, covered.length >= 1);
 }
 
 console.log("\n── 3. The paths that burned us, by name ──");
@@ -164,16 +166,14 @@ console.log("\n── 3. The paths that burned us, by name ──");
   check("the VOICE session carries it — this is the one that spoke a vendor's name",
     /AI_PROVENANCE_RULE/.test(voice) && /instructions:/.test(voice));
 
-  const messages = readFileSync("src/app/api/ai/conversations/[id]/messages/route.ts", "utf8");
-  check("the conversations endpoint carries it — found with none at all",
-    /AI_PROVENANCE_RULE/.test(messages));
-
+  /* The conversations/[id]/messages endpoint that used to be pinned here was
+     retired (audit, 2026-09-11): a second chat path with its own prompt and
+     no caller. The agent route is the one written lane; the rule reaches it
+     through the shared prompt builder, pinned in section 2. */
   /* And it must be IMPORTED rather than restated: two copies drift, and the
      copy that drifts is the one nobody is reading. */
-  for (const [label, src] of [["voice", voice], ["conversations", messages]] as const) {
-    check(`${label} imports the rule rather than re-typing it`,
-      /import \{ AI_PROVENANCE_RULE \}/.test(src));
-  }
+  check("voice imports the rule rather than re-typing it",
+    /import \{ AI_PROVENANCE_RULE \}/.test(voice));
 }
 
 console.log("\n── 4. The exceptions are deliberate, not accidental ──");

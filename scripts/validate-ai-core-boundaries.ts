@@ -50,7 +50,6 @@ const DECIDE = "src/lib/server/ai/core/decide-turn.ts";
 const CANNED = "src/lib/server/ai/core/canned-replies.ts";
 const ORCH = "src/lib/server/ai-agent/orchestrator.ts";
 const AGENT_ROUTE = "src/app/api/ai/agent/route.ts";
-const CHAT_ROUTE = "src/app/api/ai/chat/route.ts";
 const TRANSPORT = "src/lib/server/ai/core/transport.ts";
 const DEEPSEEK_ADAPTER = "src/lib/server/ai/provider/adapters/deepseek.ts";
 const read = (p: string) => readFileSync(p, "utf8");
@@ -59,7 +58,6 @@ const decide = read(DECIDE);
 const canned = read(CANNED);
 const orch = read(ORCH);
 const agentRoute = read(AGENT_ROUTE);
-const chatRoute = read(CHAT_ROUTE);
 const transport = read(TRANSPORT);
 
 /* Strip comments so a prose mention of "supabase" in a header can never be
@@ -122,10 +120,9 @@ for (const d of DETECTORS) {
   const elsewhere = [
     [ORCH, orch],
     [AGENT_ROUTE, agentRoute],
-    [CHAT_ROUTE, chatRoute],
   ].filter(([, src]) => defRe.test(src as string));
   check(
-    `${d}() is NOT re-defined in the orchestrator or either route`,
+    `${d}() is NOT re-defined in the orchestrator or the agent route`,
     elsewhere.length === 0,
   );
 }
@@ -139,19 +136,19 @@ check(
   "the approved greeting exists in canned-replies.ts",
   canned.includes(Q1_ANCHOR),
 );
+/* /api/ai/chat, the second route these checks used to read, was retired
+   (audit, 2026-09-11); the agent route is the one written lane. */
 check(
-  "the approved greeting does NOT exist in either route",
-  !agentRoute.includes(Q1_ANCHOR) && !chatRoute.includes(Q1_ANCHOR),
+  "the approved greeting does NOT exist in the agent route",
+  !agentRoute.includes(Q1_ANCHOR),
 );
 check(
-  "neither route declares its own reply table",
-  !/const\s+(FAST_REPLIES|CANNED_REPLIES)\s*:/.test(agentRoute) &&
-    !/const\s+(FAST_REPLIES|CANNED_REPLIES)\s*:/.test(chatRoute),
+  "the agent route declares no reply table of its own",
+  !/const\s+(FAST_REPLIES|CANNED_REPLIES)\s*:/.test(agentRoute),
 );
 check(
   "no file still asks a human to keep canned copies in sync",
-  !/[Kk]eep in sync with .*(FAST_REPLIES|\/api\/ai\/chat)/.test(agentRoute) &&
-    !/[Kk]eep in sync with the orchestrator/.test(chatRoute),
+  !/[Kk]eep in sync with .*(FAST_REPLIES|\/api\/ai\/chat)/.test(agentRoute),
 );
 
 console.log("\n── 4. The two tables are DIFFERENT on purpose ──");
@@ -183,9 +180,8 @@ check(
   !/export\s*\{[^}]*isBusinessDataQuery[^}]*\}/.test(orch),
 );
 check(
-  "both routes import the decision from core/decide-turn",
-  /from "@\/lib\/server\/ai\/core\/decide-turn"/.test(agentRoute) &&
-    /from "@\/lib\/server\/ai\/core\/decide-turn"/.test(chatRoute),
+  "the agent route imports the decision from core/decide-turn",
+  /from "@\/lib\/server\/ai\/core\/decide-turn"/.test(agentRoute),
 );
 check(
   "the orchestrator still USES the detectors it imports (the move was not a delete)",

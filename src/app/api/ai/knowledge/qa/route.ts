@@ -10,6 +10,7 @@ import { NextResponse } from "next/server";
 import { requireAuth, requireModuleAction } from "@/lib/server/auth";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { estimateTokens, invalidateTaughtAnswersCache, invalidateApprovedSearchCache } from "@/lib/server/ai-knowledge";
+import { dbError } from "@/lib/server/ai/http/api-error";
 
 export const dynamic = "force-dynamic";
 
@@ -46,7 +47,7 @@ export async function GET() {
     .limit(100);
   q = auth.tenant_id == null ? q.is("tenant_id", null) : q.eq("tenant_id", auth.tenant_id);
   const { data, error } = await q;
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return dbError("knowledge/qa", error);
   return NextResponse.json({
     qa: (data ?? []).map((r) => ({
       id: r.id,
@@ -100,7 +101,7 @@ export async function POST(req: Request) {
     })
     .select("id")
     .single();
-  if (error || !data) return NextResponse.json({ error: error?.message || "insert failed" }, { status: 500 });
+  if (error || !data) return dbError("knowledge/qa insert", error ?? "no row");
   /* THE AI'S VIEW OF TRUTH JUST CHANGED, SO DROP WHAT IT CACHED.
      Both planes, not one: taught pairs feed the written lanes' prompt and the
      approved-search cache feeds search_knowledge, which is the ONLY route a
@@ -127,7 +128,7 @@ export async function DELETE(req: Request) {
     .eq("id", id);
   q = auth.tenant_id == null ? q.is("tenant_id", null) : q.eq("tenant_id", auth.tenant_id);
   const { error } = await q;
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return dbError("knowledge/qa", error);
   invalidateTaughtAnswersCache(auth.tenant_id ?? null);
   invalidateApprovedSearchCache(auth.tenant_id ?? null);
   return NextResponse.json({ ok: true });

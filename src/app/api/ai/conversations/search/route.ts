@@ -20,6 +20,7 @@ import { supabaseServer } from "@/lib/server/supabase-server";
 import { requireAuth } from "@/lib/server/auth";
 import { requireInternalUser } from "@/lib/server/ai/require-internal";
 import { BUDGETS, consumeBudget, limitMode, subjectFor } from "@/lib/server/ai/security/rate-limit";
+import { dbError } from "@/lib/server/ai/http/api-error";
 import {
   SEARCH_SCAN_ROWS,
   collectHits,
@@ -80,7 +81,7 @@ export async function GET(req: Request) {
     .ilike("content", likePattern(query))
     .order("created_at", { ascending: false })
     .limit(SEARCH_SCAN_ROWS);
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return dbError("conversations/search", error);
 
   const hits = collectHits((rows ?? []) as SearchRow[], query);
   console.log(`[ai.conversations.search] ok chars=${query.length} rows=${rows?.length ?? 0} hits=${hits.length}`);
