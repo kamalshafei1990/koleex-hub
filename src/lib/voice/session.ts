@@ -31,7 +31,9 @@
    what makes this file testable in Node at all. */
 import {
   parseToolCallEvent,
-  buildToolResultMessages,
+  buildToolOutputMessage,
+  RESPONSE_CREATE_MESSAGE,
+  responseFunctionCalls,
   ToolCallNames,
   type VoiceToolCall,
 } from "./tool-calls";
@@ -325,6 +327,13 @@ export const CANARY_PATH = "/api/version";
 export const WS_FIRST_EVENT_MS = 7_000;
 /** The pause before the one retry of a handshake the link dropped. */
 const HANDSHAKE_RETRY_DELAY_MS = 800;
+/* ONE response.create PER RESPONSE, HOWEVER MANY CALLS IT MADE (tool-calls.ts,
+   responseFunctionCalls: the brief's three lookups drew three answers).
+   The set of a response's calls is known from its response.done; an output
+   sent before that event waits for it, and a vendor that never sends the
+   event still has its answer asked for after this long — one request for
+   the outputs so far, not one per output. */
+export const TOOL_RESPONSE_CREATE_FALLBACK_MS = 1_200;
 
 /** `Name: message`, bounded and without anything that is not a word — a
  *  cause for the log line, never a body or a token. "" for no cause. */
@@ -556,6 +565,13 @@ export class VoiceSession {
    *  loops. The server caps this too — this one just stops the traffic at
    *  source. */
   private toolCallCount = 0;
+  /* THE GATE ON response.create (TOOL_RESPONSE_CREATE_FALLBACK_MS). Outputs
+     already sent whose response.done has not yet named their response;
+     each response's calls still unanswered once it has; the one timer for
+     a response.done that never comes. */
+  private toolOutputsAwaitingDone = new Set<string>();
+  private toolCallsOpenByResponse = new Map<string, Set<string>>();
+  private toolResponseCreateTimer: ReturnType<typeof setTimeout> | null = null;
   private state: VoiceState = "idle";
   /* FOR THE BEACON. When a call ends by itself nobody can say why from the
      server: the audio never touched it. These few facts travel with the
@@ -757,6 +773,7 @@ export class VoiceSession {
     /* A pending timer on a call the user already ended would report a failure
        for a connection nobody is waiting on. */
     this.clearReconnectTimer();
+    this.clearToolResponseTimer();
     /* TRACKS FIRST, and the order matters. Closing the peer connection does
        not stop a capture track; the recording light stays on and the browser
        keeps the device held. */
@@ -913,6 +930,23 @@ export class VoiceSession {
     /* UNTRUSTED. This came off a network socket and describes something the
        model wants done. Nothing is executed here: the name is relayed to the
        server, which decides against its own allow-list whether it may run. */
+    /* A FINISHED RESPONSE NAMES EVERY CALL IT MADE. Read whole: the calls
+       are dispatched (once each — runToolCall de-duplicates by id) and the
+       set is what gates the ONE response.create for this response. */
+    if (this.lastEventType === EV_RESPONSE_DONE) {
+      const done = responseFunctionCalls(raw, this.toolNames);
+      if (!done || done.calls.length === 0) return;
+      this.noteResponseCalls(done.responseId, done.calls.map((c) => c.callId), channel);
+      for (const call of done.calls) {
+        if (!call.name) {
+          this.events.onToolProtocolMismatch?.(`${EV_RESPONSE_DONE} (function_call item)`);
+          continue;
+        }
+        if (this.lastResponseCreatedAt) this.toolWaitMs = Math.max(this.toolWaitMs, Date.now() - this.lastResponseCreatedAt);
+        void this.runToolCall(call, channel);
+      }
+      return;
+    }
     const parsed = parseToolCallEvent(raw, this.toolNames);
     if (parsed.unreadable) {
       this.events.onToolProtocolMismatch?.(parsed.unreadable);
@@ -993,17 +1027,74 @@ export class VoiceSession {
     this.sendToolResult(channel, call.callId, output);
   }
 
-  /** Both protocol messages, in order, with the channel checked once. */
+  /** The output item, then — once every call of its response is answered —
+   *  the one request for the model to carry on. */
   private sendToolResult(channel: VoiceChannel, callId: string, output: unknown): void {
     if (channel.readyState !== "open") return;
-    for (const message of buildToolResultMessages(callId, output)) {
-      try {
-        channel.send(message);
-      } catch {
-        /* The call may have ended while the lookup was in flight. Nothing to
-           recover: there is no longer anyone waiting for this answer. */
-        return;
+    try {
+      channel.send(buildToolOutputMessage(callId, output));
+    } catch {
+      /* The call may have ended while the lookup was in flight. Nothing to
+         recover: there is no longer anyone waiting for this answer. */
+      return;
+    }
+    this.noteToolOutputSent(callId, channel);
+  }
+
+  /** A response's calls, from its response.done. The ones already answered
+   *  are struck off; when none is left the answer is asked for at once,
+   *  otherwise the rest wait for their outputs (noteToolOutputSent). */
+  private noteResponseCalls(responseId: string, callIds: string[], channel: VoiceChannel): void {
+    if (callIds.length === 0) return;
+    const open = new Set<string>();
+    for (const id of callIds) {
+      if (this.toolOutputsAwaitingDone.delete(id)) continue;
+      open.add(id);
+    }
+    if (this.toolOutputsAwaitingDone.size === 0) this.clearToolResponseTimer();
+    if (open.size === 0) {
+      this.sendResponseCreate(channel);
+      return;
+    }
+    this.toolCallsOpenByResponse.set(responseId || `call:${callIds[0]}`, open);
+  }
+
+  /** An output went out. Its response's set, when known, loses it — and the
+   *  last one out asks for the answer. Unknown yet (response.done still on
+   *  its way): it waits, briefly, so a vendor that never sends the event
+   *  still gets ONE request for whatever was answered. */
+  private noteToolOutputSent(callId: string, channel: VoiceChannel): void {
+    for (const [rid, open] of this.toolCallsOpenByResponse) {
+      if (!open.delete(callId)) continue;
+      if (open.size === 0) {
+        this.toolCallsOpenByResponse.delete(rid);
+        this.sendResponseCreate(channel);
       }
+      return;
+    }
+    this.toolOutputsAwaitingDone.add(callId);
+    if (this.toolResponseCreateTimer !== null) return;
+    this.toolResponseCreateTimer = setTimeout(() => {
+      this.toolResponseCreateTimer = null;
+      if (this.toolOutputsAwaitingDone.size === 0) return;
+      this.toolOutputsAwaitingDone.clear();
+      this.sendResponseCreate(channel);
+    }, TOOL_RESPONSE_CREATE_FALLBACK_MS);
+  }
+
+  private sendResponseCreate(channel: VoiceChannel): void {
+    if (channel.readyState !== "open") return;
+    try {
+      channel.send(RESPONSE_CREATE_MESSAGE);
+    } catch {
+      /* The call ended under the answer; nobody is waiting. */
+    }
+  }
+
+  private clearToolResponseTimer(): void {
+    if (this.toolResponseCreateTimer !== null) {
+      clearTimeout(this.toolResponseCreateTimer);
+      this.toolResponseCreateTimer = null;
     }
   }
 
@@ -1115,6 +1206,7 @@ export class VoiceSession {
     if (this.state === "ended") return;
     this.lastError = describeError(cause);
     this.clearReconnectTimer();
+    this.clearToolResponseTimer();
     /* A CALL THAT WAS UP AND LOST ITS LINE KEEPS THE MICROPHONE for the call
        that resumes it (takeMicrophone): stopping the tracks here made the
        resume ask the phone for the microphone again, outside any tap, and

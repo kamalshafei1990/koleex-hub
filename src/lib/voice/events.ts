@@ -57,6 +57,10 @@ export type TranscriptUpdate = {
    *  بس." — of answers that were sentences. Found in the saved transcript,
    *  not in a test: the fixture had always used cumulative deltas. */
   incremental?: boolean;
+  /** The conversation item this transcript belongs to, when the event named
+   *  one. A caller's turn is ONE item however many times it is transcribed;
+   *  appendTranscript keys on it. See the item rule there. */
+  itemId?: string;
   /** False while more is coming. A caller may render partial text differently
    *  (dimmed, no timestamp) but must never drop it: partial text arriving as
    *  the user speaks is the entire point of showing it live. */
@@ -79,6 +83,12 @@ export const EV_ASSISTANT_DELTA_GA = "response.output_audio_transcript.delta";
 export const EV_ASSISTANT_DONE_GA = "response.output_audio_transcript.done";
 export const EV_USER_DELTA = "conversation.item.input_audio_transcription.delta";
 export const EV_USER_DONE = "conversation.item.input_audio_transcription.completed";
+/* THE CALLER'S TRANSCRIPT AS IT GROWS, under the socket lane's vendor's own
+   name. That vendor sends `…transcription.updated` while the caller speaks
+   (54 of them in one call, 2026-09-11) and never `.delta`; nothing read
+   them, so the caller's words appeared only settled, never live. Read as
+   the cumulative partial it is. */
+export const EV_USER_UPDATED = "conversation.item.input_audio_transcription.updated";
 
 /** The far side also announces the session and its own turn boundaries. Only
  *  the ones a screen reacts to are named; everything else is ignored rather
@@ -132,6 +142,13 @@ function deltaText(payload: Record<string, unknown>): string {
   const confirmed = str(payload.text) || str(payload.delta);
   const unconfirmed = str(payload.stash);
   return confirmed + unconfirmed;
+}
+
+/** `{ itemId }` when the event names its conversation item, else nothing —
+ *  so an update without one is exactly the update it was before. */
+function itemOf(payload: Record<string, unknown>): { itemId?: string } {
+  const id = str(payload.item_id);
+  return id ? { itemId: id } : {};
 }
 
 /**
@@ -236,10 +253,14 @@ export function parseVoiceEvent(raw: string): ParsedEvent {
         phase: null,
       };
     case EV_USER_DELTA:
-      return { transcript: { role: "user", text: deltaText(msg), final: false }, phase: "listening" };
+      return { transcript: { role: "user", text: deltaText(msg), final: false, ...itemOf(msg) }, phase: "listening" };
+    /* The vendor's cumulative partial: the whole turn so far, under
+       `transcript` or `text` + `stash`, for one item. */
+    case EV_USER_UPDATED:
+      return { transcript: { role: "user", text: str(msg.transcript) || deltaText(msg), final: false, ...itemOf(msg) }, phase: "listening" };
     case EV_USER_DONE:
       return {
-        transcript: { role: "user", text: str(msg.transcript) || deltaText(msg), final: true },
+        transcript: { role: "user", text: str(msg.transcript) || deltaText(msg), final: true, ...itemOf(msg) },
         phase: null,
       };
     /* THE CALLER SPOKE OVER THE ANSWER. The far side cancels its response
@@ -282,7 +303,14 @@ export type TranscriptLine = {
   final: boolean;
   via?: TranscriptVia;
   photos?: readonly TranscriptPhoto[];
+  /** The far side's item id for a spoken caller turn, when it sent one. */
+  itemId?: string;
 };
+
+/** How far back a caller's item is looked for. Two lines is the ordinary
+ *  overlap; a re-hearing can land after the far side's filler, its lookup
+ *  and its answer have all opened and closed — a handful more. */
+export const ITEM_LOOKBACK = 8;
 
 /**
  * Fold one update into the running list.
@@ -332,6 +360,33 @@ export function appendTranscript(
   update: TranscriptUpdate,
 ): TranscriptLine[] {
   const last = lines[lines.length - 1];
+  /* THE SAME TURN, HEARD AGAIN (a call, 2026-09-11 17:32 UTC: 70 settled
+     caller transcripts for 8 turns). The socket lane's vendor transcribes
+     a turn as it goes and sends the WHOLE of it, settled, every time it has
+     more — "قوللي الـ...", then "قوللي الااا التوداي..." — all under one
+     item id. The prefix rule further down caught the adjacent case and
+     missed the rest: a re-hearing that changed an early word ("بتقوليلي" →
+     "بتهيدي"), and every one that landed after the far side had already
+     opened its filler or its answer. Each of those became its own row, so
+     the thread held one question three times, the first two cut short.
+     THE ID IS THE TURN: an update that names a line's item replaces that
+     line where it stands — open or settled, whatever has come after it —
+     and a re-hearing that is only noise markers withdraws it. */
+  if (update.role === "user" && update.itemId) {
+    for (let i = lines.length - 1; i >= 0 && i >= lines.length - ITEM_LOOKBACK; i--) {
+      const line = lines[i];
+      if (line.role !== "user" || line.itemId !== update.itemId) continue;
+      if (update.final && isNonSpeech(update.text)) return [...lines.slice(0, i), ...lines.slice(i + 1)];
+      const out = [...lines];
+      out[i] = {
+        ...line,
+        text: update.text || line.text,
+        final: line.final || update.final,
+        ...(update.photos && update.photos.length > 0 && !(line.photos && line.photos.length > 0) ? { photos: update.photos } : {}),
+      };
+      return out;
+    }
+  }
   /* "[noise] ..." IS NOT A TURN (a saved caller line, 2026-09-07 19:47).
      A transcriber that heard nothing it could write marks it so; the mark
      is not something the caller said, and a bubble of it in the thread is
@@ -388,6 +443,7 @@ export function appendTranscript(
       final: update.final,
       ...(update.via ? { via: update.via } : {}),
       ...(update.photos && update.photos.length > 0 ? { photos: update.photos } : {}),
+      ...(update.itemId ? { itemId: update.itemId } : {}),
     };
     /* A LATE USER FINAL GOES BEFORE THE ANSWER IT TRIGGERED. The assistant
        has an open line and the user's turn lands settled with no open line
@@ -415,6 +471,7 @@ export function appendTranscript(
     ...((open.photos?.length ? open.photos : update.photos?.length ? update.photos : null)
       ? { photos: open.photos?.length ? open.photos : update.photos }
       : {}),
+    ...(open.itemId ?? update.itemId ? { itemId: open.itemId ?? update.itemId } : {}),
   };
   const out = [...lines];
   out[openIdx] = merged;

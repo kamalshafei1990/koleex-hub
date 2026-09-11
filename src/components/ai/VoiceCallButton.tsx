@@ -215,6 +215,9 @@ export type VoiceCallButtonProps = {
   ensureConversation?: () => Promise<string | null>;
   /** The rows the server wrote, so the parent can show them in the thread. */
   onTurnsSaved?: (rows: SavedTurn[], conversation: { id: string; title: string | null }) => void;
+  /** A saved row the server corrected — the same spoken turn, heard again
+   *  (lib/voice/persist.ts) — so the thread shows the fuller words. */
+  onTurnUpdated?: (row: SavedTurn) => void;
 };
 
 export default function VoiceCallButton({
@@ -231,6 +234,7 @@ export default function VoiceCallButton({
   conversationId = null,
   ensureConversation,
   onTurnsSaved,
+  onTurnUpdated,
 }: VoiceCallButtonProps) {
   const [state, setState] = useState<VoiceState>("idle");
   /** The lane the current call is on, for render: the socket lane meters
@@ -503,6 +507,7 @@ export default function VoiceCallButton({
   const conversationIdRef = useRef(conversationId);
   const ensureConversationRef = useRef(ensureConversation);
   const onTurnsSavedRef = useRef(onTurnsSaved);
+  const onTurnUpdatedRef = useRef(onTurnUpdated);
   useEffect(() => {
     onErrorRef.current = onError;
     onMessageRef.current = onMessage;
@@ -513,7 +518,8 @@ export default function VoiceCallButton({
     conversationIdRef.current = conversationId;
     ensureConversationRef.current = ensureConversation;
     onTurnsSavedRef.current = onTurnsSaved;
-  }, [onError, onMessage, onTranscript, onPhase, onLiveChange, lang, conversationId, ensureConversation, onTurnsSaved]);
+    onTurnUpdatedRef.current = onTurnUpdated;
+  }, [onError, onMessage, onTranscript, onPhase, onLiveChange, lang, conversationId, ensureConversation, onTurnsSaved, onTurnUpdated]);
 
   /* One per call, made with the session and finished with it. Holds the
      count of turns already queued, which is why it cannot outlive a call. */
@@ -805,6 +811,7 @@ export default function VoiceCallButton({
         fetchFn: (input, init) => fetch(input, init),
         ensureConversation: () => ensureConversationRef.current?.() ?? Promise.resolve(null),
         onSaved: (rows, conversation) => onTurnsSavedRef.current?.(rows, conversation),
+        onUpdated: (row) => onTurnUpdatedRef.current?.(row),
         onError: (reason) => onErrorRef.current?.(PERSIST_COPY[langRef.current][reason]),
       },
       conversationIdRef.current,

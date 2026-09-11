@@ -31,6 +31,9 @@ import {
   EV_OUTPUT_ITEM_ADDED,
   EV_FN_ARGS_DONE,
   EV_RESPONSE_DONE,
+  responseFunctionCalls,
+  buildToolOutputMessage,
+  RESPONSE_CREATE_MESSAGE,
 } from "../src/lib/voice/tool-calls";
 import {
   VOICE_TOOL_NAMES,
@@ -838,6 +841,46 @@ console.log("\n── 4. Handing the answer back ──");
     typeof first.item.output === "string" && first.item.output.includes('"answer":42'));
   const asString = JSON.parse(buildToolResultMessages("c2", "plain")[0]) as { item: { output: string } };
   check("a string output is passed through unchanged", asString.item.output === "plain");
+}
+
+console.log("\n── 4b. One answer per response, however many calls it made ──");
+{
+  /* A call, 2026-09-11 17:32 UTC: "Today's brief" is three lookups in ONE
+     response; three outputs went back, each with its own response.create,
+     and the far side answered three times. The set of a response's calls
+     is on its response.done — read whole here. */
+  const names = new ToolCallNames();
+  names.remember("c2", "listMyTodos");
+  const three = responseFunctionCalls(ev({
+    type: EV_RESPONSE_DONE,
+    response: { id: "resp_1", status: "completed", output: [
+      { type: "function_call", call_id: "c1", name: "listMyCalendar", arguments: "{}" },
+      { type: "function_call", call_id: "c2", arguments: '{"due":"today"}' },
+      { type: "message", id: "m1" },
+      { type: "function_call", call_id: "c3", name: "listMyPlanning" },
+    ] },
+  }), names);
+  check("every function call on a response.done is read, in order, with the response's id",
+    three?.responseId === "resp_1" && three.calls.map((c) => c.callId).join() === "c1,c2,c3");
+  check("  …a name the event omits comes from the remembered half; arguments default to {}",
+    three?.calls[1].name === "listMyTodos" && three.calls[1].argumentsJson === '{"due":"today"}' && three.calls[2].argumentsJson === "{}");
+  check("  …a call whose name was never seen is listed nameless — the caller refuses it, the count still holds",
+    responseFunctionCalls(ev({ type: EV_RESPONSE_DONE, response: { output: [{ type: "function_call", call_id: "zz" }] } }), new ToolCallNames())?.calls[0].name === "");
+  check("a response with no calls reads as an empty set, not null; any other event is null; garbage is null",
+    responseFunctionCalls(ev({ type: EV_RESPONSE_DONE, response: { id: "r", output: [{ type: "message" }] } }), names)?.calls.length === 0 &&
+    responseFunctionCalls(ev({ type: EV_FN_ARGS_DONE, call_id: "c1" }), names) === null &&
+    responseFunctionCalls("not json", names) === null && responseFunctionCalls(ev({ type: EV_RESPONSE_DONE, response: "x" }), names)?.calls.length === 0);
+  check("the two halves of the result are the two messages buildToolResultMessages sends",
+    buildToolResultMessages("c1", { a: 1 })[0] === buildToolOutputMessage("c1", { a: 1 }) &&
+    buildToolResultMessages("c1", { a: 1 })[1] === RESPONSE_CREATE_MESSAGE && RESPONSE_CREATE_MESSAGE === JSON.stringify({ type: "response.create" }));
+  /* THE SESSION SENDS THE SECOND HALF ONCE (source read; the behaviour is
+     driven in validate:voice-client). */
+  const session = readFileSync("src/lib/voice/session.ts", "utf8");
+  check("the session sends the output item alone and gates the one response.create on the response's set",
+    /channel\.send\(buildToolOutputMessage\(callId, output\)\);[\s\S]{0,300}?this\.noteToolOutputSent\(callId, channel\);/.test(session) &&
+    /if \(this\.lastEventType === EV_RESPONSE_DONE\) \{\s*const done = responseFunctionCalls\(raw, this\.toolNames\);/.test(session) &&
+    !/buildToolResultMessages/.test(session) &&
+    /export const TOOL_RESPONSE_CREATE_FALLBACK_MS = 1_200;/.test(session));
 }
 
 console.log("\n── 5. The browser is a courier, not an authority (source read) ──");

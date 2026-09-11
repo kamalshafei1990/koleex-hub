@@ -15,7 +15,7 @@
    --------------------------------------------------------------------------- */
 
 import { VoiceSession, describeError, HANDSHAKE_PATH, WS_SESSION_PATH, failureForStatus, type VoiceSocket, waitForIceGathering, normalizeSdp, type VoiceDeps, type VoiceState, type VoiceFailure,
-  TOOL_PATH,
+  TOOL_PATH, TOOL_RESPONSE_CREATE_FALLBACK_MS,
 } from "../src/lib/voice/session";
 import { TranscriptPersister, TRANSCRIPT_PATH, MAX_TURNS_PER_POST, MAX_POST_FAILURES, type SavedTurn } from "../src/lib/voice/persist";
 import { buildTextTurnMessages, EV_ITEM_CREATE, EV_RESPONSE_CREATE, MAX_TYPED_TURN_CHARS } from "../src/lib/voice/text-turn";
@@ -1492,6 +1492,82 @@ console.log("\n── 12. Mute ──");
     }
 
     {
+      /* THE SAME TURN, HEARD AGAIN (a call, 2026-09-11 17:32 UTC): the fold
+         now replaces a caller's line in place (events.ts, the item rule),
+         but the first hearing was already a row. A written line that reads
+         differently is corrected by the id the echo gave it. */
+      type Call = { method: string; body: Record<string, unknown> };
+      const calls: Call[] = [];
+      const updated: SavedTurn[] = [];
+      let patchStatus = 200;
+      const fetchFn = (async (_u: string, init?: RequestInit) => {
+        const body = JSON.parse(String(init?.body)) as Record<string, unknown>;
+        const method = String(init?.method);
+        calls.push({ method, body });
+        if (method === "PATCH") {
+          return { ok: patchStatus < 400, status: patchStatus, json: async () => ({ message: { id: body.message_id, role: "user", content: body.text, created_at: "now", source: "voice" }, conversation: { id: CONV, title: "T" } }) } as unknown as Response;
+        }
+        const turns = body.turns as Array<{ role: string; text: string; via: string }>;
+        return { ok: true, status: 200, json: async () => ({ messages: turns.map((t, i) => ({ id: `row-${calls.length}-${i}`, role: t.role, content: t.text, created_at: "now", source: t.via })), conversation: { id: CONV, title: "T" } }) } as unknown as Response;
+      }) as unknown as typeof fetch;
+      const p = new TranscriptPersister({ fetchFn, ensureConversation: async () => CONV, onUpdated: (row) => updated.push(row) }, CONV);
+      p.observe([L("user", "قوللي الـ...", true)]);
+      await p.finish();
+      check("the first hearing is written as before, and a POST carries no index field", calls.length === 1 && calls[0].method === "POST" && JSON.stringify(Object.keys((calls[0].body.turns as object[])[0]).sort()) === JSON.stringify(["role", "text", "via"]));
+      p.observe([L("user", "قوللي الااا التوداي...", true), L("assistant", "ثانية واحدة.", true)]);
+      await p.finish();
+      const patches = calls.filter((c) => c.method === "PATCH");
+      check("a written line that reads differently is PATCHED by its row id, with the conversation — after the insert of what settled since",
+        patches.length === 1 && patches[0].body.message_id === "row-1-0" && patches[0].body.text === "قوللي الااا التوداي..." && patches[0].body.conversation_id === CONV &&
+        calls.filter((c) => c.method === "POST").length === 2 && calls.indexOf(patches[0]) === 2);
+      check("  …the thread is told the corrected row once; nothing was written twice",
+        updated.length === 1 && updated[0].content === "قوللي الااا التوداي..." && p.corrections() === 0 &&
+        calls.filter((c) => c.method === "POST").flatMap((c) => c.body.turns as unknown[]).length === 2);
+      p.observe([L("user", "قوللي الااا التوداي...", true), L("assistant", "ثانية واحدة.", true)]);
+      await p.finish();
+      check("  …the same words again are no correction", calls.length === 3);
+      patchStatus = 404;
+      p.observe([L("user", "قوللي التوداي بريف", true), L("assistant", "ثانية واحدة.", true)]);
+      await p.finish();
+      check("  …a 404 on the correction drops it rather than retrying for ever, and tells the thread nothing",
+        calls.filter((c) => c.method === "PATCH").length === 2 && p.corrections() === 0 && updated.length === 1);
+
+      /* Newer words that land while the insert is still in flight wait for
+         the echo's id, then go as one correction. */
+      const slow: Array<() => void> = [];
+      const calls2: Call[] = [];
+      const fetch2 = (async (_u: string, init?: RequestInit) => {
+        const body = JSON.parse(String(init?.body)) as Record<string, unknown>;
+        const method = String(init?.method);
+        calls2.push({ method, body });
+        if (method === "POST") await new Promise<void>((res) => slow.push(res));
+        const turns = (body.turns as Array<{ role: string; text: string; via: string }> | undefined) ?? [];
+        return {
+          ok: true, status: 200,
+          json: async () => (method === "PATCH"
+            ? { message: { id: body.message_id, role: "user", content: body.text, created_at: "now", source: "voice" } }
+            : { messages: turns.map((t, i) => ({ id: `r${i}`, role: t.role, content: t.text, created_at: "now", source: t.via })), conversation: { id: CONV, title: "T" } }),
+        } as unknown as Response;
+      }) as unknown as typeof fetch;
+      const p2 = new TranscriptPersister({ fetchFn: fetch2, ensureConversation: async () => CONV }, CONV);
+      p2.observe([L("user", "حاجة أنا بجر...", true)]);
+      const first = p2.flush();
+      p2.observe([L("user", "حاجة أنا بجرّبك", true)]);
+      check("newer words that land while the insert is in flight wait for its id", p2.corrections() === 1 && calls2.length === 1);
+      slow.shift()?.();
+      await first;
+      await p2.finish();
+      check("  …and go as one PATCH once the echo names the row",
+        calls2.filter((c) => c.method === "PATCH").length === 1 && calls2[1].body.message_id === "r0" && calls2[1].body.text === "حاجة أنا بجرّبك" && p2.corrections() === 0);
+      /* A resumed persister never corrects lines it did not write. */
+      const p3 = new TranscriptPersister({ fetchFn: fetch2, ensureConversation: async () => CONV }, CONV, 1);
+      const n3 = calls2.length;
+      p3.observe([L("user", "changed by nobody", true)]);
+      await p3.finish();
+      check("a resumed persister leaves the lines of the writer before it alone", calls2.length === n3 && p3.corrections() === 0);
+    }
+
+    {
       const h = harness({ conv: null, ensure: async () => null });
       for (let i = 0; i < MAX_POST_FAILURES; i++) {
         h.p.observe([L("user", "turn", true)].concat(Array.from({ length: i }, (_, k) => L("assistant", `a${k}`, true))));
@@ -2653,10 +2729,45 @@ function describeErrorCheck(): boolean {
     check("  …and the caller starting to speak flushes what was queued (barge-in)", r.audios[0].flushes === 1);
     r.sockets[0].message(JSON.stringify({ type: "response.output_item.added", item: { type: "function_call", call_id: "c1", name: "search_knowledge" } }));
     r.sockets[0].message(JSON.stringify({ type: "response.function_call_arguments.done", call_id: "c1", arguments: "{\"query\":\"x\"}" }));
+    r.sockets[0].message(JSON.stringify({ type: "response.done", response: { id: "r1", status: "completed", output: [{ type: "function_call", call_id: "c1", name: "search_knowledge", arguments: "{\"query\":\"x\"}" }] } }));
     await sleep(20);
-    check("a tool call on the socket is relayed to the same server route and its answer goes back on the socket",
+    const RC = JSON.stringify({ type: "response.create" });
+    const rc = () => r.sockets[0].sent.filter((m) => m === RC).length;
+    const outputsSince = (from: number) => r.sockets[0].sent.slice(from).filter((m) => /function_call_output/.test(m)).length;
+    check("a tool call on the socket is relayed to the same server route and its answer goes back on the socket — the output item, then ONE response.create",
       r.tools.join() === "search_knowledge" && r.recorded.some((x) => x.url === TOOL_PATH) &&
-      r.sockets[0].sent.some((m) => /conversation\.item\.create/.test(m) && /function_call_output/.test(m)) && r.sockets[0].sent[r.sockets[0].sent.length - 1] === JSON.stringify({ type: "response.create" }));
+      r.sockets[0].sent.some((m) => /conversation\.item\.create/.test(m) && /function_call_output/.test(m)) && r.sockets[0].sent[r.sockets[0].sent.length - 1] === RC && rc() === 1);
+    /* THREE CALLS IN ONE RESPONSE (the brief, 2026-09-11 17:32 UTC): three
+       outputs went back, each followed by its own response.create, and the
+       far side answered three times. Now the set on response.done gates ONE. */
+    const from3 = r.sockets[0].sent.length;
+    for (const id of ["c2", "c3", "c4"]) r.sockets[0].message(JSON.stringify({ type: "response.output_item.added", item: { type: "function_call", call_id: id, name: "search_knowledge" } }));
+    for (const id of ["c2", "c3"]) r.sockets[0].message(JSON.stringify({ type: "response.function_call_arguments.done", call_id: id, arguments: "{}" }));
+    await sleep(20);
+    check("two of a response's three outputs are out and nothing has asked the model to speak — its response.done has not named the set yet",
+      outputsSince(from3) === 2 && rc() === 1);
+    r.sockets[0].message(JSON.stringify({ type: "response.done", response: { id: "r2", output: ["c2", "c3", "c4"].map((id) => ({ type: "function_call", call_id: id, name: "search_knowledge", arguments: "{}" })) } }));
+    await sleep(20);
+    check("  …response.done names three: the third (never streamed) is dispatched from it, and ONE response.create follows the last output",
+      r.tools.length === 4 && outputsSince(from3) === 3 && rc() === 2 && r.sockets[0].sent[r.sockets[0].sent.length - 1] === RC);
+    const from5 = r.sockets[0].sent.length;
+    r.sockets[0].message(JSON.stringify({ type: "response.done", response: { id: "r3", output: [{ type: "function_call", call_id: "c5", name: "search_knowledge", arguments: "{}" }, { type: "function_call", call_id: "c6", name: "search_knowledge", arguments: "{}" }] } }));
+    await sleep(20);
+    check("  …a response.done seen FIRST dispatches both calls and asks once, after the second output", outputsSince(from5) === 2 && rc() === 3 && r.tools.length === 6);
+    r.sockets[0].message(JSON.stringify({ type: "response.done", response: { id: "r3", output: [{ type: "function_call", call_id: "c5", name: "search_knowledge", arguments: "{}" }, { type: "function_call", call_id: "c6", name: "search_knowledge", arguments: "{}" }] } }));
+    await sleep(20);
+    check("  …the same response.done again runs nothing twice and asks nothing more", outputsSince(from5) === 2 && rc() === 3 && r.tools.length === 6);
+    /* A vendor that never sends response.done: the output waits, then ONE
+       request after the fallback — not silence, not one per output. */
+    const from7 = r.sockets[0].sent.length;
+    for (const id of ["c7", "c8"]) {
+      r.sockets[0].message(JSON.stringify({ type: "response.output_item.added", item: { type: "function_call", call_id: id, name: "search_knowledge" } }));
+      r.sockets[0].message(JSON.stringify({ type: "response.function_call_arguments.done", call_id: id, arguments: "{}" }));
+    }
+    await sleep(20);
+    check("  …with no response.done at all the outputs wait", outputsSince(from7) === 2 && rc() === 3);
+    await sleep(TOOL_RESPONSE_CREATE_FALLBACK_MS + 100);
+    check("  …and ONE response.create follows both after the fallback wait", rc() === 4 && r.sockets[0].sent[r.sockets[0].sent.length - 1] === RC && TOOL_RESPONSE_CREATE_FALLBACK_MS === 1_200);
     r.s.stop();
     check("hanging up closes the socket and the audio, and releases the microphone — with no failure reported", r.sockets[0].closed === 1 && r.audios[0].closed === 1 && r.mic.allStopped() && r.s.getState() === "ended" && r.states.every(([st]) => st !== "failed"));
     r.sockets[0].drop();

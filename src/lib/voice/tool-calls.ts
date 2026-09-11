@@ -186,23 +186,79 @@ export function parseToolCallEvent(raw: string, names: ToolCallNames): ToolCallP
 }
 
 /**
- * The message that hands a result back to the model.
- *
- * Two events, in this order, exactly as the protocol wants them: the output
- * item, then a request for the model to carry on speaking. Built here so the
- * shape is testable without a browser.
+ * The message that hands a result back to the model — the OUTPUT ITEM only.
  *
  * `output` is a STRING in this protocol, not an object — a caller that passes
  * an object gets it serialised here rather than silently sending `[object
  * Object]`.
  */
-export function buildToolResultMessages(callId: string, output: unknown): string[] {
+export function buildToolOutputMessage(callId: string, output: unknown): string {
   const text = typeof output === "string" ? output : JSON.stringify(output ?? null);
-  return [
-    JSON.stringify({
-      type: "conversation.item.create",
-      item: { type: "function_call_output", call_id: callId, output: text },
-    }),
-    JSON.stringify({ type: "response.create" }),
-  ];
+  return JSON.stringify({
+    type: "conversation.item.create",
+    item: { type: "function_call_output", call_id: callId, output: text },
+  });
+}
+
+/** The request for the model to carry on speaking, once its calls are
+ *  answered. ONE per model response — see responseFunctionCalls. */
+export const RESPONSE_CREATE_MESSAGE: string = JSON.stringify({ type: "response.create" });
+
+/**
+ * Both messages, in order: the output item, then a request for the model to
+ * carry on speaking. Kept for a caller that answers ONE call at a time;
+ * the session answers several and sends the second half once (below).
+ */
+export function buildToolResultMessages(callId: string, output: unknown): string[] {
+  return [buildToolOutputMessage(callId, output), RESPONSE_CREATE_MESSAGE];
+}
+
+/* ---------------------------------------------------------------------------
+   ONE ANSWER PER RESPONSE, HOWEVER MANY CALLS IT MADE.
+
+   THE BUG (a call, 2026-09-11 17:32 UTC). "Today's brief" makes the model
+   call three lookups in ONE response — the calendar, the tasks, the plans.
+   Each result went back followed by its own `response.create`, so the far
+   side was asked to speak THREE times and did: the whole brief, then "and
+   nothing in the schedule either", then "nothing planned either" — the
+   caller asked why it kept repeating itself, and it apologised. The
+   protocol's rule is one `response.create` after ALL of a response's
+   function-call outputs are in; sending one per output is what asks for
+   the repeats.
+
+   The set of calls a response made is on its `response.done`, in
+   `response.output`. This reads every function_call item off it — the
+   fallback route in parseToolCallEvent reads only the first, which is
+   right for a parser that yields one call, and wrong for counting.
+   --------------------------------------------------------------------------- */
+export type ResponseFunctionCalls = {
+  /** The response's id, or "" when the event carried none. */
+  responseId: string;
+  /** Every call the response made, in order, with what is known of each. */
+  calls: VoiceToolCall[];
+};
+
+/** The function calls a `response.done` event lists, or null for any other
+ *  event or an unreadable one. A call whose name was never seen is still
+ *  listed (the caller de-duplicates and refuses nameless calls itself);
+ *  its arguments default to "{}" as on the other routes. Pure. */
+export function responseFunctionCalls(raw: string, names: ToolCallNames): ResponseFunctionCalls | null {
+  let payload: Record<string, unknown> | null;
+  try {
+    payload = asRecord(JSON.parse(raw));
+  } catch {
+    return null;
+  }
+  if (!payload || str(payload.type) !== EV_RESPONSE_DONE) return null;
+  const response = asRecord(payload.response);
+  const output = response && Array.isArray(response.output) ? response.output : [];
+  const calls: VoiceToolCall[] = [];
+  for (const entry of output) {
+    const item = asRecord(entry);
+    if (!item || str(item.type) !== "function_call") continue;
+    const callId = str(item.call_id) || str(item.id);
+    if (!callId) continue;
+    calls.push({ callId, name: str(item.name) || names.nameFor(callId), argumentsJson: str(item.arguments) || "{}" });
+  }
+  return { responseId: response ? str(response.id) : "", calls };
 }

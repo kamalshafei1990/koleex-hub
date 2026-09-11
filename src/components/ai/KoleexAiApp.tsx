@@ -804,6 +804,18 @@ export default function KoleexAiApp() {
     [],
   );
 
+  /* A SPOKEN TURN, HEARD AGAIN: the server corrected the row's words
+     (lib/voice/persist.ts); the bubble shows the fuller sentence in place. */
+  const onVoiceTurnUpdated = useCallback((row: SavedTurn) => {
+    setMessages((prev) => {
+      const at = prev.findIndex((m) => m.id === row.id);
+      if (at < 0 || prev[at].content === row.content) return prev;
+      const next = [...prev];
+      next[at] = { ...prev[at], content: row.content };
+      return next;
+    });
+  }, []);
+
   /* THE SIDEBAR BUMP, once. A finished turn moves its chat to the top with
      the new title and preview; the same reducer existed twice in send()
      (audit, 2026-09-11). The timestamp is taken outside the updater so the
@@ -2964,6 +2976,7 @@ export default function KoleexAiApp() {
                       conversationId={activeId}
                       ensureConversation={ensureVoiceConversation}
                       onTurnsSaved={onVoiceTurnsSaved}
+                      onTurnUpdated={onVoiceTurnUpdated}
                     />
 
                     {/* Send / Stop — inverted bg circle, anchors the row. */}

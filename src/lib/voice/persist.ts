@@ -28,7 +28,16 @@
    NEVER TAKES THE CALL DOWN. A failed post is retried a bounded number of
    times and then given up on with one callback; the audio continues
    regardless. Persistence is a nicety on top of a call, not a condition of it.
-   --------------------------------------------------------------------------- */
+
+   A SAVED LINE THAT CHANGES IS CORRECTED, NOT WRITTEN AGAIN (a call,
+   2026-09-11 17:32 UTC). The socket lane's vendor transcribes a caller's
+   turn several times over, settled each time, under one item; the fold
+   (events.ts) now replaces the line in place. But the first hearing had
+   already been posted — "قوللي الـ..." was a row before "قوللي الااا
+   التوداي..." arrived — so a line that was written and then changed is
+   PATCHED by the id the server gave it. Corrections go after inserts, one
+   at a time, and a correction the server refuses is dropped rather than
+   retried for ever. */
 
 import { type TranscriptLine } from "./events";
 import { photosMarkdown, imageUrlsIn } from "./photos";
@@ -51,6 +60,8 @@ export type PersistFailure = "unauthorised" | "not-found" | "failed";
 
 export type PersistDeps = {
   fetchFn: typeof fetch;
+  /** A row the server corrected, so the thread can show the new words. */
+  onUpdated?: (row: SavedTurn) => void;
   /** Returns the conversation to write into, creating one if the call began
    *  on an empty screen. Null means none could be made; the turns wait. */
   ensureConversation: () => Promise<string | null>;
@@ -60,10 +71,14 @@ export type PersistDeps = {
 };
 
 type Turn = { role: "user" | "assistant"; text: string; via: "voice" | "text" };
+/** What was written for a line, by its index: the words the server holds,
+ *  the row's id once the echo names it, and newer words waiting to go. */
+type Written = { text: string; id: string | null; dirty: string | null };
 
 export class TranscriptPersister {
   private settledCount = 0;
-  private queue: Turn[] = [];
+  private queue: Array<Turn & { index: number }> = [];
+  private written: Array<Written | null> = [];
   private inflight: Promise<void> | null = null;
   private failures = 0;
   private dead = false;
@@ -83,6 +98,22 @@ export class TranscriptPersister {
   /** How many turns are waiting to be written. For the suite. */
   pending(): number {
     return this.queue.length;
+  }
+
+  /** How many saved lines hold newer words than the server. For the suite. */
+  corrections(): number {
+    let n = 0;
+    for (const w of this.written) if (w && w.dirty !== null) n++;
+    return n;
+  }
+
+  /** The text a line is saved as: the words, and for an answer the pictures
+   *  its lookup returned that the words do not already show. */
+  private textOf(line: TranscriptLine): string {
+    const spoken = line.text.trim();
+    const already = imageUrlsIn(spoken);
+    const pictures = line.role === "assistant" ? photosMarkdown((line.photos ?? []).filter((p) => !already.has(p.url))) : "";
+    return pictures ? (spoken ? `${spoken}\n\n${pictures}` : pictures) : spoken;
   }
 
   /** The conversation the turns are going into, once known. */
@@ -119,36 +150,54 @@ export class TranscriptPersister {
     }
     for (let i = this.settledCount; i < settled; i++) {
       const line = lines[i];
-      const spoken = line.text.trim();
       /* THE PHOTOS GO WITH THE ANSWER. An assistant turn that showed a product
          is saved with the same picture, as markdown the bubble already
          renders — so the thread after a call looks like the thread after a
          typed question about the same machine. Only assistant turns: a user
-         does not "show" anything. */
-      /* NOT TWICE. The model sometimes writes the picture into its own words
-         as markdown; appending the same URL again put the same product photo
-         under the answer two times. What the words already show is not
-         appended. */
-      const already = imageUrlsIn(spoken);
-      const pictures = line.role === "assistant" ? photosMarkdown((line.photos ?? []).filter((p) => !already.has(p.url))) : "";
-      const text = pictures ? (spoken ? `${spoken}\n\n${pictures}` : pictures) : spoken;
+         does not "show" anything. NOT TWICE: what the words already show as
+         markdown is not appended (textOf). */
+      const text = this.textOf(line);
       /* An empty final — a turn the vendor closed with no words — is counted
          as seen and not sent: the route refuses empty content, rightly. */
-      if (text) this.queue.push({ role: line.role, text, via: line.via ?? "voice" });
+      this.written[i] = text ? { text, id: null, dirty: null } : null;
+      if (text) this.queue.push({ role: line.role, text, via: line.via ?? "voice", index: i });
     }
     if (settled > this.settledCount) this.settledCount = settled;
+    /* A LINE ALREADY WRITTEN THAT READS DIFFERENTLY NOW — the same turn,
+       heard again (events.ts, the item rule) — is corrected, once its row
+       has an id. Only lines this persister wrote: the ones a resume seeded
+       as already settled belong to the writer before it. */
+    for (let i = 0; i < Math.min(this.settledCount, lines.length, this.written.length); i++) {
+      const w = this.written[i];
+      if (!w) continue;
+      const text = this.textOf(lines[i]);
+      if (!text || text === w.text) {
+        w.dirty = null;
+        continue;
+      }
+      w.dirty = text;
+    }
     void this.flush();
+  }
+
+  /** The first saved line with newer words and a row to put them in. */
+  private nextCorrection(): Written | null {
+    for (const w of this.written) if (w && w.dirty !== null && w.id) return w;
+    return null;
   }
 
   /** Send what is queued. One request at a time, in order. */
   flush(keepalive = false): Promise<void> {
     if (this.inflight) return this.inflight;
-    if (this.dead || this.queue.length === 0) return Promise.resolve();
-    this.inflight = this.post(keepalive).finally(() => {
+    if (this.dead) return Promise.resolve();
+    /* Inserts first — a correction needs the id an insert's echo brings. */
+    const correction = this.queue.length === 0 ? this.nextCorrection() : null;
+    if (this.queue.length === 0 && !correction) return Promise.resolve();
+    this.inflight = (correction ? this.patch(correction, keepalive) : this.post(keepalive)).finally(() => {
       this.inflight = null;
       /* More may have settled while that was in flight. Only after a success:
          see lastPostOk. */
-      if (!this.dead && this.lastPostOk && this.queue.length > 0) void this.flush(keepalive);
+      if (!this.dead && this.lastPostOk && (this.queue.length > 0 || this.nextCorrection())) void this.flush(keepalive);
     });
     return this.inflight;
   }
@@ -160,10 +209,52 @@ export class TranscriptPersister {
        the remainder was posted afterwards in its finally — so the caller
        asking for the end-of-call summary right after finish() had the last
        batch still on its way (audit, 2026-09-07). */
-    while (!this.dead && (this.inflight || this.queue.length > 0)) {
+    while (!this.dead && (this.inflight || this.queue.length > 0 || this.nextCorrection())) {
       await this.flush(true);
       if (!this.lastPostOk) break;
     }
+  }
+
+  /** One correction: the row's new words, by its id, into the same
+   *  conversation. A refusal the server would repeat (400, 404) drops the
+   *  correction; anything else is tried again with the next turn. */
+  private async patch(w: Written, keepalive: boolean): Promise<void> {
+    const text = w.dirty;
+    if (!this.conversationId || !w.id || text === null) return;
+    let res: Response;
+    try {
+      res = await this.deps.fetchFn(TRANSCRIPT_PATH, {
+        method: "PATCH",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ conversation_id: this.conversationId, message_id: w.id, text }),
+        keepalive,
+      });
+    } catch {
+      this.noteFailure();
+      return;
+    }
+    if (res.ok) {
+      this.failures = 0;
+      this.lastPostOk = true;
+      w.text = text;
+      /* Newer words may have landed while this was in flight; they stay
+         dirty and go next. */
+      if (w.dirty === text) w.dirty = null;
+      try {
+        const body = (await res.json()) as { message?: SavedTurn };
+        if (body.message && typeof body.message === "object") this.deps.onUpdated?.(body.message);
+      } catch {
+        /* Written; the thread catches up on its next load. */
+      }
+      return;
+    }
+    if (res.status === 401 || res.status === 403) return this.giveUp("unauthorised");
+    if (res.status === 404 || res.status === 400) {
+      w.dirty = null;
+      return;
+    }
+    this.noteFailure();
   }
 
   private async post(keepalive: boolean): Promise<void> {
@@ -186,7 +277,7 @@ export class TranscriptPersister {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ conversation_id: this.conversationId, turns: batch }),
+        body: JSON.stringify({ conversation_id: this.conversationId, turns: batch.map(({ role, text, via }) => ({ role, text, via })) }),
         keepalive,
       });
     } catch {
@@ -204,6 +295,14 @@ export class TranscriptPersister {
           conversation?: { id: string; title: string | null };
         };
         if (Array.isArray(body.messages) && body.conversation) {
+          /* THE ROWS COME BACK IN THE ORDER SENT; each id is the handle a
+             later correction of that line needs. A short echo names none. */
+          if (body.messages.length === batch.length) {
+            body.messages.forEach((row, k) => {
+              const w = this.written[batch[k].index];
+              if (w && row && typeof row.id === "string") w.id = row.id;
+            });
+          }
           this.deps.onSaved?.(body.messages, body.conversation);
         }
       } catch {

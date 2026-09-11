@@ -29,6 +29,14 @@ import "server-only";
    full prompts or replies), it does not call any model, and it does not make
    a title with one either: a first turn becomes the title, cut short, the way
    the typed lane already handles very short openers.
+
+   PATCH — ONE SPOKEN TURN, HEARD AGAIN (a call, 2026-09-11 17:32 UTC). The
+   socket lane's vendor transcribes a caller's turn several times over,
+   settled each time; the first hearing is a row before the fuller one
+   arrives (lib/voice/persist.ts). The browser corrects that row by the id
+   this route gave it: same gate, same budget, same ownership check on the
+   conversation, and only a row of THIS conversation that was written by a
+   call (source voice) — never a typed message, never a server-made one.
    --------------------------------------------------------------------------- */
 
 import { NextResponse } from "next/server";
@@ -70,6 +78,70 @@ function parseTurns(raw: unknown): Turn[] | null {
   return out;
 }
 
+/** THE CONVERSATION IS THE CALLER'S — the same triple predicate every other
+ *  conversation mutation uses, so a crafted id from tenant A cannot write
+ *  into tenant B's thread. Null when it is not theirs. */
+async function ownConversation(gate: { tenantId: string | null; accountId: string }, conversationId: string) {
+  const { data: conv } = await supabaseServer
+    .from("ai_conversations")
+    .select("id, title, message_count")
+    .eq("id", conversationId)
+    .eq("tenant_id", gate.tenantId)
+    .eq("account_id", gate.accountId)
+    .maybeSingle();
+  return conv;
+}
+
+/** The budget, shared by both verbs: each is a database write. Returns the
+ *  refusal to send, or null to go on. */
+async function spendBudget(accountId: string): Promise<NextResponse | null> {
+  if (limitMode() === "off") return null;
+  const hit = await consumeBudget(subjectFor.account(accountId), BUDGETS.voiceTranscriptPerAccount());
+  if (hit.allowed) return null;
+  console.warn(`[ai.voice.transcript] ratelimit account count=${hit.count} max=${hit.max} mode=${limitMode()}`);
+  if (limitMode() !== "enforce") return null;
+  return NextResponse.json(
+    { error: "Too many transcript writes just now." },
+    { status: 429, headers: { "Retry-After": String(hit.retryAfterSec) } },
+  );
+}
+
+export async function PATCH(req: Request) {
+  const gate = await authorizeVoice(req);
+  if (gate instanceof NextResponse) return gate;
+  const refused = await spendBudget(gate.accountId);
+  if (refused) return refused;
+
+  const body: unknown = await req.json().catch(() => null);
+  const o = body && typeof body === "object" ? (body as { conversation_id?: unknown; message_id?: unknown; text?: unknown }) : null;
+  const conversationId = parseConversationParam(o ? String(o.conversation_id ?? "") : null);
+  /* A row id is a UUID like a conversation's; the same parser refuses
+     anything else. */
+  const messageId = parseConversationParam(o ? String(o.message_id ?? "") : null);
+  const text = o && typeof o.text === "string" ? o.text.trim() : "";
+  if (!conversationId || !messageId || !text || text.length > MAX_TURN_CHARS) {
+    return NextResponse.json({ error: "conversation_id, message_id and text are required." }, { status: 400 });
+  }
+  const conv = await ownConversation(gate, conversationId);
+  if (!conv) return NextResponse.json({ error: "Not found" }, { status: 404 });
+
+  const { data: row, error } = await supabaseServer
+    .from("ai_messages")
+    .update({ content: text })
+    .eq("id", messageId)
+    .eq("conversation_id", conversationId)
+    .eq("tenant_id", gate.tenantId)
+    .eq("source", "voice")
+    .select("*")
+    .maybeSingle();
+  if (error) {
+    console.error(`[ai.voice.transcript] update failed: ${error.message}`);
+    return NextResponse.json({ error: "Could not save the transcript." }, { status: 500 });
+  }
+  if (!row) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  return NextResponse.json({ message: withPublicProvider(row), conversation: { id: conversationId, title: conv.title } });
+}
+
 export async function POST(req: Request) {
   const gate = await authorizeVoice(req);
   if (gate instanceof NextResponse) return gate;
@@ -96,13 +168,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "conversation_id and turns are required." }, { status: 400 });
   }
 
-  const { data: conv } = await supabaseServer
-    .from("ai_conversations")
-    .select("id, title, message_count")
-    .eq("id", conversationId)
-    .eq("tenant_id", gate.tenantId)
-    .eq("account_id", gate.accountId)
-    .maybeSingle();
+  const conv = await ownConversation(gate, conversationId);
   if (!conv) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
   const { data: rows, error } = await supabaseServer
