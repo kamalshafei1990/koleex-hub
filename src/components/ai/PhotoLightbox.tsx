@@ -15,7 +15,8 @@
    message still carries it full size.
    --------------------------------------------------------------------------- */
 
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
+import { useFocusTrap } from "./useFocusTrap";
 import { aiImage } from "@/lib/ai/image-url";
 
 export type LightboxPhoto = { url: string; label?: string | null };
@@ -29,6 +30,10 @@ export default function PhotoLightbox({
   onClose: () => void;
   closeLabel?: string;
 }) {
+  /* Focus lands on Close, Tab stays inside, and the opener gets it back
+     when the picture closes (audit, 2026-09-11). */
+  const boxRef = useRef<HTMLDivElement | null>(null);
+  useFocusTrap(boxRef, !!photo, { initialFocus: "[data-lightbox-close]" });
   /* Escape closes the picture — and ONLY the picture. Listeners further up
      (the call screen ends the call on Escape) must not see this press, so
      it is stopped here, in the capture phase, before it reaches them. */
@@ -47,6 +52,7 @@ export default function PhotoLightbox({
   if (!photo) return null;
   return (
     <div
+      ref={boxRef}
       role="dialog"
       aria-modal="true"
       aria-label={photo.label || closeLabel}
@@ -56,6 +62,7 @@ export default function PhotoLightbox({
     >
       <button
         type="button"
+        data-lightbox-close
         onClick={onClose}
         aria-label={closeLabel}
         className="absolute top-4 right-4 h-12 w-12 rounded-full inline-flex items-center justify-center text-white border border-white/20 bg-white/[0.06] hover:bg-white/[0.12] transition-[background-color,transform] duration-150 active:scale-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0066FF]"

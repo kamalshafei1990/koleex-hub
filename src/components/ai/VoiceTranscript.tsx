@@ -146,6 +146,9 @@ export default function VoiceTranscript({ lines, lang = "en", className = "", fi
                 {isUser ? copy.you : copy.assistant}
               </p>
               <p
+                /* A line still being said is not announced — the finished
+                   one is, once (audit, 2026-09-11). */
+                aria-hidden={line.final ? undefined : true}
                 dir={textDirection(stripImageMarkdown(line.text) || line.text)}
                 /* Partial text is dimmed, NOT italicised: the brand rules
                    exclude italics, and colour carries the same "still being

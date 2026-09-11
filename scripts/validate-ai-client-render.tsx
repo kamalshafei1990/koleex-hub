@@ -1259,6 +1259,44 @@ console.log("\n── The address carries the place: ?c=<chat>, ?view=library|ca
     /if \(c !== activeIdRef\.current\) void openConversation\(c\);\s*\} else if \(activeIdRef\.current\) \{\s*void startNewChat\(\);/.test(app));
 }
 
+console.log("\n── The keyboard is kept where the eyes are (audit, 2026-09-11) ──");
+{
+  const app = readFileSync("src/components/ai/KoleexAiApp.tsx", "utf8");
+  const side = readFileSync("src/components/ai/Sidebar.tsx", "utf8");
+  const scr = readFileSync("src/components/ai/VoiceCallScreen.tsx", "utf8");
+  const trap = readFileSync("src/components/ai/useFocusTrap.ts", "utf8");
+  const pd = readFileSync("src/components/ai/ProjectDialog.tsx", "utf8");
+  const lb = readFileSync("src/components/ai/PhotoLightbox.tsx", "utf8");
+  const tr = readFileSync("src/components/ai/VoiceTranscript.tsx", "utf8");
+  check("one focus trap: remembers the opener, focuses in, cycles Tab, yields to an inner trap, gives focus back",
+    /export function useFocusTrap\(/.test(trap) && /if \(e\.key !== "Tab" \|\| e\.defaultPrevented\) return;/.test(trap) &&
+    /if \(restore && previous && document\.contains\(previous\)\) previous\.focus\(\{ preventScroll: true \}\);/.test(trap));
+  check("  …used by the call screen, its settings sheet, the project dialog and the lightbox",
+    /useFocusTrap\(rootRef, true\);/.test(scr) && /useFocusTrap\(sheetRef, voiceSheet, \{ initialFocus: "\[data-sheet-close\]" \}\);/.test(scr) &&
+    /useFocusTrap\(dialogRef, true\);/.test(pd) && /aria-labelledby="kx-project-dialog-title"/.test(pd) && /id="kx-project-dialog-title"/.test(pd) &&
+    /useFocusTrap\(boxRef, !!photo, \{ initialFocus: "\[data-lightbox-close\]" \}\);/.test(lb));
+  check("the call screen has one live region outside the layers that hide with the view; a partial transcript line is not announced; a prevented Escape does not end the call",
+    /<p className="sr-only" role="status" aria-live="polite">\{status\}<\/p>/.test(scr) && !/tracking-wide text-\[#AAAAAA\]" aria-live="polite">/.test(scr) &&
+    /if \(e\.key !== "Escape" \|\| e\.defaultPrevented\) return;/.test(scr) &&
+    /aria-hidden=\{line\.final \? undefined : true\}/.test(tr));
+  check("the hidden sidebar is inert — the drawer off screen on a phone, the collapsed column on a desktop",
+    /const asideHidden = isNarrow \? !sidebarOpen : sidebarCollapsed;/.test(app) && /aria-hidden=\{asideHidden\}\s*inert=\{asideHidden \|\| undefined\}/.test(app) &&
+    /window\.matchMedia\("\(max-width: 767px\)"\)/.test(app));
+  check("sidebar rows are not buttons holding buttons: the title is the button, pin and menu are its siblings; the row menu walks with arrow keys and hands focus back",
+    !/\n\s+role="button"\n/.test(side) &&
+    /<button type="button" onClick=\{onOpen\} className="flex-1 min-w-0 text-start rounded-lg" aria-current=\{active \? "page" : undefined\}>/.test(side) &&
+    /<button type="button" onClick=\{onOpen\} className="flex-1 min-w-0 flex items-center gap-2 text-start rounded-lg">/.test(side) &&
+    /if \(e\.key === "ArrowDown"\) go\(i \+ 1\);\s*else if \(e\.key === "ArrowUp"\) go\(i - 1\);\s*else if \(e\.key === "Home"\) go\(0\);\s*else if \(e\.key === "End"\) go\(items\.length - 1\);/.test(side) &&
+    /const closeMenu = useCallback\(\(\) => \{\s*setOpen\(false\);\s*btnRef\.current\?\.focus\(\{ preventScroll: true \}\);/.test(side) &&
+    /querySelector<HTMLElement>\('\[role="menuitem"\]'\)\?\.focus\(\{ preventScroll: true \}\);/.test(side));
+  /* Rendered: the row's title is a real <button>, and the row itself carries no role. */
+  const a11yRow = { id: "c9", title: "Row semantics", last_preview: null, message_count: 1, created_at: "2026-09-01T00:00:00Z", updated_at: "2026-09-01T00:00:00Z" };
+  const a11yBase = { active: false, projects: [], copy: COPY.en, onOpen: () => {}, onRename: () => {}, onDelete: () => {}, onTogglePin: () => {}, onMove: () => {} };
+  const rowHtml = renderToStaticMarkup(<SidebarRow row={a11yRow} {...a11yBase} /> as ReactElement);
+  check("  …rendered, the row's title is a <button> and the row carries no role",
+    /<button type="button"[^>]*class="flex-1 min-w-0 text-start rounded-lg"/.test(rowHtml) && !/role="button"/.test(rowHtml));
+}
+
 console.log(`\n${pass} passed, ${failures.length} failed`);
 if (failures.length) {
   console.log("\nFAILED:");
