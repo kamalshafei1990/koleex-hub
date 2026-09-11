@@ -17,6 +17,7 @@ import { requireInternalUser } from "@/lib/server/ai/require-internal";
 import { BUDGETS, consumeBudget, limitMode, subjectFor } from "@/lib/server/ai/security/rate-limit";
 import { SUMMARY_HEADINGS } from "@/lib/server/ai/voice/summary";
 import { CALLS_SCAN_ROWS, collectCalls, type CallRow } from "@/lib/server/ai/calls";
+import { dbError } from "@/lib/server/ai/http/api-error";
 
 export const dynamic = "force-dynamic";
 
@@ -67,7 +68,7 @@ export async function GET() {
     .or(headingFilter)
     .order("created_at", { ascending: false })
     .limit(CALLS_SCAN_ROWS);
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return dbError("calls", error);
 
   const items = collectCalls((rows ?? []) as CallRow[], titles);
   console.log(`[ai.calls] ok rows=${rows?.length ?? 0} items=${items.length}`);

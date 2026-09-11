@@ -880,10 +880,14 @@ export async function POST(req: Request) {
               ` stream=1 reply_bytes=${agent.finalReply.length}`,
           );
         } catch (e) {
+          /* The cause goes to the log; the frame carries one neutral sentence
+             — a transport or provider message named hosts and models on the
+             screen (audit, 2026-09-11). */
+          console.error("[ai.agent.stream] failed:", e instanceof Error ? e.message : String(e));
           controller.enqueue(
             send({
               type: "error",
-              message: e instanceof Error ? e.message : String(e),
+              message: "Koleex AI hit a problem while answering. Please try again.",
             }),
           );
         } finally {

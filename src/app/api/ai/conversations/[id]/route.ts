@@ -9,6 +9,7 @@ import { stripAttachEmbed } from "@/lib/server/ai/attach-embed";
    the history returns the vendor label once per message. Finding N11 —
    see ai/observability/public-provider.ts. */
 import { withPublicProvider } from "@/lib/server/ai/observability/public-provider";
+import { dbError } from "@/lib/server/ai/http/api-error";
 
 /* GET    /api/ai/conversations/:id — conversation + ordered messages
    PATCH  /api/ai/conversations/:id — rename
@@ -122,7 +123,7 @@ export async function PATCH(req: Request, { params }: RouteCtx) {
     .eq("account_id", auth.account_id)
     .select("*")
     .single();
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return dbError("conversations/id", error);
   return NextResponse.json({ conversation: data });
 }
 
@@ -140,6 +141,6 @@ export async function DELETE(_req: Request, { params }: RouteCtx) {
     .eq("id", id)
     .eq("tenant_id", auth.tenant_id)
     .eq("account_id", auth.account_id);
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return dbError("conversations/id", error);
   return NextResponse.json({ ok: true });
 }

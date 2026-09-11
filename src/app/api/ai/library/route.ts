@@ -16,6 +16,7 @@ import { requireAuth } from "@/lib/server/auth";
 import { requireInternalUser } from "@/lib/server/ai/require-internal";
 import { BUDGETS, consumeBudget, limitMode, subjectFor } from "@/lib/server/ai/security/rate-limit";
 import { LIBRARY_SCAN_ROWS, collectLibrary, type LibraryRow } from "@/lib/server/ai/library";
+import { dbError } from "@/lib/server/ai/http/api-error";
 
 export const dynamic = "force-dynamic";
 
@@ -63,7 +64,7 @@ export async function GET() {
     .like("content", "%![%](https://%")
     .order("created_at", { ascending: false })
     .limit(LIBRARY_SCAN_ROWS);
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return dbError("library", error);
 
   const items = collectLibrary((rows ?? []) as LibraryRow[], titles);
   console.log(`[ai.library] ok rows=${rows?.length ?? 0} items=${items.length}`);

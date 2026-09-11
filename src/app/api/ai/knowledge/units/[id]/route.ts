@@ -6,6 +6,7 @@ import { NextResponse } from "next/server";
 import { requireAuth } from "@/lib/server/auth";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { estimateTokens, invalidateTaughtAnswersCache, invalidateApprovedSearchCache } from "@/lib/server/ai-knowledge";
+import { dbError } from "@/lib/server/ai/http/api-error";
 
 export const dynamic = "force-dynamic";
 
@@ -62,7 +63,7 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
   let q = supabaseServer.from("ai_knowledge_units").update(updates).eq("id", id);
   q = t.value === null ? q.is(t.column, null) : q.eq(t.column, t.value);
   const { error } = await q;
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return dbError("knowledge/units/id", error);
   /* THE AI'S VIEW OF TRUTH JUST CHANGED, SO DROP WHAT IT CACHED.
      Both planes, not one: taught pairs feed the written lanes' prompt and the
      approved-search cache feeds search_knowledge, which is the ONLY route a
