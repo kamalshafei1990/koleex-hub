@@ -321,6 +321,25 @@ export default function KoleexAiApp() {
     setAiSpeaking(false);
   }, []);
   const [loadingConv, setLoadingConv] = useState(false);
+  /* A CHAT THAT FAILED TO LOAD IS NOT AN EMPTY CHAT. With messages left at
+     [] the greeting card rendered under a red banner, which reads as "this
+     chat is empty" (audit, 2026-09-11). This shows a retry card instead. */
+  const [loadError, setLoadError] = useState(false);
+  /* THE NETWORK, AS THE DEVICE REPORTS IT. Offline shows a line above the
+     composer, disables the call, and resends the message a drop put back in
+     the composer once the network returns — if it is still there unchanged. */
+  const [online, setOnline] = useState(true);
+  const resendRef = useRef<{ text: string; conversationId: string | null } | null>(null);
+  useEffect(() => {
+    const sync = () => setOnline(typeof navigator === "undefined" || navigator.onLine !== false);
+    sync();
+    window.addEventListener("online", sync);
+    window.addEventListener("offline", sync);
+    return () => {
+      window.removeEventListener("online", sync);
+      window.removeEventListener("offline", sync);
+    };
+  }, []);
   /* Read by openConversation without closing over state. */
   const loadingConvRef = useRef(false);
   /* Autosize after a PROGRAMMATIC change of the composer text: onChange
@@ -546,6 +565,7 @@ export default function KoleexAiApp() {
       setMessages([]);
       /* Chat A's error must not appear under chat B. */
       setError(null);
+      setLoadError(false);
       setSidebarOpen(false);
       setLoadingConv(true);
       loadingConvRef.current = true;
@@ -557,14 +577,14 @@ export default function KoleexAiApp() {
         if (!res.ok) {
           /* Audit P1 #9 — surface a load error instead of silently
              showing the welcome card on an existing chat. */
-          setError(humanizeError(`HTTP ${res.status}`));
+          setLoadError(true);
           return;
         }
         const { messages: rows } = (await res.json()) as { messages: ChatMsg[] };
         if (!fresh()) return;
         setMessages(rows ?? []);
-      } catch (e) {
-        if (fresh()) setError(humanizeError(e));
+      } catch {
+        if (fresh()) setLoadError(true);
       } finally {
         if (fresh()) {
           setLoadingConv(false);
@@ -896,6 +916,7 @@ export default function KoleexAiApp() {
           /* Back into THIS chat's composer only — the user may have moved
              on, and a draft must not land in the chat that is open now. */
           if (activeIdRef.current === conversationId) {
+            resendRef.current = { text, conversationId };
             setInput((cur) => (cur.trim() ? cur : text));
             setAttachments((cur) => (cur.length > 0 ? cur : filesToSend));
             resizeComposer();
@@ -1257,6 +1278,7 @@ export default function KoleexAiApp() {
              was retyping. On this link a drop is routine, so put the message
              back in the composer: one tap resends instead of rewriting. */
           if (isNetwork && activeIdRef.current === conversationId) {
+            resendRef.current = { text, conversationId };
             setInput((cur) => (cur.trim() ? cur : text));
             resizeComposer();
           }
@@ -1662,6 +1684,18 @@ export default function KoleexAiApp() {
       prev.map((c) => (c.project_id === id ? { ...c, project_id: null } : c)),
     );
   }, [pendingDeleteProjectId]);
+
+  /* THE NETWORK IS BACK: the message a drop put in the composer goes out on
+     its own, only if it is still exactly that message in that chat — a word
+     typed since means the caller took over. sendingRef refuses a double. */
+  useEffect(() => {
+    if (!online) return;
+    const pending = resendRef.current;
+    if (!pending) return;
+    if (input.trim() !== pending.text.trim() || activeIdRef.current !== pending.conversationId) return;
+    resendRef.current = null;
+    void send();
+  }, [online, input, send]);
 
   /* ── Phase 13: sidebar search ──
      Simple substring filter on title + last_preview. Case-insensitive.
@@ -2444,6 +2478,17 @@ export default function KoleexAiApp() {
               <div className="flex items-center justify-center py-20">
                 <SpinnerIcon className="h-5 w-5 text-[var(--text-dim)]" />
               </div>
+            ) : loadError && activeId ? (
+              <div role="alert" className="mx-auto max-w-[420px] rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-5 py-6 text-center">
+                <p className="text-[13px] text-[var(--text-secondary)]">{copy.loadFailed}</p>
+                <button
+                  type="button"
+                  onClick={() => void openConversation(activeId)}
+                  className="mt-4 h-10 px-5 rounded-full bg-[#0066FF] text-white text-[13px] font-semibold hover:bg-[#0052CC]"
+                >
+                  {copy.retry}
+                </button>
+              </div>
             ) : messages.length === 0 ? (
               <WelcomeCard
                 copy={copy}
@@ -2567,6 +2612,11 @@ export default function KoleexAiApp() {
           style={{ paddingBottom: "env(safe-area-inset-bottom, 0px)" }}
         >
           <div className="max-w-[820px] mx-auto px-4 md:px-6 pt-2 pb-3">
+            {!online && (
+              <div role="status" className="mb-2 rounded-xl border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-[12px] text-amber-200">
+                {copy.offline}
+              </div>
+            )}
             <form
               onSubmit={(e) => {
                 e.preventDefault();
@@ -2813,7 +2863,7 @@ export default function KoleexAiApp() {
                          the anchor back. One primary action at a time. */
                       variant={hasDraft || sending ? "icon" : "pill"}
                       lang={lang}
-                      disabled={sending}
+                      disabled={sending || !online}
                       onError={(msg) => setError(msg)}
                       onLiveChange={(live) => { if (live) stopTts(); }}
                       /* The call continues THIS thread: the server reads its
