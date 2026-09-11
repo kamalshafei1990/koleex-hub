@@ -118,7 +118,10 @@ export async function GET(req: Request) {
     const line =
       `[ai.voice.watch] ${healthy ? "ok" : "fail"} slot=${r.slot} from=${from} region=${region} ` +
       `status=${probe.status ?? "none"} afterMs=${probe.ms} credential=${probe.credential_ok ? "ok" : "refused"} cause=${probe.cause ?? "none"}`;
-    if (healthy) console.log(line);
+    /* Both at a level the log tool shows (2026-09-11: the first "ok" from
+       Beijing after the key change was invisible — "no fail line" was the
+       only evidence, and absence is a poor witness). */
+    if (healthy) console.warn(line);
     else console.error(line);
     return {
       slot: r.slot,

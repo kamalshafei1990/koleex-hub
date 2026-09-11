@@ -434,9 +434,11 @@ export async function POST(req: Request) {
          still partly a guess. Only failures were ever logged, so nothing
          recorded how long a WORKING handshake takes — which is exactly the
          number needed to decide how long a short attempt should wait before
-         giving up on a bad window. Logged at info: it is one line per call
-         and it carries no vendor detail. */
-      console.log(
+         giving up on a bad window. One line per call, no vendor detail —
+         at warn, because the log tool shows nothing below it and a slow
+         hand-over (13 s on a primary that never answered, 2026-09-11) is
+         read from THIS line's afterMs beside the failures before it. */
+      console.warn(
         `[ai.voice] handshake ok attempt=${attempt}/${budgets.length} slot=${region.slot} ` +
           `from=${process.env.VERCEL_REGION ?? "local"} region=${cfg.regionLabel} ` +
           `afterMs=${Date.now() - startedAt} budgetMs=${budgetMs} first=${candidates[0].slot}`,
