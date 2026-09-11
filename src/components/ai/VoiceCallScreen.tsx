@@ -105,6 +105,8 @@ const COPY: Record<Lang, {
      and the international line, never a vendor's name. And the note when
      the international line could not be reached and the call went on
      without it. */
+  linePick: string;
+  lineHint: string;
   laneMainland: string;
   laneInternational: string;
   laneUnreachable: string;
@@ -145,6 +147,8 @@ const COPY: Record<Lang, {
     voiceUse: "Use this voice",
     voiceUseNamed: "Use {name}",
     voiceCurrent: "Current",
+    linePick: "Line",
+    lineHint: "The international line needs a network that reaches it. If it can't be reached, the call continues on the mainland line.",
     laneMainland: "Mainland line",
     laneInternational: "International line",
     laneUnreachable: "The international line can't be reached from your network right now — continuing on the mainland line.",
@@ -200,6 +204,8 @@ const COPY: Record<Lang, {
     voiceUse: "使用这个音色",
     voiceUseNamed: "使用 {name}",
     voiceCurrent: "当前",
+    linePick: "线路",
+    lineHint: "国际线路需要能连通它的网络；连不上时，通话会继续走国内线路。",
     laneMainland: "国内线路",
     laneInternational: "国际线路",
     laneUnreachable: "当前网络无法连接国际线路，已改用国内线路继续。",
@@ -255,6 +261,8 @@ const COPY: Record<Lang, {
     voiceUse: "استخدم الصوت ده",
     voiceUseNamed: "استخدم {name}",
     voiceCurrent: "الحالي",
+    linePick: "الخط",
+    lineHint: "الخط الدولي محتاج شبكة توصل له. لو ما وصلش، المكالمة بتكمل على خط الصين.",
     laneMainland: "خط الصين",
     laneInternational: "الخط الدولي",
     laneUnreachable: "الخط الدولي مش متاح من شبكتك دلوقتي، كمّلنا على خط الصين.",
@@ -313,8 +321,14 @@ export type VoiceCallScreenProps = {
   searching?: boolean;
   /** Keys and labels only — the server's catalogue, never the vendor's ids.
    *  Empty means no picker is drawn: a control that cannot be used is noise. */
-  voices?: readonly { key: string; label: string; lane?: "rtc" | "ws" }[];
+  voices?: readonly { key: string; label: string }[];
   selectedVoice?: string | null;
+  /** THE LINE (2026-09-11). The voice names are the product's on both
+   *  lines; the line is its own choice. Present, the sheet draws two
+   *  pills — the mainland line and the international line, never a vendor
+   *  — with the current one pressed. Absent, no control: one line. */
+  lane?: "rtc" | "ws";
+  onSelectLane?: (lane: "rtc" | "ws") => void;
   /** The international line was asked for and did not answer; the call
    *  went on over the mainland line. Said under the status, once. */
   laneNote?: "international-unreachable" | null;
@@ -384,6 +398,8 @@ export default function VoiceCallScreen({
   writeError = false,
   connectingSlow = false,
   laneNote = null,
+  lane = "rtc",
+  onSelectLane,
   onRetry,
   soundBlocked = false,
   onEnableSound,
@@ -1157,20 +1173,9 @@ export default function VoiceCallScreen({
             </div>
             {/* Room above the tiles (pt-2) for the badge and the glow: an
                 overflow-x container clips vertically too. */}
-            {/* ONE ROW PER LANE when both lanes have voices (voice-pref.ts
-                offeredVoices tags them): the mainland line first, the
-                international line under it, each under its own heading —
-                so a caller can ask for a voice from the other line, and so
-                the names are never mixed without a word about which line
-                each answers on. One lane: one row, no heading. */}
-            {voices.length > 0 && voiceRows(voices).map((row) => (
-            <div key={row.lane}>
-              {row.titled && (
-                <h3 className="mt-2 mb-1 text-[12px] font-semibold text-[#AAAAAA]">{row.lane === "ws" ? copy.laneInternational : copy.laneMainland}</h3>
-              )}
+            {voices.length > 0 && (
             <div className="flex gap-4 overflow-x-auto pt-2 pb-2 -mx-2 px-2 snap-x">
-              {row.voices.map((v) => {
-                const i = voices.indexOf(v);
+              {voices.map((v, i) => {
                 const chosen = v.key === selectedVoice;
                 /* Drawn as "on": the candidate being auditioned, or the
                    chosen voice when nothing is. Pressed means CHOSEN. */
@@ -1218,8 +1223,7 @@ export default function VoiceCallScreen({
                 );
               })}
             </div>
-            </div>
-            ))}
+            )}
             {voices.length > 0 && (
               <p className="mt-3 text-[12px] text-[#666666]" aria-live="polite">
                 {sampling ? copy.voiceSampling : sampleFailed ? copy.voiceSampleFailed : onPreviewVoice ? copy.voiceTapHint : copy.voiceHint}
@@ -1245,8 +1249,37 @@ export default function VoiceCallScreen({
                 does not close the sheet or rebuild the call — the parent
                 gates the microphone at once — so the hint under it can be
                 read after choosing. */}
-            {onSelectTalkMode && (
+            {/* THE LINE (2026-09-11). Two pills, one pressed, like the talk
+                mode below. Choosing rebuilds the call on the other line with
+                the words kept (VoiceCallButton.selectLane); the hint says
+                what happens when the international line does not answer. */}
+            {onSelectLane && (
               <div className={voices.length > 0 ? "mt-6 pt-5 border-t border-white/10" : ""}>
+                <h3 className="text-[13px] font-semibold text-[#AAAAAA] mb-3">{copy.linePick}</h3>
+                <div role="group" aria-label={copy.linePick} className="grid grid-cols-2 gap-2 rounded-2xl bg-white/[0.04] p-1">
+                  {(["rtc", "ws"] as const).map((l) => {
+                    const on = lane === l;
+                    return (
+                      <button
+                        key={l}
+                        type="button"
+                        aria-pressed={on}
+                        data-lane={l}
+                        onClick={() => onSelectLane(l)}
+                        className={`h-11 rounded-xl text-[13px] font-semibold transition-[background-color,color] duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0066FF] ${
+                          on ? "bg-white text-[#0D0D0D]" : "text-[#AAAAAA] hover:text-white"
+                        }`}
+                      >
+                        {l === "ws" ? copy.laneInternational : copy.laneMainland}
+                      </button>
+                    );
+                  })}
+                </div>
+                <p className="mt-3 text-[12px] text-[#666666]">{copy.lineHint}</p>
+              </div>
+            )}
+            {onSelectTalkMode && (
+              <div className={voices.length > 0 || onSelectLane ? "mt-6 pt-5 border-t border-white/10" : ""}>
                 <h3 className="text-[13px] font-semibold text-[#AAAAAA] mb-3">{copy.modePick}</h3>
                 <div role="group" aria-label={copy.modePick} className="grid grid-cols-2 gap-2 rounded-2xl bg-white/[0.04] p-1">
                   {(["hands-free", "hold"] as const).map((mode) => {
@@ -1289,15 +1322,6 @@ const GLYPH_PATTERNS: readonly (readonly number[])[] = [
   [12, 20, 16, 24, 10],
   [10, 8, 18, 12, 20],
 ];
-
-/** The picker's rows: one per lane that has voices, headed only when there
- *  is more than one. A voice without a lane is the mainland line's. Pure. */
-export function voiceRows<V extends { key: string; lane?: "rtc" | "ws" }>(voices: readonly V[]): Array<{ lane: "rtc" | "ws"; titled: boolean; voices: V[] }> {
-  const rtc = voices.filter((v) => (v.lane ?? "rtc") === "rtc");
-  const ws = voices.filter((v) => v.lane === "ws");
-  const rows = [{ lane: "rtc" as const, voices: rtc }, { lane: "ws" as const, voices: ws }].filter((r) => r.voices.length > 0);
-  return rows.map((r) => ({ ...r, titled: rows.length > 1 }));
-}
 
 function VoiceGlyph({ index, on }: { index: number; on: boolean }) {
   const bars = GLYPH_PATTERNS[index % GLYPH_PATTERNS.length];
