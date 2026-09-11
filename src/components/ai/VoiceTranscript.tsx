@@ -26,7 +26,7 @@
    this file has no formatting layer at all.
    --------------------------------------------------------------------------- */
 
-import { useEffect, useRef, useState } from "react";
+import { memo, useEffect, useRef, useState } from "react";
 import { type TranscriptLine, type TranscriptPhoto } from "@/lib/voice/events";
 import { stripImageMarkdown } from "@/lib/voice/photos";
 import { aiImage } from "@/lib/ai/image-url";
@@ -107,7 +107,7 @@ export function PhotoTile({ photo, onOpen, label, size = 120, visible = true }: 
   );
 }
 
-export default function VoiceTranscript({ lines, lang = "en", className = "", fill = false, onOpenPhoto, photosVisible = true }: VoiceTranscriptProps) {
+function VoiceTranscript({ lines, lang = "en", className = "", fill = false, onOpenPhoto, photosVisible = true }: VoiceTranscriptProps) {
   const endRef = useRef<HTMLDivElement | null>(null);
   const copy = SPEAKER_COPY[lang];
 
@@ -157,8 +157,8 @@ export default function VoiceTranscript({ lines, lang = "en", className = "", fi
                    is #0D0D0D in both themes, and the theme tokens resolve to
                    black under the light theme — words nobody could see
                    (audit, 2026-09-11). */
-                className={`text-base leading-relaxed ${
-                  line.final ? "text-white" : "text-[#AAAAAA]"
+                className={`text-[18px] leading-relaxed ${
+                  line.final ? "text-white" : "text-white/70"
                 }`}
               >
                 {/* A markdown image the model wrote into its words is NOT a
@@ -181,3 +181,8 @@ export default function VoiceTranscript({ lines, lang = "en", className = "", fi
     </div>
   );
 }
+
+/* MEMOISED: the call screen re-renders on every level tick of the orb; the
+   lines array is the same reference between ticks, so the transcript — a
+   map over every line — need not (audit, 2026-09-11). */
+export default memo(VoiceTranscript);

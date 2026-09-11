@@ -1297,6 +1297,25 @@ console.log("\n── The keyboard is kept where the eyes are (audit, 2026-09-11
     /<button type="button"[^>]*class="flex-1 min-w-0 text-start rounded-lg"/.test(rowHtml) && !/role="button"/.test(rowHtml));
 }
 
+console.log("\n── The memo holds: one function per bubble prop, one bump reducer, the voice stack on demand (audit, 2026-09-11) ──");
+{
+  const app = readFileSync("src/components/ai/KoleexAiApp.tsx", "utf8");
+  const bubble = readFileSync("src/components/ai/Bubble.tsx", "utf8");
+  check("bubble callbacks carry the message id and the parent passes stable functions, reading the thread through a ref",
+    /onEdit\?: \(msgId: string, newText: string\) => void;/.test(bubble) && /onAnswerQuestion\?: \(msgId: string, answer: string\) => void;/.test(bubble) &&
+    /onEdit\?\.\(msg\.id, next\);/.test(bubble) && /onAnswerQuestion\?\.\(msg\.id, t\);/.test(bubble) &&
+    /onEdit=\{onBubbleEdit\}/.test(app) && /onAnswerQuestion=\{onBubbleAnswer\}/.test(app) &&
+    /const messagesRef = useRef<ChatMsg\[\]>\(\[\]\);/.test(app) && /const sendRef = useRef\(send\);/.test(app) &&
+    !/onEdit=\{\(newText\) =>/.test(app) && !/onAnswerQuestion=\{\(answer\) =>/.test(app));
+  check("the sidebar bump is one reducer, called for the JSON reply and the streamed one",
+    /const bumpConversation = useCallback\(\(id: string, title: string, preview: string\) => \{/.test(app) &&
+    (app.match(/bumpConversation\(bumpId, bumpTitle, /g) ?? []).length === 2 &&
+    (app.match(/message_count: c\.message_count \+ 2/g) ?? []).length === 1);
+  check("the call button — and lib/voice behind it — loads on demand, with a placeholder that holds the composer's geometry",
+    /const VoiceCallButton = dynamic\(\(\) => import\("@\/components\/ai\/VoiceCallButton"\), \{\s*ssr: false,/.test(app) &&
+    !/^import VoiceCallButton from/m.test(app));
+}
+
 console.log(`\n${pass} passed, ${failures.length} failed`);
 if (failures.length) {
   console.log("\nFAILED:");

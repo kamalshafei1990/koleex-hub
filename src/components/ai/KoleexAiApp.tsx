@@ -38,7 +38,6 @@ import CallsPanel from "@/components/ai/CallsPanel";
 import PhoneCallIcon from "@/components/icons/ui/PhoneCallIcon";
 import PaperPlaneIcon from "@/components/icons/ui/PaperPlaneIcon";
 import { speakText, type TtsHandle } from "@/components/ai/MicButton";
-import VoiceCallButton from "@/components/ai/VoiceCallButton";
 import { type SavedTurn } from "@/lib/voice/persist";
 
 import TrashIcon from "@/components/icons/ui/TrashIcon";
@@ -102,6 +101,13 @@ const ReportIssueButton = dynamic(() => import("@/components/qa/ReportIssueButto
    nothing before that needs it, so it loads on demand rather than ahead of
    the first message (audit, 2026-09-11). The placeholder keeps the row's
    geometry so the composer does not shift when it lands. */
+/* THE VOICE STACK LOADS ON DEMAND (audit, 2026-09-11): the call button
+   pulls lib/voice (≈4,900 lines) behind it, which every chat visitor paid
+   for at mount. The placeholder holds the composer's geometry. */
+const VoiceCallButton = dynamic(() => import("@/components/ai/VoiceCallButton"), {
+  ssr: false,
+  loading: () => <span className="h-9 w-9 inline-block shrink-0" aria-hidden />,
+});
 const EmojiButton = dynamic(() => import("@/components/ai/EmojiButton"), {
   ssr: false,
   loading: () => <span className="h-8 w-8 inline-block shrink-0" aria-hidden />,
@@ -120,6 +126,10 @@ export default function KoleexAiApp() {
 
   const [conversations, setConversations] = useState<ConversationRow[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
+  /* THE LATEST THREAD, for handlers that must not change identity on every
+     token: edit-and-retry and regenerate read it here, so the memoised
+     bubbles receive the same functions across a stream (audit, 2026-09-11). */
+  const messagesRef = useRef<ChatMsg[]>([]);
   /* Remember the last opened chat across refreshes so hitting ⌘R
      doesn't throw you back to the empty welcome state. Stored per-
      account-id so if two users share a browser they don't see each
@@ -794,6 +804,23 @@ export default function KoleexAiApp() {
     [],
   );
 
+  /* THE SIDEBAR BUMP, once. A finished turn moves its chat to the top with
+     the new title and preview; the same reducer existed twice in send()
+     (audit, 2026-09-11). The timestamp is taken outside the updater so the
+     setState callback stays pure (audit P0 #5). */
+  const bumpConversation = useCallback((id: string, title: string, preview: string) => {
+    const bumpNow = new Date().toISOString();
+    setConversations((prev) => {
+      const next = prev.map((c) =>
+        c.id === id
+          ? { ...c, title, last_preview: preview.slice(0, 180), message_count: c.message_count + 2, updated_at: bumpNow }
+          : c,
+      );
+      next.sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime());
+      return next;
+    });
+  }, []);
+
   const send = useCallback(
     async (textOverride?: string, viaVoice = false) => {
       const text = (textOverride ?? input).trim();
@@ -1106,26 +1133,7 @@ export default function KoleexAiApp() {
                  so the setState callback stays pure (no Date.now() /
                  new Date() inside the function React calls during
                  commit-replay). */
-              const bumpNow = new Date().toISOString();
-              setConversations((prev) => {
-                const next = prev.map((c) =>
-                  c.id === bumpId
-                    ? {
-                        ...c,
-                        title: bumpTitle,
-                        last_preview: fallbackReply.slice(0, 180),
-                        message_count: c.message_count + 2,
-                        updated_at: bumpNow,
-                      }
-                    : c,
-                );
-                next.sort(
-                  (a, b) =>
-                    new Date(b.updated_at).getTime() -
-                    new Date(a.updated_at).getTime(),
-                );
-                return next;
-              });
+              bumpConversation(bumpId, bumpTitle, fallbackReply);
             }
             return;
           }
@@ -1299,26 +1307,7 @@ export default function KoleexAiApp() {
             const bumpId = convUpdateId;
             const bumpTitle = convUpdateTitle;
             /* Audit P0 #5 — capture timestamp outside the updater. */
-            const bumpNow = new Date().toISOString();
-            setConversations((prev) => {
-              const next = prev.map((c) =>
-                c.id === bumpId
-                  ? {
-                      ...c,
-                      title: bumpTitle,
-                      last_preview: previewText.slice(0, 180),
-                      message_count: c.message_count + 2,
-                      updated_at: bumpNow,
-                    }
-                  : c,
-              );
-              next.sort(
-                (a, b) =>
-                  new Date(b.updated_at).getTime() -
-                  new Date(a.updated_at).getTime(),
-              );
-              return next;
-            });
+            bumpConversation(bumpId, bumpTitle, previewText);
           }
         } else if (accumulated) {
           /* Stream closed without an `end` event but we got text —
@@ -1375,7 +1364,7 @@ export default function KoleexAiApp() {
         setSending(false);
       }
     },
-    [input, activeId, lang, stopTts, attachments, webSearch, createConversation, copy, resizeComposer],
+    [input, activeId, lang, stopTts, attachments, webSearch, createConversation, copy, resizeComposer, bumpConversation],
   );
 
   /* ── Phase 12: message-level actions ────────────────────────── */
@@ -1523,21 +1512,36 @@ export default function KoleexAiApp() {
    *  to just before that message and re-send with the edited text.
    *  Server creates a fresh turn — old user + assistant entries
    *  stay in ai_messages for audit, the UI just shortens its view. */
+  const sendRef = useRef(send);
+  useEffect(() => {
+    sendRef.current = send;
+    messagesRef.current = messages;
+  }, [send, messages]);
+
   const handleEditAndRetry = useCallback(
     (index: number, newText: string) => {
       const trimmed = newText.trim();
       if (!trimmed) return;
       if (sendingRef.current) return;
       /* Sanity: make sure the indexed message is actually a user turn. */
-      const target = messages[index];
+      const target = messagesRef.current[index];
       if (!target || target.role !== "user") return;
       /* Slice off everything from this user message forward so
          send() can re-add the user bubble + placeholder cleanly. */
       setMessages((prev) => prev.slice(0, index));
-      void send(trimmed, false);
+      void sendRef.current(trimmed, false);
     },
-    [messages, send],
+    [],
   );
+  /* The bubble names its message; the parent finds the index. One function
+     for every row, so React.memo(Bubble) holds across a stream. */
+  const onBubbleEdit = useCallback((msgId: string, newText: string) => {
+    const index = messagesRef.current.findIndex((m) => m.id === msgId);
+    if (index >= 0) handleEditAndRetry(index, newText);
+  }, [handleEditAndRetry]);
+  const onBubbleAnswer = useCallback((_msgId: string, answer: string) => {
+    void sendRef.current(answer, false);
+  }, []);
 
   /** Regenerate the last assistant reply. Finds the most recent
    *  user message, removes any trailing assistant messages, and
@@ -1548,22 +1552,22 @@ export default function KoleexAiApp() {
     if (sendingRef.current) return;
     /* Walk backwards to find the last user message. */
     let lastUserIdx = -1;
-    for (let i = messages.length - 1; i >= 0; i--) {
-      if (messages[i].role === "user") {
+    for (let i = messagesRef.current.length - 1; i >= 0; i--) {
+      if (messagesRef.current[i].role === "user") {
         lastUserIdx = i;
         break;
       }
     }
     if (lastUserIdx < 0) return;
-    const lastUserText = messages[lastUserIdx].content;
+    const lastUserText = messagesRef.current[lastUserIdx].content;
     /* Audit P0 #8 — collapse the previous two setMessages into one
        (send() re-adds the user bubble itself, so we just trim back
        to BEFORE the last user message). Keeps the rebase atomic and
        removes the off-by-one risk if a new turn lands between the
        two updates. */
     setMessages((prev) => prev.slice(0, lastUserIdx));
-    void send(lastUserText, false);
-  }, [messages, send]);
+    void sendRef.current(lastUserText, false);
+  }, []);
 
   /* Two-step delete using the Hub's ConfirmDialog component. The old
      flow called window.confirm() — that's the white-on-black native
@@ -2613,7 +2617,7 @@ export default function KoleexAiApp() {
                   canEdit={!sending}
                   onCopy={handleCopy}
                   onRegenerate={handleRegenerate}
-                  onEdit={(newText) => handleEditAndRetry(i, newText)}
+                  onEdit={onBubbleEdit}
                   onSpeak={handleSpeak}
                   onFeedback={handleFeedback}
                   /* Tapping an option is exactly the same as typing it —
@@ -2621,7 +2625,7 @@ export default function KoleexAiApp() {
                      normal user message and the transcript reads honestly
                      afterwards, with the choice visible as something the
                      user said. */
-                  onAnswerQuestion={(answer) => { void send(answer, false); }}
+                  onAnswerQuestion={onBubbleAnswer}
                   lang={lang}
                   /* Only the latest AI bubble reacts to the live
                      conversation; older ones stay idle. */

@@ -2940,9 +2940,9 @@ function describeErrorCheck(): boolean {
       /transportRef\.current = decided\.lane;\s*offerFor\(decided\.lane\);/.test(btn) && /transportRef\.current = ok \? "ws" : "rtc";\s*offerFor\(transportRef\.current\);/.test(btn));
     check("the button decides from the server's default and the device's verdict, probes in the background only when told the socket lane exists, and never moves a call already placed",
       /const decided = decideLane\(server, readSavedLane\(\), Date\.now\(\)\);\s*(\/\*[^*]*\*\/\s*)?const applyLane = \(\) => \{\s*transportRef\.current = decided\.lane;\s*offerFor\(decided\.lane\);\s*\};\s*if \(sessionRef\.current\) laneAfterCallRef\.current = applyLane;\s*else applyLane\(\);\s*if \(decided\.probe && body\.ws_available === true\) \{/.test(btn) &&
-      /saveLane\(ok \? "ws" : "rtc"\);\s*(\/\*[^*]*\*\/\s*)?if \(!sessionRef\.current\) \{\s*transportRef\.current = ok \? "ws" : "rtc";/.test(btn));
+      /saveLane\(ok \? "ws" : "rtc", Date\.now\(\), "probe"\);\s*(\/\*[^*]*\*\/\s*)?if \(!sessionRef\.current\) \{\s*transportRef\.current = ok \? "ws" : "rtc";/.test(btn));
     check("  …a real call teaches the device too: live on the socket lane saves ws, a fall-back saves rtc",
-      /if \(next === "live" && transportRef\.current === "ws"\) saveLane\("ws"\);/.test(btn) && /transportRef\.current = "rtc";\s*(\/\*[^*]*\*\/\s*)?saveLane\("rtc"\);/.test(btn));
+      /if \(next === "live" && transportRef\.current === "ws"\) saveLane\("ws", Date\.now\(\), "call"\);/.test(btn) && /transportRef\.current = "rtc";\s*(\/\*[^*]*\*\/\s*)?saveLane\("rtc", Date\.now\(\), "call"\);/.test(btn));
     check("the voices GET says whether a socket lane exists and logs its decision with the country — nothing else", /ws_available: grok !== null/.test(route) && /\[ai\.voice\] lane=\$\{lane \?\? "none"\} country=/.test(route));
     check("a socket lane waits four seconds for its socket, not eight — the fall-back is behind it", /const WS_OPEN_GRACE_MS = 4_000;/.test(sess) && /this\.transport === "ws" && this\.deps\.reconnectGraceMs === undefined[\s\S]{0,400}?\? WS_OPEN_GRACE_MS/.test(sess));
   }
@@ -3238,7 +3238,7 @@ function describeErrorCheck(): boolean {
   const btn = readFileSync("src/components/ai/VoiceCallButton.tsx", "utf8");
   check("Try again beacons `retried`, releases the call, moves a socket lane that never came up to the mainland lane once, and rebuilds with the words kept — inside the tap",
     /const retryCall = useCallback\(\(\) => \{/.test(btn) && /sendVoiceTelemetry\(\{ reason: "retried", resumes: resumesRef\.current, lane: transportRef\.current/.test(btn) &&
-    /if \(transportRef\.current === "ws" && !wasUp && !laneFellBackRef\.current\) \{\s*laneFellBackRef\.current = true;\s*transportRef\.current = "rtc";\s*saveLane\("rtc"\);/.test(btn) &&
+    /if \(transportRef\.current === "ws" && !wasUp && !laneFellBackRef\.current\) \{\s*laneFellBackRef\.current = true;\s*transportRef\.current = "rtc";\s*saveLane\("rtc", Date\.now\(\), "call"\);/.test(btn) &&
     /queueMicrotask\(\(\) => void startCallRef\.current\?\.\(\{ resume: true \}\)\);\s*\}, \[releaseCall, fallToMainlandVoice\]\);/.test(btn) && /onRetry=\{retryCall\}/.test(btn) &&
     /setLaneState\(transportRef\.current\);\s*(\/\*[^*]*\*\/\s*)?flushVoiceTelemetry\(\);/.test(btn));
   const tm = await import("../src/lib/voice/telemetry");
@@ -3615,12 +3615,12 @@ function describeErrorCheck(): boolean {
     /byLaneRef\.current = byLane;/.test(btn) && /setLanesAvailable\(byLane\.rtc\.length > 0 && byLane\.ws\.length > 0\);/.test(btn) &&
     /lane=\{chosenLane\}\s*onSelectLane=\{lanesAvailable \? selectLane : undefined\}/.test(btn));
   check("choosing a line moves the next call there, saves it as the device's verdict, re-arms the one fall-back, clears the note, offers that line's voices with the current one kept, and rebuilds a running call",
-    /const selectLane = useCallback\(\(lane: "rtc" \| "ws"\) => \{\s*if \(lane === transportRef\.current\) return;\s*transportRef\.current = lane;\s*saveLane\(lane\);\s*laneFellBackRef\.current = false;\s*setLaneNote\(null\);\s*const list = byLaneRef\.current\[lane\]\.length > 0 \? byLaneRef\.current\[lane\] : byLaneRef\.current\.rtc;\s*setVoices\(list\);\s*const next = pickVoiceKey\(voiceKeyRef\.current \?\? readSavedVoiceKey\(\), list\);\s*voiceKeyRef\.current = next;\s*setVoiceKey\(next\);\s*setChosenLane\(lane\);\s*rebuildCall\(\);\s*\}, \[rebuildCall\]\);/.test(btn) &&
+    /const selectLane = useCallback\(\(lane: "rtc" \| "ws"\) => \{\s*if \(lane === transportRef\.current\) return;\s*transportRef\.current = lane;\s*saveLane\(lane, Date\.now\(\), "user"\);\s*laneFellBackRef\.current = false;\s*setLaneNote\(null\);\s*const list = byLaneRef\.current\[lane\]\.length > 0 \? byLaneRef\.current\[lane\] : byLaneRef\.current\.rtc;\s*setVoices\(list\);\s*const next = pickVoiceKey\(voiceKeyRef\.current \?\? readSavedVoiceKey\(\), list\);\s*voiceKeyRef\.current = next;\s*setVoiceKey\(next\);\s*setChosenLane\(lane\);\s*rebuildCall\(\);\s*\}, \[rebuildCall\]\);/.test(btn) &&
     /const selectVoice = useCallback\(\(key: string\) => \{\s*setVoiceKey\(key\);\s*voiceKeyRef\.current = key;\s*saveVoiceKey\(key\);\s*rebuildCall\(\);\s*\}, \[rebuildCall\]\);/.test(btn) &&
     /const rebuildCall = useCallback\(\(\) => \{\s*const current = sessionRef\.current;\s*if \(!current\) return;/.test(btn));
   check("a fall-back to the mainland line moves the current voice onto the mainland list — state AND ref, before the next start — marks the line, and says so on the screen",
     /const fallToMainlandVoice = useCallback\(\(\) => \{\s*const next = pickVoiceKey\(voiceKeyRef\.current \?\? readSavedVoiceKey\(\), byLaneRef\.current\.rtc\);\s*voiceKeyRef\.current = next;\s*setVoiceKey\(next\);\s*setChosenLane\("rtc"\);\s*setLaneNote\("international-unreachable"\);\s*\}, \[\]\);/.test(btn) &&
-    /saveLane\("rtc"\);\s*fallToMainlandVoice\(\);\s*setReady\(false\);/.test(btn) && /saveLane\("rtc"\);\s*fallToMainlandVoice\(\);\s*\}/.test(btn) &&
+    /saveLane\("rtc", Date\.now\(\), "call"\);\s*fallToMainlandVoice\(\);\s*setReady\(false\);/.test(btn) && /saveLane\("rtc", Date\.now\(\), "call"\);\s*fallToMainlandVoice\(\);\s*\}/.test(btn) &&
     /laneNote=\{laneNote\}/.test(btn));
   check("the screen draws the line control only when it is given one — two pills, the chosen one pressed, the international one honest about its need — names the lines and never a vendor, and carries the note in three languages",
     /\{onSelectLane && \(/.test(scr) && /\(\["rtc", "ws"\] as const\)\.map\(\(l\) => \{\s*const on = lane === l;/.test(scr) && /data-lane=\{l\}/.test(scr) && /onClick=\{\(\) => onSelectLane\(l\)\}/.test(scr) &&
@@ -3674,6 +3674,37 @@ console.log("\n── 39. one voice control: a long press dictates through the s
   check("the Voice control wears the settings glyph, the sheet's Close a chevron, and End keeps the owner's X",
     /SLIDERS, NOT THE WAVEFORM/.test(scr) && /<polyline points="6 9 12 15 18 9" \/>/.test(scr) &&
     /AN X, NOT A HANDSET\. The owner/.test(scr) && /className="flex items-end justify-center gap-10"/.test(scr));
+}
+/* ── 40. THE CALLER'S LINE STANDS; THE SCREEN TELLS STATE FROM WORDS (audit, 2026-09-11) ── */
+console.log("\n── 40. lane verdicts carry their source; status line; memoised transcript ──");
+{
+  const fsD = await import("node:fs");
+  const pref = await import("../src/lib/voice/voice-pref");
+  const now = 1_700_000_000_000;
+  check("a fresh USER verdict is the next lane and is NOT probed over; a probe's or a call's verdict still is",
+    JSON.stringify(pref.decideLane("rtc", { lane: "ws", at: now - 60_000, source: "user" }, now)) === JSON.stringify({ lane: "ws", probe: false }) &&
+    JSON.stringify(pref.decideLane("rtc", { lane: "rtc", at: now - 60_000, source: "user" }, now)) === JSON.stringify({ lane: "rtc", probe: false }) &&
+    pref.decideLane("rtc", { lane: "ws", at: now - 60_000, source: "probe" }, now).probe === true &&
+    pref.decideLane("rtc", { lane: "ws", at: now - 60_000, source: "call" }, now).probe === true &&
+    pref.decideLane("rtc", { lane: "ws", at: now - pref.LANE_TTL_MS - 1, source: "user" }, now).probe === true &&
+    pref.decideLane("ws", { lane: "rtc", at: now, source: "user" }, now).probe === false);
+  check("  …the source survives storage and an unknown source is dropped, not trusted",
+    JSON.stringify(pref.parseSavedLane(JSON.stringify({ lane: "ws", at: now, source: "user" }))) === JSON.stringify({ lane: "ws", at: now, source: "user" }) &&
+    JSON.stringify(pref.parseSavedLane(JSON.stringify({ lane: "ws", at: now, source: "hacker" }))) === JSON.stringify({ lane: "ws", at: now }));
+  const btn = fsD.readFileSync("src/components/ai/VoiceCallButton.tsx", "utf8");
+  check("  …the button names the source at every save: the Line control says user, the probe says probe, a call that came up or fell back says call",
+    /saveLane\(lane, Date\.now\(\), "user"\)/.test(btn) && /saveLane\(ok \? "ws" : "rtc", Date\.now\(\), "probe"\)/.test(btn) &&
+    (btn.match(/saveLane\("rtc", Date\.now\(\), "call"\)/g) ?? []).length === 2 && /saveLane\("ws", Date\.now\(\), "call"\)/.test(btn) &&
+    !/saveLane\([^,)]*\)/.test(btn));
+  const scr = fsD.readFileSync("src/components/ai/VoiceCallScreen.tsx", "utf8");
+  check("the status is a small-caps line with a state dot — blue when the far side speaks, white when it listens — and the slow caption shows the seconds",
+    /text-\[12px\] uppercase tracking-\[0\.14em\] font-semibold leading-relaxed text-\[#AAAAAA\]/.test(scr) &&
+    /\{live && ready && !working && \(\s*<span aria-hidden className=\{`inline-block h-1\.5 w-1\.5 rounded-full me-2 align-middle \$\{phase === "speaking" \? "bg-\[#0066FF\]" : "bg-white"\}`\} \/>/.test(scr) &&
+    /\{connectingSlow && \(!live \|\| !ready\) && connectingFor > 0 && \(/.test(scr) &&
+    /const tick = window\.setInterval\(\(\) => setConnectingFor\(Math\.round\(\(Date\.now\(\) - t0\) \/ 1000\)\), 1000\);/.test(scr));
+  const tr = fsD.readFileSync("src/components/ai/VoiceTranscript.tsx", "utf8");
+  check("the transcript is memoised, 18 px white, the half-spoken line at 70 %",
+    /export default memo\(VoiceTranscript\);/.test(tr) && /text-\[18px\] leading-relaxed/.test(tr) && /line\.final \? "text-white" : "text-white\/70"/.test(tr));
 }
 console.log(`\n${pass} passed, ${failures.length} failed`);
   if (failures.length) {

@@ -132,13 +132,20 @@ export const LANE_STORAGE_KEY = "koleex-voice-lane";
 /** How long a probe's or a call's verdict stands before it is re-checked. */
 export const LANE_TTL_MS = 6 * 60 * 60 * 1000;
 export type VoiceLane = "rtc" | "ws";
-export type SavedLane = { lane: VoiceLane; at: number };
+/** Who decided: the caller in the Line control, the background probe, or a
+ *  call that came up (or fell back) on a lane. A fresh USER verdict is not
+ *  overridden by the probe (audit, 2026-09-11). */
+export type LaneSource = "user" | "probe" | "call";
+export type SavedLane = { lane: VoiceLane; at: number; source?: LaneSource };
 
 export function parseSavedLane(raw: string | null | undefined): SavedLane | null {
   if (!raw) return null;
   try {
-    const v = JSON.parse(raw) as { lane?: unknown; at?: unknown };
-    if ((v.lane === "rtc" || v.lane === "ws") && typeof v.at === "number" && Number.isFinite(v.at)) return { lane: v.lane, at: v.at };
+    const v = JSON.parse(raw) as { lane?: unknown; at?: unknown; source?: unknown };
+    if ((v.lane === "rtc" || v.lane === "ws") && typeof v.at === "number" && Number.isFinite(v.at)) {
+      const source = v.source === "user" || v.source === "probe" || v.source === "call" ? v.source : undefined;
+      return source ? { lane: v.lane, at: v.at, source } : { lane: v.lane, at: v.at };
+    }
   } catch {
     /* not ours */
   }
@@ -162,6 +169,11 @@ export function decideLane(
 ): { lane: VoiceLane; probe: boolean } {
   if (server === "ws") return { lane: "ws", probe: false };
   const fresh = saved !== null && now - saved.at >= 0 && now - saved.at < ttlMs;
+  /* THE CALLER'S OWN CHOICE STANDS while it is fresh: a probe that happened
+     to succeed through a flaky tunnel used to move a caller who had picked
+     the mainland line back to the international one on the next load
+     (audit, 2026-09-11). Probe and call verdicts are still re-checked. */
+  if (fresh && saved && saved.source === "user") return { lane: saved.lane, probe: false };
   return { lane: fresh && saved ? saved.lane : "rtc", probe: true };
 }
 
@@ -181,9 +193,9 @@ export function readSavedLane(): SavedLane | null {
   }
 }
 
-export function saveLane(lane: VoiceLane, now: number = Date.now()): void {
+export function saveLane(lane: VoiceLane, now: number = Date.now(), source: LaneSource = "probe"): void {
   try {
-    window.localStorage.setItem(LANE_STORAGE_KEY, JSON.stringify({ lane, at: now } satisfies SavedLane));
+    window.localStorage.setItem(LANE_STORAGE_KEY, JSON.stringify({ lane, at: now, source } satisfies SavedLane));
   } catch {
     /* storage refused — the next call probes again */
   }
