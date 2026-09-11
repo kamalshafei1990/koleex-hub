@@ -799,8 +799,11 @@ console.log("\n── 8. What the client may know, and what it may not ──");
       /from=\$\{/.test(session) && /region=\$\{/.test(session) && /afterMs=/.test(session) && /cause=/.test(session));
     /* Audit 2026-09-07: a 403 "Unpurchased" primary was logged ok for days
        because it answered. Healthy is reachable AND the credential accepted. */
-    check("a failure is logged at error level, a success is not — and healthy means reachable AND credential ok",
-      /const healthy = probe\.reachable && probe\.credential_ok;/.test(bare) && /if \(healthy\) console\.log\(line\)/.test(bare) && /else console\.error\(line\)/.test(bare));
+    /* 2026-09-11: the success line is at WARN, not info — the log tool shows
+       nothing below warn, and the first "ok" from Beijing after the key
+       change had to be inferred from the absence of a fail line. */
+    check("a failure is logged at error level, a success at warn (never below) — and healthy means reachable AND credential ok",
+      /const healthy = probe\.reachable && probe\.credential_ok;/.test(bare) && /if \(healthy\) console\.warn\(line\)/.test(bare) && /else console\.error\(line\)/.test(bare) && !/console\.log\(line\)/.test(bare));
     /* FOUR GREEN RUNS THAT SAID NOTHING. The verdict has to be in the status
        code, because that is what the status-code breakdown and the cron
        history count; a log line at info level is not reliably surfaced. */
