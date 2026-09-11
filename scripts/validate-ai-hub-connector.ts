@@ -17,6 +17,13 @@ import { readFileSync, readdirSync } from "node:fs";
 import type { UserContext } from "../src/lib/server/ai-agent/types";
 import { koleexHub } from "../src/lib/server/ai/connectors/koleex-hub";
 import { listTools, staticToolDenial } from "../src/lib/server/ai-agent/tool-registry";
+import {
+  generalLaneTools,
+  runGeneralSearchHop,
+  GENERAL_LANE_TOOL,
+  GENERAL_SEARCH_MAX_CALLS,
+  GENERAL_SEARCH_NOTE,
+} from "../src/lib/server/ai/core/general-search";
 
 let pass = 0;
 const failures: string[] = [];
@@ -172,10 +179,91 @@ console.log("\n── 5. The connector's views agree with the registry ──");
   check("a super admin sees the full registry through the connector", names.length === listTools().length);
 }
 
-console.log(`\n${pass} passed, ${failures.length} failed`);
-if (failures.length) {
-  console.log("\nFAILED:");
-  for (const f of failures) console.log(`  · ${f}`);
-  process.exit(1);
+/* Async because the hop is awaited; tsx runs this file as CJS, where a
+   top-level await is not allowed. The summary waits for it below. */
+async function sectionSix() {
+console.log("\n── 6. The general lane's ONE lookup goes through the door (plan A4, second slice) ──");
+{
+  /* The tool-less fast lane may now call search_web once. The property to
+     hold: it is the only tool the lane can see, it is offered only through
+     the connector's own list, every call is run through invoke() and every
+     call — run or refused — gets a reply the model can read. */
+  const ctx = ctxOf({});
+  const offered = generalLaneTools(ctx);
+  check("an internal caller is offered exactly one tool on the general lane", offered !== null && offered.length === 1);
+  check("that tool is search_web", offered?.[0]?.name === GENERAL_LANE_TOOL);
+  check("it is the connector's own definition, not a copy", offered?.[0]?.description === koleexHub.availableTools(ctx).find((t) => t.name === GENERAL_LANE_TOOL)?.description);
+  check("the note names the tool and the one-lookup rule", GENERAL_SEARCH_NOTE.includes(GENERAL_LANE_TOOL) && /one lookup/i.test(GENERAL_SEARCH_NOTE));
+  check("the note keeps explanations off the tool", /explanation.*definition/i.test(GENERAL_SEARCH_NOTE));
+  check("the general lane never offers a Hub-gated tool", (offered ?? []).every((t) => t.name === GENERAL_LANE_TOOL));
+
+  const seen: Array<{ name: string; args: Record<string, unknown> }> = [];
+  const announced: number[] = [];
+  const fake = async (_c: UserContext, name: string, args: Record<string, unknown>) => {
+    seen.push({ name, args });
+    return { ok: true, permissionStatus: "allowed" as const, data: { results: [{ title: "x" }] }, message: "Searched.", sources: ["web:tavily"] };
+  };
+  const base = [{ role: "system" as const, content: "sys" }, { role: "user" as const, content: "who founded Nestlé?" }];
+  const hop = await runGeneralSearchHop({
+    ctx,
+    conversationId: "conv-1",
+    calls: [{ id: "c1", name: GENERAL_LANE_TOOL, argumentsJson: JSON.stringify({ query: "Nestlé founder" }) }],
+    priorContent: "Let me check",
+    messages: base,
+    invoke: fake,
+    onStep: (steps) => announced.push(steps.length),
+  });
+  check("one search call runs exactly one lookup, through invoke", seen.length === 1 && seen[0].name === GENERAL_LANE_TOOL && seen[0].args.query === "Nestlé founder");
+  check("the call is announced BEFORE the lookup runs (screen shows 'searching')", announced.length === 1 && announced[0] === 1);
+  check("the steps are a tool-call then a tool-result carrying the sources", hop.steps.length === 2 && hop.steps[0].kind === "tool-call" && hop.steps[1].kind === "tool-result" && hop.steps[1].sources?.[0] === "web:tavily");
+  check("the answer call's messages: the originals, the assistant's calls with its narration, then the tool reply",
+    hop.messages.length === base.length + 2 &&
+      hop.messages[base.length].role === "assistant" && hop.messages[base.length].content === "Let me check" && hop.messages[base.length].toolCalls?.[0]?.id === "c1" &&
+      hop.messages[base.length + 1].role === "tool" && hop.messages[base.length + 1].toolCallId === "c1");
+  const reply = JSON.parse(hop.messages[base.length + 1].content ?? "{}") as Record<string, unknown>;
+  check("the tool reply is the LLM-safe projection (no raw result object)", reply.ok === true && "data" in reply && !("pendingAction" in reply));
+  check("ran counts the lookups that went", hop.ran === 1);
+
+  /* Refusals: a tool that is not search_web, and calls beyond the cap. Every
+     call still gets a reply, so the provider's rule (a reply per call) holds. */
+  seen.length = 0;
+  const many = await runGeneralSearchHop({
+    ctx,
+    conversationId: "conv-1",
+    calls: [
+      { id: "a", name: "getCustomerDetails", argumentsJson: "{\"id\":\"1\"}" },
+      { id: "b", name: GENERAL_LANE_TOOL, argumentsJson: "{\"query\":\"one\"}" },
+      { id: "c", name: GENERAL_LANE_TOOL, argumentsJson: "not json" },
+      { id: "d", name: GENERAL_LANE_TOOL, argumentsJson: "{\"query\":\"three\"}" },
+    ],
+    priorContent: "",
+    messages: base,
+    invoke: fake,
+  });
+  check("a Hub tool asked for on the general lane is NEVER run", seen.every((s) => s.name === GENERAL_LANE_TOOL));
+  check(`at most ${GENERAL_SEARCH_MAX_CALLS} lookups run; the rest are refused`, seen.length === GENERAL_SEARCH_MAX_CALLS && many.ran === GENERAL_SEARCH_MAX_CALLS);
+  check("unparseable arguments become an empty object, not a throw", seen.some((s) => Object.keys(s.args).length === 0));
+  const replies = many.messages.filter((m) => m.role === "tool");
+  check("every call gets a tool reply, run or refused", replies.length === 4 && replies.map((m) => m.toolCallId).join() === "a,b,c,d");
+  const refused = JSON.parse(replies[0].content ?? "{}") as Record<string, unknown>;
+  check("a refused call's reply says it was not run", refused.ok === false && /not run/i.test(String(refused.message)));
+  check("a refused call leaves no step on the screen", many.steps.length === GENERAL_SEARCH_MAX_CALLS * 2);
+  check("an empty narration is a null assistant content, as the IR requires", many.messages.find((m) => m.role === "assistant")?.content === null);
+
+  /* The lane offers nothing to a caller the connector lists nothing for. */
+  const src = stripComments(read("src/lib/server/ai/core/general-search.ts"));
+  check("the tool list comes from koleexHub.availableTools, never from the registry directly", /koleexHub\s*\.availableTools\(/.test(src) && !/tool-registry/.test(src));
+  check("the lookup runs through koleexHub.invoke, never dispatchTool", /koleexHub\.invoke\(/.test(src) && !/dispatchTool/.test(src));
+  check("the module is server-only", /^import "server-only";/m.test(read("src/lib/server/ai/core/general-search.ts")));
 }
-console.log("One door, and it delegates — a connector that reimplemented the guard would be worse than none.");
+}
+
+void sectionSix().then(() => {
+  console.log(`\n${pass} passed, ${failures.length} failed`);
+  if (failures.length) {
+    console.log("\nFAILED:");
+    for (const f of failures) console.log(`  · ${f}`);
+    process.exit(1);
+  }
+  console.log("One door, and it delegates — a connector that reimplemented the guard would be worse than none.");
+});

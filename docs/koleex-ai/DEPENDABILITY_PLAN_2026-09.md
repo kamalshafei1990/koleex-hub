@@ -82,7 +82,7 @@ plain words. Verification is named per phase; nothing is called done without it.
 | A1 ✅ | The clock on every lane and in both voice sessions | `validate:ai-prompts`, `validate:ai-voice` pins |
 | A2 ✅ | `search_web` freshness window + search date beside results + the reading rule | `validate:ai-web-search` pins |
 | A3 ✅ | Date questions and Arabic/Chinese "latest / newest" go to the tool lane | `validate:ai-core-boundaries` pins |
-| A4 | **World facts are looked up, not recalled.** First slice ✅ (2026-09-11 evening): a question about the world outside Koleex — a person, a company, a place, a ranking, a figure, in three languages (`isWorldFactQuery`) — goes to the tool loop, where `search_web` sits, and the tool's description tells the model to look such facts up before answering. This closes "the poorest city in China" and every "who / what / when" the model half-remembered. Second slice (next): the general lane itself gets `search_web` with a one-hop loop, so the questions the detector misses are covered too, at the general lane's speed | `validate:ai-core-boundaries` pins (three languages, and the definitions that must stay on the general lane); a live check from the owner's chat |
+| A4 | **World facts are looked up, not recalled.** First slice ✅ (2026-09-11 evening): a question about the world outside Koleex — a person, a company, a place, a ranking, a figure, in three languages (`isWorldFactQuery`) — goes to the tool loop, where `search_web` sits, and the tool's description tells the model to look such facts up before answering. This closes "the poorest city in China" and every "who / what / when" the model half-remembered. Second slice ✅ (2026-09-11 night): the general lane itself is offered `search_web` — the one tool, taken from the connector's list for that caller — and answers from the result in a second, tool-less call. One hop, at most two lookups, never a loop; what the model narrated before the lookup is retracted, the lookup is shown on screen as it runs, and the answer's record carries the search steps (provider label `fast-general+search`, log field `fast_search`). Questions the detector misses are covered at the general lane's speed | `validate:ai-core-boundaries` pins (three languages, and the definitions that must stay on the general lane); a live check from the owner's chat |
 | A5 ✅ | **The model's own cutoff, stated.** The clock line tells the model that what it remembers ends before today and that "latest / current" facts from memory are to be looked up | Prompt pin |
 | A6 | "As of <date>" phrasing when the answer came from a lookup; sources under the reply are already shown; the date joins them | Client render pin |
 
@@ -158,8 +158,8 @@ caller who is elsewhere.
 
 | When | What lands |
 |---|---|
-| Today | A1–A5 (first slice of A4), B1–B5 (#404, #405, #406, and the keepalive PR) |
-| This week | A4 second slice, G1 |
+| Today | A1–A5, B1–B5 (#404, #405, #406, #407, and the A4 second-slice PR) |
+| This week | G1 |
 | Next week | B6 (the harness), C1, C2, A6 |
 | Weeks 3–4 | C3, C4, D-1, D-2 |
 | Weeks 4–5 | E1–E3, D-3, G3/H |
