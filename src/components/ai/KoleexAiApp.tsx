@@ -1041,6 +1041,8 @@ export default function KoleexAiApp() {
           const msg =
             res.status === 503
               ? copy.aiUnavailable
+              : res.status === 413
+                ? copy.messageTooLong
               : said
                 ? humanizeError(said)
                 : humanizeError(`HTTP ${res.status}`);

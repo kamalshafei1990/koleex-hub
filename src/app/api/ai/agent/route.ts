@@ -87,6 +87,8 @@ export const maxDuration = 120;
    behaviour under heavy load. Attachment embeds stay bounded separately —
    resolveHistoryAttachEmbeds keeps only the newest document's text. */
 const HISTORY_LIMIT = 60;
+/** Characters allowed in one typed turn; longer text goes as a file. */
+const MAX_CONTENT_CHARS = 24_000;
 const HISTORY_CHAR_BUDGET = 48000;
 
 /** Newest-first char-budget trim, applied AFTER the chronological flip:
@@ -175,6 +177,14 @@ export async function POST(req: Request) {
     body.stream === true || req.headers.get("accept") === "text/event-stream";
   if (!content) {
     return NextResponse.json({ error: "content required" }, { status: 400 });
+  }
+  /* ONE TURN HAS A CEILING. History is budgeted (48k chars) and attachments
+     are (60k), but the live turn itself was not — the one paid input a
+     client could make as large as it liked (audit, 2026-09-11). Long text
+     belongs in an attachment, which is read once and summarised. The client
+     maps 413 to a translated sentence. */
+  if (content.length > MAX_CONTENT_CHARS) {
+    return NextResponse.json({ error: "too_long" }, { status: 413 });
   }
   if (!conversationId) {
     return NextResponse.json({ error: "conversationId required" }, { status: 400 });

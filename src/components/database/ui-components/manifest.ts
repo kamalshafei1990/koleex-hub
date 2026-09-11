@@ -96,7 +96,6 @@ export const UI_COMPONENT_MODULES: UiModule[] = [
       "KoleexGlowOrb",
       "KoleexOrb",
       "KoleexOrbIcon",
-      "KoleexRobot",
       "MessageMarkdown",
       "MicButton",
       "ProjectGlyph",
@@ -992,16 +991,7 @@ export const UI_COMPONENT_MODULES: UiModule[] = [
     "components": [
       "AiKnowledgePage",
       "AiPage",
-      "Loading",
-      "OrbDemoPage"
-    ]
-  },
-  {
-    "key": "routes \u00b7 ai-face-lab",
-    "fileCount": 1,
-    "kitFiles": 0,
-    "components": [
-      "AiFaceLabPage"
+      "Loading"
     ]
   },
   {
