@@ -519,6 +519,8 @@ export default function KoleexAiApp() {
     const exists = conversations.some((c) => c.id === stored);
     if (exists) {
       restoredRef.current = true;
+      /* A restore is not a step the user took: the address is replaced. */
+      urlModeRef.current = "replace";
       void openConversation(stored);
     } else {
       try { window.localStorage.removeItem(activeIdKey); } catch { /* ignore */ }
@@ -539,10 +541,34 @@ export default function KoleexAiApp() {
   /* THE CALLS HISTORY (roadmap D2), the same way. */
   const [callsOpen, setCallsOpen] = useState(false);
 
+  /* THE URL CARRIES THE PLACE (audit, 2026-09-11). The open chat and the
+     Library / Calls views lived only in React state, so in the PWA the
+     system Back gesture left the app, "Open chat" from Calls could not be
+     undone, and no chat could be linked. The place is mirrored into the
+     query string — ?c=<chat id>, ?view=library|calls — with the History
+     API directly (no route change, no loading skeleton): a user action
+     pushes, the restore on load replaces, and popstate applies what the URL
+     says without pushing again (fromHistoryRef). */
+  const fromHistoryRef = useRef(false);
+  const urlModeRef = useRef<"push" | "replace">("push");
+  const syncUrl = useCallback((next: { c: string | null; view: "library" | "calls" | null }, mode: "push" | "replace") => {
+    if (typeof window === "undefined" || fromHistoryRef.current) return;
+    const url = new URL(window.location.href);
+    if (next.c) url.searchParams.set("c", next.c); else url.searchParams.delete("c");
+    if (next.view) url.searchParams.set("view", next.view); else url.searchParams.delete("view");
+    const target = `${url.pathname}${url.search}`;
+    if (target === `${window.location.pathname}${window.location.search}`) return;
+    try {
+      window.history[mode === "push" ? "pushState" : "replaceState"](null, "", target);
+    } catch { /* a history API that refuses is not worth an error */ }
+  }, []);
+
   const openConversation = useCallback(
     async (id: string) => {
       setLibraryOpen(false);
       setCallsOpen(false);
+      syncUrl({ c: id, view: null }, urlModeRef.current);
+      urlModeRef.current = "push";
       /* THE CHAT THAT IS ALREADY OPEN STAYS AS IT IS. "Open drawer, tap the
          highlighted chat to go back" used to abort the reply in flight and
          reload the thread (audit, 2026-09-07). */
@@ -592,13 +618,14 @@ export default function KoleexAiApp() {
         }
       }
     },
-    [revokeMessagePreviews],
+    [revokeMessagePreviews, syncUrl],
   );
 
   /* ── New chat — an empty screen; the row is created on the first send ── */
   const startNewChat = useCallback(async () => {
     setLibraryOpen(false);
     setCallsOpen(false);
+    syncUrl({ c: null, view: null }, "push");
     /* Same abort as openConversation — audit P0 #1. */
     abortRef.current?.abort();
     /* NO ROW UNTIL THERE ARE WORDS. This used to POST a conversation on every
@@ -614,7 +641,52 @@ export default function KoleexAiApp() {
     setSidebarOpen(false);
     /* Same race guard as send() — see the comment there for why. */
     restoredRef.current = true;
-  }, [revokeMessagePreviews]);
+  }, [revokeMessagePreviews, syncUrl]);
+
+  /* THE URL ON LOAD, and Back / Forward afterwards. A ?c= in the address
+     is the place to open — it wins over the remembered chat. */
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    const c = params.get("c");
+    const view = params.get("view");
+    if (c && /^[0-9a-f-]{8,}$/i.test(c)) {
+      restoredRef.current = true;
+      fromHistoryRef.current = true;
+      try { void openConversation(c); } finally { fromHistoryRef.current = false; }
+    }
+    if (view === "library" || view === "calls") {
+      setLibraryOpen(view === "library");
+      setCallsOpen(view === "calls");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- a one-time read of the address at mount
+  }, []);
+  useEffect(() => {
+    const onPop = () => {
+      const params = new URLSearchParams(window.location.search);
+      const c = params.get("c");
+      const view = params.get("view");
+      fromHistoryRef.current = true;
+      try {
+        if (c) {
+          if (c !== activeIdRef.current) void openConversation(c);
+        } else if (activeIdRef.current) {
+          void startNewChat();
+        }
+        if (view === "library" || view === "calls") {
+          setLibraryOpen(view === "library");
+          setCallsOpen(view === "calls");
+        } else {
+          setLibraryOpen(false);
+          setCallsOpen(false);
+        }
+      } finally {
+        fromHistoryRef.current = false;
+      }
+    };
+    window.addEventListener("popstate", onPop);
+    return () => window.removeEventListener("popstate", onPop);
+  }, [openConversation, startNewChat]);
 
   /* ── Send a message ──
      Unified path: every turn runs through /api/ai/agent (the
@@ -2132,7 +2204,7 @@ export default function KoleexAiApp() {
         <div className="px-2 pb-1">
           <button
             type="button"
-            onClick={() => { setLibraryOpen(true); setCallsOpen(false); setSidebarOpen(false); }}
+            onClick={() => { setLibraryOpen(true); setCallsOpen(false); setSidebarOpen(false); syncUrl({ c: activeIdRef.current, view: "library" }, "push"); }}
             aria-pressed={libraryOpen}
             className={`w-full h-8 px-2 rounded-lg text-start text-[13px] flex items-center gap-2 ${
               libraryOpen
@@ -2145,7 +2217,7 @@ export default function KoleexAiApp() {
           </button>
           <button
             type="button"
-            onClick={() => { setCallsOpen(true); setLibraryOpen(false); setSidebarOpen(false); }}
+            onClick={() => { setCallsOpen(true); setLibraryOpen(false); setSidebarOpen(false); syncUrl({ c: activeIdRef.current, view: "calls" }, "push"); }}
             aria-pressed={callsOpen}
             className={`w-full h-8 px-2 rounded-lg text-start text-[13px] flex items-center gap-2 ${
               callsOpen
