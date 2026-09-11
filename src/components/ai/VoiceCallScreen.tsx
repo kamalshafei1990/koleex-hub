@@ -23,6 +23,7 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import AIOrb from "@/components/ai-orb/AIOrb";
 import { useCallLevel } from "./useCallLevel";
+import { useFocusTrap } from "./useFocusTrap";
 import type { AIOrbState } from "@/components/ai-orb/ai-orb-types";
 import VoiceTranscript, { PhotoTile } from "@/components/ai/VoiceTranscript";
 import { type TranscriptLine, type TranscriptPhoto, type VoicePhase } from "@/lib/voice/events";
@@ -416,6 +417,14 @@ export default function VoiceCallScreen({
      voice is a small Koleex orb with its name — the product's own face,
      not a row of grey pills. */
   const [voiceSheet, setVoiceSheet] = useState(defaultVoiceSheetOpen);
+  /* THE KEYBOARD STAYS ON THE CALL (audit, 2026-09-11). aria-modal was
+     declared and focus went nowhere: the opener unmounted on connect, Tab
+     reached the composer behind. The screen takes focus on mount and gives
+     it back on hang-up; the sheet does the same over the screen. */
+  const rootRef = useRef<HTMLDivElement | null>(null);
+  useFocusTrap(rootRef, true);
+  const sheetRef = useRef<HTMLDivElement | null>(null);
+  useFocusTrap(sheetRef, voiceSheet, { initialFocus: "[data-sheet-close]" });
   /* SWIPE DOWN CLOSES THE SHEET. The drawn handle promised a gesture it did
      not have (audit, 2026-09-11). The header (handle + title) is the grab
      area, so the voices row keeps its horizontal scroll; past 80 px the
@@ -582,7 +591,7 @@ export default function VoiceCallScreen({
      backed out of a text box would be the worst surprise on this screen. */
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key !== "Escape") return;
+      if (e.key !== "Escape" || e.defaultPrevented) return;
       if (typedRef.current && e.target === typedRef.current) {
         typedRef.current.blur();
         return;
@@ -768,7 +777,7 @@ export default function VoiceCallScreen({
             position"): as a flex row the long "still connecting" line
             wrapped left-aligned with its dots stranded at the far right.
             A block of centred text, the dots inline after the last word. */}
-        <p className="max-w-[340px] px-2 text-center text-sm font-normal leading-relaxed tracking-wide text-[#AAAAAA]" aria-live="polite">
+        <p className="max-w-[340px] px-2 text-center text-sm font-normal leading-relaxed tracking-wide text-[#AAAAAA]">
           {working ? (
             <>
               <span className="kx-activity-text">{status.replace(/…$/, "")}</span>
@@ -873,7 +882,9 @@ export default function VoiceCallScreen({
          200 is where this codebase's real dialogs live (SignInHelpDialog),
          above the header and the dock. Deliberately BELOW ConfirmDialog's
          300: a confirmation raised during a call has to be readable over it. */
-      className="kx-call-root fixed inset-0 z-[200] flex flex-col bg-[#0D0D0D] text-white"
+      ref={rootRef}
+      tabIndex={-1}
+      className="kx-call-root fixed inset-0 z-[200] flex flex-col bg-[#0D0D0D] text-white outline-none"
       /* Read by UpdateWatcher: a live call is never interrupted by a reload
          onto a new build — the stale bundle waits until the call ends. */
       data-kx-call-active="1"
@@ -882,6 +893,11 @@ export default function VoiceCallScreen({
         paddingBottom: "env(safe-area-inset-bottom, 0px)",
       }}
     >
+      {/* ONE LIVE REGION, outside both views. The visible status sits inside
+          a layer that is aria-hidden in chat view, so nothing was announced
+          there; this copy is for readers, the visible line for eyes
+          (audit, 2026-09-11). */}
+      <p className="sr-only" role="status" aria-live="polite">{status}</p>
       <PhotoLightbox photo={openPhoto} onClose={closePhoto} closeLabel={copy.closePhoto} />
       {/* ── THE STAGE: the words underneath, the orb layer on top, one orb
           that travels between its home and the corner (see the state block:
@@ -1172,6 +1188,7 @@ export default function VoiceCallScreen({
               band under it. The container is viewport-fixed; the panel
               simply reaches the edge now. */}
           <div
+            ref={sheetRef}
             className="kx-sheet-in relative rounded-t-3xl border-t border-white/10 bg-[#111111] px-6 pt-3 text-white"
             style={{
               paddingBottom: "calc(2rem + env(safe-area-inset-bottom, 0px))",
@@ -1201,6 +1218,7 @@ export default function VoiceCallScreen({
               <h2 className="text-[16px] font-semibold">{copy.callSettings}</h2>
               <button
                 type="button"
+                data-sheet-close
                 onClick={closeVoiceSheet}
                 aria-label={copy.close}
                 title={copy.close}

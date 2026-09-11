@@ -355,6 +355,20 @@ export default function KoleexAiApp() {
   }, []);
   const [error, setError] = useState<string | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false); // mobile
+  /* WHICH SIDEBAR IS THIS. On a phone the aside is a drawer that slides off
+     screen; on a desktop it collapses to zero width. Both used to stay in the
+     tab order and the accessibility tree while invisible — thirty controls a
+     keyboard walked through blind (audit, 2026-09-11). `inert` takes them
+     out; this flag says which rule applies. */
+  const [isNarrow, setIsNarrow] = useState(false);
+  useEffect(() => {
+    if (typeof window === "undefined" || !window.matchMedia) return;
+    const mq = window.matchMedia("(max-width: 767px)");
+    const sync = () => setIsNarrow(mq.matches);
+    sync();
+    mq.addEventListener("change", sync);
+    return () => mq.removeEventListener("change", sync);
+  }, []);
   /* Knowledge queue entry — super-admin only (D2: the approval bench
      is the owner's). */
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
@@ -378,6 +392,7 @@ export default function KoleexAiApp() {
       return false;
     }
   });
+  const asideHidden = isNarrow ? !sidebarOpen : sidebarCollapsed;
   useEffect(() => {
     if (typeof window === "undefined") return;
     try {
@@ -2130,7 +2145,8 @@ export default function KoleexAiApp() {
           width: sidebarCollapsed ? 0 : SIDEBAR_W,
           minWidth: sidebarCollapsed ? 0 : SIDEBAR_W,
         }}
-        aria-hidden={!sidebarOpen && sidebarCollapsed}
+        aria-hidden={asideHidden}
+        inert={asideHidden || undefined}
       >
         {/* Content rides a FIXED-width inner column so the collapse CLIPS it
             instead of re-wrapping every text line on every frame — the

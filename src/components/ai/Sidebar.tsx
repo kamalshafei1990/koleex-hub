@@ -78,16 +78,15 @@ export function ProjectRow({
 }) {
   return (
     <div
-      className="group px-2 py-1.5 mx-2 rounded-lg cursor-pointer transition-colors flex items-center gap-2 hover:bg-[var(--bg-surface-subtle)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
-      onClick={onOpen}
-      role="button"
-      tabIndex={0}
-      onKeyDown={(e) => {
-        if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onOpen(); }
-      }}
+      className="group px-2 py-1.5 mx-2 rounded-lg transition-colors flex items-center gap-2 hover:bg-[var(--bg-surface-subtle)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
     >
-      <ProjectGlyph icon={project.icon} color={project.color} size={15} className="shrink-0" />
-      <span className="text-[13px] truncate flex-1 min-w-0">{project.name}</span>
+      {/* THE NAME IS THE BUTTON. A row that was itself role="button" held two
+          more buttons inside it, which the content model forbids and screen
+          readers flatten (audit, 2026-09-11). */}
+      <button type="button" onClick={onOpen} className="flex-1 min-w-0 flex items-center gap-2 text-start rounded-lg">
+        <ProjectGlyph icon={project.icon} color={project.color} size={15} className="shrink-0" />
+        <span className="text-[13px] truncate flex-1 min-w-0">{project.name}</span>
+      </button>
       <RowMenu
         label={moreLabel}
         items={[
@@ -181,28 +180,20 @@ export function SidebarRow({
 
   return (
     <div
-      onClick={onOpen}
-      /* A ROW IS A BUTTON. It had no role and no tab stop, so a keyboard
-         could not reach it (audit, 2026-09-07); Enter and Space open it. */
-      role="button"
-      tabIndex={0}
-      onKeyDown={(e) => {
-        if (e.target !== e.currentTarget) return;
-        if (e.key === "Enter" || e.key === " ") {
-          e.preventDefault();
-          onOpen();
-        }
-      }}
-      className={`group px-2 py-1.5 mx-2 rounded-lg cursor-pointer transition-colors flex items-center gap-1 ${
+      /* THE TITLE IS THE BUTTON. The row was role="button" with the pin and
+         the menu — two more buttons — inside it, which the content model
+         forbids and screen readers flatten; a keyboard reached it (audit,
+         2026-09-07) but announced it wrong (audit, 2026-09-11). */
+      className={`group px-2 py-1.5 mx-2 rounded-lg transition-colors flex items-center gap-1 ${
         active
           ? "bg-[var(--bg-surface-active)] text-[var(--text-primary)]"
           : "hover:bg-[var(--bg-surface-subtle)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
       }`}
     >
-      <div className="flex-1 min-w-0">
-        <div className="text-[13px] truncate" dir="auto">{row.title}</div>
-        {hint && <div className="text-[12px] truncate text-[var(--text-dim)]" data-search-hint>{hint}</div>}
-      </div>
+      <button type="button" onClick={onOpen} className="flex-1 min-w-0 text-start rounded-lg" aria-current={active ? "page" : undefined}>
+        <span className="block text-[13px] truncate" dir="auto">{row.title}</span>
+        {hint && <span className="block text-[12px] truncate text-[var(--text-dim)]" data-search-hint>{hint}</span>}
+      </button>
       {/* The pin marks the row while it is pinned and hides again on hover so
           it can't be mistaken for a button you have to press to keep it. */}
       <button
@@ -251,6 +242,31 @@ export function RowMenu({
     maxHeight: number;
   } | null>(null);
   const btnRef = useRef<HTMLButtonElement | null>(null);
+  const menuRef = useRef<HTMLDivElement | null>(null);
+  /* Closing by keyboard or by choosing hands focus back to the trigger; the
+     first item takes focus when the menu opens (audit, 2026-09-11). */
+  const closeMenu = useCallback(() => {
+    setOpen(false);
+    btnRef.current?.focus({ preventScroll: true });
+  }, []);
+  useEffect(() => {
+    if (!open) return;
+    const id = window.requestAnimationFrame(() => {
+      menuRef.current?.querySelector<HTMLElement>('[role="menuitem"]')?.focus({ preventScroll: true });
+    });
+    return () => window.cancelAnimationFrame(id);
+  }, [open]);
+  const onMenuKey = (e: React.KeyboardEvent) => {
+    const items = Array.from(menuRef.current?.querySelectorAll<HTMLElement>('[role="menuitem"]') ?? []);
+    if (items.length === 0) return;
+    const i = items.indexOf(document.activeElement as HTMLElement);
+    const go = (n: number) => { e.preventDefault(); items[(n + items.length) % items.length].focus(); };
+    if (e.key === "ArrowDown") go(i + 1);
+    else if (e.key === "ArrowUp") go(i - 1);
+    else if (e.key === "Home") go(0);
+    else if (e.key === "End") go(items.length - 1);
+    else if (e.key === "Tab") { e.preventDefault(); closeMenu(); }
+  };
 
   const place = useCallback(() => {
     const el = btnRef.current;
@@ -281,7 +297,7 @@ export function RowMenu({
   useEffect(() => {
     if (!open) return;
     const close = () => setOpen(false);
-    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setOpen(false); };
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") { e.stopPropagation(); closeMenu(); } };
     /* Any scroll or resize invalidates a fixed position, and re-placing a
        menu mid-scroll looks broken — closing is the honest response. */
     window.addEventListener("scroll", close, true);
@@ -292,7 +308,7 @@ export function RowMenu({
       window.removeEventListener("resize", close);
       window.removeEventListener("keydown", onKey);
     };
-  }, [open]);
+  }, [open, closeMenu]);
 
   return (
     <>
@@ -334,7 +350,10 @@ export function RowMenu({
               descendant blur and made the "glass" read as a flat
               see-through box (owner: "not frosted blurred glass"). */}
           <div
+            ref={menuRef}
             role="menu"
+            aria-label={label}
+            onKeyDown={onMenuKey}
             className="kx-pop-panel fixed z-[61] w-52 overflow-y-auto py-1"
             style={{
               top: pos.top,
@@ -362,7 +381,7 @@ export function RowMenu({
                   role="menuitem"
                   onClick={(e) => {
                     e.stopPropagation();
-                    setOpen(false);
+                    closeMenu();
                     it.onSelect?.();
                   }}
                   className={`w-full px-3 py-1.5 text-[12px] flex items-center gap-2 text-start hover:bg-[var(--bg-surface-subtle)] ${

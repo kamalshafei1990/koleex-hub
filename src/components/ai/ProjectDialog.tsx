@@ -9,7 +9,8 @@
    sub-component out while the client still has no test harness.
    --------------------------------------------------------------------------- */
 
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
+import { useFocusTrap } from "./useFocusTrap";
 import ProjectGlyph, { useProjectColorHex } from "@/components/ai/ProjectGlyph";
 import {
   PROJECT_COLOR_KEYS,
@@ -38,6 +39,9 @@ export default function ProjectDialog({
   onSave: () => void;
   onClose: () => void;
 }) {
+  /* The keyboard stays in the dialog and returns to the opener (audit, 2026-09-11). */
+  const dialogRef = useRef<HTMLDivElement | null>(null);
+  useFocusTrap(dialogRef, true);
   const colorHex = useProjectColorHex();
   const canSave = draft.name.trim().length > 0 && !saving;
 
@@ -57,13 +61,15 @@ export default function ProjectDialog({
         className="absolute inset-0 bg-black/50 backdrop-blur-sm"
       />
       <div
+        ref={dialogRef}
         role="dialog"
         aria-modal="true"
+        aria-labelledby="kx-project-dialog-title"
         className="kx-glass-pop relative w-full max-w-sm rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] shadow-2xl p-4"
       >
         <div className="flex items-center gap-2 mb-3">
           <ProjectGlyph icon={draft.icon} color={draft.color} size={16} />
-          <h2 className="text-[14px] font-semibold text-[var(--text-primary)]">
+          <h2 id="kx-project-dialog-title" className="text-[14px] font-semibold text-[var(--text-primary)]">
             {draft.id ? copy.editProject : copy.newProject}
           </h2>
         </div>
