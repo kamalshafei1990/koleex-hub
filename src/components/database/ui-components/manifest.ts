@@ -91,7 +91,6 @@ export const UI_COMPONENT_MODULES: UiModule[] = [
     "fileCount": 11,
     "kitFiles": 1,
     "components": [
-      "AutoTranslate",
       "EmojiButton",
       "KoleexAiApp",
       "KoleexGlowOrb",

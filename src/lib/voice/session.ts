@@ -1143,14 +1143,25 @@ export class VoiceSession {
 
     this.setState("requesting-mic");
     this.startedAt = Date.now();
+    let mic: MediaStream;
     try {
-      this.mic = await this.deps.getMicrophone();
+      mic = await this.deps.getMicrophone();
     } catch {
       /* A refused permission and a machine with no microphone are the same
          thing to the user: they cannot talk. */
       this.fail("no-microphone");
       return;
     }
+    /* HUNG UP WHILE THE PERMISSION PROMPT WAS OPEN. stop() ran first — the
+       state is ended and nothing holds this session any more — and then the
+       prompt resolved with a live capture stream. Kept, it would light the
+       recording indicator on a call nobody can end; dialled, it would bring
+       a screen back for a call the caller already left (audit, 2026-09-11). */
+    if (this.state !== "requesting-mic") {
+      mic.getTracks().forEach((t) => t.stop());
+      return;
+    }
+    this.mic = mic;
 
     /* A NEW CALL ALWAYS STARTS UNMUTED. Without this the flag survives into
        the next call: the user speaks into a session that looks live, hears
@@ -1199,6 +1210,8 @@ export class VoiceSession {
       if (first) this.fail("unavailable");
       return false;
     }
+    /* Ended is final: a call the caller already left is not dialled. */
+    if (this.state === "ended") return false;
     if (first) this.setState("connecting");
     const marker = {};
     this.wsAttempt = marker;
@@ -1517,6 +1530,8 @@ export class VoiceSession {
    *  Resolves when the answer is applied or after failing — the outcome is
    *  the STATE. Requires the microphone to be held already. */
   private async connect(): Promise<void> {
+    /* Ended is final: a call the caller already left is not dialled. */
+    if (this.state === "ended") return;
     if (!this.mic) {
       this.fail("no-microphone");
       return;
@@ -1779,6 +1794,11 @@ export class VoiceSession {
          line-ending problem. Normalised here for the same reason the vendor's
          own sample does it. */
       await pc.setRemoteDescription({ type: "answer", sdp: normalizeSdp(answer) });
+      /* Hung up while the answer was being applied: the same exit as above,
+         one await later. Without it the ended call was marked live and
+         failed eight seconds on, with a toast for a call nobody was on
+         (audit, 2026-09-11). */
+      if (this.state !== "connecting" || this.pc !== pc) return;
 
       /* The channel can have opened while the handshake was in flight, in
          which case its `onopen` already fired and found nothing to relay. */

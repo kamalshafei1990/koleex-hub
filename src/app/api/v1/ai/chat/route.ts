@@ -17,3 +17,8 @@
    --------------------------------------------------------------------------- */
 
 export { POST } from "../../../ai/chat/route";
+
+/* The segment config is written out rather than re-exported: Next.js reads
+   `maxDuration` statically and refuses a re-export of it. The value is the
+   legacy route's; validate:ai-api-v1 pins the two together. */
+export const maxDuration = 120;

@@ -764,10 +764,10 @@ async function main() {
     check("unmount stops the session — after the beacon that says it happened",
       /return \(\) => \{\s*window\.removeEventListener\("pagehide", onPageHide\);\s*beacon\("unmounted"\);\s*sessionRef\.current\?\.stop\(\);/.test(src));
     check("that cleanup belongs to a mount-only effect, so it cannot re-run early",
-      /window\.addEventListener\("pagehide", onPageHide\);\s*return \(\) => \{[\s\S]{0,200}?sessionRef\.current\?\.stop\(\);[\s\S]{0,400}?\}, \[\]\);/.test(src));
+      /window\.addEventListener\("pagehide", onPageHide\);\s*return \(\) => \{[\s\S]{0,200}?sessionRef\.current\?\.stop\(\);[\s\S]{0,1800}?\}, \[releaseWakeLock, clearSearchTimer\]\);/.test(src) && /const releaseWakeLock = useCallback\(\(\) => \{[\s\S]{0,300}?\}, \[\]\);/.test(src) && /const clearSearchTimer = useCallback\(\(\) => \{[\s\S]{0,300}?\}, \[\]\);/.test(src));
     /* THE LAST TURN IS OFTEN STILL QUEUED WHEN THE SCREEN GOES. */
     check("  …and that same cleanup flushes the transcript writer",
-      /beacon\("unmounted"\);\s*sessionRef\.current\?\.stop\(\);[\s\S]{0,300}?persisterRef\.current\?\.finish\(\);[\s\S]{0,120}?\}, \[\]\);/.test(src));
+      /beacon\("unmounted"\);\s*sessionRef\.current\?\.stop\(\);[\s\S]{0,300}?persisterRef\.current\?\.finish\(\);[\s\S]{0,1600}?\}, \[releaseWakeLock, clearSearchTimer\]\);/.test(src));
 
     /* A DROPPED CONNECTION IS STILL AN OPEN CALL, and the button decides what
        is on screen. The call screen mounts on "live or busy"; `reconnecting`
@@ -796,7 +796,7 @@ async function main() {
     check("a failure clears the session handle so a retry starts fresh",
       /next === "failed"[\s\S]{0,1800}?sessionRef\.current = null/.test(src));
     check("hanging up clears the handle too — through the release it is built on",
-      /const releaseCall[\s\S]{0,400}?sessionRef\.current = null/.test(src) && /const hangUp = useCallback\(\(\) => \{[\s\S]{0,900}?releaseCall\(\);\s*(\/\*[^*]*\*\/\s*)?laneAfterCallRef\.current\?\.\(\);\s*laneAfterCallRef\.current = null;\s*setState\("idle"\);/.test(src));
+      /const releaseCall[\s\S]{0,400}?sessionRef\.current = null/.test(src) && /const hangUp = useCallback\(\(\) => \{[\s\S]{0,900}?releaseCall\(\);\s*(\/\*[^*]*\*\/\s*)?setLaneNote\(null\);\s*(\/\*[^*]*\*\/\s*)?laneAfterCallRef\.current\?\.\(\);\s*laneAfterCallRef\.current = null;\s*setState\("idle"\);/.test(src));
     check("starting twice is refused rather than leaking the first session",
       /if \(sessionRef\.current\) return;/.test(src));
     check("hanging up detaches the stream from the audio element",
@@ -1871,7 +1871,7 @@ console.log("\n── 12. Mute ──");
   const hangUpAt16 = btn.indexOf("const releaseCall");
   const hangUpBody = btn.slice(hangUpAt16, btn.indexOf("}, [", hangUpAt16));
   check("hanging up closes the tone context and resets ready", /tonesRef\.current\?\.close\(\)/.test(hangUpBody) && /setReady\(false\)/.test(hangUpBody) && /chimedRef\.current = false/.test(hangUpBody));
-  check("  …and so does unmount", /persisterRef\.current = null;\s*tonesRef\.current\?\.close\(\);\s*tonesRef\.current = null;\s*\};\s*\}, \[\]\);/.test(btn));
+  check("  …and so does unmount", /persisterRef\.current = null;\s*tonesRef\.current\?\.close\(\);\s*tonesRef\.current = null;[\s\S]{0,1400}?releaseWakeLock\(\);\s*clearSearchTimer\(\);[\s\S]{0,400}?clearCallPulse\([\s\S]{0,200}?\);\s*\};\s*\}, \[releaseWakeLock, clearSearchTimer\]\);/.test(btn));
   check("the screen is told ready separately from live", /ready=\{ready\}/.test(btn));
   const scr = fs16.readFileSync("src/components/ai/VoiceCallScreen.tsx", "utf8");
   check("the screen says connecting until READY, not merely live — and says so differently when it is slow", /: !live \|\| !ready\s*\? \(connectingSlow \? copy\.connectingSlow : copy\.connecting\)/.test(scr) && /\{soundBlocked && onEnableSound && \(/.test(scr));
@@ -2101,7 +2101,7 @@ console.log("\n── 12. Mute ──");
     /queueMicrotask\(\(\) => void startCallRef\.current\?\.\(\{ resume: true, mic: keptMic \}\)\);/.test(btn18) &&
     /if \(!opts\?\.resume\) \{\s*linesRef\.current = \[\];/.test(btn18));
   check("  …and only when it cannot come back does the caller hear the failure",
-    /if \(canResume\) \{[\s\S]*?return;\s*\}\s*onErrorRef\.current\?\.\(FAILURE_COPY\[langRef\.current\]\[failure\]\);/.test(btn18));
+    /if \(canResume\) \{[\s\S]*?return;\s*\}\s*(\/\*[\s\S]*?\*\/\s*)?releaseCall\(\);\s*setLaneNote\(null\);\s*onErrorRef\.current\?\.\(FAILURE_COPY\[langRef\.current\]\[failure\]\);/.test(btn18));
   const tel = await import("../src/lib/voice/telemetry");
   const posted: Array<[string, string]> = [];
   tel.sendVoiceTelemetry({ reason: "connection-lost", elapsed_ms: 1234, ice: "failed", tool_calls: 3 }, (p, b) => posted.push([p, b]));
@@ -2183,7 +2183,7 @@ console.log("\n── 12. Mute ──");
     !/hangUp\(\);\s*\/\*[^*]*\*\/\s*queueMicrotask/.test(btn19) &&
     /\{\(connected \|\| busy \|\| swapping\) && typeof document !== "undefined" && createPortal\(/.test(btn19));
   check("  …hangUp is the release plus idle — the same teardown, one more step",
-    /const hangUp = useCallback\(\(\) => \{[\s\S]{0,900}?releaseCall\(\);\s*(\/\*[^*]*\*\/\s*)?laneAfterCallRef\.current\?\.\(\);\s*laneAfterCallRef\.current = null;\s*setState\("idle"\);/.test(btn19) &&
+    /const hangUp = useCallback\(\(\) => \{[\s\S]{0,900}?releaseCall\(\);\s*(\/\*[^*]*\*\/\s*)?setLaneNote\(null\);\s*(\/\*[^*]*\*\/\s*)?laneAfterCallRef\.current\?\.\(\);\s*laneAfterCallRef\.current = null;\s*setState\("idle"\);/.test(btn19) &&
     /const releaseCall = useCallback\(\(\) => \{\s*sessionRef\.current\?\.stop\(\);/.test(btn19) &&
     (btn19.match(/setState\("idle"\)/g) ?? []).length === 1);
   check("  …and says so in the log: a voice-switched beacon with the old call's diagnostics, before the release",
@@ -2361,7 +2361,7 @@ console.log("\n── 12. Mute ──");
     (await sum.requestCallSummary("c", "en", (async () => { throw new Error("offline"); }) as unknown as typeof fetch)) === null);
   const btn22 = fs22.readFileSync("src/components/ai/VoiceCallButton.tsx", "utf8");
   check("hang-up takes the writer, the thread and the words BEFORE the release, then asks after the last turns landed, and the row joins the thread; a voice switch never asks",
-    /const persister = persisterRef\.current;\s*const conversation = conversationIdRef\.current;\s*const lines = linesRef\.current;\s*releaseCall\(\);\s*(\/\*[^*]*\*\/\s*)?laneAfterCallRef\.current\?\.\(\);\s*laneAfterCallRef\.current = null;\s*setState\("idle"\);\s*if \(conversation && shouldSummarise\(lines\)\) \{/.test(btn22) &&
+    /const persister = persisterRef\.current;\s*const conversation = conversationIdRef\.current;\s*const lines = linesRef\.current;\s*releaseCall\(\);\s*(\/\*[^*]*\*\/\s*)?setLaneNote\(null\);\s*(\/\*[^*]*\*\/\s*)?laneAfterCallRef\.current\?\.\(\);\s*laneAfterCallRef\.current = null;\s*setState\("idle"\);\s*if \(conversation && shouldSummarise\(lines\)\) \{/.test(btn22) &&
     /Promise\.resolve\(persister\?\.finish\(\)\)\s*\.then\(\(\) => requestCallSummary\(conversation, langRef\.current\)\)\s*\.then\(\(res\) => \{ if \(res\) onTurnsSavedRef\.current\?\.\(\[res\.message\], res\.conversation\); \}\)/.test(btn22) &&
     (btn22.match(/requestCallSummary\(/g) ?? []).length === 1 && !/selectVoice[\s\S]{0,1200}?requestCallSummary/.test(btn22.slice(btn22.indexOf("const selectVoice"), btn22.indexOf("const selectVoice") + 1500)));
 
@@ -2424,7 +2424,7 @@ console.log("\n── 12. Mute ──");
   /* ── ROADMAP B5: THE SCREEN STAYS AWAKE ON A CALL ─────────────────────── */
   const btn25 = fs22.readFileSync("src/components/ai/VoiceCallButton.tsx", "utf8");
   check("the screen wake lock is feature-detected, asked for when the call goes live, released with the call, and asked for again when the page returns",
-    /if \(!wl \|\| wakeLockRef\.current\) return;\s*wl\.request\("screen"\)\.then\(\(lock\) => \{ wakeLockRef\.current = lock; \}\)\.catch\(/.test(btn25) &&
+    /if \(!wl \|\| wakeLockRef\.current\) return;\s*const gen = \+\+wakeGenRef\.current;\s*wl\.request\("screen"\)\.then\(\(lock\) => \{\s*if \(wakeGenRef\.current !== gen\) \{\s*void lock\.release\(\)\.catch\(\(\) => \{\}\);\s*return;\s*\}\s*wakeLockRef\.current = lock;\s*\}\)\.catch\(/.test(btn25) && /const releaseWakeLock = useCallback\(\(\) => \{\s*wakeGenRef\.current \+= 1;/.test(btn25) &&
     /if \(next === "live"\) acquireWakeLock\(\);/.test(btn25) &&
     /phaseRef\.current = null;\s*releaseWakeLock\(\);/.test(btn25) &&
     /if \(document\.visibilityState === "visible"\) \{ wakeLockRef\.current = null; acquireWakeLock\(\); \}/.test(btn25) &&
@@ -2759,7 +2759,7 @@ function describeErrorCheck(): boolean {
       /const canFallBack = transportRef\.current === "ws" && !wasUp && laneFailed && !laneFellBackRef\.current;/.test(btn) &&
       /if \(canFallBack\) \{\s*laneFellBackRef\.current = true;\s*transportRef\.current = "rtc";/.test(btn) && !/transportRef\.current = "ws";/.test(btn));
     check("  …the first `error` the far side sends is beaconed once with its bounded message, so a refused field on a new vendor names itself",
-      /if \(voiceEventType\(data\) === "error"\) reportFirstError\(data\);/.test(btn) && /reason: "config-rejected", lane: transportRef\.current, err: errorMessageOf\(data\)/.test(btn));
+      /if \(voiceEventType\(data\) === "error"\) reportFirstError\(data\);/.test(btn) && /reason: "far-side-error", lane: transportRef\.current, err: errorMessageOf\(data\)/.test(btn) && !/reason: "config-rejected"/.test(btn));
     check("hanging up a live call beacons `hung-up` with the lane and the diagnostics, before the release drops the session",
       /if \(s && \(s\.getState\(\) === "live" \|\| s\.getState\(\) === "reconnecting"\)\) \{\s*sendVoiceTelemetry\(\{ reason: "hung-up", resumes: resumesRef\.current, lane: transportRef\.current, \.\.\.s\.diagnostics\(\) \}\);/.test(btn) &&
       /const hangUp = useCallback\(\(\) => \{\s*(\/\*[\s\S]*?\*\/\s*)?beaconHangUp\(\);/.test(btn));
@@ -3345,7 +3345,7 @@ function describeErrorCheck(): boolean {
   check("the server's lane is applied at once with no call up, and kept for the hang-up when a call is running",
     /const applyLane = \(\) => \{\s*transportRef\.current = decided\.lane;\s*offerFor\(decided\.lane\);\s*\};\s*if \(sessionRef\.current\) laneAfterCallRef\.current = applyLane;\s*else applyLane\(\);/.test(btn) &&
     /const laneAfterCallRef = useRef<\(\(\) => void\) \| null>\(null\);/.test(btn) &&
-    /releaseCall\(\);\s*\/\*[^*]*\*\/\s*laneAfterCallRef\.current\?\.\(\);\s*laneAfterCallRef\.current = null;/.test(btn));
+    /releaseCall\(\);\s*\/\*[^*]*\*\/\s*setLaneNote\(null\);\s*\/\*[^*]*\*\/\s*laneAfterCallRef\.current\?\.\(\);\s*laneAfterCallRef\.current = null;/.test(btn));
 }
 
 

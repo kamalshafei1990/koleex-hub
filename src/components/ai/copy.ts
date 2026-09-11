@@ -37,8 +37,17 @@ export const COPY: Record<Lang, {
   otherOption: string;
   otherPlaceholder: string;
   otherSend: string;
-  searchChats?: string;
-  noSearchResults?: string;
+  searchChats: string;
+  noSearchResults: string;
+  /* Chrome and attachment words that were English literals inside Arabic and
+     Chinese screens (audit, 2026-09-11). `removeFile` carries a {name} slot. */
+  openSidebar: string;
+  removeFile: string;
+  uploading: string;
+  attachUnreadableImage: string;
+  attachNoText: string;
+  attachTooLarge: string;
+  attachUnsupported: string;
   /* Projects + pinning */
   projects: string;
   newProject: string;
@@ -179,6 +188,13 @@ export const COPY: Record<Lang, {
     otherSend: "Send",
     searchChats: "Search chats…",
     noSearchResults: "No chats match your search.",
+    openSidebar: "Open sidebar",
+    removeFile: "Remove {name}",
+    uploading: "Uploading",
+    attachUnreadableImage: "couldn't read this image — try a sharper photo",
+    attachNoText: "no readable text found",
+    attachTooLarge: "over the size limit (15MB images / 200MB documents)",
+    attachUnsupported: "file type not supported",
     projects: "Projects",
     newProject: "New project",
     editProject: "Edit project",
@@ -293,6 +309,13 @@ export const COPY: Record<Lang, {
     otherSend: "发送",
     searchChats: "搜索对话…",
     noSearchResults: "没有匹配的对话。",
+    openSidebar: "打开侧边栏",
+    removeFile: "移除 {name}",
+    uploading: "正在上传",
+    attachUnreadableImage: "无法识别这张图片——请换一张更清晰的照片",
+    attachNoText: "没有找到可读取的文字",
+    attachTooLarge: "超过大小限制（图片 15MB / 文档 200MB）",
+    attachUnsupported: "不支持的文件类型",
     projects: "项目",
     newProject: "新建项目",
     editProject: "编辑项目",
@@ -406,6 +429,13 @@ export const COPY: Record<Lang, {
     otherSend: "ابعت",
     searchChats: "ابحث في المحادثات…",
     noSearchResults: "لا توجد محادثات تطابق بحثك.",
+    openSidebar: "افتح الشريط الجانبي",
+    removeFile: "شيل {name}",
+    uploading: "جارٍ رفع",
+    attachUnreadableImage: "مقدرناش نقرا الصورة دي — جرّب صورة أوضح",
+    attachNoText: "مفيش نص مقروء في الملف",
+    attachTooLarge: "أكبر من الحد المسموح (15MB للصور / 200MB للملفات)",
+    attachUnsupported: "نوع الملف مش مدعوم",
     projects: "المشاريع",
     newProject: "مشروع جديد",
     editProject: "تعديل المشروع",

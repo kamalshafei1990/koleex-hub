@@ -258,18 +258,37 @@ export default function VoiceCallButton({
      call is still live. Feature-detected and never thrown: a platform
      without it behaves as before. */
   const wakeLockRef = useRef<{ release: () => Promise<void> } | null>(null);
+  /* A release that runs while the request is still in flight must win: the
+     lock the platform hands back afterwards is let go at once, not stored
+     for a call that has already ended (audit, 2026-09-11). */
+  const wakeGenRef = useRef(0);
   const acquireWakeLock = useCallback(() => {
     const wl = (typeof navigator !== "undefined"
       ? (navigator as { wakeLock?: { request: (type: "screen") => Promise<{ release: () => Promise<void> }> } }).wakeLock
       : undefined);
     if (!wl || wakeLockRef.current) return;
-    wl.request("screen").then((lock) => { wakeLockRef.current = lock; }).catch(() => { /* not granted: the call goes on */ });
+    const gen = ++wakeGenRef.current;
+    wl.request("screen").then((lock) => {
+      if (wakeGenRef.current !== gen) {
+        void lock.release().catch(() => {});
+        return;
+      }
+      wakeLockRef.current = lock;
+    }).catch(() => { /* not granted: the call goes on */ });
   }, []);
   const releaseWakeLock = useCallback(() => {
+    wakeGenRef.current += 1;
     const lock = wakeLockRef.current;
     wakeLockRef.current = null;
     void lock?.release().catch(() => {});
   }, []);
+  /* The in-call sample player: ONE per call, over the tones' context, so a
+     second tap stops the first sample instead of stacking a new player on
+     it (audit, 2026-09-11). Stopped with the call; the context is the
+     tones', closed with them. */
+  const callPreviewRef = useRef<PreviewPlayer | null>(null);
+  /* The "saved" tick's timer, so an unmount can clear it. */
+  const writeSavedTimerRef = useRef<number | null>(null);
   /* The phase as the data channel last reported it, for handlers that run
      outside a render (roadmap B3: the playback gate reads it per event). */
   const phaseRef = useRef<VoicePhase>(null);
@@ -527,8 +546,21 @@ export default function VoiceCallButton({
       persisterRef.current = null;
       tonesRef.current?.close();
       tonesRef.current = null;
+      /* THE REST OF THE RELEASE, on the exit that skipped it. The wake lock
+         outlived the component; the pulse survived an ordinary unmount and
+         was read on the next load as a call the phone killed — a second,
+         contradictory beacon and a false "the app was interrupted" for the
+         caller (audit, 2026-09-11). NOT on pagehide: a backgrounded page
+         may come back with the call still up, and the pulse is exactly what
+         reports the page a phone kills while it is away. */
+      releaseWakeLock();
+      clearSearchTimer();
+      if (writeSavedTimerRef.current !== null) window.clearTimeout(writeSavedTimerRef.current);
+      callPreviewRef.current?.stop();
+      callPreviewRef.current = null;
+      clearCallPulse(browserStorage() ?? { getItem: () => null, setItem: () => {}, removeItem: () => {} });
     };
-  }, []);
+  }, [releaseWakeLock, clearSearchTimer]);
 
   /* THE RELEASE, WITHOUT THE EXIT. Everything a finished call gives back —
      microphone, connection, writer, tones, streams — but not the step to
@@ -545,6 +577,8 @@ export default function VoiceCallButton({
     } catch { /* not a browser */ }
     void persisterRef.current?.finish();
     persisterRef.current = null;
+    callPreviewRef.current?.stop();
+    callPreviewRef.current = null;
     tonesRef.current?.close();
     tonesRef.current = null;
     chimedRef.current = false;
@@ -609,7 +643,11 @@ export default function VoiceCallButton({
       session?.sendNote(`(Screen: the caller tapped Confirm — the task "${title}" is saved. Acknowledge in a few words only if they ask.)`);
       setPendingWrite(null);
       setWriteSaved(true);
-      window.setTimeout(() => setWriteSaved(false), 3_000);
+      if (writeSavedTimerRef.current !== null) window.clearTimeout(writeSavedTimerRef.current);
+      writeSavedTimerRef.current = window.setTimeout(() => {
+        writeSavedTimerRef.current = null;
+        setWriteSaved(false);
+      }, 3_000);
     } catch {
       setWriteError(true);
     } finally {
@@ -684,6 +722,8 @@ export default function VoiceCallButton({
     const conversation = conversationIdRef.current;
     const lines = linesRef.current;
     releaseCall();
+    /* The note described THIS call's fallback; the next call starts clean. */
+    setLaneNote(null);
     /* The lane the page learned during this call is the next call's. */
     laneAfterCallRef.current?.();
     laneAfterCallRef.current = null;
@@ -704,7 +744,10 @@ export default function VoiceCallButton({
     if (errorBeaconedRef.current) return;
     errorBeaconedRef.current = true;
     const diag = sessionRef.current?.diagnostics();
-    sendVoiceTelemetry({ reason: "config-rejected", lane: transportRef.current, err: errorMessageOf(data), ...(diag ?? {}) });
+    /* Named for what it is — the far side's first error, whenever it came.
+       `config-rejected` is the session's own reason for a refusal inside the
+       configuration window; a rate limit at minute five is not that. */
+    sendVoiceTelemetry({ reason: "far-side-error", lane: transportRef.current, err: errorMessageOf(data), ...(diag ?? {}) });
   }, []);
 
   const startCall = useCallback(async (opts?: { resume?: boolean; mic?: MediaStream | null }) => {
@@ -835,6 +878,15 @@ export default function VoiceCallButton({
             queueMicrotask(() => void startCallRef.current?.({ resume: true, mic: keptMic }));
             return;
           }
+          /* A CALL THAT ENDED ON ITS OWN GIVES EVERYTHING BACK TOO. Only
+             hang-up and retry ran the release; a terminal failure left the
+             wake lock held (the phone never slept), the pulse in storage
+             (the next load reported a kill that was already reported), and
+             the tones, meters and streams standing until the next call
+             (audit, 2026-09-11). The session is already gone; this is the
+             rest. */
+          releaseCall();
+          setLaneNote(null);
           onErrorRef.current?.(FAILURE_COPY[langRef.current][failure]);
         }
       },
@@ -1003,7 +1055,7 @@ export default function VoiceCallButton({
     errorBeaconedRef.current = false;
     sessionRef.current = session;
     await session.start();
-  }, [clearSearchTimer, acquireWakeLock, reportFirstError, fallToMainlandVoice]);
+  }, [clearSearchTimer, acquireWakeLock, reportFirstError, fallToMainlandVoice, releaseCall]);
   useEffect(() => { startCallRef.current = startCall; }, [startCall]);
 
   /* ONE METER PER SIDE, AND ONLY THE ACTIVE ONE RUNS. Measuring both at once
@@ -1129,14 +1181,19 @@ export default function VoiceCallButton({
     try {
       if (viaCall) return await viaCall;
       const tones = tonesRef.current?.context() ?? null;
-      const p = player ?? (tones ? createPreviewPlayer(() => tones as unknown as PreviewContextLike) : (previewRef.current ??= createPreviewPlayer(browserPreviewContext)));
+      const p = player ?? (tones
+        ? (callPreviewRef.current ??= createPreviewPlayer(() => tones as unknown as PreviewContextLike))
+        : (previewRef.current ??= createPreviewPlayer(browserPreviewContext)));
       return await p.play(bytes);
     } finally {
       if (far && !viaCall) far.muted = farWasMuted;
       if (micWasOpen && sessionRef.current === session) session.setMuted(false);
     }
   }, [lang]);
-  const stopPreview = useCallback(() => previewRef.current?.stop(), []);
+  const stopPreview = useCallback(() => {
+    previewRef.current?.stop();
+    callPreviewRef.current?.stop();
+  }, []);
   useEffect(() => () => { previewRef.current?.close(); previewRef.current = null; }, []);
 
   /* THE PULSE (lib/voice/call-memory.ts): while a call is up, its
@@ -1398,7 +1455,6 @@ export default function VoiceCallButton({
         disabled={disabled && !connected && !busy}
         aria-label={label}
         title={label}
-        aria-pressed={connected}
         style={{ height: size, width: size }}
         className={`rounded-full inline-flex items-center justify-center shrink-0 transition-colors ${
           connected

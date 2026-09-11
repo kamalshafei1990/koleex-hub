@@ -9,6 +9,12 @@ import { estimateTokens, invalidateTaughtAnswersCache, invalidateApprovedSearchC
 
 export const dynamic = "force-dynamic";
 
+/* One tenant's rows per caller — the rule the list and qa routes follow;
+   a unit edit keyed on the raw id alone did not (audit, 2026-09-11). */
+function scopeTenant<T extends { is(col: string, v: null): T; eq(col: string, v: string): T }>(q: T, tenantId: string | null | undefined): T {
+  return tenantId == null ? q.is("tenant_id", null) : q.eq("tenant_id", tenantId);
+}
+
 export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }> }) {
   const auth = await requireAuth();
   if (auth instanceof NextResponse) return auth;
@@ -27,11 +33,13 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
     updates.approved_at = body.status === "approved" ? new Date().toISOString() : null;
   }
   if (typeof body.body === "string" && body.body.trim()) {
-    const { data: cur } = await supabaseServer
-      .from("ai_knowledge_units")
-      .select("version, tenant_id")
-      .eq("id", id)
-      .maybeSingle();
+    const { data: cur } = await scopeTenant(
+      supabaseServer
+        .from("ai_knowledge_units")
+        .select("version, tenant_id")
+        .eq("id", id),
+      auth.tenant_id,
+    ).maybeSingle();
     updates.body = body.body.trim();
     updates.tokens = estimateTokens(body.body);
     updates.version = ((cur?.version as number) ?? 1) + 1;
@@ -48,7 +56,7 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
   if (typeof body.title === "string") updates.title = body.title.trim() || null;
   if (Array.isArray(body.tags)) updates.tags = body.tags.map(String);
 
-  const { error } = await supabaseServer.from("ai_knowledge_units").update(updates).eq("id", id);
+  const { error } = await scopeTenant(supabaseServer.from("ai_knowledge_units").update(updates).eq("id", id), auth.tenant_id);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   /* THE AI'S VIEW OF TRUTH JUST CHANGED, SO DROP WHAT IT CACHED.
      Both planes, not one: taught pairs feed the written lanes' prompt and the
