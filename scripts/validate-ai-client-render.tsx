@@ -1243,6 +1243,22 @@ console.log("\n── A chat that failed to load says so; an offline device is t
     /\.kx-ai-root :is\(button, \[role="button"\], a\[href\]\):focus-visible \{\s*outline: 2px solid #0066FF;/.test(css));
 }
 
+console.log("\n── The address carries the place: ?c=<chat>, ?view=library|calls (audit, 2026-09-11) ──");
+{
+  const app = readFileSync("src/components/ai/KoleexAiApp.tsx", "utf8");
+  check("opening a chat, a new chat and the Library / Calls views write the query string; the restore on load replaces instead of pushing",
+    /const syncUrl = useCallback\(\(next: \{ c: string \| null; view: "library" \| "calls" \| null \}, mode: "push" \| "replace"\) => \{/.test(app) &&
+    /if \(typeof window === "undefined" \|\| fromHistoryRef\.current\) return;/.test(app) &&
+    /setCallsOpen\(false\);\s*syncUrl\(\{ c: id, view: null \}, urlModeRef\.current\);\s*urlModeRef\.current = "push";/.test(app) &&
+    /setCallsOpen\(false\);\s*syncUrl\(\{ c: null, view: null \}, "push"\);/.test(app) &&
+    /syncUrl\(\{ c: activeIdRef\.current, view: "library" \}, "push"\)/.test(app) && /syncUrl\(\{ c: activeIdRef\.current, view: "calls" \}, "push"\)/.test(app) &&
+    /urlModeRef\.current = "replace";\s*void openConversation\(stored\);/.test(app));
+  check("  …a ?c= in the address wins over the remembered chat on load, and Back / Forward apply the address without pushing again",
+    /const c = params\.get\("c"\);[\s\S]{0,200}?restoredRef\.current = true;\s*fromHistoryRef\.current = true;\s*try \{ void openConversation\(c\); \} finally \{ fromHistoryRef\.current = false; \}/.test(app) &&
+    /window\.addEventListener\("popstate", onPop\);/.test(app) &&
+    /if \(c !== activeIdRef\.current\) void openConversation\(c\);\s*\} else if \(activeIdRef\.current\) \{\s*void startNewChat\(\);/.test(app));
+}
+
 console.log(`\n${pass} passed, ${failures.length} failed`);
 if (failures.length) {
   console.log("\nFAILED:");
