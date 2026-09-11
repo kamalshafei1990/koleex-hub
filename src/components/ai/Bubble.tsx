@@ -69,9 +69,11 @@ function BubbleImpl({
   canEdit?: boolean;
   onCopy?: (text: string, renderedEl?: HTMLElement | null) => Promise<boolean> | boolean;
   onRegenerate?: () => void;
-  onEdit?: (newText: string) => void;
+  /** Carries the message id so the parent can pass ONE stable function to
+   *  every bubble; a per-row lambda defeated the memo (audit, 2026-09-11). */
+  onEdit?: (msgId: string, newText: string) => void;
   /** A clarifying option was tapped — send it as the next user message. */
-  onAnswerQuestion?: (answer: string) => void;
+  onAnswerQuestion?: (msgId: string, answer: string) => void;
   /** Per-message TTS replay — gets the bubble's text and the chosen
    *  language; returns a handle the bubble can use to stop playback. */
   onSpeak?: (text: string) => void;
@@ -139,8 +141,8 @@ function BubbleImpl({
       return;
     }
     setEditing(false);
-    onEdit?.(next);
-  }, [editValue, msg.content, onEdit]);
+    onEdit?.(msg.id, next);
+  }, [editValue, msg.content, msg.id, onEdit]);
   const cancelEdit = useCallback(() => {
     setEditing(false);
     setEditValue(msg.content);
@@ -365,7 +367,7 @@ function BubbleImpl({
                 const t = otherText.trim();
                 if (!t) return;
                 setPickedOption(t);
-                onAnswerQuestion?.(t);
+                onAnswerQuestion?.(msg.id, t);
               };
               return (
                 <div className="kx-glass-pop -mx-1 rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-3">
@@ -380,7 +382,7 @@ function BubbleImpl({
                           key={`${o.label}-${i}`}
                           type="button"
                           disabled={!live}
-                          onClick={() => { setPickedOption(o.label); onAnswerQuestion?.(o.label); }}
+                          onClick={() => { setPickedOption(o.label); onAnswerQuestion?.(msg.id, o.label); }}
                           className={`group w-full rounded-xl border px-3 py-2.5 text-start transition-all ${
                             chosen
                               ? "border-[var(--border-focus)] bg-[var(--bg-surface-subtle)]"

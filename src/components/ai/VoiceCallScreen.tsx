@@ -423,6 +423,17 @@ export default function VoiceCallScreen({
      it back on hang-up; the sheet does the same over the screen. */
   const rootRef = useRef<HTMLDivElement | null>(null);
   useFocusTrap(rootRef, true);
+  /* HOW LONG THE CONNECT HAS TAKEN, in seconds, shown beside the slow caption
+     so a long wait is a number and not a feeling (audit, 2026-09-11). The
+     timings themselves are unchanged: the mainland handshake has been slow
+     and then succeeded, and a shorter cap would have cut those calls off. */
+  const [connectingFor, setConnectingFor] = useState(0);
+  useEffect(() => {
+    if (live && ready) return;
+    const t0 = Date.now();
+    const tick = window.setInterval(() => setConnectingFor(Math.round((Date.now() - t0) / 1000)), 1000);
+    return () => window.clearInterval(tick);
+  }, [live, ready]);
   const sheetRef = useRef<HTMLDivElement | null>(null);
   useFocusTrap(sheetRef, voiceSheet, { initialFocus: "[data-sheet-close]" });
   /* SWIPE DOWN CLOSES THE SHEET. The drawn handle promised a gesture it did
@@ -777,12 +788,22 @@ export default function VoiceCallScreen({
             position"): as a flex row the long "still connecting" line
             wrapped left-aligned with its dots stranded at the far right.
             A block of centred text, the dots inline after the last word. */}
-        <p className="max-w-[340px] px-2 text-center text-sm font-normal leading-relaxed tracking-wide text-[#AAAAAA]">
+        {/* STATUS, NOT WORDS. Small caps with a state dot (blue: the far side
+            is speaking; white: it is listening) so the state is told apart
+            from the half-spoken sentence above it at a glance (audit,
+            2026-09-11). */}
+        <p className="max-w-[340px] px-2 text-center text-[12px] uppercase tracking-[0.14em] font-semibold leading-relaxed text-[#AAAAAA]">
+          {live && ready && !working && (
+            <span aria-hidden className={`inline-block h-1.5 w-1.5 rounded-full me-2 align-middle ${phase === "speaking" ? "bg-[#0066FF]" : "bg-white"}`} />
+          )}
           {working ? (
             <>
               <span className="kx-activity-text">{status.replace(/…$/, "")}</span>
               {" "}
               <span className="kx-activity-dots align-baseline" aria-hidden><i /><i /><i /></span>
+              {connectingSlow && (!live || !ready) && connectingFor > 0 && (
+                <span aria-hidden className="ms-2 normal-case tracking-normal font-normal">{connectingFor}s</span>
+              )}
             </>
           ) : status}
         </p>

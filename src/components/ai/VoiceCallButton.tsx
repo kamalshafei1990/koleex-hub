@@ -475,7 +475,7 @@ export default function VoiceCallButton({
         if (decided.probe && body.ws_available === true) {
           void probeWsLane({ fetchFn: (...a) => fetch(...a), createWebSocket: (url, protocols) => new WebSocket(url, protocols) as unknown as VoiceSocket }).then((ok) => {
             if (cancelled) return;
-            saveLane(ok ? "ws" : "rtc");
+            saveLane(ok ? "ws" : "rtc", Date.now(), "probe");
             /* Not under a call already placed on the other lane. */
             if (!sessionRef.current) {
               transportRef.current = ok ? "ws" : "rtc";
@@ -713,7 +713,7 @@ export default function VoiceCallButton({
     if (transportRef.current === "ws" && !wasUp && !laneFellBackRef.current) {
       laneFellBackRef.current = true;
       transportRef.current = "rtc";
-      saveLane("rtc");
+      saveLane("rtc", Date.now(), "call");
       fallToMainlandVoice();
     }
     setReady(false);
@@ -844,7 +844,7 @@ export default function VoiceCallButton({
            is up, so the next call from here — after a drop, a switch, or
            tomorrow morning — asks for it first. */
         if (next === "live") acquireWakeLock();
-        if (next === "live" && transportRef.current === "ws") saveLane("ws");
+        if (next === "live" && transportRef.current === "ws") saveLane("ws", Date.now(), "call");
         if (next === "live") {
           const region = sessionRef.current?.diagnostics().region;
           if (region === "alt" || region === "primary") {
@@ -873,7 +873,7 @@ export default function VoiceCallButton({
             laneFellBackRef.current = true;
             transportRef.current = "rtc";
             /* The socket lane does not work from this network today. */
-            saveLane("rtc");
+            saveLane("rtc", Date.now(), "call");
             fallToMainlandVoice();
             setReady(false);
             chimedRef.current = false;
@@ -1367,7 +1367,7 @@ export default function VoiceCallButton({
   const selectLane = useCallback((lane: "rtc" | "ws") => {
     if (lane === transportRef.current) return;
     transportRef.current = lane;
-    saveLane(lane);
+    saveLane(lane, Date.now(), "user");
     laneFellBackRef.current = false;
     setLaneNote(null);
     const list = byLaneRef.current[lane].length > 0 ? byLaneRef.current[lane] : byLaneRef.current.rtc;
