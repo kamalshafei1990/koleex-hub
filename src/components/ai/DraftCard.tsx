@@ -30,15 +30,15 @@ export default function DraftCard({ payload, lang = "en" }: { payload: Quotation
     <div
       className={`rounded-2xl border backdrop-blur-md px-4 py-3.5 ${
         needsApproval
-          ? "border-amber-500/40 bg-amber-500/5"
+          ? "border-[var(--kx-ai-warning-line)] bg-[var(--kx-ai-warning-soft)]"
           : "border-[var(--border-subtle)] bg-[var(--bg-secondary)]/75"
       }`}
       style={{ maxWidth: 460 }}
     >
       <div className="flex items-center gap-2 mb-2">
-        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold tracking-wide uppercase ${
+        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[12px] font-bold tracking-wide uppercase ${
           needsApproval
-            ? "bg-amber-500/20 text-amber-200 border border-amber-500/40"
+            ? "bg-[var(--kx-ai-warning-soft)] text-[var(--kx-ai-warning-text)] border border-[var(--kx-ai-warning-line)]"
             : "bg-[var(--bg-surface)]/80 text-[var(--text-muted)] border border-[var(--border-subtle)]"
         }`}>
           {needsApproval ? copy.draftNeedsApproval : copy.draftLabel}
@@ -52,7 +52,7 @@ export default function DraftCard({ payload, lang = "en" }: { payload: Quotation
           {payload.total.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
         </span>
         <span className="text-[12px] text-[var(--text-muted)]">{payload.currency}</span>
-        <span className="text-[11px] text-[var(--text-dim)] ms-auto">
+        <span className="text-[12px] text-[var(--text-dim)] ms-auto">
           {(payload.line_count === 1 ? copy.lineOne : copy.linesCount).replace("{n}", String(payload.line_count))}
         </span>
       </div>

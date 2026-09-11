@@ -2364,6 +2364,36 @@ html[data-kx-tabslide] #main-scroll-container { overflow-x: clip; }
    carries; Arabic glyphs render thinner still. Raised inside the AI app only
    (audit, 2026-09-11) so the rest of the Hub keeps its scale. */
 .kx-ai-root { --text-dim: rgba(255,255,255,0.56); }
+
+/* KOLEEX AI — ONE BLUE, THE BRAND'S THREE FUNCTIONAL COLOURS, ONE SCALE.
+   The AI app ran three blues (--accent #567FB2, hard-coded #0066FF, link
+   #6aa7ff) and Tailwind's emerald/rose/sky/amber where the brand defines
+   #0066FF / #00CC66 / #FF3333 / #FFCC00 (audit, 2026-09-11). These tokens
+   are what components/ai now uses; --accent is pointed at Hub Blue inside
+   the app so the shared controls follow. Radii and type come from Tailwind's
+   own 8/12/16/24 and 12/13/14/16/18 steps — no half-pixel sizes. */
+.kx-ai-root, .kx-call-root {
+  --kx-ai-accent: #0066FF;
+  --kx-ai-accent-strong: #0052CC;
+  --kx-ai-accent-soft: rgba(0,102,255,0.12);
+  --kx-ai-accent-line: rgba(0,102,255,0.40);
+  --kx-ai-success: #00CC66;
+  --kx-ai-success-soft: rgba(0,204,102,0.12);
+  --kx-ai-success-line: rgba(0,204,102,0.40);
+  --kx-ai-warning: #FFCC00;
+  --kx-ai-warning-text: #FFE066;
+  --kx-ai-warning-soft: rgba(255,204,0,0.10);
+  --kx-ai-warning-line: rgba(255,204,0,0.35);
+  --kx-ai-danger: #FF3333;
+  --kx-ai-danger-text: #FF7A7A;
+  --kx-ai-danger-soft: rgba(255,51,51,0.10);
+  --kx-ai-danger-line: rgba(255,51,51,0.30);
+}
+.kx-ai-root { --accent: var(--kx-ai-accent); }
+[data-theme="light"] .kx-ai-root {
+  --kx-ai-warning-text: #8A6D00;
+  --kx-ai-danger-text: #C62828;
+}
 [data-theme="light"] .kx-ai-root { --text-dim: rgba(0,0,0,0.62); }
 
 /* KOLEEX AI — A VISIBLE FOCUS RING ON EVERY CONTROL. Tab landed on the

@@ -2114,7 +2114,7 @@ export default function KoleexAiApp() {
               value={sidebarQuery}
               onChange={(e) => setSidebarQuery(e.target.value)}
               placeholder={copy.searchChats}
-              className="w-full h-8 px-2.5 rounded-md bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[12px] text-[var(--text-primary)] placeholder:text-[var(--text-dim)] outline-none focus:border-[var(--border-focus)]"
+              className="w-full h-8 px-2.5 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[12px] text-[var(--text-primary)] placeholder:text-[var(--text-dim)] outline-none focus:border-[var(--border-focus)]"
               aria-label={copy.searchChats}
             />
           </div>
@@ -2242,7 +2242,7 @@ export default function KoleexAiApp() {
                           color: DEFAULT_PROJECT_COLOR,
                         })
                       }
-                      className="h-5 w-5 rounded-md text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-subtle)] flex items-center justify-center shrink-0"
+                      className="h-5 w-5 rounded-lg text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-subtle)] flex items-center justify-center shrink-0"
                       title={copy.newProject}
                       aria-label={copy.newProject}
                     >
@@ -2440,11 +2440,11 @@ export default function KoleexAiApp() {
             <ArrowLeftIcon className="h-4 w-4 rtl:rotate-180" />
           </Link>
           <div className="min-w-0 flex-1">
-            <h1 className="text-[16px] md:text-[17px] font-bold tracking-tight text-[var(--text-primary)] truncate leading-snug">
+            <h1 className="text-[16px] md:text-[18px] font-bold tracking-tight text-[var(--text-primary)] truncate leading-snug">
               {active?.title || "Koleex AI"}
             </h1>
             {!active && (
-              <p className="text-[11.5px] text-[var(--text-dim)] truncate">{copy.welcomeSub}</p>
+              <p className="text-[12px] text-[var(--text-dim)] truncate">{copy.welcomeSub}</p>
             )}
           </div>
           <ReportIssueButton variant="inline" />
@@ -2555,7 +2555,7 @@ export default function KoleexAiApp() {
               </div>
             )}
             {error && (
-              <div role="alert" className="rounded-xl border border-rose-500/30 bg-rose-500/10 text-rose-300 px-3 py-2 text-[12px]">
+              <div role="alert" className="rounded-xl border border-[var(--kx-ai-danger-line)] bg-[var(--kx-ai-danger-soft)] text-[var(--kx-ai-danger-text)] px-3 py-2 text-[12px]">
                 {error}
               </div>
             )}
@@ -2579,7 +2579,7 @@ export default function KoleexAiApp() {
                     setShowJumpToBottom(false);
                   }}
                   aria-label={copy.jumpToLatest}
-                  className="kx-glass-pop pointer-events-auto h-8 -translate-y-full px-3 rounded-full bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[11.5px] text-[var(--text-primary)] hover:bg-[var(--bg-surface-subtle)] flex items-center gap-1.5 shadow-lg"
+                  className="kx-glass-pop pointer-events-auto h-8 -translate-y-full px-3 rounded-full bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[12px] text-[var(--text-primary)] hover:bg-[var(--bg-surface-subtle)] flex items-center gap-1.5 shadow-lg"
                 >
                   ↓ {copy.latest}
                 </button>
@@ -2612,7 +2612,7 @@ export default function KoleexAiApp() {
         >
           <div className="max-w-[820px] mx-auto px-4 md:px-6 pt-2 pb-3">
             {!online && (
-              <div role="status" className="mb-2 rounded-xl border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-[12px] text-amber-200">
+              <div role="status" className="mb-2 rounded-xl border border-[var(--kx-ai-warning-line)] bg-[var(--kx-ai-warning-soft)] px-3 py-2 text-[12px] text-[var(--kx-ai-warning-text)]">
                 {copy.offline}
               </div>
             )}
@@ -2712,7 +2712,7 @@ export default function KoleexAiApp() {
                       return (
                         <span
                           key={`${file.name}-${i}`}
-                          className="inline-flex items-center gap-1.5 max-w-[200px] rounded-md border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-2 py-1 text-[11.5px] text-[var(--text-primary)]"
+                          className="inline-flex items-center gap-1.5 max-w-[200px] rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-2 py-1 text-[12px] text-[var(--text-primary)]"
                           title={file.name}
                         >
                           <span aria-hidden>📎</span>
@@ -2720,7 +2720,7 @@ export default function KoleexAiApp() {
                           <button
                             type="button"
                             onClick={() => removeAttachment(i)}
-                            className="ms-0.5 text-[var(--text-dim)] hover:text-rose-300"
+                            className="ms-0.5 text-[var(--text-dim)] hover:text-[var(--kx-ai-danger-text)]"
                             aria-label={copy.removeFile.replace("{name}", file.name)}
                           >
                             <CrossIcon size={10} />
@@ -2826,7 +2826,7 @@ export default function KoleexAiApp() {
                       title={webSearch ? copy.webSearchOn : copy.webSearchOff}
                       className={`h-8 w-8 rounded-full inline-flex items-center justify-center transition-colors ${
                         webSearch
-                          ? "bg-emerald-300/[0.12] text-emerald-200 ring-1 ring-emerald-300/40"
+                          ? "bg-[var(--kx-ai-accent-soft)] text-[var(--kx-ai-accent)] ring-1 ring-[var(--kx-ai-accent-line)]"
                           : "text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-subtle)]"
                       }`}
                     >
@@ -2898,7 +2898,7 @@ export default function KoleexAiApp() {
                 </div>
               </div>
             </form>
-            <div className="text-[10px] text-[var(--text-dim)] mt-2.5 text-center">
+            <div className="text-[12px] text-[var(--text-dim)] mt-2.5 text-center">
               {copy.footer}
             </div>
           </div>

@@ -3634,7 +3634,7 @@ console.log("\n── 38. call settings sheet: title, voice heading, swipe-down,
   const fsB = await import("node:fs");
   const scr = fsB.readFileSync("src/components/ai/VoiceCallScreen.tsx", "utf8");
   check("the sheet is titled Call settings in all three languages and the voices get their own heading under it",
-    /aria-label=\{copy\.callSettings\}/.test(scr) && /<h2 className="text-\[15px\] font-semibold">\{copy\.callSettings\}<\/h2>/.test(scr) &&
+    /aria-label=\{copy\.callSettings\}/.test(scr) && /<h2 className="text-\[16px\] font-semibold">\{copy\.callSettings\}<\/h2>/.test(scr) &&
     /<h3 className="text-\[13px\] font-semibold text-\[#AAAAAA\] mb-1">\{copy\.voicePick\}<\/h3>/.test(scr) &&
     ["en", "zh", "ar"].every((l) => /callSettings: "/.test(scr.slice(scr.indexOf(`  ${l}: {`)))));
   check("  …a swipe down of more than 80 px on the header closes it; a shorter one springs back; the panel moves with `translate`, not the animation's `transform`",

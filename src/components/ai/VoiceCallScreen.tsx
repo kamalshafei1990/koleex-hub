@@ -902,7 +902,7 @@ export default function VoiceCallScreen({
             {pendingWrite ? (
               <>
                 <div className="text-[12px] uppercase tracking-wide text-[#AAAAAA]">{copy.taskPreview}</div>
-                <div className="mt-1 text-[15px] font-semibold leading-snug" data-task-title>{String(pendingWrite.args.title ?? "")}</div>
+                <div className="mt-1 text-[16px] font-semibold leading-snug" data-task-title>{String(pendingWrite.args.title ?? "")}</div>
                 {(pendingWrite.args.due_date || pendingWrite.args.priority || pendingWrite.args.label) && (
                   <div className="mt-1 text-[12px] text-[#AAAAAA]">
                     {pendingWrite.args.due_date ? `${copy.due} ${String(pendingWrite.args.due_date)}` : ""}
@@ -1170,7 +1170,7 @@ export default function VoiceCallScreen({
               band under it. The container is viewport-fixed; the panel
               simply reaches the edge now. */}
           <div
-            className="kx-sheet-in relative rounded-t-[28px] border-t border-white/10 bg-[#111111] px-6 pt-3 text-white"
+            className="kx-sheet-in relative rounded-t-3xl border-t border-white/10 bg-[#111111] px-6 pt-3 text-white"
             style={{
               paddingBottom: "calc(2rem + env(safe-area-inset-bottom, 0px))",
               /* `translate`, not `transform`: the entrance animation owns transform. */
@@ -1196,7 +1196,7 @@ export default function VoiceCallScreen({
             >
             <div aria-hidden className="mx-auto mb-4 h-1 w-10 rounded-full bg-white/20" />
             <div className="flex items-center justify-between mb-5">
-              <h2 className="text-[15px] font-semibold">{copy.callSettings}</h2>
+              <h2 className="text-[16px] font-semibold">{copy.callSettings}</h2>
               <button
                 type="button"
                 onClick={closeVoiceSheet}
@@ -1279,7 +1279,7 @@ export default function VoiceCallScreen({
                 type="button"
                 onClick={confirmVoice}
                 disabled={!candidate || candidate === selectedVoice}
-                className="mt-4 h-12 w-full rounded-2xl bg-[#0066FF] text-[15px] font-semibold text-white disabled:bg-white/[0.06] disabled:text-[#AAAAAA] transition-[background-color,transform] duration-150 active:scale-[0.99] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0066FF] focus-visible:ring-offset-2 focus-visible:ring-offset-[#111111]"
+                className="mt-4 h-12 w-full rounded-2xl bg-[#0066FF] text-[16px] font-semibold text-white disabled:bg-white/[0.06] disabled:text-[#AAAAAA] transition-[background-color,transform] duration-150 active:scale-[0.99] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0066FF] focus-visible:ring-offset-2 focus-visible:ring-offset-[#111111]"
               >
                 {candidate && candidate !== selectedVoice
                   ? copy.voiceUseNamed.replace("{name}", voices.find((v) => v.key === candidate)?.label ?? "")

@@ -346,11 +346,11 @@ export default function MicButton({
      icons; the row now scans uniformly. */
   const color =
     computedState === "listening"
-      ? "bg-rose-500 text-white"
+      ? "bg-[var(--kx-ai-danger)] text-white"
       : computedState === "processing"
         ? "bg-[var(--bg-surface)] text-[var(--text-dim)]"
         : computedState === "speaking"
-          ? "bg-sky-500 text-white"
+          ? "bg-[var(--kx-ai-accent)] text-white"
           : "text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-subtle)]";
 
   const ariaLabel =
@@ -366,8 +366,8 @@ export default function MicButton({
   const isSpeaking = computedState === "speaking";
   const showRing = isListening || isSpeaking;
   const ringColor = isListening
-    ? "rgba(244,63,94,0.55)"   // rose-500
-    : "rgba(14,165,233,0.55)"; // sky-500
+    ? "rgba(255,51,51,0.55)"   // --kx-ai-danger
+    : "rgba(0,102,255,0.55)"; // --kx-ai-accent
 
   return (
     <span
@@ -426,7 +426,7 @@ export default function MicButton({
       {isListening && (
         <span
           aria-live="polite"
-          className="absolute -top-7 left-1/2 -translate-x-1/2 whitespace-nowrap text-[10px] font-semibold tracking-wider text-rose-300 bg-rose-500/15 border border-rose-500/30 rounded-full px-2 py-0.5 pointer-events-none shadow-md backdrop-blur-md"
+          className="absolute -top-7 left-1/2 -translate-x-1/2 whitespace-nowrap text-[12px] font-semibold tracking-wider text-[var(--kx-ai-danger-text)] bg-[var(--kx-ai-danger-soft)] border border-[var(--kx-ai-danger-line)] rounded-full px-2 py-0.5 pointer-events-none shadow-md backdrop-blur-md"
         >
           ● {t.rec} · {formatDuration(elapsed)}
         </span>
@@ -437,7 +437,7 @@ export default function MicButton({
       {computedState === "processing" && (
         <span
           aria-live="polite"
-          className="absolute -top-7 left-1/2 -translate-x-1/2 whitespace-nowrap text-[10px] font-medium tracking-wider text-[var(--text-dim)] bg-[var(--bg-secondary)]/95 border border-[var(--border-color)] rounded-full px-2 py-0.5 pointer-events-none shadow-lg backdrop-blur-md"
+          className="absolute -top-7 left-1/2 -translate-x-1/2 whitespace-nowrap text-[12px] font-medium tracking-wider text-[var(--text-dim)] bg-[var(--bg-secondary)]/95 border border-[var(--border-color)] rounded-full px-2 py-0.5 pointer-events-none shadow-lg backdrop-blur-md"
         >
           {t.transcribing}
         </span>

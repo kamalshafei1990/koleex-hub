@@ -101,7 +101,7 @@ console.log("\n── 3. Approval state changes what the user is told ──");
   const needs = html(<DraftCard payload={draft({ approval_required: true })} />);
   check("a plain draft is labelled 'Draft'", text(plain).includes("Draft") && !text(plain).includes("needs approval"));
   check("a draft needing approval says so", text(needs).includes("needs approval"));
-  check("and is styled differently, not only worded differently", plain !== needs && needs.includes("amber"));
+  check("and is styled differently, not only worded differently", plain !== needs && needs.includes("kx-ai-warning"));
 }
 
 console.log("\n── 4. The welcome card renders the localised copy it is given ──");
