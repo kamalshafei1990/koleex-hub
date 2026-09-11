@@ -873,7 +873,7 @@ export default function VoiceCallScreen({
          200 is where this codebase's real dialogs live (SignInHelpDialog),
          above the header and the dock. Deliberately BELOW ConfirmDialog's
          300: a confirmation raised during a call has to be readable over it. */
-      className="fixed inset-0 z-[200] flex flex-col bg-[#0D0D0D] text-white"
+      className="kx-call-root fixed inset-0 z-[200] flex flex-col bg-[#0D0D0D] text-white"
       /* Read by UpdateWatcher: a live call is never interrupted by a reload
          onto a new build — the stale bundle waits until the call ends. */
       data-kx-call-active="1"
@@ -969,7 +969,7 @@ export default function VoiceCallScreen({
                 aria-label={copy.typePlaceholder}
                 enterKeyHint="send"
                 autoComplete="off"
-                className="flex-1 min-w-0 bg-transparent text-sm text-white placeholder:text-[#666666] outline-none"
+                className="flex-1 min-w-0 bg-transparent text-base text-white placeholder:text-[#666666] outline-none"
               />
               <button
                 type="submit"

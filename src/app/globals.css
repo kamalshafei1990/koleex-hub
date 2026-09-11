@@ -2374,6 +2374,40 @@ html[data-kx-tabslide] #main-scroll-container { overflow-x: clip; }
   outline: 2px solid #0066FF;
   outline-offset: 2px;
 }
+
+/* KOLEEX AI — 44 px TARGETS ON TOUCH SCREENS. The composer icons (32 px),
+   the sidebar pin and menu (24 px), the bubble action row (28 px) and the
+   call sheet's Close and Send (36 px) are the "mis-tap opens the chat
+   instead of pinning" class of bug the sidebar already met once (audit,
+   2026-09-11). The glyphs stay their size; the HIT AREA grows: a centred
+   pseudo-element of at least 44 × 44 on every button, and a 44 px minimum
+   height on the clickable rows. Inputs render at 16 px on a phone so iOS
+   has no reason to zoom into them. Pointer-coarse only: a mouse needs none
+   of this and the desktop layout does not move. Scoped to the AI app and
+   the call screen — the rest of the Hub keeps its own sizes. */
+@media (pointer: coarse) {
+  .kx-ai-root button:not(.absolute):not(.fixed):not(.sticky),
+  .kx-call-root button:not(.absolute):not(.fixed):not(.sticky) {
+    position: relative;
+  }
+  .kx-ai-root button::after,
+  .kx-call-root button::after {
+    content: "";
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: max(100%, 44px);
+    height: max(100%, 44px);
+    transform: translate(-50%, -50%);
+  }
+  .kx-ai-root [role="button"],
+  .kx-call-root [role="button"] {
+    min-height: 44px;
+  }
+  .kx-ai-root :is(input:not([type="checkbox"]):not([type="radio"]):not([type="range"]), textarea, select) {
+    font-size: 16px;
+  }
+}
 [data-kx-skin="aurora"] .kx-ai-bar { background: transparent; }
 /* Small controls (chips, inputs, row hovers) re-tint to the header-button
    grammar by overriding the app's OWN surface variables — one rule instead
