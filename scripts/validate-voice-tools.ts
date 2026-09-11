@@ -945,11 +945,21 @@ console.log("\n── 6. What a call gets back from a web search is shorter ─�
     images: [{ url: "https://ex.com/a.jpg", description: "pyramids" }],
     usage_note: "note",
   };
-  const out = forVoice("search_web", data) as typeof data;
+  const out = forVoice("search_web", data) as { results: Array<{ snippet: string; source?: string; url?: string; title: string }>; images?: unknown; pictures_on_screen?: number; answer: string; usage_note: string };
   check("a web search for a call keeps three results", out.results.length === VOICE_SEARCH_RESULTS && VOICE_SEARCH_RESULTS === 3);
   check("  …with snippets cut to the cap, marked as cut", out.results.every((r) => r.snippet.length === VOICE_SNIPPET_CHARS + 1 && r.snippet.endsWith("…")) && VOICE_SNIPPET_CHARS === 200);
   check("  …a short snippet is left alone", (forVoice("search_web", { results: [{ snippet: "short" }] }) as { results: Array<{ snippet: string }> }).results[0].snippet === "short");
-  check("  …the pictures, the answer and the note travel whole", out.images.length === 1 && out.answer === data.answer && out.usage_note === "note");
+  /* NOTHING A VOICE CAN READ ALOUD BY MISTAKE (2026-09-11 19:06: "! (exhibitorsearch.messefrankfurt.com)" spoken twice). */
+  check("  …the answer travels whole; the pictures do NOT — their count does, and each result's url becomes its site's name",
+    out.answer === data.answer && !("images" in out) && out.pictures_on_screen === 1 &&
+    out.results.every((r) => !("url" in r) && r.source === "ex.com" && typeof r.title === "string"));
+  check("  …and the note is written for speech: no links, no markdown, no picture words; one sentence about what the screen shows",
+    out.usage_note.startsWith("SPOKEN ANSWER.") && /NEVER say a link, a web address, a file name, a host, markdown/.test(out.usage_note) &&
+    /screen is already showing one picture from this lookup: say one short sentence/.test(out.usage_note) && !/markdown !\[/.test(out.usage_note) && !/Cite the source URL/.test(out.usage_note));
+  const machineOut = forVoice("search_web", { results: [{ url: "https://www.a.example/x", snippet: "s" }], usage_note: "These are public web results… NO PICTURES FOR MACHINES FROM THE WEB. … FRESHNESS: this search ran on 2026-09-11. Results carry their published dates." }) as { results: Array<{ source?: string }>; pictures_on_screen?: number; usage_note: string };
+  check("  …a machine query keeps the product-tools rule, the freshness rule survives, www. is dropped from a source, and no pictures means no count",
+    /Koleex product question — use searchProducts/.test(machineOut.usage_note) && /FRESHNESS: this search ran on 2026-09-11\. Results carry their published dates\./.test(machineOut.usage_note) &&
+    machineOut.results[0].source === "a.example" && !("pictures_on_screen" in machineOut) && !/screen is already showing/.test(machineOut.usage_note));
   check("  …the input is not mutated", data.results.length === 6 && data.results[0].snippet.length === 400);
   check("any other tool's data passes through untouched", forVoice("searchProducts", data) === data && forVoice("search_web", null) === null && forVoice("search_web", "s") === "s");
   check("a search result without a results list passes through", forVoice("search_web", { answer: "a" }) !== null);

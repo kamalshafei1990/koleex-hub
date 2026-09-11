@@ -663,6 +663,37 @@ export function isLiveInfoQuery(msg: string): boolean {
   return false;
 }
 
+/* ─── World-fact detector (dependability plan, Phase A4, first slice) ─────
+   "The poorest city in China", "who is the CEO of Nestlé", "how many
+   people live in Cairo", "when was Messe Frankfurt founded": facts about
+   the world outside Koleex that the model half-remembers from a training
+   set a year or more old, and that the tool-less general lane answered
+   from memory, sounding exactly as sure as a lookup (2026-09-11 19:09:
+   "أفقر مدينة في الصين" answered from memory with a hedge). These go to
+   the tool loop, where search_web sits; a false positive costs one slower
+   turn, a false negative is a stale answer delivered with confidence.
+
+   A QUESTION WORD AND A WORLD NOUN, both required, so "what is FOB" (a
+   definition — the general lane's job), "explain the difference" and
+   "how do I…" stay where they are. Koleex's own data has its own detector
+   ahead of this one. */
+export function isWorldFactQuery(msg: string): boolean {
+  const s = (msg ?? "").toLowerCase();
+  if (!s || s.length < 5) return false;
+  /* English: a question word, then a noun of the world. */
+  const enQ = /\b(who|whom|whose|which|where|when|how\s+(many|much|old|far|big|tall|large|long|rich)|what('s| is| are| was| were)\s+the)\b/;
+  const enNoun = /\b(ceo|founder|president|prime\s+minister|king|owner|company|companies|corporation|brand|country|countries|city|cities|capital|population|people|inhabitants|lives?\s+in|richest|poorest|biggest|largest|smallest|tallest|oldest|newest|most\s+\w+|top\s+\d+|ranking|ranked|founded|headquarter\w*|located|born|died|gdp|currency|exchange\s+rate|price\s+of|cost\s+of|market\s+share|revenue|stock|factory|factories|manufacturer\w*|supplier\w*|port|airport|university|award|champion\w*|winner|won)\b/;
+  if (enQ.test(s) && enNoun.test(s)) return true;
+  /* Arabic: a question word (مين/إيه/فين/إمتى/كام/أنهي) with a world noun
+     or a superlative (أكبر/أفقر/أغنى/أحسن/أشهر/أول/آخر). */
+  const arQ = /(مين|من هو|من هي|إيه|ايه|فين|إمتى|امتى|كام|أنهي|انهي|هل)/;
+  const arNoun = /(شركة|شركات|دولة|دول|مدينة|مدن|عاصمة|رئيس|مدير|مالك|مؤسس|سكان|عدد\s*السكان|أكبر|اكبر|أفقر|افقر|أغنى|اغنى|أحسن|احسن|أشهر|اشهر|أطول|اطول|أقدم|اقدم|أول|اول|آخر|اخر|أهم|اهم|مصنع|مصانع|ماركة|ميناء|مطار|جامعة|سعر|تكلفة|عملة|اتأسست|اتاسست|تأسست|بيتصنع|بتتصنع|مقر|ترتيب|توب\s*\d+)/;
+  if (arQ.test(msg) && arNoun.test(msg)) return true;
+  /* Chinese */
+  if (/(谁是|哪个|哪家|哪里|什么时候|多少|几年|排名|最大|最小|最富|最穷|最好|最有名|首都|人口|创始人|总裁|老板|公司|国家|城市|工厂|制造商|供应商|价格|成本|港口|机场|大学|成立于|总部)/.test(msg) && /(谁|哪|什么|多少|几|吗|？|\?)/.test(msg)) return true;
+  return false;
+}
+
 /* Memory/teaching intents must never take a tool-less lane — the model
    would hallucinate "saved ✓" (observed). Mirrors the agent-route guard. */
 /* ─── Picture-making detector ─────────────────────────────────────

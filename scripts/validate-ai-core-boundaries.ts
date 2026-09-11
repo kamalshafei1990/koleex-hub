@@ -27,6 +27,7 @@ import {
   isBusinessDataQuery,
   isWorkDataQuery,
   isLiveInfoQuery,
+  isWorldFactQuery,
   isImageCreationRequest,
   isMemoryIntentQuery,
   isTradeTermQuestion,
@@ -223,6 +224,22 @@ check(
   isLiveInfoQuery("أحدث آيفون نزل إيه") && isLiveInfoQuery("آخر إصدار من الماكينة") && isLiveInfoQuery("最新的iPhone是哪款") && isLiveInfoQuery("what is the newest phone"),
 );
 check("live info: an ordinary sentence with none of that stays on the fast lane", !isLiveInfoQuery("thank you, that helps") && !isLiveInfoQuery("شكراً يا كولكس") && !isLiveInfoQuery("explain what FOB means"));
+/* Dependability plan A4, first slice: a fact about the world outside Koleex
+   is looked up, not recalled (2026-09-11 19:09: "أفقر مدينة في الصين"
+   answered from memory). A question word AND a world noun, both required. */
+check(
+  "world facts: people, companies, places, rankings and figures go to the tools, in three languages",
+  isWorldFactQuery("who is the CEO of Nestlé") && isWorldFactQuery("which country produces the most cotton") && isWorldFactQuery("how many people live in Cairo") &&
+    isWorldFactQuery("what is the richest company in the world") && isWorldFactQuery("when was Messe Frankfurt founded") &&
+    isWorldFactQuery("إيه أفقر مدينة في الصين") && isWorldFactQuery("مين رئيس شركة نستله") && isWorldFactQuery("إيه أكبر مصنع ملابس في مصر") && isWorldFactQuery("نيسكافيه جولد بيتصنع في أنهي دولة") &&
+    isWorldFactQuery("谁是特斯拉的创始人") && isWorldFactQuery("中国最穷的城市是哪个") && isWorldFactQuery("开罗有多少人口"),
+);
+check(
+  "world facts: definitions, explanations, how-tos and small talk stay on the general lane",
+  !isWorldFactQuery("what is FOB") && !isWorldFactQuery("explain the difference between CIF and FOB") && !isWorldFactQuery("how do I write a cover letter") &&
+    !isWorldFactQuery("translate this to Chinese") && !isWorldFactQuery("إيه معنى الكلمة دي") && !isWorldFactQuery("ok") && !isWorldFactQuery("thanks a lot") && !isWorldFactQuery("解释一下什么是信用证"),
+);
+check("world facts: the route treats one as live information", /isWorldFactQuery\(normalizedContent\) \|\|/.test(readFileSync("src/app/api/ai/agent/route.ts", "utf8")));
 check(
   "live info: asking to SEE something is a lookup, in three languages",
   isLiveInfoQuery("show me a picture of Port Said port") &&
