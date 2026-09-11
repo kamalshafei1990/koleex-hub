@@ -730,7 +730,10 @@ export default function VoiceCallScreen({
      pictures under it. Only the orb takes taps once the words are open. ── */
   const orbLayer = (
     <div className={`absolute inset-0 flex flex-col items-center px-6 ${view === "orb" ? "" : "pointer-events-none"}`}>
-      <div className={`kx-call-fade shrink-0 pt-2 ${view === "orb" ? "is-in" : ""}`} aria-hidden={view !== "orb"}>
+      {/* A LITTLE ROOM ABOVE THE WORDMARK (owner, 2026-09-11: "make koleex
+          logo little down in desktop mode and mobile"): pt-6 on both, over
+          the safe-area inset the frame already adds on a phone. */}
+      <div className={`kx-call-fade shrink-0 pt-6 ${view === "orb" ? "is-in" : ""}`} aria-hidden={view !== "orb"}>
         <KoleexLogo className="h-6 w-auto shrink-0 text-white" />
       </div>
       <div className="flex-1 min-h-0 w-full flex items-center justify-center">
