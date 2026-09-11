@@ -695,22 +695,34 @@ voice at all." Two causes, both in the client:
    on inside the window changed nothing. Now the verdict is only where the
    next tap goes, with no wait; the probe runs on every open and moves the
    lane when the network has moved.
-2. **The picker showed one lane.** A device settled on the mainland lane
-   never saw the socket lane's names, and the caller had no way to ask.
-   Now every voice is offered, tagged by lane, in two rows under neutral
-   headings ("Mainland line" / "International line" — never a vendor).
-   Choosing a voice from the other row is choosing that lane: the next
-   call goes there, the choice is saved as the device's verdict, and the
-   one fall-back is re-armed. When the socket lane does not answer, the
-   call falls back to the mainland lane as before, the current voice moves
-   onto the mainland list (a socket-lane key asked of the mainland lane
-   was the server's default voice under the wrong name), and the screen
-   says so once: "The international line can't be reached from your network
-   right now — continuing on the mainland line."
+2. **The sheet had no way to ask for the other line.** The first cut of
+   this change merged both lanes' voices into one picker, tagged by lane —
+   and the Mac showed ONE row (09:35): the voice names are the PRODUCT'S on
+   both lines (`v1…v5`, Nour/Layla/Omar/Adam/Sara), a different vendor id
+   behind each per line (`[ai.voice.ws] session voice=v1 vendor=Ara`), so
+   the keys collided and a voice could never name a line. The line is its
+   own control now: two pills in the voice sheet under "Line" — "Mainland
+   line" / "International line", never a vendor — drawn only when both
+   lines have voices, the current one pressed. Choosing a line moves the
+   next call there, saves the choice as the device's verdict, re-arms the
+   one fall-back, offers that line's voices (the same names; the current
+   one kept), and rebuilds a running call with the words kept. When the
+   international line does not answer, the call falls back to the mainland
+   line as before, the sheet's pill follows, and the screen says so once:
+   "The international line can't be reached from your network right now —
+   continuing on the mainland line."
 
-Pure helpers: `offeredVoices`, `laneOfVoice` (voice-pref.ts), `voiceRows`
-(VoiceCallScreen.tsx). Suite section 37; mutation: restoring the six-hour
-lock fails 2.
+Suite section 37; mutation: restoring the six-hour lock fails 2, dropping
+the lane save in selectLane fails 1.
+
+**The Mac, VPN on, 09:34 — what the note was for:** the international line
+was chosen (server: `lane=ws country=US`), the ws-session answered, and the
+socket never opened: `service-unreachable … err="AbortError: Fetch is
+aborted" canary=timeout5001ms` — our own host did not answer the Mac's
+canary in five seconds either; the VPN's path to our servers was the
+problem, not the vendor's. The call fell back, the mainland line answered
+from Singapore in 120–430 ms, the note showed, and a later international
+call at 09:36 went through the relay.
 
 **Billing, the same hour:** the vendor's SMS — the China account's balance
 is −0.04 yuan. The mainland lane bills THAT account (the international

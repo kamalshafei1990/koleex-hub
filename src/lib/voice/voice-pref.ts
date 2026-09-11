@@ -165,36 +165,13 @@ export function decideLane(
   return { lane: fresh && saved ? saved.lane : "rtc", probe: true };
 }
 
-/* ── BOTH LANES' VOICES IN ONE PICKER (owner, 2026-09-11: "with VPN and
-   without VPN only [the mainland] voice, no [socket-lane] voice at all").
-   The picker used to show the lane the device had settled on; a device
-   settled on the mainland lane never showed the other names, and the
-   caller had no way to ask for them. Now every voice is offered, tagged
-   with its lane, mainland first; choosing a voice from the other lane's
-   list is choosing that lane (VoiceCallButton.selectVoice). Pure. */
-export type LaneVoice = { key: string; label: string; lane: VoiceLane };
+/* THE VOICE NAMES ARE THE PRODUCT'S, ON BOTH LANES (2026-09-11): the same
+   five keys, the same labels, a different vendor id behind each on each
+   lane. So a voice cannot name a lane, and a picker that merged both lists
+   showed one row (the keys collided). The lane is its own choice — the
+   "Line" control in the voice sheet (VoiceCallButton.selectLane); the
+   voices offered are the chosen lane's, as before. */
 export type VoicesByLane = { rtc: readonly { key: string; label: string }[]; ws: readonly { key: string; label: string }[] };
-
-export function offeredVoices(byLane: VoicesByLane): LaneVoice[] {
-  const seen = new Set<string>();
-  const out: LaneVoice[] = [];
-  for (const lane of ["rtc", "ws"] as const) {
-    for (const v of byLane[lane]) {
-      if (seen.has(v.key)) continue;
-      seen.add(v.key);
-      out.push({ key: v.key, label: v.label, lane });
-    }
-  }
-  return out;
-}
-
-/** The lane a voice key belongs to: the socket lane's when it is in that
- *  list, the mainland lane otherwise (an unknown key is a mainland call
- *  on the server's default voice, which is what it always was). */
-export function laneOfVoice(byLane: VoicesByLane, key: string | null | undefined): VoiceLane {
-  const want = (key ?? "").trim();
-  return want !== "" && byLane.ws.some((v) => v.key === want) && !byLane.rtc.some((v) => v.key === want) ? "ws" : "rtc";
-}
 
 export function readSavedLane(): SavedLane | null {
   try {

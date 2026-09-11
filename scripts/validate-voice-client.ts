@@ -2169,7 +2169,7 @@ console.log("\n── 12. Mute ──");
   if (hadWindow) g.window = prevWindow;
   const btn19 = fs19.readFileSync("src/components/ai/VoiceCallButton.tsx", "utf8");
   check("the button pre-selects the remembered voice from the server's list, and remembers every choice",
-    /setVoices\(offeredVoices\(byLane\)\);\s*setVoiceKey\(\(cur\) => pickVoiceKey\(cur \?\? readSavedVoiceKey\(\), own\)\);/.test(btn19) &&
+    /setVoices\(list\);\s*setVoiceKey\(\(cur\) => pickVoiceKey\(cur \?\? readSavedVoiceKey\(\), list\)\);/.test(btn19) &&
     !/body\.voices\?\.\[0\]\?\.key/.test(btn19) &&
     /const selectVoice = useCallback\(\(key: string\) => \{\s*setVoiceKey\(key\);\s*voiceKeyRef\.current = key;\s*saveVoiceKey\(key\);/.test(btn19));
 
@@ -2932,8 +2932,8 @@ function describeErrorCheck(): boolean {
     const btn = fs27.readFileSync("src/components/ai/VoiceCallButton.tsx", "utf8");
     const route = fs27.readFileSync("src/app/api/ai/voice/session/route.ts", "utf8");
     const sess = fs27.readFileSync("src/lib/voice/session.ts", "utf8");
-    check("the picker offers BOTH lanes' voices, and the current one follows the lane the device settles on — now, and again after the probe",
-      /const offerFor = \(lane: "rtc" \| "ws"\) => \{\s*const own = byLane\[lane\]\.length > 0 \? byLane\[lane\] : byLane\.rtc;\s*setVoices\(offeredVoices\(byLane\)\);\s*setVoiceKey\(\(cur\) => pickVoiceKey\(cur \?\? readSavedVoiceKey\(\), own\)\);/.test(btn) &&
+    check("the picker shows the lane's OWN voices, and follows the lane the device settles on — now, and again after the probe",
+      /const offerFor = \(lane: "rtc" \| "ws"\) => \{\s*const list = byLane\[lane\]\.length > 0 \? byLane\[lane\] : byLane\.rtc;\s*setVoices\(list\);\s*setVoiceKey\(\(cur\) => pickVoiceKey\(cur \?\? readSavedVoiceKey\(\), list\)\);/.test(btn) &&
       /transportRef\.current = decided\.lane;\s*offerFor\(decided\.lane\);/.test(btn) && /transportRef\.current = ok \? "ws" : "rtc";\s*offerFor\(transportRef\.current\);/.test(btn));
     check("the button decides from the server's default and the device's verdict, probes in the background only when told the socket lane exists, and never moves a call already placed",
       /const decided = decideLane\(server, readSavedLane\(\), Date\.now\(\)\);\s*(\/\*[^*]*\*\/\s*)?const applyLane = \(\) => \{\s*transportRef\.current = decided\.lane;\s*offerFor\(decided\.lane\);\s*\};\s*if \(sessionRef\.current\) laneAfterCallRef\.current = applyLane;\s*else applyLane\(\);\s*if \(decided\.probe && body\.ws_available === true\) \{/.test(btn) &&
@@ -3585,14 +3585,17 @@ function describeErrorCheck(): boolean {
     wsRoute.includes("console.warn(`[ai.voice.ws] session voice=") && !wsRoute.includes("console.log(`[ai.voice.ws] session") && sdpRoute.includes("console.warn(`[ai.voice] lane=") && !sdpRoute.includes("console.log(`[ai.voice] lane="));
 }
 {
-  console.log("\n── 37. Both lanes' voices in one picker; the voice names the lane; a fresh verdict is the first call's lane, not a lock ──");
+  console.log("\n── 37. The line is the caller's to choose; a fresh verdict is the first call's lane, not a lock ──");
   /* 2026-09-11, the owner: "with VPN and without VPN only [the mainland]
      voice, no [socket-lane] voice at all". Two things: a fresh "mainland"
      verdict (six hours) stopped the probe, so a VPN switched on inside the
-     window changed nothing; and the picker only ever showed the lane the
-     device had settled on, so the other names were never on offer. */
-  const { decideLane, offeredVoices, laneOfVoice, LANE_TTL_MS } = await import("../src/lib/voice/voice-pref");
-  const { voiceRows } = await import("../src/components/ai/VoiceCallScreen");
+     window changed nothing; and the sheet had no way to ask for the other
+     line. THE VOICE NAMES ARE THE PRODUCT'S ON BOTH LINES (v1…v5, the same
+     labels, a different vendor id behind each per line — the ws-session
+     log reads `voice=v1 vendor=Ara`), so a voice cannot name a line and a
+     merged picker showed ONE row (the keys collided; the Mac, 09:35). The
+     line is its own control. */
+  const { decideLane, LANE_TTL_MS } = await import("../src/lib/voice/voice-pref");
   const { readFileSync } = await import("node:fs");
   const now = 1_800_000_000_000;
   check("a fresh device verdict is where the next tap goes, AND the probe still runs — in both directions",
@@ -3601,33 +3604,29 @@ function describeErrorCheck(): boolean {
   check("  …the server saying the socket lane is still final, a stale verdict still falls back to mainland with a probe",
     JSON.stringify(decideLane("ws", { lane: "rtc", at: now }, now)) === JSON.stringify({ lane: "ws", probe: false }) &&
     JSON.stringify(decideLane("rtc", { lane: "ws", at: now - LANE_TTL_MS - 1 }, now)) === JSON.stringify({ lane: "rtc", probe: true }));
-  const byLane = { rtc: [{ key: "Cherry", label: "Cherry" }, { key: "Ethan", label: "Ethan" }], ws: [{ key: "Ara", label: "Ara" }, { key: "Rex", label: "Rex" }, { key: "Cherry", label: "Cherry" }] };
-  check("every voice is offered, tagged with its lane, mainland first, a key seen twice kept once",
-    JSON.stringify(offeredVoices(byLane)) === JSON.stringify([{ key: "Cherry", label: "Cherry", lane: "rtc" }, { key: "Ethan", label: "Ethan", lane: "rtc" }, { key: "Ara", label: "Ara", lane: "ws" }, { key: "Rex", label: "Rex", lane: "ws" }]));
-  check("the lane of a voice: the socket lane's own keys, mainland for everything else — an unknown key, an empty key, a key both lists carry",
-    laneOfVoice(byLane, "Ara") === "ws" && laneOfVoice(byLane, "Rex") === "ws" && laneOfVoice(byLane, "Cherry") === "rtc" && laneOfVoice(byLane, "Ethan") === "rtc" && laneOfVoice(byLane, "Nobody") === "rtc" && laneOfVoice(byLane, "") === "rtc" && laneOfVoice(byLane, null) === "rtc" &&
-    laneOfVoice({ rtc: [], ws: [{ key: "Ara", label: "Ara" }] }, "Ara") === "ws");
-  check("  …one lane's voices: one row, no heading; both lanes: two rows, headed, mainland first",
-    JSON.stringify(voiceRows([{ key: "a", lane: "rtc" }, { key: "b" }]).map((r) => [r.lane, r.titled, r.voices.length])) === JSON.stringify([["rtc", false, 2]]) &&
-    JSON.stringify(voiceRows(offeredVoices(byLane)).map((r) => [r.lane, r.titled, r.voices.length])) === JSON.stringify([["rtc", true, 2], ["ws", true, 2]]) &&
-    JSON.stringify(voiceRows([{ key: "x", lane: "ws" }]).map((r) => [r.lane, r.titled])) === JSON.stringify([["ws", false]]));
 
   const btn = readFileSync("src/components/ai/VoiceCallButton.tsx", "utf8");
   const scr = readFileSync("src/components/ai/VoiceCallScreen.tsx", "utf8");
-  check("the button offers every voice and takes the CURRENT one from the settled lane's own list",
-    /const offerFor = \(lane: "rtc" \| "ws"\) => \{\s*const own = byLane\[lane\]\.length > 0 \? byLane\[lane\] : byLane\.rtc;\s*setVoices\(offeredVoices\(byLane\)\);\s*setVoiceKey\(\(cur\) => pickVoiceKey\(cur \?\? readSavedVoiceKey\(\), own\)\);/.test(btn) &&
-    /byLaneRef\.current = byLane;/.test(btn));
-  check("choosing a voice from the other lane moves the next call there, saves the lane as the device's verdict, re-arms the one fall-back, and clears the note",
-    /const lane = laneOfVoice\(byLaneRef\.current, key\);\s*if \(lane !== transportRef\.current\) \{\s*transportRef\.current = lane;\s*saveLane\(lane\);\s*laneFellBackRef\.current = false;\s*\}\s*setLaneNote\(null\);/.test(btn));
-  check("a fall-back to the mainland lane moves the current voice onto the mainland list — state AND ref, before the next start — and says so on the screen",
-    /const fallToMainlandVoice = useCallback\(\(\) => \{\s*const next = pickVoiceKey\(voiceKeyRef\.current \?\? readSavedVoiceKey\(\), byLaneRef\.current\.rtc\);\s*voiceKeyRef\.current = next;\s*setVoiceKey\(next\);\s*setLaneNote\("international-unreachable"\);\s*\}, \[\]\);/.test(btn) &&
+  check("the picker offers the settled lane's own voices (the names are the same on both lines), keeps both lists, and tells the sheet which line is chosen and whether there are two",
+    /const offerFor = \(lane: "rtc" \| "ws"\) => \{\s*const list = byLane\[lane\]\.length > 0 \? byLane\[lane\] : byLane\.rtc;\s*setVoices\(list\);\s*setVoiceKey\(\(cur\) => pickVoiceKey\(cur \?\? readSavedVoiceKey\(\), list\)\);\s*setChosenLane\(lane\);/.test(btn) &&
+    /byLaneRef\.current = byLane;/.test(btn) && /setLanesAvailable\(byLane\.rtc\.length > 0 && byLane\.ws\.length > 0\);/.test(btn) &&
+    /lane=\{chosenLane\}\s*onSelectLane=\{lanesAvailable \? selectLane : undefined\}/.test(btn));
+  check("choosing a line moves the next call there, saves it as the device's verdict, re-arms the one fall-back, clears the note, offers that line's voices with the current one kept, and rebuilds a running call",
+    /const selectLane = useCallback\(\(lane: "rtc" \| "ws"\) => \{\s*if \(lane === transportRef\.current\) return;\s*transportRef\.current = lane;\s*saveLane\(lane\);\s*laneFellBackRef\.current = false;\s*setLaneNote\(null\);\s*const list = byLaneRef\.current\[lane\]\.length > 0 \? byLaneRef\.current\[lane\] : byLaneRef\.current\.rtc;\s*setVoices\(list\);\s*const next = pickVoiceKey\(voiceKeyRef\.current \?\? readSavedVoiceKey\(\), list\);\s*voiceKeyRef\.current = next;\s*setVoiceKey\(next\);\s*setChosenLane\(lane\);\s*rebuildCall\(\);\s*\}, \[rebuildCall\]\);/.test(btn) &&
+    /const selectVoice = useCallback\(\(key: string\) => \{\s*setVoiceKey\(key\);\s*voiceKeyRef\.current = key;\s*saveVoiceKey\(key\);\s*rebuildCall\(\);\s*\}, \[rebuildCall\]\);/.test(btn) &&
+    /const rebuildCall = useCallback\(\(\) => \{\s*const current = sessionRef\.current;\s*if \(!current\) return;/.test(btn));
+  check("a fall-back to the mainland line moves the current voice onto the mainland list — state AND ref, before the next start — marks the line, and says so on the screen",
+    /const fallToMainlandVoice = useCallback\(\(\) => \{\s*const next = pickVoiceKey\(voiceKeyRef\.current \?\? readSavedVoiceKey\(\), byLaneRef\.current\.rtc\);\s*voiceKeyRef\.current = next;\s*setVoiceKey\(next\);\s*setChosenLane\("rtc"\);\s*setLaneNote\("international-unreachable"\);\s*\}, \[\]\);/.test(btn) &&
     /saveLane\("rtc"\);\s*fallToMainlandVoice\(\);\s*setReady\(false\);/.test(btn) && /saveLane\("rtc"\);\s*fallToMainlandVoice\(\);\s*\}/.test(btn) &&
     /laneNote=\{laneNote\}/.test(btn));
-  check("the screen draws one row per lane with its own heading, names the lines and never a vendor, and carries the note in three languages",
-    /voices\.length > 0 && voiceRows\(voices\)\.map\(\(row\) =>/.test(scr) && /row\.lane === "ws" \? copy\.laneInternational : copy\.laneMainland/.test(scr) &&
+  check("the screen draws the line control only when it is given one — two pills, the chosen one pressed, the international one honest about its need — names the lines and never a vendor, and carries the note in three languages",
+    /\{onSelectLane && \(/.test(scr) && /\(\["rtc", "ws"\] as const\)\.map\(\(l\) => \{\s*const on = lane === l;/.test(scr) && /data-lane=\{l\}/.test(scr) && /onClick=\{\(\) => onSelectLane\(l\)\}/.test(scr) &&
+    /\{l === "ws" \? copy\.laneInternational : copy\.laneMainland\}/.test(scr) && /\{copy\.lineHint\}/.test(scr) &&
     /laneNote === "international-unreachable" && \(/.test(scr) &&
-    ["en", "zh", "ar"].every((l) => { const blk = scr.slice(scr.indexOf(`  ${l}: {`)); return /laneMainland: "/.test(blk) && /laneInternational: "/.test(blk) && /laneUnreachable: "/.test(blk); }) &&
-    !/laneMainland: "[^"]*(Qwen|Grok|xAI|Alibaba)/i.test(scr) && !/laneInternational: "[^"]*(Qwen|Grok|xAI|Alibaba)/i.test(scr) && !/laneUnreachable: "[^"]*(Qwen|Grok|xAI|Alibaba)/i.test(scr));
+    ["en", "zh", "ar"].every((l) => { const blk = scr.slice(scr.indexOf(`  ${l}: {`)); return /linePick: "/.test(blk) && /lineHint: "/.test(blk) && /laneMainland: "/.test(blk) && /laneInternational: "/.test(blk) && /laneUnreachable: "/.test(blk); }) &&
+    !/(linePick|lineHint|laneMainland|laneInternational|laneUnreachable): "[^"]*(Qwen|Grok|xAI|Alibaba|通义|千问)/i.test(scr));
+  check("  …and the line control keeps the talk-mode control's own divider when it is the section above it",
+    /<div className=\{voices\.length > 0 \|\| onSelectLane \? "mt-6 pt-5 border-t border-white\/10" : ""\}>/.test(scr));
 }
 console.log(`\n${pass} passed, ${failures.length} failed`);
   if (failures.length) {
