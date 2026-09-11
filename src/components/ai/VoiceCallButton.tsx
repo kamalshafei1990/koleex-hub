@@ -65,6 +65,7 @@ import { requestCallSummary, shouldSummarise } from "@/lib/voice/summary";
 import { sendVoiceTelemetry, flushVoiceTelemetry } from "@/lib/voice/telemetry";
 import { writeCallPulse, clearCallPulse, takeInterruptedCall, browserStorage, CALL_PULSE_EVERY_MS } from "@/lib/voice/call-memory";
 import { probeWsLane } from "@/lib/voice/lane-probe";
+import { useDictation, formatDictationDuration, DICTATION_COPY } from "./useDictation";
 import { createPreviewPlayer, browserPreviewContext, VOICE_PREVIEW_PATH, PREVIEW_FETCH_TIMEOUT_MS, type PreviewPlayer, type PreviewContextLike } from "@/lib/voice/preview-player";
 import { TranscriptPersister, type SavedTurn, type PersistFailure } from "@/lib/voice/persist";
 import { VOICE_SWITCH_GREETING } from "@/lib/voice/text-turn";
@@ -168,11 +169,16 @@ export const RESUME_MIN_LIVE_MS = 5_000;
    coming back, and the caller should hear so rather than watch it try. */
 export const MAX_RESUMES = 2;
 
-const LABEL_COPY: Record<Lang, { start: string; end: string; connecting: string; speak: string }> = {
-  en: { start: "Start voice call", end: "End call", connecting: "Connecting…", speak: "Speak" },
-  zh: { start: "开始语音通话", end: "结束通话", connecting: "正在连接…", speak: "语音" },
-  ar: { start: "ابدأ مكالمة صوتية", end: "إنهاء المكالمة", connecting: "جارٍ الاتصال…", speak: "اتكلم" },
+const LABEL_COPY: Record<Lang, { start: string; end: string; connecting: string; speak: string; holdHint: string; dictating: string }> = {
+  en: { start: "Start voice call", end: "End call", connecting: "Connecting…", speak: "Speak", holdHint: "Tap to call · hold to dictate", dictating: "Listening… release to send" },
+  zh: { start: "开始语音通话", end: "结束通话", connecting: "正在连接…", speak: "语音", holdHint: "点按通话 · 长按口述", dictating: "正在听…松开即发送" },
+  ar: { start: "ابدأ مكالمة صوتية", end: "إنهاء المكالمة", connecting: "جارٍ الاتصال…", speak: "اتكلم", holdHint: "اضغط للمكالمة · اضغط مطوّلًا للإملاء", dictating: "بسمعك… سيب الزرار وهتتبعت" },
 };
+
+/* A PRESS THIS LONG IS A HOLD. Shorter is a tap (the call). 450 ms sits
+   between a slow tap and the platform's own long-press menus, which the
+   control suppresses while dictation is offered. */
+const HOLD_TO_DICTATE_MS = 450;
 
 export type VoiceCallButtonProps = {
   size?: number;
@@ -181,6 +187,10 @@ export type VoiceCallButtonProps = {
    *  its name on it, for the moment the composer is empty and talking is
    *  the obvious next thing to do. */
   variant?: "icon" | "pill";
+  /** ONE VOICE CONTROL (audit, 2026-09-11): when given, a long press on the
+   *  button dictates through the browser's recogniser and hands the words
+   *  here; a tap still starts the call. Absent, the button is the call alone. */
+  dictation?: { onTranscript: (text: string) => void; onError?: (message: string) => void };
   lang?: Lang;
   disabled?: boolean;
   onError?: (message: string) => void;
@@ -210,6 +220,7 @@ export type VoiceCallButtonProps = {
 export default function VoiceCallButton({
   size = 36,
   variant = "icon",
+  dictation,
   lang = "en",
   disabled = false,
   onError,
@@ -1372,6 +1383,62 @@ export default function VoiceCallButton({
   const labels = LABEL_COPY[lang];
   const label = connected ? labels.end : busy ? labels.connecting : labels.start;
 
+  /* HOLD TO DICTATE. The recogniser is the shared hook; the words go to the
+     caller's latest handler through a ref. The hold timer arms on pointer
+     down and is cleared on release — a release before it fires is a tap,
+     and the click that follows starts the call; a release after it fires
+     stops the recogniser, and the click is swallowed (heldRef). */
+  const dictationRef = useRef(dictation);
+  useEffect(() => {
+    dictationRef.current = dictation;
+  }, [dictation]);
+  const dict = useDictation({
+    lang,
+    onTranscript: (t) => dictationRef.current?.onTranscript(t),
+    onError: (m) => dictationRef.current?.onError?.(m),
+  });
+  const holdTimerRef = useRef<number | null>(null);
+  const heldRef = useRef(false);
+  const clearHold = useCallback(() => {
+    if (holdTimerRef.current !== null) {
+      window.clearTimeout(holdTimerRef.current);
+      holdTimerRef.current = null;
+    }
+  }, []);
+  useEffect(() => clearHold, [clearHold]);
+  const releaseHold = useCallback(() => {
+    clearHold();
+    if (heldRef.current) dict.stop();
+  }, [clearHold, dict]);
+  const holdHandlers = dictation
+    ? {
+        onPointerDown: (e: React.PointerEvent) => {
+          if (disabled || connected || busy || e.button !== 0) return;
+          heldRef.current = false;
+          clearHold();
+          holdTimerRef.current = window.setTimeout(() => {
+            holdTimerRef.current = null;
+            heldRef.current = true;
+            dict.start();
+          }, HOLD_TO_DICTATE_MS);
+        },
+        onPointerUp: releaseHold,
+        onPointerLeave: releaseHold,
+        onPointerCancel: releaseHold,
+        onContextMenu: (e: React.MouseEvent) => e.preventDefault(),
+        style: { WebkitTouchCallout: "none" } as React.CSSProperties,
+      }
+    : {};
+  const tapStartsCall = () => {
+    if (heldRef.current) {
+      heldRef.current = false;
+      return;
+    }
+    void startCall();
+  };
+  const dictating = dict.listening;
+  const recLabel = `● ${DICTATION_COPY[lang].rec} · ${formatDictationDuration(dict.elapsed)}`;
+
   return (
     <>
       {/* Playback only. Never rendered visibly — the button is the control. */}
@@ -1432,12 +1499,15 @@ export default function VoiceCallButton({
            control goes back to the small round one. */
         <button
           type="button"
-          onClick={() => void startCall()}
+          onClick={tapStartsCall}
           disabled={disabled}
-          aria-label={labels.start}
-          title={labels.start}
-          style={{ height: size }}
-          className={`rounded-full px-3.5 inline-flex items-center gap-1.5 shrink-0 bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold transition-[opacity,transform] duration-150 active:scale-95 ${disabled ? "opacity-40 cursor-not-allowed" : ""}`}
+          aria-label={dictating ? labels.dictating : labels.start}
+          title={dictation ? labels.holdHint : labels.start}
+          {...holdHandlers}
+          style={{ ...(holdHandlers.style ?? {}), height: size }}
+          className={`rounded-full px-3.5 inline-flex items-center gap-1.5 shrink-0 select-none text-[13px] font-semibold transition-[opacity,transform,background-color] duration-150 active:scale-95 ${
+            dictating ? "bg-[var(--kx-ai-danger)] text-white" : "bg-[var(--bg-inverted)] text-[var(--text-inverted)]"
+          } ${disabled ? "opacity-40 cursor-not-allowed" : ""}`}
         >
           <svg aria-hidden viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
             <line x1="4" y1="10" x2="4" y2="14" />
@@ -1446,18 +1516,21 @@ export default function VoiceCallButton({
             <line x1="16" y1="7" x2="16" y2="17" />
             <line x1="20" y1="10" x2="20" y2="14" />
           </svg>
-          {labels.speak}
+          {dictating ? recLabel : labels.speak}
         </button>
       ) : (
       <button
         type="button"
-        onClick={connected || busy ? hangUp : () => void startCall()}
+        onClick={connected || busy ? hangUp : tapStartsCall}
         disabled={disabled && !connected && !busy}
-        aria-label={label}
-        title={label}
-        style={{ height: size, width: size }}
-        className={`rounded-full inline-flex items-center justify-center shrink-0 transition-colors ${
-          connected
+        aria-label={dictating ? labels.dictating : label}
+        title={dictation && !connected && !busy ? labels.holdHint : label}
+        {...holdHandlers}
+        style={{ ...(holdHandlers.style ?? {}), height: size, width: size }}
+        className={`rounded-full inline-flex items-center justify-center shrink-0 select-none transition-colors ${
+          dictating
+            ? "bg-[var(--kx-ai-danger)] text-white"
+            : connected
             ? "bg-[#FF3333]/[0.16] text-[#FF3333] ring-1 ring-[#FF3333]/50"
             : busy
               ? "bg-[var(--bg-surface-subtle)] text-[var(--text-dim)]"

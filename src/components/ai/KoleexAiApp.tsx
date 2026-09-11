@@ -37,7 +37,7 @@ import { needsChunking, uploadInChunks, type ChunkedRef } from "@/lib/ai/attachm
 import CallsPanel from "@/components/ai/CallsPanel";
 import PhoneCallIcon from "@/components/icons/ui/PhoneCallIcon";
 import PaperPlaneIcon from "@/components/icons/ui/PaperPlaneIcon";
-import MicButton, { speakText, type TtsHandle } from "@/components/ai/MicButton";
+import { speakText, type TtsHandle } from "@/components/ai/MicButton";
 import VoiceCallButton from "@/components/ai/VoiceCallButton";
 import { type SavedTurn } from "@/lib/voice/persist";
 
@@ -1399,6 +1399,13 @@ export default function KoleexAiApp() {
    *  selected output voice + language are consistent. */
   const handleSpeak = useCallback((text: string) => {
     if (!text) return;
+    /* A TOGGLE: the stop control lived on the dictation mic, which the
+       composer no longer draws; a second tap on Read aloud stops it. */
+    if (aiSpeaking) {
+      ttsHandleRef.current?.cancel?.();
+      setAiSpeaking(false);
+      return;
+    }
     /* Stop any in-flight playback (voice-turn auto-read or a previous
        Speak click) before starting the new one. */
     ttsHandleRef.current?.cancel?.();
@@ -1408,7 +1415,7 @@ export default function KoleexAiApp() {
       onEnd: () => setAiSpeaking(false),
       onError: () => setAiSpeaking(false),
     });
-  }, [lang]);
+  }, [lang, aiSpeaking]);
 
   /** Per-message 👍 / 👎 feedback. Fire-and-forget — the server
    *  endpoint is a stub today (it accepts the row and ack-200s);
@@ -2839,20 +2846,13 @@ export default function KoleexAiApp() {
                   </div>
 
                   <div className="flex items-center gap-0.5">
-                    {/* Mic — primary cluster, 36×36. */}
-                    <MicButton
-                      size={36}
-                      onTranscript={(t) => send(t, true)}
-                      onError={(msg) => setError(msg)}
-                      speaking={aiSpeaking}
-                      onStopSpeaking={stopTts}
-                      disabled={sending}
-                      lang={lang}
-                    />
-
-                    {/* Live call — beside the mic, not instead of it. The mic
-                        transcribes and sends text; this opens a continuous
-                        audio connection. Two tools, both kept. */}
+                    {/* ONE VOICE CONTROL (audit, 2026-09-11). The dictation mic and
+                        the Speak pill sat side by side under the same waveform
+                        glyph — three meanings for one shape across the
+                        composer and the call. A tap starts the call; a long
+                        press dictates into the composer and sends. The
+                        standalone MicButton still serves Discuss and the
+                        floating panel. */}
                     <VoiceCallButton
                       size={36}
                       /* Grok's shape, the owner's ask: on an empty composer
@@ -2864,6 +2864,7 @@ export default function KoleexAiApp() {
                       lang={lang}
                       disabled={sending || !online}
                       onError={(msg) => setError(msg)}
+                      dictation={{ onTranscript: (t) => send(t, true), onError: (msg) => setError(msg) }}
                       onLiveChange={(live) => { if (live) stopTts(); }}
                       /* The call continues THIS thread: the server reads its
                          recent turns into the session, and the spoken turns

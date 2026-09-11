@@ -27,8 +27,6 @@
    Visible states:
      · idle       — mic outline, tap to start
      · listening  — solid red, pulsing, tap again to stop
-     · processing — spinner, final transcript resolving (brief — usually
-                    skipped since recognition returns instantly)
      · speaking   — mic+note, TTS is reading the AI reply
                    (caller passes `speaking=true` when speech is live)
 
@@ -37,86 +35,22 @@
    SpeechRecognition get a clear "not supported" message.
    --------------------------------------------------------------------------- */
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback } from "react";
 import MicIcon from "@/components/icons/ui/MicIcon";
 import StopIcon from "@/components/icons/ui/StopIcon";
-import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 
-/* Minimal typings for the vendor-prefixed Web Speech API. The browser
-   ships this under either `SpeechRecognition` or
-   `webkitSpeechRecognition`. We avoid pulling in the full DOM
-   SpeechRecognition declaration (not present in stock lib.dom.d.ts
-   across all TS configs) by using a thin structural type. */
-interface SRResult {
-  isFinal: boolean;
-  0: { transcript: string; confidence: number };
-}
-interface SREvent {
-  results: ArrayLike<SRResult>;
-  resultIndex: number;
-}
-interface SRErrorEvent {
-  error: string;
-  message?: string;
-}
-interface SpeechRecognitionLike {
-  continuous: boolean;
-  interimResults: boolean;
-  lang: string;
-  maxAlternatives: number;
-  start(): void;
-  stop(): void;
-  abort(): void;
-  onresult: ((ev: SREvent) => void) | null;
-  onerror: ((ev: SRErrorEvent) => void) | null;
-  onend: ((ev: Event) => void) | null;
-  onstart: ((ev: Event) => void) | null;
-}
-type SRConstructor = new () => SpeechRecognitionLike;
+import { useDictation, DICTATION_COPY, formatDictationDuration } from "./useDictation";
 
-function getSRConstructor(): SRConstructor | null {
-  if (typeof window === "undefined") return null;
-  const w = window as unknown as {
-    SpeechRecognition?: SRConstructor;
-    webkitSpeechRecognition?: SRConstructor;
-  };
-  return w.SpeechRecognition ?? w.webkitSpeechRecognition ?? null;
-}
+export type MicState = "idle" | "listening" | "speaking";
 
-export type MicState = "idle" | "listening" | "processing" | "speaking";
-
-function formatDuration(s: number): string {
-  if (s < 0) s = 0;
-  const m = Math.floor(s / 60);
-  const ss = s % 60;
-  return `${m.toString().padStart(1, "0")}:${ss.toString().padStart(2, "0")}`;
-}
 
 /* EVERY WORD THIS CONTROL SAYS, in the three UI languages. It was an English
    island: its errors reach the chat's red banner through onError, and its
    labels are what a screen reader announces (audit, 2026-09-11). */
 const MIC_COPY = {
-  en: {
-    label: "Voice input", stopRecording: "Stop recording", transcribing: "Transcribing…", stopSpeaking: "Stop speaking", rec: "REC",
-    unsupported: "Your browser doesn't support voice input. Try Chrome or Edge.",
-    noSpeech: "I didn't hear anything — please try again.", denied: "Microphone permission was denied.",
-    noMic: "Couldn't access your microphone.", network: "Voice service is unreachable — please try again.",
-    failed: "Voice input failed. Please try again.", cantStart: "Couldn't start voice input.",
-  },
-  zh: {
-    label: "语音输入", stopRecording: "停止录音", transcribing: "正在转写…", stopSpeaking: "停止朗读", rec: "录音",
-    unsupported: "你的浏览器不支持语音输入，请试试 Chrome 或 Edge。",
-    noSpeech: "没有听到声音，请再试一次。", denied: "麦克风权限被拒绝。",
-    noMic: "无法访问麦克风。", network: "语音服务暂时无法连接，请再试一次。",
-    failed: "语音输入失败，请再试一次。", cantStart: "无法启动语音输入。",
-  },
-  ar: {
-    label: "إدخال صوتي", stopRecording: "وقّف التسجيل", transcribing: "بنكتب اللي قلته…", stopSpeaking: "وقّف الكلام", rec: "تسجيل",
-    unsupported: "المتصفح ده مش بيدعم الإدخال الصوتي — جرّب Chrome أو Edge.",
-    noSpeech: "مسمعتش حاجة — جرّب تاني.", denied: "إذن الميكروفون مرفوض.",
-    noMic: "مقدرناش نوصل للميكروفون.", network: "خدمة الصوت مش متاحة دلوقتي — جرّب تاني.",
-    failed: "الإدخال الصوتي فشل. جرّب تاني.", cantStart: "مقدرناش نبدأ الإدخال الصوتي.",
-  },
+  en: { label: "Voice input", stopRecording: "Stop recording", transcribing: "Transcribing…", stopSpeaking: "Stop speaking" },
+  zh: { label: "语音输入", stopRecording: "停止录音", transcribing: "正在转写…", stopSpeaking: "停止朗读" },
+  ar: { label: "إدخال صوتي", stopRecording: "وقّف التسجيل", transcribing: "بنكتب اللي قلته…", stopSpeaking: "وقّف الكلام" },
 } as const;
 
 interface Props {
@@ -155,151 +89,16 @@ export default function MicButton({
 }: Props) {
   const t = MIC_COPY[lang ?? "en"];
   const baseLabel = label ?? t.label;
-  const [state, setState] = useState<MicState>("idle");
-  const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
-  /* Accumulates final result segments across one recognition session.
-     SpeechRecognition fires onresult with partial + final chunks; we
-     keep only the finalised ones so short pauses don't drop earlier
-     parts of the user's sentence. */
-  const finalTextRef = useRef<string>("");
-  /* Seconds since recording started. Zeroed in recognition.onstart (an
-     event handler, so no setState inside an effect body); the interval
-     only runs while listening, and the pill is only rendered while
-     listening, so a stale value can never show. */
-  const [elapsed, setElapsed] = useState(0);
+  /* THE RECOGNISER IS SHARED (useDictation, audit 2026-09-11): the chat
+     composer's single voice control dictates on a long press with the same
+     hook, so the two never drift. */
+  const dictation = useDictation({ lang, onTranscript, onError });
+  const state: MicState = dictation.listening ? "listening" : "idle";
+  const elapsed = dictation.elapsed;
+  const startRecording = dictation.start;
+  const stopRecording = dictation.stop;
 
   const computedState: MicState = speaking ? "speaking" : state;
-
-  useEffect(() => {
-    if (state !== "listening") return;
-    const tick = setInterval(() => setElapsed((s) => s + 1), 1000);
-    return () => clearInterval(tick);
-  }, [state]);
-
-  /* Cleanup on unmount — abort any live recognition so the mic
-     indicator in the browser tab turns off.
-     Audit P0 #12 — flip an alive flag so the recognition's onend /
-     onresult / onerror handlers, which may fire AFTER the unmount
-     (the browser's speech engine doesn't always cancel synchronously),
-     don't call setState on a dead component. */
-  const aliveRef = useRef(true);
-  useEffect(() => {
-    aliveRef.current = true;
-    return () => {
-      aliveRef.current = false;
-      try { recognitionRef.current?.abort(); } catch { /* ignore */ }
-      recognitionRef.current = null;
-    };
-  }, []);
-
-  const handleError = useCallback(
-    (msg: string) => {
-      setState("idle");
-      try {
-        recognitionRef.current?.abort();
-      } catch {
-        // ignore
-      }
-      recognitionRef.current = null;
-      onError?.(msg);
-    },
-    [onError],
-  );
-
-  /** BCP-47 language tag for SpeechRecognition. Uses the parent's
-   *  lang hint when present; otherwise stays unset so the browser
-   *  picks based on system language. */
-  const bcp47 =
-    lang === "zh" ? "zh-CN" : lang === "ar" ? "ar-SA" : lang === "en" ? "en-US" : "";
-
-  const startRecording = useCallback(() => {
-    const SR = getSRConstructor();
-    if (!SR) {
-      handleError(t.unsupported);
-      return;
-    }
-
-    try {
-      const recognition = new SR();
-      recognition.continuous = true;
-      recognition.interimResults = true;
-      recognition.maxAlternatives = 1;
-      if (bcp47) recognition.lang = bcp47;
-      finalTextRef.current = "";
-
-      recognition.onresult = (ev) => {
-        for (let i = ev.resultIndex; i < ev.results.length; i++) {
-          const r = ev.results[i];
-          if (r.isFinal) {
-            const t = r[0]?.transcript ?? "";
-            if (t) finalTextRef.current += (finalTextRef.current ? " " : "") + t.trim();
-          }
-        }
-      };
-      recognition.onerror = (ev) => {
-        /* Common error codes per the Web Speech API spec:
-             · no-speech   — user didn't say anything audible
-             · aborted     — programmatic abort (we did this; ignore)
-             · audio-capture — no mic available
-             · not-allowed — permission denied
-             · network     — transcription service unreachable (some
-                             browsers route audio to a cloud service) */
-        const code = ev.error ?? "";
-        if (code === "aborted") return; // our own abort, no error
-        if (code === "no-speech") {
-          handleError(t.noSpeech);
-          return;
-        }
-        if (code === "not-allowed" || code === "service-not-allowed") {
-          handleError(t.denied);
-          return;
-        }
-        if (code === "audio-capture") {
-          handleError(t.noMic);
-          return;
-        }
-        if (code === "network") {
-          handleError(t.network);
-          return;
-        }
-        handleError(t.failed);
-      };
-      recognition.onend = () => {
-        const text = finalTextRef.current.trim();
-        finalTextRef.current = "";
-        recognitionRef.current = null;
-        if (!aliveRef.current) return;
-        setState("idle");
-        if (text) onTranscript(text);
-      };
-      recognition.onstart = () => {
-        if (!aliveRef.current) return;
-        setElapsed(0);
-        setState("listening");
-      };
-      recognition.start();
-      recognitionRef.current = recognition;
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
-      if (/denied|not allowed/i.test(msg)) {
-        handleError(t.denied);
-      } else {
-        handleError(t.cantStart);
-      }
-    }
-  }, [bcp47, handleError, onTranscript, t]);
-
-  const stopRecording = useCallback(() => {
-    const rec = recognitionRef.current;
-    if (!rec) return;
-    try {
-      rec.stop(); // triggers onend, which delivers final transcript
-    } catch {
-      // ignore
-    }
-    /* Don't flip to "processing" — recognition is on-device and
-       instantaneous. Keep the listening halo until onend fires. */
-  }, []);
 
   const handleClick = useCallback(() => {
     if (disabled) return;
@@ -329,9 +128,7 @@ export default function MicButton({
      listening / speaking states keep a slightly smaller stop icon
      so its square geometry doesn't crowd the circle. */
   const icon =
-    computedState === "processing" ? (
-      <SpinnerIcon className="h-4 w-4" />
-    ) : computedState === "speaking" ? (
+    computedState === "speaking" ? (
       <StopIcon size={14} />
     ) : computedState === "listening" ? (
       <StopIcon size={14} />
@@ -347,18 +144,14 @@ export default function MicButton({
   const color =
     computedState === "listening"
       ? "bg-[var(--kx-ai-danger)] text-white"
-      : computedState === "processing"
-        ? "bg-[var(--bg-surface)] text-[var(--text-dim)]"
-        : computedState === "speaking"
+      : computedState === "speaking"
           ? "bg-[var(--kx-ai-accent)] text-white"
           : "text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-subtle)]";
 
   const ariaLabel =
     computedState === "listening"
       ? t.stopRecording
-      : computedState === "processing"
-        ? t.transcribing
-        : computedState === "speaking"
+      : computedState === "speaking"
           ? t.stopSpeaking
           : baseLabel;
 
@@ -409,7 +202,7 @@ export default function MicButton({
       <button
         type="button"
         onClick={handleClick}
-        disabled={disabled || computedState === "processing"}
+        disabled={disabled}
         aria-label={ariaLabel}
         title={ariaLabel}
         className={`relative rounded-full flex items-center justify-center shrink-0 transition-all disabled:opacity-40 ${color} ${
@@ -428,20 +221,10 @@ export default function MicButton({
           aria-live="polite"
           className="absolute -top-7 left-1/2 -translate-x-1/2 whitespace-nowrap text-[12px] font-semibold tracking-wider text-[var(--kx-ai-danger-text)] bg-[var(--kx-ai-danger-soft)] border border-[var(--kx-ai-danger-line)] rounded-full px-2 py-0.5 pointer-events-none shadow-md backdrop-blur-md"
         >
-          ● {t.rec} · {formatDuration(elapsed)}
+          ● {DICTATION_COPY[lang ?? "en"].rec} · {formatDictationDuration(elapsed)}
         </span>
       )}
 
-      {/* Transcribing indicator — small but visible so the user knows
-          their clip is being processed and hasn't been lost. */}
-      {computedState === "processing" && (
-        <span
-          aria-live="polite"
-          className="absolute -top-7 left-1/2 -translate-x-1/2 whitespace-nowrap text-[12px] font-medium tracking-wider text-[var(--text-dim)] bg-[var(--bg-secondary)]/95 border border-[var(--border-color)] rounded-full px-2 py-0.5 pointer-events-none shadow-lg backdrop-blur-md"
-        >
-          {t.transcribing}
-        </span>
-      )}
     </span>
   );
 }

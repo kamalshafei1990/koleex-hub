@@ -1013,7 +1013,7 @@ export default function VoiceCallScreen({
             LABELS, because an unlabelled icon pair is a guess. A caller who
             has never been on this screen should not have to find out what
             the grey circle does by pressing it while someone is listening. */}
-        <div className="flex items-end justify-center gap-8">
+        <div className="flex items-end justify-center gap-10">
           {talkMode === "hold" && onHold ? (
             /* HOLD TO TALK (roadmap B2), in Mute's place: the one control a
                caller in a loud room uses, so it is the widest thing on the
@@ -1116,12 +1116,14 @@ export default function VoiceCallScreen({
                 title={copy.voicePick}
                 className="h-14 w-14 rounded-full inline-flex items-center justify-center border text-[#AAAAAA] hover:text-white border-white/20 hover:border-white/30 bg-white/[0.04] hover:bg-white/[0.08] transition-[background-color,color,border-color,transform] duration-150 active:scale-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0066FF] focus-visible:ring-offset-2 focus-visible:ring-offset-[#0D0D0D]"
               >
+                {/* SLIDERS, NOT THE WAVEFORM. The waveform meant "speak" on the
+                    composer and "pick a voice" here — one shape, two meanings.
+                    This opens Call settings, so it wears the settings glyph
+                    (audit, 2026-09-11). */}
                 <svg aria-hidden viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round">
-                  <line x1="4" y1="10" x2="4" y2="14" />
-                  <line x1="8" y1="7" x2="8" y2="17" />
-                  <line x1="12" y1="4" x2="12" y2="20" />
-                  <line x1="16" y1="7" x2="16" y2="17" />
-                  <line x1="20" y1="10" x2="20" y2="14" />
+                  <line x1="4" y1="7" x2="20" y2="7" /><circle cx="9" cy="7" r="2" fill="#0D0D0D" />
+                  <line x1="4" y1="12" x2="20" y2="12" /><circle cx="15" cy="12" r="2" fill="#0D0D0D" />
+                  <line x1="4" y1="17" x2="20" y2="17" /><circle cx="7" cy="17" r="2" fill="#0D0D0D" />
                 </svg>
               </button>
               <span aria-hidden className="text-[12px] tracking-wide text-[#AAAAAA] max-w-[72px] truncate">
@@ -1204,8 +1206,12 @@ export default function VoiceCallScreen({
                 title={copy.close}
                 className="h-9 w-9 rounded-full inline-flex items-center justify-center text-[#AAAAAA] hover:text-white bg-white/[0.06] hover:bg-white/[0.1] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0066FF] focus-visible:ring-offset-2 focus-visible:ring-offset-[#111111]"
               >
-                <svg aria-hidden viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-                  <line x1="6" y1="6" x2="18" y2="18" /><line x1="18" y1="6" x2="6" y2="18" />
+                {/* A CHEVRON, NOT AN X. The X is the End button's — the one that
+                    ends the call — and the sheet's Close wore the same glyph
+                    with opposite stakes. Down is also the swipe that closes
+                    it (audit, 2026-09-11). */}
+                <svg aria-hidden viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="6 9 12 15 18 9" />
                 </svg>
               </button>
             </div>
