@@ -103,7 +103,7 @@ const searchTheWeb: ToolDef<SearchArgs, SearchData> = {
   name: "search_web",
   description:
     "Search the public internet for CURRENT or PUBLIC information the model cannot know: today's weather, news, exchange rates, shipping or port conditions, public standards and specifications, or any fact that may have changed since training. " +
-    "Call this whenever the user asks something time-sensitive instead of saying you have no live access. " +
+    "Call this whenever the user asks something time-sensitive instead of saying you have no live access — and for any fact about the world outside Koleex (a person, a company, a place, a ranking, a figure) that you would otherwise recall from training: look it up, then answer. " +
     "For 'latest / newest / current / this week' questions set recency (month for products and releases, week or day for news and prices) and put the current year, from the date block, in the query. " +
     "NEVER put Koleex's own data in the query — no customer names, prices, quotation contents, employee details or internal codes; those have their own tools. " +
     "Never use it to find or suggest machines from other manufacturers. " +

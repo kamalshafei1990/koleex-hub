@@ -51,6 +51,7 @@ import {
   isBusinessDataQuery,
   isWorkDataQuery,
   isLiveInfoQuery,
+  isWorldFactQuery,
   isImageCreationRequest,
 } from "@/lib/server/ai/core/decide-turn";
 import { tryCannedReply } from "@/lib/server/ai/core/canned-replies";
@@ -521,6 +522,9 @@ export async function POST(req: Request) {
              same treatment or this lane will swallow it. */
           const isLiveInfo =
             isLiveInfoQuery(normalizedContent) ||
+            /* A fact about the world outside Koleex is looked up, not
+               recalled (dependability plan A4). */
+            isWorldFactQuery(normalizedContent) ||
             /* "Draw me…" needs generate_image, which only the tool loop has. */
             isImageCreationRequest(normalizedContent) ||
             body.web_search === true;

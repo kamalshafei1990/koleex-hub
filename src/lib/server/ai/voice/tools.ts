@@ -236,17 +236,62 @@ export function voiceToolSchemas(variant: "full" | "compact" = "full"): Array<{
    provider's one-line answer are kept whole. Pure; exported for the suite. */
 export const VOICE_SEARCH_RESULTS = 3;
 export const VOICE_SNIPPET_CHARS = 200;
+
+/* NOTHING A VOICE CAN READ ALOUD BY MISTAKE (a call, 2026-09-11 19:06 UTC:
+   "here are pictures of the factory. ! (exhibitorsearch.messefrankfurt.com)
+   ! (exhibitorsearch.messefrankfurt.com)" — the model wrote the pictures'
+   markdown into its spoken turn and the voice read the punctuation and the
+   host out loud). The text lane's envelope carries picture URLs and a rule
+   to embed them as markdown, and asks for the source URL to be cited;
+   every one of those is wrong in a mouth. On a call the SCREEN already
+   shows the pictures a lookup returns (VoiceCallButton.onToolResult reads
+   them from the route's response before the model sees anything), so the
+   model is handed the count, not the links; a result's url becomes its
+   site's name; and the note is written for speech. */
+export const VOICE_SEARCH_NOTE =
+  "SPOKEN ANSWER. These are public web results, for facts only; never present another manufacturer's product as an option — " +
+  "Koleex only ever recommends Koleex machines. Name a source by its site's name in words if it matters; NEVER say a link, " +
+  "a web address, a file name, a host, markdown, or the words \"image\" or \"url\".";
+export const VOICE_PICTURES_NOTE = (n: number) =>
+  ` The caller's screen is already showing ${n === 1 ? "one picture" : `${n} pictures`} from this lookup: say one short sentence about what they show and go on.`;
+
+function hostOf(url: unknown): string {
+  if (typeof url !== "string") return "";
+  try {
+    return new URL(url).hostname.replace(/^www\./, "");
+  } catch {
+    return "";
+  }
+}
+
 export function forVoice(tool: string, data: unknown): unknown {
   if (tool !== "search_web" || !data || typeof data !== "object" || Array.isArray(data)) return data;
   const d = data as Record<string, unknown>;
   if (!Array.isArray(d.results)) return data;
+  const pictures = Array.isArray(d.images) ? d.images.length : 0;
+  const note = typeof d.usage_note === "string" ? d.usage_note : "";
+  /* The two sentences of the text note that are true out loud: the machine
+     rule (the product tools, never another maker) and the freshness rule. */
+  const machine = /NO PICTURES FOR MACHINES/.test(note)
+    ? " This query names a machine: that is a Koleex product question — use searchProducts and speak about Koleex's own machine; these results are reference only."
+    : "";
+  const fresh = (note.match(/FRESHNESS: .*$/) ?? [""])[0];
+  const rest: Record<string, unknown> = { ...d };
+  delete rest.images;
   return {
-    ...d,
+    ...rest,
     results: d.results.slice(0, VOICE_SEARCH_RESULTS).map((r) => {
       if (!r || typeof r !== "object") return r;
-      const row = r as Record<string, unknown>;
-      const snippet = typeof row.snippet === "string" ? row.snippet : "";
-      return { ...row, snippet: snippet.length > VOICE_SNIPPET_CHARS ? `${snippet.slice(0, VOICE_SNIPPET_CHARS)}…` : snippet };
+      const { url, snippet: rawSnippet, ...row } = r as Record<string, unknown>;
+      const snippet = typeof rawSnippet === "string" ? rawSnippet : "";
+      const source = hostOf(url);
+      return {
+        ...row,
+        ...(source ? { source } : {}),
+        snippet: snippet.length > VOICE_SNIPPET_CHARS ? `${snippet.slice(0, VOICE_SNIPPET_CHARS)}…` : snippet,
+      };
     }),
+    ...(pictures > 0 ? { pictures_on_screen: pictures } : {}),
+    usage_note: `${VOICE_SEARCH_NOTE}${pictures > 0 ? VOICE_PICTURES_NOTE(pictures) : ""}${machine}${fresh ? ` ${fresh}` : ""}`,
   };
 }

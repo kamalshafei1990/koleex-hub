@@ -468,6 +468,21 @@ export function closeCodeOf(ev: unknown): string {
   return typeof code === "number" ? String(code) : "";
 }
 
+/** The event histogram as one bounded string — THE NOTABLE KEYS FIRST
+ *  (2026-09-11: every beacon of the day was cut at "respon…" — the ordinary
+ *  events came first in arrival order and the six hundred characters ran
+ *  out before `response.done.cancelled` or `error` could appear, which are
+ *  the ones a cut sentence is diagnosed from). Cancellations, errors and
+ *  the statuses of answers that did not complete lead; the rest follow in
+ *  the order they were first seen. Pure; exported for the suite. */
+export const NOTABLE_EVENT = /cancel|error|incomplete|fail|truncat|\.done\./i;
+export function eventHistogram(counts: ReadonlyMap<string, number>): string {
+  const entries = [...counts.entries()];
+  const notable = entries.filter(([k]) => NOTABLE_EVENT.test(k));
+  const rest = entries.filter(([k]) => !NOTABLE_EVENT.test(k));
+  return [...notable, ...rest].map(([k, v]) => `${k}:${v}`).join(",").slice(0, 600);
+}
+
 export class VoiceSession {
   private pc: RTCPeerConnection | null = null;
   private mic: MediaStream | null = null;
@@ -733,7 +748,7 @@ export class VoiceSession {
       region: this.servedRegion,
       ice_ever_connected: this.iceEverConnected,
       err: this.lastError,
-      events: [...this.eventCounts.entries()].map(([k, v]) => `${k}:${v}`).join(",").slice(0, 600),
+      events: eventHistogram(this.eventCounts),
       ws_reconnects: this.wsReconnects,
       ws_close: this.wsCloseCode,
       canary: this.canary,
