@@ -848,10 +848,13 @@ async function main() {
     check("no vendor, endpoint, model or key name in the client source",
       !/dashscope|aliyun|qwen|maas|api[_-]?key|ws-pl/i.test(src));
 
-    /* The existing mic is a working tool and the standing rule keeps it. */
+    /* ONE VOICE CONTROL (owner-approved, 2026-09-11): the composer draws the
+       call button alone; dictation rides on it as a long press through the
+       shared hook. The standalone MicButton still serves Discuss. */
     const app = fs.readFileSync("src/components/ai/KoleexAiApp.tsx", "utf8");
-    check("MicButton is still mounted — the call button is an addition, not a replacement",
-      /<MicButton/.test(app) && /<VoiceCallButton/.test(app));
+    check("the composer has one voice control: no MicButton, the call button carries dictation",
+      !/<MicButton/.test(app) && /<VoiceCallButton/.test(app) &&
+      /dictation=\{\{ onTranscript: \(t\) => send\(t, true\), onError: \(msg\) => setError\(msg\) \}\}/.test(app));
     check("a live call stops the page's own speech synthesis",
       /onLiveChange=\{\(live\) => \{ if \(live\) stopTts\(\); \}\}/.test(app));
   }
@@ -2246,7 +2249,7 @@ console.log("\n── 12. Mute ──");
      call shrinks to its icon. */
   check("the call button has a pill variant: inverted, named Speak in three languages, only while idle",
     /variant\?: "icon" \| "pill";/.test(btn20) && /\{variant === "pill" && !connected && !busy \? \(/.test(btn20) &&
-    /bg-\[var\(--bg-inverted\)\] text-\[var\(--text-inverted\)\] text-\[13px\] font-semibold/.test(btn20) && /\{labels\.speak\}/.test(btn20) &&
+    /dictating \? "bg-\[var\(--kx-ai-danger\)\] text-white" : "bg-\[var\(--bg-inverted\)\] text-\[var\(--text-inverted\)\]"/.test(btn20) && /\{dictating \? recLabel : labels\.speak\}/.test(btn20) &&
     /speak: "Speak"/.test(btn20) && /speak: "语音"/.test(btn20) && /speak: "اتكلم"/.test(btn20));
   check("  …the composer uses it when there is nothing to send, and shows Send only when there is",
     /const hasDraft = input\.trim\(\)\.length > 0 \|\| attachments\.length > 0;/.test(app20) &&
@@ -3646,6 +3649,31 @@ console.log("\n── 38. call settings sheet: title, voice heading, swipe-down,
   check("  …no caption on the call screen is #666666 any more except the text field's placeholder, and none is under 12 px",
     (scr.match(/(?<!placeholder:)text-\[#666666\]/g) ?? []).length === 0 && /placeholder:text-\[#666666\]/.test(scr) &&
     !/text-\[1[01](\.5)?px\]/.test(scr) && !/text-\[9(\.5)?px\]/.test(scr));
+}
+/* ── 39. ONE VOICE CONTROL: tap calls, hold dictates (owner-approved, 2026-09-11) ── */
+console.log("\n── 39. one voice control: a long press dictates through the shared recogniser ──");
+{
+  const fsC = await import("node:fs");
+  const btn = fsC.readFileSync("src/components/ai/VoiceCallButton.tsx", "utf8");
+  const mic = fsC.readFileSync("src/components/ai/MicButton.tsx", "utf8");
+  const hook = fsC.readFileSync("src/components/ai/useDictation.ts", "utf8");
+  check("the recogniser is one hook, used by the call button and by the standalone mic alike",
+    /export function useDictation\(/.test(hook) && /import \{ useDictation, formatDictationDuration, DICTATION_COPY \} from "\.\/useDictation";/.test(btn) &&
+    /const dictation = useDictation\(\{ lang, onTranscript, onError \}\);/.test(mic) && !/webkitSpeechRecognition/.test(mic));
+  check("a press past the hold threshold starts dictation; release stops it and the words go to the caller; the click that follows a hold is swallowed, a tap still calls",
+    /const HOLD_TO_DICTATE_MS = 450;/.test(btn) &&
+    /holdTimerRef\.current = window\.setTimeout\(\(\) => \{\s*holdTimerRef\.current = null;\s*heldRef\.current = true;\s*dict\.start\(\);\s*\}, HOLD_TO_DICTATE_MS\);/.test(btn) &&
+    /const releaseHold = useCallback\(\(\) => \{\s*clearHold\(\);\s*if \(heldRef\.current\) dict\.stop\(\);/.test(btn) &&
+    /const tapStartsCall = \(\) => \{\s*if \(heldRef\.current\) \{\s*heldRef\.current = false;\s*return;\s*\}\s*void startCall\(\);/.test(btn) &&
+    /onPointerUp: releaseHold,\s*onPointerLeave: releaseHold,\s*onPointerCancel: releaseHold,/.test(btn) &&
+    /onContextMenu: \(e: React\.MouseEvent\) => e\.preventDefault\(\),/.test(btn));
+  check("  …while dictating the control is red and reads REC with the seconds; the hold is only offered when the composer asked for dictation, never during a call",
+    /\{dictating \? recLabel : labels\.speak\}/.test(btn) && /if \(disabled \|\| connected \|\| busy \|\| e\.button !== 0\) return;/.test(btn) &&
+    /const holdHandlers = dictation\s*\?/.test(btn) && ["en", "zh", "ar"].every((l) => new RegExp(`${l}: \\{[^\\n]*holdHint: "`).test(btn)));
+  const scr = fsC.readFileSync("src/components/ai/VoiceCallScreen.tsx", "utf8");
+  check("the Voice control wears the settings glyph, the sheet's Close a chevron, and End keeps the owner's X",
+    /SLIDERS, NOT THE WAVEFORM/.test(scr) && /<polyline points="6 9 12 15 18 9" \/>/.test(scr) &&
+    /AN X, NOT A HANDSET\. The owner/.test(scr) && /className="flex items-end justify-center gap-10"/.test(scr));
 }
 console.log(`\n${pass} passed, ${failures.length} failed`);
   if (failures.length) {

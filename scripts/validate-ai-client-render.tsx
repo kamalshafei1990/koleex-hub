@@ -920,9 +920,11 @@ console.log("\n── The transcript belongs to the call, not to the chat ──
      worse than no assertion. */
   const callButtonEl = app.slice(app.indexOf("<VoiceCallButton"), app.indexOf("/>", app.indexOf("<VoiceCallButton")));
   check("and holds no transcript state that could outlive a call",
-    !/voiceLines/.test(app) && !/onTranscript/.test(callButtonEl));
-  check("the existing mic still hands its transcript to the chat",
-    /<MicButton[\s\S]{0,400}?onTranscript=\{\(t\) => send\(t, true\)\}/.test(app));
+    /* `dictation={{ onTranscript: … }}` is the long-press dictation's words going
+       to send(); a transcript PROP (`onTranscript=`) is what this forbids. */
+    !/voiceLines/.test(app) && !/onTranscript=/.test(callButtonEl));
+  check("dictation still hands its transcript to the chat — through the call button's long press, the composer's one voice control",
+    !/<MicButton/.test(app) && /dictation=\{\{ onTranscript: \(t\) => send\(t, true\)/.test(app));
   check("the call button is still mounted there", /<VoiceCallButton/.test(app));
 
   /* It is rendered by the call screen, which closes with the call. */
