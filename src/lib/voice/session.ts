@@ -243,6 +243,8 @@ export type VoiceDeps = {
   /** Test seam for the per-call cap, so the loop guard can be proved without
    *  making a dozen round trips. */
   maxToolCallsPerSession?: number;
+  /** Test seam for the socket keepalive's period. */
+  wsKeepaliveMs?: number;
 };
 
 /* ICE gathering normally finishes in well under a second on a local network
@@ -461,6 +463,17 @@ export const WS_SESSION_PATH = "/api/ai/voice/ws-session";
    microphone, the same audio, the same screen. The far side's history
    comes back from the server with the new session. */
 export const WS_RECONNECT_DELAYS_MS: readonly number[] = [0, 1_500, 3_000, 6_000];
+/* THE KEEPALIVE (2026-09-11 15:07 UTC: the socket to the relay died twice at
+   exactly 36 s, `client-closed 1006`, with audio frames flowing the whole
+   time — the shape of a proxy on the phone's path that cuts a WebSocket it
+   sees no application traffic on, protocol pings notwithstanding). While a
+   socket to OUR relay is open, one small text frame goes up every ten
+   seconds; the relay answers it and never forwards it (the vendor must not
+   see an event it does not know), and the echo is not an event here: it
+   makes nothing live and is not counted. Only when the handshake says the
+   socket is the relay's (`keepalive: true`). */
+export const WS_KEEPALIVE_MS = 10_000;
+export const WS_KEEPALIVE_MESSAGE = JSON.stringify({ type: "koleex.keepalive" });
 
 /** The close code a socket reports, as text for a beacon. Pure. */
 export function closeCodeOf(ev: unknown): string {
@@ -496,6 +509,10 @@ export class VoiceSession {
   private wsReconnects = 0;
   private wsOutageAttempt = 0;
   private wsCloseCode = "";
+  /** The socket keepalive (WS_KEEPALIVE_MS): whether this handshake allows
+   *  it, and the interval while the socket is open. */
+  private wsKeepalive = false;
+  private wsKeepaliveTimer: ReturnType<typeof setInterval> | null = null;
   /** A microphone a failed call kept alive for the call that resumes it —
    *  see fail(). A phone asks no second permission for a stream it holds. */
   private orphanMic: MediaStream | null = null;
@@ -822,6 +839,7 @@ export class VoiceSession {
   /** Tear down the WebSocket lane's objects, silently: a close the session
    *  itself asked for must not read as the far side hanging up. */
   private closeWs(): void {
+    this.stopKeepalive();
     const ws = this.ws;
     this.ws = null;
     if (ws) {
@@ -1419,6 +1437,7 @@ export class VoiceSession {
       protocols = Array.isArray(body.protocols) ? body.protocols.filter((p): p is string => typeof p === "string" && p.length > 0) : [];
       const rate = body.audio?.sample_rate;
       if (typeof rate === "number" && rate >= 8_000 && rate <= 48_000) sampleRate = rate;
+      this.wsKeepalive = (body as { keepalive?: unknown }).keepalive === true;
       if (body.session && typeof body.session === "object") this.sessionUpdate = JSON.stringify(body.session);
       if (body.session_compact && typeof body.session_compact === "object") this.sessionUpdateCompact = JSON.stringify(body.session_compact);
       /* Only a secure socket, only with a secret to present. */
@@ -1440,6 +1459,7 @@ export class VoiceSession {
       return false;
     }
     /* A redial replaces the dead socket silently: its close is not news. */
+    this.stopKeepalive();
     const prev = this.ws;
     if (prev && prev !== ws) {
       prev.onclose = null;
@@ -1486,6 +1506,7 @@ export class VoiceSession {
 
     ws.onopen = () => {
       if (this.ws !== ws) return;
+      if (this.wsKeepalive) this.startKeepalive(ws);
       /* AN OPEN SOCKET IS NOT THE TRANSPORT UP. The far side's first event
          is (markTransportUp, from onChannelMessage) — an open socket that
          says nothing is what a stalled tunnel looks like (WS_FIRST_EVENT_MS).
@@ -1511,6 +1532,8 @@ export class VoiceSession {
     };
     ws.onmessage = (m) => {
       if (this.ws !== ws || typeof m.data !== "string") return;
+      /* The relay's echo of our own keepalive: not the far side speaking. */
+      if (m.data === WS_KEEPALIVE_MESSAGE) return;
       this.onWsAudioEvent(m.data, this.wsAudio);
       this.onChannelMessage(m.data, channel);
     };
@@ -1545,6 +1568,28 @@ export class VoiceSession {
       }, this.deps.wsFirstEventMs ?? WS_FIRST_EVENT_MS);
     }
     return true;
+  }
+
+  private startKeepalive(ws: VoiceSocket): void {
+    this.stopKeepalive();
+    this.wsKeepaliveTimer = setInterval(() => {
+      if (this.ws !== ws || ws.readyState !== 1) {
+        this.stopKeepalive();
+        return;
+      }
+      try {
+        ws.send(WS_KEEPALIVE_MESSAGE);
+      } catch {
+        /* The socket is closing; its close handler owns what happens next. */
+      }
+    }, this.deps.wsKeepaliveMs ?? WS_KEEPALIVE_MS);
+  }
+
+  private stopKeepalive(): void {
+    if (this.wsKeepaliveTimer !== null) {
+      clearInterval(this.wsKeepaliveTimer);
+      this.wsKeepaliveTimer = null;
+    }
   }
 
   /** Arm the canary (WS_CANARY_AFTER_MS): after the delay, one GET to our

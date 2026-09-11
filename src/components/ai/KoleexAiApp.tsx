@@ -371,6 +371,10 @@ export default function KoleexAiApp() {
      but not painted, and the aurora canvas is not drawn at all: nothing
      behind an opaque full-screen layer is worth a phone's memory. */
   const [callLive, setCallLive] = useState(false);
+  /* THE CALL THE PAGE DIED UNDER, offered back (plan B5): the button found
+     the pulse on this load and handed over a way to continue; the card
+     below the thread carries it until the caller taps or dismisses. */
+  const [interruptedCall, setInterruptedCall] = useState<{ resume: () => void; conversation: string | null } | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false); // mobile
   /* WHICH SIDEBAR IS THIS. On a phone the aside is a drawer that slides off
      screen; on a desktop it collapses to zero width. Both used to stay in the
@@ -822,6 +826,19 @@ export default function KoleexAiApp() {
       return next;
     });
   }, []);
+
+  const onVoiceInterrupted = useCallback((resume: () => void, conversation: string | null) => {
+    setInterruptedCall({ resume, conversation });
+  }, []);
+  const continueInterruptedCall = useCallback(async () => {
+    const it = interruptedCall;
+    if (!it) return;
+    setInterruptedCall(null);
+    /* The same conversation as the call that died, opened first when it is
+       not the one on screen — the new call reads its thread as history. */
+    if (it.conversation && it.conversation !== activeIdRef.current) await openConversation(it.conversation);
+    it.resume();
+  }, [interruptedCall, openConversation]);
 
   /* THE SIDEBAR BUMP, once. A finished turn moves its chat to the top with
      the new title and preview; the same reducer existed twice in send()
@@ -2673,6 +2690,21 @@ export default function KoleexAiApp() {
                 {attachStatus}
               </div>
             )}
+            {interruptedCall && !callLive && (
+              <div role="status" className="rounded-xl border border-[var(--kx-ai-warning-line)] bg-[var(--kx-ai-warning-soft)] text-[var(--kx-ai-warning-text)] px-3 py-2 text-[12px] flex flex-wrap items-center gap-2">
+                <span className="flex-1 min-w-[12rem]">{copy.callCutOff}</span>
+                <button
+                  type="button"
+                  onClick={() => void continueInterruptedCall()}
+                  className="rounded-full bg-[var(--bg-inverted)] text-[var(--text-inverted)] px-3 py-1 text-[12px] font-semibold"
+                >
+                  {copy.continueCall}
+                </button>
+                <button type="button" onClick={() => setInterruptedCall(null)} aria-label={copy.dismiss} className="rounded-full px-2 py-1 text-[12px] opacity-70 hover:opacity-100">
+                  ✕
+                </button>
+              </div>
+            )}
             {error && (
               <div role="alert" className="rounded-xl border border-[var(--kx-ai-danger-line)] bg-[var(--kx-ai-danger-soft)] text-[var(--kx-ai-danger-text)] px-3 py-2 text-[12px]">
                 {error}
@@ -2985,6 +3017,7 @@ export default function KoleexAiApp() {
                       ensureConversation={ensureVoiceConversation}
                       onTurnsSaved={onVoiceTurnsSaved}
                       onTurnUpdated={onVoiceTurnUpdated}
+                      onInterrupted={onVoiceInterrupted}
                     />
 
                     {/* Send / Stop — inverted bg circle, anchors the row. */}

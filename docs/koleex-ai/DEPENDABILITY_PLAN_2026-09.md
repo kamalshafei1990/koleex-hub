@@ -93,8 +93,8 @@ plain words. Verification is named per phase; nothing is called done without it.
 | B1 ✅ | One `response.create` per response; the fallback waits for an active response | `validate:voice-client` |
 | B2 ✅ | Item-keyed caller lines, corrected rows | `validate:voice-events`, `validate:voice-client`, `validate:ai-voice` |
 | B3 ✅ | The page behind a live call goes quiet; newest pictures only; the pulse records the page's weight | `validate:ai-client-render`, `validate:voice-client` |
-| B4 | **The 36-second socket drop.** Read every `wsClose=1006` beacon of the week against the relay's log; if the drops cluster at one interval, it is a proxy on the path (a VPN's or a carrier's idle rule) — the fix is an application-level heartbeat on the socket (a tiny JSON ping every 10 s from the client) beside the relay's protocol ping, and a shorter relay ping. If they do not cluster, it is the phone's network, and the redial (already immediate) is the right answer | The beacon histogram over a week shows `wsReconnects=0` on the owner's calls |
-| B5 | **Continue the call with one tap.** A page the phone killed under a call comes back to a small card: "The call was cut — continue" — same conversation, same voice, one tap (the microphone needs the tap anyway). Today it is a sentence and the caller has to find the button | Client render pin; a real reload during a call |
+| B4 ✅ (shipped; proof pending) | **The 36-second socket drop.** The two drops of the 15:07 call were at exactly 36 s with audio flowing — the shape of a proxy on the phone's path that cuts a WebSocket it sees no application traffic on. Shipped: an application-level keepalive on the socket lane — the client sends one small text frame every 10 s while the socket to OUR relay is open, the relay answers it and never forwards it (`services/voice-relay`, `KEEPALIVE_FRAME`; the handshake says `keepalive: true` only for the relay's socket), and the echo is not an event on the client. Still to read: a week of beacons | The beacon histogram over a week shows `wsReconnects=0` on the owner's calls |
+| B5 ✅ | **Continue the call with one tap.** A page the phone killed under a call comes back to a card below the thread — "The last call was cut off — Continue the call" — which opens the call's conversation if it is not the open one and starts a new call there on the tap (the microphone needs the tap anyway). A parent that offers no card still gets the sentence | `validate:voice-client` pins; a real reload during a call |
 | B6 | **The voice harness.** A Playwright script (Chromium, a WAV file as the microphone, the relay's real socket, a recorded vendor) that runs a scripted call: greet, ask for the brief, ask for a picture, interrupt mid-answer, hang up — and asserts the transcript, the number of `response.create`, the audio frames played, the rows saved. Runs on demand and nightly. This is the missing piece behind every voice regression of this month | The script exists and is green on `main` |
 | B7 | **The root cause of the page death.** With the pulse's `dom=/imgs=` and a real-device session (§5, decision 2), either a memory figure that names the culprit or Safari's own crash log from the phone (Settings → Privacy → Analytics). Then the specific fix, not a guess | A call with three picture answers in a row survives on the owner's phone |
 
@@ -158,8 +158,8 @@ caller who is elsewhere.
 
 | When | What lands |
 |---|---|
-| Today | A1–A3, B1–B3 (this PR and #404) |
-| This week | A4, A5, B4, B5, G1 |
+| Today | A1–A5 (first slice of A4), B1–B5 (#404, #405, #406, and the keepalive PR) |
+| This week | A4 second slice, G1 |
 | Next week | B6 (the harness), C1, C2, A6 |
 | Weeks 3–4 | C3, C4, D-1, D-2 |
 | Weeks 4–5 | E1–E3, D-3, G3/H |
