@@ -21,6 +21,8 @@ import {
   EV_ASSISTANT_DONE,
   EV_USER_DELTA,
   EV_USER_DONE,
+  EV_USER_UPDATED,
+  ITEM_LOOKBACK,
   EV_SESSION_UPDATED,
   EV_ERROR,
   EV_SPEECH_STARTED,
@@ -451,6 +453,57 @@ console.log("\n── 10. The protocol's newer names, and an utterance heard aga
     extendsUtterance("Hello?", "hello, there") && extendsUtterance("إزيك؟", "إزيك، إيه الأخبار") && !extendsUtterance("a", "ab") && !extendsUtterance("hello there", "hello") && !extendsUtterance("", "x"));
   const withPhoto = appendTranscript([{ role: "user", text: "show me", final: true }], { role: "user", text: "show me the KX-180", final: true, photos: [{ url: "https://x/y.jpg", label: "p" }] });
   check("  …a replacement keeps the newer line's photos", withPhoto.length === 1 && withPhoto[0].photos?.length === 1);
+}
+
+{
+  /* THE SAME TURN, HEARD AGAIN — a call, 2026-09-11 17:32 UTC: the socket
+     lane's vendor sent 70 settled caller transcripts for 8 turns, and 54
+     `.updated` partials nothing read. Each hearing is the WHOLE turn so far
+     under one item id; the thread held "قوللي الـ...", then "قوللي الااا
+     التوداي..." as two rows, with the far side's filler between them. */
+  check("the vendor's cumulative partial has its literal name, and a bounded look-back exists",
+    EV_USER_UPDATED === "conversation.item.input_audio_transcription.updated" && ITEM_LOOKBACK >= 4 && ITEM_LOOKBACK <= 12);
+  const up = parseVoiceEvent(ev({ type: EV_USER_UPDATED, item_id: "item_A", transcript: "قوللي الـ" }));
+  check("an .updated event is the caller's open turn, with its item",
+    up.transcript?.role === "user" && up.transcript.final === false && up.transcript.text === "قوللي الـ" && up.transcript.itemId === "item_A" && up.phase === "listening");
+  check("  …read from text + stash too, and an item-less event carries no id",
+    parseVoiceEvent(ev({ type: EV_USER_UPDATED, text: "how ", stash: "many" })).transcript?.text === "how many" &&
+    parseVoiceEvent(ev({ type: EV_USER_DONE, transcript: "x" })).transcript?.itemId === undefined);
+  const done = parseVoiceEvent(ev({ type: EV_USER_DONE, item_id: "item_A", transcript: "قوللي الـ..." }));
+  check("a completed event carries its item too", done.transcript?.itemId === "item_A" && done.transcript.final === true);
+
+  let lines: TranscriptLine[] = [];
+  const feed = (raw: string) => { const t = parseVoiceEvent(raw).transcript; if (t) lines = appendTranscript(lines, t); };
+  feed(ev({ type: EV_USER_UPDATED, item_id: "item_A", transcript: "قوللي الـ" }));
+  feed(ev({ type: EV_USER_DONE, item_id: "item_A", transcript: "قوللي الـ..." }));
+  check("a partial then a completed of one item is ONE settled line", lines.length === 1 && lines[0].final && lines[0].text === "قوللي الـ..." && lines[0].itemId === "item_A");
+  feed(ev({ type: EV_ASSISTANT_DELTA_GA, delta: "ثانية " }));
+  feed(ev({ type: EV_ASSISTANT_DONE_GA, transcript: "ثانية واحدة." }));
+  feed(ev({ type: EV_USER_DONE, item_id: "item_A", transcript: "قوللي الااا التوداي..." }));
+  check("a re-hearing that lands AFTER the far side's filler replaces the line where it stands — the words are the fullest, the order is kept, no new row",
+    lines.length === 2 && lines[0].role === "user" && lines[0].text === "قوللي الااا التوداي..." && lines[0].final && lines[1].text === "ثانية واحدة.");
+  feed(ev({ type: EV_ASSISTANT_DELTA_GA, delta: "مفيش" }));
+  feed(ev({ type: EV_USER_DONE, item_id: "item_A", transcript: "قوللي التوداي بريف" }));
+  check("  …even when an early word changed and an answer is open on top (the tatweel case: no prefix in common)",
+    lines.length === 3 && lines[0].text === "قوللي التوداي بريف" && lines[2].final === false);
+  feed(ev({ type: EV_ASSISTANT_DONE_GA, transcript: "مفيش اجتماعات." }));
+  feed(ev({ type: EV_USER_DONE, item_id: "item_B", transcript: "هو أنتي بتقوليلي." }));
+  check("a different item is a new turn", lines.length === 4 && lines[3].itemId === "item_B" && lines[3].text === "هو أنتي بتقوليلي.");
+  feed(ev({ type: EV_USER_DONE, item_id: "item_B", transcript: "هو أنتي بتهيدي نفس الكلام ليه." }));
+  check("  …and its re-hearing replaces IT, not the older item", lines.length === 4 && lines[3].text === "هو أنتي بتهيدي نفس الكلام ليه." && lines[0].text === "قوللي التوداي بريف");
+  feed(ev({ type: EV_USER_DONE, item_id: "item_B", transcript: "[noise] ..." }));
+  check("  …a re-hearing that is only noise markers withdraws the line", lines.length === 3 && lines.every((l) => l.itemId !== "item_B"));
+  /* Beyond the look-back an item is out of reach — the fold is bounded. */
+  let far: TranscriptLine[] = [{ role: "user", text: "old", final: true, itemId: "item_Z" }];
+  for (let i = 0; i < ITEM_LOOKBACK; i++) far = appendTranscript(far, { role: i % 2 ? "user" : "assistant", text: `t${i}`, final: true });
+  far = appendTranscript(far, { role: "user", text: "old, heard again", final: true, itemId: "item_Z" });
+  check("  …an item older than the look-back is not reached: the update is a new line", far[0].text === "old" && far[far.length - 1].text === "old, heard again");
+  /* Photos: a replacement keeps the line's pictures, or takes the update's when it had none. */
+  const withPic = appendTranscript([{ role: "user", text: "a", final: true, itemId: "p" }], { role: "user", text: "ab", final: true, itemId: "p", photos: [{ url: "https://x/1.jpg", label: "" }] });
+  check("  …a replacement takes the update's photos when the line had none", withPic[0].photos?.length === 1 && withPic[0].text === "ab");
+  /* The persister reads the same list: a replaced line at an index it has
+     written is what the correction (persist.ts) is for. */
+  check("the item id survives the open-line merge path", appendTranscript([{ role: "user", text: "he", final: false, itemId: "m" }], { role: "user", text: "hello", final: true })[0].itemId === "m");
 }
 
 {

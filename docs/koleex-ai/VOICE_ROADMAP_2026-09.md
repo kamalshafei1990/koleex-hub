@@ -766,3 +766,18 @@ views, photos inline, no reload over a call · #338 default voice catalogue ·
 keeps the screen, region memory, silent-exit beacons · #341 Speak pill,
 activity line, voices sheet · #342/#343 orb flight between views, voice
 signatures · #344 End is an X, connected cue "arrive".
+
+## Deep check, 2026-09-11 evening — one call, three faults
+
+Owner, 17:40 UTC: "suddenly the voice conversation stop and the voice not
+so stable, some sentence is cut and some sentences repeated." Read from the
+saved rows of conversation `49fe6010…` (17:32–17:35 UTC), the relay's log
+(session 514: 202 s, `client-closed code=1006`, 2375 frames up / 541 down),
+the `page-killed` beacon the next page sent, and the Vercel request log.
+
+| What the owner heard | What the evidence says | Fixed |
+|---|---|---|
+| **Repeated sentences** — the brief, then "and nothing in the schedule either", then "nothing planned either"; the owner asked why it repeats and it apologised | `response.created:15` for 8 caller turns. "Today's brief" makes the model call THREE lookups in one response; each result went back followed by its own `response.create`, so the far side was asked to speak three times. | Yes — the session reads every function call off `response.done` and sends ONE `response.create` when the last output of that response is in (`responseFunctionCalls`, `noteToolOutputSent`); an output whose `response.done` never comes still gets one request after 1.2 s |
+| **Cut sentences in the thread** — "قوللي الـ...", "حاجة أنا بجر...", "أنا عايزك ت..." as rows, each followed by the fuller hearing | `input_audio_transcription.completed:70` and `.updated:54` for `speech_started:8`: the socket lane's vendor transcribes a turn several times over, settled each time, under ONE `item_id`. The prefix rule merged only the adjacent case; a re-hearing that changed an early word, or landed after the far side's filler, became its own row — and the first hearing was already saved | Yes — a caller's line is keyed on its item: any later hearing replaces it where it stands (`appendTranscript`, `ITEM_LOOKBACK`); `.updated` is read as the live caption it is; a line already written is **corrected** in its row (`PATCH /api/ai/voice/transcript`, same gate, budget and ownership; only a `source='voice'` row of that conversation) and the bubble updates in place |
+| **The call stopped** | 17:35:33 the answer with two web pictures was saved; 17:35:35 a full document load of `/ai` on the SAME build (no 404s, no stale-bundle heal — the page had loaded fresh at 17:31:48); no `page-hidden` beacon (a reload fires `pagehide`); the pulse reported `page-killed` with `lastEvent=response.output_audio.delta`. That is the shape of the phone's WebKit process dying under the page and Safari reloading it, not of anything this code did. The same shape as 2026-09-07 17:33 and 18:03, both also right after pictures | Not fixable from a page. Pictures already come resized through `/api/ai/image` (2026-09-07); the audio graph is one context. What remains is memory the page cannot see. Kept: the next load names it and tells the caller |
+| **"Not so stable"** | The Discuss realtime channel on the owner's other device flapped `CLOSED/reconnect` seven times between 17:35:02 and 17:35:53 — the local link was unsteady in the same minute. The socket lane's jitter buffer adapts up to 0.8 s | Nothing to change blind; the buffer is the right tool for a link like that |

@@ -980,9 +980,34 @@ console.log("\n── 8. What the client may know, and what it may not ──");
       ownAt !== -1 && ownAt < route.indexOf(".insert(") &&
       /\.select\("id, title, message_count"\)\s*\.eq\("id", conversationId\)\s*\.eq\("tenant_id", gate\.tenantId\)\s*\.eq\("account_id", gate\.accountId\)\s*\.maybeSingle\(\)/.test(route) &&
       /if \(!conv\) return NextResponse\.json\(\{ error: "Not found" \}, \{ status: 404 \}\);/.test(route));
+    /* Two account predicates: the ownership read (ownConversation, shared by
+       both verbs) and the summary update. Three tenant predicates: those two
+       and the PATCH's row update — a message row has no account column, so
+       its scope is the conversation the ownership read just proved, plus the
+       tenant. */
     check("  …and the summary update is scoped the same way",
       (route.match(/\.eq\("account_id", gate\.accountId\)/g) ?? []).length === 2 &&
-      (route.match(/\.eq\("tenant_id", gate\.tenantId\)/g) ?? []).length === 2);
+      (route.match(/\.eq\("tenant_id", gate\.tenantId\)/g) ?? []).length === 3);
+    check("both verbs prove ownership through the one helper",
+      (route.match(/await ownConversation\(gate, conversationId\)/g) ?? []).length === 2 &&
+      (route.match(/\.from\("ai_conversations"\)/g) ?? []).length === 2);
+
+    /* PATCH — the same turn, heard again, corrected in its row. */
+    const patchAt = route.indexOf("export async function PATCH");
+    const postAt = route.indexOf("export async function POST");
+    check("a PATCH verb exists, and it goes through the gate and the budget before reading the body",
+      patchAt !== -1 && /export async function PATCH\(req: Request\) \{\s*const gate = await authorizeVoice\(req\);\s*if \(gate instanceof NextResponse\) return gate;\s*const refused = await spendBudget\(gate\.accountId\);\s*if \(refused\) return refused;/.test(route));
+    const patch = route.slice(patchAt, postAt > patchAt ? postAt : undefined);
+    check("  …the row id is parsed as a UUID and the text is capped and non-empty",
+      /const messageId = parseConversationParam\(/.test(patch) && /!conversationId \|\| !messageId \|\| !text \|\| text\.length > MAX_TURN_CHARS/.test(patch));
+    check("  …ownership of the conversation is proved before the update",
+      patch.indexOf("await ownConversation(gate, conversationId)") !== -1 && patch.indexOf("await ownConversation(gate, conversationId)") < patch.indexOf(".update("));
+    check("  …and the update touches one row of THIS conversation, this tenant, written by a call — never a typed or server-made message",
+      /\.from\("ai_messages"\)\s*\.update\(\{ content: text \}\)\s*\.eq\("id", messageId\)\s*\.eq\("conversation_id", conversationId\)\s*\.eq\("tenant_id", gate\.tenantId\)\s*\.eq\("source", "voice"\)\s*\.select\("\*"\)\s*\.maybeSingle\(\)/.test(patch) &&
+      /if \(!row\) return NextResponse\.json\(\{ error: "Not found" \}, \{ status: 404 \}\);/.test(patch) &&
+      /message: withPublicProvider\(row\)/.test(patch));
+    check("  …the shared budget helper is the one the POST's budget block matches",
+      /BUDGETS\.voiceTranscriptPerAccount\(\)/.test(route.slice(0, patchAt)));
     check("the conversation id is parsed as a UUID, not trusted as a string",
       /parseConversationParam\(/.test(route));
 
