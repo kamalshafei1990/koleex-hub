@@ -7,8 +7,13 @@
    question is answered with numbers: this route is the voice-watch handler
    re-exported unchanged, pinned to sin1 in vercel.json, on the same
    fifteen-minute cadence offset by seven minutes. Its lines carry from=sin1,
-   so one log query compares the two regions side by side over a day. The
-   real handshake stays where it is until that comparison says otherwise.
+   so one log query compares the two regions side by side over a day.
+
+   THE COMPARISON SAID OTHERWISE (2026-09-11): the mainland endpoint's new
+   host timed out from Tokyo twice (handshake 08:20:50, watchdog 08:30:35)
+   and answered from here at 08:22:33. The handshake is pinned to sin1 in
+   vercel.json since; this probe and the Tokyo one keep measuring both, so
+   a reversal is read from the same log.
 
    The segment config is written out rather than re-exported: Next.js reads
    `dynamic` and `maxDuration` statically and refuses a re-export of them.

@@ -34,6 +34,11 @@
     }
   ],
   "functions": {
+    "src/app/api/ai/voice/session/route.ts": {
+      "regions": [
+        "sin1"
+      ]
+    },
     "src/app/api/cron/voice-watch-sin1/route.ts": {
       "regions": [
         "sin1"
