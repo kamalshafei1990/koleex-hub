@@ -643,12 +643,22 @@ export function isLiveInfoQuery(msg: string): boolean {
   if (/(给我看|看看|发一张)?(图片|照片|图)|长什么样/.test(msg)) return true;
 
   /* "current / latest / today's X" framings. */
-  if (/\b(current|latest|today'?s|right\s+now|as\s+of\s+today|this\s+week'?s)\b/.test(s)) return true;
+  if (/\b(current|latest|newest|today'?s|right\s+now|as\s+of\s+today|this\s+week'?s|this\s+year'?s|recently\s+(released|launched|announced))\b/.test(s)) return true;
+
+  /* THE DATE ITSELF (owner, 2026-09-11 19:10: "النهاردة يوم ايه؟" reached
+     the small-talk lane, which then had no clock). Every lane now carries
+     the date; a question ABOUT the date still belongs with the tools, where
+     the full date block and the calendar live. */
+  if (/\b(what('s| is)\s+(the\s+)?(date|day|time|year)|what\s+day\s+is\s+(it|today)|today'?s\s+date|which\s+(day|year)\s+is\s+(it|this)|what\s+time\s+is\s+it)\b/.test(s)) return true;
+  if (/(النهارد[هة]|النهار\s*د[هة]|انهارد[هة]).{0,12}(يوم|تاريخ|كام)|(يوم|تاريخ)\s*(إيه|ايه|كام)\s*(النهارد[هة])?|إحنا\s*في\s*(يوم|سنة|شهر)|احنا\s*في\s*(يوم|سنة|شهر)|الساعة\s*كام|التاريخ\s*(إيه|ايه|كام|النهارد[هة])/.test(msg)) return true;
+  if (/今天(是)?(几号|星期几|几月几日|什么日期)|现在几点|今年是|几号了/.test(msg)) return true;
 
   /* Arabic */
   if (/الطقس|الجو|درجة\s*الحرارة|الأخبار|اخبار|سعر\s*الصرف|سعر\s*الدولار|آخر\s*الأخبار|ابحث\s*في\s*النت|ابحث\s*على\s*النت/.test(msg)) return true;
+  /* "the latest / newest X" in Arabic: أحدث, آخر إصدار, أجدد. */
+  if (/أحدث|احدث|أجدد|اجدد|آخر\s*(إصدار|اصدار|موديل|نسخة|نسخه)|اخر\s*(إصدار|اصدار|موديل|نسخة|نسخه)|نزل\s*جديد|الجديد\s*اللي\s*نزل/.test(msg)) return true;
   /* Chinese */
-  if (/天气|气温|新闻|汇率|股价|最新|搜索一下|查一下/.test(msg)) return true;
+  if (/天气|气温|新闻|汇率|股价|最新|搜索一下|查一下|刚发布|新发布/.test(msg)) return true;
 
   return false;
 }

@@ -38,7 +38,7 @@ import { buildUserContext, checkModule } from "@/lib/server/ai-agent/permissions
 import { orchestrate } from "@/lib/server/ai-agent/orchestrator";
 /* Phase 2C — the streaming lanes build their prompts from the prompt layer
    directly, rather than reaching through the orchestrator for them. */
-import { buildBrandSystemPrompt, buildMinimalSystemPrompt } from "@/lib/server/ai/prompts";
+import { buildBrandSystemPrompt, buildMinimalSystemPrompt, buildNowLine } from "@/lib/server/ai/prompts";
 /* Phase 2B — the seals are their own layer now. The route applies the same
    two it always did; it just no longer reaches through the orchestrator to
    get them. */
@@ -621,7 +621,13 @@ export async function POST(req: Request) {
                       expectedFormat: analysis.expectedFormat,
                       entityScope: entity.scope,
                     })[0].content;
-            const systemPrompt = systemPromptBase + taughtBlock + knowledgeNudge;
+            /* THE CLOCK, ON EVERY FAST LANE. The brand and small-talk builders
+               carry it themselves; the general prompt takes no context, so
+               the line is added here — at the tail, where per-minute text
+               belongs (owner, 2026-09-11: "what day is it today" answered
+               "I have no access to the date" from this path). */
+            const systemPrompt = systemPromptBase + taughtBlock + knowledgeNudge +
+              (fastLane === "general" ? `\n\n${buildNowLine(ctx.timezone)}` : "");
             /* Every lane, not just the tool loop: the general lane answers
                most ordinary messages, and it is where "you replied in English
                again" was coming from. */

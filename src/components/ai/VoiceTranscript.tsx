@@ -44,6 +44,8 @@ const SPEAKER_COPY: Record<Lang, { you: string; assistant: string; live: string;
    screen the last exchange is what matters, and everything above it is
    history nobody is reading while someone is talking. */
 const VISIBLE_LINES = 4;
+/** How many of the newest answers keep their pictures decoded on a call. */
+export const RECENT_PHOTO_LINES = 2;
 
 export type VoiceTranscriptProps = {
   lines: readonly TranscriptLine[];
@@ -121,6 +123,14 @@ function VoiceTranscript({ lines, lang = "en", className = "", fill = false, onO
   /* Filling the call screen: everything, scrolling. Beside a chat: the last
      four, which is all a glance wants. */
   const shown = fill ? lines : lines.slice(-VISIBLE_LINES);
+  /* PICTURES KEEP THEIR PIXELS ONLY ON THE NEWEST ANSWERS. A long call that
+     showed a picture every few turns held every one of them decoded; the
+     older tiles now draw their frame and give the pixels back (PhotoTile,
+     visible=false). RECENT_PHOTO_LINES answers with pictures, from the end. */
+  const withPixels = new Set<number>();
+  for (let i = shown.length - 1; i >= 0 && withPixels.size < RECENT_PHOTO_LINES; i--) {
+    if (shown[i].photos && shown[i].photos!.length > 0) withPixels.add(i);
+  }
 
   return (
     <div
@@ -169,7 +179,7 @@ function VoiceTranscript({ lines, lang = "en", className = "", fill = false, onO
               {line.photos && line.photos.length > 0 && (
                 <div className="mt-3 flex flex-wrap gap-3" role="group" aria-label={copy.photos}>
                   {line.photos.map((p) => (
-                    <PhotoTile key={p.url} photo={p} onOpen={onOpenPhoto} label={copy.photos} visible={photosVisible} />
+                    <PhotoTile key={p.url} photo={p} onOpen={onOpenPhoto} label={copy.photos} visible={photosVisible && withPixels.has(i)} />
                   ))}
                 </div>
               )}

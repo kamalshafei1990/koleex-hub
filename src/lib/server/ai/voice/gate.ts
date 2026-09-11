@@ -40,6 +40,9 @@ export type VoiceViewer = {
   isSuperAdmin: boolean;
   /** Their Settings → Koleex AI preferences; null in older fixtures. */
   personalization?: AiPersonalization | null;
+  /** Their calendar timezone (IANA), so the call knows what day it is
+   *  where they are. Absent in older fixtures: the default zone applies. */
+  timezone?: string | null;
 };
 
 export type VoiceGate = { accountId: string; tenantId: string | null; viewer: VoiceViewer };
@@ -75,6 +78,7 @@ export async function authorizeVoice(req: Request): Promise<NextResponse | Voice
       department: ctx.viewer.department,
       isSuperAdmin: ctx.viewer.isSuperAdmin,
       personalization: ctx.personalization ?? null,
+      timezone: ctx.timezone ?? null,
     },
   };
 }

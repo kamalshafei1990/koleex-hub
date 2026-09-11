@@ -364,6 +364,13 @@ export default function KoleexAiApp() {
     });
   }, []);
   const [error, setError] = useState<string | null>(null);
+  /* A LIVE CALL OWNS THE SCREEN, AND THE PAGE BEHIND IT GOES QUIET (twice
+     on 2026-09-11 the phone killed this page during a call, both times a
+     second after an answer with pictures landed in the thread behind the
+     call screen). While a call is up the thread and the sidebar are kept
+     but not painted, and the aurora canvas is not drawn at all: nothing
+     behind an opaque full-screen layer is worth a phone's memory. */
+  const [callLive, setCallLive] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false); // mobile
   /* WHICH SIDEBAR IS THIS. On a phone the aside is a drawer that slides off
      screen; on a desktop it collapses to zero width. Both used to stay in the
@@ -2102,13 +2109,14 @@ export default function KoleexAiApp() {
   return (
     <div
       className="kx-ai-root kx-app-fullbleed h-full text-[var(--text-primary)] flex overflow-hidden w-full relative bg-[var(--bg-primary)]"
+      data-kx-call-live={callLive ? "1" : undefined}
     >
       {inputDialog}
       {/* Aurora: the Hub ground behind the whole app — the root goes
           transparent under the skin (globals: .kx-ai-root) and the fixed
           canvas shows through every glass surface, exactly like Home. Core
           keeps this solid bg-primary page untouched. */}
-      {aurora && (
+      {aurora && !callLive && (
         <div className="fixed inset-0 z-0 pointer-events-none" aria-hidden>
           <WavyBackground />
         </div>
@@ -2576,7 +2584,7 @@ export default function KoleexAiApp() {
         <div
           ref={scrollRef}
           onScroll={handleScroll}
-          className="relative flex-1 overflow-y-auto"
+          className="kx-ai-thread relative flex-1 overflow-y-auto"
         >
 
           <div className="relative z-[1] max-w-[820px] mx-auto px-4 md:px-6 py-6 space-y-4">
@@ -2969,7 +2977,7 @@ export default function KoleexAiApp() {
                       disabled={sending || !online}
                       onError={(msg) => setError(msg)}
                       dictation={{ onTranscript: (t) => send(t, true), onError: (msg) => setError(msg) }}
-                      onLiveChange={(live) => { if (live) stopTts(); }}
+                      onLiveChange={(live) => { setCallLive(live); if (live) stopTts(); }}
                       /* The call continues THIS thread: the server reads its
                          recent turns into the session, and the spoken turns
                          are written back into it as messages. */

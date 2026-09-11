@@ -15,7 +15,7 @@
    --------------------------------------------------------------------------- */
 
 import { VoiceSession, describeError, HANDSHAKE_PATH, WS_SESSION_PATH, failureForStatus, type VoiceSocket, waitForIceGathering, normalizeSdp, type VoiceDeps, type VoiceState, type VoiceFailure,
-  TOOL_PATH, TOOL_RESPONSE_CREATE_FALLBACK_MS,
+  TOOL_PATH, TOOL_RESPONSE_CREATE_FALLBACK_MS, TOOL_RESPONSE_MAX_DEFERRALS,
 } from "../src/lib/voice/session";
 import { TranscriptPersister, TRANSCRIPT_PATH, MAX_TURNS_PER_POST, MAX_POST_FAILURES, type SavedTurn } from "../src/lib/voice/persist";
 import { buildTextTurnMessages, EV_ITEM_CREATE, EV_RESPONSE_CREATE, MAX_TYPED_TURN_CHARS } from "../src/lib/voice/text-turn";
@@ -855,8 +855,8 @@ async function main() {
     check("the composer has one voice control: no MicButton, the call button carries dictation",
       !/<MicButton/.test(app) && /<VoiceCallButton/.test(app) &&
       /dictation=\{\{ onTranscript: \(t\) => send\(t, true\), onError: \(msg\) => setError\(msg\) \}\}/.test(app));
-    check("a live call stops the page's own speech synthesis",
-      /onLiveChange=\{\(live\) => \{ if \(live\) stopTts\(\); \}\}/.test(app));
+    check("a live call stops the page's own speech synthesis — and marks the app live",
+      /onLiveChange=\{\(live\) => \{ setCallLive\(live\); if \(live\) stopTts\(\); \}\}/.test(app));
   }
 
   console.log("\n── 10. The audio meter releases what it opens ──");
@@ -2768,6 +2768,22 @@ function describeErrorCheck(): boolean {
     check("  …with no response.done at all the outputs wait", outputsSince(from7) === 2 && rc() === 3);
     await sleep(TOOL_RESPONSE_CREATE_FALLBACK_MS + 100);
     check("  …and ONE response.create follows both after the fallback wait", rc() === 4 && r.sockets[0].sent[r.sockets[0].sent.length - 1] === RC && TOOL_RESPONSE_CREATE_FALLBACK_MS === 1_200);
+    /* NEVER INTO AN ANSWER STILL BEING SPOKEN (owner, 2026-09-11: the end
+       of "one moment, let me see" was cut). With a response active and no
+       response.done, the fallback waits again — twice — then sends. */
+    r.sockets[0].message(JSON.stringify({ type: "response.created", response: { id: "r9" } }));
+    r.sockets[0].message(JSON.stringify({ type: "response.output_item.added", item: { type: "function_call", call_id: "c9", name: "search_knowledge" } }));
+    r.sockets[0].message(JSON.stringify({ type: "response.function_call_arguments.done", call_id: "c9", arguments: "{}" }));
+    await sleep(TOOL_RESPONSE_CREATE_FALLBACK_MS + 100);
+    check("with a response still active and no response.done, the fallback does not ask yet", rc() === 4 && TOOL_RESPONSE_MAX_DEFERRALS === 2);
+    r.sockets[0].message(JSON.stringify({ type: "response.done", response: { id: "r9", output: [{ type: "message" }] } }));
+    await sleep(TOOL_RESPONSE_CREATE_FALLBACK_MS + 100);
+    check("  …the response finishing (a done that lists no calls) lets the next wait ask, once", rc() === 5);
+    r.sockets[0].message(JSON.stringify({ type: "response.created", response: { id: "r10" } }));
+    r.sockets[0].message(JSON.stringify({ type: "response.output_item.added", item: { type: "function_call", call_id: "c10", name: "search_knowledge" } }));
+    r.sockets[0].message(JSON.stringify({ type: "response.function_call_arguments.done", call_id: "c10", arguments: "{}" }));
+    await sleep(TOOL_RESPONSE_CREATE_FALLBACK_MS * (TOOL_RESPONSE_MAX_DEFERRALS + 1) + 200);
+    check("  …a vendor that never sends response.done still gets ONE request after the bounded deferrals — the call is never silenced", rc() === 6);
     r.s.stop();
     check("hanging up closes the socket and the audio, and releases the microphone — with no failure reported", r.sockets[0].closed === 1 && r.audios[0].closed === 1 && r.mic.allStopped() && r.s.getState() === "ended" && r.states.every(([st]) => st !== "failed"));
     r.sockets[0].drop();
@@ -3173,7 +3189,7 @@ function describeErrorCheck(): boolean {
       !/src=\{photo\.url\}/.test(tr) && !/src=\{url\}/.test(md) && !/src=\{photo\.url\}/.test(lb) && !/src=\{it\.url\}/.test(lib));
     check("a tile in a layer that is not showing holds no picture: the words layer's tiles are visible only on the chat view, the strip's only on the orb view",
       /visible = true \}/.test(tr) && /const img = visible \? \(/.test(tr) && /<span aria-hidden className=\{`block \$\{frame\}`\} style=\{\{ width: size, height: size \}\} \/>/.test(tr) &&
-      /visible=\{photosVisible\}/.test(tr) && /photosVisible=\{view === "chat"\}/.test(scr) && /size=\{88\} visible=\{view === "orb"\}/.test(scr));
+      /visible=\{photosVisible && withPixels\.has\(i\)\}/.test(tr) && /photosVisible=\{view === "chat"\}/.test(scr) && /size=\{88\} visible=\{view === "orb"\}/.test(scr));
   }
 }
 
@@ -3300,6 +3316,27 @@ function describeErrorCheck(): boolean {
       /const flush = \(\) => flushVoiceTelemetry\(\);\s*flush\(\);\s*window\.addEventListener\("online", flush\);/.test(btn) &&
       /const dead = store \? takeInterruptedCall\(store\) : null;/.test(btn) && /reason: "page-killed",\s*lane: dead\.lane,/.test(btn) && /onErrorRef\.current\?\.\(INTERRUPTED_COPY\[langRef\.current\]\);/.test(btn) &&
       (["en", "zh", "ar"] as const).every((l) => new RegExp(`${l}: "[^"]{20,}"`).test(btn.slice(btn.indexOf("const INTERRUPTED_COPY"), btn.indexOf("const INTERRUPTED_COPY") + 600))));
+    /* THE PAGE BEHIND A LIVE CALL GOES QUIET, AND THE PULSE SAYS HOW HEAVY IT
+       WAS (2026-09-11: twice the page died a second after an answer with
+       pictures landed in the thread behind the call screen). */
+    const fsQ = await import("node:fs");
+    const appSrc = fsQ.readFileSync("src/components/ai/KoleexAiApp.tsx", "utf8");
+    const cssSrc = fsQ.readFileSync("src/app/globals.css", "utf8");
+    check("a live call marks the app root, drops the aurora canvas, and the thread and sidebar behind it are kept but not painted",
+      /const \[callLive, setCallLive\] = useState\(false\);/.test(appSrc) && /data-kx-call-live=\{callLive \? "1" : undefined\}/.test(appSrc) &&
+      /\{aurora && !callLive && \(/.test(appSrc) && /className="kx-ai-thread relative flex-1 overflow-y-auto"/.test(appSrc) &&
+      /\.kx-ai-root\[data-kx-call-live="1"\] > aside,\s*\.kx-ai-root\[data-kx-call-live="1"\] \.kx-ai-thread \{\s*visibility: hidden;\s*\}/.test(cssSrc) &&
+      /\.kx-ai-root\[data-kx-call-live="1"\] \.kx-ai-thread \{\s*content-visibility: hidden;\s*\}/.test(cssSrc));
+    check("  …the pulse carries the page's element and picture counts, and the page-killed beacon relays them",
+      /dom: document\.getElementsByTagName\("\*"\)\.length,\s*imgs: document\.images\.length,/.test(btn) &&
+      /\.\.\.\(dead\.dom !== undefined \? \{ dom: dead\.dom, imgs: dead\.imgs \?\? 0 \} : \{\}\),/.test(btn) &&
+      (() => { const st = new Map<string, string>(); const like = { getItem: (k: string) => st.get(k) ?? null, setItem: (k: string, v: string) => { st.set(k, v); }, removeItem: (k: string) => { st.delete(k); } };
+        const beat = { at: 1_000_000, startedAt: 990_000, lane: "ws", voice: "v2", conversation: "c1", elapsed_ms: 10_000, events: "ping:3", last_event: "ping", ws_reconnects: 1, ws_close: "1006", dom: 1234, imgs: 7 };
+        cm.writeCallPulse(like, beat); const f = cm.takeInterruptedCall(like, 1_000_000 + 20_000); return f?.dom === 1234 && f?.imgs === 7; })() &&
+      /\(num\(body\.dom\) \? ` dom=\$\{num\(body\.dom\)\} imgs=\$\{num\(body\.imgs\)\}` : ""\)/.test(fsQ.readFileSync("src/app/api/ai/voice/telemetry/route.ts", "utf8")));
+    const trSrc = fsQ.readFileSync("src/components/ai/VoiceTranscript.tsx", "utf8");
+    check("  …only the two newest answers with pictures keep their pixels on a call; older tiles draw their frame",
+      /export const RECENT_PHOTO_LINES = 2;/.test(trSrc) && /withPixels\.size < RECENT_PHOTO_LINES/.test(trSrc));
     check("  …a resumed call is handed the microphone the lost one kept — and a microphone nobody resumes is released",
       /const keptMic = sessionRef\.current\?\.takeMicrophone\(\) \?\? null;\s*sessionRef\.current = null;\s*if \(keptMic && !canResume\) keptMic\.getTracks\(\)\.forEach\(\(t\) => t\.stop\(\)\);/.test(btn) &&
       /if \(kept && kept\.getAudioTracks\(\)\.some\(\(t\) => t\.readyState === "live"\)\) \{\s*deps\.getMicrophone = async \(\) => kept;/.test(btn));

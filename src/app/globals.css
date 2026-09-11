@@ -4461,6 +4461,18 @@ html[data-kx-tabslide] #main-scroll-container { overflow-x: clip; }
 }
 /* Product photos inside an answer: bounded, rounded, a hairline edge, and
    room around them so a picture sits between sentences rather than on one. */
+/* A LIVE CALL: the page behind the call screen is kept, not painted (see
+   KoleexAiApp, callLive). visibility rather than display, so the thread's
+   scroll position and the composer's state survive the call; the call
+   screen itself is a portal on the body, outside this root. */
+.kx-ai-root[data-kx-call-live="1"] > aside,
+.kx-ai-root[data-kx-call-live="1"] .kx-ai-thread {
+  visibility: hidden;
+}
+.kx-ai-root[data-kx-call-live="1"] .kx-ai-thread {
+  content-visibility: hidden;
+}
+
 .koleex-md .koleex-md-img-link {
   display: inline-block;
   margin: 8px 0;

@@ -334,6 +334,9 @@ const HANDSHAKE_RETRY_DELAY_MS = 800;
    event still has its answer asked for after this long — one request for
    the outputs so far, not one per output. */
 export const TOOL_RESPONSE_CREATE_FALLBACK_MS = 1_200;
+/** How many more waits the fallback takes while a response is still being
+ *  spoken (armToolResponseFallback). Two: the filler is a sentence. */
+export const TOOL_RESPONSE_MAX_DEFERRALS = 2;
 
 /** `Name: message`, bounded and without anything that is not a word — a
  *  cause for the log line, never a body or a token. "" for no cause. */
@@ -572,6 +575,15 @@ export class VoiceSession {
   private toolOutputsAwaitingDone = new Set<string>();
   private toolCallsOpenByResponse = new Map<string, Set<string>>();
   private toolResponseCreateTimer: ReturnType<typeof setTimeout> | null = null;
+  /* NEVER INTO AN ANSWER STILL BEING SPOKEN (owner, 2026-09-11: "when the
+     voice starts to think or find something the end of the sentence is
+     cut"). A response.create that lands while the far side is still
+     streaming its filler's audio cancels that response — the tail of
+     "one moment, let me see" is what went missing. The response set on
+     response.done is the ordinary gate; the fallback below now also waits,
+     a bounded number of times, for the active response to finish. */
+  private responseActive = false;
+  private toolResponseDeferrals = 0;
   private state: VoiceState = "idle";
   /* FOR THE BEACON. When a call ends by itself nobody can say why from the
      server: the audio never touched it. These few facts travel with the
@@ -923,8 +935,15 @@ export class VoiceSession {
       const key = this.eventCounts.has(t) || this.eventCounts.size < EVENT_TYPES_MAX ? t : "…";
       this.eventCounts.set(key, (this.eventCounts.get(key) ?? 0) + 1);
     }
-    if (this.lastEventType === EV_RESPONSE_DONE) this.noteResponseDone(raw);
-    if (this.lastEventType === EV_RESPONSE_CREATED) this.lastResponseCreatedAt = Date.now();
+    if (this.lastEventType === EV_RESPONSE_DONE) {
+      this.noteResponseDone(raw);
+      this.responseActive = false;
+    }
+    if (this.lastEventType === EV_RESPONSE_CREATED) {
+      this.lastResponseCreatedAt = Date.now();
+      this.responseActive = true;
+    }
+    if (this.lastEventType === "response.cancelled") this.responseActive = false;
     this.events.onMessage?.(raw);
 
     /* UNTRUSTED. This came off a network socket and describes something the
@@ -1074,9 +1093,24 @@ export class VoiceSession {
     }
     this.toolOutputsAwaitingDone.add(callId);
     if (this.toolResponseCreateTimer !== null) return;
+    this.toolResponseDeferrals = 0;
+    this.armToolResponseFallback(channel);
+  }
+
+  /** The fallback: after the wait, ONE response.create for the outputs
+   *  whose response.done never came — unless the far side is still
+   *  speaking its response, in which case the wait is taken again, up to
+   *  TOOL_RESPONSE_MAX_DEFERRALS times, and then sent regardless (a vendor
+   *  that never sends response.done must not silence the call). */
+  private armToolResponseFallback(channel: VoiceChannel): void {
     this.toolResponseCreateTimer = setTimeout(() => {
       this.toolResponseCreateTimer = null;
       if (this.toolOutputsAwaitingDone.size === 0) return;
+      if (this.responseActive && this.toolResponseDeferrals < TOOL_RESPONSE_MAX_DEFERRALS) {
+        this.toolResponseDeferrals++;
+        this.armToolResponseFallback(channel);
+        return;
+      }
       this.toolOutputsAwaitingDone.clear();
       this.sendResponseCreate(channel);
     }, TOOL_RESPONSE_CREATE_FALLBACK_MS);

@@ -46,6 +46,11 @@ export type CallPulse = {
   last_event: string;
   ws_reconnects: number;
   ws_close: string;
+  /** HOW HEAVY THE PAGE WAS (2026-09-11: twice the page died right after
+   *  an answer with pictures, and the beacon could not say what the page
+   *  held). Elements in the document and pictures in it, at the last beat. */
+  dom?: number;
+  imgs?: number;
 };
 
 export function writeCallPulse(storage: StorageLike, pulse: CallPulse): void {
@@ -90,6 +95,8 @@ export function takeInterruptedCall(storage: StorageLike, now: number = Date.now
       last_event: typeof v.last_event === "string" ? v.last_event : "",
       ws_reconnects: typeof v.ws_reconnects === "number" ? v.ws_reconnects : 0,
       ws_close: typeof v.ws_close === "string" ? v.ws_close : "",
+      ...(typeof v.dom === "number" ? { dom: v.dom } : {}),
+      ...(typeof v.imgs === "number" ? { imgs: v.imgs } : {}),
     };
   } catch {
     return null;

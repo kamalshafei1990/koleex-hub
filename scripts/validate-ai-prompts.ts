@@ -21,6 +21,7 @@
    --------------------------------------------------------------------------- */
 
 import { readFileSync } from "node:fs";
+import { buildNowLine } from "../src/lib/server/ai/prompts/blocks";
 import type { UserContext } from "../src/lib/server/ai-agent/types";
 import {
   buildSystemPrompt,
@@ -246,6 +247,29 @@ console.log("\n── The safety-rule matrix: which lane carries which ABSOLUTE 
     `supplier-confidentiality's own text is on ${supplierRuleLanes.length} of ${LANES.length} lanes, and the gap is covered by brand exclusivity`,
     LANES.every(([, p]) => p.includes("Koleex is the ONLY brand or manufacturer name")),
   );
+}
+
+console.log("\n── Every lane knows what day it is ──");
+{
+  /* Owner, 2026-09-11 19:10: "النهاردة يوم ايه؟" → "I have no direct access
+     to today's date" — from the small-talk lane, which carried no clock. */
+  const line = buildNowLine("Asia/Dubai");
+  check("the one-line clock names the day, the zone, the ISO date and the year, and says the model DOES know it",
+    /^Current date & time: \w+, \w+ \d{1,2}, 20\d\d/.test(line) && /\(Asia\/Dubai\)\. TODAY is \d{4}-\d{2}-\d{2}; the current year is 20\d\d\./.test(line) && /You DO know the date/.test(line));
+  check("  …a zone the runtime does not know still yields a date", /TODAY is \d{4}-\d{2}-\d{2}/.test(buildNowLine("Nowhere/Nope")) && /TODAY is \d{4}-\d{2}-\d{2}/.test(buildNowLine(null)));
+  const LANES: Array<[string, string]> = [
+    ["small talk", buildMinimalSystemPrompt(ctx, "en")],
+    ["brand", buildBrandSystemPrompt(ctx, "en", "company")],
+    ["degraded", buildDegradedSystemPrompt(ctx, "en")],
+    ["tool loop", buildSystemPrompt(ctx, "en")],
+  ];
+  for (const [name, prompt] of LANES) {
+    check(`${name}: carries TODAY, at the tail`, /TODAY is \d{4}-\d{2}-\d{2}/.test(prompt) && prompt.lastIndexOf("TODAY is") > prompt.length * 0.7);
+  }
+  const route = readFileSync("src/app/api/ai/agent/route.ts", "utf8");
+  check("the general fast lane — the one with no context — gets the clock from the route",
+    /import \{ buildBrandSystemPrompt, buildMinimalSystemPrompt, buildNowLine \} from "@\/lib\/server\/ai\/prompts";/.test(route) &&
+    /const systemPrompt = systemPromptBase \+ taughtBlock \+ knowledgeNudge \+\s*\(fastLane === "general" \? `\\n\\n\$\{buildNowLine\(ctx\.timezone\)\}` : ""\);/.test(route));
 }
 
 console.log("\n── The Hub's products are the current range; the printed index is a fallback ──");
