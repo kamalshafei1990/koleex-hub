@@ -259,7 +259,19 @@ console.log("\n── 3. The route, read — the surface a fetch cannot be teste
      THE ASSERTIONS ARE INVERTED RATHER THAN DELETED. Deleting them would
      leave nothing standing between the next person and the same idea, which
      is superficially very reasonable. Anyone re-pinning this function now has
-     to come here, change this, and read the numbers first. */
+     to come here, change this, and read the numbers first.
+
+     AND THEN THE NUMBERS SAID SINGAPORE (2026-09-11). The mainland endpoint
+     moved to the China account's default workspace (its own host, the same
+     two A records as the old one). From Tokyo, the handshake and the
+     watchdog both hit UND_ERR_CONNECT_TIMEOUT at 08:20:50 and 08:30:35 —
+     the socket never opened in ten seconds; the caller waited thirteen
+     before the hand-over to the alternate region. From Singapore, the
+     watchdog re-exported there (the measurement this file demanded) reached
+     it at 08:22:33. The owner said "move it to Singapore"; this pins ONLY
+     the SDP handshake — the media path is phone → vendor and never touches
+     our function — and the two watchdogs keep measuring both regions, so
+     the next reversal, if there is one, is read from the same log. */
   {
     const vercelCfg = JSON.parse(readFileSync("vercel.json", "utf8")) as {
       regions?: string[];
@@ -267,18 +279,19 @@ console.log("\n── 3. The route, read — the surface a fetch cannot be teste
       crons?: unknown[];
     };
     const VOICE_FN = "src/app/api/ai/voice/session/route.ts";
-    check("the voice handshake is NOT pinned away from the project's region",
-      vercelCfg.functions?.[VOICE_FN]?.regions === undefined);
-    /* ONE override is allowed, and it is a measurement: the watchdog
-       re-exported from Singapore, so the two regions can be compared in
-       the log before any handshake is ever pinned again. Nothing else. */
-    check("  …and the only per-function region override is the Singapore MEASUREMENT probe",
-      JSON.stringify(Object.keys(vercelCfg.functions ?? {})) === JSON.stringify(["src/app/api/cron/voice-watch-sin1/route.ts"]) &&
+    check("the voice handshake is pinned to Singapore — the region the watchdog measured reaching the mainland endpoint when Tokyo could not (2026-09-11)",
+      JSON.stringify(vercelCfg.functions?.[VOICE_FN]?.regions) === JSON.stringify(["sin1"]));
+    /* TWO overrides, no more: the handshake, and the measurement that
+       justified it — the watchdog re-exported from Singapore, so the two
+       regions stay compared in the log. The Tokyo watchdog stays on the
+       project default, so a reversal is read the same way this move was. */
+    check("  …and the only other per-function region override is the Singapore MEASUREMENT probe",
+      JSON.stringify(Object.keys(vercelCfg.functions ?? {}).sort()) === JSON.stringify([VOICE_FN, "src/app/api/cron/voice-watch-sin1/route.ts"].sort()) &&
       JSON.stringify(vercelCfg.functions?.["src/app/api/cron/voice-watch-sin1/route.ts"]?.regions) === JSON.stringify(["sin1"]));
     check("  …which re-exports the watchdog unchanged and is scheduled between the Tokyo runs",
       (() => { const sin = readFileSync("src/app/api/cron/voice-watch-sin1/route.ts", "utf8"); const tokyo = readFileSync("src/app/api/cron/voice-watch/route.ts", "utf8"); return /export \{ GET \} from "\.\.\/voice-watch\/route";/.test(sin) && /export const dynamic = "force-dynamic";/.test(sin) && (sin.match(/export const maxDuration = (\d+);/) ?? [])[1] === (tokyo.match(/export const maxDuration = (\d+);/) ?? [])[1]; })() &&
       (vercelCfg.crons as Array<{ path: string; schedule: string }>).some((c) => c.path === "/api/cron/voice-watch-sin1" && c.schedule === "7-59/15 * * * *"));
-    check("the project default is the region that actually completes handshakes",
+    check("the project default stays Tokyo — everything but the handshake, and the Tokyo watchdog that keeps the comparison alive",
       JSON.stringify(vercelCfg.regions) === JSON.stringify(["hnd1"]));
     /* Non-vacuity: rewriting vercel.json is how the scheduled work gets
        dropped by accident, and it has been rewritten twice now. */

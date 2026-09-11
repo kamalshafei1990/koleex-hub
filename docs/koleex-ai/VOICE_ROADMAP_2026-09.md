@@ -645,6 +645,41 @@ context created inside the tap (before the handshake), not after it;
 `:stalled` with the track live means the OS delivers silence to the page
 and the microphone must be re-acquired.
 
+## The mainland endpoint answers Singapore, not Tokyo — the handshake moves (2026-09-11 08:20–08:47)
+
+With the China account's key and workspace in place, the first no-VPN call
+from the phone (08:20:50):
+
+| step | where | result |
+|---|---|---|
+| handshake attempt 1, slot=primary (Beijing) | hnd1 | `UND_ERR_CONNECT_TIMEOUT` after 10.3 s |
+| handshake attempt 2, slot=primary | hnd1 | `TimeoutError` after 3.0 s |
+| hand-over to slot=alt (international) | hnd1 | call up; 101 s, four turns |
+| watchdog, slot=primary | sin1 08:22:33 | no fail line — reached (the ok line was still info-level) |
+| watchdog, slot=primary | hnd1 08:30:35 | `UND_ERR_CONNECT_TIMEOUT` after 10.5 s |
+
+The new workspace host resolves to the same two A records as the old one
+(47.94.20.201, 101.201.58.201), so this is not DNS; the old host answered
+Tokyo with a 403 in ~420 ms fifteen minutes earlier. From Tokyo the socket
+to the new host does not open; from Singapore it does. The caller paid the
+thirteen seconds of "Still connecting" on the primary that never answered,
+then talked to the alternate region — which works, but carries the media
+out of the country.
+
+**Change:** `vercel.json` pins `src/app/api/ai/voice/session/route.ts` to
+`sin1`. Only the SDP handshake moves; the media path is phone → vendor and
+never touches our function. The project default stays `hnd1`, and both
+watchdogs keep measuring both regions, so a reversal is read from the same
+log as this move. The suite's region assertions are inverted again, with
+the numbers above beside the earlier Hong Kong numbers — the file's own
+rule: read the numbers first.
+
+**Owner's directive:** "go ahead and move it to Singapore."
+
+**Still open:** the socket lane's silent worklet on the phone without a
+VPN (#388's stall watchdog is live; no beacon from a no-VPN socket-lane
+call since, because the mainland lane now serves those calls).
+
 ## Owner-side (not code)
 
 - 2026-09-08 19:30 UTC: the owner added `AI_VOICE_RELAY_URL` and
