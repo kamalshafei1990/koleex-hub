@@ -1,4 +1,5 @@
 import "server-only";
+import { logProviderFailure } from "@/lib/server/ai/observability/provider-log";
 
 /* ---------------------------------------------------------------------------
    ai-agent/orchestrator — the tool-calling loop.
@@ -526,7 +527,7 @@ export async function orchestrate(input: TurnInput): Promise<AgentResponse> {
     }
 
     if (callFailedStatus) {
-      console.error("[ai.agent.groq]", callFailedStatus, callFailedBody.slice(0, 500));
+      logProviderFailure("[ai.agent.groq]", callFailedStatus, callFailedBody);
 
       /* Rescue-first: if tools already produced valid data this turn,
          don't discard that work because a secondary Groq call failed.

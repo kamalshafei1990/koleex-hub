@@ -1,4 +1,5 @@
 import "server-only";
+import { logProviderFailure } from "@/lib/server/ai/observability/provider-log";
 
 /* ---------------------------------------------------------------------------
    ai-provider — thin adapter layer so the rest of Koleex never knows which
@@ -177,7 +178,7 @@ ${input.text}`;
 
   if (!res.ok) {
     const bodyText = await res.text().catch(() => "");
-    console.error("[ai.gemini.translate]", res.status, bodyText);
+    logProviderFailure("[ai.gemini.translate]", res.status, bodyText);
     lastProviderError = `Gemini ${res.status}: ${extractErrorMessage(bodyText)}`;
     return null;
   }
@@ -244,7 +245,7 @@ export async function geminiChat(messages: ChatMessage[]): Promise<ChatResult | 
 
   if (!res.ok) {
     const bodyText = await res.text().catch(() => "");
-    console.error("[ai.gemini.chat]", res.status, bodyText);
+    logProviderFailure("[ai.gemini.chat]", res.status, bodyText);
     lastProviderError = `Gemini ${res.status}: ${extractErrorMessage(bodyText)}`;
     return null;
   }
@@ -289,7 +290,7 @@ async function groqChat(messages: ChatMessage[]): Promise<ChatResult | null> {
 
   if (!res.ok) {
     const bodyText = await res.text().catch(() => "");
-    console.error("[ai.groq.chat]", res.status, bodyText);
+    logProviderFailure("[ai.groq.chat]", res.status, bodyText);
     lastProviderError = `Groq ${res.status}: ${extractErrorMessage(bodyText)}`;
     return null;
   }
@@ -336,7 +337,7 @@ async function groqTranslate(input: TranslateInput): Promise<TranslateResult | n
 
   if (!res.ok) {
     const bodyText = await res.text().catch(() => "");
-    console.error("[ai.groq.translate]", res.status, bodyText);
+    logProviderFailure("[ai.groq.translate]", res.status, bodyText);
     lastProviderError = `Groq ${res.status}: ${extractErrorMessage(bodyText)}`;
     return null;
   }
@@ -379,7 +380,7 @@ async function deepseekTranslate(input: TranslateInput): Promise<TranslateResult
 
   if (!res.ok) {
     const bodyText = await res.text().catch(() => "");
-    console.error("[ai.deepseek.translate]", res.status, bodyText);
+    logProviderFailure("[ai.deepseek.translate]", res.status, bodyText);
     lastProviderError = `DeepSeek ${res.status}: ${extractErrorMessage(bodyText)}`;
     return null;
   }
@@ -409,7 +410,7 @@ async function deepseekChat(messages: ChatMessage[]): Promise<ChatResult | null>
 
   if (!res.ok) {
     const bodyText = await res.text().catch(() => "");
-    console.error("[ai.deepseek.chat]", res.status, bodyText);
+    logProviderFailure("[ai.deepseek.chat]", res.status, bodyText);
     lastProviderError = `DeepSeek ${res.status}: ${extractErrorMessage(bodyText)}`;
     return null;
   }

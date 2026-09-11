@@ -1,4 +1,5 @@
 import "server-only";
+import { logProviderFailure } from "@/lib/server/ai/observability/provider-log";
 
 /* ---------------------------------------------------------------------------
    ai/vision — turn an image into words, so the rest of Koleex AI can carry on
@@ -175,7 +176,7 @@ async function askProvider(
       }),
     });
     if (!res.ok) {
-      console.error("[ai.vision] http", provider.label, res.status, (await res.text()).slice(0, 300));
+      logProviderFailure(`[ai.vision] ${provider.label}`, res.status, await res.text().catch(() => ""));
       return null;
     }
     const json = (await res.json()) as {

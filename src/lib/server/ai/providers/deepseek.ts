@@ -1,4 +1,5 @@
 import "server-only";
+import { logProviderFailure } from "@/lib/server/ai/observability/provider-log";
 
 /* ---------------------------------------------------------------------------
    ai/providers/deepseek — DeepSeek chat adapter.
@@ -124,7 +125,7 @@ export async function deepseekChat(
 
     if (!res.ok) {
       const bodyText = await res.text().catch(() => "");
-      console.error("[ai.deepseek.chat]", res.status, bodyText);
+      logProviderFailure("[ai.deepseek.chat]", res.status, bodyText);
       lastDeepseekError = `DeepSeek ${res.status}: ${extractErrorMessage(bodyText)}`;
       return null;
     }
@@ -203,7 +204,7 @@ export async function* deepseekChatStream(
 
   if (!res.ok || !res.body) {
     const bodyText = await res.text().catch(() => "");
-    console.error("[ai.deepseek.stream]", res.status, bodyText);
+    logProviderFailure("[ai.deepseek.stream]", res.status, bodyText);
     lastDeepseekError = `DeepSeek ${res.status}: ${extractErrorMessage(bodyText)}`;
     yield { type: "error", error: lastDeepseekError };
     return;
