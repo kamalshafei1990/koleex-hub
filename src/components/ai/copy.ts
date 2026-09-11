@@ -52,6 +52,10 @@ export const COPY: Record<Lang, {
   messageTooLong: string;
   /** Shown above the composer while the device reports no network. */
   offline: string;
+  /** The last call was cut by the page dying under it: one tap continues. */
+  callCutOff: string;
+  continueCall: string;
+  dismiss: string;
   /* Projects + pinning */
   projects: string;
   newProject: string;
@@ -201,6 +205,9 @@ export const COPY: Record<Lang, {
     attachUnsupported: "file type not supported",
     messageTooLong: "That message is too long for one turn. Split it, or attach it as a file.",
     offline: "You're offline — your message will be sent when you're back.",
+    callCutOff: "The last call was cut off — the app was interrupted.",
+    continueCall: "Continue the call",
+    dismiss: "Dismiss",
     projects: "Projects",
     newProject: "New project",
     editProject: "Edit project",
@@ -324,6 +331,9 @@ export const COPY: Record<Lang, {
     attachUnsupported: "不支持的文件类型",
     messageTooLong: "这条消息太长了，请分成几条发送，或作为文件附上。",
     offline: "当前离线——恢复连接后会自动发送。",
+    callCutOff: "上一次通话被打断了——应用被中断。",
+    continueCall: "继续通话",
+    dismiss: "关闭",
     projects: "项目",
     newProject: "新建项目",
     editProject: "编辑项目",
@@ -446,6 +456,9 @@ export const COPY: Record<Lang, {
     attachUnsupported: "نوع الملف مش مدعوم",
     messageTooLong: "الرسالة دي طويلة أوي على مرة واحدة. قسّمها أو ارفعها كملف.",
     offline: "مفيش نت دلوقتي — رسالتك هتتبعت أول ما ترجع.",
+    callCutOff: "المكالمة اللي فاتت اتقطعت — الأبلكيشن اتقفل من غيرك.",
+    continueCall: "كمّل المكالمة",
+    dismiss: "إخفاء",
     projects: "المشاريع",
     newProject: "مشروع جديد",
     editProject: "تعديل المشروع",

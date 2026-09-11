@@ -218,6 +218,12 @@ export type VoiceCallButtonProps = {
   /** A saved row the server corrected — the same spoken turn, heard again
    *  (lib/voice/persist.ts) — so the thread shows the fuller words. */
   onTurnUpdated?: (row: SavedTurn) => void;
+  /** THE CALL THE PAGE DIED UNDER can be continued with one tap (plan B5):
+   *  the next load finds its pulse and offers `resume` — a new call in the
+   *  same conversation, which the parent opens first when it is not the
+   *  open one. Without this the caller is told in a sentence and left to
+   *  find the button. */
+  onInterrupted?: (resume: () => void, conversationId: string | null) => void;
 };
 
 export default function VoiceCallButton({
@@ -235,6 +241,7 @@ export default function VoiceCallButton({
   ensureConversation,
   onTurnsSaved,
   onTurnUpdated,
+  onInterrupted,
 }: VoiceCallButtonProps) {
   const [state, setState] = useState<VoiceState>("idle");
   /** The lane the current call is on, for render: the socket lane meters
@@ -508,6 +515,7 @@ export default function VoiceCallButton({
   const ensureConversationRef = useRef(ensureConversation);
   const onTurnsSavedRef = useRef(onTurnsSaved);
   const onTurnUpdatedRef = useRef(onTurnUpdated);
+  const onInterruptedRef = useRef(onInterrupted);
   useEffect(() => {
     onErrorRef.current = onError;
     onMessageRef.current = onMessage;
@@ -519,7 +527,8 @@ export default function VoiceCallButton({
     ensureConversationRef.current = ensureConversation;
     onTurnsSavedRef.current = onTurnsSaved;
     onTurnUpdatedRef.current = onTurnUpdated;
-  }, [onError, onMessage, onTranscript, onPhase, onLiveChange, lang, conversationId, ensureConversation, onTurnsSaved, onTurnUpdated]);
+    onInterruptedRef.current = onInterrupted;
+  }, [onError, onMessage, onTranscript, onPhase, onLiveChange, lang, conversationId, ensureConversation, onTurnsSaved, onTurnUpdated, onInterrupted]);
 
   /* One per call, made with the session and finished with it. Holds the
      count of turns already queued, which is why it cannot outlive a call. */
@@ -1267,7 +1276,11 @@ export default function VoiceCallButton({
         ice_ever_connected: true,
         ...(dead.dom !== undefined ? { dom: dead.dom, imgs: dead.imgs ?? 0 } : {}),
       });
-      onErrorRef.current?.(INTERRUPTED_COPY[langRef.current]);
+      /* One tap to continue where a parent offers it; the sentence where
+         none does. The tap is the gesture the microphone needs anyway. */
+      const offer = onInterruptedRef.current;
+      if (offer) offer(() => void startCallRef.current?.(), dead.conversation);
+      else onErrorRef.current?.(INTERRUPTED_COPY[langRef.current]);
     }
     return () => window.removeEventListener("online", flush);
   }, []);

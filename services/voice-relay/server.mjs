@@ -52,6 +52,21 @@ export const MAX_CONNECTIONS = 200;
 export const MAX_PER_ADDRESS = 8;
 export const TICKET_MAX_AGE_S = 15 * 60;        // a ticket cannot outlive the secret it names by much
 
+/* ── The keepalive ──────────────────────────────────────────────────────── */
+
+/** THE FRAME THAT KEEPS A MIDDLEBOX FROM CUTTING THE LINE (2026-09-11 15:07
+ *  UTC: the browser's socket to this relay died twice at exactly 36 s,
+ *  `client-closed 1006`, with audio frames flowing the whole time — the
+ *  shape of a proxy on the phone's path that times out a WebSocket it does
+ *  not see application traffic on, protocol pings notwithstanding). The
+ *  browser sends this small text frame every few seconds; the relay
+ *  answers it and never forwards it — the vendor must not see an event it
+ *  does not know. Exact match, so nothing else can pretend to be it. */
+export const KEEPALIVE_FRAME = '{"type":"koleex.keepalive"}';
+export function isKeepalive(text) {
+  return text === KEEPALIVE_FRAME;
+}
+
 /* ── The ticket ─────────────────────────────────────────────────────────── */
 
 /** `exp.sig`: sig = HMAC-SHA256(secret, `${token}.${exp}`) as hex. Pure. */
@@ -228,9 +243,14 @@ function bridge(client, token, model, address) {
 
   client.on("message", (data, isBinary) => {
     if (isBinary) return;
-    up++;
     alive = true;
     const text = data.toString();
+    /* Answered here, counted nowhere, forwarded never. */
+    if (isKeepalive(text)) {
+      if (client.readyState === WebSocket.OPEN) client.send(KEEPALIVE_FRAME);
+      return;
+    }
+    up++;
     if (upstream.readyState === WebSocket.OPEN) upstream.send(text);
     else if (upstream.readyState === WebSocket.CONNECTING) {
       if (pending.length < 200) pending.push(text);

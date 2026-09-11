@@ -175,6 +175,11 @@ export async function POST(req: Request) {
       protocols: grokProtocols(cfg, secret.value),
       expires_at: secret.expiresAt,
       audio: { format: "pcm16", sample_rate: cfg.sampleRate },
+      /* THE KEEPALIVE IS THE RELAY'S (services/voice-relay): only a socket
+         to our own relay may carry the frame, because only the relay
+         answers it without forwarding it — a vendor dialled directly would
+         see an event it does not know. */
+      keepalive: socket.via === "relay",
       session: payload.full,
       session_compact: payload.compact,
     },

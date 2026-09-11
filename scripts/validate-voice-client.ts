@@ -15,7 +15,7 @@
    --------------------------------------------------------------------------- */
 
 import { VoiceSession, describeError, HANDSHAKE_PATH, WS_SESSION_PATH, failureForStatus, type VoiceSocket, waitForIceGathering, normalizeSdp, type VoiceDeps, type VoiceState, type VoiceFailure,
-  TOOL_PATH, TOOL_RESPONSE_CREATE_FALLBACK_MS, TOOL_RESPONSE_MAX_DEFERRALS,
+  TOOL_PATH, TOOL_RESPONSE_CREATE_FALLBACK_MS, TOOL_RESPONSE_MAX_DEFERRALS, WS_KEEPALIVE_MS, WS_KEEPALIVE_MESSAGE,
 } from "../src/lib/voice/session";
 import { TranscriptPersister, TRANSCRIPT_PATH, MAX_TURNS_PER_POST, MAX_POST_FAILURES, type SavedTurn } from "../src/lib/voice/persist";
 import { buildTextTurnMessages, EV_ITEM_CREATE, EV_RESPONSE_CREATE, MAX_TYPED_TURN_CHARS } from "../src/lib/voice/text-turn";
@@ -2647,9 +2647,10 @@ function describeErrorCheck(): boolean {
     session_compact: { type: "session.update", session: { modalities: ["text", "audio"] } },
     ...over,
   });
-  const laneRun = async (opts: { envelope?: unknown; status?: number; noSocket?: boolean; noAudio?: boolean; audioThrows?: boolean; reconnectGraceMs?: number; wsFirstEventMs?: number; failFetch?: number } = {}) => {
+  const laneRun = async (opts: { envelope?: unknown; status?: number; noSocket?: boolean; noAudio?: boolean; audioThrows?: boolean; reconnectGraceMs?: number; wsFirstEventMs?: number; failFetch?: number; wsKeepaliveMs?: number } = {}) => {
     const recorded: Recorded[] = [];
     const d = deps({ recorded, reconnectGraceMs: opts.reconnectGraceMs, wsFirstEventMs: opts.wsFirstEventMs });
+    if (opts.wsKeepaliveMs) d.deps.wsKeepaliveMs = opts.wsKeepaliveMs;
     const base = d.deps.fetchFn;
     const sockets: FakeSocket[] = [];
     const audios: FakeAudio[] = [];
@@ -2788,6 +2789,38 @@ function describeErrorCheck(): boolean {
     check("hanging up closes the socket and the audio, and releases the microphone — with no failure reported", r.sockets[0].closed === 1 && r.audios[0].closed === 1 && r.mic.allStopped() && r.s.getState() === "ended" && r.states.every(([st]) => st !== "failed"));
     r.sockets[0].drop();
     check("  …and a close that follows the hang-up changes nothing", r.s.getState() === "ended");
+  }
+  {
+    /* THE KEEPALIVE (plan B4; 2026-09-11 15:07: the socket to the relay died
+       twice at exactly 36 s with audio flowing). A handshake that says the
+       socket is the relay's turns on one small frame every period; the
+       relay's echo is not an event; a hang-up stops it; a vendor dialled
+       directly never sees it. */
+    const KA = JSON.stringify({ type: "koleex.keepalive" });
+    const r = await laneRun({ envelope: wsEnvelope({ keepalive: true }), wsKeepaliveMs: 15 });
+    r.sockets[0].open();
+    const before = r.sockets[0].sent.length;
+    await sleep(60);
+    check("with keepalive:true from the handshake, the open socket carries the keepalive frame every period",
+      r.sockets[0].sent.slice(before).filter((m) => m === KA).length >= 2 && WS_KEEPALIVE_MS === 10_000 && WS_KEEPALIVE_MESSAGE === KA);
+    r.sockets[0].message(KA);
+    check("  …the relay's echo is not an event: the call is still connecting and nothing is counted",
+      r.s.getState() === "connecting" && !/koleex/.test(r.s.diagnostics().events) && r.s.diagnostics().last_event === "");
+    r.s.stop();
+    await sleep(30);
+    const after = r.sockets[0].sent.length;
+    await sleep(40);
+    check("  …and hanging up stops it", r.sockets[0].sent.length === after);
+    const r2 = await laneRun({ wsKeepaliveMs: 15 });
+    r2.sockets[0].open();
+    await sleep(50);
+    check("without keepalive from the handshake (a vendor dialled directly) no frame goes up", !r2.sockets[0].sent.some((m) => m === KA));
+    r2.s.stop();
+    const fsK = await import("node:fs");
+    check("the handshake says keepalive only for the relay's socket, and the relay answers the exact frame without forwarding it",
+      /keepalive: socket\.via === "relay",/.test(fsK.readFileSync("src/app/api/ai/voice/ws-session/route.ts", "utf8")) &&
+      /export const KEEPALIVE_FRAME = '\{"type":"koleex\.keepalive"\}';/.test(fsK.readFileSync("services/voice-relay/server.mjs", "utf8")) &&
+      /if \(isKeepalive\(text\)\) \{\s*if \(client\.readyState === WebSocket\.OPEN\) client\.send\(KEEPALIVE_FRAME\);\s*return;\s*\}\s*up\+\+;/.test(fsK.readFileSync("services/voice-relay/server.mjs", "utf8")));
   }
   {
     const r = await laneRun({ reconnectGraceMs: 80 });
@@ -3334,6 +3367,14 @@ function describeErrorCheck(): boolean {
         const beat = { at: 1_000_000, startedAt: 990_000, lane: "ws", voice: "v2", conversation: "c1", elapsed_ms: 10_000, events: "ping:3", last_event: "ping", ws_reconnects: 1, ws_close: "1006", dom: 1234, imgs: 7 };
         cm.writeCallPulse(like, beat); const f = cm.takeInterruptedCall(like, 1_000_000 + 20_000); return f?.dom === 1234 && f?.imgs === 7; })() &&
       /\(num\(body\.dom\) \? ` dom=\$\{num\(body\.dom\)\} imgs=\$\{num\(body\.imgs\)\}` : ""\)/.test(fsQ.readFileSync("src/app/api/ai/voice/telemetry/route.ts", "utf8")));
+    /* ONE TAP TO CONTINUE (plan B5): the pulse's call is offered back through
+       the parent, which opens its conversation first; the sentence remains
+       for a parent that offers nothing. */
+    check("a found pulse is offered back as a resume when the parent takes one — the sentence otherwise",
+      /const offer = onInterruptedRef\.current;\s*if \(offer\) offer\(\(\) => void startCallRef\.current\?\.\(\), dead\.conversation\);\s*else onErrorRef\.current\?\.\(INTERRUPTED_COPY\[langRef\.current\]\);/.test(btn) &&
+      /onInterrupted\?: \(resume: \(\) => void, conversationId: string \| null\) => void;/.test(btn) &&
+      /onInterrupted=\{onVoiceInterrupted\}/.test(appSrc) && /if \(it\.conversation && it\.conversation !== activeIdRef\.current\) await openConversation\(it\.conversation\);\s*it\.resume\(\);/.test(appSrc) &&
+      /\{interruptedCall && !callLive && \(/.test(appSrc) && /\{copy\.continueCall\}/.test(appSrc) && /aria-label=\{copy\.dismiss\}/.test(appSrc));
     const trSrc = fsQ.readFileSync("src/components/ai/VoiceTranscript.tsx", "utf8");
     check("  …only the two newest answers with pictures keep their pixels on a call; older tiles draw their frame",
       /export const RECENT_PHOTO_LINES = 2;/.test(trSrc) && /withPixels\.size < RECENT_PHOTO_LINES/.test(trSrc));

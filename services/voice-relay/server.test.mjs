@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { signTicket, verifyTicket, tokenFromProtocols, upstreamUrlFor, originAllowed, TICKET_MAX_AGE_S } from "./server.mjs";
+import { signTicket, verifyTicket, tokenFromProtocols, upstreamUrlFor, originAllowed, TICKET_MAX_AGE_S, isKeepalive, KEEPALIVE_FRAME } from "./server.mjs";
 
 const SECRET = "relay-secret-for-tests";
 
@@ -39,4 +39,12 @@ test("origins: Koleex domains and Vercel previews, nothing else", () => {
   assert.equal(originAllowed(undefined), true, "no Origin is not a browser: the watchdog's Node socket; the ticket still gates it");
   assert.equal(originAllowed(""), true);
   assert.equal(originAllowed("null"), false, "an opaque browser origin is a browser, and not ours");
+});
+
+test("the keepalive is one exact frame, answered by the relay and never forwarded", () => {
+  assert.equal(KEEPALIVE_FRAME, '{"type":"koleex.keepalive"}');
+  assert.equal(isKeepalive(KEEPALIVE_FRAME), true);
+  assert.equal(isKeepalive('{"type":"koleex.keepalive","x":1}'), false, "exact match only");
+  assert.equal(isKeepalive('{"type":"input_audio_buffer.append","audio":"AAAA"}'), false);
+  assert.equal(isKeepalive(""), false);
 });
