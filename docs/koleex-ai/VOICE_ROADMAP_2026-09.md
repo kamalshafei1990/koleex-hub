@@ -680,6 +680,45 @@ rule: read the numbers first.
 VPN (#388's stall watchdog is live; no beacon from a no-VPN socket-lane
 call since, because the mainland lane now serves those calls).
 
+## Both lanes' voices in one picker, and a verdict that is not a lock (2026-09-11 09:05)
+
+After the Singapore pin the mainland lane served the phone directly:
+`handshake ok attempt=1/2 slot=primary from=sin1 afterMs=408 / 482 / 427`
+(09:01–09:02, three calls, one with a lookup). Then the owner: "with VPN
+and without VPN is only [the mainland] voice, there is no [socket-lane]
+voice at all." Two causes, both in the client:
+
+1. **A fresh verdict was a lock.** `decideLane` returned `probe: false` for
+   any device verdict younger than six hours. The 08:20 probe had failed
+   (the relay saw no session — the phone did not reach it at that moment),
+   "mainland" was saved, and for six hours no probe ran — a VPN switched
+   on inside the window changed nothing. Now the verdict is only where the
+   next tap goes, with no wait; the probe runs on every open and moves the
+   lane when the network has moved.
+2. **The picker showed one lane.** A device settled on the mainland lane
+   never saw the socket lane's names, and the caller had no way to ask.
+   Now every voice is offered, tagged by lane, in two rows under neutral
+   headings ("Mainland line" / "International line" — never a vendor).
+   Choosing a voice from the other row is choosing that lane: the next
+   call goes there, the choice is saved as the device's verdict, and the
+   one fall-back is re-armed. When the socket lane does not answer, the
+   call falls back to the mainland lane as before, the current voice moves
+   onto the mainland list (a socket-lane key asked of the mainland lane
+   was the server's default voice under the wrong name), and the screen
+   says so once: "The international line can't be reached from your network
+   right now — continuing on the mainland line."
+
+Pure helpers: `offeredVoices`, `laneOfVoice` (voice-pref.ts), `voiceRows`
+(VoiceCallScreen.tsx). Suite section 37; mutation: restoring the six-hour
+lock fails 2.
+
+**Billing, the same hour:** the vendor's SMS — the China account's balance
+is −0.04 yuan. The mainland lane bills THAT account (the international
+region bills the other one). The owner recharges the China account; until
+then a refused mainland handshake falls over to the alternate region as
+designed, and the watchdog's `slot=primary` line will say `credential=refused`
+the moment the vendor enforces the arrears.
+
 ## Owner-side (not code)
 
 - 2026-09-08 19:30 UTC: the owner added `AI_VOICE_RELAY_URL` and
