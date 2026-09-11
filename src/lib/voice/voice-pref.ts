@@ -147,9 +147,13 @@ export function parseSavedLane(raw: string | null | undefined): SavedLane | null
 
 /** THE LANE A CALL STARTS ON. The server's word wins when it says the
  *  socket lane (a caller it already sends there needs no second opinion);
- *  when it says mainland, a fresh device verdict overrides it in either
- *  direction; a stale or absent verdict leaves the server's answer and
- *  asks for a probe. Pure. */
+ *  when it says mainland, a fresh device verdict is where the next tap
+ *  goes — with no wait — and a stale or absent one leaves the server's
+ *  answer. EITHER WAY THE PROBE RUNS (2026-09-11: the owner switched a VPN
+ *  on inside the six hours and the picker kept the mainland voices — a
+ *  fresh "mainland" verdict was a lock, and the socket lane was never
+ *  re-tried). A verdict is the first call's lane, not the day's; the probe,
+ *  in the background, moves the lane when the network has moved. Pure. */
 export function decideLane(
   server: VoiceLane,
   saved: SavedLane | null,
@@ -158,8 +162,38 @@ export function decideLane(
 ): { lane: VoiceLane; probe: boolean } {
   if (server === "ws") return { lane: "ws", probe: false };
   const fresh = saved !== null && now - saved.at >= 0 && now - saved.at < ttlMs;
-  if (fresh && saved) return { lane: saved.lane, probe: false };
-  return { lane: "rtc", probe: true };
+  return { lane: fresh && saved ? saved.lane : "rtc", probe: true };
+}
+
+/* ── BOTH LANES' VOICES IN ONE PICKER (owner, 2026-09-11: "with VPN and
+   without VPN only [the mainland] voice, no [socket-lane] voice at all").
+   The picker used to show the lane the device had settled on; a device
+   settled on the mainland lane never showed the other names, and the
+   caller had no way to ask for them. Now every voice is offered, tagged
+   with its lane, mainland first; choosing a voice from the other lane's
+   list is choosing that lane (VoiceCallButton.selectVoice). Pure. */
+export type LaneVoice = { key: string; label: string; lane: VoiceLane };
+export type VoicesByLane = { rtc: readonly { key: string; label: string }[]; ws: readonly { key: string; label: string }[] };
+
+export function offeredVoices(byLane: VoicesByLane): LaneVoice[] {
+  const seen = new Set<string>();
+  const out: LaneVoice[] = [];
+  for (const lane of ["rtc", "ws"] as const) {
+    for (const v of byLane[lane]) {
+      if (seen.has(v.key)) continue;
+      seen.add(v.key);
+      out.push({ key: v.key, label: v.label, lane });
+    }
+  }
+  return out;
+}
+
+/** The lane a voice key belongs to: the socket lane's when it is in that
+ *  list, the mainland lane otherwise (an unknown key is a mainland call
+ *  on the server's default voice, which is what it always was). */
+export function laneOfVoice(byLane: VoicesByLane, key: string | null | undefined): VoiceLane {
+  const want = (key ?? "").trim();
+  return want !== "" && byLane.ws.some((v) => v.key === want) && !byLane.rtc.some((v) => v.key === want) ? "ws" : "rtc";
 }
 
 export function readSavedLane(): SavedLane | null {

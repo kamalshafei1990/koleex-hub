@@ -58,7 +58,7 @@ import { useSessionLevels } from "@/lib/voice/useSessionLevels";
 import { CallTones } from "@/lib/voice/tones";
 import { pickSttLang, readSavedSttLang, saveSttLang, learnSttLang, type SttLang } from "@/lib/voice/stt-lang";
 import {
-  pickVoiceKey, readSavedVoiceKey, saveVoiceKey, readSavedRegion, saveRegion, decideLane, readSavedLane, saveLane,
+  pickVoiceKey, readSavedVoiceKey, saveVoiceKey, readSavedRegion, saveRegion, decideLane, readSavedLane, saveLane, offeredVoices, laneOfVoice, type LaneVoice, type VoicesByLane,
   readSavedTalkMode, saveTalkMode, type TalkMode,
 } from "@/lib/voice/voice-pref";
 import { requestCallSummary, shouldSummarise } from "@/lib/voice/summary";
@@ -281,7 +281,13 @@ export default function VoiceCallButton({
   /* The catalogue, as the server describes it: keys and labels, never vendor
      ids. Empty until fetched, and empty forever if the owner configured none —
      in which case no picker is drawn and the vendor's default voice is used. */
-  const [voices, setVoices] = useState<readonly { key: string; label: string }[]>([]);
+  const [voices, setVoices] = useState<readonly LaneVoice[]>([]);
+  /* Each lane's own list, for the voice → lane lookup a choice needs. */
+  const byLaneRef = useRef<VoicesByLane>({ rtc: [], ws: [] });
+  /* THE LANE THAT DID NOT ANSWER, said on the screen (2026-09-11): a caller
+     who chose a socket-lane voice and was carried to the mainland lane
+     used to hear the wrong voice with no word about why. */
+  const [laneNote, setLaneNote] = useState<"international-unreachable" | null>(null);
   const [voiceKey, setVoiceKey] = useState<string | null>(null);
   /* Mirrors the session's flag. Kept in state because the screen renders from
      it; the session stays the source of truth for the tracks themselves. */
@@ -399,14 +405,18 @@ export default function VoiceCallButton({
            use Grok voice I want the Grok voice choices"). Each lane's list
            is kept, and the one on offer follows the lane the device settles
            on — now, and again if the probe moves it. */
-        const byLane = {
+        const byLane: VoicesByLane = {
           rtc: Array.isArray(body.voices_by_lane?.rtc) ? body.voices_by_lane.rtc : Array.isArray(body.voices) ? body.voices : [],
           ws: Array.isArray(body.voices_by_lane?.ws) ? body.voices_by_lane.ws : [],
         };
+        byLaneRef.current = byLane;
+        /* EVERY VOICE IS OFFERED, tagged by lane (voice-pref.ts
+           offeredVoices); the lane the device settles on only decides
+           which list the CURRENT voice is taken from. */
         const offerFor = (lane: "rtc" | "ws") => {
-          const list = byLane[lane].length > 0 ? byLane[lane] : byLane.rtc;
-          setVoices(list);
-          setVoiceKey((cur) => pickVoiceKey(cur ?? readSavedVoiceKey(), list));
+          const own = byLane[lane].length > 0 ? byLane[lane] : byLane.rtc;
+          setVoices(offeredVoices(byLane));
+          setVoiceKey((cur) => pickVoiceKey(cur ?? readSavedVoiceKey(), own));
         };
         /* THE SERVER'S LANE IS A DEFAULT; THE DEVICE KNOWS ITS OWN NETWORK
            (lane-probe.ts). A fresh verdict from a probe or a real call
@@ -627,6 +637,18 @@ export default function VoiceCallButton({
      released and rebuilt with the words kept — on the mainland lane when
      the socket lane never came up, since that is the lane that is not
      answering. Inside the tap, so the rebuilt call may open its audio. */
+  /* THE VOICE FOLLOWS THE LANE IT FELL TO. A socket-lane voice asked of
+     the mainland lane is an unknown key there — the server's default voice
+     under the wrong name. The current voice moves to the mainland list
+     (kept when it is already there), the ref goes with it because the next
+     start runs before React's mirror does, and the screen says why. */
+  const fallToMainlandVoice = useCallback(() => {
+    const next = pickVoiceKey(voiceKeyRef.current ?? readSavedVoiceKey(), byLaneRef.current.rtc);
+    voiceKeyRef.current = next;
+    setVoiceKey(next);
+    setLaneNote("international-unreachable");
+  }, []);
+
   const retryCall = useCallback(() => {
     const s = sessionRef.current;
     const diag = s?.diagnostics();
@@ -637,11 +659,12 @@ export default function VoiceCallButton({
       laneFellBackRef.current = true;
       transportRef.current = "rtc";
       saveLane("rtc");
+      fallToMainlandVoice();
     }
     setReady(false);
     chimedRef.current = false;
     queueMicrotask(() => void startCallRef.current?.({ resume: true }));
-  }, [releaseCall]);
+  }, [releaseCall, fallToMainlandVoice]);
 
   const hangUp = useCallback(() => {
     /* WHAT THE CALL CAME TO, written down (roadmap B1). Taken before the
@@ -791,6 +814,7 @@ export default function VoiceCallButton({
             transportRef.current = "rtc";
             /* The socket lane does not work from this network today. */
             saveLane("rtc");
+            fallToMainlandVoice();
             setReady(false);
             chimedRef.current = false;
             queueMicrotask(() => void startCallRef.current?.({ resume: false }));
@@ -973,7 +997,7 @@ export default function VoiceCallButton({
     errorBeaconedRef.current = false;
     sessionRef.current = session;
     await session.start();
-  }, [clearSearchTimer, acquireWakeLock, reportFirstError]);
+  }, [clearSearchTimer, acquireWakeLock, reportFirstError, fallToMainlandVoice]);
   useEffect(() => { startCallRef.current = startCall; }, [startCall]);
 
   /* ONE METER PER SIDE, AND ONLY THE ACTIVE ONE RUNS. Measuring both at once
@@ -1228,6 +1252,18 @@ export default function VoiceCallButton({
     setVoiceKey(key);
     voiceKeyRef.current = key;
     saveVoiceKey(key);
+    /* THE VOICE NAMES THE LANE (owner, 2026-09-11: "no [socket-lane] voice
+       at all"). A voice from the other lane's list moves the next call
+       there. The choice is the device's verdict now — saved, as a probe's
+       would be — and the one fall-back is armed again, so a lane that does
+       not answer is tried once more and then said on the screen. */
+    const lane = laneOfVoice(byLaneRef.current, key);
+    if (lane !== transportRef.current) {
+      transportRef.current = lane;
+      saveLane(lane);
+      laneFellBackRef.current = false;
+    }
+    setLaneNote(null);
     const current = sessionRef.current;
     if (!current) return;
     /* THE CALL IS REBUILT WITH THE SCREEN STILL UP. The first version hung
@@ -1299,6 +1335,7 @@ export default function VoiceCallButton({
           writeSaved={writeSaved}
           writeError={writeError}
           connectingSlow={connectingSlow}
+          laneNote={laneNote}
           onRetry={retryCall}
           soundBlocked={soundBlocked}
           onEnableSound={enableSound}
