@@ -101,7 +101,7 @@ console.log("\n── 3. Approval state changes what the user is told ──");
   const needs = html(<DraftCard payload={draft({ approval_required: true })} />);
   check("a plain draft is labelled 'Draft'", text(plain).includes("Draft") && !text(plain).includes("needs approval"));
   check("a draft needing approval says so", text(needs).includes("needs approval"));
-  check("and is styled differently, not only worded differently", plain !== needs && needs.includes("amber"));
+  check("and is styled differently, not only worded differently", plain !== needs && needs.includes("kx-ai-warning"));
 }
 
 console.log("\n── 4. The welcome card renders the localised copy it is given ──");
@@ -1229,6 +1229,12 @@ console.log("\n── A chat that failed to load says so; an offline device is t
     /if \(isNetwork && activeIdRef\.current === conversationId\) \{\s*resendRef\.current = \{ text, conversationId \};/.test(app) &&
     /if \(input\.trim\(\) !== pending\.text\.trim\(\) \|\| activeIdRef\.current !== pending\.conversationId\) return;\s*resendRef\.current = null;\s*void send\(\);/.test(app) &&
     ["en", "zh", "ar"].every((l) => COPY[l as "en" | "zh" | "ar"].offline.length > 0));
+  check("on a touch screen every button in the AI app and the call screen has a 44 px hit area, rows are 44 px tall and inputs are 16 px — pointer-coarse only, scoped, the viewport lock untouched",
+    /@media \(pointer: coarse\) \{[\s\S]{0,900}?\.kx-ai-root button::after,\s*\.kx-call-root button::after \{[\s\S]{0,300}?width: max\(100%, 44px\);\s*height: max\(100%, 44px\);/.test(css) &&
+    /\.kx-ai-root \[role="button"\],\s*\.kx-call-root \[role="button"\] \{\s*min-height: 44px;/.test(css) &&
+    /\.kx-ai-root :is\(input:not\(\[type="checkbox"\]\):not\(\[type="radio"\]\):not\(\[type="range"\]\), textarea, select\) \{\s*font-size: 16px;/.test(css) &&
+    /className="kx-call-root fixed inset-0 z-\[200\]/.test(readFileSync("src/components/ai/VoiceCallScreen.tsx", "utf8")) &&
+    /maximumScale: 1,\s*userScalable: false,/.test(readFileSync("src/app/layout.tsx", "utf8")));
   check("the AI app's dim text clears AA and every control shows a focus ring — scoped to .kx-ai-root, not the whole Hub",
     /\.kx-ai-root \{ --text-dim: rgba\(255,255,255,0\.56\); \}/.test(css) &&
     /\[data-theme="light"\] \.kx-ai-root \{ --text-dim: rgba\(0,0,0,0\.62\); \}/.test(css) &&

@@ -142,7 +142,7 @@ export default function VoiceTranscript({ lines, lang = "en", className = "", fi
               {/* The speaker on its OWN line. Inline, the label ran into the
                   first word and in Arabic — where the text flows the other way
                   — it landed in the middle of the sentence. */}
-              <p className="text-[11px] uppercase tracking-wider text-[#666666] mb-1">
+              <p className="text-[12px] uppercase tracking-wider text-[#666666] mb-1">
                 {isUser ? copy.you : copy.assistant}
               </p>
               <p

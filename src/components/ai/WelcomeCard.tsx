@@ -47,7 +47,7 @@ export default function WelcomeCard({
       <h2 className="text-[22px] md:text-[26px] font-bold tracking-tight text-[var(--text-primary)] mb-2.5 leading-tight">
         {greeting}
       </h2>
-      <p className="text-[12.5px] text-[var(--text-dim)] mb-5 md:mb-9 max-w-md">
+      <p className="text-[13px] text-[var(--text-dim)] mb-5 md:mb-9 max-w-md">
         {copy.welcomeSub}
       </p>
 
@@ -62,7 +62,7 @@ export default function WelcomeCard({
                tile glass (owner: "this also can have the glass effect").
                Solid var() bg stays for Core; hover keeps speaking in the
                border (the glass fill owns the background under Aurora). */
-            className="kx-glass relative group flex min-h-[64px] items-center rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] px-3.5 py-3 text-start text-[12.5px] text-[var(--text-primary)] hover:border-[var(--border-focus)] hover:bg-[var(--bg-surface-subtle)] transition-colors"
+            className="kx-glass relative group flex min-h-[64px] items-center rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] px-3.5 py-3 text-start text-[13px] text-[var(--text-primary)] hover:border-[var(--border-focus)] hover:bg-[var(--bg-surface-subtle)] transition-colors"
           >
             <span className="flex-1 leading-snug">{p}</span>
           </button>

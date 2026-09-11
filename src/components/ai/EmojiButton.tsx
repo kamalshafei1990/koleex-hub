@@ -215,7 +215,7 @@ export default function EmojiButton({
             onChange={(e) => setQuery(e.target.value)}
             placeholder={copy.searchEmoji}
             aria-label={copy.searchEmoji}
-            className="w-full h-8 px-2.5 rounded-md bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[12.5px] text-[var(--text-primary)] placeholder:text-[var(--text-dim)] outline-none focus:border-[var(--border-focus)]"
+            className="w-full h-8 px-2.5 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-dim)] outline-none focus:border-[var(--border-focus)]"
             /* 16px font on iOS prevents the zoom-on-focus, but the
                picker lives over a fixed-position panel and 12.5 here
                is consistent with the rest of the Hub composer. */
@@ -245,7 +245,7 @@ export default function EmojiButton({
                 }}
                 className="pb-2"
               >
-                <div className="px-1 pt-1.5 pb-1 text-[10px] font-bold uppercase tracking-wider text-[var(--text-dim)]">
+                <div className="px-1 pt-1.5 pb-1 text-[12px] font-bold uppercase tracking-wider text-[var(--text-dim)]">
                   {catName(cat.id, cat.label)}
                 </div>
                 <div className="grid grid-cols-8 gap-0.5">
@@ -269,7 +269,7 @@ export default function EmojiButton({
                 onClick={() => jumpToCategory(cat.id)}
                 aria-label={catName(cat.id, cat.label)}
                 title={catName(cat.id, cat.label)}
-                className={`h-7 w-7 flex items-center justify-center rounded-md text-[16px] transition-colors ${
+                className={`h-7 w-7 flex items-center justify-center rounded-lg text-[16px] transition-colors ${
                   isActive
                     ? "bg-[var(--bg-surface)] text-[var(--text-primary)]"
                     : "text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-subtle)]"
@@ -322,7 +322,7 @@ function EmojiCell({
     <button
       type="button"
       onClick={() => onPick(entry.c)}
-      className="aspect-square rounded-md flex items-center justify-center text-[22px] hover:bg-[var(--bg-surface-subtle)] active:bg-[var(--bg-surface)] transition-colors"
+      className="aspect-square rounded-lg flex items-center justify-center text-[22px] hover:bg-[var(--bg-surface-subtle)] active:bg-[var(--bg-surface)] transition-colors"
       aria-label={`${insertLabel} ${entry.c}`}
       title={entry.k.split(" ").slice(0, 3).join(" ")}
     >

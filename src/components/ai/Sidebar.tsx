@@ -201,14 +201,14 @@ export function SidebarRow({
     >
       <div className="flex-1 min-w-0">
         <div className="text-[13px] truncate" dir="auto">{row.title}</div>
-        {hint && <div className="text-[11px] truncate text-[var(--text-dim)]" data-search-hint>{hint}</div>}
+        {hint && <div className="text-[12px] truncate text-[var(--text-dim)]" data-search-hint>{hint}</div>}
       </div>
       {/* The pin marks the row while it is pinned and hides again on hover so
           it can't be mistaken for a button you have to press to keep it. */}
       <button
         type="button"
         onClick={(e) => { e.stopPropagation(); onTogglePin(); }}
-        className={`h-6 w-6 rounded-md flex items-center justify-center shrink-0 ${
+        className={`h-6 w-6 rounded-lg flex items-center justify-center shrink-0 ${
           pinned
             ? "text-[var(--text-dim)] group-hover:text-[var(--text-primary)]"
             /* VISIBLE WHERE THERE IS NO HOVER. On a phone a tap has no hover,
@@ -304,7 +304,7 @@ export function RowMenu({
           if (!open) place();
           setOpen((v) => !v);
         }}
-        className={`h-6 w-6 rounded-md flex items-center justify-center shrink-0 text-[var(--text-dim)] hover:text-[var(--text-primary)] ${
+        className={`h-6 w-6 rounded-lg flex items-center justify-center shrink-0 text-[var(--text-dim)] hover:text-[var(--text-primary)] ${
           open || alwaysVisible
             ? "opacity-100"
             : "opacity-0 group-hover:opacity-100 [@media(hover:none)]:opacity-100 focus-visible:opacity-100"
@@ -348,7 +348,7 @@ export function RowMenu({
               it.separator ? (
                 <div key={it.key} className="px-3 pt-2 pb-1">
                   {it.label ? (
-                    <span className="text-[10px] uppercase tracking-[0.14em] font-semibold text-[var(--text-dim)]">
+                    <span className="text-[12px] uppercase tracking-[0.14em] font-semibold text-[var(--text-dim)]">
                       {it.label}
                     </span>
                   ) : (
@@ -367,7 +367,7 @@ export function RowMenu({
                   }}
                   className={`w-full px-3 py-1.5 text-[12px] flex items-center gap-2 text-start hover:bg-[var(--bg-surface-subtle)] ${
                     it.danger
-                      ? "text-rose-400"
+                      ? "text-[var(--kx-ai-danger-text)]"
                       : it.selected
                         ? "text-[var(--text-primary)]"
                         : "text-[var(--text-secondary)]"

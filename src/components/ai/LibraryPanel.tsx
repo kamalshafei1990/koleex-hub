@@ -67,7 +67,7 @@ export default function LibraryPanel({
 
   return (
     <section aria-label={copy.library} className="max-w-[820px] mx-auto px-4 md:px-6 py-6">
-      <h2 className="text-[15px] font-semibold text-[var(--text-primary)] mb-4">{copy.library}</h2>
+      <h2 className="text-[16px] font-semibold text-[var(--text-primary)] mb-4">{copy.library}</h2>
       {items === null ? (
         <div className="flex items-center justify-center py-20">
           <SpinnerIcon className="h-5 w-5 text-[var(--text-dim)]" />
@@ -100,7 +100,7 @@ export default function LibraryPanel({
                 className="h-full w-full object-cover transition-transform duration-200 group-hover:scale-[1.03]"
               />
               {(it.label || it.conversation_title) && (
-                <span className="absolute inset-x-0 bottom-0 px-1.5 py-1 text-[10px] leading-tight text-white bg-gradient-to-t from-black/70 to-transparent truncate text-start">
+                <span className="absolute inset-x-0 bottom-0 px-1.5 py-1 text-[12px] leading-tight text-white bg-gradient-to-t from-black/70 to-transparent truncate text-start">
                   {it.label || it.conversation_title}
                 </span>
               )}

@@ -2364,6 +2364,36 @@ html[data-kx-tabslide] #main-scroll-container { overflow-x: clip; }
    carries; Arabic glyphs render thinner still. Raised inside the AI app only
    (audit, 2026-09-11) so the rest of the Hub keeps its scale. */
 .kx-ai-root { --text-dim: rgba(255,255,255,0.56); }
+
+/* KOLEEX AI — ONE BLUE, THE BRAND'S THREE FUNCTIONAL COLOURS, ONE SCALE.
+   The AI app ran three blues (--accent #567FB2, hard-coded #0066FF, link
+   #6aa7ff) and Tailwind's emerald/rose/sky/amber where the brand defines
+   #0066FF / #00CC66 / #FF3333 / #FFCC00 (audit, 2026-09-11). These tokens
+   are what components/ai now uses; --accent is pointed at Hub Blue inside
+   the app so the shared controls follow. Radii and type come from Tailwind's
+   own 8/12/16/24 and 12/13/14/16/18 steps — no half-pixel sizes. */
+.kx-ai-root, .kx-call-root {
+  --kx-ai-accent: #0066FF;
+  --kx-ai-accent-strong: #0052CC;
+  --kx-ai-accent-soft: rgba(0,102,255,0.12);
+  --kx-ai-accent-line: rgba(0,102,255,0.40);
+  --kx-ai-success: #00CC66;
+  --kx-ai-success-soft: rgba(0,204,102,0.12);
+  --kx-ai-success-line: rgba(0,204,102,0.40);
+  --kx-ai-warning: #FFCC00;
+  --kx-ai-warning-text: #FFE066;
+  --kx-ai-warning-soft: rgba(255,204,0,0.10);
+  --kx-ai-warning-line: rgba(255,204,0,0.35);
+  --kx-ai-danger: #FF3333;
+  --kx-ai-danger-text: #FF7A7A;
+  --kx-ai-danger-soft: rgba(255,51,51,0.10);
+  --kx-ai-danger-line: rgba(255,51,51,0.30);
+}
+.kx-ai-root { --accent: var(--kx-ai-accent); }
+[data-theme="light"] .kx-ai-root {
+  --kx-ai-warning-text: #8A6D00;
+  --kx-ai-danger-text: #C62828;
+}
 [data-theme="light"] .kx-ai-root { --text-dim: rgba(0,0,0,0.62); }
 
 /* KOLEEX AI — A VISIBLE FOCUS RING ON EVERY CONTROL. Tab landed on the
@@ -2373,6 +2403,40 @@ html[data-kx-tabslide] #main-scroll-container { overflow-x: clip; }
 .kx-ai-root :is(button, [role="button"], a[href]):focus-visible {
   outline: 2px solid #0066FF;
   outline-offset: 2px;
+}
+
+/* KOLEEX AI — 44 px TARGETS ON TOUCH SCREENS. The composer icons (32 px),
+   the sidebar pin and menu (24 px), the bubble action row (28 px) and the
+   call sheet's Close and Send (36 px) are the "mis-tap opens the chat
+   instead of pinning" class of bug the sidebar already met once (audit,
+   2026-09-11). The glyphs stay their size; the HIT AREA grows: a centred
+   pseudo-element of at least 44 × 44 on every button, and a 44 px minimum
+   height on the clickable rows. Inputs render at 16 px on a phone so iOS
+   has no reason to zoom into them. Pointer-coarse only: a mouse needs none
+   of this and the desktop layout does not move. Scoped to the AI app and
+   the call screen — the rest of the Hub keeps its own sizes. */
+@media (pointer: coarse) {
+  .kx-ai-root button:not(.absolute):not(.fixed):not(.sticky),
+  .kx-call-root button:not(.absolute):not(.fixed):not(.sticky) {
+    position: relative;
+  }
+  .kx-ai-root button::after,
+  .kx-call-root button::after {
+    content: "";
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: max(100%, 44px);
+    height: max(100%, 44px);
+    transform: translate(-50%, -50%);
+  }
+  .kx-ai-root [role="button"],
+  .kx-call-root [role="button"] {
+    min-height: 44px;
+  }
+  .kx-ai-root :is(input:not([type="checkbox"]):not([type="radio"]):not([type="range"]), textarea, select) {
+    font-size: 16px;
+  }
 }
 [data-kx-skin="aurora"] .kx-ai-bar { background: transparent; }
 /* Small controls (chips, inputs, row hovers) re-tint to the header-button

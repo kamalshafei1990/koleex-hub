@@ -217,7 +217,7 @@ function BubbleImpl({
             className={`rounded-2xl leading-relaxed ${
               isUser ? "whitespace-pre-wrap px-4 py-2.5" : "px-5 py-3.5"
             } ${
-              rtl ? "text-[15px]" : "text-[14px]"
+              rtl ? "text-[16px]" : "text-[14px]"
             } ${
               isUser
                 ? "bg-[var(--bg-inverted)] text-[var(--text-inverted)]"
@@ -303,7 +303,7 @@ function BubbleImpl({
                         ) : (
                           <span
                             key={`${f.name}-${i}`}
-                            className="inline-flex max-w-[240px] items-center gap-1.5 rounded-md border border-white/15 px-2 py-1 text-[11.5px]"
+                            className="inline-flex max-w-[240px] items-center gap-1.5 rounded-lg border border-white/15 px-2 py-1 text-[12px]"
                             title={f.name}
                           >
                             <span aria-hidden>📎</span>
@@ -369,7 +369,7 @@ function BubbleImpl({
               };
               return (
                 <div className="kx-glass-pop -mx-1 rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-3">
-                  <p className="mb-2.5 px-0.5 text-[13.5px] font-semibold text-[var(--text-primary)]">
+                  <p className="mb-2.5 px-0.5 text-[14px] font-semibold text-[var(--text-primary)]">
                     {q?.question || msg.content}
                   </p>
                   <div className="flex flex-col gap-1.5">
@@ -417,14 +417,14 @@ function BubbleImpl({
                             )}
                             <span className="text-[13px] font-medium text-[var(--text-primary)]">{o.label}</span>
                             {o.recommended && (
-                              <span className="ms-auto shrink-0 rounded-full border border-[var(--border-focus)] px-1.5 py-px text-[9.5px] font-bold uppercase tracking-wider text-[var(--text-muted)]">
+                              <span className="ms-auto shrink-0 rounded-full border border-[var(--border-focus)] px-1.5 py-px text-[12px] font-bold uppercase tracking-wider text-[var(--text-muted)]">
                                 {cardCopy.recommended}
                               </span>
                             )}
                           </span>
                           {o.detail && (
                             <span
-                              className={`mt-1 block text-[11.5px] leading-snug text-[var(--text-dim)] ${
+                              className={`mt-1 block text-[12px] leading-snug text-[var(--text-dim)] ${
                                 o.photo_url ? "ps-[58px]" : "ps-[22px]"
                               }`}
                             >
@@ -457,7 +457,7 @@ function BubbleImpl({
                               {cardCopy.otherOption}
                             </span>
                           </span>
-                          <span className="mt-1 block ps-[22px] text-[11.5px] leading-snug text-[var(--text-dim)]">
+                          <span className="mt-1 block ps-[22px] text-[12px] leading-snug text-[var(--text-dim)]">
                             {settled}
                           </span>
                         </div>
@@ -479,7 +479,7 @@ function BubbleImpl({
                             type="button"
                             onClick={submitOther}
                             disabled={!otherText.trim()}
-                            className="shrink-0 rounded-lg border border-[var(--border-subtle)] px-2.5 py-1 text-[11.5px] font-medium text-[var(--text-primary)] transition-colors hover:border-[var(--border-focus)] hover:bg-[var(--bg-surface-subtle)] disabled:opacity-40"
+                            className="shrink-0 rounded-lg border border-[var(--border-subtle)] px-2.5 py-1 text-[12px] font-medium text-[var(--text-primary)] transition-colors hover:border-[var(--border-focus)] hover:bg-[var(--bg-surface-subtle)] disabled:opacity-40"
                           >
                             {cardCopy.otherSend}
                           </button>
@@ -499,7 +499,7 @@ function BubbleImpl({
                               {cardCopy.otherOption}
                             </span>
                           </span>
-                          <span className="mt-1 block ps-[22px] text-[11.5px] leading-snug text-[var(--text-dim)]">
+                          <span className="mt-1 block ps-[22px] text-[12px] leading-snug text-[var(--text-dim)]">
                             {cardCopy.otherPlaceholder}
                           </span>
                         </button>
@@ -520,7 +520,7 @@ function BubbleImpl({
             to the reader. Quiet: dim, small, under the bubble. */}
         {msg.source === "voice" && !!msg.content && (
           <span
-            className="inline-flex items-center gap-1 text-[11px] text-[var(--text-dim)]"
+            className="inline-flex items-center gap-1 text-[12px] text-[var(--text-dim)]"
             title={copy.voiceMessage}
           >
             <svg aria-hidden viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
@@ -537,13 +537,13 @@ function BubbleImpl({
             with new text) or Save/Cancel while editing. Only shown
             when the parent supplied onEdit and allowed it. */}
         {isUser && showEditButton && (
-          <div className="mt-1 flex items-center gap-2 text-[11px] text-[var(--text-dim)]">
+          <div className="mt-1 flex items-center gap-2 text-[12px] text-[var(--text-dim)]">
             {editing ? (
               <>
                 <button
                   type="button"
                   onClick={submitEdit}
-                  className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-[var(--bg-inverted)] text-[var(--text-inverted)] transition-opacity"
+                  className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-[var(--bg-inverted)] text-[var(--text-inverted)] transition-opacity"
                   aria-label={copy.saveAndRetry}
                 >
                   {copy.saveAndRetry}
@@ -551,7 +551,7 @@ function BubbleImpl({
                 <button
                   type="button"
                   onClick={cancelEdit}
-                  className="inline-flex items-center gap-1 px-2 py-1 rounded-md hover:bg-[var(--bg-surface-subtle)] hover:text-[var(--text-primary)] transition-colors"
+                  className="inline-flex items-center gap-1 px-2 py-1 rounded-lg hover:bg-[var(--bg-surface-subtle)] hover:text-[var(--text-primary)] transition-colors"
                   aria-label={copy.cancelEdit}
                 >
                   {copy.cancel}
@@ -564,7 +564,7 @@ function BubbleImpl({
                   setEditValue(msg.content);
                   setEditing(true);
                 }}
-                className="inline-flex items-center gap-1 px-2 py-1 rounded-md hover:bg-[var(--bg-surface-subtle)] hover:text-[var(--text-primary)] transition-colors"
+                className="inline-flex items-center gap-1 px-2 py-1 rounded-lg hover:bg-[var(--bg-surface-subtle)] hover:text-[var(--text-primary)] transition-colors"
                 aria-label={copy.editAndRetry}
               >
                 ✎ {copy.editShort}
@@ -602,7 +602,7 @@ function BubbleImpl({
             // eslint-disable-next-line @next/next/no-img-element
             <img src={userAvatar} alt="" className="h-full w-full object-cover" />
           ) : (
-            <span className="text-[11px] font-bold text-[var(--text-primary)]">
+            <span className="text-[12px] font-bold text-[var(--text-primary)]">
               {userInitial}
             </span>
           )}
@@ -658,14 +658,14 @@ export function BubbleActions({
      instead of "copy and regenerate are smaller than the speaker".
      Earlier draft mixed 12 / 13 / 14 px icons which the user spotted
      as a visible alignment bug. */
-  const btnCls = "inline-flex items-center justify-center h-7 w-7 rounded-md hover:bg-[var(--bg-surface-subtle)] hover:text-[var(--text-primary)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed";
+  const btnCls = "inline-flex items-center justify-center h-7 w-7 rounded-lg hover:bg-[var(--bg-surface-subtle)] hover:text-[var(--text-primary)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed";
   const ICON = 14;
   return (
-    <div role="toolbar" aria-label={copy.messageActions} className="mt-1 flex items-center gap-1 text-[11px] text-[var(--text-dim)]">
+    <div role="toolbar" aria-label={copy.messageActions} className="mt-1 flex items-center gap-1 text-[12px] text-[var(--text-dim)]">
       <button
         type="button"
         onClick={onCopy}
-        className={`${btnCls} ${copied ? "text-emerald-300" : ""}`}
+        className={`${btnCls} ${copied ? "text-[var(--kx-ai-success)]" : ""}`}
         aria-label={copied ? copy.copied : copy.copyMessage}
         title={copied ? copy.copied : copy.copyMessage}
       >
@@ -726,7 +726,7 @@ export function BubbleActions({
           <button
             type="button"
             onClick={() => sendVote("up")}
-            className={`${btnCls} ${vote === "up" ? "text-emerald-300" : ""}`}
+            className={`${btnCls} ${vote === "up" ? "text-[var(--kx-ai-success)]" : ""}`}
             aria-label={copy.goodResponse}
             title={copy.goodResponse}
           >
@@ -737,7 +737,7 @@ export function BubbleActions({
           <button
             type="button"
             onClick={() => sendVote("down")}
-            className={`${btnCls} ${vote === "down" ? "text-rose-300" : ""}`}
+            className={`${btnCls} ${vote === "down" ? "text-[var(--kx-ai-danger-text)]" : ""}`}
             aria-label={copy.badResponse}
             title={copy.badResponse}
           >

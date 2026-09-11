@@ -68,7 +68,7 @@ export default function ProjectDialog({
           </h2>
         </div>
 
-        <label className="block text-[10px] uppercase tracking-[0.14em] font-semibold text-[var(--text-dim)] mb-1">
+        <label className="block text-[12px] uppercase tracking-[0.14em] font-semibold text-[var(--text-dim)] mb-1">
           {copy.projectName}
         </label>
         <input
@@ -81,7 +81,7 @@ export default function ProjectDialog({
           placeholder={copy.newProject}
         />
 
-        <div className="mt-3 text-[10px] uppercase tracking-[0.14em] font-semibold text-[var(--text-dim)] mb-1.5">
+        <div className="mt-3 text-[12px] uppercase tracking-[0.14em] font-semibold text-[var(--text-dim)] mb-1.5">
           {copy.projectIcon}
         </div>
         <div className="grid grid-cols-6 gap-1.5">
@@ -103,7 +103,7 @@ export default function ProjectDialog({
           ))}
         </div>
 
-        <div className="mt-3 text-[10px] uppercase tracking-[0.14em] font-semibold text-[var(--text-dim)] mb-1.5">
+        <div className="mt-3 text-[12px] uppercase tracking-[0.14em] font-semibold text-[var(--text-dim)] mb-1.5">
           {copy.projectColor}
         </div>
         <div className="flex items-center gap-2 flex-wrap">

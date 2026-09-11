@@ -74,7 +74,7 @@ export default function CallsPanel({
 
   return (
     <section aria-label={copy.calls} className="max-w-[820px] mx-auto px-4 md:px-6 py-6">
-      <h2 className="text-[15px] font-semibold text-[var(--text-primary)] mb-4">{copy.calls}</h2>
+      <h2 className="text-[16px] font-semibold text-[var(--text-primary)] mb-4">{copy.calls}</h2>
       {items === null ? (
         <div className="flex items-center justify-center py-20">
           <SpinnerIcon className="h-5 w-5 text-[var(--text-dim)]" />
