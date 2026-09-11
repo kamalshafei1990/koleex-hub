@@ -1236,6 +1236,9 @@ export default function VoiceCallButton({
         last_event: d.last_event,
         ws_reconnects: d.ws_reconnects,
         ws_close: d.ws_close,
+        /* How heavy the page is, for the beacon a death leaves behind. */
+        dom: document.getElementsByTagName("*").length,
+        imgs: document.images.length,
       });
     };
     beat();
@@ -1262,6 +1265,7 @@ export default function VoiceCallButton({
         ws_reconnects: dead.ws_reconnects,
         ws_close: dead.ws_close,
         ice_ever_connected: true,
+        ...(dead.dom !== undefined ? { dom: dead.dom, imgs: dead.imgs ?? 0 } : {}),
       });
       onErrorRef.current?.(INTERRUPTED_COPY[langRef.current]);
     }

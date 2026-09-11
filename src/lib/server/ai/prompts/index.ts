@@ -33,9 +33,9 @@ import {
 } from "@/lib/server/ai/identity";
 import { identityAngleFor } from "@/lib/server/ai/identity-angle";
 import { ENTITY_GUIDANCE_FULL } from "@/lib/server/ai/entity-scope";
-import { viewerBlockFor, buildNowBlock } from "./blocks";
+import { viewerBlockFor, buildNowBlock, buildNowLine } from "./blocks";
 
-export { viewerBlockFor, buildNowBlock } from "./blocks";
+export { viewerBlockFor, buildNowBlock, buildNowLine, isoDateIn } from "./blocks";
 
 /** Minimal system prompt for small-talk that escaped the canned
  *  fast-reply table (e.g. "hey Koleex", "hi there Koleex AI"). Skips
@@ -70,7 +70,9 @@ ${DATA_PROTECTION_RULE}
 
 ${AI_PROVENANCE_RULE}${AI_IDENTITY_BRIEF}${KOLEEX_COMPANY_BRIEF}
 ${dialect === "egyptian" ? `\n${EGYPTIAN_DIALECT_RULE}\n` : ""}
-Current user: ${ctx.auth.username}.`;
+Current user: ${ctx.auth.username}.
+
+${buildNowLine(ctx.timezone)}`;
 }
 
 /** Lean prompt used ONLY on the brand fast-path. Strips the tool /
@@ -212,7 +214,9 @@ The right SHAPE for questions about you (shapes only — there is no sentence he
 
 ${AI_PROVENANCE_RULE}${selfDescriptionForSection(section)}${section === "company" ? "" : identityAngleFor(userMessage ?? "")}
 
-${dialect === "egyptian" ? `${EGYPTIAN_DIALECT_RULE}\n\n` : ""}${brandKnowledgeFor(section)}`;
+${dialect === "egyptian" ? `${EGYPTIAN_DIALECT_RULE}\n\n` : ""}${brandKnowledgeFor(section)}
+
+${buildNowLine(ctx.timezone)}`;
 }
 
 /* Build the "current date/time" directive in the user's timezone. Server
@@ -466,6 +470,7 @@ export function buildDegradedSystemPrompt(
     "say live-data lookups are temporarily unavailable and an administrator needs to finish the AI configuration — " +
     "never name any provider, API or key — and offer to help with anything else. " +
     BRAND_EXCLUSIVITY_RULE + "\n\n" + DIRECT_VOICE_RULE + "\n\n" + DATA_PROTECTION_RULE +
-    "\n\n" + AI_PROVENANCE_RULE + AI_IDENTITY_BRIEF + KOLEEX_COMPANY_BRIEF
+    "\n\n" + AI_PROVENANCE_RULE + AI_IDENTITY_BRIEF + KOLEEX_COMPANY_BRIEF +
+    "\n\n" + buildNowLine(ctx.timezone)
   );
 }

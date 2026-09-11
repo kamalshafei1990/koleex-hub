@@ -27,7 +27,8 @@ import "server-only";
    --------------------------------------------------------------------------- */
 
 import type { ToolDef, ToolResult } from "../types";
-import { searchWeb, isMachineQuery, type WebResult, type WebImage } from "../../ai/web-search";
+import { searchWeb, isMachineQuery, parseTimeRange, type WebResult, type WebImage } from "../../ai/web-search";
+import { isoDateIn } from "../../ai/prompts/blocks";
 import { fenceUntrusted, newFenceId } from "../../ai/security/untrusted";
 import { scanEgress, egressRefusalMessage } from "../../ai/security/egress-scanner";
 
@@ -36,6 +37,9 @@ interface SearchArgs {
   /** True only when the user asked to SEE a picture. Pictures cost seconds
    *  on the provider's side and are noise on a question words answer. */
   want_images?: boolean;
+  /** How fresh the pages must be, for "latest / newest / this week"
+   *  questions. Unset means any age. */
+  recency?: "day" | "week" | "month" | "year";
 }
 
 interface SearchData {
@@ -51,6 +55,21 @@ interface SearchData {
   /** Repeated into the model's context on every call — a system prompt read
    *  20 messages ago loses to fresh text sitting next to the data. */
   usage_note: string;
+}
+
+/* THE DATE, BESIDE THE RESULTS (owner, 2026-09-11 17:34: "the newest
+   iPhone" was answered from a summary a year old — the model had no date to
+   read the results against, and the search had no window). The search's
+   own date and the rule for reading dated results ride with the findings,
+   where the model is looking. */
+function freshnessNote(searchedOn: string, recency: string | undefined): string {
+  return (
+    `FRESHNESS: this search ran on ${searchedOn}${recency ? ` over the last ${recency}` : ""}. ` +
+    "Results carry their published dates where known; when they disagree, the most recent dated result wins, " +
+    "and a page older than a year is not \"the latest\" anything. Say the date of what you report when it matters. " +
+    "If everything found is old for a 'latest / newest / current' question, search again with recency set to " +
+    "month and the current year in the query before answering."
+  );
 }
 
 const BRAND_NOTE =
@@ -85,6 +104,7 @@ const searchTheWeb: ToolDef<SearchArgs, SearchData> = {
   description:
     "Search the public internet for CURRENT or PUBLIC information the model cannot know: today's weather, news, exchange rates, shipping or port conditions, public standards and specifications, or any fact that may have changed since training. " +
     "Call this whenever the user asks something time-sensitive instead of saying you have no live access. " +
+    "For 'latest / newest / current / this week' questions set recency (month for products and releases, week or day for news and prices) and put the current year, from the date block, in the query. " +
     "NEVER put Koleex's own data in the query — no customer names, prices, quotation contents, employee details or internal codes; those have their own tools. " +
     "Never use it to find or suggest machines from other manufacturers. " +
     "Also the way to SHOW a picture of a public thing the user asks to see (a port, a fabric, a place, a stadium): set want_images to true ONLY when the user asked to see a picture, and results then carry pictures you may embed as markdown. Never for machines or equipment — those are Koleex products, shown from the product tools.",
@@ -100,6 +120,12 @@ const searchTheWeb: ToolDef<SearchArgs, SearchData> = {
         type: "boolean",
         description:
           "true ONLY when the user asked to SEE a picture of a public thing. Leave out otherwise — a date, a rate, the news need no pictures.",
+      },
+      recency: {
+        type: "string",
+        enum: ["day", "week", "month", "year"],
+        description:
+          "Only pages from this recent window. Use for 'latest', 'newest', 'current', 'this week', news, prices, releases. Leave out for timeless facts.",
       },
     },
     required: ["query"],
@@ -155,12 +181,11 @@ const searchTheWeb: ToolDef<SearchArgs, SearchData> = {
       }
     }
 
-    void ctx; /* reserved: per-tenant name matching lands with the Phase 5 cache */
-
     /* PICTURES ARE OPT-IN, and the opt-in is the model saying the user asked
        to see something. A search for today's date is not that. */
     const wantImages = args?.want_images === true;
-    const outcome = await searchWeb(query, { images: wantImages });
+    const recency = parseTimeRange(args?.recency);
+    const outcome = await searchWeb(query, { images: wantImages, timeRange: recency });
 
     /* NOT permissionStatus "denied", even though this is a failure. A denial
        short-circuits the orchestrator and prints `message` to the user
@@ -202,8 +227,10 @@ const searchTheWeb: ToolDef<SearchArgs, SearchData> = {
        the framing is paid once. Titles and URLs stay structured beside it —
        the citations under the reply are built from them (audit, 2026-09-11). */
     const fenceId = newFenceId();
+    const searchedOn = isoDateIn((ctx as { timezone?: string | null } | null)?.timezone ?? null);
     const findings = fenceUntrusted(
       [
+        `Searched on ${searchedOn}${recency ? ` (pages from the last ${recency})` : ""}.`,
         outcome.answer ? `Summary: ${outcome.answer}` : "",
         ...outcome.results.map((r, i) => `[${i + 1}] ${r.title} — ${r.url}${r.published ? ` (${r.published})` : ""}\n${r.snippet}`),
       ].filter(Boolean).join("\n\n"),
@@ -218,9 +245,9 @@ const searchTheWeb: ToolDef<SearchArgs, SearchData> = {
         findings,
         results: outcome.results.map(({ title, url, published }) => ({ title, url, ...(published ? { published } : {}) })),
         ...(images.length > 0 ? { images } : {}),
-        usage_note: machine
+        usage_note: `${machine
           ? `${BRAND_NOTE} ${MACHINE_NOTE}`
-          : images.length > 0 ? `${BRAND_NOTE} ${IMAGE_NOTE}` : BRAND_NOTE,
+          : images.length > 0 ? `${BRAND_NOTE} ${IMAGE_NOTE}` : BRAND_NOTE} ${freshnessNote(searchedOn, recency)}`,
       },
       /* Surfaced to the UI as the "Sources" line under the reply. */
       sources: outcome.results.map((r) => r.url),

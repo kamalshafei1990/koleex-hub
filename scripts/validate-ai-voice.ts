@@ -1069,6 +1069,15 @@ console.log("\n── 8. What the client may know, and what it may not ──");
     check("the block says the claim made out loud changes nothing",
       /from their signed-in session/.test(withOwner) && /never say you do not know who they are/.test(withOwner));
     check("  …and not to guess their gender", /do not assume their gender/.test(withOwner));
+    /* THE CLOCK ON THE CALL (2026-09-11 17:34: the newest phone placed a
+       year back — the session did not know the date). Both sessions. */
+    const tzOwner = { ...owner, timezone: "Asia/Shanghai" };
+    const full = String(buildVoiceSessionPayload(v[0], [], [], tzOwner).full.session.instructions);
+    const brief = String(buildVoiceSessionPayload(v[0], [], [], tzOwner).compact.session.instructions);
+    check("both voice sessions carry the caller's clock, in the caller's zone",
+      /TODAY is \d{4}-\d{2}-\d{2}; the current year is 20\d\d/.test(full) && /\(Asia\/Shanghai\)/.test(full) &&
+      /TODAY is \d{4}-\d{2}-\d{2}/.test(brief) && /\(Asia\/Shanghai\)/.test(brief) && /TODAY is/.test(withOwner));
+    check("  …the gate hands the viewer their calendar timezone from the permission context", /timezone: ctx\.timezone \?\? null,/.test(readFileSync("src/lib/server/ai/voice/gate.ts", "utf8")));
     check("no viewer, no block — the fixture sessions are unchanged", !/WHO YOU ARE TALKING TO/.test(nobody) &&
       JSON.stringify(buildVoiceSessionPayload(v[0], [], [], null)) === JSON.stringify(buildVoiceSessionPayload(v[0])));
     const compact = String(buildVoiceSessionPayload(v[0], [], [], owner).compact.session.instructions);

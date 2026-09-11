@@ -213,6 +213,17 @@ check(
 check("business data: a trade-term question routes to tools", isBusinessDataQuery("What does DDP mean?"));
 check("live info: 'weather in Cairo' bypasses the tool-less lane", isLiveInfoQuery("what is the weather in Cairo"));
 check(
+  "live info: a question about the date itself goes to the tools, in three languages (owner, 2026-09-11 19:10)",
+  isLiveInfoQuery("what's the date today?") && isLiveInfoQuery("What day is it") && isLiveInfoQuery("what time is it") &&
+    isLiveInfoQuery("النهاردة يوم اية ؟") && isLiveInfoQuery("النهارده تاريخ كام") && isLiveInfoQuery("احنا في سنة كام") && isLiveInfoQuery("الساعة كام") &&
+    isLiveInfoQuery("今天几号") && isLiveInfoQuery("今天是星期几") && isLiveInfoQuery("现在几点"),
+);
+check(
+  "live info: 'the newest / latest X' in Arabic and Chinese is a lookup, like the English framing",
+  isLiveInfoQuery("أحدث آيفون نزل إيه") && isLiveInfoQuery("آخر إصدار من الماكينة") && isLiveInfoQuery("最新的iPhone是哪款") && isLiveInfoQuery("what is the newest phone"),
+);
+check("live info: an ordinary sentence with none of that stays on the fast lane", !isLiveInfoQuery("thank you, that helps") && !isLiveInfoQuery("شكراً يا كولكس") && !isLiveInfoQuery("explain what FOB means"));
+check(
   "live info: asking to SEE something is a lookup, in three languages",
   isLiveInfoQuery("show me a picture of Port Said port") &&
     isLiveInfoQuery("what does a Jacquard loom look like") &&

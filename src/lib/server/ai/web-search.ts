@@ -173,7 +173,7 @@ async function fetchJson(url: string, init: RequestInit, timeoutMs = TIMEOUT_MS)
   }
 }
 
-async function searchTavily(key: string, query: string, withImages: boolean, timeoutMs: number): Promise<WebSearchOutcome> {
+async function searchTavily(key: string, query: string, withImages: boolean, timeoutMs: number, timeRange?: WebSearchTimeRange): Promise<WebSearchOutcome> {
   const json = (await fetchJson("https://api.tavily.com/search", {
     method: "POST",
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}` },
@@ -182,6 +182,8 @@ async function searchTavily(key: string, query: string, withImages: boolean, tim
       max_results: MAX_RESULTS,
       search_depth: "basic",
       include_answer: true,
+      /* The freshness window the tool asked for, when it asked. */
+      ...(timeRange ? { time_range: timeRange } : {}),
       /* Pictures ride along on the same call — no second provider, no
          second request, no second key. DESCRIPTIONS ARE NOT ASKED FOR:
          the provider generates them, and that is where the seconds went
@@ -255,6 +257,17 @@ export interface WebSearchOptions {
    *  to SEE something: "what is the date today" came back with two calendar
    *  pictures and a slower search, for a question words answer in one line. */
   images?: boolean;
+  /** HOW FRESH THE PAGES MUST BE (owner, 2026-09-11: "what is the newest
+   *  phone" was answered from a year-old summary). The provider's own
+   *  window; absent means no restriction, as before. */
+  timeRange?: WebSearchTimeRange;
+}
+
+export type WebSearchTimeRange = "day" | "week" | "month" | "year";
+export const WEB_SEARCH_TIME_RANGES: readonly WebSearchTimeRange[] = ["day", "week", "month", "year"];
+
+export function parseTimeRange(v: unknown): WebSearchTimeRange | undefined {
+  return typeof v === "string" && (WEB_SEARCH_TIME_RANGES as readonly string[]).includes(v) ? (v as WebSearchTimeRange) : undefined;
 }
 
 export async function searchWeb(rawQuery: string, opts: WebSearchOptions = {}): Promise<WebSearchOutcome> {
@@ -276,11 +289,11 @@ export async function searchWeb(rawQuery: string, opts: WebSearchOptions = {}): 
        text is asked for again, alone, so the caller still gets an answer. */
     const withImages = opts.images === true && !isMachineQuery(query);
     try {
-      return await searchTavily(tavily, query, withImages, TIMEOUT_MS);
+      return await searchTavily(tavily, query, withImages, TIMEOUT_MS, opts.timeRange);
     } catch (first) {
       if (!withImages || !isAbort(first)) throw first;
       console.warn("[ai.web-search] timed out with pictures — retrying for the text alone");
-      return await searchTavily(tavily, query, false, RETRY_TIMEOUT_MS);
+      return await searchTavily(tavily, query, false, RETRY_TIMEOUT_MS, opts.timeRange);
     }
   } catch (e) {
     /* A dead provider must degrade to "I couldn't check", never to a

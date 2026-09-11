@@ -165,7 +165,35 @@ async function main() {
     const r = await searchTheWeb.handler(ctx, { query: "USD to CNY rate" });
     const data = r.data as Record<string, unknown> | null;
     check("a search without pictures has NO images key at all", r.ok && data !== null && !("images" in data));
-    check("  …and the plain brand note only", data?.usage_note === "These are public web results, for facts only. Never present another manufacturer's product as an option — Koleex only ever recommends Koleex machines. Cite the source URL for any figure you take from here, and say how fresh it is when a date is given.");
+    check("  …and the brand note, then the freshness note — nothing about pictures",
+      (data?.usage_note as string).startsWith("These are public web results, for facts only. Never present another manufacturer's product as an option — Koleex only ever recommends Koleex machines. Cite the source URL for any figure you take from here, and say how fresh it is when a date is given. FRESHNESS: this search ran on ") &&
+      !/PICTURES:/.test(String(data?.usage_note)));
+  }
+  {
+    /* FRESHNESS (owner, 2026-09-11 17:34: "the newest iPhone" answered from
+       a year-old summary). The tool takes a window, the provider gets it,
+       the search's date rides beside the results, and the rule says the
+       newest dated result wins. */
+    const { parseTimeRange, WEB_SEARCH_TIME_RANGES } = await import("../src/lib/server/ai/web-search");
+    check("the freshness window is a closed set, and garbage is no window",
+      WEB_SEARCH_TIME_RANGES.join() === "day,week,month,year" && parseTimeRange("month") === "month" && parseTimeRange("decade") === undefined && parseTimeRange(7) === undefined);
+    stubFetch({ results: [{ title: "iPhone 18", url: "https://x.example/18", content: "Announced.", published_date: "2026-09-09" }] });
+    const r = await searchTheWeb.handler(ctx, { query: "newest iPhone 2026", recency: "month" });
+    const body = JSON.parse(String(lastRequest?.init.body ?? "{}")) as Record<string, unknown>;
+    const data = r.data as { findings: string; usage_note: string } | null;
+    check("recency reaches the provider as its time window", body.time_range === "month");
+    check("  …the findings open with the search's own date and window", /Searched on \d{4}-\d{2}-\d{2} \(pages from the last month\)\./.test(data?.findings ?? ""));
+    check("  …a result's published date rides beside it", /\(2026-09-09\)/.test(data?.findings ?? ""));
+    check("  …and the note says how to read dated results, after the brand rule",
+      /FRESHNESS: this search ran on \d{4}-\d{2}-\d{2} over the last month\./.test(data?.usage_note ?? "") && /most recent dated result wins/.test(data?.usage_note ?? "") &&
+      /search again with recency set to month and the current year/.test(data?.usage_note ?? "") && (data?.usage_note ?? "").indexOf("These are public web results") < (data?.usage_note ?? "").indexOf("FRESHNESS:"));
+    stubFetch({ results: [{ title: "t", url: "https://x.example/1", content: "c" }] });
+    await searchTheWeb.handler(ctx, { query: "USD to CNY rate", recency: "decade" });
+    const body2 = JSON.parse(String(lastRequest?.init.body ?? "{}")) as Record<string, unknown>;
+    check("  …no window, or a bad one, sends none", !("time_range" in body2));
+    check("the description tells the model when to set recency and to put the year in the query",
+      /set recency \(month for products and releases, week or day for news and prices\)/.test(searchTheWeb.description) &&
+      (searchTheWeb.parameters as { properties: { recency?: { enum?: string[] } } }).properties.recency?.enum?.join() === "day,week,month,year");
   }
   {
     const r = await searchTheWeb.handler(ctx, { query: "Alpha Textiles quotation 250000 USD margin 18%" });
@@ -270,7 +298,7 @@ async function main() {
     await searchWeb("Cairo International Stadium");
     check("a provider ERROR is not retried — only a timeout is", calls3.length === 1);
     const src = readFileSync("src/lib/server/ai/web-search.ts", "utf8");
-    check("the retry has its own, shorter ceiling", /const RETRY_TIMEOUT_MS = 6_000;/.test(src) && /searchTavily\(tavily, query, false, RETRY_TIMEOUT_MS\)/.test(src));
+    check("the retry has its own, shorter ceiling", /const RETRY_TIMEOUT_MS = 6_000;/.test(src) && /searchTavily\(tavily, query, false, RETRY_TIMEOUT_MS, opts\.timeRange\)/.test(src));
   }
 
   console.log("\n── 5. Reading the source: the picture never comes from anywhere but the search reply ──");

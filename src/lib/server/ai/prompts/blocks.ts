@@ -55,6 +55,40 @@ function personalizationParagraph(ctx: UserContext): string {
   return block ? `\n${block.trim()}\n` : "";
 }
 
+/** The ISO date (YYYY-MM-DD) in a timezone, or today's UTC date when the
+ *  zone is unknown to the runtime. Pure but for the clock. */
+export function isoDateIn(timezone: string | null | undefined): string {
+  const tz = timezone || "Asia/Dubai";
+  const now = new Date();
+  try {
+    return new Intl.DateTimeFormat("en-CA", { timeZone: tz, year: "numeric", month: "2-digit", day: "2-digit" }).format(now);
+  } catch {
+    return now.toISOString().slice(0, 10);
+  }
+}
+
+/* ONE LINE OF CLOCK FOR THE LANES THAT HAD NONE (owner, 2026-09-11 19:10:
+   "النهاردة يوم ايه؟" → "I have no direct access to today's date" — from
+   the small-talk lane, which carried no date at all; the voice session
+   carried none either and placed the newest phone a year back). The full
+   block above is written for the tool loop and its dated writes; the other
+   lanes need the fact, in a sentence, at the prompt's tail where the
+   per-minute text belongs (prefix caching). */
+export function buildNowLine(timezone: string | null | undefined): string {
+  const tz = timezone || "Asia/Dubai";
+  const now = new Date();
+  let human: string;
+  try {
+    human = new Intl.DateTimeFormat("en-US", {
+      timeZone: tz, weekday: "long", year: "numeric", month: "long", day: "numeric", hour: "2-digit", minute: "2-digit", hour12: false,
+    }).format(now);
+  } catch {
+    human = now.toUTCString();
+  }
+  const iso = isoDateIn(tz);
+  return `Current date & time: ${human} (${tz}). TODAY is ${iso}; the current year is ${iso.slice(0, 4)}. You DO know the date — answer date and time questions from this line, resolve "today"/"tomorrow" from it, and treat anything you remember as older than today.`;
+}
+
 export function buildNowBlock(timezone: string): string {
   const tz = timezone || "Asia/Dubai";
   const now = new Date();

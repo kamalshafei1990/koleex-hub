@@ -39,6 +39,9 @@ export type VoiceTelemetryFields = {
   capture?: string;
   mic_peak?: number;
   mic?: string;
+  /** The page's weight at the last pulse before it died (call-memory.ts). */
+  dom?: number;
+  imgs?: number;
 };
 
 export type VoiceTelemetry = VoiceTelemetryFields;
