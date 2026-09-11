@@ -107,6 +107,8 @@ const COPY: Record<Lang, {
      without it. */
   linePick: string;
   lineHint: string;
+  /** The sheet holds voice, line and talk mode — it is the call's settings. */
+  callSettings: string;
   laneMainland: string;
   laneInternational: string;
   laneUnreachable: string;
@@ -148,6 +150,7 @@ const COPY: Record<Lang, {
     voiceUseNamed: "Use {name}",
     voiceCurrent: "Current",
     linePick: "Line",
+    callSettings: "Call settings",
     lineHint: "The international line needs a network that reaches it. If it can't be reached, the call continues on the mainland line.",
     laneMainland: "Mainland line",
     laneInternational: "International line",
@@ -205,6 +208,7 @@ const COPY: Record<Lang, {
     voiceUseNamed: "使用 {name}",
     voiceCurrent: "当前",
     linePick: "线路",
+    callSettings: "通话设置",
     lineHint: "国际线路需要能连通它的网络；连不上时，通话会继续走国内线路。",
     laneMainland: "国内线路",
     laneInternational: "国际线路",
@@ -262,6 +266,7 @@ const COPY: Record<Lang, {
     voiceUseNamed: "استخدم {name}",
     voiceCurrent: "الحالي",
     linePick: "الخط",
+    callSettings: "إعدادات المكالمة",
     lineHint: "الخط الدولي محتاج شبكة توصل له. لو ما وصلش، المكالمة بتكمل على خط الصين.",
     laneMainland: "خط الصين",
     laneInternational: "الخط الدولي",
@@ -411,6 +416,12 @@ export default function VoiceCallScreen({
      voice is a small Koleex orb with its name — the product's own face,
      not a row of grey pills. */
   const [voiceSheet, setVoiceSheet] = useState(defaultVoiceSheetOpen);
+  /* SWIPE DOWN CLOSES THE SHEET. The drawn handle promised a gesture it did
+     not have (audit, 2026-09-11). The header (handle + title) is the grab
+     area, so the voices row keeps its horizontal scroll; past 80 px the
+     sheet closes, else it springs back. */
+  const sheetDragRef = useRef<{ y0: number; dy: number } | null>(null);
+  const [sheetDy, setSheetDy] = useState(0);
   /* THE HOLD. Local, because it is a gesture in progress, not call state:
      the parent learns of it through onHold and owns the microphone. Every
      way a press can end releases it — pointer up, pointer cancel, capture
@@ -829,7 +840,7 @@ export default function VoiceCallScreen({
                 {copy.brief}
               </button>
             )}
-            <p className="max-w-[820px] mx-auto text-center text-xs text-[#666666]">{talkMode === "hold" ? copy.holdHint : copy.hint}</p>
+            <p className="max-w-[820px] mx-auto text-center text-[13px] text-[#AAAAAA]">{talkMode === "hold" ? copy.holdHint : copy.hint}</p>
           </div>
         )}
         {latestPhotos.length > 0 && (
@@ -890,7 +901,7 @@ export default function VoiceCallScreen({
           <div className="max-w-[560px] mx-auto rounded-2xl border border-white/15 bg-[#111111] px-4 py-3 text-white">
             {pendingWrite ? (
               <>
-                <div className="text-[11px] uppercase tracking-wide text-[#AAAAAA]">{copy.taskPreview}</div>
+                <div className="text-[12px] uppercase tracking-wide text-[#AAAAAA]">{copy.taskPreview}</div>
                 <div className="mt-1 text-[15px] font-semibold leading-snug" data-task-title>{String(pendingWrite.args.title ?? "")}</div>
                 {(pendingWrite.args.due_date || pendingWrite.args.priority || pendingWrite.args.label) && (
                   <div className="mt-1 text-[12px] text-[#AAAAAA]">
@@ -965,7 +976,7 @@ export default function VoiceCallScreen({
                 disabled={!typed.trim()}
                 aria-label={copy.sendTyped}
                 title={copy.sendTyped}
-                className="h-9 w-9 rounded-full inline-flex items-center justify-center shrink-0 bg-white text-[#0D0D0D] disabled:bg-white/[0.08] disabled:text-[#666666] transition-[background-color,color,transform] duration-150 active:scale-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0066FF] focus-visible:ring-offset-2 focus-visible:ring-offset-[#0D0D0D]"
+                className="h-9 w-9 rounded-full inline-flex items-center justify-center shrink-0 bg-white text-[#0D0D0D] disabled:bg-white/[0.08] disabled:text-[#AAAAAA] transition-[background-color,color,transform] duration-150 active:scale-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0066FF] focus-visible:ring-offset-2 focus-visible:ring-offset-[#0D0D0D]"
               >
                 <svg aria-hidden viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
                   <line x1="12" y1="19" x2="12" y2="5" />
@@ -974,7 +985,7 @@ export default function VoiceCallScreen({
               </button>
             </div>
             {typedNotice && (
-              <p role="status" className="mt-2 text-center text-xs text-[#AAAAAA]">
+              <p role="status" className="mt-2 text-center text-[13px] text-[#AAAAAA]">
                 {typedNotice}
               </p>
             )}
@@ -1039,7 +1050,7 @@ export default function VoiceCallScreen({
                 </svg>
                 {holding ? copy.holdRelease : copy.holdToTalk}
               </button>
-              <span aria-hidden className={`text-[11px] tracking-wide transition-colors ${holding ? "text-white" : "text-[#666666]"}`}>
+              <span aria-hidden className={`text-[12px] tracking-wide transition-colors ${holding ? "text-white" : "text-[#AAAAAA]"}`}>
                 {copy.micShort}
               </span>
             </div>
@@ -1085,7 +1096,7 @@ export default function VoiceCallScreen({
               </button>
               {/* aria-hidden: the button above already carries the accessible
                   name, and a screen reader announcing both says it twice. */}
-              <span aria-hidden className={`text-[11px] tracking-wide transition-colors ${muted ? "text-white" : "text-[#666666]"}`}>
+              <span aria-hidden className={`text-[12px] tracking-wide transition-colors ${muted ? "text-white" : "text-[#AAAAAA]"}`}>
                 {copy.micShort}
               </span>
             </div>
@@ -1113,7 +1124,7 @@ export default function VoiceCallScreen({
                   <line x1="20" y1="10" x2="20" y2="14" />
                 </svg>
               </button>
-              <span aria-hidden className="text-[11px] tracking-wide text-[#666666] max-w-[72px] truncate">
+              <span aria-hidden className="text-[12px] tracking-wide text-[#AAAAAA] max-w-[72px] truncate">
                 {selectedVoiceLabel}
               </span>
             </div>
@@ -1137,7 +1148,7 @@ export default function VoiceCallScreen({
                 <line x1="18" y1="6" x2="6" y2="18" />
               </svg>
             </button>
-            <span aria-hidden className="text-[11px] tracking-wide text-[#666666]">
+            <span aria-hidden className="text-[12px] tracking-wide text-[#AAAAAA]">
               {copy.endShort}
             </span>
           </div>
@@ -1151,17 +1162,41 @@ export default function VoiceCallScreen({
           others asleep. Choosing closes the sheet; the call rebuilds in
           place with the words kept (VoiceCallButton.selectVoice). */}
       {voiceSheet && (voices.length > 0 || onSelectTalkMode) && (
-        <div className="fixed inset-0 z-[250] flex flex-col justify-end" role="dialog" aria-modal="true" aria-label={copy.voicePick}>
+        <div className="fixed inset-0 z-[250] flex flex-col justify-end" role="dialog" aria-modal="true" aria-label={copy.callSettings}>
           <button type="button" aria-label={copy.close} onClick={closeVoiceSheet} className="absolute inset-0 bg-black/60" />
           {/* THE HUB'S OWN SURFACE (#111111 is --bg-secondary), and a bottom
               padding that clears the home indicator: the panel used to stop
               at 2rem and the indicator's strip showed through as a black
               band under it. The container is viewport-fixed; the panel
               simply reaches the edge now. */}
-          <div className="kx-sheet-in relative rounded-t-[28px] border-t border-white/10 bg-[#111111] px-6 pt-3 text-white" style={{ paddingBottom: "calc(2rem + env(safe-area-inset-bottom, 0px))" }}>
+          <div
+            className="kx-sheet-in relative rounded-t-[28px] border-t border-white/10 bg-[#111111] px-6 pt-3 text-white"
+            style={{
+              paddingBottom: "calc(2rem + env(safe-area-inset-bottom, 0px))",
+              /* `translate`, not `transform`: the entrance animation owns transform. */
+              translate: sheetDy > 0 ? `0 ${sheetDy}px` : undefined,
+            }}
+          >
+            <div
+              className="touch-none cursor-grab select-none"
+              onPointerDown={(e) => { sheetDragRef.current = { y0: e.clientY, dy: 0 }; }}
+              onPointerMove={(e) => {
+                const d = sheetDragRef.current;
+                if (!d) return;
+                d.dy = Math.max(0, e.clientY - d.y0);
+                setSheetDy(d.dy);
+              }}
+              onPointerUp={() => {
+                const d = sheetDragRef.current;
+                sheetDragRef.current = null;
+                setSheetDy(0);
+                if (d && d.dy > 80) closeVoiceSheet();
+              }}
+              onPointerCancel={() => { sheetDragRef.current = null; setSheetDy(0); }}
+            >
             <div aria-hidden className="mx-auto mb-4 h-1 w-10 rounded-full bg-white/20" />
             <div className="flex items-center justify-between mb-5">
-              <h2 className="text-[15px] font-semibold">{copy.voicePick}</h2>
+              <h2 className="text-[15px] font-semibold">{copy.callSettings}</h2>
               <button
                 type="button"
                 onClick={closeVoiceSheet}
@@ -1174,9 +1209,12 @@ export default function VoiceCallScreen({
                 </svg>
               </button>
             </div>
+            </div>
             {/* Room above the tiles (pt-2) for the badge and the glow: an
                 overflow-x container clips vertically too. */}
             {voices.length > 0 && (
+            <>
+            <h3 className="text-[13px] font-semibold text-[#AAAAAA] mb-1">{copy.voicePick}</h3>
             <div className="flex gap-4 overflow-x-auto pt-2 pb-2 -mx-2 px-2 snap-x">
               {voices.map((v, i) => {
                 const chosen = v.key === selectedVoice;
@@ -1216,7 +1254,7 @@ export default function VoiceCallScreen({
                     </span>
                     <span className="flex flex-col items-center leading-tight">
                       <span className={`text-[12px] ${on ? "text-white font-semibold" : "text-[#AAAAAA] group-hover:text-white"}`}>{v.label}</span>
-                      <span className="text-[10px] text-[#666666] h-[14px] inline-flex items-center justify-center">
+                      <span className="text-[12px] text-[#AAAAAA] h-[14px] inline-flex items-center justify-center">
                         {chosen ? copy.voiceCurrent : sampling === v.key ? (
                           <span className="kx-activity-dots text-[#0066FF]" aria-hidden><i /><i /><i /></span>
                         ) : ""}
@@ -1226,9 +1264,10 @@ export default function VoiceCallScreen({
                 );
               })}
             </div>
+            </>
             )}
             {voices.length > 0 && (
-              <p className="mt-3 text-[12px] text-[#666666]" aria-live="polite">
+              <p className="mt-3 text-[13px] text-[#AAAAAA]" aria-live="polite">
                 {sampling ? copy.voiceSampling : sampleFailed ? copy.voiceSampleFailed : onPreviewVoice ? copy.voiceTapHint : copy.voiceHint}
               </p>
             )}
@@ -1240,7 +1279,7 @@ export default function VoiceCallScreen({
                 type="button"
                 onClick={confirmVoice}
                 disabled={!candidate || candidate === selectedVoice}
-                className="mt-4 h-12 w-full rounded-2xl bg-[#0066FF] text-[15px] font-semibold text-white disabled:bg-white/[0.06] disabled:text-[#666666] transition-[background-color,transform] duration-150 active:scale-[0.99] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0066FF] focus-visible:ring-offset-2 focus-visible:ring-offset-[#111111]"
+                className="mt-4 h-12 w-full rounded-2xl bg-[#0066FF] text-[15px] font-semibold text-white disabled:bg-white/[0.06] disabled:text-[#AAAAAA] transition-[background-color,transform] duration-150 active:scale-[0.99] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0066FF] focus-visible:ring-offset-2 focus-visible:ring-offset-[#111111]"
               >
                 {candidate && candidate !== selectedVoice
                   ? copy.voiceUseNamed.replace("{name}", voices.find((v) => v.key === candidate)?.label ?? "")
@@ -1278,7 +1317,7 @@ export default function VoiceCallScreen({
                     );
                   })}
                 </div>
-                <p className="mt-3 text-[12px] text-[#666666]">{copy.lineHint}</p>
+                <p className="mt-3 text-[13px] text-[#AAAAAA]">{copy.lineHint}</p>
               </div>
             )}
             {onSelectTalkMode && (
@@ -1303,7 +1342,7 @@ export default function VoiceCallScreen({
                     );
                   })}
                 </div>
-                <p className="mt-3 text-[12px] text-[#666666]">{copy.modeHint}</p>
+                <p className="mt-3 text-[13px] text-[#AAAAAA]">{copy.modeHint}</p>
               </div>
             )}
           </div>

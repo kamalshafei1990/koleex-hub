@@ -1209,6 +1209,32 @@ console.log("\n── VoiceCallScreen: typing into the call ──");
 
 }
 
+console.log("\n── A chat that failed to load says so; an offline device is told (audit, 2026-09-11) ──");
+{
+  const app = readFileSync("src/components/ai/KoleexAiApp.tsx", "utf8");
+  const css = readFileSync("src/app/globals.css", "utf8");
+  check("a failed conversation load renders a retry card in place of the greeting, and the banner is not used for it",
+    /const \[loadError, setLoadError\] = useState\(false\);/.test(app) &&
+    /\) : loadError && activeId \? \(/.test(app) && /onClick=\{\(\) => void openConversation\(activeId\)\}/.test(app) &&
+    /\{copy\.loadFailed\}/.test(app) && /\{copy\.retry\}/.test(app) &&
+    /if \(!res\.ok\) \{[\s\S]{0,260}?setLoadError\(true\);\s*return;\s*\}/.test(app) &&
+    /setError\(null\);\s*setLoadError\(false\);/.test(app));
+  check("offline: a status line above the composer, the call control disabled, and the message a drop put back is resent once — only if it is still that message in that chat",
+    /window\.addEventListener\("offline", sync\);/.test(app) && /\{!online && \(/.test(app) && /\{copy\.offline\}/.test(app) &&
+    /disabled=\{sending \|\| !online\}/.test(app) &&
+    /* ONE arming site: a dropped connection. A file that could not be read
+       also puts the words back, and must NOT be resent on its own — the
+       same unreadable file would go out again. */
+    (app.match(/resendRef\.current = \{ text, conversationId \};/g) ?? []).length === 1 &&
+    /if \(isNetwork && activeIdRef\.current === conversationId\) \{\s*resendRef\.current = \{ text, conversationId \};/.test(app) &&
+    /if \(input\.trim\(\) !== pending\.text\.trim\(\) \|\| activeIdRef\.current !== pending\.conversationId\) return;\s*resendRef\.current = null;\s*void send\(\);/.test(app) &&
+    ["en", "zh", "ar"].every((l) => COPY[l as "en" | "zh" | "ar"].offline.length > 0));
+  check("the AI app's dim text clears AA and every control shows a focus ring — scoped to .kx-ai-root, not the whole Hub",
+    /\.kx-ai-root \{ --text-dim: rgba\(255,255,255,0\.56\); \}/.test(css) &&
+    /\[data-theme="light"\] \.kx-ai-root \{ --text-dim: rgba\(0,0,0,0\.62\); \}/.test(css) &&
+    /\.kx-ai-root :is\(button, \[role="button"\], a\[href\]\):focus-visible \{\s*outline: 2px solid #0066FF;/.test(css));
+}
+
 console.log(`\n${pass} passed, ${failures.length} failed`);
 if (failures.length) {
   console.log("\nFAILED:");

@@ -3628,6 +3628,25 @@ function describeErrorCheck(): boolean {
   check("  …and the line control keeps the talk-mode control's own divider when it is the section above it",
     /<div className=\{voices\.length > 0 \|\| onSelectLane \? "mt-6 pt-5 border-t border-white\/10" : ""\}>/.test(scr));
 }
+/* ── 38. THE CALL SHEET IS THE CALL'S SETTINGS, AND IT CAN BE SWIPED AWAY (audit, 2026-09-11) ── */
+console.log("\n── 38. call settings sheet: title, voice heading, swipe-down, readable captions ──");
+{
+  const fsB = await import("node:fs");
+  const scr = fsB.readFileSync("src/components/ai/VoiceCallScreen.tsx", "utf8");
+  check("the sheet is titled Call settings in all three languages and the voices get their own heading under it",
+    /aria-label=\{copy\.callSettings\}/.test(scr) && /<h2 className="text-\[15px\] font-semibold">\{copy\.callSettings\}<\/h2>/.test(scr) &&
+    /<h3 className="text-\[13px\] font-semibold text-\[#AAAAAA\] mb-1">\{copy\.voicePick\}<\/h3>/.test(scr) &&
+    ["en", "zh", "ar"].every((l) => /callSettings: "/.test(scr.slice(scr.indexOf(`  ${l}: {`)))));
+  check("  …a swipe down of more than 80 px on the header closes it; a shorter one springs back; the panel moves with `translate`, not the animation's `transform`",
+    /const sheetDragRef = useRef<\{ y0: number; dy: number \} \| null>\(null\);/.test(scr) &&
+    /d\.dy = Math\.max\(0, e\.clientY - d\.y0\);\s*setSheetDy\(d\.dy\);/.test(scr) &&
+    /setSheetDy\(0\);\s*if \(d && d\.dy > 80\) closeVoiceSheet\(\);/.test(scr) &&
+    /translate: sheetDy > 0 \? `0 \$\{sheetDy\}px` : undefined,/.test(scr) &&
+    /className="touch-none cursor-grab select-none"/.test(scr));
+  check("  …no caption on the call screen is #666666 any more except the text field's placeholder, and none is under 12 px",
+    (scr.match(/(?<!placeholder:)text-\[#666666\]/g) ?? []).length === 0 && /placeholder:text-\[#666666\]/.test(scr) &&
+    !/text-\[1[01](\.5)?px\]/.test(scr) && !/text-\[9(\.5)?px\]/.test(scr));
+}
 console.log(`\n${pass} passed, ${failures.length} failed`);
   if (failures.length) {
     console.log("\nFAILED:");
