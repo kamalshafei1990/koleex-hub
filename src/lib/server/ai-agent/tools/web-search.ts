@@ -28,6 +28,7 @@ import "server-only";
 
 import type { ToolDef, ToolResult } from "../types";
 import { searchWeb, isMachineQuery, type WebResult, type WebImage } from "../../ai/web-search";
+import { fenceUntrusted, newFenceId } from "../../ai/security/untrusted";
 import { scanEgress, egressRefusalMessage } from "../../ai/security/egress-scanner";
 
 interface SearchArgs {
@@ -38,8 +39,12 @@ interface SearchArgs {
 }
 
 interface SearchData {
-  answer?: string;
-  results: WebResult[];
+  /** The provider's answer and every snippet, inside one untrusted fence —
+   *  the model reads them as data, never as instructions. */
+  findings: string;
+  /** Where each finding came from, structured for citations; the text
+   *  itself lives in `findings`. */
+  results: Array<Pick<WebResult, "title" | "url" | "published">>;
   /** Pictures the search found. Present only when there are any, so a
    *  result with none says nothing about pictures at all. */
   images?: WebImage[];
@@ -191,12 +196,27 @@ const searchTheWeb: ToolDef<SearchArgs, SearchData> = {
        door, because the door is the one the owner found open. ──────── */
     const machine = isMachineQuery(query);
     const images = machine || !wantImages ? [] : outcome.images;
+    /* WHAT THE WEB SAID IS DATA, NOT INSTRUCTIONS. The provider's answer
+       and every snippet come from pages nobody here wrote; they go to the
+       model inside the same nonce fence a document gets, in one block so
+       the framing is paid once. Titles and URLs stay structured beside it —
+       the citations under the reply are built from them (audit, 2026-09-11). */
+    const fenceId = newFenceId();
+    const findings = fenceUntrusted(
+      [
+        outcome.answer ? `Summary: ${outcome.answer}` : "",
+        ...outcome.results.map((r, i) => `[${i + 1}] ${r.title} — ${r.url}${r.published ? ` (${r.published})` : ""}\n${r.snippet}`),
+      ].filter(Boolean).join("\n\n"),
+      "web",
+      `web search: ${query}`.slice(0, 120),
+      fenceId,
+    );
     return {
       ok: true,
       permissionStatus: "allowed",
       data: {
-        answer: outcome.answer,
-        results: outcome.results,
+        findings,
+        results: outcome.results.map(({ title, url, published }) => ({ title, url, ...(published ? { published } : {}) })),
         ...(images.length > 0 ? { images } : {}),
         usage_note: machine
           ? `${BRAND_NOTE} ${MACHINE_NOTE}`

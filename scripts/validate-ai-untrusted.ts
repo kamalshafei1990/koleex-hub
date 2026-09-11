@@ -11,6 +11,7 @@
    message. That case is asserted here so it cannot come back.
    ========================================================================== */
 
+import { readFileSync } from "node:fs";
 import { fenceUntrusted, newFenceId, hasUntrustedContent } from "../src/lib/server/ai/security/untrusted";
 
 let pass = 0, fail = 0;
@@ -73,6 +74,22 @@ check(
   "a user merely TALKING about attachments does not trigger the exemption",
   !hasUntrustedContent("can you read attached files? I want to send you an untrusted document later"),
 );
+
+/* THE WEB IS THE OTHER UNTRUSTED SOURCE. Search answers and snippets come
+   from pages nobody here wrote; the tool must hand them to the model inside
+   the same fence a document gets, or an injected page can steer a reply
+   (audit, 2026-09-11). Pinned on the source, like the agent route's fence. */
+{
+  const tool = readFileSync("src/lib/server/ai-agent/tools/web-search.ts", "utf8");
+  check(
+    "web-search fences the provider's answer and snippets as untrusted web content",
+    /fenceUntrusted\(/.test(tool) && /"web",/.test(tool) && /newFenceId\(\)/.test(tool),
+  );
+  check(
+    "web-search no longer hands raw snippets to the model beside the fence",
+    !/results: outcome\.results,/.test(tool),
+  );
+}
 
 console.log(`\n${pass} passed, ${fail} failed\n`);
 process.exit(fail > 0 ? 1 : 0);

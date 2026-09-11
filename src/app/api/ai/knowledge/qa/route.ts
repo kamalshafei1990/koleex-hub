@@ -119,10 +119,14 @@ export async function DELETE(req: Request) {
   const url = new URL(req.url);
   const id = url.searchParams.get("id") || "";
   if (!id) return NextResponse.json({ error: "id required" }, { status: 400 });
-  const { error } = await supabaseServer
+  /* The caller's tenant, like GET and POST above — a retire keyed on the raw
+     id alone was the one verb here without the predicate (audit, 2026-09-11). */
+  let q = supabaseServer
     .from("ai_knowledge_units")
     .update({ status: "retired", updated_at: new Date().toISOString() })
     .eq("id", id);
+  q = auth.tenant_id == null ? q.is("tenant_id", null) : q.eq("tenant_id", auth.tenant_id);
+  const { error } = await q;
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   invalidateTaughtAnswersCache(auth.tenant_id ?? null);
   invalidateApprovedSearchCache(auth.tenant_id ?? null);

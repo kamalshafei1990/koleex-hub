@@ -1,6 +1,6 @@
 # KOLEEX AI — Evolution Plan
 
-**Version:** 1.0 · **Date:** 2026-08-30 · **Status:** DRAFT — awaiting owner approval before Phase 0 execution
+**Version:** 1.0 · **Date:** 2026-08-30 · **Status:** ACTIVE — approved; Phases 2, 3 and 6 are marked complete in the body (status line corrected 2026-09-11; the rollback flags `AI_CORE_V2`, `AI_PROVIDER_V2`, `AI_TRUE_STREAM` and the `runTurn()` pipeline named below were planned and never built — the lanes shipped under `src/lib/server/ai/core` instead)
 **Baseline commit:** `7c99778` (origin/main) · **Companion:** [`KOLEEX_AI_ARCHITECTURE_AUDIT.md`](../../KOLEEX_AI_ARCHITECTURE_AUDIT.md)
 **Supersedes as the active roadmap:** [`implementation-phases.md`](./implementation-phases.md) (Phase 0 shipped; Phases 1–6 folded into this plan)
 

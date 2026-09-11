@@ -1,6 +1,6 @@
 # Phase 15 — Realtime Voice · Design (v3)
 
-**Status:** design only. No code written.
+**Status:** SUPERSEDED (2026-09-11) by [`VOICE_ROADMAP_2026-09.md`](./VOICE_ROADMAP_2026-09.md). Voice shipped in `src/lib/voice` with a different model and a second (socket) lane; the gateway fields and model name below describe the design as it stood, not what runs. Kept as the design record.
 **Date:** 2026-08-31
 **Model:** `qwen3.5-omni-plus-realtime` (Alibaba Cloud Model Studio)
 

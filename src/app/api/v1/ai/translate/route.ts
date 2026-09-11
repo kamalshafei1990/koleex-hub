@@ -17,3 +17,7 @@
    --------------------------------------------------------------------------- */
 
 export { POST } from "../../../ai/translate/route";
+
+/* Written out, not re-exported (Next.js reads it statically); pinned to the
+   legacy route's value by validate:ai-api-v1. */
+export const maxDuration = 60;

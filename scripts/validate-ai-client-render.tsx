@@ -244,7 +244,10 @@ console.log("\n── VoiceCallButton: first paint ──");
      findable by a test. */
   check("renders a button with an accessible label",
     /<button/.test(html) && /aria-label="Start voice call"/.test(html));
-  check("is not pressed while idle", /aria-pressed="false"/.test(html));
+  /* An action button whose NAME changes ("Start voice call" / "End call")
+     is not a toggle; aria-pressed on it announced two states for one thing
+     (audit, 2026-09-11). */
+  check("carries no toggle state — its name changes instead", !/aria-pressed=/.test(html));
 
   /* Playback element must exist at first paint — attaching a stream to an
      element that has not rendered yet is a silent dead call. */

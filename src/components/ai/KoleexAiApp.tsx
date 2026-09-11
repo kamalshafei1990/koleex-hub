@@ -17,8 +17,8 @@
      └───────────────────┴──────────────────────────────────────────┘
 
    Conversations persist to Supabase (ai_conversations + ai_messages).
-   Replies come from whichever AI provider is wired in /api/ai/chat
-   (Gemini Flash on the free tier today).
+   Replies come from the server's AI lanes (/api/ai/agent); which model
+   answers is the server's business and is never named here.
    --------------------------------------------------------------------------- */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -52,7 +52,6 @@ import type { AIOrbActivity } from "@/components/ai-orb/ai-orb-types";
 import BookOpenIcon from "@/components/icons/ui/BookOpenIcon";
 import SparklesIcon from "@/components/icons/ui/SparklesIcon";
 import { markdownToPlainText, bubbleHtmlForClipboard } from "@/lib/markdown-clipboard";
-import EmojiButton from "@/components/ai/EmojiButton";
 import { useCurrentAccount } from "@/lib/identity";
 import { ConfirmDialog } from "@/components/notes/NotesDialog";
 import { humanizeError } from "@/lib/ui/humanize-error";
@@ -99,6 +98,14 @@ const WavyBackground = dynamic(() => import("@/components/ui/WavyBackground"), {
 /* QA reporter (inline trigger in the top bars). Deferred like RootShell's
    floating twin — heavy modal machinery stays off the critical path. */
 const ReportIssueButton = dynamic(() => import("@/components/qa/ReportIssueButton"), { ssr: false });
+/* The emoji picker carries its 42 KB table with it; it opens on a tap and
+   nothing before that needs it, so it loads on demand rather than ahead of
+   the first message (audit, 2026-09-11). The placeholder keeps the row's
+   geometry so the composer does not shift when it lands. */
+const EmojiButton = dynamic(() => import("@/components/ai/EmojiButton"), {
+  ssr: false,
+  loading: () => <span className="h-8 w-8 inline-block shrink-0" aria-hidden />,
+});
 
 const SIDEBAR_W = 248;
 
@@ -210,8 +217,11 @@ export default function KoleexAiApp() {
        camera-roll PNG becomes a JPEG of a megabyte or two before the size
        gate below ever sees it. The gate then judges what will be sent. */
     void Promise.all(incoming.map((f) => shrinkImage(f))).then((files) => addFilesSized(files));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [attachments.length]);
+    /* The real dependency, not the list's length: the sizer carries the copy,
+       and a stale one reported a size error in the previous language after a
+       switch (audit, 2026-09-11). The cap reads `prev`, so the length was
+       never needed here. */
+  }, [addFilesSized]);
 
   const onFilesPicked = useCallback((ev: React.ChangeEvent<HTMLInputElement>) => {
     addFiles(Array.from(ev.target.files ?? []));
@@ -292,7 +302,7 @@ export default function KoleexAiApp() {
   const [sending, setSending] = useState(false);
   /* Mode separates the two AI personalities served by this page:
        · "chat"  → fast, router-driven reply via /api/ai/chat
-                   (Groq for chat / unknown, DeepSeek for business).
+                   (the server picks the model per lane).
                    No tools, no DB reads, no persistence.
        · "agent" → the full orchestrator at /api/ai/agent with
                    permission-aware tool calls, audit logging, and
@@ -355,7 +365,6 @@ export default function KoleexAiApp() {
       window.localStorage.setItem("koleex-ai-sidebar-collapsed", sidebarCollapsed ? "1" : "0");
     } catch { /* private mode / quota — best-effort */ }
   }, [sidebarCollapsed]);
-  const bottomRef = useRef<HTMLDivElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const [showJumpToBottom, setShowJumpToBottom] = useState(false);
   /* ── Synchronous lock against double-submit races.
@@ -407,11 +416,16 @@ export default function KoleexAiApp() {
      briefly render every pinned chat as unpinned. */
   const CONV_CACHE_KEY = "koleex-ai-conversations-cache-v2";
   const loadConversations = useCallback(async () => {
-    const res = await fetch("/api/ai/conversations", { credentials: "include" });
-    if (!res.ok) return;
-    const { conversations: rows } = (await res.json()) as {
-      conversations: ConversationRow[];
-    };
+    /* Offline on first load is routine on this link: the cached list stands
+       and the failure is not an unhandled rejection (audit, 2026-09-11). */
+    let rows: ConversationRow[] | undefined;
+    try {
+      const res = await fetch("/api/ai/conversations", { credentials: "include" });
+      if (!res.ok) return;
+      ({ conversations: rows } = (await res.json()) as { conversations: ConversationRow[] });
+    } catch {
+      return;
+    }
     const fresh = rows ?? [];
     setConversations(fresh);
     if (typeof window !== "undefined") {
@@ -429,10 +443,14 @@ export default function KoleexAiApp() {
      state optimistically and reconciles with the row the server returns. */
   const [projects, setProjects] = useState<AiProject[]>([]);
   const loadProjects = useCallback(async () => {
-    const res = await fetch("/api/ai/projects", { credentials: "include" });
-    if (!res.ok) return;
-    const { projects: rows } = (await res.json()) as { projects: AiProject[] };
-    setProjects(rows ?? []);
+    try {
+      const res = await fetch("/api/ai/projects", { credentials: "include" });
+      if (!res.ok) return;
+      const { projects: rows } = (await res.json()) as { projects: AiProject[] };
+      setProjects(rows ?? []);
+    } catch {
+      /* Offline: the folders stay as they were. */
+    }
   }, []);
   useEffect(() => { void loadProjects(); }, [loadProjects]);
 
@@ -790,16 +808,15 @@ export default function KoleexAiApp() {
 
              The user's own words ride with the files: the picture is read
              FOR the question, which keeps the reading short and quick. */
-          const L_UPLOADING = lang === "ar" ? "جارٍ رفع" : lang === "zh" ? "正在上传" : "Uploading";
           let request: () => Promise<Response>;
           if (needsChunking(filesToSend)) {
             const refs: ChunkedRef[] = [];
             for (const f of filesToSend) {
               const mb = (f.size / 1048576).toFixed(1);
-              setAttachStatus(`${L_UPLOADING} ${f.name} (${mb}MB)…`);
+              setAttachStatus(`${copy.uploading} ${f.name} (${mb}MB)…`);
               refs.push(
                 await uploadInChunks(f, (fraction) => {
-                  setAttachStatus(`${L_UPLOADING} ${f.name} (${mb}MB) · ${Math.round(fraction * 100)}%`);
+                  setAttachStatus(`${copy.uploading} ${f.name} (${mb}MB) · ${Math.round(fraction * 100)}%`);
                 }, aborter.signal),
               );
             }
@@ -857,10 +874,10 @@ export default function KoleexAiApp() {
                      unreachable), and telling the user the capability is
                      missing would send them off to solve the wrong
                      problem. */
-                  f.error === "unreadable_image" ? "couldn't read this image — try a sharper photo"
-                  : f.error === "no_text" ? "no readable text found"
-                  : f.error === "too_large" ? "over the size limit (15MB images / 200MB documents)"
-                  : "file type not supported";
+                  f.error === "unreadable_image" ? copy.attachUnreadableImage
+                  : f.error === "no_text" ? copy.attachNoText
+                  : f.error === "too_large" ? copy.attachTooLarge
+                  : copy.attachUnsupported;
                 return `${f.name}: ${why}`;
               })
               .join(" · ");
@@ -1012,10 +1029,21 @@ export default function KoleexAiApp() {
         }
 
         if (!res.ok || !res.body) {
+          /* THE SERVER'S OWN SENTENCE, when it sent one. A refused turn comes
+             back as JSON { error } — a permission, a rate limit, a validation
+             — and it was thrown away for "HTTP 429" because the JSON branch
+             above only runs on 2xx (audit, 2026-09-11). 503 is the one
+             status with a fixed meaning; it gets the translated line. */
+          const envelope = ct.includes("application/json")
+            ? ((await res.json().catch(() => null)) as { error?: string; message?: string } | null)
+            : null;
+          const said = envelope?.message || envelope?.error;
           const msg =
             res.status === 503
-              ? "AI is not configured yet."
-              : humanizeError(`HTTP ${res.status}`);
+              ? copy.aiUnavailable
+              : said
+                ? humanizeError(said)
+                : humanizeError(`HTTP ${res.status}`);
           setError(msg);
           /* Drop the placeholder so the UI doesn't show an empty bubble. */
           setMessages((prev) => prev.filter((m) => m.id !== placeholderId));
@@ -1133,7 +1161,6 @@ export default function KoleexAiApp() {
            final steps (id/created_at now come from Supabase, not the
            temporary placeholder). */
         if (finalMessage) {
-          const persistedId = finalMessage.id;
           setMessages((prev) => {
             const idx = prev.findIndex((m) => m.id === placeholderId);
             if (idx < 0) return prev;
@@ -1184,7 +1211,6 @@ export default function KoleexAiApp() {
               return next;
             });
           }
-          void persistedId;
         } else if (accumulated) {
           /* Stream closed without an `end` event but we got text —
              keep what we have so the user at least sees the reply. */
@@ -1466,16 +1492,24 @@ export default function KoleexAiApp() {
   const doRenameConversation = useCallback(
     async (id: string, currentTitle: string, next: string) => {
       if (!next || next.trim() === currentTitle) return;
-      const res = await fetch(`/api/ai/conversations/${id}`, {
-        method: "PATCH",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ title: next.trim() }),
-      });
-      if (!res.ok) return;
-      setConversations((prev) =>
-        prev.map((c) => (c.id === id ? { ...c, title: next.trim() } : c)),
-      );
+      try {
+        const res = await fetch(`/api/ai/conversations/${id}`, {
+          method: "PATCH",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ title: next.trim() }),
+        });
+        if (!res.ok) {
+          setError(humanizeError(`HTTP ${res.status}`));
+          return;
+        }
+        setConversations((prev) =>
+          prev.map((c) => (c.id === id ? { ...c, title: next.trim() } : c)),
+        );
+      } catch {
+        /* A rename that did not reach the server is said, not swallowed. */
+        setError(humanizeError("NetworkError"));
+      }
     },
     [],
   );
@@ -1501,15 +1535,9 @@ export default function KoleexAiApp() {
       setConversations((prev) =>
         prev.map((c) => (c.id === id ? { ...c, ...patch } : c)),
       );
-      const res = await fetch(`/api/ai/conversations/${id}`, {
-        method: "PATCH",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(patch),
-      });
-      if (!res.ok) {
-        /* Put back exactly the fields we touched — not the whole row, which
-           may have been updated by a reply landing in the meantime. */
+      /* Put back exactly the fields we touched — not the whole row, which
+         may have been updated by a reply landing in the meantime. */
+      const rollback = () =>
         setConversations((prev) =>
           prev.map((c) =>
             c.id === id
@@ -1517,7 +1545,22 @@ export default function KoleexAiApp() {
               : c,
           ),
         );
-        setError(humanizeError(`HTTP ${res.status}`));
+      try {
+        const res = await fetch(`/api/ai/conversations/${id}`, {
+          method: "PATCH",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(patch),
+        });
+        if (!res.ok) {
+          rollback();
+          setError(humanizeError(`HTTP ${res.status}`));
+        }
+      } catch {
+        /* A network drop is not a server "no", but the pin never landed
+           either: the sidebar must not keep showing it (audit, 2026-09-11). */
+        rollback();
+        setError(humanizeError("NetworkError"));
       }
     },
     [],
@@ -1583,6 +1626,8 @@ export default function KoleexAiApp() {
         setActiveProjectId(project.id);
       }
       setProjectDraft(null);
+    } catch {
+      setError(humanizeError("NetworkError"));
     } finally {
       setProjectSaving(false);
     }
@@ -1591,11 +1636,19 @@ export default function KoleexAiApp() {
   const confirmDeleteProject = useCallback(async () => {
     const id = pendingDeleteProjectId;
     if (!id) return;
-    const res = await fetch(`/api/ai/projects/${id}`, {
-      method: "DELETE",
-      credentials: "include",
-    });
+    /* The dialog closes on the tap, not after the round trip: a fetch that
+       threw left the danger dialog open with nothing said (audit, 2026-09-11). */
     setPendingDeleteProjectId(null);
+    let res: Response;
+    try {
+      res = await fetch(`/api/ai/projects/${id}`, {
+        method: "DELETE",
+        credentials: "include",
+      });
+    } catch {
+      setError(humanizeError("NetworkError"));
+      return;
+    }
     if (!res.ok) {
       setError(humanizeError(`HTTP ${res.status}`));
       return;
@@ -2025,9 +2078,9 @@ export default function KoleexAiApp() {
               type="search"
               value={sidebarQuery}
               onChange={(e) => setSidebarQuery(e.target.value)}
-              placeholder={copy.searchChats ?? "Search chats…"}
+              placeholder={copy.searchChats}
               className="w-full h-8 px-2.5 rounded-md bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[12px] text-[var(--text-primary)] placeholder:text-[var(--text-dim)] outline-none focus:border-[var(--border-focus)]"
-              aria-label={copy.searchChats ?? "Search chats"}
+              aria-label={copy.searchChats}
             />
           </div>
         )}
@@ -2221,7 +2274,7 @@ export default function KoleexAiApp() {
                 </div>
               ) : filteredConversations.length === 0 ? (
                 <div className="px-4 py-6 text-center text-[12px] text-[var(--text-dim)]">
-                  {copy.noSearchResults ?? "No chats match your search."}
+                  {copy.noSearchResults}
                 </div>
               ) : (
                 <>
@@ -2274,7 +2327,13 @@ export default function KoleexAiApp() {
         {/* Settings → Koleex AI: style, standing instructions, memory. A quiet
             footer row rather than another icon in the crowded header — the
             place ChatGPT keeps it too (behind the account, not on the bar). */}
-        <div className="kx-ai-side-sep shrink-0 border-t border-[var(--border-subtle)] p-2">
+        <div
+          className="kx-ai-side-sep shrink-0 border-t border-[var(--border-subtle)] p-2"
+          /* The drawer runs to the bottom edge of the phone; without this the
+             row sits under the home indicator (audit, 2026-09-11). Zero on a
+             desktop. */
+          style={{ paddingBottom: "calc(0.5rem + env(safe-area-inset-bottom, 0px))" }}
+        >
           <Link
             href="/settings?tab=ai"
             className="flex h-9 items-center gap-2 rounded-lg px-2 text-[12px] text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)]"
@@ -2296,7 +2355,7 @@ export default function KoleexAiApp() {
             type="button"
             onClick={() => setSidebarOpen((v) => !v)}
             className="h-8 w-8 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] flex items-center justify-center"
-            aria-label={sidebarOpen ? "Close sidebar" : "Open sidebar"}
+            aria-label={sidebarOpen ? copy.closeSidebar : copy.openSidebar}
           >
             {sidebarOpen ? <CrossIcon size={14} /> : <MenuBurgerIcon size={14} />}
           </button>
@@ -2450,7 +2509,7 @@ export default function KoleexAiApp() {
               </div>
             )}
             {error && (
-              <div className="rounded-xl border border-rose-500/30 bg-rose-500/10 text-rose-300 px-3 py-2 text-[12px]">
+              <div role="alert" className="rounded-xl border border-rose-500/30 bg-rose-500/10 text-rose-300 px-3 py-2 text-[12px]">
                 {error}
               </div>
             )}
@@ -2480,7 +2539,6 @@ export default function KoleexAiApp() {
                 </button>
               </div>
             )}
-            <div ref={bottomRef} />
           </div>
         </div>
 
@@ -2588,8 +2646,12 @@ export default function KoleexAiApp() {
                             <button
                               type="button"
                               onClick={() => removeAttachment(i)}
-                              className="absolute end-0.5 top-0.5 inline-flex h-5 w-5 items-center justify-center rounded-full bg-black/60 text-white opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100"
-                              aria-label={`Remove ${file.name}`}
+                              /* ALWAYS VISIBLE WHERE THERE IS NO HOVER. On the phone a
+                                 hover-only control never appears, so a wrong photo could
+                                 not be detached — the only exit was sending it (audit,
+                                 2026-09-11). Same rule the sidebar pin follows. */
+                              className="absolute end-0.5 top-0.5 inline-flex h-5 w-5 items-center justify-center rounded-full bg-black/60 text-white opacity-0 transition-opacity group-hover:opacity-100 [@media(hover:none)]:opacity-100 focus-visible:opacity-100"
+                              aria-label={copy.removeFile.replace("{name}", file.name)}
                             >
                               <CrossIcon size={9} />
                             </button>
@@ -2608,7 +2670,7 @@ export default function KoleexAiApp() {
                             type="button"
                             onClick={() => removeAttachment(i)}
                             className="ms-0.5 text-[var(--text-dim)] hover:text-rose-300"
-                            aria-label={`Remove ${file.name}`}
+                            aria-label={copy.removeFile.replace("{name}", file.name)}
                           >
                             <CrossIcon size={10} />
                           </button>

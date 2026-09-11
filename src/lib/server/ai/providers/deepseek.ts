@@ -151,10 +151,6 @@ export async function deepseekChat(
   }
 }
 
-/** Resolved model id — exposed for telemetry / logs, matching
- *  GROQ_MODEL_ID in providers/groq.ts. */
-export const DEEPSEEK_MODEL_ID = DEEPSEEK_MODEL;
-
 /* ─── Streaming chat (Phase 2) ──────────────────────────────────
    OpenAI-compatible SSE, identical shape to providers/groq.ts. The
    two implementations stay separate (no shared helper) to preserve

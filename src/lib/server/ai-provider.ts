@@ -101,6 +101,15 @@ export interface ChatResult {
  *  instead of a generic "unreachable". Module-level lets us avoid
  *  threading it through every call signature. */
 let lastProviderError: string | null = null;
+
+/* EVERY PROVIDER CALL HAS A DEADLINE. A hung upstream used to hold the
+   function until the platform killed it — forty translate calls in flight
+   behind one request, none of them ending (audit, 2026-09-11). Long enough
+   for a slow model on a slow link; short enough to be a real answer. */
+const PROVIDER_TIMEOUT_MS = 45_000;
+function providerDeadline(): AbortSignal | undefined {
+  return typeof AbortSignal !== "undefined" && "timeout" in AbortSignal ? AbortSignal.timeout(PROVIDER_TIMEOUT_MS) : undefined;
+}
 export function getLastAiError(): string | null {
   return lastProviderError;
 }
@@ -149,10 +158,13 @@ Text to translate:
 ${input.text}`;
 
   const res = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${key}`,
+    "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent",
     {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      /* THE KEY TRAVELS IN A HEADER, never in the URL: a query string lands in
+         every proxy, CDN and access log on the way (audit, 2026-09-11). */
+      headers: { "Content-Type": "application/json", "x-goog-api-key": key },
+      signal: providerDeadline(),
       body: JSON.stringify({
         contents: [{ parts: [{ text: prompt }] }],
         generationConfig: {
@@ -219,10 +231,13 @@ export async function geminiChat(messages: ChatMessage[]): Promise<ChatResult | 
   }
 
   const res = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${key}`,
+    "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent",
     {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      /* THE KEY TRAVELS IN A HEADER, never in the URL: a query string lands in
+         every proxy, CDN and access log on the way (audit, 2026-09-11). */
+      headers: { "Content-Type": "application/json", "x-goog-api-key": key },
+      signal: providerDeadline(),
       body: JSON.stringify(body),
     },
   );
@@ -259,6 +274,7 @@ async function groqChat(messages: ChatMessage[]): Promise<ChatResult | null> {
 
   const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
     method: "POST",
+    signal: providerDeadline(),
     headers: {
       "Content-Type": "application/json",
       Authorization: `Bearer ${key}`,
@@ -305,6 +321,7 @@ async function groqTranslate(input: TranslateInput): Promise<TranslateResult | n
 
   const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
     method: "POST",
+    signal: providerDeadline(),
     headers: {
       "Content-Type": "application/json",
       Authorization: `Bearer ${key}`,
@@ -352,6 +369,7 @@ async function deepseekTranslate(input: TranslateInput): Promise<TranslateResult
 
   const res = await fetch(DEEPSEEK_URL, {
     method: "POST",
+    signal: providerDeadline(),
     headers: {
       "Content-Type": "application/json",
       Authorization: `Bearer ${key}`,
@@ -381,6 +399,7 @@ async function deepseekChat(messages: ChatMessage[]): Promise<ChatResult | null>
 
   const res = await fetch(DEEPSEEK_URL, {
     method: "POST",
+    signal: providerDeadline(),
     headers: {
       "Content-Type": "application/json",
       Authorization: `Bearer ${key}`,

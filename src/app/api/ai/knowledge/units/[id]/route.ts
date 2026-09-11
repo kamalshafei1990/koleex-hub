@@ -9,6 +9,14 @@ import { estimateTokens, invalidateTaughtAnswersCache, invalidateApprovedSearchC
 
 export const dynamic = "force-dynamic";
 
+/* One tenant's rows per caller — the rule the list and qa routes follow;
+   a unit edit keyed on the raw id alone did not (audit, 2026-09-11). The
+   predicate is written inline per query: a generic helper over the query
+   builder sent the type checker into infinite instantiation. */
+function tenantIs(tenantId: string | null | undefined): { column: "tenant_id"; value: string | null } {
+  return { column: "tenant_id", value: tenantId ?? null };
+}
+
 export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }> }) {
   const auth = await requireAuth();
   if (auth instanceof NextResponse) return auth;
@@ -27,11 +35,13 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
     updates.approved_at = body.status === "approved" ? new Date().toISOString() : null;
   }
   if (typeof body.body === "string" && body.body.trim()) {
-    const { data: cur } = await supabaseServer
+    const t = tenantIs(auth.tenant_id);
+    let curQ = supabaseServer
       .from("ai_knowledge_units")
       .select("version, tenant_id")
-      .eq("id", id)
-      .maybeSingle();
+      .eq("id", id);
+    curQ = t.value === null ? curQ.is(t.column, null) : curQ.eq(t.column, t.value);
+    const { data: cur } = await curQ.maybeSingle();
     updates.body = body.body.trim();
     updates.tokens = estimateTokens(body.body);
     updates.version = ((cur?.version as number) ?? 1) + 1;
@@ -48,7 +58,10 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
   if (typeof body.title === "string") updates.title = body.title.trim() || null;
   if (Array.isArray(body.tags)) updates.tags = body.tags.map(String);
 
-  const { error } = await supabaseServer.from("ai_knowledge_units").update(updates).eq("id", id);
+  const t = tenantIs(auth.tenant_id);
+  let q = supabaseServer.from("ai_knowledge_units").update(updates).eq("id", id);
+  q = t.value === null ? q.is(t.column, null) : q.eq(t.column, t.value);
+  const { error } = await q;
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   /* THE AI'S VIEW OF TRUTH JUST CHANGED, SO DROP WHAT IT CACHED.
      Both planes, not one: taught pairs feed the written lanes' prompt and the

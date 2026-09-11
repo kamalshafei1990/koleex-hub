@@ -28,6 +28,11 @@ export const maxDuration = 10;
 
 const REASONS = new Set([
   "connection-lost", "handshake-failed", "config-rejected", "service-unreachable", "service-refused",
+  /* The far side's first error event of a call, with its one bounded
+     sentence — whenever it arrives. It used to be filed as config-rejected,
+     which is a refusal inside the configuration window and nothing else
+     (audit, 2026-09-11). */
+  "far-side-error",
   "unavailable", "no-microphone", "not-allowed", "signed-out", "resumed", "resume-failed",
   /* THE EXITS THAT ARE NOT FAILURES. A call that ended with no failure
      beacon was invisible here — and the owner met exactly that: five

@@ -20,6 +20,10 @@ import { withPublicProvider } from "@/lib/server/ai/observability/public-provide
 
 type RouteCtx = { params: Promise<{ id: string }> };
 
+/* Two model calls in sequence, on a provider path with its own deadline —
+   a ceiling so a hung upstream ends the request rather than the platform. */
+export const maxDuration = 60;
+
 export async function POST(req: Request, { params }: RouteCtx) {
   const auth = await requireAuth();
   if (auth instanceof NextResponse) return auth;
@@ -47,13 +51,14 @@ export async function POST(req: Request, { params }: RouteCtx) {
     return NextResponse.json(
       {
         error: "no_provider",
-        message: "Koleex AI is not configured. Add GEMINI_API_KEY in Vercel env.",
+        /* No vendor, no variable name: this text reaches a screen. */
+        message: "Koleex AI is not configured yet. Ask a Super Admin to finish the setup.",
       },
       { status: 503 },
     );
   }
 
-  const body = (await req.json()) as {
+  const body = (await req.json().catch(() => ({}))) as {
     content?: string;
     user_lang?: "en" | "zh" | "ar";
   };
@@ -118,7 +123,14 @@ ${AI_PROVENANCE_RULE}${AI_IDENTITY_BRIEF}${KOLEEX_COMPANY_BRIEF}${identityDepthF
     return NextResponse.json(
       {
         error: "provider_error",
-        message: getLastAiError() ?? "AI provider is unreachable right now.",
+        /* The vendor's own words ("<vendor> 402: Insufficient Balance") go to
+           the log, where the owner reads them; the screen gets one neutral
+           sentence, per the identity rule. */
+        message: (() => {
+          const detail = getLastAiError();
+          if (detail) console.error("[ai.messages] provider:", detail);
+          return "Koleex AI is unavailable right now. Please try again in a moment.";
+        })(),
       },
       { status: 502 },
     );

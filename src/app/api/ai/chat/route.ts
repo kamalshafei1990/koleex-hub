@@ -4,6 +4,7 @@ import { memoryFor, readPersonalization } from "@/lib/server/ai/personalization-
 import { NextResponse } from "next/server";
 import { requireAuth } from "@/lib/server/auth";
 import { requireInternalUser } from "@/lib/server/ai/require-internal";
+import { consumeBudget, limitMode, BUDGETS, subjectFor } from "@/lib/server/ai/security/rate-limit";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { aiProviderConfigured, type ChatMessage } from "@/lib/server/ai-provider";
 import { routeAi, streamRouteAi } from "@/lib/server/ai/router";
@@ -60,6 +61,11 @@ function clamp(str: string, max: number): string {
   return str.length <= max ? str : str.slice(0, max - 20) + " …[trimmed]";
 }
 
+/* The orchestrator and a stream behind one request: the same ceiling the
+   agent route declares, so a stalled provider ends here and not at the
+   platform's hand. */
+export const maxDuration = 120;
+
 export async function POST(req: Request) {
   const t0 = Date.now();
   const auth = await requireAuth();
@@ -68,6 +74,26 @@ export async function POST(req: Request) {
   {
     const notInternal = requireInternalUser(auth);
     if (notInternal) return notInternal;
+  }
+  /* THE SAME METER AS THE AGENT ROUTE. This lane reaches the same tool loop
+     and the same paid provider; it was the one door to them without a
+     budget (audit, 2026-09-11). Same buckets, same mode switch, same words. */
+  if (limitMode() !== "off") {
+    const [perAccount, perTenant] = await Promise.all([
+      consumeBudget(subjectFor.account(auth.account_id), BUDGETS.turnPerAccount()),
+      consumeBudget(subjectFor.tenant(auth.tenant_id), BUDGETS.turnPerTenant()),
+    ]);
+    const hit = !perAccount.allowed ? perAccount : !perTenant.allowed ? perTenant : null;
+    if (hit && !hit.allowed) {
+      const scope = !perAccount.allowed ? "account" : "tenant";
+      console.warn(`[ai.ratelimit] ep=chat scope=${scope} count=${hit.count} max=${hit.max} mode=${limitMode()}`);
+      if (limitMode() === "enforce") {
+        return NextResponse.json(
+          { error: "Koleex AI is handling a lot of requests from your account right now. Give it a moment and try again." },
+          { status: 429, headers: { "Retry-After": String(hit.retryAfterSec) } },
+        );
+      }
+    }
   }
 
   /* Identity for the prompt. The chat lane never passed one, so its
@@ -104,7 +130,7 @@ export async function POST(req: Request) {
      lane applies in buildUserContext. */
   const memory = memoryFor(personalization, facts);
 
-  const body = (await req.json()) as {
+  const body = (await req.json().catch(() => ({}))) as {
     messages?: ChatMessage[];
     user_lang?: "en" | "zh" | "ar";
     stream?: boolean;
@@ -230,8 +256,8 @@ export async function POST(req: Request) {
     return NextResponse.json(
       {
         error: "no_provider",
-        message:
-          "Koleex AI is not configured yet. Ask a Super Admin to add a GEMINI_API_KEY (or ANTHROPIC_API_KEY / OPENAI_API_KEY) in Vercel env vars.",
+        /* No vendor, no variable name: this text reaches a screen. */
+        message: "Koleex AI is not configured yet. Ask a Super Admin to finish the setup.",
       },
       { status: 503 },
     );

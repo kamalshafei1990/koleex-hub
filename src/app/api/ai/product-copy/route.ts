@@ -161,6 +161,9 @@ function parseJson(reply: string): { value?: string; values?: string[]; reason?:
   }
 }
 
+/* One provider call with its own deadline; the ceiling is the backstop. */
+export const maxDuration = 30;
+
 export async function POST(req: Request) {
   const auth = await requireAuth();
   if (auth instanceof NextResponse) return auth;

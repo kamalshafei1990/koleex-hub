@@ -150,8 +150,12 @@ export default function VoiceTranscript({ lines, lang = "en", className = "", fi
                 /* Partial text is dimmed, NOT italicised: the brand rules
                    exclude italics, and colour carries the same "still being
                    said" meaning without breaking the type system. */
+                /* FIXED COLOURS, because the surface is fixed: the call screen
+                   is #0D0D0D in both themes, and the theme tokens resolve to
+                   black under the light theme — words nobody could see
+                   (audit, 2026-09-11). */
                 className={`text-base leading-relaxed ${
-                  line.final ? "text-[var(--text-primary)]" : "text-[var(--text-dim)]"
+                  line.final ? "text-white" : "text-[#AAAAAA]"
                 }`}
               >
                 {/* A markdown image the model wrote into its words is NOT a
