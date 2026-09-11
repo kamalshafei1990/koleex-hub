@@ -916,7 +916,6 @@ export default function KoleexAiApp() {
           /* Back into THIS chat's composer only — the user may have moved
              on, and a draft must not land in the chat that is open now. */
           if (activeIdRef.current === conversationId) {
-            resendRef.current = { text, conversationId };
             setInput((cur) => (cur.trim() ? cur : text));
             setAttachments((cur) => (cur.length > 0 ? cur : filesToSend));
             resizeComposer();

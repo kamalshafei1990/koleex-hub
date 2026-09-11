@@ -1222,7 +1222,11 @@ console.log("\n── A chat that failed to load says so; an offline device is t
   check("offline: a status line above the composer, the call control disabled, and the message a drop put back is resent once — only if it is still that message in that chat",
     /window\.addEventListener\("offline", sync\);/.test(app) && /\{!online && \(/.test(app) && /\{copy\.offline\}/.test(app) &&
     /disabled=\{sending \|\| !online\}/.test(app) &&
-    (app.match(/resendRef\.current = \{ text, conversationId \};/g) ?? []).length === 2 &&
+    /* ONE arming site: a dropped connection. A file that could not be read
+       also puts the words back, and must NOT be resent on its own — the
+       same unreadable file would go out again. */
+    (app.match(/resendRef\.current = \{ text, conversationId \};/g) ?? []).length === 1 &&
+    /if \(isNetwork && activeIdRef\.current === conversationId\) \{\s*resendRef\.current = \{ text, conversationId \};/.test(app) &&
     /if \(input\.trim\(\) !== pending\.text\.trim\(\) \|\| activeIdRef\.current !== pending\.conversationId\) return;\s*resendRef\.current = null;\s*void send\(\);/.test(app) &&
     ["en", "zh", "ar"].every((l) => COPY[l as "en" | "zh" | "ar"].offline.length > 0));
   check("the AI app's dim text clears AA and every control shows a focus ring — scoped to .kx-ai-root, not the whole Hub",
