@@ -968,6 +968,14 @@ console.log("\n── 6. What a call gets back from a web search is shorter ─�
     /data: forVoice\(name, result\.data\),/.test(route) &&
     /console\.log\(`\[ai\.voice\.tool\] \$\{name\} ok=\$\{result\.ok\} status=\$\{result\.permissionStatus\} ms=\$\{Date\.now\(\) - t0\}`\);/.test(route) &&
     !/console\.log\([^)]*args/.test(route));
+  /* 2026-09-12 04:16: "ما فيش صور على الشاشة" while the model said four were
+     showing. The spoken envelope has no images; the screen's pictures travel
+     as their own field, read from the RAW result by the same extractor the
+     screen uses. */
+  check("the route sends the screen its pictures BESIDE the model's envelope, read from the raw result (not from the spoken shape)",
+    /import \{ extractProductPhotos \} from "@\/lib\/voice\/photos";/.test(route) &&
+    /const pictures = extractProductPhotos\(result\.data\);/.test(route) &&
+    /\.\.\.\(pictures\.length > 0 \? \{ pictures \} : \{\}\),/.test(route));
 }
 
 console.log(`\n${pass} passed, ${failures.length} failed`);
