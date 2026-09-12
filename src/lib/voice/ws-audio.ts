@@ -321,7 +321,23 @@ export const CAPTURE_WORKLET_NAME = "koleex-capture";
 export function createBrowserWsAudio(wireRate: number, opts: { stallMs?: number } = {}): WsAudio {
   const stallMs = opts.stallMs ?? CAPTURE_STALL_MS;
   const Ctx = (window.AudioContext ?? (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext) as typeof AudioContext;
-  const ctx = new Ctx();
+  /* THE CONTEXT RUNS AT THE WIRE'S RATE (owner, 2026-09-12: "when Koleex
+     AI talks I hear pulses… the voice is not clean"). Each frame of the far
+     side's voice used to become its own 24 kHz buffer inside a 48 kHz
+     context, and the engine resampled every buffer ON ITS OWN — with no
+     memory of the previous one, so every frame boundary, twenty or so times
+     a second, was a small discontinuity: the pulses. At the wire's rate the
+     frames play back to back as one continuous signal and only the device's
+     output resamples, once, continuously. The microphone is then read at the
+     same rate and needs no resampling either. An engine that refuses the
+     option (the argument is ignored or throws) gets the default context, as
+     before; stats() carries the rate the beacon reads. */
+  let ctx: AudioContext;
+  try {
+    ctx = new Ctx({ sampleRate: wireRate });
+  } catch {
+    ctx = new Ctx();
+  }
   const out = ctx.createMediaStreamDestination();
   let source: MediaStreamAudioSourceNode | null = null;
   let processor: ScriptProcessorNode | null = null;
