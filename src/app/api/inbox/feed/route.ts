@@ -175,8 +175,25 @@ export async function GET(req: Request) {
           const { sender: _s, ...base } = row;
           void _s;
           if (slim) {
-            const meta = base.metadata as { type?: unknown } | null;
-            base.metadata = meta && typeof meta === "object" && meta.type != null ? { type: meta.type } : {};
+            /* Keep `kind` as well as `type`. The trim exists to drop fat
+               payloads, not classification: classifyInboxActivity types a row
+               from EITHER key, because person-targeted notifications write
+               metadata.type while notifySuperAdmins writes metadata.kind
+               ("new_device", audit actions…). Keeping only `type` stripped
+               every super-admin alert down to {} before it reached the
+               client — measured on the live inbox, 101 of 106 messages — so
+               the bell could not type them: its filter row showed nothing but
+               "All", the Security chip never appeared, and those rows took
+               the default chime. Two keys, both short strings. */
+            const meta = base.metadata as { type?: unknown; kind?: unknown } | null;
+            if (meta && typeof meta === "object") {
+              const trimmed: Record<string, unknown> = {};
+              if (meta.type != null) trimmed.type = meta.type;
+              if (meta.kind != null) trimmed.kind = meta.kind;
+              base.metadata = trimmed;
+            } else {
+              base.metadata = {};
+            }
           }
           const sender = flattenSender(row.sender);
           return { ...base, sender: sender ? { ...sender, avatar_url: sender.avatar_url ?? null } : null };

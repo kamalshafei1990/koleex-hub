@@ -142,6 +142,22 @@ export async function DELETE(
   const denied = await requireProductDataAction(auth, "delete");
   if (denied) return denied;
 
+  /* Read the name BEFORE the row goes — after the delete there is nothing
+     left to name it with. Without this the critical alert every super admin
+     receives reads "Delete — product: 0708328d-9026-485f-…", and the person
+     who has to judge whether that deletion was right cannot tell WHICH
+     product it was without going to look the id up. Measured on the live
+     inbox: 7 such alerts, all UUID-only. The UPDATE path above already
+     passes entity_label; only delete — the severest action — did not.
+     Best-effort: a failed lookup must never block the deletion, it just
+     falls back to the id the way it always did. */
+  const { data: doomed } = await supabaseServer
+    .from("products")
+    .select("product_name")
+    .eq("tenant_id", auth.tenant_id)
+    .eq("id", id)
+    .maybeSingle();
+
   const { error } = await supabaseServer
     .from("products")
     .delete()
@@ -157,6 +173,7 @@ export async function DELETE(
     action_type: "delete",
     entity_type: "product",
     entity_id: id,
+    entity_label: (doomed as { product_name?: string } | null)?.product_name || undefined,
     severity: "critical",
     module: "Product Data",
     route: "/product-data",

@@ -137,7 +137,20 @@ export interface SoundPrefs {
  *  the server push sender applies the same rules, so muting an activity in
  *  Settings silences its chime AND its push with one switch. */
 export function classifyInboxActivity(meta: unknown): SoundActivity | null {
-  return classifyNotificationActivity((meta as { type?: string } | null)?.type);
+  /* `type` OR `kind` — both are written, and reading only one silently
+     un-classified most of the inbox. notify paths that target a person write
+     metadata.type ("todo_assignment", "calendar_invite"…), while
+     notifySuperAdmins writes metadata.kind ("new_device", "role_change"…) and
+     no type at all. Measured on the live inbox: 101 of 106 messages were SA
+     alerts, so 95% of the bell classified as null — they never appeared under
+     the Security chip (only under All / Other) and took the default chime
+     instead of their activity's sound. classifyNotificationActivity already
+     understands both vocabularies ("new_device" → security_alerts); its own
+     header says it maps "kind/metadata.type". Only this reader was narrow.
+     The server push path was never affected — web-push.ts classifies
+     payload.kind directly. */
+  const m = meta as { type?: unknown; kind?: unknown } | null;
+  return classifyNotificationActivity(m?.type ?? m?.kind);
 }
 
 /** The built-in tones: the original WAV plus the six synthesized ones.
