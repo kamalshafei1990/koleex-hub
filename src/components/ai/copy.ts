@@ -31,6 +31,7 @@ export const COPY: Record<Lang, {
   renamePrompt: string;
   footer: string;
   stopped: string;
+  summaryWriting: string;
   dropHere: string;
   recommended: string;
   orTypeYourOwn: string;
@@ -188,6 +189,7 @@ export const COPY: Record<Lang, {
     renamePrompt: "New title",
     footer: "Koleex AI — Powered by Koleex Technology Systems",
     stopped: "Stopped",
+    summaryWriting: "Writing the call summary…",
     dropHere: "Drop files to attach",
     recommended: "Recommended",
     orTypeYourOwn: "Or type your own answer below.",
@@ -314,6 +316,7 @@ export const COPY: Record<Lang, {
     renamePrompt: "新标题",
     footer: "Koleex AI — 由 Koleex 技术系统驱动",
     stopped: "已停止",
+    summaryWriting: "正在整理通话摘要…",
     dropHere: "拖放文件以附加",
     recommended: "推荐",
     orTypeYourOwn: "或在下方输入你自己的答案。",
@@ -439,6 +442,7 @@ export const COPY: Record<Lang, {
     renamePrompt: "عنوان جديد",
     footer: "Koleex AI — بدعم من أنظمة Koleex التقنية",
     stopped: "تم الإيقاف",
+    summaryWriting: "بكتب ملخص المكالمة…",
     dropHere: "أفلت الملفات لإرفاقها",
     recommended: "موصى به",
     orTypeYourOwn: "أو اكتب إجابتك بنفسك في الأسفل.",

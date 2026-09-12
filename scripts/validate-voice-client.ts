@@ -3893,8 +3893,8 @@ console.log("\n── 38. call settings sheet: title, voice heading, swipe-down,
     /setSheetDy\(0\);\s*if \(d && d\.dy > 80\) closeVoiceSheet\(\);/.test(scr) &&
     /translate: sheetDy > 0 \? `0 \$\{sheetDy\}px` : undefined,/.test(scr) &&
     /className="touch-none cursor-grab select-none"/.test(scr));
-  check("  …no caption on the call screen is #666666 any more except the text field's placeholder, and none is under 12 px",
-    (scr.match(/(?<!placeholder:)text-\[#666666\]/g) ?? []).length === 0 && /placeholder:text-\[#666666\]/.test(scr) &&
+  check("  …no caption on the call screen is #666666 any more — the text field's placeholder is the palette's #AAAAAA (UI review, 2026-09-12) — and none is under 12 px",
+    !/text-\[#666666\]/.test(scr) && /placeholder:text-\[#AAAAAA\]/.test(scr) &&
     !/text-\[1[01](\.5)?px\]/.test(scr) && !/text-\[9(\.5)?px\]/.test(scr));
 }
 /* ── 39. ONE VOICE CONTROL: tap calls, hold dictates (owner-approved, 2026-09-11) ── */
@@ -3920,7 +3920,7 @@ console.log("\n── 39. one voice control: a long press dictates through the s
   const scr = fsC.readFileSync("src/components/ai/VoiceCallScreen.tsx", "utf8");
   check("the Voice control wears the settings glyph, the sheet's Close a chevron, and End keeps the owner's X",
     /SLIDERS, NOT THE WAVEFORM/.test(scr) && /<polyline points="6 9 12 15 18 9" \/>/.test(scr) &&
-    /AN X, NOT A HANDSET\. The owner/.test(scr) && /className="flex items-end justify-center gap-10"/.test(scr));
+    /AN X, NOT A HANDSET\. The owner/.test(scr) && /className="flex items-end justify-center gap-10 pb-6"/.test(scr));
 }
 /* ── 40. THE CALLER'S LINE STANDS; THE SCREEN TELLS STATE FROM WORDS (audit, 2026-09-11) ── */
 console.log("\n── 40. lane verdicts carry their source; status line; memoised transcript ──");
@@ -3945,13 +3945,143 @@ console.log("\n── 40. lane verdicts carry their source; status line; memoise
     !/saveLane\([^,)]*\)/.test(btn));
   const scr = fsD.readFileSync("src/components/ai/VoiceCallScreen.tsx", "utf8");
   check("the status is a small-caps line with a state dot — blue when the far side speaks, white when it listens — and the slow caption shows the seconds",
-    /text-\[12px\] uppercase tracking-\[0\.14em\] font-semibold leading-relaxed text-\[#AAAAAA\]/.test(scr) &&
+    /text-\[12px\] uppercase \$\{lang === "ar" \? "" : "tracking-\[0\.14em\]"\} font-semibold leading-relaxed text-\[#AAAAAA\]/.test(scr) &&
     /\{live && ready && !working && \(\s*<span aria-hidden className=\{`inline-block h-1\.5 w-1\.5 rounded-full me-2 align-middle \$\{phase === "speaking" \? "bg-\[#0066FF\]" : "bg-white"\}`\} \/>/.test(scr) &&
     /\{connectingSlow && \(!live \|\| !ready\) && connectingFor > 0 && \(/.test(scr) &&
     /const tick = window\.setInterval\(\(\) => setConnectingFor\(Math\.round\(\(Date\.now\(\) - t0\) \/ 1000\)\), 1000\);/.test(scr));
   const tr = fsD.readFileSync("src/components/ai/VoiceTranscript.tsx", "utf8");
   check("the transcript is memoised, 18 px white, the half-spoken line at 70 %",
     /export default memo\(VoiceTranscript\);/.test(tr) && /text-\[18px\] leading-relaxed/.test(tr) && /line\.final \? "text-white" : "text-white\/70"/.test(tr));
+}
+/* ── 41. THE DEEP CHECK'S BUG HUNT (2026-09-12): what a drop, a busy server and a late `done` do to the thread ── */
+console.log("\n── 41. bug hunt: resume count, a busy server, corrections by line, a late done, refused redials ──");
+{
+  const fsE = await import("node:fs");
+  const ev = await import("../src/lib/voice/events");
+  const per = await import("../src/lib/voice/persist");
+  const CONV = "00000000-0000-4000-8000-000000000041";
+  const L = (role: "user" | "assistant", text: string, final: boolean, itemId?: string): TranscriptLine =>
+    ({ role, text, final, ...(itemId ? { itemId } : {}) });
+  type Call = { method: string; body: Record<string, unknown>; init: RequestInit | undefined };
+  const harness = (status: (n: number, method: string) => number = () => 200) => {
+    const calls: Call[] = [];
+    const errors: string[] = [];
+    const fetchFn = (async (_u: string, init?: RequestInit) => {
+      const body = JSON.parse(String(init?.body)) as Record<string, unknown>;
+      const method = String(init?.method);
+      calls.push({ method, body, init });
+      const st = status(calls.length, method);
+      if (method === "PATCH") {
+        return { ok: st < 400, status: st, headers: new Map(), json: async () => ({ message: { id: body.message_id, role: "user", content: body.text, created_at: "now", source: "voice" }, conversation: { id: CONV, title: "T" } }) } as unknown as Response;
+      }
+      const turns = body.turns as Array<{ role: string; text: string; via: string }>;
+      return { ok: st < 400, status: st, json: async () => ({ messages: turns.map((t, i) => ({ id: `row-${calls.length}-${i}`, role: t.role, content: t.text, created_at: "now", source: t.via })), conversation: { id: CONV, title: "T" } }) } as unknown as Response;
+    }) as unknown as typeof fetch;
+    const p = new per.TranscriptPersister({ fetchFn, ensureConversation: async () => CONV, onError: (r) => errors.push(r) }, CONV);
+    return { p, calls, errors, fetchFn };
+  };
+
+  {
+    /* THE 05:36 DUPLICATE. An answer cut by a lookup sat open BEHIND the
+       conversation; the writer took it as settled (the stale-line rule)
+       and wrote the turn after it. The resume's writer counted finals on
+       screen — one fewer — and wrote that turn again. */
+    const cut = [L("user", "show me the machine", true), L("assistant", "one moment", false), L("user", "the price?", true), L("assistant", "It is", false)];
+    const h = harness();
+    h.p.observe(cut);
+    await h.p.finish();
+    const written = h.calls.flatMap((c) => (c.body.turns as Array<{ text: string }>).map((t) => t.text));
+    check("an unfinished line behind the conversation is written, and the writer's settled count is past it — not the count of finals",
+      written.join("|") === "show me the machine|one moment|the price?" && h.p.settled() === 3 && cut.filter((l) => l.final).length === 2);
+    const next = new per.TranscriptPersister({ fetchFn: h.fetchFn, ensureConversation: async () => CONV }, CONV, h.p.settled());
+    next.observe([...cut.slice(0, 3), L("assistant", "It is", true)]);
+    await next.finish();
+    const all = h.calls.flatMap((c) => (c.body.turns as Array<{ text: string }>).map((t) => t.text));
+    check("  …a writer seeded from where the last one stopped writes only what came after — the question is in the thread once",
+      all.filter((t) => t === "the price?").length === 1 && all[all.length - 1] === "It is");
+    const naive = new per.TranscriptPersister({ fetchFn: h.fetchFn, ensureConversation: async () => CONV }, CONV, cut.filter((l) => l.final).length);
+    naive.observe([...cut.slice(0, 3), L("assistant", "It is", true)]);
+    await naive.finish();
+    check("  …proved: seeded from the finals count it would have written the question a second time",
+      h.calls.flatMap((c) => (c.body.turns as Array<{ text: string }>).map((t) => t.text)).filter((t) => t === "the price?").length === 2);
+  }
+
+  {
+    /* A BUSY SERVER IS NOT A STRIKE. Three 429s used to end the call's
+       persistence for good; now they wait for the next turn or the drain. */
+    let busy = 3;
+    const h = harness((_n, method) => (method === "POST" && busy-- > 0 ? 429 : 200));
+    h.p.observe([L("user", "one", true)]);
+    await h.p.flush();
+    h.p.observe([L("user", "one", true), L("assistant", "two", true)]);
+    await h.p.flush();
+    h.p.observe([L("user", "one", true), L("assistant", "two", true), L("user", "three", true)]);
+    await h.p.flush();
+    check("three 429s in a row do not kill the writer — nothing was given up, the turns are still queued", h.errors.length === 0 && h.p.pending() === 3);
+    await h.p.finish();
+    check("  …and the drain writes them all once the server has a moment",
+      h.errors.length === 0 && h.p.pending() === 0 && h.calls.length === 4 && (h.calls[3].body.turns as unknown[]).length === 3);
+    check("  …proved: three ordinary failures still do", (() => {
+      const g = harness((_n, method) => (method === "POST" ? 500 : 200));
+      g.p.observe([L("user", "a", true)]);
+      return g.p.flush().then(() => { g.p.observe([L("user", "a", true), L("assistant", "b", true)]); return g.p.flush(); })
+        .then(() => { g.p.observe([L("user", "a", true), L("assistant", "b", true), L("user", "c", true)]); return g.p.flush(); })
+        .then(() => g.errors.join() === "failed") as unknown as boolean;
+    })() !== false);
+    check("every write carries a deadline, on a runtime that has one",
+      per.PERSIST_TIMEOUT_MS === 12_000 && h.calls.every((c) => c.init?.signal instanceof AbortSignal));
+  }
+
+  {
+    /* CORRECTIONS FOLLOW THE LINE. A re-hearing that was only noise
+       withdraws a caller's line (events.ts); the lines after it move up a
+       slot. Slot-keyed, the writer then saw "newer words" in every moved
+       slot and PATCHED other turns over the rows. */
+    const h = harness();
+    h.p.observe([L("user", "hello", true, "it-1"), L("user", "[noise]", true, "it-2"), L("user", "the price?", true, "it-3"), L("assistant", "Two hundred.", true)]);
+    await h.p.finish();
+    const before = h.calls.length;
+    h.p.observe([L("user", "hello", true, "it-1"), L("user", "the price?", true, "it-3"), L("assistant", "Two hundred.", true)]);
+    await h.p.finish();
+    check("a withdrawn line shifts its followers and corrects NOTHING — no PATCH puts another turn's words over a row",
+      h.calls.length === before && h.p.corrections() === 0);
+    h.p.observe([L("user", "hello there", true, "it-1"), L("user", "the price?", true, "it-3"), L("assistant", "Two hundred.", true)]);
+    await h.p.finish();
+    const patches = h.calls.filter((c) => c.method === "PATCH");
+    check("  …while a line re-heard under its own item id is still corrected, by that line's row",
+      patches.length === 1 && patches[0].body.message_id === "row-1-0" && patches[0].body.text === "hello there");
+  }
+
+  {
+    /* A LATE `done` IS THE ANSWER, NOT A SECOND ONE. */
+    const settled = [L("user", "the price?", true), L("assistant", "It is two", true)];
+    const late = ev.appendTranscript(settled, { role: "assistant", text: "It is two hundred dollars.", final: true });
+    check("an assistant final that begins with the settled answer replaces it where it stands",
+      late.length === 2 && late[1].text === "It is two hundred dollars." && late[1].final === true && late[1].role === "assistant");
+    const other = ev.appendTranscript(settled, { role: "assistant", text: "Anything else?", final: true });
+    check("  …a different answer is a new line", other.length === 3 && other[2].text === "Anything else?");
+    const piece = ev.appendTranscript(settled, { role: "assistant", text: "It is two hundred", final: true, incremental: true });
+    check("  …an incremental final never replaces — it is a piece, not the whole", piece.length === 3);
+  }
+
+  {
+    /* A REFUSED REDIAL. */
+    const s = await import("../src/lib/voice/session");
+    const src = fsE.readFileSync("src/lib/voice/session.ts", "utf8");
+    check("a redial refused as signed-out, not-allowed or too-many-calls ends the call; a short Retry-After is the next redial's delay",
+      s.WS_REDIAL_RETRY_AFTER_MAX_MS === 10_000 &&
+      /if \(res\.status === 401 \|\| res\.status === 403\) \{\s*this\.fail\(failureForStatus\(res\.status\)\);\s*return false;\s*\}/.test(src) &&
+      /const after = Number\(res\.headers\.get\("Retry-After"\)\);/.test(src) &&
+      /if \(waitMs <= WS_REDIAL_RETRY_AFTER_MAX_MS\) \{\s*this\.wsRetryAfterMs = waitMs;\s*\} else \{\s*this\.fail\("too-many-calls"\);\s*\}/.test(src) &&
+      /const delay = this\.wsRetryAfterMs !== null \? Math\.max\(backoff, this\.wsRetryAfterMs\) : backoff;\s*this\.wsRetryAfterMs = null;/.test(src));
+    const btn = fsE.readFileSync("src/components/ai/VoiceCallButton.tsx", "utf8");
+    check("the call button closes the cut answer on `reconnecting`, finishes the dying call's writer before the next start, and seeds the next writer from where it stopped",
+      /if \(next === "reconnecting"\) \{\s*const cut = settleOpenLine\(linesRef\.current, "assistant"\);/.test(btn) &&
+      /const dropped = settleOpenLine\(linesRef\.current, "assistant"\);[\s\S]*?resumeSettledRef\.current = persisterRef\.current\?\.settled\(\) \?\? null;\s*void persisterRef\.current\?\.finish\(\);\s*persisterRef\.current = null;\s*if \(canFallBack\) \{/.test(btn) &&
+      /opts\?\.resume \? \(resumeSettledRef\.current \?\? linesRef\.current\.filter\(\(l\) => l\.final\)\.length\) : 0,\s*\);\s*resumeSettledRef\.current = null;/.test(btn));
+    const route = fsE.readFileSync("src/app/api/ai/agent/route.ts", "utf8");
+    check("a fast lane that returned nothing at all is null, never an empty reply", /fastReply = \(out\.response\.content \|\| accumulated\) \|\| null;/.test(route) && !/fastReply = out\.response\.content \|\| accumulated;/.test(route));
+  }
 }
 console.log(`\n${pass} passed, ${failures.length} failed`);
   if (failures.length) {

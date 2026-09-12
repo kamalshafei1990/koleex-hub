@@ -31,6 +31,7 @@ import { searchWeb, isMachineQuery, parseTimeRange, type WebResult, type WebImag
 import { isoDateIn } from "../../ai/prompts/blocks";
 import { fenceUntrusted, newFenceId } from "../../ai/security/untrusted";
 import { scanEgress, egressRefusalMessage } from "../../ai/security/egress-scanner";
+import { consumeBudget, limitMode, BUDGETS, subjectFor } from "../../ai/security/rate-limit";
 
 interface SearchArgs {
   query: string;
@@ -185,6 +186,33 @@ const searchTheWeb: ToolDef<SearchArgs, SearchData> = {
        to see something. A search for today's date is not that. */
     const wantImages = args?.want_images === true;
     const recency = parseTimeRange(args?.recency);
+
+    /* ── GUARD 2 (security review, 2026-09-12): the vendor's bill ─────────
+       Every lane that can search runs through this handler — the tool loop,
+       the general lane's one hop, a voice call's lookup — so the budget for
+       paid searches lives here and none of them can forget it. Over the
+       line, the model is told plainly and answers without a lookup; the
+       account's turns are not blocked, only its searches. Observe mode logs
+       and lets it through, as the turn budgets do. */
+    if (limitMode() !== "off") {
+      const [perAccount, perTenant] = await Promise.all([
+        consumeBudget(subjectFor.account(ctx.auth.account_id), BUDGETS.searchPerAccount()),
+        consumeBudget(subjectFor.tenant(ctx.auth.tenant_id), BUDGETS.searchPerTenantDay()),
+      ]);
+      const hit = !perAccount.allowed ? perAccount : !perTenant.allowed ? perTenant : null;
+      if (hit && !hit.allowed) {
+        console.warn(`[ai.ratelimit] ep=search_web scope=${!perAccount.allowed ? "account" : "tenant"} count=${hit.count} max=${hit.max} mode=${limitMode()}`);
+        if (limitMode() === "enforce") {
+          return {
+            ok: false,
+            permissionStatus: "allowed",
+            data: null,
+            message: "Web search is paused for a little while — too many lookups in a short time. Answer from what you know, say plainly that you could not look it up just now, and do not present the answer as current.",
+          };
+        }
+      }
+    }
+
     const outcome = await searchWeb(query, { images: wantImages, timeRange: recency });
 
     /* NOT permissionStatus "denied", even though this is a failure. A denial

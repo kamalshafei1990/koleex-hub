@@ -478,6 +478,9 @@ export const WS_SESSION_PATH = "/api/ai/voice/ws-session";
    microphone, the same audio, the same screen. The far side's history
    comes back from the server with the new session. */
 export const WS_RECONNECT_DELAYS_MS: readonly number[] = [0, 1_500, 3_000, 6_000];
+/** The longest "Retry-After" a refused redial waits out instead of ending the
+ *  call. The outage window is twenty seconds; a wait past this is past it. */
+export const WS_REDIAL_RETRY_AFTER_MAX_MS = 10_000;
 /* THE KEEPALIVE (2026-09-11 15:07 UTC: the socket to the relay died twice at
    exactly 36 s, `client-closed 1006`, with audio frames flowing the whole
    time — the shape of a proxy on the phone's path that cuts a WebSocket it
@@ -523,6 +526,9 @@ export class VoiceSession {
   private wsReconnectTimer: ReturnType<typeof setTimeout> | null = null;
   private wsReconnects = 0;
   private wsOutageAttempt = 0;
+  /** A wait the route asked for on the last refused redial (429), spent by
+   *  the next redial's delay; null when it asked for none. */
+  private wsRetryAfterMs: number | null = null;
   private wsCloseCode = "";
   /** The socket keepalive (WS_KEEPALIVE_MS): whether this handshake allows
    *  it, and the interval while the socket is open. */
@@ -1478,7 +1484,32 @@ export class VoiceSession {
       }
       if (!alive()) return false;
       if (!res.ok) {
-        if (first) this.fail(failureForStatus(res.status));
+        if (first) {
+          this.fail(failureForStatus(res.status));
+          return false;
+        }
+        /* A REDIAL REFUSED FOR A REASON THAT WILL NOT CHANGE ENDS THE CALL
+           (bug hunt, 2026-09-12). Signed out or not allowed cannot mend
+           inside the outage window; and "too many calls" — each redial is
+           a call start to the route's budget — was redialled again on the
+           backoff, spending the budget it had just run out of, until the
+           deadline ended the call anyway. The route says how long to wait:
+           a short wait is honoured as the next redial's delay; a long one,
+           or none, ends the call with the reason on screen. */
+        if (res.status === 401 || res.status === 403) {
+          this.fail(failureForStatus(res.status));
+          return false;
+        }
+        if (res.status === 429) {
+          const after = Number(res.headers.get("Retry-After"));
+          const waitMs = Number.isFinite(after) && after > 0 ? after * 1000 : Number.NaN;
+          if (waitMs <= WS_REDIAL_RETRY_AFTER_MAX_MS) {
+            this.wsRetryAfterMs = waitMs;
+          } else {
+            this.fail("too-many-calls");
+          }
+          return false;
+        }
         return false;
       }
       const body = (await res.json()) as {
@@ -1692,7 +1723,9 @@ export class VoiceSession {
   private scheduleWsReconnect(): void {
     if (this.transport !== "ws" || !this.iceEverConnected || this.state !== "reconnecting") return;
     if (this.wsReconnectTimer !== null) return;
-    const delay = WS_RECONNECT_DELAYS_MS[Math.min(this.wsOutageAttempt, WS_RECONNECT_DELAYS_MS.length - 1)];
+    const backoff = WS_RECONNECT_DELAYS_MS[Math.min(this.wsOutageAttempt, WS_RECONNECT_DELAYS_MS.length - 1)];
+    const delay = this.wsRetryAfterMs !== null ? Math.max(backoff, this.wsRetryAfterMs) : backoff;
+    this.wsRetryAfterMs = null;
     this.wsOutageAttempt++;
     this.wsReconnectTimer = setTimeout(() => {
       this.wsReconnectTimer = null;

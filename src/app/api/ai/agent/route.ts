@@ -434,6 +434,10 @@ export async function POST(req: Request) {
               .from("ai_messages")
               .select("role, content, created_at")
               .eq("conversation_id", conversationId)
+              /* Ownership was checked on the conversation; the tenant is on
+                 this read too, so the rule "tenant on every read" does not
+                 depend on the order of the checks (security review). */
+              .eq("tenant_id", auth.tenant_id)
               .order("created_at", { ascending: false })
               .limit(HISTORY_LIMIT),
             buildUserContext(auth),
@@ -745,7 +749,11 @@ export async function POST(req: Request) {
                  distinction queryable, and the provider half now names
                  whichever adapter actually served. */
               if (out.ok) {
-                fastReply = out.response.content || accumulated;
+                /* NULL, NOT "": a lane that returned nothing at all is a lane
+                   that did not answer, and the turn falls through to the
+                   orchestrator — an empty string was sealed and sent as the
+                   reply (bug hunt, 2026-09-12). */
+                fastReply = (out.response.content || accumulated) || null;
                 fastProvider = `${activeProviderLabel()}:fast-${fastLane}${fastSteps.length > 0 ? "+search" : ""}`;
               } else if (gotFirst) {
                 /* Failed after deltas were already on the client's screen. We
@@ -1002,6 +1010,7 @@ export async function POST(req: Request) {
       .from("ai_messages")
       .select("role, content, created_at")
       .eq("conversation_id", conversationId)
+      .eq("tenant_id", auth.tenant_id)
       .order("created_at", { ascending: false })
       .limit(HISTORY_LIMIT),
     buildUserContext(auth),

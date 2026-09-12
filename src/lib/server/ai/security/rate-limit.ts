@@ -99,6 +99,23 @@ export const BUDGETS = {
     windowSec: 60,
     max: num(process.env.AI_LIMIT_VOICE_SUMMARIES_PER_MIN, 6),
   }),
+  /* A WEB SEARCH IS A PAID VENDOR CALL, on every lane that can make one
+     (the tool loop, the general lane's one hop, a voice call's lookup). The
+     turn budgets bound turns, not searches: two lookups a turn on thirty
+     turns a minute is sixty vendor calls a minute from one account, with
+     no alarm (security review, 2026-09-12). Consumed inside the tool
+     itself so no lane can forget it. A person asks a handful a minute;
+     twenty is far above that. The tenant ceiling is the bill's. */
+  searchPerAccount: (): Budget => ({
+    bucket: "search",
+    windowSec: 60,
+    max: num(process.env.AI_LIMIT_SEARCHES_PER_MIN, 20),
+  }),
+  searchPerTenantDay: (): Budget => ({
+    bucket: "search:tenant:day",
+    windowSec: 24 * 60 * 60,
+    max: num(process.env.AI_LIMIT_TENANT_SEARCHES_PER_DAY, 2000),
+  }),
   /* A search box, typed into. Debounced on the client; this is the floor
      under a client that is not. */
   conversationSearchPerAccount: (): Budget => ({

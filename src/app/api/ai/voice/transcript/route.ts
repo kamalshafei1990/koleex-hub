@@ -55,6 +55,8 @@ const MAX_TURNS = 20;
    2 000 characters; this is the server's own ceiling on either. */
 const MAX_TURN_CHARS = 4_000;
 const TITLE_CHARS = 60;
+/** How far back a landed copy of the same batch is looked for. */
+const RETRY_WINDOW_MS = 2 * 60_000;
 
 type Turn = { role: "user" | "assistant"; text: string; via: "voice" | "text" };
 
@@ -170,6 +172,35 @@ export async function POST(req: Request) {
 
   const conv = await ownConversation(gate, conversationId);
   if (!conv) return NextResponse.json({ error: "Not found" }, { status: 404 });
+
+  /* A BATCH THAT ALREADY LANDED IS NOT WRITTEN AGAIN (bug hunt, 2026-09-12).
+     The browser's write has a deadline now; a request that landed here and
+     whose answer never made it back is sent again by the same writer, in
+     the same order — and that second copy put every turn of the batch in
+     the thread twice. The check is the whole batch against the newest rows
+     of the thread: same count, same order, same speaker, same words, all
+     written by this route moments ago. A caller who says the same word
+     twice in a row with nothing between is the one thing this could
+     mistake, and the cost there is one lost "ok". No new column, no key. */
+  const { data: tail } = await supabaseServer
+    .from("ai_messages")
+    .select("*")
+    .eq("conversation_id", conversationId)
+    .eq("tenant_id", gate.tenantId)
+    .gte("created_at", new Date(Date.now() - RETRY_WINDOW_MS).toISOString())
+    .order("created_at", { ascending: false })
+    .limit(turns.length);
+  const landed = (tail ?? []).reverse();
+  const isRetry =
+    landed.length === turns.length &&
+    turns.every((t, i) => landed[i].role === t.role && landed[i].content === t.text && landed[i].source === t.via);
+  if (isRetry) {
+    console.warn(`[ai.voice.transcript] repeat post skipped n=${turns.length}`);
+    return NextResponse.json({
+      messages: landed.map((r) => withPublicProvider(r)),
+      conversation: { id: conversationId, title: conv.title },
+    });
+  }
 
   const { data: rows, error } = await supabaseServer
     .from("ai_messages")

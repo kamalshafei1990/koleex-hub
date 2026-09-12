@@ -776,6 +776,10 @@ export default function KoleexAiApp() {
      it is in ChatGPT. Guarded by the conversation they belong to: a user who
      opened another chat mid-call must not see spoken turns land in it. Rows
      the thread already holds (a retried post) are not added twice. */
+  /* THE SUMMARY IS ON ITS WAY. Between the hang-up and the summary row there
+     is a gap of a few seconds; without a line in it the thread looks done and
+     the summary then lands from nowhere (UI review, 2026-09-12). */
+  const [summaryPending, setSummaryPending] = useState(false);
   const onVoiceTurnsSaved = useCallback(
     (rows: SavedTurn[], conversation: { id: string; title: string | null }) => {
       if (rows.length === 0) return;
@@ -1370,8 +1374,9 @@ export default function KoleexAiApp() {
               /* No tokens before abort → drop the empty bubble. */
               return prev.filter((m) => m.id !== placeholderId);
             }
-            /* Keep the partial text the user already saw. */
-            return prev;
+            /* Keep the partial text the user already saw — marked as
+               stopped, so it does not read as a finished answer later. */
+            return prev.map((m) => (m.id === placeholderId ? { ...m, stopped: true } : m));
           });
         } else {
           /* Audit P0 #11 — distinguish a true network drop (fetch
@@ -2684,9 +2689,15 @@ export default function KoleexAiApp() {
                 renders TypingIndicator inline (empty content = dots),
                 which gives the same feedback without stacking two
                 waiting indicators on top of each other. */}
+            {summaryPending && !callLive && (
+              <div role="status" className="flex items-center gap-2 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] px-3 py-2 text-[12px] text-[var(--text-muted)]">
+                <span className="h-3 w-3 shrink-0 motion-safe:animate-spin rounded-full border-[1.5px] border-current border-t-transparent" aria-hidden />
+                {copy.summaryWriting}
+              </div>
+            )}
             {attachStatus && (
               <div className="flex items-center gap-2 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] px-3 py-2 text-[12px] text-[var(--text-muted)]">
-                <span className="h-3 w-3 shrink-0 animate-spin rounded-full border-[1.5px] border-current border-t-transparent" aria-hidden />
+                <span className="h-3 w-3 shrink-0 motion-safe:animate-spin rounded-full border-[1.5px] border-current border-t-transparent" aria-hidden />
                 {attachStatus}
               </div>
             )}
@@ -2936,12 +2947,16 @@ export default function KoleexAiApp() {
                     between siblings, since the icons already carry
                     their own breathing room via rounded-full hover. */}
                 <div className="flex items-center justify-between px-2 pb-2 pt-0.5">
-                  <div className="flex items-center gap-0">
+                  {/* 40 px buttons with a 4 px gap: the coarse-pointer hit
+                      areas (44 px, globals.css) no longer overlap, so a tap on
+                      the edge of one cannot land on its neighbour (UI review,
+                      2026-09-12). */}
+                  <div className="flex items-center gap-1">
                     {/* + Attachment */}
                     <button
                       type="button"
                       onClick={openFilePicker}
-                      className="h-8 w-8 rounded-full inline-flex items-center justify-center text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-subtle)] transition-colors"
+                      className="h-10 w-10 rounded-full inline-flex items-center justify-center text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-subtle)] transition-colors"
                       aria-label={copy.attachFile}
                       title={copy.attachFile}
                     >
@@ -2965,7 +2980,7 @@ export default function KoleexAiApp() {
                     <EmojiButton
                       lang={lang}
                       onSelect={insertEmoji}
-                      className="h-8 w-8 rounded-full inline-flex items-center justify-center text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-subtle)] transition-colors"
+                      className="h-10 w-10 rounded-full inline-flex items-center justify-center text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-subtle)] transition-colors"
                     />
 
                     {/* Web search toggle — emerald tint when on. */}
@@ -2975,7 +2990,7 @@ export default function KoleexAiApp() {
                       aria-pressed={webSearch}
                       aria-label={copy.searchWeb}
                       title={webSearch ? copy.webSearchOn : copy.webSearchOff}
-                      className={`h-8 w-8 rounded-full inline-flex items-center justify-center transition-colors ${
+                      className={`h-10 w-10 rounded-full inline-flex items-center justify-center transition-colors ${
                         webSearch
                           ? "bg-[var(--kx-ai-accent-soft)] text-[var(--kx-ai-accent)] ring-1 ring-[var(--kx-ai-accent-line)]"
                           : "text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-subtle)]"
@@ -3018,6 +3033,7 @@ export default function KoleexAiApp() {
                       onTurnsSaved={onVoiceTurnsSaved}
                       onTurnUpdated={onVoiceTurnUpdated}
                       onInterrupted={onVoiceInterrupted}
+                      onSummaryPending={setSummaryPending}
                     />
 
                     {/* Send / Stop — inverted bg circle, anchors the row. */}
