@@ -887,7 +887,9 @@ console.log("\n── VoiceCallScreen: choosing a voice ──");
     <VoiceCallScreen live phase="listening" audioLevel={0.2} lines={[]} lang="ar"
       onEnd={() => {}} voices={voices} selectedVoice="v2" onSelectVoice={() => {}} /> as ReactElement,
   );
-  check("the picker's own label is localised", arPicker.includes("الصوت"));
+  /* The control opens Call settings — lane and voice — so that is its name (UI
+     review, 2026-09-12); the selected voice's own name sits under it. */
+  check("the picker's own label is localised", arPicker.includes("إعدادات المكالمة"));
   const arSheet = renderToStaticMarkup(
     <VoiceCallScreen live phase="listening" audioLevel={0.2} lines={[]} lang="ar"
       onEnd={() => {}} voices={voices} selectedVoice="v2" onSelectVoice={() => {}} defaultVoiceSheetOpen /> as ReactElement,
@@ -1240,7 +1242,7 @@ console.log("\n── A chat that failed to load says so; an offline device is t
   check("the AI app's dim text clears AA and every control shows a focus ring — scoped to .kx-ai-root, not the whole Hub",
     /\.kx-ai-root \{ --text-dim: rgba\(255,255,255,0\.56\); \}/.test(css) &&
     /\[data-theme="light"\] \.kx-ai-root \{ --text-dim: rgba\(0,0,0,0\.62\); \}/.test(css) &&
-    /\.kx-ai-root :is\(button, \[role="button"\], a\[href\]\):focus-visible \{\s*outline: 2px solid #0066FF;/.test(css));
+    /\.kx-ai-root :is\(button, \[role="button"\], a\[href\]\):focus-visible,\s*\.kx-call-root :is\(button, \[role="button"\], a\[href\]\):focus-visible \{\s*outline: 2px solid #0066FF;/.test(css));
 }
 
 console.log("\n── The address carries the place: ?c=<chat>, ?view=library|calls (audit, 2026-09-11) ──");

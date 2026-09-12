@@ -1,6 +1,16 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { signTicket, verifyTicket, tokenFromProtocols, upstreamUrlFor, originAllowed, TICKET_MAX_AGE_S, isKeepalive, KEEPALIVE_FRAME } from "./server.mjs";
+import { signTicket, verifyTicket, tokenFromProtocols, upstreamUrlFor, originAllowed, TICKET_MAX_AGE_S, isKeepalive, KEEPALIVE_FRAME, clientAddress, MAX_PER_TICKET, MAX_PENDING_BYTES, MAX_FRAME_BYTES } from "./server.mjs";
+
+test("the per-address cap keys on the hop the edge appended, never on what the browser wrote in front", () => {
+  assert.equal(clientAddress("1.2.3.4", "10.0.0.9"), "1.2.3.4");
+  assert.equal(clientAddress("9.9.9.9, 1.2.3.4", "10.0.0.9"), "1.2.3.4", "a spoofed front hop is ignored");
+  assert.equal(clientAddress(" 9.9.9.9 , 1.2.3.4 ", "10.0.0.9"), "1.2.3.4");
+  assert.equal(clientAddress(undefined, "10.0.0.9"), "10.0.0.9", "no header: the socket's own peer");
+  assert.equal(clientAddress("", undefined), "");
+  assert.ok(MAX_PER_TICKET >= 2 && MAX_PER_TICKET <= 4, "a ticket admits a redial's overlap and little more");
+  assert.ok(MAX_PENDING_BYTES < 200 * MAX_FRAME_BYTES, "the pre-open queue is bounded by bytes, far below two hundred full frames");
+});
 
 const SECRET = "relay-secret-for-tests";
 

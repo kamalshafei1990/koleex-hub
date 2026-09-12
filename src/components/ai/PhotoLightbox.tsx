@@ -65,7 +65,7 @@ export default function PhotoLightbox({
         data-lightbox-close
         onClick={onClose}
         aria-label={closeLabel}
-        className="absolute top-4 right-4 h-12 w-12 rounded-full inline-flex items-center justify-center text-white border border-white/20 bg-white/[0.06] hover:bg-white/[0.12] transition-[background-color,transform] duration-150 active:scale-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0066FF]"
+        className="absolute top-4 end-4 h-12 w-12 rounded-full inline-flex items-center justify-center text-white border border-white/20 bg-white/[0.06] hover:bg-white/[0.12] transition-[background-color,transform] duration-150 active:scale-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0066FF]"
         style={{ top: "calc(env(safe-area-inset-top, 0px) + 16px)" }}
       >
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" aria-hidden>

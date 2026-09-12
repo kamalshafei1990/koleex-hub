@@ -152,7 +152,10 @@ function VoiceTranscript({ lines, lang = "en", className = "", fill = false, onO
               {/* The speaker on its OWN line. Inline, the label ran into the
                   first word and in Arabic — where the text flows the other way
                   — it landed in the middle of the sentence. */}
-              <p className="text-[12px] uppercase tracking-wider text-[#666666] mb-1">
+              {/* No letter-spacing on Arabic: a cursive script pulled apart
+                  reads as broken glyphs (UI review, 2026-09-12). #AAAAAA (the palette's dim) clears
+                  AA at 12px on the call surface; #666 did not. */}
+              <p className={`text-[12px] uppercase ${lang === "ar" ? "" : "tracking-wider"} text-[#AAAAAA] mb-1`}>
                 {isUser ? copy.you : copy.assistant}
               </p>
               <p

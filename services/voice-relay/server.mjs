@@ -50,6 +50,20 @@ export const UPSTREAM_OPEN_MS = 10_000;         // the vendor must open in this 
 export const PING_EVERY_MS = 20_000;            // keeps a NAT / border path alive
 export const MAX_CONNECTIONS = 200;
 export const MAX_PER_ADDRESS = 8;
+/** Sockets one ticket may hold at once: the live one, a redial that
+ *  overlaps it while the dead one drains, and one spare. */
+export const MAX_PER_TICKET = 3;
+/** Frames queued while the vendor opens, in bytes: a session configuration
+ *  and a second or two of audio, never a memory of the whole handshake. */
+export const MAX_PENDING_BYTES = 2 * 1024 * 1024;
+
+/** The peer the edge actually spoke to: the LAST x-forwarded-for hop (the
+ *  edge appends it), else the socket's own address. A browser can write the
+ *  front of that header; it cannot write the end. Pure. */
+export function clientAddress(forwardedFor, remoteAddress) {
+  const hops = String(forwardedFor || "").split(",").map((s) => s.trim()).filter(Boolean);
+  return hops.length ? hops[hops.length - 1] : String(remoteAddress || "");
+}
 export const TICKET_MAX_AGE_S = 15 * 60;        // a ticket cannot outlive the secret it names by much
 
 /* ── The keepalive ──────────────────────────────────────────────────────── */
@@ -128,6 +142,8 @@ export function originAllowed(origin) {
 /* ── The server ─────────────────────────────────────────────────────────── */
 
 const perAddress = new Map();
+/** Open sockets per admission ticket (see MAX_PER_TICKET). */
+const perTicket = new Map();
 let connections = 0;
 let sessions = 0;
 
@@ -172,11 +188,21 @@ export function createRelay() {
     if (!token) return refuse(400, "protocol");
     if (!verifyTicket(SECRET, token, url.searchParams.get("t"))) return refuse(403, "ticket");
     if (connections >= MAX_CONNECTIONS) return refuse(503, "busy");
-    const address = String(req.headers["x-forwarded-for"] || req.socket.remoteAddress || "").split(",")[0].trim();
+    /* THE ADDRESS THE EDGE SAW, not the one the browser wrote (security
+       review, 2026-09-12): a client can put anything in front of
+       x-forwarded-for; the edge appends the peer it actually spoke to at
+       the END. The per-address cap keys on that last hop. */
+    const address = clientAddress(req.headers["x-forwarded-for"], req.socket.remoteAddress);
     if ((perAddress.get(address) || 0) >= MAX_PER_ADDRESS) return refuse(429, "too-many");
+    /* ONE TICKET, A FEW SOCKETS. A ticket is not single-use — a redial on a
+       dropped line presents the same one — but it admits at most
+       MAX_PER_TICKET sockets at once, so a copied ticket cannot fill the
+       relay on its own. */
+    const ticketKey = url.searchParams.get("t") || "";
+    if ((perTicket.get(ticketKey) || 0) >= MAX_PER_TICKET) return refuse(429, "too-many-ticket");
 
     wss.handleUpgrade(req, socket, head, (client) => {
-      bridge(client, token, url.searchParams.get("model"), address);
+      bridge(client, token, url.searchParams.get("model"), address, ticketKey);
     });
   });
 
@@ -189,7 +215,8 @@ export function createRelay() {
   return http;
 }
 
-function bridge(client, token, model, address) {
+function bridge(client, token, model, address, ticketKey = "") {
+  perTicket.set(ticketKey, (perTicket.get(ticketKey) || 0) + 1);
   const id = ++sessions;
   const t0 = Date.now();
   connections++;
@@ -205,6 +232,7 @@ function bridge(client, token, model, address) {
   });
   /* Frames the browser sends before the vendor is open wait here, in order. */
   const pending = [];
+  let pendingBytes = 0;
 
   const finish = (why, code = 1000) => {
     if (closed) return;
@@ -213,6 +241,9 @@ function bridge(client, token, model, address) {
     const n = (perAddress.get(address) || 1) - 1;
     if (n <= 0) perAddress.delete(address);
     else perAddress.set(address, n);
+    const t = (perTicket.get(ticketKey) || 1) - 1;
+    if (t <= 0) perTicket.delete(ticketKey);
+    else perTicket.set(ticketKey, t);
     clearInterval(pinger);
     clearTimeout(cap);
     try { client.close(code); } catch { /* gone */ }
@@ -258,7 +289,13 @@ function bridge(client, token, model, address) {
     up++;
     if (upstream.readyState === WebSocket.OPEN) upstream.send(text);
     else if (upstream.readyState === WebSocket.CONNECTING) {
-      if (pending.length < 200) pending.push(text);
+      /* Bounded by BYTES, not frames (security review, 2026-09-12): two
+         hundred frames of the maximum size was two hundred megabytes held
+         per socket while the vendor opened. */
+      if (pendingBytes + text.length <= MAX_PENDING_BYTES) {
+        pending.push(text);
+        pendingBytes += text.length;
+      }
     }
   });
   client.on("close", (code) => finish("client-closed", code >= 1000 && code < 5000 ? code : 1001));

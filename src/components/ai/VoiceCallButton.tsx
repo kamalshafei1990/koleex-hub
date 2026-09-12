@@ -225,6 +225,12 @@ export type VoiceCallButtonProps = {
    *  open one. Without this the caller is told in a sentence and left to
    *  find the button. */
   onInterrupted?: (resume: () => void, conversationId: string | null) => void;
+  /** While the server is writing the call summary after a hang-up: true when
+   *  the request goes out, false when its row has landed or nothing came.
+   *  The parent shows a quiet "writing the summary" line in the thread so
+   *  the gap between the last spoken turn and the summary row is not a
+   *  silence (UI review, 2026-09-12). */
+  onSummaryPending?: (pending: boolean) => void;
 };
 
 export default function VoiceCallButton({
@@ -243,6 +249,7 @@ export default function VoiceCallButton({
   onTurnsSaved,
   onTurnUpdated,
   onInterrupted,
+  onSummaryPending,
 }: VoiceCallButtonProps) {
   const [state, setState] = useState<VoiceState>("idle");
   /** The lane the current call is on, for render: the socket lane meters
@@ -517,6 +524,7 @@ export default function VoiceCallButton({
   const conversationIdRef = useRef(conversationId);
   const ensureConversationRef = useRef(ensureConversation);
   const onTurnsSavedRef = useRef(onTurnsSaved);
+  const onSummaryPendingRef = useRef(onSummaryPending);
   const onTurnUpdatedRef = useRef(onTurnUpdated);
   const onInterruptedRef = useRef(onInterrupted);
   useEffect(() => {
@@ -529,13 +537,18 @@ export default function VoiceCallButton({
     conversationIdRef.current = conversationId;
     ensureConversationRef.current = ensureConversation;
     onTurnsSavedRef.current = onTurnsSaved;
+    onSummaryPendingRef.current = onSummaryPending;
     onTurnUpdatedRef.current = onTurnUpdated;
     onInterruptedRef.current = onInterrupted;
-  }, [onError, onMessage, onTranscript, onPhase, onLiveChange, lang, conversationId, ensureConversation, onTurnsSaved, onTurnUpdated, onInterrupted]);
+  }, [onError, onMessage, onTranscript, onPhase, onLiveChange, lang, conversationId, ensureConversation, onTurnsSaved, onTurnUpdated, onInterrupted, onSummaryPending]);
 
   /* One per call, made with the session and finished with it. Holds the
      count of turns already queued, which is why it cannot outlive a call. */
   const persisterRef = useRef<TranscriptPersister | null>(null);
+  /** Where the last writer of this call stopped, for the next writer of the
+   *  same call (a resume, a voice switch) to start from. Null when there was
+   *  none; consumed by the next start. */
+  const resumeSettledRef = useRef<number | null>(null);
 
   /* The transcript accumulates across events and must not be React state HERE:
      this component re-renders on every phase change, and rebuilding the fold
@@ -604,6 +617,9 @@ export default function VoiceCallButton({
     try {
       window.dispatchEvent(new Event("kx-call-ended"));
     } catch { /* not a browser */ }
+    /* Where this writer stopped, for a voice switch that rebuilds the call
+       with the captions kept; a fresh call ignores it (startCall). */
+    resumeSettledRef.current = persisterRef.current?.settled() ?? null;
     void persisterRef.current?.finish();
     persisterRef.current = null;
     callPreviewRef.current?.stop();
@@ -758,10 +774,12 @@ export default function VoiceCallButton({
     laneAfterCallRef.current = null;
     setState("idle");
     if (conversation && shouldSummarise(lines)) {
+      onSummaryPendingRef.current?.(true);
       void Promise.resolve(persister?.finish())
         .then(() => requestCallSummary(conversation, langRef.current))
         .then((res) => { if (res) onTurnsSavedRef.current?.([res.message], res.conversation); })
-        .catch(() => { /* a summary that did not come is nothing on screen */ });
+        .catch(() => { /* a summary that did not come is nothing on screen */ })
+        .finally(() => onSummaryPendingRef.current?.(false));
     }
   }, [releaseCall, beaconHangUp]);
 
@@ -830,8 +848,14 @@ export default function VoiceCallButton({
       /* A RESUMED CALL KEEPS ITS CAPTIONS; the new persister must not write
          them again (audit, 2026-09-07: every auto-resume and voice switch
          re-posted the whole call so far). */
-      opts?.resume ? linesRef.current.filter((l) => l.final).length : 0,
+      /* FROM WHERE THE LAST WRITER STOPPED, when there was one (bug hunt,
+         2026-09-12): the count of finals on screen undercounts when an
+         unfinished line sits behind the conversation, and the turn after it
+         was then written twice. The finals count remains the fallback for a
+         resume with no writer before it (a call the page died under). */
+      opts?.resume ? (resumeSettledRef.current ?? linesRef.current.filter((l) => l.final).length) : 0,
     );
+    resumeSettledRef.current = null;
 
     /* A RESUMED CALL KEEPS THE MICROPHONE IT HAD (VoiceSession.fail keeps
        it; takeMicrophone hands it over): the phone is asked for nothing
@@ -852,6 +876,21 @@ export default function VoiceCallButton({
         if (next === "connecting") {
           setReady(false);
           chimedRef.current = false;
+        }
+        /* THE ANSWER THAT WAS CUT BY THE DROP IS OVER (bug hunt, 2026-09-12).
+           A redial opens a fresh far-side session; the response that was
+           in flight is not resumed, and its `done` is not coming. The open
+           assistant line closes with the words it has and goes to the
+           thread now, so the redialled call's first answer opens a new line
+           instead of being glued onto the cut one. */
+        if (next === "reconnecting") {
+          const cut = settleOpenLine(linesRef.current, "assistant");
+          if (cut.length !== linesRef.current.length || cut.some((l, i) => l !== linesRef.current[i])) {
+            linesRef.current = cut;
+            setLines(cut);
+            onTranscriptRef.current?.(cut);
+            persisterRef.current?.observe(cut);
+          }
         }
         /* RECONNECTING COUNTS AS LIVE TO THE PARENT. The microphone is still
            held and the far side may resume speaking at any moment, so a parent
@@ -888,6 +927,24 @@ export default function VoiceCallButton({
           const keptMic = sessionRef.current?.takeMicrophone() ?? null;
           sessionRef.current = null;
           if (keptMic && !canResume) keptMic.getTracks().forEach((t) => t.stop());
+          /* THE WRITER OF THE CALL THAT DIED FINISHES FIRST (bug hunt,
+             2026-09-12). The answer in flight at the drop closes with the
+             words it has and goes to the thread with this writer; the next
+             call's writer then starts from where this one stopped. Before,
+             the old writer was simply overwritten with its last turn still
+             queued, and the new one counted from the finals on screen — a
+             different number when an unfinished line sat behind the
+             conversation — and wrote the turn after it again. */
+          const dropped = settleOpenLine(linesRef.current, "assistant");
+          if (dropped.length !== linesRef.current.length || dropped.some((l, i) => l !== linesRef.current[i])) {
+            linesRef.current = dropped;
+            setLines(dropped);
+            onTranscriptRef.current?.(dropped);
+            persisterRef.current?.observe(dropped);
+          }
+          resumeSettledRef.current = persisterRef.current?.settled() ?? null;
+          void persisterRef.current?.finish();
+          persisterRef.current = null;
           if (canFallBack) {
             laneFellBackRef.current = true;
             transportRef.current = "rtc";
@@ -1576,7 +1633,7 @@ export default function VoiceCallButton({
             <line x1="2" y1="2" x2="22" y2="22" />
           </svg>
         ) : busy ? (
-          <svg aria-hidden viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" className="animate-spin">
+          <svg aria-hidden viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" className="motion-safe:animate-spin">
             <path d="M21 12a9 9 0 1 1-6.22-8.56" />
           </svg>
         ) : (

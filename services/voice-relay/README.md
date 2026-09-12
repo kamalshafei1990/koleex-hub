@@ -33,6 +33,15 @@ instead of the vendor's url. Unset, browsers dial the vendor directly as before.
 
 `npm test` runs the pure checks (ticket, protocol, upstream url, origins).
 
+Limits (security review, 2026-09-12): one frame at most 1 MiB; at most 8
+open sockets per client address and 3 per admission ticket (a ticket is one
+call — a redial reuses it, a leak would not stop at three); at most 2 MiB of
+frames held for an upstream that has not opened yet. The client address is
+the LAST hop of `X-Forwarded-For` (the one Railway's edge appended), never
+the first, which anyone can write. `VOICE_RELAY_ORIGINS` on the service
+names the Hub's hosts exactly; the default `vercel.app` suffix is only for a
+service with no variable set.
+
 ## Deploying
 
 Railway builds this directory from `main` (root directory `services/voice-relay`,

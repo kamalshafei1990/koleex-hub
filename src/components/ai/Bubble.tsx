@@ -535,6 +535,19 @@ function BubbleImpl({
             {copy.voiceMessage}
           </span>
         )}
+        {/* CUT SHORT. The caller pressed Stop while this reply was streaming,
+            so the text above is the part that arrived, not the answer. Two
+            words under the bubble keep it from reading as complete later
+            (UI review, 2026-09-12). Browser-only: the row is never saved
+            with this flag, so a reload shows the plain partial text. */}
+        {!isUser && msg.stopped && (
+          <span className="inline-flex items-center gap-1 text-[12px] text-[var(--text-dim)]" title={copy.stopped}>
+            <svg aria-hidden viewBox="0 0 24 24" width="12" height="12" fill="currentColor">
+              <rect x="6" y="6" width="12" height="12" rx="2" />
+            </svg>
+            {copy.stopped}
+          </span>
+        )}
         {/* Phase 13: user-side action row — Edit (re-runs the turn
             with new text) or Save/Cancel while editing. Only shown
             when the parent supplied onEdit and allowed it. */}
@@ -663,7 +676,7 @@ export function BubbleActions({
   const btnCls = "inline-flex items-center justify-center h-7 w-7 rounded-lg hover:bg-[var(--bg-surface-subtle)] hover:text-[var(--text-primary)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed";
   const ICON = 14;
   return (
-    <div role="toolbar" aria-label={copy.messageActions} className="mt-1 flex items-center gap-1 text-[12px] text-[var(--text-dim)]">
+    <div role="toolbar" aria-label={copy.messageActions} className="mt-1 flex items-center gap-4 text-[12px] text-[var(--text-dim)]">
       <button
         type="button"
         onClick={onCopy}

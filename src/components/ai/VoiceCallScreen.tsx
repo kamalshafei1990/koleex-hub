@@ -607,11 +607,19 @@ export default function VoiceCallScreen({
         typedRef.current.blur();
         return;
       }
+      /* ONE STEP BACK, NOT THE WHOLE WAY. Escape closes the sheet and the
+         photo; on the words view it goes back to the orb the same way. Only
+         Escape on the orb itself ends the call (UI review, 2026-09-12: the
+         key meant "close" everywhere else, then ended a call). */
+      if (view === "chat") {
+        switchView("orb");
+        return;
+      }
       onEnd();
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [onEnd]);
+  }, [onEnd, view, switchView]);
 
   const submitTyped = () => {
     const text = typed.trim();
@@ -792,7 +800,10 @@ export default function VoiceCallScreen({
             is speaking; white: it is listening) so the state is told apart
             from the half-spoken sentence above it at a glance (audit,
             2026-09-11). */}
-        <p className="max-w-[340px] px-2 text-center text-[12px] uppercase tracking-[0.14em] font-semibold leading-relaxed text-[#AAAAAA]">
+        {/* NO LETTER-SPACING ON ARABIC (UI review, 2026-09-12): a cursive
+            script pulled apart renders as disconnected glyphs. The other two
+            keep the small-caps tracking. */}
+        <p className={`max-w-[340px] px-2 text-center text-[12px] uppercase ${lang === "ar" ? "" : "tracking-[0.14em]"} font-semibold leading-relaxed text-[#AAAAAA]`}>
           {live && ready && !working && (
             <span aria-hidden className={`inline-block h-1.5 w-1.5 rounded-full me-2 align-middle ${phase === "speaking" ? "bg-[#0066FF]" : "bg-white"}`} />
           )}
@@ -993,7 +1004,7 @@ export default function VoiceCallScreen({
               submitTyped();
             }}
           >
-            <div className="flex items-center gap-2 h-12 pl-4 pr-1.5 rounded-full border border-white/20 bg-white/[0.04] focus-within:border-white/40 transition-colors">
+            <div className="flex items-center gap-2 h-12 ps-4 pe-1.5 rounded-full border border-white/20 bg-white/[0.04] focus-within:border-white/40 transition-colors">
               <input
                 ref={typedRef}
                 type="text"
@@ -1006,7 +1017,7 @@ export default function VoiceCallScreen({
                 aria-label={copy.typePlaceholder}
                 enterKeyHint="send"
                 autoComplete="off"
-                className="flex-1 min-w-0 bg-transparent text-base text-white placeholder:text-[#666666] outline-none"
+                className="flex-1 min-w-0 bg-transparent text-base text-white placeholder:text-[#AAAAAA] outline-none"
               />
               <button
                 type="submit"
@@ -1050,7 +1061,10 @@ export default function VoiceCallScreen({
             LABELS, because an unlabelled icon pair is a guess. A caller who
             has never been on this screen should not have to find out what
             the grey circle does by pressing it while someone is listening. */}
-        <div className="flex items-end justify-center gap-10">
+        {/* Room under the controls: on the desktop app "Mic / End" sat on the
+            window's edge and on a phone on the home-indicator strip (the
+            safe-area inset is added by the root, on top of this). */}
+        <div className="flex items-end justify-center gap-10 pb-6">
           {talkMode === "hold" && onHold ? (
             /* HOLD TO TALK (roadmap B2), in Mute's place: the one control a
                caller in a loud room uses, so it is the widest thing on the
@@ -1087,7 +1101,7 @@ export default function VoiceCallScreen({
                 </svg>
                 {holding ? copy.holdRelease : copy.holdToTalk}
               </button>
-              <span aria-hidden className={`text-[12px] tracking-wide transition-colors ${holding ? "text-white" : "text-[#AAAAAA]"}`}>
+              <span aria-hidden className={`text-[12px] ${lang === "ar" ? "" : "tracking-wide"} transition-colors ${holding ? "text-white" : "text-[#AAAAAA]"}`}>
                 {copy.micShort}
               </span>
             </div>
@@ -1133,7 +1147,7 @@ export default function VoiceCallScreen({
               </button>
               {/* aria-hidden: the button above already carries the accessible
                   name, and a screen reader announcing both says it twice. */}
-              <span aria-hidden className={`text-[12px] tracking-wide transition-colors ${muted ? "text-white" : "text-[#AAAAAA]"}`}>
+              <span aria-hidden className={`text-[12px] ${lang === "ar" ? "" : "tracking-wide"} transition-colors ${muted ? "text-white" : "text-[#AAAAAA]"}`}>
                 {copy.micShort}
               </span>
             </div>
@@ -1149,8 +1163,8 @@ export default function VoiceCallScreen({
                 onClick={() => setVoiceSheet(true)}
                 aria-haspopup="dialog"
                 aria-expanded={voiceSheet}
-                aria-label={copy.voicePick}
-                title={copy.voicePick}
+                aria-label={copy.callSettings}
+                title={copy.callSettings}
                 className="h-14 w-14 rounded-full inline-flex items-center justify-center border text-[#AAAAAA] hover:text-white border-white/20 hover:border-white/30 bg-white/[0.04] hover:bg-white/[0.08] transition-[background-color,color,border-color,transform] duration-150 active:scale-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0066FF] focus-visible:ring-offset-2 focus-visible:ring-offset-[#0D0D0D]"
               >
                 {/* SLIDERS, NOT THE WAVEFORM. The waveform meant "speak" on the
@@ -1163,7 +1177,7 @@ export default function VoiceCallScreen({
                   <line x1="4" y1="17" x2="20" y2="17" /><circle cx="7" cy="17" r="2" fill="#0D0D0D" />
                 </svg>
               </button>
-              <span aria-hidden className="text-[12px] tracking-wide text-[#AAAAAA] max-w-[72px] truncate">
+              <span aria-hidden className={`text-[12px] ${lang === "ar" ? "" : "tracking-wide"} text-[#AAAAAA] max-w-[72px] truncate`}>
                 {selectedVoiceLabel}
               </span>
             </div>
@@ -1187,7 +1201,7 @@ export default function VoiceCallScreen({
                 <line x1="18" y1="6" x2="6" y2="18" />
               </svg>
             </button>
-            <span aria-hidden className="text-[12px] tracking-wide text-[#AAAAAA]">
+            <span aria-hidden className={`text-[12px] ${lang === "ar" ? "" : "tracking-wide"} text-[#AAAAAA]`}>
               {copy.endShort}
             </span>
           </div>
@@ -1219,7 +1233,17 @@ export default function VoiceCallScreen({
           >
             <div
               className="touch-none cursor-grab select-none"
-              onPointerDown={(e) => { sheetDragRef.current = { y0: e.clientY, dy: 0 }; }}
+              onPointerDown={(e) => {
+                sheetDragRef.current = { y0: e.clientY, dy: 0 };
+                /* A mouse drag that leaves the handle still ends here: without
+                   capture the desktop app's sheet froze half-open (UI review,
+                   2026-09-12). Hold-to-talk captures the same way. */
+                try {
+                  e.currentTarget.setPointerCapture(e.pointerId);
+                } catch {
+                  /* An engine without capture drags as before. */
+                }
+              }}
               onPointerMove={(e) => {
                 const d = sheetDragRef.current;
                 if (!d) return;

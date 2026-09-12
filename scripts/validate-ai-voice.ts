@@ -981,13 +981,14 @@ console.log("\n── 8. What the client may know, and what it may not ──");
       /\.select\("id, title, message_count"\)\s*\.eq\("id", conversationId\)\s*\.eq\("tenant_id", gate\.tenantId\)\s*\.eq\("account_id", gate\.accountId\)\s*\.maybeSingle\(\)/.test(route) &&
       /if \(!conv\) return NextResponse\.json\(\{ error: "Not found" \}, \{ status: 404 \}\);/.test(route));
     /* Two account predicates: the ownership read (ownConversation, shared by
-       both verbs) and the summary update. Three tenant predicates: those two
-       and the PATCH's row update — a message row has no account column, so
+       both verbs) and the summary update. Four tenant predicates: those two,
+       the PATCH's row update, and the POST's read of the thread's newest
+       rows (the repeat-post check) — a message row has no account column, so
        its scope is the conversation the ownership read just proved, plus the
        tenant. */
     check("  …and the summary update is scoped the same way",
       (route.match(/\.eq\("account_id", gate\.accountId\)/g) ?? []).length === 2 &&
-      (route.match(/\.eq\("tenant_id", gate\.tenantId\)/g) ?? []).length === 3);
+      (route.match(/\.eq\("tenant_id", gate\.tenantId\)/g) ?? []).length === 4);
     check("both verbs prove ownership through the one helper",
       (route.match(/await ownConversation\(gate, conversationId\)/g) ?? []).length === 2 &&
       (route.match(/\.from\("ai_conversations"\)/g) ?? []).length === 2);
@@ -1029,6 +1030,16 @@ console.log("\n── 8. What the client may know, and what it may not ──");
       /message_count: \(conv\.message_count \?\? 0\) \+ turns\.length/.test(route));
     check("rows go back through the provider mask like every other message",
       /withPublicProvider\(r\)/.test(route));
+    /* A REPEAT OF A LANDED POST (bug hunt, 2026-09-12): the browser's write
+       has a deadline, so a batch that landed and whose answer was lost is
+       sent again. The whole batch against the thread's newest rows, in the
+       tenant, within a short window; a match echoes the rows already there
+       and writes nothing. */
+    check("a repeat of a batch that already landed is echoed, not written again — whole batch, newest rows, same tenant, short window",
+      /const RETRY_WINDOW_MS = 2 \* 60_000;/.test(route) &&
+      /\.gte\("created_at", new Date\(Date\.now\(\) - RETRY_WINDOW_MS\)\.toISOString\(\)\)\s*\.order\("created_at", \{ ascending: false \}\)\s*\.limit\(turns\.length\);/.test(route) &&
+      /landed\.length === turns\.length &&\s*turns\.every\(\(t, i\) => landed\[i\]\.role === t\.role && landed\[i\]\.content === t\.text && landed\[i\]\.source === t\.via\)/.test(route) &&
+      route.indexOf("const isRetry") < route.indexOf(".insert(") && /if \(isRetry\) \{[\s\S]*?messages: landed\.map\(\(r\) => withPublicProvider\(r\)\)/.test(route));
     /* Production must not log prompts or replies. Every console call here
        carries a count, a status or a Postgres message — never a turn. */
     const logs = route.match(/console\.\w+\([^)]*\)/g) ?? [];

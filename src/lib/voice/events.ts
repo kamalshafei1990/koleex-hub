@@ -425,6 +425,17 @@ export function appendTranscript(
   if (update.final && !open && last && last.final && last.role === "user" && update.role === "user" && update.text && extendsUtterance(last.text, update.text)) {
     return [...lines.slice(0, -1), { ...last, text: update.text, ...(update.photos && update.photos.length > 0 ? { photos: update.photos } : {}) }];
   }
+  /* AN ANSWER'S LATE `done` IS THE ANSWER, NOT A SECOND ONE (bug hunt,
+     2026-09-12). The open assistant line is closed early on a drop and on
+     a cut (settleOpenLine); when the far side's own `done` for that answer
+     still arrives afterwards — the mainland lane's channel came back — it
+     carries the whole transcript, which BEGINS with the words already
+     settled. A new line of it put the answer in the thread twice, the
+     first copy cut short. The same prefix rule as the caller's re-hearing:
+     it replaces the settled line where it stands. */
+  if (update.final && !open && last && last.final && last.role === "assistant" && update.role === "assistant" && update.text && !update.incremental && extendsUtterance(last.text, update.text)) {
+    return [...lines.slice(0, -1), { ...last, text: update.text, ...(update.photos && update.photos.length > 0 && !(last.photos && last.photos.length > 0) ? { photos: update.photos } : {}) }];
+  }
   /* AN EMPTY FINAL WITH NO OPEN TURN IS NOTHING. A repeated `done` after the
      turn has already closed used to open a new, blank, final line — a row
      with no words in the saved conversation. There is no turn for it to

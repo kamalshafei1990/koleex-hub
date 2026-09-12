@@ -47,6 +47,17 @@ export const TRANSCRIPT_PATH = "/api/ai/voice/transcript";
 export const MAX_TURNS_PER_POST = 20;
 /** Consecutive failed posts before this module stops trying for the call. */
 export const MAX_POST_FAILURES = 3;
+/** How long one write may take before it is given up on and queued again.
+ *  A request with no deadline hung the hang-up drain for as long as the
+ *  network cared to (bug hunt, 2026-09-12); the route answers in well under
+ *  a second when it answers at all. */
+export const PERSIST_TIMEOUT_MS = 12_000;
+
+/** The deadline as a fetch option, where the runtime has one; nothing on a
+ *  runtime without it, so the call is exactly what it was. */
+function deadline(): { signal?: AbortSignal } {
+  return typeof AbortSignal !== "undefined" && "timeout" in AbortSignal ? { signal: AbortSignal.timeout(PERSIST_TIMEOUT_MS) } : {};
+}
 
 export type SavedTurn = {
   id: string;
@@ -73,7 +84,7 @@ export type PersistDeps = {
 type Turn = { role: "user" | "assistant"; text: string; via: "voice" | "text" };
 /** What was written for a line, by its index: the words the server holds,
  *  the row's id once the echo names it, and newer words waiting to go. */
-type Written = { text: string; id: string | null; dirty: string | null };
+type Written = { text: string; id: string | null; dirty: string | null; role: "user" | "assistant"; itemId?: string };
 
 export class TranscriptPersister {
   private settledCount = 0;
@@ -98,6 +109,15 @@ export class TranscriptPersister {
   /** How many turns are waiting to be written. For the suite. */
   pending(): number {
     return this.queue.length;
+  }
+
+  /** How many lines of the transcript this writer has taken as settled —
+   *  the count the NEXT writer of the same call starts from (a resume, a
+   *  voice switch). Counting finals from the list instead undercounted when
+   *  an unfinished line sat behind the conversation, and the new writer
+   *  posted the turn after it a second time (the 05:36 duplicate, 2026-09-12). */
+  settled(): number {
+    return this.settledCount;
   }
 
   /** How many saved lines hold newer words than the server. For the suite. */
@@ -159,7 +179,7 @@ export class TranscriptPersister {
       const text = this.textOf(line);
       /* An empty final — a turn the vendor closed with no words — is counted
          as seen and not sent: the route refuses empty content, rightly. */
-      this.written[i] = text ? { text, id: null, dirty: null } : null;
+      this.written[i] = text ? { text, id: null, dirty: null, role: line.role, ...(line.itemId ? { itemId: line.itemId } : {}) } : null;
       if (text) this.queue.push({ role: line.role, text, via: line.via ?? "voice", index: i });
     }
     if (settled > this.settledCount) this.settledCount = settled;
@@ -167,10 +187,21 @@ export class TranscriptPersister {
        heard again (events.ts, the item rule) — is corrected, once its row
        has an id. Only lines this persister wrote: the ones a resume seeded
        as already settled belong to the writer before it. */
-    for (let i = 0; i < Math.min(this.settledCount, lines.length, this.written.length); i++) {
+    /* BY THE LINE, NOT THE SLOT (bug hunt, 2026-09-12). A withdrawn caller
+       line (a re-hearing that was only noise) or a dropped empty line shifts
+       every index after it, and a slot-keyed comparison then found "newer
+       words" that were another turn entirely and PATCHED them over the row.
+       A written line that had an item id is found again by that id; a line
+       without one is only compared with a line of the same speaker in the
+       same slot; anything else is left as it was written. */
+    for (let i = 0; i < Math.min(this.settledCount, this.written.length); i++) {
       const w = this.written[i];
       if (!w) continue;
-      const text = this.textOf(lines[i]);
+      const line = w.itemId
+        ? lines.find((l) => l.itemId === w.itemId && l.role === w.role)
+        : lines[i] && lines[i].role === w.role && !lines[i].itemId ? lines[i] : undefined;
+      if (!line) continue;
+      const text = this.textOf(line);
       if (!text || text === w.text) {
         w.dirty = null;
         continue;
@@ -229,6 +260,7 @@ export class TranscriptPersister {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ conversation_id: this.conversationId, message_id: w.id, text }),
         keepalive,
+        ...deadline(),
       });
     } catch {
       this.noteFailure();
@@ -254,6 +286,7 @@ export class TranscriptPersister {
       w.dirty = null;
       return;
     }
+    if (res.status === 429) return this.noteBusy();
     this.noteFailure();
   }
 
@@ -279,6 +312,7 @@ export class TranscriptPersister {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ conversation_id: this.conversationId, turns: batch.map(({ role, text, via }) => ({ role, text, via })) }),
         keepalive,
+        ...deadline(),
       });
     } catch {
       this.queue.unshift(...batch);
@@ -323,6 +357,7 @@ export class TranscriptPersister {
     if (res.status === 400) return;
 
     this.queue.unshift(...batch);
+    if (res.status === 429) return this.noteBusy();
     this.noteFailure();
   }
 
@@ -330,6 +365,14 @@ export class TranscriptPersister {
     this.lastPostOk = false;
     this.failures++;
     if (this.failures >= MAX_POST_FAILURES) this.giveUp("failed");
+  }
+
+  /** The server asked for a moment (429). Not a strike: three of those in a
+   *  busy minute ended a call's persistence for good, and the turns after
+   *  were lost (bug hunt, 2026-09-12). The next settled turn or the hang-up
+   *  drain tries again, as after any failure. */
+  private noteBusy(): void {
+    this.lastPostOk = false;
   }
 
   private giveUp(reason: PersistFailure): void {

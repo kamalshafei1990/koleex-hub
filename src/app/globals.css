@@ -2400,7 +2400,8 @@ html[data-kx-tabslide] #main-scroll-container { overflow-x: clip; }
    composer buttons, the sidebar rows and the prompt tiles with nothing to
    show for it; the call screen already draws this ring on its own controls
    (audit, 2026-09-11). Inputs keep their border focus. */
-.kx-ai-root :is(button, [role="button"], a[href]):focus-visible {
+.kx-ai-root :is(button, [role="button"], a[href]):focus-visible,
+.kx-call-root :is(button, [role="button"], a[href]):focus-visible {
   outline: 2px solid #0066FF;
   outline-offset: 2px;
 }

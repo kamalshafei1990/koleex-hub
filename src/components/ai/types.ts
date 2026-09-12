@@ -30,6 +30,11 @@ export interface ChatMsg {
    *  renders the tool-call / tool-result chips inline. Not persisted;
    *  audit table is the permanent record. */
   steps?: AgentStep[];
+  /** The caller pressed Stop while this reply was streaming: what is here is
+   *  the part that arrived, not the answer. Browser-only, never persisted;
+   *  the bubble wears a small "Stopped" mark so it is never mistaken for a
+   *  complete reply later (UI review, 2026-09-12). */
+  stopped?: boolean;
   /** Which channel the message came through. Absent on rows written before
    *  the column existed and on optimistic bubbles — both mean typed. A
    *  `voice` row was spoken on a call and relayed by the browser; the bubble
