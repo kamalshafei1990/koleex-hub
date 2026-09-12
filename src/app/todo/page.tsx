@@ -63,7 +63,7 @@ import { fetchProjects } from "@/lib/projects";
 import type {
   TodoWithRelations, TodoAssigneeInfo, TodoLabelRow, TodoPriority, TodoMetadata, TodoChecklistItem, TodoStatus, TodoRecurrence,
 } from "@/types/supabase";
-import { getCurrentAccountIdSync } from "@/lib/identity";
+import { useCurrentAccountId } from "@/lib/identity";
 import { usePermissions } from "@/lib/permissions";
 import { loadScopeContext, type ScopeContext } from "@/lib/scope";
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
@@ -442,7 +442,7 @@ function TaskModal({ open, editEntry, employees, departments, labels, onClose, o
   const [showExtras, setShowExtras] = useState(false);
   const [projects, setProjects] = useState<{ id: string; name: string }[]>([]);
   const inputRef = useRef<HTMLInputElement>(null);
-  const accountId = getCurrentAccountIdSync();
+  const accountId = useCurrentAccountId();
 
   /* Active projects for the optional "Related project" link. fetchProjects
      returns [] when the user lacks Projects access, which hides the field. */
@@ -1546,7 +1546,7 @@ export default function TodoPage() {
   const [employees, setEmployees] = useState<TodoAssigneeInfo[]>(snap?.employees ?? []);
   const [departments, setDepartments] = useState<string[]>(snap?.departments ?? []);
   const [labels, setLabels] = useState<TodoLabelRow[]>(snap?.labels ?? []);
-  const accountId = getCurrentAccountIdSync();
+  const accountId = useCurrentAccountId();
   const [scopeCtx, setScopeCtx] = useState<ScopeContext | null>(null);
   /* Super-admin audience lens: "own" (default — SA sees THEIR tasks like any
      user), "all" (every task in the tenant), or an account_id (that user's
