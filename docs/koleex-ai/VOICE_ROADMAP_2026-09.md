@@ -826,7 +826,7 @@ family first; the owner then chose the public-domain **glass** cue set
 - Settings → Sounds gains a "Koleex AI" card and one card per group: tap a
   name to hear it, the switch keeps or silences the moment.
 - Provenance: `public/sounds/ai/NOTICE.txt` (CC0 1.0, original cue names).
-- Still to pick (the owner marked "change" on the page): hold-to-talk
-  start, thinking, pictures shown, summary written, back online, dictation
-  sent, approval needed — shipped with a second candidate each; the
-  settings screen previews them.
+- Round two (the seven the owner marked "change"): hold-to-talk start → hover,
+  thinking → streaming, pictures shown → expand, summary written → checkout,
+  back online → redo, dictation sent → check, approval needed →
+  double-click. All thirty are the owner's picks now.
