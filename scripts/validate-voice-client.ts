@@ -4083,6 +4083,53 @@ console.log("\n── 41. bug hunt: resume count, a busy server, corrections by 
     check("a fast lane that returned nothing at all is null, never an empty reply", /fastReply = \(out\.response\.content \|\| accumulated\) \|\| null;/.test(route) && !/fastReply = out\.response\.content \|\| accumulated;/.test(route));
   }
 }
+/* ── 42. THE SOUND FAMILY (owner, 2026-09-12): one grammar, quiet, short, three languages ── */
+console.log("\n── 42. the sound catalog: one family, pinned grammar, the call's own cues kept ──");
+{
+  const cat = await import("../src/lib/sounds/catalog");
+  const tn = await import("../src/lib/voice/tones");
+  const keys = cat.SOUND_CATALOG.map((s) => s.key);
+  check("every key is unique and every cue is under the family's ceiling",
+    new Set(keys).size === keys.length && keys.length >= 30 &&
+    cat.SOUND_CATALOG.every((s) => cat.soundLength(s.notes) <= cat.SOUND_MAX_SECONDS && s.notes.length > 0));
+  check("every cue is named and described in all three product languages",
+    cat.SOUND_CATALOG.every((s) => (["en", "zh", "ar"] as const).every((l) => s.label[l].trim().length > 0 && s.when[l].trim().length > 0)));
+  const dir = (k: (typeof keys)[number]) => cat.soundDirection(cat.soundByKey(k).notes);
+  check("rising means begun or yours: ready, recovered, back online, done, summary, unmute, sent",
+    (["call-ready", "call-recovered", "back-online", "action-done", "summary-ready", "mic-unmute", "message-sent", "ptt-start", "dictation-start"] as const).every((k) => dir(k) === "rising"));
+  check("falling means ended or taken away: ended, failed, cancelled, deleted, mute, released",
+    (["call-end", "call-failed", "action-cancelled", "deleted", "mic-mute", "ptt-stop", "dictation-stop", "call-reconnecting"] as const).every((k) => dir(k) === "falling"));
+  check("attention cues are low and doubled with a little edge: error, denied, failed, cut off",
+    (["error", "action-denied", "call-failed", "call-interrupted"] as const).every((k) => {
+      const n = cat.soundByKey(k).notes;
+      return n.length === 2 && n.every((x) => x.wave === "triangle" && x.freq <= 1400);
+    }));
+  check("the thinking tick sits well under the assistant's voice and is off by default; copied is a single tick",
+    cat.soundByKey("thinking").notes.length === 1 && (cat.soundByKey("thinking").notes[0].level ?? 1) <= 0.4 && !cat.soundByKey("thinking").defaultOn &&
+    cat.soundByKey("copied").notes.length === 1 && cat.soundLength(cat.soundByKey("copied").notes) <= 0.05);
+  check("the call keeps the cues the owner already approved, note for note",
+    cat.soundByKey("call-ready").notes === tn.READY_TONE && cat.soundByKey("call-recovered").notes === tn.RECOVERED_TONE);
+  check("the per-turn cues of a typed chat start OFF; the ones that mark a state change start on",
+    !cat.soundByKey("message-sent").defaultOn && !cat.soundByKey("reply-received").defaultOn && cat.soundByKey("error").defaultOn && cat.soundByKey("call-ready").defaultOn);
+  {
+    /* scheduleTone honours the two new fields and defaults them away. */
+    const made: Array<{ type: string; peak: number }> = [];
+    const fake = {
+      currentTime: 0, destination: {},
+      createOscillator: () => { const o = { type: "sine", frequency: { setValueAtTime() {}, linearRampToValueAtTime() {} }, connect() {}, start() {}, stop() {} }; made.push({ type: "", peak: 0 }); const slot = made[made.length - 1]; return new Proxy(o, { set(t, k, v) { if (k === "type") slot.type = String(v); (t as Record<string | symbol, unknown>)[k] = v; return true; } }); },
+      createGain: () => ({ gain: { setValueAtTime(v: number) { const slot = made[made.length - 1]; if (v > slot.peak) slot.peak = v; }, linearRampToValueAtTime(v: number) { const slot = made[made.length - 1]; if (v > slot.peak) slot.peak = v; } }, connect() {} }),
+    };
+    tn.scheduleTone(fake as unknown as Parameters<typeof tn.scheduleTone>[0], [{ freq: 440, at: 0, dur: 0.1 }, { freq: 440, at: 0.2, dur: 0.1, wave: "triangle", level: 0.5 }]);
+    check("the scheduler plays a plain note as a sine at the family gain, and a marked note with its wave and level",
+      made.length === 2 && made[0].type === "sine" && Math.abs(made[0].peak - tn.TONE_GAIN) < 1e-9 && made[1].type === "triangle" && Math.abs(made[1].peak - tn.TONE_GAIN * 0.5) < 1e-9);
+  }
+  const fsF = await import("node:fs");
+  const gen = fsF.readFileSync("scripts/sounds-preview.ts", "utf8");
+  check("the preview page is generated from the catalog and carries the app's own scheduler and gain",
+    /import \{ SOUND_CATALOG, SOUND_MAX_SECONDS, soundLength \} from "\.\.\/src\/lib\/sounds\/catalog";/.test(gen) &&
+    /const BASE_GAIN = \$\{TONE_GAIN\};/.test(gen) && /g\.gain\.linearRampToValueAtTime\(peak, start \+ RAMP\);/.test(gen) &&
+    /"sounds:preview": "tsx scripts\/sounds-preview\.ts"/.test(fsF.readFileSync("package.json", "utf8")));
+}
 console.log(`\n${pass} passed, ${failures.length} failed`);
   if (failures.length) {
     console.log("\nFAILED:");
