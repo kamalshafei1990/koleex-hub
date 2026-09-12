@@ -180,7 +180,12 @@ export function createRelay() {
     });
   });
 
-  http.listen(PORT, () => log(`listening port=${PORT} upstream=${new URL(UPSTREAM_URL).host} configured=${Boolean(SECRET)}`));
+  /* The region is in the first line so the deploy log answers "where is it
+     running" without a dashboard: on 2026-09-12 the service was found in
+     Amsterdam while the notes said Singapore, and nothing in the logs had
+     said so for four days. Railway sets RAILWAY_REPLICA_REGION on each
+     instance. */
+  http.listen(PORT, () => log(`listening port=${PORT} upstream=${new URL(UPSTREAM_URL).host} configured=${Boolean(SECRET)} region=${process.env.RAILWAY_REPLICA_REGION || "unknown"}`));
   return http;
 }
 

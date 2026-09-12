@@ -3,13 +3,18 @@
 The socket lane's vendor connection, carried through Koleex's own domain.
 See the header of `server.mjs` for why it exists and what it refuses.
 
-Runs on Railway in **Singapore** (`asia-southeast1-eqsg3a`), pinned by
-`railway.json` — the dashboard had the service in Amsterdam (`ams`) until
-2026-09-12, so every audio frame of a socket-lane call from China crossed to
-Europe and back before it reached the vendor; the owner's "the voice still has
-a glitch" call of 04:14 UTC ran that path. Config in code overrides the
-dashboard on each deployment, so the region cannot drift again without a
-commit here. Environment:
+Must run on Railway in **Singapore** (`asia-southeast1-eqsg3a`). On
+2026-09-12 the service was found in Amsterdam (`ams`): every audio frame of a
+socket-lane call from China crossed to Europe and back before it reached the
+vendor, and the owner's "the voice still has a glitch" call of 04:14 UTC ran
+that path. `railway.json` names the Singapore region, but the deployment of
+04:34 UTC still reported the dashboard's `ams` — Railway's config-as-code is
+deprecated and did not visibly override the region — so the region was also
+changed on the service itself (staged 04:52 UTC; committing a staged change
+needs the owner's two-factor approval in the dashboard). The deploy log's
+first line prints `region=` (`RAILWAY_REPLICA_REGION`): read it after every
+deployment; `asia-southeast1-eqsg3a` is the only acceptable value.
+Environment:
 
 | Variable | Meaning |
 | --- | --- |
