@@ -2,11 +2,13 @@
    sounds/catalog — every sound Koleex AI makes about itself, as notes.
 
    THE OWNER'S ASK (2026-09-12): "a sound system for the Koleex AI app —
-   connected sound, cancel sound, error sound, thinking sound". He chose
-   synthesis over files: nothing to download, nothing that can 404, nothing
-   a slow link in mainland China can delay past the moment it is for, and
-   no licence to anyone else's recording. The call already works this way
-   (voice/tones.ts); this is that idea for the whole app.
+   connected sound, cancel sound, error sound, thinking sound". He listened
+   to a synthesised family first, then chose the public-domain "glass" cue
+   set (CC0; public/sounds/ai/NOTICE.txt) and picked a cue per moment. Each
+   entry names its recorded FILE, served from this app's own origin so it
+   works from mainland China with nothing external; the synthesised NOTES
+   stay as the fallback for an engine or a file that is not there, and as
+   the way a test can pin the grammar without audio.
 
    ONE FAMILY. Every cue is a few short sine notes on the same scale, quiet,
    under half a second, with the same fades — so they sound like one product
@@ -71,6 +73,11 @@ export type SoundDef = {
   label: { en: string; zh: string; ar: string };
   /** When it plays, for the preview page and the settings sheet. */
   when: { en: string; zh: string; ar: string };
+  /** The recorded cue, as a basename under /sounds/ai (no extension): the
+   *  owner's pick from the public-domain glass set (public/sounds/ai/NOTICE.txt).
+   *  The notes below are the FALLBACK for an engine or a file that is not
+   *  there — never a second sound on top. */
+  file: string;
   notes: readonly ToneNote[];
   /** Whether the default is ON. A cue that would fire on every turn of a
    *  conversation (thinking, sent, received) starts off; the owner decides. */
@@ -97,6 +104,7 @@ export const SOUND_CATALOG: readonly SoundDef[] = [
   /* ── The call ─────────────────────────────────────────────────────── */
   {
     key: "call-dialing",
+    file: "call-dialing",
     group: "call",
     label: { en: "Dialling", zh: "拨号中", ar: "بيتصل" },
     when: { en: "The moment you tap to start a call", zh: "点按开始通话的那一刻", ar: "أول ما تدوس عشان تبدأ المكالمة" },
@@ -109,6 +117,7 @@ export const SOUND_CATALOG: readonly SoundDef[] = [
   },
   {
     key: "call-ready",
+    file: "call-ready",
     group: "call",
     label: { en: "Ready to hear you", zh: "可以说话了", ar: "جاهز يسمعك" },
     when: { en: "The call is up and listening", zh: "通话已接通并在聆听", ar: "المكالمة اتوصلت وبيسمعك" },
@@ -117,6 +126,7 @@ export const SOUND_CATALOG: readonly SoundDef[] = [
   },
   {
     key: "call-reconnecting",
+    file: "call-reconnecting",
     group: "call",
     label: { en: "Line dropped, reconnecting", zh: "线路中断，重连中", ar: "الخط وقع وبيحاول يرجع" },
     when: { en: "The connection was lost and is being redialled", zh: "连接丢失，正在重新拨号", ar: "الاتصال اتقطع وبيعيد الاتصال" },
@@ -126,6 +136,7 @@ export const SOUND_CATALOG: readonly SoundDef[] = [
   },
   {
     key: "call-recovered",
+    file: "call-recovered",
     group: "call",
     label: { en: "Line is back", zh: "线路恢复", ar: "الخط رجع" },
     when: { en: "The dropped connection came back", zh: "中断的连接已恢复", ar: "الاتصال اللي وقع رجع تاني" },
@@ -134,6 +145,7 @@ export const SOUND_CATALOG: readonly SoundDef[] = [
   },
   {
     key: "call-failed",
+    file: "call-failed",
     group: "call",
     label: { en: "Call failed", zh: "通话失败", ar: "المكالمة فشلت" },
     when: { en: "The call could not start or could not be recovered", zh: "通话无法开始或无法恢复", ar: "المكالمة ما قدرتش تبدأ أو ما رجعتش" },
@@ -146,6 +158,7 @@ export const SOUND_CATALOG: readonly SoundDef[] = [
   },
   {
     key: "call-end",
+    file: "call-end",
     group: "call",
     label: { en: "Call ended", zh: "通话结束", ar: "المكالمة خلصت" },
     when: { en: "You ended the call", zh: "你结束了通话", ar: "أنت قفلت المكالمة" },
@@ -159,6 +172,7 @@ export const SOUND_CATALOG: readonly SoundDef[] = [
   },
   {
     key: "mic-mute",
+    file: "mic-mute",
     group: "call",
     label: { en: "Microphone off", zh: "麦克风关闭", ar: "المايك اتقفل" },
     when: { en: "You muted yourself on a call", zh: "你在通话中静音", ar: "كتمت المايك أثناء المكالمة" },
@@ -167,6 +181,7 @@ export const SOUND_CATALOG: readonly SoundDef[] = [
   },
   {
     key: "mic-unmute",
+    file: "mic-unmute",
     group: "call",
     label: { en: "Microphone on", zh: "麦克风开启", ar: "المايك اتفتح" },
     when: { en: "You unmuted yourself", zh: "你取消了静音", ar: "فتحت المايك تاني" },
@@ -175,6 +190,7 @@ export const SOUND_CATALOG: readonly SoundDef[] = [
   },
   {
     key: "ptt-start",
+    file: "ptt-start",
     group: "call",
     label: { en: "Hold to talk: listening", zh: "按住说话：聆听中", ar: "اضغط وتكلم: بيسمعك" },
     when: { en: "You pressed and held the talk button", zh: "你按住了说话按钮", ar: "ضغطت مطوّل على زرار الكلام" },
@@ -183,6 +199,7 @@ export const SOUND_CATALOG: readonly SoundDef[] = [
   },
   {
     key: "ptt-stop",
+    file: "ptt-stop",
     group: "call",
     label: { en: "Hold to talk: released", zh: "按住说话：已松开", ar: "اضغط وتكلم: سيبت الزرار" },
     when: { en: "You let go of the talk button", zh: "你松开了说话按钮", ar: "سيبت زرار الكلام" },
@@ -191,6 +208,7 @@ export const SOUND_CATALOG: readonly SoundDef[] = [
   },
   {
     key: "thinking",
+    file: "thinking",
     group: "call",
     label: { en: "Thinking", zh: "思考中", ar: "بيفكّر" },
     when: { en: "Koleex AI took your question and is working on it (once, not a loop)", zh: "Koleex AI 收到问题正在处理（只响一次）", ar: "Koleex AI أخد سؤالك وبيشتغل عليه (مرة واحدة، مش لوب)" },
@@ -200,6 +218,7 @@ export const SOUND_CATALOG: readonly SoundDef[] = [
   },
   {
     key: "pictures-shown",
+    file: "pictures-shown",
     group: "call",
     label: { en: "Pictures on screen", zh: "图片已显示", ar: "الصور ظهرت" },
     when: { en: "Product pictures appeared during the call", zh: "通话中出现了产品图片", ar: "صور المنتج ظهرت على الشاشة أثناء المكالمة" },
@@ -211,6 +230,7 @@ export const SOUND_CATALOG: readonly SoundDef[] = [
   },
   {
     key: "voice-switched",
+    file: "voice-switched",
     group: "call",
     label: { en: "Voice or line changed", zh: "音色或线路已更改", ar: "الصوت أو الخط اتغير" },
     when: { en: "You switched the voice or the line mid-call", zh: "你在通话中切换了音色或线路", ar: "غيّرت الصوت أو الخط أثناء المكالمة" },
@@ -223,6 +243,7 @@ export const SOUND_CATALOG: readonly SoundDef[] = [
   },
   {
     key: "call-interrupted",
+    file: "call-interrupted",
     group: "call",
     label: { en: "Call was cut off", zh: "通话被中断", ar: "المكالمة اتقطعت من الجهاز" },
     when: { en: "The device killed the call; a 'continue the call' button is offered", zh: "设备中断了通话，并提供“继续通话”按钮", ar: "الجهاز قطع المكالمة وفيه زرار «كمّل المكالمة»" },
@@ -234,6 +255,7 @@ export const SOUND_CATALOG: readonly SoundDef[] = [
   },
   {
     key: "summary-ready",
+    file: "summary-ready",
     group: "call",
     label: { en: "Call summary written", zh: "通话摘要已生成", ar: "ملخص المكالمة اتكتب" },
     when: { en: "The summary of the call landed in the thread", zh: "通话摘要已加入对话", ar: "ملخص المكالمة نزل في الشات" },
@@ -249,6 +271,7 @@ export const SOUND_CATALOG: readonly SoundDef[] = [
   /* ── The typed chat ───────────────────────────────────────────────── */
   {
     key: "message-sent",
+    file: "message-sent",
     group: "chat",
     label: { en: "Message sent", zh: "消息已发送", ar: "الرسالة اتبعتت" },
     when: { en: "You sent a message", zh: "你发送了一条消息", ar: "بعتّ رسالة" },
@@ -257,6 +280,7 @@ export const SOUND_CATALOG: readonly SoundDef[] = [
   },
   {
     key: "reply-received",
+    file: "reply-received",
     group: "chat",
     label: { en: "Reply arrived", zh: "回复已到达", ar: "الرد وصل" },
     when: { en: "Koleex AI finished a reply (useful when the app is not in front of you)", zh: "Koleex AI 完成了回复（当应用不在眼前时有用）", ar: "Koleex AI خلّص الرد (مفيد لو التطبيق مش قدامك)" },
@@ -268,6 +292,7 @@ export const SOUND_CATALOG: readonly SoundDef[] = [
   },
   {
     key: "generation-stopped",
+    file: "generation-stopped",
     group: "chat",
     label: { en: "Stopped", zh: "已停止", ar: "وقّفت الرد" },
     when: { en: "You stopped a reply while it was being written", zh: "你在回复生成中停止了它", ar: "وقّفت الرد وهو بيتكتب" },
@@ -276,6 +301,7 @@ export const SOUND_CATALOG: readonly SoundDef[] = [
   },
   {
     key: "error",
+    file: "error",
     group: "chat",
     label: { en: "Something went wrong", zh: "出错了", ar: "حصل خطأ" },
     when: { en: "A reply failed or the connection was lost", zh: "回复失败或连接丢失", ar: "الرد فشل أو النت اتقطع" },
@@ -287,6 +313,7 @@ export const SOUND_CATALOG: readonly SoundDef[] = [
   },
   {
     key: "back-online",
+    file: "back-online",
     group: "chat",
     label: { en: "Back online", zh: "已恢复在线", ar: "النت رجع" },
     when: { en: "The connection came back", zh: "网络连接已恢复", ar: "الاتصال بالنت رجع" },
@@ -298,6 +325,7 @@ export const SOUND_CATALOG: readonly SoundDef[] = [
   },
   {
     key: "copied",
+    file: "copied",
     group: "chat",
     label: { en: "Copied", zh: "已复制", ar: "اتنسخ" },
     when: { en: "Text was copied to the clipboard", zh: "文字已复制到剪贴板", ar: "النص اتنسخ" },
@@ -306,6 +334,7 @@ export const SOUND_CATALOG: readonly SoundDef[] = [
   },
   {
     key: "attachment-ready",
+    file: "attachment-ready",
     group: "chat",
     label: { en: "File read", zh: "文件已读取", ar: "الملف اتقرا" },
     when: { en: "An attached file was read and is ready", zh: "附件已读取并准备就绪", ar: "الملف المرفق اتقرا وجاهز" },
@@ -317,6 +346,7 @@ export const SOUND_CATALOG: readonly SoundDef[] = [
   },
   {
     key: "attachment-failed",
+    file: "attachment-failed",
     group: "chat",
     label: { en: "File refused", zh: "文件被拒绝", ar: "الملف اترفض" },
     when: { en: "An attached file could not be read", zh: "附件无法读取", ar: "الملف المرفق ما اتقراش" },
@@ -327,6 +357,7 @@ export const SOUND_CATALOG: readonly SoundDef[] = [
   /* ── Dictation in the composer ────────────────────────────────────── */
   {
     key: "dictation-start",
+    file: "dictation-start",
     group: "dictation",
     label: { en: "Dictation started", zh: "开始听写", ar: "الإملاء بدأ" },
     when: { en: "The microphone started listening for dictation", zh: "麦克风开始听写", ar: "المايك بدأ يسمع الإملاء" },
@@ -335,6 +366,7 @@ export const SOUND_CATALOG: readonly SoundDef[] = [
   },
   {
     key: "dictation-stop",
+    file: "dictation-stop",
     group: "dictation",
     label: { en: "Dictation sent", zh: "听写已发送", ar: "الإملاء اتبعت" },
     when: { en: "Dictation ended and the words were sent", zh: "听写结束并已发送", ar: "الإملاء خلص والكلام اتبعت" },
@@ -345,6 +377,7 @@ export const SOUND_CATALOG: readonly SoundDef[] = [
   /* ── Tools and actions ────────────────────────────────────────────── */
   {
     key: "approval-needed",
+    file: "approval-needed",
     group: "actions",
     label: { en: "Your approval is needed", zh: "需要你的确认", ar: "محتاج موافقتك" },
     when: { en: "An action is waiting for your tap to confirm", zh: "一个操作正在等待你确认", ar: "فيه إجراء مستني منك تأكيد" },
@@ -357,6 +390,7 @@ export const SOUND_CATALOG: readonly SoundDef[] = [
   },
   {
     key: "action-done",
+    file: "action-done",
     group: "actions",
     label: { en: "Done", zh: "已完成", ar: "تم" },
     when: { en: "An action was carried out (a quotation created, a task saved)", zh: "操作已完成（报价已创建、任务已保存）", ar: "الإجراء اتنفذ (عرض سعر اتعمل، مهمة اتحفظت)" },
@@ -369,6 +403,7 @@ export const SOUND_CATALOG: readonly SoundDef[] = [
   },
   {
     key: "action-cancelled",
+    file: "action-cancelled",
     group: "actions",
     label: { en: "Cancelled", zh: "已取消", ar: "اتلغى" },
     when: { en: "You cancelled an action before it ran", zh: "你在执行前取消了操作", ar: "لغيت الإجراء قبل ما يتنفذ" },
@@ -377,6 +412,7 @@ export const SOUND_CATALOG: readonly SoundDef[] = [
   },
   {
     key: "action-denied",
+    file: "action-denied",
     group: "actions",
     label: { en: "Not allowed", zh: "不允许", ar: "مش مسموح" },
     when: { en: "The action was refused by your permissions", zh: "操作因权限被拒绝", ar: "الإجراء اترفض بسبب الصلاحيات" },
@@ -390,6 +426,7 @@ export const SOUND_CATALOG: readonly SoundDef[] = [
   /* ── General ──────────────────────────────────────────────────────── */
   {
     key: "deleted",
+    file: "deleted",
     group: "general",
     label: { en: "Deleted", zh: "已删除", ar: "اتمسح" },
     when: { en: "A conversation was deleted", zh: "对话已删除", ar: "المحادثة اتمسحت" },

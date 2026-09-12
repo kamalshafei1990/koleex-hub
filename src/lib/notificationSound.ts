@@ -124,6 +124,11 @@ export interface SoundPrefs {
    *  tone that merely equals an old default is still the default and moves
    *  when the default does (see migrateCallTone). */
   call: { enabled: boolean; tone: SoundTone; chosen?: boolean };
+  /** Koleex AI's own cues (src/lib/sounds/catalog.ts): one switch for all
+   *  of them, and the moments the user silenced one by one. Like the call
+   *  cue, not silenced by do-not-disturb — every one answers something the
+   *  user is doing in the app right now. */
+  ai: { enabled: boolean; muted: string[] };
 }
 
 /** Classify an inbox message into an activity key from its metadata.type
@@ -155,6 +160,7 @@ const DEFAULT_PREFS: SoundPrefs = {
      connected sound to be ping from our sounds". Before it: confirm, then
      arrive, then confirm again. Changeable in Settings. */
   call: { enabled: true, tone: "ping" },
+  ai: { enabled: true, muted: [] },
 };
 
 /** The call tones the defaults used before "ping". A stored copy of one of
@@ -197,6 +203,10 @@ export function getSoundPrefs(): SoundPrefs {
     notification: { ...DEFAULT_PREFS.notification, ...(stored.notification ?? {}) },
     message: { ...DEFAULT_PREFS.message, ...(stored.message ?? {}) },
     call: migrateCallTone({ ...DEFAULT_PREFS.call, ...(stored.call ?? {}) }),
+    ai: {
+      enabled: stored.ai?.enabled ?? DEFAULT_PREFS.ai.enabled,
+      muted: Array.isArray(stored.ai?.muted) ? stored.ai.muted.filter((k): k is string => typeof k === "string") : [],
+    },
   };
   return prefsCache;
 }
@@ -206,6 +216,7 @@ export function setSoundPrefs(patch: {
   notification?: Partial<SoundPrefs["notification"]>;
   message?: Partial<SoundPrefs["message"]>;
   call?: Partial<SoundPrefs["call"]>;
+  ai?: Partial<SoundPrefs["ai"]>;
 }): SoundPrefs {
   const cur = getSoundPrefs();
   const next: SoundPrefs = {
@@ -224,6 +235,7 @@ export function setSoundPrefs(patch: {
     /* A picked tone is marked as such, so a later change of default leaves
        it alone. */
     call: { ...cur.call, ...(patch.call ?? {}), ...(patch.call?.tone !== undefined ? { chosen: true } : {}) },
+    ai: { ...cur.ai, ...(patch.ai ?? {}) },
   };
   prefsCache = next;
   try { localStorage.setItem(PREFS_KEY, JSON.stringify(next)); } catch { /* private mode */ }
@@ -602,6 +614,57 @@ export function playCallSound(): CallSoundOutcome {
   if (!ensureCtx()) return "unavailable";
   playAppSound("call");
   return "played";
+}
+
+/* ── Koleex AI's cues, through the same engine ────────────────────────────
+   src/lib/sounds/player.ts owns WHICH cue plays when; these three are the
+   engine's side: warm a set of files inside a gesture, play one file by
+   its path, and hand out the context for the synthesised fallback. No
+   preference is read here — the player reads them, so the rule "one
+   engine, one prefs store" holds without this module knowing the catalog. */
+
+/** Warm files inside a gesture: create the context and decode each. */
+export function primeSoundFiles(srcs: readonly string[]): void {
+  if (typeof window === "undefined") return;
+  attachUnlockListeners();
+  const ctx = ensureCtx();
+  if (!ctx) return;
+  if (ctx.state === "suspended") void ctx.resume().then(() => { unlocked = true; });
+  for (const src of srcs) void decode(src);
+}
+
+/** Play one file at a volume (the prefs volume when omitted). "played" when
+ *  it went out or is decoding to go out, "unavailable" when there is no
+ *  engine or no gesture yet — the caller may synthesise instead. */
+export function playSoundFile(src: string, volume?: number): "played" | "unavailable" {
+  if (typeof window === "undefined") return "unavailable";
+  if (!unlocked && !audioCtx) {
+    attachUnlockListeners();
+    return "unavailable";
+  }
+  const ctx = ensureCtx();
+  if (!ctx) return "unavailable";
+  const fire = () => {
+    const c = audioCtx;
+    if (!c || c.state !== "running") return;
+    if (!playBufferNow(src, volume)) void decode(src).then(() => playBufferNow(src, volume));
+  };
+  if (ctx.state === "suspended") {
+    void ctx.resume().then(fire);
+    return "played";
+  }
+  if (!buffers.has(src)) {
+    void decode(src).then(fire);
+    return "played";
+  }
+  fire();
+  return "played";
+}
+
+/** The shared context, for a synthesised cue that must play beside the
+ *  files without opening a second context. Null before any gesture. */
+export function soundContext(): AudioContext | null {
+  return audioCtx;
 }
 
 /** Play the classic notification WAV. Prefer playAppSound(category) — this

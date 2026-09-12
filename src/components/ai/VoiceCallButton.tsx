@@ -63,6 +63,7 @@ import {
   readSavedTalkMode, saveTalkMode, type TalkMode,
 } from "@/lib/voice/voice-pref";
 import { requestCallSummary, shouldSummarise } from "@/lib/voice/summary";
+import { playSound, primeSounds } from "@/lib/sounds/player";
 import { sendVoiceTelemetry, flushVoiceTelemetry } from "@/lib/voice/telemetry";
 import { writeCallPulse, clearCallPulse, takeInterruptedCall, browserStorage, CALL_PULSE_EVERY_MS } from "@/lib/voice/call-memory";
 import { probeWsLane } from "@/lib/voice/lane-probe";
@@ -682,12 +683,14 @@ export default function VoiceCallButton({
       const body = res.ok ? ((await res.json()) as { output?: { ok?: boolean } }) : null;
       if (!body?.output?.ok) {
         setWriteError(true);
+        playSound("error");
         return;
       }
       const title = String(pending.args.title ?? "").slice(0, 200);
       session?.sendNote(`(Screen: the caller tapped Confirm — the task "${title}" is saved. Acknowledge in a few words only if they ask.)`);
       setPendingWrite(null);
       setWriteSaved(true);
+      playSound("action-done");
       if (writeSavedTimerRef.current !== null) window.clearTimeout(writeSavedTimerRef.current);
       writeSavedTimerRef.current = window.setTimeout(() => {
         writeSavedTimerRef.current = null;
@@ -705,6 +708,7 @@ export default function VoiceCallButton({
     setPendingWrite(null);
     setWriteError(false);
     if (!pending) return;
+    playSound("action-cancelled");
     /* The preview row simply expires on the server; the model is told so it
        does not keep asking for a confirmation that is not coming. */
     sessionRef.current?.sendNote("(Screen: the caller cancelled the task card. Nothing was saved; drop it without comment.)");
@@ -763,6 +767,7 @@ export default function VoiceCallButton({
        call the caller ENDED, with a real exchange in it — a voice switch
        releases and rebuilds, and a two-second call has nothing to say. */
     beaconHangUp();
+    playSound("call-end");
     const persister = persisterRef.current;
     const conversation = conversationIdRef.current;
     const lines = linesRef.current;
@@ -777,7 +782,11 @@ export default function VoiceCallButton({
       onSummaryPendingRef.current?.(true);
       void Promise.resolve(persister?.finish())
         .then(() => requestCallSummary(conversation, langRef.current))
-        .then((res) => { if (res) onTurnsSavedRef.current?.([res.message], res.conversation); })
+        .then((res) => {
+          if (!res) return;
+          onTurnsSavedRef.current?.([res.message], res.conversation);
+          playSound("summary-ready");
+        })
         .catch(() => { /* a summary that did not come is nothing on screen */ })
         .finally(() => onSummaryPendingRef.current?.(false));
     }
@@ -830,6 +839,11 @@ export default function VoiceCallButton({
     tonesRef.current?.close();
     tonesRef.current = new CallTones();
     tonesRef.current.prime();
+    /* THE CALL'S CUES, warmed in the same tap (sounds/player.ts): the files a
+       call will need are decoded now, so "ready" costs no fetch later. The
+       dialling cue is the tap's own answer; a resume dials quietly. */
+    primeSounds(["call-dialing", "call-ready", "call-reconnecting", "call-recovered", "call-failed", "call-end", "mic-mute", "mic-unmute", "ptt-start", "ptt-stop", "thinking", "pictures-shown", "approval-needed", "action-done", "action-cancelled", "summary-ready", "error"]);
+    if (!opts?.resume) playSound("call-dialing");
 
     /* THE WRITER FOR THIS CALL. `fetch` is wrapped rather than passed: a bare
        reference to window.fetch throws "Illegal invocation" when called off
@@ -884,6 +898,7 @@ export default function VoiceCallButton({
            thread now, so the redialled call's first answer opens a new line
            instead of being glued onto the cut one. */
         if (next === "reconnecting") {
+          playSound("call-reconnecting");
           const cut = settleOpenLine(linesRef.current, "assistant");
           if (cut.length !== linesRef.current.length || cut.some((l, i) => l !== linesRef.current[i])) {
             linesRef.current = cut;
@@ -974,6 +989,7 @@ export default function VoiceCallButton({
              rest. */
           releaseCall();
           setLaneNote(null);
+          playSound("call-failed");
           onErrorRef.current?.(FAILURE_COPY[langRef.current][failure]);
         }
       },
@@ -1037,6 +1053,7 @@ export default function VoiceCallButton({
         setWriteError(false);
         setWriteSaved(false);
         setPendingWrite({ tool: pending.tool, args: pending.args, message });
+        playSound("approval-needed");
       },
       onToolResult: (_name, output) => {
         /* DATA, READ FOR PICTURES AND NOTHING ELSE. https URLs only, capped,
@@ -1046,6 +1063,7 @@ export default function VoiceCallButton({
         const found = extractProductPhotos(output);
         if (found.length === 0) return;
         pendingPhotosRef.current = found;
+        if (found.length > 0) playSound("pictures-shown");
       },
       onToolProtocolMismatch: (eventType) => {
         /* THE ONE PLACE THIS BECOMES VISIBLE. If the vendor names its
@@ -1095,6 +1113,9 @@ export default function VoiceCallButton({
              done. Clearing here rather than on the tool result keeps the
              indicator honest: what ends the wait is the answer being spoken. */
           if (parsed.phase === "speaking") setSearching(false);
+          /* Once, as the far side takes the turn — not on every event of
+             the pause. Off by default; the owner decides. */
+          if (parsed.phase === "thinking" && phaseRef.current !== "thinking") playSound("thinking");
           phaseRef.current = parsed.phase;
           setPhase(parsed.phase);
           onPhaseRef.current?.(parsed.phase);
@@ -1203,13 +1224,17 @@ export default function VoiceCallButton({
   useEffect(() => {
     if (live && ready && !chimedRef.current) {
       chimedRef.current = true;
-      tonesRef.current?.ready();
+      /* The owner's chosen cue (sounds/catalog.ts); the synthesised notes
+         only when there is no engine at all. Silenced is silenced. */
+      if (playSound("call-ready") === "unavailable") tonesRef.current?.ready();
     }
   }, [live, ready]);
   useEffect(() => {
     const prev = prevStateRef.current;
     prevStateRef.current = state;
-    if (prev === "reconnecting" && state === "live") tonesRef.current?.recovered();
+    if (prev === "reconnecting" && state === "live") {
+      if (playSound("call-recovered") === "unavailable") tonesRef.current?.recovered();
+    }
   }, [state]);
   const listening = connected && phase !== "speaking";
   /* ON THE SOCKET LANE NO SECOND CONTEXT TOUCHES THE MICROPHONE: the
@@ -1359,6 +1384,7 @@ export default function VoiceCallButton({
     const next = !session.isMuted();
     session.setMuted(next);
     setMuted(next);
+    playSound(next ? "mic-mute" : "mic-unmute");
   }, []);
 
   /* THE HOLD (roadmap B2). Pressed: the tracks open; released: they close.
@@ -1372,6 +1398,7 @@ export default function VoiceCallButton({
     if (!session || talkModeRef.current !== "hold") return;
     session.setMuted(!held);
     setMuted(!held);
+    playSound(held ? "ptt-start" : "ptt-stop");
   }, []);
 
   /* CHOOSING HOW TO TALK takes effect on the live call at once — no new
@@ -1441,6 +1468,7 @@ export default function VoiceCallButton({
     setVoiceKey(key);
     voiceKeyRef.current = key;
     saveVoiceKey(key);
+    if (sessionRef.current) playSound("voice-switched");
     rebuildCall();
   }, [rebuildCall]);
 
@@ -1496,7 +1524,10 @@ export default function VoiceCallButton({
   useEffect(() => clearHold, [clearHold]);
   const releaseHold = useCallback(() => {
     clearHold();
-    if (heldRef.current) dict.stop();
+    if (heldRef.current) {
+      dict.stop();
+      playSound("dictation-stop");
+    }
   }, [clearHold, dict]);
   const holdHandlers = dictation
     ? {
@@ -1507,6 +1538,7 @@ export default function VoiceCallButton({
           holdTimerRef.current = window.setTimeout(() => {
             holdTimerRef.current = null;
             heldRef.current = true;
+            playSound("dictation-start");
             dict.start();
           }, HOLD_TO_DICTATE_MS);
         },

@@ -806,3 +806,27 @@ client; what each found and what changed, in one PR.
 | Relay: the client address was the first `X-Forwarded-For` hop (spoofable); no cap per ticket; the pending queue unbounded | `services/voice-relay` | Yes — last hop, `MAX_PER_TICKET` 3, `MAX_PENDING_BYTES` 2 MiB; origins env set on Railway (applies on the next deploy) |
 | History reads were not scoped to the tenant; the general lane's web search had no budget | agent route, `search_web` | Yes — tenant predicate on both selects; per-account and per-tenant-day search budgets |
 | UI: Arabic letter-spacing, a #666666 placeholder, physical `left/right` in the lightbox, no focus ring on the call screen, the settings button without a name, spinners under reduced motion, Escape ending the call from the chat view, no mark on a reply the caller stopped, a silent gap before the call summary | chat + call screens | Yes — all applied; "Stopped" mark on a cut-short reply; "Writing the call summary…" row (en/zh/ar) between hang-up and the summary |
+
+## The sound system (2026-09-12)
+
+Owner: "make a sound system for the Koleex AI app — connected, cancel,
+error, thinking". Thirty moments were listed and offered as a synthesised
+family first; the owner then chose the public-domain **glass** cue set
+(UI SFX, CC0 audio) and picked a cue per moment on a listening page.
+
+- `src/lib/sounds/catalog.ts` — the 30 moments, each naming its recording
+  (`/sounds/ai/<moment>.mp3`, served from this origin so it works from
+  mainland China) and keeping synthesised notes as the fallback. Defaults:
+  everything on except message-sent, reply-received, copied (the owner's
+  "no sound") and thinking.
+- `src/lib/sounds/player.ts` — `playSound(key)` through the Hub's one
+  engine (`lib/notificationSound`): master switch, the Koleex AI switch,
+  and per-moment switches (`prefs.ai`), never do-not-disturb; one cue at a
+  time per moment; the notes only when there is no engine.
+- Settings → Sounds gains a "Koleex AI" card and one card per group: tap a
+  name to hear it, the switch keeps or silences the moment.
+- Provenance: `public/sounds/ai/NOTICE.txt` (CC0 1.0, original cue names).
+- Round two (the seven the owner marked "change"): hold-to-talk start → hover,
+  thinking → streaming, pictures shown → expand, summary written → checkout,
+  back online → redo, dictation sent → check, approval needed →
+  double-click. All thirty are the owner's picks now.

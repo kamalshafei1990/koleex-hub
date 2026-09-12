@@ -26,6 +26,7 @@ import dynamic from "next/dynamic";
 import { useInput } from "@/components/kds/useInput";
 import Link from "next/link";
 import { useSkin } from "@/lib/appearance";
+import { playSound } from "@/lib/sounds/player";
 import { useTranslation, type Lang } from "@/lib/i18n";
 import ArrowLeftIcon from "@/components/icons/ui/ArrowLeftIcon";
 import PlusIcon from "@/components/icons/ui/PlusIcon";
@@ -340,8 +341,15 @@ export default function KoleexAiApp() {
      the composer once the network returns — if it is still there unchanged. */
   const [online, setOnline] = useState(true);
   const resendRef = useRef<{ text: string; conversationId: string | null } | null>(null);
+  const onlineRef = useRef(true);
   useEffect(() => {
-    const sync = () => setOnline(typeof navigator === "undefined" || navigator.onLine !== false);
+    const sync = () => {
+      const now = typeof navigator === "undefined" || navigator.onLine !== false;
+      /* The cue is for the RETURN, not the state: once, on the edge. */
+      if (!onlineRef.current && now) playSound("back-online");
+      onlineRef.current = now;
+      setOnline(now);
+    };
     sync();
     window.addEventListener("online", sync);
     window.addEventListener("offline", sync);
@@ -364,6 +372,11 @@ export default function KoleexAiApp() {
     });
   }, []);
   const [error, setError] = useState<string | null>(null);
+  /* One cue per error shown, wherever it was set — a dozen setError sites,
+     one place that sounds. */
+  useEffect(() => {
+    if (error) playSound("error");
+  }, [error]);
   /* A LIVE CALL OWNS THE SCREEN, AND THE PAGE BEHIND IT GOES QUIET (twice
      on 2026-09-11 the phone killed this page during a call, both times a
      second after an answer with pictures landed in the thread behind the
@@ -833,6 +846,7 @@ export default function KoleexAiApp() {
 
   const onVoiceInterrupted = useCallback((resume: () => void, conversation: string | null) => {
     setInterruptedCall({ resume, conversation });
+    playSound("call-interrupted");
   }, []);
   const continueInterruptedCall = useCallback(async () => {
     const it = interruptedCall;
@@ -870,6 +884,7 @@ export default function KoleexAiApp() {
          Send click / Enter press can't slip past the state check. */
       if (sendingRef.current) return;
       sendingRef.current = true;
+      playSound("message-sent");
       setSending(true);
       /* New turn cancels any in-flight TTS so audio never stacks. */
       stopTts();
@@ -1065,6 +1080,7 @@ export default function KoleexAiApp() {
         }
         setAttachStatus(null);
         setAttachReading(false);
+        if (!aborter.signal.aborted) playSound(failure !== null || attachPayload.length === 0 ? "attachment-failed" : "attachment-ready");
         if (failure !== null || attachPayload.length === 0 || aborter.signal.aborted) {
           setMessages((prev) => prev.filter((m) => m.id !== optimistic.id && m.id !== placeholderId));
           /* Back into THIS chat's composer only — the user may have moved
@@ -1414,6 +1430,7 @@ export default function KoleexAiApp() {
    *  already streamed in stays on screen; the placeholder with
    *  no content gets dropped (see catch block in send). */
   const handleStop = useCallback(() => {
+    if (abortRef.current) playSound("generation-stopped");
     abortRef.current?.abort();
   }, []);
 
@@ -1460,6 +1477,7 @@ export default function KoleexAiApp() {
    *       checkmark still appears for the user. */
   const handleCopy = useCallback(async (content: string, renderedEl?: HTMLElement | null): Promise<boolean> => {
     if (!content) return false;
+    playSound("copied");
     /* Never put raw markdown on the clipboard — pasting `**bold**` and
        `| table |` soup anywhere was the whole complaint. Plain flavor =
        organized text; rich flavor = the bubble's own rendered HTML, so
@@ -1634,6 +1652,7 @@ export default function KoleexAiApp() {
       return;
     }
     setConversations((prev) => prev.filter((c) => c.id !== id));
+    playSound("deleted");
     if (activeId === id) {
       /* A reply still streaming into a chat that no longer exists would
          leave the welcome screen stuck on "sending" (audit, 2026-09-07). */
@@ -2076,9 +2095,12 @@ export default function KoleexAiApp() {
   useEffect(() => {
     if (prevSendingRef.current && !sending) {
       setOrbPulse(error ? "error" : "success");
+      /* A reply that arrived whole. Not one the caller stopped, and not a
+         failure — the error cue already spoke for that. Off by default. */
+      if (!error && !(lastMsg?.role === "assistant" && lastMsg.stopped)) playSound("reply-received");
     }
     prevSendingRef.current = sending;
-  }, [sending, error]);
+  }, [sending, error, lastMsg]);
   useEffect(() => {
     if (!orbPulse) return;
     const t = setTimeout(() => setOrbPulse(null), 1500);
