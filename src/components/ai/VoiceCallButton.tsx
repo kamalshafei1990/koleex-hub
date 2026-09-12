@@ -55,6 +55,7 @@ import {
 import { extractProductPhotos, type ProductPhoto } from "@/lib/voice/photos";
 import { useStreamLevel } from "@/lib/voice/useStreamLevel";
 import { useSessionLevels } from "@/lib/voice/useSessionLevels";
+import { useReceiverLevel } from "@/lib/voice/useReceiverLevel";
 import { CallTones } from "@/lib/voice/tones";
 import { pickSttLang, readSavedSttLang, saveSttLang, learnSttLang, type SttLang } from "@/lib/voice/stt-lang";
 import {
@@ -318,7 +319,9 @@ export default function VoiceCallButton({
   /* Kept in state rather than a ref: the meter hook takes the stream as a
      dependency, so it must re-run when one arrives. */
   const [micStream, setMicStream] = useState<MediaStream | null>(null);
-  const [farStream, setFarStream] = useState<MediaStream | null>(null);
+  /* Held for the element's lifecycle only: the far meter no longer reads
+     the stream (useReceiverLevel), so nothing renders from this value. */
+  const [, setFarStream] = useState<MediaStream | null>(null);
   /* The catalogue, as the server describes it: keys and labels, never vendor
      ids. Empty until fetched, and empty forever if the owner configured none —
      in which case no picker is drawn and the vendor's default voice is used. */
@@ -1157,7 +1160,11 @@ export default function VoiceCallButton({
      call's own audio (useSessionLevels / ws-audio.ts). */
   const wsLane = laneState === "ws";
   const micLevelRtc = useStreamLevel(wsLane ? null : micStream, listening);
-  const farLevelRtc = useStreamLevel(wsLane ? null : farStream, connected && phase === "speaking");
+  /* THE ASSISTANT'S VOICE IS NEVER TAPPED BY A SECOND CONTEXT (2026-09-12,
+     "pulses" while it talks): on the mainland lane its level comes from the
+     WebRTC receiver's own reading, so only the audio element touches the
+     remote track. See useReceiverLevel.ts. */
+  const farLevelRtc = useReceiverLevel(sessionRef, !wsLane && connected && phase === "speaking");
   const wsLevels = useSessionLevels(sessionRef, wsLane && connected);
   const micLevel = wsLane ? wsLevels.mic : micLevelRtc;
   const farLevel = wsLane ? wsLevels.far : farLevelRtc;

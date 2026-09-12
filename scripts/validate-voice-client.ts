@@ -3432,9 +3432,18 @@ function describeErrorCheck(): boolean {
   check("  …the stream meter shares the arithmetic and no longer carries its own copy", /const next = rmsLevel\(buf\);/.test(hook) && !/DISPLAY_GAIN = 2\.8/.test(hook));
   const btn = readFileSync("src/components/ai/VoiceCallButton.tsx", "utf8");
   check("the button gives the stream meters NO stream on the socket lane and reads the session's levels instead; the lane is state set when the call starts",
-    /const micLevelRtc = useStreamLevel\(wsLane \? null : micStream, listening\);/.test(btn) && /const farLevelRtc = useStreamLevel\(wsLane \? null : farStream, connected && phase === "speaking"\);/.test(btn) &&
+    /const micLevelRtc = useStreamLevel\(wsLane \? null : micStream, listening\);/.test(btn) && /const farLevelRtc = useReceiverLevel\(sessionRef, !wsLane && connected && phase === "speaking"\);/.test(btn) &&
     /const wsLevels = useSessionLevels\(sessionRef, wsLane && connected\);/.test(btn) && /const micLevel = wsLane \? wsLevels\.mic : micLevelRtc;/.test(btn) &&
     /if \(sessionRef\.current\) return;\s*setLaneState\(transportRef\.current\);/.test(btn));
+  /* 2026-09-12, "pulses while Koleex AI talks": the assistant's remote track
+     is never tapped by a second AudioContext any more — its level comes from
+     the receiver. */
+  const rl = readFileSync("src/lib/voice/useReceiverLevel.ts", "utf8");
+  check("the far meter on the mainland lane reads the receiver, opens no AudioContext over the remote stream, and tells React only when it moved",
+    !/useStreamLevel\(wsLane \? null : farStream/.test(btn) && /sessionRef\.current\?\.farLevel\(\)/.test(rl) && !/new (Ctor|AudioContext)\(/.test(rl) && /LEVEL_EPSILON/.test(rl) && /if \(!active\) return;/.test(rl));
+  const sessRl = readFileSync("src/lib/voice/session.ts", "utf8");
+  check("  …the session reads the level from the receiver's own synchronization sources, clamped, null without a peer",
+    /farLevel\(\): number \| null \{/.test(sessRl) && /getSynchronizationSources\?\.\(\)/.test(sessRl) && /Math\.min\(1, Math\.max\(0, level\)\)/.test(sessRl));
   const sl = readFileSync("src/lib/voice/useSessionLevels.ts", "utf8");
   check("  …the session-levels hook polls once a frame, only while active, and tells React only when a level moved", /requestAnimationFrame\(tick\)/.test(sl) && /if \(!active\) return;/.test(sl) && /LEVEL_EPSILON/.test(sl) && !/new (Ctor|AudioContext)\(/.test(sl));
 }
@@ -3623,6 +3632,30 @@ function describeErrorCheck(): boolean {
     threw = e instanceof Error ? `${e.name}: ${e.message}` : String(e);
   }
   check("the factory is built against a destination that REFUSES connect, as a browser's does — and does not throw", threw === "" && built !== null);
+  /* 2026-09-12, "pulses while Koleex AI talks": the context is asked for at
+     the wire's rate so the far side's frames are not each resampled on
+     their own; an engine that refuses the option gets the default. */
+  {
+    const waSrc = (await import("node:fs")).readFileSync("src/lib/voice/ws-audio.ts", "utf8");
+    check("the context runs at the wire's rate, with the default as the fallback",
+      /ctx = new Ctx\(\{ sampleRate: wireRate \}\);\s*\} catch \{\s*ctx = new Ctx\(\);/.test(waSrc));
+    class RefusingCtx extends FakeCtx {
+      constructor(opts?: unknown) {
+        super();
+        if (opts) throw new TypeError("sampleRate not supported");
+      }
+    }
+    g.window = { AudioContext: RefusingCtx };
+    let fell: ReturnType<typeof createBrowserWsAudio> | null = null;
+    try {
+      fell = createBrowserWsAudio(24_000);
+    } catch {
+      fell = null;
+    }
+    check("  …an engine that throws on the option still yields a working player", fell !== null && fell.stats().rate === 48_000);
+    fell?.close();
+    g.window = { AudioContext: FakeCtx };
+  }
   check("  …the far bus feeds the destination and the meter; nothing is connected FROM the destination",
     connections.some(([f, t]) => f === "gain" && t === "streamDestination") && connections.some(([f, t]) => f === "gain" && t === "analyser") && !connections.some(([f]) => f === "streamDestination"));
   if (built) {

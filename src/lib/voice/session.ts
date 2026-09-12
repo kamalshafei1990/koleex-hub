@@ -770,6 +770,32 @@ export class VoiceSession {
   }
 
   /** States and counts only — what a log line needs to explain a failure. */
+  /** THE FAR SIDE'S LEVEL ON THE MAINLAND LANE, from the receiver itself
+   *  (2026-09-12: "when Koleex AI talks I hear pulses"). The orb used to
+   *  measure the assistant's voice by running the remote stream through a
+   *  second AudioContext beside the element playing it — on Safari a remote
+   *  WebRTC track tapped by WebAudio while an element plays it is a known
+   *  source of clicks and garbling in the played audio itself. The receiver
+   *  reports the level the engine already computed for its own RTP
+   *  (getSynchronizationSources().audioLevel, 0..1), so nothing but the
+   *  element touches the voice. Null when the lane, the peer or the engine
+   *  has no such reading — a still orb, never a broken call. */
+  farLevel(): number | null {
+    const pc = this.pc;
+    if (!pc || typeof pc.getReceivers !== "function") return null;
+    try {
+      for (const r of pc.getReceivers()) {
+        if (r.track?.kind !== "audio") continue;
+        const sources = (r as { getSynchronizationSources?: () => Array<{ audioLevel?: number }> }).getSynchronizationSources?.();
+        const level = sources?.[0]?.audioLevel;
+        return typeof level === "number" && Number.isFinite(level) ? Math.min(1, Math.max(0, level)) : 0;
+      }
+    } catch {
+      /* An engine without the reading. */
+    }
+    return null;
+  }
+
   diagnostics(): VoiceDiagnostics {
     const capture = this.captureStats();
     return {
