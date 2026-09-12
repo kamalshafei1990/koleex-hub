@@ -7,11 +7,24 @@
    did: read the microphone and cut it into frames, and turn the frames
    that come back into sound.
 
-   THE SOUND COMES OUT AS A MediaStream, on purpose. The call button plays
-   the far side through an <audio> element and meters it with a stream
-   analyser; a MediaStreamAudioDestinationNode gives this lane the same
-   object, so the button, the meter, the "turn on sound" recovery and the
-   barge-in gate on the element all work unchanged.
+   THE SOUND GOES STRAIGHT TO THE SPEAKER (2026-09-12 evening, the owner
+   after two rounds of fixes: "crackling while it talks — nothing changed",
+   with the beacon reading ZERO buffer underruns at a 450 ms lead, so the
+   buffer was not the crackle). Until then the far side was rendered into a
+   MediaStreamAudioDestinationNode and that stream was played by the call
+   button's <audio> element: a second clock domain, a second buffer, and
+   on Apple's engine a known source of clicks — the more so with a context
+   running at the wire's 24 kHz against 48 kHz hardware. Now the far bus
+   connects to the context's own destination; the element is handed a
+   stream that carries nothing, so the button's wiring stands, and the
+   barge-in gate reaches this lane through `mute()` instead of the element.
+
+   AND THE CONTEXT RUNS AT THE ENGINE'S OWN RATE AGAIN. The wire is 24 kHz;
+   the frames are resampled here, CONTINUOUSLY — one resampler carries its
+   position and its last sample from frame to frame, so the joints are
+   seamless (the per-buffer resampling of the first version, which forgot
+   the previous frame at every joint, was the "pulses" of the morning). The
+   microphone goes the other way through the same kind of resampler.
 
    A JITTER BUFFER, BECAUSE THE VOICE ARRIVED CHOPPED (owner, 2026-09-07
    18:10: "the voice of Grok not so stable"; 19:05: still "a strange voice").
@@ -52,6 +65,9 @@ export type WsAudio = {
   play(b64: string): void;
   /** Drop everything queued (barge-in). */
   flush(): void;
+  /** The barge-in gate: silence the far side's output (the answer being
+   *  cancelled still has frames in flight) or let it through again. */
+  mute?(on: boolean): void;
   /** Release the microphone reader and the output. */
   close(): void;
   /** A VOICE SAMPLE THROUGH THIS SAME CONTEXT (owner, 2026-09-07 night:
@@ -133,6 +149,51 @@ export function resample(input: Float32Array, fromRate: number, toRate: number):
   return out;
 }
 
+/**
+ * A resampler that remembers where it was. Frames of a stream go through
+ * ONE instance: it keeps the fractional read position and the last input
+ * sample across calls, so the output is the same continuous signal it
+ * would be for the whole stream at once — no discontinuity at frame
+ * joints. Linear interpolation, like `resample`. Pure per instance.
+ */
+export class StreamResampler {
+  private pos = 0;
+  private last = 0;
+  private primed = false;
+  constructor(private readonly fromRate: number, private readonly toRate: number) {}
+  get ratio(): number {
+    return this.fromRate / this.toRate;
+  }
+  process(input: Float32Array): Float32Array {
+    if (this.fromRate === this.toRate) return input;
+    if (input.length === 0) return input;
+    const ratio = this.ratio;
+    /* Positions are counted in INPUT samples, relative to an input made of
+       the last sample of the previous frame followed by this frame. */
+    const ext = new Float32Array(input.length + 1);
+    ext[0] = this.primed ? this.last : input[0];
+    ext.set(input, 1);
+    const out: number[] = [];
+    /* `pos` is where the next output sample falls in `ext`; while it is
+       inside this frame (strictly before the last input sample's slot) both
+       neighbours exist. What is left over — always in [0, ratio) — is where
+       the next frame starts. (A frame of ONE sample used to leave a negative
+       position behind and the next frame read before the array: a NaN, a
+       click.) */
+    let pos = this.pos;
+    while (pos < input.length) {
+      const i0 = Math.floor(pos);
+      const t = pos - i0;
+      out.push(ext[i0] * (1 - t) + ext[i0 + 1] * t);
+      pos += ratio;
+    }
+    this.pos = pos - input.length;
+    this.last = input[input.length - 1];
+    this.primed = true;
+    return Float32Array.from(out);
+  }
+}
+
 /** Float samples (-1..1) to little-endian PCM16 bytes. Pure. */
 export function floatToPcm16(samples: Float32Array): Uint8Array {
   const out = new Uint8Array(samples.length * 2);
@@ -200,7 +261,7 @@ export const RUN_GAP_S = 1.0;
 /** Scheduling margin so a start time is never already in the past. */
 const START_MARGIN_S = 0.05;
 
-export type JitterFrame<T> = { node: T; duration: number };
+export type JitterFrame<T> = { node: T; duration: number; /** Exact length in samples, when known. */ samples?: number };
 export type JitterDeps<T> = {
   now(): number;
   /** Start this frame at this context time. */
@@ -243,10 +304,10 @@ export class JitterQueue<T> {
   constructor(private readonly deps: JitterDeps<T>) {}
 
   /** Advance the run by one frame, sample-exact when the rate is known. */
-  private advance(duration: number): void {
+  private advance(duration: number, samples?: number): void {
     const rate = this.deps.rate;
     if (rate && rate > 0) {
-      this.runSamples += Math.round(duration * rate);
+      this.runSamples += samples ?? Math.round(duration * rate);
       this.nextStart = this.runStart + this.runSamples / rate;
     } else {
       this.nextStart += duration;
@@ -265,7 +326,7 @@ export class JitterQueue<T> {
       const now = this.deps.now();
       if (this.nextStart >= now) {
         this.deps.start(frame.node, this.nextStart);
-        this.advance(frame.duration);
+        this.advance(frame.duration, frame.samples);
         return;
       }
       const late = now - this.nextStart;
@@ -275,7 +336,7 @@ export class JitterQueue<T> {
         this.target = Math.min(PREBUFFER_MAX_S, this.target + PREBUFFER_STEP_S);
         this.beginRun(now + LATE_RESTART_S);
         this.deps.start(frame.node, this.nextStart);
-        this.advance(frame.duration);
+        this.advance(frame.duration, frame.samples);
         return;
       }
       /* The run drained before this frame arrived. */
@@ -306,7 +367,7 @@ export class JitterQueue<T> {
     this.beginRun(this.deps.now() + START_MARGIN_S);
     for (const f of this.pending) {
       this.deps.start(f.node, this.nextStart);
-      this.advance(f.duration);
+      this.advance(f.duration, f.samples);
     }
     this.pending = [];
     this.pendingDur = 0;
@@ -388,13 +449,12 @@ export function createBrowserWsAudio(wireRate: number, opts: { stallMs?: number 
      same rate and needs no resampling either. An engine that refuses the
      option (the argument is ignored or throws) gets the default context, as
      before; stats() carries the rate the beacon reads. */
-  let ctx: AudioContext;
-  try {
-    ctx = new Ctx({ sampleRate: wireRate });
-  } catch {
-    ctx = new Ctx();
-  }
+  const ctx: AudioContext = new Ctx();
+  /* The element still gets a stream (the button's wiring stands); it
+     carries nothing — the voice goes to the destination below. */
   const out = ctx.createMediaStreamDestination();
+  const down = new StreamResampler(wireRate, ctx.sampleRate);
+  const up = new StreamResampler(ctx.sampleRate, wireRate);
   let source: MediaStreamAudioSourceNode | null = null;
   let processor: ScriptProcessorNode | null = null;
   let worklet: AudioWorkletNode | null = null;
@@ -422,7 +482,7 @@ export function createBrowserWsAudio(wireRate: number, opts: { stallMs?: number 
      destination, so no suite caught it. Everything that plays connects to
      the bus; the bus feeds the destination and the meter. */
   const farBus = ctx.createGain();
-  farBus.connect(out);
+  farBus.connect(ctx.destination);
   const farMeter = ctx.createAnalyser();
   farMeter.fftSize = METER_FFT_SIZE;
   farBus.connect(farMeter);
@@ -444,9 +504,15 @@ export function createBrowserWsAudio(wireRate: number, opts: { stallMs?: number 
     clearTimer: (h) => clearTimeout(h as ReturnType<typeof setTimeout>),
     rate: ctx.sampleRate,
   });
+  /* Silence-in-the-graph: the destination node needs an input to stay in
+     the graph on some engines; the far bus at zero into it costs nothing. */
+  const outKeep = ctx.createGain();
+  outKeep.gain.value = 0;
+  farBus.connect(outKeep);
+  outKeep.connect(out);
 
   const emit = (onFrame: (b64: string) => void, input: Float32Array) => {
-    const frame = resample(input, ctx.sampleRate, wireRate);
+    const frame = up.process(input);
     frames += 1;
     for (let i = 0; i < frame.length; i++) {
       const a = frame[i] < 0 ? -frame[i] : frame[i];
@@ -564,15 +630,18 @@ export function createBrowserWsAudio(wireRate: number, opts: { stallMs?: number 
       });
     },
     play(b64) {
-      const samples = pcm16ToFloat(base64ToBytes(b64));
+      const samples = down.process(pcm16ToFloat(base64ToBytes(b64)));
       if (samples.length === 0) return;
-      const buffer = ctx.createBuffer(1, samples.length, wireRate);
+      const buffer = ctx.createBuffer(1, samples.length, ctx.sampleRate);
       buffer.getChannelData(0).set(samples);
       const node = ctx.createBufferSource();
       node.buffer = buffer;
       node.connect(farBus);
-      jitter.push({ node, duration: buffer.duration });
+      jitter.push({ node, duration: buffer.duration, samples: samples.length });
       void ctx.resume().catch(() => {});
+    },
+    mute(on) {
+      farBus.gain.value = on ? 0 : 1;
     },
     endOfResponse() {
       jitter.release();
