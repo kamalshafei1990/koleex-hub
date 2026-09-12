@@ -1059,6 +1059,9 @@ export class VoiceSession {
     this.events.onToolCall?.(call.name);
 
     let output: unknown;
+    /* The screen's pictures, sent by the route beside the model's envelope
+       (which has none: a voice never reads a URL). */
+    let pictures: unknown;
     try {
       const res = await this.deps.fetchFn(TOOL_PATH, {
         method: "POST",
@@ -1079,8 +1082,9 @@ export class VoiceSession {
            can say. */
         output = { ok: false, message: "That lookup could not be completed just now." };
       } else {
-        const body = (await res.json()) as { output?: unknown; pending?: { tool?: unknown; args?: unknown } };
+        const body = (await res.json()) as { output?: unknown; pictures?: unknown; pending?: { tool?: unknown; args?: unknown } };
         output = body.output ?? { ok: false, message: "That lookup returned nothing." };
+        pictures = body.pictures;
         const p = body.pending;
         if (p && typeof p.tool === "string" && p.args && typeof p.args === "object" && !Array.isArray(p.args)) {
           const msg = (output as { message?: unknown } | null)?.message;
@@ -1091,8 +1095,11 @@ export class VoiceSession {
       output = { ok: false, message: "That lookup could not be completed just now." };
     }
 
-    /* The screen sees it as the model does, and at the same moment. */
-    this.events.onToolResult?.(call.name, output);
+    /* The screen hears of it at the same moment the model does — and gets
+       the route's own picture list when there is one (2026-09-12: the
+       spoken envelope has no images, so reading pictures out of it showed
+       nothing while the model said four were on the screen). */
+    this.events.onToolResult?.(call.name, Array.isArray(pictures) && pictures.length > 0 ? { pictures } : output);
     this.sendToolResult(channel, call.callId, output);
   }
 
@@ -1624,8 +1631,8 @@ export class VoiceSession {
           cache: "no-store",
           ...(typeof AbortSignal !== "undefined" && "timeout" in AbortSignal ? { signal: AbortSignal.timeout(WS_CANARY_TIMEOUT_MS) } : {}),
         }))
-        .then((r) => { this.canary = `${r.status}/${took()}`; })
-        .catch((e) => { this.canary = `${isTimeoutError(e) ? "timeout" : "error"}/${took()}`; });
+        .then((r) => { this.canary = `${r.status}:${took()}`; })
+        .catch((e) => { this.canary = `${isTimeoutError(e) ? "timeout" : "error"}:${took()}`; });
     }, WS_CANARY_AFTER_MS);
     return () => clearTimeout(timer);
   }

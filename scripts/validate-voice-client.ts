@@ -1735,6 +1735,31 @@ console.log("\n── 12. Mute ──");
       seen.length === 1 && seen[0][0] === "searchProducts" && extractProductPhotos(seen[0][1]).length === 1);
     check("  …before the result is relayed to the model, so the screen and the model see the same thing",
       r.pcCalls.sent.some((m) => m.includes("function_call_output")));
+    /* 2026-09-12 04:16, the owner: "ما فيش صور على الشاشة" — the model said four
+       pictures were showing. The spoken envelope has no `images` (a voice
+       never reads a URL), so the screen reading pictures out of it found
+       none. The route now sends `pictures` beside the envelope; the screen
+       gets that list, the model still gets the envelope. */
+    const sentToModel = r.pcCalls.sent.length;
+    r.deps.fetchFn = (async (url: string, init?: RequestInit) => {
+      if (String(url) === TOOL_PATH) {
+        return { ok: true, status: 200, json: async () => ({
+          output: { ok: true, data: { results: [{ title: "t", source: "ex.com", snippet: "s" }], pictures_on_screen: 2, usage_note: "SPOKEN ANSWER." } },
+          pictures: [{ url: "https://img.example/1.jpg", label: "Graff Hallucination" }, { url: "https://img.example/2.jpg", label: "" }, { url: "http://plain.example/3.jpg", label: "not https" }],
+        }) } as unknown as Response;
+      }
+      return toolFetch(url, init);
+    }) as unknown as typeof fetch;
+    r.pcCalls.channel!.onmessage?.({ data: JSON.stringify({ type: "response.output_item.added", item: { type: "function_call", call_id: "c2", name: "search_web" } }) } as MessageEvent);
+    r.pcCalls.channel!.onmessage?.({ data: JSON.stringify({ type: "response.function_call_arguments.done", call_id: "c2", arguments: "{\"query\":\"most expensive watch\",\"want_images\":true}" }) } as MessageEvent);
+    await new Promise((res) => setTimeout(res, 20));
+    const webPics = seen.length === 2 ? extractProductPhotos(seen[1][1]) : [];
+    check("a web search's pictures reach the screen from the route's own list — two https pictures, the plain-http one dropped, captions kept",
+      seen.length === 2 && seen[1][0] === "search_web" && webPics.length === 2 && webPics[0].url === "https://img.example/1.jpg" && webPics[0].label === "Graff Hallucination");
+    check("  …while the model still gets the spoken envelope, with no picture URL in it",
+      r.pcCalls.sent.length > sentToModel && r.pcCalls.sent.slice(sentToModel).some((m) => m.includes("function_call_output") && m.includes("pictures_on_screen") && !m.includes("img.example")));
+    check("  …and a route body without pictures hands the screen the output itself, as before",
+      extractProductPhotos({ pictures: [] }).length === 0 && extractProductPhotos({ pictures: [{ url: "https://a.example/p.jpg", label: "x" }] }).length === 1);
 
     /* THE PERSISTER SAVES THE PICTURE WITH THE WORDS. */
     type Post = { body: { turns: Array<{ role: string; text: string }> } };
@@ -3467,7 +3492,7 @@ function describeErrorCheck(): boolean {
   check("the canary is armed four seconds into the call's own handshake, disarmed when the handshake answers, and never on a redial",
     /const WS_CANARY_AFTER_MS = 4_000;/.test(sess) && /const WS_CANARY_TIMEOUT_MS = 5_000;/.test(sess) && CANARY_PATH === "/api/version" &&
     /const disarmCanary = first \? this\.armCanary\(\) : \(\) => \{\};/.test(sess) && /\} finally \{\s*disarmCanary\(\);\s*\}/.test(sess) &&
-    /this\.canary = `\$\{r\.status\}\/\$\{took\(\)\}`;/.test(sess) && /this\.canary = `\$\{isTimeoutError\(e\) \? "timeout" : "error"\}\/\$\{took\(\)\}`;/.test(sess) &&
+    /this\.canary = `\$\{r\.status\}:\$\{took\(\)\}`;/.test(sess) && /this\.canary = `\$\{isTimeoutError\(e\) \? "timeout" : "error"\}:\$\{took\(\)\}`;/.test(sess) &&
     /canary: this\.canary,\s*resp_err: this\.lastResponseError,/.test(sess));
   {
     /* A handshake that answers at once never sends a canary. */

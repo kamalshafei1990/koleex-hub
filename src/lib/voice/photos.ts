@@ -70,6 +70,18 @@ export function extractProductPhotos(output: unknown): ProductPhoto[] {
     add(httpsOnly(o.main_photo_url), label);
     add(httpsOnly(o.photo_url), label);
     if (Array.isArray(o.photo_urls)) add(httpsOnly(o.photo_urls[0]), label);
+    /* THE SCREEN'S OWN LIST (2026-09-12): the tool route reads the pictures
+       out of the raw result with this very function and sends them beside
+       the model's envelope as `pictures: [{ url, label }]`, because the
+       envelope the model hears has no `images` in it any more. Read first,
+       as-is; the same caps and the https rule apply. */
+    if (Array.isArray(o.pictures)) {
+      for (const pic of o.pictures) {
+        if (!pic || typeof pic !== "object") continue;
+        const p = pic as Record<string, unknown>;
+        add(httpsOnly(p.url), str(p.label).slice(0, 80));
+      }
+    }
     /* A web search's pictures: `{ url, description }` entries. The caption
        is the label, so the strip says what the picture is. */
     if (Array.isArray(o.images)) {

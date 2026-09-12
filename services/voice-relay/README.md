@@ -3,7 +3,13 @@
 The socket lane's vendor connection, carried through Koleex's own domain.
 See the header of `server.mjs` for why it exists and what it refuses.
 
-Runs on Railway (Singapore). Environment:
+Runs on Railway in **Singapore** (`asia-southeast1-eqsg3a`), pinned by
+`railway.json` — the dashboard had the service in Amsterdam (`ams`) until
+2026-09-12, so every audio frame of a socket-lane call from China crossed to
+Europe and back before it reached the vendor; the owner's "the voice still has
+a glitch" call of 04:14 UTC ran that path. Config in code overrides the
+dashboard on each deployment, so the region cannot drift again without a
+commit here. Environment:
 
 | Variable | Meaning |
 | --- | --- |

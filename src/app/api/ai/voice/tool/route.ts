@@ -40,6 +40,7 @@ import { buildUserContext, checkModule } from "@/lib/server/ai-agent/permissions
 import { consumeBudget, limitMode, subjectFor } from "@/lib/server/ai/security/rate-limit";
 import { dispatchTool } from "@/lib/server/ai-agent/tool-registry";
 import { forVoice, isVoiceTool, isVoiceWriteTool } from "@/lib/server/ai/voice/tools";
+import { extractProductPhotos } from "@/lib/voice/photos";
 import { parseConversationParam } from "@/lib/server/ai/voice/history";
 
 export const dynamic = "force-dynamic";
@@ -204,6 +205,15 @@ export async function POST(req: Request) {
      Status 200 even when the tool refused: the REQUEST succeeded, and the
      refusal is a result the model must hear and say out loud. An HTTP error
      here would leave the call waiting for an answer that never comes. */
+  /* WHAT GOES TO THE SCREEN, beside it (2026-09-12 04:16, the owner: "ما فيش
+     صور على الشاشة" while the model said four pictures were showing). The
+     spoken envelope above drops a web search's `images` so a voice never
+     reads a URL aloud — and the call screen used to read its pictures out
+     of that same envelope, so from #406 on it found none. The pictures are
+     read here from the RAW result, https only, capped and deduplicated
+     (voice/photos.ts), and travel as their own field: the screen's data and
+     the model's data are different things and now arrive as such. */
+  const pictures = extractProductPhotos(result.data);
   return NextResponse.json(
     {
       call_id: callId,
@@ -213,6 +223,7 @@ export async function POST(req: Request) {
         message: result.message,
         data: forVoice(name, result.data),
       },
+      ...(pictures.length > 0 ? { pictures } : {}),
       ...(pending ? { pending } : {}),
     },
     { headers: { "Cache-Control": "no-store" } },
