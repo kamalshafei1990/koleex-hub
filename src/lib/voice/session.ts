@@ -905,7 +905,7 @@ export class VoiceSession {
       resp_err: this.lastResponseError,
       tool_wait_ms: this.toolWaitMs,
       up_frames: this.wsFramesUp,
-      capture: capture ? `${capture.path}:${capture.ctx}:${capture.rate}:f${capture.frames}:s${capture.start}${capture.stalled ? ":stalled" : ""}${capture.underruns !== undefined ? `:u${capture.underruns}:b${capture.bufferMs ?? 0}` : ""}` : "",
+      capture: capture ? `${capture.path}:${capture.ctx}:${capture.rate}:f${capture.frames}:s${capture.start}${capture.stalled ? ":stalled" : ""}${capture.underruns !== undefined ? `:u${capture.underruns}:b${capture.bufferMs ?? 0}` : ""}${capture.playout ? `:o${capture.playout}` : ""}` : "",
       mic_peak: capture?.peak ?? 0,
       mic: this.micState(),
       call: this.callId,

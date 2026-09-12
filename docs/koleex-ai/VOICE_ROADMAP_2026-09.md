@@ -874,3 +874,49 @@ now gone:
 
 If the crackle survives this too, the next suspect is outside the page: the
 device's output route (Bluetooth/receiver) or the far side's own stream.
+
+## "Nothing fixed, everything is the same" — the fourth time (2026-09-12 18:08–18:10 UTC, after #418)
+
+Two calls, both on production with #418 live (Vercel READY 17:51, merge
+commit `0e4c2f8`):
+
+| Call | Lane | What the beacon read |
+|---|---|---|
+| `b412f0fed8`, 18:08:35 → voice switched at 34 s | mainland (rtc) | `rtc=recv219 lost5 jitter10 conc47394` — of ~220 packets, 5 lost, 10 ms jitter, and **47 394 concealed samples** (≈1 s of audio the decoder had to invent, with `jitterBufferTarget` already at 400 ms) |
+| `3aae46dc11`, 18:09:17 → 18:10:27 (78 s) | international (ws) | `capture=worklet:running:48000:f859:srunning:u2:b750` — the engine's rate is **48000**, so the #418 build was running; 2 underruns, the lead grew to 750 ms; relay session 12: 74 s, `up=865 down=193`, no cut |
+
+So #418 was live and the crackle survived it. Looking at what every attempt
+since #412 shared: each frame of the far side became its own
+`AudioBufferSourceNode`, started at a computed time — at the wire's rate, at
+the engine's rate, through a stream, straight to the destination. A start
+time is honoured by the engine's scheduler; on some engines to the render
+quantum, not the sample. Two hundred starts a minute are two hundred seams.
+
+**Now (this PR): the far side is one continuous stream.** Its samples go
+into a ring on the audio thread (`PLAYOUT_WORKLET_SOURCE`, an
+`AudioWorkletProcessor`; the script processor with the same `PcmRing` where
+there is no worklet) and the engine pulls from the ring every quantum —
+there is nothing to seam. The ring reports the moment it runs dry and holds.
+`PlayoutGate` on the main thread decides when it may play: gather 450 ms of
+an answer (or 350 ms of waiting, or the answer's end), then open; a dry
+ring inside an answer is an underrun — the lead grows a step and the ring
+gathers again, waiting for the *grown* lead this time (the old queue's
+350 ms wait let frames out before the lead was rebuilt, so its growth
+bought nothing); a dry ring after the answer's end is the answer over. The
+beacon's capture string gains `:o<worklet|processor|pending|failed>`.
+
+**And the relay now measures the vendor's own pacing** (`createPacing`,
+end line `deltas= audioMs= gaps= maxGap= minAhead=`): whether the far
+side's stream stalls is read where no tunnel and no phone is in the way. If
+`minAhead` reads hundreds of ms negative, the cuts are the vendor's stream
+and the only client answer is a longer lead; if it reads near zero while
+the beacon still counts underruns, the cuts are on the path from Singapore
+to the phone.
+
+What this cannot fix: the mainland lane's concealment is the decoder's own
+(the browser's WebRTC stack, packets from the vendor's media server);
+FEC is on and the receiver holds 400 ms. The next question for the owner,
+if the crackle survives this too, is the device's output route — phone
+speaker, wired, or Bluetooth (a Bluetooth headset with the microphone open
+falls to the low-rate hands-free profile on every phone; that sounds
+"not clean" on both lanes and no page can change it).

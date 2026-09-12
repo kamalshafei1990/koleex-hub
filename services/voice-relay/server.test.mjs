@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { signTicket, verifyTicket, tokenFromProtocols, upstreamUrlFor, originAllowed, TICKET_MAX_AGE_S, isKeepalive, KEEPALIVE_FRAME, clientAddress, MAX_PER_TICKET, MAX_PENDING_BYTES, MAX_FRAME_BYTES, relayHello, shouldPark, RESUME_GRACE_MS, MAX_PARK_BYTES, NO_SESSION_CODE } from "./server.mjs";
+import { signTicket, verifyTicket, tokenFromProtocols, upstreamUrlFor, originAllowed, TICKET_MAX_AGE_S, isKeepalive, KEEPALIVE_FRAME, clientAddress, MAX_PER_TICKET, MAX_PENDING_BYTES, MAX_FRAME_BYTES, relayHello, shouldPark, RESUME_GRACE_MS, MAX_PARK_BYTES, NO_SESSION_CODE, createPacing, audioMsOf, PACING_GAP_MS, WIRE_RATE } from "./server.mjs";
 
 test("the per-address cap keys on the hop the edge appended, never on what the browser wrote in front", () => {
   assert.equal(clientAddress("1.2.3.4", "10.0.0.9"), "1.2.3.4");
@@ -71,4 +71,27 @@ test("the resume hello is one small frame, the grace is short and bounded, and a
   assert.ok(RESUME_GRACE_MS >= 5_000 && RESUME_GRACE_MS <= 20_000);
   assert.ok(MAX_PARK_BYTES <= 2 * MAX_FRAME_BYTES);
   assert.equal(NO_SESSION_CODE, 4001);
+});
+
+test("the pacing meter reads the vendor's audio deltas: their length, the silences between them inside one answer, and how far ahead of real time the answer runs", () => {
+  const delta = (ms) => JSON.stringify({ type: "response.output_audio.delta", delta: Buffer.alloc(ms * (WIRE_RATE / 1000) * 2).toString("base64") });
+  assert.equal(WIRE_RATE, 24_000);
+  assert.equal(audioMsOf(delta(10)), 10);
+  assert.equal(audioMsOf(JSON.stringify({ type: "response.audio.delta", delta: Buffer.alloc(479).toString("base64") })), 479 / 48, "padding is not counted");
+  assert.equal(audioMsOf('{"type":"response.done"}'), 0);
+  const p = createPacing();
+  p.note(delta(500), 0);
+  p.note(delta(500), 100);
+  p.note(delta(500), 900);       // 800 ms after the last: a gap
+  p.note(delta(500), 2000);      // 1100 ms after the last: the longest; the answer is 1500 ms of audio at 2000 ms of wall time — 500 behind
+  p.note('{"type":"response.output_audio.done"}', 2100);
+  p.note(delta(500), 5000);      // the next answer: no gap counted across answers, ahead starts at 0
+  p.note('{"type":"input_audio_buffer.speech_started"}', 5001);
+  assert.equal(PACING_GAP_MS, 250);
+  assert.equal(p.summary(), "deltas=5 audioMs=2500 gaps=2 maxGap=1100 minAhead=-500");
+  const q = createPacing();
+  q.note(delta(200), 0);
+  q.note(delta(200), 50);
+  q.note(delta(200), 100);
+  assert.equal(q.summary(), "deltas=3 audioMs=600 gaps=0 maxGap=50 minAhead=0", "a stream ahead of real time never goes negative");
 });

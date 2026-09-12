@@ -86,7 +86,7 @@ export async function POST(req: Request) {
       (short(body.canary, 24) ? ` canary=${short(body.canary, 24)}` : "") +
       (cause(body.resp_err) ? ` respErr="${cause(body.resp_err)}"` : "") +
       (num(body.tool_wait_ms) ? ` toolWaitMs=${num(body.tool_wait_ms)}` : "") +
-      (short(body.capture, 64) ? ` upFrames=${num(body.up_frames)} capture=${short(body.capture, 64)} micPeak=${typeof body.mic_peak === "number" && Number.isFinite(body.mic_peak) ? Math.round(body.mic_peak * 100) / 100 : 0} mic=${short(body.mic, 24) || "none"}` : "") +
+      (short(body.capture, 96) ? ` upFrames=${num(body.up_frames)} capture=${short(body.capture, 96)} micPeak=${typeof body.mic_peak === "number" && Number.isFinite(body.mic_peak) ? Math.round(body.mic_peak * 100) / 100 : 0} mic=${short(body.mic, 24) || "none"}` : "") +
       (num(body.dom) ? ` dom=${num(body.dom)} imgs=${num(body.imgs)}` : "") +
       (short(body.call, 12) ? ` call=${short(body.call, 12)}` : "") +
       (short(body.rtc, 80) ? ` rtc=${short(body.rtc, 80)}` : "") +

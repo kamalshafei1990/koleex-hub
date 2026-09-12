@@ -46,6 +46,16 @@ afresh at once. A caller who hangs up (a close frame) parks nothing. The
 log reads `parked`, `resumed gapMs=… held=…`, and the end line carries
 `resumes=`.
 
+The end line also carries the vendor's PACING (2026-09-12 night), measured
+here where no tunnel and no phone is in the way: `deltas=` audio frames
+received, `audioMs=` their total length, `gaps=` silences longer than
+`PACING_GAP_MS` (250 ms) between two frames of one answer, `maxGap=` the
+longest, and `minAhead=` how far ahead of real time the answer's audio ran
+at its worst (audio delivered minus wall time since the answer's first
+frame; a player with no lead would have run dry by that much when it is
+negative). Two regexes on each downstream frame; the audio is never
+decoded or kept.
+
 Limits (security review, 2026-09-12): one frame at most 1 MiB; at most 8
 open sockets per client address and 3 per admission ticket (a ticket is one
 call — a redial reuses it, a leak would not stop at three); at most 2 MiB of

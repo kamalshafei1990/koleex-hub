@@ -35,7 +35,10 @@
    GATHERED before it plays — a third of a second of sound, or whatever has
    arrived after a third of a second — and then plays back to back; a run
    that still drains mid-answer grows the gathering for the rest of the call,
-   up to a ceiling. The logic is JitterQueue, pure given a clock, and tested.
+   up to a ceiling. And since 2026-09-12 night the far side is ONE stream —
+   a ring on the audio thread the engine pulls from, never a node per frame
+   (the crackle that survived four attempts was the seam between frames).
+   The gate is PlayoutGate, the ring PcmRing, both pure and tested.
 
    THE MICROPHONE IS READ OFF THE MAIN THREAD when the engine allows it.
    A ScriptProcessorNode runs on the main thread, and the main thread of
@@ -122,6 +125,10 @@ export type WsAudioStats = {
    *  without a buffer. */
   underruns?: number;
   bufferMs?: number;
+  /** "worklet" | "processor" | "pending" | "failed": what plays the far
+   *  side — pending until the worklet module loaded, failed when neither
+   *  path could be built (the beacon carries it). */
+  playout?: string;
 };
 
 /** A reader that has read NOTHING this long after it started is judged
@@ -232,167 +239,253 @@ export function base64ToBytes(b64: string): Uint8Array {
   return out;
 }
 
-/* ── The jitter buffer ──────────────────────────────────────────────────── */
+/* ── The playout ────────────────────────────────────────────────────────── */
 
-/** How much of an answer is gathered before its first frame plays.
+/** How much of an answer is gathered before its first sample plays.
  *  (Owner, 2026-09-12 evening: "crackling and cuts while it talks, VPN or
  *  not" — a China path jitters by hundreds of ms; a third of a second of
  *  lead drained mid-sentence again and again. Half a second is the price
  *  of a sentence that plays whole.) */
 export const PREBUFFER_S = 0.45;
-/** How much the gathering grows each time a run still drains mid-answer. */
+/** How much the gathering grows each time the ring still runs dry mid-answer. */
 export const PREBUFFER_STEP_S = 0.15;
 /** The most delay a rough network can buy itself. */
 export const PREBUFFER_MAX_S = 1.2;
-/** A frame that arrives this soon after the run drained CONTINUES the run
- *  from now — a gap too short to hear — instead of stopping the sentence
- *  to gather again (which was a third-of-a-second hole in every word the
- *  network delivered a few ms late: the "cuts"). It still counts as an
- *  underrun, so the next run starts with more lead. */
-export const LATE_GRACE_S = 0.12;
-/** Where a late frame restarts the run: just ahead of now. */
-const LATE_RESTART_S = 0.02;
-/** A short answer ("Yes.") never fills the buffer: whatever has arrived
- *  plays after this long regardless. */
+/** A short answer ("Yes.") never fills the gathering: whatever has arrived
+ *  plays after this long regardless — the guard for a vendor whose
+ *  end-of-answer event never comes. */
 export const PREBUFFER_WAIT_MS = 350;
-/** A run that drained this long ago ended on its own — the answer was over,
- *  not late. Shorter than this is an UNDERRUN and grows the buffer. */
-export const RUN_GAP_S = 1.0;
-/** Scheduling margin so a start time is never already in the past. */
-const START_MARGIN_S = 0.05;
-
-export type JitterFrame<T> = { node: T; duration: number; /** Exact length in samples, when known. */ samples?: number };
-export type JitterDeps<T> = {
-  now(): number;
-  /** Start this frame at this context time. */
-  start(node: T, at: number): void;
-  setTimer(fn: () => void, ms: number): unknown;
-  clearTimer(handle: unknown): void;
-  /** The context's sample rate. With it, a run's start times are counted
-   *  in whole samples from the run's first frame, so a thousand frames of
-   *  float `duration` cannot drift a fraction of a sample apart — a gap or
-   *  an overlap at a frame boundary is a click, twenty times a second. */
-  rate?: number;
-};
+/** After the ring ran dry mid-answer, the gathering waits for its (grown)
+ *  target plus this much before playing what it has. A wait as short as
+ *  PREBUFFER_WAIT_MS let the frames out before the lead was rebuilt, and
+ *  the target's growth bought nothing. */
+export const REGATHER_EXTRA_MS = 250;
+/** The script processor's block, when there is no worklet: ~43 ms at 48 kHz. */
+export const PLAYOUT_PROCESSOR_SAMPLES = 2048;
 
 /**
- * Frames in, start times out.
- *
- * The first version butted each frame 50 ms behind "now": every gap on the
- * wire longer than that was a gap in the voice, and the FIRST frame of an
- * answer — the vendor sends a small one fast, then streams — was a blip, a
- * silence, then the sentence. Now an answer is GATHERED first: frames queue
- * until PREBUFFER_S of sound is held (or PREBUFFER_WAIT_MS has passed), then
- * play back to back from a single start. A frame that arrives after the run
- * drained is an underrun: the run stops, the target grows a step, and the
- * frame begins a new gathering. A frame that arrives long after the run
- * drained is simply the next answer, gathered at the target the call has
- * settled on. Pure given its deps; the suite drives it with a fake clock.
+ * ONE CONTINUOUS STREAM (owner, 2026-09-12 night, the fourth "nothing fixed,
+ * everything is the same" — on a build the beacon proved live: rate 48000,
+ * two dry runs in 78 s, the lead at 750 ms). Every attempt before this one
+ * played each frame of the far side as its own AudioBufferSourceNode started
+ * at a computed time — at the wire's rate, at the engine's rate, through a
+ * stream, straight to the destination — and the crackle survived them all:
+ * the one thing they shared. A start time is honoured by the engine's
+ * scheduler, on some engines to the render quantum and not the sample; two
+ * hundred starts a minute are two hundred seams. Now the far side is ONE
+ * stream: its samples go into a ring on the audio thread (a worklet, or the
+ * script processor where there is none) and the engine pulls from the ring
+ * every quantum, so there is nothing to seam. The ring reports the moment it
+ * runs dry and holds until told to go on. This gate, on the main thread,
+ * decides when the ring may play: gather PREBUFFER_S of an answer first (or
+ * PREBUFFER_WAIT_MS, or the answer's end), then open; a dry ring inside an
+ * answer is an UNDERRUN — the target grows a step and the ring gathers
+ * again; a dry ring after the answer's end is the answer over. Pure given
+ * its deps; the suite drives it with a fake ring and a fake clock.
  */
-export class JitterQueue<T> {
+export type PlayoutDeps = {
+  /** Let the ring play (true) or hold what it has (false). */
+  gate(open: boolean): void;
+  /** Empty the ring and begin generation `gen`: a report carrying an older
+   *  generation is from before the flush and is ignored. */
+  flush(gen: number): void;
+  setTimer(fn: () => void, ms: number): unknown;
+  clearTimer(handle: unknown): void;
+};
+export type PlayoutPhase = "idle" | "gathering" | "playing";
+
+export class PlayoutGate {
   target = PREBUFFER_S;
   underruns = 0;
-  private nextStart = 0;
-  /* The run's origin and its length in whole samples (see JitterDeps.rate). */
-  private runStart = 0;
-  private runSamples = 0;
-  private running = false;
-  private pending: JitterFrame<T>[] = [];
-  private pendingDur = 0;
+  /* Samples pushed and consumed since the last flush: exact while the ring
+     holds (it consumes nothing then), which is the only time they decide. */
+  private pushed = 0;
+  private consumed = 0;
+  private gen = 0;
+  private state: PlayoutPhase = "idle";
+  private answerOpen = false;
   private timer: unknown = null;
 
-  constructor(private readonly deps: JitterDeps<T>) {}
+  constructor(private readonly deps: PlayoutDeps, private readonly rate: number) {}
 
-  /** Advance the run by one frame, sample-exact when the rate is known. */
-  private advance(duration: number, samples?: number): void {
-    const rate = this.deps.rate;
-    if (rate && rate > 0) {
-      this.runSamples += samples ?? Math.round(duration * rate);
-      this.nextStart = this.runStart + this.runSamples / rate;
-    } else {
-      this.nextStart += duration;
-    }
+  get phase(): PlayoutPhase {
+    return this.state;
   }
-
-  private beginRun(at: number): void {
-    this.runStart = at;
-    this.runSamples = 0;
-    this.nextStart = at;
-    this.running = true;
+  get generation(): number {
+    return this.gen;
   }
-
-  push(frame: JitterFrame<T>): void {
-    if (this.running) {
-      const now = this.deps.now();
-      if (this.nextStart >= now) {
-        this.deps.start(frame.node, this.nextStart);
-        this.advance(frame.duration, frame.samples);
-        return;
-      }
-      const late = now - this.nextStart;
-      if (late < LATE_GRACE_S) {
-        /* Barely late: the sentence goes on from now, the lead grows. */
-        this.underruns++;
-        this.target = Math.min(PREBUFFER_MAX_S, this.target + PREBUFFER_STEP_S);
-        this.beginRun(now + LATE_RESTART_S);
-        this.deps.start(frame.node, this.nextStart);
-        this.advance(frame.duration, frame.samples);
-        return;
-      }
-      /* The run drained before this frame arrived. */
-      this.running = false;
-      if (late < RUN_GAP_S) {
-        this.underruns++;
-        this.target = Math.min(PREBUFFER_MAX_S, this.target + PREBUFFER_STEP_S);
-      }
-    }
-    this.pending.push(frame);
-    this.pendingDur += frame.duration;
-    if (this.pendingDur >= this.target) this.release();
-    else if (this.timer === null) {
-      this.timer = this.deps.setTimer(() => {
-        this.timer = null;
-        this.release();
-      }, PREBUFFER_WAIT_MS);
-    }
-  }
-
-  /** Play everything gathered, back to back, from now. */
-  release(): void {
-    if (this.timer !== null) {
-      this.deps.clearTimer(this.timer);
-      this.timer = null;
-    }
-    if (this.pending.length === 0) return;
-    this.beginRun(this.deps.now() + START_MARGIN_S);
-    for (const f of this.pending) {
-      this.deps.start(f.node, this.nextStart);
-      this.advance(f.duration, f.samples);
-    }
-    this.pending = [];
-    this.pendingDur = 0;
-  }
-
-  /** Drop what is gathered and forget the run (barge-in). The target the
-   *  call has settled on is kept. */
-  flush(): T[] {
-    if (this.timer !== null) {
-      this.deps.clearTimer(this.timer);
-      this.timer = null;
-    }
-    const dropped = this.pending.map((f) => f.node);
-    this.pending = [];
-    this.pendingDur = 0;
-    this.running = false;
-    this.nextStart = 0;
-    return dropped;
-  }
-
-  /** How much sound is gathered and not yet playing, in seconds. */
+  /** Seconds held and not yet played (exact while gathering). */
   get buffered(): number {
-    return this.pendingDur;
+    return Math.max(0, this.pushed - this.consumed) / this.rate;
+  }
+
+  /** `samples` more are in the ring. */
+  push(samples: number): void {
+    this.pushed += samples;
+    this.answerOpen = true;
+    if (this.state === "playing") return;
+    if (this.state === "idle") this.state = "gathering";
+    if (this.buffered >= this.target) this.open();
+    else this.arm(PREBUFFER_WAIT_MS);
+  }
+
+  /** The ring ran dry — and holds until opened again. */
+  onDry(gen: number, consumed: number): void {
+    if (gen !== this.gen) return;
+    this.consumed = consumed;
+    if (this.state !== "playing") return;
+    if (!this.answerOpen) {
+      this.state = "idle";
+      return;
+    }
+    this.underruns++;
+    this.target = Math.min(PREBUFFER_MAX_S, this.target + PREBUFFER_STEP_S);
+    this.state = "gathering";
+    if (this.buffered >= this.target) this.open();
+    else this.arm(Math.round(this.target * 1000) + REGATHER_EXTRA_MS);
+  }
+
+  /** The far side finished the answer: what is gathered plays now. */
+  endOfResponse(): void {
+    this.answerOpen = false;
+    if (this.state === "gathering") this.open();
+  }
+
+  /** Drop everything (barge-in); the target the call settled on is kept. */
+  flush(): void {
+    this.disarm();
+    this.gen++;
+    this.state = "idle";
+    this.answerOpen = false;
+    this.pushed = 0;
+    this.consumed = 0;
+    this.deps.flush(this.gen);
+  }
+
+  private open(): void {
+    this.disarm();
+    if (this.state !== "gathering") return;
+    this.state = "playing";
+    this.deps.gate(true);
+  }
+  private arm(ms: number): void {
+    if (this.timer !== null) return;
+    this.timer = this.deps.setTimer(() => {
+      this.timer = null;
+      this.open();
+    }, ms);
+  }
+  private disarm(): void {
+    if (this.timer === null) return;
+    this.deps.clearTimer(this.timer);
+    this.timer = null;
   }
 }
+
+/** What the ring tells the gate. */
+export type RingReport = { type: "dry"; gen: number; consumed: number };
+
+/** The ring itself, as the script-processor path runs it on this thread —
+ *  the worklet below is the same logic on the audio thread. Frames queue
+ *  whole; `pull` fills a block from them while open and silence where it
+ *  has nothing; running out while open is reported ONCE and the ring holds
+ *  (open again is the gate's decision). Pure. */
+export class PcmRing {
+  private chunks: Float32Array[] = [];
+  private head = 0;
+  private open = false;
+  private gen = 0;
+  private consumed = 0;
+  held = 0;
+
+  constructor(private readonly report: (r: RingReport) => void) {}
+
+  push(frame: Float32Array): void {
+    this.chunks.push(frame);
+    this.held += frame.length;
+  }
+  gate(open: boolean): void {
+    this.open = open;
+  }
+  flush(gen: number): void {
+    this.chunks = [];
+    this.head = 0;
+    this.held = 0;
+    this.open = false;
+    this.gen = gen;
+    this.consumed = 0;
+  }
+  pull(out: Float32Array): void {
+    let i = 0;
+    if (this.open) {
+      while (i < out.length && this.chunks.length > 0) {
+        const c = this.chunks[0];
+        const take = Math.min(out.length - i, c.length - this.head);
+        out.set(c.subarray(this.head, this.head + take), i);
+        i += take;
+        this.head += take;
+        this.consumed += take;
+        this.held -= take;
+        if (this.head === c.length) {
+          this.chunks.shift();
+          this.head = 0;
+        }
+      }
+      if (i < out.length) {
+        this.open = false;
+        this.report({ type: "dry", gen: this.gen, consumed: this.consumed });
+      }
+    }
+    out.fill(0, i);
+  }
+}
+
+/** The ring, as a worklet: PcmRing above, in the engine's own thread. The
+ *  main thread posts frames (transferred), `{cmd:"gate",open}` and
+ *  `{cmd:"flush",gen}`; the ring posts `{type:"dry",gen,consumed}`. */
+export const PLAYOUT_WORKLET_NAME = "koleex-playout";
+export const PLAYOUT_WORKLET_SOURCE = `
+class KoleexPlayout extends AudioWorkletProcessor {
+  constructor() {
+    super();
+    this.chunks = [];
+    this.head = 0;
+    this.open = false;
+    this.gen = 0;
+    this.consumed = 0;
+    this.port.onmessage = (ev) => {
+      const m = ev.data;
+      if (m instanceof Float32Array) { this.chunks.push(m); return; }
+      if (!m || typeof m !== "object") return;
+      if (m.cmd === "gate") { this.open = !!m.open; return; }
+      if (m.cmd === "flush") { this.chunks = []; this.head = 0; this.open = false; this.gen = m.gen | 0; this.consumed = 0; }
+    };
+  }
+  process(_inputs, outputs) {
+    const out = outputs[0] && outputs[0][0];
+    if (!out) return true;
+    let i = 0;
+    if (this.open) {
+      while (i < out.length && this.chunks.length > 0) {
+        const c = this.chunks[0];
+        const take = Math.min(out.length - i, c.length - this.head);
+        out.set(c.subarray(this.head, this.head + take), i);
+        i += take;
+        this.head += take;
+        this.consumed += take;
+        if (this.head === c.length) { this.chunks.shift(); this.head = 0; }
+      }
+      if (i < out.length) {
+        this.open = false;
+        this.port.postMessage({ type: "dry", gen: this.gen, consumed: this.consumed });
+      }
+    }
+    out.fill(0, i);
+    return true;
+  }
+}
+registerProcessor("${PLAYOUT_WORKLET_NAME}", KoleexPlayout);
+`;
 
 /* ── Capture ────────────────────────────────────────────────────────────── */
 
@@ -438,17 +531,11 @@ export const CAPTURE_WORKLET_NAME = "koleex-capture";
 export function createBrowserWsAudio(wireRate: number, opts: { stallMs?: number } = {}): WsAudio {
   const stallMs = opts.stallMs ?? CAPTURE_STALL_MS;
   const Ctx = (window.AudioContext ?? (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext) as typeof AudioContext;
-  /* THE CONTEXT RUNS AT THE WIRE'S RATE (owner, 2026-09-12: "when Koleex
-     AI talks I hear pulses… the voice is not clean"). Each frame of the far
-     side's voice used to become its own 24 kHz buffer inside a 48 kHz
-     context, and the engine resampled every buffer ON ITS OWN — with no
-     memory of the previous one, so every frame boundary, twenty or so times
-     a second, was a small discontinuity: the pulses. At the wire's rate the
-     frames play back to back as one continuous signal and only the device's
-     output resamples, once, continuously. The microphone is then read at the
-     same rate and needs no resampling either. An engine that refuses the
-     option (the argument is ignored or throws) gets the default context, as
-     before; stats() carries the rate the beacon reads. */
+  /* THE CONTEXT RUNS AT THE ENGINE'S OWN RATE (2026-09-12 evening). The
+     morning's context at the wire's 24 kHz put 24 against 48 kHz hardware
+     on Apple's engine; the frames are bridged here instead, by one
+     continuous resampler each way (StreamResampler), and the engine never
+     resamples its output. stats() carries the rate the beacon reads. */
   const ctx: AudioContext = new Ctx();
   /* The element still gets a stream (the button's wiring stands); it
      carries nothing — the voice goes to the destination below. */
@@ -468,7 +555,6 @@ export function createBrowserWsAudio(wireRate: number, opts: { stallMs?: number 
   let stalled = false;
   let stallTimer: ReturnType<typeof setTimeout> | null = null;
   let sample: { node: AudioBufferSourceNode; stop: () => void } | null = null;
-  const playing = new Set<AudioBufferSourceNode>();
   /* THE FAR SIDE GOES THROUGH A BUS, and the meter hangs off the bus — NOT
      off the destination. A MediaStreamAudioDestinationNode has NO outputs,
      and `out.connect(analyser)` throws IndexSizeError in every browser. That
@@ -493,17 +579,98 @@ export function createBrowserWsAudio(wireRate: number, opts: { stallMs?: number 
     a.getByteTimeDomainData(meterBuf);
     return rmsLevel(meterBuf);
   };
-  const jitter = new JitterQueue<AudioBufferSourceNode>({
-    now: () => ctx.currentTime,
-    start: (node, at) => {
-      node.start(at);
-      playing.add(node);
-      node.onended = () => playing.delete(node);
+  /* THE FAR SIDE'S RING (see PlayoutGate). The worklet is loaded from a
+     blob at build time; frames that arrive before it is up wait in `early`
+     and the gate's decision waits with them; the script processor takes
+     the ring on an engine without worklets. */
+  type Sink = { push(f: Float32Array): void; gate(open: boolean): void; flush(gen: number): void; close(): void };
+  let sink: Sink | null = null;
+  let playoutPath = "pending";
+  const early: Float32Array[] = [];
+  let wantOpen = false;
+  let wantGen = 0;
+  const gate = new PlayoutGate({
+    gate: (open) => {
+      wantOpen = open;
+      sink?.gate(open);
+    },
+    flush: (gen) => {
+      early.length = 0;
+      wantGen = gen;
+      wantOpen = false;
+      sink?.flush(gen);
     },
     setTimer: (fn, ms) => setTimeout(fn, ms),
     clearTimer: (h) => clearTimeout(h as ReturnType<typeof setTimeout>),
-    rate: ctx.sampleRate,
+  }, ctx.sampleRate);
+  const attachSink = (s: Sink) => {
+    sink = s;
+    s.flush(wantGen);
+    for (const f of early) s.push(f);
+    early.length = 0;
+    s.gate(wantOpen);
+  };
+  const workletSink = (node: AudioWorkletNode): Sink => ({
+    push: (f) => node.port.postMessage(f, [f.buffer]),
+    gate: (open) => node.port.postMessage({ cmd: "gate", open }),
+    flush: (gen) => node.port.postMessage({ cmd: "flush", gen }),
+    close: () => {
+      try {
+        node.disconnect();
+        node.port.close();
+      } catch {
+        /* gone */
+      }
+    },
   });
+  const processorSink = (): Sink => {
+    const ring = new PcmRing((r) => gate.onDry(r.gen, r.consumed));
+    const node = ctx.createScriptProcessor(PLAYOUT_PROCESSOR_SAMPLES, 1, 1);
+    node.onaudioprocess = (ev: AudioProcessingEvent) => ring.pull(ev.outputBuffer.getChannelData(0));
+    node.connect(farBus);
+    return {
+      push: (f) => ring.push(f),
+      gate: (open) => ring.gate(open),
+      flush: (gen) => ring.flush(gen),
+      close: () => {
+        try {
+          node.disconnect();
+        } catch {
+          /* gone */
+        }
+      },
+    };
+  };
+  const startPlayout = async (): Promise<void> => {
+    if (ctx.audioWorklet && typeof AudioWorkletNode !== "undefined") {
+      const url = URL.createObjectURL(new Blob([PLAYOUT_WORKLET_SOURCE], { type: "application/javascript" }));
+      try {
+        await ctx.audioWorklet.addModule(url);
+        if (closed) return;
+        const node = new AudioWorkletNode(ctx, PLAYOUT_WORKLET_NAME, { numberOfInputs: 0, numberOfOutputs: 1, outputChannelCount: [1] });
+        node.port.onmessage = (ev: MessageEvent) => {
+          const m = ev.data as Partial<RingReport> | null;
+          if (m && m.type === "dry") gate.onDry(Number(m.gen), Number(m.consumed));
+        };
+        node.connect(farBus);
+        attachSink(workletSink(node));
+        playoutPath = "worklet";
+        return;
+      } catch {
+        /* the processor below */
+      } finally {
+        URL.revokeObjectURL(url);
+      }
+    }
+    if (closed) return;
+    try {
+      attachSink(processorSink());
+      playoutPath = "processor";
+    } catch {
+      playoutPath = "failed";
+    }
+  };
+  void startPlayout();
   /* Silence-in-the-graph: the destination node needs an input to stay in
      the graph on some engines; the far bus at zero into it costs nothing. */
   const outKeep = ctx.createGain();
@@ -630,45 +797,29 @@ export function createBrowserWsAudio(wireRate: number, opts: { stallMs?: number 
       });
     },
     play(b64) {
+      if (closed) return;
       const samples = down.process(pcm16ToFloat(base64ToBytes(b64)));
       if (samples.length === 0) return;
-      const buffer = ctx.createBuffer(1, samples.length, ctx.sampleRate);
-      buffer.getChannelData(0).set(samples);
-      const node = ctx.createBufferSource();
-      node.buffer = buffer;
-      node.connect(farBus);
-      jitter.push({ node, duration: buffer.duration, samples: samples.length });
+      if (sink) sink.push(samples);
+      else early.push(samples);
+      gate.push(samples.length);
       void ctx.resume().catch(() => {});
     },
     mute(on) {
       farBus.gain.value = on ? 0 : 1;
     },
     endOfResponse() {
-      jitter.release();
+      gate.endOfResponse();
     },
     flush() {
-      /* Gathered frames were never started; started ones are stopped. */
-      for (const node of jitter.flush()) {
-        try {
-          node.disconnect();
-        } catch {
-          /* never connected */
-        }
-      }
-      for (const node of playing) {
-        try {
-          node.stop();
-        } catch {
-          /* already ended */
-        }
-      }
-      playing.clear();
+      /* The ring is emptied and held; nothing was ever "started". */
+      gate.flush();
     },
     levels() {
       return { mic: read(micMeter), far: read(farMeter) };
     },
     stats() {
-      return { path: capturePath, frames, peak: Math.round(peak * 100) / 100, ctx: String(ctx.state ?? ""), rate: ctx.sampleRate, start: startState, stalled, underruns: jitter.underruns, bufferMs: Math.round(jitter.target * 1000) };
+      return { path: capturePath, frames, peak: Math.round(peak * 100) / 100, ctx: String(ctx.state ?? ""), rate: ctx.sampleRate, start: startState, stalled, underruns: gate.underruns, bufferMs: Math.round(gate.target * 1000), playout: playoutPath };
     },
     playSample(bytes) {
       /* Whatever the far side was saying yields to the sample. */
@@ -709,6 +860,8 @@ export function createBrowserWsAudio(wireRate: number, opts: { stallMs?: number 
       if (stallTimer) clearTimeout(stallTimer);
       stallTimer = null;
       this.flush();
+      sink?.close();
+      sink = null;
       sample?.stop();
       sample = null;
       try {
