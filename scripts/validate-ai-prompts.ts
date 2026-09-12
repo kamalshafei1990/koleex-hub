@@ -269,7 +269,7 @@ console.log("\n── Every lane knows what day it is ──");
   const route = readFileSync("src/app/api/ai/agent/route.ts", "utf8");
   check("the general fast lane — the one with no context — gets the clock from the route",
     /import \{ buildBrandSystemPrompt, buildMinimalSystemPrompt, buildNowLine \} from "@\/lib\/server\/ai\/prompts";/.test(route) &&
-    /const systemPrompt = systemPromptBase \+ taughtBlock \+ knowledgeNudge \+\s*\(fastLane === "general" \? `\\n\\n\$\{buildNowLine\(ctx\.timezone\)\}` : ""\);/.test(route));
+    /const systemPrompt = systemPromptBase \+ taughtBlock \+ knowledgeNudge \+\s*\(fastLane === "general" \? `\\n\\n\$\{buildNowLine\(ctx\.timezone\)\}` : ""\)/.test(route));
 }
 
 console.log("\n── The Hub's products are the current range; the printed index is a fallback ──");

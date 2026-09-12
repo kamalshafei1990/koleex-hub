@@ -30,3 +30,14 @@ matched nothing and the merge of 2026-09-08 20:56 UTC produced no deployment
 at all, so the relay kept refusing the watchdog's Origin-less probe for hours
 after the fix had merged). A change anywhere under this directory deploys;
 a change elsewhere in the repository does not.
+
+Check after every merge that touches this directory: the merge of #407
+(2026-09-11, the `koleex.keepalive` frame answered here instead of being
+forwarded) produced no deployment either, with the pattern correct — the
+deployment list still ended at 2026-09-09. Until the relay carries it, a
+browser's keepalive is forwarded to the vendor as an unknown event, which the
+vendor may answer with an `error` event — one the call survives, but that the
+beacon would file as `far-side-error`, and that keeps the frame from doing
+its job. This note is the change under the directory that makes
+the deployment; if the list does not show it, deploy from the Railway
+dashboard (the service's ⋯ → Redeploy builds the latest `main`).

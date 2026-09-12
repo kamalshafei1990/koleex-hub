@@ -240,6 +240,22 @@ check(
     !isWorldFactQuery("translate this to Chinese") && !isWorldFactQuery("إيه معنى الكلمة دي") && !isWorldFactQuery("ok") && !isWorldFactQuery("thanks a lot") && !isWorldFactQuery("解释一下什么是信用证"),
 );
 check("world facts: the route treats one as live information", /isWorldFactQuery\(normalizedContent\) \|\|/.test(readFileSync("src/app/api/ai/agent/route.ts", "utf8")));
+/* Dependability plan A4, second slice: the general lane itself may look one
+   thing up. Source pins on the route — the behaviour is unit-tested in
+   validate:ai-hub-connector §6, where the connector can be imported. */
+{
+  const route = readFileSync("src/app/api/ai/agent/route.ts", "utf8");
+  const body = route.replace(/\/\*[\s\S]*?\*\//g, "");
+  check("general lane: the tool list is asked for ONLY on the general lane", /const generalTools = fastLane === "general" \? generalLaneTools\(ctx\) : null;/.test(body));
+  check("general lane: the tools ride the first call only when offered, with toolChoice auto", /\.\.\.\(generalTools \? \{ tools: generalTools, toolChoice: "auto" as const \} : \{\}\)/.test(body));
+  check("general lane: the hop runs only on a call that returned tool calls with tools offered", /if \(out\.ok && generalTools && out\.response\.toolCalls\.length > 0\)/.test(body));
+  check("general lane: what the model narrated first is retracted before the lookup", /if \(accumulated\) controller\.enqueue\(send\(\{ type: "retract" \}\)\);\s*const hop = await runGeneralSearchHop\(/.test(body));
+  check("general lane: the second call carries NO tools — a hop, never a loop", /out = await chatWithTools\(\s*\{ messages: hop\.messages, maxTokens, temperature: 0\.3, modelClass: "GENERAL" as const, stream: true \},/.test(body));
+  check("general lane: the lookup's steps are on the answer's record and the pricing seal sees them", /sealPricingSafety\(fastReply, fastSteps\)/.test(body) && /\.\.\.fastSteps,\s*\{ kind: "answer"/.test(body));
+  check("general lane: the provider label says when a lookup was made", /fast-\$\{fastLane\}\$\{fastSteps\.length > 0 \? "\+search" : ""\}/.test(body));
+  check("general lane: the log line counts lookups", /fast_search=\$\{fastSteps\.filter/.test(body));
+  check("general lane: the note is on the prompt only when the tool is offered", /\(generalTools \? `\\n\\n\$\{GENERAL_SEARCH_NOTE\}` : ""\)/.test(body));
+}
 check(
   "live info: asking to SEE something is a lookup, in three languages",
   isLiveInfoQuery("show me a picture of Port Said port") &&

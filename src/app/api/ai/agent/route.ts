@@ -56,6 +56,7 @@ import {
 } from "@/lib/server/ai/core/decide-turn";
 import { tryCannedReply } from "@/lib/server/ai/core/canned-replies";
 import { chatWithTools, activeProviderLabel } from "@/lib/server/ai/provider/registry";
+import { generalLaneTools, runGeneralSearchHop, GENERAL_SEARCH_NOTE } from "@/lib/server/ai/core/general-search";
 import { streamingFastLaneEnabled } from "@/lib/server/ai/router/provider-policy";
 import { planReveal } from "@/lib/server/ai/streaming/reveal";
 import { withPublicProvider } from "@/lib/server/ai/observability/public-provider";
@@ -594,6 +595,9 @@ export async function POST(req: Request) {
           let fastReply: string | null = null;
           let fastProvider: string | null = null;
           let fastLane: "brand" | "small" | "general" | null = null;
+          /* The lookup's steps, when the general lane made one: shown on
+             the screen as they happened and kept on the answer's record. */
+          let fastSteps: AgentStep[] = [];
 
           /* Data queries ALWAYS win over the tool-less fast lanes: a
              question can read as a brand question AND a catalog/data
@@ -630,8 +634,16 @@ export async function POST(req: Request) {
                the line is added here — at the tail, where per-minute text
                belongs (owner, 2026-09-11: "what day is it today" answered
                "I have no access to the date" from this path). */
+            /* ONE LOOKUP ON THE GENERAL LANE (dependability plan A4, second
+               slice). The lane may call search_web once and answer from the
+               result — for the world-fact questions isWorldFactQuery does
+               not catch. Offered only when the connector lists the tool for
+               this caller; the second call carries no tools, so this is a
+               hop, never a loop. core/general-search.ts has the rules. */
+            const generalTools = fastLane === "general" ? generalLaneTools(ctx) : null;
             const systemPrompt = systemPromptBase + taughtBlock + knowledgeNudge +
-              (fastLane === "general" ? `\n\n${buildNowLine(ctx.timezone)}` : "");
+              (fastLane === "general" ? `\n\n${buildNowLine(ctx.timezone)}` : "") +
+              (generalTools ? `\n\n${GENERAL_SEARCH_NOTE}` : "");
             /* Every lane, not just the tool loop: the general lane answers
                most ordinary messages, and it is where "you replied in English
                again" was coming from. */
@@ -662,24 +674,52 @@ export async function POST(req: Request) {
                the same one this lane always sent: no tools, streamed,
                per-lane token budget. */
             try {
-              const out = await chatWithTools(
+              const onDelta = (text: string) => {
+                if (!gotFirst) gotFirst = true;
+                accumulated += text;
+                controller.enqueue(send({ type: "delta", text }));
+              };
+              const irMessages = fastMessages.map((m) => ({ role: m.role, content: m.content }));
+              let out = await chatWithTools(
                 {
-                  messages: fastMessages.map((m) => ({ role: m.role, content: m.content })),
+                  messages: irMessages,
                   maxTokens,
                   temperature: 0.3,
                   /* Small talk is the cheapest thing the assistant does; brand
-                     and general answers are prose but still tool-less. */
+                     and general answers are prose. The general lane alone may
+                     make the one lookup; brand and small talk stay tool-less. */
                   modelClass: fastLane === "small" ? ("FAST" as const) : ("GENERAL" as const),
                   stream: true,
+                  ...(generalTools ? { tools: generalTools, toolChoice: "auto" as const } : {}),
                 },
-                {
-                  onDelta: (text) => {
-                    if (!gotFirst) gotFirst = true;
-                    accumulated += text;
-                    controller.enqueue(send({ type: "delta", text }));
-                  },
-                },
+                { onDelta },
               );
+              /* THE HOP. The model asked to look something up: whatever it
+                 narrated first comes off the screen (the answer replaces it),
+                 the lookup runs and is shown as it happens, and a second,
+                 tool-less call answers from the result. A second call that
+                 fails before its first delta leaves fastReply null below, so
+                 the turn falls through to the orchestrator as any other fast
+                 lane failure does. */
+              if (out.ok && generalTools && out.response.toolCalls.length > 0) {
+                if (accumulated) controller.enqueue(send({ type: "retract" }));
+                const hop = await runGeneralSearchHop({
+                  ctx,
+                  conversationId: conversationId!,
+                  calls: out.response.toolCalls,
+                  priorContent: accumulated,
+                  messages: irMessages,
+                  onStep: (steps) => controller.enqueue(send({ type: "steps", steps })),
+                });
+                fastSteps = hop.steps;
+                controller.enqueue(send({ type: "steps", steps: hop.steps }));
+                accumulated = "";
+                gotFirst = false;
+                out = await chatWithTools(
+                  { messages: hop.messages, maxTokens, temperature: 0.3, modelClass: "GENERAL" as const, stream: true },
+                  { onDelta },
+                );
+              }
               /* Lane-truthful label. The registry reports the bare model id
                  ("deepseek:deepseek-chat") — identical to orchestrate()'s
                  label, which made ai_messages.provider useless for telling
@@ -689,7 +729,7 @@ export async function POST(req: Request) {
                  whichever adapter actually served. */
               if (out.ok) {
                 fastReply = out.response.content || accumulated;
-                fastProvider = `${activeProviderLabel()}:fast-${fastLane}`;
+                fastProvider = `${activeProviderLabel()}:fast-${fastLane}${fastSteps.length > 0 ? "+search" : ""}`;
               } else if (gotFirst) {
                 /* Failed after deltas were already on the client's screen. We
                    cannot un-emit them, so keep what was said rather than
@@ -697,7 +737,7 @@ export async function POST(req: Request) {
                    registry applies the same rule one level down: it does not
                    fail over once a delta has been emitted. */
                 fastReply = accumulated || null;
-                fastProvider = `${activeProviderLabel()}:fast-${fastLane}`;
+                fastProvider = `${activeProviderLabel()}:fast-${fastLane}${fastSteps.length > 0 ? "+search" : ""}`;
               }
               /* Failed before any delta → fastReply stays null and the turn
                  falls through to orchestrate(), exactly as before. */
@@ -713,9 +753,10 @@ export async function POST(req: Request) {
                between the two branches. sealPricingSafety runs with no
                evidence steps — any pricing-like content in a brand /
                small-talk reply gets replaced with PRICING_GUARD_MESSAGE. */
-            const sealed = sealPricingSafety(fastReply, []);
+            const sealed = sealPricingSafety(fastReply, fastSteps);
             agent = {
               steps: [
+                ...fastSteps,
                 { kind: "answer", text: sealed, permissionStatus: "allowed" },
               ],
               finalReply: sealed,
@@ -884,7 +925,7 @@ export async function POST(req: Request) {
           console.log(
             `[ai] lane=${fastLane ?? "protected"} ep=agent provider=${agent.provider} intent=agent` +
               ` fallback=${agent.provider === "fallback" ? 1 : 0}` +
-              ` fast_stream=${fastReply !== null ? 1 : 0}` +
+              ` fast_stream=${fastReply !== null ? 1 : 0} fast_search=${fastSteps.filter((s) => s.kind === "tool-result").length}` +
               ` msg_lang=${detected.language} rewrote_egy=${rewroteReply ? 1 : 0}` +
               ` in_bytes=${content.length} hist=${history.length} ms=${tEnd - t0}` +
               ` stream=1 reply_bytes=${agent.finalReply.length}`,
