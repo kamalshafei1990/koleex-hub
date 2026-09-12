@@ -458,6 +458,11 @@ const EVENT_TYPES_MAX = 40;
 const EV_WS_SPEECH_STARTED = "input_audio_buffer.speech_started";
 const EV_WS_RESPONSE_CANCELLED = "response.cancelled";
 const EV_WS_RESPONSE_CREATED = "response.created";
+/* The answer's audio is over (both names of the event) or the response is
+   done: what the buffer still holds plays now (WsAudio.endOfResponse). */
+const EV_WS_AUDIO_DONE = "response.audio.done";
+const EV_WS_AUDIO_DONE_GA = "response.output_audio.done";
+const EV_WS_RESPONSE_DONE = "response.done";
 
 /** The route's statuses, mapped to what the screen can act on — the same
  *  table connect() applies inline (kept there so its pins hold). Pure. */
@@ -1889,6 +1894,14 @@ export class VoiceSession {
         } catch {
           /* One bad frame is a click, not a dropped call. */
         }
+      }
+      return;
+    }
+    if (type === EV_WS_AUDIO_DONE || type === EV_WS_AUDIO_DONE_GA || type === EV_WS_RESPONSE_DONE) {
+      try {
+        audio.endOfResponse?.();
+      } catch {
+        /* nothing gathered, nothing to play */
       }
       return;
     }

@@ -3188,7 +3188,7 @@ function describeErrorCheck(): boolean {
      page that holds the audio graph. And 18:10, the owner: "the voice of
      Grok not so stable" — frames butted 50 ms behind now, so every wire gap
      longer than that was a gap in the voice. */
-  const { JitterQueue, PREBUFFER_S, PREBUFFER_STEP_S, PREBUFFER_MAX_S, PREBUFFER_WAIT_MS, RUN_GAP_S, CAPTURE_WORKLET_SOURCE, CAPTURE_WORKLET_NAME, FRAME_SAMPLES } = await import("../src/lib/voice/ws-audio");
+  const { JitterQueue, PREBUFFER_S, PREBUFFER_STEP_S, PREBUFFER_MAX_S, PREBUFFER_WAIT_MS, RUN_GAP_S, LATE_GRACE_S, CAPTURE_WORKLET_SOURCE, CAPTURE_WORKLET_NAME, FRAME_SAMPLES } = await import("../src/lib/voice/ws-audio");
   const { aiImage, AI_IMAGE_PROXY_PATH } = await import("../src/lib/ai/image-url");
   {
     /* A fake clock and a fake scheduler: frames are letters, starts are
@@ -3205,30 +3205,65 @@ function describeErrorCheck(): boolean {
     });
     q.push({ node: "a", duration: 0.1 });
     check("the first small frame of an answer is GATHERED, not played: nothing starts, a timer is armed for the short-answer case",
-      PREBUFFER_S === 0.3 && starts.length === 0 && q.buffered === 0.1 && timers.length === 1 && timers[0].ms === PREBUFFER_WAIT_MS && PREBUFFER_WAIT_MS === 350);
+      PREBUFFER_S === 0.45 && starts.length === 0 && q.buffered === 0.1 && timers.length === 1 && timers[0].ms === PREBUFFER_WAIT_MS && PREBUFFER_WAIT_MS === 350);
     now = 10.2;
-    q.push({ node: "b", duration: 0.25 });
-    check("  …once a third of a second is held, everything plays back to back from now, and the timer is dropped",
+    q.push({ node: "b", duration: 0.4 });
+    check("  …once the lead is held, everything plays back to back from now, and the timer is dropped",
       starts.join() === "a@10.25,b@10.35" && timers.length === 0 && q.buffered === 0);
     now = 10.4;
     q.push({ node: "c", duration: 0.3 });
-    check("  …a frame arriving while the run is still ahead butts against it", starts[2] === "c@10.60");
-    /* The run ends at 10.90. A frame at 11.1 is 0.2 s late: an UNDERRUN. */
+    check("  …a frame arriving while the run is still ahead butts against it", starts[2] === "c@10.75");
+    /* The run ends at 11.05. A frame at 11.10 is 50 ms late: barely — the
+       sentence goes on from now, no gathering, the lead grows. */
     now = 11.1;
     q.push({ node: "d", duration: 0.1 });
-    check("a frame that arrives shortly after the run drained is an underrun: it is gathered again and the target grows a step",
-      starts.length === 3 && q.underruns === 1 && Math.abs(q.target - (PREBUFFER_S + PREBUFFER_STEP_S)) < 1e-9 && timers.length === 1);
+    check("a frame that arrives a few ms after the run drained CONTINUES the run from now — no hole in the sentence — and still grows the lead (owner, 2026-09-12: 'cuts while it talks')",
+      LATE_GRACE_S === 0.12 && starts[3] === "d@11.12" && q.underruns === 1 && Math.abs(q.target - (PREBUFFER_S + PREBUFFER_STEP_S)) < 1e-9 && timers.length === 0);
+    /* The run ends at 11.22. A frame at 11.5 is 0.28 s late: an UNDERRUN
+       proper — gathered again. */
+    now = 11.5;
+    q.push({ node: "e", duration: 0.1 });
+    check("a frame that arrives well after the run drained is an underrun: it is gathered again and the target grows another step",
+      starts.length === 4 && q.underruns === 2 && Math.abs(q.target - (PREBUFFER_S + 2 * PREBUFFER_STEP_S)) < 1e-9 && timers.length === 1);
     const fire = timers[0];
     timers = [];
     fire.fn();
-    check("  …and the short-answer timer releases what is held when the buffer never fills", starts[3] === "d@11.15");
-    /* The run ends at 11.25. The next answer comes 3 s later: not an underrun. */
+    check("  …and the short-answer timer releases what is held when the buffer never fills", starts[4] === "e@11.55");
+    /* The run ends at 11.65. The next answer comes 3 s later: not an underrun. */
     now = 14.5;
-    q.push({ node: "e", duration: 0.5 });
+    q.push({ node: "f", duration: 0.8 });
     check("a frame that arrives long after the run drained is the NEXT answer: gathered at the settled target, no growth",
-      RUN_GAP_S === 1.0 && q.underruns === 1 && Math.abs(q.target - 0.4) < 1e-9 && starts[4] === "e@14.55" /* 0.5 ≥ 0.4 releases at once */);
+      RUN_GAP_S === 1.0 && q.underruns === 2 && Math.abs(q.target - 0.75) < 1e-9 && starts[5] === "f@14.55" /* 0.8 ≥ 0.75 releases at once */);
     for (let i = 0; i < 20; i++) { now += 10; q.push({ node: "x", duration: 0.05 }); q.release(); now += 0.5; q.push({ node: "y", duration: 0.05 }); }
-    check("  …the target stops growing at the ceiling", PREBUFFER_MAX_S === 0.8 && Math.abs(q.target - PREBUFFER_MAX_S) < 1e-9 && q.underruns > 1);
+    check("  …the target stops growing at the ceiling", PREBUFFER_MAX_S === 1.2 && Math.abs(q.target - PREBUFFER_MAX_S) < 1e-9 && q.underruns > 2);
+    {
+      /* SAMPLE-EXACT STARTS. A thousand frames of 0.0213333… s at 24 kHz:
+         with float accumulation the last start drifts; counted in samples
+         it is exact, and every boundary lands on a whole sample. */
+      const st: number[] = [];
+      const t = 100;
+      const qq = new JitterQueue<number>({ now: () => t, start: (_n, at) => st.push(at), setTimer: () => 1, clearTimer: () => {}, rate: 24_000 });
+      const dur = 512 / 24_000;
+      for (let k = 0; k < 24; k++) qq.push({ node: k, duration: dur });
+      const runStart = st[0];
+      let exact = true;
+      for (let k = 0; k < st.length; k++) if (Math.abs(st[k] - (runStart + (k * 512) / 24_000)) > 1e-12) exact = false;
+      for (let k = 0; k < 1000; k++) qq.push({ node: k, duration: dur });
+      const lastExpected = runStart + ((23 + 1000) * 512) / 24_000;
+      check("with the rate known, every start is a whole number of samples from the run's origin — no drift over a thousand frames",
+        exact && Math.abs(st[st.length - 1] - lastExpected) < 1e-9);
+    }
+    {
+      /* END OF ANSWER: the gathered tail plays now, not glued to the next. */
+      const t2 = 50;
+      const st2: string[] = [];
+      let tm: Array<{ fn: () => void }> = [];
+      const q2 = new JitterQueue<string>({ now: () => t2, start: (n, at) => st2.push(`${n}@${at.toFixed(2)}`), setTimer: (fn) => { tm.push({ fn }); return tm.length; }, clearTimer: () => { tm = []; } });
+      q2.push({ node: "tail", duration: 0.05 });
+      check("a short tail is gathered, waiting", st2.length === 0 && tm.length === 1);
+      q2.release();
+      check("  …and released at once by end-of-response — the last letter is said now, the timer dropped", st2.join() === "tail@50.05" && tm.length === 0);
+    }
     const before = q.target;
     q.push({ node: "held", duration: 0.01 });
     const dropped = q.flush();
@@ -3238,6 +3273,10 @@ function describeErrorCheck(): boolean {
     check("the browser player feeds every decoded frame to the queue, starts nodes only when the queue says so, and a flush stops the started and disconnects the gathered",
       /jitter\.push\(\{ node, duration: buffer\.duration \}\);/.test(wa) && /start: \(node, at\) => \{\s*node\.start\(at\);\s*playing\.add\(node\);/.test(wa) &&
       /for \(const node of jitter\.flush\(\)\) \{[\s\S]{0,120}?node\.disconnect\(\);/.test(wa) && !/nextFrameStart|LEAD_S \/ 2/.test(wa));
+    check("  …the queue is told the context's rate, and the session tells the player when an answer's audio is over (both event names) and on response.done",
+      /rate: ctx\.sampleRate,\s*\}\);/.test(wa) && /endOfResponse\(\) \{\s*jitter\.release\(\);\s*\}/.test(wa) &&
+      /if \(type === EV_WS_AUDIO_DONE \|\| type === EV_WS_AUDIO_DONE_GA \|\| type === EV_WS_RESPONSE_DONE\) \{\s*try \{\s*audio\.endOfResponse\?\.\(\);/.test(fs29.readFileSync("src/lib/voice/session.ts", "utf8")) &&
+      /const EV_WS_AUDIO_DONE = "response\.audio\.done";\s*const EV_WS_AUDIO_DONE_GA = "response\.output_audio\.done";\s*const EV_WS_RESPONSE_DONE = "response\.done";/.test(fs29.readFileSync("src/lib/voice/session.ts", "utf8")));
     check("the microphone is read on the audio thread by a worklet loaded from a blob — no second file — and the processor is the fallback, never both",
       CAPTURE_WORKLET_NAME === "koleex-capture" && CAPTURE_WORKLET_SOURCE.includes(`registerProcessor("${CAPTURE_WORKLET_NAME}"`) && CAPTURE_WORKLET_SOURCE.includes(`new Float32Array(${FRAME_SAMPLES})`) &&
       CAPTURE_WORKLET_SOURCE.includes("this.port.postMessage(out, [out.buffer])") &&
