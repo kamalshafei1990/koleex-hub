@@ -232,6 +232,20 @@ export const settingsT: Translations = {
   "sounds.tonePicker":    { en: "{name} tone", zh: "{name}铃声", ar: "نغمة {name}" },
   "sounds.cat.notification": { en: "Notification", zh: "通知", ar: "الإشعارات" },
   "sounds.cat.message":   { en: "Message", zh: "消息", ar: "الرسائل" },
+  /* Koleex AI's own cues — one per moment of a call or a chat, chosen by the
+     owner from a public-domain set (2026-09-12). Moment names come from the
+     catalog itself (src/lib/sounds/catalog.ts), in the three languages. */
+  "sounds.ai":            { en: "Koleex AI", zh: "Koleex AI", ar: "Koleex AI" },
+  "sounds.ai.sub":        { en: "The short cues a call and a chat make: connected, line dropped, done, error.", zh: "通话和聊天中的短提示音：已接通、线路中断、完成、错误。", ar: "النغمات القصيرة في المكالمة والشات: اتوصل، الخط وقع، تم، خطأ." },
+  "sounds.ai.enabled":    { en: "Koleex AI sounds", zh: "Koleex AI 提示音", ar: "أصوات Koleex AI" },
+  "sounds.ai.enabled.hint": { en: "Turn every Koleex AI cue on or off at once; each moment below can be switched on its own.", zh: "一键开关所有 Koleex AI 提示音；下方每个时刻可单独设置。", ar: "شغّل أو اقفل كل أصوات Koleex AI مرة واحدة؛ وكل لحظة تحت تتظبط لوحدها." },
+  "sounds.ai.moments":    { en: "By moment", zh: "按时刻", ar: "حسب اللحظة" },
+  "sounds.ai.moments.sub": { en: "Tap a name to hear it; the switch keeps or silences that moment.", zh: "点按名称试听；开关用于保留或静音该时刻。", ar: "دوس على الاسم تسمعه؛ والمفتاح يخلّي اللحظة دي بصوت أو صامتة." },
+  "sounds.ai.group.call": { en: "On a call", zh: "通话中", ar: "في المكالمة" },
+  "sounds.ai.group.chat": { en: "In the chat", zh: "聊天中", ar: "في الشات" },
+  "sounds.ai.group.dictation": { en: "Dictation", zh: "听写", ar: "الإملاء" },
+  "sounds.ai.group.actions": { en: "Actions", zh: "操作", ar: "الإجراءات" },
+  "sounds.ai.group.general": { en: "General", zh: "常规", ar: "عام" },
   "sounds.footer":        { en: "Koleex tones are real recordings, loudness-matched so none is louder than another; only the tone you pick is downloaded. Basic tones are generated on this device and always work offline. Sound settings are per-device, like a phone's ringtone.", zh: "Koleex 铃声为真实录音，已统一响度，不会有铃声突然过响；只下载您选择的铃声。基本铃声在本设备生成，始终可离线使用。声音设置按设备保存，就像手机铃声一样。", ar: "نغمات Koleex تسجيلات حقيقية بمستوى صوت موحَّد؛ تُنزَّل فقط النغمة التي تختارها. النغمات الأساسية تُولَّد على جهازك وتعمل دائمًا دون اتصال. إعدادات الصوت خاصة بكل جهاز، مثل نغمة الهاتف." },
 
   /* ── Activities (shared: Sounds + Notification preferences) ── */

@@ -1970,8 +1970,8 @@ console.log("\n── 12. Mute ──");
   check("  …and the handshake POST carries our own deadline, read as the service not answering",
     /signal: AbortSignal\.timeout\(HANDSHAKE_TIMEOUT_MS\)/.test(sessWatch) && /this\.fail\(isTimeoutError\(e\) \? "service-unreachable" : "handshake-failed", e\);/.test(sessWatch));
   check("the tone plays once, when live AND ready, guarded by a ref so a re-render cannot repeat it",
-    /if \(live && ready && !chimedRef\.current\) \{\s*chimedRef\.current = true;\s*tonesRef\.current\?\.ready\(\);/.test(btn));
-  check("  …and a recovered connection plays its own single note", /prev === "reconnecting" && state === "live"\) tonesRef\.current\?\.recovered\(\)/.test(btn));
+    /if \(live && ready && !chimedRef\.current\) \{\s*chimedRef\.current = true;\s*(\/\*[\s\S]*?\*\/\s*)?if \(playSound\("call-ready"\) === "unavailable"\) tonesRef\.current\?\.ready\(\);/.test(btn));
+  check("  …and a recovered connection plays its own single note", /prev === "reconnecting" && state === "live"\) \{\s*if \(playSound\("call-recovered"\) === "unavailable"\) tonesRef\.current\?\.recovered\(\);/.test(btn));
   const hangUpAt16 = btn.indexOf("const releaseCall");
   const hangUpBody = btn.slice(hangUpAt16, btn.indexOf("}, [", hangUpAt16));
   check("hanging up closes the tone context and resets ready", /tonesRef\.current\?\.close\(\)/.test(hangUpBody) && /setReady\(false\)/.test(hangUpBody) && /chimedRef\.current = false/.test(hangUpBody));
@@ -2205,7 +2205,7 @@ console.log("\n── 12. Mute ──");
     /queueMicrotask\(\(\) => void startCallRef\.current\?\.\(\{ resume: true, mic: keptMic \}\)\);/.test(btn18) &&
     /if \(!opts\?\.resume\) \{\s*linesRef\.current = \[\];/.test(btn18));
   check("  …and only when it cannot come back does the caller hear the failure",
-    /if \(canResume\) \{[\s\S]*?return;\s*\}\s*(\/\*[\s\S]*?\*\/\s*)?releaseCall\(\);\s*setLaneNote\(null\);\s*onErrorRef\.current\?\.\(FAILURE_COPY\[langRef\.current\]\[failure\]\);/.test(btn18));
+    /if \(canResume\) \{[\s\S]*?return;\s*\}\s*(\/\*[\s\S]*?\*\/\s*)?releaseCall\(\);\s*setLaneNote\(null\);\s*playSound\("call-failed"\);\s*onErrorRef\.current\?\.\(FAILURE_COPY\[langRef\.current\]\[failure\]\);/.test(btn18));
   const tel = await import("../src/lib/voice/telemetry");
   const posted: Array<[string, string]> = [];
   tel.sendVoiceTelemetry({ reason: "connection-lost", elapsed_ms: 1234, ice: "failed", tool_calls: 3 }, (p, b) => posted.push([p, b]));
@@ -2466,7 +2466,7 @@ console.log("\n── 12. Mute ──");
   const btn22 = fs22.readFileSync("src/components/ai/VoiceCallButton.tsx", "utf8");
   check("hang-up takes the writer, the thread and the words BEFORE the release, then asks after the last turns landed, and the row joins the thread; a voice switch never asks",
     /const persister = persisterRef\.current;\s*const conversation = conversationIdRef\.current;\s*const lines = linesRef\.current;\s*releaseCall\(\);\s*(\/\*[^*]*\*\/\s*)?setLaneNote\(null\);\s*(\/\*[^*]*\*\/\s*)?laneAfterCallRef\.current\?\.\(\);\s*laneAfterCallRef\.current = null;\s*setState\("idle"\);\s*if \(conversation && shouldSummarise\(lines\)\) \{/.test(btn22) &&
-    /Promise\.resolve\(persister\?\.finish\(\)\)\s*\.then\(\(\) => requestCallSummary\(conversation, langRef\.current\)\)\s*\.then\(\(res\) => \{ if \(res\) onTurnsSavedRef\.current\?\.\(\[res\.message\], res\.conversation\); \}\)/.test(btn22) &&
+    /Promise\.resolve\(persister\?\.finish\(\)\)\s*\.then\(\(\) => requestCallSummary\(conversation, langRef\.current\)\)\s*\.then\(\(res\) => \{\s*if \(!res\) return;\s*onTurnsSavedRef\.current\?\.\(\[res\.message\], res\.conversation\);\s*playSound\("summary-ready"\);\s*\}\)/.test(btn22) &&
     (btn22.match(/requestCallSummary\(/g) ?? []).length === 1 && !/selectVoice[\s\S]{0,1200}?requestCallSummary/.test(btn22.slice(btn22.indexOf("const selectVoice"), btn22.indexOf("const selectVoice") + 1500)));
 
   /* ── ROADMAP B2: HOLD TO TALK ──────────────────────────────────────────
@@ -2506,7 +2506,7 @@ console.log("\n── 12. Mute ──");
   check("hold mode CLOSES the tracks the moment the microphone exists — per session, so a rebuilt line keeps the mode — through the session's own mute",
     /onLocalStream: \(stream\) => \{\s*setMicStream\(stream\);[\s\S]{0,900}?if \(talkModeRef\.current === "hold"\) \{\s*session\.setMuted\(true\);\s*setMuted\(true\);\s*\}\s*\},/.test(btn23));
   check("the hold opens the tracks while held and closes them on release, and is IGNORED outside hold mode (a stray event must not close a hands-free microphone)",
-    /const setHolding = useCallback\(\(held: boolean\) => \{\s*const session = sessionRef\.current;\s*if \(!session \|\| talkModeRef\.current !== "hold"\) return;\s*session\.setMuted\(!held\);\s*setMuted\(!held\);\s*\}, \[\]\);/.test(btn23));
+    /const setHolding = useCallback\(\(held: boolean\) => \{\s*const session = sessionRef\.current;\s*if \(!session \|\| talkModeRef\.current !== "hold"\) return;\s*session\.setMuted\(!held\);\s*setMuted\(!held\);\s*playSound\(held \? "ptt-start" : "ptt-stop"\);\s*\}, \[\]\);/.test(btn23));
   check("choosing a mode is remembered on the device and applied to the live call at once — closed for hold, open for hands-free — without a new session",
     /const selectTalkMode = useCallback\(\(mode: TalkMode\) => \{\s*talkModeRef\.current = mode;\s*setTalkMode\(mode\);\s*saveTalkMode\(mode\);\s*const session = sessionRef\.current;\s*if \(!session\) return;\s*const closed = mode === "hold";\s*session\.setMuted\(closed\);\s*setMuted\(closed\);\s*\}, \[\]\);/.test(btn23) &&
     !/selectTalkMode[\s\S]{0,600}?releaseCall\(\)/.test(btn23.slice(btn23.indexOf("const selectTalkMode"), btn23.indexOf("const selectTalkMode") + 700)));
@@ -2552,7 +2552,7 @@ console.log("\n── 12. Mute ──");
   const btn26 = fs22.readFileSync("src/components/ai/VoiceCallButton.tsx", "utf8");
   check("the tap posts the previewed arguments with confirm:true marked via tap to the fixed tool path, then tells the model in a note; a cancel tells it too; hang-up clears the card",
     /fetch\(TOOL_PATH, \{\s*method: "POST",\s*credentials: "include",[\s\S]{0,300}?name: pending\.tool,[\s\S]{0,120}?arguments: JSON\.stringify\(\{ \.\.\.pending\.args, confirm: true \}\),\s*via: "tap",/.test(btn26) &&
-    /if \(!body\?\.output\?\.ok\) \{\s*setWriteError\(true\);\s*return;\s*\}/.test(btn26) &&
+    /if \(!body\?\.output\?\.ok\) \{\s*setWriteError\(true\);\s*playSound\("error"\);\s*return;\s*\}/.test(btn26) &&
     /session\?\.sendNote\(`\(Screen: the caller tapped Confirm/.test(btn26) &&
     /sessionRef\.current\?\.sendNote\("\(Screen: the caller cancelled the task card/.test(btn26) &&
     /releaseWakeLock\(\);\s*setPendingWrite\(null\);/.test(btn26) &&
@@ -3863,7 +3863,7 @@ function describeErrorCheck(): boolean {
     /lane=\{chosenLane\}\s*onSelectLane=\{lanesAvailable \? selectLane : undefined\}/.test(btn));
   check("choosing a line moves the next call there, saves it as the device's verdict, re-arms the one fall-back, clears the note, offers that line's voices with the current one kept, and rebuilds a running call",
     /const selectLane = useCallback\(\(lane: "rtc" \| "ws"\) => \{\s*if \(lane === transportRef\.current\) return;\s*transportRef\.current = lane;\s*saveLane\(lane, Date\.now\(\), "user"\);\s*laneFellBackRef\.current = false;\s*setLaneNote\(null\);\s*const list = byLaneRef\.current\[lane\]\.length > 0 \? byLaneRef\.current\[lane\] : byLaneRef\.current\.rtc;\s*setVoices\(list\);\s*const next = pickVoiceKey\(voiceKeyRef\.current \?\? readSavedVoiceKey\(\), list\);\s*voiceKeyRef\.current = next;\s*setVoiceKey\(next\);\s*setChosenLane\(lane\);\s*rebuildCall\(\);\s*\}, \[rebuildCall\]\);/.test(btn) &&
-    /const selectVoice = useCallback\(\(key: string\) => \{\s*setVoiceKey\(key\);\s*voiceKeyRef\.current = key;\s*saveVoiceKey\(key\);\s*rebuildCall\(\);\s*\}, \[rebuildCall\]\);/.test(btn) &&
+    /const selectVoice = useCallback\(\(key: string\) => \{\s*setVoiceKey\(key\);\s*voiceKeyRef\.current = key;\s*saveVoiceKey\(key\);\s*if \(sessionRef\.current\) playSound\("voice-switched"\);\s*rebuildCall\(\);\s*\}, \[rebuildCall\]\);/.test(btn) &&
     /const rebuildCall = useCallback\(\(\) => \{\s*const current = sessionRef\.current;\s*if \(!current\) return;/.test(btn));
   check("a fall-back to the mainland line moves the current voice onto the mainland list — state AND ref, before the next start — marks the line, and says so on the screen",
     /const fallToMainlandVoice = useCallback\(\(\) => \{\s*const next = pickVoiceKey\(voiceKeyRef\.current \?\? readSavedVoiceKey\(\), byLaneRef\.current\.rtc\);\s*voiceKeyRef\.current = next;\s*setVoiceKey\(next\);\s*setChosenLane\("rtc"\);\s*setLaneNote\("international-unreachable"\);\s*\}, \[\]\);/.test(btn) &&
@@ -3909,8 +3909,8 @@ console.log("\n── 39. one voice control: a long press dictates through the s
     /const dictation = useDictation\(\{ lang, onTranscript, onError \}\);/.test(mic) && !/webkitSpeechRecognition/.test(mic));
   check("a press past the hold threshold starts dictation; release stops it and the words go to the caller; the click that follows a hold is swallowed, a tap still calls",
     /const HOLD_TO_DICTATE_MS = 450;/.test(btn) &&
-    /holdTimerRef\.current = window\.setTimeout\(\(\) => \{\s*holdTimerRef\.current = null;\s*heldRef\.current = true;\s*dict\.start\(\);\s*\}, HOLD_TO_DICTATE_MS\);/.test(btn) &&
-    /const releaseHold = useCallback\(\(\) => \{\s*clearHold\(\);\s*if \(heldRef\.current\) dict\.stop\(\);/.test(btn) &&
+    /holdTimerRef\.current = window\.setTimeout\(\(\) => \{\s*holdTimerRef\.current = null;\s*heldRef\.current = true;\s*playSound\("dictation-start"\);\s*dict\.start\(\);\s*\}, HOLD_TO_DICTATE_MS\);/.test(btn) &&
+    /const releaseHold = useCallback\(\(\) => \{\s*clearHold\(\);\s*if \(heldRef\.current\) \{\s*dict\.stop\(\);\s*playSound\("dictation-stop"\);\s*\}/.test(btn) &&
     /const tapStartsCall = \(\) => \{\s*if \(heldRef\.current\) \{\s*heldRef\.current = false;\s*return;\s*\}\s*void startCall\(\);/.test(btn) &&
     /onPointerUp: releaseHold,\s*onPointerLeave: releaseHold,\s*onPointerCancel: releaseHold,/.test(btn) &&
     /onContextMenu: \(e: React\.MouseEvent\) => e\.preventDefault\(\),/.test(btn));
@@ -4076,7 +4076,7 @@ console.log("\n── 41. bug hunt: resume count, a busy server, corrections by 
       /const delay = this\.wsRetryAfterMs !== null \? Math\.max\(backoff, this\.wsRetryAfterMs\) : backoff;\s*this\.wsRetryAfterMs = null;/.test(src));
     const btn = fsE.readFileSync("src/components/ai/VoiceCallButton.tsx", "utf8");
     check("the call button closes the cut answer on `reconnecting`, finishes the dying call's writer before the next start, and seeds the next writer from where it stopped",
-      /if \(next === "reconnecting"\) \{\s*const cut = settleOpenLine\(linesRef\.current, "assistant"\);/.test(btn) &&
+      /if \(next === "reconnecting"\) \{\s*playSound\("call-reconnecting"\);\s*const cut = settleOpenLine\(linesRef\.current, "assistant"\);/.test(btn) &&
       /const dropped = settleOpenLine\(linesRef\.current, "assistant"\);[\s\S]*?resumeSettledRef\.current = persisterRef\.current\?\.settled\(\) \?\? null;\s*void persisterRef\.current\?\.finish\(\);\s*persisterRef\.current = null;\s*if \(canFallBack\) \{/.test(btn) &&
       /opts\?\.resume \? \(resumeSettledRef\.current \?\? linesRef\.current\.filter\(\(l\) => l\.final\)\.length\) : 0,\s*\);\s*resumeSettledRef\.current = null;/.test(btn));
     const route = fsE.readFileSync("src/app/api/ai/agent/route.ts", "utf8");
@@ -4122,6 +4122,41 @@ console.log("\n── 42. the sound catalog: one family, pinned grammar, the cal
     tn.scheduleTone(fake as unknown as Parameters<typeof tn.scheduleTone>[0], [{ freq: 440, at: 0, dur: 0.1 }, { freq: 440, at: 0.2, dur: 0.1, wave: "triangle", level: 0.5 }]);
     check("the scheduler plays a plain note as a sine at the family gain, and a marked note with its wave and level",
       made.length === 2 && made[0].type === "sine" && Math.abs(made[0].peak - tn.TONE_GAIN) < 1e-9 && made[1].type === "triangle" && Math.abs(made[1].peak - tn.TONE_GAIN * 0.5) < 1e-9);
+  }
+  {
+    /* THE OWNER'S PICKS (2026-09-12): every moment names a recorded file
+       that is really in the app, with its provenance beside it. */
+    const fsG = await import("node:fs");
+    check("every cue names a recording that ships with the app, under the moment's own name, with the CC0 notice beside it",
+      cat.SOUND_CATALOG.every((s) => s.file === s.key && fsG.existsSync(`public/sounds/ai/${s.file}.mp3`) && fsG.statSync(`public/sounds/ai/${s.file}.mp3`).size > 500 && fsG.statSync(`public/sounds/ai/${s.file}.mp3`).size < 60_000) &&
+      /CC0 1\.0/.test(fsG.readFileSync("public/sounds/ai/NOTICE.txt", "utf8")));
+    check("the owner's three silent moments start off: sent, received, copied — and nothing else does but thinking",
+      cat.SOUND_CATALOG.filter((s) => !s.defaultOn).map((s) => s.key).sort().join() === "copied,message-sent,reply-received,thinking");
+    const player = await import("../src/lib/sounds/player");
+    const base = { master: true, dnd: false, volume: 0.8, notification: { enabled: true, tone: "classic" as const }, message: { enabled: true, tone: "classic" as const }, call: { enabled: true, tone: "ping" as const }, ai: { enabled: true, muted: [] as string[] } };
+    check("a moment is on by its default, off when silenced, on when woken; the master and the Koleex AI switch silence everything; do-not-disturb does not",
+      player.soundEnabled("call-ready", base) && !player.soundEnabled("copied", base) &&
+      !player.soundEnabled("call-ready", { ...base, ai: { enabled: true, muted: ["call-ready"] } }) &&
+      player.soundEnabled("copied", { ...base, ai: { enabled: true, muted: ["+copied"] } }) &&
+      !player.soundEnabled("call-ready", { ...base, master: false }) && !player.soundEnabled("call-ready", { ...base, ai: { enabled: false, muted: [] } }) &&
+      player.soundEnabled("call-ready", { ...base, dnd: true }));
+    check("  …and the settings store only departures from the default: silencing a default-on moment, waking a default-off one",
+      (() => {
+        const writes: Array<{ ai: { muted: string[] } }> = [];
+        const set = (p: { ai: { muted: string[] } }) => writes.push(p);
+        player.setSoundMoment("call-ready", false, set, base);
+        player.setSoundMoment("copied", true, set, base);
+        player.setSoundMoment("call-ready", true, set, { ...base, ai: { enabled: true, muted: ["call-ready", "+copied"] } });
+        return writes.map((w) => w.ai.muted.join("|")).join(";") === "call-ready;+copied;+copied";
+      })());
+    check("the recording's path is under the app's own origin, never a vendor host", player.soundSrc("call-ready") === "/sounds/ai/call-ready.mp3");
+    const btnS = fsG.readFileSync("src/components/ai/VoiceCallButton.tsx", "utf8");
+    const appS = fsG.readFileSync("src/components/ai/KoleexAiApp.tsx", "utf8");
+    const wired = (src: string, keys: string[]) => keys.every((k) => new RegExp(`playSound\\([^)]*"${k}"`).test(src));
+    check("every call moment is wired in the call button and every chat moment in the chat, through the one player",
+      wired(btnS, ["call-dialing", "call-ready", "call-reconnecting", "call-recovered", "call-failed", "call-end", "mic-mute", "mic-unmute", "ptt-start", "ptt-stop", "thinking", "pictures-shown", "voice-switched", "summary-ready", "dictation-start", "dictation-stop", "approval-needed", "action-done", "action-cancelled"]) &&
+      wired(appS, ["error", "back-online", "copied", "attachment-ready", "attachment-failed", "call-interrupted", "generation-stopped", "message-sent", "reply-received", "deleted"]) &&
+      /primeSounds\(\["call-dialing"/.test(btnS) && /if \(!opts\?\.resume\) playSound\("call-dialing"\);/.test(btnS));
   }
   const fsF = await import("node:fs");
   const gen = fsF.readFileSync("scripts/sounds-preview.ts", "utf8");

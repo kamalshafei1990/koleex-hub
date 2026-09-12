@@ -1,0 +1,39 @@
+Koleex AI interface cues — provenance
+
+These MP3 files are the "glass" pack of UI SFX (https://github.com/romainsimon/uisfx),
+whose audio is dedicated to the public domain under CC0 1.0 Universal
+(https://creativecommons.org/publicdomain/zero/1.0/). Attribution is not
+required; this notice is kept so the origin of what ships stays auditable.
+
+Each file is named for the Koleex AI moment it plays on (see
+src/lib/sounds/catalog.ts). Original cue names, for reference:
+  call-dialing.mp3  <-  glass/queued.mp3
+  call-ready.mp3  <-  glass/unlock.mp3
+  call-reconnecting.mp3  <-  glass/disconnect.mp3
+  call-recovered.mp3  <-  glass/success.mp3
+  call-failed.mp3  <-  glass/blocked.mp3
+  call-end.mp3  <-  glass/sleep.mp3
+  mic-mute.mp3  <-  glass/collapse.mp3
+  mic-unmute.mp3  <-  glass/toggle-on.mp3
+  ptt-start.mp3  <-  glass/focus.mp3
+  ptt-stop.mp3  <-  glass/stop.mp3
+  thinking.mp3  <-  glass/progress-step.mp3
+  pictures-shown.mp3  <-  glass/expand.mp3
+  voice-switched.mp3  <-  glass/snap.mp3
+  call-interrupted.mp3  <-  glass/blocked.mp3
+  summary-ready.mp3  <-  glass/receive.mp3
+  message-sent.mp3  <-  glass/press.mp3
+  reply-received.mp3  <-  glass/mention.mp3
+  generation-stopped.mp3  <-  glass/stop.mp3
+  error.mp3  <-  glass/invalid-drop.mp3
+  back-online.mp3  <-  glass/redo.mp3
+  copied.mp3  <-  glass/copy.mp3
+  attachment-ready.mp3  <-  glass/success.mp3
+  attachment-failed.mp3  <-  glass/invalid-drop.mp3
+  dictation-start.mp3  <-  glass/start.mp3
+  dictation-stop.mp3  <-  glass/check.mp3
+  approval-needed.mp3  <-  glass/info.mp3
+  action-done.mp3  <-  glass/purchase.mp3
+  action-cancelled.mp3  <-  glass/cancel.mp3
+  action-denied.mp3  <-  glass/blocked.mp3
+  deleted.mp3  <-  glass/delete.mp3
