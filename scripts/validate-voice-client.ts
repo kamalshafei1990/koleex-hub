@@ -3188,71 +3188,121 @@ function describeErrorCheck(): boolean {
      page that holds the audio graph. And 18:10, the owner: "the voice of
      Grok not so stable" — frames butted 50 ms behind now, so every wire gap
      longer than that was a gap in the voice. */
-  const { JitterQueue, PREBUFFER_S, PREBUFFER_STEP_S, PREBUFFER_MAX_S, PREBUFFER_WAIT_MS, RUN_GAP_S, LATE_GRACE_S, CAPTURE_WORKLET_SOURCE, CAPTURE_WORKLET_NAME, FRAME_SAMPLES } = await import("../src/lib/voice/ws-audio");
+  const { PlayoutGate, PcmRing, PREBUFFER_S, PREBUFFER_STEP_S, PREBUFFER_MAX_S, PREBUFFER_WAIT_MS, REGATHER_EXTRA_MS, PLAYOUT_WORKLET_SOURCE, PLAYOUT_WORKLET_NAME, PLAYOUT_PROCESSOR_SAMPLES, CAPTURE_WORKLET_SOURCE, CAPTURE_WORKLET_NAME, FRAME_SAMPLES } = await import("../src/lib/voice/ws-audio");
   const { aiImage, AI_IMAGE_PROXY_PATH } = await import("../src/lib/ai/image-url");
   {
-    /* A fake clock and a fake scheduler: frames are letters, starts are
-       recorded as "letter@time". */
-    let now = 10;
-    const starts: string[] = [];
+    /* THE GATE, driven by hand (2026-09-12 night: the far side is ONE stream
+       through a ring; this decides when the ring may play). A fake ring
+       records opens and flushes; a fake clock holds timers. 48 kHz. */
+    const R = 48_000;
+    const gates: boolean[] = [];
+    const flushes: number[] = [];
     let timers: Array<{ fn: () => void; ms: number; id: number }> = [];
     let nextId = 1;
-    const q = new JitterQueue<string>({
-      now: () => now,
-      start: (node, at) => starts.push(`${node}@${at.toFixed(2)}`),
+    const g = new PlayoutGate({
+      gate: (open) => gates.push(open),
+      flush: (gen) => flushes.push(gen),
       setTimer: (fn, ms) => { const id = nextId++; timers.push({ fn, ms, id }); return id; },
       clearTimer: (h) => { timers = timers.filter((t) => t.id !== h); },
-    });
-    q.push({ node: "a", duration: 0.1 });
-    check("the first small frame of an answer is GATHERED, not played: nothing starts, a timer is armed for the short-answer case",
-      PREBUFFER_S === 0.45 && starts.length === 0 && q.buffered === 0.1 && timers.length === 1 && timers[0].ms === PREBUFFER_WAIT_MS && PREBUFFER_WAIT_MS === 350);
-    now = 10.2;
-    q.push({ node: "b", duration: 0.4 });
-    check("  …once the lead is held, everything plays back to back from now, and the timer is dropped",
-      starts.join() === "a@10.25,b@10.35" && timers.length === 0 && q.buffered === 0);
-    now = 10.4;
-    q.push({ node: "c", duration: 0.3 });
-    check("  …a frame arriving while the run is still ahead butts against it", starts[2] === "c@10.75");
-    /* The run ends at 11.05. A frame at 11.10 is 50 ms late: barely — the
-       sentence goes on from now, no gathering, the lead grows. */
-    now = 11.1;
-    q.push({ node: "d", duration: 0.1 });
-    check("a frame that arrives a few ms after the run drained CONTINUES the run from now — no hole in the sentence — and still grows the lead (owner, 2026-09-12: 'cuts while it talks')",
-      LATE_GRACE_S === 0.12 && starts[3] === "d@11.12" && q.underruns === 1 && Math.abs(q.target - (PREBUFFER_S + PREBUFFER_STEP_S)) < 1e-9 && timers.length === 0);
-    /* The run ends at 11.22. A frame at 11.5 is 0.28 s late: an UNDERRUN
-       proper — gathered again. */
-    now = 11.5;
-    q.push({ node: "e", duration: 0.1 });
-    check("a frame that arrives well after the run drained is an underrun: it is gathered again and the target grows another step",
-      starts.length === 4 && q.underruns === 2 && Math.abs(q.target - (PREBUFFER_S + 2 * PREBUFFER_STEP_S)) < 1e-9 && timers.length === 1);
+    }, R);
+    g.push(0.1 * R);
+    check("the first small frame of an answer is GATHERED, not played: the ring stays shut, a timer is armed for the short-answer case",
+      PREBUFFER_S === 0.45 && gates.length === 0 && g.phase === "gathering" && Math.abs(g.buffered - 0.1) < 1e-9 && timers.length === 1 && timers[0].ms === PREBUFFER_WAIT_MS && PREBUFFER_WAIT_MS === 350);
+    g.push(0.4 * R);
+    check("  …once the lead is held the ring is opened and the timer dropped", gates.join() === "true" && g.phase === "playing" && timers.length === 0);
+    g.push(0.3 * R);
+    check("  …frames arriving while it plays just go in — no second open", gates.length === 1);
+    g.onDry(0, 0.8 * R);
+    check("a ring that runs dry inside an answer is an UNDERRUN: the target grows a step and the gathering waits long enough to rebuild it, not the short-answer wait (owner, 2026-09-12: 'cuts while it talks')",
+      g.underruns === 1 && Math.abs(g.target - (PREBUFFER_S + PREBUFFER_STEP_S)) < 1e-9 && g.phase === "gathering" && gates.length === 1 && timers.length === 1 && timers[0].ms === Math.round(g.target * 1000) + REGATHER_EXTRA_MS && REGATHER_EXTRA_MS === 250);
+    g.push(0.3 * R);
+    check("  …a frame short of the grown target keeps gathering", gates.length === 1 && Math.abs(g.buffered - 0.3) < 1e-9);
+    g.push(0.3 * R);
+    check("  …and the frame that reaches it opens the ring again", gates.join() === "true,true" && g.phase === "playing" && timers.length === 0);
+    g.endOfResponse();
+    g.onDry(0, 1.4 * R);
+    check("a ring that drains after the answer's end is the answer over: idle, no growth", g.phase === "idle" && g.underruns === 1 && Math.abs(g.target - 0.6) < 1e-9);
+    g.push(0.05 * R);
     const fire = timers[0];
     timers = [];
     fire.fn();
-    check("  …and the short-answer timer releases what is held when the buffer never fills", starts[4] === "e@11.55");
-    /* The run ends at 11.65. The next answer comes 3 s later: not an underrun. */
-    now = 14.5;
-    q.push({ node: "f", duration: 0.8 });
-    check("a frame that arrives long after the run drained is the NEXT answer: gathered at the settled target, no growth",
-      RUN_GAP_S === 1.0 && q.underruns === 2 && Math.abs(q.target - 0.75) < 1e-9 && starts[5] === "f@14.55" /* 0.8 ≥ 0.75 releases at once */);
-    for (let i = 0; i < 20; i++) { now += 10; q.push({ node: "x", duration: 0.05 }); q.release(); now += 0.5; q.push({ node: "y", duration: 0.05 }); }
-    check("  …the target stops growing at the ceiling", PREBUFFER_MAX_S === 1.2 && Math.abs(q.target - PREBUFFER_MAX_S) < 1e-9 && q.underruns > 2);
-    {
-      /* SAMPLE-EXACT STARTS. A thousand frames of 0.0213333… s at 24 kHz:
-         with float accumulation the last start drifts; counted in samples
-         it is exact, and every boundary lands on a whole sample. */
-      const st: number[] = [];
-      const t = 100;
-      const qq = new JitterQueue<number>({ now: () => t, start: (_n, at) => st.push(at), setTimer: () => 1, clearTimer: () => {}, rate: 24_000 });
-      const dur = 512 / 24_000;
-      for (let k = 0; k < 24; k++) qq.push({ node: k, duration: dur });
-      const runStart = st[0];
-      let exact = true;
-      for (let k = 0; k < st.length; k++) if (Math.abs(st[k] - (runStart + (k * 512) / 24_000)) > 1e-12) exact = false;
-      for (let k = 0; k < 1000; k++) qq.push({ node: k, duration: dur });
-      const lastExpected = runStart + ((23 + 1000) * 512) / 24_000;
-      check("with the rate known, every start is a whole number of samples from the run's origin — no drift over a thousand frames",
-        exact && Math.abs(st[st.length - 1] - lastExpected) < 1e-9);
-    }
+    check("a short answer that never fills the lead plays after the short-answer wait", gates.length === 3 && g.phase === "playing");
+    g.endOfResponse();
+    g.onDry(0, 1.45 * R);
+    g.push(0.05 * R);
+    g.endOfResponse();
+    check("the gathered tail plays the moment the far side says the answer is over — the last letter is said now, the timer dropped", gates.length === 4 && timers.length === 0);
+    g.onDry(0, 1.5 * R);
+    g.push(0.1 * R);
+    const before = g.target;
+    g.flush();
+    check("flush() empties the ring under a new generation, forgets the run, keeps the target", flushes.join() === "1" && g.generation === 1 && g.phase === "idle" && g.buffered === 0 && g.target === before && timers.length === 0);
+    g.push(0.6 * R);
+    g.onDry(0, 0.6 * R);
+    check("  …a dry report from the old generation changes nothing", g.phase === "playing" && g.underruns === 1);
+    for (let i = 0; i < 20; i++) { g.onDry(1, 0); g.push(1.3 * R); }
+    check("  …the target stops growing at the ceiling", PREBUFFER_MAX_S === 1.2 && Math.abs(g.target - PREBUFFER_MAX_S) < 1e-9 && g.underruns > 2 && g.phase === "playing");
+  }
+  {
+    /* THE RING: frames of any size in, blocks out with no seam; shut it is
+       silence; dry while open is reported once and it holds. */
+    const reports: Array<{ gen: number; consumed: number }> = [];
+    const ring = new PcmRing((r) => reports.push({ gen: r.gen, consumed: r.consumed }));
+    const out = new Float32Array(128);
+    ring.push(Float32Array.from({ length: 200 }, (_, i) => i + 1));
+    ring.pull(out);
+    check("a shut ring gives silence and keeps what it holds", out.every((v) => v === 0) && ring.held === 200 && reports.length === 0);
+    ring.gate(true);
+    ring.pull(out);
+    ring.push(Float32Array.from({ length: 100 }, (_, i) => 201 + i));
+    const out2 = new Float32Array(128);
+    ring.pull(out2);
+    check("open, blocks come out of the frames in order across frame joints — 1..128 then 129..256", out[0] === 1 && out[127] === 128 && out2[0] === 129 && out2[127] === 256 && ring.held === 44);
+    const out3 = new Float32Array(128);
+    ring.pull(out3);
+    check("  …running dry mid-block plays what is left, silence after, reports ONCE with the samples consumed, and shuts", out3[43] === 300 && out3[44] === 0 && reports.length === 1 && reports[0].consumed === 300 && reports[0].gen === 0);
+    ring.pull(out3);
+    check("  …a second block while dry is silence, not a second report", reports.length === 1);
+    ring.push(new Float32Array(10));
+    ring.pull(out3);
+    check("  …a frame after the dry waits: the ring holds until the gate opens it", ring.held === 10 && reports.length === 1);
+    ring.flush(7);
+    ring.gate(true);
+    ring.pull(out3);
+    check("flush() empties it under the new generation, and the next dry carries that generation", ring.held === 0 && reports.length === 2 && reports[1].gen === 7 && reports[1].consumed === 0);
+  }
+  {
+    /* THE WORKLET IS THE RING: its source runs here against a fake
+       AudioWorkletProcessor, so what the audio thread does is tested, not
+       pinned by regex. */
+    const posted: Array<{ type: string; gen: number; consumed: number }> = [];
+    class FakeProcessor { port = { onmessage: null as null | ((ev: { data: unknown }) => void), postMessage: (m: { type: string; gen: number; consumed: number }) => { posted.push(m); } }; }
+    type Proc = { port: FakeProcessor["port"]; process(i: unknown[], o: Float32Array[][]): boolean };
+    const registry: Record<string, new () => Proc> = {};
+    new Function("AudioWorkletProcessor", "registerProcessor", PLAYOUT_WORKLET_SOURCE)(FakeProcessor, (name: string, cls: new () => Proc) => { registry[name] = cls; });
+    const Ring = registry[PLAYOUT_WORKLET_NAME];
+    check("the playout worklet registers under its name", PLAYOUT_WORKLET_NAME === "koleex-playout" && typeof Ring === "function");
+    const p = new Ring();
+    const block = () => [[new Float32Array(128)]];
+    p.port.onmessage?.({ data: Float32Array.from({ length: 200 }, (_, i) => i + 1) });
+    let o = block();
+    p.process([], o);
+    check("  …shut, it renders silence and keeps the frame", o[0][0].every((v) => v === 0) && posted.length === 0);
+    p.port.onmessage?.({ data: { cmd: "gate", open: true } });
+    o = block();
+    p.process([], o);
+    const first = o[0][0];
+    o = block();
+    const keep = p.process([], o);
+    check("  …open, blocks come out in order across the frame joint; dry mid-block is silence after, reported once with the samples consumed, and it shuts",
+      first[0] === 1 && first[127] === 128 && o[0][0][71] === 200 && o[0][0][72] === 0 && posted.length === 1 && posted[0].type === "dry" && posted[0].consumed === 200 && posted[0].gen === 0 && keep === true);
+    p.process([], block());
+    check("  …and stays silent without a second report", posted.length === 1);
+    p.port.onmessage?.({ data: { cmd: "flush", gen: 3 } });
+    p.port.onmessage?.({ data: { cmd: "gate", open: true } });
+    p.process([], block());
+    check("  …a flush begins the generation named; the next dry carries it", posted.length === 2 && posted[1].gen === 3 && posted[1].consumed === 0);
+  }
     {
       /* ONE RESAMPLER FOR THE WHOLE STREAM (owner, 2026-09-12 evening: the
          crackle survived a buffer with zero underruns). Frames of a 24 kHz
@@ -3285,28 +3335,18 @@ function describeErrorCheck(): boolean {
       check("  …equal rates pass the frame through untouched; the old per-frame resample still exists for callers that have no stream",
         same.process(inp) === inp && resample(inp, 48_000, 48_000) === inp && new StreamResampler(48_000, 24_000).process(new Float32Array(4800)).length === 2400);
     }
-    {
-      /* END OF ANSWER: the gathered tail plays now, not glued to the next. */
-      const t2 = 50;
-      const st2: string[] = [];
-      let tm: Array<{ fn: () => void }> = [];
-      const q2 = new JitterQueue<string>({ now: () => t2, start: (n, at) => st2.push(`${n}@${at.toFixed(2)}`), setTimer: (fn) => { tm.push({ fn }); return tm.length; }, clearTimer: () => { tm = []; } });
-      q2.push({ node: "tail", duration: 0.05 });
-      check("a short tail is gathered, waiting", st2.length === 0 && tm.length === 1);
-      q2.release();
-      check("  …and released at once by end-of-response — the last letter is said now, the timer dropped", st2.join() === "tail@50.05" && tm.length === 0);
-    }
-    const before = q.target;
-    q.push({ node: "held", duration: 0.01 });
-    const dropped = q.flush();
-    check("flush() hands back what was gathered and never started, forgets the run, and keeps the target", dropped.includes("held") && q.buffered === 0 && q.target === before);
+  {
     const fs29 = await import("node:fs");
     const wa = fs29.readFileSync("src/lib/voice/ws-audio.ts", "utf8");
-    check("the browser player feeds every decoded frame to the queue, starts nodes only when the queue says so, and a flush stops the started and disconnects the gathered",
-      /jitter\.push\(\{ node, duration: buffer\.duration, samples: samples\.length \}\);/.test(wa) && /start: \(node, at\) => \{\s*node\.start\(at\);\s*playing\.add\(node\);/.test(wa) &&
-      /for \(const node of jitter\.flush\(\)\) \{[\s\S]{0,120}?node\.disconnect\(\);/.test(wa) && !/nextFrameStart|LEAD_S \/ 2/.test(wa));
-    check("  …the queue is told the context's rate, and the session tells the player when an answer's audio is over (both event names) and on response.done",
-      /rate: ctx\.sampleRate,\s*\}\);/.test(wa) && /endOfResponse\(\) \{\s*jitter\.release\(\);\s*\}/.test(wa) &&
+    check("the browser player pushes every decoded frame into the ring and tells the gate; the worklet is loaded from a blob with no inputs and one channel out; the processor is the fallback; dry reports from either reach the gate; flush is the gate's flush; no node per frame remains",
+      /if \(sink\) sink\.push\(samples\);\s*else early\.push\(samples\);\s*gate\.push\(samples\.length\);/.test(wa) &&
+      /URL\.createObjectURL\(new Blob\(\[PLAYOUT_WORKLET_SOURCE\], \{ type: "application\/javascript" \}\)\)/.test(wa) &&
+      /new AudioWorkletNode\(ctx, PLAYOUT_WORKLET_NAME, \{ numberOfInputs: 0, numberOfOutputs: 1, outputChannelCount: \[1\] \}\)/.test(wa) &&
+      /if \(m && m\.type === "dry"\) gate\.onDry\(Number\(m\.gen\), Number\(m\.consumed\)\);/.test(wa) &&
+      /const ring = new PcmRing\(\(r\) => gate\.onDry\(r\.gen, r\.consumed\)\);\s*const node = ctx\.createScriptProcessor\(PLAYOUT_PROCESSOR_SAMPLES, 1, 1\);\s*node\.onaudioprocess = \(ev: AudioProcessingEvent\) => ring\.pull\(ev\.outputBuffer\.getChannelData\(0\)\);\s*node\.connect\(farBus\);/.test(wa) &&
+      /flush\(\) \{[\s\S]{0,120}?gate\.flush\(\);\s*\}/.test(wa) && !/JitterQueue|nextFrameStart|LEAD_S \/ 2|jitter\.push|createBufferSource\(\);\s*node\.buffer = buffer;\s*node\.connect\(farBus\);\s*(jitter|gate)/.test(wa) && PLAYOUT_PROCESSOR_SAMPLES === 2048);
+    check("  …the session tells the player when an answer's audio is over (both event names) and on response.done, and the gate hears it",
+      /endOfResponse\(\) \{\s*gate\.endOfResponse\(\);\s*\}/.test(wa) &&
       /if \(type === EV_WS_AUDIO_DONE \|\| type === EV_WS_AUDIO_DONE_GA \|\| type === EV_WS_RESPONSE_DONE\) \{\s*try \{\s*audio\.endOfResponse\?\.\(\);/.test(fs29.readFileSync("src/lib/voice/session.ts", "utf8")) &&
       /const EV_WS_AUDIO_DONE = "response\.audio\.done";\s*const EV_WS_AUDIO_DONE_GA = "response\.output_audio\.done";\s*const EV_WS_RESPONSE_DONE = "response\.done";/.test(fs29.readFileSync("src/lib/voice/session.ts", "utf8")));
     check("the microphone is read on the audio thread by a worklet loaded from a blob — no second file — and the processor is the fallback, never both",
@@ -3514,7 +3554,7 @@ function describeErrorCheck(): boolean {
     rmsLevel(silent) === 0 && Math.abs(rmsLevel(loud) - Math.min(1, 0.5 * DISPLAY_GAIN)) < 1e-9 && rmsLevel(new Uint8Array(0)) === 0 && rmsLevel(new Uint8Array(512).fill(255)) === 1 && DISPLAY_GAIN === 2.8 && LEVEL_EPSILON === 0.02);
   const wa = readFileSync("src/lib/voice/ws-audio.ts", "utf8");
   check("the socket lane's audio meters both sides INSIDE its own context: an analyser on the output, one on the microphone source, read on demand",
-    /const farMeter = ctx\.createAnalyser\(\);/.test(wa) && /const farBus = ctx\.createGain\(\);\s*farBus\.connect\(ctx\.destination\);/.test(wa) && /farBus\.connect\(farMeter\);/.test(wa) && !/^\s*out\.connect/m.test(wa) && (wa.match(/node\.connect\(farBus\);/g) ?? []).length === 2 && /micMeter = ctx\.createAnalyser\(\);[\s\S]{0,240}?source\.connect\(micMeter\);/.test(wa) &&
+    /const farMeter = ctx\.createAnalyser\(\);/.test(wa) && /const farBus = ctx\.createGain\(\);\s*farBus\.connect\(ctx\.destination\);/.test(wa) && /farBus\.connect\(farMeter\);/.test(wa) && !/^\s*out\.connect/m.test(wa) && (wa.match(/node\.connect\(farBus\);/g) ?? []).length === 3 && /micMeter = ctx\.createAnalyser\(\);[\s\S]{0,240}?source\.connect\(micMeter\);/.test(wa) &&
     /levels\(\) \{\s*return \{ mic: read\(micMeter\), far: read\(farMeter\) \};/.test(wa) && /return rmsLevel\(meterBuf\);/.test(wa) && (wa.match(/meterMic\(\);/g) ?? []).length === 2);
   const hook = readFileSync("src/lib/voice/useStreamLevel.ts", "utf8");
   check("  …the stream meter shares the arithmetic and no longer carries its own copy", /const next = rmsLevel\(buf\);/.test(hook) && !/DISPLAY_GAIN = 2\.8/.test(hook));
@@ -3736,7 +3776,7 @@ function describeErrorCheck(): boolean {
       /const ctx: AudioContext = new Ctx\(\);/.test(waSrc) && !/new Ctx\(\{ sampleRate: wireRate \}\)/.test(waSrc) &&
       /const down = new StreamResampler\(wireRate, ctx\.sampleRate\);\s*const up = new StreamResampler\(ctx\.sampleRate, wireRate\);/.test(waSrc) &&
       /const samples = down\.process\(pcm16ToFloat\(base64ToBytes\(b64\)\)\);/.test(waSrc) && /const frame = up\.process\(input\);/.test(waSrc) &&
-      /ctx\.createBuffer\(1, samples\.length, ctx\.sampleRate\)/.test(waSrc) && /farBus\.connect\(ctx\.destination\);/.test(waSrc) &&
+      /new PlayoutGate\(\{/.test(waSrc) && !/ctx\.createBuffer\(1, samples\.length/.test(waSrc) && /farBus\.connect\(ctx\.destination\);/.test(waSrc) &&
       /mute\(on\) \{\s*farBus\.gain\.value = on \? 0 : 1;\s*\}/.test(waSrc) &&
       /if \(gate\) sessionRef\.current\?\.setFarMuted\(gate === "cut"\);/.test((await import("node:fs")).readFileSync("src/components/ai/VoiceCallButton.tsx", "utf8")) &&
       /setFarMuted\(on: boolean\): void \{\s*try \{\s*this\.wsAudio\?\.mute\?\.\(on\);/.test((await import("node:fs")).readFileSync("src/lib/voice/session.ts", "utf8")));
@@ -3746,7 +3786,7 @@ function describeErrorCheck(): boolean {
     connections.some(([f, t]) => f === "gain" && t === "streamDestination") && connections.some(([f, t]) => f === "gain" && t === "analyser") && !connections.some(([f]) => f === "streamDestination"));
   if (built) {
     built.play(Buffer.from(new Int16Array([0, 1000, -1000, 0]).buffer).toString("base64"));
-    check("  …a voice frame connects to the bus, not to the destination", connections.some(([f, t]) => f === "bufferSource" && t === "gain") && !connections.some(([f, t]) => f === "bufferSource" && t === "streamDestination"));
+    check("  …without a worklet the far side's ring is the script processor, on the bus, never on the destination — and stats() names it", connections.some(([f, t]) => f === "processor" && t === "gain") && !connections.some(([f, t]) => f === "processor" && t === "streamDestination") && !connections.some(([f]) => f === "bufferSource") && built.stats().playout === "processor");
     check("  …and levels read from both meters without throwing", JSON.stringify(built.levels()) === JSON.stringify({ mic: 0, far: 0 }));
     built.close();
   }
@@ -3789,7 +3829,7 @@ function describeErrorCheck(): boolean {
     g.window = { AudioContext: class extends FakeCtx { constructor() { super(); made.push(this); } } };
     const ctx = () => made[0];
     const audio = createBrowserWsAudio(24_000);
-    check("a reader that has not started says so: none, the context's state, its rate — and the far side's buffer, dry count and depth", (() => { const st = audio.stats(); return JSON.stringify({ ...st, underruns: undefined, bufferMs: undefined }) === JSON.stringify({ path: "none", frames: 0, peak: 0, ctx: "running", rate: 24_000, start: "", stalled: false }) && st.underruns === 0 && typeof st.bufferMs === "number" && st.bufferMs > 0; })());
+    check("a reader that has not started says so: none, the context's state, its rate — and the far side's buffer, dry count and depth", (() => { const st = audio.stats(); return JSON.stringify({ ...st, underruns: undefined, bufferMs: undefined, playout: undefined }) === JSON.stringify({ path: "none", frames: 0, peak: 0, ctx: "running", rate: 24_000, start: "", stalled: false }) && st.underruns === 0 && typeof st.bufferMs === "number" && st.bufferMs > 0 && st.playout === "processor"; })());
     const frames: string[] = [];
     audio.startCapture({ getAudioTracks: () => [] } as unknown as MediaStream, (b64) => frames.push(b64));
     await new Promise((res) => setTimeout(res, 0));
@@ -3808,7 +3848,7 @@ function describeErrorCheck(): boolean {
     const refused = createBrowserWsAudio(24_000);
     refused.startCapture({ getAudioTracks: () => [] } as unknown as MediaStream, () => {});
     await new Promise((res) => setTimeout(res, 0));
-    check("a graph with neither reader says failed — the beacon carries it, nothing throws", refused.stats().path === "failed" && refused.stats().frames === 0);
+    check("a graph with neither reader says failed — the beacon carries it, nothing throws; the far side's ring says failed too", refused.stats().path === "failed" && refused.stats().frames === 0 && refused.stats().playout === "failed");
     refused.close();
     if (hadWindow === undefined) delete g.window; else g.window = hadWindow;
   }
@@ -3850,7 +3890,9 @@ function describeErrorCheck(): boolean {
     const hadWindow = g.window;
     const hadNode = g.AudioWorkletNode;
     g.window = { AudioContext: WorkletCtx };
-    g.AudioWorkletNode = class { port = { onmessage: null as null | ((ev: MessageEvent) => void), close() {} }; connect() {} disconnect() {} constructor() { workletNodes.push(this as unknown as ReturnType<typeof mkNode>); } };
+    const posted: unknown[] = [];
+    g.AudioWorkletNode = class { name: string; port = { onmessage: null as null | ((ev: MessageEvent) => void), postMessage(m: unknown) { posted.push(m); }, close() {} }; connect() {} disconnect() {} constructor(_ctx: unknown, name: string) { this.name = name; workletNodes.push(this as unknown as ReturnType<typeof mkNode>); } };
+    const captureNode = () => [...workletNodes].reverse().find((n) => (n as unknown as { name: string }).name === "koleex-capture") ?? workletNodes[workletNodes.length - 1];
     const tick = (ms: number) => new Promise((res) => setTimeout(res, ms));
     const mic = { getAudioTracks: () => [] } as unknown as MediaStream;
 
@@ -3888,7 +3930,7 @@ function describeErrorCheck(): boolean {
       const audio = createBrowserWsAudio(24_000, { stallMs: 20 });
       audio.startCapture(mic, () => {});
       await tick(5);
-      const node = workletNodes[workletNodes.length - 1];
+      const node = captureNode();
       node.port.onmessage?.({ data: new Float32Array(4096) } as MessageEvent);
       await tick(60);
       check("a worklet that read a frame keeps the microphone: no switch, not stalled", audio.stats().path === "worklet" && audio.stats().frames === 1 && !audio.stats().stalled);
@@ -3904,6 +3946,31 @@ function describeErrorCheck(): boolean {
       await tick(50);
       check("a call that ended before the stall check does not switch readers after teardown", made[made.length - 1].sources === before && audio.stats().path === "worklet");
     }
+    /* 5. The far side through the worklet ring: a frame that arrives before
+       the worklet is up waits and is handed to it, with the gate's word;
+       the answer's end opens the ring; a barge-in flushes it under a new
+       generation; a dry report inside an answer grows the lead. */
+    {
+      posted.length = 0;
+      const audio = createBrowserWsAudio(24_000, { stallMs: 20 });
+      audio.play(Buffer.from(new Int16Array(4800).buffer).toString("base64"));
+      check("a frame before the ring is up is kept, not lost, and the ring is still pending", audio.stats().playout === "pending" && posted.length === 0);
+      await tick(5);
+      const kinds = posted.map((m) => (m instanceof Float32Array ? `frame:${m.length}` : JSON.stringify(m)));
+      check("  …once the worklet is up it gets a flush at generation 0, the waiting frame at the engine's rate, and the gate's decision (shut: 0.2 s is short of the lead)",
+        audio.stats().playout === "worklet" && kinds.length === 3 && kinds[0] === '{"cmd":"flush","gen":0}' && kinds[1] === "frame:9600" && kinds[2] === '{"cmd":"gate","open":false}');
+      audio.endOfResponse?.();
+      check("  …the answer's end opens it", JSON.stringify(posted[posted.length - 1]) === '{"cmd":"gate","open":true}');
+      const ringNode = [...workletNodes].reverse().find((n) => (n as unknown as { name: string }).name === "koleex-playout") as unknown as { port: { onmessage: null | ((ev: MessageEvent) => void) } };
+      ringNode.port.onmessage?.({ data: { type: "dry", gen: 0, consumed: 9600 } } as MessageEvent);
+      check("  …a dry after the answer's end is the answer over: no underrun", audio.stats().underruns === 0);
+      audio.play(Buffer.from(new Int16Array(24000).buffer).toString("base64"));
+      ringNode.port.onmessage?.({ data: { type: "dry", gen: 0, consumed: 9600 + 48000 } } as MessageEvent);
+      check("  …a dry inside the next answer is an underrun the beacon counts, and the lead grows", audio.stats().underruns === 1 && audio.stats().bufferMs === 600);
+      audio.flush();
+      check("  …a barge-in flushes the ring under generation 1", JSON.stringify(posted[posted.length - 1]) === '{"cmd":"flush","gen":1}');
+      audio.close();
+    }
     if (hadWindow === undefined) delete g.window; else g.window = hadWindow;
     if (hadNode === undefined) delete g.AudioWorkletNode; else g.AudioWorkletNode = hadNode;
   }
@@ -3913,7 +3980,7 @@ function describeErrorCheck(): boolean {
   const route = readFileSync("src/app/api/ai/voice/telemetry/route.ts", "utf8");
   check("the beacon type carries up_frames, capture, mic_peak and mic", /up_frames\?: number;/.test(tel) && /capture\?: string;/.test(tel) && /mic_peak\?: number;/.test(tel) && /\bmic\?: string;/.test(tel));
   check("  …and the telemetry route logs them, bounded and sanitised, only when a capture was reported",
-    route.includes('short(body.capture, 64) ? ` upFrames=${num(body.up_frames)} capture=${short(body.capture, 64)} micPeak=') && route.includes('mic=${short(body.mic, 24) || "none"}'));
+    route.includes('short(body.capture, 96) ? ` upFrames=${num(body.up_frames)} capture=${short(body.capture, 96)} micPeak=') && route.includes('mic=${short(body.mic, 24) || "none"}'));
   /* THE SERVER'S OWN LINES ARE VISIBLE: the log tool never shows info. */
   const wsRoute = readFileSync("src/app/api/ai/voice/ws-session/route.ts", "utf8");
   const sdpRoute = readFileSync("src/app/api/ai/voice/session/route.ts", "utf8");

@@ -99,6 +99,72 @@ export const NO_SESSION_CODE = 4001;
 
 /* ── The keepalive ──────────────────────────────────────────────────────── */
 
+/* ── The vendor's pacing (2026-09-12 night) ───────────────────────────────
+   The caller heard crackle and cuts through a client buffer that never ran
+   dry, on a build the beacon proved live. Whether the vendor's own stream
+   stalls is measured HERE, where no tunnel and no phone is in the way: for
+   every audio delta the relay notes how far AHEAD of real time the answer's
+   audio is (audio delivered so far minus the wall time since the answer's
+   first delta — a player with no lead would have run dry by that much when
+   it is negative), the longest silence between two deltas of one answer,
+   and how many silences passed PACING_GAP_MS. Summarised in the end line:
+   `deltas= audioMs= gaps= maxGap= minAhead=`. Nothing is parsed beyond two
+   regexes; the audio itself is never decoded or kept. */
+export const WIRE_RATE = 24_000;
+export const PACING_GAP_MS = 250;
+const DELTA_RE = /"type"\s*:\s*"response\.(?:output_)?audio\.delta"/;
+const AUDIO_DONE_RE = /"type"\s*:\s*"response\.(?:output_)?audio\.done"/;
+const DELTA_B64_RE = /"delta"\s*:\s*"([A-Za-z0-9+/=]*)"/;
+/** Milliseconds of PCM16 at the wire rate inside one delta frame. */
+export function audioMsOf(text) {
+  const m = DELTA_B64_RE.exec(text);
+  if (!m) return 0;
+  const b64 = m[1];
+  let bytes = Math.floor((b64.length * 3) / 4);
+  if (b64.endsWith("==")) bytes -= 2;
+  else if (b64.endsWith("=")) bytes -= 1;
+  return bytes / 2 / (WIRE_RATE / 1000);
+}
+export function createPacing() {
+  let deltas = 0;
+  let audioMs = 0;
+  let gaps = 0;
+  let maxGap = 0;
+  let minAhead = 0;
+  let open = false;
+  let firstAt = 0;
+  let lastAt = 0;
+  let answerMs = 0;
+  return {
+    note(text, now = Date.now()) {
+      if (DELTA_RE.test(text)) {
+        const ms = audioMsOf(text);
+        deltas++;
+        audioMs += ms;
+        if (!open) {
+          open = true;
+          firstAt = now;
+          lastAt = now;
+          answerMs = 0;
+        } else {
+          const gap = now - lastAt;
+          if (gap > PACING_GAP_MS) gaps++;
+          if (gap > maxGap) maxGap = gap;
+        }
+        const ahead = answerMs - (now - firstAt);
+        if (ahead < minAhead) minAhead = ahead;
+        answerMs += ms;
+        lastAt = now;
+        return;
+      }
+      if (open && AUDIO_DONE_RE.test(text)) open = false;
+    },
+    summary() {
+      return `deltas=${deltas} audioMs=${Math.round(audioMs)} gaps=${gaps} maxGap=${Math.round(maxGap)} minAhead=${Math.round(minAhead)}`;
+    },
+  };
+}
+
 /** THE FRAME THAT KEEPS A MIDDLEBOX FROM CUTTING THE LINE (2026-09-11 15:07
  *  UTC: the browser's socket to this relay died twice at exactly 36 s,
  *  `client-closed 1006`, with audio frames flowing the whole time — the
@@ -282,6 +348,7 @@ function bridge(firstClient, token, model, firstAddress, ticketKey = "") {
   let parkTimer = null;
   const held = [];
   let heldBytes = 0;
+  const pacing = createPacing();
 
   const upstream = new WebSocket(upstreamUrlFor(model), [`${PROTOCOL_PREFIX}${token}`], {
     handshakeTimeout: UPSTREAM_OPEN_MS,
@@ -311,7 +378,7 @@ function bridge(firstClient, token, model, firstAddress, ticketKey = "") {
     if (parked.get(token)?.attach === attach) parked.delete(token);
     try { client?.close(code); } catch { /* gone */ }
     try { upstream.close(); } catch { /* gone */ }
-    log(`session=${id} end why=${why} code=${code} ms=${Date.now() - t0} openMs=${upstreamOpenedAt ? upstreamOpenedAt - t0 : "none"} up=${up} down=${down} resumes=${resumes}`);
+    log(`session=${id} end why=${why} code=${code} ms=${Date.now() - t0} openMs=${upstreamOpenedAt ? upstreamOpenedAt - t0 : "none"} up=${up} down=${down} resumes=${resumes} ${pacing.summary()}`);
   };
 
   const cap = setTimeout(() => finish("cap", 1000), MAX_SESSION_MS);
@@ -405,6 +472,7 @@ function bridge(firstClient, token, model, firstAddress, ticketKey = "") {
     if (isBinary) return;
     down++;
     const text = data.toString();
+    pacing.note(text);
     if (client) {
       if (client.readyState === WebSocket.OPEN) client.send(text);
       return;
