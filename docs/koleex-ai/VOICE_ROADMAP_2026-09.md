@@ -830,3 +830,18 @@ family first; the owner then chose the public-domain **glass** cue set
   thinking → streaming, pictures shown → expand, summary written → checkout,
   back online → redo, dictation sent → check, approval needed →
   double-click. All thirty are the owner's picks now.
+
+## "Not clean, glitches and cuts, on both lines" (2026-09-12 16:53–17:00 UTC)
+
+Three calls after the sound system shipped, read from the beacons, the relay
+log and the saved turns.
+
+| Call | What the evidence says | Change |
+|---|---|---|
+| 16:53 `4fa72f0ae1`, **China (Mainland) line**, 131 s, hung up cleanly, `ice=connected`, no drop | The handshake to the mainland region timed out twice (`UND_ERR_CONNECT_TIMEOUT` 10.5 s, then 3 s) and the call was served from the alternate region after 13.5 s. No connection drop in the call itself, so what was heard is packet loss on the path, not a cut line — and the beacon could not yet say how much | The offer now asks for **Opus in-band FEC** (`withOpusFec`), so a lost packet is rebuilt from the next; the hang-up beacon carries **inbound stats** (`rtc=recv= lost= jitter= conc=`, sampled every 5 s) so the next call says how lossy the path was |
+| 16:56 `82f2124765`, international line, **US exit**, 40 s | Zero cuts; relay session 14 ended cleanly at 37 s | Nothing — this path works, as on 2026-09-12 04:14 (153 s, zero cuts) |
+| 16:58 `84ace574a1`, international line, **Japan exit**, 140 s, `wsReconnects=5`, `wsClose=1006` | Relay sessions 15–19: `client-closed 1006` at 3.0 / 28.9 / 29.2 / 28.3 / 32.9 s — the ~30 s cut of the 05:35 call again, on the same exit; the US exit has never shown it. Each redial opened a **new** far-side session: configured again, context gone, the answer in flight lost — that is the "cuts" heard | The relay **parks** the far side for 12 s when a client vanishes abnormally and the first redial **resumes** it with the same secret (`resume=1`, hello `koleex.relay resumed:true`): no second configuration, the held frames delivered, the conversation continues. The path still cuts every 30 s; the call no longer restarts with it |
+| The sounds | "Too many" | Defaults cut to the five a caller must not miss: ready, line back, ended, failed, error. The rest stay in Settings → Sounds, off |
+
+Still the owner's to check: the ~30 s cut does not happen on the US exit; the
+network path is the difference, and a resume hides it rather than removes it.

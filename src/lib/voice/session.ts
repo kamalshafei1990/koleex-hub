@@ -155,6 +155,10 @@ export type VoiceDiagnostics = {
   /** THE CALL'S OWN ID (plan G1): minted when the call starts, on every
    *  beacon it sends, so one call's lines read together in the log. */
   call: string;
+  /** The mainland lane's inbound audio in numbers (startRtcStats): packets
+   *  received and lost, jitter in ms, concealed samples. "" on the socket
+   *  lane or before the first sample. */
+  rtc: string;
   /** SOCKET LANE, THE MICROPHONE'S SIDE (2026-09-09 03:09): frames this
    *  call sent up, the reader that made them with the context's state and
    *  rate, the frames it read and the context's state when it started
@@ -372,6 +376,8 @@ function isTimeoutError(e: unknown): boolean {
    is a third of a second of steadiness against a jittery tunnel, and well
    under what a person notices as a delay in a conversation. */
 const JITTER_BUFFER_TARGET_MS = 400;
+/** How often the mainland lane's inbound stats are sampled for the beacon. */
+const RTC_STATS_EVERY_MS = 5_000;
 
 /* The label is ours to choose — the vendor's sample notes the name is
    customizable. Named for what travels on it rather than after any vendor. */
@@ -493,6 +499,58 @@ export const WS_REDIAL_RETRY_AFTER_MAX_MS = 10_000;
 export const WS_KEEPALIVE_MS = 10_000;
 export const WS_KEEPALIVE_MESSAGE = JSON.stringify({ type: "koleex.keepalive" });
 
+/* THE LINE DROPS EVERY THIRTY SECONDS ON SOME PATHS, AND THE CONVERSATION
+   USED TO DROP WITH IT (2026-09-12 16:58–17:00 UTC, the owner's Japan exit:
+   five `client-closed 1006` at ~29 s each; the same shape at 05:35). Every
+   redial asked our route for a NEW secret and opened a NEW far-side
+   session: configuration again, context gone, the answer in flight lost.
+   Now the first redial of an outage presents the SAME secret to the relay
+   with `resume=1`; the relay kept the far side parked for a short grace
+   and attaches the new socket to it, answering with this hello first. On
+   `resumed:true` nothing is configured again and the far side's next word
+   is the call back. A relay with nothing parked closes the socket with
+   WS_NO_SESSION_CODE, and the next dial asks the route afresh at once. */
+export const WS_RELAY_HELLO_TYPE = "koleex.relay";
+export const WS_NO_SESSION_CODE = "4001";
+/** The relay's hello, or null for any other frame. Pure. */
+export function parseRelayHello(raw: string): { resumed: boolean } | null {
+  if (typeof raw !== "string" || raw.length > 200 || !raw.includes(WS_RELAY_HELLO_TYPE)) return null;
+  try {
+    const v = JSON.parse(raw) as { type?: unknown; resumed?: unknown };
+    return v && v.type === WS_RELAY_HELLO_TYPE ? { resumed: v.resumed === true } : null;
+  } catch {
+    return null;
+  }
+}
+/** The socket url with `resume=1`, for a redial that wants the parked
+ *  session. Pure. */
+export function resumeUrl(url: string): string {
+  return `${url}${url.includes("?") ? "&" : "?"}resume=1`;
+}
+
+/* OPUS IN-BAND FEC ON THE MAINLAND LANE. A lossy path — a phone in mainland
+   China on a VPN — loses packets, and each lost packet is a gap the caller
+   hears as a cut. Asking the far side for forward error correction costs a
+   little bandwidth and lets the decoder rebuild a lost frame from the next
+   one. The offer's Opus fmtp line carries the request; the far side may
+   honour it. Pure: SDP text in, SDP text out, nothing else touched. */
+export function withOpusFec(sdp: string): string {
+  /* A lookahead, not `$`: with CRLF line ends `\s*$` swallowed the `\r`
+     and the inserted line broke the one after it. */
+  const rtpmap = /^a=rtpmap:(\d+) opus\/48000(?:\/2)?(?=\r?\n|$)/mi.exec(sdp);
+  if (!rtpmap) return sdp;
+  const pt = rtpmap[1];
+  const fmtp = new RegExp(`^a=fmtp:${pt} (.*)$`, "m");
+  const line = fmtp.exec(sdp);
+  if (line) {
+    if (/useinbandfec=1/.test(line[1])) return sdp;
+    if (/useinbandfec=0/.test(line[1])) return sdp.replace(fmtp, `a=fmtp:${pt} ${line[1].replace("useinbandfec=0", "useinbandfec=1")}`);
+    return sdp.replace(fmtp, `a=fmtp:${pt} ${line[1].replace(/;?\s*$/, "")};useinbandfec=1`);
+  }
+  const eol = sdp.includes("\r\n") ? "\r\n" : "\n";
+  return sdp.replace(rtpmap[0], `${rtpmap[0]}${eol}a=fmtp:${pt} useinbandfec=1`);
+}
+
 /** The close code a socket reports, as text for a beacon. Pure. */
 export function closeCodeOf(ev: unknown): string {
   const code = ev && typeof ev === "object" ? (ev as { code?: unknown }).code : undefined;
@@ -597,6 +655,17 @@ export class VoiceSession {
   private toolWaitMs = 0;
   /** Socket lane: `input_audio_buffer.append` frames sent on this call. */
   private wsFramesUp = 0;
+  /** The socket the first dial of this call opened — url, subprotocols,
+   *  wire rate — kept so a redial can present the same secret and resume
+   *  the parked far side (see WS_RELAY_HELLO_TYPE). */
+  private wsDial: { url: string; protocols: string[]; sampleRate: number } | null = null;
+  /** Whether this outage's resume was already tried; the next dial asks
+   *  the route afresh. Reset when the call is live again. */
+  private wsResumeTried = false;
+  /** The mainland lane's inbound audio, sampled every few seconds while the
+   *  peer connection lives (startRtcStats), for the beacon. */
+  private rtcStats = "";
+  private rtcStatsTimer: ReturnType<typeof setInterval> | null = null;
   /* THE OTHER REGION. The server may hold a second endpoint (see the
      server's voice/config.ts for why). It tells this client two things with
      the answer: which SLOT served — a neutral word, never a host — and
@@ -820,11 +889,38 @@ export class VoiceSession {
       resp_err: this.lastResponseError,
       tool_wait_ms: this.toolWaitMs,
       up_frames: this.wsFramesUp,
-      capture: capture ? `${capture.path}:${capture.ctx}:${capture.rate}:f${capture.frames}:s${capture.start}${capture.stalled ? ":stalled" : ""}` : "",
+      capture: capture ? `${capture.path}:${capture.ctx}:${capture.rate}:f${capture.frames}:s${capture.start}${capture.stalled ? ":stalled" : ""}${capture.underruns !== undefined ? `:u${capture.underruns}:b${capture.bufferMs ?? 0}` : ""}` : "",
       mic_peak: capture?.peak ?? 0,
       mic: this.micState(),
       call: this.callId,
+      rtc: this.rtcStats,
     };
+  }
+
+  /** Sample the peer connection's inbound audio every few seconds: packets
+   *  received and lost, jitter, concealed samples — the cuts a caller
+   *  hears, in numbers, for the hang-up beacon. Never throws; a runtime
+   *  without getStats leaves the field empty. */
+  private startRtcStats(pc: RTCPeerConnection): void {
+    this.stopRtcStats();
+    if (typeof pc.getStats !== "function") return;
+    const sample = () => {
+      if (this.pc !== pc) return this.stopRtcStats();
+      pc.getStats().then((report) => {
+        report.forEach((r: { type?: string; kind?: string; packetsReceived?: number; packetsLost?: number; jitter?: number; concealedSamples?: number }) => {
+          if (r.type !== "inbound-rtp" || (r.kind !== undefined && r.kind !== "audio")) return;
+          this.rtcStats = `recv=${r.packetsReceived ?? 0} lost=${r.packetsLost ?? 0} jitter=${Math.round((r.jitter ?? 0) * 1000)} conc=${r.concealedSamples ?? 0}`;
+        });
+      }).catch(() => { /* a closed connection has no stats */ });
+    };
+    this.rtcStatsTimer = setInterval(sample, RTC_STATS_EVERY_MS);
+  }
+
+  private stopRtcStats(): void {
+    if (this.rtcStatsTimer !== null) {
+      clearInterval(this.rtcStatsTimer);
+      this.rtcStatsTimer = null;
+    }
   }
 
   /** The socket-lane reader's own account (WsAudio.stats). Null on the
@@ -867,6 +963,7 @@ export class VoiceSession {
        for a connection nobody is waiting on. */
     this.clearReconnectTimer();
     this.clearToolResponseTimer();
+    this.stopRtcStats();
     /* TRACKS FIRST, and the order matters. Closing the peer connection does
        not stop a capture track; the recording light stays on and the browser
        keeps the device held. */
@@ -1292,6 +1389,7 @@ export class VoiceSession {
       this.clearReconnectTimer();
       if (this.state === "reconnecting") {
         this.wsOutageAttempt = 0;
+        this.wsResumeTried = false;
         this.setState("live");
       }
     }
@@ -1330,6 +1428,7 @@ export class VoiceSession {
     this.lastError = describeError(cause);
     this.clearReconnectTimer();
     this.clearToolResponseTimer();
+    this.stopRtcStats();
     /* A CALL THAT WAS UP AND LOST ITS LINE KEEPS THE MICROPHONE for the call
        that resumes it (takeMicrophone): stopping the tracks here made the
        resume ask the phone for the microphone again, outside any tap, and
@@ -1436,7 +1535,15 @@ export class VoiceSession {
     let url = "";
     let protocols: string[] = [];
     let sampleRate = 24_000;
-    try {
+    /* THE FIRST REDIAL OF AN OUTAGE RESUMES: same secret, same socket url
+       plus `resume=1`, no request to our route (see WS_RELAY_HELLO_TYPE). */
+    const resuming = !first && this.wsDial !== null && !this.wsResumeTried;
+    if (resuming && this.wsDial) {
+      this.wsResumeTried = true;
+      url = resumeUrl(this.wsDial.url);
+      protocols = this.wsDial.protocols;
+      sampleRate = this.wsDial.sampleRate;
+    } else try {
       const query = new URLSearchParams();
       if (this.voiceKey) query.set("voice", this.voiceKey);
       if (this.conversationId) query.set("conversation", this.conversationId);
@@ -1527,6 +1634,7 @@ export class VoiceSession {
         if (first) this.fail("handshake-failed");
         return false;
       }
+      this.wsDial = { url, protocols, sampleRate };
     } catch (e) {
       if (first) this.fail(isTimeoutError(e) ? "service-unreachable" : "handshake-failed", e);
       return false;
@@ -1594,7 +1702,8 @@ export class VoiceSession {
          says nothing is what a stalled tunnel looks like (WS_FIRST_EVENT_MS).
          The session goes out and the microphone reader starts now, so the
          far side has something to answer. */
-      this.sendSessionConfig(channel);
+      /* A resumed session is already configured; the relay's hello says so. */
+      if (!resuming) this.sendSessionConfig(channel);
       if (audio && first) {
         this.events.onRemoteStream?.(audio.stream);
         if (this.mic) {
@@ -1616,12 +1725,26 @@ export class VoiceSession {
       if (this.ws !== ws || typeof m.data !== "string") return;
       /* The relay's echo of our own keepalive: not the far side speaking. */
       if (m.data === WS_KEEPALIVE_MESSAGE) return;
+      const hello = resuming ? parseRelayHello(m.data) : null;
+      if (hello) {
+        if (hello.resumed) {
+          this.configSent = true;
+          this.configAckPending = false;
+          this.markTransportUp();
+        } else {
+          this.sendSessionConfig(channel);
+        }
+        return;
+      }
       this.onWsAudioEvent(m.data, this.wsAudio);
       this.onChannelMessage(m.data, channel);
     };
     ws.onclose = (ev) => {
       if (this.ws !== ws) return;
       this.wsCloseCode = closeCodeOf(ev);
+      /* Nothing parked for this secret: the next dial asks the route afresh,
+         and at once — this attempt cost no backoff step. */
+      if (resuming && this.wsCloseCode === WS_NO_SESSION_CODE) this.wsOutageAttempt = Math.max(0, this.wsOutageAttempt - 1);
       /* The call's own socket, closed before the far side said a word: the
          service did not answer (refused, blocked, a dead network). Said now,
          not after the wait — the fall-back runs sooner. */
@@ -1811,6 +1934,7 @@ export class VoiceSession {
     try {
       pc = this.deps.createPeerConnection();
       this.pc = pc;
+      this.startRtcStats(pc);
       for (const track of this.mic.getTracks()) pc.addTrack(track, this.mic);
 
       /* NOTHING WATCHED THE CONNECTION AFTER IT WENT LIVE, and on an unstable
@@ -1936,7 +2060,8 @@ export class VoiceSession {
       };
 
       const offer = await pc.createOffer({ offerToReceiveAudio: true });
-      await pc.setLocalDescription(offer);
+      /* Forward error correction asked for in the offer (withOpusFec). */
+      await pc.setLocalDescription({ type: offer.type, sdp: withOpusFec(offer.sdp ?? "") });
 
       /* WAIT FOR ICE GATHERING, and this is not optional. The SDP produced by
          setLocalDescription does not yet carry the candidates — the addresses

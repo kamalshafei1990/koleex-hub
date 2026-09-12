@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { signTicket, verifyTicket, tokenFromProtocols, upstreamUrlFor, originAllowed, TICKET_MAX_AGE_S, isKeepalive, KEEPALIVE_FRAME, clientAddress, MAX_PER_TICKET, MAX_PENDING_BYTES, MAX_FRAME_BYTES } from "./server.mjs";
+import { signTicket, verifyTicket, tokenFromProtocols, upstreamUrlFor, originAllowed, TICKET_MAX_AGE_S, isKeepalive, KEEPALIVE_FRAME, clientAddress, MAX_PER_TICKET, MAX_PENDING_BYTES, MAX_FRAME_BYTES, relayHello, shouldPark, RESUME_GRACE_MS, MAX_PARK_BYTES, NO_SESSION_CODE } from "./server.mjs";
 
 test("the per-address cap keys on the hop the edge appended, never on what the browser wrote in front", () => {
   assert.equal(clientAddress("1.2.3.4", "10.0.0.9"), "1.2.3.4");
@@ -57,4 +57,18 @@ test("the keepalive is one exact frame, answered by the relay and never forwarde
   assert.equal(isKeepalive('{"type":"koleex.keepalive","x":1}'), false, "exact match only");
   assert.equal(isKeepalive('{"type":"input_audio_buffer.append","audio":"AAAA"}'), false);
   assert.equal(isKeepalive(""), false);
+});
+
+test("a client lost without a close frame parks the far side; a caller who hung up does not", () => {
+  assert.equal(shouldPark(1006), true);
+  for (const code of [1000, 1001, 1005, 1011, 4001, undefined]) assert.equal(shouldPark(code), false, String(code));
+});
+
+test("the resume hello is one small frame, the grace is short and bounded, and a miss has its own code", () => {
+  assert.equal(relayHello(true), '{"type":"koleex.relay","resumed":true}');
+  assert.equal(relayHello(false), '{"type":"koleex.relay","resumed":false}');
+  assert.equal(relayHello("yes"), '{"type":"koleex.relay","resumed":true}');
+  assert.ok(RESUME_GRACE_MS >= 5_000 && RESUME_GRACE_MS <= 20_000);
+  assert.ok(MAX_PARK_BYTES <= 2 * MAX_FRAME_BYTES);
+  assert.equal(NO_SESSION_CODE, 4001);
 });

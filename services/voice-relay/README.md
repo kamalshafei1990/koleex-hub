@@ -33,6 +33,19 @@ instead of the vendor's url. Unset, browsers dial the vendor directly as before.
 
 `npm test` runs the pure checks (ticket, protocol, upstream url, origins).
 
+Resume (2026-09-12): on some paths the browser's socket dies every ~30 s
+(`client-closed code=1006` with frames flowing). A client lost WITHOUT a
+close frame leaves its far-side session parked for `RESUME_GRACE_MS`
+(12 s); frames that arrive meanwhile are held (bounded by
+`MAX_PARK_BYTES`). A redial that presents the same secret with `resume=1`
+is attached to it — the relay sends `{"type":"koleex.relay","resumed":true}`
+first, then the held frames — and the conversation continues where it
+was, with no second configuration and no second far-side session. A
+resume with nothing parked is closed with code 4001 so the client dials
+afresh at once. A caller who hangs up (a close frame) parks nothing. The
+log reads `parked`, `resumed gapMs=… held=…`, and the end line carries
+`resumes=`.
+
 Limits (security review, 2026-09-12): one frame at most 1 MiB; at most 8
 open sockets per client address and 3 per admission ticket (a ticket is one
 call — a redial reuses it, a leak would not stop at three); at most 2 MiB of
