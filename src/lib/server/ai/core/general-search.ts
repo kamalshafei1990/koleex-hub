@@ -26,6 +26,7 @@ import type { UserContext, ToolResult, AgentStep } from "@/lib/server/ai-agent/t
 import type { IrMessage, IrTool, IrToolCall } from "@/lib/server/ai/provider/turn-ir";
 import { koleexHub } from "@/lib/server/ai/connectors/koleex-hub";
 import { toLlmSafe, humaniseCall } from "@/lib/server/ai/core/wire";
+import { logToolRun } from "@/lib/server/ai/observability/turn-trace";
 
 /** The only tool the general lane may see. */
 export const GENERAL_LANE_TOOL = "search_web";
@@ -103,6 +104,8 @@ export async function runGeneralSearchHop(input: {
   messages: IrMessage[];
   invoke?: GeneralInvoke;
   onStep?: (steps: AgentStep[]) => void;
+  /** The turn's trace id for the [ai.tool] line; the conversation id stands in. */
+  traceId?: string | null;
 }): Promise<GeneralSearchHop> {
   const invoke = input.invoke ?? ((ctx, name, args, opts) => koleexHub.invoke(ctx, name, args, opts));
   const steps: AgentStep[] = [];
@@ -124,7 +127,10 @@ export async function runGeneralSearchHop(input: {
         /* A listener must not take the turn down. */
       }
       ran++;
+      const tTool = Date.now();
       result = await invoke(input.ctx, call.name, args, { conversationId: input.conversationId });
+      /* Plan G1: the same [ai.tool] line the orchestrator writes. */
+      logToolRun({ tool: call.name, ms: Date.now() - tTool, ok: result.ok, status: result.permissionStatus, trace: input.traceId ?? input.conversationId });
       steps.push({
         kind: "tool-result",
         tool: call.name,

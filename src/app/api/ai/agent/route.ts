@@ -57,6 +57,8 @@ import {
 import { tryCannedReply } from "@/lib/server/ai/core/canned-replies";
 import { chatWithTools, activeProviderLabel } from "@/lib/server/ai/provider/registry";
 import { generalLaneTools, runGeneralSearchHop, GENERAL_SEARCH_NOTE } from "@/lib/server/ai/core/general-search";
+import { newTraceId, traceFields } from "@/lib/server/ai/observability/turn-trace";
+import { meterTurn } from "@/lib/server/ai/cost/meter";
 import { streamingFastLaneEnabled } from "@/lib/server/ai/router/provider-policy";
 import { planReveal } from "@/lib/server/ai/streaming/reveal";
 import { withPublicProvider } from "@/lib/server/ai/observability/public-provider";
@@ -125,6 +127,8 @@ function computeTitle(
 
 export async function POST(req: Request) {
   const t0 = Date.now();
+  /* Plan G1: one id for this turn, on every line it writes. */
+  const trace = newTraceId();
   const auth = await requireAuth();
   const tAuth = Date.now();
   if (auth instanceof NextResponse) return auth;
@@ -327,7 +331,8 @@ export async function POST(req: Request) {
        see lane / endpoint / provider / intent / fallback / sizes / ms. */
     console.log(
       `[ai] lane=protected ep=agent provider=fast-path intent=canned` +
-        ` fallback=0 in_bytes=${content.length} hist=0 ms=${tEnd - t0}`,
+        ` fallback=0 in_bytes=${content.length} hist=0 ms=${tEnd - t0}` +
+        traceFields({ trace, ttftMs: tEnd - t0, ok: true }),
     );
 
     const agent: AgentResponse = {
@@ -409,6 +414,11 @@ export async function POST(req: Request) {
            load step throws before the original `const keepalive` line. */
         let alive = true;
         let keepalive: ReturnType<typeof setInterval> | null = null;
+        /* Declared before the try so the failure path can name the lane and
+           the first-token time on its own [ai] line (plan G1). */
+        let fastLane: "brand" | "small" | "general" | null = null;
+        /* Plan G1: when the first streamed byte left for the browser. */
+        let tFirst: number | null = null;
         try {
           controller.enqueue(send({ type: "start", conversationId }));
 
@@ -594,7 +604,6 @@ export async function POST(req: Request) {
             : "";
           let fastReply: string | null = null;
           let fastProvider: string | null = null;
-          let fastLane: "brand" | "small" | "general" | null = null;
           /* The lookup's steps, when the general lane made one: shown on
              the screen as they happened and kept on the answer's record. */
           let fastSteps: AgentStep[] = [];
@@ -676,9 +685,14 @@ export async function POST(req: Request) {
             try {
               const onDelta = (text: string) => {
                 if (!gotFirst) gotFirst = true;
+                if (tFirst === null) tFirst = Date.now();
                 accumulated += text;
                 controller.enqueue(send({ type: "delta", text }));
               };
+              /* Plan G1: the fast lanes' calls were the one path that wrote
+                 no [ai.usage] line. Same meter, same fields, this turn's trace. */
+              const meter = (o: Awaited<ReturnType<typeof chatWithTools>>, lane: string) =>
+                meterTurn(o, { tenantId: auth.tenant_id ?? null, accountId: auth.account_id ?? null, lane, traceId: trace });
               const irMessages = fastMessages.map((m) => ({ role: m.role, content: m.content }));
               let out = await chatWithTools(
                 {
@@ -694,6 +708,7 @@ export async function POST(req: Request) {
                 },
                 { onDelta },
               );
+              meter(out, `fast-${fastLane}`);
               /* THE HOP. The model asked to look something up: whatever it
                  narrated first comes off the screen (the answer replaces it),
                  the lookup runs and is shown as it happens, and a second,
@@ -710,6 +725,7 @@ export async function POST(req: Request) {
                   priorContent: accumulated,
                   messages: irMessages,
                   onStep: (steps) => controller.enqueue(send({ type: "steps", steps })),
+                  traceId: trace,
                 });
                 fastSteps = hop.steps;
                 controller.enqueue(send({ type: "steps", steps: hop.steps }));
@@ -719,6 +735,7 @@ export async function POST(req: Request) {
                   { messages: hop.messages, maxTokens, temperature: 0.3, modelClass: "GENERAL" as const, stream: true },
                   { onDelta },
                 );
+                meter(out, "fast-general+search");
               }
               /* Lane-truthful label. The registry reports the bare model id
                  ("deepseek:deepseek-chat") — identical to orchestrate()'s
@@ -773,8 +790,10 @@ export async function POST(req: Request) {
               dialect: wantsRewrite ? ("egyptian" as const) : null,
               onDelta: (text) => {
                 liveDeltaCount++;
+                if (tFirst === null) tFirst = Date.now();
                 controller.enqueue(send({ type: "delta", text }));
               },
+              traceId: trace,
               /* The streamed first call narrated and then called a tool: the
                  client clears what it showed; the real answer follows. */
               onRetract: () => {
@@ -928,13 +947,21 @@ export async function POST(req: Request) {
               ` fast_stream=${fastReply !== null ? 1 : 0} fast_search=${fastSteps.filter((s) => s.kind === "tool-result").length}` +
               ` msg_lang=${detected.language} rewrote_egy=${rewroteReply ? 1 : 0}` +
               ` in_bytes=${content.length} hist=${history.length} ms=${tEnd - t0}` +
-              ` stream=1 reply_bytes=${agent.finalReply.length}`,
+              ` stream=1 reply_bytes=${agent.finalReply.length}` +
+              traceFields({ trace, ttftMs: tFirst === null ? null : tFirst - t0, ok: true }),
           );
         } catch (e) {
           /* The cause goes to the log; the frame carries one neutral sentence
              — a transport or provider message named hosts and models on the
              screen (audit, 2026-09-11). */
           console.error("[ai.agent.stream] failed:", e instanceof Error ? e.message : String(e));
+          /* Plan G1: the failed turn gets its [ai] line too, so an error rate
+             can be read from the same lines as the latency. */
+          console.log(
+            `[ai] lane=${fastLane ?? "protected"} ep=agent provider=none intent=agent fallback=0` +
+              ` in_bytes=${content.length} hist=${history.length} ms=${Date.now() - t0} stream=1` +
+              traceFields({ trace, ttftMs: tFirst === null ? null : tFirst - t0, ok: false }),
+          );
           controller.enqueue(
             send({
               type: "error",
@@ -1010,6 +1037,7 @@ export async function POST(req: Request) {
     userMessage: content + attachBlock,
     userLang,
     conversationId,
+    traceId: trace,
     webSearchRequested: body.web_search === true,
     /* Same gate as the streaming path — see AUDIT ISSUE 7 note above. */
     taughtAnswers:
@@ -1061,7 +1089,8 @@ export async function POST(req: Request) {
   console.log(
     `[ai] lane=protected ep=agent provider=${agent.provider} intent=agent` +
       ` fallback=${agent.provider === "fallback" ? 1 : 0}` +
-      ` in_bytes=${content.length} hist=${history.length} ms=${tEnd - t0}`,
+      ` in_bytes=${content.length} hist=${history.length} ms=${tEnd - t0}` +
+      traceFields({ trace, ttftMs: null, ok: true }),
   );
 
   return NextResponse.json({

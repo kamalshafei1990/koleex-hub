@@ -135,7 +135,7 @@ plain words. Verification is named per phase; nothing is called done without it.
 
 | Item | What |
 |---|---|
-| G1 | A trace id per turn and per call; latency to first token and to last, per lane, per provider, as percentiles; tool durations; error rates. Read from the existing log lines, no new table until a week of data says one is needed |
+| G1 ✅ | A trace id per turn and per call; latency to first token and to last, per lane, per provider, as percentiles; tool durations; error rates. Read from the existing log lines, no new table until a week of data says one is needed. **Shipped 2026-09-12 (`observability/turn-trace.ts`):** the agent route mints one `trace=` per turn and puts it on every `[ai]` line — the failed turn's too (`ok=0`) — beside `ttft=` (first streamed byte); the same id rides the `[ai.usage]` lines (the fast lanes now meter their calls as well) and one `[ai.tool] tool= ms= ok= status=` line per lookup that ran, from the orchestrator and from the general lane's hop; a voice call mints `call=` on every beacon. `npm run report:ai-latency -- <log file>` prints p50/p90/p99/max and error rates per lane, provider and tool. Suite `validate:ai-trace` |
 | G2 | **The weekly note to the owner**, in plain words: how many turns and calls, how fast, what failed and why, the evaluation score per language, what changed. Written by the assistant from the numbers, sent as a chat |
 | G3 | The voice watchdogs gain the search, vision and picture providers (D8) |
 

@@ -88,6 +88,7 @@ export async function POST(req: Request) {
       (num(body.tool_wait_ms) ? ` toolWaitMs=${num(body.tool_wait_ms)}` : "") +
       (short(body.capture, 64) ? ` upFrames=${num(body.up_frames)} capture=${short(body.capture, 64)} micPeak=${typeof body.mic_peak === "number" && Number.isFinite(body.mic_peak) ? Math.round(body.mic_peak * 100) / 100 : 0} mic=${short(body.mic, 24) || "none"}` : "") +
       (num(body.dom) ? ` dom=${num(body.dom)} imgs=${num(body.imgs)}` : "") +
+      (short(body.call, 12) ? ` call=${short(body.call, 12)}` : "") +
       (typeof body.events === "string" && body.events ? ` events=${body.events.replace(/[^\w.:,…-]/g, "").slice(0, 600)}` : ""),
   );
   return new NextResponse(null, { status: 204 });

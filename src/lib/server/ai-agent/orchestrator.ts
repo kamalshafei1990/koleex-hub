@@ -38,6 +38,7 @@ import { logSealTransform } from "@/lib/server/ai/observability/reply-log";
 import type { TurnInput } from "@/lib/server/ai/core/types";
 export type { TurnInput } from "@/lib/server/ai/core/types";
 import { toLlmSafe, humaniseCall } from "@/lib/server/ai/core/wire";
+import { logToolRun } from "@/lib/server/ai/observability/turn-trace";
 import { preToolGuard } from "@/lib/server/ai/core/pre-tool-guard";
 import { runDegradedTurn, fallback } from "@/lib/server/ai/core/recovery";
 /* Phase 3C — the loop reaches a model through ONE function. It no longer
@@ -148,7 +149,7 @@ export async function orchestrate(input: TurnInput): Promise<AgentResponse> {
   const tStart = Date.now();
   const {
     ctx, history, userMessage, userLang, dialect, conversationId, onDelta, onStep, onRetract,
-    webSearchRequested = false, languageLock = "", taughtAnswers = "",
+    webSearchRequested = false, languageLock = "", taughtAnswers = "", traceId = null,
   } = input;
   /* True when a user-uploaded document's extracted text is in play — this
      turn or retained history. Gates the recital exemption in
@@ -367,7 +368,7 @@ export async function orchestrate(input: TurnInput): Promise<AgentResponse> {
       inputTokens: out.ok ? (out.response.usage?.inputTokens ?? null) : null,
       outputTokens: out.ok ? (out.response.usage?.outputTokens ?? null) : null,
       ms: out.ms ?? tPost - tPre,
-      traceId: conversationId,
+      traceId: traceId ?? conversationId,
     });
     if (out.ok) {
       const rawReply = out.response.content.trim();
@@ -515,7 +516,7 @@ export async function orchestrate(input: TurnInput): Promise<AgentResponse> {
         inputTokens: out.ok ? (out.response.usage?.inputTokens ?? null) : null,
         outputTokens: out.ok ? (out.response.usage?.outputTokens ?? null) : null,
         ms: out.ms ?? 0,
-        traceId: conversationId,
+        traceId: traceId ?? conversationId,
       });
       if (!out.ok) {
         callFailedStatus = out.status || 500;
@@ -735,9 +736,13 @@ export async function orchestrate(input: TurnInput): Promise<AgentResponse> {
         }
 
         totalToolRuns++;
+        const tTool = Date.now();
         const result = await koleexHub.invoke(ctx, tc.function.name, parsedArgs, {
           conversationId,
         });
+        /* Plan G1: the lookup's duration and outcome, on the turn's trace.
+           Name and numbers only — never the arguments or the result. */
+        logToolRun({ tool: tc.function.name, ms: Date.now() - tTool, ok: result.ok, status: result.permissionStatus, trace: traceId ?? conversationId });
         toolCache.set(cacheKey, { result: result.data, cached: false });
 
         steps.push({

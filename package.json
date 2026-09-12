@@ -29,6 +29,8 @@
     "validate:ai-library": "NODE_OPTIONS=--conditions=react-server tsx scripts/validate-ai-library.ts",
     "validate:ai-calls": "NODE_OPTIONS=--conditions=react-server tsx scripts/validate-ai-calls.ts",
     "validate:ai-usage": "NODE_OPTIONS=--conditions=react-server tsx scripts/validate-ai-usage.ts",
+    "validate:ai-trace": "tsx scripts/validate-ai-trace.ts",
+    "report:ai-latency": "tsx scripts/ai-latency-report.ts",
     "validate:ai-export": "NODE_OPTIONS=--conditions=react-server tsx scripts/validate-ai-export.ts",
     "validate:ai-attach": "tsx scripts/validate-ai-attach.ts",
     "validate:ai-vision": "NODE_OPTIONS=--conditions=react-server tsx scripts/validate-ai-vision.ts",

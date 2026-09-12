@@ -23,6 +23,10 @@ export interface TurnInput {
    *  the model then generates natural Egyptian Arabic natively. */
   dialect?: "egyptian" | null;
   conversationId: string;
+  /** The turn's trace id (observability/turn-trace.ts), minted by the route
+   *  and put on every line this turn writes. Absent: the conversation id
+   *  stands in, as it did before plan G1. */
+  traceId?: string | null;
   /** The composer's globe control was on for this turn. A nudge toward
    *  search_web, never a command — the model still decides. */
   webSearchRequested?: boolean;
