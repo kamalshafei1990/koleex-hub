@@ -40,6 +40,7 @@
     "validate:ai-turn-ir": "NODE_OPTIONS=--conditions=react-server tsx scripts/validate-ai-turn-ir.ts",
     "validate:ai-api-v1": "tsx scripts/validate-ai-api-v1.ts",
     "validate:ai-client-render": "tsx scripts/validate-ai-client-render.tsx",
+    "sounds:preview": "tsx scripts/sounds-preview.ts",
     "validate:ai-hub-connector": "NODE_OPTIONS=--conditions=react-server tsx scripts/validate-ai-hub-connector.ts",
     "validate:ai-cache": "NODE_OPTIONS=--conditions=react-server tsx scripts/validate-ai-cache.ts",
     "validate:ai-client-neutral": "NODE_OPTIONS=--conditions=react-server tsx scripts/validate-ai-client-neutral.ts",

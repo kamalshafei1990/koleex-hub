@@ -40,6 +40,13 @@ export interface ToneNote {
    *  A glide is what makes a plain sine sound like a signal rather than a
    *  doorbell. Omitted, the note holds `freq`. */
   glideTo?: number;
+  /** Oscillator shape. Sine is the family's voice; a triangle carries a
+   *  little edge for a warning without becoming a buzzer. Omitted: sine. */
+  wave?: "sine" | "triangle";
+  /** Multiplier on the tone's gain for this note alone — a tick that must
+   *  sit under the assistant's voice, a warning that may sit a little over
+   *  the rest. Omitted: 1. */
+  level?: number;
 }
 
 /* THE OWNER, after the first version: "the sound when it connects is not good
@@ -103,15 +110,16 @@ export function scheduleTone(ctx: ToneContextLike, notes: readonly ToneNote[], g
   for (const n of notes) {
     const osc = ctx.createOscillator();
     const g = ctx.createGain();
-    osc.type = "sine";
+    osc.type = n.wave ?? "sine";
     const start = t0 + n.at;
     const stop = start + n.dur;
+    const peak = gain * (n.level ?? 1);
     osc.frequency.setValueAtTime(n.freq, start);
     if (n.glideTo !== undefined) osc.frequency.linearRampToValueAtTime(n.glideTo, stop);
     /* Envelope: silent → gain → silent, ramps at both ends. */
     g.gain.setValueAtTime(0, start);
-    g.gain.linearRampToValueAtTime(gain, start + RAMP_S);
-    g.gain.setValueAtTime(gain, Math.max(start + RAMP_S, stop - RAMP_S));
+    g.gain.linearRampToValueAtTime(peak, start + RAMP_S);
+    g.gain.setValueAtTime(peak, Math.max(start + RAMP_S, stop - RAMP_S));
     g.gain.linearRampToValueAtTime(0, stop);
     osc.connect(g);
     g.connect(ctx.destination);
