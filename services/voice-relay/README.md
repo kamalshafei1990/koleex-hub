@@ -31,13 +31,20 @@ at all, so the relay kept refusing the watchdog's Origin-less probe for hours
 after the fix had merged). A change anywhere under this directory deploys;
 a change elsewhere in the repository does not.
 
-Check after every merge that touches this directory: the merge of #407
-(2026-09-11, the `koleex.keepalive` frame answered here instead of being
-forwarded) produced no deployment either, with the pattern correct — the
-deployment list still ended at 2026-09-09. Until the relay carries it, a
-browser's keepalive is forwarded to the vendor as an unknown event, which the
-vendor may answer with an `error` event — one the call survives, but that the
-beacon would file as `far-side-error`, and that keeps the frame from doing
-its job. This note is the change under the directory that makes
-the deployment; if the list does not show it, deploy from the Railway
-dashboard (the service's ⋯ → Redeploy builds the latest `main`).
+Check after every merge that touches this directory. The merges of #407 and
+#408 (2026-09-11, the `koleex.keepalive` frame answered here instead of being
+forwarded) produced no deployment, with the pattern correct: Railway reported
+**auto-deploy disabled — the repository has no Railway GitHub App
+installation** (`NO_INSTALLATION`). The webhook connection exists; the app is
+not authorised on the repository, so no merge can trigger a build. Until the
+owner installs the Railway GitHub App on `kamalshafei1990/koleex-hub` (Railway
+→ the service → Settings → Source → connect / reinstall, then refresh the
+repository list), every deployment of this relay is manual: the Railway
+dashboard (the service's ⋯ → Deploy latest commit) or the Railway MCP's
+deploy tool with the commit hash. The keepalive reached the relay this way on
+2026-09-12 03:19 UTC (deployment `486769f9`, commit `ac10fd4f`).
+
+Why it matters: until the relay carries a change, a browser's keepalive is
+forwarded to the vendor as an unknown event, which the vendor may answer with
+an `error` event — one the call survives, but that the beacon would file as
+`far-side-error`, and that keeps the frame from doing its job.

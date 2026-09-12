@@ -42,6 +42,9 @@ export type VoiceTelemetryFields = {
   /** The page's weight at the last pulse before it died (call-memory.ts). */
   dom?: number;
   imgs?: number;
+  /** The call's own id (session.ts), so every beacon of one call — and the
+   *  handshake it began with — can be read together. Plan G1. */
+  call?: string;
 };
 
 export type VoiceTelemetry = VoiceTelemetryFields;

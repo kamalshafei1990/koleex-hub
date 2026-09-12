@@ -2195,7 +2195,7 @@ console.log("\n── 12. Mute ──");
     /console\.warn\(\s*`\[ai\.voice\.client\]/.test(telRoute) && !/supabase|insert\(/.test(telRoute) && /new NextResponse\(null, \{ status: 204 \}\)/.test(telRoute));
   const diagS = new VoiceSession(deps({ status: 200 }).deps);
   const dg = diagS.diagnostics();
-  check("diagnostics are states and counts only", Object.keys(dg).sort().join(",") === "canary,capture,dc,elapsed_ms,err,events,ice,ice_ever_connected,last_event,mic,mic_peak,region,resp_err,tool_calls,tool_wait_ms,up_frames,ws_close,ws_reconnects" && dg.up_frames === 0 && dg.capture === "" && dg.mic_peak === 0 && dg.mic === "none" && dg.canary === "" && dg.resp_err === "" && dg.tool_wait_ms === 0 && dg.tool_calls === 0 && dg.ws_reconnects === 0 && dg.ws_close === "" && dg.elapsed_ms === 0 && dg.err === "" && dg.events === "");
+  check("diagnostics are states and counts only", Object.keys(dg).sort().join(",") === "call,canary,capture,dc,elapsed_ms,err,events,ice,ice_ever_connected,last_event,mic,mic_peak,region,resp_err,tool_calls,tool_wait_ms,up_frames,ws_close,ws_reconnects" && dg.call === "" && dg.up_frames === 0 && dg.capture === "" && dg.mic_peak === 0 && dg.mic === "none" && dg.canary === "" && dg.resp_err === "" && dg.tool_wait_ms === 0 && dg.tool_calls === 0 && dg.ws_reconnects === 0 && dg.ws_close === "" && dg.elapsed_ms === 0 && dg.err === "" && dg.events === "");
 
   /* THE PICTURE EXPANDS IN PLACE. */
   check("a photo in the conversation is a button that opens the lightbox, not a link out of the app",

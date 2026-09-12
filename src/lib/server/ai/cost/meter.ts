@@ -98,3 +98,36 @@ export function recordUsage(input: UsageInput): void {
     /* Measuring must not be able to break the thing being measured. */
   }
 }
+
+/** What a provider call's outcome carries that the meter reads. Structural,
+ *  so a TurnOutcome (provider/types.ts, server-only) fits without this pure
+ *  module importing it. A failed call has no response: tokens unknown. */
+export interface MeteredOutcome {
+  ok: boolean;
+  servedBy?: string | null;
+  model?: string | null;
+  ms?: number | null;
+  response?: { usage?: { inputTokens: number | null; outputTokens: number | null } };
+}
+
+/** Meter one provider call from its outcome (plan G1: the fast lanes' calls
+ *  were the one path that wrote no usage line). The provider label goes to
+ *  the LOG only — this function is the reason a route never has to write
+ *  `provider: out.servedBy` itself, which the cost suite reads as a value
+ *  on its way to a client. */
+export function meterTurn(
+  out: MeteredOutcome,
+  ids: { tenantId: string | null; accountId: string | null; lane: string; traceId: string | null },
+): void {
+  recordUsage({
+    tenantId: ids.tenantId,
+    accountId: ids.accountId,
+    lane: ids.lane,
+    provider: out.servedBy ?? "none",
+    model: out.model ?? "unknown",
+    inputTokens: out.ok ? (out.response?.usage?.inputTokens ?? null) : null,
+    outputTokens: out.ok ? (out.response?.usage?.outputTokens ?? null) : null,
+    ms: out.ms ?? 0,
+    traceId: ids.traceId,
+  });
+}

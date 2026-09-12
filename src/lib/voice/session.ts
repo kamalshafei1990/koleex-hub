@@ -115,6 +115,18 @@ export type VoiceFailure =
    *  fixes and the first version reported both the same way. */
   | "config-rejected";
 
+/** Ten hex characters, once per call: enough to tell a week's calls apart,
+ *  short enough to read off a log line. Never throws. */
+export function newCallId(): string {
+  try {
+    const c = (globalThis as { crypto?: { randomUUID?: () => string } }).crypto;
+    if (c?.randomUUID) return c.randomUUID().replace(/-/g, "").slice(0, 10);
+  } catch {
+    /* fall through */
+  }
+  return (Date.now().toString(16) + Math.random().toString(16).slice(2)).slice(0, 10);
+}
+
 export type VoiceDiagnostics = {
   elapsed_ms: number;
   ice: string;
@@ -140,6 +152,9 @@ export type VoiceDiagnostics = {
   /** The longest wait, in one call, from a response's creation to the tool
    *  call it carried being complete — the "thinking" the caller sat through. */
   tool_wait_ms: number;
+  /** THE CALL'S OWN ID (plan G1): minted when the call starts, on every
+   *  beacon it sends, so one call's lines read together in the log. */
+  call: string;
   /** SOCKET LANE, THE MICROPHONE'S SIDE (2026-09-09 03:09): frames this
    *  call sent up, the reader that made them with the context's state and
    *  rate, the frames it read and the context's state when it started
@@ -622,6 +637,7 @@ export class VoiceSession {
      failure so the next "it stopped by itself" has a cause attached. No
      content, no transcript — states and counts only. */
   private startedAt = 0;
+  private callId = "";
   private lastEventType = "";
   /* EVERY EVENT TYPE THE FAR SIDE SENT, COUNTED. Names only, never payloads.
      A vendor on a different protocol revision is invisible from the
@@ -775,6 +791,7 @@ export class VoiceSession {
       capture: capture ? `${capture.path}:${capture.ctx}:${capture.rate}:f${capture.frames}:s${capture.start}${capture.stalled ? ":stalled" : ""}` : "",
       mic_peak: capture?.peak ?? 0,
       mic: this.micState(),
+      call: this.callId,
     };
   }
 
@@ -1302,6 +1319,7 @@ export class VoiceSession {
 
     this.setState("requesting-mic");
     this.startedAt = Date.now();
+    this.callId = newCallId();
     let mic: MediaStream;
     try {
       mic = await this.deps.getMicrophone();
