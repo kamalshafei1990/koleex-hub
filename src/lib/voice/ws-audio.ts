@@ -76,6 +76,11 @@ export type WsAudio = {
    *  microphone, how many frames it handed out, the loudest sample it saw,
    *  and the context's state and rate — for the beacon, at hang-up. */
   stats(): WsAudioStats;
+  /** The far side finished an answer: whatever is still gathered plays now.
+   *  Without this the last frames of a short tail waited out the gathering
+   *  timer and came out glued to the NEXT answer — "it swallows the last
+   *  letter and says it when the result comes" (owner, 2026-09-12). */
+  endOfResponse?(): void;
 };
 
 export type WsAudioStats = {
@@ -168,12 +173,24 @@ export function base64ToBytes(b64: string): Uint8Array {
 
 /* ── The jitter buffer ──────────────────────────────────────────────────── */
 
-/** How much of an answer is gathered before its first frame plays. */
-export const PREBUFFER_S = 0.3;
+/** How much of an answer is gathered before its first frame plays.
+ *  (Owner, 2026-09-12 evening: "crackling and cuts while it talks, VPN or
+ *  not" — a China path jitters by hundreds of ms; a third of a second of
+ *  lead drained mid-sentence again and again. Half a second is the price
+ *  of a sentence that plays whole.) */
+export const PREBUFFER_S = 0.45;
 /** How much the gathering grows each time a run still drains mid-answer. */
-export const PREBUFFER_STEP_S = 0.1;
+export const PREBUFFER_STEP_S = 0.15;
 /** The most delay a rough network can buy itself. */
-export const PREBUFFER_MAX_S = 0.8;
+export const PREBUFFER_MAX_S = 1.2;
+/** A frame that arrives this soon after the run drained CONTINUES the run
+ *  from now — a gap too short to hear — instead of stopping the sentence
+ *  to gather again (which was a third-of-a-second hole in every word the
+ *  network delivered a few ms late: the "cuts"). It still counts as an
+ *  underrun, so the next run starts with more lead. */
+export const LATE_GRACE_S = 0.12;
+/** Where a late frame restarts the run: just ahead of now. */
+const LATE_RESTART_S = 0.02;
 /** A short answer ("Yes.") never fills the buffer: whatever has arrived
  *  plays after this long regardless. */
 export const PREBUFFER_WAIT_MS = 350;
@@ -190,6 +207,11 @@ export type JitterDeps<T> = {
   start(node: T, at: number): void;
   setTimer(fn: () => void, ms: number): unknown;
   clearTimer(handle: unknown): void;
+  /** The context's sample rate. With it, a run's start times are counted
+   *  in whole samples from the run's first frame, so a thousand frames of
+   *  float `duration` cannot drift a fraction of a sample apart — a gap or
+   *  an overlap at a frame boundary is a click, twenty times a second. */
+  rate?: number;
 };
 
 /**
@@ -210,6 +232,9 @@ export class JitterQueue<T> {
   target = PREBUFFER_S;
   underruns = 0;
   private nextStart = 0;
+  /* The run's origin and its length in whole samples (see JitterDeps.rate). */
+  private runStart = 0;
+  private runSamples = 0;
   private running = false;
   private pending: JitterFrame<T>[] = [];
   private pendingDur = 0;
@@ -217,17 +242,45 @@ export class JitterQueue<T> {
 
   constructor(private readonly deps: JitterDeps<T>) {}
 
+  /** Advance the run by one frame, sample-exact when the rate is known. */
+  private advance(duration: number): void {
+    const rate = this.deps.rate;
+    if (rate && rate > 0) {
+      this.runSamples += Math.round(duration * rate);
+      this.nextStart = this.runStart + this.runSamples / rate;
+    } else {
+      this.nextStart += duration;
+    }
+  }
+
+  private beginRun(at: number): void {
+    this.runStart = at;
+    this.runSamples = 0;
+    this.nextStart = at;
+    this.running = true;
+  }
+
   push(frame: JitterFrame<T>): void {
     if (this.running) {
       const now = this.deps.now();
       if (this.nextStart >= now) {
         this.deps.start(frame.node, this.nextStart);
-        this.nextStart += frame.duration;
+        this.advance(frame.duration);
+        return;
+      }
+      const late = now - this.nextStart;
+      if (late < LATE_GRACE_S) {
+        /* Barely late: the sentence goes on from now, the lead grows. */
+        this.underruns++;
+        this.target = Math.min(PREBUFFER_MAX_S, this.target + PREBUFFER_STEP_S);
+        this.beginRun(now + LATE_RESTART_S);
+        this.deps.start(frame.node, this.nextStart);
+        this.advance(frame.duration);
         return;
       }
       /* The run drained before this frame arrived. */
       this.running = false;
-      if (now - this.nextStart < RUN_GAP_S) {
+      if (late < RUN_GAP_S) {
         this.underruns++;
         this.target = Math.min(PREBUFFER_MAX_S, this.target + PREBUFFER_STEP_S);
       }
@@ -250,15 +303,13 @@ export class JitterQueue<T> {
       this.timer = null;
     }
     if (this.pending.length === 0) return;
-    let at = this.deps.now() + START_MARGIN_S;
+    this.beginRun(this.deps.now() + START_MARGIN_S);
     for (const f of this.pending) {
-      this.deps.start(f.node, at);
-      at += f.duration;
+      this.deps.start(f.node, this.nextStart);
+      this.advance(f.duration);
     }
     this.pending = [];
     this.pendingDur = 0;
-    this.nextStart = at;
-    this.running = true;
   }
 
   /** Drop what is gathered and forget the run (barge-in). The target the
@@ -391,6 +442,7 @@ export function createBrowserWsAudio(wireRate: number, opts: { stallMs?: number 
     },
     setTimer: (fn, ms) => setTimeout(fn, ms),
     clearTimer: (h) => clearTimeout(h as ReturnType<typeof setTimeout>),
+    rate: ctx.sampleRate,
   });
 
   const emit = (onFrame: (b64: string) => void, input: Float32Array) => {
@@ -521,6 +573,9 @@ export function createBrowserWsAudio(wireRate: number, opts: { stallMs?: number 
       node.connect(farBus);
       jitter.push({ node, duration: buffer.duration });
       void ctx.resume().catch(() => {});
+    },
+    endOfResponse() {
+      jitter.release();
     },
     flush() {
       /* Gathered frames were never started; started ones are stopped. */

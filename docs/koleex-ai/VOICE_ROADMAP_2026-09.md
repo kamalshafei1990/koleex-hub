@@ -845,3 +845,15 @@ log and the saved turns.
 
 Still the owner's to check: the ~30 s cut does not happen on the US exit; the
 network path is the difference, and a resume hides it rather than removes it.
+
+## "Crackling while it talks; it swallows the last letter and says it when the result comes" (2026-09-12, after #416)
+
+The owner is on the international (socket) line with and without a VPN, so
+the socket lane's own playback path is the suspect — and it had three faults
+that fit the words exactly:
+
+| Heard | Cause in `ws-audio.ts` | Change |
+|---|---|---|
+| Crackling, ~20 clicks a second while the voice plays | Each frame's start time was `previous + duration` in floating point; over a few hundred frames the starts drifted a fraction of a sample from the true boundary — a gap or an overlap at every joint | Starts are counted in **whole samples** from the run's origin (`JitterDeps.rate`); every boundary lands on a sample |
+| Cuts mid-sentence | A frame arriving even 1 ms after the run drained stopped the sentence and gathered a whole new lead (a third of a second of silence), then resumed | A frame less than **120 ms** late continues the run from now (`LATE_GRACE_S`); the lead still grows for the next run. The lead itself starts at **450 ms** (was 300), grows by 150 and caps at 1.2 s |
+| The last letter missing, said when the next answer comes | The tail of an answer that arrived after a drain was gathered and waited for the 350 ms timer; if the model's tool call and the next answer came first, the tail played glued to it | `response.output_audio.done` / `response.audio.done` / `response.done` release the buffer at once (`WsAudio.endOfResponse`) |
