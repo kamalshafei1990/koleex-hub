@@ -45,6 +45,10 @@ export type VoiceTelemetryFields = {
   /** The call's own id (session.ts), so every beacon of one call — and the
    *  handshake it began with — can be read together. Plan G1. */
   call?: string;
+  /** The mainland lane's inbound audio, sampled through the call
+   *  (session.ts sampleRtcStats): "recv=<packets> lost=<packets>
+   *  jitter=<ms> conc=<samples>". The cuts a caller hears, in numbers. */
+  rtc?: string;
 };
 
 export type VoiceTelemetry = VoiceTelemetryFields;

@@ -66,6 +66,37 @@ export function clientAddress(forwardedFor, remoteAddress) {
 }
 export const TICKET_MAX_AGE_S = 15 * 60;        // a ticket cannot outlive the secret it names by much
 
+/* ── The parked session ─────────────────────────────────────────────────── */
+
+/** THE LINE DROPS EVERY THIRTY SECONDS AND THE CONVERSATION USED TO DROP
+ *  WITH IT (2026-09-12 16:58–17:00 UTC: sessions 15–19, `client-closed
+ *  code=1006` at 3.0 / 28.9 / 29.2 / 28.3 / 32.9 s on the owner's Japan
+ *  exit; the same shape at 05:35). Each redial opened a NEW vendor session:
+ *  a fresh configuration, an empty context, the answer in flight lost. The
+ *  vendor's side of the line was never the problem — so it is kept. A
+ *  client that vanishes abnormally leaves its upstream PARKED for a short
+ *  grace; a redial presenting the same secret with `resume=1` is attached
+ *  to it, hears the frames that arrived meanwhile, and the conversation
+ *  goes on where it was. A clean close (the caller hung up) parks nothing. */
+export const RESUME_GRACE_MS = 12_000;
+/** Frames held for the absent client, in bytes; past this the session ends
+ *  rather than grow (a minute of answer audio is ~1.5 MB of base64). */
+export const MAX_PARK_BYTES = 1024 * 1024;
+/** The relay's own first frame on a resumed socket, so the client knows
+ *  not to configure the session again. Never forwarded upstream. */
+export function relayHello(resumed) {
+  return JSON.stringify({ type: "koleex.relay", resumed: Boolean(resumed) });
+}
+/** A client loss the caller did not choose (1006: the socket died with no
+ *  close frame) parks; a close frame from the client (1000, 1005, 1001) is
+ *  the caller leaving, and ends the session as before. Pure. */
+export function shouldPark(clientCloseCode) {
+  return clientCloseCode === 1006;
+}
+/** Close code on a resume that finds nothing parked: the client dials
+ *  afresh at once instead of waiting out a backoff. */
+export const NO_SESSION_CODE = 4001;
+
 /* ── The keepalive ──────────────────────────────────────────────────────── */
 
 /** THE FRAME THAT KEEPS A MIDDLEBOX FROM CUTTING THE LINE (2026-09-11 15:07
@@ -144,6 +175,9 @@ export function originAllowed(origin) {
 const perAddress = new Map();
 /** Open sockets per admission ticket (see MAX_PER_TICKET). */
 const perTicket = new Map();
+/** Sessions whose client vanished abnormally, by client secret, for
+ *  RESUME_GRACE_MS (see the constant). */
+const parked = new Map();
 let connections = 0;
 let sessions = 0;
 
@@ -200,8 +234,23 @@ export function createRelay() {
        relay on its own. */
     const ticketKey = url.searchParams.get("t") || "";
     if ((perTicket.get(ticketKey) || 0) >= MAX_PER_TICKET) return refuse(429, "too-many-ticket");
+    const wantsResume = url.searchParams.get("resume") === "1";
 
     wss.handleUpgrade(req, socket, head, (client) => {
+      if (wantsResume) {
+        /* A resume attaches to the session this secret parked, or is told
+           at once that there is none — never a second upstream on a secret
+           the vendor may already have seen. */
+        const park = parked.get(token);
+        if (park) {
+          parked.delete(token);
+          park.attach(client, address);
+        } else {
+          log(`resume miss`);
+          try { client.close(NO_SESSION_CODE, "no-session"); } catch { /* gone */ }
+        }
+        return;
+      }
       bridge(client, token, url.searchParams.get("model"), address, ticketKey);
     });
   });
@@ -215,16 +264,24 @@ export function createRelay() {
   return http;
 }
 
-function bridge(client, token, model, address, ticketKey = "") {
+function bridge(firstClient, token, model, firstAddress, ticketKey = "") {
   perTicket.set(ticketKey, (perTicket.get(ticketKey) || 0) + 1);
   const id = ++sessions;
   const t0 = Date.now();
   connections++;
+  let client = firstClient;
+  let address = firstAddress;
   perAddress.set(address, (perAddress.get(address) || 0) + 1);
   let up = 0;
   let down = 0;
+  let resumes = 0;
   let upstreamOpenedAt = 0;
   let closed = false;
+  /* While parked: the client is null, downstream frames wait here. */
+  let parkedAt = 0;
+  let parkTimer = null;
+  const held = [];
+  let heldBytes = 0;
 
   const upstream = new WebSocket(upstreamUrlFor(model), [`${PROTOCOL_PREFIX}${token}`], {
     handshakeTimeout: UPSTREAM_OPEN_MS,
@@ -234,31 +291,109 @@ function bridge(client, token, model, address, ticketKey = "") {
   const pending = [];
   let pendingBytes = 0;
 
+  const releaseAddress = () => {
+    const n = (perAddress.get(address) || 1) - 1;
+    if (n <= 0) perAddress.delete(address);
+    else perAddress.set(address, n);
+  };
+
   const finish = (why, code = 1000) => {
     if (closed) return;
     closed = true;
     connections--;
-    const n = (perAddress.get(address) || 1) - 1;
-    if (n <= 0) perAddress.delete(address);
-    else perAddress.set(address, n);
+    if (client) releaseAddress();
     const t = (perTicket.get(ticketKey) || 1) - 1;
     if (t <= 0) perTicket.delete(ticketKey);
     else perTicket.set(ticketKey, t);
     clearInterval(pinger);
     clearTimeout(cap);
-    try { client.close(code); } catch { /* gone */ }
+    if (parkTimer) clearTimeout(parkTimer);
+    if (parked.get(token)?.attach === attach) parked.delete(token);
+    try { client?.close(code); } catch { /* gone */ }
     try { upstream.close(); } catch { /* gone */ }
-    log(`session=${id} end why=${why} code=${code} ms=${Date.now() - t0} openMs=${upstreamOpenedAt ? upstreamOpenedAt - t0 : "none"} up=${up} down=${down}`);
+    log(`session=${id} end why=${why} code=${code} ms=${Date.now() - t0} openMs=${upstreamOpenedAt ? upstreamOpenedAt - t0 : "none"} up=${up} down=${down} resumes=${resumes}`);
   };
 
   const cap = setTimeout(() => finish("cap", 1000), MAX_SESSION_MS);
   let alive = true;
   const pinger = setInterval(() => {
+    /* A parked session has no client to ping; the grace timer bounds it. */
+    if (!client) return;
     if (!alive) return finish("silent-client", 1001);
     alive = false;
     try { client.ping(); } catch { /* closing */ }
   }, PING_EVERY_MS);
-  client.on("pong", () => { alive = true; });
+
+  /** The client's side of the bridge, attached once per socket. */
+  const wire = (c) => {
+    c.on("pong", () => { alive = true; });
+    c.on("message", (data, isBinary) => {
+      if (c !== client || isBinary) return;
+      alive = true;
+      const text = data.toString();
+      /* Answered here, counted nowhere, forwarded never. */
+      if (isKeepalive(text)) {
+        if (c.readyState === WebSocket.OPEN) c.send(KEEPALIVE_FRAME);
+        return;
+      }
+      up++;
+      if (upstream.readyState === WebSocket.OPEN) upstream.send(text);
+      else if (upstream.readyState === WebSocket.CONNECTING) {
+        /* Bounded by BYTES, not frames (security review, 2026-09-12): two
+           hundred frames of the maximum size was two hundred megabytes held
+           per socket while the vendor opened. */
+        if (pendingBytes + text.length <= MAX_PENDING_BYTES) {
+          pending.push(text);
+          pendingBytes += text.length;
+        }
+      }
+    });
+    c.on("close", (code) => {
+      if (c !== client) return;
+      const clean = code >= 1000 && code < 5000 ? code : 1001;
+      if (shouldPark(code) && upstream.readyState === WebSocket.OPEN && !closed) return park();
+      finish("client-closed", clean);
+    });
+    c.on("error", () => { if (c === client) finish("client-error", 1011); });
+  };
+
+  /** The client is gone without a word: keep the vendor's side for a while. */
+  const park = () => {
+    releaseAddress();
+    client = null;
+    parkedAt = Date.now();
+    parked.set(token, { attach });
+    parkTimer = setTimeout(() => {
+      parkTimer = null;
+      if (!client) finish("resume-expired", 1001);
+    }, RESUME_GRACE_MS);
+    log(`session=${id} parked ms=${parkedAt - t0} up=${up} down=${down}`);
+  };
+
+  /** A redial with the same secret takes the parked session over. */
+  const attach = (c, addr) => {
+    if (closed) {
+      try { c.close(NO_SESSION_CODE, "no-session"); } catch { /* gone */ }
+      return;
+    }
+    if (parkTimer) clearTimeout(parkTimer);
+    parkTimer = null;
+    client = c;
+    address = addr;
+    perAddress.set(address, (perAddress.get(address) || 0) + 1);
+    alive = true;
+    resumes++;
+    const gapMs = parkedAt ? Date.now() - parkedAt : 0;
+    parkedAt = 0;
+    wire(c);
+    try {
+      c.send(relayHello(true));
+      for (const f of held) c.send(f);
+    } catch { /* the new socket died at once; its close handles it */ }
+    log(`session=${id} resumed gapMs=${gapMs} held=${held.length}`);
+    held.length = 0;
+    heldBytes = 0;
+  };
 
   upstream.on("open", () => {
     upstreamOpenedAt = Date.now();
@@ -269,7 +404,15 @@ function bridge(client, token, model, address, ticketKey = "") {
   upstream.on("message", (data, isBinary) => {
     if (isBinary) return;
     down++;
-    if (client.readyState === WebSocket.OPEN) client.send(data.toString());
+    const text = data.toString();
+    if (client) {
+      if (client.readyState === WebSocket.OPEN) client.send(text);
+      return;
+    }
+    /* Parked: held for the client that comes back, bounded. */
+    if (heldBytes + text.length > MAX_PARK_BYTES) return finish("park-overflow", 1011);
+    held.push(text);
+    heldBytes += text.length;
   });
   upstream.on("close", (code) => finish("upstream-closed", code >= 1000 && code < 5000 ? code : 1011));
   upstream.on("error", (e) => {
@@ -277,29 +420,7 @@ function bridge(client, token, model, address, ticketKey = "") {
     finish("upstream-error", 1011);
   });
 
-  client.on("message", (data, isBinary) => {
-    if (isBinary) return;
-    alive = true;
-    const text = data.toString();
-    /* Answered here, counted nowhere, forwarded never. */
-    if (isKeepalive(text)) {
-      if (client.readyState === WebSocket.OPEN) client.send(KEEPALIVE_FRAME);
-      return;
-    }
-    up++;
-    if (upstream.readyState === WebSocket.OPEN) upstream.send(text);
-    else if (upstream.readyState === WebSocket.CONNECTING) {
-      /* Bounded by BYTES, not frames (security review, 2026-09-12): two
-         hundred frames of the maximum size was two hundred megabytes held
-         per socket while the vendor opened. */
-      if (pendingBytes + text.length <= MAX_PENDING_BYTES) {
-        pending.push(text);
-        pendingBytes += text.length;
-      }
-    }
-  });
-  client.on("close", (code) => finish("client-closed", code >= 1000 && code < 5000 ? code : 1001));
-  client.on("error", () => finish("client-error", 1011));
+  wire(client);
   log(`session=${id} start model=${typeof model === "string" && /^[\w.-]{1,64}$/.test(model) ? model : "default"}`);
 }
 

@@ -96,6 +96,11 @@ export type WsAudioStats = {
   start: string;
   /** Both readers were given the microphone and neither read a frame. */
   stalled: boolean;
+  /** The far side's jitter buffer: how many times it ran dry (each one an
+   *  audible gap) and the depth it settled at, in ms. Absent on a runtime
+   *  without a buffer. */
+  underruns?: number;
+  bufferMs?: number;
 };
 
 /** A reader that has read NOTHING this long after it started is judged
@@ -539,7 +544,7 @@ export function createBrowserWsAudio(wireRate: number, opts: { stallMs?: number 
       return { mic: read(micMeter), far: read(farMeter) };
     },
     stats() {
-      return { path: capturePath, frames, peak: Math.round(peak * 100) / 100, ctx: String(ctx.state ?? ""), rate: ctx.sampleRate, start: startState, stalled };
+      return { path: capturePath, frames, peak: Math.round(peak * 100) / 100, ctx: String(ctx.state ?? ""), rate: ctx.sampleRate, start: startState, stalled, underruns: jitter.underruns, bufferMs: Math.round(jitter.target * 1000) };
     },
     playSample(bytes) {
       /* Whatever the far side was saying yields to the sample. */

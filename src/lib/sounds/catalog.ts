@@ -79,8 +79,11 @@ export type SoundDef = {
    *  there — never a second sound on top. */
   file: string;
   notes: readonly ToneNote[];
-  /** Whether the default is ON. A cue that would fire on every turn of a
-   *  conversation (thinking, sent, received) starts off; the owner decides. */
+  /** Whether the default is ON. The owner, after the first day with all of
+   *  them (2026-09-12 evening: "too many — keep the sounds for basic
+   *  things"): only the moments a caller must not miss start on — the call
+   *  is ready, the line came back, the call ended or failed, an error. The
+   *  rest wait in Settings → Sounds for whoever wants them. */
   defaultOn: boolean;
 };
 
@@ -113,7 +116,7 @@ export const SOUND_CATALOG: readonly SoundDef[] = [
       { freq: E6, at: 0, dur: 0.08, level: 0.7 },
       { freq: E6, at: 0.22, dur: 0.08, level: 0.7 },
     ],
-    defaultOn: true,
+    defaultOn: false,
   },
   {
     key: "call-ready",
@@ -132,7 +135,7 @@ export const SOUND_CATALOG: readonly SoundDef[] = [
     when: { en: "The connection was lost and is being redialled", zh: "连接丢失，正在重新拨号", ar: "الاتصال اتقطع وبيعيد الاتصال" },
     /* One note settling downward: something slipped, not over yet. */
     notes: [{ freq: A5, at: 0, dur: 0.22, glideTo: G5 }],
-    defaultOn: true,
+    defaultOn: false,
   },
   {
     key: "call-recovered",
@@ -177,7 +180,7 @@ export const SOUND_CATALOG: readonly SoundDef[] = [
     label: { en: "Microphone off", zh: "麦克风关闭", ar: "المايك اتقفل" },
     when: { en: "You muted yourself on a call", zh: "你在通话中静音", ar: "كتمت المايك أثناء المكالمة" },
     notes: [{ freq: C6, at: 0, dur: 0.12, glideTo: A5 }],
-    defaultOn: true,
+    defaultOn: false,
   },
   {
     key: "mic-unmute",
@@ -186,7 +189,7 @@ export const SOUND_CATALOG: readonly SoundDef[] = [
     label: { en: "Microphone on", zh: "麦克风开启", ar: "المايك اتفتح" },
     when: { en: "You unmuted yourself", zh: "你取消了静音", ar: "فتحت المايك تاني" },
     notes: [{ freq: A5, at: 0, dur: 0.12, glideTo: C6 }],
-    defaultOn: true,
+    defaultOn: false,
   },
   {
     key: "ptt-start",
@@ -195,7 +198,7 @@ export const SOUND_CATALOG: readonly SoundDef[] = [
     label: { en: "Hold to talk: listening", zh: "按住说话：聆听中", ar: "اضغط وتكلم: بيسمعك" },
     when: { en: "You pressed and held the talk button", zh: "你按住了说话按钮", ar: "ضغطت مطوّل على زرار الكلام" },
     notes: [{ freq: G6, at: 0, dur: 0.08, glideTo: C7, level: 0.8 }],
-    defaultOn: true,
+    defaultOn: false,
   },
   {
     key: "ptt-stop",
@@ -204,7 +207,7 @@ export const SOUND_CATALOG: readonly SoundDef[] = [
     label: { en: "Hold to talk: released", zh: "按住说话：已松开", ar: "اضغط وتكلم: سيبت الزرار" },
     when: { en: "You let go of the talk button", zh: "你松开了说话按钮", ar: "سيبت زرار الكلام" },
     notes: [{ freq: C7, at: 0, dur: 0.08, glideTo: G6, level: 0.8 }],
-    defaultOn: true,
+    defaultOn: false,
   },
   {
     key: "thinking",
@@ -226,7 +229,7 @@ export const SOUND_CATALOG: readonly SoundDef[] = [
       { freq: C7, at: 0, dur: 0.06, level: 0.7 },
       { freq: E7, at: 0.07, dur: 0.1, level: 0.7 },
     ],
-    defaultOn: true,
+    defaultOn: false,
   },
   {
     key: "voice-switched",
@@ -239,7 +242,7 @@ export const SOUND_CATALOG: readonly SoundDef[] = [
       { freq: E6, at: 0.08, dur: 0.07 },
       { freq: C6, at: 0.16, dur: 0.1 },
     ],
-    defaultOn: true,
+    defaultOn: false,
   },
   {
     key: "call-interrupted",
@@ -251,7 +254,7 @@ export const SOUND_CATALOG: readonly SoundDef[] = [
       { freq: A5, at: 0, dur: 0.1, wave: "triangle", level: 0.7 },
       { freq: A5, at: 0.16, dur: 0.16, glideTo: G5, wave: "triangle", level: 0.7 },
     ],
-    defaultOn: true,
+    defaultOn: false,
   },
   {
     key: "summary-ready",
@@ -265,7 +268,7 @@ export const SOUND_CATALOG: readonly SoundDef[] = [
       { freq: E6, at: 0.11, dur: 0.1 },
       { freq: G6, at: 0.22, dur: 0.3 },
     ],
-    defaultOn: true,
+    defaultOn: false,
   },
 
   /* ── The typed chat ───────────────────────────────────────────────── */
@@ -297,7 +300,7 @@ export const SOUND_CATALOG: readonly SoundDef[] = [
     label: { en: "Stopped", zh: "已停止", ar: "وقّفت الرد" },
     when: { en: "You stopped a reply while it was being written", zh: "你在回复生成中停止了它", ar: "وقّفت الرد وهو بيتكتب" },
     notes: [{ freq: A5, at: 0, dur: 0.1, level: 0.7 }],
-    defaultOn: true,
+    defaultOn: false,
   },
   {
     key: "error",
@@ -321,7 +324,7 @@ export const SOUND_CATALOG: readonly SoundDef[] = [
       { freq: G5, at: 0, dur: 0.09, glideTo: C6 },
       { freq: E6, at: 0.1, dur: 0.14 },
     ],
-    defaultOn: true,
+    defaultOn: false,
   },
   {
     key: "copied",
@@ -342,7 +345,7 @@ export const SOUND_CATALOG: readonly SoundDef[] = [
       { freq: C6, at: 0, dur: 0.07 },
       { freq: G6, at: 0.08, dur: 0.12 },
     ],
-    defaultOn: true,
+    defaultOn: false,
   },
   {
     key: "attachment-failed",
@@ -351,7 +354,7 @@ export const SOUND_CATALOG: readonly SoundDef[] = [
     label: { en: "File refused", zh: "文件被拒绝", ar: "الملف اترفض" },
     when: { en: "An attached file could not be read", zh: "附件无法读取", ar: "الملف المرفق ما اتقراش" },
     notes: [{ freq: D5, at: 0, dur: 0.16, wave: "triangle", level: 0.8 }],
-    defaultOn: true,
+    defaultOn: false,
   },
 
   /* ── Dictation in the composer ────────────────────────────────────── */
@@ -362,7 +365,7 @@ export const SOUND_CATALOG: readonly SoundDef[] = [
     label: { en: "Dictation started", zh: "开始听写", ar: "الإملاء بدأ" },
     when: { en: "The microphone started listening for dictation", zh: "麦克风开始听写", ar: "المايك بدأ يسمع الإملاء" },
     notes: [{ freq: G6, at: 0, dur: 0.08, glideTo: C7, level: 0.8 }],
-    defaultOn: true,
+    defaultOn: false,
   },
   {
     key: "dictation-stop",
@@ -371,7 +374,7 @@ export const SOUND_CATALOG: readonly SoundDef[] = [
     label: { en: "Dictation sent", zh: "听写已发送", ar: "الإملاء اتبعت" },
     when: { en: "Dictation ended and the words were sent", zh: "听写结束并已发送", ar: "الإملاء خلص والكلام اتبعت" },
     notes: [{ freq: C7, at: 0, dur: 0.08, glideTo: G6, level: 0.8 }],
-    defaultOn: true,
+    defaultOn: false,
   },
 
   /* ── Tools and actions ────────────────────────────────────────────── */
@@ -386,7 +389,7 @@ export const SOUND_CATALOG: readonly SoundDef[] = [
       { freq: E6, at: 0.12, dur: 0.09 },
       { freq: G6, at: 0.26, dur: 0.2 },
     ],
-    defaultOn: true,
+    defaultOn: false,
   },
   {
     key: "action-done",
@@ -399,7 +402,7 @@ export const SOUND_CATALOG: readonly SoundDef[] = [
       { freq: E6, at: 0.1, dur: 0.09 },
       { freq: G6, at: 0.2, dur: 0.24, glideTo: A6 },
     ],
-    defaultOn: true,
+    defaultOn: false,
   },
   {
     key: "action-cancelled",
@@ -408,7 +411,7 @@ export const SOUND_CATALOG: readonly SoundDef[] = [
     label: { en: "Cancelled", zh: "已取消", ar: "اتلغى" },
     when: { en: "You cancelled an action before it ran", zh: "你在执行前取消了操作", ar: "لغيت الإجراء قبل ما يتنفذ" },
     notes: [{ freq: G6, at: 0, dur: 0.16, glideTo: E6 }],
-    defaultOn: true,
+    defaultOn: false,
   },
   {
     key: "action-denied",
@@ -420,7 +423,7 @@ export const SOUND_CATALOG: readonly SoundDef[] = [
       { freq: E5, at: 0, dur: 0.1, wave: "triangle", level: 0.8 },
       { freq: D5, at: 0.13, dur: 0.14, wave: "triangle", level: 0.8 },
     ],
-    defaultOn: true,
+    defaultOn: false,
   },
 
   /* ── General ──────────────────────────────────────────────────────── */
@@ -431,7 +434,7 @@ export const SOUND_CATALOG: readonly SoundDef[] = [
     label: { en: "Deleted", zh: "已删除", ar: "اتمسح" },
     when: { en: "A conversation was deleted", zh: "对话已删除", ar: "المحادثة اتمسحت" },
     notes: [{ freq: C6, at: 0, dur: 0.2, glideTo: A4 }],
-    defaultOn: true,
+    defaultOn: false,
   },
 ];
 

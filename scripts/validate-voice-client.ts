@@ -2220,7 +2220,7 @@ console.log("\n── 12. Mute ──");
     /console\.warn\(\s*`\[ai\.voice\.client\]/.test(telRoute) && !/supabase|insert\(/.test(telRoute) && /new NextResponse\(null, \{ status: 204 \}\)/.test(telRoute));
   const diagS = new VoiceSession(deps({ status: 200 }).deps);
   const dg = diagS.diagnostics();
-  check("diagnostics are states and counts only", Object.keys(dg).sort().join(",") === "call,canary,capture,dc,elapsed_ms,err,events,ice,ice_ever_connected,last_event,mic,mic_peak,region,resp_err,tool_calls,tool_wait_ms,up_frames,ws_close,ws_reconnects" && dg.call === "" && dg.up_frames === 0 && dg.capture === "" && dg.mic_peak === 0 && dg.mic === "none" && dg.canary === "" && dg.resp_err === "" && dg.tool_wait_ms === 0 && dg.tool_calls === 0 && dg.ws_reconnects === 0 && dg.ws_close === "" && dg.elapsed_ms === 0 && dg.err === "" && dg.events === "");
+  check("diagnostics are states and counts only", Object.keys(dg).sort().join(",") === "call,canary,capture,dc,elapsed_ms,err,events,ice,ice_ever_connected,last_event,mic,mic_peak,region,resp_err,rtc,tool_calls,tool_wait_ms,up_frames,ws_close,ws_reconnects" && dg.call === "" && dg.rtc === "" && dg.up_frames === 0 && dg.capture === "" && dg.mic_peak === 0 && dg.mic === "none" && dg.canary === "" && dg.resp_err === "" && dg.tool_wait_ms === 0 && dg.tool_calls === 0 && dg.ws_reconnects === 0 && dg.ws_close === "" && dg.elapsed_ms === 0 && dg.err === "" && dg.events === "");
 
   /* THE PICTURE EXPANDS IN PLACE. */
   check("a photo in the conversation is a button that opens the lightbox, not a link out of the app",
@@ -2651,7 +2651,7 @@ function describeErrorCheck(): boolean {
      the transport — configuration, acknowledgement, transcripts, tool relay
      — is the same code the WebRTC lane runs, so what is proved here is the
      transport: the handshake, the socket, the frames, the teardown. */
-  type FakeSocket = VoiceSocket & { sent: string[]; url: string; protocols: string[]; closed: number; open(): void; message(raw: string): void; drop(): void };
+  type FakeSocket = VoiceSocket & { sent: string[]; url: string; protocols: string[]; closed: number; open(): void; message(raw: string): void; drop(): void; dropWith(code: number): void };
   const makeSocket = (url: string, protocols: string[]): FakeSocket => {
     const sock: FakeSocket = {
       url, protocols, sent: [], closed: 0, readyState: 0,
@@ -2661,6 +2661,7 @@ function describeErrorCheck(): boolean {
       open() { (sock as { readyState: number }).readyState = 1; sock.onopen?.({}); },
       message(raw) { sock.onmessage?.({ data: raw }); },
       drop() { (sock as { readyState: number }).readyState = 3; sock.onclose?.({}); },
+      dropWith(code) { (sock as { readyState: number }).readyState = 3; sock.onclose?.({ code }); },
     };
     return sock;
   };
@@ -2845,7 +2846,7 @@ function describeErrorCheck(): boolean {
     check("the handshake says keepalive only for the relay's socket, and the relay answers the exact frame without forwarding it",
       /keepalive: socket\.via === "relay",/.test(fsK.readFileSync("src/app/api/ai/voice/ws-session/route.ts", "utf8")) &&
       /export const KEEPALIVE_FRAME = '\{"type":"koleex\.keepalive"\}';/.test(fsK.readFileSync("services/voice-relay/server.mjs", "utf8")) &&
-      /if \(isKeepalive\(text\)\) \{\s*if \(client\.readyState === WebSocket\.OPEN\) client\.send\(KEEPALIVE_FRAME\);\s*return;\s*\}\s*up\+\+;/.test(fsK.readFileSync("services/voice-relay/server.mjs", "utf8")));
+      /if \(isKeepalive\(text\)\) \{\s*if \(c\.readyState === WebSocket\.OPEN\) c\.send\(KEEPALIVE_FRAME\);\s*return;\s*\}\s*up\+\+;/.test(fsK.readFileSync("services/voice-relay/server.mjs", "utf8")));
   }
   {
     const r = await laneRun({ reconnectGraceMs: 80 });
@@ -2990,6 +2991,15 @@ function describeErrorCheck(): boolean {
        died with it, nothing redialled, the deadline ended the call). */
     const { WS_RECONNECT_DELAYS_MS, closeCodeOf } = await import("../src/lib/voice/session");
     check("the redial ladder starts at once and backs off; a close event's code is read as text", WS_RECONNECT_DELAYS_MS.join() === "0,1500,3000,6000" && closeCodeOf({ code: 1006 }) === "1006" && closeCodeOf({}) === "" && closeCodeOf(null) === "");
+    const { parseRelayHello, resumeUrl, withOpusFec, WS_NO_SESSION_CODE } = await import("../src/lib/voice/session");
+    check("the relay's hello is read only as itself; resume=1 joins the url either way; 4001 is the 'nothing parked' code",
+      JSON.stringify(parseRelayHello('{"type":"koleex.relay","resumed":true}')) === JSON.stringify({ resumed: true }) && parseRelayHello('{"type":"koleex.relay"}')?.resumed === false && parseRelayHello('{"type":"session.created"}') === null && parseRelayHello("not json") === null &&
+      resumeUrl("wss://a/b") === "wss://a/b?resume=1" && resumeUrl("wss://a/b?t=1") === "wss://a/b?t=1&resume=1" && WS_NO_SESSION_CODE === "4001");
+    const sdp = "v=0\r\nm=audio 9 UDP/TLS/RTP/SAVPF 111 63\r\na=rtpmap:111 opus/48000/2\r\na=fmtp:111 minptime=10;useinbandfec=0\r\na=rtpmap:63 red/48000/2\r\n";
+    check("the offer asks for Opus in-band FEC: appended to the fmtp line, added when there is none, left alone when already asked, untouched without Opus",
+      withOpusFec(sdp) === sdp.replace("useinbandfec=0", "useinbandfec=1") && withOpusFec("a=rtpmap:111 opus/48000/2\r\na=fmtp:111 minptime=10\r\n") === "a=rtpmap:111 opus/48000/2\r\na=fmtp:111 minptime=10;useinbandfec=1\r\n" &&
+      withOpusFec("a=rtpmap:111 opus/48000/2\r\na=rtpmap:63 red/48000/2\r\n") === "a=rtpmap:111 opus/48000/2\r\na=fmtp:111 useinbandfec=1\r\na=rtpmap:63 red/48000/2\r\n" &&
+      withOpusFec("a=rtpmap:111 opus/48000/2\na=fmtp:111 useinbandfec=1\n") === "a=rtpmap:111 opus/48000/2\na=fmtp:111 useinbandfec=1\n" && withOpusFec("a=rtpmap:0 PCMU/8000\n") === "a=rtpmap:0 PCMU/8000\n");
     const r = await laneRun({ reconnectGraceMs: 400 });
     r.sockets[0].open();
     r.sockets[0].message(JSON.stringify({ type: "session.updated" }));
@@ -2997,21 +3007,28 @@ function describeErrorCheck(): boolean {
     r.sockets[0].drop();
     check("a dropped socket on a call that was up is 'reconnecting', not failed — and the deadline is armed once", r.s.getState() === "reconnecting" && r.s.diagnostics().ws_close === "");
     await sleep(30);
-    check("  …a new secret is asked for and a NEW socket dialled at once, on the same microphone and audio",
-      r.recorded.filter((x) => x.url.startsWith(WS_SESSION_PATH)).length === postsBefore + 1 && r.sockets.length === 2 && r.audios.length === 1 && !r.mic.allStopped() && r.s.diagnostics().ws_reconnects === 1);
+    check("  …the first redial RESUMES: no new secret asked for, the same socket url with resume=1 and the same subprotocol, on the same microphone and audio",
+      r.recorded.filter((x) => x.url.startsWith(WS_SESSION_PATH)).length === postsBefore && r.sockets.length === 2 && r.sockets[1].url === "wss://voice.example/v1/realtime?resume=1" && r.sockets[1].protocols.join() === r.sockets[0].protocols.join() && r.audios.length === 1 && !r.mic.allStopped() && r.s.diagnostics().ws_reconnects === 1);
     r.sockets[1].open();
-    check("  …an open redial is not yet the call back: reconnecting until the far side speaks on it", r.s.getState() === "reconnecting" && r.sockets[1].sent.length === 1);
-    r.sockets[1].message(JSON.stringify({ type: "ping" }));
-    check("  …and the far side's first word on the new socket is the call back: live, the session configured afresh on the new socket, no failure shown",
-      r.s.getState() === "live" && r.sockets[1].sent.length === 1 && /session\.update/.test(r.sockets[1].sent[0]) && r.states.every(([st]) => st !== "failed"));
+    check("  …an open resume sends NOTHING — the far side is already configured — and is not yet the call back", r.s.getState() === "reconnecting" && r.sockets[1].sent.length === 0);
+    r.sockets[1].message(JSON.stringify({ type: "koleex.relay", resumed: true }));
+    check("  …the relay's hello `resumed` is the call back: live, no session.update, no failure shown, the conversation where it was",
+      r.s.getState() === "live" && r.sockets[1].sent.length === 0 && r.states.every(([st]) => st !== "failed"));
     r.sockets[1].message(JSON.stringify({ type: "response.output_audio.delta", delta: "QQ==" }));
     r.audios[0].frame?.("BBBB");
-    check("  …voice frames flow on the new socket both ways — the reader was kept, not restarted", r.audios[0].played.join() === "QQ==" && r.sockets[1].sent[r.sockets[1].sent.length - 1] === JSON.stringify({ type: "input_audio_buffer.append", audio: "BBBB" }) && r.audios[0].captureStarted);
-    /* A second outage whose redials all die: the deadline ends the call. */
+    check("  …voice frames flow on the resumed socket both ways — the reader was kept, not restarted", r.audios[0].played.join() === "QQ==" && r.sockets[1].sent[r.sockets[1].sent.length - 1] === JSON.stringify({ type: "input_audio_buffer.append", audio: "BBBB" }) && r.audios[0].captureStarted);
+    /* A second outage: the resume finds nothing parked (the relay says so
+       with 4001) — the next dial asks the route afresh, at once. */
     r.sockets[1].drop();
     await sleep(30);
-    check("a redial that dies before opening schedules the next — the deadline is not pushed out by it", r.s.getState() === "reconnecting" && r.sockets.length === 3);
-    r.sockets[2].drop();
+    check("a second outage tries the resume again first", r.s.getState() === "reconnecting" && r.sockets.length === 3 && /resume=1$/.test(r.sockets[2].url) && r.recorded.filter((x) => x.url.startsWith(WS_SESSION_PATH)).length === postsBefore);
+    r.sockets[2].dropWith(4001);
+    await sleep(30);
+    check("  …and a relay with nothing parked (4001) makes the next dial a fresh handshake at once: a new secret, a socket without resume, the session to be configured again",
+      r.sockets.length === 4 && !/resume=/.test(r.sockets[3].url) && r.recorded.filter((x) => x.url.startsWith(WS_SESSION_PATH)).length === postsBefore + 1);
+    r.sockets[3].open();
+    check("  …which sends the session configuration on open, as a first dial does", r.sockets[3].sent.length === 1 && /session\.update/.test(r.sockets[3].sent[0]));
+    r.sockets[3].drop();
     await sleep(520);
     const last = r.states[r.states.length - 1];
     check("  …and when the deadline passes with no socket open, the call fails as connection-lost, keeping the microphone for a resume",
@@ -3703,7 +3720,7 @@ function describeErrorCheck(): boolean {
     g.window = { AudioContext: class extends FakeCtx { constructor() { super(); made.push(this); } } };
     const ctx = () => made[0];
     const audio = createBrowserWsAudio(24_000);
-    check("a reader that has not started says so: none, the context's state, its rate", JSON.stringify(audio.stats()) === JSON.stringify({ path: "none", frames: 0, peak: 0, ctx: "running", rate: 24_000, start: "", stalled: false }));
+    check("a reader that has not started says so: none, the context's state, its rate — and the far side's buffer, dry count and depth", (() => { const st = audio.stats(); return JSON.stringify({ ...st, underruns: undefined, bufferMs: undefined }) === JSON.stringify({ path: "none", frames: 0, peak: 0, ctx: "running", rate: 24_000, start: "", stalled: false }) && st.underruns === 0 && typeof st.bufferMs === "number" && st.bufferMs > 0; })());
     const frames: string[] = [];
     audio.startCapture({ getAudioTracks: () => [] } as unknown as MediaStream, (b64) => frames.push(b64));
     await new Promise((res) => setTimeout(res, 0));
@@ -4110,7 +4127,7 @@ console.log("\n── 42. the sound catalog: one family, pinned grammar, the cal
   check("the call keeps the cues the owner already approved, note for note",
     cat.soundByKey("call-ready").notes === tn.READY_TONE && cat.soundByKey("call-recovered").notes === tn.RECOVERED_TONE);
   check("the per-turn cues of a typed chat start OFF; the ones that mark a state change start on",
-    !cat.soundByKey("message-sent").defaultOn && !cat.soundByKey("reply-received").defaultOn && cat.soundByKey("error").defaultOn && cat.soundByKey("call-ready").defaultOn);
+    !cat.soundByKey("message-sent").defaultOn && !cat.soundByKey("reply-received").defaultOn && !cat.soundByKey("thinking").defaultOn && cat.soundByKey("error").defaultOn && cat.soundByKey("call-ready").defaultOn);
   {
     /* scheduleTone honours the two new fields and defaults them away. */
     const made: Array<{ type: string; peak: number }> = [];
@@ -4130,8 +4147,8 @@ console.log("\n── 42. the sound catalog: one family, pinned grammar, the cal
     check("every cue names a recording that ships with the app, under the moment's own name, with the CC0 notice beside it",
       cat.SOUND_CATALOG.every((s) => s.file === s.key && fsG.existsSync(`public/sounds/ai/${s.file}.mp3`) && fsG.statSync(`public/sounds/ai/${s.file}.mp3`).size > 500 && fsG.statSync(`public/sounds/ai/${s.file}.mp3`).size < 60_000) &&
       /CC0 1\.0/.test(fsG.readFileSync("public/sounds/ai/NOTICE.txt", "utf8")));
-    check("the owner's three silent moments start off: sent, received, copied — and nothing else does but thinking",
-      cat.SOUND_CATALOG.filter((s) => !s.defaultOn).map((s) => s.key).sort().join() === "copied,message-sent,reply-received,thinking");
+    check("only the moments a caller must not miss start on — ready, line back, ended, failed, error — everything else waits in Settings (owner, 2026-09-12 evening)",
+      cat.SOUND_CATALOG.filter((s) => s.defaultOn).map((s) => s.key).sort().join() === "call-end,call-failed,call-ready,call-recovered,error");
     const player = await import("../src/lib/sounds/player");
     const base = { master: true, dnd: false, volume: 0.8, notification: { enabled: true, tone: "classic" as const }, message: { enabled: true, tone: "classic" as const }, call: { enabled: true, tone: "ping" as const }, ai: { enabled: true, muted: [] as string[] } };
     check("a moment is on by its default, off when silenced, on when woken; the master and the Koleex AI switch silence everything; do-not-disturb does not",
