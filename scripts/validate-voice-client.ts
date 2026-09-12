@@ -3254,6 +3254,38 @@ function describeErrorCheck(): boolean {
         exact && Math.abs(st[st.length - 1] - lastExpected) < 1e-9);
     }
     {
+      /* ONE RESAMPLER FOR THE WHOLE STREAM (owner, 2026-09-12 evening: the
+         crackle survived a buffer with zero underruns). Frames of a 24 kHz
+         signal through one StreamResampler come out as the SAME samples the
+         whole signal gives at once — no seam at any frame joint. */
+      const { StreamResampler, resample } = await import("../src/lib/voice/ws-audio");
+      const n = 24_000;
+      const whole = new Float32Array(n);
+      for (let i = 0; i < n; i++) whole[i] = Math.sin((2 * Math.PI * 440 * i) / 24_000) * 0.5;
+      const rs = new StreamResampler(24_000, 48_000);
+      const pieces: Float32Array[] = [];
+      let off = 0;
+      const sizes = [480, 1023, 2400, 777, 4800, 1, 3000];
+      let k = 0;
+      while (off < n) { const len = Math.min(sizes[k++ % sizes.length], n - off); pieces.push(rs.process(whole.subarray(off, off + len))); off += len; }
+      const joined = new Float32Array(pieces.reduce((a, p) => a + p.length, 0));
+      let o = 0;
+      for (const p of pieces) { joined.set(p, o); o += p.length; }
+      let maxJump = 0;
+      for (let i = 1; i < joined.length; i++) maxJump = Math.max(maxJump, Math.abs(joined[i] - joined[i - 1]));
+      const wholeUp = new StreamResampler(24_000, 48_000).process(whole);
+      let maxDiff = 0;
+      for (let i = 0; i < Math.min(joined.length, wholeUp.length); i++) maxDiff = Math.max(maxDiff, Math.abs(joined[i] - wholeUp[i]));
+      /* A 440 Hz sine at 48 kHz moves at most ~0.029 per sample at this
+         amplitude; a seam would jump by far more. */
+      check("frames of any size through one resampler join without a seam, and equal the whole stream resampled at once",
+        Math.abs(joined.length - 2 * n) <= 2 && maxJump < 0.035 && maxDiff < 1e-6);
+      const same = new StreamResampler(48_000, 48_000);
+      const inp = new Float32Array([0.1, 0.2, 0.3]);
+      check("  …equal rates pass the frame through untouched; the old per-frame resample still exists for callers that have no stream",
+        same.process(inp) === inp && resample(inp, 48_000, 48_000) === inp && new StreamResampler(48_000, 24_000).process(new Float32Array(4800)).length === 2400);
+    }
+    {
       /* END OF ANSWER: the gathered tail plays now, not glued to the next. */
       const t2 = 50;
       const st2: string[] = [];
@@ -3271,7 +3303,7 @@ function describeErrorCheck(): boolean {
     const fs29 = await import("node:fs");
     const wa = fs29.readFileSync("src/lib/voice/ws-audio.ts", "utf8");
     check("the browser player feeds every decoded frame to the queue, starts nodes only when the queue says so, and a flush stops the started and disconnects the gathered",
-      /jitter\.push\(\{ node, duration: buffer\.duration \}\);/.test(wa) && /start: \(node, at\) => \{\s*node\.start\(at\);\s*playing\.add\(node\);/.test(wa) &&
+      /jitter\.push\(\{ node, duration: buffer\.duration, samples: samples\.length \}\);/.test(wa) && /start: \(node, at\) => \{\s*node\.start\(at\);\s*playing\.add\(node\);/.test(wa) &&
       /for \(const node of jitter\.flush\(\)\) \{[\s\S]{0,120}?node\.disconnect\(\);/.test(wa) && !/nextFrameStart|LEAD_S \/ 2/.test(wa));
     check("  …the queue is told the context's rate, and the session tells the player when an answer's audio is over (both event names) and on response.done",
       /rate: ctx\.sampleRate,\s*\}\);/.test(wa) && /endOfResponse\(\) \{\s*jitter\.release\(\);\s*\}/.test(wa) &&
@@ -3482,7 +3514,7 @@ function describeErrorCheck(): boolean {
     rmsLevel(silent) === 0 && Math.abs(rmsLevel(loud) - Math.min(1, 0.5 * DISPLAY_GAIN)) < 1e-9 && rmsLevel(new Uint8Array(0)) === 0 && rmsLevel(new Uint8Array(512).fill(255)) === 1 && DISPLAY_GAIN === 2.8 && LEVEL_EPSILON === 0.02);
   const wa = readFileSync("src/lib/voice/ws-audio.ts", "utf8");
   check("the socket lane's audio meters both sides INSIDE its own context: an analyser on the output, one on the microphone source, read on demand",
-    /const farMeter = ctx\.createAnalyser\(\);/.test(wa) && /const farBus = ctx\.createGain\(\);\s*farBus\.connect\(out\);/.test(wa) && /farBus\.connect\(farMeter\);/.test(wa) && !/^\s*out\.connect/m.test(wa) && (wa.match(/node\.connect\(farBus\);/g) ?? []).length === 2 && /micMeter = ctx\.createAnalyser\(\);[\s\S]{0,240}?source\.connect\(micMeter\);/.test(wa) &&
+    /const farMeter = ctx\.createAnalyser\(\);/.test(wa) && /const farBus = ctx\.createGain\(\);\s*farBus\.connect\(ctx\.destination\);/.test(wa) && /farBus\.connect\(farMeter\);/.test(wa) && !/^\s*out\.connect/m.test(wa) && (wa.match(/node\.connect\(farBus\);/g) ?? []).length === 2 && /micMeter = ctx\.createAnalyser\(\);[\s\S]{0,240}?source\.connect\(micMeter\);/.test(wa) &&
     /levels\(\) \{\s*return \{ mic: read\(micMeter\), far: read\(farMeter\) \};/.test(wa) && /return rmsLevel\(meterBuf\);/.test(wa) && (wa.match(/meterMic\(\);/g) ?? []).length === 2);
   const hook = readFileSync("src/lib/voice/useStreamLevel.ts", "utf8");
   check("  …the stream meter shares the arithmetic and no longer carries its own copy", /const next = rmsLevel\(buf\);/.test(hook) && !/DISPLAY_GAIN = 2\.8/.test(hook));
@@ -3693,24 +3725,22 @@ function describeErrorCheck(): boolean {
      their own; an engine that refuses the option gets the default. */
   {
     const waSrc = (await import("node:fs")).readFileSync("src/lib/voice/ws-audio.ts", "utf8");
-    check("the context runs at the wire's rate, with the default as the fallback",
-      /ctx = new Ctx\(\{ sampleRate: wireRate \}\);\s*\} catch \{\s*ctx = new Ctx\(\);/.test(waSrc));
-    class RefusingCtx extends FakeCtx {
-      constructor(opts?: unknown) {
-        super();
-        if (opts) throw new TypeError("sampleRate not supported");
-      }
-    }
-    g.window = { AudioContext: RefusingCtx };
-    let fell: ReturnType<typeof createBrowserWsAudio> | null = null;
-    try {
-      fell = createBrowserWsAudio(24_000);
-    } catch {
-      fell = null;
-    }
-    check("  …an engine that throws on the option still yields a working player", fell !== null && fell.stats().rate === 48_000);
-    fell?.close();
-    g.window = { AudioContext: FakeCtx };
+    /* THE CONTEXT RUNS AT THE ENGINE'S RATE AGAIN (2026-09-12 evening): the
+       wire-rate context of the morning put 24 kHz against 48 kHz hardware
+       on Apple's engine, and the far side went out through a MediaStream
+       and an <audio> element — the crackle survived a buffer with zero
+       underruns. The frames are resampled here, continuously, and the far
+       bus goes straight to the destination; the element's stream carries
+       nothing, and the barge-in gate is a gain on the bus. */
+    check("the context runs at the engine's own rate; the wire is bridged by one continuous resampler each way; the voice goes to the destination, not through a stream; the gate is a gain",
+      /const ctx: AudioContext = new Ctx\(\);/.test(waSrc) && !/new Ctx\(\{ sampleRate: wireRate \}\)/.test(waSrc) &&
+      /const down = new StreamResampler\(wireRate, ctx\.sampleRate\);\s*const up = new StreamResampler\(ctx\.sampleRate, wireRate\);/.test(waSrc) &&
+      /const samples = down\.process\(pcm16ToFloat\(base64ToBytes\(b64\)\)\);/.test(waSrc) && /const frame = up\.process\(input\);/.test(waSrc) &&
+      /ctx\.createBuffer\(1, samples\.length, ctx\.sampleRate\)/.test(waSrc) && /farBus\.connect\(ctx\.destination\);/.test(waSrc) &&
+      /mute\(on\) \{\s*farBus\.gain\.value = on \? 0 : 1;\s*\}/.test(waSrc) &&
+      /if \(gate\) sessionRef\.current\?\.setFarMuted\(gate === "cut"\);/.test((await import("node:fs")).readFileSync("src/components/ai/VoiceCallButton.tsx", "utf8")) &&
+      /setFarMuted\(on: boolean\): void \{\s*try \{\s*this\.wsAudio\?\.mute\?\.\(on\);/.test((await import("node:fs")).readFileSync("src/lib/voice/session.ts", "utf8")));
+    check("  …the player reports the engine's rate", built !== null && built.stats().rate === 48_000);
   }
   check("  …the far bus feeds the destination and the meter; nothing is connected FROM the destination",
     connections.some(([f, t]) => f === "gain" && t === "streamDestination") && connections.some(([f, t]) => f === "gain" && t === "analyser") && !connections.some(([f]) => f === "streamDestination"));

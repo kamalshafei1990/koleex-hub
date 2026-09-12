@@ -857,3 +857,20 @@ that fit the words exactly:
 | Crackling, ~20 clicks a second while the voice plays | Each frame's start time was `previous + duration` in floating point; over a few hundred frames the starts drifted a fraction of a sample from the true boundary — a gap or an overlap at every joint | Starts are counted in **whole samples** from the run's origin (`JitterDeps.rate`); every boundary lands on a sample |
 | Cuts mid-sentence | A frame arriving even 1 ms after the run drained stopped the sentence and gathered a whole new lead (a third of a second of silence), then resumed | A frame less than **120 ms** late continues the run from now (`LATE_GRACE_S`); the lead still grows for the next run. The lead itself starts at **450 ms** (was 300), grows by 150 and caps at 1.2 s |
 | The last letter missing, said when the next answer comes | The tail of an answer that arrived after a drain was gathered and waited for the 350 ms timer; if the model's tool call and the next answer came first, the tail played glued to it | `response.output_audio.done` / `response.audio.done` / `response.done` release the buffer at once (`WsAudio.endOfResponse`) |
+
+## "Nothing fixed, everything is the same" (2026-09-12 17:37–17:39 UTC, after #417)
+
+The beacon of the 17:37 call (`7015f6547e`, 84 s, socket lane, production
+deployment of #417) read `capture=…:u0:b450`: **zero** buffer underruns at
+a 450 ms lead, and the relay session ran 81 s with no cut. So the jitter
+buffer was never the crackle. What remained on the playback path, and is
+now gone:
+
+| | Before | Now |
+|---|---|---|
+| Output | The far side rendered into a `MediaStreamAudioDestinationNode`, its stream played by the call button's `<audio>` element: a second clock domain and a second buffer, a known source of clicks on Apple's engine | The far bus connects to the context's destination; the element gets a stream that carries nothing (the button's wiring stands); the barge-in gate is a gain on the bus (`WsAudio.mute`, `session.setFarMuted`) |
+| Context rate | The wire's 24 kHz (since #412), against 48 kHz hardware — the engine resampled the whole output | The engine's own rate; the 24 kHz wire is bridged by **one continuous resampler per direction** (`StreamResampler`: carries its position and last sample from frame to frame, so joints are seamless; the morning's per-buffer resampling forgot the previous frame at every joint) |
+| Frame starts | Counted in whole samples from `duration` | Counted from the exact resampled length (`JitterFrame.samples`) |
+
+If the crackle survives this too, the next suspect is outside the page: the
+device's output route (Bluetooth/receiver) or the far side's own stream.

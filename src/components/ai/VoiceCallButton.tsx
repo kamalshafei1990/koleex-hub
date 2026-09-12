@@ -1087,6 +1087,9 @@ export default function VoiceCallButton({
            turn again. See events.ts playbackGate for the rule. */
         const gate = playbackGate(voiceEventType(data), phaseRef.current);
         if (gate && audioRef.current) audioRef.current.muted = gate === "cut";
+        /* The socket lane plays inside its own graph, not through the
+           element: the gate reaches it through the session. */
+        if (gate) sessionRef.current?.setFarMuted(gate === "cut");
 
         /* UNTRUSTED TEXT. This came off a network socket and is about to be
            rendered. It is data, never instruction — nothing here dispatches

@@ -781,6 +781,17 @@ export class VoiceSession {
 
   /** How loud each side is, measured inside the socket lane's own audio
    *  context (WsAudio.levels). Null on the other lane. */
+  /** The barge-in gate on the socket lane: the far side's output is
+   *  silenced or let through inside the audio graph (the element the
+   *  button mutes carries nothing on this lane). No-op on the other lane. */
+  setFarMuted(on: boolean): void {
+    try {
+      this.wsAudio?.mute?.(on);
+    } catch {
+      /* a double without the gate */
+    }
+  }
+
   levels(): { mic: number; far: number } | null {
     return this.wsAudio ? this.wsAudio.levels() : null;
   }
