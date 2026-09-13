@@ -49,7 +49,7 @@ import TruckIcon from "@/components/icons/ui/TruckIcon";        // the tab itsel
    same round mark. A landmark says "customs house" and cannot be mistaken for
    anything else on the sheet. */
 import LandmarkIcon from "@/components/icons/ui/LandmarkIcon";  // Origin & Customs card
-import PackageIcon from "@/components/icons/ui/PackageIcon";    // Packing card
+import ArchiveIcon from "@/components/icons/ui/ArchiveIcon";    // one crate (package tile)
 import ShipIcon from "@/components/icons/ui/ShipIcon";          // Loading card
 import LayersIcon from "@/components/icons/ui/LayersIcon";      // stackable
 import PlaneIcon from "@/components/icons/ui/PlaneIcon";        // volumetric (air)
@@ -774,7 +774,7 @@ function PackingSheet({
       ) : null}
 
       {packing ? (
-        <Group motion={motion} icon={<PackageIcon className="h-4 w-4" />} title={t("logistics.packingSection", "Packing")} count={t("logistics.packingSectionBadge", "Crates · Weights")} editLabel={t("action.edit", "Edit")} onEdit={onEdit}>
+        <Group motion={motion} icon={<BoxesIcon className="h-4 w-4" />} title={t("logistics.packingSection", "Packing")} count={t("logistics.packingSectionBadge", "Crates · Weights")} editLabel={t("action.edit", "Edit")} onEdit={onEdit}>
           {logistics.packing_photo_url ? (
             /* eslint-disable-next-line @next/next/no-img-element */
             <img
@@ -822,22 +822,21 @@ function PackingSheet({
               {(logistics.packages ?? []).map((r, i) => (
                 <div key={i} className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-3">
                   <div className="flex items-center gap-3">
-                    {/* THE SAME CRATE GLYPH ON EVERY CRATE SAID NOTHING THREE
-                        TIMES. A packing list numbers its packages — the number
-                        is on the crate, on the packing list and on the bill of
-                        lading — so the tile carries that instead, and a photo
-                        takes its place the moment there is one. */}
-                    <span className="h-16 w-16 shrink-0 rounded-lg overflow-hidden border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] flex items-center justify-center text-[var(--text-secondary)]">
+                    {/* A crate glyph AND its number. The number is what the
+                        packing list, the crate stencil and the bill of lading
+                        all carry, so it stays on the tile as a badge — over the
+                        photo too, once there is one. The glyph is the single
+                        crate (Archive); the section header is the stack
+                        (Boxes) and the packing-type chip the lidded box (Box),
+                        so no two marks on this sheet mean the same thing. */}
+                    <span className="relative h-16 w-16 shrink-0 rounded-lg overflow-hidden border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] flex items-center justify-center text-[var(--text-secondary)]">
                       {r.photo_url ? (
                         /* eslint-disable-next-line @next/next/no-img-element */
                         <img src={r.photo_url} alt="" className="h-full w-full object-cover" />
                       ) : (
-                        /* The number alone. Keeping a crate glyph above it put
-                           the same mark back on all three tiles — the very
-                           repeat the number was there to remove — and the card
-                           beside it already says what the crate is. */
-                        <span className="text-[19px] font-bold tabular-nums text-[var(--text-secondary)]">{i + 1}</span>
+                        <ArchiveIcon className="h-7 w-7" />
                       )}
+                      <span className="absolute bottom-1 end-1 h-[18px] min-w-[18px] px-1 rounded-md bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[10.5px] font-bold tabular-nums leading-none flex items-center justify-center">{i + 1}</span>
                     </span>
                     <span className="min-w-0 flex-1">
                       <span className="block text-[13.5px] font-semibold text-[var(--text-primary)] truncate">
