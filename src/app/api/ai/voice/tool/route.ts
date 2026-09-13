@@ -193,7 +193,13 @@ export async function POST(req: Request) {
      with the tap. The model's output is unchanged. */
   const pending =
     isVoiceWriteTool(name) && result.permissionStatus === "approval_required" && result.pendingAction
-      ? { tool: result.pendingAction.tool, args: result.pendingAction.args }
+      ? {
+          tool: result.pendingAction.tool,
+          args: result.pendingAction.args,
+          /* The tool's own preview — names for ids, times in words — for
+             the card to show; never carried back with the tap. */
+          preview: (result.data as { preview?: unknown } | null)?.preview ?? undefined,
+        }
       : undefined;
 
   /* WHAT GOES BACK TO THE MODEL. The tool's own envelope, unchanged — it is

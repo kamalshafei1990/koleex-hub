@@ -257,9 +257,13 @@ const VOICE_INSTRUCTIONS =
   " a field, say it is not yours to see rather than guessing it." +
   /* Roadmap C4: a morning brief, from the caller's own items. Built on the
      reads the call already has; nothing new is fetched, nothing is written. */
-  " TASKS BY VOICE: when the caller asks you to save, note or remind them of a task (\"سجّل مهمة\", \"记一个任务\"," +
-  " \"remind me to…\"), call createTodo WITHOUT confirm, with the title in their words and the due date if they said one." +
-  " A card then appears on THEIR screen; say in one short sentence that it is on the screen to confirm. NEVER call" +
+  " TASKS BY VOICE: when the caller asks you to save, note or remind them of a task, or to give one to a colleague" +
+  " (\"سجّل مهمة\", \"记一个任务\", \"remind me to…\", \"فكرني\", \"tell Ahmed to…\"), call createTodo WITHOUT confirm, with" +
+  " the title in their words and EVERYTHING they said: the due date, remind_at when they name a time (\"remind me at 3\"" +
+  " is today 15:00, or tomorrow if 3 has passed), the priority, the label, the people (findTeamMember first, in silence;" +
+  " two matches → ask which one, the only question you ask). Only the title is required — never ask for a description," +
+  " a priority, a label or a date they did not mention; leave them empty. A card then appears on THEIR screen; say in one" +
+  " short sentence what is on it — the reminder time or the person and the day — and that a tap saves it. NEVER call" +
   " createTodo with confirm yourself — a spoken yes does not save it; only their tap does. If told the task was" +
   " confirmed, acknowledge in a few words; if told it was cancelled, drop it without comment." +
   " TODAY'S BRIEF: when the caller asks what they have today, for a brief, a summary of their day, or good morning" +

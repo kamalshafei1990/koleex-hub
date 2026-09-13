@@ -345,7 +345,10 @@ check(
 check(
   "every write tool still offers a two-phase preview",
   ["createTodo", "completeTodo", "updateTodo", "reassignTodo", "deleteTodo"].every((t) =>
-    new RegExp(`name: "${t}"[\\s\\S]{0,6000}args\\.confirm !== true`).test(todos),
+    /* 9 000 since tasks phase 1 (2026-09-13): createTodo's schema and
+       people-resolution grew the distance from its name to its preview
+       gate; the gate itself is unchanged. */
+    new RegExp(`name: "${t}"[\\s\\S]{0,9000}args\\.confirm !== true`).test(todos),
   ),
   "Phase 1 will make this server-enforced; until then the shape must not regress",
 );

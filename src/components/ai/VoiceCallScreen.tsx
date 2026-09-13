@@ -67,6 +67,8 @@ const COPY: Record<Lang, {
   taskSaved: string;
   taskFailed: string;
   due: string;
+  remind: string;
+  forPeople: string;
   holdHint: string;
   modePick: string;
   modeHandsFree: string;
@@ -167,6 +169,8 @@ const COPY: Record<Lang, {
     taskSaved: "Task saved",
     taskFailed: "Could not save it. Try again.",
     due: "Due",
+    remind: "Reminder",
+    forPeople: "For",
     holdHint: "Hold the button while you speak, let go when you are done.",
     modePick: "How you talk",
     modeHandsFree: "Hands-free",
@@ -225,6 +229,8 @@ const COPY: Record<Lang, {
     taskSaved: "任务已保存",
     taskFailed: "没保存成功，再试一次。",
     due: "截止",
+    remind: "提醒",
+    forPeople: "给",
     holdHint: "说话时按住按钮，说完松开。",
     modePick: "说话方式",
     modeHandsFree: "免提",
@@ -283,6 +289,8 @@ const COPY: Record<Lang, {
     taskSaved: "المهمة اتحفظت",
     taskFailed: "ماتحفظتش. جرّب تاني.",
     due: "موعدها",
+    remind: "تذكير",
+    forPeople: "لـ",
     holdHint: "اضغط على الزرار وانت بتتكلم، وسيبه لما تخلص.",
     modePick: "طريقة الكلام",
     modeHandsFree: "كلام حر",
@@ -359,7 +367,7 @@ export type VoiceCallScreenProps = {
   /** A write the model previewed, waiting for the caller's tap (roadmap D1).
    *  The screen shows what will be saved and two buttons; the parent carries
    *  the tap to the server. Nothing here decides anything. */
-  pendingWrite?: { tool: string; args: Record<string, unknown>; message: string } | null;
+  pendingWrite?: { tool: string; args: Record<string, unknown>; message: string; preview?: Record<string, unknown> } | null;
   onConfirmWrite?: () => void;
   onCancelWrite?: () => void;
   writeBusy?: boolean;
@@ -951,15 +959,27 @@ export default function VoiceCallScreen({
               <>
                 <div className="text-[12px] uppercase tracking-wide text-[#AAAAAA]">{copy.taskPreview}</div>
                 <div className="mt-1 text-[16px] font-semibold leading-snug" data-task-title>{String(pendingWrite.args.title ?? "")}</div>
-                {(pendingWrite.args.due_date || pendingWrite.args.priority || pendingWrite.args.label) && (
-                  <div className="mt-1 text-[12px] text-[#AAAAAA]">
-                    {pendingWrite.args.due_date ? `${copy.due} ${String(pendingWrite.args.due_date)}` : ""}
-                    {pendingWrite.args.due_date && (pendingWrite.args.priority || pendingWrite.args.label) ? " · " : ""}
-                    {pendingWrite.args.priority ? String(pendingWrite.args.priority) : ""}
-                    {pendingWrite.args.priority && pendingWrite.args.label ? " · " : ""}
-                    {pendingWrite.args.label ? String(pendingWrite.args.label) : ""}
-                  </div>
-                )}
+                {(() => {
+                  /* WHAT WILL BE SAVED, IN WORDS. The tool's preview carries
+                     the times in the caller's own zone and the people by
+                     name; the raw arguments are the fallback. */
+                  const pv = pendingWrite.preview ?? {};
+                  const when = (pv.when && typeof pv.when === "object" ? pv.when : {}) as { due?: unknown; remind?: unknown };
+                  const people = ([] as string[])
+                    .concat(Array.isArray(pv.assignees) ? (pv.assignees as Array<{ name?: unknown }>).map((a) => String(a.name ?? "")).filter(Boolean) : [])
+                    .concat(typeof pv.department === "string" && pv.department ? [pv.department] : [])
+                    .concat(pv.assign_to_all === true ? ["*"] : []);
+                  const due = typeof when.due === "string" && when.due ? when.due : pendingWrite.args.due_date ? String(pendingWrite.args.due_date) : "";
+                  const remind = typeof when.remind === "string" && when.remind ? when.remind : "";
+                  const bits = [
+                    due ? `${copy.due} ${due}` : "",
+                    remind ? `${copy.remind} ${remind}` : "",
+                    pendingWrite.args.priority ? String(pendingWrite.args.priority) : "",
+                    pendingWrite.args.label ? String(pendingWrite.args.label) : "",
+                    people.length ? `${copy.forPeople} ${people.join(", ")}` : "",
+                  ].filter(Boolean);
+                  return bits.length > 0 ? <div className="mt-1 text-[12px] text-[#AAAAAA]" data-task-details>{bits.join(" · ")}</div> : null;
+                })()}
                 {writeError && <div className="mt-2 text-[12px] text-[#FF3333]">{copy.taskFailed}</div>}
                 <div className="mt-3 flex gap-2">
                   <button

@@ -416,7 +416,7 @@ export default function VoiceCallButton({
      exact arguments its confirming phase needs arrived beside the model's
      envelope and sit here until the caller taps Confirm or Cancel on the
      card. `saved` flashes the outcome for a moment. */
-  const [pendingWrite, setPendingWrite] = useState<{ tool: string; args: Record<string, unknown>; message: string } | null>(null);
+  const [pendingWrite, setPendingWrite] = useState<{ tool: string; args: Record<string, unknown>; message: string; preview?: Record<string, unknown> } | null>(null);
   const [writeSaved, setWriteSaved] = useState(false);
   const [writeBusy, setWriteBusy] = useState(false);
   const [writeError, setWriteError] = useState(false);
@@ -1118,10 +1118,10 @@ export default function VoiceCallButton({
           setSearching(false);
         }, 12_000);
       },
-      onPendingWrite: (_name, pending, message) => {
+      onPendingWrite: (_name, pending, message, preview) => {
         setWriteError(false);
         setWriteSaved(false);
-        setPendingWrite({ tool: pending.tool, args: pending.args, message });
+        setPendingWrite({ tool: pending.tool, args: pending.args, message, preview });
         playSound("approval-needed");
       },
       onToolResult: (_name, output) => {
