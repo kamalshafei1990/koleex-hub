@@ -267,6 +267,8 @@ export const PREBUFFER_WAIT_MS = 350;
 export const REGATHER_EXTRA_MS = 250;
 /** The script processor's block, when there is no worklet: ~43 ms at 48 kHz. */
 export const PLAYOUT_PROCESSOR_SAMPLES = 2048;
+/** The far side's lift on this lane (see the bus in createBrowserWsAudio). */
+export const FAR_GAIN = 1.6;
 
 /** THE LEAD THE DEVICE LEARNED (2026-09-13). The relay's meter proved the
  *  far side's own stream stalls — silences of 1.2–1.35 s inside one answer,
@@ -595,7 +597,26 @@ export function createBrowserWsAudio(wireRate: number, opts: { stallMs?: number 
      destination, so no suite caught it. Everything that plays connects to
      the bus; the bus feeds the destination and the meter. */
   const farBus = ctx.createGain();
-  farBus.connect(ctx.destination);
+  /* LOUDER, AND LIMITED (owner, 2026-09-13: "the Chinese voice is louder;
+     the international one is low"). The mainland lane's voice comes out of
+     a media element; this lane's comes out of the audio graph, which a
+     phone in a call session plays quieter. The far side's peaks sit at
+     ~60 % of full scale (the relay's meter), so FAR_GAIN lifts them toward
+     the top, and a compressor set as a limiter catches the rare peak that
+     would clip. An engine without a compressor gets the gain alone. */
+  farBus.gain.value = FAR_GAIN;
+  const limiter = typeof ctx.createDynamicsCompressor === "function" ? ctx.createDynamicsCompressor() : null;
+  if (limiter) {
+    limiter.threshold.value = -6;
+    limiter.knee.value = 6;
+    limiter.ratio.value = 12;
+    limiter.attack.value = 0.003;
+    limiter.release.value = 0.12;
+    farBus.connect(limiter);
+    limiter.connect(ctx.destination);
+  } else {
+    farBus.connect(ctx.destination);
+  }
   const farMeter = ctx.createAnalyser();
   farMeter.fftSize = METER_FFT_SIZE;
   farBus.connect(farMeter);
@@ -843,7 +864,7 @@ export function createBrowserWsAudio(wireRate: number, opts: { stallMs?: number 
       void ctx.resume().catch(() => {});
     },
     mute(on) {
-      farBus.gain.value = on ? 0 : 1;
+      farBus.gain.value = on ? 0 : FAR_GAIN;
     },
     endOfResponse() {
       gate.endOfResponse();
@@ -867,7 +888,8 @@ export function createBrowserWsAudio(wireRate: number, opts: { stallMs?: number 
             const node = ctx.createBufferSource();
             node.buffer = buffer;
             const level = ctx.createGain();
-            level.gain.value = Math.max(0, Math.min(1, gain));
+            /* A cue keeps its own volume: the bus lifts the voice, not it. */
+            level.gain.value = Math.max(0, Math.min(1, gain)) / FAR_GAIN;
             node.connect(level);
             level.connect(farBus);
             node.onended = () => resolve(true);

@@ -125,7 +125,10 @@ export const SOUND_CATALOG: readonly SoundDef[] = [
     label: { en: "Ready to hear you", zh: "可以说话了", ar: "جاهز يسمعك" },
     when: { en: "The call is up and listening", zh: "通话已接通并在聆听", ar: "المكالمة اتوصلت وبيسمعك" },
     notes: READY_TONE,
-    defaultOn: true,
+    /* Off by default (owner, 2026-09-13: "remove the sound of listening").
+       The orb already shows the call is up; the cue stays in Settings →
+       Sounds for anyone who wants it. */
+    defaultOn: false,
   },
   {
     key: "call-reconnecting",

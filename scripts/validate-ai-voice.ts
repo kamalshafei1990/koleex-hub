@@ -1291,9 +1291,9 @@ console.log("\n── 8. What the client may know, and what it may not ──");
     check("a turn with no words is not a question — never 'you're welcome', and a cut-off answer continues",
       /A TURN WITH NO WORDS IN IT/.test(sc) && /Never answer it with[\s"+]*\\"you're welcome\\"/.test(sc) && /CONTINUE that answer from where you stopped/.test(sc));
     check("the pause is filled with 'let me think' aloud, before the lookup — and never a search word",
-      /ALWAYS SAY A SHORT FILLER ALOUD FIRST, before the lookup/.test(sc) && /let me think/.test(sc) && !/let me check/i.test(sc));
+      /NEVER SPEAK IN THE TURN THAT CALLS A TOOL/.test(sc) && /Call the tool first, in silence, and speak only when you have the result/.test(sc) && !/SAY A SHORT FILLER/.test(sc) && !/say a short filler/.test(sc) && !/let me check/i.test(sc));
     check("web pictures on a call are opt-in: want_images, only when the caller asked to see one",
-      /call search_web with want_images true; otherwise never/.test(sc));
+      /call search_web with want_images true, in silence; otherwise never/.test(sc));
     /* Two saved calls, 2026-09-04: Arabic answered in English three times, and
        a Tesla photo refused four times with the tool on the list. */
     const built = String(buildVoiceSessionPayload(null).full.session.instructions);
