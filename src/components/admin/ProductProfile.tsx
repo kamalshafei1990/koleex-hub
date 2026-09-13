@@ -17,7 +17,7 @@
    All data arrives from GET /api/products/[id]/profile in one round trip.
    --------------------------------------------------------------------------- */
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, useRef } from "react";
 import { useTopRampOwner } from "@/lib/useTopRampOwner";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
@@ -26,6 +26,9 @@ import { humanizeError } from "@/lib/ui/humanize-error";
 import { useTranslation } from "@/lib/i18n";
 import { PRODUCTS_UI_I18N } from "@/lib/products-ui-i18n";
 import { fetchClassificationIcons, updateProduct } from "@/lib/products-admin";
+import { usePermissions } from "@/lib/permissions";
+import { useMeBootstrap } from "@/lib/me-bootstrap";
+import ConfirmDialog from "@/components/kds/ConfirmDialog";
 /* INLINE EDIT — the form's own section components, hosted inside the sheet's
    cards. Same inputs, same units, same rules; only the card around them is
    the profile's. */
@@ -480,7 +483,7 @@ function Val({ v, mono }: { v: unknown; mono?: boolean }) {
    title, optional badge, collapse chevron. */
 function Group({
   icon, title, count, onEdit, children, motion = "kx-tab-in", editLabel = "Edit",
-  editing = false, editor, saving = false, error, onSave, onCancel, saveLabel = "Save", cancelLabel = "Cancel",
+  editing = false, editor, saving = false, error, onSave, onCancel, saveLabel = "Save", cancelLabel = "Cancel", canSave = true,
 }: { icon?: React.ReactNode; title: string; count?: string; onEdit?: () => void; children: React.ReactNode;
   /** Translated by the caller — Group is presentational and has no dictionary. */
   editLabel?: string;
@@ -498,6 +501,8 @@ function Group({
   onCancel?: () => void;
   saveLabel?: string;
   cancelLabel?: string;
+  /** False = nothing changed yet, or the draft is not valid — Save waits. */
+  canSave?: boolean;
 }) {
   const [open, setOpen] = useState(true);
   return (
@@ -518,7 +523,7 @@ function Group({
             <button type="button" onClick={onCancel} disabled={saving} className="h-7 px-2.5 rounded-lg text-[11px] font-medium text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)] transition-colors disabled:opacity-50">
               {cancelLabel}
             </button>
-            <button type="button" onClick={onSave} disabled={saving} className="h-7 px-3 rounded-lg bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[11px] font-semibold inline-flex items-center gap-1.5 transition-all disabled:opacity-50">
+            <button type="button" onClick={onSave} disabled={saving || !canSave} className="h-7 px-3 rounded-lg bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[11px] font-semibold inline-flex items-center gap-1.5 transition-all disabled:opacity-40">
               {saving ? <SpinnerIcon className="h-3 w-3" /> : <CheckIcon className="h-3 w-3" />} {saveLabel}
             </button>
           </span>
@@ -637,7 +642,7 @@ const MEDIA_SLOTS: Array<{ type: string; fallback: string }> = [
 
 function StatTile({
   label, value, unit, tone = "plain", input, extra,
-}: { label: string; value: React.ReactNode; unit?: string; tone?: "plain" | "accent";
+}: { label: string; value: React.ReactNode; unit?: string; tone?: "plain" | "accent" | "warn";
   /** Edit mode: the control that stands where the number stood. Same tile. */
   input?: React.ReactNode;
   /** Edit mode: a line under the number/control (a mode switch, a reset). */
@@ -646,7 +651,9 @@ function StatTile({
     <div className={`h-full rounded-xl border px-3.5 py-3 ${
       tone === "accent"
         ? "border-[#567FB2]/30 bg-[#567FB2]/[0.07]"
-        : "border-[var(--border-subtle)] bg-[var(--bg-surface)]"
+        : tone === "warn"
+          ? "border-amber-500/40 bg-amber-500/[0.07]"
+          : "border-[var(--border-subtle)] bg-[var(--bg-surface)]"
     }`}>
       <div className="text-[9.5px] font-bold uppercase tracking-[0.1em] text-[var(--text-ghost)] truncate">{label}</div>
       {input ? (
@@ -797,6 +804,7 @@ function DimsInput({ value, onChange }: { value: string; onChange: (v: string) =
       {(["L", "W", "H"] as const).map((ph, i) => (
         <span key={ph} className="flex items-center gap-1.5">
           <input
+            aria-label={ph}
             inputMode="decimal"
             value={raw[i] !== undefined ? raw[i] : displayIn(stored[i], "mm", entry)}
             onChange={(e) => setAt(i, e.target.value)}
@@ -819,6 +827,7 @@ function WeightInput({ value, onChange, placeholder = "0" }: { value: string; on
   return (
     <span className="flex items-center gap-1.5">
       <input
+        aria-label="kg"
         inputMode="decimal"
         value={raw !== undefined ? raw : displayIn(value, "kg", entry)}
         onChange={(e) => { setRaw(e.target.value); onChange(String(storeFrom(e.target.value, "kg", entry))); }}
@@ -863,7 +872,7 @@ function CrateTile({ url, badge, onChange, productId, title }: {
 }
 
 function PackingSheet({
-  logistics, model, product, t, lang, motion, productId, schemaCovers, onSaved,
+  logistics, model, product, t, lang, motion, productId, schemaCovers, onSaved, canEdit, onDirtyChange, aiContext,
 }: {
   logistics: ProductLogistics;
   model: Record<string, unknown> | undefined;
@@ -877,6 +886,12 @@ function PackingSheet({
   schemaCovers: Set<string>;
   /** The saved patch, so the page can show it before the reload lands. */
   onSaved: (patch: Record<string, unknown>) => void;
+  /** No edit permission (or viewing as someone) → no Edit, no "+ section". */
+  canEdit: boolean;
+  /** Unsaved changes exist — the page guards tab switches and leaving. */
+  onDirtyChange: (dirty: boolean) => void;
+  /** What the HS-code suggestion is asked about — the editor's own context shape. */
+  aiContext: Record<string, unknown>;
 }) {
   /* ── INLINE EDIT, IN THE SHEET'S OWN LAYOUT. Edit does not swap the card
      for the form: every tile stays where it is and the value inside it
@@ -890,6 +905,11 @@ function PackingSheet({
   const [draft, setDraft] = useState<PackingDraft | null>(null);
   const [saving, setSaving] = useState(false);
   const [saveErr, setSaveErr] = useState<string | null>(null);
+  /* The draft as it was when Edit was pressed: Save is disabled until the
+     draft differs from it, and the page asks before throwing it away. */
+  const [initialJson, setInitialJson] = useState<string>("");
+  const [aiBusy, setAiBusy] = useState(false);
+  const [aiMsg, setAiMsg] = useState<{ kind: "ok" | "error"; text: string } | null>(null);
   /* Raw keystrokes for the converted number cells — converting on every
      keystroke and echoing the result back eats the decimal point ("1." → 1). */
   const [raw, setRaw] = useState<Record<string, string>>({});
@@ -897,7 +917,7 @@ function PackingSheet({
 
   const str = (v: unknown) => (v === null || v === undefined ? "" : String(v));
   const begin = (k: PackingSection) => {
-    setDraft({
+    const d: PackingDraft = {
       logistics: JSON.parse(JSON.stringify(logistics ?? {})) as ProductLogistics,
       machine_dimensions: str(product?.machine_dimensions),
       machine_weight_kg: str(product?.machine_weight_kg),
@@ -905,12 +925,48 @@ function PackingSheet({
       hs_code: str(product?.hs_code),
       moq: str(product?.moq),
       lead_time: str(product?.lead_time),
-    });
+    };
+    setDraft(d);
+    setInitialJson(JSON.stringify(d));
     setRaw({});
     setSaveErr(null);
+    setAiMsg(null);
     setEditing(k);
   };
-  const cancel = () => { setEditing(null); setDraft(null); setSaveErr(null); };
+  const cancel = () => { setEditing(null); setDraft(null); setSaveErr(null); setAiMsg(null); };
+  const dirty = !!draft && JSON.stringify(draft) !== initialJson;
+  useEffect(() => { onDirtyChange(dirty); }, [dirty]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => () => onDirtyChange(false), []); // eslint-disable-line react-hooks/exhaustive-deps
+  /* An HS code is 4 to 10 digits, dotted or not: 8452, 8452.21, 8452.21.00.
+     Anything else ("8451,5", a word) is a typo the customs form would
+     bounce, so Save waits for it. */
+  const hsOk = (v: string) => { const x = v.trim(); return !x || /^\d{4}(\.?\d{2}){0,3}$/.test(x); };
+  const sectionValid = (k: PackingSection, d: PackingDraft) => (k === "customs" ? hsOk(d.hs_code) : true);
+  /* HS-code suggestion — the editor's own call and rules: fill the box,
+     never save; the model's one-line reason shows under the field so the
+     confirmation is informed. */
+  const aiSuggestHs = async () => {
+    if (aiBusy) return;
+    setAiBusy(true); setAiMsg(null);
+    try {
+      const res = await fetch("/api/ai/product-copy", {
+        method: "POST", headers: { "Content-Type": "application/json" }, credentials: "include",
+        body: JSON.stringify({ field: "hs_code", context: aiContext }),
+      });
+      const data = (await res.json()) as { value?: string; reason?: string; fallback?: boolean };
+      if (res.ok && !data.fallback && !data.value && data.reason) { setAiMsg({ kind: "error", text: data.reason }); return; }
+      if (!res.ok || data.fallback || !data.value) {
+        setAiMsg({ kind: "error", text: data.reason === "no_provider" ? t("ai.noProvider", "AI is off — no provider configured.") : t("ai.failed", "Couldn't draft right now — try again.") });
+        return;
+      }
+      patchDraft({ hs_code: data.value });
+      setAiMsg({ kind: "ok", text: data.reason ? `${data.value} — ${data.reason}` : data.value });
+    } catch {
+      setAiMsg({ kind: "error", text: t("ai.failed", "Couldn't draft right now — try again.") });
+    } finally {
+      setAiBusy(false);
+    }
+  };
   const patchDraft = (u: Partial<PackingDraft>) => setDraft((d) => (d ? { ...d, ...u } : d));
   const patchLogistics = (u: Partial<ProductLogistics>) => setDraft((d) => (d ? { ...d, logistics: { ...d.logistics, ...u } } : d));
   const payloadFor = (k: PackingSection, d: PackingDraft): Record<string, unknown> => {
@@ -944,6 +1000,7 @@ function PackingSheet({
   };
   const save = async () => {
     if (!draft || !editing || !productId) return;
+    if (!dirty || !sectionValid(editing, draft)) return;
     const payload = payloadFor(editing, draft);
     setSaving(true); setSaveErr(null);
     try {
@@ -959,7 +1016,7 @@ function PackingSheet({
   /* The header props every card shares. */
   const gp = (k: PackingSection) => ({
     editLabel: t("action.edit", "Edit"),
-    onEdit: () => begin(k),
+    onEdit: canEdit ? () => begin(k) : undefined,
     editing: editing === k,
     saving,
     error: editing === k ? saveErr : null,
@@ -967,7 +1024,15 @@ function PackingSheet({
     onCancel: cancel,
     saveLabel: t("action.save", "Save"),
     cancelLabel: t("action.cancel", "Cancel"),
+    canSave: dirty && !!draft && sectionValid(k, draft),
   });
+  /* Esc cancels, ⌘/Ctrl+Enter saves — plain Enter is left to the dropdowns
+     and never submits a card by accident. */
+  const onKeyDown = (e: React.KeyboardEvent) => {
+    if (!editing) return;
+    if (e.key === "Escape") { e.preventDefault(); cancel(); }
+    else if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) { e.preventDefault(); void save(); }
+  };
 
   /* ── What the sheet reads from: the draft while editing, the row otherwise.
      The draft is a copy, so sections not being edited read the same values. */
@@ -1034,6 +1099,7 @@ function PackingSheet({
       <span className="min-w-0">
         <span className={TINY}>{lab}</span>
         <input
+          aria-label={lab}
           inputMode="decimal"
           value={shown}
           onChange={(e) => {
@@ -1076,7 +1142,7 @@ function PackingSheet({
     /* The empty state stands for the whole tab, so it takes the tab's own
        glyph rather than borrowing Origin & Customs' globe. */
     return (
-      <Group motion={motion} icon={<BoundIcon semanticKey="section.logistics" className="h-4 w-4" fallback={<TruckIcon className="h-4 w-4" />} />} title={t("pp.sec.logistics", "Packing & Logistics")} editLabel={t("action.edit", "Edit")} onEdit={() => begin("packing")}>
+      <Group motion={motion} icon={<BoundIcon semanticKey="section.logistics" className="h-4 w-4" fallback={<TruckIcon className="h-4 w-4" />} />} title={t("pp.sec.logistics", "Packing & Logistics")} editLabel={t("action.edit", "Edit")} onEdit={canEdit ? () => begin("packing") : undefined}>
         <p className="text-[12px] text-[var(--text-ghost)] leading-relaxed">
           {t("pp.f.packingEmpty", "Nothing entered yet. Open Edit to add the crate, its contents, weights and container quantities.")}
         </p>
@@ -1085,7 +1151,7 @@ function PackingSheet({
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4" onKeyDown={onKeyDown}>
       {machine || ePhys ? (
         <Group motion={motion} icon={<RulerIcon className="h-4 w-4" />} title={t("tech.secPhysical", "Physical (Bare Machine)")} count={t("logistics.physicalBadge", "Dimensions · Weight")} {...gp("physical")}>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 gap-2.5">
@@ -1141,7 +1207,7 @@ function PackingSheet({
                     {mode === "per_package" ? (
                       <label className="flex items-center gap-2">
                         <span className={`${TINY} mb-0`}>{t("pk.piecesPerPkg", "Pieces per package")}</span>
-                        <input inputMode="numeric" value={String(L.units_per_package ?? "")} onChange={(e) => patchLogistics({ units_per_package: e.target.value })} placeholder="50" className={`${INP_B} w-[72px] text-center tabular-nums`} />
+                        <input aria-label={t("pk.piecesPerPkg", "Pieces per package")} inputMode="numeric" value={String(L.units_per_package ?? "")} onChange={(e) => patchLogistics({ units_per_package: e.target.value })} placeholder="50" className={`${INP_B} w-[72px] text-center tabular-nums`} />
                       </label>
                     ) : null}
                   </div>
@@ -1155,7 +1221,7 @@ function PackingSheet({
                 value={String(netW ?? "—")}
                 unit={ePack ? wtUnit : "kg"}
                 input={ePack ? (
-                  <input
+                  <input aria-label={t("pp.f.netWeight", "Net weight")}
                     inputMode="decimal"
                     value={raw.net !== undefined ? raw.net : displayIn(L.net_weight_kg, "kg", wtUnit)}
                     onChange={(e) => { setRaw((mm) => ({ ...mm, net: e.target.value })); patchLogistics({ net_weight_kg: storeFrom(e.target.value, "kg", wtUnit) }); }}
@@ -1175,7 +1241,10 @@ function PackingSheet({
                 label={t("pk.packagingWeightBare", "Packaging weight")}
                 value={packagingKg !== null ? String(packagingKg) : "—"}
                 unit="kg"
-                                extra={ePack ? calc(t("pk.packagingHint", "Gross − net. Negative means one of them is wrong.")) : undefined}
+                tone={packagingKg !== null && packagingKg < 0 ? "warn" : "plain"}
+                extra={ePack ? calc(t("pk.packagingHint", "Gross − net. Negative means one of them is wrong.")) : packagingKg !== null && packagingKg < 0 ? (
+                  <div className="mt-1.5 text-[9.5px] leading-snug text-amber-400">{t("pk.packagingHint", "Gross − net. Negative means one of them is wrong.")}</div>
+                ) : undefined}
               />
             ) : null}
           </div>
@@ -1246,6 +1315,7 @@ function PackingSheet({
                       {ePack ? (
                         <span className="flex items-center gap-2">
                           <input
+                            aria-label={t("pk.colPackage", "Package")}
                             value={r.label ?? ""}
                             onChange={(e) => setRow(i, { label: e.target.value })}
                             placeholder={i === 0 ? t("pk.phMachineCrate", "Machine crate") : t("pk.phAccBox", "Accessories box")}
@@ -1263,7 +1333,7 @@ function PackingSheet({
                       )}
                       {ePack ? (
                         /* The measurement line, as five cells in the same place. */
-                        <span className="mt-2 grid grid-cols-5 gap-1.5">
+                        <span className="mt-2 grid grid-cols-3 sm:grid-cols-5 gap-1.5">
                           {cell(i, "qty", "1", t("pk.colQty", "Qty"))}
                           {cell(i, "l_cm", "120", `${t("pk.colLbare", "L")} (${dimUnit})`)}
                           {cell(i, "w_cm", "80", `${t("pk.colWbare", "W")} (${dimUnit})`)}
@@ -1328,7 +1398,7 @@ function PackingSheet({
                   unit={perPkgLabel}
                   tone="accent"
                   input={eLoad ? (
-                    <input inputMode="numeric" value={String(typed ?? (r.qty || ""))} onChange={(e) => patchLogistics({ [stored]: e.target.value } as Partial<ProductLogistics>)} placeholder="—" className={`${INP_B} w-full tabular-nums text-[17px]`} />
+                    <input aria-label={CONTAINERS[key].label} inputMode="numeric" value={String(typed ?? (r.qty || ""))} onChange={(e) => patchLogistics({ [stored]: e.target.value } as Partial<ProductLogistics>)} placeholder="—" className={`${INP_B} w-full tabular-nums text-[17px]`} />
                   ) : undefined}
                   extra={eLoad ? (
                     <div className="mt-1.5 flex flex-wrap items-center gap-x-2 text-[9.5px] leading-snug text-[var(--text-ghost)]">
@@ -1367,7 +1437,7 @@ function PackingSheet({
                 icon={<BoxesIcon className="h-6 w-6" />}
                 label={t("pk.maxLayers", "Maximum layers")}
                 value={String(L.stack_max ?? "")}
-                input={eLoad ? <input inputMode="numeric" value={String(L.stack_max ?? "")} onChange={(e) => patchLogistics({ stack_max: e.target.value })} placeholder="2" className={`${INP_B} w-[72px] text-center tabular-nums`} /> : undefined}
+                input={eLoad ? <input aria-label={t("pk.maxLayers", "Maximum layers")} inputMode="numeric" value={String(L.stack_max ?? "")} onChange={(e) => patchLogistics({ stack_max: e.target.value })} placeholder="2" className={`${INP_B} w-[72px] text-center tabular-nums`} /> : undefined}
               />
             ) : null}
             {sums.volumetricKg ? (
@@ -1405,7 +1475,21 @@ function PackingSheet({
                 icon={<ScanLineIcon className="h-6 w-6" />}
                 label={t("pp.f.hs", "HS code")}
                 value={str(col("hs_code"))}
-                input={eCust && draft ? <input value={draft.hs_code} onChange={(e) => patchDraft({ hs_code: e.target.value })} placeholder="8452.21" className={`${INP_B} w-full font-mono`} /> : undefined}
+                input={eCust && draft ? (
+                  <span className="block">
+                    <span className="flex items-center gap-1.5">
+                      <input aria-label={t("pp.f.hs", "HS code")} value={draft.hs_code} onChange={(e) => { patchDraft({ hs_code: e.target.value }); setAiMsg(null); }} placeholder="8452.21" className={`${INP_B} w-full min-w-0 flex-1 font-mono ${hsOk(draft.hs_code) ? "" : "border-amber-500/60"}`} />
+                      <button type="button" onClick={() => void aiSuggestHs()} disabled={aiBusy} className="kx-ai-glow h-8 px-2 shrink-0 rounded-md text-[10px] font-bold text-[var(--accent,#0066FF)] border border-[var(--accent,#0066FF)]/40 hover:bg-[var(--accent,#0066FF)]/10 disabled:opacity-40 transition-all">
+                        {aiBusy ? t("ai.generating", "Drafting…") : t("ai.suggest", "AI Suggest")}
+                      </button>
+                    </span>
+                    {!hsOk(draft.hs_code) ? (
+                      <span className="block mt-1 text-[10px] leading-snug text-amber-400">{t("pk.hsInvalid", "4–10 digits, dotted or not — e.g. 8452.21.00.")}</span>
+                    ) : aiMsg ? (
+                      <span className={`block mt-1 text-[10px] leading-snug ${aiMsg.kind === "ok" ? "text-[var(--text-muted)]" : "text-amber-400"}`}>{aiMsg.text}</span>
+                    ) : null}
+                  </span>
+                ) : undefined}
               />
             ) : null}
             {eCust || (L.origin_certificate && L.origin_certificate !== "none") ? (
@@ -1421,7 +1505,10 @@ function PackingSheet({
                 icon={<TriangleWarningIcon className="h-6 w-6" />}
                 label={t("pp.f.regulated", "Regulated content")}
                 value={dgNames.join(", ") || t("pk.dgHas", "Has regulated content")}
-                note={[dg?.un_numbers, dg?.notes].filter(Boolean).join("  ·  ") || undefined}
+                note={[
+                  dg?.has && !(dg?.kinds ?? []).length ? t("pk.dgNoKind", "Type not specified — the MSDS request will ask which.") : null,
+                  dg?.un_numbers, dg?.notes,
+                ].filter(Boolean).join("  ·  ") || undefined}
                 tone={dg?.has ? "warn" : "plain"}
                 /* The band, not a cell: wrapped text made it taller than its
                    neighbours; given its own band it stops leaving a hole in
@@ -1435,6 +1522,7 @@ function PackingSheet({
                     </span>
                     {dg?.has ? (
                       <>
+                        {!(dg?.kinds ?? []).length ? <span className="block text-[10px] leading-snug text-amber-400">{t("pk.dgNoKind", "Type not specified — the MSDS request will ask which.")}</span> : null}
                         <span className="flex flex-wrap gap-1">
                           {DG_KINDS.map((k) => (
                             <button key={k.value} type="button" onClick={() => toggleKind(k.value)} className={seg((dg?.kinds ?? []).includes(k.value), true)}>{t(`pk.opt.${k.value}`, k.label)}</button>
@@ -1443,11 +1531,11 @@ function PackingSheet({
                         <span className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                           <span>
                             <span className={TINY}>{t("pk.unNumbers", "UN number(s)")}</span>
-                            <input value={dg?.un_numbers ?? ""} onChange={(e) => setDg({ un_numbers: e.target.value })} placeholder="UN3481" className={`${INP_B} w-full font-mono`} />
+                            <input aria-label={t("pk.unNumbers", "UN number(s)")} value={dg?.un_numbers ?? ""} onChange={(e) => setDg({ un_numbers: e.target.value })} placeholder="UN3481" className={`${INP_B} w-full font-mono`} />
                           </span>
                           <span>
                             <span className={TINY}>{t("pk.dgNote", "Note for the forwarder")}</span>
-                            <input value={dg?.notes ?? ""} onChange={(e) => setDg({ notes: e.target.value })} placeholder={t("pk.dgNotePh", "Oil drained before shipment")} className={`${INP_B} w-full`} />
+                            <input aria-label={t("pk.dgNote", "Note for the forwarder")} value={dg?.notes ?? ""} onChange={(e) => setDg({ notes: e.target.value })} placeholder={t("pk.dgNotePh", "Oil drained before shipment")} className={`${INP_B} w-full`} />
                           </span>
                         </span>
                       </>
@@ -1468,7 +1556,7 @@ function PackingSheet({
                 icon={<ShoppingCartIcon className="h-6 w-6" />}
                 label={t("pp.f.moq", "MOQ")}
                 value={str(col("moq"))}
-                input={eOrd && draft ? <input type="number" min={1} value={draft.moq} onChange={(e) => patchDraft({ moq: e.target.value })} placeholder={t("technical.moqPlaceholder", "e.g. 10")} className={`${INP_B} w-full tabular-nums`} /> : undefined}
+                input={eOrd && draft ? <input aria-label={t("pp.f.moq", "MOQ")} type="number" min={1} value={draft.moq} onChange={(e) => patchDraft({ moq: e.target.value })} placeholder={t("technical.moqPlaceholder", "e.g. 10")} className={`${INP_B} w-full tabular-nums`} /> : undefined}
               />
             ) : null}
             {eOrd || pv("lead_time") ? (
@@ -1476,7 +1564,7 @@ function PackingSheet({
                 icon={<ClockIcon className="h-6 w-6" />}
                 label={t("pp.f.leadTime", "Lead time")}
                 value={str(col("lead_time"))}
-                input={eOrd && draft ? <input value={draft.lead_time} onChange={(e) => patchDraft({ lead_time: e.target.value })} placeholder={t("technical.leadTimePlaceholder", "e.g. 7-14 days")} className={`${INP_B} w-full`} /> : undefined}
+                input={eOrd && draft ? <input aria-label={t("pp.f.leadTime", "Lead time")} value={draft.lead_time} onChange={(e) => patchDraft({ lead_time: e.target.value })} placeholder={t("technical.leadTimePlaceholder", "e.g. 7-14 days")} className={`${INP_B} w-full`} /> : undefined}
               />
             ) : null}
             {eOrd || L.port_of_loading ? (
@@ -1495,7 +1583,7 @@ function PackingSheet({
           must still be reachable, or the only way to fill them would be the
           editor route this page is meant to replace. One chip per missing
           section opens that card in edit mode. */}
-      {editing === null ? (() => {
+      {editing === null && canEdit ? (() => {
         const missing: { k: PackingSection; label: string }[] = [];
         if (!machine) missing.push({ k: "physical", label: t("tech.secPhysical", "Physical (Bare Machine)") });
         if (!packing) missing.push({ k: "packing", label: t("logistics.packingSection", "Packing") });
@@ -1560,6 +1648,27 @@ export default function ProductProfile() {
   const params = useParams<{ id: string }>();
   const handle = params?.id;
   const router = useRouter();
+  /* Who may edit here: the same "edit" action the API checks, and never while
+     viewing as someone else (the proxy blocks those writes anyway — better
+     that the button is not there than that Save fails). */
+  const perms = usePermissions();
+  const { data: me } = useMeBootstrap();
+  /* No `loading` gate: for a super admin `can` answers at once, and for
+     everyone else it answers false until the rows land — Edit appears then.
+     Gating on loading hid the button from the owner himself on this page. */
+  const canEdit = !me?.auth?.viewing_as && (!!me?.isSuperAdmin || perms.can("Product Data", "edit"));
+  /* Unsaved inline edits: switching tab, Back, Edit and closing the page all
+     ask first — the draft dies with the sheet, silently, otherwise. */
+  const dirtyRef = useRef(false);
+  const [leaveAsk, setLeaveAsk] = useState<null | (() => void)>(null);
+  const guard = useCallback((go: () => void) => {
+    if (dirtyRef.current) setLeaveAsk(() => go); else go();
+  }, []);
+  useEffect(() => {
+    const h = (e: BeforeUnloadEvent) => { if (dirtyRef.current) { e.preventDefault(); e.returnValue = ""; } };
+    window.addEventListener("beforeunload", h);
+    return () => window.removeEventListener("beforeunload", h);
+  }, []);
   const { t, lang } = useTranslation(useMemo(() => ({ ...PRODUCTS_UI_I18N, ...PROFILE_T }), []));
   const aurora = useSkin() === "aurora";
 
@@ -1654,6 +1763,24 @@ export default function ProductProfile() {
     () => new Set((data?.schema?.groups ?? []).flatMap((g) => (g.fields ?? []).map((f) => f.key))),
     [data?.schema],
   );
+  /* The same context the editor sends for its HS-code suggestion. */
+  const aiContext = useMemo(() => {
+    const prod = data?.product ?? {};
+    const specs: Record<string, string> = {};
+    for (const [k, v] of Object.entries((prod.schema_specs as Record<string, unknown> | null) ?? {})) {
+      if (v === null || v === undefined || v === "" || typeof v === "object") continue;
+      specs[k] = String(v);
+      if (Object.keys(specs).length >= 40) break;
+    }
+    const nameOf = (kind: keyof TaxonomyNames, slug: unknown) => (slug ? taxo[kind][String(slug)]?.en : undefined);
+    return {
+      name: prod.product_name, brand: prod.brand,
+      division: nameOf("division", prod.division_slug), category: nameOf("category", prod.category_slug), subcategory: nameOf("subcategory", prod.subcategory_slug),
+      models: (data?.models ?? []).map((mm) => String(mm.primary_model ?? mm.model_name ?? "")).filter(Boolean).slice(0, 6),
+      specs,
+      description: String(prod.description ?? "").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim().slice(0, 1500),
+    };
+  }, [data, taxo]);
   const hero = useMemo(() => {
     const main = (data?.media ?? []).find((m) => m.type === "main_image");
     return (main?.url as string) || null;
@@ -1709,6 +1836,7 @@ export default function ProductProfile() {
           href="/product-data"
           aria-label={t("pp.back", "Back to Product Data")}
           className={BACK_CHROME}
+          onClick={(e) => { if (dirtyRef.current) { e.preventDefault(); guard(() => router.push("/product-data")); } }}
         >
           <RrIcon name="arrow-left" size={14} />
           <span className="hidden text-[12px] font-medium sm:inline">{t("pp.backShort", "Product Data")}</span>
@@ -1737,15 +1865,28 @@ export default function ProductProfile() {
             <ExternalLinkIcon className="h-3.5 w-3.5" /> {t("pp.publicPage", "Public page")}
           </Link>
         ) : null}
-        <Link href={editHref}
-          className="h-8 px-4 rounded-lg bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[12px] font-semibold flex items-center gap-1.5 transition-all shrink-0">
-          <PencilIcon className="h-3.5 w-3.5" /> {t("action.edit", "Edit")}
-        </Link>
+        {canEdit ? (
+          <Link href={editHref}
+            onClick={(e) => { if (dirtyRef.current) { e.preventDefault(); guard(() => router.push(editHref)); } }}
+            className="h-8 px-4 rounded-lg bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[12px] font-semibold flex items-center gap-1.5 transition-all shrink-0">
+            <PencilIcon className="h-3.5 w-3.5" /> {t("action.edit", "Edit")}
+          </Link>
+        ) : null}
       </div>
 
       {/* Tabs FIRST — always at the top (owner rule); the family bar and
           the member spotlight live UNDER them. */}
-      <ProfileTabs current={step} onPick={setStep} />
+      <ProfileTabs current={step} onPick={(i) => guard(() => setStep(i))} />
+      <ConfirmDialog
+        open={leaveAsk !== null}
+        tone="neutral"
+        onCancel={() => setLeaveAsk(null)}
+        onConfirm={() => { const go = leaveAsk; setLeaveAsk(null); dirtyRef.current = false; go?.(); }}
+        title={t("wizard.confirmDiscardTitle", "Discard unsaved changes?")}
+        message={t("wizard.confirmDiscard", "Discard your changes and leave this page? Anything you've edited that hasn't been saved will be lost.")}
+        confirmLabel={t("wizard.discardConfirm", "Discard & leave")}
+        cancelLabel={t("wizard.discardCancel", "Keep editing")}
+      />
 
       {/* ── Family bar ── one product, several sellable models. Picking a
           member opens its spotlight: square photo, tight one-line facts,
@@ -2287,6 +2428,9 @@ export default function ProductProfile() {
           motion={tabMotion}
           productId={p?.id as string | undefined}
           schemaCovers={schemaCovers}
+          canEdit={canEdit}
+          onDirtyChange={(d) => { dirtyRef.current = d; }}
+          aiContext={aiContext}
           onSaved={(patch) => {
             setData((prev) => (prev ? { ...prev, product: { ...prev.product, ...patch } } : prev));
             setReloadTick((n) => n + 1);

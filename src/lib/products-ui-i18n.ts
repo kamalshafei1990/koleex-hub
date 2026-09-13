@@ -1361,6 +1361,8 @@ export const PRODUCTS_UI_I18N: Translations = {
   "pk.unitTitle":        { en: "Type in any unit — the value is stored in {unit}.", zh: "可按任意单位输入 — 数值以 {unit} 存储。", ar: "اكتب بأي وحدة — القيمة بتتخزن بـ {unit}." },
   "pk.unitEnter":        { en: "Enter values in {unit}", zh: "以 {unit} 输入数值", ar: "أدخل القيم بـ {unit}" },
   "pk.portPh":           { en: "Shanghai", zh: "上海", ar: "شنغهاي" },
+  "pk.hsInvalid":        { en: "4–10 digits, dotted or not — e.g. 8452.21.00.", zh: "4–10 位数字，可带点 — 例如 8452.21.00。", ar: "٤–١٠ أرقام، بنقط أو من غيرها — مثلاً 8452.21.00." },
+  "pk.dgNoKind":         { en: "Type not specified — the MSDS request will ask which.", zh: "未指定类型 — MSDS 询问时会要求说明。", ar: "النوع مش محدد — طلب الـ MSDS هيسأل عنه." },
   "specs.toggleSuggestions": { en: "Toggle suggestions", zh: "显示/隐藏建议", ar: "إظهار/إخفاء الاقتراحات" },
   "pk.unitsWord":        { en: "units", zh: "台", ar: "وحدة" },
   "pk.pcsWord":          { en: "pcs", zh: "件", ar: "قطعة" },
