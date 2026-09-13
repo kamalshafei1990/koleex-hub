@@ -971,6 +971,19 @@ export default function ProductForm({ productId }: Props) {
      step (see the note on getSteps) and the argument went with it. Memoised
      on nothing so the array identity stays stable across renders. */
   const steps = useMemo(() => getSteps(), []);
+  /* LAND ON THE SECTION THAT WAS ASKED FOR. The profile's per-section Edit
+     has linked to /edit#logistics all along and nothing ever read the hash —
+     every Edit opened on Classify. Applied once, after load, because until
+     then the steps are not the product's own. */
+  const stepApplied = useRef(false);
+  useEffect(() => {
+    if (loading || stepApplied.current) return;
+    stepApplied.current = true;
+    const wanted = typeof window !== "undefined" ? window.location.hash.replace(/^#/, "") : "";
+    if (!wanted) return;
+    const idx = steps.findIndex((st) => st.id === wanted);
+    if (idx >= 0) setCurrentStep(idx);
+  }, [loading, steps]);
 
   /* ── Load data ── */
   useEffect(() => {
