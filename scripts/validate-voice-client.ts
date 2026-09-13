@@ -2962,10 +2962,16 @@ function describeErrorCheck(): boolean {
     const btn = fs26.readFileSync("src/components/ai/VoiceCallButton.tsx", "utf8");
     const sess = fs26.readFileSync("src/lib/voice/session.ts", "utf8");
     check("the button takes the lane from the voices GET — the server's word — and hands it to the session; it never picks one",
-      /const server: "rtc" \| "ws" = body\.transport === "ws" \? "ws" : "rtc";/.test(btn) && /transportRef\.current\);/.test(btn) && !/transportRef\.current = "ws";/.test(btn));
-    check("  …a ws lane that never came up falls back to the mainland lane ONCE, silently, and never the other way",
+      /const server: "rtc" \| "ws" = body\.transport === "ws" \? "ws" : "rtc";/.test(btn) && /transportRef\.current\);/.test(btn) && (btn.match(/transportRef\.current = "ws";/g) ?? []).length === 1);
+    check("  …a ws lane that never came up falls back to the mainland lane ONCE, silently, and never the other way inside a call — the one move back to the socket lane is after a fallen-back call ENDS, and only on a probe that answered",
       /const canFallBack = transportRef\.current === "ws" && !wasUp && laneFailed && !laneFellBackRef\.current;/.test(btn) &&
-      /if \(canFallBack\) \{\s*laneFellBackRef\.current = true;\s*transportRef\.current = "rtc";/.test(btn) && !/transportRef\.current = "ws";/.test(btn));
+      /if \(canFallBack\) \{\s*laneFellBackRef\.current = true;\s*transportRef\.current = "rtc";/.test(btn) &&
+      /const recheckLaneAfterFallback = useCallback\(\(\) => \{\s*if \(!laneFellBackRef\.current \|\| byLaneRef\.current\.ws\.length === 0\) return;\s*void probeWsLane\(/.test(btn) &&
+      /if \(!ok \|\| sessionRef\.current \|\| !laneFellBackRef\.current\) return;\s*laneFellBackRef\.current = false;\s*transportRef\.current = "ws";\s*saveLane\("ws", Date\.now\(\), "probe"\);/.test(btn) &&
+      /setChosenLane\("ws"\);\s*setLaneNote\(null\);\s*\}\);\s*\}, \[\]\);/.test(btn) &&
+      /const hangUp = useCallback\(\(\) => \{\s*\/\*[^*]*\*\/\s*recheckLaneAfterFallback\(\);/.test(btn) &&
+      /onErrorRef\.current\?\.\(FAILURE_COPY\[langRef\.current\]\[failure\]\);\s*recheckLaneAfterFallback\(\);\s*\}/.test(btn) &&
+      /\}, \[releaseCall, beaconHangUp, recheckLaneAfterFallback\]\);/.test(btn));
     check("  …the first `error` the far side sends is beaconed once with its bounded message, so a refused field on a new vendor names itself",
       /if \(voiceEventType\(data\) === "error"\) reportFirstError\(data\);/.test(btn) && /reason: "far-side-error", lane: transportRef\.current, err: errorMessageOf\(data\)/.test(btn) && !/reason: "config-rejected"/.test(btn));
     check("hanging up a live call beacons `hung-up` with the lane and the diagnostics, before the release drops the session",
@@ -3745,7 +3751,7 @@ function describeErrorCheck(): boolean {
   const { readFileSync } = await import("node:fs");
   const sess = readFileSync("src/lib/voice/session.ts", "utf8");
   check("the socket lane's handshake waits fifteen seconds for our own route, not the mainland lane's fifty",
-    WS_HANDSHAKE_TIMEOUT_MS === 15_000 && /const deadline = setTimeout\(\(\) => abortAs\("handshake-deadline"\), WS_HANDSHAKE_TIMEOUT_MS\);/.test(sess) && /const HANDSHAKE_TIMEOUT_MS = 50_000;/.test(sess));
+    WS_HANDSHAKE_TIMEOUT_MS === 15_000 && /let deadline = setTimeout\(\(\) => abortAs\("handshake-deadline"\), WS_HANDSHAKE_TIMEOUT_MS\);/.test(sess) && /const HANDSHAKE_TIMEOUT_MS = 50_000;/.test(sess));
   const btn = readFileSync("src/components/ai/VoiceCallButton.tsx", "utf8");
   check("Try again beacons `retried`, releases the call, moves a socket lane that never came up to the mainland lane once, and rebuilds with the words kept — inside the tap",
     /const retryCall = useCallback\(\(\) => \{/.test(btn) && /sendVoiceTelemetry\(\{ reason: "retried", resumes: resumesRef\.current, lane: transportRef\.current/.test(btn) &&
@@ -3789,7 +3795,7 @@ function describeErrorCheck(): boolean {
   check("the canary is armed 2.5 s into the call's own handshake with a 3.5 s deadline, disarmed when the handshake answers, never on a redial — and its failure aborts the handshake as a timeout (2026-09-13: 'connecting is too slow')",
     /const WS_CANARY_AFTER_MS = 2_500;/.test(sess) && /const WS_CANARY_TIMEOUT_MS = 3_500;/.test(sess) && CANARY_PATH === "/api/version" &&
     /const disarmCanary = first \? this\.armCanary\(\(\) => abortAs\("origin-unreachable"\)\) : \(\) => \{\};/.test(sess) && /\} finally \{\s*disarmCanary\(\);\s*clearTimeout\(deadline\);\s*\}/.test(sess) &&
-    /const deadline = setTimeout\(\(\) => abortAs\("handshake-deadline"\), WS_HANDSHAKE_TIMEOUT_MS\);/.test(sess) && /\.\.\.\(ctrl \? \{ signal: ctrl\.signal \} : \{\}\),\s*credentials: "include",/.test(sess) &&
+    /let deadline = setTimeout\(\(\) => abortAs\("handshake-deadline"\), WS_HANDSHAKE_TIMEOUT_MS\);/.test(sess) && /\.\.\.\(ctrl \? \{ signal: ctrl\.signal \} : \{\}\),\s*credentials: "include",/.test(sess) &&
     /if \(!disarmed\) onDead\(\);/.test(sess) && /return new DOMException\(why, "TimeoutError"\);/.test(sess) &&
     /this\.canary = `\$\{r\.status\}:\$\{took\(\)\}`;/.test(sess) && /this\.canary = `\$\{isTimeoutError\(e\) \? "timeout" : "error"\}:\$\{took\(\)\}`;/.test(sess) &&
     /canary: this\.canary,\s*resp_err: this\.lastResponseError,/.test(sess));
@@ -3818,41 +3824,69 @@ function describeErrorCheck(): boolean {
     s.stop();
   }
   {
-    /* A DEAD ORIGIN ENDS THE WAIT (2026-09-13 05:08: the route answered in
-       two seconds, nothing reached the phone, the canary timed out too, and
-       the caller watched "connecting" for seventeen seconds). The POST here
-       never answers on its own — it rejects only when its signal aborts —
-       and the canary rejects as a timeout: the call fails as
-       service-unreachable within the canary's delay, not the deadline's. */
-    const recorded: Recorded[] = [];
-    const d = deps({ recorded });
-    const base = d.deps.fetchFn;
-    let aborted = "";
-    d.deps.fetchFn = (async (url: string, init?: RequestInit) => {
-      if (String(url) === CANARY_PATH) throw new DOMException("canary", "TimeoutError");
-      if (String(url).startsWith(WS_SESSION_PATH)) {
-        return new Promise<Response>((_res, rej) => {
-          init?.signal?.addEventListener("abort", () => {
-            const reason = (init.signal as AbortSignal & { reason?: unknown }).reason;
-            aborted = reason instanceof Error ? `${reason.name}:${reason.message}` : String(reason);
-            rej(reason ?? new DOMException("aborted", "AbortError"));
+    /* A DEAD ORIGIN ENDS THE WAIT — AFTER ONE MORE ASK (2026-09-13 05:08:
+       the route answered in two seconds, nothing reached the phone, the
+       canary timed out too, and the caller watched "connecting" for
+       seventeen seconds; 06:42 and 07:01: the route answered, nothing
+       reached the phone, and one second later the next request from the
+       same page went straight through). The POST here never answers on its
+       own — it rejects only when its signal aborts — and the canary
+       rejects as a timeout: the first request is aborted for the origin,
+       the SAME request goes out again at once on a fresh controller, and
+       only the second one's own deadline (WS_HANDSHAKE_RETRY_MS) fails the
+       call as service-unreachable — still within seconds, never the
+       fifteen-second deadline. */
+    const { WS_HANDSHAKE_RETRY_MS, WS_HANDSHAKE_TIMEOUT_MS: WS_HS_TIMEOUT } = await import("../src/lib/voice/session");
+    check("the second ask has four seconds of its own, well inside the handshake's fifteen", WS_HANDSHAKE_RETRY_MS === 4_000 && WS_HANDSHAKE_RETRY_MS < WS_HS_TIMEOUT &&
+      /if \(first && abortedFor === "origin-unreachable" && ctrl\) \{/.test(sess) && /ctrl = new AbortController\(\);\s*abortedFor = "";\s*this\.canary \+= "\+retry";\s*deadline = setTimeout\(\(\) => abortAs\("handshake-retry-deadline"\), this\.deps\.wsHandshakeRetryMs \?\? WS_HANDSHAKE_RETRY_MS\);\s*res = await post\(\);/.test(sess));
+    const envelope = () => ({
+      transport: "ws", url: "wss://voice.example/v1/realtime", protocols: ["xai-client-secret.SECRET-1"], expires_at: 1,
+      audio: { format: "pcm16", sample_rate: 24_000 },
+      session: { type: "session.update", session: { modalities: ["text", "audio"] } },
+    });
+    const run = async (answerSecond: boolean) => {
+      const recorded: Recorded[] = [];
+      const d = deps({ recorded });
+      const base = d.deps.fetchFn;
+      const aborted: string[] = [];
+      let posts = 0;
+      d.deps.fetchFn = (async (url: string, init?: RequestInit) => {
+        if (String(url) === CANARY_PATH) throw new DOMException("canary", "TimeoutError");
+        if (String(url).startsWith(WS_SESSION_PATH)) {
+          posts++;
+          if (posts === 2 && answerSecond) return { ok: true, status: 200, json: async () => envelope() } as unknown as Response;
+          return new Promise<Response>((_res, rej) => {
+            init?.signal?.addEventListener("abort", () => {
+              const reason = (init.signal as AbortSignal & { reason?: unknown }).reason;
+              aborted.push(reason instanceof Error ? `${reason.name}:${reason.message}` : String(reason));
+              rej(reason ?? new DOMException("aborted", "AbortError"));
+            });
           });
-        });
-      }
-      return base(url, init);
-    }) as unknown as typeof fetch;
-    d.deps.wsCanaryAfterMs = 20;
-    d.deps.createWebSocket = () => ({ readyState: 0, send: () => {}, close: () => {}, onopen: null, onmessage: null, onclose: null, onerror: null }) as VoiceSocket;
-    d.deps.createWsAudio = () => ({ stream: {} as MediaStream, startCapture: () => {}, play: () => {}, flush: () => {}, close: () => {}, playSample: async () => true, levels: () => ({ mic: 0, far: 0 }), stats: () => ({ path: "none", frames: 0, peak: 0, ctx: "running", rate: 24_000, start: "", stalled: false }) });
-    const states: Array<[VoiceState, VoiceFailure | undefined]> = [];
-    const s = new VoiceSession(d.deps, { onState: (st, f) => states.push([st, f]) }, null, null, null, null, "ws");
-    const t0 = Date.now();
-    await within(2000, s.start());
-    await new Promise((r) => setTimeout(r, 60));
-    const failed = states.find(([st]) => st === "failed");
-    check("a canary that times out aborts the handshake with a TimeoutError named for the origin, and the call fails as service-unreachable at once — within the canary's delay, not the fifteen-second deadline",
-      aborted === "TimeoutError:origin-unreachable" && failed !== undefined && failed[1] === "service-unreachable" && Date.now() - t0 < 1500 && s.diagnostics().canary.startsWith("timeout:"));
-    s.stop();
+        }
+        return base(url, init);
+      }) as unknown as typeof fetch;
+      d.deps.wsCanaryAfterMs = 20;
+      d.deps.wsHandshakeRetryMs = 50;
+      const sockets: VoiceSocket[] = [];
+      d.deps.createWebSocket = () => { const sock = { readyState: 0, send: () => {}, close: () => {}, onopen: null, onmessage: null, onclose: null, onerror: null } as VoiceSocket; sockets.push(sock); return sock; };
+      d.deps.createWsAudio = () => ({ stream: {} as MediaStream, startCapture: () => {}, play: () => {}, flush: () => {}, close: () => {}, playSample: async () => true, levels: () => ({ mic: 0, far: 0 }), stats: () => ({ path: "none", frames: 0, peak: 0, ctx: "running", rate: 24_000, start: "", stalled: false }) });
+      const states: Array<[VoiceState, VoiceFailure | undefined]> = [];
+      const s = new VoiceSession(d.deps, { onState: (st, f) => states.push([st, f]) }, null, null, null, null, "ws");
+      const t0 = Date.now();
+      await within(2000, s.start());
+      await new Promise((r) => setTimeout(r, 120));
+      return { s, states, aborted, posts: () => posts, sockets, took: Date.now() - t0 };
+    };
+    const a = await run(false);
+    const failedA = a.states.find(([st]) => st === "failed");
+    check("a canary that times out aborts the handshake for the origin and asks AGAIN at once; when the second ask is not answered either, the call fails as service-unreachable on the retry's own deadline — seconds, not fifteen",
+      a.aborted.join() === "TimeoutError:origin-unreachable,TimeoutError:handshake-retry-deadline" && a.posts() === 2 && failedA !== undefined && failedA[1] === "service-unreachable" && a.took < 1500 &&
+      /^timeout:\d+ms\+retry$/.test(a.s.diagnostics().canary) && a.sockets.length === 0);
+    a.s.stop();
+    const b = await run(true);
+    check("  …and when the second ask IS answered, the socket opens on it and the call goes on connecting — no failure, no fall-back, the retry in the beacon",
+      b.aborted.join() === "TimeoutError:origin-unreachable" && b.posts() === 2 && b.sockets.length === 1 && !b.states.some(([st]) => st === "failed") && b.s.getState() === "connecting" && /^timeout:\d+ms\+retry$/.test(b.s.diagnostics().canary));
+    b.s.stop();
   }
 
   /* AN ANSWER THAT ENDED BADLY: response.done with a status other than

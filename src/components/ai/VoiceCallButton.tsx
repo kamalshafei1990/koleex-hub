@@ -755,6 +755,35 @@ export default function VoiceCallButton({
     setLaneNote("international-unreachable");
   }, []);
 
+  /* THE INTERNATIONAL LINE IS ASKED AGAIN AFTER A CALL THAT FELL OFF IT
+     (owner, 2026-09-13 08:2x: "fix the international voice opening on the
+     Chinese line"). 06:42:45 and 07:01:45 UTC: the socket lane's handshake
+     was answered by our route and the answer never reached the phone; the
+     fall-back placed the call on the mainland line, and every call after
+     it on this page stayed there — the fall-back flag was cleared only by
+     the caller's own Line choice, and the mount-time probe runs once. Now,
+     when a call that fell back ends, the socket lane is probed in the
+     background (lane-probe.ts): if it answers, the next call is back on the
+     international line with the caller's voice (the same key on both
+     lines), the device remembers it, and the note goes; if it does not,
+     nothing moves. Never under a call already placed. */
+  const recheckLaneAfterFallback = useCallback(() => {
+    if (!laneFellBackRef.current || byLaneRef.current.ws.length === 0) return;
+    void probeWsLane({ fetchFn: (...a) => fetch(...a), createWebSocket: (url, protocols) => new WebSocket(url, protocols) as unknown as VoiceSocket }).then((ok) => {
+      if (!ok || sessionRef.current || !laneFellBackRef.current) return;
+      laneFellBackRef.current = false;
+      transportRef.current = "ws";
+      saveLane("ws", Date.now(), "probe");
+      const list = byLaneRef.current.ws;
+      setVoices(list);
+      const next = pickVoiceKey(voiceKeyRef.current ?? readSavedVoiceKey(), list);
+      voiceKeyRef.current = next;
+      setVoiceKey(next);
+      setChosenLane("ws");
+      setLaneNote(null);
+    });
+  }, []);
+
   const retryCall = useCallback(() => {
     const s = sessionRef.current;
     const diag = s?.diagnostics();
@@ -773,6 +802,8 @@ export default function VoiceCallButton({
   }, [releaseCall, fallToMainlandVoice]);
 
   const hangUp = useCallback(() => {
+    /* A call that fell off the international line: ask for it again (above). */
+    recheckLaneAfterFallback();
     /* WHAT THE CALL CAME TO, written down (roadmap B1). Taken before the
        release drops the handles: the writer, the thread, the words. After
        the last turns have landed, the server is asked for a summary of the
@@ -803,7 +834,7 @@ export default function VoiceCallButton({
         .catch(() => { /* a summary that did not come is nothing on screen */ })
         .finally(() => onSummaryPendingRef.current?.(false));
     }
-  }, [releaseCall, beaconHangUp]);
+  }, [releaseCall, beaconHangUp, recheckLaneAfterFallback]);
 
   /* THE FIRST ERROR THE FAR SIDE SENDS, once per call, with its message: a
      refused field in the session configuration used to be invisible from
@@ -1028,6 +1059,7 @@ export default function VoiceCallButton({
           setLaneNote(null);
           playSound("call-failed");
           onErrorRef.current?.(FAILURE_COPY[langRef.current][failure]);
+          recheckLaneAfterFallback();
         }
       },
       onReady: () => {
@@ -1203,7 +1235,7 @@ export default function VoiceCallButton({
     errorBeaconedRef.current = false;
     sessionRef.current = session;
     await session.start();
-  }, [clearSearchTimer, acquireWakeLock, reportFirstError, fallToMainlandVoice, releaseCall]);
+  }, [clearSearchTimer, acquireWakeLock, reportFirstError, fallToMainlandVoice, releaseCall, recheckLaneAfterFallback]);
   useEffect(() => { startCallRef.current = startCall; }, [startCall]);
 
   /* ONE METER PER SIDE, AND ONLY THE ACTIVE ONE RUNS. Measuring both at once

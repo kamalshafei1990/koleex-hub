@@ -274,6 +274,8 @@ export type VoiceDeps = {
   wsRotateTimeoutMs?: number;
   wsRotateAfterMs?: number;
   now?: () => number;
+  /** The second handshake's own wait after the canary's verdict (WS_HANDSHAKE_RETRY_MS). */
+  wsHandshakeRetryMs?: number;
 };
 
 /* ICE gathering normally finishes in well under a second on a local network
@@ -345,6 +347,20 @@ export const WS_HANDSHAKE_TIMEOUT_MS = 15_000;
    timeout, or error. */
 const WS_CANARY_AFTER_MS = 2_500;
 const WS_CANARY_TIMEOUT_MS = 3_500;
+/* THE HANDSHAKE IS ASKED ONCE MORE BEFORE THE LINE IS GIVEN UP (owner,
+   2026-09-13 08:2x: "fix the international voice opening on the Chinese
+   line"). 06:42:45 and 07:01:45 UTC: our route ANSWERED the socket lane's
+   handshake — its log says 200, `socket=relay` — and the answer never
+   reached the phone; the canary beside it stalled too, and the call failed
+   as service-unreachable at 7.8 s and fell back to the mainland line and
+   its voice. One second later the mainland lane's own POST from the same
+   page went straight through. Not a dead origin: a request stuck on a
+   connection the phone's exit had just changed under. So the canary's
+   verdict no longer ends the call — it aborts the stuck request and sends
+   the same handshake AGAIN, at once, on a fresh controller, with this
+   much of the wait left; only that second request failing is the service
+   not answering. The beacon says `canary=timeout:…+retry`. */
+export const WS_HANDSHAKE_RETRY_MS = 4_000;
 /* AND THE CANARY'S VERDICT ENDS THE WAIT (2026-09-13 05:08 and 05:15, the
    owner: "connecting is too slow"): our route answered in two seconds, the
    answer never reached the phone, and the canary to our own origin timed
@@ -1731,8 +1747,11 @@ export class VoiceSession {
       /* ONE CONTROLLER FOR THE HANDSHAKE: our own deadline, and the canary's
          verdict (WS_CANARY_TIMEOUT_MS) — either aborts the POST as a
          timeout, which fails the call as service-unreachable. */
-      const ctrl = typeof AbortController !== "undefined" ? new AbortController() : null;
+      let ctrl = typeof AbortController !== "undefined" ? new AbortController() : null;
+      /* Why the controller was aborted, for the retry rule below. */
+      let abortedFor = "";
       const abortAs = (why: string) => {
+        abortedFor = why;
         try {
           ctrl?.abort(timeoutError(why));
         } catch {
@@ -1740,7 +1759,7 @@ export class VoiceSession {
           try { ctrl?.abort(); } catch { /* gone */ }
         }
       };
-      const deadline = setTimeout(() => abortAs("handshake-deadline"), WS_HANDSHAKE_TIMEOUT_MS);
+      let deadline = setTimeout(() => abortAs("handshake-deadline"), WS_HANDSHAKE_TIMEOUT_MS);
       const post = () => this.deps.fetchFn(path, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -1756,10 +1775,23 @@ export class VoiceSession {
         try {
           res = await post();
         } catch (firstErr) {
-          if (!(firstErr instanceof TypeError) || isTimeoutError(firstErr) || !alive()) throw firstErr;
-          await new Promise((r) => setTimeout(r, HANDSHAKE_RETRY_DELAY_MS));
           if (!alive()) throw firstErr;
-          res = await post();
+          if (first && abortedFor === "origin-unreachable" && ctrl) {
+            /* THE CANARY'S VERDICT: the same request again, at once, on a
+               fresh controller (WS_HANDSHAKE_RETRY_MS). */
+            disarmCanary();
+            clearTimeout(deadline);
+            ctrl = new AbortController();
+            abortedFor = "";
+            this.canary += "+retry";
+            deadline = setTimeout(() => abortAs("handshake-retry-deadline"), this.deps.wsHandshakeRetryMs ?? WS_HANDSHAKE_RETRY_MS);
+            res = await post();
+          } else {
+            if (!(firstErr instanceof TypeError) || isTimeoutError(firstErr)) throw firstErr;
+            await new Promise((r) => setTimeout(r, HANDSHAKE_RETRY_DELAY_MS));
+            if (!alive()) throw firstErr;
+            res = await post();
+          }
         }
       } finally {
         disarmCanary();

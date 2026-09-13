@@ -1141,3 +1141,37 @@ Expected on the owner's next international call: `handovers=N` on the
 relay with `resumes=0`, `wsRotations=N wsReconnects=0` in the beacon, and
 `:u` near zero. If the path's cut is not periodic after all, the learnt
 lifetime is wrong by construction and the resume path still holds.
+
+## "Fix the international voice opening on the Chinese line" (2026-09-13 08:2x UTC)
+
+Two calls of the morning (06:42:45, 07:01:45) placed the caller's
+international voice on the mainland line. The evidence, read together:
+
+- Both times our route ANSWERED the socket lane's handshake — `POST
+  /api/ai/voice/ws-session 200 … socket=relay` in the server log — and the
+  answer never reached the phone. The canary beside it stalled too, the
+  call failed as `service-unreachable` at 7.8 s (`canary=timeout:3501ms`),
+  and the fall-back placed the call on the mainland lane. One second later
+  the mainland lane's own POST from the same page went straight through.
+  Not a dead origin: a request stuck on a connection the phone's exit had
+  just changed under (US → SG at that minute).
+- After that one fall-back, EVERY call on the page stayed on the mainland
+  line: the fall-back flag was cleared only by the caller's own Line
+  choice, and the mount-time probe runs once.
+
+Two changes:
+
+- `src/lib/voice/session.ts`: the canary's verdict no longer ends the
+  call. It aborts the stuck request and sends the same handshake again, at
+  once, on a fresh controller with `WS_HANDSHAKE_RETRY_MS` (4 s) of its
+  own; only that second request failing is the service not answering. The
+  beacon reads `canary=timeout:…+retry`.
+- `src/components/ai/VoiceCallButton.tsx`: when a call that fell back
+  ends (hang-up or terminal failure), the socket lane is probed in the
+  background (lane-probe.ts); if it answers, the next call is back on the
+  international line with the caller's voice (the same key on both lines),
+  the device remembers `ws/probe`, and the note goes. Never under a call
+  already placed.
+- voice-client 756: the retry in both outcomes (second ask answered → the
+  socket opens, no failure; not answered → service-unreachable on the
+  retry's own deadline), the pins for the re-probe.
