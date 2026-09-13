@@ -135,23 +135,35 @@ export async function POST(req: Request) {
     }
     const guardVersion = typeof body.base_version === "number" ? body.base_version : currentVersion;
 
+    /* Only overwrite what the caller actually sent.
+    
+       This used to read `customer_id: body.customer_id ?? null` for every
+       field, which silently WIPED anything the editor did not know about. It
+       became a real defect the moment a packing list started being raised
+       from an invoice: the route set customer_id and a title at creation, and
+       the first save from PackingListDoc — which sends neither — cleared them.
+    
+       `undefined` now means "leave it alone" and an explicit `null` still
+       means "clear it", which is what a caller means by each. */
+    const patch: Record<string, unknown> = {
+      doc: body.doc ?? {},
+      version: guardVersion + 1,
+      updated_by: auth.account_id,
+      updated_by_name: auth.username,
+      updated_at: new Date().toISOString(),
+    };
+    if (body.doc_no !== undefined) patch.doc_no = body.doc_no;
+    if (body.title !== undefined) patch.title = body.title;
+    if (body.customer_id !== undefined) patch.customer_id = body.customer_id;
+    if (body.currency !== undefined) patch.currency = body.currency;
+    if (body.status !== undefined) patch.status = body.status;
+    if (body.issue_date !== undefined) patch.issue_date = body.issue_date;
+    if (body.due_date !== undefined) patch.due_date = body.due_date;
+    if (body.total !== undefined) patch.total = body.total;
+
     const { data, error } = await supabaseServer
       .from("documents")
-      .update({
-        doc_no: body.doc_no ?? cur.doc_no,
-        title: body.title ?? null,
-        customer_id: body.customer_id ?? null,
-        currency: body.currency ?? baseCurrency,
-        status: body.status ?? "draft",
-        issue_date: body.issue_date ?? new Date().toISOString().slice(0, 10),
-        due_date: body.due_date ?? null,
-        total: body.total ?? 0,
-        doc: body.doc ?? {},
-        version: guardVersion + 1,
-        updated_by: auth.account_id,
-        updated_by_name: auth.username,
-        updated_at: new Date().toISOString(),
-      })
+      .update(patch)
       .eq("id", body.id)
       .eq("tenant_id", auth.tenant_id)
       .eq("version", guardVersion)

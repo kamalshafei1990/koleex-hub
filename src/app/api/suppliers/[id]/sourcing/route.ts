@@ -11,7 +11,7 @@ import "server-only";
 
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
-import { requireAuth, requireModuleAccess , requireModuleAction} from "@/lib/server/auth";
+import { requireAuth, requireModuleAction} from "@/lib/server/auth";
 
 export async function PUT(req: Request, ctx: { params: Promise<{ id: string }> }) {
   const auth = await requireAuth(req);

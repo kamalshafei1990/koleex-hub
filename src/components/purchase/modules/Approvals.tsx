@@ -5,9 +5,8 @@
    the app is useful out-of-box. Standard SAP "Release Strategy",
    Odoo "Approval Rules", Coupa "Approval Chains". */
 
-import { useEffect, useState } from "react";
 import type { PurchaseModuleProps } from "../shared";
-import { cardCls, formatMoney, sectionTitleCls } from "../shared";
+import { cardCls, formatMoney, sectionTitleCls, usePurchaseList } from "../shared";
 import HandCoinsIcon from "@/components/icons/ui/HandCoinsIcon";
 import { kxInspectAttrs } from "@/lib/qa/inspector";
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
@@ -27,20 +26,8 @@ const APPLIES_LABEL: Record<string, string> = {
 };
 
 export default function ApprovalsModule({ t }: PurchaseModuleProps) {
-  const [rows, setRows] = useState<Rule[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      const res = await fetch("/api/purchase/list?resource=approvals", { credentials: "include" });
-      const data = (res.ok ? await res.json() : { rows: [] }) as { rows: Rule[] };
-      if (cancelled) return;
-      setRows(data.rows);
-      setLoading(false);
-    })();
-    return () => { cancelled = true; };
-  }, []);
+  const { data, loading } = usePurchaseList<{ rows: Rule[] }>("approvals");
+  const rows = data?.rows ?? [];
 
   if (loading) return <div className="h-full flex items-center justify-center text-[var(--text-dim)]"><SpinnerIcon size={20} /></div>;
 

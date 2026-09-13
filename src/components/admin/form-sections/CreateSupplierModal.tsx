@@ -5,7 +5,6 @@ import PlusIcon from "@/components/icons/ui/PlusIcon";
 import KdsSelect from "@/components/kds/Select";
 import TrashIcon from "@/components/icons/ui/TrashIcon";
 import AngleDownIcon from "@/components/icons/ui/AngleDownIcon";
-import SearchIcon from "@/components/icons/ui/SearchIcon";
 import PictureIcon from "@/components/icons/ui/PictureIcon";
 /* SYS-3 pattern: deep Country import (Turbopack doesn't tree-shake the
    package index — the full 8 MB city dataset would ride this chunk);

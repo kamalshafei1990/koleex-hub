@@ -20,7 +20,7 @@
    · Menu pills at the bottom — text + active state + "More ▾" overflow
    --------------------------------------------------------------------------- */
 
-import { useEffect, useMemo, useRef, useState, isValidElement, type FormEvent, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, isValidElement, type FormEvent, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import RrIcon, { type RrIconName } from "@/components/ui/RrIcon";
@@ -59,6 +59,12 @@ export interface PageHeaderProps {
    *  "Hub". Set it when the parent is a specific record — "Quotation #1042" —
    *  so the control answers "back to what?" instead of just "back". */
   backLabel?: string;
+  /** Run instead of navigating. For screens whose back is GUARDED — a form
+   *  that must warn about unsaved changes cannot hand its exit to a plain
+   *  <Link>, and that single gap is why every wizard in the Hub hand-rolled
+   *  its own header instead of using this one. The control keeps the exact
+   *  same chrome either way; only the element changes. */
+  onBack?: () => void;
   action?: ReactNode;
   controls?: ReactNode;
   meta?: ReactNode;
@@ -83,6 +89,13 @@ function parentPath(pathname: string): string {
   return trimmed.slice(0, idx);
 }
 
+/* Exported so a screen that deliberately does NOT take the full hero still
+   wears the same back control. Product Data's record view is the case: its
+   identity strip is slim on purpose, to keep the tabs from being pushed down
+   the page, but "slim" was never a reason for a different-looking control. */
+export const BACK_CHROME =
+  "kx-ph-chrome flex h-8 shrink-0 items-center justify-center gap-1.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-2.5 text-[var(--text-dim)] transition-all duration-200 hover:border-[var(--border-color)] hover:bg-[var(--bg-surface-hover)] hover:text-[var(--text-primary)] sm:h-10 sm:rounded-xl sm:px-3 sm:hover:-translate-y-0.5";
+
 export default function PageHeader({
   title,
   titleNode,
@@ -90,6 +103,7 @@ export default function PageHeader({
   icon,
   backHref,
   backLabel,
+  onBack,
   action,
   controls,
   meta,
@@ -213,14 +227,30 @@ export default function PageHeader({
               beside it must not be squeezed; there it is the wider arrow (BK-2)
               instead. `backLabel` lets a caller name a real parent
               ("Quotation #1042"); the default is the Hub. */}
-          <Link
-            href={resolvedBackHref}
-            aria-label={backLabel ? `Back to ${backLabel}` : "Back"}
-            className="kx-ph-chrome flex h-8 shrink-0 items-center justify-center gap-1.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-2.5 text-[var(--text-dim)] transition-all duration-200 hover:border-[var(--border-color)] hover:bg-[var(--bg-surface-hover)] hover:text-[var(--text-primary)] sm:h-10 sm:rounded-xl sm:px-3 sm:hover:-translate-y-0.5"
-          >
-            <RrIcon name="arrow-left" size={14} />
-            <span className="hidden text-[12px] font-medium sm:inline">{backLabel ?? "Hub"}</span>
-          </Link>
+          {/* The class string is written ONCE and worn by whichever element
+              this screen needs — a link when back is a destination, a button
+              when it is a decision. Duplicating it per branch is how the two
+              would drift apart. */}
+          {onBack ? (
+            <button
+              type="button"
+              onClick={onBack}
+              aria-label={backLabel ? `Back to ${backLabel}` : "Back"}
+              className={BACK_CHROME}
+            >
+              <RrIcon name="arrow-left" size={14} />
+              <span className="hidden text-[12px] font-medium sm:inline">{backLabel ?? "Hub"}</span>
+            </button>
+          ) : (
+            <Link
+              href={resolvedBackHref}
+              aria-label={backLabel ? `Back to ${backLabel}` : "Back"}
+              className={BACK_CHROME}
+            >
+              <RrIcon name="arrow-left" size={14} />
+              <span className="hidden text-[12px] font-medium sm:inline">{backLabel ?? "Hub"}</span>
+            </Link>
+          )}
           {/* NO kx-ph-chrome HERE. This is the app-icon chip: a plain div with
               no href and no handler, sitting next to a back LINK that wears
               the identical box. It was carrying the chrome recipe anyway, so
@@ -411,6 +441,7 @@ function SlidingPillNav({
 }) {
   const [tabWidth, setTabWidth] = useState<number>(TAB_WIDTH_LG);
   const trackRef = useRef<HTMLDivElement>(null);
+  const router = useRouter();
   /* No scroll-arrow buttons: they were removed at Kamal's request (they read
      as clutter sitting on top of the rail). The track still scrolls by swipe,
      trackpad and shift-wheel, arrow keys still move focus between tabs, and
@@ -433,6 +464,115 @@ function SlidingPillNav({
     0,
     tabs.findIndex((t) => (t.active ?? (t.key === activeKey))),
   );
+
+  /* ── The gliding pill ────────────────────────────────────────────────
+     Measured in the TRACK's own coordinates (offsetLeft scrolls with the
+     tabs, so the pill stays under its tab while the bar scrolls). Null
+     until measured, and the first placement jumps rather than animating —
+     otherwise the pill streaks in from x=0 on every page load. */
+  const pillRef = useRef<HTMLSpanElement>(null);
+  const firstPlaceRef = useRef(true);
+  const trackWidthRef = useRef(-1);
+
+  /* ── PULL EVERY TAB'S ROUTE INTO THE ROUTER CACHE UP FRONT ─────────────
+     The warm data cache made these screens paint instantly and the owner
+     still saw a loading sign, because the thing on screen was not our
+     spinner: it was the segment's `loading.tsx` skeleton, and it shows
+     whenever a navigation has to go and FETCH the route. Data being ready
+     cannot help — the boundary renders before the page component mounts.
+
+     A tab bar is the one place where the next destination is known in
+     advance and is almost certainly where the user is going, so there is no
+     reason to wait for a click to find out. Prefetching all of them puts
+     the routes in the cache while the operator is still reading the page,
+     and the navigation then has nothing to suspend on.
+
+     NOT ALL OF THEM, THOUGH. A fourteen-tab strip would fire fourteen route
+     fetches on every app open, and on this network each request is most of a
+     second — spending the operator's bandwidth on thirteen screens they are
+     not looking at to save one they might. So: the two NEIGHBOURS after idle,
+     since a tab bar is mostly walked sideways, and anything else the moment
+     the cursor lands on it. Hover precedes a click by a few hundred
+     milliseconds, which is the whole fetch.
+
+     Measured in development: no prefetch request fires for a tab until it is
+     clicked, and router.prefetch here produces none either. That is Next's
+     own behaviour — prefetching is DISABLED in dev — so this earns its keep
+     only in production, and the route skeleton will keep appearing on
+     localhost no matter what we do here. */
+  const prefetched = useRef(new Set<string>());
+  const warmRoute = useCallback((href: string) => {
+    if (!href.startsWith("/") || prefetched.current.has(href)) return;
+    prefetched.current.add(href);
+    router.prefetch(href);
+  }, [router]);
+
+  useEffect(() => {
+    const t = window.setTimeout(() => {
+      for (const i of [activeIndex - 1, activeIndex + 1]) {
+        const href = tabs[i]?.key;
+        if (href) warmRoute(href);
+      }
+    }, 600);
+    return () => window.clearTimeout(t);
+  }, [tabs, activeIndex, warmRoute]);
+
+  /* Written straight onto the node rather than held in state. Geometry read
+     from the DOM can only be measured after layout, and pushing it back
+     through state costs an extra render of the whole header on every tab
+     change to say something the element could have been told directly.
+     `instant` suppresses the transition for placements that must not read as
+     movement — the first one, and relayouts. The attribute and the styles
+     land in the same style pass, so `transition: none` is already in force
+     when the new geometry is computed and nothing animates. */
+  const placePill = useCallback((instant: boolean) => {
+    const el = trackRef.current?.querySelectorAll<HTMLElement>('[role="tab"]')[activeIndex];
+    const p = pillRef.current;
+    if (!el || !p) return;
+    if (instant) p.setAttribute("data-kx-instant", "1");
+    p.style.transform = `translateX(${el.offsetLeft}px)`;
+    p.style.width = `${el.offsetWidth}px`;
+    p.style.opacity = "1";
+    if (instant) requestAnimationFrame(() => p.removeAttribute("data-kx-instant"));
+  }, [activeIndex]);
+
+  /* Selection changed — this is the move that should GLIDE. The very first
+     placement jumps: an unmeasured pill gliding in from x=0 would streak
+     across the whole bar on load. */
+  useLayoutEffect(() => {
+    placePill(firstPlaceRef.current);
+    firstPlaceRef.current = false;
+  }, [placePill, tabs.length, tabWidth]);
+
+  /* THE RESIZE WATCHER IS MOUNTED ONCE AND ONLY REACTS TO A REAL WIDTH
+     CHANGE. Both halves matter, and getting either wrong kills the glide
+     silently: a ResizeObserver fires an initial callback the moment it
+     observes, so an observer re-created on every selection change re-armed
+     the no-animation flag mid-flight and the pill teleported. It measured as
+     a running transition and looked like a jump. */
+  useEffect(() => {
+    const track = trackRef.current;
+    if (!track) return;
+    trackWidthRef.current = track.clientWidth;
+    const ro = new ResizeObserver(() => {
+      const w = track.clientWidth;
+      if (w === trackWidthRef.current) return;
+      trackWidthRef.current = w;
+      /* A relayout must not send the pill gliding across the bar — dragging
+         a window edge would look like the selection was moving. */
+      placePill(true);
+    });
+    ro.observe(track);
+    return () => ro.disconnect();
+  }, [placePill]);
+
+  /* Fonts settling after hydration shift label widths once; re-place a beat
+     later so the pill never sits a few px off its tab — without animating,
+     because a few pixels of drift is a correction, not a move. */
+  useEffect(() => {
+    const t = window.setTimeout(() => placePill(true), 250);
+    return () => window.clearTimeout(t);
+  }, [placePill]);
 
   /* Scroll the active pill into view ONLY when it changes AND is currently
      off-screen. Two guards stop the auto-scroll from fighting the user:
@@ -604,15 +744,27 @@ function SlidingPillNav({
       // brand-minimal aesthetic.
       className="kx-ph-tabs relative inline-flex max-w-full items-center gap-1 overflow-x-auto rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] px-1.5 py-1.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
     >
+      {/* The moving fill. It carries the active background that used to sit
+          on the tab itself, which is why the tabs below only carry colour. */}
+      <span
+        ref={pillRef}
+        aria-hidden
+        className="kx-ph-pill"
+        data-kx-instant="1"
+        style={{ opacity: 0, width: 0 }}
+      />
       {tabs.map((tab, i) => {
         const isActive = i === activeIndex;
-        /* Canonical TabStrip pill: auto-width, per-button filled active.
-           (Matches src/components/ui/TabStrip.tsx so every tab bar in the
-           system looks identical.) */
+        /* Canonical TabStrip pill: auto-width, filled active — except the
+           fill is the ONE gliding element above, not a background per tab.
+           The label colour still cross-fades, and it is retimed to the
+           pill's own curve: at Tailwind's 150ms default the text flipped to
+           inverted well before the fill arrived under it, which read as a
+           flicker on the destination tab. */
         const tabClass =
-          "relative z-10 inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg px-3.5 py-1.5 text-[12.5px] font-medium outline-none transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--border-focus)] " +
+          "relative z-10 inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg px-3.5 py-1.5 text-[12.5px] font-medium outline-none transition-colors [transition-duration:var(--kx-dur-slow,320ms)] [transition-timing-function:var(--kx-ease-glide,cubic-bezier(0.32,0.72,0,1))] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--border-focus)] " +
           (isActive
-            ? "bg-[var(--bg-inverted)] text-[var(--text-inverted)]"
+            ? "text-[var(--text-inverted)]"
             : "text-[var(--text-muted)] hover:bg-[var(--bg-surface-subtle)] hover:text-[var(--text-primary)]");
         const inner = (
           <>
@@ -645,6 +797,12 @@ function SlidingPillNav({
              of the viewport when the user finishes a swipe. */
           style: { scrollSnapAlign: "start" as const },
           className: tabClass,
+          /* Intent, not clairvoyance: the cursor arriving is the cheapest
+             honest signal that this tab is next, and it lands a few hundred
+             milliseconds before the click — enough to have the route in hand
+             by then. Focus counts too, for keyboard users. */
+          onPointerEnter: () => warmRoute(tab.key),
+          onFocus: () => warmRoute(tab.key),
         };
         if (tab.onClick) {
           return (

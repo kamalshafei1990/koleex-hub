@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import AngleDownIcon from "@/components/icons/ui/AngleDownIcon";
+import Collapse from "@/components/ui/Collapse";
 
 /* KDS CollapsibleSection — ELECTED AC-2 by owner 2026-08-02 (Suppliers
    style): rounded-2xl card, tinted header strip with icon chip, a
@@ -48,7 +49,9 @@ export default function CollapsibleSection({
           <AngleDownIcon className={`h-4 w-4 text-[var(--text-faint)] transition-transform ${open ? "" : "-rotate-90 rtl:rotate-90"}`} />
         </span>
       </button>
-      {open && <div className="px-4 md:px-5 py-4">{children}</div>}
+      <Collapse open={open} className="px-4 md:px-5 py-4">
+        {children}
+      </Collapse>
     </div>
   );
 }

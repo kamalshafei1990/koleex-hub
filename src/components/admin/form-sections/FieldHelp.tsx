@@ -9,6 +9,7 @@
    --------------------------------------------------------------------------- */
 
 import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 
 export function FieldHelp({ en, zh }: { en: string; zh: string }) {
   const [rect, setRect] = useState<DOMRect | null>(null);
@@ -49,7 +50,13 @@ function BilingualTip({ anchorRect, en, zh }: { anchorRect: DOMRect; en: string;
   if (typeof window !== "undefined" && top + 180 > window.innerHeight) {
     top = Math.max(8, anchorRect.top - 180 - margin);
   }
-  return (
+  /* PORTALLED to <body> — the owner caught the tip rendering at the top of
+     the card instead of at the chip. The chip lives inside a .kx-glass form
+     card whose backdrop-filter makes the CARD the containing block for
+     position:fixed, so viewport coordinates landed relative to the card
+     (same MN-5 lesson as the AI chat-row menu). Outside the card, fixed
+     means the viewport again and the glass material can actually blur. */
+  return createPortal(
     <span
       role="tooltip"
       dir="ltr"
@@ -60,7 +67,8 @@ function BilingualTip({ anchorRect, en, zh }: { anchorRect: DOMRect; en: string;
       <span className="block mb-2">{en}</span>
       <span className="block text-[9px] font-bold tracking-widest text-white/55 mb-0.5">中文</span>
       <span className="block">{zh}</span>
-    </span>
+    </span>,
+    document.body,
   );
 }
 

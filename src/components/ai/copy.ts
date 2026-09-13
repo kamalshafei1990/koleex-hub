@@ -1,0 +1,554 @@
+/* ---------------------------------------------------------------------------
+   components/ai/copy — the Koleex AI client's localised strings.
+
+   Phase 2J, moved verbatim from KoleexAiApp.tsx. A frozen data table with no
+   logic, which is why it is the second safe cut: nothing here can behave
+   differently in a new file.
+
+   EN / ZH / AR in one place so a string added for one language is visibly
+   missing for the others — the type `Record<Lang, …>` makes that a compile
+   error rather than a blank label discovered by a user.
+   --------------------------------------------------------------------------- */
+
+import { type Lang } from "@/lib/i18n";
+
+/* ── Localised copy ── */
+export const COPY: Record<Lang, {
+  newChat: string;
+  placeholder: string;
+  welcomeTitle: string;
+  welcomeSub: string;
+  thinking: string;
+  noChats: string;
+  today: string;
+  yesterday: string;
+  previous7: string;
+  previous30: string;
+  earlier: string;
+  delete: string;
+  rename: string;
+  confirmDelete: string;
+  renamePrompt: string;
+  footer: string;
+  stopped: string;
+  summaryWriting: string;
+  dropHere: string;
+  recommended: string;
+  orTypeYourOwn: string;
+  otherOption: string;
+  otherPlaceholder: string;
+  otherSend: string;
+  searchChats: string;
+  noSearchResults: string;
+  /* Chrome and attachment words that were English literals inside Arabic and
+     Chinese screens (audit, 2026-09-11). `removeFile` carries a {name} slot. */
+  openSidebar: string;
+  removeFile: string;
+  uploading: string;
+  attachUnreadableImage: string;
+  attachNoText: string;
+  attachTooLarge: string;
+  attachUnsupported: string;
+  /** The server refused the turn as too long (413). */
+  messageTooLong: string;
+  /** Shown above the composer while the device reports no network. */
+  offline: string;
+  /** The last call was cut by the page dying under it: one tap continues. */
+  callCutOff: string;
+  continueCall: string;
+  dismiss: string;
+  /* Projects + pinning */
+  projects: string;
+  newProject: string;
+  editProject: string;
+  projectName: string;
+  projectIcon: string;
+  projectColor: string;
+  deleteProject: string;
+  confirmDeleteProject: string;
+  emptyProject: string;
+  pin: string;
+  unpin: string;
+  pinned: string;
+  moveTo: string;
+  noProject: string;
+  more: string;
+  recents: string;
+  /* Roadmap C3 — the picture gallery. */
+  library: string;
+  libraryEmpty: string;
+  openChat: string;
+  /* Roadmap D2 — past calls by their summaries. */
+  calls: string;
+  callsEmpty: string;
+  /* Roadmap D5 — one chat as a printable page. */
+  exportChat: string;
+  back: string;
+  seeMore: string;
+  seeLess: string;
+  webSearchOn: string;
+  webSearchOff: string;
+  save: string;
+  cancel: string;
+  /* ── CONTROL LABELS ────────────────────────────────────────────────────
+     Every one of these was a hardcoded English literal sitting inside an
+     `aria-label` or a `title`, in a product whose every visible word is
+     translated. Two different people were getting an English interface: a
+     screen-reader user on Arabic heard "Regenerate response" in the middle
+     of an Arabic conversation, and — because `title` is a tooltip, not an
+     accessibility affordance — EVERY Arabic and Chinese user saw English
+     the moment they hovered a toolbar button.
+
+     They were not missing because there was no system for them. The system
+     is this file; they simply never got added to it. */
+  readAloud: string;
+  regenerate: string;
+  goodResponse: string;
+  badResponse: string;
+  messageActions: string;
+  editAndRetry: string;
+  saveAndRetry: string;
+  cancelEdit: string;
+  emojiPicker: string;
+  searchEmoji: string;
+  closeSidebar: string;
+  collapseSidebar: string;
+  expandSidebar: string;
+  aiKnowledge: string;
+  /* Sidebar link to Settings → Koleex AI. */
+  personalize: string;
+  backToHub: string;
+  jumpToLatest: string;
+  attachFile: string;
+  searchWeb: string;
+  stopGenerating: string;
+  send: string;
+  /* The composer and the edit box have no visible label — a placeholder is
+     not one, and it disappears the moment anyone types. */
+  composerLabel: string;
+  editMessageLabel: string;
+  /* `thinking` is the words on screen; this is what a screen reader
+     announces for the same state, which needs a subject to make sense. */
+  thinkingAria: string;
+  /* THE EMOJI PICKER'S CATEGORY NAMES, keyed by the id in emojiData.
+     They live here rather than in that file because emojiData is 700 lines
+     of emoji and adding three languages to every category row would bury
+     the eight strings that actually need translating. */
+  emojiCategories: Record<string, string>;
+  insertEmoji: string;
+  /** The mark on a message that was spoken on a call rather than typed. */
+  voiceMessage: string;
+  /* Audit 2026-09-07: every string a person could READ was English on the
+     Arabic and Chinese screens — the attached-file default question (which
+     lands in the user's own bubble and in the database), the errors, the
+     small controls. Each is a key now, so a missing language is a compile
+     error rather than an English surprise. */
+  attachDefaultPrompt: string;
+  latest: string;
+  copied: string;
+  copyMessage: string;
+  copyCode: string;
+  codeLabel: string;
+  closePhoto: string;
+  loadFailed: string;
+  retry: string;
+  supportedFiles: string;
+  /** Template: {name}, {size}, {cap}, {kind}. */
+  fileTooLarge: string;
+  kindImages: string;
+  kindDocuments: string;
+  attachError: string;
+  attachNothingRead: string;
+  noReply: string;
+  aiUnavailable: string;
+  couldNotStartChat: string;
+  editShort: string;
+  draftNeedsApproval: string;
+  draftLabel: string;
+  /** Templates: {n}. */
+  lineOne: string;
+  linesCount: string;
+  reviewInQuotations: string;
+  prompts: string[];
+}> = {
+  en: {
+    newChat: "New chat",
+    placeholder: "Ask Koleex AI…",
+    welcomeTitle: "Hi",
+    welcomeSub: "What's on your mind? I'm Koleex AI — ask me anything, big or small.",
+    thinking: "Thinking…",
+    noChats: "No chats yet",
+    today: "Today",
+    yesterday: "Yesterday",
+    previous7: "Previous 7 days",
+    previous30: "Previous 30 days",
+    earlier: "Earlier",
+    delete: "Delete",
+    rename: "Rename",
+    confirmDelete: "Delete this conversation?",
+    renamePrompt: "New title",
+    footer: "Koleex AI — Powered by Koleex Technology Systems",
+    stopped: "Stopped",
+    summaryWriting: "Writing the call summary…",
+    dropHere: "Drop files to attach",
+    recommended: "Recommended",
+    orTypeYourOwn: "Or type your own answer below.",
+    otherOption: "Something else",
+    otherPlaceholder: "Tell me what you mean…",
+    otherSend: "Send",
+    searchChats: "Search chats…",
+    noSearchResults: "No chats match your search.",
+    openSidebar: "Open sidebar",
+    removeFile: "Remove {name}",
+    uploading: "Uploading",
+    attachUnreadableImage: "couldn't read this image — try a sharper photo",
+    attachNoText: "no readable text found",
+    attachTooLarge: "over the size limit (15MB images / 200MB documents)",
+    attachUnsupported: "file type not supported",
+    messageTooLong: "That message is too long for one turn. Split it, or attach it as a file.",
+    offline: "You're offline — your message will be sent when you're back.",
+    callCutOff: "The last call was cut off — the app was interrupted.",
+    continueCall: "Continue the call",
+    dismiss: "Dismiss",
+    projects: "Projects",
+    newProject: "New project",
+    editProject: "Edit project",
+    projectName: "Project name",
+    projectIcon: "Icon",
+    projectColor: "Colour",
+    deleteProject: "Delete project",
+    confirmDeleteProject:
+      "Delete this project? Its chats stay — they move back to the main list.",
+    emptyProject: "No chats in here yet",
+    pin: "Pin",
+    unpin: "Unpin",
+    pinned: "Pinned",
+    moveTo: "Move to",
+    noProject: "No project",
+    more: "More",
+    recents: "Recents",
+    library: "Library",
+    libraryEmpty: "No pictures yet. Pictures from your chats will appear here.",
+    openChat: "Open chat",
+    calls: "Calls",
+    callsEmpty: "No calls yet. When a call ends with a real exchange, its summary will appear here.",
+    exportChat: "Export / print",
+    back: "Back",
+    seeMore: "See more",
+    seeLess: "See less",
+    webSearchOn: "Web search: on",
+    webSearchOff: "Web search: off",
+    save: "Save",
+    cancel: "Cancel",
+    readAloud: "Read aloud",
+    regenerate: "Regenerate response",
+    goodResponse: "Good response",
+    badResponse: "Bad response",
+    messageActions: "Message actions",
+    editAndRetry: "Edit and retry",
+    saveAndRetry: "Save and retry",
+    cancelEdit: "Cancel edit",
+    emojiPicker: "Emoji picker",
+    searchEmoji: "Search emoji",
+    closeSidebar: "Close sidebar",
+    collapseSidebar: "Collapse sidebar",
+    expandSidebar: "Expand sidebar",
+    aiKnowledge: "AI Knowledge",
+    personalize: "Personalize Koleex AI",
+    backToHub: "Back to Hub",
+    jumpToLatest: "Jump to latest",
+    attachFile: "Attach file",
+    searchWeb: "Search the web",
+    stopGenerating: "Stop generating",
+    send: "Send",
+    composerLabel: "Message Koleex AI",
+    editMessageLabel: "Edit your message",
+    thinkingAria: "Koleex AI is thinking",
+    emojiCategories: { smileys: "Smileys & People", nature: "Animals & Nature", food: "Food & Drink", activity: "Activity", travel: "Travel & Places", objects: "Objects", symbols: "Symbols", flags: "Flags" },
+    insertEmoji: "Insert",
+    voiceMessage: "Spoken on a call",
+    attachDefaultPrompt: "Please read the attached file(s) and give me the key points.",
+    latest: "Latest",
+    copied: "Copied",
+    copyMessage: "Copy message",
+    copyCode: "Copy code",
+    codeLabel: "code",
+    closePhoto: "Close photo",
+    loadFailed: "Couldn't load this right now. Check your connection and try again.",
+    retry: "Try again",
+    supportedFiles: "Supported files: images, PDF, Excel, TXT, MD, CSV, JSON.",
+    fileTooLarge: "{name} is {size}MB — the limit is {cap}MB for {kind}.",
+    kindImages: "images",
+    kindDocuments: "documents",
+    attachError: "Couldn't process the attachment(s)",
+    attachNothingRead: "Couldn't read the attachment(s).",
+    noReply: "No reply was received.",
+    aiUnavailable: "Koleex AI is unavailable right now.",
+    couldNotStartChat: "Couldn't start a new chat.",
+    editShort: "Edit",
+    draftNeedsApproval: "Draft · needs approval",
+    draftLabel: "Draft",
+    lineOne: "{n} line",
+    linesCount: "{n} lines",
+    reviewInQuotations: "Review in Quotations →",
+    prompts: [
+      "What's a good way to start my day at work?",
+      "Help me write a polite reply to a customer email.",
+      "Explain how pricing bands generally work.",
+      "Translate to Chinese: Please confirm delivery by Friday.",
+    ],
+  },
+  zh: {
+    newChat: "新建对话",
+    placeholder: "向 Koleex AI 提问…",
+    welcomeTitle: "你好",
+    welcomeSub: "想聊点什么？我是 Koleex AI — 大事小事都可以问我。",
+    thinking: "思考中…",
+    noChats: "还没有对话",
+    today: "今天",
+    yesterday: "昨天",
+    previous7: "过去 7 天",
+    previous30: "过去 30 天",
+    earlier: "更早",
+    delete: "删除",
+    rename: "重命名",
+    confirmDelete: "删除这个对话？",
+    renamePrompt: "新标题",
+    footer: "Koleex AI — 由 Koleex 技术系统驱动",
+    stopped: "已停止",
+    summaryWriting: "正在整理通话摘要…",
+    dropHere: "拖放文件以附加",
+    recommended: "推荐",
+    orTypeYourOwn: "或在下方输入你自己的答案。",
+    otherOption: "其他",
+    otherPlaceholder: "请说明你的意思…",
+    otherSend: "发送",
+    searchChats: "搜索对话…",
+    noSearchResults: "没有匹配的对话。",
+    openSidebar: "打开侧边栏",
+    removeFile: "移除 {name}",
+    uploading: "正在上传",
+    attachUnreadableImage: "无法识别这张图片——请换一张更清晰的照片",
+    attachNoText: "没有找到可读取的文字",
+    attachTooLarge: "超过大小限制（图片 15MB / 文档 200MB）",
+    attachUnsupported: "不支持的文件类型",
+    messageTooLong: "这条消息太长了，请分成几条发送，或作为文件附上。",
+    offline: "当前离线——恢复连接后会自动发送。",
+    callCutOff: "上一次通话被打断了——应用被中断。",
+    continueCall: "继续通话",
+    dismiss: "关闭",
+    projects: "项目",
+    newProject: "新建项目",
+    editProject: "编辑项目",
+    projectName: "项目名称",
+    projectIcon: "图标",
+    projectColor: "颜色",
+    deleteProject: "删除项目",
+    confirmDeleteProject: "删除这个项目？其中的对话会保留，并移回主列表。",
+    emptyProject: "这里还没有对话",
+    pin: "置顶",
+    unpin: "取消置顶",
+    pinned: "已置顶",
+    moveTo: "移动到",
+    noProject: "无项目",
+    more: "更多",
+    recents: "最近",
+    library: "图库",
+    libraryEmpty: "还没有图片。聊天中出现的图片会显示在这里。",
+    openChat: "打开对话",
+    calls: "通话",
+    callsEmpty: "还没有通话。通话结束后，摘要会显示在这里。",
+    exportChat: "导出 / 打印",
+    back: "返回",
+    seeMore: "查看更多",
+    seeLess: "收起",
+    webSearchOn: "联网搜索：开",
+    webSearchOff: "联网搜索：关",
+    save: "保存",
+    cancel: "取消",
+    readAloud: "朗读",
+    regenerate: "重新生成回答",
+    goodResponse: "回答很好",
+    badResponse: "回答不佳",
+    messageActions: "消息操作",
+    editAndRetry: "编辑并重新发送",
+    saveAndRetry: "保存并重新发送",
+    cancelEdit: "取消编辑",
+    emojiPicker: "表情选择器",
+    searchEmoji: "搜索表情",
+    closeSidebar: "关闭侧边栏",
+    collapseSidebar: "收起侧边栏",
+    expandSidebar: "展开侧边栏",
+    aiKnowledge: "AI 知识库",
+    personalize: "个性化 Koleex AI",
+    backToHub: "返回 Hub",
+    jumpToLatest: "跳到最新",
+    attachFile: "添加文件",
+    searchWeb: "联网搜索",
+    stopGenerating: "停止生成",
+    send: "发送",
+    composerLabel: "给 Koleex AI 发送消息",
+    editMessageLabel: "编辑你的消息",
+    thinkingAria: "Koleex AI 正在思考",
+    emojiCategories: { smileys: "笑脸与人物", nature: "动物与自然", food: "食物与饮料", activity: "活动", travel: "旅行与地点", objects: "物品", symbols: "符号", flags: "旗帜" },
+    insertEmoji: "插入",
+    voiceMessage: "通话中所说",
+    attachDefaultPrompt: "请阅读附件并告诉我要点。",
+    latest: "最新",
+    copied: "已复制",
+    copyMessage: "复制消息",
+    copyCode: "复制代码",
+    codeLabel: "代码",
+    closePhoto: "关闭图片",
+    loadFailed: "现在加载不了，请检查网络后再试。",
+    retry: "重试",
+    supportedFiles: "支持的文件：图片、PDF、Excel、TXT、MD、CSV、JSON。",
+    fileTooLarge: "{name} 有 {size}MB，{kind}的上限是 {cap}MB。",
+    kindImages: "图片",
+    kindDocuments: "文档",
+    attachError: "附件处理失败",
+    attachNothingRead: "读不了这个附件。",
+    noReply: "没有收到回复。",
+    aiUnavailable: "Koleex AI 现在暂时不可用。",
+    couldNotStartChat: "无法开始新对话。",
+    editShort: "编辑",
+    draftNeedsApproval: "草稿 · 待审批",
+    draftLabel: "草稿",
+    lineOne: "{n} 行",
+    linesCount: "{n} 行",
+    reviewInQuotations: "在报价中查看 →",
+    prompts: [
+      "早上开始工作的好方法是什么？",
+      "帮我给客户写一封礼貌的回复邮件。",
+      "简单解释一下价格区间是怎么运作的。",
+      "翻译成英文：请在周五前确认交货。",
+    ],
+  },
+  ar: {
+    newChat: "محادثة جديدة",
+    placeholder: "اسأل Koleex AI…",
+    welcomeTitle: "مرحبًا",
+    welcomeSub: "في إيه في دماغك؟ أنا Koleex AI — اسألني أي حاجة، صغيرة ولا كبيرة.",
+    thinking: "بفكّر…",
+    noChats: "مفيش محادثات لسه",
+    today: "اليوم",
+    yesterday: "أمس",
+    previous7: "آخر 7 أيام",
+    previous30: "آخر 30 يومًا",
+    earlier: "قبل ذلك",
+    delete: "حذف",
+    rename: "غيّر الاسم",
+    confirmDelete: "تمسح المحادثة دي؟",
+    renamePrompt: "عنوان جديد",
+    footer: "Koleex AI — بدعم من أنظمة Koleex التقنية",
+    stopped: "تم الإيقاف",
+    summaryWriting: "بكتب ملخص المكالمة…",
+    dropHere: "أفلت الملفات لإرفاقها",
+    recommended: "موصى به",
+    orTypeYourOwn: "أو اكتب إجابتك بنفسك في الأسفل.",
+    otherOption: "حاجة تانية",
+    otherPlaceholder: "اكتبلي قصدك إيه…",
+    otherSend: "ابعت",
+    searchChats: "ابحث في المحادثات…",
+    noSearchResults: "مفيش محادثات مطابقة للبحث.",
+    openSidebar: "افتح الشريط الجانبي",
+    removeFile: "شيل {name}",
+    uploading: "جارٍ رفع",
+    attachUnreadableImage: "مقدرناش نقرا الصورة دي — جرّب صورة أوضح",
+    attachNoText: "مفيش نص مقروء في الملف",
+    attachTooLarge: "أكبر من الحد المسموح (15MB للصور / 200MB للملفات)",
+    attachUnsupported: "نوع الملف مش مدعوم",
+    messageTooLong: "الرسالة دي طويلة أوي على مرة واحدة. قسّمها أو ارفعها كملف.",
+    offline: "مفيش نت دلوقتي — رسالتك هتتبعت أول ما ترجع.",
+    callCutOff: "المكالمة اللي فاتت اتقطعت — الأبلكيشن اتقفل من غيرك.",
+    continueCall: "كمّل المكالمة",
+    dismiss: "إخفاء",
+    projects: "المشاريع",
+    newProject: "مشروع جديد",
+    editProject: "تعديل المشروع",
+    projectName: "اسم المشروع",
+    projectIcon: "الأيقونة",
+    projectColor: "اللون",
+    deleteProject: "حذف المشروع",
+    confirmDeleteProject:
+      "تمسح المشروع ده؟ محادثاته هتفضل موجودة — وهترجع للقائمة الرئيسية.",
+    emptyProject: "مفيش محادثات هنا لسه",
+    pin: "تثبيت",
+    unpin: "إلغاء التثبيت",
+    pinned: "مثبّتة",
+    moveTo: "نقل إلى",
+    noProject: "بدون مشروع",
+    more: "المزيد",
+    recents: "الأحدث",
+    library: "المكتبة",
+    libraryEmpty: "مفيش صور لسه. الصور اللي ظهرت في محادثاتك هتتجمع هنا.",
+    openChat: "افتح المحادثة",
+    calls: "المكالمات",
+    callsEmpty: "مفيش مكالمات لسه. لما مكالمة تخلص بكلام حقيقي، ملخصها هيظهر هنا.",
+    exportChat: "تصدير / طباعة",
+    back: "رجوع",
+    seeMore: "عرض المزيد",
+    seeLess: "عرض أقل",
+    webSearchOn: "البحث في الويب: مفعّل",
+    webSearchOff: "البحث في الويب: متوقّف",
+    save: "حفظ",
+    cancel: "إلغاء",
+    readAloud: "اسمع الرد",
+    regenerate: "رد تاني",
+    goodResponse: "إجابة جيدة",
+    badResponse: "إجابة سيئة",
+    messageActions: "إجراءات الرسالة",
+    editAndRetry: "عدّل وابعت تاني",
+    saveAndRetry: "احفظ وابعت تاني",
+    cancelEdit: "إلغاء التعديل",
+    emojiPicker: "اختيار الرموز",
+    searchEmoji: "ابحث عن رمز",
+    closeSidebar: "إغلاق الشريط الجانبي",
+    collapseSidebar: "طيّ الشريط الجانبي",
+    expandSidebar: "توسيع الشريط الجانبي",
+    aiKnowledge: "معرفة Koleex AI",
+    personalize: "تخصيص Koleex AI",
+    backToHub: "العودة إلى Hub",
+    jumpToLatest: "الانتقال إلى الأحدث",
+    attachFile: "إرفاق ملف",
+    searchWeb: "البحث في الويب",
+    stopGenerating: "إيقاف التوليد",
+    send: "إرسال",
+    composerLabel: "اكتب رسالة إلى Koleex AI",
+    editMessageLabel: "تعديل رسالتك",
+    thinkingAria: "Koleex AI يفكّر",
+    emojiCategories: { smileys: "الوجوه والأشخاص", nature: "الحيوانات والطبيعة", food: "الطعام والشراب", activity: "الأنشطة", travel: "السفر والأماكن", objects: "الأشياء", symbols: "الرموز", flags: "الأعلام" },
+    insertEmoji: "إدراج",
+    voiceMessage: "اتقالت في مكالمة",
+    attachDefaultPrompt: "اقرا الملف المرفق وقولي أهم النقط.",
+    latest: "الأحدث",
+    copied: "اتنسخ",
+    copyMessage: "انسخ الرسالة",
+    copyCode: "انسخ الكود",
+    codeLabel: "كود",
+    closePhoto: "اقفل الصورة",
+    loadFailed: "مش قادرين نحمّل ده دلوقتي. اتأكد من النت وجرّب تاني.",
+    retry: "جرّب تاني",
+    supportedFiles: "الملفات المدعومة: صور، PDF، Excel، TXT، MD، CSV، JSON.",
+    fileTooLarge: "{name} حجمه {size}MB — الحد {cap}MB لـ{kind}.",
+    kindImages: "الصور",
+    kindDocuments: "المستندات",
+    attachError: "مقدرناش نقرا المرفق",
+    attachNothingRead: "مقدرناش نقرا المرفق.",
+    noReply: "مفيش رد وصل.",
+    aiUnavailable: "Koleex AI مش متاح دلوقتي.",
+    couldNotStartChat: "مقدرناش نبدأ محادثة جديدة.",
+    editShort: "تعديل",
+    draftNeedsApproval: "مسودة · محتاجة اعتماد",
+    draftLabel: "مسودة",
+    lineOne: "بند واحد",
+    linesCount: "{n} بنود",
+    reviewInQuotations: "افتحها في عروض الأسعار ←",
+    prompts: [
+      "ما طريقة جيدة لبدء يومي في العمل؟",
+      "ساعدني في كتابة رد مهذب على رسالة من عميل.",
+      "اشرح لي ببساطة كيف تعمل شرائح الأسعار.",
+      "ترجم إلى الإنجليزية: الرجاء تأكيد التسليم بحلول يوم الجمعة.",
+    ],
+  },
+};

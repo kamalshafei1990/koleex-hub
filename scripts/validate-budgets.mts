@@ -85,13 +85,27 @@ const ROUTE_BUDGETS: Record<string, { chunks: number; kbytes: number }> = {
   "ai": { chunks: 10, kbytes: 508 },
   "calendar": { chunks: 12, kbytes: 824 },
   "catalogs": { chunks: 15, kbytes: 1124 },
-  "commercial-policy": { chunks: 11, kbytes: 665 },
+  /* Re-measured 2026-08-21 after a chunk repack (11 → 8 chunks, 673 KB —
+     fewer, fatter chunks from unrelated shared-module churn; +5 KB tripped
+     the old line). Measured + headroom. */
+  "commercial-policy": { chunks: 9, kbytes: 700 },
+  /* Measured 9 chunks / 504 KB the day the app shipped, +12%. Sits with
+     contacts (508) and crm (514): almost all of it is the shared baseline,
+     which is the expected shape for one list plus one dialog. The CONTRACT
+     itself is not in this number — the paper lives on /contracts/[id],
+     which is a separate route with its own manifest. */
+  "contracts": { chunks: 10, kbytes: 564 },
   "contacts": { chunks: 10, kbytes: 508 },
   "crm": { chunks: 10, kbytes: 514 },
   "customers": { chunks: 10, kbytes: 515 },
   "database": { chunks: 11, kbytes: 549 },
   "discuss": { chunks: 10, kbytes: 508 },
   "documents": { chunks: 10, kbytes: 514 },
+  /* Measured 2026-08-20 TWICE — the widget-canvas demo is under active
+     development in a parallel session and grew 8→9 chunks within the hour
+     (498→508 KB). Budgeted at the second measurement + headroom; if it
+     trips again the owning session should set its own number. */
+  "dashboard": { chunks: 10, kbytes: 570 },
   "employees": { chunks: 12, kbytes: 851 },
   "expenses": { chunks: 13, kbytes: 722 },
   "finance": { chunks: 14, kbytes: 999 },
@@ -100,11 +114,25 @@ const ROUTE_BUDGETS: Record<string, { chunks: number; kbytes: number }> = {
   "inventory": { chunks: 13, kbytes: 675 },
   "invoices": { chunks: 8, kbytes: 520 },
   "issues": { chunks: 12, kbytes: 712 },
-  "knowledge": { chunks: 11, kbytes: 520 },
+  /* Re-measured 2026-08-24: 525 KB against a 520 budget. NOT drift — its
+     peers (ai, contacts, crm, customers, discuss, notes, planning) all sit at
+     497-502 KB, so the knowledge route genuinely carries ~24 KB of its own,
+     and 5 KB of that is new. The source is product-coding/data.ts, which went
+     12 KB -> 34 KB across CL-0026 and CL-0027. That growth is mandated: the
+     owner's standing rule is that every minted code is taught in the Knowledge
+     app, so this number rises every time the taxonomy does. Budgeted at
+     measured + 12%; it is the one route where headroom is expected to be
+     spent, and a jump far past 590 means something OTHER than codes arrived. */
+  "knowledge": { chunks: 11, kbytes: 590 },
   "landed-cost": { chunks: 11, kbytes: 577 },
   "management": { chunks: 12, kbytes: 983 },
   "markets": { chunks: 11, kbytes: 772 },
   "notes": { chunks: 10, kbytes: 513 },
+  /* Measured 8 chunks / 502 KB the day it shipped, +12%. Sits exactly with
+     customers (502) and suppliers (502): almost all of it is the shared
+     baseline, which is the expected shape — the app is one list and one
+     detail screen with no library of its own. */
+  "orders": { chunks: 10, kbytes: 562 },
   "planning": { chunks: 10, kbytes: 514 },
   "price-calculator": { chunks: 12, kbytes: 803 },
   "product-data": { chunks: 12, kbytes: 796 },
@@ -254,6 +282,56 @@ console.log("\nE. Warm-start seeding (no double layout)");
   !cardBody.includes("animate-pulse")
     ? ok("card reserves space without animating")
     : bad("card placeholder", "ProductCard contains animate-pulse — reserve the height, draw nothing");
+
+  /* ── The rule the whole Hub is held to, not just this one screen ────────
+     MEASURED ON PRODUCTION 2026-08-22, across the ten screens the owner
+     works in: a route COMMITS in 63-493ms, but its data does not settle
+     until 1.0-1.8s, because ONE api request costs 400-920ms on this network
+     path and a screen that waits for it renders nothing meanwhile. Request
+     count (2-10) and waterfall depth (1-3) were already fine, so there was
+     nothing left to batch — the only lever is to stop waiting.
+
+     Every mature list app had already reached that conclusion separately
+     (Products, To-do, Contacts, Customers, CRM, HR, Notes, Finance, Home
+     all warm-start from a stored snapshot). The two screens that felt slow,
+     Purchases and Inventory, were exactly the two that never got it.
+
+     So: an app landing screen may not open on a blocking spinner with no
+     warm path behind it. This lists the landing screens and asserts each
+     one either seeds from a snapshot or is honestly exempt. A NEW app added
+     without a warm start fails the build the day it lands, which is the
+     entire point of this file. */
+  const WARM_REQUIRED: Array<{ label: string; file: string }> = [
+    { label: "Purchases home",  file: "src/components/purchase/PurchaseHome.tsx" },
+    { label: "Inventory home",  file: "src/components/inventory/InventoryDashboard.tsx" },
+    { label: "Products list",   file: "src/components/admin/ProductList.tsx" },
+    { label: "To-do",           file: "src/app/todo/page.tsx" },
+    { label: "HR",              file: "src/components/hr/HRApp.tsx" },
+  ];
+  /* Any of the accepted spellings: the shared helper, or one of the
+     hand-rolled snapshot readers that predate it. */
+  const WARM_MARK = /useWarm\s*<|readWarm\s*<|readTodoSnap|readMetaCache|sessionStorage\.getItem|localStorage\.getItem/;
+  for (const s of WARM_REQUIRED) {
+    const p = path.join(ROOT, s.file);
+    if (!fs.existsSync(p)) { bad(`warm start: ${s.label}`, `${s.file} not found — did it move?`); continue; }
+    WARM_MARK.test(fs.readFileSync(p, "utf8"))
+      ? ok(`warm start: ${s.label}`)
+      : bad(`warm start: ${s.label}`,
+            `${s.file} opens on a cold fetch. A request costs 400-920ms here, so the screen ` +
+            `shows nothing for that long. Use useWarm/writeWarm from src/lib/warm-cache.ts ` +
+            `and DERIVE (fresh ?? warm) — do not seed state from storage in a useState initialiser.`);
+  }
+
+  /* The warm cache must stay inside the sign-out wipe. session-caches.ts
+     clears by prefix; a key invented outside `kx:` would survive a sign-out
+     and paint one tenant's numbers into another account's session. */
+  const wc = fs.readFileSync(path.join(ROOT, "src/lib/warm-cache.ts"), "utf8");
+  /^const PREFIX = "kx:/m.test(wc)
+    ? ok("warm cache is inside the sign-out wipe", "kx: prefix")
+    : bad("warm cache prefix", "warm-cache.ts must key under `kx:` — session-caches.ts wipes by that prefix on sign-out");
+  wc.includes("useSyncExternalStore")
+    ? ok("warm cache hydrates without a mismatch")
+    : bad("warm cache hydration", "reading storage during the first client render contradicts the server HTML — use useSyncExternalStore");
 }
 
 /* ── F. Aurora CSS: a state rule its own resting rule can outrank ──────────

@@ -121,7 +121,7 @@ const listMyProjects: ToolDef<
     const { data, error } = await q.order("updated_at", { ascending: false }).limit(limit);
     if (error) {
       console.error("[tool.listMyProjects]", error);
-      return { ok: false, permissionStatus: "denied", data: null, message: "Couldn't load your projects right now." };
+      return { ok: false, permissionStatus: "allowed", data: null, message: "Couldn't load your projects right now." };
     }
     const rows = (data ?? []) as Array<Record<string, unknown>>;
     return {
@@ -189,7 +189,7 @@ const listProjectTasks: ToolDef<
       .limit(limit);
     if (error) {
       console.error("[tool.listProjectTasks]", error);
-      return { ok: false, permissionStatus: "denied", data: null, message: "Couldn't load project tasks right now." };
+      return { ok: false, permissionStatus: "allowed", data: null, message: "Couldn't load project tasks right now." };
     }
     const rows = (data ?? []) as Array<Record<string, unknown>>;
     return {
@@ -234,8 +234,8 @@ const createProjectTask: ToolDef<
   handler: async (ctx, args): Promise<ToolResult<Record<string, unknown> | { preview: Record<string, unknown> }>> => {
     const projectId = String(args.project_id ?? "").trim();
     const title = String(args.title ?? "").trim();
-    if (!projectId) return { ok: false, permissionStatus: "denied", data: null, message: "Which project should the task go in? I can list your projects." };
-    if (!title) return { ok: false, permissionStatus: "denied", data: null, message: "What should the task be called?" };
+    if (!projectId) return { ok: false, permissionStatus: "allowed", data: null, message: "Which project should the task go in? I can list your projects." };
+    if (!title) return { ok: false, permissionStatus: "allowed", data: null, message: "What should the task be called?" };
     const priority = ["low", "normal", "high"].includes(String(args.priority)) ? String(args.priority) : "normal";
 
     // Verify the project is visible to this user (same scope as listMyProjects
@@ -250,7 +250,7 @@ const createProjectTask: ToolDef<
       projQ = projQ.or(orParts.join(","));
     }
     const { data: proj } = await projQ.maybeSingle();
-    if (!proj) return { ok: false, permissionStatus: "denied", data: null, message: "I can't find that project among the ones you can access." };
+    if (!proj) return { ok: false, permissionStatus: "allowed", data: null, message: "I can't find that project among the ones you can access." };
     const projectName = (proj as { name: string }).name;
 
     const normalized = {
@@ -305,7 +305,7 @@ const createProjectTask: ToolDef<
 
     if (error) {
       console.error("[tool.createProjectTask]", error);
-      return { ok: false, permissionStatus: "denied", data: null, message: "Couldn't create the project task — please try again." };
+      return { ok: false, permissionStatus: "allowed", data: null, message: "Couldn't create the project task — please try again." };
     }
     return {
       ok: true,
@@ -341,12 +341,12 @@ const completeProjectTask: ToolDef<
   requiredAction: "edit",
   handler: async (ctx, args): Promise<ToolResult<Record<string, unknown> | { preview: Record<string, unknown> }>> => {
     const id = String(args.task_id ?? "").trim();
-    if (!id) return { ok: false, permissionStatus: "denied", data: null, message: "Which task? Pick it from listProjectTasks first." };
-    if (!isUuid(id)) return { ok: false, permissionStatus: "denied", data: null, message: BAD_ID_MESSAGE };
+    if (!id) return { ok: false, permissionStatus: "allowed", data: null, message: "Which task? Pick it from listProjectTasks first." };
+    if (!isUuid(id)) return { ok: false, permissionStatus: "allowed", data: null, message: BAD_ID_MESSAGE };
     const done = args.done !== false;
 
     const t = await loadVisibleTask(ctx, id);
-    if (!t) return { ok: false, permissionStatus: "denied", data: null, message: "I can't find that task among the ones you can access — pick it again from listProjectTasks." };
+    if (!t) return { ok: false, permissionStatus: "allowed", data: null, message: "I can't find that task among the ones you can access — pick it again from listProjectTasks." };
 
     const title = t.title ?? "Task";
     if (done && t.status === "done") {
@@ -378,7 +378,7 @@ const completeProjectTask: ToolDef<
       .eq("tenant_id", ctx.auth.tenant_id);
     if (error) {
       console.error("[tool.completeProjectTask]", error);
-      return { ok: false, permissionStatus: "denied", data: null, message: "Couldn't update the task — please try again." };
+      return { ok: false, permissionStatus: "allowed", data: null, message: "Couldn't update the task — please try again." };
     }
     void recomputeProjectProgress(ctx.auth.tenant_id, t.project_id);
     return {
@@ -422,11 +422,11 @@ const updateProjectTask: ToolDef<
   requiredAction: "edit",
   handler: async (ctx, args): Promise<ToolResult<Record<string, unknown> | { preview: Record<string, unknown> }>> => {
     const id = String(args.task_id ?? "").trim();
-    if (!id) return { ok: false, permissionStatus: "denied", data: null, message: "Which task? Pick it from listProjectTasks first." };
-    if (!isUuid(id)) return { ok: false, permissionStatus: "denied", data: null, message: BAD_ID_MESSAGE };
+    if (!id) return { ok: false, permissionStatus: "allowed", data: null, message: "Which task? Pick it from listProjectTasks first." };
+    if (!isUuid(id)) return { ok: false, permissionStatus: "allowed", data: null, message: BAD_ID_MESSAGE };
 
     const t = await loadVisibleTask(ctx, id);
-    if (!t) return { ok: false, permissionStatus: "denied", data: null, message: "I can't find that task among the ones you can access — pick it again from listProjectTasks." };
+    if (!t) return { ok: false, permissionStatus: "allowed", data: null, message: "I can't find that task among the ones you can access — pick it again from listProjectTasks." };
 
     const changes: Record<string, unknown> = {};
     if (typeof args.title === "string" && args.title.trim()) changes.title = args.title.trim();
@@ -436,7 +436,7 @@ const updateProjectTask: ToolDef<
       changes.due_date = args.due_date.trim().toLowerCase() === "none" ? null : args.due_date.trim();
     }
     if (Object.keys(changes).length === 0) {
-      return { ok: false, permissionStatus: "denied", data: null, message: "Nothing to change — tell me what to update (title, description, priority, or due date)." };
+      return { ok: false, permissionStatus: "allowed", data: null, message: "Nothing to change — tell me what to update (title, description, priority, or due date)." };
     }
 
     const title = t.title ?? "Task";
@@ -458,7 +458,7 @@ const updateProjectTask: ToolDef<
       .eq("tenant_id", ctx.auth.tenant_id);
     if (error) {
       console.error("[tool.updateProjectTask]", error);
-      return { ok: false, permissionStatus: "denied", data: null, message: "Couldn't update the task — please try again." };
+      return { ok: false, permissionStatus: "allowed", data: null, message: "Couldn't update the task — please try again." };
     }
     return {
       ok: true,
@@ -490,11 +490,11 @@ const deleteProjectTask: ToolDef<
   requiredAction: "delete",
   handler: async (ctx, args): Promise<ToolResult<Record<string, unknown> | { preview: Record<string, unknown> }>> => {
     const id = String(args.task_id ?? "").trim();
-    if (!id) return { ok: false, permissionStatus: "denied", data: null, message: "Which task? Pick it from listProjectTasks first." };
-    if (!isUuid(id)) return { ok: false, permissionStatus: "denied", data: null, message: BAD_ID_MESSAGE };
+    if (!id) return { ok: false, permissionStatus: "allowed", data: null, message: "Which task? Pick it from listProjectTasks first." };
+    if (!isUuid(id)) return { ok: false, permissionStatus: "allowed", data: null, message: BAD_ID_MESSAGE };
 
     const t = await loadVisibleTask(ctx, id);
-    if (!t) return { ok: false, permissionStatus: "denied", data: null, message: "I can't find that task among the ones you can access — pick it again from listProjectTasks." };
+    if (!t) return { ok: false, permissionStatus: "allowed", data: null, message: "I can't find that task among the ones you can access — pick it again from listProjectTasks." };
 
     const title = t.title ?? "Task";
     if (args.confirm !== true) {
@@ -514,7 +514,7 @@ const deleteProjectTask: ToolDef<
       .eq("tenant_id", ctx.auth.tenant_id);
     if (error) {
       console.error("[tool.deleteProjectTask]", error);
-      return { ok: false, permissionStatus: "denied", data: null, message: "Couldn't delete the task — please try again." };
+      return { ok: false, permissionStatus: "allowed", data: null, message: "Couldn't delete the task — please try again." };
     }
     void recomputeProjectProgress(ctx.auth.tenant_id, t.project_id);
     return {

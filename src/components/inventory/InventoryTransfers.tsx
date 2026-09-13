@@ -9,6 +9,7 @@
    --------------------------------------------------------------------------- */
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useWarmData } from "@/lib/warm-cache";
 import Link from "next/link";
 import InventoryHeader from "@/components/inventory/InventoryHeader";
 import RrIcon from "@/components/ui/RrIcon";
@@ -74,6 +75,12 @@ type TabKey = "all" | "draft" | "pending" | "approved" | "shipped" | "received" 
 const PRIMARY_TABS: TabKey[] = ["all", "pending", "shipped"];
 const SECONDARY_TABS: TabKey[] = ["draft", "approved", "received", "voided"];
 
+type TransfersSnap = {
+  transfers: TransferRow[];
+  warehouses: Warehouse[];
+  rollups: Record<string, TransferRollup>;
+};
+
 export default function InventoryTransfers() {
   const { t } = useTranslation({ ...inventoryT, ...TR_T });
   useInventoryShortcuts({ isActive: true });
@@ -87,12 +94,7 @@ export default function InventoryTransfers() {
       return next;
     });
 
-  const [transfers, setTransfers] = useState<TransferRow[]>([]);
-  const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
-  const [rollups, setRollups] = useState<Record<string, TransferRollup>>({});
   const [tab, setTab] = useState<TabKey>("all");
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
 
   /* INV-H5A — ?create=1 deep link from operator menu */
@@ -120,16 +122,11 @@ export default function InventoryTransfers() {
     await load();
   };
 
-  const warehouseMap = useMemo(() => {
-    const m = new Map<string, Warehouse>();
-    for (const w of warehouses) m.set(w.id, w);
-    return m;
-  }, [warehouses]);
-
-  const load = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
+  /* Warm: neither call takes a user filter, so the response IS the default
+     view. The hundred per-row rollup requests below are the bulk of the wait
+     and they are cached with it, so a return visit shows the whole table —
+     counts included — on the first frame. */
+  const fetchAll = useCallback(async (): Promise<TransfersSnap> => {
       const [tRes, whRes] = await Promise.all([
         fetch("/api/inventory/transfers?limit=500", { cache: "no-store", credentials: "include" }),
         fetch("/api/inventory/warehouses", { cache: "no-store", credentials: "include" }),
@@ -137,9 +134,7 @@ export default function InventoryTransfers() {
       const tJ = await tRes.json();
       if (!tRes.ok) throw new Error(humanizeError(tJ.error ?? `HTTP ${tRes.status}`));
       const list = (tJ.transfers ?? []) as TransferRow[];
-      setTransfers(list);
       const whJ = await whRes.json();
-      setWarehouses((whJ.warehouses ?? []) as Warehouse[]);
 
       /* Best-effort: pull rollups for the visible transfers. */
       const rolls: Record<string, TransferRollup> = {};
@@ -161,17 +156,24 @@ export default function InventoryTransfers() {
           } catch {/* ignore — row will show — */}
         }),
       );
-      setRollups(rolls);
-    } catch (e) {
-      setError(humanizeError(e instanceof Error ? e.message : String(e)));
-    } finally {
-      setLoading(false);
-    }
+      return {
+        transfers: list,
+        warehouses: (whJ.warehouses ?? []) as Warehouse[],
+        rollups: rolls,
+      };
   }, []);
+  const { data, loading, error: loadError, reload: load } =
+    useWarmData<TransfersSnap>("inv:transfers", fetchAll);
+  const transfers = useMemo(() => data?.transfers ?? [], [data]);
+  const warehouses = useMemo(() => data?.warehouses ?? [], [data]);
+  const rollups = useMemo(() => data?.rollups ?? {}, [data]);
+  const error = loadError ? humanizeError(loadError instanceof Error ? loadError.message : String(loadError)) : null;
 
-  useEffect(() => {
-    void load();
-  }, [load]);
+  const warehouseMap = useMemo(() => {
+    const m = new Map<string, Warehouse>();
+    for (const w of warehouses) m.set(w.id, w);
+    return m;
+  }, [warehouses]);
 
   const filtered = useMemo(() => {
     if (tab === "all") return transfers;

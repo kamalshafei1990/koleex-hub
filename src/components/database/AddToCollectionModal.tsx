@@ -66,7 +66,7 @@ export default function AddToCollectionModal({
 
   return (
     <div className="fixed inset-0 z-[130] flex items-end justify-center bg-black/60 backdrop-blur-sm sm:items-center" onClick={onClose}>
-      <div className="flex max-h-[80vh] w-full max-w-md flex-col rounded-t-2xl border border-[var(--border-subtle)] bg-[var(--bg-card)] sm:rounded-2xl" onClick={(e) => e.stopPropagation()}>
+      <div className="flex max-h-[80vh] w-full max-w-md flex-col rounded-t-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] sm:rounded-2xl" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between border-b border-[var(--border-subtle)] px-5 py-4">
           <div>
             <h3 className="text-[15px] font-semibold text-[var(--text-primary)]">{t("vl.addCol.title", "Add to collection")}</h3>
@@ -76,7 +76,7 @@ export default function AddToCollectionModal({
         </div>
 
         <div className="border-b border-[var(--border-subtle)] px-5 py-3">
-          <div className="flex items-center gap-2 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-card)] px-3 py-2 focus-within:border-[var(--border-focus)]">
+          <div className="flex items-center gap-2 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-secondary)] px-3 py-2 focus-within:border-[var(--border-focus)]">
             <SearchIcon size={14} className="shrink-0 text-[var(--text-dim)]" />
             <input value={q} onChange={(e) => setQ(e.target.value)} placeholder={t("vl.addCol.searchPlaceholder", "Search collections…")}
               className="min-w-0 flex-1 bg-transparent text-[13px] outline-none placeholder:text-[var(--text-dim)]" />

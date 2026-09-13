@@ -42,6 +42,8 @@ import Volume2Icon from "@/components/icons/ui/Volume2Icon";
 import { KX_RANGE_CLASS, kxRangeStyle } from "@/components/ui/rangeSlider";
 import { useTranslation } from "@/lib/i18n";
 import { settingsT } from "@/lib/translations/settings";
+import { SOUND_CATALOG, type SoundGroup } from "@/lib/sounds/catalog";
+import { previewSoundMoment, primeAllSounds, setSoundMoment, soundEnabled } from "@/lib/sounds/player";
 
 const TONE_LABELS: Record<"classic" | SynthTone, string> = {
   classic: "Classic",
@@ -70,6 +72,7 @@ function toneLabel(tone: SoundTone | undefined, t: (k: string) => string): strin
 const CATEGORY_KEYS: Record<SoundCategory, string> = {
   notification: "sounds.cat.notification",
   message: "sounds.cat.message",
+  call: "sounds.cat.call",
 };
 const ACTIVITY_KEYS: Record<SoundActivity, string> = {
   mentions: "act.mentions",
@@ -97,7 +100,7 @@ type PickerTarget =
   | { kind: "activity"; activity: SoundActivity };
 
 export default function SoundsTab() {
-  const { t } = useTranslation(settingsT);
+  const { t, lang } = useTranslation(settingsT);
   const [prefs, setPrefs] = useState<SoundPrefs>(getSoundPrefs);
   const [picker, setPicker] = useState<PickerTarget | null>(null);
   useEffect(() => subscribeSoundPrefs(setPrefs), []);
@@ -182,9 +185,61 @@ export default function SoundsTab() {
           label={t("sounds.msgTone")}
           value={toneLabel(prefs.message.tone, t)}
           onClick={() => setPicker({ kind: "category", category: "message" })}
+        />
+        {/* THE VOICE CALL'S "CONNECTED" CUE. The owner asked for one of the
+            recorded tones here instead of the synthesised notes; it is a
+            category like the others so it can be changed or silenced. */}
+        <SwitchRow
+          label={t("sounds.callSounds")}
+          hint={t("sounds.callSounds.hint")}
+          checked={prefs.call.enabled}
+          onChange={(on) => setSoundPrefs({ call: { enabled: on } })}
+        />
+        <NavRow
+          label={t("sounds.callTone")}
+          value={toneLabel(prefs.call.tone, t)}
+          onClick={() => setPicker({ kind: "category", category: "call" })}
           last
         />
       </SettingsCard>
+
+      {/* ── Koleex AI's own cues ───────────────────────────────────────────
+          One per moment of a call or a chat (src/lib/sounds/catalog.ts),
+          chosen by the owner from a public-domain set. Tapping the name
+          plays it whether or not it is on — that is how you choose what to
+          turn back on; the switch keeps or silences the moment. */}
+      <SettingsCard
+        flush
+        title={t("sounds.ai")}
+        subtitle={muted ? t("sounds.alerts.muted") : t("sounds.ai.sub")}
+      >
+        <SwitchRow
+          label={t("sounds.ai.enabled")}
+          hint={t("sounds.ai.enabled.hint")}
+          checked={prefs.ai.enabled}
+          onChange={(on) => setSoundPrefs({ ai: { enabled: on } })}
+          last
+        />
+      </SettingsCard>
+      {(["call", "chat", "dictation", "actions", "general"] as SoundGroup[]).map((group) => {
+        const items = SOUND_CATALOG.filter((s) => s.group === group);
+        return (
+          <SettingsCard key={group} flush title={t(`sounds.ai.group.${group}`)} subtitle={group === "call" ? t("sounds.ai.moments.sub") : undefined}>
+            {items.map((s, i) => (
+              <MomentRow
+                key={s.key}
+                label={s.label[lang]}
+                hint={s.when[lang]}
+                checked={soundEnabled(s.key, prefs)}
+                onPreview={() => { primeAllSounds(); previewSoundMoment(s.key); }}
+                onChange={(on) => setSoundMoment(s.key, on, setSoundPrefs, prefs)}
+                last={i === items.length - 1}
+                dim={!prefs.ai.enabled || muted}
+              />
+            ))}
+          </SettingsCard>
+        );
+      })}
 
       {/* ── Per-activity tones ────────────────────────────────────────────
           Exactly the activities from Notification preferences, each able to
@@ -213,6 +268,42 @@ export default function SoundsTab() {
       <p className="px-1 text-[11.5px] text-[var(--text-dim)]">
         {t("sounds.footer")}
       </p>
+    </div>
+  );
+}
+
+/* ── One Koleex AI moment: play on the name, keep or silence on the switch ── */
+function MomentRow({
+  label, hint, checked, onPreview, onChange, last, dim,
+}: {
+  label: string; hint: string; checked: boolean; onPreview: () => void; onChange: (v: boolean) => void; last?: boolean; dim?: boolean;
+}) {
+  return (
+    <div className={`flex items-center justify-between gap-3 py-2.5 ${last ? "" : "border-b border-[var(--border-faint)]"} ${dim ? "opacity-60" : ""}`}>
+      <button
+        type="button"
+        onClick={onPreview}
+        data-kx-keep-hover=""
+        className="flex min-w-0 flex-1 items-center gap-3 rounded-lg px-1 py-1 text-start transition-colors hover:bg-[var(--bg-surface-hover)]"
+      >
+        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[var(--text-muted)]">
+          <Volume2Icon className="h-3.5 w-3.5" />
+        </span>
+        <span className="min-w-0">
+          <span className="block truncate text-[13px] font-medium text-[var(--text-primary)]">{label}</span>
+          <span className="mt-0.5 block text-[11px] text-[var(--text-dim)]">{hint}</span>
+        </span>
+      </button>
+      <button
+        type="button"
+        role="switch"
+        aria-checked={checked}
+        aria-label={label}
+        onClick={() => onChange(!checked)}
+        className={`relative h-6 w-11 shrink-0 rounded-full transition-colors duration-200 ${checked ? "bg-emerald-500" : "bg-[var(--border-color,#6b7280)]"}`}
+      >
+        <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-[inset-inline-start] duration-200 ${checked ? "start-[22px]" : "start-0.5"}`} />
+      </button>
     </div>
   );
 }

@@ -322,7 +322,9 @@ export default function UserMenu({ dk }: { dk: boolean }) {
 
       {/* Portalled: inside the header pane its backdrop-filter was starved,
           so the glass never rendered. See kds/PopoverPanel. */}
-      <PopoverPanel anchorRef={menuRef} open={open} onClose={() => setOpen(false)} align="end" matchAnchorWidth={false} className="kx-drop-in w-64">
+      {/* kx-pop-clear: the owner-picked frosted-transparent material with
+          Hub-Blue neon hairlines (ballot "L", clarified "frosted transparent") */}
+      <PopoverPanel anchorRef={menuRef} open={open} onClose={() => setOpen(false)} align="end" matchAnchorWidth={false} className="kx-drop-in kx-pop-clear w-64">
           {/* Identity block */}
           <div className={`px-4 py-3.5 border-b ${dk ? "border-white/[0.06]" : "border-black/[0.06]"}`}>
             <div className="flex items-center gap-3">

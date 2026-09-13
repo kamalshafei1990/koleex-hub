@@ -29,7 +29,11 @@ export const PRODUCTS_UI_I18N: Translations = {
   "step.machineSpecs": { en: "Machine Specs", zh: "机器规格", ar: "مواصفات الماكينة" },
   "step.models": { en: "Variants", zh: "变体", ar: "المتغيرات" },
   "step.modelsVariants": { en: "Variants & Pricing", zh: "变体与定价", ar: "المتغيرات والتسعير" },
-  "step.logisticsCustoms": { en: "Logistics & Customs", zh: "物流与海关", ar: "اللوجستيات والجمارك" },
+  "step.options":      { en: "Buyer Options", zh: "买家选项", ar: "خيارات المشتري" },
+  "step.optionsShort": { en: "Options", zh: "选项", ar: "الخيارات" },
+  "options.title":     { en: "Buyer Options", zh: "买家选项", ar: "خيارات المشتري" },
+  "options.badge":     { en: "Configurator questions", zh: "配置问题", ar: "أسئلة المنشئ" },
+  "step.logisticsCustoms": { en: "Packing & Logistics", zh: "包装与物流", ar: "التعبئة واللوجستيات" },
   "step.technical": { en: "Technical", zh: "技术参数", ar: "التفاصيل التقنية" },
   "step.media": { en: "Media & Files", zh: "媒体与文件", ar: "الوسائط والملفات" },
   "step.review": { en: "Review", zh: "审核", ar: "المراجعة" },
@@ -72,6 +76,16 @@ export const PRODUCTS_UI_I18N: Translations = {
   "status.active": { en: "Active", zh: "已上架", ar: "نشط" },
   "status.archived": { en: "Archived", zh: "已归档", ar: "مؤرشف" },
   "save.success": { en: "Product saved successfully!", zh: "产品保存成功！", ar: "تم حفظ المنتج بنجاح!" },
+  "save.modelFailed": {
+    en: "Couldn't save model \"{code}\" — the rest of the save was stopped so nothing is half-written. Check your access or try again.",
+    zh: "无法保存型号“{code}” — 已停止其余保存操作，避免数据写入一半。请检查您的权限或重试。",
+    ar: "تعذّر حفظ الموديل «{code}» — تم إيقاف بقية الحفظ حتى لا تُكتب البيانات نصف كتابة. تحقق من صلاحياتك أو حاول مجددًا.",
+  },
+  "save.modelCreateFailed": {
+    en: "Couldn't create model \"{code}\" — the rest of the save was stopped.",
+    zh: "无法创建型号“{code}” — 已停止其余保存操作。",
+    ar: "تعذّر إنشاء الموديل «{code}» — تم إيقاف بقية الحفظ.",
+  },
   "save.cantPublish": {
     en: "Can't publish yet — fill the required fields. Switch status to Draft to save your work for now.",
     zh: "暂时无法发布 — 请填写必填字段。可先将状态切换为草稿以保存当前进度。",
@@ -91,6 +105,16 @@ export const PRODUCTS_UI_I18N: Translations = {
     en: "Draft restored — review the fields, then Save when you're ready.",
     zh: "草稿已恢复 — 请检查各字段，准备好后点击保存。",
     ar: "تم استرجاع المسودة — راجع الحقول ثم احفظ عندما تكون جاهزًا.",
+  },
+  "draft.staleWarning": {
+    en: "⚠ This draft is OLDER than the last save — restoring it will bring back old values and undo newer changes.",
+    zh: "⚠ 此草稿早于最近一次保存 — 恢复它将带回旧值并撤销较新的更改。",
+    ar: "⚠ هذه المسودة أقدم من آخر حفظ — استرجاعها سيعيد قيمًا قديمة ويلغي التغييرات الأحدث.",
+  },
+  "draft.photosDropped": {
+    en: "{n} attached photo(s) could not be kept in the draft — please attach them again before saving.",
+    zh: "{n} 张已附加的图片无法保留在草稿中 — 请在保存前重新附加。",
+    ar: "تعذّر الاحتفاظ بـ {n} صورة مرفقة في المسودة — يرجى إرفاقها مرة أخرى قبل الحفظ.",
   },
 
   /* ── Media upload feedback (P0 #3) ──────────────────────────────── */
@@ -142,6 +166,11 @@ export const PRODUCTS_UI_I18N: Translations = {
   "sup.modelNumber": { en: "Model number", zh: "型号", ar: "رقم الموديل" },
   "sup.costPrice": { en: "Cost price", zh: "成本价", ar: "سعر التكلفة" },
   "sup.eg": { en: "e.g.", zh: "例如", ar: "مثال:" },
+  "sup.memberCosts": {
+    en: "This is the family cost. These models have their own — pick one on the strip above to edit it:",
+    zh: "这是家族成本。以下型号有各自的成本 — 在上方型号条中选择一个进行编辑：",
+    ar: "هذه تكلفة العائلة. الموديلات التالية لها تكلفتها الخاصة — اختر أحدها من الشريط أعلاه لتعديله:",
+  },
   "sup.cnyTitle": { en: "Factory cost is always entered in CNY (¥) — the pricing engine works from the CNY cost.", zh: "出厂成本始终以人民币(¥)录入——定价引擎基于人民币成本计算。", ar: "تكلفة المصنع تُدخل دائماً بعملة CNY (¥) — محرك التسعير يعمل على التكلفة بها." },
   "sup.costIncludes": { en: "Cost includes", zh: "成本包含", ar: "التكلفة تشمل" },
   "sup.costDelivered": { en: "Delivered to Koleex (full landed)", zh: "送达Koleex(全到岸)", ar: "التسليم إلى Koleex (تكلفة كاملة)" },
@@ -668,6 +697,8 @@ export const PRODUCTS_UI_I18N: Translations = {
   "technical.jumpToHero": { en: "Jump to Hero", zh: "跳转到主图", ar: "الانتقال إلى الواجهة" },
   "technical.title": { en: "Technical Details", zh: "技术细节", ar: "التفاصيل التقنية" },
   "technical.badge": { en: "Electrical · Physical", zh: "电气 · 物理", ar: "كهربائية · فيزيائية" },
+  "technical.badge2": { en: "Electrical", zh: "电气", ar: "كهربائية" },
+  "logistics.physicalBadge": { en: "Dimensions · Weight", zh: "尺寸 · 重量", ar: "الأبعاد · الوزن" },
   "technical.purchaseOptions": { en: "Purchase Options", zh: "购买选项", ar: "خيارات الشراء" },
   "technical.purchaseBadge": { en: "Head-only · Complete set", zh: "仅机头 · 整套", ar: "الرأس فقط · الطقم الكامل" },
   "technical.purchaseHint": {
@@ -1029,6 +1060,41 @@ export const PRODUCTS_UI_I18N: Translations = {
   "preview.countVideos": { en: "{n} videos", zh: "{n} 个视频", ar: "{n} فيديو" },
   "preview.countDocuments": { en: "{n} documents", zh: "{n} 个文档", ar: "{n} مستند" },
 
+  /* ── Internal card strings that were falling back to English ── */
+  "card.hidden": { en: "Hidden from customers", zh: "对客户隐藏", ar: "مخفي عن العملاء" },
+  "card.hiddenShort": { en: "Hidden", zh: "已隐藏", ar: "مخفي" },
+  "card.noCostYet": { en: "Cost not set", zh: "未设置成本", ar: "التكلفة غير محددة" },
+  "card.noSupplier": { en: "No supplier linked", zh: "未关联供应商", ar: "لا يوجد مورّد مرتبط" },
+  "card.priceFrom": { en: "From", zh: "起", ar: "ابتداءً من" },
+
+  /* ── Catalogue card · commercial half (2026-08-29) ── */
+  "card.globalFob": { en: "Global FOB", zh: "全球 FOB 价", ar: "سعر FOB العالمي" },
+  "card.priceOnRequest": { en: "Price on request", zh: "价格面议", ar: "السعر عند الطلب" },
+  "card.askAi": { en: "Ask AI", zh: "问 AI", ar: "اسأل AI" },
+  "card.compare": { en: "Compare", zh: "对比", ar: "مقارنة" },
+  "card.addToQuotation": { en: "Quote", zh: "加入报价", ar: "عرض سعر" },
+
+  /* ── 2026-08-29 sweep: the customer product page's own chrome. These 16
+     keys were called with an English default but never defined, so the
+     sticky pill, the section eyebrows and the model/compare copy stayed
+     English in zh/ar while the product's name and tagline switched. ── */
+  "preview.stickyOverview": { en: "Overview", zh: "概览", ar: "نظرة عامة" },
+  "preview.stickySpecs": { en: "Specs", zh: "参数", ar: "المواصفات" },
+  "preview.stickyGallery": { en: "Gallery", zh: "图库", ar: "الصور" },
+  "preview.getHighlights": { en: "Get the highlights.", zh: "核心亮点。", ar: "أبرز المميزات." },
+  "preview.eyebrowPerformance": { en: "Performance", zh: "性能", ar: "الأداء" },
+  "preview.eyebrowUpClose": { en: "Up close", zh: "细节", ar: "عن قرب" },
+  "preview.eyebrowLineup": { en: "Lineup", zh: "系列型号", ar: "الطُرز" },
+  "preview.eyebrowCompare": { en: "Compare", zh: "对比", ar: "مقارنة" },
+  "preview.takeCloserLook": { en: "Take a closer look.", zh: "细看每个细节。", ar: "شاهدها عن قرب." },
+  "preview.chooseModel": { en: "Choose your model.", zh: "选择您的型号。", ar: "اختر الطراز المناسب." },
+  "preview.compareTitle": { en: "How it stacks up.", zh: "同类对比。", ar: "كيف تتفوّق." },
+  "preview.compareWith": { en: "Compare with", zh: "对比", ar: "مقارنة مع" },
+  "preview.model": { en: "Model", zh: "型号", ar: "الطراز" },
+  "preview.viewProduct": { en: "View", zh: "查看", ar: "عرض" },
+  "preview.photo": { en: "Photo", zh: "图片", ar: "صورة" },
+  "preview.noImage": { en: "No image", zh: "暂无图片", ar: "لا توجد صورة" },
+
   /* ── 2026-07-30 full-translation sweep: keys that were falling back ── */
   "preview.eyebrowSafety": { en: "Before you run it", zh: "运行之前", ar: "قبل التشغيل" },
   "preview.warnings": { en: "Warnings & Safety", zh: "警告与安全", ar: "التحذيرات والسلامة" },
@@ -1069,7 +1135,6 @@ export const PRODUCTS_UI_I18N: Translations = {
   "logistics.countryOfOrigin": { en: "Country of Origin", zh: "原产国", ar: "بلد المنشأ" },
   "logistics.hsCode": { en: "HS Code", zh: "HS 编码", ar: "رمز HS" },
   "logistics.hsHint": { en: "Harmonized System tariff code.", zh: "海关协调制度税则编码。", ar: "رمز التعرفة في النظام المنسّق." },
-  "logistics.hsInSpecs": { en: "HS Code for this category is set in the Specifications tab (Compliance & Customs).", zh: "该品类的 HS 编码在“规格”标签页（合规与海关）中设置。", ar: "رمز HS لهذه الفئة يُضبط في تبويب المواصفات (الامتثال والجمارك)." },
   "logistics.packingTitle": { en: "Packing & shipment are per-variant", zh: "包装与运输按变体填写", ar: "التغليف والشحن على مستوى كل متغير" },
   "logistics.packingBody": { en: "Packing type, carton dimensions, CBM, net/gross weight and 20ft/40ft container quantities are entered per variant on the Variants tab.", zh: "包装方式、纸箱尺寸、CBM、净/毛重及 20/40 尺柜装载量在“变体”标签页按变体录入。", ar: "نوع التغليف وأبعاد الكرتونة وCBM والوزن الصافي/القائم وكميات حاويات 20/40 قدماً تُدخل لكل متغير في تبويب المتغيرات." },
   "logistics.jumpCommercial": { en: "Open Variants", zh: "打开变体", ar: "افتح المتغيرات" },
@@ -1189,7 +1254,7 @@ export const PRODUCTS_UI_I18N: Translations = {
   "step.knowledgeRel": { en: "Knowledge & Relationships", zh: "知识与关联", ar: "المعرفة والعلاقات" },
   "step.supplier": { en: "Supplier", zh: "供应商", ar: "المورّد" },
   "step.price": { en: "Price", zh: "价格", ar: "السعر" },
-  "step.logistics": { en: "Logistics", zh: "物流", ar: "اللوجستيات" },
+  "step.logistics": { en: "Packing & Logistics", zh: "包装与物流", ar: "التعبئة واللوجستيات" },
   "step.compliance": { en: "Compliance", zh: "合规", ar: "الامتثال" },
   "step.knowledge": { en: "Knowledge", zh: "知识", ar: "المعرفة" },
   /* ── legacy Technical Details block ── */
@@ -1202,11 +1267,14 @@ export const PRODUCTS_UI_I18N: Translations = {
   "tech.ipRatingHint": { en: "Ingress protection (dust + water).", zh: "防尘防水等级。", ar: "درجة الحماية من الغبار والماء." },
   "tech.operatingTempHint": { en: "Recommended operating range.", zh: "建议工作温度范围。", ar: "نطاق التشغيل الموصى به." },
   "tech.secElectrical": { en: "Electrical", zh: "电气", ar: "الكهرباء" },
-  "tech.secElectricalSub": { en: "Voltage, frequency, motor power, phase, and the plug types this product ships with", zh: "电压、频率、电机功率、相数，以及本产品随附的插头类型", ar: "الجهد والتردد وقدرة المحرك والأطوار وأنواع القوابس المرفقة بالمنتج" },
+  /* Named voltage and plug types until 2026-08-25; both fields were retired
+     here in favour of the spec schema, and a subtitle that keeps promising
+     them is the same kind of lie the card would tell by showing an empty box. */
+  "tech.secElectricalSub": { en: "Frequency, motor power, phase, and the air supply this machine needs", zh: "频率、电机功率、相数，以及本机所需的气源", ar: "التردد وقدرة المحرك والأطوار وهواء التشغيل اللي الماكينة محتاجاه" },
   "tech.secPhysical": { en: "Physical (Bare Machine)", zh: "物理参数（裸机）", ar: "القياسات الفعلية (الماكينة وحدها)" },
   "tech.secPhysicalSub": { en: "Footprint and weight of the machine itself — packed shipment data lives on the Models step", zh: "机器本体的占地与重量——装箱运输数据在“型号”步骤中填写", ar: "مساحة ووزن الماكينة نفسها — بيانات التغليف والشحن مكانها خطوة الموديلات" },
   "tech.secCompliance": { en: "Compliance & Customs", zh: "合规与海关", ar: "المطابقة والجمارك" },
-  "tech.secComplianceSub": { en: "Certifications, HS classification, environmental ratings, and visual attributes", zh: "认证、HS 编码归类、环保等级与外观属性", ar: "الشهادات وتصنيف HS والتقييمات البيئية والخصائص المرئية" },
+  "tech.secComplianceSub": { en: "Certifications, HS classification, and environmental ratings", zh: "认证、HS 编码归类与环保等级", ar: "الشهادات وتصنيف HS والتقييمات البيئية" },
   "tech.frequency": { en: "Frequency (Hz)", zh: "频率（Hz）", ar: "التردد (Hz)" },
   "tech.motorPower": { en: "Motor Power", zh: "电机功率", ar: "قدرة الموتور" },
   "tech.powerConsumption": { en: "Power Consumption", zh: "功耗", ar: "استهلاك القدرة" },

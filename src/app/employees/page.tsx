@@ -5,7 +5,7 @@
    Layout matches Products app: min-h-screen, max-w container, natural scroll.
    --------------------------------------------------------------------------- */
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import KdsAvatar from "@/components/kds/Avatar";
 import BoundIcon from "@/components/common/BoundIcon";
 import { fpAvatar } from "@/lib/cdn";
@@ -21,7 +21,6 @@ import CheckIcon from "@/components/icons/ui/CheckIcon";
 import EnvelopeIcon from "@/components/icons/ui/EnvelopeIcon";
 import PhoneIcon from "@/components/icons/ui/PhoneIcon";
 import FilterIcon from "@/components/icons/ui/FilterIcon";
-import UserIcon from "@/components/icons/ui/UserIcon";
 import PencilIcon from "@/components/icons/ui/PencilIcon";
 import TrashIcon from "@/components/icons/ui/TrashIcon";
 import EmployeesIcon from "@/components/icons/EmployeesIcon";
@@ -131,9 +130,15 @@ export default function EmployeesPage() {
       if (cached) {
         const parsed = JSON.parse(cached) as { employees: EmployeeListItem[]; departments: DepartmentRow[] };
         if (parsed?.employees?.length) {
-          setEmployees(parsed.employees);
-          setDepartments(parsed.departments ?? []);
-          setLoading(false); // show real rows, refresh underneath
+          /* microtask: same paint for the user, but no synchronous setState
+             inside the effect body. The network reconcile below overwrites
+             it either way. */
+          queueMicrotask(() => {
+            if (cancelled) return;
+            setEmployees(parsed.employees);
+            setDepartments(parsed.departments ?? []);
+            setLoading(false); // show real rows, refresh underneath
+          });
         }
       }
     } catch {

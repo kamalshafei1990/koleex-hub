@@ -15,9 +15,44 @@
    --------------------------------------------------------------------------- */
 
 import { NextResponse } from "next/server";
-import { requireAuth } from "@/lib/server/auth";
+import { requireAuth, requireModuleAction } from "@/lib/server/auth";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { refine, persistUnits, type RefinerySegment } from "@/lib/server/ai-knowledge";
+import { assertSafeUrl } from "@/lib/server/safe-url";
+import { dbError } from "@/lib/server/ai/http/api-error";
+
+/* THE PAGE FETCH IS BOUNDED. A page is read up to this many bytes and then
+   cut off — a host that streams for ever must not fill the function's
+   memory (audit, 2026-09-11). Same ceiling the UI copy promises ("up to 2 MB"). */
+const PAGE_MAX_BYTES = 2_000_000;
+const PAGE_MAX_HOPS = 3;
+
+/** The body up to `max` bytes, cut there — never the whole stream. */
+async function readCappedText(res: Response, max: number): Promise<string> {
+  const reader = res.body?.getReader();
+  if (!reader) return (await res.text()).slice(0, max);
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    chunks.push(value);
+    total += value.byteLength;
+    if (total >= max) {
+      await reader.cancel().catch(() => {});
+      break;
+    }
+  }
+  const out = new Uint8Array(Math.min(total, max));
+  let off = 0;
+  for (const c of chunks) {
+    const take = Math.min(c.byteLength, out.byteLength - off);
+    if (take <= 0) break;
+    out.set(c.subarray(0, take), off);
+    off += take;
+  }
+  return new TextDecoder().decode(out);
+}
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -43,19 +78,29 @@ function htmlToText(html: string): string {
     .trim();
 }
 
+  /* READ is grantable, WRITE is not. The super admin can hand "AI Knowledge"
+     to an account so it can open the bench and read the corpus; ingesting
+     sources and approving units stay his alone, because approval is what
+     decides what the AI treats as true. */
 export async function GET() {
   const auth = await requireAuth();
   if (auth instanceof NextResponse) return auth;
-  if (!auth.is_super_admin) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  const denied = await requireModuleAction(auth, "AI Knowledge", "view");
+  if (denied) return denied;
 
-  const [srcRes, kuRes] = await Promise.all([
-    supabaseServer
-      .from("ai_sources")
-      .select("id, title, kind, origin, domain, lang, status, error, created_at")
-      .order("created_at", { ascending: false })
-      .limit(200),
-    supabaseServer.from("ai_knowledge_units").select("source_id, status"),
-  ]);
+  /* ONE TENANT'S ROWS ONLY — the same rule qa/route.ts applies. Without
+     the predicate this list showed every tenant's titles, URLs and error
+     strings to any account holding the AI Knowledge module (audit,
+     2026-09-11). */
+  let srcQ = supabaseServer
+    .from("ai_sources")
+    .select("id, title, kind, origin, domain, lang, status, error, created_at")
+    .order("created_at", { ascending: false })
+    .limit(200);
+  srcQ = auth.tenant_id == null ? srcQ.is("tenant_id", null) : srcQ.eq("tenant_id", auth.tenant_id);
+  let kuQ = supabaseServer.from("ai_knowledge_units").select("source_id, status");
+  kuQ = auth.tenant_id == null ? kuQ.is("tenant_id", null) : kuQ.eq("tenant_id", auth.tenant_id);
+  const [srcRes, kuRes] = await Promise.all([srcQ, kuQ]);
   if (srcRes.error) return NextResponse.json({ error: srcRes.error.message }, { status: 500 });
 
   const counts: Record<string, { draft: number; approved: number; retired: number }> = {};
@@ -119,17 +164,51 @@ export async function POST(req: Request) {
            Every unit keeps the URL as its origin so citations in Phase 2
            point back to the exact page. */
         const url = body.url.trim();
-        if (!/^https?:\/\//i.test(url)) {
+        if (!/^https?:\/\//i.test(url) || url.length > 2048) {
           return NextResponse.json({ error: "URL must start with http(s)://" }, { status: 400 });
         }
-        const resp = await fetch(url, {
-          headers: { "User-Agent": "KoleexHub-KnowledgeBot/1.0" },
-          signal: AbortSignal.timeout(20000),
-        });
+        /* OUR SERVER FETCHES WHAT THE OWNER PASTED — the SSRF shape. The
+           address goes through the same gate as the picture proxy: scheme,
+           name and every resolved IP checked, redirects followed by hand so
+           a public page cannot 302 inward (audit, 2026-09-11). */
+        let current: URL;
+        try {
+          current = await assertSafeUrl(url);
+        } catch (e) {
+          const why = e instanceof Error ? e.message : "bad_url";
+          return NextResponse.json(
+            { error: why === "blocked_host" ? "That address cannot be read from here." : "That URL could not be reached." },
+            { status: 400 },
+          );
+        }
+        const signal = AbortSignal.timeout(20000);
+        let resp: Response | null = null;
+        for (let hop = 0; hop <= PAGE_MAX_HOPS; hop++) {
+          resp = await fetch(current.toString(), {
+            headers: { "User-Agent": "KoleexHub-KnowledgeBot/1.0" },
+            redirect: "manual",
+            signal,
+          });
+          if (resp.status >= 300 && resp.status < 400) {
+            const loc = resp.headers.get("location");
+            if (!loc) break;
+            try {
+              current = await assertSafeUrl(new URL(loc, current).toString());
+            } catch {
+              return NextResponse.json({ error: "That address cannot be read from here." }, { status: 400 });
+            }
+            resp = null;
+            continue;
+          }
+          break;
+        }
+        if (!resp) {
+          return NextResponse.json({ error: "Too many redirects." }, { status: 400 });
+        }
         if (!resp.ok) {
           return NextResponse.json({ error: `Fetch failed: HTTP ${resp.status}` }, { status: 400 });
         }
-        const raw = (await resp.text()).slice(0, 2_000_000);
+        const raw = await readCappedText(resp, PAGE_MAX_BYTES);
         const textContent = htmlToText(raw);
         if (textContent.length < 200) {
           return NextResponse.json({ error: "Page has too little readable text (JS-rendered pages are not supported yet)." }, { status: 400 });
@@ -156,7 +235,10 @@ export async function POST(req: Request) {
       }
     }
   } catch (e) {
-    return NextResponse.json({ error: `Could not read the source: ${String(e)}` }, { status: 400 });
+    /* The cause goes to the log, not to the browser: a fetch failure's text
+       names hosts and addresses. */
+    console.error("[ai.knowledge.sources] read failed:", e instanceof Error ? e.message : String(e));
+    return NextResponse.json({ error: "Could not read the source." }, { status: 400 });
   }
 
   if (!title) return NextResponse.json({ error: "title is required" }, { status: 400 });
@@ -172,7 +254,7 @@ export async function POST(req: Request) {
     })
     .select("id")
     .single();
-  if (srcErr || !src) return NextResponse.json({ error: srcErr?.message || "insert failed" }, { status: 500 });
+  if (srcErr || !src) return dbError("knowledge/sources insert", srcErr ?? "no row");
 
   try {
     const units = refine(segments);
@@ -191,6 +273,7 @@ export async function POST(req: Request) {
       .from("ai_sources")
       .update({ status: "failed", error: String(e), updated_at: new Date().toISOString() })
       .eq("id", src.id);
-    return NextResponse.json({ error: `Refinery failed: ${String(e)}` }, { status: 500 });
+    console.error("[ai.knowledge.sources] refinery failed:", e instanceof Error ? e.message : String(e));
+    return NextResponse.json({ error: "Refinery failed." }, { status: 500 });
   }
 }

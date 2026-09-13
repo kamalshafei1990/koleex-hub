@@ -116,9 +116,10 @@ export default function EmployeePicker({
 
   useEffect(() => {
     if (!open) return;
-    setQuery("");
     /* Focus the filter so typing works immediately, but not on touch — it
-       would throw up the keyboard over the list the user came to read. */
+       would throw up the keyboard over the list the user came to read.
+       (The query reset lives in the trigger's onClick, not here — no
+       setState from inside an effect body.) */
     if (window.matchMedia?.("(pointer: fine)").matches) {
       requestAnimationFrame(() => searchRef.current?.focus());
     }
@@ -147,7 +148,7 @@ export default function EmployeePicker({
       <button
         type="button"
         disabled={disabled}
-        onClick={() => setOpen((o) => !o)}
+        onClick={() => { if (!open) setQuery(""); setOpen(!open); }}
         aria-haspopup="listbox"
         aria-expanded={open}
         className={`w-full h-10 px-3 rounded-xl bg-[var(--bg-surface)] border text-[13px] outline-none transition-colors flex items-center gap-2.5 text-start disabled:opacity-50 ${

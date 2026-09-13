@@ -61,6 +61,9 @@ interface CreatePoBody {
   internal_notes?: string | null;
   status?: "draft" | "confirmed";
   items?: PoItemBody[];
+  /* The customer deal this PO sources, when there is one. Most POs are stock
+     replenishment and carry none. */
+  order_id?: string | null;
 }
 
 function generatePoNo(): string {
@@ -117,6 +120,24 @@ export async function POST(req: Request) {
      (CNY for a Chinese tenant). Only the form's explicit override is
      honoured. */
   const purchaseDefaultCcy = await resolveBaseCurrency(auth.tenant_id);
+
+  /* The deal number is read from the order rather than taken from the caller:
+     a client that could name its own deal_no could attach a PO to a deal it
+     was never shown. */
+  let orderId: string | null = null;
+  let dealNo: number | null = null;
+  if (body.order_id) {
+    const { data: order } = await supabaseServer
+      .from("orders")
+      .select("id, deal_no")
+      .eq("id", body.order_id)
+      .eq("tenant_id", auth.tenant_id)
+      .maybeSingle();
+    if (!order) return NextResponse.json({ error: "Order not found." }, { status: 404 });
+    orderId = order.id as string;
+    dealNo = order.deal_no as number;
+  }
+
   const { data: poRow, error: poErr } = await supabaseServer
     .from("purchase_orders")
     .insert({
@@ -136,6 +157,8 @@ export async function POST(req: Request) {
       total: subtotal,
       notes: body.notes ?? null,
       internal_notes: body.internal_notes ?? null,
+      order_id: orderId,
+      deal_no: dealNo,
       created_by_account_id: auth.account_id,
     })
     .select("id, po_no")

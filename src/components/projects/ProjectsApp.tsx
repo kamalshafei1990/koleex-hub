@@ -20,6 +20,7 @@ import { useTranslation } from "@/lib/i18n";
 import { usePermissions } from "@/lib/permissions";
 import { getCurrentAccountIdSync } from "@/lib/identity";
 import { projectsT } from "@/lib/translations/projects";
+import { useTabMotion } from "@/components/ui/useTabMotion";
 import { ScrollLockOverlay } from "@/hooks/useScrollLock";
 import ArrowLeftIcon from "@/components/icons/ui/ArrowLeftIcon";
 import PlusIcon from "@/components/icons/ui/PlusIcon";
@@ -86,10 +87,14 @@ import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 
 type TabId = "projects" | "mine" | "all" | "reporting" | "config";
 
+/* Strip order — feeds the directional tab motion (kx-tab-fwd / kx-tab-back). */
+const TAB_ORDER: TabId[] = ["projects", "mine", "all", "reporting", "config"];
+
 export default function ProjectsApp() {
   const { t } = useTranslation(projectsT);
   const searchPlaceholder = useSearchPlaceholder("projects");
   const [tab, setTab] = useState<TabId>("projects");
+  const tabMotion = useTabMotion(TAB_ORDER.indexOf(tab));
   const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
 
   // Shared tag cache — loaded once, consumed by every task card.
@@ -145,11 +150,13 @@ export default function ProjectsApp() {
             searchPlaceholder={searchPlaceholder}
           />
 
-          {tab === "projects" && <ProjectsListView onOpenProject={setActiveProjectId} />}
-          {tab === "mine" && <TasksListView mine tags={tags} />}
-          {tab === "all" && <TasksListView mine={false} tags={tags} />}
-          {tab === "reporting" && <ReportingView />}
-          {tab === "config" && <ConfigurationView tags={tags} reloadTags={reloadTags} />}
+          <div key={tab} className={tabMotion}>
+            {tab === "projects" && <ProjectsListView onOpenProject={setActiveProjectId} />}
+            {tab === "mine" && <TasksListView mine tags={tags} />}
+            {tab === "all" && <TasksListView mine={false} tags={tags} />}
+            {tab === "reporting" && <ReportingView />}
+            {tab === "config" && <ConfigurationView tags={tags} reloadTags={reloadTags} />}
+          </div>
         </div>
       </div>
     </div>

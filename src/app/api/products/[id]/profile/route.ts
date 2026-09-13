@@ -67,16 +67,23 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
      display only, never copy them into Product Data (binding rule). */
   const supplierIds = ((suppliers.data ?? []) as Array<{ supplier_id: string | null }>)
     .map((r) => r.supplier_id).filter((v): v is string => !!v);
-  const supplierNames = new Map<string, { name: string; logo: string | null }>();
+  const supplierNames = new Map<string, { name: string; logo: string | null; supply_type: string | null; incoterms: string | null }>();
   if (supplierIds.length) {
     const { data } = await supabaseServer
       .from("contacts")
-      .select("id, company_name_en, company_name_cn, display_name, photo_url, logo_url")
+      .select("id, company_name_en, company_name_cn, display_name, photo_url, logo_url, supplier_type, incoterms")
       .in("id", supplierIds);
     for (const c of (data ?? []) as Array<Record<string, string | null>>) {
       supplierNames.set(c.id as string, {
         name: c.company_name_en || c.display_name || c.company_name_cn || "—",
         logo: c.photo_url || c.logo_url || null,
+        /* Supply type & incoterms live on the supplier record (Suppliers
+           app; the contacts column is spelled supplier_type) — the link
+           table's columns of the same name are legacy (incoterms removed
+           from the form by owner, 2026-07-31), so the profile view reads
+           these instead of the always-empty link ones. */
+        supply_type: c.supplier_type || null,
+        incoterms: c.incoterms || null,
       });
     }
   }

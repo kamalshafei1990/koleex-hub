@@ -47,6 +47,7 @@ export { default as ClipboardCheckIcon } from "./ClipboardCheckIcon";
 export { default as ClockIcon } from "./ClockIcon";
 export { default as CogIcon } from "./CogIcon";
 export { default as CommentIcon } from "./CommentIcon";
+export { default as ContractIcon } from "./ContractIcon";
 export { default as CopyIcon } from "./CopyIcon";
 export { default as CornerUpLeftIcon } from "./CornerUpLeftIcon";
 export { default as CornerUpRightIcon } from "./CornerUpRightIcon";

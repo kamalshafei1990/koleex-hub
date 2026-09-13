@@ -1,3 +1,5 @@
+import { DEFAULT_AI_PERSONALIZATION, type AiPersonalization } from "@/lib/ai-personalization";
+
 /* ---------------------------------------------------------------------------
    Access Control Catalog — module keys, access levels, and preferences shape
    for the Accounts Manager v2 (Odoo-inspired) refactor.
@@ -356,6 +358,10 @@ export interface AccountPreferences {
      lives in lib/wallpaper.ts, and importing it would drag the catalogue into
      everything that reads an account. Absent means the Aurora wave field. */
   wallpaper?: { id: string; photoUrl?: string; photoPath?: string; fit?: string; dim?: number; tint?: string };
+  /* How Koleex AI speaks to this user: style dials, standing instructions,
+     memory controls. Shape and limits live in lib/ai-personalization.ts;
+     every prompt lane reads it from here. */
+  ai?: AiPersonalization;
 }
 
 /**
@@ -417,6 +423,7 @@ export const DEFAULT_PREFERENCES: Required<
     default_meeting_duration_min: 30,
     out_of_office: { enabled: false },
   },
+  ai: DEFAULT_AI_PERSONALIZATION,
 };
 
 /** Merge stored preferences with frontend defaults for display. */
@@ -488,6 +495,9 @@ export function withDefaults(
        Required<> on DEFAULT_PREFERENCES catches a missing DEFAULT; nothing
        catches a missing passthrough, which is why this comment exists. */
     wallpaper: p.wallpaper ?? DEFAULT_PREFERENCES.wallpaper,
+    /* Same passthrough, same reason as wallpaper: a key this function does
+       not name is a key every wholesale save deletes. */
+    ai: p.ai ?? DEFAULT_PREFERENCES.ai,
   };
 }
 

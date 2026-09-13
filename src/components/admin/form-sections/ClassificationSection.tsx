@@ -6,13 +6,12 @@ import { localizedName } from "@/lib/i18n-name";
 import { mkName, mkDesc } from "@/lib/machine-kinds-i18n";
 import type { DivisionRow, CategoryRow, SubcategoryRow } from "@/types/supabase";
 import type { ProductFormState } from "@/types/product-form";
-import { useMemo, useState, useEffect } from "react";
+import { useMemo, useState } from "react";
 import PlusIcon from "@/components/icons/ui/PlusIcon";
 import CheckIcon from "@/components/icons/ui/CheckIcon";
 import AngleLeftIcon from "@/components/icons/ui/AngleLeftIcon";
 import LayersIcon from "@/components/icons/ui/LayersIcon";
 import FolderTreeIcon from "@/components/icons/ui/FolderTreeIcon";
-import TagsIcon from "@/components/icons/ui/TagsIcon";
 import Image from "next/image";
 import { getDivisionIcon } from "@/components/icons/divisions";
 import {
@@ -110,7 +109,7 @@ function MonoIcon({ src, className }: { src: string; className?: string }) {
 
 export default function ClassificationSection({
   data, onChange, divisions, categories, subcategories,
-  divisionLogos, categoryLogos, subcategoryLogos,
+  divisionLogos, categoryLogos,
   iconOverrides,
   onClickCreateDivision, onClickCreateCategory, onClickCreateSubcategory,
   machineKindSlug = "",

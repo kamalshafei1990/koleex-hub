@@ -59,7 +59,7 @@ export async function resolveProductSearchReach(q: string, tenantId: string): Pr
   const terms: string[] = [];
   let capped = false;
 
-  const [models, divisions, categories, subcategories, suppliers] = await Promise.all([
+  const [models, divisions, categories, subcategories, suppliers, supplierWords, translations] = await Promise.all([
     /* Model code, primary model, Koleex SKU, slug AND the models' Chinese /
        other-language names — all of it in ONE indexed column that the database
        maintains (migration `product_models_search_text_generated_column`).
@@ -91,6 +91,24 @@ export async function resolveProductSearchReach(q: string, tenantId: string): Pr
       .eq("contact_type", "supplier")
       .or([`display_name.ilike.${like}`, `company_name.ilike.${like}`, `legal_name.ilike.${like}`].join(","))
       .limit(MAX_IDS),
+    /* THE SUPPLIER TAB'S OWN WORDS (owner request 2026-08-29): the supplier's
+       model code, their product name and its translations, the price notes,
+       and the price-ladder notes — one generated column, one trigram index
+       (migration supplier_translations_search_text). Typing "Raised Height"
+       or the supplier's A7 code now finds the product. */
+    supabaseServer
+      .from("product_suppliers")
+      .select("product_id")
+      .ilike("search_text", like)
+      .limit(MAX_IDS + 1),
+    /* THE HERO TAB'S TRANSLATED WORDS: per-locale product name, tagline,
+       excerpt and description live in product_translations — this is where
+       the Chinese/Arabic product names actually are. Same migration. */
+    supabaseServer
+      .from("product_translations")
+      .select("product_id")
+      .ilike("search_text", like)
+      .limit(MAX_IDS + 1),
   ]);
 
   /* One dependent hop, and only when a supplier name actually matched — a
@@ -112,6 +130,7 @@ export async function resolveProductSearchReach(q: string, tenantId: string): Pr
     ["product_models", models],
     ["divisions", divisions], ["categories", categories], ["subcategories", subcategories],
     ["contacts(supplier)", suppliers], ["product_suppliers", supplierLinks],
+    ["product_suppliers(words)", supplierWords], ["product_translations", translations],
   ] as const) {
     if (res?.error) console.error(`[product-search] ${name} lookup failed:`, res.error.message);
   }
@@ -119,6 +138,8 @@ export async function resolveProductSearchReach(q: string, tenantId: string): Pr
   const modelRows = [
     ...((models.data ?? []) as { product_id: string | null }[]),
     ...((supplierLinks?.data ?? []) as { product_id: string | null }[]),
+    ...((supplierWords.data ?? []) as { product_id: string | null }[]),
+    ...((translations.data ?? []) as { product_id: string | null }[]),
   ];
   const modelIds = Array.from(
     new Set(modelRows.map((r) => r.product_id).filter(Boolean) as string[]),

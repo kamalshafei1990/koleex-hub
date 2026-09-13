@@ -205,7 +205,7 @@ export default function CollectionDetail({ cid }: { cid: string }) {
             <label className="mb-2 block">
               <span className="mb-1 block text-[10.5px] uppercase tracking-wide text-[var(--text-dim)]">{t("vl.colDetail.preferredStyle", "Preferred style")}</span>
               <select value={col.preferred_style ?? ""} onChange={(e) => colAction({ preferred_style: e.target.value || null })}
-                className="w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-card)] px-2.5 py-1.5 text-[12px] text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)]">
+                className="w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-secondary)] px-2.5 py-1.5 text-[12px] text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)]">
                 <option value="">—</option>
                 {COLLECTION_STYLES.map((s) => <option key={s} value={s}>{s.replace(/_/g, " ")}</option>)}
               </select>
@@ -231,7 +231,7 @@ export default function CollectionDetail({ cid }: { cid: string }) {
 }
 
 function Tag({ children }: { children: React.ReactNode }) {
-  return <span className="rounded-full border border-[var(--border-subtle)] bg-[var(--bg-card)] px-2 py-0.5 capitalize">{children}</span>;
+  return <span className="rounded-full border border-[var(--border-subtle)] bg-[var(--bg-secondary)] px-2 py-0.5 capitalize">{children}</span>;
 }
 
 function IntelBlock({ label, rows, fmt, empty }: { label: string; rows?: { value: string; count: number }[]; fmt?: (v: string) => string; empty?: string }) {
@@ -243,7 +243,7 @@ function IntelBlock({ label, rows, fmt, empty }: { label: string; rows?: { value
       ) : (
         <div className="mt-1.5 flex flex-wrap gap-1.5">
           {rows.map((r) => (
-            <span key={r.value} className="inline-flex items-center gap-1 rounded-full border border-[var(--border-subtle)] bg-[var(--bg-card)] px-2 py-0.5 text-[11px] text-[var(--text-muted)]">
+            <span key={r.value} className="inline-flex items-center gap-1 rounded-full border border-[var(--border-subtle)] bg-[var(--bg-secondary)] px-2 py-0.5 text-[11px] text-[var(--text-muted)]">
               <span className="capitalize">{fmt ? fmt(r.value) : r.value}</span>
               <span className="tabular-nums text-[var(--text-dim)]">{r.count}</span>
             </span>
@@ -298,7 +298,7 @@ function AddAssets({ cid, existing, onAdded }: { cid: string; existing: Set<stri
   return (
     <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-2.5">
       <div className="flex items-center gap-2">
-        <div className="flex min-w-0 flex-1 items-center gap-2 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-card)] px-3 py-2 focus-within:border-[var(--border-focus)]">
+        <div className="flex min-w-0 flex-1 items-center gap-2 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-secondary)] px-3 py-2 focus-within:border-[var(--border-focus)]">
           <PlusIcon size={13} className="shrink-0 text-[var(--text-dim)]" />
           <input value={q} onChange={(e) => setQ(e.target.value)} placeholder={t("vl.colDetail.addSearchPlaceholder", "Search the library to add assets…")} className="min-w-0 flex-1 bg-transparent text-[12.5px] outline-none placeholder:text-[var(--text-dim)]" />
           {searching && <SpinnerIcon size={13} className="text-[var(--text-dim)]" />}
@@ -313,7 +313,7 @@ function AddAssets({ cid, existing, onAdded }: { cid: string; existing: Set<stri
         <div className="mt-2 flex flex-wrap gap-1.5">
           {results.map((a) => (
             <button key={a.id} type="button" disabled={adding === a.id} onClick={() => add(a.id)}
-              className="inline-flex items-center gap-1.5 rounded-full border border-[var(--border-subtle)] bg-[var(--bg-card)] py-1 pl-1 pr-2.5 text-[11.5px] text-[var(--text-primary)] hover:border-[var(--border-color)] disabled:opacity-50">
+              className="inline-flex items-center gap-1.5 rounded-full border border-[var(--border-subtle)] bg-[var(--bg-secondary)] py-1 pl-1 pr-2.5 text-[11.5px] text-[var(--text-primary)] hover:border-[var(--border-color)] disabled:opacity-50">
               <span className="flex h-5 w-5 items-center justify-center rounded-full bg-white">
                 {a.public_url ? (
                   // eslint-disable-next-line @next/next/no-img-element

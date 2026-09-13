@@ -1208,6 +1208,26 @@ const SUBCATEGORY_TO_TEMPLATE: Record<string, string> = {
   "collar-machines": "single-needle-lockstitch",
   "sleeve-setting-machines": "single-needle-lockstitch",
 
+  /* CL-0024 — six shelves created 2026-08-20 (fur, carpet, flatlock,
+     template, tape, pintuck). Mapped to the CLOSEST form template, same
+     convention as the automatic units below — the slug must resolve or the
+     legacy form renders nothing. */
+  "flatlock-machines": "flatlock-interlock",
+  "carpet-overedging-machines": "overlock",
+  "fur-sewing-machines": "single-needle-lockstitch",
+  "template-sewing-machines": "single-needle-lockstitch",
+  "tape-attaching-units": "single-needle-lockstitch",
+  "pintuck-sewing-units": "single-needle-lockstitch",
+  /* CL-0025 — four approved-backlog shelves applied 2026-08-20. */
+  "ultrasonic-sewing-machines": "single-needle-lockstitch",
+  "elastic-attaching-machines": "flatlock-interlock",
+  "belt-loop-attaching-units": "bartacking",
+  "dart-sewing-units": "single-needle-lockstitch",
+  /* CL-0026 — the JOOKE decision paper executed (D1-A, D2-A, D3-A). */
+  "glue-dispensing-machines": "single-needle-lockstitch",
+  "bra-hardware-machines": "button-attach",
+  "garment-prep-units": "single-needle-lockstitch",
+
   // Leather & footwear
   "shoe-sewing-machines": "single-needle-lockstitch",
   "bag-sewing-machines": "single-needle-lockstitch",

@@ -7,7 +7,7 @@
    Zone B: All Apps (category chips + flat grid)
    --------------------------------------------------------------------------- */
 
-import { useState, useEffect, useMemo, useCallback, useRef, memo } from "react";
+import { useState, useEffect, useMemo, useCallback, useRef, useSyncExternalStore, memo } from "react";
 import dynamic from "next/dynamic";
 import { useRouter, usePathname } from "next/navigation";
 import SearchIcon from "@/components/icons/ui/SearchIcon";
@@ -27,6 +27,7 @@ import {
 import { getCurrentAccountIdSync, useCurrentAccount } from "@/lib/identity";
 import AppLaunchLink from "@/components/layout/AppLaunchLink";
 import { useAppBadges } from "@/lib/app-badges";
+import { todoListUrl } from "@/lib/todo-list-url";
 import BoundIcon from "@/components/common/BoundIcon";
 import { idlePreloadApps, isPreloadAllowed, readNetworkContext } from "@/lib/app-prefetch";
 import { preloadAppChunk, hasChunkPreloader } from "@/lib/app-chunk-preload";
@@ -35,6 +36,49 @@ import { useAfterInteractive } from "@/lib/perf/use-after-interactive";
 import { usePermittedModules } from "@/lib/use-scope";
 import { getMeBootstrapLastError, retryMeBootstrap, useMeBootstrap } from "@/lib/me-bootstrap";
 import { useShortcutHint } from "@/lib/ui/use-shortcut-hint";
+/* Home dashboard is code-split: it only matters after the grid is usable,
+   and keeping it out of the critical chunk protects the home budget. */
+/* Timezone label — computed once per client, cached at module level.
+   e.g. "Dubai (GMT+4)". */
+const noopSubscribe = () => () => {};
+let tzLabelCache: string | null = null;
+function getTzLabel(): string {
+  if (tzLabelCache === null) {
+    try {
+      const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+      const city = tz.split("/").pop()?.replace(/_/g, " ") || tz;
+      const offset = -new Date().getTimezoneOffset();
+      const sign = offset >= 0 ? "+" : "-";
+      const hrs = Math.floor(Math.abs(offset) / 60);
+      const mins = Math.abs(offset) % 60;
+      tzLabelCache = `${city} (GMT${sign}${hrs}${mins ? `:${mins.toString().padStart(2, "0")}` : ""})`;
+    } catch {
+      tzLabelCache = "";
+    }
+  }
+  return tzLabelCache;
+}
+
+const HomeDashboard = dynamic(() => import("@/components/home/HomeDashboard"), { ssr: false });
+/* ── DARK-LAUNCH SWITCH (owner rule, 2026-08-20; widened 2026-08-22) ──
+   The dashboard is still being built and must NOT appear on production —
+   but three sessions share this tree and any of them pushing main would
+   carry it out. This gate keeps it dark wherever the flag is absent, and
+   is inlined at build time so a build without it tree-shakes the chunk
+   away entirely.
+
+   The `NODE_ENV === "development"` half is GONE on purpose. Production was
+   already clean — measured 2026-08-22, zero dashboard cards on prod Home —
+   but a development tree still painted 56 of them, which is what the owner
+   was actually looking at when he said "remove any dashboard cards from
+   home screen, we will work on it later then add it back". Off everywhere
+   is the honest reading of that, and it keeps every session's local Home
+   showing the same thing production shows.
+
+   TO BRING IT BACK: set NEXT_PUBLIC_HOME_DASHBOARD=1 (locally in
+   .env.local, or on Vercel when it is ready to ship). No code change —
+   the component, its data route and its widgets are all untouched. */
+const HOME_DASHBOARD_ON = process.env.NEXT_PUBLIC_HOME_DASHBOARD === "1";
 import { useSkin } from "@/lib/appearance";
 /* A canvas and a draw loop must never sit in Home's boot chunk — Home is the
    most-opened screen in the Hub and its budget is the tightest one there is.
@@ -58,7 +102,7 @@ function getGreetingKey(): string {
    apps whose list endpoint sends max-age/stale-while-revalidate AND whose
    client fetches in the default (cacheable) mode, so the warm entry is actually
    reused. Fire-and-forget; a miss is harmless. */
-const APP_DATA_PREFETCH: Record<string, string> = {
+const APP_DATA_PREFETCH: Record<string, string | (() => string)> = {
   /* MUST match the catalogue's request BYTE FOR BYTE or the warm entry is a
      different cache key and the download is pure waste. It has been wrong
      twice now: first the bare /api/products (the full 80-column projection),
@@ -69,7 +113,9 @@ const APP_DATA_PREFETCH: Record<string, string> = {
   products: "/api/products?view=list&paged=1&pageSize=150&division=garment-machinery&status=active",
   "product-data": "/api/products?view=list&paged=1&pageSize=150",
   projects: "/api/projects",
-  todo: "/api/todos",
+  /* To-do appends ?v=<write version> (busts its 30s HTTP cache after a
+     write) — the prefetch must build the same key, hence the function. */
+  todo: todoListUrl,
   accounts: "/api/accounts",
   customers: "/api/contacts?type=customer",
   suppliers: "/api/contacts?type=supplier",
@@ -95,7 +141,10 @@ function ClockWidget({ dk = true }: { dk?: boolean }) {
     pm: false,
     blink: true,
   });
-  const [tzLabel, setTzLabel] = useState("");
+  /* Timezone never changes within a session: read once on the client via
+     useSyncExternalStore (server snapshot is "", matching the old initial
+     state, so the static prerender still hydrates cleanly). */
+  const tzLabel = useSyncExternalStore(noopSubscribe, getTzLabel, () => "");
   const [dateLabel, setDateLabel] = useState("");
 
   /* The clock, the date and the timezone label are all seeded in an EFFECT, not
@@ -137,20 +186,6 @@ function ClockWidget({ dk = true }: { dk?: boolean }) {
       if (document.visibilityState === "visible") tick();
     };
     document.addEventListener("visibilitychange", onClockVis);
-
-    /* Timezone label — e.g. "Dubai (GMT+4)" */
-    try {
-      const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
-      const city = tz.split("/").pop()?.replace(/_/g, " ") || tz;
-      const offset = -new Date().getTimezoneOffset();
-      const sign = offset >= 0 ? "+" : "-";
-      const hrs = Math.floor(Math.abs(offset) / 60);
-      const mins = Math.abs(offset) % 60;
-      const gmtStr = `GMT${sign}${hrs}${mins ? `:${mins.toString().padStart(2, "0")}` : ""}`;
-      setTzLabel(`${city} (${gmtStr})`);
-    } catch {
-      setTzLabel("");
-    }
 
     return () => {
       clearInterval(id);
@@ -552,10 +587,11 @@ export default function HomePage() {
   /* ── Search + filter ── */
   const shortcut = useShortcutHint(); // platform-aware ⌘K / Ctrl K label + tooltip
   const [search, setSearch] = useState("");
-  const [activeCategory, setActiveCategory] = useState("all");
+  /* Category chips were removed from the grid; the filter plumbing stays
+     for their return, pinned to "all" until then. */
+  const [activeCategory] = useState("all");
 
   /* ── Per-user data ── */
-  const [dataLoaded, setDataLoaded] = useState(false);
   const accountIdRef = useRef<string | null>(null);
   /* Unread Discuss messages → notification badge on the Discuss app tile.
      Mirrors the NotificationBell source of truth (fetchMyChannels +
@@ -578,7 +614,6 @@ export default function HomePage() {
   useEffect(() => {
     const id = getCurrentAccountIdSync();
     accountIdRef.current = id;
-    setDataLoaded(true);
   }, []);
 
   /* ── Discuss unread badge ──
@@ -708,7 +743,8 @@ export default function HomePage() {
       try { router.prefetch(app.route); } catch { /* ignore */ }
       /* Warm the app's data too (default cache mode → populates the browser
          HTTP cache), so the app's own fetch on mount is served from cache. */
-      const dataUrl = APP_DATA_PREFETCH[app.id];
+      const entry = APP_DATA_PREFETCH[app.id];
+      const dataUrl = typeof entry === "function" ? entry() : entry;
       if (dataUrl) {
         try { void fetch(dataUrl, { credentials: "include" }).catch(() => {}); } catch { /* ignore */ }
       }
@@ -802,13 +838,6 @@ export default function HomePage() {
     })).filter((g) => g.apps.length > 0);
   }, [isSearchOrFilter, visibleRegistry]);
 
-  const dateLocale = dateLocaleFor(lang);
-  const today = new Date().toLocaleDateString(dateLocale, {
-    weekday: "long", year: "numeric", month: "long", day: "numeric",
-  });
-
-  const activeCount = filteredApps.filter((a) => a.active).length;
-  const totalCount = filteredApps.length;
 
   /* Tier-A idle preload (evidence-based). Once the permitted set is known and
      the network/device permits, warm the few most-launched apps the user is
@@ -920,7 +949,7 @@ export default function HomePage() {
         .kx-grid > * { animation: kx-tile-in 150ms ease-out both; }
         @media (prefers-reduced-motion: reduce) { .kx-grid > * { animation: none; } }
       `}</style>
-      <div className="relative z-10 px-4 md:px-10 py-5 md:py-6 pb-20 max-w-[1400px] mx-auto">
+      <div data-kx-home-stage="" className="relative z-10 px-4 md:px-10 py-5 md:py-6 pb-20 max-w-[1400px] mx-auto">
 
         {/* ── Header: Greeting + Clock + Date ── */}
         {/* min-height = card (~96px) + the orb's 27px float amplitude on
@@ -983,6 +1012,12 @@ export default function HomePage() {
           </div>
         </div>
 
+        {/* ── Zone B: the Dashboard (owner call 2026-08-20: the FULL dashboard
+            lives on Home, in the slab style cloned from his references).
+            One request (/api/dashboard, no-store), server-side permission
+            filtering, renders nothing at all for accounts with no visible
+            widgets — the grid below is untouched for them. */}
+        {HOME_DASHBOARD_ON && <HomeDashboard />}
 
         {/* Mobile-resilience: while the permission bootstrap is in
             flight or has failed (timeout / 5xx / lost mobile signal),
@@ -1278,20 +1313,43 @@ function BootstrapErrorBanner({ dk, onRetry }: { dk: boolean; onRetry: () => voi
           {/* Elected primary (R-2) — the old emerald chip predated the
               element election and matched nothing in the system. */}
           {isAuth ? (
-            /* eslint-disable-next-line @next/next/no-html-link-for-pages --
-               A FULL page load is the point. The session just failed, so the
-               client state is the thing we are trying to discard; <Link> would
-               soft-navigate and carry it straight back. */
-            <a
-              /* The root IS the sign-in screen: AdminAuth renders the username
-                 + password form in place when there is no session. This used to
-                 point at /login, a second form that asked for an EMAIL and
-                 belonged to an auth system that is switched off. */
-              href="/"
+            /* THIS BUTTON USED TO BE `<a href="/">`, AND IT COULD NOT WORK.
+               A full page load was the right instinct — the client state is
+               what we are discarding — but a reload alone leaves the REJECTED
+               COOKIE in place. The root only renders the sign-in form when
+               there is NO session cookie; with a cookie the server refuses,
+               the page decides you are signed in, renders the Hub, every API
+               call 401s, this banner reappears, and pressing the button
+               returns you to the exact same state. A closed loop with no way
+               out from inside the product.
+
+               Observed in production, not theorised: 560 responses of 401
+               across every API route in three hours, and ZERO requests to
+               /api/auth/signin in the same window — the owner pressed this
+               button repeatedly and it never once attempted a sign-in.
+
+               So it signs out FIRST. `keepalive` lets the request survive the
+               navigation, and the reload happens whether or not the POST
+               succeeds: a cleanup that can strand the user when it fails is
+               worse than the bug it fixes. */
+            <button
+              type="button"
+              onClick={async () => {
+                try {
+                  await fetch("/api/auth/signout", { method: "POST", keepalive: true });
+                } catch {
+                  /* Offline, blocked, mid-deploy — the reload still has to
+                     happen. Worst case the cookie survives and the user is
+                     where they already were. */
+                }
+                /* location.assign, not <Link>: a soft navigation would carry
+                   the client state we are trying to throw away. */
+                window.location.assign("/");
+              }}
               className="inline-flex items-center gap-2 h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold hover:opacity-90 transition-all shadow-lg"
             >
               Sign in again
-            </a>
+            </button>
           ) : (
             <button
               type="button"

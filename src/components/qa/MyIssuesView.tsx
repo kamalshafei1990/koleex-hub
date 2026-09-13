@@ -70,7 +70,7 @@ export default function MyIssuesView() {
   return (
     <div className={shell}>
       {/* Header strip */}
-      <div className="sticky top-0 z-20 -mx-4 mb-4 border-b border-[var(--border-subtle)] bg-[var(--bg-primary)]/95 px-4 py-3 backdrop-blur md:-mx-6 md:px-6">
+      <div className="sticky top-0 z-20 -mx-4 mb-4 border-b border-[var(--border-subtle)] bg-[var(--bg-secondary)] px-4 py-3 backdrop-blur md:-mx-6 md:px-6">
         <div className="flex flex-wrap items-center justify-between gap-2 text-[12px]">
           <div className="flex items-center gap-2">
             <Link

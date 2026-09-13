@@ -46,6 +46,7 @@ import {
 } from "@/lib/docs-sync";
 import { useQuotationCollab } from "@/lib/quotation-collab";
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
+import DocTitlePicker from "@/components/quotations/DocTitlePicker";
 
 /* ON DEMAND, not on arrival. These two open when someone clicks "add product"
    or "pick customer" — most visits to the list never do either, and a static
@@ -172,6 +173,16 @@ export interface Quotation {
      formatted text is also baked into `terms` for the printed doc.
      All optional — legacy quotes have these undefined. */
   paymentTermId?: string;
+  /* Heading this document prints under — see DocTitlePicker. Stored on the
+     doc so the same record can go out as a Proforma Invoice now and a
+     Commercial Invoice later. */
+  docTitleId?: string;
+  docTitleText?: string;
+  docTitleNoun?: string;
+  /* The chosen title's stable code (e.g. "proforma_invoice"). Read for
+     behaviour; docTitleText is only ever for printing. */
+  docTitleCode?: string;
+  docTitleValidity?: boolean;
   incotermId?: string;
   /* Picked Incoterm's short code (FOB, CIF, DDP, ...). Stored
      alongside incotermId so the items-table header can show the
@@ -374,6 +385,11 @@ export function fromRow(row: RemoteDocRow): Quotation {
     signatureUrl: doc.signatureUrl,
     customerContactId: doc.customerContactId,
     paymentTermId: doc.paymentTermId,
+    docTitleId: doc.docTitleId,
+    docTitleText: doc.docTitleText,
+    docTitleNoun: doc.docTitleNoun,
+    docTitleCode: doc.docTitleCode,
+    docTitleValidity: doc.docTitleValidity,
     incotermId: doc.incotermId,
     incotermCode: doc.incotermCode,
     incotermLocation: doc.incotermLocation,
@@ -1313,6 +1329,31 @@ export default function Quotations() {
     setView("editor");
   }, [markSaved]);
 
+  /* ── Deep link ──
+     /quotations?doc=<id> opens that quotation straight into the editor, so
+     an order's "KL2026-1520" is a link rather than an instruction to go and
+     find it in a list.
+
+     Fires ONCE via a ref, reading the id rather than watching it, so Back
+     returns to the list instead of pulling the reader straight back in.
+     markSaved sets the dirty baseline — without it the editor would think
+     the freshly-loaded quotation had unsaved edits. */
+  const deepLinkedRef = useRef(false);
+  useEffect(() => {
+    if (deepLinkedRef.current) return;
+    const id = new URLSearchParams(window.location.search).get("doc");
+    if (!id || id.length !== 36) return;
+    deepLinkedRef.current = true;
+    void (async () => {
+      const row = await fetchDocOne(QUOTATIONS_SYNC, id);
+      if (!row) return;
+      const loaded = fromRow(row);
+      setCurrent(loaded);
+      markSaved(loaded);
+      setView("editor");
+    })();
+  }, [markSaved]);
+
   /* ── Open existing ──
      The list endpoint strips `items` from the doc payload to keep the
      response small, so the row coming from the list view has no items.
@@ -2105,6 +2146,54 @@ export default function Quotations() {
     [current],
   );
 
+  /* Save the typed party details as a CRM customer.
+
+     A details card filled by hand is a dead end otherwise: the buyer exists
+     on this one document and the operator retypes them on the next. Creating
+     the customer also earns them a permanent code (BD-100 …), which is what
+     makes the same buyer recognisable across every document afterwards.
+
+     The new customer is linked straight back onto the document, so the button
+     disappears and the card behaves exactly as if it had been picked from the
+     CRM in the first place. */
+  const [savingCustomer, setSavingCustomer] = useState(false);
+  const saveCurrentPartyAsCustomer = useCallback(async () => {
+    if (!current || savingCustomer) return;
+    const name = (current.customerName || current.companyName || "").trim();
+    if (!name) return;
+
+    setSavingCustomer(true);
+    try {
+      const res = await fetch("/api/customers", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name,
+          company_name: current.companyName?.trim() || null,
+          email: current.toEmail?.trim() || null,
+          phone: current.toPhone?.trim() || null,
+          /* The card holds a free-text address; the country is parsed out of
+             its last line, which is where an export address puts it. A wrong
+             guess only costs an XX- prefix, never a failed save. */
+          country: (current.toAddress || "").split(/[\n,]/).map((x) => x.trim()).filter(Boolean).pop() || null,
+        }),
+      });
+      const json = (await res.json().catch(() => null)) as
+        | { customer?: { id: string; customer_code: string | null }; error?: string }
+        | null;
+      if (!res.ok || !json?.customer) {
+        alert(json?.error ?? "Could not save the customer.");
+        return;
+      }
+      setCurrent((q) => (q ? { ...q, customerContactId: json.customer!.id } : q));
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "Could not save the customer.");
+    } finally {
+      setSavingCustomer(false);
+    }
+  }, [current, savingCustomer]);
+
   /* Append a new item pre-filled from the catalog picker. If the
      bottom-most row is still completely blank (typical right after
      a "+ Add row"), replace it instead of appending — keeps the
@@ -2672,6 +2761,18 @@ export default function Quotations() {
           {hidePanels ? <EyeIcon size={15} /> : <EyeOffIcon size={15} />}
           {hidePanels ? "Show panels" : "Hide panels"}
         </button>
+        {/* Document heading — a top-level decision, so it sits in the
+            toolbar rather than inside Quick Fill. */}
+        <DocTitlePicker
+          titleId={current.docTitleId}
+          titleText={current.docTitleText}
+          fallbackLabel="QUOTATION"
+          onPick={({ id, text, noun, validity, code }) =>
+            setCurrent((q) =>
+              q ? { ...q, docTitleId: id, docTitleText: text, docTitleNoun: noun, docTitleValidity: validity, docTitleCode: code } : q,
+            )
+          }
+        />
         <div style={{ flex: 1 }} />
         {/* ── Presence — who else is on this quotation right now ── */}
         {peers.length > 0 && (
@@ -2981,6 +3082,8 @@ export default function Quotations() {
         addHeader={addHeader}
         onPickFromCatalog={() => setPickerOpen(true)}
         onPickCustomer={() => setCustomerPickerOpen(true)}
+        onSaveCustomer={saveCurrentPartyAsCustomer}
+        savingCustomer={savingCustomer}
         savedStampUrl={savedStampUrl}
         savedSignatureUrl={savedSignatureUrl}
         isSuperAdmin={isSuperAdmin}

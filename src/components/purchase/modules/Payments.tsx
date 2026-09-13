@@ -4,9 +4,9 @@
    Sales `invoice_payments` feed but for AP. Tracks 30/90/all-time
    spend tiles plus a recent list with payment method tone. */
 
-import { useCallback, useEffect, useMemo, useState } from "react";
-import type { PurchaseModuleProps } from "../shared";
-import { cardCls, formatMoney, formatDate, sectionTitleCls, TONE_KIND_AURORA } from "../shared";
+import { useMemo, useState } from "react";
+import type { PurchaseModuleProps, SupplierRef } from "../shared";
+import { cardCls, formatMoney, formatDate, sectionTitleCls, TONE_KIND_AURORA, supplierNames, usePurchaseList } from "../shared";
 import { useSkin } from "@/lib/appearance";
 import { NewPaymentDialog } from "../dialogs";
 import WalletIcon from "@/components/icons/ui/WalletIcon";
@@ -31,31 +31,19 @@ const METHOD_TONE: Record<string, string> = {
 
 export default function PaymentsModule({ t }: PurchaseModuleProps) {
   const aurora = useSkin() === "aurora";
-  const [rows, setRows] = useState<Payment[]>([]);
-  const [supplierName, setSupplierName] = useState<Map<string, string>>(new Map());
-  const [billNo, setBillNo] = useState<Map<string, string>>(new Map());
-  const [loading, setLoading] = useState(true);
   const [newOpen, setNewOpen] = useState(false);
-
-  const load = useCallback(async () => {
-    const res = await fetch("/api/purchase/list?resource=payments", { credentials: "include" });
-    const data = (res.ok ? await res.json() : { rows: [], bills: [], suppliers: [] }) as {
-      rows: Payment[];
-      bills: { id: string; bill_no: string | null }[];
-      suppliers: { id: string; display_name: string | null; company_name: string | null; full_name: string | null }[];
-    };
-
-    setRows(data.rows);
-    const bm = new Map<string, string>();
-    for (const b of data.bills) bm.set(b.id, b.bill_no || "");
-    setBillNo(bm);
-    const sm = new Map<string, string>();
-    for (const c of data.suppliers) sm.set(c.id, c.company_name || c.display_name || c.full_name || "—");
-    setSupplierName(sm);
-    setLoading(false);
-  }, []);
-
-  useEffect(() => { load(); }, [load]);
+  const { data, loading, reload: load } = usePurchaseList<{
+    rows: Payment[];
+    bills: { id: string; bill_no: string | null }[];
+    suppliers: SupplierRef[];
+  }>("payments");
+  const rows = useMemo(() => data?.rows ?? [], [data]);
+  const supplierName = useMemo(() => supplierNames(data?.suppliers), [data]);
+  const billNo = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const b of data?.bills ?? []) m.set(b.id, b.bill_no || "");
+    return m;
+  }, [data]);
 
   /* React-Compiler: anchor "now" once via useState so useMemo stays pure. */
   const [nowMs] = useState(() => Date.now());

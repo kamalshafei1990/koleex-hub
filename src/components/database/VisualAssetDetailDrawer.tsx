@@ -193,7 +193,7 @@ function AiField({ label, value, placeholder, onChange }: { label: string; value
     <label className="block py-1.5">
       <span className="mb-1 block text-[10.5px] font-medium uppercase tracking-wide text-[var(--text-dim)]">{label}</span>
       <textarea value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} rows={1}
-        className="w-full resize-y rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-card)] px-2.5 py-1.5 text-[12px] text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)] placeholder:text-[var(--text-dim)]" />
+        className="w-full resize-y rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-secondary)] px-2.5 py-1.5 text-[12px] text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)] placeholder:text-[var(--text-dim)]" />
     </label>
   );
 }
@@ -250,7 +250,7 @@ export default function VisualAssetDetailDrawer({
 
   return (
     <div className="fixed inset-0 z-[120] flex justify-end bg-black/60 backdrop-blur-sm" onClick={onClose}>
-      <div className="flex h-full w-full max-w-md flex-col border-l border-[var(--border-subtle)] bg-[var(--bg-card)]" onClick={(e) => e.stopPropagation()}>
+      <div className="flex h-full w-full max-w-md flex-col border-l border-[var(--border-subtle)] bg-[var(--bg-secondary)]" onClick={(e) => e.stopPropagation()}>
         {/* Header */}
         <div className="border-b border-[var(--border-subtle)] px-5 pt-4">
           <div className="flex items-start justify-between gap-3">
@@ -354,7 +354,7 @@ function OverviewTab({ asset, busy, fileRef, onFile, onPickFile }: {
           <div className="flex items-center justify-between gap-2">
             <span className="text-[11px] font-semibold uppercase tracking-wide text-[var(--text-dim)]">{t("vl.drawer.download", "Download")}</span>
             <label className="flex items-center gap-1.5 text-[11px] text-[var(--text-dim)]">{t("vl.drawer.size", "Size")}
-              <select value={dlSize} onChange={(e) => setDlSize(Number(e.target.value))} className="rounded-md border border-[var(--border-subtle)] bg-[var(--bg-card)] px-1.5 py-1 text-[11px] text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)]">
+              <select value={dlSize} onChange={(e) => setDlSize(Number(e.target.value))} className="rounded-md border border-[var(--border-subtle)] bg-[var(--bg-secondary)] px-1.5 py-1 text-[11px] text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)]">
                 {[64, 128, 256, 512, 1024].map((s) => <option key={s} value={s}>{s}px</option>)}
               </select>
             </label>
@@ -432,7 +432,7 @@ function SmallField({ label, value, placeholder, onChange }: { label: string; va
     <label className="block">
       <span className="mb-1 block text-[10px] uppercase tracking-wide text-[var(--text-dim)]">{label}</span>
       <input value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder}
-        className="w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-card)] px-2.5 py-1.5 text-[12px] text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)] placeholder:text-[var(--text-dim)]" />
+        className="w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-secondary)] px-2.5 py-1.5 text-[12px] text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)] placeholder:text-[var(--text-dim)]" />
     </label>
   );
 }

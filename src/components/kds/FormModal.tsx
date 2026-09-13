@@ -9,6 +9,7 @@
 
 import { useEffect, useRef } from "react";
 import CrossIcon from "@/components/icons/ui/CrossIcon";
+import { usePresence } from "./usePresence";
 
 interface Props {
   open: boolean;
@@ -36,15 +37,17 @@ export default function Modal({ open, onClose, title, subtitle, children, footer
     };
   }, [open, onClose]);
 
-  if (!open) return null;
+  /* Motion (owner-approved system 2026-08-21): pop in, shrink away. */
+  const { mounted, closing } = usePresence(open);
+  if (!mounted) return null;
 
   return (
     <div
       ref={overlayRef}
       onClick={(e) => { if (e.target === overlayRef.current) onClose(); }}
-      className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
+      className={`fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 transition-opacity duration-150 ${closing ? "opacity-0 pointer-events-none" : "opacity-100"}`}
     >
-      <div className={`${width} kx-glass-pop w-full bg-[var(--bg-secondary)] border border-[var(--border-subtle)] rounded-2xl shadow-2xl shadow-black/40 flex flex-col max-h-[85vh] animate-in fade-in zoom-in-95 duration-200`}>
+      <div className={`${width} kx-glass-pop kx-pop-in ${closing ? "kx-pop-closing" : ""} w-full bg-[var(--bg-secondary)] border border-[var(--border-subtle)] rounded-2xl shadow-2xl shadow-black/40 flex flex-col max-h-[85vh]`}>
         {/* Header */}
         <div className="flex items-start justify-between px-6 py-5 border-b border-[var(--border-subtle)] shrink-0">
           <div>

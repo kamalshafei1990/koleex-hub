@@ -11,7 +11,8 @@
    record, category cards) follows within the 60s cache window.
    --------------------------------------------------------------------------- */
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
+import { useWarmData } from "@/lib/warm-cache";
 import { useTranslation } from "@/lib/i18n";
 import { PRODUCTS_UI_I18N } from "@/lib/products-ui-i18n";
 import { fetchDivisions, fetchCategories, fetchSubcategories } from "@/lib/products-admin";
@@ -33,32 +34,36 @@ function Glyph({ url, className = "h-4 w-4" }: { url: string; className?: string
   );
 }
 
+type IconHubSnap = {
+  divisions: DivisionRow[];
+  categories: CategoryRow[];
+  subcategories: SubcategoryRow[];
+  bindings: BindingsMap;
+};
+
 export default function ClassificationIconHub() {
   const { t } = useTranslation(PRODUCTS_UI_I18N);
-  const [divisions, setDivisions] = useState<DivisionRow[]>([]);
-  const [categories, setCategories] = useState<CategoryRow[]>([]);
-  const [subcategories, setSubcategories] = useState<SubcategoryRow[]>([]);
-  const [bindings, setBindings] = useState<BindingsMap>({});
   const [pickDivId, setPickDivId] = useState<string>("");
   const [pickCatId, setPickCatId] = useState<string>("");
   const [pickSubSlug, setPickSubSlug] = useState<string>("");
   const [editing, setEditing] = useState<Node | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  const load = async () => {
+  /* Warm: the whole classification tree, none of it filtered server-side.
+     It is reference data that changes rarely and is read constantly, which
+     is the ideal shape for this cache. */
+  const fetchAll = useCallback(async (): Promise<IconHubSnap> => {
     const [d, c, sc, b] = await Promise.all([
       fetchDivisions().catch(() => []),
       fetchCategories().catch(() => []),
       fetchSubcategories().catch(() => []),
       fetchIconBindings(),
     ]);
-    setDivisions(d);
-    setCategories(c);
-    setSubcategories(sc);
-    setBindings(b);
-    setLoading(false);
-  };
-  useEffect(() => { void load(); }, []);
+    return { divisions: d, categories: c, subcategories: sc, bindings: b };
+  }, []);
+  const { data, loading, reload: load } = useWarmData<IconHubSnap>("db:classification-icons", fetchAll);
+  const divisions = useMemo(() => data?.divisions ?? [], [data]);
+  const categories = useMemo(() => data?.categories ?? [], [data]);
+  const subcategories = useMemo(() => data?.subcategories ?? [], [data]);
+  const bindings = useMemo(() => data?.bindings ?? ({} as BindingsMap), [data]);
 
   /* No selection = show EVERYTHING, ORGANIZED (owner: children grouped
      under their parent — categories by division, subcategories by category,
@@ -253,7 +258,10 @@ export default function ClassificationIconHub() {
           label={editing.name}
           currentUrl={iconOf(editing.level, editing.slug) ?? null}
           onClose={() => setEditing(null)}
-          onSaved={() => { invalidateIconBindings(); void fetchIconBindings().then(setBindings); }}
+          /* Reload the whole snapshot rather than patching bindings alone:
+             the cache holds one object, so a half-updated copy would be the
+             thing that gets shown on the next visit. */
+          onSaved={() => { invalidateIconBindings(); void load(); }}
         />
       )}
     </div>

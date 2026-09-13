@@ -100,7 +100,7 @@ export default function SemanticRelationships({
       {rels.length > 1 && (
         <div className="mb-2 flex flex-wrap items-center gap-2">
           <select value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)}
-            className="rounded-md border border-[var(--border-subtle)] bg-[var(--bg-card)] px-2 py-1 text-[11px] text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)]">
+            className="rounded-md border border-[var(--border-subtle)] bg-[var(--bg-secondary)] px-2 py-1 text-[11px] text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)]">
             <option value="">{t("vl.sem.all-types", "All types")}</option>
             {presentTypes.map((v) => <option key={v} value={v}>{t(`vl.relType.${v}`, RELATIONSHIP_LABEL[v as RelationshipType] ?? v)}</option>)}
           </select>

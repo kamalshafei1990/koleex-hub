@@ -176,7 +176,7 @@ const listMyTodos: ToolDef<
 
     if (error) {
       console.error("[tool.listMyTodos]", error);
-      return { ok: false, permissionStatus: "denied", data: null, message: "Couldn't load your tasks right now." };
+      return { ok: false, permissionStatus: "allowed", data: null, message: "Couldn't load your tasks right now." };
     }
 
     const rows = (data ?? []) as Array<Record<string, unknown>>;
@@ -217,7 +217,7 @@ const findTeamMember: ToolDef<
   minRole: "internal",
   handler: async (ctx, args): Promise<ToolResult<Array<Record<string, unknown>>>> => {
     const query = String(args.query ?? "").trim().toLowerCase();
-    if (!query) return { ok: false, permissionStatus: "denied", data: null, message: "Whose name should I look up?" };
+    if (!query) return { ok: false, permissionStatus: "allowed", data: null, message: "Whose name should I look up?" };
     const limit = Math.min(Math.max(Number(args.limit ?? 6) || 6, 1), 10);
 
     let all;
@@ -225,7 +225,7 @@ const findTeamMember: ToolDef<
       all = await listAssignableEmployees(ctx.auth.tenant_id);
     } catch (e) {
       console.error("[tool.findTeamMember]", e instanceof Error ? e.message : e);
-      return { ok: false, permissionStatus: "denied", data: null, message: "Couldn't search the team right now." };
+      return { ok: false, permissionStatus: "allowed", data: null, message: "Couldn't search the team right now." };
     }
 
     const matches = all
@@ -303,7 +303,7 @@ const createTodo: ToolDef<
   handler: async (ctx, args): Promise<ToolResult<Record<string, unknown> | { preview: Record<string, unknown> }>> => {
     const title = String(args.title ?? "").trim();
     if (!title) {
-      return { ok: false, permissionStatus: "denied", data: null, message: "What should the task be called? Give me a title." };
+      return { ok: false, permissionStatus: "allowed", data: null, message: "What should the task be called? Give me a title." };
     }
     const priority = ["low", "medium", "high"].includes(String(args.priority)) ? String(args.priority) : "medium";
     const normalized = {
@@ -328,14 +328,14 @@ const createTodo: ToolDef<
         all = await listAssignableEmployees(ctx.auth.tenant_id);
       } catch (e) {
         console.error("[tool.createTodo.assignees]", e instanceof Error ? e.message : e);
-        return { ok: false, permissionStatus: "denied", data: null, message: "Couldn't verify the assignees right now — please try again." };
+        return { ok: false, permissionStatus: "allowed", data: null, message: "Couldn't verify the assignees right now — please try again." };
       }
       const byId = new Map(all.map((a) => [a.account_id, a]));
       const unknown = requestedIds.filter((id) => !byId.has(id));
       if (unknown.length > 0) {
         return {
           ok: false,
-          permissionStatus: "denied",
+          permissionStatus: "allowed",
           data: null,
           message: "One or more assignees didn't match a real team member. Look each person up with findTeamMember and use the account_id it returns.",
         };
@@ -401,7 +401,7 @@ const createTodo: ToolDef<
 
     if (error) {
       console.error("[tool.createTodo]", error);
-      return { ok: false, permissionStatus: "denied", data: null, message: "Couldn't create the task — please try again." };
+      return { ok: false, permissionStatus: "allowed", data: null, message: "Couldn't create the task — please try again." };
     }
 
     /* Assignment fan-out — mirrors /api/todos POST: assignee rows, then an
@@ -468,8 +468,8 @@ const completeTodo: ToolDef<
   requiredAction: "create",
   handler: async (ctx, args): Promise<ToolResult<Record<string, unknown> | { preview: Record<string, unknown> }>> => {
     const id = String(args.task_id ?? "").trim();
-    if (!id) return { ok: false, permissionStatus: "denied", data: null, message: "Which task? Pick it from listMyTodos first." };
-    if (!isUuid(id)) return { ok: false, permissionStatus: "denied", data: null, message: BAD_ID_MESSAGE };
+    if (!id) return { ok: false, permissionStatus: "allowed", data: null, message: "Which task? Pick it from listMyTodos first." };
+    if (!isUuid(id)) return { ok: false, permissionStatus: "allowed", data: null, message: BAD_ID_MESSAGE };
     const done = args.done !== false;
 
     const [t, { data: assignee }] = await Promise.all([
@@ -481,7 +481,7 @@ const completeTodo: ToolDef<
         .eq("account_id", ctx.auth.account_id)
         .maybeSingle(),
     ]);
-    if (!t) return { ok: false, permissionStatus: "denied", data: null, message: "I can't find that task — pick it again from listMyTodos." };
+    if (!t) return { ok: false, permissionStatus: "allowed", data: null, message: "I can't find that task — pick it again from listMyTodos." };
 
     const acc = ctx.auth.account_id;
     const isOwner = ctx.isSuperAdmin || t.created_by_account_id === acc || t.assigned_by_account_id === acc;
@@ -544,7 +544,7 @@ const completeTodo: ToolDef<
         .eq("id", id);
       if (error) {
         console.error("[tool.completeTodo]", error);
-        return { ok: false, permissionStatus: "denied", data: null, message: "Couldn't update the task — please try again." };
+        return { ok: false, permissionStatus: "allowed", data: null, message: "Couldn't update the task — please try again." };
       }
       if (willSubmit && t.assigned_by_account_id && t.assigned_by_account_id !== acc) {
         await supabaseServer.from("inbox_messages").insert({
@@ -585,7 +585,7 @@ const completeTodo: ToolDef<
       .eq("id", id);
     if (error) {
       console.error("[tool.completeTodo]", error);
-      return { ok: false, permissionStatus: "denied", data: null, message: "Couldn't update the task — please try again." };
+      return { ok: false, permissionStatus: "allowed", data: null, message: "Couldn't update the task — please try again." };
     }
     return {
       ok: true,
@@ -633,11 +633,11 @@ const updateTodo: ToolDef<
   requiredAction: "edit",
   handler: async (ctx, args): Promise<ToolResult<Record<string, unknown> | { preview: Record<string, unknown> }>> => {
     const id = String(args.task_id ?? "").trim();
-    if (!id) return { ok: false, permissionStatus: "denied", data: null, message: "Which task? Pick it from listMyTodos first." };
-    if (!isUuid(id)) return { ok: false, permissionStatus: "denied", data: null, message: BAD_ID_MESSAGE };
+    if (!id) return { ok: false, permissionStatus: "allowed", data: null, message: "Which task? Pick it from listMyTodos first." };
+    if (!isUuid(id)) return { ok: false, permissionStatus: "allowed", data: null, message: BAD_ID_MESSAGE };
 
     const t = await loadTodoRow(id, ctx.auth.tenant_id);
-    if (!t) return { ok: false, permissionStatus: "denied", data: null, message: "I can't find that task — pick it again from listMyTodos." };
+    if (!t) return { ok: false, permissionStatus: "allowed", data: null, message: "I can't find that task — pick it again from listMyTodos." };
 
     const acc = ctx.auth.account_id;
     const isOwner = ctx.isSuperAdmin || t.created_by_account_id === acc || t.assigned_by_account_id === acc;
@@ -661,7 +661,7 @@ const updateTodo: ToolDef<
       changes.label = args.label.trim().toLowerCase() === "none" ? null : args.label.trim();
     }
     if (Object.keys(changes).length === 0) {
-      return { ok: false, permissionStatus: "denied", data: null, message: "Nothing to change — tell me what to update (title, description, priority, due date, or label)." };
+      return { ok: false, permissionStatus: "allowed", data: null, message: "Nothing to change — tell me what to update (title, description, priority, due date, or label)." };
     }
 
     const title = t.title ?? "Task";
@@ -689,7 +689,7 @@ const updateTodo: ToolDef<
       .eq("id", id);
     if (error) {
       console.error("[tool.updateTodo]", error);
-      return { ok: false, permissionStatus: "denied", data: null, message: "Couldn't update the task — please try again." };
+      return { ok: false, permissionStatus: "allowed", data: null, message: "Couldn't update the task — please try again." };
     }
     return {
       ok: true,
@@ -749,11 +749,11 @@ const reassignTodo: ToolDef<
   requiredAction: "edit",
   handler: async (ctx, args): Promise<ToolResult<Record<string, unknown> | { preview: Record<string, unknown> }>> => {
     const id = String(args.task_id ?? "").trim();
-    if (!id) return { ok: false, permissionStatus: "denied", data: null, message: "Which task? Pick it from listMyTodos first." };
-    if (!isUuid(id)) return { ok: false, permissionStatus: "denied", data: null, message: BAD_ID_MESSAGE };
+    if (!id) return { ok: false, permissionStatus: "allowed", data: null, message: "Which task? Pick it from listMyTodos first." };
+    if (!isUuid(id)) return { ok: false, permissionStatus: "allowed", data: null, message: BAD_ID_MESSAGE };
 
     const t = await loadTodoRow(id, ctx.auth.tenant_id);
-    if (!t) return { ok: false, permissionStatus: "denied", data: null, message: "I can't find that task — pick it again from listMyTodos." };
+    if (!t) return { ok: false, permissionStatus: "allowed", data: null, message: "I can't find that task — pick it again from listMyTodos." };
 
     const acc = ctx.auth.account_id;
     const isOwner = ctx.isSuperAdmin || t.created_by_account_id === acc || t.assigned_by_account_id === acc;
@@ -768,10 +768,10 @@ const reassignTodo: ToolDef<
     const hasReplace = args.replace_with_account_ids !== undefined;
     const replaceIds = norm(args.replace_with_account_ids);
     if (!hasReplace && addIds.length === 0 && removeIds.length === 0) {
-      return { ok: false, permissionStatus: "denied", data: null, message: "Tell me who to add or remove — or give me the complete new assignee list." };
+      return { ok: false, permissionStatus: "allowed", data: null, message: "Tell me who to add or remove — or give me the complete new assignee list." };
     }
     if (hasReplace && (addIds.length > 0 || removeIds.length > 0)) {
-      return { ok: false, permissionStatus: "denied", data: null, message: "Use either add/remove OR a full replacement list — not both in one call." };
+      return { ok: false, permissionStatus: "allowed", data: null, message: "Use either add/remove OR a full replacement list — not both in one call." };
     }
 
     const { data: curRows } = await supabaseServer
@@ -792,13 +792,13 @@ const reassignTodo: ToolDef<
       all = await listAssignableEmployees(ctx.auth.tenant_id);
     } catch (e) {
       console.error("[tool.reassignTodo]", e instanceof Error ? e.message : e);
-      return { ok: false, permissionStatus: "denied", data: null, message: "Couldn't verify the assignees right now — please try again." };
+      return { ok: false, permissionStatus: "allowed", data: null, message: "Couldn't verify the assignees right now — please try again." };
     }
     const byId = new Map(all.map((a) => [a.account_id, a]));
     if (nextIds.some((i) => !byId.has(i))) {
       return {
         ok: false,
-        permissionStatus: "denied",
+        permissionStatus: "allowed",
         data: null,
         message: "One or more people didn't match a real team member. Look each person up with findTeamMember and use the account_id it returns.",
       };
@@ -830,7 +830,7 @@ const reassignTodo: ToolDef<
     const { error: delErr } = await supabaseServer.from("koleex_todo_assignees").delete().eq("todo_id", id);
     if (delErr) {
       console.error("[tool.reassignTodo.delete]", delErr);
-      return { ok: false, permissionStatus: "denied", data: null, message: "Couldn't update the assignees — please try again." };
+      return { ok: false, permissionStatus: "allowed", data: null, message: "Couldn't update the assignees — please try again." };
     }
     if (nextIds.length > 0) {
       const { error: insErr } = await supabaseServer.from("koleex_todo_assignees").insert(
@@ -838,7 +838,7 @@ const reassignTodo: ToolDef<
       );
       if (insErr) {
         console.error("[tool.reassignTodo.insert]", insErr);
-        return { ok: false, permissionStatus: "denied", data: null, message: "Couldn't update the assignees — please try again." };
+        return { ok: false, permissionStatus: "allowed", data: null, message: "Couldn't update the assignees — please try again." };
       }
     }
 
@@ -889,11 +889,11 @@ const deleteTodo: ToolDef<
   requiredAction: "delete",
   handler: async (ctx, args): Promise<ToolResult<Record<string, unknown> | { preview: Record<string, unknown> }>> => {
     const id = String(args.task_id ?? "").trim();
-    if (!id) return { ok: false, permissionStatus: "denied", data: null, message: "Which task? Pick it from listMyTodos first." };
-    if (!isUuid(id)) return { ok: false, permissionStatus: "denied", data: null, message: BAD_ID_MESSAGE };
+    if (!id) return { ok: false, permissionStatus: "allowed", data: null, message: "Which task? Pick it from listMyTodos first." };
+    if (!isUuid(id)) return { ok: false, permissionStatus: "allowed", data: null, message: BAD_ID_MESSAGE };
 
     const t = await loadTodoRow(id, ctx.auth.tenant_id);
-    if (!t) return { ok: false, permissionStatus: "denied", data: null, message: "I can't find that task — pick it again from listMyTodos." };
+    if (!t) return { ok: false, permissionStatus: "allowed", data: null, message: "I can't find that task — pick it again from listMyTodos." };
 
     const acc = ctx.auth.account_id;
     const canDelete = ctx.isSuperAdmin || t.created_by_account_id === acc || t.assigned_by_account_id === acc;
@@ -915,7 +915,7 @@ const deleteTodo: ToolDef<
     const { error } = await supabaseServer.from("koleex_todos").delete().eq("id", id);
     if (error) {
       console.error("[tool.deleteTodo]", error);
-      return { ok: false, permissionStatus: "denied", data: null, message: "Couldn't delete the task — please try again." };
+      return { ok: false, permissionStatus: "allowed", data: null, message: "Couldn't delete the task — please try again." };
     }
     return {
       ok: true,

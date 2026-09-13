@@ -6,9 +6,9 @@
    we're buying with quantities + unit costs, and tracks how much
    has been received and billed against it. */
 
-import { useCallback, useEffect, useState } from "react";
-import type { PurchaseModuleProps } from "../shared";
-import { cardCls, formatMoney, formatDate, sectionTitleCls, STATUS_TONE_PO } from "../shared";
+import { useMemo, useState } from "react";
+import type { PurchaseModuleProps, SupplierRef } from "../shared";
+import { cardCls, formatMoney, formatDate, sectionTitleCls, STATUS_TONE_PO, supplierNames, usePurchaseList } from "../shared";
 import { NewPurchaseOrderDialog } from "../dialogs";
 import ReceiveDialog from "../ReceiveDialog";
 import BoxesIcon from "@/components/icons/ui/BoxesIcon";
@@ -24,28 +24,11 @@ type PO = {
 };
 
 export default function OrdersModule({ t }: PurchaseModuleProps) {
-  const [rows, setRows] = useState<PO[]>([]);
-  const [supplierName, setSupplierName] = useState<Map<string, string>>(new Map());
-  const [loading, setLoading] = useState(true);
   const [newOpen, setNewOpen] = useState(false);
   const [receivePoId, setReceivePoId] = useState<string | null>(null);
-
-  const load = useCallback(async () => {
-    const res = await fetch("/api/purchase/list?resource=orders", { credentials: "include" });
-    const data = (res.ok ? await res.json() : { rows: [], suppliers: [] }) as {
-      rows: PO[];
-      suppliers: { id: string; display_name: string | null; company_name: string | null; full_name: string | null }[];
-    };
-    setRows(data.rows);
-    const m = new Map<string, string>();
-    for (const c of data.suppliers) {
-      m.set(c.id, c.company_name || c.display_name || c.full_name || "—");
-    }
-    setSupplierName(m);
-    setLoading(false);
-  }, []);
-
-  useEffect(() => { load(); }, [load]);
+  const { data, loading, reload: load } = usePurchaseList<{ rows: PO[]; suppliers: SupplierRef[] }>("orders");
+  const rows = data?.rows ?? [];
+  const supplierName = useMemo(() => supplierNames(data?.suppliers), [data]);
 
   if (loading) return <div className="h-full flex items-center justify-center text-[var(--text-dim)]"><SpinnerIcon size={20} /></div>;
 

@@ -376,14 +376,22 @@ export default function AccountsList() {
               {t("acc.title")}
             </h1>
           </div>
-          <div className="flex items-center gap-2 shrink-0">
+          {/* WRAPS ON A PHONE. These four actions total ~506px and the row
+              carried shrink-0, so at 375px it ran 147px past the edge and
+              made the whole shell scroll sideways — measured: the
+              shell-content-offset pane had 147px of horizontal scroll on
+              /accounts, and nowhere else in the Hub. The parent already
+              wraps; this row refused to, so it left as one rigid block.
+              Below `sm` it becomes a full-width wrapping row of equal
+              buttons instead. */}
+          <div className="flex items-center gap-2 shrink-0 max-sm:w-full max-sm:mt-2 max-sm:flex-wrap max-sm:shrink">
             {/* The way IN to the review queue. It existed only as a link
                 inside a mail notification, so anyone who cleared the mail had
                 no route to it at all. The count is the point: a reviewer
                 should see there is work waiting without opening anything. */}
             <Link
               href="/accounts/requests"
-              className="h-10 px-4 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[var(--text-secondary)] text-[13px] font-semibold flex items-center gap-2 hover:text-[var(--text-primary)] transition-colors"
+              className="h-10 px-4 max-sm:flex-1 max-sm:justify-center max-sm:min-w-[calc(50%-0.25rem)] rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[var(--text-secondary)] text-[13px] font-semibold flex items-center gap-2 hover:text-[var(--text-primary)] transition-colors"
               title="Become Koleex Member — applications waiting for review"
             >
               Requests
@@ -395,7 +403,7 @@ export default function AccountsList() {
             </Link>
             <Link
               href="/accounts/login-security"
-              className="h-10 px-4 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[var(--text-secondary)] text-[13px] font-semibold flex items-center gap-2 hover:text-[var(--text-primary)] transition-colors"
+              className="h-10 px-4 max-sm:flex-1 max-sm:justify-center max-sm:min-w-[calc(50%-0.25rem)] rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[var(--text-secondary)] text-[13px] font-semibold flex items-center gap-2 hover:text-[var(--text-primary)] transition-colors"
               title="Login Security — observe-mode rate-limit analytics"
             >
               Security
@@ -403,12 +411,12 @@ export default function AccountsList() {
             <button
               type="button"
               onClick={() => { setBinOpen((o) => !o); if (!binOpen) loadBin(); }}
-              className="h-10 px-4 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[var(--text-secondary)] text-[13px] font-semibold flex items-center gap-2 hover:text-[var(--text-primary)] transition-colors"
+              className="h-10 px-4 max-sm:flex-1 max-sm:justify-center max-sm:min-w-[calc(50%-0.25rem)] rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[var(--text-secondary)] text-[13px] font-semibold flex items-center gap-2 hover:text-[var(--text-primary)] transition-colors"
               title={t("acc.bin.title")}
             >
               <TrashIcon className="h-3.5 w-3.5" /> {t("acc.bin.title")}
             </button>
-            <Link href="/accounts/new" className="h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold flex items-center gap-2 transition-all shadow-lg">
+            <Link href="/accounts/new" className="h-10 px-5 max-sm:flex-1 max-sm:justify-center max-sm:min-w-[calc(50%-0.25rem)] rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold flex items-center gap-2 transition-all shadow-lg">
               <PlusIcon className="h-4 w-4" /> {t("acc.newAccount")}
             </Link>
           </div>

@@ -15,6 +15,7 @@
    --------------------------------------------------------------------------- */
 
 import { useEffect, useRef } from "react";
+import { whenNetworkQuiet } from "@/lib/net-idle";
 import { usePathname } from "next/navigation";
 import { getDeviceId } from "@/lib/activity/device-id";
 import { routeToModule } from "@/lib/activity/modules";
@@ -118,11 +119,16 @@ export default function ActivityTracker() {
        Idle callback with a 3s ceiling, so it still starts promptly on a busy
        page. The revocation check rides this beat, but the normal cadence is
        already 30s — a few seconds later on the first one changes nothing. */
-    const startBeats = () => { void loop(); };
-    const ric = (window as Window & { requestIdleCallback?: (cb: () => void, o?: { timeout: number }) => number }).requestIdleCallback;
-    let startTimer: number | undefined;
-    if (ric) ric(startBeats, { timeout: 3000 });
-    else startTimer = window.setTimeout(startBeats, 1500);
+    /* NETWORK-quiet, not CPU-idle — measured 2026-08-21: this beat fired at
+       816ms into a screen open, INSIDE the nine-call pile-up it was written
+       to avoid, because requestIdleCallback reports main-thread idleness and
+       the main thread is perfectly idle while six fetches are in flight.
+       whenNetworkQuiet waits for the fetches instead. Same intent, correct
+       instrument; the ceiling keeps a chatty screen from starving presence. */
+    let cancelledStart = false;
+    const startBeats = () => { if (!cancelledStart) void loop(); };
+    void whenNetworkQuiet({ quietMs: 700, maxWaitMs: 6000 }).then(startBeats);
+    const startTimer: number | undefined = undefined;
 
     /* The catch-up ping is THROTTLED. Coming back to the tab fires an
        immediate beat, which is right for a real return — but a user flicking
@@ -161,6 +167,7 @@ export default function ActivityTracker() {
     window.addEventListener("pagehide", onLeave);
 
     return () => {
+      cancelledStart = true;
       stopped = true;
       if (timer !== undefined) window.clearTimeout(timer);
       if (startTimer !== undefined) window.clearTimeout(startTimer);

@@ -140,6 +140,13 @@ export const IMG = {
    *  containers and 96 was rendering too tight to be recognisable. */
   thumb: (url: string | null | undefined) =>
     cdnImage(url, { width: narrowViewport() ? 96 : 160, quality: 75, resize: "contain" }),
+  /** Catalogue LIST row photo (2026-08-29). The catalogue row shows a real
+   *  product photo at 96px (64px on phones), not the 56px data-table chip the
+   *  internal table uses, so `thumb`'s 160px only covered it at 1.7x and went
+   *  soft on retina. 240 covers 96px at 2.5x; `card`'s 480 would have been
+   *  4x more pixels than the slot can paint, on every row of the list. */
+  row: (url: string | null | undefined) =>
+    cdnImage(url, { width: narrowViewport() ? 160 : 320, quality: 75, resize: "contain" }),
   /** Card grid thumbnail — products list, related products. */
   card: (url: string | null | undefined) =>
     cdnImage(url, { width: narrowViewport() ? 384 : 480, quality: 75, resize: "contain" }),

@@ -630,6 +630,14 @@ const broadcastSubs = new Map<
   }
 >();
 
+/** A subscription that held this long is a recovery; shorter is a flap. */
+export const REJOIN_STABLE_MS = 30_000;
+/** Capped exponential backoff with jitter: 1 s, 2 s, 4 s … 60 s. Pure
+ *  apart from the jitter, which the suite pins by range. */
+export function rejoinDelayMs(retry: number, random: () => number = Math.random): number {
+  return Math.min(60_000, 1_000 * 2 ** Math.min(retry, 6)) * (0.8 + random() * 0.4);
+}
+
 function subscribeBroadcast(topic: string, onPing: (p: PingPayload) => void): () => void {
   let entry = broadcastSubs.get(topic);
   if (!entry) {
@@ -648,6 +656,9 @@ function subscribeBroadcast(topic: string, onPing: (p: PingPayload) => void): ()
          tab-visible events (below) trigger an immediate retry. */
       retry: 0,
       rejoinTimer: null as number | null,
+      /* When the current channel reached SUBSCRIBED, for the flap rule
+         below. A join that dies within seconds is not a recovery. */
+      subscribedAt: 0,
     };
 
     const scope = topic.split(":").slice(0, 2).join(":");
@@ -671,11 +682,28 @@ function subscribeBroadcast(topic: string, onPing: (p: PingPayload) => void): ()
           try {
             if (status === "SUBSCRIBED") {
               created.joins += 1;
-              created.retry = 0;
+              created.subscribedAt = performance.now();
+              /* THE FLAP. A channel that subscribes and is closed within a
+                 second, over and over, reset its backoff on every SUBSCRIBED
+                 and rejoined ~once a second for hours (production, 2026-09-07:
+                 the same page reported CLOSED → reconnect every 0.8 s from
+                 15:00 to 17:33, then died mid-call). A subscription counts as
+                 recovered — and the backoff resets — only once it has held
+                 for STABLE_MS; a shorter life keeps climbing the backoff. */
+              if (created.retry > 0 && created.joins > 1) {
+                /* reset deferred: see the CLOSED branch */
+              } else {
+                created.retry = 0;
+              }
               if (created.joins === 1) perfRecord("rt.join_ms", performance.now() - created.t0, { scope });
               else perfEvent("rt.reconnect", { scope });
             } else if (status === "CHANNEL_ERROR" || status === "TIMED_OUT" || status === "CLOSED") {
               perfEvent("rt.status", { s: status, scope });
+              /* Held long enough to count as a real recovery? Then this is a
+                 fresh drop and the backoff starts over. Otherwise it flapped,
+                 and the next wait is longer than the last. */
+              if (created.subscribedAt > 0 && performance.now() - created.subscribedAt >= REJOIN_STABLE_MS) created.retry = 0;
+              created.subscribedAt = 0;
             }
             perfRecord("rt.channels", broadcastSubs.size);
           } catch { /* metrics never break realtime */ }
@@ -688,7 +716,18 @@ function subscribeBroadcast(topic: string, onPing: (p: PingPayload) => void): ()
     const scheduleRejoin = () => {
       if (created.listeners.size === 0) return; // real teardown, not a drop
       if (created.rejoinTimer != null) return;  // one pending rejoin at a time
-      const delay = Math.min(15_000, 1_000 * 2 ** created.retry) * (0.8 + Math.random() * 0.4);
+      /* NOT WHILE HIDDEN. A background page that rejoins on a timer keeps a
+         socket storm going for hours; the visible/online nudge (kickAll)
+         retries the moment the page is back. */
+      if (typeof document !== "undefined" && document.visibilityState === "hidden") return;
+      /* NOT UNDER A LIVE CALL EITHER (2026-09-08). The metrics of a call
+         that died with the phone's network show this channel closing and
+         rejoining every second or two for the whole call — a socket storm
+         on the same flaky link the call's own socket was fighting for. A
+         call is the one thing on the page that matters while it is up; the
+         channel rejoins the moment it ends (the kx-call-ended nudge). */
+      if (typeof document !== "undefined" && document.querySelector("[data-kx-call-active='1']")) return;
+      const delay = rejoinDelayMs(created.retry);
       created.retry += 1;
       created.rejoinTimer = window.setTimeout(() => {
         created.rejoinTimer = null;
@@ -735,6 +774,7 @@ if (typeof window !== "undefined") {
     }
   };
   window.addEventListener("online", kickAll);
+  window.addEventListener("kx-call-ended", kickAll);
   document.addEventListener("visibilitychange", () => {
     if (document.visibilityState === "visible") kickAll();
   });

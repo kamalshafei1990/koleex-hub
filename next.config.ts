@@ -61,7 +61,17 @@ const nextConfig: NextConfig = {
      OUT of the server bundle so the prebuilt .node binary is require()'d at
      runtime instead of being mangled by the bundler. Server (Node) runtime
      only — never imported into client/edge code. */
-  serverExternalPackages: ["@node-rs/argon2"],
+  serverExternalPackages: [
+    "@node-rs/argon2",
+    /* Native skia binding — bundling it strips the .node binary and every
+       scanned-PDF rasterisation dies with MODULE_NOT_FOUND. Keep external. */
+    "@napi-rs/canvas",
+    /* unpdf bundles its own pdf.js whose canvas factory does a dynamic
+       import of @napi-rs/canvas — bundling unpdf breaks that import and
+       every scan rasterisation throws. Unbundled in real Node, the whole
+       chain works (verified standalone). */
+    "unpdf",
+  ],
   compiler: {
     removeConsole: process.env.NODE_ENV === "production" ? { exclude: ["error", "warn"] } : false,
   },

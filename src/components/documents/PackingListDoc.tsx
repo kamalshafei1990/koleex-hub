@@ -323,7 +323,54 @@ export default function PackingListDoc({
     setDirty(true);
     setSaveState("idle");
   };
-  const handlePrint = () => window.print();
+  /* ── Print / PDF ──────────────────────────────────────────────────────
+     Through a HIDDEN IFRAME pointing at /documents/<id>/print, never
+     window.print() on this window. Printing the editor drags the Hub layout,
+     the Aurora scope and the ground canvas into the print pass, and the
+     surviving wrappers impose their own heights on the page box. Measured on
+     a real list: the sheet came out 297 × 356.5 mm against A4 landscape's
+     297 × 210 — 1.7 pages tall, so the second sheet carried a stub above 70%
+     white. The invoice and the contract print the same way for the same
+     reason.
+
+     An unsaved list has no id to print from, so it falls back to the old
+     behaviour rather than doing nothing. */
+  const handlePrint = () => {
+    if (!docId) {
+      window.print();
+      return;
+    }
+    const FRAME_ID = "koleex-packing-print-frame";
+    let frame = document.getElementById(FRAME_ID) as HTMLIFrameElement | null;
+    if (!frame) {
+      frame = document.createElement("iframe");
+      frame.id = FRAME_ID;
+      frame.style.position = "fixed";
+      frame.style.left = "-10000px";
+      frame.style.top = "0";
+      frame.style.width = "297mm";
+      frame.style.height = "210mm";
+      frame.style.border = "none";
+      /* Off-screen by position, never visibility:hidden — some browsers skip
+         invisible iframes when printing. */
+      document.body.appendChild(frame);
+    }
+    frame.src = `/documents/${encodeURIComponent(docId)}/print?_t=${Date.now()}`;
+    const onLoad = () => {
+      frame!.removeEventListener("load", onLoad);
+      const ready = () => {
+        const win = frame!.contentWindow as (Window & { __quotation_pdf_ready__?: boolean }) | null;
+        if (win?.__quotation_pdf_ready__) {
+          win.focus();
+          win.print();
+        } else {
+          setTimeout(ready, 100);
+        }
+      };
+      ready();
+    };
+    frame.addEventListener("load", onLoad);
+  };
 
   const handleExcel = useCallback(async () => {
     const dataRows: (string | number | null)[][] = rows

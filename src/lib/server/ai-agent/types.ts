@@ -1,4 +1,5 @@
 import "server-only";
+import type { AiPersonalization } from "@/lib/ai-personalization";
 
 /* ---------------------------------------------------------------------------
    Koleex AI Agent — shared types.
@@ -78,6 +79,10 @@ export interface UserContext {
      accounts.preferences.ai_memory (no new table). Key → value, e.g.
      { birthday: "3 March", prefers: "short answers" }. */
   memory: Record<string, string>;
+  /* How this user asked to be spoken to — accounts.preferences.ai, read by
+     buildUserContext and rendered by prompts/blocks.ts. Optional so older
+     fixtures still type; the builder always sets it. */
+  personalization?: AiPersonalization | null;
 }
 
 /* ─────────────────────────────────────────────────────────────────────
@@ -97,14 +102,27 @@ export interface UserContext {
 
 export type ToolAction = "view" | "create" | "edit" | "delete";
 
+/* A JSON-schema subset. `items` carries its own properties so a tool can take
+   an ARRAY OF OBJECTS — askUser needs {label, detail, recommended} per option,
+   and the alternative was three parallel string arrays the model would have to
+   keep aligned by hand, which is exactly the kind of thing it gets wrong. */
+export interface ToolParameterProperty {
+  type: "string" | "number" | "integer" | "boolean" | "array" | "object";
+  description?: string;
+  enum?: string[];
+  items?: {
+    type: string;
+    description?: string;
+    properties?: Record<string, ToolParameterProperty>;
+    required?: string[];
+  };
+  properties?: Record<string, ToolParameterProperty>;
+  required?: string[];
+}
+
 export interface ToolParameterSchema {
   type: "object";
-  properties: Record<string, {
-    type: "string" | "number" | "integer" | "boolean" | "array" | "object";
-    description: string;
-    enum?: string[];
-    items?: { type: string };
-  }>;
+  properties: Record<string, ToolParameterProperty>;
   required?: string[];
 }
 
@@ -127,6 +145,16 @@ export interface ToolDef<TArgs = Record<string, unknown>, TResult = unknown> {
    - "limited"         — some fields were filtered out (tool succeeded)
    - "denied"          — user lacks module/action permission
    - "approval_required" — draft or action awaiting human sign-off
+
+   "DENIED" MEANS A PERMISSION, NOT A FAILURE. For a long time tools answered
+   every failure with it — a product that did not exist, a calendar that did
+   not load, a missing query — and the model, reading `status: denied`, told
+   a super admin he was not allowed to see things. A tool's own failure is
+   `ok: false` with permissionStatus "allowed" (nothing was withheld by
+   permission) and a message that says what happened. "denied" is written
+   only when the answer really is "you may not": the permission gates, an
+   ownership rule (someone else's task or calendar), or view-as. The suite
+   validate:ai-tool-exposure reads every tool and holds this line.
    ───────────────────────────────────────────────────────────────────── */
 
 export type PermissionStatus =
@@ -170,6 +198,9 @@ export interface ToolResult<T = unknown> {
 
 export type AgentStepKind =
   | "answer"
+  /** A clarifying question with options — the turn ENDS here and the user
+   *  answers next. payload is { question, options[] }. */
+  | "question"
   | "tool-call"
   | "tool-result"
   | "recommendation"

@@ -113,7 +113,7 @@ export async function GET(
     safe(() =>
       supabaseServer
         .from("product_suppliers")
-        .select("product_id, is_primary, supplier_product_photo, supplier_product_code, supplier_product_name")
+        .select("product_id, is_primary, supplier_product_photo, supplier_product_code, supplier_product_name, sourcing_status")
         .eq("supplier_id", id)
         .limit(200),
     ),
@@ -404,11 +404,35 @@ export async function GET(
     certsActive,
     trustLevel: riskProfile && typeof riskProfile.trust_level === "string" ? riskProfile.trust_level : null,
   });
+  /* Two tables carry one fact: the roles system writes
+     supplier_product_links.sourcing_role while the product form's Supplier
+     tab writes product_suppliers.sourcing_status — so a product marked
+     "preferred" on its own form never appeared in Sourcing Intelligence
+     ("0 preferred products" with 52 linked). Merge derived read-only rows
+     from product_suppliers for any product the roles table doesn't cover. */
+  const KNOWN_SOURCING_ROLES = new Set(["preferred", "approved", "backup", "experimental", "blocked"]);
+  const roleCoveredIds = new Set(sourcingLinks.map((l) => l.product_id));
+  const derivedSourcingLinks = productLinkRows
+    .filter((r) =>
+      typeof r.product_id === "string" && !roleCoveredIds.has(r.product_id) &&
+      typeof r.sourcing_status === "string" && KNOWN_SOURCING_ROLES.has(r.sourcing_status))
+    .map((r) => {
+      const p = productById.get(r.product_id as string);
+      return {
+        id: `ps-${r.product_id}`,
+        product_id: r.product_id,
+        sourcing_role: r.sourcing_status,
+        sourcing_priority: null,
+        derived: true,
+        products: p ? { product_name: p.product_name, category_slug: p.category_slug } : null,
+      } as Row;
+    });
+  const allSourcingLinks = [...sourcingLinks, ...derivedSourcingLinks];
   const sourcing = {
     score: sourcingScore,
     priority: sourcingProfile && typeof sourcingProfile.sourcing_priority === "number" ? sourcingProfile.sourcing_priority : null,
-    preferredProducts: sourcingLinks.filter((l) => l.sourcing_role === "preferred").length,
-    blockedProducts: sourcingLinks.filter((l) => l.sourcing_role === "blocked").length,
+    preferredProducts: allSourcingLinks.filter((l) => l.sourcing_role === "preferred").length,
+    blockedProducts: allSourcingLinks.filter((l) => l.sourcing_role === "blocked").length,
     soleSource: !!(riskProfile && riskProfile.dependency_level === "critical") || !!(riskProfile && riskProfile.backup_supplier_exists === false && riskProfile.dependency_level === "high"),
   };
 
@@ -453,7 +477,7 @@ export async function GET(
       negotiationIntel,
       risk,
       sourcingProfile,
-      sourcingLinks,
+      sourcingLinks: allSourcingLinks,
       specializations,
       sourcing,
       callerTier,

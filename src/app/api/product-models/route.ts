@@ -21,7 +21,14 @@ import { humanizeError } from "@/lib/ui/humanize-error";
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { requireAuth } from "@/lib/server/auth";
-import { hasProductCostAccess, PUBLIC_MODEL_COLUMNS, requireProductDataAction } from "@/lib/server/product-access";
+import {
+  hasProductCostAccess,
+  hasProductDataAccess,
+  MODEL_COST_FIELDS,
+  PUBLIC_MODEL_COLUMNS,
+  requireProductDataAction,
+  stripSecrets,
+} from "@/lib/server/product-access";
 
 export async function GET(req: Request) {
   const auth = await requireAuth();
@@ -105,7 +112,15 @@ export async function GET(req: Request) {
   if (!productId) {
     return NextResponse.json({ error: "product_id required" }, { status: 400 });
   }
-  const cols = canSeeSecrets ? "*" : PUBLIC_MODEL_COLUMNS;
+  /* Three tiers — this projection FEEDS THE EDIT FORM, and the form writes
+     back what it was given. Serving a Product Data editor the public-catalog
+     projection made every override column hydrate empty and the next save
+     NULL them all (the family-override data-loss bug, 2026-08-21). So:
+       cost access        → full row
+       Product Data (no cost) → full row minus the cost-side columns
+       everyone else      → the public catalog projection, unchanged */
+  const canSeePD = canSeeSecrets || (await hasProductDataAccess(auth));
+  const cols = canSeePD ? "*" : PUBLIC_MODEL_COLUMNS;
   const { data, error } = await supabaseServer
     .from("product_models")
     .select(cols)
@@ -115,8 +130,12 @@ export async function GET(req: Request) {
     console.error("[api/product-models GET]", error.message);
     return NextResponse.json({ error: "Failed to load models" }, { status: 500 });
   }
+  const rows = (data ?? []) as unknown as Record<string, unknown>[];
+  const models = canSeePD && !canSeeSecrets
+    ? rows.map((r) => stripSecrets(r, MODEL_COST_FIELDS))
+    : rows;
   return NextResponse.json(
-    { models: data ?? [] },
+    { models },
     { headers: { "Cache-Control": "private, max-age=30, stale-while-revalidate=300" } },
   );
 }

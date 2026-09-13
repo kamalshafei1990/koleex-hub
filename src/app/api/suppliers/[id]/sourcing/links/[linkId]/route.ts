@@ -11,7 +11,7 @@ import "server-only";
 
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
-import { requireAuth, requireModuleAccess } from "@/lib/server/auth";
+import { requireAuth, requireModuleAction } from "@/lib/server/auth";
 import { logSupplierEvent, actorName, type TimelineEventInput } from "@/lib/suppliers/timeline";
 import { sourcingRoleLabel } from "@/lib/suppliers/intelligence";
 
@@ -19,16 +19,18 @@ type Params = { params: Promise<{ id: string; linkId: string }> };
 const ROLES = new Set(["preferred", "approved", "backup", "experimental", "blocked"]);
 const QUALITY = new Set(["low", "medium", "high"]);
 
-async function guard(req: Request) {
+async function guard(req: Request, action: "edit" | "delete") {
   const auth = await requireAuth(req);
   if (auth instanceof NextResponse) return { auth: null as never, res: auth };
-  const deny = await requireModuleAccess(auth, "Suppliers");
+  /* Write routes must demand the matching action, not just view access —
+     same contract as the sibling contacts/[contactId] route. */
+  const deny = await requireModuleAction(auth, "Suppliers", action);
   if (deny) return { auth: null as never, res: deny };
   return { auth, res: null };
 }
 
 export async function PATCH(req: Request, ctx: Params) {
-  const { auth, res } = await guard(req);
+  const { auth, res } = await guard(req, "edit");
   if (res) return res;
   const { id, linkId } = await ctx.params;
   const tid = auth.tenant_id;
@@ -75,7 +77,7 @@ export async function PATCH(req: Request, ctx: Params) {
 }
 
 export async function DELETE(req: Request, ctx: Params) {
-  const { auth, res } = await guard(req);
+  const { auth, res } = await guard(req, "delete");
   if (res) return res;
   const { id, linkId } = await ctx.params;
   const tid = auth.tenant_id;

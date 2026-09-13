@@ -20,6 +20,7 @@
  */
 
 import { useState } from "react";
+import { TRANSLATABLE_LANGS } from "@/lib/i18n";
 import BookOpenIcon from "@/components/icons/ui/BookOpenIcon";
 import PlusIcon from "@/components/icons/ui/PlusIcon";
 import TrashIcon from "@/components/icons/ui/TrashIcon";
@@ -278,6 +279,55 @@ export default function KnowledgeSection({ blocks, onChange }: Props) {
                         items={asQA(b.content)}
                         onChange={(qs) => update(idx, { content: { questions: qs as unknown as Record<string, unknown>[] } })}
                       />
+                    )}
+
+                    {/* ── Translations (2026-08-29) ──────────────────────────
+                        Knowledge was the one part of a product page with no
+                        place to put zh/ar, so it stayed English while the
+                        name and tagline switched. English above stays the
+                        canonical copy the AI layer reads; these overlay it
+                        for the reader. Q&A blocks are excluded — their shape
+                        is nested and needs its own editor. */}
+                    {(meta.shape === "text" || meta.shape === "list") && (
+                      <div className="space-y-2 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)]/40 p-2.5">
+                        <p className="text-[10px] font-semibold uppercase tracking-wide text-[var(--text-ghost)]">
+                          Translations · leave empty to show English
+                        </p>
+                        {TRANSLATABLE_LANGS.map(({ code: lc, label, nativeLabel, dir }) => {
+                          const cur = b.content_i18n?.[lc];
+                          const val = meta.shape === "list"
+                            ? (Array.isArray(cur) ? cur.join("\n") : (cur ?? ""))
+                            : (typeof cur === "string" ? cur : "");
+                          return (
+                            <div key={lc} className="flex items-start gap-2">
+                              <span className="mt-2 w-14 shrink-0 text-[10px] font-bold uppercase tracking-wider text-[var(--text-ghost)]" title={nativeLabel}>
+                                {label}
+                              </span>
+                              <textarea
+                                dir={dir}
+                                value={val}
+                                onChange={(e) => {
+                                  const raw = e.target.value;
+                                  const next = meta.shape === "list"
+                                    ? raw.split("\n").map((l) => l.trimEnd()).filter((l, i, arr) => l !== "" || i === arr.length - 1)
+                                    : raw;
+                                  const isEmpty = Array.isArray(next) ? next.every((l) => !l.trim()) : !next.trim();
+                                  const merged = { ...(b.content_i18n ?? {}) };
+                                  /* Drop the key when cleared so the block
+                                     falls back to English instead of showing
+                                     an empty section. */
+                                  if (isEmpty) delete merged[lc];
+                                  else merged[lc] = next;
+                                  update(idx, { content_i18n: Object.keys(merged).length ? merged : undefined });
+                                }}
+                                rows={meta.shape === "list" ? Math.max(2, val.split("\n").length) : 2}
+                                className={inputCls + " resize-y leading-relaxed"}
+                                placeholder={`${nativeLabel}${meta.shape === "list" ? " · one item per line" : ""}`}
+                              />
+                            </div>
+                          );
+                        })}
+                      </div>
                     )}
 
                     {/* visibility + AI weight */}

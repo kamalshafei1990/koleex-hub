@@ -358,7 +358,7 @@ export default function FieldRenderer({ field, value, onChange, disabled }: Prop
           <div className="rounded-lg border border-black/[0.08] dark:border-white/[0.08] divide-y divide-black/[0.06] dark:divide-white/[0.06]">
             {rows.length === 0 && (
               <div className="px-3 py-4 text-[11.5px] text-black/40 dark:text-white/40">
-                No rows yet — click "Add row" below.
+                No rows yet — click &ldquo;Add row&rdquo; below.
               </div>
             )}
             {rows.map((row, idx) => (

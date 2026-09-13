@@ -1,0 +1,1688 @@
+"use client";
+
+/* ---------------------------------------------------------------------------
+   VoiceCallButton — a real-time voice call, beside the existing mic.
+
+   WHY IT IS A SECOND BUTTON RATHER THAN A CHANGE TO MicButton. The mic is a
+   working tool and the standing rule is not to remove one. It is also a
+   genuinely different thing: MicButton transcribes in the browser, sends TEXT
+   through the normal chat path, and reads the reply back with speech
+   synthesis. It is turn-based, and its transcription depends on the browser's
+   own service — which in Chrome means a Google endpoint, so it is the part of
+   the product most likely to be unavailable in mainland China.
+
+   This opens a continuous audio connection to a region that is reachable
+   there, with no transcription round trip. Two different tools, both offered.
+
+   WHAT THIS COMPONENT DOES NOT DO. It does not interpret DataChannel messages
+   beyond what the pure modules in lib/voice parse for it. A call can talk,
+   listen and look things up; it cannot act — the tools are read-only and the
+   server chooses them.
+
+   WHAT IT NOW ALSO DOES. Two things that make a call part of the
+   conversation rather than a thing beside it: settled turns are handed to a
+   TranscriptPersister, which posts them to a route that writes them into the
+   open thread (lib/voice/persist.ts); and the conversation's id travels with
+   the handshake so the server can read its recent turns into the session.
+   Neither happens in this file — it wires them.
+
+   WHY THE AUDIO ELEMENT LIVES HERE. VoiceSession touches no DOM on purpose —
+   it hands over a MediaStream and playback is the caller's business. That
+   keeps the session testable in Node, which is why its 40 assertions can run
+   at all.
+   --------------------------------------------------------------------------- */
+
+import { useCallback, useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
+import {
+  VoiceSession,
+  browserVoiceDeps,
+  HANDSHAKE_PATH,
+  type VoiceState,
+  type VoiceFailure, TOOL_PATH,   type VoiceSocket,
+} from "@/lib/voice/session";
+import { type Lang } from "@/lib/i18n";
+import {
+  parseVoiceEvent,
+  appendTranscript,
+  settleOpenLine,
+  settleStaleLines,
+  playbackGate,
+  voiceEventType,
+  type TranscriptLine,
+  type VoicePhase,
+} from "@/lib/voice/events";
+import { extractProductPhotos, type ProductPhoto } from "@/lib/voice/photos";
+import { useStreamLevel } from "@/lib/voice/useStreamLevel";
+import { useSessionLevels } from "@/lib/voice/useSessionLevels";
+import { useReceiverLevel } from "@/lib/voice/useReceiverLevel";
+import { CallTones } from "@/lib/voice/tones";
+import { pickSttLang, readSavedSttLang, saveSttLang, learnSttLang, type SttLang } from "@/lib/voice/stt-lang";
+import {
+  pickVoiceKey, readSavedVoiceKey, saveVoiceKey, readSavedRegion, saveRegion, decideLane, readSavedLane, saveLane, type VoicesByLane,
+  readSavedTalkMode, saveTalkMode, type TalkMode,
+} from "@/lib/voice/voice-pref";
+import { requestCallSummary, shouldSummarise } from "@/lib/voice/summary";
+import { playSound, primeSounds } from "@/lib/sounds/player";
+import { sendVoiceTelemetry, flushVoiceTelemetry } from "@/lib/voice/telemetry";
+import { writeCallPulse, clearCallPulse, takeInterruptedCall, browserStorage, CALL_PULSE_EVERY_MS } from "@/lib/voice/call-memory";
+import { probeWsLane } from "@/lib/voice/lane-probe";
+import { useDictation, formatDictationDuration, DICTATION_COPY } from "./useDictation";
+import { createPreviewPlayer, browserPreviewContext, VOICE_PREVIEW_PATH, PREVIEW_FETCH_TIMEOUT_MS, type PreviewPlayer, type PreviewContextLike } from "@/lib/voice/preview-player";
+import { TranscriptPersister, type SavedTurn, type PersistFailure } from "@/lib/voice/persist";
+import { VOICE_SWITCH_GREETING } from "@/lib/voice/text-turn";
+import VoiceCallScreen from "@/components/ai/VoiceCallScreen";
+
+/* Every failure the session can report, in every language the app speaks.
+   `Record<Lang, Record<VoiceFailure, string>>` makes a missing translation a
+   compile error rather than a blank message a user has to interpret. */
+const FAILURE_COPY: Record<Lang, Record<VoiceFailure, string>> = {
+  en: {
+    "no-microphone": "No microphone available, or permission was declined.",
+    "not-allowed": "You do not have access to voice calls.",
+    "too-many-calls": "Too many calls started just now. Wait about a minute and try again.",
+    "signed-out": "Your session has expired. Please sign in again.",
+    unavailable: "Voice is unavailable right now. Please try again later.",
+    "connection-lost": "The connection dropped and did not come back. Please try again.",
+    "service-unreachable": "The voice service is not responding. Please try again shortly.",
+    "service-refused": "The voice service refused the call. This usually needs an administrator — please report it.",
+    "config-rejected": "The call connected but could not be set up. Please try again.",
+    "handshake-failed": "Could not start the call. Please try again.",
+  },
+  zh: {
+    "no-microphone": "没有可用的麦克风，或者权限被拒绝。",
+    "not-allowed": "您没有语音通话的权限。",
+    "too-many-calls": "刚刚发起的通话过多，请等待约一分钟后再试。",
+    "signed-out": "登录已过期，请重新登录。",
+    unavailable: "语音服务当前不可用，请稍后再试。",
+    "connection-lost": "连接中断且没有恢复，请重试。",
+    "service-unreachable": "语音服务无响应，请稍后再试。",
+    "service-refused": "语音服务拒绝了本次通话，通常需要管理员处理，请反馈此问题。",
+    "config-rejected": "通话已连接，但会话配置失败，请重试。",
+    "handshake-failed": "无法开始通话，请重试。",
+  },
+  ar: {
+    "no-microphone": "لا يوجد ميكروفون متاح، أو تم رفض الإذن.",
+    "not-allowed": "ليس لديك صلاحية استخدام المكالمات الصوتية.",
+    "too-many-calls": "بدأت مكالمات كتير في وقت قصير. استنى دقيقة وحاول تاني.",
+    "signed-out": "الجلسة انتهت. سجّل دخول تاني.",
+    unavailable: "الخدمة الصوتية غير متاحة حاليًا. حاول مرة أخرى لاحقًا.",
+    "connection-lost": "الاتصال اتقطع وما رجعش تاني. حاول مرة أخرى.",
+    "service-unreachable": "الخدمة الصوتية مش بتردّ. حاول كمان شوية.",
+    "service-refused": "الخدمة الصوتية رفضت المكالمة. ده غالبًا محتاج مسؤول النظام — بلّغ عنه.",
+    "config-rejected": "المكالمة اتصلت بس تعذّر إعدادها. حاول تاني.",
+    "handshake-failed": "تعذّر بدء المكالمة. حاول مرة أخرى.",
+  },
+};
+
+/* When the transcript could not be saved. One line, once per call, and the
+   call itself is unaffected — the words were still heard and answered. */
+const PERSIST_COPY: Record<Lang, Record<PersistFailure, string>> = {
+  en: {
+    failed: "This call's transcript could not be saved to the conversation.",
+    unauthorised: "This call's transcript could not be saved — you are no longer allowed to.",
+    "not-found": "This call's transcript could not be saved — the conversation is gone.",
+  },
+  zh: {
+    failed: "本次通话的文字记录无法保存到对话中。",
+    unauthorised: "本次通话的文字记录无法保存——您已没有权限。",
+    "not-found": "本次通话的文字记录无法保存——该对话已不存在。",
+  },
+  ar: {
+    failed: "ما قدرناش نحفظ كلام المكالمة دي في المحادثة.",
+    unauthorised: "ما قدرناش نحفظ كلام المكالمة — ما بقالكش صلاحية.",
+    "not-found": "ما قدرناش نحفظ كلام المكالمة — المحادثة اتمسحت.",
+  },
+};
+
+/* THE CALL THE PAGE DIED UNDER, told once when the page is back
+   (lib/voice/call-memory.ts). Plain words; the tap to continue is the
+   ordinary call button. */
+const INTERRUPTED_COPY: Record<Lang, string> = {
+  en: "The last call stopped without warning — the app was interrupted. Tap the call button to continue.",
+  zh: "上一次通话意外中断（应用被打断）。点一下通话按钮继续。",
+  ar: "المكالمة اللي فاتت اتقطعت فجأة — الأبلكيشن اتقفل من غيرك. دوس على زرار المكالمة عشان تكمل.",
+};
+
+/* How long a live call may go unacknowledged before it is called ready
+   anyway. Long enough for a slow session.update round trip on a mainland
+   network; short enough that nobody waits on a vendor that never answers. */
+const READY_FALLBACK_MS = 2_500;
+
+/** The far side's own words for an `error` event, bounded — for the beacon
+ *  only. Reads `error.message`, then `message`; anything else is "". Pure. */
+export function errorMessageOf(raw: string): string {
+  try {
+    const v = JSON.parse(raw) as { error?: { message?: unknown; code?: unknown }; message?: unknown };
+    const m = typeof v?.error?.message === "string" ? v.error.message : typeof v?.message === "string" ? v.message : "";
+    const code = typeof v?.error?.code === "string" ? `${v.error.code}: ` : "";
+    return `${code}${m}`.slice(0, 160);
+  } catch {
+    return "";
+  }
+}
+/** After this long in "connecting" the caption says the service is slow. */
+const CONNECTING_SLOW_MS = 8_000;
+/* A call that was up for at least this long and then lost its connection is
+   started again in place. Shorter than this and the "drop" is the connection
+   never really working, which a retry does not fix. */
+export const RESUME_MIN_LIVE_MS = 5_000;
+/* Twice, then the truth: a line that drops three times in one call is not
+   coming back, and the caller should hear so rather than watch it try. */
+export const MAX_RESUMES = 2;
+
+const LABEL_COPY: Record<Lang, { start: string; end: string; connecting: string; speak: string; holdHint: string; dictating: string }> = {
+  en: { start: "Start voice call", end: "End call", connecting: "Connecting…", speak: "Speak", holdHint: "Tap to call · hold to dictate", dictating: "Listening… release to send" },
+  zh: { start: "开始语音通话", end: "结束通话", connecting: "正在连接…", speak: "语音", holdHint: "点按通话 · 长按口述", dictating: "正在听…松开即发送" },
+  ar: { start: "ابدأ مكالمة صوتية", end: "إنهاء المكالمة", connecting: "جارٍ الاتصال…", speak: "اتكلم", holdHint: "اضغط للمكالمة · اضغط مطوّلًا للإملاء", dictating: "بسمعك… سيب الزرار وهتتبعت" },
+};
+
+/* A PRESS THIS LONG IS A HOLD. Shorter is a tap (the call). 450 ms sits
+   between a slow tap and the platform's own long-press menus, which the
+   control suppresses while dictation is offered. */
+const HOLD_TO_DICTATE_MS = 450;
+
+export type VoiceCallButtonProps = {
+  size?: number;
+  /** "icon": the round waveform button beside the mic. "pill": the inverted
+   *  Speak pill the owner asked for (Grok's shape) — the same control with
+   *  its name on it, for the moment the composer is empty and talking is
+   *  the obvious next thing to do. */
+  variant?: "icon" | "pill";
+  /** ONE VOICE CONTROL (audit, 2026-09-11): when given, a long press on the
+   *  button dictates through the browser's recogniser and hands the words
+   *  here; a tap still starts the call. Absent, the button is the call alone. */
+  dictation?: { onTranscript: (text: string) => void; onError?: (message: string) => void };
+  lang?: Lang;
+  disabled?: boolean;
+  onError?: (message: string) => void;
+  /** One decoded DataChannel message, passed through untouched. Still offered
+   *  because the tool bridge will need the raw stream, not the captions. */
+  onMessage?: (data: string) => void;
+  /** The running conversation, rebuilt on every event. The parent renders it —
+   *  this component owns the call, not the layout. */
+  onTranscript?: (lines: readonly TranscriptLine[]) => void;
+  /** What the far side is doing: drives the orb's listening/speaking states. */
+  onPhase?: (phase: VoicePhase) => void;
+  /** So the parent can mute its own speech synthesis while a call is live —
+   *  two voices talking over each other is the obvious failure here. */
+  onLiveChange?: (live: boolean) => void;
+  /** The conversation this call continues. Sent with the handshake so the
+   *  server can read its recent turns into the session, and the thread the
+   *  spoken turns are written into. Null on an empty screen. */
+  conversationId?: string | null;
+  /** Makes a conversation when there is none — called by the persister the
+   *  first time a settled turn needs somewhere to go, never at call start, so
+   *  a call that fails to connect leaves no empty chat behind. */
+  ensureConversation?: () => Promise<string | null>;
+  /** The rows the server wrote, so the parent can show them in the thread. */
+  onTurnsSaved?: (rows: SavedTurn[], conversation: { id: string; title: string | null }) => void;
+  /** A saved row the server corrected — the same spoken turn, heard again
+   *  (lib/voice/persist.ts) — so the thread shows the fuller words. */
+  onTurnUpdated?: (row: SavedTurn) => void;
+  /** THE CALL THE PAGE DIED UNDER can be continued with one tap (plan B5):
+   *  the next load finds its pulse and offers `resume` — a new call in the
+   *  same conversation, which the parent opens first when it is not the
+   *  open one. Without this the caller is told in a sentence and left to
+   *  find the button. */
+  onInterrupted?: (resume: () => void, conversationId: string | null) => void;
+  /** While the server is writing the call summary after a hang-up: true when
+   *  the request goes out, false when its row has landed or nothing came.
+   *  The parent shows a quiet "writing the summary" line in the thread so
+   *  the gap between the last spoken turn and the summary row is not a
+   *  silence (UI review, 2026-09-12). */
+  onSummaryPending?: (pending: boolean) => void;
+};
+
+export default function VoiceCallButton({
+  size = 36,
+  variant = "icon",
+  dictation,
+  lang = "en",
+  disabled = false,
+  onError,
+  onMessage,
+  onTranscript,
+  onPhase,
+  onLiveChange,
+  conversationId = null,
+  ensureConversation,
+  onTurnsSaved,
+  onTurnUpdated,
+  onInterrupted,
+  onSummaryPending,
+}: VoiceCallButtonProps) {
+  const [state, setState] = useState<VoiceState>("idle");
+  /** The lane the current call is on, for render: the socket lane meters
+   *  inside its own audio (useSessionLevels), the other opens meters. */
+  const [laneState, setLaneState] = useState<"rtc" | "ws">("rtc");
+  /* True from a voice switch until the rebuilt call is up or has failed. The
+     screen stays mounted on it — see the portal condition — because the
+     session goes `ended` and then `requesting-mic` in between, and either
+     alone would unmount the call the caller is still on. */
+  const [swapping, setSwapping] = useState(false);
+  /* Where the last session was served, for a call that continues it. */
+  const regionHintRef = useRef<"primary" | "alt" | null>(null);
+  /* WHICH LANE, as the server said on the voices GET (see ai/voice/grok.ts):
+     the WebRTC lane the product has always had, or the WebSocket lane for
+     callers outside mainland China. Held in a ref: it is read when a call
+     starts, not rendered. */
+  const transportRef = useRef<"rtc" | "ws">("rtc");
+  /** The lane the server named while a call was already running, as the
+   *  step that applies it (lane and voices); run at that call's hang-up. */
+  const laneAfterCallRef = useRef<(() => void) | null>(null);
+  /* ONE FALL-BACK PER SCREEN. A WebSocket lane that never comes up — a
+     network that blocks the vendor's host, a refused secret — is retried
+     ONCE on the other lane, silently, before the caller sees a failure. */
+  const laneFellBackRef = useRef(false);
+  /* The first `error` event of a call is beaconed with its message: it is
+     how a refused session configuration on a new vendor gets diagnosed. */
+  const errorBeaconedRef = useRef(false);
+  const [phase, setPhase] = useState<VoicePhase>(null);
+  /* THE SCREEN STAYS AWAKE ON A CALL (roadmap B5). A phone that locks itself
+     mid-call suspends the installed app — audio, microphone, the line — and
+     nothing in a web page can hold a call through a locked screen. What a
+     page CAN do is ask the screen not to lock while the call is up: the
+     Screen Wake Lock, where the platform offers it (iOS 16.4+, Android,
+     desktop). Released with the call. The platform drops it when the page
+     is hidden, so it is asked for again when the page comes back while the
+     call is still live. Feature-detected and never thrown: a platform
+     without it behaves as before. */
+  const wakeLockRef = useRef<{ release: () => Promise<void> } | null>(null);
+  /* A release that runs while the request is still in flight must win: the
+     lock the platform hands back afterwards is let go at once, not stored
+     for a call that has already ended (audit, 2026-09-11). */
+  const wakeGenRef = useRef(0);
+  const acquireWakeLock = useCallback(() => {
+    const wl = (typeof navigator !== "undefined"
+      ? (navigator as { wakeLock?: { request: (type: "screen") => Promise<{ release: () => Promise<void> }> } }).wakeLock
+      : undefined);
+    if (!wl || wakeLockRef.current) return;
+    const gen = ++wakeGenRef.current;
+    wl.request("screen").then((lock) => {
+      if (wakeGenRef.current !== gen) {
+        void lock.release().catch(() => {});
+        return;
+      }
+      wakeLockRef.current = lock;
+    }).catch(() => { /* not granted: the call goes on */ });
+  }, []);
+  const releaseWakeLock = useCallback(() => {
+    wakeGenRef.current += 1;
+    const lock = wakeLockRef.current;
+    wakeLockRef.current = null;
+    void lock?.release().catch(() => {});
+  }, []);
+  /* The in-call sample player: ONE per call, over the tones' context, so a
+     second tap stops the first sample instead of stacking a new player on
+     it (audit, 2026-09-11). Stopped with the call; the context is the
+     tones', closed with them. */
+  const callPreviewRef = useRef<PreviewPlayer | null>(null);
+  /* The "saved" tick's timer, so an unmount can clear it. */
+  const writeSavedTimerRef = useRef<number | null>(null);
+  /* The phase as the data channel last reported it, for handlers that run
+     outside a render (roadmap B3: the playback gate reads it per event). */
+  const phaseRef = useRef<VoicePhase>(null);
+  const [lines, setLines] = useState<readonly TranscriptLine[]>([]);
+  /* Kept in state rather than a ref: the meter hook takes the stream as a
+     dependency, so it must re-run when one arrives. */
+  const [micStream, setMicStream] = useState<MediaStream | null>(null);
+  /* Held for the element's lifecycle only: the far meter no longer reads
+     the stream (useReceiverLevel), so nothing renders from this value. */
+  const [, setFarStream] = useState<MediaStream | null>(null);
+  /* The catalogue, as the server describes it: keys and labels, never vendor
+     ids. Empty until fetched, and empty forever if the owner configured none —
+     in which case no picker is drawn and the vendor's default voice is used. */
+  const [voices, setVoices] = useState<readonly { key: string; label: string }[]>([]);
+  /* Each lane's own list, so a lane chosen in the sheet offers its voices. */
+  const byLaneRef = useRef<VoicesByLane>({ rtc: [], ws: [] });
+  /* THE LANE THE SHEET SHOWS AS CHOSEN. Not laneState — that is the lane
+     the running call's meters read from and must not move under it; this
+     follows transportRef, which is the next call's lane. */
+  const [chosenLane, setChosenLane] = useState<"rtc" | "ws">("rtc");
+  const [lanesAvailable, setLanesAvailable] = useState(false);
+  /* THE LANE THAT DID NOT ANSWER, said on the screen (2026-09-11): a caller
+     who chose a socket-lane voice and was carried to the mainland lane
+     used to hear the wrong voice with no word about why. */
+  const [laneNote, setLaneNote] = useState<"international-unreachable" | null>(null);
+  const [voiceKey, setVoiceKey] = useState<string | null>(null);
+  /* Mirrors the session's flag. Kept in state because the screen renders from
+     it; the session stays the source of truth for the tracks themselves. */
+  const [muted, setMuted] = useState(false);
+  /* HOW THE CALLER TALKS (roadmap B2). Hands-free is the call as it was:
+     the far side detects turns from the room. Hold to talk gates the mic
+     tracks around a held button, for rooms where the room itself would get
+     turns. A ref beside the state because the session's own handlers — the
+     mic arriving, the line coming back after a drop — read it outside a
+     render. Read lazily: the reader never throws, answers hands-free where
+     there is no window, and nothing in the idle markup depends on it, so
+     the server's frame and the browser's still match. */
+  const [talkMode, setTalkMode] = useState<TalkMode>(readSavedTalkMode);
+  const talkModeRef = useRef<TalkMode>(talkMode);
+  /* READY IS NOT LIVE. `live` is the transport standing; `ready` is the far
+     side having accepted the session configuration, which is when it listens
+     as Koleex AI. The caption says "go ahead" and the tone sounds on READY —
+     a caller told to go ahead a beat too early speaks to a session that has
+     not yet been told who it is. A vendor that never acknowledges is covered
+     by a fallback timer, so the call can never be stuck on "connecting". */
+  const [ready, setReady] = useState(false);
+  /* The speaker is held back by autoplay policy on a call that is otherwise
+     up: the screen offers a tap that unlocks it. */
+  const [soundBlocked, setSoundBlocked] = useState(false);
+  const [connectingSlow, setConnectingSlow] = useState(false);
+  const enableSound = useCallback(() => {
+    const el = audioRef.current;
+    if (!el) return;
+    void el.play().then(() => setSoundBlocked(false)).catch(() => {});
+  }, []);
+  /* WHICH LANGUAGE THE CALLER SPEAKS — not which language the app is in, and
+     LEARNED rather than asked. The UI language used to be sent as the
+     transcription hint, and an English UI over Egyptian speech produced
+     English nonsense while Koleex AI (which hears the audio) answered
+     correctly. The first fix asked the caller to choose; the owner did not
+     want to be asked. Now: what the device learned from Koleex AI's own
+     replies on the last call, else the device's language, else the UI's —
+     and the server overrules all of it with the conversation's history.
+     Read after mount so the server and the browser render the same frame. */
+  const sttLangRef = useRef<SttLang>(pickSttLang(null, null, lang));
+  useEffect(() => {
+    sttLangRef.current = pickSttLang(readSavedSttLang(), typeof navigator !== "undefined" ? navigator.language : null, lang);
+  }, [lang]);
+  /* A CALL THAT DROPS COMES BACK BY ITSELF. "The voice stopped and closed the
+     conversation by itself": a lost connection used to end the call with an
+     error. Now a call that was up and is lost is started again — same
+     screen, same transcript — up to twice, and what the browser saw at the
+     moment it dropped is sent to the server's log, because the server never
+     sees the audio path and could not say why. */
+  const resumesRef = useRef(0);
+  const liveSinceRef = useRef<number | null>(null);
+  /* One per call, made INSIDE the tap that starts it (browsers unlock audio
+     only in a gesture) and closed with it. */
+  const tonesRef = useRef<CallTones | null>(null);
+  /* The tone plays once per call, and once per recovery — never on a
+     re-render. */
+  const chimedRef = useRef(false);
+  const prevStateRef = useRef<VoiceState>("idle");
+  /* A lookup takes a second or two of real silence. The model is told to say
+     "let me check" first, but it does not always, and a screen that says
+     nothing during it reads as a frozen call. */
+  const [searching, setSearching] = useState(false);
+  /* A WRITE WAITING FOR A TAP (roadmap D1). The model previewed a task; the
+     exact arguments its confirming phase needs arrived beside the model's
+     envelope and sit here until the caller taps Confirm or Cancel on the
+     card. `saved` flashes the outcome for a moment. */
+  const [pendingWrite, setPendingWrite] = useState<{ tool: string; args: Record<string, unknown>; message: string } | null>(null);
+  const [writeSaved, setWriteSaved] = useState(false);
+  const [writeBusy, setWriteBusy] = useState(false);
+  const [writeError, setWriteError] = useState(false);
+  /* WHAT THE LAST LOOKUP SHOWED. A product search on a call used to be heard
+     and never seen; these are the photos out of its result, drawn on the
+     call screen until the next lookup replaces them or the call ends. */
+  /* Held until the assistant's next turn, then attached to THAT line so the
+     saved message carries the picture with the words that described it. */
+  const pendingPhotosRef = useRef<readonly ProductPhoto[]>([]);
+  /* ONE TIMER, NOT ONE PER LOOKUP — and the bug that made this necessary.
+     The floor timer was created bare on every tool call, so a call that
+     looked two things up had two of them running. The FIRST one then fired
+     while the SECOND lookup was still in flight and cleared the indicator,
+     so the screen went quiet and the caller was told nothing was happening
+     while something was. Holding the handle lets each new lookup replace the
+     previous floor instead of racing it — and lets hang-up cancel it, which
+     nothing did before. */
+  const searchTimerRef = useRef<number | null>(null);
+  const clearSearchTimer = useCallback(() => {
+    if (searchTimerRef.current !== null) {
+      window.clearTimeout(searchTimerRef.current);
+      searchTimerRef.current = null;
+    }
+  }, []);
+  /* Read inside the session callbacks, which outlive any single render. */
+  const voiceKeyRef = useRef<string | null>(null);
+  useEffect(() => { voiceKeyRef.current = voiceKey; }, [voiceKey]);
+  /** Set by a voice switch; consumed by the next ready (a word from the new voice). */
+  const greetOnReadyRef = useRef(false);
+
+  /* Fetched once on mount rather than per call: it is small, it rarely
+     changes, and asking for it while the user is waiting to talk would add a
+     round trip to the one moment that should feel immediate. A failure is
+     silent — no catalogue means no picker, which is the same as not having
+     configured one, and is not worth an error a user cannot act on. */
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const res = await fetch(HANDSHAKE_PATH, { credentials: "include" });
+        if (!res.ok) return;
+        const body = (await res.json()) as {
+          voices?: { key: string; label: string }[]; transport?: unknown; ws_available?: unknown;
+          voices_by_lane?: { rtc?: { key: string; label: string }[]; ws?: { key: string; label: string }[] };
+        };
+        if (cancelled) return;
+        /* THE PICKER SHOWS THE LANE'S OWN VOICES (owner, 2026-09-08: "when I
+           use Grok voice I want the Grok voice choices"). Each lane's list
+           is kept, and the one on offer follows the lane the device settles
+           on — now, and again if the probe moves it. */
+        const byLane: VoicesByLane = {
+          rtc: Array.isArray(body.voices_by_lane?.rtc) ? body.voices_by_lane.rtc : Array.isArray(body.voices) ? body.voices : [],
+          ws: Array.isArray(body.voices_by_lane?.ws) ? body.voices_by_lane.ws : [],
+        };
+        byLaneRef.current = byLane;
+        /* THE LINE CONTROL IS DRAWN ONLY WHEN THERE ARE TWO LINES. */
+        setLanesAvailable(byLane.rtc.length > 0 && byLane.ws.length > 0);
+        const offerFor = (lane: "rtc" | "ws") => {
+          const list = byLane[lane].length > 0 ? byLane[lane] : byLane.rtc;
+          setVoices(list);
+          setVoiceKey((cur) => pickVoiceKey(cur ?? readSavedVoiceKey(), list));
+          setChosenLane(lane);
+        };
+        /* THE SERVER'S LANE IS A DEFAULT; THE DEVICE KNOWS ITS OWN NETWORK
+           (lane-probe.ts). A fresh verdict from a probe or a real call
+           overrides a mainland default; a stale one is re-checked, in the
+           background, so the tap that starts a call never waits on it. */
+        const server: "rtc" | "ws" = body.transport === "ws" ? "ws" : "rtc";
+        const decided = decideLane(server, readSavedLane(), Date.now());
+        /* NOT UNDER A CALL (2026-09-08 05:52: the tap came three seconds
+           after the page opened and this answer came after the tap; moving
+           the lane then relabelled a running mainland call as the socket
+           lane — its beacons said so — and Try again moved it "back" to
+           the lane it was already on). A call in progress keeps its lane;
+           the answer waits for the hang-up and sets the lane of the next
+           call. */
+        const applyLane = () => {
+          transportRef.current = decided.lane;
+          offerFor(decided.lane);
+        };
+        if (sessionRef.current) laneAfterCallRef.current = applyLane;
+        else applyLane();
+        if (decided.probe && body.ws_available === true) {
+          void probeWsLane({ fetchFn: (...a) => fetch(...a), createWebSocket: (url, protocols) => new WebSocket(url, protocols) as unknown as VoiceSocket }).then((ok) => {
+            if (cancelled) return;
+            saveLane(ok ? "ws" : "rtc", Date.now(), "probe");
+            /* Not under a call already placed on the other lane. */
+            if (!sessionRef.current) {
+              transportRef.current = ok ? "ws" : "rtc";
+              offerFor(transportRef.current);
+            }
+          });
+        }
+      } catch {
+        /* No picker. The call still works on the default voice. */
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+  const sessionRef = useRef<VoiceSession | null>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+
+  /* Held in refs so the session's callbacks never close over a stale render.
+     The session outlives any single render and fires from network events. */
+  const onErrorRef = useRef(onError);
+  const onMessageRef = useRef(onMessage);
+  const onTranscriptRef = useRef(onTranscript);
+  const onPhaseRef = useRef(onPhase);
+  const onLiveChangeRef = useRef(onLiveChange);
+  const langRef = useRef(lang);
+  const conversationIdRef = useRef(conversationId);
+  const ensureConversationRef = useRef(ensureConversation);
+  const onTurnsSavedRef = useRef(onTurnsSaved);
+  const onSummaryPendingRef = useRef(onSummaryPending);
+  const onTurnUpdatedRef = useRef(onTurnUpdated);
+  const onInterruptedRef = useRef(onInterrupted);
+  useEffect(() => {
+    onErrorRef.current = onError;
+    onMessageRef.current = onMessage;
+    onTranscriptRef.current = onTranscript;
+    onPhaseRef.current = onPhase;
+    onLiveChangeRef.current = onLiveChange;
+    langRef.current = lang;
+    conversationIdRef.current = conversationId;
+    ensureConversationRef.current = ensureConversation;
+    onTurnsSavedRef.current = onTurnsSaved;
+    onSummaryPendingRef.current = onSummaryPending;
+    onTurnUpdatedRef.current = onTurnUpdated;
+    onInterruptedRef.current = onInterrupted;
+  }, [onError, onMessage, onTranscript, onPhase, onLiveChange, lang, conversationId, ensureConversation, onTurnsSaved, onTurnUpdated, onInterrupted, onSummaryPending]);
+
+  /* One per call, made with the session and finished with it. Holds the
+     count of turns already queued, which is why it cannot outlive a call. */
+  const persisterRef = useRef<TranscriptPersister | null>(null);
+  /** Where the last writer of this call stopped, for the next writer of the
+   *  same call (a resume, a voice switch) to start from. Null when there was
+   *  none; consumed by the next start. */
+  const resumeSettledRef = useRef<number | null>(null);
+
+  /* The transcript accumulates across events and must not be React state HERE:
+     this component re-renders on every phase change, and rebuilding the fold
+     from a stale closure is how captions double or vanish. The parent owns
+     the rendering; this owns the running total. */
+  const linesRef = useRef<readonly TranscriptLine[]>([]);
+  /* startCall is declared below and selectVoice needs it. A ref rather than a
+     reorder: the declaration order here follows the call's lifecycle, and
+     shuffling it to satisfy a closure would make it harder to read. */
+  const startCallRef = useRef<((opts?: { resume?: boolean; mic?: MediaStream | null }) => Promise<void>) | null>(null);
+
+  /* A call must not survive the component. Without this, navigating away
+     leaves the microphone captured and the recording indicator lit — the one
+     failure here a user would rightly call a betrayal. */
+  useEffect(() => {
+    /* THE EXITS NOTHING REPORTED. A live call ended by a reload, a killed
+       tab, or a parent unmounting this button left no line in the log —
+       the failure beacon fires only from fail(). One beacon each, before
+       the teardown, so the next "it just stopped" has a reason beside it. */
+    const beacon = (reason: "unmounted" | "page-hidden") => {
+      const s = sessionRef.current;
+      if (!s) return;
+      const st = s.getState();
+      if (st !== "live" && st !== "reconnecting") return;
+      sendVoiceTelemetry({ reason, resumes: resumesRef.current, ...s.diagnostics() });
+    };
+    const onPageHide = () => beacon("page-hidden");
+    window.addEventListener("pagehide", onPageHide);
+    return () => {
+      window.removeEventListener("pagehide", onPageHide);
+      beacon("unmounted");
+      sessionRef.current?.stop();
+      sessionRef.current = null;
+      /* The last settled turn is often still queued at the moment the screen
+         goes. `finish` posts with keepalive so it outlives the unmount. */
+      void persisterRef.current?.finish();
+      persisterRef.current = null;
+      tonesRef.current?.close();
+      tonesRef.current = null;
+      /* THE REST OF THE RELEASE, on the exit that skipped it. The wake lock
+         outlived the component; the pulse survived an ordinary unmount and
+         was read on the next load as a call the phone killed — a second,
+         contradictory beacon and a false "the app was interrupted" for the
+         caller (audit, 2026-09-11). NOT on pagehide: a backgrounded page
+         may come back with the call still up, and the pulse is exactly what
+         reports the page a phone kills while it is away. */
+      releaseWakeLock();
+      clearSearchTimer();
+      if (writeSavedTimerRef.current !== null) window.clearTimeout(writeSavedTimerRef.current);
+      callPreviewRef.current?.stop();
+      callPreviewRef.current = null;
+      clearCallPulse(browserStorage() ?? { getItem: () => null, setItem: () => {}, removeItem: () => {} });
+    };
+  }, [releaseWakeLock, clearSearchTimer]);
+
+  /* THE RELEASE, WITHOUT THE EXIT. Everything a finished call gives back —
+     microphone, connection, writer, tones, streams — but not the step to
+     `idle`, so a caller who is about to start the next session (a voice
+     switch) can do so with the screen still up. hangUp is this plus idle. */
+  const releaseCall = useCallback(() => {
+    sessionRef.current?.stop();
+    sessionRef.current = null;
+    /* The call is over on purpose: no pulse to find later, and the page's
+       other sockets (Discuss) may rejoin now. */
+    clearCallPulse(browserStorage() ?? { getItem: () => null, setItem: () => {}, removeItem: () => {} });
+    try {
+      window.dispatchEvent(new Event("kx-call-ended"));
+    } catch { /* not a browser */ }
+    /* Where this writer stopped, for a voice switch that rebuilds the call
+       with the captions kept; a fresh call ignores it (startCall). */
+    resumeSettledRef.current = persisterRef.current?.settled() ?? null;
+    void persisterRef.current?.finish();
+    persisterRef.current = null;
+    callPreviewRef.current?.stop();
+    callPreviewRef.current = null;
+    tonesRef.current?.close();
+    tonesRef.current = null;
+    chimedRef.current = false;
+    setReady(false);
+    liveSinceRef.current = null;
+    if (audioRef.current) {
+      audioRef.current.srcObject = null;
+      audioRef.current.muted = false;
+    }
+    phaseRef.current = null;
+    releaseWakeLock();
+    setPendingWrite(null);
+    setWriteError(false);
+    /* Dropped so the meters tear their audio contexts down. A retained stream
+       here would keep a hardware handle open for the life of the page. */
+    setMicStream(null);
+    setFarStream(null);
+    setPhase(null);
+    setMuted(false);
+    clearSearchTimer();
+    setSearching(false);
+    pendingPhotosRef.current = [];
+    onLiveChangeRef.current?.(false);
+    /* The transcript SURVIVES hang-up on purpose: what was said is what the
+       user came for, and clearing it the instant the call ends throws away
+       the record at the moment they want to read it. */
+    onPhaseRef.current?.(null);
+    /* clearSearchTimer and releaseWakeLock are stable useCallback([])s —
+       naming them here satisfies the exhaustive-deps rule without making
+       this callback churn. */
+  }, [clearSearchTimer, releaseWakeLock]);
+
+  /* THE TAP (roadmap D1). The card's arguments go back to the tool route as
+     the confirming phase, marked as the caller's tap; the ledger on the
+     server still has to find the preview the model caused. The model is then
+     told in a note it does not answer, so the next thing the caller says is
+     answered knowing the task exists. Cancelling tells it the same way. */
+  const confirmWrite = useCallback(async () => {
+    const pending = pendingWrite;
+    const session = sessionRef.current;
+    if (!pending || writeBusy) return;
+    setWriteBusy(true);
+    setWriteError(false);
+    try {
+      const res = await fetch(TOOL_PATH, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: pending.tool,
+          call_id: `tap-${Date.now().toString(36)}`,
+          arguments: JSON.stringify({ ...pending.args, confirm: true }),
+          via: "tap",
+        }),
+      });
+      const body = res.ok ? ((await res.json()) as { output?: { ok?: boolean } }) : null;
+      if (!body?.output?.ok) {
+        setWriteError(true);
+        playSound("error");
+        return;
+      }
+      const title = String(pending.args.title ?? "").slice(0, 200);
+      session?.sendNote(`(Screen: the caller tapped Confirm — the task "${title}" is saved. Acknowledge in a few words only if they ask.)`);
+      setPendingWrite(null);
+      setWriteSaved(true);
+      playSound("action-done");
+      if (writeSavedTimerRef.current !== null) window.clearTimeout(writeSavedTimerRef.current);
+      writeSavedTimerRef.current = window.setTimeout(() => {
+        writeSavedTimerRef.current = null;
+        setWriteSaved(false);
+      }, 3_000);
+    } catch {
+      setWriteError(true);
+    } finally {
+      setWriteBusy(false);
+    }
+  }, [pendingWrite, writeBusy]);
+
+  const cancelWrite = useCallback(() => {
+    const pending = pendingWrite;
+    setPendingWrite(null);
+    setWriteError(false);
+    if (!pending) return;
+    playSound("action-cancelled");
+    /* The preview row simply expires on the server; the model is told so it
+       does not keep asking for a confirmation that is not coming. */
+    sessionRef.current?.sendNote("(Screen: the caller cancelled the task card. Nothing was saved; drop it without comment.)");
+  }, [pendingWrite]);
+
+  /* THE ORDINARY END IS BEACONED TOO, with the event histogram: a call that
+     connected, heard the caller and answered nothing is otherwise
+     indistinguishable from one that went perfectly (2026-09-07). Read
+     before the release drops the session. */
+  const beaconHangUp = useCallback(() => {
+    const s = sessionRef.current;
+    if (s && (s.getState() === "live" || s.getState() === "reconnecting")) {
+      sendVoiceTelemetry({ reason: "hung-up", resumes: resumesRef.current, lane: transportRef.current, ...s.diagnostics() });
+    }
+  }, []);
+
+  /* TRY AGAIN, ON A SLOW HANDSHAKE (owner, 2026-09-08 03:40). The call is
+     released and rebuilt with the words kept — on the mainland lane when
+     the socket lane never came up, since that is the lane that is not
+     answering. Inside the tap, so the rebuilt call may open its audio. */
+  /* THE VOICE FOLLOWS THE LANE IT FELL TO. A socket-lane voice asked of
+     the mainland lane is an unknown key there — the server's default voice
+     under the wrong name. The current voice moves to the mainland list
+     (kept when it is already there), the ref goes with it because the next
+     start runs before React's mirror does, and the screen says why. */
+  const fallToMainlandVoice = useCallback(() => {
+    const next = pickVoiceKey(voiceKeyRef.current ?? readSavedVoiceKey(), byLaneRef.current.rtc);
+    voiceKeyRef.current = next;
+    setVoiceKey(next);
+    setChosenLane("rtc");
+    setLaneNote("international-unreachable");
+  }, []);
+
+  const retryCall = useCallback(() => {
+    const s = sessionRef.current;
+    const diag = s?.diagnostics();
+    const wasUp = liveSinceRef.current !== null;
+    sendVoiceTelemetry({ reason: "retried", resumes: resumesRef.current, lane: transportRef.current, ...(diag ?? {}) });
+    releaseCall();
+    if (transportRef.current === "ws" && !wasUp && !laneFellBackRef.current) {
+      laneFellBackRef.current = true;
+      transportRef.current = "rtc";
+      saveLane("rtc", Date.now(), "call");
+      fallToMainlandVoice();
+    }
+    setReady(false);
+    chimedRef.current = false;
+    queueMicrotask(() => void startCallRef.current?.({ resume: true }));
+  }, [releaseCall, fallToMainlandVoice]);
+
+  const hangUp = useCallback(() => {
+    /* WHAT THE CALL CAME TO, written down (roadmap B1). Taken before the
+       release drops the handles: the writer, the thread, the words. After
+       the last turns have landed, the server is asked for a summary of the
+       call and its row joins the thread like any other saved turn. Only a
+       call the caller ENDED, with a real exchange in it — a voice switch
+       releases and rebuilds, and a two-second call has nothing to say. */
+    beaconHangUp();
+    playSound("call-end");
+    const persister = persisterRef.current;
+    const conversation = conversationIdRef.current;
+    const lines = linesRef.current;
+    releaseCall();
+    /* The note described THIS call's fallback; the next call starts clean. */
+    setLaneNote(null);
+    /* The lane the page learned during this call is the next call's. */
+    laneAfterCallRef.current?.();
+    laneAfterCallRef.current = null;
+    setState("idle");
+    if (conversation && shouldSummarise(lines)) {
+      onSummaryPendingRef.current?.(true);
+      void Promise.resolve(persister?.finish())
+        .then(() => requestCallSummary(conversation, langRef.current))
+        .then((res) => {
+          if (!res) return;
+          onTurnsSavedRef.current?.([res.message], res.conversation);
+          playSound("summary-ready");
+        })
+        .catch(() => { /* a summary that did not come is nothing on screen */ })
+        .finally(() => onSummaryPendingRef.current?.(false));
+    }
+  }, [releaseCall, beaconHangUp]);
+
+  /* THE FIRST ERROR THE FAR SIDE SENDS, once per call, with its message: a
+     refused field in the session configuration used to be invisible from
+     the server and guessed at from the screen. States and one bounded
+     sentence — no transcript, no content. */
+  const reportFirstError = useCallback((data: string) => {
+    if (errorBeaconedRef.current) return;
+    errorBeaconedRef.current = true;
+    const diag = sessionRef.current?.diagnostics();
+    /* Named for what it is — the far side's first error, whenever it came.
+       `config-rejected` is the session's own reason for a refusal inside the
+       configuration window; a rate limit at minute five is not that. */
+    sendVoiceTelemetry({ reason: "far-side-error", lane: transportRef.current, err: errorMessageOf(data), ...(diag ?? {}) });
+  }, []);
+
+  const startCall = useCallback(async (opts?: { resume?: boolean; mic?: MediaStream | null }) => {
+    if (sessionRef.current) return;
+    setLaneState(transportRef.current);
+    /* Beacons a flaky link held back go with the next call's first request. */
+    flushVoiceTelemetry();
+    /* UNLOCK THE SPEAKER INSIDE THE GESTURE. An element that has been asked
+       to play during a tap may later play a stream without a second tap on
+       browsers that gate autoplay; the far side's audio arrives well after
+       the tap. A rejection here means nothing — the element is still empty. */
+    if (!opts?.resume) void audioRef.current?.play().catch(() => {});
+    /* A second call is a new conversation, not a continuation of the last
+       one's captions — unless it is the SAME call coming back after a drop,
+       in which case the words stay where the caller can see them. */
+    if (!opts?.resume) {
+      linesRef.current = [];
+      setLines(linesRef.current);
+      resumesRef.current = 0;
+    }
+    liveSinceRef.current = null;
+    setPhase(null);
+    phaseRef.current = null;
+    /* The session resets its own flag on start; this keeps the UI in step so a
+       second call never opens showing the last one's mute. */
+    setMuted(false);
+    pendingPhotosRef.current = [];
+    onTranscriptRef.current?.(linesRef.current);
+    setReady(false);
+    chimedRef.current = false;
+    /* Primed HERE, in the tap: the context a browser will let play later is
+       the one created while the gesture is current. */
+    tonesRef.current?.close();
+    tonesRef.current = new CallTones();
+    tonesRef.current.prime();
+    /* THE CALL'S CUES, warmed in the same tap (sounds/player.ts): the files a
+       call will need are decoded now, so "ready" costs no fetch later. The
+       dialling cue is the tap's own answer; a resume dials quietly. */
+    primeSounds(["call-dialing", "call-ready", "call-reconnecting", "call-recovered", "call-failed", "call-end", "mic-mute", "mic-unmute", "ptt-start", "ptt-stop", "thinking", "pictures-shown", "approval-needed", "action-done", "action-cancelled", "summary-ready", "error"]);
+    if (!opts?.resume) playSound("call-dialing");
+
+    /* THE WRITER FOR THIS CALL. `fetch` is wrapped rather than passed: a bare
+       reference to window.fetch throws "Illegal invocation" when called off
+       the window. A missing ensureConversation means turns wait on an id that
+       never comes and are dropped at the failure cap — a parent that does not
+       wire persistence gets none, with no error. */
+    persisterRef.current = new TranscriptPersister(
+      {
+        fetchFn: (input, init) => fetch(input, init),
+        ensureConversation: () => ensureConversationRef.current?.() ?? Promise.resolve(null),
+        onSaved: (rows, conversation) => onTurnsSavedRef.current?.(rows, conversation),
+        onUpdated: (row) => onTurnUpdatedRef.current?.(row),
+        onError: (reason) => onErrorRef.current?.(PERSIST_COPY[langRef.current][reason]),
+      },
+      conversationIdRef.current,
+      /* A RESUMED CALL KEEPS ITS CAPTIONS; the new persister must not write
+         them again (audit, 2026-09-07: every auto-resume and voice switch
+         re-posted the whole call so far). */
+      /* FROM WHERE THE LAST WRITER STOPPED, when there was one (bug hunt,
+         2026-09-12): the count of finals on screen undercounts when an
+         unfinished line sits behind the conversation, and the turn after it
+         was then written twice. The finals count remains the fallback for a
+         resume with no writer before it (a call the page died under). */
+      opts?.resume ? (resumeSettledRef.current ?? linesRef.current.filter((l) => l.final).length) : 0,
+    );
+    resumeSettledRef.current = null;
+
+    /* A RESUMED CALL KEEPS THE MICROPHONE IT HAD (VoiceSession.fail keeps
+       it; takeMicrophone hands it over): the phone is asked for nothing
+       outside a tap, which it can refuse. A stream whose tracks have ended
+       is not offered — the ordinary request runs instead. */
+    const deps = browserVoiceDeps();
+    const kept = opts?.mic ?? null;
+    if (kept && kept.getAudioTracks().some((t) => t.readyState === "live")) {
+      deps.getMicrophone = async () => kept;
+    }
+    const session = new VoiceSession(deps, {
+      onState: (next, failure) => {
+        setState(next);
+        /* A NEW NEGOTIATION IS NOT READY. The session resets its own flag when
+           it reconnects through the other region; the screen must forget too,
+           or the alt-region call says "go ahead" the instant it goes live and
+           the tone never sounds (audit, 2026-09-07). */
+        if (next === "connecting") {
+          setReady(false);
+          chimedRef.current = false;
+        }
+        /* THE ANSWER THAT WAS CUT BY THE DROP IS OVER (bug hunt, 2026-09-12).
+           A redial opens a fresh far-side session; the response that was
+           in flight is not resumed, and its `done` is not coming. The open
+           assistant line closes with the words it has and goes to the
+           thread now, so the redialled call's first answer opens a new line
+           instead of being glued onto the cut one. */
+        if (next === "reconnecting") {
+          playSound("call-reconnecting");
+          const cut = settleOpenLine(linesRef.current, "assistant");
+          if (cut.length !== linesRef.current.length || cut.some((l, i) => l !== linesRef.current[i])) {
+            linesRef.current = cut;
+            setLines(cut);
+            onTranscriptRef.current?.(cut);
+            persisterRef.current?.observe(cut);
+          }
+        }
+        /* RECONNECTING COUNTS AS LIVE TO THE PARENT. The microphone is still
+           held and the far side may resume speaking at any moment, so a parent
+           that unmutes its own speech synthesis here would talk over the call
+           the instant it recovers. */
+        onLiveChangeRef.current?.(next === "live" || next === "reconnecting");
+        if (next === "live" && liveSinceRef.current === null) liveSinceRef.current = Date.now();
+        /* THE REGION THAT SERVED, remembered on the device the moment the call
+           is up, so the next call from here — after a drop, a switch, or
+           tomorrow morning — asks for it first. */
+        if (next === "live") acquireWakeLock();
+        if (next === "live" && transportRef.current === "ws") saveLane("ws", Date.now(), "call");
+        if (next === "live") {
+          const region = sessionRef.current?.diagnostics().region;
+          if (region === "alt" || region === "primary") {
+            regionHintRef.current = region;
+            saveRegion(region);
+          }
+        }
+        if (next === "failed" && failure) {
+          const diag = sessionRef.current?.diagnostics();
+          if (diag) regionHintRef.current = diag.region === "alt" ? "alt" : "primary";
+          const wasUp = liveSinceRef.current !== null && Date.now() - liveSinceRef.current >= RESUME_MIN_LIVE_MS;
+          const canResume = failure === "connection-lost" && wasUp && resumesRef.current < MAX_RESUMES;
+          /* THE OTHER LANE, ONCE: a WebSocket lane that never came up is
+             retried on the mainland lane before the caller hears anything.
+             Never the other way round. */
+          const laneFailed = failure === "service-unreachable" || failure === "handshake-failed" || failure === "service-refused" || failure === "unavailable" || failure === "connection-lost";
+          const canFallBack = transportRef.current === "ws" && !wasUp && laneFailed && !laneFellBackRef.current;
+          sendVoiceTelemetry({ reason: canResume ? "resumed" : failure, resumes: resumesRef.current, lane: transportRef.current, fell_back: canFallBack, ...diag });
+          /* The session has already torn itself down; drop our handle so the
+             next start makes a fresh one rather than reusing a dead session.
+             The microphone it kept goes to the resume, or is released. */
+          const keptMic = sessionRef.current?.takeMicrophone() ?? null;
+          sessionRef.current = null;
+          if (keptMic && !canResume) keptMic.getTracks().forEach((t) => t.stop());
+          /* THE WRITER OF THE CALL THAT DIED FINISHES FIRST (bug hunt,
+             2026-09-12). The answer in flight at the drop closes with the
+             words it has and goes to the thread with this writer; the next
+             call's writer then starts from where this one stopped. Before,
+             the old writer was simply overwritten with its last turn still
+             queued, and the new one counted from the finals on screen — a
+             different number when an unfinished line sat behind the
+             conversation — and wrote the turn after it again. */
+          const dropped = settleOpenLine(linesRef.current, "assistant");
+          if (dropped.length !== linesRef.current.length || dropped.some((l, i) => l !== linesRef.current[i])) {
+            linesRef.current = dropped;
+            setLines(dropped);
+            onTranscriptRef.current?.(dropped);
+            persisterRef.current?.observe(dropped);
+          }
+          resumeSettledRef.current = persisterRef.current?.settled() ?? null;
+          void persisterRef.current?.finish();
+          persisterRef.current = null;
+          if (canFallBack) {
+            laneFellBackRef.current = true;
+            transportRef.current = "rtc";
+            /* The socket lane does not work from this network today. */
+            saveLane("rtc", Date.now(), "call");
+            fallToMainlandVoice();
+            setReady(false);
+            chimedRef.current = false;
+            queueMicrotask(() => void startCallRef.current?.({ resume: false }));
+            return;
+          }
+          if (canResume) {
+            resumesRef.current += 1;
+            setReady(false);
+            chimedRef.current = false;
+            /* After the teardown, not during it: start() refuses while a
+               session handle is still held. */
+            queueMicrotask(() => void startCallRef.current?.({ resume: true, mic: keptMic }));
+            return;
+          }
+          /* A CALL THAT ENDED ON ITS OWN GIVES EVERYTHING BACK TOO. Only
+             hang-up and retry ran the release; a terminal failure left the
+             wake lock held (the phone never slept), the pulse in storage
+             (the next load reported a kill that was already reported), and
+             the tones, meters and streams standing until the next call
+             (audit, 2026-09-11). The session is already gone; this is the
+             rest. */
+          releaseCall();
+          setLaneNote(null);
+          playSound("call-failed");
+          onErrorRef.current?.(FAILURE_COPY[langRef.current][failure]);
+        }
+      },
+      onReady: () => {
+        setReady(true);
+        /* A WORD FROM THE NEW VOICE, the moment the rebuilt call is
+           acknowledged — see text-turn.ts VOICE_SWITCH_GREETING. Once, and
+           only after a switch; an ordinary call still waits to be spoken to. */
+        if (greetOnReadyRef.current) {
+          greetOnReadyRef.current = false;
+          sessionRef.current?.requestResponse(VOICE_SWITCH_GREETING);
+        }
+      },
+      onLocalStream: (stream) => {
+        setMicStream(stream);
+        /* HOLD TO TALK STARTS WITH THE MICROPHONE CLOSED. A session always
+           opens its tracks (see VoiceSession: a new call starts unmuted);
+           in hold mode the caller opens them by holding, so the tracks are
+           closed here, the moment they exist — before the line is up, so
+           nothing said while connecting goes anywhere either. Applied per
+           session, so a rebuilt line (voice switch, auto-resume) keeps the
+           mode without the caller noticing a change. */
+        if (talkModeRef.current === "hold") {
+          session.setMuted(true);
+          setMuted(true);
+        }
+      },
+      onRemoteStream: (stream) => {
+        setFarStream(stream);
+        if (audioRef.current) {
+          audioRef.current.srcObject = stream;
+          /* A new line starts audible: the gate below may have left the
+             element muted on a line that dropped mid-interruption. */
+          audioRef.current.muted = false;
+          /* Autoplay can still be refused even after a user gesture on some
+             browsers. Failing silently would look like a dead call, so it is
+             reported as one. */
+          void audioRef.current.play().then(() => setSoundBlocked(false)).catch(() => {
+            /* The call is live and the far side can hear; only the speaker is
+               held back by autoplay policy. A "could not start" toast sent the
+               owner looking for a dead call (audit, 2026-09-07); what fixes it
+               is a tap, so the screen offers one. */
+            setSoundBlocked(true);
+          });
+        }
+      },
+      onToolCall: () => {
+        setSearching(true);
+        /* Cleared on the next thing the far side says, and on a timer as a
+           floor: a failed lookup still ends, and an indicator that never
+           clears is worse than none. The previous floor is cancelled first,
+           so a second lookup extends the indicator rather than inheriting
+           the deadline of the first one. */
+        clearSearchTimer();
+        searchTimerRef.current = window.setTimeout(() => {
+          searchTimerRef.current = null;
+          setSearching(false);
+        }, 12_000);
+      },
+      onPendingWrite: (_name, pending, message) => {
+        setWriteError(false);
+        setWriteSaved(false);
+        setPendingWrite({ tool: pending.tool, args: pending.args, message });
+        playSound("approval-needed");
+      },
+      onToolResult: (_name, output) => {
+        /* DATA, READ FOR PICTURES AND NOTHING ELSE. https URLs only, capped,
+           deduplicated — see voice/photos.ts. An empty result leaves the
+           screen as it was: a lookup that found no photo should not blank
+           the one from the lookup before it. */
+        const found = extractProductPhotos(output);
+        if (found.length === 0) return;
+        pendingPhotosRef.current = found;
+        if (found.length > 0) playSound("pictures-shown");
+      },
+      onToolProtocolMismatch: (eventType) => {
+        /* THE ONE PLACE THIS BECOMES VISIBLE. If the vendor names its
+           function-call events differently, every lookup silently does
+           nothing and the model answers from memory sounding just as certain.
+           This is the line that turns that into a minute of work instead of a
+           bug report about the assistant being out of date. */
+        console.warn(
+          `[voice] a tool call arrived in an unrecognised shape: ${eventType}. ` +
+            `Search during a call will not work until src/lib/voice/tool-calls.ts handles it.`,
+        );
+      },
+      onMessage: (data) => {
+        /* Raw first, and unconditionally: the tool bridge will read this
+           stream and must not depend on whether a caption was produced. */
+        onMessageRef.current?.(data);
+
+        /* BARGE-IN (roadmap B3). When the caller starts speaking over an
+           answer, the far side stops sending but the jitter buffer still
+           plays out; the element is silenced until the far side has the
+           turn again. See events.ts playbackGate for the rule. */
+        const gate = playbackGate(voiceEventType(data), phaseRef.current);
+        if (gate && audioRef.current) audioRef.current.muted = gate === "cut";
+        /* The socket lane plays inside its own graph, not through the
+           element: the gate reaches it through the session. */
+        if (gate) sessionRef.current?.setFarMuted(gate === "cut");
+
+        /* UNTRUSTED TEXT. This came off a network socket and is about to be
+           rendered. It is data, never instruction — nothing here dispatches
+           on it, and the parser only ever returns strings. */
+        const parsed = parseVoiceEvent(data);
+        /* The first `error` the far side sends, once per call, beaconed with
+           its message — see reportFirstError. */
+        if (voiceEventType(data) === "error") reportFirstError(data);
+        /* THE ANSWER IS OVER, OR WAS CUT OFF: its open line closes with the
+           words it has, so the thread keeps it and the persister moves on
+           (events.ts settleOpenLine). Before the transcript of this same
+           event, so a new turn opens after a closed one. */
+        if (parsed.settles) {
+          const settled = settleOpenLine(linesRef.current, parsed.settles);
+          if (settled.length !== linesRef.current.length || settled.some((l, i) => l !== linesRef.current[i])) {
+            linesRef.current = settled;
+            setLines(settled);
+            onTranscriptRef.current?.(settled);
+            persisterRef.current?.observe(settled);
+          }
+        }
+        if (parsed.phase) {
+          /* The far side is talking again, so whatever it was checking is
+             done. Clearing here rather than on the tool result keeps the
+             indicator honest: what ends the wait is the answer being spoken. */
+          if (parsed.phase === "speaking") setSearching(false);
+          /* Once, as the far side takes the turn — not on every event of
+             the pause. Off by default; the owner decides. */
+          if (parsed.phase === "thinking" && phaseRef.current !== "thinking") playSound("thinking");
+          phaseRef.current = parsed.phase;
+          setPhase(parsed.phase);
+          onPhaseRef.current?.(parsed.phase);
+        }
+        if (parsed.transcript) {
+          /* The photos ride on the assistant turn that follows the lookup —
+             the answer that describes them. Attached once; appendTranscript
+             keeps them on the line through every later delta. */
+          const update =
+            parsed.transcript.role === "assistant" && pendingPhotosRef.current.length > 0
+              ? { ...parsed.transcript, photos: pendingPhotosRef.current }
+              : parsed.transcript;
+          if (update !== parsed.transcript) pendingPhotosRef.current = [];
+          /* Folded, then any line the fold can no longer reach is closed
+             (events.ts settleStaleLines): an answer whose `done` never came
+             must not stay dim for the rest of the call, nor hold the
+             persister at its index. */
+          linesRef.current = settleStaleLines(appendTranscript(linesRef.current, update));
+          setLines(linesRef.current);
+          onTranscriptRef.current?.(linesRef.current);
+          /* WHAT THIS CALL TEACHES: Koleex AI answered in the caller's
+             language. Remembered for the next call's transcriber. */
+          if (update.role === "assistant" && update.final) {
+            const learned = learnSttLang(linesRef.current, sttLangRef.current);
+            if (learned && learned !== sttLangRef.current) {
+              sttLangRef.current = learned;
+              saveSttLang(learned);
+            }
+          }
+          /* Settled turns leave for the conversation from here. The
+             persister reads the same list the screen renders, so what is
+             saved is exactly what was shown. */
+          persisterRef.current?.observe(linesRef.current);
+        }
+      },
+    }, voiceKeyRef.current, conversationIdRef.current, sttLangRef.current,
+    /* Every call asks first for the region that served this device last —
+       this session's, or the one the device remembered from an earlier call.
+       The server still decides; a device with no memory leaves it to the
+       server's own. */
+    regionHintRef.current ?? readSavedRegion(),
+    /* The lane the server chose; the fall-back below may have moved it. */
+    transportRef.current);
+
+    errorBeaconedRef.current = false;
+    sessionRef.current = session;
+    await session.start();
+  }, [clearSearchTimer, acquireWakeLock, reportFirstError, fallToMainlandVoice, releaseCall]);
+  useEffect(() => { startCallRef.current = startCall; }, [startCall]);
+
+  /* ONE METER PER SIDE, AND ONLY THE ACTIVE ONE RUNS. Measuring both at once
+     would burn a frame loop and an audio context on silence, which on a phone
+     is battery for nothing. */
+  /* A DROPPED CONNECTION IS STILL AN OPEN CALL. `reconnecting` is not `live`
+     and it is not `idle`: the session is holding the microphone and is waiting
+     to recover, so every place that asks "is there a call on screen" must say
+     yes. Treating it as neither is how the call screen would have vanished
+     mid-sentence on the unstable network this was built for. */
+  const live = state === "live";
+  /* The platform releases the lock when the page is hidden; asked for again
+     when the page returns while the call is still up. */
+  useEffect(() => {
+    if (!live) return;
+    const onVisible = () => { if (document.visibilityState === "visible") { wakeLockRef.current = null; acquireWakeLock(); } };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => document.removeEventListener("visibilitychange", onVisible);
+  }, [live, acquireWakeLock]);
+  const reconnecting = state === "reconnecting";
+  const connected = live || reconnecting;
+
+  /* THE FALLBACK FOR READY. A vendor that never acknowledges the session
+     configuration would otherwise leave a working call saying "connecting"
+     for ever. Live for this long with no word from the far side is treated
+     as ready — the transport is up and the microphone is open. */
+  useEffect(() => {
+    if (!live || ready) return;
+    /* ONLY ON A TRANSPORT THAT EXISTS. "live" is set when the answer is
+       applied, before ICE and the data channel come up; on a network where
+       they never do, the timer alone said "go ahead" to a caller nobody
+       could hear (audit, 2026-09-07). The fallback waits for the channel to
+       be open or the media to have connected, then for the grace period. */
+    const startedAt = Date.now();
+    const t = window.setInterval(() => {
+      const d = sessionRef.current?.diagnostics();
+      const transportUp = !!d && (d.dc === "open" || d.ice_ever_connected === true);
+      if (transportUp && Date.now() - startedAt >= READY_FALLBACK_MS) setReady(true);
+    }, 250);
+    return () => window.clearInterval(t);
+  }, [live, ready]);
+
+  /* STILL CONNECTING, SAID OUT LOUD. The handshake can legitimately take a
+     while when the voice service is slow; after this long the caption says
+     so and reminds the caller they can end and retry (audit, 2026-09-07). */
+  useEffect(() => {
+    if (state !== "connecting") {
+      setConnectingSlow(false);
+      return;
+    }
+    const t = window.setTimeout(() => setConnectingSlow(true), CONNECTING_SLOW_MS);
+    return () => window.clearTimeout(t);
+  }, [state]);
+
+  /* THE SOUND. Once when the call becomes ready, once more each time a
+     dropped connection comes back — the two moments a caller may start
+     talking again and may not be looking at the screen. */
+  useEffect(() => {
+    if (live && ready && !chimedRef.current) {
+      chimedRef.current = true;
+      /* The owner's chosen cue (sounds/catalog.ts); the synthesised notes
+         only when there is no engine at all. Silenced is silenced. */
+      if (playSound("call-ready") === "unavailable") tonesRef.current?.ready();
+    }
+  }, [live, ready]);
+  useEffect(() => {
+    const prev = prevStateRef.current;
+    prevStateRef.current = state;
+    if (prev === "reconnecting" && state === "live") {
+      if (playSound("call-recovered") === "unavailable") tonesRef.current?.recovered();
+    }
+  }, [state]);
+  const listening = connected && phase !== "speaking";
+  /* ON THE SOCKET LANE NO SECOND CONTEXT TOUCHES THE MICROPHONE: the
+     stream meters get no stream at all, and the levels come from the
+     call's own audio (useSessionLevels / ws-audio.ts). */
+  const wsLane = laneState === "ws";
+  const micLevelRtc = useStreamLevel(wsLane ? null : micStream, listening);
+  /* THE ASSISTANT'S VOICE IS NEVER TAPPED BY A SECOND CONTEXT (2026-09-12,
+     "pulses" while it talks): on the mainland lane its level comes from the
+     WebRTC receiver's own reading, so only the audio element touches the
+     remote track. See useReceiverLevel.ts. */
+  const farLevelRtc = useReceiverLevel(sessionRef, !wsLane && connected && phase === "speaking");
+  const wsLevels = useSessionLevels(sessionRef, wsLane && connected);
+  const micLevel = wsLane ? wsLevels.mic : micLevelRtc;
+  const farLevel = wsLane ? wsLevels.far : farLevelRtc;
+  const audioLevel = phase === "speaking" ? farLevel : micLevel;
+
+  /* THE CONFIGURATION IS SENT ONCE PER SESSION, so a new voice needs a new
+     session. Restarting is honest about that; silently storing the choice for
+     "next time" would look like a control that does nothing. */
+  /* HEARING A VOICE BEFORE CHOOSING IT (owner, 2026-09-07). The sheet asks
+     for a sample; this fetches it from our route and plays it through a
+     player primed inside the tap (preview-player.ts). While the sample
+     plays the microphone is closed and the far side is silenced, so the
+     sample is neither heard by the far side as the caller's words nor
+     talked over — and both are restored exactly as they were. */
+  const previewRef = useRef<PreviewPlayer | null>(null);
+  const previewVoice = useCallback(async (key: string): Promise<boolean> => {
+    /* NO SECOND AUDIO CONTEXT UNDER A LIVE CALL (owner, 2026-09-07 night:
+       "when I talk it has a noise"; the call's transcript read "[noise]"
+       right after two samples). A sample plays through the call's own
+       context: the socket lane's audio (session.previewAudio) or, on the
+       other lane, the tones' context. The standalone player — its own
+       context — is only for a sample with no call under it. */
+    const inCall = !!sessionRef.current;
+    const player = inCall ? null : (previewRef.current ??= createPreviewPlayer(browserPreviewContext));
+    player?.prime();
+    let bytes: ArrayBuffer;
+    try {
+      const q = new URLSearchParams({ voice: key, lane: transportRef.current, lang });
+      const res = await fetch(`${VOICE_PREVIEW_PATH}?${q.toString()}`, {
+        credentials: "include",
+        ...(typeof AbortSignal !== "undefined" && "timeout" in AbortSignal ? { signal: AbortSignal.timeout(PREVIEW_FETCH_TIMEOUT_MS) } : {}),
+      });
+      if (!res.ok) return false;
+      bytes = await res.arrayBuffer();
+    } catch {
+      return false;
+    }
+    const session = sessionRef.current;
+    const micWasOpen = !!session && !session.isMuted();
+    if (micWasOpen) session.setMuted(true);
+    /* On the socket lane the sample travels the far side's own stream and
+       element, so the element stays audible; elsewhere it is silenced so
+       the sample is not talked over. */
+    const viaCall = session?.previewAudio(bytes) ?? null;
+    const far = audioRef.current;
+    const farWasMuted = far?.muted ?? false;
+    if (far && !viaCall) far.muted = true;
+    try {
+      if (viaCall) return await viaCall;
+      const tones = tonesRef.current?.context() ?? null;
+      const p = player ?? (tones
+        ? (callPreviewRef.current ??= createPreviewPlayer(() => tones as unknown as PreviewContextLike))
+        : (previewRef.current ??= createPreviewPlayer(browserPreviewContext)));
+      return await p.play(bytes);
+    } finally {
+      if (far && !viaCall) far.muted = farWasMuted;
+      if (micWasOpen && sessionRef.current === session) session.setMuted(false);
+    }
+  }, [lang]);
+  const stopPreview = useCallback(() => {
+    previewRef.current?.stop();
+    callPreviewRef.current?.stop();
+  }, []);
+  useEffect(() => () => { previewRef.current?.close(); previewRef.current = null; }, []);
+
+  /* THE PULSE (lib/voice/call-memory.ts): while a call is up, its
+     diagnostics are written to the device every few seconds, so a page the
+     phone kills under the call leaves the next load something to report. */
+  useEffect(() => {
+    if (state !== "live" && state !== "reconnecting") return;
+    const store = browserStorage();
+    if (!store) return;
+    const beat = () => {
+      const s = sessionRef.current;
+      if (!s) return;
+      const d = s.diagnostics();
+      writeCallPulse(store, {
+        at: Date.now(),
+        startedAt: liveSinceRef.current ?? Date.now(),
+        lane: transportRef.current,
+        voice: voiceKeyRef.current,
+        conversation: conversationIdRef.current,
+        elapsed_ms: d.elapsed_ms,
+        events: d.events,
+        last_event: d.last_event,
+        ws_reconnects: d.ws_reconnects,
+        ws_close: d.ws_close,
+        /* How heavy the page is, for the beacon a death leaves behind. */
+        dom: document.getElementsByTagName("*").length,
+        imgs: document.images.length,
+      });
+    };
+    beat();
+    const t = window.setInterval(beat, CALL_PULSE_EVERY_MS);
+    return () => window.clearInterval(t);
+  }, [state]);
+
+  /* THE PAGE IS BACK. Beacons the network could not carry go now; a pulse
+     nobody cleared is a call the page died under — reported once, to the
+     log and to the caller. */
+  useEffect(() => {
+    const flush = () => flushVoiceTelemetry();
+    flush();
+    window.addEventListener("online", flush);
+    const store = browserStorage();
+    const dead = store ? takeInterruptedCall(store) : null;
+    if (dead) {
+      sendVoiceTelemetry({
+        reason: "page-killed",
+        lane: dead.lane,
+        elapsed_ms: dead.elapsed_ms,
+        events: dead.events,
+        last_event: dead.last_event,
+        ws_reconnects: dead.ws_reconnects,
+        ws_close: dead.ws_close,
+        ice_ever_connected: true,
+        ...(dead.dom !== undefined ? { dom: dead.dom, imgs: dead.imgs ?? 0 } : {}),
+      });
+      /* One tap to continue where a parent offers it; the sentence where
+         none does. The tap is the gesture the microphone needs anyway. */
+      const offer = onInterruptedRef.current;
+      if (offer) offer(() => void startCallRef.current?.(), dead.conversation);
+      else onErrorRef.current?.(INTERRUPTED_COPY[langRef.current]);
+    }
+    return () => window.removeEventListener("online", flush);
+  }, []);
+
+  const toggleMute = useCallback(() => {
+    const session = sessionRef.current;
+    if (!session) return;
+    /* READ THE SESSION, NOT THE COMPONENT STATE. The session owns the tracks;
+       deriving the next value from a possibly-stale render would let the
+       button and the microphone disagree, which is the one thing a mute
+       control must never do. */
+    const next = !session.isMuted();
+    session.setMuted(next);
+    setMuted(next);
+    playSound(next ? "mic-mute" : "mic-unmute");
+  }, []);
+
+  /* THE HOLD (roadmap B2). Pressed: the tracks open; released: they close.
+     The same setMuted the mute control uses, so the session stays the one
+     owner of the tracks and the screen's `muted` keeps telling the truth
+     between holds ("Hold to talk", not "Listening"). Ignored outside hold
+     mode: a hands-free call has no button to hold, and a stray event from
+     one must not close the microphone. */
+  const setHolding = useCallback((held: boolean) => {
+    const session = sessionRef.current;
+    if (!session || talkModeRef.current !== "hold") return;
+    session.setMuted(!held);
+    setMuted(!held);
+    playSound(held ? "ptt-start" : "ptt-stop");
+  }, []);
+
+  /* CHOOSING HOW TO TALK takes effect on the live call at once — no new
+     session, because nothing about the session changes: hold mode closes
+     the tracks until the next hold, hands-free opens them. Remembered on
+     the device like the voice. */
+  const selectTalkMode = useCallback((mode: TalkMode) => {
+    talkModeRef.current = mode;
+    setTalkMode(mode);
+    saveTalkMode(mode);
+    const session = sessionRef.current;
+    if (!session) return;
+    const closed = mode === "hold";
+    session.setMuted(closed);
+    setMuted(closed);
+  }, []);
+
+  /* TYPE INTO THE CALL. The text goes to the session as the user's turn and
+     into the transcript as a settled user line marked `via: "text"`, so the
+     screen shows it at once and the persister writes it as a TYPED message —
+     it was typed, and the thread should say so. */
+  const sendTyped = useCallback((text: string): boolean => {
+    const session = sessionRef.current;
+    if (!session) return false;
+    const trimmed = text.trim();
+    if (!trimmed || !session.sendText(trimmed)) return false;
+    linesRef.current = appendTranscript(linesRef.current, {
+      role: "user",
+      text: trimmed,
+      final: true,
+      via: "text",
+    });
+    setLines(linesRef.current);
+    onTranscriptRef.current?.(linesRef.current);
+    persisterRef.current?.observe(linesRef.current);
+    return true;
+  }, []);
+
+  /* THE CALL IS REBUILT WITH THE SCREEN STILL UP — for a new voice and for
+     a new line alike. Nothing here decides which. */
+  const rebuildCall = useCallback(() => {
+    const current = sessionRef.current;
+    if (!current) return;
+    /* The first version hung
+       up and started again: the state went idle, the portal unmounted the
+       call screen, and the caller was back in the text chat for the whole
+       handshake — the owner's "the conversation stopped and took me out of
+       the voice chat", the day the picker appeared. Now the screen stays,
+       says connecting, keeps the words, and the new session asks for the
+       region that served the old one first. The beacon is what makes the
+       next such report answerable from the log. */
+    const diag = current.diagnostics();
+    sendVoiceTelemetry({ reason: "voice-switched", resumes: resumesRef.current, lane: transportRef.current, ...diag });
+    regionHintRef.current = diag.region === "alt" ? "alt" : "primary";
+    greetOnReadyRef.current = true;
+    setSwapping(true);
+    releaseCall();
+    /* After the teardown, not during it: start() refuses while a session
+       handle is still held. */
+    queueMicrotask(() => {
+      const started = startCallRef.current?.({ resume: true });
+      void (started ?? Promise.resolve()).finally(() => setSwapping(false));
+    });
+  }, [releaseCall]);
+
+  const selectVoice = useCallback((key: string) => {
+    setVoiceKey(key);
+    voiceKeyRef.current = key;
+    saveVoiceKey(key);
+    if (sessionRef.current) playSound("voice-switched");
+    rebuildCall();
+  }, [rebuildCall]);
+
+  /* THE LINE IS THE CALLER'S TO CHOOSE (owner, 2026-09-11: "with VPN and
+     without VPN … no [international] voice at all"). The voice names are
+     the product's on both lines, so the line is its own control. Choosing
+     it moves the next call there, saves the choice as the device's verdict
+     — as a probe's would be — re-arms the one fall-back so a line that does
+     not answer is tried once more and then said on the screen, and offers
+     that line's voices (the same names; the current one is kept when the
+     line carries it). Under a call, the call is rebuilt on the new line. */
+  const selectLane = useCallback((lane: "rtc" | "ws") => {
+    if (lane === transportRef.current) return;
+    transportRef.current = lane;
+    saveLane(lane, Date.now(), "user");
+    laneFellBackRef.current = false;
+    setLaneNote(null);
+    const list = byLaneRef.current[lane].length > 0 ? byLaneRef.current[lane] : byLaneRef.current.rtc;
+    setVoices(list);
+    const next = pickVoiceKey(voiceKeyRef.current ?? readSavedVoiceKey(), list);
+    voiceKeyRef.current = next;
+    setVoiceKey(next);
+    setChosenLane(lane);
+    rebuildCall();
+  }, [rebuildCall]);
+
+  const busy = state === "requesting-mic" || state === "connecting";
+  const labels = LABEL_COPY[lang];
+  const label = connected ? labels.end : busy ? labels.connecting : labels.start;
+
+  /* HOLD TO DICTATE. The recogniser is the shared hook; the words go to the
+     caller's latest handler through a ref. The hold timer arms on pointer
+     down and is cleared on release — a release before it fires is a tap,
+     and the click that follows starts the call; a release after it fires
+     stops the recogniser, and the click is swallowed (heldRef). */
+  const dictationRef = useRef(dictation);
+  useEffect(() => {
+    dictationRef.current = dictation;
+  }, [dictation]);
+  const dict = useDictation({
+    lang,
+    onTranscript: (t) => dictationRef.current?.onTranscript(t),
+    onError: (m) => dictationRef.current?.onError?.(m),
+  });
+  const holdTimerRef = useRef<number | null>(null);
+  const heldRef = useRef(false);
+  const clearHold = useCallback(() => {
+    if (holdTimerRef.current !== null) {
+      window.clearTimeout(holdTimerRef.current);
+      holdTimerRef.current = null;
+    }
+  }, []);
+  useEffect(() => clearHold, [clearHold]);
+  const releaseHold = useCallback(() => {
+    clearHold();
+    if (heldRef.current) {
+      dict.stop();
+      playSound("dictation-stop");
+    }
+  }, [clearHold, dict]);
+  const holdHandlers = dictation
+    ? {
+        onPointerDown: (e: React.PointerEvent) => {
+          if (disabled || connected || busy || e.button !== 0) return;
+          heldRef.current = false;
+          clearHold();
+          holdTimerRef.current = window.setTimeout(() => {
+            holdTimerRef.current = null;
+            heldRef.current = true;
+            playSound("dictation-start");
+            dict.start();
+          }, HOLD_TO_DICTATE_MS);
+        },
+        onPointerUp: releaseHold,
+        onPointerLeave: releaseHold,
+        onPointerCancel: releaseHold,
+        onContextMenu: (e: React.MouseEvent) => e.preventDefault(),
+        style: { WebkitTouchCallout: "none" } as React.CSSProperties,
+      }
+    : {};
+  const tapStartsCall = () => {
+    if (heldRef.current) {
+      heldRef.current = false;
+      return;
+    }
+    void startCall();
+  };
+  const dictating = dict.listening;
+  const recLabel = `● ${DICTATION_COPY[lang].rec} · ${formatDictationDuration(dict.elapsed)}`;
+
+  return (
+    <>
+      {/* Playback only. Never rendered visibly — the button is the control. */}
+      <audio ref={audioRef} autoPlay playsInline className="hidden" />
+
+      {/* A live call takes the screen. Mounted for `busy` too, so connecting
+          is visible rather than a button that looks stuck. */}
+      {/* THROUGH A PORTAL, TO THE BODY. The owner: "the orb is always covered
+          by the main header". The screen is position:fixed at z-200, above
+          the header's z-100 — on paper. In the tree it sat inside the chat
+          column, under ancestors with transforms and backdrop filters, and a
+          fixed element inside a transformed ancestor is fixed to THAT
+          ancestor and stacked inside it: its z-index never competes with the
+          header at all. Rendered at the body it is what it claims to be. */}
+      {(connected || busy || swapping) && typeof document !== "undefined" && createPortal(
+        <VoiceCallScreen
+          live={connected}
+          ready={ready}
+          reconnecting={reconnecting}
+          phase={phase}
+          audioLevel={audioLevel}
+          lines={lines}
+          lang={lang}
+          onEnd={hangUp}
+          muted={muted}
+          onToggleMute={toggleMute}
+          talkMode={talkMode}
+          onSelectTalkMode={selectTalkMode}
+          onHold={setHolding}
+          searching={searching}
+          voices={voices}
+          selectedVoice={voiceKey}
+          onSelectVoice={selectVoice}
+          lane={chosenLane}
+          onSelectLane={lanesAvailable ? selectLane : undefined}
+          onPreviewVoice={previewVoice}
+          onStopPreview={stopPreview}
+          onSendText={sendTyped}
+          pendingWrite={pendingWrite}
+          onConfirmWrite={() => void confirmWrite()}
+          onCancelWrite={cancelWrite}
+          writeBusy={writeBusy}
+          writeSaved={writeSaved}
+          writeError={writeError}
+          connectingSlow={connectingSlow}
+          laneNote={laneNote}
+          onRetry={retryCall}
+          soundBlocked={soundBlocked}
+          onEnableSound={enableSound}
+        />,
+        document.body,
+      )}
+      {variant === "pill" && !connected && !busy ? (
+        /* THE SPEAK PILL. Inverted, named, on the 8px grid: the one control
+           in the composer that says what it does, because on an empty
+           composer it is the primary thing to do. Only while idle — a live
+           or connecting call has the screen, and the composer's copy of the
+           control goes back to the small round one. */
+        <button
+          type="button"
+          onClick={tapStartsCall}
+          disabled={disabled}
+          aria-label={dictating ? labels.dictating : labels.start}
+          title={dictation ? labels.holdHint : labels.start}
+          {...holdHandlers}
+          style={{ ...(holdHandlers.style ?? {}), height: size }}
+          className={`rounded-full px-3.5 inline-flex items-center gap-1.5 shrink-0 select-none text-[13px] font-semibold transition-[opacity,transform,background-color] duration-150 active:scale-95 ${
+            dictating ? "bg-[var(--kx-ai-danger)] text-white" : "bg-[var(--bg-inverted)] text-[var(--text-inverted)]"
+          } ${disabled ? "opacity-40 cursor-not-allowed" : ""}`}
+        >
+          <svg aria-hidden viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+            <line x1="4" y1="10" x2="4" y2="14" />
+            <line x1="8" y1="7" x2="8" y2="17" />
+            <line x1="12" y1="4" x2="12" y2="20" />
+            <line x1="16" y1="7" x2="16" y2="17" />
+            <line x1="20" y1="10" x2="20" y2="14" />
+          </svg>
+          {dictating ? recLabel : labels.speak}
+        </button>
+      ) : (
+      <button
+        type="button"
+        onClick={connected || busy ? hangUp : tapStartsCall}
+        disabled={disabled && !connected && !busy}
+        aria-label={dictating ? labels.dictating : label}
+        title={dictation && !connected && !busy ? labels.holdHint : label}
+        {...holdHandlers}
+        style={{ ...(holdHandlers.style ?? {}), height: size, width: size }}
+        className={`rounded-full inline-flex items-center justify-center shrink-0 select-none transition-colors ${
+          dictating
+            ? "bg-[var(--kx-ai-danger)] text-white"
+            : connected
+            ? "bg-[#FF3333]/[0.16] text-[#FF3333] ring-1 ring-[#FF3333]/50"
+            : busy
+              ? "bg-[var(--bg-surface-subtle)] text-[var(--text-dim)]"
+              : "text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-subtle)]"
+        } ${disabled && !connected && !busy ? "opacity-40 cursor-not-allowed" : ""}`}
+      >
+        {connected ? (
+          /* Hang up — a struck-through handset reads as "end" across locales
+             more reliably than a rotated one. */
+          <svg aria-hidden viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.36 1.9.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.9.34 1.85.57 2.81.7A2 2 0 0 1 22 16.92z" />
+            <line x1="2" y1="2" x2="22" y2="22" />
+          </svg>
+        ) : busy ? (
+          <svg aria-hidden viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" className="motion-safe:animate-spin">
+            <path d="M21 12a9 9 0 1 1-6.22-8.56" />
+          </svg>
+        ) : (
+          /* Waveform — a call you speak into, distinct from the mic beside it. */
+          <svg aria-hidden viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+            <line x1="4" y1="10" x2="4" y2="14" />
+            <line x1="8" y1="7" x2="8" y2="17" />
+            <line x1="12" y1="4" x2="12" y2="20" />
+            <line x1="16" y1="7" x2="16" y2="17" />
+            <line x1="20" y1="10" x2="20" y2="14" />
+          </svg>
+        )}
+      </button>
+      )}
+    </>
+  );
+}

@@ -68,7 +68,7 @@ export default function WebsiteCMS() {
   const iframeSrc = activeTab === "builder" ? CMS_URL : `${WEBSITE_URL}${previewPage}`;
 
   return (
-    <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)] flex flex-col">
+    <div className="min-h-full bg-[var(--bg-primary)] text-[var(--text-primary)] flex flex-col">
       {/* ── Header ── */}
       <header className="sticky top-0 z-50 bg-[var(--bg-primary)]/95 backdrop-blur border-b border-[var(--border-color)]">
         <div className="flex items-center justify-between px-4 h-14">

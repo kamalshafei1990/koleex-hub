@@ -36,6 +36,12 @@ import {
 } from "@/lib/docs-sync";
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 import AppIcon from "@/components/common/AppIcon";
+import DocTitlePicker from "@/components/quotations/DocTitlePicker";
+import ContractIcon from "@/components/icons/ui/ContractIcon";
+import OrdersIcon from "@/components/icons/OrdersIcon";
+import BoxIcon from "@/components/icons/ui/BoxIcon";
+import { useRouter } from "next/navigation";
+import { useConfirm } from "@/components/kds/useConfirm";
 
 /* ON DEMAND, not on arrival. These two open when someone clicks "add product"
    or "pick customer" — most visits to the list never do either, and a static
@@ -128,6 +134,20 @@ export interface Invoice {
   /* Master-data references for the Terms quick-fill row. Mirror of
      the Quotation type — see Quotations.tsx. */
   paymentTermId?: string;
+  /* The deal this invoice belongs to. Read from the ROW, never from the doc
+     snapshot — the order is a relationship between records, not part of the
+     printed document, and it is set by the routes that create contracts,
+     packing lists and POs rather than by this editor. */
+  orderId?: string | null;
+  dealNo?: number | null;
+  /* Heading this document prints under — see DocTitlePicker. */
+  docTitleId?: string;
+  docTitleText?: string;
+  docTitleNoun?: string;
+  /* The chosen title's stable code (e.g. "proforma_invoice"). Read for
+     behaviour; docTitleText is only ever for printing. */
+  docTitleCode?: string;
+  docTitleValidity?: boolean;
   incotermId?: string;
   incotermCode?: string;
   incotermLocation?: string;
@@ -256,6 +276,8 @@ export function fromRow(row: RemoteDocRow): Invoice {
     customerName: doc.customerName ?? "",
     companyName: doc.companyName ?? "",
     invoiceNo: (row.inv_no as string | null) ?? doc.invoiceNo ?? "",
+    orderId: (row as { order_id?: string | null }).order_id ?? null,
+    dealNo: (row as { deal_no?: number | null }).deal_no ?? null,
     date: doc.date ?? todayDDMMYYYY(),
     clientNo: doc.clientNo ?? "",
     validTill: doc.validTill ?? addDays(todayDDMMYYYY(), 30),
@@ -281,6 +303,11 @@ export function fromRow(row: RemoteDocRow): Invoice {
     signatureUrl: doc.signatureUrl,
     customerContactId: doc.customerContactId,
     paymentTermId: doc.paymentTermId,
+    docTitleId: doc.docTitleId,
+    docTitleText: doc.docTitleText,
+    docTitleNoun: doc.docTitleNoun,
+    docTitleCode: doc.docTitleCode,
+    docTitleValidity: doc.docTitleValidity,
     incotermId: doc.incotermId,
     incotermCode: doc.incotermCode,
     incotermLocation: doc.incotermLocation,
@@ -1006,6 +1033,27 @@ export default function Quotations() {
     })();
   }, []);
 
+  /* ── Deep link ──
+     /invoices?doc=<id> opens that invoice straight into the editor. The
+     Orders app links here, and without this an order's "INV2026-0008" landed
+     the reader on a list to scroll, which is not a link.
+
+     Fires ONCE via a ref, reading the id rather than watching it, so Back
+     returns to the list instead of pulling the reader straight back in. */
+  const deepLinkedRef = useRef(false);
+  useEffect(() => {
+    if (deepLinkedRef.current) return;
+    const id = new URLSearchParams(window.location.search).get("doc");
+    if (!id || id.length !== 36) return;
+    deepLinkedRef.current = true;
+    void (async () => {
+      const row = await fetchDocOne(INVOICES_DOC_SYNC, id);
+      if (!row) return;
+      setCurrent(fromRow(row));
+      setView("editor");
+    })();
+  }, []);
+
   /* ── Open existing ──
      The list endpoint strips `items` from the doc payload to keep the
      response small, so the row coming from the list view has no items.
@@ -1141,9 +1189,132 @@ export default function Quotations() {
      persist it as-is. The statusHistory audit log only grows when the
      status actually changes; idle saves don't pollute it with
      duplicate "draft" rows. */
+  /* The heading this document last carried on disk. A proforma invoice that
+     becomes a commercial invoice is a NEW document — the proforma was issued
+     to a bank and has to survive — so retitling a saved document and pressing
+     save offers to branch instead of silently overwriting. */
+  const { askConfirm, confirmDialog } = useConfirm();
+  const savedTitleRef = useRef<string | undefined>(undefined);
+  useEffect(() => {
+    if (view === "editor" && current?.id) savedTitleRef.current = current.docTitleText;
+    if (view !== "editor") savedTitleRef.current = undefined;
+  }, [view, current?.id]);
+
+  /* Branch: keep the document on disk untouched and save the retitled version
+     as a separate one. It joins the same order, so both sit on the same deal. */
+  const saveRetitledAsNew = useCallback(
+    async (status: InvoiceStatus | "final") => {
+      if (!current) return;
+      const today = todayDDMMYYYY();
+      const branched: Invoice = {
+        ...current,
+        id: generateId(),
+        /* Blank so the server mints the next number on this deal —
+           KL-IN-12350 keeps its identity, the new one becomes -2. */
+        invoiceNo: "",
+        date: today,
+        status: "draft",
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        serverTotal: undefined,
+        statusHistory: [],
+        items: current.items.map((it) => ({ ...it })),
+      };
+      setCurrent(branched);
+      savedTitleRef.current = branched.docTitleText;
+      /* Defer so the editor is rendering the branch before it is written. */
+      setTimeout(() => { void handleSaveInner(status, branched); }, 0);
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [current],
+  );
+
+  /* ── Sales contract ──────────────────────────────────────────────────────
+     One invoice, one contract — until an amendment is raised, which takes its
+     own suffixed number. So the button opens the existing contract rather
+     than minting a second one, and only creates when there is none. */
+  const router = useRouter();
+  const [contractState, setContractState] = useState<"idle" | "working">("idle");
+
+  const handleSalesContract = useCallback(async () => {
+    if (!current?.id) return;
+    setContractState("working");
+    try {
+      const found = await fetch(`/api/sales-contracts?invoice_id=${current.id}`, { cache: "no-store" });
+      const foundJson = (await found.json()) as { contracts?: { id: string }[]; error?: string };
+      const existing = foundJson.contracts?.[0];
+      if (existing) {
+        router.push(`/contracts/${existing.id}`);
+        return;
+      }
+      const res = await fetch("/api/sales-contracts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ invoice_id: current.id }),
+      });
+      const json = (await res.json()) as { contract?: { id: string }; error?: string };
+      if (!res.ok || !json.contract) throw new Error(json.error ?? "Could not create the contract.");
+      router.push(`/contracts/${json.contract.id}`);
+    } catch (e) {
+      showToast(e instanceof Error ? e.message : "Could not create the contract.", "error");
+      setContractState("idle");
+    }
+  }, [current?.id, router, showToast]);
+
+  /* ── Packing list ────────────────────────────────────────────────────────
+     Raised from the invoice so the shipment it describes is the shipment the
+     bank is paying against. Goods, buyer and ports are copied; cartons and
+     weights are left blank because they are measured at packing, and a guess
+     printed there would end up on a customs declaration. */
+  const [packingState, setPackingState] = useState<"idle" | "working">("idle");
+
+  const handlePackingList = useCallback(async () => {
+    if (!current?.id) return;
+    setPackingState("working");
+    try {
+      const res = await fetch("/api/packing-lists/from-invoice", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ invoice_id: current.id }),
+      });
+      const json = (await res.json()) as { document?: { id: string }; error?: string };
+      if (!res.ok || !json.document) throw new Error(json.error ?? "Could not create the packing list.");
+      router.push(`/documents?doc=${json.document.id}`);
+    } catch (e) {
+      showToast(e instanceof Error ? e.message : "Could not create the packing list.", "error");
+      setPackingState("idle");
+    }
+  }, [current?.id, router, showToast]);
+
   const handleSave = useCallback(
     async (status: InvoiceStatus | "final") => {
       if (!current) return;
+      /* Retitled a document that already exists on disk → ask. Doing it
+         silently either destroys the proforma or produces a surprise second
+         invoice; both are worse than one question. */
+      const savedTitle = savedTitleRef.current;
+      const nowTitle = current.docTitleText;
+      if (current.id && savedTitle !== undefined && savedTitle !== nowTitle) {
+        askConfirm(
+          `Save "${nowTitle ?? "this document"}" as a NEW document and keep "${savedTitle ?? "the original"}"?`,
+          () => saveRetitledAsNew(status),
+          {
+            confirmLabel: "Save as new",
+            tone: "neutral",
+            onCancel: () => { savedTitleRef.current = nowTitle; void handleSaveInner(status, current); },
+          },
+        );
+        return;
+      }
+      return handleSaveInner(status, current);
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [current, saveRetitledAsNew],
+  );
+
+  const handleSaveInner = useCallback(
+    async (status: InvoiceStatus | "final", doc: Invoice) => {
+      const current = doc;
       setSaveState("saving");
       setSaveError("");
       const nextStatus: InvoiceStatus = status === "final" ? "sent" : status;
@@ -1162,6 +1333,10 @@ export default function Quotations() {
         const saved = await saveInvoiceRemote(intent);
         if (saved) {
           setCurrent(saved);
+          /* What is on disk is now this title — otherwise a later retitle
+             would be compared against the one from page load and the prompt
+             would never fire twice in a session. */
+          savedTitleRef.current = saved.docTitleText;
           const list = await loadInvoicesRemote({ fresh: true });
           setQuotations(list);
           setSaveState("saved");
@@ -2001,6 +2176,7 @@ export default function Quotations() {
     <AuroraShell className="text-[var(--text-primary)]">
       <style>{PRINT_AND_DOC_STYLES}</style>
       {toastElement}
+      {confirmDialog}
 
       {/* ── Toolbar (dark bar above A4) ── */}
       <div
@@ -2021,6 +2197,36 @@ export default function Quotations() {
           <ArrowLeftIcon size={15} />
           {t("btn.back")}
         </button>
+        {/* Document heading — same control as Quotations. An invoice
+            record legitimately prints as a Commercial Invoice, a plain
+            Invoice, or a Tax Invoice depending on the market. */}
+        <DocTitlePicker
+          titleId={current.docTitleId}
+          titleText={current.docTitleText}
+          fallbackLabel="COMMERCIAL INVOICE"
+          onPick={({ id, text, noun, validity, code }) =>
+            setCurrent((q) =>
+              q ? { ...q, docTitleId: id, docTitleText: text, docTitleNoun: noun, docTitleValidity: validity, docTitleCode: code } : q,
+            )
+          }
+        />
+        {/* The deal this invoice belongs to. Shown only once it has one — an
+            invoice raised before the numbering scheme has no order until a
+            contract, packing list or backfill brings one into being.
+            KL-{deal} is exactly how ensureOrder and the backfill build
+            order_no, so deriving the label costs nothing where fetching the
+            order row to read the same string would cost a round-trip. */}
+        {current.orderId ? (
+          <button
+            onClick={() => router.push(`/orders/${current.orderId}`)}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] text-gray-300 bg-[var(--bg-surface)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-inverted)]/[0.1] transition"
+            title="Open the order and every document raised against it"
+          >
+            <OrdersIcon size={13} />
+            <span className="font-mono">KL-{current.dealNo}</span>
+          </button>
+        ) : null}
+
         <div style={{ flex: 1 }} />
         {/* Clickable status pill — opens a menu of transitions. The
             colour map mirrors the list-view row badge so the same
@@ -2067,6 +2273,31 @@ export default function Quotations() {
           className="px-4 py-2 text-sm bg-[var(--bg-inverted)] hover:opacity-90 text-[var(--text-inverted)] rounded-lg font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {saveState === "saving" ? "Saving…" : t("btn.saveFinal")}
+        </button>
+        {/* Raises the sales contract for this deal, or opens the one already
+            raised. Sits with the document actions because that is what it is:
+            another document of the same order. */}
+        <button
+          onClick={handleSalesContract}
+          disabled={!current.id || contractState === "working"}
+          className="inline-flex items-center gap-1.5 px-3 py-2 text-sm text-gray-300 bg-[var(--bg-surface)] hover:bg-[var(--bg-inverted)]/[0.1] rounded-lg transition disabled:opacity-40 disabled:cursor-not-allowed"
+          title={current.id
+            ? "Open the sales contract for this deal, or raise one from this invoice."
+            : "Save the invoice first — a contract is raised from a saved invoice."}
+        >
+          <ContractIcon size={14} />
+          {contractState === "working" ? "Opening…" : "Contract"}
+        </button>
+        <button
+          onClick={handlePackingList}
+          disabled={!current.id || packingState === "working"}
+          className="inline-flex items-center gap-1.5 px-3 py-2 text-sm text-gray-300 bg-[var(--bg-surface)] hover:bg-[var(--bg-inverted)]/[0.1] rounded-lg transition disabled:opacity-40 disabled:cursor-not-allowed"
+          title={current.id
+            ? "Open the packing list for this shipment, or raise one from this invoice."
+            : "Save the invoice first — a packing list is raised from a saved invoice."}
+        >
+          <BoxIcon size={14} />
+          {packingState === "working" ? "Opening…" : "Packing"}
         </button>
         <button
           onClick={handleDuplicate}

@@ -231,12 +231,21 @@ export function MemberIdentityPanel({
   /* Live uniqueness for NON-primary codes — same endpoint the Hero
      governance block uses; debounced; purely advisory (save-side rules
      still apply). */
-  const [codeState, setCodeState] = useState<{ s: "idle" | "checking" | "ok" | "taken"; conflict?: string }>({ s: "idle" });
+  /* The check result remembers WHICH code it answered; everything shown is
+     derived from that at render, so the effect writes state only from the
+     async response — the old sync setCodeState({idle}/{checking}) pair was
+     two cascading re-renders per keystroke (react-hooks/set-state-in-effect). */
+  const [checked, setChecked] = useState<{ code: string; s: "ok" | "taken"; conflict?: string } | null>(null);
   const code = (model.primary_model || "").trim();
+  const codeState: { s: "idle" | "checking" | "ok" | "taken"; conflict?: string } =
+    isPrimary || !code || code.length < 3
+      ? { s: "idle" }
+      : checked && checked.code === code
+        ? { s: checked.s, conflict: checked.conflict }
+        : { s: "checking" };
   useEffect(() => {
-    if (isPrimary || !code || code.length < 3) { setCodeState({ s: "idle" }); return; }
+    if (isPrimary || !code || code.length < 3) return;
     let cancelled = false;
-    setCodeState({ s: "checking" });
     const timer = setTimeout(async () => {
       try {
         const params = new URLSearchParams({ code });
@@ -246,13 +255,13 @@ export function MemberIdentityPanel({
         const j = res.ok ? await res.json() : null;
         if (cancelled) return;
         if (j?.available === false && j?.conflict) {
-          setCodeState({ s: "taken", conflict: j.conflict.product_name || j.conflict.primary_model });
+          setChecked({ code, s: "taken", conflict: j.conflict.product_name || j.conflict.primary_model });
         } else if (j) {
-          setCodeState({ s: "ok" });
+          setChecked({ code, s: "ok" });
         } else {
-          setCodeState({ s: "idle" });
+          setChecked(null);
         }
-      } catch { if (!cancelled) setCodeState({ s: "idle" }); }
+      } catch { if (!cancelled) setChecked(null); }
     }, 450);
     return () => { cancelled = true; clearTimeout(timer); };
   }, [code, isPrimary, excludeProductId]);

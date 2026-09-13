@@ -6,6 +6,7 @@ import DialogHost from "@/lib/ui-dialog";
 import SmartCreateDrawer from "@/components/ui/create/SmartCreateDrawer";
 import Providers from "./providers";
 import { SpeedInsights } from "@vercel/speed-insights/next";
+import { Analytics } from "@vercel/analytics/next";
 import { SKIN_BOOTSTRAP } from "@/lib/appearance";
 
 const inter = Inter({
@@ -130,6 +131,19 @@ export default function RootLayout({
               normalized route names; no user content. Dashboard: Vercel →
               project → Speed Insights (enable once, owner-side). */}
           <SpeedInsights />
+          {/* Vercel Web Analytics — WHO is using the Hub from WHERE, and how
+              each page performs for them. The question it exists to answer:
+              "would a server closer to mainland China change anything?"
+              Until now there was no number behind that, only opinion.
+
+              Privacy: cookieless; sends the route, the country, the device
+              class and the referrer — never a user id, a name, a form value
+              or any content. The script is served from THIS origin
+              (/_vercel/insights), so it loads wherever the Hub loads,
+              mainland China included. Dashboard: Vercel → project →
+              Analytics (enable once, owner-side); until then the script is
+              a no-op. */}
+          <Analytics />
         </Providers>
       </body>
     </html>

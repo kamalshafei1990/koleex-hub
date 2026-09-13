@@ -29,6 +29,7 @@ import { customerProfileT } from "@/lib/translations/customer-profile";
 import ArrowLeftIcon from "@/components/icons/ui/ArrowLeftIcon";
 import ArrowRightIcon from "@/components/icons/ui/ArrowRightIcon";
 import BrandLoading from "@/components/ui/BrandLoading";
+import { useTabMotion } from "@/components/ui/useTabMotion";
 import UserIcon from "@/components/icons/ui/UserIcon";
 import CustomersIcon from "@/components/icons/CustomersIcon";
 import PhoneIcon from "@/components/icons/ui/PhoneIcon";
@@ -286,6 +287,7 @@ export default function CustomerProfilePage({
   const [notFound, setNotFound] = useState(false);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<Tab>("activity");
+  const tabMotion = useTabMotion(TABS.indexOf(tab));
   const [creatingCommercial, setCreatingCommercial] = useState(false);
   const [createError, setCreateError] = useState(false);
 
@@ -497,6 +499,7 @@ export default function CustomerProfilePage({
           })}
         </nav>
 
+        <div key={tab} className={tabMotion}>
         {/* ── Activity ── */}
         {tab === "activity" && (
           <div>
@@ -688,6 +691,7 @@ export default function CustomerProfilePage({
           </div>
           </div>
         )}
+        </div>
       </div>
     </div>
   );

@@ -99,7 +99,10 @@ export async function GET(
      different one. */
   const acct = empRow.account_id ?? (accountId && accountId === empRow.account_id ? accountId : null);
 
-  const leave = await bucket<Row>(
+  /* Started, not awaited: leave is employee-keyed and independent of the
+     account resolution below, so it rides in parallel with the to-do link
+     lookup and the main bucket batch instead of adding its own stage. */
+  const leavePromise = bucket<Row>(
     "hr_leave_requests",
     () =>
       supabaseServer
@@ -119,6 +122,7 @@ export async function GET(
   );
 
   if (!acct) {
+    const leave = await leavePromise;
     return NextResponse.json({
       activity: {
         crmOpportunities: EMPTY, quotations: EMPTY, invoices: EMPTY,
@@ -137,8 +141,9 @@ export async function GET(
     .eq("account_id", acct);
   const todoIds = ((todoLinks ?? []) as { todo_id: string }[]).map((t) => t.todo_id);
 
-  const [crm, quotations, invoices, projectsManaged, tasksAssigned, todosAssigned, calendarEvents, notes] =
+  const [leave, crm, quotations, invoices, projectsManaged, tasksAssigned, todosAssigned, calendarEvents, notes] =
     await Promise.all([
+      leavePromise,
       /* expected_revenue, not `value`, and crm_opportunities has no currency
          column at all — the browser version asked for both and the whole
          bucket errored out on every load. */

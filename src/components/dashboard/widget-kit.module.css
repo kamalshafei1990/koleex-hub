@@ -1,0 +1,171 @@
+/* ---------------------------------------------------------------------------
+   Widget kit — ONE set of card faces shared by the Dashboard app (the full
+   system summary) and the Home page (the personal pinned board).
+
+   The card's GLASS is the global `kx-glass` (added beside .w in JSX) — this
+   module adds only the slab anatomy on top (owner-approved family: interior
+   Hub-Blue wash, neon lip). Faces: number / list / shortcut + the three
+   specials that predate the simplification (stages bars, attention feed,
+   system strip) — kept because the Home look is owner-approved.
+   --------------------------------------------------------------------------- */
+
+/* ── the canvas: 6 units wide, dense packing (2 on phones) ── */
+.canvas {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  grid-auto-rows: 96px;
+  grid-auto-flow: dense;
+  gap: 14px;
+}
+@media (max-width: 900px) {
+  .canvas { grid-template-columns: repeat(2, 1fr); }
+}
+
+/* ── the slab shell ── */
+.w {
+  position: relative; border-radius: 20px; isolation: isolate;
+  padding: 14px 16px; border: 1px solid rgba(255, 255, 255, 0.05);
+  overflow: hidden;
+  display: flex; flex-direction: column;
+  text-decoration: none; color: inherit;
+}
+.w::before {
+  content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none;
+  background:
+    radial-gradient(150% 85% at 50% -32%, rgba(215, 225, 238, 0.07), transparent 55%),
+    radial-gradient(160% 70% at 50% 122%, rgba(86, 127, 178, 0.16), rgba(86, 127, 178, 0.045) 45%, transparent 66%);
+}
+.w > * { position: relative; }
+
+.s11 { grid-column: span 1; grid-row: span 1; }
+.s21 { grid-column: span 2; grid-row: span 1; }
+.s22 { grid-column: span 2; grid-row: span 2; }
+.s42 { grid-column: span 4; grid-row: span 2; }
+.s62 { grid-column: span 6; grid-row: span 1; }
+@media (max-width: 900px) {
+  .s11 { grid-column: span 1; }
+  .s21, .s22, .s42, .s62 { grid-column: span 2; }
+}
+
+/* ── shared type ── */
+.lbl { font-size: 9.5px; letter-spacing: 1.4px; color: rgba(255, 255, 255, 0.42); text-transform: uppercase;
+       display: flex; justify-content: space-between; gap: 6px; }
+.val { font-size: 24px; font-weight: 300; color: #fff; margin-block-start: 5px; font-variant-numeric: tabular-nums;
+       text-shadow: 0 0 12px rgba(200, 222, 247, 0.18); }
+.unit { font-size: 11px; color: rgba(255, 255, 255, 0.35); }
+.sm { font-size: 10px; color: rgba(255, 255, 255, 0.4); margin-block-start: 2px; }
+.warnTone { color: #edc684; }
+.goodTone { color: #79d89a; }
+.empty { font-size: 11px; color: rgba(255, 255, 255, 0.35); }
+
+/* ── NUMBER face ── */
+.sparks { display: flex; align-items: flex-end; gap: 3px; block-size: 34px; margin-block-start: auto; }
+.sparks i { flex: 1; border-radius: 2px; background: rgba(140, 190, 255, 0.18); }
+.sparks .hot { background: #7fa9d6; box-shadow: 0 0 8px rgba(127, 169, 214, 0.5); }
+
+/* ── LIST face ── */
+.rows { margin-block-start: 10px; }
+.rows > div { display: flex; justify-content: space-between; align-items: baseline; gap: 10px;
+  font-size: 11px; color: rgba(255, 255, 255, 0.62); padding-block: 5px;
+  border-block-end: 1px solid rgba(255, 255, 255, 0.05); }
+.rows > div:last-child { border-block-end: none; }
+.rowA { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-inline-size: 0; }
+.rows b { color: #fff; font-weight: 600; font-variant-numeric: tabular-nums; flex: none; }
+.listEmpty { font-size: 11px; color: rgba(255, 255, 255, 0.38); margin-block-start: 14px; line-height: 1.5; }
+
+/* ── SHORTCUT face ── */
+.shortcut { align-items: center; justify-content: center; gap: 8px; text-align: center; cursor: pointer; }
+.shortcut svg { inline-size: 24px; block-size: 24px; color: rgba(226, 238, 250, 0.85);
+                filter: drop-shadow(0 0 6px rgba(120, 180, 255, 0.25)); }
+.shortcut .nm { font-size: 10.5px; color: rgba(255, 255, 255, 0.65); line-height: 1.25; }
+/* launcher cards carry the app's REAL icon, big and clear (owner ask) */
+.shortcut svg.launcherIcon { inline-size: 30px; block-size: 30px; }
+
+/* number + avatar strip on ONE line (the team card) */
+.teamRow { display: flex; align-items: center; gap: 12px; margin-block-start: 5px; flex-wrap: wrap; row-gap: 4px; min-inline-size: 0; }
+
+/* ── presence avatars (the clip + oval lessons are baked in).
+   24px + tight gaps: label + value + one avatar row must FIT a 96px card —
+   a clipped avatar strip reads as a bug (owner catches these). ── */
+.people { display: flex; gap: 5px; margin-block-start: 6px; flex-wrap: wrap; overflow: hidden; }
+.pv { inline-size: 24px; block-size: 24px; border-radius: 50%; background: rgba(255, 255, 255, 0.06);
+      display: grid; place-items: center; font-size: 9px; font-weight: 600; color: rgba(226, 238, 250, 0.85);
+      position: relative; border: 1px solid rgba(255, 255, 255, 0.1); opacity: 0.45; }
+.pvOn { opacity: 1; box-shadow: 0 0 0 1.5px rgba(127, 169, 214, 0.45); }
+.pvOn::after { content: ""; position: absolute; bottom: -2px; inset-inline-end: -2px;
+  inline-size: 8px; block-size: 8px; border-radius: 50%; background: #79d89a; border: 2px solid #0c0d10; }
+.pvImg { position: absolute; inset: 0; inline-size: 100%; block-size: 100%; object-fit: cover; border-radius: 50%; }
+
+/* ── SPECIAL: stages bars ── */
+.barsWrap { position: relative; flex: 1; min-block-size: 90px; margin-block-start: 20px; display: flex; align-items: flex-end; gap: 8px; margin-block-end: 18px; }
+.bar { flex: 1; position: relative; border-start-start-radius: 6px; border-start-end-radius: 6px;
+  background: linear-gradient(180deg, rgba(188, 216, 240, 0.13), rgba(127, 169, 214, 0.03));
+  border: 1px solid rgba(255, 255, 255, 0.08); border-block-end: none; }
+.bar b { position: absolute; inset-inline: 0; top: -18px; font-size: 11px; font-weight: 600; text-align: center;
+         color: rgba(230, 240, 252, 0.85); }
+.bar em { position: absolute; inset-inline: 0; bottom: -16px; font-style: normal; font-size: 8.5px;
+          color: rgba(255, 255, 255, 0.32); text-align: center; letter-spacing: 0.6px; }
+.barHot { background: linear-gradient(180deg, rgba(188, 216, 240, 0.26), rgba(127, 169, 214, 0.07));
+          border-color: rgba(188, 216, 240, 0.3); }
+
+/* ── SPECIAL: attention feed ── */
+.attnRow { display: flex; align-items: flex-start; gap: 11px; padding: 8px 2px; font-size: 12px;
+  color: rgba(255, 255, 255, 0.55); border-block-end: 1px solid rgba(255, 255, 255, 0.06); text-decoration: none; }
+.attnRow:last-child { border-block-end: none; }
+.attnRow b { color: #e9f1fa; font-weight: 600; }
+.sig { inline-size: 8px; block-size: 8px; border-radius: 50%; margin-block-start: 4px; flex: none; }
+.sigCrit { background: #f49090; box-shadow: 0 0 9px rgba(244, 144, 144, 0.5); }
+.sigWarn { background: #edc684; box-shadow: 0 0 9px rgba(237, 198, 132, 0.5); }
+.sigOk   { background: #79d89a; box-shadow: 0 0 9px rgba(121, 216, 154, 0.4); }
+.go { margin-inline-start: auto; font-size: 9px; color: rgba(188, 216, 240, 0.7); white-space: nowrap; letter-spacing: 1px; }
+
+/* ── SPECIAL: system strip ── */
+.sysRow { display: flex; align-items: center; gap: 16px; flex: 1; flex-wrap: wrap; }
+.sysItem { display: flex; align-items: center; gap: 8px; font-size: 9.5px; letter-spacing: 1px; text-transform: uppercase; color: rgba(255, 255, 255, 0.48); }
+.sysSep { inline-size: 1px; block-size: 13px; background: rgba(255, 255, 255, 0.1); }
+.sysEnd { margin-inline-start: auto; font-size: 9px; letter-spacing: 2.2px; color: rgba(255, 255, 255, 0.25); }
+@media (max-width: 700px) { .sysEnd { display: none; } }
+
+/* ── edit chrome: the iOS grammar (jiggle, minus, size dot) ── */
+.editing .w { animation: kitJiggle 300ms ease-in-out infinite alternate; cursor: grab; touch-action: none; user-select: none; }
+/* the lifted card carries an inline transform — the jiggle keyframes would
+   fight it, so the lift opts out of the jiggle entirely */
+.editing .dragLift { animation: none; cursor: grabbing; }
+.editing .w:nth-child(2n) { animation-delay: 90ms; }
+.editing .w:nth-child(3n) { animation-delay: 160ms; }
+@keyframes kitJiggle { from { transform: rotate(-0.5deg); } to { transform: rotate(0.5deg); } }
+.dragLift { will-change: transform; }
+
+.minus {
+  position: absolute; top: 6px; inset-inline-start: 6px; z-index: 3;
+  inline-size: 20px; block-size: 20px; border-radius: 50%;
+  background: #3a3f47; color: #fff; border: 1px solid rgba(255, 255, 255, 0.25);
+  display: grid; place-items: center; font-size: 14px; line-height: 1; cursor: pointer; font-family: inherit;
+}
+.sizeDot {
+  position: absolute; bottom: 6px; inset-inline-end: 6px; z-index: 3;
+  border-radius: 9999px; border: none; cursor: pointer; font-family: inherit;
+  font-size: 9px; font-weight: 700; padding: 3px 9px;
+  background: rgba(86, 127, 178, 0.85); color: #eaf2fb;
+  box-shadow: 0 0 10px rgba(86, 127, 178, 0.4);
+}
+
+/* ── pin control (Dashboard app → Home): a small round toggle so it never
+   covers a narrow card's title; ＋ = add, ✓ (Hub Blue) = on Home ── */
+.pinBtn {
+  position: absolute; top: 7px; inset-inline-end: 7px; z-index: 3;
+  inline-size: 22px; block-size: 22px; display: grid; place-items: center;
+  font-size: 12px; font-weight: 700; line-height: 1;
+  border-radius: 50%; cursor: pointer; font-family: inherit;
+  color: rgba(226, 238, 250, 0.75);
+  border: 1px solid rgba(165, 200, 250, 0.25); background: rgba(20, 26, 36, 0.75);
+  transition: color 0.15s ease-out, background-color 0.15s ease-out, border-color 0.15s ease-out;
+}
+.pinBtn:hover { color: #fff; border-color: rgba(127, 169, 214, 0.55); }
+.pinOn { color: #0d0f13; background: #bcd8f0; border-color: transparent; }
+/* titles never run under the toggle */
+.w .lbl { padding-inline-end: 24px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .editing .w { animation: none; }
+}

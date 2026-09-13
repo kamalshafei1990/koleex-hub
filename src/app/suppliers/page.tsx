@@ -41,7 +41,10 @@ export default function SuppliersPage() {
     if (loading) return; // wait for the trusted cohort flag before deciding/telemetry
     const inCohort = data?.suppliersServerList === true;
     const sl = decide(inCohort);
-    setMode(sl ? "server" : "legacy");
+    /* microtask: same tick for the user, but no synchronous setState in
+       the effect body (react-hooks/set-state-in-effect). */
+    let keep = true;
+    queueMicrotask(() => { if (keep) setMode(sl ? "server" : "legacy"); });
     if (!firedRef.current) {
       firedRef.current = true;
       const eventType = sl ? "suppliers_server_list_open" : "suppliers_legacy_list_open";
@@ -54,6 +57,7 @@ export default function SuppliersPage() {
         }
       } catch { /* telemetry is best-effort */ }
     }
+    return () => { keep = false; };
   }, [loading, data]);
 
   return (

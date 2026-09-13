@@ -248,18 +248,15 @@ export async function POST(req: Request) {
         metadata: { via: "password" },
       }).catch(() => undefined);
 
-      const loginMeta = requestMeta(req);
-      await notifySuperAdmins({
-        kind: "login",
-        subject: `${account.username || account.login_email} signed in`,
-        actorName: account.username || account.login_email,
-        action: "Signed in",
-        location: locationLabel(loginMeta),
-        severity: "info",
-        actorAccountId: account.id,
-        tenantId: account.tenant_id,
-        metadata: { username: account.username },
-      }).catch(() => undefined);
+      /* NO BELL FOR AN ORDINARY SIGN-IN (owner, 2026-08-27: the bell was
+         "full of problems" — and the single loudest source was this call,
+         one "X signed in" alert to every super admin on EVERY login of EVERY
+         employee, unread until somebody clicked it). An ordinary login is a
+         record, not an event: it stays in the audit log (logActivity above)
+         and on the login-history page. The alerts that MEAN something all
+         still fire from their own emitters — new_device (activity
+         heartbeat), failed_login_threshold (this file, above), suspicious /
+         new_ip (sa-notify). */
     });
 
     return NextResponse.json({

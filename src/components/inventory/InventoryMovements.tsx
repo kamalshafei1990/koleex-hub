@@ -16,6 +16,7 @@
    --------------------------------------------------------------------------- */
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { readWarm, useWarmData, warmAge, writeWarm } from "@/lib/warm-cache";
 import { useInput } from "@/components/kds/useInput";
 import InventoryHeader from "@/components/inventory/InventoryHeader";
 import type { MovementStatus, MovementType } from "@/lib/inventory/types";
@@ -46,6 +47,11 @@ import {
 } from "@/components/inventory/InventoryUx";
 
 const MV_T: Translations = {
+  /* This screen renders its own dictionary, so a key that lives only in the
+     shared inventory dictionary falls through and paints RAW — the header
+     was showing the literal "inv.shortcuts.hint" to the operator. Copied
+     here rather than re-pointed, because MV_T is what this screen reads. */
+  "inv.shortcuts.hint":  { en: "Shortcuts: R receive · S ship · T transfer · A adjust · F find", zh: "快捷键：R 入库·S 发货·T 调拨·A 调整·F 搜索", ar: "اختصارات: R استلام · S شحن · T تحويل · A تعديل · F بحث" },
   "mv.title":            { en: "Stock Movements", zh: "库存移动", ar: "حركات المخزون" },
   "mv.subtitle":         { en: "Inventory ledger. Receipts and shipments come from their workflows; adjustments require approval.", zh: "库存分录。收货与发货由工作流生成；调整需审批。", ar: "سجل المخزون. الاستلام والشحن من تدفقاتهم؛ التعديلات تتطلب موافقة." },
   "mv.tab.workflow":     { en: "Workflow",       zh: "工作流",   ar: "حركات النظام" },
@@ -137,6 +143,15 @@ const WORKFLOW_TYPES: MovementType[] = [
   "transfer_in", "transfer_out",
 ];
 
+type MovementsRef = {
+  products: ProductOption[];
+  warehouses: Warehouse[];
+  internalItems: Array<{
+    id: string; item_code: string; item_name: string; brand: string | null;
+    unit_of_measure: string; type_name: string; usage_scope?: string;
+  }>;
+};
+
 export default function InventoryMovements() {
   const { t } = useTranslation(MV_T);
   useInventoryShortcuts({ isActive: true });
@@ -160,10 +175,8 @@ export default function InventoryMovements() {
     if (create) setPendingCreate(create);
   }, []);
 
-  const [movements, setMovements] = useState<MovementRow[]>([]);
   const [products, setProducts] = useState<ProductOption[]>([]);
   const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
-  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [tab, setTab] = useState<TabKey>("workflow");
   const [showForm, setShowForm] = useState(false);
@@ -197,41 +210,62 @@ export default function InventoryMovements() {
   const [variantOptions, setVariantOptions] = useState<Array<{ id: string; variant_name: string }>>([]);
   const [batchOptions, setBatchOptions] = useState<Array<{ id: string; batch_no: string; variant_id: string | null; expiry_date: string | null }>>([]);
 
+  /* THE REFERENCE BUNDLE IS CACHED TOO, and skipped outright while it is
+     fresh. Leaving it cold was a deliberate call — "nobody waits on a
+     dropdown" — and it was wrong for the reason that matters: it is three of
+     the heaviest calls in the app (two of them ?limit=500) and they fired on
+     EVERY visit to this tab, competing with the screen that had already
+     painted. Measured on one lap of the Inventory strip, Movements issued 23
+     requests after its route committed, more than any other tab, and the
+     owner named it first: "the movement tab ... not load immediately there is
+     a lag." Warm and inside the stale window, this now costs nothing.
+     Kept as one effect rather than moved to useWarmData because of the
+     `setWarehouseId` default below — a side effect on first arrival that a
+     pure derivation has nowhere to live. Every setState stays behind an
+     await, which is what keeps it out of the synchronous-update rule. */
   useEffect(() => {
     let cancelled = false;
     void (async () => {
       try {
-        const [whRes, prodRes, invRes] = await Promise.all([
-          fetch("/api/inventory/warehouses", { cache: "no-store", credentials: "include" }),
-          fetch("/api/products/with-stock-profile?limit=500", { cache: "no-store", credentials: "include" }),
-          /* INV-H5B — internal-use items live in inventory_items but have no
-             linked product. Pull a generous page and filter client-side. */
-          fetch("/api/inventory/items?status=active&limit=500", { cache: "no-store", credentials: "include" }),
-        ]);
-        const whJ = await whRes.json();
-        const prodJ = await prodRes.json();
-        const invJ = await invRes.json();
+        const KEY = "inv:movements:ref";
+        const cached = warmAge(KEY) < 60_000 ? readWarm<MovementsRef>(KEY) : null;
+        const d: MovementsRef = cached ?? await (async () => {
+          const [whRes, prodRes, invRes] = await Promise.all([
+            fetch("/api/inventory/warehouses", { cache: "no-store", credentials: "include" }),
+            fetch("/api/products/with-stock-profile?limit=500", { cache: "no-store", credentials: "include" }),
+            /* INV-H5B — internal-use items live in inventory_items but have no
+               linked product. Pull a generous page and filter client-side. */
+            fetch("/api/inventory/items?status=active&limit=500", { cache: "no-store", credentials: "include" }),
+          ]);
+          const whJ = await whRes.json();
+          const prodJ = await prodRes.json();
+          const invJ = await invRes.json();
+          const allItems = (invJ.items ?? []) as Array<{
+            id: string; item_code: string; item_name: string; brand: string | null;
+            unit_of_measure: string; type_name: string;
+            usage_scope?: string; requires_product?: boolean;
+            linked_product_id?: string | null;
+          }>;
+          const built: MovementsRef = {
+            products: (prodJ.products ?? []) as ProductOption[],
+            warehouses: (whJ.warehouses ?? []) as Warehouse[],
+            internalItems: allItems
+              .filter((it) => it.usage_scope === "internal_use" || it.requires_product === false || !it.linked_product_id)
+              .map((it) => ({
+                id: it.id, item_code: it.item_code, item_name: it.item_name,
+                brand: it.brand, unit_of_measure: it.unit_of_measure,
+                type_name: it.type_name, usage_scope: it.usage_scope,
+              })),
+          };
+          writeWarm(KEY, built);
+          return built;
+        })();
         if (cancelled) return;
-        setProducts((prodJ.products ?? []) as ProductOption[]);
-        const whList = (whJ.warehouses ?? []) as Warehouse[];
-        setWarehouses(whList);
-        const def = whList.find((w) => w.is_default) ?? whList[0];
+        setProducts(d.products);
+        setWarehouses(d.warehouses);
+        const def = d.warehouses.find((w) => w.is_default) ?? d.warehouses[0];
         if (def) setWarehouseId(def.id);
-        const allItems = (invJ.items ?? []) as Array<{
-          id: string; item_code: string; item_name: string; brand: string | null;
-          unit_of_measure: string; type_name: string;
-          usage_scope?: string; requires_product?: boolean;
-          linked_product_id?: string | null;
-        }>;
-        setInternalItems(
-          allItems
-            .filter((it) => it.usage_scope === "internal_use" || it.requires_product === false || !it.linked_product_id)
-            .map((it) => ({
-              id: it.id, item_code: it.item_code, item_name: it.item_name,
-              brand: it.brand, unit_of_measure: it.unit_of_measure,
-              type_name: it.type_name, usage_scope: it.usage_scope,
-            })),
-        );
+        setInternalItems(d.internalItems);
       } catch {
         /* surface via movement load instead */
       }
@@ -253,25 +287,24 @@ export default function InventoryMovements() {
     return m;
   }, [warehouses]);
 
-  const loadMovements = useCallback(async () => {
-    setLoading(true); setError(null);
-    try {
-      const qs = new URLSearchParams();
-      qs.set("limit", "200");
-      const r = await fetch(`/api/inventory/movements?${qs.toString()}`, {
-        cache: "no-store", credentials: "include",
-      });
-      const j = await r.json();
-      if (!r.ok) throw new Error(humanizeError(j.error ?? `HTTP ${r.status}`));
-      setMovements((j.movements ?? []) as MovementRow[]);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
-    } finally {
-      setLoading(false);
-    }
+  /* Warm: the query carries only a fixed page size, no user filter, so the
+     response IS the default view. This is the table the operator watches
+     load, so it is the one that must be on screen when the tab commits.
+     The reference-data effect above stays cold on purpose — it fills
+     dropdowns, and nobody waits on a dropdown. */
+  const fetchMovements = useCallback(async () => {
+    const qs = new URLSearchParams();
+    qs.set("limit", "200");
+    const r = await fetch(`/api/inventory/movements?${qs.toString()}`, {
+      cache: "no-store", credentials: "include",
+    });
+    const j = await r.json();
+    if (!r.ok) throw new Error(humanizeError(j.error ?? `HTTP ${r.status}`));
+    return (j.movements ?? []) as MovementRow[];
   }, []);
-
-  useEffect(() => { void loadMovements(); }, [loadMovements]);
+  const { data: movementsData, loading, reload: loadMovements } =
+    useWarmData<MovementRow[]>("inv:movements", fetchMovements);
+  const movements = useMemo(() => movementsData ?? [], [movementsData]);
 
   /* Apply ?create= deep-link once the form state is wired. */
   useEffect(() => {

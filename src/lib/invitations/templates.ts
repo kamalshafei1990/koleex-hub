@@ -41,6 +41,20 @@ export type LetterInput = {
 /** One labelled row of the passport block. */
 export type LetterRow = { label: string; value: string };
 
+/* A paragraph is a run of pieces, each plain or STRONG. The owner asked for
+   the facts a consular officer scans for — dates, duration, visa type, who
+   is being invited — to stand out. Marking them at BUILD time, where the
+   value is still a value, is the only way that is safe: highlighting by
+   pattern-matching the finished sentence would eventually bold a date
+   inside a company name, and the two languages would drift apart. */
+export type Piece = { text: string; strong?: true };
+export type Para = Piece[];
+
+/** Plain run. */
+export const t = (text: string): Piece => ({ text });
+/** Highlighted run — a fact, never a phrase. */
+export const b = (text: string): Piece => ({ text, strong: true });
+
 export type LetterText = {
   title: string;
   /** "The Visa Section, Embassy of the People's Republic of China in Egypt" */
@@ -49,10 +63,10 @@ export type LetterText = {
   refLine: string;
   salutation: string;
   /** Paragraphs before the passport block. */
-  intro: string[];
+  intro: Para[];
   passportBlock: LetterRow[];
   /** Paragraphs after the passport block. */
-  body: string[];
+  body: Para[];
   closing: string;
   signOff: { name: string; position: string; company: string; address: string; phone: string };
 };
@@ -171,17 +185,28 @@ export function buildEnglish(input: LetterInput): LetterText {
       ? "a multiple-entry business (M) visa"
       : "a single-entry business (M) visa";
 
-  const intro: string[] = [
-    `We, ${company}, a company duly registered in Taizhou, Zhejiang Province, ` +
-      `the People's Republic of China${s.creditCode ? ` (Unified Social Credit Code: ${s.creditCode})` : ""}, ` +
-      `hereby respectfully invite the following person to visit China on business:`,
+  const intro: Para[] = [
+    [
+      t("We, "),
+      b(company),
+      t(", a company duly registered in Taizhou, Zhejiang Province, the People's Republic of China"),
+      ...(s.creditCode
+        ? [t(" (Unified Social Credit Code: "), b(s.creditCode), t(")")]
+        : []),
+      t(", hereby respectfully invite the following person to visit China on business:"),
+    ],
   ];
 
+  /* Row 1 is the NAME, full width — long passport names (four and five
+     words are normal) were wrapping inside a half-width cell and threw the
+     whole grid off. After it, pairs grouped by MEANING, not by entry order:
+     who they are, then the passport's numbers and dates together, then the
+     job. The owner asked for the table organised; this is the organisation. */
   const passportBlock: LetterRow[] = [
     { label: "Name",             value: v.name },
     { label: "Gender",           value: genderEn(v.gender) },
-    { label: "Date of Birth",    value: formatDateEn(v.dob) },
     { label: "Nationality",      value: v.nationality ?? "" },
+    { label: "Date of Birth",    value: formatDateEn(v.dob) },
     { label: "Passport Number",  value: v.passportNo ?? "" },
     { label: "Date of Issue",    value: formatDateEn(v.passportIssue) },
     { label: "Date of Expiry",   value: formatDateEn(v.passportExpiry) },
@@ -190,28 +215,46 @@ export function buildEnglish(input: LetterInput): LetterText {
   /* Only printed when we actually have one — see whoIsHeEn. */
   if (v.position) passportBlock.push({ label: "Position", value: v.position });
 
-  const body: string[] = [
-    `${whoIsHeEn(v)} is our valued customer, invited ${purposeEn(visit)}.`,
+  const body: Para[] = [
+    [b(whoIsHeEn(v)), t(` is our valued customer, invited ${purposeEn(visit)}.`)],
 
-    `${subject} plans to arrive in China on ${formatDateEn(visit.arrivalDate)}` +
-      `${visit.arrivalCity ? ` through ${visit.arrivalCity}` : ""} and to depart on ` +
-      `${formatDateEn(visit.departureDate)}, a stay of ${days} day${days === 1 ? "" : "s"}` +
-      `${cities ? `, during which ${pronounEn(v)} will visit ${cities}` : ""}.`,
+    [
+      t(`${subject} plans to arrive in China on `),
+      b(formatDateEn(visit.arrivalDate)),
+      ...(visit.arrivalCity ? [t(" through "), b(visit.arrivalCity)] : []),
+      t(" and to depart on "),
+      b(formatDateEn(visit.departureDate)),
+      t(", a stay of "),
+      b(`${days} day${days === 1 ? "" : "s"}`),
+      ...(cities ? [t(`, during which ${pronounEn(v)} will visit `), b(cities)] : []),
+      t("."),
+    ],
 
-    `All expenses relating to this visit, including international travel, ` +
-      `accommodation, local transport and medical insurance, will be borne by ` +
-      `the visitor's own company. Our company will assist with the arrangements ` +
-      `during the stay in China.`,
+    [
+      t(
+        "All expenses relating to this visit, including international travel, " +
+          "accommodation, local transport and medical insurance, will be borne by " +
+          "the visitor's own company. Our company will assist with the arrangements " +
+          "during the stay in China.",
+      ),
+    ],
 
-    `We hereby guarantee that ${subject} will comply with the laws and ` +
-      `regulations of the People's Republic of China and will leave the country ` +
-      `before the expiry of the authorised period of stay.`,
+    [
+      t(
+        `We hereby guarantee that ${subject} will comply with the laws and ` +
+          "regulations of the People's Republic of China and will leave the country " +
+          "before the expiry of the authorised period of stay.",
+      ),
+    ],
 
-    `We would therefore be grateful if you would kindly grant ${subject} ` +
-      `${visaWord}. A copy of our business licence is attached for your reference.`,
+    [
+      t(`We would therefore be grateful if you would kindly grant ${subject} `),
+      b(visaWord),
+      t(". A copy of our business licence is attached for your reference."),
+    ],
   ];
 
-  if (visit.extraNote) body.push(visit.extraNote);
+  if (visit.extraNote) body.push([t(visit.extraNote)]);
 
   return {
     title: "INVITATION LETTER",
@@ -251,19 +294,28 @@ export function buildChinese(input: LetterInput): LetterText {
       ? "多次往返商务签证（M签证）"
       : "一次入境商务签证（M签证）";
 
-  const intro: string[] = [
-    tidyCn(
-      `我司${company}系在中华人民共和国浙江省台州市依法注册成立的企业` +
-        `${s.creditCode ? `（统一社会信用代码：${latinInCn(s.creditCode)}）` : ""}，` +
-        `现诚挚邀请下列人员来华进行商务访问：`,
-    ),
+  /* Each PIECE is tidied on its own. tidyCn normalises the spacing around
+     Latin runs, and it has to see a piece's real edges — running it on the
+     joined sentence and then splitting would put the marks in the wrong
+     places. */
+  const intro: Para[] = [
+    [
+      t(tidyCn("我司")),
+      b(tidyCn(company)),
+      t(tidyCn("系在中华人民共和国浙江省台州市依法注册成立的企业")),
+      ...(s.creditCode
+        ? [t("（统一社会信用代码："), b(tidyCn(latinInCn(s.creditCode))), t("）")]
+        : []),
+      t("，现诚挚邀请下列人员来华进行商务访问："),
+    ],
   ];
 
+  /* Same order as the English page — they are one document. */
   const passportBlock: LetterRow[] = [
     { label: "姓名",     value: v.name },
     { label: "性别",     value: genderCn(v.gender) },
-    { label: "出生日期", value: formatDateCn(v.dob) },
     { label: "国籍",     value: countryCn(v.nationalityCode, v.nationality) },
+    { label: "出生日期", value: formatDateCn(v.dob) },
     { label: "护照号码", value: v.passportNo ?? "" },
     { label: "签发日期", value: formatDateCn(v.passportIssue) },
     { label: "有效期至", value: formatDateCn(v.passportExpiry) },
@@ -279,28 +331,48 @@ export function buildChinese(input: LetterInput): LetterText {
      opens a sentence, and keeps it when the name follows a Chinese word. */
   const nameCn = latinInCn(v.name);
 
-  const body: string[] = [
-    tidyCn(`${whoIsHeCn(v)}系我司重要客户，此次来华的目的为${purposeCn(visit)}。`),
+  const body: Para[] = [
+    [
+      b(tidyCn(whoIsHeCn(v))),
+      t(tidyCn(`系我司重要客户，此次来华的目的为${purposeCn(visit)}。`)),
+    ],
 
-    tidyCn(
-      `${nameCn}${honor}计划于${formatDateCn(visit.arrivalDate)}` +
-        `${visit.arrivalCity ? `由${cityCn(visit.arrivalCity)}` : ""}入境，` +
-        `并于${formatDateCn(visit.departureDate)}离境，在华停留共计${days}天` +
-        `${citiesCn ? `，期间将前往${citiesCn}等地` : ""}。`,
-    ),
+    [
+      t(tidyCn(`${nameCn}${honor}计划于`)),
+      b(formatDateCn(visit.arrivalDate)),
+      ...(visit.arrivalCity ? [t("由"), b(cityCn(visit.arrivalCity))] : []),
+      t("入境，并于"),
+      b(formatDateCn(visit.departureDate)),
+      t("离境，在华停留共计"),
+      b(`${days}天`),
+      ...(citiesCn ? [t("，期间将前往"), b(citiesCn), t("等地")] : []),
+      t("。"),
+    ],
 
-    `此次访问的全部费用，包括国际旅费、在华食宿、交通及医疗保险等，` +
-      `将由其所在公司承担。我司将协助安排其在华期间的相关事宜。`,
+    [
+      t(
+        "此次访问的全部费用，包括国际旅费、在华食宿、交通及医疗保险等，" +
+          "将由其所在公司承担。我司将协助安排其在华期间的相关事宜。",
+      ),
+    ],
 
-    tidyCn(
-      `我司在此保证，${nameCn}${honor}在华期间将遵守中华人民共和国的法律法规，` +
-        `并将在准许停留期限届满前离境。`,
-    ),
+    [
+      t(
+        tidyCn(
+          `我司在此保证，${nameCn}${honor}在华期间将遵守中华人民共和国的法律法规，` +
+            "并将在准许停留期限届满前离境。",
+        ),
+      ),
+    ],
 
-    tidyCn(`恳请贵处为${nameCn}${honor}签发${visaWord}。随函附上我司营业执照副本复印件，敬请查收。`),
+    [
+      t(tidyCn(`恳请贵处为${nameCn}${honor}签发`)),
+      b(visaWord),
+      t("。随函附上我司营业执照副本复印件，敬请查收。"),
+    ],
   ];
 
-  if (visit.extraNote) body.push(visit.extraNote);
+  if (visit.extraNote) body.push([t(visit.extraNote)]);
 
   return {
     title: "邀 请 函",

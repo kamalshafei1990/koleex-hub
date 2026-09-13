@@ -37,7 +37,7 @@ import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
    DOCUMENTS MODULE
    ═══════════════════════════════════════════════════ */
 
-export default function Documents({ employees, t, lang }: HRModuleProps) {
+export default function Documents({ employees, t }: HRModuleProps) {
   /* ── Translation helpers ── */
   const { tCat } = makeTranslationHelpers(t);
 

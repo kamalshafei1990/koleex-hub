@@ -291,16 +291,28 @@ export async function getMeBootstrap(opts?: {
         try {
           const res = await fetchWithTimeout("/api/me/bootstrap", timeoutMs, noStore);
           if (!res.ok) {
-            /* Capture status so the UI can hint specifically — 401 →
-               "please sign in again", 5xx → "server is having a
-               moment". */
+            /* NOT EVERY 401 IS AN EXPIRED SESSION, and saying so sent people
+               in circles. The server now sends a `code` with the reason; a
+               deactivated account needs an administrator, not another sign-in,
+               and telling it to "sign in again" is advice that can never
+               succeed — the same shape of closed loop as the 2026-08-30
+               lockout. Read defensively: an older deployment sends no code and
+               must keep behaving exactly as before. */
+            let code: string | null = null;
+            try {
+              const j = (await res.clone().json()) as { code?: unknown };
+              if (typeof j?.code === "string") code = j.code;
+            } catch { /* not JSON, or a body already consumed — fall through */ }
+
             _lastError = {
               kind: `http_${res.status}`,
               status: res.status,
               raw: `bootstrap returned ${res.status}`,
               message:
                 res.status === 401
-                  ? "Session expired — please sign in again."
+                  ? code === "account_inactive"
+                    ? "This account is not active. Contact an administrator."
+                    : "Session expired — please sign in again."
                   : res.status >= 500
                     ? "Server is having a moment. Tap Retry."
                     : `Server responded ${res.status}. Tap Retry.`,

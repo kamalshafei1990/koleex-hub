@@ -83,10 +83,18 @@ async function uploadDirectToStorage(
     bucket: string; path: string; signedUrl: string; token: string;
   };
 
-  const base = process.env.NEXT_PUBLIC_SUPABASE_URL?.replace(/\/+$/, "") ?? "";
-  if (!base) return { ok: false, error: "Storage is not configured" };
-  /* signedUrl is a path relative to the storage API root. */
-  const target = `${base}/storage/v1${signed.signedUrl}`;
+  /* supabase-js used to return signedUrl as a PATH relative to the storage
+     API root; newer versions return it ABSOLUTE. Joining an absolute URL
+     onto the base produced https://…/storage/v1https://… — a 404 that broke
+     EVERY direct (>4.2MB) upload. Handle both shapes. */
+  let target: string;
+  if (/^https?:\/\//i.test(signed.signedUrl)) {
+    target = signed.signedUrl;
+  } else {
+    const base = process.env.NEXT_PUBLIC_SUPABASE_URL?.replace(/\/+$/, "") ?? "";
+    if (!base) return { ok: false, error: "Storage is not configured" };
+    target = `${base}/storage/v1${signed.signedUrl.startsWith("/") ? "" : "/"}${signed.signedUrl}`;
+  }
 
   let putRes: Response;
   try {
@@ -112,13 +120,14 @@ async function uploadDirectToStorage(
 
   /* Mirror /api/storage/upload's contract exactly, including publicUrl: null
      for private buckets — callers must not have to know which route ran. */
+  const publicBase = process.env.NEXT_PUBLIC_SUPABASE_URL?.replace(/\/+$/, "") ?? "";
   const isPrivate = bucket === "finance-documents" || bucket === "hr-documents"
     || bucket === "discuss-media" || bucket === "discuss-voice";
   return {
     ok: true,
     data: {
       path: signed.path,
-      publicUrl: isPrivate ? null : `${base}/storage/v1/object/public/${bucket}/${signed.path}`,
+      publicUrl: isPrivate || !publicBase ? null : `${publicBase}/storage/v1/object/public/${bucket}/${signed.path}`,
     },
   };
 }

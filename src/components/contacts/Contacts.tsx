@@ -6752,38 +6752,16 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
       </div>
 
       {/* Contact list */}
-      <div className="flex-1 overflow-y-auto will-change-scroll">
-        {/* LIST EDGE — the same ramp Purchase runs, moved to the surface that
-            actually scrolls.
-
-            This app fails the header-ramp entry test on purpose: its list
-            lives in this container, which starts ~150px below the header, so
-            nothing ever passes beneath the main header and a ramp up there
-            would frost empty air while softening the static title. The edge
-            belongs to the scrollport the content moves through — here.
-
-            Hosted on a sticky h-0 wrapper so it pins to the list's own top
-            edge and costs ZERO layout: kx-bar-prog is absolutely positioned
-            and `inset: 0 0 calc(var(--kx-ramp-ext) * -1) 0` grows it downward
-            out of a zero-height box. No new CSS — one recipe for every edge on
-            the Hub.
-
-            IT NEEDS A z-index, AND MY FIRST VERSION LEFT IT OUT. Without one
-            the rows — later siblings in the same stacking context — paint ON
-            TOP of the layer, so backdrop-filter samples the page behind the
-            list and the rows scroll past perfectly crisp. It looked mounted
-            and measured correct (0-height host, 40px band, four layers) while
-            doing nothing at all. Proved by lifting it live: the moment the
-            host got a z the rows entering the band went soft.
-
-            z-[5] puts it above the rows; the alphabet headers take z-10 to
-            stay above IT, since they pin into exactly this band and are the
-            one thing the reader scans for. */}
-        {aurora && (
-          <div aria-hidden className="kx-bar-host sticky top-0 z-[5] h-0 pointer-events-none [--kx-ramp-ext:2.5rem]">
-            <div className="kx-glass-bar kx-bar-prog"><i /><i /><i /><i /></div>
-          </div>
-        )}
+      {/* kx-flat-items: the contact rows below drop their blur pass and keep
+          their surface. This list is the Hub's longest (the scale target is
+          6,000 contacts) — see the rule in globals for why repeated items
+          never get a blur pass. */}
+        <div className="kx-flat-items flex-1 overflow-y-auto will-change-scroll">
+        {/* No edge-blur ramp on this list — owner decision (2026-08-28):
+            after three rounds it kept frosting whatever static block sat in
+            its resting tail (KPI digits, then the A letterbar). "remove edge
+            blur here if this will make a problem." The letterbars and rows
+            render plain; the sticky bars above carry their own surfaces. */}
         {/* Compact KPI strip — stacked mode only (in split view the full
             dashboard is the right panel, so this would be a duplicate) */}
         {moduleKpis && filterType === "customer" && (
@@ -6864,7 +6842,15 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
                   for. top-0 is correct: these pin to the LIST's scroller, not
                   the page, so the under-glass offset other apps need does not
                   apply here. */}
-              <div className="kx-letterbar px-4 py-1.5 text-xs font-semibold text-[var(--text-dim)] bg-[var(--bg-surface-subtle)] sticky top-0 z-10 backdrop-blur-sm">
+              {/* NO backdrop-blur — it was already dead weight and the CSS rule for
+                  .kx-letterbar says so in its own words: these headers sit inside
+                  the filtered list pane, "a filtered ancestor starves a
+                  descendant's backdrop-filter, so that blur never rendered",
+                  which is why the rule gives them a dense FILL instead. The
+                  class stayed on the markup though, and a starved filter still
+                  builds a composited layer: measured 33 of them on /contacts,
+                  one per alphabet header, all paying for nothing. */}
+              <div className="kx-letterbar px-4 py-1.5 text-xs font-semibold text-[var(--text-dim)] bg-[var(--bg-surface-subtle)] sticky top-0 z-10">
                 {letter}
               </div>
               {/* Stacked mode puts the list across the whole app width, where a

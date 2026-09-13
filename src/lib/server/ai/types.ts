@@ -1,4 +1,5 @@
 import "server-only";
+import type { AiPersonalization } from "@/lib/ai-personalization";
 
 /* ---------------------------------------------------------------------------
    ai/types — shared types for the hybrid AI system.
@@ -58,6 +59,9 @@ export interface AiContext {
   } | null;
   /** Facts the user asked the assistant to remember (accounts.preferences.ai_memory). */
   memory?: Record<string, string> | null;
+  /** How this user asked to be spoken to (accounts.preferences.ai). Tone,
+   *  format and personal context only — see ai/personalization-prompt.ts. */
+  personalization?: AiPersonalization | null;
   /** UI locale — what the app chrome is rendered in. A fallback for
    *  when no strong signal is present in the user's message. */
   userLang?: "en" | "zh" | "ar";

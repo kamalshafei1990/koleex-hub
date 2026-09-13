@@ -37,6 +37,12 @@ import {
 import CustomerPicker from "@/components/travel/CustomerPicker";
 import PassportScanBox from "@/components/travel/PassportScanBox";
 import {
+  ARRIVAL_CITIES,
+  COUNTRIES,
+  cityDisplayName,
+  codeForCountryName,
+  countryDisplayName,
+  flagEmoji,
   COMMON_CITIES,
   PURPOSES,
   durationDays,
@@ -132,8 +138,31 @@ function toPayload(f: FormState) {
   };
 }
 
+function withCurrent(options: { value: string; label: string }[], current: string) {
+  if (!current || options.some((o) => o.value === current)) return options;
+  return [{ value: current, label: current }, ...options];
+}
+/* STANDING RULES (owner): country dropdowns carry the FLAG, and dropdown
+   CONTENTS follow the active language — the label alone is not enough.
+   Values stay the canonical English names (DB + letter), only labels move. */
+function countryOptions(lang: string) {
+  return COUNTRIES.map((c) => ({
+    value: c.name,
+    /* Name FIRST, flag after. With the flag leading, the browser's
+       type-ahead matched against the emoji and typing "E" jumped to the
+       wrong country — the owner hit it immediately. Name-first restores
+       first-letter search and the flag stays visible. */
+    label: `${countryDisplayName(c.code, c.name, lang)}  ${flagEmoji(c.code)}`,
+  }));
+}
+function arrivalOptions(lang: string) {
+  return ARRIVAL_CITIES.map((c) => ({ value: c.en, label: cityDisplayName(c, lang) }));
+}
+
 export default function InvitationForm({ id }: { id?: string }) {
-  const { t } = useTranslation(travelT);
+  const { t, lang } = useTranslation(travelT);
+  const COUNTRY_OPTIONS = useMemo(() => countryOptions(lang), [lang]);
+  const ARRIVAL_OPTIONS = useMemo(() => arrivalOptions(lang), [lang]);
   const router = useRouter();
 
   const isNew = !id;
@@ -299,8 +328,28 @@ export default function InvitationForm({ id }: { id?: string }) {
   }
 
   return (
-    <div className="h-full overflow-y-auto">
-      <div className="mx-auto w-full max-w-5xl px-4 pb-24 sm:px-6">
+    /* min-h-full, NOT h-full + overflow-y-auto.
+
+       Owning an internal scroller froze the Hub's own scroller
+       (#main-scroll-container) — the page scrolled inside itself while the
+       shell stayed still, which is why the frosted header ramp never passed
+       over the content and the action buttons sat under it permanently.
+       These are flowing form/list pages, so they belong IN the Hub scroller
+       exactly like Expenses. h-full is for a page that genuinely owns its
+       internal panes; this is not one. */
+    <div className="min-h-full">
+      {/* pt-12 = 3rem. NOT a round number picked by eye — it is exactly the
+          `+ 3rem` in the frosted ramp's own height,
+          `calc(var(--kx-header-h) + 3rem)` (globals.css). The shell already
+          offsets content by --kx-header-h (56 px), so without this the page
+          starts at 56 and the ramp reaches 104: measured, the Save / Export
+          PDF / Preview / Duplicate row sat from 56 to 88 — entirely inside
+          the frost, before any scrolling. The ramp is pointer-events:none, so
+          the buttons still worked; they were just permanently veiled, which
+          is worse than broken because nothing looks wrong enough to report.
+
+          Notes, which is fine, starts its first control at 136. */}
+      <div className="mx-auto w-full max-w-5xl px-4 pt-12 pb-24 sm:px-6">
         <PageHeader
           title={isNew ? t("action.new") : (letter?.reference ?? t("app.title"))}
           subtitle={isNew ? t("app.subtitle") : form.name}
@@ -317,7 +366,7 @@ export default function InvitationForm({ id }: { id?: string }) {
                   <Button
                     variant="secondary"
                     size="sm"
-                    onClick={() => window.open(`/travel/${id}/print`, "_blank")}
+                    onClick={() => router.push(`/travel/${id}/print`)}
                   >
                     {t("act.preview")}
                   </Button>
@@ -392,14 +441,23 @@ export default function InvitationForm({ id }: { id?: string }) {
               ]}
             />
             <DateField label={t("f.dob")} value={form.dob} onChange={(v) => set("dob", v)} />
-            <TextField
+            <SelectField
               label={t("f.nationality")}
               value={form.nationality}
-              onChange={(v) => set("nationality", v)}
+              options={withCurrent(COUNTRY_OPTIONS, form.nationality)}
+              onChange={(v) => {
+                set("nationality", v);
+                /* Picking from the list fills the code from the SAME entry —
+                   the owner asked what "ISO code" meant, which settles that
+                   nobody should be typing it. */
+                const code =
+                  COUNTRIES.find((c) => c.name === v)?.code ?? codeForCountryName(v);
+                if (code) set("nationalityCode", code);
+              }}
             />
             <TextField
-              label="ISO code"
-              hint="Two letters — decides the Chinese wording"
+              label={t("f.countryCode")}
+              hint={t("f.countryCode.hint")}
               value={form.nationalityCode}
               onChange={(v) => set("nationalityCode", v.slice(0, 2).toUpperCase())}
             />
@@ -456,10 +514,15 @@ export default function InvitationForm({ id }: { id?: string }) {
               value={form.position}
               onChange={(v) => set("position", v)}
             />
-            <TextField
+            <SelectField
               label={t("f.country")}
               value={form.country}
-              onChange={(v) => set("country", v)}
+              options={withCurrent(COUNTRY_OPTIONS, form.country)}
+              onChange={(v) => {
+                set("country", v);
+                const code = COUNTRIES.find((c) => c.name === v)?.code;
+                if (code) set("countryCode", code);
+              }}
             />
           </Section>
 
@@ -469,7 +532,7 @@ export default function InvitationForm({ id }: { id?: string }) {
               label={t("f.purpose")}
               value={form.purpose}
               onChange={(v) => set("purpose", v)}
-              options={PURPOSES.map((p) => ({ value: p.value, label: p.en }))}
+              options={PURPOSES.map((p) => ({ value: p.value, label: lang === "zh" ? p.cn : lang === "ar" ? p.ar : p.en }))}
               wide
             />
             {form.purpose === "exhibition" && (
@@ -480,9 +543,10 @@ export default function InvitationForm({ id }: { id?: string }) {
                 wide
               />
             )}
-            <TextField
+            <SelectField
               label={t("f.arrivalCity")}
               value={form.arrivalCity}
+              options={withCurrent(ARRIVAL_OPTIONS, form.arrivalCity)}
               onChange={(v) => set("arrivalCity", v)}
             />
             <SegmentField<VisaType>
@@ -522,7 +586,7 @@ export default function InvitationForm({ id }: { id?: string }) {
             <ChipsField
               label={t("f.cities")}
               selected={form.cities}
-              options={COMMON_CITIES.map((c) => c.en)}
+              options={COMMON_CITIES.map((c) => ({ value: c.en, label: cityDisplayName(c, lang) }))}
               onToggle={(city) =>
                 setForm((f) => ({
                   ...f,

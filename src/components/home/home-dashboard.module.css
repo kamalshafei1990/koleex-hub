@@ -1,0 +1,375 @@
+/* ---------------------------------------------------------------------------
+   Home Dashboard — the "futuristic slab" family (owner-approved 2026-08-20,
+   cloned from his reference cards: milky top fog, navy backlit body, a neon
+   lip blooming out of the bottom edge, blueprint grid fading in below).
+
+   OWNER DECISION: this glow level is a deliberate exception to the brand's
+   "glow must be subtle" line — the dashboard is the Hub's illuminated face.
+   Scoped as a CSS module on purpose: nothing here can leak into globals or
+   fight the aurora control-hover layer.
+   --------------------------------------------------------------------------- */
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(12, 1fr);
+  gap: 18px;
+}
+
+/* MATCH THE APP TILES (owner, 2026-08-20: "same glass effect as the apps
+   cards"): the card's GLASS is the global `kx-glass` — the very utility the
+   tiles wear — added in the JSX beside this class, so theme/light/lowpower/
+   no-backdrop behavior is inherited, never imitated. This module adds ONLY
+   the futurist anatomy on top: the tile border, the interior Hub-Blue wash
+   (a ::before overlay — kx-glass owns box-shadow and would override one
+   declared here), the bottom lip, the blueprint grid, the glowing curve. */
+.slab {
+  position: relative;
+  border-radius: 20px;
+  isolation: isolate;
+  padding: 16px 18px;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+.slab::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  background:
+    radial-gradient(150% 85% at 50% -32%, rgba(215, 225, 238, 0.07), transparent 55%),
+    radial-gradient(160% 70% at 50% 122%, rgba(86, 127, 178, 0.18), rgba(86, 127, 178, 0.05) 45%, transparent 66%);
+}
+.slab::after {
+  content: "";
+  position: absolute;
+  inset-inline: 14%;
+  bottom: -6px;
+  height: 11px;
+  z-index: -1;
+  border-radius: 9999px;
+  filter: blur(9px);
+  background: radial-gradient(55% 120% at 50% 0%, rgba(127, 169, 214, 0.26), rgba(86, 127, 178, 0.07) 62%, transparent);
+}
+.slab > * { position: relative; }
+
+.bp {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  overflow: hidden;
+  pointer-events: none;
+}
+.bp::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    repeating-linear-gradient(90deg, rgba(200, 214, 232, 0.055) 0 1px, transparent 1px 42px),
+    repeating-linear-gradient(180deg, rgba(200, 214, 232, 0.04) 0 1px, transparent 1px 42px);
+  -webkit-mask: linear-gradient(180deg, transparent 45%, #000 82%);
+  mask: linear-gradient(180deg, transparent 45%, #000 82%);
+}
+
+.hero { grid-column: span 8; min-height: 186px; display: flex; flex-direction: column; }
+/* the hero above the pinned board — a standalone block, full width */
+.heroWide { min-height: 186px; }
+
+/* ── the pinned board's header row: label + Edit control. The show/hide
+   toggle above is OWNER-PINNED and untouched — this row is its own. ── */
+.deckHead { display: flex; align-items: center; gap: 10px; margin-block: 16px 12px; }
+.deckTitle { font-size: 9.5px; letter-spacing: 2px; color: rgba(255, 255, 255, 0.3); }
+.deckAdd { font-size: 11px; color: rgba(188, 216, 240, 0.8); text-decoration: none; margin-inline-start: auto; }
+.deckAdd:hover { color: #fff; }
+.deckHead > button { margin-inline-start: auto; }
+.deckHead > .deckAdd + button { margin-inline-start: 0; }
+.deckEmpty { grid-column: 1 / -1; padding: 26px 0; text-align: center; font-size: 12px; color: rgba(255, 255, 255, 0.4); }
+.deckEmpty a { color: rgba(188, 216, 240, 0.85); }
+.side { grid-column: span 4; display: flex; flex-direction: column; gap: 18px; }
+.kpi  { flex: 1; display: flex; flex-direction: column; justify-content: center; }
+.half { grid-column: span 6; }
+
+.klabel {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.55);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+.ttl { color: #e9f1fa; font-weight: 600; }
+.mini {
+  font-size: 9px;
+  color: rgba(188, 216, 240, 0.7);
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 9999px;
+  padding: 3px 9px;
+  letter-spacing: 0.6px;
+  white-space: nowrap;
+}
+.unit { font-size: 11px; color: rgba(255, 255, 255, 0.35); }
+
+.curve { position: relative; flex: 1; min-height: 72px; margin: 4px -4px 0; }
+.curve svg { width: 100%; height: 100%; display: block; overflow: visible; }
+
+.heroNum { text-align: center; padding-block-end: 2px; }
+.heroLbl { font-size: 12.5px; color: rgba(212, 226, 244, 0.72); }
+.heroBig {
+  font-size: 34px;
+  font-weight: 300;
+  color: #fff;
+  line-height: 1.12;
+  letter-spacing: 1px;
+  font-variant-numeric: tabular-nums;
+  text-shadow: 0 0 16px rgba(200, 222, 247, 0.22);
+}
+.heroSub { font-size: 11px; color: rgba(190, 205, 225, 0.48); margin-block-start: 2px; }
+
+.kval {
+  font-size: 25px;
+  font-weight: 300;
+  margin-block-start: 6px;
+  color: #fff;
+  font-variant-numeric: tabular-nums;
+  text-shadow: 0 0 12px rgba(200, 222, 247, 0.18);
+}
+.kdelta { font-size: 10.5px; margin-block-start: 2px; color: rgba(255, 255, 255, 0.42); }
+.good { color: #79d89a; }
+.warnTone { color: #edc684; }
+
+.ringRow { display: flex; align-items: center; gap: 13px; margin-block-start: 8px; flex-wrap: wrap; }
+.ringWrap { position: relative; inline-size: 44px; block-size: 44px; flex: none; }
+.ringTxt { position: absolute; inset: 0; display: grid; place-items: center; font-size: 10.5px; font-weight: 600; }
+
+.barsWrap { position: relative; block-size: 116px; margin-block-start: 18px; display: flex; align-items: flex-end; gap: 8px; padding-block-end: 2px; }
+.bar {
+  flex: 1;
+  position: relative;
+  border-start-start-radius: 6px;
+  border-start-end-radius: 6px;
+  background: linear-gradient(180deg, rgba(188, 216, 240, 0.13), rgba(127, 169, 214, 0.03));
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-block-end: none;
+}
+.bar em {
+  position: absolute;
+  inset-inline: 0;
+  bottom: -18px;
+  font-style: normal;
+  font-size: 8.5px;
+  color: rgba(255, 255, 255, 0.32);
+  text-align: center;
+  letter-spacing: 0.6px;
+}
+.bar b {
+  position: absolute;
+  inset-inline: 0;
+  top: -18px;
+  font-size: 11px;
+  font-weight: 600;
+  text-align: center;
+  color: rgba(230, 240, 252, 0.85);
+}
+.barHot {
+  background: linear-gradient(180deg, rgba(188, 216, 240, 0.26), rgba(127, 169, 214, 0.07));
+  border-color: rgba(188, 216, 240, 0.3);
+}
+.pipePad { padding-block-end: 30px; }
+
+.attnRow {
+  display: flex;
+  align-items: flex-start;
+  gap: 11px;
+  padding: 9px 2px;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.55);
+  border-block-end: 1px solid rgba(255, 255, 255, 0.06);
+  text-decoration: none;
+}
+.attnRow:last-child { border-block-end: none; }
+.attnRow b { color: #e9f1fa; font-weight: 600; }
+.sig { inline-size: 8px; block-size: 8px; border-radius: 50%; margin-block-start: 4px; flex: none; }
+.sigCrit { background: #f49090; box-shadow: 0 0 9px rgba(244, 144, 144, 0.5); }
+.sigWarn { background: #edc684; box-shadow: 0 0 9px rgba(237, 198, 132, 0.5); }
+.sigOk   { background: #79d89a; box-shadow: 0 0 9px rgba(121, 216, 154, 0.4); }
+.go {
+  margin-inline-start: auto;
+  font-size: 9px;
+  color: rgba(188, 216, 240, 0.7);
+  white-space: nowrap;
+  letter-spacing: 1px;
+}
+
+.errCard { font-size: 11.5px; color: #edc684; margin-block-start: 8px; }
+
+/* skeleton shimmer while the one request is in flight */
+.skel { min-block-size: 250px; display: grid; place-items: center; }
+.skelDot {
+  inline-size: 9px; block-size: 9px; border-radius: 50%;
+  background: #6fb4ff;
+  animation: dashPulse 1.4s ease-in-out infinite;
+}
+@keyframes dashPulse {
+  0%, 100% { box-shadow: 0 0 6px rgba(111, 180, 255, 0.9); opacity: .7; }
+  50% { box-shadow: 0 0 18px 5px rgba(111, 180, 255, 0.35); opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) { .skelDot { animation: none; } }
+
+@media (max-width: 900px) {
+  .hero, .side, .half { grid-column: span 12; }
+  .heroBig { font-size: 30px; }
+  /* phone: the latency hint gives its space to the toggle — the button
+     must never leave the screen (owner rule: it does not move) */
+  .tabsHint { display: none; }
+  .tab { padding: 5px 11px; }
+  .toggleBtn { min-inline-size: 64px; margin-inline-start: auto; }
+}
+
+/* ── period chips ── */
+.tabs { display: flex; align-items: center; gap: 6px; margin-block-end: 12px; flex-wrap: wrap; row-gap: 8px; }
+.tab {
+  font-size: 11px; color: rgba(255, 255, 255, 0.5);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 9999px; padding: 5px 13px; cursor: pointer;
+  font-family: inherit; transition: color 0.15s ease-out, background-color 0.15s ease-out;
+}
+.tab:hover { color: rgba(255, 255, 255, 0.8); }
+.tabOn {
+  color: #fff; background: rgba(188, 216, 240, 0.12);
+  border-color: rgba(127, 169, 214, 0.5);
+}
+.tabsHint { margin-inline-start: auto; font-size: 9.5px; letter-spacing: 1.2px; color: rgba(255, 255, 255, 0.28); }
+
+/* ── ring gauge (conic, Hub Blue) ── */
+.ringGauge {
+  inline-size: 44px; block-size: 44px; border-radius: 50%;
+  background: conic-gradient(from -90deg, #7FA9D6 0 var(--pct, 0%), rgba(255, 255, 255, 0.09) var(--pct, 0%) 100%);
+  -webkit-mask: radial-gradient(circle, transparent 57%, #000 58%);
+  mask: radial-gradient(circle, transparent 57%, #000 58%);
+  filter: drop-shadow(0 0 7px rgba(127, 169, 214, 0.4));
+}
+
+/* ── presence avatars ── */
+.people { display: flex; gap: 7px; margin-block-start: 10px; flex-wrap: wrap; }
+/* the CLIP lesson again (owner-flagged UI bug): overflow:hidden on the
+   circle clipped the presence dot into a sliver, and the fuzzy glow read
+   as a white smear. The clip now lives on the IMAGE (it's the only thing
+   needing it); the dot sits outside untouched; the active ring is a
+   crisp 1.5px line, not a blur. */
+.pv {
+  inline-size: 30px; block-size: 30px; border-radius: 50%;
+  background: rgba(255, 255, 255, 0.06);
+  display: grid; place-items: center;
+  font-size: 10px; font-weight: 600; color: rgba(226, 238, 250, 0.85);
+  position: relative; border: 1px solid rgba(255, 255, 255, 0.1);
+  opacity: 0.45;
+}
+.pvOn { opacity: 1; box-shadow: 0 0 0 1.5px rgba(127, 169, 214, 0.45); }
+.pvOn::after {
+  content: ""; position: absolute; bottom: -2px; inset-inline-end: -2px;
+  inline-size: 9px; block-size: 9px; border-radius: 50%;
+  background: #79d89a; border: 2px solid #0c0d10;
+}
+/* absolute fill: percentage sizing of a grid item let portrait photos
+   escape the 30px circle as ovals (owner's second catch). Pinned to the
+   circle's box, the photo cannot be anything but a 30px disc. */
+.pvImg { position: absolute; inset: 0; inline-size: 100%; block-size: 100%; object-fit: cover; border-radius: 50%; }
+
+/* ── system strip (SA) ── */
+.sysStrip {
+  grid-column: span 12;
+  margin-block-start: 2px;
+  display: flex; align-items: center; gap: 18px;
+  padding: 13px 20px;
+}
+.sysItem { display: flex; align-items: center; gap: 8px; font-size: 9.5px; letter-spacing: 1px; text-transform: uppercase; color: rgba(255, 255, 255, 0.48); }
+.sysSep { inline-size: 1px; block-size: 13px; background: rgba(255, 255, 255, 0.1); }
+.sysEnd { margin-inline-start: auto; font-size: 9px; letter-spacing: 2.2px; color: rgba(255, 255, 255, 0.25); }
+@media (max-width: 700px) { .sysEnd { display: none; } }
+
+/* ── show/hide: the collapse machine ──
+   grid-template-rows 1fr→0fr is the smoothest pure-CSS height animation —
+   no JS measuring, no magic max-height (the measured-motion traps stay
+   away). The inner div owns overflow; the cards themselves stagger their
+   scale/fade so the close reads as the deck being drawn back into the
+   header, and the open as it being dealt out. */
+.collapser {
+  display: grid;
+  grid-template-rows: 1fr;
+  transition: grid-template-rows 720ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+.collapsed {
+  grid-template-rows: 0fr;
+  /* the cards fly into the button FIRST; the sheet closes behind the
+     flight — one gesture: gather, then breathe shut */
+  transition-delay: 900ms;
+  transition-duration: 560ms;
+}
+/* overflow stays hidden in EVERY state — during the open animation a
+   visible overflow would paint the full deck over the app grid below.
+   The lips' outside glow survives by the old lesson (offscreen-glass):
+   PAD by the glow instead of unclipping — the inner carries the bottom
+   padding the grid used to carry as margin. */
+.collapseInner {
+  overflow: hidden; min-block-size: 0; padding-block-end: 34px;
+  transition: padding-block-end 720ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+/* collapsed, the glow padding must go too — overflow clips at the PADDING
+   edge, so a kept 34px pad shows a strip of the deck under the pulse line */
+.collapsed .collapseInner { padding-block-end: 0; transition-delay: 900ms; transition-duration: 560ms; }
+/* while the deck is in the air the clip lifts and the layer rises above
+   the search bar — the flight is SEEN leaving/entering the button. The
+   clip (and its pointer protection) returns the instant the flight ends. */
+.flying .collapseInner { overflow: visible; position: relative; z-index: 30; }
+.collapsed:not(.flying) .collapseInner { pointer-events: none; }
+
+/* the button "catches" the deck at the end of the inhale */
+.toggleCaught { animation: kxCatch 420ms cubic-bezier(0.34, 1.56, 0.64, 1) 1080ms both; }
+@keyframes kxCatch {
+  0%   { transform: scale(1); }
+  40%  { transform: scale(1.18); box-shadow: 0 0 22px rgba(127, 169, 214, 0.5); }
+  100% { transform: scale(1); }
+}
+/* the pulse line pops in with a tiny spring once the deck is away */
+.pulseLine { animation: kxPulseIn 460ms cubic-bezier(0.34, 1.4, 0.64, 1) 1180ms both; }
+@keyframes kxPulseIn {
+  from { opacity: 0; transform: translateY(4px) scale(0.96); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+/* the toggle */
+.toggleBtn {
+  margin-inline-start: 10px; display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  /* fixed box: "Hide" and "Show" have different widths — without this the
+     right-anchored button slides a few px between states */
+  min-inline-size: 78px;
+}
+.chev { display: inline-block; flex: none; opacity: 0.75; transition: transform 420ms cubic-bezier(0.22, 1, 0.36, 1); }
+.chevClosed { transform: rotate(180deg); }
+
+/* the collapsed pulse line */
+.pulseLine {
+  font-size: 12px; color: rgba(255, 255, 255, 0.55);
+  font-variant-numeric: tabular-nums; letter-spacing: 0.3px;
+  /* owner: the toggle must NOT move between states. The pulse line takes
+     all the free width, so the button stays pinned at the exact spot the
+     chips row keeps it — same X, same Y, open or closed. */
+  flex: 1;
+}
+
+/* the hero curve draws itself on every expand */
+.curveDraw {
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  animation: kxDraw 950ms cubic-bezier(0.4, 0, 0.2, 1) 180ms forwards;
+}
+@keyframes kxDraw { to { stroke-dashoffset: 0; } }
+
+@media (prefers-reduced-motion: reduce) {
+  .collapser { transition: none; }
+  .toggleCaught { animation: none; }
+  .pulseLine { animation: none; }
+  .chev { transition: none; }
+  .curveDraw { animation: none; stroke-dashoffset: 0; }
+}

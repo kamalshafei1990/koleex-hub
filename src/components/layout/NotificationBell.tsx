@@ -614,6 +614,28 @@ export default function NotificationBell({ dk, defaultOpen = false }: { dk: bool
     const aid = accountIdRef.current;
     if (!aid) return;
 
+    /* SCOPED TO THE ACTIVE FILTER (owner request): standing on "Task
+       reminders" and pressing the button clears task reminders — not the
+       approvals you haven't looked at yet. On "All" it behaves exactly as
+       before. Per-id marking for a filtered set (the sets are small once
+       the lifecycle fixes landed); the one bulk call stays for "All". */
+    if (filter !== "all" && filter !== "discuss") {
+      const targets = messages.filter((m) => {
+        if ((m as { read_at?: string | null }).read_at) return false;
+        const a = classifyInboxActivity((m as { metadata?: unknown }).metadata);
+        return filter === "other" ? a === null : a === filter;
+      });
+      if (targets.length === 0) return;
+      const nowIso = new Date().toISOString();
+      const ids = new Set(targets.map((m) => m.id));
+      setInboxUnread((n) => Math.max(0, n - targets.length));
+      setMessages((prev) =>
+        prev.map((m) => (ids.has(m.id) ? { ...m, read_at: nowIso } : m)),
+      );
+      targets.forEach((m) => void markMessageRead(m.id));
+      return;
+    }
+
     /* Optimistic local clear. */
     if (inboxUnread > 0) {
       setInboxUnread(0);
@@ -668,15 +690,24 @@ export default function NotificationBell({ dk, defaultOpen = false }: { dk: bool
 
   /* Per-type counts over the WHOLE loaded feed — they drive which chips are
      shown (only types that actually have something) and the count badges. */
+  /* UNREAD counts, deliberately — the chips counted EVERY loaded row while
+     the badge and the header counted unread, so the owner's panel said
+     "30 new" under a chip row shouting "All 99+ · Task reminders 64":
+     three different truths for one bell. One convention now, everywhere
+     a number appears on this panel: a count is things needing attention. */
   const typeCounts = new Map<NotifFilter, number>();
   for (const m of messages) {
+    if ((m as { read_at?: string | null }).read_at) continue;
     const a =
       classifyInboxActivity((m as { metadata?: unknown }).metadata) ?? "other";
     typeCounts.set(a, (typeCounts.get(a) ?? 0) + 1);
   }
+  const unreadInboxCount = messages.filter(
+    (m) => !(m as { read_at?: string | null }).read_at,
+  ).length;
   const chipCount = (key: NotifFilter): number =>
     key === "all"
-      ? messages.length + allDiscussRows.length
+      ? unreadInboxCount + allDiscussRows.length
       : key === "discuss"
         ? allDiscussRows.length
         : (typeCounts.get(key) ?? 0);
@@ -731,7 +762,7 @@ export default function NotificationBell({ dk, defaultOpen = false }: { dk: bool
           under the header — while md+ stays a dropdown anchored to the bell. */}
       <PopoverPanel anchorRef={wrapRef} open={open} onClose={() => setOpen(false)} align="end"
         matchAnchorWidth={false} mobileSheet maxHeight={620}
-        className="kx-drop-in kx-pop-sheet w-auto md:w-[380px] md:max-w-[92vw]">
+        className="kx-drop-in kx-pop-sheet kx-pop-clear w-auto md:w-[380px] md:max-w-[92vw]">
           {/* Header */}
           <div
             className={`flex items-center justify-between px-4 py-3 border-b ${

@@ -5,8 +5,11 @@
    Matches the Koleex Hub admin design system.
    --------------------------------------------------------------------------- */
 
-import { useEffect, useState, type ReactNode, type ComponentType, type MouseEvent } from "react";
+import { useEffect, useSyncExternalStore, type ReactNode, type ComponentType, type MouseEvent } from "react";
 import { createPortal } from "react-dom";
+
+/* Stable no-op subscription for the mounted-flag useSyncExternalStore. */
+const noopSubscribe = () => () => {};
 import Link from "next/link";
 import CrossIcon from "@/components/icons/ui/CrossIcon";
 
@@ -151,8 +154,9 @@ export function ModalShell({
      modal's own title bar and first fields slid up underneath the app header
      and tab strip. Rendering into <body> escapes any such ancestor for good,
      whatever a parent does with transform/filter/contain later. */
-  const [mounted, setMounted] = useState(false);
-  useEffect(() => setMounted(true), []);
+  /* True after hydration, false during SSR — the store form of the classic
+     mounted flag, with no setState-in-effect render cascade. */
+  const mounted = useSyncExternalStore(noopSubscribe, () => true, () => false);
 
   useEffect(() => {
     if (!open) return;

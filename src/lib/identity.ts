@@ -23,7 +23,7 @@
      setCurrentAccountId("uuid");
 --------------------------------------------------------------------------- */
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
 import type { AccountWithLinks } from "@/types/supabase";
 import { clearScopeContextCache } from "./scope";
 
@@ -87,6 +87,36 @@ export function getCurrentAccountIdSync(): string | null {
   } catch {
     return null;
   }
+}
+
+/* Reactive twin of getCurrentAccountIdSync.
+ *
+ * The sync getter is a ONE-SHOT read, and a component that calls it at render
+ * without subscribing is stuck with whatever storage held at first paint. That
+ * is a FALSE EMPTY waiting to happen: the id is written asynchronously (the
+ * auto-pick inside useCurrentAccount below, or a sign-in in another tab), so a
+ * page that filters by "me" — the To-do Assignment Report is exactly this —
+ * can render before the id exists, show "No assigned tasks in this period",
+ * and never recover, because nothing re-renders it when the id lands. A reload
+ * is the only cure, and the operator has no way to know that.
+ *
+ * Both events matter: IDENTITY_EVENT is dispatched for same-tab changes (the
+ * `storage` event deliberately does not fire in the tab that wrote), and
+ * `storage` covers a sign-in or account switch in another tab. */
+function subscribeToIdentity(onChange: () => void): () => void {
+  if (typeof window === "undefined") return () => {};
+  window.addEventListener(IDENTITY_EVENT, onChange);
+  window.addEventListener("storage", onChange);
+  return () => {
+    window.removeEventListener(IDENTITY_EVENT, onChange);
+    window.removeEventListener("storage", onChange);
+  };
+}
+
+export function useCurrentAccountId(): string | null {
+  /* Server snapshot is null: the id lives in localStorage, which SSR cannot
+     see, and returning anything else would hydrate a mismatch. */
+  return useSyncExternalStore(subscribeToIdentity, getCurrentAccountIdSync, () => null);
 }
 
 export function setCurrentAccountId(id: string | null): void {

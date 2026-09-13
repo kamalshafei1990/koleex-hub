@@ -26,6 +26,10 @@ import Button from "@/components/ui/Button";
 import TravelIcon from "@/components/icons/TravelIcon";
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 import { CARD, SELECTED_CHIP } from "@/components/travel/fields";
+import ConfirmDialog from "@/components/ui/ConfirmDialog";
+import PencilIcon from "@/components/icons/ui/PencilIcon";
+import CopyIcon from "@/components/icons/ui/CopyIcon";
+import TrashIcon from "@/components/icons/ui/TrashIcon";
 import { formatDateEn, PURPOSES } from "@/lib/invitations/types";
 import type { InvitationLetter } from "@/lib/invitations/types";
 
@@ -41,6 +45,10 @@ export default function TravelApp() {
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState<Filter>("all");
   const [query, setQuery] = useState("");
+  /** The letter a Delete press is asking about; the dialog names the visitor
+   *  and the reference, per the agreed rule — delete is permanent. */
+  const [pendingDelete, setPendingDelete] = useState<InvitationLetter | null>(null);
+  const [rowBusy, setRowBusy] = useState(false);
 
   const load = useCallback(async () => {
     setError(null);
@@ -58,6 +66,45 @@ export default function TravelApp() {
   useEffect(() => {
     void load();
   }, [load]);
+
+  /** Exact copy, the owner's rule — only the reference differs. The list row
+   *  already carries the whole letter, so this needs no extra fetch. */
+  const duplicate = useCallback(
+    async (r: InvitationLetter) => {
+      setRowBusy(true);
+      try {
+        const res = await fetch("/api/invitations", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            contactId: r.contactId,
+            visitor: r.visitor,
+            visit: r.visit,
+            letterDate: r.letterDate,
+          }),
+        });
+        const body = (await res.json()) as { letter?: InvitationLetter };
+        if (res.ok && body.letter) router.push(`/travel/${body.letter.id}`);
+      } finally {
+        setRowBusy(false);
+      }
+    },
+    [router],
+  );
+
+  const confirmDelete = useCallback(async () => {
+    if (!pendingDelete) return;
+    setRowBusy(true);
+    try {
+      const res = await fetch(`/api/invitations/${pendingDelete.id}`, { method: "DELETE" });
+      if (res.ok) {
+        setPendingDelete(null);
+        await load();
+      }
+    } finally {
+      setRowBusy(false);
+    }
+  }, [pendingDelete, load]);
 
   const counts = useMemo(() => {
     const list = rows ?? [];
@@ -85,8 +132,28 @@ export default function TravelApp() {
   }, [rows, filter, query]);
 
   return (
-    <div className="h-full overflow-y-auto">
-      <div className="mx-auto w-full max-w-6xl px-4 pb-16 sm:px-6">
+    /* min-h-full, NOT h-full + overflow-y-auto.
+
+       Owning an internal scroller froze the Hub's own scroller
+       (#main-scroll-container) — the page scrolled inside itself while the
+       shell stayed still, which is why the frosted header ramp never passed
+       over the content and the action buttons sat under it permanently.
+       These are flowing form/list pages, so they belong IN the Hub scroller
+       exactly like Expenses. h-full is for a page that genuinely owns its
+       internal panes; this is not one. */
+    <div className="min-h-full">
+      {/* pt-12 = 3rem. NOT a round number picked by eye — it is exactly the
+          `+ 3rem` in the frosted ramp's own height,
+          `calc(var(--kx-header-h) + 3rem)` (globals.css). The shell already
+          offsets content by --kx-header-h (56 px), so without this the page
+          starts at 56 and the ramp reaches 104: measured, the Save / Export
+          PDF / Preview / Duplicate row sat from 56 to 88 — entirely inside
+          the frost, before any scrolling. The ramp is pointer-events:none, so
+          the buttons still worked; they were just permanently veiled, which
+          is worse than broken because nothing looks wrong enough to report.
+
+          Notes, which is fine, starts its first control at 136. */}
+      <div className="mx-auto w-full max-w-6xl px-4 pt-12 pb-16 sm:px-6">
         <PageHeader
           title={t("app.title")}
           subtitle={t("app.subtitle")}
@@ -162,18 +229,25 @@ export default function TravelApp() {
           <ul className="flex flex-col gap-2">
             {visible.map((r) => (
               <li key={r.id}>
-                <button
-                  type="button"
-                  onClick={() => router.push(`/travel/${r.id}`)}
-                  /* data-kx-keep-hover: this is a <button> wrapping a whole
-                     row, and Aurora's control-hover rule would otherwise
-                     paint a hard blue box across it. Opting out lets the
-                     row's own surface-hover show instead. */
-                  data-kx-keep-hover=""
-                  className={`${CARD} w-full px-4 py-3 text-start transition-colors
-                             hover:bg-[var(--bg-surface-hover)] sm:flex sm:items-center sm:gap-4`}
+                {/* The row is a CARD holding a big "open the letter" button
+                    and three sibling action buttons — siblings, never nested,
+                    because a button inside a button is invalid HTML and the
+                    inner clicks would bubble into navigation. Pressing the
+                    row shows the INVITATION itself (the print view, which
+                    carries its own Back button); editing is one of the
+                    explicit actions beside it — the owner's call. */}
+                <div
+                  className={`${CARD} flex flex-col gap-2 px-4 py-3 transition-colors
+                             hover:bg-[var(--bg-surface-hover)] sm:flex-row sm:items-center sm:gap-4`}
                 >
-                  <div className="min-w-0 flex-1">
+                  <button
+                    type="button"
+                    onClick={() => router.push(`/travel/${r.id}/print`)}
+                    /* data-kx-keep-hover: a whole-row button would otherwise
+                       get Aurora's hard blue control-box on hover. */
+                    data-kx-keep-hover=""
+                    className="min-w-0 flex-1 text-start"
+                  >
                     <div className="flex items-baseline gap-2">
                       <span className="truncate font-medium">{r.visitor.name}</span>
                       <span className="shrink-0 text-xs tabular-nums text-[var(--text-secondary)]">
@@ -185,9 +259,9 @@ export default function TravelApp() {
                         .filter(Boolean)
                         .join(" · ")}
                     </p>
-                  </div>
+                  </button>
 
-                  <div className="mt-2 flex items-center gap-3 sm:mt-0 sm:shrink-0">
+                  <div className="flex items-center gap-3 sm:shrink-0">
                     <span className="text-sm tabular-nums text-[var(--text-secondary)]">
                       {formatDateEn(r.visit.arrivalDate)}
                       {" → "}
@@ -209,13 +283,65 @@ export default function TravelApp() {
                     >
                       {r.status === "issued" ? t("status.issued") : t("status.draft")}
                     </span>
+
+                    {/* The three actions the owner asked for, right on the
+                        row. Icon buttons with tooltips; each disabled while
+                        any row action is in flight so a double-press cannot
+                        duplicate twice or delete during a duplicate. */}
+                    <div className="flex items-center gap-1.5 border-s border-[var(--border-subtle)] ps-3">
+                      <button
+                        type="button"
+                        title={t("act.edit")}
+                        aria-label={t("act.edit")}
+                        disabled={rowBusy}
+                        onClick={() => router.push(`/travel/${r.id}`)}
+                        className="flex h-8 w-8 items-center justify-center rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-surface-hover)] hover:text-[var(--text-primary)] disabled:opacity-50"
+                      >
+                        <PencilIcon size={14} />
+                      </button>
+                      <button
+                        type="button"
+                        title={t("act.duplicate")}
+                        aria-label={t("act.duplicate")}
+                        disabled={rowBusy}
+                        onClick={() => void duplicate(r)}
+                        className="flex h-8 w-8 items-center justify-center rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-surface-hover)] hover:text-[var(--text-primary)] disabled:opacity-50"
+                      >
+                        <CopyIcon size={14} />
+                      </button>
+                      <button
+                        type="button"
+                        title={t("act.delete")}
+                        aria-label={t("act.delete")}
+                        disabled={rowBusy}
+                        onClick={() => setPendingDelete(r)}
+                        className="flex h-8 w-8 items-center justify-center rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[var(--text-secondary)] transition-colors hover:border-rose-500/40 hover:bg-rose-500/10 hover:text-rose-400 disabled:opacity-50"
+                      >
+                        <TrashIcon size={14} />
+                      </button>
+                    </div>
                   </div>
-                </button>
+                </div>
               </li>
             ))}
           </ul>
         )}
       </div>
+
+      <ConfirmDialog
+        open={pendingDelete !== null}
+        title={t("del.title")}
+        description={
+          pendingDelete
+            ? `${pendingDelete.visitor.name} · ${pendingDelete.reference} — ${t("del.body")}`
+            : ""
+        }
+        confirmLabel={t("act.delete")}
+        destructive
+        busy={rowBusy}
+        onConfirm={() => void confirmDelete()}
+        onCancel={() => setPendingDelete(null)}
+      />
     </div>
   );
 }

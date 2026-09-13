@@ -33,12 +33,6 @@ import CalendarPlusIcon from "@/components/icons/ui/CalendarPlusIcon";
 import ClockIcon from "@/components/icons/ui/ClockIcon";
 import DocumentIcon from "@/components/icons/ui/DocumentIcon";
 import UserIcon from "@/components/icons/ui/UserIcon";
-import UserPlusIcon from "@/components/icons/ui/UserPlusIcon";
-import StarIcon from "@/components/icons/ui/StarIcon";
-import CheckCircleIcon from "@/components/icons/ui/CheckCircleIcon";
-import WalletIcon from "@/components/icons/ui/WalletIcon";
-import BookOpenIcon from "@/components/icons/ui/BookOpenIcon";
-import BarChart3Icon from "@/components/icons/ui/BarChart3Icon";
 import ShieldIcon from "@/components/icons/ui/ShieldIcon";
 import KpiCard from "@/components/ui/KpiCard";
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
@@ -47,7 +41,7 @@ import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
    MAIN COMPONENT
    ═══════════════════════════════════════════════════ */
 
-export default function DashboardModule({ employees, t, lang, setActiveTab }: HRModuleProps) {
+export default function DashboardModule({ t }: HRModuleProps) {
   /* ── state ── */
   const [dashStats, setDashStats] = useState<HrDashboardStats | null>(null);
   const [expiringItems, setExpiringItems] = useState<ExpiringItem[]>([]);

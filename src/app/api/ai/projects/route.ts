@@ -4,6 +4,7 @@ import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { requireAuth } from "@/lib/server/auth";
 import { requireInternalUser } from "@/lib/server/ai/require-internal";
+import { dbError } from "@/lib/server/ai/http/api-error";
 import {
   normalizeProjectColor,
   normalizeProjectIcon,
@@ -34,7 +35,7 @@ export async function GET() {
     .eq("account_id", auth.account_id)
     .order("sort_order", { ascending: true })
     .order("created_at", { ascending: true });
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return dbError("projects", error);
   return NextResponse.json({ projects: data ?? [] });
 }
 
@@ -75,6 +76,6 @@ export async function POST(req: Request) {
     })
     .select(COLUMNS)
     .single();
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return dbError("projects", error);
   return NextResponse.json({ project: data });
 }

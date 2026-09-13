@@ -21,13 +21,13 @@ import "server-only";
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { requireAuth } from "@/lib/server/auth";
-import { hasProductDataAccess, requireProductDataAction } from "@/lib/server/product-access";
+import { requireProductDataAction } from "@/lib/server/product-access";
 import { humanizeError } from "@/lib/ui/humanize-error";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 const LINK_COLS =
-  "id, product_id, supplier_id, is_primary, show_in_catalog, supplier_product_code, moq, lead_time_days, unit_cost_cny, currency, payment_terms, notes, notes_i18n, price_options, supplier_product_name, supplier_product_name_i18n, supplier_product_photo, supply_type, sample_available, sample_cost, incoterms, supplier_warranty_months, price_tiers, price_quoted_on, price_valid_until, quotation_file_url, quotation_file_name, sourcing_status, preferred_reason, min_order_value, tooling_owner, tooling_cost, cost_basis, cost_includes_tax";
+  "id, product_id, supplier_id, is_primary, show_in_catalog, supplier_product_code, moq, lead_time_days, unit_cost_cny, currency, payment_terms, notes, notes_i18n, price_options, supplier_product_name, supplier_product_name_i18n, supplier_product_photo, supply_type, sample_available, sample_cost, incoterms, supplier_warranty_months, price_tiers, price_quoted_on, price_valid_until, quotation_file_url, quotation_file_name, sourcing_status, preferred_reason, min_order_value, tooling_owner, tooling_cost, cost_basis, cost_includes_tax, cost_extras";
 
 /* Confirm the product exists AND belongs to the caller's tenant before
    reading/writing its supplier links. Returns the product id or null. */
@@ -152,6 +152,21 @@ export async function PUT(req: Request) {
         ? (r.cost_basis as string)
         : "delivered",
       cost_includes_tax: r.cost_includes_tax === undefined || r.cost_includes_tax === null ? true : !!r.cost_includes_tax,
+      /* Adjunct costs for non-landed bases — numbers only, junk dropped. */
+      cost_extras: (() => {
+        const ex = r.cost_extras as Record<string, unknown> | null | undefined;
+        if (!ex || typeof ex !== "object") return null;
+        const num = (v: unknown) => (typeof v === "number" && Number.isFinite(v) && v >= 0 ? v : null);
+        const out = {
+          tax_rate_percent: num(ex.tax_rate_percent),
+          delivery_cny: num(ex.delivery_cny),
+          packing_cny: num(ex.packing_cny),
+          combined_cny: num(ex.combined_cny),
+          combined: !!ex.combined,
+        };
+        const any = out.tax_rate_percent !== null || out.delivery_cny !== null || out.packing_cny !== null || out.combined_cny !== null;
+        return any ? out : null;
+      })(),
     }));
 
   /* At most one primary. If callers mark several, keep the first. */

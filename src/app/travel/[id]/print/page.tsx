@@ -18,6 +18,7 @@
    --------------------------------------------------------------------------- */
 
 import { use, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import LetterSheet, { type SheetAssets } from "@/components/travel/LetterSheet";
 import { LETTER_STYLES } from "@/components/travel/letter-styles";
 import { buildChinese, buildEnglish } from "@/lib/invitations/templates";
@@ -47,6 +48,7 @@ export default function InvitationPrintPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = use(params);
+  const router = useRouter();
   const [data, setData] = useState<Loaded | null>(null);
   const [failed, setFailed] = useState(false);
   /** Sheets that grew past one page — measured after paint, shown on screen
@@ -120,13 +122,60 @@ export default function InvitationPrintPage({
       }
       if (cancelled) return;
 
+      /* The tab's title is what "Print → Save as PDF" proposes as the file
+         name, and the owner's save dialog offered "Claude" — the host app's
+         name, because nothing here ever set one. Name it after the letter so
+         the saved file arrives as KX-INV-2026-0002 - Invitation Letter.pdf.
+         (The Export PDF button names its own download server-side; this is
+         only for the browser-print path.) */
+      const ref = data.letter.reference || "Invitation Letter";
+      const who = (data.letter.visitor?.name || "").trim();
+      document.title = who ? `${ref} - ${who}` : `${ref} - Invitation Letter`;
+
       /* Measure each sheet now that images and fonts have settled — a stamp
-         that decoded late can be what pushes a page over. 270 mm at 96 dpi;
-         a 2 mm tolerance absorbs sub-pixel rounding. */
+         that decoded late can be what pushes a page over. */
       const MM = 96 / 25.4;
       const over: number[] = [];
-      document.querySelectorAll(".inv-a4").forEach((el, i) => {
-        if (el.getBoundingClientRect().height > 270 * MM + 2 * MM) over.push(i + 1);
+      /* 270mm — the sheet's OWN design height, not the 292 the warning used.
+         The letter has to survive TWO printing paths, and they do not offer
+         the same room:
+           · Export PDF  → headless Chromium, margin 0 → 297mm usable.
+           · Print → Save as PDF → the operator's print dialog, which applies
+             its own paper margins (~13mm top and bottom on macOS) → about
+             271mm usable, and @page margin:0 does not override the system
+             dialog.
+         The owner printed through the second path and the letter's last two
+         lines — phones and reference — landed on a blank sheet, even though
+         the same letter exported perfectly through the first. Fitting to the
+         sheet's declared height satisfies both, and it is the height the
+         design already promises. */
+      const LIMIT = 270 * MM;
+      document.querySelectorAll<HTMLElement>(".inv-a4").forEach((el, i) => {
+        /* SHRINK TO FIT, don't just warn.
+           The English sheet measures 288mm against a 297mm page — nine
+           millimetres of slack — and the sheet's height depends on the FONT:
+           measured on the live letter, Helvetica Neue gives 288mm, Inter 293,
+           Courier 312. The dev machine has Helvetica Neue; the serverless
+           Chromium that renders the production PDF does not, so it falls back
+           to something wider and the letter spills its last three lines onto
+           an otherwise blank page — which is the export the owner received
+           while the same letter generated locally fitted perfectly.
+           Pinning a font would only move the problem (Inter already leaves
+           4mm). Instead the sheet is measured after fonts and images settle
+           and scaled down just enough to fit — Word's "shrink to fit", and it
+           does nothing at all when the letter already fits its own height.
+           `zoom`, not `transform`: zoom changes the LAYOUT box, so print
+           pagination sees the smaller sheet. It scales width too, hence the
+           `margin: 0 auto` in the print stylesheet that keeps a shrunk sheet
+           centred on the paper. Floor at 0.82 so a genuinely over-long letter
+           still flows to another page (and still warns) instead of becoming
+           unreadable. */
+        el.style.zoom = "";
+        const h = el.getBoundingClientRect().height;
+        if (h > LIMIT) {
+          el.style.zoom = String(Math.max(0.82, LIMIT / h));
+          if (el.getBoundingClientRect().height > LIMIT) over.push(i + 1);
+        }
       });
       setOverflowing(over);
 
@@ -160,6 +209,22 @@ export default function InvitationPrintPage({
   }
 
   const { letter, settings, assets } = data;
+
+  /* WHAT THE LETTER CANNOT BE SENT WITHOUT.
+     Found by rendering a real letter against an empty settings row: the
+     Chinese page read "我司系在中华人民共和国浙江省台州市依法注册成立的企业"
+     — the company inviting was simply absent, and nothing said so. A letter
+     that does not name the inviting company is not a document a consulate can
+     act on, so the gap is named here rather than left to be noticed by the
+     person at the counter. */
+  const missing: string[] = [];
+  if (!settings.companyNameEn) missing.push("the registered name (English)");
+  if (!settings.companyNameCn) missing.push("the registered name (Chinese)");
+  if (!settings.creditCode) missing.push("the Unified Social Credit Code");
+  if (!settings.addressEn && !settings.addressCn) missing.push("the licence address");
+  if (!settings.inviterName) missing.push("who signs the letter");
+  if (!assets.stampUrl) missing.push("the company stamp");
+  if (!assets.signatureUrl) missing.push("the signature");
   const input = {
     visitor: letter.visitor,
     visit: letter.visit,
@@ -171,7 +236,51 @@ export default function InvitationPrintPage({
   return (
     <>
       <style>{LETTER_STYLES}</style>
+      {/* The control bar — same shape as the Quotation editor's dark toolbar
+          above its A4: Back, then the letter's actions. In the desktop shell
+          there is no browser chrome, so this bar is also the only way out —
+          the trap the owner hit twice. no-print + the PDF route's readiness
+          flag ignores it, so paper never carries it. */}
+      <div className="inv-bar no-print">
+        <button type="button" className="inv-bar-btn" onClick={() => router.back()}>
+          ← Back
+        </button>
+        <span className="inv-bar-ref">{letter.reference}</span>
+        <span className="inv-bar-spacer" />
+        <button
+          type="button"
+          className="inv-bar-btn"
+          onClick={() => router.push(`/travel/${id}`)}
+        >
+          Edit
+        </button>
+        <button type="button" className="inv-bar-btn" onClick={() => window.print()}>
+          Print
+        </button>
+        <button
+          type="button"
+          className="inv-bar-btn inv-bar-btn-primary"
+          onClick={() => {
+            window.location.href = `/api/invitations/${id}/pdf`;
+          }}
+        >
+          Export PDF
+        </button>
+      </div>
       <div className="inv-stack">
+        {missing.length > 0 && (
+          /* no-print: this is guidance for the operator, never part of the
+             document. The letter still renders in full so what IS set can be
+             checked — refusing to render would hide the rest. */
+          <div className="inv-missing-note no-print">
+            <strong>This letter is missing {missing.length === 1 ? "one thing" : `${missing.length} things`}.</strong>{" "}
+            Not set yet: {missing.join(", ")}.{" "}
+            {(!assets.stampUrl || !assets.signatureUrl)
+              ? "The stamp and signature come from Quotations → saved assets; everything else is in Travel → Settings."
+              : "Add them in Travel → Settings."}{" "}
+            This notice is not printed.
+          </div>
+        )}
         {overflowing.length > 0 && (
           <div className="inv-overflow-note no-print">
             <strong>
@@ -196,8 +305,12 @@ export default function InvitationPrintPage({
             Business Licence · 营业执照
           </h2>
           {settings.licenceDocUrl ? (
-            // eslint-disable-next-line @next/next/no-img-element -- see LetterSheet
-            <img src={settings.licenceDocUrl} alt="" className="inv-licence-img" />
+            /* The frame exists because the image inside it is ROTATED — see
+               .inv-licence-img in letter-styles for why. */
+            <div className="inv-licence-frame">
+              {/* eslint-disable-next-line @next/next/no-img-element -- see LetterSheet */}
+              <img src={settings.licenceDocUrl} alt="" className="inv-licence-img" />
+            </div>
           ) : (
             <div className="inv-licence-missing">
               No business licence has been uploaded yet.
