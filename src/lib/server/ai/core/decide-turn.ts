@@ -584,7 +584,16 @@ export function isWorkDataQuery(msg: string): boolean {
   /* Direct phrasings that don't need the noun+framing combo. */
   if (/\bwhat('?s| is| are|'re)?\s+(due|on\s+my\s+(plate|calendar|schedule|agenda|list)|assigned\s+to\s+me|coming\s+up)\b/.test(s)) return true;
   if (/\bwhat\s+am\s+i\s+(working\s+on|planned\s+for|doing\s+(today|this\s+week))\b/.test(s)) return true;
-  if (/\bremind\s+me\s+to\b/.test(s)) return true;
+  /* "Remind me …" in ANY continuation — to / of / about / that / at / on /
+     tomorrow. The old rule knew only "remind me to"; the owner's live
+     failure (2026-09-13 12:12, "Remind me of tomorrow to keep working on
+     products data") had no work noun and "remind me of", so it fell to the
+     tool-less general lane, which could only say it cannot set reminders.
+     "Remind" is itself the work verb: whoever it is aimed at, the turn
+     wants a reminder written, and only the tool loop can write one. */
+  if (/\bremind\s+(me|us|him|her|them|myself|ourselves)\b/.test(s)) return true;
+  if (/\b(don'?t|do\s+not|never)\s+let\s+(me|us)\s+forget\b/.test(s)) return true;
+  if (/\b(set|create|add|make|put|schedule|need|want)\s+(a\s+|an\s+|me\s+a\s+)?(reminder|alarm|alert|follow[- ]?up)\b/.test(s)) return true;
   if (/\b(add|create)\s+(a\s+)?(task|to-?do|reminder|shift|event)\b/.test(s)) return true;
 
   /* WRITE intents: a work-action verb + a work noun is work data even
@@ -600,10 +609,10 @@ export function isWorkDataQuery(msg: string): boolean {
   if (writeVerb.test(s) && workNoun.test(s)) return true;
 
   /* Arabic: مهام/مهمة/جدول/مواعيد/اجتماع/تذكير/مشروع/أعمالي. */
-  if (/مهام|مهمة|مهامي|المهام|جدول|جدولي|مواعيد|موعد|اجتماع|اجتماعات|ميتنج|ميتينج|تذكير|ذكرني|فكرني|مشروع|مشاريع|أعمالي|اعمالي|شغلي/.test(msg)) return true;
+  if (/مهام|مهمة|مهامي|المهام|جدول|جدولي|مواعيد|موعد|اجتماع|اجتماعات|ميتنج|ميتينج|تذكير|تذكيرات|ذكرني|ذكّرني|تذكرني|فكرني|فكّرني|تفكرني|نبهني|نبّهني|منبه|متنساني|ما\s*تنساني|مشروع|مشاريع|أعمالي|اعمالي|شغلي/.test(msg)) return true;
 
   /* Chinese: 任务/日程/日历/会议/提醒/待办/项目/安排. */
-  if (/任务|日程|日历|会议|提醒|待办|项目|安排/.test(msg)) return true;
+  if (/任务|日程|日历|会议|提醒|待办|项目|安排|别忘|不要忘|闹钟/.test(msg)) return true;
 
   return false;
 }
