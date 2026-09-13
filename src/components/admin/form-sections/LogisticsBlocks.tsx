@@ -19,6 +19,8 @@
    --------------------------------------------------------------------------- */
 
 import { useMemo, useRef, useState } from "react";
+import { useTranslation } from "@/lib/i18n";
+import { PRODUCTS_UI_I18N } from "@/lib/products-ui-i18n";
 import KdsSelect from "@/components/kds/Select";
 import {
   CONTAINERS, DG_KINDS, ITEM_KINDS, ORIGIN_CERTIFICATES, PACKING_TYPES, WOOD_TREATMENTS,
@@ -45,6 +47,28 @@ const inpBase =
 const inp = `w-full ${inpBase}`;
 const hint = "text-[10px] text-[var(--text-ghost)] leading-relaxed mt-1";
 
+/* CHOICE BUTTONS MUST GROW, NOT CLIP. Every pair on this tab was `h-10` with a
+   sentence inside it — "One package → many pieces", "Has regulated content" —
+   and at 375px the text wrapped to two lines inside a 40px box and spilled out
+   of its own border. Measured on the phone viewport: three buttons with
+   scrollHeight past clientHeight. min-h with auto height lets the label wrap
+   and the button grow; the row stacks below sm so each choice gets the full
+   width instead of splitting 343px two ways. */
+const choiceRow = "flex flex-col sm:flex-row items-stretch gap-2";
+const choiceBtn =
+  "min-h-10 py-2 px-3 rounded-lg text-[11.5px] font-semibold border transition-colors flex-1 text-center leading-snug";
+const choiceOn = "border-[#567FB2]/60 bg-[#567FB2]/[0.12] text-[var(--text-primary)]";
+const choiceOff =
+  "border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)]/70 text-[var(--text-muted)] hover:text-[var(--text-primary)]";
+
+/* Closed lists carry English labels in src/lib/logistics.ts because that file
+   is shared with the server. The FORM is what a person reads, so every option
+   passes through the UI dictionary on the way to the screen; the stored value
+   never changes. */
+type TFn = (key: string, fallback: string) => string;
+const localise = (t: TFn, list: readonly { value: string; label: string }[]) =>
+  list.map((o) => ({ value: o.value, label: t(`pk.opt.${o.value}`, o.label) }));
+
 type Patch = (u: Partial<ProductLogistics>) => void;
 interface BlockProps { value: ProductLogistics; onChange: Patch; }
 
@@ -61,6 +85,7 @@ const n = (v: unknown): number => {
    0.001 m³ here and the operator sees it immediately.
    ═══════════════════════════════════════════════════════════════════ */
 export function LogisticsSummary({ value }: { value: ProductLogistics }) {
+  const { t } = useTranslation(PRODUCTS_UI_I18N);
   const sums = useMemo(() => sumPackages(value.packages), [value.packages]);
   const plan = useMemo(
     () => loadPlan(value.packages, {
@@ -80,9 +105,9 @@ export function LogisticsSummary({ value }: { value: ProductLogistics }) {
   return (
     <div className="kx-glass rounded-xl border border-[#567FB2]/30 px-4 py-3">
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-x-4 gap-y-3">
-        {cell("Packages", perPkg > 1 ? `${perPkg} pcs / pkg` : `${sums.packageCount} / unit`)}
-        {cell("CBM", `${sums.cbm} m³`)}
-        {cell("Gross", `${sums.grossKg} kg`)}
+        {cell(t("pk.cellPackages", "Packages"), perPkg > 1 ? `${perPkg} ${t("pk.perPkgShort", "pcs / pkg")}` : `${sums.packageCount} ${t("pk.perUnitShort", "/ unit")}`)}
+        {cell(t("pk.cbm", "CBM (m³)").replace(/\s*\(.*\)$/, ""), `${sums.cbm} m³`)}
+        {cell(t("pk.cellGross", "Gross"), `${sums.grossKg} kg`)}
         {cell("20ft", plan.c20.qty ? String(plan.c20.qty) : "—")}
         {cell("40ft", plan.c40.qty ? String(plan.c40.qty) : "—")}
         {cell("40HQ", plan.c40hq.qty ? String(plan.c40hq.qty) : "—")}
@@ -95,6 +120,7 @@ export function LogisticsSummary({ value }: { value: ProductLogistics }) {
    PACKING — the crates, what is inside them, and how many pieces to a box.
    ═══════════════════════════════════════════════════════════════════ */
 export function PackingBlock({ value, onChange, productId }: BlockProps & { productId?: string }) {
+  const { t } = useTranslation(PRODUCTS_UI_I18N);
   /* Memoised so the fallback row is not a fresh array on every render — that
      identity change re-ran the sums below on every keystroke anywhere on the
      form. */
@@ -136,18 +162,14 @@ export function PackingBlock({ value, onChange, productId }: BlockProps & { prod
           only exists in the second case, so the field only exists there. */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
-          <label className={lbl}>How is it packed?</label>
-          <div className="flex items-center gap-2">
-            {([["per_unit", "One unit → its own package(s)"], ["per_package", "One package → many pieces"]] as const).map(([k, label]) => (
+          <label className={lbl}>{t("pk.modeQ", "How is it packed?")}</label>
+          <div className={choiceRow}>
+            {([["per_unit", t("pk.modePerUnit", "One unit → its own package(s)")], ["per_package", t("pk.modePerPackage", "One package → many pieces")]] as const).map(([k, label]) => (
               <button
                 key={k}
                 type="button"
-                onClick={() => onChange({ packing_mode: k })}
-                className={`h-10 px-3 rounded-lg text-[11.5px] font-semibold border transition-colors flex-1 ${
-                  mode === k
-                    ? "border-[#567FB2]/60 bg-[#567FB2]/[0.12] text-[var(--text-primary)]"
-                    : "border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)]/70 text-[var(--text-muted)] hover:text-[var(--text-primary)]"
-                }`}
+                onClick={() => onChange({ packing_mode: k as PackingMode })}
+                className={`${choiceBtn} ${mode === k ? choiceOn : choiceOff}`}
               >
                 {label}
               </button>
@@ -155,13 +177,13 @@ export function PackingBlock({ value, onChange, productId }: BlockProps & { prod
           </div>
           <p className={hint}>
             {mode === "per_unit"
-              ? "A machine: one unit ships as one or more crates."
-              : "A small item: one carton holds many pieces."}
+              ? t("pk.modeHintUnit", "A machine: one unit ships as one or more crates.")
+              : t("pk.modeHintPkg", "A small item: one carton holds many pieces.")}
           </p>
         </div>
         {mode === "per_package" ? (
           <div>
-            <label className={lbl}>Pieces per package</label>
+            <label className={lbl}>{t("pk.piecesPerPkg", "Pieces per package")}</label>
             <input
               inputMode="numeric"
               value={String(value.units_per_package ?? "")}
@@ -169,43 +191,43 @@ export function PackingBlock({ value, onChange, productId }: BlockProps & { prod
               placeholder="50"
               className={`${inp} tabular-nums`}
             />
-            <p className={hint}>The first thing a customer asks about a small item. Container counts below are in PIECES.</p>
+            <p className={hint}>{t("pk.piecesHint", "The first thing a customer asks about a small item. Container counts below are in PIECES.")}</p>
           </div>
         ) : (
           <div>
-            <label className={lbl}>CBM (m³)</label>
+            <label className={lbl}>{t("pk.cbm", "CBM (m³)")}</label>
             <input value={sums.cbm ? String(sums.cbm) : ""} readOnly placeholder="—" className={`${inp} tabular-nums opacity-70`} />
-            <p className={hint}>Calculated from the package sizes below — L × W × H ÷ 1,000,000.</p>
+            <p className={hint}>{t("pk.cbmHintCalc", "Calculated from the package sizes below — L × W × H ÷ 1,000,000.")}</p>
           </div>
         )}
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
-          <label className={lbl}>Packing type</label>
+          <label className={lbl}>{t("pk.packingType", "Packing type")}</label>
           <KdsSelect
             value={value.packing_type ?? ""}
             onChange={(v: string) => onChange({ packing_type: v })}
-            options={PACKING_TYPES.map((o) => ({ value: o.value, label: o.label }))}
-            placeholder="— Select —"
+            options={localise(t, PACKING_TYPES)}
+            placeholder={t("pk.select", "— Select —")}
             triggerClassName={inp + " pe-9 text-start"}
           />
         </div>
         <div>
-          <label className={lbl}>Wood treatment (ISPM-15)</label>
+          <label className={lbl}>{t("pk.woodTreatment", "Wood treatment (ISPM-15)")}</label>
           <KdsSelect
             value={value.wood_treatment ?? ""}
             onChange={(v: string) => onChange({ wood_treatment: v })}
-            options={WOOD_TREATMENTS.map((o) => ({ value: o.value, label: o.label }))}
-            placeholder="— Select —"
+            options={localise(t, WOOD_TREATMENTS)}
+            placeholder={t("pk.select", "— Select —")}
             triggerClassName={inp + " pe-9 text-start"}
           />
           {/* Not paperwork trivia: untreated solid wood is refused at the
               border, and the shipment is fumigated at the port or sent back. */}
           <p className={hint}>
             {value.wood_treatment === "untreated"
-              ? "⚠ Untreated solid wood is refused by EU / US / AU customs — it must be heat-treated or fumigated and bear the IPPC mark."
-              : "Solid wood packaging must be treated and IPPC-marked. Plywood and processed board are exempt."}
+              ? t("pk.woodWarn", "⚠ Untreated solid wood is refused by EU / US / AU customs — it must be heat-treated or fumigated and bear the IPPC mark.")
+              : t("pk.woodHint", "Solid wood packaging must be treated and IPPC-marked. Plywood and processed board are exempt.")}
           </p>
         </div>
       </div>
@@ -228,7 +250,7 @@ export function PackingBlock({ value, onChange, productId }: BlockProps & { prod
           container count wrong, and cannot produce a packing list at all. */}
       <div>
         <div className="flex items-center justify-between gap-2 mb-2">
-          <label className={`${lbl} mb-0`}>{mode === "per_package" ? "Package" : "Packages per unit"}</label>
+          <label className={`${lbl} mb-0`}>{mode === "per_package" ? t("pk.packageOne", "Package") : t("pk.packagesPerUnit", "Packages per unit")}</label>
           <span className="text-[10px] tabular-nums text-[var(--text-ghost)]">
             {sums.packageCount} pkg · {sums.cbm} m³ · {sums.grossKg} kg
             {mode === "per_package" && per > 1 ? ` · ${Math.round((sums.cbm / per) * 10000) / 10000} m³/pc` : ""}
@@ -238,7 +260,7 @@ export function PackingBlock({ value, onChange, productId }: BlockProps & { prod
         <div className="space-y-3">
           {rows.map((r, i) => (
             <div key={i} className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)]/40 p-3 space-y-3">
-              <div className="flex items-start gap-3">
+              <div className="flex items-start gap-2 sm:gap-3">
                 <ItemPhoto
                   url={r.photo_url ?? null}
                   kind="box"
@@ -246,21 +268,21 @@ export function PackingBlock({ value, onChange, productId }: BlockProps & { prod
                   onChange={(u) => setRow(i, { photo_url: u })}
                   productId={productId}
                 />
-                <div className="flex-1 min-w-0 grid grid-cols-2 sm:grid-cols-6 gap-2">
-                  <div className="col-span-2 sm:col-span-2 min-w-0">
-                    <div className="text-[9px] uppercase tracking-[0.1em] text-[var(--text-ghost)] mb-1">Package</div>
+                <div className="flex-1 min-w-0 grid grid-cols-3 sm:grid-cols-6 gap-2">
+                  <div className="col-span-3 sm:col-span-2 min-w-0">
+                    <div className="text-[9px] uppercase tracking-[0.1em] text-[var(--text-ghost)] mb-1">{t("pk.colPackage", "Package")}</div>
                     <input
                       value={r.label ?? ""}
                       onChange={(e) => setRow(i, { label: e.target.value })}
-                      placeholder={i === 0 ? "Machine crate" : "Accessories box"}
+                      placeholder={i === 0 ? t("pk.phMachineCrate", "Machine crate") : t("pk.phAccBox", "Accessories box")}
                       className={inp}
                     />
                   </div>
-                  {numCell(i, "qty", "1", "Qty")}
-                  {numCell(i, "l_cm", "120", "L (cm)")}
-                  {numCell(i, "w_cm", "80", "W (cm)")}
-                  {numCell(i, "h_cm", "110", "H (cm)")}
-                  <div className="col-span-2 sm:col-span-1">{numCell(i, "gross_kg", "210", "Gross (kg)")}</div>
+                  {numCell(i, "qty", "1", t("pk.colQty", "Qty"))}
+                  {numCell(i, "l_cm", "120", t("pk.colL", "L (cm)"))}
+                  {numCell(i, "w_cm", "80", t("pk.colW", "W (cm)"))}
+                  {numCell(i, "h_cm", "110", t("pk.colH", "H (cm)"))}
+                  <div className="col-span-3 sm:col-span-1">{numCell(i, "gross_kg", "210", t("pk.colGross", "Gross (kg)"))}</div>
                 </div>
                 {rows.length > 1 ? (
                   <button
@@ -289,17 +311,16 @@ export function PackingBlock({ value, onChange, productId }: BlockProps & { prod
           onClick={addRow}
           className="mt-2 inline-flex items-center gap-1.5 h-8 px-2.5 rounded-lg text-[11px] font-semibold text-[var(--text-primary)] bg-[var(--bg-base)] hover:bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] transition-colors"
         >
-          + Add package
+          {t("pk.addPackage", "+ Add package")}
         </button>
         <p className={hint}>
-          Centimetres — the unit on every packing list and bill of lading. Machine
-          dimensions above stay in mm.
+          {t("pk.cmHint", "Centimetres — the unit on every packing list and bill of lading. Machine dimensions above stay in mm.")}
         </p>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <div>
-          <label className={lbl}>Net weight (kg)</label>
+          <label className={lbl}>{t("pk.netWeight", "Net weight (kg)")}</label>
           <input
             inputMode="decimal"
             value={String(value.net_weight_kg ?? "")}
@@ -307,29 +328,29 @@ export function PackingBlock({ value, onChange, productId }: BlockProps & { prod
             placeholder="180"
             className={`${inp} tabular-nums`}
           />
-          <p className={hint}>The goods without packaging.</p>
+          <p className={hint}>{t("pk.netHint", "The goods without packaging.")}</p>
         </div>
         <div>
-          <label className={lbl}>Gross weight (kg)</label>
+          <label className={lbl}>{t("pk.grossWeight", "Gross weight (kg)")}</label>
           <input value={sums.grossKg ? String(sums.grossKg) : ""} readOnly placeholder="—" className={`${inp} tabular-nums opacity-70`} />
           {/* Gross used to be a free number with no relationship to anything;
               it is the sum of the crates, so the crates state it. */}
-          <p className={hint}>Sum of the packages above.</p>
+          <p className={hint}>{t("pk.grossHint", "Sum of the packages above.")}</p>
         </div>
         <div>
-          <label className={lbl}>Packaging weight (kg)</label>
+          <label className={lbl}>{t("pk.packagingWeight", "Packaging weight (kg)")}</label>
           <input
             value={sums.grossKg && n(value.net_weight_kg) ? String(Math.round((sums.grossKg - n(value.net_weight_kg)) * 100) / 100) : ""}
             readOnly
             placeholder="—"
             className={`${inp} tabular-nums opacity-70`}
           />
-          <p className={hint}>Gross − net. Negative means one of them is wrong.</p>
+          <p className={hint}>{t("pk.packagingHint", "Gross − net. Negative means one of them is wrong.")}</p>
         </div>
         <div>
-          <label className={lbl}>CBM (m³)</label>
+          <label className={lbl}>{t("pk.cbm", "CBM (m³)")}</label>
           <input value={sums.cbm ? String(sums.cbm) : ""} readOnly placeholder="—" className={`${inp} tabular-nums opacity-70`} />
-          <p className={hint}>All packages together.</p>
+          <p className={hint}>{t("pk.cbmHintAll", "All packages together.")}</p>
         </div>
       </div>
     </div>
@@ -385,18 +406,19 @@ function useImagePicker(onPicked: (url: string | null) => void, productId?: stri
 function PackingPhoto({
   url, onChange, productId,
 }: { url: string | null; onChange: (u: string | null) => void; productId?: string }) {
+  const { t } = useTranslation(PRODUCTS_UI_I18N);
   const { busy, open, input } = useImagePicker(onChange, productId);
   return (
     <div>
       <div className="flex items-center justify-between gap-2 mb-1.5">
-        <label className={`${lbl} mb-0`}>Packing sample photo</label>
+        <label className={`${lbl} mb-0`}>{t("pk.samplePhoto", "Packing sample photo")}</label>
         {url ? (
           <button
             type="button"
             onClick={() => onChange(null)}
             className="text-[10px] font-semibold text-[var(--text-ghost)] hover:text-[var(--text-primary)]"
           >
-            Remove
+            {t("pk.remove", "Remove")}
           </button>
         ) : null}
       </div>
@@ -421,10 +443,10 @@ function PackingPhoto({
           disabled={busy}
           className="w-full h-40 rounded-xl border border-dashed border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)]/40 text-[12px] text-[var(--text-ghost)] hover:border-[var(--border-strong)] hover:text-[var(--text-muted)] transition-colors disabled:opacity-50"
         >
-          {busy ? "Uploading…" : "Click to upload a photo of the packed product"}
+          {busy ? t("pk.uploading", "Uploading…") : t("pk.samplePhotoCta", "Click to upload a photo of the packed product")}
         </button>
       )}
-      <p className={hint}>One photograph settles what &quot;wooden case&quot; means — for the buyer and for the factory.</p>
+      <p className={hint}>{t("pk.samplePhotoHint", "One photograph settles what \"wooden case\" means — for the buyer and for the factory.")}</p>
     </div>
   );
 }
@@ -487,6 +509,7 @@ function ContentsEditor({
   productId?: string;
   depth?: number;
 }) {
+  const { t } = useTranslation(PRODUCTS_UI_I18N);
   const set = (i: number, u: Partial<ContentItem>) => onChange(items.map((it, x) => (x === i ? { ...it, ...u } : it)));
   const remove = (i: number) => onChange(items.filter((_, x) => x !== i));
   const add = () => onChange([...items, { qty: 1 }]);
@@ -498,7 +521,7 @@ function ContentsEditor({
         onClick={add}
         className={`inline-flex items-center gap-1.5 h-7 px-2 rounded-lg text-[10.5px] font-semibold text-[var(--text-ghost)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-hover)] border border-dashed border-[var(--border-subtle)] transition-colors ${depth ? "ms-11" : ""}`}
       >
-        + {depth === 0 ? "List what's inside" : "What's inside this box"}
+        + {depth === 0 ? t("pk.listInside", "List what's inside") : t("pk.insideThisBox", "What's inside this box")}
       </button>
     );
   }
@@ -506,11 +529,14 @@ function ContentsEditor({
   return (
     <div className={`space-y-2 ${depth ? "ms-11 ps-3 border-s border-[var(--border-subtle)]" : ""}`}>
       {depth === 0 ? (
-        <div className="text-[9px] uppercase tracking-[0.1em] text-[var(--text-ghost)]">What&apos;s inside</div>
+        <div className="text-[9px] uppercase tracking-[0.1em] text-[var(--text-ghost)]">{t("pk.whatsInside", "What's inside")}</div>
       ) : null}
       {items.map((it, i) => (
         <div key={i} className="space-y-2">
-          <div className="flex items-center gap-2">
+          {/* Wraps rather than squeezes: at 375px a photo, a label, a quantity,
+              an icon picker and a delete button do not fit on one line, and
+              forcing them there is what pushed the qty box off the screen. */}
+          <div className="flex flex-wrap items-center gap-2">
             <ItemPhoto
               url={it.photo_url ?? null}
               kind={it.kind}
@@ -520,15 +546,15 @@ function ContentsEditor({
             <input
               value={it.label ?? ""}
               onChange={(e) => set(i, { label: e.target.value })}
-              placeholder={depth === 0 ? "Machine / Accessories box" : "Cover, tool kit, spare needles…"}
-              className={`${inpBase} flex-1 min-w-0`}
+              placeholder={depth === 0 ? t("pk.itemPh0", "Machine / Accessories box") : t("pk.itemPh1", "Cover, tool kit, spare needles…")}
+              className={`${inpBase} flex-1 basis-[140px] min-w-0`}
             />
             <input
               inputMode="numeric"
               value={String(it.qty ?? "")}
               onChange={(e) => set(i, { qty: e.target.value })}
               placeholder="1"
-              className={`${inpBase} w-16 text-center tabular-nums px-1.5`}
+              className={`${inpBase} w-14 shrink-0 text-center tabular-nums px-1.5`}
             />
             {/* No photo? Then the glyph carries the meaning, so it is worth
                 choosing. Hidden once a photo exists — the photo wins. */}
@@ -536,9 +562,9 @@ function ContentsEditor({
               <KdsSelect
                 value={it.kind ?? ""}
                 onChange={(v: string) => set(i, { kind: v })}
-                options={ITEM_KINDS.map((k) => ({ value: k.value, label: k.label }))}
-                placeholder="Icon"
-                triggerClassName={`${inpBase} w-[132px] pe-8 text-start shrink-0`}
+                options={localise(t, ITEM_KINDS)}
+                placeholder={t("pk.iconPh", "Icon")}
+                triggerClassName={`${inpBase} w-[92px] sm:w-[132px] pe-7 text-start shrink-0 text-[11px]`}
               />
             ) : null}
             <button
@@ -567,7 +593,7 @@ function ContentsEditor({
         onClick={add}
         className="inline-flex items-center gap-1.5 h-7 px-2 rounded-lg text-[10.5px] font-semibold text-[var(--text-ghost)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-hover)] transition-colors"
       >
-        + Add item
+        {t("pk.addItem", "+ Add item")}
       </button>
     </div>
   );
@@ -577,6 +603,7 @@ function ContentsEditor({
    LOADING — how many fit, and which limit decides it.
    ═══════════════════════════════════════════════════════════════════ */
 export function LoadingBlock({ value, onChange }: BlockProps) {
+  const { t } = useTranslation(PRODUCTS_UI_I18N);
   const sums = useMemo(() => sumPackages(value.packages), [value.packages]);
   const plan = useMemo(
     () => loadPlan(value.packages, {
@@ -603,7 +630,7 @@ export function LoadingBlock({ value, onChange }: BlockProps) {
         <div className="flex items-center justify-between gap-2">
           <span className="text-[11px] font-semibold text-[var(--text-muted)]">
             {CONTAINERS[key].label}
-            <span className="ms-1 font-normal text-[var(--text-ghost)]">{perPkg > 1 ? "pcs" : "units"}</span>
+            <span className="ms-1 font-normal text-[var(--text-ghost)]">{perPkg > 1 ? t("pk.pcsWord", "pcs") : t("pk.unitsWord", "units")}</span>
           </span>
           {overridden ? (
             <button
@@ -611,11 +638,11 @@ export function LoadingBlock({ value, onChange }: BlockProps) {
               onClick={() => onChange({ [stored]: r.qty } as Partial<ProductLogistics>)}
               className="text-[9.5px] font-bold uppercase tracking-[0.1em] text-amber-600 dark:text-amber-300 underline underline-offset-2"
             >
-              Edited · reset {r.qty}
+              {t("pk.resetTo", "Edited · reset")} {r.qty}
             </button>
           ) : (
             <span className="text-[8.5px] font-bold uppercase tracking-[0.12em] px-1.5 py-px rounded-full border border-[#567FB2]/50 text-[#3E6796] dark:text-[#7FA9D6]">
-              Calculated
+              {t("pk.calculated", "Calculated")}
             </span>
           )}
         </div>
@@ -627,14 +654,14 @@ export function LoadingBlock({ value, onChange }: BlockProps) {
           className={`${inp} mt-1.5 tabular-nums text-[15px] font-bold`}
         />
         <p className={hint}>
-          {perPkg > 1 && r.qty > 0 ? `${Math.floor(r.qty / perPkg)} packages × ${perPkg} pcs. ` : ""}
+          {perPkg > 1 && r.qty > 0 ? `${Math.floor(r.qty / perPkg)} ${t("pk.pkgsTimes", "packages ×")} ${perPkg} ${t("pk.pcsWord", "pcs")}. ` : ""}
           {r.qty === 0
             ? anyMeasured
-              ? "Does not fit — a package is taller or longer than the container."
-              : "Enter the packages above."
+              ? t("pk.doesNotFit", "Does not fit — a package is taller or longer than the container.")
+              : t("pk.enterPackages", "Enter the packages above.")
             : r.limit === "weight"
-              ? `Weight-limited — ${CONTAINERS[key].payload_kg.toLocaleString()} kg payload.`
-              : "Space-limited — footprint × layers."}
+              ? `${t("pk.weightLimited", "Weight-limited")} — ${CONTAINERS[key].payload_kg.toLocaleString()} kg ${t("pk.payload", "payload")}.`
+              : t("pk.spaceLimited", "Space-limited — footprint × layers.")}
         </p>
       </div>
     );
@@ -644,30 +671,26 @@ export function LoadingBlock({ value, onChange }: BlockProps) {
     <div className="space-y-4">
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
-          <label className={lbl}>Can crates be stacked?</label>
-          <div className="flex items-center gap-2">
+          <label className={lbl}>{t("pk.stackQ", "Can crates be stacked?")}</label>
+          <div className={choiceRow}>
             {[["yes", true], ["no", false]].map(([k, v]) => (
               <button
                 key={String(k)}
                 type="button"
                 onClick={() => onChange({ stackable: v as boolean })}
-                className={`h-10 px-4 rounded-lg text-[12px] font-semibold border transition-colors ${
-                  !!value.stackable === v
-                    ? "border-[#567FB2]/60 bg-[#567FB2]/[0.12] text-[var(--text-primary)]"
-                    : "border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)]/70 text-[var(--text-muted)] hover:text-[var(--text-primary)]"
-                }`}
+                className={`${choiceBtn} ${!!value.stackable === v ? choiceOn : choiceOff}`}
               >
-                {k === "yes" ? "Stackable" : "Not stackable"}
+                {k === "yes" ? t("pk.stackable", "Stackable") : t("pk.notStackable", "Not stackable")}
               </button>
             ))}
           </div>
           {/* This one answer can halve or double every number below it: an
               unstackable crate wastes the whole container above its own height. */}
-          <p className={hint}>An unstackable crate uses the floor only — everything above it is air.</p>
+          <p className={hint}>{t("pk.stackHint", "An unstackable crate uses the floor only — everything above it is air.")}</p>
         </div>
         {value.stackable ? (
           <div>
-            <label className={lbl}>Maximum layers</label>
+            <label className={lbl}>{t("pk.maxLayers", "Maximum layers")}</label>
             <input
               inputMode="numeric"
               value={String(value.stack_max ?? "")}
@@ -675,7 +698,7 @@ export function LoadingBlock({ value, onChange }: BlockProps) {
               placeholder="2"
               className={`${inp} tabular-nums`}
             />
-            <p className={hint}>Blank = as many as the container height allows.</p>
+            <p className={hint}>{t("pk.maxLayersHint", "Blank = as many as the container height allows.")}</p>
           </div>
         ) : null}
       </div>
@@ -688,18 +711,16 @@ export function LoadingBlock({ value, onChange }: BlockProps) {
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
-          <label className={lbl}>CBM (m³)</label>
+          <label className={lbl}>{t("pk.cbm", "CBM (m³)")}</label>
           <input value={sums.cbm ? String(sums.cbm) : ""} readOnly placeholder="—" className={`${inp} tabular-nums opacity-60`} />
-          <p className={hint}>All packages together.</p>
+          <p className={hint}>{t("pk.cbmHintAll", "All packages together.")}</p>
         </div>
         <div>
-          <label className={lbl}>Volumetric weight (kg, air)</label>
+          <label className={lbl}>{t("pk.volumetric", "Volumetric weight (kg, air)")}</label>
           <input value={sums.volumetricKg ? String(sums.volumetricKg) : ""} readOnly placeholder="—" className={`${inp} tabular-nums opacity-60`} />
           {/* Air freight charges the greater of actual and volumetric. Spare
               parts and accessories fly constantly; nothing computed this. */}
-          <p className={hint}>
-            L×W×H cm ÷ 6000. Air freight bills the greater of this and {sums.grossKg || "gross"} kg.
-          </p>
+          <p className={hint}>{t("pk.volumetricHint", "L×W×H cm ÷ 6000. Air freight bills the greater of this and the gross weight.")}</p>
         </div>
       </div>
     </div>
@@ -710,6 +731,7 @@ export function LoadingBlock({ value, onChange }: BlockProps) {
    CUSTOMS — what the border asks that the HS code does not answer.
    ═══════════════════════════════════════════════════════════════════ */
 export function CustomsExtras({ value, onChange }: BlockProps) {
+  const { t } = useTranslation(PRODUCTS_UI_I18N);
   const dg = value.dangerous_goods ?? {};
   const setDg = (u: Partial<typeof dg>) => onChange({ dangerous_goods: { ...dg, ...u } });
   const toggleKind = (k: string) => {
@@ -720,40 +742,40 @@ export function CustomsExtras({ value, onChange }: BlockProps) {
     <div className="space-y-4 mt-4 pt-4 border-t border-[var(--border-subtle)]">
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
-          <label className={lbl}>Origin certificate</label>
+          <label className={lbl}>{t("pk.originCert", "Origin certificate")}</label>
           <KdsSelect
             value={value.origin_certificate ?? ""}
             onChange={(v: string) => onChange({ origin_certificate: v })}
-            options={ORIGIN_CERTIFICATES.map((o) => ({ value: o.value, label: o.label }))}
-            placeholder="— Select —"
+            options={localise(t, ORIGIN_CERTIFICATES)}
+            placeholder={t("pk.select", "— Select —")}
             triggerClassName={inp + " pe-9 text-start"}
           />
           {/* Country of origin says where it was made; this says what the buyer
               can present to pay less duty on it. Form E and Form A carry a
               preference, a plain CO does not. */}
-          <p className={hint}>What the buyer&apos;s customs will accept as proof of origin.</p>
+          <p className={hint}>{t("pk.originCertHint", "What the buyer's customs will accept as proof of origin.")}</p>
         </div>
         <div>
-          <label className={lbl}>Regulated content</label>
-          <div className="flex items-center gap-2">
+          <label className={lbl}>{t("pk.dgLabel", "Regulated content")}</label>
+          <div className={choiceRow}>
             {[["none", false], ["has", true]].map(([k, v]) => (
               <button
                 key={String(k)}
                 type="button"
                 onClick={() => setDg({ has: v as boolean })}
-                className={`h-10 px-4 rounded-lg text-[12px] font-semibold border transition-colors ${
+                className={`${choiceBtn} ${
                   !!dg.has === v
                     ? v
                       ? "border-amber-500/60 bg-amber-500/[0.12] text-[var(--text-primary)]"
-                      : "border-[#567FB2]/60 bg-[#567FB2]/[0.12] text-[var(--text-primary)]"
-                    : "border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)]/70 text-[var(--text-muted)] hover:text-[var(--text-primary)]"
+                      : choiceOn
+                    : choiceOff
                 }`}
               >
-                {k === "none" ? "Nothing regulated" : "Has regulated content"}
+                {k === "none" ? t("pk.dgNone", "Nothing regulated") : t("pk.dgHas", "Has regulated content")}
               </button>
             ))}
           </div>
-          <p className={hint}>Batteries, oil inside the machine, magnets — asked for by air freight and by every MSDS request.</p>
+          <p className={hint}>{t("pk.dgHint", "Batteries, oil inside the machine, magnets — asked for by air freight and by every MSDS request.")}</p>
         </div>
       </div>
 
@@ -773,14 +795,14 @@ export function CustomsExtras({ value, onChange }: BlockProps) {
                       : "border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)]/70 text-[var(--text-muted)] hover:text-[var(--text-primary)]"
                   }`}
                 >
-                  {k.label}
+                  {t(`pk.opt.${k.value}`, k.label)}
                 </button>
               );
             })}
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label className={lbl}>UN number(s)</label>
+              <label className={lbl}>{t("pk.unNumbers", "UN number(s)")}</label>
               <input
                 value={dg.un_numbers ?? ""}
                 onChange={(e) => setDg({ un_numbers: e.target.value })}
@@ -789,11 +811,11 @@ export function CustomsExtras({ value, onChange }: BlockProps) {
               />
             </div>
             <div>
-              <label className={lbl}>Note for the forwarder</label>
+              <label className={lbl}>{t("pk.dgNote", "Note for the forwarder")}</label>
               <input
                 value={dg.notes ?? ""}
                 onChange={(e) => setDg({ notes: e.target.value })}
-                placeholder="Oil drained before shipment"
+                placeholder={t("pk.dgNotePh", "Oil drained before shipment")}
                 className={inp}
               />
             </div>
@@ -811,17 +833,18 @@ export function CustomsExtras({ value, onChange }: BlockProps) {
    this tab was just cleared of.
    ═══════════════════════════════════════════════════════════════════ */
 export function ShippingOrigin({ value, onChange }: BlockProps) {
+  const { t } = useTranslation(PRODUCTS_UI_I18N);
   return (
     <div className="mt-4 pt-4 border-t border-[var(--border-subtle)]">
       <div className="max-w-md">
-        <label className={lbl}>Default port of loading</label>
+        <label className={lbl}>{t("pk.portOfLoading", "Default port of loading")}</label>
         <input
           value={value.port_of_loading ?? ""}
           onChange={(e) => onChange({ port_of_loading: e.target.value })}
           placeholder="Shanghai"
           className={inp}
         />
-        <p className={hint}>Where this product normally ships from — freight cannot be quoted without it.</p>
+        <p className={hint}>{t("pk.portHint", "Where this product normally ships from — freight cannot be quoted without it.")}</p>
       </div>
     </div>
   );
