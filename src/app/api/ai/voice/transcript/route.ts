@@ -1,3 +1,4 @@
+import { conversationTitle } from "@/lib/server/ai/conversation-title";
 import "server-only";
 
 /* ---------------------------------------------------------------------------
@@ -222,11 +223,12 @@ export async function POST(req: Request) {
   }
 
   /* The thread's summary, rolled the way the typed lane rolls it. The title
-     is taken from the first USER turn of a still-untitled chat and cut short
-     — no model call for a label, on a route that must stay cheap. */
+     is taken from the first USER turn of a still-untitled chat by the one
+     shared rule (conversationTitle) — no model call for a label, on a route
+     that must stay cheap. */
   const firstUser = turns.find((t) => t.role === "user");
   const untitled = (conv.title === "New chat" || !conv.title) && (conv.message_count ?? 0) === 0;
-  const title = untitled && firstUser ? firstUser.text.slice(0, TITLE_CHARS) : conv.title;
+  const title = untitled && firstUser ? (conversationTitle(firstUser.text) || firstUser.text.slice(0, TITLE_CHARS)) : conv.title;
   const lastTurn = turns[turns.length - 1];
   await supabaseServer
     .from("ai_conversations")

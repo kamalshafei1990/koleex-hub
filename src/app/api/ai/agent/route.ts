@@ -36,6 +36,7 @@ import { ATTACH_SPLIT, resolveHistoryAttachEmbeds } from "@/lib/server/ai/attach
 import { getTaughtAnswersBlock, getKnowledgeNudgeBlock } from "@/lib/server/ai-knowledge";
 import { buildUserContext, checkModule } from "@/lib/server/ai-agent/permissions";
 import { orchestrate } from "@/lib/server/ai-agent/orchestrator";
+import { conversationTitle } from "@/lib/server/ai/conversation-title";
 /* Phase 2C — the streaming lanes build their prompts from the prompt layer
    directly, rather than reaching through the orchestrator for them. */
 import { buildBrandSystemPrompt, buildMinimalSystemPrompt, buildNowLine } from "@/lib/server/ai/prompts";
@@ -109,8 +110,9 @@ function trimHistoryToBudget<T extends { content: string }>(history: T[]): T[] {
 }
 
 
-/** Auto-title rule — identical to /chat. Pulled into a helper so the
- *  canned and non-canned branches can share it without drift. */
+/** Auto-title rule, shared with the voice lane (lib/server/ai/conversation-title).
+ *  Pulled into a helper so the canned and non-canned branches can share it
+ *  without drift. */
 function computeTitle(
   conv: { title: string | null; message_count: number | null },
   content: string,
@@ -118,11 +120,7 @@ function computeTitle(
   if ((conv.title !== "New chat" && conv.title) || (conv.message_count ?? 0) !== 0) {
     return conv.title;
   }
-  const trimmed = content.trim();
-  const words = trimmed.split(/\s+/);
-  return words.length <= 4
-    ? trimmed.slice(0, 60)
-    : words.slice(0, 4).join(" ").slice(0, 60);
+  return conversationTitle(content) || content.trim().slice(0, 60);
 }
 
 export async function POST(req: Request) {
