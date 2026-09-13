@@ -441,6 +441,55 @@ export default function TechnicalSection({ data, onChange, hiddenFields }: Props
      inputs writing one column on two different tabs.
    ═══════════════════════════════════════════════════════════════════ */
 
+/* Machine dimensions — THREE boxes, one per dimension.
+ *
+ * This was a single free-text input "so you can use any unit / format", and
+ * the freedom was the problem: of the four products that carry a value, two
+ * read `×1100×1750` — a length that was never typed, saved without a murmur
+ * and impossible to spot in a one-line field. Three boxes cannot lose a
+ * number silently; an empty one is visibly empty.
+ *
+ * Stored unchanged as the same "L×W×H" string the schema's own dimension
+ * field writes, so the two ways a product can reach this question keep
+ * producing the same value. Reading splits on the separator rather than
+ * scooping up every number in the string: `×1100×1750` then puts 1100 and
+ * 1750 where their author put them, with L blank, instead of sliding them
+ * left into L and W and inventing a machine of a different size.
+ */
+function MachineDimensionFields({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const { t } = useTranslation(PRODUCTS_UI_I18N);
+  const parts = (value || "").split(/[×xX*,]/).map((x) => x.trim());
+  const [l, w, h] = [parts[0] ?? "", parts[1] ?? "", parts[2] ?? ""];
+  const compose = (a: string, b: string, c: string) => (!a && !b && !c ? "" : `${a}×${b}×${c}`);
+  const box = (v: string, ph: string, set: (x: string) => void) => (
+    <input
+      type="number"
+      value={v}
+      onChange={(e) => set(e.target.value)}
+      placeholder={ph}
+      className="min-w-0 flex-1 h-10 px-3 rounded-lg bg-[var(--bg-inverted)]/[0.05] border border-[var(--border-subtle)] text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-dim)] outline-none focus:border-[var(--border-focus)] transition-colors tabular-nums"
+    />
+  );
+  return (
+    <div>
+      <FieldLabel icon={<RulerIcon className="h-3.5 w-3.5" />}>
+        {t("tech.machineDimsLwh", "Machine Dimensions (L × W × H)")}
+      </FieldLabel>
+      <div className="flex items-center gap-2">
+        {box(l, "L", (x) => onChange(compose(x, w, h)))}
+        <span className="text-[var(--text-ghost)] shrink-0">×</span>
+        {box(w, "W", (x) => onChange(compose(l, x, h)))}
+        <span className="text-[var(--text-ghost)] shrink-0">×</span>
+        {box(h, "H", (x) => onChange(compose(l, w, x)))}
+        <span className="text-[11px] font-medium text-[var(--text-ghost)] shrink-0">mm</span>
+      </div>
+      <p className="text-[10px] text-[var(--text-ghost)] mt-1">
+        {t("tech.machineDimsHelp", "Footprint of the machine in operation, in millimetres. The crate is entered separately under Packing.")}
+      </p>
+    </div>
+  );
+}
+
 export function PhysicalFields({ data, onChange, hiddenFields }: {
   data: { machine_dimensions: string; machine_weight_kg: string };
   onChange: (updates: Partial<{ machine_dimensions: string; machine_weight_kg: string }>) => void;
@@ -450,23 +499,7 @@ export function PhysicalFields({ data, onChange, hiddenFields }: {
   const hidden = (k: string) => hiddenFields?.has(k) ?? false;
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-      {!hidden("machine_dimensions") && (
-      <div>
-        <FieldLabel icon={<RulerIcon className="h-3.5 w-3.5" />}>
-          {t("tech.machineDimsLwh", "Machine Dimensions (L × W × H)")}
-        </FieldLabel>
-        <input
-          type="text"
-          value={data.machine_dimensions}
-          onChange={(e) => onChange({ machine_dimensions: e.target.value })}
-          placeholder="e.g. 480 × 180 × 360 mm"
-          className="w-full h-10 px-4 rounded-lg bg-[var(--bg-inverted)]/[0.05] border border-[var(--border-subtle)] text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-dim)] outline-none focus:border-[var(--border-focus)] transition-colors"
-        />
-        <p className="text-[10px] text-[var(--text-ghost)] mt-1">
-          Footprint of the machine in operation. Free-text so you can use any unit / format.
-        </p>
-      </div>
-      )}
+      {!hidden("machine_dimensions") && <MachineDimensionFields value={data.machine_dimensions} onChange={(v) => onChange({ machine_dimensions: v })} />}
       {!hidden("machine_weight_kg") && (
       <NumberUnit
         label={t("tech.machineWeight", "Machine Weight")}
@@ -475,7 +508,7 @@ export function PhysicalFields({ data, onChange, hiddenFields }: {
         unit="kg"
         placeholder="e.g. 32"
         onChange={(v) => onChange({ machine_weight_kg: v })}
-        helpText="Bare-head weight. Packed crate weight is per-variant on Models."
+        helpText="The machine itself, without packaging. The packed crate weight is entered under Packing on this tab."
       />
       )}
     </div>

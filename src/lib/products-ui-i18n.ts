@@ -1308,6 +1308,7 @@ export const PRODUCTS_UI_I18N: Translations = {
   "tech.allSelected": { en: "All options selected", zh: "已选择全部选项", ar: "كل الخيارات محددة" },
   "tech.machineDims": { en: "Machine Dimensions", zh: "整机尺寸", ar: "أبعاد الماكينة" },
   "tech.machineDimsLwh": { en: "Machine Dimensions (L × W × H)", zh: "整机尺寸（长 × 宽 × 高）", ar: "أبعاد الماكينة (طول × عرض × ارتفاع)" },
+  "tech.machineDimsHelp": { en: "Footprint of the machine in operation, in millimetres. The crate is entered separately under Packing.", zh: "整机运行时的占地尺寸，单位毫米。木箱尺寸在“包装”中单独填写。", ar: "أبعاد الماكينة أثناء التشغيل بالمليمتر. أبعاد الصندوق تُدخل في قسم التعبئة." },
   "list.uncategorized": { en: "Uncategorized", zh: "未分类", ar: "غير مصنّف" },
   "list.other": { en: "Other", zh: "其他", ar: "أخرى" },
   "list.productOne": { en: "product", zh: "件产品", ar: "منتج" },
