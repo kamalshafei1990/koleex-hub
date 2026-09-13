@@ -1073,3 +1073,18 @@ Three facts from this window, in order of weight:
   far side's peaks at ~60 % of full scale) into a compressor set as a
   limiter (−6 dB threshold, 12:1), so the rare peak is caught rather than
   clipped. Cues divide the lift out and keep their own volume.
+
+## "Check the difference of the photos — this is what happens while it loads" (2026-09-13)
+
+Two screenshots of the same second. In the first: no emoji button, no Speak
+pill, the globe further left, the orb higher. In the second: both controls
+in place, the globe moved right, the orb lower. Two causes:
+
+- The lazy controls' placeholders were not their shapes: a 36 px square for
+  a ~90 px pill, a 32 px square for a 40 px button. When the code landed, the
+  composer's row re-laid itself. Now the placeholders ARE the shapes — the
+  pill's height, padding, icon and colour with a blank where the word goes;
+  the emoji button's 40 px. The row does not move when the code does.
+- The orb's one-shot hello (a transform hop) fired at 350 ms, while the
+  root was still fading in and the controls still arriving — it read as
+  part of a glitch. It waits 900 ms now, past all of that.
