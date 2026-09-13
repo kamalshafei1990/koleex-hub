@@ -1308,6 +1308,8 @@ export const PRODUCTS_UI_I18N: Translations = {
   "pk.addPackage":       { en: "+ Add package", zh: "+ 添加包装", ar: "+ أضف طرد" },
   "pk.cmHint":           { en: "Centimetres — the unit on every packing list and bill of lading. Machine dimensions above stay in mm.", zh: "厘米 — 装箱单与提单通用单位。上方整机尺寸仍为毫米。", ar: "بالسنتيمتر — وحدة كل قائمة تعبئة وبوليصة شحن. أبعاد الماكينة فوق فاضلة بالمليمتر." },
   "pk.whatsInside":      { en: "What's inside", zh: "箱内清单", ar: "محتويات الطرد" },
+  "pk.packagesRule":     { en: "A package is one thing the forwarder loads: only what is weighed and measured on its own belongs here. A box inside another box goes under \"What's inside\" — the outer crate's size and weight already include it.", zh: "“包装”指货代单独装卸并称重的一件：只有单独量尺寸、单独称重的才填在这里。箱中箱请填在“箱内清单”——外箱的尺寸和重量已经包含它。", ar: "الطرد هو الحاجة اللي شركة الشحن بتشيلها وتوزنها لوحدها: اللي بيتقاس ويتوزن لوحده بس هو اللي يتكتب هنا. الصندوق اللي جوه صندوق تاني بيتكتب في «محتويات الطرد» — مقاس الصندوق الخارجي ووزنه شاملينه أصلاً." },
+  "pk.insideNotWeighed": { en: "not weighed separately", zh: "不单独计重", ar: "مش بيتوزن لوحده" },
   "pk.listInside":       { en: "List what's inside", zh: "填写箱内清单", ar: "اكتب اللي جوه" },
   "pk.insideThisBox":    { en: "What's inside this box", zh: "这个箱子里有什么", ar: "اللي جوه الصندوق ده" },
   "pk.addItem":          { en: "+ Add item", zh: "+ 添加项目", ar: "+ أضف صنف" },

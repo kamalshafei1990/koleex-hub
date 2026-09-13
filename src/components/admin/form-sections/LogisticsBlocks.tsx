@@ -421,6 +421,16 @@ export function PackingBlock({ value, onChange, productId }: BlockProps & { prod
         <p className={hint}>
           {t("pk.cmHint", "Centimetres — the unit on every packing list and bill of lading. Machine dimensions above stay in mm.")}
         </p>
+        {/* THE ONE RULE THAT KEEPS THE TOTALS HONEST. A package is something
+            the forwarder loads and weighs; what is inside it is already in its
+            size and its weight. Entering the accessories box as a package as
+            well as listing it inside the crate counts the same box twice — the
+            crate's 210 kg already includes it — and nothing in the arithmetic
+            can detect that, because both readings are perfectly valid numbers.
+            So the rule is stated where the mistake would be made. */}
+        <p className={`${hint} mt-1.5`}>
+          {t("pk.packagesRule", "A package is one thing the forwarder loads: only what is weighed and measured on its own belongs here. A box inside another box goes under \"What's inside\" — the outer crate's size and weight already include it.")}
+        </p>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -669,7 +679,12 @@ function ContentsEditor({
   return (
     <div className={`space-y-2 ${depth ? "ms-11 ps-3 border-s border-[var(--border-subtle)]" : ""}`}>
       {depth === 0 ? (
-        <div className="text-[9px] uppercase tracking-[0.1em] text-[var(--text-ghost)]">{t("pk.whatsInside", "What's inside")}</div>
+        <div className="text-[9px] uppercase tracking-[0.1em] text-[var(--text-ghost)]">
+          {t("pk.whatsInside", "What's inside")}
+          <span className="ms-2 normal-case tracking-normal font-normal text-[9.5px] opacity-80">
+            {t("pk.insideNotWeighed", "not weighed separately")}
+          </span>
+        </div>
       ) : null}
       {items.map((it, i) => (
         <div key={i} className="space-y-2">
