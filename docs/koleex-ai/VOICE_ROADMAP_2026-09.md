@@ -1175,3 +1175,48 @@ Two changes:
 - voice-client 756: the retry in both outcomes (second ask answered → the
   socket opens, no failure; not answered → service-unreachable on the
   retry's own deadline), the pins for the re-probe.
+
+## Tasks by AI, phase 1 — the tool speaks the whole table (2026-09-13)
+
+Owner: "start to do the plan without reading, I trust you, anything for
+this task you can decide for me." Decisions taken (TASKS_BY_AI_PLAN §7):
+reminders are self-tasks with a reminder time; saving by voice stays a
+tap; a named project makes a project task (instruction-level, later); the
+web assignment rule stands; the proactive brief comes in phase 5.
+
+- `ai-agent/tools/task-time.ts` (new, pure): times resolve in the CALLER's
+  zone (`UserContext.timezone`, default Asia/Dubai) — a date alone is 09:00
+  there (17:00 for a due date), a local datetime is read there, a value
+  with an offset is kept; DST honoured through Intl; wording for the
+  preview ("Fri 18 Sept, 15:00").
+- `createTodo`: `remind_at`, `start_date`, `recurrence(_until)`,
+  `is_private`, `assign_to_department`, `assign_to_all` (admins; refused
+  as a permission otherwise), `observer_account_ids`,
+  `mention_account_ids`. A reminder defaults to the due time when the due
+  date names a clock time. People resolve once against the assignable
+  list; a department must be one they have. The insert and the
+  notifications (assignees → mentions → observers, never twice, never the
+  creator) mirror `/api/todos` POST, people into `metadata` as the app
+  writes them. The preview carries names, times in words and the zone;
+  the pending action carries ids and ISO times only.
+- `updateTodo`: the same fields, `none` clears, observers add/remove as a
+  previewed list, the newly added notified.
+- Voice: the tool route forwards the tool's preview beside the pending
+  args (never back with the tap); the call card words the due and
+  reminder times and names the people, in three languages. The call's
+  createTodo description and the TASKS BY VOICE instruction ask for
+  everything said and forbid asking for what was not.
+- Text lane: THE SECRETARY'S WAY paragraph — extract first, only the title
+  required, ask only when the task would be wrong without the answer, one
+  sentence with a default.
+- Suites: new `validate:ai-tasks` (50: real-zone time cases incl. DST, the
+  schema and write pins, both lanes' instructions, the card);
+  `validate:voice-tools` 208, `validate:ai-tool-exposure` 33 (47 tools
+  unchanged), `validate:ai-voice` payload budget still under 40 KB,
+  voice-client 756.
+
+Not in this phase (by design): attachments from the chat (the AI's uploads
+live in a transient bucket; copying them into `todo-attachments` is phase
+2 work with the chat card), a project link on a to-do (a named project
+should become a project task — instruction in phase 3), the chat confirm
+card (phase 2), the brief on the text lane (phase 4).

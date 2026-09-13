@@ -203,7 +203,7 @@ export type VoiceEvents = {
   /** A write tool answered with a PREVIEW (roadmap D1): the arguments its
    *  confirming phase needs, for a card the caller can tap. The server put
    *  them beside the model's envelope; nothing here acts on them. */
-  onPendingWrite?: (name: string, pending: { tool: string; args: Record<string, unknown> }, message: string) => void;
+  onPendingWrite?: (name: string, pending: { tool: string; args: Record<string, unknown> }, message: string, preview?: Record<string, unknown>) => void;
   /** SOMETHING NAMED ITSELF A FUNCTION CALL AND COULD NOT BE READ.
    *
    *  This exists because the alternative is silence: if the vendor's event
@@ -1388,13 +1388,14 @@ export class VoiceSession {
            can say. */
         output = { ok: false, message: "That lookup could not be completed just now." };
       } else {
-        const body = (await res.json()) as { output?: unknown; pictures?: unknown; pending?: { tool?: unknown; args?: unknown } };
+        const body = (await res.json()) as { output?: unknown; pictures?: unknown; pending?: { tool?: unknown; args?: unknown; preview?: unknown } };
         output = body.output ?? { ok: false, message: "That lookup returned nothing." };
         pictures = body.pictures;
         const p = body.pending;
         if (p && typeof p.tool === "string" && p.args && typeof p.args === "object" && !Array.isArray(p.args)) {
           const msg = (output as { message?: unknown } | null)?.message;
-          this.events.onPendingWrite?.(call.name, { tool: p.tool, args: p.args as Record<string, unknown> }, typeof msg === "string" ? msg : "");
+          const preview = p.preview && typeof p.preview === "object" && !Array.isArray(p.preview) ? (p.preview as Record<string, unknown>) : undefined;
+          this.events.onPendingWrite?.(call.name, { tool: p.tool, args: p.args as Record<string, unknown> }, typeof msg === "string" ? msg : "", preview);
         }
       }
     } catch {

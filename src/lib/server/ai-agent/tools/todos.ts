@@ -32,6 +32,7 @@ import { sendPushToAccounts } from "../../web-push";
 import { listAssignableEmployees } from "../../assignable-employees";
 import type { ToolDef, ToolResult } from "../types";
 import { isUuid, BAD_ID_MESSAGE } from "../uuid";
+import { resolveTaskTime, resolveTaskDay, describeWhen, hasClockTime, parseRecurrence } from "./task-time";
 
 const TODO_MODULE = "To-do";
 
@@ -49,7 +50,7 @@ interface TodoRow {
   approval_state: string | null;
   created_by_account_id: string | null;
   assigned_by_account_id: string | null;
-  metadata: { observers?: Array<{ account_id?: string }> } | null;
+  metadata: { observers?: Array<{ account_id?: string; full_name?: string | null; username?: string | null }>; [key: string]: unknown } | null;
 }
 
 async function loadTodoRow(id: string, tenantId: string | null): Promise<TodoRow | null> {
@@ -69,6 +70,51 @@ const TODO_COLS = `id, title, description, status, completed, completed_at,
   priority, label, due_date, start_date, remind_at, recurrence,
   assigned_department, assign_to_all, is_private, created_by_account_id,
   created_at, updated_at`;
+
+/* ── People on a task, resolved once ──
+   Every account id the model passes — assignees, observers, mentions — must
+   be a real, assignable colleague (internal, active, human: the same list
+   every picker in the app uses) and, for a department, a department those
+   colleagues actually have. An id not on the list is a hard error, never
+   silently dropped; the model is told to look the person up again. One
+   lookup serves all three groups. */
+type Person = { account_id: string; name: string; username: string; department: string | null };
+type PeopleResult =
+  | { ok: true; people: Map<string, Person>; departments: Set<string> }
+  | { ok: false; message: string };
+
+function idList(v: unknown): string[] {
+  return Array.isArray(v) ? Array.from(new Set(v.map((x) => String(x).trim()).filter(Boolean))) : [];
+}
+
+async function resolvePeople(tenantId: string | null, ids: string[], label: string): Promise<PeopleResult> {
+  let all;
+  try {
+    all = await listAssignableEmployees(tenantId);
+  } catch (e) {
+    console.error(`[tool.${label}.people]`, e instanceof Error ? e.message : e);
+    return { ok: false, message: "Couldn't verify the people right now — please try again." };
+  }
+  const people = new Map<string, Person>();
+  const departments = new Set<string>();
+  for (const a of all) {
+    people.set(a.account_id, { account_id: a.account_id, name: a.full_name || a.username, username: a.username, department: a.department });
+    if (a.department) departments.add(a.department.trim().toLowerCase());
+  }
+  const unknown = ids.filter((id) => !people.has(id));
+  if (unknown.length > 0) {
+    return {
+      ok: false,
+      message: "One or more people didn't match a real team member. Look each person up with findTeamMember and use the account_id it returns.",
+    };
+  }
+  return { ok: true, people, departments };
+}
+
+/** The metadata shape the To-do app writes for a person on a task. */
+function personRef(p: Person): { account_id: string; full_name: string | null; username: string | null } {
+  return { account_id: p.account_id, full_name: p.name, username: p.username };
+}
 
 /** Day boundaries in ISO for simple due filters. Server runtime (not the
  *  workflow sandbox) so Date is available. */
@@ -272,6 +318,15 @@ const createTodo: ToolDef<
     description?: string;
     priority?: string;
     due_date?: string;
+    remind_at?: string;
+    start_date?: string;
+    recurrence?: string;
+    recurrence_until?: string;
+    is_private?: boolean;
+    assign_to_department?: string;
+    assign_to_all?: boolean;
+    observer_account_ids?: string[];
+    mention_account_ids?: string[];
     label?: string;
     assign_to_account_ids?: string[];
     confirm?: boolean;
@@ -280,20 +335,29 @@ const createTodo: ToolDef<
 > = {
   name: "createTodo",
   description:
-    "Create a NEW to-do task — personal by default, or ASSIGNED TO COLLEAGUES by passing assign_to_account_ids (resolve each person with findTeamMember first; if a name matches several people, ask the user which one before calling this). ALWAYS call this first WITHOUT confirm to preview what will be created; show the user the details — including WHO it will be assigned to — and only call again with confirm:true after they explicitly agree. Assigned colleagues are notified automatically.",
+    "Create a NEW to-do task or reminder — for the user by default, or ASSIGNED TO COLLEAGUES by passing assign_to_account_ids (resolve each person with findTeamMember first; if a name matches several people, ask the user which one before calling this). Fill everything the conversation already says: due_date, remind_at (\"remind me at 3\" → today 15:00 in the user's timezone), start_date, priority, label, recurrence, is_private, observers (people who should follow it), mentions (people who should know). Only the title is required — never ask for the rest; leave what was not said empty. ALWAYS call this first WITHOUT confirm to preview what will be created; show the user the details — including WHO it will be assigned to and WHEN they will be reminded — and only call again with confirm:true after they explicitly agree. Assigned colleagues, observers and mentioned people are notified automatically.",
   parameters: {
     type: "object",
     properties: {
-      title: { type: "string", description: "The task title (required)." },
-      description: { type: "string", description: "Optional longer description." },
-      priority: { type: "string", description: "low | medium | high. Default medium.", enum: ["low", "medium", "high"] },
-      due_date: { type: "string", description: "Optional ISO date/datetime the task is due." },
-      label: { type: "string", description: "Optional short label/category." },
+      title: { type: "string", description: "The task title, in the user's own words (required)." },
+      description: { type: "string", description: "Optional longer description — only what the user said, never invented." },
+      priority: { type: "string", description: "low | medium | high. Default medium; \"urgent\" or a deadline today means high.", enum: ["low", "medium", "high"] },
+      due_date: { type: "string", description: "When it is due: ISO date (2026-09-18) or local datetime (2026-09-18T15:00). A bare time the user said (\"at 3\") is today at that hour, or tomorrow if it has passed. Read in the user's timezone." },
+      remind_at: { type: "string", description: "When to remind: ISO date or local datetime, read in the user's timezone. \"Remind me at 3\" → today 15:00. If omitted and due_date has a time, the reminder is at the due time; a bare due date gets no reminder." },
+      start_date: { type: "string", description: "Optional ISO date the work starts (\"from Monday\")." },
+      label: { type: "string", description: "Optional short label/category — a department or project word the user used, or an existing label name." },
+      recurrence: { type: "string", description: "Optional: daily | weekly | monthly (\"every Monday\" → weekly with due_date on the first Monday).", enum: ["daily", "weekly", "monthly"] },
+      recurrence_until: { type: "string", description: "Optional ISO date the recurrence stops." },
+      is_private: { type: "boolean", description: "True when the user says the task is private / just for them." },
       assign_to_account_ids: {
         type: "array",
         items: { type: "string" },
-        description: "Account ids of colleagues to assign this task to — each id MUST come from a findTeamMember result in this conversation. Omit for a personal task.",
+        description: "Account ids of colleagues to assign this task to — each id MUST come from a findTeamMember result in this conversation. Omit for the user's own task.",
       },
+      assign_to_department: { type: "string", description: "Optional department name to assign the task to everyone in it (\"the design team\")." },
+      assign_to_all: { type: "boolean", description: "True to assign to everyone in the company (admins only)." },
+      observer_account_ids: { type: "array", items: { type: "string" }, description: "People who should follow the task (\"keep X in the loop\") — ids from findTeamMember." },
+      mention_account_ids: { type: "array", items: { type: "string" }, description: "People who should be told about it (\"let X know\", \"cc X\") — ids from findTeamMember." },
       confirm: { type: "boolean", description: "Leave unset to PREVIEW. Set true ONLY after the user has explicitly confirmed the previewed task." },
     },
     required: ["title"],
@@ -305,77 +369,142 @@ const createTodo: ToolDef<
     if (!title) {
       return { ok: false, permissionStatus: "allowed", data: null, message: "What should the task be called? Give me a title." };
     }
+    const tz = ctx.timezone || "Asia/Dubai";
     const priority = ["low", "medium", "high"].includes(String(args.priority)) ? String(args.priority) : "medium";
+    const dueIso = resolveTaskTime(args.due_date, tz, 17);
+    const remindIso = resolveTaskTime(args.remind_at, tz) ?? (dueIso && hasClockTime(args.due_date) ? dueIso : null);
+    const startDay = resolveTaskDay(args.start_date, tz);
+    const recurrence = parseRecurrence(args.recurrence);
+    const recurrenceUntil = recurrence ? resolveTaskDay(args.recurrence_until, tz) : null;
+    if (args.due_date && !dueIso) {
+      return { ok: false, permissionStatus: "allowed", data: null, message: "I couldn't read that due date — give it as an ISO date or a local date and time." };
+    }
+    if (args.remind_at && !remindIso) {
+      return { ok: false, permissionStatus: "allowed", data: null, message: "I couldn't read that reminder time — give it as a local date and time." };
+    }
     const normalized = {
       title,
       description: args.description ? String(args.description) : null,
       priority,
-      due_date: args.due_date ? String(args.due_date) : null,
+      due_date: dueIso,
+      remind_at: remindIso,
+      start_date: startDay,
       label: args.label ? String(args.label) : null,
+      recurrence,
+      recurrence_until: recurrenceUntil,
+      is_private: args.is_private === true,
     };
 
-    /* Resolve requested assignees against the assignable-employees list —
-       the same internal/active/human source every app picker uses. An id
-       that isn't on that list (hallucinated, or a portal account) is a
-       hard error, never silently dropped. */
-    const requestedIds = Array.isArray(args.assign_to_account_ids)
-      ? Array.from(new Set(args.assign_to_account_ids.map((v) => String(v).trim()).filter(Boolean)))
-      : [];
-    let assignees: Array<{ account_id: string; name: string }> = [];
-    if (requestedIds.length > 0) {
-      let all;
-      try {
-        all = await listAssignableEmployees(ctx.auth.tenant_id);
-      } catch (e) {
-        console.error("[tool.createTodo.assignees]", e instanceof Error ? e.message : e);
-        return { ok: false, permissionStatus: "allowed", data: null, message: "Couldn't verify the assignees right now — please try again." };
-      }
-      const byId = new Map(all.map((a) => [a.account_id, a]));
-      const unknown = requestedIds.filter((id) => !byId.has(id));
-      if (unknown.length > 0) {
+    /* PEOPLE. Assignees, observers and mentions resolve against the
+       assignable-employees list — the same internal/active/human source
+       every app picker uses. A department must be one those colleagues
+       have. "Everyone" is an admin's call, as a permission, not a failure. */
+    const assigneeIds = idList(args.assign_to_account_ids);
+    const observerIds = idList(args.observer_account_ids);
+    const mentionIds = idList(args.mention_account_ids);
+    const department = typeof args.assign_to_department === "string" ? args.assign_to_department.trim() : "";
+    const toAll = args.assign_to_all === true;
+    if (toAll) {
+      const ut = (ctx.auth.user_type ?? "").toLowerCase();
+      if (!ctx.isSuperAdmin && ut !== "admin") {
         return {
           ok: false,
-          permissionStatus: "allowed",
+          permissionStatus: "denied",
           data: null,
-          message: "One or more assignees didn't match a real team member. Look each person up with findTeamMember and use the account_id it returns.",
+          message: "You don't have permission to assign a task to everyone — that needs an admin account. I can assign it to named colleagues or to a department instead.",
         };
       }
-      assignees = requestedIds.map((id) => {
-        const a = byId.get(id)!;
-        return { account_id: id, name: a.full_name || a.username };
-      });
     }
-    const assigneeNames = assignees.map((a) => a.name).join(", ");
+    const everyone = [...assigneeIds, ...observerIds, ...mentionIds];
+    let people = new Map<string, Person>();
+    let departmentName: string | null = null;
+    if (everyone.length > 0 || department) {
+      const r = await resolvePeople(ctx.auth.tenant_id, everyone, "createTodo");
+      if (!r.ok) return { ok: false, permissionStatus: "allowed", data: null, message: r.message };
+      people = r.people;
+      if (department) {
+        if (!r.departments.has(department.toLowerCase())) {
+          return {
+            ok: false,
+            permissionStatus: "allowed",
+            data: null,
+            message: `I don't know a department called "${department}". The departments I can assign to: ${Array.from(r.departments).sort().join(", ") || "none"}.`,
+          };
+        }
+        /* The department as its colleagues spell it. */
+        departmentName = Array.from(r.people.values()).find((p) => (p.department ?? "").trim().toLowerCase() === department.toLowerCase())?.department?.trim() ?? department;
+      }
+    }
+    const assignees = assigneeIds.map((id) => people.get(id)!);
+    const observers = observerIds.map((id) => people.get(id)!);
+    const mentions = mentionIds.map((id) => people.get(id)!);
+    const names = (list: Person[]) => list.map((p) => p.name).join(", ");
+    const who = toAll ? "everyone" : [names(assignees), departmentName ? `the ${departmentName} team` : ""].filter(Boolean).join(" and ");
+    const when = {
+      due: describeWhen(normalized.due_date, tz),
+      remind: describeWhen(normalized.remind_at, tz),
+      start: normalized.start_date ?? "",
+    };
 
     // Phase 1: preview only — nothing is written.
     if (args.confirm !== true) {
-      const due = normalized.due_date ? ` · due ${normalized.due_date}` : "";
-      const who = assignees.length > 0 ? ` assigned to ${assigneeNames}` : " for you";
+      const bits = [
+        `priority ${priority}`,
+        when.due ? `due ${when.due}` : "",
+        when.remind ? `reminder ${when.remind}` : "",
+        when.start ? `starts ${when.start}` : "",
+        recurrence ? `repeats ${recurrence}` : "",
+        normalized.label ? `label ${normalized.label}` : "",
+        normalized.is_private ? "private" : "",
+        observers.length ? `observers ${names(observers)}` : "",
+        mentions.length ? `mention ${names(mentions)}` : "",
+      ].filter(Boolean);
+      const forWhom = who ? ` assigned to ${who}` : " for you";
       return {
         ok: true,
         permissionStatus: "approval_required",
-        data: { preview: { ...normalized, assignees } },
-        message: `Ready to create this to-do${who}: "${title}" (priority ${priority}${due}). Confirm and I'll add it${assignees.length > 0 ? " and notify them" : ""}.`,
+        data: {
+          preview: {
+            ...normalized,
+            assignees: assignees.map((p) => ({ account_id: p.account_id, name: p.name })),
+            observers: observers.map((p) => ({ account_id: p.account_id, name: p.name })),
+            mentions: mentions.map((p) => ({ account_id: p.account_id, name: p.name })),
+            department: departmentName,
+            assign_to_all: toAll,
+            when,
+            timezone: tz,
+          },
+        },
+        message: `Ready to create this to-do${forWhom}: "${title}" (${bits.join(", ")}). Confirm and I'll add it${who ? " and notify them" : ""}.`,
         pendingAction: {
           tool: "createTodo",
           args: {
             ...normalized,
-            ...(requestedIds.length > 0 ? { assign_to_account_ids: requestedIds } : {}),
+            ...(assigneeIds.length > 0 ? { assign_to_account_ids: assigneeIds } : {}),
+            ...(observerIds.length > 0 ? { observer_account_ids: observerIds } : {}),
+            ...(mentionIds.length > 0 ? { mention_account_ids: mentionIds } : {}),
+            ...(departmentName ? { assign_to_department: departmentName } : {}),
+            ...(toAll ? { assign_to_all: true } : {}),
             confirm: true,
           },
         },
       };
     }
 
-    // Phase 2: confirmed — insert exactly like /api/todos POST (personal task).
+    // Phase 2: confirmed — insert exactly like /api/todos POST.
     const { data, error } = await supabaseServer
       .from("koleex_todos")
       .insert({
         title: normalized.title,
         /* AI provenance lives in metadata: the `source` column has a CHECK
            constraint (manual|crm|calendar) — 'koleex-ai' violates it and
-           silently failed every confirmed create until 2026-08-08. */
-        metadata: { created_via: "koleex-ai" },
+           silently failed every confirmed create until 2026-08-08. People on
+           the task go where the To-do app puts them. */
+        metadata: {
+          created_via: "koleex-ai",
+          ...(observers.length ? { observers: observers.map(personRef) } : {}),
+          ...(mentions.length ? { mentions: mentions.map(personRef) } : {}),
+        },
         description: normalized.description,
         completed: false,
         completed_at: null,
@@ -383,59 +512,99 @@ const createTodo: ToolDef<
         priority: normalized.priority,
         label: normalized.label,
         due_date: normalized.due_date,
-        start_date: null,
-        remind_at: null,
-        recurrence: null,
-        recurrence_until: null,
+        start_date: normalized.start_date,
+        remind_at: normalized.remind_at,
+        recurrence: normalized.recurrence,
+        recurrence_until: normalized.recurrence_until,
         created_by_account_id: ctx.auth.account_id,
         assigned_by_account_id: ctx.auth.account_id,
         source: "manual",
         source_id: null,
-        assigned_department: null,
-        assign_to_all: false,
-        is_private: false,
+        assigned_department: departmentName,
+        assign_to_all: toAll,
+        is_private: normalized.is_private,
         tenant_id: ctx.auth.tenant_id,
       })
-      .select("id, title, status, priority, due_date, created_at")
+      .select("id, title, status, priority, due_date, remind_at, created_at")
       .single();
 
     if (error) {
       console.error("[tool.createTodo]", error);
       return { ok: false, permissionStatus: "allowed", data: null, message: "Couldn't create the task — please try again." };
     }
+    const todoId = (data as { id: string }).id;
 
-    /* Assignment fan-out — mirrors /api/todos POST: assignee rows, then an
-       inbox "New task" notification to every assignee except the creator. */
-    if (assignees.length > 0) {
-      const todoId = (data as { id: string }).id;
-      const { error: asgErr } = await supabaseServer.from("koleex_todo_assignees").insert(
-        assignees.map((a) => ({ todo_id: todoId, account_id: a.account_id })),
-      );
-      if (asgErr) console.error("[tool.createTodo.assignRows]", asgErr);
-      const recipients = assignees.map((a) => a.account_id).filter((id) => id !== ctx.auth.account_id);
-      if (recipients.length > 0) {
-        await supabaseServer.from("inbox_messages").insert(
-          recipients.map((recipientId) => ({
-            recipient_account_id: recipientId,
-            sender_account_id: ctx.auth.account_id,
-            category: "task",
-            subject: `New task: ${normalized.title}`,
-            body: normalized.description || normalized.title,
-            link: `/todo?task=${todoId}`,
-            metadata: { type: "todo_assignment", todo_id: todoId, priority: normalized.priority },
-          })),
-        );
-      }
+    /* ASSIGNEE ROWS — the explicit list, a department's members, or
+       everyone — exactly as the route expands them, INTERNAL ONLY. */
+    let assigneeAccountIds = assignees.map((a) => a.account_id);
+    if (departmentName && ctx.auth.tenant_id) {
+      const { data: emps } = await supabaseServer
+        .from("koleex_employees")
+        .select("account_id")
+        .eq("department", departmentName)
+        .eq("tenant_id", ctx.auth.tenant_id)
+        .not("account_id", "is", null);
+      const deptIds = (emps ?? []).map((e) => (e as { account_id: string | null }).account_id).filter(Boolean) as string[];
+      assigneeAccountIds = Array.from(new Set([...assigneeAccountIds, ...deptIds]));
+    }
+    if (toAll && ctx.auth.tenant_id) {
+      const { data: allAccounts } = await supabaseServer
+        .from("accounts")
+        .select("id")
+        .eq("user_type", "internal")
+        .eq("status", "active")
+        .eq("tenant_id", ctx.auth.tenant_id);
+      assigneeAccountIds = (allAccounts ?? []).map((a) => (a as { id: string }).id);
+    }
+    if (assigneeAccountIds.length > 0 && ctx.auth.tenant_id) {
+      const { data: internal } = await supabaseServer
+        .from("accounts")
+        .select("id")
+        .in("id", assigneeAccountIds)
+        .eq("user_type", "internal")
+        .eq("tenant_id", ctx.auth.tenant_id);
+      assigneeAccountIds = (internal ?? []).map((a) => (a as { id: string }).id);
     }
 
+    /* NOTIFICATIONS — mirror /api/todos POST: assignees, then mentions, then
+       observers; never the creator, never the same person twice. */
+    const notified = new Set<string>([ctx.auth.account_id]);
+    const inbox = async (recipients: string[], subject: string, type: string, extra: Record<string, unknown> = {}) => {
+      const fresh = recipients.filter((id) => !notified.has(id));
+      if (fresh.length === 0) return;
+      fresh.forEach((id) => notified.add(id));
+      const { error: nErr } = await supabaseServer.from("inbox_messages").insert(
+        fresh.map((recipientId) => ({
+          recipient_account_id: recipientId,
+          sender_account_id: ctx.auth.account_id,
+          category: "task",
+          subject,
+          body: normalized.description || normalized.title,
+          link: `/todo?task=${todoId}`,
+          metadata: { type, todo_id: todoId, ...extra },
+        })),
+      );
+      if (nErr) console.error(`[tool.createTodo.${type}]`, nErr);
+    };
+    if (assigneeAccountIds.length > 0) {
+      const { error: asgErr } = await supabaseServer.from("koleex_todo_assignees").insert(
+        assigneeAccountIds.map((accountId) => ({ todo_id: todoId, account_id: accountId })),
+      );
+      if (asgErr) console.error("[tool.createTodo.assignRows]", asgErr);
+      await inbox(assigneeAccountIds, `New task: ${normalized.title}`, "todo_assignment", { priority: normalized.priority });
+    }
+    await inbox(mentions.map((p) => p.account_id), `You were mentioned: ${normalized.title}`, "todo_mention");
+    await inbox(observers.map((p) => p.account_id), `You are now an observer: ${normalized.title}`, "todo_observer");
+
+    const reminderNote = when.remind ? ` I'll remind ${who ? "them" : "you"} ${when.remind}.` : "";
     return {
       ok: true,
       permissionStatus: "allowed",
-      data: { ...(data as Record<string, unknown>), assignees },
+      data: { ...(data as Record<string, unknown>), assignees: assignees.map((p) => ({ account_id: p.account_id, name: p.name })), when },
       message:
-        assignees.length > 0
-          ? `Created the to-do "${title}" and assigned it to ${assigneeNames} — they've been notified.`
-          : `Created the to-do "${title}". You'll find it in your To-do app.`,
+        who
+          ? `Created the to-do "${title}" and assigned it to ${who} — they've been notified.${reminderNote}`
+          : `Created the to-do "${title}". You'll find it in your To-do app.${reminderNote}`,
       sources: ["koleex_todos(insert)"],
     };
   },
@@ -607,6 +776,12 @@ const updateTodo: ToolDef<
     title?: string;
     description?: string;
     priority?: string;
+    remind_at?: string;
+    start_date?: string;
+    recurrence?: string;
+    is_private?: boolean;
+    add_observer_account_ids?: string[];
+    remove_observer_account_ids?: string[];
     due_date?: string;
     label?: string;
     confirm?: boolean;
@@ -615,7 +790,7 @@ const updateTodo: ToolDef<
 > = {
   name: "updateTodo",
   description:
-    "Update details of one of the user's own to-do tasks: title, description, priority, due date, or label. Resolve the task id via listMyTodos FIRST — never invent an id. Only the task's owner (its creator or assigner) can edit details; assignees should use completeTodo instead. ALWAYS call first WITHOUT confirm to preview the change; only call again with confirm:true after the user explicitly agrees. Pass ONLY the fields being changed. To clear the due date or label, pass the literal string \"none\".",
+    "Update details of one of the user's own to-do tasks: title, description, priority, due date, reminder time, start date, label, recurrence, private flag, or the people following it (observers). Resolve the task id via listMyTodos FIRST — never invent an id. Only the task's owner (its creator or assigner) can edit details; assignees should use completeTodo instead. ALWAYS call first WITHOUT confirm to preview the change; only call again with confirm:true after the user explicitly agrees. Pass ONLY the fields being changed. To clear a date, reminder, label or recurrence, pass the literal string \"none\". Times are read in the user's timezone.",
   parameters: {
     type: "object",
     properties: {
@@ -623,8 +798,14 @@ const updateTodo: ToolDef<
       title: { type: "string", description: "New title." },
       description: { type: "string", description: "New description." },
       priority: { type: "string", description: "New priority.", enum: ["low", "medium", "high"] },
-      due_date: { type: "string", description: "New ISO due date/datetime, or \"none\" to clear it." },
+      due_date: { type: "string", description: "New due date (ISO date or local datetime), or \"none\" to clear it." },
+      remind_at: { type: "string", description: "New reminder time (ISO date or local datetime), or \"none\" to clear it." },
+      start_date: { type: "string", description: "New start date (ISO date), or \"none\" to clear it." },
       label: { type: "string", description: "New short label, or \"none\" to clear it." },
+      recurrence: { type: "string", description: "daily | weekly | monthly, or \"none\" to stop repeating." },
+      is_private: { type: "boolean", description: "Make the task private (true) or visible as usual (false)." },
+      add_observer_account_ids: { type: "array", items: { type: "string" }, description: "People to add as observers — ids from findTeamMember." },
+      remove_observer_account_ids: { type: "array", items: { type: "string" }, description: "Observers to remove — ids from the task's observers." },
       confirm: { type: "boolean", description: "Leave unset to PREVIEW. Set true ONLY after the user explicitly confirmed the previewed change." },
     },
     required: ["task_id"],
@@ -650,23 +831,61 @@ const updateTodo: ToolDef<
       };
     }
 
+    const tz = ctx.timezone || "Asia/Dubai";
+    const isNone = (v: unknown) => typeof v === "string" && v.trim().toLowerCase() === "none";
     const changes: Record<string, unknown> = {};
     if (typeof args.title === "string" && args.title.trim()) changes.title = args.title.trim();
     if (typeof args.description === "string") changes.description = args.description;
     if (["low", "medium", "high"].includes(String(args.priority))) changes.priority = String(args.priority);
     if (typeof args.due_date === "string" && args.due_date.trim()) {
-      changes.due_date = args.due_date.trim().toLowerCase() === "none" ? null : args.due_date.trim();
+      const v = isNone(args.due_date) ? null : resolveTaskTime(args.due_date, tz, 17);
+      if (!isNone(args.due_date) && !v) return { ok: false, permissionStatus: "allowed", data: null, message: "I couldn't read that due date — give it as an ISO date or a local date and time." };
+      changes.due_date = v;
+    }
+    if (typeof args.remind_at === "string" && args.remind_at.trim()) {
+      const v = isNone(args.remind_at) ? null : resolveTaskTime(args.remind_at, tz);
+      if (!isNone(args.remind_at) && !v) return { ok: false, permissionStatus: "allowed", data: null, message: "I couldn't read that reminder time — give it as a local date and time." };
+      changes.remind_at = v;
+    }
+    if (typeof args.start_date === "string" && args.start_date.trim()) {
+      changes.start_date = isNone(args.start_date) ? null : resolveTaskDay(args.start_date, tz);
     }
     if (typeof args.label === "string" && args.label.trim()) {
-      changes.label = args.label.trim().toLowerCase() === "none" ? null : args.label.trim();
+      changes.label = isNone(args.label) ? null : args.label.trim();
     }
-    if (Object.keys(changes).length === 0) {
-      return { ok: false, permissionStatus: "allowed", data: null, message: "Nothing to change — tell me what to update (title, description, priority, due date, or label)." };
+    if (typeof args.recurrence === "string" && args.recurrence.trim()) {
+      changes.recurrence = isNone(args.recurrence) ? null : parseRecurrence(args.recurrence);
+      if (changes.recurrence === null) changes.recurrence_until = null;
+    }
+    if (typeof args.is_private === "boolean") changes.is_private = args.is_private;
+
+    /* OBSERVERS live in metadata; a change is a new list, previewed by name. */
+    const addObs = idList(args.add_observer_account_ids);
+    const removeObs = new Set(idList(args.remove_observer_account_ids));
+    const currentObs = Array.isArray(t.metadata?.observers) ? t.metadata!.observers : [];
+    let nextObservers: Array<{ account_id: string; full_name: string | null; username: string | null }> | null = null;
+    let observerNames = "";
+    if (addObs.length > 0 || removeObs.size > 0) {
+      const r = addObs.length > 0 ? await resolvePeople(ctx.auth.tenant_id, addObs, "updateTodo") : null;
+      if (r && !r.ok) return { ok: false, permissionStatus: "allowed", data: null, message: r.message };
+      const kept = currentObs
+        .filter((o) => o.account_id && !removeObs.has(o.account_id))
+        .map((o) => ({ account_id: o.account_id!, full_name: o.full_name ?? null, username: o.username ?? null }));
+      const have = new Set(kept.map((o) => o.account_id));
+      const added = r && r.ok ? addObs.filter((id) => !have.has(id)).map((id) => personRef(r.people.get(id)!)) : [];
+      nextObservers = [...kept, ...added];
+      observerNames = nextObservers.map((o) => o.full_name || o.username || "").filter(Boolean).join(", ") || "(none)";
+    }
+    if (Object.keys(changes).length === 0 && nextObservers === null) {
+      return { ok: false, permissionStatus: "allowed", data: null, message: "Nothing to change — tell me what to update (title, description, priority, due date, reminder, start date, label, recurrence, private, or observers)." };
     }
 
     const title = t.title ?? "Task";
+    const worded = (k: string, v: unknown) =>
+      v === null ? "(cleared)" : (k === "due_date" || k === "remind_at") && typeof v === "string" ? describeWhen(v, tz) : String(v);
     if (args.confirm !== true) {
-      const parts = Object.entries(changes).map(([k, v]) => `${k.replace("_", " ")} → ${v === null ? "(cleared)" : String(v)}`);
+      const parts = Object.entries(changes).map(([k, v]) => `${k.replace("_", " ")} → ${worded(k, v)}`);
+      if (nextObservers !== null) parts.push(`observers → ${observerNames}`);
       return {
         ok: true,
         permissionStatus: "approval_required",
@@ -676,6 +895,8 @@ const updateTodo: ToolDef<
             title,
             current: { title: t.title, description: t.description, priority: t.priority, due_date: t.due_date, label: t.label },
             changes,
+            ...(nextObservers !== null ? { observers: nextObservers } : {}),
+            timezone: tz,
           },
         },
         message: `Ready to update "${title}": ${parts.join(", ")}. Confirm?`,
@@ -683,18 +904,38 @@ const updateTodo: ToolDef<
       };
     }
 
+    const patch: Record<string, unknown> = { ...changes, updated_at: new Date().toISOString() };
+    if (nextObservers !== null) patch.metadata = { ...(t.metadata ?? {}), observers: nextObservers };
     const { error } = await supabaseServer
       .from("koleex_todos")
-      .update({ ...changes, updated_at: new Date().toISOString() })
+      .update(patch)
       .eq("id", id);
     if (error) {
       console.error("[tool.updateTodo]", error);
       return { ok: false, permissionStatus: "allowed", data: null, message: "Couldn't update the task — please try again." };
     }
+    /* Newly added observers hear about it, as they do from the app. */
+    if (nextObservers !== null) {
+      const before = new Set(currentObs.map((o) => o.account_id));
+      const fresh = nextObservers.map((o) => o.account_id).filter((id) => !before.has(id) && id !== ctx.auth.account_id);
+      if (fresh.length > 0) {
+        await supabaseServer.from("inbox_messages").insert(
+          fresh.map((recipientId) => ({
+            recipient_account_id: recipientId,
+            sender_account_id: ctx.auth.account_id,
+            category: "task",
+            subject: `You are now an observer: ${title}`,
+            body: t.description || title,
+            link: `/todo?task=${t.id}`,
+            metadata: { type: "todo_observer", todo_id: t.id },
+          })),
+        );
+      }
+    }
     return {
       ok: true,
       permissionStatus: "allowed",
-      data: { id: t.id, updated: Object.keys(changes) },
+      data: { id: t.id, updated: [...Object.keys(changes), ...(nextObservers !== null ? ["observers"] : [])] },
       message: `Updated "${typeof changes.title === "string" ? changes.title : title}".`,
       sources: ["koleex_todos(update)"],
     };

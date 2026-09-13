@@ -200,7 +200,9 @@ export function isVoiceTool(name: string): boolean {
  *  confirm yourself — the caller taps". The model was given both. */
 const VOICE_DESCRIPTION_OVERRIDES: Record<string, string> = {
   createTodo:
-    "Save a task for the caller. Call WITHOUT confirm with the title in their words and the due date if they said one:" +
+    "Save a task or reminder for the caller, or assign one to colleagues (ids from findTeamMember). Call WITHOUT confirm" +
+    " with the title in their words and everything they said — the due date, remind_at for \"remind me at 3\" (today" +
+    " 15:00 in their timezone), priority, people, label, recurrence; only the title is required, never ask for the rest:" +
     " a card appears on their screen and only their tap saves it. Never call with confirm yourself.",
 };
 

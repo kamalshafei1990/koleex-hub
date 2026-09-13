@@ -125,7 +125,7 @@ console.log("\n── 1. The allow-list is the security boundary ──");
   check("  …and the call's conversation id reaches the registry, parsed strictly, so the ledger and the audit table know which call (audit, 2026-09-07)",
     /const conversationId = parseConversationParam\(typeof body\.conversation_id === "string" \? body\.conversation_id : null\);/.test(toolRoute));
   check("a write's PREVIEW arguments go to the client beside the model's envelope, never inside it, and only for a write tool awaiting approval",
-    /isVoiceWriteTool\(name\) && result\.permissionStatus === "approval_required" && result\.pendingAction\s*\?\s*\{ tool: result\.pendingAction\.tool, args: result\.pendingAction\.args \}/.test(toolRoute) &&
+    /isVoiceWriteTool\(name\) && result\.permissionStatus === "approval_required" && result\.pendingAction\s*\?\s*\{\s*tool: result\.pendingAction\.tool,\s*args: result\.pendingAction\.args,\s*(\/\*[^*]*\*\/\s*)?preview: \(result\.data as \{ preview\?: unknown \} \| null\)\?\.preview \?\? undefined,\s*\}/.test(toolRoute) &&
     /\.\.\.\(pending \? \{ pending \} : \{\}\),/.test(toolRoute) &&
     !/output: \{[^}]*pending/.test(toolRoute));
 
