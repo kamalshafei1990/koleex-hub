@@ -1001,3 +1001,53 @@ Now:
 So during a live call exactly one AudioContext runs. If the crackle
 survives this, the relay's `clicks=`/`edges=`/`clip=` readings decide
 between the vendor's audio and the device.
+
+## "The iPad is much better; the Chinese line on the iPad is totally fine" (2026-09-13 06:12–06:20 UTC)
+
+Three facts from this window, in order of weight:
+
+1. **The far side's audio is clean.** The relay's new meter on two socket-lane
+   calls (sessions 5 and 8): `clicks=0 edges=0 clip=0 peak=61`, `peak=59`.
+   No click, no clipped sample, no seam at any frame joint. Whatever the
+   iPhone hears was made after Singapore.
+2. **The iPhone runs dry where the relay does not.** Session 8 (82 s):
+   `gaps=13 maxGap=1598 minAhead=-25` at the relay — the far side stalls up
+   to 1.6 s between frames but, counted from an answer's first frame, is
+   only 25 ms behind real time. The same call's beacon: `u13:b1200` —
+   thirteen underruns with the lead at its 1.2 s ceiling. An iPad on the
+   same account does not cut. Either the path Singapore → phone adds more
+   than a second of jitter the tablet's path does not, or the phone's main
+   thread stalls and cannot feed the ring. The beacon now tells them apart:
+   `:g<ms>` (the longest gap between frames of one answer AS THEY REACH THE
+   PAGE — against the relay's maxGap) and `:m<ms>` (the main thread's worst
+   stall, a 250 ms timer's lateness); the mainland string gains `sconc=`
+   (concealment that was silence) and `jbd=` (the receiver's hold) and
+   `stall=`.
+3. **"Connecting" was the server, seven times over.** Every mainland
+   handshake from sin1 between 06:12 and 06:18 spent 10 s on a connect
+   timeout to the cn-north endpoint, 3 s on a retry of the same endpoint,
+   and then got the alt region in under 200 ms — `first=primary` each time,
+   because the browser's saved hint ("primary served me at 06:12:09")
+   outranked the server's memory of it failing since. Meanwhile the socket
+   lane's origin was unreachable from the phone (canary timeout at 3.5 s —
+   the new abort worked: 6.7–9.6 s instead of 17–20), and the fall-backs and
+   "Try again" taps ran the account's six-starts-a-minute budget out:
+   `ratelimit account count=10 max=6`, "Too many calls started".
+
+### This PR
+
+- **A failed region goes last for ten minutes** (`lastFailed`,
+  `orderRegionSlots(..., failed)`), whatever the hint says.
+- **A dead path is not sampled twice**: a connect timeout, a refused
+  connection or an unresolved name leaves the region for the other one at
+  once (`continue regions`), and the first attempt is 7 s, not 13.
+  Worst case on a dead primary: ~7 s once, then ~1 s.
+- **Twelve starts a minute**, not six: a fall-back and a "Try again" are
+  starts too.
+- **The aurora rests while a call is up** (`kx-call-live` → the canvas loop
+  stops; `kx-call-ended` → it resumes): the heaviest thing on the page gives
+  the phone its headroom back.
+- **The AI app is warmed on Home** (prefetch tier A, gated on Save-Data, a
+  slow link, a hidden tab, offline): the loading screen the owner sees is
+  its chunk downloading on the tap.
+- **The meters above**, so the next iPhone call says path or page.

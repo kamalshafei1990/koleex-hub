@@ -1956,7 +1956,7 @@ console.log("\n── 12. Mute ──");
      call's context by a sink; the Hub engine is held from live to release. */
   check("the call installs a cue sink at the tap — the voice's context first, the tones' context second, nothing before the call has one — holds the Hub engine from live, and releases both",
     /setCueSink\(\(bytes, volume\) => \{\s*const viaCall = sessionRef\.current\?\.playCue\(bytes, volume\) \?\? null;\s*if \(viaCall\) return viaCall;\s*const tones = tonesRef\.current\?\.context\(\) \?\? null;\s*if \(!tones\) return false;\s*return \(cuePlayerRef\.current \?\?= createPreviewPlayer\(\(\) => tones as unknown as PreviewContextLike\)\)\.play\(bytes\);\s*\}\);\s*prefetchCues\(CALL_CUES\);/.test(startBody) &&
-    /if \(next === "live"\) holdSoundEngine\(true\);/.test(btn) && (btn.match(/cuePlayerRef\.current\?\.stop\(\);\s*cuePlayerRef\.current = null;\s*setCueSink\(null\);\s*holdSoundEngine\(false\);/g) ?? []).length === 2 &&
+    /if \(next === "live"\) \{\s*holdSoundEngine\(true\);/.test(btn) && (btn.match(/cuePlayerRef\.current\?\.stop\(\);\s*cuePlayerRef\.current = null;\s*setCueSink\(null\);\s*holdSoundEngine\(false\);/g) ?? []).length === 2 &&
     (() => {
       const fs = fs16.readFileSync("src/lib/notificationSound.ts", "utf8");
       const pl = fs16.readFileSync("src/lib/sounds/player.ts", "utf8");
@@ -3064,13 +3064,13 @@ function describeErrorCheck(): boolean {
     const r = await laneRun();
     const d0 = r.s.diagnostics();
     check("before the socket opens: no frames up, a reader that has not started, a microphone track that is live, open and on",
-      d0.up_frames === 0 && d0.capture === "none:running:24000:f0:s" && d0.mic === "live:open:on");
+      d0.up_frames === 0 && d0.capture === "none:running:24000:f0:s:g0:m0" && d0.mic === "live:open:on");
     r.sockets[0].open();
     r.audios[0].frame?.("AAAA");
     r.audios[0].frame?.("BBBB");
     const d1 = r.s.diagnostics();
     check("two microphone frames sent are two frames up; the reader, the context's state and its rate are named; the loudest sample is the reader's",
-      d1.up_frames === 2 && d1.capture === "worklet:running:24000:f0:srunning" && d1.mic_peak === 0.42 && r.sockets[0].sent.length === 3);
+      d1.up_frames === 2 && d1.capture === "worklet:running:24000:f0:srunning:g0:m0" && d1.mic_peak === 0.42 && r.sockets[0].sent.length === 3);
     r.sockets[0].drop();
     r.audios[0].frame?.("CCCC");
     check("  …a frame under a closed socket is not sent and not counted", r.s.diagnostics().up_frames === 2);
@@ -3379,7 +3379,7 @@ function describeErrorCheck(): boolean {
       /flush\(\) \{[\s\S]{0,120}?gate\.flush\(\);\s*\}/.test(wa) && !/JitterQueue|nextFrameStart|LEAD_S \/ 2|jitter\.push|createBufferSource\(\);\s*node\.buffer = buffer;\s*node\.connect\(farBus\);\s*(jitter|gate)/.test(wa) && PLAYOUT_PROCESSOR_SAMPLES === 2048);
     check("  …the session tells the player when an answer's audio is over (both event names) and on response.done, and the gate hears it",
       /endOfResponse\(\) \{\s*gate\.endOfResponse\(\);\s*\}/.test(wa) &&
-      /if \(type === EV_WS_AUDIO_DONE \|\| type === EV_WS_AUDIO_DONE_GA \|\| type === EV_WS_RESPONSE_DONE\) \{\s*try \{\s*audio\.endOfResponse\?\.\(\);/.test(fs29.readFileSync("src/lib/voice/session.ts", "utf8")) &&
+      /if \(type === EV_WS_AUDIO_DONE \|\| type === EV_WS_AUDIO_DONE_GA \|\| type === EV_WS_RESPONSE_DONE\) \{\s*(\/\*[\s\S]*?\*\/\s*)?this\.wsLastDeltaAt = 0;\s*try \{\s*audio\.endOfResponse\?\.\(\);/.test(fs29.readFileSync("src/lib/voice/session.ts", "utf8")) &&
       /const EV_WS_AUDIO_DONE = "response\.audio\.done";\s*const EV_WS_AUDIO_DONE_GA = "response\.output_audio\.done";\s*const EV_WS_RESPONSE_DONE = "response\.done";/.test(fs29.readFileSync("src/lib/voice/session.ts", "utf8")));
     check("the microphone is read on the audio thread by a worklet loaded from a blob — no second file — and the processor is the fallback, never both",
       CAPTURE_WORKLET_NAME === "koleex-capture" && CAPTURE_WORKLET_SOURCE.includes(`registerProcessor("${CAPTURE_WORKLET_NAME}"`) && CAPTURE_WORKLET_SOURCE.includes(`new Float32Array(${FRAME_SAMPLES})`) &&
@@ -3530,6 +3530,27 @@ function describeErrorCheck(): boolean {
     check("the button writes the pulse while live or reconnecting, clears it on release, and nudges the page's other sockets",
       /if \(state !== "live" && state !== "reconnecting"\) return;[\s\S]{0,900}?writeCallPulse\(store, \{/.test(btn) && /const t = window\.setInterval\(beat, CALL_PULSE_EVERY_MS\);/.test(btn) &&
       /clearCallPulse\(browserStorage\(\)/.test(btn) && /window\.dispatchEvent\(new Event\("kx-call-ended"\)\);/.test(btn));
+  /* THE PATH AND THE PAGE, TOLD APART; THE AURORA RESTS; THE AI APP IS
+     WARMED ON HOME (2026-09-13, iPhone cuts where the iPad did not). */
+  check("the beacon tells the path from the page: the longest gap between frames of one answer at the page and the main thread's worst stall ride the capture string; the mainland stats add silent concealment and the receiver's hold",
+    (() => {
+      const se = readFileSync("src/lib/voice/session.ts", "utf8");
+      return /const STALL_EVERY_MS = 250;/.test(se) && /:g\$\{this\.wsMaxDeltaGapMs\}:m\$\{this\.stallMaxMs\}` : "",/.test(se) &&
+        /rtc: this\.rtcStats \? `\$\{this\.rtcStats\} stall=\$\{this\.stallMaxMs\}` : "",/.test(se) &&
+        /sconc=\$\{r\.silentConcealedSamples \?\? 0\} jbd=\$\{jbd\}/.test(se) &&
+        /if \(this\.wsLastDeltaAt > 0\) \{\s*const gap = arrivedAt - this\.wsLastDeltaAt;\s*if \(gap > this\.wsMaxDeltaGapMs\) this\.wsMaxDeltaGapMs = gap;\s*\}/.test(se) &&
+        /this\.wsLastDeltaAt = 0;\s*try \{\s*audio\.endOfResponse\?\.\(\);/.test(se) &&
+        (se.match(/this\.stopRtcStats\(\);\s*this\.stopStallMeter\(\);/g) ?? []).length === 2 && /this\.startRtcStats\(pc\);\s*this\.startStallMeter\(\);/.test(se);
+    })());
+  check("the aurora rests while a call is up — the button says kx-call-live at live, the canvas stops its loop and resumes at kx-call-ended — and the AI app is warmed on Home",
+    (() => {
+      const wavy = readFileSync("src/components/ui/WavyBackground.tsx", "utf8");
+      const pre = readFileSync("src/lib/app-prefetch.ts", "utf8");
+      return /window\.dispatchEvent\(new Event\("kx-call-live"\)\)/.test(btn) &&
+        /const shouldRun = !document\.hidden && !inCall;/.test(wavy) && /window\.addEventListener\("kx-call-live", onCallLive\);\s*window\.addEventListener\("kx-call-ended", onCallEnded\);/.test(wavy) &&
+        /window\.removeEventListener\("kx-call-live", onCallLive\);\s*window\.removeEventListener\("kx-call-ended", onCallEnded\);/.test(wavy) &&
+        /TIER_A_IDLE_PRELOAD: readonly string\[\] = \["ai", /.test(pre) && !/TIER_C_NO_PRELOAD: readonly string\[\] = \[\s*"database", "ai"/.test(pre);
+    })());
     check("  …on load it flushes queued beacons, and a found pulse is beaconed as page-killed and told to the caller",
       /const flush = \(\) => flushVoiceTelemetry\(\);\s*flush\(\);\s*window\.addEventListener\("online", flush\);/.test(btn) &&
       /const dead = store \? takeInterruptedCall\(store\) : null;/.test(btn) && /reason: "page-killed",\s*lane: dead\.lane,/.test(btn) && /onErrorRef\.current\?\.\(INTERRUPTED_COPY\[langRef\.current\]\);/.test(btn) &&

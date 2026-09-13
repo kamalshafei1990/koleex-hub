@@ -306,11 +306,19 @@ export function orderRegionSlots(
   hint: VoiceRegionSlot | null,
   remembered: VoiceRegionSlot | null,
   have: { primary: boolean; alt: boolean },
+  /* A SLOT THAT DID NOT ANSWER THIS INSTANCE A MOMENT AGO (2026-09-13
+     06:12–06:18: seven handshakes in six minutes, every one of them thirteen
+     seconds on a mainland endpoint that had timed out for the one before,
+     because the browser's hint — saved when that endpoint last served —
+     outranked the server's memory of it failing). A failure that fresh is
+     the one fact newer than the hint; the slot goes last. */
+  failed: VoiceRegionSlot | null = null,
 ): VoiceRegionSlot[] {
   const base = (["primary", "alt"] as const).filter((s) => have[s]);
   const first = hint && have[hint] ? hint : remembered && have[remembered] ? remembered : null;
-  if (!first) return base;
-  return [first, ...base.filter((s) => s !== first)];
+  const order = first ? [first, ...base.filter((s) => s !== first)] : base;
+  if (failed && order.length > 1 && order[0] === failed) return [...order.slice(1), failed];
+  return order;
 }
 
 /* ---------------------------------------------------------------------------

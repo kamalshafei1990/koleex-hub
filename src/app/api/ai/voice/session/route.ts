@@ -183,13 +183,24 @@ const HANDSHAKE_ATTEMPT_BUDGETS_MS = [13_000, 3_000, 3_000, 3_000] as const;
    short one: 13+3 twice is 32s, inside the same 45s ceiling. Two samples of
    a path that is dead right now buy less than one attempt at a different
    path — which is the whole reason the second region exists. */
-const TWO_REGION_ATTEMPT_BUDGETS_MS = [13_000, 3_000] as const;
+/* SEVEN SECONDS FOR THE FIRST ATTEMPT (2026-09-13): a mainland handshake
+   that answers does so in about a second (838 ms at 06:12:09); one that dies
+   with UND_ERR_CONNECT_TIMEOUT does so at ten, and thirteen was a ceiling the
+   connect timeout never let it reach. Seven bounds a dead path at seven, and
+   a path that is dead is not retried here — it is left for the other region
+   (see `continue regions` below) and remembered (lastFailed). */
+const TWO_REGION_ATTEMPT_BUDGETS_MS = [7_000, 3_000] as const;
 
 /* A voice call is the only feature in this product that spends money
    continuously while the user says nothing, so the budget is on SESSIONS
    rather than turns and is deliberately tight. A person opens a handful of
    calls a minute at the very most; a loop opens hundreds. */
-const VOICE_SESSIONS_PER_MIN = Number(process.env.AI_LIMIT_VOICE_SESSIONS_PER_MIN) || 6;
+/* TWELVE A MINUTE (2026-09-13 06:12: a caller whose first lane was
+   unreachable, whose second lane spent thirteen seconds on a dead region,
+   and who tapped "Try again" twice, was refused with "too many calls" at the
+   seventh start — every fall-back and retry is a start to this counter).
+   Twelve still bounds a runaway to one call every five seconds. */
+const VOICE_SESSIONS_PER_MIN = Number(process.env.AI_LIMIT_VOICE_SESSIONS_PER_MIN) || 12;
 
 /* Named explicitly rather than passing `process.env`. The config module takes
    the four variables it is allowed to see and nothing else, so a future
@@ -210,6 +221,15 @@ let lastServed: { slot: VoiceRegionSlot; at: number } | null = null;
 const LAST_SERVED_TTL_MS = 30 * 60_000;
 function rememberedSlot(): VoiceRegionSlot | null {
   return lastServed && Date.now() - lastServed.at < LAST_SERVED_TTL_MS ? lastServed.slot : null;
+}
+/* AND THE SLOT THAT DID NOT ANSWER — the same warm-instance memory, a shorter
+   life. A connect timeout is a path that is down right now; for the next
+   ten minutes this instance asks the other region first, whatever the
+   browser's hint says (orderRegionSlots). */
+let lastFailed: { slot: VoiceRegionSlot; at: number } | null = null;
+const LAST_FAILED_TTL_MS = 10 * 60_000;
+function recentlyFailedSlot(): VoiceRegionSlot | null {
+  return lastFailed && Date.now() - lastFailed.at < LAST_FAILED_TTL_MS ? lastFailed.slot : null;
 }
 
 function voiceEnv(): VoiceEnv {
@@ -325,7 +345,7 @@ export async function POST(req: Request) {
      memory exists: it is the difference between a call that connects in a
      second and one that spends thirteen seconds timing out on a region that
      has not answered all day. */
-  const order = orderRegionSlots(hint, rememberedSlot(), { primary: primary !== null, alt: alt !== null });
+  const order = orderRegionSlots(hint, rememberedSlot(), { primary: primary !== null, alt: alt !== null }, recentlyFailedSlot());
   const candidates: Array<{ slot: VoiceRegionSlot; cfg: VoiceConfig }> = order.map((slot) => ({
     slot,
     cfg: (slot === "alt" ? alt : primary) as VoiceConfig,
@@ -478,6 +498,19 @@ export async function POST(req: Request) {
           `region=${cfg.regionLabel} ` +
           `afterMs=${Date.now() - startedAt} budgetMs=${budgetMs} cause=${lastCause}`,
       );
+      /* A PATH THAT IS DOWN IS NOT SAMPLED TWICE (2026-09-13). A connect
+         timeout, a refused connection or a name that does not resolve is
+         the network, not a slow service; the short retry on the same slot
+         bought nothing seven times in six minutes while the other region
+         answered in under a second. With another region to ask, this one
+         is left now and remembered as failed for the calls that follow. */
+      const pathDown = timedOut || /CONNECT_TIMEOUT|ECONNREFUSED|ENOTFOUND|EAI_AGAIN|ECONNRESET/.test(lastCause);
+      const another = candidates.indexOf(region) < candidates.length - 1;
+      if (pathDown && another) {
+        lastFailed = { slot: region.slot, at: Date.now() };
+        continue regions;
+      }
+      if (attempt === budgets.length) lastFailed = { slot: region.slot, at: Date.now() };
     }
   }
   }
