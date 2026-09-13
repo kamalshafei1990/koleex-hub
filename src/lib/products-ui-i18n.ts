@@ -1394,6 +1394,20 @@ export const PRODUCTS_UI_I18N: Translations = {
   "pk.opt.docs":           { en: "Manual / documents", zh: "说明书 / 文件", ar: "كتالوج / مستندات" },
 
   "pk.select":             { en: "— Select —", zh: "— 请选择 —", ar: "— اختر —" },
+
+  /* Unit switch + unit-suffixed labels (2026-09-13). Supplier catalogues print
+     sizes in mm, cm or m and weights in g or kg; the operator picks what the
+     page in front of them says and the form stores cm/kg regardless. */
+  "pk.unitSize":           { en: "Size", zh: "尺寸", ar: "المقاس" },
+  "pk.unitWeight":         { en: "Weight", zh: "重量", ar: "الوزن" },
+  "pk.colLbare":           { en: "L", zh: "长", ar: "طول" },
+  "pk.colWbare":           { en: "W", zh: "宽", ar: "عرض" },
+  "pk.colHbare":           { en: "H", zh: "高", ar: "ارتفاع" },
+  "pk.colGrossBare":       { en: "Gross", zh: "毛重", ar: "قائم" },
+  "pk.netWeightBare":      { en: "Net weight", zh: "净重", ar: "الوزن الصافي" },
+  "pk.grossWeightBare":    { en: "Gross weight", zh: "毛重", ar: "الوزن القائم" },
+  "pk.packagingWeightBare":{ en: "Packaging weight", zh: "包装重量", ar: "وزن التغليف" },
+  "pk.dropHere":           { en: "…or drag an image here", zh: "…或将图片拖到此处", ar: "…أو اسحب صورة هنا" },
   "step.compliance": { en: "Compliance", zh: "合规", ar: "الامتثال" },
   "step.knowledge": { en: "Knowledge", zh: "知识", ar: "المعرفة" },
   /* ── legacy Technical Details block ── */

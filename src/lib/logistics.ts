@@ -61,8 +61,71 @@ export interface DangerousGoods {
  * container — depends on which of the two this product is. */
 export type PackingMode = "per_unit" | "per_package";
 
+/* ── UNITS ARE A DISPLAY CHOICE, NEVER A STORAGE ONE ───────────────────────
+   Supplier catalogues do not agree with each other: one prints the crate in
+   mm, the next in cm, a third in metres, and weights come as grams or kilos.
+   The operator must be able to type what the catalogue says without doing
+   arithmetic in their head — that mental conversion is where a 1,200 becomes
+   a 120.
+
+   So the FORM lets them pick the unit, and the FILE keeps one: centimetres
+   and kilograms, the units the field names already promise (l_cm, gross_kg).
+   Everything downstream — CBM, container loading, the packing list — keeps
+   reading canonical numbers and needs no idea a choice was ever made. Picking
+   a different unit re-displays the same physical size; it never rewrites it. */
+export type DimUnit = "mm" | "cm" | "m";
+export type WeightUnit = "g" | "kg";
+
+export const DIM_UNITS: { value: DimUnit; label: string; perCm: number }[] = [
+  { value: "mm", label: "mm", perCm: 10 },
+  { value: "cm", label: "cm", perCm: 1 },
+  { value: "m",  label: "m",  perCm: 0.01 },
+];
+export const WEIGHT_UNITS: { value: WeightUnit; label: string; perKg: number }[] = [
+  { value: "g",  label: "g",  perKg: 1000 },
+  { value: "kg", label: "kg", perKg: 1 },
+];
+
+const dimFactor = (u: DimUnit | undefined) => DIM_UNITS.find((x) => x.value === u)?.perCm ?? 1;
+const wtFactor = (u: WeightUnit | undefined) => WEIGHT_UNITS.find((x) => x.value === u)?.perKg ?? 1;
+
+/* Round to 4 decimals on the way in: 12 m → 1200 cm exactly, and a value that
+   has been round-tripped through metres does not accumulate float dust. */
+const tidy = (n: number) => Math.round(n * 10000) / 10000;
+
+/** What the operator typed (in `unit`) → centimetres for storage. */
+export const dimToCm = (v: unknown, unit: DimUnit | undefined): number | "" => {
+  const s = String(v ?? "").trim();
+  if (s === "") return "";
+  const n = Number(s);
+  return Number.isFinite(n) ? tidy(n / dimFactor(unit)) : "";
+};
+/** Stored centimetres → what the operator should see in `unit`. */
+export const dimFromCm = (v: unknown, unit: DimUnit | undefined): string => {
+  const s = String(v ?? "").trim();
+  if (s === "") return "";
+  const n = Number(s);
+  return Number.isFinite(n) ? String(tidy(n * dimFactor(unit))) : "";
+};
+export const weightToKg = (v: unknown, unit: WeightUnit | undefined): number | "" => {
+  const s = String(v ?? "").trim();
+  if (s === "") return "";
+  const n = Number(s);
+  return Number.isFinite(n) ? tidy(n / wtFactor(unit)) : "";
+};
+export const weightFromKg = (v: unknown, unit: WeightUnit | undefined): string => {
+  const s = String(v ?? "").trim();
+  if (s === "") return "";
+  const n = Number(s);
+  return Number.isFinite(n) ? String(tidy(n * wtFactor(unit))) : "";
+};
+
 export interface ProductLogistics {
   packing_mode?: PackingMode;
+  /* Entry units. Display only — every stored length is cm and every stored
+     weight is kg regardless of what these say. */
+  dim_unit?: DimUnit;
+  weight_unit?: WeightUnit;
   /** per_package only: pieces of the product in ONE package. */
   units_per_package?: number | string;
   /** The big sample photo of how this product is packed. */
