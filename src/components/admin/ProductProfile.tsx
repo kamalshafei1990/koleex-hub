@@ -53,6 +53,10 @@ import Collapse from "@/components/ui/Collapse";
 import dynamic from "next/dynamic";
 import { useSkin } from "@/lib/appearance";
 import FeatureHighlightsDisplay from "./FeatureHighlightsDisplay";
+import {
+  DG_KINDS, ORIGIN_CERTIFICATES, PACKING_TYPES, WOOD_TREATMENTS,
+  flattenContents, sumPackages, type ProductLogistics,
+} from "@/lib/logistics";
 
 const WavyBackground = dynamic(() => import("@/components/ui/WavyBackground"), { ssr: false });
 
@@ -159,6 +163,16 @@ const PROFILE_T: Record<string, { en: string; zh: string; ar: string }> = {
   "pp.f.machineWeight": { en: "Machine weight (kg)", zh: "机器重量(kg)", ar: "وزن الماكينة (كجم)" },
   "pp.f.machineDims": { en: "Machine dimensions", zh: "机器尺寸",       ar: "أبعاد الماكينة" },
   "pp.f.packingTitle": { en: "Primary variant packing", zh: "主型号包装", ar: "تغليف المتغيّر الأساسي" },
+  /* Read-side labels for products.logistics (2026-09-13). The profile used to
+     print "Primary variant packing" over variant columns; when the product
+     carries its own packing the heading has to say so. */
+  "pp.f.packingTitleProduct": { en: "Packing & shipment", zh: "包装与发运", ar: "التعبئة والشحن" },
+  "pp.f.packingPhotoAlt":     { en: "Packed product", zh: "已包装产品", ar: "المنتج بعد التغليف" },
+  "pp.f.woodTreatment":       { en: "Wood treatment", zh: "木材处理", ar: "معالجة الخشب" },
+  "pp.f.packages":            { en: "Packages", zh: "包装件数", ar: "الطرود" },
+  "pp.f.portOfLoading":       { en: "Port of loading", zh: "装运港", ar: "ميناء الشحن" },
+  "pp.f.originCert":          { en: "Origin certificate", zh: "原产地证书", ar: "شهادة المنشأ" },
+  "pp.f.regulated":           { en: "Regulated content", zh: "受管制内容物", ar: "محتوى خاضع لقيود" },
   "pp.f.netWeight":   { en: "Net weight",         zh: "净重",           ar: "الوزن الصافي" },
   "pp.f.grossWeight": { en: "Gross weight",       zh: "毛重",           ar: "الوزن القائم" },
   "pp.f.cbm":         { en: "CBM",                zh: "体积(立方米)",   ar: "الحجم (م³)" },
@@ -481,6 +495,132 @@ const MEDIA_SLOTS: Array<{ type: string; fallback: string }> = [
 
 /* The editor's field row: label on top, value under it, help line beneath.
    Used by every tab so a reader never meets two different field shapes. */
+/* ── packing, read-only ────────────────────────────────────────────────────
+   Shows what the Packing & Logistics tab holds, in the order the tab asks it:
+   what the crate is, what is inside it, what it weighs, how many fit. Values
+   the operator never entered are simply absent — a sheet full of "Not set" is
+   noise, and the tab itself is where the gaps are supposed to be visible. */
+function PackingSheet({
+  logistics, model, t, rows,
+}: {
+  logistics: ProductLogistics;
+  model: Record<string, unknown> | undefined;
+  t: (k: string, fb: string) => string;
+  rows: string;
+}) {
+  const label = (list: readonly { value: string; label: string }[], v: unknown) => {
+    const hit = list.find((o) => o.value === v);
+    return hit ? t(`pk.opt.${hit.value}`, hit.label) : (v as string) || null;
+  };
+  const sums = sumPackages(logistics.packages);
+  /* The product is the source; a legacy product that never saw the new tab
+     still has its numbers on the primary variant, so fall back rather than
+     show an empty sheet over data that exists. */
+  const fromProduct = sums.packageCount > 0 || logistics.packing_type || logistics.net_weight_kg;
+  const m = (k: string) => (model ? (model as Record<string, unknown>)[k] : undefined);
+
+  const netW = fromProduct ? logistics.net_weight_kg : m("net_weight");
+  const grossW = fromProduct ? (sums.grossKg || logistics.gross_weight_kg) : m("weight");
+  const cbm = fromProduct ? (sums.cbm || logistics.cbm) : m("cbm");
+  const q20 = fromProduct ? logistics.qty_20ft : m("container_20ft_qty");
+  const q40 = fromProduct ? logistics.qty_40ft : m("container_40ft_qty");
+  const q40hq = fromProduct ? logistics.qty_40hq : m("container_40hq_qty");
+  const pType = fromProduct ? label(PACKING_TYPES, logistics.packing_type) : (m("packing_type") as string | undefined);
+
+  const anything =
+    pType || netW || grossW || cbm || q20 || q40 || q40hq ||
+    logistics.wood_treatment || logistics.origin_certificate || logistics.port_of_loading ||
+    logistics.dangerous_goods?.has;
+  if (!anything) return null;
+
+  const dg = logistics.dangerous_goods;
+  /* DG_KINDS, not ITEM_KINDS — the wrong list matched nothing and the sheet
+     printed the stored values: "lithium_battery, oil_filled". */
+  const dgNames = (dg?.kinds ?? []).map((k) => label(DG_KINDS, k) ?? k);
+
+  return (
+    <div className="mt-4 pt-4 border-t border-[var(--border-subtle)]">
+      <div className="text-[11px] font-semibold text-[var(--text-muted)] mb-2.5">
+        {fromProduct
+          ? t("pp.f.packingTitleProduct", "Packing & shipment")
+          : t("pp.f.packingTitle", "Primary variant packing")}
+      </div>
+
+      {logistics.packing_photo_url ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={logistics.packing_photo_url}
+          alt={t("pp.f.packingPhotoAlt", "Packed product")}
+          className="mb-3 w-full max-w-md rounded-xl border border-[var(--border-subtle)] object-contain bg-black/20"
+        />
+      ) : null}
+
+      <div className={rows}>
+        <Row label={t("pp.f.packingType", "Packing type")} value={pType} />
+        {logistics.wood_treatment ? (
+          <Row label={t("pp.f.woodTreatment", "Wood treatment")} value={label(WOOD_TREATMENTS, logistics.wood_treatment)} />
+        ) : null}
+        {sums.packageCount > 0 ? (
+          <Row
+            label={t("pp.f.packages", "Packages")}
+            value={
+              logistics.packing_mode === "per_package" && logistics.units_per_package
+                ? `${logistics.units_per_package} ${t("pk.pcsWord", "pcs")} / ${t("pk.packageOne", "Package").toLowerCase()}`
+                : `${sums.packageCount}`
+            }
+            help={(logistics.packages ?? [])
+              .map((r) => [r.label, r.l_cm && r.w_cm && r.h_cm ? `${r.l_cm}×${r.w_cm}×${r.h_cm} cm` : null].filter(Boolean).join(" · "))
+              .filter(Boolean)
+              .join("  |  ") || undefined}
+          />
+        ) : null}
+        <Row label={t("pp.f.netWeight", "Net weight")} value={netW} />
+        <Row label={t("pp.f.grossWeight", "Gross weight")} value={grossW} />
+        <Row label={t("pp.f.cbm", "CBM")} value={cbm} />
+        <Row label={t("pp.f.q20", "20ft qty")} value={q20} />
+        <Row label={t("pp.f.q40", "40ft qty")} value={q40} />
+        <Row label={t("pp.f.q40hq", "40HQ qty")} value={q40hq} />
+        {logistics.port_of_loading ? (
+          <Row label={t("pp.f.portOfLoading", "Port of loading")} value={logistics.port_of_loading} />
+        ) : null}
+        {logistics.origin_certificate && logistics.origin_certificate !== "none" ? (
+          <Row label={t("pp.f.originCert", "Origin certificate")} value={label(ORIGIN_CERTIFICATES, logistics.origin_certificate)} />
+        ) : null}
+        {dg?.has ? (
+          <Row
+            label={t("pp.f.regulated", "Regulated content")}
+            value={dgNames.join(", ") || t("pk.dgHas", "Has regulated content")}
+            help={[dg.un_numbers, dg.notes].filter(Boolean).join(" · ") || undefined}
+          />
+        ) : null}
+      </div>
+
+      {/* What is in the crates — the packing list, flattened with the
+          quantities multiplied through the nesting. */}
+      {(logistics.packages ?? []).some((r) => r.contents?.length) ? (
+        <div className="mt-3 pt-3 border-t border-[var(--border-subtle)]">
+          <div className="text-[10px] font-bold uppercase tracking-[0.08em] text-[var(--text-ghost)] mb-1.5">
+            {t("pk.whatsInside", "What's inside")}
+          </div>
+          <ul className="space-y-1">
+            {(logistics.packages ?? []).flatMap((r, ri) =>
+              flattenContents(r.contents, Number(r.qty) || 1).map((c, ci) => (
+                <li
+                  key={`${ri}-${ci}`}
+                  className="text-[12px] text-[var(--text-secondary)] tabular-nums"
+                  style={{ paddingInlineStart: `${c.depth * 14}px` }}
+                >
+                  <span className="text-[var(--text-ghost)]">{c.qty} ×</span> {c.label}
+                </li>
+              )),
+            )}
+          </ul>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 function Row({ label, value, help, mono, badge, iconSrc }: {
   label: string; value: unknown; help?: string; mono?: boolean; badge?: string;
   /** Explicit glyph URL (e.g. the classification icon HUB) — overrides the
@@ -606,6 +746,8 @@ export default function ProductProfile() {
   })();
 
   const s2 = (k: string) => p[k];
+  /* products.logistics — the single home for packing since 2026-09-13. */
+  const logi = (p?.logistics ?? {}) as ProductLogistics;
 
   return (
     <div className="kx-pd min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)]">
@@ -1192,21 +1334,16 @@ export default function ProductProfile() {
           <Row label={t("pp.f.machineWeight", "Machine weight (kg)")} value={s2("machine_weight_kg")} />
           <Row label={t("pp.f.machineDims", "Machine dimensions")} value={s2("machine_dimensions")} />
         </div>
-        {data.models[0] && (
-          <div className="mt-4 pt-4 border-t border-[var(--border-subtle)]">
-            <div className="text-[11px] font-semibold text-[var(--text-muted)] mb-2.5">{t("pp.f.packingTitle", "Primary variant packing")}</div>
-            <div className={rows}>
-              <Row label={t("pp.f.netWeight", "Net weight")} value={data.models[0].net_weight} />
-              <Row label={t("pp.f.grossWeight", "Gross weight")} value={data.models[0].weight} />
-              <Row label={t("pp.f.cbm", "CBM")} value={data.models[0].cbm} />
-              <Row label={t("pp.f.carton", "Carton dimensions")} value={data.models[0].carton_dimensions} />
-              <Row label={t("pp.f.packingType", "Packing type")} value={data.models[0].packing_type} />
-              <Row label={t("pp.f.q20", "20ft qty")} value={data.models[0].container_20ft_qty} />
-              <Row label={t("pp.f.q40", "40ft qty")} value={data.models[0].container_40ft_qty} />
-              <Row label={t("pp.f.q40hq", "40HQ qty")} value={data.models[0].container_40hq_qty} />
-            </div>
-          </div>
-        )}
+        {/* THE PROFILE WAS READING THE WRONG TABLE. Packing moved to
+            products.logistics — one fixed section for every product — but this
+            sheet still read the primary VARIANT's columns, so everything typed
+            on the new tab showed as empty here while the page confidently
+            printed a heading over it. It reads the product first now, and falls
+            back to the variant for products whose packing was entered before
+            the move (and for the per-variant overrides that still live there).
+            Packing type and wood treatment are stored as enum values; the same
+            dictionary the form uses turns them back into words. */}
+        <PackingSheet logistics={logi} model={data.models[0]} t={t} rows={rows} />
       </Group>
       )}
 
