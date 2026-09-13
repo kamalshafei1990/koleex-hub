@@ -3607,7 +3607,7 @@ function describeErrorCheck(): boolean {
     rmsLevel(silent) === 0 && Math.abs(rmsLevel(loud) - Math.min(1, 0.5 * DISPLAY_GAIN)) < 1e-9 && rmsLevel(new Uint8Array(0)) === 0 && rmsLevel(new Uint8Array(512).fill(255)) === 1 && DISPLAY_GAIN === 2.8 && LEVEL_EPSILON === 0.02);
   const wa = readFileSync("src/lib/voice/ws-audio.ts", "utf8");
   check("the socket lane's audio meters both sides INSIDE its own context: an analyser on the output, one on the microphone source, read on demand",
-    /const farMeter = ctx\.createAnalyser\(\);/.test(wa) && /const farBus = ctx\.createGain\(\);\s*farBus\.connect\(ctx\.destination\);/.test(wa) && /farBus\.connect\(farMeter\);/.test(wa) && !/^\s*out\.connect/m.test(wa) && (wa.match(/node\.connect\(farBus\);/g) ?? []).length === 3 && /micMeter = ctx\.createAnalyser\(\);[\s\S]{0,240}?source\.connect\(micMeter\);/.test(wa) &&
+    /const farMeter = ctx\.createAnalyser\(\);/.test(wa) && /const farBus = ctx\.createGain\(\);[\s\S]{0,900}?farBus\.gain\.value = FAR_GAIN;[\s\S]{0,700}?farBus\.connect\(limiter\);\s*limiter\.connect\(ctx\.destination\);\s*\} else \{\s*farBus\.connect\(ctx\.destination\);\s*\}/.test(wa) && /farBus\.connect\(farMeter\);/.test(wa) && !/^\s*out\.connect/m.test(wa) && (wa.match(/node\.connect\(farBus\);/g) ?? []).length === 3 && /micMeter = ctx\.createAnalyser\(\);[\s\S]{0,240}?source\.connect\(micMeter\);/.test(wa) &&
     /levels\(\) \{\s*return \{ mic: read\(micMeter\), far: read\(farMeter\) \};/.test(wa) && /return rmsLevel\(meterBuf\);/.test(wa) && (wa.match(/meterMic\(\);/g) ?? []).length === 2);
   const hook = readFileSync("src/lib/voice/useStreamLevel.ts", "utf8");
   check("  …the stream meter shares the arithmetic and no longer carries its own copy", /const next = rmsLevel\(buf\);/.test(hook) && !/DISPLAY_GAIN = 2\.8/.test(hook));
@@ -3869,7 +3869,7 @@ function describeErrorCheck(): boolean {
       /const down = new StreamResampler\(wireRate, ctx\.sampleRate\);\s*const up = new StreamResampler\(ctx\.sampleRate, wireRate\);/.test(waSrc) &&
       /const samples = down\.process\(pcm16ToFloat\(base64ToBytes\(b64\)\)\);/.test(waSrc) && /const frame = up\.process\(input\);/.test(waSrc) &&
       /new PlayoutGate\(\{/.test(waSrc) && !/ctx\.createBuffer\(1, samples\.length/.test(waSrc) && /farBus\.connect\(ctx\.destination\);/.test(waSrc) &&
-      /mute\(on\) \{\s*farBus\.gain\.value = on \? 0 : 1;\s*\}/.test(waSrc) &&
+      /mute\(on\) \{\s*farBus\.gain\.value = on \? 0 : FAR_GAIN;\s*\}/.test(waSrc) && /export const FAR_GAIN = 1\.6;/.test(waSrc) && /limiter\.threshold\.value = -6;/.test(waSrc) && /Math\.min\(1, gain\)\) \/ FAR_GAIN;/.test(waSrc) &&
       /if \(gate\) sessionRef\.current\?\.setFarMuted\(gate === "cut"\);/.test((await import("node:fs")).readFileSync("src/components/ai/VoiceCallButton.tsx", "utf8")) &&
       /setFarMuted\(on: boolean\): void \{\s*try \{\s*this\.wsAudio\?\.mute\?\.\(on\);/.test((await import("node:fs")).readFileSync("src/lib/voice/session.ts", "utf8")));
     check("  …the player reports the engine's rate", built !== null && built.stats().rate === 48_000);

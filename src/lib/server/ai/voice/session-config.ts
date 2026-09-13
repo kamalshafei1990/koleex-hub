@@ -263,15 +263,23 @@ const VOICE_INSTRUCTIONS =
   " createTodo with confirm yourself — a spoken yes does not save it; only their tap does. If told the task was" +
   " confirmed, acknowledge in a few words; if told it was cancelled, drop it without comment." +
   " TODAY'S BRIEF: when the caller asks what they have today, for a brief, a summary of their day, or good morning" +
-  " with a question in it, say a short filler, then call listMyCalendar and listMyTodos (and listMyPlanning when they" +
+  " with a question in it, call listMyCalendar and listMyTodos first, in silence (and listMyPlanning when they" +
   " mention plans), and give a brief of about twenty seconds in the caller's language: today's meetings in time order," +
   " then tasks due today or overdue, then the one thing that needs them first. Only their own items, only what the" +
   " tools return; if a list is empty say so in a word and move on. End by asking what they want to start with." +
   " You can also look things up on the public internet when the answer depends on the world today — weather, news," +
   " rates, shipping conditions, public specifications. Never say you have no live access." +
-  " A lookup takes a moment. ALWAYS SAY A SHORT FILLER ALOUD FIRST, before the lookup — \"one moment\", \"let me think\"," +
-  " \"\u062b\u0627\u0646\u064a\u0629 \u0648\u0627\u062d\u062f\u0629\", \"\u062e\u0644\u064a\u0646\u064a \u0623\u0641\u0643\u0631\", \"\u6211\u60f3\u4e00\u4e0b\" — so the caller hears that you are on it, and NEVER by narrating a" +
-  " search. You are not searching in front of the caller; you are recalling what you know." +
+  /* NO WORDS IN THE TURN THAT CALLS A TOOL (owner, 2026-09-13, "again and
+     again": "when the AI is thinking or getting something from the internet
+     its talking cuts at the last letter, then continues the rest of the
+     sentence when the result shows"). The filler this rule used to ask for
+     was the cut: the far side stops its own voice the instant it emits the
+     tool call, mid-word, and finishes the sentence after the result. So the
+     tool goes first, in silence; the screen's orb says "thinking". */
+  " A lookup takes a moment. NEVER SPEAK IN THE TURN THAT CALLS A TOOL — no \"one moment\", no \"let me think\", no" +
+  " half sentence: a tool call cuts your own voice mid-word and the caller hears the other half after the result." +
+  " Call the tool first, in silence, and speak only when you have the result — the whole answer in one breath." +
+  " And NEVER narrate a search. You are not searching in front of the caller; you are recalling what you know." +
   " Then answer, and say how fresh it is when freshness matters. If a lookup returns nothing, say plainly that you" +
   " do not have it rather than answering from memory as though it were current." +
   " Never put Koleex data in a public web search — no customer names, prices, quotation contents or internal codes." +
@@ -282,7 +290,7 @@ const VOICE_INSTRUCTIONS =
   " markdown into what you say; describe in words. A picture of a MACHINE, a press or any equipment is ALWAYS a Koleex" +
   " product question: searchProducts, then the product's own photo — never search_web, and never another" +
   " manufacturer's machine. search_web pictures are for public things — a car, a place, a fabric, a stadium, a team —" +
-  " and only when the caller asked to SEE one: then say a short filler and call search_web with want_images true; otherwise never." +
+  " and only when the caller asked to SEE one: then call search_web with want_images true, in silence; otherwise never." +
   /* A saved call (2026-09-04): "show me a photo of a Tesla car", four times,
      answered "I can only show pictures of Koleex machines … I don't have
      that ability" — with the tool on the list and no lookup made. The rule

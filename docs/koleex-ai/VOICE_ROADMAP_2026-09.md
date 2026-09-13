@@ -1051,3 +1051,25 @@ Three facts from this window, in order of weight:
   slow link, a hidden tab, offline): the loading screen the owner sees is
   its chunk downloading on the tap.
 - **The meters above**, so the next iPhone call says path or page.
+
+## Three owner asks, same evening (2026-09-13)
+
+- **"Remove the sound of listening."** The `call-ready` cue ("ready to hear
+  you") is off by default; it stays in Settings → Sounds. Four cues remain on:
+  line back, ended, failed, error.
+- **"When it is thinking or getting something from the internet, its talking
+  cuts at the last letter, then continues the rest of the sentence when the
+  result shows."** The spoken filler the instructions asked for before a
+  lookup WAS the cut: the far side stops its own voice the instant it emits a
+  tool call, mid-word, and finishes the sentence after the result. The rule
+  is now the opposite: no words in the turn that calls a tool; the tool goes
+  first, in silence, and the whole answer follows in one breath. The orb
+  shows "thinking" meanwhile (and the `thinking` cue is there for anyone who
+  turns it on).
+- **"The Chinese voice is louder; the international one is low."** The
+  mainland lane plays through a media element, the socket lane through the
+  audio graph, which a phone in a call session plays quieter. The socket
+  lane's far bus now carries a 1.6× lift (`FAR_GAIN`; the relay measured the
+  far side's peaks at ~60 % of full scale) into a compressor set as a
+  limiter (−6 dB threshold, 12:1), so the rare peak is caught rather than
+  clipped. Cues divide the lift out and keep their own volume.

@@ -226,8 +226,11 @@ console.log("\n── 2a. The rules a spoken answer needs, which voice did not h
      have lost is the owner's. */
   check("the session does not tell the model to narrate a search",
     !/let me check/i.test(instructions) && !/Say something short first/.test(instructions));
-  check("and still tells it to fill the pause, without naming a search",
-    /one moment/i.test(instructions) && /NEVER by narrating a\s+" \+\n  " search|NEVER by narrating a search/.test(instructions));
+  /* 2026-09-13: the spoken filler WAS the cut the owner heard ("its talking
+     cuts at the last letter, then continues when the result shows") — the
+     far side stops its own voice the instant it emits a tool call. */
+  check("and tells it to keep silent in the turn that calls a tool, and never to narrate a search",
+    /NEVER SPEAK IN THE TURN THAT CALLS A TOOL/.test(instructions) && /Call the tool first, in silence/.test(instructions) && /NEVER narrate a search/.test(instructions) && !/SAY A SHORT FILLER/.test(instructions));
 }
 
 console.log("\n── 2b. A call reaches the same knowledge the chat box does ──");
