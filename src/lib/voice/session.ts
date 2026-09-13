@@ -821,6 +821,12 @@ export class VoiceSession {
     return this.wsAudio ? this.wsAudio.playSample(bytes) : null;
   }
 
+  /** A call cue through the socket lane's own context (WsAudio.playCue);
+   *  null on the other lane, where the tones' context takes it. */
+  playCue(bytes: ArrayBuffer, gain: number): Promise<boolean> | null {
+    return this.wsAudio?.playCue ? this.wsAudio.playCue(bytes, gain) : null;
+  }
+
   /** Ask the far side to speak now, to these instructions, with no user
    *  turn added — a word from a newly chosen voice (text-turn.ts). */
   requestResponse(instructions: string): boolean {

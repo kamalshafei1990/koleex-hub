@@ -82,6 +82,11 @@ export type WsAudio = {
    *  here, through the same output the voice uses. Resolves when it ended;
    *  false when it could not be decoded or was stopped. */
   playSample(bytes: ArrayBuffer): Promise<boolean>;
+  /** A CUE THROUGH THIS SAME CONTEXT (2026-09-13, sounds/player.ts): a
+   *  call's chime decoded and played here, over the voice, at `gain` —
+   *  without a second AudioContext under the microphone. Unlike playSample
+   *  it flushes nothing. Resolves true when it ended. */
+  playCue?(bytes: ArrayBuffer, gain?: number): Promise<boolean>;
   /** HOW LOUD, BOTH WAYS, FROM THIS CONTEXT (2026-09-08). The orb's meters
    *  used to open their own AudioContext over the microphone; on a phone
    *  that garbled this context's reader. Two analysers here, one on the
@@ -852,6 +857,30 @@ export function createBrowserWsAudio(wireRate: number, opts: { stallMs?: number 
     },
     stats() {
       return { path: capturePath, frames, peak: Math.round(peak * 100) / 100, ctx: String(ctx.state ?? ""), rate: ctx.sampleRate, start: startState, stalled, underruns: gate.underruns, bufferMs: Math.round(gate.target * 1000), playout: playoutPath };
+    },
+    playCue(bytes, gain = 1) {
+      if (closed) return Promise.resolve(false);
+      return new Promise<boolean>((resolve) => {
+        void ctx.decodeAudioData(bytes.slice(0)).then(
+          (buffer) => {
+            if (closed) return resolve(false);
+            const node = ctx.createBufferSource();
+            node.buffer = buffer;
+            const level = ctx.createGain();
+            level.gain.value = Math.max(0, Math.min(1, gain));
+            node.connect(level);
+            level.connect(farBus);
+            node.onended = () => resolve(true);
+            try {
+              node.start();
+            } catch {
+              resolve(false);
+            }
+            void ctx.resume().catch(() => {});
+          },
+          () => resolve(false),
+        );
+      });
     },
     playSample(bytes) {
       /* Whatever the far side was saying yields to the sample. */

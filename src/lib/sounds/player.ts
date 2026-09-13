@@ -19,7 +19,7 @@
    turn) — a cue is one signal, not a rhythm.
    --------------------------------------------------------------------------- */
 
-import { getSoundPrefs, playSoundFile, primeSoundFiles, soundContext } from "@/lib/notificationSound";
+import { getSoundPrefs, playSoundFile, primeSoundFiles, soundContext, soundEngineHeld } from "@/lib/notificationSound";
 import { scheduleTone, TONE_GAIN } from "@/lib/voice/tones";
 import { SOUND_CATALOG, soundByKey, soundLength, type SoundKey } from "./catalog";
 
@@ -71,6 +71,53 @@ export function primeAllSounds(): void {
 
 const lastPlayed = new Map<SoundKey, number>();
 
+/* THE CALL'S CUES PLAY IN THE CALL'S OWN CONTEXT (2026-09-13). Every cue
+   used to go through the Hub engine's AudioContext — a SECOND context (a
+   third on the socket lane, beside the call's tones and its voice) running
+   under a live microphone on a phone, and the codebase already knew what
+   that does (ws-audio.ts playSample, 2026-09-07: "a second context started
+   mid-call re-negotiates the audio hardware… the far side transcribed
+   [noise]"). The crackle the owner heard through every playback redesign
+   began the day the cues shipped. While a call is up, the button installs a
+   SINK: the cue's bytes are handed to the call's own context (the socket
+   lane's WsAudio, or the tones' context on the mainland lane) and the Hub
+   engine is held (notificationSound.holdSoundEngine). A sink that cannot
+   play — no call context yet, at the very tap — falls back to the engine,
+   which is not held before the call is live. */
+export type CueSink = (bytes: ArrayBuffer, volume: number) => Promise<boolean> | boolean;
+let cueSink: CueSink | null = null;
+export function setCueSink(sink: CueSink | null): void {
+  cueSink = sink;
+}
+export function cueSinkSet(): boolean {
+  return cueSink !== null;
+}
+/* The bytes of a cue file, fetched once per page (no decode: the context
+   that plays them decodes them). */
+const cueBytes = new Map<string, Promise<ArrayBuffer | null>>();
+export function fetchCue(src: string): Promise<ArrayBuffer | null> {
+  let p = cueBytes.get(src);
+  if (!p) {
+    p = (async () => {
+      try {
+        const res = await fetch(src, { credentials: "same-origin" });
+        if (!res.ok) return null;
+        return await res.arrayBuffer();
+      } catch {
+        return null;
+      }
+    })();
+    cueBytes.set(src, p);
+    void p.then((b) => { if (!b) cueBytes.delete(src); });
+  }
+  return p;
+}
+/** Warm the bytes the sink will need, inside the tap that starts a call. */
+export function prefetchCues(keys: readonly SoundKey[]): void {
+  if (typeof window === "undefined") return;
+  for (const k of keys) if (soundEnabled(k)) void fetchCue(soundSrc(k));
+}
+
 /** Play a cue if the user allows it. Returns what happened, for a caller
  *  that keeps its own fallback (the call's tones). */
 export function playSound(key: SoundKey, opts?: { force?: boolean }): "played" | "silenced" | "unavailable" {
@@ -81,6 +128,20 @@ export function playSound(key: SoundKey, opts?: { force?: boolean }): "played" |
   const busyUntil = lastPlayed.get(key) ?? 0;
   if (!opts?.force && now < busyUntil) return "silenced";
   lastPlayed.set(key, now + Math.max(120, Math.round(soundLength(def.notes) * 1000)));
+  if (cueSink) {
+    const sink = cueSink;
+    const src = soundSrc(key);
+    const volume = getSoundPrefs().volume;
+    void fetchCue(src)
+      .then((bytes) => (bytes ? sink(bytes, volume) : false))
+      .then((ok) => {
+        /* No call context could take it (the tap itself, before the call
+           has one): the engine plays it, unless the call holds the engine. */
+        if (!ok && !soundEngineHeld()) playSoundFile(src, volume);
+      })
+      .catch(() => {});
+    return "played";
+  }
   try {
     const outcome = playSoundFile(soundSrc(key), getSoundPrefs().volume);
     if (outcome === "played") return "played";

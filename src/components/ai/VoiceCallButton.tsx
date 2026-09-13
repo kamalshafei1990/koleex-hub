@@ -56,14 +56,15 @@ import { extractProductPhotos, type ProductPhoto } from "@/lib/voice/photos";
 import { useStreamLevel } from "@/lib/voice/useStreamLevel";
 import { useSessionLevels } from "@/lib/voice/useSessionLevels";
 import { useReceiverLevel } from "@/lib/voice/useReceiverLevel";
-import { CallTones } from "@/lib/voice/tones";
+import { CallTones, browserToneContext } from "@/lib/voice/tones";
 import { pickSttLang, readSavedSttLang, saveSttLang, learnSttLang, type SttLang } from "@/lib/voice/stt-lang";
 import {
   pickVoiceKey, readSavedVoiceKey, saveVoiceKey, readSavedRegion, saveRegion, decideLane, readSavedLane, saveLane, type VoicesByLane,
   readSavedTalkMode, saveTalkMode, type TalkMode,
 } from "@/lib/voice/voice-pref";
 import { requestCallSummary, shouldSummarise } from "@/lib/voice/summary";
-import { playSound, primeSounds } from "@/lib/sounds/player";
+import { playSound, primeSounds, prefetchCues, setCueSink } from "@/lib/sounds/player";
+import { holdSoundEngine } from "@/lib/notificationSound";
 import { sendVoiceTelemetry, flushVoiceTelemetry } from "@/lib/voice/telemetry";
 import { writeCallPulse, clearCallPulse, takeInterruptedCall, browserStorage, CALL_PULSE_EVERY_MS } from "@/lib/voice/call-memory";
 import { probeWsLane } from "@/lib/voice/lane-probe";
@@ -318,6 +319,10 @@ export default function VoiceCallButton({
      it (audit, 2026-09-11). Stopped with the call; the context is the
      tones', closed with them. */
   const callPreviewRef = useRef<PreviewPlayer | null>(null);
+  /* The call's cues on the mainland lane, played through the tones' context
+     (sounds/player.ts setCueSink). Stopped at release, never closed here:
+     the context is the tones', closed with them. */
+  const cuePlayerRef = useRef<PreviewPlayer | null>(null);
   /* The "saved" tick's timer, so an unmount can clear it. */
   const writeSavedTimerRef = useRef<number | null>(null);
   /* The phase as the data channel last reported it, for handlers that run
@@ -601,6 +606,10 @@ export default function VoiceCallButton({
       if (writeSavedTimerRef.current !== null) window.clearTimeout(writeSavedTimerRef.current);
       callPreviewRef.current?.stop();
       callPreviewRef.current = null;
+      cuePlayerRef.current?.stop();
+      cuePlayerRef.current = null;
+      setCueSink(null);
+      holdSoundEngine(false);
       clearCallPulse(browserStorage() ?? { getItem: () => null, setItem: () => {}, removeItem: () => {} });
     };
   }, [releaseWakeLock, clearSearchTimer]);
@@ -625,6 +634,10 @@ export default function VoiceCallButton({
     persisterRef.current = null;
     callPreviewRef.current?.stop();
     callPreviewRef.current = null;
+    cuePlayerRef.current?.stop();
+    cuePlayerRef.current = null;
+    setCueSink(null);
+    holdSoundEngine(false);
     tonesRef.current?.close();
     tonesRef.current = null;
     chimedRef.current = false;
@@ -837,12 +850,29 @@ export default function VoiceCallButton({
     /* Primed HERE, in the tap: the context a browser will let play later is
        the one created while the gesture is current. */
     tonesRef.current?.close();
-    tonesRef.current = new CallTones();
+    /* ONE AUDIO CONTEXT PER CALL (2026-09-13; the owner listens on the
+       phone's own speaker and heard crackle through four playback
+       redesigns). On the socket lane the voice has its own context, so the
+       tones open none; on the mainland lane the tones' context is the one,
+       and it plays the cues too. The Hub engine is held once the call is
+       live (below) and the cues go through the call's context via the sink;
+       at the tap, before the call has a context, the sink cannot play and
+       the engine still does. */
+    tonesRef.current = new CallTones(transportRef.current === "ws" ? () => null : browserToneContext);
     tonesRef.current.prime();
+    const CALL_CUES = ["call-dialing", "call-ready", "call-reconnecting", "call-recovered", "call-failed", "call-end", "mic-mute", "mic-unmute", "ptt-start", "ptt-stop", "thinking", "pictures-shown", "approval-needed", "action-done", "action-cancelled", "summary-ready", "error"] as const;
+    setCueSink((bytes, volume) => {
+      const viaCall = sessionRef.current?.playCue(bytes, volume) ?? null;
+      if (viaCall) return viaCall;
+      const tones = tonesRef.current?.context() ?? null;
+      if (!tones) return false;
+      return (cuePlayerRef.current ??= createPreviewPlayer(() => tones as unknown as PreviewContextLike)).play(bytes);
+    });
+    prefetchCues(CALL_CUES);
     /* THE CALL'S CUES, warmed in the same tap (sounds/player.ts): the files a
        call will need are decoded now, so "ready" costs no fetch later. The
        dialling cue is the tap's own answer; a resume dials quietly. */
-    primeSounds(["call-dialing", "call-ready", "call-reconnecting", "call-recovered", "call-failed", "call-end", "mic-mute", "mic-unmute", "ptt-start", "ptt-stop", "thinking", "pictures-shown", "approval-needed", "action-done", "action-cancelled", "summary-ready", "error"]);
+    primeSounds(CALL_CUES);
     if (!opts?.resume) playSound("call-dialing");
 
     /* THE WRITER FOR THIS CALL. `fetch` is wrapped rather than passed: a bare
@@ -917,6 +947,9 @@ export default function VoiceCallButton({
            is up, so the next call from here — after a drop, a switch, or
            tomorrow morning — asks for it first. */
         if (next === "live") acquireWakeLock();
+        /* From here to the release, the Hub engine's context is held: the
+           call's own context is the only one under the microphone. */
+        if (next === "live") holdSoundEngine(true);
         if (next === "live" && transportRef.current === "ws") saveLane("ws", Date.now(), "call");
         if (next === "live") {
           const region = sessionRef.current?.diagnostics().region;
