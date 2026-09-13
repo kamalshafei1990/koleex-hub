@@ -1398,6 +1398,8 @@ export const PRODUCTS_UI_I18N: Translations = {
   /* Unit switch + unit-suffixed labels (2026-09-13). Supplier catalogues print
      sizes in mm, cm or m and weights in g or kg; the operator picks what the
      page in front of them says and the form stores cm/kg regardless. */
+  "pk.packingSectionTitle": { en: "Packing", zh: "包装", ar: "التعبئة" },
+  "pk.loadingSectionTitle": { en: "Loading & Containers", zh: "装柜", ar: "التحميل والحاويات" },
   "pk.unitSize":           { en: "Size", zh: "尺寸", ar: "المقاس" },
   "pk.unitWeight":         { en: "Weight", zh: "重量", ar: "الوزن" },
   "pk.colLbare":           { en: "L", zh: "长", ar: "طول" },

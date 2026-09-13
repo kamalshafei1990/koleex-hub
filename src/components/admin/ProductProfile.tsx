@@ -38,6 +38,9 @@ import FolderTreeIcon from "@/components/icons/ui/FolderTreeIcon";
 import SparklesIcon from "@/components/icons/ui/SparklesIcon";
 import Settings2Icon from "@/components/icons/ui/Settings2Icon";
 import BoxesIcon from "@/components/icons/ui/BoxesIcon";
+import BoxIcon from "@/components/icons/ui/BoxIcon";
+import RulerIcon from "@/components/icons/ui/RulerIcon";
+import WrenchIcon from "@/components/icons/ui/WrenchIcon";
 import DollarSignIcon from "@/components/icons/ui/DollarSignIcon";
 import GlobeIcon from "@/components/icons/ui/GlobeIcon";
 import ShieldCheckIcon from "@/components/icons/ui/ShieldCheckIcon";
@@ -173,6 +176,8 @@ const PROFILE_T: Record<string, { en: string; zh: string; ar: string }> = {
   "pp.f.portOfLoading":       { en: "Port of loading", zh: "装运港", ar: "ميناء الشحن" },
   "pp.f.originCert":          { en: "Origin certificate", zh: "原产地证书", ar: "شهادة المنشأ" },
   "pp.f.regulated":           { en: "Regulated content", zh: "受管制内容物", ar: "محتوى خاضع لقيود" },
+  "pp.f.packingEmpty":        { en: "Nothing entered yet. Open Edit to add the crate, its contents, weights and container quantities.", zh: "尚未填写。点击“编辑”添加木箱、箱内清单、重量与装柜数量。", ar: "لسه مفيش حاجة مكتوبة. افتح تعديل عشان تضيف الصندوق ومحتوياته والأوزان وكميات الحاويات." },
+  "pp.sec.machine":           { en: "Machine (bare)", zh: "整机（裸机）", ar: "الماكينة (بدون تغليف)" },
   "pp.f.netWeight":   { en: "Net weight",         zh: "净重",           ar: "الوزن الصافي" },
   "pp.f.grossWeight": { en: "Gross weight",       zh: "毛重",           ar: "الوزن القائم" },
   "pp.f.cbm":         { en: "CBM",                zh: "体积(立方米)",   ar: "الحجم (م³)" },
@@ -430,7 +435,8 @@ const STEPS = [
   { id: "specs",      short: "Specs" },
   { id: "commercial", short: "Variants" },
   { id: "pricing",    short: "Price" },
-  { id: "logistics",  short: "Logistics" },
+  /* The same name as the editor's tab, because it is the same tab. */
+  { id: "logistics",  short: "Packing & Logistics" },
   { id: "compliance", short: "Compliance" },
   { id: "media",      short: "Media & Files" },
   { id: "knowledge",  short: "Knowledge" },
@@ -495,30 +501,38 @@ const MEDIA_SLOTS: Array<{ type: string; fallback: string }> = [
 
 /* The editor's field row: label on top, value under it, help line beneath.
    Used by every tab so a reader never meets two different field shapes. */
-/* ── packing, read-only ────────────────────────────────────────────────────
-   Shows what the Packing & Logistics tab holds, in the order the tab asks it:
-   what the crate is, what is inside it, what it weighs, how many fit. Values
-   the operator never entered are simply absent — a sheet full of "Not set" is
-   noise, and the tab itself is where the gaps are supposed to be visible. */
+/* ── Packing & Logistics, read-only ───────────────────────────────────────
+   The edit tab with the inputs taken out: the same five sections in the same
+   order (Machine, Packing, Loading, Customs, Order) under the same names, so
+   moving between the sheet and the form never asks anyone to re-orient.
+
+   Values nobody entered are simply absent — a page of "Not set" is noise, and
+   the form is where the gaps are meant to be visible. A section with nothing
+   in it does not print an empty heading; when the packing has not been
+   entered at all, one line says so and points at Edit. */
 function PackingSheet({
-  logistics, model, t, rows,
+  logistics, model, product, t, rows, motion, onEdit,
 }: {
   logistics: ProductLogistics;
   model: Record<string, unknown> | undefined;
+  product: Record<string, unknown> | undefined;
   t: (k: string, fb: string) => string;
   rows: string;
+  motion: string;
+  onEdit: () => void;
 }) {
   const label = (list: readonly { value: string; label: string }[], v: unknown) => {
     const hit = list.find((o) => o.value === v);
     return hit ? t(`pk.opt.${hit.value}`, hit.label) : (v as string) || null;
   };
   const sums = sumPackages(logistics.packages);
-  /* The product is the source; a legacy product that never saw the new tab
-     still has its numbers on the primary variant, so fall back rather than
-     show an empty sheet over data that exists. */
-  const fromProduct = sums.packageCount > 0 || logistics.packing_type || logistics.net_weight_kg;
   const m = (k: string) => (model ? (model as Record<string, unknown>)[k] : undefined);
+  const pv = (k: string) => (product ? product[k] : undefined);
 
+  /* The product is the source. A product that never saw the new tab still has
+     its numbers on the primary variant, so fall back rather than print an
+     empty sheet over data that exists. */
+  const fromProduct = sums.packageCount > 0 || !!logistics.packing_type || !!logistics.net_weight_kg;
   const netW = fromProduct ? logistics.net_weight_kg : m("net_weight");
   const grossW = fromProduct ? (sums.grossKg || logistics.gross_weight_kg) : m("weight");
   const cbm = fromProduct ? (sums.cbm || logistics.cbm) : m("cbm");
@@ -526,96 +540,146 @@ function PackingSheet({
   const q40 = fromProduct ? logistics.qty_40ft : m("container_40ft_qty");
   const q40hq = fromProduct ? logistics.qty_40hq : m("container_40hq_qty");
   const pType = fromProduct ? label(PACKING_TYPES, logistics.packing_type) : (m("packing_type") as string | undefined);
-
-  const anything =
-    pType || netW || grossW || cbm || q20 || q40 || q40hq ||
-    logistics.wood_treatment || logistics.origin_certificate || logistics.port_of_loading ||
-    logistics.dangerous_goods?.has;
-  if (!anything) return null;
-
   const dg = logistics.dangerous_goods;
-  /* DG_KINDS, not ITEM_KINDS — the wrong list matched nothing and the sheet
-     printed the stored values: "lithium_battery, oil_filled". */
   const dgNames = (dg?.kinds ?? []).map((k) => label(DG_KINDS, k) ?? k);
 
-  return (
-    <div className="mt-4 pt-4 border-t border-[var(--border-subtle)]">
-      <div className="text-[11px] font-semibold text-[var(--text-muted)] mb-2.5">
-        {fromProduct
-          ? t("pp.f.packingTitleProduct", "Packing & shipment")
-          : t("pp.f.packingTitle", "Primary variant packing")}
-      </div>
+  const has = (...v: unknown[]) => v.some((x) => x !== undefined && x !== null && x !== "" && x !== false);
 
-      {logistics.packing_photo_url ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
-          src={logistics.packing_photo_url}
-          alt={t("pp.f.packingPhotoAlt", "Packed product")}
-          className="mb-3 w-full max-w-md rounded-xl border border-[var(--border-subtle)] object-contain bg-black/20"
-        />
+  const machine = has(pv("machine_dimensions"), pv("machine_weight_kg"));
+  const packing = has(pType, logistics.wood_treatment, netW, grossW, cbm, sums.packageCount || null, logistics.packing_photo_url);
+  const loading = has(q20, q40, q40hq, logistics.stackable);
+  const customs = has(pv("country_of_origin"), pv("hs_code"), logistics.origin_certificate && logistics.origin_certificate !== "none" ? logistics.origin_certificate : null, dg?.has);
+  const order = has(pv("moq"), pv("lead_time"), logistics.port_of_loading);
+
+  /* ONE CARD PER SECTION, not one card with headings inside it. The editor
+     puts Physical, Packing, Loading, Origin & Customs and Fulfillment in five
+     separate collapsible cards; stacking them as sub-headings inside a single
+     card made the same content read as a different screen. Same cards, same
+     order, same titles and badges — the sheet is the form with the inputs
+     taken out. */
+  if (!machine && !packing && !loading && !customs && !order) {
+    return (
+      <Group motion={motion} icon={<BoundIcon semanticKey="section.logistics" className="h-4 w-4" fallback={<GlobeIcon className="h-4 w-4" />} />} title={t("pp.sec.logistics", "Packing & Logistics")} onEdit={onEdit}>
+        <p className="text-[12px] text-[var(--text-ghost)] leading-relaxed">
+          {t("pp.f.packingEmpty", "Nothing entered yet. Open Edit to add the crate, its contents, weights and container quantities.")}
+        </p>
+      </Group>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      {machine ? (
+        <Group motion={motion} icon={<RulerIcon className="h-4 w-4" />} title={t("tech.secPhysical", "Physical (Bare Machine)")} count={t("logistics.physicalBadge", "Dimensions · Weight")} onEdit={onEdit}>
+          <div className={rows}>
+            <Row label={t("pp.f.machineDims", "Machine dimensions")} value={pv("machine_dimensions")} />
+            <Row label={t("pp.f.machineWeight", "Machine weight (kg)")} value={pv("machine_weight_kg")} />
+          </div>
+        </Group>
       ) : null}
 
-      <div className={rows}>
-        <Row label={t("pp.f.packingType", "Packing type")} value={pType} />
-        {logistics.wood_treatment ? (
-          <Row label={t("pp.f.woodTreatment", "Wood treatment")} value={label(WOOD_TREATMENTS, logistics.wood_treatment)} />
-        ) : null}
-        {sums.packageCount > 0 ? (
-          <Row
-            label={t("pp.f.packages", "Packages")}
-            value={
-              logistics.packing_mode === "per_package" && logistics.units_per_package
-                ? `${logistics.units_per_package} ${t("pk.pcsWord", "pcs")} / ${t("pk.packageOne", "Package").toLowerCase()}`
-                : `${sums.packageCount}`
-            }
-            help={(logistics.packages ?? [])
-              .map((r) => [r.label, r.l_cm && r.w_cm && r.h_cm ? `${r.l_cm}×${r.w_cm}×${r.h_cm} cm` : null].filter(Boolean).join(" · "))
-              .filter(Boolean)
-              .join("  |  ") || undefined}
-          />
-        ) : null}
-        <Row label={t("pp.f.netWeight", "Net weight")} value={netW} />
-        <Row label={t("pp.f.grossWeight", "Gross weight")} value={grossW} />
-        <Row label={t("pp.f.cbm", "CBM")} value={cbm} />
-        <Row label={t("pp.f.q20", "20ft qty")} value={q20} />
-        <Row label={t("pp.f.q40", "40ft qty")} value={q40} />
-        <Row label={t("pp.f.q40hq", "40HQ qty")} value={q40hq} />
-        {logistics.port_of_loading ? (
-          <Row label={t("pp.f.portOfLoading", "Port of loading")} value={logistics.port_of_loading} />
-        ) : null}
-        {logistics.origin_certificate && logistics.origin_certificate !== "none" ? (
-          <Row label={t("pp.f.originCert", "Origin certificate")} value={label(ORIGIN_CERTIFICATES, logistics.origin_certificate)} />
-        ) : null}
-        {dg?.has ? (
-          <Row
-            label={t("pp.f.regulated", "Regulated content")}
-            value={dgNames.join(", ") || t("pk.dgHas", "Has regulated content")}
-            help={[dg.un_numbers, dg.notes].filter(Boolean).join(" · ") || undefined}
-          />
-        ) : null}
-      </div>
-
-      {/* What is in the crates — the packing list, flattened with the
-          quantities multiplied through the nesting. */}
-      {(logistics.packages ?? []).some((r) => r.contents?.length) ? (
-        <div className="mt-3 pt-3 border-t border-[var(--border-subtle)]">
-          <div className="text-[10px] font-bold uppercase tracking-[0.08em] text-[var(--text-ghost)] mb-1.5">
-            {t("pk.whatsInside", "What's inside")}
+      {packing ? (
+        <Group motion={motion} icon={<BoxIcon className="h-4 w-4" />} title={t("logistics.packingSection", "Packing")} count={t("logistics.packingSectionBadge", "Crates · Weights")} onEdit={onEdit}>
+          {logistics.packing_photo_url ? (
+            /* eslint-disable-next-line @next/next/no-img-element */
+            <img
+              src={logistics.packing_photo_url}
+              alt={t("pp.f.packingPhotoAlt", "Packed product")}
+              className="mb-3 w-full max-w-md rounded-xl border border-[var(--border-subtle)] object-contain bg-black/20"
+            />
+          ) : null}
+          <div className={rows}>
+            <Row label={t("pk.packingType", "Packing type")} value={pType} />
+            {logistics.wood_treatment ? (
+              <Row label={t("pp.f.woodTreatment", "Wood treatment")} value={label(WOOD_TREATMENTS, logistics.wood_treatment)} />
+            ) : null}
+            {sums.packageCount > 0 ? (
+              <Row
+                label={t("pp.f.packages", "Packages")}
+                value={
+                  logistics.packing_mode === "per_package" && logistics.units_per_package
+                    ? `${logistics.units_per_package} ${t("pk.pcsWord", "pcs")} / ${t("pk.packageOne", "Package").toLowerCase()}`
+                    : `${sums.packageCount}`
+                }
+                help={(logistics.packages ?? [])
+                  .map((r) => [r.label, r.l_cm && r.w_cm && r.h_cm ? `${r.l_cm}×${r.w_cm}×${r.h_cm} cm` : null].filter(Boolean).join(" · "))
+                  .filter(Boolean)
+                  .join("  |  ") || undefined}
+              />
+            ) : null}
+            <Row label={t("pp.f.netWeight", "Net weight")} value={netW} />
+            <Row label={t("pp.f.grossWeight", "Gross weight")} value={grossW} />
+            <Row label={t("pp.f.cbm", "CBM")} value={cbm} />
           </div>
-          <ul className="space-y-1">
-            {(logistics.packages ?? []).flatMap((r, ri) =>
-              flattenContents(r.contents, Number(r.qty) || 1).map((c, ci) => (
-                <li
-                  key={`${ri}-${ci}`}
-                  className="text-[12px] text-[var(--text-secondary)] tabular-nums"
-                  style={{ paddingInlineStart: `${c.depth * 14}px` }}
-                >
-                  <span className="text-[var(--text-ghost)]">{c.qty} ×</span> {c.label}
-                </li>
-              )),
-            )}
-          </ul>
-        </div>
+
+          {/* What is in the crates, with quantities multiplied through the
+              nesting — a box of five in a crate that ships twice reads ten. */}
+          {(logistics.packages ?? []).some((r) => r.contents?.length) ? (
+            <div className="mt-3">
+              <div className="text-[10px] font-bold uppercase tracking-[0.08em] text-[var(--text-ghost)] mb-1.5">
+                {t("pk.whatsInside", "What's inside")}
+              </div>
+              <ul className="space-y-1">
+                {(logistics.packages ?? []).flatMap((r, ri) =>
+                  flattenContents(r.contents, Number(r.qty) || 1).map((c, ci) => (
+                    <li
+                      key={`${ri}-${ci}`}
+                      className="text-[12px] text-[var(--text-secondary)] tabular-nums"
+                      style={{ paddingInlineStart: `${c.depth * 14}px` }}
+                    >
+                      <span className="text-[var(--text-ghost)]">{c.qty} ×</span> {c.label}
+                    </li>
+                  )),
+                )}
+              </ul>
+            </div>
+          ) : null}
+        </Group>
+      ) : null}
+
+      {loading ? (
+        <Group motion={motion} icon={<BoxesIcon className="h-4 w-4" />} title={t("logistics.loadingSection", "Loading & Containers")} count={t("logistics.loadingSectionBadge", "20ft · 40ft · 40HQ")} onEdit={onEdit}>
+          <div className={rows}>
+            <Row label={t("pk.stackQ", "Can crates be stacked?")} value={logistics.stackable ? t("pk.stackable", "Stackable") : t("pk.notStackable", "Not stackable")} />
+            <Row label={t("pp.f.q20", "20ft qty")} value={q20} />
+            <Row label={t("pp.f.q40", "40ft qty")} value={q40} />
+            <Row label={t("pp.f.q40hq", "40HQ qty")} value={q40hq} />
+            {sums.volumetricKg ? (
+              <Row label={t("pk.volumetric", "Volumetric weight (kg, air)")} value={sums.volumetricKg} />
+            ) : null}
+          </div>
+        </Group>
+      ) : null}
+
+      {customs ? (
+        <Group motion={motion} icon={<GlobeIcon className="h-4 w-4" />} title={t("logistics.title", "Origin & Customs")} count={t("logistics.badge", "Shipping · Customs")} onEdit={onEdit}>
+          <div className={rows}>
+            <Row label={t("pp.f.origin", "Country of origin")} value={pv("country_of_origin")} />
+            <Row label={t("pp.f.hs", "HS code")} value={pv("hs_code")} mono />
+            {logistics.origin_certificate && logistics.origin_certificate !== "none" ? (
+              <Row label={t("pp.f.originCert", "Origin certificate")} value={label(ORIGIN_CERTIFICATES, logistics.origin_certificate)} />
+            ) : null}
+            {dg?.has ? (
+              <Row
+                label={t("pp.f.regulated", "Regulated content")}
+                value={dgNames.join(", ") || t("pk.dgHas", "Has regulated content")}
+                help={[dg.un_numbers, dg.notes].filter(Boolean).join(" · ") || undefined}
+              />
+            ) : null}
+          </div>
+        </Group>
+      ) : null}
+
+      {order ? (
+        <Group motion={motion} icon={<WrenchIcon className="h-4 w-4" />} title={t("technical.fulfillmentDefaults", "Fulfillment Defaults")} count={t("technical.fulfillmentBadge", "MOQ · Lead Time")} onEdit={onEdit}>
+          <div className={rows}>
+            <Row label={t("pp.f.moq", "MOQ")} value={pv("moq")} />
+            <Row label={t("pp.f.leadTime", "Lead time")} value={pv("lead_time")} />
+            {logistics.port_of_loading ? (
+              <Row label={t("pp.f.portOfLoading", "Port of loading")} value={logistics.port_of_loading} />
+            ) : null}
+          </div>
+        </Group>
       ) : null}
     </div>
   );
@@ -1324,27 +1388,14 @@ export default function ProductProfile() {
 
       <CostHistoryDrawer target={historyFor} onClose={() => setHistoryFor(null)} t={t} />
 
+      {/* THIS SHEET IS THE EDIT TAB, READ-ONLY: the same five cards, in the
+          same order, under the same titles and badges. It used to be a flat
+          list of six rows under one heading, so the page and the form it
+          mirrors did not read as the same subject at all - nothing about
+          crates, nothing about loading, and the packing just typed on the form
+          was nowhere on it. */}
       {STEPS[step].id === "logistics" && (
-      <Group motion={tabMotion} icon={<BoundIcon semanticKey="section.logistics" className="h-4 w-4" fallback={<GlobeIcon className="h-4 w-4" />} />} title={t("pp.sec.logistics", "Packing & Logistics")} onEdit={() => goStep("logistics")}>
-        <div className={rows}>
-          <Row label={t("pp.f.origin", "Country of origin")} value={s2("country_of_origin")} />
-          <Row label={t("pp.f.hs", "HS code")} value={s2("hs_code")} mono />
-          <Row label={t("pp.f.moq", "MOQ")} value={s2("moq")} />
-          <Row label={t("pp.f.leadTime", "Lead time")} value={s2("lead_time")} />
-          <Row label={t("pp.f.machineWeight", "Machine weight (kg)")} value={s2("machine_weight_kg")} />
-          <Row label={t("pp.f.machineDims", "Machine dimensions")} value={s2("machine_dimensions")} />
-        </div>
-        {/* THE PROFILE WAS READING THE WRONG TABLE. Packing moved to
-            products.logistics — one fixed section for every product — but this
-            sheet still read the primary VARIANT's columns, so everything typed
-            on the new tab showed as empty here while the page confidently
-            printed a heading over it. It reads the product first now, and falls
-            back to the variant for products whose packing was entered before
-            the move (and for the per-variant overrides that still live there).
-            Packing type and wood treatment are stored as enum values; the same
-            dictionary the form uses turns them back into words. */}
-        <PackingSheet logistics={logi} model={data.models[0]} t={t} rows={rows} />
-      </Group>
+        <PackingSheet logistics={logi} model={data.models[0]} product={p} t={t} rows={rows} motion={tabMotion} onEdit={() => goStep("logistics")} />
       )}
 
       {STEPS[step].id === "compliance" && (
