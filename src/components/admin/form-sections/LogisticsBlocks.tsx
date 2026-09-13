@@ -84,7 +84,7 @@ const localise = (t: TFn, list: readonly { value: string; label: string }[]) =>
 /* The unit switch is the shared UnitPicker (./UnitPicker) with a caption — one
    control for units everywhere on the form, so the crate's switch and the
    machine's switch above it are visibly the same thing. */
-function UnitSwitch({
+export function UnitSwitch({
   value, options, onChange, label, canonical,
 }: {
   value: string;
@@ -501,7 +501,7 @@ async function uploadPackingImage(file: File, productId?: string): Promise<strin
   return res.ok ? res.data.publicUrl : null;
 }
 
-function useImagePicker(onPicked: (url: string | null) => void, productId?: string) {
+export function useImagePicker(onPicked: (url: string | null) => void, productId?: string) {
   const [busy, setBusy] = useState(false);
   const [over, setOver] = useState(false);
   const ref = useRef<HTMLInputElement | null>(null);
@@ -543,7 +543,7 @@ function useImagePicker(onPicked: (url: string | null) => void, productId?: stri
   return { busy, over, drop, open: () => ref.current?.click(), input };
 }
 
-function PackingPhoto({
+export function PackingPhoto({
   url, onChange, productId,
 }: { url: string | null; onChange: (u: string | null) => void; productId?: string }) {
   const { t } = useTranslation(PRODUCTS_UI_I18N);
@@ -660,7 +660,7 @@ function ItemPhoto({
    list nests one level. Everything is optional — plenty of machines ship as a
    crate with a machine in it and nothing else to say.
    ═══════════════════════════════════════════════════════════════════ */
-function ContentsEditor({
+export function ContentsEditor({
   items, onChange, productId, depth = 0,
 }: {
   items: ContentItem[];

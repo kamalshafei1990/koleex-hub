@@ -29,8 +29,9 @@ import { fetchClassificationIcons, updateProduct } from "@/lib/products-admin";
 /* INLINE EDIT — the form's own section components, hosted inside the sheet's
    cards. Same inputs, same units, same rules; only the card around them is
    the profile's. */
-import { PackingBlock, LoadingBlock, CustomsExtras, ShippingOrigin } from "./form-sections/LogisticsBlocks";
-import { PhysicalFields } from "./form-sections/TechnicalSection";
+import { PackingPhoto, ContentsEditor, UnitSwitch, useImagePicker } from "./form-sections/LogisticsBlocks";
+import UnitPicker from "./form-sections/UnitPicker";
+import { LENGTH_UNITS, MASS_UNITS, displayIn, storeFrom, useEntryUnits, type LengthUnit, type MassUnit } from "@/lib/entry-units";
 import KdsSelect from "@/components/kds/Select";
 import { COUNTRIES } from "@/types/product-form";
 import { flagOf, countryName } from "@/lib/countries-dial";
@@ -101,8 +102,8 @@ import dynamic from "next/dynamic";
 import { useSkin } from "@/lib/appearance";
 import FeatureHighlightsDisplay from "./FeatureHighlightsDisplay";
 import {
-  DG_KINDS, ORIGIN_CERTIFICATES, PACKING_TYPES, WOOD_TREATMENTS,
-  sumPackages, type ContentItem, type ProductLogistics,
+  CONTAINERS, DG_KINDS, ORIGIN_CERTIFICATES, PACKING_TYPES, WOOD_TREATMENTS,
+  loadPlan, sumPackages, type ContentItem, type PackageRow, type ProductLogistics,
 } from "@/lib/logistics";
 
 const WavyBackground = dynamic(() => import("@/components/ui/WavyBackground"), { ssr: false });
@@ -635,8 +636,12 @@ const MEDIA_SLOTS: Array<{ type: string; fallback: string }> = [
    photographs. Nothing here calls iconForField. */
 
 function StatTile({
-  label, value, unit, tone = "plain",
-}: { label: string; value: React.ReactNode; unit?: string; tone?: "plain" | "accent" }) {
+  label, value, unit, tone = "plain", input, extra,
+}: { label: string; value: React.ReactNode; unit?: string; tone?: "plain" | "accent";
+  /** Edit mode: the control that stands where the number stood. Same tile. */
+  input?: React.ReactNode;
+  /** Edit mode: a line under the number/control (a mode switch, a reset). */
+  extra?: React.ReactNode }) {
   return (
     <div className={`h-full rounded-xl border px-3.5 py-3 ${
       tone === "accent"
@@ -644,17 +649,27 @@ function StatTile({
         : "border-[var(--border-subtle)] bg-[var(--bg-surface)]"
     }`}>
       <div className="text-[9.5px] font-bold uppercase tracking-[0.1em] text-[var(--text-ghost)] truncate">{label}</div>
-      <div className="mt-1 flex items-baseline gap-1">
-        <span className="text-[21px] leading-none font-bold tabular-nums text-[var(--text-primary)]">{value}</span>
-        {unit ? <span className="text-[11px] font-medium text-[var(--text-muted)]">{unit}</span> : null}
-      </div>
+      {input ? (
+        <div className="mt-1.5 flex items-center gap-1.5">
+          <span className="min-w-0 flex-1">{input}</span>
+          {unit ? <span className="text-[11px] font-medium text-[var(--text-muted)] shrink-0">{unit}</span> : null}
+        </div>
+      ) : (
+        <div className="mt-1 flex items-baseline gap-1">
+          <span className="text-[21px] leading-none font-bold tabular-nums text-[var(--text-primary)]">{value}</span>
+          {unit ? <span className="text-[11px] font-medium text-[var(--text-muted)]">{unit}</span> : null}
+        </div>
+      )}
+      {extra}
     </div>
   );
 }
 
 function FactChip({
-  icon, label, value, note, tone = "plain", wide = false,
-}: { icon: React.ReactNode; label: string; value: string; note?: string; tone?: "plain" | "warn"; wide?: boolean }) {
+  icon, label, value, note, tone = "plain", wide = false, input,
+}: { icon: React.ReactNode; label: string; value: string; note?: string; tone?: "plain" | "warn"; wide?: boolean;
+  /** Edit mode: the control that stands where the value stood. Same chip. */
+  input?: React.ReactNode }) {
   /* A BLOCK, NOT AN INLINE PILL. Content-width chips made every row ragged —
      three facts of different name lengths left three different gutters, and
      the fourth wrapped onto a line of its own. In a grid each fact takes the
@@ -674,7 +689,11 @@ function FactChip({
       </span>
       <span className="min-w-0 flex-1">
         <span className="block text-[9.5px] font-bold uppercase tracking-[0.1em] text-[var(--text-ghost)]">{label}</span>
-        <span className="block text-[13px] font-semibold text-[var(--text-primary)] break-words">{value}</span>
+        {input ? (
+          <span className="block mt-1">{input}</span>
+        ) : (
+          <span className="block text-[13px] font-semibold text-[var(--text-primary)] break-words">{value}</span>
+        )}
         {/* The forwarder's note belongs to the fact it qualifies, not to a
             stray paragraph under the card. */}
         {note ? <span className="block text-[11px] text-[var(--text-muted)] mt-0.5 break-words">{note}</span> : null}
@@ -745,8 +764,103 @@ interface PackingDraft {
   moq: string;
   lead_time: string;
 }
-const INP = "w-full h-11 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none focus:border-[var(--border-focus)] focus:ring-1 focus:ring-[var(--border-focus)] transition-all appearance-none";
-const LBL = "block text-[11px] font-semibold text-[var(--text-dim)] uppercase tracking-wider mb-1.5";
+/* The input that stands inside a tile. No width of its own (the width trap:
+   `w-full` + `w-16` resolves by Tailwind's emit order, not by which was
+   written last), so each place sets the width it has. */
+const INP_B = "h-9 px-2.5 rounded-lg bg-[var(--bg-surface-subtle)]/70 border border-[var(--border-subtle)] text-[13px] font-semibold text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] placeholder:font-normal outline-none focus:border-[var(--border-focus)] transition-colors";
+const SEG = "h-7 px-2 rounded-md text-[10.5px] font-semibold border transition-colors";
+const SEG_ON = "border-[#567FB2]/60 bg-[#567FB2]/[0.12] text-[var(--text-primary)]";
+const SEG_OFF = "border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)]/70 text-[var(--text-muted)] hover:text-[var(--text-primary)]";
+const SEG_WARN = "border-amber-500/60 bg-amber-500/[0.12] text-[var(--text-primary)]";
+const TINY = "text-[9px] uppercase tracking-[0.1em] text-[var(--text-ghost)] mb-0.5 truncate";
+const HINT = "text-[10px] text-[var(--text-ghost)] leading-relaxed mt-1";
+const num = (v: unknown): number => {
+  const x = typeof v === "number" ? v : Number(String(v ?? "").trim());
+  return Number.isFinite(x) ? x : 0;
+};
+
+/* Machine L×W×H typed in the operator's unit, stored in mm — the editor's
+   own contract (MachineDimensionFields), in the space of one chip. */
+function DimsInput({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const { length: entry, setLength } = useEntryUnits();
+  const [raw, setRaw] = useState<Record<number, string>>({});
+  const parts = (value || "").split(/[×xX*,]/).map((x) => x.trim());
+  const stored = [parts[0] ?? "", parts[1] ?? "", parts[2] ?? ""];
+  const setAt = (i: number, typed: string) => {
+    setRaw((m) => ({ ...m, [i]: typed }));
+    const next = [...stored];
+    next[i] = String(storeFrom(typed, "mm", entry));
+    onChange(next.every((x) => x === "") ? "" : `${next[0]}×${next[1]}×${next[2]}`);
+  };
+  return (
+    <span className="flex flex-wrap items-center gap-1.5">
+      {(["L", "W", "H"] as const).map((ph, i) => (
+        <span key={ph} className="flex items-center gap-1.5">
+          <input
+            inputMode="decimal"
+            value={raw[i] !== undefined ? raw[i] : displayIn(stored[i], "mm", entry)}
+            onChange={(e) => setAt(i, e.target.value)}
+            onBlur={() => setRaw((m) => { const n = { ...m }; delete n[i]; return n; })}
+            placeholder={ph}
+            className={`${INP_B} w-[64px] text-center tabular-nums px-1`}
+          />
+          {i < 2 ? <span className="text-[var(--text-ghost)]">×</span> : null}
+        </span>
+      ))}
+      <UnitPicker value={entry} options={LENGTH_UNITS} onPick={(u) => { setRaw({}); setLength(u as LengthUnit); }} canonical="mm" size="sm" />
+    </span>
+  );
+}
+
+/* One number in the operator's mass unit, stored in kg. */
+function WeightInput({ value, onChange, placeholder = "0" }: { value: string; onChange: (v: string) => void; placeholder?: string }) {
+  const { mass: entry, setMass } = useEntryUnits();
+  const [raw, setRaw] = useState<string | undefined>(undefined);
+  return (
+    <span className="flex items-center gap-1.5">
+      <input
+        inputMode="decimal"
+        value={raw !== undefined ? raw : displayIn(value, "kg", entry)}
+        onChange={(e) => { setRaw(e.target.value); onChange(String(storeFrom(e.target.value, "kg", entry))); }}
+        onBlur={() => setRaw(undefined)}
+        placeholder={placeholder}
+        className={`${INP_B} w-[96px] tabular-nums`}
+      />
+      <UnitPicker value={entry} options={MASS_UNITS} onPick={(u) => { setRaw(undefined); setMass(u as MassUnit); }} canonical="kg" size="sm" />
+    </span>
+  );
+}
+
+/* The crate tile, editable: the same 64px square with the same number badge,
+   now also a click-or-drop target for the crate's photo. */
+function CrateTile({ url, badge, onChange, productId, title }: {
+  url: string | null; badge: number; onChange: (u: string | null) => void; productId?: string; title: string;
+}) {
+  const { busy, over, drop, open, input } = useImagePicker(onChange, productId);
+  return (
+    <>
+      {input}
+      <button
+        type="button"
+        onClick={open}
+        disabled={busy}
+        title={title}
+        {...drop}
+        className={`relative h-16 w-16 shrink-0 rounded-lg overflow-hidden border bg-[var(--bg-surface-subtle)] flex items-center justify-center text-[var(--text-secondary)] transition-colors disabled:opacity-50 ${
+          over ? "border-[#567FB2]" : "border-[var(--border-subtle)] hover:border-[var(--border-strong)]"
+        }`}
+      >
+        {url ? (
+          /* eslint-disable-next-line @next/next/no-img-element */
+          <img src={url} alt="" className="h-full w-full object-cover" />
+        ) : (
+          <ArchiveIcon className="h-7 w-7" />
+        )}
+        <span className="absolute bottom-1 end-1 h-[18px] min-w-[18px] px-1 rounded-md bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[10.5px] font-bold tabular-nums leading-none flex items-center justify-center">{badge}</span>
+      </button>
+    </>
+  );
+}
 
 function PackingSheet({
   logistics, model, product, t, lang, motion, productId, schemaCovers, onSaved,
@@ -764,13 +878,23 @@ function PackingSheet({
   /** The saved patch, so the page can show it before the reload lands. */
   onSaved: (patch: Record<string, unknown>) => void;
 }) {
-  /* ── Inline edit state. One section at a time; the draft is a copy taken
-     the moment Edit is pressed, so Cancel is free and Save sends only that
-     section's fields. */
+  /* ── INLINE EDIT, IN THE SHEET'S OWN LAYOUT. Edit does not swap the card
+     for the form: every tile stays where it is and the value inside it
+     becomes the control for that value. Owner, after the first version put
+     the form's layout inside the card: "it's still totally different layout
+     and different field places." One section at a time; the draft is a copy
+     taken when Edit is pressed, so Cancel is free and Save sends only that
+     section's fields. While a section is being edited, everything derived
+     (CBM, gross, container counts) is computed from the draft, live. */
   const [editing, setEditing] = useState<PackingSection | null>(null);
   const [draft, setDraft] = useState<PackingDraft | null>(null);
   const [saving, setSaving] = useState(false);
   const [saveErr, setSaveErr] = useState<string | null>(null);
+  /* Raw keystrokes for the converted number cells — converting on every
+     keystroke and echoing the result back eats the decimal point ("1." → 1). */
+  const [raw, setRaw] = useState<Record<string, string>>({});
+  const { length: dimUnit, mass: wtUnit, setLength, setMass } = useEntryUnits();
+
   const str = (v: unknown) => (v === null || v === undefined ? "" : String(v));
   const begin = (k: PackingSection) => {
     setDraft({
@@ -782,6 +906,7 @@ function PackingSheet({
       moq: str(product?.moq),
       lead_time: str(product?.lead_time),
     });
+    setRaw({});
     setSaveErr(null);
     setEditing(k);
   };
@@ -843,95 +968,100 @@ function PackingSheet({
     saveLabel: t("action.save", "Save"),
     cancelLabel: t("action.cancel", "Cancel"),
   });
-  const editorFor = (k: PackingSection): React.ReactNode => {
-    if (!draft || editing !== k) return null;
-    switch (k) {
-      case "physical":
-        return <PhysicalFields data={draft} onChange={patchDraft} />;
-      case "packing":
-        return <PackingBlock value={draft.logistics} onChange={patchLogistics} productId={productId} />;
-      case "loading":
-        return <LoadingBlock value={draft.logistics} onChange={patchLogistics} />;
-      case "customs":
-        return (
-          <div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className={LBL}>{t("logistics.countryOfOrigin", "Country of Origin")}</label>
-                <KdsSelect
-                  value={draft.country_of_origin}
-                  onChange={(v) => patchDraft({ country_of_origin: v })}
-                  options={COUNTRIES.map((c) => ({ value: c.code, label: `${flagOf(c.code)} ${countryName(c, lang)}` }))}
-                  placeholder="—"
-                  triggerClassName={INP + " pe-9 text-start"}
-                />
-              </div>
-              <div>
-                <label className={LBL}>{t("logistics.hsCode", "HS Code")}</label>
-                <input type="text" value={draft.hs_code} onChange={(e) => patchDraft({ hs_code: e.target.value })} placeholder="e.g. 8452.21" className={INP} />
-              </div>
-            </div>
-            <CustomsExtras value={draft.logistics} onChange={patchLogistics} />
-          </div>
-        );
-      case "order":
-        return (
-          <div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className={LBL}>{t("technical.defaultMoq", "Default MOQ (Product-level)")}</label>
-                <input type="number" min={1} value={draft.moq} onChange={(e) => patchDraft({ moq: e.target.value })} placeholder={t("technical.moqPlaceholder", "e.g. 10")} className={INP} />
-              </div>
-              <div>
-                <label className={LBL}>{t("technical.defaultLeadTime", "Default Lead Time")}</label>
-                <input type="text" value={draft.lead_time} onChange={(e) => patchDraft({ lead_time: e.target.value })} placeholder={t("technical.leadTimePlaceholder", "e.g. 7-14 days")} className={INP} />
-              </div>
-            </div>
-            <ShippingOrigin value={draft.logistics} onChange={patchLogistics} />
-          </div>
-        );
-    }
-  };
+
+  /* ── What the sheet reads from: the draft while editing, the row otherwise.
+     The draft is a copy, so sections not being edited read the same values. */
+  const L: ProductLogistics = draft?.logistics ?? logistics;
+  const col = (k: keyof PackingDraft & string) => (draft ? draft[k] : product?.[k]);
+  const ePhys = editing === "physical";
+  const ePack = editing === "packing";
+  const eLoad = editing === "loading";
+  const eCust = editing === "customs";
+  const eOrd = editing === "order";
 
   const label = (list: readonly { value: string; label: string }[], v: unknown) => {
     const hit = list.find((o) => o.value === v);
     return hit ? t(`pk.opt.${hit.value}`, hit.label) : (v as string) || null;
   };
-  const sums = sumPackages(logistics.packages);
+  const opts = (list: readonly { value: string; label: string }[]) => list.map((o) => ({ value: o.value, label: t(`pk.opt.${o.value}`, o.label) }));
+  const rows: PackageRow[] = L.packages?.length ? L.packages : ePack ? [{ qty: 1 }] : [];
+  const sums = sumPackages(rows);
+  const mode = L.packing_mode === "per_package" ? "per_package" : "per_unit";
+  const perPkg = mode === "per_package" ? Math.max(1, Math.floor(num(L.units_per_package) || 1)) : 1;
+  const plan = loadPlan(rows, { stackable: L.stackable, stackMax: num(L.stack_max), unitsPerPackage: perPkg });
   const m = (k: string) => (model ? (model as Record<string, unknown>)[k] : undefined);
   const pv = (k: string) => (product ? product[k] : undefined);
 
   /* The product is the source. A product that never saw the new tab still has
      its numbers on the primary variant, so fall back rather than print an
      empty sheet over data that exists. */
-  const fromProduct = sums.packageCount > 0 || !!logistics.packing_type || !!logistics.net_weight_kg;
-  const netW = fromProduct ? logistics.net_weight_kg : m("net_weight");
-  const grossW = fromProduct ? (sums.grossKg || logistics.gross_weight_kg) : m("weight");
-  const cbm = fromProduct ? (sums.cbm || logistics.cbm) : m("cbm");
-  const q20 = fromProduct ? logistics.qty_20ft : m("container_20ft_qty");
-  const q40 = fromProduct ? logistics.qty_40ft : m("container_40ft_qty");
-  const q40hq = fromProduct ? logistics.qty_40hq : m("container_40hq_qty");
-  const pType = fromProduct ? label(PACKING_TYPES, logistics.packing_type) : (m("packing_type") as string | undefined);
-  const dg = logistics.dangerous_goods;
+  const fromProduct = sums.packageCount > 0 || !!L.packing_type || !!L.net_weight_kg;
+  const netW = fromProduct ? L.net_weight_kg : m("net_weight");
+  const grossW = fromProduct ? (sums.grossKg || L.gross_weight_kg) : m("weight");
+  const cbm = fromProduct ? (sums.cbm || L.cbm) : m("cbm");
+  /* A count the operator typed wins; otherwise the count the crates give —
+     the editor shows the calculated number in the box, so the sheet does too. */
+  const q20 = fromProduct ? (L.qty_20ft ?? (plan.c20.qty || undefined)) : m("container_20ft_qty");
+  const q40 = fromProduct ? (L.qty_40ft ?? (plan.c40.qty || undefined)) : m("container_40ft_qty");
+  const q40hq = fromProduct ? (L.qty_40hq ?? (plan.c40hq.qty || undefined)) : m("container_40hq_qty");
+  const pType = fromProduct ? label(PACKING_TYPES, L.packing_type) : (m("packing_type") as string | undefined);
+  const dg = L.dangerous_goods;
   const dgNames = (dg?.kinds ?? []).map((k) => label(DG_KINDS, k) ?? k);
-  /* A container count means pieces for a product that ships many to a carton
-     and whole machines otherwise — the tile has to say which. */
-  const perPkgLabel = logistics.packing_mode === "per_package" ? t("pk.pcsWord", "pcs") : t("pk.unitsWord", "units");
+  const perPkgLabel = mode === "per_package" ? t("pk.pcsWord", "pcs") : t("pk.unitsWord", "units");
 
   const has = (...v: unknown[]) => v.some((x) => x !== undefined && x !== null && x !== "" && x !== false);
-
   const machine = has(pv("machine_dimensions"), pv("machine_weight_kg"));
-  const packing = has(pType, logistics.wood_treatment, netW, grossW, cbm, sums.packageCount || null, logistics.packing_photo_url);
-  const loading = has(q20, q40, q40hq, logistics.stackable);
-  const customs = has(pv("country_of_origin"), pv("hs_code"), logistics.origin_certificate && logistics.origin_certificate !== "none" ? logistics.origin_certificate : null, dg?.has);
-  const order = has(pv("moq"), pv("lead_time"), logistics.port_of_loading);
+  const packing = has(pType, L.wood_treatment, netW, grossW, cbm, sums.packageCount || null, L.packing_photo_url);
+  const loading = has(q20, q40, q40hq, L.stackable);
+  const customs = has(pv("country_of_origin"), pv("hs_code"), L.origin_certificate && L.origin_certificate !== "none" ? L.origin_certificate : null, dg?.has);
+  const order = has(pv("moq"), pv("lead_time"), L.port_of_loading);
+
+  /* ── Packing edit helpers: the same maths as the editor's PackingBlock. */
+  const writeRows = (next: PackageRow[]) => {
+    const s2 = sumPackages(next);
+    patchLogistics({ packages: next, cbm: s2.cbm, gross_weight_kg: s2.grossKg });
+  };
+  const setRow = (i: number, u: Partial<PackageRow>) => writeRows(rows.map((r, x) => (x === i ? { ...r, ...u } : r)));
+  const addRow = () => patchLogistics({ packages: [...rows, { qty: 1 }] });
+  const removeRow = (i: number) => writeRows(rows.filter((_, x) => x !== i));
+  const cell = (i: number, k: keyof PackageRow, ph: string, lab: string) => {
+    const isDim = k === "l_cm" || k === "w_cm" || k === "h_cm";
+    const isWeight = k === "gross_kg";
+    const id = `${i}:${String(k)}`;
+    const converted = isDim ? displayIn(rows[i][k], "cm", dimUnit) : isWeight ? displayIn(rows[i][k], "kg", wtUnit) : String(rows[i][k] ?? "");
+    const shown = raw[id] !== undefined ? raw[id] : converted;
+    return (
+      <span className="min-w-0">
+        <span className={TINY}>{lab}</span>
+        <input
+          inputMode="decimal"
+          value={shown}
+          onChange={(e) => {
+            setRaw((mm) => ({ ...mm, [id]: e.target.value }));
+            const stored = isDim ? storeFrom(e.target.value, "cm", dimUnit) : isWeight ? storeFrom(e.target.value, "kg", wtUnit) : e.target.value;
+            setRow(i, { [k]: stored } as Partial<PackageRow>);
+          }}
+          onBlur={() => setRaw((mm) => { const next = { ...mm }; delete next[id]; return next; })}
+          placeholder={ph}
+          className={`${INP_B} w-full text-center tabular-nums px-1`}
+        />
+      </span>
+    );
+  };
+  const setDg = (u: Partial<NonNullable<ProductLogistics["dangerous_goods"]>>) => patchLogistics({ dangerous_goods: { ...(dg ?? {}), ...u } });
+  const toggleKind = (k: string) => {
+    const cur = dg?.kinds ?? [];
+    setDg({ kinds: cur.includes(k) ? cur.filter((x) => x !== k) : [...cur, k] });
+  };
+  const seg = (on: boolean, warn = false) => `${SEG} ${on ? (warn ? SEG_WARN : SEG_ON) : SEG_OFF}`;
+  const selectCls = `${INP_B} w-full pe-8 text-start`;
 
   /* ONE CARD PER SECTION, not one card with headings inside it. The editor
      puts Physical, Packing, Loading, Origin & Customs and Fulfillment in five
      separate collapsible cards; stacking them as sub-headings inside a single
      card made the same content read as a different screen. Same cards, same
      order, same titles and badges — the sheet is the form with the inputs
-     taken out. */
+     taken out, and Edit puts them back where the values were. */
   if (!machine && !packing && !loading && !customs && !order && editing === null) {
     /* The empty state stands for the whole tab, so it takes the tab's own
        glyph rather than borrowing Origin & Customs' globe. */
@@ -946,56 +1076,111 @@ function PackingSheet({
 
   return (
     <div className="space-y-4">
-      {machine || editing === "physical" ? (
-        <Group motion={motion} icon={<RulerIcon className="h-4 w-4" />} title={t("tech.secPhysical", "Physical (Bare Machine)")} count={t("logistics.physicalBadge", "Dimensions · Weight")} {...gp("physical")} editor={editorFor("physical")}>
+      {machine || ePhys ? (
+        <Group motion={motion} icon={<RulerIcon className="h-4 w-4" />} title={t("tech.secPhysical", "Physical (Bare Machine)")} count={t("logistics.physicalBadge", "Dimensions · Weight")} {...gp("physical")}>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 gap-2.5">
-            {pv("machine_dimensions") ? (
-              <FactChip icon={<Maximize2Icon className="h-6 w-6" />} label={t("pp.f.machineDims", "Machine dimensions")} value={`${String(pv("machine_dimensions"))} mm`} />
+            {ePhys || pv("machine_dimensions") ? (
+              <FactChip
+                icon={<Maximize2Icon className="h-6 w-6" />}
+                label={t("pp.f.machineDims", "Machine dimensions")}
+                value={`${str(col("machine_dimensions"))} mm`}
+                input={ePhys && draft ? <DimsInput value={draft.machine_dimensions} onChange={(v) => patchDraft({ machine_dimensions: v })} /> : undefined}
+              />
             ) : null}
-            {pv("machine_weight_kg") ? (
-              <FactChip icon={<ScaleIcon className="h-6 w-6" />} label={t("pp.f.machineWeight", "Machine weight (kg)")} value={`${String(pv("machine_weight_kg"))} kg`} />
+            {ePhys || pv("machine_weight_kg") ? (
+              <FactChip
+                icon={<ScaleIcon className="h-6 w-6" />}
+                label={t("pp.f.machineWeight", "Machine weight (kg)")}
+                value={`${str(col("machine_weight_kg"))} kg`}
+                input={ePhys && draft ? <WeightInput value={draft.machine_weight_kg} onChange={(v) => patchDraft({ machine_weight_kg: v })} /> : undefined}
+              />
             ) : null}
           </div>
-                </Group>
+        </Group>
       ) : null}
 
-      {packing || editing === "packing" ? (
-        <Group motion={motion} icon={<BoxesIcon className="h-4 w-4" />} title={t("logistics.packingSection", "Packing")} count={t("logistics.packingSectionBadge", "Crates · Weights")} {...gp("packing")} editor={editorFor("packing")}>
-          {logistics.packing_photo_url ? (
+      {packing || ePack ? (
+        <Group motion={motion} icon={<BoxesIcon className="h-4 w-4" />} title={t("logistics.packingSection", "Packing")} count={t("logistics.packingSectionBadge", "Crates · Weights")} {...gp("packing")}>
+          {ePack ? (
+            <div className="mb-4">
+              <PackingPhoto url={L.packing_photo_url ?? null} onChange={(u) => patchLogistics({ packing_photo_url: u })} productId={productId} />
+            </div>
+          ) : L.packing_photo_url ? (
             /* eslint-disable-next-line @next/next/no-img-element */
             <img
-              src={logistics.packing_photo_url}
+              src={L.packing_photo_url}
               alt={t("pp.f.packingPhotoAlt", "Packed product")}
               className="mb-4 w-full max-w-lg rounded-xl border border-[var(--border-subtle)] object-contain bg-black/20"
             />
           ) : null}
-
           {/* The four numbers a buyer or a forwarder asks for first. */}
           <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
-            {sums.packageCount > 0 ? (
+            {ePack || sums.packageCount > 0 ? (
               <StatTile
                 label={t("pp.f.packages", "Packages")}
-                value={logistics.packing_mode === "per_package" && logistics.units_per_package ? String(logistics.units_per_package) : String(sums.packageCount)}
-                unit={logistics.packing_mode === "per_package" && logistics.units_per_package ? `${t("pk.pcsWord", "pcs")} / ${t("pk.packageOne", "Package").toLowerCase()}` : undefined}
+                value={mode === "per_package" && L.units_per_package ? String(L.units_per_package) : String(sums.packageCount)}
+                unit={mode === "per_package" && L.units_per_package ? `${t("pk.pcsWord", "pcs")} / ${t("pk.packageOne", "Package").toLowerCase()}` : undefined}
+                extra={ePack ? (
+                  /* How it is packed — the answer changes what every number
+                     below means, so it sits on the count it governs. */
+                  <div className="mt-2 space-y-1.5">
+                    <div className="flex flex-wrap gap-1">
+                      <button type="button" onClick={() => patchLogistics({ packing_mode: "per_unit" })} className={seg(mode === "per_unit")}>{t("pk.modePerUnit", "One unit → its own package(s)")}</button>
+                      <button type="button" onClick={() => patchLogistics({ packing_mode: "per_package" })} className={seg(mode === "per_package")}>{t("pk.modePerPackage", "One package → many pieces")}</button>
+                    </div>
+                    {mode === "per_package" ? (
+                      <label className="flex items-center gap-2">
+                        <span className={`${TINY} mb-0`}>{t("pk.piecesPerPkg", "Pieces per package")}</span>
+                        <input inputMode="numeric" value={String(L.units_per_package ?? "")} onChange={(e) => patchLogistics({ units_per_package: e.target.value })} placeholder="50" className={`${INP_B} w-[72px] text-center tabular-nums`} />
+                      </label>
+                    ) : null}
+                  </div>
+                ) : undefined}
               />
             ) : null}
-            {cbm ? <StatTile label={t("pp.f.cbm", "CBM")} value={String(cbm)} unit="m³" tone="accent" /> : null}
-            {netW ? <StatTile label={t("pp.f.netWeight", "Net weight")} value={String(netW)} unit="kg" /> : null}
-            {grossW ? <StatTile label={t("pp.f.grossWeight", "Gross weight")} value={String(grossW)} unit="kg" tone="accent" /> : null}
+            {ePack || cbm ? <StatTile label={t("pp.f.cbm", "CBM")} value={String(sums.cbm || cbm || "—")} unit="m³" tone="accent" /> : null}
+            {ePack || netW ? (
+              <StatTile
+                label={t("pp.f.netWeight", "Net weight")}
+                value={String(netW ?? "—")}
+                unit={ePack ? wtUnit : "kg"}
+                input={ePack ? (
+                  <input
+                    inputMode="decimal"
+                    value={raw.net !== undefined ? raw.net : displayIn(L.net_weight_kg, "kg", wtUnit)}
+                    onChange={(e) => { setRaw((mm) => ({ ...mm, net: e.target.value })); patchLogistics({ net_weight_kg: storeFrom(e.target.value, "kg", wtUnit) }); }}
+                    onBlur={() => setRaw((mm) => { const next = { ...mm }; delete next.net; return next; })}
+                    placeholder="180"
+                    className={`${INP_B} w-full tabular-nums text-[17px]`}
+                  />
+                ) : undefined}
+              />
+            ) : null}
+            {ePack || grossW ? <StatTile label={t("pp.f.grossWeight", "Gross weight")} value={String(sums.grossKg || grossW || "—")} unit="kg" tone="accent" /> : null}
           </div>
-
-          {(pType || logistics.wood_treatment) ? (
+          {ePack || pType || L.wood_treatment ? (
             <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
-              {pType ? <FactChip icon={<BoxIcon className="h-6 w-6" />} label={t("pk.packingType", "Packing type")} value={pType} /> : null}
-              {logistics.wood_treatment ? (
+              {ePack || pType ? (
+                <FactChip
+                  icon={<BoxIcon className="h-6 w-6" />}
+                  label={t("pk.packingType", "Packing type")}
+                  value={pType ?? ""}
+                  input={ePack ? <KdsSelect value={L.packing_type ?? ""} onChange={(v: string) => patchLogistics({ packing_type: v })} options={opts(PACKING_TYPES)} placeholder={t("pk.select", "— Select —")} triggerClassName={selectCls} /> : undefined}
+                />
+              ) : null}
+              {ePack || L.wood_treatment ? (
                 <FactChip
                   icon={<FlaskConicalIcon className="h-6 w-6" />}
                   label={t("pp.f.woodTreatment", "Wood treatment")}
-                  value={label(WOOD_TREATMENTS, logistics.wood_treatment) ?? ""}
-                  tone={logistics.wood_treatment === "untreated" ? "warn" : "plain"}
+                  value={label(WOOD_TREATMENTS, L.wood_treatment) ?? ""}
+                  tone={L.wood_treatment === "untreated" ? "warn" : "plain"}
+                  input={ePack ? <KdsSelect value={L.wood_treatment ?? ""} onChange={(v: string) => patchLogistics({ wood_treatment: v })} options={opts(WOOD_TREATMENTS)} placeholder={t("pk.select", "— Select —")} triggerClassName={selectCls} /> : undefined}
                 />
               ) : null}
             </div>
+          ) : null}
+          {ePack && L.wood_treatment === "untreated" ? (
+            <p className="mt-1.5 text-[10.5px] text-amber-400">{t("pk.woodWarn", "⚠ Untreated solid wood is refused by EU / US / AU customs — it must be heat-treated or fumigated and bear the IPPC mark.")}</p>
           ) : null}
 
           {/* EACH CRATE CARRIES ITS OWN PACKING LIST. They were merged into
@@ -1003,39 +1188,80 @@ function PackingSheet({
               question a packing list exists to answer: what is in THIS box.
               One card per crate, its contents inside it, so the machine crate
               and the accessories box can never be read as one pile. */}
-          {(logistics.packages ?? []).length ? (
-            <div className="mt-4 space-y-2.5">
-              {(logistics.packages ?? []).map((r, i) => (
+          {ePack ? (
+            /* The unit switches sit with the numbers they govern. INPUTS
+               speak the operator's unit; every TOTAL stays m³ and kg. */
+            <div className="mt-4 flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+              <span className="text-[9.5px] font-bold uppercase tracking-[0.1em] text-[var(--text-ghost)]">{mode === "per_package" ? t("pk.packageOne", "Package") : t("pk.packagesPerUnit", "Packages per unit")}</span>
+              <div className="flex flex-wrap items-center gap-3">
+                <UnitSwitch label={t("pk.unitSize", "Size")} value={dimUnit} options={LENGTH_UNITS} canonical="cm" onChange={(v) => { setRaw({}); setLength(v as LengthUnit); }} />
+                <UnitSwitch label={t("pk.unitWeight", "Weight")} value={wtUnit} options={MASS_UNITS} canonical="kg" onChange={(v) => { setRaw({}); setMass(v as MassUnit); }} />
+              </div>
+            </div>
+          ) : null}
+          {rows.length ? (
+            <div className={`${ePack ? "mt-2" : "mt-4"} space-y-2.5`}>
+              {rows.map((r, i) => (
                 <div key={i} className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-3">
                   <div className="flex items-center gap-3">
                     {/* A crate glyph AND its number. The number is what the
                         packing list, the crate stencil and the bill of lading
                         all carry, so it stays on the tile as a badge — over the
-                        photo too, once there is one. The glyph is the single
-                        crate (Archive); the section header is the stack
-                        (Boxes) and the packing-type chip the lidded box (Box),
-                        so no two marks on this sheet mean the same thing. */}
-                    <span className="relative h-16 w-16 shrink-0 rounded-lg overflow-hidden border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] flex items-center justify-center text-[var(--text-secondary)]">
-                      {r.photo_url ? (
-                        /* eslint-disable-next-line @next/next/no-img-element */
-                        <img src={r.photo_url} alt="" className="h-full w-full object-cover" />
-                      ) : (
-                        <ArchiveIcon className="h-7 w-7" />
-                      )}
-                      <span className="absolute bottom-1 end-1 h-[18px] min-w-[18px] px-1 rounded-md bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[10.5px] font-bold tabular-nums leading-none flex items-center justify-center">{i + 1}</span>
-                    </span>
+                        photo too, once there is one. */}
+                    {ePack ? (
+                      <CrateTile url={r.photo_url ?? null} badge={i + 1} onChange={(u) => setRow(i, { photo_url: u })} productId={productId} title={r.photo_url ? t("pk.photoReplace", "Click or drop an image to replace") : t("pk.photoAdd", "Click or drop an image to add a photo")} />
+                    ) : (
+                      <span className="relative h-16 w-16 shrink-0 rounded-lg overflow-hidden border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] flex items-center justify-center text-[var(--text-secondary)]">
+                        {r.photo_url ? (
+                          /* eslint-disable-next-line @next/next/no-img-element */
+                          <img src={r.photo_url} alt="" className="h-full w-full object-cover" />
+                        ) : (
+                          <ArchiveIcon className="h-7 w-7" />
+                        )}
+                        <span className="absolute bottom-1 end-1 h-[18px] min-w-[18px] px-1 rounded-md bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[10.5px] font-bold tabular-nums leading-none flex items-center justify-center">{i + 1}</span>
+                      </span>
+                    )}
                     <span className="min-w-0 flex-1">
-                      <span className="block text-[13.5px] font-semibold text-[var(--text-primary)] truncate">
-                        {(r.label || "").trim() || t("pk.packageOne", "Package")}
-                        {Number(r.qty) > 1 ? <span className="ms-1.5 text-[11px] font-medium text-[var(--text-muted)]">× {r.qty}</span> : null}
-                      </span>
-                      <span className="block text-[11.5px] tabular-nums text-[var(--text-muted)] mt-0.5">
-                        {r.l_cm && r.w_cm && r.h_cm ? `${r.l_cm} × ${r.w_cm} × ${r.h_cm} cm` : "—"}
-                        {r.gross_kg ? `  ·  ${r.gross_kg} kg` : ""}
-                      </span>
+                      {ePack ? (
+                        <span className="flex items-center gap-2">
+                          <input
+                            value={r.label ?? ""}
+                            onChange={(e) => setRow(i, { label: e.target.value })}
+                            placeholder={i === 0 ? t("pk.phMachineCrate", "Machine crate") : t("pk.phAccBox", "Accessories box")}
+                            className={`${INP_B} w-full min-w-0 flex-1`}
+                          />
+                          {rows.length > 1 ? (
+                            <button type="button" onClick={() => removeRow(i)} aria-label={t("pk.removePackage", "Remove package")} className="h-9 w-8 shrink-0 rounded-lg text-[var(--text-ghost)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-subtle)] transition-colors">×</button>
+                          ) : null}
+                        </span>
+                      ) : (
+                        <span className="block text-[13.5px] font-semibold text-[var(--text-primary)] truncate">
+                          {(r.label || "").trim() || t("pk.packageOne", "Package")}
+                          {Number(r.qty) > 1 ? <span className="ms-1.5 text-[11px] font-medium text-[var(--text-muted)]">× {r.qty}</span> : null}
+                        </span>
+                      )}
+                      {ePack ? (
+                        /* The measurement line, as five cells in the same place. */
+                        <span className="mt-2 grid grid-cols-5 gap-1.5">
+                          {cell(i, "qty", "1", t("pk.colQty", "Qty"))}
+                          {cell(i, "l_cm", "120", `${t("pk.colLbare", "L")} (${dimUnit})`)}
+                          {cell(i, "w_cm", "80", `${t("pk.colWbare", "W")} (${dimUnit})`)}
+                          {cell(i, "h_cm", "110", `${t("pk.colHbare", "H")} (${dimUnit})`)}
+                          {cell(i, "gross_kg", "210", `${t("pk.colGrossBare", "Gross")} (${wtUnit})`)}
+                        </span>
+                      ) : (
+                        <span className="block text-[11.5px] tabular-nums text-[var(--text-muted)] mt-0.5">
+                          {r.l_cm && r.w_cm && r.h_cm ? `${r.l_cm} × ${r.w_cm} × ${r.h_cm} cm` : "—"}
+                          {r.gross_kg ? `  ·  ${r.gross_kg} kg` : ""}
+                        </span>
+                      )}
                     </span>
                   </div>
-                  {(r.contents ?? []).length ? (
+                  {ePack ? (
+                    <div className="mt-3 pt-3 border-t border-[var(--border-subtle)]">
+                      <ContentsEditor items={r.contents ?? []} onChange={(items) => setRow(i, { contents: items })} productId={productId} />
+                    </div>
+                  ) : (r.contents ?? []).length ? (
                     <ul className="mt-3 pt-3 border-t border-[var(--border-subtle)] space-y-1.5">
                       {(r.contents ?? []).map((it, ci) => (
                         <ContentRow key={ci} item={it} mult={Number(r.qty) || 1} depth={0} />
@@ -1046,24 +1272,83 @@ function PackingSheet({
               ))}
             </div>
           ) : null}
+          {ePack ? (
+            <div className="mt-2.5">
+              <button type="button" onClick={addRow} className="inline-flex items-center gap-1.5 h-8 px-2.5 rounded-lg text-[11px] font-semibold text-[var(--text-primary)] bg-[var(--bg-surface)] hover:bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] transition-colors">
+                {t("pk.addPackage", "+ Add package")}
+              </button>
+              {/* THE ONE RULE THAT KEEPS THE TOTALS HONEST: a package is what
+                  the forwarder loads and weighs; a box inside it is already in
+                  its size and weight. Stated where the mistake would be made. */}
+              <p className={`${HINT} mt-2`}>
+                {t("pk.packagesRule", "A package is one thing the forwarder loads: only what is weighed and measured on its own belongs here. A box inside another box goes under \"What's inside\" — the outer crate's size and weight already include it.")}
+              </p>
+            </div>
+          ) : null}
         </Group>
       ) : null}
 
-      {loading || editing === "loading" ? (
-        <Group motion={motion} icon={<ShipIcon className="h-4 w-4" />} title={t("logistics.loadingSection", "Loading & Containers")} count={t("logistics.loadingSectionBadge", "20ft · 40ft · 40HQ")} {...gp("loading")} editor={editorFor("loading")}>
+      {loading || eLoad ? (
+        <Group motion={motion} icon={<ShipIcon className="h-4 w-4" />} title={t("logistics.loadingSection", "Loading & Containers")} count={t("logistics.loadingSectionBadge", "20ft · 40ft · 40HQ")} {...gp("loading")}>
           {/* Three numbers, three tiles: this is the question a forwarder asks
-              and it should be answerable at a glance, not read out of a list. */}
+              and it should be answerable at a glance, not read out of a list.
+              In edit, each tile is the calculated count with the box the
+              operator may overwrite it in — and says which limit decided it. */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
-            <StatTile label="20ft" value={q20 ? String(q20) : "—"} unit={perPkgLabel} tone="accent" />
-            <StatTile label="40ft" value={q40 ? String(q40) : "—"} unit={perPkgLabel} tone="accent" />
-            <StatTile label="40HQ" value={q40hq ? String(q40hq) : "—"} unit={perPkgLabel} tone="accent" />
+            {([["c20", "qty_20ft", q20], ["c40", "qty_40ft", q40], ["c40hq", "qty_40hq", q40hq]] as const).map(([key, stored, q]) => {
+              const r = plan[key];
+              const typed = L[stored];
+              const overridden = typed !== undefined && typed !== "" && num(typed) !== r.qty;
+              return (
+                <StatTile
+                  key={key}
+                  label={CONTAINERS[key].label}
+                  value={q ? String(q) : "—"}
+                  unit={perPkgLabel}
+                  tone="accent"
+                  input={eLoad ? (
+                    <input inputMode="numeric" value={String(typed ?? (r.qty || ""))} onChange={(e) => patchLogistics({ [stored]: e.target.value } as Partial<ProductLogistics>)} placeholder="—" className={`${INP_B} w-full tabular-nums text-[17px]`} />
+                  ) : undefined}
+                  extra={eLoad ? (
+                    <div className="mt-1.5 flex flex-wrap items-center gap-x-2 text-[9.5px] leading-snug text-[var(--text-ghost)]">
+                      {overridden ? (
+                        <button type="button" onClick={() => patchLogistics({ [stored]: r.qty } as Partial<ProductLogistics>)} className="font-bold uppercase tracking-[0.1em] text-amber-400 underline underline-offset-2">{t("pk.resetTo", "Edited · reset")} {r.qty}</button>
+                      ) : (
+                        <span className="font-bold uppercase tracking-[0.12em] px-1.5 py-px rounded-full border border-[#567FB2]/50 text-[#7FA9D6]">{t("pk.calculated", "Calculated")}</span>
+                      )}
+                      <span>
+                        {r.qty === 0
+                          ? t("pk.enterPackages", "Enter the packages above.")
+                          : r.limit === "weight"
+                            ? `${t("pk.weightLimited", "Weight-limited")} — ${CONTAINERS[key].payload_kg.toLocaleString()} kg ${t("pk.payload", "payload")}.`
+                            : t("pk.spaceLimited", "Space-limited — footprint × layers.")}
+                      </span>
+                    </div>
+                  ) : undefined}
+                />
+              );
+            })}
           </div>
           <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
             <FactChip
               icon={<LayersIcon className="h-6 w-6" />}
               label={t("pk.stackQ", "Can crates be stacked?")}
-              value={logistics.stackable ? t("pk.stackable", "Stackable") : t("pk.notStackable", "Not stackable")}
+              value={L.stackable ? t("pk.stackable", "Stackable") : t("pk.notStackable", "Not stackable")}
+              input={eLoad ? (
+                <span className="flex flex-wrap gap-1">
+                  <button type="button" onClick={() => patchLogistics({ stackable: true })} className={seg(!!L.stackable)}>{t("pk.stackable", "Stackable")}</button>
+                  <button type="button" onClick={() => patchLogistics({ stackable: false })} className={seg(!L.stackable)}>{t("pk.notStackable", "Not stackable")}</button>
+                </span>
+              ) : undefined}
             />
+            {L.stackable && (eLoad || L.stack_max) ? (
+              <FactChip
+                icon={<BoxesIcon className="h-6 w-6" />}
+                label={t("pk.maxLayers", "Maximum layers")}
+                value={String(L.stack_max ?? "")}
+                input={eLoad ? <input inputMode="numeric" value={String(L.stack_max ?? "")} onChange={(e) => patchLogistics({ stack_max: e.target.value })} placeholder="2" className={`${INP_B} w-[72px] text-center tabular-nums`} /> : undefined}
+              />
+            ) : null}
             {sums.volumetricKg ? (
               <FactChip
                 icon={<PlaneIcon className="h-6 w-6" />}
@@ -1072,52 +1357,111 @@ function PackingSheet({
               />
             ) : null}
           </div>
-                </Group>
+        </Group>
       ) : null}
 
-      {customs || editing === "customs" ? (
-        <Group motion={motion} icon={<LandmarkIcon className="h-4 w-4" />} title={t("logistics.title", "Origin & Customs")} count={t("logistics.badge", "Shipping · Customs")} {...gp("customs")} editor={editorFor("customs")}>
+      {customs || eCust ? (
+        <Group motion={motion} icon={<LandmarkIcon className="h-4 w-4" />} title={t("logistics.title", "Origin & Customs")} count={t("logistics.badge", "Shipping · Customs")} {...gp("customs")}>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
-            {pv("country_of_origin") ? (
-              <FactChip icon={<FlagIcon className="h-6 w-6" />} label={t("pp.f.origin", "Country of origin")} value={String(pv("country_of_origin"))} />
+            {eCust || pv("country_of_origin") ? (
+              <FactChip
+                icon={<FlagIcon className="h-6 w-6" />}
+                label={t("pp.f.origin", "Country of origin")}
+                value={(() => { const c = COUNTRIES.find((x) => x.code === str(col("country_of_origin"))); return c ? `${flagOf(c.code)} ${countryName(c, lang)}` : str(col("country_of_origin")); })()}
+                input={eCust && draft ? (
+                  <KdsSelect value={draft.country_of_origin} onChange={(v: string) => patchDraft({ country_of_origin: v })} options={COUNTRIES.map((c) => ({ value: c.code, label: `${flagOf(c.code)} ${countryName(c, lang)}` }))} placeholder="—" triggerClassName={selectCls} />
+                ) : undefined}
+              />
             ) : null}
-            {pv("hs_code") ? (
-              <FactChip icon={<ScanLineIcon className="h-6 w-6" />} label={t("pp.f.hs", "HS code")} value={String(pv("hs_code"))} />
+            {eCust || pv("hs_code") ? (
+              <FactChip
+                icon={<ScanLineIcon className="h-6 w-6" />}
+                label={t("pp.f.hs", "HS code")}
+                value={str(col("hs_code"))}
+                input={eCust && draft ? <input value={draft.hs_code} onChange={(e) => patchDraft({ hs_code: e.target.value })} placeholder="8452.21" className={`${INP_B} w-full font-mono`} /> : undefined}
+              />
             ) : null}
-            {logistics.origin_certificate && logistics.origin_certificate !== "none" ? (
-              <FactChip icon={<FileCheckIcon className="h-6 w-6" />} label={t("pp.f.originCert", "Origin certificate")} value={label(ORIGIN_CERTIFICATES, logistics.origin_certificate) ?? ""} />
+            {eCust || (L.origin_certificate && L.origin_certificate !== "none") ? (
+              <FactChip
+                icon={<FileCheckIcon className="h-6 w-6" />}
+                label={t("pp.f.originCert", "Origin certificate")}
+                value={label(ORIGIN_CERTIFICATES, L.origin_certificate) ?? ""}
+                input={eCust ? <KdsSelect value={L.origin_certificate ?? ""} onChange={(v: string) => patchLogistics({ origin_certificate: v })} options={opts(ORIGIN_CERTIFICATES)} placeholder={t("pk.select", "— Select —")} triggerClassName={selectCls} /> : undefined}
+              />
             ) : null}
-            {dg?.has ? (
+            {eCust || dg?.has ? (
               <FactChip
                 icon={<TriangleWarningIcon className="h-6 w-6" />}
                 label={t("pp.f.regulated", "Regulated content")}
                 value={dgNames.join(", ") || t("pk.dgHas", "Has regulated content")}
-                note={[dg.un_numbers, dg.notes].filter(Boolean).join("  ·  ") || undefined}
-                tone="warn"
-                /* A warning with a note behind it is taller than its
+                note={[dg?.un_numbers, dg?.notes].filter(Boolean).join("  ·  ") || undefined}
+                tone={dg?.has ? "warn" : "plain"}
+                /* The band, not a cell: wrapped text made it taller than its
                    neighbours; given its own band it stops leaving a hole in
                    the row and reads like the alert it is. */
                 wide
+                input={eCust ? (
+                  <span className="block space-y-2">
+                    <span className="flex flex-wrap gap-1">
+                      <button type="button" onClick={() => setDg({ has: false })} className={seg(!dg?.has)}>{t("pk.dgNone", "Nothing regulated")}</button>
+                      <button type="button" onClick={() => setDg({ has: true })} className={seg(!!dg?.has, true)}>{t("pk.dgHas", "Has regulated content")}</button>
+                    </span>
+                    {dg?.has ? (
+                      <>
+                        <span className="flex flex-wrap gap-1">
+                          {DG_KINDS.map((k) => (
+                            <button key={k.value} type="button" onClick={() => toggleKind(k.value)} className={seg((dg?.kinds ?? []).includes(k.value), true)}>{t(`pk.opt.${k.value}`, k.label)}</button>
+                          ))}
+                        </span>
+                        <span className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                          <span>
+                            <span className={TINY}>{t("pk.unNumbers", "UN number(s)")}</span>
+                            <input value={dg?.un_numbers ?? ""} onChange={(e) => setDg({ un_numbers: e.target.value })} placeholder="UN3481" className={`${INP_B} w-full font-mono`} />
+                          </span>
+                          <span>
+                            <span className={TINY}>{t("pk.dgNote", "Note for the forwarder")}</span>
+                            <input value={dg?.notes ?? ""} onChange={(e) => setDg({ notes: e.target.value })} placeholder={t("pk.dgNotePh", "Oil drained before shipment")} className={`${INP_B} w-full`} />
+                          </span>
+                        </span>
+                      </>
+                    ) : null}
+                  </span>
+                ) : undefined}
               />
             ) : null}
           </div>
-                </Group>
+        </Group>
       ) : null}
 
-      {order || editing === "order" ? (
-        <Group motion={motion} icon={<ClipboardCheckIcon className="h-4 w-4" />} title={t("technical.fulfillmentDefaults", "Fulfillment Defaults")} count={t("technical.fulfillmentBadge", "MOQ · Lead Time")} {...gp("order")} editor={editorFor("order")}>
+      {order || eOrd ? (
+        <Group motion={motion} icon={<ClipboardCheckIcon className="h-4 w-4" />} title={t("technical.fulfillmentDefaults", "Fulfillment Defaults")} count={t("technical.fulfillmentBadge", "MOQ · Lead Time")} {...gp("order")}>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
-            {pv("moq") ? (
-              <FactChip icon={<ShoppingCartIcon className="h-6 w-6" />} label={t("pp.f.moq", "MOQ")} value={String(pv("moq"))} />
+            {eOrd || pv("moq") ? (
+              <FactChip
+                icon={<ShoppingCartIcon className="h-6 w-6" />}
+                label={t("pp.f.moq", "MOQ")}
+                value={str(col("moq"))}
+                input={eOrd && draft ? <input type="number" min={1} value={draft.moq} onChange={(e) => patchDraft({ moq: e.target.value })} placeholder={t("technical.moqPlaceholder", "e.g. 10")} className={`${INP_B} w-full tabular-nums`} /> : undefined}
+              />
             ) : null}
-            {pv("lead_time") ? (
-              <FactChip icon={<ClockIcon className="h-6 w-6" />} label={t("pp.f.leadTime", "Lead time")} value={String(pv("lead_time"))} />
+            {eOrd || pv("lead_time") ? (
+              <FactChip
+                icon={<ClockIcon className="h-6 w-6" />}
+                label={t("pp.f.leadTime", "Lead time")}
+                value={str(col("lead_time"))}
+                input={eOrd && draft ? <input value={draft.lead_time} onChange={(e) => patchDraft({ lead_time: e.target.value })} placeholder={t("technical.leadTimePlaceholder", "e.g. 7-14 days")} className={`${INP_B} w-full`} /> : undefined}
+              />
             ) : null}
-            {logistics.port_of_loading ? (
-              <FactChip icon={<AnchorIcon className="h-6 w-6" />} label={t("pp.f.portOfLoading", "Port of loading")} value={logistics.port_of_loading} />
+            {eOrd || L.port_of_loading ? (
+              <FactChip
+                icon={<AnchorIcon className="h-6 w-6" />}
+                label={t("pp.f.portOfLoading", "Port of loading")}
+                value={L.port_of_loading ?? ""}
+                input={eOrd ? <input value={L.port_of_loading ?? ""} onChange={(e) => patchLogistics({ port_of_loading: e.target.value })} placeholder={t("pk.portPh", "Shanghai")} className={`${INP_B} w-full`} /> : undefined}
+              />
             ) : null}
           </div>
-                </Group>
+        </Group>
       ) : null}
 
       {/* Sections with nothing in them are not shown as empty cards — but they
@@ -1134,9 +1478,9 @@ function PackingSheet({
         if (!missing.length) return null;
         return (
           <div className={`${motion} flex flex-wrap items-center gap-2`}>
-            {missing.map((m) => (
-              <button key={m.k} type="button" onClick={() => begin(m.k)} className="inline-flex items-center gap-1.5 h-8 px-3 rounded-lg border border-dashed border-[var(--border-subtle)] text-[11.5px] font-medium text-[var(--text-ghost)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)] transition-colors">
-                + {m.label}
+            {missing.map((mm) => (
+              <button key={mm.k} type="button" onClick={() => begin(mm.k)} className="inline-flex items-center gap-1.5 h-8 px-3 rounded-lg border border-dashed border-[var(--border-subtle)] text-[11.5px] font-medium text-[var(--text-ghost)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)] transition-colors">
+                + {mm.label}
               </button>
             ))}
           </div>
