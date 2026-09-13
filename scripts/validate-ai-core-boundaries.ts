@@ -34,6 +34,7 @@ import {
   isChoiceShapedQuestion,
 } from "../src/lib/server/ai/core/decide-turn";
 import { tryCannedReply } from "../src/lib/server/ai/core/canned-replies";
+import { conversationTitle } from "../src/lib/server/ai/conversation-title";
 
 let pass = 0;
 const failures: string[] = [];
@@ -320,6 +321,33 @@ check(
 );
 check("brand: an ordinary question needs no brand section", classifyBrandSection("how do I reset my password") === "none");
 check("canned: a real question is NOT canned-answered", tryCannedReply("what is our MOQ for spreading machines") === null);
+
+console.log("\n── 6b. A new chat's title: one rule for both lanes, a label in the message's language (owner, 2026-09-13) ──");
+check("English: the first sentence, at most five words, not ending on a filler word",
+  conversationTitle("Remind me of tomorrow to keep working on products data") === "Remind me of tomorrow" &&
+  conversationTitle("What does DDP mean? I have a shipment leaving Ningbo next week.") === "What does DDP mean" &&
+  conversationTitle("Free UI Animation Libraries") === "Free UI Animation Libraries" &&
+  conversationTitle("Translate Flat White Coffee") === "Translate Flat White Coffee");
+check("Arabic: whole words, never a cut mid-word, no dangling وَ/في",
+  conversationTitle("فكّرني بكرة أكمل بيانات المنتجات لو سمحت") === "فكّرني بكرة أكمل بيانات المنتجات" &&
+  conversationTitle("عايز أعرف سعر الماكينة في الصين") === "عايز أعرف سعر الماكينة" &&
+  conversationTitle("براءات اختراع وإنجازات شخصية") === "براءات اختراع وإنجازات شخصية" &&
+  !/\s$/.test(conversationTitle("ماكينات الخياطة،")));
+check("Chinese: no spaces to count, so at most twelve ideographs, cut at the first clause",
+  conversationTitle("分析中国教师前景以及未来发展趋势和薪资水平怎么样，谢谢") === "分析中国教师前景以及未来" &&
+  conversationTitle("删除一个") === "删除一个" &&
+  conversationTitle("你好，请帮我看看这台缝纫机的报价单是否合理").startsWith("请帮我看看") && Array.from(conversationTitle("你好，请帮我看看这台缝纫机的报价单是否合理")).length <= 12);
+check("a greeting clause is dropped in every script; a lone greeting is kept",
+  conversationTitle("Hello, can you help me with the quotation for the Cairo customer") === "can you help me" &&
+  conversationTitle("يا كولكس، عايز أعرف سعر الماكينة") === "عايز أعرف سعر الماكينة" &&
+  conversationTitle("Hello") === "Hello" && conversationTitle("你好") === "你好");
+check("markdown, links and quotes do not reach the label; empty in, empty out",
+  conversationTitle("**Hello** — can you check [this](https://example.com) for me?") === "Hello — can you check" &&
+  conversationTitle("") === "" && conversationTitle("   ") === "");
+check("both routes take the title from the one rule",
+  /return conversationTitle\(content\) \|\| content\.trim\(\)\.slice\(0, 60\);/.test(readFileSync(AGENT_ROUTE, "utf8")) &&
+  !/words\.slice\(0, 4\)/.test(readFileSync(AGENT_ROUTE, "utf8")) &&
+  /conversationTitle\(firstUser\.text\) \|\| firstUser\.text\.slice\(0, TITLE_CHARS\)/.test(readFileSync("src/app/api/ai/voice/transcript/route.ts", "utf8")));
 
 console.log("\n── 7. The core carries no vendor identity at all (Phase 2D → tightened 4A) ──");
 /* Phase 3 replaces the inside of core/transport.ts with provider adapters.

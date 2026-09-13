@@ -1372,3 +1372,22 @@ the text size in this app specifically the Arabic and Chinese".
 - **Suites.** `validate:ai-client-render` 272 (+14): the script detector on
   mixed lines, the rendered `lang` and class on rows, bubbles, tiles and
   the task card, the root's `lang`, and the stylesheet's rules by name.
+
+### The chat's title, one rule for both lanes (same evening)
+
+The sidebar's second Arabic problem was the label itself. The typed lane
+titled a new chat with its first four words — a Chinese sentence has no
+spaces, so it came through whole, sixty ideographs in a 248 px row — and
+the voice lane with its first N characters, cutting Arabic mid-word.
+`lib/server/ai/conversation-title` is now the one rule both routes call:
+markdown and links stripped; a greeting clause dropped ("Hello, can you…",
+"يا كولكس، عايز…", "你好，请帮我…"); the first sentence or clause; at most
+five words that do not end on a filler (to / of / في / و / 的…), or at most
+twelve ideographs cut on a word boundary through `Intl.Segmenter`. No model
+call — this runs on every first turn. Pinned in
+`validate:ai-core-boundaries` §6b (90).
+
+Note for the record: the merge of #433 did not get a production deployment
+from Vercel — its GitHub webhook for the `main` push was missed (the branch
+push of the same commit deployed as a preview) — so this change also carries
+#433 to production.
