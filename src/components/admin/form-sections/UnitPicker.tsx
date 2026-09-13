@@ -1,5 +1,8 @@
 "use client";
 
+import { useTranslation } from "@/lib/i18n";
+import { PRODUCTS_UI_I18N } from "@/lib/products-ui-i18n";
+
 /* ---------------------------------------------------------------------------
    UnitPicker — the one control that says which unit a number is being typed in.
 
@@ -27,10 +30,11 @@ export default function UnitPicker({
   size?: "sm" | "md";
 }) {
   const h = size === "sm" ? "h-8" : "h-10";
+  const { t } = useTranslation(PRODUCTS_UI_I18N);
   return (
     <span
       className={`inline-flex shrink-0 ${h} rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)]/60 overflow-hidden`}
-      title={`Type in any unit — the value is stored in ${canonical}.`}
+      title={t("pk.unitTitle", "Type in any unit — the value is stored in {unit}.").replace("{unit}", canonical)}
     >
       {options.map((u) => (
         <button
@@ -38,7 +42,7 @@ export default function UnitPicker({
           type="button"
           onClick={() => onPick(u)}
           aria-pressed={value === u}
-          aria-label={`Enter values in ${u}`}
+          aria-label={t("pk.unitEnter", "Enter values in {unit}").replace("{unit}", u)}
           className={`px-2 text-[11px] font-semibold tabular-nums transition-colors ${
             value === u
               ? "bg-[#567FB2]/[0.18] text-[var(--text-primary)]"

@@ -88,6 +88,7 @@ import type {
   ProductCertificationFormState, ProductDocumentFormState,
 } from "@/types/product-form";
 import { EMPTY_PRODUCT, createEmptyModel, COUNTRIES, LOCALES } from "@/types/product-form";
+import { flagOf, countryName } from "@/lib/countries-dial";
 import {
   resolveSchema,
   computeReadiness,
@@ -257,6 +258,7 @@ const STEP_SHORT_KEY: Record<string, string> = {
   commercial: "step.models",
   options: "step.optionsShort",
   pricing: "step.price",
+  highlights: "step.highlights",
   logistics: "step.logistics",
   compliance: "step.compliance",
   technical: "step.technical",
@@ -5723,7 +5725,7 @@ export default function ProductForm({ productId }: Props) {
                   <KdsSelect
                     value={product.country_of_origin}
                     onChange={(v) => updateProduct_({ country_of_origin: v })}
-                    options={COUNTRIES.map((c) => ({ value: c.code, label: c.name }))}
+                    options={COUNTRIES.map((c) => ({ value: c.code, label: `${flagOf(c.code)} ${countryName(c, lang)}` }))}
                     placeholder="—"
                     triggerClassName={inp + " pe-9 text-start"}
                   />

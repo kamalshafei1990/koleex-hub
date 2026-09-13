@@ -446,6 +446,7 @@ function NumberSuggestField({
   onSet: (v: unknown) => void;
 }) {
   const { open, setOpen, triggerRef, menuRef, rect } = useAnchoredMenu();
+  const { t } = useTranslation(PRODUCTS_UI_I18N);
   /* Machine Weight is a unit_number WITH suggestions, so it lands here rather
      than in UnitNumberField — and it was the one weight on the tab still stuck
      in kilograms. Same contract as everywhere: typed in the operator's unit,
@@ -483,7 +484,7 @@ function NumberSuggestField({
       <button
         type="button"
         tabIndex={-1}
-        aria-label="Toggle suggestions"
+        aria-label={t("specs.toggleSuggestions", "Toggle suggestions")}
         onMouseDown={(e) => { e.preventDefault(); setOpen((o) => !o); }}
         className="absolute end-2.5 top-1/2 -translate-y-1/2 text-[var(--text-ghost)] hover:text-[var(--text-secondary)] transition-colors"
       >

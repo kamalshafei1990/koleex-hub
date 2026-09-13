@@ -131,7 +131,10 @@ export function LogisticsSummary({ value }: { value: ProductLogistics }) {
   const cell = (k: string, v: string) => (
     <div key={k} className="min-w-0">
       <div className="text-[9px] uppercase tracking-[0.12em] text-[var(--text-ghost)]">{k}</div>
-      <div className="text-[13px] font-bold tabular-nums text-[var(--text-primary)] truncate">{v}</div>
+      {/* <bdi> is INLINE: the run reads LTR ("1.46 m³", never "m³ 1.46")
+          while the cell still aligns with its label on the page's own side.
+          dir on the div itself did the first and broke the second. */}
+      <div className="text-[13px] font-bold tabular-nums text-[var(--text-primary)] truncate"><bdi dir="ltr">{v}</bdi></div>
     </div>
   );
   return (
@@ -347,9 +350,14 @@ export function PackingBlock({ value, onChange, productId }: BlockProps & { prod
             TOTAL speaks the shipping units, m³ and kg, because that is what a
             packing list, a bill of lading and a freight quote are written in.
             A total in grams would be a number nobody downstream can use. */}
+        {/* A number-and-unit run is Latin-script; inside an Arabic page the
+            bidi algorithm reorders it ("m³ 1.46"). It is isolated LTR so the
+            totals read the same in every language. */}
         <div className="text-[10px] tabular-nums text-[var(--text-ghost)] mb-2">
-          {sums.packageCount} pkg · {sums.cbm} m³ · {sums.grossKg} kg
-          {mode === "per_package" && per > 1 ? ` · ${Math.round((sums.cbm / per) * 10000) / 10000} m³/pc` : ""}
+          <bdi dir="ltr">
+            {sums.packageCount} {t("pk.pkgWord", "pkg")} · {sums.cbm} m³ · {sums.grossKg} kg
+            {mode === "per_package" && per > 1 ? ` · ${Math.round((sums.cbm / per) * 10000) / 10000} ${t("pk.m3PerPc", "m³/pc")}` : ""}
+          </bdi>
         </div>
 
         <div className="space-y-3">
@@ -384,7 +392,7 @@ export function PackingBlock({ value, onChange, productId }: BlockProps & { prod
                       <button
                         type="button"
                         onClick={() => removeRow(i)}
-                        aria-label="Remove package"
+                        aria-label={t("pk.removePackage", "Remove package")}
                         className="h-10 w-9 shrink-0 rounded-lg text-[var(--text-ghost)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-hover)] transition-colors"
                       >
                         ×
@@ -560,7 +568,7 @@ function PackingPhoto({
           type="button"
           onClick={open}
           {...drop}
-          title="Click or drop an image to replace"
+          title={t("pk.photoReplace", "Click or drop an image to replace")}
           className={`block w-full max-w-3xl overflow-hidden rounded-xl border bg-[var(--bg-surface-subtle)]/40 transition-colors ${over ? "border-[#567FB2]" : "border-[var(--border-subtle)]"}`}
         >
           {/* Deliberately large. A packing photo is read, not glanced at: the
@@ -615,6 +623,7 @@ function ItemPhoto({
   url: string | null; kind?: string; onChange: (u: string | null) => void;
   productId?: string; size?: "sm" | "lg";
 }) {
+  const { t } = useTranslation(PRODUCTS_UI_I18N);
   const { busy, over, drop, open, input } = useImagePicker(onChange, productId);
   const box = size === "lg" ? "h-24 w-24" : "h-10 w-10";
   return (
@@ -625,7 +634,7 @@ function ItemPhoto({
         onClick={open}
         disabled={busy}
         {...drop}
-        title={url ? "Click or drop an image to replace" : "Click or drop an image to add a photo"}
+        title={url ? t("pk.photoReplace", "Click or drop an image to replace") : t("pk.photoAdd", "Click or drop an image to add a photo")}
         className={`${box} shrink-0 rounded-lg overflow-hidden border bg-[var(--bg-surface-subtle)]/60 flex items-center justify-center transition-colors disabled:opacity-50 ${
           over
             ? "border-[#567FB2] text-[var(--text-primary)]"
@@ -725,7 +734,7 @@ function ContentsEditor({
             <button
               type="button"
               onClick={() => remove(i)}
-              aria-label="Remove item"
+              aria-label={t("pk.removeItem", "Remove item")}
               className="h-8 w-8 shrink-0 rounded-lg text-[var(--text-ghost)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-hover)] transition-colors"
             >
               ×
@@ -995,7 +1004,7 @@ export function ShippingOrigin({ value, onChange }: BlockProps) {
         <input
           value={value.port_of_loading ?? ""}
           onChange={(e) => onChange({ port_of_loading: e.target.value })}
-          placeholder="Shanghai"
+          placeholder={t("pk.portPh", "Shanghai")}
           className={inp}
         />
         <p className={hint}>{t("pk.portHint", "Where this product normally ships from — freight cannot be quoted without it.")}</p>
