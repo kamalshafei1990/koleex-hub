@@ -188,13 +188,18 @@ const requiredFilled = (f: SpecField, v: unknown): boolean => {
 
 /* ── visibility chips ──────────────────────────────────────────── */
 
-const VisBadge = ({ label, tone }: { label: string; tone: "public" | "internal" | "ai" }) => {
+const VisBadge = ({ label, tone }: { label: string; tone: "public" | "internal" | "ai" | "calc" | "edited" }) => {
   const cls =
     tone === "public"
       ? "border-emerald-500/40 text-emerald-600 dark:text-emerald-300"
       : tone === "ai"
         ? "border-[var(--border-subtle)] text-[var(--text-secondary)]"
-        : "border-amber-500/40 text-amber-600 dark:text-amber-300";
+        /* Hub Blue = the Hub's own voice: this number is the FORM talking,
+           not the operator. "Edited" borrows the internal amber because it
+           means the same thing both places — a human overrode the default. */
+        : tone === "calc"
+          ? "border-[#567FB2]/50 text-[#3E6796] dark:text-[#7FA9D6]"
+          : "border-amber-500/40 text-amber-600 dark:text-amber-300";
   return (
     <span
       className={`text-[8.5px] font-bold uppercase tracking-[0.12em] px-1.5 py-px rounded-full border ${cls}`}
@@ -204,10 +209,19 @@ const VisBadge = ({ label, tone }: { label: string; tone: "public" | "internal" 
   );
 };
 
-const FieldBadges = ({ f }: { f: SpecField }) => {
+const FieldBadges = ({ f, calc }: { f: SpecField; calc?: "tracking" | "overridden" | null }) => {
   const { t: fbT } = useTranslation(PRODUCTS_UI_I18N);
   return (
   <span className="inline-flex items-center gap-1">
+    {/* FIVE OF THE FOURTEEN FIELDS ON THE PACKING TAB ARE NOT QUESTIONS.
+        CBM comes from the crate dimensions, the three container counts come
+        from CBM, and Net Weight is a straight copy of Machine Weight — the
+        same number under a second label. They looked exactly like the nine
+        fields that DO need an answer, so the tab read as fourteen things to
+        fill in. The chip says which are the form's own arithmetic, and says
+        when a typed value has stopped following its source. */}
+    {calc === "tracking" ? <VisBadge label={fbT("specs.badgeCalculated", "Calculated")} tone="calc" /> : null}
+    {calc === "overridden" ? <VisBadge label={fbT("specs.badgeEdited", "Edited")} tone="edited" /> : null}
     {f.internalOnly ? (
       <VisBadge label={fbT("specs.visInternal", "Internal")} tone="internal" />
     ) : f.publicVisible ? (
@@ -588,10 +602,17 @@ function GroupCard({
   group,
   values,
   setField,
+  allFields,
 }: {
   group: SpecGroup;
   values: Record<string, unknown>;
   setField: (key: string, v: unknown) => void;
+  /* EVERY field in the schema, not just this group's. A computed field's
+     source is regularly in a DIFFERENT group — Net Weight sits under Packing
+     & Shipping and copies Machine Weight from Physical — and looking the
+     source up inside this group alone made the hint read "auto-fills from
+     the linked field", which names nothing. */
+  allFields: SpecField[];
 }) {
   const { t: ts, lang: specLang } = useTranslation(SPEC_I18N);
   const { t: tui } = useTranslation(PRODUCTS_UI_I18N);
@@ -653,26 +674,73 @@ function GroupCard({
 
       {open ? (
         <div className="px-4 pb-4 pt-4 space-y-5 border-t border-[var(--border-subtle)]">
-          {fields.map((f) => (
+          {fields.map((f) => {
+            /* Is this computed field still the arithmetic, or did someone
+               type over it? Compared against the value the formula produces
+               RIGHT NOW from its source, so editing the source and leaving a
+               stale hand-typed number shows as "Edited" — which is the case
+               worth catching: a CBM that no longer matches its crate. */
+            const derived = f.computed
+              ? computeDerivedValue(f.computed.formula, values[f.computed.from])
+              : null;
+            /* No source value yet = nothing to disagree with. A CBM typed
+               before anyone entered the crate dimensions is just a value, not
+               a number that "stopped following" — flagging it amber would be
+               crying wolf on the most ordinary half-finished product. */
+            const srcFilled = f.computed ? isFilled(values[f.computed.from]) : false;
+            const calc: "tracking" | "overridden" | null = !f.computed
+              ? null
+              : !isFilled(values[f.key])
+                ? "tracking"
+                : !srcFilled
+                  ? null
+                  : derived !== null && Number(values[f.key]) === derived
+                    ? "tracking"
+                    : "overridden";
+            const srcField = f.computed ? allFields.find((x) => x.key === f.computed!.from) : undefined;
+            const srcLabel = srcField ? ts(`f:${srcField.key}`, srcField.label) : tui("specs.linkedField", "the linked field");
+            return (
             <div key={f.key} className="space-y-1.5">
               <div className="flex items-center justify-between gap-2 flex-wrap">
-                <label className="text-[11px] font-semibold text-[var(--text-secondary)] inline-flex items-center gap-1.5">
+                <label className={`text-[11px] font-semibold inline-flex items-center gap-1.5 ${calc === "tracking" ? "text-[var(--text-muted)]" : "text-[var(--text-secondary)]"}`}>
                   <SpecGlyph fieldKey={f.key} />
                   {ts(`f:${f.key}`, f.label)}
                   {f.required ? <span className="text-red-500">*</span> : null}
                 </label>
-                <FieldBadges f={f} />
+                <FieldBadges f={f} calc={calc} />
               </div>
-              <FieldInput
-                field={locField(f)}
-                value={values[f.key]}
-                onSet={(v) => setField(f.key, v)}
-              />
+              {/* Dimmed while it is tracking — the row is still fully editable,
+                  it just stops competing for attention with the fields that
+                  actually need an answer. Full strength the moment it holds a
+                  number of the operator's own. */}
+              <div className={calc === "tracking" ? "opacity-60 focus-within:opacity-100 transition-opacity" : undefined}>
+                <FieldInput
+                  field={locField(f)}
+                  value={values[f.key]}
+                  onSet={(v) => setField(f.key, v)}
+                />
+              </div>
               {f.computed ? (
-                <p className="text-[10px] text-[var(--text-secondary)] leading-relaxed inline-flex items-center gap-1">
-                  <span aria-hidden>↻</span> {tui("specs.autoFillsFrom", "Auto-fills from")}{" "}
-                  {(() => { const src = group.fields.find((x) => x.key === f.computed!.from); return src ? ts(`f:${src.key}`, src.label) : tui("specs.linkedField", "the linked field"); })()} — {tui("specs.canTypeManually", "you can also type it manually.")}
-                </p>
+                calc === "overridden" ? (
+                  <p className="text-[10px] text-amber-600 dark:text-amber-300/90 leading-relaxed inline-flex items-center gap-1.5 flex-wrap">
+                    <span aria-hidden>✎</span>
+                    {tui("specs.typedNotFollowing", "Typed by hand — no longer follows")} {srcLabel}.
+                    {derived !== null ? (
+                      <button
+                        type="button"
+                        onClick={() => setField(f.key, derived)}
+                        className="underline underline-offset-2 font-semibold hover:opacity-80"
+                      >
+                        {tui("specs.recalculate", "Recalculate")} ({derived})
+                      </button>
+                    ) : null}
+                  </p>
+                ) : (
+                  <p className="text-[10px] text-[var(--text-secondary)] leading-relaxed inline-flex items-center gap-1">
+                    <span aria-hidden>↻</span> {tui("specs.calculatedFrom", "Calculated from")}{" "}
+                    {srcLabel} — {tui("specs.canTypeManually", "you can also type it manually.")}
+                  </p>
+                )
               ) : null}
               {f.description ? (
                 <p className="text-[10px] text-[var(--text-ghost)] leading-relaxed">
@@ -680,7 +748,8 @@ function GroupCard({
                 </p>
               ) : null}
             </div>
-          ))}
+            );
+          })}
         </div>
       ) : null}
     </div>
@@ -755,6 +824,11 @@ export default function SchemaSpecsSection({ schema, values, onChange, hideHeade
     () => (schema ? [...schema.groups].sort((a, b) => a.order - b.order) : []),
     [schema],
   );
+  /* Flat field list for cross-group source lookups (see GroupCard.allFields). */
+  const allFields = useMemo(
+    () => (schema?.groups ?? []).flatMap((g) => g.fields ?? []),
+    [schema],
+  );
 
   const { reqTotal, reqFilled } = useMemo(() => {
     let t = 0;
@@ -809,7 +883,7 @@ export default function SchemaSpecsSection({ schema, values, onChange, hideHeade
       ) : null}
 
       {groups.map((g) => (
-        <GroupCard key={g.id} group={g} values={values} setField={setField} />
+        <GroupCard key={g.id} group={g} values={values} setField={setField} allFields={allFields} />
       ))}
     </div>
   );

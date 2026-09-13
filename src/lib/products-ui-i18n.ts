@@ -1240,7 +1240,17 @@ export const PRODUCTS_UI_I18N: Translations = {
   "specs.structuredSpecs": { en: "structured specs", zh: "结构化规格", ar: "مواصفات منظمة" },
   "specs.introBody": { en: "These power the public product page, quotations, brochures, and the AI layer. Each field shows where it appears (Public / Internal / AI). Choices over free text wherever possible.", zh: "这些数据驱动公开产品页、报价单、手册与 AI 层。每个字段都标注其展示范围（公开/内部/AI）。尽量使用选项而非自由文本。", ar: "هذه البيانات تغذي صفحة المنتج العامة وعروض الأسعار والكتيبات وطبقة الذكاء الاصطناعي. كل حقل يبيّن أين يظهر (عام / داخلي / AI). فضِّل الاختيارات على النص الحر ما أمكن." },
   "specs.required": { en: "Required", zh: "必填", ar: "إلزامي" },
-  "specs.autoFillsFrom": { en: "Auto-fills from", zh: "自动填充自", ar: "يتعبأ تلقائياً من" },
+  /* "Auto-fills from" became "Calculated from": the old wording described a
+     one-time convenience, and the operator read the result as a number the
+     form had guessed. These five fields ARE the arithmetic — CBM from the
+     crate, the container counts from CBM, Net Weight copied from Machine
+     Weight — and naming them so is what turns a 14-field tab back into the
+     nine questions it actually asks. */
+  "specs.calculatedFrom": { en: "Calculated from", zh: "计算自", ar: "محسوبة من" },
+  "specs.badgeCalculated": { en: "Calculated", zh: "计算值", ar: "محسوبة" },
+  "specs.badgeEdited": { en: "Edited", zh: "已手改", ar: "معدّلة" },
+  "specs.typedNotFollowing": { en: "Typed by hand — no longer follows", zh: "手动输入 — 不再跟随", ar: "مكتوبة يدوياً — لم تعد تتبع" },
+  "specs.recalculate": { en: "Recalculate", zh: "重新计算", ar: "أعد الحساب" },
   "specs.linkedField": { en: "the linked field", zh: "关联字段", ar: "الحقل المرتبط" },
   "specs.canTypeManually": { en: "you can also type it manually.", zh: "也可手动输入。", ar: "ويمكنك إدخاله يدوياً." },
   "specs.yes": { en: "Yes", zh: "是", ar: "نعم" },
