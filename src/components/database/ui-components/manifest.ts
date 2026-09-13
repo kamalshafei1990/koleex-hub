@@ -49,7 +49,6 @@ export const UI_COMPONENT_MODULES: UiModule[] = [
       "KnowledgeSection",
       "MediaSection",
       "MemberIdentityPanel",
-      "MemberLogisticsPanel",
       "MemberPricingPanel",
       "MemberSupplierPanel",
       "ModelsSection",

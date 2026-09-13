@@ -547,49 +547,13 @@ export function MemberPricingPanel({
   );
 }
 
-/* ── Logistics panel: the member's packing & shipping ── */
-export function MemberLogisticsPanel({
-  model, onUpdate,
-}: {
-  model: ModelFormState;
-  onUpdate: (u: Partial<ModelFormState>) => void;
-}) {
-  const { t } = useTranslation(PRODUCTS_UI_I18N);
-  const f = (label: string, key: keyof ModelFormState, ph: string, type: "text" | "number" = "text") => (
-    <div>
-      <label className={lbl}>{label}</label>
-      <input
-        type={type}
-        value={(model[key] as string) || ""}
-        onChange={(e) => onUpdate({ [key]: e.target.value } as Partial<ModelFormState>)}
-        placeholder={ph}
-        className={inp}
-      />
-    </div>
-  );
-  return (
-    <div className="rounded-2xl border border-[#567FB2]/30 bg-[var(--bg-secondary)] p-5 space-y-4">
-      <div className="flex items-center gap-2">
-        <span className="h-1.5 w-1.5 rounded-full bg-[#567FB2]" />
-        <h3 className="text-[13px] font-bold text-[var(--text-primary)]">
-          {t("fam.logisticsTitle", "This model's packing & shipping")}
-        </h3>
-        <span className="text-[11px] font-mono text-[var(--text-dim)]">{model.primary_model || ""}</span>
-      </div>
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        {f(t("fam.packingType", "Packing type"), "packing_type", "Wooden case")}
-        {f(t("fam.carton", "Carton dimensions (cm)"), "carton_dimensions", "120 × 80 × 110")}
-        {f(t("fam.cbm", "CBM (m³)"), "cbm", "1.06", "number")}
-        {f(t("fam.nw", "Net weight (kg)"), "net_weight", "180", "number")}
-        {f(t("fam.gw", "Gross weight (kg)"), "weight", "210", "number")}
-        {f(t("fam.c20", "Qty / 20ft"), "container_20ft_qty", "26", "number")}
-        {f(t("fam.c40", "Qty / 40ft"), "container_40ft_qty", "54", "number")}
-        {f(t("fam.c40hq", "Qty / 40HQ"), "container_40hq_qty", "60", "number")}
-      </div>
-    </div>
-  );
-}
-
+/* MemberLogisticsPanel — REMOVED 2026-09-13. It put a second copy of the
+   packing questions (type, carton, CBM, net/gross, 20ft/40ft/40HQ) on the
+   Packing & Logistics tab, directly above the product-level Packing &
+   Shipping group that asks the same eight — and in cm where that one asks in
+   mm. Owner's call: packing is asked once, on the product; the Variants tab
+   still carries a per-model packing card for a model that genuinely differs.
+   Its fields live on the model row (product_models) either way. */
 
 /* ── Supplier panel (member view) ────────────────────────────────────────
    Owner rule: the SUPPLIER is a family-level fact — only the primary

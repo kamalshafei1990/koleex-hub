@@ -127,7 +127,7 @@ import TechnicalSection, { PhysicalFields, ComplianceEnvFields } from "./form-se
 import RulerIcon from "@/components/icons/ui/RulerIcon";
 import ModelsSection from "./form-sections/ModelsSection";
 import FamilySpecGrid from "./form-sections/FamilySpecGrid";
-import { FamilyStrip, FamilySharedDivider, MemberPricingPanel, MemberLogisticsPanel } from "./form-sections/FamilyMemberPanels";
+import { FamilyStrip, FamilySharedDivider, MemberPricingPanel } from "./form-sections/FamilyMemberPanels";
 import MediaSection from "./form-sections/MediaSection";
 import FeatureHighlightsSection from "./form-sections/FeatureHighlightsSection";
 import ProductOptionsSection from "./form-sections/ProductOptionsSection";
@@ -5642,12 +5642,14 @@ export default function ProductForm({ productId }: Props) {
            ═══════════════════════════════════════════════════════════ */}
         {(onePage || steps[currentStep]?.id === "logistics") && (
           <div id="sec-logistics" className="space-y-5 scroll-mt-28">
-            {memberCtx && activeModel && (
-              <>
-                <MemberLogisticsPanel model={activeModel} onUpdate={updateActiveMember} />
-                <FamilySharedDivider />
-              </>
-            )}
+            {/* The per-model packing panel used to sit here, above the
+                family-shared groups, and it asked the SAME eight questions the
+                product-level Packing & Shipping group below asks — packing
+                type, carton size, CBM, net/gross, the three container counts —
+                on one screen, with carton size in cm here and in mm there.
+                Removed 2026-09-13 (owner): packing is entered once, on the
+                product. A model that really does crate differently still has
+                its own packing card on the Variants tab. */}
             <Section id="logistics-origin" icon={<GlobeIcon className="h-4 w-4" />} title={t("logistics.title", "Origin & Customs")} badge={t("logistics.badge", "Shipping · Customs")}>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
