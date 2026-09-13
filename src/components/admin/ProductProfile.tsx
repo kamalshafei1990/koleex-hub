@@ -39,6 +39,10 @@ import SparklesIcon from "@/components/icons/ui/SparklesIcon";
 import Settings2Icon from "@/components/icons/ui/Settings2Icon";
 import BoxesIcon from "@/components/icons/ui/BoxesIcon";
 import BoxIcon from "@/components/icons/ui/BoxIcon";
+import PackageIcon from "@/components/icons/ui/PackageIcon";
+import LayersIcon from "@/components/icons/ui/LayersIcon";
+import PlugIcon from "@/components/icons/ui/PlugIcon";
+import FileIcon from "@/components/icons/ui/FileIcon";
 import RulerIcon from "@/components/icons/ui/RulerIcon";
 import WrenchIcon from "@/components/icons/ui/WrenchIcon";
 import DollarSignIcon from "@/components/icons/ui/DollarSignIcon";
@@ -58,7 +62,7 @@ import { useSkin } from "@/lib/appearance";
 import FeatureHighlightsDisplay from "./FeatureHighlightsDisplay";
 import {
   DG_KINDS, ORIGIN_CERTIFICATES, PACKING_TYPES, WOOD_TREATMENTS,
-  flattenContents, sumPackages, type ProductLogistics,
+  sumPackages, type ContentItem, type ProductLogistics,
 } from "@/lib/logistics";
 
 const WavyBackground = dynamic(() => import("@/components/ui/WavyBackground"), { ssr: false });
@@ -501,6 +505,97 @@ const MEDIA_SLOTS: Array<{ type: string; fallback: string }> = [
 
 /* The editor's field row: label on top, value under it, help line beneath.
    Used by every tab so a reader never meets two different field shapes. */
+/* ── the visual grammar of the packing sheet ──────────────────────────────
+   A row with a small glyph and a label is a LIST, and a list is read line by
+   line. The numbers that matter here — what it weighs, what it cubes, how many
+   fit in a container — are looked UP, not read through, and they were buried
+   in that list behind glyphs the page was guessing at: labels it could not
+   match fell back to the same info circle, so half the rows wore the same icon
+   and none of them meant anything.
+
+   So the numbers become tiles, the facts become chips with a glyph that was
+   chosen rather than inferred, and the crates become cards with their own
+   photographs. Nothing here calls iconForField. */
+
+function StatTile({
+  label, value, unit, tone = "plain",
+}: { label: string; value: React.ReactNode; unit?: string; tone?: "plain" | "accent" }) {
+  return (
+    <div className={`rounded-xl border px-3.5 py-3 ${
+      tone === "accent"
+        ? "border-[#567FB2]/30 bg-[#567FB2]/[0.07]"
+        : "border-[var(--border-subtle)] bg-[var(--bg-surface)]"
+    }`}>
+      <div className="text-[9.5px] font-bold uppercase tracking-[0.1em] text-[var(--text-ghost)] truncate">{label}</div>
+      <div className="mt-1 flex items-baseline gap-1">
+        <span className="text-[21px] leading-none font-bold tabular-nums text-[var(--text-primary)]">{value}</span>
+        {unit ? <span className="text-[11px] font-medium text-[var(--text-muted)]">{unit}</span> : null}
+      </div>
+    </div>
+  );
+}
+
+function FactChip({
+  icon, label, value, tone = "plain",
+}: { icon: React.ReactNode; label: string; value: string; tone?: "plain" | "warn" }) {
+  return (
+    <span className={`inline-flex items-center gap-2.5 rounded-xl border px-3 py-2 ${
+      tone === "warn"
+        ? "border-amber-500/40 bg-amber-500/[0.07]"
+        : "border-[var(--border-subtle)] bg-[var(--bg-surface)]"
+    }`}>
+      {/* Bigger and brighter than a list glyph on purpose: at 16px in
+          --text-muted these read as empty squares on a dark chip. */}
+      <span className={`h-11 w-11 shrink-0 rounded-lg flex items-center justify-center ${
+        tone === "warn" ? "bg-amber-500/[0.14] text-amber-400" : "bg-[var(--bg-surface-subtle)] text-[var(--text-secondary)]"
+      }`}>
+        {icon}
+      </span>
+      <span className="min-w-0">
+        <span className="block text-[9.5px] font-bold uppercase tracking-[0.1em] text-[var(--text-ghost)]">{label}</span>
+        <span className="block text-[13px] font-semibold text-[var(--text-primary)] truncate">{value}</span>
+      </span>
+    </span>
+  );
+}
+
+/* The glyph for one item in a crate. A photo when there is one, otherwise the
+   kind the operator picked — never a guess from the label. */
+function KindGlyph({ kind, className = "h-5 w-5" }: { kind?: string; className?: string }) {
+  switch (kind) {
+    case "machine": return <BoxesIcon className={className} />;
+    case "tools":   return <WrenchIcon className={className} />;
+    case "cable":   return <PlugIcon className={className} />;
+    case "cover":   return <ShieldCheckIcon className={className} />;
+    case "parts":   return <LayersIcon className={className} />;
+    case "docs":    return <FileIcon className={className} />;
+    default:        return <PackageIcon className={className} />;
+  }
+}
+
+function ContentRow({ item, mult, depth }: { item: ContentItem; mult: number; depth: number }) {
+  const qty = (Number(item.qty) || 1) * mult;
+  return (
+    <>
+      <li className="flex items-center gap-2.5" style={{ paddingInlineStart: `${depth * 20}px` }}>
+        <span className="h-10 w-10 shrink-0 rounded-lg overflow-hidden border border-[var(--border-subtle)] bg-[var(--bg-surface)] flex items-center justify-center text-[var(--text-secondary)]">
+          {item.photo_url ? (
+            /* eslint-disable-next-line @next/next/no-img-element */
+            <img src={item.photo_url} alt="" className="h-full w-full object-cover" />
+          ) : (
+            <KindGlyph kind={item.kind} className="h-5 w-5" />
+          )}
+        </span>
+        <span className="text-[13px] text-[var(--text-primary)] truncate">{(item.label || "").trim() || "—"}</span>
+        <span className="text-[12px] font-semibold tabular-nums text-[var(--text-muted)] ms-auto shrink-0">× {qty}</span>
+      </li>
+      {(item.items ?? []).map((sub, i) => (
+        <ContentRow key={i} item={sub} mult={qty} depth={depth + 1} />
+      ))}
+    </>
+  );
+}
+
 /* ── Packing & Logistics, read-only ───────────────────────────────────────
    The edit tab with the inputs taken out: the same five sections in the same
    order (Machine, Packing, Loading, Customs, Order) under the same names, so
@@ -511,13 +606,12 @@ const MEDIA_SLOTS: Array<{ type: string; fallback: string }> = [
    in it does not print an empty heading; when the packing has not been
    entered at all, one line says so and points at Edit. */
 function PackingSheet({
-  logistics, model, product, t, rows, motion, onEdit,
+  logistics, model, product, t, motion, onEdit,
 }: {
   logistics: ProductLogistics;
   model: Record<string, unknown> | undefined;
   product: Record<string, unknown> | undefined;
   t: (k: string, fb: string) => string;
-  rows: string;
   motion: string;
   onEdit: () => void;
 }) {
@@ -542,6 +636,9 @@ function PackingSheet({
   const pType = fromProduct ? label(PACKING_TYPES, logistics.packing_type) : (m("packing_type") as string | undefined);
   const dg = logistics.dangerous_goods;
   const dgNames = (dg?.kinds ?? []).map((k) => label(DG_KINDS, k) ?? k);
+  /* A container count means pieces for a product that ships many to a carton
+     and whole machines otherwise — the tile has to say which. */
+  const perPkgLabel = logistics.packing_mode === "per_package" ? t("pk.pcsWord", "pcs") : t("pk.unitsWord", "units");
 
   const has = (...v: unknown[]) => v.some((x) => x !== undefined && x !== null && x !== "" && x !== false);
 
@@ -571,11 +668,15 @@ function PackingSheet({
     <div className="space-y-4">
       {machine ? (
         <Group motion={motion} icon={<RulerIcon className="h-4 w-4" />} title={t("tech.secPhysical", "Physical (Bare Machine)")} count={t("logistics.physicalBadge", "Dimensions · Weight")} onEdit={onEdit}>
-          <div className={rows}>
-            <Row label={t("pp.f.machineDims", "Machine dimensions")} value={pv("machine_dimensions")} />
-            <Row label={t("pp.f.machineWeight", "Machine weight (kg)")} value={pv("machine_weight_kg")} />
+          <div className="flex flex-wrap gap-2.5">
+            {pv("machine_dimensions") ? (
+              <FactChip icon={<RulerIcon className="h-6 w-6" />} label={t("pp.f.machineDims", "Machine dimensions")} value={`${String(pv("machine_dimensions"))} mm`} />
+            ) : null}
+            {pv("machine_weight_kg") ? (
+              <FactChip icon={<LayersIcon className="h-6 w-6" />} label={t("pp.f.machineWeight", "Machine weight (kg)")} value={`${String(pv("machine_weight_kg"))} kg`} />
+            ) : null}
           </div>
-        </Group>
+                </Group>
       ) : null}
 
       {packing ? (
@@ -585,101 +686,152 @@ function PackingSheet({
             <img
               src={logistics.packing_photo_url}
               alt={t("pp.f.packingPhotoAlt", "Packed product")}
-              className="mb-3 w-full max-w-md rounded-xl border border-[var(--border-subtle)] object-contain bg-black/20"
+              className="mb-4 w-full max-w-lg rounded-xl border border-[var(--border-subtle)] object-contain bg-black/20"
             />
           ) : null}
-          <div className={rows}>
-            <Row label={t("pk.packingType", "Packing type")} value={pType} />
-            {logistics.wood_treatment ? (
-              <Row label={t("pp.f.woodTreatment", "Wood treatment")} value={label(WOOD_TREATMENTS, logistics.wood_treatment)} />
-            ) : null}
+
+          {/* The four numbers a buyer or a forwarder asks for first. */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
             {sums.packageCount > 0 ? (
-              <Row
+              <StatTile
                 label={t("pp.f.packages", "Packages")}
-                value={
-                  logistics.packing_mode === "per_package" && logistics.units_per_package
-                    ? `${logistics.units_per_package} ${t("pk.pcsWord", "pcs")} / ${t("pk.packageOne", "Package").toLowerCase()}`
-                    : `${sums.packageCount}`
-                }
-                help={(logistics.packages ?? [])
-                  .map((r) => [r.label, r.l_cm && r.w_cm && r.h_cm ? `${r.l_cm}×${r.w_cm}×${r.h_cm} cm` : null].filter(Boolean).join(" · "))
-                  .filter(Boolean)
-                  .join("  |  ") || undefined}
+                value={logistics.packing_mode === "per_package" && logistics.units_per_package ? String(logistics.units_per_package) : String(sums.packageCount)}
+                unit={logistics.packing_mode === "per_package" && logistics.units_per_package ? `${t("pk.pcsWord", "pcs")} / ${t("pk.packageOne", "Package").toLowerCase()}` : undefined}
               />
             ) : null}
-            <Row label={t("pp.f.netWeight", "Net weight")} value={netW} />
-            <Row label={t("pp.f.grossWeight", "Gross weight")} value={grossW} />
-            <Row label={t("pp.f.cbm", "CBM")} value={cbm} />
+            {cbm ? <StatTile label={t("pp.f.cbm", "CBM")} value={String(cbm)} unit="m³" tone="accent" /> : null}
+            {netW ? <StatTile label={t("pp.f.netWeight", "Net weight")} value={String(netW)} unit="kg" /> : null}
+            {grossW ? <StatTile label={t("pp.f.grossWeight", "Gross weight")} value={String(grossW)} unit="kg" tone="accent" /> : null}
           </div>
 
-          {/* What is in the crates, with quantities multiplied through the
-              nesting — a box of five in a crate that ships twice reads ten. */}
+          {(pType || logistics.wood_treatment) ? (
+            <div className="mt-3 flex flex-wrap gap-2.5">
+              {pType ? <FactChip icon={<BoxIcon className="h-6 w-6" />} label={t("pk.packingType", "Packing type")} value={pType} /> : null}
+              {logistics.wood_treatment ? (
+                <FactChip
+                  icon={<ShieldCheckIcon className="h-6 w-6" />}
+                  label={t("pp.f.woodTreatment", "Wood treatment")}
+                  value={label(WOOD_TREATMENTS, logistics.wood_treatment) ?? ""}
+                  tone={logistics.wood_treatment === "untreated" ? "warn" : "plain"}
+                />
+              ) : null}
+            </div>
+          ) : null}
+
+          {/* The crates themselves — each one its own card, with its photo. */}
+          {(logistics.packages ?? []).length ? (
+            <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-2.5">
+              {(logistics.packages ?? []).map((r, i) => (
+                <div key={i} className="flex items-center gap-3 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-2.5">
+                  <span className="h-16 w-16 shrink-0 rounded-lg overflow-hidden border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] flex items-center justify-center text-[var(--text-secondary)]">
+                    {r.photo_url ? (
+                      /* eslint-disable-next-line @next/next/no-img-element */
+                      <img src={r.photo_url} alt="" className="h-full w-full object-cover" />
+                    ) : (
+                      <BoxIcon className="h-7 w-7" />
+                    )}
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-[13px] font-semibold text-[var(--text-primary)] truncate">
+                      {(r.label || "").trim() || t("pk.packageOne", "Package")}
+                      {Number(r.qty) > 1 ? <span className="ms-1.5 text-[11px] font-medium text-[var(--text-muted)]">× {r.qty}</span> : null}
+                    </span>
+                    <span className="block text-[11.5px] tabular-nums text-[var(--text-muted)]">
+                      {r.l_cm && r.w_cm && r.h_cm ? `${r.l_cm} × ${r.w_cm} × ${r.h_cm} cm` : "—"}
+                      {r.gross_kg ? `  ·  ${r.gross_kg} kg` : ""}
+                    </span>
+                  </span>
+                </div>
+              ))}
+            </div>
+          ) : null}
+
           {(logistics.packages ?? []).some((r) => r.contents?.length) ? (
-            <div className="mt-3">
-              <div className="text-[10px] font-bold uppercase tracking-[0.08em] text-[var(--text-ghost)] mb-1.5">
+            <div className="mt-4">
+              <div className="text-[9.5px] font-bold uppercase tracking-[0.1em] text-[var(--text-ghost)] mb-2">
                 {t("pk.whatsInside", "What's inside")}
               </div>
-              <ul className="space-y-1">
+              <ul className="space-y-1.5">
                 {(logistics.packages ?? []).flatMap((r, ri) =>
-                  flattenContents(r.contents, Number(r.qty) || 1).map((c, ci) => (
-                    <li
-                      key={`${ri}-${ci}`}
-                      className="text-[12px] text-[var(--text-secondary)] tabular-nums"
-                      style={{ paddingInlineStart: `${c.depth * 14}px` }}
-                    >
-                      <span className="text-[var(--text-ghost)]">{c.qty} ×</span> {c.label}
-                    </li>
+                  (r.contents ?? []).map((it, ci) => (
+                    <ContentRow key={`${ri}-${ci}`} item={it} mult={Number(r.qty) || 1} depth={0} />
                   )),
                 )}
               </ul>
             </div>
           ) : null}
-        </Group>
+                </Group>
       ) : null}
 
       {loading ? (
         <Group motion={motion} icon={<BoxesIcon className="h-4 w-4" />} title={t("logistics.loadingSection", "Loading & Containers")} count={t("logistics.loadingSectionBadge", "20ft · 40ft · 40HQ")} onEdit={onEdit}>
-          <div className={rows}>
-            <Row label={t("pk.stackQ", "Can crates be stacked?")} value={logistics.stackable ? t("pk.stackable", "Stackable") : t("pk.notStackable", "Not stackable")} />
-            <Row label={t("pp.f.q20", "20ft qty")} value={q20} />
-            <Row label={t("pp.f.q40", "40ft qty")} value={q40} />
-            <Row label={t("pp.f.q40hq", "40HQ qty")} value={q40hq} />
+          {/* Three numbers, three tiles: this is the question a forwarder asks
+              and it should be answerable at a glance, not read out of a list. */}
+          <div className="grid grid-cols-3 gap-2.5">
+            <StatTile label="20ft" value={q20 ? String(q20) : "—"} unit={perPkgLabel} tone="accent" />
+            <StatTile label="40ft" value={q40 ? String(q40) : "—"} unit={perPkgLabel} tone="accent" />
+            <StatTile label="40HQ" value={q40hq ? String(q40hq) : "—"} unit={perPkgLabel} tone="accent" />
+          </div>
+          <div className="mt-3 flex flex-wrap gap-2.5">
+            <FactChip
+              icon={<BoxesIcon className="h-6 w-6" />}
+              label={t("pk.stackQ", "Can crates be stacked?")}
+              value={logistics.stackable ? t("pk.stackable", "Stackable") : t("pk.notStackable", "Not stackable")}
+            />
             {sums.volumetricKg ? (
-              <Row label={t("pk.volumetric", "Volumetric weight (kg, air)")} value={sums.volumetricKg} />
+              <FactChip
+                icon={<RulerIcon className="h-6 w-6" />}
+                label={t("pk.volumetric", "Volumetric weight (kg, air)")}
+                value={`${sums.volumetricKg} kg`}
+              />
             ) : null}
           </div>
-        </Group>
+                </Group>
       ) : null}
 
       {customs ? (
         <Group motion={motion} icon={<GlobeIcon className="h-4 w-4" />} title={t("logistics.title", "Origin & Customs")} count={t("logistics.badge", "Shipping · Customs")} onEdit={onEdit}>
-          <div className={rows}>
-            <Row label={t("pp.f.origin", "Country of origin")} value={pv("country_of_origin")} />
-            <Row label={t("pp.f.hs", "HS code")} value={pv("hs_code")} mono />
+          <div className="flex flex-wrap gap-2.5">
+            {pv("country_of_origin") ? (
+              <FactChip icon={<GlobeIcon className="h-6 w-6" />} label={t("pp.f.origin", "Country of origin")} value={String(pv("country_of_origin"))} />
+            ) : null}
+            {pv("hs_code") ? (
+              <FactChip icon={<FileIcon className="h-6 w-6" />} label={t("pp.f.hs", "HS code")} value={String(pv("hs_code"))} />
+            ) : null}
             {logistics.origin_certificate && logistics.origin_certificate !== "none" ? (
-              <Row label={t("pp.f.originCert", "Origin certificate")} value={label(ORIGIN_CERTIFICATES, logistics.origin_certificate)} />
+              <FactChip icon={<ShieldCheckIcon className="h-6 w-6" />} label={t("pp.f.originCert", "Origin certificate")} value={label(ORIGIN_CERTIFICATES, logistics.origin_certificate) ?? ""} />
             ) : null}
             {dg?.has ? (
-              <Row
+              <FactChip
+                icon={<PlugIcon className="h-6 w-6" />}
                 label={t("pp.f.regulated", "Regulated content")}
                 value={dgNames.join(", ") || t("pk.dgHas", "Has regulated content")}
-                help={[dg.un_numbers, dg.notes].filter(Boolean).join(" · ") || undefined}
+                tone="warn"
               />
             ) : null}
           </div>
-        </Group>
+          {dg?.has && (dg.un_numbers || dg.notes) ? (
+            <p className="mt-2 text-[11.5px] text-[var(--text-muted)]">
+              {[dg.un_numbers, dg.notes].filter(Boolean).join("  ·  ")}
+            </p>
+          ) : null}
+                </Group>
       ) : null}
 
       {order ? (
         <Group motion={motion} icon={<WrenchIcon className="h-4 w-4" />} title={t("technical.fulfillmentDefaults", "Fulfillment Defaults")} count={t("technical.fulfillmentBadge", "MOQ · Lead Time")} onEdit={onEdit}>
-          <div className={rows}>
-            <Row label={t("pp.f.moq", "MOQ")} value={pv("moq")} />
-            <Row label={t("pp.f.leadTime", "Lead time")} value={pv("lead_time")} />
+          <div className="flex flex-wrap gap-2.5">
+            {pv("moq") ? (
+              <FactChip icon={<BoxesIcon className="h-6 w-6" />} label={t("pp.f.moq", "MOQ")} value={String(pv("moq"))} />
+            ) : null}
+            {pv("lead_time") ? (
+              <FactChip icon={<WrenchIcon className="h-6 w-6" />} label={t("pp.f.leadTime", "Lead time")} value={String(pv("lead_time"))} />
+            ) : null}
             {logistics.port_of_loading ? (
-              <Row label={t("pp.f.portOfLoading", "Port of loading")} value={logistics.port_of_loading} />
+              <FactChip icon={<GlobeIcon className="h-6 w-6" />} label={t("pp.f.portOfLoading", "Port of loading")} value={logistics.port_of_loading} />
             ) : null}
           </div>
-        </Group>
+                </Group>
       ) : null}
     </div>
   );
@@ -1395,7 +1547,7 @@ export default function ProductProfile() {
           crates, nothing about loading, and the packing just typed on the form
           was nowhere on it. */}
       {STEPS[step].id === "logistics" && (
-        <PackingSheet logistics={logi} model={data.models[0]} product={p} t={t} rows={rows} motion={tabMotion} onEdit={() => goStep("logistics")} />
+        <PackingSheet logistics={logi} model={data.models[0]} product={p} t={t} motion={tabMotion} onEdit={() => goStep("logistics")} />
       )}
 
       {STEPS[step].id === "compliance" && (
