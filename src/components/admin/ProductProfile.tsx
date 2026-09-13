@@ -370,6 +370,26 @@ const FIELD_ICON_FALLBACK: Record<string, string> = {
   division: "general/business/building.svg", category: "pack/files/folder-tree.svg", subcategory: "pack/actions/layers.svg",
 };
 
+type TaxoName = { en: string; zh: string | null; ar: string | null };
+type TaxonomyNames = Record<"division" | "category" | "subcategory", Record<string, TaxoName>>;
+
+/** The classification name in the page's language, falling back to English and
+ *  then to a tidied slug — never to the raw slug, which is a URL fragment. */
+function taxoLabel(
+  taxo: TaxonomyNames,
+  kind: "division" | "category" | "subcategory",
+  slug: unknown,
+  lang: string,
+): string {
+  const key = typeof slug === "string" ? slug : "";
+  const hit = taxo[kind][key];
+  if (hit) {
+    const localised = lang === "zh" ? hit.zh : lang === "ar" ? hit.ar : null;
+    return (localised || hit.en || "").trim() || humanizeSlug(key);
+  }
+  return humanizeSlug(key);
+}
+
 /** "garment-machinery" → "Garment Machinery". */
 function humanizeSlug(v: unknown): string {
   const raw = typeof v === "string" ? v.trim() : "";
@@ -904,7 +924,7 @@ export default function ProductProfile() {
   const params = useParams<{ id: string }>();
   const handle = params?.id;
   const router = useRouter();
-  const { t } = useTranslation(useMemo(() => ({ ...PRODUCTS_UI_I18N, ...PROFILE_T }), []));
+  const { t, lang } = useTranslation(useMemo(() => ({ ...PRODUCTS_UI_I18N, ...PROFILE_T }), []));
   const aurora = useSkin() === "aurora";
 
   const [data, setData] = useState<Profile | null>(null);
@@ -930,10 +950,29 @@ export default function ProductProfile() {
      "linked"). 60s shared cache; absent entry = keyword fallback. */
   const [classIcons, setClassIcons] = useState<Record<string, Record<string, string>>>({});
   const [bindings, setBindings] = useState<BindingsMap>({});
+  /* THE CLASSIFICATION HAS TRANSLATIONS AND THE PAGE WAS NOT ASKING FOR THEM.
+     divisions / categories / subcategories each carry name_zh and name_ar, so
+     "Garment Machinery" has been "آلات الملابس" in the database all along —
+     the sheet simply printed the slug, and later the title-cased slug, which
+     is English whatever the page language is. The taxonomy is already fetched
+     and cached app-wide, so this costs nothing but the lookup. */
+  const [taxo, setTaxo] = useState<TaxonomyNames>({ division: {}, category: {}, subcategory: {} });
   useEffect(() => {
     let alive = true;
     fetchClassificationIcons().then((m) => { if (alive) setClassIcons(m); }).catch(() => {});
     fetchIconBindings().then((m) => { if (alive) { BINDINGS_SNAPSHOT = m; setBindings(m); } }).catch(() => {});
+    void import("@/lib/products-admin").then(({ fetchTaxonomyAll }) =>
+      fetchTaxonomyAll().then((all) => {
+        if (!alive) return;
+        const index = (rows: { slug: string; name: string; name_zh?: string | null; name_ar?: string | null }[]) =>
+          Object.fromEntries(rows.map((r) => [r.slug, { en: r.name, zh: r.name_zh ?? null, ar: r.name_ar ?? null }]));
+        setTaxo({
+          division: index(all.divisions),
+          category: index(all.categories),
+          subcategory: index(all.subcategories),
+        });
+      }).catch(() => {}),
+    );
     return () => { alive = false; };
   }, []);
 
@@ -1231,11 +1270,11 @@ export default function ProductProfile() {
               Title-casing is the honest half-measure available without a
               second request; the real fix is to fetch the division and
               category rows and show their localised names. */}
-          <span className="text-[var(--text-dim)]">{humanizeSlug(s2("division_slug") as string)}</span>
+          <span className="text-[var(--text-dim)]">{taxoLabel(taxo, "division", s2("division_slug"), lang)}</span>
           <AngleRightIcon className="h-3 w-3 text-[var(--text-ghost)]" />
-          <span className="text-[var(--text-dim)]">{humanizeSlug(s2("category_slug") as string)}</span>
+          <span className="text-[var(--text-dim)]">{taxoLabel(taxo, "category", s2("category_slug"), lang)}</span>
           <AngleRightIcon className="h-3 w-3 text-[var(--text-ghost)]" />
-          <span className="text-[var(--text-primary)] font-medium">{data.subcategory?.name ?? "—"}</span>
+          <span className="text-[var(--text-primary)] font-medium">{taxoLabel(taxo, "subcategory", s2("subcategory_slug"), lang)}</span>
           {data.subcategory?.code && (
             <span className="font-mono text-[11px] px-1.5 py-0.5 rounded bg-[var(--bg-surface)] text-[var(--text-muted)]">{data.subcategory.code}</span>
           )}
@@ -1246,9 +1285,9 @@ export default function ProductProfile() {
       {STEPS[step].id === "classify" && (
       <Group motion={tabMotion} icon={<BoundIcon semanticKey="field.category" className="h-4 w-4" fallback={<FolderTreeIcon className="h-4 w-4" />} />} title={t("pp.sec.classification", "Classification")} editLabel={t("action.edit", "Edit")} onEdit={() => goStep("classify")}>
         <div className={rows}>
-          <Row label={t("pp.f.division", "Division")} value={humanizeSlug(s2("division_slug"))} iconSrc={classIcons.division?.[String(s2("division_slug") ?? "")]} />
-          <Row label={t("pp.f.category", "Category")} value={humanizeSlug(s2("category_slug"))} iconSrc={classIcons.category?.[String(s2("category_slug") ?? "")]} />
-          <Row label={t("pp.f.subcategory", "Subcategory")} value={data.subcategory?.name ?? s2("subcategory_slug")} iconSrc={classIcons.subcategory?.[String(s2("subcategory_slug") ?? "")]} />
+          <Row label={t("pp.f.division", "Division")} value={taxoLabel(taxo, "division", s2("division_slug"), lang)} iconSrc={classIcons.division?.[String(s2("division_slug") ?? "")]} />
+          <Row label={t("pp.f.category", "Category")} value={taxoLabel(taxo, "category", s2("category_slug"), lang)} iconSrc={classIcons.category?.[String(s2("category_slug") ?? "")]} />
+          <Row label={t("pp.f.subcategory", "Subcategory")} value={taxoLabel(taxo, "subcategory", s2("subcategory_slug"), lang)} iconSrc={classIcons.subcategory?.[String(s2("subcategory_slug") ?? "")]} />
           <Row label={t("pp.f.subCode", "Subcategory code")} value={data.subcategory?.code} mono />
           {/* "Not set" reads as MISSING data, but a standalone product
               legitimately has no family (owner). Real family → member
