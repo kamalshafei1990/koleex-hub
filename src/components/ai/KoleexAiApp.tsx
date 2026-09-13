@@ -131,25 +131,20 @@ export default function KoleexAiApp() {
      token: edit-and-retry and regenerate read it here, so the memoised
      bubbles receive the same functions across a stream (audit, 2026-09-11). */
   const messagesRef = useRef<ChatMsg[]>([]);
-  /* Remember the last opened chat across refreshes so hitting ⌘R
-     doesn't throw you back to the empty welcome state. Stored per-
-     account-id so if two users share a browser they don't see each
-     other's stale selection. Cleared automatically when the stored
-     conversation no longer exists (deleted from another tab). */
-  const activeIdKey = account?.id ? `koleex-ai-active-chat:${account.id}` : null;
+  /* THE APP OPENS ON A NEW CHAT (owner, 2026-09-13: "when I open Koleex AI
+     it should have a new chat, not continue the old one, except I choose
+     the old one myself — the ChatGPT way"). The remembered last chat
+     (localStorage `koleex-ai-active-chat:<account>`) is gone: the sidebar
+     holds the history, a tap opens one, and a ?c= in the address still
+     opens the chat it names (deep links, Back, the interrupted-call chip).
+     Old devices keep the stale key; nothing reads it. */
   /* Live ref of the current activeId — read inside the SSE reader so a
      mid-stream conversation switch makes deltas no-op instead of
      writing into the new thread's placeholder. Audit P0 #1/#2. */
   const activeIdRef = useRef<string | null>(activeId);
   useEffect(() => {
     activeIdRef.current = activeId;
-    if (!activeIdKey) return;
-    if (!activeId) return;
-    /* Safari private mode + quota-exceeded throw on setItem; the
-       conversation persistence is best-effort, so swallow the error
-       instead of crashing the whole component. Audit P0 #4. */
-    try { window.localStorage.setItem(activeIdKey, activeId); } catch { /* ignore */ }
-  }, [activeId, activeIdKey]);
+  }, [activeId]);
   const [messages, setMessages] = useState<ChatMsg[]>([]);
   const [input, setInput] = useState("");
   /* Ref for the composer textarea so autosize can reset height after
@@ -551,32 +546,10 @@ export default function KoleexAiApp() {
     loadConversations();
   }, [loadConversations]);
 
-  /* Auto-restore the previously opened conversation after the sidebar
-     loads. Only fires once per mount (restoredRef) so manually opening
-     another chat later doesn't get overridden. If the stored id no
-     longer exists (deleted elsewhere), clear the key and fall through
-     to the welcome state. */
+  /* Set once the address has been read (a ?c= opens its chat) or the
+     caller started a chat; kept so a late sidebar load never opens
+     anything on its own. */
   const restoredRef = useRef(false);
-  useEffect(() => {
-    if (restoredRef.current) return;
-    if (!activeIdKey) return;
-    if (conversations.length === 0) return;
-    let stored: string | null;
-    try { stored = window.localStorage.getItem(activeIdKey); }
-    catch { stored = null; }
-    if (!stored) { restoredRef.current = true; return; }
-    const exists = conversations.some((c) => c.id === stored);
-    if (exists) {
-      restoredRef.current = true;
-      /* A restore is not a step the user took: the address is replaced. */
-      urlModeRef.current = "replace";
-      void openConversation(stored);
-    } else {
-      try { window.localStorage.removeItem(activeIdKey); } catch { /* ignore */ }
-      restoredRef.current = true;
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [conversations, activeIdKey]);
 
   /* ── Load a conversation's messages ── */
   /* THE LIBRARY (roadmap C3) takes the main pane while open; opening any
@@ -1659,13 +1632,8 @@ export default function KoleexAiApp() {
       abortRef.current?.abort();
       setActiveId(null);
       setMessages([]);
-      /* Keep the persisted "last opened" key in sync so a refresh
-         after a delete doesn't try to reopen the now-gone chat. */
-      if (activeIdKey) {
-        try { window.localStorage.removeItem(activeIdKey); } catch { /* ignore */ }
-      }
     }
-  }, [activeId, pendingDeleteId, activeIdKey]);
+  }, [activeId, pendingDeleteId]);
 
   /* Declared before renameConversation — a closure referencing a binding
      declared later (TDZ) blocks React Compiler analysis for the whole
@@ -2152,7 +2120,7 @@ export default function KoleexAiApp() {
 
   return (
     <div
-      className="kx-ai-root kx-app-fullbleed h-full text-[var(--text-primary)] flex overflow-hidden w-full relative bg-[var(--bg-primary)]"
+      className="kx-ai-root kx-ai-enter kx-app-fullbleed h-full text-[var(--text-primary)] flex overflow-hidden w-full relative bg-[var(--bg-primary)]"
       data-kx-call-live={callLive ? "1" : undefined}
     >
       {inputDialog}

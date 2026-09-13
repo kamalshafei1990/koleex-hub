@@ -419,7 +419,7 @@ export default function WavyBackground(
       <canvas
         ref={ref}
         aria-hidden
-        className="absolute pointer-events-none"
+        className="absolute pointer-events-none kx-aurora-canvas"
         style={{ inset: -48, width: "calc(100% + 96px)", height: "calc(100% + 96px)" }}
       />
       )}

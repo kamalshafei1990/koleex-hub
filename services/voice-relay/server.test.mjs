@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { signTicket, verifyTicket, tokenFromProtocols, upstreamUrlFor, originAllowed, TICKET_MAX_AGE_S, isKeepalive, KEEPALIVE_FRAME, clientAddress, MAX_PER_TICKET, MAX_PENDING_BYTES, MAX_FRAME_BYTES, relayHello, shouldPark, RESUME_GRACE_MS, MAX_PARK_BYTES, NO_SESSION_CODE, createPacing, audioMsOf, PACING_GAP_MS, WIRE_RATE } from "./server.mjs";
+import { signTicket, verifyTicket, tokenFromProtocols, upstreamUrlFor, originAllowed, TICKET_MAX_AGE_S, isKeepalive, KEEPALIVE_FRAME, clientAddress, MAX_PER_TICKET, MAX_PENDING_BYTES, MAX_FRAME_BYTES, relayHello, shouldPark, RESUME_GRACE_MS, MAX_PARK_BYTES, NO_SESSION_CODE, createPacing, audioMsOf, PACING_GAP_MS, WIRE_RATE, scanPcm16, CLICK_JUMP, CLIP_LEVEL } from "./server.mjs";
 
 test("the per-address cap keys on the hop the edge appended, never on what the browser wrote in front", () => {
   assert.equal(clientAddress("1.2.3.4", "10.0.0.9"), "1.2.3.4");
@@ -88,10 +88,41 @@ test("the pacing meter reads the vendor's audio deltas: their length, the silenc
   p.note(delta(500), 5000);      // the next answer: no gap counted across answers, ahead starts at 0
   p.note('{"type":"input_audio_buffer.speech_started"}', 5001);
   assert.equal(PACING_GAP_MS, 250);
-  assert.equal(p.summary(), "deltas=5 audioMs=2500 gaps=2 maxGap=1100 minAhead=-500");
+  assert.equal(p.summary(), "deltas=5 audioMs=2500 gaps=2 maxGap=1100 minAhead=-500 clicks=0 edges=0 peak=0 clip=0");
   const q = createPacing();
   q.note(delta(200), 0);
   q.note(delta(200), 50);
   q.note(delta(200), 100);
-  assert.equal(q.summary(), "deltas=3 audioMs=600 gaps=0 maxGap=50 minAhead=0", "a stream ahead of real time never goes negative");
+  assert.equal(q.summary(), "deltas=3 audioMs=600 gaps=0 maxGap=50 minAhead=0 clicks=0 edges=0 peak=0 clip=0", "a stream ahead of real time never goes negative");
+});
+
+test("the sound itself is read for clicks, joints, peak and clipping — counted, never kept", () => {
+  const pcm = (samples) => { const b = Buffer.alloc(samples.length * 2); samples.forEach((v, i) => b.writeInt16LE(v, i * 2)); return b; };
+  const sine = Array.from({ length: 2400 }, (_, i) => Math.round(Math.sin((2 * Math.PI * 440 * i) / WIRE_RATE) * 20000));
+  const clean = scanPcm16(pcm(sine), null);
+  assert.equal(clean.clicks, 0, "a loud 440 Hz sine has no click");
+  assert.equal(clean.edge, 0);
+  assert.equal(clean.peak, 20000);
+  assert.equal(clean.clip, 0);
+  assert.equal(clean.last, sine[sine.length - 1]);
+  const step = [0, 0, 0, 30000, 30000, 30000, -30000, 0];
+  const s1 = scanPcm16(pcm(step), 25000);
+  assert.equal(s1.clicks, 3, "three jumps past CLICK_JUMP inside the frame (0→30000, 30000→−30000, −30000→0)");
+  assert.equal(s1.edge, 25000, "the joint against the previous frame's last sample");
+  assert.equal(s1.clip, 0);
+  assert.equal(CLICK_JUMP, 16000);
+  assert.equal(CLIP_LEVEL, 32000);
+  const pinned = scanPcm16(pcm([32767, -32768, 32767, 100]), null);
+  assert.equal(pinned.clip, 3);
+  assert.equal(pinned.peak, 32768);
+  const empty = scanPcm16(Buffer.alloc(0), 7);
+  assert.deepEqual(empty, { clicks: 0, edge: 0, peak: 0, clip: 0, last: 7 });
+  /* Through the meter: joints are judged only inside one answer. */
+  const delta = (samples) => JSON.stringify({ type: "response.output_audio.delta", delta: pcm(samples).toString("base64") });
+  const p = createPacing();
+  p.note(delta([0, 100, 200, 300]), 0);
+  p.note(delta([20000, 20100, 20200]), 10);      // a jump of 19700 at the joint: one edge
+  p.note('{"type":"response.output_audio.done"}', 20);
+  p.note(delta([-20000, -20000, 32767, 32767]), 5000); // a new answer: no joint counted; one click, two clipped
+  assert.equal(p.summary(), "deltas=3 audioMs=0 gaps=0 maxGap=10 minAhead=-10 clicks=1 edges=1 peak=100 clip=2");
 });

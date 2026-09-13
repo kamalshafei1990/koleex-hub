@@ -115,15 +115,48 @@ export const PACING_GAP_MS = 250;
 const DELTA_RE = /"type"\s*:\s*"response\.(?:output_)?audio\.delta"/;
 const AUDIO_DONE_RE = /"type"\s*:\s*"response\.(?:output_)?audio\.done"/;
 const DELTA_B64_RE = /"delta"\s*:\s*"([A-Za-z0-9+/=]*)"/;
+/** The PCM16 bytes inside one delta frame, or null. */
+export function deltaBytes(text) {
+  const m = DELTA_B64_RE.exec(text);
+  if (!m) return null;
+  return Buffer.from(m[1], "base64");
+}
 /** Milliseconds of PCM16 at the wire rate inside one delta frame. */
 export function audioMsOf(text) {
-  const m = DELTA_B64_RE.exec(text);
-  if (!m) return 0;
-  const b64 = m[1];
-  let bytes = Math.floor((b64.length * 3) / 4);
-  if (b64.endsWith("==")) bytes -= 2;
-  else if (b64.endsWith("=")) bytes -= 1;
-  return bytes / 2 / (WIRE_RATE / 1000);
+  const b = deltaBytes(text);
+  return b ? b.length / 2 / (WIRE_RATE / 1000) : 0;
+}
+/* THE SOUND ITSELF (2026-09-13): the caller hears "crackle while it talks"
+   through a client that no longer seams frames, so the frames are read here
+   for what a click IS — a jump between two neighbouring samples no voice
+   makes (CLICK_JUMP of full scale, ≈0.49), inside a frame or across the
+   joint with the frame before — and for clipping (samples pinned at full
+   scale) and the loudest sample. Counted, never kept. */
+export const CLICK_JUMP = 16_000;
+export const CLIP_LEVEL = 32_000;
+/** Scan one frame's PCM16: clicks inside it, the jump at its start against
+ *  `prevLast` (null for the first frame of an answer), peak and clipped
+ *  samples. Returns { clicks, edge, peak, clip, last }. */
+export function scanPcm16(buf, prevLast) {
+  const n = Math.floor(buf.length / 2);
+  let clicks = 0;
+  let peak = 0;
+  let clip = 0;
+  let edge = 0;
+  let prev = prevLast;
+  for (let i = 0; i < n; i++) {
+    const v = buf.readInt16LE(i * 2);
+    const a = v < 0 ? -v : v;
+    if (a > peak) peak = a;
+    if (a >= CLIP_LEVEL) clip++;
+    if (prev !== null) {
+      const d = v > prev ? v - prev : prev - v;
+      if (i === 0) edge = d;
+      else if (d > CLICK_JUMP) clicks++;
+    }
+    prev = v;
+  }
+  return { clicks, edge, peak, clip, last: n > 0 ? prev : prevLast };
 }
 export function createPacing() {
   let deltas = 0;
@@ -135,12 +168,26 @@ export function createPacing() {
   let firstAt = 0;
   let lastAt = 0;
   let answerMs = 0;
+  let clicks = 0;
+  let edges = 0;
+  let peak = 0;
+  let clip = 0;
+  let prevLast = null;
   return {
     note(text, now = Date.now()) {
       if (DELTA_RE.test(text)) {
-        const ms = audioMsOf(text);
+        const bytes = deltaBytes(text);
+        const ms = bytes ? bytes.length / 2 / (WIRE_RATE / 1000) : 0;
         deltas++;
         audioMs += ms;
+        if (bytes) {
+          const sc = scanPcm16(bytes, open ? prevLast : null);
+          clicks += sc.clicks;
+          if (sc.edge > CLICK_JUMP) edges++;
+          if (sc.peak > peak) peak = sc.peak;
+          clip += sc.clip;
+          prevLast = sc.last;
+        }
         if (!open) {
           open = true;
           firstAt = now;
@@ -160,7 +207,7 @@ export function createPacing() {
       if (open && AUDIO_DONE_RE.test(text)) open = false;
     },
     summary() {
-      return `deltas=${deltas} audioMs=${Math.round(audioMs)} gaps=${gaps} maxGap=${Math.round(maxGap)} minAhead=${Math.round(minAhead)}`;
+      return `deltas=${deltas} audioMs=${Math.round(audioMs)} gaps=${gaps} maxGap=${Math.round(maxGap)} minAhead=${Math.round(minAhead)} clicks=${clicks} edges=${edges} peak=${Math.round((peak / 32768) * 100)} clip=${clip}`;
     },
   };
 }

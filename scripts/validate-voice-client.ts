@@ -3244,6 +3244,22 @@ function describeErrorCheck(): boolean {
     check("  …the target stops growing at the ceiling", PREBUFFER_MAX_S === 1.2 && Math.abs(g.target - PREBUFFER_MAX_S) < 1e-9 && g.underruns > 2 && g.phase === "playing");
   }
   {
+    /* THE LEAD THE DEVICE LEARNED (2026-09-13): a call starts where the last
+       one settled; a clean call hands one step back; both bounded. */
+    const { initialLead, nextLead, LEAD_STORAGE_KEY } = await import("../src/lib/voice/ws-audio");
+    check("no memory, garbage or a tiny value start at the default; a kept lead is used, bounded to the ceiling",
+      initialLead(null) === PREBUFFER_S && initialLead("abc") === PREBUFFER_S && initialLead("0") === PREBUFFER_S && initialLead("100") === PREBUFFER_S &&
+      Math.abs(initialLead("1050") - 1.05) < 1e-9 && initialLead("9000") === PREBUFFER_MAX_S && LEAD_STORAGE_KEY === "koleex-voice-lead-ms");
+    check("a call with underruns keeps the lead it grew to; a clean call gives one step back, never below the default",
+      Math.abs(nextLead(0.45, 1.05, 4) - 1.05) < 1e-9 && Math.abs(nextLead(1.05, 1.05, 0) - 0.9) < 1e-9 && nextLead(0.45, 0.45, 0) === PREBUFFER_S && nextLead(0.6, 5, 1) === PREBUFFER_MAX_S);
+    const g2 = new PlayoutGate({ gate: () => {}, flush: () => {}, setTimer: () => 1, clearTimer: () => {} }, 48_000, 1.05);
+    check("  …and the gate starts at the lead it is given", Math.abs(g2.target - 1.05) < 1e-9 && new PlayoutGate({ gate: () => {}, flush: () => {}, setTimer: () => 1, clearTimer: () => {} }, 48_000).target === PREBUFFER_S);
+    const fs30 = await import("node:fs");
+    const wa30 = fs30.readFileSync("src/lib/voice/ws-audio.ts", "utf8");
+    check("  …the browser player reads the kept lead at build and writes what the call learned at close, only when the far side spoke",
+      /const startLead = initialLead\(/.test(wa30) && /\}, ctx\.sampleRate, startLead\);/.test(wa30) && /if \(farFrames > 0\) \{\s*try \{ leadStore\(\)\?\.setItem\(LEAD_STORAGE_KEY, String\(Math\.round\(nextLead\(startLead, gate\.target, gate\.underruns\) \* 1000\)\)\); \}/.test(wa30));
+  }
+  {
     /* THE RING: frames of any size in, blocks out with no seam; shut it is
        silence; dry while open is reported once and it holds. */
     const reports: Array<{ gen: number; consumed: number }> = [];
@@ -3339,7 +3355,7 @@ function describeErrorCheck(): boolean {
     const fs29 = await import("node:fs");
     const wa = fs29.readFileSync("src/lib/voice/ws-audio.ts", "utf8");
     check("the browser player pushes every decoded frame into the ring and tells the gate; the worklet is loaded from a blob with no inputs and one channel out; the processor is the fallback; dry reports from either reach the gate; flush is the gate's flush; no node per frame remains",
-      /if \(sink\) sink\.push\(samples\);\s*else early\.push\(samples\);\s*gate\.push\(samples\.length\);/.test(wa) &&
+      /if \(sink\) sink\.push\(samples\);\s*else early\.push\(samples\);\s*farFrames \+= 1;\s*gate\.push\(samples\.length\);/.test(wa) &&
       /URL\.createObjectURL\(new Blob\(\[PLAYOUT_WORKLET_SOURCE\], \{ type: "application\/javascript" \}\)\)/.test(wa) &&
       /new AudioWorkletNode\(ctx, PLAYOUT_WORKLET_NAME, \{ numberOfInputs: 0, numberOfOutputs: 1, outputChannelCount: \[1\] \}\)/.test(wa) &&
       /if \(m && m\.type === "dry"\) gate\.onDry\(Number\(m\.gen\), Number\(m\.consumed\)\);/.test(wa) &&
@@ -3585,7 +3601,7 @@ function describeErrorCheck(): boolean {
   const { readFileSync } = await import("node:fs");
   const sess = readFileSync("src/lib/voice/session.ts", "utf8");
   check("the socket lane's handshake waits fifteen seconds for our own route, not the mainland lane's fifty",
-    WS_HANDSHAKE_TIMEOUT_MS === 15_000 && /signal: AbortSignal\.timeout\(WS_HANDSHAKE_TIMEOUT_MS\)/.test(sess) && /const HANDSHAKE_TIMEOUT_MS = 50_000;/.test(sess));
+    WS_HANDSHAKE_TIMEOUT_MS === 15_000 && /const deadline = setTimeout\(\(\) => abortAs\("handshake-deadline"\), WS_HANDSHAKE_TIMEOUT_MS\);/.test(sess) && /const HANDSHAKE_TIMEOUT_MS = 50_000;/.test(sess));
   const btn = readFileSync("src/components/ai/VoiceCallButton.tsx", "utf8");
   check("Try again beacons `retried`, releases the call, moves a socket lane that never came up to the mainland lane once, and rebuilds with the words kept — inside the tap",
     /const retryCall = useCallback\(\(\) => \{/.test(btn) && /sendVoiceTelemetry\(\{ reason: "retried", resumes: resumesRef\.current, lane: transportRef\.current/.test(btn) &&
@@ -3626,9 +3642,11 @@ function describeErrorCheck(): boolean {
      our origin; its outcome is in the diagnostics. Driven with a short
      delay through the real timer: the constant is private, so the source
      is pinned and the behaviour is shown with a fetch that never answers. */
-  check("the canary is armed four seconds into the call's own handshake, disarmed when the handshake answers, and never on a redial",
-    /const WS_CANARY_AFTER_MS = 4_000;/.test(sess) && /const WS_CANARY_TIMEOUT_MS = 5_000;/.test(sess) && CANARY_PATH === "/api/version" &&
-    /const disarmCanary = first \? this\.armCanary\(\) : \(\) => \{\};/.test(sess) && /\} finally \{\s*disarmCanary\(\);\s*\}/.test(sess) &&
+  check("the canary is armed 2.5 s into the call's own handshake with a 3.5 s deadline, disarmed when the handshake answers, never on a redial — and its failure aborts the handshake as a timeout (2026-09-13: 'connecting is too slow')",
+    /const WS_CANARY_AFTER_MS = 2_500;/.test(sess) && /const WS_CANARY_TIMEOUT_MS = 3_500;/.test(sess) && CANARY_PATH === "/api/version" &&
+    /const disarmCanary = first \? this\.armCanary\(\(\) => abortAs\("origin-unreachable"\)\) : \(\) => \{\};/.test(sess) && /\} finally \{\s*disarmCanary\(\);\s*clearTimeout\(deadline\);\s*\}/.test(sess) &&
+    /const deadline = setTimeout\(\(\) => abortAs\("handshake-deadline"\), WS_HANDSHAKE_TIMEOUT_MS\);/.test(sess) && /\.\.\.\(ctrl \? \{ signal: ctrl\.signal \} : \{\}\),\s*credentials: "include",/.test(sess) &&
+    /if \(!disarmed\) onDead\(\);/.test(sess) && /return new DOMException\(why, "TimeoutError"\);/.test(sess) &&
     /this\.canary = `\$\{r\.status\}:\$\{took\(\)\}`;/.test(sess) && /this\.canary = `\$\{isTimeoutError\(e\) \? "timeout" : "error"\}:\$\{took\(\)\}`;/.test(sess) &&
     /canary: this\.canary,\s*resp_err: this\.lastResponseError,/.test(sess));
   {
@@ -3653,6 +3671,43 @@ function describeErrorCheck(): boolean {
     await within(2000, s.start());
     await new Promise((r) => setTimeout(r, 30));
     check("a handshake that answers opens its socket and sends no canary, and the diagnostics say so", opened === 1 && canaries === 0 && s.diagnostics().canary === "" && s.diagnostics().resp_err === "");
+    s.stop();
+  }
+  {
+    /* A DEAD ORIGIN ENDS THE WAIT (2026-09-13 05:08: the route answered in
+       two seconds, nothing reached the phone, the canary timed out too, and
+       the caller watched "connecting" for seventeen seconds). The POST here
+       never answers on its own — it rejects only when its signal aborts —
+       and the canary rejects as a timeout: the call fails as
+       service-unreachable within the canary's delay, not the deadline's. */
+    const recorded: Recorded[] = [];
+    const d = deps({ recorded });
+    const base = d.deps.fetchFn;
+    let aborted = "";
+    d.deps.fetchFn = (async (url: string, init?: RequestInit) => {
+      if (String(url) === CANARY_PATH) throw new DOMException("canary", "TimeoutError");
+      if (String(url).startsWith(WS_SESSION_PATH)) {
+        return new Promise<Response>((_res, rej) => {
+          init?.signal?.addEventListener("abort", () => {
+            const reason = (init.signal as AbortSignal & { reason?: unknown }).reason;
+            aborted = reason instanceof Error ? `${reason.name}:${reason.message}` : String(reason);
+            rej(reason ?? new DOMException("aborted", "AbortError"));
+          });
+        });
+      }
+      return base(url, init);
+    }) as unknown as typeof fetch;
+    d.deps.wsCanaryAfterMs = 20;
+    d.deps.createWebSocket = () => ({ readyState: 0, send: () => {}, close: () => {}, onopen: null, onmessage: null, onclose: null, onerror: null }) as VoiceSocket;
+    d.deps.createWsAudio = () => ({ stream: {} as MediaStream, startCapture: () => {}, play: () => {}, flush: () => {}, close: () => {}, playSample: async () => true, levels: () => ({ mic: 0, far: 0 }), stats: () => ({ path: "none", frames: 0, peak: 0, ctx: "running", rate: 24_000, start: "", stalled: false }) });
+    const states: Array<[VoiceState, VoiceFailure | undefined]> = [];
+    const s = new VoiceSession(d.deps, { onState: (st, f) => states.push([st, f]) }, null, null, null, null, "ws");
+    const t0 = Date.now();
+    await within(2000, s.start());
+    await new Promise((r) => setTimeout(r, 60));
+    const failed = states.find(([st]) => st === "failed");
+    check("a canary that times out aborts the handshake with a TimeoutError named for the origin, and the call fails as service-unreachable at once — within the canary's delay, not the fifteen-second deadline",
+      aborted === "TimeoutError:origin-unreachable" && failed !== undefined && failed[1] === "service-unreachable" && Date.now() - t0 < 1500 && s.diagnostics().canary.startsWith("timeout:"));
     s.stop();
   }
 

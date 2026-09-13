@@ -53,8 +53,12 @@ received, `audioMs=` their total length, `gaps=` silences longer than
 longest, and `minAhead=` how far ahead of real time the answer's audio ran
 at its worst (audio delivered minus wall time since the answer's first
 frame; a player with no lead would have run dry by that much when it is
-negative). Two regexes on each downstream frame; the audio is never
-decoded or kept.
+negative). And the sound itself (2026-09-13): `clicks=` jumps between two
+neighbouring samples no voice makes (`CLICK_JUMP`, ≈0.49 of full scale)
+inside a frame, `edges=` such jumps at the joint between two frames of one
+answer, `peak=` the loudest sample in percent of full scale, `clip=`
+samples pinned at full scale. Each frame is decoded for the count and
+dropped; nothing is kept.
 
 Limits (security review, 2026-09-12): one frame at most 1 MiB; at most 8
 open sockets per client address and 3 per admission ticket (a ticket is one

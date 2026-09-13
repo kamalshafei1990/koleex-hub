@@ -920,3 +920,56 @@ if the crackle survives this too, is the device's output route — phone
 speaker, wired, or Bluetooth (a Bluetooth headset with the microphone open
 falls to the low-rate hands-free profile on every phone; that sounds
 "not clean" on both lanes and no page can change it).
+
+## The relay's first pacing readings, and three owner asks (2026-09-13 05:08–05:19 UTC)
+
+Three socket-lane calls on production with #419 live (`:oworklet` in every
+beacon — the ring is what played):
+
+| Relay session | Length | deltas | audio | gaps > 250 ms | longest gap | minAhead | Client beacon |
+|---|---|---|---|---|---|---|---|
+| 18 | 32 s | 36 | 25.9 s | 10 | 1 183 ms | **−525 ms** | `u1:b600` |
+| 21 | 19 s | 19 | 10.3 s | 5 | 959 ms | −148 ms | (page killed) |
+| 23 | 58 s | 36 | 32.5 s | 13 | 1 354 ms | −129 ms | `u4:b1050` |
+
+**The far side's own stream stalls.** Its frames are 700–900 ms of audio
+each, and the silences between two frames of one answer reach 1.35 s: the
+audio runs up to half a second behind real time even before it leaves
+Singapore. That is the cut the caller hears — and a lead of 450 ms cannot
+cover a 1.35 s silence. Session 23's four underruns against a relay-side
+deficit of only 129 ms say the Singapore → phone path adds jitter of its own.
+
+**The crackle is not the seams.** The ring was live and the caller heard the
+same, so the last client-side candidate is gone. The relay now reads the
+sound itself: `clicks=` (jumps between neighbouring samples no voice makes),
+`edges=` (such jumps at the joint of two frames of one answer), `peak=`,
+`clip=`. If the vendor's PCM carries clicks at its own frame joints, the
+next readings say so; if it reads clean, the crackle is made on the device
+(the output route — a Bluetooth headset with the microphone open falls to
+the hands-free profile on every phone).
+
+**"Connecting is too slow."** Calls `3b3f58a895` (05:08) and `9667fc037f`
+(05:15): our route answered the handshake POST in ~2 s (server log 200), the
+answer never reached the phone, the canary GET to our own origin timed out —
+the tunnel was dead for those seconds — and the caller watched "connecting"
+for 17 and 20 s until the fifteen-second deadline let the fall-back lane run.
+
+### This PR
+
+- **A lead the device learns.** The socket lane starts at the lead the last
+  call settled on (`koleex-voice-lead-ms`); a call that never ran dry hands
+  back one step. The first call on a path pays the cuts once.
+- **A dead origin ends the wait.** The canary is armed at 2.5 s with a 3.5 s
+  deadline, and its timeout or error ABORTS the handshake as a timeout: the
+  call fails as service-unreachable and the fall-back runs within ~6 s of
+  the tap instead of 15–20.
+- **The relay reads the sound** (`clicks= edges= peak= clip=`).
+- **The app opens on a new chat** (owner: "the ChatGPT way"). The remembered
+  last chat is gone; the sidebar holds the history; `?c=` and the
+  interrupted-call chip still open the chat they name.
+- **One look from loader to app**: the root fades in over 220 ms, the aurora
+  canvas over 600 ms, opacity only, nothing under reduced motion.
+
+What this cannot fix: the vendor's pacing itself. A lead that covers a
+1.35 s silence is a lead of 1.35 s — the device learns it where the path
+needs it, and gives it back where it does not.

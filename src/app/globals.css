@@ -616,6 +616,20 @@ body {
   .animate-koleex-rise-in { animation: none; }
 }
 
+/* ONE LOOK FROM LOADER TO APP (owner, 2026-09-13: "when it loads, the screen
+   appears suddenly, like a flash — it feels like a lag or a glitch"). The
+   loader and the app swapped in one frame, and the aurora canvas painted its
+   first frame a beat after the app stood. Now the app's root fades in over
+   220 ms once its code has landed, and the aurora canvas fades in over 600 ms
+   everywhere it mounts. Opacity only — no movement, no stagger: the eye
+   should not notice the swap, not watch an animation. Reduced motion: none. */
+@media (prefers-reduced-motion: no-preference) {
+  .kx-ai-enter { animation: kx-ai-enter 220ms ease-out both; }
+  .kx-aurora-canvas { animation: kx-aurora-in 600ms ease-out both; }
+}
+@keyframes kx-ai-enter { from { opacity: 0; } to { opacity: 1; } }
+@keyframes kx-aurora-in { from { opacity: 0; } to { opacity: 1; } }
+
 
 /* Shiny material tier labels (Diamond / Platinum / Gold / Silver).
    The per-tier gradient is supplied inline via --kx-tier-grad; this class

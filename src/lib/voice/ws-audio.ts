@@ -263,6 +263,26 @@ export const REGATHER_EXTRA_MS = 250;
 /** The script processor's block, when there is no worklet: ~43 ms at 48 kHz. */
 export const PLAYOUT_PROCESSOR_SAMPLES = 2048;
 
+/** THE LEAD THE DEVICE LEARNED (2026-09-13). The relay's meter proved the
+ *  far side's own stream stalls — silences of 1.2–1.35 s inside one answer,
+ *  audio up to 525 ms behind real time — so the lead a call needs is a
+ *  property of the path, not of the call, and a call that starts at the
+ *  default relearns it through the same cuts every time. A call now starts
+ *  where the last one settled: the lead the gate grew to is kept on the
+ *  device (LEAD_STORAGE_KEY, ms); a call that never ran dry hands back one
+ *  step, so a path that improved earns its latency back. Bounded to
+ *  [PREBUFFER_S, PREBUFFER_MAX_S]. Pure. */
+export const LEAD_STORAGE_KEY = "koleex-voice-lead-ms";
+export function initialLead(stored: string | null | undefined): number {
+  const ms = Number(stored);
+  if (!Number.isFinite(ms) || ms <= 0) return PREBUFFER_S;
+  return Math.min(PREBUFFER_MAX_S, Math.max(PREBUFFER_S, ms / 1000));
+}
+export function nextLead(start: number, settled: number, underruns: number): number {
+  if (underruns === 0) return Math.max(PREBUFFER_S, Math.round((start - PREBUFFER_STEP_S) * 1000) / 1000);
+  return Math.min(PREBUFFER_MAX_S, Math.max(PREBUFFER_S, settled));
+}
+
 /**
  * ONE CONTINUOUS STREAM (owner, 2026-09-12 night, the fourth "nothing fixed,
  * everything is the same" — on a build the beacon proved live: rate 48000,
@@ -306,7 +326,9 @@ export class PlayoutGate {
   private answerOpen = false;
   private timer: unknown = null;
 
-  constructor(private readonly deps: PlayoutDeps, private readonly rate: number) {}
+  constructor(private readonly deps: PlayoutDeps, private readonly rate: number, initialTarget = PREBUFFER_S) {
+    this.target = initialTarget;
+  }
 
   get phase(): PlayoutPhase {
     return this.state;
@@ -589,6 +611,15 @@ export function createBrowserWsAudio(wireRate: number, opts: { stallMs?: number 
   const early: Float32Array[] = [];
   let wantOpen = false;
   let wantGen = 0;
+  const leadStore = (): Storage | null => {
+    try {
+      return typeof window !== "undefined" && window.localStorage ? window.localStorage : null;
+    } catch {
+      return null;
+    }
+  };
+  const startLead = initialLead((() => { try { return leadStore()?.getItem(LEAD_STORAGE_KEY); } catch { return null; } })());
+  let farFrames = 0;
   const gate = new PlayoutGate({
     gate: (open) => {
       wantOpen = open;
@@ -602,7 +633,7 @@ export function createBrowserWsAudio(wireRate: number, opts: { stallMs?: number 
     },
     setTimer: (fn, ms) => setTimeout(fn, ms),
     clearTimer: (h) => clearTimeout(h as ReturnType<typeof setTimeout>),
-  }, ctx.sampleRate);
+  }, ctx.sampleRate, startLead);
   const attachSink = (s: Sink) => {
     sink = s;
     s.flush(wantGen);
@@ -802,6 +833,7 @@ export function createBrowserWsAudio(wireRate: number, opts: { stallMs?: number 
       if (samples.length === 0) return;
       if (sink) sink.push(samples);
       else early.push(samples);
+      farFrames += 1;
       gate.push(samples.length);
       void ctx.resume().catch(() => {});
     },
@@ -859,6 +891,10 @@ export function createBrowserWsAudio(wireRate: number, opts: { stallMs?: number 
       closed = true;
       if (stallTimer) clearTimeout(stallTimer);
       stallTimer = null;
+      /* What this call learned about the path, for the next one. */
+      if (farFrames > 0) {
+        try { leadStore()?.setItem(LEAD_STORAGE_KEY, String(Math.round(nextLead(startLead, gate.target, gate.underruns) * 1000))); } catch { /* private mode */ }
+      }
       this.flush();
       sink?.close();
       sink = null;
