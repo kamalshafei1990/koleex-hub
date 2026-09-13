@@ -1265,6 +1265,15 @@ console.log("\n── The address carries the place: ?c=<chat>, ?view=library|ca
   /* ONE LOOK FROM LOADER TO APP (owner, 2026-09-13: "it appears suddenly,
      like a flash"): the root fades in, the aurora canvas fades in, opacity
      only, none of it under reduced motion. */
+  /* THE LAZY CONTROLS' STAND-INS ARE THEIR OWN SHAPES (owner, 2026-09-13,
+     two screenshots a second apart): the Speak pill's placeholder has the
+     pill's height, padding, icon and colour with a blank for the word; the
+     emoji button's has its 40 px; the orb's hello waits until the screen
+     has settled. */
+  check("the Speak pill and the emoji button keep their shape while their code loads, and the orb's hello comes after the screen has settled",
+    /loading: \(\) => \(\s*<span aria-hidden className="h-9 rounded-full px-3\.5 inline-flex items-center gap-1\.5 shrink-0 bg-\[var\(--bg-inverted\)\] text-\[var\(--text-inverted\)\] text-\[13px\] font-semibold">/.test(app) &&
+    /<span className="inline-block w-\[40px\]" \/>/.test(app) && /loading: \(\) => <span className="h-10 w-10 inline-block shrink-0" aria-hidden \/>/.test(app) && !/h-9 w-9 inline-block shrink-0/.test(app) &&
+    /const t = setTimeout\(\(\) => setGreet\(1\), 900\);/.test(readFileSync("src/components/ai/WelcomeCard.tsx", "utf8")));
   check("the app's root fades in over 220 ms and the aurora canvas over 600 ms — opacity only, motion-safe only",
     /className="kx-ai-root kx-ai-enter /.test(app) &&
     (() => {

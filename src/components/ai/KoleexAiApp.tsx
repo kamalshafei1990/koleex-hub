@@ -105,13 +105,32 @@ const ReportIssueButton = dynamic(() => import("@/components/qa/ReportIssueButto
 /* THE VOICE STACK LOADS ON DEMAND (audit, 2026-09-11): the call button
    pulls lib/voice (≈4,900 lines) behind it, which every chat visitor paid
    for at mount. The placeholder holds the composer's geometry. */
+/* THE PLACEHOLDERS ARE THE CONTROLS' OWN SHAPES (owner, 2026-09-13, two
+   screenshots of the same second: "check the difference of the photos —
+   this is what happens when I open the app while it loads"). The Speak
+   pill's stand-in was a 36 px square and the emoji button's a 32 px one, so
+   the composer's row re-laid itself when the real controls landed: the
+   globe slid, the pill popped in. Now the stand-ins have the pill's own
+   height, padding, icon and colour with a blank where the word goes, and
+   the emoji button's own 40 px — the row does not move when the code does. */
 const VoiceCallButton = dynamic(() => import("@/components/ai/VoiceCallButton"), {
   ssr: false,
-  loading: () => <span className="h-9 w-9 inline-block shrink-0" aria-hidden />,
+  loading: () => (
+    <span aria-hidden className="h-9 rounded-full px-3.5 inline-flex items-center gap-1.5 shrink-0 bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold">
+      <svg aria-hidden viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+        <line x1="4" y1="10" x2="4" y2="14" />
+        <line x1="8" y1="7" x2="8" y2="17" />
+        <line x1="12" y1="4" x2="12" y2="20" />
+        <line x1="16" y1="7" x2="16" y2="17" />
+        <line x1="20" y1="10" x2="20" y2="14" />
+      </svg>
+      <span className="inline-block w-[40px]" />
+    </span>
+  ),
 });
 const EmojiButton = dynamic(() => import("@/components/ai/EmojiButton"), {
   ssr: false,
-  loading: () => <span className="h-8 w-8 inline-block shrink-0" aria-hidden />,
+  loading: () => <span className="h-10 w-10 inline-block shrink-0" aria-hidden />,
 });
 
 const SIDEBAR_W = 248;

@@ -38,7 +38,11 @@ export default function WelcomeCard({
      on mount) then flips to 1 → fires the jump reaction once. */
   const [greet, setGreet] = useState(0);
   useEffect(() => {
-    const t = setTimeout(() => setGreet(1), 350);
+    /* AFTER THE SCREEN HAS SETTLED (owner, 2026-09-13): at 350 ms the hop
+       landed while the root was still fading in and the composer's lazy
+       controls were still arriving, and read as part of a glitch rather
+       than a hello. 900 ms is past all of that. */
+    const t = setTimeout(() => setGreet(1), 900);
     return () => clearTimeout(t);
   }, []);
   return (
