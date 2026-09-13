@@ -6,8 +6,9 @@
 
      - Legacy (NEXT_PUBLIC_USE_SUPABASE_AUTH ≠ "true"):
          · Shows "KS" avatar + "Koleex Admin" identity
-         · "Sign Out" clears sessionStorage["koleex-admin"] and hard-reloads,
-           kicking the user back to the AdminAuth password gate.
+         · "Sign Out" revokes the session cookie (POST /api/auth/signout),
+           clears localStorage["koleex-admin"] and hard-reloads, kicking the
+           user back to the AdminAuth password gate.
          · "Sign In" opens the legacy password prompt (already rendered by
            AdminAuth on protected routes), so we just link to "/".
 
@@ -212,6 +213,22 @@ export default function UserMenu({ dk }: { dk: boolean }) {
        would otherwise survive; the legacy path hard-reloads (drops the
        QueryClient) but localStorage survives a reload, so both paths need this. */
     try { queryClient.clear(); } catch { /* ignore */ }
+    /* SIGN OUT USED TO LEAVE THE SESSION ITSELF ALIVE. Everything below
+       clears the CLIENT's idea of the session — the flags, the caches, the
+       stored identity — and until now that was all it did: the HttpOnly
+       `koleex_session` cookie, the thing the server actually trusts, stayed
+       in the browser jar for its full 30 days. On the office machines this
+       menu's "shared computer" option exists for, that is a signed-out screen
+       over a session anyone can still present. /api/auth/signout is what
+       revokes it (and any view-as cookie with it); it is idempotent, and the
+       sign-out proceeds whether or not it answers — a cleanup that can
+       strand the user when the network hiccups is worse than the bug it
+       fixes. `keepalive` carries it across the navigation below. */
+    try {
+      await fetch("/api/auth/signout", { method: "POST", keepalive: true });
+    } catch {
+      /* offline / aborted — the client-side clear below still runs */
+    }
     /* AWAITED on purpose — the contacts directory lives in IndexedDB now and
        deleting from there is async. Not awaiting lets the legacy path's hard
        reload below cut the delete short, which would leave the previous user's

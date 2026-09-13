@@ -320,6 +320,21 @@ export async function getMeBootstrap(opts?: {
             if (res.status === 401) {
               cache = null;
               clearPersisted();
+              /* THE COOKIE IS GONE AND THE CLIENT STILL THINKS IT IS SIGNED
+                 IN. This route 401s only when there is no valid session, so
+                 the flag the gate reads (`koleex-admin`, localStorage, no
+                 expiry) is now a lie — and while it says "true" the Hub keeps
+                 painting, every call keeps 401ing, and the sign-in form never
+                 comes back. Clearing the hints flips the gate to the password
+                 form by itself, which is the one action that can actually fix
+                 it. Exception: `account_inactive` is a valid session belonging
+                 to a deactivated account — signing in again cannot help, so
+                 leave that message on screen. */
+              if (code !== "account_inactive") {
+                void import("./session-hints")
+                  .then((m) => m.dropClientSessionHints())
+                  .catch(() => undefined);
+              }
               for (const cb of listeners) cb(null);
               return null;   // No point retrying 401
             }
