@@ -39,6 +39,8 @@ import { useTranslation } from "@/lib/i18n";
 import { settingsT } from "@/lib/translations/settings";
 
 const API = "/api/ai/personalization";
+/** The hours a morning brief may be sent: early morning to noon. */
+const BRIEF_HOURS = [5, 6, 7, 8, 9, 10, 11, 12] as const;
 
 const FIELD_CLASS =
   "w-full rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-3 py-2 text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-dim)] focus:outline-none focus:border-[var(--border-focus)]";
@@ -152,8 +154,16 @@ export default function AiTab({ account, onChanged }: {
           hint={t("ai.suggestions.hint")}
           checked={draft.suggestions}
           onChange={(v) => set("suggestions", v)}
-          last
         />
+        {/* THE MORNING BRIEF (tasks phase 5): one hour, in the user's own
+            calendar timezone, or off. The cron reads it every hour. */}
+        <ControlRow label={t("ai.brief")} hint={t("ai.brief.hint")}>
+          <SelectControl<string>
+            value={draft.briefHour === null ? "off" : String(draft.briefHour)}
+            onChange={(v) => set("briefHour", v === "off" ? null : Number(v))}
+            options={[{ value: "off", label: t("ai.brief.off") }, ...BRIEF_HOURS.map((h) => ({ value: String(h), label: `${String(h).padStart(2, "0")}:00` }))]}
+          />
+        </ControlRow>
       </SettingsGroup>
 
       <SettingsGroup header={t("ai.instructions")} footer={t("ai.instructions.hint")} flush={false}>

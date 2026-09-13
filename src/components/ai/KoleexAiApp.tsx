@@ -701,6 +701,15 @@ export default function KoleexAiApp() {
       setLibraryOpen(view === "library");
       setCallsOpen(view === "calls");
     }
+    /* THE MORNING BRIEF'S NOTIFICATION opens here with ?ask=brief (tasks
+       phase 5): a new chat, the brief asked for in the user's language, the
+       parameter dropped so a reload does not ask again. */
+    if (params.get("ask") === "brief" && !c) {
+      params.delete("ask");
+      const rest = params.toString();
+      try { window.history.replaceState(window.history.state, "", `${window.location.pathname}${rest ? `?${rest}` : ""}`); } catch { /* no history */ }
+      void startNewChat().then(() => sendRef.current(copy.prompts[0], false));
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- a one-time read of the address at mount
   }, []);
   useEffect(() => {

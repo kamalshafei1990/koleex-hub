@@ -18,6 +18,9 @@ import {
 } from "../src/lib/server/ai-agent/tools/task-time";
 import { isChatConfirmTool, CHAT_CONFIRM_TOOLS } from "../src/lib/server/ai/chat-confirm";
 import { buildTaskDraft, dayRangeISO, type Person, type DraftResult } from "../src/lib/server/ai-agent/tools/task-draft";
+import { todoScopeClauses, applyTodoScope } from "../src/lib/server/todo-scope-rule";
+import { briefText, hourIn, dayIn } from "../src/lib/server/ai/brief-text";
+import { normalizeAiPersonalization, DEFAULT_AI_PERSONALIZATION } from "../src/lib/ai-personalization";
 
 let pass = 0, fail = 0;
 function check(name: string, cond: boolean, detail?: string) {
@@ -257,6 +260,60 @@ check("the first welcome tile asks for the day's brief, in all three languages",
   /prompts: \[\s*"Give me my brief for today: my meetings, tasks due, reminders, and what needs me first\.",/.test(copySrc) &&
   /prompts: \[\s*"给我今天的简报：会议、到期任务、提醒，以及我最该先做什么。",/.test(copySrc) &&
   /prompts: \[\s*"اعطيني بريف اليوم: اجتماعاتي، المهام اللي موعدها النهاردة، التذكيرات، وإيه اللي محتاجني الأول\.",/.test(copySrc));
+
+console.log("\n── 8. Phases 5–6: one scope rule; the morning brief at the hour you chose; the drifted columns on record ──");
+const me = { accountId: "me-1", tenantId: "t-1", department: "Sales", isSuperAdmin: false, canViewPrivate: false };
+const clauses = todoScopeClauses(me, ["x1", "x2"]);
+check("the scope rule, written once: created · assigned · everyone · my department · shared (assignee or observer) — and private hidden unless mine",
+  clauses !== null && clauses.scope === "created_by_account_id.eq.me-1,assigned_by_account_id.eq.me-1,assign_to_all.eq.true,assigned_department.eq.Sales,id.in.(x1,x2)" &&
+  clauses.privacy === "is_private.eq.false,created_by_account_id.eq.me-1");
+check("  …no department and nothing shared drops those branches; break-glass drops the privacy clause; a super admin has no clauses at all",
+  todoScopeClauses({ ...me, department: null }, [])?.scope === "created_by_account_id.eq.me-1,assigned_by_account_id.eq.me-1,assign_to_all.eq.true" &&
+  todoScopeClauses({ ...me, canViewPrivate: true }, [])?.privacy === null && todoScopeClauses({ ...me, isSuperAdmin: true }, ["x1"]) === null);
+const calls: string[] = [];
+const fakeQ = { or(f: string) { calls.push(f); return fakeQ; } };
+applyTodoScope(fakeQ, me, ["x1"]);
+applyTodoScope(fakeQ, { ...me, isSuperAdmin: true }, ["x1"]);
+check("  …applied as two AND-ed `or` filters on the query, none for a super admin", calls.length === 2 && calls[0].startsWith("created_by_account_id.eq.me-1") && calls[1].startsWith("is_private.eq.false"));
+const routeSrc = readFileSync("src/app/api/todos/route.ts", "utf8");
+check("the To-do route and the AI's listMyTodos both read the one rule from lib/server/todo-scope — the ported copy is gone",
+  /import \{ applyTodoScope, sharedTodoIds, type TodoViewer \} from "@\/lib\/server\/todo-scope";/.test(routeSrc) && /query = applyTodoScope\(query, viewer, sharedIds\);/.test(routeSrc) &&
+  /import \{ applyTodoScope, sharedTodoIds, type TodoViewer \} from "\.\.\/\.\.\/todo-scope";/.test(todos) && /q = applyTodoScope\(q, viewer, await sharedTodoIds\(viewer\)\);/.test(todos) &&
+  !/Port of the route's non-SA visibility scope/.test(todos) && !/orParts/.test(todos) && !/orParts/.test(routeSrc));
+const mig = readFileSync("supabase/migrations/todo_columns_reconcile_2026_09.sql", "utf8");
+check("the columns production has without a migration file are on record — every one IF NOT EXISTS, with the reason, rollback and load stated",
+  ["is_private", "tenant_id", "metadata", "reminded_at", "recurrence", "recurrence_parent_id", "recurrence_spawned_for", "recurrence_until", "approval_state", "approved_by_account_id", "approved_at"].every((c) => new RegExp(`ADD COLUMN IF NOT EXISTS ${c}\\s`).test(mig)) &&
+  /CREATE INDEX IF NOT EXISTS idx_koleex_todos_tenant_open/.test(mig) && /Rollback:/.test(mig) && /Load:/.test(mig) && /RLS:/.test(mig) && !/^\s*(DROP|DELETE|TRUNCATE|UPDATE) /m.test(mig));
+
+check("the brief's words: counts joined, the first meeting named, a quiet day said plainly — in three languages",
+  briefText({ meetings: 3, dueToday: 2, overdue: 1, reminders: 1, first: "09:30 Delta call" }, "en").body === "3 meetings · 2 due today · 1 overdue · 1 reminder — first: 09:30 Delta call" &&
+  briefText({ meetings: 1, dueToday: 0, overdue: 0, reminders: 0, first: "" }, "en").body === "1 meeting" &&
+  briefText({ meetings: 0, dueToday: 0, overdue: 0, reminders: 0, first: "" }, "en").body === "Nothing on your plate today. A quiet one." &&
+  briefText({ meetings: 2, dueToday: 1, overdue: 0, reminders: 2, first: "10:00 بنك" }, "ar").body === "2 اجتماعات · 1 مهمة موعدها النهاردة · 2 تذكيرات — الأول: 10:00 بنك" && briefText({ meetings: 0, dueToday: 0, overdue: 0, reminders: 0, first: "" }, "ar").title === "☀️ بريف اليوم" &&
+  briefText({ meetings: 1, dueToday: 1, overdue: 1, reminders: 1, first: "" }, "zh").body === "1 个会议 · 1 个今天到期 · 1 个已逾期 · 1 个提醒" && briefText({ meetings: 0, dueToday: 0, overdue: 0, reminders: 0, first: "" }, "zh").body === "今天日程为空，轻松的一天。");
+check("the hour and the day are read in the person's zone (03:30Z is 07 in Dubai and 11 in Shanghai; 20:30Z Sunday is Monday in Shanghai)",
+  hourIn("Asia/Dubai", new Date("2026-09-13T03:30:00Z")) === 7 && hourIn("Asia/Shanghai", new Date("2026-09-13T03:30:00Z")) === 11 &&
+  dayIn("Asia/Shanghai", new Date("2026-09-13T20:30:00Z")) === "2026-09-14" && dayIn("Asia/Dubai", new Date("2026-09-13T20:30:00Z")) === "2026-09-14" && dayIn("Europe/London", new Date("2026-09-13T20:30:00Z")) === "2026-09-13" &&
+  hourIn("Mars/Olympus", new Date("2026-09-13T03:30:00Z")) === 7);
+check("the setting is one integer hour or off — defaults off, refuses 24, 7.5, '8' and true",
+  DEFAULT_AI_PERSONALIZATION.briefHour === null && normalizeAiPersonalization({ briefHour: 8 }).briefHour === 8 && normalizeAiPersonalization({ briefHour: 0 }).briefHour === 0 &&
+  normalizeAiPersonalization({ briefHour: 24 }).briefHour === null && normalizeAiPersonalization({ briefHour: 7.5 }).briefHour === null && normalizeAiPersonalization({ briefHour: "8" }).briefHour === null &&
+  normalizeAiPersonalization({ briefHour: true }).briefHour === null && normalizeAiPersonalization({}).briefHour === null);
+const cron = readFileSync("src/app/api/cron/ai-brief/route.ts", "utf8");
+check("the cron: the secret, opted-in active internal accounts only, the person's hour in their zone, one per person per day, the non-admin scope on purpose, an inbox row and one push that open the chat with ?ask=brief",
+  /req\.headers\.get\("authorization"\) !== `Bearer \$\{secret\}`/.test(cron) && /\.eq\("user_type", "internal"\)\s*\.eq\("status", "active"\)\s*\.not\("preferences->ai->>briefHour", "is", null\)/.test(cron) &&
+  /if \(hourIn\(tz, now\) !== hour\) continue;/.test(cron) && /\.eq\("metadata->>type", "ai_brief"\)\s*\.eq\("metadata->>day", day\)/.test(cron) && /isSuperAdmin: false,/.test(cron) &&
+  /link: "\/ai\?ask=brief"/.test(cron) && /url: "\/ai\?ask=brief", tag: `ai-brief-\$\{day\}`/.test(cron) && !/\.from\("koleex_todos"\)\s*\.(insert|update|delete)/.test(cron));
+const vercel = JSON.parse(readFileSync("vercel.json", "utf8")) as { crons: Array<{ path: string; schedule: string }> };
+check("vercel runs it hourly", vercel.crons.some((c) => c.path === "/api/cron/ai-brief" && c.schedule === "0 * * * *"));
+const briefSrc = readFileSync("src/lib/server/ai/brief.ts", "utf8");
+check("the brief reads the person's own calendar (one-off and recurring, today in their zone) and the tasks through the shared scope; it writes nothing",
+  /\.from\("koleex_calendar_events"\)[\s\S]{0,200}?\.eq\("account_id", viewer\.accountId\)/.test(briefSrc) && /expandRecurrence\(e\.start_at/.test(briefSrc) &&
+  /tq = applyTodoScope\(tq, viewer, await sharedTodoIds\(viewer\)\);/.test(briefSrc) && !/\.insert\(|\.update\(|\.delete\(/.test(briefSrc));
+check("the settings tab offers the hour beside the suggestion tiles, in three languages; the chat opens the brief from the notification and drops the parameter",
+  /BRIEF_HOURS = \[5, 6, 7, 8, 9, 10, 11, 12\]/.test(readFileSync("src/components/settings/tabs/AiTab.tsx", "utf8")) && /set\("briefHour", v === "off" \? null : Number\(v\)\)/.test(readFileSync("src/components/settings/tabs/AiTab.tsx", "utf8")) &&
+  /"ai\.brief":\s*\{ en: "Morning brief", zh: "每日简报", ar: "بريف الصبح" \}/.test(readFileSync("src/lib/translations/settings.ts", "utf8")) &&
+  /if \(params\.get\("ask"\) === "brief" && !c\) \{[\s\S]{0,400}?params\.delete\("ask"\);[\s\S]{0,400}?void startNewChat\(\)\.then\(\(\) => sendRef\.current\(copy\.prompts\[0\], false\)\);/.test(app));
 
 console.log(`\n${pass} passed, ${fail} failed`);
 if (fail > 0) process.exit(1);
