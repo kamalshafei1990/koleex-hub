@@ -21,6 +21,7 @@ import ActivityLine from "@/components/ai/ActivityLine";
 import MessageMarkdown from "@/components/ai/MessageMarkdown";
 import { textDirection } from "@/lib/text-direction";
 import DraftCard from "@/components/ai/DraftCard";
+import TaskCard, { type TaskCardState } from "@/components/ai/TaskCard";
 import PhotoLightbox, { type LightboxPhoto } from "@/components/ai/PhotoLightbox";
 import type { ChatMsg, QuotationDraftPayload } from "@/components/ai/types";
 import { COPY } from "@/components/ai/copy";
@@ -51,6 +52,9 @@ function BubbleImpl({
   onSpeak,
   onFeedback,
   onAnswerQuestion,
+  onConfirmTask,
+  onCancelTask,
+  taskStatus,
   lang,
   orbState = "idle",
   orbActivity = "none",
@@ -74,6 +78,11 @@ function BubbleImpl({
   onEdit?: (msgId: string, newText: string) => void;
   /** A clarifying option was tapped — send it as the next user message. */
   onAnswerQuestion?: (msgId: string, answer: string) => void;
+  /** The Task card's Save / Cancel (tasks phase 2). The parent carries the
+   *  tap to /api/ai/agent/confirm and owns the card's outcome. */
+  onConfirmTask?: (msgId: string, pending: { tool: string; args: Record<string, unknown> }) => void;
+  onCancelTask?: (msgId: string) => void;
+  taskStatus?: TaskCardState;
   /** Per-message TTS replay — gets the bubble's text and the chosen
    *  language; returns a handle the bubble can use to stop playback. */
   onSpeak?: (text: string) => void;
@@ -159,6 +168,24 @@ function BubbleImpl({
           typeof (s.payload as { review_url?: unknown }).review_url === "string",
       )
     : undefined;
+  /* THE TASK CARD (tasks phase 2): a to-do write tool's first phase, its
+     confirm arguments riding on the step (AgentStep.pending). Rendered above
+     the answer like the quotation draft; tappable only on the last message
+     with no outcome yet. */
+  const taskStep = !isUser
+    ? steps.find(
+        (s) =>
+          s.kind === "tool-result" &&
+          (s.tool === "createTodo" || s.tool === "updateTodo") &&
+          s.permissionStatus === "approval_required" &&
+          !!s.pending &&
+          typeof s.pending.tool === "string",
+      )
+    : undefined;
+  const taskPreview = taskStep && taskStep.payload && typeof taskStep.payload === "object"
+    ? ((taskStep.payload as { preview?: unknown }).preview as Record<string, unknown> | undefined) ?? null
+    : null;
+  const taskState: TaskCardState = taskStatus ?? { state: "pending" };
   /* Both sides now get an avatar so the transcript reads like a real
      conversation — matches the ChatGPT / Gemini visual pattern Kamal
      referenced. User side: real profile photo (or initial fallback).
@@ -183,6 +210,18 @@ function BubbleImpl({
             and the quotation DraftCard below still surfaces its result. */}
         {draftStep && (
           <DraftCard payload={draftStep.payload as QuotationDraftPayload} lang={lang} />
+        )}
+        {taskStep && taskStep.pending && (
+          <TaskCard
+            tool={taskStep.tool ?? taskStep.pending.tool}
+            pending={taskStep.pending}
+            preview={taskPreview}
+            status={taskState}
+            live={!!isLast && !!onConfirmTask && !answeredWith}
+            lang={lang}
+            onSave={() => onConfirmTask?.(msg.id, taskStep.pending!)}
+            onCancel={() => onCancelTask?.(msg.id)}
+          />
         )}
         {/* WHAT IT IS DOING, IN WORDS. The three anonymous dots said only
             "wait"; this line says why — Thinking, Searching the web, Checking

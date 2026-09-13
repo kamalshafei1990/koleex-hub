@@ -1220,3 +1220,41 @@ live in a transient bucket; copying them into `todo-attachments` is phase
 2 work with the chat card), a project link on a to-do (a named project
 should become a project task — instruction in phase 3), the chat confirm
 card (phase 2), the brief on the text lane (phase 4).
+
+## Tasks by AI, phase 2 — the Task card in the chat, saved by a tap (2026-09-13)
+
+The text lane confirmed a task by typing "yes" — the model re-sent the
+arguments with confirm:true and the ledger matched. Now the chat has the
+call screen's card:
+
+- `AgentStep.pending` (server and client): a write tool's first phase
+  hands its confirm arguments to the screen on the tool-result step, only
+  while `approval_required`; the model's envelope is unchanged
+  (orchestrator).
+- `POST /api/ai/agent/confirm` (new): the page posts the preview's own
+  arguments with confirm:true and the conversation id. The route re-decides
+  everything in the voice tool route's order — the door, the account type,
+  the context, the body and its size, the chat-confirm list
+  (`lib/server/ai/chat-confirm.ts`: the five to-do writes, catalogue
+  fail-safe), a 40/min budget, the caller's own conversation — then
+  `dispatchTool` with the conversation id, where the ledger refuses a tap
+  that matches no recorded preview. On success the tool's own line joins
+  the thread as an assistant message (`provider: tool:confirm`), so a
+  reload shows the task saved and the model's next turn knows it exists.
+- `components/ai/TaskCard.tsx` (new): title, the times in words, the
+  people by name, observers, mentions, recurrence, private — from the
+  tool's preview; Save (Hub Blue) and Cancel while live (the last message,
+  no reply yet); saving / saved (with "Open in To-do") / failed / not saved
+  as a record afterwards. An update preview is a "Task change" card listing
+  the changes. Copy in en/zh/ar (`copy.ts`).
+- `Bubble.tsx` renders it above the answer like the quotation draft;
+  `KoleexAiApp.tsx` owns the tap, the outcome per message, and appends the
+  route's message once. Cancel closes the card; the recorded preview
+  expires on its own (15 min).
+- Suites: `validate:ai-client-render` 258 (the card live, older, answered,
+  saving, saved with the link, failed, cancelled, the update card, the two
+  refusals, ar/zh); `validate:ai-tasks` 58 (the step, the types, the list,
+  the route's order and its post-dispatch write, the page's post, the
+  bubble's live rule).
+
+Voice unchanged: the call keeps its card and its tap route.

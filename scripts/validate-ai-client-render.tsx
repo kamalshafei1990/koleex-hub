@@ -1182,6 +1182,45 @@ console.log("\n── VoiceCallScreen: typing into the call ──");
   }
 
 
+  /* ── TASKS PHASE 2: the Task card in the chat ─────────────────────────── */
+  console.log("\n── Bubble: a task waiting for a tap, in the chat ──");
+  {
+    /* eslint-disable @typescript-eslint/no-explicit-any */
+    const pending = { tool: "createTodo", args: { title: "Call Mr Li about the Ningbo shipment", due_date: "2026-09-18T11:00:00.000Z", remind_at: "2026-09-18T11:00:00.000Z", priority: "high", label: "Sales", confirm: true } };
+    const preview = { title: "Call Mr Li about the Ningbo shipment", priority: "high", when: { due: "Fri 18 Sept, 15:00", remind: "Fri 18 Sept, 15:00", start: "" }, assignees: [{ account_id: "a1", name: "Ahmed Hassan" }], observers: [{ account_id: "a2", name: "Sara" }], mentions: [], department: null, assign_to_all: false, timezone: "Asia/Dubai" };
+    const step = { kind: "tool-result", tool: "createTodo", permissionStatus: "approval_required", text: "Ready to create…", payload: { preview }, pending };
+    const base: any = { msg: { id: "t1", role: "assistant", content: "Ready — a reminder at 3 to call Mr Li. Save?", created_at: "2026-09-13T10:00:00Z", steps: [step] }, userInitial: "M", isLast: true, lang: "en", onConfirmTask: () => {}, onCancelTask: () => {} };
+    const live = html(<Bubble {...base} />);
+    check("a to-do preview step renders the Task card above the answer: the title in the user's words, the times in words, the person, the label, the priority",
+      /data-task-card/.test(live) && /data-task-state="pending"/.test(live) && text(live).includes("Call Mr Li about the Ningbo shipment") && text(live).includes("Due Fri 18 Sept, 15:00") &&
+      text(live).includes("Reminder Fri 18 Sept, 15:00") && text(live).includes("For Ahmed Hassan") && text(live).includes("Following Sara") && text(live).includes("high") && text(live).includes("Sales") &&
+      text(live).includes("Ready — a reminder at 3 to call Mr Li. Save?"));
+    check("  …live on the last message: Save is the one Hub-Blue control, Cancel beside it",
+      /data-task-save/.test(live) && live.includes("bg-[#0066FF]") && text(live).includes("Save task") && /data-task-cancel/.test(live) && text(live).includes("Cancel"));
+    const older = html(<Bubble {...({ ...base, isLast: false } as any)} />);
+    check("  …an older message keeps the card as a record with no buttons", /data-task-card/.test(older) && !/data-task-save/.test(older) && text(older).includes("Call Mr Li"));
+    const answered = html(<Bubble {...({ ...base, answeredWith: "actually make it tomorrow" } as any)} />);
+    check("  …a card the user already replied to is frozen too", !/data-task-save/.test(answered));
+    const saving = html(<Bubble {...({ ...base, taskStatus: { state: "saving" } } as any)} />);
+    check("  …while saving the button says so and is disabled", text(saving).includes("Saving…") && /disabled=""/.test(saving));
+    const saved = html(<Bubble {...({ ...base, taskStatus: { state: "saved", todoId: "7b2f0c1e-1111-4222-8333-444455556666" } } as any)} />);
+    check("  …saved: the heading says so, nothing to press, and a link opens it in To-do",
+      /data-task-state="saved"/.test(saved) && text(saved).includes("Task saved") && !/data-task-save/.test(saved) && /href="\/todo\?task=7b2f0c1e-1111-4222-8333-444455556666"/.test(saved) && text(saved).includes("Open in To-do"));
+    const failed = html(<Bubble {...({ ...base, taskStatus: { state: "failed" } } as any)} />);
+    check("  …a failed save says so and keeps the buttons", /data-task-error/.test(failed) && text(failed).includes("Could not save it") && /data-task-save/.test(failed));
+    const cancelled = html(<Bubble {...({ ...base, taskStatus: { state: "cancelled" } } as any)} />);
+    check("  …cancelled: 'Not saved', no buttons", /data-task-state="cancelled"/.test(cancelled) && text(cancelled).includes("Not saved") && !/data-task-save/.test(cancelled));
+    const update = html(<Bubble {...({ ...base, msg: { ...base.msg, steps: [{ kind: "tool-result", tool: "updateTodo", permissionStatus: "approval_required", payload: { preview: { title: "Send the revised quotation", changes: { priority: "high", due_date: "2026-09-19T13:00:00.000Z" }, observers: [{ name: "Sara" }] } }, pending: { tool: "updateTodo", args: { task_id: "x", priority: "high", confirm: true } } }] } } as any)} />);
+    check("an update preview is a 'Task change' card listing the changes and the observers",
+      text(update).includes("Task change") && text(update).includes("priority: high") && text(update).includes("due date: 2026-09-19T13:00:00.000Z") && text(update).includes("Following Sara"));
+    const noPending = html(<Bubble {...({ ...base, msg: { ...base.msg, steps: [{ ...step, pending: undefined }] } } as any)} />);
+    const allowed = html(<Bubble {...({ ...base, msg: { ...base.msg, steps: [{ ...step, permissionStatus: "allowed" }] } } as any)} />);
+    check("no card without the confirm arguments, and none for a step that is not awaiting approval", !/data-task-card/.test(noPending) && !/data-task-card/.test(allowed));
+    check("the card is localised — Arabic and Chinese from the same copy",
+      text(html(<Bubble {...({ ...base, lang: "ar" } as any)} />)).includes("احفظ المهمة") && text(html(<Bubble {...({ ...base, lang: "ar" } as any)} />)).includes("تذكير") &&
+      text(html(<Bubble {...({ ...base, lang: "zh" } as any)} />)).includes("保存任务") && text(html(<Bubble {...({ ...base, lang: "zh" } as any)} />)).includes("提醒"));
+  }
+
   /* ── ROADMAP D1: the task card ────────────────────────────────────────── */
   console.log("\n── VoiceCallScreen: a task waiting for a tap ──");
   {

@@ -753,6 +753,11 @@ export async function orchestrate(input: TurnInput): Promise<AgentResponse> {
           permissionStatus: result.permissionStatus,
           sources: result.sources,
           filteredFields: result.filteredFields,
+          /* The preview's confirm arguments ride to the screen (see
+             AgentStep.pending); the model's envelope is unchanged. */
+          ...(result.pendingAction && result.permissionStatus === "approval_required"
+            ? { pending: { tool: result.pendingAction.tool, args: result.pendingAction.args } }
+            : {}),
         });
 
         return { tc, result };

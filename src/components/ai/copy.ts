@@ -38,6 +38,25 @@ export const COPY: Record<Lang, {
   otherOption: string;
   otherPlaceholder: string;
   otherSend: string;
+  /* The Task card (tasks phase 2): a write tool's preview in the chat,
+     saved by a tap. The same words the call screen uses. */
+  taskPreview: string;
+  taskUpdate: string;
+  saveTask: string;
+  cancelTask: string;
+  savingTask: string;
+  taskSaved: string;
+  taskFailed: string;
+  taskCancelled: string;
+  openTodo: string;
+  due: string;
+  remind: string;
+  forPeople: string;
+  observers: string;
+  mentions: string;
+  repeats: string;
+  privateTask: string;
+  starts: string;
   searchChats: string;
   noSearchResults: string;
   /* Chrome and attachment words that were English literals inside Arabic and
@@ -172,6 +191,23 @@ export const COPY: Record<Lang, {
   prompts: string[];
 }> = {
   en: {
+    taskPreview: "New task",
+    taskUpdate: "Task change",
+    saveTask: "Save task",
+    cancelTask: "Cancel",
+    savingTask: "Saving…",
+    taskSaved: "Task saved",
+    taskFailed: "Could not save it. Try again.",
+    taskCancelled: "Not saved",
+    openTodo: "Open in To-do",
+    due: "Due",
+    remind: "Reminder",
+    forPeople: "For",
+    observers: "Following",
+    mentions: "Told",
+    repeats: "Repeats",
+    privateTask: "Private",
+    starts: "Starts",
     newChat: "New chat",
     placeholder: "Ask Koleex AI…",
     welcomeTitle: "Hi",
@@ -299,6 +335,23 @@ export const COPY: Record<Lang, {
     ],
   },
   zh: {
+    taskPreview: "新任务",
+    taskUpdate: "任务修改",
+    saveTask: "保存任务",
+    cancelTask: "取消",
+    savingTask: "保存中…",
+    taskSaved: "任务已保存",
+    taskFailed: "保存失败，请重试。",
+    taskCancelled: "未保存",
+    openTodo: "在待办中打开",
+    due: "截止",
+    remind: "提醒",
+    forPeople: "给",
+    observers: "关注",
+    mentions: "通知",
+    repeats: "重复",
+    privateTask: "私密",
+    starts: "开始",
     newChat: "新建对话",
     placeholder: "向 Koleex AI 提问…",
     welcomeTitle: "你好",
@@ -425,6 +478,23 @@ export const COPY: Record<Lang, {
     ],
   },
   ar: {
+    taskPreview: "مهمة جديدة",
+    taskUpdate: "تعديل مهمة",
+    saveTask: "احفظ المهمة",
+    cancelTask: "إلغاء",
+    savingTask: "جارٍ الحفظ…",
+    taskSaved: "تم حفظ المهمة",
+    taskFailed: "ما قدرنا نحفظها. حاول تاني.",
+    taskCancelled: "لم تُحفظ",
+    openTodo: "افتح في المهام",
+    due: "موعدها",
+    remind: "تذكير",
+    forPeople: "لـ",
+    observers: "يتابع",
+    mentions: "أُخبِر",
+    repeats: "يتكرر",
+    privateTask: "خاص",
+    starts: "يبدأ",
     newChat: "محادثة جديدة",
     placeholder: "اسأل Koleex AI…",
     welcomeTitle: "مرحبًا",

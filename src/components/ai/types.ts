@@ -20,6 +20,9 @@ export interface AgentStep {
   permissionStatus?: "allowed" | "limited" | "denied" | "approval_required";
   sources?: string[];
   filteredFields?: string[];
+  /** A write tool's preview arguments, for the Task card's Save (mirrors
+   *  the server's AgentStep.pending). */
+  pending?: { tool: string; args: Record<string, unknown> };
 }
 export interface ChatMsg {
   id: string;
