@@ -25,7 +25,16 @@ import { IMG } from "@/lib/cdn";
 import { humanizeError } from "@/lib/ui/humanize-error";
 import { useTranslation } from "@/lib/i18n";
 import { PRODUCTS_UI_I18N } from "@/lib/products-ui-i18n";
-import { fetchClassificationIcons } from "@/lib/products-admin";
+import { fetchClassificationIcons, updateProduct } from "@/lib/products-admin";
+/* INLINE EDIT — the form's own section components, hosted inside the sheet's
+   cards. Same inputs, same units, same rules; only the card around them is
+   the profile's. */
+import { PackingBlock, LoadingBlock, CustomsExtras, ShippingOrigin } from "./form-sections/LogisticsBlocks";
+import { PhysicalFields } from "./form-sections/TechnicalSection";
+import KdsSelect from "@/components/kds/Select";
+import { COUNTRIES } from "@/types/product-form";
+import { flagOf, countryName } from "@/lib/countries-dial";
+import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 import { fetchIconBindings, type BindingsMap } from "@/lib/visual-bindings";
 import { BACK_CHROME } from "@/components/ui/PageHeader";
 import RrIcon from "@/components/ui/RrIcon";
@@ -470,11 +479,25 @@ function Val({ v, mono }: { v: unknown; mono?: boolean }) {
    title, optional badge, collapse chevron. */
 function Group({
   icon, title, count, onEdit, children, motion = "kx-tab-in", editLabel = "Edit",
+  editing = false, editor, saving = false, error, onSave, onCancel, saveLabel = "Save", cancelLabel = "Cancel",
 }: { icon?: React.ReactNode; title: string; count?: string; onEdit?: () => void; children: React.ReactNode;
   /** Translated by the caller — Group is presentational and has no dictionary. */
   editLabel?: string;
   /** Entrance class — the profile passes useTabMotion's directional pick. */
-  motion?: string }) {
+  motion?: string;
+  /* ── Inline edit ──
+     The card stays where it is, with its icon, title and badge; only the
+     body swaps to `editor` and the header's Edit becomes Cancel / Save. The
+     page around the card does not move. */
+  editing?: boolean;
+  editor?: React.ReactNode;
+  saving?: boolean;
+  error?: string | null;
+  onSave?: () => void;
+  onCancel?: () => void;
+  saveLabel?: string;
+  cancelLabel?: string;
+}) {
   const [open, setOpen] = useState(true);
   return (
     <section className={`${motion} scroll-mt-24 bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] overflow-hidden transition-shadow hover:shadow-[0_2px_12px_rgba(0,0,0,0.15)]`}>
@@ -484,19 +507,34 @@ function Group({
         </div>
         <h2 className="text-[14px] font-semibold text-[var(--text-primary)] tracking-tight flex-1 text-left truncate">{title}</h2>
         {count && (
-          <span className="text-[10px] font-medium text-[var(--text-ghost)] bg-[var(--bg-surface)] px-2 py-0.5 rounded-full shrink-0">{count}</span>
+          /* While editing, Cancel + Save join the row; on a phone that left no
+             room for the title, which truncated to nothing. The badge is the
+             least important thing here, so it yields first. */
+          <span className={`text-[10px] font-medium text-[var(--text-ghost)] bg-[var(--bg-surface)] px-2 py-0.5 rounded-full shrink-0 ${editing ? "hidden sm:inline" : ""}`}>{count}</span>
         )}
-        {onEdit && (
+        {editing ? (
+          <span className="shrink-0 inline-flex items-center gap-1.5">
+            <button type="button" onClick={onCancel} disabled={saving} className="h-7 px-2.5 rounded-lg text-[11px] font-medium text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)] transition-colors disabled:opacity-50">
+              {cancelLabel}
+            </button>
+            <button type="button" onClick={onSave} disabled={saving} className="h-7 px-3 rounded-lg bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[11px] font-semibold inline-flex items-center gap-1.5 transition-all disabled:opacity-50">
+              {saving ? <SpinnerIcon className="h-3 w-3" /> : <CheckIcon className="h-3 w-3" />} {saveLabel}
+            </button>
+          </span>
+        ) : onEdit ? (
           <button type="button" onClick={onEdit} className="shrink-0 inline-flex items-center gap-1.5 text-[11px] font-medium text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors">
             <PencilIcon className="h-3 w-3" /> {editLabel}
           </button>
-        )}
+        ) : null}
         <button type="button" onClick={() => setOpen(!open)} className="shrink-0 text-[var(--text-ghost)] hover:text-[var(--text-primary)] transition-colors" aria-label={open ? "Collapse" : "Expand"}>
           <AngleDownIcon className={`h-4 w-4 transition-transform duration-300 ${open ? "rotate-180" : ""}`} />
         </button>
       </div>
-      <Collapse open={open} className="px-6 pb-6 pt-4 border-t border-[var(--border-subtle)]">
-        {children}
+      <Collapse open={open || editing} className="px-6 pb-6 pt-4 border-t border-[var(--border-subtle)]">
+        {editing && error ? (
+          <p className="mb-3 px-3 py-2 rounded-lg bg-red-500/10 border border-red-500/20 text-[12px] text-red-400">{error}</p>
+        ) : null}
+        {editing && editor ? editor : children}
       </Collapse>
     </section>
   );
@@ -697,16 +735,164 @@ function ContentRow({ item, mult, depth }: { item: ContentItem; mult: number; de
    the form is where the gaps are meant to be visible. A section with nothing
    in it does not print an empty heading; when the packing has not been
    entered at all, one line says so and points at Edit. */
+type PackingSection = "physical" | "packing" | "loading" | "customs" | "order";
+interface PackingDraft {
+  logistics: ProductLogistics;
+  machine_dimensions: string;
+  machine_weight_kg: string;
+  country_of_origin: string;
+  hs_code: string;
+  moq: string;
+  lead_time: string;
+}
+const INP = "w-full h-11 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none focus:border-[var(--border-focus)] focus:ring-1 focus:ring-[var(--border-focus)] transition-all appearance-none";
+const LBL = "block text-[11px] font-semibold text-[var(--text-dim)] uppercase tracking-wider mb-1.5";
+
 function PackingSheet({
-  logistics, model, product, t, motion, onEdit,
+  logistics, model, product, t, lang, motion, productId, schemaCovers, onSaved,
 }: {
   logistics: ProductLogistics;
   model: Record<string, unknown> | undefined;
   product: Record<string, unknown> | undefined;
   t: (k: string, fb: string) => string;
+  lang: string;
   motion: string;
-  onEdit: () => void;
+  productId: string | undefined;
+  /** Columns the product's spec template owns (its schema_specs is the source
+   *  and the column a mirror) — the Physical save writes both, as the form does. */
+  schemaCovers: Set<string>;
+  /** The saved patch, so the page can show it before the reload lands. */
+  onSaved: (patch: Record<string, unknown>) => void;
 }) {
+  /* ── Inline edit state. One section at a time; the draft is a copy taken
+     the moment Edit is pressed, so Cancel is free and Save sends only that
+     section's fields. */
+  const [editing, setEditing] = useState<PackingSection | null>(null);
+  const [draft, setDraft] = useState<PackingDraft | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [saveErr, setSaveErr] = useState<string | null>(null);
+  const str = (v: unknown) => (v === null || v === undefined ? "" : String(v));
+  const begin = (k: PackingSection) => {
+    setDraft({
+      logistics: JSON.parse(JSON.stringify(logistics ?? {})) as ProductLogistics,
+      machine_dimensions: str(product?.machine_dimensions),
+      machine_weight_kg: str(product?.machine_weight_kg),
+      country_of_origin: str(product?.country_of_origin),
+      hs_code: str(product?.hs_code),
+      moq: str(product?.moq),
+      lead_time: str(product?.lead_time),
+    });
+    setSaveErr(null);
+    setEditing(k);
+  };
+  const cancel = () => { setEditing(null); setDraft(null); setSaveErr(null); };
+  const patchDraft = (u: Partial<PackingDraft>) => setDraft((d) => (d ? { ...d, ...u } : d));
+  const patchLogistics = (u: Partial<ProductLogistics>) => setDraft((d) => (d ? { ...d, logistics: { ...d.logistics, ...u } } : d));
+  const payloadFor = (k: PackingSection, d: PackingDraft): Record<string, unknown> => {
+    switch (k) {
+      case "physical": {
+        const dims = d.machine_dimensions.trim();
+        const w = d.machine_weight_kg.trim();
+        const out: Record<string, unknown> = {
+          machine_dimensions: dims || null,
+          machine_weight_kg: w ? parseFloat(w) : null,
+        };
+        /* Template products: schema_specs is the source and the column its
+           mirror (ProductForm's schemaColumnMirror). Writing only the column
+           would be undone by the next full save, so both are written. */
+        if (schemaCovers.has("machine_dimensions") || schemaCovers.has("machine_weight_kg")) {
+          const specs = { ...((product?.schema_specs as Record<string, unknown> | null) ?? {}) };
+          if (schemaCovers.has("machine_dimensions")) { if (dims) specs.machine_dimensions = dims; else delete specs.machine_dimensions; }
+          if (schemaCovers.has("machine_weight_kg")) { if (w) specs.machine_weight_kg = parseFloat(w); else delete specs.machine_weight_kg; }
+          out.schema_specs = specs;
+        }
+        return out;
+      }
+      case "packing":
+      case "loading":
+        return { logistics: d.logistics };
+      case "customs":
+        return { country_of_origin: d.country_of_origin || null, hs_code: d.hs_code.trim() || null, logistics: d.logistics };
+      case "order":
+        return { moq: d.moq.trim() ? parseInt(d.moq, 10) : null, lead_time: d.lead_time.trim() || null, logistics: d.logistics };
+    }
+  };
+  const save = async () => {
+    if (!draft || !editing || !productId) return;
+    const payload = payloadFor(editing, draft);
+    setSaving(true); setSaveErr(null);
+    try {
+      await updateProduct(productId, payload);
+      onSaved(payload);
+      setEditing(null); setDraft(null);
+    } catch (e) {
+      setSaveErr(humanizeError(e));
+    } finally {
+      setSaving(false);
+    }
+  };
+  /* The header props every card shares. */
+  const gp = (k: PackingSection) => ({
+    editLabel: t("action.edit", "Edit"),
+    onEdit: () => begin(k),
+    editing: editing === k,
+    saving,
+    error: editing === k ? saveErr : null,
+    onSave: save,
+    onCancel: cancel,
+    saveLabel: t("action.save", "Save"),
+    cancelLabel: t("action.cancel", "Cancel"),
+  });
+  const editorFor = (k: PackingSection): React.ReactNode => {
+    if (!draft || editing !== k) return null;
+    switch (k) {
+      case "physical":
+        return <PhysicalFields data={draft} onChange={patchDraft} />;
+      case "packing":
+        return <PackingBlock value={draft.logistics} onChange={patchLogistics} productId={productId} />;
+      case "loading":
+        return <LoadingBlock value={draft.logistics} onChange={patchLogistics} />;
+      case "customs":
+        return (
+          <div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className={LBL}>{t("logistics.countryOfOrigin", "Country of Origin")}</label>
+                <KdsSelect
+                  value={draft.country_of_origin}
+                  onChange={(v) => patchDraft({ country_of_origin: v })}
+                  options={COUNTRIES.map((c) => ({ value: c.code, label: `${flagOf(c.code)} ${countryName(c, lang)}` }))}
+                  placeholder="—"
+                  triggerClassName={INP + " pe-9 text-start"}
+                />
+              </div>
+              <div>
+                <label className={LBL}>{t("logistics.hsCode", "HS Code")}</label>
+                <input type="text" value={draft.hs_code} onChange={(e) => patchDraft({ hs_code: e.target.value })} placeholder="e.g. 8452.21" className={INP} />
+              </div>
+            </div>
+            <CustomsExtras value={draft.logistics} onChange={patchLogistics} />
+          </div>
+        );
+      case "order":
+        return (
+          <div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className={LBL}>{t("technical.defaultMoq", "Default MOQ (Product-level)")}</label>
+                <input type="number" min={1} value={draft.moq} onChange={(e) => patchDraft({ moq: e.target.value })} placeholder={t("technical.moqPlaceholder", "e.g. 10")} className={INP} />
+              </div>
+              <div>
+                <label className={LBL}>{t("technical.defaultLeadTime", "Default Lead Time")}</label>
+                <input type="text" value={draft.lead_time} onChange={(e) => patchDraft({ lead_time: e.target.value })} placeholder={t("technical.leadTimePlaceholder", "e.g. 7-14 days")} className={INP} />
+              </div>
+            </div>
+            <ShippingOrigin value={draft.logistics} onChange={patchLogistics} />
+          </div>
+        );
+    }
+  };
+
   const label = (list: readonly { value: string; label: string }[], v: unknown) => {
     const hit = list.find((o) => o.value === v);
     return hit ? t(`pk.opt.${hit.value}`, hit.label) : (v as string) || null;
@@ -746,11 +932,11 @@ function PackingSheet({
      card made the same content read as a different screen. Same cards, same
      order, same titles and badges — the sheet is the form with the inputs
      taken out. */
-  if (!machine && !packing && !loading && !customs && !order) {
+  if (!machine && !packing && !loading && !customs && !order && editing === null) {
     /* The empty state stands for the whole tab, so it takes the tab's own
        glyph rather than borrowing Origin & Customs' globe. */
     return (
-      <Group motion={motion} icon={<BoundIcon semanticKey="section.logistics" className="h-4 w-4" fallback={<TruckIcon className="h-4 w-4" />} />} title={t("pp.sec.logistics", "Packing & Logistics")} editLabel={t("action.edit", "Edit")} onEdit={onEdit}>
+      <Group motion={motion} icon={<BoundIcon semanticKey="section.logistics" className="h-4 w-4" fallback={<TruckIcon className="h-4 w-4" />} />} title={t("pp.sec.logistics", "Packing & Logistics")} editLabel={t("action.edit", "Edit")} onEdit={() => begin("packing")}>
         <p className="text-[12px] text-[var(--text-ghost)] leading-relaxed">
           {t("pp.f.packingEmpty", "Nothing entered yet. Open Edit to add the crate, its contents, weights and container quantities.")}
         </p>
@@ -760,8 +946,8 @@ function PackingSheet({
 
   return (
     <div className="space-y-4">
-      {machine ? (
-        <Group motion={motion} icon={<RulerIcon className="h-4 w-4" />} title={t("tech.secPhysical", "Physical (Bare Machine)")} count={t("logistics.physicalBadge", "Dimensions · Weight")} editLabel={t("action.edit", "Edit")} onEdit={onEdit}>
+      {machine || editing === "physical" ? (
+        <Group motion={motion} icon={<RulerIcon className="h-4 w-4" />} title={t("tech.secPhysical", "Physical (Bare Machine)")} count={t("logistics.physicalBadge", "Dimensions · Weight")} {...gp("physical")} editor={editorFor("physical")}>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 gap-2.5">
             {pv("machine_dimensions") ? (
               <FactChip icon={<Maximize2Icon className="h-6 w-6" />} label={t("pp.f.machineDims", "Machine dimensions")} value={`${String(pv("machine_dimensions"))} mm`} />
@@ -773,8 +959,8 @@ function PackingSheet({
                 </Group>
       ) : null}
 
-      {packing ? (
-        <Group motion={motion} icon={<BoxesIcon className="h-4 w-4" />} title={t("logistics.packingSection", "Packing")} count={t("logistics.packingSectionBadge", "Crates · Weights")} editLabel={t("action.edit", "Edit")} onEdit={onEdit}>
+      {packing || editing === "packing" ? (
+        <Group motion={motion} icon={<BoxesIcon className="h-4 w-4" />} title={t("logistics.packingSection", "Packing")} count={t("logistics.packingSectionBadge", "Crates · Weights")} {...gp("packing")} editor={editorFor("packing")}>
           {logistics.packing_photo_url ? (
             /* eslint-disable-next-line @next/next/no-img-element */
             <img
@@ -863,8 +1049,8 @@ function PackingSheet({
         </Group>
       ) : null}
 
-      {loading ? (
-        <Group motion={motion} icon={<ShipIcon className="h-4 w-4" />} title={t("logistics.loadingSection", "Loading & Containers")} count={t("logistics.loadingSectionBadge", "20ft · 40ft · 40HQ")} editLabel={t("action.edit", "Edit")} onEdit={onEdit}>
+      {loading || editing === "loading" ? (
+        <Group motion={motion} icon={<ShipIcon className="h-4 w-4" />} title={t("logistics.loadingSection", "Loading & Containers")} count={t("logistics.loadingSectionBadge", "20ft · 40ft · 40HQ")} {...gp("loading")} editor={editorFor("loading")}>
           {/* Three numbers, three tiles: this is the question a forwarder asks
               and it should be answerable at a glance, not read out of a list. */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
@@ -889,8 +1075,8 @@ function PackingSheet({
                 </Group>
       ) : null}
 
-      {customs ? (
-        <Group motion={motion} icon={<LandmarkIcon className="h-4 w-4" />} title={t("logistics.title", "Origin & Customs")} count={t("logistics.badge", "Shipping · Customs")} editLabel={t("action.edit", "Edit")} onEdit={onEdit}>
+      {customs || editing === "customs" ? (
+        <Group motion={motion} icon={<LandmarkIcon className="h-4 w-4" />} title={t("logistics.title", "Origin & Customs")} count={t("logistics.badge", "Shipping · Customs")} {...gp("customs")} editor={editorFor("customs")}>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
             {pv("country_of_origin") ? (
               <FactChip icon={<FlagIcon className="h-6 w-6" />} label={t("pp.f.origin", "Country of origin")} value={String(pv("country_of_origin"))} />
@@ -918,8 +1104,8 @@ function PackingSheet({
                 </Group>
       ) : null}
 
-      {order ? (
-        <Group motion={motion} icon={<ClipboardCheckIcon className="h-4 w-4" />} title={t("technical.fulfillmentDefaults", "Fulfillment Defaults")} count={t("technical.fulfillmentBadge", "MOQ · Lead Time")} editLabel={t("action.edit", "Edit")} onEdit={onEdit}>
+      {order || editing === "order" ? (
+        <Group motion={motion} icon={<ClipboardCheckIcon className="h-4 w-4" />} title={t("technical.fulfillmentDefaults", "Fulfillment Defaults")} count={t("technical.fulfillmentBadge", "MOQ · Lead Time")} {...gp("order")} editor={editorFor("order")}>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
             {pv("moq") ? (
               <FactChip icon={<ShoppingCartIcon className="h-6 w-6" />} label={t("pp.f.moq", "MOQ")} value={String(pv("moq"))} />
@@ -933,6 +1119,29 @@ function PackingSheet({
           </div>
                 </Group>
       ) : null}
+
+      {/* Sections with nothing in them are not shown as empty cards — but they
+          must still be reachable, or the only way to fill them would be the
+          editor route this page is meant to replace. One chip per missing
+          section opens that card in edit mode. */}
+      {editing === null ? (() => {
+        const missing: { k: PackingSection; label: string }[] = [];
+        if (!machine) missing.push({ k: "physical", label: t("tech.secPhysical", "Physical (Bare Machine)") });
+        if (!packing) missing.push({ k: "packing", label: t("logistics.packingSection", "Packing") });
+        if (!loading) missing.push({ k: "loading", label: t("logistics.loadingSection", "Loading & Containers") });
+        if (!customs) missing.push({ k: "customs", label: t("logistics.title", "Origin & Customs") });
+        if (!order) missing.push({ k: "order", label: t("technical.fulfillmentDefaults", "Fulfillment Defaults") });
+        if (!missing.length) return null;
+        return (
+          <div className={`${motion} flex flex-wrap items-center gap-2`}>
+            {missing.map((m) => (
+              <button key={m.k} type="button" onClick={() => begin(m.k)} className="inline-flex items-center gap-1.5 h-8 px-3 rounded-lg border border-dashed border-[var(--border-subtle)] text-[11.5px] font-medium text-[var(--text-ghost)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)] transition-colors">
+                + {m.label}
+              </button>
+            ))}
+          </div>
+        );
+      })() : null}
     </div>
   );
 }
@@ -987,6 +1196,9 @@ export default function ProductProfile() {
   const [historyFor, setHistoryFor] = useState<{ id: string; name: string } | null>(null);
   NOT_SET = t("pp.notSet", "Not set");
   const [step, setStep] = useState(0);
+  /* Inline edits on the sheet: the saved patch is merged into the page at
+     once, and the row is re-read behind it so derived fields catch up. */
+  const [reloadTick, setReloadTick] = useState(0);
   /* Directional pane swap (owner pick 3A): forward slides from the end,
      back from the start; RTL flips in CSS. Fed to every Group below. */
   const tabMotion = useTabMotion(step);
@@ -1037,7 +1249,11 @@ export default function ProductProfile() {
     let cancelled = false;
     (async () => {
       try {
-        const res = await fetch(`/api/products/${handle}/profile`, { credentials: "include" });
+        /* The profile response is cached for 15s (private, max-age=15). The
+           first read may use that; a re-read AFTER an inline save must not —
+           it came back with the pre-save row and overwrote the value the
+           operator had just watched land. */
+        const res = await fetch(`/api/products/${handle}/profile`, { credentials: "include", cache: reloadTick ? "no-store" : "default" });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const json = (await res.json()) as Profile;
         if (!cancelled) {
@@ -1055,12 +1271,18 @@ export default function ProductProfile() {
       }
     })();
     return () => { cancelled = true; };
-  }, [handle, wantedModel]);
+  }, [handle, wantedModel, reloadTick]);
 
   const p = data?.product;
   const editHref = p ? `/product-data/${p.id as string}/edit` : "#";
   const goStep = useCallback((step: string) => router.push(`${editHref}#${step}`), [editHref, router]);
 
+  /* Columns the spec template owns — the inline Physical save writes the
+     template's schema_specs (source) as well as the column (mirror). */
+  const schemaCovers = useMemo(
+    () => new Set((data?.schema?.groups ?? []).flatMap((g) => (g.fields ?? []).map((f) => f.key))),
+    [data?.schema],
+  );
   const hero = useMemo(() => {
     const main = (data?.media ?? []).find((m) => m.type === "main_image");
     return (main?.url as string) || null;
@@ -1685,7 +1907,20 @@ export default function ProductProfile() {
           crates, nothing about loading, and the packing just typed on the form
           was nowhere on it. */}
       {STEPS[step].id === "logistics" && (
-        <PackingSheet logistics={logi} model={data.models[0]} product={p} t={t} motion={tabMotion} onEdit={() => goStep("logistics")} />
+        <PackingSheet
+          logistics={logi}
+          model={data.models[0]}
+          product={p}
+          t={t}
+          lang={lang}
+          motion={tabMotion}
+          productId={p?.id as string | undefined}
+          schemaCovers={schemaCovers}
+          onSaved={(patch) => {
+            setData((prev) => (prev ? { ...prev, product: { ...prev.product, ...patch } } : prev));
+            setReloadTick((n) => n + 1);
+          }}
+        />
       )}
 
       {STEPS[step].id === "compliance" && (
