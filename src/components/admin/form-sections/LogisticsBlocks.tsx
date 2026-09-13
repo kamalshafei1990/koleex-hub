@@ -194,11 +194,12 @@ export function PackingBlock({ value, onChange, productId }: BlockProps & { prod
             <p className={hint}>{t("pk.piecesHint", "The first thing a customer asks about a small item. Container counts below are in PIECES.")}</p>
           </div>
         ) : (
-          <div>
-            <label className={lbl}>{t("pk.cbm", "CBM (m³)")}</label>
-            <input value={sums.cbm ? String(sums.cbm) : ""} readOnly placeholder="—" className={`${inp} tabular-nums opacity-70`} />
-            <p className={hint}>{t("pk.cbmHintCalc", "Calculated from the package sizes below — L × W × H ÷ 1,000,000.")}</p>
-          </div>
+          /* The right half stays EMPTY in per-unit mode, and that is deliberate.
+             It held a second CBM field — the same read-only number the weights
+             row below already shows — which is the exact duplication this tab
+             spent the day losing. The slot keeps its width so the layout does
+             not jump when the mode is switched. */
+          <div aria-hidden />
         )}
       </div>
 
@@ -268,8 +269,14 @@ export function PackingBlock({ value, onChange, productId }: BlockProps & { prod
                   onChange={(u) => setRow(i, { photo_url: u })}
                   productId={productId}
                 />
-                <div className="flex-1 min-w-0 grid grid-cols-3 sm:grid-cols-6 gap-2">
-                  <div className="col-span-3 sm:col-span-2 min-w-0">
+                {/* SIX EQUAL COLUMNS WAS THE WRONG SHAPE. The name needs room
+                    and the numbers need three digits, but an even split gave
+                    every field 180px and then pushed Gross onto a row of its
+                    own with five empty columns beside it — 900px of nothing in
+                    the middle of the card. Explicit track sizes: the label
+                    takes what is left, each number takes what a number needs. */}
+                <div className="flex-1 min-w-0 grid grid-cols-3 sm:[grid-template-columns:minmax(160px,1fr)_72px_88px_88px_88px_104px] gap-2">
+                  <div className="col-span-3 sm:col-span-1 min-w-0">
                     <div className="text-[9px] uppercase tracking-[0.1em] text-[var(--text-ghost)] mb-1">{t("pk.colPackage", "Package")}</div>
                     <input
                       value={r.label ?? ""}
@@ -283,6 +290,7 @@ export function PackingBlock({ value, onChange, productId }: BlockProps & { prod
                   {numCell(i, "w_cm", "80", t("pk.colW", "W (cm)"))}
                   {numCell(i, "h_cm", "110", t("pk.colH", "H (cm)"))}
                   <div className="col-span-3 sm:col-span-1">{numCell(i, "gross_kg", "210", t("pk.colGross", "Gross (kg)"))}</div>
+                  {/* the remaining five cells are the number fields above */}
                 </div>
                 {rows.length > 1 ? (
                   <button
@@ -428,7 +436,7 @@ function PackingPhoto({
           type="button"
           onClick={open}
           title="Click to replace"
-          className="block w-full overflow-hidden rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)]/40"
+          className="block w-full max-w-3xl overflow-hidden rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)]/40"
         >
           {/* Deliberately large. A packing photo is read, not glanced at: the
               buyer is looking for how the corners are protected and whether the
@@ -437,11 +445,16 @@ function PackingPhoto({
           <img src={url} alt="Packing sample" className="w-full max-h-[420px] object-contain bg-black/20" />
         </button>
       ) : (
+        /* EMPTY, IT IS A CONTROL; FILLED, IT IS THE PHOTO. Full width and
+           160px tall, the empty state drew a 1,266px dashed band across the
+           middle of the tab — more visual weight than any field that actually
+           holds data. Capped while empty; the image below is the thing allowed
+           to be big. */
         <button
           type="button"
           onClick={open}
           disabled={busy}
-          className="w-full h-40 rounded-xl border border-dashed border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)]/40 text-[12px] text-[var(--text-ghost)] hover:border-[var(--border-strong)] hover:text-[var(--text-muted)] transition-colors disabled:opacity-50"
+          className="w-full max-w-md h-28 rounded-xl border border-dashed border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)]/40 text-[12px] text-[var(--text-ghost)] hover:border-[var(--border-strong)] hover:text-[var(--text-muted)] transition-colors disabled:opacity-50"
         >
           {busy ? t("pk.uploading", "Uploading…") : t("pk.samplePhotoCta", "Click to upload a photo of the packed product")}
         </button>
@@ -709,12 +722,11 @@ export function LoadingBlock({ value, onChange }: BlockProps) {
         {box("c40hq", "qty_40hq")}
       </div>
 
+      {/* CBM used to sit here too. It is a property of the PACKING and is
+          already stated beside the weights it belongs with, so repeating it
+          here put the same number on the tab twice. What belongs in Loading
+          is the number air freight is actually billed on. */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div>
-          <label className={lbl}>{t("pk.cbm", "CBM (m³)")}</label>
-          <input value={sums.cbm ? String(sums.cbm) : ""} readOnly placeholder="—" className={`${inp} tabular-nums opacity-60`} />
-          <p className={hint}>{t("pk.cbmHintAll", "All packages together.")}</p>
-        </div>
         <div>
           <label className={lbl}>{t("pk.volumetric", "Volumetric weight (kg, air)")}</label>
           <input value={sums.volumetricKg ? String(sums.volumetricKg) : ""} readOnly placeholder="—" className={`${inp} tabular-nums opacity-60`} />
