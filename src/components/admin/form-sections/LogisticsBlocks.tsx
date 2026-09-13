@@ -275,8 +275,15 @@ export function PackingBlock({ value, onChange, productId }: BlockProps & { prod
                     own with five empty columns beside it — 900px of nothing in
                     the middle of the card. Explicit track sizes: the label
                     takes what is left, each number takes what a number needs. */}
-                <div className="flex-1 min-w-0 grid grid-cols-3 sm:[grid-template-columns:minmax(160px,1fr)_72px_88px_88px_88px_104px] gap-2">
-                  <div className="col-span-3 sm:col-span-1 min-w-0">
+                {/* THE SIX-TRACK ROW NEEDS 680px AND ASKED FOR IT AT 640.
+                    `sm:` turned it on from 640px up, but the tracks alone total
+                    640 before the photo, the delete button and the card's own
+                    padding — so between 640 and 1024 the row was 790px inside a
+                    691px section and the right-hand fields were cut off. The
+                    one-line layout starts at lg, where it actually fits; below
+                    that the fields stack three to a row. */}
+                <div className="flex-1 min-w-0 grid grid-cols-3 lg:[grid-template-columns:minmax(160px,1fr)_72px_88px_88px_88px_104px] gap-2">
+                  <div className="col-span-3 lg:col-span-1 min-w-0">
                     <div className="text-[9px] uppercase tracking-[0.1em] text-[var(--text-ghost)] mb-1">{t("pk.colPackage", "Package")}</div>
                     <input
                       value={r.label ?? ""}
@@ -289,7 +296,7 @@ export function PackingBlock({ value, onChange, productId }: BlockProps & { prod
                   {numCell(i, "l_cm", "120", t("pk.colL", "L (cm)"))}
                   {numCell(i, "w_cm", "80", t("pk.colW", "W (cm)"))}
                   {numCell(i, "h_cm", "110", t("pk.colH", "H (cm)"))}
-                  <div className="col-span-3 sm:col-span-1">{numCell(i, "gross_kg", "210", t("pk.colGross", "Gross (kg)"))}</div>
+                  <div className="col-span-3 lg:col-span-1">{numCell(i, "gross_kg", "210", t("pk.colGross", "Gross (kg)"))}</div>
                   {/* the remaining five cells are the number fields above */}
                 </div>
                 {rows.length > 1 ? (
