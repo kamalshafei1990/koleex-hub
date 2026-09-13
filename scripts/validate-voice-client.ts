@@ -4355,7 +4355,7 @@ console.log("\n── 42. the sound catalog: one family, pinned grammar, the cal
   check("the call keeps the cues the owner already approved, note for note",
     cat.soundByKey("call-ready").notes === tn.READY_TONE && cat.soundByKey("call-recovered").notes === tn.RECOVERED_TONE);
   check("the per-turn cues of a typed chat start OFF; the ones that mark a state change start on",
-    !cat.soundByKey("message-sent").defaultOn && !cat.soundByKey("reply-received").defaultOn && !cat.soundByKey("thinking").defaultOn && cat.soundByKey("error").defaultOn && cat.soundByKey("call-ready").defaultOn);
+    !cat.soundByKey("message-sent").defaultOn && !cat.soundByKey("reply-received").defaultOn && !cat.soundByKey("thinking").defaultOn && cat.soundByKey("error").defaultOn && !cat.soundByKey("call-ready").defaultOn /* owner, 2026-09-13: "remove the sound of listening" */);
   {
     /* scheduleTone honours the two new fields and defaults them away. */
     const made: Array<{ type: string; peak: number }> = [];
@@ -4376,23 +4376,23 @@ console.log("\n── 42. the sound catalog: one family, pinned grammar, the cal
       cat.SOUND_CATALOG.every((s) => s.file === s.key && fsG.existsSync(`public/sounds/ai/${s.file}.mp3`) && fsG.statSync(`public/sounds/ai/${s.file}.mp3`).size > 500 && fsG.statSync(`public/sounds/ai/${s.file}.mp3`).size < 60_000) &&
       /CC0 1\.0/.test(fsG.readFileSync("public/sounds/ai/NOTICE.txt", "utf8")));
     check("only the moments a caller must not miss start on — ready, line back, ended, failed, error — everything else waits in Settings (owner, 2026-09-12 evening)",
-      cat.SOUND_CATALOG.filter((s) => s.defaultOn).map((s) => s.key).sort().join() === "call-end,call-failed,call-ready,call-recovered,error");
+      cat.SOUND_CATALOG.filter((s) => s.defaultOn).map((s) => s.key).sort().join() === "call-end,call-failed,call-recovered,error");
     const player = await import("../src/lib/sounds/player");
     const base = { master: true, dnd: false, volume: 0.8, notification: { enabled: true, tone: "classic" as const }, message: { enabled: true, tone: "classic" as const }, call: { enabled: true, tone: "ping" as const }, ai: { enabled: true, muted: [] as string[] } };
     check("a moment is on by its default, off when silenced, on when woken; the master and the Koleex AI switch silence everything; do-not-disturb does not",
-      player.soundEnabled("call-ready", base) && !player.soundEnabled("copied", base) &&
-      !player.soundEnabled("call-ready", { ...base, ai: { enabled: true, muted: ["call-ready"] } }) &&
+      player.soundEnabled("call-end", base) && !player.soundEnabled("copied", base) &&
+      !player.soundEnabled("call-end", { ...base, ai: { enabled: true, muted: ["call-end"] } }) &&
       player.soundEnabled("copied", { ...base, ai: { enabled: true, muted: ["+copied"] } }) &&
-      !player.soundEnabled("call-ready", { ...base, master: false }) && !player.soundEnabled("call-ready", { ...base, ai: { enabled: false, muted: [] } }) &&
-      player.soundEnabled("call-ready", { ...base, dnd: true }));
+      !player.soundEnabled("call-end", { ...base, master: false }) && !player.soundEnabled("call-end", { ...base, ai: { enabled: false, muted: [] } }) &&
+      player.soundEnabled("call-end", { ...base, dnd: true }));
     check("  …and the settings store only departures from the default: silencing a default-on moment, waking a default-off one",
       (() => {
         const writes: Array<{ ai: { muted: string[] } }> = [];
         const set = (p: { ai: { muted: string[] } }) => writes.push(p);
-        player.setSoundMoment("call-ready", false, set, base);
+        player.setSoundMoment("call-end", false, set, base);
         player.setSoundMoment("copied", true, set, base);
-        player.setSoundMoment("call-ready", true, set, { ...base, ai: { enabled: true, muted: ["call-ready", "+copied"] } });
-        return writes.map((w) => w.ai.muted.join("|")).join(";") === "call-ready;+copied;+copied";
+        player.setSoundMoment("call-end", true, set, { ...base, ai: { enabled: true, muted: ["call-end", "+copied"] } });
+        return writes.map((w) => w.ai.muted.join("|")).join(";") === "call-end;+copied;+copied";
       })());
     check("the recording's path is under the app's own origin, never a vendor host", player.soundSrc("call-ready") === "/sounds/ai/call-ready.mp3");
     const btnS = fsG.readFileSync("src/components/ai/VoiceCallButton.tsx", "utf8");
