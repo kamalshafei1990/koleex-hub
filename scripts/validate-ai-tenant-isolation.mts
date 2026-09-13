@@ -45,6 +45,9 @@ const TENANT_SCOPED = new Set([
   "customers",
   "quotations",
   "koleex_todos",
+  /* Tasks phase 1 (2026-09-13): createTodo expands a department to its
+     members exactly as /api/todos POST does — by tenant. */
+  "koleex_employees",
   "projects",
   "project_tasks",
   "project_stages",
@@ -71,7 +74,7 @@ const SHARED_BY_DESIGN: Record<string, string> = {
   product_option_values: "child of products (shared catalog)",
   product_suppliers: "child of products; gated at runtime by hasProductCostAccess()",
   contacts: "supplier identity lookup; reached only behind hasProductCostAccess()",
-  accounts: "keyed by ctx.auth.account_id — the caller's own row only",
+  accounts: "keyed by ctx.auth.account_id — the caller's own row; or the tenant's INTERNAL accounts, filtered by tenant_id, for createTodo's assignee expansion (as /api/todos POST)",
   koleex_permissions: "keyed by ctx.auth.role_id",
   account_permission_overrides: "keyed by ctx.auth.account_id",
   quotation_items: "child of quotations; parent tenant-verified before insert",
