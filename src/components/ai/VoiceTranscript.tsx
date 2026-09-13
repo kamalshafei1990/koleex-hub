@@ -31,7 +31,7 @@ import { type TranscriptLine, type TranscriptPhoto } from "@/lib/voice/events";
 import { stripImageMarkdown } from "@/lib/voice/photos";
 import { aiImage } from "@/lib/ai/image-url";
 import { type Lang } from "@/lib/i18n";
-import { textDirection } from "@/lib/text-direction";
+import { textDirection, textLang } from "@/lib/text-direction";
 
 const SPEAKER_COPY: Record<Lang, { you: string; assistant: string; live: string; photos: string }> = {
   en: { you: "You", assistant: "Koleex AI", live: "Live transcript", photos: "Photos" },
@@ -163,6 +163,7 @@ function VoiceTranscript({ lines, lang = "en", className = "", fill = false, onO
                    one is, once (audit, 2026-09-11). */
                 aria-hidden={line.final ? undefined : true}
                 dir={textDirection(stripImageMarkdown(line.text) || line.text)}
+                lang={textLang(stripImageMarkdown(line.text) || line.text)}
                 /* Partial text is dimmed, NOT italicised: the brand rules
                    exclude italics, and colour carries the same "still being
                    said" meaning without breaking the type system. */
@@ -170,7 +171,7 @@ function VoiceTranscript({ lines, lang = "en", className = "", fill = false, onO
                    is #0D0D0D in both themes, and the theme tokens resolve to
                    black under the light theme — words nobody could see
                    (audit, 2026-09-11). */
-                className={`text-[18px] leading-relaxed ${
+                className={`kx-call-line text-[18px] leading-relaxed ${
                   line.final ? "text-white" : "text-white/70"
                 }`}
               >

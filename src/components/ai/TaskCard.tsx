@@ -19,6 +19,7 @@
    record, as the question card is (Bubble.tsx).
    --------------------------------------------------------------------------- */
 
+import { textLang } from "@/lib/text-direction";
 import Link from "next/link";
 import { type Lang } from "@/lib/i18n";
 import { COPY } from "@/components/ai/copy";
@@ -110,7 +111,7 @@ export default function TaskCard({
       <div className="text-[11px] uppercase tracking-wide text-[var(--text-tertiary)]">
         {status.state === "saved" ? copy.taskSaved : status.state === "cancelled" ? copy.taskCancelled : heading}
       </div>
-      {title && <div className="mt-1 text-[15px] font-semibold leading-snug text-[var(--text-primary)]" data-task-title>{title}</div>}
+      {title && <div className="mt-1 text-[15px] font-semibold leading-snug text-[var(--text-primary)]" dir="auto" lang={textLang(title)} data-task-title>{title}</div>}
       {details.length > 0 && (
         <div className="mt-1 text-[12.5px] leading-relaxed text-[var(--text-secondary)]" data-task-details>{details.join(" · ")}</div>
       )}

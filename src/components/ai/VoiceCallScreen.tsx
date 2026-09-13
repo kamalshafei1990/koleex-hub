@@ -31,7 +31,7 @@ import { type Lang } from "@/lib/i18n";
 import { type TalkMode } from "@/lib/voice/voice-pref";
 import PhotoLightbox from "@/components/ai/PhotoLightbox";
 import KoleexLogo from "@/components/layout/KoleexLogo";
-import { textDirection } from "@/lib/text-direction";
+import { textDirection, textLang } from "@/lib/text-direction";
 import { stripImageMarkdown } from "@/lib/voice/photos";
 
 
@@ -853,7 +853,8 @@ export default function VoiceCallScreen({
         {lastLine && (
           <p
             dir={textDirection(stripImageMarkdown(lastLine.text) || lastLine.text)}
-            className={`max-w-[820px] px-2 text-center text-base leading-relaxed line-clamp-3 ${lastLine.final ? "text-white" : "text-[#AAAAAA]"}`}
+            lang={textLang(stripImageMarkdown(lastLine.text) || lastLine.text)}
+            className={`kx-call-caption max-w-[820px] px-2 text-center text-base leading-relaxed line-clamp-3 ${lastLine.final ? "text-white" : "text-[#AAAAAA]"}`}
           >
             {stripImageMarkdown(lastLine.text)}
           </p>

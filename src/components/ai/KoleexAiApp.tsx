@@ -34,7 +34,7 @@ import PlusIcon from "@/components/icons/ui/PlusIcon";
 import PictureIcon from "@/components/icons/ui/PictureIcon";
 import LibraryPanel from "@/components/ai/LibraryPanel";
 import { shrinkImage } from "@/lib/ai/image-shrink";
-import { textDirection } from "@/lib/text-direction";
+import { textDirection, textLang } from "@/lib/text-direction";
 import { needsChunking, uploadInChunks, type ChunkedRef } from "@/lib/ai/attachment-chunks";
 import CallsPanel from "@/components/ai/CallsPanel";
 import PhoneCallIcon from "@/components/icons/ui/PhoneCallIcon";
@@ -2193,6 +2193,10 @@ export default function KoleexAiApp() {
 
   return (
     <div
+      /* The screen's language on the root, so the stylesheet's :lang() rules
+         size the chrome for an Arabic or Chinese screen; a message or a
+         title carries its own lang underneath when its script differs. */
+      lang={lang}
       className="kx-ai-root kx-ai-enter kx-app-fullbleed h-full text-[var(--text-primary)] flex overflow-hidden w-full relative bg-[var(--bg-primary)]"
       data-kx-call-live={callLive ? "1" : undefined}
     >
@@ -2602,7 +2606,7 @@ export default function KoleexAiApp() {
               enough") — the character lives in the conversation, not the
               chrome. */}
           <div className="min-w-0 flex-1">
-            <div className="text-[13px] font-semibold truncate text-[var(--text-primary)]">
+            <div className="kx-ai-bar-title text-[13px] font-semibold truncate text-[var(--text-primary)]" dir="auto" lang={active?.title ? textLang(active.title) : undefined}>
               {active?.title ?? "Koleex AI"}
             </div>
           </div>
@@ -2644,7 +2648,7 @@ export default function KoleexAiApp() {
             <ArrowLeftIcon className="h-4 w-4 rtl:rotate-180" />
           </Link>
           <div className="min-w-0 flex-1">
-            <h1 className="text-[16px] md:text-[18px] font-bold tracking-tight text-[var(--text-primary)] truncate leading-snug">
+            <h1 className="kx-ai-bar-title text-[16px] md:text-[18px] font-bold tracking-tight text-[var(--text-primary)] truncate leading-snug" dir="auto" lang={active?.title ? textLang(active.title) : undefined}>
               {active?.title || "Koleex AI"}
             </h1>
             {!active && (
@@ -2998,11 +3002,12 @@ export default function KoleexAiApp() {
                   /* Measured like the bubbles: one Arabic word inside an
                      English sentence no longer flips the whole box. */
                   dir={textDirection(input)}
+                  lang={textLang(input)}
                   enterKeyHint="send"
                   inputMode="text"
                   autoComplete="off"
                   autoCorrect="on"
-                  className="block w-full px-5 pt-4 pb-1 bg-transparent text-[16px] text-[var(--text-primary)] outline-none resize-none max-h-40 placeholder:text-[var(--text-dim)]"
+                  className="kx-ai-composer-text block w-full px-5 pt-4 pb-1 bg-transparent text-[16px] text-[var(--text-primary)] outline-none resize-none max-h-40 placeholder:text-[var(--text-dim)]"
                   style={{ minHeight: "44px" }}
                 />
 
