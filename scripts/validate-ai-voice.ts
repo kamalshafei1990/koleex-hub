@@ -295,8 +295,9 @@ console.log("\n── 3. The route, read — the surface a fetch cannot be teste
       JSON.stringify(vercelCfg.regions) === JSON.stringify(["hnd1"]));
     /* Non-vacuity: rewriting vercel.json is how the scheduled work gets
        dropped by accident, and it has been rewritten twice now. */
-    check("  …and the cron jobs sharing this file survived the edit",
-      Array.isArray(vercelCfg.crons) && vercelCfg.crons.length === 7);
+    check("  …and the cron jobs sharing this file survived the edit (eight since tasks phase 5 added the hourly morning brief)",
+      Array.isArray(vercelCfg.crons) && vercelCfg.crons.length === 8 &&
+      (vercelCfg.crons as Array<{ path: string }>).some((c) => c.path === "/api/cron/todo-reminders") && (vercelCfg.crons as Array<{ path: string }>).some((c) => c.path === "/api/cron/ai-brief"));
 
     /* THE FIELD THAT MADE THE REVERSAL POSSIBLE, and the reason it stays.
        `region=` in this log is the VENDOR's label. Without our own execution
