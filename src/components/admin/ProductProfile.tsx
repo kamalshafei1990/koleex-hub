@@ -1054,6 +1054,16 @@ function PackingSheet({
     setDg({ kinds: cur.includes(k) ? cur.filter((x) => x !== k) : [...cur, k] });
   };
   const seg = (on: boolean, warn = false) => `${SEG} ${on ? (warn ? SEG_WARN : SEG_ON) : SEG_OFF}`;
+  /* A derived number looks exactly like a typed one until the operator tries
+     to type into it. In edit mode every derived tile says so — the same pill
+     the container tiles wear — and says what it is derived from. */
+  const calc = (hint: string) => (
+    <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[9.5px] leading-snug text-[var(--text-ghost)]">
+      <span className="font-bold uppercase tracking-[0.12em] px-1.5 py-px rounded-full border border-[#567FB2]/50 text-[#7FA9D6]">{t("pk.calculated", "Calculated")}</span>
+      <span>{hint}</span>
+    </div>
+  );
+  const packagingKg = sums.grossKg && num(netW) ? Math.round((sums.grossKg - num(netW)) * 10000) / 10000 : null;
   const selectCls = `${INP_B} w-full pe-8 text-start`;
 
   /* ONE CARD PER SECTION, not one card with headings inside it. The editor
@@ -1114,7 +1124,7 @@ function PackingSheet({
             />
           ) : null}
           {/* The four numbers a buyer or a forwarder asks for first. */}
-          <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
+          <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-5 gap-2.5">
             {ePack || sums.packageCount > 0 ? (
               <StatTile
                 label={t("pp.f.packages", "Packages")}
@@ -1138,7 +1148,7 @@ function PackingSheet({
                 ) : undefined}
               />
             ) : null}
-            {ePack || cbm ? <StatTile label={t("pp.f.cbm", "CBM")} value={String(sums.cbm || cbm || "—")} unit="m³" tone="accent" /> : null}
+            {ePack || cbm ? <StatTile label={t("pp.f.cbm", "CBM")} value={String(sums.cbm || cbm || "—")} unit="m³" tone="accent" extra={ePack ? calc(t("pk.cbmHintAll", "All packages together.")) : undefined} /> : null}
             {ePack || netW ? (
               <StatTile
                 label={t("pp.f.netWeight", "Net weight")}
@@ -1156,7 +1166,18 @@ function PackingSheet({
                 ) : undefined}
               />
             ) : null}
-            {ePack || grossW ? <StatTile label={t("pp.f.grossWeight", "Gross weight")} value={String(sums.grossKg || grossW || "—")} unit="kg" tone="accent" /> : null}
+            {ePack || grossW ? <StatTile label={t("pp.f.grossWeight", "Gross weight")} value={String(sums.grossKg || grossW || "—")} unit="kg" tone="accent" extra={ePack ? calc(t("pk.grossHint", "Sum of the packages above.")) : undefined} /> : null}
+            {/* Gross − net: the editor has it, so the sheet has it. Negative
+                means one of the two is wrong, which is exactly when it earns
+                its place. */}
+            {ePack || packagingKg !== null ? (
+              <StatTile
+                label={t("pk.packagingWeightBare", "Packaging weight")}
+                value={packagingKg !== null ? String(packagingKg) : "—"}
+                unit="kg"
+                                extra={ePack ? calc(t("pk.packagingHint", "Gross − net. Negative means one of them is wrong.")) : undefined}
+              />
+            ) : null}
           </div>
           {ePack || pType || L.wood_treatment ? (
             <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
@@ -1354,6 +1375,12 @@ function PackingSheet({
                 icon={<PlaneIcon className="h-6 w-6" />}
                 label={t("pk.volumetric", "Volumetric weight (kg, air)")}
                 value={`${sums.volumetricKg} kg`}
+                input={eLoad ? (
+                  <span className="block">
+                    <span className="block text-[13px] font-semibold text-[var(--text-primary)]">{sums.volumetricKg} kg</span>
+                    {calc(t("pk.volumetricHint", "L×W×H cm ÷ 6000. Air freight bills the greater of this and the gross weight."))}
+                  </span>
+                ) : undefined}
               />
             ) : null}
           </div>
