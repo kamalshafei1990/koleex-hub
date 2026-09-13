@@ -328,7 +328,7 @@ export const COPY: Record<Lang, {
     linesCount: "{n} lines",
     reviewInQuotations: "Review in Quotations →",
     prompts: [
-      "What's a good way to start my day at work?",
+      "Give me my brief for today: my meetings, tasks due, reminders, and what needs me first.",
       "Help me write a polite reply to a customer email.",
       "Explain how pricing bands generally work.",
       "Translate to Chinese: Please confirm delivery by Friday.",
@@ -471,7 +471,7 @@ export const COPY: Record<Lang, {
     linesCount: "{n} 行",
     reviewInQuotations: "在报价中查看 →",
     prompts: [
-      "早上开始工作的好方法是什么？",
+      "给我今天的简报：会议、到期任务、提醒，以及我最该先做什么。",
       "帮我给客户写一封礼貌的回复邮件。",
       "简单解释一下价格区间是怎么运作的。",
       "翻译成英文：请在周五前确认交货。",
@@ -615,7 +615,7 @@ export const COPY: Record<Lang, {
     linesCount: "{n} بنود",
     reviewInQuotations: "افتحها في عروض الأسعار ←",
     prompts: [
-      "ما طريقة جيدة لبدء يومي في العمل؟",
+      "اعطيني بريف اليوم: اجتماعاتي، المهام اللي موعدها النهاردة، التذكيرات، وإيه اللي محتاجني الأول.",
       "ساعدني في كتابة رد مهذب على رسالة من عميل.",
       "اشرح لي ببساطة كيف تعمل شرائح الأسعار.",
       "ترجم إلى الإنجليزية: الرجاء تأكيد التسليم بحلول يوم الجمعة.",

@@ -17,6 +17,7 @@ import {
   resolveTaskTime, resolveTaskDay, describeWhen, hasClockTime, parseRecurrence, zonedToUtcMs, DEFAULT_TASK_HOUR,
 } from "../src/lib/server/ai-agent/tools/task-time";
 import { isChatConfirmTool, CHAT_CONFIRM_TOOLS } from "../src/lib/server/ai/chat-confirm";
+import { buildTaskDraft, dayRangeISO, type Person, type DraftResult } from "../src/lib/server/ai-agent/tools/task-draft";
 
 let pass = 0, fail = 0;
 function check(name: string, cond: boolean, detail?: string) {
@@ -67,19 +68,42 @@ for (const field of ["remind_at", "start_date", "recurrence", "recurrence_until"
 }
 check("only the title is required, and the description says so",
   /required: \["title"\]/.test(createSrc) && /Only the title is required — never ask for the rest/.test(createSrc));
-check("times resolve in the caller's zone (UserContext.timezone), the due date at the end of the working day, the reminder at the start",
-  /const tz = ctx\.timezone \|\| "Asia\/Dubai";/.test(createSrc) && /resolveTaskTime\(args\.due_date, tz, 17\)/.test(createSrc) && /resolveTaskTime\(args\.remind_at, tz\)/.test(createSrc));
-check("a reminder defaults to the due time only when the due date names a clock time",
-  /resolveTaskTime\(args\.remind_at, tz\) \?\? \(dueIso && hasClockTime\(args\.due_date\) \? dueIso : null\)/.test(createSrc));
-check("an unreadable date or reminder is a plain failure with the format asked for, never a guess",
-  /if \(args\.due_date && !dueIso\) \{\s*return \{ ok: false, permissionStatus: "allowed"/.test(createSrc) && /if \(args\.remind_at && !remindIso\) \{\s*return \{ ok: false, permissionStatus: "allowed"/.test(createSrc));
-check("assignees, observers and mentions resolve against the assignable list in ONE lookup; an unknown id is a hard error",
-  /const everyone = \[\.\.\.assigneeIds, \.\.\.observerIds, \.\.\.mentionIds\];/.test(createSrc) && /await resolvePeople\(ctx\.auth\.tenant_id, everyone, "createTodo"\)/.test(createSrc) &&
-  /const unknown = ids\.filter\(\(id\) => !people\.has\(id\)\);\s*if \(unknown\.length > 0\) \{\s*return \{\s*ok: false,/.test(todos));
-check("a department must be one the colleagues have, spelled as they spell it, else the known ones are listed",
-  /if \(!r\.departments\.has\(department\.toLowerCase\(\)\)\)/.test(createSrc) && /I don't know a department called/.test(createSrc));
-check("'everyone' is an admin's call — refused as a PERMISSION, with the alternative offered",
-  /if \(!ctx\.isSuperAdmin && ut !== "admin"\) \{\s*return \{\s*ok: false,\s*permissionStatus: "denied",/.test(createSrc) && /You don't have permission to assign a task to everyone/.test(createSrc));
+/* The draft is pure (task-draft.ts): what follows exercises it directly. */
+const TEAM: Person[] = [
+  { account_id: "a1", name: "Ahmed Hassan", username: "ahmed.h", department: "Sales" },
+  { account_id: "a2", name: "Ahmed Nour", username: "ahmed.n", department: "Design" },
+  { account_id: "a3", name: "Sara Adel", username: "sara", department: "Sales" },
+  { account_id: "a4", name: "Mona Fathy", username: "mona", department: "Finance" },
+  { account_id: "a5", name: "Li Wei", username: "liwei", department: "Logistics" },
+];
+const people = new Map(TEAM.map((p) => [p.account_id, p]));
+const departments = new Set(TEAM.map((p) => p.department!.toLowerCase()));
+const dubai = { tz: "Asia/Dubai", people, departments, isAdmin: false };
+const draft = (args: Record<string, unknown>, o: Partial<typeof dubai> = {}) => buildTaskDraft(args, { ...dubai, ...o });
+const okOf = (r: DraftResult) => (r.ok ? r : null);
+check("the tool hands the draft to pure code with the caller's zone, the resolved people, their departments and the admin flag, and maps a permission refusal to denied",
+  /const r = await resolvePeople\(ctx\.auth\.tenant_id, \[\], "createTodo"\);/.test(createSrc) &&
+  /buildTaskDraft\(args, \{ tz, people, departments, isAdmin: ctx\.isSuperAdmin \|\| ut === "admin" \}\)/.test(createSrc) &&
+  /permissionStatus: built\.permission \? "denied" : "allowed"/.test(createSrc));
+check("a due date alone is the end of that working day in the zone; a reminder alone, the start of it",
+  okOf(draft({ title: "x", due_date: "2026-09-18" }))?.draft.due_date === "2026-09-18T13:00:00.000Z" && okOf(draft({ title: "x", due_date: "2026-09-18" }))?.draft.remind_at === null &&
+  okOf(draft({ title: "x", remind_at: "2026-09-18" }))?.draft.remind_at === "2026-09-18T05:00:00.000Z");
+check("a reminder defaults to the due time only when the due date names a clock time; an explicit reminder wins",
+  okOf(draft({ title: "x", due_date: "2026-09-18T15:00" }))?.draft.remind_at === "2026-09-18T11:00:00.000Z" &&
+  okOf(draft({ title: "x", due_date: "2026-09-18T15:00", remind_at: "2026-09-18T09:00" }))?.draft.remind_at === "2026-09-18T05:00:00.000Z");
+check("an unreadable date or reminder is a named refusal with the format asked for — never a guess, never a permission",
+  (() => { const r = draft({ title: "x", due_date: "next Thursday" }); return !r.ok && r.refusal === "bad-due" && !r.permission && /ISO date/.test(r.message); })() &&
+  (() => { const r = draft({ title: "x", remind_at: "14:30" }); return !r.ok && r.refusal === "bad-remind" && !r.permission; })() &&
+  (() => { const r = draft({ title: "  " }); return !r.ok && r.refusal === "no-title"; })());
+check("an id not on the assignable list — assignee, observer or mention — is a hard refusal that sends the model back to findTeamMember",
+  ["assign_to_account_ids", "observer_account_ids", "mention_account_ids"].every((k) => { const r = draft({ title: "x", [k]: ["a9"] }); return !r.ok && r.refusal === "unknown-person" && /findTeamMember/.test(r.message); }) &&
+  okOf(draft({ title: "x", assign_to_account_ids: ["a1", "a1"], observer_account_ids: ["a4"], mention_account_ids: ["a3"] }))?.who === "Ahmed Hassan");
+check("a department must be one the colleagues have — matched without case, spelled as they spell it — else the known ones are listed",
+  (() => { const r = okOf(draft({ title: "x", assign_to_department: "design" })); return r?.department === "Design" && r?.who === "the Design team"; })() &&
+  (() => { const r = draft({ title: "x", assign_to_department: "Marketing" }); return !r.ok && r.refusal === "unknown-department" && /design, finance, logistics, sales/.test(r.message); })());
+check("'everyone' is an admin's call — refused as a PERMISSION with the alternative offered; an admin gets it",
+  (() => { const r = draft({ title: "x", assign_to_all: true }); return !r.ok && r.refusal === "everyone-denied" && r.permission && /admin account/.test(r.message); })() &&
+  (() => { const r = okOf(draft({ title: "x", assign_to_all: true }, { isAdmin: true })); return r?.toAll === true && r?.who === "everyone"; })());
 check("the preview carries names, the times in words, the zone — and the pending action carries ids and ISO times only",
   /preview: \{\s*\.\.\.normalized,\s*assignees: assignees\.map/.test(createSrc) && /when,\s*timezone: tz,/.test(createSrc) &&
   /pendingAction: \{\s*tool: "createTodo",\s*args: \{\s*\.\.\.normalized,\s*\.\.\.\(assigneeIds\.length > 0 \? \{ assign_to_account_ids: assigneeIds \} : \{\}\),\s*\.\.\.\(observerIds\.length > 0 \? \{ observer_account_ids: observerIds \} : \{\}\),\s*\.\.\.\(mentionIds\.length > 0 \? \{ mention_account_ids: mentionIds \} : \{\}\),/.test(createSrc));
@@ -172,6 +196,67 @@ check("the page posts the preview's own arguments with the conversation id and v
 const bubble = readFileSync("src/components/ai/Bubble.tsx", "utf8");
 check("the bubble shows the card only for a to-do write awaiting approval with its confirm arguments, tappable only on the last unanswered message",
   /\(s\.tool === "createTodo" \|\| s\.tool === "updateTodo"\) &&\s*s\.permissionStatus === "approval_required" &&\s*!!s\.pending/.test(bubble) && /live=\{!!isLast && !!onConfirmTask && !answeredWith\}/.test(bubble));
+
+console.log("\n── 6. Thirty things a caller says, in three languages — the draft each one becomes (phase 3) ──");
+/* Each case: what the caller said, the arguments a model following THE
+   SECRETARY'S WAY sends for it (today is Sun 2026-09-13; the model writes
+   local times in the caller's zone), and what the draft must be. The model's
+   extraction is pinned by instruction (§3); the server's half is proved here. */
+type Case = { say: string; args: Record<string, unknown>; o?: Partial<typeof dubai>; expect: (r: DraftResult) => boolean };
+const remindAt = (iso: string) => (r: DraftResult) => r.ok && r.draft.remind_at === iso;
+const CASES: Case[] = [
+  { say: "Remind me at 3 to call Mr Li about the Ningbo shipment", args: { title: "Call Mr Li about the Ningbo shipment", remind_at: "2026-09-13T15:00" }, expect: (r) => remindAt("2026-09-13T11:00:00.000Z")(r) && r.ok && r.draft.due_date === null && r.who === "" },
+  { say: "فكرني الساعة ٣ أكلم مستر لي عن شحنة نينجبو", args: { title: "أكلم مستر لي عن شحنة نينجبو", remind_at: "2026-09-13T15:00" }, expect: (r) => remindAt("2026-09-13T11:00:00.000Z")(r) && r.ok && r.who === "" },
+  { say: "下午三点提醒我给李先生打电话，关于宁波的货", args: { title: "给李先生打电话，关于宁波的货", remind_at: "2026-09-13T15:00" }, o: { tz: "Asia/Shanghai" }, expect: remindAt("2026-09-13T07:00:00.000Z") },
+  { say: "Ahmed should send the revised quotation to Delta before Thursday, high priority, and Sara should know", args: { title: "Send the revised quotation to Delta", assign_to_account_ids: ["a1"], due_date: "2026-09-17", priority: "high", mention_account_ids: ["a3"] }, expect: (r) => r.ok && r.who === "Ahmed Hassan" && r.draft.due_date === "2026-09-17T13:00:00.000Z" && r.draft.remind_at === null && r.draft.priority === "high" && r.mentions[0]?.name === "Sara Adel" && /Thu 17 Sept/.test(r.when.due) },
+  { say: "أحمد يبعت عرض السعر المعدّل لدلتا قبل الخميس، مهم، وسارة تعرف", args: { title: "يبعت عرض السعر المعدّل لدلتا", assign_to_account_ids: ["a1"], due_date: "2026-09-17", priority: "high", mention_account_ids: ["a3"] }, expect: (r) => r.ok && r.who === "Ahmed Hassan" && r.mentions.length === 1 },
+  { say: "让阿赫迈德周四前把修改后的报价发给 Delta，高优先级，告诉 Sara", args: { title: "把修改后的报价发给 Delta", assign_to_account_ids: ["a1"], due_date: "2026-09-17", priority: "high", mention_account_ids: ["a3"] }, o: { tz: "Asia/Shanghai" }, expect: (r) => r.ok && r.draft.due_date === "2026-09-17T09:00:00.000Z" },
+  { say: "Put a task for the design team to update the catalogue", args: { title: "Update the catalogue", assign_to_department: "design" }, expect: (r) => r.ok && r.department === "Design" && r.who === "the Design team" && r.assignees.length === 0 },
+  { say: "حط مهمة لفريق التصميم يحدّثوا الكتالوج", args: { title: "تحديث الكتالوج", assign_to_department: "Design" }, expect: (r) => r.ok && r.department === "Design" },
+  { say: "给设计团队安排一个任务：更新产品目录", args: { title: "更新产品目录", assign_to_department: "DESIGN" }, expect: (r) => r.ok && r.department === "Design" },
+  { say: "Every Monday send the weekly sales report, starting next Monday", args: { title: "Send the weekly sales report", recurrence: "weekly", due_date: "2026-09-21T17:00" }, expect: (r) => r.ok && r.draft.recurrence === "weekly" && r.draft.due_date === "2026-09-21T13:00:00.000Z" && /Mon 21 Sept/.test(r.when.due) },
+  { say: "كل يوم اتنين ابعت تقرير المبيعات الأسبوعي", args: { title: "ابعت تقرير المبيعات الأسبوعي", recurrence: "weekly", due_date: "2026-09-14" }, expect: (r) => r.ok && r.draft.recurrence === "weekly" && r.draft.remind_at === null },
+  { say: "每周一发送周销售报告", args: { title: "发送周销售报告", recurrence: "weekly", due_date: "2026-09-14T17:00" }, o: { tz: "Asia/Shanghai" }, expect: (r) => r.ok && r.draft.recurrence === "weekly" && r.draft.remind_at === "2026-09-14T09:00:00.000Z" },
+  { say: "Private: prepare notes for my meeting with the bank, tomorrow morning", args: { title: "Prepare notes for the meeting with the bank", is_private: true, due_date: "2026-09-14T09:00" }, expect: (r) => r.ok && r.draft.is_private && r.draft.due_date === "2026-09-14T05:00:00.000Z" && r.draft.remind_at === "2026-09-14T05:00:00.000Z" },
+  { say: "مهمة خاصة: جهّز ملاحظات اجتماع البنك بكرة الصبح", args: { title: "جهّز ملاحظات اجتماع البنك", is_private: true, due_date: "2026-09-14T09:00" }, expect: (r) => r.ok && r.draft.is_private && r.who === "" },
+  { say: "私密任务：明天早上准备和银行开会的笔记", args: { title: "准备和银行开会的笔记", is_private: true, due_date: "2026-09-14T09:00" }, o: { tz: "Asia/Shanghai" }, expect: (r) => r.ok && r.draft.is_private && r.draft.due_date === "2026-09-14T01:00:00.000Z" },
+  { say: "Assign it to everyone: fill the timesheet by Friday (a sales user)", args: { title: "Fill the timesheet", assign_to_all: true, due_date: "2026-09-18" }, expect: (r) => !r.ok && r.refusal === "everyone-denied" && r.permission },
+  { say: "Assign it to everyone: fill the timesheet by Friday (an admin)", args: { title: "Fill the timesheet", assign_to_all: true, due_date: "2026-09-18" }, o: { isAdmin: true }, expect: (r) => r.ok && r.toAll && r.who === "everyone" },
+  { say: "كلّف الكل: تعبية التايم شيت قبل الجمعة (أدمن)", args: { title: "تعبية التايم شيت", assign_to_all: true, due_date: "2026-09-18" }, o: { isAdmin: true }, expect: (r) => r.ok && r.toAll },
+  { say: "Keep Mona in the loop on the Delta quotation task", args: { title: "Delta quotation", observer_account_ids: ["a4"] }, expect: (r) => r.ok && r.observers[0]?.name === "Mona Fathy" && r.who === "" },
+  { say: "خلي منى متابعة على مهمة عرض دلتا", args: { title: "عرض دلتا", observer_account_ids: ["a4"] }, expect: (r) => r.ok && r.observers.length === 1 },
+  { say: "让 Mona 关注 Delta 报价这个任务", args: { title: "Delta 报价", observer_account_ids: ["a4"] }, expect: (r) => r.ok && r.observers[0]?.account_id === "a4" },
+  { say: "Tell Ahmed to… (two Ahmeds — a model that guessed instead of asking)", args: { title: "Call the customer", assign_to_account_ids: ["ahmed"] }, expect: (r) => !r.ok && r.refusal === "unknown-person" },
+  { say: "Remind me next Tuesday to renew the license", args: { title: "Renew the license", remind_at: "2026-09-22" }, expect: (r) => r.ok && r.draft.remind_at === "2026-09-22T05:00:00.000Z" && r.draft.due_date === null && /Tue 22 Sept/.test(r.when.remind) },
+  { say: "فكرني الثلاثاء الجاي أجدد الرخصة", args: { title: "أجدد الرخصة", remind_at: "2026-09-22" }, expect: (r) => r.ok && r.draft.remind_at === "2026-09-22T05:00:00.000Z" },
+  { say: "下周二提醒我续签许可证", args: { title: "续签许可证", remind_at: "2026-09-22" }, o: { tz: "Asia/Shanghai" }, expect: (r) => r.ok && r.draft.remind_at === "2026-09-22T01:00:00.000Z" },
+  { say: "Call the supplier at 9 tomorrow, urgent", args: { title: "Call the supplier", due_date: "2026-09-14T09:00", priority: "high" }, expect: (r) => r.ok && r.draft.priority === "high" && r.draft.due_date === "2026-09-14T05:00:00.000Z" && r.draft.remind_at === "2026-09-14T05:00:00.000Z" },
+  { say: "Make a task: review the Delta contract", args: { title: "Review the Delta contract" }, expect: (r) => r.ok && r.who === "" && r.draft.due_date === null && r.draft.remind_at === null && r.draft.priority === "medium" && r.draft.label === null && r.when.due === "" },
+  { say: "Remind me at half past two (a model that sent a bare clock)", args: { title: "x", remind_at: "14:30" }, expect: (r) => !r.ok && r.refusal === "bad-remind" },
+  { say: "A task for the marketing team (a department this company has not got)", args: { title: "Plan the campaign", assign_to_department: "marketing" }, expect: (r) => !r.ok && r.refusal === "unknown-department" && /design, finance, logistics, sales/.test(r.message) },
+  { say: "Sara: prepare the samples by Wednesday, label Sales, starting Monday", args: { title: "Prepare the samples", assign_to_account_ids: ["a3"], due_date: "2026-09-16", label: "Sales", start_date: "2026-09-14" }, expect: (r) => r.ok && r.who === "Sara Adel" && r.draft.due_date === "2026-09-16T13:00:00.000Z" && r.draft.start_date === "2026-09-14" && r.draft.label === "Sales" && r.when.start === "2026-09-14" },
+];
+check(`thirty utterances are listed`, CASES.length === 30);
+for (const c of CASES) check(c.say, c.expect(draft(c.args, c.o)));
+
+console.log("\n── 7. Phase 4: the day is the caller's; reminders ringing today; the brief on the text lane ──");
+const dubaiDay = dayRangeISO("Asia/Dubai", new Date("2026-09-13T01:00:00.000Z"));
+const shanghaiDay = dayRangeISO("Asia/Shanghai", new Date("2026-09-13T17:30:00.000Z"));
+check("today's bounds are the caller's day: 05:00 Dubai is Sunday there (20:00Z Sat → 19:59Z Sun); 01:30 Monday Shanghai is already Monday",
+  dubaiDay.startOfToday === "2026-09-12T20:00:00.000Z" && dubaiDay.endOfToday === "2026-09-13T19:59:59.999Z" && dubaiDay.endOfWeek === "2026-09-20T19:59:59.999Z" &&
+  shanghaiDay.startOfToday === "2026-09-13T16:00:00.000Z" && shanghaiDay.endOfToday === "2026-09-14T15:59:59.999Z");
+const listSrc = todos.slice(todos.indexOf("const listMyTodos"), todos.indexOf('name: "findTeamMember"'));
+check("listMyTodos reads 'today' and 'week' in the caller's zone and offers 'reminders' — tasks whose reminder rings today, still open",
+  /dayRangeISO\(ctx\.timezone \|\| "Asia\/Dubai"\)/.test(listSrc) && /enum: \["any", "overdue", "today", "week", "reminders"\]/.test(listSrc) &&
+  /else if \(due === "reminders"\) q = q\.gte\("remind_at", startOfToday\)\.lte\("remind_at", endOfToday\)\.eq\("completed", false\);/.test(listSrc) && !/todayRangeISO/.test(todos));
+check("the text lane has the brief: calendar, open tasks and today's reminders in one turn, then meetings → due/overdue → reminders → the one thing first → what to start with",
+  /TODAY'S BRIEF \(text lane, tasks phase 4\)/.test(prompt) && /listMyCalendar AND listMyTodos\(filter:"open", due:"any"\) AND listMyTodos\(due:"reminders"\) in the SAME turn/.test(prompt) &&
+  /reminders ringing today with their times; the one thing that needs them first; end by asking what they want to start with/.test(prompt));
+const copySrc = readFileSync("src/components/ai/copy.ts", "utf8");
+check("the first welcome tile asks for the day's brief, in all three languages",
+  /prompts: \[\s*"Give me my brief for today: my meetings, tasks due, reminders, and what needs me first\.",/.test(copySrc) &&
+  /prompts: \[\s*"给我今天的简报：会议、到期任务、提醒，以及我最该先做什么。",/.test(copySrc) &&
+  /prompts: \[\s*"اعطيني بريف اليوم: اجتماعاتي، المهام اللي موعدها النهاردة، التذكيرات، وإيه اللي محتاجني الأول\.",/.test(copySrc));
 
 console.log(`\n${pass} passed, ${fail} failed`);
 if (fail > 0) process.exit(1);
