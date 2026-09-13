@@ -221,6 +221,12 @@ export interface AgentStep {
   sources?: string[];
   /** Fields stripped by the permission layer. */
   filteredFields?: string[];
+  /** A WRITE TOOL'S FIRST PHASE, for the screen (tasks phase 2, 2026-09-13):
+   *  the exact arguments its second phase needs, so a card in the chat can
+   *  carry them back with a tap to /api/ai/agent/confirm — the same shape
+   *  the voice tool route hands the call screen. Ids and ISO times only;
+   *  the ledger still decides whether they match a recorded preview. */
+  pending?: { tool: string; args: Record<string, unknown> };
 }
 
 export interface AgentResponse {

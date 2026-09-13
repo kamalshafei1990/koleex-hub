@@ -16,6 +16,7 @@ import { readFileSync } from "node:fs";
 import {
   resolveTaskTime, resolveTaskDay, describeWhen, hasClockTime, parseRecurrence, zonedToUtcMs, DEFAULT_TASK_HOUR,
 } from "../src/lib/server/ai-agent/tools/task-time";
+import { isChatConfirmTool, CHAT_CONFIRM_TOOLS } from "../src/lib/server/ai/chat-confirm";
 
 let pass = 0, fail = 0;
 function check(name: string, cond: boolean, detail?: string) {
@@ -136,6 +137,41 @@ check("the card words the due and reminder times from the preview (raw arguments
   /data-task-details/.test(screen) && /onClick=\{onConfirmWrite\}/.test(screen));
 check("the card's new words exist in all three languages",
   /remind: "Reminder",/.test(screen) && /remind: "提醒",/.test(screen) && /remind: "تذكير",/.test(screen) && /forPeople: "For",/.test(screen) && /forPeople: "给",/.test(screen) && /forPeople: "لـ",/.test(screen));
+
+console.log("\n── 5. Phase 2: the Task card in the chat, saved by a tap through the ledger ──");
+const orch = readFileSync("src/lib/server/ai-agent/orchestrator.ts", "utf8");
+check("the orchestrator hands the preview's confirm arguments to the screen on the step — only while awaiting approval — and leaves the model's envelope alone",
+  /\.\.\.\(result\.pendingAction && result\.permissionStatus === "approval_required"\s*\? \{ pending: \{ tool: result\.pendingAction\.tool, args: result\.pendingAction\.args \} \}\s*: \{\}\),/.test(orch));
+const serverTypes = readFileSync("src/lib/server/ai-agent/types.ts", "utf8");
+const clientTypes = readFileSync("src/components/ai/types.ts", "utf8");
+check("AgentStep.pending exists on both sides of the wire, the client's a mirror",
+  /pending\?: \{ tool: string; args: Record<string, unknown> \};/.test(serverTypes) && /pending\?: \{ tool: string; args: Record<string, unknown> \};/.test(clientTypes));
+check("the chat may confirm the five to-do writes and nothing else — not a read, not a tool off the list, not an invention",
+  [...CHAT_CONFIRM_TOOLS].sort().join() === "completeTodo,createTodo,deleteTodo,reassignTodo,updateTodo" &&
+  isChatConfirmTool("createTodo") && isChatConfirmTool("updateTodo") && !isChatConfirmTool("listMyTodos") && !isChatConfirmTool("createCalendarEvent") && !isChatConfirmTool("search_web") && !isChatConfirmTool("") && !isChatConfirmTool("CREATETODO"));
+const confirmRoute = readFileSync("src/app/api/ai/agent/confirm/route.ts", "utf8");
+const at = (re: RegExp) => { const m = re.exec(confirmRoute); return m ? m.index : -1; };
+const order = [
+  at(/const auth = await requireAuth\(req\);/), at(/requireInternalUser\(auth\)/), at(/await buildUserContext\(auth\)/), at(/await req\.json\(\)/),
+  at(/CHAT_CONFIRM_MAX_ARGS_BYTES\) return NextResponse\.json\(\{ error: "Too large\." \}, \{ status: 413 \}\)/), at(/if \(!isChatConfirmTool\(name\)\) return NextResponse\.json\(\{ error: "Not allowed\." \}, \{ status: 403 \}\)/),
+  at(/bucket: "chat_confirm", windowSec: 60, max: CHAT_CONFIRM_PER_MIN/), at(/parseConversationParam\(/), at(/\.from\("ai_conversations"\)[\s\S]{0,200}?\.eq\("account_id", auth\.account_id\)/),
+  at(/dispatchTool\(ctx, name, \{ \.\.\.args, confirm: true \}, \{ conversationId \}\)/),
+];
+check("the confirm route re-decides everything in the voice tool route's order: the door, the account type, the context, the body, the size, the list, the budget, the caller's own conversation, then dispatch WITH the conversation id",
+  order.every((i) => i >= 0) && order.every((i, k) => k === 0 || i > order[k - 1]));
+check("a fabricated tap is the ledger's to refuse: the route passes confirm:true and lets dispatchTool match the recorded preview; it never writes a table itself before dispatch",
+  confirmRoute.indexOf('.from("ai_messages")') > at(/dispatchTool\(ctx, name/) && !/\.from\("koleex_todos"\)/.test(confirmRoute));
+check("on success the tool's own line joins the thread as an assistant message and the conversation counter moves — never on a refusal",
+  /if \(result\.ok && result\.permissionStatus === "allowed" && typeof result\.message === "string"/.test(confirmRoute) && /role: "assistant", content: result\.message, provider: "tool-confirm"/.test(confirmRoute) &&
+  /message_count: \(conv\.message_count \?\? 0\) \+ 1/.test(confirmRoute) && /withPublicProvider\(ins\.data/.test(confirmRoute) && /export const dynamic = "force-dynamic";/.test(confirmRoute));
+const app = readFileSync("src/components/ai/KoleexAiApp.tsx", "utf8");
+check("the page posts the preview's own arguments with the conversation id and via:'tap', shows saved/failed, and appends the route's message once",
+  /fetch\("\/api\/ai\/agent\/confirm", \{[\s\S]{0,300}?body: JSON\.stringify\(\{ conversation_id: conversationId, name: pending\.tool, arguments: pending\.args, via: "tap" \}\)/.test(app) &&
+  /\[msgId\]: \{ state: "saved", text: body\.output\?\.message \?\? undefined, todoId \}/.test(app) && /prev\.some\(\(m\) => m\.id === row\.id\) \? prev : \[\.\.\.prev, row\]/.test(app) &&
+  /onConfirmTask=\{onConfirmTask\}\s*onCancelTask=\{onCancelTask\}\s*taskStatus=\{taskCards\[m\.id\]\}/.test(app));
+const bubble = readFileSync("src/components/ai/Bubble.tsx", "utf8");
+check("the bubble shows the card only for a to-do write awaiting approval with its confirm arguments, tappable only on the last unanswered message",
+  /\(s\.tool === "createTodo" \|\| s\.tool === "updateTodo"\) &&\s*s\.permissionStatus === "approval_required" &&\s*!!s\.pending/.test(bubble) && /live=\{!!isLast && !!onConfirmTask && !answeredWith\}/.test(bubble));
 
 console.log(`\n${pass} passed, ${fail} failed`);
 if (fail > 0) process.exit(1);

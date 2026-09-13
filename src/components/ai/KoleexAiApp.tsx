@@ -27,6 +27,7 @@ import { useInput } from "@/components/kds/useInput";
 import Link from "next/link";
 import { useSkin } from "@/lib/appearance";
 import { playSound } from "@/lib/sounds/player";
+import type { TaskCardState } from "@/components/ai/TaskCard";
 import { useTranslation, type Lang } from "@/lib/i18n";
 import ArrowLeftIcon from "@/components/icons/ui/ArrowLeftIcon";
 import PlusIcon from "@/components/icons/ui/PlusIcon";
@@ -1594,6 +1595,50 @@ export default function KoleexAiApp() {
     void sendRef.current(answer, false);
   }, []);
 
+  /* THE TASK CARD'S TAP (tasks phase 2, 2026-09-13). Save posts the preview's
+     own arguments with confirm:true to /api/ai/agent/confirm — the server's
+     ledger decides, as it does for the call screen's tap. On success the
+     card says saved and the tool's own line joins the thread as the
+     assistant's message (the route wrote the same row), so the model's
+     next turn knows the task exists. Cancel only closes the card: the
+     recorded preview expires on its own. Outcomes are browser state, keyed
+     by message id, like the question card's pick. */
+  const [taskCards, setTaskCards] = useState<Record<string, TaskCardState>>({});
+  const onConfirmTask = useCallback(async (msgId: string, pending: { tool: string; args: Record<string, unknown> }) => {
+    const conversationId = activeIdRef.current;
+    if (!conversationId) return;
+    setTaskCards((prev) => ({ ...prev, [msgId]: { state: "saving" } }));
+    try {
+      const res = await fetch("/api/ai/agent/confirm", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ conversation_id: conversationId, name: pending.tool, arguments: pending.args, via: "tap" }),
+      });
+      const body = res.ok
+        ? ((await res.json()) as { output?: { ok?: boolean; message?: string | null; data?: { id?: unknown } | null }; message?: ChatMsg })
+        : null;
+      if (!body?.output?.ok) {
+        setTaskCards((prev) => ({ ...prev, [msgId]: { state: "failed" } }));
+        playSound("error");
+        return;
+      }
+      const todoId = typeof body.output.data?.id === "string" ? body.output.data.id : null;
+      setTaskCards((prev) => ({ ...prev, [msgId]: { state: "saved", text: body.output?.message ?? undefined, todoId } }));
+      playSound("reply-received");
+      if (body.message && typeof body.message.id === "string" && activeIdRef.current === conversationId) {
+        const row = body.message;
+        setMessages((prev) => (prev.some((m) => m.id === row.id) ? prev : [...prev, row]));
+      }
+    } catch {
+      setTaskCards((prev) => ({ ...prev, [msgId]: { state: "failed" } }));
+      playSound("error");
+    }
+  }, []);
+  const onCancelTask = useCallback((msgId: string) => {
+    setTaskCards((prev) => ({ ...prev, [msgId]: { state: "cancelled" } }));
+  }, []);
+
   /** Regenerate the last assistant reply. Finds the most recent
    *  user message, removes any trailing assistant messages, and
    *  re-runs send() with that same text. Server treats it as a
@@ -2677,6 +2722,9 @@ export default function KoleexAiApp() {
                      afterwards, with the choice visible as something the
                      user said. */
                   onAnswerQuestion={onBubbleAnswer}
+                  onConfirmTask={onConfirmTask}
+                  onCancelTask={onCancelTask}
+                  taskStatus={taskCards[m.id]}
                   lang={lang}
                   /* Only the latest AI bubble reacts to the live
                      conversation; older ones stay idle. */
