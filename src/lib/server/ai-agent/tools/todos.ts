@@ -7,7 +7,9 @@ import "server-only";
    can never do more than the caller could in the To-do app itself:
    - listMyTodos       ← /api/todos GET visibility scope (creator / assigner /
                           assignee / observer / department / broadcast, plus
-                          the private-task overlay; SA skips row scope).
+                          the private-task overlay; SA skips row scope) —
+                          ONE rule, in lib/server/todo-scope.ts, since
+                          tasks phase 6.
    - findTeamMember    ← /api/todos/assignees (assignable employees =
                           internal + active + human; read-only lookup).
    - createTodo        ← /api/todos POST (personal or assigned-to-colleagues
@@ -34,6 +36,7 @@ import type { ToolDef, ToolResult } from "../types";
 import { isUuid, BAD_ID_MESSAGE } from "../uuid";
 import { resolveTaskTime, resolveTaskDay, describeWhen, parseRecurrence } from "./task-time";
 import { buildTaskDraft, dayRangeISO, idList, type Person } from "./task-draft";
+import { applyTodoScope, sharedTodoIds, type TodoViewer } from "../../todo-scope";
 
 const TODO_MODULE = "To-do";
 
@@ -157,38 +160,16 @@ const listMyTodos: ToolDef<
       q = q.ilike("title", `%${titleQuery.replace(/[%_\\]/g, "\\$&")}%`);
     }
 
-    /* ── Port of the route's non-SA visibility scope ── */
-    if (!ctx.isSuperAdmin) {
-      // Tasks the caller is an assignee of.
-      const { data: asg } = await supabaseServer
-        .from("koleex_todo_assignees")
-        .select("todo_id")
-        .eq("account_id", accountId);
-      const assigneeIds = (asg ?? []).map((r) => (r as { todo_id: string }).todo_id);
-
-      // Tasks the caller observes (metadata.observers jsonb containment).
-      const { data: obs } = await supabaseServer
-        .from("koleex_todos")
-        .select("id")
-        .contains("metadata", { observers: [{ account_id: accountId }] })
-        .eq("tenant_id", tenantId);
-      const observerIds = (obs ?? []).map((r) => (r as { id: string }).id);
-
-      const orParts = [
-        `created_by_account_id.eq.${accountId}`,
-        `assigned_by_account_id.eq.${accountId}`,
-        `assign_to_all.eq.true`,
-      ];
-      if (ctx.department) orParts.push(`assigned_department.eq.${ctx.department}`);
-      const ids = [...new Set([...assigneeIds, ...observerIds])];
-      if (ids.length > 0) orParts.push(`id.in.(${ids.join(",")})`);
-      q = q.or(orParts.join(","));
-
-      // Private-task overlay: hide others' private tasks unless break-glass.
-      if (!ctx.canViewPrivate) {
-        q = q.or(`is_private.eq.false,created_by_account_id.eq.${accountId}`);
-      }
-    }
+    /* ── The scope: lib/server/todo-scope.ts, the same rule as /api/todos
+       GET and the morning brief (tasks phase 6) ── */
+    const viewer: TodoViewer = {
+      accountId,
+      tenantId,
+      department: ctx.department,
+      isSuperAdmin: ctx.isSuperAdmin,
+      canViewPrivate: ctx.canViewPrivate,
+    };
+    q = applyTodoScope(q, viewer, await sharedTodoIds(viewer));
 
     /* ── Convenience filters ── */
     if (filter === "open") q = q.eq("completed", false);

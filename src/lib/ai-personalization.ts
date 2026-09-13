@@ -50,6 +50,10 @@ export type AiPersonalization = {
   nickname: string;
   occupation: string;
   about: string;
+  /** The hour (0–23, in the user's calendar timezone) a morning brief is
+   *  sent as a notification — meetings, tasks due, reminders — or null
+   *  for none (tasks phase 5). */
+  briefHour: number | null;
 };
 
 /** Hard caps. Every string is trimmed and cut here, whoever sends it. */
@@ -72,6 +76,7 @@ export const DEFAULT_AI_PERSONALIZATION: AiPersonalization = {
   nickname: "",
   occupation: "",
   about: "",
+  briefHour: null,
 };
 
 const isRecord = (v: unknown): v is Record<string, unknown> =>
@@ -120,7 +125,14 @@ export function normalizeAiPersonalization(raw: unknown): AiPersonalization {
     nickname: cleanAiText(r.nickname, L.nickname),
     occupation: cleanAiText(r.occupation, L.occupation),
     about: cleanAiText(r.about, L.about),
+    briefHour: pickHour(r.briefHour),
   };
+}
+
+/** An integer hour of the day, or null. Anything else is null (off). */
+function pickHour(v: unknown): number | null {
+  if (typeof v !== "number" || !Number.isInteger(v)) return null;
+  return v >= 0 && v <= 23 ? v : null;
 }
 
 /** Apply a partial edit on top of a stored value, then normalise. Only

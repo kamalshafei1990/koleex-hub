@@ -4,6 +4,7 @@ import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { requireAuth, requireModuleAccess , requireModuleAction} from "@/lib/server/auth";
 import { countOpenTodos } from "@/lib/todo-open-count";
+import { applyTodoScope, sharedTodoIds, type TodoViewer } from "@/lib/server/todo-scope";
 
 /* GET /api/todos
    Returns the enriched todo list (with assignees, assigner, notes) scoped
@@ -61,30 +62,18 @@ export async function GET(req: Request) {
     return NextResponse.json({ ok: true, data: { open } });
   }
 
-  // Step 1: resolve the set of todo_ids the caller is an assignee of,
-  // plus the ones they observe (metadata.observers). Needed for the
-  // "shared" branch of the scope OR.
-  let assigneeTodoIds: string[] = [];
-  if (!auth.is_super_admin) {
-    let obsQuery = supabaseServer
-      .from("koleex_todos")
-      .select("id")
-      .contains("metadata", { observers: [{ account_id: auth.account_id }] });
-    if (auth.tenant_id) obsQuery = obsQuery.eq("tenant_id", auth.tenant_id);
-    const [{ data: rows }, { data: obsRows }] = await Promise.all([
-      supabaseServer
-        .from("koleex_todo_assignees")
-        .select("todo_id")
-        .eq("account_id", auth.account_id),
-      obsQuery,
-    ]);
-    assigneeTodoIds = Array.from(
-      new Set([
-        ...(rows ?? []).map((r) => (r as { todo_id: string }).todo_id),
-        ...(obsRows ?? []).map((r) => (r as { id: string }).id),
-      ]),
-    );
-  }
+  /* THE SCOPE, from lib/server/todo-scope.ts (tasks phase 6, 2026-09-13):
+     one rule for this route, the AI's listMyTodos and the morning brief.
+     The ids the caller is an assignee of or observes first, then the
+     query bounded by tenant, then the scope and privacy clauses. */
+  const viewer: TodoViewer = {
+    accountId: auth.account_id,
+    tenantId: auth.tenant_id,
+    department: auth.department,
+    isSuperAdmin: auth.is_super_admin,
+    canViewPrivate: auth.can_view_private,
+  };
+  const sharedIds = await sharedTodoIds(viewer);
 
   // Step 2: main todos query with scope + tenant + privacy filters.
   let query = supabaseServer
@@ -95,29 +84,7 @@ export async function GET(req: Request) {
   if (auth.tenant_id) {
     query = query.eq("tenant_id", auth.tenant_id);
   }
-
-  if (!auth.is_super_admin) {
-    // Build a PostgREST "or" clause for the scope match.
-    const orParts: string[] = [
-      `created_by_account_id.eq.${auth.account_id}`,
-      `assigned_by_account_id.eq.${auth.account_id}`,
-      `assign_to_all.eq.true`,
-    ];
-    if (auth.department) {
-      orParts.push(`assigned_department.eq.${auth.department}`);
-    }
-    if (assigneeTodoIds.length > 0) {
-      orParts.push(`id.in.(${assigneeTodoIds.join(",")})`);
-    }
-    query = query.or(orParts.join(","));
-
-    // Privacy: hide is_private unless I'm the creator or have break-glass.
-    if (!auth.can_view_private) {
-      query = query.or(
-        `is_private.eq.false,created_by_account_id.eq.${auth.account_id}`,
-      );
-    }
-  }
+  query = applyTodoScope(query, viewer, sharedIds);
 
   const { data: todos, error } = await query;
   if (error) {

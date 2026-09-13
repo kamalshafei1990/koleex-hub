@@ -1296,3 +1296,48 @@ simulated here.
 
 Voice unchanged (its brief already reads tasks due and overdue; the
 `reminders` filter is available to it through the same tool).
+
+## Tasks by AI, phases 5 and 6 — the brief comes to you; the rule is written once (2026-09-13)
+
+**Phase 5 — the proactive brief (dependability plan F3).**
+- Settings → Koleex AI → **Morning brief**: one hour (05:00–12:00) in the
+  user's calendar timezone, or off (default). Stored as
+  `preferences.ai.briefHour` through the existing personalization route;
+  normalised to an integer hour or null.
+- `GET /api/cron/ai-brief`, hourly (`vercel.json`): for each opted-in active
+  internal account whose local hour is now, and who has no brief today
+  (the inbox row `metadata.type=ai_brief, day` is the record): today's
+  meetings (one-off and recurring, `expandRecurrence`), tasks due today,
+  overdue, reminders ringing today — through `lib/server/todo-scope` with
+  the NON-admin scope on purpose (a super admin's brief is their own day,
+  not the tenant's) — then one inbox row (`system`) and one push (`tag
+  ai-brief-<day>`), both opening `/ai?ask=brief`. Wording in the reply
+  language (`lib/server/ai/brief-text.ts`): "3 meetings · 2 due today ·
+  1 overdue · 1 reminder — first: 09:30 Delta call"; a quiet day is said
+  plainly. Nothing is written to tasks or calendar.
+- The chat, opened with `?ask=brief`, starts a new conversation, asks for
+  the brief in the user's language (the first welcome tile's words) and
+  drops the parameter.
+
+**Phase 6 — hygiene.**
+- `lib/server/todo-scope.ts` (+ the pure `todo-scope-rule.ts`): the To-do
+  visibility rule written ONCE — created · assigned · everyone · my
+  department · shared (assignee or observer) · private only if mine or
+  break-glass · super admin sees the tenant. `/api/todos` GET, the AI's
+  `listMyTodos` and the brief read it; the ported copy in the tool is gone.
+- `supabase/migrations/todo_columns_reconcile_2026_09.sql`: the eleven
+  columns production has without a migration file, every one
+  `IF NOT EXISTS` (a no-op on production, verified against
+  information_schema on 2026-09-13), with the reason, RLS posture,
+  rollback and load stated as the schema rule requires; one small index
+  on (tenant_id, completed).
+- Suites: `validate:ai-tasks` 106 (the scope rule and its application, the
+  two callers, the migration's shape, the brief's words in three
+  languages, the zone hour and day, the setting's normalisation, the
+  cron's order and its no-writes, the vercel entry, the settings control,
+  the deep link).
+
+Not done, by choice: attachments from the chat onto a task (the AI's
+uploads live in a transient bucket; copying them into `todo-attachments`
+is its own small piece), and a "project task when a project is named"
+instruction — both listed for the owner as next.
