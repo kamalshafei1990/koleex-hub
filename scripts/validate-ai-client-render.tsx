@@ -38,6 +38,8 @@ import VoiceCallScreen from "../src/components/ai/VoiceCallScreen";
 import PhotoLightbox from "../src/components/ai/PhotoLightbox";
 import MessageMarkdown from "../src/components/ai/MessageMarkdown";
 import type { TranscriptLine } from "../src/lib/voice/events";
+import { textLang, textScript } from "../src/lib/text-direction";
+import TaskCard from "../src/components/ai/TaskCard";
 
 let pass = 0;
 const failures: string[] = [];
@@ -1383,6 +1385,69 @@ console.log("\n── The memo holds: one function per bubble prop, one bump red
   check("the call button — and lib/voice behind it — loads on demand, with a placeholder that holds the composer's geometry",
     /const VoiceCallButton = dynamic\(\(\) => import\("@\/components\/ai\/VoiceCallButton"\), \{\s*ssr: false,/.test(app) &&
     !/^import VoiceCallButton from/m.test(app));
+}
+
+console.log("\n── Arabic and Chinese at their own size; the sidebar title keeps the list's edge (owner, 2026-09-13) ──");
+{
+  /* eslint-disable @typescript-eslint/no-explicit-any */
+  check("textScript weighs the whole string and leans to the non-Latin script",
+    textScript("ماكينات الخياطة") === "ar" && textScript("分析中国教师前景") === "zh" && textScript("Free UI Animation Libraries") === "latin" &&
+    textScript("ماكينة Koleex KX-220 للفرش") === "ar" && textScript("Koleex 缝纫机 报价") === "zh" && textScript("") === "none" && textScript("1250 — ?") === "none");
+  check("  …a Japanese line is not marked Chinese, and Kana alone is not a script this app sizes",
+    textScript("ひらがな") === "none");
+  check("textLang: ar / zh for the two sized scripts, en for Latin, nothing for nothing",
+    textLang("أخبار تمام") === "ar" && textLang("删除一个") === "zh" && textLang("Delete one") === "en" && textLang("…") === undefined);
+
+  const base: any = { active: false, projects: [], copy: COPY.en, onOpen: () => {}, onRename: () => {}, onDelete: () => {}, onTogglePin: () => {}, onMove: () => {} };
+  const rowOf = (title: string) => ({ id: "r", title, last_preview: null, message_count: 1, created_at: "2026-09-13T00:00:00Z", updated_at: "2026-09-13T00:00:00Z" });
+  const ar = html(<SidebarRow {...base} row={rowOf("براءات اختراع وإنجازات شخصية")} />);
+  const zh = html(<SidebarRow {...base} row={rowOf("分析中国教师前景")} />);
+  const en = html(<SidebarRow {...base} row={rowOf("Mobile capabilities explained")} />);
+  check("an Arabic title is marked lang=\"ar\", shaped with dir=\"auto\", and carries the edge-pinning class",
+    /<span class="kx-ai-row-title block text-\[13px\] truncate" dir="auto" lang="ar">/.test(ar));
+  check("a Chinese title is marked lang=\"zh\"", /class="kx-ai-row-title block text-\[13px\] truncate" dir="auto" lang="zh">/.test(zh));
+  check("an English title is marked lang=\"en\" so it keeps its size inside an Arabic screen", /dir="auto" lang="en">Mobile capabilities explained</.test(en));
+  check("the search hint follows the same rule",
+    /data-search-hint/.test(html(<SidebarRow {...base} row={rowOf("t")} hint="…سعر الماكينة…" />)) &&
+    /class="kx-ai-row-title block text-\[12px\] truncate text-\[var\(--text-dim\)\]" dir="auto" lang="ar" data-search-hint/.test(html(<SidebarRow {...base} row={rowOf("t")} hint="…سعر الماكينة…" />)));
+
+  const msg: any = { id: "m1", role: "assistant", created_at: "2026-09-13T10:00:00Z" };
+  const bubbleOf = (content: string) => html(<Bubble {...({ msg: { ...msg, content }, userInitial: "M", isLast: true, lang: "en" } as any)} />);
+  check("a Chinese reply reads at 16px like an Arabic one, and both carry their lang; English stays at 14",
+    /dir="ltr" lang="zh" class="rounded-2xl leading-relaxed px-5 py-3.5 text-\[16px\]/.test(bubbleOf("三种宽度可选：1.8米、2.2米和2.6米。")) &&
+    /dir="rtl" lang="ar" class="rounded-2xl leading-relaxed px-5 py-3.5 text-\[16px\]/.test(bubbleOf("تتوفر ثلاثة عروض للماكينة.")) &&
+    /dir="ltr" lang="en" class="rounded-2xl leading-relaxed px-5 py-3.5 text-\[14px\]/.test(bubbleOf("Three widths are available.")));
+
+  const tiles = html(<WelcomeCard copy={COPY.ar} onPick={() => {}} firstName="" />);
+  check("the welcome tiles carry the language of their words", /class="kx-ai-tile-text flex-1 leading-snug" lang="ar">/.test(tiles) &&
+    /class="kx-ai-tile-text flex-1 leading-snug" lang="zh">/.test(html(<WelcomeCard copy={COPY.zh} onPick={() => {}} firstName="" />)));
+
+  const card = html(<TaskCard {...({ tool: "createTodo", pending: { tool: "createTodo", args: { title: "متابعة بيانات المنتجات" } }, preview: { title: "متابعة بيانات المنتجات" }, status: { state: "live" }, copy: COPY.en, onConfirm: () => {}, onCancel: () => {} } as any)} />);
+  check("the task title is shaped and marked", /dir="auto" lang="ar" data-task-title/.test(card));
+
+  const app = readFileSync("src/components/ai/KoleexAiApp.tsx", "utf8");
+  const css = readFileSync("src/app/globals.css", "utf8");
+  check("the root carries the screen's language; both bar titles and the composer carry their content's",
+    /lang=\{lang\}\s+className="kx-ai-root /.test(app) &&
+    (app.match(/kx-ai-bar-title[^>]*dir="auto" lang=\{active\?\.title \? textLang\(active\.title\) : undefined\}/g) ?? []).length === 2 &&
+    /dir=\{textDirection\(input\)\}\s+lang=\{textLang\(input\)\}/.test(app) && /className="kx-ai-composer-text block w-full/.test(app));
+  check("the stylesheet pins the title to the screen's side and sizes ar/zh content one step up on every marked surface",
+    /\.kx-ai-root \.kx-ai-row-title,\s*\.kx-ai-root \.kx-ai-bar-title \{\s*text-align: left;/.test(css) &&
+    /html\[dir="rtl"\] \.kx-ai-root \.kx-ai-row-title,\s*html\[dir="rtl"\] \.kx-ai-root \.kx-ai-bar-title \{\s*text-align: right;/.test(css) &&
+    /\.kx-ai-root \.kx-ai-row-title:is\(:lang\(ar\), :lang\(zh\)\) \{\s*font-size: 15px;/.test(css) &&
+    /\.kx-ai-root \.kx-ai-composer-text:is\(:lang\(ar\), :lang\(zh\)\) \{\s*font-size: 17px;/.test(css) &&
+    /\.kx-ai-root \.kx-ai-tile-text:is\(:lang\(ar\), :lang\(zh\)\) \{\s*font-size: 15px;/.test(css) &&
+    /\.kx-ai-root \[data-task-title\]:is\(:lang\(ar\), :lang\(zh\)\) \{\s*font-size: 17px;/.test(css) &&
+    /\.kx-call-root \.kx-call-line:is\(:lang\(ar\), :lang\(zh\)\) \{\s*font-size: 20px;/.test(css) &&
+    /\.kx-call-root \.kx-call-caption:is\(:lang\(ar\), :lang\(zh\)\) \{\s*font-size: 18px;/.test(css));
+  check("  …an Arabic or Chinese screen lifts the chrome, leaving the content surfaces to their own rule; Chinese has its own font stack",
+    /:is\(\.kx-ai-root:lang\(ar\), \.kx-ai-root:lang\(zh\)\) \.text-\\\[13px\\\]:not\(\.kx-ai-row-title\):not\(\.kx-ai-bar-title\):not\(\.kx-ai-tile-text\) \{\s*font-size: 14px;/.test(css) &&
+    /"PingFang SC", "Hiragino Sans GB", "Microsoft YaHei"/.test(css));
+  const tr = readFileSync("src/components/ai/VoiceTranscript.tsx", "utf8");
+  const scr = readFileSync("src/components/ai/VoiceCallScreen.tsx", "utf8");
+  check("the call's transcript lines and caption carry their lang and the classes the call rules size",
+    /lang=\{textLang\(stripImageMarkdown\(line\.text\) \|\| line\.text\)\}/.test(tr) && /kx-call-line text-\[18px\]/.test(tr) &&
+    /lang=\{textLang\(stripImageMarkdown\(lastLine\.text\) \|\| lastLine\.text\)\}/.test(scr) && /kx-call-caption max-w-\[820px\]/.test(scr));
 }
 
 console.log(`\n${pass} passed, ${failures.length} failed`);

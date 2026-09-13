@@ -21,6 +21,7 @@ import TrashIcon from "@/components/icons/ui/TrashIcon";
 import CheckIcon from "@/components/icons/ui/CheckIcon";
 import type { ConversationRow, MenuItem } from "@/components/ai/types";
 import { COPY } from "@/components/ai/copy";
+import { textLang } from "@/lib/text-direction";
 
 /* ── Sidebar section heading ──
    A date, "Projects" and "Pinned" are all chrome, not content. The label used
@@ -85,7 +86,7 @@ export function ProjectRow({
           readers flatten (audit, 2026-09-11). */}
       <button type="button" onClick={onOpen} className="flex-1 min-w-0 flex items-center gap-2 text-start rounded-lg">
         <ProjectGlyph icon={project.icon} color={project.color} size={15} className="shrink-0" />
-        <span className="text-[13px] truncate flex-1 min-w-0">{project.name}</span>
+        <span className="kx-ai-row-title text-[13px] truncate flex-1 min-w-0" dir="auto" lang={textLang(project.name)}>{project.name}</span>
       </button>
       <RowMenu
         label={moreLabel}
@@ -191,8 +192,15 @@ export function SidebarRow({
       }`}
     >
       <button type="button" onClick={onOpen} className="flex-1 min-w-0 text-start rounded-lg" aria-current={active ? "page" : undefined}>
-        <span className="block text-[13px] truncate" dir="auto">{row.title}</span>
-        {hint && <span className="block text-[12px] truncate text-[var(--text-dim)]" data-search-hint>{hint}</span>}
+        {/* THE TITLE KEEPS THE LIST'S EDGE. dir="auto" shapes an Arabic title
+            correctly, but on its own it also right-aligned it, so in an
+            English sidebar Arabic chats sat against the pin while English
+            ones sat against the icon — two columns in one list (owner,
+            2026-09-13, against the ChatGPT sidebar). .kx-ai-row-title pins
+            the alignment to the screen's side and, through lang, sizes
+            Arabic and Chinese titles for their own scripts. */}
+        <span className="kx-ai-row-title block text-[13px] truncate" dir="auto" lang={textLang(row.title)}>{row.title}</span>
+        {hint && <span className="kx-ai-row-title block text-[12px] truncate text-[var(--text-dim)]" dir="auto" lang={textLang(hint)} data-search-hint>{hint}</span>}
       </button>
       {/* The pin marks the row while it is pinned and hides again on hover so
           it can't be mistaken for a button you have to press to keep it. */}

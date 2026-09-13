@@ -1341,3 +1341,34 @@ Not done, by choice: attachments from the chat onto a task (the AI's
 uploads live in a transient bucket; copying them into `todo-attachments`
 is its own small piece), and a "project task when a project is named"
 instruction — both listed for the owner as next.
+
+## The sidebar against ChatGPT's; Arabic and Chinese at their own size (2026-09-13)
+
+Owner, with a screenshot of the ChatGPT sidebar: "our Koleex AI sidebar
+needs to adjust specially when a conversation starts with Arabic … adjust
+the text size in this app specifically the Arabic and Chinese".
+
+- **What was wrong.** The row title had `dir="auto"` (right for shaping)
+  and nothing else, so `text-align: start` resolved to the title's own
+  side: Arabic chats sat against the pin, English ones against the icon —
+  two columns in one list. And the whole app is drawn at Latin sizes;
+  Arabic (no ascender line) and Chinese (a dense square per word) both
+  read a step smaller than Latin at the same px, and Chinese was not even
+  detected — the bubble sized by direction alone, so a Chinese reply got
+  the Latin 14.
+- **The rule, written once.** `lib/text-direction` gains `textScript` /
+  `textLang` beside `textDirection`: the whole string is weighed, the
+  non-Latin script wins a near-tie, Kana is not Chinese. Content carries
+  its script as a `lang` attribute (sidebar and project titles, the search
+  hint, both bar titles, the bubble, the composer, the welcome tiles, the
+  task title, the call's lines and caption); the AI root carries the
+  screen's language. The stylesheet does the rest in one block of
+  `globals.css`: titles pinned to the screen's side; ar/zh content one step
+  up per surface (13→15 titles and tiles, 14→16 bubbles, 16→17 composer,
+  15→17 task title, 18→20 call lines); a CJK font stack for `lang="zh"`;
+  and an Arabic or Chinese SCREEN lifts the 11/12/13 px chrome one step,
+  with the content surfaces excluded so an English title inside an Arabic
+  screen is not grown twice.
+- **Suites.** `validate:ai-client-render` 272 (+14): the script detector on
+  mixed lines, the rendered `lang` and class on rows, bubbles, tiles and
+  the task card, the root's `lang`, and the stylesheet's rules by name.

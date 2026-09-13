@@ -8,6 +8,7 @@
    does not need to know how the host app resolves language.
    --------------------------------------------------------------------------- */
 
+import { textLang } from "@/lib/text-direction";
 import { useEffect, useState } from "react";
 import KoleexOrb from "@/components/ai/KoleexGlowOrb";
 import { COPY } from "@/components/ai/copy";
@@ -68,7 +69,7 @@ export default function WelcomeCard({
                border (the glass fill owns the background under Aurora). */
             className="kx-glass relative group flex min-h-[64px] items-center rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] px-3.5 py-3 text-start text-[13px] text-[var(--text-primary)] hover:border-[var(--border-focus)] hover:bg-[var(--bg-surface-subtle)] transition-colors"
           >
-            <span className="flex-1 leading-snug">{p}</span>
+            <span className="kx-ai-tile-text flex-1 leading-snug" lang={textLang(p)}>{p}</span>
           </button>
         ))}
       </div>

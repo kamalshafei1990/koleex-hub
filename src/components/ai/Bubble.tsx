@@ -19,7 +19,7 @@ import type { AIOrbActivity } from "@/components/ai-orb/ai-orb-types";
 import TypingIndicator from "@/components/ai/TypingIndicator";
 import ActivityLine from "@/components/ai/ActivityLine";
 import MessageMarkdown from "@/components/ai/MessageMarkdown";
-import { textDirection } from "@/lib/text-direction";
+import { textDirection, textLang, textScript } from "@/lib/text-direction";
 import DraftCard from "@/components/ai/DraftCard";
 import TaskCard, { type TaskCardState } from "@/components/ai/TaskCard";
 import PhotoLightbox, { type LightboxPhoto } from "@/components/ai/PhotoLightbox";
@@ -101,6 +101,12 @@ function BubbleImpl({
   /* One measurement drives layout, font and size, so they cannot disagree */
   const bubbleDir = textDirection(msg.content);
   const rtl = bubbleDir === "rtl";
+  /* The script decides the size: Arabic and Chinese glyphs sit small at the
+     Latin 14px, so both read at 16 (owner, 2026-09-13); Chinese used to be
+     judged by direction alone and got the Latin size. The lang attribute
+     lets the stylesheet and the browser pick the font and glyph variants. */
+  const bubbleScript = textScript(msg.content);
+  const bubbleLang = textLang(msg.content);
   /* Memoised so the `?? []` fallback doesn't mint a new array each render
      and re-run everything downstream that depends on it. */
   const steps = useMemo(() => msg.steps ?? [], [msg.steps]);
@@ -255,10 +261,11 @@ function BubbleImpl({
                for bullets, headings, code blocks, tables, links. */
             ref={bubbleRef}
             dir={bubbleDir}
+            lang={bubbleLang}
             className={`rounded-2xl leading-relaxed ${
               isUser ? "whitespace-pre-wrap px-4 py-2.5" : "px-5 py-3.5"
             } ${
-              rtl ? "text-[16px]" : "text-[14px]"
+              bubbleScript === "ar" || bubbleScript === "zh" ? "text-[16px]" : "text-[14px]"
             } ${
               isUser
                 ? "bg-[var(--bg-inverted)] text-[var(--text-inverted)]"
