@@ -259,6 +259,8 @@ export type VoiceDeps = {
   liveGraceMs?: number;
   /** Test seam for the socket lane's wait for the far side's first event. */
   wsFirstEventMs?: number;
+  /** The canary's delay (WS_CANARY_AFTER_MS); the suite shortens it. */
+  wsCanaryAfterMs?: number;
   /** Test seam for the per-call cap, so the loop guard can be proved without
    *  making a dozen round trips. */
   maxToolCallsPerSession?: number;
@@ -333,8 +335,17 @@ export const WS_HANDSHAKE_TIMEOUT_MS = 15_000;
    in four seconds, one small GET to our own origin runs beside it, and its
    outcome rides in the failure beacon as `canary`: status and time, or
    timeout, or error. */
-const WS_CANARY_AFTER_MS = 4_000;
-const WS_CANARY_TIMEOUT_MS = 5_000;
+const WS_CANARY_AFTER_MS = 2_500;
+const WS_CANARY_TIMEOUT_MS = 3_500;
+/* AND THE CANARY'S VERDICT ENDS THE WAIT (2026-09-13 05:08 and 05:15, the
+   owner: "connecting is too slow"): our route answered in two seconds, the
+   answer never reached the phone, and the canary to our own origin timed
+   out in the same seconds — the tunnel was dead for a while — yet the
+   caller watched "connecting" until the fifteen-second deadline, and only
+   then did the fall-back lane run. An origin that does not answer a small
+   GET is not about to answer the POST: the canary's timeout or error now
+   ABORTS the handshake as a timeout, the call fails as service-unreachable,
+   and the fall-back runs within ~6 s of the tap instead of 15–20. */
 export const CANARY_PATH = "/api/version";
 /* A SOCKET THAT OPENS AND SAYS NOTHING IS NOT A CALL (2026-09-08 06:21: the
    socket to the vendor opened — readyState 1 — and for ninety-six seconds
@@ -366,6 +377,14 @@ export function describeError(e: unknown): string {
   const name = e instanceof Error ? e.name : typeof e === "object" ? (e as { name?: unknown }).name : "";
   const message = e instanceof Error ? e.message : typeof e === "string" ? e : "";
   return `${String(name || "Error")}: ${String(message ?? "")}`.replace(/[^\w .:()/-]/g, "").slice(0, 100);
+}
+
+/** A timeout, as the platform names one (isTimeoutError recognises it). */
+function timeoutError(why: string): Error {
+  if (typeof DOMException !== "undefined") return new DOMException(why, "TimeoutError");
+  const e = new Error(why);
+  e.name = "TimeoutError";
+  return e;
 }
 
 function isTimeoutError(e: unknown): boolean {
@@ -1582,16 +1601,29 @@ export class VoiceSession {
       });
       /* Same retry rule as the other lane: once, on a bare network error,
          never on our own deadline, never after a hang-up. */
+      /* ONE CONTROLLER FOR THE HANDSHAKE: our own deadline, and the canary's
+         verdict (WS_CANARY_TIMEOUT_MS) — either aborts the POST as a
+         timeout, which fails the call as service-unreachable. */
+      const ctrl = typeof AbortController !== "undefined" ? new AbortController() : null;
+      const abortAs = (why: string) => {
+        try {
+          ctrl?.abort(timeoutError(why));
+        } catch {
+          /* an engine whose abort() takes no reason */
+          try { ctrl?.abort(); } catch { /* gone */ }
+        }
+      };
+      const deadline = setTimeout(() => abortAs("handshake-deadline"), WS_HANDSHAKE_TIMEOUT_MS);
       const post = () => this.deps.fetchFn(path, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: handshakeBody,
-        ...(typeof AbortSignal !== "undefined" && "timeout" in AbortSignal ? { signal: AbortSignal.timeout(WS_HANDSHAKE_TIMEOUT_MS) } : {}),
+        ...(ctrl ? { signal: ctrl.signal } : {}),
         credentials: "include",
       });
       /* The canary runs only beside the call's own handshake — a redial's
          slowness is the outage the redial is already about. */
-      const disarmCanary = first ? this.armCanary() : () => {};
+      const disarmCanary = first ? this.armCanary(() => abortAs("origin-unreachable")) : () => {};
       let res: Response;
       try {
         try {
@@ -1604,6 +1636,7 @@ export class VoiceSession {
         }
       } finally {
         disarmCanary();
+        clearTimeout(deadline);
       }
       if (!alive()) return false;
       if (!res.ok) {
@@ -1817,7 +1850,8 @@ export class VoiceSession {
    *  own origin, its outcome kept for the beacon. Returns the disarm; a
    *  handshake that answers in time never sends one. A canary already in
    *  flight finishes on its own — its answer is still worth having. */
-  private armCanary(): () => void {
+  private armCanary(onDead: () => void): () => void {
+    let disarmed = false;
     const timer = setTimeout(() => {
       const t0 = Date.now();
       const took = () => `${Date.now() - t0}ms`;
@@ -1828,9 +1862,17 @@ export class VoiceSession {
           ...(typeof AbortSignal !== "undefined" && "timeout" in AbortSignal ? { signal: AbortSignal.timeout(WS_CANARY_TIMEOUT_MS) } : {}),
         }))
         .then((r) => { this.canary = `${r.status}:${took()}`; })
-        .catch((e) => { this.canary = `${isTimeoutError(e) ? "timeout" : "error"}:${took()}`; });
-    }, WS_CANARY_AFTER_MS);
-    return () => clearTimeout(timer);
+        .catch((e) => {
+          this.canary = `${isTimeoutError(e) ? "timeout" : "error"}:${took()}`;
+          /* Our origin did not answer: the handshake beside this will not
+             be answered either — end the wait now (see WS_CANARY_TIMEOUT_MS). */
+          if (!disarmed) onDead();
+        });
+    }, this.deps.wsCanaryAfterMs ?? WS_CANARY_AFTER_MS);
+    return () => {
+      disarmed = true;
+      clearTimeout(timer);
+    };
   }
 
   /** AN ANSWER THAT ENDED BADLY IS COUNTED BY HOW (2026-09-08 05:54, the

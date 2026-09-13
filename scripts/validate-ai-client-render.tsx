@@ -1254,7 +1254,26 @@ console.log("\n── The address carries the place: ?c=<chat>, ?view=library|ca
     /setCallsOpen\(false\);\s*syncUrl\(\{ c: id, view: null \}, urlModeRef\.current\);\s*urlModeRef\.current = "push";/.test(app) &&
     /setCallsOpen\(false\);\s*syncUrl\(\{ c: null, view: null \}, "push"\);/.test(app) &&
     /syncUrl\(\{ c: activeIdRef\.current, view: "library" \}, "push"\)/.test(app) && /syncUrl\(\{ c: activeIdRef\.current, view: "calls" \}, "push"\)/.test(app) &&
-    /urlModeRef\.current = "replace";\s*void openConversation\(stored\);/.test(app));
+    !/openConversation\(stored\)/.test(app));
+  /* THE APP OPENS ON A NEW CHAT (owner, 2026-09-13, "the ChatGPT way"): no
+     remembered last chat is written or reopened; ?c= still opens its chat;
+     the interrupted-call chip opens its own conversation by hand. */
+  check("the app opens on a new chat: the remembered-chat key is neither written nor read, and only a ?c= in the address or the caller opens one",
+    !/koleex-ai-active-chat:\$\{account\.id\}/.test(app) && !/activeIdKey/.test(app) && !/localStorage\.setItem\([^)]*activeId\)/.test(app) &&
+    /useEffect\(\(\) => \{\s*activeIdRef\.current = activeId;\s*\}, \[activeId\]\);/.test(app) &&
+    /if \(it\.conversation && it\.conversation !== activeIdRef\.current\) await openConversation\(it\.conversation\);/.test(app));
+  /* ONE LOOK FROM LOADER TO APP (owner, 2026-09-13: "it appears suddenly,
+     like a flash"): the root fades in, the aurora canvas fades in, opacity
+     only, none of it under reduced motion. */
+  check("the app's root fades in over 220 ms and the aurora canvas over 600 ms — opacity only, motion-safe only",
+    /className="kx-ai-root kx-ai-enter /.test(app) &&
+    (() => {
+      const css = readFileSync("src/app/globals.css", "utf8");
+      const canvas = readFileSync("src/components/ui/WavyBackground.tsx", "utf8");
+      return /@media \(prefers-reduced-motion: no-preference\) \{\s*\.kx-ai-enter \{ animation: kx-ai-enter 220ms ease-out both; \}\s*\.kx-aurora-canvas \{ animation: kx-aurora-in 600ms ease-out both; \}\s*\}/.test(css) &&
+        /@keyframes kx-ai-enter \{ from \{ opacity: 0; \} to \{ opacity: 1; \} \}/.test(css) && /@keyframes kx-aurora-in \{ from \{ opacity: 0; \} to \{ opacity: 1; \} \}/.test(css) &&
+        /className="absolute pointer-events-none kx-aurora-canvas"/.test(canvas);
+    })());
   check("  …a ?c= in the address wins over the remembered chat on load, and Back / Forward apply the address without pushing again",
     /const c = params\.get\("c"\);[\s\S]{0,200}?restoredRef\.current = true;\s*fromHistoryRef\.current = true;\s*try \{ void openConversation\(c\); \} finally \{ fromHistoryRef\.current = false; \}/.test(app) &&
     /window\.addEventListener\("popstate", onPop\);/.test(app) &&
