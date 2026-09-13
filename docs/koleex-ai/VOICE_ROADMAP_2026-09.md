@@ -1258,3 +1258,41 @@ call screen's card:
   bubble's live rule).
 
 Voice unchanged: the call keeps its card and its tap route.
+
+## Tasks by AI, phases 3 and 4 — the draft is proved, and the brief reaches the chat (2026-09-13)
+
+**Phase 3 — the secretary's extraction, measured.** The model extracts;
+the server decides. `ai-agent/tools/task-draft.ts` (new, pure) now holds
+what createTodo will write: times in the caller's zone, the reminder
+defaulted, people by name, the department as its colleagues spell it, or
+one NAMED refusal (`no-title`, `bad-due`, `bad-remind`, `unknown-person`,
+`unknown-department`, `everyone-denied` — the last a permission). createTodo
+resolves the people once and calls it. `validate:ai-tasks` runs THIRTY
+utterances — Arabic, Chinese, English — each with the arguments a model
+following THE SECRETARY'S WAY sends and the draft it must become: "remind
+me at 3" is 15:00 in Dubai and in Shanghai; "before Thursday" is Thursday
+17:00 with no reminder; "tomorrow morning" carries its reminder; "the
+design team" resolves to Design; "everyone" is refused for a sales user
+and granted to an admin; two Ahmeds guessed at is a refusal that sends the
+model back to findTeamMember; a bare "14:30" is refused, never guessed.
+Honest boundary: the model's half — that it sends those arguments for
+those words — is pinned by instruction and read in production logs, not
+simulated here.
+
+**Phase 4 — the brief on the text lane.**
+- `listMyTodos`: "today" and "week" are the CALLER's day
+  (`dayRangeISO(ctx.timezone)`), not the server's UTC day — for a caller in
+  Dubai or Shanghai the old bound started at 04:00 or 08:00 their time and
+  hid the morning's tasks; new `due: "reminders"` — tasks whose reminder
+  rings today, still open.
+- Text-lane prompt: TODAY'S BRIEF — calendar, open tasks and today's
+  reminders in ONE turn, then meetings in time order → due/overdue →
+  reminders with their times → the one thing first → what to start with;
+  a few short lines, no headers.
+- The first welcome tile now asks for the day's brief (en/zh/ar).
+- Suites: `validate:ai-tasks` 94 (the draft's behaviour, the thirty
+  utterances, the day bounds in two zones, the reminders filter, the
+  prompt, the tiles).
+
+Voice unchanged (its brief already reads tasks due and overdue; the
+`reminders` filter is available to it through the same tool).

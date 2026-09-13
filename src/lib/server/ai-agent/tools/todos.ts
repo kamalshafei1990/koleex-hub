@@ -32,7 +32,8 @@ import { sendPushToAccounts } from "../../web-push";
 import { listAssignableEmployees } from "../../assignable-employees";
 import type { ToolDef, ToolResult } from "../types";
 import { isUuid, BAD_ID_MESSAGE } from "../uuid";
-import { resolveTaskTime, resolveTaskDay, describeWhen, hasClockTime, parseRecurrence } from "./task-time";
+import { resolveTaskTime, resolveTaskDay, describeWhen, parseRecurrence } from "./task-time";
+import { buildTaskDraft, dayRangeISO, idList, type Person } from "./task-draft";
 
 const TODO_MODULE = "To-do";
 
@@ -78,14 +79,9 @@ const TODO_COLS = `id, title, description, status, completed, completed_at,
    colleagues actually have. An id not on the list is a hard error, never
    silently dropped; the model is told to look the person up again. One
    lookup serves all three groups. */
-type Person = { account_id: string; name: string; username: string; department: string | null };
 type PeopleResult =
   | { ok: true; people: Map<string, Person>; departments: Set<string> }
   | { ok: false; message: string };
-
-function idList(v: unknown): string[] {
-  return Array.isArray(v) ? Array.from(new Set(v.map((x) => String(x).trim()).filter(Boolean))) : [];
-}
 
 async function resolvePeople(tenantId: string | null, ids: string[], label: string): Promise<PeopleResult> {
   let all;
@@ -116,16 +112,6 @@ function personRef(p: Person): { account_id: string; full_name: string | null; u
   return { account_id: p.account_id, full_name: p.name, username: p.username };
 }
 
-/** Day boundaries in ISO for simple due filters. Server runtime (not the
- *  workflow sandbox) so Date is available. */
-function todayRangeISO(): { startOfToday: string; endOfToday: string; endOfWeek: string } {
-  const now = new Date();
-  const start = new Date(now); start.setHours(0, 0, 0, 0);
-  const end = new Date(now); end.setHours(23, 59, 59, 999);
-  const week = new Date(now); week.setDate(week.getDate() + 7); week.setHours(23, 59, 59, 999);
-  return { startOfToday: start.toISOString(), endOfToday: end.toISOString(), endOfWeek: week.toISOString() };
-}
-
 const listMyTodos: ToolDef<
   { filter?: string; due?: string; q?: string; limit?: number },
   Array<Record<string, unknown>>
@@ -144,8 +130,8 @@ const listMyTodos: ToolDef<
       due: {
         type: "string",
         description:
-          "Optional due filter. Default 'any' — use 'any' for general questions like 'what tasks do I have', 'what's on my plate', or even 'what do I have today' (an active task with NO due date is still something the user has, so 'any' surfaces it). Only use 'today' when the user explicitly asks what is DUE today (it excludes undated tasks); 'overdue' for past-due; 'week' for the next 7 days.",
-        enum: ["any", "overdue", "today", "week"],
+          "Optional due filter. Default 'any' — use 'any' for general questions like 'what tasks do I have', 'what's on my plate', or even 'what do I have today' (an active task with NO due date is still something the user has, so 'any' surfaces it). Only use 'today' when the user explicitly asks what is DUE today (it excludes undated tasks); 'overdue' for past-due; 'week' for the next 7 days; 'reminders' for tasks whose reminder rings today (for the day's brief). Days are the user's own, in their timezone.",
+        enum: ["any", "overdue", "today", "week", "reminders"],
       },
       q: { type: "string", description: "Title search (case-insensitive contains). Use when looking for a specific task by name." },
       limit: { type: "integer", description: "Max rows. Default 20, cap 50." },
@@ -208,12 +194,16 @@ const listMyTodos: ToolDef<
     if (filter === "open") q = q.eq("completed", false);
     else if (filter === "done") q = q.eq("completed", true);
 
+    /* THE DAY IS THE CALLER'S (tasks phase 4, 2026-09-13): "today" used to
+       be the server's UTC day — for a caller in Dubai or Shanghai that
+       started at 04:00 or 08:00 their time and hid the morning's tasks. */
     if (due !== "any") {
-      const { endOfToday, endOfWeek } = todayRangeISO();
+      const { startOfToday, endOfToday, endOfWeek } = dayRangeISO(ctx.timezone || "Asia/Dubai");
       const nowISO = new Date().toISOString();
       if (due === "overdue") q = q.lt("due_date", nowISO).eq("completed", false);
-      else if (due === "today") q = q.gte("due_date", nowISO.slice(0, 10)).lte("due_date", endOfToday);
+      else if (due === "today") q = q.gte("due_date", startOfToday).lte("due_date", endOfToday);
       else if (due === "week") q = q.gte("due_date", nowISO).lte("due_date", endOfWeek);
+      else if (due === "reminders") q = q.gte("remind_at", startOfToday).lte("remind_at", endOfToday).eq("completed", false);
     }
 
     const { data, error } = await q
@@ -366,85 +356,32 @@ const createTodo: ToolDef<
   requiredAction: "create",
   handler: async (ctx, args): Promise<ToolResult<Record<string, unknown> | { preview: Record<string, unknown> }>> => {
     const title = String(args.title ?? "").trim();
-    if (!title) {
-      return { ok: false, permissionStatus: "allowed", data: null, message: "What should the task be called? Give me a title." };
-    }
     const tz = ctx.timezone || "Asia/Dubai";
-    const priority = ["low", "medium", "high"].includes(String(args.priority)) ? String(args.priority) : "medium";
-    const dueIso = resolveTaskTime(args.due_date, tz, 17);
-    const remindIso = resolveTaskTime(args.remind_at, tz) ?? (dueIso && hasClockTime(args.due_date) ? dueIso : null);
-    const startDay = resolveTaskDay(args.start_date, tz);
-    const recurrence = parseRecurrence(args.recurrence);
-    const recurrenceUntil = recurrence ? resolveTaskDay(args.recurrence_until, tz) : null;
-    if (args.due_date && !dueIso) {
-      return { ok: false, permissionStatus: "allowed", data: null, message: "I couldn't read that due date — give it as an ISO date or a local date and time." };
-    }
-    if (args.remind_at && !remindIso) {
-      return { ok: false, permissionStatus: "allowed", data: null, message: "I couldn't read that reminder time — give it as a local date and time." };
-    }
-    const normalized = {
-      title,
-      description: args.description ? String(args.description) : null,
-      priority,
-      due_date: dueIso,
-      remind_at: remindIso,
-      start_date: startDay,
-      label: args.label ? String(args.label) : null,
-      recurrence,
-      recurrence_until: recurrenceUntil,
-      is_private: args.is_private === true,
-    };
-
-    /* PEOPLE. Assignees, observers and mentions resolve against the
-       assignable-employees list — the same internal/active/human source
-       every app picker uses. A department must be one those colleagues
-       have. "Everyone" is an admin's call, as a permission, not a failure. */
-    const assigneeIds = idList(args.assign_to_account_ids);
-    const observerIds = idList(args.observer_account_ids);
-    const mentionIds = idList(args.mention_account_ids);
+    /* PEOPLE, resolved once against the assignable-employees list — the same
+       internal/active/human source every app picker uses; the draft itself
+       is decided by pure code (task-draft.ts) so it can be proved. */
+    const everyone = [...idList(args.assign_to_account_ids), ...idList(args.observer_account_ids), ...idList(args.mention_account_ids)];
     const department = typeof args.assign_to_department === "string" ? args.assign_to_department.trim() : "";
-    const toAll = args.assign_to_all === true;
-    if (toAll) {
-      const ut = (ctx.auth.user_type ?? "").toLowerCase();
-      if (!ctx.isSuperAdmin && ut !== "admin") {
-        return {
-          ok: false,
-          permissionStatus: "denied",
-          data: null,
-          message: "You don't have permission to assign a task to everyone — that needs an admin account. I can assign it to named colleagues or to a department instead.",
-        };
-      }
-    }
-    const everyone = [...assigneeIds, ...observerIds, ...mentionIds];
     let people = new Map<string, Person>();
-    let departmentName: string | null = null;
+    let departments = new Set<string>();
     if (everyone.length > 0 || department) {
-      const r = await resolvePeople(ctx.auth.tenant_id, everyone, "createTodo");
+      const r = await resolvePeople(ctx.auth.tenant_id, [], "createTodo");
       if (!r.ok) return { ok: false, permissionStatus: "allowed", data: null, message: r.message };
       people = r.people;
-      if (department) {
-        if (!r.departments.has(department.toLowerCase())) {
-          return {
-            ok: false,
-            permissionStatus: "allowed",
-            data: null,
-            message: `I don't know a department called "${department}". The departments I can assign to: ${Array.from(r.departments).sort().join(", ") || "none"}.`,
-          };
-        }
-        /* The department as its colleagues spell it. */
-        departmentName = Array.from(r.people.values()).find((p) => (p.department ?? "").trim().toLowerCase() === department.toLowerCase())?.department?.trim() ?? department;
-      }
+      departments = r.departments;
     }
-    const assignees = assigneeIds.map((id) => people.get(id)!);
-    const observers = observerIds.map((id) => people.get(id)!);
-    const mentions = mentionIds.map((id) => people.get(id)!);
+    const ut = (ctx.auth.user_type ?? "").toLowerCase();
+    const built = buildTaskDraft(args, { tz, people, departments, isAdmin: ctx.isSuperAdmin || ut === "admin" });
+    if (!built.ok) {
+      return { ok: false, permissionStatus: built.permission ? "denied" : "allowed", data: null, message: built.message };
+    }
+    const { draft: normalized, assignees, observers, mentions, department: departmentName, toAll, who, when } = built;
+    const priority = normalized.priority;
+    const recurrence = normalized.recurrence;
+    const assigneeIds = assignees.map((p) => p.account_id);
+    const observerIds = observers.map((p) => p.account_id);
+    const mentionIds = mentions.map((p) => p.account_id);
     const names = (list: Person[]) => list.map((p) => p.name).join(", ");
-    const who = toAll ? "everyone" : [names(assignees), departmentName ? `the ${departmentName} team` : ""].filter(Boolean).join(" and ");
-    const when = {
-      due: describeWhen(normalized.due_date, tz),
-      remind: describeWhen(normalized.remind_at, tz),
-      start: normalized.start_date ?? "",
-    };
 
     // Phase 1: preview only — nothing is written.
     if (args.confirm !== true) {
