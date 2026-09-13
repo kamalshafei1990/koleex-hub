@@ -370,6 +370,13 @@ const FIELD_ICON_FALLBACK: Record<string, string> = {
   division: "general/business/building.svg", category: "pack/files/folder-tree.svg", subcategory: "pack/actions/layers.svg",
 };
 
+/** "garment-machinery" → "Garment Machinery". */
+function humanizeSlug(v: unknown): string {
+  const raw = typeof v === "string" ? v.trim() : "";
+  if (!raw) return "—";
+  return raw.replace(/[-_]+/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
 function fieldKeyForLabel(label: string): string {
   for (const [re, k] of FIELD_KEY_RULES) if (re.test(label)) return k;
   return "status";
@@ -417,8 +424,10 @@ function Val({ v, mono }: { v: unknown; mono?: boolean }) {
 /* The editor's Section card, field-for-field: icon in a rounded square,
    title, optional badge, collapse chevron. */
 function Group({
-  icon, title, count, onEdit, children, motion = "kx-tab-in",
+  icon, title, count, onEdit, children, motion = "kx-tab-in", editLabel = "Edit",
 }: { icon?: React.ReactNode; title: string; count?: string; onEdit?: () => void; children: React.ReactNode;
+  /** Translated by the caller — Group is presentational and has no dictionary. */
+  editLabel?: string;
   /** Entrance class — the profile passes useTabMotion's directional pick. */
   motion?: string }) {
   const [open, setOpen] = useState(true);
@@ -434,7 +443,7 @@ function Group({
         )}
         {onEdit && (
           <button type="button" onClick={onEdit} className="shrink-0 inline-flex items-center gap-1.5 text-[11px] font-medium text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors">
-            <PencilIcon className="h-3 w-3" /> Edit
+            <PencilIcon className="h-3 w-3" /> {editLabel}
           </button>
         )}
         <button type="button" onClick={() => setOpen(!open)} className="shrink-0 text-[var(--text-ghost)] hover:text-[var(--text-primary)] transition-colors" aria-label={open ? "Collapse" : "Expand"}>
@@ -452,26 +461,29 @@ function Group({
    The SAME eleven sections the editor shows, in the same order, under the
    same labels. The record and the editor are two views of one thing, so the
    navigation must not differ between them. */
+/* The tab strip. `k` is the dictionary key — the labels were raw English, so
+   the whole strip stayed in English while the page under it was Arabic. */
 const STEPS = [
-  { id: "classify",   short: "Classify" },
-  { id: "supplier",   short: "Supplier" },
-  { id: "identity",   short: "Hero" },
+  { id: "classify",   short: "Classify",           k: "step.classify" },
+  { id: "supplier",   short: "Supplier",           k: "step.supplier" },
+  { id: "identity",   short: "Hero",               k: "step.hero" },
   /* Owner call 2026-08-21: highlights get their OWN tab right after Hero. */
-  { id: "highlights", short: "Highlights" },
-  { id: "specs",      short: "Specs" },
-  { id: "commercial", short: "Variants" },
-  { id: "pricing",    short: "Price" },
+  { id: "highlights", short: "Highlights",         k: "step.highlights" },
+  { id: "specs",      short: "Specs",              k: "step.specs" },
+  { id: "commercial", short: "Variants",           k: "step.models" },
+  { id: "pricing",    short: "Price",              k: "step.price" },
   /* The same name as the editor's tab, because it is the same tab. */
-  { id: "logistics",  short: "Packing & Logistics" },
-  { id: "compliance", short: "Compliance" },
-  { id: "media",      short: "Media & Files" },
-  { id: "knowledge",  short: "Knowledge" },
-  { id: "finalize",   short: "Review" },
+  { id: "logistics",  short: "Packing & Logistics", k: "step.logistics" },
+  { id: "compliance", short: "Compliance",         k: "step.compliance" },
+  { id: "media",      short: "Media & Files",      k: "step.media" },
+  { id: "knowledge",  short: "Knowledge",          k: "step.knowledge" },
+  { id: "finalize",   short: "Review",             k: "step.review" },
 ] as const;
 
 /* The editor's own sticky tab bar, via the same canonical TabStrip — not a
    lookalike, the same component. */
 function ProfileTabs({ current, onPick }: { current: number; onPick: (i: number) => void }) {
+  const { t } = useTranslation(PRODUCTS_UI_I18N);
   /* This bar hosts the screen's ONE long ramp, so the main header pane
      must not add its flat frost on top — two filtered bands in the same
      strip read as two edges. Declared live, because only the component
@@ -498,7 +510,7 @@ function ProfileTabs({ current, onPick }: { current: number; onPick: (i: number)
         ariaLabel="Product sections"
         items={STEPS.map((st, i) => ({
           key: st.id,
-          label: st.short,
+          label: t(st.k, st.short),
           active: i === current,
           onClick: () => onPick(i),
         }))}
@@ -680,7 +692,7 @@ function PackingSheet({
     /* The empty state stands for the whole tab, so it takes the tab's own
        glyph rather than borrowing Origin & Customs' globe. */
     return (
-      <Group motion={motion} icon={<BoundIcon semanticKey="section.logistics" className="h-4 w-4" fallback={<TruckIcon className="h-4 w-4" />} />} title={t("pp.sec.logistics", "Packing & Logistics")} onEdit={onEdit}>
+      <Group motion={motion} icon={<BoundIcon semanticKey="section.logistics" className="h-4 w-4" fallback={<TruckIcon className="h-4 w-4" />} />} title={t("pp.sec.logistics", "Packing & Logistics")} editLabel={t("action.edit", "Edit")} onEdit={onEdit}>
         <p className="text-[12px] text-[var(--text-ghost)] leading-relaxed">
           {t("pp.f.packingEmpty", "Nothing entered yet. Open Edit to add the crate, its contents, weights and container quantities.")}
         </p>
@@ -691,7 +703,7 @@ function PackingSheet({
   return (
     <div className="space-y-4">
       {machine ? (
-        <Group motion={motion} icon={<RulerIcon className="h-4 w-4" />} title={t("tech.secPhysical", "Physical (Bare Machine)")} count={t("logistics.physicalBadge", "Dimensions · Weight")} onEdit={onEdit}>
+        <Group motion={motion} icon={<RulerIcon className="h-4 w-4" />} title={t("tech.secPhysical", "Physical (Bare Machine)")} count={t("logistics.physicalBadge", "Dimensions · Weight")} editLabel={t("action.edit", "Edit")} onEdit={onEdit}>
           <div className="flex flex-wrap gap-2.5">
             {pv("machine_dimensions") ? (
               <FactChip icon={<Maximize2Icon className="h-6 w-6" />} label={t("pp.f.machineDims", "Machine dimensions")} value={`${String(pv("machine_dimensions"))} mm`} />
@@ -704,7 +716,7 @@ function PackingSheet({
       ) : null}
 
       {packing ? (
-        <Group motion={motion} icon={<PackageIcon className="h-4 w-4" />} title={t("logistics.packingSection", "Packing")} count={t("logistics.packingSectionBadge", "Crates · Weights")} onEdit={onEdit}>
+        <Group motion={motion} icon={<PackageIcon className="h-4 w-4" />} title={t("logistics.packingSection", "Packing")} count={t("logistics.packingSectionBadge", "Crates · Weights")} editLabel={t("action.edit", "Edit")} onEdit={onEdit}>
           {logistics.packing_photo_url ? (
             /* eslint-disable-next-line @next/next/no-img-element */
             <img
@@ -786,7 +798,7 @@ function PackingSheet({
       ) : null}
 
       {loading ? (
-        <Group motion={motion} icon={<ShipIcon className="h-4 w-4" />} title={t("logistics.loadingSection", "Loading & Containers")} count={t("logistics.loadingSectionBadge", "20ft · 40ft · 40HQ")} onEdit={onEdit}>
+        <Group motion={motion} icon={<ShipIcon className="h-4 w-4" />} title={t("logistics.loadingSection", "Loading & Containers")} count={t("logistics.loadingSectionBadge", "20ft · 40ft · 40HQ")} editLabel={t("action.edit", "Edit")} onEdit={onEdit}>
           {/* Three numbers, three tiles: this is the question a forwarder asks
               and it should be answerable at a glance, not read out of a list. */}
           <div className="grid grid-cols-3 gap-2.5">
@@ -812,7 +824,7 @@ function PackingSheet({
       ) : null}
 
       {customs ? (
-        <Group motion={motion} icon={<GlobeIcon className="h-4 w-4" />} title={t("logistics.title", "Origin & Customs")} count={t("logistics.badge", "Shipping · Customs")} onEdit={onEdit}>
+        <Group motion={motion} icon={<GlobeIcon className="h-4 w-4" />} title={t("logistics.title", "Origin & Customs")} count={t("logistics.badge", "Shipping · Customs")} editLabel={t("action.edit", "Edit")} onEdit={onEdit}>
           <div className="flex flex-wrap gap-2.5">
             {pv("country_of_origin") ? (
               <FactChip icon={<FlagIcon className="h-6 w-6" />} label={t("pp.f.origin", "Country of origin")} value={String(pv("country_of_origin"))} />
@@ -841,7 +853,7 @@ function PackingSheet({
       ) : null}
 
       {order ? (
-        <Group motion={motion} icon={<ClipboardCheckIcon className="h-4 w-4" />} title={t("technical.fulfillmentDefaults", "Fulfillment Defaults")} count={t("technical.fulfillmentBadge", "MOQ · Lead Time")} onEdit={onEdit}>
+        <Group motion={motion} icon={<ClipboardCheckIcon className="h-4 w-4" />} title={t("technical.fulfillmentDefaults", "Fulfillment Defaults")} count={t("technical.fulfillmentBadge", "MOQ · Lead Time")} editLabel={t("action.edit", "Edit")} onEdit={onEdit}>
           <div className="flex flex-wrap gap-2.5">
             {pv("moq") ? (
               <FactChip icon={<ShoppingCartIcon className="h-6 w-6" />} label={t("pp.f.moq", "MOQ")} value={String(pv("moq"))} />
@@ -1018,7 +1030,9 @@ export default function ProductProfile() {
         </h1>
         <span className="text-[11px] font-mono text-[var(--text-dim)] shrink-0">{(data.models[0]?.primary_model as string) || ""}</span>
         <span className="inline-flex items-center px-2 py-0.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[10px] font-semibold uppercase tracking-wider text-[var(--text-muted)] shrink-0">
-          {(s2("status") as string) || "draft"}
+          {/* An enum, not a caption: it must go through the dictionary or the
+              badge reads "draft" in an Arabic sentence. */}
+          {(() => { const st = (s2("status") as string) || "draft"; return t(`status.${st}`, st); })()}
         </span>
         {readiness != null && (
           <span className="hidden sm:inline-flex items-center gap-1.5 text-[11px] text-[var(--text-dim)] shrink-0">
@@ -1210,9 +1224,16 @@ export default function ProductProfile() {
       {STEPS[step].id !== "classify" && (
         <div className="flex items-center gap-2 flex-wrap text-[12px] mb-4 px-1">
           <span className="uppercase tracking-wider text-[10px] text-[var(--text-ghost)]">{t("pp.f.classification", "Classification")}:</span>
-          <span className="text-[var(--text-dim)]">{(s2("division_slug") as string) || "—"}</span>
+          {/* A SLUG IS A URL FRAGMENT, NOT A LABEL. Only the subcategory is
+              fetched as a row with a name, so the first two links printed
+              "garment-machinery" and "fabric-preparation" verbatim — which
+              reads as leftover code in every language, Arabic included.
+              Title-casing is the honest half-measure available without a
+              second request; the real fix is to fetch the division and
+              category rows and show their localised names. */}
+          <span className="text-[var(--text-dim)]">{humanizeSlug(s2("division_slug") as string)}</span>
           <AngleRightIcon className="h-3 w-3 text-[var(--text-ghost)]" />
-          <span className="text-[var(--text-dim)]">{(s2("category_slug") as string) || "—"}</span>
+          <span className="text-[var(--text-dim)]">{humanizeSlug(s2("category_slug") as string)}</span>
           <AngleRightIcon className="h-3 w-3 text-[var(--text-ghost)]" />
           <span className="text-[var(--text-primary)] font-medium">{data.subcategory?.name ?? "—"}</span>
           {data.subcategory?.code && (
@@ -1223,10 +1244,10 @@ export default function ProductProfile() {
 
       {/* ── Step panels — one at a time, exactly like the editor ── */}
       {STEPS[step].id === "classify" && (
-      <Group motion={tabMotion} icon={<BoundIcon semanticKey="field.category" className="h-4 w-4" fallback={<FolderTreeIcon className="h-4 w-4" />} />} title={t("pp.sec.classification", "Classification")} onEdit={() => goStep("classify")}>
+      <Group motion={tabMotion} icon={<BoundIcon semanticKey="field.category" className="h-4 w-4" fallback={<FolderTreeIcon className="h-4 w-4" />} />} title={t("pp.sec.classification", "Classification")} editLabel={t("action.edit", "Edit")} onEdit={() => goStep("classify")}>
         <div className={rows}>
-          <Row label={t("pp.f.division", "Division")} value={s2("division_slug")} iconSrc={classIcons.division?.[String(s2("division_slug") ?? "")]} />
-          <Row label={t("pp.f.category", "Category")} value={s2("category_slug")} iconSrc={classIcons.category?.[String(s2("category_slug") ?? "")]} />
+          <Row label={t("pp.f.division", "Division")} value={humanizeSlug(s2("division_slug"))} iconSrc={classIcons.division?.[String(s2("division_slug") ?? "")]} />
+          <Row label={t("pp.f.category", "Category")} value={humanizeSlug(s2("category_slug"))} iconSrc={classIcons.category?.[String(s2("category_slug") ?? "")]} />
           <Row label={t("pp.f.subcategory", "Subcategory")} value={data.subcategory?.name ?? s2("subcategory_slug")} iconSrc={classIcons.subcategory?.[String(s2("subcategory_slug") ?? "")]} />
           <Row label={t("pp.f.subCode", "Subcategory code")} value={data.subcategory?.code} mono />
           {/* "Not set" reads as MISSING data, but a standalone product
@@ -1257,7 +1278,7 @@ export default function ProductProfile() {
       )}
 
       {STEPS[step].id === "supplier" && (
-      <Group motion={tabMotion} icon={<BoundIcon semanticKey="field.supplier" className="h-4 w-4" fallback={<FactoryIcon className="h-4 w-4" />} />} title={t("pp.sec.supplier", "Supplier & Sourcing")} count={`${data.suppliers.length}`} onEdit={() => goStep("supplier")}>
+      <Group motion={tabMotion} icon={<BoundIcon semanticKey="field.supplier" className="h-4 w-4" fallback={<FactoryIcon className="h-4 w-4" />} />} title={t("pp.sec.supplier", "Supplier & Sourcing")} count={`${data.suppliers.length}`} editLabel={t("action.edit", "Edit")} onEdit={() => goStep("supplier")}>
         {data.suppliers.length === 0 ? (
           <p className="text-[12px] text-[var(--text-ghost)] italic">{t("pp.e.noSupplier", "No supplier linked.")}</p>
         ) : (
@@ -1311,7 +1332,7 @@ export default function ProductProfile() {
       <div className="space-y-4">
         {/* Same two-column hero the editor opens with: the product photo owns
             the left, status/visibility/name the right. */}
-        <Group motion={tabMotion} icon={<BoundIcon semanticKey="section.hero" className="h-4 w-4" fallback={<SparklesIcon className="h-4 w-4" />} />} title={t("pp.sec.identity", "Identity & lifecycle")} onEdit={() => goStep("identity")}>
+        <Group motion={tabMotion} icon={<BoundIcon semanticKey="section.hero" className="h-4 w-4" fallback={<SparklesIcon className="h-4 w-4" />} />} title={t("pp.sec.identity", "Identity & lifecycle")} editLabel={t("action.edit", "Edit")} onEdit={() => goStep("identity")}>
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 mb-5">
             <div>
               <div className="text-[10.5px] uppercase tracking-wider text-[var(--text-ghost)] mb-2">
@@ -1350,7 +1371,7 @@ export default function ProductProfile() {
             <Row label={t("pp.f.statusReason", "Status reason")} value={s2("status_reason")} />
           </div>
         </Group>
-        <Group motion={tabMotion} icon={<BoundIcon semanticKey="field.description" className="h-4 w-4" fallback={<SparklesIcon className="h-4 w-4" />} />} title={t("pp.sec.description", "Description")} onEdit={() => goStep("identity")}>
+        <Group motion={tabMotion} icon={<BoundIcon semanticKey="field.description" className="h-4 w-4" fallback={<SparklesIcon className="h-4 w-4" />} />} title={t("pp.sec.description", "Description")} editLabel={t("action.edit", "Edit")} onEdit={() => goStep("identity")}>
           <div className="space-y-4">
             <Row label={t("pp.f.excerpt", "Short description")} value={s2("excerpt")} />
             <Row label={t("pp.f.description", "Full description")} value={s2("description")} />
@@ -1358,7 +1379,7 @@ export default function ProductProfile() {
             <Row label={t("pp.f.tags", "Tags")} value={s2("tags")} />
           </div>
         </Group>
-        <Group motion={tabMotion} icon={<BoundIcon semanticKey="field.languages" className="h-4 w-4" fallback={<SparklesIcon className="h-4 w-4" />} />} title={t("pp.sec.languages", "Languages & markets")} count={`${data.translations.length}`} onEdit={() => goStep("identity")}>
+        <Group motion={tabMotion} icon={<BoundIcon semanticKey="field.languages" className="h-4 w-4" fallback={<SparklesIcon className="h-4 w-4" />} />} title={t("pp.sec.languages", "Languages & markets")} count={`${data.translations.length}`} editLabel={t("action.edit", "Edit")} onEdit={() => goStep("identity")}>
           {data.translations.length === 0
             ? <p className="text-[12px] text-[var(--text-ghost)] italic">{t("pp.e.englishOnly", "English only — no localized names recorded.")}</p>
             : <div className={rows}>{data.translations.map((tr, i) => <Row key={i} label={String(tr.locale ?? "?")} value={tr.product_name} />)}</div>}
@@ -1368,7 +1389,7 @@ export default function ProductProfile() {
 
       {STEPS[step].id === "specs" && (
       !data.schema ? (
-        <Group motion={tabMotion} icon={<BoundIcon semanticKey="field.spec_template" className="h-4 w-4" fallback={<Settings2Icon className="h-4 w-4" />} />} title={t("pp.sec.specs", "Specifications")} onEdit={() => goStep("specs")}>
+        <Group motion={tabMotion} icon={<BoundIcon semanticKey="field.spec_template" className="h-4 w-4" fallback={<Settings2Icon className="h-4 w-4" />} />} title={t("pp.sec.specs", "Specifications")} editLabel={t("action.edit", "Edit")} onEdit={() => goStep("specs")}>
           <p className="text-[12px] text-[var(--text-ghost)] italic">
             {t("pp.e.noTemplate", "No spec template resolves for this classification, so there are no specification fields to fill.")}
           </p>
@@ -1389,7 +1410,7 @@ export default function ProductProfile() {
                 icon={<Settings2Icon className="h-4 w-4" />}
                 title={g.title || g.key || ""}
                 count={`${done}/${fields.length}`}
-                onEdit={() => goStep("specs")}
+                editLabel={t("action.edit", "Edit")} onEdit={() => goStep("specs")}
               >
                 {/* One field per row with its own help line — the editor's
                     shape. A four-column grid packed more in but stripped the
@@ -1435,7 +1456,7 @@ export default function ProductProfile() {
       )}
 
       {STEPS[step].id === "commercial" && (
-      <Group motion={tabMotion} icon={<BoundIcon semanticKey="field.family" className="h-4 w-4" fallback={<BoxesIcon className="h-4 w-4" />} />} title={t("pp.sec.variants", "Variants")} count={`${data.models.length}`} onEdit={() => goStep("commercial")}>
+      <Group motion={tabMotion} icon={<BoundIcon semanticKey="field.family" className="h-4 w-4" fallback={<BoxesIcon className="h-4 w-4" />} />} title={t("pp.sec.variants", "Variants")} count={`${data.models.length}`} editLabel={t("action.edit", "Edit")} onEdit={() => goStep("commercial")}>
         {data.models.length === 0 ? (
           <p className="text-[12px] text-[var(--text-ghost)] italic">{t("pp.e.noVariant", "No variant recorded — a product needs at least one.")}</p>
         ) : (
@@ -1506,7 +1527,7 @@ export default function ProductProfile() {
       )}
 
       {STEPS[step].id === "pricing" && (
-      <Group motion={tabMotion} icon={<BoundIcon semanticKey="field.price" className="h-4 w-4" fallback={<DollarSignIcon className="h-4 w-4" />} />} title={t("pp.sec.price", "Cost & Price")} count={`${data.models.length} variant`} onEdit={() => goStep("pricing")}>
+      <Group motion={tabMotion} icon={<BoundIcon semanticKey="field.price" className="h-4 w-4" fallback={<DollarSignIcon className="h-4 w-4" />} />} title={t("pp.sec.price", "Cost & Price")} count={`${data.models.length} variant`} editLabel={t("action.edit", "Edit")} onEdit={() => goStep("pricing")}>
         {data.models.length === 0 ? (
           <p className="text-[12px] text-[var(--text-ghost)] italic">{t("pp.e.noPrice", "No variant to price.")}</p>
         ) : (
@@ -1573,7 +1594,7 @@ export default function ProductProfile() {
       )}
 
       {STEPS[step].id === "compliance" && (
-      <Group motion={tabMotion} icon={<BoundIcon semanticKey="field.certifications" className="h-4 w-4" fallback={<ShieldCheckIcon className="h-4 w-4" />} />} title={t("pp.sec.compliance", "Compliance & Warranty")} count={`${data.certifications.length} cert`} onEdit={() => goStep("compliance")}>
+      <Group motion={tabMotion} icon={<BoundIcon semanticKey="field.certifications" className="h-4 w-4" fallback={<ShieldCheckIcon className="h-4 w-4" />} />} title={t("pp.sec.compliance", "Compliance & Warranty")} count={`${data.certifications.length} cert`} editLabel={t("action.edit", "Edit")} onEdit={() => goStep("compliance")}>
         <div className={rows}>
           <Row label={t("pp.f.warrMonths", "Warranty (months)")} value={s2("warranty_months")} />
           <Row label={t("pp.f.warrType", "Warranty type")} value={s2("warranty_type")} />
@@ -1609,13 +1630,13 @@ export default function ProductProfile() {
       {/* Feature Highlights — its own tab (owner call): catalog-style
           photo+explanation cards; the component fetches itself. */}
       {STEPS[step].id === "highlights" && (
-        <Group motion={tabMotion} icon={<ImageRawIcon className="h-4 w-4" />} title={t("pp.sec.highlights", "Feature Highlights")} count="" onEdit={() => goStep("highlights")}>
+        <Group motion={tabMotion} icon={<ImageRawIcon className="h-4 w-4" />} title={t("pp.sec.highlights", "Feature Highlights")} count="" editLabel={t("action.edit", "Edit")} onEdit={() => goStep("highlights")}>
           <FeatureHighlightsDisplay productId={String(data.product.id ?? "")} />
         </Group>
       )}
 
       {STEPS[step].id === "media" && (<>
-      <Group motion={tabMotion} icon={<BoundIcon semanticKey="field.photos" className="h-4 w-4" fallback={<ImageRawIcon className="h-4 w-4" />} />} title={t("pp.sec.media", "Media & Documents")} count={`${data.media.length} media · ${data.documents.length} docs`} onEdit={() => goStep("media")}>
+      <Group motion={tabMotion} icon={<BoundIcon semanticKey="field.photos" className="h-4 w-4" fallback={<ImageRawIcon className="h-4 w-4" />} />} title={t("pp.sec.media", "Media & Documents")} count={`${data.media.length} media · ${data.documents.length} docs`} editLabel={t("action.edit", "Edit")} onEdit={() => goStep("media")}>
         {/* Photo / file slots — every slot, filled or not. */}
         <div className="space-y-4">
           {MEDIA_SLOTS.map((slot) => {
@@ -1683,7 +1704,7 @@ export default function ProductProfile() {
       </>)}
 
       {STEPS[step].id === "knowledge" && (
-      <Group motion={tabMotion} icon={<BoundIcon semanticKey="field.knowledge" className="h-4 w-4" fallback={<BookOpenIcon className="h-4 w-4" />} />} title={t("pp.sec.knowledge", "Knowledge & Relationships")} count={`${data.related.length} linked`} onEdit={() => goStep("knowledge")}>
+      <Group motion={tabMotion} icon={<BoundIcon semanticKey="field.knowledge" className="h-4 w-4" fallback={<BookOpenIcon className="h-4 w-4" />} />} title={t("pp.sec.knowledge", "Knowledge & Relationships")} count={`${data.related.length} linked`} editLabel={t("action.edit", "Edit")} onEdit={() => goStep("knowledge")}>
         <div className={rows}>
           <Row label={t("pp.f.knowledge", "Knowledge blocks")} value={((s2("schema_knowledge") as unknown[]) ?? []).length || null} />
         </div>

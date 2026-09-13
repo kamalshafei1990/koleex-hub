@@ -1412,6 +1412,12 @@ export const PRODUCTS_UI_I18N: Translations = {
   "pk.dropHere":           { en: "…or drag an image here", zh: "…或将图片拖到此处", ar: "…أو اسحب صورة هنا" },
   "step.compliance": { en: "Compliance", zh: "合规", ar: "الامتثال" },
   "step.knowledge": { en: "Knowledge", zh: "知识", ar: "المعرفة" },
+  /* Profile tab strip + chrome (2026-09-13). These labels were raw English, so
+     the strip stayed English over an Arabic page. */
+  "step.highlights": { en: "Highlights", zh: "亮点", ar: "المزايا" },
+  "action.edit":     { en: "Edit", zh: "编辑", ar: "تعديل" },
+  "pp.backShort":    { en: "Product Data", zh: "产品数据", ar: "بيانات المنتجات" },
+  "pp.sec.highlights": { en: "Feature Highlights", zh: "功能亮点", ar: "مزايا المنتج" },
   /* ── legacy Technical Details block ── */
   "tech.voltage": { en: "Voltage Options", zh: "电压选项", ar: "خيارات الجهد" },
 
