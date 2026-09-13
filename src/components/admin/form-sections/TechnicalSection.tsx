@@ -3,6 +3,7 @@
 import { useTranslation } from "@/lib/i18n";
 import KdsSelect from "@/components/kds/Select";
 import { PRODUCTS_UI_I18N } from "@/lib/products-ui-i18n";
+import { LENGTH_UNITS, MASS_UNITS, displayIn, isLengthUnit, isMassUnit, storeFrom, useEntryUnits, type LengthUnit } from "@/lib/entry-units";
 import { useState, useRef, useEffect, type ReactNode } from "react";
 import CrossIcon from "@/components/icons/ui/CrossIcon";
 import AngleDownIcon from "@/components/icons/ui/AngleDownIcon";
@@ -214,6 +215,61 @@ function FieldLabel({ icon, children, helpText }: { icon: ReactNode; children: R
    plus a fixed unit indicator inside the input.
    ───────────────────────────────────────────────────────────────────────── */
 
+/* A number with a unit suffix — and, where that unit is convertible, a picker.
+ *
+ * Only lengths and masses convert: watts are watts, and a picker beside them
+ * would be noise. The stored number stays in the unit the field declares (kg
+ * for machine weight), so nothing that reads the column learns a choice was
+ * made; the switch is shared with the rest of the form. The raw keystroke
+ * draft is what lets a decimal be typed at all — converting on every keystroke
+ * and echoing back turns "1." into "1". */
+function UnitNumberInput({
+  value, unit, placeholder, onChange,
+}: { value: string; unit: string; placeholder?: string; onChange: (v: string) => void }) {
+  const { length, mass, setLength, setMass } = useEntryUnits();
+  const convertible = isLengthUnit(unit) || isMassUnit(unit);
+  const entry = isLengthUnit(unit) ? length : isMassUnit(unit) ? mass : unit;
+  const [raw, setRaw] = useState<string | undefined>(undefined);
+  const shown = !convertible ? value : raw !== undefined ? raw : displayIn(value, unit, entry);
+  return (
+    <div className="relative">
+      <input
+        inputMode="decimal"
+        value={shown}
+        onChange={(e) => {
+          if (!convertible) { onChange(e.target.value); return; }
+          setRaw(e.target.value);
+          onChange(String(storeFrom(e.target.value, unit, entry)));
+        }}
+        onBlur={() => setRaw(undefined)}
+        placeholder={placeholder}
+        className="w-full h-10 pl-4 pr-14 rounded-lg bg-[var(--bg-inverted)]/[0.05] border border-[var(--border-subtle)] text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-dim)] outline-none focus:border-[var(--border-focus)] transition-colors"
+      />
+      {convertible ? (
+        <select
+          value={entry}
+          onChange={(e) => {
+            setRaw(undefined);
+            const u = e.target.value;
+            if (isLengthUnit(u)) setLength(u); else if (isMassUnit(u)) setMass(u);
+          }}
+          aria-label={`Unit — stored in ${unit}`}
+          title={`Type in any unit. Stored in ${unit}.`}
+          className="absolute right-2 top-1/2 -translate-y-1/2 bg-transparent text-[11px] font-semibold text-[var(--text-muted)] hover:text-[var(--text-primary)] outline-none cursor-pointer"
+        >
+          {(isLengthUnit(unit) ? LENGTH_UNITS : MASS_UNITS).map((u) => (
+            <option key={u} value={u} className="bg-[var(--bg-surface)] text-[var(--text-primary)]">{u}</option>
+          ))}
+        </select>
+      ) : (
+        <span className="absolute right-4 top-1/2 -translate-y-1/2 text-[10px] font-medium text-[var(--text-ghost)] pointer-events-none">
+          {unit}
+        </span>
+      )}
+    </div>
+  );
+}
+
 function NumberUnit({
   label,
   value,
@@ -240,18 +296,7 @@ function NumberUnit({
           {label}
         </label>
       )}
-      <div className="relative">
-        <input
-          type="number"
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          placeholder={placeholder}
-          className="w-full h-10 pl-4 pr-12 rounded-lg bg-[var(--bg-inverted)]/[0.05] border border-[var(--border-subtle)] text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-dim)] outline-none focus:border-[var(--border-focus)] transition-colors"
-        />
-        <span className="absolute right-4 top-1/2 -translate-y-1/2 text-[10px] font-medium text-[var(--text-ghost)] pointer-events-none">
-          {unit}
-        </span>
-      </div>
+      <UnitNumberInput value={value} unit={unit} placeholder={placeholder} onChange={onChange} />
       {helpText && (
         <p className="text-[10px] text-[var(--text-ghost)] mt-1">{helpText}</p>
       )}
@@ -458,14 +503,26 @@ export default function TechnicalSection({ data, onChange, hiddenFields }: Props
  */
 function MachineDimensionFields({ value, onChange }: { value: string; onChange: (v: string) => void }) {
   const { t } = useTranslation(PRODUCTS_UI_I18N);
+  /* Same unit choice as everywhere else on the form — the schema-driven copy of
+     this field and the packing crates all read it — and the same canonical
+     storage: millimetres, whatever the switch says. */
+  const { length: entry, setLength } = useEntryUnits();
+  const [raw, setRaw] = useState<Record<number, string>>({});
   const parts = (value || "").split(/[×xX*,]/).map((x) => x.trim());
-  const [l, w, h] = [parts[0] ?? "", parts[1] ?? "", parts[2] ?? ""];
-  const compose = (a: string, b: string, c: string) => (!a && !b && !c ? "" : `${a}×${b}×${c}`);
-  const box = (v: string, ph: string, set: (x: string) => void) => (
+  const stored = [parts[0] ?? "", parts[1] ?? "", parts[2] ?? ""];
+  const compose = (next: string[]) => (next.every((x) => x === "") ? "" : `${next[0]}×${next[1]}×${next[2]}`);
+  const setAt = (i: number, typed: string) => {
+    setRaw((m) => ({ ...m, [i]: typed }));
+    const next = [...stored];
+    next[i] = String(storeFrom(typed, "mm", entry));
+    onChange(compose(next));
+  };
+  const box = (i: number, ph: string) => (
     <input
-      type="number"
-      value={v}
-      onChange={(e) => set(e.target.value)}
+      inputMode="decimal"
+      value={raw[i] !== undefined ? raw[i] : displayIn(stored[i], "mm", entry)}
+      onChange={(e) => setAt(i, e.target.value)}
+      onBlur={() => setRaw((m) => { const n = { ...m }; delete n[i]; return n; })}
       placeholder={ph}
       className="min-w-0 flex-1 h-10 px-3 rounded-lg bg-[var(--bg-inverted)]/[0.05] border border-[var(--border-subtle)] text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-dim)] outline-none focus:border-[var(--border-focus)] transition-colors tabular-nums"
     />
@@ -476,15 +533,25 @@ function MachineDimensionFields({ value, onChange }: { value: string; onChange: 
         {t("tech.machineDimsLwh", "Machine Dimensions (L × W × H)")}
       </FieldLabel>
       <div className="flex items-center gap-2">
-        {box(l, "L", (x) => onChange(compose(x, w, h)))}
+        {box(0, "L")}
         <span className="text-[var(--text-ghost)] shrink-0">×</span>
-        {box(w, "W", (x) => onChange(compose(l, x, h)))}
+        {box(1, "W")}
         <span className="text-[var(--text-ghost)] shrink-0">×</span>
-        {box(h, "H", (x) => onChange(compose(l, w, x)))}
-        <span className="text-[11px] font-medium text-[var(--text-ghost)] shrink-0">mm</span>
+        {box(2, "H")}
+        <select
+          value={entry}
+          onChange={(e) => { setRaw({}); setLength(e.target.value as LengthUnit); }}
+          aria-label="Unit — stored in mm"
+          title="Type in any unit. Stored in mm."
+          className="shrink-0 bg-transparent text-[11px] font-semibold text-[var(--text-muted)] hover:text-[var(--text-primary)] outline-none cursor-pointer"
+        >
+          {LENGTH_UNITS.map((u) => (
+            <option key={u} value={u} className="bg-[var(--bg-surface)] text-[var(--text-primary)]">{u}</option>
+          ))}
+        </select>
       </div>
       <p className="text-[10px] text-[var(--text-ghost)] mt-1">
-        {t("tech.machineDimsHelp", "Footprint of the machine in operation, in millimetres. The crate is entered separately under Packing.")}
+        {t("tech.machineDimsHelp2", "Footprint of the machine in operation. Type in mm, cm or m — it is stored in mm. The crate is entered separately under Packing.")}
       </p>
     </div>
   );

@@ -19,8 +19,11 @@
    owns the values object and persistence.
    --------------------------------------------------------------------------- */
 
-import { useMemo, useState, useRef, useEffect } from "react";
+import { Fragment, useMemo, useState, useRef, useEffect } from "react";
 import { useTranslation } from "@/lib/i18n";
+import {
+  LENGTH_UNITS, MASS_UNITS, displayIn, isLengthUnit, isMassUnit, storeFrom, useEntryUnits,
+} from "@/lib/entry-units";
 import { SPEC_I18N, SPEC_DESC_I18N, SPEC_NAME_I18N } from "@/lib/product-schema/spec-i18n";
 import { PRODUCTS_UI_I18N } from "@/lib/products-ui-i18n";
 import { createPortal } from "react-dom";
@@ -128,6 +131,136 @@ const isFilled = (v: unknown): boolean => {
 
 const asStringArray = (raw: unknown): string[] =>
   Array.isArray(raw) ? raw.map((x) => String(x)) : [];
+
+/* Dimension — three boxes, typed in whatever unit the operator picked and
+   stored in the schema's own (`field.unit`, normally mm).
+
+   The raw-keystroke draft is not optional: converting on every keystroke and
+   echoing the result back turns "1." into Number("1.") = 1 and re-renders as
+   "1", so a decimal could never be typed at all. While a box is being typed
+   into it shows exactly what was typed; the store still receives the
+   converted number on every keystroke. */
+function DimensionField({
+  field, value, onSet,
+}: { field: SpecField; value: unknown; onSet: (v: unknown) => void }) {
+  const { length, mass, setLength, setMass } = useEntryUnits();
+  const canonical = field.unit || "";
+  const entry = isLengthUnit(canonical) ? length : isMassUnit(canonical) ? mass : canonical;
+  const [raw, setRaw] = useState<Record<string, string>>({});
+
+  const parts = typeof value === "string" ? value.split(/[×xX*,]/).map((x) => x.trim()) : [];
+  const stored = [parts[0] ?? "", parts[1] ?? "", parts[2] ?? ""];
+  const shown = stored.map((v, i) => (raw[i] !== undefined ? raw[i] : displayIn(v, canonical, entry)));
+
+  const setAt = (i: number, typed: string) => {
+    setRaw((m) => ({ ...m, [i]: typed }));
+    const next = [...stored];
+    next[i] = String(storeFrom(typed, canonical, entry));
+    onSet(next.every((x) => x === "") ? undefined : `${next[0]}×${next[1]}×${next[2]}`);
+  };
+  const clearDraft = (i: number) => setRaw((m) => { const n = { ...m }; delete n[i]; return n; });
+
+  return (
+    <div className="flex items-center gap-2">
+      {[0, 1, 2].map((i) => (
+        <Fragment key={i}>
+          {i > 0 ? <span className="text-[var(--text-ghost)] shrink-0">×</span> : null}
+          <input
+            inputMode="decimal"
+            value={shown[i]}
+            onChange={(e) => setAt(i, e.target.value)}
+            onBlur={() => clearDraft(i)}
+            placeholder={["L", "W", "H"][i]}
+            className={`${inputCls} min-w-0 flex-1`}
+          />
+        </Fragment>
+      ))}
+      {canonical ? (
+        <UnitSuffix
+          canonical={canonical}
+          entry={entry}
+          onPick={(u) => {
+            setRaw({});
+            if (isLengthUnit(u)) setLength(u);
+            else if (isMassUnit(u)) setMass(u);
+          }}
+        />
+      ) : null}
+    </div>
+  );
+}
+
+/* Single number with a unit — same contract as DimensionField. */
+function UnitNumberField({
+  field, value, onSet,
+}: { field: SpecField; value: unknown; onSet: (v: unknown) => void }) {
+  const { length, mass, setLength, setMass } = useEntryUnits();
+  const canonical = field.unit || "";
+  const entry = isLengthUnit(canonical) ? length : isMassUnit(canonical) ? mass : canonical;
+  const [raw, setRaw] = useState<string | undefined>(undefined);
+  const shown = raw !== undefined ? raw : displayIn(value, canonical, entry);
+  return (
+    <div className="relative">
+      <input
+        inputMode="decimal"
+        value={shown}
+        onChange={(e) => {
+          setRaw(e.target.value);
+          const v = storeFrom(e.target.value, canonical, entry);
+          onSet(v === "" ? undefined : v);
+        }}
+        onBlur={() => setRaw(undefined)}
+        placeholder="0"
+        className={`${inputCls} ${canonical ? "pe-16" : ""}`}
+      />
+      {canonical ? (
+        <UnitSuffix
+          canonical={canonical}
+          entry={entry}
+          onPick={(u) => {
+            setRaw(undefined);
+            if (isLengthUnit(u)) setLength(u);
+            else if (isMassUnit(u)) setMass(u);
+          }}
+          className="absolute end-2 top-1/2 -translate-y-1/2"
+        />
+      ) : null}
+    </div>
+  );
+}
+
+/* ── the unit a field is TYPED in ──────────────────────────────────────────
+   A schema field declares the unit it is STORED in (`unit: "mm"`). The
+   catalogue being copied from may print something else entirely, so where the
+   unit is convertible the suffix becomes a picker and the field converts on
+   the way in and out. The stored number never leaves its declared unit — see
+   src/lib/entry-units.ts. */
+function UnitSuffix({
+  canonical, entry, onPick, className,
+}: {
+  canonical: string;
+  entry: string;
+  onPick: (u: string) => void;
+  className?: string;
+}) {
+  const opts = isLengthUnit(canonical) ? LENGTH_UNITS : isMassUnit(canonical) ? MASS_UNITS : null;
+  if (!opts) {
+    return <span className={className ?? "text-[11px] font-medium text-[var(--text-ghost)] shrink-0"}>{canonical}</span>;
+  }
+  return (
+    <select
+      value={entry}
+      onChange={(e) => onPick(e.target.value)}
+      aria-label={`Unit — stored in ${canonical}`}
+      title={`Type in any unit. Stored in ${canonical}.`}
+      className={`shrink-0 bg-transparent text-[11px] font-semibold text-[var(--text-muted)] hover:text-[var(--text-primary)] outline-none cursor-pointer ${className ?? ""}`}
+    >
+      {opts.map((u) => (
+        <option key={u} value={u} className="bg-[var(--bg-surface)] text-[var(--text-primary)]">{u}</option>
+      ))}
+    </select>
+  );
+}
 
 /* ── computed fields ───────────────────────────────────────────────
    Derive one field's value from another (e.g. CBM from packing L×W×H). */
@@ -316,25 +449,49 @@ function NumberSuggestField({
   onSet: (v: unknown) => void;
 }) {
   const { open, setOpen, triggerRef, menuRef, rect } = useAnchoredMenu();
-  const strVal = value === null || value === undefined ? "" : String(value);
-  const all = field.suggestions ?? [];
+  /* Machine Weight is a unit_number WITH suggestions, so it lands here rather
+     than in UnitNumberField — and it was the one weight on the tab still stuck
+     in kilograms. Same contract as everywhere: typed in the operator's unit,
+     stored in the field's own, suggestions shown in the typed unit so "100"
+     does not mean a different machine depending on the switch. */
+  const { length, mass, setLength, setMass } = useEntryUnits();
+  const canonical = field.unit || "";
+  const entry = isLengthUnit(canonical) ? length : isMassUnit(canonical) ? mass : canonical;
+  const convertible = isLengthUnit(canonical) || isMassUnit(canonical);
+  const [raw, setRaw] = useState<string | undefined>(undefined);
+  const strVal = raw !== undefined ? raw : displayIn(value, canonical, entry);
+  const all = (field.suggestions ?? []).map((sug) =>
+    convertible ? Number(displayIn(sug, canonical, entry)) : sug,
+  );
   const q = strVal.trim();
   const filtered = q === "" ? all : all.filter((s) => String(s).startsWith(q));
   const show = filtered.length ? filtered : all;
+  const commit = (typed: string) => {
+    setRaw(typed);
+    const v = storeFrom(typed, canonical, entry);
+    onSet(v === "" ? undefined : v);
+  };
   return (
     <div ref={triggerRef} className="relative">
       <input
-        type="number"
+        inputMode="decimal"
         value={strVal}
-        onChange={(e) => { onSet(e.target.value === "" ? undefined : Number(e.target.value)); if (!open) setOpen(true); }}
+        onChange={(e) => { commit(e.target.value); if (!open) setOpen(true); }}
         onFocus={() => setOpen(true)}
+        onBlur={() => setRaw(undefined)}
         placeholder="0"
-        className={`${inputCls} ${field.unit ? "pe-[3.75rem]" : "pe-9"}`}
+        className={`${inputCls} ${canonical ? "pe-[4.5rem]" : "pe-9"}`}
       />
-      {field.unit ? (
-        <span className="absolute end-8 top-1/2 -translate-y-1/2 text-[11px] font-medium text-[var(--text-ghost)] pointer-events-none">
-          {field.unit}
-        </span>
+      {canonical ? (
+        <UnitSuffix
+          canonical={canonical}
+          entry={entry}
+          onPick={(u) => {
+            setRaw(undefined);
+            if (isLengthUnit(u)) setLength(u); else if (isMassUnit(u)) setMass(u);
+          }}
+          className="absolute end-7 top-1/2 -translate-y-1/2"
+        />
       ) : null}
       <button
         type="button"
@@ -353,11 +510,11 @@ function NumberSuggestField({
               <button
                 key={String(s)}
                 type="button"
-                onMouseDown={(e) => { e.preventDefault(); onSet(Number(s)); setOpen(false); }}
+                onMouseDown={(e) => { e.preventDefault(); setRaw(undefined); const v = storeFrom(String(s), canonical, entry); onSet(v === "" ? undefined : v); setOpen(false); }}
                 className={`${menuItemCls} ${active ? "font-semibold text-[var(--text-primary)]" : "text-[var(--text-secondary)]"}`}
               >
                 <span>{String(s)}</span>
-                {field.unit ? <span className="text-[11px] text-[var(--text-ghost)]">{field.unit}</span> : null}
+                {canonical ? <span className="text-[11px] text-[var(--text-ghost)]">{entry}</span> : null}
               </button>
             );
           })}
@@ -464,25 +621,7 @@ function FieldInput({
     if (field.suggestions?.length) {
       return <NumberSuggestField field={field} value={value} onSet={onSet} />;
     }
-    return (
-      <div className="relative">
-        <input
-          type="number"
-          value={value === null || value === undefined ? "" : String(value)}
-          onChange={(e) => {
-            const raw = e.target.value;
-            onSet(raw === "" ? undefined : Number(raw));
-          }}
-          placeholder="0"
-          className={`${inputCls} ${field.unit ? "pe-14" : ""}`}
-        />
-        {field.unit ? (
-          <span className="absolute end-3 top-1/2 -translate-y-1/2 text-[11px] font-medium text-[var(--text-ghost)] pointer-events-none">
-            {field.unit}
-          </span>
-        ) : null}
-      </div>
-    );
+    return <UnitNumberField field={field} value={value} onSet={onSet} />;
   }
 
   /* range — two numbers composed into "min–max" (+ unit) */
@@ -522,40 +661,7 @@ function FieldInput({
      (+ unit). Any separator is accepted on read so legacy free-text values
      still populate the three boxes. */
   if (ft === "dimension") {
-    const parts = typeof value === "string" ? value.split(/[×xX*,]/).map((s) => s.trim()) : [];
-    const [l, w, h] = [parts[0] ?? "", parts[1] ?? "", parts[2] ?? ""];
-    const compose = (a: string, b: string, c: string) =>
-      !a && !b && !c ? undefined : `${a}×${b}×${c}`;
-    return (
-      <div className="flex items-center gap-2">
-        <input
-          type="number"
-          value={l}
-          onChange={(e) => onSet(compose(e.target.value, w, h))}
-          placeholder="L"
-          className={`${inputCls} min-w-0 flex-1`}
-        />
-        <span className="text-[var(--text-ghost)] shrink-0">×</span>
-        <input
-          type="number"
-          value={w}
-          onChange={(e) => onSet(compose(l, e.target.value, h))}
-          placeholder="W"
-          className={`${inputCls} min-w-0 flex-1`}
-        />
-        <span className="text-[var(--text-ghost)] shrink-0">×</span>
-        <input
-          type="number"
-          value={h}
-          onChange={(e) => onSet(compose(l, w, e.target.value))}
-          placeholder="H"
-          className={`${inputCls} min-w-0 flex-1`}
-        />
-        {field.unit ? (
-          <span className="text-[11px] font-medium text-[var(--text-ghost)] shrink-0">{field.unit}</span>
-        ) : null}
-      </div>
-    );
+    return <DimensionField field={field} value={value} onSet={onSet} />;
   }
 
   /* long_text — textarea */

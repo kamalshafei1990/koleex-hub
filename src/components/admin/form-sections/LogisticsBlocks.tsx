@@ -24,12 +24,19 @@ import { useTranslation } from "@/lib/i18n";
 import { PRODUCTS_UI_I18N } from "@/lib/products-ui-i18n";
 import KdsSelect from "@/components/kds/Select";
 import {
-  CONTAINERS, DG_KINDS, DIM_UNITS, ITEM_KINDS, ORIGIN_CERTIFICATES, PACKING_TYPES,
-  WEIGHT_UNITS, WOOD_TREATMENTS,
-  dimFromCm, dimToCm, loadPlan, sumPackages, weightFromKg, weightToKg,
-  type ContentItem, type DimUnit, type PackageRow, type PackingMode,
-  type ProductLogistics, type WeightUnit,
+  CONTAINERS, DG_KINDS, ITEM_KINDS, ORIGIN_CERTIFICATES, PACKING_TYPES, WOOD_TREATMENTS,
+  loadPlan, sumPackages,
+  type ContentItem, type PackageRow, type PackingMode, type ProductLogistics,
 } from "@/lib/logistics";
+import {
+  LENGTH_UNITS, MASS_UNITS, displayIn, storeFrom, useEntryUnits,
+} from "@/lib/entry-units";
+
+/* The packing model stores centimetres and kilograms — see the field names. */
+const dimFromCm = (v: unknown, u: string) => displayIn(v, "cm", u);
+const dimToCm = (v: string, u: string) => storeFrom(v, "cm", u);
+const weightFromKg = (v: unknown, u: string) => displayIn(v, "kg", u);
+const weightToKg = (v: string, u: string) => storeFrom(v, "kg", u);
 import BoxesIcon from "@/components/icons/ui/BoxesIcon";
 import PackageIcon from "@/components/icons/ui/PackageIcon";
 import WrenchIcon from "@/components/icons/ui/WrenchIcon";
@@ -168,12 +175,16 @@ export function PackingBlock({ value, onChange, productId }: BlockProps & { prod
   const sums = useMemo(() => sumPackages(rows), [rows]);
   const mode: PackingMode = value.packing_mode === "per_package" ? "per_package" : "per_unit";
   const per = Math.max(1, Math.floor(n(value.units_per_package) || 1));
-  const dimUnit: DimUnit = value.dim_unit ?? "cm";
-  const wtUnit: WeightUnit = value.weight_unit ?? "kg";
+  /* ONE UNIT CHOICE FOR THE WHOLE FORM, not one per section. It was stored on
+     the product, which made it a fact about the goods — it is not, it is how
+     the person at the keyboard reads the catalogue in front of them. It now
+     lives with the operator (src/lib/entry-units.ts), so picking mm here also
+     puts the machine's own dimensions above into mm, and the two halves of the
+     tab can never disagree about what a number means. */
+  const { length: dimUnit, mass: wtUnit, setLength, setMass } = useEntryUnits();
   /* Keystroke drafts for the converted fields — see numCell. Cleared whenever
      the unit changes so every box repaints in the new unit at once. */
   const [raw, setRaw] = useState<Record<string, string>>({});
-  const setUnit = (u: Partial<ProductLogistics>) => { setRaw({}); onChange(u); };
 
   const write = (next: PackageRow[]) => {
     const s = sumPackages(next);
@@ -330,14 +341,14 @@ export function PackingBlock({ value, onChange, productId }: BlockProps & { prod
             <UnitSwitch
               label={t("pk.unitSize", "Size")}
               value={dimUnit}
-              options={DIM_UNITS.map((u) => ({ value: u.value, label: u.label }))}
-              onChange={(v) => setUnit({ dim_unit: v })}
+              options={LENGTH_UNITS.map((u) => ({ value: u, label: u }))}
+              onChange={(v) => { setRaw({}); setLength(v); }}
             />
             <UnitSwitch
               label={t("pk.unitWeight", "Weight")}
               value={wtUnit}
-              options={WEIGHT_UNITS.map((u) => ({ value: u.value, label: u.label }))}
-              onChange={(v) => setUnit({ weight_unit: v })}
+              options={MASS_UNITS.map((u) => ({ value: u, label: u }))}
+              onChange={(v) => { setRaw({}); setMass(v); }}
             />
           </div>
         </div>
