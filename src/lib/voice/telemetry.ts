@@ -25,6 +25,8 @@ export type VoiceTelemetryFields = {
   /** Socket lane: redials on this call, and the last close code. */
   ws_reconnects?: number;
   ws_close?: string;
+  /** Socket lane: sockets replaced before the path cut them (session.ts WS_HANDOVER_CODE). */
+  ws_rotations?: number;
   /** A queued beacon carries when it was made. */
   queued_at?: number;
   /** The canary beside a slow socket-lane handshake, and the far side's

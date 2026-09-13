@@ -82,6 +82,7 @@ export async function POST(req: Request) {
       (cause(body.err) ? ` err="${cause(body.err)}"` : "") +
       (num(body.ws_reconnects) ? ` wsReconnects=${num(body.ws_reconnects)}` : "") +
       (short(body.ws_close, 6) ? ` wsClose=${short(body.ws_close, 6)}` : "") +
+      (num(body.ws_rotations) ? ` wsRotations=${num(body.ws_rotations)}` : "") +
       (num(body.queued_at) ? ` queuedAt=${new Date(num(body.queued_at)).toISOString()}` : "") +
       (short(body.canary, 24) ? ` canary=${short(body.canary, 24)}` : "") +
       (cause(body.resp_err) ? ` respErr="${cause(body.resp_err)}"` : "") +

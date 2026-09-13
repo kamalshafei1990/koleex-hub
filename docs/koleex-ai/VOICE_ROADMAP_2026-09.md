@@ -1088,3 +1088,56 @@ in place, the globe moved right, the orb lower. Two causes:
 - The orb's one-shot hello (a transform hop) fired at 350 ms, while the
   root was still fading in and the controls still arriving — it read as
   part of a glitch. It waits 900 ms now, past all of that.
+
+## "Try again" — the thirty-second cut, left before it comes (2026-09-13 07:42 UTC)
+
+The owner's word after #424 was "Try again". No new symptom; the same
+international-line cut. The evidence of the hour, read together:
+
+- Relay session 14 (06:45:26–06:50:02 UTC, the owner's international call,
+  273 s): `parked` at 28.9 / 59.7 / 90.6 / 121.5 / 152.4 / 183.2 / 214.1 /
+  245.0 s — eight cuts, **thirty seconds apart to the second**, on a
+  Singapore exit (the GET said SG) as on the Japan exit of 09-12. Each
+  `resumed gapMs=` 397–834, `held=` 0–3. End line `resumes=8 clicks=4`.
+- The client's beacon for the same call: `wsReconnects=8 wsClose=1006
+  capture=…:u10:b1200:oworklet:g14880:m635`. Ten underruns with the lead at
+  its ceiling: one per cut, near enough. The relay's own pacing was fine
+  (`minAhead=-770` at worst, inside one answer). The path cuts the socket;
+  the resume mends the conversation but not the half-second of silence.
+- Two dials (06:42:45, 07:01:45) never reached the relay at all and the
+  canary ended them at 7.8 s — both within seconds of a hang-up on the
+  same exit. The fall-back to the mainland lane ran, so the call came up
+  on the other voice. Not this PR's; noted.
+
+So the cut is the path's, periodic, and known in advance. This PR leaves
+the socket before the path cuts it:
+
+- `services/voice-relay/server.mjs`: a resume (`resume=1`, same secret,
+  same verified ticket) that finds the session LIVE rather than parked is a
+  **handover**: the new socket becomes the client on the spot, receives the
+  hello `resumed:true`, and the old socket is closed by the relay with
+  `HANDOVER_CODE` 4002 after the frames already written to it. The vendor's
+  side never changes. `live` map beside `parked`; `handover ms=` in the log;
+  `handovers=` in the end line. `server.handover.test.mjs` proves it on
+  real sockets against a fake vendor (12/12).
+- `src/lib/voice/session.ts`: the socket's lifetime on this path is LEARNT
+  — the first abnormal close (1006) of a socket that was up 15 s–120 s sets
+  it, for the call and in storage (`koleex-voice-ws-life`, 6 h) for the
+  device's next calls. With a lifetime known, a replacement socket dials
+  `resume=1` six seconds before it (`rotateAfter`); the relay's hello — or
+  the relay's 4002 on the old socket, whichever this page reads first —
+  makes the replacement the call: microphone frames go out on it, its
+  frames come in, the keepalive moves, the old socket is read to its end.
+  Nothing is configured, nothing restarts, the state never leaves "live".
+  A replacement not answered in 5 s is dropped and the call stays where it
+  was; the resume of #416 still mends a cut that comes anyway. Only on the
+  relay's socket; never on a vendor dialled directly; never on a device
+  that has seen no cut. `ws_rotations` in the diagnostics → `wsRotations=`
+  in the beacon line and the pulse.
+- Suites: voice-client 754 (pure helpers; the whole handover both orders;
+  the timeout; learning and storage; the two never-rotate cases); relay 12.
+
+Expected on the owner's next international call: `handovers=N` on the
+relay with `resumes=0`, `wsRotations=N wsReconnects=0` in the beacon, and
+`:u` near zero. If the path's cut is not periodic after all, the learnt
+lifetime is wrong by construction and the resume path still holds.
