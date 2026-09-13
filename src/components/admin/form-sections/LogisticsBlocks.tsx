@@ -46,6 +46,11 @@ import LayersIcon from "@/components/icons/ui/LayersIcon";
 import FileIcon from "@/components/icons/ui/FileIcon";
 import ImageRawIcon from "@/components/icons/ui/ImageRawIcon";
 import UnitPicker from "./UnitPicker";
+import { CHINA_PORTS } from "@/lib/ports";
+
+/** The port list, plus the stored value when it is not on it. */
+export const portOptions = (current?: string | null): string[] =>
+  current && !CHINA_PORTS.includes(current) ? [current, ...CHINA_PORTS] : [...CHINA_PORTS];
 
 const lbl = "block text-[11px] font-semibold text-[var(--text-muted)] mb-1.5";
 /* TWO WIDTHS, NOT ONE STRING WITH AN OVERRIDE. `inp` carries w-full, and a
@@ -1001,11 +1006,17 @@ export function ShippingOrigin({ value, onChange }: BlockProps) {
     <div className="mt-4 pt-4 border-t border-[var(--border-subtle)]">
       <div className="max-w-md">
         <label className={lbl}>{t("pk.portOfLoading", "Default port of loading")}</label>
-        <input
+        {/* The Chinese seaports, not a free line: Koleex ships FROM China and
+            the list is the same one the packing list picks from, so the
+            product's default port and the document's port can never be two
+            spellings of one place. A value entered before the list existed is
+            kept as its own option rather than silently dropped. */}
+        <KdsSelect
           value={value.port_of_loading ?? ""}
-          onChange={(e) => onChange({ port_of_loading: e.target.value })}
-          placeholder={t("pk.portPh", "Shanghai")}
-          className={inp}
+          onChange={(v: string) => onChange({ port_of_loading: v })}
+          options={portOptions(value.port_of_loading)}
+          placeholder={t("pk.select", "— Select —")}
+          triggerClassName={inp + " pe-9 text-start"}
         />
         <p className={hint}>{t("pk.portHint", "Where this product normally ships from — freight cannot be quoted without it.")}</p>
       </div>

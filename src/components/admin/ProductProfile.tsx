@@ -29,7 +29,7 @@ import { fetchClassificationIcons, updateProduct } from "@/lib/products-admin";
 /* INLINE EDIT — the form's own section components, hosted inside the sheet's
    cards. Same inputs, same units, same rules; only the card around them is
    the profile's. */
-import { PackingPhoto, ContentsEditor, UnitSwitch, useImagePicker } from "./form-sections/LogisticsBlocks";
+import { PackingPhoto, ContentsEditor, UnitSwitch, useImagePicker, portOptions } from "./form-sections/LogisticsBlocks";
 import UnitPicker from "./form-sections/UnitPicker";
 import { LENGTH_UNITS, MASS_UNITS, displayIn, storeFrom, useEntryUnits, type LengthUnit, type MassUnit } from "@/lib/entry-units";
 import KdsSelect from "@/components/kds/Select";
@@ -1484,7 +1484,7 @@ function PackingSheet({
                 icon={<AnchorIcon className="h-6 w-6" />}
                 label={t("pp.f.portOfLoading", "Port of loading")}
                 value={L.port_of_loading ?? ""}
-                input={eOrd ? <input value={L.port_of_loading ?? ""} onChange={(e) => patchLogistics({ port_of_loading: e.target.value })} placeholder={t("pk.portPh", "Shanghai")} className={`${INP_B} w-full`} /> : undefined}
+                input={eOrd ? <KdsSelect value={L.port_of_loading ?? ""} onChange={(v: string) => patchLogistics({ port_of_loading: v })} options={portOptions(L.port_of_loading)} placeholder={t("pk.select", "— Select —")} triggerClassName={selectCls} /> : undefined}
               />
             ) : null}
           </div>
