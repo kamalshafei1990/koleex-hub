@@ -973,3 +973,31 @@ for 17 and 20 s until the fifteen-second deadline let the fall-back lane run.
 What this cannot fix: the vendor's pacing itself. A lead that covers a
 1.35 s silence is a lead of 1.35 s — the device learns it where the path
 needs it, and gives it back where it does not.
+
+## "I listen from the phone speaker, no external device" — one audio context per call (2026-09-13)
+
+With Bluetooth ruled out, the count of AudioContexts alive under the live
+microphone was taken. On the socket lane there were THREE: the call's tones
+(`CallTones`, opened in the tap), the Hub's sound engine
+(`notificationSound`, opened for the cues that shipped 2026-09-12 — the day
+the "not clean, glitches" reports began), and the voice itself
+(`createBrowserWsAudio`). Two on the mainland lane. The codebase already
+recorded what a second context does on a phone (ws-audio.ts playSample,
+2026-09-07: it re-negotiates the audio hardware under the live microphone;
+the far side transcribed "[noise]"). The crackle survived four playback
+redesigns because none of them touched this.
+
+Now:
+- The tones open no context on the socket lane (the voice has one); on the
+  mainland lane the tones' context is the call's one.
+- The call's cues go through the call's own context by a SINK
+  (`sounds/player.ts setCueSink`): the voice's `WsAudio.playCue` first, the
+  tones' context second; before the call has a context (the tap's dialling
+  cue) the Hub engine still plays.
+- The Hub engine is HELD from live to release (`holdSoundEngine`): its
+  context is suspended and nothing creates or resumes it; Hub chimes during
+  a call are dropped, as a phone drops them during a phone call.
+
+So during a live call exactly one AudioContext runs. If the crackle
+survives this, the relay's `clicks=`/`edges=`/`clip=` readings decide
+between the vendor's audio and the device.

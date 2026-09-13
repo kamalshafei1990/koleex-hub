@@ -301,6 +301,27 @@ function synthTone(ctx: AudioContext, tone: SoundTone, volume: number): void {
 }
 
 let audioCtx: AudioContext | null = null;
+/* HELD WHILE A CALL IS UP (2026-09-13, sounds/player.ts): this engine's
+   context is suspended and nothing here resumes or creates it until the
+   call releases the hold, so exactly one AudioContext runs under the live
+   microphone — the call's own. Hub chimes that arrive during a call are
+   dropped, as a phone drops them during a phone call. */
+let held = false;
+let heldWasRunning = false;
+export function holdSoundEngine(on: boolean): void {
+  if (on === held) return;
+  held = on;
+  const ctx = audioCtx;
+  if (on) {
+    heldWasRunning = !!ctx && ctx.state === "running";
+    if (ctx && heldWasRunning) void ctx.suspend().catch(() => {});
+    return;
+  }
+  if (ctx && heldWasRunning && ctx.state === "suspended") void ctx.resume().catch(() => {});
+}
+export function soundEngineHeld(): boolean {
+  return held;
+}
 /* One decoded buffer per URL. Was a single global back when there was
    exactly one WAV; with a 24-tone library each tone caches independently
    and only the ones actually used are ever fetched. */
@@ -472,6 +493,7 @@ function attachUnlockListeners() {
      will keep the context alive. */
   document.addEventListener("visibilitychange", () => {
     if (document.visibilityState !== "visible") return;
+    if (held) return;
     const ctx = audioCtx;
     if (!ctx) return;
     if (ctx.state === "suspended") {
@@ -569,6 +591,7 @@ export function playAppSound(category: SoundCategory, activity?: SoundActivity |
     attachUnlockListeners();
     return;
   }
+  if (held) return;
   const prefs = getSoundPrefs();
   /* Do-not-disturb silences what arrives uninvited. A call's cue answers a
      tap the caller made seconds ago; it is not a disturbance. */
@@ -639,6 +662,7 @@ export function playCallSound(): CallSoundOutcome {
 /** Warm files inside a gesture: create the context and decode each. */
 export function primeSoundFiles(srcs: readonly string[]): void {
   if (typeof window === "undefined") return;
+  if (held) return;
   attachUnlockListeners();
   const ctx = ensureCtx();
   if (!ctx) return;
@@ -651,6 +675,7 @@ export function primeSoundFiles(srcs: readonly string[]): void {
  *  engine or no gesture yet — the caller may synthesise instead. */
 export function playSoundFile(src: string, volume?: number): "played" | "unavailable" {
   if (typeof window === "undefined") return "unavailable";
+  if (held) return "unavailable";
   if (!unlocked && !audioCtx) {
     attachUnlockListeners();
     return "unavailable";
@@ -683,6 +708,7 @@ export function soundContext(): AudioContext | null {
 /** Play the classic notification WAV. Prefer playAppSound(category) — this
  *  stays exported for the unlock/backlog machinery and the classic tone. */
 export function playNotificationSound() {
+  if (held) return;
   attachUnlockListeners();
   const ctx = ensureCtx();
   if (!ctx) {

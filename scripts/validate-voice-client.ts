@@ -1950,7 +1950,23 @@ console.log("\n── 12. Mute ──");
   const startAt = btn.indexOf("const startCall = useCallback");
   const startBody = btn.slice(startAt, btn.indexOf("await session.start();", startAt));
   check("the tones are made and primed INSIDE startCall — the tap that unlocks audio",
-    /tonesRef\.current = new CallTones\(\);\s*tonesRef\.current\.prime\(\);/.test(startBody));
+    /tonesRef\.current = new CallTones\(transportRef\.current === "ws" \? \(\) => null : browserToneContext\);\s*tonesRef\.current\.prime\(\);/.test(startBody));
+  /* ONE AUDIO CONTEXT PER CALL (2026-09-13): the tones open no context on
+     the socket lane (the voice has one); the call's cues go through the
+     call's context by a sink; the Hub engine is held from live to release. */
+  check("the call installs a cue sink at the tap — the voice's context first, the tones' context second, nothing before the call has one — holds the Hub engine from live, and releases both",
+    /setCueSink\(\(bytes, volume\) => \{\s*const viaCall = sessionRef\.current\?\.playCue\(bytes, volume\) \?\? null;\s*if \(viaCall\) return viaCall;\s*const tones = tonesRef\.current\?\.context\(\) \?\? null;\s*if \(!tones\) return false;\s*return \(cuePlayerRef\.current \?\?= createPreviewPlayer\(\(\) => tones as unknown as PreviewContextLike\)\)\.play\(bytes\);\s*\}\);\s*prefetchCues\(CALL_CUES\);/.test(startBody) &&
+    /if \(next === "live"\) holdSoundEngine\(true\);/.test(btn) && (btn.match(/cuePlayerRef\.current\?\.stop\(\);\s*cuePlayerRef\.current = null;\s*setCueSink\(null\);\s*holdSoundEngine\(false\);/g) ?? []).length === 2 &&
+    (() => {
+      const fs = fs16.readFileSync("src/lib/notificationSound.ts", "utf8");
+      const pl = fs16.readFileSync("src/lib/sounds/player.ts", "utf8");
+      const wa = fs16.readFileSync("src/lib/voice/ws-audio.ts", "utf8");
+      const se = fs16.readFileSync("src/lib/voice/session.ts", "utf8");
+      return /export function holdSoundEngine\(on: boolean\): void \{/.test(fs) && /if \(held\) return "unavailable";/.test(fs) && (fs.match(/if \(held\) return;/g) ?? []).length === 4 &&
+        /if \(cueSink\) \{\s*const sink = cueSink;/.test(pl) && /if \(!ok && !soundEngineHeld\(\)\) playSoundFile\(src, volume\);/.test(pl) &&
+        /playCue\(bytes, gain = 1\) \{\s*if \(closed\) return Promise\.resolve\(false\);\s*return new Promise<boolean>\(\(resolve\) => \{\s*void ctx\.decodeAudioData\(bytes\.slice\(0\)\)/.test(wa) && /level\.connect\(farBus\);/.test(wa) &&
+        /playCue\(bytes: ArrayBuffer, gain: number\): Promise<boolean> \| null \{\s*return this\.wsAudio\?\.playCue \? this\.wsAudio\.playCue\(bytes, gain\) : null;/.test(se);
+    })());
   check("  …before the session is created, so a slow handshake cannot outlive the gesture", startBody.indexOf("tonesRef.current.prime()") < startBody.indexOf("new VoiceSession("));
   check("ready is set by the session's onReady", /onReady: \(\) => \{\s*setReady\(true\);/.test(btn));
   /* Audit 2026-09-07: the fallback used to fire on a transport that never
@@ -4364,7 +4380,32 @@ console.log("\n── 42. the sound catalog: one family, pinned grammar, the cal
     check("every call moment is wired in the call button and every chat moment in the chat, through the one player",
       wired(btnS, ["call-dialing", "call-ready", "call-reconnecting", "call-recovered", "call-failed", "call-end", "mic-mute", "mic-unmute", "ptt-start", "ptt-stop", "thinking", "pictures-shown", "voice-switched", "summary-ready", "dictation-start", "dictation-stop", "approval-needed", "action-done", "action-cancelled"]) &&
       wired(appS, ["error", "back-online", "copied", "attachment-ready", "attachment-failed", "call-interrupted", "generation-stopped", "message-sent", "reply-received", "deleted"]) &&
-      /primeSounds\(\["call-dialing"/.test(btnS) && /if \(!opts\?\.resume\) playSound\("call-dialing"\);/.test(btnS));
+      /const CALL_CUES = \["call-dialing"/.test(btnS) && /primeSounds\(CALL_CUES\);/.test(btnS) && /if \(!opts\?\.resume\) playSound\("call-dialing"\);/.test(btnS));
+  {
+    /* THE SINK, driven: with one installed a cue's bytes go to it at the
+       prefs volume and the player says "played"; removed, the engine is
+       the player again. */
+    const pl = await import("../src/lib/sounds/player");
+    const g = globalThis as unknown as { window?: unknown; fetch: typeof fetch; localStorage?: unknown };
+    const hadWindow = g.window;
+    const hadFetch = g.fetch;
+    const hadStorage = g.localStorage;
+    const store = new Map<string, string>();
+    const fakeStorage = { getItem: (k: string) => store.get(k) ?? null, setItem: (k: string, v: string) => { store.set(k, v); }, removeItem: (k: string) => { store.delete(k); } };
+    g.localStorage = fakeStorage;
+    g.window = { localStorage: fakeStorage };
+    g.fetch = (async () => ({ ok: true, arrayBuffer: async () => new Uint8Array([1, 2, 3]).buffer })) as unknown as typeof fetch;
+    const got: Array<{ n: number; volume: number }> = [];
+    pl.setCueSink(async (bytes, volume) => { got.push({ n: bytes.byteLength, volume }); return true; });
+    const out = pl.playSound("call-ready", { force: true });
+    await new Promise((r) => setTimeout(r, 30));
+    check("with a sink installed a cue's bytes go to the call's own context at the prefs volume, and the player reports it played", out === "played" && got.length === 1 && got[0].n === 3 && got[0].volume > 0 && got[0].volume <= 1 && pl.cueSinkSet());
+    pl.setCueSink(null);
+    check("  …and removing the sink hands the player back to the engine", !pl.cueSinkSet());
+    if (hadWindow === undefined) delete g.window; else g.window = hadWindow;
+    if (hadStorage === undefined) delete g.localStorage; else g.localStorage = hadStorage;
+    g.fetch = hadFetch;
+  }
   }
   const fsF = await import("node:fs");
   const gen = fsF.readFileSync("scripts/sounds-preview.ts", "utf8");
