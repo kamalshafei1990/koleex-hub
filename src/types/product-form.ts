@@ -3,6 +3,7 @@
    These mirror the DB row types but are optimized for form editing.
    --------------------------------------------------------------------------- */
 
+import type { ProductLogistics } from "@/lib/logistics";
 import type {
   FeatureCard, ProductMediaType } from "./supabase";
 
@@ -119,6 +120,11 @@ export interface ProductFormState {
   schema_specs: Record<string, unknown>;
   schema_knowledge: unknown[];
   schema_visibility: Record<string, unknown>;
+  /* Packing & shipping — products.logistics. Deliberately NOT a schema field:
+     a crate is a crate whatever the machine does, so this is asked of every
+     product in every category, like country_of_origin beside it. See
+     src/lib/logistics.ts for the shape and the loading maths. */
+  logistics: ProductLogistics;
 }
 
 export interface ModelFormState {
@@ -427,6 +433,7 @@ export const EMPTY_PRODUCT: ProductFormState = {
   schema_specs: {},
   schema_knowledge: [],
   schema_visibility: {},
+  logistics: {},
 };
 
 export function createEmptyModel(): ModelFormState {

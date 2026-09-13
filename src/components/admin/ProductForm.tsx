@@ -95,6 +95,7 @@ import {
 } from "@/lib/product-schema";
 import { ProductPreview } from "@/components/product-preview/ProductPreview";
 import SchemaSpecsSection from "./form-sections/SchemaSpecsSection";
+import { LogisticsSummary, PackingBlock, LoadingBlock, CustomsExtras, ShippingOrigin } from "./form-sections/LogisticsBlocks";
 import ExternalLinkIcon from "@/components/icons/ui/ExternalLinkIcon";
 import EyeIcon from "@/components/icons/ui/EyeIcon";
 import EyeOffIcon from "@/components/icons/ui/EyeOffIcon";
@@ -1122,6 +1123,7 @@ export default function ProductForm({ productId }: Props) {
           schema_id: p.schema_id || "",
           schema_version: p.schema_version || "",
           schema_specs: (p.schema_specs as Record<string, unknown>) || {},
+          logistics: ((p as { logistics?: unknown }).logistics as ProductFormState["logistics"]) || {},
           schema_knowledge: (p.schema_knowledge as unknown[]) || [],
           schema_visibility: (p.schema_visibility as Record<string, unknown>) || {},
         });
@@ -1583,6 +1585,11 @@ export default function ProductForm({ productId }: Props) {
   const specsTabSchema = useMemo(() => (activeSpecsSchema
     ? { ...activeSpecsSchema, groups: activeSpecsSchema.groups.filter((g) => g.formTab !== "logistics") }
     : null), [activeSpecsSchema]);
+  /* Merge-patch for products.logistics. The blocks each own a few keys and
+     never see the others, so they hand back only what they changed. */
+  const patchLogistics = (u: Partial<ProductFormState["logistics"]>) =>
+    setProduct((prev) => ({ ...prev, logistics: { ...(prev.logistics || {}), ...u } }));
+
   const logisticsTabSchema = useMemo(() => {
     if (!activeSpecsSchema) return null;
     const groups = activeSpecsSchema.groups.filter((g) => g.formTab === "logistics");
@@ -2667,6 +2674,8 @@ export default function ProductForm({ productId }: Props) {
         schema_specs: product.schema_specs || {},
         schema_knowledge: product.schema_knowledge || [],
         schema_visibility: product.schema_visibility || {},
+        /* Packing & shipping — one column, every category. */
+        logistics: product.logistics || {},
       };
 
       /* De-dup mirror: when a schema is active it is the single source for the
@@ -5642,6 +5651,10 @@ export default function ProductForm({ productId }: Props) {
            ═══════════════════════════════════════════════════════════ */}
         {(onePage || steps[currentStep]?.id === "logistics") && (
           <div id="sec-logistics" className="space-y-5 scroll-mt-28">
+            {/* One line for the whole shipment. Fourteen separate numbers hide
+                their own mistakes; a crate typed in millimetres reads as
+                0.001 m³ right here, where it cannot be missed. */}
+            <LogisticsSummary value={product.logistics} />
             {/* The per-model packing panel used to sit here, above the
                 family-shared groups, and it asked the SAME eight questions the
                 product-level Packing & Shipping group below asks — packing
@@ -5650,6 +5663,57 @@ export default function ProductForm({ productId }: Props) {
                 Removed 2026-09-13 (owner): packing is entered once, on the
                 product. A model that really does crate differently still has
                 its own packing card on the Variants tab. */}
+
+            {/* Physical (bare machine) — dimensions + weight of the RUNNING
+                machine; the packed crate is per-variant. Lived on the Specs
+                tab until 2026-08-25, while every schema already rendered its
+                physicalGroup HERE (formTab:"logistics") — the same fact on
+                two different tabs depending on the product's era. Now one
+                tab for both eras. */}
+            {(!schemaCoveredCols.has("machine_dimensions") || !schemaCoveredCols.has("machine_weight_kg")) && (
+            <Section id="logistics-physical" icon={<RulerIcon className="h-4 w-4" />} title={t("tech.secPhysical", "Physical (Bare Machine)")} badge={t("logistics.physicalBadge", "Dimensions · Weight")}>
+              <PhysicalFields data={product} onChange={updateProduct_} hiddenFields={schemaCoveredCols} />
+            </Section>
+            )}
+
+            {/* Schema-driven Packing & Shipping group (formTab:"logistics").
+                Product-level packing/CBM/weights entered here, stored in
+                schema_specs — the single source of truth for schema products.
+                Rendered header-less (the group card carries its own title) so
+                it doesn't duplicate the title or show the Specs-tab intro. */}
+            {/* What is LEFT of the schema on this tab is genuinely product-wide:
+                Physical, and on the templates that carry them, Customs and
+                Fulfillment. The packing group that used to render here has moved
+                OUT of the templates into the fixed Packing section below, so the
+                questions are asked of every product instead of only the 7 whose
+                subcategory template happened to define them. The old "packing is
+                per-variant → Open Variants" pointer went with it: there is a
+                packing section on this tab now, so there is nowhere to point. */}
+            {logisticsTabSchema ? (
+              <div id="logistics-packing" className="scroll-mt-28">
+                <SchemaSpecsSection
+                  schema={logisticsTabSchema}
+                  values={product.schema_specs || {}}
+                  onChange={(next) => updateProduct_({ schema_specs: next })}
+                  hideHeader
+                />
+              </div>
+            ) : null}
+
+            {/* ── PACKING ─────────────────────────────────────────────────
+                Fixed fields, every category — the tab's centre of gravity. */}
+            <Section id="logistics-packing-fixed" icon={<BoxIcon className="h-4 w-4" />} title={t("logistics.packingSection", "Packing")} badge={t("logistics.packingSectionBadge", "Crates · Weights")}>
+              <PackingBlock value={product.logistics} onChange={patchLogistics} />
+            </Section>
+
+            {/* ── LOADING ─────────────────────────────────────────────────
+                Separate from Packing on purpose: these numbers are CONSEQUENCES
+                of the crates above, and the form used to ask them as if they
+                were facts of their own. */}
+            <Section id="logistics-loading" icon={<BoxesIcon className="h-4 w-4" />} title={t("logistics.loadingSection", "Loading & Containers")} badge={t("logistics.loadingSectionBadge", "20ft · 40ft · 40HQ")}>
+              <LoadingBlock value={product.logistics} onChange={patchLogistics} />
+            </Section>
+
             <Section id="logistics-origin" icon={<GlobeIcon className="h-4 w-4" />} title={t("logistics.title", "Origin & Customs")} badge={t("logistics.badge", "Shipping · Customs")}>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
@@ -5697,50 +5761,13 @@ export default function ProductForm({ productId }: Props) {
                   null
                 )}
               </div>
+              {/* What the border asks that an HS code does not answer: which
+                  origin certificate the buyer can present, and whether anything
+                  inside is regulated. Both are properties of the GOODS, so they
+                  belong to the product; Incoterm and destination are the deal's
+                  and stay on the quotation. */}
+              <CustomsExtras value={product.logistics} onChange={patchLogistics} />
             </Section>
-
-            {/* Physical (bare machine) — dimensions + weight of the RUNNING
-                machine; the packed crate is per-variant. Lived on the Specs
-                tab until 2026-08-25, while every schema already rendered its
-                physicalGroup HERE (formTab:"logistics") — the same fact on
-                two different tabs depending on the product's era. Now one
-                tab for both eras. */}
-            {(!schemaCoveredCols.has("machine_dimensions") || !schemaCoveredCols.has("machine_weight_kg")) && (
-            <Section id="logistics-physical" icon={<RulerIcon className="h-4 w-4" />} title={t("tech.secPhysical", "Physical (Bare Machine)")} badge={t("logistics.physicalBadge", "Dimensions · Weight")}>
-              <PhysicalFields data={product} onChange={updateProduct_} hiddenFields={schemaCoveredCols} />
-            </Section>
-            )}
-
-            {/* Schema-driven Packing & Shipping group (formTab:"logistics").
-                Product-level packing/CBM/weights entered here, stored in
-                schema_specs — the single source of truth for schema products.
-                Rendered header-less (the group card carries its own title) so
-                it doesn't duplicate the title or show the Specs-tab intro. */}
-            {logisticsTabSchema ? (
-              <div id="logistics-packing" className="scroll-mt-28">
-                <SchemaSpecsSection
-                  schema={logisticsTabSchema}
-                  values={product.schema_specs || {}}
-                  onChange={(next) => updateProduct_({ schema_specs: next })}
-                  hideHeader
-                />
-              </div>
-            ) : (
-              <div className="flex items-start gap-3 rounded-xl border border-dashed border-[var(--border-subtle)] bg-[var(--bg-surface)] px-4 py-3">
-                <BoxIcon className="mt-0.5 h-4 w-4 shrink-0 text-[var(--text-ghost)]" />
-                <div className="flex-1 min-w-0">
-                  <p className="text-[12px] font-medium text-[var(--text-primary)]">{t("logistics.packingTitle", "Packing & shipment are per-variant")}</p>
-                  <p className="text-[10px] text-[var(--text-ghost)] mt-0.5 leading-relaxed">{t("logistics.packingBody", "Packing type, carton dimensions, CBM, net/gross weight and 20ft/40ft container quantities are entered per variant on the Variants tab.")}</p>
-                  <button
-                    type="button"
-                    onClick={() => { const i = steps.findIndex((s) => s.id === "commercial"); if (i >= 0) goToStep(i); }}
-                    className="inline-flex items-center gap-1.5 h-7 px-2.5 rounded-lg text-[11px] font-semibold text-[var(--text-primary)] bg-[var(--bg-base)] hover:bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] transition-colors mt-2"
-                  >
-                    <ArrowUpRightIcon className="h-3 w-3" /> {t("logistics.jumpCommercial", "Open Variants")}
-                  </button>
-                </div>
-              </div>
-            )}
 
             {/* Fulfillment Defaults — MOQ + Lead Time cascade to new variants.
                 Lives on the LOGISTICS tab with the rest of the order/shipping
@@ -5773,6 +5800,7 @@ export default function ProductForm({ productId }: Props) {
                   </div>
                 </div>
               </div>
+              <ShippingOrigin value={product.logistics} onChange={patchLogistics} />
             </Section>
             )}
 

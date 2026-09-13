@@ -33,19 +33,18 @@
  * so spec-i18n and the mirror stay coherent; only genuinely new specs mint
  * new keys, and every one of those is translated in spec-i18n.
  *
- * Logistics comes from the shared factories — physicalGroup and
- * packingShippingGroup both carry `formTab: "logistics"`, so machine
- * dimensions, packing dimensions, CBM, net and gross weight land on the
- * Logistics tab of the product form exactly as they do for spreading
- * machines and fabric inspection, which is the pattern the owner asked to
- * repeat.
+ * Logistics comes from the shared physicalGroup factory, which carries
+ * `formTab: "logistics"`, so machine dimensions and weight land on the
+ * Logistics tab of the product form exactly as they do for spreading machines
+ * and fabric inspection. Packing (crate size, CBM, net/gross, container
+ * counts) is NOT a template question any more — it is a fixed section on that
+ * tab for every product.
  */
 
 import type { ProductSchemaDefinition } from "@/types/product-schema";
 import { DEFAULT_PUBLIC_VISIBILITY } from "../visibility";
 import {
   electricalGroup,
-  packingShippingGroup,
   physicalGroup,
   safetyComplianceGroup,
 } from "./_shared-machine-groups";
@@ -175,7 +174,6 @@ export const SPOTTING_MACHINE_SCHEMA: ProductSchemaDefinition = {
     },
     electricalGroup(30, { motorLabel: "Suction Motor Power" }),
     physicalGroup(60),
-    packingShippingGroup(65),
     safetyComplianceGroup(70),
   ],
 };
@@ -331,7 +329,6 @@ export const THREAD_SUCKING_SCHEMA: ProductSchemaDefinition = {
     },
     electricalGroup(40),
     physicalGroup(60),
-    packingShippingGroup(65),
     safetyComplianceGroup(70),
   ],
 };

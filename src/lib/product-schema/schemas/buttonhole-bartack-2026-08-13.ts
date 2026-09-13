@@ -51,7 +51,6 @@ import type { ProductSchemaDefinition } from "@/types/product-schema";
 import { DEFAULT_PUBLIC_VISIBILITY } from "../visibility";
 import {
   electricalGroup,
-  packingShippingGroup,
   physicalGroup,
   safetyComplianceGroup,
   FITMENT_OPTIONS,
@@ -187,7 +186,6 @@ export const BUTTONHOLE_SCHEMA: ProductSchemaDefinition = {
     },
     electricalGroup(40),
     physicalGroup(50),
-    packingShippingGroup(60),
     safetyComplianceGroup(70),
   ],
 };
@@ -269,7 +267,6 @@ export const BARTACK_SCHEMA: ProductSchemaDefinition = {
     },
     electricalGroup(40),
     physicalGroup(50),
-    packingShippingGroup(60),
     safetyComplianceGroup(70),
   ],
 };

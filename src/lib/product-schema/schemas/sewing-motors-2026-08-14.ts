@@ -43,7 +43,6 @@ import type { ProductSchemaDefinition } from "@/types/product-schema";
 import { DEFAULT_PUBLIC_VISIBILITY } from "../visibility";
 import {
   electricalGroup,
-  packingShippingGroup,
   physicalGroup,
   safetyComplianceGroup,
   FITMENT_OPTIONS,
@@ -175,7 +174,6 @@ export const SERVO_MOTOR_SCHEMA: ProductSchemaDefinition = {
     },
     electricalGroup(40),
     physicalGroup(50),
-    packingShippingGroup(60),
     safetyComplianceGroup(70),
   ],
 };
@@ -259,7 +257,6 @@ export const DIRECT_DRIVE_MOTOR_SCHEMA: ProductSchemaDefinition = {
     },
     electricalGroup(40),
     physicalGroup(50),
-    packingShippingGroup(60),
     safetyComplianceGroup(70),
   ],
 };

@@ -1265,6 +1265,12 @@ export const PRODUCTS_UI_I18N: Translations = {
   "step.supplier": { en: "Supplier", zh: "供应商", ar: "المورّد" },
   "step.price": { en: "Price", zh: "价格", ar: "السعر" },
   "step.logistics": { en: "Packing & Logistics", zh: "包装与物流", ar: "التعبئة واللوجستيات" },
+  /* The fixed Packing & Logistics sections (2026-09-13). Packing stopped being
+     a per-subcategory template question, so its headings are UI strings now. */
+  "logistics.packingSection":      { en: "Packing",              zh: "包装",         ar: "التعبئة" },
+  "logistics.packingSectionBadge": { en: "Crates · Weights",     zh: "木箱 · 重量",   ar: "الصناديق · الأوزان" },
+  "logistics.loadingSection":      { en: "Loading & Containers", zh: "装柜",         ar: "التحميل والحاويات" },
+  "logistics.loadingSectionBadge": { en: "20ft · 40ft · 40HQ",   zh: "20尺 · 40尺 · 40高柜", ar: "٢٠ قدم · ٤٠ قدم · ٤٠HQ" },
   "step.compliance": { en: "Compliance", zh: "合规", ar: "الامتثال" },
   "step.knowledge": { en: "Knowledge", zh: "知识", ar: "المعرفة" },
   /* ── legacy Technical Details block ── */
