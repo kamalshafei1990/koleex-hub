@@ -38,11 +38,33 @@ import FolderTreeIcon from "@/components/icons/ui/FolderTreeIcon";
 import SparklesIcon from "@/components/icons/ui/SparklesIcon";
 import Settings2Icon from "@/components/icons/ui/Settings2Icon";
 import BoxesIcon from "@/components/icons/ui/BoxesIcon";
-import BoxIcon from "@/components/icons/ui/BoxIcon";
-import PackageIcon from "@/components/icons/ui/PackageIcon";
-import LayersIcon from "@/components/icons/ui/LayersIcon";
-import PlugIcon from "@/components/icons/ui/PlugIcon";
-import FileIcon from "@/components/icons/ui/FileIcon";
+/* ── one glyph per concept on the Packing & Logistics sheet ──
+   Listed together so a repeat is visible at a glance: an icon that appears
+   twice tells the eye two different facts are the same fact, which is exactly
+   what the old label-guessing did when half the rows fell back to one circle. */
+import BoxIcon from "@/components/icons/ui/BoxIcon";            // packing type
+import TruckIcon from "@/components/icons/ui/TruckIcon";        // the tab itself
+import PackageIcon from "@/components/icons/ui/PackageIcon";    // Packing card
+import ArchiveIcon from "@/components/icons/ui/ArchiveIcon";    // a crate
+import ShipIcon from "@/components/icons/ui/ShipIcon";          // Loading card
+import LayersIcon from "@/components/icons/ui/LayersIcon";      // stackable
+import PlaneIcon from "@/components/icons/ui/PlaneIcon";        // volumetric (air)
+import FlaskConicalIcon from "@/components/icons/ui/FlaskConicalIcon"; // wood treatment
+import FlagIcon from "@/components/icons/ui/FlagIcon";          // country of origin
+import ScanLineIcon from "@/components/icons/ui/ScanLineIcon";  // HS code
+import FileCheckIcon from "@/components/icons/ui/FileCheckIcon";// origin certificate
+import TriangleWarningIcon from "@/components/icons/ui/TriangleWarningIcon"; // regulated
+import ShoppingCartIcon from "@/components/icons/ui/ShoppingCartIcon";       // MOQ
+import ClockIcon from "@/components/icons/ui/ClockIcon";        // lead time
+import AnchorIcon from "@/components/icons/ui/AnchorIcon";      // port of loading
+import Maximize2Icon from "@/components/icons/ui/Maximize2Icon";// machine dimensions
+import ScaleIcon from "@/components/icons/ui/ScaleIcon";        // machine weight
+import ClipboardCheckIcon from "@/components/icons/ui/ClipboardCheckIcon";   // Fulfillment card
+import InboxRawIcon from "@/components/icons/ui/InboxRawIcon";  // item: inner box
+import PlugIcon from "@/components/icons/ui/PlugIcon";          // item: cable
+import ShieldIcon from "@/components/icons/ui/ShieldIcon";      // item: cover
+import CogIcon from "@/components/icons/ui/CogIcon";            // item: spare parts
+import DocumentIcon from "@/components/icons/ui/DocumentIcon";  // item: manual
 import RulerIcon from "@/components/icons/ui/RulerIcon";
 import WrenchIcon from "@/components/icons/ui/WrenchIcon";
 import DollarSignIcon from "@/components/icons/ui/DollarSignIcon";
@@ -563,13 +585,13 @@ function FactChip({
    kind the operator picked — never a guess from the label. */
 function KindGlyph({ kind, className = "h-5 w-5" }: { kind?: string; className?: string }) {
   switch (kind) {
-    case "machine": return <BoxesIcon className={className} />;
+    case "machine": return <FactoryIcon className={className} />;
     case "tools":   return <WrenchIcon className={className} />;
     case "cable":   return <PlugIcon className={className} />;
-    case "cover":   return <ShieldCheckIcon className={className} />;
-    case "parts":   return <LayersIcon className={className} />;
-    case "docs":    return <FileIcon className={className} />;
-    default:        return <PackageIcon className={className} />;
+    case "cover":   return <ShieldIcon className={className} />;
+    case "parts":   return <CogIcon className={className} />;
+    case "docs":    return <DocumentIcon className={className} />;
+    default:        return <InboxRawIcon className={className} />;
   }
 }
 
@@ -655,8 +677,10 @@ function PackingSheet({
      order, same titles and badges — the sheet is the form with the inputs
      taken out. */
   if (!machine && !packing && !loading && !customs && !order) {
+    /* The empty state stands for the whole tab, so it takes the tab's own
+       glyph rather than borrowing Origin & Customs' globe. */
     return (
-      <Group motion={motion} icon={<BoundIcon semanticKey="section.logistics" className="h-4 w-4" fallback={<GlobeIcon className="h-4 w-4" />} />} title={t("pp.sec.logistics", "Packing & Logistics")} onEdit={onEdit}>
+      <Group motion={motion} icon={<BoundIcon semanticKey="section.logistics" className="h-4 w-4" fallback={<TruckIcon className="h-4 w-4" />} />} title={t("pp.sec.logistics", "Packing & Logistics")} onEdit={onEdit}>
         <p className="text-[12px] text-[var(--text-ghost)] leading-relaxed">
           {t("pp.f.packingEmpty", "Nothing entered yet. Open Edit to add the crate, its contents, weights and container quantities.")}
         </p>
@@ -670,17 +694,17 @@ function PackingSheet({
         <Group motion={motion} icon={<RulerIcon className="h-4 w-4" />} title={t("tech.secPhysical", "Physical (Bare Machine)")} count={t("logistics.physicalBadge", "Dimensions · Weight")} onEdit={onEdit}>
           <div className="flex flex-wrap gap-2.5">
             {pv("machine_dimensions") ? (
-              <FactChip icon={<RulerIcon className="h-6 w-6" />} label={t("pp.f.machineDims", "Machine dimensions")} value={`${String(pv("machine_dimensions"))} mm`} />
+              <FactChip icon={<Maximize2Icon className="h-6 w-6" />} label={t("pp.f.machineDims", "Machine dimensions")} value={`${String(pv("machine_dimensions"))} mm`} />
             ) : null}
             {pv("machine_weight_kg") ? (
-              <FactChip icon={<LayersIcon className="h-6 w-6" />} label={t("pp.f.machineWeight", "Machine weight (kg)")} value={`${String(pv("machine_weight_kg"))} kg`} />
+              <FactChip icon={<ScaleIcon className="h-6 w-6" />} label={t("pp.f.machineWeight", "Machine weight (kg)")} value={`${String(pv("machine_weight_kg"))} kg`} />
             ) : null}
           </div>
                 </Group>
       ) : null}
 
       {packing ? (
-        <Group motion={motion} icon={<BoxIcon className="h-4 w-4" />} title={t("logistics.packingSection", "Packing")} count={t("logistics.packingSectionBadge", "Crates · Weights")} onEdit={onEdit}>
+        <Group motion={motion} icon={<PackageIcon className="h-4 w-4" />} title={t("logistics.packingSection", "Packing")} count={t("logistics.packingSectionBadge", "Crates · Weights")} onEdit={onEdit}>
           {logistics.packing_photo_url ? (
             /* eslint-disable-next-line @next/next/no-img-element */
             <img
@@ -709,7 +733,7 @@ function PackingSheet({
               {pType ? <FactChip icon={<BoxIcon className="h-6 w-6" />} label={t("pk.packingType", "Packing type")} value={pType} /> : null}
               {logistics.wood_treatment ? (
                 <FactChip
-                  icon={<ShieldCheckIcon className="h-6 w-6" />}
+                  icon={<FlaskConicalIcon className="h-6 w-6" />}
                   label={t("pp.f.woodTreatment", "Wood treatment")}
                   value={label(WOOD_TREATMENTS, logistics.wood_treatment) ?? ""}
                   tone={logistics.wood_treatment === "untreated" ? "warn" : "plain"}
@@ -718,53 +742,51 @@ function PackingSheet({
             </div>
           ) : null}
 
-          {/* The crates themselves — each one its own card, with its photo. */}
+          {/* EACH CRATE CARRIES ITS OWN PACKING LIST. They were merged into
+              one list under the cards, which answers "what ships" but not the
+              question a packing list exists to answer: what is in THIS box.
+              One card per crate, its contents inside it, so the machine crate
+              and the accessories box can never be read as one pile. */}
           {(logistics.packages ?? []).length ? (
-            <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-2.5">
+            <div className="mt-4 space-y-2.5">
               {(logistics.packages ?? []).map((r, i) => (
-                <div key={i} className="flex items-center gap-3 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-2.5">
-                  <span className="h-16 w-16 shrink-0 rounded-lg overflow-hidden border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] flex items-center justify-center text-[var(--text-secondary)]">
-                    {r.photo_url ? (
-                      /* eslint-disable-next-line @next/next/no-img-element */
-                      <img src={r.photo_url} alt="" className="h-full w-full object-cover" />
-                    ) : (
-                      <BoxIcon className="h-7 w-7" />
-                    )}
-                  </span>
-                  <span className="min-w-0 flex-1">
-                    <span className="block text-[13px] font-semibold text-[var(--text-primary)] truncate">
-                      {(r.label || "").trim() || t("pk.packageOne", "Package")}
-                      {Number(r.qty) > 1 ? <span className="ms-1.5 text-[11px] font-medium text-[var(--text-muted)]">× {r.qty}</span> : null}
+                <div key={i} className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-3">
+                  <div className="flex items-center gap-3">
+                    <span className="h-16 w-16 shrink-0 rounded-lg overflow-hidden border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] flex items-center justify-center text-[var(--text-secondary)]">
+                      {r.photo_url ? (
+                        /* eslint-disable-next-line @next/next/no-img-element */
+                        <img src={r.photo_url} alt="" className="h-full w-full object-cover" />
+                      ) : (
+                        <ArchiveIcon className="h-7 w-7" />
+                      )}
                     </span>
-                    <span className="block text-[11.5px] tabular-nums text-[var(--text-muted)]">
-                      {r.l_cm && r.w_cm && r.h_cm ? `${r.l_cm} × ${r.w_cm} × ${r.h_cm} cm` : "—"}
-                      {r.gross_kg ? `  ·  ${r.gross_kg} kg` : ""}
+                    <span className="min-w-0 flex-1">
+                      <span className="block text-[13.5px] font-semibold text-[var(--text-primary)] truncate">
+                        {(r.label || "").trim() || t("pk.packageOne", "Package")}
+                        {Number(r.qty) > 1 ? <span className="ms-1.5 text-[11px] font-medium text-[var(--text-muted)]">× {r.qty}</span> : null}
+                      </span>
+                      <span className="block text-[11.5px] tabular-nums text-[var(--text-muted)] mt-0.5">
+                        {r.l_cm && r.w_cm && r.h_cm ? `${r.l_cm} × ${r.w_cm} × ${r.h_cm} cm` : "—"}
+                        {r.gross_kg ? `  ·  ${r.gross_kg} kg` : ""}
+                      </span>
                     </span>
-                  </span>
+                  </div>
+                  {(r.contents ?? []).length ? (
+                    <ul className="mt-3 pt-3 border-t border-[var(--border-subtle)] space-y-1.5">
+                      {(r.contents ?? []).map((it, ci) => (
+                        <ContentRow key={ci} item={it} mult={Number(r.qty) || 1} depth={0} />
+                      ))}
+                    </ul>
+                  ) : null}
                 </div>
               ))}
             </div>
           ) : null}
-
-          {(logistics.packages ?? []).some((r) => r.contents?.length) ? (
-            <div className="mt-4">
-              <div className="text-[9.5px] font-bold uppercase tracking-[0.1em] text-[var(--text-ghost)] mb-2">
-                {t("pk.whatsInside", "What's inside")}
-              </div>
-              <ul className="space-y-1.5">
-                {(logistics.packages ?? []).flatMap((r, ri) =>
-                  (r.contents ?? []).map((it, ci) => (
-                    <ContentRow key={`${ri}-${ci}`} item={it} mult={Number(r.qty) || 1} depth={0} />
-                  )),
-                )}
-              </ul>
-            </div>
-          ) : null}
-                </Group>
+        </Group>
       ) : null}
 
       {loading ? (
-        <Group motion={motion} icon={<BoxesIcon className="h-4 w-4" />} title={t("logistics.loadingSection", "Loading & Containers")} count={t("logistics.loadingSectionBadge", "20ft · 40ft · 40HQ")} onEdit={onEdit}>
+        <Group motion={motion} icon={<ShipIcon className="h-4 w-4" />} title={t("logistics.loadingSection", "Loading & Containers")} count={t("logistics.loadingSectionBadge", "20ft · 40ft · 40HQ")} onEdit={onEdit}>
           {/* Three numbers, three tiles: this is the question a forwarder asks
               and it should be answerable at a glance, not read out of a list. */}
           <div className="grid grid-cols-3 gap-2.5">
@@ -774,13 +796,13 @@ function PackingSheet({
           </div>
           <div className="mt-3 flex flex-wrap gap-2.5">
             <FactChip
-              icon={<BoxesIcon className="h-6 w-6" />}
+              icon={<LayersIcon className="h-6 w-6" />}
               label={t("pk.stackQ", "Can crates be stacked?")}
               value={logistics.stackable ? t("pk.stackable", "Stackable") : t("pk.notStackable", "Not stackable")}
             />
             {sums.volumetricKg ? (
               <FactChip
-                icon={<RulerIcon className="h-6 w-6" />}
+                icon={<PlaneIcon className="h-6 w-6" />}
                 label={t("pk.volumetric", "Volumetric weight (kg, air)")}
                 value={`${sums.volumetricKg} kg`}
               />
@@ -793,17 +815,17 @@ function PackingSheet({
         <Group motion={motion} icon={<GlobeIcon className="h-4 w-4" />} title={t("logistics.title", "Origin & Customs")} count={t("logistics.badge", "Shipping · Customs")} onEdit={onEdit}>
           <div className="flex flex-wrap gap-2.5">
             {pv("country_of_origin") ? (
-              <FactChip icon={<GlobeIcon className="h-6 w-6" />} label={t("pp.f.origin", "Country of origin")} value={String(pv("country_of_origin"))} />
+              <FactChip icon={<FlagIcon className="h-6 w-6" />} label={t("pp.f.origin", "Country of origin")} value={String(pv("country_of_origin"))} />
             ) : null}
             {pv("hs_code") ? (
-              <FactChip icon={<FileIcon className="h-6 w-6" />} label={t("pp.f.hs", "HS code")} value={String(pv("hs_code"))} />
+              <FactChip icon={<ScanLineIcon className="h-6 w-6" />} label={t("pp.f.hs", "HS code")} value={String(pv("hs_code"))} />
             ) : null}
             {logistics.origin_certificate && logistics.origin_certificate !== "none" ? (
-              <FactChip icon={<ShieldCheckIcon className="h-6 w-6" />} label={t("pp.f.originCert", "Origin certificate")} value={label(ORIGIN_CERTIFICATES, logistics.origin_certificate) ?? ""} />
+              <FactChip icon={<FileCheckIcon className="h-6 w-6" />} label={t("pp.f.originCert", "Origin certificate")} value={label(ORIGIN_CERTIFICATES, logistics.origin_certificate) ?? ""} />
             ) : null}
             {dg?.has ? (
               <FactChip
-                icon={<PlugIcon className="h-6 w-6" />}
+                icon={<TriangleWarningIcon className="h-6 w-6" />}
                 label={t("pp.f.regulated", "Regulated content")}
                 value={dgNames.join(", ") || t("pk.dgHas", "Has regulated content")}
                 tone="warn"
@@ -819,16 +841,16 @@ function PackingSheet({
       ) : null}
 
       {order ? (
-        <Group motion={motion} icon={<WrenchIcon className="h-4 w-4" />} title={t("technical.fulfillmentDefaults", "Fulfillment Defaults")} count={t("technical.fulfillmentBadge", "MOQ · Lead Time")} onEdit={onEdit}>
+        <Group motion={motion} icon={<ClipboardCheckIcon className="h-4 w-4" />} title={t("technical.fulfillmentDefaults", "Fulfillment Defaults")} count={t("technical.fulfillmentBadge", "MOQ · Lead Time")} onEdit={onEdit}>
           <div className="flex flex-wrap gap-2.5">
             {pv("moq") ? (
-              <FactChip icon={<BoxesIcon className="h-6 w-6" />} label={t("pp.f.moq", "MOQ")} value={String(pv("moq"))} />
+              <FactChip icon={<ShoppingCartIcon className="h-6 w-6" />} label={t("pp.f.moq", "MOQ")} value={String(pv("moq"))} />
             ) : null}
             {pv("lead_time") ? (
-              <FactChip icon={<WrenchIcon className="h-6 w-6" />} label={t("pp.f.leadTime", "Lead time")} value={String(pv("lead_time"))} />
+              <FactChip icon={<ClockIcon className="h-6 w-6" />} label={t("pp.f.leadTime", "Lead time")} value={String(pv("lead_time"))} />
             ) : null}
             {logistics.port_of_loading ? (
-              <FactChip icon={<GlobeIcon className="h-6 w-6" />} label={t("pp.f.portOfLoading", "Port of loading")} value={logistics.port_of_loading} />
+              <FactChip icon={<AnchorIcon className="h-6 w-6" />} label={t("pp.f.portOfLoading", "Port of loading")} value={logistics.port_of_loading} />
             ) : null}
           </div>
                 </Group>
