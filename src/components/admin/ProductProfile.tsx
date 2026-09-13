@@ -575,7 +575,7 @@ function StatTile({
   label, value, unit, tone = "plain",
 }: { label: string; value: React.ReactNode; unit?: string; tone?: "plain" | "accent" }) {
   return (
-    <div className={`rounded-xl border px-3.5 py-3 ${
+    <div className={`h-full rounded-xl border px-3.5 py-3 ${
       tone === "accent"
         ? "border-[#567FB2]/30 bg-[#567FB2]/[0.07]"
         : "border-[var(--border-subtle)] bg-[var(--bg-surface)]"
@@ -590,10 +590,14 @@ function StatTile({
 }
 
 function FactChip({
-  icon, label, value, tone = "plain",
-}: { icon: React.ReactNode; label: string; value: string; tone?: "plain" | "warn" }) {
+  icon, label, value, note, tone = "plain", wide = false,
+}: { icon: React.ReactNode; label: string; value: string; note?: string; tone?: "plain" | "warn"; wide?: boolean }) {
+  /* A BLOCK, NOT AN INLINE PILL. Content-width chips made every row ragged —
+     three facts of different name lengths left three different gutters, and
+     the fourth wrapped onto a line of its own. In a grid each fact takes the
+     same cell, so the cards line up in columns like the numbers above them. */
   return (
-    <span className={`inline-flex items-center gap-2.5 rounded-xl border px-3 py-2 ${
+    <span className={`flex h-full items-center gap-2.5 rounded-xl border px-3 py-2.5 ${wide ? "col-span-full" : ""} ${
       tone === "warn"
         ? "border-amber-500/40 bg-amber-500/[0.07]"
         : "border-[var(--border-subtle)] bg-[var(--bg-surface)]"
@@ -605,9 +609,12 @@ function FactChip({
       }`}>
         {icon}
       </span>
-      <span className="min-w-0">
+      <span className="min-w-0 flex-1">
         <span className="block text-[9.5px] font-bold uppercase tracking-[0.1em] text-[var(--text-ghost)]">{label}</span>
-        <span className="block text-[13px] font-semibold text-[var(--text-primary)] truncate">{value}</span>
+        <span className="block text-[13px] font-semibold text-[var(--text-primary)] break-words">{value}</span>
+        {/* The forwarder's note belongs to the fact it qualifies, not to a
+            stray paragraph under the card. */}
+        {note ? <span className="block text-[11px] text-[var(--text-muted)] mt-0.5 break-words">{note}</span> : null}
       </span>
     </span>
   );
@@ -724,7 +731,7 @@ function PackingSheet({
     <div className="space-y-4">
       {machine ? (
         <Group motion={motion} icon={<RulerIcon className="h-4 w-4" />} title={t("tech.secPhysical", "Physical (Bare Machine)")} count={t("logistics.physicalBadge", "Dimensions · Weight")} editLabel={t("action.edit", "Edit")} onEdit={onEdit}>
-          <div className="flex flex-wrap gap-2.5">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 gap-2.5">
             {pv("machine_dimensions") ? (
               <FactChip icon={<Maximize2Icon className="h-6 w-6" />} label={t("pp.f.machineDims", "Machine dimensions")} value={`${String(pv("machine_dimensions"))} mm`} />
             ) : null}
@@ -747,7 +754,7 @@ function PackingSheet({
           ) : null}
 
           {/* The four numbers a buyer or a forwarder asks for first. */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+          <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
             {sums.packageCount > 0 ? (
               <StatTile
                 label={t("pp.f.packages", "Packages")}
@@ -761,7 +768,7 @@ function PackingSheet({
           </div>
 
           {(pType || logistics.wood_treatment) ? (
-            <div className="mt-3 flex flex-wrap gap-2.5">
+            <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
               {pType ? <FactChip icon={<BoxIcon className="h-6 w-6" />} label={t("pk.packingType", "Packing type")} value={pType} /> : null}
               {logistics.wood_treatment ? (
                 <FactChip
@@ -821,12 +828,12 @@ function PackingSheet({
         <Group motion={motion} icon={<ShipIcon className="h-4 w-4" />} title={t("logistics.loadingSection", "Loading & Containers")} count={t("logistics.loadingSectionBadge", "20ft · 40ft · 40HQ")} editLabel={t("action.edit", "Edit")} onEdit={onEdit}>
           {/* Three numbers, three tiles: this is the question a forwarder asks
               and it should be answerable at a glance, not read out of a list. */}
-          <div className="grid grid-cols-3 gap-2.5">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
             <StatTile label="20ft" value={q20 ? String(q20) : "—"} unit={perPkgLabel} tone="accent" />
             <StatTile label="40ft" value={q40 ? String(q40) : "—"} unit={perPkgLabel} tone="accent" />
             <StatTile label="40HQ" value={q40hq ? String(q40hq) : "—"} unit={perPkgLabel} tone="accent" />
           </div>
-          <div className="mt-3 flex flex-wrap gap-2.5">
+          <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
             <FactChip
               icon={<LayersIcon className="h-6 w-6" />}
               label={t("pk.stackQ", "Can crates be stacked?")}
@@ -845,7 +852,7 @@ function PackingSheet({
 
       {customs ? (
         <Group motion={motion} icon={<GlobeIcon className="h-4 w-4" />} title={t("logistics.title", "Origin & Customs")} count={t("logistics.badge", "Shipping · Customs")} editLabel={t("action.edit", "Edit")} onEdit={onEdit}>
-          <div className="flex flex-wrap gap-2.5">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
             {pv("country_of_origin") ? (
               <FactChip icon={<FlagIcon className="h-6 w-6" />} label={t("pp.f.origin", "Country of origin")} value={String(pv("country_of_origin"))} />
             ) : null}
@@ -860,21 +867,21 @@ function PackingSheet({
                 icon={<TriangleWarningIcon className="h-6 w-6" />}
                 label={t("pp.f.regulated", "Regulated content")}
                 value={dgNames.join(", ") || t("pk.dgHas", "Has regulated content")}
+                note={[dg.un_numbers, dg.notes].filter(Boolean).join("  ·  ") || undefined}
                 tone="warn"
+                /* A warning with a note behind it is taller than its
+                   neighbours; given its own band it stops leaving a hole in
+                   the row and reads like the alert it is. */
+                wide
               />
             ) : null}
           </div>
-          {dg?.has && (dg.un_numbers || dg.notes) ? (
-            <p className="mt-2 text-[11.5px] text-[var(--text-muted)]">
-              {[dg.un_numbers, dg.notes].filter(Boolean).join("  ·  ")}
-            </p>
-          ) : null}
                 </Group>
       ) : null}
 
       {order ? (
         <Group motion={motion} icon={<ClipboardCheckIcon className="h-4 w-4" />} title={t("technical.fulfillmentDefaults", "Fulfillment Defaults")} count={t("technical.fulfillmentBadge", "MOQ · Lead Time")} editLabel={t("action.edit", "Edit")} onEdit={onEdit}>
-          <div className="flex flex-wrap gap-2.5">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
             {pv("moq") ? (
               <FactChip icon={<ShoppingCartIcon className="h-6 w-6" />} label={t("pp.f.moq", "MOQ")} value={String(pv("moq"))} />
             ) : null}
