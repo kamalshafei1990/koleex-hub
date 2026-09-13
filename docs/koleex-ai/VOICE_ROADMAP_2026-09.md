@@ -1239,7 +1239,7 @@ call screen's card:
   fail-safe), a 40/min budget, the caller's own conversation — then
   `dispatchTool` with the conversation id, where the ledger refuses a tap
   that matches no recorded preview. On success the tool's own line joins
-  the thread as an assistant message (`provider: tool:confirm`), so a
+  the thread as an assistant message (`provider: tool-confirm`), so a
   reload shows the task saved and the model's next turn knows it exists.
 - `components/ai/TaskCard.tsx` (new): title, the times in words, the
   people by name, observers, mentions, recurrence, private — from the

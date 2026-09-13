@@ -162,7 +162,7 @@ check("the confirm route re-decides everything in the voice tool route's order: 
 check("a fabricated tap is the ledger's to refuse: the route passes confirm:true and lets dispatchTool match the recorded preview; it never writes a table itself before dispatch",
   confirmRoute.indexOf('.from("ai_messages")') > at(/dispatchTool\(ctx, name/) && !/\.from\("koleex_todos"\)/.test(confirmRoute));
 check("on success the tool's own line joins the thread as an assistant message and the conversation counter moves — never on a refusal",
-  /if \(result\.ok && result\.permissionStatus === "allowed" && typeof result\.message === "string"/.test(confirmRoute) && /role: "assistant", content: result\.message, provider: "tool:confirm"/.test(confirmRoute) &&
+  /if \(result\.ok && result\.permissionStatus === "allowed" && typeof result\.message === "string"/.test(confirmRoute) && /role: "assistant", content: result\.message, provider: "tool-confirm"/.test(confirmRoute) &&
   /message_count: \(conv\.message_count \?\? 0\) \+ 1/.test(confirmRoute) && /withPublicProvider\(ins\.data/.test(confirmRoute) && /export const dynamic = "force-dynamic";/.test(confirmRoute));
 const app = readFileSync("src/components/ai/KoleexAiApp.tsx", "utf8");
 check("the page posts the preview's own arguments with the conversation id and via:'tap', shows saved/failed, and appends the route's message once",

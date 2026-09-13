@@ -97,7 +97,7 @@ export async function POST(req: Request) {
     const [ins] = await Promise.all([
       supabaseServer
         .from("ai_messages")
-        .insert({ tenant_id: auth.tenant_id, conversation_id: conversationId, role: "assistant", content: result.message, provider: "tool:confirm" })
+        .insert({ tenant_id: auth.tenant_id, conversation_id: conversationId, role: "assistant", content: result.message, provider: "tool-confirm" })
         .select("*")
         .single(),
       supabaseServer
