@@ -44,6 +44,11 @@ import BoxesIcon from "@/components/icons/ui/BoxesIcon";
    what the old label-guessing did when half the rows fell back to one circle. */
 import BoxIcon from "@/components/icons/ui/BoxIcon";            // packing type
 import TruckIcon from "@/components/icons/ui/TruckIcon";        // the tab itself
+/* Customs is a border authority, not a planet — and the globe shares its outer
+   circle with the clock used for lead time, so at 20px the two read as the
+   same round mark. A landmark says "customs house" and cannot be mistaken for
+   anything else on the sheet. */
+import LandmarkIcon from "@/components/icons/ui/LandmarkIcon";  // Origin & Customs card
 import PackageIcon from "@/components/icons/ui/PackageIcon";    // Packing card
 import ArchiveIcon from "@/components/icons/ui/ArchiveIcon";    // a crate
 import ShipIcon from "@/components/icons/ui/ShipIcon";          // Loading card
@@ -68,7 +73,6 @@ import DocumentIcon from "@/components/icons/ui/DocumentIcon";  // item: manual
 import RulerIcon from "@/components/icons/ui/RulerIcon";
 import WrenchIcon from "@/components/icons/ui/WrenchIcon";
 import DollarSignIcon from "@/components/icons/ui/DollarSignIcon";
-import GlobeIcon from "@/components/icons/ui/GlobeIcon";
 import ShieldCheckIcon from "@/components/icons/ui/ShieldCheckIcon";
 import ImageRawIcon from "@/components/icons/ui/ImageRawIcon";
 import BookOpenIcon from "@/components/icons/ui/BookOpenIcon";
@@ -290,8 +294,26 @@ function RowGlyph({ src, className = "h-3 w-3" }: { src: string; className?: str
   );
 }
 
+/* WHAT THIS TABLE IS FOR, AND WHAT IT MUST NOT DO. It guesses a glyph from a
+   field's LABEL. Guessing is acceptable; pretending to know is not — an
+   unmatched label used to fall through to `status`, whose glyph is the generic
+   info circle, so ONE mark was drawn 56 times across this page for fields that
+   have nothing to do with each other. A repeated icon is not an icon, it is
+   texture, and it teaches the eye that the marks mean nothing. Unmatched now
+   yields no key, no glyph and no tile — the label carries the row on its own. */
 const FIELD_KEY_RULES: Array<[RegExp, string]> = [
   [/visible|visibility/i, "visible"],
+  [/manufacturer|factory/i, "supplier"],
+  [/mpn|gtin|legacy code|product id/i, "barcode"],
+  [/generation|model year|schema version|version/i, "level"],
+  [/end of life|available from|starts from/i, "dates"],
+  [/tags|highlights/i, "knowledge"],
+  /* NOT mapped to "warranty": coverage, exclusions, returns, service life,
+     maintenance, support, training and installation are eight different
+     questions, and pointing them all at the shield only moved the duplication
+     from one glyph to another — eleven identical shields down the Compliance
+     tab. Until each has a mark of its own in the Visual Library they carry
+     none, which at least does not claim they are the same thing. */
   [/featured/i, "featured"],
   [/readiness/i, "readiness"],
   [/status|lifecycle/i, "status"],
@@ -350,7 +372,7 @@ const FIELD_KEY_RULES: Array<[RegExp, string]> = [
 /* Offline fallback = the registry's own seed URLs, so a failed fetch never
    blanks the tiles. The registry (visual_icon_bindings) always wins. */
 const FIELD_ICON_FALLBACK: Record<string, string> = {
-  status: "general/status/info.svg", visible: "general/security/eye.svg", featured: "pack/status/ranking-star.svg",
+  status: "general/status/badge-check.svg", visible: "general/security/eye.svg", featured: "pack/status/ranking-star.svg",
   level: "pack/actions/layers.svg", product_name: "pack/commerce/label.svg", koleex_code: "general/inventory/barcode.svg",
   public_url: "pack/actions/link.svg", brand: "pack/documents/crown.svg", family: "general/inventory/boxes.svg",
   tagline: "pack/actions/text.svg", description: "pack/actions/paragraph.svg", excerpt: "pack/misc/memo.svg",
@@ -399,14 +421,12 @@ function humanizeSlug(v: unknown): string {
 
 function fieldKeyForLabel(label: string): string {
   for (const [re, k] of FIELD_KEY_RULES) if (re.test(label)) return k;
-  return "status";
+  return "";
 }
 
 function iconForField(bindings: Record<string, string>, fieldKey: string): string {
-  return (
-    bindings[`field.${fieldKey}`] ||
-    (FIELD_ICON_FALLBACK[fieldKey] ? VL_BASE + FIELD_ICON_FALLBACK[fieldKey] : VL_BASE + "general/status/info.svg")
-  );
+  if (!fieldKey) return "";
+  return bindings[`field.${fieldKey}`] || (FIELD_ICON_FALLBACK[fieldKey] ? VL_BASE + FIELD_ICON_FALLBACK[fieldKey] : "");
 }
 
 
@@ -851,7 +871,7 @@ function PackingSheet({
       ) : null}
 
       {customs ? (
-        <Group motion={motion} icon={<GlobeIcon className="h-4 w-4" />} title={t("logistics.title", "Origin & Customs")} count={t("logistics.badge", "Shipping · Customs")} editLabel={t("action.edit", "Edit")} onEdit={onEdit}>
+        <Group motion={motion} icon={<LandmarkIcon className="h-4 w-4" />} title={t("logistics.title", "Origin & Customs")} count={t("logistics.badge", "Shipping · Customs")} editLabel={t("action.edit", "Edit")} onEdit={onEdit}>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
             {pv("country_of_origin") ? (
               <FactChip icon={<FlagIcon className="h-6 w-6" />} label={t("pp.f.origin", "Country of origin")} value={String(pv("country_of_origin"))} />
@@ -908,9 +928,19 @@ function Row({ label, value, help, mono, badge, iconSrc }: {
     <div className="flex items-start gap-3 py-3 first:pt-0 last:pb-0">
       {/* Icon tile — the eye's anchor while scanning down the sheet.
           Always a Visual Library glyph (owner rule). */}
-      <span className="mt-0.5 h-8 w-8 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-muted)] shrink-0">
-        <RowGlyph src={iconSrc || iconForField(BINDINGS_SNAPSHOT, fieldKeyForLabel(label))} className="h-4 w-4" />
-      </span>
+      {/* No glyph for this field? Then no tile — but keep its width, so a row
+          without one still lines up with the rows that have one. A box drawn
+          around nothing is just another repeated mark. */}
+      {(() => {
+        const src = iconSrc || iconForField(BINDINGS_SNAPSHOT, fieldKeyForLabel(label));
+        return src ? (
+          <span className="mt-0.5 h-8 w-8 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-muted)] shrink-0">
+            <RowGlyph src={src} className="h-4 w-4" />
+          </span>
+        ) : (
+          <span aria-hidden className="mt-0.5 h-8 w-8 shrink-0" />
+        );
+      })()}
       <div className="min-w-0 flex-1">
         <div className="flex items-start justify-between gap-3 mb-0.5">
           <span className="text-[10px] font-bold uppercase tracking-[0.08em] text-[var(--text-ghost)]">{label}</span>
