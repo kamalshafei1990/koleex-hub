@@ -21,6 +21,7 @@
 
 import { Fragment, useMemo, useState, useRef, useEffect } from "react";
 import { useTranslation } from "@/lib/i18n";
+import UnitPicker from "./UnitPicker";
 import {
   LENGTH_UNITS, MASS_UNITS, displayIn, isLengthUnit, isMassUnit, storeFrom, useEntryUnits,
 } from "@/lib/entry-units";
@@ -160,8 +161,12 @@ function DimensionField({
   };
   const clearDraft = (i: number) => setRaw((m) => { const n = { ...m }; delete n[i]; return n; });
 
+  /* The chip wraps to its own line before the three boxes get squeezed. On a
+     phone, keeping it on the row left each box 51px — 27px of that being
+     usable — and a four-digit crate scrolled inside its own field. */
   return (
-    <div className="flex items-center gap-2">
+    <div className="flex flex-wrap items-center gap-2">
+      <div className="flex items-center gap-2 min-w-0 flex-1 basis-[210px]">
       {[0, 1, 2].map((i) => (
         <Fragment key={i}>
           {i > 0 ? <span className="text-[var(--text-ghost)] shrink-0">×</span> : null}
@@ -175,6 +180,7 @@ function DimensionField({
           />
         </Fragment>
       ))}
+      </div>
       {canonical ? (
         <UnitSuffix
           canonical={canonical}
@@ -199,8 +205,12 @@ function UnitNumberField({
   const entry = isLengthUnit(canonical) ? length : isMassUnit(canonical) ? mass : canonical;
   const [raw, setRaw] = useState<string | undefined>(undefined);
   const shown = raw !== undefined ? raw : displayIn(value, canonical, entry);
+  /* The picker sits BESIDE the box, not floating inside it: a control laid
+     over an input steals the end of the number, and on the suggestion variant
+     it landed next to that field's own chevron — two arrows a centimetre
+     apart doing different things. */
   return (
-    <div className="relative">
+    <div className="flex items-center gap-2">
       <input
         inputMode="decimal"
         value={shown}
@@ -211,7 +221,7 @@ function UnitNumberField({
         }}
         onBlur={() => setRaw(undefined)}
         placeholder="0"
-        className={`${inputCls} ${canonical ? "pe-16" : ""}`}
+        className={`${inputCls} min-w-0 flex-1`}
       />
       {canonical ? (
         <UnitSuffix
@@ -222,7 +232,6 @@ function UnitNumberField({
             if (isLengthUnit(u)) setLength(u);
             else if (isMassUnit(u)) setMass(u);
           }}
-          className="absolute end-2 top-1/2 -translate-y-1/2"
         />
       ) : null}
     </div>
@@ -236,30 +245,18 @@ function UnitNumberField({
    the way in and out. The stored number never leaves its declared unit — see
    src/lib/entry-units.ts. */
 function UnitSuffix({
-  canonical, entry, onPick, className,
+  canonical, entry, onPick,
 }: {
   canonical: string;
   entry: string;
   onPick: (u: string) => void;
-  className?: string;
 }) {
   const opts = isLengthUnit(canonical) ? LENGTH_UNITS : isMassUnit(canonical) ? MASS_UNITS : null;
+  /* Not convertible (W, bar, °C) — the unit is a fact, not a choice. */
   if (!opts) {
-    return <span className={className ?? "text-[11px] font-medium text-[var(--text-ghost)] shrink-0"}>{canonical}</span>;
+    return <span className="text-[11px] font-medium text-[var(--text-ghost)] shrink-0">{canonical}</span>;
   }
-  return (
-    <select
-      value={entry}
-      onChange={(e) => onPick(e.target.value)}
-      aria-label={`Unit — stored in ${canonical}`}
-      title={`Type in any unit. Stored in ${canonical}.`}
-      className={`shrink-0 bg-transparent text-[11px] font-semibold text-[var(--text-muted)] hover:text-[var(--text-primary)] outline-none cursor-pointer ${className ?? ""}`}
-    >
-      {opts.map((u) => (
-        <option key={u} value={u} className="bg-[var(--bg-surface)] text-[var(--text-primary)]">{u}</option>
-      ))}
-    </select>
-  );
+  return <UnitPicker value={entry} options={opts} onPick={onPick} canonical={canonical} />;
 }
 
 /* ── computed fields ───────────────────────────────────────────────
@@ -472,7 +469,8 @@ function NumberSuggestField({
     onSet(v === "" ? undefined : v);
   };
   return (
-    <div ref={triggerRef} className="relative">
+    <div className="flex items-center gap-2">
+    <div ref={triggerRef} className="relative min-w-0 flex-1">
       <input
         inputMode="decimal"
         value={strVal}
@@ -480,19 +478,8 @@ function NumberSuggestField({
         onFocus={() => setOpen(true)}
         onBlur={() => setRaw(undefined)}
         placeholder="0"
-        className={`${inputCls} ${canonical ? "pe-[4.5rem]" : "pe-9"}`}
+        className={`${inputCls} pe-9`}
       />
-      {canonical ? (
-        <UnitSuffix
-          canonical={canonical}
-          entry={entry}
-          onPick={(u) => {
-            setRaw(undefined);
-            if (isLengthUnit(u)) setLength(u); else if (isMassUnit(u)) setMass(u);
-          }}
-          className="absolute end-7 top-1/2 -translate-y-1/2"
-        />
-      ) : null}
       <button
         type="button"
         tabIndex={-1}
@@ -520,6 +507,17 @@ function NumberSuggestField({
           })}
         </DropdownPortal>
       ) : null}
+    </div>
+    {canonical ? (
+      <UnitSuffix
+        canonical={canonical}
+        entry={entry}
+        onPick={(u) => {
+          setRaw(undefined);
+          if (isLengthUnit(u)) setLength(u); else if (isMassUnit(u)) setMass(u);
+        }}
+      />
+    ) : null}
     </div>
   );
 }

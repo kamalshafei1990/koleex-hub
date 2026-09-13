@@ -3,6 +3,7 @@
 import { useTranslation } from "@/lib/i18n";
 import KdsSelect from "@/components/kds/Select";
 import { PRODUCTS_UI_I18N } from "@/lib/products-ui-i18n";
+import UnitPicker from "./UnitPicker";
 import { LENGTH_UNITS, MASS_UNITS, displayIn, isLengthUnit, isMassUnit, storeFrom, useEntryUnits, type LengthUnit } from "@/lib/entry-units";
 import { useState, useRef, useEffect, type ReactNode } from "react";
 import CrossIcon from "@/components/icons/ui/CrossIcon";
@@ -232,7 +233,7 @@ function UnitNumberInput({
   const [raw, setRaw] = useState<string | undefined>(undefined);
   const shown = !convertible ? value : raw !== undefined ? raw : displayIn(value, unit, entry);
   return (
-    <div className="relative">
+    <div className={convertible ? "flex items-center gap-2" : "relative"}>
       <input
         inputMode="decimal"
         value={shown}
@@ -243,24 +244,20 @@ function UnitNumberInput({
         }}
         onBlur={() => setRaw(undefined)}
         placeholder={placeholder}
-        className="w-full h-10 pl-4 pr-14 rounded-lg bg-[var(--bg-inverted)]/[0.05] border border-[var(--border-subtle)] text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-dim)] outline-none focus:border-[var(--border-focus)] transition-colors"
+        className={`h-10 pl-4 rounded-lg bg-[var(--bg-inverted)]/[0.05] border border-[var(--border-subtle)] text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-dim)] outline-none focus:border-[var(--border-focus)] transition-colors ${
+          convertible ? "min-w-0 flex-1 pr-4" : "w-full pr-12"
+        }`}
       />
       {convertible ? (
-        <select
+        <UnitPicker
           value={entry}
-          onChange={(e) => {
+          options={isLengthUnit(unit) ? LENGTH_UNITS : MASS_UNITS}
+          onPick={(u) => {
             setRaw(undefined);
-            const u = e.target.value;
             if (isLengthUnit(u)) setLength(u); else if (isMassUnit(u)) setMass(u);
           }}
-          aria-label={`Unit — stored in ${unit}`}
-          title={`Type in any unit. Stored in ${unit}.`}
-          className="absolute right-2 top-1/2 -translate-y-1/2 bg-transparent text-[11px] font-semibold text-[var(--text-muted)] hover:text-[var(--text-primary)] outline-none cursor-pointer"
-        >
-          {(isLengthUnit(unit) ? LENGTH_UNITS : MASS_UNITS).map((u) => (
-            <option key={u} value={u} className="bg-[var(--bg-surface)] text-[var(--text-primary)]">{u}</option>
-          ))}
-        </select>
+          canonical={unit}
+        />
       ) : (
         <span className="absolute right-4 top-1/2 -translate-y-1/2 text-[10px] font-medium text-[var(--text-ghost)] pointer-events-none">
           {unit}
@@ -532,23 +529,22 @@ function MachineDimensionFields({ value, onChange }: { value: string; onChange: 
       <FieldLabel icon={<RulerIcon className="h-3.5 w-3.5" />}>
         {t("tech.machineDimsLwh", "Machine Dimensions (L × W × H)")}
       </FieldLabel>
-      <div className="flex items-center gap-2">
-        {box(0, "L")}
-        <span className="text-[var(--text-ghost)] shrink-0">×</span>
-        {box(1, "W")}
-        <span className="text-[var(--text-ghost)] shrink-0">×</span>
-        {box(2, "H")}
-        <select
+      {/* Same wrap rule as the schema copy of this field: the chip drops to its
+          own line rather than squeezing the boxes down to 51px. */}
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="flex items-center gap-2 min-w-0 flex-1 basis-[210px]">
+          {box(0, "L")}
+          <span className="text-[var(--text-ghost)] shrink-0">×</span>
+          {box(1, "W")}
+          <span className="text-[var(--text-ghost)] shrink-0">×</span>
+          {box(2, "H")}
+        </div>
+        <UnitPicker
           value={entry}
-          onChange={(e) => { setRaw({}); setLength(e.target.value as LengthUnit); }}
-          aria-label="Unit — stored in mm"
-          title="Type in any unit. Stored in mm."
-          className="shrink-0 bg-transparent text-[11px] font-semibold text-[var(--text-muted)] hover:text-[var(--text-primary)] outline-none cursor-pointer"
-        >
-          {LENGTH_UNITS.map((u) => (
-            <option key={u} value={u} className="bg-[var(--bg-surface)] text-[var(--text-primary)]">{u}</option>
-          ))}
-        </select>
+          options={LENGTH_UNITS}
+          onPick={(u) => { setRaw({}); setLength(u as LengthUnit); }}
+          canonical="mm"
+        />
       </div>
       <p className="text-[10px] text-[var(--text-ghost)] mt-1">
         {t("tech.machineDimsHelp2", "Footprint of the machine in operation. Type in mm, cm or m — it is stored in mm. The crate is entered separately under Packing.")}

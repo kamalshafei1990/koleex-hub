@@ -45,6 +45,7 @@ import ShieldCheckIcon from "@/components/icons/ui/ShieldCheckIcon";
 import LayersIcon from "@/components/icons/ui/LayersIcon";
 import FileIcon from "@/components/icons/ui/FileIcon";
 import ImageRawIcon from "@/components/icons/ui/ImageRawIcon";
+import UnitPicker from "./UnitPicker";
 
 const lbl = "block text-[11px] font-semibold text-[var(--text-muted)] mb-1.5";
 /* TWO WIDTHS, NOT ONE STRING WITH AN OVERRIDE. `inp` carries w-full, and a
@@ -80,35 +81,22 @@ type TFn = (key: string, fallback: string) => string;
 const localise = (t: TFn, list: readonly { value: string; label: string }[]) =>
   list.map((o) => ({ value: o.value, label: t(`pk.opt.${o.value}`, o.label) }));
 
-/* The unit switch. Small on purpose: it is a statement about how the operator
-   is reading a catalogue, not a field of the product. */
-function UnitSwitch<T extends string>({
-  value, options, onChange, label,
+/* The unit switch is the shared UnitPicker (./UnitPicker) with a caption — one
+   control for units everywhere on the form, so the crate's switch and the
+   machine's switch above it are visibly the same thing. */
+function UnitSwitch({
+  value, options, onChange, label, canonical,
 }: {
-  value: T;
-  options: readonly { value: T; label: string }[];
-  onChange: (v: T) => void;
+  value: string;
+  options: readonly string[];
+  onChange: (v: string) => void;
   label: string;
+  canonical: string;
 }) {
   return (
     <span className="inline-flex items-center gap-1.5">
       <span className="text-[9px] uppercase tracking-[0.1em] text-[var(--text-ghost)]">{label}</span>
-      <span className="inline-flex rounded-lg border border-[var(--border-subtle)] overflow-hidden">
-        {options.map((o) => (
-          <button
-            key={o.value}
-            type="button"
-            onClick={() => onChange(o.value)}
-            className={`h-7 px-2 text-[11px] font-semibold transition-colors ${
-              value === o.value
-                ? "bg-[#567FB2]/[0.18] text-[var(--text-primary)]"
-                : "text-[var(--text-ghost)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-hover)]"
-            }`}
-          >
-            {o.label}
-          </button>
-        ))}
-      </span>
+      <UnitPicker value={value} options={options} onPick={onChange} canonical={canonical} size="sm" />
     </span>
   );
 }
@@ -341,14 +329,16 @@ export function PackingBlock({ value, onChange, productId }: BlockProps & { prod
             <UnitSwitch
               label={t("pk.unitSize", "Size")}
               value={dimUnit}
-              options={LENGTH_UNITS.map((u) => ({ value: u, label: u }))}
-              onChange={(v) => { setRaw({}); setLength(v); }}
+              options={LENGTH_UNITS}
+              canonical="cm"
+              onChange={(v) => { setRaw({}); setLength(v as typeof dimUnit); }}
             />
             <UnitSwitch
               label={t("pk.unitWeight", "Weight")}
               value={wtUnit}
-              options={MASS_UNITS.map((u) => ({ value: u, label: u }))}
-              onChange={(v) => { setRaw({}); setMass(v); }}
+              options={MASS_UNITS}
+              canonical="kg"
+              onChange={(v) => { setRaw({}); setMass(v as typeof wtUnit); }}
             />
           </div>
         </div>
