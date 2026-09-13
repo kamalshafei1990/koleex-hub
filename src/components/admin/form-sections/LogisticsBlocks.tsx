@@ -18,17 +18,31 @@
      Shipping  → where it leaves from
    --------------------------------------------------------------------------- */
 
-import { useMemo } from "react";
+import { useMemo, useRef, useState } from "react";
 import KdsSelect from "@/components/kds/Select";
 import {
-  CONTAINERS, DG_KINDS, ORIGIN_CERTIFICATES, PACKING_TYPES, WOOD_TREATMENTS,
+  CONTAINERS, DG_KINDS, ITEM_KINDS, ORIGIN_CERTIFICATES, PACKING_TYPES, WOOD_TREATMENTS,
   loadPlan, sumPackages,
-  type PackageRow, type ProductLogistics,
+  type ContentItem, type PackageRow, type PackingMode, type ProductLogistics,
 } from "@/lib/logistics";
+import BoxesIcon from "@/components/icons/ui/BoxesIcon";
+import PackageIcon from "@/components/icons/ui/PackageIcon";
+import WrenchIcon from "@/components/icons/ui/WrenchIcon";
+import PlugIcon from "@/components/icons/ui/PlugIcon";
+import ShieldCheckIcon from "@/components/icons/ui/ShieldCheckIcon";
+import LayersIcon from "@/components/icons/ui/LayersIcon";
+import FileIcon from "@/components/icons/ui/FileIcon";
 
 const lbl = "block text-[11px] font-semibold text-[var(--text-muted)] mb-1.5";
-const inp =
-  "w-full h-10 px-3 rounded-lg bg-[var(--bg-surface-subtle)]/70 border border-[var(--border-subtle)] text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none focus:border-[var(--border-focus)] transition-colors";
+/* TWO WIDTHS, NOT ONE STRING WITH AN OVERRIDE. `inp` carries w-full, and a
+   caller that appended `w-16` did not get a 4rem box: both are width
+   utilities of equal specificity, so the winner is whichever Tailwind emits
+   last — not whichever is written last in the className. The qty box came out
+   wider than the label it followed. `inpBase` is the same input with no width
+   so a caller can set its own. */
+const inpBase =
+  "h-10 px-3 rounded-lg bg-[var(--bg-surface-subtle)]/70 border border-[var(--border-subtle)] text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none focus:border-[var(--border-focus)] transition-colors";
+const inp = `w-full ${inpBase}`;
 const hint = "text-[10px] text-[var(--text-ghost)] leading-relaxed mt-1";
 
 type Patch = (u: Partial<ProductLogistics>) => void;
@@ -49,10 +63,14 @@ const n = (v: unknown): number => {
 export function LogisticsSummary({ value }: { value: ProductLogistics }) {
   const sums = useMemo(() => sumPackages(value.packages), [value.packages]);
   const plan = useMemo(
-    () => loadPlan(value.packages, { stackable: value.stackable, stackMax: n(value.stack_max) }),
-    [value.packages, value.stackable, value.stack_max],
+    () => loadPlan(value.packages, {
+      stackable: value.stackable, stackMax: n(value.stack_max),
+      unitsPerPackage: value.packing_mode === "per_package" ? n(value.units_per_package) : 1,
+    }),
+    [value.packages, value.stackable, value.stack_max, value.packing_mode, value.units_per_package],
   );
   if (sums.packageCount === 0) return null;
+  const perPkg = value.packing_mode === "per_package" ? Math.max(1, Math.floor(n(value.units_per_package) || 1)) : 1;
   const cell = (k: string, v: string) => (
     <div key={k} className="min-w-0">
       <div className="text-[9px] uppercase tracking-[0.12em] text-[var(--text-ghost)]">{k}</div>
@@ -62,8 +80,8 @@ export function LogisticsSummary({ value }: { value: ProductLogistics }) {
   return (
     <div className="kx-glass rounded-xl border border-[#567FB2]/30 px-4 py-3">
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-x-4 gap-y-3">
-        {cell("Packages", `${sums.packageCount} / unit`)}
-        {cell("Volume", `${sums.cbm} m³`)}
+        {cell("Packages", perPkg > 1 ? `${perPkg} pcs / pkg` : `${sums.packageCount} / unit`)}
+        {cell("CBM", `${sums.cbm} m³`)}
         {cell("Gross", `${sums.grossKg} kg`)}
         {cell("20ft", plan.c20.qty ? String(plan.c20.qty) : "—")}
         {cell("40ft", plan.c40.qty ? String(plan.c40.qty) : "—")}
@@ -74,9 +92,9 @@ export function LogisticsSummary({ value }: { value: ProductLogistics }) {
 }
 
 /* ═══════════════════════════════════════════════════════════════════
-   PACKING — the crates.
+   PACKING — the crates, what is inside them, and how many pieces to a box.
    ═══════════════════════════════════════════════════════════════════ */
-export function PackingBlock({ value, onChange }: BlockProps) {
+export function PackingBlock({ value, onChange, productId }: BlockProps & { productId?: string }) {
   /* Memoised so the fallback row is not a fresh array on every render — that
      identity change re-ran the sums below on every keystroke anywhere on the
      form. */
@@ -85,29 +103,83 @@ export function PackingBlock({ value, onChange }: BlockProps) {
     [value.packages],
   );
   const sums = useMemo(() => sumPackages(rows), [rows]);
+  const mode: PackingMode = value.packing_mode === "per_package" ? "per_package" : "per_unit";
+  const per = Math.max(1, Math.floor(n(value.units_per_package) || 1));
 
-  const setRow = (i: number, u: Partial<PackageRow>) => {
-    const next = rows.map((r, x) => (x === i ? { ...r, ...u } : r));
-    onChange({ packages: next, cbm: sumPackages(next).cbm, gross_weight_kg: sumPackages(next).grossKg });
+  const write = (next: PackageRow[]) => {
+    const s = sumPackages(next);
+    onChange({ packages: next, cbm: s.cbm, gross_weight_kg: s.grossKg });
   };
+  const setRow = (i: number, u: Partial<PackageRow>) => write(rows.map((r, x) => (x === i ? { ...r, ...u } : r)));
   const addRow = () => onChange({ packages: [...rows, { qty: 1 }] });
-  const removeRow = (i: number) => {
-    const next = rows.filter((_, x) => x !== i);
-    onChange({ packages: next, cbm: sumPackages(next).cbm, gross_weight_kg: sumPackages(next).grossKg });
-  };
+  const removeRow = (i: number) => write(rows.filter((_, x) => x !== i));
 
-  const numCell = (i: number, k: keyof PackageRow, ph: string) => (
-    <input
-      inputMode="decimal"
-      value={String(rows[i][k] ?? "")}
-      onChange={(e) => setRow(i, { [k]: e.target.value } as Partial<PackageRow>)}
-      placeholder={ph}
-      className={`${inp} text-center tabular-nums px-1.5`}
-    />
+  const numCell = (i: number, k: keyof PackageRow, ph: string, label: string) => (
+    <div className="min-w-0">
+      <div className="text-[9px] uppercase tracking-[0.1em] text-[var(--text-ghost)] mb-1">{label}</div>
+      <input
+        inputMode="decimal"
+        value={String(rows[i][k] ?? "")}
+        onChange={(e) => setRow(i, { [k]: e.target.value } as Partial<PackageRow>)}
+        placeholder={ph}
+        className={`${inp} text-center tabular-nums px-1.5`}
+      />
+    </div>
   );
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-5">
+      {/* ── HOW THIS PRODUCT IS PACKED ──
+          The first question, because every number under it means something
+          different depending on the answer. A machine occupies crates; a small
+          accessory shares one. The customer's question — "how many per box?" —
+          only exists in the second case, so the field only exists there. */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div>
+          <label className={lbl}>How is it packed?</label>
+          <div className="flex items-center gap-2">
+            {([["per_unit", "One unit → its own package(s)"], ["per_package", "One package → many pieces"]] as const).map(([k, label]) => (
+              <button
+                key={k}
+                type="button"
+                onClick={() => onChange({ packing_mode: k })}
+                className={`h-10 px-3 rounded-lg text-[11.5px] font-semibold border transition-colors flex-1 ${
+                  mode === k
+                    ? "border-[#567FB2]/60 bg-[#567FB2]/[0.12] text-[var(--text-primary)]"
+                    : "border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)]/70 text-[var(--text-muted)] hover:text-[var(--text-primary)]"
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+          <p className={hint}>
+            {mode === "per_unit"
+              ? "A machine: one unit ships as one or more crates."
+              : "A small item: one carton holds many pieces."}
+          </p>
+        </div>
+        {mode === "per_package" ? (
+          <div>
+            <label className={lbl}>Pieces per package</label>
+            <input
+              inputMode="numeric"
+              value={String(value.units_per_package ?? "")}
+              onChange={(e) => onChange({ units_per_package: e.target.value })}
+              placeholder="50"
+              className={`${inp} tabular-nums`}
+            />
+            <p className={hint}>The first thing a customer asks about a small item. Container counts below are in PIECES.</p>
+          </div>
+        ) : (
+          <div>
+            <label className={lbl}>CBM (m³)</label>
+            <input value={sums.cbm ? String(sums.cbm) : ""} readOnly placeholder="—" className={`${inp} tabular-nums opacity-70`} />
+            <p className={hint}>Calculated from the package sizes below — L × W × H ÷ 1,000,000.</p>
+          </div>
+        )}
+      </div>
+
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
           <label className={lbl}>Packing type</label>
@@ -138,68 +210,84 @@ export function PackingBlock({ value, onChange }: BlockProps) {
         </div>
       </div>
 
+      {/* ── THE SAMPLE PHOTO ──
+          Large on purpose. Every written packing spec is an argument waiting to
+          happen — "wooden case" means one thing to us and another to the buyer
+          — and one photograph of the actual packed machine ends it. It is also
+          what the factory is asked to reproduce. */}
+      <PackingPhoto
+        url={value.packing_photo_url ?? null}
+        onChange={(u) => onChange({ packing_photo_url: u })}
+        productId={productId}
+      />
+
       {/* ── the crates ──
-          ONE ROW PER CRATE, because one machine is regularly more than one
-          crate — a spreader ships as machine + table/rails + accessory box.
-          A single set of dimensions gets the volume, the weight and every
+          ONE CARD PER CRATE, because one machine is regularly more than one
+          crate — a spreader ships as machine + table/rails + accessory box. A
+          single set of dimensions gets the volume, the weight and every
           container count wrong, and cannot produce a packing list at all. */}
       <div>
         <div className="flex items-center justify-between gap-2 mb-2">
-          <label className={`${lbl} mb-0`}>Packages per unit</label>
+          <label className={`${lbl} mb-0`}>{mode === "per_package" ? "Package" : "Packages per unit"}</label>
           <span className="text-[10px] tabular-nums text-[var(--text-ghost)]">
             {sums.packageCount} pkg · {sums.cbm} m³ · {sums.grossKg} kg
+            {mode === "per_package" && per > 1 ? ` · ${Math.round((sums.cbm / per) * 10000) / 10000} m³/pc` : ""}
           </span>
         </div>
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[620px] border-separate border-spacing-y-1.5">
-            <thead>
-              <tr className="text-[9px] uppercase tracking-[0.1em] text-[var(--text-ghost)]">
-                <th className="text-start font-semibold ps-1">What&apos;s inside</th>
-                <th className="w-14 font-semibold">Qty</th>
-                <th className="w-20 font-semibold">L (cm)</th>
-                <th className="w-20 font-semibold">W (cm)</th>
-                <th className="w-20 font-semibold">H (cm)</th>
-                <th className="w-24 font-semibold">Gross (kg)</th>
-                <th className="w-8" />
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((r, i) => (
-                <tr key={i}>
-                  <td className="pe-2">
+
+        <div className="space-y-3">
+          {rows.map((r, i) => (
+            <div key={i} className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)]/40 p-3 space-y-3">
+              <div className="flex items-start gap-3">
+                <ItemPhoto
+                  url={r.photo_url ?? null}
+                  kind="box"
+                  size="lg"
+                  onChange={(u) => setRow(i, { photo_url: u })}
+                  productId={productId}
+                />
+                <div className="flex-1 min-w-0 grid grid-cols-2 sm:grid-cols-6 gap-2">
+                  <div className="col-span-2 sm:col-span-2 min-w-0">
+                    <div className="text-[9px] uppercase tracking-[0.1em] text-[var(--text-ghost)] mb-1">Package</div>
                     <input
                       value={r.label ?? ""}
                       onChange={(e) => setRow(i, { label: e.target.value })}
-                      placeholder={i === 0 ? "Machine" : "Table & rails / Accessories"}
+                      placeholder={i === 0 ? "Machine crate" : "Accessories box"}
                       className={inp}
                     />
-                  </td>
-                  <td className="px-1">{numCell(i, "qty", "1")}</td>
-                  <td className="px-1">{numCell(i, "l_cm", "120")}</td>
-                  <td className="px-1">{numCell(i, "w_cm", "80")}</td>
-                  <td className="px-1">{numCell(i, "h_cm", "110")}</td>
-                  <td className="px-1">{numCell(i, "gross_kg", "210")}</td>
-                  <td className="ps-1">
-                    {rows.length > 1 ? (
-                      <button
-                        type="button"
-                        onClick={() => removeRow(i)}
-                        aria-label="Remove package"
-                        className="h-8 w-8 rounded-lg text-[var(--text-ghost)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-hover)] transition-colors"
-                      >
-                        ×
-                      </button>
-                    ) : null}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+                  </div>
+                  {numCell(i, "qty", "1", "Qty")}
+                  {numCell(i, "l_cm", "120", "L (cm)")}
+                  {numCell(i, "w_cm", "80", "W (cm)")}
+                  {numCell(i, "h_cm", "110", "H (cm)")}
+                  <div className="col-span-2 sm:col-span-1">{numCell(i, "gross_kg", "210", "Gross (kg)")}</div>
+                </div>
+                {rows.length > 1 ? (
+                  <button
+                    type="button"
+                    onClick={() => removeRow(i)}
+                    aria-label="Remove package"
+                    className="h-8 w-8 shrink-0 rounded-lg text-[var(--text-ghost)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-hover)] transition-colors"
+                  >
+                    ×
+                  </button>
+                ) : null}
+              </div>
+
+              {/* What is in this crate — the packing list, nested. */}
+              <ContentsEditor
+                items={r.contents ?? []}
+                onChange={(items) => setRow(i, { contents: items })}
+                productId={productId}
+              />
+            </div>
+          ))}
         </div>
+
         <button
           type="button"
           onClick={addRow}
-          className="mt-1 inline-flex items-center gap-1.5 h-8 px-2.5 rounded-lg text-[11px] font-semibold text-[var(--text-primary)] bg-[var(--bg-base)] hover:bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] transition-colors"
+          className="mt-2 inline-flex items-center gap-1.5 h-8 px-2.5 rounded-lg text-[11px] font-semibold text-[var(--text-primary)] bg-[var(--bg-base)] hover:bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] transition-colors"
         >
           + Add package
         </button>
@@ -209,7 +297,7 @@ export function PackingBlock({ value, onChange }: BlockProps) {
         </p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <div>
           <label className={lbl}>Net weight (kg)</label>
           <input
@@ -223,12 +311,7 @@ export function PackingBlock({ value, onChange }: BlockProps) {
         </div>
         <div>
           <label className={lbl}>Gross weight (kg)</label>
-          <input
-            value={sums.grossKg ? String(sums.grossKg) : ""}
-            readOnly
-            placeholder="—"
-            className={`${inp} tabular-nums opacity-60`}
-          />
+          <input value={sums.grossKg ? String(sums.grossKg) : ""} readOnly placeholder="—" className={`${inp} tabular-nums opacity-70`} />
           {/* Gross used to be a free number with no relationship to anything;
               it is the sum of the crates, so the crates state it. */}
           <p className={hint}>Sum of the packages above.</p>
@@ -239,11 +322,253 @@ export function PackingBlock({ value, onChange }: BlockProps) {
             value={sums.grossKg && n(value.net_weight_kg) ? String(Math.round((sums.grossKg - n(value.net_weight_kg)) * 100) / 100) : ""}
             readOnly
             placeholder="—"
-            className={`${inp} tabular-nums opacity-60`}
+            className={`${inp} tabular-nums opacity-70`}
           />
           <p className={hint}>Gross − net. Negative means one of them is wrong.</p>
         </div>
+        <div>
+          <label className={lbl}>CBM (m³)</label>
+          <input value={sums.cbm ? String(sums.cbm) : ""} readOnly placeholder="—" className={`${inp} tabular-nums opacity-70`} />
+          <p className={hint}>All packages together.</p>
+        </div>
       </div>
+    </div>
+  );
+}
+
+
+/* ═══════════════════════════════════════════════════════════════════
+   PHOTOS — one big sample of the packed product, and a thumbnail for
+   every item in the crate.
+
+   Uploads go through the same storage route the rest of the Hub uses, into
+   the public `media` bucket under packing/<product>/. The URL is all that is
+   stored in products.logistics.
+   ═══════════════════════════════════════════════════════════════════ */
+
+async function uploadPackingImage(file: File, productId?: string): Promise<string | null> {
+  const { uploadToStorage } = await import("@/lib/storage-client");
+  const ext = (file.name.split(".").pop() || "jpg").toLowerCase().replace(/[^a-z0-9]/g, "") || "jpg";
+  const path = `packing/${productId || "new"}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
+  const res = await uploadToStorage("media", path, file, { contentType: file.type || undefined, upsert: true });
+  /* The helper reports failure in the result, not by throwing — a rejected
+     upload that returned a bare null here would look like "no photo chosen". */
+  return res.ok ? res.data.publicUrl : null;
+}
+
+function useImagePicker(onPicked: (url: string | null) => void, productId?: string) {
+  const [busy, setBusy] = useState(false);
+  const ref = useRef<HTMLInputElement | null>(null);
+  const onFile = async (f: File | undefined) => {
+    if (!f) return;
+    setBusy(true);
+    try {
+      const url = await uploadPackingImage(f, productId);
+      if (url) onPicked(url);
+    } finally {
+      setBusy(false);
+      if (ref.current) ref.current.value = "";
+    }
+  };
+  const input = (
+    <input
+      ref={ref}
+      type="file"
+      accept="image/*"
+      className="hidden"
+      onChange={(e) => void onFile(e.target.files?.[0])}
+    />
+  );
+  return { busy, open: () => ref.current?.click(), input };
+}
+
+function PackingPhoto({
+  url, onChange, productId,
+}: { url: string | null; onChange: (u: string | null) => void; productId?: string }) {
+  const { busy, open, input } = useImagePicker(onChange, productId);
+  return (
+    <div>
+      <div className="flex items-center justify-between gap-2 mb-1.5">
+        <label className={`${lbl} mb-0`}>Packing sample photo</label>
+        {url ? (
+          <button
+            type="button"
+            onClick={() => onChange(null)}
+            className="text-[10px] font-semibold text-[var(--text-ghost)] hover:text-[var(--text-primary)]"
+          >
+            Remove
+          </button>
+        ) : null}
+      </div>
+      {input}
+      {url ? (
+        <button
+          type="button"
+          onClick={open}
+          title="Click to replace"
+          className="block w-full overflow-hidden rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)]/40"
+        >
+          {/* Deliberately large. A packing photo is read, not glanced at: the
+              buyer is looking for how the corners are protected and whether the
+              crate is closed or open. A thumbnail answers neither. */}
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={url} alt="Packing sample" className="w-full max-h-[420px] object-contain bg-black/20" />
+        </button>
+      ) : (
+        <button
+          type="button"
+          onClick={open}
+          disabled={busy}
+          className="w-full h-40 rounded-xl border border-dashed border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)]/40 text-[12px] text-[var(--text-ghost)] hover:border-[var(--border-strong)] hover:text-[var(--text-muted)] transition-colors disabled:opacity-50"
+        >
+          {busy ? "Uploading…" : "Click to upload a photo of the packed product"}
+        </button>
+      )}
+      <p className={hint}>One photograph settles what &quot;wooden case&quot; means — for the buyer and for the factory.</p>
+    </div>
+  );
+}
+
+function ItemGlyph({ kind, className }: { kind?: string; className?: string }) {
+  const cls = className || "h-4 w-4";
+  switch (kind) {
+    case "machine": return <BoxesIcon className={cls} />;
+    case "tools":   return <WrenchIcon className={cls} />;
+    case "cable":   return <PlugIcon className={cls} />;
+    case "cover":   return <ShieldCheckIcon className={cls} />;
+    case "parts":   return <LayersIcon className={cls} />;
+    case "docs":    return <FileIcon className={cls} />;
+    default:        return <PackageIcon className={cls} />;
+  }
+}
+
+function ItemPhoto({
+  url, kind, onChange, productId, size = "sm",
+}: {
+  url: string | null; kind?: string; onChange: (u: string | null) => void;
+  productId?: string; size?: "sm" | "lg";
+}) {
+  const { busy, open, input } = useImagePicker(onChange, productId);
+  const box = size === "lg" ? "h-16 w-16" : "h-10 w-10";
+  return (
+    <>
+      {input}
+      <button
+        type="button"
+        onClick={open}
+        disabled={busy}
+        title={url ? "Click to replace the photo" : "Click to add a photo"}
+        className={`${box} shrink-0 rounded-lg overflow-hidden border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)]/60 flex items-center justify-center text-[var(--text-ghost)] hover:border-[var(--border-strong)] hover:text-[var(--text-muted)] transition-colors disabled:opacity-50`}
+      >
+        {url ? (
+          /* eslint-disable-next-line @next/next/no-img-element */
+          <img src={url} alt="" className="h-full w-full object-cover" />
+        ) : (
+          <ItemGlyph kind={kind} className={size === "lg" ? "h-5 w-5" : "h-4 w-4"} />
+        )}
+      </button>
+    </>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   CONTENTS — what is in the crate, and what is in the boxes in it.
+
+   Owner's example, exactly: the machine crate holds the machine and an
+   accessories box; the accessories box holds the cover, the tools. So the
+   list nests one level. Everything is optional — plenty of machines ship as a
+   crate with a machine in it and nothing else to say.
+   ═══════════════════════════════════════════════════════════════════ */
+function ContentsEditor({
+  items, onChange, productId, depth = 0,
+}: {
+  items: ContentItem[];
+  onChange: (next: ContentItem[]) => void;
+  productId?: string;
+  depth?: number;
+}) {
+  const set = (i: number, u: Partial<ContentItem>) => onChange(items.map((it, x) => (x === i ? { ...it, ...u } : it)));
+  const remove = (i: number) => onChange(items.filter((_, x) => x !== i));
+  const add = () => onChange([...items, { qty: 1 }]);
+
+  if (items.length === 0) {
+    return (
+      <button
+        type="button"
+        onClick={add}
+        className={`inline-flex items-center gap-1.5 h-7 px-2 rounded-lg text-[10.5px] font-semibold text-[var(--text-ghost)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-hover)] border border-dashed border-[var(--border-subtle)] transition-colors ${depth ? "ms-11" : ""}`}
+      >
+        + {depth === 0 ? "List what's inside" : "What's inside this box"}
+      </button>
+    );
+  }
+
+  return (
+    <div className={`space-y-2 ${depth ? "ms-11 ps-3 border-s border-[var(--border-subtle)]" : ""}`}>
+      {depth === 0 ? (
+        <div className="text-[9px] uppercase tracking-[0.1em] text-[var(--text-ghost)]">What&apos;s inside</div>
+      ) : null}
+      {items.map((it, i) => (
+        <div key={i} className="space-y-2">
+          <div className="flex items-center gap-2">
+            <ItemPhoto
+              url={it.photo_url ?? null}
+              kind={it.kind}
+              onChange={(u) => set(i, { photo_url: u })}
+              productId={productId}
+            />
+            <input
+              value={it.label ?? ""}
+              onChange={(e) => set(i, { label: e.target.value })}
+              placeholder={depth === 0 ? "Machine / Accessories box" : "Cover, tool kit, spare needles…"}
+              className={`${inpBase} flex-1 min-w-0`}
+            />
+            <input
+              inputMode="numeric"
+              value={String(it.qty ?? "")}
+              onChange={(e) => set(i, { qty: e.target.value })}
+              placeholder="1"
+              className={`${inpBase} w-16 text-center tabular-nums px-1.5`}
+            />
+            {/* No photo? Then the glyph carries the meaning, so it is worth
+                choosing. Hidden once a photo exists — the photo wins. */}
+            {!it.photo_url ? (
+              <KdsSelect
+                value={it.kind ?? ""}
+                onChange={(v: string) => set(i, { kind: v })}
+                options={ITEM_KINDS.map((k) => ({ value: k.value, label: k.label }))}
+                placeholder="Icon"
+                triggerClassName={`${inpBase} w-[132px] pe-8 text-start shrink-0`}
+              />
+            ) : null}
+            <button
+              type="button"
+              onClick={() => remove(i)}
+              aria-label="Remove item"
+              className="h-8 w-8 shrink-0 rounded-lg text-[var(--text-ghost)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-hover)] transition-colors"
+            >
+              ×
+            </button>
+          </div>
+          {/* One level of nesting only — deeper than that and it is a second
+              crate, not a box inside a box. */}
+          {depth === 0 ? (
+            <ContentsEditor
+              items={it.items ?? []}
+              onChange={(sub) => set(i, { items: sub })}
+              productId={productId}
+              depth={1}
+            />
+          ) : null}
+        </div>
+      ))}
+      <button
+        type="button"
+        onClick={add}
+        className="inline-flex items-center gap-1.5 h-7 px-2 rounded-lg text-[10.5px] font-semibold text-[var(--text-ghost)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-hover)] transition-colors"
+      >
+        + Add item
+      </button>
     </div>
   );
 }
@@ -254,10 +579,14 @@ export function PackingBlock({ value, onChange }: BlockProps) {
 export function LoadingBlock({ value, onChange }: BlockProps) {
   const sums = useMemo(() => sumPackages(value.packages), [value.packages]);
   const plan = useMemo(
-    () => loadPlan(value.packages, { stackable: value.stackable, stackMax: n(value.stack_max) }),
-    [value.packages, value.stackable, value.stack_max],
+    () => loadPlan(value.packages, {
+      stackable: value.stackable, stackMax: n(value.stack_max),
+      unitsPerPackage: value.packing_mode === "per_package" ? n(value.units_per_package) : 1,
+    }),
+    [value.packages, value.stackable, value.stack_max, value.packing_mode, value.units_per_package],
   );
 
+  const perPkg = value.packing_mode === "per_package" ? Math.max(1, Math.floor(n(value.units_per_package) || 1)) : 1;
   /* MEASURED, not merely counted. The packages table starts with one empty
      row, so a count alone is 1 before anything is typed — and the box then
      announced "does not fit" on a blank form, which is an alarm about nothing. */
@@ -272,7 +601,10 @@ export function LoadingBlock({ value, onChange }: BlockProps) {
     return (
       <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)]/40 px-3 py-2.5">
         <div className="flex items-center justify-between gap-2">
-          <span className="text-[11px] font-semibold text-[var(--text-muted)]">{CONTAINERS[key].label}</span>
+          <span className="text-[11px] font-semibold text-[var(--text-muted)]">
+            {CONTAINERS[key].label}
+            <span className="ms-1 font-normal text-[var(--text-ghost)]">{perPkg > 1 ? "pcs" : "units"}</span>
+          </span>
           {overridden ? (
             <button
               type="button"
@@ -295,6 +627,7 @@ export function LoadingBlock({ value, onChange }: BlockProps) {
           className={`${inp} mt-1.5 tabular-nums text-[15px] font-bold`}
         />
         <p className={hint}>
+          {perPkg > 1 && r.qty > 0 ? `${Math.floor(r.qty / perPkg)} packages × ${perPkg} pcs. ` : ""}
           {r.qty === 0
             ? anyMeasured
               ? "Does not fit — a package is taller or longer than the container."
@@ -355,7 +688,7 @@ export function LoadingBlock({ value, onChange }: BlockProps) {
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
-          <label className={lbl}>Volume (m³ per unit)</label>
+          <label className={lbl}>CBM (m³)</label>
           <input value={sums.cbm ? String(sums.cbm) : ""} readOnly placeholder="—" className={`${inp} tabular-nums opacity-60`} />
           <p className={hint}>All packages together.</p>
         </div>

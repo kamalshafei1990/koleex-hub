@@ -6,6 +6,23 @@
    here on purpose: the same numbers have to come out on the server.
    --------------------------------------------------------------------------- */
 
+/* What is inside a crate, and inside the boxes inside it.
+ *
+ * A packing list is a nesting, not a flat list: the machine crate holds the
+ * machine and an accessories box, and the accessories box holds the cover, the
+ * tool kit, the spare needles. One level of children covers every case the Hub
+ * actually ships; anything deeper is a second crate in practice. */
+export interface ContentItem {
+  label?: string;
+  qty?: number | string;
+  /** Uploaded photo of the item. Takes precedence over `kind`. */
+  photo_url?: string | null;
+  /** Fallback glyph when there is no photo — see ITEM_KINDS. */
+  kind?: string;
+  /** What is inside THIS item, when it is itself a box. */
+  items?: ContentItem[];
+}
+
 export interface PackageRow {
   /** What is in this crate — "Machine", "Table & rails", "Accessories". */
   label?: string;
@@ -16,6 +33,10 @@ export interface PackageRow {
   h_cm?: number | string;
   /** Gross weight of ONE crate of this kind. */
   gross_kg?: number | string;
+  /** Photo of this crate, packed. */
+  photo_url?: string | null;
+  /** The packing list for this crate. */
+  contents?: ContentItem[];
 }
 
 export interface DangerousGoods {
@@ -26,7 +47,26 @@ export interface DangerousGoods {
   notes?: string;
 }
 
+/* HOW THE PRODUCT RELATES TO ITS PACKAGE — the two cases are opposites and a
+ * single model cannot serve both.
+ *
+ *   per_unit    one unit of the product occupies N packages. A spreader is
+ *               machine + table + accessory box: three crates, one machine.
+ *   per_package one package holds N units. The owner's case: "the product
+ *               itself is small and the box can take 25, 50 or 100 pieces
+ *               depending on the box size." The customer asks how many per
+ *               carton, and the container count is packages × pieces.
+ *
+ * Everything downstream — volume per unit, weight per unit, units per
+ * container — depends on which of the two this product is. */
+export type PackingMode = "per_unit" | "per_package";
+
 export interface ProductLogistics {
+  packing_mode?: PackingMode;
+  /** per_package only: pieces of the product in ONE package. */
+  units_per_package?: number | string;
+  /** The big sample photo of how this product is packed. */
+  packing_photo_url?: string | null;
   packing_type?: string;
   wood_treatment?: string;
   packages?: PackageRow[];
@@ -151,16 +191,56 @@ export function unitsPerContainer(
   return { qty, limit: byWeight < bySpace ? "weight" : "space" };
 }
 
-/** All three containers at once — what the form shows. */
+/** All three containers at once — what the form shows.
+ *
+ *  `unitsPerPackage` turns the answer from "how many SETS fit" into "how many
+ *  PIECES fit" for a product that ships many to a carton: the geometry is the
+ *  same, the multiplier is not. Without it the form would tell a customer a
+ *  container holds 1,300 cartons and leave them to do the arithmetic that
+ *  actually matters. */
 export function loadPlan(
   rows: PackageRow[] | undefined | null,
-  opts: { stackable?: boolean; stackMax?: number } = {},
+  opts: { stackable?: boolean; stackMax?: number; unitsPerPackage?: number } = {},
 ): { c20: LoadResult; c40: LoadResult; c40hq: LoadResult } {
+  const per = Math.max(1, Math.floor(num(opts.unitsPerPackage) || 1));
+  const scale = (r: LoadResult): LoadResult => (per === 1 ? r : { ...r, qty: r.qty * per });
   return {
-    c20: unitsPerContainer(rows, CONTAINERS.c20, opts),
-    c40: unitsPerContainer(rows, CONTAINERS.c40, opts),
-    c40hq: unitsPerContainer(rows, CONTAINERS.c40hq, opts),
+    c20: scale(unitsPerContainer(rows, CONTAINERS.c20, opts)),
+    c40: scale(unitsPerContainer(rows, CONTAINERS.c40, opts)),
+    c40hq: scale(unitsPerContainer(rows, CONTAINERS.c40hq, opts)),
   };
+}
+
+/* ── item glyphs ───────────────────────────────────────────────────────────
+   A photo beats an icon every time, and the owner will have photos for the
+   crate and the machine. But nobody photographs a tool kit, so an item with
+   no photo still needs to be recognisable at a glance in a list. */
+export const ITEM_KINDS = [
+  { value: "machine",  label: "Machine / main unit" },
+  { value: "box",      label: "Box / carton" },
+  { value: "tools",    label: "Tools" },
+  { value: "cable",    label: "Cable / power" },
+  { value: "cover",    label: "Cover / protection" },
+  { value: "parts",    label: "Spare parts" },
+  { value: "docs",     label: "Manual / documents" },
+] as const;
+
+/** Flatten a package's contents for a packing list — parents first, then what
+ *  is inside them, with quantities multiplied through the nesting. */
+export function flattenContents(
+  items: ContentItem[] | undefined | null,
+  parentQty = 1,
+): { label: string; qty: number; depth: number }[] {
+  const out: { label: string; qty: number; depth: number }[] = [];
+  const walk = (list: ContentItem[], mult: number, depth: number) => {
+    for (const it of list ?? []) {
+      const q = (num(it.qty) || 1) * mult;
+      out.push({ label: (it.label || "").trim() || "—", qty: q, depth });
+      if (it.items?.length) walk(it.items, q, depth + 1);
+    }
+  };
+  walk(items ?? [], parentQty, 0);
+  return out;
 }
 
 /* ── closed lists ──────────────────────────────────────────────────────── */
