@@ -326,3 +326,21 @@ close the loop with the morning; P6 keeps it honest.
 - **Mainland**: everything is our own routes and Supabase through the
   server; no new host.
 - **Vendor names**: none in any card, prompt or message.
+
+## 9. After first live test (2026-09-13)
+
+- **Owner's first try** — "Remind me of tomorrow to keep working on
+  products data" (iPhone PWA, 12:12) — never reached the tool loop. The
+  route's work-data detector (`isWorkDataQuery`, `decide-turn.ts`) knew
+  only "remind me **to**" and a work noun; the sentence had neither, so it
+  fell to the tool-less general lane, whose prompt honestly says it cannot
+  set reminders. The six phases were right; the door in front of them was
+  too narrow.
+- **Fix**: any "remind me/us/him/her/them …" continuation, "don't let me
+  forget", "set/add/need a reminder / alarm / follow-up", plus the Arabic
+  (ذكّرني، فكّرني، نبهني، متنساني) and Chinese (别忘, 闹钟) spellings, now
+  route to the tool loop. Pinned in `validate:ai-core-boundaries` with the
+  owner's exact sentence, seven more English shapes, six Arabic/Chinese
+  ones, and three negatives ("that reminds me of a story" stays general).
+- **Cost of a false positive**: one slower turn through the tool loop; the
+  loop handles small talk anyway. A false negative is the screenshot above.

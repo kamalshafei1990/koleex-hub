@@ -206,6 +206,35 @@ check(
   "work data: a general question about project management does NOT",
   !isWorkDataQuery("explain agile project management"),
 );
+/* Owner, 2026-09-13 12:12: "Remind me of tomorrow to keep working on products
+   data" reached the tool-less general lane and was told reminders cannot be
+   set here. Every "remind me …" continuation is a reminder to write. */
+check(
+  "work data: 'remind me' in any continuation reaches the tool lane (owner, 2026-09-13)",
+  isWorkDataQuery("Remind me of tomorrow to keep working on products data") &&
+    isWorkDataQuery("remind me about the shipment on Monday") &&
+    isWorkDataQuery("remind me at 5pm to call Ahmed") &&
+    isWorkDataQuery("can you remind us that the fair starts next week") &&
+    isWorkDataQuery("remind me tomorrow") &&
+    isWorkDataQuery("don't let me forget the invoice") &&
+    isWorkDataQuery("set a reminder for 9 tomorrow") &&
+    isWorkDataQuery("I need a follow-up with the Cairo customer on Thursday"),
+);
+check(
+  "work data: reminder words in Arabic and Chinese reach the tool lane too",
+  isWorkDataQuery("فكّرني بكرة أكمل بيانات المنتجات") &&
+    isWorkDataQuery("ذكّرني الساعة ٥ أكلم أحمد") &&
+    isWorkDataQuery("نبهني قبل الاجتماع") &&
+    isWorkDataQuery("متنساني أبعت الفاتورة") &&
+    isWorkDataQuery("明天提醒我继续整理产品数据") &&
+    isWorkDataQuery("别忘了提醒我发发票"),
+);
+check(
+  "work data: plain talk with none of that still stays on the fast lane",
+  !isWorkDataQuery("that reminds me of a story from the fair") &&
+    !isWorkDataQuery("thank you, that helps") &&
+    !isWorkDataQuery("what does FOB mean"),
+);
 check("trade terms: 'What does DDP mean?' is a trade-term question", isTradeTermQuestion("What does DDP mean?"));
 check(
   "trade terms: substrings do not fire — 'fobbing' is not FOB",
