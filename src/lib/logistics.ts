@@ -235,14 +235,25 @@ export function loadPlan(
    A photo beats an icon every time, and the owner will have photos for the
    crate and the machine. But nobody photographs a tool kit, so an item with
    no photo still needs to be recognisable at a glance in a list. */
+/* SEVEN KINDS WAS TOO COARSE, AND THE LIST ITSELF CAUSED THE REPEATS. Spare
+   blades, a rail set and a bag of bolts are three different things, and with
+   only "spare parts" to choose from all three wore the same glyph — the
+   operator was not being careless, the list left them no other answer. These
+   are the distinctions a machine's packing list actually makes. */
 export const ITEM_KINDS = [
-  { value: "machine",  label: "Machine / main unit" },
-  { value: "box",      label: "Box / carton" },
-  { value: "tools",    label: "Tools" },
-  { value: "cable",    label: "Cable / power" },
-  { value: "cover",    label: "Cover / protection" },
-  { value: "parts",    label: "Spare parts" },
-  { value: "docs",     label: "Manual / documents" },
+  { value: "machine",     label: "Machine / main unit" },
+  { value: "box",         label: "Box / carton" },
+  { value: "tools",       label: "Tools" },
+  { value: "cable",       label: "Cable / power" },
+  { value: "cover",       label: "Cover / protection" },
+  { value: "parts",       label: "Spare parts" },
+  { value: "blade",       label: "Blades / cutting" },
+  { value: "fastener",    label: "Fasteners / fixings" },
+  { value: "frame",       label: "Frame / table / rails" },
+  { value: "electronics", label: "Electronics / control" },
+  { value: "consumable",  label: "Oil / consumables" },
+  { value: "wheel",       label: "Wheels / casters" },
+  { value: "docs",        label: "Manual / documents" },
 ] as const;
 
 /** Flatten a package's contents for a packing list — parents first, then what

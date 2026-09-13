@@ -1392,6 +1392,12 @@ export const PRODUCTS_UI_I18N: Translations = {
   "pk.opt.cover":          { en: "Cover / protection", zh: "机罩 / 防护", ar: "غطا / حماية" },
   "pk.opt.parts":          { en: "Spare parts", zh: "备件", ar: "قطع غيار" },
   "pk.opt.docs":           { en: "Manual / documents", zh: "说明书 / 文件", ar: "كتالوج / مستندات" },
+  "pk.opt.blade":          { en: "Blades / cutting", zh: "刀片 / 裁切件", ar: "سكاكين / أدوات قص" },
+  "pk.opt.fastener":       { en: "Fasteners / fixings", zh: "紧固件", ar: "مسامير وتثبيت" },
+  "pk.opt.frame":          { en: "Frame / table / rails", zh: "机架 / 台板 / 导轨", ar: "هيكل / ترابيزة / قضبان" },
+  "pk.opt.electronics":    { en: "Electronics / control", zh: "电控件", ar: "إلكترونيات / تحكم" },
+  "pk.opt.consumable":     { en: "Oil / consumables", zh: "油品 / 耗材", ar: "زيوت / مستهلكات" },
+  "pk.opt.wheel":          { en: "Wheels / casters", zh: "轮子 / 脚轮", ar: "عجل / كاستور" },
 
   "pk.select":             { en: "— Select —", zh: "— 请选择 —", ar: "— اختر —" },
 

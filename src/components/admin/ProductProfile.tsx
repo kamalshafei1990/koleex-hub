@@ -50,7 +50,6 @@ import TruckIcon from "@/components/icons/ui/TruckIcon";        // the tab itsel
    anything else on the sheet. */
 import LandmarkIcon from "@/components/icons/ui/LandmarkIcon";  // Origin & Customs card
 import PackageIcon from "@/components/icons/ui/PackageIcon";    // Packing card
-import ArchiveIcon from "@/components/icons/ui/ArchiveIcon";    // a crate
 import ShipIcon from "@/components/icons/ui/ShipIcon";          // Loading card
 import LayersIcon from "@/components/icons/ui/LayersIcon";      // stackable
 import PlaneIcon from "@/components/icons/ui/PlaneIcon";        // volumetric (air)
@@ -70,6 +69,12 @@ import PlugIcon from "@/components/icons/ui/PlugIcon";          // item: cable
 import ShieldIcon from "@/components/icons/ui/ShieldIcon";      // item: cover
 import CogIcon from "@/components/icons/ui/CogIcon";            // item: spare parts
 import DocumentIcon from "@/components/icons/ui/DocumentIcon";  // item: manual
+import ScissorsIcon from "@/components/icons/ui/ScissorsIcon";  // item: blades
+import Link2Icon from "@/components/icons/ui/Link2Icon";        // item: fasteners
+import TableIcon from "@/components/icons/ui/TableIcon";        // item: frame / rails
+import CpuIcon from "@/components/icons/ui/CpuIcon";            // item: electronics
+import DropletsIcon from "@/components/icons/ui/DropletsIcon";  // item: oil / consumables
+import CircleDotIcon from "@/components/icons/ui/CircleDotIcon";// item: wheels
 import RulerIcon from "@/components/icons/ui/RulerIcon";
 import WrenchIcon from "@/components/icons/ui/WrenchIcon";
 import DollarSignIcon from "@/components/icons/ui/DollarSignIcon";
@@ -644,13 +649,19 @@ function FactChip({
    kind the operator picked — never a guess from the label. */
 function KindGlyph({ kind, className = "h-5 w-5" }: { kind?: string; className?: string }) {
   switch (kind) {
-    case "machine": return <FactoryIcon className={className} />;
-    case "tools":   return <WrenchIcon className={className} />;
-    case "cable":   return <PlugIcon className={className} />;
-    case "cover":   return <ShieldIcon className={className} />;
-    case "parts":   return <CogIcon className={className} />;
-    case "docs":    return <DocumentIcon className={className} />;
-    default:        return <InboxRawIcon className={className} />;
+    case "machine":     return <FactoryIcon className={className} />;
+    case "tools":       return <WrenchIcon className={className} />;
+    case "cable":       return <PlugIcon className={className} />;
+    case "cover":       return <ShieldIcon className={className} />;
+    case "parts":       return <CogIcon className={className} />;
+    case "blade":       return <ScissorsIcon className={className} />;
+    case "fastener":    return <Link2Icon className={className} />;
+    case "frame":       return <TableIcon className={className} />;
+    case "electronics": return <CpuIcon className={className} />;
+    case "consumable":  return <DropletsIcon className={className} />;
+    case "wheel":       return <CircleDotIcon className={className} />;
+    case "docs":        return <DocumentIcon className={className} />;
+    default:            return <InboxRawIcon className={className} />;
   }
 }
 
@@ -811,12 +822,21 @@ function PackingSheet({
               {(logistics.packages ?? []).map((r, i) => (
                 <div key={i} className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-3">
                   <div className="flex items-center gap-3">
+                    {/* THE SAME CRATE GLYPH ON EVERY CRATE SAID NOTHING THREE
+                        TIMES. A packing list numbers its packages — the number
+                        is on the crate, on the packing list and on the bill of
+                        lading — so the tile carries that instead, and a photo
+                        takes its place the moment there is one. */}
                     <span className="h-16 w-16 shrink-0 rounded-lg overflow-hidden border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] flex items-center justify-center text-[var(--text-secondary)]">
                       {r.photo_url ? (
                         /* eslint-disable-next-line @next/next/no-img-element */
                         <img src={r.photo_url} alt="" className="h-full w-full object-cover" />
                       ) : (
-                        <ArchiveIcon className="h-7 w-7" />
+                        /* The number alone. Keeping a crate glyph above it put
+                           the same mark back on all three tiles — the very
+                           repeat the number was there to remove — and the card
+                           beside it already says what the crate is. */
+                        <span className="text-[19px] font-bold tabular-nums text-[var(--text-secondary)]">{i + 1}</span>
                       )}
                     </span>
                     <span className="min-w-0 flex-1">
