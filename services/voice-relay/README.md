@@ -46,6 +46,20 @@ afresh at once. A caller who hangs up (a close frame) parks nothing. The
 log reads `parked`, `resumed gapMs=… held=…`, and the end line carries
 `resumes=`.
 
+Handover (2026-09-13): a path that cuts every socket at the same age
+(session 14: parked at 28.9 / 59.7 / 90.6 / 121.5 / 152.4 / 183.2 / 214.1 /
+245.0 s — thirty seconds to the second) is predictable, and each resume
+still cost 400–830 ms of silence and the frames in flight. So the client
+learns that age and dials a second socket with `resume=1` BEFORE it: a
+resume that finds the session LIVE, not parked, is a handover — the new
+socket is the session's client from that moment, gets the hello
+(`resumed:true`), and the old socket is closed by the relay with code
+`HANDOVER_CODE` (4002), which the client reads as "done", never as a drop.
+Frames already written to the old socket arrive before its close, in
+order; the vendor's side never notices. The log reads `handover ms=…` and
+the end line carries `handovers=`. `server.handover.test.mjs` proves it
+on real sockets against a fake vendor.
+
 The end line also carries the vendor's PACING (2026-09-12 night), measured
 here where no tunnel and no phone is in the way: `deltas=` audio frames
 received, `audioMs=` their total length, `gaps=` silences longer than

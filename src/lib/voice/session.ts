@@ -144,6 +144,8 @@ export type VoiceDiagnostics = {
    *  the last close code the socket reported. */
   ws_reconnects: number;
   ws_close: string;
+  /** Socket lane: sockets replaced before the path cut them (WS_HANDOVER_CODE). */
+  ws_rotations: number;
   /** The canary GET's outcome beside a slow socket-lane handshake ("" when
    *  none ran), and the far side's reason for the last answer that ended
    *  without completing ("" when every answer completed). */
@@ -266,6 +268,12 @@ export type VoiceDeps = {
   maxToolCallsPerSession?: number;
   /** Test seam for the socket keepalive's period. */
   wsKeepaliveMs?: number;
+  /** How long a handover waits for the relay's hello (WS_ROTATE_TIMEOUT_MS),
+   *  and — for a suite — a fixed wait before the replacement dials, in place
+   *  of rotateAfter(); and the clock. */
+  wsRotateTimeoutMs?: number;
+  wsRotateAfterMs?: number;
+  now?: () => number;
 };
 
 /* ICE gathering normally finishes in well under a second on a local network
@@ -554,6 +562,66 @@ export function resumeUrl(url: string): string {
   return `${url}${url.includes("?") ? "&" : "?"}resume=1`;
 }
 
+/* THE LINE IS LEFT BEFORE IT IS CUT (2026-09-13 06:45–06:50 UTC, the owner's
+   international line, one call: eight `1006` closes, the relay parked at
+   28.9 / 59.7 / 90.6 / 121.5 / 152.4 / 183.2 / 214.1 / 245.0 s — a socket
+   lifetime of thirty seconds to the second, on a Singapore exit as on the
+   Japan one. The resume above saved the conversation each time, and each
+   time cost 400–830 ms of silence and the frames in flight: ten underruns
+   in one call, the cut the caller still hears). A path that cuts every
+   socket at the same age is predictable, so the socket is REPLACED before
+   that age: a second socket dials the relay with `resume=1` while the
+   first is still up; the relay hands the session to it on the spot (hello
+   `resumed:true`) and closes the first with WS_HANDOVER_CODE after the
+   frames already written to it. From then the call is on the new socket:
+   no frame, no word, no moment of silence marks the change. The age is
+   LEARNT, never assumed: the first abnormal close of a socket that was up
+   between WS_LIFE_MIN_MS and WS_LIFE_MAX_MS sets it — for this call, and
+   in storage for this device's next calls, for WS_LIFE_TTL_MS — and the
+   replacement comes WS_ROTATE_MARGIN_MS before it. A path that never cuts
+   never rotates. A handover the relay has not answered in
+   WS_ROTATE_TIMEOUT_MS is abandoned and the call stays on its socket; the
+   cut, if it comes, is the resume's to mend as before. Only on the relay's
+   socket (`keepalive: true` from the handshake): a vendor dialled directly
+   knows no handover. */
+export const WS_LIFE_MIN_MS = 15_000;
+export const WS_LIFE_MAX_MS = 120_000;
+export const WS_ROTATE_MARGIN_MS = 6_000;
+export const WS_ROTATE_MIN_MS = 10_000;
+export const WS_ROTATE_TIMEOUT_MS = 5_000;
+export const WS_ROTATE_RETRY_MS = 1_000;
+export const WS_LIFE_TTL_MS = 6 * 60 * 60_000;
+export const WS_LIFE_STORAGE_KEY = "koleex-voice-ws-life";
+export const WS_HANDOVER_CODE = "4002";
+/** The lifetime a close teaches: the socket's age, when the close was
+ *  abnormal (1006) and the age is one a path would impose; else null. Pure. */
+export function learnedLife(ageMs: number, closeCode: string): number | null {
+  if (closeCode !== "1006" || !Number.isFinite(ageMs)) return null;
+  return ageMs >= WS_LIFE_MIN_MS && ageMs <= WS_LIFE_MAX_MS ? Math.round(ageMs) : null;
+}
+/** How long a socket on a path with this lifetime is kept before it is
+ *  replaced. Pure. */
+export function rotateAfter(lifeMs: number): number {
+  return Math.max(WS_ROTATE_MIN_MS, lifeMs - WS_ROTATE_MARGIN_MS);
+}
+/** The stored lifetime, when it is well-formed, in range and still fresh;
+ *  else null. Pure. */
+export function readStoredLife(raw: string | null, now: number): number | null {
+  if (!raw) return null;
+  try {
+    const v = JSON.parse(raw) as { ms?: unknown; at?: unknown };
+    if (typeof v.ms !== "number" || typeof v.at !== "number") return null;
+    if (now < v.at || now - v.at > WS_LIFE_TTL_MS) return null;
+    return learnedLife(v.ms, "1006");
+  } catch {
+    return null;
+  }
+}
+/** The lifetime as stored. Pure. */
+export function storedLife(ms: number, now: number): string {
+  return JSON.stringify({ ms, at: now });
+}
+
 /* OPUS IN-BAND FEC ON THE MAINLAND LANE. A lossy path — a phone in mainland
    China on a VPN — loses packets, and each lost packet is a gap the caller
    hears as a cut. Asking the far side for forward error correction costs a
@@ -688,6 +756,15 @@ export class VoiceSession {
   /** Whether this outage's resume was already tried; the next dial asks
    *  the route afresh. Reset when the call is live again. */
   private wsResumeTried = false;
+  /** THE HANDOVER (WS_HANDOVER_CODE): when the current socket opened, the
+   *  lifetime this path imposes on a socket (null: none seen), the timer
+   *  that leaves the socket before it, the replacement while it dials, and
+   *  how many handovers this call made. */
+  private wsOpenedAt = 0;
+  private wsLifeMs: number | null = null;
+  private wsRotateTimer: ReturnType<typeof setTimeout> | null = null;
+  private wsRotating: { ws: VoiceSocket; timer: ReturnType<typeof setTimeout> } | null = null;
+  private wsRotations = 0;
   /** The mainland lane's inbound audio, sampled every few seconds while the
    *  peer connection lives (startRtcStats), for the beacon. */
   private rtcStats = "";
@@ -941,6 +1018,7 @@ export class VoiceSession {
       events: eventHistogram(this.eventCounts),
       ws_reconnects: this.wsReconnects,
       ws_close: this.wsCloseCode,
+      ws_rotations: this.wsRotations,
       canary: this.canary,
       resp_err: this.lastResponseError,
       tool_wait_ms: this.toolWaitMs,
@@ -1066,6 +1144,9 @@ export class VoiceSession {
    *  itself asked for must not read as the far side hanging up. */
   private closeWs(): void {
     this.stopKeepalive();
+    this.clearRotation();
+    this.abandonRotation();
+    this.wsOpenedAt = 0;
     const ws = this.ws;
     this.ws = null;
     if (ws) {
@@ -1747,9 +1828,13 @@ export class VoiceSession {
       this.startStallMeter();
       this.wsLastDeltaAt = 0;
       this.wsMaxDeltaGapMs = 0;
+      this.loadLife();
     }
-    /* A redial replaces the dead socket silently: its close is not news. */
+    /* A redial replaces the dead socket silently: its close is not news;
+       a handover still dialling for it is dropped with it. */
     this.stopKeepalive();
+    this.clearRotation();
+    this.abandonRotation();
     const prev = this.ws;
     if (prev && prev !== ws) {
       prev.onclose = null;
@@ -1797,6 +1882,8 @@ export class VoiceSession {
     ws.onopen = () => {
       if (this.ws !== ws) return;
       if (this.wsKeepalive) this.startKeepalive(ws);
+      this.wsOpenedAt = this.clock();
+      this.armRotation(ws);
       /* AN OPEN SOCKET IS NOT THE TRANSPORT UP. The far side's first event
          is (markTransportUp, from onChannelMessage) — an open socket that
          says nothing is what a stalled tunnel looks like (WS_FIRST_EVENT_MS).
@@ -1836,28 +1923,9 @@ export class VoiceSession {
         }
         return;
       }
-      this.onWsAudioEvent(m.data, this.wsAudio);
-      this.onChannelMessage(m.data, channel);
+      this.wsFrameIn(m.data, channel);
     };
-    ws.onclose = (ev) => {
-      if (this.ws !== ws) return;
-      this.wsCloseCode = closeCodeOf(ev);
-      /* Nothing parked for this secret: the next dial asks the route afresh,
-         and at once — this attempt cost no backoff step. */
-      if (resuming && this.wsCloseCode === WS_NO_SESSION_CODE) this.wsOutageAttempt = Math.max(0, this.wsOutageAttempt - 1);
-      /* The call's own socket, closed before the far side said a word: the
-         service did not answer (refused, blocked, a dead network). Said now,
-         not after the wait — the fall-back runs sooner. */
-      if (this.state === "connecting") {
-        this.fail("service-unreachable");
-        return;
-      }
-      /* A LIVE call that drops starts the deadline (onChannelClosed) once;
-         a redial that dies while already reconnecting must not push the
-         deadline out — it simply schedules the next attempt. */
-      if (this.state === "live") this.onChannelClosed();
-      this.scheduleWsReconnect();
-    };
+    ws.onclose = (ev) => this.wsClosed(ws, ev, resuming);
     ws.onerror = () => {
       /* A close follows an error; the close is what the call acts on. */
     };
@@ -1873,6 +1941,209 @@ export class VoiceSession {
       }, this.deps.wsFirstEventMs ?? WS_FIRST_EVENT_MS);
     }
     return true;
+  }
+
+  /** A frame of the far side on the socket lane, whichever socket carried
+   *  it: sound to the audio, the event to the protocol — answered on the
+   *  CURRENT channel (after a handover the old socket's last frames still
+   *  arrive, and a tool result for one of them must not go out on the
+   *  socket the relay no longer reads). */
+  private wsFrameIn(data: string, channel: VoiceChannel): void {
+    /* The relay's echo of our own keepalive: not the far side speaking. */
+    if (data === WS_KEEPALIVE_MESSAGE) return;
+    this.onWsAudioEvent(data, this.wsAudio);
+    this.onChannelMessage(data, this.channel ?? channel);
+  }
+
+  /** The current socket closed. */
+  private wsClosed(ws: VoiceSocket, ev: unknown, resuming: boolean): void {
+    if (this.ws !== ws) return;
+    const code = closeCodeOf(ev);
+    this.wsCloseCode = code;
+    /* THE RELAY CLOSING THE SOCKET A HANDOVER REPLACED: the handover is
+       done — the replacement is the call now, whether or not its hello has
+       been read yet (two sockets, no order between them). Not a drop. */
+    if (code === WS_HANDOVER_CODE && this.wsRotating) {
+      this.adoptWs(this.wsRotating.ws, ws);
+      return;
+    }
+    this.clearRotation();
+    this.learnSocketLife(code);
+    /* Nothing parked for this secret: the next dial asks the route afresh,
+       and at once — this attempt cost no backoff step. */
+    if (resuming && code === WS_NO_SESSION_CODE) this.wsOutageAttempt = Math.max(0, this.wsOutageAttempt - 1);
+    /* The call's own socket, closed before the far side said a word: the
+       service did not answer (refused, blocked, a dead network). Said now,
+       not after the wait — the fall-back runs sooner. */
+    if (this.state === "connecting") {
+      this.fail("service-unreachable");
+      return;
+    }
+    /* A LIVE call that drops starts the deadline (onChannelClosed) once;
+       a redial that dies while already reconnecting must not push the
+       deadline out — it simply schedules the next attempt. */
+    if (this.state === "live") this.onChannelClosed();
+    this.scheduleWsReconnect();
+  }
+
+  /* ── The handover (WS_HANDOVER_CODE) ── */
+
+  private clock(): number {
+    return this.deps.now ? this.deps.now() : Date.now();
+  }
+
+  private lifeStore(): { getItem(k: string): string | null; setItem(k: string, v: string): void } | null {
+    try {
+      return typeof window !== "undefined" && window.localStorage ? window.localStorage : null;
+    } catch {
+      return null;
+    }
+  }
+
+  /** The lifetime this device learnt on an earlier call, if still fresh. */
+  private loadLife(): void {
+    let raw: string | null = null;
+    try {
+      raw = this.lifeStore()?.getItem(WS_LIFE_STORAGE_KEY) ?? null;
+    } catch {
+      raw = null;
+    }
+    this.wsLifeMs = readStoredLife(raw, this.clock());
+  }
+
+  /** A close of the current socket teaches the path's lifetime, when it is
+   *  one (learnedLife) — only on the relay's socket, only on a call that
+   *  was up. */
+  private learnSocketLife(code: string): void {
+    if (!this.wsKeepalive || !this.wsOpenedAt || !this.iceEverConnected) return;
+    const life = learnedLife(this.clock() - this.wsOpenedAt, code);
+    if (life === null) return;
+    this.wsLifeMs = life;
+    try {
+      this.lifeStore()?.setItem(WS_LIFE_STORAGE_KEY, storedLife(life, this.clock()));
+    } catch { /* private mode */ }
+  }
+
+  /** Leave this socket before the path cuts it — when a lifetime is known. */
+  private armRotation(ws: VoiceSocket): void {
+    this.clearRotation();
+    if (!this.wsKeepalive || this.wsLifeMs === null || !this.wsDial) return;
+    this.wsRotateTimer = setTimeout(() => {
+      this.wsRotateTimer = null;
+      this.rotateWs(ws);
+    }, this.deps.wsRotateAfterMs ?? rotateAfter(this.wsLifeMs));
+  }
+
+  private clearRotation(): void {
+    if (this.wsRotateTimer !== null) {
+      clearTimeout(this.wsRotateTimer);
+      this.wsRotateTimer = null;
+    }
+  }
+
+  /** Drop a replacement still dialling; the call stays on its socket. */
+  private abandonRotation(): void {
+    const r = this.wsRotating;
+    if (!r) return;
+    this.wsRotating = null;
+    clearTimeout(r.timer);
+    r.ws.onclose = null;
+    r.ws.onmessage = null;
+    r.ws.onerror = null;
+    r.ws.onopen = null;
+    try {
+      r.ws.close();
+    } catch { /* gone */ }
+  }
+
+  /** Dial the replacement: the same url with `resume=1`, the same secret,
+   *  no request to our route. It is the call only once the relay says so. */
+  private rotateWs(current: VoiceSocket): void {
+    if (this.ws !== current || current.readyState !== 1 || this.wsRotating || !this.wsDial || !this.deps.createWebSocket) return;
+    /* An open socket on a call not yet live again (a resume whose hello has
+       not come): asked again shortly, not forgotten. */
+    if (this.state !== "live") {
+      this.wsRotateTimer = setTimeout(() => {
+        this.wsRotateTimer = null;
+        this.rotateWs(current);
+      }, this.deps.wsRotateAfterMs ?? WS_ROTATE_RETRY_MS);
+      return;
+    }
+    let next: VoiceSocket;
+    try {
+      next = this.deps.createWebSocket(resumeUrl(this.wsDial.url), this.wsDial.protocols);
+    } catch {
+      return;
+    }
+    const timer = setTimeout(() => {
+      if (this.wsRotating?.ws === next) this.abandonRotation();
+    }, this.deps.wsRotateTimeoutMs ?? WS_ROTATE_TIMEOUT_MS);
+    this.wsRotating = { ws: next, timer };
+    next.onmessage = (m) => {
+      if (this.wsRotating?.ws !== next || typeof m.data !== "string") return;
+      const hello = parseRelayHello(m.data);
+      if (!hello) return;
+      if (hello.resumed) this.adoptWs(next, current);
+      else this.abandonRotation();
+    };
+    next.onclose = () => {
+      if (this.wsRotating?.ws === next) this.abandonRotation();
+    };
+    next.onerror = () => { /* the close follows */ };
+    next.onopen = () => { /* the relay's hello is what counts */ };
+  }
+
+  /** The replacement is the call from here: frames go out on it, frames
+   *  come in on it, and the old socket's last frames are still read until
+   *  the relay's close (WS_HANDOVER_CODE) ends it. Nothing is configured,
+   *  nothing restarted, no state changes hands. */
+  private adoptWs(next: VoiceSocket, old: VoiceSocket): void {
+    const r = this.wsRotating;
+    if (!r || r.ws !== next) return;
+    clearTimeout(r.timer);
+    this.wsRotating = null;
+    if (this.ws !== old) {
+      try {
+        next.close();
+      } catch { /* gone */ }
+      return;
+    }
+    this.wsRotations++;
+    this.stopKeepalive();
+    const channel: VoiceChannel = {
+      get readyState() {
+        return next.readyState === 1 ? "open" : next.readyState === 0 ? "connecting" : "closed";
+      },
+      send: (data: string) => next.send(data),
+    };
+    this.ws = next;
+    this.channel = channel;
+    this.wsOpenedAt = this.clock();
+    next.onmessage = (m) => {
+      if (this.ws !== next || typeof m.data !== "string") return;
+      /* The hello, read late (the old socket's close came first): not an event. */
+      if (parseRelayHello(m.data)) return;
+      this.wsFrameIn(m.data, channel);
+    };
+    next.onclose = (ev) => this.wsClosed(next, ev, false);
+    next.onerror = () => { /* the close follows */ };
+    if (this.wsKeepalive) this.startKeepalive(next);
+    /* The old socket: read to its end, its close nothing. Should the relay's
+       close never arrive, this side closes it after the handover's wait. */
+    old.onclose = null;
+    old.onerror = null;
+    old.onopen = null;
+    old.onmessage = (m) => {
+      if (typeof m.data === "string") this.wsFrameIn(m.data, channel);
+    };
+    setTimeout(() => {
+      if (old.readyState === 3) return;
+      old.onmessage = null;
+      try {
+        old.close();
+      } catch { /* gone */ }
+    }, this.deps.wsRotateTimeoutMs ?? WS_ROTATE_TIMEOUT_MS);
+    this.armRotation(next);
   }
 
   private startKeepalive(ws: VoiceSocket): void {

@@ -97,6 +97,26 @@ export function shouldPark(clientCloseCode) {
  *  afresh at once instead of waiting out a backoff. */
 export const NO_SESSION_CODE = 4001;
 
+/* ── The handover ───────────────────────────────────────────────────────── */
+
+/** THE LINE IS LEFT BEFORE IT IS CUT (2026-09-13 06:45–06:50 UTC, session
+ *  14: one call, parked at 28.9 / 59.7 / 90.6 / 121.5 / 152.4 / 183.2 /
+ *  214.1 / 245.0 s — a socket lifetime of thirty seconds to the second, on
+ *  a Singapore exit as on the Japan one. The park above saved the
+ *  conversation each time, but each resume cost 400–830 ms of silence and
+ *  the frames in flight: ten underruns in one call, the cut the caller
+ *  still hears). A path that cuts every socket at the same age is
+ *  predictable, so the CLIENT replaces the socket before that age: it dials
+ *  a second socket with `resume=1` while the first is still up. A resume
+ *  that finds the session LIVE, not parked, is that handover: the new
+ *  socket becomes the session's client on the spot, gets the hello
+ *  (`resumed:true`), and the old socket is closed by the relay with this
+ *  code — a close the client reads as "the handover is done", never as a
+ *  drop. Frames already written to the old socket arrive before its close
+ *  frame, in order; nothing is lost. The secret is the same secret, on the
+ *  same verified ticket, that a resume presents today: no new trust. */
+export const HANDOVER_CODE = 4002;
+
 /* ── The keepalive ──────────────────────────────────────────────────────── */
 
 /* ── The vendor's pacing (2026-09-12 night) ───────────────────────────────
@@ -291,6 +311,9 @@ const perTicket = new Map();
 /** Sessions whose client vanished abnormally, by client secret, for
  *  RESUME_GRACE_MS (see the constant). */
 const parked = new Map();
+/** Sessions with a client attached, by client secret, for the handover
+ *  (HANDOVER_CODE). A session is in one map or the other, never both. */
+const live = new Map();
 let connections = 0;
 let sessions = 0;
 
@@ -358,10 +381,17 @@ export function createRelay() {
         if (park) {
           parked.delete(token);
           park.attach(client, address);
-        } else {
-          log(`resume miss`);
-          try { client.close(NO_SESSION_CODE, "no-session"); } catch { /* gone */ }
+          return;
         }
+        /* Live, not parked: the client is leaving its socket before the
+           path cuts it (HANDOVER_CODE). */
+        const session = live.get(token);
+        if (session) {
+          session.handover(client, address);
+          return;
+        }
+        log(`resume miss`);
+        try { client.close(NO_SESSION_CODE, "no-session"); } catch { /* gone */ }
         return;
       }
       bridge(client, token, url.searchParams.get("model"), address, ticketKey);
@@ -388,6 +418,7 @@ function bridge(firstClient, token, model, firstAddress, ticketKey = "") {
   let up = 0;
   let down = 0;
   let resumes = 0;
+  let handovers = 0;
   let upstreamOpenedAt = 0;
   let closed = false;
   /* While parked: the client is null, downstream frames wait here. */
@@ -423,9 +454,10 @@ function bridge(firstClient, token, model, firstAddress, ticketKey = "") {
     clearTimeout(cap);
     if (parkTimer) clearTimeout(parkTimer);
     if (parked.get(token)?.attach === attach) parked.delete(token);
+    if (live.get(token)?.handover === handover) live.delete(token);
     try { client?.close(code); } catch { /* gone */ }
     try { upstream.close(); } catch { /* gone */ }
-    log(`session=${id} end why=${why} code=${code} ms=${Date.now() - t0} openMs=${upstreamOpenedAt ? upstreamOpenedAt - t0 : "none"} up=${up} down=${down} resumes=${resumes} ${pacing.summary()}`);
+    log(`session=${id} end why=${why} code=${code} ms=${Date.now() - t0} openMs=${upstreamOpenedAt ? upstreamOpenedAt - t0 : "none"} up=${up} down=${down} resumes=${resumes} handovers=${handovers} ${pacing.summary()}`);
   };
 
   const cap = setTimeout(() => finish("cap", 1000), MAX_SESSION_MS);
@@ -475,6 +507,7 @@ function bridge(firstClient, token, model, firstAddress, ticketKey = "") {
   const park = () => {
     releaseAddress();
     client = null;
+    live.delete(token);
     parkedAt = Date.now();
     parked.set(token, { attach });
     parkTimer = setTimeout(() => {
@@ -495,6 +528,7 @@ function bridge(firstClient, token, model, firstAddress, ticketKey = "") {
     client = c;
     address = addr;
     perAddress.set(address, (perAddress.get(address) || 0) + 1);
+    live.set(token, { handover });
     alive = true;
     resumes++;
     const gapMs = parkedAt ? Date.now() - parkedAt : 0;
@@ -507,6 +541,29 @@ function bridge(firstClient, token, model, firstAddress, ticketKey = "") {
     log(`session=${id} resumed gapMs=${gapMs} held=${held.length}`);
     held.length = 0;
     heldBytes = 0;
+  };
+
+  /** A second socket from the same caller while the first is still up
+   *  (HANDOVER_CODE): it is the client from now on; the first is closed with
+   *  the handover code after the frames already written to it. The client
+   *  side of the old socket is ignored by `wire` from this line on
+   *  (`c !== client`), so its close, whoever sends it, ends nothing. */
+  const handover = (c, addr) => {
+    if (closed || !client) {
+      try { c.close(NO_SESSION_CODE, "no-session"); } catch { /* gone */ }
+      return;
+    }
+    const old = client;
+    releaseAddress();
+    client = c;
+    address = addr;
+    perAddress.set(address, (perAddress.get(address) || 0) + 1);
+    alive = true;
+    handovers++;
+    wire(c);
+    try { c.send(relayHello(true)); } catch { /* the new socket died at once; its close handles it */ }
+    try { old.close(HANDOVER_CODE, "handover"); } catch { /* gone */ }
+    log(`session=${id} handover ms=${Date.now() - t0} up=${up} down=${down}`);
   };
 
   upstream.on("open", () => {
@@ -535,6 +592,7 @@ function bridge(firstClient, token, model, firstAddress, ticketKey = "") {
     finish("upstream-error", 1011);
   });
 
+  live.set(token, { handover });
   wire(client);
   log(`session=${id} start model=${typeof model === "string" && /^[\w.-]{1,64}$/.test(model) ? model : "default"}`);
 }

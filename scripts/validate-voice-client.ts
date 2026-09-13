@@ -2236,7 +2236,7 @@ console.log("\n── 12. Mute ──");
     /console\.warn\(\s*`\[ai\.voice\.client\]/.test(telRoute) && !/supabase|insert\(/.test(telRoute) && /new NextResponse\(null, \{ status: 204 \}\)/.test(telRoute));
   const diagS = new VoiceSession(deps({ status: 200 }).deps);
   const dg = diagS.diagnostics();
-  check("diagnostics are states and counts only", Object.keys(dg).sort().join(",") === "call,canary,capture,dc,elapsed_ms,err,events,ice,ice_ever_connected,last_event,mic,mic_peak,region,resp_err,rtc,tool_calls,tool_wait_ms,up_frames,ws_close,ws_reconnects" && dg.call === "" && dg.rtc === "" && dg.up_frames === 0 && dg.capture === "" && dg.mic_peak === 0 && dg.mic === "none" && dg.canary === "" && dg.resp_err === "" && dg.tool_wait_ms === 0 && dg.tool_calls === 0 && dg.ws_reconnects === 0 && dg.ws_close === "" && dg.elapsed_ms === 0 && dg.err === "" && dg.events === "");
+  check("diagnostics are states and counts only", Object.keys(dg).sort().join(",") === "call,canary,capture,dc,elapsed_ms,err,events,ice,ice_ever_connected,last_event,mic,mic_peak,region,resp_err,rtc,tool_calls,tool_wait_ms,up_frames,ws_close,ws_reconnects,ws_rotations" && dg.call === "" && dg.ws_rotations === 0 && dg.rtc === "" && dg.up_frames === 0 && dg.capture === "" && dg.mic_peak === 0 && dg.mic === "none" && dg.canary === "" && dg.resp_err === "" && dg.tool_wait_ms === 0 && dg.tool_calls === 0 && dg.ws_reconnects === 0 && dg.ws_close === "" && dg.elapsed_ms === 0 && dg.err === "" && dg.events === "");
 
   /* THE PICTURE EXPANDS IN PLACE. */
   check("a photo in the conversation is a button that opens the lightbox, not a link out of the app",
@@ -2689,10 +2689,13 @@ function describeErrorCheck(): boolean {
     session_compact: { type: "session.update", session: { modalities: ["text", "audio"] } },
     ...over,
   });
-  const laneRun = async (opts: { envelope?: unknown; status?: number; noSocket?: boolean; noAudio?: boolean; audioThrows?: boolean; reconnectGraceMs?: number; wsFirstEventMs?: number; failFetch?: number; wsKeepaliveMs?: number } = {}) => {
+  const laneRun = async (opts: { envelope?: unknown; status?: number; noSocket?: boolean; noAudio?: boolean; audioThrows?: boolean; reconnectGraceMs?: number; wsFirstEventMs?: number; failFetch?: number; wsKeepaliveMs?: number; rotateAfterMs?: number; rotateTimeoutMs?: number; now?: () => number } = {}) => {
     const recorded: Recorded[] = [];
     const d = deps({ recorded, reconnectGraceMs: opts.reconnectGraceMs, wsFirstEventMs: opts.wsFirstEventMs });
     if (opts.wsKeepaliveMs) d.deps.wsKeepaliveMs = opts.wsKeepaliveMs;
+    if (opts.rotateAfterMs) d.deps.wsRotateAfterMs = opts.rotateAfterMs;
+    if (opts.rotateTimeoutMs) d.deps.wsRotateTimeoutMs = opts.rotateTimeoutMs;
+    if (opts.now) d.deps.now = opts.now;
     const base = d.deps.fetchFn;
     const sockets: FakeSocket[] = [];
     const audios: FakeAudio[] = [];
@@ -3050,6 +3053,110 @@ function describeErrorCheck(): boolean {
     check("  …and when the deadline passes with no socket open, the call fails as connection-lost, keeping the microphone for a resume",
       last[0] === "failed" && last[1] === "connection-lost" && !r.mic.allStopped() && r.s.takeMicrophone() !== null);
     r.s.stop();
+  }
+  {
+    /* THE LINE IS LEFT BEFORE IT IS CUT (2026-09-13 06:45–06:50 UTC, relay
+       session 14: parked eight times, thirty seconds apart to the second;
+       each resume 400–830 ms of silence and the frames in flight). */
+    const { learnedLife, rotateAfter, readStoredLife, storedLife, WS_HANDOVER_CODE, WS_NO_SESSION_CODE, WS_LIFE_STORAGE_KEY, WS_LIFE_MIN_MS, WS_LIFE_MAX_MS, WS_ROTATE_MARGIN_MS, WS_ROTATE_MIN_MS, WS_ROTATE_TIMEOUT_MS, WS_ROTATE_RETRY_MS, WS_LIFE_TTL_MS } = await import("../src/lib/voice/session");
+    check("a lifetime is learnt only from an abnormal close (1006) at an age a path would impose — fifteen seconds to two minutes",
+      learnedLife(29_800, "1006") === 29_800 && learnedLife(29_800.4, "1006") === 29_800 && learnedLife(WS_LIFE_MIN_MS, "1006") === WS_LIFE_MIN_MS && learnedLife(WS_LIFE_MIN_MS - 1, "1006") === null && learnedLife(WS_LIFE_MAX_MS + 1, "1006") === null &&
+      learnedLife(30_000, "1000") === null && learnedLife(30_000, "1005") === null && learnedLife(30_000, "") === null && learnedLife(Number.NaN, "1006") === null);
+    check("the replacement comes a margin before the cut and never sooner than the floor; the handover's wait is short, its retry shorter, its close code its own",
+      rotateAfter(30_000) === 30_000 - WS_ROTATE_MARGIN_MS && rotateAfter(12_000) === WS_ROTATE_MIN_MS && WS_ROTATE_MARGIN_MS >= 3_000 && WS_ROTATE_MARGIN_MS <= 10_000 && WS_ROTATE_MIN_MS >= 5_000 &&
+      WS_ROTATE_TIMEOUT_MS >= 3_000 && WS_ROTATE_TIMEOUT_MS <= 6_000 && WS_ROTATE_RETRY_MS < WS_ROTATE_TIMEOUT_MS && WS_HANDOVER_CODE === "4002" && String(WS_NO_SESSION_CODE) === "4001");
+    const T0 = 1_800_000_000_000;
+    check("the stored lifetime is read back while fresh and in range — not stale, not from the future, not out of range, not malformed",
+      readStoredLife(storedLife(30_000, T0), T0 + 60_000) === 30_000 && readStoredLife(storedLife(30_000, T0), T0 + WS_LIFE_TTL_MS + 1) === null && readStoredLife(storedLife(30_000, T0 + 1), T0) === null &&
+      readStoredLife(storedLife(5_000, T0), T0) === null && readStoredLife("junk", T0) === null && readStoredLife(null, T0) === null && readStoredLife('{"ms":"30000","at":1}', T0) === null && WS_LIFE_TTL_MS >= 60 * 60_000 && WS_LIFE_TTL_MS <= 24 * 60 * 60_000);
+
+    const KA = JSON.stringify({ type: "koleex.keepalive" });
+    const g = globalThis as unknown as { window?: unknown };
+    const hadWindow = g.window;
+    const store = new Map<string, string>([[WS_LIFE_STORAGE_KEY, storedLife(30_000, T0)]]);
+    g.window = { localStorage: { getItem: (k: string) => store.get(k) ?? null, setItem: (k: string, v: string) => { store.set(k, v); } } };
+    let clock = T0 + 1_000;
+    try {
+      const r = await laneRun({ envelope: wsEnvelope({ keepalive: true }), rotateAfterMs: 20, rotateTimeoutMs: 60, wsKeepaliveMs: 15, now: () => clock });
+      r.sockets[0].open();
+      r.sockets[0].message(JSON.stringify({ type: "session.updated" }));
+      const posts = r.recorded.filter((x) => x.url.startsWith(WS_SESSION_PATH)).length;
+      check("a device that learnt a lifetime: the call is live on one socket, no replacement yet", r.s.getState() === "live" && r.sockets.length === 1);
+      await sleep(40);
+      check("  …before the cut a second socket dials the relay with resume=1 and the same secret — no request to our route — while the call stays on the first",
+        r.sockets.length === 2 && r.sockets[1].url === "wss://voice.example/v1/realtime?resume=1" && r.sockets[1].protocols.join() === r.sockets[0].protocols.join() &&
+        r.recorded.filter((x) => x.url.startsWith(WS_SESSION_PATH)).length === posts && r.s.getState() === "live" && r.s.diagnostics().ws_rotations === 0);
+      r.sockets[1].open();
+      r.audios[0].frame?.("AAAA");
+      check("  …an open replacement is not yet the call: the microphone still goes out on the first, nothing on the second",
+        r.sockets[0].sent[r.sockets[0].sent.length - 1] === JSON.stringify({ type: "input_audio_buffer.append", audio: "AAAA" }) && r.sockets[1].sent.length === 0);
+      const ka0 = r.sockets[0].sent.filter((m) => m === KA).length;
+      r.sockets[1].message(JSON.stringify({ type: "koleex.relay", resumed: true }));
+      r.audios[0].frame?.("BBBB");
+      check("  …the relay's hello hands the call over: the microphone goes out on the replacement, nothing is configured, live throughout, one handover counted and no redial",
+        r.sockets[1].sent.length === 1 && r.sockets[1].sent[0] === JSON.stringify({ type: "input_audio_buffer.append", audio: "BBBB" }) && r.s.getState() === "live" &&
+        r.s.diagnostics().ws_rotations === 1 && r.s.diagnostics().ws_reconnects === 0 && r.states.every(([st]) => st !== "failed" && st !== "reconnecting"));
+      r.sockets[0].message(JSON.stringify({ type: "response.output_audio.delta", delta: "QQ==" }));
+      r.sockets[1].message(JSON.stringify({ type: "response.output_audio.delta", delta: "Qg==" }));
+      check("  …the old socket's last frames are still heard, then the new one's", r.audios[0].played.join() === "QQ==,Qg==");
+      r.sockets[0].dropWith(4002);
+      check("  …the relay's handover close of the old socket is not a drop: live, no redial, no close code kept", r.s.getState() === "live" && r.s.diagnostics().ws_close === "" && r.s.diagnostics().ws_reconnects === 0);
+      await sleep(40);
+      check("  …the keepalive moved to the new socket and stopped on the old; and the next replacement is already dialling",
+        r.sockets[0].sent.filter((m) => m === KA).length === ka0 && r.sockets[1].sent.some((m) => m === KA) && r.sockets.length === 3 && /resume=1$/.test(r.sockets[2].url));
+      await sleep(90);
+      r.audios[0].frame?.("CCCC");
+      check("  …a replacement the relay does not answer in time is closed and the call stays on its socket, live",
+        r.sockets[2].closed === 1 && r.s.getState() === "live" && r.sockets[1].sent[r.sockets[1].sent.length - 1] === JSON.stringify({ type: "input_audio_buffer.append", audio: "CCCC" }) && r.sockets.length === 3);
+      /* The path cuts the socket after all, thirty seconds in: the age is
+         learnt (and stored), the resume of before mends the call. */
+      clock += 30_000;
+      r.sockets[1].dropWith(1006);
+      const stored = JSON.parse(store.get(WS_LIFE_STORAGE_KEY) ?? "{}") as { ms?: number; at?: number };
+      check("an abnormal close thirty seconds in teaches the lifetime, for the call and the device", r.s.getState() === "reconnecting" && stored.ms === 30_000 && stored.at === clock);
+      await sleep(30);
+      check("  …and the first redial resumes as before", r.sockets.length === 4 && /resume=1$/.test(r.sockets[3].url));
+      r.sockets[3].open();
+      await sleep(40);
+      check("  …a replacement is not dialled for a socket whose call is not live again yet", r.sockets.length === 4);
+      r.sockets[3].message(JSON.stringify({ type: "koleex.relay", resumed: true }));
+      await sleep(40);
+      check("  …once live, the replacement dials", r.s.getState() === "live" && r.sockets.length === 5 && /resume=1$/.test(r.sockets[4].url));
+      /* The other order: the relay's close of the old socket reaches this
+         page before the hello on the new one. */
+      r.sockets[4].open();
+      r.sockets[3].dropWith(4002);
+      r.audios[0].frame?.("DDDD");
+      const eventsBefore = r.s.diagnostics().events;
+      r.sockets[4].message(JSON.stringify({ type: "koleex.relay", resumed: true }));
+      check("  …the handover close arriving first is the handover done: the replacement is the call at once, and its late hello is not an event",
+        r.s.getState() === "live" && r.s.diagnostics().ws_rotations === 2 && r.sockets[4].sent[r.sockets[4].sent.length - 1] === JSON.stringify({ type: "input_audio_buffer.append", audio: "DDDD" }) && r.s.diagnostics().events === eventsBefore && !/koleex/.test(r.s.diagnostics().events));
+      await sleep(40);
+      check("  …and the next replacement is armed again", r.sockets.length === 6);
+      r.s.stop();
+      check("hang-up closes the call's socket and the replacement still dialling", r.sockets[4].closed === 1 && r.sockets[5].closed === 1);
+      /* A device that learnt nothing never rotates; a vendor dialled
+         directly (no keepalive from the handshake) never rotates. */
+      store.clear();
+      const r2 = await laneRun({ envelope: wsEnvelope({ keepalive: true }), rotateAfterMs: 20, now: () => clock });
+      r2.sockets[0].open();
+      r2.sockets[0].message(JSON.stringify({ type: "session.updated" }));
+      await sleep(50);
+      check("a device with no lifetime learnt keeps one socket", r2.sockets.length === 1 && r2.s.getState() === "live");
+      r2.s.stop();
+      store.set(WS_LIFE_STORAGE_KEY, storedLife(30_000, clock));
+      const r3 = await laneRun({ envelope: wsEnvelope(), rotateAfterMs: 20, now: () => clock });
+      r3.sockets[0].open();
+      r3.sockets[0].message(JSON.stringify({ type: "session.updated" }));
+      await sleep(50);
+      check("a vendor dialled directly (no keepalive in the handshake) is never handed over, lifetime or not", r3.sockets.length === 1 && r3.s.getState() === "live");
+      clock += 30_000;
+      r3.sockets[0].dropWith(1006);
+      check("  …and teaches nothing", (JSON.parse(store.get(WS_LIFE_STORAGE_KEY) ?? "{}") as { at?: number }).at === clock - 30_000);
+      r3.s.stop();
+    } finally {
+      g.window = hadWindow;
+    }
   }
 
   /* THE MICROPHONE'S SIDE IS IN THE BEACON (2026-09-09 03:09, a phone in

@@ -1374,6 +1374,7 @@ export default function VoiceCallButton({
         last_event: d.last_event,
         ws_reconnects: d.ws_reconnects,
         ws_close: d.ws_close,
+        ws_rotations: d.ws_rotations,
         /* How heavy the page is, for the beacon a death leaves behind. */
         dom: document.getElementsByTagName("*").length,
         imgs: document.images.length,
@@ -1402,6 +1403,7 @@ export default function VoiceCallButton({
         last_event: dead.last_event,
         ws_reconnects: dead.ws_reconnects,
         ws_close: dead.ws_close,
+        ...(dead.ws_rotations ? { ws_rotations: dead.ws_rotations } : {}),
         ice_ever_connected: true,
         ...(dead.dom !== undefined ? { dom: dead.dom, imgs: dead.imgs ?? 0 } : {}),
       });
