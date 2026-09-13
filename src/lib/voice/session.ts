@@ -397,6 +397,8 @@ function isTimeoutError(e: unknown): boolean {
 const JITTER_BUFFER_TARGET_MS = 400;
 /** How often the mainland lane's inbound stats are sampled for the beacon. */
 const RTC_STATS_EVERY_MS = 5_000;
+/** The main-thread stall meter's tick (see VoiceSession.stallMaxMs). */
+const STALL_EVERY_MS = 250;
 
 /* The label is ours to choose — the vendor's sample notes the name is
    customizable. Named for what travels on it rather than after any vendor. */
@@ -690,6 +692,19 @@ export class VoiceSession {
    *  peer connection lives (startRtcStats), for the beacon. */
   private rtcStats = "";
   private rtcStatsTimer: ReturnType<typeof setInterval> | null = null;
+  /* THE PATH AND THE PAGE, TOLD APART (2026-09-13: thirteen underruns in
+     85 s on an iPhone with the lead at its ceiling, while the relay saw the
+     far side only 25 ms behind real time; an iPad on the same account did
+     not cut). Two meters for the beacon: the longest silence between two
+     audio frames of one answer as they reach THIS page (against the relay's
+     maxGap: the difference is the path from Singapore), and the longest
+     stall of this page's main thread (a 250 ms timer's worst lateness: a
+     page that cannot run its timer cannot feed the ring either). */
+  private wsLastDeltaAt = 0;
+  private wsMaxDeltaGapMs = 0;
+  private stallTimer: ReturnType<typeof setInterval> | null = null;
+  private stallLast = 0;
+  private stallMaxMs = 0;
   /* THE OTHER REGION. The server may hold a second endpoint (see the
      server's voice/config.ts for why). It tells this client two things with
      the answer: which SLOT served — a neutral word, never a host — and
@@ -930,11 +945,11 @@ export class VoiceSession {
       resp_err: this.lastResponseError,
       tool_wait_ms: this.toolWaitMs,
       up_frames: this.wsFramesUp,
-      capture: capture ? `${capture.path}:${capture.ctx}:${capture.rate}:f${capture.frames}:s${capture.start}${capture.stalled ? ":stalled" : ""}${capture.underruns !== undefined ? `:u${capture.underruns}:b${capture.bufferMs ?? 0}` : ""}${capture.playout ? `:o${capture.playout}` : ""}` : "",
+      capture: capture ? `${capture.path}:${capture.ctx}:${capture.rate}:f${capture.frames}:s${capture.start}${capture.stalled ? ":stalled" : ""}${capture.underruns !== undefined ? `:u${capture.underruns}:b${capture.bufferMs ?? 0}` : ""}${capture.playout ? `:o${capture.playout}` : ""}:g${this.wsMaxDeltaGapMs}:m${this.stallMaxMs}` : "",
       mic_peak: capture?.peak ?? 0,
       mic: this.micState(),
       call: this.callId,
-      rtc: this.rtcStats,
+      rtc: this.rtcStats ? `${this.rtcStats} stall=${this.stallMaxMs}` : "",
     };
   }
 
@@ -948,13 +963,36 @@ export class VoiceSession {
     const sample = () => {
       if (this.pc !== pc) return this.stopRtcStats();
       pc.getStats().then((report) => {
-        report.forEach((r: { type?: string; kind?: string; packetsReceived?: number; packetsLost?: number; jitter?: number; concealedSamples?: number }) => {
+        report.forEach((r: { type?: string; kind?: string; packetsReceived?: number; packetsLost?: number; jitter?: number; concealedSamples?: number; silentConcealedSamples?: number; jitterBufferDelay?: number; jitterBufferEmittedCount?: number }) => {
           if (r.type !== "inbound-rtp" || (r.kind !== undefined && r.kind !== "audio")) return;
-          this.rtcStats = `recv=${r.packetsReceived ?? 0} lost=${r.packetsLost ?? 0} jitter=${Math.round((r.jitter ?? 0) * 1000)} conc=${r.concealedSamples ?? 0}`;
+          /* sconc: concealment that was silence (the far side sending
+             nothing between answers) — the rest is the cuts. jbd: the
+             receiver's average hold before playing, in ms. */
+          const emitted = r.jitterBufferEmittedCount ?? 0;
+          const jbd = emitted > 0 ? Math.round(((r.jitterBufferDelay ?? 0) / emitted) * 1000) : 0;
+          this.rtcStats = `recv=${r.packetsReceived ?? 0} lost=${r.packetsLost ?? 0} jitter=${Math.round((r.jitter ?? 0) * 1000)} conc=${r.concealedSamples ?? 0} sconc=${r.silentConcealedSamples ?? 0} jbd=${jbd}`;
         });
       }).catch(() => { /* a closed connection has no stats */ });
     };
     this.rtcStatsTimer = setInterval(sample, RTC_STATS_EVERY_MS);
+  }
+
+  /** The main-thread stall meter (see stallMaxMs). Idempotent. */
+  private startStallMeter(): void {
+    this.stopStallMeter();
+    /* A page's main thread is what is measured; the suite's Node has none. */
+    if (typeof document === "undefined") return;
+    this.stallLast = Date.now();
+    this.stallTimer = setInterval(() => {
+      const now = Date.now();
+      const late = now - this.stallLast - STALL_EVERY_MS;
+      if (late > this.stallMaxMs) this.stallMaxMs = late;
+      this.stallLast = now;
+    }, STALL_EVERY_MS);
+  }
+  private stopStallMeter(): void {
+    if (this.stallTimer) clearInterval(this.stallTimer);
+    this.stallTimer = null;
   }
 
   private stopRtcStats(): void {
@@ -1005,6 +1043,7 @@ export class VoiceSession {
     this.clearReconnectTimer();
     this.clearToolResponseTimer();
     this.stopRtcStats();
+    this.stopStallMeter();
     /* TRACKS FIRST, and the order matters. Closing the peer connection does
        not stop a capture track; the recording light stays on and the browser
        keeps the device held. */
@@ -1470,6 +1509,7 @@ export class VoiceSession {
     this.clearReconnectTimer();
     this.clearToolResponseTimer();
     this.stopRtcStats();
+    this.stopStallMeter();
     /* A CALL THAT WAS UP AND LOST ITS LINE KEEPS THE MICROPHONE for the call
        that resumes it (takeMicrophone): stopping the tracks here made the
        resume ask the phone for the microphone again, outside any tap, and
@@ -1702,6 +1742,11 @@ export class VoiceSession {
     } catch (e) {
       if (first) this.fail("handshake-failed", e);
       return false;
+    }
+    if (first) {
+      this.startStallMeter();
+      this.wsLastDeltaAt = 0;
+      this.wsMaxDeltaGapMs = 0;
     }
     /* A redial replaces the dead socket silently: its close is not news. */
     this.stopKeepalive();
@@ -1947,6 +1992,12 @@ export class VoiceSession {
       /* A late frame of an answer the caller cut: not a sound. */
       if (this.wsSilenced || (typeof rid === "string" && rid === this.wsSilencedResponse)) return;
       const delta = (v as { delta?: unknown }).delta;
+      const arrivedAt = Date.now();
+      if (this.wsLastDeltaAt > 0) {
+        const gap = arrivedAt - this.wsLastDeltaAt;
+        if (gap > this.wsMaxDeltaGapMs) this.wsMaxDeltaGapMs = gap;
+      }
+      this.wsLastDeltaAt = arrivedAt;
       if (typeof delta === "string" && delta) {
         try {
           audio.play(delta);
@@ -1957,6 +2008,8 @@ export class VoiceSession {
       return;
     }
     if (type === EV_WS_AUDIO_DONE || type === EV_WS_AUDIO_DONE_GA || type === EV_WS_RESPONSE_DONE) {
+      /* The silence between two answers is the caller's, not the path's. */
+      this.wsLastDeltaAt = 0;
       try {
         audio.endOfResponse?.();
       } catch {
@@ -2007,6 +2060,7 @@ export class VoiceSession {
       pc = this.deps.createPeerConnection();
       this.pc = pc;
       this.startRtcStats(pc);
+      this.startStallMeter();
       for (const track of this.mic.getTracks()) pc.addTrack(track, this.mic);
 
       /* NOTHING WATCHED THE CONNECTION AFTER IT WENT LIVE, and on an unstable

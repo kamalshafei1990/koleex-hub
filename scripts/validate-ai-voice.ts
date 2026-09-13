@@ -1224,8 +1224,21 @@ console.log("\n── 8. What the client may know, and what it may not ──");
       JSON.stringify(orderRegionSlots("alt", null, { primary: true, alt: false })) === '["primary"]' &&
       JSON.stringify(orderRegionSlots(null, "primary", { primary: false, alt: true })) === '["alt"]' &&
       JSON.stringify(orderRegionSlots(null, null, { primary: false, alt: false })) === "[]");
+    /* A SLOT THAT FAILED THIS INSTANCE A MOMENT AGO GOES LAST (2026-09-13):
+       the browser's hint, saved when that slot last served, no longer
+       outranks the server's fresher memory of it failing. */
+    check("a recently failed slot is asked last, whatever the hint or the memory said — and alone it is still asked",
+      JSON.stringify(orderRegionSlots("primary", null, { primary: true, alt: true }, "primary")) === '["alt","primary"]' &&
+      JSON.stringify(orderRegionSlots(null, "primary", { primary: true, alt: true }, "primary")) === '["alt","primary"]' &&
+      JSON.stringify(orderRegionSlots("alt", null, { primary: true, alt: true }, "primary")) === '["alt","primary"]' &&
+      JSON.stringify(orderRegionSlots(null, null, { primary: true, alt: true }, "alt")) === '["primary","alt"]' &&
+      JSON.stringify(orderRegionSlots("primary", null, { primary: true, alt: false }, "primary")) === '["primary"]');
+    check("  …the route remembers a failed slot for ten minutes, leaves a dead path for the other region without the short retry, and asks twelve starts a minute",
+      /let lastFailed: \{ slot: VoiceRegionSlot; at: number \} \| null = null;\s*const LAST_FAILED_TTL_MS = 10 \* 60_000;/.test(route) &&
+      /const pathDown = timedOut \|\| \/CONNECT_TIMEOUT\|ECONNREFUSED\|ENOTFOUND\|EAI_AGAIN\|ECONNRESET\/\.test\(lastCause\);\s*const another = candidates\.indexOf\(region\) < candidates\.length - 1;\s*if \(pathDown && another\) \{\s*lastFailed = \{ slot: region\.slot, at: Date\.now\(\) \};\s*continue regions;\s*\}/.test(route) &&
+      /\|\| 12;/.test(route));
     check("the route builds its candidates from that order, slots mapped back to the server's own configs",
-      /const order = orderRegionSlots\(hint, rememberedSlot\(\), \{ primary: primary !== null, alt: alt !== null \}\);/.test(route) &&
+      /const order = orderRegionSlots\(hint, rememberedSlot\(\), \{ primary: primary !== null, alt: alt !== null \}, recentlyFailedSlot\(\)\);/.test(route) &&
       /order\.map\(\(slot\) => \(\{\s*slot,\s*cfg: \(slot === "alt" \? alt : primary\) as VoiceConfig,\s*\}\)\)/.test(route));
     check("  …the memory is set only on an answer that is a call, after the ok line, and expires",
       (() => { const ok = route.indexOf("[ai.voice] handshake ok"); const set = route.indexOf("lastServed = { slot: region.slot, at: Date.now() };"); const brk = route.indexOf("break regions;"); return ok > 0 && set > ok && brk > set; })() &&
@@ -1247,8 +1260,8 @@ console.log("\n── 8. What the client may know, and what it may not ──");
       (() => { const i = route.indexOf("if (!res.ok) {"); const j = route.indexOf("[ai.voice] handshake ok"); return i > 0 && j > i; })());
     check("  …every region refused → 502 (the client says refused); none answered → 504 (not responding)",
       /status: rejected \? 502 : 504/.test(route) && (route.match(/handshake rejected/g) ?? []).length === 1);
-    check("with two regions each gets the long attempt and one short one, inside the ceiling",
-      (() => { const m = route.match(/const TWO_REGION_ATTEMPT_BUDGETS_MS = \[([\d_, ]+)\]/); const b = m ? m[1].split(",").map((x) => Number(x.replace(/_/g, ""))) : []; const ceiling = Number(route.match(/export const maxDuration = (\d+)/)?.[1]); return b.length === 2 && b[0] === 13_000 && 2 * b.reduce((a, c) => a + c, 0) + 10_000 <= ceiling * 1000; })());
+    check("with two regions the first attempt is seven seconds (a dead path is left for the other region), inside the ceiling",
+      (() => { const m = route.match(/const TWO_REGION_ATTEMPT_BUDGETS_MS = \[([\d_, ]+)\]/); const b = m ? m[1].split(",").map((x) => Number(x.replace(/_/g, ""))) : []; const ceiling = Number(route.match(/export const maxDuration = (\d+)/)?.[1]); return b.length === 2 && b[0] === 7_000 && 2 * b.reduce((a, c) => a + c, 0) + 10_000 <= ceiling * 1000; })());
     check("the log names the slot beside the vendor label, on success and on failure",
       /handshake ok attempt=\$\{attempt\}\/\$\{budgets\.length\} slot=\$\{region\.slot\}/.test(route) && /attempt=\$\{attempt\}\/\$\{budgets\.length\} slot=\$\{region\.slot\} from=/.test(route));
     const successReturn16 = route.slice(route.lastIndexOf("return NextResponse.json("));

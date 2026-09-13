@@ -949,7 +949,11 @@ export default function VoiceCallButton({
         if (next === "live") acquireWakeLock();
         /* From here to the release, the Hub engine's context is held: the
            call's own context is the only one under the microphone. */
-        if (next === "live") holdSoundEngine(true);
+        if (next === "live") {
+          holdSoundEngine(true);
+          /* The page's aurora rests for the call (WavyBackground). */
+          try { window.dispatchEvent(new Event("kx-call-live")); } catch { /* not a browser */ }
+        }
         if (next === "live" && transportRef.current === "ws") saveLane("ws", Date.now(), "call");
         if (next === "live") {
           const region = sessionRef.current?.diagnostics().region;

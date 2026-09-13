@@ -92,7 +92,9 @@ async function readFields(req: Request): Promise<WsSessionFields> {
   }
 }
 /* Shares the mainland lane's counter and ceiling: a call is a call. */
-const VOICE_SESSIONS_PER_MIN = Number(process.env.AI_LIMIT_VOICE_SESSIONS_PER_MIN) || 6;
+/* Twelve a minute, as on the mainland lane's route (2026-09-13): a lane
+   fall-back and a "Try again" are starts to this counter too. */
+const VOICE_SESSIONS_PER_MIN = Number(process.env.AI_LIMIT_VOICE_SESSIONS_PER_MIN) || 12;
 
 export async function POST(req: Request) {
   const gate = await authorizeVoice(req);
