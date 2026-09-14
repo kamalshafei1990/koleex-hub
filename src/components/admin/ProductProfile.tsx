@@ -99,6 +99,7 @@ import PriceSheet from "./profile/PriceSheet";
 import HeroSheet from "./profile/HeroSheet";
 import ComplianceSheet from "./profile/ComplianceSheet";
 import ClassifySheet from "./profile/ClassifySheet";
+import SupplierSheet from "./profile/SupplierSheet";
 import dynamic from "next/dynamic";
 import { useSkin } from "@/lib/appearance";
 import FeatureHighlightsDisplay from "./FeatureHighlightsDisplay";
@@ -140,6 +141,7 @@ const PROFILE_T: Record<string, { en: string; zh: string; ar: string }> = {
   "pr.variantsN":     { en: "{n} variants",       zh: "{n} 个型号",     ar: "{n} موديل" },
   "pr.variant1":      { en: "1 variant",          zh: "1 个型号",       ar: "موديل واحد" },
   "pp.certWord":      { en: "cert",               zh: "证书",           ar: "شهادة" },
+  "sup.costNote":     { en: "Price note",         zh: "价格备注",       ar: "ملاحظة السعر" },
   /* Classify tab */
   "cl.pickDivision":  { en: "Pick a division…",   zh: "选择事业部…",     ar: "اختر القسم…" },
   "cl.pickCategory":  { en: "Pick a category…",   zh: "选择类别…",       ar: "اختر الفئة…" },
@@ -2104,54 +2106,15 @@ export default function ProductProfile() {
       )}
 
       {STEPS[step].id === "supplier" && (
-      <Group motion={tabMotion} icon={<BoundIcon semanticKey="field.supplier" className="h-4 w-4" fallback={<FactoryIcon className="h-4 w-4" />} />} title={t("pp.sec.supplier", "Supplier & Sourcing")} count={`${data.suppliers.length}`} editLabel={t("action.edit", "Edit")} onEdit={() => goStep("supplier")}>
-        {data.suppliers.length === 0 ? (
-          <p className="text-[12px] text-[var(--text-ghost)] italic">{t("pp.e.noSupplier", "No supplier linked.")}</p>
-        ) : (
-          <div className="space-y-3">
-            {data.suppliers.map((sup, i) => (
-              <div key={i} className="rounded-xl border border-[var(--border-subtle)] p-3">
-                <div className="flex items-center gap-2.5 mb-3">
-                  <span className="h-8 w-8 rounded-lg bg-white border border-[var(--border-subtle)] overflow-hidden flex items-center justify-center shrink-0">
-                    {sup.supplier?.logo ? <img src={IMG.thumb(sup.supplier.logo)} alt="" className="h-full w-full object-contain p-0.5" /> : <FactoryIcon className="h-3.5 w-3.5 text-gray-400" />}
-                  </span>
-                  <span className="text-[13px] font-semibold text-[var(--text-primary)] truncate">{sup.supplier?.name ?? "—"}</span>
-                  {sup.is_primary === true && <span className="text-[10px] px-1.5 py-0.5 rounded bg-[var(--bg-surface)] text-[var(--text-muted)]">{t("pp.primary", "Primary")}</span>}
-                </div>
-                {/* The supplier tab leads with the supplier's own product photo,
-                    so the record shows that slot too — filled or empty. */}
-                <div className="grid grid-cols-1 lg:grid-cols-[220px_1fr] gap-5">
-                  <div>
-                    <div className="text-[10.5px] uppercase tracking-wider text-[var(--text-ghost)] mb-2">
-                      {t("pp.f.supPhoto", "Supplier product photo")}
-                    </div>
-                    <div className="aspect-square w-full rounded-2xl border border-dashed border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] overflow-hidden flex items-center justify-center">
-                      {sup.supplier_product_photo
-                        ? <img src={IMG.card(sup.supplier_product_photo as string)} alt="" className="h-full w-full object-contain p-2" />
-                        : <span className="text-[12px] text-[var(--text-ghost)] italic">{NOT_SET}</span>}
-                    </div>
-                  </div>
-                  <div className={rows}>
-                  <Row label={t("pp.f.supCode", "Supplier product code")} value={sup.supplier_product_code} mono />
-                  <Row label={t("pp.f.supName", "Supplier product name")} value={sup.supplier_product_name} />
-                  {data.costVisible && <Row label={t("pp.f.unitCost", "Unit cost (CNY)")} value={sup.unit_cost_cny} />}
-                  {/* Supply type & incoterms are supplier-record facts (Suppliers
-                      app) — the link columns of the same name are legacy and
-                      always empty (incoterms removed from the form, owner
-                      2026-07-31), which made these rows read "Not set" forever.
-                      Read the supplier record first, old link value as fallback. */}
-                  <Row label={t("pp.f.supplyType", "Supply type")} value={(sup.supplier as { supply_type?: string | null } | null)?.supply_type ?? sup.supply_type} />
-                  <Row label={t("pp.f.incoterms", "Incoterms")} value={(sup.supplier as { incoterms?: string | null } | null)?.incoterms ?? sup.incoterms} />
-                  <Row label={t("pp.f.sourcing", "Sourcing status")} value={sup.sourcing_status} />
-                  <Row label={t("pp.f.sampleAvail", "Sample available")} value={sup.sample_available} />
-                  <Row label={t("pp.f.supWarranty", "Supplier warranty (months)")} value={sup.supplier_warranty_months} />
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </Group>
+        <SupplierSheet
+          suppliers={data.suppliers}
+          costVisible={data.costVisible}
+          productId={p?.id as string | undefined}
+          t={t} lang={lang} motion={tabMotion} canEdit={canEdit} notSet={NOT_SET}
+          onDirtyChange={(d) => { dirtyRef.current = d; }}
+          onSaved={(rows) => mergeSaved({ suppliers: rows })}
+          glyph={glyphFor}
+        />
       )}
 
       {STEPS[step].id === "identity" && (
