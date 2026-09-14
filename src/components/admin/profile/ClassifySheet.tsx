@@ -116,7 +116,9 @@ export default function ClassifySheet({
         count={t("classify.badge", "Division · Category · Subcategory")}
         {...sheet.gp("classify", canEdit)}
       >
-        <div className="divide-y divide-[var(--border-subtle)]">
+        {/* Two columns on a wide screen: seven short facts in one column left
+            most of the card empty. The hierarchy still reads top-left down. */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 [&>*]:border-b [&>*]:border-[var(--border-subtle)] [&>*:last-child]:border-b-0 sm:[&>*:nth-last-child(2):nth-child(odd)]:border-b-0">
           <FieldRow
             label={t("pp.f.division", "Division")}
             glyph={glyphFor("division", divSlug, t("pp.f.division", "Division"))}

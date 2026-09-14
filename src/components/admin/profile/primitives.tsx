@@ -158,7 +158,7 @@ export function FactChip({
    never types it, and the label says so. */
 export function CalcBadge({ label }: { label: string }) {
   return (
-    <span className="font-bold uppercase tracking-[0.12em] px-1.5 py-px rounded-full border border-[#567FB2]/50 text-[#7FA9D6]">{label}</span>
+    <span className="inline-flex items-center h-4 text-[8.5px] leading-none font-bold uppercase tracking-[0.12em] px-1.5 rounded-full border border-[#567FB2]/50 text-[#7FA9D6] whitespace-nowrap">{label}</span>
   );
 }
 
@@ -187,16 +187,19 @@ export function FieldRow({ label, value, help, input, glyph, mono, badge, wide }
   wide?: boolean;
 }) {
   return (
-    <div className={`flex items-start gap-3 py-3 first:pt-0 last:pb-0 ${wide ? "col-span-full" : ""}`}>
+    <div className={`flex items-start gap-3 py-2.5 first:pt-0 last:pb-0 ${wide ? "col-span-full" : ""}`}>
       {glyph ? (
         <span className="mt-0.5 h-8 w-8 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-muted)] shrink-0">{glyph}</span>
       ) : (
         <span aria-hidden className="mt-0.5 h-8 w-8 shrink-0" />
       )}
       <div className="min-w-0 flex-1">
-        <div className="flex items-start justify-between gap-3 mb-0.5">
-          <span className="text-[10px] font-bold uppercase tracking-[0.08em] text-[var(--text-ghost)]">{label}</span>
-          {badge}
+        {/* The badge sits right after the label — "SUBCATEGORY CODE · CALCULATED"
+            reads as one phrase; parked at the far edge it looked like a
+            button for the row. */}
+        <div className="flex items-center gap-2 mb-0.5 min-w-0">
+          <span className="text-[10px] font-bold uppercase tracking-[0.08em] text-[var(--text-ghost)] truncate">{label}</span>
+          {badge ? <span className="shrink-0 inline-flex items-center">{badge}</span> : null}
         </div>
         {input ? (
           <div className="mt-1">{input}</div>
