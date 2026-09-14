@@ -47,8 +47,6 @@ import BoundIcon from "@/components/common/BoundIcon";
 import Drawer from "@/components/kds/Drawer";
 import ExternalLinkIcon from "@/components/icons/ui/ExternalLinkIcon";
 import FactoryIcon from "@/components/icons/ui/FactoryIcon";
-import FolderTreeIcon from "@/components/icons/ui/FolderTreeIcon";
-import SparklesIcon from "@/components/icons/ui/SparklesIcon";
 import Settings2Icon from "@/components/icons/ui/Settings2Icon";
 import BoxesIcon from "@/components/icons/ui/BoxesIcon";
 /* ── one glyph per concept on the Packing & Logistics sheet ──
@@ -89,7 +87,6 @@ import DropletsIcon from "@/components/icons/ui/DropletsIcon";  // item: oil / c
 import CircleDotIcon from "@/components/icons/ui/CircleDotIcon";// item: wheels
 import RulerIcon from "@/components/icons/ui/RulerIcon";
 import WrenchIcon from "@/components/icons/ui/WrenchIcon";
-import ShieldCheckIcon from "@/components/icons/ui/ShieldCheckIcon";
 import ImageRawIcon from "@/components/icons/ui/ImageRawIcon";
 import BookOpenIcon from "@/components/icons/ui/BookOpenIcon";
 import CheckIcon from "@/components/icons/ui/CheckIcon";
@@ -99,6 +96,9 @@ import TabStrip from "@/components/ui/TabStrip";
 import { useTabMotion } from "@/components/ui/useTabMotion";
 import { Group, StatTile, FactChip, CalcBadge, INP_B, SEG, SEG_ON, SEG_OFF } from "./profile/primitives";
 import PriceSheet from "./profile/PriceSheet";
+import HeroSheet from "./profile/HeroSheet";
+import ComplianceSheet from "./profile/ComplianceSheet";
+import ClassifySheet from "./profile/ClassifySheet";
 import dynamic from "next/dynamic";
 import { useSkin } from "@/lib/appearance";
 import FeatureHighlightsDisplay from "./FeatureHighlightsDisplay";
@@ -139,6 +139,81 @@ const PROFILE_T: Record<string, { en: string; zh: string; ar: string }> = {
   "pr.selling":       { en: "Selling prices",     zh: "售价",           ar: "أسعار البيع" },
   "pr.variantsN":     { en: "{n} variants",       zh: "{n} 个型号",     ar: "{n} موديل" },
   "pr.variant1":      { en: "1 variant",          zh: "1 个型号",       ar: "موديل واحد" },
+  "pp.certWord":      { en: "cert",               zh: "证书",           ar: "شهادة" },
+  /* Classify tab */
+  "cl.pickDivision":  { en: "Pick a division…",   zh: "选择事业部…",     ar: "اختر القسم…" },
+  "cl.pickCategory":  { en: "Pick a category…",   zh: "选择类别…",       ar: "اختر الفئة…" },
+  "cl.pickSubcategory": { en: "Pick a subcategory…", zh: "选择子类别…",   ar: "اختر الفئة الفرعية…" },
+  "cl.divisionFirst": { en: "Pick the division first", zh: "请先选择事业部", ar: "اختر القسم أولاً" },
+  "cl.categoryFirst": { en: "Pick the category first", zh: "请先选择类别",  ar: "اختر الفئة أولاً" },
+  "cl.loading":       { en: "Loading…",           zh: "加载中…",         ar: "جارٍ التحميل…" },
+  "cl.templateNote":  { en: "The subcategory picks the spec template and the KOLEEX code prefix — change it and the Specs tab follows.", zh: "子类别决定规格模板与 KOLEEX 编码前缀——更改后规格标签页随之变化。", ar: "الفئة الفرعية تحدد قالب المواصفات وبادئة كود KOLEEX — غيّرها ويتبعها تبويب المواصفات." },
+  "cl.familyNote":    { en: "The product and its models on the Variants tab.", zh: "产品及其型号见“型号”标签页。", ar: "المنتج وموديلاته في تبويب الموديلات." },
+  "cl.levelOnHero":   { en: "Set on the Hero tab (market tier).", zh: "在主页标签页设置（市场等级）。", ar: "يُحدَّد في تبويب الواجهة (المستوى السوقي)." },
+  /* Compliance tab */
+  "cw.partsOnly":     { en: "Parts only",         zh: "仅零件",          ar: "قطع الغيار فقط" },
+  "cw.partsLabour":   { en: "Parts & labour",     zh: "零件与人工",      ar: "قطع الغيار والعمالة" },
+  "cw.onSite":        { en: "On-site",            zh: "上门服务",        ar: "في الموقع" },
+  "cw.shipment":      { en: "Shipment",           zh: "发货日",          ar: "تاريخ الشحن" },
+  "cw.installation":  { en: "Installation",       zh: "安装日",          ar: "تاريخ التركيب" },
+  "cw.invoice":       { en: "Invoice date",       zh: "发票日期",        ar: "تاريخ الفاتورة" },
+  "cw.ch.Phone":      { en: "Phone",              zh: "电话",            ar: "هاتف" },
+  "cw.ch.Email":      { en: "Email",              zh: "电子邮件",        ar: "بريد إلكتروني" },
+  "cw.ch.WeChat":     { en: "WeChat",             zh: "微信",            ar: "WeChat" },
+  "cw.ch.WhatsApp":   { en: "WhatsApp",           zh: "WhatsApp",        ar: "واتساب" },
+  "cw.ch.On-site":    { en: "On-site",            zh: "上门",            ar: "في الموقع" },
+  "cw.ch.Remote":     { en: "Remote",             zh: "远程",            ar: "عن بُعد" },
+  "pp.f.sparesStock": { en: "Spare parts stock",  zh: "备件库存",        ar: "مخزون قطع الغيار" },
+  "cc.add":           { en: "Add certificate",    zh: "添加证书",        ar: "إضافة شهادة" },
+  "cc.none":          { en: "No certificate recorded.", zh: "未记录证书。", ar: "لا شهادات مسجّلة." },
+  "cc.type":          { en: "Type",               zh: "类型",            ar: "النوع" },
+  "cc.standard":      { en: "Standard",           zh: "标准",            ar: "المعيار" },
+  "cc.number":        { en: "Certificate no.",    zh: "证书编号",        ar: "رقم الشهادة" },
+  "cc.issuer":        { en: "Issuer",             zh: "签发机构",        ar: "جهة الإصدار" },
+  "cc.issued":        { en: "Issued",             zh: "签发日期",        ar: "تاريخ الإصدار" },
+  "cc.expires":       { en: "Expires",            zh: "到期日期",        ar: "تاريخ الانتهاء" },
+  "cc.remind":        { en: "Remind (days before)", zh: "提前提醒（天）", ar: "تذكير (أيام قبل الانتهاء)" },
+  "cc.remindShort":   { en: "remind {n}d before", zh: "提前 {n} 天提醒",  ar: "تذكير قبلها بـ {n} يوم" },
+  "cc.scope":         { en: "Country scope",      zh: "适用国家/地区",   ar: "نطاق الدول" },
+  "cc.status":        { en: "Status",             zh: "状态",            ar: "الحالة" },
+  "cc.st.active":     { en: "Active",             zh: "有效",            ar: "سارية" },
+  "cc.st.pending":    { en: "Pending",            zh: "待定",            ar: "قيد الإصدار" },
+  "cc.st.expired":    { en: "Expired",            zh: "已过期",          ar: "منتهية" },
+  "cc.file":          { en: "Certificate file URL", zh: "证书文件链接",  ar: "رابط ملف الشهادة" },
+  "cc.fileShort":     { en: "Certificate file",   zh: "证书文件",        ar: "ملف الشهادة" },
+  "cc.verify":        { en: "Verification URL",   zh: "验证链接",        ar: "رابط التحقق" },
+  "cc.verifyShort":   { en: "Verify online",      zh: "在线验证",        ar: "تحقق عبر الإنترنت" },
+  "cc.notes":         { en: "Notes",              zh: "备注",            ar: "ملاحظات" },
+  "cc.remove":        { en: "Remove",             zh: "移除",            ar: "إزالة" },
+  /* Hero tab */
+  "hs.posterBadge":   { en: "Public page",        zh: "客户页面",        ar: "صفحة العميل" },
+  "hs.identityBadge": { en: "Status · Name · Code", zh: "状态 · 名称 · 编码", ar: "الحالة · الاسم · الكود" },
+  "hs.mainPhotoHint": { en: "Click the photo to replace it — the gallery and the other slots are on the Media tab.", zh: "点击照片可替换——图库和其他槽位在媒体标签页。", ar: "اضغط على الصورة لاستبدالها — المعرض وباقي الخانات في تبويب الوسائط." },
+  "hs.tierAuto":      { en: "Matches the policy's tier for this cost.", zh: "与该成本对应的政策等级一致。", ar: "يطابق مستوى السياسة لهذه التكلفة." },
+  "hs.useTier":       { en: "Use it",             zh: "采用",            ar: "اعتمده" },
+  "hs.codePrefix":    { en: "Prefix {p} from the subcategory.", zh: "前缀 {p} 来自子类别。", ar: "البادئة {p} من الفئة الفرعية." },
+  "hs.code.auto_suggested": { en: "Auto",         zh: "自动",            ar: "تلقائي" },
+  "hs.code.edited":   { en: "Edited",             zh: "已编辑",          ar: "معدَّل" },
+  "hs.code.approved": { en: "Approved",           zh: "已批准",          ar: "معتمد" },
+  "hs.code.locked":   { en: "Locked",             zh: "已锁定",          ar: "مقفول" },
+  "hs.slugTaken":     { en: "This URL is already used by {p}.", zh: "该链接已被 {p} 使用。", ar: "هذا الرابط مستخدم بالفعل لـ {p}." },
+  "hs.slugFree":      { en: "Available.",         zh: "可用。",          ar: "متاح." },
+  "hs.taglinePh":     { en: "One line that sells it", zh: "一句话卖点",   ar: "سطر واحد يبيعه" },
+  "hs.codesNote":     { en: "Drawn from the KOLEEX code and the public URL — nothing to type.", zh: "由 KOLEEX 编码与公开链接生成——无需输入。", ar: "مشتقّة من كود KOLEEX والرابط العام — لا شيء لتكتبه." },
+  "hs.richText":      { en: "Rich text",          zh: "富文本",          ar: "نص منسّق" },
+  "hs.identifiersBadge": { en: "Codes · Dates",   zh: "编码 · 日期",     ar: "أكواد · تواريخ" },
+  "hs.gtinHelp":      { en: "EAN / UPC barcode number, if the product has one.", zh: "EAN / UPC 条码号（如有）。", ar: "رقم الباركود EAN / UPC إن وُجد." },
+  "hs.revNote":       { en: "What changed",       zh: "变更内容",        ar: "ما الذي تغيّر" },
+  "hs.addRevision":   { en: "Add revision",       zh: "添加版本",        ar: "إضافة مراجعة" },
+  "hs.seoBadge":      { en: "SEO · OG",           zh: "SEO · OG",        ar: "SEO · OG" },
+  "hs.metaTitle":     { en: "Meta title",         zh: "Meta 标题",       ar: "عنوان Meta" },
+  "hs.metaTitleHelp": { en: "What search engines show as the page title — leave empty to use the product name.", zh: "搜索引擎显示的页面标题——留空则使用产品名称。", ar: "ما تعرضه محركات البحث كعنوان للصفحة — اتركه فارغاً لاستخدام اسم المنتج." },
+  "hs.metaDesc":      { en: "Meta description",   zh: "Meta 描述",       ar: "وصف Meta" },
+  "hs.metaDescHelp":  { en: "The two lines under the title in search results — leave empty to use the short description.", zh: "搜索结果中标题下的两行——留空则使用简短描述。", ar: "السطران تحت العنوان في نتائج البحث — اتركه فارغاً لاستخدام الوصف المختصر." },
+  "hs.ogImage":       { en: "Social share image (OG)", zh: "社交分享图（OG）", ar: "صورة المشاركة الاجتماعية (OG)" },
+  "hs.descTranslated": { en: "Full description translated", zh: "完整描述已翻译", ar: "الوصف الكامل مترجم" },
+  "hs.descNotTranslated": { en: "Full description not translated", zh: "完整描述未翻译", ar: "الوصف الكامل غير مترجم" },
+  "hero.translateUnsupported": { en: "Auto-translate covers Chinese and Arabic — type this one by hand.", zh: "自动翻译仅支持中文与阿拉伯语——请手动输入。", ar: "الترجمة الآلية تغطي الصينية والعربية — اكتب هذه يدوياً." },
   "pr.saveFailed":    { en: "Couldn't save — try again.", zh: "保存失败——请重试。", ar: "تعذّر الحفظ — حاول مرة أخرى." },
   "pr.conflict":      { en: "This variant was changed by someone else — reload and try again.", zh: "该型号已被他人修改——请刷新后重试。", ar: "عدّل شخص آخر هذا الموديل — أعد التحميل وحاول مجدداً." },
   "pp.yes":           { en: "Yes",                zh: "是",             ar: "نعم" },
@@ -1726,6 +1801,31 @@ export default function ProductProfile() {
   })();
 
   const s2 = (k: string) => p[k];
+  /* One merge for every sheet: show what was saved at once, then re-read the
+     row behind it (no-store — the profile response is cached 15s). */
+  const mergeSaved = (u: { product?: Row; models?: Record<string, Row>; media?: Row[]; translations?: Row[]; certifications?: Row[]; suppliers?: Row[] }) => {
+    setData((prev) => {
+      if (!prev) return prev;
+      const models = u.models
+        ? prev.models.map((m) => (u.models![String(m.id)] ? { ...m, ...u.models![String(m.id)] } : m))
+        : prev.models;
+      return {
+        ...prev,
+        product: u.product ? { ...prev.product, ...u.product } : prev.product,
+        models,
+        media: u.media ?? prev.media,
+        translations: u.translations ?? prev.translations,
+        certifications: u.certifications ?? prev.certifications,
+        suppliers: (u.suppliers as Profile["suppliers"] | undefined) ?? prev.suppliers,
+      };
+    });
+    setReloadTick((n) => n + 1);
+  };
+  /* The row glyph for a label — the Visual Library binding table, or nothing. */
+  const glyphFor = (label: string) => {
+    const src = iconForField(BINDINGS_SNAPSHOT, fieldKeyForLabel(label));
+    return src ? <RowGlyph src={src} className="h-4 w-4" /> : null;
+  };
   /* products.logistics — the single home for packing since 2026-09-13. */
   const logi = (p?.logistics ?? {}) as ProductLogistics;
 
@@ -1988,37 +2088,19 @@ export default function ProductProfile() {
 
       {/* ── Step panels — one at a time, exactly like the editor ── */}
       {STEPS[step].id === "classify" && (
-      <Group motion={tabMotion} icon={<BoundIcon semanticKey="field.category" className="h-4 w-4" fallback={<FolderTreeIcon className="h-4 w-4" />} />} title={t("pp.sec.classification", "Classification")} editLabel={t("action.edit", "Edit")} onEdit={() => goStep("classify")}>
-        <div className={rows}>
-          <Row label={t("pp.f.division", "Division")} value={taxoLabel(taxo, "division", s2("division_slug"), lang)} iconSrc={classIcons.division?.[String(s2("division_slug") ?? "")]} />
-          <Row label={t("pp.f.category", "Category")} value={taxoLabel(taxo, "category", s2("category_slug"), lang)} iconSrc={classIcons.category?.[String(s2("category_slug") ?? "")]} />
-          <Row label={t("pp.f.subcategory", "Subcategory")} value={taxoLabel(taxo, "subcategory", s2("subcategory_slug"), lang)} iconSrc={classIcons.subcategory?.[String(s2("subcategory_slug") ?? "")]} />
-          <Row label={t("pp.f.subCode", "Subcategory code")} value={data.subcategory?.code} mono />
-          {/* "Not set" reads as MISSING data, but a standalone product
-              legitimately has no family (owner). Real family → member
-              count; otherwise the free-text family; otherwise the honest
-              default value "Standalone product". */}
-          <Row
-            label={t("pp.f.family", "Family")}
-            value={
-              (data.models?.length ?? 0) > 1
-                ? t("pp.f.familyOfN", "Family of {n} models").replace("{n}", String(data.models.length))
-                : (s2("family") as string | null) || t("pp.f.standalone", "Standalone product")
-            }
-          />
-          <Row
-                label={t("pp.f.level", "Level")}
-                /* Show the tier LABEL, not the stored key — the record must
-                   speak the same words as the editor and the policy page. */
-                value={(() => {
-                  const v = s2("level") as string | null;
-                  if (!v) return null;
-                  return t(`hero.level${v.charAt(0).toUpperCase()}${v.slice(1)}`, v);
-                })()}
-              />
-          <Row label={t("pp.f.template", "Spec template")} value={data.schema ? `${data.schema.name} v${data.schema.version}` : null} />
-        </div>
-      </Group>
+        <ClassifySheet
+          product={p}
+          subcategory={data.subcategory}
+          schema={data.schema ? { name: data.schema.name, version: data.schema.version } : null}
+          modelCount={data.models?.length ?? 0}
+          productId={p?.id as string | undefined}
+          t={t} lang={lang} motion={tabMotion} canEdit={canEdit} notSet={NOT_SET}
+          onDirtyChange={(d) => { dirtyRef.current = d; }}
+          onSaved={(patch) => mergeSaved({ product: patch })}
+          taxoName={(tier, slug) => (typeof slug === "string" && taxo[tier][slug] ? taxoLabel(taxo, tier, slug, lang) : null)}
+          classIcons={classIcons}
+          glyph={glyphFor}
+        />
       )}
 
       {STEPS[step].id === "supplier" && (
@@ -2073,62 +2155,20 @@ export default function ProductProfile() {
       )}
 
       {STEPS[step].id === "identity" && (
-      <div className="space-y-4">
-        {/* Same two-column hero the editor opens with: the product photo owns
-            the left, status/visibility/name the right. */}
-        <Group motion={tabMotion} icon={<BoundIcon semanticKey="section.hero" className="h-4 w-4" fallback={<SparklesIcon className="h-4 w-4" />} />} title={t("pp.sec.identity", "Identity & lifecycle")} editLabel={t("action.edit", "Edit")} onEdit={() => goStep("identity")}>
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 mb-5">
-            <div>
-              <div className="text-[10.5px] uppercase tracking-wider text-[var(--text-ghost)] mb-2">
-                {t("media.slot.main_image.label", "Main Product Photo")}
-              </div>
-              <div className="aspect-square w-full max-w-[320px] rounded-2xl border border-dashed border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] overflow-hidden flex items-center justify-center">
-                {hero
-                  ? <img src={IMG.card(hero)} alt="" className="h-full w-full object-contain p-2" />
-                  : <span className="text-[12px] text-[var(--text-ghost)] italic">{NOT_SET}</span>}
-              </div>
-            </div>
-            <div className={rows}>
-              <Row label={t("pp.f.status", "Status")} value={s2("status")} />
-              <Row label={t("pp.f.visible", "Visible to customers")} value={s2("visible")} />
-              <Row label={t("pp.f.featured", "Featured")} value={s2("featured")} />
-              <Row label={t("pp.f.level", "Level")} value={s2("level")} />
-              <Row label={t("pp.f.productName", "Product name")} value={s2("product_name")} />
-              <Row label={t("pp.f.koleexCode", "KOLEEX code")} value={data.models[0]?.primary_model} mono />
-            </div>
-          </div>
-          <div className={rows}>
-            <Row label={t("pp.f.publicUrl", "Public URL")} value={s2("slug")} mono />
-            <Row label={t("pp.f.brand", "Brand")} value={s2("brand")} />
-            <Row label={t("pp.f.manufacturer", "Manufacturer")} value={s2("manufacturer")} />
-            <Row label={t("pp.f.mpn", "MPN")} value={s2("mpn")} mono />
-            <Row label={t("pp.f.gtin", "GTIN")} value={s2("gtin")} mono />
-            <Row label={t("pp.f.sku", "Internal SKU")} value={s2("internal_sku")} mono />
-            <Row label={t("pp.f.legacy", "Legacy code")} value={s2("legacy_code")} mono />
-            <Row label={t("pp.f.generation", "Generation")} value={s2("generation")} />
-            <Row label={t("pp.f.modelYear", "Model year")} value={s2("model_year")} />
-            <Row label={t("pp.f.launch", "Launch date")} value={s2("launch_date")} />
-            <Row label={t("pp.f.eol", "End of life")} value={s2("eol_date")} />
-            <Row label={t("pp.f.availFrom", "Available from")} value={s2("available_from")} />
-            <Row label={t("pp.f.lastOrder", "Last order date")} value={s2("last_order_date")} />
-            <Row label={t("pp.f.aliases", "Alternate names")} value={s2("alternate_names")} />
-            <Row label={t("pp.f.statusReason", "Status reason")} value={s2("status_reason")} />
-          </div>
-        </Group>
-        <Group motion={tabMotion} icon={<BoundIcon semanticKey="field.description" className="h-4 w-4" fallback={<SparklesIcon className="h-4 w-4" />} />} title={t("pp.sec.description", "Description")} editLabel={t("action.edit", "Edit")} onEdit={() => goStep("identity")}>
-          <div className="space-y-4">
-            <Row label={t("pp.f.excerpt", "Short description")} value={s2("excerpt")} />
-            <Row label={t("pp.f.description", "Full description")} value={s2("description")} />
-            <Row label={t("pp.f.highlights", "Highlights")} value={s2("highlights")} />
-            <Row label={t("pp.f.tags", "Tags")} value={s2("tags")} />
-          </div>
-        </Group>
-        <Group motion={tabMotion} icon={<BoundIcon semanticKey="field.languages" className="h-4 w-4" fallback={<SparklesIcon className="h-4 w-4" />} />} title={t("pp.sec.languages", "Languages & markets")} count={`${data.translations.length}`} editLabel={t("action.edit", "Edit")} onEdit={() => goStep("identity")}>
-          {data.translations.length === 0
-            ? <p className="text-[12px] text-[var(--text-ghost)] italic">{t("pp.e.englishOnly", "English only — no localized names recorded.")}</p>
-            : <div className={rows}>{data.translations.map((tr, i) => <Row key={i} label={String(tr.locale ?? "?")} value={tr.product_name} />)}</div>}
-        </Group>
-      </div>
+        <HeroSheet
+          product={p}
+          models={data.models}
+          media={data.media}
+          translations={data.translations}
+          suppliers={data.suppliers}
+          subcategoryCode={data.subcategory?.code ?? null}
+          productId={p?.id as string | undefined}
+          t={t} lang={lang} motion={tabMotion} canEdit={canEdit} notSet={NOT_SET}
+          onDirtyChange={(d) => { dirtyRef.current = d; }}
+          onSaved={mergeSaved}
+          glyph={glyphFor}
+          aiContext={aiContext}
+        />
       )}
 
       {STEPS[step].id === "specs" && (
@@ -2332,37 +2372,16 @@ export default function ProductProfile() {
       )}
 
       {STEPS[step].id === "compliance" && (
-      <Group motion={tabMotion} icon={<BoundIcon semanticKey="field.certifications" className="h-4 w-4" fallback={<ShieldCheckIcon className="h-4 w-4" />} />} title={t("pp.sec.compliance", "Compliance & Warranty")} count={`${data.certifications.length} cert`} editLabel={t("action.edit", "Edit")} onEdit={() => goStep("compliance")}>
-        <div className={rows}>
-          <Row label={t("pp.f.warrMonths", "Warranty (months)")} value={s2("warranty_months")} />
-          <Row label={t("pp.f.warrType", "Warranty type")} value={s2("warranty_type")} />
-          <Row label={t("pp.f.warrStart", "Starts from")} value={s2("warranty_start_from")} />
-          <Row label={t("pp.f.warrCover", "Coverage")} value={s2("warranty_coverage")} />
-          <Row label={t("pp.f.warrExcl", "Exclusions")} value={s2("warranty_exclusions")} />
-          <Row label={t("pp.f.ce", "CE certified")} value={s2("ce_certified")} />
-          <Row label={t("pp.f.rohs", "RoHS compliant")} value={s2("rohs_compliant")} />
-          <Row label={t("pp.f.spares", "Spare parts availability")} value={s2("spare_parts_availability")} />
-          <Row label={t("pp.f.serviceLife", "Service life")} value={s2("service_life")} />
-          <Row label={t("pp.f.maintenance", "Maintenance interval")} value={s2("maintenance_interval")} />
-          <Row label={t("pp.f.support", "Technical support")} value={s2("technical_support")} />
-          <Row label={t("pp.f.channels", "Support channels")} value={s2("support_channels")} />
-          <Row label={t("pp.f.training", "Training available")} value={s2("training_available")} />
-          <Row label={t("pp.f.installation", "Installation service")} value={s2("installation_service")} />
-          <Row label={t("pp.f.returns", "Returns policy")} value={s2("returns_policy")} />
-        </div>
-        {data.certifications.length > 0 && (
-          <div className="mt-4 pt-4 border-t border-[var(--border-subtle)] space-y-2">
-            {data.certifications.map((c, i) => (
-              <div key={i} className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[12px]">
-                <span className="font-medium text-[var(--text-primary)]">{(c.cert_type as string) || "—"}</span>
-                <span className="text-[var(--text-dim)]">{(c.certified_standard as string) || ""}</span>
-                <span className="font-mono text-[11px] text-[var(--text-muted)]">{(c.cert_number as string) || ""}</span>
-                {c.expiry_date ? <span className="text-[11px] text-[var(--text-ghost)]">expires {String(c.expiry_date)}</span> : null}
-              </div>
-            ))}
-          </div>
-        )}
-      </Group>
+        <ComplianceSheet
+          product={p}
+          certifications={data.certifications}
+          productId={p?.id as string | undefined}
+          t={t} motion={tabMotion} canEdit={canEdit} notSet={NOT_SET}
+          schemaCovers={schemaCovers}
+          onDirtyChange={(d) => { dirtyRef.current = d; }}
+          onSaved={(patch, certs) => mergeSaved({ product: patch, certifications: certs })}
+          glyph={glyphFor}
+        />
       )}
 
       {/* Feature Highlights — its own tab (owner call): catalog-style
