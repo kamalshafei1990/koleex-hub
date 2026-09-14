@@ -1433,6 +1433,7 @@ export const PRODUCTS_UI_I18N: Translations = {
   "pk.colGrossBare":       { en: "Gross", zh: "毛重", ar: "قائم" },
   "pk.netWeightBare":      { en: "Net weight (N.W.)", zh: "净重 (N.W.)", ar: "الوزن الصافي (N.W.)" },
   "pk.grossWeightBare":    { en: "Gross weight (G.W.)", zh: "毛重 (G.W.)", ar: "الوزن القائم (G.W.)" },
+  "pk.netSameAsPhysical":  { en: "= Physical · one value, shown beside G.W.", zh: "= 物理 · 同一数值，与毛重并列显示", ar: "= Physical · نفس القيمة، معروضة جنب الـ G.W." },
   "pk.netPerCarton":       { en: "N.W. per carton: {per} × {unit} = {total} kg", zh: "每箱净重：{per} × {unit} = {total} kg", ar: "الصافي للكرتونة: {per} × {unit} = {total} كجم" },
   "pk.packagingWeightBare":{ en: "Packaging weight", zh: "包装重量", ar: "وزن التغليف" },
   "pk.dropHere":           { en: "…or drag an image here", zh: "…或将图片拖到此处", ar: "…أو اسحب صورة هنا" },

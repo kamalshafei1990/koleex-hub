@@ -1224,7 +1224,12 @@ function PackingSheet({
                 unit="kg"
                 extra={(
                   <>
-                    {ePack ? calc(t("pk.netFromMachine", "The N.W. entered once under Physical — the machine itself, as the catalogue quotes it.")) : null}
+                    {/* One number, shown twice: typed under Physical, read here
+                        beside the G.W. it belongs with. Said in both modes so
+                        it never reads as a second field. */}
+                    {ePack
+                      ? calc(t("pk.netFromMachine", "The N.W. entered once under Physical — the machine itself, as the catalogue quotes it."))
+                      : <div className="mt-1.5 text-[9.5px] leading-snug text-[var(--text-ghost)]">{t("pk.netSameAsPhysical", "= Physical · one value, shown beside G.W.")}</div>}
                     {/* Small goods: the catalogue's N.W. is for the whole carton, so
                         that figure is stated here as well — it is the one the
                         operator is looking at while typing. */}
