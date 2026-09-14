@@ -88,15 +88,15 @@ type TFn = (key: string, fallback: string) => string;
 /* The arithmetic behind a container count, in one line, so "29" is never a
    number to take on faith. Exported: the profile sheet says the same thing. */
 export function loadExplain(t: TFn, r: LoadResult, grossKg: number, payloadKg: number): string {
-  const vol = t("pk.volumeLimited", "{cbm} × {eff}% ÷ {unit} CBM = {n}")
-    .replace("{cbm}", String(r.containerCbm)).replace("{eff}", String(Math.round(STUFFING_EFFICIENCY * 100)))
-    .replace("{unit}", String(r.unitCbm)).replace("{n}", String(r.byVolume));
-  if (r.limit === "weight") {
-    const w = t("pk.weightLimitedCalc", "{payload} ÷ {gross} kg = {n}")
-      .replace("{payload}", payloadKg.toLocaleString()).replace("{gross}", String(grossKg)).replace("{n}", String(r.byWeight));
-    return `${w} — ${t("pk.weightDecides", "weight decides (volume: {n})").replace("{n}", String(r.byVolume))}`;
-  }
-  return vol;
+  const which = r.limit === "weight" ? t("pk.limitWeight", "Weight") : r.limit === "fit" ? t("pk.limitFit", "Fit") : t("pk.limitVolume", "Volume");
+  const detail =
+    r.limit === "weight"
+      ? t("pk.weightLimitedCalc", "{payload} ÷ {gross} kg = {n}").replace("{payload}", payloadKg.toLocaleString()).replace("{gross}", String(grossKg)).replace("{n}", String(r.byWeight))
+      : r.limit === "fit" && r.fitDetail
+        ? t("pk.fitExplain", "Fit: {per} per layer × {layers} layers + {extra} in the gaps = {n}").replace("{per}", String(r.fitDetail.perLayer)).replace("{layers}", String(r.fitDetail.layers)).replace("{extra}", String(r.fitDetail.extra)).replace("{n}", String(r.byFit))
+        : t("pk.volumeLimited", "{cbm} × {eff}% ÷ {unit} CBM = {n}").replace("{cbm}", String(r.containerCbm)).replace("{eff}", String(Math.round(STUFFING_EFFICIENCY * 100))).replace("{unit}", String(r.unitCbm)).replace("{n}", String(r.byVolume));
+  const ceilings = t("pk.ceilings", "volume {v} · fit {f} · weight {w}").replace("{v}", String(r.byVolume)).replace("{f}", String(r.byFit)).replace("{w}", r.byWeight ? String(r.byWeight) : "—");
+  return `${detail} — ${t("pk.decides", "{which} decides").replace("{which}", which)} (${ceilings})`;
 }
 const localise = (t: TFn, list: readonly { value: string; label: string }[]) =>
   list.map((o) => ({ value: o.value, label: t(`pk.opt.${o.value}`, o.label) }));
@@ -186,10 +186,12 @@ export function LogisticsSummary({ value }: { value: ProductLogistics }) {
 /* ═══════════════════════════════════════════════════════════════════
    PACKING — the crates, what is inside them, and how many pieces to a box.
    ═══════════════════════════════════════════════════════════════════ */
-export function PackingBlock({ value, onChange, productId, netKg }: BlockProps & { productId?: string;
+export function PackingBlock({ value, onChange, productId, netKg, onNetKgChange }: BlockProps & { productId?: string;
   /** The machine weight from Physical. Suppliers quote N.W. and G.W.; N.W. IS
-   *  the machine, so the packing tab does not ask for it a second time. */
+   *  the machine — ONE field, typed here or under Physical. */
   netKg?: number | string | null;
+  /** Writes the same field Physical writes (kg, canonical). */
+  onNetKgChange?: (kg: string) => void;
 }) {
   const { t } = useTranslation(PRODUCTS_UI_I18N);
   /* Memoised so the fallback row is not a fresh array on every render — that
@@ -480,8 +482,22 @@ export function PackingBlock({ value, onChange, productId, netKg }: BlockProps &
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <div>
           <label className={lbl}>{`${t("pk.netWeightBare", "Net weight")} (${wtUnit})`}</label>
-          <input value={weightFromKg(netOf(value, netKg), wtUnit)} readOnly placeholder="—" className={`${inp} tabular-nums opacity-70`} />
-          <p className={hint}>{t("pk.netFromMachine", "The N.W. entered once under Physical — the machine itself, as the catalogue quotes it.")}</p>
+          {/* The catalogue prints N.W., G.W. and packing size together, so the
+              operator types them together: this is Physical's own field, not a
+              copy — typing here fills Physical and vice versa. */}
+          {onNetKgChange ? (
+            <input
+              inputMode="decimal"
+              value={raw["net"] !== undefined ? raw["net"] : weightFromKg(netOf(value, netKg), wtUnit)}
+              onChange={(e) => { setRaw((m) => ({ ...m, net: e.target.value })); onNetKgChange(String(weightToKg(e.target.value, wtUnit))); }}
+              onBlur={() => setRaw((m) => { const next = { ...m }; delete next.net; return next; })}
+              placeholder="180"
+              className={`${inp} tabular-nums`}
+            />
+          ) : (
+            <input value={weightFromKg(netOf(value, netKg), wtUnit)} readOnly placeholder="—" className={`${inp} tabular-nums opacity-70`} />
+          )}
+          <p className={hint}>{t("pk.netTypeHere", "One field with Physical — type it here or there.")}</p>
           {/* Small goods: the catalogue's N.W. is for the whole carton. */}
           {mode === "per_package" && per > 1 && netOf(value, netKg) > 0 ? (
             <p className={`${hint} tabular-nums`}>
@@ -491,10 +507,22 @@ export function PackingBlock({ value, onChange, productId, netKg }: BlockProps &
         </div>
         <div>
           <label className={lbl}>{`${t("pk.grossWeightBare", "Gross weight")} (${wtUnit})`}</label>
-          <input value={weightFromKg(sums.grossKg, wtUnit)} readOnly placeholder="—" className={`${inp} tabular-nums opacity-70`} />
-          {/* Gross used to be a free number with no relationship to anything;
-              it is the sum of the crates, so the crates state it. */}
-          <p className={hint}>{t("pk.grossHint", "Sum of the packages above.")}</p>
+          {/* One package: G.W. is that package's weight, and the catalogue gives
+              it as one number — so it is typed here as one number, into the
+              package. Several packages: the sum, which the crates state. */}
+          {rows.length === 1 ? (
+            <input
+              inputMode="decimal"
+              value={raw["gross"] !== undefined ? raw["gross"] : weightFromKg(rows[0].gross_kg, wtUnit)}
+              onChange={(e) => { setRaw((m) => ({ ...m, gross: e.target.value })); setRow(0, { gross_kg: weightToKg(e.target.value, wtUnit) }); }}
+              onBlur={() => setRaw((m) => { const next = { ...m }; delete next.gross; return next; })}
+              placeholder="210"
+              className={`${inp} tabular-nums`}
+            />
+          ) : (
+            <input value={weightFromKg(sums.grossKg, wtUnit)} readOnly placeholder="—" className={`${inp} tabular-nums opacity-70`} />
+          )}
+          <p className={hint}>{rows.length === 1 ? t("pk.grossOnePkg", "One package — its gross weight, as on the catalogue.") : t("pk.grossHint", "Sum of the packages above.")}</p>
         </div>
         <div>
           <label className={lbl}>{`${t("pk.packagingWeightBare", "Packaging weight")} (${wtUnit})`}</label>

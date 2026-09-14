@@ -162,59 +162,108 @@ export function sumPackages(rows: PackageRow[] | undefined | null): PackageSums 
 
 export interface LoadResult {
   qty: number;
-  limit: "weight" | "space" | "none";
-  /** The two ceilings the count was cut from — shown beside the number so the
-   *  operator can see which one decided it and why. */
+  limit: "weight" | "space" | "fit" | "none";
+  /** The three ceilings the count was cut from — shown beside the number so
+   *  the operator can see which one decided it and why. */
   byVolume: number;
+  byFit: number;
   byWeight: number;
   /** m³ of one UNIT of the product (all its packages together). */
   unitCbm: number;
   /** Internal volume of the container, m³. */
   containerCbm: number;
+  /** How the single-package case was laid out — for the one-line explanation. */
+  fitDetail?: { perLayer: number; layers: number; extra: number };
 }
 
 export const containerCbm = (c: { l: number; w: number; h: number }): number =>
   Math.round((c.l * c.w * c.h) / 1_000_000 * 10) / 10;
 
-/* HOW MANY UNITS FIT — BY VOLUME. Owner, 2026-09-14: "it's totally about the
-   CBM." The earlier version counted footprint × layers and treated a crate
-   as unstackable unless told otherwise, so a 0.254 m³ carton came out at 29
-   per 20ft — one layer on the floor, the rest of the box air. This is the
-   number every supplier and forwarder quotes: the container's cubic metres,
-   less a stuffing allowance, divided by the unit's cubic metres — and then
-   the payload, which the volume figure alone will happily exceed (a 1 m³
-   machine at 1.5 t is 28 by volume and 16 by weight in a 20ft). */
+/* HOW MANY OF ONE BOX FIT — BY GEOMETRY. Volume alone lies for big boxes: a
+   1.056 m³ crate "fits" 28 times in 33.2 m³ × 90%, but 120 cm does not go
+   into 590 cm five times, so eight sit on the floor and two layers is 16,
+   and the leftover strip along the length takes two more. The classic
+   layer-and-leftover heuristic: every orientation of the box as a grid,
+   then the three leftover strips (along L, along W, on top) each filled
+   with the box in its best orientation. Not a bin-packer — a floor plan a
+   forwarder would actually load. */
+function gridFit(bl: number, bw: number, bh: number, L: number, W: number, H: number): number {
+  if (bl <= 0 || bw <= 0 || bh <= 0) return 0;
+  return Math.floor(L / bl) * Math.floor(W / bw) * Math.floor(H / bh);
+}
+const ORIENTATIONS = (d: [number, number, number]): [number, number, number][] => [
+  [d[0], d[1], d[2]], [d[0], d[2], d[1]], [d[1], d[0], d[2]],
+  [d[1], d[2], d[0]], [d[2], d[0], d[1]], [d[2], d[1], d[0]],
+];
+function bestGrid(d: [number, number, number], L: number, W: number, H: number): number {
+  let best = 0;
+  for (const o of ORIENTATIONS(d)) best = Math.max(best, gridFit(o[0], o[1], o[2], L, W, H));
+  return best;
+}
+export function fitCount(
+  box: { l_cm: number; w_cm: number; h_cm: number },
+  c: { l: number; w: number; h: number },
+): { count: number; perLayer: number; layers: number; extra: number } {
+  const d: [number, number, number] = [box.l_cm, box.w_cm, box.h_cm];
+  let best = { count: 0, perLayer: 0, layers: 0, extra: 0 };
+  for (const [bl, bw, bh] of ORIENTATIONS(d)) {
+    const nl = Math.floor(c.l / bl), nw = Math.floor(c.w / bw), nh = Math.floor(c.h / bh);
+    if (nl < 1 || nw < 1 || nh < 1) continue;
+    const perLayer = nl * nw;
+    const main = perLayer * nh;
+    /* The three leftover strips, each filled with the box turned whichever
+       way fits best. Strips do not overlap: along L uses the full W and H,
+       along W uses only the packed length, on top only the packed footprint. */
+    const remL = c.l - nl * bl, remW = c.w - nw * bw, remH = c.h - nh * bh;
+    const extra =
+      bestGrid(d, remL, c.w, c.h) +
+      bestGrid(d, nl * bl, remW, c.h) +
+      bestGrid(d, nl * bl, nw * bw, remH);
+    const count = main + extra;
+    if (count > best.count) best = { count, perLayer, layers: nh, extra };
+  }
+  return best;
+}
+
+/* HOW MANY UNITS FIT. Owner, 2026-09-14: "it's totally about the CBM" — and
+   then, on a 1.056 m³ crate reading 28: "I doubt the CBM results." Both are
+   right, for different boxes. The count is the SMALLEST of three ceilings:
+     volume   container m³ × 90% ÷ unit m³   (the forwarder's quotation figure)
+     fit      the floor plan above           (what actually goes through the door)
+     weight   payload ÷ unit gross           (what the road allows)
+   For a 0.254 m³ carton volume and fit agree within a few pieces; for a
+   1.056 m³ crate fit is 18 where volume says 28, and 18 is the truth. */
 export function unitsPerContainer(
   rows: PackageRow[] | undefined | null,
   container: { l: number; w: number; h: number; payload_kg: number },
 ): LoadResult {
   const cCbm = containerCbm(container);
   const list = (rows ?? []).filter((r) => num(r.l_cm) > 0 && num(r.w_cm) > 0 && num(r.h_cm) > 0);
-  const none = { byVolume: 0, byWeight: 0, unitCbm: 0, containerCbm: cCbm };
+  const none = { byVolume: 0, byFit: 0, byWeight: 0, unitCbm: 0, containerCbm: cCbm };
   if (list.length === 0) return { qty: 0, limit: "none", ...none };
-  /* A package larger than the door in every orientation does not go in at
-     any count. Sorted-dimension check: the longest side against the longest
-     inner dimension, and so on. */
-  const inner = [container.l, container.w, container.h].sort((a, b) => b - a);
-  for (const r of list) {
-    const dims = [num(r.l_cm), num(r.w_cm), num(r.h_cm)].sort((a, b) => b - a);
-    if (dims[0] > inner[0] || dims[1] > inner[1] || dims[2] > inner[2]) {
-      return { qty: 0, limit: "space", ...none };
-    }
-  }
   const sums = sumPackages(list);
   const unitCbm = sums.cbm;
   if (unitCbm <= 0) return { qty: 0, limit: "none", ...none };
+  /* Fit: one package type packs on its own; several share the box in
+     proportion — each package takes 1/fit of the container, a unit takes the
+     sum of its packages' shares. */
+  let share = 0;
+  let fitDetail: LoadResult["fitDetail"];
+  for (const r of list) {
+    const f = fitCount({ l_cm: num(r.l_cm), w_cm: num(r.w_cm), h_cm: num(r.h_cm) }, container);
+    if (f.count === 0) return { qty: 0, limit: "fit", ...none, unitCbm };
+    share += Math.max(1, num(r.qty) || 1) / f.count;
+    if (list.length === 1) fitDetail = { perLayer: f.perLayer, layers: f.layers, extra: f.extra };
+  }
+  const byFit = Math.floor(1 / share);
   const byVolume = Math.floor((cCbm * STUFFING_EFFICIENCY) / unitCbm);
   const byWeight = sums.grossKg > 0 ? Math.floor(container.payload_kg / sums.grossKg) : Infinity;
-  const qty = Math.max(0, Math.min(byVolume, byWeight));
+  const qty = Math.max(0, Math.min(byVolume, byFit, byWeight));
+  const limit: LoadResult["limit"] = qty === byWeight && byWeight < Math.min(byVolume, byFit) ? "weight" : byFit <= byVolume ? "fit" : "space";
   return {
-    qty,
-    limit: byWeight < byVolume ? "weight" : "space",
-    byVolume,
+    qty, limit, byVolume, byFit,
     byWeight: Number.isFinite(byWeight) ? byWeight : 0,
-    unitCbm,
-    containerCbm: cCbm,
+    unitCbm, containerCbm: cCbm, fitDetail,
   };
 }
 
@@ -225,7 +274,7 @@ export function loadPlan(
   opts: { unitsPerPackage?: number } = {},
 ): { c20: LoadResult; c40: LoadResult; c40hq: LoadResult } {
   const per = Math.max(1, Math.floor(num(opts.unitsPerPackage) || 1));
-  const scale = (r: LoadResult): LoadResult => (per === 1 ? r : { ...r, qty: r.qty * per, byVolume: r.byVolume * per, byWeight: r.byWeight * per });
+  const scale = (r: LoadResult): LoadResult => (per === 1 ? r : { ...r, qty: r.qty * per, byVolume: r.byVolume * per, byFit: r.byFit * per, byWeight: r.byWeight * per });
   return {
     c20: scale(unitsPerContainer(rows, CONTAINERS.c20)),
     c40: scale(unitsPerContainer(rows, CONTAINERS.c40)),

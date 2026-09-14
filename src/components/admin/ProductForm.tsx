@@ -5718,7 +5718,27 @@ export default function ProductForm({ productId }: Props) {
             {/* ── PACKING ─────────────────────────────────────────────────
                 Fixed fields, every category — the tab's centre of gravity. */}
             <Section id="logistics-packing-fixed" icon={<BoxIcon className="h-4 w-4" />} title={t("logistics.packingSection", "Packing")} badge={t("logistics.packingSectionBadge", "Crates · Weights")}>
-              <PackingBlock value={product.logistics} onChange={patchLogistics} productId={effectiveId || undefined} netKg={product.machine_weight_kg} />
+              <PackingBlock
+                value={product.logistics}
+                onChange={patchLogistics}
+                productId={effectiveId || undefined}
+                /* Template products keep N.W. in schema_specs (the column is a
+                   mirror written at save); the packing tab read only the column
+                   and showed 0 next to a filled Physical — "not synced". */
+                netKg={schemaCoveredCols.has("machine_weight_kg")
+                  ? ((product.schema_specs as Record<string, unknown> | null)?.machine_weight_kg as number | string | undefined) ?? product.machine_weight_kg
+                  : product.machine_weight_kg}
+                onNetKgChange={(kg) => {
+                  const n = kg.trim() === "" ? undefined : Number(kg);
+                  if (schemaCoveredCols.has("machine_weight_kg")) {
+                    const specs = { ...((product.schema_specs as Record<string, unknown> | null) ?? {}) };
+                    if (n === undefined || Number.isNaN(n)) delete specs.machine_weight_kg; else specs.machine_weight_kg = n;
+                    updateProduct_({ schema_specs: specs, machine_weight_kg: kg });
+                  } else {
+                    updateProduct_({ machine_weight_kg: kg });
+                  }
+                }}
+              />
             </Section>
 
             {/* ── LOADING ─────────────────────────────────────────────────

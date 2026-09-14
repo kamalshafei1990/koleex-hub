@@ -920,7 +920,7 @@ function PackingSheet({
     const d: PackingDraft = {
       logistics: JSON.parse(JSON.stringify(logistics ?? {})) as ProductLogistics,
       machine_dimensions: str(product?.machine_dimensions),
-      machine_weight_kg: str(product?.machine_weight_kg),
+      machine_weight_kg: str((product?.schema_specs as Record<string, unknown> | null)?.machine_weight_kg ?? product?.machine_weight_kg),
       country_of_origin: str(product?.country_of_origin),
       hs_code: str(product?.hs_code),
       moq: str(product?.moq),
@@ -989,7 +989,16 @@ function PackingSheet({
         }
         return out;
       }
-      case "packing":
+      case "packing": {
+        const w = d.machine_weight_kg.trim();
+        const out: Record<string, unknown> = { logistics: d.logistics, machine_weight_kg: w ? parseFloat(w) : null };
+        if (schemaCovers.has("machine_weight_kg")) {
+          const specs = { ...((product?.schema_specs as Record<string, unknown> | null) ?? {}) };
+          if (w) specs.machine_weight_kg = parseFloat(w); else delete specs.machine_weight_kg;
+          out.schema_specs = specs;
+        }
+        return out;
+      }
       case "loading":
         return { logistics: d.logistics };
       case "customs":
@@ -1064,7 +1073,10 @@ function PackingSheet({
   /* Net weight IS the machine weight (suppliers quote N.W. and G.W.; N.W. is
      the machine). The packing column is a fallback for rows written before
      the two were one. */
-  const netW = fromProduct ? (num(col("machine_weight_kg")) || L.net_weight_kg) : m("net_weight");
+  const specsNet = (product?.schema_specs as Record<string, unknown> | null)?.machine_weight_kg;
+  const netW = fromProduct
+    ? (draft ? num(draft.machine_weight_kg) : (num(specsNet) || num(col("machine_weight_kg")))) || L.net_weight_kg
+    : m("net_weight");
   const grossW = fromProduct ? (sums.grossKg || L.gross_weight_kg) : m("weight");
   const cbm = fromProduct ? (sums.cbm || L.cbm) : m("cbm");
   /* A count the operator typed wins; otherwise the count the crates give —
@@ -1220,17 +1232,28 @@ function PackingSheet({
             {ePack || cbm ? <StatTile label={t("pp.f.cbm", "CBM")} value={String(sums.cbm || cbm || "—")} unit="m³" tone="accent" extra={ePack ? calc(t("pk.cbmHintAll", "All packages together.")) : undefined} /> : null}
             {ePack || netW ? (
               <StatTile
-                label={t("pp.f.netWeight", "Net weight")}
+                label={t("pp.f.netWeight", "Net weight (N.W.)")}
                 value={String(netW ?? "—")}
-                unit="kg"
+                unit={ePack ? wtUnit : "kg"}
+                input={ePack && draft ? (
+                  <input
+                    aria-label={t("pp.f.netWeight", "Net weight (N.W.)")}
+                    inputMode="decimal"
+                    value={raw.net !== undefined ? raw.net : displayIn(draft.machine_weight_kg, "kg", wtUnit)}
+                    onChange={(e) => { setRaw((mm) => ({ ...mm, net: e.target.value })); patchDraft({ machine_weight_kg: String(storeFrom(e.target.value, "kg", wtUnit)) }); }}
+                    onBlur={() => setRaw((mm) => { const next = { ...mm }; delete next.net; return next; })}
+                    placeholder="180"
+                    className={`${INP_B} w-full tabular-nums text-[17px]`}
+                  />
+                ) : undefined}
                 extra={(
                   <>
                     {/* One number, shown twice: typed under Physical, read here
                         beside the G.W. it belongs with. Said in both modes so
                         it never reads as a second field. */}
-                    {ePack
-                      ? calc(t("pk.netFromMachine", "The N.W. entered once under Physical — the machine itself, as the catalogue quotes it."))
-                      : <div className="mt-1.5 text-[9.5px] leading-snug text-[var(--text-ghost)]">{t("pk.netSameAsPhysical", "= Physical · one value, shown beside G.W.")}</div>}
+                    <div className="mt-1.5 text-[9.5px] leading-snug text-[var(--text-ghost)]">
+                      {ePack ? t("pk.netTypeHere", "One field with Physical — type it here or there.") : t("pk.netSameAsPhysical", "= Physical · one value, shown beside G.W.")}
+                    </div>
                     {/* Small goods: the catalogue's N.W. is for the whole carton, so
                         that figure is stated here as well — it is the one the
                         operator is looking at while typing. */}
@@ -1243,7 +1266,28 @@ function PackingSheet({
                 )}
               />
             ) : null}
-            {ePack || grossW ? <StatTile label={t("pp.f.grossWeight", "Gross weight")} value={String(sums.grossKg || grossW || "—")} unit="kg" tone="accent" extra={ePack ? calc(t("pk.grossHint", "Sum of the packages above.")) : undefined} /> : null}
+            {ePack || grossW ? (
+              <StatTile
+                label={t("pp.f.grossWeight", "Gross weight (G.W.)")}
+                value={String(sums.grossKg || grossW || "—")}
+                unit={ePack && rows.length === 1 ? wtUnit : "kg"}
+                tone="accent"
+                input={ePack && rows.length === 1 ? (
+                  <input
+                    aria-label={t("pp.f.grossWeight", "Gross weight (G.W.)")}
+                    inputMode="decimal"
+                    value={raw.gross !== undefined ? raw.gross : displayIn(rows[0].gross_kg, "kg", wtUnit)}
+                    onChange={(e) => { setRaw((mm) => ({ ...mm, gross: e.target.value })); setRow(0, { gross_kg: storeFrom(e.target.value, "kg", wtUnit) }); }}
+                    onBlur={() => setRaw((mm) => { const next = { ...mm }; delete next.gross; return next; })}
+                    placeholder="210"
+                    className={`${INP_B} w-full tabular-nums text-[17px]`}
+                  />
+                ) : undefined}
+                extra={ePack ? (rows.length === 1
+                  ? <div className="mt-1.5 text-[9.5px] leading-snug text-[var(--text-ghost)]">{t("pk.grossOnePkg", "One package — its gross weight, as on the catalogue.")}</div>
+                  : calc(t("pk.grossHint", "Sum of the packages above."))) : undefined}
+              />
+            ) : null}
             {/* Gross − net: the editor has it, so the sheet has it. Negative
                 means one of the two is wrong, which is exactly when it earns
                 its place. */}
