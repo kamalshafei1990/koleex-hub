@@ -5718,7 +5718,7 @@ export default function ProductForm({ productId }: Props) {
             {/* ── PACKING ─────────────────────────────────────────────────
                 Fixed fields, every category — the tab's centre of gravity. */}
             <Section id="logistics-packing-fixed" icon={<BoxIcon className="h-4 w-4" />} title={t("logistics.packingSection", "Packing")} badge={t("logistics.packingSectionBadge", "Crates · Weights")}>
-              <PackingBlock value={product.logistics} onChange={patchLogistics} productId={effectiveId || undefined} />
+              <PackingBlock value={product.logistics} onChange={patchLogistics} productId={effectiveId || undefined} netKg={product.machine_weight_kg} />
             </Section>
 
             {/* ── LOADING ─────────────────────────────────────────────────

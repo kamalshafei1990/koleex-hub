@@ -25,7 +25,7 @@ import { PRODUCTS_UI_I18N } from "@/lib/products-ui-i18n";
 import KdsSelect from "@/components/kds/Select";
 import {
   CONTAINERS, DG_KINDS, ITEM_KINDS, ORIGIN_CERTIFICATES, PACKING_TYPES, WOOD_TREATMENTS,
-  loadPlan, sumPackages,
+  loadPlan, sumPackages, STUFFING_EFFICIENCY, type LoadResult,
   type ContentItem, type PackageRow, type PackingMode, type ProductLogistics,
 } from "@/lib/logistics";
 import {
@@ -83,6 +83,19 @@ const choiceOff =
    passes through the UI dictionary on the way to the screen; the stored value
    never changes. */
 type TFn = (key: string, fallback: string) => string;
+/* The arithmetic behind a container count, in one line, so "29" is never a
+   number to take on faith. Exported: the profile sheet says the same thing. */
+export function loadExplain(t: TFn, r: LoadResult, grossKg: number, payloadKg: number): string {
+  const vol = t("pk.volumeLimited", "By volume: {cbm} m³ × {eff}% ÷ {unit} m³ = {n}")
+    .replace("{cbm}", String(r.containerCbm)).replace("{eff}", String(Math.round(STUFFING_EFFICIENCY * 100)))
+    .replace("{unit}", String(r.unitCbm)).replace("{n}", String(r.byVolume));
+  if (r.limit === "weight") {
+    const w = t("pk.weightLimitedCalc", "By weight: {payload} kg ÷ {gross} kg = {n}")
+      .replace("{payload}", payloadKg.toLocaleString()).replace("{gross}", String(grossKg)).replace("{n}", String(r.byWeight));
+    return `${w}. ${t("pk.weightDecides", "Weight decides — the volume would allow {n}.").replace("{n}", String(r.byVolume))}`;
+  }
+  return `${vol}.`;
+}
 const localise = (t: TFn, list: readonly { value: string; label: string }[]) =>
   list.map((o) => ({ value: o.value, label: t(`pk.opt.${o.value}`, o.label) }));
 
@@ -113,6 +126,11 @@ const n = (v: unknown): number => {
   const x = typeof v === "number" ? v : Number(String(v ?? "").trim());
   return Number.isFinite(x) ? x : 0;
 };
+/* Net weight IS the machine weight (owner, 2026-09-14: "net weight means the
+   machine weight"). The packing column is kept only as a fallback for rows
+   written before the two were one. */
+export const netOf = (value: ProductLogistics, machineKg: number | string | null | undefined): number =>
+  n(machineKg) || n(value.net_weight_kg);
 
 /* ═══════════════════════════════════════════════════════════════════
    SUMMARY — the whole shipment in one line.
@@ -126,10 +144,9 @@ export function LogisticsSummary({ value }: { value: ProductLogistics }) {
   const sums = useMemo(() => sumPackages(value.packages), [value.packages]);
   const plan = useMemo(
     () => loadPlan(value.packages, {
-      stackable: value.stackable, stackMax: n(value.stack_max),
       unitsPerPackage: value.packing_mode === "per_package" ? n(value.units_per_package) : 1,
     }),
-    [value.packages, value.stackable, value.stack_max, value.packing_mode, value.units_per_package],
+    [value.packages, value.packing_mode, value.units_per_package],
   );
   if (sums.packageCount === 0) return null;
   const perPkg = value.packing_mode === "per_package" ? Math.max(1, Math.floor(n(value.units_per_package) || 1)) : 1;
@@ -159,7 +176,11 @@ export function LogisticsSummary({ value }: { value: ProductLogistics }) {
 /* ═══════════════════════════════════════════════════════════════════
    PACKING — the crates, what is inside them, and how many pieces to a box.
    ═══════════════════════════════════════════════════════════════════ */
-export function PackingBlock({ value, onChange, productId }: BlockProps & { productId?: string }) {
+export function PackingBlock({ value, onChange, productId, netKg }: BlockProps & { productId?: string;
+  /** The machine weight from Physical. Suppliers quote N.W. and G.W.; N.W. IS
+   *  the machine, so the packing tab does not ask for it a second time. */
+  netKg?: number | string | null;
+}) {
   const { t } = useTranslation(PRODUCTS_UI_I18N);
   /* Memoised so the fallback row is not a fresh array on every render — that
      identity change re-ran the sums below on every keystroke anywhere on the
@@ -449,15 +470,8 @@ export function PackingBlock({ value, onChange, productId }: BlockProps & { prod
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <div>
           <label className={lbl}>{`${t("pk.netWeightBare", "Net weight")} (${wtUnit})`}</label>
-          <input
-            inputMode="decimal"
-            value={raw["net"] !== undefined ? raw["net"] : weightFromKg(value.net_weight_kg, wtUnit)}
-            onChange={(e) => { setRaw((m) => ({ ...m, net: e.target.value })); onChange({ net_weight_kg: weightToKg(e.target.value, wtUnit) }); }}
-            onBlur={() => setRaw((m) => { const next = { ...m }; delete next.net; return next; })}
-            placeholder="180"
-            className={`${inp} tabular-nums`}
-          />
-          <p className={hint}>{t("pk.netHint", "The goods without packaging.")}</p>
+          <input value={weightFromKg(netOf(value, netKg), wtUnit)} readOnly placeholder="—" className={`${inp} tabular-nums opacity-70`} />
+          <p className={hint}>{t("pk.netFromMachine", "The machine weight from Physical — suppliers quote N.W. and G.W., and N.W. is the machine.")}</p>
         </div>
         <div>
           <label className={lbl}>{`${t("pk.grossWeightBare", "Gross weight")} (${wtUnit})`}</label>
@@ -469,7 +483,7 @@ export function PackingBlock({ value, onChange, productId }: BlockProps & { prod
         <div>
           <label className={lbl}>{`${t("pk.packagingWeightBare", "Packaging weight")} (${wtUnit})`}</label>
           <input
-            value={sums.grossKg && n(value.net_weight_kg) ? weightFromKg(Math.round((sums.grossKg - n(value.net_weight_kg)) * 10000) / 10000, wtUnit) : ""}
+            value={sums.grossKg && n(netOf(value, netKg)) ? weightFromKg(Math.round((sums.grossKg - n(netOf(value, netKg))) * 10000) / 10000, wtUnit) : ""}
             readOnly
             placeholder="—"
             className={`${inp} tabular-nums opacity-70`}
@@ -776,10 +790,9 @@ export function LoadingBlock({ value, onChange }: BlockProps) {
   const sums = useMemo(() => sumPackages(value.packages), [value.packages]);
   const plan = useMemo(
     () => loadPlan(value.packages, {
-      stackable: value.stackable, stackMax: n(value.stack_max),
       unitsPerPackage: value.packing_mode === "per_package" ? n(value.units_per_package) : 1,
     }),
-    [value.packages, value.stackable, value.stack_max, value.packing_mode, value.units_per_package],
+    [value.packages, value.packing_mode, value.units_per_package],
   );
 
   const perPkg = value.packing_mode === "per_package" ? Math.max(1, Math.floor(n(value.units_per_package) || 1)) : 1;
@@ -800,6 +813,10 @@ export function LoadingBlock({ value, onChange }: BlockProps) {
           <span className="text-[11px] font-semibold text-[var(--text-muted)]">
             {CONTAINERS[key].label}
             <span className="ms-1 font-normal text-[var(--text-ghost)]">{perPkg > 1 ? t("pk.pcsWord", "pcs") : t("pk.unitsWord", "units")}</span>
+            {/* What the box holds — the number every quote starts from. */}
+            <span className="block text-[9.5px] font-normal tabular-nums text-[var(--text-ghost)]">
+              {t("pk.containerCap", "{cbm} m³ · {kg} kg payload").replace("{cbm}", String(r.containerCbm)).replace("{kg}", CONTAINERS[key].payload_kg.toLocaleString())}
+            </span>
           </span>
           {overridden ? (
             <button
@@ -828,9 +845,7 @@ export function LoadingBlock({ value, onChange }: BlockProps) {
             ? anyMeasured
               ? t("pk.doesNotFit", "Does not fit — a package is taller or longer than the container.")
               : t("pk.enterPackages", "Enter the packages above.")
-            : r.limit === "weight"
-              ? `${t("pk.weightLimited", "Weight-limited")} — ${CONTAINERS[key].payload_kg.toLocaleString()} kg ${t("pk.payload", "payload")}.`
-              : t("pk.spaceLimited", "Space-limited — footprint × layers.")}
+            : loadExplain(t, r, sums.grossKg, CONTAINERS[key].payload_kg)}
         </p>
       </div>
     );
@@ -838,40 +853,9 @@ export function LoadingBlock({ value, onChange }: BlockProps) {
 
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div>
-          <label className={lbl}>{t("pk.stackQ", "Can crates be stacked?")}</label>
-          <div className={choiceRow}>
-            {[["yes", true], ["no", false]].map(([k, v]) => (
-              <button
-                key={String(k)}
-                type="button"
-                onClick={() => onChange({ stackable: v as boolean })}
-                className={`${choiceBtn} ${!!value.stackable === v ? choiceOn : choiceOff}`}
-              >
-                {k === "yes" ? t("pk.stackable", "Stackable") : t("pk.notStackable", "Not stackable")}
-              </button>
-            ))}
-          </div>
-          {/* This one answer can halve or double every number below it: an
-              unstackable crate wastes the whole container above its own height. */}
-          <p className={hint}>{t("pk.stackHint", "An unstackable crate uses the floor only — everything above it is air.")}</p>
-        </div>
-        {value.stackable ? (
-          <div>
-            <label className={lbl}>{t("pk.maxLayers", "Maximum layers")}</label>
-            <input
-              inputMode="numeric"
-              value={String(value.stack_max ?? "")}
-              onChange={(e) => onChange({ stack_max: e.target.value })}
-              placeholder="2"
-              className={`${inp} tabular-nums`}
-            />
-            <p className={hint}>{t("pk.maxLayersHint", "Blank = as many as the container height allows.")}</p>
-          </div>
-        ) : null}
-      </div>
-
+      {/* The stackable / layers questions used to live here. The count is by
+          volume now (owner: "it's totally about the CBM"), so they no longer
+          feed anything and asking them would only suggest they did. */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         {box("c20", "qty_20ft")}
         {box("c40", "qty_40ft")}

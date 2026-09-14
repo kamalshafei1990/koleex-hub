@@ -128,7 +128,7 @@ export const CONTAINERS = {
 
 /* Stuffing is never perfect: crates do not tessellate, dunnage and door
    clearance eat space. Applied to the floor count, not the weight. */
-const STUFFING_EFFICIENCY = 0.9;
+export const STUFFING_EFFICIENCY = 0.9;
 
 export interface PackageSums {
   /** Crates per unit of product (sum of each row's qty). */
@@ -160,74 +160,74 @@ export function sumPackages(rows: PackageRow[] | undefined | null): PackageSums 
 
 export interface LoadResult {
   qty: number;
-  /** Which limit decided it — what to tell the operator. */
   limit: "weight" | "space" | "none";
+  /** The two ceilings the count was cut from — shown beside the number so the
+   *  operator can see which one decided it and why. */
+  byVolume: number;
+  byWeight: number;
+  /** m³ of one UNIT of the product (all its packages together). */
+  unitCbm: number;
+  /** Internal volume of the container, m³. */
+  containerCbm: number;
 }
 
-/* How many UNITS of the product fit in one container.
- *
- * Geometry first, by footprint and layers rather than by raw volume: a crate
- * that cannot be stacked wastes everything above it, and dividing cubic metres
- * silently pretends it does not. Then the payload cap, and the smaller of the
- * two wins — which is the answer a forwarder would give.
- *
- * A product whose crates differ (machine + table + accessories) is loaded as a
- * SET: the set's footprint is the sum of its crates' footprints, so the count
- * is how many complete machines fit, never a mix of loose crates. */
+export const containerCbm = (c: { l: number; w: number; h: number }): number =>
+  Math.round((c.l * c.w * c.h) / 1_000_000 * 100) / 100;
+
+/* HOW MANY UNITS FIT — BY VOLUME. Owner, 2026-09-14: "it's totally about the
+   CBM." The earlier version counted footprint × layers and treated a crate
+   as unstackable unless told otherwise, so a 0.254 m³ carton came out at 29
+   per 20ft — one layer on the floor, the rest of the box air. This is the
+   number every supplier and forwarder quotes: the container's cubic metres,
+   less a stuffing allowance, divided by the unit's cubic metres — and then
+   the payload, which the volume figure alone will happily exceed (a 1 m³
+   machine at 1.5 t is 28 by volume and 16 by weight in a 20ft). */
 export function unitsPerContainer(
   rows: PackageRow[] | undefined | null,
   container: { l: number; w: number; h: number; payload_kg: number },
-  opts: { stackable?: boolean; stackMax?: number } = {},
 ): LoadResult {
+  const cCbm = containerCbm(container);
   const list = (rows ?? []).filter((r) => num(r.l_cm) > 0 && num(r.w_cm) > 0 && num(r.h_cm) > 0);
-  if (list.length === 0) return { qty: 0, limit: "none" };
-
-  const floorArea = container.l * container.w * STUFFING_EFFICIENCY;
-  const layersFor = (hCm: number) => {
-    if (hCm <= 0) return 0;
-    const fit = Math.floor(container.h / hCm);
-    if (fit < 1) return 0;                       // taller than the container
-    if (!opts.stackable) return 1;               // one layer, the rest is air
-    const cap = Math.max(1, Math.floor(num(opts.stackMax) || 0) || fit);
-    return Math.max(1, Math.min(fit, cap));
-  };
-
-  /* Footprint the SET needs, with each crate laid out in its own best layer
-     count — a short accessory box stacks higher than the machine crate. */
-  let areaPerUnit = 0;
+  const none = { byVolume: 0, byWeight: 0, unitCbm: 0, containerCbm: cCbm };
+  if (list.length === 0) return { qty: 0, limit: "none", ...none };
+  /* A package larger than the door in every orientation does not go in at
+     any count. Sorted-dimension check: the longest side against the longest
+     inner dimension, and so on. */
+  const inner = [container.l, container.w, container.h].sort((a, b) => b - a);
   for (const r of list) {
-    const qty = Math.max(1, num(r.qty) || 1);
-    const layers = layersFor(num(r.h_cm));
-    if (layers === 0) return { qty: 0, limit: "space" };
-    areaPerUnit += (num(r.l_cm) * num(r.w_cm) * qty) / layers;
+    const dims = [num(r.l_cm), num(r.w_cm), num(r.h_cm)].sort((a, b) => b - a);
+    if (dims[0] > inner[0] || dims[1] > inner[1] || dims[2] > inner[2]) {
+      return { qty: 0, limit: "space", ...none };
+    }
   }
-  if (areaPerUnit <= 0) return { qty: 0, limit: "none" };
-
-  const bySpace = Math.floor(floorArea / areaPerUnit);
-  const grossPerUnit = sumPackages(list).grossKg;
-  const byWeight = grossPerUnit > 0 ? Math.floor(container.payload_kg / grossPerUnit) : Infinity;
-
-  const qty = Math.max(0, Math.min(bySpace, byWeight));
-  return { qty, limit: byWeight < bySpace ? "weight" : "space" };
+  const sums = sumPackages(list);
+  const unitCbm = sums.cbm;
+  if (unitCbm <= 0) return { qty: 0, limit: "none", ...none };
+  const byVolume = Math.floor((cCbm * STUFFING_EFFICIENCY) / unitCbm);
+  const byWeight = sums.grossKg > 0 ? Math.floor(container.payload_kg / sums.grossKg) : Infinity;
+  const qty = Math.max(0, Math.min(byVolume, byWeight));
+  return {
+    qty,
+    limit: byWeight < byVolume ? "weight" : "space",
+    byVolume,
+    byWeight: Number.isFinite(byWeight) ? byWeight : 0,
+    unitCbm,
+    containerCbm: cCbm,
+  };
 }
 
-/** All three containers at once — what the form shows.
- *
- *  `unitsPerPackage` turns the answer from "how many SETS fit" into "how many
- *  PIECES fit" for a product that ships many to a carton: the geometry is the
- *  same, the multiplier is not. Without it the form would tell a customer a
- *  container holds 1,300 cartons and leave them to do the arithmetic that
- *  actually matters. */
+/* The plan for the three standard boxes. For a product packed many to a
+   carton, the count is in PIECES (cartons × pieces per carton). */
 export function loadPlan(
   rows: PackageRow[] | undefined | null,
-  opts: { stackable?: boolean; stackMax?: number; unitsPerPackage?: number } = {},
+  opts: { unitsPerPackage?: number } = {},
 ): { c20: LoadResult; c40: LoadResult; c40hq: LoadResult } {
   const per = Math.max(1, Math.floor(num(opts.unitsPerPackage) || 1));
-  const scale = (r: LoadResult): LoadResult => (per === 1 ? r : { ...r, qty: r.qty * per });
+  const scale = (r: LoadResult): LoadResult => (per === 1 ? r : { ...r, qty: r.qty * per, byVolume: r.byVolume * per, byWeight: r.byWeight * per });
   return {
-    c20: scale(unitsPerContainer(rows, CONTAINERS.c20, opts)),
-    c40: scale(unitsPerContainer(rows, CONTAINERS.c40, opts)),
-    c40hq: scale(unitsPerContainer(rows, CONTAINERS.c40hq, opts)),
+    c20: scale(unitsPerContainer(rows, CONTAINERS.c20)),
+    c40: scale(unitsPerContainer(rows, CONTAINERS.c40)),
+    c40hq: scale(unitsPerContainer(rows, CONTAINERS.c40hq)),
   };
 }
 

@@ -32,7 +32,7 @@ import ConfirmDialog from "@/components/kds/ConfirmDialog";
 /* INLINE EDIT — the form's own section components, hosted inside the sheet's
    cards. Same inputs, same units, same rules; only the card around them is
    the profile's. */
-import { PackingPhoto, ContentsEditor, UnitSwitch, useImagePicker, portOptions } from "./form-sections/LogisticsBlocks";
+import { PackingPhoto, ContentsEditor, UnitSwitch, useImagePicker, portOptions, loadExplain } from "./form-sections/LogisticsBlocks";
 import UnitPicker from "./form-sections/UnitPicker";
 import { LENGTH_UNITS, MASS_UNITS, displayIn, storeFrom, useEntryUnits, type LengthUnit, type MassUnit } from "@/lib/entry-units";
 import KdsSelect from "@/components/kds/Select";
@@ -64,7 +64,6 @@ import TruckIcon from "@/components/icons/ui/TruckIcon";        // the tab itsel
 import LandmarkIcon from "@/components/icons/ui/LandmarkIcon";  // Origin & Customs card
 import ArchiveIcon from "@/components/icons/ui/ArchiveIcon";    // one crate (package tile)
 import ShipIcon from "@/components/icons/ui/ShipIcon";          // Loading card
-import LayersIcon from "@/components/icons/ui/LayersIcon";      // stackable
 import PlaneIcon from "@/components/icons/ui/PlaneIcon";        // volumetric (air)
 import FlaskConicalIcon from "@/components/icons/ui/FlaskConicalIcon"; // wood treatment
 import FlagIcon from "@/components/icons/ui/FlagIcon";          // country of origin
@@ -1053,7 +1052,7 @@ function PackingSheet({
   const sums = sumPackages(rows);
   const mode = L.packing_mode === "per_package" ? "per_package" : "per_unit";
   const perPkg = mode === "per_package" ? Math.max(1, Math.floor(num(L.units_per_package) || 1)) : 1;
-  const plan = loadPlan(rows, { stackable: L.stackable, stackMax: num(L.stack_max), unitsPerPackage: perPkg });
+  const plan = loadPlan(rows, { unitsPerPackage: perPkg });
   const m = (k: string) => (model ? (model as Record<string, unknown>)[k] : undefined);
   const pv = (k: string) => (product ? product[k] : undefined);
 
@@ -1061,7 +1060,10 @@ function PackingSheet({
      its numbers on the primary variant, so fall back rather than print an
      empty sheet over data that exists. */
   const fromProduct = sums.packageCount > 0 || !!L.packing_type || !!L.net_weight_kg;
-  const netW = fromProduct ? L.net_weight_kg : m("net_weight");
+  /* Net weight IS the machine weight (suppliers quote N.W. and G.W.; N.W. is
+     the machine). The packing column is a fallback for rows written before
+     the two were one. */
+  const netW = fromProduct ? (num(col("machine_weight_kg")) || L.net_weight_kg) : m("net_weight");
   const grossW = fromProduct ? (sums.grossKg || L.gross_weight_kg) : m("weight");
   const cbm = fromProduct ? (sums.cbm || L.cbm) : m("cbm");
   /* A count the operator typed wins; otherwise the count the crates give —
@@ -1077,7 +1079,7 @@ function PackingSheet({
   const has = (...v: unknown[]) => v.some((x) => x !== undefined && x !== null && x !== "" && x !== false);
   const machine = has(pv("machine_dimensions"), pv("machine_weight_kg"));
   const packing = has(pType, L.wood_treatment, netW, grossW, cbm, sums.packageCount || null, L.packing_photo_url);
-  const loading = has(q20, q40, q40hq, L.stackable);
+  const loading = has(q20, q40, q40hq);
   const customs = has(pv("country_of_origin"), pv("hs_code"), L.origin_certificate && L.origin_certificate !== "none" ? L.origin_certificate : null, dg?.has);
   const order = has(pv("moq"), pv("lead_time"), L.port_of_loading);
 
@@ -1219,17 +1221,8 @@ function PackingSheet({
               <StatTile
                 label={t("pp.f.netWeight", "Net weight")}
                 value={String(netW ?? "—")}
-                unit={ePack ? wtUnit : "kg"}
-                input={ePack ? (
-                  <input aria-label={t("pp.f.netWeight", "Net weight")}
-                    inputMode="decimal"
-                    value={raw.net !== undefined ? raw.net : displayIn(L.net_weight_kg, "kg", wtUnit)}
-                    onChange={(e) => { setRaw((mm) => ({ ...mm, net: e.target.value })); patchLogistics({ net_weight_kg: storeFrom(e.target.value, "kg", wtUnit) }); }}
-                    onBlur={() => setRaw((mm) => { const next = { ...mm }; delete next.net; return next; })}
-                    placeholder="180"
-                    className={`${INP_B} w-full tabular-nums text-[17px]`}
-                  />
-                ) : undefined}
+                unit="kg"
+                extra={ePack ? calc(t("pk.netFromMachine", "The machine weight from Physical — suppliers quote N.W. and G.W., and N.W. is the machine.")) : undefined}
               />
             ) : null}
             {ePack || grossW ? <StatTile label={t("pp.f.grossWeight", "Gross weight")} value={String(sums.grossKg || grossW || "—")} unit="kg" tone="accent" extra={ePack ? calc(t("pk.grossHint", "Sum of the packages above.")) : undefined} /> : null}
@@ -1400,46 +1393,27 @@ function PackingSheet({
                   input={eLoad ? (
                     <input aria-label={CONTAINERS[key].label} inputMode="numeric" value={String(typed ?? (r.qty || ""))} onChange={(e) => patchLogistics({ [stored]: e.target.value } as Partial<ProductLogistics>)} placeholder="—" className={`${INP_B} w-full tabular-nums text-[17px]`} />
                   ) : undefined}
-                  extra={eLoad ? (
-                    <div className="mt-1.5 flex flex-wrap items-center gap-x-2 text-[9.5px] leading-snug text-[var(--text-ghost)]">
-                      {overridden ? (
-                        <button type="button" onClick={() => patchLogistics({ [stored]: r.qty } as Partial<ProductLogistics>)} className="font-bold uppercase tracking-[0.1em] text-amber-400 underline underline-offset-2">{t("pk.resetTo", "Edited · reset")} {r.qty}</button>
-                      ) : (
-                        <span className="font-bold uppercase tracking-[0.12em] px-1.5 py-px rounded-full border border-[#567FB2]/50 text-[#7FA9D6]">{t("pk.calculated", "Calculated")}</span>
-                      )}
-                      <span>
-                        {r.qty === 0
-                          ? t("pk.enterPackages", "Enter the packages above.")
-                          : r.limit === "weight"
-                            ? `${t("pk.weightLimited", "Weight-limited")} — ${CONTAINERS[key].payload_kg.toLocaleString()} kg ${t("pk.payload", "payload")}.`
-                            : t("pk.spaceLimited", "Space-limited — footprint × layers.")}
-                      </span>
+                  extra={(
+                    <div className="mt-1.5 space-y-1 text-[9.5px] leading-snug text-[var(--text-ghost)]">
+                      {/* What the box holds — the number every quote starts from. */}
+                      <div className="tabular-nums">{t("pk.containerCap", "{cbm} m³ · {kg} kg payload").replace("{cbm}", String(r.containerCbm)).replace("{kg}", CONTAINERS[key].payload_kg.toLocaleString())}</div>
+                      {eLoad ? (
+                        <div className="flex flex-wrap items-center gap-x-2">
+                          {overridden ? (
+                            <button type="button" onClick={() => patchLogistics({ [stored]: r.qty } as Partial<ProductLogistics>)} className="font-bold uppercase tracking-[0.1em] text-amber-400 underline underline-offset-2">{t("pk.resetTo", "Edited · reset")} {r.qty}</button>
+                          ) : (
+                            <span className="font-bold uppercase tracking-[0.12em] px-1.5 py-px rounded-full border border-[#567FB2]/50 text-[#7FA9D6]">{t("pk.calculated", "Calculated")}</span>
+                          )}
+                          <span>{r.qty === 0 ? t("pk.enterPackages", "Enter the packages above.") : loadExplain(t, r, sums.grossKg, CONTAINERS[key].payload_kg)}</span>
+                        </div>
+                      ) : null}
                     </div>
-                  ) : undefined}
+                  )}
                 />
               );
             })}
           </div>
           <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
-            <FactChip
-              icon={<LayersIcon className="h-6 w-6" />}
-              label={t("pk.stackQ", "Can crates be stacked?")}
-              value={L.stackable ? t("pk.stackable", "Stackable") : t("pk.notStackable", "Not stackable")}
-              input={eLoad ? (
-                <span className="flex flex-wrap gap-1">
-                  <button type="button" onClick={() => patchLogistics({ stackable: true })} className={seg(!!L.stackable)}>{t("pk.stackable", "Stackable")}</button>
-                  <button type="button" onClick={() => patchLogistics({ stackable: false })} className={seg(!L.stackable)}>{t("pk.notStackable", "Not stackable")}</button>
-                </span>
-              ) : undefined}
-            />
-            {L.stackable && (eLoad || L.stack_max) ? (
-              <FactChip
-                icon={<BoxesIcon className="h-6 w-6" />}
-                label={t("pk.maxLayers", "Maximum layers")}
-                value={String(L.stack_max ?? "")}
-                input={eLoad ? <input aria-label={t("pk.maxLayers", "Maximum layers")} inputMode="numeric" value={String(L.stack_max ?? "")} onChange={(e) => patchLogistics({ stack_max: e.target.value })} placeholder="2" className={`${INP_B} w-[72px] text-center tabular-nums`} /> : undefined}
-              />
-            ) : null}
             {sums.volumetricKg ? (
               <FactChip
                 icon={<PlaneIcon className="h-6 w-6" />}
