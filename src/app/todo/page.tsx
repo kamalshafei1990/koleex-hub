@@ -63,7 +63,7 @@ import { fetchProjects } from "@/lib/projects";
 import type {
   TodoWithRelations, TodoAssigneeInfo, TodoLabelRow, TodoPriority, TodoMetadata, TodoChecklistItem, TodoStatus, TodoRecurrence,
 } from "@/types/supabase";
-import { useCurrentAccountId } from "@/lib/identity";
+import { useCurrentAccountId, getCurrentAccountIdSync } from "@/lib/identity";
 import { usePermissions } from "@/lib/permissions";
 import { loadScopeContext, type ScopeContext } from "@/lib/scope";
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
@@ -1486,27 +1486,42 @@ function KpiDashboard({ todos }: { todos: TodoWithRelations[] }) {
    app that mounts it. */
 const WavyBackground = dynamic(() => import("@/components/ui/WavyBackground"), { ssr: false });
 
-const TODO_SNAP_KEY = "kx_todo_snap_v1";
+/* THE MIRROR IS PER ACCOUNT AND HAS A SHELF LIFE. v1 was one key for the
+   whole browser with no date on it: after the tasks were wiped server-side
+   the owner opened the app and watched the old list paint and then vanish
+   — the mirror from days earlier, drawn first, replaced by the empty truth.
+   The same key would also have painted one account's tasks to the next
+   account on a shared browser. Now the key carries the account id, a
+   mirror older than a few hours is not painted at all (the list loads in
+   under a second — a stale first frame is worse than a blank one), and the
+   v1 key is removed on sight. Still `kx_`-prefixed, so sign-out wipes it. */
+const TODO_SNAP_KEY_V1 = "kx_todo_snap_v1";
+const TODO_SNAP_MAX_AGE_MS = 6 * 60 * 60 * 1000;
+const todoSnapKey = () => `kx_todo_snap_v2:${getCurrentAccountIdSync() ?? "anon"}`;
 interface TodoSnap {
   todos: TodoWithRelations[];
   employees: TodoAssigneeInfo[];
   departments: string[];
   labels: TodoLabelRow[];
+  savedAt?: number;
 }
 function readTodoSnap(): TodoSnap | null {
   if (typeof window === "undefined") return null;
   try {
-    const raw = window.localStorage.getItem(TODO_SNAP_KEY);
+    window.localStorage.removeItem(TODO_SNAP_KEY_V1);
+    const raw = window.localStorage.getItem(todoSnapKey());
     if (!raw) return null;
     const s = JSON.parse(raw) as TodoSnap;
-    return Array.isArray(s?.todos) ? s : null;
+    if (!Array.isArray(s?.todos)) return null;
+    if (!s.savedAt || Date.now() - s.savedAt > TODO_SNAP_MAX_AGE_MS) return null;
+    return s;
   } catch { return null; }
 }
 function persistTodoSnap(s: TodoSnap): void {
   try {
     /* Cap rows so the mirror can never brush the localStorage quota; the
        warm paint only needs the first screens, the refresh brings the rest. */
-    window.localStorage.setItem(TODO_SNAP_KEY, JSON.stringify({ ...s, todos: s.todos.slice(0, 400) }));
+    window.localStorage.setItem(todoSnapKey(), JSON.stringify({ ...s, todos: s.todos.slice(0, 400), savedAt: Date.now() }));
   } catch { /* quota — mirror is best-effort */ }
 }
 
