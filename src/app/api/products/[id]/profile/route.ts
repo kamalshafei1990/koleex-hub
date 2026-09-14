@@ -29,6 +29,7 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 
 /** Cost-bearing columns on a variant — stripped when the caller can't see cost. */
 const COST_KEYS = ["cost_price", "head_only_price", "complete_set_price", "supplier"] as const;
+const LINK_COST_KEYS = ["unit_cost_cny", "cost_extras", "price_options", "price_tiers", "min_order_value", "tooling_cost", "sample_cost", "payment_terms"] as const;
 
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   const auth = await requireAuth();
@@ -148,10 +149,13 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
         : modelRows.map((m) => { const c = { ...m }; for (const k of COST_KEYS) delete c[k]; return c; }),
       media: mediaRows,
       translations: translations.data ?? [],
-      suppliers: ((suppliers.data ?? []) as Array<Record<string, unknown>>).map((s) => ({
-        ...s,
-        supplier: s.supplier_id ? supplierNames.get(s.supplier_id as string) ?? null : null,
-      })),
+      suppliers: ((suppliers.data ?? []) as Array<Record<string, unknown>>).map((s) => {
+        const row = { ...s };
+        /* The link's commercial numbers are cost data: the UI hid them, the
+           payload did not. Same gate as the model cost columns. */
+        if (!canSeeCosts) for (const k of LINK_COST_KEYS) delete row[k];
+        return { ...row, supplier: s.supplier_id ? supplierNames.get(s.supplier_id as string) ?? null : null };
+      }),
       certifications: certs.data ?? [],
       documents: docs.data ?? [],
       related: ((related.data ?? []) as Array<Record<string, unknown>>).map((r) => ({

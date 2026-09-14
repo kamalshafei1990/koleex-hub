@@ -39,7 +39,6 @@ import { LENGTH_UNITS, MASS_UNITS, displayIn, storeFrom, useEntryUnits, type Len
 import KdsSelect from "@/components/kds/Select";
 import { COUNTRIES } from "@/types/product-form";
 import { flagOf, countryName } from "@/lib/countries-dial";
-import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 import { fetchIconBindings, type BindingsMap } from "@/lib/visual-bindings";
 import { BACK_CHROME } from "@/components/ui/PageHeader";
 import RrIcon from "@/components/ui/RrIcon";
@@ -90,17 +89,16 @@ import DropletsIcon from "@/components/icons/ui/DropletsIcon";  // item: oil / c
 import CircleDotIcon from "@/components/icons/ui/CircleDotIcon";// item: wheels
 import RulerIcon from "@/components/icons/ui/RulerIcon";
 import WrenchIcon from "@/components/icons/ui/WrenchIcon";
-import DollarSignIcon from "@/components/icons/ui/DollarSignIcon";
 import ShieldCheckIcon from "@/components/icons/ui/ShieldCheckIcon";
 import ImageRawIcon from "@/components/icons/ui/ImageRawIcon";
 import BookOpenIcon from "@/components/icons/ui/BookOpenIcon";
 import CheckIcon from "@/components/icons/ui/CheckIcon";
 import CrossIcon from "@/components/icons/ui/CrossIcon";
-import AngleDownIcon from "@/components/icons/ui/AngleDownIcon";
 import AngleRightIcon from "@/components/icons/ui/AngleRightIcon";
 import TabStrip from "@/components/ui/TabStrip";
 import { useTabMotion } from "@/components/ui/useTabMotion";
-import Collapse from "@/components/ui/Collapse";
+import { Group, StatTile, FactChip, CalcBadge, INP_B, SEG, SEG_ON, SEG_OFF } from "./profile/primitives";
+import PriceSheet from "./profile/PriceSheet";
 import dynamic from "next/dynamic";
 import { useSkin } from "@/lib/appearance";
 import FeatureHighlightsDisplay from "./FeatureHighlightsDisplay";
@@ -122,6 +120,27 @@ const PROFILE_T: Record<string, { en: string; zh: string; ar: string }> = {
   "pp.publicPage":    { en: "Public page",        zh: "客户页面",       ar: "صفحة العميل" },
   "pp.back":          { en: "Back to Product Data", zh: "返回产品数据", ar: "رجوع إلى بيانات المنتجات" },
   "pp.notSet":        { en: "Not set",            zh: "未填写",         ar: "غير محدّد" },
+  "pp.untitledVariant": { en: "Untitled variant", zh: "未命名型号", ar: "موديل بلا اسم" },
+  /* Price tab */
+  "pr.landed":        { en: "Landed cost",        zh: "到岸成本",       ar: "التكلفة الواصلة" },
+  "pr.landedSame":    { en: "Same as the factory cost — nothing to add.", zh: "与工厂成本相同，无需加项。", ar: "نفس تكلفة المصنع — لا إضافات." },
+  "pr.source":        { en: "Cost source",        zh: "成本来源",       ar: "مصدر التكلفة" },
+  "pr.onVariant":     { en: "On the variant",     zh: "记录在型号上",   ar: "على الموديل" },
+  "pr.noLink":        { en: "No supplier linked yet — once one is linked the cost moves onto it.", zh: "尚未关联供应商——关联后成本将记录在供应商上。", ar: "لا مورّد مرتبط بعد — عند ربط مورّد تنتقل التكلفة إليه." },
+  "pr.basis":         { en: "Cost basis",         zh: "成本口径",       ar: "أساس التكلفة" },
+  "pr.basisOnSupplier": { en: "Set on the Supplier tab", zh: "在供应商标签页设置", ar: "يُحدَّد في تبويب المورّد" },
+  "pr.tax":           { en: "Tax",                zh: "税",             ar: "الضريبة" },
+  "pr.taxAdded":      { en: "{n}% VAT added to the landed cost", zh: "到岸成本已加 {n}% 增值税", ar: "أُضيفت ضريبة {n}% إلى التكلفة الواصلة" },
+  "pr.taxMissing":    { en: "VAT rate not entered — enter it on the Supplier tab.", zh: "未填写增值税率——请在供应商标签页填写。", ar: "نسبة الضريبة غير مدخلة — أدخلها في تبويب المورّد." },
+  "pr.noCost":        { en: "No factory cost yet — the Base FOB and market prices below need it.", zh: "尚无工厂成本——下方的基础 FOB 与市场价需要它。", ar: "لا تكلفة مصنع بعد — سعر FOB الأساس وأسعار الأسواق أدناه تحتاجها." },
+  "pr.options":       { en: "The supplier's price options", zh: "供应商的其他报价选项", ar: "خيارات أسعار المورّد" },
+  "pr.baseNote":      { en: "From the landed cost and the product level, through Commercial Setup — change either and this moves.", zh: "由到岸成本与产品等级经商务设置推导——二者任一变动，此处随之变动。", ar: "من التكلفة الواصلة ومستوى المنتج عبر الإعداد التجاري — غيّر أيّاً منهما يتغيّر هذا." },
+  "pr.marketNote":    { en: "The market and channel prices for the cost above, live from Commercial Setup.", zh: "上方成本对应的市场与渠道价格，实时来自商务设置。", ar: "أسعار الأسواق والقنوات للتكلفة أعلاه، مباشرة من الإعداد التجاري." },
+  "pr.selling":       { en: "Selling prices",     zh: "售价",           ar: "أسعار البيع" },
+  "pr.variantsN":     { en: "{n} variants",       zh: "{n} 个型号",     ar: "{n} موديل" },
+  "pr.variant1":      { en: "1 variant",          zh: "1 个型号",       ar: "موديل واحد" },
+  "pr.saveFailed":    { en: "Couldn't save — try again.", zh: "保存失败——请重试。", ar: "تعذّر الحفظ — حاول مرة أخرى." },
+  "pr.conflict":      { en: "This variant was changed by someone else — reload and try again.", zh: "该型号已被他人修改——请刷新后重试。", ar: "عدّل شخص آخر هذا الموديل — أعد التحميل وحاول مجدداً." },
   "pp.yes":           { en: "Yes",                zh: "是",             ar: "نعم" },
   "pp.no":            { en: "No",                 zh: "否",             ar: "لا" },
   "pp.primary":       { en: "Primary",            zh: "主要",           ar: "أساسي" },
@@ -479,73 +498,6 @@ function Val({ v, mono }: { v: unknown; mono?: boolean }) {
   return <span className={`text-[13.5px] font-semibold text-[var(--text-primary)] ${mono ? "font-mono text-[12.5px] font-medium" : ""} break-words`}>{String(v)}</span>;
 }
 
-/* The editor's Section card, field-for-field: icon in a rounded square,
-   title, optional badge, collapse chevron. */
-function Group({
-  icon, title, count, onEdit, children, motion = "kx-tab-in", editLabel = "Edit",
-  editing = false, editor, saving = false, error, onSave, onCancel, saveLabel = "Save", cancelLabel = "Cancel", canSave = true,
-}: { icon?: React.ReactNode; title: string; count?: string; onEdit?: () => void; children: React.ReactNode;
-  /** Translated by the caller — Group is presentational and has no dictionary. */
-  editLabel?: string;
-  /** Entrance class — the profile passes useTabMotion's directional pick. */
-  motion?: string;
-  /* ── Inline edit ──
-     The card stays where it is, with its icon, title and badge; only the
-     body swaps to `editor` and the header's Edit becomes Cancel / Save. The
-     page around the card does not move. */
-  editing?: boolean;
-  editor?: React.ReactNode;
-  saving?: boolean;
-  error?: string | null;
-  onSave?: () => void;
-  onCancel?: () => void;
-  saveLabel?: string;
-  cancelLabel?: string;
-  /** False = nothing changed yet, or the draft is not valid — Save waits. */
-  canSave?: boolean;
-}) {
-  const [open, setOpen] = useState(true);
-  return (
-    <section className={`${motion} scroll-mt-24 bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] overflow-hidden transition-shadow hover:shadow-[0_2px_12px_rgba(0,0,0,0.15)]`}>
-      <div className="w-full flex items-center gap-3 px-6 py-4">
-        <div className="h-8 w-8 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-secondary)] shrink-0">
-          {icon}
-        </div>
-        <h2 className="text-[14px] font-semibold text-[var(--text-primary)] tracking-tight flex-1 text-left truncate">{title}</h2>
-        {count && (
-          /* While editing, Cancel + Save join the row; on a phone that left no
-             room for the title, which truncated to nothing. The badge is the
-             least important thing here, so it yields first. */
-          <span className={`text-[10px] font-medium text-[var(--text-ghost)] bg-[var(--bg-surface)] px-2 py-0.5 rounded-full shrink-0 ${editing ? "hidden sm:inline" : ""}`}>{count}</span>
-        )}
-        {editing ? (
-          <span className="shrink-0 inline-flex items-center gap-1.5">
-            <button type="button" onClick={onCancel} disabled={saving} className="h-7 px-2.5 rounded-lg text-[11px] font-medium text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)] transition-colors disabled:opacity-50">
-              {cancelLabel}
-            </button>
-            <button type="button" onClick={onSave} disabled={saving || !canSave} className="h-7 px-3 rounded-lg bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[11px] font-semibold inline-flex items-center gap-1.5 transition-all disabled:opacity-40">
-              {saving ? <SpinnerIcon className="h-3 w-3" /> : <CheckIcon className="h-3 w-3" />} {saveLabel}
-            </button>
-          </span>
-        ) : onEdit ? (
-          <button type="button" onClick={onEdit} className="shrink-0 inline-flex items-center gap-1.5 text-[11px] font-medium text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors">
-            <PencilIcon className="h-3 w-3" /> {editLabel}
-          </button>
-        ) : null}
-        <button type="button" onClick={() => setOpen(!open)} className="shrink-0 text-[var(--text-ghost)] hover:text-[var(--text-primary)] transition-colors" aria-label={open ? "Collapse" : "Expand"}>
-          <AngleDownIcon className={`h-4 w-4 transition-transform duration-300 ${open ? "rotate-180" : ""}`} />
-        </button>
-      </div>
-      <Collapse open={open || editing} className="px-6 pb-6 pt-4 border-t border-[var(--border-subtle)]">
-        {editing && error ? (
-          <p className="mb-3 px-3 py-2 rounded-lg bg-red-500/10 border border-red-500/20 text-[12px] text-red-400">{error}</p>
-        ) : null}
-        {editing && editor ? editor : children}
-      </Collapse>
-    </section>
-  );
-}
-
 /* ── Steps ────────────────────────────────────────────────────────────────
    The SAME eleven sections the editor shows, in the same order, under the
    same labels. The record and the editor are two views of one thing, so the
@@ -640,75 +592,6 @@ const MEDIA_SLOTS: Array<{ type: string; fallback: string }> = [
    chosen rather than inferred, and the crates become cards with their own
    photographs. Nothing here calls iconForField. */
 
-function StatTile({
-  label, value, unit, tone = "plain", input, extra,
-}: { label: string; value: React.ReactNode; unit?: string; tone?: "plain" | "accent" | "warn";
-  /** Edit mode: the control that stands where the number stood. Same tile. */
-  input?: React.ReactNode;
-  /** Edit mode: a line under the number/control (a mode switch, a reset). */
-  extra?: React.ReactNode }) {
-  return (
-    <div className={`h-full rounded-xl border px-3.5 py-3 ${
-      tone === "accent"
-        ? "border-[#567FB2]/30 bg-[#567FB2]/[0.07]"
-        : tone === "warn"
-          ? "border-amber-500/40 bg-amber-500/[0.07]"
-          : "border-[var(--border-subtle)] bg-[var(--bg-surface)]"
-    }`}>
-      <div className="text-[9.5px] font-bold uppercase tracking-[0.1em] text-[var(--text-ghost)] truncate">{label}</div>
-      {input ? (
-        <div className="mt-1.5 flex items-center gap-1.5">
-          <span className="min-w-0 flex-1">{input}</span>
-          {unit ? <span className="text-[11px] font-medium text-[var(--text-muted)] shrink-0">{unit}</span> : null}
-        </div>
-      ) : (
-        <div className="mt-1 flex items-baseline gap-1">
-          <span className="text-[21px] leading-none font-bold tabular-nums text-[var(--text-primary)]">{value}</span>
-          {unit ? <span className="text-[11px] font-medium text-[var(--text-muted)]">{unit}</span> : null}
-        </div>
-      )}
-      {extra}
-    </div>
-  );
-}
-
-function FactChip({
-  icon, label, value, note, tone = "plain", wide = false, input,
-}: { icon: React.ReactNode; label: string; value: string; note?: string; tone?: "plain" | "warn"; wide?: boolean;
-  /** Edit mode: the control that stands where the value stood. Same chip. */
-  input?: React.ReactNode }) {
-  /* A BLOCK, NOT AN INLINE PILL. Content-width chips made every row ragged —
-     three facts of different name lengths left three different gutters, and
-     the fourth wrapped onto a line of its own. In a grid each fact takes the
-     same cell, so the cards line up in columns like the numbers above them. */
-  return (
-    <span className={`flex h-full items-center gap-2.5 rounded-xl border px-3 py-2.5 ${wide ? "col-span-full" : ""} ${
-      tone === "warn"
-        ? "border-amber-500/40 bg-amber-500/[0.07]"
-        : "border-[var(--border-subtle)] bg-[var(--bg-surface)]"
-    }`}>
-      {/* Bigger and brighter than a list glyph on purpose: at 16px in
-          --text-muted these read as empty squares on a dark chip. */}
-      <span className={`h-11 w-11 shrink-0 rounded-lg flex items-center justify-center ${
-        tone === "warn" ? "bg-amber-500/[0.14] text-amber-400" : "bg-[var(--bg-surface-subtle)] text-[var(--text-secondary)]"
-      }`}>
-        {icon}
-      </span>
-      <span className="min-w-0 flex-1">
-        <span className="block text-[9.5px] font-bold uppercase tracking-[0.1em] text-[var(--text-ghost)]">{label}</span>
-        {input ? (
-          <span className="block mt-1">{input}</span>
-        ) : (
-          <span className="block text-[13px] font-semibold text-[var(--text-primary)] break-words">{value}</span>
-        )}
-        {/* The forwarder's note belongs to the fact it qualifies, not to a
-            stray paragraph under the card. */}
-        {note ? <span className="block text-[11px] text-[var(--text-muted)] mt-0.5 break-words">{note}</span> : null}
-      </span>
-    </span>
-  );
-}
-
 /* The glyph for one item in a crate. A photo when there is one, otherwise the
    kind the operator picked — never a guess from the label. */
 function KindGlyph({ kind, className = "h-5 w-5" }: { kind?: string; className?: string }) {
@@ -771,13 +654,6 @@ interface PackingDraft {
   moq: string;
   lead_time: string;
 }
-/* The input that stands inside a tile. No width of its own (the width trap:
-   `w-full` + `w-16` resolves by Tailwind's emit order, not by which was
-   written last), so each place sets the width it has. */
-const INP_B = "h-9 px-2.5 rounded-lg bg-[var(--bg-surface-subtle)]/70 border border-[var(--border-subtle)] text-[13px] font-semibold text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] placeholder:font-normal outline-none focus:border-[var(--border-focus)] transition-colors";
-const SEG = "h-7 px-2 rounded-md text-[10.5px] font-semibold border transition-colors";
-const SEG_ON = "border-[#567FB2]/60 bg-[#567FB2]/[0.12] text-[var(--text-primary)]";
-const SEG_OFF = "border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)]/70 text-[var(--text-muted)] hover:text-[var(--text-primary)]";
 const SEG_WARN = "border-amber-500/60 bg-amber-500/[0.12] text-[var(--text-primary)]";
 const TINY = "text-[9px] uppercase tracking-[0.1em] text-[var(--text-ghost)] mb-0.5 truncate";
 const HINT = "text-[10px] text-[var(--text-ghost)] leading-relaxed mt-1";
@@ -1140,7 +1016,7 @@ function PackingSheet({
      the container tiles wear — and says what it is derived from. */
   const calc = (hint: string) => (
     <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[9.5px] leading-snug text-[var(--text-ghost)]">
-      <span className="font-bold uppercase tracking-[0.12em] px-1.5 py-px rounded-full border border-[#567FB2]/50 text-[#7FA9D6]">{t("pk.calculated", "Calculated")}</span>
+      <CalcBadge label={t("pk.calculated", "Calculated")} />
       <span>{hint}</span>
     </div>
   );
@@ -1467,7 +1343,7 @@ function PackingSheet({
                           {overridden ? (
                             <button type="button" onClick={() => patchLogistics({ [stored]: r.qty } as Partial<ProductLogistics>)} className="font-bold uppercase tracking-[0.1em] text-amber-400 underline underline-offset-2">{t("pk.resetTo", "Edited · reset")} {r.qty}</button>
                           ) : (
-                            <span className="font-bold uppercase tracking-[0.12em] px-1.5 py-px rounded-full border border-[#567FB2]/50 text-[#7FA9D6]">{t("pk.calculated", "Calculated")}</span>
+                            <CalcBadge label={t("pk.calculated", "Calculated")} />
                           )}
                           <span>{r.qty === 0 ? t("pk.enterPackages", "Enter the packages above.") : loadExplain(t, r, sums.grossKg, CONTAINERS[key].payload_kg)}</span>
                         </div>
@@ -2394,59 +2270,37 @@ export default function ProductProfile() {
       </Group>
       )}
 
+      {/* THE EDITOR'S PRICE TAB, READ-ONLY UNTIL EDIT: Cost Price synced to
+          the supplier, the Base FOB chain, the market ladder, then the
+          selling prices per variant — each card editable where it stands. */}
       {STEPS[step].id === "pricing" && (
-      <Group motion={tabMotion} icon={<BoundIcon semanticKey="field.price" className="h-4 w-4" fallback={<DollarSignIcon className="h-4 w-4" />} />} title={t("pp.sec.price", "Cost & Price")} count={`${data.models.length} variant`} editLabel={t("action.edit", "Edit")} onEdit={() => goStep("pricing")}>
-        {data.models.length === 0 ? (
-          <p className="text-[12px] text-[var(--text-ghost)] italic">{t("pp.e.noPrice", "No variant to price.")}</p>
-        ) : (
-          <div className="space-y-3">
-            {data.models.map((m, i) => (
-              <div key={i} className="rounded-xl border border-[var(--border-subtle)] p-3">
-                <div className="flex items-center gap-2 mb-3">
-                  <div className="text-[13px] font-semibold text-[var(--text-primary)] flex-1 truncate">
-                    {(m.model_name as string) || "Untitled variant"}
-                  </div>
-                  {data.costVisible && (
-                    <button
-                      type="button"
-                      onClick={() => setHistoryFor({ id: String(m.id), name: (m.model_name as string) || "" })}
-                      className="shrink-0 text-[11px] font-medium text-[var(--text-muted)] hover:text-[var(--text-primary)] border border-[var(--border-subtle)] rounded-lg px-2 py-1 transition-colors"
-                    >
-                      {t("pp.f.costHistory", "Cost history")}
-                    </button>
-                  )}
-                </div>
-                <div className={rows}>
-                  <Row label={t("pp.f.pricingMode", "Pricing mode")} value={m.pricing_mode ?? "fixed"} />
-                  <Row label={t("pp.f.priceNote", "Price note")} value={m.price_note} />
-                  {data.costVisible && (
-                    <Row
-                      label={t("pp.f.costPrice", "Cost price (CNY)")}
-                      value={m.cost_price ?? primarySupplierCost}
-                      help={m.cost_price == null && primarySupplierCost != null
-                        ? t("pp.f.costFromSupplier", "From the supplier link — not set on this variant.")
-                        : undefined}
-                    />
-                  )}
-                  {data.costVisible && m.cost_updated_at ? (
-                    <div className="col-span-full text-[10.5px] text-[var(--text-ghost)]">
-                      {t("pp.f.costMeta", "Updated {date} by {name} · via {src}")
-                        .replace("{date}", new Date(String(m.cost_updated_at)).toLocaleDateString())
-                        .replace("{name}", String(m.cost_updated_by_name ?? "—"))
-                        .replace("{src}", t("pp.h.src." + String(m.cost_source ?? ""), String(m.cost_source ?? "—")))}
-                    </div>
-                  ) : null}
-                  <Row label={t("pp.f.globalPrice", "Global price (USD)")} value={m.global_price} />
-                  {data.costVisible && <Row label={t("pp.f.headPrice", "Head-only price")} value={m.head_only_price} />}
-                  {data.costVisible && <Row label={t("pp.f.setPrice", "Complete-set price")} value={m.complete_set_price} />}
-                  <Row label={t("pp.f.moq", "MOQ")} value={m.moq} />
-                  <Row label={t("pp.f.leadTime", "Lead time")} value={m.lead_time} />
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </Group>
+        <PriceSheet
+          product={p}
+          models={data.models}
+          suppliers={data.suppliers}
+          costVisible={data.costVisible}
+          productId={p?.id as string | undefined}
+          t={t}
+          lang={lang}
+          motion={tabMotion}
+          canEdit={canEdit}
+          notSet={NOT_SET}
+          onDirtyChange={(d) => { dirtyRef.current = d; }}
+          onSaved={(u) => {
+            /* Show the saved values at once; the re-read behind it catches
+               derived fields (the profile response is cached 15s, so the
+               re-read is no-store — see the fetch effect). */
+            setData((prev) => {
+              if (!prev) return prev;
+              const models = u.models
+                ? prev.models.map((m) => (u.models![String(m.id)] ? { ...m, ...u.models![String(m.id)] } : m))
+                : prev.models;
+              return { ...prev, models, suppliers: (u.suppliers as Profile["suppliers"] | undefined) ?? prev.suppliers };
+            });
+            setReloadTick((n) => n + 1);
+          }}
+          onHistory={setHistoryFor}
+        />
       )}
 
       <CostHistoryDrawer target={historyFor} onClose={() => setHistoryFor(null)} t={t} />
