@@ -810,13 +810,13 @@ export function LoadingBlock({ value, onChange }: BlockProps) {
     return (
       <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)]/40 px-3 py-2.5">
         <div className="flex items-center justify-between gap-2">
-          <span className="text-[11px] font-semibold text-[var(--text-muted)]">
-            {CONTAINERS[key].label}
-            <span className="ms-1 font-normal text-[var(--text-ghost)]">{perPkg > 1 ? t("pk.pcsWord", "pcs") : t("pk.unitsWord", "units")}</span>
-            {/* What the box holds — the number every quote starts from, so it
-                is written in a size that can be read, with the m³ in bold. */}
-            <span className="block mt-0.5 text-[11.5px] font-normal tabular-nums text-[var(--text-muted)]">
-              {t("pk.capacityWord", "Capacity")} <b className="font-bold text-[var(--text-primary)]">{r.containerCbm} m³</b> · {t("pk.payload", "payload")} {CONTAINERS[key].payload_kg.toLocaleString()} kg
+          <span className="text-[12px] font-semibold text-[var(--text-primary)] tabular-nums">
+            {/* The container IS its CBM to the person quoting — so the figure
+                sits in the name: "20ft · 33.2 CBM". Owner, 2026-09-14. */}
+            {CONTAINERS[key].label} · {r.containerCbm} CBM
+            <span className="ms-1.5 text-[10.5px] font-normal text-[var(--text-ghost)]">{perPkg > 1 ? t("pk.pcsWord", "pcs") : t("pk.unitsWord", "units")}</span>
+            <span className="block mt-0.5 text-[10.5px] font-normal text-[var(--text-muted)]">
+              {t("pk.payload", "payload")} {CONTAINERS[key].payload_kg.toLocaleString()} kg
             </span>
           </span>
           {overridden ? (

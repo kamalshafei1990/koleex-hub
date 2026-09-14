@@ -1361,7 +1361,6 @@ export const PRODUCTS_UI_I18N: Translations = {
   "pk.unitTitle":        { en: "Type in any unit — the value is stored in {unit}.", zh: "可按任意单位输入 — 数值以 {unit} 存储。", ar: "اكتب بأي وحدة — القيمة بتتخزن بـ {unit}." },
   "pk.unitEnter":        { en: "Enter values in {unit}", zh: "以 {unit} 输入数值", ar: "أدخل القيم بـ {unit}" },
   "pk.portPh":           { en: "Shanghai", zh: "上海", ar: "شنغهاي" },
-  "pk.capacityWord":     { en: "Capacity", zh: "容积", ar: "السعة" },
   "pk.volumeLimited":    { en: "By volume: {cbm} m³ × {eff}% ÷ {unit} m³ = {n}", zh: "按体积：{cbm} m³ × {eff}% ÷ {unit} m³ = {n}", ar: "بالحجم: {cbm} م³ × {eff}٪ ÷ {unit} م³ = {n}" },
   "pk.weightLimitedCalc":{ en: "By weight: {payload} kg ÷ {gross} kg = {n}", zh: "按重量：{payload} kg ÷ {gross} kg = {n}", ar: "بالوزن: {payload} كجم ÷ {gross} كجم = {n}" },
   "pk.weightDecides":    { en: "Weight decides — the volume would allow {n}.", zh: "以重量为准 — 体积本可容纳 {n}。", ar: "الوزن هو اللي بيحدد — الحجم كان يسمح بـ {n}." },

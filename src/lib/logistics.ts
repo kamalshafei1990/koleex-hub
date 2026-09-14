@@ -120,10 +120,12 @@ const num = (v: unknown): number => {
    machine weighing 1.5 t came out at 28 per 20ft — 42 tonnes in a box that
    carries 25. That number could go out in a quotation and only be discovered
    at the port. */
+/* ISO internal dimensions (cm) — the ones that give the CBM figures every
+   forwarder quotes: 20ft 33.2, 40ft 67.7, 40HQ 76.4. */
 export const CONTAINERS = {
-  c20:   { label: "20ft",  l: 589, w: 234, h: 239, payload_kg: 25_000 },
-  c40:   { label: "40ft",  l: 1203, w: 234, h: 239, payload_kg: 26_000 },
-  c40hq: { label: "40HQ", l: 1203, w: 234, h: 269, payload_kg: 26_000 },
+  c20:   { label: "20ft",  l: 589.8, w: 235.2, h: 239.3, payload_kg: 25_000 },
+  c40:   { label: "40ft",  l: 1203.2, w: 235.2, h: 239.3, payload_kg: 26_000 },
+  c40hq: { label: "40HQ", l: 1203.2, w: 235.2, h: 269.8, payload_kg: 26_000 },
 } as const;
 
 /* Stuffing is never perfect: crates do not tessellate, dunnage and door
@@ -172,7 +174,7 @@ export interface LoadResult {
 }
 
 export const containerCbm = (c: { l: number; w: number; h: number }): number =>
-  Math.round((c.l * c.w * c.h) / 1_000_000 * 100) / 100;
+  Math.round((c.l * c.w * c.h) / 1_000_000 * 10) / 10;
 
 /* HOW MANY UNITS FIT — BY VOLUME. Owner, 2026-09-14: "it's totally about the
    CBM." The earlier version counted footprint × layers and treated a crate
