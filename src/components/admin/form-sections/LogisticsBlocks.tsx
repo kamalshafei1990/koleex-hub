@@ -63,6 +63,7 @@ const inpBase =
   "h-10 px-3 rounded-lg bg-[var(--bg-surface-subtle)]/70 border border-[var(--border-subtle)] text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none focus:border-[var(--border-focus)] transition-colors";
 const inp = `w-full ${inpBase}`;
 const hint = "text-[10px] text-[var(--text-ghost)] leading-relaxed mt-1";
+const tiny = "block text-[9px] uppercase tracking-[0.1em] text-[var(--text-ghost)]";
 
 /* CHOICE BUTTONS MUST GROW, NOT CLIP. Every pair on this tab was `h-10` with a
    sentence inside it — "One package → many pieces", "Has regulated content" —
@@ -86,15 +87,15 @@ type TFn = (key: string, fallback: string) => string;
 /* The arithmetic behind a container count, in one line, so "29" is never a
    number to take on faith. Exported: the profile sheet says the same thing. */
 export function loadExplain(t: TFn, r: LoadResult, grossKg: number, payloadKg: number): string {
-  const vol = t("pk.volumeLimited", "By volume: {cbm} m³ × {eff}% ÷ {unit} m³ = {n}")
+  const vol = t("pk.volumeLimited", "{cbm} × {eff}% ÷ {unit} CBM = {n}")
     .replace("{cbm}", String(r.containerCbm)).replace("{eff}", String(Math.round(STUFFING_EFFICIENCY * 100)))
     .replace("{unit}", String(r.unitCbm)).replace("{n}", String(r.byVolume));
   if (r.limit === "weight") {
-    const w = t("pk.weightLimitedCalc", "By weight: {payload} kg ÷ {gross} kg = {n}")
+    const w = t("pk.weightLimitedCalc", "{payload} ÷ {gross} kg = {n}")
       .replace("{payload}", payloadKg.toLocaleString()).replace("{gross}", String(grossKg)).replace("{n}", String(r.byWeight));
-    return `${w}. ${t("pk.weightDecides", "Weight decides — the volume would allow {n}.").replace("{n}", String(r.byVolume))}`;
+    return `${w} — ${t("pk.weightDecides", "weight decides (volume: {n})").replace("{n}", String(r.byVolume))}`;
   }
-  return `${vol}.`;
+  return vol;
 }
 const localise = (t: TFn, list: readonly { value: string; label: string }[]) =>
   list.map((o) => ({ value: o.value, label: t(`pk.opt.${o.value}`, o.label) }));
@@ -808,17 +809,14 @@ export function LoadingBlock({ value, onChange }: BlockProps) {
     const typed = value[stored];
     const overridden = typed !== undefined && typed !== "" && n(typed) !== r.qty;
     return (
+      /* ONE HIERARCHY PER TILE: the name and its status on the first line,
+         the two facts about the box under it (capacity, payload), then the
+         count with its unit, then the arithmetic. It was a name with "units"
+         hanging off it, a loose payload line and a formula that repeated
+         the m³ — three ideas on two lines. */
       <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)]/40 px-3 py-2.5">
         <div className="flex items-center justify-between gap-2">
-          <span className="text-[12px] font-semibold text-[var(--text-primary)] tabular-nums">
-            {/* The container IS its CBM to the person quoting — so the figure
-                sits in the name: "20ft · 33.2 CBM". Owner, 2026-09-14. */}
-            {CONTAINERS[key].label} · {r.containerCbm} CBM
-            <span className="ms-1.5 text-[10.5px] font-normal text-[var(--text-ghost)]">{perPkg > 1 ? t("pk.pcsWord", "pcs") : t("pk.unitsWord", "units")}</span>
-            <span className="block mt-0.5 text-[10.5px] font-normal text-[var(--text-muted)]">
-              {t("pk.payload", "payload")} {CONTAINERS[key].payload_kg.toLocaleString()} kg
-            </span>
-          </span>
+          <span className="text-[13px] font-bold text-[var(--text-primary)]">{CONTAINERS[key].label}</span>
           {overridden ? (
             <button
               type="button"
@@ -833,13 +831,26 @@ export function LoadingBlock({ value, onChange }: BlockProps) {
             </span>
           )}
         </div>
-        <input
-          inputMode="numeric"
-          value={String(typed ?? (r.qty || ""))}
-          onChange={(e) => onChange({ [stored]: e.target.value } as Partial<ProductLogistics>)}
-          placeholder="—"
-          className={`${inp} mt-1.5 tabular-nums text-[15px] font-bold`}
-        />
+        <div className="mt-1.5 grid grid-cols-2 gap-2">
+          <span className="min-w-0">
+            <span className={tiny}>{t("pk.capacityWord", "Capacity")}</span>
+            <span className="block text-[12.5px] font-semibold tabular-nums text-[var(--text-primary)]">{r.containerCbm} CBM</span>
+          </span>
+          <span className="min-w-0">
+            <span className={tiny}>{t("pk.payload", "payload")}</span>
+            <span className="block text-[12.5px] font-semibold tabular-nums text-[var(--text-primary)]">{CONTAINERS[key].payload_kg.toLocaleString()} kg</span>
+          </span>
+        </div>
+        <div className="mt-2 flex items-center gap-2">
+          <input
+            inputMode="numeric"
+            value={String(typed ?? (r.qty || ""))}
+            onChange={(e) => onChange({ [stored]: e.target.value } as Partial<ProductLogistics>)}
+            placeholder="—"
+            className={`${inp} tabular-nums text-[15px] font-bold`}
+          />
+          <span className="shrink-0 text-[11px] font-medium text-[var(--text-muted)]">{perPkg > 1 ? t("pk.pcsWord", "pcs") : t("pk.unitsWord", "units")}</span>
+        </div>
         <p className={hint}>
           {perPkg > 1 && r.qty > 0 ? `${Math.floor(r.qty / perPkg)} ${t("pk.pkgsTimes", "packages ×")} ${perPkg} ${t("pk.pcsWord", "pcs")}. ` : ""}
           {r.qty === 0
@@ -851,7 +862,6 @@ export function LoadingBlock({ value, onChange }: BlockProps) {
       </div>
     );
   };
-
   return (
     <div className="space-y-4">
       {/* The stackable / layers questions used to live here. The count is by

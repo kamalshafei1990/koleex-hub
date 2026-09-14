@@ -1395,9 +1395,11 @@ function PackingSheet({
                   ) : undefined}
                   extra={(
                     <div className="mt-1.5 space-y-1 text-[9.5px] leading-snug text-[var(--text-ghost)]">
-                      {/* The container IS its CBM to the person quoting — written
-                          large enough to read, not as a footnote. */}
-                      <div className="text-[12px] font-bold tabular-nums text-[var(--text-primary)]">{r.containerCbm} CBM <span className="font-normal text-[var(--text-muted)]">· {t("pk.payload", "payload")} {CONTAINERS[key].payload_kg.toLocaleString()} kg</span></div>
+                      {/* The two facts about the box, labelled, in one row. */}
+                      <div className="grid grid-cols-2 gap-2">
+                        <span className="min-w-0"><span className={TINY}>{t("pk.capacityWord", "Capacity")}</span><span className="block text-[12px] font-semibold tabular-nums text-[var(--text-primary)]">{r.containerCbm} CBM</span></span>
+                        <span className="min-w-0"><span className={TINY}>{t("pk.payload", "payload")}</span><span className="block text-[12px] font-semibold tabular-nums text-[var(--text-primary)]">{CONTAINERS[key].payload_kg.toLocaleString()} kg</span></span>
+                      </div>
                       {eLoad ? (
                         <div className="flex flex-wrap items-center gap-x-2">
                           {overridden ? (
