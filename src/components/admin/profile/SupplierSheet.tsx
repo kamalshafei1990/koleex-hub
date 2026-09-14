@@ -39,7 +39,10 @@ import StarIcon from "@/components/icons/ui/StarIcon";
 import SparklesIcon from "@/components/icons/ui/SparklesIcon";
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 import ExternalLinkIcon from "@/components/icons/ui/ExternalLinkIcon";
-import { Group, FieldRow, Blank, YesNo, CalcBadge, INP_B, TA } from "./primitives";
+import { Group, FieldRow, StatTile, FactChip, Blank, YesNo, CalcBadge, INP_B, TA } from "./primitives";
+import ReceiptIcon from "@/components/icons/ui/ReceiptIcon";
+import PercentIcon from "@/components/icons/ui/PercentIcon";
+import TruckIcon from "@/components/icons/ui/TruckIcon";
 import { useSheetEdit } from "./useSheetEdit";
 
 type Row = Record<string, unknown>;
@@ -322,27 +325,97 @@ export default function SupplierSheet({
                   {/* cost */}
                   {costVisible && (
                     <>
-                      {sub(t("sup.costPrice", "Cost price"), <span className="text-[10px] text-[var(--text-ghost)]">{t("sup.cnyTitle", "Factory cost is always entered in CNY (¥) — the pricing engine works from the CNY cost.")}</span>)}
-                      <div className={grid}>
-                        <FieldRow label={t("pricing.factoryCostCny", "Factory cost (CNY)")} glyph={glyph(t("pp.f.unitCost", "Unit cost (CNY)"))}
-                          badge={l.price_options.length ? <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded border border-[var(--border-subtle)] text-[var(--text-ghost)]" title={t("sup.mainPriceIs", "The main factory cost — the pricing engine works from this figure.")}>{t("sup.mainChip", "Main")}</span> : undefined}
-                          value={l.unit_cost_cny ? <span className="tabular-nums">¥{money(l.unit_cost_cny)}</span> : <Blank label={notSet} />}
-                          input={e ? money$(l.unit_cost_cny, "lg", (v) => upd(l._k, { unit_cost_cny: v }), `${t("sup.eg", "e.g.")} 1850`) : undefined} />
-                        <FieldRow label={t("pr.landed", "Landed cost")} glyph={glyph(t("pr.landed", "Landed cost"))} badge={<CalcBadge label={t("pk.calculated", "Calculated")} />}
-                          value={landed.landed !== null ? <span className="tabular-nums">¥{money(landed.landed)}</span> : <Blank label={notSet} />}
-                          help={landed.landed !== null ? (landed.parts.length || landed.taxPercent !== null ? `¥${money(l.unit_cost_cny)}${landed.parts.map((pt) => ` + ¥${pt.amount.toLocaleString()} ${pt.label}`).join("")}${landed.taxPercent !== null ? ` + ${landed.taxPercent}% VAT` : ""}` : t("pr.landedSame", "Same as the factory cost — nothing to add.")) : undefined} />
+                      {sub(t("sup.costPrice", "Cost price"))}
+                      {/* THE PRICE READS LIKE THE PRICE TAB: the two numbers as
+                          tiles, the three facts about them as chips, then the
+                          note and the other prices underneath — not a column
+                          of rows with the same glyph on every one. */}
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
+                        <StatTile
+                          label={t("pricing.factoryCostCny", "Factory cost (CNY)")}
+                          tone="accent"
+                          value={l.unit_cost_cny ? `¥${money(l.unit_cost_cny)}` : <Blank label={notSet} />}
+                          unit={e ? "¥" : undefined}
+                          input={e ? <input inputMode="decimal" value={l.unit_cost_cny} placeholder={`${t("sup.eg", "e.g.")} 1850`} onChange={(ev) => upd(l._k, { unit_cost_cny: ev.target.value.replace(/[^0-9.]/g, "") })} className={`${INP_B} w-full tabular-nums`} /> : undefined}
+                          extra={<div className="mt-1 text-[10px] text-[var(--text-ghost)] leading-snug">{l.price_options.length ? t("sup.mainPriceIs", "The main factory cost — the pricing engine works from this figure.") : t("sup.cnyTitle", "Factory cost is always entered in CNY (¥) — the pricing engine works from the CNY cost.")}</div>}
+                        />
+                        <StatTile
+                          label={t("pr.landed", "Landed cost")}
+                          value={landed.landed !== null ? `¥${money(landed.landed)}` : "—"}
+                          extra={
+                            <div className="mt-1 text-[10px] text-[var(--text-ghost)] leading-snug">
+                              <CalcBadge label={t("pk.calculated", "Calculated")} />
+                              <span className="block mt-1 tabular-nums">
+                                {landed.landed !== null && (landed.parts.length || landed.taxPercent !== null)
+                                  ? `¥${money(l.unit_cost_cny)}${landed.parts.map((pt) => ` + ¥${pt.amount.toLocaleString()} ${pt.label}`).join("")}${landed.taxPercent !== null ? ` + ${landed.taxPercent}% VAT` : ""}`
+                                  : t("pr.landedSame", "Same as the factory cost — nothing to add.")}
+                              </span>
+                            </div>
+                          }
+                        />
+                        <FactChip
+                          icon={<ReceiptIcon className="h-5 w-5" />}
+                          label={t("sup.costIncludes", "Cost includes")}
+                          value={l.cost_basis === "factory_only" ? t("sup.costFactory", "Factory only (ex-works)") : l.cost_basis === "packing" ? t("sup.costPacking", "+ Packing (no delivery)") : t("sup.costDelivered", "Delivered to Koleex (full landed)")}
+                          tone={missing.length && l.cost_basis !== "delivered" ? "warn" : "plain"}
+                          input={e ? <KdsSelect value={l.cost_basis} onChange={(v) => upd(l._k, { cost_basis: v })} options={[{ value: "delivered", label: t("sup.costDelivered", "Delivered to Koleex (full landed)") }, { value: "packing", label: t("sup.costPacking", "+ Packing (no delivery)") }, { value: "factory_only", label: t("sup.costFactory", "Factory only (ex-works)") }]} triggerClassName={`${INP_B} h-8 text-[12px] w-full pe-8 text-start`} /> : undefined}
+                        />
+                        <FactChip
+                          icon={<PercentIcon className="h-5 w-5" />}
+                          label={t("sup.taxVat", "Tax (VAT)")}
+                          value={l.cost_includes_tax ? t("sup.taxIncluded", "Tax included") : t("sup.taxNotIncluded", "Tax NOT included")}
+                          note={!l.cost_includes_tax ? (l.cost_extras.tax_rate_percent ? t("pr.taxAdded", "{n}% VAT added to the landed cost").replace("{n}", l.cost_extras.tax_rate_percent) : t("pr.taxMissing", "VAT rate not entered — enter it on the Supplier tab.").replace(" — enter it on the Supplier tab.", ".")) : undefined}
+                          tone={!l.cost_includes_tax && !l.cost_extras.tax_rate_percent ? "warn" : "plain"}
+                          input={e ? (
+                            <span className="flex items-center gap-2 flex-wrap">
+                              <Toggle checked={l.cost_includes_tax} onChange={(v) => upd(l._k, { cost_includes_tax: v })} />
+                              <span className="text-[11px] text-[var(--text-muted)]">{l.cost_includes_tax ? t("sup.taxIncluded", "Tax included") : t("sup.taxNotIncluded", "Tax NOT included")}</span>
+                              {!l.cost_includes_tax && <input inputMode="decimal" value={l.cost_extras.tax_rate_percent} placeholder={t("sup.taxRate", "VAT rate (%)")} onChange={(ev) => upd(l._k, { cost_extras: { ...l.cost_extras, tax_rate_percent: ev.target.value.replace(/[^0-9.]/g, "") } })} className={`${small} w-[96px] tabular-nums`} />}
+                            </span>
+                          ) : undefined}
+                        />
+                        {l.cost_basis !== "delivered" && (
+                          <FactChip
+                            icon={<TruckIcon className="h-5 w-5" />}
+                            label={l.cost_basis === "factory_only" ? (l.cost_extras.combined ? t("sup.packDeliveryCombined", "Packing + delivery (¥)") : `${t("sup.packingCost", "Packing (¥)")} · ${t("sup.deliveryCost", "Delivery (¥)")}`) : t("sup.deliveryCost", "Delivery (¥)")}
+                            value={l.cost_basis === "factory_only"
+                              ? (l.cost_extras.combined ? (l.cost_extras.combined_cny ? `¥${money(l.cost_extras.combined_cny)}` : notSet) : `¥${money(l.cost_extras.packing_cny)} · ¥${money(l.cost_extras.delivery_cny)}`)
+                              : (l.cost_extras.delivery_cny ? `¥${money(l.cost_extras.delivery_cny)}` : notSet)}
+                            tone={missing.some((x) => x !== t("sup.taxRate", "VAT rate (%)")) ? "warn" : "plain"}
+                            input={e ? (
+                              <span className="flex items-center gap-1.5 flex-wrap">
+                                {l.cost_basis === "factory_only" ? (
+                                  l.cost_extras.combined
+                                    ? <span className="w-[120px]">{money$(l.cost_extras.combined_cny, "sm", (v) => upd(l._k, { cost_extras: { ...l.cost_extras, combined_cny: v } }), "1500")}</span>
+                                    : <><span className="w-[100px]">{money$(l.cost_extras.packing_cny, "sm", (v) => upd(l._k, { cost_extras: { ...l.cost_extras, packing_cny: v } }), t("sup.packingCost", "Packing (¥)"))}</span><span className="w-[100px]">{money$(l.cost_extras.delivery_cny, "sm", (v) => upd(l._k, { cost_extras: { ...l.cost_extras, delivery_cny: v } }), t("sup.deliveryCost", "Delivery (¥)"))}</span></>
+                                ) : <span className="w-[120px]">{money$(l.cost_extras.delivery_cny, "sm", (v) => upd(l._k, { cost_extras: { ...l.cost_extras, delivery_cny: v } }), "800")}</span>}
+                                {l.cost_basis === "factory_only" && (
+                                  <button type="button" onClick={() => upd(l._k, { cost_extras: { ...l.cost_extras, combined: !l.cost_extras.combined } })} className="text-[10.5px] text-[var(--text-muted)] hover:text-[var(--text-primary)] underline">
+                                    {l.cost_extras.combined ? t("sup.splitPackDelivery", "Enter packing & delivery separately") : t("sup.combinePackDelivery", "Enter packing + delivery as ONE cost")}
+                                  </button>
+                                )}
+                              </span>
+                            ) : undefined}
+                          />
+                        )}
+                      </div>
+                      <div className="mt-3 divide-y divide-[var(--border-subtle)]">
                         <FieldRow label={t("sup.costNote", "Price note")} glyph={glyph(t("sup.costNote", "Price note"))} wide
                           value={<>{tob(l.notes)}{i18nBlock(`note:${l._k}`, l.notes, l.notes_i18n, (mm) => upd(l._k, { notes_i18n: mm }), (ln) => t("sup.noteInLang", "Price note in {lang}").replace("{lang}", ln))}</>}
                           input={e ? <><textarea value={l.notes} placeholder={t("sup.costNotePh2", "Note for this price (optional)…")} onChange={(ev) => upd(l._k, { notes: ev.target.value })} className={TA} />{i18nBlock(`note:${l._k}`, l.notes, l.notes_i18n, (mm) => upd(l._k, { notes_i18n: mm }), (ln) => t("sup.noteInLang", "Price note in {lang}").replace("{lang}", ln))}</> : undefined} />
                         <FieldRow label={t("pr.options", "The supplier's price options")} glyph={glyph(t("pr.options", "The supplier's price options"))} wide
                           value={l.price_options.length ? (
                             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
-                              {l.price_options.map((o, i) => (
-                                <div key={i} className="rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-3 py-2">
-                                  <div className="text-[15px] font-bold tabular-nums">¥{money(o.price)}</div>
-                                  <div className="text-[11px] text-[var(--text-muted)] leading-snug">{((o.note_i18n ?? {})[lang] || "").trim() || o.note || "—"}</div>
-                                </div>
-                              ))}
+                              {l.price_options.map((o, i) => {
+                                const trs = Object.entries(o.note_i18n ?? {}).filter(([, v]) => (v || "").trim());
+                                return (
+                                  <div key={i} className="rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-3 py-2">
+                                    <div className="text-[15px] font-bold tabular-nums">¥{money(o.price)}</div>
+                                    <div className="text-[11px] text-[var(--text-secondary)] leading-snug">{o.note || "—"}</div>
+                                    {trs.map(([code, v]) => <div key={code} dir={code === "ar" || code === "ur" ? "rtl" : "ltr"} className="text-[10.5px] text-[var(--text-muted)] leading-snug"><span className="text-[9px] uppercase tracking-wider text-[var(--text-ghost)] me-1.5">{localeDisplay(code)}</span>{v}</div>)}
+                                  </div>
+                                );
+                              })}
                             </div>
                           ) : <Blank label={notSet} />}
                           input={e ? (
@@ -360,43 +433,6 @@ export default function SupplierSheet({
                               <button type="button" onClick={() => upd(l._k, (x) => ({ ...x, price_options: [...x.price_options, { price: "", note: "", note_i18n: {} }] }))} className="inline-flex items-center gap-1 h-7 px-2.5 rounded-lg border border-[var(--border-subtle)] text-[11px] font-medium text-[var(--text-muted)] hover:text-[var(--text-primary)]"><PlusIcon className="h-3 w-3" /> {t("sup.addAnotherPrice", "Add another price")}</button>
                             </div>
                           ) : undefined} />
-                        <FieldRow label={t("sup.costIncludes", "Cost includes")} glyph={glyph(t("pr.basis", "Cost basis"))}
-                          value={l.cost_basis === "factory_only" ? t("sup.costFactory", "Factory only (ex-works)") : l.cost_basis === "packing" ? t("sup.costPacking", "+ Packing (no delivery)") : t("sup.costDelivered", "Delivered to Koleex (full landed)")}
-                          input={e ? <KdsSelect value={l.cost_basis} onChange={(v) => upd(l._k, { cost_basis: v })} options={[{ value: "delivered", label: t("sup.costDelivered", "Delivered to Koleex (full landed)") }, { value: "packing", label: t("sup.costPacking", "+ Packing (no delivery)") }, { value: "factory_only", label: t("sup.costFactory", "Factory only (ex-works)") }]} triggerClassName={sel} /> : undefined} />
-                        <FieldRow label={t("sup.taxVat", "Tax (VAT)")} glyph={glyph(t("pr.tax", "Tax"))}
-                          value={<YesNo v={l.cost_includes_tax} yes={t("sup.taxIncluded", "Tax included")} no={t("sup.taxNotIncluded", "Tax NOT included")} />}
-                          help={!l.cost_includes_tax && !e ? (l.cost_extras.tax_rate_percent ? `${l.cost_extras.tax_rate_percent}% VAT` : undefined) : undefined}
-                          input={e ? (
-                            <div className="flex items-center gap-3 flex-wrap">
-                              <Toggle checked={l.cost_includes_tax} onChange={(v) => upd(l._k, { cost_includes_tax: v })} />
-                              <span className="text-[12px] text-[var(--text-muted)]">{l.cost_includes_tax ? t("sup.taxIncluded", "Tax included") : t("sup.taxNotIncluded", "Tax NOT included")}</span>
-                              {!l.cost_includes_tax && (
-                                <span className="inline-flex items-center gap-1.5"><span className="text-[10px] uppercase tracking-wider text-[var(--text-ghost)]">{t("sup.taxRate", "VAT rate (%)")}</span>
-                                  <input inputMode="decimal" value={l.cost_extras.tax_rate_percent} placeholder="13" onChange={(ev) => upd(l._k, { cost_extras: { ...l.cost_extras, tax_rate_percent: ev.target.value.replace(/[^0-9.]/g, "") } })} className={`${small} w-[72px] tabular-nums`} /></span>
-                              )}
-                            </div>
-                          ) : undefined} />
-                        {(l.cost_basis !== "delivered") && (
-                          <FieldRow label={l.cost_basis === "factory_only" ? (l.cost_extras.combined ? t("sup.packDeliveryCombined", "Packing + delivery (¥)") : `${t("sup.packingCost", "Packing (¥)")} · ${t("sup.deliveryCost", "Delivery (¥)")}`) : t("sup.deliveryCost", "Delivery (¥)")}
-                            glyph={glyph(t("sup.deliveryCost", "Delivery (¥)"))} wide
-                            value={<span className="tabular-nums">{l.cost_basis === "factory_only"
-                              ? (l.cost_extras.combined ? (l.cost_extras.combined_cny ? `¥${money(l.cost_extras.combined_cny)}` : notSet) : `¥${money(l.cost_extras.packing_cny)} · ¥${money(l.cost_extras.delivery_cny)}`)
-                              : (l.cost_extras.delivery_cny ? `¥${money(l.cost_extras.delivery_cny)}` : notSet)}</span>}
-                            input={e ? (
-                              <div className="flex items-center gap-2 flex-wrap">
-                                {l.cost_basis === "factory_only" ? (
-                                  l.cost_extras.combined
-                                    ? <div className="w-[150px]">{money$(l.cost_extras.combined_cny, "sm", (v) => upd(l._k, { cost_extras: { ...l.cost_extras, combined_cny: v } }), "e.g. 1500")}</div>
-                                    : <><div className="w-[130px]">{money$(l.cost_extras.packing_cny, "sm", (v) => upd(l._k, { cost_extras: { ...l.cost_extras, packing_cny: v } }), t("sup.packingCost", "Packing (¥)"))}</div><div className="w-[130px]">{money$(l.cost_extras.delivery_cny, "sm", (v) => upd(l._k, { cost_extras: { ...l.cost_extras, delivery_cny: v } }), t("sup.deliveryCost", "Delivery (¥)"))}</div></>
-                                ) : <div className="w-[150px]">{money$(l.cost_extras.delivery_cny, "sm", (v) => upd(l._k, { cost_extras: { ...l.cost_extras, delivery_cny: v } }), "e.g. 800")}</div>}
-                                {l.cost_basis === "factory_only" && (
-                                  <button type="button" onClick={() => upd(l._k, { cost_extras: { ...l.cost_extras, combined: !l.cost_extras.combined } })} className="text-[11px] text-[var(--text-muted)] hover:text-[var(--text-primary)] underline">
-                                    {l.cost_extras.combined ? t("sup.splitPackDelivery", "Enter packing & delivery separately") : t("sup.combinePackDelivery", "Enter packing + delivery as ONE cost")}
-                                  </button>
-                                )}
-                              </div>
-                            ) : undefined} />
-                        )}
                       </div>
                       {missing.length > 0 && <p className="mt-2 text-[10.5px] text-amber-400/90">⚠ {t("sup.costWarnA2", "This cost is NOT full-landed/tax-in — enter the missing")} {missing.join(" · ")} {t("sup.costWarnB2", "so pricing can work from the true landed cost.")}</p>}
                     </>
