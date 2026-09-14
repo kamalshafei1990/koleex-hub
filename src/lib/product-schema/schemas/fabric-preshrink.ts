@@ -451,7 +451,7 @@ export const FABRIC_PRESHRINK_SCHEMA: ProductSchemaDefinition = {
         {
           id: "machine_weight_kg",
           key: "machine_weight_kg",
-          label: "Machine Weight",
+          label: "Net weight (N.W.)",
           order: 20,
           fieldType: "unit_number",
           dataType: "number",
@@ -465,7 +465,7 @@ export const FABRIC_PRESHRINK_SCHEMA: ProductSchemaDefinition = {
         {
           id: "machine_dimensions",
           key: "machine_dimensions",
-          label: "Machine Dimensions (L×W×H)",
+          label: "Machine dimensions (N.S., L×W×H)",
           order: 10,
           fieldType: "dimension",
           dataType: "string",

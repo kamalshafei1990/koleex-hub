@@ -472,7 +472,13 @@ export function PackingBlock({ value, onChange, productId, netKg }: BlockProps &
         <div>
           <label className={lbl}>{`${t("pk.netWeightBare", "Net weight")} (${wtUnit})`}</label>
           <input value={weightFromKg(netOf(value, netKg), wtUnit)} readOnly placeholder="—" className={`${inp} tabular-nums opacity-70`} />
-          <p className={hint}>{t("pk.netFromMachine", "The machine weight from Physical — suppliers quote N.W. and G.W., and N.W. is the machine.")}</p>
+          <p className={hint}>{t("pk.netFromMachine", "The N.W. entered once under Physical — the machine itself, as the catalogue quotes it.")}</p>
+          {/* Small goods: the catalogue's N.W. is for the whole carton. */}
+          {mode === "per_package" && per > 1 && netOf(value, netKg) > 0 ? (
+            <p className={`${hint} tabular-nums`}>
+              {t("pk.netPerCarton", "N.W. per carton: {per} × {unit} = {total} kg").replace("{per}", String(per)).replace("{unit}", String(netOf(value, netKg))).replace("{total}", String(Math.round(per * netOf(value, netKg) * 100) / 100))}
+            </p>
+          ) : null}
         </div>
         <div>
           <label className={lbl}>{`${t("pk.grossWeightBare", "Gross weight")} (${wtUnit})`}</label>

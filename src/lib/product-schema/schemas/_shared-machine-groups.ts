@@ -82,14 +82,14 @@ export function physicalGroup(order: number): SpecGroup {
     fields: [
       {
         id: "machine_dimensions", key: "machine_dimensions",
-        label: "Machine Dimensions (L×W×H)", order: 10,
+        label: "Machine dimensions (N.S., L×W×H)", order: 10,
         fieldType: "dimension", dataType: "string", unit: "mm", required: false,
         description: "Overall machine dimensions in mm (L×W×H).",
         ...pub, visualRenderType: "packing_block",
       },
       {
         id: "machine_weight_kg", key: "machine_weight_kg",
-        label: "Machine Weight", order: 20,
+        label: "Net weight (N.W.)", order: 20,
         fieldType: "unit_number", dataType: "number", unit: "kg", required: false,
         description: "Net weight of the machine.",
         suggestions: [100, 200, 350, 500, 800],

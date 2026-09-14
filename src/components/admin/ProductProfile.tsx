@@ -210,8 +210,8 @@ const PROFILE_T: Record<string, { en: string; zh: string; ar: string }> = {
   "pp.f.leadTime":    { en: "Lead time",          zh: "交货周期",       ar: "مدة التوريد" },
   "pp.f.origin":      { en: "Country of origin",  zh: "原产国",         ar: "بلد المنشأ" },
   "pp.f.hs":          { en: "HS code",            zh: "海关编码",       ar: "الرمز الجمركي" },
-  "pp.f.machineWeight": { en: "Machine weight (kg)", zh: "机器重量(kg)", ar: "وزن الماكينة (كجم)" },
-  "pp.f.machineDims": { en: "Machine dimensions", zh: "机器尺寸",       ar: "أبعاد الماكينة" },
+  "pp.f.machineWeight": { en: "Net weight (N.W.)", zh: "净重 (N.W.)", ar: "الوزن الصافي (N.W.)" },
+  "pp.f.machineDims": { en: "Machine dimensions (N.S.)", zh: "机器尺寸 (N.S.)", ar: "أبعاد الماكينة (N.S.)" },
   "pp.f.packingTitle": { en: "Primary variant packing", zh: "主型号包装", ar: "تغليف المتغيّر الأساسي" },
   /* Read-side labels for products.logistics (2026-09-13). The profile used to
      print "Primary variant packing" over variant columns; when the product
@@ -225,8 +225,8 @@ const PROFILE_T: Record<string, { en: string; zh: string; ar: string }> = {
   "pp.f.regulated":           { en: "Regulated content", zh: "受管制内容物", ar: "محتوى خاضع لقيود" },
   "pp.f.packingEmpty":        { en: "Nothing entered yet. Open Edit to add the crate, its contents, weights and container quantities.", zh: "尚未填写。点击“编辑”添加木箱、箱内清单、重量与装柜数量。", ar: "لسه مفيش حاجة مكتوبة. افتح تعديل عشان تضيف الصندوق ومحتوياته والأوزان وكميات الحاويات." },
   "pp.sec.machine":           { en: "Machine (bare)", zh: "整机（裸机）", ar: "الماكينة (بدون تغليف)" },
-  "pp.f.netWeight":   { en: "Net weight",         zh: "净重",           ar: "الوزن الصافي" },
-  "pp.f.grossWeight": { en: "Gross weight",       zh: "毛重",           ar: "الوزن القائم" },
+  "pp.f.netWeight":   { en: "Net weight (N.W.)",  zh: "净重 (N.W.)",     ar: "الوزن الصافي (N.W.)" },
+  "pp.f.grossWeight": { en: "Gross weight (G.W.)", zh: "毛重 (G.W.)",   ar: "الوزن القائم (G.W.)" },
   "pp.f.cbm":         { en: "CBM",                zh: "体积(立方米)",   ar: "الحجم (م³)" },
   "pp.f.carton":      { en: "Carton dimensions",  zh: "箱规",           ar: "أبعاد الكرتونة" },
   "pp.f.packingType": { en: "Packing type",       zh: "包装方式",       ar: "نوع التغليف" },
@@ -1222,7 +1222,19 @@ function PackingSheet({
                 label={t("pp.f.netWeight", "Net weight")}
                 value={String(netW ?? "—")}
                 unit="kg"
-                extra={ePack ? calc(t("pk.netFromMachine", "The machine weight from Physical — suppliers quote N.W. and G.W., and N.W. is the machine.")) : undefined}
+                extra={(
+                  <>
+                    {ePack ? calc(t("pk.netFromMachine", "The N.W. entered once under Physical — the machine itself, as the catalogue quotes it.")) : null}
+                    {/* Small goods: the catalogue's N.W. is for the whole carton, so
+                        that figure is stated here as well — it is the one the
+                        operator is looking at while typing. */}
+                    {mode === "per_package" && perPkg > 1 && num(netW) > 0 ? (
+                      <div className="mt-1.5 text-[9.5px] leading-snug tabular-nums text-[var(--text-muted)]">
+                        {t("pk.netPerCarton", "N.W. per carton: {per} × {unit} = {total} kg").replace("{per}", String(perPkg)).replace("{unit}", String(num(netW))).replace("{total}", String(Math.round(perPkg * num(netW) * 100) / 100))}
+                      </div>
+                    ) : null}
+                  </>
+                )}
               />
             ) : null}
             {ePack || grossW ? <StatTile label={t("pp.f.grossWeight", "Gross weight")} value={String(sums.grossKg || grossW || "—")} unit="kg" tone="accent" extra={ePack ? calc(t("pk.grossHint", "Sum of the packages above.")) : undefined} /> : null}
