@@ -1395,8 +1395,9 @@ function PackingSheet({
                   ) : undefined}
                   extra={(
                     <div className="mt-1.5 space-y-1 text-[9.5px] leading-snug text-[var(--text-ghost)]">
-                      {/* What the box holds — the number every quote starts from. */}
-                      <div className="tabular-nums">{t("pk.containerCap", "{cbm} m³ · {kg} kg payload").replace("{cbm}", String(r.containerCbm)).replace("{kg}", CONTAINERS[key].payload_kg.toLocaleString())}</div>
+                      {/* What the box holds — the number every quote starts from, so it
+                          is written in a size that can be read, with the m³ in bold. */}
+                      <div className="text-[11.5px] tabular-nums text-[var(--text-muted)]">{t("pk.capacityWord", "Capacity")} <b className="font-bold text-[var(--text-primary)]">{r.containerCbm} m³</b> · {t("pk.payload", "payload")} {CONTAINERS[key].payload_kg.toLocaleString()} kg</div>
                       {eLoad ? (
                         <div className="flex flex-wrap items-center gap-x-2">
                           {overridden ? (
