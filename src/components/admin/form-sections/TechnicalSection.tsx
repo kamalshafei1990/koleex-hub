@@ -565,7 +565,7 @@ export function PhysicalFields({ data, onChange, hiddenFields }: {
       {!hidden("machine_dimensions") && <MachineDimensionFields value={data.machine_dimensions} onChange={(v) => onChange({ machine_dimensions: v })} />}
       {!hidden("machine_weight_kg") && (
       <NumberUnit
-        label={t("tech.machineWeight", "Machine Weight")}
+        label={t("tech.machineWeight", "Net weight (N.W.)")}
         icon={<ScaleIcon className="h-3.5 w-3.5" />}
         value={data.machine_weight_kg}
         unit="kg"

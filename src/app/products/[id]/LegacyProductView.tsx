@@ -798,7 +798,7 @@ export default function LegacyProductView() {
 
     const phys: Row[] = [];
     if (product.machine_dimensions) phys.push({ label: "Machine Dimensions", value: product.machine_dimensions });
-    if (product.machine_weight_kg !== null && product.machine_weight_kg !== undefined) phys.push({ label: "Machine Weight", value: `${product.machine_weight_kg} kg` });
+    if (product.machine_weight_kg !== null && product.machine_weight_kg !== undefined) phys.push({ label: "Net weight (N.W.)", value: `${product.machine_weight_kg} kg` });
 
     const comp: Row[] = [];
     if (product.hs_code) comp.push({ label: "HS Code", value: product.hs_code });
@@ -2224,7 +2224,7 @@ export default function LegacyProductView() {
                           "Plug Types": ZapIcon,
                           "Pneumatic Supply": WrenchIcon,
                           "Machine Dimensions": RulerIcon,
-                          "Machine Weight": PackageIcon,
+                          "Net weight (N.W.)": PackageIcon,
                           "HS Code": TagsIcon,
                           "IP Rating": ShieldCheckIcon,
                           "Operating Temp": ActivityIcon,
