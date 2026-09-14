@@ -32,7 +32,8 @@ import ConfirmDialog from "@/components/kds/ConfirmDialog";
 /* INLINE EDIT — the form's own section components, hosted inside the sheet's
    cards. Same inputs, same units, same rules; only the card around them is
    the profile's. */
-import { PackingPhoto, ContentsEditor, UnitSwitch, useImagePicker, portOptions, loadExplain } from "./form-sections/LogisticsBlocks";
+import { PackingPhoto, ContentsEditor, UnitSwitch, useImagePicker, portOptions, loadExplain, packingTypeOptions } from "./form-sections/LogisticsBlocks";
+import PackingTypeIcon, { isPackingTypeKey } from "@/components/icons/packing/PackingTypeIcon";
 import UnitPicker from "./form-sections/UnitPicker";
 import { LENGTH_UNITS, MASS_UNITS, displayIn, storeFrom, useEntryUnits, type LengthUnit, type MassUnit } from "@/lib/entry-units";
 import KdsSelect from "@/components/kds/Select";
@@ -1262,10 +1263,10 @@ function PackingSheet({
             <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
               {ePack || pType ? (
                 <FactChip
-                  icon={<BoxIcon className="h-6 w-6" />}
+                  icon={isPackingTypeKey(L.packing_type) ? <PackingTypeIcon type={L.packing_type} className="h-6 w-6" /> : <BoxIcon className="h-6 w-6" />}
                   label={t("pk.packingType", "Packing type")}
                   value={pType ?? ""}
-                  input={ePack ? <KdsSelect value={L.packing_type ?? ""} onChange={(v: string) => patchLogistics({ packing_type: v })} options={opts(PACKING_TYPES)} placeholder={t("pk.select", "— Select —")} triggerClassName={selectCls} /> : undefined}
+                  input={ePack ? <KdsSelect value={L.packing_type ?? ""} onChange={(v: string) => patchLogistics({ packing_type: v })} options={packingTypeOptions(t)} placeholder={t("pk.select", "— Select —")} triggerClassName={selectCls} /> : undefined}
                 />
               ) : null}
               {ePack || L.wood_treatment ? (

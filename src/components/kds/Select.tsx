@@ -36,7 +36,10 @@ import CheckIcon from "@/components/icons/ui/CheckIcon";
 /** A row is either a bare value, or a value with its own display label —
     the `<option value="slug">Localised name</option>` shape, which is what
     most real selects in the Hub actually are. */
-export type SelectOption = string | { value: string; label: string };
+export type SelectOption = string | { value: string; label: string;
+  /** Optional glyph for this row — drawn before the label in the list and on
+   *  the trigger once chosen. Sized by the caller (h-4 w-4 is the row's). */
+  icon?: React.ReactNode };
 
 export default function Select({
   value, onChange, options, renderLabel, placeholder, icon, triggerClassName,
@@ -72,11 +75,11 @@ export default function Select({
   /* The placeholder is row 0 when present, so every index below is over ONE
      list — no off-by-one between what the arrow keys move and what renders. */
   const rows = useMemo(
-    () => (placeholder !== undefined ? [{ v: "", text: placeholder }] : []).concat(
+    () => (placeholder !== undefined ? [{ v: "", text: placeholder, icon: undefined as React.ReactNode }] : []).concat(
       options.map((o) =>
         typeof o === "string"
-          ? { v: o, text: renderLabel ? renderLabel(o) : o }
-          : { v: o.value, text: o.label },
+          ? { v: o, text: renderLabel ? renderLabel(o) : o, icon: undefined as React.ReactNode }
+          : { v: o.value, text: o.label, icon: o.icon },
       ),
     ),
     [options, renderLabel, placeholder],
@@ -260,8 +263,9 @@ export default function Select({
         data-kx-keep-hover
         className={triggerClassName}
       >
-        <span className={`block truncate text-start ${current && current.v !== "" ? "" : "text-[var(--text-ghost)]"}`}>
-          {current ? current.text : (placeholder ?? "")}
+        <span className={`flex items-center gap-2 text-start ${current && current.v !== "" ? "" : "text-[var(--text-ghost)]"}`}>
+          {current?.icon ? <span className="shrink-0 flex items-center text-[var(--text-muted)]">{current.icon}</span> : null}
+          <span className="block min-w-0 truncate">{current ? current.text : (placeholder ?? "")}</span>
         </span>
       </button>
       <AngleDownIcon size={14} className={`absolute end-3 top-1/2 -translate-y-1/2 text-[var(--text-ghost)] pointer-events-none transition-transform ${open ? "rotate-180" : ""}`} />
@@ -305,6 +309,7 @@ export default function Select({
                   i === activeIdx ? "bg-[rgba(127,169,214,0.16)]" : ""
                 } ${r.v === value ? "text-[var(--text-primary)] font-medium" : "text-[var(--text-secondary)]"}`}
               >
+                {r.icon ? <span className="shrink-0 flex items-center text-[var(--text-muted)]">{r.icon}</span> : null}
                 <span className="flex-1 min-w-0 truncate">{r.text}</span>
                 {r.v === value && <CheckIcon size={13} className="shrink-0 text-[var(--text-primary)]" />}
               </button>

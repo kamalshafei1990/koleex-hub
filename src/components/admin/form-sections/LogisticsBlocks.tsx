@@ -46,6 +46,7 @@ import LayersIcon from "@/components/icons/ui/LayersIcon";
 import FileIcon from "@/components/icons/ui/FileIcon";
 import ImageRawIcon from "@/components/icons/ui/ImageRawIcon";
 import UnitPicker from "./UnitPicker";
+import PackingTypeIcon, { isPackingTypeKey } from "@/components/icons/packing/PackingTypeIcon";
 import { CHINA_PORTS } from "@/lib/ports";
 
 /** The port list, plus the stored value when it is not on it. */
@@ -99,6 +100,14 @@ export function loadExplain(t: TFn, r: LoadResult, grossKg: number, payloadKg: n
 }
 const localise = (t: TFn, list: readonly { value: string; label: string }[]) =>
   list.map((o) => ({ value: o.value, label: t(`pk.opt.${o.value}`, o.label) }));
+/* The packing-type rows each carry their own glyph — eight different things,
+   eight different marks (owner, 2026-09-14). */
+export const packingTypeOptions = (t: TFn) =>
+  PACKING_TYPES.map((o) => ({
+    value: o.value,
+    label: t(`pk.opt.${o.value}`, o.label),
+    icon: isPackingTypeKey(o.value) ? <PackingTypeIcon type={o.value} className="h-4 w-4" /> : undefined,
+  }));
 
 /* The unit switch is the shared UnitPicker (./UnitPicker) with a caption — one
    control for units everywhere on the form, so the crate's switch and the
@@ -309,7 +318,7 @@ export function PackingBlock({ value, onChange, productId, netKg }: BlockProps &
           <KdsSelect
             value={value.packing_type ?? ""}
             onChange={(v: string) => onChange({ packing_type: v })}
-            options={localise(t, PACKING_TYPES)}
+            options={packingTypeOptions(t)}
             placeholder={t("pk.select", "— Select —")}
             triggerClassName={inp + " pe-9 text-start"}
           />
