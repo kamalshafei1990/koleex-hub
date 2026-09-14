@@ -212,7 +212,7 @@ const PROFILE_T: Record<string, { en: string; zh: string; ar: string }> = {
   "pp.f.origin":      { en: "Country of origin",  zh: "原产国",         ar: "بلد المنشأ" },
   "pp.f.hs":          { en: "HS code",            zh: "海关编码",       ar: "الرمز الجمركي" },
   "pp.f.machineWeight": { en: "Net weight (N.W.)", zh: "净重 (N.W.)", ar: "الوزن الصافي (N.W.)" },
-  "pp.f.machineDims": { en: "Machine dimensions (N.S.)", zh: "机器尺寸 (N.S.)", ar: "أبعاد الماكينة (N.S.)" },
+  "pp.f.machineDims": { en: "Machine dimensions — net, without packing", zh: "机器尺寸 — 净尺寸，不含包装", ar: "أبعاد الماكينة — صافي بدون تغليف" },
   "pp.f.packingTitle": { en: "Primary variant packing", zh: "主型号包装", ar: "تغليف المتغيّر الأساسي" },
   /* Read-side labels for products.logistics (2026-09-13). The profile used to
      print "Primary variant packing" over variant columns; when the product

@@ -736,7 +736,7 @@ export const LOCKSTITCH_SCHEMA: ProductSchemaDefinition = {
         {
           id: "machine_dimensions",
           key: "machine_dimensions",
-          label: "Machine dimensions (N.S.)",
+          label: "Machine dimensions — net size, without packing",
           order: 10,
           fieldType: "dimension",
           dataType: "json",

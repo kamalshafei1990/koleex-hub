@@ -184,7 +184,7 @@ export const COMMON_SEWING_FIELDS: TemplateField[] = [
   // Physical
   {
     key: "machine_dimensions",
-    label: "Machine dimensions (N.S., L×W×H)",
+    label: "Machine dimensions — net size, without packing (L×W×H)",
     type: "text",
     placeholder: "e.g. 480×180×360 mm",
     group: "Physical",

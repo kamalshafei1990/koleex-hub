@@ -428,7 +428,7 @@ export const FABRIC_RELAXING_SCHEMA: ProductSchemaDefinition = {
         {
           id: "machine_dimensions",
           key: "machine_dimensions",
-          label: "Machine dimensions (N.S., L×W×H)",
+          label: "Machine dimensions — net size, without packing (L×W×H)",
           order: 10,
           fieldType: "dimension",
           dataType: "string",

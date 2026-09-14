@@ -316,7 +316,7 @@ export const SPEC_I18N: Translations = {
   "f:length_measuring_accuracy": { en: "Length Measuring Accuracy", zh: "记长精度", ar: "دقة قياس الطول" },
   "f:light_source": { en: "Light Source System", zh: "光源系统", ar: "نظام الإضاءة" },
   "f:lubrication_system": { en: "Lubrication System", zh: "润滑系统", ar: "نظام التزييت" },
-  "f:machine_dimensions": { en: "Machine dimensions (N.S., L×W×H)", zh: "整机尺寸 (N.S., 长×宽×高)", ar: "أبعاد الماكينة (N.S.، طول×عرض×ارتفاع)" },
+  "f:machine_dimensions": { en: "Machine dimensions — net size, without packing (L×W×H)", zh: "整机尺寸 — 净尺寸，不含包装（长×宽×高）", ar: "أبعاد الماكينة — المقاس الصافي بدون تغليف (طول×عرض×ارتفاع)" },
   "f:machine_weight_kg": { en: "Net weight (N.W.)", zh: "净重 (N.W.)", ar: "الوزن الصافي (N.W.)" },
   "f:material_weight": { en: "Material Weight", zh: "面料克重", ar: "وزن الخامة" },
   "f:max_cloth_width": { en: "Max Cloth Width", zh: "最大铺布宽度", ar: "أقصى عرض قماش" },
