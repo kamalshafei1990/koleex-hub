@@ -101,6 +101,7 @@ import ComplianceSheet from "./profile/ComplianceSheet";
 import ClassifySheet from "./profile/ClassifySheet";
 import SupplierSheet from "./profile/SupplierSheet";
 import VariantsSheet from "./profile/VariantsSheet";
+import OptionsSheet from "./profile/OptionsSheet";
 import dynamic from "next/dynamic";
 import { useSkin } from "@/lib/appearance";
 import FeatureHighlightsDisplay from "./FeatureHighlightsDisplay";
@@ -144,6 +145,34 @@ const PROFILE_T: Record<string, { en: string; zh: string; ar: string }> = {
   "pp.certWord":      { en: "cert",               zh: "证书",           ar: "شهادة" },
   "sup.costNote":     { en: "Price note",         zh: "价格备注",       ar: "ملاحظة السعر" },
   /* Variants tab */
+  /* Options tab */
+  "opt.badgeN":       { en: "{n} questions",      zh: "{n} 个问题",     ar: "{n} أسئلة" },
+  "opt.intro":        { en: "The questions a customer answers when ordering — each answer either links a product or carries its own price, weight and volume deltas.", zh: "客户下单时回答的问题——每个答案要么关联一个产品，要么带有自己的价格、重量和体积增量。", ar: "الأسئلة التي يجيب عنها العميل عند الطلب — كل إجابة إما تربط منتجاً أو تحمل فروق سعر ووزن وحجم خاصة بها." },
+  "opt.none":         { en: "No buyer options yet.", zh: "尚无买家选项。", ar: "لا خيارات للمشتري بعد." },
+  "opt.kind.choice":  { en: "Choice list",        zh: "选择列表",       ar: "قائمة اختيار" },
+  "opt.kind.yes_no":  { en: "Yes / No",           zh: "是 / 否",        ar: "نعم / لا" },
+  "opt.kind.info":    { en: "Info only",          zh: "仅说明",         ar: "معلومة فقط" },
+  "opt.required":     { en: "Required",           zh: "必填",           ar: "إلزامي" },
+  "opt.showOnlyWhen": { en: "Show only when",     zh: "仅当…时显示",    ar: "يظهر فقط عندما" },
+  "opt.always":       { en: "Always",             zh: "始终",           ar: "دائماً" },
+  "opt.questionPh":   { en: "Question — e.g. \"Stand thickness\"", zh: "问题——例如“台架厚度”", ar: "السؤال — مثال: \"سُمك الحامل\"" },
+  "opt.answerPh":     { en: "Answer — e.g. \"2 mm\"", zh: "答案——例如“2 mm”", ar: "الإجابة — مثال: \"2 مم\"" },
+  "opt.default":      { en: "Default",            zh: "默认",           ar: "الافتراضي" },
+  "opt.deleteQuestion": { en: "Delete question",  zh: "删除问题",       ar: "حذف السؤال" },
+  "opt.deleteAnswer": { en: "Delete answer",      zh: "删除答案",       ar: "حذف الإجابة" },
+  "opt.addAnswer":    { en: "Add answer",         zh: "添加答案",       ar: "إضافة إجابة" },
+  "opt.addQuestion":  { en: "Add question",       zh: "添加问题",       ar: "إضافة سؤال" },
+  "opt.photoHint":    { en: "Click, drop or paste a photo", zh: "点击、拖放或粘贴照片", ar: "اضغط أو أفلت أو الصق صورة" },
+  "opt.priceDelta":   { en: "Price +¥",           zh: "价格 +¥",        ar: "السعر +¥" },
+  "opt.weightDelta":  { en: "Weight +kg",         zh: "重量 +kg",       ar: "الوزن +كجم" },
+  "opt.cbmDelta":     { en: "Vol +cbm",           zh: "体积 +cbm",      ar: "الحجم +م³" },
+  "opt.linkProduct":  { en: "Link a product",     zh: "关联产品",       ar: "ربط منتج" },
+  "opt.linkedProduct": { en: "Linked product",    zh: "已关联产品",     ar: "منتج مرتبط" },
+  "opt.linkedNoDeltas": { en: "price, weight and volume come from the linked product", zh: "价格、重量和体积来自关联产品", ar: "السعر والوزن والحجم من المنتج المرتبط" },
+  "opt.unlink":       { en: "Unlink",             zh: "取消关联",       ar: "فكّ الربط" },
+  "opt.noDelta":      { en: "No price, weight or volume change", zh: "无价格、重量或体积变化", ar: "لا تغيير في السعر أو الوزن أو الحجم" },
+  "opt.searchPh":     { en: "Search products…",   zh: "搜索产品…",      ar: "ابحث عن منتجات…" },
+  "opt.noMatch":      { en: "No products match.", zh: "没有匹配的产品。", ar: "لا منتجات مطابقة." },
   "vs.remove":        { en: "Remove variant",     zh: "移除型号",       ar: "إزالة الموديل" },
   "vs.codeOnHero":    { en: "The primary model's code is checked and approved on the Hero tab.", zh: "主型号编码在主页标签页校验并批准。", ar: "كود الموديل الأساسي يُفحص ويُعتمد في تبويب الواجهة." },
   "vs.addOverride":   { en: "+ Add a spec that differs on this model…", zh: "+ 添加此型号不同的规格…", ar: "+ أضف مواصفة تختلف في هذا الموديل…" },
@@ -596,6 +625,8 @@ const STEPS = [
   { id: "specs",      short: "Specs",              k: "step.specs" },
   { id: "commercial", short: "Variants",           k: "step.models" },
   { id: "pricing",    short: "Price",              k: "step.price" },
+  /* The editor's Buyer Options step — the one tab the record never had. */
+  { id: "options",    short: "Options",            k: "step.optionsShort" },
   /* The same name as the editor's tab, because it is the same tab. */
   { id: "logistics",  short: "Packing & Logistics", k: "step.logistics" },
   { id: "compliance", short: "Compliance",         k: "step.compliance" },
@@ -2219,6 +2250,14 @@ export default function ProductProfile() {
           onDirtyChange={(d) => { dirtyRef.current = d; }}
           onSaved={(u) => mergeSaved({ product: u.product })}
           glyph={glyphFor}
+        />
+      )}
+
+      {STEPS[step].id === "options" && (
+        <OptionsSheet
+          productId={p?.id as string | undefined}
+          t={t} lang={lang} motion={tabMotion} canEdit={canEdit} notSet={NOT_SET}
+          onDirtyChange={(d) => { dirtyRef.current = d; }}
         />
       )}
 
