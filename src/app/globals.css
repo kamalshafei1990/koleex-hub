@@ -4599,8 +4599,11 @@ html[dir="rtl"] .kx-ai-root .kx-ai-bar-title {
   object-fit: cover;
 }
 
-/* Code blocks inside AI answers (was also dead styled-jsx). */
+/* Code blocks inside AI answers (was also dead styled-jsx). Always
+   left-to-right, whatever the reply around them (owner, 2026-09-15). */
 .koleex-code-block {
+  direction: ltr;
+  text-align: left;
   margin: 10px 0 16px;
   background: rgba(0, 0, 0, 0.35);
   border: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.08));

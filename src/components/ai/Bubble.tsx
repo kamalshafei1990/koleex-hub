@@ -387,7 +387,7 @@ function BubbleImpl({
                 | undefined;
               const options = q?.options ?? [];
               if (options.length === 0) {
-                return <MessageMarkdown content={msg.content} lang={lang} />;
+                return <MessageMarkdown content={msg.content} lang={lang} dir={bubbleDir} />;
               }
               /* The card OUTLIVES the answer. It stays in the transcript with
                  the chosen row marked and the rest faded, because the question
