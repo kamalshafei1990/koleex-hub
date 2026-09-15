@@ -304,8 +304,8 @@ export default function SupplierSheet({
                   <div className="grid grid-cols-1 lg:grid-cols-[200px_1fr] gap-5">
                     <div>
                       <div className="text-[10.5px] uppercase tracking-wider text-[var(--text-ghost)] mb-2">{t("pp.f.supPhoto", "Supplier product photo")}</div>
-                      <label className={`block aspect-square w-full rounded-2xl border border-dashed border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] overflow-hidden flex items-center justify-center ${e ? "cursor-pointer hover:border-[var(--border-focus)]" : ""}`}>
-                        {l.supplier_product_photo ? <img src={IMG.card(l.supplier_product_photo)} alt="" className="h-full w-full object-contain p-2" /> : <span className="text-[12px] text-[var(--text-ghost)] italic">{busy === `photo:${l._k}` ? t("sup.uploading", "Uploading…") : e ? t("sup.dropOrClick", "drop or click") : notSet}</span>}
+                      <label className={`block aspect-square w-full rounded-2xl border border-black/10 bg-gradient-to-b from-white to-[#f4f5f7] overflow-hidden flex items-center justify-center ${e ? "cursor-pointer hover:border-[var(--border-focus)]" : ""}`}>
+                        {l.supplier_product_photo ? <img src={IMG.card(l.supplier_product_photo)} alt="" className="h-full w-full object-contain p-2" /> : <span className="text-[12px] text-gray-400 italic">{busy === `photo:${l._k}` ? t("sup.uploading", "Uploading…") : e ? t("sup.dropOrClick", "drop or click") : notSet}</span>}
                         {e && <input type="file" accept="image/*" className="hidden" onChange={(ev) => void upload(`photo:${l._k}`, ev.target.files?.[0], (url) => upd(l._k, { supplier_product_photo: url }))} />}
                       </label>
                       {e && l.supplier_product_photo && <button type="button" onClick={() => upd(l._k, { supplier_product_photo: "" })} className="mt-1 text-[11px] text-[var(--text-ghost)] hover:text-rose-300">{t("sup.removePhoto", "Remove photo")}</button>}

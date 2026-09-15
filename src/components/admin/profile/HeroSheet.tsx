@@ -425,8 +425,8 @@ export default function HeroSheet({
         <div className="grid grid-cols-1 lg:grid-cols-[260px_1fr] gap-6">
           <div>
             <div className="text-[10.5px] uppercase tracking-wider text-[var(--text-ghost)] mb-2">{t("media.slot.main_image.label", "Main Product Photo")}</div>
-            <label className={`block aspect-square w-full rounded-2xl border border-dashed border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] overflow-hidden ${eI ? "cursor-pointer hover:border-[var(--border-focus)]" : ""} flex items-center justify-center`}>
-              {heroUrl ? <img src={d?.mainPreview ? heroUrl : IMG.card(heroUrl)} alt="" className="h-full w-full object-contain p-2" /> : <span className="text-[12px] text-[var(--text-ghost)] italic">{notSet}</span>}
+            <label className={`block aspect-square w-full rounded-2xl border border-black/10 bg-gradient-to-b from-white to-[#f4f5f7] overflow-hidden ${eI ? "cursor-pointer hover:border-[var(--border-focus)]" : ""} flex items-center justify-center`}>
+              {heroUrl ? <img src={d?.mainPreview ? heroUrl : IMG.card(heroUrl)} alt="" className="h-full w-full object-contain p-2" /> : <span className="text-[12px] text-gray-400 italic">{notSet}</span>}
               {eI && <input type="file" accept="image/*" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (!f) return; if (!/^image\//.test(f.type)) { sheet.setError(t("media.mainNotImage", "{name} is not an image.").replace("{name}", f.name)); return; } sheet.patch({ mainFile: f, mainPreview: URL.createObjectURL(f) }); }} />}
             </label>
             {eI && <p className="mt-1.5 text-[10.5px] text-[var(--text-ghost)]">{t("hs.mainPhotoHint", "Click the photo to replace it — the gallery and the other slots are on the Media tab.")}</p>}
