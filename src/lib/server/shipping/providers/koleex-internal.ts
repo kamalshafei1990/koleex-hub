@@ -160,6 +160,8 @@ export const koleexInternalProvider: FreightRateProvider = {
         mode,
         originCode: query.originCode,
         destinationCode: query.destinationCode,
+        originCodeSystem: query.originCodeSystem,
+        destinationCodeSystem: query.destinationCodeSystem,
         originLabel: s.portOfLoading ?? undefined,
         destinationLabel: s.portOfDestination ?? undefined,
         /* A landed-cost simulation records port-to-port freight; the

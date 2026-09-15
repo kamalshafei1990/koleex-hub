@@ -83,9 +83,13 @@ export interface FreightRate {
 
   mode: ShippingMode;
 
-  /** UN/LOCODE, or IATA for air. Denormalised so history survives a reference row changing. */
+  /** The canonical identifier, denormalised so history survives a reference
+      row changing. Always read it together with the system below. */
   originCode: string;
   destinationCode: string;
+  /** Which register `originCode` / `destinationCode` come from. */
+  originCodeSystem: CodeSystem;
+  destinationCodeSystem: CodeSystem;
   originLabel?: string;
   destinationLabel?: string;
 
@@ -143,9 +147,11 @@ export interface FreightRate {
 /** What the UI asks for. One search, one shape, all three modes. */
 export interface RateQuery {
   mode: ShippingMode;
-  /** UN/LOCODE for ocean, IATA for air. */
+  /** Canonical identifiers, each with the register it belongs to. */
   originCode: string;
   destinationCode: string;
+  originCodeSystem: CodeSystem;
+  destinationCodeSystem: CodeSystem;
 
   /** FCL: which containers to price. Defaults to all three. */
   equipment?: ContainerEquipment[];
@@ -166,6 +172,17 @@ export interface RateQuery {
 
 /** Named so the divisor is never a magic number. See chargeable-weight.ts. */
 export type VolumetricRule = "iata_air" | "express_courier";
+
+/**
+ * Which coding system a code belongs to.
+ *
+ * ⚠️ NEVER INFERRED FROM THE CODE'S SHAPE. 787 UN/LOCODEs in this data set
+ * name both a seaport and an airport (USDET is Detroit port and Detroit
+ * airport), and a country prefix plus an IATA code is frequently a real and
+ * different seaport (CN + ZJG is Zhangjiagang). A bare code string cannot say
+ * which register it came from, so it never travels without this.
+ */
+export type CodeSystem = "unlocode" | "iata";
 
 /** What a provider adapter reports back, successes and failures alike. */
 export interface ProviderResult {

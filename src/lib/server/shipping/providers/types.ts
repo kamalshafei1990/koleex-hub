@@ -33,9 +33,12 @@ export interface ProviderCapabilities {
 
 export interface ProviderContext {
   tenantId: string;
-  /** Resolves a UN/LOCODE or IATA code the provider needs to be told differently. */
-  tradeCodeFor?: (code: string) => string | null;
   signal?: AbortSignal;
+  /* ⚠️ NO CODE TRANSLATOR HERE, DELIBERATELY. There was one, and it meant the
+     engine rewrote a canonical UN/LOCODE into one provider's preferred
+     spelling for EVERY provider. An adapter that needs a different spelling
+     asks for its own — providers/trade-codes.ts — so the substitution lives
+     and dies inside that one request. */
 }
 
 export interface FreightRateProvider {

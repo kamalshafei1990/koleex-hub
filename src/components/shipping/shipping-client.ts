@@ -14,9 +14,15 @@ import type {
   ContainerEquipment, FreightRate, RateKind, RateQuery, ShippingMode, VolumetricRule,
 } from "@/lib/shipping/types";
 
+/** Mirrors CanonicalPort on the server. The two identifier fields are separate
+    on purpose; see the header of src/lib/server/shipping/port-resolver.ts. */
 export interface PortHit {
   id: string;
+  /** UN/LOCODE, and only ever a UN/LOCODE. */
   locode: string | null;
+  /** IATA, and only ever IATA. Set on airports. */
+  iata?: string | null;
+  codeSystem?: "unlocode" | "iata";
   name: string;
   nameOfficial: string | null;
   countryCode: string;

@@ -24,7 +24,7 @@ import { NextResponse } from "next/server";
 import { requireAuth, requireModuleAccess } from "@/lib/server/auth";
 import { stageTimer } from "@/lib/server/perf";
 import { searchRates } from "@/lib/server/shipping/engine";
-import { resolveEndpoint } from "@/lib/server/shipping/port-resolver";
+import { endpointCode, resolveEndpoint, type CanonicalPort } from "@/lib/server/shipping/port-resolver";
 import { consumeBudget } from "@/lib/server/ai/security/rate-limit";
 import { chargeableWeight } from "@/lib/shipping/chargeable-weight";
 import type { ContainerEquipment, RateQuery, ShippingMode, VolumetricRule } from "@/lib/shipping/types";
@@ -81,17 +81,24 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "port_ambiguous", side, input: raw, candidates: r.candidates }, { status: 409 });
     }
   }
-  const originPort = (origin as { status: "ok"; port: { locode: string | null; name: string } }).port;
-  const destPort = (destination as { status: "ok"; port: { locode: string | null; name: string } }).port;
+  const originPort = (origin as { status: "ok"; port: CanonicalPort }).port;
+  const destPort = (destination as { status: "ok"; port: CanonicalPort }).port;
 
-  /* An endpoint with no confirmed code cannot be sent to a provider. That is a
+  /* ⚠️ THE CODE NEVER TRAVELS WITHOUT ITS REGISTER. endpointCode() returns the
+     canonical identifier AND which coding system it belongs to — UN/LOCODE for
+     a seaport, IATA for an airport. 787 UN/LOCODEs in this data set name both
+     a seaport and an airport, so a bare string cannot say which one it is.
+
+     An endpoint with no confirmed code cannot be sent to a provider. That is a
      data gap, stated as one, not an excuse to send its name and hope. */
-  if (!originPort.locode || !destPort.locode) {
-    _t.done({ status: 422, reason: "no_locode" });
+  const originId = endpointCode(originPort);
+  const destId = endpointCode(destPort);
+  if (!originId || !destId) {
+    _t.done({ status: 422, reason: "no_code" });
     return NextResponse.json({
       error: "port_has_no_code",
-      side: originPort.locode ? "destination" : "origin",
-      port: originPort.locode ? destPort.name : originPort.name,
+      side: originId ? "destination" : "origin",
+      port: originId ? destPort.name : originPort.name,
     }, { status: 422 });
   }
 
@@ -110,8 +117,10 @@ export async function POST(req: Request) {
 
   const query: RateQuery = {
     mode,
-    originCode: originPort.locode,
-    destinationCode: destPort.locode,
+    originCode: originId.code,
+    destinationCode: destId.code,
+    originCodeSystem: originId.system,
+    destinationCodeSystem: destId.system,
     equipment: equipment?.length ? equipment : undefined,
     cbm: num(body.cbm),
     grossKg: num(body.grossKg),

@@ -30,7 +30,6 @@ import { withConfidence } from "@/lib/shipping/confidence";
 import type {
   FreightRate, ProviderResult, RateKind, RateQuery, RateSearchResult, Surcharge,
 } from "@/lib/shipping/types";
-import { tradeCodeMap } from "./port-resolver";
 import { enabledProviders, providerStatuses, type ProviderStatus } from "./registry";
 
 /* How long a freshly fetched rate stays servable without asking again.
@@ -77,12 +76,12 @@ export async function searchRates(query: RateQuery, opts: SearchOptions): Promis
   } else {
     const providers = enabledProviders().filter((p) => p.capabilities.modes.includes(query.mode));
     if (providers.length) {
-      const trade = await tradeCodeMap([query.originCode, query.destinationCode]);
-      const ctx = {
-        tenantId: opts.tenantId,
-        tradeCodeFor: (code: string) => trade.get(code.toUpperCase()) ?? null,
-        signal: opts.signal,
-      };
+      /* ⚠️ NO CODE REWRITING HERE. The engine used to build one trade-code
+         map and hand it to every adapter, which applied one provider's habit
+         globally and overwrote an official identifier for all of them. A
+         provider that wants a different spelling now asks for it itself —
+         providers/trade-codes.ts. */
+      const ctx = { tenantId: opts.tenantId, signal: opts.signal };
       /* In parallel: one slow provider must not hold up the others, and a
          rejected promise must not lose the answers that did arrive. */
       const settled = await Promise.allSettled(providers.map((p) => p.getRates(query, ctx)));
@@ -135,6 +134,10 @@ async function readStored(query: RateQuery, tenantId: string): Promise<FreightRa
     .eq("mode", query.mode)
     .eq("origin_code", query.originCode)
     .eq("destination_code", query.destinationCode)
+    /* ⚠️ The code alone is not the key. "USDET" is the Detroit seaport in one
+       register and the Detroit airport in another, and both are real rows. */
+    .eq("origin_code_system", query.originCodeSystem)
+    .eq("destination_code_system", query.destinationCodeSystem)
     .order("retrieved_at", { ascending: false })
     .limit(120);
   if (error || !data) return [];
@@ -156,6 +159,8 @@ interface StoredRow {
   id: string; rate_kind: RateKind; source_id: string; source_label: string | null;
   source_cadence: FreightRate["sourceCadence"] | null; mode: RateQuery["mode"];
   origin_code: string; destination_code: string;
+  origin_code_system: FreightRate["originCodeSystem"] | null;
+  destination_code_system: FreightRate["destinationCodeSystem"] | null;
   scope: FreightRate["scope"];
   includes_origin_charges: boolean | null; includes_destination_charges: boolean | null;
   includes_customs: boolean | null; incoterm: string | null;
@@ -183,6 +188,10 @@ function fromRow(r: StoredRow): FreightRate {
     mode: r.mode,
     originCode: r.origin_code,
     destinationCode: r.destination_code,
+    /* Rows written before the system column existed are ocean rows — the air
+       path did not work then. Stated, not silently defaulted. */
+    originCodeSystem: r.origin_code_system ?? "unlocode",
+    destinationCodeSystem: r.destination_code_system ?? "unlocode",
     scope: r.scope,
     includesOriginCharges: r.includes_origin_charges ?? undefined,
     includesDestinationCharges: r.includes_destination_charges ?? undefined,
@@ -236,6 +245,8 @@ async function persist(rates: FreightRate[], query: RateQuery, tenantId: string,
       mode: r.mode,
       origin_code: r.originCode,
       destination_code: r.destinationCode,
+      origin_code_system: r.originCodeSystem,
+      destination_code_system: r.destinationCodeSystem,
       scope: r.scope,
       includes_origin_charges: r.includesOriginCharges ?? null,
       includes_destination_charges: r.includesDestinationCharges ?? null,

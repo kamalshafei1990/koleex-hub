@@ -262,8 +262,13 @@ export default function ShippingApp() {
   }, [countries, lang]);
 
   /* ── the search ────────────────────────────────────────────────────────── */
-  const originCode = origin ? ("locode" in origin.value ? origin.value.locode : null) ?? ("iata" in origin.value ? origin.value.iata : null) : null;
-  const destCode = dest ? ("locode" in dest.value ? dest.value.locode : null) ?? ("iata" in dest.value ? dest.value.iata : null) : null;
+  /* ⚠️ THE CODE IS TAKEN FROM THE OPTION, NOT SNIFFED OFF THE VALUE'S SHAPE.
+     The earlier version asked `"locode" in value ? … : "iata" in value ? …`,
+     which is guessing a coding system from an object's keys — the exact habit
+     that lets a seaport code and an airport code be mistaken for each other.
+     The picker already carries the canonical code it displayed. */
+  const originCode = origin?.code ?? null;
+  const destCode = dest?.code ?? null;
   const canSearch = Boolean(origin && dest && !busy);
 
   const run = useCallback(async (force = false) => {

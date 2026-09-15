@@ -36,6 +36,7 @@ import "server-only";
 import { createHash, createHmac, randomUUID } from "node:crypto";
 import type { ContainerEquipment, FreightRate, ProviderResult, RateQuery, Surcharge } from "@/lib/shipping/types";
 import { type FreightRateProvider, type ProviderContext, providerDeadline, providerError } from "./types";
+import { providerCodes } from "./trade-codes";
 
 const BASE = "https://www.5688.cn";
 const PATHS = {
@@ -75,9 +76,17 @@ export const awiceProvider: FreightRateProvider = {
     if (!this.isEnabled()) return providerError(this.id, "unconfigured", this.disabledReason?.(), 0);
 
     const path = PATHS[query.mode];
-    /* They accept the trade spelling (CNSHA), Chinese, or English names. */
-    const origin = ctx.tradeCodeFor?.(query.originCode) ?? query.originCode;
-    const destination = ctx.tradeCodeFor?.(query.destinationCode) ?? query.destinationCode;
+    /* They accept the trade spelling (CNSHA), Chinese, or English names.
+       Resolved HERE, for this request only — the canonical UN/LOCODE stays
+       canonical for the cache, the history and every other provider. */
+    const [origin, destination] = await providerCodes(
+      this.id,
+      [
+        { code: query.originCode, system: query.originCodeSystem },
+        { code: query.destinationCode, system: query.destinationCodeSystem },
+      ],
+      query.mode,
+    );
 
     const body: Record<string, unknown> = { pol: origin, pod: destination };
     if (query.departOn) body.etd = query.departOn;
@@ -147,8 +156,11 @@ export const awiceProvider: FreightRateProvider = {
         sourceLabel: awiceProvider.label,
         sourceCadence: "daily" as const,
         mode: query.mode,
+        /* Filed under the CANONICAL code, never the spelling we sent. */
         originCode: query.originCode,
         destinationCode: query.destinationCode,
+        originCodeSystem: query.originCodeSystem,
+        destinationCodeSystem: query.destinationCodeSystem,
         scope: (query.mode === "air" ? "airport_to_airport" : "port_to_port") as FreightRate["scope"],
         includesOriginCharges: surcharges.length > 0 ? true : undefined,
         includesDestinationCharges: undefined,

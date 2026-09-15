@@ -16,13 +16,47 @@ import "server-only";
    ⚠️ AMBIGUITY IS AN ANSWER. "Alexandria" is a real port in Egypt and a real
    port in the United States. resolvePort() returns `ambiguous` with the
    candidates so the caller can ask, rather than silently picking one.
+
+   ── ⚠️ FIVE DIFFERENT THINGS THAT ALL LOOK LIKE "A PORT CODE" ─────────────
+   They are never interchangeable and this module never treats them as though
+   they were:
+
+     1. UN/LOCODE      the canonical identifier of a SEAPORT here (CNSGH)
+     2. IATA           the canonical identifier of an AIRPORT here (PVG)
+     3. provider code  what one provider's API wants. Resolved INSIDE that
+                       provider's adapter, never globally — see
+                       providers/trade-codes.ts
+     4. trade alias    what the freight trade says out of habit (CNSHA for the
+                       Shanghai seaport, which the register assigns to Hongqiao
+                       AIRPORT). An alias row, never a replacement.
+     5. display name   translated, for humans, never an identifier
+
+   Measured on this data set, all three hazards are real, not theoretical:
+     · 787 UN/LOCODEs appear in BOTH the port and the airport table. USDET is
+       the Detroit seaport AND Coleman A. Young airport. A code alone does not
+       say which table it came from, so every code travels with its SYSTEM.
+     · A three-letter IATA code prefixed with its country is often a real and
+       DIFFERENT seaport: CN + ZJG is Zhangjiagang, a port, not an airport.
+     · 24 port NAMES are spelled exactly like some other port's UN/LOCODE.
+       "Gaeta" is an Italian port and GAETA is the code of Etame Terminal in
+       Gabon; "Camas" is a US port and CAMAS is Masson in Canada. The first
+       version of resolvePort() took any five-character input as a code and
+       answered "Gaeta" with an oil terminal in Gabon — silently, with a 200.
    --------------------------------------------------------------------------- */
 
 import { supabaseServer } from "@/lib/server/supabase-server";
 
+/** Which coding system a code belongs to. Never inferred from its shape. */
+export type CodeSystem = "unlocode" | "iata";
+
 export interface CanonicalPort {
   id: string;
+  /** UN/LOCODE, and ONLY ever a UN/LOCODE. Null when the register has none. */
   locode: string | null;
+  /** IATA, and ONLY ever IATA. Set on airports, null on seaports. */
+  iata: string | null;
+  /** Which of the two above is this endpoint's canonical identifier. */
+  codeSystem: CodeSystem;
   name: string;
   nameOfficial: string | null;
   countryCode: string;
@@ -57,7 +91,8 @@ type Row = {
 };
 
 const toPort = (r: Row): CanonicalPort => ({
-  id: r.id, locode: r.locode, name: r.name, nameOfficial: r.name_official,
+  id: r.id, locode: r.locode, iata: null, codeSystem: "unlocode",
+  name: r.name, nameOfficial: r.name_official,
   countryCode: r.country_code, countryName: r.country_name,
   lat: r.lat == null ? null : Number(r.lat), lng: r.lng == null ? null : Number(r.lng),
   seaRegion: r.sea_region, harborSize: r.harbor_size, isContainer: r.is_container,
@@ -72,45 +107,69 @@ export async function resolvePort(input: string, countryCode?: string): Promise<
   const raw = (input ?? "").trim();
   if (!raw) return { status: "unknown" };
 
-  /* A well-formed code is looked up directly first: it is the unambiguous
-     path, and it keeps CNSGH from going through the alias table at all. */
-  if (/^[A-Z]{2}[A-Z0-9]{3}$/i.test(raw)) {
-    const { data } = await supabaseServer
-      .from("shipping_ports").select(PORT_COLS)
-      .eq("locode", raw.toUpperCase()).is("tenant_id", null).maybeSingle();
-    if (data) return { status: "ok", port: toPort(data as Row), matchedOn: "locode" };
-  }
-
   const alias = normaliseAlias(raw);
   if (!alias) return { status: "unknown" };
 
-  const { data, error } = await supabaseServer
-    .from("shipping_port_aliases")
-    .select(`kind, shipping_ports!inner(${PORT_COLS})`)
-    .eq("alias", alias)
-    .limit(50);
-  if (error || !data?.length) return { status: "unknown" };
+  /* ⚠️ BOTH LOOKUPS RUN, AND A DISAGREEMENT IS AMBIGUITY — NOT A WINNER.
+     The first version short-circuited: five characters meant "this is a code",
+     so it answered before ever consulting the name index. That is how "Gaeta",
+     an Italian port, returned Etame Terminal in Gabon, whose UN/LOCODE happens
+     to be GAETA. Twenty-four names in this data set collide that way.
+
+     So the code index and the name index are consulted together and their
+     answers are merged. One answer is an answer; two are a question for the
+     operator. */
+  const [exact, byName] = await Promise.all([
+    /^[A-Z]{2}[A-Z0-9]{3}$/i.test(raw)
+      ? supabaseServer.from("shipping_ports").select(PORT_COLS)
+          .eq("locode", raw.toUpperCase()).is("tenant_id", null).maybeSingle()
+      : Promise.resolve({ data: null }),
+    supabaseServer.from("shipping_port_aliases")
+      .select(`kind, shipping_ports!inner(${PORT_COLS})`)
+      .eq("alias", alias).limit(50),
+  ]);
 
   const byId = new Map<string, { port: CanonicalPort; kind: string }>();
-  for (const row of data as unknown as { kind: string; shipping_ports: Row }[]) {
-    const p = toPort(row.shipping_ports);
-    if (countryCode && p.countryCode !== countryCode.toUpperCase()) continue;
+  const consider = (p: CanonicalPort, kind: string) => {
+    if (countryCode && p.countryCode !== countryCode.toUpperCase()) return;
     const prev = byId.get(p.id);
     /* Keep the strongest reason we matched, for the "why" tooltip. */
-    if (!prev || rank(row.kind) > rank(prev.kind)) byId.set(p.id, { port: p, kind: row.kind });
+    if (!prev || rank(kind) > rank(prev.kind)) byId.set(p.id, { port: p, kind });
+  };
+
+  if (exact.data) consider(toPort(exact.data as Row), "locode");
+  for (const row of ((byName.data ?? []) as unknown as { kind: string; shipping_ports: Row }[])) {
+    consider(toPort(row.shipping_ports), row.kind);
   }
 
   const hits = [...byId.values()];
   if (!hits.length) return { status: "unknown" };
   if (hits.length === 1) return { status: "ok", port: hits[0].port, matchedOn: hits[0].kind };
 
-  /* More than one port answers to this name. If exactly one of them is a port
-     Koleex already ships through, that is a safe tie-break — it is the one the
-     operator meant. Otherwise ask. */
-  const ours = hits.filter((h) => h.port.inKoleexList);
-  if (ours.length === 1) return { status: "ok", port: ours[0].port, matchedOn: `${ours[0].kind}+koleex` };
+  /* More than one port answers. A Koleex lane is a safe tie-break for two
+     ports that share a NAME — "Alexandria" in Egypt versus Virginia. It is NOT
+     safe when the disagreement is between coding systems: if one candidate
+     matched as a code and another as a name, they are different KINDS of
+     answer and picking either would be the Gaeta bug with extra steps. */
+  const kinds = new Set(hits.map((h) => h.kind));
+  const codeVsName = kinds.has("locode") && hits.some((h) => h.kind !== "locode");
+  if (!codeVsName) {
+    const ours = hits.filter((h) => h.port.inKoleexList);
+    if (ours.length === 1) return { status: "ok", port: ours[0].port, matchedOn: `${ours[0].kind}+koleex` };
+  }
 
   return { status: "ambiguous", candidates: hits.map((h) => h.port) };
+}
+
+/**
+ * The canonical identifier of an endpoint, WITH the system it belongs to.
+ *
+ * Everything downstream — the cache key, the stored rate row, the provider
+ * request — goes through this, so a bare code string never travels on its own.
+ */
+export function endpointCode(port: CanonicalPort): { code: string; system: CodeSystem } | null {
+  if (port.codeSystem === "iata") return port.iata ? { code: port.iata, system: "iata" } : null;
+  return port.locode ? { code: port.locode, system: "unlocode" } : null;
 }
 
 const KIND_RANK: Record<string, number> = {
@@ -201,18 +260,26 @@ export async function resolveAirport(input: string, countryCode?: string): Promi
   const raw = (input ?? "").trim();
   if (!raw) return { status: "unknown" };
 
-  const cols = "id, iata, name, country_code, municipality, lat, lng";
+  const cols = "id, iata, locode, name, country_code, municipality, lat, lng";
   type ARow = {
-    id: string; iata: string; name: string; country_code: string;
+    id: string; iata: string; locode: string | null; name: string; country_code: string;
     municipality: string | null; lat: number | null; lng: number | null;
   };
   const asAirport = (r: ARow): CanonicalPort => ({
     id: r.id,
-    /* The IATA code sits in `locode` on purpose: downstream this field means
-       "the code that identifies this endpoint", and air and sea must not need
-       two shapes. The UN/LOCODE an airport also has is not what a freight
-       provider quotes on. */
-    locode: r.iata,
+    /* ⚠️ THE IATA CODE DOES NOT GO IN `locode`. An earlier version put it
+       there so air and sea could share one field — which meant a stored
+       "HAM" could be read as a UN/LOCODE and a stored "USDET" could be read
+       as either the Detroit seaport or the Detroit airport (both exist, and
+       787 codes are in both tables). The system travels with the code now.
+
+       The airport's OWN UN/LOCODE is kept beside it, because it is a real
+       fact about this airport — it is simply not the identifier a freight
+       provider quotes on. Two identifiers, neither pretending to be the
+       other. */
+    locode: r.locode,
+    iata: r.iata,
+    codeSystem: "iata",
     name: r.name,
     nameOfficial: null,
     countryCode: r.country_code,

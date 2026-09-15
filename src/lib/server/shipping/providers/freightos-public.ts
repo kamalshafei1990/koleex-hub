@@ -35,6 +35,7 @@ import "server-only";
 
 import type { FreightRate, ProviderResult, RateQuery } from "@/lib/shipping/types";
 import { type FreightRateProvider, type ProviderContext, providerDeadline, providerError } from "./types";
+import { providerCodes } from "./trade-codes";
 
 const ENDPOINT = "https://ship.freightos.com/api/shippingCalculator";
 
@@ -86,9 +87,17 @@ export const freightosPublicProvider: FreightRateProvider = {
     const started = Date.now();
     if (Date.now() < coolOffUntil) return providerError(this.id, "quota", "in cool-off", 0);
 
-    /* Freightos speaks the trade spelling (CNSHA), not the register's CNSGH. */
-    const origin = ctx.tradeCodeFor?.(query.originCode) ?? query.originCode;
-    const destination = ctx.tradeCodeFor?.(query.destinationCode) ?? query.destinationCode;
+    /* Freightos speaks the trade spelling (CNSHA), not the register's CNSGH.
+       Asked for HERE, by this adapter, for this request — the canonical code
+       is untouched everywhere else. See providers/trade-codes.ts. */
+    const [origin, destination] = await providerCodes(
+      this.id,
+      [
+        { code: query.originCode, system: query.originCodeSystem },
+        { code: query.destinationCode, system: query.destinationCodeSystem },
+      ],
+      query.mode,
+    );
 
     const wanted = query.mode === "ocean_fcl"
       ? (query.equipment?.length ? query.equipment : (["20GP", "40GP", "40HQ"] as const))
@@ -132,8 +141,12 @@ export const freightosPublicProvider: FreightRateProvider = {
         sourceLabel: this.label,
         sourceCadence: "realtime",
         mode: query.mode,
+        /* The rate is filed under the CANONICAL code, never the spelling we
+           happened to send. A provider alias is request-scoped. */
         originCode: query.originCode,
         destinationCode: query.destinationCode,
+        originCodeSystem: query.originCodeSystem,
+        destinationCodeSystem: query.destinationCodeSystem,
         scope: query.mode === "air" ? "airport_to_airport" : "port_to_port",
         equipment: eq ?? undefined,
         unit: query.mode === "ocean_fcl" ? "container" : query.mode === "ocean_lcl" ? "cbm" : "kg",
