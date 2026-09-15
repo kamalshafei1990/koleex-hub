@@ -24,7 +24,7 @@ import { NextResponse } from "next/server";
 import { requireAuth, requireModuleAccess } from "@/lib/server/auth";
 import { stageTimer } from "@/lib/server/perf";
 import { searchRates } from "@/lib/server/shipping/engine";
-import { resolvePort } from "@/lib/server/shipping/port-resolver";
+import { resolveEndpoint } from "@/lib/server/shipping/port-resolver";
 import { consumeBudget } from "@/lib/server/ai/security/rate-limit";
 import { chargeableWeight } from "@/lib/shipping/chargeable-weight";
 import type { ContainerEquipment, RateQuery, ShippingMode, VolumetricRule } from "@/lib/shipping/types";
@@ -66,8 +66,8 @@ export async function POST(req: Request) {
   /* Resolve BOTH ends before spending anything. An ambiguous name is returned
      to the caller to disambiguate — it is never resolved by guessing. */
   const [origin, destination] = await Promise.all([
-    resolvePort(originRaw, typeof body.originCountry === "string" ? body.originCountry : undefined),
-    resolvePort(destRaw, typeof body.destinationCountry === "string" ? body.destinationCountry : undefined),
+    resolveEndpoint(originRaw, mode, typeof body.originCountry === "string" ? body.originCountry : undefined),
+    resolveEndpoint(destRaw, mode, typeof body.destinationCountry === "string" ? body.destinationCountry : undefined),
   ]);
   _t.mark("resolve");
 
@@ -84,7 +84,7 @@ export async function POST(req: Request) {
   const originPort = (origin as { status: "ok"; port: { locode: string | null; name: string } }).port;
   const destPort = (destination as { status: "ok"; port: { locode: string | null; name: string } }).port;
 
-  /* A port with no confirmed UN/LOCODE cannot be sent to a provider. That is a
+  /* An endpoint with no confirmed code cannot be sent to a provider. That is a
      data gap, stated as one, not an excuse to send its name and hope. */
   if (!originPort.locode || !destPort.locode) {
     _t.done({ status: 422, reason: "no_locode" });

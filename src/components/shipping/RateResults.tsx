@@ -53,13 +53,28 @@ const CONF_TONE: Record<string, string> = {
   low: "text-[var(--text-dim)]",
 };
 
-/** D/M/Y — the house date format, in every language. */
+/**
+ * D/M/Y — the house date format, in EVERY language.
+ *
+ * ⚠️ The ORDER is assembled here, not left to the locale. Asking zh-CN for a
+ * short date returns 2026/04/09, which is Y/M/D and is not the house format;
+ * ar-EG and en-GB happen to agree with it and Chinese does not. Only the
+ * DIGITS follow the reader's locale (Arabic-Indic numerals in ar), which is
+ * what formatToParts gives without also handing over the field order.
+ */
 export function fmtDate(iso: string | undefined, lang: Lang): string {
   if (!iso) return "";
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return "";
   const loc = lang === "zh" ? "zh-CN" : lang === "ar" ? "ar-EG" : "en-GB";
-  return d.toLocaleDateString(loc, { day: "2-digit", month: "2-digit", year: "numeric" });
+  try {
+    const parts = new Intl.DateTimeFormat(loc, { day: "2-digit", month: "2-digit", year: "numeric" })
+      .formatToParts(d);
+    const get = (type: string) => parts.find((p) => p.type === type)?.value ?? "";
+    const day = get("day"), month = get("month"), year = get("year");
+    if (day && month && year) return `${day}/${month}/${year}`;
+  } catch { /* fall through */ }
+  return d.toLocaleDateString("en-GB", { day: "2-digit", month: "2-digit", year: "numeric" });
 }
 
 export function fmtMoney(n: number, currency: string, lang: Lang): string {
@@ -215,7 +230,11 @@ export function RateRow({ rate, t, lang, quantity = 1 }: { rate: FreightRate; t:
                         {/* Surcharge CODES stay untranslated — BAF and THC are
                             what a carrier's invoice says, in every language. */}
                         <span className="text-[var(--text-secondary)]">
-                          <span className="font-mono text-[11px] text-[var(--text-ghost)]">{s.code}</span> {s.label}
+                          <span className="font-mono text-[11px] text-[var(--text-ghost)]">{s.code}</span>{" "}
+                          {/* The CODE is an identifier and stays; the wording
+                              beside it is copy, so it goes through t() with the
+                              provider's own English as the fallback. */}
+                          {t(`surcharge.${s.code}`, s.label)}
                         </span>
                         <span className="tabular-nums text-[var(--text-primary)]">{fmtMoney(s.amount, s.currency, lang)}</span>
                       </li>

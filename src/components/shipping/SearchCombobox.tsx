@@ -152,6 +152,16 @@ export default function SearchCombobox<T>({
     triggerRef.current?.focus();
   }, [onChange]);
 
+  /* Every open starts clean. Leaving the last query in the box meant the next
+     open showed the previous search's results, and typing appended to it —
+     "cairo" + "pudong" = "cairopudong" and no matches. */
+  const toggle = useCallback(() => {
+    setOpen((was) => {
+      if (!was) { setTerm(""); setRows([]); setActive(0); }
+      return !was;
+    });
+  }, []);
+
   const onListKey = (e: React.KeyboardEvent) => {
     if (e.key === "ArrowDown") { e.preventDefault(); setActive((i) => Math.min(i + 1, rows.length - 1)); }
     else if (e.key === "ArrowUp") { e.preventDefault(); setActive((i) => Math.max(i - 1, 0)); }
@@ -181,7 +191,7 @@ export default function SearchCombobox<T>({
         aria-label={ariaLabel}
         title={hint}
         disabled={disabled}
-        onClick={() => !disabled && setOpen((v) => !v)}
+        onClick={() => !disabled && toggle()}
         className={triggerClass}
       >
         {icon ? <span className="shrink-0 text-[var(--text-dim)]">{icon}</span> : null}

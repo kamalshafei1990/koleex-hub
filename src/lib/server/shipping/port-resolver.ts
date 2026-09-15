@@ -190,17 +190,101 @@ export async function searchPorts(opts: {
   return ((data ?? []) as Row[]).map(toPort);
 }
 
-/** Countries that actually have a port in the table, for the destination step. */
-export async function portCountries(): Promise<{ code: string; name: string | null; ports: number }[]> {
-  const { data, error } = await supabaseServer
-    .from("shipping_ports").select("country_code, country_name")
-    .is("tenant_id", null).eq("is_active", true).limit(20000);
-  if (error) return [];
-  const agg = new Map<string, { code: string; name: string | null; ports: number }>();
-  for (const r of (data ?? []) as { country_code: string; country_name: string | null }[]) {
-    const cur = agg.get(r.country_code);
-    if (cur) { cur.ports++; if (!cur.name && r.country_name) cur.name = r.country_name; }
-    else agg.set(r.country_code, { code: r.country_code, name: r.country_name, ports: 1 });
+/* ── airports ──────────────────────────────────────────────────────────────
+   Air lanes are identified by IATA, and IATA codes live in a different table.
+   The rates route used to resolve BOTH ends through shipping_ports, so every
+   air search failed with "we don't recognise PVG as a port" — true, and
+   useless. resolveEndpoint() is the one entry point both modes use. */
+
+/** An airport, shaped like a port so the engine and the UI need only one type. */
+export async function resolveAirport(input: string, countryCode?: string): Promise<PortResolution> {
+  const raw = (input ?? "").trim();
+  if (!raw) return { status: "unknown" };
+
+  const cols = "id, iata, name, country_code, municipality, lat, lng";
+  type ARow = {
+    id: string; iata: string; name: string; country_code: string;
+    municipality: string | null; lat: number | null; lng: number | null;
+  };
+  const asAirport = (r: ARow): CanonicalPort => ({
+    id: r.id,
+    /* The IATA code sits in `locode` on purpose: downstream this field means
+       "the code that identifies this endpoint", and air and sea must not need
+       two shapes. The UN/LOCODE an airport also has is not what a freight
+       provider quotes on. */
+    locode: r.iata,
+    name: r.name,
+    nameOfficial: null,
+    countryCode: r.country_code,
+    countryName: r.municipality,
+    lat: r.lat == null ? null : Number(r.lat),
+    lng: r.lng == null ? null : Number(r.lng),
+    seaRegion: null, harborSize: null, isContainer: null, inKoleexList: false,
+  });
+
+  if (/^[A-Za-z]{3}$/.test(raw)) {
+    const { data } = await supabaseServer.from("shipping_airports").select(cols)
+      .eq("iata", raw.toUpperCase()).is("tenant_id", null).maybeSingle();
+    if (data) return { status: "ok", port: asAirport(data as ARow), matchedOn: "iata" };
   }
-  return [...agg.values()].sort((a, b) => a.code.localeCompare(b.code));
+
+  let q = supabaseServer.from("shipping_airports").select(cols)
+    .is("tenant_id", null).eq("is_active", true);
+  if (countryCode) q = q.eq("country_code", countryCode.toUpperCase());
+  const esc = raw.replace(/[%,()]/g, " ").trim();
+  if (!esc) return { status: "unknown" };
+  const { data, error } = await q.or(`name.ilike.%${esc}%,municipality.ilike.%${esc}%`).limit(10);
+  if (error || !data?.length) return { status: "unknown" };
+  const hits = (data as ARow[]).map(asAirport);
+  if (hits.length === 1) return { status: "ok", port: hits[0], matchedOn: "name" };
+  const exact = hits.filter((h) => h.name.toLowerCase() === raw.toLowerCase());
+  if (exact.length === 1) return { status: "ok", port: exact[0], matchedOn: "name" };
+  return { status: "ambiguous", candidates: hits };
+}
+
+/** Resolves whichever kind of endpoint the mode is about. */
+export function resolveEndpoint(
+  input: string,
+  mode: "ocean_fcl" | "ocean_lcl" | "air",
+  countryCode?: string,
+): Promise<PortResolution> {
+  return mode === "air" ? resolveAirport(input, countryCode) : resolvePort(input, countryCode);
+}
+
+/* The country list never changes between deploys, so it is built once per
+   process and held for an hour. Without this every picker open re-read 3,806
+   rows to produce ~180. */
+let countryCache: { at: number; rows: { code: string; name: string | null; ports: number }[] } | null = null;
+const COUNTRY_TTL_MS = 60 * 60_000;
+
+/**
+ * Countries that actually have a port, for the destination step.
+ *
+ * ⚠️ PAGINATED, and that is not optional. PostgREST caps a response at 1,000
+ * rows regardless of `.limit()`, so the first version of this read 1,000 of
+ * 3,806 ports and reported 49 countries instead of 180 — silently, with a 200.
+ */
+export async function portCountries(): Promise<{ code: string; name: string | null; ports: number }[]> {
+  if (countryCache && Date.now() - countryCache.at < COUNTRY_TTL_MS) return countryCache.rows;
+
+  const agg = new Map<string, { code: string; name: string | null; ports: number }>();
+  const PAGE = 1000;
+  for (let from = 0; ; from += PAGE) {
+    const { data, error } = await supabaseServer
+      .from("shipping_ports").select("country_code, country_name")
+      .is("tenant_id", null).eq("is_active", true)
+      .order("country_code", { ascending: true })
+      .range(from, from + PAGE - 1);
+    if (error) return countryCache?.rows ?? [];
+    const rows = (data ?? []) as { country_code: string; country_name: string | null }[];
+    for (const r of rows) {
+      const cur = agg.get(r.country_code);
+      if (cur) { cur.ports++; if (!cur.name && r.country_name) cur.name = r.country_name; }
+      else agg.set(r.country_code, { code: r.country_code, name: r.country_name, ports: 1 });
+    }
+    if (rows.length < PAGE) break;
+  }
+  const rows = [...agg.values()].sort((a, b) => a.code.localeCompare(b.code));
+  countryCache = { at: Date.now(), rows };
+  return rows;
 }

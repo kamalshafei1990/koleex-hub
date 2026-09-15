@@ -154,6 +154,21 @@ export const shippingT: Translations = {
   "excl.destination":  { en: "Destination charges NOT included", zh: "不含目的港费用", ar: "لا يشمل رسوم ميناء الوصول" },
   "incl.unknown":      { en: "Inclusions not stated",        zh: "未说明包含项目", ar: "لم تُحدَّد البنود المشمولة" },
 
+  /* ── surcharge wording. The CODE beside each of these is an identifier and
+        is never translated — BAF is BAF on a carrier's invoice in every
+        language. Only the explanation moves. ─────────────────────────────── */
+  "surcharge.BAF": { en: "Bunker adjustment",        zh: "燃油附加费",     ar: "رسوم تعديل الوقود" },
+  "surcharge.CAF": { en: "Currency adjustment",      zh: "货币贬值附加费",  ar: "رسوم تعديل العملة" },
+  "surcharge.GRI": { en: "General rate increase",    zh: "运价普涨",       ar: "زيادة عامة في السعر" },
+  "surcharge.PSS": { en: "Peak season surcharge",    zh: "旺季附加费",     ar: "رسوم موسم الذروة" },
+  "surcharge.AMS": { en: "AMS / ENS / ISF filing",   zh: "AMS / ENS / ISF 申报", ar: "رسوم الإقرار المسبق AMS / ENS / ISF" },
+  "surcharge.DOC": { en: "B/L or AWB fee",           zh: "提单／空运单费",   ar: "رسوم بوليصة الشحن" },
+  "surcharge.TLX": { en: "Telex release",            zh: "电放费",         ar: "رسوم الإفراج الإلكتروني" },
+  "surcharge.INS": { en: "Insurance",                zh: "保险费",         ar: "التأمين" },
+  "surcharge.THC": { en: "Terminal handling",        zh: "码头操作费",      ar: "رسوم مناولة الميناء" },
+  "surcharge.ISPS": { en: "Port security",           zh: "港口安保费",      ar: "رسوم أمن الميناء" },
+  "surcharge.FEE": { en: "Local charge",             zh: "当地费用",       ar: "رسوم محلية" },
+
   /* ── confidence ───────────────────────────────────────────────────────── */
   "conf.label":        { en: "Confidence",  zh: "可信度",  ar: "درجة الثقة" },
   "conf.high":         { en: "High",        zh: "高",      ar: "عالية" },

@@ -25,6 +25,7 @@
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import AuroraShell from "@/components/ui/AuroraShell";
+import { useSkin } from "@/lib/appearance";
 import PageHeader from "@/components/ui/PageHeader";
 import { useTranslation } from "@/lib/i18n";
 import { shippingT } from "@/lib/translations/shipping";
@@ -70,6 +71,15 @@ const MODES: { id: ShippingMode; icon: (s: number) => React.ReactNode }[] = [
 export default function ShippingApp() {
   const { t, lang } = useTranslation(shippingT);
   const isRtl = lang === "ar";
+  /* kx-seg-on / kx-chip-on are Aurora-ONLY rules — under Core they evaluate to
+     nothing, so a selected control would be indistinguishable from an unselected
+     one. Core's own selection mark is the filled inverted pill, byte-identical
+     to what the Hub looked like before Aurora. Branching is the house pattern
+     (see settings/page.tsx and inbox/page.tsx). */
+  const aurora = useSkin() === "aurora";
+  const SEG_ON = aurora ? "kx-seg-on" : "bg-[var(--bg-inverted)] text-[var(--text-inverted)]";
+  const SEG_OFF = aurora ? "kx-seg-off" : "text-[var(--text-muted)] hover:bg-[var(--bg-surface)] hover:text-[var(--text-primary)]";
+  const CHIP_ON = aurora ? "kx-chip-on" : "bg-[var(--bg-inverted)] text-[var(--text-inverted)]";
 
   /* ── measured layout ───────────────────────────────────────────────────── */
   const [host, setHost] = useState<HTMLDivElement | null>(null);
@@ -291,12 +301,12 @@ export default function ShippingApp() {
                   /* The radius lives on THIS element, not the group: kx-seg-on
                      paints an inset RING, and a parent's rounded+overflow can
                      clip a fill into a curve but cannot bend a ring. */
-                  className={`flex min-h-[44px] flex-col items-center justify-center gap-1 rounded-lg px-2 py-1.5 text-[12px] font-medium transition-colors ${on ? "kx-seg-on" : "kx-seg-off"}`}
+                  className={`flex min-h-[44px] flex-col items-center justify-center gap-1 rounded-lg px-2 py-1.5 text-[12px] font-medium transition-colors ${on ? SEG_ON : SEG_OFF}`}
                 >
                   {m.icon(15)}
                   <span>{t(`mode.${m.id}`)}</span>
                   {w >= 560 ? (
-                    <span className="text-[10px] font-normal leading-tight text-[var(--text-ghost)]">{t(`mode.${m.id}.hint`)}</span>
+                    <span className={`text-[10px] font-normal leading-tight ${on && !aurora ? "text-[var(--text-inverted)]/70" : "text-[var(--text-ghost)]"}`}>{t(`mode.${m.id}.hint`)}</span>
                   ) : null}
                 </button>
               );
@@ -304,7 +314,11 @@ export default function ShippingApp() {
           </div>
 
           {/* route */}
-          <div className={`grid gap-2 ${wide ? "grid-cols-[1fr_auto_1fr_1fr_auto]" : mid ? "grid-cols-[1fr_auto_1fr_1fr]" : "grid-cols-1"}`}>
+          {/* relative z-20 is load-bearing. kx-bar-host lifts every
+              non-positioned child to z-index:1, so this row and the cargo row
+              below it tie — and a tie is won by the later sibling, which put
+              the container chips ON TOP of an open port list. */}
+          <div className={`relative z-20 grid gap-2 ${wide ? "grid-cols-[1fr_auto_1fr_1fr_auto]" : mid ? "grid-cols-[1fr_auto_1fr_1fr]" : "grid-cols-1"}`}>
             <Labelled label={isAir ? t("field.originAirport") : t("field.originPort")}>
               <SearchCombobox
                 value={origin}
@@ -312,11 +326,11 @@ export default function ShippingApp() {
                 search={searchOrigin}
                 scopeKey={`origin-${mode}`}
                 icon={isAir ? <PlaneIcon size={14} /> : <PortIcon size={14} />}
-                placeholder={t("ph.originPort")}
-                searchPlaceholder={t("ph.originPort")}
+                placeholder={isAir ? t("field.originAirport") : t("ph.originPort")}
+                searchPlaceholder={isAir ? t("field.originAirport") : t("ph.originPort")}
                 emptyLabel={t("err.noRoute")}
                 loadingLabel={t("load.ports")}
-                ariaLabel={t("a11y.originPicker")}
+                ariaLabel={isAir ? t("field.originAirport") : t("a11y.originPicker")}
                 clearLabel={t("action.clear")}
               />
             </Labelled>
@@ -359,11 +373,11 @@ export default function ShippingApp() {
                 search={searchDest}
                 scopeKey={`dest-${country?.key ?? ""}-${mode}`}
                 icon={isAir ? <PlaneIcon size={14} /> : <PortIcon size={14} />}
-                placeholder={t("ph.destPort")}
-                searchPlaceholder={t("ph.destPort")}
+                placeholder={isAir ? t("field.destAirport") : t("ph.destPort")}
+                searchPlaceholder={isAir ? t("field.destAirport") : t("ph.destPort")}
                 emptyLabel={t("err.noRoute")}
                 loadingLabel={t("load.ports")}
-                ariaLabel={t("a11y.destPicker")}
+                ariaLabel={isAir ? t("field.destAirport") : t("a11y.destPicker")}
                 clearLabel={t("action.clear")}
                 disabled={!country}
                 disabledHint={t("ph.pickCountryFirst")}
@@ -374,7 +388,7 @@ export default function ShippingApp() {
           </div>
 
           {/* cargo — only what this method actually needs */}
-          <div className={`mt-2 flex flex-wrap items-end gap-2 ${wide ? "" : "pb-1"}`}>
+          <div className={`relative z-10 mt-2 flex flex-wrap items-end gap-2 ${wide ? "" : "pb-1"}`}>
             {mode === "ocean_fcl" ? (
               <Labelled label={t("field.containers")}>
                 <div className="flex gap-1.5">
@@ -386,7 +400,7 @@ export default function ShippingApp() {
                         type="button"
                         aria-pressed={on}
                         onClick={() => setEquipment((prev) => (on ? prev.filter((x) => x !== eq) : [...prev, eq]))}
-                        className={`h-10 min-w-[64px] rounded-xl px-3 font-mono text-[12px] font-semibold tabular-nums transition-colors ${on ? "kx-chip-on" : "kx-seg-off"}`}
+                        className={`h-10 min-w-[64px] rounded-xl px-3 font-mono text-[12px] font-semibold tabular-nums transition-colors ${on ? CHIP_ON : SEG_OFF}`}
                       >
                         {eq}
                       </button>
@@ -418,7 +432,7 @@ export default function ShippingApp() {
                     type="button"
                     onClick={() => setDims((d) => (d.length ? [] : [{ l: "", w: "", h: "", qty: "1" }]))}
                     aria-pressed={dims.length > 0}
-                    className={`inline-flex h-10 items-center gap-1.5 rounded-xl border px-3 text-[12px] font-medium transition-colors ${dims.length ? "kx-chip-on border-transparent" : "border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)]"}`}
+                    className={`inline-flex h-10 items-center gap-1.5 rounded-xl border px-3 text-[12px] font-medium transition-colors ${dims.length ? `${CHIP_ON} border-transparent` : "border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)]"}`}
                   >
                     <RulerIcon size={13} />
                     {dims.length ? t("action.hideDetails") : t("action.addDimensions")}
@@ -438,7 +452,13 @@ export default function ShippingApp() {
               </>
             ) : null}
 
-            {!wide ? <div className="ms-auto"><SearchButton t={t} busy={busy} disabled={!canSearch} onClick={() => run(false)} /></div> : null}
+            {/* Phone: the primary action is full width and thumb-sized, not a
+                right-aligned pill that competes with the fields above it. */}
+            {!wide ? (
+              <div className={w < 560 ? "w-full" : "ms-auto"}>
+                <SearchButton t={t} busy={busy} disabled={!canSearch} onClick={() => run(false)} fullWidth={w < 560} />
+              </div>
+            ) : null}
           </div>
 
           {isAir && dims.length ? (
@@ -474,7 +494,7 @@ export default function ShippingApp() {
             {origin && dest ? (
               <RouteStrip origin={origin} dest={dest} mode={mode} isFavorite={isFavorite}
                           onToggleFavorite={toggleFavorite} onRefresh={() => run(true)}
-                          busy={busy} cached={data?.servedFromCache ?? false} t={t} />
+                          busy={busy} cached={data?.servedFromCache ?? false} t={t} narrow={w < 560} />
             ) : null}
 
             {data?.weight && isAir ? <WeightPanel weight={data.weight} t={t} /> : null}
@@ -557,13 +577,15 @@ function DimBox({ value, onChange, label, wide }: {
   );
 }
 
-function SearchButton({ t, busy, disabled, onClick }: { t: (k: string, f?: string) => string; busy: boolean; disabled: boolean; onClick: () => void }) {
+function SearchButton({ t, busy, disabled, onClick, fullWidth }: {
+  t: (k: string, f?: string) => string; busy: boolean; disabled: boolean; onClick: () => void; fullWidth?: boolean;
+}) {
   return (
     <button
       type="button"
       onClick={onClick}
       disabled={disabled}
-      className="inline-flex h-10 items-center gap-2 rounded-xl bg-[var(--bg-inverted)] px-5 text-[13px] font-semibold text-[var(--text-inverted)] shadow-lg transition-opacity hover:opacity-90 disabled:opacity-40"
+      className={`inline-flex items-center justify-center gap-2 rounded-xl bg-[var(--bg-inverted)] px-5 text-[13px] font-semibold text-[var(--text-inverted)] shadow-lg transition-opacity hover:opacity-90 disabled:opacity-40 ${fullWidth ? "h-11 w-full" : "h-10"}`}
     >
       {busy ? <SpinnerIcon size={14} className="animate-spin" /> : <SearchIcon size={14} />}
       {busy ? t("action.searching") : t("action.search")}
@@ -571,11 +593,57 @@ function SearchButton({ t, busy, disabled, onClick }: { t: (k: string, f?: strin
   );
 }
 
-function RouteStrip({ origin, dest, mode, isFavorite, onToggleFavorite, onRefresh, busy, cached, t }: {
+function RouteStrip({ origin, dest, mode, isFavorite, onToggleFavorite, onRefresh, busy, cached, t, narrow }: {
   origin: PortOpt; dest: PortOpt; mode: ShippingMode; isFavorite: boolean;
   onToggleFavorite: () => void; onRefresh: () => void; busy: boolean; cached: boolean;
-  t: (k: string, f?: string) => string;
+  t: (k: string, f?: string) => string; narrow: boolean;
 }) {
+  const actions = (
+    <div className={narrow ? "ms-auto flex items-center gap-1" : "ms-auto flex items-center gap-1"}>
+      <button type="button" onClick={onToggleFavorite}
+        aria-pressed={isFavorite}
+        aria-label={isFavorite ? t("action.unfavorite") : t("action.favorite")}
+        title={isFavorite ? t("action.unfavorite") : t("action.favorite")}
+        className={`flex h-8 w-8 items-center justify-center rounded-lg border border-[var(--border-subtle)] transition-colors ${isFavorite ? "text-[#F59E0B]" : "text-[var(--text-ghost)] hover:text-[var(--text-primary)]"}`}>
+        <StarIcon size={13} />
+      </button>
+      <button type="button" onClick={onRefresh} disabled={busy}
+        aria-label={t("action.refresh")} title={t("action.refresh")}
+        className="flex h-8 w-8 items-center justify-center rounded-lg border border-[var(--border-subtle)] text-[var(--text-ghost)] transition-colors hover:text-[var(--text-primary)] disabled:opacity-40">
+        <RefreshIcon size={13} className={busy ? "animate-spin" : undefined} />
+      </button>
+    </div>
+  );
+  const meta = (
+    <>
+      <span className="inline-flex items-center gap-1 rounded-full border border-[var(--border-subtle)] px-2 py-0.5 text-[11px] text-[var(--text-dim)]">
+        {mode === "air" ? <PlaneIcon size={11} /> : <ContainerIcon size={11} />}
+        {t(`mode.${mode}`)}
+      </span>
+      {cached ? <span className="text-[11px] text-[var(--text-ghost)]">{t("load.cached")}</span> : null}
+    </>
+  );
+
+  /* ⚠️ On a phone the one-row version squeezed BOTH port names to zero width —
+     `truncate` inside a flex row shrinks text before it drops a sibling, so the
+     strip rendered as "CNSGH→ EGALY" with no names at all. Below 560 the route
+     gets its own row and the meta and actions move underneath. */
+  if (narrow) {
+    return (
+      <div className="space-y-2 rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-3 py-2.5">
+        <div className="flex items-center gap-2">
+          <RouteIcon size={15} className="shrink-0 text-[var(--text-ghost)]" />
+          <div className="flex min-w-0 flex-1 items-center gap-2">
+            <Endpoint opt={origin} />
+            <ArrowRightIcon size={13} className="shrink-0 text-[var(--text-ghost)] rtl:rotate-180" />
+            <Endpoint opt={dest} />
+          </div>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">{meta}{actions}</div>
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-3 py-2.5">
       <RouteIcon size={15} className="shrink-0 text-[var(--text-ghost)]" />
@@ -586,25 +654,8 @@ function RouteStrip({ origin, dest, mode, isFavorite, onToggleFavorite, onRefres
         <ArrowRightIcon size={13} className="shrink-0 text-[var(--text-ghost)] rtl:rotate-180" />
         <Endpoint opt={dest} />
       </div>
-      <span className="inline-flex items-center gap-1 rounded-full border border-[var(--border-subtle)] px-2 py-0.5 text-[11px] text-[var(--text-dim)]">
-        {mode === "air" ? <PlaneIcon size={11} /> : <ContainerIcon size={11} />}
-        {t(`mode.${mode}`)}
-      </span>
-      {cached ? <span className="text-[11px] text-[var(--text-ghost)]">{t("load.cached")}</span> : null}
-      <div className="ms-auto flex items-center gap-1">
-        <button type="button" onClick={onToggleFavorite}
-          aria-pressed={isFavorite}
-          aria-label={isFavorite ? t("action.unfavorite") : t("action.favorite")}
-          title={isFavorite ? t("action.unfavorite") : t("action.favorite")}
-          className={`flex h-8 w-8 items-center justify-center rounded-lg border border-[var(--border-subtle)] transition-colors ${isFavorite ? "text-[#F59E0B]" : "text-[var(--text-ghost)] hover:text-[var(--text-primary)]"}`}>
-          <StarIcon size={13} />
-        </button>
-        <button type="button" onClick={onRefresh} disabled={busy}
-          aria-label={t("action.refresh")} title={t("action.refresh")}
-          className="flex h-8 w-8 items-center justify-center rounded-lg border border-[var(--border-subtle)] text-[var(--text-ghost)] transition-colors hover:text-[var(--text-primary)] disabled:opacity-40">
-          <RefreshIcon size={13} className={busy ? "animate-spin" : undefined} />
-        </button>
-      </div>
+      {meta}
+      {actions}
     </div>
   );
 }
@@ -613,7 +664,10 @@ function Endpoint({ opt }: { opt: PortOpt }) {
   return (
     <span className="flex min-w-0 items-center gap-1.5">
       {opt.glyph ? <span aria-hidden className="shrink-0 text-[14px] leading-none">{opt.glyph}</span> : null}
-      <span className="truncate text-[13px] font-semibold text-[var(--text-primary)]">{opt.label}</span>
+      {/* The NAME is what the operator reads. `truncate` in a flex row shrinks
+          text before it drops a sibling, so without this floor both names
+          collapsed to nothing on a phone and the strip read "CNSGH→ EGALY". */}
+      <span className="min-w-[4.5rem] truncate text-[13px] font-semibold text-[var(--text-primary)]">{opt.label}</span>
       {opt.code ? <span className="shrink-0 font-mono text-[11px] tabular-nums text-[var(--text-ghost)]">{opt.code}</span> : null}
     </span>
   );
