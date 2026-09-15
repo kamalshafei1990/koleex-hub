@@ -357,21 +357,25 @@ export default function ShippingApp() {
         />
 
         {/* ── the search strip ──────────────────────────────────────────────
-            Sticky, and it carries the ONE edge blur on this screen: a
-            filterless kx-bar-host with a kx-glass-bar child. Pinned to the
-            header height, not top-0, because /shipping is an under-glass
-            route and the scroller's top edge IS the viewport top.
+            ⚠️ NOTHING HERE IS STICKY, AND THAT IS THE HOUSE PATTERN.
 
-            ⚠️ bg-[var(--bg-primary)] IS LOAD-BEARING, AND ONLY UNDER CORE.
-            The glass comes from the kx-glass-bar child, which Aurora draws and
-            Core sets to display:none — so without a background of its own the
-            strip was transparent in Core and the result cards scrolled visibly
-            THROUGH the port fields. kx-app remaps --bg-primary to transparent
-            under Aurora, so the one class is glass in one skin and a solid
-            page ground in the other. Same shape Contacts uses. */}
-        <div className="kx-bar-host sticky top-[var(--kx-header-h,3.5rem)] z-[15] -mx-4 mb-4 bg-[var(--bg-primary)] px-4 pb-3 pt-3 sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8">
-          <div aria-hidden className="kx-glass-bar" />
+            The first version pinned this whole block — method, both port
+            pickers, the container chips and the button, about 200px of it —
+            with a `kx-bar-host` + `kx-glass-bar` frost of its own. Two things
+            were wrong with that. Half the page moved and half did not, which
+            is what the owner reported. And it was a SECOND edge blur: on an
+            under-glass route the main header's pane already wears the
+            progressive ramp, and the standing rule is one edge blur, never
+            three.
 
+            Shipping has exactly the shape the apps that get this right have —
+            PageHeader with showTabs={false}, navigation from the page itself,
+            no tab band. Travel, Expenses, Notes, Projects and Planning all
+            render that and carry ZERO stickies; they sit in isUnderglassRoute
+            and deliberately NOT in appOwnsTopRamp, because with no band there
+            is no ramp host and listing them would trade the pane's frost for a
+            ramp that never gets drawn. This is the same case. */}
+        <div className="mb-4">
           {/* method — three-up, icon-led, always visible */}
           <div role="radiogroup" aria-label={t("a11y.modeGroup")} className="mb-2 grid grid-cols-3 gap-1.5 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] p-1">
             {MODES.map((m) => {
@@ -401,12 +405,7 @@ export default function ShippingApp() {
           </div>
 
           {/* route */}
-          {/* ⚠️ DO NOT ADD A z-* CLASS HERE EXPECTING IT TO DO ANYTHING.
-              kx-bar-host pins every row of this strip to z-index:1 —
-              `z-20` here and `z-10` below both computed to 1, measured. The
-              open dropdown escapes by being portalled to <body>; see the
-              header of SearchCombobox. */}
-          <div className={`relative grid gap-2 ${wide ? "grid-cols-[1fr_auto_1fr_1fr_auto]" : mid ? "grid-cols-3" : "grid-cols-1"}`}>
+          <div className={`grid gap-2 ${wide ? "grid-cols-[1fr_auto_1fr_1fr_auto]" : mid ? "grid-cols-3" : "grid-cols-1"}`}>
             <Labelled label={isAir ? t("field.originAirport") : t("field.originPort")}>
               <SearchCombobox
                 value={origin}
@@ -484,7 +483,7 @@ export default function ShippingApp() {
           </div>
 
           {/* cargo — only what this method actually needs */}
-          <div className={`relative mt-2 flex flex-wrap items-end gap-2 ${wide ? "" : "pb-1"}`}>
+          <div className={`mt-2 flex flex-wrap items-end gap-2 ${wide ? "" : "pb-1"}`}>
             {mode === "ocean_fcl" ? (
               <Labelled label={t("field.containers")}>
                 <div className="flex gap-1.5">
@@ -701,7 +700,7 @@ function SearchButton({ t, busy, disabled, onClick, fullWidth }: {
       type="button"
       onClick={onClick}
       disabled={disabled}
-      className={`inline-flex items-center justify-center gap-2 rounded-xl bg-[var(--bg-inverted)] px-5 text-[13px] font-semibold text-[var(--text-inverted)] shadow-lg transition-opacity hover:opacity-90 disabled:opacity-40 ${fullWidth ? "h-11 w-full" : "h-10"}`}
+      className={`inline-flex items-center justify-center gap-2 rounded-xl bg-[var(--bg-inverted)] px-5 text-[13px] font-semibold text-[var(--text-inverted)] transition-opacity hover:opacity-90 disabled:opacity-40 ${fullWidth ? "h-11 w-full" : "h-10"}`}
     >
       {busy ? <SpinnerIcon size={14} className="animate-spin" /> : <SearchIcon size={14} />}
       {busy ? t("action.searching") : t("action.search")}

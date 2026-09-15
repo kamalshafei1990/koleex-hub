@@ -11,21 +11,19 @@
    loop the CRM contact picker established.
 
    ── ⚠️ WHY THE PANEL IS PORTALLED, AND MUST STAY PORTALLED ────────────────
-   The first version rendered the panel absolutely, beside its trigger, and the
-   container chips painted straight over an open port list. The cause was not a
-   z-index that was too low. `kx-bar-host` declares
+   `PopoverPanel` renders it on <body>. Three things bit this control before it
+   did:
 
-       [data-kx-skin="aurora"] .kx-bar-host > :not(.kx-glass-bar):not(.absolute)…
-         { position: relative; z-index: 1 }
-
-   so EVERY row of the search strip is pinned to z-index 1 whatever class it
-   carries. `z-20` on the route row and `z-10` on the cargo row both computed
-   to 1 — measured — the two tied, and a tie goes to the later sibling. No
-   number wins an argument the stylesheet has already settled.
-
-   `PopoverPanel` moves the panel to <body>, which is this Hub's answer to the
-   whole family: it also stops a backdrop-filter ancestor starving the panel's
-   own glass, and stops the sticky bar clipping a long list.
+   · A backdrop-filter ancestor STARVES a descendant's own backdrop-filter, so
+     a panel inside a glass card has no working glass at any radius.
+   · A card's `overflow` clips it, and a later sibling card buries it — and no
+     z-index escapes, because backdrop-filter creates a stacking context.
+   · Measured here specifically: while this strip was still a `kx-bar-host`,
+     that class pinned EVERY row of it to z-index 1 whatever class it carried,
+     so `z-20` on the route row and `z-10` on the cargo row both computed to 1,
+     tied, and the container chips painted over an open port list. The host has
+     since been removed for unrelated reasons; the portal is what made the
+     panel correct either way.
 
    `scrim={false}` is the owner's rule, not a preference: a list that appears
    while you are still typing must not dim and blur the page behind it —

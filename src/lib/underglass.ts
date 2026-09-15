@@ -15,12 +15,18 @@ export function isUnderglassRoute(pathname: string | null): boolean {
     p === "/products" ||
     p.startsWith("/products/") ||
     p.startsWith("/product-data") ||
-    /* Shipping, 2026-09-15. Sticky audit done before adding this line: the app
-       has exactly one sticky element, the search bar in ShippingApp, and it
-       pins to var(--kx-header-h) rather than top-0 — required here, because
-       under this geometry the scroller's top edge IS the viewport top. It
-       carries the kx-bar-host + kx-glass-bar pair and nothing else in the app
-       frosts, so there is one edge blur, not three. */
+    /* Shipping, 2026-09-15. Sticky audit: ZERO stickies, and that is the
+       point of the entry.
+
+       It shipped with one — a kx-bar-host + kx-glass-bar search strip pinned
+       at var(--kx-header-h) — and the owner reported the result immediately:
+       half the page moved and half did not, and the strip's frost was a
+       SECOND edge blur under a header pane that already wears the ramp. Both
+       are gone. The app renders PageHeader with showTabs={false} and navigates
+       from the page itself, exactly like Travel, Expenses, Notes, Projects and
+       Planning — which is also why /shipping belongs here and NOT in
+       appOwnsTopRamp: with no tab band there is no ramp host, and listing it
+       there would trade the pane's frost for a ramp that never gets drawn. */
     p.startsWith("/shipping") ||
     /* Inventory, 2026-08-12. THIS is what makes the main header glass on an
        app screen — the pane only frosts on under-glass routes, so converting
