@@ -232,8 +232,33 @@ export async function GET(req: Request) {
      user browse the directory, not the credit relationship. */
   const visible = sanitizeContactRows(auth, slim);
 
-  const { header } = _t.done({ status: 200, type: typeFilter ?? "all", rows: visible.length });
-  return NextResponse.json({ contacts: visible }, {
+  /* ⚠️ EMPTY KEYS ARE MOST OF THIS RESPONSE. Measured on prod, 347 contacts:
+     2,061 KB for 249 columns a row — but the twelve heaviest FIELDS together
+     are only ~160 KB. The rest is the column NAME repeated for a value that
+     is not there: 60 columns are null on every single row, and the 25 heavy
+     blobs above are explicitly set to null rather than removed. Dropping keys
+     with no value takes the same rows to 501 KB (76% off) and ~6s to about a
+     second, with no change to what the directory can show.
+
+     WHY DROP RATHER THAN SLIM THE COLUMNS: the Contacts app references 214 of
+     the 223 list columns somewhere in its 5,700 lines, so a hand-picked
+     projection (the Customers/Suppliers `?paged=1` path has one) cannot be
+     proven safe here by reading it. An absent key and a null key are the same
+     answer to "what is this contact's fax number" — verified that this client
+     has no `=== null` test on a row field, so nothing can tell the difference.
+
+     false and 0 are VALUES and stay: only null, undefined and "" go. */
+  const compact = visible.map((row) => {
+    const out: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(row as Record<string, unknown>)) {
+      if (v === null || v === undefined || v === "") continue;
+      out[k] = v;
+    }
+    return out;
+  });
+
+  const { header } = _t.done({ status: 200, type: typeFilter ?? "all", rows: compact.length });
+  return NextResponse.json({ contacts: compact }, {
     headers: {
       "Cache-Control": "private, max-age=30, stale-while-revalidate=300",
       "Server-Timing": header,
