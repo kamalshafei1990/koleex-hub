@@ -147,6 +147,13 @@ const ROUTE_BUDGETS: Record<string, { chunks: number; kbytes: number }> = {
      that was loading all twelve tab components to show one; leaving it there
      would have let the regression walk straight back in. */
   "settings": { chunks: 9, kbytes: 630 },
+  /* Measured 9 chunks / 519 KB the day it shipped, +12%. Sits with customers
+     (502) and suppliers (502): almost all of it is the shared baseline, which
+     is the expected shape for an app that is one search bar and a list of
+     cards. The port and airport tables are NOT in this number and must never
+     be — 3,806 ports live in Postgres and are searched server-side, which is
+     the whole reason they are not a TS literal. */
+  "shipping": { chunks: 10, kbytes: 581 },
   "software-center": { chunks: 10, kbytes: 551 },
   "suppliers": { chunks: 10, kbytes: 515 },
   /* Measured 9 chunks / 518 KB on the day it shipped, +12% headroom. Sits
