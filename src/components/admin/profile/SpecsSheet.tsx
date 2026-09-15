@@ -23,12 +23,13 @@
    --------------------------------------------------------------------------- */
 
 import { useEffect, useMemo, useState } from "react";
+import dynamic from "next/dynamic";
 import type { SpecField } from "@/types/product-schema";
 import { updateProduct, fetchSewingSpecsByProductId, upsertSewingSpecs } from "@/lib/products-admin";
 import { schemaColumnMirror, computeSchemaCoveredColumns } from "@/lib/product-schema/column-mirror";
 import { isSewingMachineSubcategory, getTemplateForSubcategory, COMMON_SEWING_FIELDS, groupFields, SEWING_MACHINE_TEMPLATES, type TemplateField } from "@/lib/sewing-machine-templates";
-import { FieldInput, computeDerivedValue } from "../form-sections/SchemaSpecsSection";
-import SewingMachineSection, { type SewingSpecsFormState } from "../form-sections/SewingMachineSection";
+import { computeDerivedValue } from "@/lib/product-schema/derived";
+import type { SewingSpecsFormState } from "../form-sections/SewingMachineSection";
 import AccessoryOptionsSection, { type AccessoryOptionRow, axesForSubcategory } from "../form-sections/AccessoryOptionsSection";
 import KdsSelect from "@/components/kds/Select";
 import Toggle from "@/components/kds/Toggle";
@@ -39,6 +40,22 @@ import WrenchIcon from "@/components/icons/ui/WrenchIcon";
 import TableIcon from "@/components/icons/ui/TableIcon";
 import { Group, FieldRow, Blank, YesNo, Chips, CalcBadge, INP_B } from "./primitives";
 import { useSheetEdit } from "./useSheetEdit";
+
+/* ⚠️ THE TWO SPEC EDITORS ARRIVE WHEN EDIT IS PRESSED, NOT BEFORE.
+   SchemaSpecsSection's field control is 995 lines with a portal, the visual
+   option registry and the unit pickers behind it; SewingMachineSection is
+   1337 more. The read view needs neither — it renders values as text — so a
+   static import would have put both in the paint path of every product anyone
+   merely LOOKS at. (`computeDerivedValue` moved to lib/product-schema/derived
+   for the same reason: one pure function was dragging a whole editor in.) */
+const FieldInput = dynamic(() => import("../form-sections/SchemaSpecsSection").then((m) => ({ default: m.FieldInput })), {
+  ssr: false,
+  loading: () => <div className="h-9 w-full max-w-[240px] rounded-lg border border-dashed border-[var(--border-subtle)] animate-pulse" />,
+});
+const SewingMachineSection = dynamic(() => import("../form-sections/SewingMachineSection"), {
+  ssr: false,
+  loading: () => <div className="h-40 rounded-xl border border-dashed border-[var(--border-subtle)] animate-pulse" />,
+});
 
 type Row = Record<string, unknown>;
 type Card = `g:${string}` | "technical" | "sewing" | "accessory";

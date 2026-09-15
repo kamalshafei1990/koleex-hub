@@ -28,6 +28,7 @@
    photo goes through product_media; translations upsert per locale.
    --------------------------------------------------------------------------- */
 
+import dynamic from "next/dynamic";
 import { useEffect, useState } from "react";
 import { IMG } from "@/lib/cdn";
 import {
@@ -40,8 +41,6 @@ import { LOCALES, slugify } from "@/types/product-form";
 import KdsSelect from "@/components/kds/Select";
 import Toggle from "@/components/kds/Toggle";
 import BoundIcon from "@/components/common/BoundIcon";
-import RichTextEditor from "../form-sections/RichTextEditor";
-import BarcodeQRDisplay from "../form-sections/BarcodeQRDisplay";
 import { HighlightsEditor, TagsInput } from "../form-sections/ListEditors";
 import { Group, FieldRow, Blank, YesNo, Seg, Chips, CalcBadge, INP_B, TA } from "./primitives";
 import { useSheetEdit } from "./useSheetEdit";
@@ -57,6 +56,19 @@ import GlobeIcon from "@/components/icons/ui/GlobeIcon";
 import PlusIcon from "@/components/icons/ui/PlusIcon";
 import CrossIcon from "@/components/icons/ui/CrossIcon";
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
+
+/* ⚠️ BOTH OF THESE LOAD ON DEMAND, AND THAT IS NOT AN OPTIMISATION DETAIL.
+   BarcodeQRDisplay pulls jsbarcode + qrcode — it was deliberately lazified in
+   the editor (2026-08-02) and importing it statically here quietly undid that
+   for everyone who merely OPENS a product. RichTextEditor is 750 lines that
+   only matter once someone presses Edit. The record is read far more often
+   than it is written; nothing that only serves editing may sit in the paint
+   path. */
+const RichTextEditor = dynamic(() => import("../form-sections/RichTextEditor"), {
+  ssr: false,
+  loading: () => <div className="h-[220px] rounded-xl border border-dashed border-[var(--border-subtle)] animate-pulse" />,
+});
+const BarcodeQRDisplay = dynamic(() => import("../form-sections/BarcodeQRDisplay"), { ssr: false, loading: () => null });
 
 type Row = Record<string, unknown>;
 type Card = "poster" | "identity" | "description" | "highlights" | "tags" | "identifiers" | "seo" | "languages";

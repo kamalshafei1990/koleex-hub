@@ -24,7 +24,7 @@
 import { useState } from "react";
 import { IMG } from "@/lib/cdn";
 import { uploadProductFile, createProductMedia, deleteProductMedia, saveProductDocuments, type ProductDocumentRow } from "@/lib/products-admin";
-import { MEDIA_TYPES } from "../form-sections/MediaSection";
+import { MEDIA_TYPES } from "../form-sections/media-slots";
 import KdsSelect from "@/components/kds/Select";
 import BoundIcon from "@/components/common/BoundIcon";
 import ImageRawIcon from "@/components/icons/ui/ImageRawIcon";

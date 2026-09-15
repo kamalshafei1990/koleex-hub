@@ -21,10 +21,10 @@
    --------------------------------------------------------------------------- */
 
 import { useEffect, useState } from "react";
+import dynamic from "next/dynamic";
 import Link from "next/link";
 import type { ProductKnowledgeBlock } from "@/types/product-schema";
 import { updateProduct, setRelatedProducts, searchProducts } from "@/lib/products-admin";
-import KnowledgeSection from "../form-sections/KnowledgeSection";
 import KdsSelect from "@/components/kds/Select";
 import BoundIcon from "@/components/common/BoundIcon";
 import BookOpenIcon from "@/components/icons/ui/BookOpenIcon";
@@ -33,6 +33,13 @@ import SearchIcon from "@/components/icons/ui/SearchIcon";
 import CrossIcon from "@/components/icons/ui/CrossIcon";
 import { Group, Blank, INP_B } from "./primitives";
 import { useSheetEdit } from "./useSheetEdit";
+
+/* The 481-line block editor is for the one person editing, not the many
+   reading — it arrives when Edit is pressed. */
+const KnowledgeSection = dynamic(() => import("../form-sections/KnowledgeSection"), {
+  ssr: false,
+  loading: () => <div className="h-40 rounded-xl border border-dashed border-[var(--border-subtle)] animate-pulse" />,
+});
 
 type Row = Record<string, unknown>;
 type Rel = { related_id: string; relation_type: string; name: string; slug: string | null };
