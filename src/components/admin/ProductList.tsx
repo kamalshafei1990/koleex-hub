@@ -68,6 +68,14 @@ import BackToTop from "@/components/ui/BackToTop";
    single-file change. */
 const FLAGSHIP_DIVISION_SLUG = "garment-machinery";
 
+/* ⚠️ ONE page size, used by BOTH param builders — they are compared as strings
+   to decide `isDefaultView`, so a value that drifts between them silently
+   disables the warm-start cache. 200 is the server's own ceiling
+   (`products-config.ts` maxPageSize): asking for more is clamped, asking for
+   less only buys extra round trips, and on this platform a round trip is
+   ~1s whatever it carries. */
+const LIST_PAGE_SIZE = "200";
+
 /* Division → icon. Divisions are DB-driven with no icon column, so we map by
    name keyword (robust to slug variants) and fall back to a neutral box. */
 function divisionIcon(name: string): React.ElementType {
@@ -1170,7 +1178,7 @@ export default function ProductList() {
      The string identity of this object is what the load effect keys on, so a
      changed filter starts a fresh page 1 and an unchanged one does not. */
   const serverParams = useMemo(() => {
-    const p = new URLSearchParams({ view: "list", paged: "1", pageSize: "150" });
+    const p = new URLSearchParams({ view: "list", paged: "1", pageSize: LIST_PAGE_SIZE });
     /* The DEBOUNCED term, not the deferred one — see the note beside it. */
     if (searchForServer.trim()) p.set("q", searchForServer.trim());
     if (filterDiv) p.set("division", filterDiv);
@@ -1234,7 +1242,7 @@ export default function ProductList() {
     }
     defaultDivRef.current = d;
   }
-  const defaultParams = new URLSearchParams({ view: "list", paged: "1", pageSize: "150" });
+  const defaultParams = new URLSearchParams({ view: "list", paged: "1", pageSize: LIST_PAGE_SIZE });
   if (defaultDivRef.current) defaultParams.set("division", defaultDivRef.current);
   if (!isInternal) defaultParams.set("status", "active");
   const isDefaultView = serverParams === defaultParams.toString();
@@ -1660,18 +1668,88 @@ export default function ProductList() {
     return () => { cancelled = true; ctrl.abort(); };
   }, [isInternal, products, fobPrices]);
 
+  /* ⚠️ THE REMAINING PAGES GO OUT TOGETHER, NOT ONE AFTER ANOTHER.
+     Measured on prod with 396 products: three pages, 1.2–1.8s each, each one
+     asked for only after the previous had landed — the grid was not complete
+     for ~10s and filled in three visible jumps (the owner: "the products not
+     all appear together"). The sequential loop was written to be gentle on a
+     slow link, but it pays this platform's ~1s-per-request floor once per
+     page for nothing: the moment `total` arrives the page count is known, so
+     every remaining page can be in flight at once. The auto-complete cap
+     keeps that wave small (600 / 200 = at most two extra requests); past the
+     cap nothing changes and pages still arrive on scroll. */
   useEffect(() => {
     if (loading || loadError || !hasMore) return;
     if (total == null || total > AUTO_COMPLETE_MAX) return;
+    const lastPage = Math.ceil(total / Number(LIST_PAGE_SIZE));
+    const firstMissing = pageRef.current + 1;
+    if (firstMissing > lastPage) return;
     let cancelled = false;
+    /* Hold the SHARED guard for the whole wave: the scroll observer must not
+       ask for a page that is already in flight here. */
+    loadingMoreRef.current = true;
+    setLoadingMore(true);
     void (async () => {
-      /* One page at a time, so a slow link is not hit with ten parallel
-         requests — the whole point of this work was fewer of them at once. */
+      const wanted: number[] = [];
+      for (let p = firstMissing; p <= lastPage; p++) wanted.push(p);
+      const pages = await Promise.all(wanted.map(async (p) => {
+        try {
+          const res = await fetch(`/api/products?${serverParams}&page=${p}`, { credentials: "include" });
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          return (await res.json()) as {
+            rows?: ProductRow[]; hasMore?: boolean;
+            models?: { counts: Record<string, number>; primaryModelNames: Record<string, string>; modelNames: Record<string, string[]> };
+          };
+        } catch {
+          /* One failed page must not blank the grid, and must not strand the
+             pages after it — see the contiguous-apply rule below. */
+          return null;
+        }
+      }));
+      if (cancelled) return;
+      /* Apply IN ORDER and stop at the first gap, so `pageRef` never claims a
+         page the grid does not hold — the scroll path resumes from there. */
+      const rows: ProductRow[] = [];
+      const counts: Record<string, number> = {};
+      const primaries: Record<string, string> = {};
+      const names: Record<string, string[]> = {};
+      let applied = pageRef.current;
       let more = true;
-      while (!cancelled && more) more = await loadNextPage();
+      for (let i = 0; i < pages.length; i++) {
+        const json = pages[i];
+        if (!json) break;
+        rows.push(...(json.rows ?? []));
+        if (json.models) {
+          Object.assign(counts, json.models.counts);
+          Object.assign(primaries, json.models.primaryModelNames);
+          Object.assign(names, json.models.modelNames);
+        }
+        applied = wanted[i];
+        more = Boolean(json.hasMore);
+      }
+      if (applied === pageRef.current) { loadingMoreRef.current = false; setLoadingMore(false); return; }
+      pageRef.current = applied;
+      if (Object.keys(counts).length) {
+        setModelCounts((prev) => ({ ...prev, ...counts }));
+        setPrimaryModelNames((prev) => ({ ...prev, ...primaries }));
+        setModelNames((prev) => ({ ...prev, ...names }));
+      }
+      /* Append by id, never blindly: a product edited between two page
+         requests can shift across the offset boundary and arrive twice. */
+      setProducts((prev) => {
+        const seen = new Set(prev.map((r) => r.id));
+        return [...prev, ...rows.filter((r) => !seen.has(r.id))];
+      });
+      setHasMore(more && applied < lastPage ? true : more);
+      loadingMoreRef.current = false;
+      setLoadingMore(false);
     })();
-    return () => { cancelled = true; };
-  }, [loading, loadError, hasMore, total, loadNextPage]);
+    return () => {
+      cancelled = true;
+      loadingMoreRef.current = false;
+      setLoadingMore(false);
+    };
+  }, [loading, loadError, hasMore, total, serverParams]);
 
   /* Infinite scroll — the owner's choice over a numbered pager: nothing new to
      learn, and it is the one that behaves on a phone. The sentinel sits after
