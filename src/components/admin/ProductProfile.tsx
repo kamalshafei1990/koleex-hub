@@ -102,6 +102,7 @@ import VariantsSheet from "./profile/VariantsSheet";
 import OptionsSheet from "./profile/OptionsSheet";
 import SpecsSheet from "./profile/SpecsSheet";
 import KnowledgeSheet from "./profile/KnowledgeSheet";
+import MediaSheet from "./profile/MediaSheet";
 import dynamic from "next/dynamic";
 import { useSkin } from "@/lib/appearance";
 import FeatureHighlightsDisplay from "./FeatureHighlightsDisplay";
@@ -145,6 +146,33 @@ const PROFILE_T: Record<string, { en: string; zh: string; ar: string }> = {
   "pp.certWord":      { en: "cert",               zh: "证书",           ar: "شهادة" },
   "sup.costNote":     { en: "Price note",         zh: "价格备注",       ar: "ملاحظة السعر" },
   "sp.freqHint":      { en: "Comma-separated — e.g. 50, 60", zh: "逗号分隔——例如 50, 60", ar: "مفصولة بفواصل — مثال: 50, 60" },
+  /* Media tab */
+  "md.filesWord":     { en: "files",              zh: "个文件",         ar: "ملفات" },
+  "md.addFiles":      { en: "Add files",          zh: "添加文件",       ar: "إضافة ملفات" },
+  "md.altText":       { en: "Alt text / caption", zh: "替代文本 / 说明", ar: "نص بديل / تعليق" },
+  "md.wholeProduct":  { en: "Whole product",      zh: "整个产品",       ar: "المنتج كله" },
+  "md.tooBig":        { en: "{name} is over {mb} MB.", zh: "{name} 超过 {mb} MB。", ar: "{name} أكبر من {mb} ميجابايت." },
+  "md.identityImages": { en: "Identity images",   zh: "标识图片",       ar: "صور الهوية" },
+  "md.onHero":        { en: "edited on the Hero tab", zh: "在主页标签页编辑", ar: "تُعدَّل في تبويب الواجهة" },
+  "md.noDocs":        { en: "No documents recorded.", zh: "未记录文档。", ar: "لا مستندات مسجّلة." },
+  "md.type":          { en: "Type",               zh: "类型",           ar: "النوع" },
+  "md.title":         { en: "Title",              zh: "标题",           ar: "العنوان" },
+  "md.version":       { en: "Version",            zh: "版本",           ar: "الإصدار" },
+  "md.language":      { en: "Language",           zh: "语言",           ar: "اللغة" },
+  "md.needsFile":     { en: "Upload the file to keep this document.", zh: "请上传文件以保留此文档。", ar: "ارفع الملف للاحتفاظ بهذا المستند." },
+  "md.addDoc":        { en: "Add document",       zh: "添加文档",       ar: "إضافة مستند" },
+  "md.dt.user_manual": { en: "User Manual",       zh: "用户手册",       ar: "دليل المستخدم" },
+  "md.dt.spare_parts_list": { en: "Spare Parts List", zh: "备件清单",   ar: "قائمة قطع الغيار" },
+  "md.dt.exploded_view": { en: "Exploded View",   zh: "爆炸图",         ar: "رسم تفصيلي (Exploded)" },
+  "md.dt.wiring_diagram": { en: "Wiring Diagram", zh: "接线图",         ar: "مخطط الأسلاك" },
+  "md.dt.installation_guide": { en: "Installation Guide", zh: "安装指南", ar: "دليل التركيب" },
+  "md.dt.brochure":   { en: "Brochure",           zh: "宣传册",         ar: "كتيّب" },
+  "md.dt.catalog":    { en: "Catalog",            zh: "目录",           ar: "كتالوج" },
+  "md.dt.certificate": { en: "Certificate",       zh: "证书",           ar: "شهادة" },
+  "md.dt.test_report": { en: "Test Report",       zh: "测试报告",       ar: "تقرير اختبار" },
+  "md.dt.packing_list": { en: "Packing List",     zh: "装箱单",         ar: "قائمة التعبئة" },
+  "md.dt.dimension_drawing": { en: "Dimension Drawing", zh: "尺寸图",   ar: "رسم الأبعاد" },
+  "md.dt.cad_3d":     { en: "3D CAD File",        zh: "3D CAD 文件",    ar: "ملف CAD ثلاثي الأبعاد" },
   /* Knowledge tab */
   "kn.blocksN":       { en: "{n} blocks",         zh: "{n} 个知识块",   ar: "{n} بلوكات" },
   "kn.none":          { en: "No knowledge blocks yet — press Edit to add the first.", zh: "尚无知识块——点击“编辑”添加第一个。", ar: "لا بلوكات معرفة بعد — اضغط تعديل لإضافة أول بلوك." },
@@ -695,23 +723,6 @@ function ProfileTabs({ current, onPick }: { current: number; onPick: (i: number)
   );
 }
 
-/* The editor's eleven media slots, in its order, resolved through ITS OWN
-   i18n keys (media.slot.*). The record has to show the empty slots too —
-   "no packing photos" is exactly the kind of thing an operator opens this
-   page to discover, and a bare thumbnail grid hides it. */
-const MEDIA_SLOTS: Array<{ type: string; fallback: string }> = [
-  { type: "main_image",    fallback: "Main Image" },
-  { type: "gallery",       fallback: "Gallery" },
-  { type: "packing_photo", fallback: "Packing Photos" },
-  { type: "label",         fallback: "Labels & Logos" },
-  { type: "manual",        fallback: "User Manual" },
-  { type: "datasheet",     fallback: "Datasheet" },
-  { type: "brochure",      fallback: "Brochure" },
-  { type: "certificate",   fallback: "Certificate" },
-  { type: "parts_list",    fallback: "Parts List" },
-  { type: "ar_3d",         fallback: "3D / AR" },
-  { type: "video",         fallback: "Video" },
-];
 
 /* The editor's field row: label on top, value under it, help line beneath.
    Used by every tab so a reader never meets two different field shapes. */
@@ -1863,7 +1874,7 @@ export default function ProductProfile() {
   const s2 = (k: string) => p[k];
   /* One merge for every sheet: show what was saved at once, then re-read the
      row behind it (no-store — the profile response is cached 15s). */
-  const mergeSaved = (u: { product?: Row; models?: Record<string, Row>; media?: Row[]; translations?: Row[]; certifications?: Row[]; suppliers?: Row[]; related?: Row[] }) => {
+  const mergeSaved = (u: { product?: Row; models?: Record<string, Row>; media?: Row[]; translations?: Row[]; certifications?: Row[]; suppliers?: Row[]; related?: Row[]; documents?: Row[] }) => {
     setData((prev) => {
       if (!prev) return prev;
       const models = u.models
@@ -1878,6 +1889,7 @@ export default function ProductProfile() {
         certifications: u.certifications ?? prev.certifications,
         suppliers: (u.suppliers as Profile["suppliers"] | undefined) ?? prev.suppliers,
         related: (u.related as Profile["related"] | undefined) ?? prev.related,
+        documents: u.documents ?? prev.documents,
       };
     });
     setReloadTick((n) => n + 1);
@@ -2309,73 +2321,19 @@ export default function ProductProfile() {
         </Group>
       )}
 
-      {STEPS[step].id === "media" && (<>
-      <Group motion={tabMotion} icon={<BoundIcon semanticKey="field.photos" className="h-4 w-4" fallback={<ImageRawIcon className="h-4 w-4" />} />} title={t("pp.sec.media", "Media & Documents")} count={`${data.media.length} media · ${data.documents.length} docs`} editLabel={t("action.edit", "Edit")} onEdit={() => goStep("media")}>
-        {/* Photo / file slots — every slot, filled or not. */}
-        <div className="space-y-4">
-          {MEDIA_SLOTS.map((slot) => {
-            const items = data.media.filter((m) => m.type === slot.type);
-            const label = t(`media.slot.${slot.type}.label`, slot.fallback);
-            return (
-              <div key={slot.type}>
-                <div className="flex items-center gap-2 mb-2">
-                  <span className="text-[11px] font-semibold text-[var(--text-muted)]">{label}</span>
-                  <span className="text-[10px] text-[var(--text-ghost)]">{items.length}</span>
-                </div>
-                {items.length === 0 ? (
-                  <span className="text-[12px] text-[var(--text-ghost)] italic">{NOT_SET}</span>
-                ) : (
-                  <div className="flex flex-wrap gap-2">
-                    {items.map((m, i) => {
-                      const url = typeof m.url === "string" ? m.url : "";
-                      const isImg = /\.(png|jpe?g|webp|gif|avif)(\?|$)/i.test(url);
-                      return (
-                        <a key={i} href={url || undefined} target="_blank" rel="noreferrer"
-                           className="h-20 w-20 rounded-lg overflow-hidden border border-[var(--border-subtle)] bg-white flex items-center justify-center hover:border-[var(--border-focus)] transition-colors">
-                          {isImg
-                            ? <img src={IMG.thumb(url)} alt="" className="h-full w-full object-contain p-0.5" />
-                            : <span className="text-[9px] text-gray-500 px-1 text-center break-all">{(m.file_name as string) || slot.fallback}</span>}
-                        </a>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-            );
-          })}
-
-          {/* Identity images live on the product row, not in product_media —
-              but they ARE photos, so an operator looking for "where are the
-              images?" must find them here too. */}
-          <div className="pt-3 border-t border-[var(--border-subtle)] grid grid-cols-2 md:grid-cols-4 gap-4">
-            {([["hero_poster_url", t("pp.f.heroPoster", "Hero poster")], ["brand_mark_url", t("pp.f.brandMark", "Brand mark")], ["og_image_url", "OG image"]] as const).map(([key, lbl]) => {
-              const url = s2(key) as string | null;
-              return (
-                <div key={key}>
-                  <div className="text-[10.5px] uppercase tracking-wider text-[var(--text-ghost)] mb-1">{lbl}</div>
-                  {url
-                    ? <a href={url} target="_blank" rel="noreferrer" className="block h-20 w-full rounded-lg overflow-hidden border border-[var(--border-subtle)] bg-white">
-                        <img src={IMG.thumb(url)} alt="" className="h-full w-full object-contain p-0.5" />
-                      </a>
-                    : <span className="text-[12px] text-[var(--text-ghost)] italic">{t("pp.notSet", "Not set")}</span>}
-                </div>
-              );
-            })}
-          </div>
-        </div>
-
-        {data.documents.length > 0 && (
-          <div className="space-y-1.5">
-            {data.documents.map((d, i) => (
-              <div key={i} className="flex items-center gap-2 text-[12px]">
-                <span className="text-[var(--text-muted)]">{(d.doc_type as string) || "document"}</span>
-                <span className="text-[var(--text-primary)] truncate">{(d.title as string) || (d.file_name as string) || "—"}</span>
-              </div>
-            ))}
-          </div>
-        )}
-      </Group>
-      </>)}
+      {STEPS[step].id === "media" && (
+        <MediaSheet
+          product={p}
+          media={data.media}
+          documents={data.documents}
+          models={data.models}
+          productId={p?.id as string | undefined}
+          t={t} motion={tabMotion} canEdit={canEdit} notSet={NOT_SET}
+          onDirtyChange={(d) => { dirtyRef.current = d; }}
+          onSaved={(u) => mergeSaved({ media: u.media, documents: u.documents })}
+          glyph={glyphFor}
+        />
+      )}
 
       {STEPS[step].id === "knowledge" && (
         <KnowledgeSheet

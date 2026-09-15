@@ -27,7 +27,7 @@ interface Props {
   excludeTypes?: ProductMediaType[];
 }
 
-interface MediaTypeDef {
+export interface MediaTypeDef {
   type: ProductMediaType;
   label: string;
   description: string;
@@ -52,7 +52,7 @@ interface MediaTypeDef {
 
 const MB = 1024 * 1024;
 
-const MEDIA_TYPES: MediaTypeDef[] = [
+export const MEDIA_TYPES: MediaTypeDef[] = [
   {
     type: "main_image",
     label: "Main Image",
