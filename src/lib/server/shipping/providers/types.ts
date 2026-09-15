@@ -60,6 +60,32 @@ export interface FreightRateProvider {
   getRates(query: RateQuery, ctx: ProviderContext): Promise<ProviderResult>;
 }
 
+/**
+ * ⚠️ CREDENTIALS ARE NOT PERMISSION TO SHOW A NUMBER.
+ *
+ * Every adapter here was written from a vendor's published documentation, not
+ * from a live call — no credential existed when they were written, and each
+ * file says so. A parser written that way fails silently: it reads
+ * defensively, finds nothing where a field was expected, and returns
+ * `undefined`. The screen then shows a confident rate card with a missing
+ * surcharge, a missing validity, or a freight figure that was really the
+ * all-in total. Nothing throws. The number is simply wrong.
+ *
+ * So a credentialed provider needs a second, orthogonal switch, set only after
+ * `npm run shipping:verify-provider -- <id>` has parsed a REAL response:
+ *
+ *     SHIPPING_<ID>_TERMS_REVIEWED=yes   a human read the API terms — LEGAL
+ *     SHIPPING_<ID>_VERIFIED=yes         the parser was proven — TECHNICAL
+ *
+ * Both live in the environment, never in the repo.
+ */
+export const verifiedSwitch = (providerId: string): boolean =>
+  (process.env[`SHIPPING_${providerId.toUpperCase()}_VERIFIED`] ?? "").toLowerCase() === "yes";
+
+export const verifiedReason = (providerId: string): string =>
+  `Not yet verified against a live response. Run \`npm run shipping:verify-provider -- ${providerId}\`, ` +
+  `then set SHIPPING_${providerId.toUpperCase()}_VERIFIED=yes.`;
+
 /** Shared deadline. Matches the house AI-provider convention. */
 export const PROVIDER_TIMEOUT_MS = 20_000;
 

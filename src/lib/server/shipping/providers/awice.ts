@@ -35,7 +35,7 @@ import "server-only";
 
 import { createHash, createHmac, randomUUID } from "node:crypto";
 import type { ContainerEquipment, FreightRate, ProviderResult, RateQuery, Surcharge } from "@/lib/shipping/types";
-import { type FreightRateProvider, type ProviderContext, providerDeadline, providerError } from "./types";
+import { type FreightRateProvider, type ProviderContext, providerDeadline, providerError, verifiedReason, verifiedSwitch } from "./types";
 import { providerCodes } from "./trade-codes";
 
 const BASE = "https://www.5688.cn";
@@ -60,14 +60,17 @@ export const awiceProvider: FreightRateProvider = {
     itemisesSurcharges: true,
     statesValidity: true,
     requires:
-      "Account at 5688.cn/open (mobile number, 100 free credits), SHIPPING_AWICE_APP_KEY + _APP_SECRET, server IP allow-listed, and SHIPPING_AWICE_TERMS_REVIEWED=yes once the API terms have been read.",
+      "Account at 5688.cn/open (mobile number, 100 free credits), SHIPPING_AWICE_APP_KEY + _APP_SECRET, server IP allow-listed, SHIPPING_AWICE_TERMS_REVIEWED=yes once the API terms have been read, and SHIPPING_AWICE_VERIFIED=yes once `npm run shipping:verify-provider -- awice` has parsed a real response.",
   },
 
-  isEnabled: () => Boolean(key() && secret() && termsAccepted()),
+  isEnabled: () => Boolean(key() && secret() && termsAccepted() && verifiedSwitch("awice")),
 
   disabledReason() {
     if (!key() || !secret()) return "No API credentials. Register at 5688.cn/open and set SHIPPING_AWICE_APP_KEY and SHIPPING_AWICE_APP_SECRET.";
     if (!termsAccepted()) return "Credentials present, but the provider's API terms have not been reviewed. Set SHIPPING_AWICE_TERMS_REVIEWED=yes to confirm.";
+    /* ⚠️ The parser below was transcribed from their documentation, never run
+       against a real response — see this file's header. */
+    if (!verifiedSwitch("awice")) return verifiedReason("awice");
     return undefined;
   },
 

@@ -34,7 +34,7 @@ import "server-only";
    --------------------------------------------------------------------------- */
 
 import type { FreightRate, ProviderResult, RateQuery } from "@/lib/shipping/types";
-import { type FreightRateProvider, type ProviderContext, providerDeadline, providerError } from "./types";
+import { type FreightRateProvider, type ProviderContext, providerDeadline, providerError, verifiedReason, verifiedSwitch } from "./types";
 import { providerCodes } from "./trade-codes";
 
 const ENDPOINT = "https://ship.freightos.com/api/shippingCalculator";
@@ -66,17 +66,20 @@ export const freightosPublicProvider: FreightRateProvider = {
     cadence: "realtime",
     itemisesSurcharges: false,
     statesValidity: false,
-    requires: "No credentials. Public calculator, hard IP rate limit, returns a range not a quotation.",
+    requires: "No credentials. Public calculator, hard IP rate limit, returns a range not a quotation. Needs SHIPPING_FREIGHTOS_PUBLIC=on and SHIPPING_FREIGHTOS_PUBLIC_VERIFIED=yes once `npm run shipping:verify-provider -- freightos_public` has parsed a real response.",
   },
 
   isEnabled() {
     /* Off by default until a live response has been verified — see header. */
-    return (process.env.SHIPPING_FREIGHTOS_PUBLIC ?? "").toLowerCase() === "on" && Date.now() >= coolOffUntil;
+    return (process.env.SHIPPING_FREIGHTOS_PUBLIC ?? "").toLowerCase() === "on"
+      && verifiedSwitch("freightos_public")
+      && Date.now() >= coolOffUntil;
   },
   disabledReason() {
     if ((process.env.SHIPPING_FREIGHTOS_PUBLIC ?? "").toLowerCase() !== "on") {
       return "Disabled. Set SHIPPING_FREIGHTOS_PUBLIC=on after verifying one live response.";
     }
+    if (!verifiedSwitch("freightos_public")) return verifiedReason("freightos_public");
     if (Date.now() < coolOffUntil) {
       return `Rate limited by Freightos. Retrying after ${new Date(coolOffUntil).toISOString()}.`;
     }
