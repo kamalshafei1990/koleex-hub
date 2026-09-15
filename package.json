@@ -153,7 +153,8 @@
     "validate:auth-recovery": "NODE_OPTIONS=--conditions=react-server tsx scripts/validate-auth-recovery.ts",
     "validate:voice-tools": "NODE_OPTIONS=--conditions=react-server tsx scripts/validate-voice-tools.ts",
     "shipping:build-reference": "node --import tsx scripts/shipping/build-reference-dataset.mts",
-    "shipping:seed": "node --import tsx scripts/shipping/seed-shipping-reference.mts"
+    "shipping:seed": "node --import tsx scripts/shipping/seed-shipping-reference.mts",
+    "validate:shipping-translations": "node --import tsx scripts/validate-shipping-translations.mts"
   },
   "dependencies": {
     "@napi-rs/canvas": "^0.1.100",
