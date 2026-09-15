@@ -1981,7 +1981,14 @@ export default function ProductProfile() {
             </h1>
             {/* The codes: one chip per model. A family shows every member,
                 the primary marked with the dot; a chip opens that model. */}
-            <div className="mt-2 flex items-center gap-1.5 flex-wrap">
+            {/* Phone: the codes ride ONE scrolling line (a seven-member family
+                stacked seven chips tall pushed the tabs off the screen);
+                desktop wraps them. The family count sits above the line on a
+                phone, inline after it on desktop. */}
+            {data.models.length > 1 && (
+              <div className="sm:hidden mt-2 text-[9.5px] font-bold uppercase tracking-[0.1em] text-[var(--text-ghost)] tabular-nums">{t("pp.fam.label", "Family")} · {data.models.length} {t("pp.fam.members", "models")}</div>
+            )}
+            <div className="mt-1.5 sm:mt-2 flex items-center gap-1.5 sm:flex-wrap max-sm:flex-nowrap max-sm:overflow-x-auto max-sm:-mx-4 max-sm:px-4 max-sm:[scrollbar-width:none] max-sm:[&::-webkit-scrollbar]:hidden">
               {data.models.length === 0 ? (
                 <span className="text-[11px] font-mono text-[var(--text-ghost)]">{t("pp.noCode", "no code")}</span>
               ) : data.models.map((m, i) => {
@@ -1995,7 +2002,7 @@ export default function ProductProfile() {
                     disabled={!family}
                     onClick={() => family && setFocusModel(active ? -1 : i)}
                     title={family ? (active ? t("pp.fam.close", "Close model view") : String(m.model_name ?? "")) : undefined}
-                    className={`inline-flex items-center gap-1.5 h-7 px-2.5 rounded-lg border text-[12px] font-mono font-semibold tabular-nums transition-colors ${
+                    className={`inline-flex shrink-0 items-center gap-1.5 h-7 px-2.5 rounded-lg border text-[11.5px] sm:text-[12px] font-mono font-semibold tabular-nums transition-colors ${
                       active
                         ? "bg-[var(--bg-inverted)] text-[var(--text-inverted)] border-transparent"
                         : "bg-[var(--bg-surface-subtle)] text-[var(--text-primary)] border-[var(--border-subtle)]"
@@ -2007,7 +2014,7 @@ export default function ProductProfile() {
                 );
               })}
               {data.models.length > 1 && (
-                <span className="text-[10.5px] text-[var(--text-ghost)] tabular-nums ms-1">{t("pp.fam.label", "Family")} · {data.models.length} {t("pp.fam.members", "models")}</span>
+                <span className="hidden sm:inline text-[10.5px] text-[var(--text-ghost)] tabular-nums ms-1">{t("pp.fam.label", "Family")} · {data.models.length} {t("pp.fam.members", "models")}</span>
               )}
             </div>
             <div className="mt-2 flex items-center gap-2 flex-wrap">
