@@ -28,7 +28,7 @@ import "server-only";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import type { ContainerEquipment, FreightRate, ProviderResult, RateQuery, ShippingMode, Surcharge } from "@/lib/shipping/types";
 import { normaliseAlias } from "../port-resolver";
-import type { FreightRateProvider, ProviderContext } from "./types";
+import type { FreightRateProvider } from "./types";
 
 /** The shape the landed-cost engine stores. Mirrors ShippingCosts. */
 interface ShippingCostsRow {
@@ -98,7 +98,7 @@ export const koleexInternalProvider: FreightRateProvider = {
   /* Always on: it costs no API credit and needs no key. */
   isEnabled: () => true,
 
-  async getRates(query: RateQuery, _ctx: ProviderContext): Promise<ProviderResult> {
+  async getRates(query: RateQuery): Promise<ProviderResult> {
     const started = Date.now();
 
     /* Both codes and every spelling they answer to, so a stored
