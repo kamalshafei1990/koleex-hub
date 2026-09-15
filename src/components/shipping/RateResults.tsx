@@ -242,6 +242,15 @@ export function RateRow({ rate, t, lang, quantity = 1 }: { rate: FreightRate; t:
                   </ul>
                 </div>
               ) : null}
+              {rate.minCharge != null ? (
+                /* A per-CBM rate with a minimum underneath it is how a small
+                   LCL consignment ends up costing more than volume × rate.
+                   Showing the rate without the floor is the classic under-quote. */
+                <div className="flex items-center justify-between gap-3 text-[12px]">
+                  <span className="text-[var(--text-secondary)]">{t("res.minCharge")}</span>
+                  <span className="tabular-nums text-[var(--text-primary)]">{fmtMoney(rate.minCharge, rate.currency, lang)}</span>
+                </div>
+              ) : null}
               {total ? (
                 <div className="flex items-center justify-between gap-3 border-t border-[var(--border-subtle)] pt-2 text-[13px]">
                   <span className="font-semibold text-[var(--text-secondary)]">{t("res.estimatedTotal")}</span>

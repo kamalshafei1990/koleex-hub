@@ -31,7 +31,7 @@ import { useTranslation } from "@/lib/i18n";
 import { shippingT } from "@/lib/translations/shipping";
 import { countryDisplayName, flagEmoji } from "@/lib/invitations/types";
 import { CONTAINER_EQUIPMENT, type ContainerEquipment, type ShippingMode, type VolumetricRule } from "@/lib/shipping/types";
-import { cbmOf } from "@/lib/shipping/chargeable-weight";
+import { cbmOf, revenueTons } from "@/lib/shipping/chargeable-weight";
 import SearchCombobox, { type ComboOption } from "./SearchCombobox";
 import RateResults from "./RateResults";
 import {
@@ -95,8 +95,14 @@ export default function ShippingApp() {
   }, [host]);
   /* 0 = not measured yet (first frame only). One column is the safe default:
      it is the layout that works at any width. */
+  /* ⚠️ MEASURED THRESHOLDS, AND THEY ARE NOT VIEWPORT NUMBERS.
+     A 768pt tablet in portrait gives this pane 693px once the rail is taken
+     off — measured, 15 Sep. A threshold set at 780 because "tablets are 768"
+     therefore handed a tablet the PHONE layout, which is the same arithmetic
+     mistake the Contacts directory was built to avoid, just in reverse.
+     640 is below the real tablet width with room to spare. */
   const wide = w >= 1180;
-  const mid = !wide && w >= 780;
+  const mid = !wide && w >= 640;
   const cols: 1 | 2 | 3 = wide ? 3 : mid ? 2 : 1;
 
   /* ── form state ────────────────────────────────────────────────────────── */
@@ -318,7 +324,7 @@ export default function ShippingApp() {
               non-positioned child to z-index:1, so this row and the cargo row
               below it tie — and a tie is won by the later sibling, which put
               the container chips ON TOP of an open port list. */}
-          <div className={`relative z-20 grid gap-2 ${wide ? "grid-cols-[1fr_auto_1fr_1fr_auto]" : mid ? "grid-cols-[1fr_auto_1fr_1fr]" : "grid-cols-1"}`}>
+          <div className={`relative z-20 grid gap-2 ${wide ? "grid-cols-[1fr_auto_1fr_1fr_auto]" : mid ? "grid-cols-3" : "grid-cols-1"}`}>
             <Labelled label={isAir ? t("field.originAirport") : t("field.originPort")}>
               <SearchCombobox
                 value={origin}
@@ -335,20 +341,24 @@ export default function ShippingApp() {
               />
             </Labelled>
 
-            <div className="flex items-end justify-center pb-[1px]">
-              <button
-                type="button"
-                aria-label={t("action.swap")}
-                title={t("action.swap")}
-                disabled
-                className="hidden h-10 w-8 items-center justify-center rounded-lg text-[var(--text-ghost)] sm:flex"
-              >
-                {/* Direction is fixed for v1 — Koleex ships FROM China. The
-                    control is present and disabled so the shape of a future
-                    return lane is visible rather than invented later. */}
-                <ArrowRightLeftIcon size={13} />
-              </button>
-            </div>
+            {/* Direction is fixed for v1 — Koleex ships FROM China. The control
+                is present and disabled so the shape of a future return lane is
+                visible rather than invented later, and it exists only in the
+                wide layout where there is a column for it: a lone disabled
+                button on its own row is noise, not affordance. */}
+            {wide ? (
+              <div className="flex items-end justify-center pb-[1px]">
+                <button
+                  type="button"
+                  aria-label={t("action.swap")}
+                  title={t("action.swap")}
+                  disabled
+                  className="flex h-10 w-8 items-center justify-center rounded-lg text-[var(--text-ghost)]"
+                >
+                  <ArrowRightLeftIcon size={13} />
+                </button>
+              </div>
+            ) : null}
 
             <Labelled label={t("field.country")}>
               <SearchCombobox
@@ -498,6 +508,8 @@ export default function ShippingApp() {
             ) : null}
 
             {data?.weight && isAir ? <WeightPanel weight={data.weight} t={t} /> : null}
+            {data && mode === "ocean_lcl" && effectiveCbm && Number(grossKg) > 0
+              ? <MeasurePanel cbm={effectiveCbm} grossKg={Number(grossKg)} t={t} /> : null}
 
             {busy ? <ResultSkeleton label={t("load.rates")} cols={cols} />
               : error ? <ErrorPanel error={error} t={t} onRetry={() => run(true)} />
@@ -696,6 +708,28 @@ function WeightPanel({ weight, t }: {
           <InfoIcon size={11} />
           {t(`weight.rule.${weight.rule}`)}
         </span>
+      </span>
+    </div>
+  );
+}
+
+/* Groupage is billed weight-OR-measure: the greater of cubic metres and
+   tonnes, at the same per-unit rate. A 4.5 CBM consignment weighing 6 tonnes
+   is billed as 6, and an operator who multiplies CBM by the rate under-quotes
+   it. So the basis is stated, not left to be discovered on the invoice. */
+function MeasurePanel({ cbm, grossKg, t }: { cbm: number; grossKg: number; t: (k: string, f?: string) => string }) {
+  const rt = revenueTons({ cbm, grossKg });
+  const basis = rt.basis === "weight" ? t("lcl.basisWeight") : t("lcl.basisMeasure");
+  return (
+    <div className="flex flex-wrap items-center gap-x-5 gap-y-2 rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] px-3 py-2.5">
+      <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-[var(--text-ghost)]">
+        <CubicMeterIcon size={13} />{t("lcl.revenueTons")}
+      </span>
+      <span className="text-[20px] font-semibold leading-none tabular-nums text-[var(--text-primary)]">{rt.revenueTons}</span>
+      <span className="text-[11px] text-[var(--text-dim)]">{t("lcl.wmNote").replace("{basis}", basis)}</span>
+      <span className="ms-auto flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-[var(--text-ghost)]">
+        <span>{t("field.volume")} <span className="tabular-nums text-[var(--text-dim)]">{rt.cbm} {t("unit.cbm")}</span></span>
+        <span>{t("field.grossWeight")} <span className="tabular-nums text-[var(--text-dim)]">{rt.tonnes} t</span></span>
       </span>
     </div>
   );
