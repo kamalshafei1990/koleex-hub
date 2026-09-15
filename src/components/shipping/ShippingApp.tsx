@@ -1,0 +1,788 @@
+"use client";
+
+/* ---------------------------------------------------------------------------
+   Shipping — the app.
+
+   The whole interaction is one line of thought: FROM a Chinese port, TO a
+   country and a port, BY a method, SEARCH. Everything else appears only when
+   that method needs it — containers for FCL, a volume for LCL, a weight for
+   air — so the screen never asks a question the answer does not depend on.
+
+   ── Responsive by MEASUREMENT, not by breakpoint ──────────────────────────
+   The layout reads the pane's own width through a ResizeObserver, because
+   `md:` and `lg:` know nothing about the Hub's sidebar rail: on a 1024pt
+   tablet, 1024 − 220 leaves 804, and a `lg:` three-column grid at 804px gives
+   each card 250px. Measured width is the rule the Contacts directory
+   established after exactly that bug. `container-type` is NOT used — it would
+   make this element the containing block for the fixed Aurora ground.
+
+   Three real layouts, not one stacked three ways:
+     ≥1180  rail and results side by side, containers three across
+     ≥780   search strip full width above results, containers two across
+     <780   one column, the method as a three-up segmented control, inputs at
+            touch size, results stacked
+   --------------------------------------------------------------------------- */
+
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import AuroraShell from "@/components/ui/AuroraShell";
+import PageHeader from "@/components/ui/PageHeader";
+import { useTranslation } from "@/lib/i18n";
+import { shippingT } from "@/lib/translations/shipping";
+import { countryDisplayName, flagEmoji } from "@/lib/invitations/types";
+import { CONTAINER_EQUIPMENT, type ContainerEquipment, type ShippingMode, type VolumetricRule } from "@/lib/shipping/types";
+import { cbmOf } from "@/lib/shipping/chargeable-weight";
+import SearchCombobox, { type ComboOption } from "./SearchCombobox";
+import RateResults from "./RateResults";
+import {
+  loadCountries, loadRoutes, saveRoute, searchAirports, searchPorts, searchRates,
+  RateSearchError, type AirportHit, type PortCountry, type PortHit, type RateSearchResponse, type SavedRoute,
+} from "./shipping-client";
+
+import ShippingIcon from "@/components/icons/ShippingIcon";
+import ContainerIcon from "@/components/icons/ui/ContainerIcon";
+import CubicMeterIcon from "@/components/icons/ui/CubicMeterIcon";
+import WeightIcon from "@/components/icons/ui/WeightIcon";
+import PortIcon from "@/components/icons/ui/PortIcon";
+import RouteIcon from "@/components/icons/ui/RouteIcon";
+import PlaneIcon from "@/components/icons/ui/PlaneIcon";
+import GlobeIcon from "@/components/icons/ui/GlobeIcon";
+import SearchIcon from "@/components/icons/ui/SearchIcon";
+import RefreshIcon from "@/components/icons/ui/RefreshIcon";
+import StarIcon from "@/components/icons/ui/StarIcon";
+import HistoryIcon from "@/components/icons/ui/HistoryIcon";
+import ArrowRightIcon from "@/components/icons/ui/ArrowRightIcon";
+import ArrowRightLeftIcon from "@/components/icons/ui/ArrowRightLeftIcon";
+import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
+import TriangleWarningIcon from "@/components/icons/ui/TriangleWarningIcon";
+import InfoIcon from "@/components/icons/ui/InfoIcon";
+import CrossIcon from "@/components/icons/ui/CrossIcon";
+import RulerIcon from "@/components/icons/ui/RulerIcon";
+import PlusIcon from "@/components/icons/ui/PlusIcon";
+
+type PortOpt = ComboOption<PortHit | AirportHit>;
+
+const MODES: { id: ShippingMode; icon: (s: number) => React.ReactNode }[] = [
+  { id: "ocean_fcl", icon: (s) => <ContainerIcon size={s} /> },
+  { id: "ocean_lcl", icon: (s) => <CubicMeterIcon size={s} /> },
+  { id: "air", icon: (s) => <PlaneIcon size={s} /> },
+];
+
+export default function ShippingApp() {
+  const { t, lang } = useTranslation(shippingT);
+  const isRtl = lang === "ar";
+
+  /* ── measured layout ───────────────────────────────────────────────────── */
+  const [host, setHost] = useState<HTMLDivElement | null>(null);
+  const hostRef = useCallback((node: HTMLDivElement | null) => setHost(node), []);
+  const [w, setW] = useState(0);
+  useLayoutEffect(() => {
+    if (!host) return;
+    const read = () => setW(host.getBoundingClientRect().width);
+    read();                                   // before paint, so nothing shifts
+    const ro = new ResizeObserver(read);
+    ro.observe(host);
+    return () => ro.disconnect();
+  }, [host]);
+  /* 0 = not measured yet (first frame only). One column is the safe default:
+     it is the layout that works at any width. */
+  const wide = w >= 1180;
+  const mid = !wide && w >= 780;
+  const cols: 1 | 2 | 3 = wide ? 3 : mid ? 2 : 1;
+
+  /* ── form state ────────────────────────────────────────────────────────── */
+  const [mode, setMode] = useState<ShippingMode>("ocean_fcl");
+  const [origin, setOrigin] = useState<PortOpt | null>(null);
+  const [country, setCountry] = useState<ComboOption<PortCountry> | null>(null);
+  const [dest, setDest] = useState<PortOpt | null>(null);
+  const [equipment, setEquipment] = useState<ContainerEquipment[]>([...CONTAINER_EQUIPMENT]);
+  const [cbm, setCbm] = useState("");
+  const [grossKg, setGrossKg] = useState("");
+  const [rule, setRule] = useState<VolumetricRule>("iata_air");
+  const [dims, setDims] = useState<{ l: string; w: string; h: string; qty: string }[]>([]);
+
+  const [countries, setCountries] = useState<PortCountry[]>([]);
+  const [routes, setRoutes] = useState<{ recent: SavedRoute[]; favorites: SavedRoute[] }>({ recent: [], favorites: [] });
+
+  const [busy, setBusy] = useState(false);
+  const [data, setData] = useState<RateSearchResponse | null>(null);
+  const [error, setError] = useState<{ title: string; body: string; candidates?: PortHit[] } | null>(null);
+  const abortRef = useRef<AbortController | null>(null);
+
+  const isAir = mode === "air";
+
+  /* Dimensions, when entered, ARE the volume — the CBM field becomes derived
+     so the two can never disagree on screen. */
+  const parsedDims = useMemo(
+    () => dims.map((d) => ({ l: Number(d.l), w: Number(d.w), h: Number(d.h), qty: Number(d.qty) || 1 }))
+              .filter((d) => d.l > 0 && d.w > 0 && d.h > 0),
+    [dims],
+  );
+  const derivedCbm = parsedDims.length ? cbmOf(parsedDims) : null;
+  const effectiveCbm = derivedCbm ?? (Number(cbm) || undefined);
+
+  /* Countries and saved routes are small and wanted immediately. */
+  useEffect(() => {
+    let alive = true;
+    loadCountries().then((r) => { if (alive) setCountries(r.countries); }).catch(() => {});
+    loadRoutes().then((r) => { if (alive) setRoutes(r); }).catch(() => {});
+    return () => { alive = false; };
+  }, []);
+
+  /* Switching between sea and air changes what a "port" is, so both ends reset
+     rather than silently carrying a seaport into an air search. */
+  useEffect(() => { setOrigin(null); setDest(null); }, [isAir]);
+  useEffect(() => { setDest(null); }, [country?.key]);
+
+  /* ── option builders ───────────────────────────────────────────────────── */
+  const portOption = useCallback((p: PortHit): PortOpt => ({
+    key: p.id,
+    value: p,
+    label: p.name,
+    sublabel: [p.nameOfficial && p.nameOfficial !== p.name ? p.nameOfficial : null, p.countryName]
+      .filter(Boolean).join(" · ") || undefined,
+    glyph: flagEmoji(p.countryCode) || undefined,
+    code: p.locode ?? undefined,
+    pinned: p.inKoleexList,
+  }), []);
+
+  const airportOption = useCallback((a: AirportHit): PortOpt => ({
+    key: a.id,
+    value: a,
+    label: a.name,
+    sublabel: a.municipality ?? undefined,
+    glyph: flagEmoji(a.country_code) || undefined,
+    code: a.iata,
+  }), []);
+
+  const searchOrigin = useCallback(async (term: string, signal: AbortSignal): Promise<PortOpt[]> => {
+    void signal;
+    if (isAir) {
+      const { airports } = await searchAirports({ q: term, country: "CN", limit: 20 });
+      return airports.map(airportOption);
+    }
+    const { ports } = await searchPorts({ q: term, origin: true, limit: 20 });
+    return ports.map(portOption);
+  }, [isAir, portOption, airportOption]);
+
+  const searchDest = useCallback(async (term: string, signal: AbortSignal): Promise<PortOpt[]> => {
+    void signal;
+    const cc = country?.value.code;
+    if (!cc) return [];
+    if (isAir) {
+      const { airports } = await searchAirports({ q: term, country: cc, limit: 20 });
+      return airports.map(airportOption);
+    }
+    const { ports } = await searchPorts({ q: term, country: cc, limit: 20 });
+    return ports.map(portOption);
+  }, [country?.value.code, isAir, portOption, airportOption]);
+
+  /* Countries are a fixed list, so this filters in memory — no request per
+     keystroke for 170 rows that never change. Name FIRST, then the flag:
+     leading with the emoji broke the browser's own first-letter type-ahead. */
+  const searchCountry = useCallback(async (term: string): Promise<ComboOption<PortCountry>[]> => {
+    const q = term.trim().toLowerCase();
+    return countries
+      .map((c) => ({
+        key: c.code,
+        value: c,
+        label: countryDisplayName(c.code, c.name ?? c.code, lang),
+        glyph: flagEmoji(c.code) || undefined,
+        code: c.code,
+      }))
+      .filter((o) => !q || o.label.toLowerCase().includes(q) || o.key.toLowerCase().startsWith(q))
+      .sort((a, b) => a.label.localeCompare(b.label, lang === "zh" ? "zh-CN" : lang === "ar" ? "ar" : "en"))
+      .slice(0, 40);
+  }, [countries, lang]);
+
+  /* ── the search ────────────────────────────────────────────────────────── */
+  const originCode = origin ? ("locode" in origin.value ? origin.value.locode : null) ?? ("iata" in origin.value ? origin.value.iata : null) : null;
+  const destCode = dest ? ("locode" in dest.value ? dest.value.locode : null) ?? ("iata" in dest.value ? dest.value.iata : null) : null;
+  const canSearch = Boolean(origin && dest && !busy);
+
+  const run = useCallback(async (force = false) => {
+    if (!origin || !dest) return;
+    abortRef.current?.abort();
+    const ctrl = new AbortController();
+    abortRef.current = ctrl;
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await searchRates({
+        mode,
+        origin: origin.code ?? origin.label,
+        destination: dest.code ?? dest.label,
+        destinationCountry: country?.value.code,
+        equipment: mode === "ocean_fcl" ? equipment : undefined,
+        cbm: effectiveCbm,
+        grossKg: Number(grossKg) || undefined,
+        dimensionsCm: parsedDims.length ? parsedDims : undefined,
+        volumetricRule: rule,
+        force,
+      }, ctrl.signal);
+      setData(res);
+      /* Recording the lane is a convenience, never a reason to fail a search. */
+      void saveRoute({
+        action: "record", mode,
+        originCode: res.origin.locode ?? origin.code ?? origin.label,
+        destinationCode: res.destination.locode ?? dest.code ?? dest.label,
+        originLabel: origin.label, destinationLabel: dest.label,
+        params: { equipment, cbm, grossKg, rule },
+      }).then(() => loadRoutes()).then(setRoutes).catch(() => {});
+    } catch (e) {
+      if (ctrl.signal.aborted) return;
+      setData(null);
+      setError(describe(e, t));
+    } finally {
+      if (!ctrl.signal.aborted) setBusy(false);
+    }
+  }, [origin, dest, mode, country?.value.code, equipment, cbm, effectiveCbm, grossKg, rule, parsedDims, t]);
+
+  useEffect(() => () => abortRef.current?.abort(), []);
+
+  const isFavorite = useMemo(
+    () => routes.favorites.some((f) => f.origin_code === originCode && f.destination_code === destCode && f.mode === mode),
+    [routes.favorites, originCode, destCode, mode],
+  );
+
+  const toggleFavorite = useCallback(async () => {
+    if (!originCode || !destCode || !origin || !dest) return;
+    await saveRoute({
+      action: isFavorite ? "unfavorite" : "favorite",
+      mode, originCode, destinationCode: destCode,
+      originLabel: origin.label, destinationLabel: dest.label,
+    });
+    setRoutes(await loadRoutes());
+  }, [isFavorite, mode, originCode, destCode, origin, dest]);
+
+  /* ── chrome ────────────────────────────────────────────────────────────── */
+  const quantity = mode === "ocean_lcl" ? (effectiveCbm || 1) : mode === "air" ? (Number(grossKg) || 1) : 1;
+
+  return (
+    <AuroraShell dir={isRtl ? "rtl" : "ltr"}>
+      <div ref={hostRef} className="mx-auto w-full max-w-[1500px] px-4 pt-12 pb-8 sm:px-6 lg:px-8">
+        <PageHeader
+          title={t("app.title")}
+          subtitle={t("app.subtitle")}
+          icon={<ShippingIcon size={16} />}
+          showTabs={false}
+        />
+
+        {/* ── the search strip ──────────────────────────────────────────────
+            Sticky, and it carries the ONE edge blur on this screen: a
+            filterless kx-bar-host with a kx-glass-bar child. Pinned to the
+            header height, not top-0, because /shipping is an under-glass
+            route and the scroller's top edge IS the viewport top. */}
+        <div className="kx-bar-host sticky top-[var(--kx-header-h,3.5rem)] z-[15] -mx-4 mb-4 px-4 pb-3 pt-3 sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8">
+          <div aria-hidden className="kx-glass-bar" />
+
+          {/* method — three-up, icon-led, always visible */}
+          <div role="radiogroup" aria-label={t("a11y.modeGroup")} className="mb-2 grid grid-cols-3 gap-1.5 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] p-1">
+            {MODES.map((m) => {
+              const on = mode === m.id;
+              return (
+                <button
+                  key={m.id}
+                  type="button"
+                  role="radio"
+                  aria-checked={on}
+                  onClick={() => setMode(m.id)}
+                  /* kx-seg-on paints a RING, and a ring cannot be clipped into
+                     a curve — the element owns its own radius. CI rule 09. */
+                  /* The radius lives on THIS element, not the group: kx-seg-on
+                     paints an inset RING, and a parent's rounded+overflow can
+                     clip a fill into a curve but cannot bend a ring. */
+                  className={`flex min-h-[44px] flex-col items-center justify-center gap-1 rounded-lg px-2 py-1.5 text-[12px] font-medium transition-colors ${on ? "kx-seg-on" : "kx-seg-off"}`}
+                >
+                  {m.icon(15)}
+                  <span>{t(`mode.${m.id}`)}</span>
+                  {w >= 560 ? (
+                    <span className="text-[10px] font-normal leading-tight text-[var(--text-ghost)]">{t(`mode.${m.id}.hint`)}</span>
+                  ) : null}
+                </button>
+              );
+            })}
+          </div>
+
+          {/* route */}
+          <div className={`grid gap-2 ${wide ? "grid-cols-[1fr_auto_1fr_1fr_auto]" : mid ? "grid-cols-[1fr_auto_1fr_1fr]" : "grid-cols-1"}`}>
+            <Labelled label={isAir ? t("field.originAirport") : t("field.originPort")}>
+              <SearchCombobox
+                value={origin}
+                onChange={setOrigin}
+                search={searchOrigin}
+                scopeKey={`origin-${mode}`}
+                icon={isAir ? <PlaneIcon size={14} /> : <PortIcon size={14} />}
+                placeholder={t("ph.originPort")}
+                searchPlaceholder={t("ph.originPort")}
+                emptyLabel={t("err.noRoute")}
+                loadingLabel={t("load.ports")}
+                ariaLabel={t("a11y.originPicker")}
+                clearLabel={t("action.clear")}
+              />
+            </Labelled>
+
+            <div className="flex items-end justify-center pb-[1px]">
+              <button
+                type="button"
+                aria-label={t("action.swap")}
+                title={t("action.swap")}
+                disabled
+                className="hidden h-10 w-8 items-center justify-center rounded-lg text-[var(--text-ghost)] sm:flex"
+              >
+                {/* Direction is fixed for v1 — Koleex ships FROM China. The
+                    control is present and disabled so the shape of a future
+                    return lane is visible rather than invented later. */}
+                <ArrowRightLeftIcon size={13} />
+              </button>
+            </div>
+
+            <Labelled label={t("field.country")}>
+              <SearchCombobox
+                value={country}
+                onChange={setCountry}
+                search={searchCountry}
+                scopeKey="country"
+                icon={<GlobeIcon size={14} />}
+                placeholder={t("ph.country")}
+                searchPlaceholder={t("ph.country")}
+                emptyLabel={t("err.noRoute")}
+                loadingLabel={t("load.ports")}
+                ariaLabel={t("field.country")}
+                clearLabel={t("action.clear")}
+              />
+            </Labelled>
+
+            <Labelled label={isAir ? t("field.destAirport") : t("field.destPort")}>
+              <SearchCombobox
+                value={dest}
+                onChange={setDest}
+                search={searchDest}
+                scopeKey={`dest-${country?.key ?? ""}-${mode}`}
+                icon={isAir ? <PlaneIcon size={14} /> : <PortIcon size={14} />}
+                placeholder={t("ph.destPort")}
+                searchPlaceholder={t("ph.destPort")}
+                emptyLabel={t("err.noRoute")}
+                loadingLabel={t("load.ports")}
+                ariaLabel={t("a11y.destPicker")}
+                clearLabel={t("action.clear")}
+                disabled={!country}
+                disabledHint={t("ph.pickCountryFirst")}
+              />
+            </Labelled>
+
+            {wide ? <div className="flex items-end"><SearchButton t={t} busy={busy} disabled={!canSearch} onClick={() => run(false)} /></div> : null}
+          </div>
+
+          {/* cargo — only what this method actually needs */}
+          <div className={`mt-2 flex flex-wrap items-end gap-2 ${wide ? "" : "pb-1"}`}>
+            {mode === "ocean_fcl" ? (
+              <Labelled label={t("field.containers")}>
+                <div className="flex gap-1.5">
+                  {CONTAINER_EQUIPMENT.map((eq) => {
+                    const on = equipment.includes(eq);
+                    return (
+                      <button
+                        key={eq}
+                        type="button"
+                        aria-pressed={on}
+                        onClick={() => setEquipment((prev) => (on ? prev.filter((x) => x !== eq) : [...prev, eq]))}
+                        className={`h-10 min-w-[64px] rounded-xl px-3 font-mono text-[12px] font-semibold tabular-nums transition-colors ${on ? "kx-chip-on" : "kx-seg-off"}`}
+                      >
+                        {eq}
+                      </button>
+                    );
+                  })}
+                </div>
+              </Labelled>
+            ) : null}
+
+            {mode === "ocean_lcl" ? (
+              <>
+                <NumberField label={t("field.volume")} unit={t("unit.cbm")} icon={<CubicMeterIcon size={13} />} value={cbm} onChange={setCbm} />
+                <NumberField label={t("field.grossWeight")} unit={t("unit.kg")} icon={<WeightIcon size={13} />} value={grossKg} onChange={setGrossKg} />
+              </>
+            ) : null}
+
+            {isAir ? (
+              <>
+                <NumberField label={t("field.grossWeight")} unit={t("unit.kg")} icon={<WeightIcon size={13} />} value={grossKg} onChange={setGrossKg} />
+                <NumberField
+                  label={t("field.volume")} unit={t("unit.cbm")} icon={<CubicMeterIcon size={13} />}
+                  value={derivedCbm != null ? String(derivedCbm) : cbm}
+                  onChange={setCbm}
+                  readOnly={derivedCbm != null}
+                  hint={derivedCbm != null ? t("field.dimensions") : undefined}
+                />
+                <Labelled label={t("field.dimensions")}>
+                  <button
+                    type="button"
+                    onClick={() => setDims((d) => (d.length ? [] : [{ l: "", w: "", h: "", qty: "1" }]))}
+                    aria-pressed={dims.length > 0}
+                    className={`inline-flex h-10 items-center gap-1.5 rounded-xl border px-3 text-[12px] font-medium transition-colors ${dims.length ? "kx-chip-on border-transparent" : "border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)]"}`}
+                  >
+                    <RulerIcon size={13} />
+                    {dims.length ? t("action.hideDetails") : t("action.addDimensions")}
+                  </button>
+                </Labelled>
+                <Labelled label={t("weight.rule")}>
+                  <select
+                    value={rule}
+                    onChange={(e) => setRule(e.target.value as VolumetricRule)}
+                    title={t("weight.ruleNote")}
+                    className="h-10 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-inverted)]/[0.04] px-2 text-[12px] text-[var(--text-primary)]"
+                  >
+                    <option value="iata_air">{t("weight.rule.iata_air")}</option>
+                    <option value="express_courier">{t("weight.rule.express_courier")}</option>
+                  </select>
+                </Labelled>
+              </>
+            ) : null}
+
+            {!wide ? <div className="ms-auto"><SearchButton t={t} busy={busy} disabled={!canSearch} onClick={() => run(false)} /></div> : null}
+          </div>
+
+          {isAir && dims.length ? (
+            <div className="mt-2 space-y-1.5">
+              {dims.map((d, i) => (
+                <div key={i} className="flex flex-wrap items-center gap-1.5">
+                  <DimBox value={d.l} onChange={(v) => setDims((p) => p.map((x, j) => (j === i ? { ...x, l: v } : x)))} label="L" />
+                  <span aria-hidden className="text-[11px] text-[var(--text-ghost)]">×</span>
+                  <DimBox value={d.w} onChange={(v) => setDims((p) => p.map((x, j) => (j === i ? { ...x, w: v } : x)))} label="W" />
+                  <span aria-hidden className="text-[11px] text-[var(--text-ghost)]">×</span>
+                  <DimBox value={d.h} onChange={(v) => setDims((p) => p.map((x, j) => (j === i ? { ...x, h: v } : x)))} label="H" />
+                  <span className="text-[11px] text-[var(--text-ghost)]">{t("unit.cm")}</span>
+                  <DimBox value={d.qty} onChange={(v) => setDims((p) => p.map((x, j) => (j === i ? { ...x, qty: v } : x)))} label={t("field.pieces")} wide />
+                  <button type="button" aria-label={t("action.removePiece")} title={t("action.removePiece")}
+                    onClick={() => setDims((p) => p.filter((_, j) => j !== i))}
+                    className="flex h-9 w-9 items-center justify-center rounded-lg text-[var(--text-ghost)] hover:text-[var(--text-primary)]">
+                    <CrossIcon size={11} />
+                  </button>
+                </div>
+              ))}
+              <button type="button"
+                onClick={() => setDims((p) => [...p, { l: "", w: "", h: "", qty: "1" }])}
+                className="inline-flex items-center gap-1 text-[11px] font-medium text-[var(--text-dim)] hover:text-[var(--text-primary)]">
+                <PlusIcon size={11} />{t("action.addDimensions")}
+              </button>
+            </div>
+          ) : null}
+        </div>
+
+        {/* ── body ─────────────────────────────────────────────────────────── */}
+        <div className={`grid gap-4 ${wide ? "grid-cols-[minmax(0,1fr)_300px]" : "grid-cols-1"}`}>
+          <main className="min-w-0 space-y-3">
+            {origin && dest ? (
+              <RouteStrip origin={origin} dest={dest} mode={mode} isFavorite={isFavorite}
+                          onToggleFavorite={toggleFavorite} onRefresh={() => run(true)}
+                          busy={busy} cached={data?.servedFromCache ?? false} t={t} />
+            ) : null}
+
+            {data?.weight && isAir ? <WeightPanel weight={data.weight} t={t} /> : null}
+
+            {busy ? <ResultSkeleton label={t("load.rates")} cols={cols} />
+              : error ? <ErrorPanel error={error} t={t} onRetry={() => run(true)} />
+              : data ? <RateResults data={data} t={t} lang={lang} quantity={quantity} columns={cols} />
+              : <EmptyPanel t={t} />}
+          </main>
+
+          <aside className={`min-w-0 space-y-3 ${wide ? "" : "order-last"}`}>
+            {data ? <SourcesPanel providers={data.providers} mode={mode} t={t} /> : null}
+            <RoutesPanel routes={routes} t={t}
+              onPick={(r) => {
+                setMode(r.mode);
+                setOrigin({ key: r.origin_code, value: { locode: r.origin_code } as PortHit, label: r.origin_label ?? r.origin_code, code: r.origin_code });
+                setDest({ key: r.destination_code, value: { locode: r.destination_code } as PortHit, label: r.destination_label ?? r.destination_code, code: r.destination_code });
+              }} />
+          </aside>
+        </div>
+      </div>
+    </AuroraShell>
+  );
+}
+
+/* ── small pieces ───────────────────────────────────────────────────────── */
+
+function Labelled({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <label className="block min-w-0">
+      <span className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-[var(--text-ghost)]">{label}</span>
+      {children}
+    </label>
+  );
+}
+
+function NumberField({ label, unit, icon, value, onChange, readOnly, hint }: {
+  label: string; unit: string; icon: React.ReactNode; value: string;
+  onChange: (v: string) => void; readOnly?: boolean; hint?: string;
+}) {
+  return (
+    <Labelled label={label}>
+      <div
+        title={hint}
+        className={`flex h-10 w-[150px] items-center gap-1.5 rounded-xl border border-[var(--border-subtle)] px-2.5 ${
+          readOnly ? "bg-[var(--bg-surface-subtle)]" : "bg-[var(--bg-inverted)]/[0.04] focus-within:border-[#567FB2]/60 focus-within:shadow-[0_0_0_4px_rgba(86,127,178,0.16)]"
+        }`}
+      >
+        <span className="shrink-0 text-[var(--text-ghost)]">{icon}</span>
+        <input
+          type="number"
+          inputMode="decimal"
+          min="0"
+          step="any"
+          value={value}
+          readOnly={readOnly}
+          aria-readonly={readOnly}
+          onChange={(e) => onChange(e.target.value)}
+          className="min-w-0 flex-1 bg-transparent text-[13px] tabular-nums text-[var(--text-primary)] outline-none read-only:text-[var(--text-dim)]"
+        />
+        <span className="shrink-0 text-[11px] text-[var(--text-ghost)]">{unit}</span>
+      </div>
+    </Labelled>
+  );
+}
+
+/** One L / W / H / qty box. Small on purpose — four of them share a row. */
+function DimBox({ value, onChange, label, wide }: {
+  value: string; onChange: (v: string) => void; label: string; wide?: boolean;
+}) {
+  return (
+    <label className="flex h-9 items-center gap-1 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-inverted)]/[0.04] px-2 focus-within:border-[#567FB2]/60">
+      <span className="shrink-0 text-[10px] font-semibold uppercase text-[var(--text-ghost)]">{label}</span>
+      <input
+        type="number" inputMode="decimal" min="0" step="any"
+        value={value} onChange={(e) => onChange(e.target.value)}
+        className={`min-w-0 bg-transparent text-[12px] tabular-nums text-[var(--text-primary)] outline-none ${wide ? "w-12" : "w-14"}`}
+      />
+    </label>
+  );
+}
+
+function SearchButton({ t, busy, disabled, onClick }: { t: (k: string, f?: string) => string; busy: boolean; disabled: boolean; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      className="inline-flex h-10 items-center gap-2 rounded-xl bg-[var(--bg-inverted)] px-5 text-[13px] font-semibold text-[var(--text-inverted)] shadow-lg transition-opacity hover:opacity-90 disabled:opacity-40"
+    >
+      {busy ? <SpinnerIcon size={14} className="animate-spin" /> : <SearchIcon size={14} />}
+      {busy ? t("action.searching") : t("action.search")}
+    </button>
+  );
+}
+
+function RouteStrip({ origin, dest, mode, isFavorite, onToggleFavorite, onRefresh, busy, cached, t }: {
+  origin: PortOpt; dest: PortOpt; mode: ShippingMode; isFavorite: boolean;
+  onToggleFavorite: () => void; onRefresh: () => void; busy: boolean; cached: boolean;
+  t: (k: string, f?: string) => string;
+}) {
+  return (
+    <div className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-3 py-2.5">
+      <RouteIcon size={15} className="shrink-0 text-[var(--text-ghost)]" />
+      <div className="flex min-w-0 flex-1 items-center gap-2">
+        <Endpoint opt={origin} />
+        {/* The arrow is logical: rtl:rotate-180 turns "onward" the right way
+            when the row itself mirrors. */}
+        <ArrowRightIcon size={13} className="shrink-0 text-[var(--text-ghost)] rtl:rotate-180" />
+        <Endpoint opt={dest} />
+      </div>
+      <span className="inline-flex items-center gap-1 rounded-full border border-[var(--border-subtle)] px-2 py-0.5 text-[11px] text-[var(--text-dim)]">
+        {mode === "air" ? <PlaneIcon size={11} /> : <ContainerIcon size={11} />}
+        {t(`mode.${mode}`)}
+      </span>
+      {cached ? <span className="text-[11px] text-[var(--text-ghost)]">{t("load.cached")}</span> : null}
+      <div className="ms-auto flex items-center gap-1">
+        <button type="button" onClick={onToggleFavorite}
+          aria-pressed={isFavorite}
+          aria-label={isFavorite ? t("action.unfavorite") : t("action.favorite")}
+          title={isFavorite ? t("action.unfavorite") : t("action.favorite")}
+          className={`flex h-8 w-8 items-center justify-center rounded-lg border border-[var(--border-subtle)] transition-colors ${isFavorite ? "text-[#F59E0B]" : "text-[var(--text-ghost)] hover:text-[var(--text-primary)]"}`}>
+          <StarIcon size={13} />
+        </button>
+        <button type="button" onClick={onRefresh} disabled={busy}
+          aria-label={t("action.refresh")} title={t("action.refresh")}
+          className="flex h-8 w-8 items-center justify-center rounded-lg border border-[var(--border-subtle)] text-[var(--text-ghost)] transition-colors hover:text-[var(--text-primary)] disabled:opacity-40">
+          <RefreshIcon size={13} className={busy ? "animate-spin" : undefined} />
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function Endpoint({ opt }: { opt: PortOpt }) {
+  return (
+    <span className="flex min-w-0 items-center gap-1.5">
+      {opt.glyph ? <span aria-hidden className="shrink-0 text-[14px] leading-none">{opt.glyph}</span> : null}
+      <span className="truncate text-[13px] font-semibold text-[var(--text-primary)]">{opt.label}</span>
+      {opt.code ? <span className="shrink-0 font-mono text-[11px] tabular-nums text-[var(--text-ghost)]">{opt.code}</span> : null}
+    </span>
+  );
+}
+
+function WeightPanel({ weight, t }: {
+  weight: NonNullable<RateSearchResponse["weight"]>;
+  t: (k: string, f?: string) => string;
+}) {
+  const rows: [string, string][] = [
+    [t("weight.gross"), `${weight.grossKg} kg`],
+    [t("weight.volumetric"), `${weight.volumetricKg} kg`],
+  ];
+  return (
+    <div className="flex flex-wrap items-center gap-x-5 gap-y-2 rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] px-3 py-2.5">
+      <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-[var(--text-ghost)]">
+        <WeightIcon size={13} />{t("weight.chargeable")}
+      </span>
+      <span className="text-[20px] font-semibold leading-none tabular-nums text-[var(--text-primary)]">{weight.chargeableKg} kg</span>
+      <span className="text-[11px] text-[var(--text-dim)]">
+        {weight.basis === "volumetric" ? t("weight.basisVolumetric") : t("weight.basisGross")}
+      </span>
+      <span className="ms-auto flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-[var(--text-ghost)]">
+        {rows.map(([k, v]) => <span key={k}>{k} <span className="tabular-nums text-[var(--text-dim)]">{v}</span></span>)}
+        <span title={t("weight.ruleNote")} className="inline-flex items-center gap-1">
+          <InfoIcon size={11} />
+          {t(`weight.rule.${weight.rule}`)}
+        </span>
+      </span>
+    </div>
+  );
+}
+
+function SourcesPanel({ providers, mode, t }: {
+  providers: RateSearchResponse["providers"]; mode: ShippingMode; t: (k: string, f?: string) => string;
+}) {
+  const relevant = providers.filter((p) => p.modes.includes(mode));
+  return (
+    <section className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-3">
+      <h2 className="mb-2 text-[12px] font-semibold uppercase tracking-wide text-[var(--text-ghost)]">{t("src.title")}</h2>
+      {relevant.length === 0 ? (
+        <p className="text-[12px] text-[var(--text-dim)]">{t("src.none")}</p>
+      ) : (
+        <ul className="space-y-2">
+          {relevant.map((p) => (
+            <li key={p.id} className="flex items-start gap-2">
+              <span aria-hidden className={`mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full ${p.enabled ? "bg-[#10B981]" : "bg-[var(--text-whisper)]"}`} />
+              <div className="min-w-0 flex-1">
+                <div className="flex items-baseline justify-between gap-2">
+                  <span className="truncate text-[12px] font-medium text-[var(--text-primary)]">{t(`kind.${p.kind}`)}</span>
+                  <span className="shrink-0 text-[10px] text-[var(--text-ghost)]">{t(`src.cadence.${p.cadence}`)}</span>
+                </div>
+                <p className="mt-0.5 text-[11px] leading-snug text-[var(--text-dim)]">
+                  {p.enabled ? t("src.active") : (p.reason ?? t("src.off"))}
+                </p>
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+  );
+}
+
+/* Declared at module scope, not inside RoutesPanel. A component created
+   during render is a NEW component type on every render, so React unmounts and
+   remounts it and any state inside resets — react-hooks/static-components. */
+function RouteSection({ title, icon, list, empty, onPick }: {
+  title: string; icon: React.ReactNode; list: SavedRoute[]; empty?: string;
+  onPick: (r: SavedRoute) => void;
+}) {
+  return (
+    <div>
+      <h2 className="mb-1.5 inline-flex items-center gap-1.5 text-[12px] font-semibold uppercase tracking-wide text-[var(--text-ghost)]">
+        {icon}{title}
+      </h2>
+      {list.length === 0 ? (
+        empty ? <p className="text-[11px] text-[var(--text-dim)]">{empty}</p> : null
+      ) : (
+        <ul className="flex flex-wrap gap-1.5">
+          {list.map((r) => (
+            <li key={r.id}>
+              <button type="button" onClick={() => onPick(r)}
+                className="inline-flex max-w-full items-center gap-1 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] px-2 py-1 text-[11px] text-[var(--text-secondary)] transition-colors hover:border-[var(--border-focus)] hover:text-[var(--text-primary)]">
+                <span className="truncate">{r.origin_label ?? r.origin_code}</span>
+                <ArrowRightIcon size={10} className="shrink-0 text-[var(--text-ghost)] rtl:rotate-180" />
+                <span className="truncate">{r.destination_label ?? r.destination_code}</span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+function RoutesPanel({ routes, onPick, t }: {
+  routes: { recent: SavedRoute[]; favorites: SavedRoute[] };
+  onPick: (r: SavedRoute) => void;
+  t: (k: string, f?: string) => string;
+}) {
+  if (!routes.recent.length && !routes.favorites.length) return null;
+  return (
+    <section className="space-y-3 rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-3">
+      <RouteSection title={t("fav.title")} icon={<StarIcon size={12} />} list={routes.favorites} empty={t("fav.empty")} onPick={onPick} />
+      <RouteSection title={t("recent.title")} icon={<HistoryIcon size={12} />} list={routes.recent} onPick={onPick} />
+    </section>
+  );
+}
+
+function EmptyPanel({ t }: { t: (k: string, f?: string) => string }) {
+  return (
+    <div className="rounded-2xl border border-dashed border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] px-6 py-16 text-center">
+      <RouteIcon size={22} className="mx-auto mb-2 text-[var(--text-ghost)]" />
+      <p className="text-[14px] font-semibold text-[var(--text-primary)]">{t("empty.title")}</p>
+      <p className="mx-auto mt-1 max-w-[44ch] text-[12px] text-[var(--text-dim)]">{t("empty.hint")}</p>
+    </div>
+  );
+}
+
+function ErrorPanel({ error, t, onRetry }: {
+  error: { title: string; body: string; candidates?: PortHit[] };
+  t: (k: string, f?: string) => string;
+  onRetry: () => void;
+}) {
+  return (
+    <div className="rounded-2xl border border-dashed border-[#F59E0B]/35 bg-[#F59E0B]/[0.06] px-6 py-10 text-center">
+      <TriangleWarningIcon size={20} className="mx-auto mb-2 text-[#F59E0B]" />
+      <p className="text-[14px] font-semibold text-[var(--text-primary)]">{error.title}</p>
+      <p className="mx-auto mt-1 max-w-[52ch] text-[12px] text-[var(--text-dim)]">{error.body}</p>
+      <button type="button" onClick={onRetry}
+        className="mt-4 inline-flex h-9 items-center gap-2 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-4 text-[12px] font-semibold text-[var(--text-primary)] hover:border-[var(--border-focus)]">
+        <RefreshIcon size={13} />{t("err.retry")}
+      </button>
+    </div>
+  );
+}
+
+function ResultSkeleton({ label, cols }: { label: string; cols: 1 | 2 | 3 }) {
+  const grid = cols === 3 ? "grid-cols-3" : cols === 2 ? "grid-cols-2" : "grid-cols-1";
+  return (
+    <div className="space-y-3">
+      <p className="inline-flex items-center gap-2 text-[12px] text-[var(--text-dim)]">
+        <SpinnerIcon size={13} className="animate-spin" />{label}
+      </p>
+      <div className={`grid gap-3 ${grid}`}>
+        {[0, 1, 2].slice(0, cols).map((i) => (
+          <div key={i} className="kx-shimmer h-[168px] rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)]" />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/** Turns a thrown error into a sentence. Raw provider text never reaches here. */
+function describe(e: unknown, t: (k: string, f?: string) => string): { title: string; body: string; candidates?: PortHit[] } {
+  if (e instanceof RateSearchError) {
+    switch (e.code) {
+      case "port_unknown":
+        return { title: t("err.title"), body: t("err.portUnknown").replace("{name}", e.detail?.input ?? "") };
+      case "port_ambiguous":
+        return { title: t("err.title"), body: t("err.portAmbiguous").replace("{name}", e.detail?.input ?? ""), candidates: e.detail?.candidates };
+      case "port_has_no_code":
+        return { title: t("err.title"), body: t("err.portNoCode").replace("{name}", e.detail?.port ?? "") };
+      case "rate_limited":
+        return { title: t("err.title"), body: t("err.quota") };
+      default:
+        return { title: t("err.title"), body: t("res.unavailableHint") };
+    }
+  }
+  return { title: t("err.title"), body: t("err.timeout") };
+}

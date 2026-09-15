@@ -70,6 +70,7 @@ import CommunicationSidebarIcon from "@/components/icons/CommunicationSidebarIco
 import PlanningSidebarIcon from "@/components/icons/PlanningSidebarIcon";
 import KnowledgeSidebarIcon from "@/components/icons/KnowledgeSidebarIcon";
 import SystemSidebarIcon from "@/components/icons/SystemSidebarIcon";
+import ShippingIcon from "@/components/icons/ShippingIcon";
 
 /* ═══════════════════════════════════════════════════
    TYPES
@@ -208,6 +209,7 @@ export const APP_REGISTRY: AppDef[] = [
   { id: "inventory",        tKey: "app.inventory",        name: "Inventory",         icon: InventoryIcon, route: "/inventory",        active: true,  newSince: "2026-05-17" },
   { id: "purchase",         tKey: "app.purchase",         name: "Purchases",         icon: PurchaseIcon,  route: "/purchase",         active: true,  newSince: "2026-05-26" },
   { id: "landed-cost",      tKey: "app.landed-cost",      name: "Landed Cost",       icon: LandedCostIcon, route: "/landed-cost",     active: true  },
+  { id: "shipping",         tKey: "app.shipping",         name: "Shipping",          icon: ShippingIcon,   route: "/shipping",        active: true, newSince: "2026-09-15" },
   { id: "catalogs",         tKey: "app.catalogs",         name: "Catalogs",          icon: CatalogsIcon,  route: "/catalogs",         active: true,  ready: "2026-06-04" },
   { id: "documents",        tKey: "app.documents",        name: "Documents",         icon: DocumentsIcon, route: "/documents",        active: true,  newSince: "2026-07-09" },
 
@@ -306,7 +308,7 @@ export const SIDEBAR_GROUPS: SidebarGroup[] = [
     tKey: "cat.operations",
     label: "Operations",
     icon: OperationsSidebarIcon,
-    appIds: ["products", "product-data", "inventory", "purchase", "landed-cost", "catalogs", "documents"],
+    appIds: ["products", "product-data", "inventory", "purchase", "shipping", "landed-cost", "catalogs", "documents"],
   },
   {
     id: "commercial",

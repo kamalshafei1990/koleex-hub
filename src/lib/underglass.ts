@@ -15,6 +15,13 @@ export function isUnderglassRoute(pathname: string | null): boolean {
     p === "/products" ||
     p.startsWith("/products/") ||
     p.startsWith("/product-data") ||
+    /* Shipping, 2026-09-15. Sticky audit done before adding this line: the app
+       has exactly one sticky element, the search bar in ShippingApp, and it
+       pins to var(--kx-header-h) rather than top-0 — required here, because
+       under this geometry the scroller's top edge IS the viewport top. It
+       carries the kx-bar-host + kx-glass-bar pair and nothing else in the app
+       frosts, so there is one edge blur, not three. */
+    p.startsWith("/shipping") ||
     /* Inventory, 2026-08-12. THIS is what makes the main header glass on an
        app screen — the pane only frosts on under-glass routes, so converting
        an app's own surfaces and stopping there leaves a solid black bar at
