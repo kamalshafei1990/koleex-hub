@@ -87,7 +87,6 @@ import CircleDotIcon from "@/components/icons/ui/CircleDotIcon";// item: wheels
 import RulerIcon from "@/components/icons/ui/RulerIcon";
 import WrenchIcon from "@/components/icons/ui/WrenchIcon";
 import ImageRawIcon from "@/components/icons/ui/ImageRawIcon";
-import BookOpenIcon from "@/components/icons/ui/BookOpenIcon";
 import CheckIcon from "@/components/icons/ui/CheckIcon";
 import CrossIcon from "@/components/icons/ui/CrossIcon";
 import AngleRightIcon from "@/components/icons/ui/AngleRightIcon";
@@ -102,6 +101,7 @@ import SupplierSheet from "./profile/SupplierSheet";
 import VariantsSheet from "./profile/VariantsSheet";
 import OptionsSheet from "./profile/OptionsSheet";
 import SpecsSheet from "./profile/SpecsSheet";
+import KnowledgeSheet from "./profile/KnowledgeSheet";
 import dynamic from "next/dynamic";
 import { useSkin } from "@/lib/appearance";
 import FeatureHighlightsDisplay from "./FeatureHighlightsDisplay";
@@ -145,6 +145,26 @@ const PROFILE_T: Record<string, { en: string; zh: string; ar: string }> = {
   "pp.certWord":      { en: "cert",               zh: "证书",           ar: "شهادة" },
   "sup.costNote":     { en: "Price note",         zh: "价格备注",       ar: "ملاحظة السعر" },
   "sp.freqHint":      { en: "Comma-separated — e.g. 50, 60", zh: "逗号分隔——例如 50, 60", ar: "مفصولة بفواصل — مثال: 50, 60" },
+  /* Knowledge tab */
+  "kn.blocksN":       { en: "{n} blocks",         zh: "{n} 个知识块",   ar: "{n} بلوكات" },
+  "kn.none":          { en: "No knowledge blocks yet — press Edit to add the first.", zh: "尚无知识块——点击“编辑”添加第一个。", ar: "لا بلوكات معرفة بعد — اضغط تعديل لإضافة أول بلوك." },
+  "kn.aiHigh":        { en: "High",               zh: "高",             ar: "عالٍ" },
+  "kn.aiMed":         { en: "Medium",             zh: "中",             ar: "متوسط" },
+  "kn.aiLow":         { en: "Low",                zh: "低",             ar: "منخفض" },
+  "kn.linkedN":       { en: "{n} linked",         zh: "{n} 个关联",     ar: "{n} مرتبط" },
+  "kn.noRelated":     { en: "No related products linked.", zh: "未关联相关产品。", ar: "لا منتجات مرتبطة." },
+  "kn.searchPh":      { en: "Search a product to link…", zh: "搜索要关联的产品…", ar: "ابحث عن منتج لربطه…" },
+  "rel.related":      { en: "Related",            zh: "相关",           ar: "مرتبط" },
+  "rel.accessory":    { en: "Accessory",          zh: "配件",           ar: "ملحق" },
+  "rel.spare_part":   { en: "Spare part",         zh: "备件",           ar: "قطعة غيار" },
+  "rel.consumable":   { en: "Consumable",         zh: "耗材",           ar: "مستهلكات" },
+  "rel.compatible_with": { en: "Compatible with", zh: "兼容",           ar: "متوافق مع" },
+  "rel.required_addon": { en: "Required add-on",  zh: "必需附件",       ar: "إضافة إلزامية" },
+  "rel.optional_attachment": { en: "Optional attachment", zh: "可选附件", ar: "ملحق اختياري" },
+  "rel.upgrade":      { en: "Upgrade",            zh: "升级",           ar: "ترقية" },
+  "rel.replaces":     { en: "Replaces",           zh: "替代",           ar: "يحل محل" },
+  "rel.replaced_by":  { en: "Replaced by",        zh: "被…替代",        ar: "حلّ محله" },
+  "rel.bundle":       { en: "Bundle",             zh: "套装",           ar: "حزمة" },
   /* Variants tab */
   /* Options tab */
   "opt.badgeN":       { en: "{n} questions",      zh: "{n} 个问题",     ar: "{n} أسئلة" },
@@ -1843,7 +1863,7 @@ export default function ProductProfile() {
   const s2 = (k: string) => p[k];
   /* One merge for every sheet: show what was saved at once, then re-read the
      row behind it (no-store — the profile response is cached 15s). */
-  const mergeSaved = (u: { product?: Row; models?: Record<string, Row>; media?: Row[]; translations?: Row[]; certifications?: Row[]; suppliers?: Row[] }) => {
+  const mergeSaved = (u: { product?: Row; models?: Record<string, Row>; media?: Row[]; translations?: Row[]; certifications?: Row[]; suppliers?: Row[]; related?: Row[] }) => {
     setData((prev) => {
       if (!prev) return prev;
       const models = u.models
@@ -1857,6 +1877,7 @@ export default function ProductProfile() {
         translations: u.translations ?? prev.translations,
         certifications: u.certifications ?? prev.certifications,
         suppliers: (u.suppliers as Profile["suppliers"] | undefined) ?? prev.suppliers,
+        related: (u.related as Profile["related"] | undefined) ?? prev.related,
       };
     });
     setReloadTick((n) => n + 1);
@@ -2357,23 +2378,14 @@ export default function ProductProfile() {
       </>)}
 
       {STEPS[step].id === "knowledge" && (
-      <Group motion={tabMotion} icon={<BoundIcon semanticKey="field.knowledge" className="h-4 w-4" fallback={<BookOpenIcon className="h-4 w-4" />} />} title={t("pp.sec.knowledge", "Knowledge & Relationships")} count={`${data.related.length} linked`} editLabel={t("action.edit", "Edit")} onEdit={() => goStep("knowledge")}>
-        <div className={rows}>
-          <Row label={t("pp.f.knowledge", "Knowledge blocks")} value={((s2("schema_knowledge") as unknown[]) ?? []).length || null} />
-        </div>
-        {data.related.length > 0 && (
-          <div className="mt-4 pt-4 border-t border-[var(--border-subtle)] space-y-1.5">
-            {data.related.map((r, i) => (
-              <div key={i} className="flex items-center gap-2 text-[12px]">
-                <span className="text-[10px] px-1.5 py-0.5 rounded bg-[var(--bg-surface)] text-[var(--text-muted)]">{(r.relation_type as string) || "related"}</span>
-                {r.product?.slug
-                  ? <Link href={`/product-data/${r.product.slug}`} className="text-[var(--text-primary)] hover:underline truncate">{r.product.name}</Link>
-                  : <span className="text-[var(--text-dim)] truncate">{r.product?.name ?? "—"}</span>}
-              </div>
-            ))}
-          </div>
-        )}
-      </Group>
+        <KnowledgeSheet
+          product={p}
+          related={data.related}
+          productId={p?.id as string | undefined}
+          t={t} lang={lang} motion={tabMotion} canEdit={canEdit} notSet={NOT_SET}
+          onDirtyChange={(d) => { dirtyRef.current = d; }}
+          onSaved={(u) => mergeSaved({ product: u.product, related: u.related })}
+        />
       )}
 
       {STEPS[step].id === "finalize" && (
