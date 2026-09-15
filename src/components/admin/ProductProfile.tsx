@@ -87,7 +87,6 @@ import CircleDotIcon from "@/components/icons/ui/CircleDotIcon";// item: wheels
 import RulerIcon from "@/components/icons/ui/RulerIcon";
 import WrenchIcon from "@/components/icons/ui/WrenchIcon";
 import ImageRawIcon from "@/components/icons/ui/ImageRawIcon";
-import CheckIcon from "@/components/icons/ui/CheckIcon";
 import CrossIcon from "@/components/icons/ui/CrossIcon";
 import AngleRightIcon from "@/components/icons/ui/AngleRightIcon";
 import TabStrip from "@/components/ui/TabStrip";
@@ -103,6 +102,7 @@ import OptionsSheet from "./profile/OptionsSheet";
 import SpecsSheet from "./profile/SpecsSheet";
 import KnowledgeSheet from "./profile/KnowledgeSheet";
 import MediaSheet from "./profile/MediaSheet";
+import ReviewSheet from "./profile/ReviewSheet";
 import dynamic from "next/dynamic";
 import { useSkin } from "@/lib/appearance";
 import FeatureHighlightsDisplay from "./FeatureHighlightsDisplay";
@@ -146,6 +146,23 @@ const PROFILE_T: Record<string, { en: string; zh: string; ar: string }> = {
   "pp.certWord":      { en: "cert",               zh: "证书",           ar: "شهادة" },
   "sup.costNote":     { en: "Price note",         zh: "价格备注",       ar: "ملاحظة السعر" },
   "sp.freqHint":      { en: "Comma-separated — e.g. 50, 60", zh: "逗号分隔——例如 50, 60", ar: "مفصولة بفواصل — مثال: 50, 60" },
+  /* Review tab */
+  "rv.missingShort":  { en: "Missing",            zh: "缺少",           ar: "ناقص" },
+  "rv.dim.data":      { en: "Specifications",     zh: "规格",           ar: "المواصفات" },
+  "rv.dim.media":     { en: "Media",              zh: "媒体",           ar: "الوسائط" },
+  "rv.dim.commercial": { en: "Commercial",        zh: "商务",           ar: "تجاري" },
+  "rv.dim.technical": { en: "Technical",          zh: "技术",           ar: "تقني" },
+  "rv.dim.website":   { en: "Website",            zh: "网站",           ar: "الموقع" },
+  "rv.dim.ai":        { en: "AI",                 zh: "AI",             ar: "الذكاء الاصطناعي" },
+  "rv.dim.brochure":  { en: "Brochure",           zh: "宣传册",         ar: "الكتيّب" },
+  "rv.gapsTitle":     { en: "Before it goes live", zh: "上线前",          ar: "قبل النشر" },
+  "rv.ready":         { en: "Ready",              zh: "就绪",           ar: "جاهز" },
+  "rv.gapsN":         { en: "{n} missing",        zh: "缺 {n} 项",      ar: "{n} ناقص" },
+  "rv.liveOk":        { en: "Live and nothing missing — the catalogue shows everything it wants.", zh: "已上线且无缺项——目录已展示所需的一切。", ar: "منشور ولا شيء ناقص — الكتالوج يعرض كل ما يحتاجه." },
+  "rv.draftOk":       { en: "Nothing missing — this product can go live from the Hero tab.", zh: "无缺项——可从主页标签页上线。", ar: "لا شيء ناقص — يمكن نشر المنتج من تبويب الواجهة." },
+  "rv.liveWithGaps":  { en: "This product is live while the items below are still missing.", zh: "该产品已上线，但以下项目仍缺失。", ar: "هذا المنتج منشور بينما العناصر التالية ما زالت ناقصة." },
+  "rv.previewTitle":  { en: "Customer preview",   zh: "客户预览",       ar: "معاينة العميل" },
+  "rv.previewBadge":  { en: "Public page · live", zh: "客户页面 · 实时", ar: "صفحة العميل · مباشر" },
   /* Media tab */
   "md.filesWord":     { en: "files",              zh: "个文件",         ar: "ملفات" },
   "md.addFiles":      { en: "Add files",          zh: "添加文件",       ar: "إضافة ملفات" },
@@ -461,7 +478,7 @@ interface Profile {
   certifications: Row[];
   documents: Row[];
   related: Array<Row & { product: { name: string; slug: string | null } | null }>;
-  readiness: { overall: number; dimensions?: Array<{ key: string; label: string; score: number }> } | null;
+  readiness: { overall: number; dimensions?: Array<{ dimension?: string; key?: string; label?: string; score: number; filled?: number; total?: number; missing?: Array<{ key: string; label: string }> }> } | null;
   costVisible: boolean;
 }
 
@@ -1703,7 +1720,6 @@ function Row({ label, value, help, mono, badge, iconSrc }: {
   );
 }
 
-const rows = "divide-y divide-[var(--border-subtle)]";
 
 export default function ProductProfile() {
   const params = useParams<{ id: string }>();
@@ -1913,13 +1929,9 @@ export default function ProductProfile() {
       {/* The edit screen leads with the tabs, not a page title — so does the
          record. A slim identity strip keeps "what am I looking at?" answered
          without pushing the tabs down the page. */}
-      <div className="flex items-center gap-3 mb-3 min-w-0">
-        {/* THE HUB'S BACK CONTROL, borrowed rather than re-styled. This strip
-            stays slim on purpose — a full hero here would push the tabs down
-            the page, which is the whole reason it exists — but the control
-            itself was a 32x32 icon-only square while every other screen in
-            the Hub uses a chip that NAMES where it goes. Same recipe now,
-            same answer to "back to what". */}
+      {/* The chrome row sits ABOVE the card, Back at the leading edge where
+          every other app keeps it, the actions at the trailing edge. */}
+      <div className="flex items-center gap-2 mb-3 min-w-0">
         <Link
           href="/product-data"
           aria-label={t("pp.back", "Back to Product Data")}
@@ -1929,27 +1941,10 @@ export default function ProductProfile() {
           <RrIcon name="arrow-left" size={14} />
           <span className="hidden text-[12px] font-medium sm:inline">{t("pp.backShort", "Product Data")}</span>
         </Link>
-        <h1 className="text-[15px] font-semibold text-[var(--text-primary)] truncate">
-          {(s2("product_name") as string) || t("pp.untitled", "Untitled product")}
-        </h1>
-        <span className="text-[11px] font-mono text-[var(--text-dim)] shrink-0">{(data.models[0]?.primary_model as string) || ""}</span>
-        <span className="inline-flex items-center px-2 py-0.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[10px] font-semibold uppercase tracking-wider text-[var(--text-muted)] shrink-0">
-          {/* An enum, not a caption: it must go through the dictionary or the
-              badge reads "draft" in an Arabic sentence. */}
-          {(() => { const st = (s2("status") as string) || "draft"; return t(`status.${st}`, st); })()}
-        </span>
-        {readiness != null && (
-          <span className="hidden sm:inline-flex items-center gap-1.5 text-[11px] text-[var(--text-dim)] shrink-0">
-            <span className="inline-block h-1 w-14 rounded-full bg-[var(--bg-surface)] overflow-hidden align-middle">
-              <span className={`block h-full rounded-full ${readiness >= 80 ? "bg-emerald-500" : readiness >= 50 ? "bg-amber-500" : "bg-rose-500/80"}`} style={{ width: `${Math.max(2, readiness)}%` }} />
-            </span>
-            {readiness}%
-          </span>
-        )}
         <span className="flex-1" />
         {s2("slug") ? (
           <Link href={`/products/${s2("slug") as string}`} title={t("pp.publicPage", "Public page")}
-            className="hidden sm:inline-flex items-center gap-1.5 h-8 px-3 rounded-lg bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[12px] font-medium text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-all shrink-0">
+            className="hidden sm:inline-flex items-center gap-1.5 h-8 px-3 rounded-lg bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[12px] font-medium text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors shrink-0">
             <ExternalLinkIcon className="h-3.5 w-3.5" /> {t("pp.publicPage", "Public page")}
           </Link>
         ) : null}
@@ -1960,6 +1955,77 @@ export default function ProductProfile() {
             <PencilIcon className="h-3.5 w-3.5" /> {t("action.edit", "Edit")}
           </Link>
         ) : null}
+      </div>
+      {/* THE HEADER IS THE PRODUCT: its photo at a size you can recognise,
+          its name, and every KOLEEX model it answers to — the whole family
+          when it is one, each code a chip that opens that model's spotlight.
+          No new request: the photo is the main image the profile payload
+          already carries, served at the CDN's row size. */}
+      <div className="mb-3 rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] px-4 py-3 sm:px-5 sm:py-4">
+        {/* Phone: photo and name side by side, the codes under both — a tall
+            family list next to a small square left the photo floating. */}
+        <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4 min-w-0">
+          <div className="flex items-center gap-3 sm:contents">
+            <div className="h-[84px] w-[84px] sm:h-[124px] sm:w-[124px] shrink-0 rounded-xl bg-gradient-to-b from-white to-[#f4f5f7] border border-black/10 overflow-hidden flex items-center justify-center">
+              {hero
+                ? <img src={IMG.row(hero)} alt="" decoding="async" className="h-full w-full object-contain p-2" />
+                : <ImageRawIcon className="h-6 w-6 text-gray-400" />}
+            </div>
+            <h1 className="sm:hidden text-[17px] font-semibold tracking-tight text-[var(--text-primary)] leading-snug break-words min-w-0">
+              {(s2("product_name") as string) || t("pp.untitled", "Untitled product")}
+            </h1>
+          </div>
+          <div className="min-w-0 flex-1">
+            <h1 className="hidden sm:block text-[20px] font-semibold tracking-tight text-[var(--text-primary)] leading-snug break-words">
+              {(s2("product_name") as string) || t("pp.untitled", "Untitled product")}
+            </h1>
+            {/* The codes: one chip per model. A family shows every member,
+                the primary marked with the dot; a chip opens that model. */}
+            <div className="mt-2 flex items-center gap-1.5 flex-wrap">
+              {data.models.length === 0 ? (
+                <span className="text-[11px] font-mono text-[var(--text-ghost)]">{t("pp.noCode", "no code")}</span>
+              ) : data.models.map((m, i) => {
+                const code = String(m.primary_model ?? m.model_name ?? `#${i + 1}`);
+                const active = focusModel === i;
+                const family = data.models.length > 1;
+                return (
+                  <button
+                    key={i}
+                    type="button"
+                    disabled={!family}
+                    onClick={() => family && setFocusModel(active ? -1 : i)}
+                    title={family ? (active ? t("pp.fam.close", "Close model view") : String(m.model_name ?? "")) : undefined}
+                    className={`inline-flex items-center gap-1.5 h-7 px-2.5 rounded-lg border text-[12px] font-mono font-semibold tabular-nums transition-colors ${
+                      active
+                        ? "bg-[var(--bg-inverted)] text-[var(--text-inverted)] border-transparent"
+                        : "bg-[var(--bg-surface-subtle)] text-[var(--text-primary)] border-[var(--border-subtle)]"
+                    } ${family ? "hover:border-[var(--border-strong)]" : "cursor-default"}`}
+                  >
+                    {i === 0 && family && <span className={`h-1.5 w-1.5 rounded-full ${active ? "bg-[var(--text-inverted)]" : "bg-[var(--text-ghost)]"}`} title={t("pp.primary", "Primary")} />}
+                    {code}
+                  </button>
+                );
+              })}
+              {data.models.length > 1 && (
+                <span className="text-[10.5px] text-[var(--text-ghost)] tabular-nums ms-1">{t("pp.fam.label", "Family")} · {data.models.length} {t("pp.fam.members", "models")}</span>
+              )}
+            </div>
+            <div className="mt-2 flex items-center gap-2 flex-wrap">
+              <span className="inline-flex items-center px-2 py-0.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[10px] font-semibold uppercase tracking-wider text-[var(--text-muted)] shrink-0">
+                {(() => { const st = (s2("status") as string) || "draft"; return t(`status.${st}`, st); })()}
+              </span>
+              {readiness != null && (
+                <span className="inline-flex items-center gap-1.5 text-[11px] text-[var(--text-dim)] shrink-0">
+                  <span className="inline-block h-1 w-14 rounded-full bg-[var(--bg-surface)] overflow-hidden align-middle">
+                    <span className={`block h-full rounded-full ${readiness >= 80 ? "bg-emerald-500" : readiness >= 50 ? "bg-amber-500" : "bg-rose-500/80"}`} style={{ width: `${Math.max(2, readiness)}%` }} />
+                  </span>
+                  {readiness}%
+                </span>
+              )}
+              {data.subcategory?.code ? <span className="text-[10.5px] font-mono text-[var(--text-ghost)]">{data.subcategory.code}</span> : null}
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* Tabs FIRST — always at the top (owner rule); the family bar and
@@ -1979,37 +2045,10 @@ export default function ProductProfile() {
       {/* ── Family bar ── one product, several sellable models. Picking a
           member opens its spotlight: square photo, tight one-line facts,
           resolved specs. Display-only. */}
-      {data.models.length > 1 && (
+      {/* The family chips live in the header now; only the spotlight of the
+          chosen model stays under the tabs. */}
+      {data.models.length > 1 && focusModel >= 0 && (
         <div className="mb-4">
-          <div className="flex items-center gap-2 flex-wrap">
-            <span className="uppercase tracking-wider text-[10px] text-[var(--text-ghost)]">
-              {t("pp.fam.label", "Family")}
-            </span>
-            <span className="text-[10px] text-[var(--text-dim)] tabular-nums">
-              {data.models.length} {t("pp.fam.members", "models")}
-            </span>
-            <span className="h-4 w-px bg-[var(--border-subtle)] mx-0.5" />
-            {data.models.map((m, i) => {
-              const code = String(m.primary_model ?? m.model_name ?? `#${i + 1}`);
-              const active = focusModel === i;
-              return (
-                <button
-                  key={i}
-                  type="button"
-                  onClick={() => setFocusModel(active ? -1 : i)}
-                  className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-[11px] font-semibold tabular-nums transition-colors ${
-                    active
-                      ? "bg-[var(--bg-inverted)] text-[var(--text-inverted)] border-transparent"
-                      : "bg-[var(--bg-surface-subtle)] text-[var(--text-muted)] border-[var(--border-subtle)] hover:text-[var(--text-primary)] hover:border-[var(--border-focus)]"
-                  }`}
-                >
-                  {i === 0 && <span className={`h-1.5 w-1.5 rounded-full ${active ? "bg-[var(--text-inverted)]" : "bg-[var(--text-ghost)]"}`} title={t("pp.primary", "Primary")} />}
-                  {code}
-                </button>
-              );
-            })}
-          </div>
-
           {focusModel >= 0 && data.models[focusModel] && (() => {
             const m = data.models[focusModel];
             const mPhoto = (data.media ?? []).find(
@@ -2347,35 +2386,18 @@ export default function ProductProfile() {
       )}
 
       {STEPS[step].id === "finalize" && (
-      <div className="space-y-4">
-        <Group motion={tabMotion} icon={<BoundIcon semanticKey="field.readiness" className="h-4 w-4" fallback={<CheckIcon className="h-4 w-4" />} />} title={t("pp.sec.readiness", "Readiness")}>
-          {readiness == null ? (
-            <p className="text-[12px] text-[var(--text-ghost)] italic">{t("pp.e.noScore", "No spec template resolves, so completeness can\u2019t be scored.")}</p>
-          ) : (
-            <div className="space-y-3">
-              <div className="flex items-center gap-3">
-                <span className="inline-block h-1.5 flex-1 rounded-full bg-[var(--bg-surface)] overflow-hidden">
-                  <span className={`block h-full rounded-full ${readiness >= 80 ? "bg-emerald-500" : readiness >= 50 ? "bg-amber-500" : "bg-rose-500/80"}`} style={{ width: `${Math.max(2, readiness)}%` }} />
-                </span>
-                <span className="text-[13px] font-bold tabular-nums text-[var(--text-primary)]">{readiness}%</span>
-              </div>
-              {data.readiness?.dimensions && (
-                <div className={rows}>
-                  {data.readiness.dimensions.map((d) => <Row key={d.key} label={d.label} value={`${d.score}%`} />)}
-                </div>
-              )}
-            </div>
-          )}
-        </Group>
-        <Group motion={tabMotion} icon={<BoundIcon semanticKey="field.dates" className="h-4 w-4" fallback={<CheckIcon className="h-4 w-4" />} />} title={t("pp.sec.record", "Record")}>
-          <div className={rows}>
-            <Row label={t("pp.f.productId", "Product id")} value={s2("id")} mono />
-            <Row label={t("pp.f.created", "Created")} value={s2("created_at")} />
-            <Row label={t("pp.f.updated", "Last updated")} value={s2("updated_at")} />
-            <Row label={t("pp.f.schemaVer", "Schema version")} value={s2("schema_version")} />
-          </div>
-        </Group>
-      </div>
+        <ReviewSheet
+          product={p}
+          models={data.models}
+          media={data.media}
+          translations={data.translations}
+          suppliers={data.suppliers}
+          schema={data.schema}
+          readiness={data.readiness}
+          t={t} motion={tabMotion} notSet={NOT_SET}
+          glyph={glyphFor}
+          onGo={(id) => { const i = STEPS.findIndex((st) => st.id === id); if (i >= 0) guard(() => setStep(i)); }}
+        />
       )}
       </div>
     </div>
