@@ -147,7 +147,7 @@ async function readStored(query: RateQuery, tenantId: string): Promise<FreightRa
   const seen = new Set<string>();
   const out: FreightRate[] = [];
   for (const row of data as StoredRow[]) {
-    const k = `${row.rate_kind}|${row.source_id}|${row.equipment ?? "-"}|${row.weight_break ?? "-"}|${row.scope}`;
+    const k = `${row.rate_kind}|${row.source_id}|${row.equipment ?? "-"}|${row.weight_break ?? "-"}|${row.service_scope}`;
     if (seen.has(k)) continue;
     seen.add(k);
     out.push(fromRow(row));
@@ -161,7 +161,11 @@ interface StoredRow {
   origin_code: string; destination_code: string;
   origin_code_system: FreightRate["originCodeSystem"] | null;
   destination_code_system: FreightRate["destinationCodeSystem"] | null;
-  scope: FreightRate["scope"];
+  /* ⚠️ service_scope, not scope. The column has always been service_scope;
+     this type and the two mappings below said `scope`, so every provider rate
+     failed to insert and every row read back carried scope: undefined. Silent
+     both ways — see the note on persist(). */
+  service_scope: FreightRate["scope"];
   includes_origin_charges: boolean | null; includes_destination_charges: boolean | null;
   includes_customs: boolean | null; incoterm: string | null;
   equipment: FreightRate["equipment"] | null; unit: FreightRate["unit"];
@@ -192,7 +196,7 @@ function fromRow(r: StoredRow): FreightRate {
        path did not work then. Stated, not silently defaulted. */
     originCodeSystem: r.origin_code_system ?? "unlocode",
     destinationCodeSystem: r.destination_code_system ?? "unlocode",
-    scope: r.scope,
+    scope: r.service_scope,
     includesOriginCharges: r.includes_origin_charges ?? undefined,
     includesDestinationCharges: r.includes_destination_charges ?? undefined,
     includesCustoms: r.includes_customs ?? undefined,
@@ -247,7 +251,7 @@ async function persist(rates: FreightRate[], query: RateQuery, tenantId: string,
       destination_code: r.destinationCode,
       origin_code_system: r.originCodeSystem,
       destination_code_system: r.destinationCodeSystem,
-      scope: r.scope,
+      service_scope: r.scope,
       includes_origin_charges: r.includesOriginCharges ?? null,
       includes_destination_charges: r.includesDestinationCharges ?? null,
       includes_customs: r.includesCustoms ?? null,
@@ -280,9 +284,16 @@ async function persist(rates: FreightRate[], query: RateQuery, tenantId: string,
       created_by: accountId ?? null,
     }));
   if (!rows.length) return;
-  /* A failed cache write must never fail a search the user is watching. */
+  /* ⚠️ A FAILED CACHE WRITE MUST NEVER FAIL A SEARCH THE USER IS WATCHING —
+     and that is exactly why a column-name typo here is invisible. It shipped
+     as `scope` against a `service_scope` column: every insert errored, the
+     warning went to a log nobody reads, the screen looked perfect, and the
+     cache and the whole price history would simply never have filled. Nothing
+     would have surfaced it until someone asked why the history was empty
+     months later. If you change a column name, change it in StoredRow and
+     fromRow too — the three go together. */
   const { error } = await supabaseServer.from("shipping_rate_quotes").insert(rows);
-  if (error) console.warn("[shipping.engine] cache write failed:", error.message);
+  if (error) console.warn("[shipping.engine] cache write FAILED, history will not fill:", error.message, "| first row keys:", Object.keys(rows[0]).join(","));
 }
 
 /** Same source, same product, same money — keep the newest. */
