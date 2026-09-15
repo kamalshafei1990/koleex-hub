@@ -34,6 +34,10 @@ import InfoIcon from "@/components/icons/ui/InfoIcon";
 import TriangleWarningIcon from "@/components/icons/ui/TriangleWarningIcon";
 import AngleDownIcon from "@/components/icons/ui/AngleDownIcon";
 import HistoryIcon from "@/components/icons/ui/HistoryIcon";
+import PlugIcon from "@/components/icons/ui/PlugIcon";
+import NetworkIcon from "@/components/icons/ui/NetworkIcon";
+import TimerIcon from "@/components/icons/ui/TimerIcon";
+import ExternalLinkIcon from "@/components/icons/ui/ExternalLinkIcon";
 
 type T = (key: string, fallback?: string) => string;
 
@@ -275,17 +279,120 @@ export function RateRow({ rate, t, lang, quantity = 1 }: { rate: FreightRate; t:
   );
 }
 
+
+/* ── WHY A CARD HAS NO PRICE ────────────────────────────────────────────────
+   "Rate unavailable" alone reads as a fault in the app, and it was: the
+   operator had to ask where the results were. Each state below is derived
+   from what is actually true of this search — never a guess, never a provider
+   name, never anything that looks like a crash. */
+export type UnavailableReason = "provider_disconnected" | "provider_error" | "expired" | "no_rate";
+
+const expired = (r: FreightRate, now: number) =>
+  Boolean(r.validUntil) && Date.parse(r.validUntil as string) < now;
+
+/** Rates that could be quoted today: not historical, not past their validity. */
+export function currentRates(rates: FreightRate[], now = Date.now()): FreightRate[] {
+  return rates.filter((r) => r.kind !== "koleex" && !expired(r, now));
+}
+
+/** Errors the operator can do nothing about but should not read as "no rate". */
+const REACH_ERRORS = new Set(["timeout", "upstream", "unauthorised", "quota"]);
+
+export function reasonFor(data: RateSearchResponse, groupRates: FreightRate[], now = Date.now()): UnavailableReason {
+  /* A rate that exists but has run out is its own answer — the operator needs
+     a refresh, not a different route. */
+  const quotable = groupRates.filter((r) => r.kind !== "koleex");
+  if (quotable.length > 0 && quotable.every((r) => expired(r, now))) return "expired";
+
+  /* "Live rate provider" means an EXTERNAL one. Koleex's own history is always
+     on and is not a source of current prices, so it must not make the app
+     claim a provider is connected. */
+  const external = (data.providers ?? []).filter(
+    (p) => (p.kind === "provider" || p.kind === "market") && p.modes.includes(data.query.mode),
+  );
+  const active = external.filter((p) => p.enabled);
+  if (active.length === 0) return "provider_disconnected";
+
+  const unreachable = (data.results ?? []).some(
+    (r) => r.error && REACH_ERRORS.has(r.error.kind) && active.some((p) => p.id === r.providerId),
+  );
+  if (unreachable) return "provider_error";
+
+  return "no_rate";
+}
+
+const REASON_UI: Record<UnavailableReason, { title: string; why: string; icon: (s: number) => React.ReactNode }> = {
+  provider_disconnected: { title: "res.unavailable",     why: "why.noProvider",    icon: (n) => <PlugIcon size={n} /> },
+  provider_error:        { title: "res.tempUnavailable", why: "why.providerError", icon: (n) => <NetworkIcon size={n} /> },
+  expired:               { title: "res.expired",         why: "why.expired",       icon: (n) => <TimerIcon size={n} /> },
+  no_rate:               { title: "res.unavailable",     why: "why.noRate",        icon: (n) => <TriangleWarningIcon size={n} /> },
+};
+
+/** The body of a card with no current price. Compact on purpose: one line of
+ *  title, one of reason, and nothing else. */
+function Unavailable({ reason, t }: { reason: UnavailableReason; t: T }) {
+  const ui = REASON_UI[reason];
+  return (
+    <div className="rounded-xl border border-dashed border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] px-3 py-4 text-center">
+      <span className="mx-auto mb-1 flex h-5 w-5 items-center justify-center text-[var(--text-ghost)]">{ui.icon(15)}</span>
+      <p className="text-[12px] font-medium text-[var(--text-dim)]">{t(ui.title)}</p>
+      <p className="mt-0.5 text-[11px] leading-snug text-[var(--text-ghost)]">{t(ui.why)}</p>
+    </div>
+  );
+}
+
+/** ⚠️ OFFERED, NEVER SUBSTITUTED. A past Koleex rate is real money on a past
+ *  date; it is not what this lane costs today. It sits behind a labelled
+ *  disclosure so opening it is a decision, not something that happens to the
+ *  operator while they are reading a card. */
+function HistoricalDisclosure({ rates, t, lang, quantity }: { rates: FreightRate[]; t: T; lang: Lang; quantity: number }) {
+  const [open, setOpen] = useState(false);
+  if (!rates.length) return null;
+  return (
+    <div className="mt-2">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+        className="flex w-full items-center gap-2 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] px-2.5 py-1.5 text-start transition-colors hover:border-[var(--border-focus)]"
+      >
+        <HistoryIcon size={13} className="shrink-0 text-[var(--text-ghost)]" />
+        <span className="min-w-0 flex-1">
+          <span className="block truncate text-[11.5px] font-medium text-[var(--text-secondary)]">{t("hist.available")}</span>
+          <span className="block text-[10.5px] text-[var(--text-ghost)]">{t("hist.notCurrent")}</span>
+        </span>
+        <span className="shrink-0 text-[11px] font-medium text-[var(--text-dim)]">{open ? t("hist.hide") : t("hist.view")}</span>
+        <AngleDownIcon size={11} className={`shrink-0 text-[var(--text-ghost)] transition-transform ${open ? "rotate-180" : ""}`} />
+      </button>
+      {open ? (
+        <div className="mt-2 space-y-2">
+          {rates.map((r, i) => <RateRow key={r.id ?? `h-${i}`} rate={r} t={t} lang={lang} quantity={quantity} />)}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 /* ── a comparison group: one product, every source that prices it ───────── */
-function GroupCard({ group, t, lang, quantity }: { group: ComparisonGroupView; t: T; lang: Lang; quantity: number }) {
+function GroupCard({ group, data, t, lang, quantity }: {
+  group: ComparisonGroupView; data: RateSearchResponse; t: T; lang: Lang; quantity: number;
+}) {
   const heading = group.key.equipment !== "-" ? group.key.equipment : null;
-  const empty = group.rates.length === 0;
+
+  /* ⚠️ HISTORICAL IS NOT A FALLBACK. `current` deliberately excludes Koleex's
+     own past rates and anything past its validity, so a card can never quietly
+     answer "what does this cost today" with what it cost in April. */
+  const current = currentRates(group.rates);
+  const historical = group.byKind.koleex ?? [];
+  const reason = current.length ? null : reasonFor(data, group.rates);
+
   /* Order by how actionable the number is, not by price: a bookable rate
-     first, then a quote, then our own history, then a band. */
-  const ordered: RateKind[] = ["provider", "forwarder", "koleex", "market"];
-  const rates = ordered.flatMap((k) => group.byKind[k] ?? []);
+     first, then a quote. */
+  const ordered: RateKind[] = ["provider", "forwarder", "market"];
+  const shown = ordered.flatMap((k) => (group.byKind[k] ?? []).filter((r) => current.includes(r)));
 
   return (
-    <section className={"rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-3" + (empty ? " opacity-70" : "")}>
+    <section className={"rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-3" + (reason ? " opacity-80" : "")}>
       {heading ? (
         <header className="mb-2 flex items-center justify-between gap-2">
           <h3 className="inline-flex items-center gap-1.5 text-[14px] font-semibold text-[var(--text-primary)]">
@@ -293,30 +400,30 @@ function GroupCard({ group, t, lang, quantity }: { group: ComparisonGroupView; t
             {/* Container types are identifiers, not copy — 40HQ in every language. */}
             {heading}
           </h3>
-          {group.best ? (
+          {!reason && group.best ? (
             <span title={t("cmp.bestNote")} className="rounded-full border border-[#10B981]/35 bg-[#10B981]/12 px-2 py-0.5 text-[10px] font-semibold text-[#10B981]">
               {t("cmp.best")}
             </span>
           ) : null}
         </header>
       ) : null}
-      <div className="space-y-2">
-        {rates.length ? (
-          rates.map((r, i) => <RateRow key={r.id ?? `${r.sourceId}-${i}`} rate={r} t={t} lang={lang} quantity={quantity} />)
-        ) : (
-          <div className="rounded-xl border border-dashed border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] px-3 py-5 text-center">
-            <TriangleWarningIcon size={14} className="mx-auto mb-1 text-[var(--text-ghost)]" />
-            <p className="text-[12px] font-medium text-[var(--text-dim)]">{t("res.unavailable")}</p>
-          </div>
-        )}
-      </div>
+
+      {reason ? (
+        <Unavailable reason={reason} t={t} />
+      ) : (
+        <div className="space-y-2">
+          {shown.map((r, i) => <RateRow key={r.id ?? `${r.sourceId}-${i}`} rate={r} t={t} lang={lang} quantity={quantity} />)}
+        </div>
+      )}
+
+      <HistoricalDisclosure rates={historical} t={t} lang={lang} quantity={quantity} />
     </section>
   );
 }
 
 /* ── the whole result ───────────────────────────────────────────────────── */
 export default function RateResults({
-  data, t, lang, quantity = 1, columns,
+  data, t, lang, quantity = 1, columns, onViewSources,
 }: {
   data: RateSearchResponse;
   t: T;
@@ -324,6 +431,8 @@ export default function RateResults({
   quantity?: number;
   /** Measured by the host — never a viewport breakpoint. */
   columns: 1 | 2 | 3;
+  /** Brings the existing Rate Sources section into view. Never a second screen. */
+  onViewSources?: () => void;
 }) {
   /* FCL ASKS ABOUT THREE CONTAINERS AND MUST ANSWER ABOUT THREE.
      The engine groups what it FOUND, so a lane priced only for 20GP rendered a
@@ -347,14 +456,23 @@ export default function RateResults({
     return out;
   }, [data]);
 
+  /* ONE line for the whole route, shown when every requested container came
+     back empty for the same reason — so the answer is stated once, up front,
+     instead of being inferred from three identical cards. */
+  const allReasons = groups.map((g) => (currentRates(g.rates).length ? null : reasonFor(data, g.rates)));
+  const everyCardEmpty = allReasons.every(Boolean);
+  const sharedReason = everyCardEmpty && new Set(allReasons).size === 1 ? allReasons[0] : null;
+
   if (!groups.length) {
+    const reason = reasonFor(data, []);
     return (
       <div className="rounded-2xl border border-dashed border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] px-6 py-12 text-center">
-        <TriangleWarningIcon size={20} className="mx-auto mb-2 text-[var(--text-ghost)]" />
-        <p className="text-[14px] font-semibold text-[var(--text-primary)]">{t("res.unavailable")}</p>
-        <p className="mx-auto mt-1 max-w-[46ch] text-[12px] text-[var(--text-dim)]">
-          {data.unavailable?.reason === "no_sources" ? t("err.noSources") : t("res.unavailableHint")}
-        </p>
+        <span className="mx-auto mb-2 flex h-6 w-6 items-center justify-center text-[var(--text-ghost)]">
+          {REASON_UI[reason].icon(20)}
+        </span>
+        <p className="text-[14px] font-semibold text-[var(--text-primary)]">{t(REASON_UI[reason].title)}</p>
+        <p className="mx-auto mt-1 max-w-[46ch] text-[12px] text-[var(--text-dim)]">{t(REASON_UI[reason].why)}</p>
+        {onViewSources ? <ViewSources t={t} onClick={onViewSources} /> : null}
       </div>
     );
   }
@@ -365,9 +483,24 @@ export default function RateResults({
 
   return (
     <div className="space-y-3">
+      {sharedReason ? (
+        <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1.5 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] px-3 py-2">
+          <span className="shrink-0 text-[var(--text-ghost)]">{REASON_UI[sharedReason].icon(14)}</span>
+          <p className="min-w-0 flex-1 text-[12px] text-[var(--text-secondary)]">
+            {sharedReason === "provider_disconnected" ? t("route.noSource")
+              : sharedReason === "provider_error" ? t("route.providerError")
+              : sharedReason === "expired" ? t("why.expired")
+              : t("route.noRate")}
+          </p>
+          {onViewSources && sharedReason !== "no_rate" ? (
+            <ViewSources t={t} onClick={onViewSources} inline />
+          ) : null}
+        </div>
+      ) : null}
+
       <div className={`grid gap-3 ${groups.length > 1 ? grid : "grid-cols-1"}`}>
         {groups.map((g, i) => (
-          <GroupCard key={`${g.key.equipment}-${g.key.scope}-${i}`} group={g} t={t} lang={lang} quantity={quantity} />
+          <GroupCard key={`${g.key.equipment}-${g.key.scope}-${i}`} group={g} data={data} t={t} lang={lang} quantity={quantity} />
         ))}
       </div>
 
@@ -411,6 +544,21 @@ function emptyGroup(data: RateSearchResponse, equipment: ContainerEquipment): Co
     rates: [],
     byKind: { provider: [], market: [], koleex: [], forwarder: [] },
   };
+}
+
+/** Sends the operator to the Rate Sources section that already exists — never
+ *  a second screen explaining the same thing. */
+function ViewSources({ t, onClick, inline }: { t: T; onClick: () => void; inline?: boolean }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-[var(--border-subtle)] px-2.5 text-[11px] font-medium text-[var(--text-dim)] transition-colors hover:border-[var(--border-focus)] hover:text-[var(--text-primary)] ${inline ? "h-7" : "mt-3 h-8"}`}
+    >
+      <ExternalLinkIcon size={11} />
+      {t("action.viewSources")}
+    </button>
+  );
 }
 
 /** The engine speaks English reason strings; map them onto dictionary keys. */

@@ -129,6 +129,49 @@ export const shippingT: Translations = {
                            zh: "目前没有任何来源提供该航线的运价。系统未做任何估算。",
                            ar: "لا يوجد مصدر لديه سعر حالي لهذا المسار. ولم يتم تقدير أي رقم." },
   "res.rangeOnly":     { en: "Range only",        zh: "仅区间",      ar: "نطاق فقط" },
+  /* ── why a card has no price. ⚠️ THE REASON IS THE POINT ────────────────
+        "Rate unavailable" on its own reads as a fault in the app. Each state
+        below names what is actually true, in one short line, with no provider
+        or API names — those live in Rate Sources, behind a deliberate look. */
+  "res.tempUnavailable": { en: "Rate temporarily unavailable", zh: "运价暂时不可用", ar: "السعر غير متاح مؤقتًا" },
+  "res.expired":        { en: "Rate expired",     zh: "运价已过期",   ar: "انتهت صلاحية السعر" },
+  "why.noProvider":     { en: "No live rate provider is connected yet.",
+                          zh: "尚未连接任何实时运价服务商。",
+                          ar: "لا يوجد مزوّد أسعار حي متصل بعد." },
+  "why.noRate":         { en: "No current rate was found for this route.",
+                          zh: "未找到该航线的当前运价。",
+                          ar: "لم يُعثر على سعر حالي لهذا المسار." },
+  "why.providerError":  { en: "The rate provider could not be reached.",
+                          zh: "无法连接运价服务商。",
+                          ar: "تعذّر الوصول إلى مزوّد الأسعار." },
+  "why.expired":        { en: "A current rate needs to be refreshed.",
+                          zh: "需要刷新以获取当前运价。",
+                          ar: "يلزم تحديث السعر للحصول على سعر حالي." },
+
+  /* The route-level line, shown once above the cards when every requested
+     container came back empty for the same reason. */
+  "route.noSource":     { en: "No current freight-rate source is connected for this route.",
+                          zh: "该航线尚未连接任何当前运价数据源。",
+                          ar: "لا يوجد مصدر أسعار شحن حالي متصل بهذا المسار." },
+  "route.noRate":       { en: "No current rate was found for this route.",
+                          zh: "未找到该航线的当前运价。",
+                          ar: "لم يُعثر على سعر حالي لهذا المسار." },
+  "route.providerError": { en: "The rate provider could not be reached just now.",
+                          zh: "目前无法连接运价服务商。",
+                          ar: "تعذّر الوصول إلى مزوّد الأسعار في الوقت الحالي." },
+  "action.viewSources": { en: "View rate sources", zh: "查看运价来源", ar: "عرض مصادر الأسعار" },
+
+  /* ── historical is OFFERED, never substituted ──────────────────────────
+        A past Koleex rate is real money on a past date. It is never what a
+        card shows when the current rate is missing — it is a separate,
+        labelled thing the operator chooses to open. */
+  "hist.available":     { en: "Koleex historical rate available",
+                          zh: "有 Koleex 历史运价",
+                          ar: "يتوفر سعر كوليكس التاريخي" },
+  "hist.view":          { en: "View historical data", zh: "查看历史数据", ar: "عرض البيانات التاريخية" },
+  "hist.hide":          { en: "Hide historical data", zh: "隐藏历史数据", ar: "إخفاء البيانات التاريخية" },
+  "hist.notCurrent":    { en: "Not a current rate.", zh: "并非当前运价。", ar: "ليس سعرًا حاليًا." },
+
   "res.notBookable":   { en: "Not bookable",      zh: "不可订舱",    ar: "غير قابل للحجز" },
 
   /* ── the four kinds. THE most important strings in the app. ───────────── */

@@ -148,6 +148,19 @@ export default function ShippingApp() {
   const [data, setData] = useState<RateSearchResponse | null>(null);
   const [error, setError] = useState<{ title: string; body: string; candidates?: PortHit[] } | null>(null);
   const abortRef = useRef<AbortController | null>(null);
+  const sourcesRef = useRef<HTMLElement | null>(null);
+
+  /* "View rate sources" brings the section that already exists into view — it
+     never opens a second screen saying the same thing twice. The brief ring is
+     so the operator sees WHERE they landed; .kx-reduce-motion turns the
+     transition off for anyone who asked for that. */
+  const viewSources = useCallback(() => {
+    const el = sourcesRef.current;
+    if (!el) return;
+    el.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    el.classList.add("ring-2", "ring-[#567FB2]/50");
+    window.setTimeout(() => el.classList.remove("ring-2", "ring-[#567FB2]/50"), 1600);
+  }, []);
 
   const isAir = mode === "air";
 
@@ -347,8 +360,16 @@ export default function ShippingApp() {
             Sticky, and it carries the ONE edge blur on this screen: a
             filterless kx-bar-host with a kx-glass-bar child. Pinned to the
             header height, not top-0, because /shipping is an under-glass
-            route and the scroller's top edge IS the viewport top. */}
-        <div className="kx-bar-host sticky top-[var(--kx-header-h,3.5rem)] z-[15] -mx-4 mb-4 px-4 pb-3 pt-3 sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8">
+            route and the scroller's top edge IS the viewport top.
+
+            ⚠️ bg-[var(--bg-primary)] IS LOAD-BEARING, AND ONLY UNDER CORE.
+            The glass comes from the kx-glass-bar child, which Aurora draws and
+            Core sets to display:none — so without a background of its own the
+            strip was transparent in Core and the result cards scrolled visibly
+            THROUGH the port fields. kx-app remaps --bg-primary to transparent
+            under Aurora, so the one class is glass in one skin and a solid
+            page ground in the other. Same shape Contacts uses. */}
+        <div className="kx-bar-host sticky top-[var(--kx-header-h,3.5rem)] z-[15] -mx-4 mb-4 bg-[var(--bg-primary)] px-4 pb-3 pt-3 sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8">
           <div aria-hidden className="kx-glass-bar" />
 
           {/* method — three-up, icon-led, always visible */}
@@ -578,12 +599,12 @@ export default function ShippingApp() {
 
             {busy ? <ResultSkeleton label={t("load.rates")} cols={cols} />
               : error ? <ErrorPanel error={error} t={t} onRetry={() => run(true)} />
-              : data ? <RateResults data={data} t={t} lang={lang} quantity={quantity} columns={cols} />
+              : data ? <RateResults data={data} t={t} lang={lang} quantity={quantity} columns={cols} onViewSources={viewSources} />
               : <EmptyPanel t={t} />}
           </main>
 
           <aside className={`min-w-0 space-y-3 ${wide ? "" : "order-last"}`}>
-            {data ? <SourcesPanel providers={data.providers} mode={mode} t={t} /> : null}
+            {data ? <SourcesPanel providers={data.providers} mode={mode} t={t} panelRef={sourcesRef} /> : null}
             <RoutesPanel routes={routes} t={t}
               onPick={(r) => {
                 /* changeMode first (it may clear the endpoints when the sea/air
@@ -818,12 +839,14 @@ function MeasurePanel({ cbm, grossKg, t }: { cbm: number; grossKg: number; t: (k
   );
 }
 
-function SourcesPanel({ providers, mode, t }: {
-  providers: RateSearchResponse["providers"]; mode: ShippingMode; t: (k: string, f?: string) => string;
+function SourcesPanel({ providers, mode, t, panelRef }: {
+  providers: RateSearchResponse["providers"]; mode: ShippingMode;
+  t: (k: string, f?: string) => string;
+  panelRef?: React.Ref<HTMLElement>;
 }) {
   const relevant = providers.filter((p) => p.modes.includes(mode));
   return (
-    <section className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-3">
+    <section ref={panelRef} className="scroll-mt-24 rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-3 transition-shadow">
       <h2 className="mb-2 text-[12px] font-semibold uppercase tracking-wide text-[var(--text-ghost)]">{t("src.title")}</h2>
       {relevant.length === 0 ? (
         <p className="text-[12px] text-[var(--text-dim)]">{t("src.none")}</p>
@@ -838,14 +861,20 @@ function SourcesPanel({ providers, mode, t }: {
                   {/* ⚠️ The freshness badge is for CONNECTED sources only. A
                       disabled provider showing "Live" states a fact about a
                       feed nobody is reading — and next to "Market Estimate" it
-                      reads as a promise the source does not make. The reason
-                      line underneath already says why it is off. */}
+                      reads as a promise the source does not make. */}
                   {p.enabled ? (
                     <span className="shrink-0 text-[10px] text-[var(--text-ghost)]">{t(`src.cadence.${p.cadence}`)}</span>
                   ) : null}
                 </div>
-                <p className="mt-0.5 text-[11px] leading-snug text-[var(--text-dim)]">
-                  {p.enabled ? t("src.active") : (p.reason ?? t("src.off"))}
+                {/* ⚠️ THE TECHNICAL REQUIREMENT IS A TOOLTIP, NOT THE RESTING
+                    STATE. Environment-variable names and a provider's sign-up
+                    URL are for whoever configures this, not for the operator
+                    checking a price. The status line stays plain. */}
+                <p
+                  title={p.enabled ? undefined : [p.reason, p.requires].filter(Boolean).join("\n\n")}
+                  className="mt-0.5 text-[11px] leading-snug text-[var(--text-dim)]"
+                >
+                  {p.enabled ? t("src.active") : t("src.off")}
                 </p>
               </div>
             </li>

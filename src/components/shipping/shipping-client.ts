@@ -82,8 +82,19 @@ export interface ComparisonGroupView {
   spread?: { low: number; high: number; currency: string };
 }
 
+/** One provider's answer, successes and failures alike. The UI reads only the
+    error KIND from this — a provider's name or message never reaches a rate
+    card, only the Rate Sources section. */
+export interface ProviderResultView {
+  providerId: string;
+  rates: FreightRate[];
+  error?: { kind: string; detail?: string };
+  elapsedMs?: number;
+}
+
 export interface RateSearchResponse {
   query: RateQuery;
+  results: ProviderResultView[];
   byKind: Record<RateKind, FreightRate[]>;
   groups: ComparisonGroupView[];
   refusals: { a: string; b: string; reasons: string[] }[];
