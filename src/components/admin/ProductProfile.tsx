@@ -100,6 +100,7 @@ import HeroSheet from "./profile/HeroSheet";
 import ComplianceSheet from "./profile/ComplianceSheet";
 import ClassifySheet from "./profile/ClassifySheet";
 import SupplierSheet from "./profile/SupplierSheet";
+import VariantsSheet from "./profile/VariantsSheet";
 import dynamic from "next/dynamic";
 import { useSkin } from "@/lib/appearance";
 import FeatureHighlightsDisplay from "./FeatureHighlightsDisplay";
@@ -142,6 +143,11 @@ const PROFILE_T: Record<string, { en: string; zh: string; ar: string }> = {
   "pr.variant1":      { en: "1 variant",          zh: "1 个型号",       ar: "موديل واحد" },
   "pp.certWord":      { en: "cert",               zh: "证书",           ar: "شهادة" },
   "sup.costNote":     { en: "Price note",         zh: "价格备注",       ar: "ملاحظة السعر" },
+  /* Variants tab */
+  "vs.remove":        { en: "Remove variant",     zh: "移除型号",       ar: "إزالة الموديل" },
+  "vs.codeOnHero":    { en: "The primary model's code is checked and approved on the Hero tab.", zh: "主型号编码在主页标签页校验并批准。", ar: "كود الموديل الأساسي يُفحص ويُعتمد في تبويب الواجهة." },
+  "vs.addOverride":   { en: "+ Add a spec that differs on this model…", zh: "+ 添加此型号不同的规格…", ar: "+ أضف مواصفة تختلف في هذا الموديل…" },
+  "vs.elsewhere":     { en: "Prices on the Price tab · packing on Packing & Logistics.", zh: "价格见“价格”标签页 · 包装见“包装与物流”。", ar: "الأسعار في تبويب السعر · التعبئة في تبويب التعبئة واللوجستيات." },
   /* Classify tab */
   "cl.pickDivision":  { en: "Pick a division…",   zh: "选择事业部…",     ar: "اختر القسم…" },
   "cl.pickCategory":  { en: "Pick a category…",   zh: "选择类别…",       ar: "اختر الفئة…" },
@@ -2203,74 +2209,17 @@ export default function ProductProfile() {
       )}
 
       {STEPS[step].id === "commercial" && (
-      <Group motion={tabMotion} icon={<BoundIcon semanticKey="field.family" className="h-4 w-4" fallback={<BoxesIcon className="h-4 w-4" />} />} title={t("pp.sec.variants", "Variants")} count={`${data.models.length}`} editLabel={t("action.edit", "Edit")} onEdit={() => goStep("commercial")}>
-        {data.models.length === 0 ? (
-          <p className="text-[12px] text-[var(--text-ghost)] italic">{t("pp.e.noVariant", "No variant recorded — a product needs at least one.")}</p>
-        ) : (
-          <div className="space-y-3">
-            {data.models.map((m, i) => (
-              <div key={i} className="rounded-xl border border-[var(--border-subtle)] p-3">
-                <div className="flex items-center gap-2 mb-3">
-                  <span className="text-[13px] font-semibold text-[var(--text-primary)]">{(m.model_name as string) || "Untitled variant"}</span>
-                  <span className="text-[11px] font-mono text-[var(--text-dim)]">{(m.primary_model as string) || "—"}</span>
-                  {i === 0 && <span className="text-[10px] px-1.5 py-0.5 rounded bg-[var(--bg-surface)] text-[var(--text-muted)]">{t("pp.primary", "Primary")}</span>}
-                </div>
-                <div className={rows}>
-                  <Row label={t("pp.f.variantName", "Variant name")} value={m.model_name} />
-                  <Row label={t("pp.f.koleexCode", "KOLEEX code")} value={m.primary_model} mono />
-                  <Row label={t("pp.f.supRef", "Supplier reference")} value={m.reference_model} mono />
-                  <Row label={t("pp.f.tagline", "Tagline")} value={m.tagline} />
-                  <Row label={t("pp.f.stock", "Stock status")} value={m.stock_status} />
-                  <Row label={t("pp.f.barcode", "Barcode")} value={m.barcode} mono />
-                  <Row label={t("pp.f.visible", "Visible")} value={m.visible} />
-                  <Row label={t("pp.f.status", "Status")} value={m.status} />
-                </div>
-                {/* Per-model spec differences — the answer to "what makes
-                    this size different". Labels/units come from the same
-                    schema the Specs tab renders, so the two views can never
-                    name a field differently. Everything not listed inherits
-                    the product's Specifications. */}
-                {(() => {
-                  const ov = (m.specs_overrides as Record<string, unknown> | null) ?? {};
-                  const entries = Object.entries(ov).filter(([, v]) => v !== null && v !== undefined && v !== "");
-                  const fieldByKey = new Map<string, { label: string; unit?: string }>();
-                  for (const g of data.schema?.groups ?? []) {
-                    for (const f of g.fields ?? []) fieldByKey.set(f.key, { label: f.label || f.key, unit: f.unit });
-                  }
-                  if (entries.length === 0) {
-                    return (
-                      <p className="mt-2 text-[11px] text-[var(--text-ghost)] italic">
-                        {t("pp.f.inheritsSpecs", "Inherits all product specifications — no per-model differences recorded yet.")}
-                      </p>
-                    );
-                  }
-                  return (
-                    <div className="mt-3 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)]/40 p-2.5">
-                      <div className="text-[9.5px] font-bold uppercase tracking-wider text-[var(--text-ghost)] mb-1.5">
-                        {t("pp.f.techDiff", "Technical differences vs product specs")}
-                      </div>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1">
-                        {entries.map(([k, v]) => {
-                          const f = fieldByKey.get(k);
-                          return (
-                            <div key={k} className="flex items-baseline justify-between gap-3 text-[12px]">
-                              <span className="text-[var(--text-dim)]">{f?.label ?? k}</span>
-                              <span className="text-[var(--text-primary)] font-medium tabular-nums text-end">
-                                {Array.isArray(v) ? v.join(", ") : String(v)}
-                                {f?.unit ? <span className="text-[var(--text-ghost)] ms-1 font-normal">{f.unit}</span> : null}
-                              </span>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  );
-                })()}
-              </div>
-            ))}
-          </div>
-        )}
-      </Group>
+        <VariantsSheet
+          product={p}
+          models={data.models}
+          media={data.media}
+          schemaGroups={(data.schema?.groups ?? []) as Array<{ fields?: Array<Record<string, unknown> & { key: string; label?: string; unit?: string }> }>}
+          productId={p?.id as string | undefined}
+          t={t} motion={tabMotion} canEdit={canEdit} notSet={NOT_SET}
+          onDirtyChange={(d) => { dirtyRef.current = d; }}
+          onSaved={(u) => mergeSaved({ product: u.product })}
+          glyph={glyphFor}
+        />
       )}
 
       {/* THE EDITOR'S PRICE TAB, READ-ONLY UNTIL EDIT: Cost Price synced to
