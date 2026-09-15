@@ -5,7 +5,9 @@
  *   • If the product has a RESOLVED schema → render the schema-driven
  *     <ProductPreview> (the Product Intelligence experience).
  *   • Otherwise → fall back to <LegacyProductView>, the original renderer,
- *     so the ~660 products that have no schema yet keep working unchanged.
+ *     so products that have no schema yet keep working unchanged. (That set
+ *     has shrunk as schemas landed: 29 of 271 products as of 2026-08-29, which
+ *     is why the legacy renderer is now a dynamic import — see below.)
  *
  * This is how the new experience reaches the route customers actually browse
  * without breaking non-schema products. As more machine-kind schemas land +
@@ -21,7 +23,9 @@ import { loadPublicSchemaProduct } from "@/lib/server/product-detail";
 import { getSessionAccountId } from "@/lib/server/session";
 import { ProductPreview } from "@/components/product-preview/ProductPreview";
 import ArrowLeftIcon from "@/components/icons/ui/ArrowLeftIcon";
-import LegacyProductView from "./LegacyProductView";
+/* Lazy boundary — see LegacyProductViewLazy.tsx for why the dynamic()
+   call cannot live in this Server Component. */
+import LegacyProductView from "./LegacyProductViewLazy";
 
 export async function generateMetadata({
   params,

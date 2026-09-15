@@ -30,6 +30,7 @@
 
 import { humanizeError } from "@/lib/ui/humanize-error";
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useWarmData } from "@/lib/warm-cache";
 import { record, event } from "@/lib/perf/client";
 import Link from "next/link";
 import { ErpPage, ErpPanel } from "@/components/ui/erp/ErpUi";
@@ -220,9 +221,6 @@ export function StatementsDashboard() {
   const [granularity, setGranularity] = useState<Granularity>("year");
   const [periodEnd, setPeriodEnd] = useState<string>(() => defaultAnchorForGranularity("year"));
   const [compareEnd, setCompareEnd] = useState<string | null>(null);
-  const [snap, setSnap] = useState<Snapshot | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError]     = useState<string | null>(null);
 
   /* Privacy-safe dashboard timing: mount → first content, and per-refresh
      settle time. Only durations (ms) + the metric name are ever recorded —
@@ -230,32 +228,53 @@ export function StatementsDashboard() {
   const mountT0 = useRef(typeof performance !== "undefined" ? performance.now() : 0);
   const firstReadyRef = useRef(false);
 
-  const fetchSnap = useCallback(async () => {
-    setLoading(true); setError(null);
-    const callT0 = typeof performance !== "undefined" ? performance.now() : 0;
-    try {
-      const qs = new URLSearchParams({ granularity, period_end: periodEnd });
-      if (compareEnd) qs.set("compare_end", compareEnd);
-      const r = await fetch(`/api/finance/visual-statements?${qs.toString()}`, { cache: "no-store" });
-      const j = await r.json();
-      if (!r.ok) throw new Error(humanizeError(j.error || `HTTP ${r.status}`));
-      setSnap(j.snapshot);
-      if (!firstReadyRef.current) {
-        firstReadyRef.current = true;
-        const ms = (typeof performance !== "undefined" ? performance.now() : 0) - mountT0.current;
-        record("finance.dashboard.first_card_ms", ms);
-        record("finance.dashboard.full_ready_ms", ms);
-        record("finance.dashboard.request_count", 1);
-      } else {
-        record("finance.filter.settled_ms", (typeof performance !== "undefined" ? performance.now() : 0) - callT0);
-      }
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
-      event("finance.dashboard.error");
-    } finally { setLoading(false); }
+  const qs = useMemo(() => {
+    const p = new URLSearchParams({ granularity, period_end: periodEnd });
+    if (compareEnd) p.set("compare_end", compareEnd);
+    return p.toString();
   }, [granularity, periodEnd, compareEnd]);
 
-  useEffect(() => { fetchSnap(); }, [fetchSnap]);
+  const callT0Ref = useRef(0);
+  const load = useCallback(async () => {
+    callT0Ref.current = typeof performance !== "undefined" ? performance.now() : 0;
+    const r = await fetch(`/api/finance/visual-statements?${qs}`, { cache: "no-store" });
+    const j = await r.json();
+    if (!r.ok) throw new Error(humanizeError(j.error || `HTTP ${r.status}`));
+    return j.snapshot as Snapshot;
+  }, [qs]);
+
+  /* THE QUERY IS THE KEY. Granularity, period and comparison all go to the
+     server, so a name-based key would show last quarter's figures under this
+     quarter's heading — the worst possible failure for a finance screen.
+     Keyed by the query, a warm hit is by construction the answer to the
+     question on screen. */
+  const { data: snap, loading, error: loadError } =
+    useWarmData<Snapshot>(`fin:visual:${qs}`, load);
+  const error = loadError ? String(loadError instanceof Error ? loadError.message : loadError) : null;
+  useEffect(() => { if (loadError) event("finance.dashboard.error"); }, [loadError]);
+
+  /* TIMED ON THE PAINT, NOT ON THE FETCH. first_card_ms used to be recorded
+     inside the request, which was the same moment back when the screen had
+     nothing to show until the request landed. With a warm start the cards are
+     up before the fetch resolves, so measuring the fetch would report a
+     number the operator never experienced — and quietly turn a win into a
+     no-change on the dashboard that tracks it. */
+  useEffect(() => {
+    if (!snap) return;
+    const now = typeof performance !== "undefined" ? performance.now() : 0;
+    if (!firstReadyRef.current) {
+      firstReadyRef.current = true;
+      const ms = now - mountT0.current;
+      record("finance.dashboard.first_card_ms", ms);
+      record("finance.dashboard.full_ready_ms", ms);
+      record("finance.dashboard.request_count", 1);
+      return;
+    }
+    /* Every later arrival is a filter change settling. Measured from the
+       request that produced it, which is still the honest number here: a new
+       granularity or period is a new key, so it genuinely waits. */
+    if (callT0Ref.current) record("finance.filter.settled_ms", now - callT0Ref.current);
+  }, [snap]);
 
   /* When granularity changes: snap periodEnd to a sensible boundary
      and clear the comparison — the operator opts back in if they want

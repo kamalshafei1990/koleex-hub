@@ -798,7 +798,7 @@ export default function LegacyProductView() {
 
     const phys: Row[] = [];
     if (product.machine_dimensions) phys.push({ label: "Machine Dimensions", value: product.machine_dimensions });
-    if (product.machine_weight_kg !== null && product.machine_weight_kg !== undefined) phys.push({ label: "Machine Weight", value: `${product.machine_weight_kg} kg` });
+    if (product.machine_weight_kg !== null && product.machine_weight_kg !== undefined) phys.push({ label: "Net weight (N.W.)", value: `${product.machine_weight_kg} kg` });
 
     const comp: Row[] = [];
     if (product.hs_code) comp.push({ label: "HS Code", value: product.hs_code });
@@ -1963,7 +1963,16 @@ export default function LegacyProductView() {
 
             <div className="mt-12 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
               {models.filter((m) => m.visible).map((m) => {
+                /* "model_image" FIRST: that is the type the editor writes for
+                   a family member (Models section, and the Hero tab once the
+                   strip points at a member). This view only looked for a
+                   model-scoped main_image/gallery — types the editor never
+                   produces for a member — so every variant card silently fell
+                   back to the one family photo and the whole lineup looked
+                   identical. The schema-backed renderer already keyed off
+                   model_image; this one had been left behind. */
                 const modelImage =
+                  media.find((md) => md.model_id === m.id && md.type === "model_image")?.url ||
                   media.find((md) => md.model_id === m.id && (md.type === "main_image" || md.type === "gallery"))?.url ||
                   mainImage;
                 const priceOptions: { label: string; value: number }[] = [];
@@ -2215,7 +2224,7 @@ export default function LegacyProductView() {
                           "Plug Types": ZapIcon,
                           "Pneumatic Supply": WrenchIcon,
                           "Machine Dimensions": RulerIcon,
-                          "Machine Weight": PackageIcon,
+                          "Net weight (N.W.)": PackageIcon,
                           "HS Code": TagsIcon,
                           "IP Rating": ShieldCheckIcon,
                           "Operating Temp": ActivityIcon,

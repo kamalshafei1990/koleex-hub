@@ -36,7 +36,6 @@ import type { ProductSchemaDefinition } from "@/types/product-schema";
 import { DEFAULT_PUBLIC_VISIBILITY } from "../visibility";
 import {
   electricalGroup,
-  packingShippingGroup,
   physicalGroup,
   safetyComplianceGroup,
   FITMENT_OPTIONS,
@@ -189,7 +188,6 @@ export const LASER_CUTTING_SCHEMA: ProductSchemaDefinition = {
     },
     electricalGroup(40),
     physicalGroup(50),
-    packingShippingGroup(60),
     safetyComplianceGroup(70),
   ],
 };
@@ -295,7 +293,6 @@ export const CNC_CUTTING_SCHEMA: ProductSchemaDefinition = {
     },
     electricalGroup(40),
     physicalGroup(50),
-    packingShippingGroup(60),
     safetyComplianceGroup(70),
   ],
 };
@@ -377,7 +374,6 @@ export const STRIP_CUTTING_SCHEMA: ProductSchemaDefinition = {
     },
     electricalGroup(30),
     physicalGroup(40),
-    packingShippingGroup(50),
     safetyComplianceGroup(60),
   ],
 };
@@ -466,7 +462,6 @@ export const END_CUTTER_SCHEMA: ProductSchemaDefinition = {
     },
     electricalGroup(30),
     physicalGroup(40),
-    packingShippingGroup(50),
     safetyComplianceGroup(60),
   ],
 };
@@ -553,7 +548,6 @@ export const TAPE_CUTTING_SCHEMA: ProductSchemaDefinition = {
     },
     electricalGroup(30),
     physicalGroup(40),
-    packingShippingGroup(50),
     safetyComplianceGroup(60),
   ],
 };

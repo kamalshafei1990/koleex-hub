@@ -18,8 +18,8 @@ import ArrowLeftIcon from "@/components/icons/ui/ArrowLeftIcon";
 import PencilIcon from "@/components/icons/ui/PencilIcon";
 import TrashIcon from "@/components/icons/ui/TrashIcon";
 import BrandLoading from "@/components/ui/BrandLoading";
+import { useTabMotion } from "@/components/ui/useTabMotion";
 import UserIcon from "@/components/icons/ui/UserIcon";
-import PhoneIcon from "@/components/icons/ui/PhoneIcon";
 import EnvelopeIcon from "@/components/icons/ui/EnvelopeIcon";
 import BriefcaseIcon from "@/components/icons/ui/BriefcaseIcon";
 import Building2Icon from "@/components/icons/ui/Building2Icon";
@@ -423,6 +423,7 @@ export default function EmployeeProfilePage({
   const [notFound, setNotFound] = useState(false);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<Tab>("overview");
+  const tabMotion = useTabMotion(TABS.indexOf(tab));
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
@@ -447,12 +448,16 @@ export default function EmployeeProfilePage({
       if (cancelled) return;
       if (!prof) { setNotFound(true); setLoading(false); return; }
       setProfile(prof);
-      /* Kick off the activity load in parallel — profile header can
-         render immediately while the cross-app queries resolve. */
+      /* Paint NOW — one round-trip. The old order kept loading=true until
+         the activity call also resolved, so the whole page (hero included)
+         sat behind the splash for TWO sequential round-trips while the
+         comment claimed the header "renders immediately". The activity tab
+         already handles activity === null with its own pending state, so it
+         simply fills in when the cross-app queries land. */
+      setLoading(false);
       const act = await fetchEmployeeActivity(prof.employee.id, prof.account?.id ?? null);
       if (cancelled) return;
       setActivity(act);
-      setLoading(false);
     })();
     return () => { cancelled = true; };
   }, [id]);
@@ -689,6 +694,7 @@ export default function EmployeeProfilePage({
           </nav>
         </div>
 
+        <div key={tab} className={tabMotion}>
         {tab === "overview" && (
           <>
             <GroupLabel>{t("grp.identity")}</GroupLabel>
@@ -864,6 +870,7 @@ export default function EmployeeProfilePage({
             <BehaviorStanding employeeId={employee.id} t={t} />
           </>
         )}
+        </div>
       </div>
 
       {/* ── Delete confirm ── */}

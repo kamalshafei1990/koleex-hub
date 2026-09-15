@@ -20,6 +20,7 @@ import { useTranslation } from "@/lib/i18n";
 import { usePermissions } from "@/lib/permissions";
 import { getCurrentAccountIdSync } from "@/lib/identity";
 import { planningT } from "@/lib/translations/planning";
+import { useTabMotion } from "@/components/ui/useTabMotion";
 import ArrowLeftIcon from "@/components/icons/ui/ArrowLeftIcon";
 import PlusIcon from "@/components/icons/ui/PlusIcon";
 import ExclamationIcon from "@/components/icons/ui/ExclamationIcon";
@@ -72,6 +73,9 @@ import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 
 type TabId = "schedule" | "open" | "mine" | "utilization" | "config";
 
+/* Strip order — feeds the directional tab motion (kx-tab-fwd / kx-tab-back). */
+const TAB_ORDER: TabId[] = ["schedule", "open", "mine", "utilization", "config"];
+
 export default function PlanningApp() {
   const { t } = useTranslation(planningT);
   const { isSuperAdmin: isSA } = usePermissions();
@@ -80,6 +84,7 @@ export default function PlanningApp() {
   const [saView, setSaView] = useState<string>("own");
   const searchPlaceholder = useSearchPlaceholder("planning");
   const [tab, setTab] = useState<TabId>("schedule");
+  const tabMotion = useTabMotion(TAB_ORDER.indexOf(tab));
 
   // Shared data — the schedule tab consumes everything, so load it up front.
   const [items, setItems] = useState<PlanningItem[]>([]);
@@ -269,7 +274,9 @@ export default function PlanningApp() {
             <div className="flex items-center justify-center py-20">
               <SpinnerIcon className="h-5 w-5 text-[var(--text-dim)]" />
             </div>
-          ) : tab === "schedule" ? (
+          ) : (
+          <div key={tab} className={tabMotion}>
+          {tab === "schedule" ? (
             <ScheduleView
               weekStart={weekStart}
               items={scopedItems}
@@ -306,6 +313,8 @@ export default function PlanningApp() {
               resources={resources}
               onReload={reload}
             />
+          )}
+          </div>
           )}
         </div>
       </div>

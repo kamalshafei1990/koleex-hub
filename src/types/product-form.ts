@@ -3,6 +3,7 @@
    These mirror the DB row types but are optimized for form editing.
    --------------------------------------------------------------------------- */
 
+import type { ProductLogistics } from "@/lib/logistics";
 import type {
   FeatureCard, ProductMediaType } from "./supabase";
 
@@ -119,6 +120,11 @@ export interface ProductFormState {
   schema_specs: Record<string, unknown>;
   schema_knowledge: unknown[];
   schema_visibility: Record<string, unknown>;
+  /* Packing & shipping — products.logistics. Deliberately NOT a schema field:
+     a crate is a crate whatever the machine does, so this is asked of every
+     product in every category, like country_of_origin beside it. See
+     src/lib/logistics.ts for the shape and the loading maths. */
+  logistics: ProductLogistics;
 }
 
 export interface ModelFormState {
@@ -264,6 +270,16 @@ export interface ProductSupplierFormState {
   /* What unit_cost_cny already includes (display + warning only for now). */
   cost_basis: "factory_only" | "packing" | "delivered";
   cost_includes_tax: boolean;
+  /* The missing cost pieces when the price is NOT full-landed/tax-in —
+     entered manually so pricing can work from the TRUE landed cost.
+     combined=true → packing+delivery as ONE number (combined_cny). */
+  cost_extras: {
+    tax_rate_percent: string;
+    delivery_cny: string;
+    packing_cny: string;
+    combined_cny: string;
+    combined: boolean;
+  };
   payment_terms: string;
   notes: string;
   /* Locale-keyed translations of the price note. Base note above is the
@@ -417,6 +433,7 @@ export const EMPTY_PRODUCT: ProductFormState = {
   schema_specs: {},
   schema_knowledge: [],
   schema_visibility: {},
+  logistics: {},
 };
 
 export function createEmptyModel(): ModelFormState {

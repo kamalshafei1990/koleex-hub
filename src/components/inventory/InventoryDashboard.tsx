@@ -16,6 +16,7 @@
    --------------------------------------------------------------------------- */
 
 import { useEffect, useState } from "react";
+import { useWarm, warmAge, writeWarm } from "@/lib/warm-cache";
 import Link from "next/link";
 import InventoryHeader from "@/components/inventory/InventoryHeader";
 import InventoryInternalItemDrawer from "@/components/inventory/InventoryInternalItemDrawer";
@@ -69,15 +70,26 @@ export default function InventoryDashboard() {
   const [error, setError] = useState<string | null>(null);
   /* INV-H9 — Add Internal Item drawer state. */
   const [internalDrawerOpen, setInternalDrawerOpen] = useState(false);
+  const warm = useWarm<OperatorSummary>("inventory:summary");
 
+  /* Home is part of the same tab strip, so it gets the same stale window as
+     every other tab: a summary fetched less than a minute ago is trusted and
+     no request goes out. Without this, walking back through Home between
+     tabs put one more request on the wire each time — the churn behind
+     "there is a lag". */
   useEffect(() => {
     let cancelled = false;
+    if (warmAge("inventory:summary") < 60_000) return;
     void (async () => {
       try {
         const opRes = await fetch("/api/inventory/operator-summary", { credentials: "include", cache: "no-store" });
         const opJ = await opRes.json();
         if (cancelled) return;
-        if (opRes.ok) setOp(opJ.summary as OperatorSummary);
+        if (opRes.ok) {
+          const summary = opJ.summary as OperatorSummary;
+          setOp(summary);
+          writeWarm<OperatorSummary>("inventory:summary", summary);
+        }
         else setError(opJ.error ?? "Failed to load");
       } catch (e) {
         if (!cancelled) setError(e instanceof Error ? e.message : String(e));
@@ -88,20 +100,26 @@ export default function InventoryDashboard() {
     return () => { cancelled = true; };
   }, []);
 
+  /* Measured 2026-08-22: this screen waited ~1.8s on the operator summary
+     with nothing on screen. Paint the previous summary immediately and let
+     the fresh one replace it; fresh always wins. */
+  const shownOp = op ?? warm;
+  const showLoading = loading && !shownOp;
+
   const totalAlerts =
-    (op?.alerts.low_stock ?? 0) +
-    (op?.alerts.expired_batches ?? 0) +
-    (op?.alerts.pending_approvals ?? 0) +
-    (op?.alerts.pending_transfers ?? 0) +
-    (op?.alerts.pending_returns ?? 0) +
-    (op?.alerts.stuck_serials ?? 0) +
-    (op?.alerts.stale_drafts ?? 0);
+    (shownOp?.alerts.low_stock ?? 0) +
+    (shownOp?.alerts.expired_batches ?? 0) +
+    (shownOp?.alerts.pending_approvals ?? 0) +
+    (shownOp?.alerts.pending_transfers ?? 0) +
+    (shownOp?.alerts.pending_returns ?? 0) +
+    (shownOp?.alerts.stuck_serials ?? 0) +
+    (shownOp?.alerts.stale_drafts ?? 0);
 
   const todayTotal =
-    (op?.today.receipts ?? 0) +
-    (op?.today.shipments ?? 0) +
-    (op?.today.transfers ?? 0) +
-    (op?.today.returns ?? 0);
+    (shownOp?.today.receipts ?? 0) +
+    (shownOp?.today.shipments ?? 0) +
+    (shownOp?.today.transfers ?? 0) +
+    (shownOp?.today.returns ?? 0);
 
   /* Add Internal Item button — lives in the header action slot */
   const addInternalBtn = (
@@ -142,28 +160,28 @@ export default function InventoryDashboard() {
               icon="box-open"
               label={t("inv.dashboard.kpi.stockItems")}
               value="—"
-              loading={loading}
+              loading={showLoading}
             />
             <KpiCard
               className="kx-glass"
               icon="download"
               label={t("inv.dashboard.kpi.todayReceipts")}
-              value={op?.today.receipts ?? 0}
-              loading={loading}
+              value={shownOp?.today.receipts ?? 0}
+              loading={showLoading}
             />
             <KpiCard
               className="kx-glass"
               icon="truck-side"
               label={t("inv.dashboard.kpi.todayShipments")}
-              value={op?.today.shipments ?? 0}
-              loading={loading}
+              value={shownOp?.today.shipments ?? 0}
+              loading={showLoading}
             />
             <KpiCard
               className="kx-glass"
               icon="shield-check"
               label={t("inv.dashboard.kpi.pendingActions")}
               value={totalAlerts}
-              loading={loading}
+              loading={showLoading}
             />
           </div>
         </section>
@@ -180,30 +198,30 @@ export default function InventoryDashboard() {
         </section>
 
         {/* ── 5. Alerts — only when there's something to flag ─────── */}
-        {!loading && totalAlerts > 0 && (
+        {!showLoading && totalAlerts > 0 && (
           <section data-testid="inv-home-alerts">
             <SectionEyebrow>{t("inv.home.alerts.title")}</SectionEyebrow>
             <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
-              {(op?.alerts.low_stock ?? 0) > 0 && (
-                <AlertCard icon="interrogation" label={t("inv.alert.low_stock")} count={op!.alerts.low_stock} href="/inventory/items?filter=low_stock" tone="warning" />
+              {(shownOp?.alerts.low_stock ?? 0) > 0 && (
+                <AlertCard icon="interrogation" label={t("inv.alert.low_stock")} count={shownOp!.alerts.low_stock} href="/inventory/items?filter=low_stock" tone="warning" />
               )}
-              {(op?.alerts.expired_batches ?? 0) > 0 && (
-                <AlertCard icon="clock" label={t("inv.alert.expired_batches")} count={op!.alerts.expired_batches} href="/inventory/batches?status=expired" tone="rose" />
+              {(shownOp?.alerts.expired_batches ?? 0) > 0 && (
+                <AlertCard icon="clock" label={t("inv.alert.expired_batches")} count={shownOp!.alerts.expired_batches} href="/inventory/batches?status=expired" tone="rose" />
               )}
-              {(op?.alerts.pending_approvals ?? 0) > 0 && (
-                <AlertCard icon="shield-check" label={t("inv.alert.pending_approvals")} count={op!.alerts.pending_approvals} href="/inventory/movements?approval=pending" tone="warning" />
+              {(shownOp?.alerts.pending_approvals ?? 0) > 0 && (
+                <AlertCard icon="shield-check" label={t("inv.alert.pending_approvals")} count={shownOp!.alerts.pending_approvals} href="/inventory/movements?approval=pending" tone="warning" />
               )}
-              {(op?.alerts.pending_transfers ?? 0) > 0 && (
-                <AlertCard icon="shipping-fast" label={t("inv.alert.pending_transfers")} count={op!.alerts.pending_transfers} href="/inventory/transfers?status=approved" tone="info" />
+              {(shownOp?.alerts.pending_transfers ?? 0) > 0 && (
+                <AlertCard icon="shipping-fast" label={t("inv.alert.pending_transfers")} count={shownOp!.alerts.pending_transfers} href="/inventory/transfers?status=approved" tone="info" />
               )}
-              {(op?.alerts.pending_returns ?? 0) > 0 && (
-                <AlertCard icon="recycle" label={t("inv.alert.pending_returns")} count={op!.alerts.pending_returns} href="/inventory/returns?status=approved" tone="info" />
+              {(shownOp?.alerts.pending_returns ?? 0) > 0 && (
+                <AlertCard icon="recycle" label={t("inv.alert.pending_returns")} count={shownOp!.alerts.pending_returns} href="/inventory/returns?status=approved" tone="info" />
               )}
-              {(op?.alerts.stuck_serials ?? 0) > 0 && (
-                <AlertCard icon="fingerprint" label={t("inv.alert.stuck_serials")} count={op!.alerts.stuck_serials} href="/inventory/serials?status=in_transit" tone="rose" />
+              {(shownOp?.alerts.stuck_serials ?? 0) > 0 && (
+                <AlertCard icon="fingerprint" label={t("inv.alert.stuck_serials")} count={shownOp!.alerts.stuck_serials} href="/inventory/serials?status=in_transit" tone="rose" />
               )}
-              {(op?.alerts.stale_drafts ?? 0) > 0 && (
-                <AlertCard icon="file" label={t("inv.alert.stale_drafts")} count={op!.alerts.stale_drafts} href="/inventory/movements?tab=drafts" tone="warning" />
+              {(shownOp?.alerts.stale_drafts ?? 0) > 0 && (
+                <AlertCard icon="file" label={t("inv.alert.stale_drafts")} count={shownOp!.alerts.stale_drafts} href="/inventory/movements?tab=drafts" tone="warning" />
               )}
             </div>
           </section>
@@ -214,17 +232,17 @@ export default function InventoryDashboard() {
         <section data-testid="inv-home-today">
           <div className="flex items-center gap-2">
             <SectionEyebrow>{t("inv.home.today.title")}</SectionEyebrow>
-            {!loading && todayTotal > 0 && (
+            {!showLoading && todayTotal > 0 && (
               <span className="mb-2 rounded-full border border-[var(--border-subtle)] bg-[var(--bg-secondary)] px-2 py-0.5 text-[10px] tabular-nums text-[var(--text-dim)]">
                 {todayTotal} total
               </span>
             )}
           </div>
           <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4">
-            <TodayTile icon="download"      label={t("inv.today.receipts")}  value={op?.today.receipts ?? 0}  href="/inventory/movements?direction=in" />
-            <TodayTile icon="truck-side"    label={t("inv.today.shipments")} value={op?.today.shipments ?? 0} href="/inventory/movements?direction=out" />
-            <TodayTile icon="shipping-fast" label={t("inv.today.transfers")} value={op?.today.transfers ?? 0} href="/inventory/transfers" />
-            <TodayTile icon="recycle"       label={t("inv.today.returns")}   value={op?.today.returns ?? 0}   href="/inventory/returns" />
+            <TodayTile icon="download"      label={t("inv.today.receipts")}  value={shownOp?.today.receipts ?? 0}  href="/inventory/movements?direction=in" />
+            <TodayTile icon="truck-side"    label={t("inv.today.shipments")} value={shownOp?.today.shipments ?? 0} href="/inventory/movements?direction=out" />
+            <TodayTile icon="shipping-fast" label={t("inv.today.transfers")} value={shownOp?.today.transfers ?? 0} href="/inventory/transfers" />
+            <TodayTile icon="recycle"       label={t("inv.today.returns")}   value={shownOp?.today.returns ?? 0}   href="/inventory/returns" />
           </div>
         </section>
 
@@ -253,30 +271,30 @@ export default function InventoryDashboard() {
             <IntelTile
               icon="bullseye-arrow"
               label={t("inv.home.intel.fastest")}
-              primary={op?.intel.fastest_moving[0]?.item_code ?? "—"}
-              secondary={op?.intel.fastest_moving[0] ? `${op.intel.fastest_moving[0].item_name ?? ""} · ${op.intel.fastest_moving[0].moves} moves` : ""}
-              href={op?.intel.fastest_moving[0] ? `/inventory/items/${op.intel.fastest_moving[0].inventory_item_id}` : undefined}
+              primary={shownOp?.intel.fastest_moving[0]?.item_code ?? "—"}
+              secondary={shownOp?.intel.fastest_moving[0] ? `${shownOp.intel.fastest_moving[0].item_name ?? ""} · ${shownOp.intel.fastest_moving[0].moves} moves` : ""}
+              href={shownOp?.intel.fastest_moving[0] ? `/inventory/items/${shownOp.intel.fastest_moving[0].inventory_item_id}` : undefined}
             />
             <IntelTile
               icon="clock"
               label={t("inv.home.intel.stagnant")}
-              primary={op?.intel.stagnant[0]?.item_code ?? "—"}
-              secondary={op?.intel.stagnant[0]?.item_name ?? ""}
-              href={op?.intel.stagnant[0] ? `/inventory/items/${op.intel.stagnant[0].inventory_item_id}` : undefined}
+              primary={shownOp?.intel.stagnant[0]?.item_code ?? "—"}
+              secondary={shownOp?.intel.stagnant[0]?.item_name ?? ""}
+              href={shownOp?.intel.stagnant[0] ? `/inventory/items/${shownOp.intel.stagnant[0].inventory_item_id}` : undefined}
             />
             <IntelTile
               icon="bank"
               label={t("inv.home.intel.busiest")}
-              primary={op?.intel.busiest_warehouse?.warehouse_code ?? "—"}
-              secondary={op?.intel.busiest_warehouse ? `${op.intel.busiest_warehouse.warehouse_name} · ${op.intel.busiest_warehouse.moves} moves` : ""}
-              href={op?.intel.busiest_warehouse ? `/inventory/warehouses` : undefined}
+              primary={shownOp?.intel.busiest_warehouse?.warehouse_code ?? "—"}
+              secondary={shownOp?.intel.busiest_warehouse ? `${shownOp.intel.busiest_warehouse.warehouse_name} · ${shownOp.intel.busiest_warehouse.moves} moves` : ""}
+              href={shownOp?.intel.busiest_warehouse ? `/inventory/warehouses` : undefined}
             />
             <IntelTile
               icon="recycle"
               label={t("inv.home.intel.returned")}
-              primary={op?.intel.most_returned?.item_code ?? "—"}
-              secondary={op?.intel.most_returned ? `${op.intel.most_returned.item_name ?? ""} · ${op.intel.most_returned.returns} returns` : ""}
-              href={op?.intel.most_returned ? `/inventory/items/${op.intel.most_returned.inventory_item_id}` : undefined}
+              primary={shownOp?.intel.most_returned?.item_code ?? "—"}
+              secondary={shownOp?.intel.most_returned ? `${shownOp.intel.most_returned.item_name ?? ""} · ${shownOp.intel.most_returned.returns} returns` : ""}
+              href={shownOp?.intel.most_returned ? `/inventory/items/${shownOp.intel.most_returned.inventory_item_id}` : undefined}
             />
           </div>
         </section>

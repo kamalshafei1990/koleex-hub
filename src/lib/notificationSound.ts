@@ -86,7 +86,12 @@ export type SoundTone =
   | LibraryTone // the owner's recorded tones in /public/sounds
   | "none";
 
-export type SoundCategory = "notification" | "message";
+/* `call` is the voice call's "connected, go ahead" cue. The owner: "change
+   the sound of the starting chat after connecting — we already have some
+   sounds in Settings → Notifications, choose a good one". So the cue is a
+   library tone, chosen here like any other, and the call plays it through
+   the same engine. */
+export type SoundCategory = "notification" | "message" | "call";
 
 /* The same activity keys as Settings → Notification preferences "By
    activity", so the two screens describe the same events. */
@@ -113,6 +118,17 @@ export interface SoundPrefs {
     activityTones?: Partial<Record<SoundActivity, SoundTone>>;
   };
   message: { enabled: boolean; tone: SoundTone };      // Discuss messages
+  /** The voice call's "connected" cue. Not silenced by do-not-disturb: the
+   *  caller started the call themselves a moment ago. `chosen` is set the
+   *  first time someone picks a call tone in Settings; without it, a stored
+   *  tone that merely equals an old default is still the default and moves
+   *  when the default does (see migrateCallTone). */
+  call: { enabled: boolean; tone: SoundTone; chosen?: boolean };
+  /** Koleex AI's own cues (src/lib/sounds/catalog.ts): one switch for all
+   *  of them, and the moments the user silenced one by one. Like the call
+   *  cue, not silenced by do-not-disturb — every one answers something the
+   *  user is doing in the app right now. */
+  ai: { enabled: boolean; muted: string[] };
 }
 
 /** Classify an inbox message into an activity key from its metadata.type
@@ -121,7 +137,20 @@ export interface SoundPrefs {
  *  the server push sender applies the same rules, so muting an activity in
  *  Settings silences its chime AND its push with one switch. */
 export function classifyInboxActivity(meta: unknown): SoundActivity | null {
-  return classifyNotificationActivity((meta as { type?: string } | null)?.type);
+  /* `type` OR `kind` — both are written, and reading only one silently
+     un-classified most of the inbox. notify paths that target a person write
+     metadata.type ("todo_assignment", "calendar_invite"…), while
+     notifySuperAdmins writes metadata.kind ("new_device", "role_change"…) and
+     no type at all. Measured on the live inbox: 101 of 106 messages were SA
+     alerts, so 95% of the bell classified as null — they never appeared under
+     the Security chip (only under All / Other) and took the default chime
+     instead of their activity's sound. classifyNotificationActivity already
+     understands both vocabularies ("new_device" → security_alerts); its own
+     header says it maps "kind/metadata.type". Only this reader was narrow.
+     The server push path was never affected — web-push.ts classifies
+     payload.kind directly. */
+  const m = meta as { type?: unknown; kind?: unknown } | null;
+  return classifyNotificationActivity(m?.type ?? m?.kind);
 }
 
 /** The built-in tones: the original WAV plus the six synthesized ones.
@@ -140,7 +169,22 @@ const DEFAULT_PREFS: SoundPrefs = {
   volume: 0.8,
   notification: { enabled: true, tone: "classic" },
   message: { enabled: true, tone: "classic" },
+  /* "ping" — the owner's word for it (2026-09-07, night): "change the
+     connected sound to be ping from our sounds". Before it: confirm, then
+     arrive, then confirm again. Changeable in Settings. */
+  call: { enabled: true, tone: "ping" },
+  ai: { enabled: true, muted: [] },
 };
+
+/** The call tones the defaults used before "ping". A stored copy of one of
+ *  them that nobody chose (no `chosen` flag) is an old default written back
+ *  by a save of some other setting, so it follows the default. A tone
+ *  someone picked — any tone, even one of these — is theirs and stays. */
+export const LEGACY_CALL_TONES: readonly SoundTone[] = ["arrive", "confirm"];
+export function migrateCallTone(call: SoundPrefs["call"]): SoundPrefs["call"] {
+  if (!call.chosen && LEGACY_CALL_TONES.includes(call.tone)) return { ...call, tone: DEFAULT_PREFS.call.tone };
+  return call;
+}
 
 let prefsCache: SoundPrefs | null = null;
 const prefListeners = new Set<(p: SoundPrefs) => void>();
@@ -171,6 +215,11 @@ export function getSoundPrefs(): SoundPrefs {
     ...stored,
     notification: { ...DEFAULT_PREFS.notification, ...(stored.notification ?? {}) },
     message: { ...DEFAULT_PREFS.message, ...(stored.message ?? {}) },
+    call: migrateCallTone({ ...DEFAULT_PREFS.call, ...(stored.call ?? {}) }),
+    ai: {
+      enabled: stored.ai?.enabled ?? DEFAULT_PREFS.ai.enabled,
+      muted: Array.isArray(stored.ai?.muted) ? stored.ai.muted.filter((k): k is string => typeof k === "string") : [],
+    },
   };
   return prefsCache;
 }
@@ -179,6 +228,8 @@ export function setSoundPrefs(patch: {
   master?: boolean; dnd?: boolean; volume?: number;
   notification?: Partial<SoundPrefs["notification"]>;
   message?: Partial<SoundPrefs["message"]>;
+  call?: Partial<SoundPrefs["call"]>;
+  ai?: Partial<SoundPrefs["ai"]>;
 }): SoundPrefs {
   const cur = getSoundPrefs();
   const next: SoundPrefs = {
@@ -194,6 +245,10 @@ export function setSoundPrefs(patch: {
       },
     },
     message: { ...cur.message, ...(patch.message ?? {}) },
+    /* A picked tone is marked as such, so a later change of default leaves
+       it alone. */
+    call: { ...cur.call, ...(patch.call ?? {}), ...(patch.call?.tone !== undefined ? { chosen: true } : {}) },
+    ai: { ...cur.ai, ...(patch.ai ?? {}) },
   };
   prefsCache = next;
   try { localStorage.setItem(PREFS_KEY, JSON.stringify(next)); } catch { /* private mode */ }
@@ -246,6 +301,27 @@ function synthTone(ctx: AudioContext, tone: SoundTone, volume: number): void {
 }
 
 let audioCtx: AudioContext | null = null;
+/* HELD WHILE A CALL IS UP (2026-09-13, sounds/player.ts): this engine's
+   context is suspended and nothing here resumes or creates it until the
+   call releases the hold, so exactly one AudioContext runs under the live
+   microphone — the call's own. Hub chimes that arrive during a call are
+   dropped, as a phone drops them during a phone call. */
+let held = false;
+let heldWasRunning = false;
+export function holdSoundEngine(on: boolean): void {
+  if (on === held) return;
+  held = on;
+  const ctx = audioCtx;
+  if (on) {
+    heldWasRunning = !!ctx && ctx.state === "running";
+    if (ctx && heldWasRunning) void ctx.suspend().catch(() => {});
+    return;
+  }
+  if (ctx && heldWasRunning && ctx.state === "suspended") void ctx.resume().catch(() => {});
+}
+export function soundEngineHeld(): boolean {
+  return held;
+}
 /* One decoded buffer per URL. Was a single global back when there was
    exactly one WAV; with a 24-tone library each tone caches independently
    and only the ones actually used are ever fetched. */
@@ -417,6 +493,7 @@ function attachUnlockListeners() {
      will keep the context alive. */
   document.addEventListener("visibilitychange", () => {
     if (document.visibilityState !== "visible") return;
+    if (held) return;
     const ctx = audioCtx;
     if (!ctx) return;
     if (ctx.state === "suspended") {
@@ -436,6 +513,7 @@ function selectedSrcs(): string[] {
   const tones: SoundTone[] = [
     p.notification.tone,
     p.message.tone,
+    p.call.tone,
     ...Object.values(p.notification.activityTones ?? {}),
   ];
   const srcs = new Set<string>();
@@ -513,8 +591,11 @@ export function playAppSound(category: SoundCategory, activity?: SoundActivity |
     attachUnlockListeners();
     return;
   }
+  if (held) return;
   const prefs = getSoundPrefs();
-  if (!prefs.master || prefs.dnd) return;
+  /* Do-not-disturb silences what arrives uninvited. A call's cue answers a
+     tap the caller made seconds ago; it is not a disturbance. */
+  if (!prefs.master || (prefs.dnd && category !== "call")) return;
   const cat = prefs[category];
   if (!cat.enabled) return;
   /* Per-activity override (notifications only) — falls back to the
@@ -541,9 +622,93 @@ export function previewSound(tone: SoundTone, volume?: number) {
   playTone(tone, volume ?? getSoundPrefs().volume);
 }
 
+/** What the voice call's cue did, so the call can fall back when the engine
+ *  is not there: "played" (a tone went out or is decoding to go out),
+ *  "silenced" (the caller turned it off — respect it), "unavailable" (no
+ *  window or no AudioContext — the call synthesises its own cue). */
+export type CallSoundOutcome = "played" | "silenced" | "unavailable";
+
+/** Warm the call cue while the call is still connecting, INSIDE the tap that
+ *  starts it: creates the context, decodes the chosen file. By the time the
+ *  far side says "ready" the buffer is in memory and the cue costs no fetch. */
+export function primeCallSound(): void {
+  if (typeof window === "undefined") return;
+  attachUnlockListeners();
+  const ctx = ensureCtx();
+  if (!ctx) return;
+  if (ctx.state === "suspended") void ctx.resume().then(() => { unlocked = true; });
+  const src = toneSrc(getSoundPrefs().call.tone);
+  if (src) void decode(src);
+}
+
+/** The "connected, go ahead" cue, through the shared engine and the
+ *  caller's Settings → Sounds choice. */
+export function playCallSound(): CallSoundOutcome {
+  if (typeof window === "undefined") return "unavailable";
+  const prefs = getSoundPrefs();
+  if (!prefs.master || !prefs.call.enabled || prefs.call.tone === "none") return "silenced";
+  if (!ensureCtx()) return "unavailable";
+  playAppSound("call");
+  return "played";
+}
+
+/* ── Koleex AI's cues, through the same engine ────────────────────────────
+   src/lib/sounds/player.ts owns WHICH cue plays when; these three are the
+   engine's side: warm a set of files inside a gesture, play one file by
+   its path, and hand out the context for the synthesised fallback. No
+   preference is read here — the player reads them, so the rule "one
+   engine, one prefs store" holds without this module knowing the catalog. */
+
+/** Warm files inside a gesture: create the context and decode each. */
+export function primeSoundFiles(srcs: readonly string[]): void {
+  if (typeof window === "undefined") return;
+  if (held) return;
+  attachUnlockListeners();
+  const ctx = ensureCtx();
+  if (!ctx) return;
+  if (ctx.state === "suspended") void ctx.resume().then(() => { unlocked = true; });
+  for (const src of srcs) void decode(src);
+}
+
+/** Play one file at a volume (the prefs volume when omitted). "played" when
+ *  it went out or is decoding to go out, "unavailable" when there is no
+ *  engine or no gesture yet — the caller may synthesise instead. */
+export function playSoundFile(src: string, volume?: number): "played" | "unavailable" {
+  if (typeof window === "undefined") return "unavailable";
+  if (held) return "unavailable";
+  if (!unlocked && !audioCtx) {
+    attachUnlockListeners();
+    return "unavailable";
+  }
+  const ctx = ensureCtx();
+  if (!ctx) return "unavailable";
+  const fire = () => {
+    const c = audioCtx;
+    if (!c || c.state !== "running") return;
+    if (!playBufferNow(src, volume)) void decode(src).then(() => playBufferNow(src, volume));
+  };
+  if (ctx.state === "suspended") {
+    void ctx.resume().then(fire);
+    return "played";
+  }
+  if (!buffers.has(src)) {
+    void decode(src).then(fire);
+    return "played";
+  }
+  fire();
+  return "played";
+}
+
+/** The shared context, for a synthesised cue that must play beside the
+ *  files without opening a second context. Null before any gesture. */
+export function soundContext(): AudioContext | null {
+  return audioCtx;
+}
+
 /** Play the classic notification WAV. Prefer playAppSound(category) — this
  *  stays exported for the unlock/backlog machinery and the classic tone. */
 export function playNotificationSound() {
+  if (held) return;
   attachUnlockListeners();
   const ctx = ensureCtx();
   if (!ctx) {

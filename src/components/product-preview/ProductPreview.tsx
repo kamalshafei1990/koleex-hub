@@ -14,7 +14,7 @@
    visual language without re-declaring it.
    --------------------------------------------------------------------------- */
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type {
   ProductSchemaDefinition,
   ProductKnowledgeBlock,
@@ -31,6 +31,8 @@ import {
 import VisualGlyph from "./VisualGlyph";
 import { useTranslation } from "@/lib/i18n";
 import { PRODUCTS_UI_I18N } from "@/lib/products-ui-i18n";
+import { SPEC_I18N } from "@/lib/product-schema/spec-i18n";
+import { fetchIconBindings, type BindingsMap } from "@/lib/visual-bindings";
 
 interface ProductLocaleText {
   locale: string;
@@ -234,11 +236,15 @@ const SectionHead = ({
 const Disclosure = ({
   title,
   eyebrow,
+  glyph,
   defaultOpen = false,
   children,
 }: {
   title: string;
   eyebrow?: string;
+  /* Group mark from the Visual Library. Optional on purpose — a group with no
+     binding shows no icon rather than a placeholder. */
+  glyph?: string | null;
   defaultOpen?: boolean;
   children: React.ReactNode;
 }) => {
@@ -251,14 +257,21 @@ const Disclosure = ({
         className="group w-full flex items-center justify-between gap-3 py-5 text-left"
         aria-expanded={open}
       >
-        <span>
-          {eyebrow ? (
-            <span className="block text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--text-faint)]">
-              {eyebrow}
+        <span className="flex items-center gap-3 min-w-0">
+          {glyph ? (
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-[var(--border-subtle)] text-[var(--text-faint)] transition-colors group-hover:text-[var(--text-secondary)]">
+              <Glyph src={glyph} className="h-[18px] w-[18px]" />
             </span>
           ) : null}
-          <span className="block text-[15px] font-semibold tracking-tight text-[var(--text-primary)]">
-            {title}
+          <span className="min-w-0">
+            {eyebrow ? (
+              <span className="block text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--text-faint)]">
+                {eyebrow}
+              </span>
+            ) : null}
+            <span className="block text-[15px] font-semibold tracking-tight text-[var(--text-primary)]">
+              {title}
+            </span>
           </span>
         </span>
         <span
@@ -276,8 +289,95 @@ const Disclosure = ({
   );
 };
 
+/* ── Spec glyphs ────────────────────────────────────────────────────────
+   Icons come from the SAME owner-managed registry the internal profile
+   reads, so an icon changed once in the Visual Library changes everywhere.
+   fetchIconBindings is cached and rides the shell batch every screen already
+   requests, so this costs no extra round-trip on the customer page.
+   Mask-based, not <img>: the glyph inherits currentColor and stays inside the
+   monochrome icon rule (no colour icons, one stroke language). */
+function Glyph({ src, className = "h-4 w-4" }: { src: string; className?: string }) {
+  return (
+    <span
+      aria-hidden
+      className={`inline-block shrink-0 bg-current align-middle ${className}`}
+      style={{
+        maskImage: `url("${src}")`, maskRepeat: "no-repeat", maskPosition: "center", maskSize: "contain",
+        WebkitMaskImage: `url("${src}")`, WebkitMaskRepeat: "no-repeat", WebkitMaskPosition: "center", WebkitMaskSize: "contain",
+      }}
+    />
+  );
+}
+
+/* Group titles are free text, so they resolve by MEANING, not by key: a
+   "Packing & Shipping" group and a "Packing and shipping" group get the same
+   box. Field icons are keyed exactly (`spec.<key>`) — those keys are canonical.
+
+   Each rule names a Visual Library binding key FIRST and a real library path
+   as the fallback, the same registry-then-fallback order the internal profile
+   uses. Today the registry holds only `field.*` and `classification.*` keys
+   (556 of them, no `group.*`), so every icon below comes from the fallback —
+   but the moment someone binds `group.electrical` in the Visual Library, that
+   choice wins here with no code change.
+   The paths are ones confirmed to exist in the library; a wrong path would
+   render an empty mask, i.e. silently no icon at all. */
+const VL_BASE = "https://yxyizbnfjrwrnmwhkvme.supabase.co/storage/v1/object/public/media/visual-library/";
+const GROUP_ICON_RULES: Array<[RegExp, string, string]> = [
+  /* ORDER IS THE LOGIC — first match wins, so the specific measures come
+     before the broad subject rules. "max_fabric_width" has to reach the ruler,
+     not the fabric rule; "inspection_method" the eye, not performance. */
+  [/inspect|detect|vision|scan|camera|sensor/i, "group.inspection", "general/security/eye.svg"],
+  [/width|length|diameter|dimension|weight|size|physical/i, "group.physical", "pack/manufacturing/ruler-combined.svg"],
+  [/pack|ship|logisti|carton|crate/i, "group.packing", "pack/misc/container-storage.svg"],
+  [/electric|power|utilit|voltage|pneumatic|frequency|phase/i, "group.electrical", "pack/manufacturing/bolt.svg"],
+  [/safe|complian|certif|standard/i, "group.compliance", "general/security/shield.svg"],
+  [/perform|speed|capacit|output|precision/i, "group.performance", "general/time/timer.svg"],
+  [/handl|feed|discharge|tension|transport|roll/i, "group.handling", "general/inventory/pallet.svg"],
+  [/option|equipment|accessor|configur/i, "group.options", "pack/actions/settings-sliders.svg"],
+  [/type|applicat|categor|material|fabric/i, "group.type", "pack/actions/layers.svg"],
+];
+
+function useSpecGlyphs() {
+  const [bindings, setBindings] = useState<BindingsMap>({});
+  useEffect(() => {
+    let alive = true;
+    fetchIconBindings()
+      .then((b) => { if (alive) setBindings(b); })
+      .catch(() => { /* the page reads fine without glyphs */ });
+    return () => { alive = false; };
+  }, []);
+  /* A spec field resolves by its own key first; failing that it borrows its
+     group's meaning from the label, so "Max Fabric Width" still gets the ruler
+     even though no `spec.max_fabric_width` binding exists yet. */
+  const fieldGlyph = useCallback(
+    (key: string, label?: string) => {
+      const direct = bindings[`spec.${key}`] || bindings[`field.${key}`];
+      if (direct) return direct;
+      const hay = `${key} ${label ?? ""}`;
+      for (const [re, k, fallback] of GROUP_ICON_RULES) {
+        if (re.test(hay)) return bindings[k] || VL_BASE + fallback;
+      }
+      return null;
+    },
+    [bindings],
+  );
+  const groupGlyph = useCallback((title: string) => {
+    for (const [re, k, fallback] of GROUP_ICON_RULES) {
+      if (re.test(title)) return bindings[k] || VL_BASE + fallback;
+    }
+    return null;
+  }, [bindings]);
+  return { fieldGlyph, groupGlyph };
+}
+
 export const ProductPreview = (props: ProductPreviewProps) => {
   const { t, lang } = useTranslation(PRODUCTS_UI_I18N);
+  /* Spec content (group titles, field labels, option labels) is localized by
+     the same dictionary the admin Specs editor uses. It used to be admin-only,
+     so the CUSTOMER page rendered every spec in English even in zh/ar — the
+     translations existed and were simply never read here. */
+  const { t: ts } = useTranslation(SPEC_I18N);
+  const { fieldGlyph, groupGlyph } = useSpecGlyphs();
   const {
     productName,
     primaryModel,
@@ -285,7 +385,7 @@ export const ProductPreview = (props: ProductPreviewProps) => {
     posterUrl,
     translations,
     brand,
-    schema,
+    schema: rawSchema,
     values: familyValues,
     knowledge,
     mainImageUrl,
@@ -300,6 +400,33 @@ export const ProductPreview = (props: ProductPreviewProps) => {
     variants,
     siblings,
   } = props;
+
+  /* Localize the schema ONCE, at the source: every downstream read of
+     group.title / f.label / option.label then shows the reader's language
+     without touching the ~18 render sites. Keys and stored values stay
+     canonical English — this is display only.
+     Option keys are FIELD-SCOPED first (`o:<field>.<value>`) then shared
+     (`o:<value>`), the same order the admin editor uses: two fields can
+     legitimately share a value and mean different things (a `single` head
+     count once rendered as "single phase" in zh/ar). */
+  const schema = useMemo(() => {
+    if (!rawSchema?.groups) return rawSchema;
+    return {
+      ...rawSchema,
+      groups: rawSchema.groups.map((g) => ({
+        ...g,
+        title: ts(`g:${g.title}`, g.title),
+        fields: (g.fields ?? []).map((f) => ({
+          ...f,
+          label: ts(`f:${f.key}`, f.label ?? f.key),
+          options: f.options?.map((o) => ({
+            ...o,
+            label: ts(`o:${f.key}.${o.value}`, ts(`o:${o.value}`, o.label)),
+          })),
+        })),
+      })),
+    };
+  }, [rawSchema, ts]);
 
   /* Localized overlay: when the active language has a filled-in
      translation, show it; otherwise fall back to the English base.
@@ -345,6 +472,37 @@ export const ProductPreview = (props: ProductPreviewProps) => {
     () => (variants ?? []).find((v) => v.code === selectedCode) ?? null,
     [variants, selectedCode],
   );
+
+  /* ── Sticky-pill scroll spy ──────────────────────────────────────────
+     The pill's three anchors always scrolled correctly, but Gallery was
+     hard-styled as the filled pill, so it read as "selected" no matter
+     where the reader was — click Specs, Gallery stays lit, and the bar
+     looks like broken tabs. Track which section owns the viewport and
+     light THAT one. IntersectionObserver watches the viewport, so it is
+     immune to the app shell scrolling an inner container rather than the
+     document (a plain scroll listener on window would never fire here). */
+  const [activeSection, setActiveSection] = useState<string>("overview");
+  useEffect(() => {
+    const ids = ["overview", "specs", "gallery"];
+    const nodes = ids
+      .map((id) => document.getElementById(id))
+      .filter((n): n is HTMLElement => !!n);
+    if (nodes.length === 0) return;
+    /* Top-biased band: a section counts as current once its top passes
+       under the pinned header, so the highlight flips as a heading
+       arrives rather than when the section happens to fill the screen. */
+    const io = new IntersectionObserver(
+      (entries) => {
+        const hit = entries
+          .filter((e) => e.isIntersecting)
+          .sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top)[0];
+        if (hit?.target.id) setActiveSection(hit.target.id);
+      },
+      { rootMargin: "-120px 0px -65% 0px", threshold: 0 },
+    );
+    nodes.forEach((n) => io.observe(n));
+    return () => io.disconnect();
+  }, [surface]);
   /* Every consumer below reads `values` — the RESOLVED view of whichever
      member is selected; no selection = the family baseline. */
   const values = useMemo(
@@ -422,12 +580,27 @@ export const ProductPreview = (props: ProductPreviewProps) => {
   const kbByType = useMemo(() => {
     const m = new Map<string, ProductKnowledgeBlock[]>();
     for (const b of visibleKnowledge) {
+      /* Overlay the reader's language when the block carries it; English
+         stays the fallback so a half-translated product still reads. One
+         swap here covers every knowledge surface below (hero chips,
+         highlights deck, overview, applications, FAQ …). */
+      const loc = lang === "en"
+        ? b
+        : {
+            ...b,
+            title: b.title_i18n?.[lang]?.trim() || b.title,
+            content: (() => {
+              const c = b.content_i18n?.[lang];
+              if (Array.isArray(c)) return c.length ? c : b.content;
+              return typeof c === "string" && c.trim() ? c : b.content;
+            })(),
+          };
       const arr = m.get(b.type) ?? [];
-      arr.push(b);
+      arr.push(loc);
       m.set(b.type, arr);
     }
     return m;
-  }, [visibleKnowledge]);
+  }, [visibleKnowledge, lang]);
   const firstKb = (t: string) => kbByType.get(t)?.[0];
 
   /* ── derived: anchors (schema-driven importance — any field type) ──
@@ -746,21 +919,38 @@ export const ProductPreview = (props: ProductPreviewProps) => {
             {displayName || productName}
           </span>
           <span className="flex shrink-0 items-center gap-1">
-            <a href="#overview" className="hidden sm:inline-flex items-center rounded-full px-3 py-1.5 text-[12px] font-medium text-[var(--text-muted)] transition-colors hover:text-[var(--text-primary)]">
-              {t("preview.stickyOverview", "Overview")}
-            </a>
-            <a href="#specs" className="hidden sm:inline-flex items-center rounded-full px-3 py-1.5 text-[12px] font-medium text-[var(--text-muted)] transition-colors hover:text-[var(--text-primary)]">
-              {t("preview.stickySpecs", "Specs")}
-            </a>
-            <a href="#gallery" className="inline-flex items-center rounded-full bg-[var(--bg-inverted)] px-4 py-1.5 text-[12px] font-semibold text-[var(--text-inverted)] transition-opacity hover:opacity-90">
-              {t("preview.stickyGallery", "Gallery")}
-            </a>
+            {([
+              { id: "overview", label: t("preview.stickyOverview", "Overview") },
+              { id: "specs", label: t("preview.stickySpecs", "Specs") },
+              { id: "gallery", label: t("preview.stickyGallery", "Gallery") },
+            ] as const).map((s) => {
+              const isActive = activeSection === s.id;
+              return (
+                <a
+                  key={s.id}
+                  href={`#${s.id}`}
+                  aria-current={isActive ? "true" : undefined}
+                  onClick={() => setActiveSection(s.id)}
+                  className={`items-center rounded-full py-1.5 text-[12px] transition-all ${
+                    /* Gallery stays visible on phones — the other two are the
+                       first to go when the pill runs out of room. */
+                    s.id === "gallery" ? "inline-flex" : "hidden sm:inline-flex"
+                  } ${
+                    isActive
+                      ? "bg-[var(--bg-inverted)] px-4 font-semibold text-[var(--text-inverted)] hover:opacity-90"
+                      : "px-3 font-medium text-[var(--text-muted)] hover:text-[var(--text-primary)]"
+                  }`}
+                >
+                  {s.label}
+                </a>
+              );
+            })}
           </span>
         </div>
       </div>
 
       {/* Anchor target for the poster "Learn more" CTA. */}
-      <div id="overview" className="scroll-mt-24" />
+      <div id="overview" className="scroll-mt-32" />
 
       {/* ═══ 2. AT A GLANCE — airy, glyph-forward stat band (no table lines) ═══ */}
       {coreAnchors.length > 0 ? (
@@ -793,8 +983,14 @@ export const ProductPreview = (props: ProductPreviewProps) => {
                 big = false;
               }
 
+              const glyph = fieldGlyph(f.key, f.label);
               return (
                 <div key={f.key} className="flex min-h-[7.5rem] flex-col justify-between gap-3 px-5 py-7 md:py-9">
+                  {/* The glyph names the measure before the number is read —
+                      the band is the page's opening claim, so it has to be
+                      scannable without the caption. Absent binding = no icon,
+                      never a placeholder box. */}
+                  {glyph ? <Glyph src={glyph} className="h-5 w-5 text-[var(--text-faint)]" /> : null}
                   <div className="flex items-baseline gap-1.5">
                     <span
                       className={
@@ -859,12 +1055,12 @@ export const ProductPreview = (props: ProductPreviewProps) => {
           ...asKnowledgeList(firstKb("selling_points")?.content),
           ...asKnowledgeList(firstKb("technical_advantages")?.content),
         ].slice(0, 5);
-        // Close-up detail shots lead the deck (they make the strongest
-        // cards); wide studio shots and the main render fill the rest.
-        const g = galleryUrls ?? [];
-        const detailShots = g.filter((u) => u.includes("/products/details/"));
-        const otherShots = g.filter((u) => !u.includes("/products/details/"));
-        const imgs = [...detailShots, ...otherShots, ...(mainImageUrl ? [mainImageUrl] : [])];
+        /* Owner rule (2026-08-29): a card shows a photo only when that photo
+           belongs to it. These points come from the knowledge lists, which
+           carry no image of their own — the deck used to borrow gallery and
+           main-render shots by index, pairing e.g. a detection-accuracy claim
+           with whatever photo landed at that position. Text-only cards
+           instead; per-highlight photos live in the Highlights tab. */
         if (points.length < 2) return null;
         return (
           <section className="space-y-8">
@@ -873,9 +1069,8 @@ export const ProductPreview = (props: ProductPreviewProps) => {
             </h2>
             <SnapCarousel>
               {points.map((point, i) => {
-                const img = imgs.length > 0 ? imgs[i % imgs.length] : null;
                 // Apple shop-card anatomy: bold claim on the card surface,
-                // supporting clause below it, photo grounded at the bottom.
+                // supporting clause below it.
                 // Theme-aware surface so it reads right in light AND dark.
                 const parts = point.split(/\s+—\s+/);
                 const head = parts[0];
@@ -883,7 +1078,9 @@ export const ProductPreview = (props: ProductPreviewProps) => {
                 return (
                   <div
                     key={i}
-                    className="flex h-[500px] md:h-[560px] w-[85%] shrink-0 snap-start flex-col overflow-hidden rounded-[28px] bg-[var(--bg-surface-subtle)] sm:w-[440px]"
+                    /* Text-only deck: sized to the copy (a photo-height box
+                       with no photo left a tall empty card). */
+                    className="flex min-h-[260px] w-[85%] shrink-0 snap-start flex-col overflow-hidden rounded-[28px] bg-[var(--bg-surface-subtle)] sm:w-[440px]"
                   >
                     <div className="p-7 md:p-8">
                       <h3 className="text-xl md:text-[24px] font-semibold leading-snug tracking-[-0.01em] text-[var(--text-primary)]">
@@ -897,12 +1094,6 @@ export const ProductPreview = (props: ProductPreviewProps) => {
                         </p>
                       ) : null}
                     </div>
-                    {img ? (
-                      <div className="mt-auto h-[240px] md:h-[280px]">
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img src={img} alt="" className="h-full w-full object-cover" />
-                      </div>
-                    ) : null}
                   </div>
                 );
               })}
@@ -1265,12 +1456,112 @@ export const ProductPreview = (props: ProductPreviewProps) => {
         );
       })()}
 
+      {/* ═══ THE TECHNICAL SPINE — pinned media, scrolling detail ═══
+          Owner direction (2026-09-04): the reader must never lose sight of the
+          machine while working through its record. XPRI-01 alone carries seven
+          spec groups plus features, Q&A, safety and warranty; read as a single
+          column, a buyer four screens into Electrical has long lost the thing
+          they are reading about.
+          The rail pins the photo, its gallery and the model roster while every
+          section below scrolls past it. One column below lg — sticky on a phone
+          would eat the screen the detail needs. */}
+      {/* A FIXED rail track, not minmax(0,320px): a flexible lower bound let the
+          rail collapse to 60px at 1024 — the photo became a sliver — because the
+          spec tables happily claimed the rest. The rail's job is to hold a
+          readable photo, so its width is not negotiable; only the detail column
+          flexes. */}
+      <div className="md:grid md:grid-cols-[236px_minmax(0,1fr)] lg:grid-cols-[288px_minmax(0,1fr)] xl:grid-cols-[340px_minmax(0,1fr)] md:gap-8 lg:gap-12 xl:gap-20 md:items-start">
+        {/* From md, not lg. Gating the spine at 1024 meant a 900px laptop — and
+            the preview pane itself — saw the OLD single column and nothing of
+            this design at all. The rail narrows to 236px there instead of
+            disappearing; below md it does step out, where a sticky column
+            would eat the screen the detail needs. */}
+        <aside className="hidden md:flex md:sticky md:top-24 flex-col gap-4 lg:gap-5">
+          {mainImageUrl ? (
+            <div className="overflow-hidden rounded-2xl border border-[var(--border-subtle)] bg-white">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={mainImageUrl}
+                alt={displayName || productName}
+                className="aspect-[4/3] w-full object-contain p-4"
+                loading="lazy"
+                decoding="async"
+              />
+            </div>
+          ) : null}
+
+          {(galleryUrls ?? []).length > 0 ? (
+            <div className="grid grid-cols-4 gap-2">
+              {(galleryUrls ?? []).slice(0, 4).map((u, i) => (
+                <div key={`${u}-${i}`} className="overflow-hidden rounded-lg border border-[var(--border-subtle)] bg-white">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={u} alt="" className="aspect-square w-full object-contain p-1.5" loading="lazy" decoding="async" />
+                </div>
+              ))}
+            </div>
+          ) : null}
+
+          <div className="border-t border-[var(--border-subtle)] pt-4">
+            <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--text-faint)]">
+              {primaryModel ? t("preview.model", "Model") : null}
+            </div>
+            <div className="mt-1 text-[15px] font-semibold tracking-tight text-[var(--text-primary)]">
+              {primaryModel || displayName || productName}
+            </div>
+          </div>
+
+          {/* The family roster stays reachable from the rail: a reader deep in
+              the specs can switch member without scrolling back up. */}
+          {(variants ?? []).length > 1 ? (
+            <div className="flex flex-wrap gap-1.5">
+              {(variants ?? []).map((v) => (
+                <button
+                  key={v.code}
+                  type="button"
+                  onClick={() => setSelectedCode(v.code)}
+                  aria-pressed={v.code === selectedCode}
+                  className={`rounded-lg border px-2.5 py-1.5 text-[11.5px] font-semibold tabular-nums tracking-tight transition-colors ${
+                    v.code === selectedCode
+                      ? "border-[var(--accent,#0066FF)] text-[var(--accent,#0066FF)]"
+                      : "border-[var(--border-subtle)] text-[var(--text-muted)] hover:text-[var(--text-primary)]"
+                  }`}
+                >
+                  {v.code}
+                </button>
+              ))}
+            </div>
+          ) : null}
+
+          {warranty || countryOfOrigin ? (
+            <div className="flex flex-wrap gap-x-6 gap-y-2 border-t border-[var(--border-subtle)] pt-4">
+              {warranty ? (
+                <div>
+                  <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--text-faint)]">
+                    {t("preview.warranty", "Warranty")}
+                  </div>
+                  <div className="mt-0.5 text-[13px] font-medium text-[var(--text-primary)]">{warranty}</div>
+                </div>
+              ) : null}
+              {countryOfOrigin ? (
+                <div>
+                  <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--text-faint)]">
+                    {t("preview.origin", "Origin")}
+                  </div>
+                  <div className="mt-0.5 text-[13px] font-medium text-[var(--text-primary)]">{countryOfOrigin}</div>
+                </div>
+              ) : null}
+            </div>
+          ) : null}
+        </aside>
+
+        <div className="space-y-16 md:space-y-24 min-w-0">
+
       {/* ═══ LAYER 3 — ADVANCED TECHNICAL DATA (progressive disclosure) ═══
           Primary groups open by default; standard/quiet collapsed so the
           page reads simple-first, deep-on-demand. */}
       {specGroups.length > 0 ? (
 
-        <div id="specs" data-reveal className="scroll-mt-24">
+        <div id="specs" data-reveal className="scroll-mt-32">
           <SectionHead hero eyebrow={t("preview.eyebrowLayer3", "In depth")} title={t("preview.technicalSpecifications", "Technical Specifications")} />
           <div className="mt-3 border-t border-[var(--border-subtle)]">
           {specGroups.map(({ group, fields, emphasis }) => (
@@ -1278,6 +1569,7 @@ export const ProductPreview = (props: ProductPreviewProps) => {
               key={group.id}
               title={group.title}
               eyebrow={emphasis === "primary" ? t("preview.eyebrowCore", "Core") : undefined}
+              glyph={groupGlyph(group.title)}
               defaultOpen={emphasis === "primary"}
             >
               <table className="w-full border-collapse text-sm">
@@ -1490,9 +1782,13 @@ export const ProductPreview = (props: ProductPreviewProps) => {
         </section>
       ) : null}
 
+        </div>
+      </div>
+      {/* ═══ end of the pinned spine — media and downloads go full width ═══ */}
+
       {/* ═══ 12. GALLERY ═══ */}
       {hasGallery ? (
-        <section id="gallery" className="scroll-mt-24 space-y-8">
+        <section id="gallery" className="scroll-mt-32 space-y-8">
           <SectionHead hero eyebrow={t("preview.eyebrowUpClose", "Up close")} title={t("view.gallery", "Gallery")} />
           {/* Apple "Up close" rail — large snap cards instead of a grid. */}
           <SnapCarousel>

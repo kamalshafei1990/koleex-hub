@@ -58,6 +58,39 @@ const languages: { code: Lang; label: string; short: string }[] = [
 
 export default function MainHeader() {
   const pathname = usePathname();
+
+  /* SOLID BAR AT REST, FROSTED ONCE YOU SCROLL — the owner's call after the
+     blur-at-rest defect resisted three fixes on his 17 Pro Max.
+     
+     The flag goes on <html> so the switch is pure CSS: no re-render per
+     scroll frame, and the rule can key off it anywhere. Threshold is 4px so
+     a rubber-band bounce at the top does not flicker the bar, and the
+     listener is passive — it must never delay a scroll.
+     
+     Reads #main-scroll-container, NOT the window: the Hub scrolls inside
+     that element, and window.scrollY is always 0 here. */
+  useEffect(() => {
+    const sc = document.getElementById("main-scroll-container");
+    if (!sc) return;
+    let raf = 0;
+    const apply = () => {
+      raf = 0;
+      document.documentElement.toggleAttribute("data-kx-scrolled", sc.scrollTop > 4);
+    };
+    const onScroll = () => {
+      if (raf) return;
+      raf = requestAnimationFrame(apply);
+    };
+    apply();
+    sc.addEventListener("scroll", onScroll, { passive: true });
+    return () => {
+      sc.removeEventListener("scroll", onScroll);
+      if (raf) cancelAnimationFrame(raf);
+      document.documentElement.removeAttribute("data-kx-scrolled");
+    };
+    /* Re-bind per route: the scroller element is replaced on some segment
+       changes, and a listener on a detached node silently stops firing. */
+  }, [pathname]);
   const { t } = useTranslation(hubT);
   /* Initialize from localStorage on the first client render — prevents the
      write-effect from clobbering the saved theme with the default "dark"

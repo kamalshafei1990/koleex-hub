@@ -335,7 +335,7 @@ export default function ReporterIssueView({ issueId }: { issueId: string }) {
           no breadcrumb, no way back. This strip is the page identity + the
           escape hatch: Back, what page this is, where the underlying issue
           lives. Sticky-top so it's reachable while scrolling long discussions. */}
-      <div className="sticky top-0 z-20 -mx-4 mb-4 border-b border-[var(--border-subtle)] bg-[var(--bg-primary)]/95 px-4 py-3 backdrop-blur md:-mx-6 md:px-6">
+      <div className="sticky top-0 z-20 -mx-4 mb-4 border-b border-[var(--border-subtle)] bg-[var(--bg-secondary)] px-4 py-3 backdrop-blur md:-mx-6 md:px-6">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="flex items-center gap-2 text-[12px]">
             <Link

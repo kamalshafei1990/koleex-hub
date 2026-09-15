@@ -29,7 +29,7 @@ export default function EditAccountPage() {
   return (
     <AuthGate>
       {loading ? (
-        <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)]">
+        <div className="min-h-full bg-[var(--bg-primary)] text-[var(--text-primary)]">
           <div className="max-w-[1400px] mx-auto px-4 md:px-6 lg:px-8 xl:px-10 py-8">
             <div className="animate-pulse space-y-4">
               <div className="h-8 w-64 bg-[var(--bg-surface-subtle)] rounded" />
@@ -40,7 +40,7 @@ export default function EditAccountPage() {
       ) : account ? (
         <AccountForm mode="edit" account={account} />
       ) : (
-        <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)] flex items-center justify-center">
+        <div className="min-h-full bg-[var(--bg-primary)] text-[var(--text-primary)] flex items-center justify-center">
           <p className="text-[var(--text-dim)]">Account not found.</p>
         </div>
       )}

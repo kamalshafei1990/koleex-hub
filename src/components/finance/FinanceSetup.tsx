@@ -16,6 +16,7 @@
    --------------------------------------------------------------------------- */
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useWarmData } from "@/lib/warm-cache";
 import ConfirmDialog from "@/components/kds/ConfirmDialog";
 import FinanceHeader from "@/components/finance/FinanceHeader";
 import { useTranslation } from "@/lib/i18n";
@@ -66,26 +67,19 @@ function StatusDot({ status }: { status: CardStatus }) {
 
 export default function FinanceSetup() {
   const { t } = useTranslation(financeT);
-  const [snapshot, setSnapshot] = useState<SetupSnapshot | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [activeCard, setActiveCard] = useState<CardKey | null>(null);
 
-  const load = useCallback(async () => {
-    setLoading(true); setError(null);
-    try {
-      const r = await fetch("/api/finance/setup/status", { credentials: "include", cache: "no-store" });
-      const j = await r.json();
-      if (!r.ok) throw new Error(humanizeError(j.error ?? `HTTP ${r.status}`));
-      setSnapshot(j.snapshot as SetupSnapshot);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
-    } finally {
-      setLoading(false);
-    }
+  /* Warm: the setup status takes no filter, so the response IS the default
+     view. Paints from the last answer on the first frame. */
+  const fetchStatus = useCallback(async () => {
+    const r = await fetch("/api/finance/setup/status", { credentials: "include", cache: "no-store" });
+    const j = await r.json();
+    if (!r.ok) throw new Error(humanizeError(j.error ?? `HTTP ${r.status}`));
+    return j.snapshot as SetupSnapshot;
   }, []);
-
-  useEffect(() => { void load(); }, [load]);
+  const { data: snapshot, loading, error: loadError, reload: load } =
+    useWarmData<SetupSnapshot>("fin:setup", fetchStatus);
+  const error = loadError ? String(loadError instanceof Error ? loadError.message : loadError) : null;
 
   /* Hash-to-drawer: /finance/setup#assets now opens the Assets drawer
      directly. Discoverability fix — operators land here from

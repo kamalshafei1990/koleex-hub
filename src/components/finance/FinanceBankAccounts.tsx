@@ -15,6 +15,7 @@
 
 import { humanizeError } from "@/lib/ui/humanize-error";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useWarmData } from "@/lib/warm-cache";
 import ConfirmDialog from "@/components/kds/ConfirmDialog";
 import Link from "next/link";
 import FinanceHeader from "@/components/finance/FinanceHeader";
@@ -67,8 +68,6 @@ function daysSince(iso: string | null): number | null {
 export default function FinanceBankAccounts() {
   const { t } = useTranslation(financeT);
   const baseCurrency = useBaseCurrency();
-  const [accounts, setAccounts] = useState<BankAccountListItem[]>([]);
-  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [editing, setEditing] = useState<Partial<BankAccount> | null>(null);
   const [openAccountId, setOpenAccountId] = useState<string | null>(null);
@@ -79,20 +78,19 @@ export default function FinanceBankAccounts() {
   const [detailLoading, setDetailLoading] = useState(false);
   const [movementDrawer, setMovementDrawer] = useState<{ accountId: string } | null>(null);
 
-  const loadList = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const r = await fetch("/api/finance/bank-accounts", { cache: "no-store" });
-      const j = (await r.json().catch(() => ({}))) as { accounts?: BankAccountListItem[]; error?: string };
-      if (!r.ok) throw new Error(humanizeError(j.error ?? `HTTP ${r.status}`));
-      setAccounts(j.accounts ?? []);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
-    } finally {
-      setLoading(false);
-    }
+  /* Warm: no filter goes to the server, so the response IS the default
+     view. Paints from the last answer on the first frame. */
+  const fetchList = useCallback(async () => {
+    const r = await fetch("/api/finance/bank-accounts", { cache: "no-store" });
+    const j = (await r.json().catch(() => ({}))) as { accounts?: BankAccountListItem[]; error?: string };
+    if (!r.ok) throw new Error(humanizeError(j.error ?? `HTTP ${r.status}`));
+    return j.accounts ?? [];
   }, []);
+  /* Only the LIST is warmed. The detail pane is fetched per id and opens on
+     demand — nobody stares at a closed drawer waiting for it. */
+  const { data: accountsData, loading, reload: loadList } =
+    useWarmData<BankAccountListItem[]>("fin:bank-accounts", fetchList);
+  const accounts = useMemo(() => accountsData ?? [], [accountsData]);
 
   const doArchive = useCallback(async (id: string) => {
     const r = await fetch(`/api/finance/bank-accounts/${id}/archive`, {
@@ -118,7 +116,6 @@ export default function FinanceBankAccounts() {
     }
   }, []);
 
-  useEffect(() => { void loadList(); }, [loadList]);
   useEffect(() => { if (openAccountId) void loadDetail(openAccountId); else setDetail(null); }, [openAccountId, loadDetail]);
 
   /* ── KPI strip across the whole tenant. ── */

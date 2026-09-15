@@ -2,7 +2,7 @@ import "server-only";
 
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
-import { requireAuth, requireModuleAccess , requireModuleAction} from "@/lib/server/auth";
+import { requireAuth , requireModuleAction} from "@/lib/server/auth";
 
 /* POST /api/todos/[id]/notes — add a note to a todo.
    Anyone with Todo access who can view this todo can add a note. The

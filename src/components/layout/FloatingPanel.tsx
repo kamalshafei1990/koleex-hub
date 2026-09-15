@@ -59,6 +59,7 @@ import type {
   DiscussChannelWithState,
   DiscussMessageWithAuthor,
 } from "@/types/supabase";
+import { textDirection } from "@/lib/text-direction";
 
 /* ── Theme hook ── */
 function useTheme() {
@@ -527,10 +528,12 @@ export default function FloatingPanel() {
                   | { type: "start" }
                   | { type: "steps" }
                   | { type: "delta"; text: string }
+                  | { type: "retract" }
                   | { type: "end"; reply?: string; agent?: { finalReply?: string } }
                   | { type: "error"; message?: string };
-                if (json.type === "delta") {
-                  accumulated += json.text;
+                if (json.type === "delta" || json.type === "retract") {
+                  /* A retract clears narration that preceded a lookup. */
+                  accumulated = json.type === "retract" ? "" : accumulated + json.text;
                   setAiMessages(prev => {
                     if (bubbleIndex < 0 || bubbleIndex >= prev.length) return prev;
                     const next = prev.slice();
@@ -1032,8 +1035,12 @@ export default function FloatingPanel() {
                       </div>
                       {/* Message bubble — assistant renders the SAME
                           markdown pipeline as the /ai app (headings,
-                          lists, tables); user text stays literal. */}
-                      <div dir="auto" style={{ unicodeBidi: "plaintext" }} className={`max-w-[75%] px-3 py-2 rounded-2xl text-[13px] leading-relaxed ${
+                          lists, tables); user text stays literal.
+                          Direction is measured from the whole message: a
+                          reply opening with "Koleex Hub…" is still Arabic,
+                          and dir="auto" would have called it English and
+                          reversed it. */}
+                      <div dir={textDirection(m.text)} className={`max-w-[75%] px-3 py-2 rounded-2xl text-[13px] leading-relaxed ${
                         m.role === "user"
                           ? `whitespace-pre-line ${dk ? "bg-white/[0.12] text-white" : "bg-black/[0.08] text-black"}`
                           : dk ? "bg-white/[0.05] text-white/85" : "bg-black/[0.04] text-black/85"

@@ -10,17 +10,18 @@ import type { HRModuleProps } from "@/components/hr/HRApp";
 import {
   EmptyState,
   StatusBadge,
+  fmtDate,
   fmtTime,
   ATTENDANCE_STATUS_MAP,
   makeTranslationHelpers,
   primaryBtnCls,
-  inputCls,
 } from "@/components/hr/shared";
 import {
   fetchAttendanceRecords,
   clockOut,
 } from "@/lib/hr-admin";
 import type { AttendanceRecordRow } from "@/types/supabase";
+import DatePicker from "@/components/ui/DatePicker";
 
 /* ── Icons ── */
 import UserIcon from "@/components/icons/ui/UserIcon";
@@ -31,7 +32,7 @@ import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
    ATTENDANCE MODULE
    ═══════════════════════════════════════════════════ */
 
-export default function Attendance({ employees, t, lang }: HRModuleProps) {
+export default function Attendance({ employees, t }: HRModuleProps) {
   /* ── Translation helpers ── */
   const { tStatus } = makeTranslationHelpers(t);
 
@@ -111,12 +112,17 @@ export default function Attendance({ employees, t, lang }: HRModuleProps) {
         <h2 className="text-[16px] font-semibold text-[var(--text-primary)]">
           {t("hr.attendance")}
         </h2>
-        <input
-          type="date"
-          className={inputCls + " !w-auto"}
-          value={attendanceDate}
-          onChange={(e) => setAttendanceDate(e.target.value)}
-        />
+        {/* House picker, not a native date input — the native control
+            renders mm/dd/yyyy, and dates on the Hub are Day/Month/Year
+            everywhere. An empty pick keeps the current day: the module
+            always shows exactly one date's records. */}
+        <div className="w-44">
+          <DatePicker
+            value={attendanceDate}
+            onChange={(iso) => { if (iso) setAttendanceDate(iso); }}
+            heightCls="h-10"
+          />
+        </div>
       </div>
 
       {/* Summary row */}
@@ -146,7 +152,7 @@ export default function Attendance({ employees, t, lang }: HRModuleProps) {
         <EmptyState
           icon={ClockIcon}
           title={t("hr.noAttendanceRecords")}
-          subtitle={t("hr.noRecordsFor")}
+          subtitle={`${t("hr.noRecordsFor")} ${fmtDate(attendanceDate)}`}
         />
       ) : (
         <div className="space-y-2 max-h-[60vh] overflow-y-auto overscroll-contain pr-1">

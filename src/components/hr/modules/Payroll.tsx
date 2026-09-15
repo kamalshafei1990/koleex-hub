@@ -52,7 +52,7 @@ const DEFAULT_SALARY_CURRENCY = "CNY";
    MAIN COMPONENT
    ═══════════════════════════════════════════════════ */
 
-export default function PayrollModule({ employees, t, lang }: HRModuleProps) {
+export default function PayrollModule({ employees, t }: HRModuleProps) {
   /* ── state ── */
   const [salaryRecords, setSalaryRecords] = useState<SalaryRecordWithName[]>([]);
   const [payslips, setPayslips] = useState<PayslipWithName[]>([]);

@@ -124,7 +124,12 @@ export default function ProductPicker({
   const [divisions, setDivisions] = useState<DivisionRow[]>([]);
   const [categories, setCategories] = useState<CategoryRow[]>([]);
   const [icons, setIcons] = useState<Record<string, Record<string, string>>>({});
-  const [loading, setLoading] = useState(true);
+  /* `loaded` marks the first completed fetch; loading derives from it, so
+     the effect never sets state synchronously. Deliberately NOT reset on
+     close: a re-open shows the previous catalog instantly while the effect
+     refreshes it behind — better than a spinner over data we already have. */
+  const [loaded, setLoaded] = useState(false);
+  const loading = open && !loaded;
   const [q, setQ] = useState("");
   const [div, setDiv] = useState("");
   const [cat, setCat] = useState("");
@@ -132,7 +137,6 @@ export default function ProductPicker({
   useEffect(() => {
     if (!open) return;
     let cancelled = false;
-    setLoading(true);
     const metaP = fetch("/api/products/media-thumbs", { credentials: "include" })
       .then((r) => (r.ok ? r.json() : { thumbs: {}, models: {} }))
       .then((j: { thumbs?: Record<string, string>; models?: Record<string, string> }) => ({
@@ -162,7 +166,7 @@ export default function ProductPicker({
         setCategories(cats);
       })
       .catch(() => {})
-      .finally(() => !cancelled && setLoading(false));
+      .finally(() => !cancelled && setLoaded(true));
     return () => {
       cancelled = true;
     };

@@ -132,17 +132,22 @@ const enB = tpl.buildEnglish(inp(noTitle));
 const zhB = tpl.buildChinese(inp(noTitle));
 
 /* C. the name in the narrative IS the name in the table */
+/** A paragraph is a run of marked pieces now — flatten it to plain text
+ *  before asserting on wording. Reading para[0] as a string silently
+ *  produced "[object Object]" and the assertions passed on nothing. */
+const flat = (para: { text: string }[]) => para.map((x) => x.text).join("");
+
 const tableName = enA.passportBlock.find((row: Row) => row.label === "Name")?.value ?? "";
 ok("the narrative names the same person as the passport block",
-  enA.body.every((p: string) => !p.includes("Mr. ") || p.includes(tableName)),
+  enA.body.every((p: { text: string }[]) => !flat(p).includes("Mr. ") || flat(p).includes(tableName)),
   tableName);
 ok("the Chinese narrative names the same person too",
-  zhA.body[1]!.includes(tableName));
+  flat(zhA.body[1]!).includes(tableName));
 
 /* D. no position → no invented job title */
 ok("no position → the letter says the visitor is our customer",
-  enB.body[0]!.includes("is our valued customer") && !enB.body[0]!.includes("of Nour Textiles,"),
-  enB.body[0]);
+  flat(enB.body[0]!).includes("is our valued customer") && !flat(enB.body[0]!).includes("of Nour Textiles,"),
+  flat(enB.body[0]!));
 ok("no position → no Position row in the English block",
   !enB.passportBlock.some((row: Row) => row.label === "Position"));
 ok("no position → no 职务 row in the Chinese block",
@@ -159,7 +164,7 @@ ok("the nationality row uses the Chinese country name",
 ok("a mapped job title is printed in Chinese",
   zhA.passportBlock.find((row: Row) => row.label === "职务")?.value === "总经理");
 ok("cities are printed in Chinese",
-  zhA.body[1]!.includes("台州") && zhA.body[1]!.includes("上海"));
+  flat(zhA.body[1]!).includes("台州") && flat(zhA.body[1]!).includes("上海"));
 
 /* A Latin WORD must never weld directly onto a CJK character — that produces
    the "埃及Nour TextilesGeneral Manager…" run the first draft printed.
@@ -176,7 +181,7 @@ function welds(s: string): string | null {
   return s.slice(Math.max(0, at - 10), at + 22);
 }
 for (const [tag, text] of [["with a title", zhA], ["without a title", zhB]] as const) {
-  const bad = [...text.intro, ...text.body].map(welds).find(Boolean);
+  const bad = [...text.intro, ...text.body].map((p) => welds(flat(p))).find(Boolean);
   ok(`Latin never welds onto CJK (${tag})`, !bad, bad ?? "");
 }
 
@@ -284,6 +289,188 @@ ok("both Koleex logo files exist",
   fs.existsSync(R("public/brand/koleex-logo-white.svg")));
 ok("the black logo is actually black",
   /fill:\s*#000/.test(fs.readFileSync(R("public/brand/koleex-logo-black.svg"), "utf8")));
+
+/* ── G. layout contracts the owner reported ─────────────────────────────── */
+console.log("\nG. Layout");
+
+/* h-full + overflow-y-auto on the app root gave each page its own scroller,
+   which FROZE the Hub's (#main-scroll-container): the page scrolled inside
+   itself, the frosted header ramp never travelled over the content, and the
+   action row sat under the frost permanently. These pages flow — they belong
+   in the Hub scroller, like Expenses. */
+for (const f of [
+  "src/components/travel/InvitationForm.tsx",
+  "src/components/travel/TravelApp.tsx",
+  "src/app/travel/settings/page.tsx",
+]) {
+  const src = fs.readFileSync(R(f), "utf8");
+  ok(`${f.split("/").pop()} — no private scroller on the app root`,
+    !/className="h-full overflow-y-auto"/.test(src));
+  /* The shell offsets content by --kx-header-h (56px) but the ramp reaches
+     calc(--kx-header-h + 3rem) = 104px. Without the extra 3rem the first
+     control lands inside the frost before any scrolling. */
+  ok(`${f.split("/").pop()} — content starts below the frosted ramp (pt-12)`,
+    /px-4 pt-12 pb-/.test(src));
+}
+
+/* The wordmark is 6.7:1, so height drives width: 12mm made it 80mm — 47% of
+   the content line. Anything above 8mm reads as a banner, not a letterhead. */
+const styles = fs.readFileSync(R("src/components/travel/letter-styles.ts"), "utf8");
+const logoH = /\.inv-logo \{ height: (\d+(?:\.\d+)?)mm/.exec(styles);
+ok("the letterhead logo is 8mm or under", !!logoH && parseFloat(logoH[1]!) <= 8,
+  logoH ? `${logoH[1]}mm` : "not found");
+
+/* letter-styles.ts is ONE template literal — a backtick anywhere inside it
+   ends the string and the print route stops compiling. */
+const bodyOnly = styles.slice(styles.indexOf("`") + 1, styles.lastIndexOf("`"));
+ok("no stray backtick inside the letter-styles template", !bodyOnly.includes("`"));
+
+/* The print route renders bare — no shell, so no #main-scroll-container.
+   The root layout still stamps overflow-hidden on <body>, which LOCKED the
+   letter: three A4 pages, no way to scroll them. The style block must keep
+   the body override. */
+ok("the print page unlocks body scrolling",
+  /body \{\s*\n\s*overflow-y: auto !important;/.test(styles));
+
+/* A Chinese company seal is 40mm by regulation. 22mm read as a pasted-in
+   graphic on a document a visa officer inspects. */
+const stampH = /\.inv-stamp \{[\s\S]*?height: (\d+)mm/.exec(styles);
+ok("the stamp prints at its real 40mm size", !!stampH && stampH[1] === "40",
+  stampH ? `${stampH[1]}mm` : "not found");
+
+/* Travel lives in ONE sidebar group, and it is Planning — the owner's call:
+   an invitation letter is trip planning, not a sales transaction. */
+const navSrc = fs.readFileSync(R("src/lib/navigation.ts"), "utf8");
+const carriers = [...navSrc.matchAll(/appIds: \[([^\]]+)\]/g)].filter((m) => m[1]!.includes('"travel"'));
+ok("travel is in exactly one sidebar group", carriers.length === 1);
+ok("that group is Planning", carriers.length === 1 && carriers[0]![1]!.includes('"planning"'));
+
+/* The tile icon is the plane from the Hub's own icon set (RrIcon "plane"). */
+ok("TravelIcon draws the library plane",
+  fs.readFileSync(R("src/components/icons/TravelIcon.tsx"), "utf8").includes("M21,10H17.693L13.446,1.563"));
+
+/* The licence is a landscape document on a portrait sheet: rotated to fill
+   the page. Three invariants keep that working, each one broke once:
+   · max-width:none — Tailwind preflight caps every img at 100% and silently
+     ate the rotation's whole point (measured 176mm where 236 was asked);
+   · overflow:hidden on the frame — the PRE-rotation layout box is 236mm wide
+     in a 176mm frame, and Chromium printed that horizontal spill as a
+     fourth, entirely blank PDF page;
+   · the rotation itself, -90 so the top binds to the left edge. */
+ok("licence image escapes Tailwind's img max-width", /\.inv-licence-img \{[\s\S]*?max-width: none/.test(styles));
+ok("licence frame clips pre-rotation layout overflow", /\.inv-licence-frame \{[\s\S]*?overflow: hidden/.test(styles));
+ok("licence rotates -90 (top binds left)", styles.includes("rotate(-90deg)"));
+
+/* Viewing the licence must never leave the app: in the desktop shell
+   (Electron) there are no tabs, so window.open stranded the owner on the raw
+   image with no way back. */
+const settingsSrc = fs.readFileSync(R("src/app/travel/settings/page.tsx"), "utf8");
+ok("settings licence view is in-app, not window.open", !settingsSrc.includes("window.open"));
+ok("the licence overlay closes on Escape", settingsSrc.includes('e.key === "Escape"'));
+
+/* The watermark — the owner's Feiyue letter tiles the company mark behind
+   the page and he asked for the same. Two invariants, each broke once:
+   the data: prefix (without it the URI is a relative URL and the rule is
+   dead), and background-COLOR on .inv-a4 — the background shorthand resets
+   every background-* longhand and silently erased the watermark. */
+ok("watermark tile is a data: URI",
+  /url\("data:image\/svg\+xml[;,]/.test(styles));
+ok(".inv-a4 uses background-color, never the shorthand",
+  !/\.inv-a4 \{[^}]*background:\s*#/.test(styles.replace(/\/\*[\s\S]*?\*\//g, "")));
+ok("the licence page carries no watermark",
+  /\.inv-licence-page \{[\s\S]*?background-image: none/.test(styles));
+const printPageSrc = fs.readFileSync(R("src/app/travel/[id]/print/page.tsx"), "utf8");
+ok("the print page has the control bar, and it never prints",
+  printPageSrc.includes('className="inv-bar no-print"'));
+ok("the bar carries Back, Edit, Print and Export PDF",
+  ["router.back()", "window.print()", "/pdf"].every((k) => printPageSrc.includes(k)) &&
+  printPageSrc.includes("Edit"));
+
+/* The list row: pressing it shows the INVITATION (the print view), and the
+   row carries Edit / Duplicate / Delete — the owner's spec. The actions are
+   SIBLINGS of the row button, never nested: a button inside a button is
+   invalid HTML and the inner clicks would bubble into navigation. */
+const listSrc = fs.readFileSync(R("src/components/travel/TravelApp.tsx"), "utf8");
+ok("row press opens the letter itself", listSrc.includes("/travel/${r.id}/print"));
+ok("row carries all three actions",
+  ['t("act.edit")', 't("act.duplicate")', 't("act.delete")'].every((k) => listSrc.includes(k)));
+ok("delete asks first and names visitor + reference",
+  listSrc.includes("pendingDelete.visitor.name") && listSrc.includes("pendingDelete.reference"));
+ok("no button nested inside the row button",
+  !/<button[^>]*>[\s\S]*?<button/.test(listSrc.slice(listSrc.indexOf("min-w-0 flex-1 text-start"), listSrc.indexOf("</button>", listSrc.indexOf("min-w-0 flex-1 text-start")))));
+
+/* Dates are ALWAYS Day/Month/Year — the owner's standing rule. A native
+   date input renders in the browser's locale (en-US = mm/dd) and nothing can
+   override that, so the VISIBLE control must be the DMY text field; the
+   native input survives only hidden, powering the calendar picker. */
+const fieldsSrc2 = fs.readFileSync(R("src/components/travel/fields.tsx"), "utf8");
+ok("the visible date control is dd/mm/yyyy", fieldsSrc2.includes('placeholder="dd/mm/yyyy"'));
+ok("the native date input is hidden, picker-only",
+  /type="date"[\s\S]{0,200}aria-hidden="true"|aria-hidden="true"[\s\S]{0,200}type="date"/.test(fieldsSrc2));
+ok("DMY parsing rejects impossible dates (calendar round-trip)",
+  fieldsSrc2.includes("probe.getUTCDate() !== d"));
+
+/* The three dropdowns — the owner's ask: pick, never type. Nationality and
+   Country share the full country list; Arrival city lists mainland cities
+   with international airports, each carrying a Chinese name so 由X入境 never
+   prints English mid-sentence. */
+const typesSrc = fs.readFileSync(R("src/lib/invitations/types.ts"), "utf8");
+const countryCount = (typesSrc.match(/code: "[A-Z]{2}" \}/g) ?? []).length;
+ok("the country list is substantial (140+)", countryCount >= 140, `${countryCount}`);
+ok("every arrival city carries a Chinese name",
+  !/ARRIVAL_CITIES[\s\S]*?\{ en: "[^"]+" \}/.test(typesSrc));
+ok("cityCn knows the arrival cities",
+  typesSrc.includes("[...COMMON_CITIES, ...ARRIVAL_CITIES]"));
+const formSrc2 = fs.readFileSync(R("src/components/travel/InvitationForm.tsx"), "utf8");
+ok("nationality, country and arrival city are dropdowns",
+  ["COUNTRY_OPTIONS, form.nationality", "COUNTRY_OPTIONS, form.country", "ARRIVAL_OPTIONS, form.arrivalCity"]
+    .every((k) => formSrc2.includes(k)));
+ok("a stored value outside the list stays visible (withCurrent)",
+  formSrc2.includes("function withCurrent"));
+
+/* STANDING RULES (owner, 2026-08-19): country dropdowns carry the FLAG, and
+   dropdown CONTENTS follow the active language — labels alone are not
+   enough. Cities carry all three languages; countries translate through
+   Intl.DisplayNames so there is no 150×3 table to drift. */
+ok("country options carry the flag emoji", formSrc2.includes("flagEmoji(c.code)"));
+ok("country names translate via Intl.DisplayNames",
+  typesSrc.includes('Intl.DisplayNames([lang], { type: "region" })'));
+ok("purpose options are translated", formSrc2.includes('lang === "zh" ? p.cn : lang === "ar" ? p.ar : p.en'));
+ok("city chips are translated", formSrc2.includes("cityDisplayName(c, lang)"));
+ok("every visit city carries all three languages",
+  !/COMMON_CITIES[\s\S]{0,2000}\{ en: "[^"]+", cn: "[^"]+" \}/.test(typesSrc));
+const visitCities = (typesSrc.slice(typesSrc.indexOf("COMMON_CITIES"), typesSrc.indexOf("];", typesSrc.indexOf("COMMON_CITIES"))).match(/\{ en:/g) ?? []).length;
+ok("the visit-city list grew to 20+", visitCities >= 20, `${visitCities}`);
+
+/* Stamp and signature sit SIDE BY SIDE — the owner's call. Absolute
+   placement is what let a wide signature run under the seal; a flex row with
+   a real gap cannot overlap at any signature width. */
+const ruleBody = (sel: string) =>
+  new RegExp(`\\.${sel} \\{([^}]*)\\}`).exec(styles)?.[1] ?? "";
+ok("the marks box is a flex row, not absolute placement",
+  /display: flex/.test(ruleBody("inv-marks")) &&
+  !/position: absolute/.test(ruleBody("inv-sig")) &&
+  !/position: absolute/.test(ruleBody("inv-stamp")));
+ok("there is a real gap between signature and stamp",
+  /gap: \d+mm/.test(ruleBody("inv-marks")));
+ok("the stamp is fully opaque (nothing under it now)",
+  /opacity: 1;/.test(ruleBody("inv-stamp")));
+
+/* The owner asked for the facts a consular officer scans for to stand out.
+   They are marked at BUILD time as pieces, never by pattern-matching the
+   finished sentence — that would eventually bold a date inside a company
+   name, and the two languages would drift apart. Both builders must mark
+   the SAME facts, because the pages are one document. */
+const tplSrc = fs.readFileSync(R("src/lib/invitations/templates.ts"), "utf8");
+ok("paragraphs are typed as marked pieces", /export type Piece = \{ text: string; strong\?: true \}/.test(tplSrc));
+const enBody = tplSrc.slice(tplSrc.indexOf("export function buildEnglish"), tplSrc.indexOf("export function buildChinese"));
+const zhBody = tplSrc.slice(tplSrc.indexOf("export function buildChinese"));
+const marks = (src: string) => (src.match(/\bb\(/g) ?? []).length;
+ok("the English letter highlights facts", marks(enBody) >= 8, `${marks(enBody)}`);
+ok("the Chinese letter highlights the same count", marks(zhBody) === marks(enBody),
+  `en ${marks(enBody)} vs zh ${marks(zhBody)}`);
+ok("the sheet renders strong runs", 
+  fs.readFileSync(R("src/components/travel/LetterSheet.tsx"), "utf8").includes("piece.strong ?"));
 
 /* ── result ─────────────────────────────────────────────────────────────── */
 console.log(`\n${"─".repeat(60)}`);

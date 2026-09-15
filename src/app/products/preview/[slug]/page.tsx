@@ -23,10 +23,16 @@ export async function generateMetadata({
   const { slug } = await params;
   const loaded = await loadPublicSchemaProduct(slug);
   if (!loaded) return { title: "Product not found — KOLEEX" };
-  return {
-    title: `${loaded.productName} — KOLEEX`,
-    description: loaded.tagline ?? undefined,
-  };
+  /* Same derivation the admin "Search & Social" preview shows, so what the
+     operator previews is what search engines and shared links actually get:
+     meta overrides first, then name | brand and the short description. */
+  const { seo } = loaded;
+  const title =
+    (seo.metaTitle || "").trim() ||
+    `${loaded.productName}${seo.brand ? ` | ${seo.brand}` : " | KOLEEX"}`;
+  const description =
+    (seo.metaDescription || "").trim() || (seo.excerpt || "").trim() || loaded.tagline || undefined;
+  return { title, description };
 }
 
 export default async function PublicProductPage({

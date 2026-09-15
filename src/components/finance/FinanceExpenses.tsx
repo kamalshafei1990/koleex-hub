@@ -18,7 +18,8 @@
      · Open Expenses App button → /expenses
    --------------------------------------------------------------------------- */
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
+import { useWarmData } from "@/lib/warm-cache";
 import Link from "next/link";
 import FinanceHeader from "@/components/finance/FinanceHeader";
 import { useTranslation } from "@/lib/i18n";
@@ -31,30 +32,27 @@ import { useBaseCurrencyOptional } from "@/lib/hooks/useBaseCurrency";
 import type { ExpenseCategory, FinanceExpense } from "@/lib/finance/types";
 import RrIcon from "@/components/ui/RrIcon";
 
+type ExpensesSnap = { expenses: FinanceExpense[]; categories: ExpenseCategory[] };
+
 export default function FinanceExpenseAnalytics() {
   const { t, lang } = useTranslation(financeT);
-  const [expenses, setExpenses] = useState<FinanceExpense[]>([]);
-  const [categories, setCategories] = useState<ExpenseCategory[]>([]);
-  const [loading, setLoading] = useState(true);
   /* Tenant base currency — shared session-cached hook, null until
      resolved. fmtMoney() renders "—" when given an empty currency, so
      a USD or EUR tenant never flashes "CNY" on first paint. */
   const baseCurrency = useBaseCurrencyOptional() ?? "";
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    try {
-      const [eRes, cRes] = await Promise.all([
-        fetch("/api/finance/expenses", { cache: "no-store" }).then((r) => r.json() as Promise<{ expenses?: FinanceExpense[] }>),
-        fetch("/api/finance/expense-categories", { cache: "no-store" }).then((r) => r.json() as Promise<{ categories?: ExpenseCategory[] }>),
-      ]);
-      setExpenses(eRes.expenses ?? []);
-      setCategories(cRes.categories ?? []);
-    } finally {
-      setLoading(false);
-    }
+  /* Warm: neither endpoint takes a filter, so the response IS the default
+     view. Paints from the last answer on the first frame. */
+  const fetchAll = useCallback(async (): Promise<ExpensesSnap> => {
+    const [eRes, cRes] = await Promise.all([
+      fetch("/api/finance/expenses", { cache: "no-store" }).then((r) => r.json() as Promise<{ expenses?: FinanceExpense[] }>),
+      fetch("/api/finance/expense-categories", { cache: "no-store" }).then((r) => r.json() as Promise<{ categories?: ExpenseCategory[] }>),
+    ]);
+    return { expenses: eRes.expenses ?? [], categories: cRes.categories ?? [] };
   }, []);
-  useEffect(() => { void load(); }, [load]);
+  const { data, loading, reload: load } = useWarmData<ExpensesSnap>("fin:expenses", fetchAll);
+  const expenses = useMemo(() => data?.expenses ?? [], [data]);
+  const categories = useMemo(() => data?.categories ?? [], [data]);
 
   const kpi = useMemo(() => {
     const total = expenses.reduce((s, e) => s + (Number(e.amount) || 0), 0);

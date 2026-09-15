@@ -40,9 +40,16 @@ const STATE: {
   employees: Record<string, Row>;
   roles: Record<string, Row>;
   accountsError: boolean;
+  /* Returns a VALID-LOOKING ROW ALONGSIDE THE ERROR. `maybeSingle()` does not
+     do this today, which is exactly why the plain accountsError scenario
+     cannot tell "the error branch fired" from "there was no row" — both
+     produce null and either guard alone satisfies the assertion. This flag
+     separates them, so the property under test is the one that matters:
+     WHEN error IS SET, `data` MUST NOT BE TRUSTED. */
+  accountsErrorWithRow: boolean;
 } = {
   sessionAccountId: null, viewAsAccountId: null, viewAsRoleId: null,
-  accounts: {}, employees: {}, roles: {}, accountsError: false,
+  accounts: {}, employees: {}, roles: {}, accountsError: false, accountsErrorWithRow: false,
 };
 
 /* ── Mock ./session (cookie + HMAC readers → pure returns, no DB) ────────── */
@@ -66,6 +73,9 @@ function makeQuery(table: string) {
     ilike() { return q; },
     async maybeSingle() {
       if (table === "accounts") {
+        if (STATE.accountsErrorWithRow) {
+          return { data: STATE.accounts[key ?? ""] ?? null, error: { message: "mock db error with row" } };
+        }
         if (STATE.accountsError) return { data: null, error: { message: "mock db error" } };
         return { data: STATE.accounts[key ?? ""] ?? null, error: null };
       }
@@ -96,7 +106,7 @@ STATE.employees["emp"] = { department: "Engineering" };
 STATE.employees["sa"] = { department: "Executive" };
 STATE.roles["r_role_preview"] = { id: "r_role_preview", is_super_admin: false, can_view_private: true };
 
-function reset() { STATE.sessionAccountId = null; STATE.viewAsAccountId = null; STATE.viewAsRoleId = null; STATE.accountsError = false; }
+function reset() { STATE.sessionAccountId = null; STATE.viewAsAccountId = null; STATE.viewAsRoleId = null; STATE.accountsError = false; STATE.accountsErrorWithRow = false; }
 
 let pass = 0, fail = 0;
 function check(name: string, cond: boolean) {
@@ -197,8 +207,46 @@ async function main() {
   const conc = await Promise.all([resolveServerAuth(), resolveServerAuth(), resolveServerAuth(), resolveServerAuth()]);
   check("concurrent → all identical", conc.every((r) => JSON.stringify(r) === JSON.stringify(conc[0])));
 
-  reset(); STATE.sessionAccountId = "emp"; STATE.accountsError = true;
+  /* THIS SCENARIO WAS RED ON main, AND FOR A REASON WORTH KEEPING. It used
+     account "emp", which earlier scenarios had already resolved successfully —
+     so the auth micro-cache (added 2026-07-20, 15s TTL) returned that cached
+     context and the resolver never reached the failing lookup at all. The
+     assertion said "fail-closed" and was measuring the cache.
+
+     A NEVER-BEFORE-SEEN ACCOUNT is what makes this test the resolver's own
+     behaviour rather than the cache's. */
+  reset(); STATE.sessionAccountId = "__uncached_for_db_error"; STATE.accountsError = true;
   await equiv("db-error → null (fail-closed)", (c) => { assert.equal(c, null); });
+
+  /* THE ERROR GUARD ITSELF, isolated. Above, `data` is null whenever `error`
+     is set, so `if (!data) return null` satisfies the assertion on its own and
+     deleting the error check changes nothing — a mutation proved exactly that.
+     Here a row IS present, so only the error check can produce null. */
+  reset(); STATE.sessionAccountId = "__uncached_err_with_row"; STATE.accountsErrorWithRow = true;
+  STATE.accounts["__uncached_err_with_row"] = { id: "__uncached_err_with_row", tenant_id: T_A, status: "active", user_type: "internal", role_id: "r_emp", is_super_admin: false, username: "x", login_email: "x@x", roles: { is_super_admin: false, can_view_private: false } };
+  await equiv("a DB error is honoured even when a row comes back with it", (c) => { assert.equal(c, null); });
+
+  /* AND THE CACHE'S BEHAVIOUR IS NOW ASSERTED ON PURPOSE, because it had been
+     load-bearing and untested — discovered only by breaking an unrelated
+     scenario. Within the TTL, a DB error does NOT revoke an already-resolved
+     active context; the request is served from cache.
+
+     That is the documented design, not a defect: the cookie HMAC is still
+     verified on every request (the cache only skips re-loading rows), only
+     status="active" contexts are ever cached, and the window is bounded at
+     AUTH_CTX_TTL_MS. It buys resilience through a transient DB blip at the
+     cost of a deactivated account keeping access for at most that window.
+     Pinned here so the trade-off is a decision on the record, and so nobody
+     "fixes" the fail-closed test above by loosening it instead. */
+  reset(); STATE.sessionAccountId = "emp";
+  const warm = await resolveServerAuth() as any;
+  STATE.accountsError = true;
+  const afterErr = await resolveServerAuth() as any;
+  check(
+    "db-error within the micro-cache TTL serves the cached context, deliberately",
+    warm?.account_id === "emp" && afterErr?.account_id === "emp",
+  );
+  STATE.accountsError = false;
 
   console.log(`\n${pass} passed, ${fail} failed`);
   if (!CACHE_ACTIVE) {

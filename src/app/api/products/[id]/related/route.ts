@@ -12,7 +12,7 @@ import { humanizeError } from "@/lib/ui/humanize-error";
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { requireAuth } from "@/lib/server/auth";
-import { hasProductDataAccess, requireProductDataAction } from "@/lib/server/product-access";
+import { requireProductDataAction } from "@/lib/server/product-access";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 

@@ -5,9 +5,22 @@
 
    One place to manage ALL product data points and decide how each is shown:
    Icon · Photo · Text · Icon+Text. Grouped into tabs:
-     • Commercial      — merges the Control Panel value lists (Levels, Tags,
-                          Colors, Voltage, Watt, Plug Types). Add/edit values
-                          AND set each value's visual + representation here.
+     • Commercial      — the value lists (Levels, Tags, Colors, Voltage, Watt,
+                          Plug Types), where each value gets its visual and
+                          how it is represented.
+
+                          ⚠️ THIS TAB SETS VISUALS. It does NOT add, rename or
+                          delete values — it only ever writes `value_images`
+                          and `value_modes`. This comment used to claim
+                          "Add/edit values", which was a promise nobody
+                          implemented, and a dangerous one: it invited someone
+                          to retire the Control Panel's lists believing there
+                          was a replacement here. On 2026-08-25 those six
+                          Control Panel tabs WERE retired — as dead weight, all
+                          but two of them at 0 of 272 products — so nothing
+                          adds a value now. If a new colour or voltage is ever
+                          needed, it belongs in the spec schema for its
+                          subcategory, not back in this file.
      • Classification  — Divisions / Categories / Subcategories  (next)
      • Identity & Common — the universal fields shared by all products (next)
      • Specs           — the SPECIAL specs unique to each Type (not the common

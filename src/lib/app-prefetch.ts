@@ -23,14 +23,19 @@
     business apps that are also light-to-medium to load). See
     APP_USAGE_AND_PRELOAD_RANKING.md. Keep this list SHORT — never idle-preload
     the whole catalogue. */
-export const TIER_A_IDLE_PRELOAD: readonly string[] = ["customers", "suppliers", "products", "quotations"];
+/* KOLEEX AI IS WARMED ON HOME (owner, 2026-09-13: "extremely fast, almost no
+   loading"). It was tier C as "the heavy AI workspace"; it is also the app
+   this owner opens most, and the loading screen they see is its chunk
+   downloading on the tap. The idle warm stays gated on Save-Data, a slow
+   link, a hidden tab and being offline (isPreloadAllowed). */
+export const TIER_A_IDLE_PRELOAD: readonly string[] = ["ai", "customers", "suppliers", "products", "quotations"];
 
 /** App ids explicitly excluded from ANY automatic preload (heavy / rare /
-    sensitive): the Visual Library database (5k assets), the AI workspace, the
-    activity monitor, the download center, finance dashboards, price calculator.
+    sensitive): the Visual Library database (5k assets), the activity monitor,
+    the download center, finance dashboards, price calculator.
     They still load instantly on an explicit click. */
 export const TIER_C_NO_PRELOAD: readonly string[] = [
-  "database", "ai", "activity-monitor", "software-center", "finance", "price-calculator",
+  "database", "activity-monitor", "software-center", "finance", "price-calculator",
 ];
 
 export function prefetchTier(appId: string): "A" | "B" | "C" {

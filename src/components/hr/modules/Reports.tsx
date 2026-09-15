@@ -28,7 +28,7 @@ import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
    MAIN COMPONENT
    ═══════════════════════════════════════════════════ */
 
-export default function ReportsModule({ employees, t, lang }: HRModuleProps) {
+export default function ReportsModule({ employees, t }: HRModuleProps) {
   /* ── state ── */
   const [dashStats, setDashStats] = useState<HrDashboardStats | null>(null);
   const [leaveRequests, setLeaveRequests] = useState<LeaveRequestWithName[]>([]);

@@ -1,6 +1,7 @@
 "use client";
 
 import { memo, useCallback, useEffect, useMemo, useState } from "react";
+import { useWarmData } from "@/lib/warm-cache";
 import { useToast } from "@/components/kds/useToast";
 import Link from "next/link";
 import FinanceHeader from "@/components/finance/FinanceHeader";
@@ -42,25 +43,22 @@ export default function FinanceOrders() {
      since orders are stored in USD; tweak per row when mixing
      currencies. */
   const baseCurrency = useBaseCurrency();
-  const [orders, setOrders] = useState<FinanceOrder[]>([]);
-  const [loading, setLoading] = useState(true);
   const [view, setView] = useState<"list" | "editor">("list");
   const [draft, setDraft] = useState<DraftOrder | null>(null);
   /* Hub-native delete confirmation in place of native confirm(). */
   const [confirmDeleteOrder, setConfirmDeleteOrder] = useState<FinanceOrder | null>(null);
   const [deletingOrder, setDeletingOrder] = useState(false);
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    try {
-      const r = await fetch("/api/finance/orders", { cache: "no-store" });
-      const j = (await r.json()) as { orders?: FinanceOrder[] };
-      setOrders(j.orders ?? []);
-    } finally {
-      setLoading(false);
-    }
+  /* Warm: no filter goes to the server, so the response IS the default
+     view. Paints from the last answer on the first frame. */
+  const fetchAll = useCallback(async () => {
+    const r = await fetch("/api/finance/orders", { cache: "no-store" });
+    if (!r.ok) throw new Error(`fin:orders: ${r.status}`);
+    const j = (await r.json()) as { orders?: FinanceOrder[] };
+    return j.orders ?? [];
   }, []);
-  useEffect(() => { void load(); }, [load]);
+  const { data, loading, reload: load } = useWarmData<FinanceOrder[]>("fin:orders", fetchAll);
+  const orders = useMemo(() => data ?? [], [data]);
 
   /* ── KPI summary across all orders ───────────────────────────── */
   const kpi = useMemo(() => {

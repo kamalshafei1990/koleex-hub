@@ -58,7 +58,18 @@ const REAL_TOOLS = [
   "createProjectTask", "searchProducts", "countProducts", "getCatalogStats",
   "getProductByCode", "listMyPlanning", "createPlanningItem",
   "listMyTodos", "createTodo",
+  /* The rest of the registry, mapped the day the activity got a caption:
+     an unmapped tool showed "Working on it" under the orb for a web search. */
+  "updateTodo", "completeTodo", "reassignTodo", "deleteTodo",
+  "updateProjectTask", "completeProjectTask", "deleteProjectTask",
+  "updatePlanningItem", "deletePlanningItem", "updateCalendarEvent", "deleteCalendarEvent",
+  "getProductFullDetails", "getProductPrice", "listCatalogFamilies", "searchCatalog", "auditProductData",
+  "search_web", "search_knowledge", "searchMachineKnowledge", "searchTradeTerms", "suggest_team_knowledge",
+  "findTeamMember", "remember_about_user", "forget_about_user", "generate_image", "askUser",
 ];
+check("the web is browsing, so the caption can say where the lookup goes", toolActivity("search_web") === "browsing");
+check("a picture is generating, an edit is updating, a question back is reasoning",
+  toolActivity("generate_image") === "generating" && toolActivity("updateTodo") === "updating-record" && toolActivity("askUser") === "reasoning");
 for (const t of REAL_TOOLS) {
   check(`tool mapped: ${t}`, t in TOOL_ACTIVITY_MAP, "add it to TOOL_ACTIVITY_MAP");
 }

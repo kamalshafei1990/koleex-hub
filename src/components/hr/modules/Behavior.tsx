@@ -19,7 +19,7 @@ import AngleDownIcon from "@/components/icons/ui/AngleDownIcon";
 import TriangleWarningIcon from "@/components/icons/ui/TriangleWarningIcon";
 import { usePermissions } from "@/lib/permissions";
 import { BehaviorSlider, BehaviorSliderStyles, BehaviorPicker, type BehaviorCategory, type BehaviorIndicator } from "@/components/behavior/BehaviorShared";
-import { summarize, gapStatus, isCriticalGap, requiresJustification, canFinalize, criticalStatus, type BehaviorItem } from "@/lib/behavior/scoring";
+import { summarize, isCriticalGap, requiresJustification, canFinalize, criticalStatus, type BehaviorItem } from "@/lib/behavior/scoring";
 import type { HRModuleProps } from "@/components/hr/HRApp";
 import type { Lang } from "@/lib/i18n";
 import { LIBRARY_PAYLOAD_VERSION, localizedName } from "@/lib/i18n-name";
@@ -69,7 +69,6 @@ export default function BehaviorModule({ employees, t, lang }: HRModuleProps) {
 
   const indById = useMemo(() => new Map(indicators.map((s) => [s.id, s])), [indicators]);
   const catById = useMemo(() => new Map(categories.map((c) => [c.id, c])), [categories]);
-  const reqByInd = useMemo(() => new Map(requirements.map((r) => [r.behavior_indicator_id, r])), [requirements]);
 
   useEffect(() => {
     (async () => {

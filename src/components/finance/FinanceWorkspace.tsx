@@ -11,7 +11,8 @@
      · Navigation cards (Expenses / Journals / Reports / FX)
    --------------------------------------------------------------------------- */
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo } from "react";
+import { useWarmData } from "@/lib/warm-cache";
 import Link from "next/link";
 import {
   ErpEyebrow, ErpHairline, ErpPage, ErpPanel, ErpQuickAction,
@@ -70,27 +71,27 @@ const KIND_LABEL_KEY: Record<RecentItem["kind"], { key: string; en: string }> = 
   journal: { key: "kind.journal", en: "Journal" },
 };
 
+type WorkspaceSnap = {
+  snapshot: Snapshot | null;
+  visibility: { can_see_bank_balances: boolean; can_see_profit: boolean } | null;
+};
+
 export default function FinanceWorkspace() {
   const { t } = useTranslation(financeT);
-  const [snap, setSnap] = useState<Snapshot | null>(null);
-  const [vis, setVis]   = useState<{ can_see_bank_balances: boolean; can_see_profit: boolean } | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error,   setError]   = useState<string | null>(null);
 
-  useEffect(() => {
-    (async () => {
-      setLoading(true);
-      try {
-        const r = await fetch("/api/finance/workspace");
-        const j = await r.json();
-        if (!r.ok) throw new Error(humanizeError(j.error || `HTTP ${r.status}`));
-        setSnap(j.snapshot);
-        setVis(j.visibility);
-      } catch (e) {
-        setError(humanizeError(e));
-      } finally { setLoading(false); }
-    })();
+  /* Warm: the workspace snapshot takes no filter, so the response IS the
+     default view. This is the finance landing screen — the one most worth
+     having on the glass before the network answers. */
+  const load = useCallback(async () => {
+    const r = await fetch("/api/finance/workspace");
+    const j = await r.json();
+    if (!r.ok) throw new Error(humanizeError(j.error || `HTTP ${r.status}`));
+    return { snapshot: j.snapshot, visibility: j.visibility } as WorkspaceSnap;
   }, []);
+  const { data, loading, error: loadError } = useWarmData<WorkspaceSnap>("fin:workspace", load);
+  const snap = data?.snapshot ?? null;
+  const vis = data?.visibility ?? null;
+  const error = loadError ? String(humanizeError(loadError instanceof Error ? loadError.message : String(loadError))) : null;
 
   const totalPending = (snap?.pending.length ?? 0);
 

@@ -384,11 +384,25 @@ export default function WavyBackground(
     };
     raf = requestAnimationFrame(loop);
 
-    const onVis = () => {
-      if (document.hidden) { running = false; cancelAnimationFrame(raf); }
-      else if (!running) { running = true; raf = requestAnimationFrame(loop); }
+    /* THE AURORA RESTS WHILE A CALL IS UP (2026-09-13: the owner's iPhone
+       cut and crackled where the iPad did not, and the relay proved the
+       sound itself clean — the difference is the device's headroom). A
+       blurred canvas redrawn every frame is the heaviest thing on the page;
+       under a live microphone and an audio thread it is the first thing to
+       give back. The button says kx-call-live / kx-call-ended (globally, so
+       every page's aurora hears it); hidden pages rest as before. */
+    let inCall = false;
+    const settle = () => {
+      const shouldRun = !document.hidden && !inCall;
+      if (!shouldRun && running) { running = false; cancelAnimationFrame(raf); }
+      else if (shouldRun && !running) { running = true; raf = requestAnimationFrame(loop); }
     };
+    const onVis = () => settle();
+    const onCallLive = () => { inCall = true; settle(); };
+    const onCallEnded = () => { inCall = false; settle(); };
     document.addEventListener("visibilitychange", onVis);
+    window.addEventListener("kx-call-live", onCallLive);
+    window.addEventListener("kx-call-ended", onCallEnded);
 
     let rz = 0;
     const onResize = () => {
@@ -402,6 +416,8 @@ export default function WavyBackground(
       cancelAnimationFrame(raf);
       window.clearTimeout(rz);
       document.removeEventListener("visibilitychange", onVis);
+      window.removeEventListener("kx-call-live", onCallLive);
+      window.removeEventListener("kx-call-ended", onCallEnded);
       window.removeEventListener("resize", onResize);
     };
   /* wallpaper?.tint IS A REAL DEPENDENCY, not a lint appeasement: the five wave
@@ -419,7 +435,7 @@ export default function WavyBackground(
       <canvas
         ref={ref}
         aria-hidden
-        className="absolute pointer-events-none"
+        className="absolute pointer-events-none kx-aurora-canvas"
         style={{ inset: -48, width: "calc(100% + 96px)", height: "calc(100% + 96px)" }}
       />
       )}

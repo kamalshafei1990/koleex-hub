@@ -16,6 +16,7 @@
    ========================================================================== */
 
 import { memo, useCallback, useEffect, useMemo, useState } from "react";
+import { useWarmData } from "@/lib/warm-cache";
 import { useInput } from "@/components/kds/useInput";
 import ConfirmDialog from "@/components/kds/ConfirmDialog";
 import Link from "next/link";
@@ -85,8 +86,6 @@ export default function FinanceTreasuryPlans() {
     { key: "archived",     label: t("treasuryPlans.bucket.archived", "Archived") },
   ];
   void STATUS_BUCKET_KEYS;
-  const [plans, setPlans] = useState<TreasuryPlan[]>([]);
-  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [openId, setOpenId] = useState<string | null>(null);
   /* Phase S.4 — stable id-passing callback so PlanCard's memo holds. */
@@ -98,21 +97,15 @@ export default function FinanceTreasuryPlans() {
   const [compareBusy, setCompareBusy] = useState(false);
   const [actionBusy, setActionBusy] = useState(false);
 
-  const loadList = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const r = await fetch("/api/finance/treasury-plans", { cache: "no-store" });
-      const j = (await r.json().catch(() => ({}))) as { plans?: TreasuryPlan[]; error?: string };
-      if (!r.ok) throw new Error(humanizeError(j.error ?? `HTTP ${r.status}`));
-      setPlans(j.plans ?? []);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
-    } finally {
-      setLoading(false);
-    }
+  /* Warm: no filter goes to the server, so the response IS the default view. */
+  const fetchList = useCallback(async () => {
+    const r = await fetch("/api/finance/treasury-plans", { cache: "no-store" });
+    const j = (await r.json().catch(() => ({}))) as { plans?: TreasuryPlan[]; error?: string };
+    if (!r.ok) throw new Error(humanizeError(j.error ?? `HTTP ${r.status}`));
+    return j.plans ?? [];
   }, []);
-  useEffect(() => { void loadList(); }, [loadList]);
+  const { data, loading, reload: loadList } = useWarmData<TreasuryPlan[]>("fin:treasury-plans", fetchList);
+  const plans = useMemo(() => data ?? [], [data]);
 
   const loadDetail = useCallback(async (id: string) => {
     try {

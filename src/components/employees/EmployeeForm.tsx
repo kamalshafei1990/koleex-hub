@@ -460,7 +460,12 @@ function Combobox({
   const { t } = useTranslation(employeesT);
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
-  const [highlight, setHighlight] = useState(0);
+  /* Highlight remembers WHICH query it belongs to, so a query change
+     resets it at render instead of via a setState-in-effect pass. */
+  const [hl, setHl] = useState<{ q: string; i: number }>({ q: "", i: 0 });
+  const highlight = hl.q === query ? hl.i : 0;
+  const setHighlight = (v: number | ((h: number) => number)) =>
+    setHl({ q: query, i: typeof v === "function" ? v(highlight) : v });
   const rootRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -478,15 +483,19 @@ function Combobox({
     return [...starts, ...contains];
   }, [query, options]);
 
+  /* Closing resets the search; done in the close paths themselves so no
+     setState runs inside an effect body. */
+  const close = useCallback(() => { setOpen(false); setQuery(""); }, []);
+
   /* Close on outside click. */
   useEffect(() => {
     if (!open) return;
     function handle(e: MouseEvent) {
-      if (!rootRef.current?.contains(e.target as Node)) setOpen(false);
+      if (!rootRef.current?.contains(e.target as Node)) close();
     }
     document.addEventListener("mousedown", handle);
     return () => document.removeEventListener("mousedown", handle);
-  }, [open]);
+  }, [open, close]);
 
   /* Focus search input when opening. */
   useEffect(() => {
@@ -494,12 +503,9 @@ function Combobox({
       const t = setTimeout(() => inputRef.current?.focus(), 0);
       return () => clearTimeout(t);
     }
-    setQuery("");
   }, [open]);
 
-  useEffect(() => { setHighlight(0); }, [query]);
-
-  const pick = (v: string) => { onChange(v); setOpen(false); };
+  const pick = (v: string) => { onChange(v); close(); };
 
   return (
     <div ref={rootRef} data-field={name}>
@@ -508,7 +514,9 @@ function Combobox({
         <button
           type="button"
           data-combobox-trigger
-          onClick={() => setOpen((o) => !o)}
+          onClick={() => (open ? close() : setOpen(true))}
+          role="combobox"
+          aria-controls={`combo-${name}-listbox`}
           aria-haspopup="listbox"
           aria-expanded={open}
           aria-label={ariaLabel || label}
@@ -548,7 +556,7 @@ function Combobox({
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
                   onKeyDown={(e) => {
-                    if (e.key === "Escape") { setOpen(false); return; }
+                    if (e.key === "Escape") { close(); return; }
                     if (e.key === "ArrowDown") {
                       e.preventDefault();
                       setHighlight((h) => Math.min(filtered.length - 1, h + 1));
@@ -566,7 +574,7 @@ function Combobox({
                 />
               </div>
             </div>
-            <ul role="listbox" className="max-h-64 overflow-y-auto">
+            <ul id={`combo-${name}-listbox`} role="listbox" className="max-h-64 overflow-y-auto">
               {filtered.length === 0 && (
                 <li className="px-3 py-6 text-center text-[12px] text-[var(--text-faint)]">{emptyText}</li>
               )}

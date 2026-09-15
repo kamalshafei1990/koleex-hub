@@ -41,24 +41,33 @@ export default function BaseFobCard({
 }) {
   const isCny = !currency || currency.toUpperCase() === "CNY";
   const cost = costCny && costCny > 0 ? costCny : 0;
-  const [base, setBase] = useState<Base | null>(null);
+  /* The result remembers WHICH cost produced it; render shows it only while
+     that cost is still current. This replaces the old synchronous
+     setBase(null) reset in the effect (a cascading re-render), and it is
+     also more correct: re-entering a valid cost shows "Computing…" instead
+     of flashing the previous cost's numbers. */
+  const [baseFor, setBaseFor] = useState<{ cost: number; data: Base } | null>(null);
+  const base = baseFor && baseFor.cost === cost ? baseFor.data : null;
   const [uplift, setUplift] = useState(0);
   const [fx, setFx] = useState<number | null>(null);
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const debRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  /* Whether a base is SHOWN is derived at render (see shownBase below); the
+     effect no longer clears state synchronously on the guard path — that
+     sync setState was a cascading re-render every time cost emptied. */
   useEffect(() => {
-    if (!isCny || cost <= 0) { setBase(null); return; }
+    if (!isCny || cost <= 0) return;
     if (debRef.current) clearTimeout(debRef.current);
     debRef.current = setTimeout(() => {
       setLoading(true); setErr(null);
       fetch(`/api/products/price-preview?cost_cny=${encodeURIComponent(cost)}`, { credentials: "include" })
         .then(async (r) => {
           const j = (await r.json().catch(() => ({}))) as { base?: Base; error?: string; reason?: string; costUpliftPercent?: number; fxCnyPerUsd?: number };
-          if (r.status === 403) { setErr(j.reason || "Commercial Policy access required."); setBase(null); return; }
-          if (!j.base) { setErr(j.error || "Couldn't compute the base FOB."); setBase(null); return; }
-          setBase(j.base); setUplift(j.costUpliftPercent ?? 0); setFx(j.fxCnyPerUsd ?? null);
+          if (r.status === 403) { setErr(j.reason || "Commercial Policy access required."); setBaseFor(null); return; }
+          if (!j.base) { setErr(j.error || "Couldn't compute the base FOB."); setBaseFor(null); return; }
+          setBaseFor({ cost, data: j.base }); setUplift(j.costUpliftPercent ?? 0); setFx(j.fxCnyPerUsd ?? null);
         })
         .catch((e) => setErr(e instanceof Error ? e.message : "Network error"))
         .finally(() => setLoading(false));

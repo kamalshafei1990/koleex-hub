@@ -52,7 +52,12 @@ export default function SuppliersServerList() {
   const [busyId, setBusyId] = useState<string | null>(null);
 
   useEffect(() => {
-    try { const v = window.localStorage.getItem(VIEW_KEY); if (v === "card" || v === "list") setView(v); } catch {}
+    /* microtask: keeps the read-after-mount behaviour (no SSR/hydration
+       mismatch) without a synchronous setState inside the effect body. */
+    try {
+      const v = window.localStorage.getItem(VIEW_KEY);
+      if (v === "card" || v === "list") queueMicrotask(() => setView(v));
+    } catch {}
   }, []);
   const changeView = (v: "list" | "card") => { setView(v); try { window.localStorage.setItem(VIEW_KEY, v); } catch {} };
 
