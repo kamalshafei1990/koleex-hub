@@ -33,12 +33,27 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import PhotoLightbox, { type LightboxPhoto } from "@/components/ai/PhotoLightbox";
 import { aiImage } from "@/lib/ai/image-url";
+import { blockDirection, type TextDir } from "@/lib/text-direction";
 
 interface Props {
   content: string;
   className?: string;
   /** The screen's language, for the code-block and lightbox labels. */
   lang?: Lang;
+  /** The bubble's measured direction. When given, every paragraph, heading
+   *  and list item that clearly runs the other way is marked with its own
+   *  dir — an Arabic reply that quotes an English paragraph, or an English
+   *  one that quotes Arabic, reads correctly on both sides (owner,
+   *  2026-09-15). Code blocks are always left-to-right. */
+  dir?: TextDir;
+}
+
+/* The words of a hast node, for the direction of one block. */
+function hastText(node: unknown): string {
+  if (!node || typeof node !== "object") return "";
+  const n = node as { type?: string; value?: string; children?: unknown[] };
+  if (n.type === "text") return n.value ?? "";
+  return (n.children ?? []).map(hastText).join("");
 }
 
 type MdLabels = { copied: string; copyCode: string; codeLabel: string; closePhoto: string };
@@ -67,7 +82,9 @@ function CodeBlock({
   }, [children]);
 
   return (
-    <div className="koleex-code-block">
+    /* CODE IS LEFT-TO-RIGHT, whatever the reply around it: an Arabic answer
+       that hands over a command or a prompt must not mirror it. */
+    <div className="koleex-code-block" dir="ltr">
       <div className="koleex-code-header">
         <span className="koleex-code-lang">{language || labels.codeLabel}</span>
         <button
@@ -90,6 +107,7 @@ export default function MessageMarkdown({
   content,
   className,
   lang = "en",
+  dir,
 }: Props): React.ReactElement {
   const [lightbox, setLightbox] = useState<LightboxPhoto | null>(null);
   const closeLightbox = useCallback(() => setLightbox(null), []);
@@ -103,13 +121,30 @@ export default function MessageMarkdown({
      the whole thread on each delta (audit, 2026-09-07). The tree is memoised
      on the text, so a bubble whose words did not change costs nothing. */
   const rendered = useMemo(
-    () => (
+    () => {
+      /* A block's own dir, only where it differs from the bubble's, only
+         when the bubble's is known. */
+      const blockDir = (node: unknown): TextDir | undefined => {
+        if (!dir) return undefined;
+        const d = blockDirection(hastText(node), dir);
+        return d === dir ? undefined : d;
+      };
+      return (
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
         /* react-markdown v9 defaults to safe rendering — no raw HTML,
            no script execution. We still force link safety explicitly. */
         components={{
-          a: ({ href, children, ...rest }) => (
+          p: ({ node, children, ...rest }) => <p {...rest} dir={blockDir(node)}>{children}</p>,
+          h1: ({ node, children, ...rest }) => <h1 {...rest} dir={blockDir(node)}>{children}</h1>,
+          h2: ({ node, children, ...rest }) => <h2 {...rest} dir={blockDir(node)}>{children}</h2>,
+          h3: ({ node, children, ...rest }) => <h3 {...rest} dir={blockDir(node)}>{children}</h3>,
+          h4: ({ node, children, ...rest }) => <h4 {...rest} dir={blockDir(node)}>{children}</h4>,
+          li: ({ node, children, ...rest }) => <li {...rest} dir={blockDir(node)}>{children}</li>,
+          blockquote: ({ node, children, ...rest }) => <blockquote {...rest} dir={blockDir(node)}>{children}</blockquote>,
+          /* `node` is the hast element react-markdown hands every
+             component; it must not reach the DOM as an attribute. */
+          a: ({ node, href, children, ...rest }) => (void node, (
             <a
               {...rest}
               href={href}
@@ -118,14 +153,17 @@ export default function MessageMarkdown({
             >
               {children}
             </a>
-          ),
-          code: ({ className: cls, children, ...rest }) => {
+          )),
+          code: ({ node, className: cls, children, ...rest }) => {
+            void node;
             /* Tree structure: inline code uses <code> directly; block
                code is wrapped in <pre><code className="language-x">. */
             const isBlock = /language-/.test(cls ?? "");
             if (!isBlock) {
+              /* Inline code is its own island: `stack` inside an Arabic
+                 sentence keeps its letters and its punctuation together. */
               return (
-                <code {...rest} className="koleex-md-inline-code">
+                <code {...rest} className="koleex-md-inline-code" dir="auto">
                   {children}
                 </code>
               );
@@ -152,17 +190,18 @@ export default function MessageMarkdown({
                leaving the app for a bare file in a new tab. */
             return <MarkdownPhoto url={url} alt={alt ?? ""} onOpen={() => setLightbox({ url, label: alt ?? "" })} />;
           },
-          table: ({ children, ...rest }) => (
+          table: ({ node, children, ...rest }) => (void node, (
             <div className="koleex-md-table-wrap">
               <table {...rest}>{children}</table>
             </div>
-          ),
+          )),
         }}
       >
         {content}
       </ReactMarkdown>
-    ),
-    [content, labels],
+      );
+    },
+    [content, labels, dir],
   );
   return (
     <div className={`koleex-md ${className ?? ""}`}>

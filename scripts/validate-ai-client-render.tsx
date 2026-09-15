@@ -38,7 +38,7 @@ import VoiceCallScreen from "../src/components/ai/VoiceCallScreen";
 import PhotoLightbox from "../src/components/ai/PhotoLightbox";
 import MessageMarkdown from "../src/components/ai/MessageMarkdown";
 import type { TranscriptLine } from "../src/lib/voice/events";
-import { textLang, textScript } from "../src/lib/text-direction";
+import { textLang, textScript, textDirection, blockDirection } from "../src/lib/text-direction";
 import TaskCard from "../src/components/ai/TaskCard";
 
 let pass = 0;
@@ -1448,6 +1448,46 @@ console.log("\n── Arabic and Chinese at their own size; the sidebar title ke
   check("the call's transcript lines and caption carry their lang and the classes the call rules size",
     /lang=\{textLang\(stripImageMarkdown\(line\.text\) \|\| line\.text\)\}/.test(tr) && /kx-call-line text-\[18px\]/.test(tr) &&
     /lang=\{textLang\(stripImageMarkdown\(lastLine\.text\) \|\| lastLine\.text\)\}/.test(scr) && /kx-call-caption max-w-\[820px\]/.test(scr));
+}
+
+console.log("\n── An Arabic opening before an English code block reads right-to-left; each block may differ from the bubble (owner, 2026-09-15) ──");
+{
+  const arabicOpening = "ماشي يا كيمو — هختار أنا الأنسب وأكتبلك الـ prompt كامل. اخترت SeaRates API لأنه الأقرب لاحتياجنا.\n\nانسخ اللي تحت في Claude Code:\n\n";
+  const fence = "```md\n" + "# Task: Integrate SeaRates Container Shipping Rate API into Koleex Hub. We need sea freight container rate estimates inside the Shipping app, so quotations and logistics staff can get an indicative price fast.\n".repeat(6) + "```";
+  check("the bubble's direction ignores fenced code, inline code and URLs — the words decide, not the prompt they hand over",
+    textDirection(arabicOpening + fence) === "rtl" &&
+    textDirection("شوف الرابط https://example.com/a-very-long-english-path/with/many/latin/letters/in/it/and/more") === "rtl" &&
+    textDirection("الـ `stack-agnostic-configuration-reader` ده") === "rtl" &&
+    textDirection("Three widths are available.") === "ltr" &&
+    textScript(arabicOpening + fence) === "ar");
+  check("a block decides for itself only on clear evidence: twelve Latin letters is a phrase, 'Claude Code:' is a name",
+    blockDirection("This paragraph is an English explanation", "rtl") === "ltr" &&
+    blockDirection("Claude Code:", "rtl") === "rtl" &&
+    blockDirection("KX-220", "rtl") === "rtl" &&
+    blockDirection("هذه فقرة عربية داخل رد إنجليزي.", "ltr") === "rtl" &&
+    blockDirection("", "ltr") === "ltr");
+  const mixed = "فقرة عربية في الأول.\n\n```md\nx\n```\n\nThis paragraph is an English explanation that follows the prompt.\n\nClaude Code:\n\n- بند عربي\n- `stack` الـ\n\n## Heading in English about the shipping rates";
+  const rtlBubble = renderToStaticMarkup(<MessageMarkdown content={mixed} dir="rtl" /> as ReactElement);
+  check("in an Arabic bubble: the Arabic paragraph inherits, the English paragraph and heading carry dir=\"ltr\", the short English label inherits",
+    /<p>فقرة عربية في الأول\.<\/p>/.test(rtlBubble) &&
+    /<p dir="ltr">This paragraph is an English explanation/.test(rtlBubble) &&
+    /<p>Claude Code:<\/p>/.test(rtlBubble) &&
+    /<h2 dir="ltr">Heading in English/.test(rtlBubble) &&
+    /<li>بند عربي<\/li>/.test(rtlBubble));
+  check("the code block is always left-to-right; inline code is its own island; no hast node leaks into the DOM",
+    /<div class="koleex-code-block" dir="ltr">/.test(rtlBubble) &&
+    /<code class="koleex-md-inline-code" dir="auto">stack<\/code>/.test(rtlBubble) &&
+    !/node="\[object Object\]"/.test(rtlBubble));
+  const ltrBubble = renderToStaticMarkup(<MessageMarkdown content={"English intro paragraph that is long enough.\n\nهذه فقرة عربية داخل رد إنجليزي."} dir="ltr" /> as ReactElement);
+  check("in an English bubble, a quoted Arabic paragraph carries dir=\"rtl\"",
+    /<p>English intro paragraph/.test(ltrBubble) && /<p dir="rtl">هذه فقرة عربية/.test(ltrBubble));
+  check("without a bubble direction the renderer marks nothing (the calls panel's summaries)",
+    !/ dir="(ltr|rtl)"/.test(renderToStaticMarkup(<MessageMarkdown content={"Plain text.\n\nهذه فقرة عربية."} /> as ReactElement).replace(/<div class="koleex-code-block" dir="ltr">/g, "")));
+  const bubble = readFileSync("src/components/ai/Bubble.tsx", "utf8");
+  const css = readFileSync("src/app/globals.css", "utf8");
+  check("the bubble hands its measured direction to the renderer, and the stylesheet keeps code left-to-right",
+    /<MessageMarkdown content=\{msg\.content\} lang=\{lang\} dir=\{bubbleDir\} \/>/.test(bubble) &&
+    /\.koleex-code-block \{\s*direction: ltr;\s*text-align: left;/.test(css));
 }
 
 console.log(`\n${pass} passed, ${failures.length} failed`);

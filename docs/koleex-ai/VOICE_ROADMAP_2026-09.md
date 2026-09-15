@@ -1391,3 +1391,28 @@ Note for the record: the merge of #433 did not get a production deployment
 from Vercel — its GitHub webhook for the `main` push was missed (the branch
 push of the same commit deployed as a preview) — so this change also carries
 #433 to production.
+
+## "A problem in the Arabic words at the beginning of the answer" (2026-09-15)
+
+Owner's screenshot: an Arabic opening paragraph, then a long English task
+prompt in a code fence. The opening read jumbled — laid out as an English
+paragraph, its Arabic runs in left-to-right order.
+
+- **Cause.** The bubble's direction is measured over the whole message
+  (right for a heading like "ما يغطيه Koleex Hub", which only resolves
+  from the reply around it). The fence's several hundred Latin letters
+  outweighed the ~150 Arabic ones, so the bubble went `ltr`.
+- **Fix, three parts.** `textDirection` / `textScript` measure the PROSE:
+  fenced code, inline code and URLs are ignored (`proseOf`). The markdown
+  renderer takes the bubble's direction and marks any paragraph, heading,
+  list item or quote that clearly runs the other way with its own `dir`
+  (`blockDirection`: Arabic present → the 3:1 rule; else twelve Latin
+  letters is a phrase, fewer is a name and inherits) — an English
+  paragraph inside an Arabic answer, or an Arabic one inside English,
+  reads correctly on both sides. Code blocks are always left-to-right
+  (`dir="ltr"` plus the stylesheet), inline code is its own bidi island
+  (`dir="auto"`). Also: the hast `node` react-markdown hands each
+  component no longer leaks into the DOM as an attribute.
+- **Suites.** `validate:ai-client-render` 279 (+7): the owner's shape, a
+  URL, inline code, the block thresholds, the rendered `dir` per block in
+  both bubble directions, the code block, the calls panel unchanged.

@@ -16,10 +16,12 @@
  *     product names ("Koleex Hub", "CRM", model numbers) is the normal
  *     case here, while English prose carrying Arabic essentially never is.
  *
- * Measure the whole MESSAGE, not each block: a heading like
+ * Measure the whole MESSAGE for the bubble: a heading like
  * "ما يغطيه Koleex Hub" has more Latin letters than Arabic ones on its
  * own, and only resolves correctly when it inherits from the reply
- * around it.
+ * around it. A block inside the reply may then differ from the bubble
+ * only on clear evidence (blockDirection below) — an English paragraph
+ * quoted inside an Arabic answer, or the other way round.
  */
 export type TextDir = "rtl" | "ltr";
 
@@ -32,16 +34,49 @@ const RTL_CHAR =
    in a message full of prices and model numbers. */
 const LTR_CHAR = /[A-Za-zÀ-ɏͰ-ϿЀ-ӿ]/;
 
-export function textDirection(text: string, fallback: TextDir = "ltr"): TextDir {
-  if (!text) return fallback;
+/* THE PROSE, NOT THE CODE. A fenced block, inline code and a URL are Latin
+   by nature and say nothing about the language of the words around them;
+   counted, a long code block outweighs the Arabic paragraph that introduces
+   it and the whole reply is laid out as English — the owner's screenshot of
+   2026-09-15 (an Arabic opening, then a full task prompt in a fence). Only
+   the measurement ignores them; the text itself is untouched. */
+export function proseOf(text: string): string {
+  return (text ?? "")
+    .replace(/```[\s\S]*?(```|$)/g, " ")
+    .replace(/`[^`\n]*`/g, " ")
+    .replace(/https?:\/\/\S+/g, " ")
+    .replace(/\]\([^)]*\)/g, "]");
+}
+
+function countScripts(text: string): { rtl: number; ltr: number } {
   let rtl = 0;
   let ltr = 0;
   for (const ch of text) {
     if (RTL_CHAR.test(ch)) rtl++;
     else if (LTR_CHAR.test(ch)) ltr++;
   }
+  return { rtl, ltr };
+}
+
+export function textDirection(text: string, fallback: TextDir = "ltr"): TextDir {
+  if (!text) return fallback;
+  const { rtl, ltr } = countScripts(proseOf(text));
   if (!rtl) return ltr ? "ltr" : fallback;
   return rtl * 3 >= ltr ? "rtl" : "ltr";
+}
+
+/* ONE BLOCK INSIDE A REPLY. A paragraph, heading or list item decides for
+   itself only when it carries enough of one script to be sure; a short
+   Latin line ("Claude Code:", a product name, a number) inside an Arabic
+   reply follows the reply, as the doc above requires. Twelve Latin letters
+   is a phrase, not a name. */
+const BLOCK_LATIN_MIN = 12;
+
+export function blockDirection(text: string, bubble: TextDir): TextDir {
+  if (!text) return bubble;
+  const { rtl, ltr } = countScripts(proseOf(text));
+  if (rtl) return rtl * 3 >= ltr ? "rtl" : "ltr";
+  return ltr >= BLOCK_LATIN_MIN ? "ltr" : bubble;
 }
 
 /* ---------------------------------------------------------------------------
@@ -69,7 +104,7 @@ export function textScript(text: string): TextScript {
   let ar = 0;
   let zh = 0;
   let la = 0;
-  for (const ch of text) {
+  for (const ch of proseOf(text)) {
     if (RTL_CHAR.test(ch)) ar++;
     else if (CJK_CHAR.test(ch)) zh++;
     else if (LTR_CHAR.test(ch)) la++;
