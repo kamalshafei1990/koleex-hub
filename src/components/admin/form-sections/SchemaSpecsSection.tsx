@@ -287,7 +287,7 @@ const qtyFromCbm = (raw: unknown, capacity: number): number | null => {
   return qty >= 1 ? qty : 0;
 };
 
-const computeDerivedValue = (
+export const computeDerivedValue = (
   formula: NonNullable<SpecField["computed"]>["formula"],
   sourceRaw: unknown,
 ): number | null => {
@@ -523,7 +523,7 @@ function NumberSuggestField({
   );
 }
 
-function FieldInput({
+export function FieldInput({
   field,
   value,
   onSet,

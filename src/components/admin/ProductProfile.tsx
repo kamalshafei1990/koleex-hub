@@ -47,7 +47,6 @@ import BoundIcon from "@/components/common/BoundIcon";
 import Drawer from "@/components/kds/Drawer";
 import ExternalLinkIcon from "@/components/icons/ui/ExternalLinkIcon";
 import FactoryIcon from "@/components/icons/ui/FactoryIcon";
-import Settings2Icon from "@/components/icons/ui/Settings2Icon";
 import BoxesIcon from "@/components/icons/ui/BoxesIcon";
 /* ── one glyph per concept on the Packing & Logistics sheet ──
    Listed together so a repeat is visible at a glance: an icon that appears
@@ -102,6 +101,7 @@ import ClassifySheet from "./profile/ClassifySheet";
 import SupplierSheet from "./profile/SupplierSheet";
 import VariantsSheet from "./profile/VariantsSheet";
 import OptionsSheet from "./profile/OptionsSheet";
+import SpecsSheet from "./profile/SpecsSheet";
 import dynamic from "next/dynamic";
 import { useSkin } from "@/lib/appearance";
 import FeatureHighlightsDisplay from "./FeatureHighlightsDisplay";
@@ -144,6 +144,7 @@ const PROFILE_T: Record<string, { en: string; zh: string; ar: string }> = {
   "pr.variant1":      { en: "1 variant",          zh: "1 个型号",       ar: "موديل واحد" },
   "pp.certWord":      { en: "cert",               zh: "证书",           ar: "شهادة" },
   "sup.costNote":     { en: "Price note",         zh: "价格备注",       ar: "ملاحظة السعر" },
+  "sp.freqHint":      { en: "Comma-separated — e.g. 50, 60", zh: "逗号分隔——例如 50, 60", ar: "مفصولة بفواصل — مثال: 50, 60" },
   /* Variants tab */
   /* Options tab */
   "opt.badgeN":       { en: "{n} questions",      zh: "{n} 个问题",     ar: "{n} أسئلة" },
@@ -1726,7 +1727,7 @@ export default function ProductProfile() {
      changing an icon in the Database app changes it here too (owner:
      "linked"). 60s shared cache; absent entry = keyword fallback. */
   const [classIcons, setClassIcons] = useState<Record<string, Record<string, string>>>({});
-  const [bindings, setBindings] = useState<BindingsMap>({});
+  const [, setBindings] = useState<BindingsMap>({});
   /* THE CLASSIFICATION HAS TRANSLATIONS AND THE PAGE WAS NOT ASKING FOR THEM.
      divisions / categories / subcategories each carry name_zh and name_ar, so
      "Garment Machinery" has been "آلات الملابس" in the database all along —
@@ -2172,71 +2173,15 @@ export default function ProductProfile() {
       )}
 
       {STEPS[step].id === "specs" && (
-      !data.schema ? (
-        <Group motion={tabMotion} icon={<BoundIcon semanticKey="field.spec_template" className="h-4 w-4" fallback={<Settings2Icon className="h-4 w-4" />} />} title={t("pp.sec.specs", "Specifications")} editLabel={t("action.edit", "Edit")} onEdit={() => goStep("specs")}>
-          <p className="text-[12px] text-[var(--text-ghost)] italic">
-            {t("pp.e.noTemplate", "No spec template resolves for this classification, so there are no specification fields to fill.")}
-          </p>
-        </Group>
-      ) : (
-        <div className="space-y-4">
-          {(data.schema.groups ?? []).map((g, gi) => {
-            const fields = g.fields ?? [];
-            const specs = (s2("schema_specs") as Record<string, unknown> | null) ?? {};
-            const isFilled = (k: string) => {
-              const v = specs[k];
-              return !(v === null || v === undefined || v === "" || (Array.isArray(v) && v.length === 0));
-            };
-            const done = fields.filter((f) => isFilled(f.key)).length;
-            return (
-              <Group
-                key={gi}
-                icon={<Settings2Icon className="h-4 w-4" />}
-                title={g.title || g.key || ""}
-                count={`${done}/${fields.length}`}
-                editLabel={t("action.edit", "Edit")} onEdit={() => goStep("specs")}
-              >
-                {/* One field per row with its own help line — the editor's
-                    shape. A four-column grid packed more in but stripped the
-                    descriptions, which are half of what makes a spec field
-                    fillable. */}
-                <div className="divide-y divide-[var(--border-subtle)]">
-                  {fields.map((f) => (
-                    <div key={f.key} className="flex items-start gap-3 py-3 first:pt-0 last:pb-0">
-                      <span className="mt-0.5 h-8 w-8 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-muted)] shrink-0">
-                        <RowGlyph src={bindings[`spec.${f.key}`] || iconForField(bindings, fieldKeyForLabel(f.label || f.key))} className="h-4 w-4" />
-                      </span>
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-start justify-between gap-3 mb-0.5">
-                          <span className="text-[10px] font-bold uppercase tracking-[0.08em] text-[var(--text-ghost)]">
-                            {f.label || f.key}
-                            {f.required && <span className="text-rose-400 ms-1">*</span>}
-                          </span>
-                          <span className="flex items-center gap-1 shrink-0">
-                            {f.internalOnly
-                              ? <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded border border-[var(--border-subtle)] text-[var(--text-ghost)]">INTERNAL</span>
-                              : f.publicVisible
-                              ? <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded border border-emerald-500/30 text-emerald-400/90">PUBLIC</span>
-                              : null}
-                            {f.aiReadable && <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded border border-[var(--border-subtle)] text-[var(--text-muted)]">AI</span>}
-                          </span>
-                        </div>
-                        <div>
-                          <Val v={specs[f.key]} />
-                          {f.unit && isFilled(f.key) ? <span className="text-[11px] text-[var(--text-ghost)] ms-1">{f.unit}</span> : null}
-                        </div>
-                        {f.description && (
-                          <p className="mt-1 text-[10.5px] text-[var(--text-ghost)]/80 leading-relaxed">{f.description}</p>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </Group>
-            );
-          })}
-        </div>
-      )
+        <SpecsSheet
+          product={p}
+          schema={data.schema as Parameters<typeof SpecsSheet>[0]["schema"]}
+          productId={p?.id as string | undefined}
+          t={t} motion={tabMotion} canEdit={canEdit} notSet={NOT_SET}
+          onDirtyChange={(d) => { dirtyRef.current = d; }}
+          onSaved={(patch) => mergeSaved({ product: patch })}
+          glyph={glyphFor}
+        />
       )}
 
       {STEPS[step].id === "commercial" && (
