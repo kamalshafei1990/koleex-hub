@@ -101,7 +101,7 @@ import CustomersIcon from "@/components/icons/CustomersIcon";
 import SuppliersIcon from "@/components/icons/SuppliersIcon";
 
 import {
-  checkContactsSetup, fetchContacts, fetchContactsByType, fetchContactAvatars, createContact, updateContact, deleteContact,
+  checkContactsSetup, fetchContactsByType, fetchContactsPage, fetchContactAvatars, createContact, updateContact, deleteContact,
   type ContactRow,
 } from "@/lib/contacts-admin";
 import { fetchOpportunities } from "@/lib/crm";
@@ -5352,6 +5352,9 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
      the WHOLE object rather than a hand-picked field or two. */
   const scopeKey = useMemo(() => (scopeCtx ? JSON.stringify(scopeCtx) : ""), [scopeCtx]);
 
+  /* 100 keeps the first slice small enough to paint quickly while still
+     filling the first few screens of a directory; the server clamps at 200. */
+  const PAGE_ROWS = 100;
   const loadContacts = useCallback(async () => {
     /* PERF — wait for the resolved scope before fetching. scopeCtx starts null
        for one render tick and then resolves from the (already-loaded) bootstrap
@@ -5414,9 +5417,15 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
          downloaded EVERY contact in the tenant (~789 KB of customers,
          people & companies) just to render ~a dozen suppliers. The
          type-scoped endpoint returns only what this app renders. */
-      const data = filterType
-        ? await fetchContactsByType(filterType, scopeCtx)
-        : await fetchContacts();
+      /* ⚠️ THE FIRST PAGE PAINTS, THE REST STREAMS IN BEHIND IT.
+         The whole directory in one response was 77 KB on the wire and 4.1s on
+         the owner's link — and while it downloaded it starved the rest of the
+         screen (a 40-byte analytics POST beside it took 3.3s). The same rows
+         now arrive in slices of PAGE_ROWS: the list is usable after the first
+         one, and nothing about search, filters or grouping changes, because
+         they still run over whatever `contacts` holds. */
+      const first = await fetchContactsPage(filterType ?? null, 1, PAGE_ROWS);
+      const data = first.rows;
       if (data.length === 0 && !(await setupProbe)) {
         setSetupNeeded(true); setLoading(false); return;
       }
@@ -5428,6 +5437,30 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
       const slim = data.filter(c => c.contact_type !== "employee");
       setContacts(slim);
       setLoading(false);
+
+      /* The remaining pages go out TOGETHER, not one after another: the page
+         count is known from `total`, and asking for page N+1 only after page N
+         landed would pay this platform's ~1s-per-request floor once per page
+         for nothing. They append by id — a contact edited between two page
+         requests can shift across a page boundary and arrive twice. */
+      let full = slim;
+      if (first.hasMore && first.total != null) {
+        const lastPage = Math.ceil(first.total / PAGE_ROWS);
+        const rest = await Promise.all(
+          Array.from({ length: Math.max(0, lastPage - 1) }, (_, i) => fetchContactsPage(filterType ?? null, i + 2, PAGE_ROWS)),
+        );
+        const extra = rest.flatMap((r) => r.rows).filter(c => c.contact_type !== "employee");
+        if (extra.length) {
+          /* Merge HERE, not inside the setState updater. React may run that
+             updater after this function has already moved on, and everything
+             below (the warm-start cache write, the avatar batch) reads `full`
+             synchronously — so computing the merge in the updater shipped a
+             cache and an avatar request that only ever knew page 1. */
+          const seen = new Set(full.map((c) => c.id));
+          full = [...full, ...extra.filter((c) => !seen.has(c.id))];
+          setContacts(full);
+        }
+      }
       /* Refresh the warm-start cache. Same store as the other write below —
          ⚠️ THERE ARE TWO WRITERS ON THIS KEY and they must not diverge: this
          one runs on the plain fetch path, the other after the avatar merge. A
@@ -5436,12 +5469,12 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
          which only converted the other one — so this path kept refilling
          localStorage with a 2 MB copy of a cache that had already moved. If
          you change where this cache lives, change BOTH. */
-      void import("@/lib/idb-cache").then(({ idbSet }) => { idbSet(cacheKey, slim); })
+      void import("@/lib/idb-cache").then(({ idbSet }) => { idbSet(cacheKey, full); })
         .catch(() => { /* cache is an optimisation — never fail the load for it */ });
       /* The list endpoint drops heavy base64 avatars so the response stays under
          the function size limit. Lazy-load the real logos in small batches and
          merge them in, so the directory paints instantly and logos stream in. */
-      const missing = slim.filter(c => !c.logo_url && !c.photo_url).map(c => c.id);
+      const missing = full.filter(c => !c.logo_url && !c.photo_url).map(c => c.id);
       if (missing.length) {
         fetchContactAvatars(missing).then((map) => {
           if (!map || Object.keys(map).length === 0) return;

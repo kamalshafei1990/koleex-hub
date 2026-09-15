@@ -60,6 +60,52 @@ function moduleForType(type: string | null | undefined): string {
 const LIST_COLUMNS =
   "id, entity_type, full_name, company_name, display_name, photo_url, logo_url, phone, mobile, email, website, wechat_id, country, city, address_1, address_2, notes, is_active, created_at, updated_at, contact_type, title, first_name, middle_name, last_name, company, position, birthday, customer_type, phones, emails, addresses, websites, social_profiles, related_names, custom_fields, province, country_code, province_code, total_revenue, last_order_date, payment_terms, credit_limit, outstanding_balance, currency, industry, source, tags, account_manager, first_contact_date, last_contacted, follow_up_date, communication_preference, language, shipping_addresses, preferred_shipping, tax_id, incoterms, supplier_type, product_categories, brand_names, moq, lead_time, total_purchases, origin_country, origin_country_code, certifications, rating, reliability_score, quality_notes, last_quality_issue, sample_status, factory_visit_date, company_name_en, company_name_cn, additional_company_names, supplier_tel, supplier_mobile, supplier_email, supplier_website, supplier_address, division, category, payment_info, work_email, work_tel, work_mobile, management, department, job_position, job_title, manager, work_address, work_location, private_email, private_phone, employee_bank_account, legal_name, place_of_birth, gender, visa_no, work_permit, nationality, nationality_code, id_no, ssn_no, passport_no, private_address, home_work_distance, marital_status, number_of_children, certificate_level, field_of_study, market_band, commercial_role, territory, exclusivity, exclusivity_scope, exclusivity_expiry, backup_account_manager, assigned_branch, source_details, referred_by, customer_level_assigned_date, customer_level_review_date, sales_rep, credit_rating_internal, credit_rating_external, credit_limit_approved_by, credit_limit_approved_date, overdue_balance, days_sales_outstanding, credit_insurance_covered, credit_insurance_provider, credit_insurance_coverage, preferred_payment_method, max_discount_allowed, price_list_tier, special_pricing_agreement, contract_pricing_expiry, commission_rate, kyc_status, kyc_verified_date, kyc_verified_by, kyc_review_due_date, risk_score, sanctions_check_status, sanctions_check_date, pep_status, high_risk_country, aml_status, business_registration_number, registration_country, registration_date, year_established, company_type, trading_name, employee_count_range, annual_revenue_range, eori_number, duns_number, importer_exporter_code, customs_code, gst_number, cr_number, whatsapp_business, telegram_id, line_id, skype_id, sub_industry, buying_behavior, price_sensitivity, quality_sensitivity, customer_health_score, nps_score, churn_risk, vip_status, strategic_account, relationship_stage, support_tier, port_of_entry, preferred_carriers, customs_broker, freight_forwarder, shipping_marks, container_preference, certifications_required, labeling_requirements, hs_codes, internal_notes, flags, tenant_id, strategic_status, strategic_status_since, strategic_status_reason, blacklist_reason, supports_oem_branding, supports_packaging_customization, supports_spare_parts, supports_samples, sample_turnaround_days, wecom_support_available, wechat_sales_group_available, wechat_official_account, readiness_milestone, supplier_postal_code, qq_id, dingtalk_id, messenger_id, wechat_pay_id, alipay_id, messaging_channels, supplier_profile_url, supplier_address_cn, ecatalog_url, business_timezone, business_hours_start, business_hours_end, backup_supplier_name, wechat_group_name, wechat_group_members, categories, person_id";
 
+const HEAVY_FIELDS = [
+  "business_card_front", "business_card_back", "business_license_image",
+  "documents", "catalogues", "attachments", "visa_documents",
+  "contact_persons", "bank_accounts", "resume_lines", "emergency_contacts", "family_members",
+  "wechat_qr", "wechat_official_account_qr", "whatsapp_qr", "telegram_qr", "line_qr", "skype_qr", "qq_qr",
+  "dingtalk_qr", "messenger_qr", "wechat_pay_qr", "alipay_qr", "website_qr", "ecatalog_qr",
+  "quality_issues",
+];
+
+/* logo_url / photo_url frequently hold a base64 data: URL (a cropped logo is
+   ~80 KB each). With ~100 rows that alone is several MB and pushes the list
+   response past Vercel's 4.5 MB function limit → the whole fetch fails and the
+   directory shows nothing. Drop ONLY the heavy base64 avatars here; short
+   (storage-URL) logos stay inline. The client lazy-loads the dropped ones in
+   small batches via GET /api/contacts/avatars. */
+const isHeavyDataUrl = (v: unknown) =>
+  typeof v === "string" && v.startsWith("data:") && v.length > 4000;
+
+function stripHeavy(rows: unknown[]): Record<string, unknown>[] {
+  return rows.map((row) => {
+    const r = row as Record<string, unknown>;
+    for (const k of HEAVY_FIELDS) r[k] = null;
+    if (isHeavyDataUrl(r.logo_url)) r.logo_url = null;
+    if (isHeavyDataUrl(r.photo_url)) r.photo_url = null;
+    return r;
+  });
+}
+
+/* ⚠️ EMPTY KEYS ARE MOST OF THIS RESPONSE. Measured on prod, 347 contacts:
+   2,061 KB for 249 columns a row, while the twelve heaviest FIELDS came to
+   ~160 KB. 60 columns are null on every row and the heavy blobs above are set
+   to null rather than removed. Omitting what holds nothing takes the same rows
+   to 501 KB. false and 0 are VALUES and stay: only null, undefined and "" go.
+   (Brotli already compressed most of this, so the WIRE saving is ~16% — the
+   reason the directory also had to stop asking for every row at once.) */
+function compactRows(rows: Record<string, unknown>[]): Record<string, unknown>[] {
+  return rows.map((row) => {
+    const out: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(row)) {
+      if (v === null || v === undefined || v === "") continue;
+      out[k] = v;
+    }
+    return out;
+  });
+}
+
 export async function GET(req: Request) {
   const _t = stageTimer("contacts.list");
   const auth = await requireAuth();
@@ -146,7 +192,11 @@ export async function GET(req: Request) {
      so Contacts + Suppliers are untouched. Same tenant scope + module gate +
      sanitizeContactRows as the legacy path — only search/sort/pagination move
      to the server. */
-  if (url.searchParams.get("paged") === "1") {
+  /* `wide=1` belongs to the directory's own paged branch further down — this
+     one answers with the SLIM projection under a `rows` key, so letting it
+     catch the wide request handed the Contacts app a shape it does not read
+     (it looks for `contacts`) and it silently fell back to its cache. */
+  if (url.searchParams.get("paged") === "1" && url.searchParams.get("wide") !== "1") {
     const listCfg = configForType(typeFilter);
     const listReq = parseListParams(url.searchParams, listCfg);
     let pq = supabaseServer
@@ -176,6 +226,49 @@ export async function GET(req: Request) {
     });
   }
 
+  /* ── ?paged=1&wide=1 — THE DIRECTORY'S OWN ROWS, IN PAGES ────────────────
+     The Contacts app reads 214 of the 223 list columns across its 5,700 lines,
+     so it cannot use the slim server-list projection above — but it also could
+     not keep asking for all 347 rows at once. Measured on prod: that response
+     is 77 KB on the wire and takes 4.1s on the owner's link, and while it
+     downloads it starves everything else (a 40-byte analytics POST beside it
+     took 3.3s). So: the SAME projection, the SAME order and the SAME
+     post-processing as the full path below — only in slices, so the directory
+     can paint from the first one and stream the rest in behind it.
+
+     ⚠️ THE SECOND SORT KEY IS NOT DECORATION. first_name repeats (and is null
+     on every company), and a page boundary inside a tie can hand the same row
+     to two pages or skip one entirely. Ordering by id after it makes the total
+     order stable, which is what makes slicing safe at all. */
+  if (url.searchParams.get("paged") === "1" && url.searchParams.get("wide") === "1") {
+    const pageSize = Math.min(200, Math.max(1, Number(url.searchParams.get("pageSize")) || 100));
+    const page = Math.max(1, Number(url.searchParams.get("page")) || 1);
+    const from = (page - 1) * pageSize;
+    let wq = supabaseServer
+      .from("contacts")
+      .select(LIST_COLUMNS as "*", { count: "exact" })
+      .eq("tenant_id", auth.tenant_id)
+      .order("first_name", { ascending: true })
+      .order("id", { ascending: true })
+      .range(from, from + pageSize - 1);
+    if (typeFilter) wq = wq.eq("contact_type", typeFilter);
+
+    const { data: wData, error: wErr, count } = await wq;
+    _t.mark("db");
+    if (wErr) {
+      console.error("[api/contacts wide-paged]", wErr.message);
+      _t.done({ status: 500, paged: 1 });
+      return NextResponse.json({ error: "Failed to load contacts" }, { status: 500 });
+    }
+    const wRows = compactRows(sanitizeContactRows(auth, stripHeavy(wData ?? [])));
+    const total = count ?? null;
+    const { header } = _t.done({ status: 200, type: typeFilter ?? "all", rows: wRows.length, paged: 1, wide: 1 });
+    return NextResponse.json(
+      { contacts: wRows, total, page, hasMore: total != null ? from + wRows.length < total : wRows.length === pageSize },
+      { headers: { "Cache-Control": "private, max-age=30, stale-while-revalidate=180", "Server-Timing": header } },
+    );
+  }
+
   let q = supabaseServer
     .from("contacts")
     /* `as "*"` keeps supabase-js typing identical to the previous select("*")
@@ -203,59 +296,21 @@ export async function GET(req: Request) {
      avatar (photo_url/logo_url) + text fields for rows and search. Strip the
      heavy blob columns from the LIST payload; the detail/edit views fetch the
      full record on demand via GET /api/contacts/[id]. */
-  const HEAVY_FIELDS = [
-    "business_card_front", "business_card_back", "business_license_image",
-    "documents", "catalogues", "attachments", "visa_documents",
-    "contact_persons", "bank_accounts", "resume_lines", "emergency_contacts", "family_members",
-    "wechat_qr", "wechat_official_account_qr", "whatsapp_qr", "telegram_qr", "line_qr", "skype_qr", "qq_qr",
-    "dingtalk_qr", "messenger_qr", "wechat_pay_qr", "alipay_qr", "website_qr", "ecatalog_qr",
-    "quality_issues",
-  ];
+
   /* logo_url / photo_url frequently hold a base64 data: URL (a cropped logo is
      ~80 KB each). With ~100 rows that alone is several MB and pushes the list
      response past Vercel's 4.5 MB function limit → the whole fetch fails and the
      directory shows nothing. Drop ONLY the heavy base64 avatars here; short
      (storage-URL) logos stay inline. The client lazy-loads the dropped ones in
      small batches via GET /api/contacts/avatars. */
-  const isHeavyDataUrl = (v: unknown) =>
-    typeof v === "string" && v.startsWith("data:") && v.length > 4000;
-  const slim = (data ?? []).map((row) => {
-    const r = row as Record<string, unknown>;
-    for (const k of HEAVY_FIELDS) r[k] = null;
-    if (isHeavyDataUrl(r.logo_url)) r.logo_url = null;
-    if (isHeavyDataUrl(r.photo_url)) r.photo_url = null;
-    return r;
-  });
+  const slim = stripHeavy(data ?? []);
 
   /* Column-level policy: credit limits, payment terms, margins-adjacent
      commercial data need can_view_private — module access alone lets a
      user browse the directory, not the credit relationship. */
   const visible = sanitizeContactRows(auth, slim);
 
-  /* ⚠️ EMPTY KEYS ARE MOST OF THIS RESPONSE. Measured on prod, 347 contacts:
-     2,061 KB for 249 columns a row — but the twelve heaviest FIELDS together
-     are only ~160 KB. The rest is the column NAME repeated for a value that
-     is not there: 60 columns are null on every single row, and the 25 heavy
-     blobs above are explicitly set to null rather than removed. Dropping keys
-     with no value takes the same rows to 501 KB (76% off) and ~6s to about a
-     second, with no change to what the directory can show.
-
-     WHY DROP RATHER THAN SLIM THE COLUMNS: the Contacts app references 214 of
-     the 223 list columns somewhere in its 5,700 lines, so a hand-picked
-     projection (the Customers/Suppliers `?paged=1` path has one) cannot be
-     proven safe here by reading it. An absent key and a null key are the same
-     answer to "what is this contact's fax number" — verified that this client
-     has no `=== null` test on a row field, so nothing can tell the difference.
-
-     false and 0 are VALUES and stay: only null, undefined and "" go. */
-  const compact = visible.map((row) => {
-    const out: Record<string, unknown> = {};
-    for (const [k, v] of Object.entries(row as Record<string, unknown>)) {
-      if (v === null || v === undefined || v === "") continue;
-      out[k] = v;
-    }
-    return out;
-  });
+  const compact = compactRows(visible);
 
   const { header } = _t.done({ status: 200, type: typeFilter ?? "all", rows: compact.length });
   return NextResponse.json({ contacts: compact }, {
