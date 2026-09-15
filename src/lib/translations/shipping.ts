@@ -45,6 +45,14 @@ export const shippingT: Translations = {
   "ph.country":       { en: "Pick a country",   zh: "选择国家",     ar: "اختر دولة" },
   "ph.destPort":      { en: "Pick a port",      zh: "选择港口",     ar: "اختر ميناء" },
   "ph.pickCountryFirst": { en: "Pick a country first", zh: "请先选择国家", ar: "اختر الدولة أولًا" },
+  /* The box INSIDE the panel says what to do; repeating the trigger's own hint
+     there read as the same sentence printed twice. */
+  "ph.searchPorts":     { en: "Search ports",     zh: "搜索港口",   ar: "ابحث عن ميناء" },
+  "ph.searchAirports":  { en: "Search airports",  zh: "搜索机场",   ar: "ابحث عن مطار" },
+  "ph.searchCountries": { en: "Search countries", zh: "搜索国家",   ar: "ابحث عن دولة" },
+  "ph.moreResults":     { en: "Showing the first {n} — type to narrow.",
+                          zh: "仅显示前 {n} 条，请输入以缩小范围。",
+                          ar: "يُعرض أول {n} فقط — اكتب لتضييق النتائج." },
 
   /* ── modes ────────────────────────────────────────────────────────────── */
   "mode.ocean_fcl":   { en: "Full container",   zh: "整柜",        ar: "حاوية كاملة" },

@@ -168,7 +168,7 @@ export async function searchPorts(opts: {
   /** Restrict to China, for the origin picker. */
   originOnly?: boolean;
 }): Promise<PortSearchHit[]> {
-  const limit = Math.min(50, Math.max(1, opts.limit ?? 20));
+  const limit = Math.min(100, Math.max(1, opts.limit ?? 20));
   const term = (opts.term ?? "").trim();
 
   let q = supabaseServer.from("shipping_ports").select(PORT_COLS)

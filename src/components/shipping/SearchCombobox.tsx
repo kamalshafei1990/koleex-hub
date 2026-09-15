@@ -6,15 +6,31 @@
    The Hub had no shared searchable picker. `kds/Select` has type-ahead but no
    filter box and takes its whole option list up front, which cannot work
    against 3,806 ports; `PortCombobox` in the Documents app is hard-coded
-   light-mode paper styling for the printed packing list. So this is built from
-   the canon parts — MenuList / MenuSearch / MenuBody / MenuItem, which supply
-   the MN-5 shell and glass — with the debounce / abort / stale-guard / IME
+   light-mode paper styling for the printed packing list. So this is the MN-5
+   shell from `kds/PopoverPanel` plus the debounce / abort / stale-guard / IME
    loop the CRM contact picker established.
 
-   It lives in components/shipping for now on purpose. Promoting it to
-   components/kds means adding it to a barrel that every route imports, and the
-   budgets guard has caught exactly that before — so the move belongs in its
-   own change, with `npm run validate:budgets` run against it.
+   ── ⚠️ WHY THE PANEL IS PORTALLED, AND MUST STAY PORTALLED ────────────────
+   The first version rendered the panel absolutely, beside its trigger, and the
+   container chips painted straight over an open port list. The cause was not a
+   z-index that was too low. `kx-bar-host` declares
+
+       [data-kx-skin="aurora"] .kx-bar-host > :not(.kx-glass-bar):not(.absolute)…
+         { position: relative; z-index: 1 }
+
+   so EVERY row of the search strip is pinned to z-index 1 whatever class it
+   carries. `z-20` on the route row and `z-10` on the cargo row both computed
+   to 1 — measured — the two tied, and a tie goes to the later sibling. No
+   number wins an argument the stylesheet has already settled.
+
+   `PopoverPanel` moves the panel to <body>, which is this Hub's answer to the
+   whole family: it also stops a backdrop-filter ancestor starving the panel's
+   own glass, and stops the sticky bar clipping a long list.
+
+   `scrim={false}` is the owner's rule, not a preference: a list that appears
+   while you are still typing must not dim and blur the page behind it —
+   "when I search by typing the background become blur. for searching no need
+   that."
 
    ── Why the request loop looks like this ──────────────────────────────────
    · 220ms debounce — a port name is 4-8 keystrokes, and each one is a
@@ -29,9 +45,10 @@
    --------------------------------------------------------------------------- */
 
 import { useCallback, useEffect, useId, useRef, useState } from "react";
-import { MenuBody, MenuList, MenuSearch } from "@/components/kds";
+import PopoverPanel from "@/components/kds/PopoverPanel";
 import AngleDownIcon from "@/components/icons/ui/AngleDownIcon";
 import CrossIcon from "@/components/icons/ui/CrossIcon";
+import SearchIcon from "@/components/icons/ui/SearchIcon";
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 
 export interface ComboOption<T> {
@@ -65,11 +82,18 @@ interface Props<T> {
   className?: string;
   /** Re-runs the browse list when this changes — e.g. the selected country. */
   scopeKey?: string;
+  /** How many rows `search` can return at most. When a result hits it, the
+      panel says so — silently showing 100 of 662 ports is indistinguishable
+      from missing data, which is exactly how this was reported. */
+  resultCap?: number;
+  /** Shown when the cap is hit. Should tell the operator to type. */
+  cappedHint?: string;
 }
 
 export default function SearchCombobox<T>({
   value, onChange, search, placeholder, searchPlaceholder, emptyLabel, loadingLabel,
   disabled, disabledHint, icon, ariaLabel, clearLabel, className = "", scopeKey = "",
+  resultCap, cappedHint,
 }: Props<T>) {
   const [open, setOpen] = useState(false);
   const [term, setTerm] = useState("");
@@ -78,8 +102,8 @@ export default function SearchCombobox<T>({
   const [active, setActive] = useState(0);
   const [composing, setComposing] = useState(false);
 
-  const hostRef = useRef<HTMLDivElement | null>(null);
   const triggerRef = useRef<HTMLButtonElement | null>(null);
+  const inputRef = useRef<HTMLInputElement | null>(null);
   const abortRef = useRef<AbortController | null>(null);
   const seqRef = useRef(0);
   const listId = useId();
@@ -126,24 +150,18 @@ export default function SearchCombobox<T>({
 
   useEffect(() => () => abortRef.current?.abort(), []);
 
-  /* ── outside click and Escape ────────────────────────────────────────── */
+  /* The panel lives on <body>, so it is not in the trigger's focus subtree and
+     autoFocus cannot reach it — focus is moved once the panel exists. */
   useEffect(() => {
     if (!open) return;
-    const onDown = (e: MouseEvent | TouchEvent) => {
-      if (!hostRef.current?.contains(e.target as Node)) setOpen(false);
-    };
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") { setOpen(false); triggerRef.current?.focus(); }
-    };
-    document.addEventListener("mousedown", onDown);
-    document.addEventListener("touchstart", onDown);
-    document.addEventListener("keydown", onKey);
-    return () => {
-      document.removeEventListener("mousedown", onDown);
-      document.removeEventListener("touchstart", onDown);
-      document.removeEventListener("keydown", onKey);
-    };
+    const id = window.setTimeout(() => inputRef.current?.focus(), 0);
+    return () => window.clearTimeout(id);
   }, [open]);
+
+  const close = useCallback(() => {
+    setOpen(false);
+    triggerRef.current?.focus();
+  }, []);
 
   const pick = useCallback((o: ComboOption<T>) => {
     onChange(o);
@@ -166,9 +184,8 @@ export default function SearchCombobox<T>({
     if (e.key === "ArrowDown") { e.preventDefault(); setActive((i) => Math.min(i + 1, rows.length - 1)); }
     else if (e.key === "ArrowUp") { e.preventDefault(); setActive((i) => Math.max(i - 1, 0)); }
     else if (e.key === "Enter" && rows[active]) { e.preventDefault(); pick(rows[active]); }
+    else if (e.key === "Escape") { e.preventDefault(); close(); }
   };
-
-  const hint = disabled ? disabledHint : undefined;
 
   /* A control shaped like a field is MADE of field under Aurora — the global
      rule keys on a `bg-[var(--bg-inverted)]/…` tint plus w-full on a button,
@@ -180,7 +197,7 @@ export default function SearchCombobox<T>({
     "focus-visible:shadow-[0_0_0_4px_rgba(86,127,178,0.16)] disabled:opacity-50 disabled:cursor-not-allowed";
 
   return (
-    <div ref={hostRef} className={`relative ${className}`}>
+    <div className={`relative ${className}`}>
       <button
         ref={triggerRef}
         type="button"
@@ -189,23 +206,23 @@ export default function SearchCombobox<T>({
         aria-haspopup="listbox"
         aria-controls={open ? listId : undefined}
         aria-label={ariaLabel}
-        title={hint}
+        title={disabled ? disabledHint : undefined}
         disabled={disabled}
         onClick={() => !disabled && toggle()}
         className={triggerClass}
       >
         {icon ? <span className="shrink-0 text-[var(--text-dim)]">{icon}</span> : null}
-        <span className="min-w-0 flex-1 truncate">
+        <span className="flex min-w-0 flex-1 items-center gap-2 truncate">
           {value ? (
-            <span className="flex items-center gap-2">
-              {value.glyph ? <span aria-hidden>{value.glyph}</span> : null}
+            <>
+              {value.glyph ? <span aria-hidden className="shrink-0">{value.glyph}</span> : null}
               <span className="truncate font-medium text-[var(--text-primary)]">{value.label}</span>
               {value.code ? (
                 <span className="shrink-0 font-mono text-[11px] tabular-nums text-[var(--text-ghost)]">{value.code}</span>
               ) : null}
-            </span>
+            </>
           ) : (
-            <span className="text-[var(--text-ghost)]">{disabled ? (disabledHint ?? placeholder) : placeholder}</span>
+            <span className="truncate text-[var(--text-ghost)]">{disabled ? (disabledHint ?? placeholder) : placeholder}</span>
           )}
         </span>
         {value && clearLabel ? (
@@ -219,67 +236,90 @@ export default function SearchCombobox<T>({
             <CrossIcon size={12} />
           </span>
         ) : null}
-        <AngleDownIcon size={12} className="shrink-0 text-[var(--text-ghost)] transition-transform group-aria-expanded:rotate-180" />
+        <AngleDownIcon size={12} className={`shrink-0 text-[var(--text-ghost)] transition-transform ${open ? "rotate-180" : ""}`} />
       </button>
 
-      {open ? (
-        /* kx-glass-pop earns the automatic z-lift that stops the next card
-           painting over this panel — see the note in globals.css. */
-        <MenuList className="kx-pop-sheet absolute inset-x-0 top-[calc(100%+4px)] z-50 w-full">
-          <MenuSearch
-            value={term}
-            onChange={(e) => setTerm(e.target.value)}
-            placeholder={searchPlaceholder}
-            autoFocus
-            onKeyDown={onListKey}
-            onCompositionStart={() => setComposing(true)}
-            onCompositionEnd={(e) => {
-              setComposing(false);
-              setTerm((e.target as HTMLInputElement).value);
-            }}
-          />
-          <MenuBody>
-            <div id={listId} role="listbox" aria-label={ariaLabel}>
-            {loading && !rows.length ? (
-              <div className="flex items-center gap-2 px-3 py-6 text-[12px] text-[var(--text-dim)]">
-                <SpinnerIcon size={14} className="animate-spin" />
-                {loadingLabel}
-              </div>
-            ) : rows.length === 0 ? (
-              <div className="px-3 py-6 text-center text-[12px] text-[var(--text-dim)]">{emptyLabel}</div>
-            ) : (
-              rows.map((o, i) => (
-                <button
-                  key={o.key}
-                  type="button"
-                  role="option"
-                  aria-selected={value?.key === o.key}
-                  onMouseEnter={() => setActive(i)}
-                  onClick={() => pick(o)}
-                  className={`flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-start text-[13px] transition-colors ${
-                    i === active ? "bg-[var(--bg-surface-hover)]" : ""
-                  } ${value?.key === o.key ? "text-[var(--text-primary)]" : "text-[var(--text-secondary)]"}`}
-                >
-                  {o.glyph ? <span aria-hidden className="shrink-0 text-[15px] leading-none">{o.glyph}</span> : null}
-                  <span className="min-w-0 flex-1">
-                    <span className="flex items-center gap-1.5">
-                      <span className="truncate font-medium text-[var(--text-primary)]">{o.label}</span>
-                      {o.pinned ? <span aria-hidden className="text-[10px] text-[#7FA9D6]">●</span> : null}
-                    </span>
-                    {o.sublabel ? (
-                      <span className="block truncate text-[11px] text-[var(--text-ghost)]">{o.sublabel}</span>
+      <PopoverPanel
+        anchorRef={triggerRef}
+        open={open}
+        onClose={close}
+        scrim={false}
+        matchAnchorWidth
+        mobileSheet
+        maxHeight={340}
+        className="flex flex-col"
+      >
+        <div className="shrink-0 border-b border-[var(--border-subtle)] p-2">
+          <div className="relative">
+            <span className="pointer-events-none absolute start-2.5 top-1/2 -translate-y-1/2 text-[var(--text-ghost)]">
+              <SearchIcon size={13} />
+            </span>
+            <input
+              ref={inputRef}
+              value={term}
+              onChange={(e) => setTerm(e.target.value)}
+              onKeyDown={onListKey}
+              onCompositionStart={() => setComposing(true)}
+              onCompositionEnd={(e) => {
+                setComposing(false);
+                setTerm((e.target as HTMLInputElement).value);
+              }}
+              placeholder={searchPlaceholder}
+              aria-label={searchPlaceholder}
+              aria-controls={listId}
+              aria-autocomplete="list"
+              className="h-9 w-full rounded-lg border border-[var(--border-color)] bg-[var(--bg-surface)] ps-8 pe-3 text-sm text-[var(--text-primary)] outline-none placeholder:text-[var(--text-ghost)] focus:border-[var(--border-focus)]"
+            />
+          </div>
+        </div>
+
+        <div id={listId} role="listbox" aria-label={ariaLabel} className="min-h-0 flex-1 overflow-y-auto py-1">
+          {loading && !rows.length ? (
+            <div className="flex items-center gap-2 px-3 py-6 text-[12px] text-[var(--text-dim)]">
+              <SpinnerIcon size={14} className="animate-spin" />
+              {loadingLabel}
+            </div>
+          ) : rows.length === 0 ? (
+            <div className="px-3 py-6 text-center text-[12px] text-[var(--text-dim)]">{emptyLabel}</div>
+          ) : (
+            rows.map((o, i) => (
+              <button
+                key={o.key}
+                type="button"
+                role="option"
+                aria-selected={value?.key === o.key}
+                onMouseEnter={() => setActive(i)}
+                onClick={() => pick(o)}
+                className={`flex w-full items-center gap-2.5 px-2.5 py-2 text-start text-[13px] transition-colors ${
+                  i === active ? "bg-[var(--bg-surface-hover)]" : ""
+                } ${value?.key === o.key ? "text-[var(--text-primary)]" : "text-[var(--text-secondary)]"}`}
+              >
+                {o.glyph ? <span aria-hidden className="shrink-0 text-[15px] leading-none">{o.glyph}</span> : null}
+                <span className="min-w-0 flex-1">
+                  <span className="flex items-center gap-1.5">
+                    <span className="truncate font-medium text-[var(--text-primary)]">{o.label}</span>
+                    {o.pinned ? (
+                      <span aria-hidden className="h-1.5 w-1.5 shrink-0 rounded-full bg-[#7FA9D6]" />
                     ) : null}
                   </span>
-                  {o.code ? (
-                    <span className="shrink-0 font-mono text-[11px] tabular-nums text-[var(--text-ghost)]">{o.code}</span>
+                  {o.sublabel ? (
+                    <span className="block truncate text-[11px] text-[var(--text-ghost)]">{o.sublabel}</span>
                   ) : null}
-                </button>
-              ))
-            )}
-            </div>
-          </MenuBody>
-        </MenuList>
-      ) : null}
+                </span>
+                {o.code ? (
+                  <span className="shrink-0 font-mono text-[11px] tabular-nums text-[var(--text-ghost)]">{o.code}</span>
+                ) : null}
+              </button>
+            ))
+          )}
+        </div>
+
+        {resultCap && cappedHint && rows.length >= resultCap ? (
+          <div className="shrink-0 border-t border-[var(--border-subtle)] px-3 py-1.5 text-[11px] text-[var(--text-ghost)]">
+            {cappedHint.replace("{n}", String(rows.length))}
+          </div>
+        ) : null}
+      </PopoverPanel>
     </div>
   );
 }

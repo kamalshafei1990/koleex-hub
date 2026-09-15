@@ -62,6 +62,12 @@ import PlusIcon from "@/components/icons/ui/PlusIcon";
 
 type PortOpt = ComboOption<PortHit | AirportHit>;
 
+/* The reference endpoint's own ceiling. Anything smaller truncates a country's
+   port list during a plain browse, which reads as missing data. The United
+   States has 662 ports, so the ceiling stays — the panel says when it is hit
+   instead of hiding it. */
+const PICKER_ROWS = 100;
+
 const MODES: { id: ShippingMode; icon: (s: number) => React.ReactNode }[] = [
   { id: "ocean_fcl", icon: (s) => <ContainerIcon size={s} /> },
   { id: "ocean_lcl", icon: (s) => <CubicMeterIcon size={s} /> },
@@ -144,10 +150,28 @@ export default function ShippingApp() {
     return () => { alive = false; };
   }, []);
 
-  /* Switching between sea and air changes what a "port" is, so both ends reset
-     rather than silently carrying a seaport into an air search. */
-  useEffect(() => { setOrigin(null); setDest(null); }, [isAir]);
-  useEffect(() => { setDest(null); }, [country?.key]);
+  /* ⚠️ THESE RESETS ARE HANDLERS, NOT EFFECTS, AND THAT IS THE WHOLE POINT.
+     As effects keyed on `isAir` / `country`, they ran after ANY change to
+     those values — including a saved-route chip restoring a lane, which sets
+     the mode and both endpoints together. The effect then fired on the next
+     commit and wiped the endpoints it had just been given, so clicking an air
+     route while in ocean mode emptied both fields.
+
+     A handler only runs when the OPERATOR changes the control, which is the
+     actual rule: switching between sea and air changes what a "port" is, so
+     both ends clear rather than carrying a seaport into an air search. */
+  const changeMode = useCallback((next: ShippingMode) => {
+    setMode((prev) => {
+      if ((prev === "air") !== (next === "air")) { setOrigin(null); setDest(null); }
+      return next;
+    });
+  }, []);
+  const changeCountry = useCallback((next: ComboOption<PortCountry> | null) => {
+    setCountry((prev) => {
+      if (prev?.key !== next?.key) setDest(null);
+      return next;
+    });
+  }, []);
 
   /* ── option builders ───────────────────────────────────────────────────── */
   const portOption = useCallback((p: PortHit): PortOpt => ({
@@ -170,13 +194,16 @@ export default function ShippingApp() {
     code: a.iata,
   }), []);
 
+  /* PAGE_ROWS is the endpoint's own maximum. 20 was below the size of a single
+     country's list — China has 43 ports and Egypt 34 — so browsing either one
+     stopped part-way with no sign that it had. */
   const searchOrigin = useCallback(async (term: string, signal: AbortSignal): Promise<PortOpt[]> => {
     void signal;
     if (isAir) {
-      const { airports } = await searchAirports({ q: term, country: "CN", limit: 20 });
+      const { airports } = await searchAirports({ q: term, country: "CN", limit: PICKER_ROWS });
       return airports.map(airportOption);
     }
-    const { ports } = await searchPorts({ q: term, origin: true, limit: 20 });
+    const { ports } = await searchPorts({ q: term, origin: true, limit: PICKER_ROWS });
     return ports.map(portOption);
   }, [isAir, portOption, airportOption]);
 
@@ -185,10 +212,10 @@ export default function ShippingApp() {
     const cc = country?.value.code;
     if (!cc) return [];
     if (isAir) {
-      const { airports } = await searchAirports({ q: term, country: cc, limit: 20 });
+      const { airports } = await searchAirports({ q: term, country: cc, limit: PICKER_ROWS });
       return airports.map(airportOption);
     }
-    const { ports } = await searchPorts({ q: term, country: cc, limit: 20 });
+    const { ports } = await searchPorts({ q: term, country: cc, limit: PICKER_ROWS });
     return ports.map(portOption);
   }, [country?.value.code, isAir, portOption, airportOption]);
 
@@ -196,6 +223,12 @@ export default function ShippingApp() {
      keystroke for 170 rows that never change. Name FIRST, then the flag:
      leading with the emoji broke the browser's own first-letter type-ahead. */
   const searchCountry = useCallback(async (term: string): Promise<ComboOption<PortCountry>[]> => {
+    /* ⚠️ NOT CAPPED. A `.slice(0, 40)` lived here, copied from the PORT
+       pickers where a cap is right — those search 3,806 rows on the server and
+       return a page. Countries are a fixed in-memory list of ~198 that the
+       operator SCROLLS, so the cap silently truncated it and everything past
+       the fortieth name was unreachable. A picker that cannot reach its own
+       options is worse than a slow one. */
     const q = term.trim().toLowerCase();
     return countries
       .map((c) => ({
@@ -206,8 +239,7 @@ export default function ShippingApp() {
         code: c.code,
       }))
       .filter((o) => !q || o.label.toLowerCase().includes(q) || o.key.toLowerCase().startsWith(q))
-      .sort((a, b) => a.label.localeCompare(b.label, lang === "zh" ? "zh-CN" : lang === "ar" ? "ar" : "en"))
-      .slice(0, 40);
+      .sort((a, b) => a.label.localeCompare(b.label, lang === "zh" ? "zh-CN" : lang === "ar" ? "ar" : "en"));
   }, [countries, lang]);
 
   /* ── the search ────────────────────────────────────────────────────────── */
@@ -275,7 +307,11 @@ export default function ShippingApp() {
 
   return (
     <AuroraShell dir={isRtl ? "rtl" : "ltr"}>
-      <div ref={hostRef} className="mx-auto w-full max-w-[1500px] px-4 pt-12 pb-8 sm:px-6 lg:px-8">
+      {/* pb-24 when the saved/recent rail sits at the BOTTOM: the Hub's floating
+          AI dock is `fixed bottom-6 end-6`, and with only pb-8 the last route
+          chip rendered underneath it. In the wide layout the rail is a right
+          column and clears it on its own. */}
+      <div ref={hostRef} className={`mx-auto w-full max-w-[1500px] px-4 pt-12 sm:px-6 lg:px-8 ${wide ? "pb-8" : "pb-24"}`}>
         <PageHeader
           title={t("app.title")}
           subtitle={t("app.subtitle")}
@@ -301,7 +337,7 @@ export default function ShippingApp() {
                   type="button"
                   role="radio"
                   aria-checked={on}
-                  onClick={() => setMode(m.id)}
+                  onClick={() => changeMode(m.id)}
                   /* kx-seg-on paints a RING, and a ring cannot be clipped into
                      a curve — the element owns its own radius. CI rule 09. */
                   /* The radius lives on THIS element, not the group: kx-seg-on
@@ -320,11 +356,12 @@ export default function ShippingApp() {
           </div>
 
           {/* route */}
-          {/* relative z-20 is load-bearing. kx-bar-host lifts every
-              non-positioned child to z-index:1, so this row and the cargo row
-              below it tie — and a tie is won by the later sibling, which put
-              the container chips ON TOP of an open port list. */}
-          <div className={`relative z-20 grid gap-2 ${wide ? "grid-cols-[1fr_auto_1fr_1fr_auto]" : mid ? "grid-cols-3" : "grid-cols-1"}`}>
+          {/* ⚠️ DO NOT ADD A z-* CLASS HERE EXPECTING IT TO DO ANYTHING.
+              kx-bar-host pins every row of this strip to z-index:1 —
+              `z-20` here and `z-10` below both computed to 1, measured. The
+              open dropdown escapes by being portalled to <body>; see the
+              header of SearchCombobox. */}
+          <div className={`relative grid gap-2 ${wide ? "grid-cols-[1fr_auto_1fr_1fr_auto]" : mid ? "grid-cols-3" : "grid-cols-1"}`}>
             <Labelled label={isAir ? t("field.originAirport") : t("field.originPort")}>
               <SearchCombobox
                 value={origin}
@@ -333,10 +370,12 @@ export default function ShippingApp() {
                 scopeKey={`origin-${mode}`}
                 icon={isAir ? <PlaneIcon size={14} /> : <PortIcon size={14} />}
                 placeholder={isAir ? t("field.originAirport") : t("ph.originPort")}
-                searchPlaceholder={isAir ? t("field.originAirport") : t("ph.originPort")}
+                searchPlaceholder={isAir ? t("ph.searchAirports") : t("ph.searchPorts")}
                 emptyLabel={t("err.noRoute")}
                 loadingLabel={t("load.ports")}
                 ariaLabel={isAir ? t("field.originAirport") : t("a11y.originPicker")}
+                resultCap={PICKER_ROWS}
+                cappedHint={t("ph.moreResults")}
                 clearLabel={t("action.clear")}
               />
             </Labelled>
@@ -363,12 +402,12 @@ export default function ShippingApp() {
             <Labelled label={t("field.country")}>
               <SearchCombobox
                 value={country}
-                onChange={setCountry}
+                onChange={changeCountry}
                 search={searchCountry}
                 scopeKey="country"
                 icon={<GlobeIcon size={14} />}
                 placeholder={t("ph.country")}
-                searchPlaceholder={t("ph.country")}
+                searchPlaceholder={t("ph.searchCountries")}
                 emptyLabel={t("err.noRoute")}
                 loadingLabel={t("load.ports")}
                 ariaLabel={t("field.country")}
@@ -384,10 +423,12 @@ export default function ShippingApp() {
                 scopeKey={`dest-${country?.key ?? ""}-${mode}`}
                 icon={isAir ? <PlaneIcon size={14} /> : <PortIcon size={14} />}
                 placeholder={isAir ? t("field.destAirport") : t("ph.destPort")}
-                searchPlaceholder={isAir ? t("field.destAirport") : t("ph.destPort")}
+                searchPlaceholder={isAir ? t("ph.searchAirports") : t("ph.searchPorts")}
                 emptyLabel={t("err.noRoute")}
                 loadingLabel={t("load.ports")}
                 ariaLabel={isAir ? t("field.destAirport") : t("a11y.destPicker")}
+                resultCap={PICKER_ROWS}
+                cappedHint={t("ph.moreResults")}
                 clearLabel={t("action.clear")}
                 disabled={!country}
                 disabledHint={t("ph.pickCountryFirst")}
@@ -398,7 +439,7 @@ export default function ShippingApp() {
           </div>
 
           {/* cargo — only what this method actually needs */}
-          <div className={`relative z-10 mt-2 flex flex-wrap items-end gap-2 ${wide ? "" : "pb-1"}`}>
+          <div className={`relative mt-2 flex flex-wrap items-end gap-2 ${wide ? "" : "pb-1"}`}>
             {mode === "ocean_fcl" ? (
               <Labelled label={t("field.containers")}>
                 <div className="flex gap-1.5">
@@ -521,7 +562,9 @@ export default function ShippingApp() {
             {data ? <SourcesPanel providers={data.providers} mode={mode} t={t} /> : null}
             <RoutesPanel routes={routes} t={t}
               onPick={(r) => {
-                setMode(r.mode);
+                /* changeMode first (it may clear the endpoints when the sea/air
+                   axis flips), then set them — never the other way round. */
+                changeMode(r.mode);
                 setOrigin({ key: r.origin_code, value: { locode: r.origin_code } as PortHit, label: r.origin_label ?? r.origin_code, code: r.origin_code });
                 setDest({ key: r.destination_code, value: { locode: r.destination_code } as PortHit, label: r.destination_label ?? r.destination_code, code: r.destination_code });
               }} />
@@ -769,9 +812,12 @@ function SourcesPanel({ providers, mode, t }: {
 /* Declared at module scope, not inside RoutesPanel. A component created
    during render is a NEW component type on every render, so React unmounts and
    remounts it and any state inside resets — react-hooks/static-components. */
-function RouteSection({ title, icon, list, empty, onPick }: {
+/* Declared at module scope, not inside RoutesPanel. A component created
+   during render is a NEW component type on every render, so React unmounts and
+   remounts it and any state inside resets — react-hooks/static-components. */
+function RouteSection({ title, icon, list, empty, onPick, t }: {
   title: string; icon: React.ReactNode; list: SavedRoute[]; empty?: string;
-  onPick: (r: SavedRoute) => void;
+  onPick: (r: SavedRoute) => void; t: (k: string, f?: string) => string;
 }) {
   return (
     <div>
@@ -784,8 +830,21 @@ function RouteSection({ title, icon, list, empty, onPick }: {
         <ul className="flex flex-wrap gap-1.5">
           {list.map((r) => (
             <li key={r.id}>
-              <button type="button" onClick={() => onPick(r)}
+              <button
+                type="button"
+                onClick={() => onPick(r)}
+                title={`${r.origin_label ?? r.origin_code} → ${r.destination_label ?? r.destination_code} · ${t(`mode.${r.mode}`)}`}
                 className="inline-flex max-w-full items-center gap-1 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] px-2 py-1 text-[11px] text-[var(--text-secondary)] transition-colors hover:border-[var(--border-focus)] hover:text-[var(--text-primary)]">
+                {/* ⚠️ THE MODE IS PART OF THE IDENTITY. The same lane searched
+                    as FCL and as groupage is two rows (the unique key includes
+                    the mode), and without this glyph they rendered as two
+                    identical chips — the list looked like it had duplicated
+                    itself. */}
+                <span aria-hidden className="shrink-0 text-[var(--text-ghost)]">
+                  {r.mode === "air" ? <PlaneIcon size={10} />
+                    : r.mode === "ocean_lcl" ? <CubicMeterIcon size={10} />
+                    : <ContainerIcon size={10} />}
+                </span>
                 <span className="truncate">{r.origin_label ?? r.origin_code}</span>
                 <ArrowRightIcon size={10} className="shrink-0 text-[var(--text-ghost)] rtl:rotate-180" />
                 <span className="truncate">{r.destination_label ?? r.destination_code}</span>
@@ -806,8 +865,8 @@ function RoutesPanel({ routes, onPick, t }: {
   if (!routes.recent.length && !routes.favorites.length) return null;
   return (
     <section className="space-y-3 rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-3">
-      <RouteSection title={t("fav.title")} icon={<StarIcon size={12} />} list={routes.favorites} empty={t("fav.empty")} onPick={onPick} />
-      <RouteSection title={t("recent.title")} icon={<HistoryIcon size={12} />} list={routes.recent} onPick={onPick} />
+      <RouteSection title={t("fav.title")} icon={<StarIcon size={12} />} list={routes.favorites} empty={t("fav.empty")} onPick={onPick} t={t} />
+      <RouteSection title={t("recent.title")} icon={<HistoryIcon size={12} />} list={routes.recent} onPick={onPick} t={t} />
     </section>
   );
 }

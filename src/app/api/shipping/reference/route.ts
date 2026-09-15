@@ -35,7 +35,11 @@ export async function GET(req: Request) {
   const kind = url.searchParams.get("kind") ?? "ports";
   const term = url.searchParams.get("q")?.trim() ?? "";
   const country = url.searchParams.get("country")?.trim() || undefined;
-  const limit = Math.min(50, Math.max(1, Number(url.searchParams.get("limit")) || 20));
+  /* 100, not 50: China has 74 ports and 242 airports, so a smaller ceiling
+     truncated a plain browse of the origin country. The United States has 662
+     ports, so a ceiling is still necessary — the picker says when it has hit
+     one rather than hiding it. */
+  const limit = Math.min(100, Math.max(1, Number(url.searchParams.get("limit")) || 20));
 
   try {
     if (kind === "countries") {
