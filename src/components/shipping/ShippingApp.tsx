@@ -62,6 +62,25 @@ import PlusIcon from "@/components/icons/ui/PlusIcon";
 
 type PortOpt = ComboOption<PortHit | AirportHit>;
 
+/** ISO country out of a UN/LOCODE. IATA codes carry none, so they answer null. */
+function countryOfCode(code: string): string | null {
+  return /^[A-Z]{2}[A-Z0-9]{3}$/.test(code) ? code.slice(0, 2) : null;
+}
+
+/* A saved route stores codes and labels, not the full port row. Rebuilding the
+   option from those two is enough for the trigger to look identical to a
+   freshly picked one — including the flag, which the LOCODE already carries. */
+function restoredEndpoint(code: string, label: string | null): PortOpt {
+  const cc = countryOfCode(code);
+  return {
+    key: code,
+    value: { locode: code } as PortHit,
+    label: label ?? code,
+    code,
+    glyph: cc ? (flagEmoji(cc) || undefined) : undefined,
+  };
+}
+
 /* The reference endpoint's own ceiling. Anything smaller truncates a country's
    port list during a plain browse, which reads as missing data. The United
    States has 662 ports, so the ceiling stays — the panel says when it is hit
@@ -565,8 +584,24 @@ export default function ShippingApp() {
                 /* changeMode first (it may clear the endpoints when the sea/air
                    axis flips), then set them — never the other way round. */
                 changeMode(r.mode);
-                setOrigin({ key: r.origin_code, value: { locode: r.origin_code } as PortHit, label: r.origin_label ?? r.origin_code, code: r.origin_code });
-                setDest({ key: r.destination_code, value: { locode: r.destination_code } as PortHit, label: r.destination_label ?? r.destination_code, code: r.destination_code });
+                setOrigin(restoredEndpoint(r.origin_code, r.origin_label));
+                setDest(restoredEndpoint(r.destination_code, r.destination_label));
+                /* The country field has to follow, or the form shows a chosen
+                   destination port above an empty "Pick a country" and reads
+                   half-filled. A UN/LOCODE opens with the ISO country code, so
+                   the answer is already in the value we just set. IATA carries
+                   no country, so an air route leaves it alone rather than
+                   guessing. */
+                const cc = countryOfCode(r.destination_code);
+                const hit = cc ? countries.find((c) => c.code === cc) : null;
+                if (hit) {
+                  setCountry({
+                    key: hit.code, value: hit,
+                    label: countryDisplayName(hit.code, hit.name ?? hit.code, lang),
+                    glyph: flagEmoji(hit.code) || undefined,
+                    code: hit.code,
+                  });
+                }
               }} />
           </aside>
         </div>
@@ -795,7 +830,14 @@ function SourcesPanel({ providers, mode, t }: {
               <div className="min-w-0 flex-1">
                 <div className="flex items-baseline justify-between gap-2">
                   <span className="truncate text-[12px] font-medium text-[var(--text-primary)]">{t(`kind.${p.kind}`)}</span>
-                  <span className="shrink-0 text-[10px] text-[var(--text-ghost)]">{t(`src.cadence.${p.cadence}`)}</span>
+                  {/* ⚠️ The freshness badge is for CONNECTED sources only. A
+                      disabled provider showing "Live" states a fact about a
+                      feed nobody is reading — and next to "Market Estimate" it
+                      reads as a promise the source does not make. The reason
+                      line underneath already says why it is off. */}
+                  {p.enabled ? (
+                    <span className="shrink-0 text-[10px] text-[var(--text-ghost)]">{t(`src.cadence.${p.cadence}`)}</span>
+                  ) : null}
                 </div>
                 <p className="mt-0.5 text-[11px] leading-snug text-[var(--text-dim)]">
                   {p.enabled ? t("src.active") : (p.reason ?? t("src.off"))}

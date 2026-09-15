@@ -20,9 +20,10 @@
    fallback figure, no nearest-port substitution and no average.
    --------------------------------------------------------------------------- */
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import type { Lang } from "@/lib/i18n";
-import type { FreightRate, RateKind } from "@/lib/shipping/types";
+import type { ContainerEquipment, FreightRate, RateKind } from "@/lib/shipping/types";
+import { CONTAINER_EQUIPMENT } from "@/lib/shipping/types";
 import { allInTotal } from "@/lib/shipping/comparability";
 import type { ComparisonGroupView, RateSearchResponse } from "./shipping-client";
 import ContainerIcon from "@/components/icons/ui/ContainerIcon";
@@ -277,13 +278,14 @@ export function RateRow({ rate, t, lang, quantity = 1 }: { rate: FreightRate; t:
 /* ── a comparison group: one product, every source that prices it ───────── */
 function GroupCard({ group, t, lang, quantity }: { group: ComparisonGroupView; t: T; lang: Lang; quantity: number }) {
   const heading = group.key.equipment !== "-" ? group.key.equipment : null;
+  const empty = group.rates.length === 0;
   /* Order by how actionable the number is, not by price: a bookable rate
      first, then a quote, then our own history, then a band. */
   const ordered: RateKind[] = ["provider", "forwarder", "koleex", "market"];
   const rates = ordered.flatMap((k) => group.byKind[k] ?? []);
 
   return (
-    <section className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-3">
+    <section className={"rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-3" + (empty ? " opacity-70" : "")}>
       {heading ? (
         <header className="mb-2 flex items-center justify-between gap-2">
           <h3 className="inline-flex items-center gap-1.5 text-[14px] font-semibold text-[var(--text-primary)]">
@@ -299,9 +301,14 @@ function GroupCard({ group, t, lang, quantity }: { group: ComparisonGroupView; t
         </header>
       ) : null}
       <div className="space-y-2">
-        {rates.length
-          ? rates.map((r, i) => <RateRow key={r.id ?? `${r.sourceId}-${i}`} rate={r} t={t} lang={lang} quantity={quantity} />)
-          : <p className="px-1 py-4 text-center text-[12px] text-[var(--text-dim)]">{t("res.unavailable")}</p>}
+        {rates.length ? (
+          rates.map((r, i) => <RateRow key={r.id ?? `${r.sourceId}-${i}`} rate={r} t={t} lang={lang} quantity={quantity} />)
+        ) : (
+          <div className="rounded-xl border border-dashed border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] px-3 py-5 text-center">
+            <TriangleWarningIcon size={14} className="mx-auto mb-1 text-[var(--text-ghost)]" />
+            <p className="text-[12px] font-medium text-[var(--text-dim)]">{t("res.unavailable")}</p>
+          </div>
+        )}
       </div>
     </section>
   );
@@ -318,7 +325,27 @@ export default function RateResults({
   /** Measured by the host — never a viewport breakpoint. */
   columns: 1 | 2 | 3;
 }) {
-  const groups = data.groups;
+  /* FCL ASKS ABOUT THREE CONTAINERS AND MUST ANSWER ABOUT THREE.
+     The engine groups what it FOUND, so a lane priced only for 20GP rendered a
+     single card and the other two simply were not there — which reads as "we
+     did not ask" rather than "there is no rate". Every requested container gets
+     a card; the ones with nothing say so. */
+  const groups = useMemo(() => {
+    if (data.query.mode !== "ocean_fcl") return data.groups;
+    const wanted = data.query.equipment?.length ? data.query.equipment : CONTAINER_EQUIPMENT;
+    const byEquipment = new Map(data.groups.map((g) => [g.key.equipment, g]));
+    const out: ComparisonGroupView[] = [];
+    for (const eq of wanted) {
+      const hit = byEquipment.get(eq);
+      out.push(hit ?? emptyGroup(data, eq));
+      byEquipment.delete(eq);
+    }
+    /* Anything the engine returned that was NOT asked for still belongs on
+       screen — a provider answering with a container we did not request is
+       information, not noise. */
+    for (const g of byEquipment.values()) out.push(g);
+    return out;
+  }, [data]);
 
   if (!groups.length) {
     return (
@@ -366,6 +393,24 @@ export default function RateResults({
       ) : null}
     </div>
   );
+}
+
+/** A container we asked about and got nothing for. Rendered, never omitted. */
+function emptyGroup(data: RateSearchResponse, equipment: ContainerEquipment): ComparisonGroupView {
+  return {
+    key: {
+      mode: data.query.mode,
+      originCode: data.query.originCode,
+      destinationCode: data.query.destinationCode,
+      equipment,
+      unit: "container",
+      currency: "USD",
+      scope: "port_to_port",
+      inclusions: "???",
+    },
+    rates: [],
+    byKind: { provider: [], market: [], koleex: [], forwarder: [] },
+  };
 }
 
 /** The engine speaks English reason strings; map them onto dictionary keys. */
