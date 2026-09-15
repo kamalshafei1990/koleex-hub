@@ -374,8 +374,13 @@ export default function ShippingApp() {
             render that and carry ZERO stickies; they sit in isUnderglassRoute
             and deliberately NOT in appOwnsTopRamp, because with no band there
             is no ramp host and listing them would trade the pane's frost for a
-            ramp that never gets drawn. This is the same case. */}
-        <div className="mb-4">
+            ramp that never gets drawn. This is the same case.
+
+            mt-5 is the house gap after a PageHeader — Travel and Contracts
+            both set exactly that on their first block. This strip had no top
+            margin at all, so the method selector sat flush against the header
+            row with nothing between them. */}
+        <div className="mb-4 mt-5">
           {/* method — three-up, icon-led, always visible */}
           <div role="radiogroup" aria-label={t("a11y.modeGroup")} className="mb-2 grid grid-cols-3 gap-1.5 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] p-1">
             {MODES.map((m) => {
