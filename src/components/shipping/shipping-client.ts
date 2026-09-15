@@ -194,3 +194,108 @@ export function saveRoute(body: {
     body: JSON.stringify(body),
   }).then((r) => r.ok).catch(() => false);
 }
+
+/* ── forwarder quotes ──────────────────────────────────────────────────────
+   The only rate source an operator can fill themselves. Everything here is a
+   plain write: no cache, because a price that was just typed must be visible
+   on the very next search. */
+
+export interface ForwarderQuoteInput {
+  mode: ShippingMode;
+  /** Sent as the picker showed it — the server resolves it the same way the
+      search does, so the stored lane and the searched lane cannot drift. */
+  origin: string;
+  destination: string;
+  originCountry?: string;
+  destinationCountry?: string;
+
+  forwarder: string;
+  amount: number;
+  currency: string;
+  /** FCL only. */
+  equipment?: ContainerEquipment;
+  /** Air only, as the forwarder wrote it: 'MIN', '+45', '+100'… */
+  weightBreak?: string;
+  /** true when the price covers the whole shipment rather than each unit. */
+  lumpSum?: boolean;
+  minCharge?: number;
+
+  scope?: string;
+  /** "yes" | "no" | undefined — undefined means the quote did not say, and is
+      kept as its own answer rather than being read as "no". */
+  includesOriginCharges?: "yes" | "no";
+  includesDestinationCharges?: "yes" | "no";
+  includesCustoms?: "yes" | "no";
+  incoterm?: string;
+
+  surcharges?: { code: string; label: string; amount: number; currency: string; per: string }[];
+
+  validFrom?: string;
+  validUntil: string;
+  transitDaysMin?: number;
+  transitDaysMax?: number;
+  carrier?: string;
+  /** true only when the forwarder called it indicative. */
+  isEstimate?: boolean;
+  notes?: string;
+}
+
+export interface ForwarderQuoteRow {
+  id: string;
+  source_label: string | null;
+  mode: ShippingMode;
+  origin_code: string;
+  destination_code: string;
+  equipment: ContainerEquipment | null;
+  unit: string;
+  amount: number | null;
+  currency: string;
+  total_estimate: number | null;
+  valid_from: string | null;
+  valid_until: string | null;
+  transit_days_min: number | null;
+  transit_days_max: number | null;
+  carrier: string | null;
+  is_estimate: boolean;
+  notes: string | null;
+  created_at: string;
+}
+
+/** Shaped like RateSearchError so one `describe()` can explain both. */
+export async function saveForwarderQuote(input: ForwarderQuoteInput): Promise<{ id: string }> {
+  const res = await fetch("/api/shipping/quotes", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+  const body = (await res.json().catch(() => ({}))) as Record<string, unknown>;
+  if (!res.ok) {
+    throw new RateSearchError(String(body.error ?? "save_failed"), res.status, {
+      side: typeof body.side === "string" ? body.side : undefined,
+      input: typeof body.input === "string" ? body.input : undefined,
+      port: typeof body.port === "string" ? body.port : undefined,
+      candidates: Array.isArray(body.candidates) ? (body.candidates as PortHit[]) : undefined,
+    });
+  }
+  return { id: String(body.id ?? "") };
+}
+
+export function listForwarderQuotes(lane?: {
+  mode: ShippingMode; originCode: string; destinationCode: string;
+}): Promise<{ quotes: ForwarderQuoteRow[] }> {
+  const p = new URLSearchParams();
+  if (lane) {
+    p.set("mode", lane.mode);
+    p.set("originCode", lane.originCode);
+    p.set("destinationCode", lane.destinationCode);
+  }
+  const qs = p.toString();
+  return fetch(`/api/shipping/quotes${qs ? `?${qs}` : ""}`, { cache: "no-store" })
+    .then((r) => (r.ok ? r.json() : { quotes: [] }))
+    .catch(() => ({ quotes: [] }));
+}
+
+export function deleteForwarderQuote(id: string): Promise<boolean> {
+  return fetch(`/api/shipping/quotes?id=${encodeURIComponent(id)}`, { method: "DELETE" })
+    .then((r) => r.ok).catch(() => false);
+}

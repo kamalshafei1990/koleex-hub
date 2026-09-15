@@ -57,6 +57,31 @@ export type RateUnit = "container" | "cbm" | "kg" | "shipment";
 /** Objective, computed — see confidence.ts. Never an opinion. */
 export type ConfidenceLevel = "high" | "medium" | "low";
 
+/**
+ * Why a rate scored what it scored — as a CODE the screen translates, never a
+ * finished English sentence.
+ *
+ * ⚠️ These are shown to the operator in the panel under a price, so they carry
+ * the same two obligations as any other visible string: they are translated
+ * (en / zh / ar) and any date in them is rendered D/M/Y by the screen. Neither
+ * is possible if the scorer bakes prose and an ISO date into a string.
+ * `date` is ISO and stays ISO on the wire; `text` is an identifier pair like
+ * "CNNBO→EGPSD" that is deliberately not translated.
+ */
+export interface ConfidenceReason {
+  code:
+    | "noRetrievalTime" | "retrievedToday" | "daysOld" | "daysOldStale"
+    | "validTo" | "validityExpired" | "noValidity"
+    | "exactLane" | "otherLane" | "equipmentMismatch"
+    | "surchargeItemised" | "surchargesItemised" | "inclusionsOnly" | "freightOnly"
+    | "singleSource" | "corroboratedOne" | "corroborated" | "sourcesDisagree"
+    | "dailyCadence" | "marketBand" | "koleexPast";
+  n?: number;
+  /** ISO yyyy-mm-dd. The screen formats it. */
+  date?: string;
+  text?: string;
+}
+
 /** One itemised charge. Surcharges are listed, never folded into the freight. */
 export interface Surcharge {
   /** Trade code where there is one: BAF, CAF, GRI, PSS, THC, ISPS, DOC, AMS… */
@@ -137,7 +162,7 @@ export interface FreightRate {
 
   confidence?: ConfidenceLevel;
   confidenceScore?: number;
-  confidenceReasons?: string[];
+  confidenceReasons?: ConfidenceReason[];
   /** true unless the source says this is bookable. */
   isEstimate: boolean;
 

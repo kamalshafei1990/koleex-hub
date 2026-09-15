@@ -22,7 +22,7 @@
 
 import { useMemo, useState } from "react";
 import type { Lang } from "@/lib/i18n";
-import type { ContainerEquipment, FreightRate, RateKind } from "@/lib/shipping/types";
+import type { ConfidenceReason, ContainerEquipment, FreightRate, RateKind } from "@/lib/shipping/types";
 import { CONTAINER_EQUIPMENT } from "@/lib/shipping/types";
 import { allInTotal } from "@/lib/shipping/comparability";
 import type { ComparisonGroupView, RateSearchResponse } from "./shipping-client";
@@ -38,6 +38,7 @@ import PlugIcon from "@/components/icons/ui/PlugIcon";
 import NetworkIcon from "@/components/icons/ui/NetworkIcon";
 import TimerIcon from "@/components/icons/ui/TimerIcon";
 import ExternalLinkIcon from "@/components/icons/ui/ExternalLinkIcon";
+import FilePlusIcon from "@/components/icons/ui/FilePlusIcon";
 
 type T = (key: string, fallback?: string) => string;
 
@@ -82,6 +83,21 @@ export function fmtDate(iso: string | undefined, lang: Lang): string {
   return d.toLocaleDateString("en-GB", { day: "2-digit", month: "2-digit", year: "numeric" });
 }
 
+/** One confidence reason, in the reader's language and the Hub's date format.
+ *
+ *  ⚠️ THE DATE IS FORMATTED HERE, NOT IN THE SCORER. These lines used to be
+ *  English prose built server-side, and `valid to 2026-09-29` printed a raw
+ *  ISO date — a standing-rule break (dates are D/M/Y everywhere) that only
+ *  became visible the day a rate first drew on screen. The scorer now emits a
+ *  code and its slots; the wording and the date belong to the screen. */
+export function reasonText(r: ConfidenceReason, t: T, lang: Lang): string {
+  let out = t(`conf.reason.${r.code}`, r.code);
+  if (r.n != null) out = out.replace("{n}", String(r.n));
+  if (r.date) out = out.replace("{date}", fmtDate(r.date, lang));
+  if (r.text) out = out.replace("{text}", r.text);
+  return out;
+}
+
 export function fmtMoney(n: number, currency: string, lang: Lang): string {
   const loc = lang === "zh" ? "zh-CN" : lang === "ar" ? "ar-EG" : "en-GB";
   try {
@@ -113,12 +129,12 @@ export function KindBadge({ rate, t }: { rate: FreightRate; t: T }) {
   );
 }
 
-function ConfidenceMark({ rate, t }: { rate: FreightRate; t: T }) {
+function ConfidenceMark({ rate, t, lang }: { rate: FreightRate; t: T; lang: Lang }) {
   if (!rate.confidence) return null;
   const level = t(`conf.${rate.confidence}`);
   return (
     <span
-      title={`${t("conf.label")}: ${level} · ${rate.confidenceScore}/100\n${(rate.confidenceReasons ?? []).join("\n")}`}
+      title={`${t("conf.label")}: ${level} · ${rate.confidenceScore}/100\n${(rate.confidenceReasons ?? []).map((r) => reasonText(r, t, lang)).join("\n")}`}
       className={`inline-flex items-center gap-1 text-[11px] font-medium ${CONF_TONE[rate.confidence]}`}
     >
       <span aria-hidden>●</span>
@@ -182,7 +198,7 @@ export function RateRow({ rate, t, lang, quantity = 1 }: { rate: FreightRate; t:
         <div className="min-w-0">
           <div className="mb-1.5 flex flex-wrap items-center gap-1.5">
             <KindBadge rate={rate} t={t} />
-            <ConfidenceMark rate={rate} t={t} />
+            <ConfidenceMark rate={rate} t={t} lang={lang} />
           </div>
           <Amount rate={rate} t={t} lang={lang} />
         </div>
@@ -266,7 +282,7 @@ export function RateRow({ rate, t, lang, quantity = 1 }: { rate: FreightRate; t:
                 <div>
                   <div className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-[var(--text-ghost)]">{t("conf.why")}</div>
                   <ul className="space-y-0.5 text-[11px] text-[var(--text-dim)]">
-                    {rate.confidenceReasons.map((r, i) => <li key={i}>· {r}</li>)}
+                    {rate.confidenceReasons.map((r, i) => <li key={i}>· {reasonText(r, t, lang)}</li>)}
                   </ul>
                 </div>
               ) : null}
@@ -374,6 +390,14 @@ function HistoricalDisclosure({ rates, t, lang, quantity }: { rates: FreightRate
 }
 
 /* ── a comparison group: one product, every source that prices it ───────── */
+/** The rows a card actually draws, in order of how actionable they are.
+ *  Exported so validate:shipping-states can assert it across a JSON
+ *  round-trip — see the note inside GroupCard for why that matters. */
+export function shownRates(group: ComparisonGroupView): FreightRate[] {
+  const ordered: RateKind[] = ["provider", "forwarder", "market"];
+  return ordered.flatMap((k) => currentRates(group.byKind[k] ?? []));
+}
+
 function GroupCard({ group, data, t, lang, quantity }: {
   group: ComparisonGroupView; data: RateSearchResponse; t: T; lang: Lang; quantity: number;
 }) {
@@ -387,9 +411,19 @@ function GroupCard({ group, data, t, lang, quantity }: {
   const reason = current.length ? null : reasonFor(data, group.rates);
 
   /* Order by how actionable the number is, not by price: a bookable rate
-     first, then a quote. */
-  const ordered: RateKind[] = ["provider", "forwarder", "market"];
-  const shown = ordered.flatMap((k) => (group.byKind[k] ?? []).filter((r) => current.includes(r)));
+     first, then a quote.
+
+     ⚠️ FILTERED WITH THE PREDICATE, NOT AGAINST `current`. This read
+     `.filter((r) => current.includes(r))` — reference equality between
+     `group.rates` and `group.byKind[k]`. That holds on the SERVER, where
+     compare() pushes the same object into both, and is destroyed by the wire:
+     JSON.stringify writes each occurrence out in full and JSON.parse builds
+     independent objects, so in the browser the two lists never share a
+     reference and `shown` was ALWAYS empty. The card rendered its heading and
+     its "Lowest bookable" badge over a blank body. Nothing caught it because
+     until a forwarder quote existed there had never been a rate to draw.
+     currentRates() is a pure predicate over each list, so it is immune. */
+  const shown = shownRates(group);
 
   return (
     <section className={"rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-3" + (reason ? " opacity-80" : "")}>
@@ -423,7 +457,7 @@ function GroupCard({ group, data, t, lang, quantity }: {
 
 /* ── the whole result ───────────────────────────────────────────────────── */
 export default function RateResults({
-  data, t, lang, quantity = 1, columns, onViewSources,
+  data, t, lang, quantity = 1, columns, onViewSources, onAddQuote,
 }: {
   data: RateSearchResponse;
   t: T;
@@ -433,6 +467,10 @@ export default function RateResults({
   columns: 1 | 2 | 3;
   /** Brings the existing Rate Sources section into view. Never a second screen. */
   onViewSources?: () => void;
+  /** Opens the forwarder-quote form on this lane. Offered ONLY where a card
+      has no price: it is the one thing the operator can do about it, and it
+      would be noise beside a card that already has a rate. */
+  onAddQuote?: () => void;
 }) {
   /* FCL ASKS ABOUT THREE CONTAINERS AND MUST ANSWER ABOUT THREE.
      The engine groups what it FOUND, so a lane priced only for 20GP rendered a
@@ -472,7 +510,10 @@ export default function RateResults({
         </span>
         <p className="text-[14px] font-semibold text-[var(--text-primary)]">{t(REASON_UI[reason].title)}</p>
         <p className="mx-auto mt-1 max-w-[46ch] text-[12px] text-[var(--text-dim)]">{t(REASON_UI[reason].why)}</p>
-        {onViewSources ? <ViewSources t={t} onClick={onViewSources} /> : null}
+        <div className="mt-3 flex flex-wrap items-center justify-center gap-2">
+          {onAddQuote ? <AddQuote t={t} onClick={onAddQuote} /> : null}
+          {onViewSources ? <ViewSources t={t} onClick={onViewSources} inline /> : null}
+        </div>
       </div>
     );
   }
@@ -492,6 +533,7 @@ export default function RateResults({
               : sharedReason === "expired" ? t("why.expired")
               : t("route.noRate")}
           </p>
+          {onAddQuote ? <AddQuote t={t} onClick={onAddQuote} /> : null}
           {onViewSources && sharedReason !== "no_rate" ? (
             <ViewSources t={t} onClick={onViewSources} inline />
           ) : null}
@@ -548,6 +590,22 @@ function emptyGroup(data: RateSearchResponse, equipment: ContainerEquipment): Co
 
 /** Sends the operator to the Rate Sources section that already exists — never
  *  a second screen explaining the same thing. */
+/** The one action an operator can actually take when no source has a price:
+ *  type in the quotation they already have. It is deliberately NOT styled as
+ *  the primary button — it is an offer, not a prompt to invent a number. */
+function AddQuote({ t, onClick }: { t: T; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="inline-flex h-7 shrink-0 items-center gap-1.5 rounded-lg border border-[var(--border-subtle)] px-2.5 text-[11px] font-medium text-[var(--text-dim)] transition-colors hover:border-[var(--border-focus)] hover:text-[var(--text-primary)]"
+    >
+      <FilePlusIcon size={11} />
+      {t("quote.add")}
+    </button>
+  );
+}
+
 function ViewSources({ t, onClick, inline }: { t: T; onClick: () => void; inline?: boolean }) {
   return (
     <button

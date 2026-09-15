@@ -34,6 +34,7 @@ import { CONTAINER_EQUIPMENT, type ContainerEquipment, type ShippingMode, type V
 import { cbmOf, revenueTons } from "@/lib/shipping/chargeable-weight";
 import SearchCombobox, { type ComboOption } from "./SearchCombobox";
 import RateResults from "./RateResults";
+import ForwarderQuoteModal from "./ForwarderQuoteModal";
 import {
   loadCountries, loadRoutes, saveRoute, searchAirports, searchPorts, searchRates,
   RateSearchError, type AirportHit, type PortCountry, type PortHit, type RateSearchResponse, type SavedRoute,
@@ -59,6 +60,7 @@ import InfoIcon from "@/components/icons/ui/InfoIcon";
 import CrossIcon from "@/components/icons/ui/CrossIcon";
 import RulerIcon from "@/components/icons/ui/RulerIcon";
 import PlusIcon from "@/components/icons/ui/PlusIcon";
+import FilePlusIcon from "@/components/icons/ui/FilePlusIcon";
 
 type PortOpt = ComboOption<PortHit | AirportHit>;
 
@@ -323,6 +325,11 @@ export default function ShippingApp() {
   }, [origin, dest, mode, country?.value.code, equipment, cbm, effectiveCbm, grossKg, rule, parsedDims, t]);
 
   useEffect(() => () => abortRef.current?.abort(), []);
+
+  /* The quote form is opened FROM a lane, never on its own: a forwarder quote
+     filed against a route the operator is not looking at is a quote nobody
+     will ever find again. */
+  const [quoteOpen, setQuoteOpen] = useState(false);
 
   const isFavorite = useMemo(
     () => routes.favorites.some((f) => f.origin_code === originCode && f.destination_code === destCode && f.mode === mode),
@@ -594,6 +601,7 @@ export default function ShippingApp() {
             {origin && dest ? (
               <RouteStrip origin={origin} dest={dest} mode={mode} isFavorite={isFavorite}
                           onToggleFavorite={toggleFavorite} onRefresh={() => run(true)}
+                          onAddQuote={() => setQuoteOpen(true)}
                           busy={busy} cached={data?.servedFromCache ?? false} t={t} narrow={w < 560} />
             ) : null}
 
@@ -603,7 +611,8 @@ export default function ShippingApp() {
 
             {busy ? <ResultSkeleton label={t("load.rates")} cols={cols} />
               : error ? <ErrorPanel error={error} t={t} onRetry={() => run(true)} />
-              : data ? <RateResults data={data} t={t} lang={lang} quantity={quantity} columns={cols} onViewSources={viewSources} />
+              : data ? <RateResults data={data} t={t} lang={lang} quantity={quantity} columns={cols}
+                                    onViewSources={viewSources} onAddQuote={() => setQuoteOpen(true)} />
               : <EmptyPanel t={t} />}
           </main>
 
@@ -636,6 +645,30 @@ export default function ShippingApp() {
           </aside>
         </div>
       </div>
+
+      {/* Mounted only with both ends chosen — the lane is the form's subject,
+          not one of its fields. */}
+      {origin && dest ? (
+        <ForwarderQuoteModal
+          open={quoteOpen}
+          onClose={() => setQuoteOpen(false)}
+          /* Re-run FORCED so the new row is read back and the card repaints
+             with it, rather than the operator saving a price and still looking
+             at the empty state that made them open the form. */
+          onSaved={() => { void run(true); }}
+          lane={{
+            mode,
+            origin: origin.code ?? origin.label,
+            destination: dest.code ?? dest.label,
+            originLabel: origin.label,
+            destinationLabel: dest.label,
+            destinationCountry: country?.value.code,
+            equipment: mode === "ocean_fcl" ? (equipment[0] ?? "40HQ") : undefined,
+          }}
+          t={t}
+          lang={lang}
+        />
+      ) : null}
     </AuroraShell>
   );
 }
@@ -713,9 +746,10 @@ function SearchButton({ t, busy, disabled, onClick, fullWidth }: {
   );
 }
 
-function RouteStrip({ origin, dest, mode, isFavorite, onToggleFavorite, onRefresh, busy, cached, t, narrow }: {
+function RouteStrip({ origin, dest, mode, isFavorite, onToggleFavorite, onRefresh, onAddQuote, busy, cached, t, narrow }: {
   origin: PortOpt; dest: PortOpt; mode: ShippingMode; isFavorite: boolean;
-  onToggleFavorite: () => void; onRefresh: () => void; busy: boolean; cached: boolean;
+  onToggleFavorite: () => void; onRefresh: () => void; onAddQuote: () => void;
+  busy: boolean; cached: boolean;
   t: (k: string, f?: string) => string; narrow: boolean;
 }) {
   const actions = (
@@ -731,6 +765,15 @@ function RouteStrip({ origin, dest, mode, isFavorite, onToggleFavorite, onRefres
         aria-label={t("action.refresh")} title={t("action.refresh")}
         className="flex h-8 w-8 items-center justify-center rounded-lg border border-[var(--border-subtle)] text-[var(--text-ghost)] transition-colors hover:text-[var(--text-primary)] disabled:opacity-40">
         <RefreshIcon size={13} className={busy ? "animate-spin" : undefined} />
+      </button>
+      {/* Sits with the lane, not with the results: a forwarder quote belongs
+          to a ROUTE, and the operator has one in front of them whether or not
+          a search has returned anything. */}
+      <button type="button" onClick={onAddQuote}
+        aria-label={t("quote.add")} title={t("quote.add")}
+        className="flex h-8 items-center gap-1.5 rounded-lg border border-[var(--border-subtle)] px-2 text-[11px] font-medium text-[var(--text-dim)] transition-colors hover:text-[var(--text-primary)]">
+        <FilePlusIcon size={13} />
+        {narrow ? null : <span>{t("quote.addShort")}</span>}
       </button>
     </div>
   );
@@ -751,9 +794,15 @@ function RouteStrip({ origin, dest, mode, isFavorite, onToggleFavorite, onRefres
   if (narrow) {
     return (
       <div className="space-y-2 rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-3 py-2.5">
-        <div className="flex items-center gap-2">
-          <RouteIcon size={15} className="shrink-0 text-[var(--text-ghost)]" />
-          <div className="flex min-w-0 flex-1 items-center gap-2">
+        <div className="flex items-start gap-2">
+          <RouteIcon size={15} className="mt-[3px] shrink-0 text-[var(--text-ghost)]" />
+          {/* WRAPS on a phone. Measured at 375pt: the row needed 334px inside
+              317px, so the destination's UN/LOCODE was clipped away — and a
+              port code is the one thing on this screen that must not be half
+              shown, since EGPSD and EGALY differ by their last three letters.
+              Letting the destination drop to its own line costs a row and
+              keeps both identifiers whole. */}
+          <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-0.5">
             <Endpoint opt={origin} />
             <ArrowRightIcon size={13} className="shrink-0 text-[var(--text-ghost)] rtl:rotate-180" />
             <Endpoint opt={dest} />

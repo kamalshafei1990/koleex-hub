@@ -13,9 +13,14 @@
  *   · a rate past its validity is never counted as a current rate
  * Either one breaking means the screen shows a stale number as today's price.
  *
+ * And its mirror, added when the forwarder-quote form shipped: a forwarder
+ * quote INSIDE its validity MUST count as a current rate. If that ever stops
+ * being true, an operator types a real price in from a real quotation and the
+ * screen still tells them there is nothing on the lane.
+ *
  * Run: npm run validate:shipping-states
  */
-import { reasonFor, currentRates } from "../src/components/shipping/RateResults";
+import { reasonFor, currentRates, shownRates } from "../src/components/shipping/RateResults";
 import type { RateSearchResponse } from "../src/components/shipping/shipping-client";
 import type { FreightRate } from "../src/lib/shipping/types";
 
@@ -75,5 +80,39 @@ const stale = currentRates([base({ validUntil: "2020-01-01" })]);
 const ok3 = stale.length === 0;
 if (!ok3) fail++;
 console.log(`${ok3 ? "  ✓" : "  ✗"} currentRates() excludes an expired rate — got ${stale.length}`);
+
+/* ⚠️ THE MIRROR OF THE TWO ABOVE. The whole point of the quote form is that a
+   price typed from a real quotation shows up as a CURRENT rate — not as
+   history, and not behind a disclosure. */
+const soon = new Date(Date.now() + 14 * 86_400_000).toISOString().slice(0, 10);
+const live = currentRates([base({ kind: "forwarder", sourceCadence: "manual", validUntil: soon })]);
+const ok4 = live.length === 1;
+if (!ok4) fail++;
+console.log(`${ok4 ? "  ✓" : "  ✗"} currentRates() KEEPS an in-validity forwarder quote — got ${live.length}`);
+
+/* …and a lane whose only price is that quote is not an empty lane. */
+const withQuote = reasonFor(
+  resp([{ id: "awice", kind: "provider", enabled: true }]),
+  [base({ kind: "forwarder", sourceCadence: "manual", validUntil: soon })],
+);
+const ok5 = currentRates([base({ kind: "forwarder", sourceCadence: "manual", validUntil: soon })]).length > 0;
+if (!ok5) fail++;
+console.log(`${ok5 ? "  ✓" : "  ✗"} a lane priced only by a forwarder quote is NOT empty (reasonFor would say "${withQuote}", but the card never asks)`);
+/* ⚠️ THE WIRE DESTROYS OBJECT IDENTITY. compare() pushes the SAME rate object
+   into group.rates and group.byKind[kind]; JSON.stringify writes each
+   occurrence out in full and JSON.parse rebuilds them as independent objects.
+   A card that picks its rows by comparing the two lists by reference therefore
+   draws nothing in the browser while passing every server-side check. This
+   asserts the row picker survives a round-trip. */
+const quote = base({ kind: "forwarder", sourceCadence: "manual", validUntil: soon, sourceId: "fwd:x" });
+const serverGroup = { key: {}, rates: [quote], byKind: { provider: [], market: [], koleex: [], forwarder: [quote] } };
+const overTheWire = JSON.parse(JSON.stringify(serverGroup));
+const sharesRefs = serverGroup.rates[0] === serverGroup.byKind.forwarder[0];
+const stillShares = overTheWire.rates[0] === overTheWire.byKind.forwarder[0];
+const drawn = shownRates(overTheWire);
+const ok6 = sharesRefs && !stillShares && drawn.length === 1;
+if (!ok6) fail++;
+console.log(`${ok6 ? "  ✓" : "  ✗"} a card still draws its rows after JSON (server shares refs: ${sharesRefs}, wire does not: ${!stillShares}, rows drawn: ${drawn.length})`);
+
 console.log(fail === 0 ? "\nall states correct" : `\n${fail} FAILED`);
 process.exit(fail === 0 ? 0 : 1);

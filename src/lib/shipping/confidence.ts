@@ -21,7 +21,19 @@
    low-quality presence, and it returns null.
    --------------------------------------------------------------------------- */
 
-import type { ConfidenceLevel, FreightRate, RateKind, RateQuery } from "./types";
+import type { ConfidenceLevel, ConfidenceReason, FreightRate, RateKind, RateQuery } from "./types";
+
+/* ⚠️ A REASON IS A CODE, NOT A SENTENCE.
+   These strings used to be English prose assembled here — "retrieved today",
+   "valid to 2026-09-29", "2 surcharges itemised". They are rendered in the one
+   panel that explains WHY a price scored what it scored, which is the last
+   place an Arabic or Chinese operator should meet untranslated English; and
+   the raw ISO date broke the Hub's standing D/M/Y rule the moment a rate
+   finally drew on screen. So the scorer emits a CODE plus its slots, and the
+   screen owns both the wording and the date format. The arithmetic below is
+   untouched — this changes what the reasons are called, never what they cost. */
+const reason = (code: ConfidenceReason["code"], slots: Omit<ConfidenceReason, "code"> = {}): ConfidenceReason =>
+  ({ code, ...slots });
 
 /* ── weights ────────────────────────────────────────────────────────────────
    They sum to 100. Change one and the others still mean what they say. */
@@ -90,7 +102,7 @@ export interface ConfidenceVerdict {
   score: number;
   level: ConfidenceLevel;
   /** One short sentence per factor, positive or negative. Shown on demand. */
-  reasons: string[];
+  reasons: ConfidenceReason[];
   /** The raw 0-1 factors, for tests and for the diagnostics panel. */
   factors: Record<keyof typeof WEIGHTS, number>;
   cappedByKind: boolean;
@@ -100,16 +112,16 @@ export function scoreConfidence({ rate, query, peers = [], now = Date.now() }: C
   /* No number means no verdict. "Rate unavailable" is its own state. */
   if (rate.amount == null && rate.amountLow == null) return null;
 
-  const reasons: string[] = [];
+  const reasons: ConfidenceReason[] = [];
   const f = {} as Record<keyof typeof WEIGHTS, number>;
 
   /* freshness */
   const age = ageDays(rate.retrievedAt, now);
   f.freshness = freshnessFactor(age);
-  if (age == null) reasons.push("no retrieval time recorded");
-  else if (age <= 1) reasons.push("retrieved today");
-  else if (age <= 7) reasons.push(`${Math.round(age)} days old`);
-  else reasons.push(`${Math.round(age)} days old — freight moves weekly`);
+  if (age == null) reasons.push(reason("noRetrievalTime"));
+  else if (age <= 1) reasons.push(reason("retrievedToday"));
+  else if (age <= 7) reasons.push(reason("daysOld", { n: Math.round(age) }));
+  else reasons.push(reason("daysOldStale", { n: Math.round(age) }));
 
   /* validity */
   if (rate.validUntil) {
@@ -118,45 +130,45 @@ export function scoreConfidence({ rate, query, peers = [], now = Date.now() }: C
       if (end >= now) {
         const left = (end - now) / DAY;
         f.validity = left >= 7 ? 1 : 0.6 + 0.4 * clamp01(left / 7);
-        reasons.push(`valid to ${rate.validUntil}`);
+        reasons.push(reason("validTo", { date: rate.validUntil }));
       } else {
         f.validity = 0;
-        reasons.push(`validity expired ${rate.validUntil}`);
+        reasons.push(reason("validityExpired", { date: rate.validUntil }));
       }
     } else f.validity = 0.3;
   } else {
     /* The source did not state a validity. That is not the same as expired,
        but it is not a commitment either. */
     f.validity = 0.4;
-    reasons.push("no validity stated by the source");
+    reasons.push(reason("noValidity"));
   }
 
   /* route match */
   if (!query) f.routeMatch = 0.8;
   else if (rate.originCode === query.originCode && rate.destinationCode === query.destinationCode) {
     f.routeMatch = 1;
-    reasons.push("exact lane");
+    reasons.push(reason("exactLane"));
   } else {
     f.routeMatch = 0;
-    reasons.push(`priced ${rate.originCode}→${rate.destinationCode}, not the lane asked for`);
+    reasons.push(reason("otherLane", { text: `${rate.originCode}→${rate.destinationCode}` }));
   }
 
   /* equipment match */
   if (rate.mode !== "ocean_fcl") f.equipmentMatch = 1;
   else if (!query?.equipment?.length) f.equipmentMatch = rate.equipment ? 1 : 0.4;
   else if (rate.equipment && query.equipment.includes(rate.equipment)) f.equipmentMatch = 1;
-  else { f.equipmentMatch = 0; reasons.push("container type does not match the search"); }
+  else { f.equipmentMatch = 0; reasons.push(reason("equipmentMismatch")); }
 
   /* surcharges */
   if (rate.surcharges.length > 0) {
     f.surchargesKnown = 1;
-    reasons.push(`${rate.surcharges.length} surcharge${rate.surcharges.length === 1 ? "" : "s"} itemised`);
+    reasons.push(reason(rate.surcharges.length === 1 ? "surchargeItemised" : "surchargesItemised", { n: rate.surcharges.length }));
   } else if (rate.includesDestinationCharges != null || rate.includesOriginCharges != null) {
     f.surchargesKnown = 0.6;
-    reasons.push("inclusions stated, individual surcharges not broken out");
+    reasons.push(reason("inclusionsOnly"));
   } else {
     f.surchargesKnown = 0;
-    reasons.push("freight only — surcharges unknown, the landed figure will be higher");
+    reasons.push(reason("freightOnly"));
   }
 
   /* corroboration: an independent source, on the same lane, comparable scope */
@@ -171,17 +183,17 @@ export function scoreConfidence({ rate, query, peers = [], now = Date.now() }: C
     if (mine == null || theirs == null || p.currency !== rate.currency) return false;
     return Math.abs(theirs - mine) / Math.max(mine, 1) <= 0.15;   // within 15%
   });
-  if (!others.length) { f.corroboration = 0.35; reasons.push("single source"); }
+  if (!others.length) { f.corroboration = 0.35; reasons.push(reason("singleSource")); }
   else if (agreeing.length) {
     f.corroboration = Math.min(1, 0.6 + 0.2 * agreeing.length);
-    reasons.push(`${agreeing.length} independent source${agreeing.length === 1 ? "" : "s"} within 15%`);
-  } else { f.corroboration = 0.15; reasons.push("other sources disagree by more than 15%"); }
+    reasons.push(reason(agreeing.length === 1 ? "corroboratedOne" : "corroborated", { n: agreeing.length }));
+  } else { f.corroboration = 0.15; reasons.push(reason("sourcesDisagree")); }
 
   /* what the source is */
   f.sourceClass = SOURCE_CLASS[rate.kind];
-  if (rate.sourceCadence === "daily") reasons.push("source refreshes once a day");
-  if (rate.kind === "market") reasons.push("market band — indicative, not bookable");
-  if (rate.kind === "koleex") reasons.push("Koleex's own past rate, not today's market");
+  if (rate.sourceCadence === "daily") reasons.push(reason("dailyCadence"));
+  if (rate.kind === "market") reasons.push(reason("marketBand"));
+  if (rate.kind === "koleex") reasons.push(reason("koleexPast"));
 
   let score = 0;
   for (const k of Object.keys(WEIGHTS) as (keyof typeof WEIGHTS)[]) score += WEIGHTS[k] * f[k];

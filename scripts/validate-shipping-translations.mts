@@ -41,6 +41,19 @@ const DYNAMIC: Record<string, string[]> = {
   "kind.__what": ["provider.what", "market.what", "koleex.what", "forwarder.what"],
   "scope.": ["port_to_port", "door_to_port", "port_to_door", "door_to_door", "airport_to_airport"],
   "conf.": ["high", "medium", "low"],
+  /* Every code ConfidenceReason["code"] can be. These render under a price in
+     the panel that explains it — the last place to meet untranslated English. */
+  "conf.__reason": ["reason.noRetrievalTime", "reason.retrievedToday", "reason.daysOld",
+    "reason.daysOldStale", "reason.validTo", "reason.validityExpired", "reason.noValidity",
+    "reason.exactLane", "reason.otherLane", "reason.equipmentMismatch",
+    "reason.surchargeItemised", "reason.surchargesItemised", "reason.inclusionsOnly",
+    "reason.freightOnly", "reason.singleSource", "reason.corroboratedOne", "reason.corroborated",
+    "reason.sourcesDisagree", "reason.dailyCadence", "reason.marketBand", "reason.koleexPast"],
+  /* Every error /api/shipping/quotes can return. t() falls back to the generic
+     sentence, so a missing one is not a blank — but it IS a worse message. */
+  "quote.__err": ["err.save_failed", "err.missing_forwarder", "err.invalid_amount",
+    "err.missing_validity", "err.validity_backwards", "err.missing_equipment",
+    "err.port_unknown", "err.port_ambiguous", "err.port_has_no_code"],
   "src.cadence.": ["realtime", "daily", "historical", "manual"],
   "weight.rule.": ["iata_air", "express_courier"],
   "cmp.diff.": ["mode", "lane", "equipment", "unit", "currency", "scope", "inclusions"],
