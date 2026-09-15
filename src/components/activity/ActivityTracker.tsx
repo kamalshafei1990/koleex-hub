@@ -184,7 +184,16 @@ export default function ActivityTracker() {
     const deviceId = getDeviceId();
     const referrer = lastTrackedPath.current;
     lastTrackedPath.current = pathname;
-    const t = window.setTimeout(() => {
+    /* ⚠️ THE PAGE VIEW WAITS FOR THE SCREEN, like the presence beat and the
+       build check above it. A flat 400ms timer landed this POST in the middle
+       of the opening screen's own fetches — measured on prod inside a
+       /quotations open, where it cost 4.7s of a budget nothing on screen was
+       waiting for. Analytics may never compete with the data a person is
+       looking at; the ceiling keeps a chatty screen from losing the view
+       entirely. */
+    let cancelled = false;
+    void whenNetworkQuiet({ quietMs: 700, maxWaitMs: 6000 }).then(() => {
+      if (cancelled) return;
       void fetch("/api/activity/track", {
         method: "POST",
         credentials: "include",
@@ -199,8 +208,8 @@ export default function ActivityTracker() {
           referrer,
         }),
       }).catch(() => {});
-    }, 400);
-    return () => window.clearTimeout(t);
+    });
+    return () => { cancelled = true; };
   }, [pathname]);
 
   return null;
