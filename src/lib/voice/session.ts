@@ -289,7 +289,25 @@ export type VoiceDeps = {
    enough not to have finished, which is exactly the tunnelled or congested
    one this needs to tolerate. Cutting a slow network off early produces an
    offer with too few candidates: it negotiates, and then connects to nothing. */
-const ICE_GATHER_TIMEOUT_MS = 6_000;
+export const ICE_GATHER_TIMEOUT_MS = 6_000;
+/* …AND THE CEILING IS NOT THE COST (owner, 2026-09-16: "it always like that
+   and not connected fast"; production 17:34 — three seconds between the
+   config read and the offer, while our own handshake answered in 611 ms).
+
+   "Complete" means every transport has heard from every STUN server it was
+   given, INCLUDING the ones that will never answer from a tunnelled mainland
+   exit. The offer does not need that. It needs a route back through the NAT,
+   which is exactly one server-reflexive (or relayed) candidate; the rest of
+   gathering adds near-duplicates from the other servers.
+
+   So the wait now ends when that candidate is in hand and a short settle
+   window has passed — long enough for the two or three that arrive with it,
+   short enough to be invisible. The six seconds stay as the ceiling for a
+   network that produces none, and the old fear is unchanged by this: we are
+   not cutting gathering off early, we are ending it once it has produced the
+   thing the far side needs. Host candidates alone never end it — on a phone
+   behind carrier NAT they are the ones that connect to nothing. */
+export const ICE_SETTLE_MS = 250;
 
 /* THE LOOP GUARD, at source. Generous enough that a real conversation never
    reaches it — a caller asking follow-up questions for ten minutes stays well
@@ -442,25 +460,61 @@ const DATA_CHANNEL_LABEL = "koleex-events";
    changed, only who writes it.
    --------------------------------------------------------------------------- */
 
-/** Resolve when the connection has finished gathering candidates, or when the
- *  budget runs out. Never rejects — a timeout here is a degraded offer, not a
- *  failed call. */
-export function waitForIceGathering(pc: RTCPeerConnection, timeoutMs: number): Promise<void> {
-  if (pc.iceGatheringState === "complete") return Promise.resolve();
-  return new Promise<void>((resolve) => {
+/** What kind of route a candidate line describes. Pure: the type rides in the
+ *  line itself as `typ <kind>`, which every browser writes and which is
+ *  readable without trusting an optional property on the candidate object. */
+export function candidateKind(line: string): "host" | "srflx" | "prflx" | "relay" | "" {
+  const m = /(?:^|\s)typ\s+(host|srflx|prflx|relay)(?:\s|$)/.exec(line ?? "");
+  return m ? (m[1] as "host" | "srflx" | "prflx" | "relay") : "";
+}
+
+/** A candidate that gives the far side a way back through the NAT. A host
+ *  candidate does not: it is this device's own address on its own network. */
+export function candidateIsReachable(line: string): boolean {
+  const kind = candidateKind(line);
+  return kind === "srflx" || kind === "prflx" || kind === "relay";
+}
+
+/** Resolve when the offer is worth sending — gathering finished, or a route
+ *  back through the NAT is in hand and the settle window has passed — or when
+ *  the budget runs out. Never rejects: a timeout here is a degraded offer,
+ *  not a failed call. Returns how long it waited, for the beacon. */
+export function waitForIceGathering(
+  pc: RTCPeerConnection,
+  timeoutMs: number,
+  opts?: { settleMs?: number; now?: () => number },
+): Promise<number> {
+  const clock = opts?.now ?? (() => Date.now());
+  const startedAt = clock();
+  if (pc.iceGatheringState === "complete") return Promise.resolve(0);
+  return new Promise<number>((resolve) => {
     let done = false;
+    let settle: ReturnType<typeof setTimeout> | null = null;
     const finish = () => {
       if (done) return;
       done = true;
       clearTimeout(timer);
+      if (settle !== null) clearTimeout(settle);
       pc.removeEventListener?.("icegatheringstatechange", onChange);
-      resolve();
+      pc.removeEventListener?.("icecandidate", onCandidate as EventListener);
+      resolve(clock() - startedAt);
     };
     const onChange = () => {
       if (pc.iceGatheringState === "complete") finish();
     };
+    /* A null candidate is the end-of-candidates signal; some browsers send it
+       before the state settles. A reachable one starts the settle window,
+       which is not restarted by the ones that follow it. */
+    const onCandidate = (ev: RTCPeerConnectionIceEvent) => {
+      const line = ev.candidate?.candidate ?? "";
+      if (!ev.candidate) { finish(); return; }
+      if (settle === null && candidateIsReachable(line)) {
+        settle = setTimeout(finish, Math.max(0, opts?.settleMs ?? ICE_SETTLE_MS));
+      }
+    };
     const timer = setTimeout(finish, timeoutMs);
     pc.addEventListener?.("icegatheringstatechange", onChange);
+    pc.addEventListener?.("icecandidate", onCandidate as EventListener);
   });
 }
 
@@ -783,6 +837,10 @@ export class VoiceSession {
   private wsRotations = 0;
   /** The mainland lane's inbound audio, sampled every few seconds while the
    *  peer connection lives (startRtcStats), for the beacon. */
+  /* HOW LONG THE OFFER WAITED ON ICE, in the beacon beside the rest of the
+     RTC line — so "not connected fast" can be read off a call rather than
+     guessed at. 0 until a WebRTC call has gathered. */
+  private gatherMs = 0;
   private rtcStats = "";
   private rtcStatsTimer: ReturnType<typeof setInterval> | null = null;
   /* THE PATH AND THE PAGE, TOLD APART (2026-09-13: thirteen underruns in
@@ -1043,7 +1101,7 @@ export class VoiceSession {
       mic_peak: capture?.peak ?? 0,
       mic: this.micState(),
       call: this.callId,
-      rtc: this.rtcStats ? `${this.rtcStats} stall=${this.stallMaxMs}` : "",
+      rtc: this.rtcStats || this.gatherMs ? `${this.rtcStats} stall=${this.stallMaxMs} gather=${this.gatherMs}` : "",
     };
   }
 
@@ -2501,8 +2559,12 @@ export class VoiceSession {
          The first version of this file did exactly that. The vendor's own
          guidance is explicit: *"Wait for iceGatheringState === 'complete'
          before using the SDP. At that point, the SDP contains all ICE
-         candidate information."* */
-      await waitForIceGathering(pc, this.deps.iceTimeoutMs ?? ICE_GATHER_TIMEOUT_MS);
+         candidate information."*
+
+         What the wait ends ON is the part that changed (2026-09-16): a route
+         back through the NAT, plus a settle window — not the last STUN server
+         on a tunnelled exit finally giving up. See ICE_SETTLE_MS. */
+      this.gatherMs = await waitForIceGathering(pc, this.deps.iceTimeoutMs ?? ICE_GATHER_TIMEOUT_MS);
 
       /* The client asks; the server decides. An unknown key is ignored server
          side rather than rejected, so a stale preference degrades to the

@@ -1455,3 +1455,55 @@ fetched and decoded once so the first cue of a session is not late.
 assert the rule rather than a list — every moment on, every cue in the
 catalogue played by something in the app. Mutation-tested: unwiring
 `action-denied` fails four checks, returning one cue to silent fails two.
+
+## "It always like that and not connected fast" (2026-09-16)
+
+Screenshot: "STILL CONNECTING — the voice service is slow right now … 12s".
+The caption appears at eight seconds (CONNECTING_SLOW_MS); the counter read
+twelve.
+
+**What the logs say.** The call is in production at 17:34 UTC:
+
+| t | line |
+|---|---|
+| 17:34:03 | `GET /api/ai/voice/session` — `lane=ws country=US`; `auth.resolve total_ms=817` (db 518) |
+| 17:34:06 | `POST /api/ai/voice/session` — `handshake ok attempt=1/2 slot=primary from=sin1 afterMs=611 budgetMs=7000` |
+
+So the server was not slow: our handshake to the voice region answered in
+**611 ms**, from Singapore, first attempt. The session route is already
+pinned to `sin1` in `vercel.json`, which matters — the watchdog shows the
+primary region is unreachable from Tokyo (`from=hnd1 … afterMs=10491
+UND_ERR_CONNECT_TIMEOUT`, every run) and healthy from Singapore
+(`from=sin1 … afterMs=494`). Nothing to fix there; worth knowing.
+
+The three seconds between the two lines are the client's, and they are the
+part we own.
+
+**The cause.** `waitForIceGathering` waited for
+`iceGatheringState === "complete"` with a six-second ceiling. "Complete"
+means every transport has heard from every STUN server it was handed —
+including the ones that never answer from a tunnelled mainland exit. The
+offer does not need that. It needs one route back through the NAT.
+
+**The fix.** The wait now ends on the first server-reflexive (or relayed)
+candidate plus a 250 ms settle window, keeping the six seconds as the
+ceiling for a network that produces none. A **host** candidate never ends
+it — behind carrier NAT that is the offer that "negotiates, and then
+connects to nothing", which is what the old comment was protecting against
+and still is. This is not cutting gathering off early: it ends once
+gathering has produced the thing the far side needs.
+
+`candidateKind` / `candidateIsReachable` read `typ <kind>` from the
+candidate line itself rather than trusting an optional property, and are
+pure. The wait now returns how long it took, and that rides the beacon as
+`gather=` beside `rtc=` — so the next slow call is read, not guessed.
+
+**What this does not fix.** After the offer is posted the ICE *connection*
+still has to form, and on this path that is the network. The socket lane
+exists for exactly that; a mainland-lane call that stalls in ICE has no
+automatic escape to it, only "Try again". That is the next thing to look
+at if the owner still sees long connects with `gather=` reading small.
+
+**Suites.** `validate:voice-client` 768 (+6). Mutation-tested: letting a
+host candidate end the wait fails two checks, restoring the wait-for-
+complete behaviour fails one.

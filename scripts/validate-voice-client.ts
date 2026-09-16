@@ -14,7 +14,7 @@
    rather than on the happy one.
    --------------------------------------------------------------------------- */
 
-import { VoiceSession, describeError, HANDSHAKE_PATH, WS_SESSION_PATH, failureForStatus, type VoiceSocket, waitForIceGathering, normalizeSdp, type VoiceDeps, type VoiceState, type VoiceFailure,
+import { VoiceSession, describeError, HANDSHAKE_PATH, WS_SESSION_PATH, failureForStatus, type VoiceSocket, waitForIceGathering, candidateKind, candidateIsReachable, ICE_GATHER_TIMEOUT_MS, ICE_SETTLE_MS, normalizeSdp, type VoiceDeps, type VoiceState, type VoiceFailure,
   TOOL_PATH, TOOL_RESPONSE_CREATE_FALLBACK_MS, TOOL_RESPONSE_MAX_DEFERRALS, WS_KEEPALIVE_MS, WS_KEEPALIVE_MESSAGE,
 } from "../src/lib/voice/session";
 import { TranscriptPersister, TRANSCRIPT_PATH, MAX_TURNS_PER_POST, MAX_POST_FAILURES, type SavedTurn } from "../src/lib/voice/persist";
@@ -405,6 +405,79 @@ async function main() {
         await waitForIceGathering(pc, 50);
         return true;
       })());
+
+    /* ── THE OFFER LEAVES WHEN IT IS WORTH SENDING (owner, 2026-09-16: "it
+       always like that and not connected fast"; production 17:34 — three
+       seconds between the config read and the offer, while our own handshake
+       answered in 611 ms). "Complete" waits on every STUN server a tunnelled
+       mainland exit was given, including the ones that never answer. ── */
+    check("a candidate line names its own kind, and only a route back through the NAT counts as reachable",
+      candidateKind("candidate:1 1 udp 2113937151 192.168.1.9 5353 typ host generation 0") === "host" &&
+      candidateKind("candidate:2 1 udp 1677729535 3.4.5.6 57621 typ srflx raddr 192.168.1.9 rport 5353") === "srflx" &&
+      candidateKind("candidate:3 1 udp 41885439 7.8.9.1 62000 typ relay raddr 0.0.0.0 rport 0") === "relay" &&
+      candidateKind("candidate:4 1 udp 1 1.2.3.4 1 typ prflx") === "prflx" &&
+      candidateKind("") === "" && candidateKind("a=end-of-candidates") === "" &&
+      /* "typ" inside an address or a foundation is not a kind. */
+      candidateKind("candidate:typhost 1 udp 1 1.2.3.4 1") === "" &&
+      !candidateIsReachable("candidate:1 1 udp 2113937151 192.168.1.9 5353 typ host") &&
+      candidateIsReachable("candidate:2 1 udp 1 3.4.5.6 1 typ srflx") &&
+      candidateIsReachable("candidate:3 1 udp 1 7.8.9.1 1 typ relay"));
+
+    {
+      /* A connection that gathers a host candidate, then a reflexive one, and
+         then never finishes — the tunnelled exit. Ordering, not wall-clock:
+         what matters is that the wait ended on the reflexive candidate rather
+         than on the six-second ceiling. */
+      const mk = () => {
+        const on: Record<string, Array<(ev: unknown) => void>> = {};
+        return {
+          pc: {
+            iceGatheringState: "gathering",
+            addEventListener: (ev: string, fn: (e: unknown) => void) => { (on[ev] ??= []).push(fn); },
+            removeEventListener: () => {},
+          } as unknown as RTCPeerConnection,
+          fire: (ev: string, e: unknown) => { for (const fn of on[ev] ?? []) fn(e); },
+          listening: (ev: string) => (on[ev] ?? []).length > 0,
+        };
+      };
+      const host = { candidate: { candidate: "candidate:1 1 udp 1 192.168.1.9 5353 typ host" } };
+      const srflx = { candidate: { candidate: "candidate:2 1 udp 1 3.4.5.6 1 typ srflx" } };
+
+      const a = mk();
+      const waitedA = waitForIceGathering(a.pc, 6_000, { settleMs: 5 });
+      a.fire("icecandidate", host);
+      const stillWaiting = await Promise.race([waitedA.then(() => "ended"), new Promise((r) => setTimeout(() => r("waiting"), 25))]);
+      check("a host candidate alone does not end the wait — on a phone behind carrier NAT it connects to nothing", stillWaiting === "waiting");
+      a.fire("icecandidate", srflx);
+      const ms = await Promise.race([waitedA, new Promise<number>((r) => setTimeout(() => r(-1), 500))]);
+      check("  …and a reflexive one does, after the settle window, well inside the six-second ceiling",
+        ms >= 0 && ms < 1_000 && ICE_GATHER_TIMEOUT_MS === 6_000 && ICE_SETTLE_MS === 250);
+
+      const b = mk();
+      const waitedB = waitForIceGathering(b.pc, 6_000, { settleMs: 5 });
+      b.fire("icecandidate", { candidate: null });
+      check("the end-of-candidates signal ends the wait too", (await Promise.race([waitedB.then(() => true), new Promise((r) => setTimeout(() => r(false), 200))])) === true);
+
+      const c = mk();
+      const waitedC = waitForIceGathering(c.pc, 30, { settleMs: 5 });
+      c.fire("icecandidate", host);
+      check("a network that produces no route back still leaves on the ceiling, with the offer it has",
+        (await Promise.race([waitedC.then(() => true), new Promise((r) => setTimeout(() => r(false), 400))])) === true);
+
+      const d = mk();
+      const waitedD = waitForIceGathering(d.pc, 6_000, { settleMs: 5 });
+      check("both signals are listened for, and the state change still ends it", d.listening("icecandidate") && d.listening("icegatheringstatechange") &&
+        await (async () => {
+          (d.pc as unknown as { iceGatheringState: string }).iceGatheringState = "complete";
+          d.fire("icegatheringstatechange", {});
+          return (await Promise.race([waitedD.then(() => true), new Promise((r) => setTimeout(() => r(false), 200))])) === true;
+        })());
+    }
+    {
+      const sessSrc = (await import("node:fs")).readFileSync("src/lib/voice/session.ts", "utf8");
+      check("the offer's own wait rides the beacon, so a slow connect can be read off a call rather than guessed",
+        /this\.gatherMs = await waitForIceGathering\(/.test(sessSrc) && /gather=\$\{this\.gatherMs\}/.test(sessSrc));
+    }
   }
 
   console.log("\n── 5. The DataChannel the client must open itself ──");
@@ -3649,7 +3722,7 @@ function describeErrorCheck(): boolean {
     (() => {
       const se = readFileSync("src/lib/voice/session.ts", "utf8");
       return /const STALL_EVERY_MS = 250;/.test(se) && /:g\$\{this\.wsMaxDeltaGapMs\}:m\$\{this\.stallMaxMs\}` : "",/.test(se) &&
-        /rtc: this\.rtcStats \? `\$\{this\.rtcStats\} stall=\$\{this\.stallMaxMs\}` : "",/.test(se) &&
+        /rtc: this\.rtcStats \|\| this\.gatherMs \? `\$\{this\.rtcStats\} stall=\$\{this\.stallMaxMs\} gather=\$\{this\.gatherMs\}` : "",/.test(se) &&
         /sconc=\$\{r\.silentConcealedSamples \?\? 0\} jbd=\$\{jbd\}/.test(se) &&
         /if \(this\.wsLastDeltaAt > 0\) \{\s*const gap = arrivedAt - this\.wsLastDeltaAt;\s*if \(gap > this\.wsMaxDeltaGapMs\) this\.wsMaxDeltaGapMs = gap;\s*\}/.test(se) &&
         /this\.wsLastDeltaAt = 0;\s*try \{\s*audio\.endOfResponse\?\.\(\);/.test(se) &&
