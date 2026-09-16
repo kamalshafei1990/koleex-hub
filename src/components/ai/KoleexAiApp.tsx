@@ -26,7 +26,8 @@ import dynamic from "next/dynamic";
 import { useInput } from "@/components/kds/useInput";
 import Link from "next/link";
 import { useSkin } from "@/lib/appearance";
-import { playSound } from "@/lib/sounds/player";
+import { playSound, primeSounds } from "@/lib/sounds/player";
+import type { SoundKey } from "@/lib/sounds/catalog";
 import type { TaskCardState } from "@/components/ai/TaskCard";
 import { useTranslation, type Lang } from "@/lib/i18n";
 import ArrowLeftIcon from "@/components/icons/ui/ArrowLeftIcon";
@@ -138,6 +139,15 @@ const SIDEBAR_W = 248;
 
 /* How many project rows show before "See more". */
 const PROJECTS_COLLAPSED = 4;
+
+/* The cues a typed turn can reach, warmed on mount. The call's list lives
+   in VoiceCallButton beside the tap that needs it. */
+const CHAT_CUES: readonly SoundKey[] = [
+  "message-sent", "reply-received", "error", "copied", "deleted",
+  "generation-stopped", "attachment-ready", "attachment-failed",
+  "back-online", "call-interrupted",
+  "approval-needed", "action-done", "action-cancelled", "action-denied",
+];
 
 export default function KoleexAiApp() {
   const { askInput, inputDialog } = useInput();
@@ -1625,16 +1635,27 @@ export default function KoleexAiApp() {
         body: JSON.stringify({ conversation_id: conversationId, name: pending.tool, arguments: pending.args, via: "tap" }),
       });
       const body = res.ok
-        ? ((await res.json()) as { output?: { ok?: boolean; message?: string | null; data?: { id?: unknown } | null }; message?: ChatMsg })
+        ? ((await res.json()) as { output?: { ok?: boolean; status?: string; message?: string | null; data?: { id?: unknown } | null }; message?: ChatMsg })
         : null;
       if (!body?.output?.ok) {
         setTaskCards((prev) => ({ ...prev, [msgId]: { state: "failed" } }));
-        playSound("error");
+        /* A REFUSAL IS NOT A FAULT. The server answers a tap it will not
+           carry out with 403 (the tool is not on the chat-confirm list) or
+           with status "denied" (dispatchTool re-checked the caller's
+           permission — "assign to everyone" needs an admin). That is the
+           action-denied cue's whole purpose, and until now it was the one
+           moment in the catalog nothing ever played. Everything else here
+           is a real failure and keeps the error cue. */
+        const denied = res.status === 403 || body?.output?.status === "denied";
+        playSound(denied ? "action-denied" : "error");
         return;
       }
       const todoId = typeof body.output.data?.id === "string" ? body.output.data.id : null;
       setTaskCards((prev) => ({ ...prev, [msgId]: { state: "saved", text: body.output?.message ?? undefined, todoId } }));
-      playSound("reply-received");
+      /* THE SAME TAP AS THE CALL SCREEN'S, so the same cue: action-done
+         ("a task saved"). This played reply-received — the cue for an
+         answer arriving — which said the wrong thing about a write. */
+      playSound("action-done");
       if (body.message && typeof body.message.id === "string" && activeIdRef.current === conversationId) {
         const row = body.message;
         setMessages((prev) => (prev.some((m) => m.id === row.id) ? prev : [...prev, row]));
@@ -1646,6 +1667,17 @@ export default function KoleexAiApp() {
   }, []);
   const onCancelTask = useCallback((msgId: string) => {
     setTaskCards((prev) => ({ ...prev, [msgId]: { state: "cancelled" } }));
+    playSound("action-cancelled");
+  }, []);
+
+  /* THE CHAT'S OWN CUES, WARMED. The call warms its seventeen inside the
+     tap that starts it (primeSounds(CALL_CUES)); the thread warmed none, so
+     the first cue of a session decoded while it was meant to be playing.
+     These are the ones a typed turn can reach; the engine fetches each once
+     and keeps it. Cheap (every file is under 16 KB) and silent — priming
+     plays nothing. */
+  useEffect(() => {
+    primeSounds(CHAT_CUES);
   }, []);
 
   /** Regenerate the last assistant reply. Finds the most recent
@@ -2136,9 +2168,25 @@ export default function KoleexAiApp() {
   useEffect(() => {
     if (prevSendingRef.current && !sending) {
       setOrbPulse(error ? "error" : "success");
-      /* A reply that arrived whole. Not one the caller stopped, and not a
-         failure — the error cue already spoke for that. Off by default. */
-      if (!error && !(lastMsg?.role === "assistant" && lastMsg.stopped)) playSound("reply-received");
+      /* THE TURN'S ONE CUE. A reply that arrived whole — not one the caller
+         stopped, and not a failure, which the error cue already spoke for.
+         A turn that ends with a TASK CARD waiting says that instead: the
+         same moment a call announces with approval-needed the instant the
+         write tool's preview arrives (VoiceCallButton, onPendingWrite),
+         which in the thread happened in silence. One or the other, never
+         both — a cue is one signal, not a rhythm (sounds/player.ts). It
+         rides the end of a turn rather than the arrival of a message, so
+         opening a thread that already holds a card stays quiet. */
+      const waitingOnTap = (lastMsg?.steps ?? []).some(
+        (st) =>
+          st.kind === "tool-result" &&
+          st.permissionStatus === "approval_required" &&
+          !!st.pending &&
+          typeof st.pending.tool === "string",
+      );
+      if (!error && !(lastMsg?.role === "assistant" && lastMsg.stopped)) {
+        playSound(waitingOnTap ? "approval-needed" : "reply-received");
+      }
     }
     prevSendingRef.current = sending;
   }, [sending, error, lastMsg]);
