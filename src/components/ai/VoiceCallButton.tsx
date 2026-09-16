@@ -693,10 +693,15 @@ export default function VoiceCallButton({
           via: "tap",
         }),
       });
-      const body = res.ok ? ((await res.json()) as { output?: { ok?: boolean } }) : null;
+      const body = res.ok ? ((await res.json()) as { output?: { ok?: boolean; status?: string } }) : null;
       if (!body?.output?.ok) {
         setWriteError(true);
-        playSound("error");
+        /* A REFUSAL IS NOT A FAULT — the same distinction the thread now
+           draws: 403 (the tool is not one a tap may confirm) or status
+           "denied" (the caller's permission was re-checked and said no) is
+           the action-denied cue; anything else is the error cue. */
+        const denied = res.status === 403 || body?.output?.status === "denied";
+        playSound(denied ? "action-denied" : "error");
         return;
       }
       const title = String(pending.args.title ?? "").slice(0, 200);
@@ -891,7 +896,7 @@ export default function VoiceCallButton({
        the engine still does. */
     tonesRef.current = new CallTones(transportRef.current === "ws" ? () => null : browserToneContext);
     tonesRef.current.prime();
-    const CALL_CUES = ["call-dialing", "call-ready", "call-reconnecting", "call-recovered", "call-failed", "call-end", "mic-mute", "mic-unmute", "ptt-start", "ptt-stop", "thinking", "pictures-shown", "approval-needed", "action-done", "action-cancelled", "summary-ready", "error"] as const;
+    const CALL_CUES = ["call-dialing", "call-ready", "call-reconnecting", "call-recovered", "call-failed", "call-end", "mic-mute", "mic-unmute", "ptt-start", "ptt-stop", "thinking", "pictures-shown", "approval-needed", "action-done", "action-cancelled", "action-denied", "summary-ready", "error"] as const;
     setCueSink((bytes, volume) => {
       const viaCall = sessionRef.current?.playCue(bytes, volume) ?? null;
       if (viaCall) return viaCall;

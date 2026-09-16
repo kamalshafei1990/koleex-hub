@@ -1416,3 +1416,42 @@ paragraph, its Arabic runs in left-to-right order.
 - **Suites.** `validate:ai-client-render` 279 (+7): the owner's shape, a
   URL, inline code, the block thresholds, the rendered `dir` per block in
   both bubble directions, the code block, the calls panel unchanged.
+
+## "All sounds are good — keep them all and wire them" (2026-09-16)
+
+The glass family shipped in #415 with a catalogue of thirty moments, a
+player, recordings, a settings sheet and a preview page. Having heard the
+recorded set end to end the owner approved all of it and asked for it to be
+connected. Three things were in the way.
+
+- **Twenty-six of the thirty were silent by default.** The first decision
+  (2026-09-12 evening, on the synthesised family: "too many — keep the
+  sounds for basic things") left only four on: the line came back, the call
+  ended, the call failed, an error. Every other cue existed, had a call
+  site, and never played unless someone went to Settings → Sounds and woke
+  it. Every moment now starts on; the switch is how one goes quiet. The
+  catalogue records both decisions and which one stands.
+- **`action-denied` was never played by anything.** It was in the
+  catalogue, in the settings sheet and on the preview page from the first
+  day; both lanes answered a refusal with the generic error cue. A tap the
+  server will not carry out — 403, or `status: "denied"` after
+  `dispatchTool` re-checks the caller's permission — now says so, on the
+  call screen and in the thread. A real fault still says error.
+- **The thread's task card was mute, or spoke the wrong cue.** The card
+  shipped with the tasks work (#428–#431), after the sounds; the call
+  screen has announced the same three moments since #415. Saving played
+  `reply-received` — the cue for an answer arriving — and now plays
+  `action-done` ("a task saved"). Cancelling played nothing and now plays
+  `action-cancelled`. A turn that ends with a card waiting plays
+  `approval-needed` INSTEAD of the reply cue, never both, and rides the end
+  of the turn rather than a message's arrival — so opening a thread that
+  already holds a card stays quiet.
+
+Also: the thread warms its own cues on mount, as the call warms its
+seventeen inside the tap that starts it. Nothing plays; the files are
+fetched and decoded once so the first cue of a session is not late.
+
+**Suites.** `validate:voice-client` 761 (+5), and the catalogue's pins now
+assert the rule rather than a list — every moment on, every cue in the
+catalogue played by something in the app. Mutation-tested: unwiring
+`action-denied` fails four checks, returning one cue to silent fails two.

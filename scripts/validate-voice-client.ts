@@ -2568,7 +2568,7 @@ console.log("\n── 12. Mute ──");
   const btn26 = fs22.readFileSync("src/components/ai/VoiceCallButton.tsx", "utf8");
   check("the tap posts the previewed arguments with confirm:true marked via tap to the fixed tool path, then tells the model in a note; a cancel tells it too; hang-up clears the card",
     /fetch\(TOOL_PATH, \{\s*method: "POST",\s*credentials: "include",[\s\S]{0,300}?name: pending\.tool,[\s\S]{0,120}?arguments: JSON\.stringify\(\{ \.\.\.pending\.args, confirm: true \}\),\s*via: "tap",/.test(btn26) &&
-    /if \(!body\?\.output\?\.ok\) \{\s*setWriteError\(true\);\s*playSound\("error"\);\s*return;\s*\}/.test(btn26) &&
+    /if \(!body\?\.output\?\.ok\) \{\s*setWriteError\(true\);[\s\S]{0,600}?const denied = res\.status === 403 \|\| body\?\.output\?\.status === "denied";\s*playSound\(denied \? "action-denied" : "error"\);\s*return;\s*\}/.test(btn26) &&
     /session\?\.sendNote\(`\(Screen: the caller tapped Confirm/.test(btn26) &&
     /sessionRef\.current\?\.sendNote\("\(Screen: the caller cancelled the task card/.test(btn26) &&
     /releaseWakeLock\(\);\s*setPendingWrite\(null\);/.test(btn26) &&
@@ -4490,13 +4490,18 @@ console.log("\n── 42. the sound catalog: one family, pinned grammar, the cal
       const n = cat.soundByKey(k).notes;
       return n.length === 2 && n.every((x) => x.wave === "triangle" && x.freq <= 1400);
     }));
-  check("the thinking tick sits well under the assistant's voice and is off by default; copied is a single tick",
-    cat.soundByKey("thinking").notes.length === 1 && (cat.soundByKey("thinking").notes[0].level ?? 1) <= 0.4 && !cat.soundByKey("thinking").defaultOn &&
+  check("the thinking tick sits well under the assistant's voice; copied is a single tick",
+    cat.soundByKey("thinking").notes.length === 1 && (cat.soundByKey("thinking").notes[0].level ?? 1) <= 0.4 &&
     cat.soundByKey("copied").notes.length === 1 && cat.soundLength(cat.soundByKey("copied").notes) <= 0.05);
   check("the call keeps the cues the owner already approved, note for note",
     cat.soundByKey("call-ready").notes === tn.READY_TONE && cat.soundByKey("call-recovered").notes === tn.RECOVERED_TONE);
-  check("the per-turn cues of a typed chat start OFF; the ones that mark a state change start on",
-    !cat.soundByKey("message-sent").defaultOn && !cat.soundByKey("reply-received").defaultOn && !cat.soundByKey("thinking").defaultOn && cat.soundByKey("error").defaultOn && !cat.soundByKey("call-ready").defaultOn /* owner, 2026-09-13: "remove the sound of listening" */);
+  /* THE OWNER'S SECOND DECISION (2026-09-16: "all sounds are good keep them
+     all and wire them"), which replaces the first (2026-09-12 evening: "too
+     many"). Every moment starts on; Settings → Sounds is how one goes quiet.
+     Pinned as ALL rather than a list, so a cue added later cannot arrive
+     silent by accident and pass. */
+  check("every moment in the catalogue starts on — the owner's second decision, after hearing the recorded set",
+    cat.SOUND_CATALOG.every((s) => s.defaultOn) && cat.SOUND_CATALOG.length >= 30);
   {
     /* scheduleTone honours the two new fields and defaults them away. */
     const made: Array<{ type: string; peak: number }> = [];
@@ -4516,13 +4521,16 @@ console.log("\n── 42. the sound catalog: one family, pinned grammar, the cal
     check("every cue names a recording that ships with the app, under the moment's own name, with the CC0 notice beside it",
       cat.SOUND_CATALOG.every((s) => s.file === s.key && fsG.existsSync(`public/sounds/ai/${s.file}.mp3`) && fsG.statSync(`public/sounds/ai/${s.file}.mp3`).size > 500 && fsG.statSync(`public/sounds/ai/${s.file}.mp3`).size < 60_000) &&
       /CC0 1\.0/.test(fsG.readFileSync("public/sounds/ai/NOTICE.txt", "utf8")));
-    check("only the moments a caller must not miss start on — ready, line back, ended, failed, error — everything else waits in Settings (owner, 2026-09-12 evening)",
-      cat.SOUND_CATALOG.filter((s) => s.defaultOn).map((s) => s.key).sort().join() === "call-end,call-failed,call-recovered,error");
+    check("no moment is left silent by default, and the four the first decision kept are still among them",
+      cat.SOUND_CATALOG.filter((s) => !s.defaultOn).length === 0 &&
+      (["call-end", "call-failed", "call-recovered", "error"] as const).every((k) => cat.soundByKey(k).defaultOn));
     const player = await import("../src/lib/sounds/player");
     const base = { master: true, dnd: false, volume: 0.8, notification: { enabled: true, tone: "classic" as const }, message: { enabled: true, tone: "classic" as const }, call: { enabled: true, tone: "ping" as const }, ai: { enabled: true, muted: [] as string[] } };
     check("a moment is on by its default, off when silenced, on when woken; the master and the Koleex AI switch silence everything; do-not-disturb does not",
-      player.soundEnabled("call-end", base) && !player.soundEnabled("copied", base) &&
+      player.soundEnabled("call-end", base) && player.soundEnabled("copied", base) &&
       !player.soundEnabled("call-end", { ...base, ai: { enabled: true, muted: ["call-end"] } }) &&
+      !player.soundEnabled("copied", { ...base, ai: { enabled: true, muted: ["copied"] } }) &&
+      /* The waking path stays live for a cue that ships off one day. */
       player.soundEnabled("copied", { ...base, ai: { enabled: true, muted: ["+copied"] } }) &&
       !player.soundEnabled("call-end", { ...base, master: false }) && !player.soundEnabled("call-end", { ...base, ai: { enabled: false, muted: [] } }) &&
       player.soundEnabled("call-end", { ...base, dnd: true }));
@@ -4531,9 +4539,9 @@ console.log("\n── 42. the sound catalog: one family, pinned grammar, the cal
         const writes: Array<{ ai: { muted: string[] } }> = [];
         const set = (p: { ai: { muted: string[] } }) => writes.push(p);
         player.setSoundMoment("call-end", false, set, base);
-        player.setSoundMoment("copied", true, set, base);
-        player.setSoundMoment("call-end", true, set, { ...base, ai: { enabled: true, muted: ["call-end", "+copied"] } });
-        return writes.map((w) => w.ai.muted.join("|")).join(";") === "call-end;+copied;+copied";
+        player.setSoundMoment("copied", false, set, { ...base, ai: { enabled: true, muted: ["call-end"] } });
+        player.setSoundMoment("call-end", true, set, { ...base, ai: { enabled: true, muted: ["call-end", "copied"] } });
+        return writes.map((w) => w.ai.muted.join("|")).join(";") === "call-end;call-end|copied;copied";
       })());
     check("the recording's path is under the app's own origin, never a vendor host", player.soundSrc("call-ready") === "/sounds/ai/call-ready.mp3");
     const btnS = fsG.readFileSync("src/components/ai/VoiceCallButton.tsx", "utf8");
@@ -4543,6 +4551,36 @@ console.log("\n── 42. the sound catalog: one family, pinned grammar, the cal
       wired(btnS, ["call-dialing", "call-ready", "call-reconnecting", "call-recovered", "call-failed", "call-end", "mic-mute", "mic-unmute", "ptt-start", "ptt-stop", "thinking", "pictures-shown", "voice-switched", "summary-ready", "dictation-start", "dictation-stop", "approval-needed", "action-done", "action-cancelled"]) &&
       wired(appS, ["error", "back-online", "copied", "attachment-ready", "attachment-failed", "call-interrupted", "generation-stopped", "message-sent", "reply-received", "deleted"]) &&
       /const CALL_CUES = \["call-dialing"/.test(btnS) && /primeSounds\(CALL_CUES\);/.test(btnS) && /if \(!opts\?\.resume\) playSound\("call-dialing"\);/.test(btnS));
+    /* NOT ONE CUE LEFT WITHOUT A MOMENT (owner, 2026-09-16: "wire them").
+       action-denied was in the catalogue, in the settings sheet and in the
+       preview page from the day the family shipped, and nothing in the app
+       ever played it: both lanes answered a refusal with the error cue. */
+    check("every cue in the catalogue is played by something — the app is the proof, not the catalogue",
+      cat.SOUND_CATALOG.every((s) => new RegExp(`playSound\\([^)]*"${s.key}"`).test(btnS) || new RegExp(`playSound\\([^)]*"${s.key}"`).test(appS)));
+    check("a refusal speaks as a refusal on both lanes, and a real fault still speaks as an error",
+      (btnS.match(/playSound\(denied \? "action-denied" : "error"\)/g) ?? []).length === 1 &&
+      (appS.match(/playSound\(denied \? "action-denied" : "error"\)/g) ?? []).length === 1 &&
+      (btnS.match(/const denied = res\.status === 403 \|\| body\?\.output\?\.status === "denied";/g) ?? []).length === 1 &&
+      (appS.match(/const denied = res\.status === 403 \|\| body\?\.output\?\.status === "denied";/g) ?? []).length === 1);
+    check("the thread's task card speaks the card's own three moments, the same three the call screen speaks for the same taps",
+      /"approval-needed"/.test(appS) && /playSound\("action-done"\)/.test(appS) && /playSound\("action-cancelled"\)/.test(appS) &&
+      /* …and the saved tap no longer borrows the cue for an answer arriving. */
+      !/state: "saved"[\s\S]{0,120}?playSound\("reply-received"\)/.test(appS));
+    check("  …one cue per turn, on the turn's end rather than a message's arrival: a card waiting replaces the reply cue, and opening a thread that already holds one stays quiet",
+      /const waitingOnTap = \(lastMsg\?\.steps \?\? \[\]\)\.some\(/.test(appS) &&
+      /playSound\(waitingOnTap \? "approval-needed" : "reply-received"\)/.test(appS) &&
+      /if \(prevSendingRef\.current && !sending\) \{/.test(appS) &&
+      /* Neither cue is reachable from anywhere but that one turn-end branch. */
+      (appS.match(/playSound\("reply-received"\)/g) ?? []).length === 0 &&
+      (appS.match(/playSound\("approval-needed"\)/g) ?? []).length === 0);
+    check("the thread warms its own cues on mount, as the call warms its own inside the tap",
+      /const CHAT_CUES: readonly SoundKey\[\] = \[/.test(appS) && /primeSounds\(CHAT_CUES\);/.test(appS) &&
+      /* Every cue it warms is one it can actually play. */
+      (() => {
+        const list = (appS.match(/const CHAT_CUES: readonly SoundKey\[\] = \[([\s\S]*?)\];/) ?? [])[1] ?? "";
+        const keys = [...list.matchAll(/"([a-z-]+)"/g)].map((m) => m[1]);
+        return keys.length > 0 && keys.every((k) => new RegExp(`playSound\\([^)]*"${k}"`).test(appS));
+      })());
   {
     /* THE SINK, driven: with one installed a cue's bytes go to it at the
        prefs volume and the player says "played"; removed, the engine is
