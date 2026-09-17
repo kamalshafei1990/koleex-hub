@@ -81,6 +81,54 @@ const FLOOR_MAX_KB = 520;   // measured 2026-08-09: 6 files / 445 KB
    does. They were first written as GUESSES and two of them failed on the
    first run; measured beats guessed, always. */
 const ROUTE_BUDGETS: Record<string, { chunks: number; kbytes: number }> = {
+
+  /* ── DETAIL ROUTES, MEASURED 17/09/2026 ───────────────────────────────────
+     These 34 had never been budgeted: section C only read navigation.ts,
+     whose entries are all top-level, so every detail page in the Hub was
+     unwatched. That is how /product-data/[id] reached 1,257 KB — nearly twice
+     its own list — with nothing to notice. The coverage check below now
+     weighs nested routes and asks for a line once one passes 800 KB.
+
+     Written from the measurement, +12%, exactly as the app budgets were.
+     Two things worth seeing in this list rather than hiding behind a pass:
+     /products/[id] is the heaviest screen in the Hub at 1,410 KB, and the
+     finance/* cluster sits at 800–1,010 KB across ~25 routes, which says the
+     weight is shared between them rather than in any one page. Neither is
+     addressed here; they are now VISIBLE, which is the prerequisite. */
+  "contracts/[id]/print": { chunks: 14, kbytes: 1019 },
+  "database/product-specs": { chunks: 12, kbytes: 982 },
+  "documents/[id]/print": { chunks: 15, kbytes: 1040 },
+  "employees/[id]/edit": { chunks: 15, kbytes: 977 },
+  "employees/new": { chunks: 15, kbytes: 974 },
+  "finance/accounting/cash-flow": { chunks: 14, kbytes: 907 },
+  "finance/accounting/equity": { chunks: 14, kbytes: 906 },
+  "finance/accounting/general-ledger": { chunks: 14, kbytes: 903 },
+  "finance/accounting/profit-loss": { chunks: 14, kbytes: 912 },
+  "finance/accounting/queue": { chunks: 14, kbytes: 941 },
+  "finance/accounting/trial-balance": { chunks: 14, kbytes: 903 },
+  "finance/bank-accounts": { chunks: 16, kbytes: 1007 },
+  "finance/bank-imports": { chunks: 15, kbytes: 960 },
+  "finance/customers": { chunks: 15, kbytes: 956 },
+  "finance/expenses": { chunks: 15, kbytes: 974 },
+  "finance/intelligence": { chunks: 16, kbytes: 1135 },
+  "finance/notifications": { chunks: 15, kbytes: 959 },
+  "finance/orders": { chunks: 16, kbytes: 1029 },
+  "finance/overview": { chunks: 15, kbytes: 1068 },
+  "finance/payments": { chunks: 15, kbytes: 987 },
+  "finance/reconciliation": { chunks: 15, kbytes: 965 },
+  "finance/reports": { chunks: 14, kbytes: 909 },
+  "finance/setup": { chunks: 15, kbytes: 954 },
+  "finance/statements": { chunks: 14, kbytes: 948 },
+  "finance/suppliers": { chunks: 15, kbytes: 955 },
+  "finance/treasury-forecast": { chunks: 15, kbytes: 972 },
+  "finance/treasury-plans": { chunks: 15, kbytes: 982 },
+  "finance/visual": { chunks: 15, kbytes: 1068 },
+  "invoices/[id]/print": { chunks: 14, kbytes: 1040 },
+  "product-data/[id]": { chunks: 14, kbytes: 1053 },
+  "products/[id]": { chunks: 14, kbytes: 1579 },
+  "products/preview/[slug]": { chunks: 14, kbytes: 1579 },
+  "quotations/[id]/print": { chunks: 13, kbytes: 984 },
+  "suppliers/[id]": { chunks: 14, kbytes: 1180 },
   /* ── RE-BASELINED 17/09/2026 ──────────────────────────────────────────────
      Ten routes sat 1–6 KB over while using FEWER chunks than budgeted (8 of
      10, 9 of 11). That shape is the signature of a shared-module repack, not
@@ -206,6 +254,52 @@ console.log("\nC. Coverage");
   const active = [...new Set(routes)].filter((r) =>
     fs.existsSync(path.join(NEXT, "server/app", r, "page_client-reference-manifest.js")));
   const unbudgeted = active.filter((r) => !(r in ROUTE_BUDGETS));
+
+  /* ⚠️ AND THE HEAVY ROUTES UNDER THEM — THIS IS WHERE THE WEIGHT HID.
+     The scan above reads navigation.ts, whose `route:` entries are all
+     top-level, so DETAIL pages were invisible to it. Measured 17/09/2026:
+     /product-data was 698 KB and budgeted, while /product-data/[id] — the
+     record every operator actually works in — was 1,257 KB and watched by
+     nothing, and /products/[id] was 1,411 KB. The heaviest screens in the Hub
+     were the ones no number covered.
+
+     ⚠️ BUT NOT *EVERY* NESTED ROUTE. The first version of this check demanded
+     a budget for all of them and named 190 — most of them static knowledge
+     pages a few KB over the shared floor. A guard that asks for 190 numbers
+     nobody will maintain is a guard that gets deleted, which is the same
+     lesson the card-placeholder check already taught one section below.
+     So the line is drawn by WEIGHT: a nested route only needs its own budget
+     once it is heavy enough to matter. 800 KB is the shared floor (446 KB)
+     plus roughly 350 KB of a route's own code — past that it is an app in its
+     own right and deserves a number. */
+  const HEAVY_NESTED_KB = 800;
+  const nested: string[] = [];
+  const walkApp = (dir: string, rel = "") => {
+    for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
+      if (!e.isDirectory()) continue;
+      const here = rel ? `${rel}/${e.name}` : e.name;
+      if (fs.existsSync(path.join(dir, e.name, "page_client-reference-manifest.js"))) nested.push(here);
+      walkApp(path.join(dir, e.name), here);
+    }
+  };
+  walkApp(path.join(NEXT, "server/app"));
+  const weigh = (route: string): number => {
+    try {
+      const src = fs.readFileSync(path.join(NEXT, "server/app", route, "page_client-reference-manifest.js"), "utf8");
+      const start = src.indexOf("= {", src.indexOf("__RSC_MANIFEST"));
+      const mf = JSON.parse(src.slice(start + 2).trim().replace(/;$/, "")) as
+        { clientModules?: Record<string, { chunks?: string[] }> };
+      const cs = new Set<string>();
+      for (const info of Object.values(mf.clientModules ?? {})) for (const c of info.chunks ?? []) if (c.endsWith(".js")) cs.add(c);
+      return kb([...cs].reduce((n, c) => n + sizeOf(c), 0));
+    } catch { return 0; }
+  };
+  const heavyNested = nested
+    .filter((r) => r.includes("/") && !(r in ROUTE_BUDGETS))
+    .map((r) => ({ r, kb: weigh(r) }))
+    .filter((x) => x.kb >= HEAVY_NESTED_KB)
+    .sort((a, b) => b.kb - a.kb);
+  const unbudgetedNested = heavyNested.map((x) => `${x.r} (${x.kb} KB)`);
   /* EVERY built app route must carry a budget. This is the part that answers
      the owner's actual worry — a NEW app cannot ship unwatched, because the
      build stops until someone measures it and writes the number down. Adding
@@ -215,6 +309,9 @@ console.log("\nC. Coverage");
   unbudgeted.length === 0
     ? ok("every app route has a budget", `${active.length} routes`)
     : bad("unbudgeted app routes", `${unbudgeted.join(", ")} — run \`npm run budgets\` to read their measured size, then add a line to ROUTE_BUDGETS (measured + ~12%)`);
+  unbudgetedNested.length === 0
+    ? ok(`no unbudgeted nested route is over ${HEAVY_NESTED_KB} KB`, `${nested.filter((r) => r.includes("/")).length} nested routes weighed`)
+    : bad("unbudgeted HEAVY detail routes", `${unbudgetedNested.join(", ")} — a detail page this size needs its own line in ROUTE_BUDGETS`);
 }
 
 /* ── D. Boot document weight — the number the user actually waits for ──────

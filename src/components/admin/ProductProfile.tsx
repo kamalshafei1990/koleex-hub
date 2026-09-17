@@ -92,19 +92,57 @@ import AngleRightIcon from "@/components/icons/ui/AngleRightIcon";
 import TabStrip from "@/components/ui/TabStrip";
 import { useTabMotion } from "@/components/ui/useTabMotion";
 import { Group, StatTile, FactChip, CalcBadge, INP_B, SEG, SEG_ON, SEG_OFF } from "./profile/primitives";
-import PriceSheet from "./profile/PriceSheet";
-import HeroSheet from "./profile/HeroSheet";
-import ComplianceSheet from "./profile/ComplianceSheet";
+/* ⚠️ TWELVE TABS, ONE ON SCREEN — SO ELEVEN OF THEM ARE DEFERRED.
+   Every sheet was a static import, so opening ANY product downloaded all of
+   them: Hero 54 KB, Supplier 49, Price 32, Options 30, Compliance 25,
+   Variants 24, Specs 23, Media 21, Knowledge 13, Review 12 — 283 KB of
+   source for panels the operator had not asked for. Measured: /product-data/
+   [id] was 1,257 KB against the list's 698, and the route carried no budget
+   at all, which is how it got there unnoticed.
+
+   ClassifySheet stays EAGER because `step` starts at 0 and STEPS[0] is
+   "classify" — the landing tab must never wait on a chunk.
+
+   This splits for real: the split has to happen inside a "use client" module
+   or Next ships every client reference the route declares anyway (the trap
+   recorded in project_route_client_reference_preload), and this file is one.
+   Verified on a PRODUCTION build, not dev.
+
+   No `loading` placeholder on purpose — a reserved-height box that collapses
+   to the real panel is the CLS mistake this screen's list sibling already
+   paid for. Instead the tabs are WARMED below once the screen is quiet, so
+   the chunk is in cache before anyone clicks. */
 import ClassifySheet from "./profile/ClassifySheet";
-import SupplierSheet from "./profile/SupplierSheet";
-import VariantsSheet from "./profile/VariantsSheet";
-import OptionsSheet from "./profile/OptionsSheet";
-import SpecsSheet from "./profile/SpecsSheet";
-import KnowledgeSheet from "./profile/KnowledgeSheet";
-import MediaSheet from "./profile/MediaSheet";
-import ReviewSheet from "./profile/ReviewSheet";
+
+const PriceSheet      = dynamic(() => import("./profile/PriceSheet"));
+const HeroSheet       = dynamic(() => import("./profile/HeroSheet"));
+const ComplianceSheet = dynamic(() => import("./profile/ComplianceSheet"));
+const SupplierSheet   = dynamic(() => import("./profile/SupplierSheet"));
+const VariantsSheet   = dynamic(() => import("./profile/VariantsSheet"));
+const OptionsSheet    = dynamic(() => import("./profile/OptionsSheet"));
+const SpecsSheet      = dynamic(() => import("./profile/SpecsSheet"));
+const KnowledgeSheet  = dynamic(() => import("./profile/KnowledgeSheet"));
+const MediaSheet      = dynamic(() => import("./profile/MediaSheet"));
+const ReviewSheet     = dynamic(() => import("./profile/ReviewSheet"));
+
+/* The same import specifiers again, as thunks. Calling these warms the exact
+   chunks the components above will ask for — webpack dedupes on the specifier,
+   so a warmed tab opens from cache. */
+const SHEET_CHUNKS = [
+  () => import("./profile/PriceSheet"),
+  () => import("./profile/HeroSheet"),
+  () => import("./profile/ComplianceSheet"),
+  () => import("./profile/SupplierSheet"),
+  () => import("./profile/VariantsSheet"),
+  () => import("./profile/OptionsSheet"),
+  () => import("./profile/SpecsSheet"),
+  () => import("./profile/KnowledgeSheet"),
+  () => import("./profile/MediaSheet"),
+  () => import("./profile/ReviewSheet"),
+];
 import dynamic from "next/dynamic";
 import { useSkin } from "@/lib/appearance";
+import { whenNetworkQuiet } from "@/lib/net-idle";
 import FeatureHighlightsDisplay from "./FeatureHighlightsDisplay";
 import {
   CONTAINERS, DG_KINDS, ORIGIN_CERTIFICATES, PACKING_TYPES, WOOD_TREATMENTS,
@@ -1753,6 +1791,26 @@ export default function ProductProfile() {
   const [historyFor, setHistoryFor] = useState<{ id: string; name: string } | null>(null);
   NOT_SET = t("pp.notSet", "Not set");
   const [step, setStep] = useState(0);
+
+  /* ⚠️ WARM THE OTHER TABS ONCE THE SCREEN IS DONE ASKING FOR THINGS.
+     Deferring the sheets makes the OPEN fast; without this it would make the
+     first click on every other tab slow instead, which is a worse trade on a
+     screen an operator tabs through all day. So the chunks are fetched after
+     the profile's own requests go quiet — never alongside them, because a
+     prefetch that competes with the data the user is actually waiting for is
+     the thing whenNetworkQuiet exists to prevent (same rule as the shell's
+     badge reads and the activity beacon).
+
+     Fire-and-forget by design: a failed warm-up is not an error, the tab just
+     loads on click as it would have anyway. */
+  useEffect(() => {
+    let cancelled = false;
+    void whenNetworkQuiet({ quietMs: 700, maxWaitMs: 6000 }).then(() => {
+      if (cancelled) return;
+      for (const load of SHEET_CHUNKS) void load().catch(() => {});
+    });
+    return () => { cancelled = true; };
+  }, []);
   /* Inline edits on the sheet: the saved patch is merged into the page at
      once, and the row is re-read behind it so derived fields catch up. */
   const [reloadTick, setReloadTick] = useState(0);
@@ -2254,7 +2312,7 @@ export default function ProductProfile() {
       {STEPS[step].id === "specs" && (
         <SpecsSheet
           product={p}
-          schema={data.schema as Parameters<typeof SpecsSheet>[0]["schema"]}
+          schema={data.schema as React.ComponentProps<typeof SpecsSheet>["schema"]}
           productId={p?.id as string | undefined}
           t={t} motion={tabMotion} canEdit={canEdit} notSet={NOT_SET}
           onDirtyChange={(d) => { dirtyRef.current = d; }}
