@@ -164,19 +164,49 @@ export function parseSavedLane(raw: string | null | undefined): SavedLane | null
  *  fresh "mainland" verdict was a lock, and the socket lane was never
  *  re-tried). A verdict is the first call's lane, not the day's; the probe,
  *  in the background, moves the lane when the network has moved. Pure. */
+export function verdictIsFresh(saved: SavedLane | null, now: number, ttlMs: number = LANE_TTL_MS): boolean {
+  return saved !== null && now - saved.at >= 0 && now - saved.at < ttlMs;
+}
+
 export function decideLane(
   server: VoiceLane,
   saved: SavedLane | null,
   now: number,
   ttlMs: number = LANE_TTL_MS,
 ): { lane: VoiceLane; probe: boolean } {
-  if (server === "ws") return { lane: "ws", probe: false };
-  const fresh = saved !== null && now - saved.at >= 0 && now - saved.at < ttlMs;
+  const fresh = verdictIsFresh(saved, now, ttlMs);
   /* THE CALLER'S OWN CHOICE STANDS while it is fresh: a probe that happened
      to succeed through a flaky tunnel used to move a caller who had picked
      the mainland line back to the international one on the next load
      (audit, 2026-09-11). Probe and call verdicts are still re-checked. */
   if (fresh && saved && saved.source === "user") return { lane: saved.lane, probe: false };
+  /* WHAT THIS NETWORK DID BEATS WHAT THE COUNTRY SAYS (owner, 2026-09-17:
+     "still same", a third time).
+
+     `server` is a guess from the country stamp on the request — nothing
+     more. It used to be checked FIRST and to end the decision, so a
+     deployment that answers "ws" overrode every verdict this device had
+     earned on this network. The owner's beacon is what that costs:
+
+       service-unreachable elapsedMs=11698 lane=ws fellBack=true
+       err="AbortError: Fetch is aborted" canary=timeout:3502ms+retry
+
+     Our own ws-session route answered 200 twice (04:57:29 and :35) and
+     neither answer reached the browser; the canary to our own origin timed
+     out at 3.5 s. The call then fell back to the mainland lane and
+     connected — and wrote "rtc" down, as it should. On the next load the
+     country stamp said "ws" again, the verdict was ignored again, and the
+     same twelve seconds were spent again. Every call, which is exactly
+     what "always slow" means.
+
+     A verdict from a REAL CALL or a PROBE is evidence from this network; it
+     now wins over the guess. The probe still runs behind it, so a network
+     that recovers moves the lane back on its own — the lock the 2026-09-11
+     note warns about is what `probe: true` exists to prevent. */
+  if (fresh && saved && (saved.source === "call" || saved.source === "probe") && saved.lane !== server) {
+    return { lane: saved.lane, probe: true };
+  }
+  if (server === "ws") return { lane: "ws", probe: false };
   return { lane: fresh && saved ? saved.lane : "rtc", probe: true };
 }
 
