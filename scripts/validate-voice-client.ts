@@ -3337,6 +3337,78 @@ function describeErrorCheck(): boolean {
   check("  …a saved 'server' verdict survives a round trip through storage, and a nonsense source is dropped",
     parseSavedLane(JSON.stringify({ lane: "ws", at: now, source: "server" }))?.source === "server" &&
     parseSavedLane(JSON.stringify({ lane: "ws", at: now, source: "nonsense" }))?.source === undefined);
+
+  /* ── WHAT A REAL CALL PROVED IS NOT ERASED BY A FIVE-SECOND PROBE ──
+     (owner, 2026-09-17: "still slow", a fourth time, with #439 live.)
+     Production, one loop, timestamps as read:
+
+       05:30:01  beacon service-unreachable elapsedMs=10802 lane=ws fellBack=true
+                 → the call writes rtc/call
+       05:30:07  ws-session probe=true
+                 → the probe writes ws/probe, OVER IT
+       05:31:06  beacon service-unreachable elapsedMs=11682 … the same again
+
+     decideLane was already reading the device's verdict ahead of the
+     country stamp. It could not help: the verdict was gone six seconds
+     after it was written. A probe opens one short socket; a call opens a
+     session. Both were stored as equal evidence. Now they are ranked, and
+     the ranking lives in the STORE, so it holds for every writer. */
+  const { mergeLane, CALL_VERDICT_HOLD_MS } = await import("../src/lib/voice/voice-pref");
+  const callVerdict = { lane: "rtc" as const, at: now, source: "call" as const };
+  check("a probe disagreeing with a fresh call verdict is refused — the loop the owner sat in cannot re-form",
+    mergeLane(callVerdict, { lane: "ws", source: "probe" }, now + 6_000) === null &&
+    mergeLane(callVerdict, { lane: "ws", source: "server" }, now + 6_000) === null &&
+    CALL_VERDICT_HOLD_MS === 30 * 60_000 && CALL_VERDICT_HOLD_MS < LANE_TTL_MS);
+  check("  …and after the hold the probe is heard again, so a network that really changed re-opens the other lane",
+    JSON.stringify(mergeLane(callVerdict, { lane: "ws", source: "probe" }, now + CALL_VERDICT_HOLD_MS)) ===
+      JSON.stringify({ lane: "ws", at: now + CALL_VERDICT_HOLD_MS, source: "probe" }));
+  check("  …the caller's own hand always writes, and is never written over by a machine that disagrees",
+    JSON.stringify(mergeLane(callVerdict, { lane: "ws", source: "user" }, now + 1_000)) ===
+      JSON.stringify({ lane: "ws", at: now + 1_000, source: "user" }) &&
+    mergeLane({ lane: "ws", at: now, source: "user" }, { lane: "rtc", source: "probe" }, now + 1_000) === null &&
+    mergeLane({ lane: "ws", at: now, source: "user" }, { lane: "rtc", source: "server" }, now + 1_000) === null);
+  check("  …a second real call still overrules both: a lane that just failed is not kept because it was chosen",
+    JSON.stringify(mergeLane({ lane: "ws", at: now, source: "user" }, { lane: "rtc", source: "call" }, now + 1_000)) ===
+      JSON.stringify({ lane: "rtc", at: now + 1_000, source: "call" }) &&
+    JSON.stringify(mergeLane(callVerdict, { lane: "ws", source: "call" }, now + 1_000)) ===
+      JSON.stringify({ lane: "ws", at: now + 1_000, source: "call" }));
+  check("  …an AGREEING write refreshes the stamp and keeps the stronger source, so the next probe still faces a call verdict",
+    JSON.stringify(mergeLane(callVerdict, { lane: "rtc", source: "probe" }, now + 6_000)) ===
+      JSON.stringify({ lane: "rtc", at: now + 6_000, source: "call" }) &&
+    mergeLane(mergeLane(callVerdict, { lane: "rtc", source: "probe" }, now + 6_000), { lane: "ws", source: "probe" }, now + 12_000) === null);
+  check("  …a device with nothing written down, and a verdict past its life, take whatever arrives",
+    JSON.stringify(mergeLane(null, { lane: "ws", source: "probe" }, now)) === JSON.stringify({ lane: "ws", at: now, source: "probe" }) &&
+    JSON.stringify(mergeLane({ lane: "rtc", at: now - LANE_TTL_MS - 1, source: "call" }, { lane: "ws", source: "probe" }, now)) ===
+      JSON.stringify({ lane: "ws", at: now, source: "probe" }) &&
+    JSON.stringify(mergeLane({ lane: "rtc", at: now }, { lane: "ws", source: "probe" }, now)) ===
+      JSON.stringify({ lane: "ws", at: now, source: "probe" }));
+  check("  …a clock that ran backwards does not create a hold out of nothing",
+    JSON.stringify(mergeLane({ lane: "rtc", at: now + 60_000, source: "call" }, { lane: "ws", source: "probe" }, now)) ===
+      JSON.stringify({ lane: "ws", at: now, source: "probe" }));
+  {
+    /* THE STORE ENFORCES IT, not the seven places that write to it. */
+    const gLane = globalThis as unknown as { window?: unknown };
+    const hadWin = "window" in gLane;
+    const prevWin = gLane.window;
+    const laneStore = new Map<string, string>();
+    gLane.window = { localStorage: { getItem: (k: string) => laneStore.get(k) ?? null, setItem: (k: string, v: string) => { laneStore.set(k, v); } } };
+    const vp = await import("../src/lib/voice/voice-pref");
+    vp.saveLane("rtc", now, "call");
+    vp.saveLane("ws", now + 6_000, "probe");
+    const afterProbe = vp.readSavedLane();
+    check("the owner's exact sequence, through the real store: the probe six seconds later does not move the lane",
+      afterProbe?.lane === "rtc" && afterProbe?.source === "call" && afterProbe?.at === now &&
+      JSON.stringify(decideLane("ws", afterProbe, now + 55_000)) === JSON.stringify({ lane: "rtc", probe: true }) &&
+      startingLane(afterProbe, now + 55_000) === "rtc");
+    vp.saveLane("ws", now + 6_000, "user");
+    check("  …and the caller choosing the socket lane by hand still lands, in the same store",
+      vp.readSavedLane()?.lane === "ws" && vp.readSavedLane()?.source === "user");
+    gLane.window = { localStorage: { getItem: () => { throw new Error("refused"); }, setItem: () => { throw new Error("refused"); } } };
+    let laneThrew = false;
+    try { vp.saveLane("rtc", now, "call"); } catch { laneThrew = true; }
+    check("  …a refusing store is still silent — the ranking read cannot turn a save into a throw", !laneThrew);
+    if (hadWin) gLane.window = prevWin; else delete gLane.window;
+  }
   check("the server saying mainland with no device verdict: mainland now, and a probe", JSON.stringify(decideLane("rtc", null, now)) === JSON.stringify({ lane: "rtc", probe: true }));
   /* 2026-09-11: a fresh verdict is the first call's lane, not a six-hour
      lock — the probe runs anyway (section 37). */

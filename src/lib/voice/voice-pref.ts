@@ -249,9 +249,85 @@ export function readSavedLane(): SavedLane | null {
   }
 }
 
+/* HOW LONG A REAL CALL'S VERDICT HOLDS AGAINST A PROBE'S (owner,
+   2026-09-17: "still slow", a fourth time, with #439 already live).
+
+   THE LOOP THE LAST FIX DID NOT BREAK, read straight off production:
+
+     05:29:51  ws-session            the call's first attempt
+     05:29:57  ws-session            its retry
+     05:30:01  beacon service-unreachable elapsedMs=10802 lane=ws fellBack=true
+                                     → writes rtc, source "call"
+     05:30:01  session POST          primary timed out 7002ms, alt ok 261ms
+     05:30:07  ws-session probe=true the BACKGROUND PROBE
+                                     → writes ws, source "probe"  ← overwrites it
+     05:30:56  ws-session            the next call, on ws again
+     05:31:06  beacon service-unreachable elapsedMs=11682 …
+
+   decideLane was already preferring the device's verdict over the country
+   stamp. It did not help, because six seconds after a real call spent
+   eleven seconds failing on the socket lane, a five-second synthetic probe
+   said the lane was fine and overwrote it. And the probe is not wrong about
+   what it measured: it opens one short socket, where a call opens a
+   session. The two are not equal evidence, and they were stored as if they
+   were.
+
+   Thirty minutes: long enough that the loop cannot re-form (the network
+   will not have changed in the six seconds the probe fires after a
+   fall-back), short enough that a network which really has changed is
+   re-opened by the next probe rather than by a six-hour expiry. */
+export const CALL_VERDICT_HOLD_MS = 30 * 60_000;
+
+/* WHICH VERDICT MAY REPLACE WHICH, and what survives when two agree.
+   Pure, so the ranking is a rule rather than the order two writes happen
+   to land in.
+
+   The caller's own hand always writes, and is never written over by a
+   machine that disagrees — that was true of decideLane's READING and not
+   of the store, so a probe could quietly erase a chosen lane and the next
+   load would read a "probe" verdict where the caller had chosen.
+
+   AN AGREEING WRITE KEEPS THE STRONGER SOURCE. Writing the weaker one down
+   re-opens the very loop this closes: fall-back stores rtc/call, the probe
+   six seconds later agrees and stores rtc/PROBE, and the probe after that
+   — the one that says "ws" — now faces a probe verdict it is allowed to
+   overwrite. Agreement is not new evidence; it refreshes the stamp and
+   leaves the provenance alone. */
+const VERDICT_RANK: Record<LaneSource, number> = { server: 0, probe: 1, call: 2, user: 3 };
+const rankOf = (source: LaneSource | undefined): number => (source ? VERDICT_RANK[source] : 0);
+
+export function mergeLane(
+  existing: SavedLane | null,
+  next: { lane: VoiceLane; source: LaneSource },
+  now: number,
+  ttlMs: number = LANE_TTL_MS,
+): SavedLane | null {
+  const write: SavedLane = { lane: next.lane, at: now, source: next.source };
+  if (!existing) return write;
+  if (next.source === "user") return write;
+  if (next.lane === existing.lane) {
+    return rankOf(next.source) >= rankOf(existing.source)
+      ? write
+      : { lane: existing.lane, at: now, source: existing.source };
+  }
+  /* From here the two DISAGREE. A measurement of this network (a call) or
+     the caller's own choice is not overturned by a short synthetic probe
+     or by the country stamp. */
+  const weak = next.source === "probe" || next.source === "server";
+  if (!weak) return write;
+  if (existing.source === "user" && verdictIsFresh(existing, now, ttlMs)) return null;
+  if (existing.source === "call" && verdictIsFresh(existing, now, CALL_VERDICT_HOLD_MS)) return null;
+  return write;
+}
+
 export function saveLane(lane: VoiceLane, now: number = Date.now(), source: LaneSource = "probe"): void {
   try {
-    window.localStorage.setItem(LANE_STORAGE_KEY, JSON.stringify({ lane, at: now, source } satisfies SavedLane));
+    /* The ranking is enforced HERE rather than at each call site: every
+       writer means "record this verdict", and which verdict survives is a
+       property of the store, not of the seven places that write to it. */
+    const write = mergeLane(readSavedLane(), { lane, source }, now);
+    if (!write) return;
+    window.localStorage.setItem(LANE_STORAGE_KEY, JSON.stringify(write satisfies SavedLane));
   } catch {
     /* storage refused — the next call probes again */
   }
