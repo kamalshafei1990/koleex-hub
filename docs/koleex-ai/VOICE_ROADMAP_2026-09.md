@@ -1594,3 +1594,61 @@ clobber a verdict fails two, dropping the probe behind a verdict fails two.
 **Still true and not ours:** the owner's network drops responses from our
 origin. The fall-back now happens once rather than on every call, but the
 first call after a network change still spends that time discovering it.
+
+---
+
+## 2026-09-17 — "still slow", a fourth time: a five-second probe was erasing what an eleven-second call proved
+
+#439 shipped and did not help. The reason is in production, one loop, read
+straight off the logs:
+
+| t | line |
+|---|---|
+| 05:29:51 | `POST /api/ai/voice/ws-session` — the call's first attempt |
+| 05:29:57 | `POST /api/ai/voice/ws-session` — its retry |
+| 05:30:01 | beacon `service-unreachable elapsedMs=10802 lane=ws fellBack=true` → writes `rtc`, source `call` |
+| 05:30:01 | `POST /api/ai/voice/session` — primary region timed out at 7002 ms, alt answered in 261 ms |
+| 05:30:07 | `POST /api/ai/voice/ws-session probe=true` → writes `ws`, source `probe` — **over it** |
+| 05:30:56 | `POST /api/ai/voice/ws-session` — the next call, on `ws` again |
+| 05:31:06 | beacon `service-unreachable elapsedMs=11682 …` — the same eleven seconds |
+
+`decideLane` was already reading the device's verdict ahead of the country
+stamp. It could not help, because the verdict was gone six seconds after it
+was written. **The reading was ranked; the store was not.**
+
+And the probe is not wrong about what it measured. It opens one short
+socket, then closes it. A call opens a session and keeps it. On a network
+that completes a handshake but drops a held response, the probe passes and
+the call fails — so the two are not equal evidence, and they were being
+stored as if they were.
+
+**The fix.** `mergeLane` — pure — decides which verdict may replace which,
+and `saveLane` enforces it, so the rule is a property of the store rather
+than of the seven places that write to it:
+
+- the caller's own hand always writes, and a machine that disagrees never
+  writes over a fresh one (true of `decideLane`'s reading before this, and
+  not of the store — a probe could quietly erase a chosen lane);
+- a real call's verdict holds against a probe or the country stamp for
+  **30 minutes** (`CALL_VERDICT_HOLD_MS`) — long enough that the loop above
+  cannot re-form, short enough that a network which really changed is
+  re-opened by the next probe rather than by the six-hour expiry;
+- an **agreeing** write refreshes the stamp and keeps the stronger source.
+  Without this the loop simply takes one more step to close: fall-back
+  stores `rtc/call`, the agreeing probe stores `rtc/probe`, and the probe
+  after that — the one saying `ws` — faces a verdict it is allowed to
+  overwrite.
+
+Also confirmed live from the same logs: the ICE-gathering fix (#437) works —
+a connected call reported `gather111`, 111 ms, where the old path waited for
+every STUN server to give up. Gathering was never the cost.
+
+**Suites.** `validate:voice-client` 786 (+10), including the owner's exact
+sequence replayed through the real store. Mutation-tested four ways: writing
+without the ranking fails 1, letting a probe outrank a call fails 3, letting
+an agreeing probe erase the call's provenance fails 1, letting a probe erase
+the caller's own choice fails 1.
+
+**Still true and not ours:** this network drops held responses from our
+origin on the socket lane. What changed is that the caller pays for that
+discovery once, not on every call.
