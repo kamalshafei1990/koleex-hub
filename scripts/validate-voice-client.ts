@@ -3271,10 +3271,42 @@ function describeErrorCheck(): boolean {
      mainland address and chose the mainland lane while the browser could
      reach the vendor all along. The server's answer is a default; the
      browser probes, once, ahead of the call, and remembers. */
-  const { decideLane, parseSavedLane, LANE_TTL_MS } = await import("../src/lib/voice/voice-pref");
+  const { decideLane, parseSavedLane, startingLane, LANE_TTL_MS } = await import("../src/lib/voice/voice-pref");
+  const fsSync = await import("node:fs");
   const { probeWsLane, LANE_PROBE_TIMEOUT_MS } = await import("../src/lib/voice/lane-probe");
   const now = 1_700_000_000_000;
   check("the server saying the socket lane is final — no probe", JSON.stringify(decideLane("ws", { lane: "rtc", at: now }, now)) === JSON.stringify({ lane: "ws", probe: false }));
+
+  /* ── THE TAP'S OWN STARTING LANE (owner, 2026-09-17: "still slow") ──
+     The button's ref used to start at "rtc" and be corrected only when the
+     config read returned — 470–840 ms of auth in production. A tap inside
+     that window went out on the mainland lane whatever the deployment said:
+     two calls at 04:32 and 04:33, each preceded by `[ai.voice] lane=ws`,
+     both posting to the WebRTC handshake, and the beacon for that lane on
+     this network reads `ice=new … iceEverConnected=false` after 25 s. */
+  check("a tap before the config answers starts on the lane this device already proved, whatever wrote it down",
+    startingLane({ lane: "ws", at: now, source: "call" }, now) === "ws" &&
+    startingLane({ lane: "ws", at: now, source: "probe" }, now) === "ws" &&
+    startingLane({ lane: "ws", at: now, source: "user" }, now) === "ws" &&
+    startingLane({ lane: "ws", at: now, source: "server" }, now) === "ws" &&
+    startingLane({ lane: "rtc", at: now, source: "call" }, now) === "rtc");
+  check("  …a device with nothing written down, or a verdict past its life, starts on the lane that needs no relay",
+    startingLane(null, now) === "rtc" &&
+    startingLane({ lane: "ws", at: now - LANE_TTL_MS - 1 }, now) === "rtc" &&
+    /* A clock that went backwards is not a fresh verdict. */
+    startingLane({ lane: "ws", at: now + 60_000 }, now) === "rtc");
+  check("  …and the deployment's own answer is written down, so the next load seeds on it instead of racing the read again",
+    (() => {
+      const btn = fsSync.readFileSync("src/components/ai/VoiceCallButton.tsx", "utf8");
+      return /useState<"rtc" \| "ws">\(\(\) => startingLane\(readSavedLane\(\), Date\.now\(\)\)\)/.test(btn) &&
+        /const transportRef = useRef<"rtc" \| "ws">\(seededLane\);/.test(btn) &&
+        !/const transportRef = useRef<"rtc" \| "ws">\("rtc"\);/.test(btn) &&
+        /saveLane\(decided\.lane, Date\.now\(\), "server"\)/.test(btn) &&
+        /if \(!newer && known\?\.source !== "user"\)/.test(btn);
+    })());
+  check("  …a saved 'server' verdict survives a round trip through storage, and a nonsense source is dropped",
+    parseSavedLane(JSON.stringify({ lane: "ws", at: now, source: "server" }))?.source === "server" &&
+    parseSavedLane(JSON.stringify({ lane: "ws", at: now, source: "nonsense" }))?.source === undefined);
   check("the server saying mainland with no device verdict: mainland now, and a probe", JSON.stringify(decideLane("rtc", null, now)) === JSON.stringify({ lane: "rtc", probe: true }));
   /* 2026-09-11: a fresh verdict is the first call's lane, not a six-hour
      lock — the probe runs anyway (section 37). */
@@ -3343,7 +3375,7 @@ function describeErrorCheck(): boolean {
       /const offerFor = \(lane: "rtc" \| "ws"\) => \{\s*const list = byLane\[lane\]\.length > 0 \? byLane\[lane\] : byLane\.rtc;\s*setVoices\(list\);\s*setVoiceKey\(\(cur\) => pickVoiceKey\(cur \?\? readSavedVoiceKey\(\), list\)\);/.test(btn) &&
       /transportRef\.current = decided\.lane;\s*offerFor\(decided\.lane\);/.test(btn) && /transportRef\.current = ok \? "ws" : "rtc";\s*offerFor\(transportRef\.current\);/.test(btn));
     check("the button decides from the server's default and the device's verdict, probes in the background only when told the socket lane exists, and never moves a call already placed",
-      /const decided = decideLane\(server, readSavedLane\(\), Date\.now\(\)\);\s*(\/\*[^*]*\*\/\s*)?const applyLane = \(\) => \{\s*transportRef\.current = decided\.lane;\s*offerFor\(decided\.lane\);\s*\};\s*if \(sessionRef\.current\) laneAfterCallRef\.current = applyLane;\s*else applyLane\(\);\s*if \(decided\.probe && body\.ws_available === true\) \{/.test(btn) &&
+      /const decided = decideLane\(server, readSavedLane\(\), Date\.now\(\)\);\s*(\/\*[^*]*\*\/\s*)?const applyLane = \(\) => \{\s*transportRef\.current = decided\.lane;\s*offerFor\(decided\.lane\);[\s\S]{0,700}?\};\s*if \(sessionRef\.current\) laneAfterCallRef\.current = applyLane;\s*else applyLane\(\);\s*if \(decided\.probe && body\.ws_available === true\) \{/.test(btn) &&
       /saveLane\(ok \? "ws" : "rtc", Date\.now\(\), "probe"\);\s*(\/\*[^*]*\*\/\s*)?if \(!sessionRef\.current\) \{\s*transportRef\.current = ok \? "ws" : "rtc";/.test(btn));
     check("  …a real call teaches the device too: live on the socket lane saves ws, a fall-back saves rtc",
       /if \(next === "live" && transportRef\.current === "ws"\) saveLane\("ws", Date\.now\(\), "call"\);/.test(btn) && /transportRef\.current = "rtc";\s*(\/\*[^*]*\*\/\s*)?saveLane\("rtc", Date\.now\(\), "call"\);/.test(btn));
@@ -4003,7 +4035,7 @@ function describeErrorCheck(): boolean {
      come after the tap; it must not relabel a running call. */
   const btn = readFileSync("src/components/ai/VoiceCallButton.tsx", "utf8");
   check("the server's lane is applied at once with no call up, and kept for the hang-up when a call is running",
-    /const applyLane = \(\) => \{\s*transportRef\.current = decided\.lane;\s*offerFor\(decided\.lane\);\s*\};\s*if \(sessionRef\.current\) laneAfterCallRef\.current = applyLane;\s*else applyLane\(\);/.test(btn) &&
+    /const applyLane = \(\) => \{\s*transportRef\.current = decided\.lane;\s*offerFor\(decided\.lane\);[\s\S]{0,700}?\};\s*if \(sessionRef\.current\) laneAfterCallRef\.current = applyLane;\s*else applyLane\(\);/.test(btn) &&
     /const laneAfterCallRef = useRef<\(\(\) => void\) \| null>\(null\);/.test(btn) &&
     /releaseCall\(\);\s*\/\*[^*]*\*\/\s*setLaneNote\(null\);\s*\/\*[^*]*\*\/\s*laneAfterCallRef\.current\?\.\(\);\s*laneAfterCallRef\.current = null;/.test(btn));
 }
