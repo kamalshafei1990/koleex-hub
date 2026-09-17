@@ -28,7 +28,7 @@ import { useWarmData } from "@/lib/warm-cache";
 import FinanceHeader from "@/components/finance/FinanceHeader";
 import { useTabMotion } from "@/components/ui/useTabMotion";
 import { useTranslation } from "@/lib/i18n";
-import { financeT } from "@/lib/translations/finance";
+import { FIN_STATEMENTS } from "@/lib/translations/finance/statements";
 import { Eyebrow, Hairline } from "@/components/finance/FinanceDashboardUi";
 
 type Tab = "pl" | "bs" | "cf" | "ar" | "ap" | "inv" | "gp";
@@ -47,7 +47,7 @@ function fmtQty(n: number) {
 }
 
 export default function FinanceStatements() {
-  const { t } = useTranslation(financeT);
+  const { t } = useTranslation(FIN_STATEMENTS);
   const TABS: Array<{ key: Tab; label: string }> = [
     { key: "pl",  label: t("statements.tab.pl", "Profit & Loss") },
     { key: "bs",  label: t("statements.tab.bs", "Balance Sheet") },
@@ -180,7 +180,7 @@ interface PLStatement {
 }
 
 function ProfitLossPanel({ from, to }: { from: string; to: string }) {
-  const { t } = useTranslation(financeT);
+  const { t } = useTranslation(FIN_STATEMENTS);
   const { data, loading, error } = useJson<{ statement: PLStatement }>(
     `/api/accounting/profit-loss?from=${from}&to=${to}`,
   );
@@ -206,7 +206,7 @@ function ProfitLossPanel({ from, to }: { from: string; to: string }) {
   );
 }
 function SectionRow({ label, s, accent }: { label: string; s: PLSection; accent: string }) {
-  const { t } = useTranslation(financeT);
+  const { t } = useTranslation(FIN_STATEMENTS);
   const lines = s.lines ?? [];
   return (
     <>
@@ -250,7 +250,7 @@ interface BSSummary {
 }
 
 function BalanceSheetPanel({ asOf }: { asOf: string }) {
-  const { t } = useTranslation(financeT);
+  const { t } = useTranslation(FIN_STATEMENTS);
   const { data, loading, error } = useJson<{ summary: BSSummary }>(
     `/api/accounting/balance-sheet?as_of=${asOf}`,
   );
@@ -302,7 +302,7 @@ function BalanceSheetPanel({ asOf }: { asOf: string }) {
 
 interface CFSummary { from: string; to: string; cash_in: number; cash_out: number; net_change: number; counts: { in: number; out: number } }
 function CashFlowPanel({ from, to }: { from: string; to: string }) {
-  const { t } = useTranslation(financeT);
+  const { t } = useTranslation(FIN_STATEMENTS);
   const { data, loading, error } = useJson<{ report: CFSummary }>(
     `/api/accounting/statements/cash-flow-summary?from=${from}&to=${to}`,
   );
@@ -329,7 +329,7 @@ interface AgingPartyRow { party_id: string | null; party_name: string | null; to
 interface AgingReport { as_of: string; buckets: string[]; parties: AgingPartyRow[]; totals: { by_bucket: Record<string, number>; total_open: number; total_overdue: number } }
 
 function AgingPanel({ title, url }: { title: string; url: string }) {
-  const { t } = useTranslation(financeT);
+  const { t } = useTranslation(FIN_STATEMENTS);
   const { data, loading, error } = useJson<{ report: AgingReport }>(url);
   const r = data?.report;
   if (loading && !r) return <Panel title={title}><div className="px-4 py-6 text-[12px] text-[var(--text-dim)]">{t("statements.loading", "Loading…")}</div></Panel>;
@@ -379,11 +379,11 @@ function AgingPanel({ title, url }: { title: string; url: string }) {
   );
 }
 function ArAgingPanel({ asOf }: { asOf: string }) {
-  const { t } = useTranslation(financeT);
+  const { t } = useTranslation(FIN_STATEMENTS);
   return <AgingPanel title={t("statements.tab.ar", "AR Aging")} url={`/api/accounting/statements/ar-aging?as_of=${asOf}`} />;
 }
 function ApAgingPanel({ asOf }: { asOf: string }) {
-  const { t } = useTranslation(financeT);
+  const { t } = useTranslation(FIN_STATEMENTS);
   return <AgingPanel title={t("statements.tab.ap", "AP Aging")} url={`/api/accounting/statements/ap-aging?as_of=${asOf}`} />;
 }
 
@@ -393,7 +393,7 @@ interface InvRow { inventory_item_id: string; item_code: string; item_name: stri
 interface InvReport { as_of: string; rows: InvRow[]; totals: { total_qty: number; total_value: number; by_currency: Record<string, number> } }
 
 function InventoryValuePanel() {
-  const { t } = useTranslation(financeT);
+  const { t } = useTranslation(FIN_STATEMENTS);
   const { data, loading, error } = useJson<{ report: InvReport }>("/api/accounting/statements/inventory-valuation");
   const r = data?.report;
   if (loading && !r) return <Panel title={t("statements.tab.inv", "Inventory Value")}><div className="px-4 py-6 text-[12px] text-[var(--text-dim)]">{t("statements.loading", "Loading…")}</div></Panel>;
@@ -447,7 +447,7 @@ interface GPRow { invoice_id: string; invoice_no: string | null; customer_name: 
 interface GPReport { as_of: string; from: string | null; to: string | null; rows: GPRow[]; totals: { revenue: number; cogs: number; gross_profit: number; margin_pct: number } }
 
 function GrossProfitPanel({ from, to }: { from: string; to: string }) {
-  const { t } = useTranslation(financeT);
+  const { t } = useTranslation(FIN_STATEMENTS);
   const { data, loading, error } = useJson<{ report: GPReport }>(
     `/api/accounting/statements/gross-profit?from=${from}&to=${to}`,
   );

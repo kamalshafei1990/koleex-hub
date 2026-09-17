@@ -13,12 +13,12 @@ import {
 import { fmtMoney } from "@/lib/finance/calc";
 import RrIcon from "@/components/ui/RrIcon";
 import { useTranslation } from "@/lib/i18n";
-import { financeT } from "@/lib/translations/finance";
+import { FIN_CUSTOMERS } from "@/lib/translations/finance/customers";
 import type { FinanceCustomerAccount } from "@/lib/finance/types";
 
 export default function FinanceCustomers() {
   const { showToast, toastElement } = useToast();
-  const { t } = useTranslation(financeT);
+  const { t } = useTranslation(FIN_CUSTOMERS);
   /* Warm: this endpoint takes no filter, so the response IS the default
      view. Paints from the last answer on the first frame, refreshes behind
      the painted screen. */

@@ -39,7 +39,7 @@ import Link from "next/link";
 import { ErpEyebrow, ErpHairline, ErpPage, ErpPanel } from "@/components/ui/erp/ErpUi";
 import RrIcon, { type RrIconName } from "@/components/ui/RrIcon";
 import { useTranslation } from "@/lib/i18n";
-import { financeT } from "@/lib/translations/finance";
+import { FIN_DATAENTRY } from "@/lib/translations/finance/dataEntry";
 
 interface EntryRow {
   href: string;
@@ -77,7 +77,7 @@ const DAILY_ENTRIES: EntryRow[] = [
 ];
 
 export default function DataEntryHub() {
-  const { t } = useTranslation(financeT);
+  const { t } = useTranslation(FIN_DATAENTRY);
   return (
     <ErpPage
       title={t("dataEntry.title", "Data Entry")}
@@ -137,7 +137,7 @@ export default function DataEntryHub() {
 }
 
 function EntryRowItem({ row }: { row: EntryRow }) {
-  const { t } = useTranslation(financeT);
+  const { t } = useTranslation(FIN_DATAENTRY);
   const tagCls =
     row.tag === "required"    ? "border-rose-500/60 dark:border-rose-300/40 bg-rose-500/15 dark:bg-rose-300/[0.08] text-rose-800 dark:text-rose-100" :
     row.tag === "recommended" ? "border-amber-500/60 dark:border-amber-300/40 bg-amber-500/15 dark:bg-amber-300/[0.08] text-amber-800 dark:text-amber-100" :

@@ -1,0 +1,67 @@
+import type { Translations } from "@/lib/i18n";
+
+/* Finance — the `expAnalytics.*` strings, split out of the one 287 KB dictionary.
+   See the header of ../finance.ts for why. */
+
+export const FIN_EXPANALYTICS: Translations = {
+  /* Other Finance pages — title + subtitle for the FinanceHeader on each */
+  "expAnalytics.subtitle.long":{ en: "Where the money goes — by category, by order, by trend. Daily entry lives in the Expenses app.",
+                              zh: "钱的去向 — 按类别、按订单、按趋势查看。日常录入仍在费用应用中。",
+                              ar: "أين تذهب الأموال — حسب الفئة والطلب والاتجاه. الإدخال اليومي في تطبيق المصروفات." },
+
+  /* ── Expense Analytics (/finance/expenses) ─────────────────────── */
+  "expAnalytics.title":     { en: "Expense Analytics",            zh: "费用分析",               ar: "تحليلات المصروفات" },
+  "expAnalytics.subtitle":  { en: "Strategic view of operating spend — daily entry stays in the Expenses app.",
+                              zh: "运营支出的战略视图 — 日常录入仍在费用应用中。",
+                              ar: "نظرة استراتيجية على الإنفاق التشغيلي — الإدخال اليومي يبقى في تطبيق المصروفات." },
+  "expAnalytics.openApp":   { en: "Open Expenses App",            zh: "打开费用应用",            ar: "فتح تطبيق المصروفات" },
+  "expAnalytics.kpi.total": { en: "Total spend",                  zh: "总支出",                 ar: "إجمالي الإنفاق" },
+  "expAnalytics.kpi.paid":  { en: "Paid",                         zh: "已支付",                 ar: "مدفوع" },
+  "expAnalytics.kpi.unpaid":{ en: "Unpaid",                       zh: "未支付",                 ar: "غير مدفوع" },
+  "expAnalytics.kpi.overdue":{en: "Overdue",                      zh: "逾期",                   ar: "متأخر" },
+  "expAnalytics.byCategory":{ en: "By category",                  zh: "按类别",                 ar: "حسب الفئة" },
+  "expAnalytics.unusual":   { en: "Unusual expenses",             zh: "异常费用",               ar: "مصروفات غير معتادة" },
+  "expAnalytics.increases": { en: "Recent increases",             zh: "近期增加",               ar: "زيادات حديثة" },
+  "expAnalytics.orderImpact":{en: "Order-linked impact",          zh: "与订单关联的影响",         ar: "الأثر المرتبط بالطلب" },
+
+  /* ── Expense Analytics page (FinanceExpenses.tsx) ───────────────── */
+  "expAnalytics.openApp.aria":          { en: "Open Expenses App",              zh: "打开费用应用",                  ar: "افتح تطبيق المصروفات" },
+  "expAnalytics.kpi.total.label":       { en: "Total Expenses",                 zh: "总费用",                       ar: "إجمالي المصروفات" },
+  "expAnalytics.kpi.total.hint":        { en: "All time, this view",            zh: "全部时间，本视图",              ar: "كل الفترات، هذا العرض" },
+  "expAnalytics.kpi.unpaid.label":      { en: "Unpaid (Money to Pay)",          zh: "未支付（应付款项）",            ar: "غير مدفوع (مبالغ مستحقة الدفع)" },
+  "expAnalytics.kpi.unpaid.hint":       { en: "Awaiting payment",               zh: "等待支付",                     ar: "بانتظار السداد" },
+  "expAnalytics.kpi.paid.label":        { en: "Paid",                           zh: "已支付",                       ar: "مدفوع" },
+  "expAnalytics.kpi.paid.hint":         { en: "Already settled",                zh: "已结清",                       ar: "تمت تسويته" },
+  "expAnalytics.kpi.overdue.label":     { en: "Overdue",                        zh: "逾期",                         ar: "متأخر" },
+  "expAnalytics.kpi.overdue.hint":      { en: "Past due date — needs action",   zh: "已过到期日 — 需要处理",          ar: "تجاوز تاريخ الاستحقاق — يستلزم إجراءً" },
+  "expAnalytics.aria.seeAll":           { en: "See every expense",              zh: "查看所有费用",                  ar: "اعرض كل المصروفات" },
+  "expAnalytics.aria.reviewUnpaid":     { en: "Review unpaid expenses",         zh: "查阅未支付费用",                ar: "مراجعة المصروفات غير المدفوعة" },
+  "expAnalytics.aria.seeSettled":       { en: "See settled expenses",           zh: "查看已结清费用",                ar: "عرض المصروفات المسوّاة" },
+  "expAnalytics.aria.resolveOverdue":   { en: "Resolve overdue expenses",       zh: "处理逾期费用",                  ar: "معالجة المصروفات المتأخرة" },
+  "expAnalytics.donut.title":           { en: "Category distribution",          zh: "类别分布",                     ar: "توزيع الفئات" },
+  "expAnalytics.donut.subtitle":        { en: "Share of total spend, monochrome by intensity.", zh: "占总支出的份额，按强度单色显示。", ar: "حصة من إجمالي الإنفاق، أحادي اللون بحسب الكثافة." },
+  "expAnalytics.donut.center":          { en: "Total",                          zh: "总计",                         ar: "الإجمالي" },
+  "expAnalytics.monthly.title":         { en: "Monthly spend",                  zh: "月度支出",                     ar: "الإنفاق الشهري" },
+  "expAnalytics.monthly.subtitle":      { en: "Last 6 months. Latest highlighted.", zh: "最近 6 个月，最新月份高亮显示。", ar: "آخر 6 أشهر. الأحدث مُميَّز." },
+  "expAnalytics.monthly.thisMonth":     { en: "This month",                     zh: "本月",                         ar: "هذا الشهر" },
+  "expAnalytics.vendors.title":         { en: "Top vendors",                    zh: "主要供应商",                    ar: "أبرز الموردين" },
+  "expAnalytics.vendors.subtitle":      { en: "Ranked by total spend.",         zh: "按总支出排序。",                ar: "مُرتَّب حسب إجمالي الإنفاق." },
+  "expAnalytics.vendors.empty":         { en: "No supplier-linked expenses yet.", zh: "暂无与供应商关联的费用。",        ar: "لا توجد بعد مصروفات مرتبطة بمورد." },
+  "expAnalytics.vendors.unlinked":      { en: "Unlinked",                       zh: "未关联",                       ar: "غير مرتبط" },
+  "expAnalytics.vendors.expense":       { en: "expense",                        zh: "笔费用",                       ar: "مصروف" },
+  "expAnalytics.vendors.expenses":      { en: "expenses",                       zh: "笔费用",                       ar: "مصروفات" },
+  "expAnalytics.byCategory.title":      { en: "By Category",                    zh: "按类别",                       ar: "حسب الفئة" },
+  "expAnalytics.byCategory.subtitle":   { en: "Each tile shows total spend, share of all expenses, and month-over-month change.", zh: "每个磁贴显示总支出、占全部费用的份额以及环比变化。", ar: "تُظهر كل بطاقة إجمالي الإنفاق، والحصة من جميع المصروفات، والتغير شهرًا بشهر." },
+  "expAnalytics.byCategory.ofTotal":    { en: "{n}% of total",                  zh: "占总额 {n}%",                   ar: "{n}% من الإجمالي" },
+  "expAnalytics.recent.title":          { en: "Recent Increases",               zh: "近期增加",                     ar: "زيادات حديثة" },
+  "expAnalytics.recent.subtitle":       { en: "Categories whose spend grew >25 % this month.", zh: "本月支出增长超过 25% 的类别。", ar: "الفئات التي زاد إنفاقها بأكثر من 25٪ هذا الشهر." },
+  "expAnalytics.recent.thisLast":       { en: "This month {tm} · last month {lm}", zh: "本月 {tm} · 上月 {lm}",       ar: "هذا الشهر {tm} · الشهر الماضي {lm}" },
+  "expAnalytics.unusual.title":         { en: "Unusual Expenses",               zh: "异常费用",                     ar: "مصروفات غير معتادة" },
+  "expAnalytics.unusual.subtitle":      { en: "Items 3× larger than the median of their category.", zh: "金额超过同类别中位数 3 倍的条目。", ar: "بنود تتجاوز ضعف الوسيط لفئتها بثلاث مرات." },
+  "expAnalytics.orderImpact.title":     { en: "Order-Linked Impact",            zh: "与订单关联的影响",              ar: "الأثر المرتبط بالطلب" },
+  "expAnalytics.orderImpact.subtitle":  { en: "Orders absorbing the most expense spend.", zh: "承担最多费用支出的订单。",    ar: "الطلبات التي تستوعب أكبر قدر من المصروفات." },
+  "expAnalytics.orderImpact.linked":    { en: "{n} {label} linked",             zh: "已关联 {n} {label}",            ar: "{n} {label} مرتبط" },
+  "expAnalytics.empty.title":           { en: "No expenses recorded yet",       zh: "暂无费用记录",                  ar: "لا توجد مصروفات مسجّلة بعد" },
+  "expAnalytics.empty.hint":            { en: "Daily expense entry happens in the Expenses app — open it from the sidebar or the button above.", zh: "日常费用录入在“费用”应用中进行 — 请从侧边栏或上方按钮打开。", ar: "إدخال المصروفات اليومية يتم في تطبيق المصروفات — افتحه من الشريط الجانبي أو الزر أعلاه." },
+  "expAnalytics.other":                 { en: "Other",                          zh: "其他",                         ar: "أخرى" },
+};

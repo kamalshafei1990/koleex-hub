@@ -5,7 +5,7 @@ import { useWarmData } from "@/lib/warm-cache";
 import { useToast } from "@/components/kds/useToast";
 import FinanceHeader from "@/components/finance/FinanceHeader";
 import { useTranslation } from "@/lib/i18n";
-import { financeT } from "@/lib/translations/finance";
+import { FIN_SUPPLIERS } from "@/lib/translations/finance/suppliers";
 import { EmptyState, ProgressBar } from "@/components/finance/FinanceUi";
 import { formatCompact } from "@/components/finance/FinanceUiX";
 import {
@@ -18,7 +18,7 @@ import type { FinanceSupplierAccount } from "@/lib/finance/types";
 
 export default function FinanceSuppliers() {
   const { showToast, toastElement } = useToast();
-  const { t } = useTranslation(financeT);
+  const { t } = useTranslation(FIN_SUPPLIERS);
   /* Warm: this endpoint takes no filter, so the response IS the default
      view. Paints from the last answer on the first frame, refreshes behind
      the painted screen. */

@@ -21,7 +21,7 @@ import { useInput } from "@/components/kds/useInput";
 import Link from "next/link";
 import FinanceHeader from "@/components/finance/FinanceHeader";
 import { useTranslation } from "@/lib/i18n";
-import { financeT } from "@/lib/translations/finance";
+import { FIN_RECONCILIATION } from "@/lib/translations/finance/reconciliation";
 import { EmptyState, SectionCard } from "@/components/finance/FinanceUi";
 import { MetricCard } from "@/components/finance/FinanceUiX";
 import RrIcon from "@/components/ui/RrIcon";
@@ -38,7 +38,7 @@ import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 type FilterKey = "active" | "suggested" | "confirmed" | "rejected" | "all";
 
 export default function FinanceReconciliation() {
-  const { t } = useTranslation(financeT);
+  const { t } = useTranslation(FIN_RECONCILIATION);
   const [rescanBusy, setRescanBusy] = useState(false);
   const [filter, setFilter] = useState<FilterKey>("active");
   const [acting, setActing] = useState<string | null>(null);   // candidate.id currently in-flight
@@ -267,7 +267,7 @@ const CandidateRow = memo(function CandidateRow({
   onConfirm: (id: string) => void;
   onReject: (id: string) => void;
 }) {
-  const { t } = useTranslation(financeT);
+  const { t } = useTranslation(FIN_RECONCILIATION);
   const p = candidate.payment ?? null;
   const m = candidate.cash_movement ?? null;
   const isActive = candidate.status === "suggested";
@@ -428,7 +428,7 @@ function ConfidencePill({ level, pct }: { level: ReconciliationConfidenceLevel; 
 }
 
 function TypeChip({ type }: { type: ReconciliationCandidateType }) {
-  const { t } = useTranslation(financeT);
+  const { t } = useTranslation(FIN_RECONCILIATION);
   const cls =
     type === "exact"          ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-300" :
     type === "partial"        ? "bg-amber-500/15 text-amber-600 dark:text-amber-300"      :
@@ -458,7 +458,7 @@ function SideCard({
   accentTone: "positive" | "negative";
   href?: string;
 }) {
-  const { t } = useTranslation(financeT);
+  const { t } = useTranslation(FIN_RECONCILIATION);
   const accent = accentTone === "positive" ? "text-emerald-600 dark:text-emerald-300" : "text-rose-600 dark:text-rose-300";
   return (
     <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-primary)]/40 px-3 py-2.5">

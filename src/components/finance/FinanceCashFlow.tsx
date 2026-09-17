@@ -8,8 +8,14 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import FinanceHeader from "@/components/finance/FinanceHeader";
 import { useTranslation } from "@/lib/i18n";
-import { financeT } from "@/lib/translations/finance";
+import { FIN_ACCOUNTING } from "@/lib/translations/finance/accounting";
+import { FIN_CF } from "@/lib/translations/finance/cf";
+import { FIN_COMMON } from "@/lib/translations/finance/common";
 import { Eyebrow, Hairline } from "@/components/finance/FinanceDashboardUi";
+
+/* Only the namespaces this screen actually reads — see finance.ts. */
+const DICT = { ...FIN_ACCOUNTING, ...FIN_CF, ...FIN_COMMON } as const;
+
 
 interface CashFlowLine { label: string; amount: number; detail?: string }
 interface CashFlowSection { label: string; amount: number; lines: CashFlowLine[] }
@@ -32,7 +38,7 @@ function fmt(n: number): string {
 }
 
 export default function FinanceCashFlow() {
-  const { t } = useTranslation(financeT);
+  const { t } = useTranslation(DICT);
   const sectionKeyFor = (label: string): string => {
     const l = label.toLowerCase();
     if (l.includes("operat")) return "cf.section.operating";

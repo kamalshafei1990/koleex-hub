@@ -5,7 +5,7 @@ import { useWarmData } from "@/lib/warm-cache";
 import { useToast } from "@/components/kds/useToast";
 import FinanceHeader from "@/components/finance/FinanceHeader";
 import { useTranslation } from "@/lib/i18n";
-import { financeT } from "@/lib/translations/finance";
+import { FIN_PAYMENTS } from "@/lib/translations/finance/payments";
 import { EmptyState, SectionCard, StatusBadge } from "@/components/finance/FinanceUi";
 import { HeroKpiCard, MetricCard } from "@/components/finance/FinanceUiX";
 import { fmtMoney } from "@/lib/finance/calc";
@@ -19,7 +19,7 @@ import { useBaseCurrency } from "@/lib/hooks/useBaseCurrency";
 
 export default function FinancePayments() {
   const { showToast, toastElement } = useToast();
-  const { t } = useTranslation(financeT);
+  const { t } = useTranslation(FIN_PAYMENTS);
   const baseCurrency = useBaseCurrency();
   const [editing, setEditing] = useState<Partial<FinancePayment> | null>(null);
   /* Phase 2.3 — review drawer + approver-permission state. */

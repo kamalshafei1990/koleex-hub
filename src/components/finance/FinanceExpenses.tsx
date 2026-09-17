@@ -23,7 +23,7 @@ import { useWarmData } from "@/lib/warm-cache";
 import Link from "next/link";
 import FinanceHeader from "@/components/finance/FinanceHeader";
 import { useTranslation } from "@/lib/i18n";
-import { financeT } from "@/lib/translations/finance";
+import { FIN_EXPANALYTICS } from "@/lib/translations/finance/expAnalytics";
 import { EmptyState, SectionCard } from "@/components/finance/FinanceUi";
 import { BarChart, DonutChart, HeroKpiCard, MetricCard, formatCompact } from "@/components/finance/FinanceUiX";
 import { accentBgClass, accentSolidBg, styleForCategory } from "@/components/finance/categoryStyles";
@@ -35,7 +35,7 @@ import RrIcon from "@/components/ui/RrIcon";
 type ExpensesSnap = { expenses: FinanceExpense[]; categories: ExpenseCategory[] };
 
 export default function FinanceExpenseAnalytics() {
-  const { t, lang } = useTranslation(financeT);
+  const { t, lang } = useTranslation(FIN_EXPANALYTICS);
   /* Tenant base currency — shared session-cached hook, null until
      resolved. fmtMoney() renders "—" when given an empty currency, so
      a USD or EUR tenant never flashes "CNY" on first paint. */

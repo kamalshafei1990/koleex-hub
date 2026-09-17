@@ -111,7 +111,17 @@ import {
   type MemoryState,
 } from "@/lib/intelligence";
 import { useTranslation } from "@/lib/i18n";
-import { financeT } from "@/lib/translations/finance";
+import { FIN_APPROVALS } from "@/lib/translations/finance/approvals";
+import { FIN_DASH } from "@/lib/translations/finance/dash";
+import { FIN_DASHBOARD } from "@/lib/translations/finance/dashboard";
+import { FIN_HOME } from "@/lib/translations/finance/home";
+import { FIN_SUBTAB } from "@/lib/translations/finance/subtab";
+import { FIN_TREASURY } from "@/lib/translations/finance/treasury";
+import { FIN_WORKFLOW } from "@/lib/translations/finance/workflow";
+
+/* Only the namespaces this screen actually reads — see finance.ts. */
+const DICT = { ...FIN_APPROVALS, ...FIN_DASH, ...FIN_DASHBOARD, ...FIN_HOME, ...FIN_SUBTAB, ...FIN_TREASURY, ...FIN_WORKFLOW } as const;
+
 
 const MODE_STORAGE_KEY = "koleex-finance-mode";
 
@@ -127,7 +137,7 @@ type DashboardStatic = {
 };
 
 export default function FinanceDashboard() {
-  const { t } = useTranslation(financeT);
+  const { t } = useTranslation(DICT);
   const PERIOD_OPTIONS: { value: DashboardPeriod; label: string }[] = [
     { value: "week",    label: t("dashboard.period.week", "Week") },
     { value: "quarter", label: t("dashboard.period.quarter", "Quarter") },

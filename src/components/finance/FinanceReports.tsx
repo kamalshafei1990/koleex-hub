@@ -19,7 +19,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useToast } from "@/components/kds/useToast";
 import FinanceHeader from "@/components/finance/FinanceHeader";
 import { useTranslation } from "@/lib/i18n";
-import { financeT } from "@/lib/translations/finance";
+import { FIN_REPORTS } from "@/lib/translations/finance/reports";
 import { EmptyState, SectionCard } from "@/components/finance/FinanceUi";
 import RrIcon, { type RrIconName } from "@/components/ui/RrIcon";
 import type {
@@ -39,7 +39,7 @@ export default function FinanceReports({
   initialFilters?: ReportFilters;
 }) {
   const { showToast, toastElement } = useToast();
-  const { t } = useTranslation(financeT);
+  const { t } = useTranslation(FIN_REPORTS);
   const [templates, setTemplates] = useState<ReportTemplateDescriptor[]>([]);
   const [activeType, setActiveType] = useState<ReportType | null>(initialType ?? null);
   const [filters, setFilters] = useState<ReportFilters>(initialFilters ?? defaultFilters());
@@ -315,7 +315,7 @@ function FiltersPanel({
   onPrint: () => void;
   busy: "pdf" | "print" | null;
 }) {
-  const { t } = useTranslation(financeT);
+  const { t } = useTranslation(FIN_REPORTS);
   const allFilterKeys: Array<keyof ReportFilters> = Array.from(new Set([...descriptor.required_filters, ...descriptor.optional_filters]));
   const set = (k: keyof ReportFilters, v: string | undefined) => onChange({ ...filters, [k]: v || undefined });
 

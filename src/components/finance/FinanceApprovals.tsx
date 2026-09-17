@@ -18,7 +18,12 @@ import {
 } from "@/components/ui/erp/ErpUi";
 import RrIcon, { type RrIconName } from "@/components/ui/RrIcon";
 import { useTranslation } from "@/lib/i18n";
-import { financeT } from "@/lib/translations/finance";
+import { FIN_APPROVALS } from "@/lib/translations/finance/approvals";
+import { FIN_COMMON } from "@/lib/translations/finance/common";
+
+/* Only the namespaces this screen actually reads — see finance.ts. */
+const DICT = { ...FIN_APPROVALS, ...FIN_COMMON } as const;
+
 
 type Entity = "expense" | "payment" | "bill" | "journal";
 type Status = "draft" | "submitted" | "pending" | "approved" | "rejected";
@@ -54,7 +59,7 @@ function fmtTime(iso: string | null) {
 type ApprovalsSnap = { items: PendingItem[]; canApprove: boolean; activity: ActivityRow[] };
 
 export default function FinanceApprovals() {
-  const { t } = useTranslation(financeT);
+  const { t } = useTranslation(DICT);
   const [error, setError]     = useState<string | null>(null);
   const [busyId, setBusyId]   = useState<string | null>(null);
 

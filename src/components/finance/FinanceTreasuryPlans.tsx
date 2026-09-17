@@ -22,7 +22,8 @@ import ConfirmDialog from "@/components/kds/ConfirmDialog";
 import Link from "next/link";
 import FinanceHeader from "@/components/finance/FinanceHeader";
 import { useTranslation } from "@/lib/i18n";
-import { financeT } from "@/lib/translations/finance";
+import { FIN_FORECAST } from "@/lib/translations/finance/forecast";
+import { FIN_TREASURYPLANS } from "@/lib/translations/finance/treasuryPlans";
 import { EmptyState, SectionCard } from "@/components/finance/FinanceUi";
 import { MetricCard } from "@/components/finance/FinanceUiX";
 import { useBaseCurrency } from "@/lib/hooks/useBaseCurrency";
@@ -37,6 +38,10 @@ import type {
 import type { ForecastResult } from "@/lib/intelligence/treasury-forecast";
 import { humanizeError } from "@/lib/ui/humanize-error";
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
+
+/* Only the namespaces this screen actually reads — see finance.ts. */
+const DICT = { ...FIN_FORECAST, ...FIN_TREASURYPLANS } as const;
+
 
 function fmtCompactUsd(n: number | null | undefined): string {
   if (n == null || !Number.isFinite(n)) return "—";
@@ -78,7 +83,7 @@ interface CompareResponse {
 }
 
 export default function FinanceTreasuryPlans() {
-  const { t } = useTranslation(financeT);
+  const { t } = useTranslation(DICT);
   const STATUS_BUCKETS: { key: TreasuryPlanStatus; label: string }[] = [
     { key: "draft",        label: t("treasuryPlans.bucket.draft", "Drafts") },
     { key: "under_review", label: t("treasuryPlans.bucket.under_review", "Under review") },
@@ -305,7 +310,7 @@ export default function FinanceTreasuryPlans() {
 /* Phase S.4 — memoized; parent's `openId` toggle no longer rerenders
    every card in the list. */
 const PlanCard = memo(function PlanCard({ plan, active, onOpen }: { plan: TreasuryPlan; active: boolean; onOpen: (id: string) => void }) {
-  const { t } = useTranslation(financeT);
+  const { t } = useTranslation(DICT);
   const m = plan.projected_metrics;
   const ds = daysAgo(plan.approved_at ?? plan.updated_at);
   const agoStr = ds === 0 ? t("treasuryPlans.card.today", "today") : t("treasuryPlans.card.daysAgo", "{n}d ago").replace("{n}", String(ds));
@@ -394,7 +399,7 @@ function PlanDetail({
   onArchive: () => void;
   onClose: () => void;
 }) {
-  const { t } = useTranslation(financeT);
+  const { t } = useTranslation(DICT);
   const baseCurrency = useBaseCurrency();
   const p = detail.plan;
   const m = p.projected_metrics;
@@ -633,7 +638,7 @@ function DriverList({
   items: Array<{ key?: string; party?: string; amountReporting?: number; daysFromNow?: number }>;
   tone: "positive" | "negative";
 }) {
-  const { t } = useTranslation(financeT);
+  const { t } = useTranslation(DICT);
   const accent = tone === "positive" ? "text-emerald-600 dark:text-emerald-300" : "text-rose-600 dark:text-rose-300";
   return (
     <div>

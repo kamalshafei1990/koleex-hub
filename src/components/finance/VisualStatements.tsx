@@ -37,7 +37,7 @@ import { ErpPage, ErpPanel } from "@/components/ui/erp/ErpUi";
 import RrIcon from "@/components/ui/RrIcon";
 import { AngleLeftIcon, AngleRightIcon, CrossIcon } from "@/components/icons/ui";
 import { useTranslation, type Lang } from "@/lib/i18n";
-import { financeT } from "@/lib/translations/finance";
+import { FIN_VISUAL } from "@/lib/translations/finance/visual";
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 
 type Tab = "income" | "balance" | "cashflow";
@@ -216,7 +216,7 @@ function BodySkeleton() {
 }
 
 export function StatementsDashboard() {
-  const { t, lang } = useTranslation(financeT);
+  const { t, lang } = useTranslation(FIN_VISUAL);
   const [tab, setTab] = useState<Tab>("income");
   const [granularity, setGranularity] = useState<Granularity>("year");
   const [periodEnd, setPeriodEnd] = useState<string>(() => defaultAnchorForGranularity("year"));
@@ -520,7 +520,7 @@ function PeriodChip({
 /* ── Full page wrapper — used by /finance/visual + /finance/overview ── */
 
 export default function VisualStatements() {
-  const { t } = useTranslation(financeT);
+  const { t } = useTranslation(FIN_VISUAL);
   return (
     <ErpPage
       title={t("visual.pageTitle", "Overview")}
@@ -573,7 +573,7 @@ function KpiHero({
 /* ───── Trend chart (twin bars) ───── */
 
 function TrendChart({ trend }: { trend: TrendBucket[] }) {
-  const { t } = useTranslation(financeT);
+  const { t } = useTranslation(FIN_VISUAL);
   const buckets = trend.slice(-5);
   const w = 920; const h = 170; const padL = 16; const padR = 16; const padT = 8; const padB = 26;
   const innerW = w - padL - padR; const innerH = h - padT - padB;
@@ -727,7 +727,7 @@ function Divider({
 }
 
 function HeaderCells({ priorLabel, curLabel, showPrior }: { priorLabel?: string; curLabel: string; showPrior: boolean }) {
-  const { t } = useTranslation(financeT);
+  const { t } = useTranslation(FIN_VISUAL);
   /* Bumped from 10.5 px → 14 px so the period tags ("May 14" /
      "May 21", "2025" / "2026", "Q4 2026") read clearly on first
      glance — they're the orientation cue for the whole table. Kept
@@ -884,7 +884,7 @@ function HeadlineCells({ label, prior, cur, showPrior, tone }: { label: string; 
 /* ───── Income view ───── */
 
 function IncomeView({ pl, compare, ccy, curLabel, compareLabel }: { pl: ProfitLoss; compare?: ProfitLoss; ccy: string; curLabel: string; compareLabel: string }) {
-  const { t } = useTranslation(financeT);
+  const { t } = useTranslation(FIN_VISUAL);
   void ccy;
   const showCompare = !!compare;
   const cols: 2 | 3 = showCompare ? 3 : 2;
@@ -932,7 +932,7 @@ function priorAccount(section: PLSection, code: string) {
 /* ───── Balance sheet ───── */
 
 function BalanceView({ bs, ccy, curLabel }: { bs: BalanceSheet; ccy: string; curLabel: string }) {
-  const { t } = useTranslation(financeT);
+  const { t } = useTranslation(FIN_VISUAL);
   void ccy;
   return (
     <div className={STATEMENT_GRID_1COL}>
@@ -971,7 +971,7 @@ function BalanceView({ bs, ccy, curLabel }: { bs: BalanceSheet; ccy: string; cur
 /* ───── Cash flow ───── */
 
 function CashFlowView({ cf, compare, ccy, curLabel, compareLabel }: { cf: CashFlow; compare?: CashFlow; ccy: string; curLabel: string; compareLabel: string }) {
-  const { t } = useTranslation(financeT);
+  const { t } = useTranslation(FIN_VISUAL);
   void ccy;
   const showCompare = !!compare;
   const cols: 2 | 3 = showCompare ? 3 : 2;

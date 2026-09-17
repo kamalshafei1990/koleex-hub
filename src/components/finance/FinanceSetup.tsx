@@ -20,7 +20,7 @@ import { useWarmData } from "@/lib/warm-cache";
 import ConfirmDialog from "@/components/kds/ConfirmDialog";
 import FinanceHeader from "@/components/finance/FinanceHeader";
 import { useTranslation } from "@/lib/i18n";
-import { financeT } from "@/lib/translations/finance";
+import { FIN_SETUP } from "@/lib/translations/finance/setup";
 import { Eyebrow, Hairline } from "@/components/finance/FinanceDashboardUi";
 import RrIcon from "@/components/ui/RrIcon";
 import { humanizeError } from "@/lib/ui/humanize-error";
@@ -66,7 +66,7 @@ function StatusDot({ status }: { status: CardStatus }) {
 /* ─── Main page ───────────────────────────────────────────────── */
 
 export default function FinanceSetup() {
-  const { t } = useTranslation(financeT);
+  const { t } = useTranslation(FIN_SETUP);
   const [activeCard, setActiveCard] = useState<CardKey | null>(null);
 
   /* Warm: the setup status takes no filter, so the response IS the default
@@ -198,7 +198,7 @@ export default function FinanceSetup() {
 function DrawerShell({
   title, subtitle, onClose, children, footer,
 }: { title: string; subtitle?: string; onClose: () => void; children: React.ReactNode; footer?: React.ReactNode }) {
-  const { t } = useTranslation(financeT);
+  const { t } = useTranslation(FIN_SETUP);
   return (
     <div className="fixed inset-0 z-[120] flex justify-end bg-black/60 backdrop-blur-sm" onClick={onClose}>
       <div onClick={(e) => e.stopPropagation()} className="flex w-full max-w-lg flex-col bg-[var(--bg-primary)] text-[var(--text-primary)] border-l border-[var(--border-subtle)]">
@@ -245,7 +245,7 @@ function SetupDrawer({
 /* ─── Base currency ──────────────────────────────────────────── */
 
 function BaseCurrencyDrawer({ onClose, onChange }: { onClose: () => void; onChange: () => void }) {
-  const { t } = useTranslation(financeT);
+  const { t } = useTranslation(FIN_SETUP);
   const [code, setCode] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -310,7 +310,7 @@ function BaseCurrencyDrawer({ onClose, onChange }: { onClose: () => void; onChan
 interface BankRow { id: string; bank_name: string | null; account_name: string | null; account_number: string | null; iban: string | null; swift_code: string | null; currency: string; opening_balance: number; is_primary: boolean; status: string }
 
 function BankAccountsDrawer({ baseCurrency, onClose, onChange }: { baseCurrency: string; onClose: () => void; onChange: () => void }) {
-  const { t } = useTranslation(financeT);
+  const { t } = useTranslation(FIN_SETUP);
   const [rows, setRows] = useState<BankRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -410,7 +410,7 @@ function BankAccountsDrawer({ baseCurrency, onClose, onChange }: { baseCurrency:
 interface FxRow { id: string; from_currency: string; to_currency: string; rate: number; effective_date: string; notes: string | null }
 
 function FxRatesDrawer({ baseCurrency, onClose, onChange }: { baseCurrency: string; onClose: () => void; onChange: () => void }) {
-  const { t } = useTranslation(financeT);
+  const { t } = useTranslation(FIN_SETUP);
   const [rows, setRows] = useState<FxRow[]>([]);
   const [from, setFrom] = useState("");
   const [to, setTo] = useState(baseCurrency);
@@ -510,7 +510,7 @@ function FxRatesDrawer({ baseCurrency, onClose, onChange }: { baseCurrency: stri
 interface AssetRow { id: string; name: string; category: string | null; purchase_value: number; purchase_date: string | null; depreciation_method: string; useful_life_years: number | null; currency: string; notes: string | null; status: string }
 
 function AssetsDrawer({ baseCurrency, onClose, onChange }: { baseCurrency: string; onClose: () => void; onChange: () => void }) {
-  const { t } = useTranslation(financeT);
+  const { t } = useTranslation(FIN_SETUP);
   const DEPRECIATION_METHODS: Array<{ value: string; label: string }> = [
     { value: "straight_line",      label: t("setup.assets.method.sl", "Straight line") },
     { value: "declining_balance",  label: t("setup.assets.method.db", "Declining balance") },
@@ -636,7 +636,7 @@ type OBCategory = "cash" | "owner_capital" | "loan" | "customer_receivable" | "s
 interface OBRow { id: string; category: OBCategory; label: string; amount: number; currency: string; notes: string | null; created_at: string }
 
 function OpeningBalancesDrawer({ category, baseCurrency, onClose, onChange }: { category: OBCategory; baseCurrency: string; onClose: () => void; onChange: () => void }) {
-  const { t } = useTranslation(financeT);
+  const { t } = useTranslation(FIN_SETUP);
   const CATEGORY_META: Record<OBCategory, { title: string; hint: string; placeholder: string }> = {
     cash:                { title: t("setup.ob.cat.cash.title", "Cash Accounts"),         hint: t("setup.ob.cat.cash.hint", "Physical cash on hand and petty-cash floats."),                placeholder: t("setup.ob.cat.cash.placeholder", "Main petty cash") },
     owner_capital:       { title: t("setup.ob.cat.owner.title", "Equity / Capital"),      hint: t("setup.ob.cat.owner.hint", "Owner-injected capital at company formation."),                placeholder: t("setup.ob.cat.owner.placeholder", "Founder contribution") },
@@ -765,7 +765,7 @@ function OpeningBalancesDrawer({ category, baseCurrency, onClose, onChange }: { 
 /* ─── Setup guidance — operator-friendly checklist + warnings ─── */
 
 function SetupGuidance({ snapshot }: { snapshot: SetupSnapshot }) {
-  const { t } = useTranslation(financeT);
+  const { t } = useTranslation(FIN_SETUP);
   /* Recommended setup order — operators repeatedly asked "where do I
      start?" The checklist below is the answer: do these in this
      order and the rest unlocks. */

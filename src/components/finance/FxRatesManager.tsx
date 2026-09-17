@@ -22,7 +22,12 @@ import { SmartField, SmartInput, SmartSelect } from "@/components/ui/create/Smar
 import { humanizeError } from "@/lib/ui/humanize-error";
 import { useBaseCurrencyOptional } from "@/lib/hooks/useBaseCurrency";
 import { useTranslation } from "@/lib/i18n";
-import { financeT } from "@/lib/translations/finance";
+import { FIN_COMMON } from "@/lib/translations/finance/common";
+import { FIN_FX } from "@/lib/translations/finance/fx";
+
+/* Only the namespaces this screen actually reads — see finance.ts. */
+const DICT = { ...FIN_COMMON, ...FIN_FX } as const;
+
 
 interface RateRow {
   id: string; from_currency: string; to_currency: string;
@@ -52,7 +57,7 @@ interface FxStatus {
 type FxSnap = { rates: RateRow[]; status: FxStatus | null };
 
 export default function FxRatesManager() {
-  const { t } = useTranslation(financeT);
+  const { t } = useTranslation(DICT);
   /* Base currency comes from the shared cached hook. It feeds both the
      display labels and the "To" select default — once it resolves, the
      form auto-flips from "USD" → tenant base. */

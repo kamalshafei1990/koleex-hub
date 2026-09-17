@@ -5,7 +5,7 @@ import { useWarmData } from "@/lib/warm-cache";
 import { useInput } from "@/components/kds/useInput";
 import FinanceHeader from "@/components/finance/FinanceHeader";
 import { useTranslation } from "@/lib/i18n";
-import { financeT } from "@/lib/translations/finance";
+import { FIN_NOTIFICATIONS } from "@/lib/translations/finance/notifications";
 import { EmptyState, SectionCard, StatusBadge } from "@/components/finance/FinanceUi";
 import { HeroKpiCard, MetricCard } from "@/components/finance/FinanceUiX";
 import { fmtMoney } from "@/lib/finance/calc";
@@ -56,7 +56,7 @@ const OFFSET_OPTIONS = [
 ];
 
 export default function FinanceNotifications() {
-  const { t } = useTranslation(financeT);
+  const { t } = useTranslation(FIN_NOTIFICATIONS);
   const baseCurrency = useBaseCurrency();
 
   /* Warm: this endpoint takes no filter, so the response IS the default

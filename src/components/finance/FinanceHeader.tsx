@@ -16,10 +16,15 @@ import RrIcon from "@/components/ui/RrIcon";
 import Button from "@/components/ui/Button";
 import { openSmartCreate } from "@/components/ui/create/SmartCreateDrawer";
 import { useTranslation } from "@/lib/i18n";
-import { financeT } from "@/lib/translations/finance";
+import { FIN_APP } from "@/lib/translations/finance/app";
+import { FIN_HEADER } from "@/lib/translations/finance/header";
 import { ACCENT } from "@/lib/accentColors";
 import { useSearchPlaceholder } from "@/lib/searchPlaceholders";
 import AppIcon from "@/components/common/AppIcon";
+
+/* Only the namespaces this screen actually reads — see finance.ts. */
+const DICT = { ...FIN_APP, ...FIN_HEADER } as const;
+
 
 export type HealthStatus = "healthy" | "watch" | "stress" | "unknown";
 
@@ -137,7 +142,7 @@ export default function FinanceHeader({
   health?: HealthStatus;
   showTabs?: boolean;
 }) {
-  const { t } = useTranslation(financeT);
+  const { t } = useTranslation(DICT);
   const searchPlaceholder = useSearchPlaceholder("finance");
 
   const tabs: PageTab[] = PRIMARY_TABS_RAW.map((tab) => ({
@@ -196,7 +201,7 @@ export default function FinanceHeader({
 /* Compact health pill — re-exported for callers that render it inline. */
 export function HealthPill({ status }: { status: HealthStatus }) {
   const s = HEALTH_STYLE[status];
-  const { t } = useTranslation(financeT);
+  const { t } = useTranslation(DICT);
   return (
     <span
       title={t(s.hintKey, s.hintFallback)}

@@ -23,7 +23,12 @@ import { FocusBoundary, FocusToggle } from "@/components/ui/focus/FocusMode";
 import { openSmartCreate } from "@/components/ui/create/SmartCreateDrawer";
 import { humanizeError } from "@/lib/ui/humanize-error";
 import { useTranslation } from "@/lib/i18n";
-import { financeT } from "@/lib/translations/finance";
+import { FIN_HEADER } from "@/lib/translations/finance/header";
+import { FIN_WORKSPACE } from "@/lib/translations/finance/workspace";
+
+/* Only the namespaces this screen actually reads — see finance.ts. */
+const DICT = { ...FIN_HEADER, ...FIN_WORKSPACE } as const;
+
 
 interface PendingItem {
   kind: "expense" | "payment" | "bill" | "journal";
@@ -77,7 +82,7 @@ type WorkspaceSnap = {
 };
 
 export default function FinanceWorkspace() {
-  const { t } = useTranslation(financeT);
+  const { t } = useTranslation(DICT);
 
   /* Warm: the workspace snapshot takes no filter, so the response IS the
      default view. This is the finance landing screen — the one most worth
@@ -293,7 +298,7 @@ function EmptyState({ icon, title, body, actionHref, actionLabel }: {
 function NavCard({ href, icon, label, count }: {
   href: string; icon: RrIconName; label: string; count: number | null;
 }) {
-  const { t } = useTranslation(financeT);
+  const { t } = useTranslation(DICT);
   return (
     <Link href={href} className="block">
       <ErpPanel className="kx-glass px-3 py-3.5 transition-colors hover:bg-[var(--bg-surface-subtle)]">

@@ -13,10 +13,17 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import FinanceHeader from "@/components/finance/FinanceHeader";
 import { useTranslation } from "@/lib/i18n";
-import { financeT, translateAccountName } from "@/lib/translations/finance";
+import { FIN_ACCOUNTING } from "@/lib/translations/finance/accounting";
+import { FIN_COMMON } from "@/lib/translations/finance/common";
+import { FIN_TB } from "@/lib/translations/finance/tb";
+import { translateAccountName } from "@/lib/translations/finance/account-names";
 import { EmptyState } from "@/components/finance/FinanceUi";
 import RrIcon from "@/components/ui/RrIcon";
 import type { TrialBalance } from "@/lib/accounting/types";
+
+/* Only the namespaces this screen reads — see finance.ts. */
+const DICT = { ...FIN_ACCOUNTING, ...FIN_COMMON, ...FIN_TB } as const;
+
 
 const TYPE_GROUPS: Array<{ key: string; label: string; types: string[] }> = [
   { key: "tb.group.assets",      label: "Assets",      types: ["asset", "contra_asset"] },
@@ -46,7 +53,7 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 }
 
 export default function FinanceTrialBalance() {
-  const { t, lang } = useTranslation(financeT);
+  const { t, lang } = useTranslation(DICT);
   const today = useMemo(() => new Date().toISOString().slice(0, 10), []);
   const ninetyAgo = useMemo(() => { const d = new Date(); d.setDate(d.getDate() - 365); return d.toISOString().slice(0, 10); }, []);
   const [from, setFrom] = useState<string>("");          // empty = all-time

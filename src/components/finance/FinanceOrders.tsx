@@ -6,7 +6,8 @@ import { useToast } from "@/components/kds/useToast";
 import Link from "next/link";
 import FinanceHeader from "@/components/finance/FinanceHeader";
 import { useTranslation } from "@/lib/i18n";
-import { financeT } from "@/lib/translations/finance";
+import { FIN_COMMON } from "@/lib/translations/finance/common";
+import { FIN_ORDERS } from "@/lib/translations/finance/orders";
 import {
   EmptyState,
   ProgressBar,
@@ -22,6 +23,10 @@ import RrIcon from "@/components/ui/RrIcon";
 import { computeOrderProfit, deriveTaxRefundValue, fmtMoney, fmtPct } from "@/lib/finance/calc";
 import type { FinanceOrder, FinanceOrderSupplier } from "@/lib/finance/types";
 
+/* Only the namespaces this screen actually reads — see finance.ts. */
+const DICT = { ...FIN_COMMON, ...FIN_ORDERS } as const;
+
+
 const EMPTY_SUPPLIER: Omit<FinanceOrderSupplier, "id" | "order_id"> = {
   supplier_id: null,
   supplier_name: "",
@@ -35,7 +40,7 @@ const EMPTY_SUPPLIER: Omit<FinanceOrderSupplier, "id" | "order_id"> = {
 
 export default function FinanceOrders() {
   const { showToast, toastElement } = useToast();
-  const { t } = useTranslation(financeT);
+  const { t } = useTranslation(DICT);
   /* Currency: sales-side surface, so we keep USD as the form default
      per the brief — but the KPI cards use the tenant base so a Chinese
      tenant aggregating USD orders sees CNY-converted totals where the
@@ -276,7 +281,7 @@ export default function FinanceOrders() {
 /* memo: the order list re-renders on unrelated parent state (delete-dialog
    open/close, loading flips). With props unchanged, skip the row's re-render. */
 const OrderRowCard = memo(function OrderRowCard({ order, onEdit, onDelete }: { order: FinanceOrder; onEdit: () => void; onDelete: () => void }) {
-  const { t } = useTranslation(financeT);
+  const { t } = useTranslation(DICT);
   const ccy = order.currency || "USD";
   const sellingPrice = order.selling_price ?? 0;
   const supplierCost = order.total_supplier_cost ?? 0;
@@ -565,7 +570,7 @@ function OrderEditor({
   onCancel: () => void;
   onSave: () => void;
 }) {
-  const { t } = useTranslation(financeT);
+  const { t } = useTranslation(DICT);
   const sellingPrice = Number(draft.order.selling_price) || 0;
   const taxValue = deriveTaxRefundValue(
     sellingPrice,
