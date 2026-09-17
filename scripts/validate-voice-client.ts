@@ -3271,11 +3271,42 @@ function describeErrorCheck(): boolean {
      mainland address and chose the mainland lane while the browser could
      reach the vendor all along. The server's answer is a default; the
      browser probes, once, ahead of the call, and remembers. */
-  const { decideLane, parseSavedLane, startingLane, LANE_TTL_MS } = await import("../src/lib/voice/voice-pref");
+  const { decideLane, parseSavedLane, startingLane, verdictIsFresh, LANE_TTL_MS } = await import("../src/lib/voice/voice-pref");
   const fsSync = await import("node:fs");
   const { probeWsLane, LANE_PROBE_TIMEOUT_MS } = await import("../src/lib/voice/lane-probe");
   const now = 1_700_000_000_000;
-  check("the server saying the socket lane is final — no probe", JSON.stringify(decideLane("ws", { lane: "rtc", at: now }, now)) === JSON.stringify({ lane: "ws", probe: false }));
+  check("the server saying the socket lane is final when this device has proved nothing against it — no probe",
+    JSON.stringify(decideLane("ws", { lane: "rtc", at: now }, now)) === JSON.stringify({ lane: "ws", probe: false }) &&
+    JSON.stringify(decideLane("ws", null, now)) === JSON.stringify({ lane: "ws", probe: false }) &&
+    JSON.stringify(decideLane("ws", { lane: "rtc", at: now - LANE_TTL_MS - 1, source: "call" }, now)) === JSON.stringify({ lane: "ws", probe: false }));
+
+  /* ── WHAT THIS NETWORK DID BEATS WHAT THE COUNTRY SAYS ──
+     (owner, 2026-09-17, third report of a slow connect.) His beacon:
+       service-unreachable elapsedMs=11698 lane=ws fellBack=true
+       err="AbortError: Fetch is aborted" canary=timeout:3502ms+retry
+     Our ws-session route answered 200 twice and neither answer reached the
+     browser; the call fell back to the mainland lane, connected, and wrote
+     "rtc" down. The country stamp then said "ws" on the next load and the
+     verdict was thrown away — the same twelve seconds, every call. */
+  check("a fall-back a real call proved outranks the country stamp, and the probe still runs so a recovered network moves back",
+    JSON.stringify(decideLane("ws", { lane: "rtc", at: now, source: "call" }, now)) === JSON.stringify({ lane: "rtc", probe: true }) &&
+    JSON.stringify(decideLane("ws", { lane: "rtc", at: now, source: "probe" }, now)) === JSON.stringify({ lane: "rtc", probe: true }));
+  check("  …and the caller's own choice still outranks everything, with no probe behind it",
+    JSON.stringify(decideLane("ws", { lane: "rtc", at: now, source: "user" }, now)) === JSON.stringify({ lane: "rtc", probe: false }) &&
+    JSON.stringify(decideLane("rtc", { lane: "ws", at: now, source: "user" }, now)) === JSON.stringify({ lane: "ws", probe: false }));
+  check("  …a verdict that AGREES with the country stamp changes nothing, and a verdict with no source is not evidence",
+    JSON.stringify(decideLane("ws", { lane: "ws", at: now, source: "call" }, now)) === JSON.stringify({ lane: "ws", probe: false }) &&
+    JSON.stringify(decideLane("ws", { lane: "rtc", at: now }, now)) === JSON.stringify({ lane: "ws", probe: false }) &&
+    JSON.stringify(decideLane("ws", { lane: "rtc", at: now, source: "server" }, now)) === JSON.stringify({ lane: "ws", probe: false }));
+  check("  …and the country stamp is written down only when this device knows nothing, so it can never land on a verdict",
+    (() => {
+      const btn = fsSync.readFileSync("src/components/ai/VoiceCallButton.tsx", "utf8");
+      return /if \(!verdictIsFresh\(readSavedLane\(\), Date\.now\(\)\)\) saveLane\(decided\.lane, Date\.now\(\), "server"\);/.test(btn);
+    })() &&
+    verdictIsFresh({ lane: "ws", at: now, source: "call" }, now) &&
+    !verdictIsFresh(null, now) &&
+    !verdictIsFresh({ lane: "ws", at: now - LANE_TTL_MS - 1 }, now) &&
+    !verdictIsFresh({ lane: "ws", at: now + 60_000 }, now));
 
   /* ── THE TAP'S OWN STARTING LANE (owner, 2026-09-17: "still slow") ──
      The button's ref used to start at "rtc" and be corrected only when the
@@ -3301,8 +3332,7 @@ function describeErrorCheck(): boolean {
       return /useState<"rtc" \| "ws">\(\(\) => startingLane\(readSavedLane\(\), Date\.now\(\)\)\)/.test(btn) &&
         /const transportRef = useRef<"rtc" \| "ws">\(seededLane\);/.test(btn) &&
         !/const transportRef = useRef<"rtc" \| "ws">\("rtc"\);/.test(btn) &&
-        /saveLane\(decided\.lane, Date\.now\(\), "server"\)/.test(btn) &&
-        /if \(!newer && known\?\.source !== "user"\)/.test(btn);
+        /if \(!verdictIsFresh\(readSavedLane\(\), Date\.now\(\)\)\) saveLane\(decided\.lane, Date\.now\(\), "server"\);/.test(btn);
     })());
   check("  …a saved 'server' verdict survives a round trip through storage, and a nonsense source is dropped",
     parseSavedLane(JSON.stringify({ lane: "ws", at: now, source: "server" }))?.source === "server" &&

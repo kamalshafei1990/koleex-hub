@@ -1546,3 +1546,51 @@ the caller made themselves or a fresher verdict from the network.
 **Suites.** `validate:voice-client` 772 (+4). Mutation-tested: restoring the
 hard-coded `"rtc"` fails one check, making `startingLane` ignore the saved
 verdict fails another.
+
+## "Still same" — the beacon finally says why (2026-09-17, 04:57)
+
+The gather number arrived, and with it the answer. It was never the
+gathering.
+
+    [ai.voice.client] service-unreachable elapsedMs=11698 ice=none dc=none
+    lane=ws fellBack=true iceEverConnected=false
+    err="AbortError: Fetch is aborted" canary=timeout:3502ms+retry
+
+Beside it, our own logs for the same twelve seconds:
+
+| t | line |
+|---|---|
+| 04:57:29 | `POST /api/ai/voice/ws-session` **200** (auth 153 ms) `socket=relay` |
+| 04:57:35 | `POST /api/ai/voice/ws-session` **200** — the retry |
+| 04:57:39 | the beacon above |
+| 04:57:40 | `POST /api/ai/voice/session` `handshake ok afterMs=436` — the fall-back, which connected |
+
+**Our route answered 200 twice and neither answer reached the browser.**
+The canary — a plain GET to `/api/version` on our own origin — timed out at
+3.5 s. This network cannot reliably complete a response from
+hub.koleexgroup.com on the socket lane. Nothing in the voice path is slow:
+the handshake that did connect took 436 ms.
+
+**Why it happened on every call.** The call fell back, connected, and wrote
+`rtc` down — correctly. `decideLane` then threw that away: its first line
+was `if (server === "ws") return { lane: "ws", probe: false }`, and `server`
+is a guess from the country stamp on the request. So the next load tried the
+socket lane again, failed again, and spent the same twelve seconds. Every
+call. That is what "always slow" was.
+
+**The fix.** A fresh verdict from a real call or a probe is evidence from
+this network and now outranks the country stamp; the caller's own choice
+still outranks both. The probe keeps running behind the verdict, so a
+network that recovers moves the lane back on its own — the lock the
+2026-09-11 note warns about is exactly what `probe: true` prevents. And the
+country stamp is written down only when the device knows nothing at all, so
+it can never land on top of a verdict (it could, until now — added the day
+before, and it was making this worse).
+
+**Suites.** `validate:voice-client` 776 (+7). Mutation-tested three ways:
+putting the country stamp first again fails two checks, letting the stamp
+clobber a verdict fails two, dropping the probe behind a verdict fails two.
+
+**Still true and not ours:** the owner's network drops responses from our
+origin. The fall-back now happens once rather than on every call, but the
+first call after a network change still spends that time discovering it.

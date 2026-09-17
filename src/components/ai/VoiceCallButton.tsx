@@ -59,7 +59,7 @@ import { useReceiverLevel } from "@/lib/voice/useReceiverLevel";
 import { CallTones, browserToneContext } from "@/lib/voice/tones";
 import { pickSttLang, readSavedSttLang, saveSttLang, learnSttLang, type SttLang } from "@/lib/voice/stt-lang";
 import {
-  pickVoiceKey, readSavedVoiceKey, saveVoiceKey, readSavedRegion, saveRegion, decideLane, readSavedLane, saveLane, startingLane, type VoicesByLane,
+  pickVoiceKey, readSavedVoiceKey, saveVoiceKey, readSavedRegion, saveRegion, decideLane, readSavedLane, saveLane, startingLane, verdictIsFresh, type VoicesByLane,
   readSavedTalkMode, saveTalkMode, type TalkMode,
 } from "@/lib/voice/voice-pref";
 import { requestCallSummary, shouldSummarise } from "@/lib/voice/summary";
@@ -503,14 +503,14 @@ export default function VoiceCallButton({
         const applyLane = () => {
           transportRef.current = decided.lane;
           offerFor(decided.lane);
-          /* WRITTEN DOWN, so the next page load starts here rather than
-             racing this read again. Never over a choice the caller made
-             themselves, and never over a fresher verdict a probe or a live
-             call just wrote — those are evidence from the network, this is
-             a default from the country stamp. */
-          const known = readSavedLane();
-          const newer = known && known.at > Date.now() - 1_000;
-          if (!newer && known?.source !== "user") saveLane(decided.lane, Date.now(), "server");
+          /* WRITTEN DOWN ONLY WHEN THIS DEVICE KNOWS NOTHING, so the next
+             page load starts here rather than racing this read again. It
+             must never land on top of a verdict: this is a guess from the
+             country stamp, and a probe, a real call or the caller's own
+             choice all outrank it (decideLane). Writing over a fall-back
+             verdict is what made the socket lane be re-tried, and re-fail,
+             on every single call. */
+          if (!verdictIsFresh(readSavedLane(), Date.now())) saveLane(decided.lane, Date.now(), "server");
         };
         if (sessionRef.current) laneAfterCallRef.current = applyLane;
         else applyLane();
