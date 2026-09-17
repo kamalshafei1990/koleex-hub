@@ -59,7 +59,7 @@ import { useReceiverLevel } from "@/lib/voice/useReceiverLevel";
 import { CallTones, browserToneContext } from "@/lib/voice/tones";
 import { pickSttLang, readSavedSttLang, saveSttLang, learnSttLang, type SttLang } from "@/lib/voice/stt-lang";
 import {
-  pickVoiceKey, readSavedVoiceKey, saveVoiceKey, readSavedRegion, saveRegion, decideLane, readSavedLane, saveLane, type VoicesByLane,
+  pickVoiceKey, readSavedVoiceKey, saveVoiceKey, readSavedRegion, saveRegion, decideLane, readSavedLane, saveLane, startingLane, type VoicesByLane,
   readSavedTalkMode, saveTalkMode, type TalkMode,
 } from "@/lib/voice/voice-pref";
 import { requestCallSummary, shouldSummarise } from "@/lib/voice/summary";
@@ -268,7 +268,14 @@ export default function VoiceCallButton({
      the WebRTC lane the product has always had, or the WebSocket lane for
      callers outside mainland China. Held in a ref: it is read when a call
      starts, not rendered. */
-  const transportRef = useRef<"rtc" | "ws">("rtc");
+  /* THE LANE A TAP OPENS ON, seeded from what this device already knows
+     (voice-pref.startingLane). It used to start at "rtc" and wait for the
+     config read to correct it — a window of 470–840 ms in which a quick tap
+     placed the call on the mainland lane whatever the deployment said, and
+     on this owner's network that lane does not connect at all. The config's
+     answer still corrects this below; it no longer has to win a race. */
+  const [seededLane] = useState<"rtc" | "ws">(() => startingLane(readSavedLane(), Date.now()));
+  const transportRef = useRef<"rtc" | "ws">(seededLane);
   /** The lane the server named while a call was already running, as the
    *  step that applies it (lane and voices); run at that call's hang-up. */
   const laneAfterCallRef = useRef<(() => void) | null>(null);
@@ -496,6 +503,14 @@ export default function VoiceCallButton({
         const applyLane = () => {
           transportRef.current = decided.lane;
           offerFor(decided.lane);
+          /* WRITTEN DOWN, so the next page load starts here rather than
+             racing this read again. Never over a choice the caller made
+             themselves, and never over a fresher verdict a probe or a live
+             call just wrote — those are evidence from the network, this is
+             a default from the country stamp. */
+          const known = readSavedLane();
+          const newer = known && known.at > Date.now() - 1_000;
+          if (!newer && known?.source !== "user") saveLane(decided.lane, Date.now(), "server");
         };
         if (sessionRef.current) laneAfterCallRef.current = applyLane;
         else applyLane();

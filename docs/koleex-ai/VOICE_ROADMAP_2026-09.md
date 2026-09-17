@@ -1507,3 +1507,42 @@ at if the owner still sees long connects with `gather=` reading small.
 **Suites.** `validate:voice-client` 768 (+6). Mutation-tested: letting a
 host candidate end the wait fails two checks, restoring the wait-for-
 complete behaviour fails one.
+
+## "Still slow — check the gather number" (2026-09-17)
+
+No `gather=` number existed yet: the beacon is flushed on the NEXT call, and
+the only one that had arrived was queued from 2026-09-16 07:50, before the
+change. What it said, though, was the more important finding:
+
+    [ai.voice.client] retried elapsedMs=25703 ice=new dc=connecting
+    lastEvent=none lane=rtc slot=primary iceEverConnected=false
+
+`ice=new` — the connection state never left "new" in 25.7 seconds. It moves
+to "checking" the moment the answer is applied, so on that call the answer
+was never applied. And `lane=rtc`.
+
+**The lane was the wrong one, and it was a race.** The owner's two calls at
+04:32 and 04:33 UTC are each preceded by `[ai.voice] lane=ws country=US` —
+the deployment told the device to take the socket lane — and each POSTs to
+the WebRTC handshake anyway. `decideLane` returns `ws` unconditionally when
+the server says so, so the only way to land on `rtc` is to tap before that
+answer is applied. The button held the lane in a ref that **started at
+"rtc"** and was corrected only when the config read returned: 470–840 ms of
+`auth.resolve` (db 360–560 ms) in production, and a quick tap fits inside
+it. On this caller's network the mainland lane does not connect at all.
+
+**The fix.** `startingLane` (pure, in voice-pref) gives the tap the lane
+this device already proved — every probe, live call and deliberate choice
+is already written down, it simply was not read at the start. A device with
+nothing written down still starts on `rtc`, the lane that needs no relay.
+And the deployment's own answer is now written down too (`source: "server"`),
+so a first-ever load seeds correctly on the second, and never over a choice
+the caller made themselves or a fresher verdict from the network.
+
+**What the earlier change did do.** Tap-to-POST fell from ~3 s (2026-09-16
+17:34) to ~2 s (04:32); the server's own handshake answered in 443 ms and
+684 ms. That part is no longer the cost.
+
+**Suites.** `validate:voice-client` 772 (+4). Mutation-tested: restoring the
+hard-coded `"rtc"` fails one check, making `startingLane` ignore the saved
+verdict fails another.

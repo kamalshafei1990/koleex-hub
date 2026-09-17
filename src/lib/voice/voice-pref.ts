@@ -135,7 +135,10 @@ export type VoiceLane = "rtc" | "ws";
 /** Who decided: the caller in the Line control, the background probe, or a
  *  call that came up (or fell back) on a lane. A fresh USER verdict is not
  *  overridden by the probe (audit, 2026-09-11). */
-export type LaneSource = "user" | "probe" | "call";
+/* "server" is the deployment's own answer for this caller's country, learnt
+   from the config read and written down so the NEXT page load starts on it
+   without waiting for that read again. See startingLane. */
+export type LaneSource = "user" | "probe" | "call" | "server";
 export type SavedLane = { lane: VoiceLane; at: number; source?: LaneSource };
 
 export function parseSavedLane(raw: string | null | undefined): SavedLane | null {
@@ -143,7 +146,7 @@ export function parseSavedLane(raw: string | null | undefined): SavedLane | null
   try {
     const v = JSON.parse(raw) as { lane?: unknown; at?: unknown; source?: unknown };
     if ((v.lane === "rtc" || v.lane === "ws") && typeof v.at === "number" && Number.isFinite(v.at)) {
-      const source = v.source === "user" || v.source === "probe" || v.source === "call" ? v.source : undefined;
+      const source = v.source === "user" || v.source === "probe" || v.source === "call" || v.source === "server" ? v.source : undefined;
       return source ? { lane: v.lane, at: v.at, source } : { lane: v.lane, at: v.at };
     }
   } catch {
@@ -184,6 +187,29 @@ export function decideLane(
    "Line" control in the voice sheet (VoiceCallButton.selectLane); the
    voices offered are the chosen lane's, as before. */
 export type VoicesByLane = { rtc: readonly { key: string; label: string }[]; ws: readonly { key: string; label: string }[] };
+
+/* ── WHICH LANE A TAP OPENS ON BEFORE THE SERVER HAS ANSWERED ──────────────
+   THE RACE THIS CLOSES (owner, 2026-09-17: "still slow", twice in a row).
+   The button held its lane in a ref that started at "rtc" and was corrected
+   only when the config read came back — and that read costs the auth
+   round trip (measured 470–840 ms, most of it the session lookup). A caller
+   who taps inside that window places the call on the mainland lane whatever
+   the deployment says, and the production logs show exactly that: two calls
+   at 04:32 and 04:33, both preceded by `[ai.voice] lane=ws`, both posting to
+   the WebRTC handshake. On this caller's network that lane does not connect
+   at all — the beacon reads `ice=new … iceEverConnected=false` after 25 s.
+
+   The device already writes down the lane every probe, every live call and
+   every deliberate choice; it just was not reading it at the start. Now it
+   does, and the fresh verdict is the tap's starting lane. Pure, so the race
+   is closed by a rule rather than by timing. A device with nothing written
+   down still starts on "rtc" — the lane that needs no relay — and the
+   config's answer corrects it as before, and is now written down too. */
+export function startingLane(saved: SavedLane | null, now: number, ttlMs: number = LANE_TTL_MS): VoiceLane {
+  if (!saved) return "rtc";
+  const fresh = now - saved.at >= 0 && now - saved.at < ttlMs;
+  return fresh ? saved.lane : "rtc";
+}
 
 export function readSavedLane(): SavedLane | null {
   try {
