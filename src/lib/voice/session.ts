@@ -363,8 +363,34 @@ export const WS_HANDSHAKE_TIMEOUT_MS = 15_000;
    in four seconds, one small GET to our own origin runs beside it, and its
    outcome rides in the failure beacon as `canary`: status and time, or
    timeout, or error. */
-const WS_CANARY_AFTER_MS = 2_500;
-const WS_CANARY_TIMEOUT_MS = 3_500;
+/* RETUNED 2026-09-17 (owner, "still slow", a fifth time). The socket lane
+   costs the caller ELEVEN SECONDS to give up on this network, and the
+   fall-back that follows connects in 436 ms. Where those eleven went:
+
+     0.0 – 2.5 s   waiting, canary not yet armed
+     2.5 – 6.0 s   the canary's own 3.5 s timeout → the verdict
+     6.0 – 10.0 s  the one retry's 4 s deadline
+     ~10.2 s       give up, then rtc at 0.44 s
+
+   None of those three numbers was measured; they were room left for a
+   round trip. Today's measurements say the room is far too generous.
+   Our own watch cron, hitting the same route from the same regions:
+
+     [ai.voice.watch] ok slot=primary from=hnd1 status=400 afterMs=646
+     [ai.voice.watch] ok slot=alt     from=sin1 status=400 afterMs=98
+     [ai.voice.watch] socket ok from=hnd1 afterMs=643 openMs=384
+     [ai.voice.watch] relay  ok from=sin1 afterMs=969
+
+   and /api/version — what the canary asks for — answers in under 200 ms.
+   So: arm at 1.5 s (still past a healthy handshake), give the canary 2.5 s
+   (twelve times its healthy answer), and give the retry 2.5 s (the
+   2026-09-13 incident's own retry went through "one second later").
+
+   Worst case becomes ~6.5 s rather than ~11. Every incident behaviour below
+   is unchanged — the canary still only reports and aborts, the retry still
+   gets its turn, and the fall-back still runs only after it. */
+const WS_CANARY_AFTER_MS = 1_500;
+const WS_CANARY_TIMEOUT_MS = 2_500;
 /* THE HANDSHAKE IS ASKED ONCE MORE BEFORE THE LINE IS GIVEN UP (owner,
    2026-09-13 08:2x: "fix the international voice opening on the Chinese
    line"). 06:42:45 and 07:01:45 UTC: our route ANSWERED the socket lane's
@@ -378,7 +404,7 @@ const WS_CANARY_TIMEOUT_MS = 3_500;
    the same handshake AGAIN, at once, on a fresh controller, with this
    much of the wait left; only that second request failing is the service
    not answering. The beacon says `canary=timeout:…+retry`. */
-export const WS_HANDSHAKE_RETRY_MS = 4_000;
+export const WS_HANDSHAKE_RETRY_MS = 2_500;
 /* AND THE CANARY'S VERDICT ENDS THE WAIT (2026-09-13 05:08 and 05:15, the
    owner: "connecting is too slow"): our route answered in two seconds, the
    answer never reached the phone, and the canary to our own origin timed

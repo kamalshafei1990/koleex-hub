@@ -3999,8 +3999,8 @@ function describeErrorCheck(): boolean {
      our origin; its outcome is in the diagnostics. Driven with a short
      delay through the real timer: the constant is private, so the source
      is pinned and the behaviour is shown with a fetch that never answers. */
-  check("the canary is armed 2.5 s into the call's own handshake with a 3.5 s deadline, disarmed when the handshake answers, never on a redial — and its failure aborts the handshake as a timeout (2026-09-13: 'connecting is too slow')",
-    /const WS_CANARY_AFTER_MS = 2_500;/.test(sess) && /const WS_CANARY_TIMEOUT_MS = 3_500;/.test(sess) && CANARY_PATH === "/api/version" &&
+  check("the canary is armed 1.5 s into the call's own handshake with a 2.5 s deadline, disarmed when the handshake answers, never on a redial — and its failure aborts the handshake as a timeout (2026-09-13: 'connecting is too slow')",
+    /const WS_CANARY_AFTER_MS = 1_500;/.test(sess) && /const WS_CANARY_TIMEOUT_MS = 2_500;/.test(sess) && CANARY_PATH === "/api/version" &&
     /const disarmCanary = first \? this\.armCanary\(\(\) => abortAs\("origin-unreachable"\)\) : \(\) => \{\};/.test(sess) && /\} finally \{\s*disarmCanary\(\);\s*clearTimeout\(deadline\);\s*\}/.test(sess) &&
     /let deadline = setTimeout\(\(\) => abortAs\("handshake-deadline"\), WS_HANDSHAKE_TIMEOUT_MS\);/.test(sess) && /\.\.\.\(ctrl \? \{ signal: ctrl\.signal \} : \{\}\),\s*credentials: "include",/.test(sess) &&
     /if \(!disarmed\) onDead\(\);/.test(sess) && /return new DOMException\(why, "TimeoutError"\);/.test(sess) &&
@@ -4044,8 +4044,24 @@ function describeErrorCheck(): boolean {
        call as service-unreachable — still within seconds, never the
        fifteen-second deadline. */
     const { WS_HANDSHAKE_RETRY_MS, WS_HANDSHAKE_TIMEOUT_MS: WS_HS_TIMEOUT } = await import("../src/lib/voice/session");
-    check("the second ask has four seconds of its own, well inside the handshake's fifteen", WS_HANDSHAKE_RETRY_MS === 4_000 && WS_HANDSHAKE_RETRY_MS < WS_HS_TIMEOUT &&
+    check("the second ask has two and a half seconds of its own, well inside the handshake's fifteen", WS_HANDSHAKE_RETRY_MS === 2_500 && WS_HANDSHAKE_RETRY_MS < WS_HS_TIMEOUT &&
       /if \(first && abortedFor === "origin-unreachable" && ctrl\) \{/.test(sess) && /ctrl = new AbortController\(\);\s*abortedFor = "";\s*this\.canary \+= "\+retry";\s*deadline = setTimeout\(\(\) => abortAs\("handshake-retry-deadline"\), this\.deps\.wsHandshakeRetryMs \?\? WS_HANDSHAKE_RETRY_MS\);\s*res = await post\(\);/.test(sess));
+    /* ── WHAT THE CALLER WAITS BEFORE THE OTHER LANE RUNS ──
+       (owner, 2026-09-17: "still slow", a fifth time.) The three numbers
+       above are one budget, and nobody was adding them up: 2.5 + 3.5 + 4
+       was ten seconds of waiting before a fall-back that then connected in
+       436 ms. None of the three was measured. Our own watch cron answers
+       the same route in 98–1303 ms and /api/version in under 200 ms, so the
+       budget is pinned as a SUM — a later change to any one of them has to
+       face the total a caller actually sits through. */
+    const canaryAfter = Number(/const WS_CANARY_AFTER_MS = ([0-9_]+);/.exec(sess)?.[1].replace(/_/g, "") ?? NaN);
+    const canaryTimeout = Number(/const WS_CANARY_TIMEOUT_MS = ([0-9_]+);/.exec(sess)?.[1].replace(/_/g, "") ?? NaN);
+    check("the whole socket-lane give-up — arm, canary, retry — fits in seven seconds, so the fall-back runs inside the owner's patience",
+      canaryAfter === 1_500 && canaryTimeout === 2_500 &&
+      canaryAfter + canaryTimeout + WS_HANDSHAKE_RETRY_MS <= 7_000 &&
+      canaryAfter + canaryTimeout + WS_HANDSHAKE_RETRY_MS < WS_HS_TIMEOUT);
+    check("  …and the canary is still armed AFTER a healthy handshake would have answered, so a working lane is never cut short",
+      canaryAfter > 1_303 && canaryTimeout > 5 * 200);
     const envelope = () => ({
       transport: "ws", url: "wss://voice.example/v1/realtime", protocols: ["xai-client-secret.SECRET-1"], expires_at: 1,
       audio: { format: "pcm16", sample_rate: 24_000 },
