@@ -82,6 +82,10 @@ const FLOOR_MAX_KB = 520;   // measured 2026-08-09: 6 files / 445 KB
    first run; measured beats guessed, always. */
 const ROUTE_BUDGETS: Record<string, { chunks: number; kbytes: number }> = {
 
+  /* products/[id] and products/preview/[slug] were re-baselined the same day,
+     AFTER the preview-dictionary split and the spec-i18n change took them from
+     1,410 KB to 853. A budget left at the old number would have quietly
+     allowed all of it back. */
   /* ── DETAIL ROUTES, MEASURED 17/09/2026 ───────────────────────────────────
      These 34 had never been budgeted: section C only read navigation.ts,
      whose entries are all top-level, so every detail page in the Hub was
@@ -125,8 +129,8 @@ const ROUTE_BUDGETS: Record<string, { chunks: number; kbytes: number }> = {
   "finance/visual": { chunks: 15, kbytes: 1068 },
   "invoices/[id]/print": { chunks: 14, kbytes: 1040 },
   "product-data/[id]": { chunks: 14, kbytes: 1053 },
-  "products/[id]": { chunks: 14, kbytes: 1579 },
-  "products/preview/[slug]": { chunks: 14, kbytes: 1579 },
+  "products/[id]": { chunks: 12, kbytes: 955 },
+  "products/preview/[slug]": { chunks: 12, kbytes: 954 },
   "quotations/[id]/print": { chunks: 13, kbytes: 984 },
   "suppliers/[id]": { chunks: 14, kbytes: 1180 },
   /* ── RE-BASELINED 17/09/2026 ──────────────────────────────────────────────

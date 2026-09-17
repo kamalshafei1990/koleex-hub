@@ -22,6 +22,8 @@ const ROOT = process.cwd();
 const LIST_DICT = "src/lib/products-list-i18n.ts";
 const FULL_DICT = "src/lib/products-ui-i18n.ts";
 const LIST_UI = "src/components/admin/ProductList.tsx";
+const PREVIEW_DICT = "src/lib/products-preview-i18n.ts";
+const PREVIEW_UI = "src/components/product-preview/ProductPreview.tsx";
 const LANGS = ["en", "zh", "ar"] as const;
 
 let failures = 0;
@@ -38,6 +40,9 @@ function keysOf(src: string): string[] {
 const listSrc = read(LIST_DICT);
 const fullSrc = read(FULL_DICT);
 const uiSrc = read(LIST_UI);
+const previewSrc = read(PREVIEW_DICT);
+const previewUiSrc = read(PREVIEW_UI);
+const previewKeys = new Set(keysOf(previewSrc));
 
 const listKeys = new Set(keysOf(listSrc));
 const fullKeys = new Set(keysOf(fullSrc));
@@ -61,6 +66,40 @@ both.length
   ? fail(`${both.length} key(s) defined in BOTH files`, both.slice(0, 8).join(", "))
   : ok(`no key is defined twice — ${listKeys.size} list + ${fullKeys.size} editor`);
 
+/* The customer-facing product page carries the same rule, for the same
+   reason — it was reading 52 of 1,070. */
+if (/^\s*import\s*\{[^}]*\bPRODUCTS_UI_I18N\b/m.test(previewUiSrc)) {
+  fail("ProductPreview imports PRODUCTS_UI_I18N",
+       "That puts the editor's 1,015 keys back onto /products/[id], the heaviest page in the Hub.");
+} else ok("ProductPreview imports only PRODUCTS_PREVIEW_I18N");
+if (!/\.\.\.PRODUCTS_PREVIEW_I18N/.test(fullSrc)) {
+  fail("PRODUCTS_UI_I18N no longer spreads PRODUCTS_PREVIEW_I18N", "The editor would lose every preview.* key, silently.");
+} else ok("PRODUCTS_UI_I18N spreads the preview dictionary");
+{
+  const dup = [...previewKeys].filter((k) => fullKeys.has(k) || listKeys.has(k));
+  dup.length
+    ? fail(`${dup.length} preview key(s) defined in another file too`, dup.slice(0, 8).join(", "))
+    : ok(`preview dictionary is disjoint — ${previewKeys.size} keys`);
+  const lits = [...new Set([...previewUiSrc.matchAll(/\bt\(\s*"([^"]+)"/g)].map((m) => m[1]))];
+  const miss = lits.filter((k) => !previewKeys.has(k));
+  miss.length
+    ? fail(`${miss.length} key(s) called by ProductPreview are not defined`, miss.join(", "))
+    : ok(`all ${lits.length} ProductPreview keys are defined`);
+}
+
+/* ⚠️ spec-i18n is 445 KB and English does not need a byte of it — the schema
+   label IS the English label, and where the two disagreed the dictionary was
+   silently overriding 61 of them. A static import here puts all of it back on
+   every visitor in every language, and nothing on screen would look wrong. */
+if (/^\s*import\s+\{[^}]*SPEC_I18N[^}]*\}\s+from/m.test(previewUiSrc)) {
+  fail("ProductPreview statically imports SPEC_I18N",
+       "445 KB back on the heaviest page in the Hub, in every language. Load it with await import() for zh/ar only.");
+} else ok("spec-i18n is loaded on demand, not on every visit");
+if (!/import\(\s*["']@\/lib\/product-schema\/spec-i18n["']\s*\)/.test(previewUiSrc)) {
+  fail("ProductPreview never loads SPEC_I18N at all",
+       "zh/ar would read English spec labels with no error — the exact silent failure this file guards.");
+} else ok("zh/ar still get the spec dictionary");
+
 console.log("\nB. Every key the list calls exists");
 /* Literals. */
 const literals = [...new Set([...uiSrc.matchAll(/\bt\(\s*"([^"]+)"/g)].map((m) => m[1]))];
@@ -81,7 +120,7 @@ for (const p of prefixes) {
 }
 
 console.log("\nC. Three languages, everywhere");
-for (const [label, src] of [["list", listSrc], ["editor", fullSrc]] as const) {
+for (const [label, src] of [["list", listSrc], ["preview", previewSrc], ["editor", fullSrc]] as const) {
   /* Entries span lines when a translation is long, so the body is matched
      lazily across newlines up to the closing brace of THAT entry. Matching
      `[^}]*` only saw single-line entries and called every wrapped one

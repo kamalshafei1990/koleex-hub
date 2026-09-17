@@ -29,9 +29,11 @@ import {
   collectAnchors,
 } from "@/lib/product-schema";
 import VisualGlyph from "./VisualGlyph";
-import { useTranslation } from "@/lib/i18n";
-import { PRODUCTS_UI_I18N } from "@/lib/products-ui-i18n";
-import { SPEC_I18N } from "@/lib/product-schema/spec-i18n";
+import { useTranslation, type Translations } from "@/lib/i18n";
+/* ⚠️ THE PREVIEW'S OWN DICTIONARY, NOT THE EDITOR'S. This read 52 keys out of
+   1,070 — the rest are packing, supplier, variant and review strings this page
+   never renders. See the header of products-preview-i18n.ts. */
+import { PRODUCTS_PREVIEW_I18N } from "@/lib/products-preview-i18n";
 import { fetchIconBindings, type BindingsMap } from "@/lib/visual-bindings";
 
 interface ProductLocaleText {
@@ -370,13 +372,46 @@ function useSpecGlyphs() {
   return { fieldGlyph, groupGlyph };
 }
 
+/* Frozen, so the hook's dependency does not change identity every render
+   while English is showing. */
+const EMPTY_SPEC_I18N: Translations = Object.freeze({}) as Translations;
+
 export const ProductPreview = (props: ProductPreviewProps) => {
-  const { t, lang } = useTranslation(PRODUCTS_UI_I18N);
+  const { t, lang } = useTranslation(PRODUCTS_PREVIEW_I18N);
   /* Spec content (group titles, field labels, option labels) is localized by
      the same dictionary the admin Specs editor uses. It used to be admin-only,
      so the CUSTOMER page rendered every spec in English even in zh/ar — the
-     translations existed and were simply never read here. */
-  const { t: ts } = useTranslation(SPEC_I18N);
+     translations existed and were simply never read here.
+
+     ⚠️ ENGLISH DOES NOT LOAD IT, AND ENGLISH IS NOT MISSING ANYTHING.
+     spec-i18n is 1,688 keys x 3 languages — 445 KB of source — holding spec
+     labels for EVERY machine kind in the catalogue, downloaded to render one
+     product. 95% of its English is the schema's own label repeated back.
+
+     The other 5% was worse than redundant: `ts(key, fallback)` prefers the
+     dictionary, so wherever the two disagreed the dictionary OVERRODE the
+     schema. `f:power_consumption_w` is one slot, and six schemas label it
+     "Power Consumption" / "Total Installed Power" / "Suction Motor Power" /
+     "Drive Motor" / "Total Power" / "Power" — all six rendered as "Motor
+     Power" on the live site. `o:large` flattened "Large Format" on a spreader
+     and "Large Hook" on a sewing machine into "Large". 61 distinct labels were
+     being covered this way.
+
+     Owner's call (17/09/2026): the SCHEMA wins in English. So English reads
+     the fallback — which is the schema's own, more specific label — and the
+     dictionary is fetched only for zh/ar, where it is the only source of the
+     translation. An empty dictionary makes `t(key, fallback)` return the
+     fallback, so English needs no branch beyond never loading the file. */
+  const [specDict, setSpecDict] = useState<Translations | null>(null);
+  useEffect(() => {
+    if (lang === "en") return;            // the schema is already the answer
+    let alive = true;
+    void import("@/lib/product-schema/spec-i18n")
+      .then((m) => { if (alive) setSpecDict(m.SPEC_I18N); })
+      .catch(() => { /* a failed fetch leaves the English labels up, not a blank */ });
+    return () => { alive = false; };
+  }, [lang]);
+  const { t: ts } = useTranslation(specDict ?? EMPTY_SPEC_I18N);
   const { fieldGlyph, groupGlyph } = useSpecGlyphs();
   const {
     productName,
