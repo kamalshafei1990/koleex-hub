@@ -201,4 +201,13 @@ export const PRODUCTS_LIST_I18N: Translations = {
   "card.missing.code":        { en: "No code",          zh: "无编码",     ar: "لا يوجد كود" },
   "card.missing.description": { en: "No description",   zh: "无描述",     ar: "لا يوجد وصف" },
   "card.missing.template":    { en: "No spec template", zh: "无规格模板", ar: "لا يوجد قالب مواصفات" },
+  /* The DOM ceiling (MOUNTED_MAX in ProductList). Phrased as a fact about
+     this view, never as an error — the catalogue is complete, the GRID is
+     full, and the filters are the way through. */
+  "list.mountCapTitle": { en: "Showing {n} of {total} products",
+                          zh: "已显示 {total} 个产品中的 {n} 个",
+                          ar: "معروض {n} من {total} منتج" },
+  "list.mountCapHint":  { en: "The grid holds this many at once. Search, or pick a division or category, to reach the rest — filtering runs on the server, so you get a complete result, not a shorter one.",
+                          zh: "网格一次最多显示这么多。请使用搜索，或选择事业部或类别，以查看其余产品——筛选在服务器端执行，因此结果是完整的，而不是被截断的。",
+                          ar: "تعرض الشبكة هذا العدد في المرة الواحدة. ابحث أو اختر قسمًا أو فئة للوصول إلى الباقي — التصفية تتم على الخادم، فتحصل على نتيجة كاملة لا مقتطعة." },
 };

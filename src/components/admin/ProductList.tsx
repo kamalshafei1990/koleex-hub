@@ -1592,6 +1592,29 @@ export default function ProductList() {
      demand, which is the only thing that works at that size. */
   const AUTO_COMPLETE_MAX = 600;
 
+  /* ⚠️ THE DOM HAS A CEILING AND NOTHING USED TO ENFORCE IT.
+     Every section renders — `content-visibility:auto` skips the offscreen
+     ones' paint and layout, but not their CONSTRUCTION — so the node count
+     tracks the catalogue exactly, and the scroll path appended pages for as
+     long as the operator kept scrolling. Measured on this machine, scrolling
+     the real grid at a realistic speed:
+
+         395 products   17,500 nodes    8 ms/frame   60fps, 0 long tasks
+        ~3000 products  133,000 nodes   39 ms/frame  ~25fps, 7 long tasks
+
+     44 nodes per product, and the curve is linear. 1,200 keeps the grid near
+     53,000 nodes, which still measured smooth; past that the operator is
+     scrolling a catalogue nobody reads card by card anyway.
+
+     So the cap is not a limitation, it is the honest shape of the screen: at
+     that size you FILTER. Search, division, category, brand, level and status
+     all execute in SQL already (products-config.ts), so narrowing returns a
+     different, complete result rather than a truncated one — which is why the
+     message below sends the operator there instead of to a "load more"
+     button that would just keep growing the tree. */
+  const MOUNTED_MAX = 1200;
+  const atMountCap = products.length >= MOUNTED_MAX;
+
   /* ONE implementation of "fetch the next page", shared by the background
      completion above and the scroll observer below, so they cannot disagree
      about the page counter or race each other into the same request.
@@ -1696,6 +1719,7 @@ export default function ProductList() {
   useEffect(() => {
     if (loading || loadError || !hasMore) return;
     if (total == null || total > AUTO_COMPLETE_MAX) return;
+    if (atMountCap) return;
     const lastPage = Math.ceil(total / Number(LIST_PAGE_SIZE));
     const firstMissing = pageRef.current + 1;
     if (firstMissing > lastPage) return;
@@ -1764,7 +1788,7 @@ export default function ProductList() {
       loadingMoreRef.current = false;
       setLoadingMore(false);
     };
-  }, [loading, loadError, hasMore, total, serverParams]);
+  }, [loading, loadError, hasMore, total, serverParams, atMountCap]);
 
   /* Infinite scroll — the owner's choice over a numbered pager: nothing new to
      learn, and it is the one that behaves on a phone. The sentinel sits after
@@ -1775,7 +1799,9 @@ export default function ProductList() {
      the owner's link, and the point is that he never watches it happen. */
   useEffect(() => {
     const el = sentinelRef.current;
-    if (!el || !hasMore || loading || loadError) return;
+    /* At the ceiling the sentinel is gone from the tree anyway; bailing here
+       too means the observer is never even created on the render that hits it. */
+    if (!el || !hasMore || loading || loadError || atMountCap) return;
     let cancelled = false;
     const io = new IntersectionObserver(
       (entries) => {
@@ -1792,7 +1818,7 @@ export default function ProductList() {
     );
     io.observe(el);
     return () => { cancelled = true; io.disconnect(); };
-  }, [hasMore, loading, loadError, loadNextPage]);
+  }, [hasMore, loading, loadError, loadNextPage, atMountCap]);
 
   /* Persist the filter snapshot to sessionStorage on every change.
      Back-button from a detail page returns to the same view. Stays
@@ -3709,7 +3735,22 @@ export default function ProductList() {
             reaches the bottom — on the owner's link a page is seconds, and he
             should never watch it arrive. Rendered only while more pages
             exist, so the observer has nothing to fire on at the end. */}
-        {hasMore && !loading && !loadError && (
+        {/* THE CEILING, STATED. Not an error and not a failure to load: the
+            grid is holding as much as it can render smoothly, and the rest of
+            the catalogue is one filter away. Says the real numbers so the
+            operator can see it is deliberate. */}
+        {atMountCap && hasMore && !loading && !loadError && (
+          <div className="mt-8 rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] px-4 py-5 text-center">
+            <p className="text-[13px] font-semibold text-[var(--text-primary)]">
+              {t("list.mountCapTitle").replace("{n}", String(products.length)).replace("{total}", String(total ?? products.length))}
+            </p>
+            <p className="mx-auto mt-1 max-w-[52ch] text-[12px] leading-snug text-[var(--text-dim)]">
+              {t("list.mountCapHint")}
+            </p>
+          </div>
+        )}
+
+        {hasMore && !loading && !loadError && !atMountCap && (
           <div ref={sentinelRef} className="pt-8 pb-2" aria-hidden>
             {loadingMore && (
               <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
