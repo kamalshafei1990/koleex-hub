@@ -156,7 +156,8 @@
     "shipping:seed": "node --import tsx scripts/shipping/seed-shipping-reference.mts",
     "validate:shipping-translations": "node --import tsx scripts/validate-shipping-translations.mts",
     "validate:shipping-states": "node --import tsx scripts/validate-shipping-states.tsx",
-    "shipping:verify-provider": "node --conditions=react-server --import tsx scripts/shipping/verify-provider.mts"
+    "shipping:verify-provider": "node --conditions=react-server --import tsx scripts/shipping/verify-provider.mts",
+    "validate:products-i18n": "node --import tsx scripts/validate-products-i18n.mts"
   },
   "dependencies": {
     "@napi-rs/canvas": "^0.1.100",

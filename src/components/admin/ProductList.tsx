@@ -20,7 +20,13 @@ import { humanizeError } from "@/lib/ui/humanize-error";
 import { useTranslation } from "@/lib/i18n";
 import { StatusPill } from "@/components/kds";
 import { localizedName } from "@/lib/i18n-name";
-import { PRODUCTS_UI_I18N } from "@/lib/products-ui-i18n";
+/* ⚠️ THE LIST'S OWN DICTIONARY, NOT THE WHOLE ONE. PRODUCTS_UI_I18N carries
+   1,165 keys × 3 languages (173 KB of source) and this screen reads 84 of
+   them — the rest are the editor's packing, supplier, hero, variant and
+   review strings, which the catalogue never renders. Importing the big one
+   here meant every edit to a form tab grew the list's bundle. See the header
+   of products-list-i18n.ts. */
+import { PRODUCTS_LIST_I18N } from "@/lib/products-list-i18n";
 import { IMG } from "@/lib/cdn";
 import PlusIcon from "@/components/icons/ui/PlusIcon";
 import SearchIcon from "@/components/icons/ui/SearchIcon";
@@ -582,8 +588,17 @@ const ProductCard = memo(function ProductCard({
               {fobPending && fob === undefined ? (
                 /* Reserve the line rather than collapse it — a price that
                    pops in later must not shift the whole grid. Height tracks
-                   the real figure's line box. */
-                <span className="h-6 w-24 rounded bg-[var(--bg-surface-subtle)] animate-pulse" aria-hidden="true" />
+                   the real figure's line box.
+
+                   ⚠️ RESERVED, AND INVISIBLE. This carried a tinted background
+                   and `animate-pulse`, which is one pulsing box PER CARD —
+                   395 of them breathing at once on a full catalogue, which is
+                   the exact flash the budgets guard was written to stop after
+                   the first attempt drew 726. Inside a card, waiting is a
+                   space that holds still; only the infinite-scroll sentinel
+                   may animate, because there it means "more is coming"
+                   rather than "this will be replaced under you". */
+                <span className="h-6 w-24" aria-hidden="true" />
               ) : fob?.fobUsd != null ? (
                 /* The price is the card's headline number — it should read at
                    a glance from across the grid, not sit at label size. */
@@ -861,7 +876,7 @@ const ProductCard = memo(function ProductCard({
 export default function ProductList() {
   const router = useRouter();
   const pathname = usePathname();
-  const { t, lang } = useTranslation(PRODUCTS_UI_I18N);
+  const { t, lang } = useTranslation(PRODUCTS_LIST_I18N);
   /* "internal" when the same component is rendered under /product-data.
      Under /products the view is the PUBLIC catalog: no supplier
      column, no Add button, no Edit/Delete actions, no cost hints. */

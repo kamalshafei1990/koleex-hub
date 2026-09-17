@@ -1,4 +1,5 @@
 import type { Translations } from "@/lib/i18n";
+import { PRODUCTS_LIST_I18N } from "@/lib/products-list-i18n";
 
 /* ═══════════════════════════════════════════════════════════════════
    PRODUCTS + PRODUCT DATA — OPERATOR UI DICTIONARY  (P0 #5 · i18n)
@@ -18,7 +19,13 @@ import type { Translations } from "@/lib/i18n";
    vocabulary across all five surfaces.
    ═══════════════════════════════════════════════════════════════════ */
 
+/* ⚠️ THE LIST'S KEYS LIVE IN products-list-i18n.ts AND ARE SPREAD IN HERE.
+   The editor resolves every key from this one import exactly as before; the
+   products list imports only the small file, so a new packing or supplier
+   string never lands in the catalogue's bundle again. Define a key in exactly
+   one of the two files — validate:products-i18n fails on a duplicate. */
 export const PRODUCTS_UI_I18N: Translations = {
+  ...PRODUCTS_LIST_I18N,
   /* ── Wizard step labels ─────────────────────────────────────────── */
   "step.classify": { en: "Classify", zh: "分类", ar: "التصنيف" },
   "step.classification": { en: "Classification", zh: "分类", ar: "التصنيف" },
@@ -62,19 +69,6 @@ export const PRODUCTS_UI_I18N: Translations = {
     zh: "缺少 {n} 个必填字段",
     ar: "ينقص {n} من الحقول المطلوبة",
   },
-
-  /* ── Save / publish / draft actions ─────────────────────────────── */
-  "action.save": { en: "Save", zh: "保存", ar: "حفظ" },
-  "action.saveProduct": { en: "Save Product", zh: "保存产品", ar: "حفظ المنتج" },
-  "action.saving": { en: "Saving…", zh: "保存中…", ar: "جارٍ الحفظ…" },
-  "action.cancel": { en: "Cancel", zh: "取消", ar: "إلغاء" },
-  "action.retry": { en: "Retry", zh: "重试", ar: "إعادة المحاولة" },
-  "action.next": { en: "Next", zh: "下一步", ar: "التالي" },
-  "action.back": { en: "Back", zh: "上一步", ar: "السابق" },
-  "action.newProduct": { en: "New Product", zh: "新建产品", ar: "منتج جديد" },
-  "status.draft": { en: "Draft", zh: "草稿", ar: "مسودة" },
-  "status.active": { en: "Active", zh: "已上架", ar: "نشط" },
-  "status.archived": { en: "Archived", zh: "已归档", ar: "مؤرشف" },
   "save.success": { en: "Product saved successfully!", zh: "产品保存成功！", ar: "تم حفظ المنتج بنجاح!" },
   "save.modelFailed": {
     en: "Couldn't save model \"{code}\" — the rest of the save was stopped so nothing is half-written. Check your access or try again.",
@@ -147,13 +141,6 @@ export const PRODUCTS_UI_I18N: Translations = {
     zh: "目前无法验证该编码 — 保存时将重新检查。",
     ar: "تعذّر التحقق من هذا الرمز الآن — سنعيد التحقق عند الحفظ.",
   },
-
-  /* ── Product list / cards (Products + Product Data list) ────────── */
-  "list.products": { en: "Products", zh: "产品", ar: "المنتجات" },
-  "list.productData": { en: "Product Data", zh: "产品数据", ar: "بيانات المنتجات" },
-  "list.search": { en: "Search products…", zh: "搜索产品…", ar: "ابحث عن المنتجات…" },
-  "list.allDivisions": { en: "All divisions", zh: "全部事业部", ar: "كل الأقسام" },
-  "list.filters": { en: "Filters", zh: "筛选", ar: "التصفية" },
   "sup.noneLinked": { en: "No supplier linked yet. Link a supplier from the Suppliers app below.", zh: "尚未关联供应商。请从下方的供应商应用中关联一个供应商。", ar: "لا يوجد مورّد مرتبط بعد. اربط مورّداً من تطبيق الموردين أدناه." },
   "sup.viewDetails": { en: "View supplier details", zh: "查看供应商详情", ar: "عرض تفاصيل المورّد" },
   "sup.identityHint": { en: "Supplier · tap for details · managed in the Suppliers app", zh: "供应商 · 点击查看详情 · 在供应商应用中管理", ar: "مورّد · اضغط للتفاصيل · يُدار في تطبيق الموردين" },
@@ -324,106 +311,12 @@ export const PRODUCTS_UI_I18N: Translations = {
   "fc.removeCard": { en: "Remove card", zh: "删除卡片", ar: "حذف البطاقة" },
   "fc.moveUp": { en: "Move up", zh: "上移", ar: "تحريك لأعلى" },
   "fc.moveDown": { en: "Move down", zh: "下移", ar: "تحريك لأسفل" },
-  "list.featured": { en: "Featured", zh: "精选", ar: "مميّز" },
-  "list.modelOne": { en: "model", zh: "个型号", ar: "موديل" },
-  "list.modelMany": { en: "models", zh: "个型号", ar: "موديلات" },
-  "list.allCategories": { en: "All categories", zh: "全部类别", ar: "كل الفئات" },
-  "list.resultsCount": { en: "{n} product(s)", zh: "{n} 个产品", ar: "{n} منتج" },
-
-  /* ── List surface: header, search, filters, results (P0 #5a) ────── */
-  "list.controlPanel": { en: "Control Panel", zh: "控制面板", ar: "لوحة التحكم" },
-  "list.countInCatalog": { en: "products in catalog", zh: "个产品（共计）", ar: "منتج في الكتالوج" },
-  "list.backToTop": { en: "Back to top", zh: "回到顶部", ar: "العودة إلى الأعلى" },
   "hero.addPhotos": { en: "Add more photos", zh: "添加更多照片", ar: "أضِف صوراً أخرى" },
   "hero.galleryLabel": { en: "Gallery", zh: "图库", ar: "المعرض" },
   "hero.removePhoto": { en: "Remove photo", zh: "移除照片", ar: "إزالة الصورة" },
   "pp.f.techDiff": { en: "Technical differences vs product specs", zh: "与产品规格的技术差异", ar: "الفروقات التقنية عن مواصفات المنتج" },
   "pp.f.inheritsSpecs": { en: "Inherits all product specifications — no per-model differences recorded yet.", zh: "继承产品全部规格 — 尚未录入该型号的差异。", ar: "يرث كل مواصفات المنتج — لا فروقات مسجَّلة لهذا الموديل بعد." },
   "hero.galleryHint": { en: "Extra angles & details — these appear in the product gallery. Manage all media in the Media tab.", zh: "更多角度与细节 — 显示在产品图库中。全部媒体可在“媒体”标签管理。", ar: "زوايا وتفاصيل إضافية — تظهر في معرض المنتج. أدر كل الوسائط من تبويب الوسائط." },
-  /* Kept short enough to READ. Measured at 375px: the full sentence needed
-     329px of a 263px text area, so the phone showed "Search by name, model
-     code, bra…" — the list of what you can search by, cut off mid-list, which
-     is the one thing a placeholder exists to say. The long form now lives in
-     the aria-label and the title, where nothing truncates it. */
-  "list.searchPlaceholder": {
-    en: "Search name, code, brand, tags…",
-    zh: "搜索名称、编码、品牌、标签…",
-    ar: "ابحث بالاسم أو الرمز أو العلامة أو الوسوم…",
-  },
-  "list.searchAria": {
-    en: "Search products by name, model code, brand, category or tags",
-    zh: "按名称、型号编码、品牌、类别或标签搜索产品",
-    ar: "ابحث عن المنتجات بالاسم أو رمز الموديل أو العلامة التجارية أو الفئة أو الوسوم",
-  },
-  "list.clearSearch": { en: "Clear search", zh: "清除搜索", ar: "مسح البحث" },
-  "list.allOption": { en: "All", zh: "全部", ar: "الكل" },
-  "list.divisions": { en: "Divisions", zh: "部门", ar: "الأقسام" },
-  "list.activeFilters": { en: "Active:", zh: "已筛选：", ar: "مفعّلة:" },
-  "list.removeFilter": { en: "Remove filter {label}", zh: "移除筛选 {label}", ar: "إزالة عامل التصفية {label}" },
-  "list.noMatchesFor": { en: "No matches for", zh: "未找到匹配项：", ar: "لا توجد نتائج مطابقة لـ" },
-  "list.showing": { en: "Showing", zh: "显示", ar: "عرض" },
-  "list.ofProducts": { en: "of {total} products", zh: "／共 {total} 个产品", ar: "من أصل {total} منتج" },
-  "list.matching": { en: "matching", zh: "匹配", ar: "مطابقة لـ" },
-  "list.noProductsYetHint": {
-    en: "Add your first product to get started.",
-    zh: "添加您的第一个产品以开始。",
-    ar: "أضف منتجك الأول للبدء.",
-  },
-  "list.noResultsHint": {
-    en: "Try adjusting your search or filters.",
-    zh: "请尝试调整搜索或筛选条件。",
-    ar: "حاول تعديل البحث أو عوامل التصفية.",
-  },
-
-  /* ── Filter labels + options (P0 #5a) ───────────────────────────── */
-  "filter.division": { en: "Division", zh: "事业部", ar: "القسم" },
-  "filter.category": { en: "Category", zh: "类别", ar: "الفئة" },
-  "filter.subcategory": { en: "Subcategory", zh: "子类别", ar: "الفئة الفرعية" },
-  "filter.supplier": { en: "Supplier", zh: "供应商", ar: "المورّد" },
-  "filter.brand": { en: "Brand", zh: "品牌", ar: "العلامة التجارية" },
-  "filter.level": { en: "Level", zh: "等级", ar: "المستوى" },
-  "filter.visibility": { en: "Visibility", zh: "可见性", ar: "إمكانية الظهور" },
-  "filter.status": { en: "Status", zh: "状态", ar: "الحالة" },
-  "filter.featured": { en: "Featured", zh: "精选", ar: "مميّز" },
-  "filter.visible": { en: "Visible", zh: "可见", ar: "ظاهر" },
-  "filter.hidden": { en: "Hidden", zh: "隐藏", ar: "مخفي" },
-  "filter.isFeatured": { en: "Featured", zh: "精选", ar: "مميّز" },
-  "filter.notFeatured": { en: "Not Featured", zh: "非精选", ar: "غير مميّز" },
-
-  /* ── List/grid column headers + actions (P0 #5a) ────────────────── */
-  "list.colProduct": { en: "Product", zh: "产品", ar: "المنتج" },
-  "list.colCategory": { en: "Category", zh: "类别", ar: "الفئة" },
-  "list.colBrand": { en: "Brand", zh: "品牌", ar: "العلامة التجارية" },
-  "list.colModels": { en: "Models", zh: "型号", ar: "الموديلات" },
-  "list.colStatus": { en: "Status", zh: "状态", ar: "الحالة" },
-  "action.addProduct": { en: "Add Product", zh: "添加产品", ar: "إضافة منتج" },
-  "card.editProduct": { en: "Edit product", zh: "编辑产品", ar: "تعديل المنتج" },
-  "card.deleteProduct": { en: "Delete product", zh: "删除产品", ar: "حذف المنتج" },
-
-  /* ── Search suggestions dropdown (P0 #5a) ───────────────────────── */
-  "search.groupCategories": { en: "Categories", zh: "类别", ar: "الفئات" },
-  "search.groupSubcategories": { en: "Subcategories", zh: "子类别", ar: "الفئات الفرعية" },
-  "search.groupBrands": { en: "Brands", zh: "品牌", ar: "العلامات التجارية" },
-  "search.groupSuppliers": { en: "Suppliers", zh: "供应商", ar: "المورّدون" },
-  "search.groupProducts": { en: "Products", zh: "产品", ar: "المنتجات" },
-  "search.inCategory": { en: "in", zh: "属于", ar: "في" },
-  "search.open": { en: "Open →", zh: "打开 →", ar: "فتح ←" },
-
-  /* ── Generic empty / error / loading states ─────────────────────── */
-  "state.loading": { en: "Loading…", zh: "加载中…", ar: "جارٍ التحميل…" },
-  "state.empty": { en: "Nothing here yet", zh: "暂无内容", ar: "لا يوجد شيء هنا بعد" },
-  "state.noProducts": { en: "No products yet", zh: "暂无产品", ar: "لا توجد منتجات بعد" },
-  "state.noResults": { en: "No products match your filters", zh: "没有符合筛选条件的产品", ar: "لا توجد منتجات مطابقة لعوامل التصفية" },
-  "state.loadFailedTitle": { en: "Couldn't load products", zh: "无法加载产品", ar: "تعذّر تحميل المنتجات" },
-  /* Shown INSTEAD of the failure panel when the warm-start cache already put
-     the catalogue on screen — the products are there, only the refresh
-     failed, so the message is about freshness rather than availability. */
-  "state.showingCached": {
-    en: "Showing your last loaded catalog — couldn't reach the server just now.",
-    zh: "显示上次加载的产品目录 — 暂时无法连接服务器。",
-    ar: "بنعرضلك آخر نسخة اتحمّلت — الاتصال بالسيرفر مانفعش دلوقتي.",
-  },
-  "state.serverTimeout": { en: "The server took too long to respond. Please retry.", zh: "服务器响应超时，请重试。", ar: "استغرق الخادم وقتًا طويلًا للرد. يرجى إعادة المحاولة." },
 
   /* ── Wizard chrome: header, nav, breadcrumb, steps gate (P0 #5b) ── */
   "wizard.newProductHeading": { en: "New Product", zh: "新建产品", ar: "منتج جديد" },
@@ -1003,10 +896,6 @@ export const PRODUCTS_UI_I18N: Translations = {
     zh: "状态为“草稿” — 仅内部保存，不会显示在公开目录。准备发布时，请在“主图”步骤切换为“已上架”。",
     ar: "الحالة مسودة — محفوظ داخليًا ولا يظهر في الكتالوج العام. بدّل إلى نشط في خطوة الواجهة عند الجاهزية للنشر.",
   },
-  /* Smart save labels */
-  "action.savePublish": { en: "Save & Publish", zh: "保存并发布", ar: "حفظ ونشر" },
-  "action.saveChanges": { en: "Save Changes", zh: "保存更改", ar: "حفظ التغييرات" },
-  "action.saveAsDraft": { en: "Save as Draft", zh: "保存为草稿", ar: "حفظ كمسودة" },
 
   /* ── TemplateView: read-mode renderer chrome (P0 #5d) ───────────────
      Only UI furniture is translated here. Section titles, field labels,
@@ -1059,20 +948,6 @@ export const PRODUCTS_UI_I18N: Translations = {
   "preview.countPhotos": { en: "{n} photos", zh: "{n} 张照片", ar: "{n} صورة" },
   "preview.countVideos": { en: "{n} videos", zh: "{n} 个视频", ar: "{n} فيديو" },
   "preview.countDocuments": { en: "{n} documents", zh: "{n} 个文档", ar: "{n} مستند" },
-
-  /* ── Internal card strings that were falling back to English ── */
-  "card.hidden": { en: "Hidden from customers", zh: "对客户隐藏", ar: "مخفي عن العملاء" },
-  "card.hiddenShort": { en: "Hidden", zh: "已隐藏", ar: "مخفي" },
-  "card.noCostYet": { en: "Cost not set", zh: "未设置成本", ar: "التكلفة غير محددة" },
-  "card.noSupplier": { en: "No supplier linked", zh: "未关联供应商", ar: "لا يوجد مورّد مرتبط" },
-  "card.priceFrom": { en: "From", zh: "起", ar: "ابتداءً من" },
-
-  /* ── Catalogue card · commercial half (2026-08-29) ── */
-  "card.globalFob": { en: "Global FOB", zh: "全球 FOB 价", ar: "سعر FOB العالمي" },
-  "card.priceOnRequest": { en: "Price on request", zh: "价格面议", ar: "السعر عند الطلب" },
-  "card.askAi": { en: "Ask AI", zh: "问 AI", ar: "اسأل AI" },
-  "card.compare": { en: "Compare", zh: "对比", ar: "مقارنة" },
-  "card.addToQuotation": { en: "Quote", zh: "加入报价", ar: "عرض سعر" },
 
   /* ── 2026-08-29 sweep: the customer product page's own chrome. These 16
      keys were called with an English default but never defined, so the
@@ -1463,7 +1338,6 @@ export const PRODUCTS_UI_I18N: Translations = {
   /* Profile tab strip + chrome (2026-09-13). These labels were raw English, so
      the strip stayed English over an Arabic page. */
   "step.highlights": { en: "Highlights", zh: "亮点", ar: "المزايا" },
-  "action.edit":     { en: "Edit", zh: "编辑", ar: "تعديل" },
   "pp.backShort":    { en: "Product Data", zh: "产品数据", ar: "بيانات المنتجات" },
   "pp.sec.highlights": { en: "Feature Highlights", zh: "功能亮点", ar: "مزايا المنتج" },
   /* ── legacy Technical Details block ── */
@@ -1503,15 +1377,6 @@ export const PRODUCTS_UI_I18N: Translations = {
   "tech.machineDimsLwh": { en: "Machine dimensions — net size, without packing (L × W × H)", zh: "整机尺寸 — 净尺寸，不含包装（长 × 宽 × 高）", ar: "أبعاد الماكينة — المقاس الصافي بدون تغليف (طول × عرض × ارتفاع)" },
   "tech.machineDimsHelp": { en: "Footprint of the machine in operation, in millimetres. The crate is entered separately under Packing.", zh: "整机运行时的占地尺寸，单位毫米。木箱尺寸在“包装”中单独填写。", ar: "أبعاد الماكينة أثناء التشغيل بالمليمتر. أبعاد الصندوق تُدخل في قسم التعبئة." },
   "tech.machineDimsHelp2": { en: "Footprint of the machine in operation. Type in mm, cm or m — it is stored in mm. The crate is entered separately under Packing.", zh: "整机运行时的占地尺寸。可按毫米、厘米或米输入 — 统一以毫米存储。木箱尺寸在“包装”中单独填写。", ar: "أبعاد الماكينة أثناء التشغيل. اكتبها بالمم أو السم أو المتر — بتتخزن بالمم. أبعاد الصندوق في قسم التعبئة." },
-  "list.uncategorized": { en: "Uncategorized", zh: "未分类", ar: "غير مصنّف" },
-  "list.other": { en: "Other", zh: "其他", ar: "أخرى" },
-  "list.productOne": { en: "product", zh: "件产品", ar: "منتج" },
-  "list.productMany": { en: "products", zh: "件产品", ar: "منتجات" },
-  /* Used by the category heading once the catalogue outgrows one page:
-     "12 of 214 products", and the placeholder for a category the current
-     page has not reached yet. */
-  "list.ofWord": { en: "of", zh: "共", ar: "من" },
-  "list.scrollToLoad": { en: "scroll to load", zh: "滚动加载", ar: "مرِّر للتحميل" },
   "cls.selectDivision": { en: "Select Division", zh: "选择事业部", ar: "اختر القسم" },
   "cls.selectCategoryIn": { en: "Select Category in", zh: "选择类别 —", ar: "اختر الفئة ضمن" },
   "cls.selectSubcategoryIn": { en: "Select Subcategory in", zh: "选择子类别 —", ar: "اختر الفئة الفرعية ضمن" },
@@ -1530,8 +1395,4 @@ export const PRODUCTS_UI_I18N: Translations = {
   "cls.skip": { en: "Skip", zh: "跳过", ar: "تخطّي" },
   "cls.addKind": { en: "Add machine kind (optional)", zh: "添加机器类型(可选)", ar: "إضافة نوع الماكينة (اختياري)" },
   "cls.kindNa": { en: "doesn\u2019t apply to this subcategory — you can move on.", zh: "不适用于此子类别——可以继续下一步。", ar: "لا ينطبق على هذه الفئة الفرعية — يمكنك المتابعة." },
-  "list.needsName": { en: "Needs name", zh: "缺名称", ar: "يحتاج اسماً" },
-  /* Accessible names for the icon-only grid/list toggle. */
-  "list.viewGrid": { en: "Grid view", zh: "网格视图", ar: "عرض شبكي" },
-  "list.viewList": { en: "List view", zh: "列表视图", ar: "عرض قائمة" },
 };
