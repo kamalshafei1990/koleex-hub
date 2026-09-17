@@ -1652,3 +1652,64 @@ the caller's own choice fails 1.
 **Still true and not ours:** this network drops held responses from our
 origin on the socket lane. What changed is that the caller pays for that
 discovery once, not on every call.
+
+---
+
+## 2026-09-17 — the socket lane's give-up budget: nobody was adding the three numbers up
+
+Checked the production logs before changing anything, and the first finding
+was that **the owner has not placed a call since 05:31** — neither #439 (live
+~05:40) nor #440 (live 05:51) has been exercised by him. His app was open and
+read the config at 05:51:51 on the new build:
+
+```
+[ai.voice] lane=ws country=US ws=true rtc=true
+```
+
+— note `country=US`, a VPN exit, which is why the server keeps offering the
+socket lane — and then no `POST /api/ai/voice/ws-session` and no
+`POST /api/ai/voice/session` before the app went quiet at 05:55. So the
+report is the 05:30 experience repeated, not a verdict on the fix. Said so
+to the owner rather than shipping over it.
+
+**What is still genuinely wrong**, and is this change: the first call on any
+fresh browser still pays the full give-up on the socket lane, and that
+give-up is ~11 s while the fall-back behind it connects in 436 ms. Where the
+eleven went:
+
+| window | cost | why |
+|---|---|---|
+| 0.0 – 2.5 s | `WS_CANARY_AFTER_MS` | waiting, canary not yet armed |
+| 2.5 – 6.0 s | `WS_CANARY_TIMEOUT_MS` | the canary's own deadline → the verdict |
+| 6.0 – 10.0 s | `WS_HANDSHAKE_RETRY_MS` | the one retry |
+| ~10.2 s | | give up → rtc, 0.44 s |
+
+**None of those three was measured.** They were room left for a round trip,
+added by three different incidents, and no one ever added them together. The
+measurements say the room is far too generous — our own watch cron, hitting
+the same route from the same regions:
+
+```
+[ai.voice.watch] ok slot=primary from=hnd1 status=400 afterMs=646
+[ai.voice.watch] ok slot=alt     from=sin1 status=400 afterMs=98
+[ai.voice.watch] socket ok from=hnd1 afterMs=643 openMs=384
+[ai.voice.watch] relay  ok from=sin1 afterMs=969
+```
+
+and `/api/version`, which is what the canary asks for, answers in under
+200 ms.
+
+**New budget:** arm at 1.5 s (still past a healthy handshake's 1.3 s),
+canary 2.5 s (twelve times its healthy answer), retry 2.5 s — the
+2026-09-13 incident's own retry went through *one second* later. Worst case
+**~6.5 s instead of ~11**, and every incident behaviour is unchanged: the
+canary still only reports and aborts, the retry still gets its turn, and the
+fall-back still runs only after it.
+
+The three are now pinned **as a sum**, so the next change to any one of them
+has to face the total a caller actually sits through.
+
+**Suites.** `validate:voice-client` 788 (+2). Mutation-tested four ways:
+arming late again fails 2, the four-second retry fails 2, arming so early it
+would cut a healthy handshake short fails 3, a canary deadline under five
+times its healthy answer fails 3.
