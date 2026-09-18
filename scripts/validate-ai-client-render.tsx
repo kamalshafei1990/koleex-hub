@@ -23,6 +23,7 @@
    --------------------------------------------------------------------------- */
 
 import { readFileSync } from "node:fs";
+import * as uw from "../src/components/pwa/UpdateWatcher";
 import { renderToStaticMarkup } from "react-dom/server";
 import type { ReactElement } from "react";
 import DraftCard from "../src/components/ai/DraftCard";
@@ -1574,6 +1575,45 @@ console.log("\n── An Arabic opening before an English code block reads right
 
   check("  …and the caller unlocks on it, so the next message is still sendable",
     /const created = await createConversation\(\);\s*if \(!created\) \{\s*setError\(copy\.couldNotStartChat\);\s*sendingRef\.current = false;\s*setSending\(false\);\s*return;\s*\}/.test(app));
+}
+
+{
+  console.log("\n── The installed app heals onto a new build, and retries if the heal is lost ──");
+  /* ── (owner, 2026-09-18: the Mac dock app and the phone's home screen
+     "not updated".) The guard recorded the ATTEMPT, not the OUTCOME, and
+     recorded it BEFORE the navigation: mark "done", then reload. A reload
+     that never completes — a dropped link mid-navigation, the ordinary
+     failure on this owner's network — left the mark written and the app on
+     the old bundle, and it never tried again.
+
+     Verified first, and these are the things that were NOT broken: the
+     production HTML carries the real build id (matching /api/version), the
+     service worker never caches HTML, and a changed chunk always gets a NEW
+     filename — tested by building twice across a real source change: zero
+     files kept a name while changing content, six got new names. So cached
+     JS cannot go stale; only the heal could, and it did. */
+  const watcher = readFileSync("src/components/pwa/UpdateWatcher.tsx", "utf8");
+  const { healAttemptsFor, nextHealRecord, HEAL_ATTEMPTS_MAX } = uw;
+
+  check("an attempt is counted per FROM→TO move, so a lost navigation is tried again rather than written off",
+    HEAL_ATTEMPTS_MAX === 3 &&
+    healAttemptsFor(null, "a", "b") === 0 &&
+    healAttemptsFor(nextHealRecord("a", "b", 1), "a", "b") === 1 &&
+    healAttemptsFor(nextHealRecord("a", "b", 2), "a", "b") === 2);
+  check("  …a heal that WORKED cannot be retried: the next boot's `from` is the new build, so the record is not about this move",
+    healAttemptsFor(nextHealRecord("a", "b", 3), "b", "c") === 0 &&
+    healAttemptsFor(nextHealRecord("a", "b", 3), "b", "b") === 0);
+  check("  …a stuck build is bounded, not infinite — the guard's original job, with a budget of three instead of one",
+    healAttemptsFor(nextHealRecord("a", "b", HEAL_ATTEMPTS_MAX), "a", "b") >= HEAL_ATTEMPTS_MAX &&
+    /const tried = healAttemptsFor\(sessionStorage\.getItem\(HEAL_KEY\), from, id\);\s*if \(tried >= HEAL_ATTEMPTS_MAX\) return;\s*sessionStorage\.setItem\(HEAL_KEY, nextHealRecord\(from, id, tried \+ 1\)\);/.test(watcher));
+  check("  …junk, and the pre-2026-09-18 bare-id record, count as no attempt rather than as a completed heal",
+    healAttemptsFor("not json", "a", "b") === 0 &&
+    healAttemptsFor("b", "a", "b") === 0 &&
+    healAttemptsFor(JSON.stringify({ f: "a", t: "b", n: -1 }), "a", "b") === 0);
+  check("  …and the heal still refuses to interrupt a live call or unsaved work, and still only runs on screen",
+    /if \(!isInstalledApp\(\)\) return;\s*if \(document\.visibilityState !== "visible"\) return;/.test(watcher) &&
+    /if \(busyWithSomethingUninterruptible\(\)\) return;/.test(watcher) &&
+    /healInstalledApp\(boot\.current, id\);/.test(watcher));
 }
 
 console.log(`\n${pass} passed, ${failures.length} failed`);

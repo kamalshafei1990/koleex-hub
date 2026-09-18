@@ -1933,3 +1933,79 @@ It cannot quietly become "no gate".
 
 `validate:ai-client-render` 286 (+3). `validate:ai` 44/44, tsc and eslint
 clean, `next build` clean.
+
+
+---
+
+## 2026-09-18 — "the dock app / home screen is not updated": four things were fine, one was not
+
+Owner asked why the installed app does not pick up new builds. Checked the
+whole chain with evidence before changing anything, and **the first
+hypothesis was wrong** — worth recording, because it was the one I was most
+sure of.
+
+### Verified working (not guesses)
+
+| link | result |
+|---|---|
+| does the page carry the real build id? | ✅ live HTML `<meta name="kx-build" content="5890c1d…">` |
+| does `/api/version` agree? | ✅ same sha |
+| can the service worker serve stale JS? | ✅ **no** — tested, see below |
+| is `UpdateWatcher` actually mounted? | ✅ `RootShell.tsx:393` |
+
+**The killed hypothesis.** The service worker is cache-first on
+`/_next/static/`, justified by "every file there has a hash in its name, so
+it can NEVER go stale". Turbopack's names *look* like short slugs, not
+content hashes, and several (`02o~ssm5_k3~4.js`, `0jp0h8059qlzg.css`) were
+identical across builds days apart — so it looked like the installed app was
+being served old JavaScript under a stable URL, which would have explained
+the whole week.
+
+It was tested rather than believed: build, snapshot all 571 chunk hashes,
+change a **shipped string** (`copy.ts` → `newChat`), rebuild, compare.
+
+```
+same filename, different content : 0
+brand-new filenames              : 6
+```
+
+(Two earlier probes — a comment, then an unused export — produced
+byte-identical output, because both are stripped. That is why the third probe
+used a string that actually ships.) The names are content-addressed; the
+cache-first rule is safe exactly as its comment claims. **No change was made
+on the strength of a plausible mechanism.**
+
+### What was actually broken
+
+`healInstalledApp` recorded the **attempt**, not the outcome, and recorded it
+**before** the navigation:
+
+```
+mark "done" for build X  →  window.location.reload()
+```
+
+A reload that never completes — a dropped link mid-navigation, the ordinary
+failure on this owner's network — leaves the mark written. The app comes back
+on the old bundle, sees the new id, calls the function, reads its own mark,
+and returns. **It never tries again**, and the installed app is frozen on
+that build for the rest of the session.
+
+The record now counts attempts and is keyed **FROM→TO**:
+
+- a lost navigation is retried, up to `HEAL_ATTEMPTS_MAX` (3);
+- a heal that *worked* cannot be retried — the next boot's `from` is the new
+  build, so the record is not about that move (and `check()` will not call it
+  once the ids agree);
+- a genuinely stuck build costs three loads instead of an infinite loop, so
+  the original guard's job is still done, on a bounded budget instead of a
+  budget of one;
+- junk, and the old bare-id format, count as **no attempt** rather than as a
+  completed heal.
+
+Still refuses to interrupt a live call or unsaved work, and still only runs
+while the app is on screen.
+
+**Suites.** `validate:ai-client-render` 291 (+5). Mutation-tested four ways:
+the one-shot guard back fails 1, dropping the FROM→TO key fails 1, an
+unbounded budget fails 1, and interrupting a live call fails 1.
+`validate:ai` 44/44, tsc and eslint clean, `next build` clean.
