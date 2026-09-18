@@ -15,6 +15,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { useRouter, usePathname } from "next/navigation";
 import { currentScopeKey } from "@/lib/me-bootstrap";
+import { setCache } from "@/lib/storage-guard";
 import { kxInspectAttrs } from "@/lib/qa/inspector";
 import { humanizeError } from "@/lib/ui/humanize-error";
 import { useTranslation } from "@/lib/i18n";
@@ -76,11 +77,13 @@ const FLAGSHIP_DIVISION_SLUG = "garment-machinery";
 
 /* ⚠️ ONE page size, used by BOTH param builders — they are compared as strings
    to decide `isDefaultView`, so a value that drifts between them silently
-   disables the warm-start cache. 200 is the server's own ceiling
+   disables the warm-start cache. 400 is the server's own ceiling
    (`products-config.ts` maxPageSize): asking for more is clamped, asking for
    less only buys extra round trips, and on this platform a round trip is
-   ~1s whatever it carries. */
-const LIST_PAGE_SIZE = "200";
+   ~1s whatever it carries. Raised from 200 on 18/09/2026 so that today's 394
+   products arrive in ONE response — at 200 a cold open painted half the grid
+   and completed in public. */
+const LIST_PAGE_SIZE = "400";
 
 /* Division → icon. Divisions are DB-driven with no icon column, so we map by
    name keyword (robust to slug variants) and fall back to a neutral box. */
@@ -1381,20 +1384,22 @@ export default function ProductList() {
         }
         if (cancelled) return;
         queryClient.setQueryData(productsQK, p); // warm the cache for instant revisit
-        /* Persist for instant paint on the next cold load / PWA restart —
-           but ONLY the unfiltered, unsearched first page. Caching a filtered
-           result would make the next cold open paint someone's leftover
-           "Draft + Garment Machinery" view as if it were the whole catalogue. */
+        /* ⚠️ THE PRODUCT ROWS ARE NOT PERSISTED HERE ANY MORE — see the effect
+           below. This wrote whatever the FIRST page happened to hold, which is
+           the whole catalogue only while it fits in one page. At 3,000 products
+           it would cache 400 rows and the next cold open would paint a third of
+           the grid and finish in public, which is the exact defect the owner
+           screenshotted at 394. One writer, and it only writes a COMPLETE
+           default view.
+
+           The model maps stay here: they arrive WITH this page and, without
+           them, the warm paint renders cards with no code, no chips and no
+           count — 208px — that grow to 311px the moment the network answers
+           (measured on production: page height 10676 -> 11574 at 1.4s). They
+           are keyed per page and merged, so a partial map is additive rather
+           than a half-truth about the catalogue's size. */
         if (isDefaultView) {
           try {
-            const json = JSON.stringify(p);
-            if (json.length < 2_500_000) window.localStorage.setItem(listSnapshotKey, json);
-            /* The model maps go WITH the list. Without them the warm paint
-               renders cards that have no code, no chips and no count — 208px
-               — and they grow to 311px the moment the network answers. That
-               is the open-glitch again, just sourced from cache instead of
-               from a late request (measured on production: page height
-               10676 -> 11574 at 1.4s). */
             if (modelsFromPageRef.current) {
               const mj = JSON.stringify(modelsFromPageRef.current);
               if (mj.length < 600_000) window.localStorage.setItem(`kx_products_models_v1:${currentScopeKey()}`, mj);
@@ -1789,6 +1794,35 @@ export default function ProductList() {
       setLoadingMore(false);
     };
   }, [loading, loadError, hasMore, total, serverParams, atMountCap]);
+
+  /* ⚠️ THE WARM SNAPSHOT HELD ONE PAGE, SO EVERY COLD OPEN REBUILT ITSELF.
+     The first-page fetch persisted its own 200 rows and nothing persisted the
+     background wave — the request that actually completes the catalogue. So a
+     cold open painted 200 products instantly from cache and then jumped to 394
+     when the network answered. The owner's two screenshots, one minute apart,
+     caught it exactly: "Fabric preparation — 3 of 67 products / Spreading
+     Machines 1", then "67 products / 6". No request was slow; the screen was
+     showing a cached HALF of itself and finishing in public.
+
+     Persisted from an EFFECT, not from inside setProducts. Writing to storage
+     in a state updater is the mistake this file already paid for once — React
+     invokes an updater twice in development, and the page-request guard that
+     lived in one is why pages 2,2,3,3 were fetched. An effect also covers every
+     path that completes the list (the wave, scroll paging, a delete), not just
+     the one I happened to edit.
+
+     ONLY when the default view is COMPLETE. A partial list in the cache would
+     reproduce the same half-painted open from storage instead of from the
+     network — worse, because it would then happen offline too.
+
+     setCache prunes and retries on a full quota; a bare setItem is what let
+     three contact caches each pass their own guard and blow a 5 MB origin quota
+     between them, killing every warm start at once, silently. */
+  useEffect(() => {
+    if (!isDefaultView || hasMore || loading || loadError || products.length === 0) return;
+    try { setCache(listSnapshotKey, JSON.stringify(products)); }
+    catch { /* serialize guard — the next open simply cold-loads, as before */ }
+  }, [products, hasMore, loading, loadError, isDefaultView, listSnapshotKey]);
 
   /* Infinite scroll — the owner's choice over a numbered pager: nothing new to
      learn, and it is the one that behaves on a phone. The sentinel sits after
@@ -2330,10 +2364,8 @@ export default function ProductList() {
          deleted product from localStorage and it vanishes when the network
          lands. */
       queryClient.setQueryData(productsQK, next);
-      try {
-        const json = JSON.stringify(next);
-        if (json.length < 2_500_000) window.localStorage.setItem(listSnapshotKey, json);
-      } catch { /* quota guard */ }
+      try { setCache(listSnapshotKey, JSON.stringify(next)); }
+      catch { /* serialize guard */ }
       return next;
     });
   };
