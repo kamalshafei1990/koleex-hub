@@ -1896,3 +1896,40 @@ waits is owned by the one rule with evidence behind it — a subscription that
 held for `REJOIN_STABLE_MS`. A burst of nudges is also one rejoin now
 (`KICK_FLOOR_MS`), since `online` and `visibilitychange` arrive in bursts and
 each nudge is a teardown plus a fresh socket.
+
+
+---
+
+## 2026-09-18 — the second gate on /ai is gone (owner: "remove it")
+
+Offered as the owner's call rather than mine, because removing a gate is a
+permissions change and the standing rule is *do not weaken permissions*. He
+said remove it. **Checked before touching it**, and the check is what makes it
+safe rather than the instruction:
+
+- `RootShell` wraps every route in `<AuthGate>` except two lists —
+  `BYPASS_PREFIXES = ["/auth"]` and `BYPASS_SUFFIXES = ["/print"]`. `/ai` is in
+  neither, so it cannot render until that gate has passed.
+- `AuthGate` gates on **both** branches: `AdminAuth` when
+  `NEXT_PUBLIC_USE_SUPABASE_AUTH` is off, `SupabaseGate` when it is on. There
+  is no configuration in which removing the page's copy leaves the route open.
+- Forty-five other routes never double-wrapped; `/ai` is now consistent with
+  them rather than weaker than the norm.
+
+**What it cost while it was there.** The inner copy started its own `authed`
+state at `null` and painted a full-height `BrandLoading` until its effect had
+read storage — and `<KoleexAiApp/>` is `next/dynamic`, so its chunk could not
+*begin* downloading until that effect ran. It also put three loading surfaces
+in a row (route skeleton → BrandLoading → skeleton again), which is precisely
+what the comment above that component promises not to do: *"One look from
+click to content."*
+
+**Pinned, not argued.** `validate:ai-client-render` now asserts all four
+facts: `/ai` is not bypassable, the shell gates what it does not bypass,
+AuthGate gates on both branches, and the page holds no gate of its own.
+Mutation-tested three ways — making `/ai` bypassable fails 1, drifting the
+page shape fails 1, and removing the gate from either AuthGate branch fails 1.
+It cannot quietly become "no gate".
+
+`validate:ai-client-render` 286 (+3). `validate:ai` 44/44, tsc and eslint
+clean, `next build` clean.

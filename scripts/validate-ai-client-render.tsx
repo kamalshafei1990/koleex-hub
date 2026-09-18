@@ -1544,6 +1544,34 @@ console.log("\n── An Arabic opening before an English code block reads right
     /if \(!res\.ok\) return null;/.test(app) &&
     /\(\{ conversation \} = \(await res\.json\(\)\) as \{ conversation: ConversationRow \}\);/.test(app) &&
     /if \(!conversation\?\.id\) return null;/.test(app));
+  /* ── ONE GATE, AND IT IS THE SHELL'S (owner, 2026-09-18: "remove it") ──
+     `/ai` wrapped itself in <AdminAuth> while RootShell already wraps every
+     non-bypassed route in <AuthGate>. The same gate twice, and not free: the
+     inner copy painted a full-height BrandLoading until its own effect had
+     read storage, which is what delayed the START of the lazy chunk download
+     and put three loading surfaces in a row.
+
+     Removing a gate is a permissions change, so the safety is pinned rather
+     than argued: `/ai` must not be bypassable, the shell must gate what it
+     does not bypass, AuthGate must gate on BOTH of its branches, and the page
+     must not be the thing holding the gate. If any of those stops being true,
+     this fails — it cannot quietly become "no gate". */
+  const shell = readFileSync("src/components/layout/RootShell.tsx", "utf8");
+  const gate = readFileSync("src/components/admin/AuthGate.tsx", "utf8");
+  /* Comments stripped: this page EXPLAINS why the second gate went, so the
+     word appears in prose. The pin is about the code. */
+  const aiPage = readFileSync("src/app/ai/page.tsx", "utf8").replace(/\/\*[\s\S]*?\*\//g, "");
+  check("the AI route is still gated — by the shell, which cannot bypass it",
+    /const BYPASS_SUFFIXES = \["\/print"\];/.test(shell) &&
+    /const BYPASS_PREFIXES = \["\/auth"\];/.test(shell) &&
+    !/"\/ai"/.test(/const BYPASS_(SUFFIXES|PREFIXES)[^;]*;/.exec(shell)?.[0] ?? "") &&
+    /if \(isBypassed\(pathname\)\) \{\s*return <>\{children\}<\/>;\s*\}\s*return \(\s*<AuthGate>/.test(shell));
+  check("  …and AuthGate gates on BOTH branches, so the flag cannot open a hole",
+    /if \(!useSupabase\) \{\s*return \(\s*<AdminAuth>\{children\}<\/AdminAuth>\s*\);\s*\}/.test(gate) &&
+    /return <SupabaseGate>\{children\}<\/SupabaseGate>;/.test(gate));
+  check("  …so the page carries no second gate of its own, and no longer imports one",
+    !/AdminAuth/.test(aiPage) && /export default function AiPage\(\) \{\s*return <KoleexAiApp \/>;\s*\}/.test(aiPage));
+
   check("  …and the caller unlocks on it, so the next message is still sendable",
     /const created = await createConversation\(\);\s*if \(!created\) \{\s*setError\(copy\.couldNotStartChat\);\s*sendingRef\.current = false;\s*setSending\(false\);\s*return;\s*\}/.test(app));
 }
