@@ -81,15 +81,68 @@ export function busyWithSomethingUninterruptible(): boolean {
   return Boolean(document.querySelector("[data-kx-unsaved='1'], [data-kx-call-active='1']"));
 }
 
-function healInstalledApp(id: string): void {
+/* THE HEAL IS TRIED AGAIN IF IT DID NOT LAND (owner, 2026-09-18: the app in
+   the Mac dock and on the phone's home screen "not updated").
+
+   The guard used to be one line — write the build id, reload, and never
+   reload for that id again. It was written to stop an infinite reload loop,
+   and it did. But it recorded the ATTEMPT, not the OUTCOME, and it recorded
+   it BEFORE the navigation:
+
+       mark "done" for build X  →  window.location.reload()
+
+   If that reload never completes — the link drops mid-navigation, which on
+   this owner's network is the ordinary case and not the exotic one — the
+   mark is already written. The app comes back on the OLD bundle, sees the
+   new build id, calls this function, reads its own mark and returns. It
+   never tries again. One lost navigation and the installed app is frozen on
+   that build for the rest of the session, which is exactly the shape of
+   "the dock app is not updated".
+
+   So the record now counts attempts and is keyed FROM→TO. Three things fall
+   out of that:
+
+     · a lost navigation is retried, up to HEAL_ATTEMPTS_MAX;
+     · a heal that WORKED cannot be retried, because the next boot's `from`
+       is the new build and no longer matches the record (and check() will
+       not call this at all once the ids agree);
+     · a genuinely stuck build — an HTML the CDN keeps serving stale — costs
+       three loads instead of an infinite loop, so the original guard's job
+       is still done, just with a bounded budget instead of a budget of one.
+
+   Pure helpers, so the rule is testable without a browser. */
+export const HEAL_ATTEMPTS_MAX = 3;
+const HEAL_KEY = "kx-healed-build";
+
+/** How many times we have already tried to move this app FROM one build TO
+ *  another. A record for a different pair — or junk, or the old single-id
+ *  format — counts as zero: it is not about this move. Pure. */
+export function healAttemptsFor(raw: string | null, from: string, to: string): number {
+  if (!raw) return 0;
+  try {
+    const v = JSON.parse(raw) as { f?: unknown; t?: unknown; n?: unknown };
+    if (v?.f !== from || v?.t !== to) return 0;
+    return typeof v.n === "number" && Number.isFinite(v.n) && v.n > 0 ? Math.floor(v.n) : 0;
+  } catch {
+    return 0;   /* the pre-2026-09-18 format was a bare id; treat it as no attempt */
+  }
+}
+
+/** The record to write before attempting the move. Pure. */
+export function nextHealRecord(from: string, to: string, attempts: number): string {
+  return JSON.stringify({ f: from, t: to, n: attempts });
+}
+
+function healInstalledApp(from: string, id: string): void {
   if (!isInstalledApp()) return;
   if (document.visibilityState !== "visible") return;
   /* Never interrupt unsaved work or a live call — the same guard onHide and
      the exit prompts use. A stale bundle can wait for the next resume. */
   if (busyWithSomethingUninterruptible()) return;
   try {
-    if (sessionStorage.getItem("kx-healed-build") === id) return;
-    sessionStorage.setItem("kx-healed-build", id);
+    const tried = healAttemptsFor(sessionStorage.getItem(HEAL_KEY), from, id);
+    if (tried >= HEAL_ATTEMPTS_MAX) return;
+    sessionStorage.setItem(HEAL_KEY, nextHealRecord(from, id, tried + 1));
   } catch {
     /* Private mode / storage disabled: the loop guard is best-effort, but a
        reload that fixes the app is still better than an app frozen forever. */
@@ -130,7 +183,7 @@ export default function UpdateWatcher() {
           /* The pill is enough everywhere the hide-heal works. It is not
              enough in the installed app, which may never go hidden-and-back
              in a way iOS lets us use. */
-          healInstalledApp(id);
+          healInstalledApp(boot.current, id);
         }
       } catch {
         /* offline / transient — ignore */
