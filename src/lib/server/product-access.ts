@@ -87,9 +87,19 @@ export const LIST_PRODUCT_COLUMNS = [
   "brand",
   "level",
   "tags",
-  "excerpt",
-  "description",      // part of the client-side search haystack
-  "alternate_names",   // Chinese/other-language product names — search haystack
+  /* ⚠️ excerpt and description are NOT here, and that is the point.
+     Measured 18/09/2026 over the real 394 products: `excerpt` alone was 70 KB
+     of a 155 KB response — 45% of everything the catalogue downloads — and it
+     is rendered NOWHERE on the list. Its only reader was the browser-side
+     search haystack, and the server already searches it: `search_text` is a
+     GENERATED STORED column covering product_name, slug, brand, excerpt,
+     description, alternate_names and tags, with a GIN trigram index
+     (products-config.ts searchColumns). So the bytes bought a second, worse
+     copy of a search Postgres was already doing.
+     `description` went with it for the same reason.
+     alternate_names STAYS: it is the Chinese/other-language name (熔接机 finds
+     the fusing machine) and it is small. */
+  "alternate_names",
   "status",
   "visible",
   "featured",

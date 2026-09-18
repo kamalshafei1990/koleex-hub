@@ -7,6 +7,7 @@
    Zone B: All Apps (category chips + flat grid)
    --------------------------------------------------------------------------- */
 
+import { PRODUCTS_PREFETCH_URL, PRODUCT_DATA_PREFETCH_URL } from "@/lib/products-list-params";
 import { useState, useEffect, useMemo, useCallback, useRef, useSyncExternalStore, memo } from "react";
 import dynamic from "next/dynamic";
 import { useRouter, usePathname } from "next/navigation";
@@ -103,15 +104,15 @@ function getGreetingKey(): string {
    client fetches in the default (cacheable) mode, so the warm entry is actually
    reused. Fire-and-forget; a miss is harmless. */
 const APP_DATA_PREFETCH: Record<string, string | (() => string)> = {
-  /* MUST match the catalogue's request BYTE FOR BYTE or the warm entry is a
-     different cache key and the download is pure waste. It has been wrong
-     twice now: first the bare /api/products (the full 80-column projection),
-     and then ?view=list after the grid moved to server paging — 72 KB
-     downloaded and never read on every hover, which at the owner's 3000
-     products becomes ~1.8 MB competing with the real page load. If
-     ProductList's serverParams change, change this with them. */
-  products: "/api/products?view=list&paged=1&pageSize=150&division=garment-machinery&status=active",
-  "product-data": "/api/products?view=list&paged=1&pageSize=150",
+  /* ⚠️ BUILT, NOT TYPED. This must match the catalogue's request byte for
+     byte or the warm entry is a different cache key and the download is pure
+     waste — and it had been wrong THREE times: the bare /api/products (full
+     80-column projection), then a stale ?view=list after the grid moved to
+     server paging, then pageSize=150 while the grid asked for 200. A comment
+     asking the next person to keep two strings in sync lost three times, so
+     both now come from products-list-params.ts. */
+  products: PRODUCTS_PREFETCH_URL,
+  "product-data": PRODUCT_DATA_PREFETCH_URL,
   projects: "/api/projects",
   /* To-do appends ?v=<write version> (busts its 30s HTTP cache after a
      write) — the prefetch must build the same key, hence the function. */

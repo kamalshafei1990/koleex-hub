@@ -16,6 +16,7 @@ import Link from "next/link";
 import { useRouter, usePathname } from "next/navigation";
 import { currentScopeKey } from "@/lib/me-bootstrap";
 import { setCache } from "@/lib/storage-guard";
+import { LIST_PAGE_SIZE, defaultListParams } from "@/lib/products-list-params";
 import { kxInspectAttrs } from "@/lib/qa/inspector";
 import { humanizeError } from "@/lib/ui/humanize-error";
 import { useTranslation } from "@/lib/i18n";
@@ -73,17 +74,13 @@ import BackToTop from "@/components/ui/BackToTop";
    discover but aren't the hub's primary story. Keep this constant
    in one place so a future rename (e.g. "koleex-machinery") is a
    single-file change. */
-const FLAGSHIP_DIVISION_SLUG = "garment-machinery";
+/* Re-exported from products-list-params so the public catalogue default and
+   Home's prefetch cannot disagree about which division opens. */
+import { FLAGSHIP_DIVISION_SLUG } from "@/lib/products-list-params";
 
-/* ⚠️ ONE page size, used by BOTH param builders — they are compared as strings
-   to decide `isDefaultView`, so a value that drifts between them silently
-   disables the warm-start cache. 400 is the server's own ceiling
-   (`products-config.ts` maxPageSize): asking for more is clamped, asking for
-   less only buys extra round trips, and on this platform a round trip is
-   ~1s whatever it carries. Raised from 200 on 18/09/2026 so that today's 394
-   products arrive in ONE response — at 200 a cold open painted half the grid
-   and completed in public. */
-const LIST_PAGE_SIZE = "400";
+/* LIST_PAGE_SIZE and the default-view query string both live in
+   products-list-params.ts, because Home's prefetch has to build the SAME
+   string and a comment asking two places to agree lost three times. */
 
 /* Division → icon. Divisions are DB-driven with no icon column, so we map by
    name keyword (robust to slug variants) and fall back to a neutral box. */
@@ -1260,10 +1257,12 @@ export default function ProductList() {
     }
     defaultDivRef.current = d;
   }
-  const defaultParams = new URLSearchParams({ view: "list", paged: "1", pageSize: LIST_PAGE_SIZE });
-  if (defaultDivRef.current) defaultParams.set("division", defaultDivRef.current);
-  if (!isInternal) defaultParams.set("status", "active");
-  const isDefaultView = serverParams === defaultParams.toString();
+  /* The SAME builder Home's prefetch uses, so "what a clean open asks for"
+     has exactly one definition. Order matters: this is a string comparison. */
+  const isDefaultView = serverParams === defaultListParams({
+    internal: isInternal,
+    division: defaultDivRef.current,
+  });
   const [showFilters, setShowFilters] = useState(initialFilters.showFilters ?? false);
   const [viewMode, setViewMode] = useState<"grid" | "list">(initialFilters.viewMode ?? "grid");
 
@@ -1974,8 +1973,14 @@ export default function ProductList() {
         mn,
         allModels,
         (p.brand || "").toLowerCase(),
-        (p.excerpt || "").toLowerCase(),
-        (p.description || "").toLowerCase(),
+        /* ⚠️ NO excerpt / description HERE — they are no longer in the list
+           projection (45% of the response, rendered nowhere). The SERVER
+           searches both through its `search_text` GIN index, so typing a word
+           that appears only in an excerpt still finds the product; it arrives
+           with the debounced server search rather than narrowing the already
+           loaded rows on the keystroke. Reading them here after they stopped
+           being fetched would have been silent dead code: `(p.excerpt || "")`
+           is a perfectly happy empty string. */
         (p.level || "").toLowerCase(),
         (p.status || "").toLowerCase(),
         triTaxonomyBySlug[p.division_slug] || divNameBySlug[p.division_slug] || "",

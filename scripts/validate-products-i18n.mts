@@ -100,6 +100,44 @@ if (!/import\(\s*["']@\/lib\/product-schema\/spec-i18n["']\s*\)/.test(previewUiS
        "zh/ar would read English spec labels with no error — the exact silent failure this file guards.");
 } else ok("zh/ar still get the spec dictionary");
 
+/* ── The catalogue's request has ONE definition ──────────────────────────
+   Home warms the browser HTTP cache on hover. A different query string is a
+   different cache key, so a drift means the prefetch downloads a response
+   nobody reads — and it has drifted THREE times (bare /api/products, a stale
+   ?view=list, then pageSize=150 against a grid asking 200). Both sides now
+   build from products-list-params.ts; this makes going back a build failure. */
+{
+  const home = read("src/app/page.tsx");
+  const list = read("src/components/admin/ProductList.tsx");
+  if (/["'`]\/api\/products\?view=list/.test(home)) {
+    fail("Home hardcodes the catalogue prefetch URL",
+         "Import PRODUCTS_PREFETCH_URL / PRODUCT_DATA_PREFETCH_URL from @/lib/products-list-params — a typed copy has drifted three times.");
+  } else if (!/PRODUCTS_PREFETCH_URL/.test(home)) {
+    fail("Home no longer prefetches the catalogue", "APP_DATA_PREFETCH should use PRODUCTS_PREFETCH_URL / PRODUCT_DATA_PREFETCH_URL.");
+  } else ok("Home's prefetch is built from the shared params, not typed");
+
+  if (/new URLSearchParams\(\{\s*view:\s*"list"[^)]*\}\)[\s\S]{0,400}isDefaultView/.test(list)) {
+    fail("ProductList rebuilds the default view by hand",
+         "isDefaultView must compare against defaultListParams() or the warm snapshot silently stops being written.");
+  } else ok("isDefaultView compares against the shared builder");
+
+  const proj = read("src/lib/server/product-access.ts");
+  /* ⚠️ Search for the terminator AFTER the array starts. `indexOf("].join")`
+     over the whole file found an EARLIER join and produced a backwards slice,
+     i.e. an empty string — so this check passed while "excerpt" really was in
+     the projection. A guard that cannot fail is worse than no guard; this one
+     was caught only because the failure direction was tested. */
+  const projStart = proj.indexOf("LIST_PRODUCT_COLUMNS = [");
+  const body = proj.slice(projStart, proj.indexOf("].join", projStart));
+  if (body.length < 50) fail("could not read LIST_PRODUCT_COLUMNS", "the projection check is not actually looking at anything");
+  for (const heavy of ["excerpt", "description"]) {
+    new RegExp(`^\\s*"${heavy}",`, "m").test(body)
+      ? fail(`"${heavy}" is back in the list projection`,
+             `It was 45% of the response and is rendered nowhere; the server already searches it through search_text.`)
+      : ok(`"${heavy}" stays out of the catalogue payload`);
+  }
+}
+
 console.log("\nB. Every key the list calls exists");
 /* Literals. */
 const literals = [...new Set([...uiSrc.matchAll(/\bt\(\s*"([^"]+)"/g)].map((m) => m[1]))];
