@@ -2009,3 +2009,58 @@ while the app is on screen.
 the one-shot guard back fails 1, dropping the FROM→TO key fails 1, an
 unbounded budget fails 1, and interrupting a live call fails 1.
 `validate:ai` 44/44, tsc and eslint clean, `next build` clean.
+
+---
+
+## 2026-09-18 — PR #447: a 34-second hold is not a healthy link
+
+The owner said "still slow" for the sixth time. Nothing was shipped on a
+hypothesis this round; the deployment's own logs were read first
+(`dpl_ChjMPwTcFXQu4q2PU5CcHqn37L38`, 17:24–17:32 UTC), and most of what they
+say is that the complaint cannot be attributed yet:
+
+- **No voice call reached the server at all** in that window — no
+  `POST /api/ai/voice/session`, no `/api/ai/voice/ws-session`. Whatever was
+  slow, it was not a call we saw.
+- **No `nav.cold.*` / `nav.warm_ms`** either: no cold app open in the window.
+- The vendor path measured healthy from `hnd1` at 17:30:35 — primary
+  `afterMs=683`, socket `spoke afterMs=713`. (The `sin1` sample at 17:22:33
+  was `afterMs=1920`, well outside the 426–838 ms band the 2500 ms first
+  attempt budget in #442 was derived from. Worth watching; one sample.)
+- What the window DOES show, continuously, is the `discuss:account` realtime
+  channel failing to hold on his link.
+
+### The one thing the numbers proved
+
+The flap rule from #443 is working — the ramp climbs cleanly — and it was
+being thrown away by its own recovery clause. From his session:
+
+```
++0.27s +2.1s +4.6s +6.7s +6.3s +12.2s +36.3s   ← ramp, correct
+  (one subscription then held 34.1s → retry = 0)
++0.89s +0.93s +2.1s +4.2s +8.3s +13.9s          ← and again from zero
+```
+
+`REJOIN_STABLE_MS` is 30 s, the hold was 34.1 s, so the whole session's
+history was erased by 4.1 s. Fourteen socket opens in ten minutes on a link
+that never once held a channel for a full minute — on the mainland path the
+product exists for.
+
+`retryAfterRecovery` replaces `retry = 0`: a recovery **halves** the step.
+A channel that genuinely recovers is still rewarded and is back to a short
+retry within two recoveries; a channel that flaps at 34 s forever settles
+near the 60 s cap instead of sprinting back to 0.9 s.
+
+### And the part that is still not explained
+
+Several CLOSED → reconnect pairs in his data are ~250 ms apart. A scheduled
+rejoin cannot do that — `rejoinDelayMs(0)` floors at 800 ms — so either a
+nudge opened them (and `KICK_FLOOR_MS` says no more than one per 3 s) or the
+page is not running the build we think it is. Rather than pick one and ship
+it, `rt.reconnect` now carries `via` (`init` / `timer` / `kick`) and the
+backoff step `r`, and `rt.status` carries `held` in seconds. The next round
+of this is a reading, not an argument.
+
+`rt.channels` also stopped firing once per status change — the set cannot
+have changed there — and is recorded where it actually changes. That was
+half of every perf beacon on the one link that cannot spare it.
