@@ -189,7 +189,45 @@ const HANDSHAKE_ATTEMPT_BUDGETS_MS = [13_000, 3_000, 3_000, 3_000] as const;
    connect timeout never let it reach. Seven bounds a dead path at seven, and
    a path that is dead is not retried here — it is left for the other region
    (see `continue regions` below) and remembered (lastFailed). */
-const TWO_REGION_ATTEMPT_BUDGETS_MS = [7_000, 3_000] as const;
+/* TWO AND A HALF (owner, 2026-09-18: "first one 7 seconds, second one still
+   slow"). SEVEN IS WHAT THE SECOND CALL COST HIM. Nothing was wrong with the
+   lane by then — the client had learnt the lane and skipped the socket — and
+   the caller still waited, because a bad burst on the mainland path is paid
+   for at the full first budget before the other region is asked.
+
+   The watch cron has been sampling both paths from both of our regions every
+   fifteen minutes, and nobody had read it as a distribution. One hour,
+   2026-09-17 18:00–19:00 UTC, every sample:
+
+     18:15 hnd1  primary FAIL 10487ms UND_ERR_CONNECT_TIMEOUT · alt ok 482
+     18:22 sin1  primary ok     521ms                         · alt ok 342
+     18:30 hnd1  primary ok     652ms                         · alt ok 638
+     18:37 sin1  primary ok     531ms                         · alt ok 242
+     18:45 hnd1  primary ok     823ms                         · alt ok 457
+     18:52 sin1  primary ok     426ms                         · alt ok 146
+
+   Two things fall out, and the first one killed a change I was about to make.
+   The path is NOT worse from one of our regions than the other — it failed
+   from hnd1 here and from sin1 at 05:52 the same day — so the region pin in
+   vercel.json is not the fault and must not be flipped on one sample pair.
+   What it is, is INTERMITTENT, exactly as the note above this one says.
+
+   The second: a primary handshake that is going to work answers in
+   426–838 ms, every single observation we have, from either region. A dead
+   one is a connect timeout at ~10.5 s. There is no measured case between
+   0.9 s and 10 s. So seven seconds of waiting buys nothing — it is spent
+   entirely inside a gap where no successful handshake has ever landed.
+
+   2.5 s is three times the slowest healthy answer on record. It changes
+   nothing for a caller whose mainland path is up, and it hands a caller
+   whose path is in a bad burst to the other region in 2.5 s instead of 7.
+
+   NOT A HEDGE, deliberately: racing both regions and taking the first answer
+   would quietly move mainland callers onto the international endpoint, since
+   the answer the browser gets carries the ICE candidates it will connect its
+   MEDIA to. Mainland must work without a VPN. The order stands; only the
+   waiting is cut. */
+const TWO_REGION_ATTEMPT_BUDGETS_MS = [2_500, 3_000] as const;
 
 /* A voice call is the only feature in this product that spends money
    continuously while the user says nothing, so the budget is on SESSIONS

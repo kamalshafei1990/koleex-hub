@@ -1713,3 +1713,66 @@ has to face the total a caller actually sits through.
 arming late again fails 2, the four-second retry fails 2, arming so early it
 would cut a healthy handshake short fails 3, a canary deadline under five
 times its healthy answer fails 3.
+
+---
+
+## 2026-09-18 — the owner's two calls, measured: seven seconds is the mainland region's dead-burst budget
+
+The owner tested #440 and #441 and reported: **"first one 7 seconds, second one
+still slow."** That is the first real measurement in this whole thread, and it
+moves the fault off the lane entirely — by the second call the client has
+learnt the lane and skips the socket, and the caller still waits.
+
+### What the watch cron had been recording, unread
+
+It samples both vendor paths from both of our regions every fifteen minutes.
+Nobody had read it as a distribution. One hour, 2026-09-17 18:00–19:00 UTC,
+every sample:
+
+| t | from | primary (`cn-north`) | alt |
+|---|---|---|---|
+| 18:15 | hnd1 | **FAIL 10487 ms** `UND_ERR_CONNECT_TIMEOUT` | ok 482 ms |
+| 18:22 | sin1 | ok 521 ms | ok 342 ms |
+| 18:30 | hnd1 | ok 652 ms | ok 638 ms |
+| 18:37 | sin1 | ok 531 ms | ok 242 ms |
+| 18:45 | hnd1 | ok 823 ms | ok 457 ms |
+| 18:52 | sin1 | ok 426 ms | ok 146 ms |
+
+**This killed a change that was one edit from being made.** The 05:52 failure
+that day was from `sin1`, and it looked like the vendor's mainland host had
+moved to answering Tokyo — which would have meant flipping the `sin1` pin
+`vercel.json` has carried since #391. The hour above shows the primary failing
+from **hnd1** too. The path is not worse from one of our regions than the
+other; it is **intermittent**, exactly as the note above
+`HANDSHAKE_ATTEMPT_BUDGETS_MS` already said. The pin is not the fault and must
+not be flipped on one sample pair.
+
+### What the fault is
+
+A primary handshake that is going to work answers in **426–838 ms**, every
+observation we have, from either region. A dead one is a connect timeout at
+**~10.5 s**. Nothing has ever been measured between 0.9 s and 10 s.
+
+`TWO_REGION_ATTEMPT_BUDGETS_MS[0]` was **7 000 ms** — seven seconds spent
+entirely inside a gap where no successful handshake has ever landed. On every
+call that meets a bad burst, the caller pays all seven before the other region
+is asked, and the other region answers in 146–638 ms. That is the owner's
+seven-second call, both of them.
+
+Now **2 500 ms** — three times the slowest healthy answer on record. It changes
+nothing for a caller whose mainland path is up, and it hands a caller in a bad
+burst to the other region in 2.5 s instead of 7.
+
+**Deliberately not a hedge.** Racing both regions and taking the first answer
+would quietly move mainland callers onto the international endpoint, because
+the answer carries the ICE candidates the browser connects its **media** to.
+Mainland must work without a VPN. The order stands; only the waiting is cut.
+
+**Suites.** `validate:ai-voice` 378 (+2), including a pin that the candidates
+are still walked as one ordered loop with exactly one handshake in flight.
+Mutation-tested three ways: seven seconds again fails 1, a budget tighter than
+a healthy handshake needs fails 1, replacing the ordered loop fails 2.
+
+**Still open, and worth watching:** the primary path fails in bursts from both
+of our regions. The cost is now bounded, not removed. The watch cron's samples
+are the record to read if it gets worse.
