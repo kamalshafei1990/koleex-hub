@@ -4587,8 +4587,24 @@ console.log("\n── 40. lane verdicts carry their source; status line; memoise
     JSON.stringify(pref.decideLane("rtc", { lane: "rtc", at: now - 60_000, source: "user" }, now)) === JSON.stringify({ lane: "rtc", probe: false }) &&
     pref.decideLane("rtc", { lane: "ws", at: now - 60_000, source: "probe" }, now).probe === true &&
     pref.decideLane("rtc", { lane: "ws", at: now - 60_000, source: "call" }, now).probe === true &&
-    pref.decideLane("rtc", { lane: "ws", at: now - pref.LANE_TTL_MS - 1, source: "user" }, now).probe === true &&
     pref.decideLane("ws", { lane: "rtc", at: now, source: "user" }, now).probe === false);
+  /* ── AND IT DOES NOT EXPIRE (owner, 2026-09-18: "until when we have this
+     problem?"). Everything shipped this week makes the SECOND call fast by
+     remembering what the first one learnt, which is no help on a device
+     that has learnt nothing — he asked from the Mac app, where the memory
+     was empty. The switch for this existed all along, and it un-set itself
+     after six hours. A machine may re-check what a machine concluded; a
+     clock running out is no reason to overrule a person. */
+  check("a line the caller picked by hand holds at ANY age — a setting must not quietly un-set itself",
+    pref.decideLane("rtc", { lane: "ws", at: now - pref.LANE_TTL_MS - 1, source: "user" }, now).probe === false &&
+    JSON.stringify(pref.decideLane("rtc", { lane: "ws", at: now - 30 * 24 * 3_600_000, source: "user" }, now)) === JSON.stringify({ lane: "ws", probe: false }) &&
+    pref.startingLane({ lane: "ws", at: now - pref.LANE_TTL_MS - 1, source: "user" }, now) === "ws" &&
+    pref.mergeLane({ lane: "ws", at: now - pref.LANE_TTL_MS - 1, source: "user" }, { lane: "rtc", source: "probe" }, now) === null);
+  check("  …but it is a choice, not a lock: a REAL CALL that tried it and failed still overrules it, so a caller who travels is corrected",
+    JSON.stringify(pref.mergeLane({ lane: "ws", at: now, source: "user" }, { lane: "rtc", source: "call" }, now + 1_000)) ===
+      JSON.stringify({ lane: "rtc", at: now + 1_000, source: "call" }) &&
+    /* a clock that ran backwards is still not a verdict */
+    pref.startingLane({ lane: "ws", at: now + 60_000, source: "user" }, now) === "rtc");
   check("  …the source survives storage and an unknown source is dropped, not trusted",
     JSON.stringify(pref.parseSavedLane(JSON.stringify({ lane: "ws", at: now, source: "user" }))) === JSON.stringify({ lane: "ws", at: now, source: "user" }) &&
     JSON.stringify(pref.parseSavedLane(JSON.stringify({ lane: "ws", at: now, source: "hacker" }))) === JSON.stringify({ lane: "ws", at: now }));
@@ -4763,13 +4779,25 @@ console.log("\n── 42. the sound catalog: one family, pinned grammar, the cal
     cat.soundByKey("copied").notes.length === 1 && cat.soundLength(cat.soundByKey("copied").notes) <= 0.05);
   check("the call keeps the cues the owner already approved, note for note",
     cat.soundByKey("call-ready").notes === tn.READY_TONE && cat.soundByKey("call-recovered").notes === tn.RECOVERED_TONE);
-  /* THE OWNER'S SECOND DECISION (2026-09-16: "all sounds are good keep them
-     all and wire them"), which replaces the first (2026-09-12 evening: "too
-     many"). Every moment starts on; Settings → Sounds is how one goes quiet.
-     Pinned as ALL rather than a list, so a cue added later cannot arrive
-     silent by accident and pass. */
-  check("every moment in the catalogue starts on — the owner's second decision, after hearing the recorded set",
-    cat.SOUND_CATALOG.every((s) => s.defaultOn) && cat.SOUND_CATALOG.length >= 30);
+  /* THE OWNER'S FIRST ANSWER IS THE ONE THAT STANDS. He said it on
+     2026-09-12 ("too many — keep the sounds for basic things"), I read
+     2026-09-16 ("all sounds are good keep them all and wire them") as
+     permission to turn all thirty on, and on 2026-09-18 he corrected it:
+     "I said not need alot of sounds in the app just the basic is enough".
+     The middle message was approving the RECORDINGS he had just heard and
+     asking that every cue have something to play — not that every cue play
+     unasked.
+
+     Pinned as the EXACT SET, not as a count: the rule is "a sound is for
+     something you need to know without looking at the screen", and a cue
+     added later has to be argued into that set rather than drift into it. */
+  check("only the four basic moments start on — a call ended, a call failed, a call came back, something went wrong",
+    cat.SOUND_CATALOG.filter((s) => s.defaultOn).map((s) => s.key).sort().join(",") ===
+      ["call-end", "call-failed", "call-recovered", "error"].sort().join(",") &&
+    cat.SOUND_CATALOG.length >= 30);
+  check("  …and every other moment still EXISTS, wired and playable — quiet by default, not deleted",
+    cat.SOUND_CATALOG.filter((s) => !s.defaultOn).length >= 26 &&
+    cat.SOUND_CATALOG.every((s) => s.notes.length > 0 && s.file === s.key));
   {
     /* scheduleTone honours the two new fields and defaults them away. */
     const made: Array<{ type: string; peak: number }> = [];
@@ -4789,13 +4817,13 @@ console.log("\n── 42. the sound catalog: one family, pinned grammar, the cal
     check("every cue names a recording that ships with the app, under the moment's own name, with the CC0 notice beside it",
       cat.SOUND_CATALOG.every((s) => s.file === s.key && fsG.existsSync(`public/sounds/ai/${s.file}.mp3`) && fsG.statSync(`public/sounds/ai/${s.file}.mp3`).size > 500 && fsG.statSync(`public/sounds/ai/${s.file}.mp3`).size < 60_000) &&
       /CC0 1\.0/.test(fsG.readFileSync("public/sounds/ai/NOTICE.txt", "utf8")));
-    check("no moment is left silent by default, and the four the first decision kept are still among them",
-      cat.SOUND_CATALOG.filter((s) => !s.defaultOn).length === 0 &&
-      (["call-end", "call-failed", "call-recovered", "error"] as const).every((k) => cat.soundByKey(k).defaultOn));
+    check("the four basic moments are on and the rest wait in Settings",
+      (["call-end", "call-failed", "call-recovered", "error"] as const).every((k) => cat.soundByKey(k).defaultOn) &&
+      !cat.soundByKey("copied").defaultOn && !cat.soundByKey("message-sent").defaultOn);
     const player = await import("../src/lib/sounds/player");
     const base = { master: true, dnd: false, volume: 0.8, notification: { enabled: true, tone: "classic" as const }, message: { enabled: true, tone: "classic" as const }, call: { enabled: true, tone: "ping" as const }, ai: { enabled: true, muted: [] as string[] } };
     check("a moment is on by its default, off when silenced, on when woken; the master and the Koleex AI switch silence everything; do-not-disturb does not",
-      player.soundEnabled("call-end", base) && player.soundEnabled("copied", base) &&
+      player.soundEnabled("call-end", base) && !player.soundEnabled("copied", base) &&
       !player.soundEnabled("call-end", { ...base, ai: { enabled: true, muted: ["call-end"] } }) &&
       !player.soundEnabled("copied", { ...base, ai: { enabled: true, muted: ["copied"] } }) &&
       /* The waking path stays live for a cue that ships off one day. */
@@ -4804,12 +4832,17 @@ console.log("\n── 42. the sound catalog: one family, pinned grammar, the cal
       player.soundEnabled("call-end", { ...base, dnd: true }));
     check("  …and the settings store only departures from the default: silencing a default-on moment, waking a default-off one",
       (() => {
+        /* With the basic-four defaults, the two departures are: silencing
+           `call-end` (on by default) and WAKING `copied` (off by default,
+           so it is stored with the "+" marker). Turning `copied` off again
+           is no departure at all and must leave nothing behind. */
         const writes: Array<{ ai: { muted: string[] } }> = [];
         const set = (p: { ai: { muted: string[] } }) => writes.push(p);
         player.setSoundMoment("call-end", false, set, base);
-        player.setSoundMoment("copied", false, set, { ...base, ai: { enabled: true, muted: ["call-end"] } });
-        player.setSoundMoment("call-end", true, set, { ...base, ai: { enabled: true, muted: ["call-end", "copied"] } });
-        return writes.map((w) => w.ai.muted.join("|")).join(";") === "call-end;call-end|copied;copied";
+        player.setSoundMoment("copied", true, set, { ...base, ai: { enabled: true, muted: ["call-end"] } });
+        player.setSoundMoment("copied", false, set, { ...base, ai: { enabled: true, muted: ["call-end", "+copied"] } });
+        player.setSoundMoment("call-end", true, set, { ...base, ai: { enabled: true, muted: ["call-end"] } });
+        return writes.map((w) => w.ai.muted.join("|")).join(";") === "call-end;call-end|+copied;call-end;";
       })());
     check("the recording's path is under the app's own origin, never a vendor host", player.soundSrc("call-ready") === "/sounds/ai/call-ready.mp3");
     const btnS = fsG.readFileSync("src/components/ai/VoiceCallButton.tsx", "utf8");

@@ -168,6 +168,32 @@ export function verdictIsFresh(saved: SavedLane | null, now: number, ttlMs: numb
   return saved !== null && now - saved.at >= 0 && now - saved.at < ttlMs;
 }
 
+/* A LINE THE CALLER PICKED BY HAND DOES NOT EXPIRE (owner, 2026-09-18:
+   "until when we have this problem?").
+
+   That question deserved a real answer rather than a fifth fix. Everything
+   shipped this week makes the SECOND call fast by remembering what the first
+   one learnt — which is no help at all on a device that has learnt nothing.
+   He asked from the Mac app, where the memory was empty, so it paid the
+   discovery again; and it will on every new device and every cleared
+   browser, for as long as his network refuses the international lane.
+
+   There has been a switch for this all along — the "Line" control in the
+   voice sheet — and it expired after six hours, which made it a setting
+   that quietly un-set itself. A machine may re-check what a machine
+   concluded; it has no business overruling a person's choice because a
+   clock ran out. So a `user` verdict now holds until the caller changes it.
+
+   It is not a lock. A REAL CALL still overrules it (mergeLane lets a `call`
+   write through), so a caller who travels, or whose network changes under
+   them, is corrected by the one thing that actually knows — a call that
+   tried the chosen lane and failed. What can no longer happen is the
+   choice being forgotten while it is still right. */
+export function verdictHolds(saved: SavedLane | null, now: number, ttlMs: number = LANE_TTL_MS): boolean {
+  if (saved !== null && saved.source === "user" && now - saved.at >= 0) return true;
+  return verdictIsFresh(saved, now, ttlMs);
+}
+
 export function decideLane(
   server: VoiceLane,
   saved: SavedLane | null,
@@ -175,11 +201,13 @@ export function decideLane(
   ttlMs: number = LANE_TTL_MS,
 ): { lane: VoiceLane; probe: boolean } {
   const fresh = verdictIsFresh(saved, now, ttlMs);
-  /* THE CALLER'S OWN CHOICE STANDS while it is fresh: a probe that happened
-     to succeed through a flaky tunnel used to move a caller who had picked
-     the mainland line back to the international one on the next load
-     (audit, 2026-09-11). Probe and call verdicts are still re-checked. */
-  if (fresh && saved && saved.source === "user") return { lane: saved.lane, probe: false };
+  /* THE CALLER'S OWN CHOICE STANDS, and no longer only "while it is fresh"
+     (see verdictHolds): a probe that happened to succeed through a flaky
+     tunnel used to move a caller who had picked the mainland line back to
+     the international one on the next load (audit, 2026-09-11), and a
+     six-hour clock used to do the same thing more slowly. Probe and call
+     verdicts are still re-checked. */
+  if (verdictHolds(saved, now, ttlMs) && saved && saved.source === "user") return { lane: saved.lane, probe: false };
   /* WHAT THIS NETWORK DID BEATS WHAT THE COUNTRY SAYS (owner, 2026-09-17:
      "still same", a third time).
 
@@ -237,8 +265,10 @@ export type VoicesByLane = { rtc: readonly { key: string; label: string }[]; ws:
    config's answer corrects it as before, and is now written down too. */
 export function startingLane(saved: SavedLane | null, now: number, ttlMs: number = LANE_TTL_MS): VoiceLane {
   if (!saved) return "rtc";
-  const fresh = now - saved.at >= 0 && now - saved.at < ttlMs;
-  return fresh ? saved.lane : "rtc";
+  /* A hand-picked line seeds the tap whatever its age — the same rule as
+     decideLane, so the lane the caller chose is also the lane the button
+     opens on before the config has answered. */
+  return verdictHolds(saved, now, ttlMs) ? saved.lane : "rtc";
 }
 
 export function readSavedLane(): SavedLane | null {
@@ -315,7 +345,7 @@ export function mergeLane(
      or by the country stamp. */
   const weak = next.source === "probe" || next.source === "server";
   if (!weak) return write;
-  if (existing.source === "user" && verdictIsFresh(existing, now, ttlMs)) return null;
+  if (existing.source === "user" && verdictHolds(existing, now, ttlMs)) return null;
   if (existing.source === "call" && verdictIsFresh(existing, now, CALL_VERDICT_HOLD_MS)) return null;
   return write;
 }
