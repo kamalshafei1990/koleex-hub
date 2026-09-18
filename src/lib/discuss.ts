@@ -621,6 +621,28 @@ const broadcastSubs = new Map<
 
 /** A subscription that held this long is a recovery; shorter is a flap. */
 export const REJOIN_STABLE_MS = 30_000;
+/* A RECOVERY STEPS THE BACKOFF DOWN; IT DOES NOT ZERO IT (owner's session,
+   2026-09-18 17:29-17:31 UTC, `discuss:account`). The flap rule below was
+   already doing its job — the ramp climbed cleanly — and then one
+   subscription held for 34.1s, one tick over REJOIN_STABLE_MS, and the whole
+   session's history was thrown away:
+
+     hold 34.1s  →  retry = 0  →  +0.9s +0.9s +2.1s +4.2s +8.3s +13.9s +36.3s
+     hold 34.1s  →  retry = 0  →  +0.9s +0.9s +2.1s +4.2s +8.3s +13.9s …
+
+   Fourteen socket opens in ten minutes on a link that has never once held a
+   subscription for a full minute. On this owner's link — mainland China, no
+   VPN, the case the whole product is built for — a 34-second subscription is
+   not a healthy channel, it is a slightly longer flap, and treating it as
+   proof of a good link puts the storm straight back.
+
+   Halving keeps both truths: a channel that recovers IS rewarded, and gets
+   back to a short retry after a couple of genuine recoveries; a channel that
+   flaps at 34s forever settles near the 60s cap instead of sprinting back to
+   0.9s. Pure, so the ladder is pinned by the suite without a browser. */
+export function retryAfterRecovery(retry: number): number {
+  return retry > 1 ? Math.floor(retry / 2) : 0;
+}
 /* The least time between two honoured nudges on one topic. `online` and
    `visibilitychange` arrive in bursts on a phone changing network, and each
    nudge is a teardown plus a fresh socket. */
@@ -654,11 +676,18 @@ function subscribeBroadcast(topic: string, onPing: (p: PingPayload) => void): ()
       subscribedAt: 0,
       /* When the last online/visible nudge was honoured (see kick). */
       lastKickAt: 0,
+      /* What opened the CURRENT channel, reported on rt.reconnect. A ramp
+         read from metrics alone cannot tell a scheduled rejoin from a nudge,
+         and the difference is the whole diagnosis: the same 250ms gap is
+         normal for a nudge and impossible for a timer (the floor is 800ms).
+         One tag turns the next round of this into a reading. */
+      via: "init" as "init" | "timer" | "kick",
     };
 
     const scope = topic.split(":").slice(0, 2).join(":");
 
-    const join = () => {
+    const join = (via: "init" | "timer" | "kick") => {
+      created.via = via;
       const channel = supabase.channel(topic);
       created.channel = channel;
       channel
@@ -691,16 +720,20 @@ function subscribeBroadcast(topic: string, onPing: (p: PingPayload) => void): ()
                 created.retry = 0;
               }
               if (created.joins === 1) perfRecord("rt.join_ms", performance.now() - created.t0, { scope });
-              else perfEvent("rt.reconnect", { scope });
+              else perfEvent("rt.reconnect", { scope, via: created.via, r: created.retry });
             } else if (status === "CHANNEL_ERROR" || status === "TIMED_OUT" || status === "CLOSED") {
-              perfEvent("rt.status", { s: status, scope });
-              /* Held long enough to count as a real recovery? Then this is a
-                 fresh drop and the backoff starts over. Otherwise it flapped,
-                 and the next wait is longer than the last. */
-              if (created.subscribedAt > 0 && performance.now() - created.subscribedAt >= REJOIN_STABLE_MS) created.retry = 0;
+              /* How long this subscription lived, to the second. Without it a
+                 drop is a bare event and the flap rule below cannot be
+                 checked against what actually happened on the link. */
+              const heldMs = created.subscribedAt > 0 ? performance.now() - created.subscribedAt : 0;
+              perfEvent("rt.status", { s: status, scope, held: Math.round(heldMs / 1000) });
+              /* Held long enough to count as a real recovery? Then the wait
+                 steps back down. Otherwise it flapped, and the next wait is
+                 longer than the last. Either way the link's history survives:
+                 see retryAfterRecovery. */
+              if (heldMs >= REJOIN_STABLE_MS) created.retry = retryAfterRecovery(created.retry);
               created.subscribedAt = 0;
             }
-            perfRecord("rt.channels", broadcastSubs.size);
           } catch { /* metrics never break realtime */ }
           if (status === "CHANNEL_ERROR" || status === "TIMED_OUT" || status === "CLOSED") {
             scheduleRejoin();
@@ -728,7 +761,7 @@ function subscribeBroadcast(topic: string, onPing: (p: PingPayload) => void): ()
         created.rejoinTimer = null;
         if (created.listeners.size === 0) return;
         try { supabase.removeChannel(created.channel); } catch { /* ignore */ }
-        join();
+        join("timer");
       }, delay);
     };
 
@@ -768,11 +801,17 @@ function subscribeBroadcast(topic: string, onPing: (p: PingPayload) => void): ()
       created.lastKickAt = now;
       if (created.rejoinTimer != null) { window.clearTimeout(created.rejoinTimer); created.rejoinTimer = null; }
       try { supabase.removeChannel(created.channel); } catch { /* ignore */ }
-      join();
+      join("kick");
     };
 
-    join();
+    join("init");
     broadcastSubs.set(topic, created);
+    /* The gauge belongs where the SET actually changes — here and in the
+       teardown below. It used to fire inside the status callback as well,
+       once per status change, where the size cannot have moved: on this
+       owner's link that was half of every perf beacon spent re-sending a
+       constant, on the one link in the product that cannot spare it. */
+    perfRecord("rt.channels", broadcastSubs.size);
     entry = created;
   }
   entry.listeners.add(onPing);

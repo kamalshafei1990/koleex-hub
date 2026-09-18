@@ -3500,12 +3500,38 @@ function describeErrorCheck(): boolean {
   const fs28 = await import("node:fs");
   const discuss = fs28.readFileSync("src/lib/discuss.ts", "utf8");
   const launch = fs28.readFileSync("src/components/layout/AppLaunchLink.tsx", "utf8");
-  check("a rejoin's backoff climbs to a minute and only resets once a subscription has HELD for thirty seconds — a flap keeps climbing",
+  check("a rejoin's backoff climbs to a minute and only eases once a subscription has HELD for thirty seconds — a flap keeps climbing",
     /export const REJOIN_STABLE_MS = 30_000;/.test(discuss) &&
     /return Math\.min\(60_000, 1_000 \* 2 \*\* Math\.min\(retry, 6\)\) \* \(0\.8 \+ random\(\) \* 0\.4\);/.test(discuss) &&
-    /if \(created\.subscribedAt > 0 && performance\.now\(\) - created\.subscribedAt >= REJOIN_STABLE_MS\) created\.retry = 0;/.test(discuss) &&
+    /if \(heldMs >= REJOIN_STABLE_MS\) created\.retry = retryAfterRecovery\(created\.retry\);/.test(discuss) &&
     /if \(created\.retry > 0 && created\.joins > 1\) \{[\s\S]{0,120}?\} else \{\s*created\.retry = 0;\s*\}/.test(discuss) &&
     !/const delay = Math\.min\(15_000/.test(discuss));
+  /* ── AND A RECOVERY DOES NOT ERASE THE SESSION EITHER ──
+     (owner's session, 2026-09-18 17:29-17:31 UTC.) The ramp above climbed
+     correctly, reached +36.3s, and was zeroed by ONE subscription that held
+     34.1s — 4.1s past the threshold — on a link that never once held a
+     channel for a full minute. Fourteen socket opens in ten minutes, on the
+     mainland link the product exists for. A recovery now halves the wait
+     instead of forgetting it. */
+  /* The ladder is exercised from the SHIPPED text, not a copy of it: the
+     module cannot be imported here (it pulls the browser and the database
+     client in), and a copy would only prove the copy. */
+  const stepSrc = /export function retryAfterRecovery\(retry: number\): number \{([\s\S]*?)\n\}/.exec(discuss)?.[1] ?? "throw new Error('not found')";
+  const step = new Function("retry", stepSrc.replace(/: number/g, "")) as (r: number) => number;
+  check("  …and a recovery STEPS the backoff down rather than zeroing it, so one 34s hold cannot restart the storm",
+    step(7) === 3 && step(3) === 1 && step(2) === 1 &&
+    /* a link with nothing behind it still starts clean */
+    step(1) === 0 && step(0) === 0 &&
+    /* and it must still come DOWN — a recovery that changed nothing would be
+       the flap rule with extra steps */
+    step(6) < 6 && step(4) < 4);
+  check("  …and a drop reports how long it held, and a reconnect what opened it, so the next round of this is read and not guessed",
+    /perfEvent\("rt\.status", \{ s: status, scope, held: Math\.round\(heldMs \/ 1000\) \}\);/.test(discuss) &&
+    /perfEvent\("rt\.reconnect", \{ scope, via: created\.via, r: created\.retry \}\);/.test(discuss) &&
+    /join\("timer"\);/.test(discuss) && /join\("kick"\);/.test(discuss) && /join\("init"\);/.test(discuss));
+  check("  …and the channel gauge is recorded where the set actually changes, not once per status on a link that cannot spare it",
+    /broadcastSubs\.set\(topic, created\);[\s\S]{0,500}?perfRecord\("rt\.channels", broadcastSubs\.size\);/.test(discuss) &&
+    !/created\.subscribedAt = 0;\s*\}\s*perfRecord\("rt\.channels"/.test(discuss));
   check("  …and a hidden page schedules no rejoin at all; the visible/online nudge retries when it is back",
     /if \(typeof document !== "undefined" && document\.visibilityState === "hidden"\) return;[\s\S]{0,700}?const delay = rejoinDelayMs\(created\.retry\);/.test(discuss) && /const kickAll = \(\) => \{/.test(discuss));
   check("  …nor under a live call: the channel's storm waits for the call to end, and the end nudges it",
@@ -3548,10 +3574,13 @@ function describeErrorCheck(): boolean {
       /\} catch \{\s*output = \{ ok: false, message: "That lookup could not be completed just now\." \};\s*\}/.test(sess));
   }
 
-  check("an online/visible nudge rejoins AT ONCE but never resets the backoff — only a subscription that held does that",
-    /\(created as unknown as \{ kick: \(\) => void \}\)\.kick = \(\) => \{[\s\S]{0,900}?join\(\);\s*\};/.test(discuss) &&
-    !/\.kick = \(\) => \{[\s\S]{0,900}?created\.retry = 0;/.test(discuss) &&
-    (discuss.match(/created\.retry = 0;/g) ?? []).length === 2);
+  check("an online/visible nudge rejoins AT ONCE but never touches the backoff — only a subscription that held does that",
+    /\(created as unknown as \{ kick: \(\) => void \}\)\.kick = \(\) => \{[\s\S]{0,900}?join\("kick"\);\s*\};/.test(discuss) &&
+    !/\.kick = \(\) => \{[\s\S]{0,900}?created\.retry =/.test(discuss) &&
+    /* the ONE remaining zeroing is the first join of a fresh topic; a drop
+       now goes through retryAfterRecovery and nothing else may shortcut it */
+    (discuss.match(/created\.retry = 0;/g) ?? []).length === 1 &&
+    (discuss.match(/created\.retry = retryAfterRecovery\(created\.retry\);/g) ?? []).length === 1);
   check("  …and a burst of nudges is one rejoin, not one per event — `online` and `visibilitychange` arrive in bursts on a phone changing network",
     /export const KICK_FLOOR_MS = 3_000;/.test(discuss) &&
     /const now = Date\.now\(\);\s*if \(now - created\.lastKickAt < KICK_FLOOR_MS\) return;\s*created\.lastKickAt = now;/.test(discuss) &&
