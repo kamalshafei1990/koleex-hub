@@ -17,7 +17,7 @@
 import { useMemo, useState } from "react";
 import { useConfirm } from "@/components/kds/useConfirm";
 import { useTranslation } from "@/lib/i18n";
-import { contactsT } from "@/lib/translations/contacts";
+import { CT_TS } from "@/lib/translations/contacts/ts";
 import { humanizeError } from "@/lib/ui/humanize-error";
 import {
   TIMELINE_CATEGORY_LABELS, TIMELINE_CATEGORY_ORDER, timelineCategoryLabel,
@@ -154,7 +154,7 @@ export default function TimelineSection({
   timeline: Row[];
   onSaved: () => void | Promise<void>;
 }) {
-  const { t } = useTranslation(contactsT);
+  const { t } = useTranslation(CT_TS);
   const [cat, setCat] = useState<string>("all");
   const [q, setQ] = useState("");
   const [busyId, setBusyId] = useState<string | null>(null);

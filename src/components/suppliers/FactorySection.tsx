@@ -11,7 +11,7 @@
 
 import { useMemo, useState } from "react";
 import { useTranslation } from "@/lib/i18n";
-import { contactsT } from "@/lib/translations/contacts";
+import { CT_FS } from "@/lib/translations/contacts/fs";
 import { humanizeError } from "@/lib/ui/humanize-error";
 import { FACTORY_TYPE_LABELS, factoryTypeLabel } from "@/lib/suppliers/intelligence";
 import FactoryIcon from "@/components/icons/ui/FactoryIcon";
@@ -87,7 +87,7 @@ export default function FactorySection({
   factory: Row | null;
   onSaved: () => void | Promise<void>;
 }) {
-  const { t } = useTranslation(contactsT);
+  const { t } = useTranslation(CT_FS);
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState<string | null>(null);

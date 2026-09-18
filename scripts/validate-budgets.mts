@@ -137,7 +137,7 @@ const ROUTE_BUDGETS: Record<string, { chunks: number; kbytes: number }> = {
   "products/[id]": { chunks: 12, kbytes: 955 },
   "products/preview/[slug]": { chunks: 12, kbytes: 954 },
   "quotations/[id]/print": { chunks: 13, kbytes: 984 },
-  "suppliers/[id]": { chunks: 14, kbytes: 1180 },
+  "suppliers/[id]": { chunks: 13, kbytes: 1062 },
   /* ── RE-BASELINED 17/09/2026 ──────────────────────────────────────────────
      Ten routes sat 1–6 KB over while using FEWER chunks than budgeted (8 of
      10, 9 of 11). That shape is the signature of a shared-module repack, not

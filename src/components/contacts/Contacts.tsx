@@ -129,7 +129,53 @@ import {
   getCitiesOfCountrySync,
 } from "@/lib/geo/state-city-lazy";
 import { useTranslation } from "@/lib/i18n";
-import { contactsT } from "@/lib/translations/contacts";
+import { CT_ACTION } from "@/lib/translations/contacts/action";
+import { CT_ADD } from "@/lib/translations/contacts/add";
+import { CT_BACK } from "@/lib/translations/contacts/back";
+import { CT_BTN } from "@/lib/translations/contacts/btn";
+import { CT_CLASSIFICATIONS } from "@/lib/translations/contacts/classifications";
+import { CT_CREATE } from "@/lib/translations/contacts/create";
+import { CT_CUSTOMERTAB } from "@/lib/translations/contacts/customerTab";
+import { CT_DELETE } from "@/lib/translations/contacts/delete";
+import { CT_DEPT } from "@/lib/translations/contacts/dept";
+import { CT_DETAIL } from "@/lib/translations/contacts/detail";
+import { CT_EDITCONTACT } from "@/lib/translations/contacts/editContact";
+import { CT_ENTITY } from "@/lib/translations/contacts/entity";
+import { CT_ERROR } from "@/lib/translations/contacts/error";
+import { CT_FIELD } from "@/lib/translations/contacts/field";
+import { CT_FILTER } from "@/lib/translations/contacts/filter";
+import { CT_HINT } from "@/lib/translations/contacts/hint";
+import { CT_KPI } from "@/lib/translations/contacts/kpi";
+import { CT_MISC } from "@/lib/translations/contacts/misc";
+import { CT_NEWCONTACT } from "@/lib/translations/contacts/newContact";
+import { CT_NEWCUSTOMER } from "@/lib/translations/contacts/newCustomer";
+import { CT_NEWSUPPLIER } from "@/lib/translations/contacts/newSupplier";
+import { CT_NOCONTACTSFOUND } from "@/lib/translations/contacts/noContactsFound";
+import { CT_OWNER } from "@/lib/translations/contacts/owner";
+import { CT_PHOTO } from "@/lib/translations/contacts/photo";
+import { CT_PIPELINE } from "@/lib/translations/contacts/pipeline";
+import { CT_PLACEHOLDER } from "@/lib/translations/contacts/placeholder";
+import { CT_REFRESHING } from "@/lib/translations/contacts/refreshing";
+import { CT_RESUMETYPE } from "@/lib/translations/contacts/resumeType";
+import { CT_SD } from "@/lib/translations/contacts/sd";
+import { CT_SEARCHCUSTOMERS } from "@/lib/translations/contacts/searchCustomers";
+import { CT_SEARCHPLACEHOLDER } from "@/lib/translations/contacts/searchPlaceholder";
+import { CT_SEARCHSUPPLIERS } from "@/lib/translations/contacts/searchSuppliers";
+import { CT_SECTION } from "@/lib/translations/contacts/section";
+import { CT_SELECTCONTACT } from "@/lib/translations/contacts/selectContact";
+import { CT_SETUP } from "@/lib/translations/contacts/setup";
+import { CT_SREASON } from "@/lib/translations/contacts/sreason";
+import { CT_SUBSECTION } from "@/lib/translations/contacts/subsection";
+import { CT_SUPGROUP } from "@/lib/translations/contacts/supgroup";
+import { CT_SUPPLIER } from "@/lib/translations/contacts/supplier";
+import { CT_TAB } from "@/lib/translations/contacts/tab";
+import { CT_TIER } from "@/lib/translations/contacts/tier";
+import { CT_TITLE } from "@/lib/translations/contacts/title";
+import { CT_TOOLTIP } from "@/lib/translations/contacts/tooltip";
+import { CT_TS } from "@/lib/translations/contacts/ts";
+import { CT_TYPE } from "@/lib/translations/contacts/type";
+import { CT_TYPECHOOSER } from "@/lib/translations/contacts/typeChooser";
+import { CT_UNIT } from "@/lib/translations/contacts/unit";
 import EntityPlanningStrip from "@/components/planning/EntityPlanningStrip";
 import EntityTasksStrip from "@/components/projects/EntityTasksStrip";
 import EntityInvoicesStrip from "@/components/invoices/EntityInvoicesStrip";
@@ -144,6 +190,10 @@ import { useSkin } from "@/lib/appearance";
 import nextDynamic from "next/dynamic";
 import AppIcon from "@/components/common/AppIcon";
 import { uploadToStorage } from "@/lib/storage-client";
+
+/* Only the namespaces this screen reads — see contacts.ts. */
+const DICT = { ...CT_ACTION, ...CT_ADD, ...CT_BACK, ...CT_BTN, ...CT_CLASSIFICATIONS, ...CT_CREATE, ...CT_CUSTOMERTAB, ...CT_DELETE, ...CT_DEPT, ...CT_DETAIL, ...CT_EDITCONTACT, ...CT_ENTITY, ...CT_ERROR, ...CT_FIELD, ...CT_FILTER, ...CT_HINT, ...CT_KPI, ...CT_MISC, ...CT_NEWCONTACT, ...CT_NEWCUSTOMER, ...CT_NEWSUPPLIER, ...CT_NOCONTACTSFOUND, ...CT_OWNER, ...CT_PHOTO, ...CT_PIPELINE, ...CT_PLACEHOLDER, ...CT_REFRESHING, ...CT_RESUMETYPE, ...CT_SD, ...CT_SEARCHCUSTOMERS, ...CT_SEARCHPLACEHOLDER, ...CT_SEARCHSUPPLIERS, ...CT_SECTION, ...CT_SELECTCONTACT, ...CT_SETUP, ...CT_SREASON, ...CT_SUBSECTION, ...CT_SUPGROUP, ...CT_SUPPLIER, ...CT_TAB, ...CT_TIER, ...CT_TITLE, ...CT_TOOLTIP, ...CT_TS, ...CT_TYPE, ...CT_TYPECHOOSER, ...CT_UNIT } as const;
+
 
 /* Aurora ground — mounted only under the skin, so Core never pays for it. */
 const WavyBackground = nextDynamic(() => import("@/components/ui/WavyBackground"), { ssr: false });
@@ -2465,7 +2515,7 @@ const TeamAvatar = React.memo(function TeamAvatar({ m, size = 24 }: { m: TeamMem
 const EmployeeSelect = React.memo(function EmployeeSelect({ label, value, onChange, placeholder, tier, help }: {
   label: string; value: string; onChange: (v: string) => void; placeholder?: string; tier?: FieldTier; help?: string;
 }) {
-  const { t } = useTranslation(contactsT);
+  const { t } = useTranslation(DICT);
   const [open, setOpen] = React.useState(false);
   const [members, setMembers] = React.useState<TeamMember[]>(_teamCache ?? []);
   const [loading, setLoading] = React.useState(!_teamCache);
@@ -4198,7 +4248,7 @@ function splitPhone(value: string): { code: string; number: string } {
 const PhoneField = React.memo(function PhoneField({ label, value, onChange, placeholder, defaultIso }: {
   label?: string; value: string; onChange: (v: string) => void; placeholder?: string; defaultIso?: string;
 }) {
-  const { lang } = useTranslation(contactsT);
+  const { lang } = useTranslation(DICT);
   const parsed = splitPhone(value);
   const defaultCode = defaultIso ? (DIAL_CODES.find(d => d.iso === defaultIso)?.code ?? "") : "";
   const [selCode, setSelCode] = useState<string>(() => parsed.code || defaultCode);
@@ -4768,7 +4818,7 @@ function CountryDropdown({ value, displayValue, onChange, label, placeholder, no
   onChange: (name: string, isoCode: string) => void;
   label?: string; placeholder?: string; noResults?: string;
 }) {
-  const { lang } = useTranslation(contactsT);
+  const { lang } = useTranslation(DICT);
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const wrapperRef = useRef<HTMLDivElement>(null);
@@ -4844,7 +4894,7 @@ function ProvinceDropdown({ countryCode, value, displayValue, onChange, label, p
   onChange: (name: string, isoCode: string) => void;
   label?: string; placeholder?: string; noResults?: string;
 }) {
-  const { lang } = useTranslation(contactsT);
+  const { lang } = useTranslation(DICT);
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const wrapperRef = useRef<HTMLDivElement>(null);
@@ -4917,7 +4967,7 @@ function CityDropdown({ countryCode, stateCode, value, onChange, label, placehol
   onChange: (name: string) => void;
   label?: string; placeholder?: string; noResults?: string;
 }) {
-  const { lang } = useTranslation(contactsT);
+  const { lang } = useTranslation(DICT);
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const wrapperRef = useRef<HTMLDivElement>(null);
@@ -5057,7 +5107,7 @@ function DeleteConfirmHost({ t }: { t: (key: string, fallback?: string) => strin
 
 export default function Contacts({ filterType }: { filterType?: ContactType } = {}) {
   /* ── i18n ── */
-  const { t, lang } = useTranslation(contactsT);
+  const { t, lang } = useTranslation(DICT);
   const aurora = useSkin() === "aurora";
   const router = useRouter();
   /** Translate a dropdown option value. Falls back to the raw value. */

@@ -14,7 +14,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useConfirm } from "@/components/kds/useConfirm";
 import { useTranslation } from "@/lib/i18n";
-import { contactsT } from "@/lib/translations/contacts";
+import { CT_SRCG } from "@/lib/translations/contacts/srcg";
 import { humanizeError } from "@/lib/ui/humanize-error";
 import {
   SOURCING_ROLE_LABELS, SOURCING_ROLE_ORDER, sourcingRoleLabel, SOURCING_ROLE_RANK,
@@ -68,7 +68,7 @@ export default function SourcingSection({
   specializations: Row[];
   onSaved: () => void | Promise<void>;
 }) {
-  const { t } = useTranslation(contactsT);
+  const { t } = useTranslation(CT_SRCG);
   const [err, setErr] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
   const band = sourcingBand(sourcing?.score ?? null);

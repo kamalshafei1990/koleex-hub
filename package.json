@@ -158,7 +158,8 @@
     "validate:shipping-states": "node --import tsx scripts/validate-shipping-states.tsx",
     "shipping:verify-provider": "node --conditions=react-server --import tsx scripts/shipping/verify-provider.mts",
     "validate:products-i18n": "node --import tsx scripts/validate-products-i18n.mts",
-    "validate:finance-i18n": "node --import tsx scripts/validate-finance-i18n.mts"
+    "validate:finance-i18n": "node --import tsx scripts/validate-finance-i18n.mts",
+    "validate:contacts-i18n": "node --import tsx scripts/validate-contacts-i18n.mts"
   },
   "dependencies": {
     "@napi-rs/canvas": "^0.1.100",

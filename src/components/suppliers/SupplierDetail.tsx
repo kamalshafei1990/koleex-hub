@@ -17,7 +17,10 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { humanizeError } from "@/lib/ui/humanize-error";
 import { useTranslation } from "@/lib/i18n";
-import { contactsT } from "@/lib/translations/contacts";
+import { CT_BADGE } from "@/lib/translations/contacts/badge";
+import { CT_CS } from "@/lib/translations/contacts/cs";
+import { CT_NEG } from "@/lib/translations/contacts/neg";
+import { CT_SD } from "@/lib/translations/contacts/sd";
 import ArrowLeftIcon from "@/components/icons/ui/ArrowLeftIcon";
 import StarIcon from "@/components/icons/ui/StarIcon";
 import Building2Icon from "@/components/icons/ui/Building2Icon";
@@ -68,6 +71,10 @@ import RiskSection from "./RiskSection";
 import NegotiationSection from "./NegotiationSection";
 import SourcingSection from "./SourcingSection";
 import { kxInspectAttrs } from "@/lib/qa/inspector";
+
+/* Only the namespaces this screen reads — see contacts.ts. */
+const DICT = { ...CT_BADGE, ...CT_CS, ...CT_NEG, ...CT_SD } as const;
+
 
 type Row = Record<string, unknown>;
 
@@ -188,7 +195,7 @@ const StatusPill = ({ value }: { value: string }) =>
   );
 
 export default function SupplierDetail({ id, embedded = false, onEdit, onDelete, onBack }: { id: string; embedded?: boolean; onEdit?: () => void; onDelete?: () => void; onBack?: () => void }) {
-  const { t } = useTranslation(contactsT);
+  const { t } = useTranslation(DICT);
   const router = useRouter();
   const [data, setData] = useState<Payload | null>(null);
   const [loading, setLoading] = useState(true);

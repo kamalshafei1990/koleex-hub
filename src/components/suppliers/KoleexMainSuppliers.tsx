@@ -15,7 +15,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useTranslation } from "@/lib/i18n";
-import { contactsT } from "@/lib/translations/contacts";
+import { CT_COV } from "@/lib/translations/contacts/cov";
 import SuppliersHeader from "./SuppliersHeader";
 import { ScrollLockOverlay } from "@/hooks/useScrollLock";
 import { taxonomyLogoUrl } from "@/components/knowledge/product-coding/taxonomy-logo";
@@ -80,7 +80,7 @@ function writeCache(key: string, data: unknown): void {
 
 export default function KoleexMainSuppliers() {
   const aurora = useSkin() === "aurora";
-  const { t } = useTranslation(contactsT);
+  const { t } = useTranslation(CT_COV);
   const router = useRouter();
 
   const [rows, setRows] = useState<CoverageRow[]>([]);

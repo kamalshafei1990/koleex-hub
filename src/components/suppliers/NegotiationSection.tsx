@@ -13,7 +13,7 @@
 import { useState } from "react";
 import { useConfirm } from "@/components/kds/useConfirm";
 import { useTranslation } from "@/lib/i18n";
-import { contactsT } from "@/lib/translations/contacts";
+import { CT_NEG } from "@/lib/translations/contacts/neg";
 import { humanizeError } from "@/lib/ui/humanize-error";
 import { NEGOTIATION_INTEL_FIELDS, QUALITY_LEVELS, QUALITY_LEVEL_LABELS } from "@/lib/suppliers/intelligence";
 import HandshakeIcon from "@/components/icons/ui/HandshakeIcon";
@@ -59,7 +59,7 @@ export default function NegotiationSection({
   negotiationIntel: Row | null;
   onSaved: () => void | Promise<void>;
 }) {
-  const { t } = useTranslation(contactsT);
+  const { t } = useTranslation(CT_NEG);
   const [open, setOpen] = useState(false);
   const [d, setD] = useState(emptyDraft);
   const [busy, setBusy] = useState(false);

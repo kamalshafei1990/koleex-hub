@@ -17,7 +17,7 @@
 import { useMemo, useState } from "react";
 import { useConfirm } from "@/components/kds/useConfirm";
 import { useTranslation } from "@/lib/i18n";
-import { contactsT } from "@/lib/translations/contacts";
+import { CT_MS } from "@/lib/translations/contacts/ms";
 import { humanizeError } from "@/lib/ui/humanize-error";
 import { uploadToStorage, removeFromStorage } from "@/lib/storage-client";
 import { checkSupplierUpload, supplierMb, resolveUploadMime, SUPPLIER_PRIVATE_ACCEPT_ATTR } from "@/lib/suppliers/upload-policy";
@@ -112,7 +112,7 @@ export default function MediaSection({
   media: Row[];
   onSaved: () => void | Promise<void>;
 }) {
-  const { t } = useTranslation(contactsT);
+  const { t } = useTranslation(CT_MS);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
 
