@@ -276,6 +276,8 @@ export type VoiceDeps = {
   now?: () => number;
   /** The second handshake's own wait after the canary's verdict (WS_HANDSHAKE_RETRY_MS). */
   wsHandshakeRetryMs?: number;
+  /** A lookup's deadline on a call (TOOL_FETCH_TIMEOUT_MS); a suite shortens it. */
+  toolTimeoutMs?: number;
 };
 
 /* ICE gathering normally finishes in well under a second on a local network
@@ -570,6 +572,24 @@ export function normalizeSdp(sdp: string): string {
 const CONFIG_ACK_WINDOW_MS = 5_000;
 
 export const TOOL_PATH = "/api/ai/voice/tool";
+/* A LOOKUP ON A CALL HAS A DEADLINE, like every other request this module
+   makes (owner, 2026-09-18: "fix any issue in this app"). This one POST had
+   no signal, and it is the one where a stall is heard: nothing answers the
+   far side until the fetch settles, so the model waits for a
+   function_call_output that never comes and SAYS NOTHING. The caller sits in
+   a live, silent call with no error and no way out but hanging up — on a link
+   where a stall is the ordinary failure, not the exotic one. Every sibling
+   already had its deadline: PERSIST_TIMEOUT_MS ("a request with no deadline
+   hung the hang-up drain"), HANDSHAKE_TIMEOUT_MS, PREVIEW_FETCH_TIMEOUT_MS.
+
+   TWELVE SECONDS, because that is already the number the screen uses: the
+   call button clears its "searching" indicator on a 12 s floor, for the same
+   reason ("an indicator that never clears is worse than none"). Past that
+   the screen has stopped explaining, so the model should have its answer —
+   the catch below already turns a failure into a sentence it can say — at
+   the same moment rather than never. It also sits under the route's own
+   maxDuration of 30, so our deadline is the one that fires. */
+export const TOOL_FETCH_TIMEOUT_MS = 12_000;
 
 export const HANDSHAKE_PATH = "/api/ai/voice/session";
 /* The WebSocket lane's own three events — the ones that are audio rather
@@ -1457,6 +1477,11 @@ export class VoiceSession {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
+        /* An engine without AbortSignal.timeout keeps today's behaviour
+           rather than losing the lookup. */
+        ...(typeof AbortSignal !== "undefined" && "timeout" in AbortSignal
+          ? { signal: AbortSignal.timeout(this.deps.toolTimeoutMs ?? TOOL_FETCH_TIMEOUT_MS) }
+          : {}),
         body: JSON.stringify({
           name: call.name,
           call_id: call.callId,

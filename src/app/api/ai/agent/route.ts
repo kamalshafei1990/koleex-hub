@@ -417,6 +417,26 @@ export async function POST(req: Request) {
         let fastLane: "brand" | "small" | "general" | null = null;
         /* Plan G1: when the first streamed byte left for the browser. */
         let tFirst: number | null = null;
+        /* HOW MANY TURNS WENT IN, READABLE FROM THE CATCH (owner, 2026-09-18:
+           "fix any issue in this app"). `history` is declared INSIDE the try
+           below, and the catch read `history.length` — which is not in scope
+           there. It compiled only because tsconfig's "lib" includes "dom",
+           whose global `history: History` carries a `.length`; on the server
+           that global does not exist, so the catch threw `ReferenceError:
+           history is not defined` on its first statement after the
+           console.error — BEFORE the `{type:"error"}` frame was enqueued.
+
+           What that cost on every failed turn: the browser got a stream that
+           simply ENDED, so the screen fell through to "No reply was received"
+           instead of the sentence written for this case; and the
+           `[ai] … ok=false` line that plan G1 added — the whole error-rate
+           signal — was never written, so the failures were invisible in the
+           very logs meant to count them. Pressing Stop mid-answer takes this
+           path too: the aborted stream makes the next enqueue throw.
+
+           Captured here, beside the timer it is logged with, so both lines
+           read a binding that exists on both paths. */
+        let histLen = 0;
         try {
           controller.enqueue(send({ type: "start", conversationId }));
 
@@ -461,6 +481,7 @@ export async function POST(req: Request) {
               ),
             ),
           );
+          histLen = history.length;
 
           /* Keepalive comments while orchestrate / fast-path runs.
              SSE treats lines starting with ":" as comments — they
@@ -952,7 +973,7 @@ export async function POST(req: Request) {
               ` fallback=${agent.provider === "fallback" ? 1 : 0}` +
               ` fast_stream=${fastReply !== null ? 1 : 0} fast_search=${fastSteps.filter((s) => s.kind === "tool-result").length}` +
               ` msg_lang=${detected.language} rewrote_egy=${rewroteReply ? 1 : 0}` +
-              ` in_bytes=${content.length} hist=${history.length} ms=${tEnd - t0}` +
+              ` in_bytes=${content.length} hist=${histLen} ms=${tEnd - t0}` +
               ` stream=1 reply_bytes=${agent.finalReply.length}` +
               traceFields({ trace, ttftMs: tFirst === null ? null : tFirst - t0, ok: true }),
           );
@@ -965,7 +986,7 @@ export async function POST(req: Request) {
              can be read from the same lines as the latency. */
           console.log(
             `[ai] lane=${fastLane ?? "protected"} ep=agent provider=none intent=agent fallback=0` +
-              ` in_bytes=${content.length} hist=${history.length} ms=${Date.now() - t0} stream=1` +
+              ` in_bytes=${content.length} hist=${histLen} ms=${Date.now() - t0} stream=1` +
               traceFields({ trace, ttftMs: tFirst === null ? null : tFirst - t0, ok: false }),
           );
           controller.enqueue(

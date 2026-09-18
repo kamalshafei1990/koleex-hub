@@ -1490,6 +1490,64 @@ console.log("\n── An Arabic opening before an English code block reads right
     /\.koleex-code-block \{\s*direction: ltr;\s*text-align: left;/.test(css));
 }
 
+{
+  console.log("\n── The AI app is warmed, and a failed start unlocks the composer ──");
+  const preload = readFileSync("src/lib/app-chunk-preload.ts", "utf8");
+  const prefetch = readFileSync("src/lib/app-prefetch.ts", "utf8");
+  const app = readFileSync("src/components/ai/KoleexAiApp.tsx", "utf8");
+
+  /* ── WARMED IN NAME ONLY ──
+     (owner, 2026-09-18: "make it fast".) TIER_A_IDLE_PRELOAD has carried
+     "ai" first since 2026-09-13, with the owner's "extremely fast, almost no
+     loading" written beside it — and CHUNK_PRELOADERS had no `ai` key, so
+     Home's idle warm skipped it, the hover-intent warm was a no-op, and the
+     ~573 KB chunk group downloaded on the tap every session. Worse, the rule
+     that an app with no preloader "has nothing to warm" made
+     wasChunkWarmed("ai") return TRUE, so the launch was logged WARM: the
+     owner's telemetry read nav.warm_ms 14923 for a fully cold download,
+     while going BACK from /ai in the same session took 427 ms. The number
+     that should have caught it was the number it fooled.
+
+     Pinned as the INVARIANT, not as one key: every app listed for idle
+     preload must actually have a preloader. */
+  /* The gap is recorded by NAME, so this fails the moment a NEW app joins the
+     broken set — but it does not pretend `products` is fixed. `products` is
+     listed for idle preload and has no preloader either; it is outside the AI
+     app, and with the idle budget at two chunks (ai, customers) it is never
+     reached in practice, so it is reported to the owner rather than changed
+     from here. Shrink this set, never grow it. */
+  const KNOWN_UNWARMED = new Set(["products"]);
+  check("every app listed for idle preload really has a chunk preloader, bar one known and named — 'warmed' in the list must mean warmed in the browser",
+    (() => {
+      const tier = /TIER_A_IDLE_PRELOAD: readonly string\[\] = \[([^\]]*)\]/.exec(prefetch)?.[1] ?? "";
+      const listed = [...tier.matchAll(/"([a-z-]+)"/g)].map((m) => m[1]);
+      const keys = /const CHUNK_PRELOADERS: Record<string, \(\) => Promise<unknown>> = \{([\s\S]*?)\n\};/.exec(preload)?.[1] ?? "";
+      const have = new Set([...keys.matchAll(/^\s*([a-z-]+):/gm)].map((m) => m[1]));
+      const missing = listed.filter((id) => !have.has(id));
+      return listed.length > 0 && listed.includes("ai") && have.has("ai") &&
+        missing.every((id) => KNOWN_UNWARMED.has(id));
+    })());
+  check("  …and the AI preloader imports the very module the route lazy-loads, so the browser dedupes the chunk",
+    /ai: \(\) => import\("@\/components\/ai\/KoleexAiApp"\),/.test(preload) &&
+    /dynamic\(\(\) => import\("@\/components\/ai\/KoleexAiApp"\)/.test(readFileSync("src/app/ai/page.tsx", "utf8")));
+
+  /* ── A CHAT THAT COULD NOT START MUST NOT LOCK THE COMPOSER ──
+     createConversation returned null for a refusal and THREW for a dropped
+     link. send() awaits it before its own try/finally begins, so a rejection
+     skipped the finally that clears sendingRef: the composer stayed on
+     "Stop" for the rest of the session, every later send() returned at the
+     guard, and only a reload freed it. The caller's `if (!created)` handling
+     was already right — it just never ran. */
+  check("a chat that could not be started comes back as null on EVERY failure — a dropped link, an unreadable body, a refusal",
+    /let res: Response;\s*try \{\s*res = await fetch\("\/api\/ai\/conversations"/.test(app) &&
+    /\} catch \{\s*return null;/.test(app) &&
+    /if \(!res\.ok\) return null;/.test(app) &&
+    /\(\{ conversation \} = \(await res\.json\(\)\) as \{ conversation: ConversationRow \}\);/.test(app) &&
+    /if \(!conversation\?\.id\) return null;/.test(app));
+  check("  …and the caller unlocks on it, so the next message is still sendable",
+    /const created = await createConversation\(\);\s*if \(!created\) \{\s*setError\(copy\.couldNotStartChat\);\s*sendingRef\.current = false;\s*setSending\(false\);\s*return;\s*\}/.test(app));
+}
+
 console.log(`\n${pass} passed, ${failures.length} failed`);
 if (failures.length) {
   console.log("\nFAILED:");

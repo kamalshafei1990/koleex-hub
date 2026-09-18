@@ -763,16 +763,40 @@ export default function KoleexAiApp() {
      settled turn wants somewhere to go. The restore-race note inside applies
      to both callers equally, which is why this is one function and not two. */
   const createConversation = useCallback(async (): Promise<string | null> => {
-    /* Starting a chat while standing inside a folder files it there — the
-       server verifies the id belongs to the caller before it uses it. */
-    const res = await fetch("/api/ai/conversations", {
-      method: "POST",
-      credentials: "include",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(activeProjectId ? { project_id: activeProjectId } : {}),
-    });
+    /* EVERY FAILURE LEAVES BY THE `null` DOOR (owner, 2026-09-18: "fix any
+       issue in this app"). This returned null for a refusal and THREW for a
+       dropped link — and the one caller that matters, send(), awaits it at a
+       point where nothing is catching yet: its try/finally starts much
+       further down, after the turn is built. So a rejection here skipped the
+       finally that clears `sendingRef`, and the composer stayed locked on
+       "Stop" FOR THE REST OF THE SESSION: every later send() returned at the
+       `if (sendingRef.current) return;` guard, silently, and Stop could not
+       clear it either (it only aborts the controller). A page reload was the
+       only way out.
+
+       The caller's handling was already right — `if (!created)` says
+       couldNotStartChat and unlocks. It simply never ran, because the thing
+       it checks for was never produced. On this owner's link a drop is
+       routine, so this is the ordinary case, not the exotic one. */
+    let res: Response;
+    try {
+      res = await fetch("/api/ai/conversations", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(activeProjectId ? { project_id: activeProjectId } : {}),
+      });
+    } catch {
+      return null;   /* the link went — the caller says so and unlocks */
+    }
     if (!res.ok) return null;
-    const { conversation } = (await res.json()) as { conversation: ConversationRow };
+    let conversation: ConversationRow | undefined;
+    try {
+      ({ conversation } = (await res.json()) as { conversation: ConversationRow });
+    } catch {
+      return null;   /* 200 with a body we cannot read is still no chat */
+    }
+    if (!conversation?.id) return null;
     setConversations((prev) => [conversation, ...prev]);
     setActiveId(conversation.id);
     /* Fix: mark auto-restore as done so it doesn't race us on
