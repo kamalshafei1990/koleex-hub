@@ -1261,8 +1261,24 @@ console.log("\n── 8. What the client may know, and what it may not ──");
       (() => { const i = route.indexOf("if (!res.ok) {"); const j = route.indexOf("[ai.voice] handshake ok"); return i > 0 && j > i; })());
     check("  …every region refused → 502 (the client says refused); none answered → 504 (not responding)",
       /status: rejected \? 502 : 504/.test(route) && (route.match(/handshake rejected/g) ?? []).length === 1);
-    check("with two regions the first attempt is seven seconds (a dead path is left for the other region), inside the ceiling",
-      (() => { const m = route.match(/const TWO_REGION_ATTEMPT_BUDGETS_MS = \[([\d_, ]+)\]/); const b = m ? m[1].split(",").map((x) => Number(x.replace(/_/g, ""))) : []; const ceiling = Number(route.match(/export const maxDuration = (\d+)/)?.[1]); return b.length === 2 && b[0] === 7_000 && 2 * b.reduce((a, c) => a + c, 0) + 10_000 <= ceiling * 1000; })());
+    /* ── THE FIRST ATTEMPT IS BOUNDED BY THE MEASURED SPREAD, NOT BY ROOM ──
+       (owner, 2026-09-18: "first one 7 seconds, second one still slow" —
+       seven is what the second call cost, on a lane the client had already
+       learnt.) The watch cron's own samples, 2026-09-17 18:00–19:00 UTC:
+       primary ok at 521, 652, 823, 426 ms from both of our regions, and one
+       FAIL at 10487 ms with UND_ERR_CONNECT_TIMEOUT. A healthy primary handshake has
+       never been observed past 838 ms; a dead one dies at ~10.5 s. Seven
+       seconds of waiting sits entirely inside a gap where no successful
+       handshake has ever landed. */
+    check("with two regions the first attempt is bounded at three times the slowest healthy handshake on record, inside the ceiling",
+      (() => { const m = route.match(/const TWO_REGION_ATTEMPT_BUDGETS_MS = \[([\d_, ]+)\]/); const b = m ? m[1].split(",").map((x) => Number(x.replace(/_/g, ""))) : []; const ceiling = Number(route.match(/export const maxDuration = (\d+)/)?.[1]); return b.length === 2 && b[0] === 2_500 && b[0] >= 2 * 838 && b[0] < 10_000 && 2 * b.reduce((a, c) => a + c, 0) + 10_000 <= ceiling * 1000; })());
+    check("  …and the regions are still asked IN ORDER, never raced — the answer carries the ICE candidates the browser connects its media to, so a race would move mainland callers onto the international endpoint",
+      /* `route` here has its comments stripped, so this pins the SHAPE: one
+         sequential loop over the candidates and exactly one handshake in
+         flight — which is what "in order, never raced" means. */
+      /regions: for \(const region of candidates\) \{/.test(route) && !/Promise\.(race|any|all|allSettled)\(\s*candidates/.test(route) &&
+      (route.match(/await fetch\(cfg\.sdpUrl/g) ?? []).length === 1 &&
+      /const order = orderRegionSlots\(/.test(route));
     check("the log names the slot beside the vendor label, on success and on failure",
       /handshake ok attempt=\$\{attempt\}\/\$\{budgets\.length\} slot=\$\{region\.slot\}/.test(route) && /attempt=\$\{attempt\}\/\$\{budgets\.length\} slot=\$\{region\.slot\} from=/.test(route));
     const successReturn16 = route.slice(route.lastIndexOf("return NextResponse.json("));
