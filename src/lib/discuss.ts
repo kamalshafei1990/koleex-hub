@@ -56,17 +56,6 @@ const CONTACTS = "contacts";
 const rtChannelTopic = (channelId: string) => `discuss:channel:${channelId}`;
 const rtAccountTopic = (accountId: string) => `discuss:account:${accountId}`;
 
-/** Silent fallback when a table hasn't been migrated yet. Matches the
- *  detection logic in inbox.ts so behavior is consistent. */
-function isMissingTable(message: string): boolean {
-  const m = message.toLowerCase();
-  return (
-    m.includes("does not exist") ||
-    m.includes("not found") ||
-    m.includes("schema cache") ||
-    m.includes("404")
-  );
-}
 
 /** Route a write through the authenticated server endpoint. Every Discuss
  *  mutation goes through /api/discuss/mutate, so the browser's anon key can
@@ -632,6 +621,10 @@ const broadcastSubs = new Map<
 
 /** A subscription that held this long is a recovery; shorter is a flap. */
 export const REJOIN_STABLE_MS = 30_000;
+/* The least time between two honoured nudges on one topic. `online` and
+   `visibilitychange` arrive in bursts on a phone changing network, and each
+   nudge is a teardown plus a fresh socket. */
+export const KICK_FLOOR_MS = 3_000;
 /** Capped exponential backoff with jitter: 1 s, 2 s, 4 s … 60 s. Pure
  *  apart from the jitter, which the suite pins by range. */
 export function rejoinDelayMs(retry: number, random: () => number = Math.random): number {
@@ -659,6 +652,8 @@ function subscribeBroadcast(topic: string, onPing: (p: PingPayload) => void): ()
       /* When the current channel reached SUBSCRIBED, for the flap rule
          below. A join that dies within seconds is not a recovery. */
       subscribedAt: 0,
+      /* When the last online/visible nudge was honoured (see kick). */
+      lastKickAt: 0,
     };
 
     const scope = topic.split(":").slice(0, 2).join(":");
@@ -737,11 +732,41 @@ function subscribeBroadcast(topic: string, onPing: (p: PingPayload) => void): ()
       }, delay);
     };
 
-    /* Expose an immediate-retry hook for the global online/visible nudges. */
+    /* Expose an immediate-retry hook for the global online/visible nudges.
+
+       IT DOES NOT RESET THE BACKOFF, and that line is the whole point
+       (owner, 2026-09-18, from his own session's metrics). The flap rule
+       above — a join counts as recovered only once it has held for
+       REJOIN_STABLE_MS — was written for the 2026-09-07 storm and it works;
+       this hook was quietly undoing it. `created.retry = 0` sat here, and
+       `kick` fires on `online`, on `kx-call-ended`, and on every return to
+       the tab. On a phone that is changing networks and switching apps —
+       which is the whole of this owner's usage — the ramp never got to
+       climb. His metrics, one session, reconnects on `discuss:account`:
+
+         +0.8s  +1.8s  +4.4s  +7.1s  +15.9s   … then back to +0.8s
+         +1.1s  +1.7s  +4.2s  +7.0s  +13.3s  +27.5s  … and again
+
+       That is the backoff working correctly and being zeroed, over and
+       over, for the length of the session — a socket storm on the same
+       flaky link his voice call is fighting for, which is exactly what the
+       call guard in scheduleRejoin already exists to prevent.
+
+       A nudge means "do not sit out the wait", not "forget what this link
+       has been doing". It still rejoins AT ONCE; what the next failure
+       waits is still owned by the one rule that has evidence behind it —
+       a subscription that held. */
     (created as unknown as { kick: () => void }).kick = () => {
       if (created.status === "SUBSCRIBED" || created.listeners.size === 0) return;
+      /* AND NOT TEN TIMES IN A SECOND. `online` and `visibilitychange` both
+         fire in bursts when a phone changes network; each nudge tears the
+         channel down and opens a new one, so a burst of events was itself a
+         burst of sockets. One nudge per KICK_FLOOR_MS; the rest fall through
+         to the scheduled rejoin, which is still pending. */
+      const now = Date.now();
+      if (now - created.lastKickAt < KICK_FLOOR_MS) return;
+      created.lastKickAt = now;
       if (created.rejoinTimer != null) { window.clearTimeout(created.rejoinTimer); created.rejoinTimer = null; }
-      created.retry = 0;
       try { supabase.removeChannel(created.channel); } catch { /* ignore */ }
       join();
     };

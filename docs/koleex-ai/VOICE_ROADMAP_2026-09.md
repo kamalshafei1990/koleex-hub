@@ -1776,3 +1776,123 @@ a healthy handshake needs fails 1, replacing the ordered loop fails 2.
 **Still open, and worth watching:** the primary path fails in bursts from both
 of our regions. The cost is now bounded, not removed. The watch cron's samples
 are the record to read if it gets worse.
+
+---
+
+## 2026-09-18 — full debug pass on the Koleex AI app: four real faults, all found by measuring
+
+Owner: *"clean and make full debugging for Koleex AI app and make it fast and
+fix any issue."* Method was the one that has been paying off all week — read
+the production numbers first, then fix what they name.
+
+### 1. Koleex AI was listed as warmed and was never warmed
+
+`TIER_A_IDLE_PRELOAD` has carried `"ai"` first since 2026-09-13, with the
+owner's *"extremely fast, almost no loading"* written beside it. There was no
+`ai` key in `CHUNK_PRELOADERS`. The decision was written down and never
+reached the browser:
+
+- Home's idle warm (`if (chunksWarmed < 2 && hasChunkPreloader(id))`) skipped
+  AI entirely; the hover-intent warm was a no-op too. Only the 16.6 KB `.rsc`
+  shell was ever prefetched.
+- The ~573 KB `KoleexAiApp` chunk group therefore downloaded **on the tap**,
+  every first launch of every session.
+- And `wasChunkWarmed("ai")` returned **true** — because an app with no
+  preloader "has nothing to warm" — so the launch was reported **warm**. The
+  owner's telemetry read `nav.warm_ms 14923` for a fully cold download, while
+  going *back* from `/ai` in the same session took **427 ms**. The number that
+  should have caught this was the number it fooled.
+
+Pinned as the invariant — every app listed for idle preload must have a
+preloader — with the one other offender (`products`) named, so a *new* one
+fails the build. `products` is outside this app and, with the idle budget at
+two chunks, is never reached; reported rather than changed from here.
+
+### 2. The agent route's error handler could not run
+
+```
+const history = …   ← declared INSIDE the try
+} catch (e) {
+  … `hist=${history.length}` …   ← not in scope
+```
+
+It compiled only because `tsconfig`'s `"lib"` includes `"dom"`, whose global
+`history: History` carries a `.length`. On the server that global does not
+exist, so the catch threw `ReferenceError: history is not defined` **before**
+enqueuing the `{type:"error"}` frame. On every failed turn the browser got a
+stream that simply ended — the screen said *"No reply was received"* instead
+of the sentence written for it — and the `[ai] … ok=false` line that plan G1
+added, the whole error-rate signal, was never written. **Pressing Stop
+mid-answer takes this path too.** The count is now hoisted; pinned as a rule
+(nothing the catch reads may be declared inside the try), not as a spelling.
+
+### 3. A chat that failed to start locked the composer for the session
+
+`createConversation()` returned `null` for a refusal and **threw** for a
+dropped link. `send()` awaits it before its own `try/finally` begins, so a
+rejection skipped the `finally` that clears `sendingRef`: the composer stayed
+on "Stop" for the rest of the session, every later `send()` returned at the
+guard, silently, and Stop could not clear it either. Only a reload freed it.
+The caller's `if (!created)` handling was already correct — it just never ran.
+Every failure now leaves by the `null` door.
+
+### 4. The in-call lookup had no deadline
+
+The POST to `/api/ai/voice/tool` was the one request this module made with no
+signal, and it is the one where a stall is *heard*: nothing answers the far
+side until it settles, so the model waits for a `function_call_output` that
+never comes and says nothing — a live, silent call with no error and no way
+out but hanging up. Every sibling already had its deadline
+(`PERSIST_TIMEOUT_MS`: *"a request with no deadline hung the hang-up drain"*).
+Now 12 s — the number the screen already uses for its "searching" floor, and
+under the route's own `maxDuration` of 30.
+
+### Also
+
+- The realtime channel's nudge was undoing its own flap rule — see the entry
+  below.
+- `isMissingTable` in `discuss.ts` was dead (its twin in `inbox.ts` is the
+  live one); removed.
+- **The voice-client suite is flaky under load**: four resume/handover checks
+  failed once while a build and two audits ran, and passed on a clean re-run.
+  The cause is `await sleep(160)` against an 80 ms grace timer — 2× headroom
+  is not enough on a loaded machine. Not fixed here; recorded so CI red can
+  be recognised for what it is.
+
+**Suites.** `validate:ai-client-render` 283 (+2), `validate:ai-streaming` 37
+(+2), `validate:voice-client` 793 (+3+2). Mutation-tested five ways, each
+caught. `validate:ai` 44/44, tsc and eslint clean, `next build` clean.
+
+### Left for the owner to decide
+
+`/ai` mounts `AdminAuth` **twice** — once from the shell (`RootShell →
+AuthGate`) and again in `src/app/ai/page.tsx`. The inner one renders
+`BrandLoading` until its own effect reads storage, which delays the *start* of
+the chunk download and shows a third loading surface. Eleven sibling routes
+carry the same wrapper, and removing it changes behaviour when
+`NEXT_PUBLIC_USE_SUPABASE_AUTH` is on. That is a permissions question, not a
+performance one, so it is the owner's call rather than mine.
+
+---
+
+## 2026-09-18 — the realtime nudge was undoing its own flap rule
+
+The rejoin backoff is right and was being defeated one line below it. `kick`
+set `retry = 0`, and `kick` fires on `online`, on `kx-call-ended`, and on
+every return to the tab. On a phone changing networks and switching apps —
+the whole of this owner's usage — the ramp never got to climb. His
+reconnects on `discuss:account`, one session:
+
+```
++0.8s +1.8s +4.4s +7.1s +15.9s   → back to +0.8s
++1.1s +1.7s +4.2s +7.0s +13.3s +27.5s → and again
+```
+
+That is a socket storm on the same flaky link his voice call fights for —
+which is exactly what the call guard in `scheduleRejoin` already exists to
+prevent. A nudge now means *"do not sit out the wait"*, not *"forget what this
+link has been doing"*: it still rejoins at once, and what the next failure
+waits is owned by the one rule with evidence behind it — a subscription that
+held for `REJOIN_STABLE_MS`. A burst of nudges is also one rejoin now
+(`KICK_FLOOR_MS`), since `online` and `visibilitychange` arrive in bursts and
+each nudge is a teardown plus a fresh socket.

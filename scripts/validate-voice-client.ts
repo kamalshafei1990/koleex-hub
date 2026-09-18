@@ -3511,6 +3511,51 @@ function describeErrorCheck(): boolean {
   check("  …nor under a live call: the channel's storm waits for the call to end, and the end nudges it",
     /if \(typeof document !== "undefined" && document\.querySelector\("\[data-kx-call-active='1'\]"\)\) return;\s*const delay = rejoinDelayMs\(created\.retry\);/.test(discuss) &&
     /window\.addEventListener\("kx-call-ended", kickAll\);/.test(discuss));
+  /* ── AND THE NUDGE DOES NOT UNDO THE FLAP RULE ──
+     (owner, 2026-09-18, read off his own session.) The rule above is right
+     and it was being defeated one line below it: `kick` set retry to 0, and
+     `kick` fires on `online`, on `kx-call-ended`, and on every return to the
+     tab. On a phone changing networks and switching apps the ramp never got
+     to climb. His reconnects on `discuss:account`, one session:
+
+       +0.8s +1.8s +4.4s +7.1s +15.9s  → back to +0.8s
+       +1.1s +1.7s +4.2s +7.0s +13.3s +27.5s → and again
+
+     A nudge means "do not sit out the wait", not "forget what this link has
+     been doing". */
+  /* ── A LOOKUP ON A CALL HAS A DEADLINE ──
+     (owner, 2026-09-18.) The POST to the tool route was the one request this
+     module made with no signal, and it is the one where a stall is HEARD:
+     nothing answers the far side until it settles, so the model waits for a
+     function_call_output that never comes and says nothing — a live, silent
+     call with no error. Every sibling already had its deadline. Twelve
+     seconds is the number the screen already uses for the same reason (the
+     call button's "searching" floor), and it sits under the route's own
+     maxDuration of 30, so ours is the deadline that fires. */
+  {
+    const fsTool = await import("node:fs");
+    const sess = fsTool.readFileSync("src/lib/voice/session.ts", "utf8");
+    const { TOOL_FETCH_TIMEOUT_MS } = await import("../src/lib/voice/session");
+    const btnTool = fsTool.readFileSync("src/components/ai/VoiceCallButton.tsx", "utf8");
+    check("the in-call lookup carries a deadline, matching the screen's own searching floor and under the route's ceiling",
+      TOOL_FETCH_TIMEOUT_MS === 12_000 &&
+      /\}, 12_000\);/.test(btnTool) &&
+      /signal: AbortSignal\.timeout\(this\.deps\.toolTimeoutMs \?\? TOOL_FETCH_TIMEOUT_MS\)/.test(sess) &&
+      /const res = await this\.deps\.fetchFn\(TOOL_PATH, \{[\s\S]{0,500}?AbortSignal\.timeout/.test(sess));
+    check("  …and an engine with no AbortSignal.timeout still makes the lookup rather than losing it",
+      /typeof AbortSignal !== "undefined" && "timeout" in AbortSignal\s*\?\s*\{ signal: AbortSignal\.timeout\(this\.deps\.toolTimeoutMs/.test(sess));
+    check("  …a stalled lookup lands in the same catch that already gives the model a sentence it can say",
+      /\} catch \{\s*output = \{ ok: false, message: "That lookup could not be completed just now\." \};\s*\}/.test(sess));
+  }
+
+  check("an online/visible nudge rejoins AT ONCE but never resets the backoff — only a subscription that held does that",
+    /\(created as unknown as \{ kick: \(\) => void \}\)\.kick = \(\) => \{[\s\S]{0,900}?join\(\);\s*\};/.test(discuss) &&
+    !/\.kick = \(\) => \{[\s\S]{0,900}?created\.retry = 0;/.test(discuss) &&
+    (discuss.match(/created\.retry = 0;/g) ?? []).length === 2);
+  check("  …and a burst of nudges is one rejoin, not one per event — `online` and `visibilitychange` arrive in bursts on a phone changing network",
+    /export const KICK_FLOOR_MS = 3_000;/.test(discuss) &&
+    /const now = Date\.now\(\);\s*if \(now - created\.lastKickAt < KICK_FLOOR_MS\) return;\s*created\.lastKickAt = now;/.test(discuss) &&
+    /lastKickAt: 0,/.test(discuss));
   check("a stale build's full-page app launch is skipped mid-call — the same guard the update watcher uses",
     /import \{ busyWithSomethingUninterruptible \} from "@\/components\/pwa\/UpdateWatcher";/.test(launch) &&
     /if \(g\.__kxStaleBuild && !busyWithSomethingUninterruptible\(\)\) \{/.test(launch));

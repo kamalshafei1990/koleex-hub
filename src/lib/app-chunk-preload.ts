@@ -25,7 +25,27 @@
    production-default LEGACY implementation (the shared 11.6k-line Contacts
    chunk, used by the vast majority); cohort/server-list users still load their
    smaller adapter on click via the route's own dynamic loading state. */
+/* KOLEEX AI WAS LISTED AS WARMED AND WAS NEVER WARMED (owner, 2026-09-18:
+   "make it fast"). app-prefetch's TIER_A_IDLE_PRELOAD has carried "ai" first
+   since 2026-09-13, with a note recording the owner's "extremely fast, almost
+   no loading" — and there was no `ai` key HERE, so the decision was written
+   down and never reached the browser. Three things followed from one missing
+   line, all of them measured:
+
+     · hasChunkPreloader("ai") === false, so Home's idle warm
+       (`if (chunksWarmed < 2 && hasChunkPreloader(id))`) skipped AI
+       altogether, and the hover-intent warm on the tile was a no-op too.
+       Only the 16.6 KB .rsc shell was ever prefetched.
+     · the ~573 KB KoleexAiApp chunk group therefore downloaded ON THE TAP,
+       every first launch of every session.
+     · and wasChunkWarmed("ai") returned TRUE — because of the rule just
+       below, that an app with no preloader has nothing to warm — so the
+       launch was reported as WARM. The owner's own telemetry read
+       `nav.warm_ms 14923` for a launch that was paying a full cold
+       download; going BACK from /ai to / in the same session took 427 ms.
+       The number that should have caught this was the number it fooled. */
 const CHUNK_PRELOADERS: Record<string, () => Promise<unknown>> = {
+  ai: () => import("@/components/ai/KoleexAiApp"),
   crm: () => import("@/components/crm/CRM"),
   customers: () => import("@/components/contacts/Contacts"),
   suppliers: () => import("@/components/contacts/Contacts"),

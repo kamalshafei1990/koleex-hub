@@ -182,6 +182,37 @@ console.log("\n── Live tool steps: the screen learns what is being looked up
     /onStep: \(steps\) => \{\s*const live = steps\.filter\(\(s\) => s\.kind !== "answer"\);\s*if \(live\.length > 0\) controller\.enqueue\(send\(\{ type: "steps", steps: live \}\)\);/.test(route));
   const types = rf("src/lib/server/ai/core/types.ts", "utf8");
   check("  …through a typed, optional hook on the turn input", /onStep\?: \(steps: AgentStep\[\]\) => void;/.test(types));
+
+  /* ── THE FAILURE PATH MUST BE ABLE TO RUN ──
+     (owner, 2026-09-18: "fix any issue in this app".) The catch read
+     `history.length`, and `history` is declared INSIDE the try. It compiled
+     because tsconfig's "lib" carries "dom", whose global `history: History`
+     has a `.length`; on the server that global does not exist, so the catch
+     threw `ReferenceError: history is not defined` BEFORE enqueuing the
+     `{type:"error"}` frame. Every failed turn therefore ended as a stream
+     that just stopped — the screen said "No reply was received" — and the
+     `[ai] … ok=false` line that the error rate is read from was never
+     written. Pressing Stop mid-answer takes this same path.
+
+     Pinned as a rule, not as a spelling: NOTHING the catch reads may be
+     declared inside the try. */
+  check("the stream's catch reads only bindings declared OUTSIDE the try — a failed turn can still send its error frame and write its log line",
+    (() => {
+      const i = route.indexOf("let histLen = 0;");
+      const t = route.indexOf("try {", i);
+      const c = route.indexOf("} catch (e) {", t);
+      const fin = route.indexOf("} finally {", c);
+      if (i < 0 || t < 0 || c < 0 || fin < 0) return false;
+      const body = route.slice(c, fin);
+      /* the count is hoisted, set inside, and read by both lines */
+      return /let histLen = 0;\s*try \{/.test(route) &&
+        /histLen = history\.length;/.test(route.slice(t, c)) &&
+        /hist=\$\{histLen\}/.test(body) &&
+        !/history\.length/.test(body) &&
+        /controller\.enqueue\(\s*send\(\{\s*type: "error",/.test(body);
+    })());
+  check("  …and the success line reads the same hoisted count, so the two cannot drift apart",
+    (route.match(/hist=\$\{histLen\}/g) ?? []).length === 2);
 }
 
 
