@@ -23,7 +23,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import FinanceHeader from "@/components/finance/FinanceHeader";
 import { useTranslation } from "@/lib/i18n";
-import { financeT } from "@/lib/translations/finance";
+import { FIN_FORECAST } from "@/lib/translations/finance/forecast";
 import { EmptyState, SectionCard } from "@/components/finance/FinanceUi";
 import { MetricCard } from "@/components/finance/FinanceUiX";
 import RrIcon from "@/components/ui/RrIcon";
@@ -87,7 +87,7 @@ function zeroY(H: number, vMin: number, vMax: number, padY = 8): number {
 type ScenarioPreset = "base" | "delay7" | "delay15" | "delay30" | "accel7" | "accel15" | "fx5" | "fx10" | "cost10" | "combined" | "custom";
 
 export default function FinanceTreasuryForecast() {
-  const { t } = useTranslation(financeT);
+  const { t } = useTranslation(FIN_FORECAST);
   const baseCurrency = useBaseCurrency();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -105,7 +105,17 @@ export default function FinanceTreasuryForecast() {
      server" so the operator can always pull fresh data. */
   const [cachedInputs, setCachedInputs] = useState<ForecastInputs | null>(null);
 
-  /* Fetch fresh inputs from the server and run the base case. The
+  /* DELIBERATELY NOT WARM-CACHED — the one Finance tab left cold on
+     purpose, so the reasoning is here rather than discovered later.
+     Every other screen in the sweep serves a stored list and revalidates
+     behind it; this one is not a list. It POSTs a set of assumptions and
+     gets back a COMPUTATION, and its results are then recomputed locally as
+     the operator toggles presets. A cached answer here would be a forecast
+     produced from assumptions the operator can no longer see, presented as
+     the current scenario — and unlike a stale row count, a stale liquidity
+     projection is acted on. It waits, honestly.
+
+     Fetch fresh inputs from the server and run the base case. The
      server bundles `inputs` into the response when we ask for them,
      so subsequent preset toggles can recompute locally. */
   const refreshFromServer = useCallback(async (a: ScenarioAssumptions | null) => {
@@ -596,7 +606,7 @@ function DriverList({
   items: Array<{ key: string; party: string; amountReporting: number; daysFromNow: number; source: string }>;
   tone: "positive" | "negative";
 }) {
-  const { t } = useTranslation(financeT);
+  const { t } = useTranslation(FIN_FORECAST);
   const accent = tone === "positive" ? "text-emerald-600 dark:text-emerald-300" : "text-rose-600 dark:text-rose-300";
   return (
     <div>

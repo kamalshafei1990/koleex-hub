@@ -14,7 +14,7 @@
 import { useState } from "react";
 import { useConfirm } from "@/components/kds/useConfirm";
 import { useTranslation } from "@/lib/i18n";
-import { contactsT } from "@/lib/translations/contacts";
+import { CT_RS } from "@/lib/translations/contacts/rs";
 import { humanizeError } from "@/lib/ui/humanize-error";
 import {
   RISK_LEVEL_LABELS, RISK_LEVEL_ORDER, riskLevelTone,
@@ -118,7 +118,7 @@ export default function RiskSection({
   risk: { level: string | null; score: number | null; trustLevel: string | null; openItems: number; openHighRisks: number } | null;
   onSaved: () => void | Promise<void>;
 }) {
-  const { t } = useTranslation(contactsT);
+  const { t } = useTranslation(CT_RS);
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState<string | null>(null);

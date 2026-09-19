@@ -15,12 +15,13 @@
          confirm + reject + open-payment + open-movement actions
    ========================================================================== */
 
-import { memo, useCallback, useEffect, useMemo, useState } from "react";
+import { memo, useCallback, useMemo, useState } from "react";
+import { useWarmData } from "@/lib/warm-cache";
 import { useInput } from "@/components/kds/useInput";
 import Link from "next/link";
 import FinanceHeader from "@/components/finance/FinanceHeader";
 import { useTranslation } from "@/lib/i18n";
-import { financeT } from "@/lib/translations/finance";
+import { FIN_RECONCILIATION } from "@/lib/translations/finance/reconciliation";
 import { EmptyState, SectionCard } from "@/components/finance/FinanceUi";
 import { MetricCard } from "@/components/finance/FinanceUiX";
 import RrIcon from "@/components/ui/RrIcon";
@@ -37,35 +38,34 @@ import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 type FilterKey = "active" | "suggested" | "confirmed" | "rejected" | "all";
 
 export default function FinanceReconciliation() {
-  const { t } = useTranslation(financeT);
-  const [candidates, setCandidates] = useState<FinanceReconciliationCandidate[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { t } = useTranslation(FIN_RECONCILIATION);
   const [rescanBusy, setRescanBusy] = useState(false);
   const [filter, setFilter] = useState<FilterKey>("active");
   const [acting, setActing] = useState<string | null>(null);   // candidate.id currently in-flight
   const [error, setError] = useState<string | null>(null);
 
-  const load = useCallback(async (status: FilterKey) => {
-    setLoading(true);
-    setError(null);
-    try {
-      const statusParam =
-        status === "active"    ? "suggested,confirmed" :
-        status === "suggested" ? "suggested" :
-        status === "confirmed" ? "confirmed" :
-        status === "rejected"  ? "rejected,expired" :
-        "suggested,confirmed,rejected,expired";
-      const r = await fetch(`/api/finance/reconciliation/candidates?status=${encodeURIComponent(statusParam)}&limit=200`, { cache: "no-store" });
-      const j = (await r.json().catch(() => ({}))) as { candidates?: FinanceReconciliationCandidate[]; error?: string };
-      if (!r.ok) throw new Error(humanizeError(j.error ?? `HTTP ${r.status}`));
-      setCandidates(j.candidates ?? []);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-  useEffect(() => { void load(filter); }, [load, filter]);
+  const fetchCandidates = useCallback(async () => {
+    const statusParam =
+      filter === "active"    ? "suggested,confirmed" :
+      filter === "suggested" ? "suggested" :
+      filter === "confirmed" ? "confirmed" :
+      filter === "rejected"  ? "rejected,expired" :
+      "suggested,confirmed,rejected,expired";
+    const r = await fetch(`/api/finance/reconciliation/candidates?status=${encodeURIComponent(statusParam)}&limit=200`, { cache: "no-store" });
+    const j = (await r.json().catch(() => ({}))) as { candidates?: FinanceReconciliationCandidate[]; error?: string };
+    if (!r.ok) throw new Error(humanizeError(j.error ?? `HTTP ${r.status}`));
+    return j.candidates ?? [];
+  }, [filter]);
+
+  /* THE FILTER IS THE KEY. Every tab here is a different status set, so a
+     shared key would show the rejected pile under "Active". Keyed by the
+     filter, each tab warms its own answer and can never be handed another
+     tab's. */
+  const { data, loading, reload } =
+    useWarmData<FinanceReconciliationCandidate[]>(`fin:recon:${filter}`, fetchCandidates);
+  const candidates = useMemo(() => data ?? [], [data]);
+  /* Callers pass the filter they are acting on; the hook already tracks it. */
+  const load = useCallback(async () => { await reload(); }, [reload]);
 
   const rescan = useCallback(async () => {
     setRescanBusy(true);
@@ -78,13 +78,13 @@ export default function FinanceReconciliation() {
       });
       const j = (await r.json().catch(() => ({}))) as { ok?: boolean; error?: string };
       if (!r.ok || !j.ok) throw new Error(humanizeError(j.error ?? `HTTP ${r.status}`));
-      await load(filter);
+      await load();
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
       setRescanBusy(false);
     }
-  }, [load, filter]);
+  }, [load]);
 
   const confirm = useCallback(async (id: string) => {
     setActing(id);
@@ -97,13 +97,13 @@ export default function FinanceReconciliation() {
       });
       const j = (await r.json().catch(() => ({}))) as { ok?: boolean; error?: string };
       if (!r.ok || !j.ok) throw new Error(humanizeError(j.error ?? `HTTP ${r.status}`));
-      await load(filter);
+      await load();
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
       setActing(null);
     }
-  }, [load, filter]);
+  }, [load]);
 
   const { askInput, inputDialog } = useInput();
   const reject = useCallback((id: string) => {
@@ -121,13 +121,13 @@ export default function FinanceReconciliation() {
       });
       const j = (await r.json().catch(() => ({}))) as { candidate?: unknown; error?: string };
       if (!r.ok) throw new Error(humanizeError(j.error ?? `HTTP ${r.status}`));
-      await load(filter);
+      await load();
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
       setActing(null);
     }
-  }, [load, filter]);
+  }, [load]);
 
   /* ── KPIs over the currently-loaded queue ── */
   const kpi = useMemo(() => {
@@ -267,7 +267,7 @@ const CandidateRow = memo(function CandidateRow({
   onConfirm: (id: string) => void;
   onReject: (id: string) => void;
 }) {
-  const { t } = useTranslation(financeT);
+  const { t } = useTranslation(FIN_RECONCILIATION);
   const p = candidate.payment ?? null;
   const m = candidate.cash_movement ?? null;
   const isActive = candidate.status === "suggested";
@@ -428,7 +428,7 @@ function ConfidencePill({ level, pct }: { level: ReconciliationConfidenceLevel; 
 }
 
 function TypeChip({ type }: { type: ReconciliationCandidateType }) {
-  const { t } = useTranslation(financeT);
+  const { t } = useTranslation(FIN_RECONCILIATION);
   const cls =
     type === "exact"          ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-300" :
     type === "partial"        ? "bg-amber-500/15 text-amber-600 dark:text-amber-300"      :
@@ -458,7 +458,7 @@ function SideCard({
   accentTone: "positive" | "negative";
   href?: string;
 }) {
-  const { t } = useTranslation(financeT);
+  const { t } = useTranslation(FIN_RECONCILIATION);
   const accent = accentTone === "positive" ? "text-emerald-600 dark:text-emerald-300" : "text-rose-600 dark:text-rose-300";
   return (
     <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-primary)]/40 px-3 py-2.5">

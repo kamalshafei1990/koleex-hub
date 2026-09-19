@@ -18,7 +18,7 @@ import { useMemo, useState } from "react";
 import { useConfirm } from "@/components/kds/useConfirm";
 import { fpAvatar } from "@/lib/cdn";
 import { useTranslation } from "@/lib/i18n";
-import { contactsT } from "@/lib/translations/contacts";
+import { CT_CS } from "@/lib/translations/contacts/cs";
 import { humanizeError } from "@/lib/ui/humanize-error";
 import { uploadToStorage } from "@/lib/storage-client";
 import {
@@ -143,7 +143,7 @@ export default function ContactsSection({
   onSaved: () => void | Promise<void>;
 }) {
   // editingId: contact id being edited, "new" for add, null for none
-  const { t } = useTranslation(contactsT);
+  const { t } = useTranslation(CT_CS);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [draft, setDraft] = useState<Draft>(emptyDraft);
   const [saving, setSaving] = useState(false);

@@ -43,6 +43,7 @@ import type {
   TodoMetadata,
 } from "@/types/supabase";
 import type { ScopeContext } from "./scope";
+import { todoListUrl, TODO_WRITE_VERSION_KEY } from "./todo-list-url";
 
 /* ── Fetch todos with scope enforcement ──
    When ctx is provided, the fetch filters results to what the user's role
@@ -58,7 +59,7 @@ export async function fetchTodos(
   try {
     /* ?v=<writes so far> — see bumpTodoWriteVersion. Without it a reload after
        a toggle repaints the cached, pre-toggle list. */
-    const res = await fetch(`/api/todos?v=${todoWriteVersion()}`, { credentials: "include" });
+    const res = await fetch(todoListUrl(), { credentials: "include" });
     if (!res.ok) {
       if (res.status !== 401 && res.status !== 403) {
         console.error("[Todos] fetchTodos:", res.status);
@@ -122,12 +123,16 @@ export async function createTodo(input: {
     });
     if (res.ok) {
       const json = (await res.json()) as { todo: TodoRow | null };
-      if (typeof window !== "undefined" && json.todo) {
-        setTimeout(
-          () => window.dispatchEvent(new CustomEvent("inbox:force-recount")),
-          500,
-        );
-      }
+      /* ⚠️ THE ONE WRITE THAT NEVER ANNOUNCED ITSELF. update / toggle / delete
+         all call announceTodoChange() — which bumps the ?v= write version that
+         busts the list's 30-second HTTP cache — and CREATE did not. So the
+         refetch right after adding a task asked the same ?v= URL, the browser
+         answered from cache with the pre-create list, and the task the user
+         just added simply was not there: reproduced live 2026-08-28 (row in
+         the database, list and Active counter unmoved). announceTodoChange
+         also fires the force-recount event, so the old bare setTimeout event
+         is folded into it. */
+      if (json.todo) await announceTodoChange();
       return json.todo;
     }
     if (res.status !== 401 && res.status !== 403) {
@@ -173,19 +178,13 @@ export async function createTodo(input: {
 
    `kx_` prefix, so the sign-out wipe in session-caches.ts clears it. Ordinary
    repeat loads with no write in between still keep the 30s cache. */
-const WRITE_VERSION_KEY = "kx_todo_write_v";
 
 export function bumpTodoWriteVersion(): void {
   if (typeof window === "undefined") return;
   try {
-    const n = Number(window.localStorage.getItem(WRITE_VERSION_KEY) ?? "0") + 1;
-    window.localStorage.setItem(WRITE_VERSION_KEY, String(n));
+    const n = Number(window.localStorage.getItem(TODO_WRITE_VERSION_KEY) ?? "0") + 1;
+    window.localStorage.setItem(TODO_WRITE_VERSION_KEY, String(n));
   } catch { /* private mode — the no-store fallback below still applies */ }
-}
-
-function todoWriteVersion(): string {
-  if (typeof window === "undefined") return "";
-  try { return window.localStorage.getItem(WRITE_VERSION_KEY) ?? "0"; } catch { return "0"; }
 }
 
 async function announceTodoChange(): Promise<void> {

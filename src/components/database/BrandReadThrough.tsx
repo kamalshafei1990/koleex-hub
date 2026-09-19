@@ -175,7 +175,7 @@ export default function BrandReadThrough() {
                       type="button"
                       disabled={busyId !== null}
                       onClick={() => { targetRef.current = r.id; fileRef.current?.click(); }}
-                      className="rounded-md border border-[var(--border-subtle)] bg-[var(--bg-primary)]/90 px-1.5 py-0.5 text-[9px] font-semibold text-[var(--text-secondary)] hover:text-[var(--text-primary)] disabled:opacity-40"
+                      className="rounded-md border border-[var(--border-subtle)] bg-black/70 px-1.5 py-0.5 text-[9px] font-semibold text-[var(--text-secondary)] hover:text-[var(--text-primary)] disabled:opacity-40"
                     >
                       {t("vl.brands.replace", "Replace")}
                     </button>
@@ -184,7 +184,7 @@ export default function BrandReadThrough() {
                         type="button"
                         disabled={busyId !== null}
                         onClick={() => { void patchLogo(r.id, null); }}
-                        className="rounded-md border border-[var(--border-subtle)] bg-[var(--bg-primary)]/90 px-1.5 py-0.5 text-[9px] font-semibold text-[var(--text-secondary)] hover:text-rose-400 disabled:opacity-40"
+                        className="rounded-md border border-[var(--border-subtle)] bg-black/70 px-1.5 py-0.5 text-[9px] font-semibold text-[var(--text-secondary)] hover:text-rose-400 disabled:opacity-40"
                       >
                         {t("vl.brands.remove", "Remove")}
                       </button>

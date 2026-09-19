@@ -8,8 +8,14 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import FinanceHeader from "@/components/finance/FinanceHeader";
 import { useTranslation } from "@/lib/i18n";
-import { financeT } from "@/lib/translations/finance";
+import { FIN_ACCOUNTING } from "@/lib/translations/finance/accounting";
+import { FIN_COMMON } from "@/lib/translations/finance/common";
+import { FIN_EQUITY } from "@/lib/translations/finance/equity";
 import { Eyebrow, Hairline } from "@/components/finance/FinanceDashboardUi";
+
+/* Only the namespaces this screen actually reads — see finance.ts. */
+const DICT = { ...FIN_ACCOUNTING, ...FIN_COMMON, ...FIN_EQUITY } as const;
+
 
 interface EquityMovement { label: string; amount: number; detail?: string }
 interface EquityStatement {
@@ -30,7 +36,7 @@ function fmt(n: number): string {
 }
 
 export default function FinanceEquity() {
-  const { t } = useTranslation(financeT);
+  const { t } = useTranslation(DICT);
   const today = useMemo(() => new Date().toISOString().slice(0, 10), []);
   const ytdStart = useMemo(() => `${new Date().getUTCFullYear()}-01-01`, []);
   const [from, setFrom] = useState(ytdStart);

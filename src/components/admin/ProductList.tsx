@@ -15,12 +15,22 @@ import { useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { useRouter, usePathname } from "next/navigation";
 import { currentScopeKey } from "@/lib/me-bootstrap";
+import { setCache } from "@/lib/storage-guard";
+import { LIST_PAGE_SIZE, defaultListParams } from "@/lib/products-list-params";
 import { kxInspectAttrs } from "@/lib/qa/inspector";
 import { humanizeError } from "@/lib/ui/humanize-error";
 import { useTranslation } from "@/lib/i18n";
 import { StatusPill } from "@/components/kds";
+import { freshnessBadges } from "@/lib/products-freshness";
+import { catalogueFetchInit, markCatalogueFetched } from "@/lib/products-change";
 import { localizedName } from "@/lib/i18n-name";
-import { PRODUCTS_UI_I18N } from "@/lib/products-ui-i18n";
+/* ⚠️ THE LIST'S OWN DICTIONARY, NOT THE WHOLE ONE. PRODUCTS_UI_I18N carries
+   1,165 keys × 3 languages (173 KB of source) and this screen reads 84 of
+   them — the rest are the editor's packing, supplier, hero, variant and
+   review strings, which the catalogue never renders. Importing the big one
+   here meant every edit to a form tab grew the list's bundle. See the header
+   of products-list-i18n.ts. */
+import { PRODUCTS_LIST_I18N } from "@/lib/products-list-i18n";
 import { IMG } from "@/lib/cdn";
 import PlusIcon from "@/components/icons/ui/PlusIcon";
 import SearchIcon from "@/components/icons/ui/SearchIcon";
@@ -46,10 +56,11 @@ import PackageIcon from "@/components/icons/ui/PackageIcon";
 import ListIcon from "@/components/icons/ui/ListIcon";
 import SettingsIcon2 from "@/components/icons/ui/SettingsIcon2";
 import ArrowLeftIcon from "@/components/icons/ui/ArrowLeftIcon";
+import { BACK_CHROME } from "@/components/ui/PageHeader";
 import ProductsIcon from "@/components/icons/ProductsIcon";
 import ProductDataIcon from "@/components/icons/ProductDataIcon";
 import {
-  fetchProducts, fetchTaxonomyAll,
+  fetchTaxonomyAll,
   fetchModelSummaries, fetchProductMainImages, deleteProduct,
   fetchClassificationIcons,
 } from "@/lib/products-admin";
@@ -65,7 +76,13 @@ import BackToTop from "@/components/ui/BackToTop";
    discover but aren't the hub's primary story. Keep this constant
    in one place so a future rename (e.g. "koleex-machinery") is a
    single-file change. */
-const FLAGSHIP_DIVISION_SLUG = "garment-machinery";
+/* Re-exported from products-list-params so the public catalogue default and
+   Home's prefetch cannot disagree about which division opens. */
+import { FLAGSHIP_DIVISION_SLUG } from "@/lib/products-list-params";
+
+/* LIST_PAGE_SIZE and the default-view query string both live in
+   products-list-params.ts, because Home's prefetch has to build the SAME
+   string and a comment asking two places to agree lost three times. */
 
 /* Division → icon. Divisions are DB-driven with no icon column, so we map by
    name keyword (robust to slug variants) and fall back to a neutral box. */
@@ -126,16 +143,29 @@ const EMPTY_SUPPLIERS: string[] = [];
    shrinking the utility itself: 32px gap + 24px padding = the same 56px that
    `space-y-14` used to give. Change one and change the other.
 
-   Checked at 375px too: the room needed drops to 18px against the same 24px,
-   the section overhangs the viewport by 8px each side, and there is still no
-   horizontal scrollbar because the body carries `overflow-x: hidden` there.
-   Same dependency as `.kx-lazy-grid`; the full note is in globals.css. */
+   THE BLEED MUST MATCH THE CONTAINER'S OWN PADDING, NOT A FIXED 24.
+   The wrapper is `px-4 md:px-6 lg:px-8` — 16px on a phone, 24 from md up.
+   A hardcoded -24 therefore overhung the viewport by 8px each side at 375px.
+   The earlier note here accepted that, reasoning the body's `overflow-x:
+   hidden` would absorb it; it does not, because the Hub scrolls inside
+   #main-scroll-container, not the body — measured, the page scrolled
+   sideways by exactly those 8px and the owner reported the whole app
+   "dancing" on mobile.
+
+   `--kx-bleed` is defined from the same breakpoints as the wrapper padding
+   (globals.css), so the two can no longer disagree. Change the wrapper's
+   padding and change --kx-bleed with it.
+
+   The bleed itself stays: content-visibility clips paint at the box edge, so
+   without room the cards' hover glow was sheared off. The bottom padding is
+   paid for by the utility: 32px gap + 24px padding = the 56px `space-y-14`
+   used to give. Same dependency as `.kx-lazy-grid`; full note in globals.css. */
 const SECTION_CV = {
   contentVisibility: "auto",
   containIntrinsicSize: "1px 800px",
-  paddingInline: 24,
+  paddingInline: "var(--kx-bleed)",
   paddingBottom: 24,
-  marginInline: -24,
+  marginInline: "calc(var(--kx-bleed) * -1)",
 } as const;
 
 const levelColors: Record<string, string> = {
@@ -221,7 +251,7 @@ function SupplierRowShell({ supplierId, children }: { supplierId: string | null;
     <Link
       href={`/suppliers/${supplierId}`}
       onClick={(e) => e.stopPropagation()}
-      className="relative z-[6] flex items-center gap-2 min-w-0 rounded-md -mx-1 px-1 py-0.5 transition-colors hover:bg-[var(--bg-inverted)]/[0.06] group/sup"
+      className="relative z-[6] flex items-center gap-2 min-w-0 rounded-md px-1 py-0.5 transition-colors hover:bg-[var(--bg-inverted)]/[0.06] group/sup"
       title="Open in the Suppliers app"
     >
       {children}
@@ -270,8 +300,46 @@ function readModelCache(scopeKey: string): ModelMaps | null {
   } catch { return null; }
 }
 
+/* One entry per freshness bit. The chips sit on the photo's white ground,
+   so the text is the DARK shade of each family — the Hub's brand blue in
+   its light-theme value (#2F5C8A, the same --action-ai Core uses) and the
+   700-weight of the two functional state colours (amber = changed,
+   green = money). The dot carries the familiar mid value so the colour
+   still matches its StatusPill sibling at a glance. No new hue enters
+   the system. */
+const FRESH_BADGE = {
+  new:     { key: "list.badgeNew",          fallback: "New",           cls: "text-[#2F5C8A]", dot: "bg-[#567FB2]" },
+  updated: { key: "list.badgeUpdated",      fallback: "Updated",       cls: "text-[#B45309]", dot: "bg-[#F59E0B]" },
+  price:   { key: "list.badgePriceUpdated", fallback: "Price updated", cls: "text-[#047857]", dot: "bg-[#10B981]" },
+} as const;
+
+/* The tag row. Frosted-white chips with dark coloured text and a coloured
+   dot: on the photo's white ground it is the only palette that reads, and
+   on the phone's dark card body the same white chip is simply the most
+   legible thing on it — one look in both places. Static spans: no clock,
+   no fetch, no animation; most cards render none. */
+function FreshnessTags({ fresh, t, className }: {
+  fresh: number;
+  t: (key: string, fallback?: string) => string;
+  className: string;
+}) {
+  return (
+    <div className={`flex flex-wrap gap-1.5 ${className}`}>
+      {freshnessBadges(fresh).map((b) => (
+        <span
+          key={b}
+          className={`inline-flex items-center gap-1.5 h-[22px] px-2 rounded-md border border-black/[0.12] bg-white/95 shadow-sm text-[11px] font-bold uppercase tracking-wide whitespace-nowrap ${FRESH_BADGE[b].cls}`}
+        >
+          <i aria-hidden="true" className={`h-1.5 w-1.5 rounded-full ${FRESH_BADGE[b].dot}`} />
+          {t(FRESH_BADGE[b].key, FRESH_BADGE[b].fallback)}
+        </span>
+      ))}
+    </div>
+  );
+}
+
 const ProductCard = memo(function ProductCard({
-  p, imgUrl, models, suppliers, lvl, baseRoute, isInternal, aurora, catMap, subMap, divMap, primaryModelNames, modelNamesList, signal, signalsPending, modelsPending, t, onAskDelete, fx, fxTitle,
+  p, imgUrl, models, suppliers, lvl, baseRoute, isInternal, aurora, catMap, subMap, divMap, primaryModelNames, modelNamesList, signal, signalsPending, modelsPending, t, onAskDelete, fx, fxTitle, fob, fobPending, onCardAction,
 }: {
   p: ProductRow;
   imgUrl?: string;
@@ -311,12 +379,21 @@ const ProductCard = memo(function ProductCard({
      also keeps the memo from busting on every render. */
   fx?: { rate: number; source: string; asOf: string | null } | null;
   fxTitle?: string;
+  /* Global FOB for THIS product (catalogue card only). undefined = not
+     fetched yet, null fobUsd = no cost on file or quoted per configuration. */
+  fob?: { fobUsd: number | null; mode: string };
+  fobPending?: boolean;
+  onCardAction?: (action: "ask_ai" | "compare" | "quote", product: ProductRow) => void;
 }) {
   return (
     <div
       key={p.id}
       {...kxInspectAttrs({ component: "ProductCard", module: "Product Data", section: "Catalog", recordId: p.slug || p.id })}
-      className="group relative kx-glass kx-hover-card kx-glow-in bg-[var(--bg-secondary)] rounded-xl border border-[var(--border-subtle)] overflow-hidden"
+      /* flex-col: the grid already stretches every card to its row's height
+         (align-items: stretch is the default); this lets the body below
+         USE that height — price + actions sit on the floor of every card,
+         not under whatever content happened to come before them. */
+      className="group relative kx-glass kx-hover-card kx-glow-in bg-[var(--bg-secondary)] rounded-xl border border-[var(--border-subtle)] overflow-hidden flex flex-col"
     >
       {/* Stretched navigation link — covers the whole card and
           is the ONLY card-level anchor, so the edit/delete actions
@@ -331,7 +408,7 @@ const ProductCard = memo(function ProductCard({
           blend in (no white box around the photo).
           No scale on hover — the card lifts, image
           stays put. */}
-      <div className="relative aspect-[4/3] max-sm:aspect-[3/2] bg-gradient-to-b from-white to-[#f4f5f7] overflow-hidden border-b border-black/5">
+      <div className="relative shrink-0 aspect-[4/3] max-sm:aspect-[3/2] bg-gradient-to-b from-white to-[#f4f5f7] overflow-hidden border-b border-black/5">
         {imgUrl ? (
           /* IMG.card = CDN-downscaled 480px render. The raw
              URL here was the original multi-MB upload — the
@@ -351,8 +428,10 @@ const ProductCard = memo(function ProductCard({
           </div>
         )}
 
-        {/* Badges overlay */}
-        <div className="absolute top-2.5 left-2.5 flex flex-col gap-1.5">
+        {/* Badges overlay. items-start: a flex column stretches its children
+            to the widest one by default, so a short NEW chip grew to the
+            width of PRICE UPDATED beneath it. Each chip keeps its own width. */}
+        <div className="absolute top-2.5 left-2.5 flex flex-col items-start gap-1.5">
           {p.featured && (
             <span /* no backdrop-blur: the inverted bg is fully opaque, so it blurred nothing while costing a render surface on every card */
                       className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[10px] font-bold uppercase tracking-wider">
@@ -365,6 +444,28 @@ const ProductCard = memo(function ProductCard({
             </span>
           )}
         </div>
+
+        {/* ── Freshness tags — NEW / Updated / Price updated, each for 14 days
+            after its moment (owner spec 19/09/2026). Catalogue card only:
+            Product Data has its own work signals.
+
+            WHERE (sm and up): the photo's BOTTOM padding strip. The picture
+            is drawn object-contain with p-4, and product shots are
+            landscape, so the bottom of the frame is white on nearly every
+            card — the one place a tag can sit on the photo without sitting
+            on the product. One row, bottom-left; the three fit one row at
+            the 3-up desktop width. The first version stacked opaque chips
+            top-left over the machine (owner: "it covered the product
+            photo"); the owner then asked for the white area, organised, and
+            then for bigger and clearer.
+
+            ON A PHONE the card is ~155px wide and the photo is 3:2 — three
+            22px chips would stack three rows high over a third of the
+            picture. So below sm the SAME chips render in the body instead
+            (see FreshnessTags in the body), and this copy is hidden. */}
+        {!isInternal && p.fresh ? (
+          <FreshnessTags fresh={p.fresh} t={t} className="absolute bottom-2.5 left-2.5 right-2.5 items-end max-sm:hidden" />
+        ) : null}
 
         {/* Actions (show on hover) — internal only.
             Edit is a real <Link> (with prefetch), wrapped
@@ -383,10 +484,31 @@ const ProductCard = memo(function ProductCard({
               light image (owner: "I can't see clearly if under white
               background"). A fixed dark scrim + a light rim reads on any
               photo in any theme; Core keeps the token, where it is solid. */}
+          {/* NO backdrop-blur ON THESE TWO, and the number is why: they are
+              2 per card × 214 cards = 428 live blur layers on one screen —
+              measured 2026-08-21, and they were 428 of the 429 filtered
+              elements on the whole page. They are also INVISIBLE at rest on
+              desktop (opacity-0 until the card is hovered), and a
+              compositor still pays for a filtered layer it is not showing.
+              Nothing is lost visually: they already sit on a fixed
+              black/60 scrim, which is what makes them readable over a white
+              photo — the blur under an opaque-enough scrim showed nothing.
+              This cost was SKIN-INDEPENDENT, which is why it survived the
+              kx-flat-items sweep (that rule targets .kx-glass). */}
+          {/* data-kx-keep-hover, both of them: the global Aurora hover
+              REPLACES a control's own hover fill with its 3% white + blue
+              rim — which over a white product photo turned this scrim
+              nearly transparent and the white glyph invisible exactly on
+              hover (owner: "the hover become white and the background is
+              white so I can see nothing"). These two manage their own
+              contrast against an unknown photo; the skin must not touch
+              them. This is the hatch that rule documents — the FIRST
+              legitimate use, not a :not() escalation. */}
           <Link
             href={`${baseRoute}/${p.id}/edit`}
+            data-kx-keep-hover=""
             onClick={(e) => e.stopPropagation()}
-            className={`h-8 w-8 rounded-lg border backdrop-blur-sm flex items-center justify-center transition-colors ${
+            className={`h-8 w-8 rounded-lg border flex items-center justify-center transition-colors ${
               aurora
                 ? "bg-black/60 border-white/25 text-white/85 hover:text-white hover:bg-black/75"
                 : "bg-[var(--bg-primary)]/80 border-[var(--border-subtle)] text-[var(--text-muted)] hover:text-[var(--text-primary)]"
@@ -396,8 +518,9 @@ const ProductCard = memo(function ProductCard({
             <PencilIcon className="h-3.5 w-3.5" />
           </Link>
           <button
+            data-kx-keep-hover=""
             onClick={(e) => onAskDelete(e, p.id, p.product_name)}
-            className={`h-8 w-8 rounded-lg border backdrop-blur-sm flex items-center justify-center transition-colors ${
+            className={`h-8 w-8 rounded-lg border flex items-center justify-center transition-colors ${
               aurora
                 ? "bg-black/60 border-white/25 text-white/85 hover:text-red-400 hover:bg-black/75"
                 : "bg-[var(--bg-primary)]/80 border-[var(--border-subtle)] text-[var(--text-muted)] hover:text-red-400"
@@ -410,12 +533,15 @@ const ProductCard = memo(function ProductCard({
         )}
       </div>
 
-      {/* Content — internal cards are a fixed-height flex column so every
-          card in a row lines up: the name slot always reserves two lines,
-          the readiness slot always exists, and the cost row is pinned to
-          the bottom with mt-auto. Without this, a one-line name shifted
-          everything below it up and the grid read as ragged. */}
-      <div className={`p-3.5 md:p-4 max-sm:p-3 ${isInternal ? "flex flex-col min-h-[208px] max-sm:min-h-[164px]" : ""}`}>
+      {/* Content — a flex column on BOTH cards so every card in a row lines
+          up. Internal: fixed min-height, name slot reserves two lines, the
+          cost row is pinned with mt-auto. Public (owner 2026-09-19): the
+          same discipline — title, two-line name slot and category sit at
+          the same y on every card; the family roster is the ONE variable
+          block and lives in the middle; Global FOB + Ask AI / Compare /
+          Quote are pinned to the floor with mt-auto, so a card with three
+          model chips and a card with none end on the same line. */}
+      <div className={`p-3.5 md:p-4 max-sm:p-3 flex flex-col flex-1 ${isInternal ? "min-h-[208px] max-sm:min-h-[164px]" : ""}`}>
         {(() => {
           const mn = primaryModelNames[p.id];
           const hasDistinctName = mn && mn !== p.product_name;
@@ -427,7 +553,7 @@ const ProductCard = memo(function ProductCard({
                 <h3 className="text-[16px] md:text-[18px] font-bold tracking-tight text-[var(--text-primary)] truncate group-hover:text-[var(--text-highlight)] transition-colors">
                   {mn}
                 </h3>
-                <p className={`text-[12px] md:text-[13px] text-[var(--text-muted)] mt-0.5 line-clamp-2 leading-snug ${isInternal ? "min-h-[34px] max-sm:min-h-0" : ""}`}>
+                <p className={`text-[12px] md:text-[13px] text-[var(--text-muted)] mt-0.5 line-clamp-2 leading-snug min-h-[34px] ${isInternal ? "max-sm:min-h-0" : ""}`}>
                   {p.product_name}
                 </p>
               </>
@@ -451,34 +577,13 @@ const ProductCard = memo(function ProductCard({
                   {modelsPending ? "" : t("list.needsName", "Needs name")}
                 </p>
               )}
+              {/* Public: the slot is reserved even when there is nothing to
+                  say in it, so the category line lands on the same y as on
+                  the cards beside it. */}
+              {!isInternal && <p className="mt-0.5 min-h-[34px]" aria-hidden="true" />}
             </>
           );
         })()}
-
-        {/* ── Family chips ── A product that carries several models is a
-            FAMILY; show every member code on the card so someone hunting
-            for XF-600 spots it from outside without opening XF-450.
-            Chips sit ABOVE the stretched card link (z-10) and deep-link
-            the profile straight onto that member. */}
-        {/* Family roster — EVERY member code, always visible (owner rule:
-            never hide a code). An ALIGNED mini-grid, not ragged pills:
-            two tidy columns on desktop, one full-width column on phones —
-            reads like the catalog's own model list. */}
-        {modelNamesList && modelNamesList.length > 1 && (
-          <div className="relative z-10 mt-2 grid grid-cols-2 max-sm:grid-cols-1 gap-1">
-            {modelNamesList.map((code) => (
-              <Link
-                key={code}
-                href={`${baseRoute}/${p.slug || p.id}?model=${encodeURIComponent(code)}`}
-                onClick={(e) => e.stopPropagation()}
-                className="flex items-center min-w-0 px-2 py-1 rounded-md border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] text-[11.5px] font-bold tabular-nums tracking-tight text-[var(--text-primary)] hover:border-[var(--border-focus)] hover:bg-[var(--bg-surface)] transition-colors"
-                title={code}
-              >
-                <span className="truncate">{code}</span>
-              </Link>
-            ))}
-          </div>
-        )}
 
         {/* Category + Subcategory line.
             PUBLIC card only: the internal grid is already grouped by
@@ -509,9 +614,153 @@ const ProductCard = memo(function ProductCard({
           </p>
         )}
 
-        {/* Meta row — publish status, brand, models. */}
-        <div className="flex items-center gap-2 mt-3 max-sm:mt-2 max-sm:gap-1.5 flex-wrap">
-          {(() => {
+        {/* ── Family chips ── A product that carries several models is a
+            FAMILY; show every member code on the card so someone hunting
+            for XF-600 spots it from outside without opening XF-450.
+            Chips sit ABOVE the stretched card link (z-10) and deep-link
+            the profile straight onto that member. */}
+        {/* Family roster — EVERY member code, always visible (owner rule:
+            never hide a code). An ALIGNED mini-grid, not ragged pills:
+            two tidy columns on desktop, one full-width column on phones —
+            reads like the catalog's own model list. */}
+        {modelNamesList && modelNamesList.length > 1 && (
+          <div className="relative z-10 mt-2.5 grid grid-cols-2 max-sm:grid-cols-1 gap-1">
+            {modelNamesList.map((code) => (
+              <Link
+                key={code}
+                href={`${baseRoute}/${p.slug || p.id}?model=${encodeURIComponent(code)}`}
+                onClick={(e) => e.stopPropagation()}
+                className="flex items-center min-w-0 px-2 py-1 rounded-md border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] text-[11.5px] font-bold tabular-nums tracking-tight text-[var(--text-primary)] hover:border-[var(--border-focus)] hover:bg-[var(--bg-surface)] transition-colors"
+                title={code}
+              >
+                <span className="truncate">{code}</span>
+              </Link>
+            ))}
+          </div>
+        )}
+
+        {/* Phone placement of the freshness tags — see the photo-strip copy
+            above for why. The body's variable zone (under the family
+            roster, above the price floor) is where the card already differs
+            per product, so the aligned floor holds. */}
+        {!isInternal && p.fresh ? (
+          <FreshnessTags fresh={p.fresh} t={t} className="mt-2.5 sm:hidden" />
+        ) : null}
+
+        {/* ── Global FOB + actions — the CATALOGUE card's commercial half.
+            Price is the tier-agnostic Global FOB in USD, computed server-side
+            by /api/products/fob-prices from the landed factory cost through
+            Commercial Setup, converted at the DAY'S rate — so it re-prices
+            itself as the rate moves and can never go stale. The cost it is
+            derived from never reaches the browser.
+            Gated to Hub accounts (owner decision 2026-08-29): the route needs
+            a session, and Hub accounts are issued by the owner personally. */}
+        {/* The spacer is the floor's MINIMUM distance from whatever sits
+            above it (the old mt-3); mt-auto on the block below then takes
+            every remaining pixel, so the tallest card in the row looks the
+            same as before and the shorter ones grow here, not at the top. */}
+        {!isInternal && <div className="h-3 shrink-0" aria-hidden="true" />}
+        {!isInternal && (
+          <div className="relative z-10 mt-auto pt-3 border-t border-[var(--border-subtle)] flex flex-col gap-2.5">
+            {/* Label ABOVE the figure on a phone, beside it from sm. In the
+                2-up mobile grid the price block is ~147px: a shrink-0 label
+                plus a 22px figure came to ~156px, so the price was clipped
+                mid-digit ("$64,79"). Stacking gives the number the full width
+                at every card size. */}
+            <div className="flex flex-col items-start gap-0.5 sm:flex-row sm:items-baseline sm:justify-between sm:gap-2">
+              {/* The label stays a quiet caption so the figure beside it is
+                  unmistakably the thing being read. */}
+              <span className="text-[9.5px] uppercase tracking-[0.12em] text-[var(--text-ghost)] truncate max-w-full">
+                {t("card.globalFob", "Global FOB")}
+              </span>
+              {fobPending && fob === undefined ? (
+                /* Reserve the line rather than collapse it — a price that
+                   pops in later must not shift the whole grid. Height tracks
+                   the real figure's line box.
+
+                   ⚠️ RESERVED, AND INVISIBLE. This carried a tinted background
+                   and `animate-pulse`, which is one pulsing box PER CARD —
+                   395 of them breathing at once on a full catalogue, which is
+                   the exact flash the budgets guard was written to stop after
+                   the first attempt drew 726. Inside a card, waiting is a
+                   space that holds still; only the infinite-scroll sentinel
+                   may animate, because there it means "more is coming"
+                   rather than "this will be replaced under you". */
+                <span className="h-6 w-24" aria-hidden="true" />
+              ) : fob?.fobUsd != null ? (
+                /* The price is the card's headline number — it should read at
+                   a glance from across the grid, not sit at label size. */
+                <span
+                  className="text-[22px] leading-none font-bold tabular-nums tracking-tight text-[var(--text-primary)]"
+                  title={fxTitle}
+                >
+                  ${fob.fobUsd.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                </span>
+              ) : (
+                <span className="text-[11px] font-medium text-[var(--text-dim)]">
+                  {t("card.priceOnRequest", "Price on request")}
+                </span>
+              )}
+            </div>
+
+            {/* Actions. Wired to onCardAction so the list owns the behaviour —
+                the three flows are specified separately by the owner. */}
+            {/* Three across on desktop; STACKED on phones — at the 2-column
+               mobile grid a card is ~155px wide and "Compare" cannot fit in a
+               third of that (measured at 360px: all three clipped to one
+               letter). Full-width rows also give a proper tap target.
+
+               Each action reads as ITSELF (owner call 2026-08-29): Ask AI
+               wears the same travelling glow as every other AI control in the
+               Hub (kx-ai-glow — reused, never re-declared), Compare is amber
+               and Quote is green. Amber and green are the design system's
+               FUNCTIONAL state tokens, not new brand colours, so the card
+               stays inside the monochrome-plus-accent rule. */}
+            <div className="grid grid-cols-3 max-sm:grid-cols-1 gap-1.5">
+              {([
+                {
+                  key: "ask_ai",
+                  label: t("card.askAi", "Ask AI"),
+                  cls: "kx-ai-glow border-[var(--action-ai,#567FB2)]/45 text-[var(--action-ai,#567FB2)] hover:bg-[var(--action-ai,#567FB2)]/10",
+                },
+                {
+                  key: "compare",
+                  label: t("card.compare", "Compare"),
+                  cls: "border-[var(--action-compare,#F59E0B)]/45 text-[var(--action-compare,#F59E0B)] hover:bg-[var(--action-compare,#F59E0B)]/10 hover:border-[var(--action-compare,#F59E0B)]/70",
+                },
+                {
+                  key: "quote",
+                  label: t("card.addToQuotation", "Quote"),
+                  cls: "border-[var(--action-quote,#10B981)]/45 text-[var(--action-quote,#10B981)] hover:bg-[var(--action-quote,#10B981)]/10 hover:border-[var(--action-quote,#10B981)]/70",
+                },
+              ] as const).map((a) => (
+                <button
+                  key={a.key}
+                  type="button"
+                  onClick={(e) => { e.preventDefault(); e.stopPropagation(); onCardAction?.(a.key, p); }}
+                  /* whitespace-nowrap, NOT truncate: the AI glow ring is drawn
+                     at inset -2px, i.e. OUTSIDE the button box, so truncate's
+                     overflow:hidden clipped the travelling beam away entirely —
+                     the button kept its blue rim and lost its motion. This is
+                     the same class the Auto-translate control uses. */
+                  className={`px-2 py-1.5 rounded-lg border bg-[var(--bg-surface-subtle)] text-[10.5px] font-bold whitespace-nowrap transition-all ${a.cls}`}
+                  title={a.label}
+                >
+                  {a.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Meta row — publish status, brand, models.
+            INTERNAL ONLY (owner spec 2026-08-29). The catalogue card carries
+            exactly six things: photo · model · family · category+subcategory ·
+            Global FOB · actions. "Active" is the publishing state of OUR
+            record and customers read it as stock; the brand chip says Koleex
+            on every Koleex product. Both were noise on a customer card. */}
+        <div className={`flex items-center gap-2 mt-3 max-sm:mt-2 max-sm:gap-1.5 flex-wrap ${isInternal ? "" : "hidden"}`}>
+          {isInternal && (() => {
             const st = (p.status || "draft");
             return (
               <StatusPill tone={ST_TONE[st as keyof typeof ST_TONE] ?? "warning"} className="uppercase tracking-wider !text-[10px]">
@@ -519,13 +768,6 @@ const ProductCard = memo(function ProductCard({
               </StatusPill>
             );
           })()}
-          {/* Brand chip: PUBLIC only. Internally every product is Koleex,
-              so the chip carried zero information and cost a whole row. */}
-          {!isInternal && p.brand && (
-            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-[var(--bg-surface)] text-[10px] font-medium text-[var(--text-subtle)]">
-              <TagsIcon className="h-2.5 w-2.5" /> {p.brand}
-            </span>
-          )}
           {/* Visibility — distinct from status: "active" says the record is
               live, this says customers can actually see it. */}
           {isInternal && signal && !signal.visible && (
@@ -662,7 +904,7 @@ const ProductCard = memo(function ProductCard({
             <div className="flex items-baseline gap-2 min-w-0 mt-auto pt-1">
               {signal.cost != null ? (
                 <span
-                  className="flex items-baseline gap-1 shrink-0"
+                  className="flex min-w-0 items-baseline gap-1"
                   title={[
                     signal.priceNote || "",
                     signal.costNote || "",
@@ -722,7 +964,7 @@ const ProductCard = memo(function ProductCard({
 export default function ProductList() {
   const router = useRouter();
   const pathname = usePathname();
-  const { t, lang } = useTranslation(PRODUCTS_UI_I18N);
+  const { t, lang } = useTranslation(PRODUCTS_LIST_I18N);
   /* "internal" when the same component is rendered under /product-data.
      Under /products the view is the PUBLIC catalog: no supplier
      column, no Add button, no Edit/Delete actions, no cost hints. */
@@ -781,6 +1023,21 @@ export default function ProductList() {
       return parsed && typeof parsed === "object" ? parsed : {};
     } catch { return {}; }
   });
+  /* Phone-only: the category grid collapsed to its first two rows.
+     13 categories at 2-up = ~7 rows ≈ half the phone viewport before any
+     product shows (owner screenshot) — the exact reason the original tile
+     grid died. Desktop always shows all; ≥sm ignores this state. */
+  const [catsOpen, setCatsOpen] = useState(false);
+  useEffect(() => {
+    if (!catsOpen) return;
+    const close = (e: Event) => {
+      const t = e.target as HTMLElement | null;
+      if (t && t.closest("[data-kx-cats-menu],[data-kx-cats-trigger]")) return;
+      setCatsOpen(false);
+    };
+    document.addEventListener("pointerdown", close, true);
+    return () => document.removeEventListener("pointerdown", close, true);
+  }, [catsOpen]);
   useEffect(() => {
     let alive = true;
     fetchClassificationIcons().then((v) => {
@@ -808,6 +1065,54 @@ export default function ProductList() {
   /* Internal work signals — fetched only under /product-data, in parallel
      with the meta round-trip, so the public catalogue payload is untouched. */
   const [signals, setSignals] = useState<Record<string, ProductSignal>>({});
+  /* Global FOB per product — CATALOGUE only, and deliberately a second,
+     narrow round-trip rather than a field on the list payload: the list is
+     paginated and cached, while the price must reflect the DAY'S exchange
+     rate, so baking it into a cached row would serve a stale number. The
+     route returns the finished USD figure only — never the cost behind it. */
+  /* Warm start for the price, same pattern the thumbnails use. Without it the
+     figure could only appear after products land AND a second round-trip
+     returns (~700ms warm, longer on a cold route), so every open showed an
+     empty price slot first.
+     DAY-STAMPED, deliberately: the price tracks a DAILY reference rate, so a
+     cache from yesterday must not paint. Same day = show instantly, then the
+     background fetch overwrites it anyway. */
+  const fobCacheKey = `kx_products_fob_v1:${currentScopeKey()}`;
+  const [fobPrices, setFobPrices] = useState<Record<string, { fobUsd: number | null; mode: string }>>(() => {
+    if (typeof window === "undefined" || isInternal) return {};
+    try {
+      const raw = window.localStorage.getItem(fobCacheKey);
+      if (!raw) return {};
+      const parsed = JSON.parse(raw) as { day?: string; prices?: Record<string, { fobUsd: number | null; mode: string }> };
+      return parsed.day === new Date().toDateString() ? (parsed.prices ?? {}) : {};
+    } catch { return {}; }
+  });
+  const [fobPending, setFobPending] = useState(false);
+
+  /* Card actions. The three flows (Ask AI · Compare · Add to Quotation) are
+     being specified by the owner separately, so this is the single seam they
+     will land in — one handler, so no card needs to change when they do.
+     Until then the buttons are inert BY DESIGN, not by oversight. */
+  /* List-view column template. The catalogue row and the internal row answer
+     different questions, so they do not share a grid: internally the columns
+     are readiness / cost / status; on the catalogue they are Global FOB /
+     models / actions. Tailwind needs the whole class literal, so these are
+     two complete strings rather than an interpolated one. */
+  const LIST_COLS = isInternal
+    ? "md:grid-cols-[56px_1fr_140px_120px_100px_80px_80px]"
+    /* Catalogue row: leads with a REAL product photo (96px + breathing room),
+       not the 56px chip the data table uses — a buyer scans pictures first.
+       Two templates, because one was not survivable: with the photo, price
+       and a 232px action block all fixed, the fixed columns alone came to
+       770px, so between ~900px and ~1200px the 1fr name column was squeezed
+       to nothing and the product name vanished from its own row. Below xl
+       the Models count steps out (it is the least useful of the six) and the
+       fixed widths tighten; from xl the full six columns fit comfortably. */
+    : "md:grid-cols-[88px_minmax(0,1fr)_118px_212px] lg:grid-cols-[128px_minmax(0,1fr)_160px_126px_210px] xl:grid-cols-[144px_minmax(0,1fr)_190px_140px_236px]";
+
+  const onCardAction = useCallback((action: "ask_ai" | "compare" | "quote", product: ProductRow) => {
+    void action; void product;
+  }, []);
   /* Factory costs are quoted and stored in CNY; the "≈ $" beside them is a
      reading aid so nobody converts in their head at a half-remembered rate.
      Fetched once for the whole grid and handed down to the cards. */
@@ -976,7 +1281,7 @@ export default function ProductList() {
      The string identity of this object is what the load effect keys on, so a
      changed filter starts a fresh page 1 and an unchanged one does not. */
   const serverParams = useMemo(() => {
-    const p = new URLSearchParams({ view: "list", paged: "1", pageSize: "150" });
+    const p = new URLSearchParams({ view: "list", paged: "1", pageSize: LIST_PAGE_SIZE });
     /* The DEBOUNCED term, not the deferred one — see the note beside it. */
     if (searchForServer.trim()) p.set("q", searchForServer.trim());
     if (filterDiv) p.set("division", filterDiv);
@@ -1040,10 +1345,12 @@ export default function ProductList() {
     }
     defaultDivRef.current = d;
   }
-  const defaultParams = new URLSearchParams({ view: "list", paged: "1", pageSize: "150" });
-  if (defaultDivRef.current) defaultParams.set("division", defaultDivRef.current);
-  if (!isInternal) defaultParams.set("status", "active");
-  const isDefaultView = serverParams === defaultParams.toString();
+  /* The SAME builder Home's prefetch uses, so "what a clean open asks for"
+     has exactly one definition. Order matters: this is a string comparison. */
+  const isDefaultView = serverParams === defaultListParams({
+    internal: isInternal,
+    division: defaultDivRef.current,
+  });
   const [showFilters, setShowFilters] = useState(initialFilters.showFilters ?? false);
   const [viewMode, setViewMode] = useState<"grid" | "list">(initialFilters.viewMode ?? "grid");
 
@@ -1130,8 +1437,12 @@ export default function ProductList() {
           /* ?view=list keeps the response to the ~15 columns this grid
              actually uses; ?paged=1 keeps it to ONE page. Search and filters
              ride along in serverParams and execute in SQL. */
-          const res = await fetch(`/api/products?${serverParams}`, { credentials: "include", signal: ctrl.signal });
+          /* products-change.ts: after a save in Product Data THIS browser's
+             next list request skips its HTTP cache (`cache: "reload"`) —
+             same URL, fresh rows. Every other open uses the normal cache. */
+          const res = await fetch(`/api/products?${serverParams}`, catalogueFetchInit({ credentials: "include", signal: ctrl.signal }));
           if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          markCatalogueFetched();
           const json = (await res.json()) as {
             rows?: ProductRow[]; total?: number | null; hasMore?: boolean;
             models?: { counts: Record<string, number>; primaryModelNames: Record<string, string>; modelNames: Record<string, string[]> };
@@ -1164,20 +1475,22 @@ export default function ProductList() {
         }
         if (cancelled) return;
         queryClient.setQueryData(productsQK, p); // warm the cache for instant revisit
-        /* Persist for instant paint on the next cold load / PWA restart —
-           but ONLY the unfiltered, unsearched first page. Caching a filtered
-           result would make the next cold open paint someone's leftover
-           "Draft + Garment Machinery" view as if it were the whole catalogue. */
+        /* ⚠️ THE PRODUCT ROWS ARE NOT PERSISTED HERE ANY MORE — see the effect
+           below. This wrote whatever the FIRST page happened to hold, which is
+           the whole catalogue only while it fits in one page. At 3,000 products
+           it would cache 400 rows and the next cold open would paint a third of
+           the grid and finish in public, which is the exact defect the owner
+           screenshotted at 394. One writer, and it only writes a COMPLETE
+           default view.
+
+           The model maps stay here: they arrive WITH this page and, without
+           them, the warm paint renders cards with no code, no chips and no
+           count — 208px — that grow to 311px the moment the network answers
+           (measured on production: page height 10676 -> 11574 at 1.4s). They
+           are keyed per page and merged, so a partial map is additive rather
+           than a half-truth about the catalogue's size. */
         if (isDefaultView) {
           try {
-            const json = JSON.stringify(p);
-            if (json.length < 2_500_000) window.localStorage.setItem(listSnapshotKey, json);
-            /* The model maps go WITH the list. Without them the warm paint
-               renders cards that have no code, no chips and no count — 208px
-               — and they grow to 311px the moment the network answers. That
-               is the open-glitch again, just sourced from cache instead of
-               from a late request (measured on production: page height
-               10676 -> 11574 at 1.4s). */
             if (modelsFromPageRef.current) {
               const mj = JSON.stringify(modelsFromPageRef.current);
               if (mj.length < 600_000) window.localStorage.setItem(`kx_products_models_v1:${currentScopeKey()}`, mj);
@@ -1375,6 +1688,29 @@ export default function ProductList() {
      demand, which is the only thing that works at that size. */
   const AUTO_COMPLETE_MAX = 600;
 
+  /* ⚠️ THE DOM HAS A CEILING AND NOTHING USED TO ENFORCE IT.
+     Every section renders — `content-visibility:auto` skips the offscreen
+     ones' paint and layout, but not their CONSTRUCTION — so the node count
+     tracks the catalogue exactly, and the scroll path appended pages for as
+     long as the operator kept scrolling. Measured on this machine, scrolling
+     the real grid at a realistic speed:
+
+         395 products   17,500 nodes    8 ms/frame   60fps, 0 long tasks
+        ~3000 products  133,000 nodes   39 ms/frame  ~25fps, 7 long tasks
+
+     44 nodes per product, and the curve is linear. 1,200 keeps the grid near
+     53,000 nodes, which still measured smooth; past that the operator is
+     scrolling a catalogue nobody reads card by card anyway.
+
+     So the cap is not a limitation, it is the honest shape of the screen: at
+     that size you FILTER. Search, division, category, brand, level and status
+     all execute in SQL already (products-config.ts), so narrowing returns a
+     different, complete result rather than a truncated one — which is why the
+     message below sends the operator there instead of to a "load more"
+     button that would just keep growing the tree. */
+  const MOUNTED_MAX = 1200;
+  const atMountCap = products.length >= MOUNTED_MAX;
+
   /* ONE implementation of "fetch the next page", shared by the background
      completion above and the scroll observer below, so they cannot disagree
      about the page counter or race each other into the same request.
@@ -1385,7 +1721,7 @@ export default function ProductList() {
     setLoadingMore(true);
     const next = pageRef.current + 1;
     try {
-      const res = await fetch(`/api/products?${serverParams}&page=${next}`, { credentials: "include" });
+      const res = await fetch(`/api/products?${serverParams}&page=${next}`, catalogueFetchInit({ credentials: "include" }));
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const json = (await res.json()) as {
         rows?: ProductRow[]; hasMore?: boolean;
@@ -1419,18 +1755,165 @@ export default function ProductList() {
     }
   }, [serverParams]);
 
+  /* ── Global FOB for the catalogue cards ────────────────────────────────
+     Fires only under /products, only for ids we do not already hold, and in
+     ONE request for the whole visible batch — the same discipline the meta
+     round-trip follows. Fire-and-forget: a slow or failed price call must
+     never delay the grid, the cards just show "Price on request" until it
+     lands. Ids already priced are skipped, so scrolling a paginated list
+     asks for the new page only. */
+  useEffect(() => {
+    if (isInternal) return;
+    const all = products.map((p) => p.id).filter((id) => !(id in fobPrices));
+    if (all.length === 0) return;
+    /* Ask for the first screen before the rest. The whole loaded page went in
+       one body — 271 ids measured ~700ms warm — so the ten rows a reader can
+       actually see waited on 261 they cannot. The tail follows in the next
+       pass of this effect, once these land. */
+    const FIRST_PAINT = 24;
+    const missing = all.slice(0, FIRST_PAINT);
+    let cancelled = false;
+    const ctrl = new AbortController();
+    setFobPending(true);
+    fetch("/api/products/fob-prices", {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ids: missing }),
+      signal: ctrl.signal,
+    })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((j: { prices?: Record<string, { fobUsd: number | null; mode: string }> } | null) => {
+        if (cancelled || !j?.prices) return;
+        /* Merge, never replace — an earlier page's prices must survive. */
+        setFobPrices((prev) => {
+          const next = { ...prev, ...j.prices };
+          try {
+            const blob = JSON.stringify({ day: new Date().toDateString(), prices: next });
+            /* Tiny (~40 bytes a product) but still guarded: a full quota is
+               what silently kills warm start elsewhere in this app. */
+            if (blob.length < 500_000) window.localStorage.setItem(fobCacheKey, blob);
+          } catch { /* quota guard */ }
+          return next;
+        });
+      })
+      .catch(() => { /* price is optional on the card */ })
+      .finally(() => { if (!cancelled) setFobPending(false); });
+    return () => { cancelled = true; ctrl.abort(); };
+  }, [isInternal, products, fobPrices]);
+
+  /* ⚠️ THE REMAINING PAGES GO OUT TOGETHER, NOT ONE AFTER ANOTHER.
+     Measured on prod with 396 products: three pages, 1.2–1.8s each, each one
+     asked for only after the previous had landed — the grid was not complete
+     for ~10s and filled in three visible jumps (the owner: "the products not
+     all appear together"). The sequential loop was written to be gentle on a
+     slow link, but it pays this platform's ~1s-per-request floor once per
+     page for nothing: the moment `total` arrives the page count is known, so
+     every remaining page can be in flight at once. The auto-complete cap
+     keeps that wave small (600 / 200 = at most two extra requests); past the
+     cap nothing changes and pages still arrive on scroll. */
   useEffect(() => {
     if (loading || loadError || !hasMore) return;
     if (total == null || total > AUTO_COMPLETE_MAX) return;
+    if (atMountCap) return;
+    const lastPage = Math.ceil(total / Number(LIST_PAGE_SIZE));
+    const firstMissing = pageRef.current + 1;
+    if (firstMissing > lastPage) return;
     let cancelled = false;
+    /* Hold the SHARED guard for the whole wave: the scroll observer must not
+       ask for a page that is already in flight here. */
+    loadingMoreRef.current = true;
+    setLoadingMore(true);
     void (async () => {
-      /* One page at a time, so a slow link is not hit with ten parallel
-         requests — the whole point of this work was fewer of them at once. */
+      const wanted: number[] = [];
+      for (let p = firstMissing; p <= lastPage; p++) wanted.push(p);
+      const pages = await Promise.all(wanted.map(async (p) => {
+        try {
+          const res = await fetch(`/api/products?${serverParams}&page=${p}`, { credentials: "include" });
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          return (await res.json()) as {
+            rows?: ProductRow[]; hasMore?: boolean;
+            models?: { counts: Record<string, number>; primaryModelNames: Record<string, string>; modelNames: Record<string, string[]> };
+          };
+        } catch {
+          /* One failed page must not blank the grid, and must not strand the
+             pages after it — see the contiguous-apply rule below. */
+          return null;
+        }
+      }));
+      if (cancelled) return;
+      /* Apply IN ORDER and stop at the first gap, so `pageRef` never claims a
+         page the grid does not hold — the scroll path resumes from there. */
+      const rows: ProductRow[] = [];
+      const counts: Record<string, number> = {};
+      const primaries: Record<string, string> = {};
+      const names: Record<string, string[]> = {};
+      let applied = pageRef.current;
       let more = true;
-      while (!cancelled && more) more = await loadNextPage();
+      for (let i = 0; i < pages.length; i++) {
+        const json = pages[i];
+        if (!json) break;
+        rows.push(...(json.rows ?? []));
+        if (json.models) {
+          Object.assign(counts, json.models.counts);
+          Object.assign(primaries, json.models.primaryModelNames);
+          Object.assign(names, json.models.modelNames);
+        }
+        applied = wanted[i];
+        more = Boolean(json.hasMore);
+      }
+      if (applied === pageRef.current) { loadingMoreRef.current = false; setLoadingMore(false); return; }
+      pageRef.current = applied;
+      if (Object.keys(counts).length) {
+        setModelCounts((prev) => ({ ...prev, ...counts }));
+        setPrimaryModelNames((prev) => ({ ...prev, ...primaries }));
+        setModelNames((prev) => ({ ...prev, ...names }));
+      }
+      /* Append by id, never blindly: a product edited between two page
+         requests can shift across the offset boundary and arrive twice. */
+      setProducts((prev) => {
+        const seen = new Set(prev.map((r) => r.id));
+        return [...prev, ...rows.filter((r) => !seen.has(r.id))];
+      });
+      setHasMore(more && applied < lastPage ? true : more);
+      loadingMoreRef.current = false;
+      setLoadingMore(false);
     })();
-    return () => { cancelled = true; };
-  }, [loading, loadError, hasMore, total, loadNextPage]);
+    return () => {
+      cancelled = true;
+      loadingMoreRef.current = false;
+      setLoadingMore(false);
+    };
+  }, [loading, loadError, hasMore, total, serverParams, atMountCap]);
+
+  /* ⚠️ THE WARM SNAPSHOT HELD ONE PAGE, SO EVERY COLD OPEN REBUILT ITSELF.
+     The first-page fetch persisted its own 200 rows and nothing persisted the
+     background wave — the request that actually completes the catalogue. So a
+     cold open painted 200 products instantly from cache and then jumped to 394
+     when the network answered. The owner's two screenshots, one minute apart,
+     caught it exactly: "Fabric preparation — 3 of 67 products / Spreading
+     Machines 1", then "67 products / 6". No request was slow; the screen was
+     showing a cached HALF of itself and finishing in public.
+
+     Persisted from an EFFECT, not from inside setProducts. Writing to storage
+     in a state updater is the mistake this file already paid for once — React
+     invokes an updater twice in development, and the page-request guard that
+     lived in one is why pages 2,2,3,3 were fetched. An effect also covers every
+     path that completes the list (the wave, scroll paging, a delete), not just
+     the one I happened to edit.
+
+     ONLY when the default view is COMPLETE. A partial list in the cache would
+     reproduce the same half-painted open from storage instead of from the
+     network — worse, because it would then happen offline too.
+
+     setCache prunes and retries on a full quota; a bare setItem is what let
+     three contact caches each pass their own guard and blow a 5 MB origin quota
+     between them, killing every warm start at once, silently. */
+  useEffect(() => {
+    if (!isDefaultView || hasMore || loading || loadError || products.length === 0) return;
+    try { setCache(listSnapshotKey, JSON.stringify(products)); }
+    catch { /* serialize guard — the next open simply cold-loads, as before */ }
+  }, [products, hasMore, loading, loadError, isDefaultView, listSnapshotKey]);
 
   /* Infinite scroll — the owner's choice over a numbered pager: nothing new to
      learn, and it is the one that behaves on a phone. The sentinel sits after
@@ -1441,7 +1924,9 @@ export default function ProductList() {
      the owner's link, and the point is that he never watches it happen. */
   useEffect(() => {
     const el = sentinelRef.current;
-    if (!el || !hasMore || loading || loadError) return;
+    /* At the ceiling the sentinel is gone from the tree anyway; bailing here
+       too means the observer is never even created on the render that hits it. */
+    if (!el || !hasMore || loading || loadError || atMountCap) return;
     let cancelled = false;
     const io = new IntersectionObserver(
       (entries) => {
@@ -1458,7 +1943,7 @@ export default function ProductList() {
     );
     io.observe(el);
     return () => { cancelled = true; io.disconnect(); };
-  }, [hasMore, loading, loadError, loadNextPage]);
+  }, [hasMore, loading, loadError, loadNextPage, atMountCap]);
 
   /* Persist the filter snapshot to sessionStorage on every change.
      Back-button from a detail page returns to the same view. Stays
@@ -1580,8 +2065,14 @@ export default function ProductList() {
         mn,
         allModels,
         (p.brand || "").toLowerCase(),
-        (p.excerpt || "").toLowerCase(),
-        (p.description || "").toLowerCase(),
+        /* ⚠️ NO excerpt / description HERE — they are no longer in the list
+           projection (45% of the response, rendered nowhere). The SERVER
+           searches both through its `search_text` GIN index, so typing a word
+           that appears only in an excerpt still finds the product; it arrives
+           with the debounced server search rather than narrowing the already
+           loaded rows on the keystroke. Reading them here after they stopped
+           being fetched would have been silent dead code: `(p.excerpt || "")`
+           is a perfectly happy empty string. */
         (p.level || "").toLowerCase(),
         (p.status || "").toLowerCase(),
         triTaxonomyBySlug[p.division_slug] || divNameBySlug[p.division_slug] || "",
@@ -1920,7 +2411,11 @@ export default function ProductList() {
       const displayName = catName.charAt(0).toUpperCase() + catName.slice(1);
       return { slug: catSlug, name: displayName, total, loaded, subSections };
     });
-  }, [filtered, categories, subcategories, subMap, catNameBySlug, viewMode, groupCounts, isInternal, filterSupplier]);
+    /* `t` IS a dependency. It supplies the "Uncategorized" and "Other"
+       fallback names above, so leaving it out meant switching language
+       relaid the whole page and left those two group headings in the
+       previous language until some unrelated filter happened to change. */
+  }, [filtered, categories, subcategories, subMap, catNameBySlug, viewMode, groupCounts, isInternal, filterSupplier, t]);
 
   /* THE CONDITION HAS TO MATCH THE RENDER, EXACTLY.
      The category jump-nav below hosts this screen's long ramp, and it only
@@ -1966,10 +2461,8 @@ export default function ProductList() {
          deleted product from localStorage and it vanishes when the network
          lands. */
       queryClient.setQueryData(productsQK, next);
-      try {
-        const json = JSON.stringify(next);
-        if (json.length < 2_500_000) window.localStorage.setItem(listSnapshotKey, json);
-      } catch { /* quota guard */ }
+      try { setCache(listSnapshotKey, JSON.stringify(next)); }
+      catch { /* serialize guard */ }
       return next;
     });
   };
@@ -1988,14 +2481,26 @@ export default function ProductList() {
         {/* Header */}
         {/* relative z-30: the top strip's ramp (z-20) runs BEHIND this. */}
         <div className="relative z-30 flex flex-wrap items-center gap-3 mb-1">
-          <Link href="/" className="kx-glass kx-hover-glow h-8 w-8 flex items-center justify-center rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] transition-colors shrink-0">
-            <ArrowLeftIcon className="h-4 w-4" />
+          {/* Matched to Inventory's PageHeader (owner, 2026-08-20: "compare with
+              inventory app… make them same"): the BK-4 labeled back chip, the
+              plain (non-glass) icon chip, the M-1 title rule and the
+              kx-ph-search well — the four real deltas the comparison found.
+              The divisions TabStrip already shared the canon recipe. */}
+          {/* The recipe is IMPORTED, not re-typed. This row was hand-matched
+              to PageHeader once and the class string copied along with it —
+              which is exactly how the two drift the next time the canon moves.
+              The arrangement below stays bespoke on purpose (the count and FX
+              rate ride the title line to reclaim vertical space), but the
+              control wears the shared definition. */}
+          <Link href="/" aria-label="Back to Hub" className={BACK_CHROME}>
+            <ArrowLeftIcon className="h-3.5 w-3.5" />
+            <span className="hidden text-[12px] font-medium sm:inline">Hub</span>
           </Link>
           <div className="flex items-center gap-2.5 min-w-0 flex-1">
-            <div className="kx-glass h-8 w-8 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-dim)] shrink-0">
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[var(--text-muted)] sm:h-10 sm:w-10 sm:rounded-xl">
               {isInternal ? <ProductDataIcon size={16} /> : <ProductsIcon size={16} />}
             </div>
-            <h1 className="text-xl md:text-[22px] font-bold tracking-tight truncate">
+            <h1 className="text-xl font-bold tracking-tight truncate md:sr-only">
               {isInternal ? t("list.productData") : t("list.products")}
             </h1>
             {/* Count and rate ride the TITLE line instead of owning a row of
@@ -2072,7 +2577,7 @@ export default function ProductList() {
             4px under the app header when pinned — on a phone that read as the
             two bars touching. Its measured height feeds --kx-pd-tools-h, which
             is what the category nav below pins to. */}
-        <div ref={toolbarRef} className="kx-bar-host sticky top-0 z-30 -mx-4 md:-mx-6 lg:-mx-8 px-4 md:px-6 lg:px-8 pt-2 pb-2 mb-3 bg-[var(--bg-primary)]">
+        <div ref={toolbarRef} className="kx-bar-host kx-pd-toolbar sticky top-0 z-30 -mx-4 md:-mx-6 lg:-mx-8 px-4 md:px-6 lg:px-8 pt-2 pb-2 mb-3 bg-[var(--bg-primary)]">
           {/* NO layer of its own. This bar sits inside the category nav's
               ramp, which now reaches up over it (--kx-ramp-top) — one
               blurred edge for the whole top strip, owner's rule: "you are
@@ -2088,8 +2593,15 @@ export default function ProductList() {
           <div className="flex flex-wrap gap-3">
             <div className="relative basis-full sm:basis-0 sm:flex-1 min-w-0" ref={searchBoxRef}>
               <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[var(--text-dim)] z-10" />
+              {/* role="combobox": this input already carries
+                  aria-autocomplete and aria-expanded and drives a suggestion
+                  list with the arrow keys, but a bare <input> is a textbox,
+                  where neither property is allowed — so assistive tech was
+                  being told about a listbox it had no way to reach. */}
               <input
                 type="search"
+                role="combobox"
+                aria-controls="pl-search-suggestions"
                 value={search}
                 onChange={(e) => { setSearch(e.target.value); setSearchOpen(true); }}
                 onFocus={() => setSearchOpen(true)}
@@ -2116,7 +2628,7 @@ export default function ProductList() {
                 title={t("list.searchAria")}
                 aria-autocomplete="list"
                 aria-expanded={searchOpen && suggestions.length > 0}
-                className="w-full h-10 pl-10 pr-10 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-dim)] outline-none transition-[border-color,box-shadow] focus:border-[#567FB2]/60 focus:shadow-[0_0_0_4px_rgba(86,127,178,0.16)] [&::-webkit-search-cancel-button]:hidden"
+                className="kx-ph-search w-full h-11 pl-10 pr-10 rounded-xl bg-[var(--bg-card)] border border-[var(--border-subtle)] text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-dim)] outline-none transition-colors duration-200 [&::-webkit-search-cancel-button]:hidden"
               />
               {/* Clear button — only when there's text. Native input
                   type=search clear button is inconsistent across
@@ -2139,6 +2651,7 @@ export default function ProductList() {
                   active row, Enter applies, Escape closes. */}
               {searchOpen && suggestions.length > 0 && (
                 <div
+                  id="pl-search-suggestions"
                   role="listbox"
                   className="kx-glass-pop absolute left-0 right-0 top-[calc(100%+8px)] z-40 max-h-[420px] overflow-y-auto rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-subtle)] shadow-2xl"
                 >
@@ -2676,7 +3189,7 @@ export default function ProductList() {
                    --kx-ramp-fade must be a LENGTH here, not the default 45%:
                    a percentage is taken from the layer's own height, so once
                    the layer grew to cover the strip the fade grew with it. */
-                className="kx-bar-host sticky z-20 -mx-4 md:-mx-6 lg:-mx-8 px-4 md:px-6 lg:px-8 pt-1.5 pb-3.5 mb-5 bg-[var(--bg-primary)] [--kx-ramp-ext:1rem] [--kx-ramp-fade:4rem]"
+                className="kx-bar-host max-sm:static sticky z-20 -mx-4 md:-mx-6 lg:-mx-8 px-4 md:px-6 lg:px-8 pt-1.5 pb-3.5 mb-5 bg-[var(--bg-primary)] [--kx-ramp-ext:1rem] [--kx-ramp-fade:4rem]"
                 data-kx-progressive=""
                 aria-label="Categories"
               >
@@ -2697,15 +3210,21 @@ export default function ProductList() {
                     instead of ~380px. From `sm` up the tile grid is unchanged.
                     One DOM tree, responsive classes: no duplicated markup and
                     no second copy for screen readers to read out. */}
-                {/* THE PILL ROW IS NOW THE ONLY LAYOUT, not the phone fallback.
-                    The 88px tile grid was already replaced below `sm` for the
-                    exact reason it fails everywhere: it is the largest object
-                    on the page and it is NAVIGATION, not content. On a laptop
-                    it pushed the first product to 597px of a 686px viewport.
-                    Same DOM, same links, same icons — one row that scrolls,
-                    ~44px instead of ~200px, and identical on every size, which
-                    also removes a whole breakpoint's worth of divergence. */}
-                <div className="flex gap-2 overflow-x-auto pb-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                {/* UNIFORM GRID, owner's pick (2026-08-20, sample 2 of 4):
+                    "I don't want have scrolling, I want all can show in the
+                    page with organize way." Every category is visible — equal
+                    columns, names truncating, counts on the trailing edge —
+                    instead of the one scrolling pill row.
+
+                    History, because this bar has flip-flopped: the original
+                    88px tile grid died for pushing the first product to 597px
+                    of a 686px viewport; the scrolling row that replaced it is
+                    what the owner has now rejected. This grid is the middle:
+                    ~2–3 rows of 38px on a laptop (~130px), never a sideways
+                    scroll. On phones the same grid runs 2-up (~7 rows), so
+                    there the bar goes STATIC (max-sm) — a ~320px block may
+                    scroll away with the page, but it must not DOCK over it. */}
+                <div className="hidden sm:grid grid-cols-[repeat(auto-fill,minmax(178px,1fr))] gap-2 pb-0.5">
                   {categoryTree.map((cat) => (
                     <a
                       key={cat.slug}
@@ -2713,21 +3232,126 @@ export default function ProductList() {
                       onClick={(e) => {
                         e.preventDefault();
                         const el = document.getElementById(`cat-${cat.slug}`);
-                        if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+                        const sc = document.getElementById("main-scroll-container");
+                        const navEl = e.currentTarget.closest("nav");
+                        if (!el || !sc) return;
+                        /* scrollIntoView put the title BEHIND the docked
+                           chrome (owner: "it didn't take me to the right
+                           place"): block:"start" aligns the section with the
+                           scroller's top edge, and the sticky grid + tools
+                           row then cover exactly that strip. The offset is
+                           measured, not hardcoded, because the grid's height
+                           is 2–3 rows depending on viewport — and on phones
+                           the bar is static, so only a small clearance. */
+                        const stuck = navEl && getComputedStyle(navEl).position === "sticky";
+                        const offset = stuck
+                          ? navEl.getBoundingClientRect().height +
+                            (parseFloat(getComputedStyle(navEl).top) || 0) + 8
+                          : 60;
+                        const targetTop = () =>
+                          el.getBoundingClientRect().top - sc.getBoundingClientRect().top + sc.scrollTop - offset;
+                        sc.scrollTo({ top: targetTop(), behavior: "smooth" });
+                        /* Second half of the miss: the sections render with
+                           content-visibility:auto, so everything below the
+                           fold has an ESTIMATED height until it paints. The
+                           first scroll lands on the estimate; as the passed
+                           sections materialize, the real target moves. Wait
+                           for the scroll to stop (scrollTop stable across a
+                           few frames — works whether or not the browser has
+                           scrollend), then snap the residual error. Bounded:
+                           at most 4 corrections and ~5s of frames, and a
+                           user grabbing the scrollbar mid-flight just makes
+                           the loop finish early. */
+                        let last = -1, still = 0, passes = 0, frames = 0;
+                        const settle = () => {
+                          if (++frames > 300) return;
+                          const cur = sc.scrollTop;
+                          if (cur === last) still += 1; else { still = 0; last = cur; }
+                          if (still >= 3) {
+                            const diff = targetTop() - cur;
+                            if (Math.abs(diff) <= 4 || passes >= 4) return;
+                            passes += 1; still = 0;
+                            sc.scrollTop = cur + diff;
+                          }
+                          requestAnimationFrame(settle);
+                        };
+                        requestAnimationFrame(settle);
                       }}
-                      className="group relative flex flex-row items-center justify-start gap-1.5 h-[36px] w-auto shrink-0 px-3 rounded-full kx-glass bg-[var(--bg-card)] border border-white/[0.06] kx-hover-card kx-hover-tile kx-tile-neon select-none transition-transform duration-75 active:scale-[0.97] motion-reduce:transition-none motion-reduce:active:scale-100"
+                      className={`group relative flex flex-row items-center justify-start gap-1.5 h-[38px] min-w-0 px-3 rounded-xl kx-glass bg-[var(--bg-card)] border border-white/[0.06] kx-hover-card kx-hover-tile kx-tile-neon select-none transition-transform duration-75 active:scale-[0.97] motion-reduce:transition-none motion-reduce:active:scale-100`}
                     >
                       {classIcons.category?.[cat.slug] ? (
                         <ClassMonoIcon src={classIcons.category[cat.slug]} className="kx-neon-icon h-4 w-4 shrink-0 text-[var(--text-primary)] opacity-90" />
                       ) : (
                         <LayoutGridIcon className="kx-neon-svg h-4 w-4 shrink-0 text-[var(--text-primary)] opacity-90" />
                       )}
-                      <span className="kx-neon-label text-[11px] font-medium leading-none whitespace-nowrap text-[var(--text-muted)]">{cat.name}</span>
+                      <span className="kx-neon-label flex-1 min-w-0 truncate text-[11px] font-medium leading-none text-[var(--text-muted)]">{cat.name}</span>
                       {/* The count earns the pill its keep: the row is now
                           navigation AND a size read, which the tile never was. */}
                       <span className="text-[10px] tabular-nums text-[var(--text-ghost)] shrink-0">{cat.total}</span>
                     </a>
                   ))}
+                </div>
+                {/* ── PHONES: ONE 40px row + the MN-5 dropdown ──
+                    Third phone layout for this nav, and the owner rejected
+                    the previous two on sight (the full grid ate half the
+                    viewport; the two-row collapse was "still don't like").
+                    Sample 1 of the mobile set: the row names the control,
+                    the tap opens the one canonical dropdown (kx-glass-pop
+                    material + kx-pop-panel shell, per MN-5) listing every
+                    category with its count; picking one jumps and closes.
+                    Desktop keeps the sample-2 grid untouched. */}
+                <div className="sm:hidden relative">
+                  <button
+                    type="button"
+                    aria-expanded={catsOpen}
+                    data-kx-cats-trigger=""
+                    onClick={() => setCatsOpen((o) => !o)}
+                    className="w-full flex items-center gap-2 h-10 px-3 rounded-xl kx-glass bg-[var(--bg-card)] border border-white/[0.06] select-none active:scale-[0.99] transition-transform"
+                  >
+                    <LayoutGridIcon className="h-4 w-4 shrink-0 text-[var(--text-primary)] opacity-90" />
+                    <span className="flex-1 text-start text-[12px] font-medium text-[var(--text-primary)]">
+                      {t("list.allCategories")}
+                    </span>
+                    <span className="text-[11px] tabular-nums text-[var(--text-ghost)]">{categoryTree.length}</span>
+                    <span aria-hidden className={`text-[11px] text-[var(--text-ghost)] transition-transform ${catsOpen ? "rotate-180" : ""}`}>⌄</span>
+                  </button>
+                  {catsOpen && (
+                    <>
+                      {/* NO fixed full-screen closer. The first version put an
+                          invisible fixed button over the viewport; dragging on
+                          a fixed element scrolls ITS scrollable ancestor — the
+                          body, which in this shell never scrolls — so with the
+                          panel open every touch-drag went dead. Outside-tap
+                          closing is a document listener instead (below), which
+                          eats nothing. */}
+                      <div className="kx-glass-pop kx-pop-panel kx-pop-dense absolute left-0 right-0 top-[calc(100%+6px)] z-50 max-h-[60vh] overflow-y-auto p-1.5 rounded-2xl" data-kx-cats-menu="">
+                        {categoryTree.map((cat) => (
+                          <a
+                            key={cat.slug}
+                            href={`#cat-${cat.slug}`}
+                            onClick={(e) => {
+                              e.preventDefault();
+                              setCatsOpen(false);
+                              const el = document.getElementById(`cat-${cat.slug}`);
+                              const sc = document.getElementById("main-scroll-container");
+                              if (!el || !sc) return;
+                              const top = el.getBoundingClientRect().top - sc.getBoundingClientRect().top + sc.scrollTop - 60;
+                              sc.scrollTo({ top, behavior: "smooth" });
+                            }}
+                            className="flex items-center gap-2 h-10 px-2.5 rounded-lg text-[12px] text-[var(--text-secondary)]"
+                          >
+                            {classIcons.category?.[cat.slug] ? (
+                              <ClassMonoIcon src={classIcons.category[cat.slug]} className="h-4 w-4 shrink-0 text-[var(--text-primary)] opacity-90" />
+                            ) : (
+                              <LayoutGridIcon className="h-4 w-4 shrink-0 text-[var(--text-primary)] opacity-90" />
+                            )}
+                            <span className="flex-1 min-w-0 truncate">{cat.name}</span>
+                            <span className="text-[10px] tabular-nums text-[var(--text-ghost)]">{cat.total}</span>
+                          </a>
+                        ))}
+                      </div>
+                    </>
+                  )}
                 </div>
               </nav>
             )}
@@ -2735,7 +3359,12 @@ export default function ProductList() {
           {/* 8, not 14: each section now carries 24px of its own bottom padding
               so its cards' hover glow is not clipped by paint containment
               (see SECTION_CV). 32 + 24 = the 56px this used to be. */}
-          <div className="space-y-8">
+          {/* kx-flat-items: every product card below loses its blur pass and
+              keeps its surface — one attribute covering all category
+              sections at once. See the rule in globals for the measurement
+              (cards flashing blank on a fast scroll: hundreds of live blur
+              layers per frame). */}
+          <div className="kx-flat-items space-y-8">
           {categoryTree.map((cat) => (
             /* Every section renders; content-visibility:auto skips the paint +
                layout of the offscreen ones. This replaced a progressive-mount
@@ -2822,6 +3451,9 @@ export default function ProductList() {
                 suppliers={productSuppliers[p.id] || EMPTY_SUPPLIERS}
                 signalsPending={isInternal && !signalsReady}
                 modelsPending={isInternal && !modelsReady}
+                fob={fobPrices[p.id]}
+                fobPending={!isInternal && fobPending}
+                onCardAction={onCardAction}
                 lvl={levelColors[p.level || ""] || ""}
                 baseRoute={baseRoute}
                 isInternal={isInternal}
@@ -2853,17 +3485,31 @@ export default function ProductList() {
             {/* Internal table trades the Brand column (always "Koleex")
                 for the two numbers an operator actually scans: readiness
                 and cost. Public table keeps Brand. */}
-            <div className="hidden md:grid grid-cols-[56px_1fr_140px_120px_100px_80px_80px] gap-4 items-center px-5 py-3 border-b border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)]">
+            {/* The gap utilities MUST match the row's exactly. They did not:
+                the header carried `gap-4` while the row carried
+                `gap-3 md:gap-4`, and the header's resolved to 12px against the
+                row's 16px — five columns of 4px drift, so every heading sat up
+                to 12px off the content beneath it. */}
+            <div className={`hidden md:grid ${LIST_COLS} gap-3 md:gap-4 items-center px-5 py-3 border-b border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)]`}>
               <span />
               <span className="text-[10px] font-semibold text-[var(--text-dim)] uppercase tracking-wider">{t("list.colProduct")}</span>
-              <span className="text-[10px] font-semibold text-[var(--text-dim)] uppercase tracking-wider">{t("list.colCategory")}</span>
+              <span className={`text-[10px] font-semibold text-[var(--text-dim)] uppercase tracking-wider ${isInternal ? "" : "hidden lg:block"}`}>{t("list.colCategory")}</span>
               <span className="text-[10px] font-semibold text-[var(--text-dim)] uppercase tracking-wider">
-                {isInternal ? t("list.colReady", "Ready") : t("list.colBrand")}
+                {isInternal ? t("list.colReady", "Ready") : t("card.globalFob", "Global FOB")}
               </span>
-              <span className="text-[10px] font-semibold text-[var(--text-dim)] uppercase tracking-wider">
-                {isInternal ? t("list.colCost", "Cost") : t("list.colModels")}
-              </span>
-              <span className="text-[10px] font-semibold text-[var(--text-dim)] uppercase tracking-wider">{t("list.colStatus")}</span>
+              {/* Models: INTERNAL only. On the catalogue the family line under
+                  the name already spells out every member code, so a column
+                  repeating the count was a whole column of nothing new. */}
+              {isInternal && (
+                <span className="text-[10px] font-semibold text-[var(--text-dim)] uppercase tracking-wider">
+                  {t("list.colCost", "Cost")}
+                </span>
+              )}
+              {/* Status is an internal concern — the catalogue row spends that
+                  column on the actions instead. */}
+              {isInternal && (
+                <span className="text-[10px] font-semibold text-[var(--text-dim)] uppercase tracking-wider">{t("list.colStatus")}</span>
+              )}
               <span />
             </div>
             <div className="divide-y divide-[var(--border-subtle)]" style={{ contentVisibility: "auto", containIntrinsicSize: "1px 1200px" }}>
@@ -2876,7 +3522,11 @@ export default function ProductList() {
                 return (
                   <div
                     key={p.id}
-                    className="group relative flex items-center gap-3 md:grid md:grid-cols-[56px_1fr_140px_120px_100px_80px_80px] md:gap-4 px-4 md:px-5 py-3 hover:bg-[var(--bg-surface-subtle)] transition-colors"
+                    /* items-start on phones: the catalogue row's meta line
+                       (category · subcategory · models · price) makes the text
+                       block taller than the photo, and centering left the photo
+                       floating beside the middle of it. */
+                    className={`group relative flex ${isInternal ? "items-center" : "items-start md:items-center"} gap-3.5 md:grid ${LIST_COLS} md:gap-4 px-4 md:px-5 py-3.5 md:py-3 hover:bg-[var(--bg-surface-subtle)] transition-colors`}
                   >
                     {/* Stretched navigation link — only card-level anchor;
                         action links below are siblings (no nested <a>). */}
@@ -2890,10 +3540,14 @@ export default function ProductList() {
                         instead of multi-MB originals). loading="lazy"
                         keeps off-screen rows from blocking the
                         first paint. */}
-                    <div className="h-12 w-12 md:h-14 md:w-14 rounded-xl bg-white border border-[var(--border-subtle)] overflow-hidden shrink-0 flex items-center justify-center">
+                    <div className={`rounded-xl bg-white border border-[var(--border-subtle)] overflow-hidden shrink-0 flex items-center justify-center ${
+                      isInternal
+                        ? "h-12 w-12 md:h-14 md:w-14"
+                        : "h-24 w-24 md:h-20 md:w-20 lg:h-[120px] lg:w-[120px] xl:h-[136px] xl:w-[136px]"
+                    }`}>
                       {imgUrl ? (
                         <img
-                          src={IMG.thumb(imgUrl)}
+                          src={isInternal ? IMG.thumb(imgUrl) : IMG.row(imgUrl)}
                           alt={p.product_name}
                           className="w-full h-full object-contain p-1"
                           loading="lazy"
@@ -2913,12 +3567,22 @@ export default function ProductList() {
                           return (
                             <>
                               <div className="flex items-center gap-2">
-                                <h3 className="text-[14px] md:text-[16px] font-bold tracking-tight text-[var(--text-primary)] truncate group-hover:text-[var(--text-highlight)] transition-colors">
+                                <h3 className={`font-bold tracking-tight text-[var(--text-primary)] truncate group-hover:text-[var(--text-highlight)] transition-colors ${
+                                  isInternal ? "text-[14px] md:text-[16px]" : "text-[16px] md:text-[17px] xl:text-[19px]"
+                                }`}>
                                   {mn}
                                 </h3>
                                 {p.featured && <StarIcon className="h-3 w-3 text-amber-400 shrink-0" />}
                               </div>
-                              <p className="text-[12px] md:text-[13px] text-[var(--text-muted)] truncate">
+                              <p className={`text-[var(--text-muted)] ${
+                                isInternal
+                                  ? "text-[12px] md:text-[13px] truncate"
+                                  /* Two lines on a phone: there is room for
+                                     them and "…Intelligent Fabric…" told a
+                                     buyer nothing. One line from md, where the
+                                     column has to stay a fixed height. */
+                                  : "text-[13px] md:text-[14px] mt-0.5 line-clamp-2 md:line-clamp-none md:truncate"
+                              }`}>
                                 {p.product_name}
                               </p>
                             </>
@@ -2935,24 +3599,65 @@ export default function ProductList() {
                       })()}
                       {/* Family roster — same visibility the grid chips give:
                           every member code readable from the list row. */}
+                      {/* Category caption — catalogue, md→xl only. Between
+                          those widths the category has no column of its own
+                          (the photo, price and actions need the room), so it
+                          rides under the name instead of disappearing. */}
+                      {!isInternal && (
+                        <p className="hidden md:block lg:hidden text-[11px] text-[var(--text-dim)] truncate mt-0.5">
+                          {catMap[p.category_slug] || p.category_slug}
+                          {p.subcategory_slug && subMap[p.subcategory_slug] ? (
+                            <span className="text-[var(--text-ghost)]"> · {subMap[p.subcategory_slug]}</span>
+                          ) : null}
+                        </p>
+                      )}
                       {(modelNames[p.id]?.length ?? 0) > 1 && (
-                        <p className="text-[10px] font-medium tabular-nums text-[var(--text-ghost)] truncate mt-0.5">
+                        <p className="text-[10.5px] font-medium tabular-nums text-[var(--text-ghost)] truncate mt-1">
                           {modelNames[p.id].slice(0, 5).join(" · ")}
                           {modelNames[p.id].length > 5 ? ` · +${modelNames[p.id].length - 5}` : ""}
                         </p>
                       )}
                       {/* Mobile: show all meta inline */}
-                      <div className="md:hidden flex items-center gap-2 mt-0.5 flex-wrap">
-                        <span className="text-[11px] text-[var(--text-dim)]">{catMap[p.category_slug] || p.category_slug}</span>
-                        {p.brand && (
-                          <>
-                            <span className="text-[var(--text-ghost)]">·</span>
-                            <span className="text-[11px] text-[var(--text-dim)]">{p.brand}</span>
-                          </>
-                        )}
-                        <span className="text-[var(--text-ghost)]">·</span>
-                        <span className="text-[11px] text-[var(--text-dim)]">{models} {models === 1 ? t("list.modelOne", "model") : t("list.modelMany", "models")}</span>
-                      </div>
+                      {/* Phone meta. It used to be one flex-wrap of values with
+                          "·" as separate children, so every wrap left a comma
+                          dangling at the end of a line and the price began with
+                          one. Category and its subcategory are now ONE line that
+                          can wrap as a unit, and the price is its own line —
+                          which is also the only place it appears on a phone,
+                          so it gets read at a real size instead of 11px. */}
+                      {isInternal ? (
+                        <div className="md:hidden flex items-center gap-2 mt-0.5 flex-wrap">
+                          <span className="text-[11px] text-[var(--text-dim)]">{catMap[p.category_slug] || p.category_slug}</span>
+                          {p.brand && (
+                            <>
+                              <span className="text-[var(--text-ghost)]">·</span>
+                              <span className="text-[11px] text-[var(--text-dim)]">{p.brand}</span>
+                            </>
+                          )}
+                          <span className="text-[var(--text-ghost)]">·</span>
+                          <span className="text-[11px] text-[var(--text-dim)]">{models} {models === 1 ? t("list.modelOne", "model") : t("list.modelMany", "models")}</span>
+                        </div>
+                      ) : (
+                        /* Identity above, commerce below, with a rule between
+                           them: the phone row was one long left-aligned stack
+                           where the category and the price read as two more
+                           lines of the name. They now share a baseline row —
+                           category truncated to one line on the left, price
+                           anchored right — so the row scans in two beats. */
+                        <div className="md:hidden mt-2 pt-2 border-t border-[var(--border-subtle)] flex items-baseline justify-between gap-3">
+                          <p className="min-w-0 flex-1 text-[11.5px] leading-snug text-[var(--text-dim)] truncate">
+                            {catMap[p.category_slug] || p.category_slug}
+                            {p.subcategory_slug && subMap[p.subcategory_slug] ? (
+                              <span className="text-[var(--text-ghost)]">{" · "}{subMap[p.subcategory_slug]}</span>
+                            ) : null}
+                          </p>
+                          {fobPrices[p.id]?.fobUsd != null ? (
+                            <p className="shrink-0 text-[17px] leading-none font-bold tabular-nums tracking-tight text-[var(--text-primary)]">
+                              ${fobPrices[p.id]!.fobUsd!.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                            </p>
+                          ) : null}
+                        </div>
+                      )}
                       {/* Desktop: supplier line — internal only, with logo */}
                       {isInternal && (signals[p.id]?.supplier || suppliers.length > 0) && (() => {
                         const sup = signals[p.id]?.supplier;
@@ -2974,11 +3679,18 @@ export default function ProductList() {
                     {/* Category (desktop only) — show the division
                         below the category as a subtle caption when
                         the product is NOT in the flagship line. */}
-                    <div className="hidden md:flex flex-col min-w-0 gap-0.5">
+                    <div className={`hidden ${isInternal ? "md:flex" : "lg:flex"} flex-col min-w-0 gap-0.5`}>
                       <span className="flex items-center gap-1.5 text-[12px] text-[var(--text-muted)] truncate">
                         <LayersIcon className="h-3 w-3 text-[var(--text-ghost)] shrink-0" />
                         {catMap[p.category_slug] || p.category_slug}
                       </span>
+                      {/* Subcategory — catalogue only. The internal table is
+                          already grouped by subcategory heading. */}
+                      {!isInternal && p.subcategory_slug && subMap[p.subcategory_slug] && (
+                        <span className="text-[11px] text-[var(--text-dim)] truncate pl-[18px]">
+                          {subMap[p.subcategory_slug]}
+                        </span>
+                      )}
                       {p.division_slug && p.division_slug !== FLAGSHIP_DIVISION_SLUG && divMap[p.division_slug] && (
                         <span className="text-[10px] text-[var(--text-ghost)] uppercase tracking-wider truncate pl-[18px]">
                           {divMap[p.division_slug]}
@@ -2986,8 +3698,10 @@ export default function ProductList() {
                       )}
                     </div>
 
-                    {/* Readiness (internal) / Brand (public) — desktop only */}
-                    <div className="hidden md:flex items-center gap-1.5 min-w-0">
+                    {/* Readiness (internal) / Global FOB (catalogue) — desktop
+                        only. justify-start so the figure sits under its own
+                        column heading rather than drifting mid-cell. */}
+                    <div className="hidden md:flex items-center justify-start gap-1.5 min-w-0">
                       {isInternal ? (() => {
                         const sig = signals[p.id];
                         if (!sig) return <span className="text-[11px] text-[var(--text-ghost)]">—</span>;
@@ -3013,17 +3727,33 @@ export default function ProductList() {
                             <span className="text-[11px] font-semibold tabular-nums text-[var(--text-subtle)] shrink-0">{sig.readiness}%</span>
                           </div>
                         );
-                      })() : p.brand ? (
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-[var(--bg-surface)] text-[11px] font-medium text-[var(--text-subtle)] truncate">
-                          <TagsIcon className="h-2.5 w-2.5 shrink-0" /> {p.brand}
-                        </span>
-                      ) : (
-                        <span className="text-[11px] text-[var(--text-ghost)]">—</span>
-                      )}
+                      })() : (() => {
+                        /* Catalogue: this column carries the price, not the
+                           brand — every product here is Koleex. Same live
+                           Global FOB the grid card shows. */
+                        const f = fobPrices[p.id];
+                        if (fobPending && f === undefined) {
+                          return <span className="h-5 w-20 rounded bg-[var(--bg-surface)] animate-pulse" aria-hidden="true" />;
+                        }
+                        return f?.fobUsd != null ? (
+                          <span
+                            className="text-[18px] leading-none font-bold tabular-nums tracking-tight text-[var(--text-primary)]"
+                            title={fxTitle}
+                          >
+                            ${f.fobUsd.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                          </span>
+                        ) : (
+                          <span className="text-[11px] text-[var(--text-dim)] truncate">
+                            {t("card.priceOnRequest", "Price on request")}
+                          </span>
+                        );
+                      })()}
                     </div>
 
-                    {/* Cost + models (internal) / models (public) — desktop only */}
-                    <div className="hidden md:flex items-center gap-1.5">
+                    {/* Cost + models (internal) / models (public) — desktop only.
+                        Catalogue: from xl only, so the name column keeps its
+                        width at laptop sizes. */}
+                    <div className={`hidden ${isInternal ? "md:flex" : ""} items-center gap-1.5`}>
                       {isInternal && (() => {
                         const c = signals[p.id]?.cost;
                         return c != null ? (
@@ -3038,16 +3768,22 @@ export default function ProductList() {
                       <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-[var(--bg-surface)] text-[11px] font-medium text-[var(--text-subtle)]">
                         <BoxesIcon className="h-2.5 w-2.5" /> {models}
                       </span>
-                      {p.level && (
+                      {/* Market level — INTERNAL only. It is a pricing-tier
+                          label, it is not in the catalogue row's six fields,
+                          and at this column width it pushed straight into the
+                          action buttons. */}
+                      {isInternal && p.level && (
                         <span className={`inline-flex items-center px-1.5 py-0.5 rounded-md text-[10px] font-semibold uppercase tracking-wider border ${lvl}`}>
                           {p.level}
                         </span>
                       )}
                     </div>
 
-                    {/* Status (desktop only) */}
-                    <div className="hidden md:flex items-center justify-center">
-                      {(() => {
+                    {/* Status (desktop only) — INTERNAL only: it is the
+                        publishing state of our record, and a customer reads
+                        it as stock. */}
+                    <div className={`hidden ${isInternal ? "md:flex" : ""} items-center justify-center`}>
+                      {isInternal && (() => {
                         const st = (p.status || "draft");
                         return (
                           <StatusPill tone={ST_TONE[st as keyof typeof ST_TONE] ?? "warning"} className="uppercase tracking-wider !text-[10px]">
@@ -3078,6 +3814,43 @@ export default function ProductList() {
                           </button>
                         </>
                       )}
+                      {/* Catalogue: the same three actions the grid card
+                          offers, so a customer is not forced back into grid
+                          view to use them. Hidden on phones — the row is
+                          already tight there and the card view carries them. */}
+                      {!isInternal && (
+                        <div className="hidden md:grid grid-cols-3 gap-1 w-full">
+                          {([
+                            {
+                              key: "ask_ai",
+                              label: t("card.askAi", "Ask AI"),
+                              cls: "kx-ai-glow border-[var(--action-ai,#567FB2)]/45 text-[var(--action-ai,#567FB2)] hover:bg-[var(--action-ai,#567FB2)]/10",
+                            },
+                            {
+                              key: "compare",
+                              label: t("card.compare", "Compare"),
+                              cls: "border-[var(--action-compare,#F59E0B)]/45 text-[var(--action-compare,#F59E0B)] hover:bg-[var(--action-compare,#F59E0B)]/10 hover:border-[var(--action-compare,#F59E0B)]/70",
+                            },
+                            {
+                              key: "quote",
+                              label: t("card.addToQuotation", "Quote"),
+                              cls: "border-[var(--action-quote,#10B981)]/45 text-[var(--action-quote,#10B981)] hover:bg-[var(--action-quote,#10B981)]/10 hover:border-[var(--action-quote,#10B981)]/70",
+                            },
+                          ] as const).map((a) => (
+                            <button
+                              key={a.key}
+                              type="button"
+                              onClick={(e) => { e.preventDefault(); e.stopPropagation(); onCardAction(a.key, p); }}
+                              /* whitespace-nowrap, never truncate — truncate's
+                                 overflow:hidden clips the AI glow ring away. */
+                              className={`px-1.5 py-1.5 rounded-lg border bg-[var(--bg-surface-subtle)] text-[10px] font-bold whitespace-nowrap transition-all ${a.cls}`}
+                              title={a.label}
+                            >
+                              {a.label}
+                            </button>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   </div>
                 );
@@ -3091,7 +3864,22 @@ export default function ProductList() {
             reaches the bottom — on the owner's link a page is seconds, and he
             should never watch it arrive. Rendered only while more pages
             exist, so the observer has nothing to fire on at the end. */}
-        {hasMore && !loading && !loadError && (
+        {/* THE CEILING, STATED. Not an error and not a failure to load: the
+            grid is holding as much as it can render smoothly, and the rest of
+            the catalogue is one filter away. Says the real numbers so the
+            operator can see it is deliberate. */}
+        {atMountCap && hasMore && !loading && !loadError && (
+          <div className="mt-8 rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] px-4 py-5 text-center">
+            <p className="text-[13px] font-semibold text-[var(--text-primary)]">
+              {t("list.mountCapTitle").replace("{n}", String(products.length)).replace("{total}", String(total ?? products.length))}
+            </p>
+            <p className="mx-auto mt-1 max-w-[52ch] text-[12px] leading-snug text-[var(--text-dim)]">
+              {t("list.mountCapHint")}
+            </p>
+          </div>
+        )}
+
+        {hasMore && !loading && !loadError && !atMountCap && (
           <div ref={sentinelRef} className="pt-8 pb-2" aria-hidden>
             {loadingMore && (
               <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">

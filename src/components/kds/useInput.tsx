@@ -72,7 +72,13 @@ export function useInput() {
             autoFocus
             value={value}
             onChange={(e) => { setValue(e.target.value); if (error) setError(null); }}
-            onKeyDown={(e) => { if (e.key === "Enter") submit(); if (e.key === "Escape") setAsk(null); }}
+            onKeyDown={(e) => {
+              /* Confirming a pinyin candidate is Enter too (keyCode 229 on
+                 older engines): not a submit. */
+              if (e.nativeEvent.isComposing || e.keyCode === 229) return;
+              if (e.key === "Enter") submit();
+              if (e.key === "Escape") setAsk(null);
+            }}
             placeholder={ask.placeholder}
             className="mt-2.5 w-full h-9 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[12.5px] text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)] placeholder:text-[var(--text-ghost)]"
           />

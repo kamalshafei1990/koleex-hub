@@ -1,11 +1,13 @@
 "use client";
 
 import { memo, useCallback, useEffect, useMemo, useState } from "react";
+import { useWarmData } from "@/lib/warm-cache";
 import { useToast } from "@/components/kds/useToast";
 import Link from "next/link";
 import FinanceHeader from "@/components/finance/FinanceHeader";
 import { useTranslation } from "@/lib/i18n";
-import { financeT } from "@/lib/translations/finance";
+import { FIN_COMMON } from "@/lib/translations/finance/common";
+import { FIN_ORDERS } from "@/lib/translations/finance/orders";
 import {
   EmptyState,
   ProgressBar,
@@ -21,6 +23,10 @@ import RrIcon from "@/components/ui/RrIcon";
 import { computeOrderProfit, deriveTaxRefundValue, fmtMoney, fmtPct } from "@/lib/finance/calc";
 import type { FinanceOrder, FinanceOrderSupplier } from "@/lib/finance/types";
 
+/* Only the namespaces this screen actually reads — see finance.ts. */
+const DICT = { ...FIN_COMMON, ...FIN_ORDERS } as const;
+
+
 const EMPTY_SUPPLIER: Omit<FinanceOrderSupplier, "id" | "order_id"> = {
   supplier_id: null,
   supplier_name: "",
@@ -34,7 +40,7 @@ const EMPTY_SUPPLIER: Omit<FinanceOrderSupplier, "id" | "order_id"> = {
 
 export default function FinanceOrders() {
   const { showToast, toastElement } = useToast();
-  const { t } = useTranslation(financeT);
+  const { t } = useTranslation(DICT);
   /* Currency: sales-side surface, so we keep USD as the form default
      per the brief — but the KPI cards use the tenant base so a Chinese
      tenant aggregating USD orders sees CNY-converted totals where the
@@ -42,25 +48,22 @@ export default function FinanceOrders() {
      since orders are stored in USD; tweak per row when mixing
      currencies. */
   const baseCurrency = useBaseCurrency();
-  const [orders, setOrders] = useState<FinanceOrder[]>([]);
-  const [loading, setLoading] = useState(true);
   const [view, setView] = useState<"list" | "editor">("list");
   const [draft, setDraft] = useState<DraftOrder | null>(null);
   /* Hub-native delete confirmation in place of native confirm(). */
   const [confirmDeleteOrder, setConfirmDeleteOrder] = useState<FinanceOrder | null>(null);
   const [deletingOrder, setDeletingOrder] = useState(false);
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    try {
-      const r = await fetch("/api/finance/orders", { cache: "no-store" });
-      const j = (await r.json()) as { orders?: FinanceOrder[] };
-      setOrders(j.orders ?? []);
-    } finally {
-      setLoading(false);
-    }
+  /* Warm: no filter goes to the server, so the response IS the default
+     view. Paints from the last answer on the first frame. */
+  const fetchAll = useCallback(async () => {
+    const r = await fetch("/api/finance/orders", { cache: "no-store" });
+    if (!r.ok) throw new Error(`fin:orders: ${r.status}`);
+    const j = (await r.json()) as { orders?: FinanceOrder[] };
+    return j.orders ?? [];
   }, []);
-  useEffect(() => { void load(); }, [load]);
+  const { data, loading, reload: load } = useWarmData<FinanceOrder[]>("fin:orders", fetchAll);
+  const orders = useMemo(() => data ?? [], [data]);
 
   /* ── KPI summary across all orders ───────────────────────────── */
   const kpi = useMemo(() => {
@@ -278,7 +281,7 @@ export default function FinanceOrders() {
 /* memo: the order list re-renders on unrelated parent state (delete-dialog
    open/close, loading flips). With props unchanged, skip the row's re-render. */
 const OrderRowCard = memo(function OrderRowCard({ order, onEdit, onDelete }: { order: FinanceOrder; onEdit: () => void; onDelete: () => void }) {
-  const { t } = useTranslation(financeT);
+  const { t } = useTranslation(DICT);
   const ccy = order.currency || "USD";
   const sellingPrice = order.selling_price ?? 0;
   const supplierCost = order.total_supplier_cost ?? 0;
@@ -567,7 +570,7 @@ function OrderEditor({
   onCancel: () => void;
   onSave: () => void;
 }) {
-  const { t } = useTranslation(financeT);
+  const { t } = useTranslation(DICT);
   const sellingPrice = Number(draft.order.selling_price) || 0;
   const taxValue = deriveTaxRefundValue(
     sellingPrice,

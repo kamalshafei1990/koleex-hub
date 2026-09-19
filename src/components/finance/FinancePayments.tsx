@@ -1,10 +1,11 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useWarmData } from "@/lib/warm-cache";
 import { useToast } from "@/components/kds/useToast";
 import FinanceHeader from "@/components/finance/FinanceHeader";
 import { useTranslation } from "@/lib/i18n";
-import { financeT } from "@/lib/translations/finance";
+import { FIN_PAYMENTS } from "@/lib/translations/finance/payments";
 import { EmptyState, SectionCard, StatusBadge } from "@/components/finance/FinanceUi";
 import { HeroKpiCard, MetricCard } from "@/components/finance/FinanceUiX";
 import { fmtMoney } from "@/lib/finance/calc";
@@ -18,10 +19,8 @@ import { useBaseCurrency } from "@/lib/hooks/useBaseCurrency";
 
 export default function FinancePayments() {
   const { showToast, toastElement } = useToast();
-  const { t } = useTranslation(financeT);
+  const { t } = useTranslation(FIN_PAYMENTS);
   const baseCurrency = useBaseCurrency();
-  const [rows, setRows] = useState<FinancePayment[]>([]);
-  const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState<Partial<FinancePayment> | null>(null);
   /* Phase 2.3 — review drawer + approver-permission state. */
   const [reviewPayment, setReviewPayment] = useState<FinancePayment | null>(null);
@@ -39,17 +38,17 @@ export default function FinancePayments() {
     return () => { cancelled = true; };
   }, []);
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    try {
-      const r = await fetch("/api/finance/payments", { cache: "no-store" });
-      const j = (await r.json()) as { payments?: FinancePayment[] };
-      setRows(j.payments ?? []);
-    } finally {
-      setLoading(false);
-    }
+  /* Warm: this endpoint takes no filter, so the response IS the default
+     view. Paints from the last answer on the first frame, refreshes behind
+     the painted screen. */
+  const fetchAll = useCallback(async () => {
+    const r = await fetch("/api/finance/payments", { cache: "no-store" });
+    if (!r.ok) throw new Error(`fin:payments: ${r.status}`);
+    const j = (await r.json()) as { payments?: FinancePayment[] };
+    return j.payments ?? [];
   }, []);
-  useEffect(() => { void load(); }, [load]);
+  const { data, loading, reload: load } = useWarmData<FinancePayment[]>("fin:payments", fetchAll);
+  const rows = useMemo(() => data ?? [], [data]);
 
   const kpi = useMemo(() => {
     const inComp = rows.filter((p) => p.direction === "in" && p.status === "completed").reduce((s, p) => s + (Number(p.amount) || 0), 0);

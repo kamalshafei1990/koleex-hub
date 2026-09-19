@@ -28,11 +28,18 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import { createPortal } from "react-dom";
 import SmileIcon from "@/components/icons/ui/SmileIcon";
 import { EMOJI_CATEGORIES, ALL_EMOJIS, type EmojiEntry } from "@/components/ai/emojiData";
+import { COPY } from "@/components/ai/copy";
+import { type Lang } from "@/lib/i18n";
 
 interface Props {
   onSelect: (emoji: string) => void;
   label?: string;
   className?: string;
+  /* OPTIONAL, DEFAULTING TO ENGLISH, because this component was written
+     without a language at all and every caller would otherwise have to be
+     changed at once. The default is what it already did; passing one is
+     what makes it stop being an English island in an Arabic interface. */
+  lang?: Lang;
 }
 
 const POPOVER_W = 340;
@@ -40,9 +47,19 @@ const POPOVER_H = 420;
 
 export default function EmojiButton({
   onSelect,
-  label = "Insert emoji",
+  label,
   className,
+  lang = "en",
 }: Props): React.ReactElement {
+  const copy = COPY[lang] ?? COPY.en;
+  const triggerLabel = label ?? copy.emojiPicker;
+  /* The data file's own English label is the FALLBACK, not the source: a
+     category added there without a translation still renders, in English,
+     instead of rendering blank. */
+  const catName = useCallback(
+    (id: string, fallback: string) => copy.emojiCategories[id] ?? fallback,
+    [copy],
+  );
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [activeCat, setActiveCat] = useState<string>(EMOJI_CATEGORIES[0].id);
@@ -64,6 +81,15 @@ export default function EmojiButton({
     ).slice(0, 200);
   }, [query]);
 
+  /* Closing resets search + tab so the next open starts fresh; done in
+     the close handlers (not an effect) so no setState runs inside an
+     effect body. */
+  const closePopover = useCallback(() => {
+    setOpen(false);
+    setQuery("");
+    setActiveCat(EMOJI_CATEGORIES[0].id);
+  }, []);
+
   /* Outside-click + Escape — same pattern as v1, both must close. */
   useEffect(() => {
     if (!open) return;
@@ -71,32 +97,29 @@ export default function EmojiButton({
       const target = e.target as Node;
       if (wrapperRef.current && wrapperRef.current.contains(target)) return;
       if (popoverRef.current && popoverRef.current.contains(target)) return;
-      setOpen(false);
+      closePopover();
     };
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
-  }, [open]);
+  }, [open, closePopover]);
 
   useEffect(() => {
     if (!open) return;
     const handler = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
-        setOpen(false);
+        closePopover();
         triggerRef.current?.focus();
       }
     };
     document.addEventListener("keydown", handler);
     return () => document.removeEventListener("keydown", handler);
-  }, [open]);
+  }, [open, closePopover]);
 
   /* When the popover opens, auto-focus the search input — matches
      iOS where the keyboard pops up ready to type. */
   useEffect(() => {
     if (open) {
       requestAnimationFrame(() => searchRef.current?.focus({ preventScroll: true }));
-    } else {
-      setQuery("");
-      setActiveCat(EMOJI_CATEGORIES[0].id);
     }
   }, [open]);
 
@@ -179,7 +202,7 @@ export default function EmojiButton({
       <div
         ref={popoverRef}
         role="dialog"
-        aria-label="Emoji picker"
+        aria-label={copy.emojiPicker}
         style={{ ...popoverStyle, backgroundColor: "var(--bg-primary)" }}
         className="flex flex-col overflow-hidden rounded-2xl border border-[var(--border-subtle)] shadow-2xl"
       >
@@ -190,9 +213,9 @@ export default function EmojiButton({
             type="search"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search emoji"
-            aria-label="Search emoji"
-            className="w-full h-8 px-2.5 rounded-md bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[12.5px] text-[var(--text-primary)] placeholder:text-[var(--text-dim)] outline-none focus:border-[var(--border-focus)]"
+            placeholder={copy.searchEmoji}
+            aria-label={copy.searchEmoji}
+            className="w-full h-8 px-2.5 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-dim)] outline-none focus:border-[var(--border-focus)]"
             /* 16px font on iOS prevents the zoom-on-focus, but the
                picker lives over a fixed-position panel and 12.5 here
                is consistent with the rest of the Hub composer. */
@@ -209,7 +232,7 @@ export default function EmojiButton({
             ) : (
               <div className="grid grid-cols-8 gap-0.5">
                 {searched.map((e, i) => (
-                  <EmojiCell key={`search-${i}-${e.c}`} entry={e} onPick={handlePick} />
+                  <EmojiCell key={`search-${i}-${e.c}`} entry={e} onPick={handlePick} insertLabel={copy.insertEmoji} />
                 ))}
               </div>
             )
@@ -222,12 +245,12 @@ export default function EmojiButton({
                 }}
                 className="pb-2"
               >
-                <div className="px-1 pt-1.5 pb-1 text-[10px] font-bold uppercase tracking-wider text-[var(--text-dim)]">
-                  {cat.label}
+                <div className="px-1 pt-1.5 pb-1 text-[12px] font-bold uppercase tracking-wider text-[var(--text-dim)]">
+                  {catName(cat.id, cat.label)}
                 </div>
                 <div className="grid grid-cols-8 gap-0.5">
                   {cat.emojis.map((e, i) => (
-                    <EmojiCell key={`${cat.id}-${i}-${e.c}`} entry={e} onPick={handlePick} />
+                    <EmojiCell key={`${cat.id}-${i}-${e.c}`} entry={e} onPick={handlePick} insertLabel={copy.insertEmoji} />
                   ))}
                 </div>
               </div>
@@ -244,9 +267,9 @@ export default function EmojiButton({
                 key={cat.id}
                 type="button"
                 onClick={() => jumpToCategory(cat.id)}
-                aria-label={cat.label}
-                title={cat.label}
-                className={`h-7 w-7 flex items-center justify-center rounded-md text-[16px] transition-colors ${
+                aria-label={catName(cat.id, cat.label)}
+                title={catName(cat.id, cat.label)}
+                className={`h-7 w-7 flex items-center justify-center rounded-lg text-[16px] transition-colors ${
                   isActive
                     ? "bg-[var(--bg-surface)] text-[var(--text-primary)]"
                     : "text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-subtle)]"
@@ -265,8 +288,8 @@ export default function EmojiButton({
       <button
         type="button"
         ref={triggerRef}
-        onClick={() => setOpen((v) => !v)}
-        aria-label={label}
+        onClick={() => (open ? closePopover() : setOpen(true))}
+        aria-label={triggerLabel}
         aria-expanded={open}
         aria-haspopup="dialog"
         className={
@@ -286,17 +309,21 @@ export default function EmojiButton({
 /* ── Single emoji cell ─────────────────────────────────────────────── */
 
 function EmojiCell({
-  entry, onPick,
+  entry, onPick, insertLabel,
 }: {
   entry: EmojiEntry;
   onPick: (emoji: string) => void;
+  /* The verb only — the emoji itself follows it, and an emoji needs no
+     translating. Passed in rather than resolved here so this cell stays the
+     cheap leaf it is: it renders once per emoji, and there are thousands. */
+  insertLabel: string;
 }) {
   return (
     <button
       type="button"
       onClick={() => onPick(entry.c)}
-      className="aspect-square rounded-md flex items-center justify-center text-[22px] hover:bg-[var(--bg-surface-subtle)] active:bg-[var(--bg-surface)] transition-colors"
-      aria-label={`Insert ${entry.c}`}
+      className="aspect-square rounded-lg flex items-center justify-center text-[22px] hover:bg-[var(--bg-surface-subtle)] active:bg-[var(--bg-surface)] transition-colors"
+      aria-label={`${insertLabel} ${entry.c}`}
       title={entry.k.split(" ").slice(0, 3).join(" ")}
     >
       <span aria-hidden>{entry.c}</span>

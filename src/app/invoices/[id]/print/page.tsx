@@ -56,6 +56,23 @@ export default function InvoicePrintPage({
     };
   }, [id]);
 
+  /* Name the saved PDF. The browser's "Save as PDF" dialog uses
+     document.title as the default filename, so without this every export
+     lands as the app's own title and they all collide in the download
+     folder. Owner's order: customer - company - number. Blanks are dropped
+     rather than left as empty separators. */
+  useEffect(() => {
+    if (!invoice) return;
+    const safe = (s: unknown) => (typeof s === "string" ? s.trim() : "");
+    const name =
+      [safe(invoice.customerName), safe(invoice.companyName), safe(invoice.invoiceNo)]
+        .filter(Boolean)
+        .join(" - ") || "Invoice";
+    const prev = document.title;
+    document.title = name;
+    return () => { document.title = prev; };
+  }, [invoice]);
+
   /* PDF-ready flag + auto-print trigger -- identical to the
      quotation print page so the Export PDF flow is consistent. */
   useEffect(() => {

@@ -42,17 +42,17 @@
  *
  * Keys reuse the frozen vocabulary (voltage_phase, power_kw, air_pressure,
  * control_system, working_height…) so spec-i18n and the mirror stay coherent.
- * Logistics comes from the shared factories: physicalGroup and
- * packingShippingGroup both carry `formTab: "logistics"`, so dimensions, CBM
- * and weights land on the Logistics tab exactly as they do for spreading
- * machines — the pattern the owner asked to repeat.
+ * Logistics comes from the shared physicalGroup factory, which carries
+ * `formTab: "logistics"`, so machine dimensions and weight land on the
+ * Logistics tab exactly as they do for spreading machines. Packing (crate,
+ * CBM, net/gross, container counts) is NOT a template question any more — it
+ * is a fixed section on that tab for every product.
  */
 
 import type { ProductSchemaDefinition } from "@/types/product-schema";
 import { DEFAULT_PUBLIC_VISIBILITY } from "../visibility";
 import {
   electricalGroup,
-  packingShippingGroup,
   physicalGroup,
   safetyComplianceGroup,
 } from "./_shared-machine-groups";
@@ -181,7 +181,6 @@ export const STEAM_IRON_SCHEMA: ProductSchemaDefinition = {
     },
     electricalGroup(30),
     physicalGroup(60),
-    packingShippingGroup(65),
     safetyComplianceGroup(70, [
       { value: "four_level_safety", label: "4-Level Safety System" },
       { value: "boiler_safety_valve", label: "Boiler Safety Valve" },
@@ -278,7 +277,6 @@ export const COLLAR_CUFF_PRESS_SCHEMA: ProductSchemaDefinition = {
     },
     electricalGroup(30),
     physicalGroup(60),
-    packingShippingGroup(65),
     safetyComplianceGroup(70),
   ],
 };
@@ -391,7 +389,6 @@ export const DOUBLE_STATION_HEAT_PRESS_SCHEMA: ProductSchemaDefinition = {
     },
     electricalGroup(30),
     physicalGroup(60),
-    packingShippingGroup(65),
     safetyComplianceGroup(70, [
       { value: "photoelectric_guard", label: "Photoelectric Safety Guard" },
       { value: "thermal_cutoff", label: "Heating-Plate Thermal Cut-Off" },
@@ -519,7 +516,6 @@ export const PNEUMATIC_HEAT_PRESS_SCHEMA: ProductSchemaDefinition = {
     },
     electricalGroup(30, { motorLabel: "Drive Motor" }),
     physicalGroup(60),
-    packingShippingGroup(65),
     safetyComplianceGroup(70, [
       { value: "photoelectric_guard", label: "Photoelectric Safety Guard" },
       { value: "dual_hand_control", label: "Two-Hand Control" },

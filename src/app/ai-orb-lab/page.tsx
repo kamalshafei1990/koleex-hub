@@ -1,5 +1,7 @@
 "use client";
 
+import AdminAuth from "@/components/admin/AdminAuth";
+
 /* Dev-only harness for the AIOrb status system. NOT registered in
    APP_REGISTRY — reachable only by typing /ai-orb-lab.
 
@@ -47,7 +49,7 @@ const FAMILY_DESC: Record<string, string> = {
   "ordered-orbit": "rim particles become ordered, brighter, clockwise",
 };
 
-export default function AiOrbLab() {
+function AiOrbLabInner() {
   const [state, setState] = useState<AIOrbState>("idle");
   const [activity, setActivity] = useState<AIOrbActivity>("none");
   const [result, setResult] = useState<AIOrbResult>("none");
@@ -156,5 +158,15 @@ export default function AiOrbLab() {
         </label>
       </div>
     </div>
+  );
+}
+
+/* BEHIND THE SAME DOOR AS /ai. A dev harness with no nav link was still a
+   public, unauthenticated page in production (audit, 2026-09-11). */
+export default function AiOrbLab() {
+  return (
+    <AdminAuth>
+      <AiOrbLabInner />
+    </AdminAuth>
   );
 }

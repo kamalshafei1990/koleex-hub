@@ -30,8 +30,13 @@ import type {
   CashMovementType,
 } from "@/lib/finance/types";
 import { useTranslation } from "@/lib/i18n";
-import { financeT } from "@/lib/translations/finance";
+import { FIN_BANK } from "@/lib/translations/finance/bank";
+import { FIN_MOVEMENT } from "@/lib/translations/finance/movement";
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
+
+/* Only the namespaces this screen actually reads — see finance.ts. */
+const DICT = { ...FIN_BANK, ...FIN_MOVEMENT } as const;
+
 
 export const INPUT =
   "w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-primary)] px-3 py-2 text-sm placeholder-[var(--text-ghost)] transition focus:border-[var(--border-strong)] focus:outline-none focus:ring-1 focus:ring-[var(--border-subtle)]";
@@ -65,7 +70,7 @@ export function EditDrawer({
   onClose: () => void;
   onSaved: () => void;
 }) {
-  const { t } = useTranslation(financeT);
+  const { t } = useTranslation(DICT);
   const [local, setLocal] = useState<Partial<BankAccount>>(draft ?? {});
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -211,7 +216,7 @@ export function ManualMovementDrawer({
   onClose: () => void;
   onSaved: () => void;
 }) {
-  const { t } = useTranslation(financeT);
+  const { t } = useTranslation(DICT);
   const [draft, setDraft] = useState<{
     bank_account_id: string;
     movement_type: CashMovementType;

@@ -1,10 +1,11 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
+import { useWarmData } from "@/lib/warm-cache";
 import { useToast } from "@/components/kds/useToast";
 import FinanceHeader from "@/components/finance/FinanceHeader";
 import { useTranslation } from "@/lib/i18n";
-import { financeT } from "@/lib/translations/finance";
+import { FIN_SUPPLIERS } from "@/lib/translations/finance/suppliers";
 import { EmptyState, ProgressBar } from "@/components/finance/FinanceUi";
 import { formatCompact } from "@/components/finance/FinanceUiX";
 import {
@@ -17,21 +18,18 @@ import type { FinanceSupplierAccount } from "@/lib/finance/types";
 
 export default function FinanceSuppliers() {
   const { showToast, toastElement } = useToast();
-  const { t } = useTranslation(financeT);
-  const [rows, setRows] = useState<FinanceSupplierAccount[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  const load = useCallback(async () => {
-    setLoading(true);
-    try {
-      const r = await fetch("/api/finance/suppliers", { cache: "no-store" });
-      const j = (await r.json()) as { suppliers?: FinanceSupplierAccount[] };
-      setRows(j.suppliers ?? []);
-    } finally {
-      setLoading(false);
-    }
+  const { t } = useTranslation(FIN_SUPPLIERS);
+  /* Warm: this endpoint takes no filter, so the response IS the default
+     view. Paints from the last answer on the first frame, refreshes behind
+     the painted screen. */
+  const fetchAll = useCallback(async () => {
+    const r = await fetch("/api/finance/suppliers", { cache: "no-store" });
+    if (!r.ok) throw new Error(`fin:suppliers: ${r.status}`);
+    const j = (await r.json()) as { suppliers?: FinanceSupplierAccount[] };
+    return j.suppliers ?? [];
   }, []);
-  useEffect(() => { void load(); }, [load]);
+  const { data, loading, reload: load } = useWarmData<FinanceSupplierAccount[]>("fin:suppliers", fetchAll);
+  const rows = useMemo(() => data ?? [], [data]);
 
   /* Phase R.1 — generate an external account statement for one
      supplier. Same flow as the customer statement: print export →

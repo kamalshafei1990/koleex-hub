@@ -49,6 +49,7 @@ import FileBadge2Icon from "@/components/icons/ui/FileBadge2Icon";
 import ShieldIcon from "@/components/icons/ui/ShieldIcon";
 import WrenchIcon from "@/components/icons/ui/WrenchIcon";
 import MonitorIcon from "@/components/icons/ui/MonitorIcon";
+import SparklesIcon from "@/components/icons/ui/SparklesIcon";
 import { useMeBootstrap } from "@/lib/me-bootstrap";
 import { useTranslation } from "@/lib/i18n";
 import { settingsT } from "@/lib/translations/settings";
@@ -96,13 +97,20 @@ const PrivacyTab        = dynamic(() => import("@/components/settings/tabs/Priva
 const StampSignatureTab = dynamic(() => import("@/components/settings/tabs/StampSignatureTab"), { loading: tabLoading });
 const AdminTab          = dynamic(() => import("@/components/settings/tabs/AdminTab"),          { loading: tabLoading });
 const AboutTab          = dynamic(() => import("@/components/settings/tabs/AboutTab"),          { loading: tabLoading });
+const AiTab             = dynamic(() => import("@/components/settings/tabs/AiTab"),             { loading: tabLoading });
 
 /* Language names in their own script, the way the switcher shows them — a
    reader scanning for "العربية" should find the word they picked, not a
    translation of it. */
 const LANG_LABEL: Record<string, string> = { en: "English", zh: "中文", ar: "العربية" };
 
-type Tab = "profile" | "calendar" | "display" | "wallpaper" | "sounds" | "region" | "notifications" | "password" | "security" | "privacy" | "assets" | "admin" | "about";
+type Tab = "profile" | "calendar" | "display" | "wallpaper" | "sounds" | "region" | "ai" | "notifications" | "password" | "security" | "privacy" | "assets" | "admin" | "about";
+const TABS: readonly Tab[] = ["profile", "calendar", "display", "wallpaper", "sounds", "region", "ai", "notifications", "password", "security", "privacy", "assets", "admin", "about"];
+function requestedTab(): Tab | null {
+  if (typeof window === "undefined") return null;
+  const want = new URLSearchParams(window.location.search).get("tab");
+  return want && (TABS as readonly string[]).includes(want) ? (want as Tab) : null;
+}
 
 type SectionDef = {
   id: Tab; label: string; subtitle: string;
@@ -163,9 +171,14 @@ function SettingsContent() {
   const skin = useSkin();
   const aurora = skin === "aurora";
   const isSA = !!boot?.isSuperAdmin;
-  const [tab, setTab] = useState<Tab>("profile");
+  /* DEEP LINK: /settings?tab=ai opens a section directly — the Koleex AI
+     sidebar points here. Read once, lazily, allow-listed to the tabs that
+     exist; on the server there is no window and the default stands. Nothing
+     visible depends on it during hydration: this page renders a skeleton
+     until the account arrives. */
+  const [tab, setTab] = useState<Tab>(() => requestedTab() ?? "profile");
   /* Mobile only: false → show the list, true → show the pushed detail. */
-  const [mobileDetail, setMobileDetail] = useState(false);
+  const [mobileDetail, setMobileDetail] = useState(() => requestedTab() !== null);
   /* ABOVE the `if (!account)` return below. A hook under an early return is
      what took out /projects with React #310 — the order changes the moment
      the account resolves. Every hook in this component stays up here. */
@@ -264,6 +277,11 @@ function SettingsContent() {
       node: <SoundsTab />,
     },
     {
+      id: "ai", label: t("nav.ai"), subtitle: t("nav.ai.sub"),
+      icon: <SparklesIcon className="h-3.5 w-3.5" />,
+      node: <AiTab account={account} onChanged={onChanged} />,
+    },
+    {
       id: "region", label: t("nav.region"), subtitle: t("nav.region.sub"),
       value: langLabel,
       icon: <GlobeIcon className="h-3.5 w-3.5" />,
@@ -339,7 +357,7 @@ function SettingsContent() {
        why it was already Super-Admin-only. A group of one called "Workspace"
        was hiding that. */
   const personalItems = (["profile"] as Tab[]).map(byId);
-  const displayItems = (["display", "wallpaper", "sounds", "region", "calendar"] as Tab[]).map(byId);
+  const displayItems = (["display", "wallpaper", "sounds", "region", "ai", "calendar"] as Tab[]).map(byId);
   const notificationsItem = byId("notifications");
   const securityItems = (["password", "security", "privacy"] as Tab[]).map(byId);
   const adminItems = isSA ? (["assets", "admin"] as Tab[]).map(byId) : [];
@@ -373,10 +391,12 @@ function SettingsContent() {
 
       {/* Body */}
       <div className="relative z-[1] flex-1 min-h-0">
-        <div className="mx-auto max-w-[1600px] h-full px-4 md:px-6 py-5 md:grid md:grid-cols-[320px_minmax(0,1fr)] md:gap-8">
+        <div className={`kx-md-split ${mobileDetail ? "kx-md-pushed" : ""} mx-auto max-w-[1600px] h-full px-4 md:px-6 py-5 md:grid md:grid-cols-[320px_minmax(0,1fr)] md:gap-8`}>
 
-          {/* Master list — sidebar on iPad, full screen on iPhone. */}
-          <aside className={`${mobileDetail ? "hidden" : "block"} md:block h-full overflow-y-auto no-scrollbar space-y-4`}>
+          {/* Master list — sidebar on iPad, full screen on iPhone. The
+              hidden/block flip became the kx-md push (motion system):
+              opening a section slides the detail in over this list. */}
+          <aside className="kx-md-list md:block h-full overflow-y-auto no-scrollbar space-y-4">
             {/* Account card (Apple-ID style).
 
                 REFRACTION WAS TRIED HERE AND REMOVED. LiquidGlass wrapped this
@@ -472,7 +492,7 @@ function SettingsContent() {
           </aside>
 
           {/* Detail pane */}
-          <main className={`${mobileDetail ? "block" : "hidden"} md:block h-full overflow-y-auto no-scrollbar`}>
+          <main className="kx-md-detail max-md:bg-[var(--bg-primary)] md:block h-full overflow-y-auto no-scrollbar">
             {/* Mobile-only back to the settings list (iOS push nav). */}
             <button
               type="button"

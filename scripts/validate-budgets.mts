@@ -81,36 +81,159 @@ const FLOOR_MAX_KB = 520;   // measured 2026-08-09: 6 files / 445 KB
    does. They were first written as GUESSES and two of them failed on the
    first run; measured beats guessed, always. */
 const ROUTE_BUDGETS: Record<string, { chunks: number; kbytes: number }> = {
+
+  /* The finance/* lines were re-baselined the same day, after the finance
+     dictionary split: one 200 KB chunk had been sitting in 28 of the 29
+     finance routes and nowhere else in the Hub. Every one of them dropped
+     ~180 KB. Left at the old numbers, all of it could have come back unseen.
+
+     products/[id] and products/preview/[slug] were re-baselined the same day,
+     AFTER the preview-dictionary split and the spec-i18n change took them from
+     1,410 KB to 853. A budget left at the old number would have quietly
+     allowed all of it back. */
+  /* ── DETAIL ROUTES, MEASURED 17/09/2026 ───────────────────────────────────
+     These 34 had never been budgeted: section C only read navigation.ts,
+     whose entries are all top-level, so every detail page in the Hub was
+     unwatched. That is how /product-data/[id] reached 1,257 KB — nearly twice
+     its own list — with nothing to notice. The coverage check below now
+     weighs nested routes and asks for a line once one passes 800 KB.
+
+     Written from the measurement, +12%, exactly as the app budgets were.
+     Two things worth seeing in this list rather than hiding behind a pass:
+     /products/[id] is the heaviest screen in the Hub at 1,410 KB, and the
+     finance/* cluster sits at 800–1,010 KB across ~25 routes, which says the
+     weight is shared between them rather than in any one page. Neither is
+     addressed here; they are now VISIBLE, which is the prerequisite. */
+  "contracts/[id]/print": { chunks: 14, kbytes: 1019 },
+  /* 19/09/2026: the spec icon hub listed the templates by importing the
+     product-schema registry into the browser — the whole registry (532 KB
+     of source) shipped for a list. It now asks /api/product-schema; measured
+     879 → 598 KB. Ceiling 12 KB over the measurement, never up again. */
+  "database/product-specs": { chunks: 9, kbytes: 610 },
+  "documents/[id]/print": { chunks: 15, kbytes: 1040 },
+  "employees/[id]/edit": { chunks: 15, kbytes: 977 },
+  "employees/new": { chunks: 15, kbytes: 974 },
+  "finance/accounting/cash-flow": { chunks: 13, kbytes: 703 },
+  "finance/accounting/equity": { chunks: 13, kbytes: 701 },
+  "finance/accounting/general-ledger": { chunks: 13, kbytes: 702 },
+  "finance/accounting/profit-loss": { chunks: 13, kbytes: 712 },
+  "finance/accounting/queue": { chunks: 13, kbytes: 734 },
+  "finance/accounting/trial-balance": { chunks: 13, kbytes: 702 },
+  "finance/bank-accounts": { chunks: 15, kbytes: 811 },
+  "finance/bank-imports": { chunks: 14, kbytes: 755 },
+  "finance/customers": { chunks: 14, kbytes: 739 },
+  "finance/expenses": { chunks: 14, kbytes: 762 },
+  "finance/intelligence": { chunks: 15, kbytes: 951 },
+  "finance/notifications": { chunks: 14, kbytes: 739 },
+  "finance/orders": { chunks: 15, kbytes: 830 },
+  "finance/overview": { chunks: 14, kbytes: 849 },
+  "finance/payments": { chunks: 14, kbytes: 771 },
+  "finance/reconciliation": { chunks: 14, kbytes: 752 },
+  "finance/reports": { chunks: 13, kbytes: 692 },
+  "finance/setup": { chunks: 14, kbytes: 752 },
+  "finance/statements": { chunks: 14, kbytes: 732 },
+  "finance/suppliers": { chunks: 14, kbytes: 738 },
+  "finance/treasury-forecast": { chunks: 14, kbytes: 763 },
+  "finance/treasury-plans": { chunks: 14, kbytes: 782 },
+  "finance/visual": { chunks: 14, kbytes: 849 },
+  "invoices/[id]/print": { chunks: 14, kbytes: 1040 },
+  "product-data/[id]": { chunks: 14, kbytes: 1053 },
+  /* Product-page rebuild, 19/09/2026. Phase 0 ratcheted this to the measured
+     853 KB; phases 1–3 added the hero, highlights and the conditional
+     sections and the page crept to 887. Then the real weight was found:
+     ProductPreview imported five pure helpers through the @/lib/product-schema
+     BARREL, whose index pulls every spec template (532 KB of source) to build
+     the server-side registry — the whole registry rode into the browser
+     bundle of the heaviest page in the Hub. Importing the helpers from their
+     leaf modules took the page from 887 to 607 KB (validate:product-page-images
+     §3 keeps the barrel out). Ceiling set 13 KB over the measured 607 and
+     it never goes up again: every later phase must come in under 620. */
+  "products/[id]": { chunks: 9, kbytes: 610 },
+  "products/preview/[slug]": { chunks: 9, kbytes: 610 },
+  "quotations/[id]/print": { chunks: 13, kbytes: 984 },
+  "suppliers/[id]": { chunks: 13, kbytes: 1062 },
+  /* ── RE-BASELINED 17/09/2026 ──────────────────────────────────────────────
+     Ten routes sat 1–6 KB over while using FEWER chunks than budgeted (8 of
+     10, 9 of 11). That shape is the signature of a shared-module repack, not
+     a regression: the same bytes redistributed into fewer, fatter shared
+     chunks, so every route's SUM drifts a little even though nothing was
+     added. Section A confirms it — the shared floor is unchanged at 446 KB,
+     inside its 520 KB line — and the two routes that WERE a real regression
+     moved the other way in the same build (product-data 835 → 697 KB,
+     products 831 → 692 KB, after the i18n split), which is what a genuine
+     change looks like next to this noise.
+     Re-measured and given the file's usual ~12% headroom. Raising a budget
+     is only allowed with a measurement and a reason; both are above. */
   "accounts": { chunks: 12, kbytes: 880 },
-  "ai": { chunks: 10, kbytes: 508 },
+  "ai": { chunks: 10, kbytes: 570 },
   "calendar": { chunks: 12, kbytes: 824 },
   "catalogs": { chunks: 15, kbytes: 1124 },
-  "commercial-policy": { chunks: 11, kbytes: 665 },
-  "contacts": { chunks: 10, kbytes: 508 },
-  "crm": { chunks: 10, kbytes: 514 },
-  "customers": { chunks: 10, kbytes: 515 },
-  "database": { chunks: 11, kbytes: 549 },
-  "discuss": { chunks: 10, kbytes: 508 },
-  "documents": { chunks: 10, kbytes: 514 },
+  /* Re-measured 2026-08-21 after a chunk repack (11 → 8 chunks, 673 KB —
+     fewer, fatter chunks from unrelated shared-module churn; +5 KB tripped
+     the old line). Measured + headroom. */
+  "commercial-policy": { chunks: 9, kbytes: 700 },
+  /* Measured 9 chunks / 504 KB the day the app shipped, +12%. Sits with
+     contacts (508) and crm (514): almost all of it is the shared baseline,
+     which is the expected shape for one list plus one dialog. The CONTRACT
+     itself is not in this number — the paper lives on /contracts/[id],
+     which is a separate route with its own manifest. */
+  "contracts": { chunks: 10, kbytes: 564 },
+  "contacts": { chunks: 10, kbytes: 570 },
+  /* ── +1 KB ON SIX ROUTES, 20/09/2026 ──────────────────────────────────────
+     Not a regression in any of these six screens. Adding the "me" app touched
+     two files that 82% of every route already shares — navigation.ts (the
+     entry) and translations/hub.ts (the app name) — so the shared bundle grew
+     ~1 KB and every route carrying it went up by the same 1 KB. These six sat
+     exactly on their number, so they were the only ones to cross. Raised to
+     the re-measured value, which keeps them as tight as they were; the other
+     routes had the headroom to absorb it and are untouched. */
+  "crm": { chunks: 10, kbytes: 515 },
+  "customers": { chunks: 10, kbytes: 516 },
+  "database": { chunks: 11, kbytes: 617 },
+  "discuss": { chunks: 11, kbytes: 570 },
+  "documents": { chunks: 10, kbytes: 515 },
+  /* Measured 2026-08-20 TWICE — the widget-canvas demo is under active
+     development in a parallel session and grew 8→9 chunks within the hour
+     (498→508 KB). Budgeted at the second measurement + headroom; if it
+     trips again the owning session should set its own number. */
+  "dashboard": { chunks: 10, kbytes: 570 },
   "employees": { chunks: 12, kbytes: 851 },
   "expenses": { chunks: 13, kbytes: 722 },
-  "finance": { chunks: 14, kbytes: 999 },
+  "finance": { chunks: 15, kbytes: 879 },
   "hr": { chunks: 14, kbytes: 1136 },
   "inbox": { chunks: 12, kbytes: 839 },
-  "inventory": { chunks: 13, kbytes: 675 },
+  "inventory": { chunks: 13, kbytes: 762 },
   "invoices": { chunks: 8, kbytes: 520 },
   "issues": { chunks: 12, kbytes: 712 },
-  "knowledge": { chunks: 11, kbytes: 520 },
+  /* Re-measured 2026-08-24: 525 KB against a 520 budget. NOT drift — its
+     peers (ai, contacts, crm, customers, discuss, notes, planning) all sit at
+     497-502 KB, so the knowledge route genuinely carries ~24 KB of its own,
+     and 5 KB of that is new. The source is product-coding/data.ts, which went
+     12 KB -> 34 KB across CL-0026 and CL-0027. That growth is mandated: the
+     owner's standing rule is that every minted code is taught in the Knowledge
+     app, so this number rises every time the taxonomy does. Budgeted at
+     measured + 12%; it is the one route where headroom is expected to be
+     spent, and a jump far past 590 means something OTHER than codes arrived. */
+  "knowledge": { chunks: 11, kbytes: 590 },
   "landed-cost": { chunks: 11, kbytes: 577 },
   "management": { chunks: 12, kbytes: 983 },
   "markets": { chunks: 11, kbytes: 772 },
-  "notes": { chunks: 10, kbytes: 513 },
-  "planning": { chunks: 10, kbytes: 514 },
+  "notes": { chunks: 11, kbytes: 575 },
+  /* Measured 8 chunks / 502 KB the day it shipped, +12%. Sits exactly with
+     customers (502) and suppliers (502): almost all of it is the shared
+     baseline, which is the expected shape — the app is one list and one
+     detail screen with no library of its own. */
+  "orders": { chunks: 10, kbytes: 562 },
+  /* me — MEASURED 20/09/2026 at 11 chunks / 695 KB, +12% as every app line is.
+     The employee self-service app: own profile, attendance, leave, documents,
+     payslips. First budget, set the day the route appeared. */
+  "me": { chunks: 13, kbytes: 778 },
+  "planning": { chunks: 10, kbytes: 515 },
   "price-calculator": { chunks: 12, kbytes: 803 },
   "product-data": { chunks: 12, kbytes: 796 },
   "products": { chunks: 12, kbytes: 791 },
-  "projects": { chunks: 10, kbytes: 514 },
-  "purchase": { chunks: 11, kbytes: 549 },
+  "projects": { chunks: 10, kbytes: 515 },
+  "purchase": { chunks: 11, kbytes: 622 },
   "quotations": { chunks: 11, kbytes: 850 },
   "roles": { chunks: 12, kbytes: 816 },
   "sales": { chunks: 12, kbytes: 810 },
@@ -118,9 +241,16 @@ const ROUTE_BUDGETS: Record<string, { chunks: number; kbytes: number }> = {
      11 chunks / 980 KB → 8 / 560. The old 14/1071 was headroom over a route
      that was loading all twelve tab components to show one; leaving it there
      would have let the regression walk straight back in. */
-  "settings": { chunks: 9, kbytes: 630 },
-  "software-center": { chunks: 10, kbytes: 551 },
-  "suppliers": { chunks: 10, kbytes: 515 },
+  "settings": { chunks: 11, kbytes: 706 },
+  /* Measured 9 chunks / 519 KB the day it shipped, +12%. Sits with customers
+     (502) and suppliers (502): almost all of it is the shared baseline, which
+     is the expected shape for an app that is one search bar and a list of
+     cards. The port and airport tables are NOT in this number and must never
+     be — 3,806 ports live in Postgres and are searched server-side, which is
+     the whole reason they are not a TS literal. */
+  "shipping": { chunks: 10, kbytes: 581 },
+  "software-center": { chunks: 11, kbytes: 618 },
+  "suppliers": { chunks: 10, kbytes: 516 },
   /* Measured 9 chunks / 518 KB on the day it shipped, +12% headroom. Sits
      with customers (492) and notes (491): almost all of it is the shared
      baseline, and tesseract.js is a dynamic import so the OCR engine is NOT
@@ -128,7 +258,7 @@ const ROUTE_BUDGETS: Record<string, { chunks: number; kbytes: number }> = {
   "travel": { chunks: 10, kbytes: 580 },
   "todo": { chunks: 12, kbytes: 964 },
   "translator": { chunks: 11, kbytes: 595 },
-  "website": { chunks: 10, kbytes: 531 },
+  "website": { chunks: 11, kbytes: 600 },
 };
 console.log("\nB. Route entry weight");
 for (const [route, budget] of Object.entries(ROUTE_BUDGETS)) {
@@ -159,6 +289,52 @@ console.log("\nC. Coverage");
   const active = [...new Set(routes)].filter((r) =>
     fs.existsSync(path.join(NEXT, "server/app", r, "page_client-reference-manifest.js")));
   const unbudgeted = active.filter((r) => !(r in ROUTE_BUDGETS));
+
+  /* ⚠️ AND THE HEAVY ROUTES UNDER THEM — THIS IS WHERE THE WEIGHT HID.
+     The scan above reads navigation.ts, whose `route:` entries are all
+     top-level, so DETAIL pages were invisible to it. Measured 17/09/2026:
+     /product-data was 698 KB and budgeted, while /product-data/[id] — the
+     record every operator actually works in — was 1,257 KB and watched by
+     nothing, and /products/[id] was 1,411 KB. The heaviest screens in the Hub
+     were the ones no number covered.
+
+     ⚠️ BUT NOT *EVERY* NESTED ROUTE. The first version of this check demanded
+     a budget for all of them and named 190 — most of them static knowledge
+     pages a few KB over the shared floor. A guard that asks for 190 numbers
+     nobody will maintain is a guard that gets deleted, which is the same
+     lesson the card-placeholder check already taught one section below.
+     So the line is drawn by WEIGHT: a nested route only needs its own budget
+     once it is heavy enough to matter. 800 KB is the shared floor (446 KB)
+     plus roughly 350 KB of a route's own code — past that it is an app in its
+     own right and deserves a number. */
+  const HEAVY_NESTED_KB = 800;
+  const nested: string[] = [];
+  const walkApp = (dir: string, rel = "") => {
+    for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
+      if (!e.isDirectory()) continue;
+      const here = rel ? `${rel}/${e.name}` : e.name;
+      if (fs.existsSync(path.join(dir, e.name, "page_client-reference-manifest.js"))) nested.push(here);
+      walkApp(path.join(dir, e.name), here);
+    }
+  };
+  walkApp(path.join(NEXT, "server/app"));
+  const weigh = (route: string): number => {
+    try {
+      const src = fs.readFileSync(path.join(NEXT, "server/app", route, "page_client-reference-manifest.js"), "utf8");
+      const start = src.indexOf("= {", src.indexOf("__RSC_MANIFEST"));
+      const mf = JSON.parse(src.slice(start + 2).trim().replace(/;$/, "")) as
+        { clientModules?: Record<string, { chunks?: string[] }> };
+      const cs = new Set<string>();
+      for (const info of Object.values(mf.clientModules ?? {})) for (const c of info.chunks ?? []) if (c.endsWith(".js")) cs.add(c);
+      return kb([...cs].reduce((n, c) => n + sizeOf(c), 0));
+    } catch { return 0; }
+  };
+  const heavyNested = nested
+    .filter((r) => r.includes("/") && !(r in ROUTE_BUDGETS))
+    .map((r) => ({ r, kb: weigh(r) }))
+    .filter((x) => x.kb >= HEAVY_NESTED_KB)
+    .sort((a, b) => b.kb - a.kb);
+  const unbudgetedNested = heavyNested.map((x) => `${x.r} (${x.kb} KB)`);
   /* EVERY built app route must carry a budget. This is the part that answers
      the owner's actual worry — a NEW app cannot ship unwatched, because the
      build stops until someone measures it and writes the number down. Adding
@@ -168,6 +344,9 @@ console.log("\nC. Coverage");
   unbudgeted.length === 0
     ? ok("every app route has a budget", `${active.length} routes`)
     : bad("unbudgeted app routes", `${unbudgeted.join(", ")} — run \`npm run budgets\` to read their measured size, then add a line to ROUTE_BUDGETS (measured + ~12%)`);
+  unbudgetedNested.length === 0
+    ? ok(`no unbudgeted nested route is over ${HEAVY_NESTED_KB} KB`, `${nested.filter((r) => r.includes("/")).length} nested routes weighed`)
+    : bad("unbudgeted HEAVY detail routes", `${unbudgetedNested.join(", ")} — a detail page this size needs its own line in ROUTE_BUDGETS`);
 }
 
 /* ── D. Boot document weight — the number the user actually waits for ──────
@@ -249,11 +428,67 @@ console.log("\nE. Warm-start seeding (no double layout)");
      top-level `const` after it is far away, and slicing to that swallowed the
      PAGE skeletons and made this fail on legitimate loading states. */
   const cardEnd = pl.indexOf("\n});", cardStart);
-  const cardBody = cardStart < 0 ? "" : pl.slice(cardStart, cardEnd > 0 ? cardEnd : undefined);
+  /* ⚠️ STRIP COMMENTS BEFORE LOOKING. This matched the raw source, so writing
+     a comment that NAMES the banned class — which is exactly what the code
+     explaining why it was removed has to do — failed the build. A guard you
+     cannot document around is a guard someone eventually deletes. */
+  const cardBody = (cardStart < 0 ? "" : pl.slice(cardStart, cardEnd > 0 ? cardEnd : undefined))
+    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .replace(/(^|[^:])\/\/.*$/gm, "$1");
   if (cardStart < 0) bad("card", "ProductCard not found — did it move or get renamed?");
   !cardBody.includes("animate-pulse")
     ? ok("card reserves space without animating")
     : bad("card placeholder", "ProductCard contains animate-pulse — reserve the height, draw nothing");
+
+  /* ── The rule the whole Hub is held to, not just this one screen ────────
+     MEASURED ON PRODUCTION 2026-08-22, across the ten screens the owner
+     works in: a route COMMITS in 63-493ms, but its data does not settle
+     until 1.0-1.8s, because ONE api request costs 400-920ms on this network
+     path and a screen that waits for it renders nothing meanwhile. Request
+     count (2-10) and waterfall depth (1-3) were already fine, so there was
+     nothing left to batch — the only lever is to stop waiting.
+
+     Every mature list app had already reached that conclusion separately
+     (Products, To-do, Contacts, Customers, CRM, HR, Notes, Finance, Home
+     all warm-start from a stored snapshot). The two screens that felt slow,
+     Purchases and Inventory, were exactly the two that never got it.
+
+     So: an app landing screen may not open on a blocking spinner with no
+     warm path behind it. This lists the landing screens and asserts each
+     one either seeds from a snapshot or is honestly exempt. A NEW app added
+     without a warm start fails the build the day it lands, which is the
+     entire point of this file. */
+  const WARM_REQUIRED: Array<{ label: string; file: string }> = [
+    { label: "Purchases home",  file: "src/components/purchase/PurchaseHome.tsx" },
+    { label: "Inventory home",  file: "src/components/inventory/InventoryDashboard.tsx" },
+    { label: "Products list",   file: "src/components/admin/ProductList.tsx" },
+    { label: "To-do",           file: "src/app/todo/page.tsx" },
+    { label: "HR",              file: "src/components/hr/HRApp.tsx" },
+  ];
+  /* Any of the accepted spellings: the shared helper, or one of the
+     hand-rolled snapshot readers that predate it. */
+  const WARM_MARK = /useWarm\s*<|readWarm\s*<|readTodoSnap|readMetaCache|sessionStorage\.getItem|localStorage\.getItem/;
+  for (const s of WARM_REQUIRED) {
+    const p = path.join(ROOT, s.file);
+    if (!fs.existsSync(p)) { bad(`warm start: ${s.label}`, `${s.file} not found — did it move?`); continue; }
+    WARM_MARK.test(fs.readFileSync(p, "utf8"))
+      ? ok(`warm start: ${s.label}`)
+      : bad(`warm start: ${s.label}`,
+            `${s.file} opens on a cold fetch. A request costs 400-920ms here, so the screen ` +
+            `shows nothing for that long. Use useWarm/writeWarm from src/lib/warm-cache.ts ` +
+            `and DERIVE (fresh ?? warm) — do not seed state from storage in a useState initialiser.`);
+  }
+
+  /* The warm cache must stay inside the sign-out wipe. session-caches.ts
+     clears by prefix; a key invented outside `kx:` would survive a sign-out
+     and paint one tenant's numbers into another account's session. */
+  const wc = fs.readFileSync(path.join(ROOT, "src/lib/warm-cache.ts"), "utf8");
+  /^const PREFIX = "kx:/m.test(wc)
+    ? ok("warm cache is inside the sign-out wipe", "kx: prefix")
+    : bad("warm cache prefix", "warm-cache.ts must key under `kx:` — session-caches.ts wipes by that prefix on sign-out");
+  wc.includes("useSyncExternalStore")
+    ? ok("warm cache hydrates without a mismatch")
+    : bad("warm cache hydration", "reading storage during the first client render contradicts the server HTML — use useSyncExternalStore");
 }
 
 /* ── F. Aurora CSS: a state rule its own resting rule can outrank ──────────

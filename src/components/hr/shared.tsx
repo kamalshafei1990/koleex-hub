@@ -5,8 +5,11 @@
    Matches the Koleex Hub admin design system.
    --------------------------------------------------------------------------- */
 
-import { useEffect, useState, type ReactNode, type ComponentType, type MouseEvent } from "react";
+import { useEffect, useSyncExternalStore, type ReactNode, type ComponentType, type MouseEvent } from "react";
 import { createPortal } from "react-dom";
+
+/* Stable no-op subscription for the mounted-flag useSyncExternalStore. */
+const noopSubscribe = () => () => {};
 import Link from "next/link";
 import CrossIcon from "@/components/icons/ui/CrossIcon";
 
@@ -45,6 +48,8 @@ export const sectionTitleCls =
 
 export const LEAVE_STATUS_MAP: Record<string, string> = {
   pending:   "bg-amber-500/15 text-amber-400 border-amber-500/20",
+  /* Phase B — manager said yes, HR has not decided yet. */
+  manager_approved: "bg-blue-500/15 text-blue-400 border-blue-500/20",
   approved:  "bg-emerald-500/15 text-emerald-400 border-emerald-500/20",
   rejected:  "bg-red-500/15 text-red-400 border-red-500/20",
   cancelled: "bg-slate-500/15 text-slate-400 border-slate-500/20",
@@ -72,6 +77,11 @@ export const ATTENDANCE_STATUS_MAP: Record<string, string> = {
   late:     "bg-amber-500/15 text-amber-400 border-amber-500/20",
   absent:   "bg-red-500/15 text-red-400 border-red-500/20",
   half_day: "bg-blue-500/15 text-blue-400 border-blue-500/20",
+  /* Phase C sheet statuses — derived days, muted: they are not punches. */
+  leave:    "bg-blue-500/10 text-blue-400 border-blue-500/15",
+  holiday:  "bg-slate-500/10 text-slate-400 border-slate-500/15",
+  weekend:  "bg-slate-500/10 text-slate-500 border-slate-500/10",
+  future:   "bg-transparent text-[var(--text-faint)] border-transparent",
 };
 
 export const PAYSLIP_STATUS_MAP: Record<string, string> = {
@@ -151,8 +161,9 @@ export function ModalShell({
      modal's own title bar and first fields slid up underneath the app header
      and tab strip. Rendering into <body> escapes any such ancestor for good,
      whatever a parent does with transform/filter/contain later. */
-  const [mounted, setMounted] = useState(false);
-  useEffect(() => setMounted(true), []);
+  /* True after hydration, false during SSR — the store form of the classic
+     mounted flag, with no setState-in-effect render cascade. */
+  const mounted = useSyncExternalStore(noopSubscribe, () => true, () => false);
 
   useEffect(() => {
     if (!open) return;

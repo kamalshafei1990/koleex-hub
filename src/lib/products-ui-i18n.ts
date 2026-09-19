@@ -1,4 +1,6 @@
 import type { Translations } from "@/lib/i18n";
+import { PRODUCTS_LIST_I18N } from "@/lib/products-list-i18n";
+import { PRODUCTS_PREVIEW_I18N } from "@/lib/products-preview-i18n";
 
 /* ═══════════════════════════════════════════════════════════════════
    PRODUCTS + PRODUCT DATA — OPERATOR UI DICTIONARY  (P0 #5 · i18n)
@@ -18,7 +20,16 @@ import type { Translations } from "@/lib/i18n";
    vocabulary across all five surfaces.
    ═══════════════════════════════════════════════════════════════════ */
 
+/* ⚠️ THE LIST'S AND THE PREVIEW'S KEYS LIVE IN THEIR OWN FILES AND ARE SPREAD
+   IN HERE. The editor resolves every key from this one import exactly as
+   before; the catalogue list and the customer-facing product page each import
+   only their small file, so a new packing or supplier string never lands in
+   their bundles. Define a key in exactly one of the three files —
+   validate:products-i18n fails on a duplicate. */
 export const PRODUCTS_UI_I18N: Translations = {
+  ...PRODUCTS_LIST_I18N,
+  ...PRODUCTS_PREVIEW_I18N,
+  ...PRODUCTS_LIST_I18N,
   /* ── Wizard step labels ─────────────────────────────────────────── */
   "step.classify": { en: "Classify", zh: "分类", ar: "التصنيف" },
   "step.classification": { en: "Classification", zh: "分类", ar: "التصنيف" },
@@ -29,7 +40,11 @@ export const PRODUCTS_UI_I18N: Translations = {
   "step.machineSpecs": { en: "Machine Specs", zh: "机器规格", ar: "مواصفات الماكينة" },
   "step.models": { en: "Variants", zh: "变体", ar: "المتغيرات" },
   "step.modelsVariants": { en: "Variants & Pricing", zh: "变体与定价", ar: "المتغيرات والتسعير" },
-  "step.logisticsCustoms": { en: "Logistics & Customs", zh: "物流与海关", ar: "اللوجستيات والجمارك" },
+  "step.options":      { en: "Buyer Options", zh: "买家选项", ar: "خيارات المشتري" },
+  "step.optionsShort": { en: "Options", zh: "选项", ar: "الخيارات" },
+  "options.title":     { en: "Buyer Options", zh: "买家选项", ar: "خيارات المشتري" },
+  "options.badge":     { en: "Configurator questions", zh: "配置问题", ar: "أسئلة المنشئ" },
+  "step.logisticsCustoms": { en: "Packing & Logistics", zh: "包装与物流", ar: "التعبئة واللوجستيات" },
   "step.technical": { en: "Technical", zh: "技术参数", ar: "التفاصيل التقنية" },
   "step.media": { en: "Media & Files", zh: "媒体与文件", ar: "الوسائط والملفات" },
   "step.review": { en: "Review", zh: "审核", ar: "المراجعة" },
@@ -58,20 +73,17 @@ export const PRODUCTS_UI_I18N: Translations = {
     zh: "缺少 {n} 个必填字段",
     ar: "ينقص {n} من الحقول المطلوبة",
   },
-
-  /* ── Save / publish / draft actions ─────────────────────────────── */
-  "action.save": { en: "Save", zh: "保存", ar: "حفظ" },
-  "action.saveProduct": { en: "Save Product", zh: "保存产品", ar: "حفظ المنتج" },
-  "action.saving": { en: "Saving…", zh: "保存中…", ar: "جارٍ الحفظ…" },
-  "action.cancel": { en: "Cancel", zh: "取消", ar: "إلغاء" },
-  "action.retry": { en: "Retry", zh: "重试", ar: "إعادة المحاولة" },
-  "action.next": { en: "Next", zh: "下一步", ar: "التالي" },
-  "action.back": { en: "Back", zh: "上一步", ar: "السابق" },
-  "action.newProduct": { en: "New Product", zh: "新建产品", ar: "منتج جديد" },
-  "status.draft": { en: "Draft", zh: "草稿", ar: "مسودة" },
-  "status.active": { en: "Active", zh: "已上架", ar: "نشط" },
-  "status.archived": { en: "Archived", zh: "已归档", ar: "مؤرشف" },
   "save.success": { en: "Product saved successfully!", zh: "产品保存成功！", ar: "تم حفظ المنتج بنجاح!" },
+  "save.modelFailed": {
+    en: "Couldn't save model \"{code}\" — the rest of the save was stopped so nothing is half-written. Check your access or try again.",
+    zh: "无法保存型号“{code}” — 已停止其余保存操作，避免数据写入一半。请检查您的权限或重试。",
+    ar: "تعذّر حفظ الموديل «{code}» — تم إيقاف بقية الحفظ حتى لا تُكتب البيانات نصف كتابة. تحقق من صلاحياتك أو حاول مجددًا.",
+  },
+  "save.modelCreateFailed": {
+    en: "Couldn't create model \"{code}\" — the rest of the save was stopped.",
+    zh: "无法创建型号“{code}” — 已停止其余保存操作。",
+    ar: "تعذّر إنشاء الموديل «{code}» — تم إيقاف بقية الحفظ.",
+  },
   "save.cantPublish": {
     en: "Can't publish yet — fill the required fields. Switch status to Draft to save your work for now.",
     zh: "暂时无法发布 — 请填写必填字段。可先将状态切换为草稿以保存当前进度。",
@@ -91,6 +103,16 @@ export const PRODUCTS_UI_I18N: Translations = {
     en: "Draft restored — review the fields, then Save when you're ready.",
     zh: "草稿已恢复 — 请检查各字段，准备好后点击保存。",
     ar: "تم استرجاع المسودة — راجع الحقول ثم احفظ عندما تكون جاهزًا.",
+  },
+  "draft.staleWarning": {
+    en: "⚠ This draft is OLDER than the last save — restoring it will bring back old values and undo newer changes.",
+    zh: "⚠ 此草稿早于最近一次保存 — 恢复它将带回旧值并撤销较新的更改。",
+    ar: "⚠ هذه المسودة أقدم من آخر حفظ — استرجاعها سيعيد قيمًا قديمة ويلغي التغييرات الأحدث.",
+  },
+  "draft.photosDropped": {
+    en: "{n} attached photo(s) could not be kept in the draft — please attach them again before saving.",
+    zh: "{n} 张已附加的图片无法保留在草稿中 — 请在保存前重新附加。",
+    ar: "تعذّر الاحتفاظ بـ {n} صورة مرفقة في المسودة — يرجى إرفاقها مرة أخرى قبل الحفظ.",
   },
 
   /* ── Media upload feedback (P0 #3) ──────────────────────────────── */
@@ -123,13 +145,6 @@ export const PRODUCTS_UI_I18N: Translations = {
     zh: "目前无法验证该编码 — 保存时将重新检查。",
     ar: "تعذّر التحقق من هذا الرمز الآن — سنعيد التحقق عند الحفظ.",
   },
-
-  /* ── Product list / cards (Products + Product Data list) ────────── */
-  "list.products": { en: "Products", zh: "产品", ar: "المنتجات" },
-  "list.productData": { en: "Product Data", zh: "产品数据", ar: "بيانات المنتجات" },
-  "list.search": { en: "Search products…", zh: "搜索产品…", ar: "ابحث عن المنتجات…" },
-  "list.allDivisions": { en: "All divisions", zh: "全部事业部", ar: "كل الأقسام" },
-  "list.filters": { en: "Filters", zh: "筛选", ar: "التصفية" },
   "sup.noneLinked": { en: "No supplier linked yet. Link a supplier from the Suppliers app below.", zh: "尚未关联供应商。请从下方的供应商应用中关联一个供应商。", ar: "لا يوجد مورّد مرتبط بعد. اربط مورّداً من تطبيق الموردين أدناه." },
   "sup.viewDetails": { en: "View supplier details", zh: "查看供应商详情", ar: "عرض تفاصيل المورّد" },
   "sup.identityHint": { en: "Supplier · tap for details · managed in the Suppliers app", zh: "供应商 · 点击查看详情 · 在供应商应用中管理", ar: "مورّد · اضغط للتفاصيل · يُدار في تطبيق الموردين" },
@@ -142,6 +157,11 @@ export const PRODUCTS_UI_I18N: Translations = {
   "sup.modelNumber": { en: "Model number", zh: "型号", ar: "رقم الموديل" },
   "sup.costPrice": { en: "Cost price", zh: "成本价", ar: "سعر التكلفة" },
   "sup.eg": { en: "e.g.", zh: "例如", ar: "مثال:" },
+  "sup.memberCosts": {
+    en: "This is the family cost. These models have their own — pick one on the strip above to edit it:",
+    zh: "这是家族成本。以下型号有各自的成本 — 在上方型号条中选择一个进行编辑：",
+    ar: "هذه تكلفة العائلة. الموديلات التالية لها تكلفتها الخاصة — اختر أحدها من الشريط أعلاه لتعديله:",
+  },
   "sup.cnyTitle": { en: "Factory cost is always entered in CNY (¥) — the pricing engine works from the CNY cost.", zh: "出厂成本始终以人民币(¥)录入——定价引擎基于人民币成本计算。", ar: "تكلفة المصنع تُدخل دائماً بعملة CNY (¥) — محرك التسعير يعمل على التكلفة بها." },
   "sup.costIncludes": { en: "Cost includes", zh: "成本包含", ar: "التكلفة تشمل" },
   "sup.costDelivered": { en: "Delivered to Koleex (full landed)", zh: "送达Koleex(全到岸)", ar: "التسليم إلى Koleex (تكلفة كاملة)" },
@@ -295,106 +315,12 @@ export const PRODUCTS_UI_I18N: Translations = {
   "fc.removeCard": { en: "Remove card", zh: "删除卡片", ar: "حذف البطاقة" },
   "fc.moveUp": { en: "Move up", zh: "上移", ar: "تحريك لأعلى" },
   "fc.moveDown": { en: "Move down", zh: "下移", ar: "تحريك لأسفل" },
-  "list.featured": { en: "Featured", zh: "精选", ar: "مميّز" },
-  "list.modelOne": { en: "model", zh: "个型号", ar: "موديل" },
-  "list.modelMany": { en: "models", zh: "个型号", ar: "موديلات" },
-  "list.allCategories": { en: "All categories", zh: "全部类别", ar: "كل الفئات" },
-  "list.resultsCount": { en: "{n} product(s)", zh: "{n} 个产品", ar: "{n} منتج" },
-
-  /* ── List surface: header, search, filters, results (P0 #5a) ────── */
-  "list.controlPanel": { en: "Control Panel", zh: "控制面板", ar: "لوحة التحكم" },
-  "list.countInCatalog": { en: "products in catalog", zh: "个产品（共计）", ar: "منتج في الكتالوج" },
-  "list.backToTop": { en: "Back to top", zh: "回到顶部", ar: "العودة إلى الأعلى" },
   "hero.addPhotos": { en: "Add more photos", zh: "添加更多照片", ar: "أضِف صوراً أخرى" },
   "hero.galleryLabel": { en: "Gallery", zh: "图库", ar: "المعرض" },
   "hero.removePhoto": { en: "Remove photo", zh: "移除照片", ar: "إزالة الصورة" },
   "pp.f.techDiff": { en: "Technical differences vs product specs", zh: "与产品规格的技术差异", ar: "الفروقات التقنية عن مواصفات المنتج" },
   "pp.f.inheritsSpecs": { en: "Inherits all product specifications — no per-model differences recorded yet.", zh: "继承产品全部规格 — 尚未录入该型号的差异。", ar: "يرث كل مواصفات المنتج — لا فروقات مسجَّلة لهذا الموديل بعد." },
   "hero.galleryHint": { en: "Extra angles & details — these appear in the product gallery. Manage all media in the Media tab.", zh: "更多角度与细节 — 显示在产品图库中。全部媒体可在“媒体”标签管理。", ar: "زوايا وتفاصيل إضافية — تظهر في معرض المنتج. أدر كل الوسائط من تبويب الوسائط." },
-  /* Kept short enough to READ. Measured at 375px: the full sentence needed
-     329px of a 263px text area, so the phone showed "Search by name, model
-     code, bra…" — the list of what you can search by, cut off mid-list, which
-     is the one thing a placeholder exists to say. The long form now lives in
-     the aria-label and the title, where nothing truncates it. */
-  "list.searchPlaceholder": {
-    en: "Search name, code, brand, tags…",
-    zh: "搜索名称、编码、品牌、标签…",
-    ar: "ابحث بالاسم أو الرمز أو العلامة أو الوسوم…",
-  },
-  "list.searchAria": {
-    en: "Search products by name, model code, brand, category or tags",
-    zh: "按名称、型号编码、品牌、类别或标签搜索产品",
-    ar: "ابحث عن المنتجات بالاسم أو رمز الموديل أو العلامة التجارية أو الفئة أو الوسوم",
-  },
-  "list.clearSearch": { en: "Clear search", zh: "清除搜索", ar: "مسح البحث" },
-  "list.allOption": { en: "All", zh: "全部", ar: "الكل" },
-  "list.divisions": { en: "Divisions", zh: "部门", ar: "الأقسام" },
-  "list.activeFilters": { en: "Active:", zh: "已筛选：", ar: "مفعّلة:" },
-  "list.removeFilter": { en: "Remove filter {label}", zh: "移除筛选 {label}", ar: "إزالة عامل التصفية {label}" },
-  "list.noMatchesFor": { en: "No matches for", zh: "未找到匹配项：", ar: "لا توجد نتائج مطابقة لـ" },
-  "list.showing": { en: "Showing", zh: "显示", ar: "عرض" },
-  "list.ofProducts": { en: "of {total} products", zh: "／共 {total} 个产品", ar: "من أصل {total} منتج" },
-  "list.matching": { en: "matching", zh: "匹配", ar: "مطابقة لـ" },
-  "list.noProductsYetHint": {
-    en: "Add your first product to get started.",
-    zh: "添加您的第一个产品以开始。",
-    ar: "أضف منتجك الأول للبدء.",
-  },
-  "list.noResultsHint": {
-    en: "Try adjusting your search or filters.",
-    zh: "请尝试调整搜索或筛选条件。",
-    ar: "حاول تعديل البحث أو عوامل التصفية.",
-  },
-
-  /* ── Filter labels + options (P0 #5a) ───────────────────────────── */
-  "filter.division": { en: "Division", zh: "事业部", ar: "القسم" },
-  "filter.category": { en: "Category", zh: "类别", ar: "الفئة" },
-  "filter.subcategory": { en: "Subcategory", zh: "子类别", ar: "الفئة الفرعية" },
-  "filter.supplier": { en: "Supplier", zh: "供应商", ar: "المورّد" },
-  "filter.brand": { en: "Brand", zh: "品牌", ar: "العلامة التجارية" },
-  "filter.level": { en: "Level", zh: "等级", ar: "المستوى" },
-  "filter.visibility": { en: "Visibility", zh: "可见性", ar: "إمكانية الظهور" },
-  "filter.status": { en: "Status", zh: "状态", ar: "الحالة" },
-  "filter.featured": { en: "Featured", zh: "精选", ar: "مميّز" },
-  "filter.visible": { en: "Visible", zh: "可见", ar: "ظاهر" },
-  "filter.hidden": { en: "Hidden", zh: "隐藏", ar: "مخفي" },
-  "filter.isFeatured": { en: "Featured", zh: "精选", ar: "مميّز" },
-  "filter.notFeatured": { en: "Not Featured", zh: "非精选", ar: "غير مميّز" },
-
-  /* ── List/grid column headers + actions (P0 #5a) ────────────────── */
-  "list.colProduct": { en: "Product", zh: "产品", ar: "المنتج" },
-  "list.colCategory": { en: "Category", zh: "类别", ar: "الفئة" },
-  "list.colBrand": { en: "Brand", zh: "品牌", ar: "العلامة التجارية" },
-  "list.colModels": { en: "Models", zh: "型号", ar: "الموديلات" },
-  "list.colStatus": { en: "Status", zh: "状态", ar: "الحالة" },
-  "action.addProduct": { en: "Add Product", zh: "添加产品", ar: "إضافة منتج" },
-  "card.editProduct": { en: "Edit product", zh: "编辑产品", ar: "تعديل المنتج" },
-  "card.deleteProduct": { en: "Delete product", zh: "删除产品", ar: "حذف المنتج" },
-
-  /* ── Search suggestions dropdown (P0 #5a) ───────────────────────── */
-  "search.groupCategories": { en: "Categories", zh: "类别", ar: "الفئات" },
-  "search.groupSubcategories": { en: "Subcategories", zh: "子类别", ar: "الفئات الفرعية" },
-  "search.groupBrands": { en: "Brands", zh: "品牌", ar: "العلامات التجارية" },
-  "search.groupSuppliers": { en: "Suppliers", zh: "供应商", ar: "المورّدون" },
-  "search.groupProducts": { en: "Products", zh: "产品", ar: "المنتجات" },
-  "search.inCategory": { en: "in", zh: "属于", ar: "في" },
-  "search.open": { en: "Open →", zh: "打开 →", ar: "فتح ←" },
-
-  /* ── Generic empty / error / loading states ─────────────────────── */
-  "state.loading": { en: "Loading…", zh: "加载中…", ar: "جارٍ التحميل…" },
-  "state.empty": { en: "Nothing here yet", zh: "暂无内容", ar: "لا يوجد شيء هنا بعد" },
-  "state.noProducts": { en: "No products yet", zh: "暂无产品", ar: "لا توجد منتجات بعد" },
-  "state.noResults": { en: "No products match your filters", zh: "没有符合筛选条件的产品", ar: "لا توجد منتجات مطابقة لعوامل التصفية" },
-  "state.loadFailedTitle": { en: "Couldn't load products", zh: "无法加载产品", ar: "تعذّر تحميل المنتجات" },
-  /* Shown INSTEAD of the failure panel when the warm-start cache already put
-     the catalogue on screen — the products are there, only the refresh
-     failed, so the message is about freshness rather than availability. */
-  "state.showingCached": {
-    en: "Showing your last loaded catalog — couldn't reach the server just now.",
-    zh: "显示上次加载的产品目录 — 暂时无法连接服务器。",
-    ar: "بنعرضلك آخر نسخة اتحمّلت — الاتصال بالسيرفر مانفعش دلوقتي.",
-  },
-  "state.serverTimeout": { en: "The server took too long to respond. Please retry.", zh: "服务器响应超时，请重试。", ar: "استغرق الخادم وقتًا طويلًا للرد. يرجى إعادة المحاولة." },
 
   /* ── Wizard chrome: header, nav, breadcrumb, steps gate (P0 #5b) ── */
   "wizard.newProductHeading": { en: "New Product", zh: "新建产品", ar: "منتج جديد" },
@@ -668,6 +594,8 @@ export const PRODUCTS_UI_I18N: Translations = {
   "technical.jumpToHero": { en: "Jump to Hero", zh: "跳转到主图", ar: "الانتقال إلى الواجهة" },
   "technical.title": { en: "Technical Details", zh: "技术细节", ar: "التفاصيل التقنية" },
   "technical.badge": { en: "Electrical · Physical", zh: "电气 · 物理", ar: "كهربائية · فيزيائية" },
+  "technical.badge2": { en: "Electrical", zh: "电气", ar: "كهربائية" },
+  "logistics.physicalBadge": { en: "Dimensions · Weight", zh: "尺寸 · 重量", ar: "الأبعاد · الوزن" },
   "technical.purchaseOptions": { en: "Purchase Options", zh: "购买选项", ar: "خيارات الشراء" },
   "technical.purchaseBadge": { en: "Head-only · Complete set", zh: "仅机头 · 整套", ar: "الرأس فقط · الطقم الكامل" },
   "technical.purchaseHint": {
@@ -687,10 +615,6 @@ export const PRODUCTS_UI_I18N: Translations = {
   "technical.leadTimeOverrideHint": { en: "Per-model Lead Time in the Models step overrides this.", zh: "“型号”步骤中的单型号交期将覆盖此值。", ar: "تتجاوز هذه مدةُ التوريد لكل موديل في خطوة الموديلات." },
   "technical.stockProfile": { en: "Stock Profile", zh: "库存档案", ar: "ملف المخزون" },
   "technical.stockBadge": { en: "Inventory", zh: "库存", ar: "المخزون" },
-
-  /* ── Models step (P0 #5b) ── */
-    "list.codesLess": { en: "Less", zh: "收起", ar: "أقل" },
-  "preview.primary": { en: "Primary", zh: "主型号", ar: "أساسي" },
   "fam.strip": { en: "Family", zh: "系列", ar: "العائلة" },
   "fam.addMember": { en: "Add model", zh: "添加型号", ar: "إضافة موديل" },
   "fam.editingNote": { en: "You are editing {code} — Hero, Specs, Price and Logistics save to this model. Other tabs are family-shared.", zh: "正在编辑 {code}——Hero、规格、价格与物流将保存到该型号。其他标签为系列共享。", ar: "أنت تحرّر {code} — Hero والمواصفات والسعر واللوجستيات تُحفظ لهذا الموديل. بقية التبويبات مشتركة للعائلة." },
@@ -972,66 +896,6 @@ export const PRODUCTS_UI_I18N: Translations = {
     zh: "状态为“草稿” — 仅内部保存，不会显示在公开目录。准备发布时，请在“主图”步骤切换为“已上架”。",
     ar: "الحالة مسودة — محفوظ داخليًا ولا يظهر في الكتالوج العام. بدّل إلى نشط في خطوة الواجهة عند الجاهزية للنشر.",
   },
-  /* Smart save labels */
-  "action.savePublish": { en: "Save & Publish", zh: "保存并发布", ar: "حفظ ونشر" },
-  "action.saveChanges": { en: "Save Changes", zh: "保存更改", ar: "حفظ التغييرات" },
-  "action.saveAsDraft": { en: "Save as Draft", zh: "保存为草稿", ar: "حفظ كمسودة" },
-
-  /* ── TemplateView: read-mode renderer chrome (P0 #5d) ───────────────
-     Only UI furniture is translated here. Section titles, field labels,
-     highlight titles/blurbs, descriptions and spec values come from the
-     template/schema or product data and are intentionally left as-is. */
-  "view.loadingProduct": { en: "Loading product…", zh: "正在加载产品…", ar: "جارٍ تحميل المنتج…" },
-  "view.gallery": { en: "Gallery", zh: "图库", ar: "معرض الصور" },
-  "view.detailViews": { en: "Detail views", zh: "细节视图", ar: "اللقطات التفصيلية" },
-
-  /* ── ProductPreview: schema-driven product page chrome (P0 #5d) ─────
-     Hardcoded section eyebrows/titles, generic labels, empty/placeholder
-     states, and buttons only. Per-product section/group/field titles,
-     option labels, knowledge headlines, taglines and spec values are
-     schema/content-driven and stay untranslated (deferred multilingual
-     content layer). */
-  "preview.emptyState": {
-    en: "No schema for this classification. The public preview will appear once a schema is registered for this subcategory.",
-    zh: "此分类暂无模式。为该子类别注册模式后，公开预览将会出现。",
-    ar: "لا يوجد مخطط لهذا التصنيف. ستظهر المعاينة العامة بمجرد تسجيل مخطط لهذه الفئة الفرعية.",
-  },
-  "preview.untitledProduct": { en: "Untitled product", zh: "未命名产品", ar: "منتج بلا عنوان" },
-  "preview.warranty": { en: "Warranty", zh: "保修", ar: "الضمان" },
-  "preview.origin": { en: "Origin", zh: "原产地", ar: "المنشأ" },
-  "preview.noMainImage": { en: "No main image", zh: "暂无主图", ar: "لا توجد صورة رئيسية" },
-  "preview.learnMore": { en: "Learn more", zh: "了解更多", ar: "اعرف المزيد" },
-  "preview.yes": { en: "Yes", zh: "是", ar: "نعم" },
-  "preview.no": { en: "No", zh: "否", ar: "لا" },
-  "preview.eyebrowCapability": { en: "Capability", zh: "能力", ar: "القدرات" },
-  "preview.suitableMaterials": { en: "Suitable Materials", zh: "适用材料", ar: "المواد المناسبة" },
-  "preview.eyebrowBuiltFor": { en: "Built for", zh: "适用于", ar: "مصمَّم لـ" },
-  "preview.applications": { en: "Applications", zh: "应用", ar: "التطبيقات" },
-  "preview.eyebrowHandsOff": { en: "Hands-off", zh: "免手动", ar: "تشغيل آلي" },
-  "preview.automationWorkflow": { en: "Automation workflow", zh: "自动化流程", ar: "سير العمل الآلي" },
-  "preview.eyebrowWhyItWins": { en: "Why it wins", zh: "优势所在", ar: "لماذا يتفوّق" },
-  "preview.advantages": { en: "Advantages", zh: "优势", ar: "المزايا" },
-  "preview.eyebrowWhatItMeans": { en: "What it means for you", zh: "对您的意义", ar: "ماذا يعني لك" },
-  "preview.productIntelligence": { en: "Product Intelligence", zh: "产品智能", ar: "ذكاء المنتج" },
-  "preview.eyebrowLayer3": { en: "Layer 3", zh: "第三层", ar: "الطبقة 3" },
-  "preview.technicalSpecifications": { en: "Technical Specifications", zh: "技术规格", ar: "المواصفات التقنية" },
-  "preview.eyebrowCore": { en: "Core", zh: "核心", ar: "أساسي" },
-  "preview.features": { en: "Features", zh: "功能特性", ar: "الميزات" },
-  "preview.eyebrowGoodToKnow": { en: "Good to know", zh: "须知", ar: "معلومات مفيدة" },
-  "preview.buyerQuestions": { en: "Buyer Questions", zh: "买家问题", ar: "أسئلة المشترين" },
-  "preview.whatsIncluded": { en: "What's Included", zh: "包装清单", ar: "محتويات العبوة" },
-  "preview.media": { en: "Media", zh: "媒体", ar: "الوسائط" },
-  "preview.viewIn3dAr": { en: "View in 3D / AR", zh: "查看 3D / AR", ar: "العرض ثلاثي الأبعاد / الواقع المعزز" },
-  "preview.documents": { en: "Documents", zh: "文档", ar: "المستندات" },
-  "preview.download": { en: "Download", zh: "下载", ar: "تنزيل" },
-  "preview.compliance": { en: "Compliance", zh: "合规", ar: "الامتثال" },
-  "preview.countPhotos": { en: "{n} photos", zh: "{n} 张照片", ar: "{n} صورة" },
-  "preview.countVideos": { en: "{n} videos", zh: "{n} 个视频", ar: "{n} فيديو" },
-  "preview.countDocuments": { en: "{n} documents", zh: "{n} 个文档", ar: "{n} مستند" },
-
-  /* ── 2026-07-30 full-translation sweep: keys that were falling back ── */
-  "preview.eyebrowSafety": { en: "Before you run it", zh: "运行之前", ar: "قبل التشغيل" },
-  "preview.warnings": { en: "Warnings & Safety", zh: "警告与安全", ar: "التحذيرات والسلامة" },
   "hero.noSupplierLinked": { en: "No supplier linked — add one in the Supplier tab", zh: "未关联供应商 — 请在“供应商”标签页添加", ar: "لا يوجد مورّد مرتبط — أضِفه من تبويب المورّد" },
   "hero.unknownSupplier": { en: "(supplier)", zh: "（供应商）", ar: "(مورّد)" },
   "hero.manageInSupplierTab": { en: "Manage in the Supplier tab", zh: "在“供应商”标签页管理", ar: "يُدار من تبويب المورّد" },
@@ -1063,13 +927,25 @@ export const PRODUCTS_UI_I18N: Translations = {
   "pricing.baseFobBadge": { en: "Auto · by product level", zh: "自动 · 按产品等级", ar: "تلقائي · حسب مستوى المنتج" },
   "pricing.fobTitle": { en: "Market & Customer Pricing", zh: "市场与客户定价", ar: "تسعير الأسواق والعملاء" },
   "pricing.fobBadge": { en: "Live · from Commercial Setup", zh: "实时 · 来自商务设置", ar: "مباشر · من الإعداد التجاري" },
+  "pricing.basisIncomplete": { en: "The supplier price is not full-landed/tax-in and the missing costs are not entered yet (Supplier tab) — pricing below uses the raw price.", zh: "供应商报价并非全到岸/含税，且缺失的费用尚未填写（供应商标签页）——下方定价按原价计算。", ar: "سعر المورّد ليس واصلاً بالكامل/شاملاً الضريبة والتكاليف الناقصة لم تُدخل بعد (تبويب المورّد) — التسعير أدناه يستخدم السعر الخام." },
+  "pricing.previewingOption": { en: "Previewing the pricing below from option", zh: "下方定价正按此选项预览", ar: "التسعير أدناه معاين من الخيار" },
+  "pricing.previewingOptionHint": { en: "the main price is unchanged; click the option again to switch back.", zh: "主价格未变；再次点击该选项即可切回。", ar: "السعر الأساسي لم يتغيّر؛ اضغط الخيار مرة أخرى للرجوع." },
+  "pricing.ladder2opt": { en: "Add these as Buyer Options (Options tab)", zh: "添加为买家选项（选项标签页）", ar: "أضفها كخيارات للمشتري (تبويب الخيارات)" },
+  "pricing.ladder2optSaving": { en: "Adding…", zh: "添加中…", ar: "جارٍ الإضافة…" },
+  "pricing.ladder2optDone": { en: "✓ Added as Buyer Options — set the weight deltas on the Options tab", zh: "✓ 已添加为买家选项——请在选项标签页设置重量差", ar: "✓ أُضيفت كخيارات للمشتري — حدّد فروق الوزن في تبويب الخيارات" },
+  "pricing.ladder2optError": { en: "Failed — try again", zh: "失败——请重试", ar: "فشل — حاول مجدداً" },
+  "mv.pricingMode": { en: "Pricing", zh: "定价方式", ar: "طريقة التسعير" },
+  "mv.pricingFixed": { en: "Fixed price", zh: "固定价格", ar: "سعر ثابت" },
+  "mv.pricingFrom": { en: "From — base + options", zh: "起价 — 基础价 + 选项", ar: "يبدأ من — أساس + خيارات" },
+  "mv.pricingOnRequest": { en: "Priced per configuration", zh: "按配置报价", ar: "يُسعَّر حسب التهيئة" },
+  "mv.priceNote": { en: "What drives the price", zh: "价格取决于", ar: "ما يحدّد السعر" },
+  "mv.phPriceNote": { en: "e.g. depends on table width, motor and automation level", zh: "例如：取决于台面宽度、电机与自动化程度", ar: "مثال: يعتمد على عرض الطاولة والموتور ومستوى الأتمتة" },
   "pricing.optionsMovedHint": { en: "This product's options (shape, size, quality, thickness, lifting, wheels…) and their ¥ price add-ons are configured on the Specs tab. Each option's delta feeds the complete-set price on machines.", zh: "该产品的选项（形状、尺寸、材质、厚度、升降、脚轮…）及其 ¥ 价格附加在“规格”标签页配置。每个选项的差价计入整机套装价格。", ar: "خيارات هذا المنتج (الشكل، المقاس، الجودة، السماكة، الرفع، العجلات…) وإضافاتها السعرية ¥ تُضبط في تبويب المواصفات، وفرق كل خيار يدخل في سعر الطقم الكامل للمكائن." },
   "logistics.title": { en: "Origin & Customs", zh: "原产地与海关", ar: "المنشأ والجمارك" },
   "logistics.badge": { en: "Shipping · Customs", zh: "运输 · 海关", ar: "الشحن · الجمارك" },
   "logistics.countryOfOrigin": { en: "Country of Origin", zh: "原产国", ar: "بلد المنشأ" },
   "logistics.hsCode": { en: "HS Code", zh: "HS 编码", ar: "رمز HS" },
   "logistics.hsHint": { en: "Harmonized System tariff code.", zh: "海关协调制度税则编码。", ar: "رمز التعرفة في النظام المنسّق." },
-  "logistics.hsInSpecs": { en: "HS Code for this category is set in the Specifications tab (Compliance & Customs).", zh: "该品类的 HS 编码在“规格”标签页（合规与海关）中设置。", ar: "رمز HS لهذه الفئة يُضبط في تبويب المواصفات (الامتثال والجمارك)." },
   "logistics.packingTitle": { en: "Packing & shipment are per-variant", zh: "包装与运输按变体填写", ar: "التغليف والشحن على مستوى كل متغير" },
   "logistics.packingBody": { en: "Packing type, carton dimensions, CBM, net/gross weight and 20ft/40ft container quantities are entered per variant on the Variants tab.", zh: "包装方式、纸箱尺寸、CBM、净/毛重及 20/40 尺柜装载量在“变体”标签页按变体录入。", ar: "نوع التغليف وأبعاد الكرتونة وCBM والوزن الصافي/القائم وكميات حاويات 20/40 قدماً تُدخل لكل متغير في تبويب المتغيرات." },
   "logistics.jumpCommercial": { en: "Open Variants", zh: "打开变体", ar: "افتح المتغيرات" },
@@ -1175,7 +1051,17 @@ export const PRODUCTS_UI_I18N: Translations = {
   "specs.structuredSpecs": { en: "structured specs", zh: "结构化规格", ar: "مواصفات منظمة" },
   "specs.introBody": { en: "These power the public product page, quotations, brochures, and the AI layer. Each field shows where it appears (Public / Internal / AI). Choices over free text wherever possible.", zh: "这些数据驱动公开产品页、报价单、手册与 AI 层。每个字段都标注其展示范围（公开/内部/AI）。尽量使用选项而非自由文本。", ar: "هذه البيانات تغذي صفحة المنتج العامة وعروض الأسعار والكتيبات وطبقة الذكاء الاصطناعي. كل حقل يبيّن أين يظهر (عام / داخلي / AI). فضِّل الاختيارات على النص الحر ما أمكن." },
   "specs.required": { en: "Required", zh: "必填", ar: "إلزامي" },
-  "specs.autoFillsFrom": { en: "Auto-fills from", zh: "自动填充自", ar: "يتعبأ تلقائياً من" },
+  /* "Auto-fills from" became "Calculated from": the old wording described a
+     one-time convenience, and the operator read the result as a number the
+     form had guessed. These five fields ARE the arithmetic — CBM from the
+     crate, the container counts from CBM, Net Weight copied from Machine
+     Weight — and naming them so is what turns a 14-field tab back into the
+     nine questions it actually asks. */
+  "specs.calculatedFrom": { en: "Calculated from", zh: "计算自", ar: "محسوبة من" },
+  "specs.badgeCalculated": { en: "Calculated", zh: "计算值", ar: "محسوبة" },
+  "specs.badgeEdited": { en: "Edited", zh: "已手改", ar: "معدّلة" },
+  "specs.typedNotFollowing": { en: "Typed by hand — no longer follows", zh: "手动输入 — 不再跟随", ar: "مكتوبة يدوياً — لم تعد تتبع" },
+  "specs.recalculate": { en: "Recalculate", zh: "重新计算", ar: "أعد الحساب" },
   "specs.linkedField": { en: "the linked field", zh: "关联字段", ar: "الحقل المرتبط" },
   "specs.canTypeManually": { en: "you can also type it manually.", zh: "也可手动输入。", ar: "ويمكنك إدخاله يدوياً." },
   "specs.yes": { en: "Yes", zh: "是", ar: "نعم" },
@@ -1189,9 +1075,194 @@ export const PRODUCTS_UI_I18N: Translations = {
   "step.knowledgeRel": { en: "Knowledge & Relationships", zh: "知识与关联", ar: "المعرفة والعلاقات" },
   "step.supplier": { en: "Supplier", zh: "供应商", ar: "المورّد" },
   "step.price": { en: "Price", zh: "价格", ar: "السعر" },
-  "step.logistics": { en: "Logistics", zh: "物流", ar: "اللوجستيات" },
+  "step.logistics": { en: "Packing & Logistics", zh: "包装与物流", ar: "التعبئة واللوجستيات" },
+  /* The fixed Packing & Logistics sections (2026-09-13). Packing stopped being
+     a per-subcategory template question, so its headings are UI strings now. */
+  "logistics.packingSection":      { en: "Packing",              zh: "包装",         ar: "التعبئة" },
+  "logistics.packingSectionBadge": { en: "Crates · Weights",     zh: "木箱 · 重量",   ar: "الصناديق · الأوزان" },
+  "logistics.loadingSection":      { en: "Loading & Containers", zh: "装柜",         ar: "التحميل والحاويات" },
+  "logistics.loadingSectionBadge": { en: "20ft · 40ft · 40HQ",   zh: "20尺 · 40尺 · 40高柜", ar: "٢٠ قدم · ٤٠ قدم · ٤٠HQ" },
+
+  /* ── Packing & Logistics, the fixed section (2026-09-13) ──
+     Every string the operator can see on that tab. It shipped in English only
+     and the owner reads the form in three languages — an untranslated field is
+     an unusable field for whoever is doing data entry that day. */
+  "pk.modeQ":            { en: "How is it packed?", zh: "如何包装？", ar: "إزاي بتتغلّف؟" },
+  "pk.modePerUnit":      { en: "One unit → its own package(s)", zh: "一台 → 独立包装", ar: "وحدة واحدة ← طرودها الخاصة" },
+  "pk.modePerPackage":   { en: "One package → many pieces", zh: "一箱 → 多件", ar: "طرد واحد ← قطع كتير" },
+  "pk.modeHintUnit":     { en: "A machine: one unit ships as one or more crates.", zh: "机器：一台以一个或多个木箱发运。", ar: "ماكينة: الوحدة بتتشحن في صندوق أو أكتر." },
+  "pk.modeHintPkg":      { en: "A small item: one carton holds many pieces.", zh: "小件：一箱装多件。", ar: "صنف صغير: الكرتونة بتشيل كذا قطعة." },
+  "pk.piecesPerPkg":     { en: "Pieces per package", zh: "每箱件数", ar: "عدد القطع في الطرد" },
+  "pk.piecesHint":       { en: "The first thing a customer asks about a small item. Container counts below are in PIECES.", zh: "客户对小件最先问的问题。下方装柜数量按“件”计。", ar: "أول سؤال العميل بيسأله عن أي صنف صغير. أرقام الحاويات تحت بالقطعة." },
+  "pk.cbm":              { en: "CBM (m³)", zh: "体积 CBM（立方米）", ar: "الحجم CBM (م٣)" },
+  "pk.cbmHintCalc":      { en: "Calculated from the package sizes below — L × W × H ÷ 1,000,000.", zh: "由下方包装尺寸自动计算 — 长 × 宽 × 高 ÷ 1,000,000。", ar: "محسوبة من مقاسات الطرود تحت — طول × عرض × ارتفاع ÷ ١٬٠٠٠٬٠٠٠." },
+  "pk.cbmHintAll":       { en: "All packages together.", zh: "所有包装合计。", ar: "كل الطرود مع بعض." },
+  "pk.packingType":      { en: "Packing type", zh: "包装方式", ar: "نوع التغليف" },
+  "pk.woodTreatment":    { en: "Wood treatment (ISPM-15)", zh: "木材处理（ISPM-15）", ar: "معالجة الخشب (ISPM-15)" },
+  "pk.woodHint":         { en: "Solid wood packaging must be treated and IPPC-marked. Plywood and processed board are exempt.", zh: "实木包装必须熏蒸/热处理并加盖 IPPC 标识。胶合板及人造板免除。", ar: "الخشب الصلب لازم يكون معالَج وعليه ختم IPPC. الأبلكاش والألواح المصنّعة معفيين." },
+  "pk.woodWarn":         { en: "⚠ Untreated solid wood is refused by EU / US / AU customs — it must be heat-treated or fumigated and bear the IPPC mark.", zh: "⚠ 未处理实木会被欧盟/美国/澳洲海关拒收 — 必须热处理或熏蒸并加盖 IPPC 标识。", ar: "⚠ الخشب الصلب غير المعالَج بيترفض في جمارك أوروبا وأمريكا وأستراليا — لازم معالجة حرارية أو تبخير وختم IPPC." },
+  "pk.samplePhoto":      { en: "Packing sample photo", zh: "包装样照", ar: "صورة نموذج التغليف" },
+  "pk.samplePhotoCta":   { en: "Click to upload a photo of the packed product", zh: "点击上传已包装产品的照片", ar: "اضغط لرفع صورة للمنتج وهو متغلّف" },
+  "pk.samplePhotoHint":  { en: "One photograph settles what \"wooden case\" means — for the buyer and for the factory.", zh: "一张照片就说清“木箱”到底是什么 — 对客户，也对工厂。", ar: "صورة واحدة بتحسم معنى «صندوق خشب» — للعميل وللمصنع." },
+  "pk.uploading":        { en: "Uploading…", zh: "上传中…", ar: "بيترفع…" },
+  "pk.remove":           { en: "Remove", zh: "移除", ar: "حذف" },
+  "pk.packagesPerUnit":  { en: "Packages per unit — packing size · G.W.", zh: "每台包装件数 — 包装尺寸 · G.W.", ar: "الطرود لكل وحدة — مقاس التعبئة · G.W." },
+  "pk.packageOne":       { en: "Package", zh: "包装", ar: "الطرد" },
+  "pk.colPackage":       { en: "Package", zh: "包装", ar: "الطرد" },
+  "pk.colQty":           { en: "Qty", zh: "数量", ar: "العدد" },
+  "pk.colL":             { en: "L (cm)", zh: "长（厘米）", ar: "الطول (سم)" },
+  "pk.colW":             { en: "W (cm)", zh: "宽（厘米）", ar: "العرض (سم)" },
+  "pk.colH":             { en: "H (cm)", zh: "高（厘米）", ar: "الارتفاع (سم)" },
+  "pk.colGross":         { en: "Gross (kg)", zh: "毛重（公斤）", ar: "القائم (كجم)" },
+  "pk.phMachineCrate":   { en: "Machine crate", zh: "机器木箱", ar: "صندوق الماكينة" },
+  "pk.phAccBox":         { en: "Accessories box", zh: "配件箱", ar: "صندوق الملحقات" },
+  "pk.addPackage":       { en: "+ Add package", zh: "+ 添加包装", ar: "+ أضف طرد" },
+  "pk.cmHint":           { en: "Centimetres — the unit on every packing list and bill of lading. Machine dimensions above stay in mm.", zh: "厘米 — 装箱单与提单通用单位。上方整机尺寸仍为毫米。", ar: "بالسنتيمتر — وحدة كل قائمة تعبئة وبوليصة شحن. أبعاد الماكينة فوق فاضلة بالمليمتر." },
+  "pk.whatsInside":      { en: "What's inside", zh: "箱内清单", ar: "محتويات الطرد" },
+  "pk.packagesRule":     { en: "A package is one thing the forwarder loads: only what is weighed and measured on its own belongs here. A box inside another box goes under \"What's inside\" — the outer crate's size and weight already include it.", zh: "“包装”指货代单独装卸并称重的一件：只有单独量尺寸、单独称重的才填在这里。箱中箱请填在“箱内清单”——外箱的尺寸和重量已经包含它。", ar: "الطرد هو الحاجة اللي شركة الشحن بتشيلها وتوزنها لوحدها: اللي بيتقاس ويتوزن لوحده بس هو اللي يتكتب هنا. الصندوق اللي جوه صندوق تاني بيتكتب في «محتويات الطرد» — مقاس الصندوق الخارجي ووزنه شاملينه أصلاً." },
+  "pk.insideNotWeighed": { en: "not weighed separately", zh: "不单独计重", ar: "مش بيتوزن لوحده" },
+  "pk.listInside":       { en: "List what's inside", zh: "填写箱内清单", ar: "اكتب اللي جوه" },
+  "pk.insideThisBox":    { en: "What's inside this box", zh: "这个箱子里有什么", ar: "اللي جوه الصندوق ده" },
+  "pk.addItem":          { en: "+ Add item", zh: "+ 添加项目", ar: "+ أضف صنف" },
+  "pk.itemPh0":          { en: "Machine / Accessories box", zh: "机器 / 配件箱", ar: "ماكينة / صندوق ملحقات" },
+  "pk.itemPh1":          { en: "Cover, tool kit, spare needles…", zh: "机罩、工具包、备用机针…", ar: "غطا، شنطة عدة، إبر احتياطي…" },
+  "pk.iconPh":           { en: "Icon", zh: "图标", ar: "أيقونة" },
+  "pk.netWeight":        { en: "Net weight (kg)", zh: "净重（公斤）", ar: "الوزن الصافي (كجم)" },
+  "pk.netHint":          { en: "The goods without packaging.", zh: "不含包装的货物重量。", ar: "البضاعة من غير التغليف." },
+  "pk.grossWeight":      { en: "Gross weight (kg)", zh: "毛重（公斤）", ar: "الوزن القائم (كجم)" },
+  "pk.grossHint":        { en: "Sum of the packages above.", zh: "上方各包装之和。", ar: "مجموع الطرود اللي فوق." },
+  "pk.packagingWeight":  { en: "Packaging weight (kg)", zh: "包装重量（公斤）", ar: "وزن التغليف (كجم)" },
+  "pk.packagingHint":    { en: "Gross − net. Negative means one of them is wrong.", zh: "毛重 − 净重。若为负数，说明其中一个填错了。", ar: "القائم − الصافي. لو طلع بالسالب يبقى فيه رقم غلط." },
+  "pk.stackQ":           { en: "Can crates be stacked?", zh: "木箱可以堆叠吗？", ar: "الصناديق تترص فوق بعض؟" },
+  "pk.stackable":        { en: "Stackable", zh: "可堆叠", ar: "تترص" },
+  "pk.notStackable":     { en: "Not stackable", zh: "不可堆叠", ar: "ما تترصّش" },
+  "pk.stackHint":        { en: "An unstackable crate uses the floor only — everything above it is air.", zh: "不可堆叠时只占地面 — 上方全是空的。", ar: "الصندوق اللي ما يترصّش بياخد الأرضية بس — واللي فوقه هوا." },
+  "pk.maxLayers":        { en: "Maximum layers", zh: "最多层数", ar: "أقصى عدد طبقات" },
+  "pk.maxLayersHint":    { en: "Blank = as many as the container height allows.", zh: "留空 = 按柜高能放多少放多少。", ar: "سيبها فاضية = على قد ما ارتفاع الحاوية يسمح." },
+  "pk.calculated":       { en: "Calculated", zh: "计算值", ar: "محسوبة" },
+  "pk.resetTo":          { en: "Edited · reset", zh: "已手改 · 恢复", ar: "معدّلة · رجّع" },
+  "pk.enterPackages":    { en: "Enter the packages above.", zh: "请先填写上方包装。", ar: "املا الطرود اللي فوق الأول." },
+  "pk.doesNotFit":       { en: "Does not fit — a package is taller or longer than the container.", zh: "装不下 — 某个包装比柜子还高或还长。", ar: "مش داخل — فيه طرد أطول أو أعلى من الحاوية." },
+  "pk.weightLimited":    { en: "Weight-limited", zh: "受重量限制", ar: "محدود بالوزن" },
+  "pk.spaceLimited":     { en: "Space-limited — footprint × layers.", zh: "受空间限制 — 占地面积 × 层数。", ar: "محدود بالمساحة — المساحة × عدد الطبقات." },
+  "pk.payload":          { en: "payload", zh: "载重", ar: "حمولة" },
+  "pk.volumetric":       { en: "Volumetric weight (kg, air)", zh: "体积重（公斤，空运）", ar: "الوزن الحجمي (كجم، جوي)" },
+  "pk.volumetricHint":   { en: "L×W×H cm ÷ 6000. Air freight bills the greater of this and the gross weight.", zh: "长×宽×高(厘米) ÷ 6000。空运按体积重与毛重两者取大计费。", ar: "طول×عرض×ارتفاع بالسم ÷ ٦٠٠٠. الشحن الجوي بيحاسب على الأكبر بينها وبين الوزن القائم." },
+  "pk.originCert":       { en: "Origin certificate", zh: "原产地证书", ar: "شهادة المنشأ" },
+  "pk.originCertHint":   { en: "What the buyer's customs will accept as proof of origin.", zh: "买方海关认可的原产地证明。", ar: "اللي جمارك المشتري بتقبله كإثبات منشأ." },
+  "pk.dgLabel":          { en: "Regulated content", zh: "受管制内容物", ar: "محتوى خاضع لقيود" },
+  "pk.dgNone":           { en: "Nothing regulated", zh: "无受管制内容", ar: "مفيش حاجة خاضعة" },
+  "pk.dgHas":            { en: "Has regulated content", zh: "含受管制内容", ar: "فيه محتوى خاضع" },
+  "pk.dgHint":           { en: "Batteries, oil inside the machine, magnets — asked for by air freight and by every MSDS request.", zh: "电池、机内油品、磁铁 — 空运与每一次 MSDS 询问都会问到。", ar: "بطاريات، زيت جوه الماكينة، مغناطيس — الشحن الجوي وأي طلب MSDS بيسأل عنها." },
+  "pk.unNumbers":        { en: "UN number(s)", zh: "UN 编号", ar: "أرقام UN" },
+  "pk.dgNote":           { en: "Note for the forwarder", zh: "给货代的说明", ar: "ملاحظة لشركة الشحن" },
+  "pk.dgNotePh":         { en: "Oil drained before shipment", zh: "发运前已排净油品", ar: "الزيت اتصفّى قبل الشحن" },
+  "pk.portOfLoading":    { en: "Default port of loading", zh: "默认装运港", ar: "ميناء الشحن الافتراضي" },
+  "pk.portHint":         { en: "Where this product normally ships from — freight cannot be quoted without it.", zh: "该产品通常的起运港 — 没有它无法报运费。", ar: "المنتج ده بيتشحن من فين عادةً — من غيره مينفعش تسعّر شحن." },
+  "pk.cellPackages":     { en: "Packages", zh: "包装件数", ar: "الطرود" },
+  "pk.cellGross":        { en: "Gross", zh: "毛重", ar: "القائم" },
+  "pk.perPkgShort":      { en: "pcs / pkg", zh: "件/箱", ar: "قطعة/طرد" },
+  "pk.perUnitShort":     { en: "/ unit", zh: "/ 台", ar: "/ وحدة" },
+  "pk.pkgWord":          { en: "pkg", zh: "件", ar: "طرد" },
+  "pk.m3PerPc":          { en: "m³/pc", zh: "m³/件", ar: "م³/قطعة" },
+  "pk.removePackage":    { en: "Remove package", zh: "移除包装件", ar: "حذف الطرد" },
+  "pk.removeItem":       { en: "Remove item", zh: "移除项目", ar: "حذف الصنف" },
+  "pk.photoReplace":     { en: "Click or drop an image to replace", zh: "点击或拖入图片以替换", ar: "اضغط أو اسحب صورة للاستبدال" },
+  "pk.photoAdd":         { en: "Click or drop an image to add a photo", zh: "点击或拖入图片以添加照片", ar: "اضغط أو اسحب صورة لإضافة صورة" },
+  "pk.unitTitle":        { en: "Type in any unit — the value is stored in {unit}.", zh: "可按任意单位输入 — 数值以 {unit} 存储。", ar: "اكتب بأي وحدة — القيمة بتتخزن بـ {unit}." },
+  "pk.unitEnter":        { en: "Enter values in {unit}", zh: "以 {unit} 输入数值", ar: "أدخل القيم بـ {unit}" },
+  "pk.portPh":           { en: "Shanghai", zh: "上海", ar: "شنغهاي" },
+  "pk.capacityWord":     { en: "Capacity", zh: "容积", ar: "السعة" },
+  "pk.volumeLimited":    { en: "{cbm} × {eff}% ÷ {unit} CBM = {n}", zh: "{cbm} × {eff}% ÷ {unit} CBM = {n}", ar: "{cbm} × {eff}٪ ÷ {unit} CBM = {n}" },
+  "pk.weightLimitedCalc":{ en: "{payload} ÷ {gross} kg = {n}", zh: "{payload} ÷ {gross} kg = {n}", ar: "{payload} ÷ {gross} كجم = {n}" },
+  "pk.fitExplain":       { en: "Fit: {per} per layer × {layers} layers + {extra} in the gaps = {n}", zh: "装载：每层 {per} × {layers} 层 + 缝隙 {extra} = {n}", ar: "الرصّ: {per} في الطبقة × {layers} طبقات + {extra} في الفراغات = {n}" },
+  "pk.ceilings":         { en: "volume {v} · fit {f} · weight {w}", zh: "体积 {v} · 装载 {f} · 重量 {w}", ar: "الحجم {v} · الرصّ {f} · الوزن {w}" },
+  "pk.decides":          { en: "{which} decides", zh: "以{which}为准", ar: "{which} هو اللي بيحدد" },
+  "pk.limitVolume":      { en: "Volume", zh: "体积", ar: "الحجم" },
+  "pk.limitFit":         { en: "Fit", zh: "装载", ar: "الرصّ" },
+  "pk.limitWeight":      { en: "Weight", zh: "重量", ar: "الوزن" },
+  "pk.netTypeHere":      { en: "One field with Physical — type it here or there.", zh: "与“物理”中的同一字段 — 在此处或那里填写均可。", ar: "نفس حقل Physical — اكتبه هنا أو هناك." },
+  "pk.grossOnePkg":      { en: "One package — its gross weight, as on the catalogue.", zh: "单件包装 — 即目录上的毛重。", ar: "طرد واحد — وزنه القائم زي الكتالوج." },
+  "pk.weightDecides":    { en: "weight decides (volume: {n})", zh: "以重量为准（体积：{n}）", ar: "الوزن هو اللي بيحدد (الحجم: {n})" },
+  "pk.netFromMachine":   { en: "The N.W. entered once under Physical — the machine itself, as the catalogue quotes it.", zh: "在“物理”中只填一次的净重 — 即机器本身，与目录一致。", ar: "الـ N.W. اللي اتكتب مرة واحدة في Physical — الماكينة نفسها زي ما الكتالوج بيكتبها." },
+  "pk.hsInvalid":        { en: "4–10 digits, dotted or not — e.g. 8452.21.00.", zh: "4–10 位数字，可带点 — 例如 8452.21.00。", ar: "٤–١٠ أرقام، بنقط أو من غيرها — مثلاً 8452.21.00." },
+  "pk.dgNoKind":         { en: "Type not specified — the MSDS request will ask which.", zh: "未指定类型 — MSDS 询问时会要求说明。", ar: "النوع مش محدد — طلب الـ MSDS هيسأل عنه." },
+  "specs.toggleSuggestions": { en: "Toggle suggestions", zh: "显示/隐藏建议", ar: "إظهار/إخفاء الاقتراحات" },
+  "pk.unitsWord":        { en: "units", zh: "台", ar: "وحدة" },
+  "pk.pcsWord":          { en: "pcs", zh: "件", ar: "قطعة" },
+  "pk.pkgsTimes":        { en: "packages ×", zh: "箱 ×", ar: "طرد ×" },
+
+  /* Option labels for the packing dropdowns. They lived in src/lib/logistics.ts
+     as English constants, so the lists stayed English even with the whole form
+     in Arabic — a closed list nobody can read is worse than a text box. */
+  "pk.opt.wooden_case":    { en: "Wooden Case", zh: "木箱", ar: "صندوق خشبي" },
+  "pk.opt.plywood_crate":  { en: "Plywood Crate", zh: "胶合板箱", ar: "قفص أبلكاش" },
+  "pk.opt.wooden_pallet":  { en: "Wooden Pallet (open)", zh: "木托盘（开放式）", ar: "بالتة خشب (مفتوحة)" },
+  "pk.opt.pallet_film":    { en: "Pallet + Stretch Film", zh: "托盘 + 缠绕膜", ar: "بالتة + فيلم لاصق" },
+  "pk.opt.carton":         { en: "Carton", zh: "纸箱", ar: "كرتونة" },
+  "pk.opt.foam_carton":    { en: "Carton + Foam Inserts", zh: "纸箱 + 泡沫内衬", ar: "كرتونة + حشو فوم" },
+  "pk.opt.metal_frame":    { en: "Metal Frame Crate", zh: "铁架箱", ar: "قفص إطار حديد" },
+  "pk.opt.bulk_loose":     { en: "Container Bulk (unpacked)", zh: "散装入柜（不打包）", ar: "سايب جوه الحاوية (بدون تغليف)" },
+
+  "pk.opt.not_wood":       { en: "No wood packaging", zh: "无木质包装", ar: "مفيش تغليف خشب" },
+  "pk.opt.plywood_exempt": { en: "Plywood / processed — ISPM-15 exempt", zh: "胶合板/人造板 — 免 ISPM-15", ar: "أبلكاش / مصنّع — معفي من ISPM-15" },
+  "pk.opt.heat_treated":   { en: "Solid wood — heat treated (HT)", zh: "实木 — 热处理 (HT)", ar: "خشب صلب — معالجة حرارية (HT)" },
+  "pk.opt.fumigated":      { en: "Solid wood — fumigated (MB)", zh: "实木 — 熏蒸 (MB)", ar: "خشب صلب — تبخير (MB)" },
+  "pk.opt.untreated":      { en: "Solid wood — untreated ⚠", zh: "实木 — 未处理 ⚠", ar: "خشب صلب — غير معالَج ⚠" },
+
+  "pk.opt.none":           { en: "None", zh: "无", ar: "مفيش" },
+  "pk.opt.co":             { en: "Certificate of Origin (CO)", zh: "原产地证 (CO)", ar: "شهادة منشأ (CO)" },
+  "pk.opt.form_a":         { en: "Form A (GSP)", zh: "普惠制产地证 Form A", ar: "Form A (نظام الأفضليات)" },
+  "pk.opt.form_e":         { en: "Form E (ASEAN–China)", zh: "东盟产地证 Form E", ar: "Form E (آسيان–الصين)" },
+  "pk.opt.eur1":           { en: "EUR.1 movement certificate", zh: "EUR.1 运输证明", ar: "شهادة نقل EUR.1" },
+
+  "pk.opt.lithium_battery":{ en: "Lithium battery (UN3480 / UN3481)", zh: "锂电池（UN3480 / UN3481）", ar: "بطارية ليثيوم (UN3480 / UN3481)" },
+  "pk.opt.oil_filled":     { en: "Ships with oil / lubricant inside", zh: "机内含油/润滑剂发运", ar: "بتتشحن وفيها زيت / شحم" },
+  "pk.opt.magnet":         { en: "Strong magnets", zh: "强磁材料", ar: "مغناطيس قوي" },
+  "pk.opt.aerosol":        { en: "Aerosol / pressurised", zh: "气雾/加压容器", ar: "أيروسول / مضغوط" },
+  "pk.opt.flammable":      { en: "Flammable liquid or solid", zh: "易燃液体或固体", ar: "سائل أو مادة قابلة للاشتعال" },
+  "pk.opt.other":          { en: "Other regulated content", zh: "其他受管制内容", ar: "محتوى خاضع آخر" },
+
+  "pk.opt.machine":        { en: "Machine / main unit", zh: "机器 / 主机", ar: "ماكينة / الوحدة الأساسية" },
+  "pk.opt.box":            { en: "Box / carton", zh: "箱 / 纸箱", ar: "صندوق / كرتونة" },
+  "pk.opt.tools":          { en: "Tools", zh: "工具", ar: "عدة" },
+  "pk.opt.cable":          { en: "Cable / power", zh: "线缆 / 电源", ar: "كابل / كهربا" },
+  "pk.opt.cover":          { en: "Cover / protection", zh: "机罩 / 防护", ar: "غطا / حماية" },
+  "pk.opt.parts":          { en: "Spare parts", zh: "备件", ar: "قطع غيار" },
+  "pk.opt.docs":           { en: "Manual / documents", zh: "说明书 / 文件", ar: "كتالوج / مستندات" },
+  "pk.opt.blade":          { en: "Blades / cutting", zh: "刀片 / 裁切件", ar: "سكاكين / أدوات قص" },
+  "pk.opt.fastener":       { en: "Fasteners / fixings", zh: "紧固件", ar: "مسامير وتثبيت" },
+  "pk.opt.frame":          { en: "Frame / table / rails", zh: "机架 / 台板 / 导轨", ar: "هيكل / ترابيزة / قضبان" },
+  "pk.opt.electronics":    { en: "Electronics / control", zh: "电控件", ar: "إلكترونيات / تحكم" },
+  "pk.opt.consumable":     { en: "Oil / consumables", zh: "油品 / 耗材", ar: "زيوت / مستهلكات" },
+  "pk.opt.wheel":          { en: "Wheels / casters", zh: "轮子 / 脚轮", ar: "عجل / كاستور" },
+
+  "pk.select":             { en: "— Select —", zh: "— 请选择 —", ar: "— اختر —" },
+
+  /* Unit switch + unit-suffixed labels (2026-09-13). Supplier catalogues print
+     sizes in mm, cm or m and weights in g or kg; the operator picks what the
+     page in front of them says and the form stores cm/kg regardless. */
+  "pk.packingSectionTitle": { en: "Packing", zh: "包装", ar: "التعبئة" },
+  "pk.loadingSectionTitle": { en: "Loading & Containers", zh: "装柜", ar: "التحميل والحاويات" },
+  "pk.unitSize":           { en: "Size", zh: "尺寸", ar: "المقاس" },
+  "pk.unitWeight":         { en: "Weight", zh: "重量", ar: "الوزن" },
+  "pk.colLbare":           { en: "L", zh: "长", ar: "طول" },
+  "pk.colWbare":           { en: "W", zh: "宽", ar: "عرض" },
+  "pk.colHbare":           { en: "H", zh: "高", ar: "ارتفاع" },
+  "pk.colGrossBare":       { en: "Gross", zh: "毛重", ar: "قائم" },
+  "pk.netWeightBare":      { en: "Net weight (N.W.)", zh: "净重 (N.W.)", ar: "الوزن الصافي (N.W.)" },
+  "pk.grossWeightBare":    { en: "Gross weight (G.W.)", zh: "毛重 (G.W.)", ar: "الوزن القائم (G.W.)" },
+  "pk.netSameAsPhysical":  { en: "= Physical · one value, shown beside G.W.", zh: "= 物理 · 同一数值，与毛重并列显示", ar: "= Physical · نفس القيمة، معروضة جنب الـ G.W." },
+  "pk.netPerCarton":       { en: "N.W. per carton: {per} × {unit} = {total} kg", zh: "每箱净重：{per} × {unit} = {total} kg", ar: "الصافي للكرتونة: {per} × {unit} = {total} كجم" },
+  "pk.packagingWeightBare":{ en: "Packaging weight", zh: "包装重量", ar: "وزن التغليف" },
+  "pk.dropHere":           { en: "…or drag an image here", zh: "…或将图片拖到此处", ar: "…أو اسحب صورة هنا" },
   "step.compliance": { en: "Compliance", zh: "合规", ar: "الامتثال" },
   "step.knowledge": { en: "Knowledge", zh: "知识", ar: "المعرفة" },
+  /* Profile tab strip + chrome (2026-09-13). These labels were raw English, so
+     the strip stayed English over an Arabic page. */
+  "step.highlights": { en: "Highlights", zh: "亮点", ar: "المزايا" },
+  "pp.backShort":    { en: "Product Data", zh: "产品数据", ar: "بيانات المنتجات" },
+  "pp.sec.highlights": { en: "Feature Highlights", zh: "功能亮点", ar: "مزايا المنتج" },
   /* ── legacy Technical Details block ── */
   "tech.voltage": { en: "Voltage Options", zh: "电压选项", ar: "خيارات الجهد" },
 
@@ -1202,17 +1273,20 @@ export const PRODUCTS_UI_I18N: Translations = {
   "tech.ipRatingHint": { en: "Ingress protection (dust + water).", zh: "防尘防水等级。", ar: "درجة الحماية من الغبار والماء." },
   "tech.operatingTempHint": { en: "Recommended operating range.", zh: "建议工作温度范围。", ar: "نطاق التشغيل الموصى به." },
   "tech.secElectrical": { en: "Electrical", zh: "电气", ar: "الكهرباء" },
-  "tech.secElectricalSub": { en: "Voltage, frequency, motor power, phase, and the plug types this product ships with", zh: "电压、频率、电机功率、相数，以及本产品随附的插头类型", ar: "الجهد والتردد وقدرة المحرك والأطوار وأنواع القوابس المرفقة بالمنتج" },
+  /* Named voltage and plug types until 2026-08-25; both fields were retired
+     here in favour of the spec schema, and a subtitle that keeps promising
+     them is the same kind of lie the card would tell by showing an empty box. */
+  "tech.secElectricalSub": { en: "Frequency, motor power, phase, and the air supply this machine needs", zh: "频率、电机功率、相数，以及本机所需的气源", ar: "التردد وقدرة المحرك والأطوار وهواء التشغيل اللي الماكينة محتاجاه" },
   "tech.secPhysical": { en: "Physical (Bare Machine)", zh: "物理参数（裸机）", ar: "القياسات الفعلية (الماكينة وحدها)" },
   "tech.secPhysicalSub": { en: "Footprint and weight of the machine itself — packed shipment data lives on the Models step", zh: "机器本体的占地与重量——装箱运输数据在“型号”步骤中填写", ar: "مساحة ووزن الماكينة نفسها — بيانات التغليف والشحن مكانها خطوة الموديلات" },
   "tech.secCompliance": { en: "Compliance & Customs", zh: "合规与海关", ar: "المطابقة والجمارك" },
-  "tech.secComplianceSub": { en: "Certifications, HS classification, environmental ratings, and visual attributes", zh: "认证、HS 编码归类、环保等级与外观属性", ar: "الشهادات وتصنيف HS والتقييمات البيئية والخصائص المرئية" },
+  "tech.secComplianceSub": { en: "Certifications, HS classification, and environmental ratings", zh: "认证、HS 编码归类与环保等级", ar: "الشهادات وتصنيف HS والتقييمات البيئية" },
   "tech.frequency": { en: "Frequency (Hz)", zh: "频率（Hz）", ar: "التردد (Hz)" },
   "tech.motorPower": { en: "Motor Power", zh: "电机功率", ar: "قدرة الموتور" },
   "tech.powerConsumption": { en: "Power Consumption", zh: "功耗", ar: "استهلاك القدرة" },
   "tech.plugTypes": { en: "Plug Types", zh: "插头类型", ar: "أنواع القابس" },
   "tech.pneumatic": { en: "Pneumatic Supply Required", zh: "需压缩空气", ar: "يتطلب هواء مضغوطاً" },
-  "tech.machineWeight": { en: "Machine Weight", zh: "整机重量", ar: "وزن الماكينة" },
+  "tech.machineWeight": { en: "Net weight (N.W.)", zh: "净重 (N.W.)", ar: "الوزن الصافي (N.W.)" },
   "tech.oilMist": { en: "Oil-Mist Filter", zh: "油雾过滤器", ar: "مرشّح رذاذ الزيت" },
   "tech.colors": { en: "Colors", zh: "颜色", ar: "الألوان" },
   "tech.ipRating": { en: "IP Rating", zh: "IP 防护等级", ar: "تصنيف IP" },
@@ -1223,16 +1297,9 @@ export const PRODUCTS_UI_I18N: Translations = {
   "tech.watt": { en: "Watt", zh: "瓦特", ar: "واط" },
   "tech.allSelected": { en: "All options selected", zh: "已选择全部选项", ar: "كل الخيارات محددة" },
   "tech.machineDims": { en: "Machine Dimensions", zh: "整机尺寸", ar: "أبعاد الماكينة" },
-  "tech.machineDimsLwh": { en: "Machine Dimensions (L × W × H)", zh: "整机尺寸（长 × 宽 × 高）", ar: "أبعاد الماكينة (طول × عرض × ارتفاع)" },
-  "list.uncategorized": { en: "Uncategorized", zh: "未分类", ar: "غير مصنّف" },
-  "list.other": { en: "Other", zh: "其他", ar: "أخرى" },
-  "list.productOne": { en: "product", zh: "件产品", ar: "منتج" },
-  "list.productMany": { en: "products", zh: "件产品", ar: "منتجات" },
-  /* Used by the category heading once the catalogue outgrows one page:
-     "12 of 214 products", and the placeholder for a category the current
-     page has not reached yet. */
-  "list.ofWord": { en: "of", zh: "共", ar: "من" },
-  "list.scrollToLoad": { en: "scroll to load", zh: "滚动加载", ar: "مرِّر للتحميل" },
+  "tech.machineDimsLwh": { en: "Machine dimensions — net size, without packing (L × W × H)", zh: "整机尺寸 — 净尺寸，不含包装（长 × 宽 × 高）", ar: "أبعاد الماكينة — المقاس الصافي بدون تغليف (طول × عرض × ارتفاع)" },
+  "tech.machineDimsHelp": { en: "Footprint of the machine in operation, in millimetres. The crate is entered separately under Packing.", zh: "整机运行时的占地尺寸，单位毫米。木箱尺寸在“包装”中单独填写。", ar: "أبعاد الماكينة أثناء التشغيل بالمليمتر. أبعاد الصندوق تُدخل في قسم التعبئة." },
+  "tech.machineDimsHelp2": { en: "Footprint of the machine in operation. Type in mm, cm or m — it is stored in mm. The crate is entered separately under Packing.", zh: "整机运行时的占地尺寸。可按毫米、厘米或米输入 — 统一以毫米存储。木箱尺寸在“包装”中单独填写。", ar: "أبعاد الماكينة أثناء التشغيل. اكتبها بالمم أو السم أو المتر — بتتخزن بالمم. أبعاد الصندوق في قسم التعبئة." },
   "cls.selectDivision": { en: "Select Division", zh: "选择事业部", ar: "اختر القسم" },
   "cls.selectCategoryIn": { en: "Select Category in", zh: "选择类别 —", ar: "اختر الفئة ضمن" },
   "cls.selectSubcategoryIn": { en: "Select Subcategory in", zh: "选择子类别 —", ar: "اختر الفئة الفرعية ضمن" },
@@ -1251,8 +1318,4 @@ export const PRODUCTS_UI_I18N: Translations = {
   "cls.skip": { en: "Skip", zh: "跳过", ar: "تخطّي" },
   "cls.addKind": { en: "Add machine kind (optional)", zh: "添加机器类型(可选)", ar: "إضافة نوع الماكينة (اختياري)" },
   "cls.kindNa": { en: "doesn\u2019t apply to this subcategory — you can move on.", zh: "不适用于此子类别——可以继续下一步。", ar: "لا ينطبق على هذه الفئة الفرعية — يمكنك المتابعة." },
-  "list.needsName": { en: "Needs name", zh: "缺名称", ar: "يحتاج اسماً" },
-  /* Accessible names for the icon-only grid/list toggle. */
-  "list.viewGrid": { en: "Grid view", zh: "网格视图", ar: "عرض شبكي" },
-  "list.viewList": { en: "List view", zh: "列表视图", ar: "عرض قائمة" },
 };

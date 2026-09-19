@@ -3,7 +3,7 @@ import { stageTimer } from "@/lib/server/perf";
 
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
-import { getServerAuth } from "@/lib/server/auth";
+import { getServerAuthOutcome, authFailureResponse } from "@/lib/server/auth";
 import { isInCustomersServerListCohort } from "@/lib/server/customers-rollout";
 import { isInSuppliersServerListCohort } from "@/lib/server/suppliers-rollout";
 
@@ -26,12 +26,24 @@ const TYPE_C_MODULES = ["Calendar", "To-do", "Koleex Mail", "Inbox", "Notes"];
 
 export async function GET() {
   const timer = stageTimer("me.bootstrap");
-  const auth = await getServerAuth();
+  /* THE OUTCOME, NOT THE BOOLEAN. `getServerAuth()` collapses every failure
+     to null, and this route turned that null into one flat 401 — so a DB
+     blip during the accounts lookup ("backend_unavailable", which the auth
+     layer classifies as 503 precisely because the caller IS signed in) came
+     back here as "Not signed in". The client treats a bootstrap 401 as proof
+     the cookie is dead and now clears the session hints on it; sending 401
+     for our own outage would sign a working session out. It also never sent
+     the `code` the client has been branching on, which left the
+     deactivated-account message unreachable. authFailureResponse carries
+     both the right status and the right code. */
+  const outcome = await getServerAuthOutcome();
   timer.mark("auth");
-  if (!auth) {
-    timer.done({ status: 401 });
-    return NextResponse.json({ error: "Not signed in" }, { status: 401 });
+  if (!outcome.ok) {
+    const res = authFailureResponse(outcome.reason);
+    timer.done({ status: res.status });
+    return res;
   }
+  const auth = outcome.auth;
 
   /* In role-mode the SA is still themselves — but we want the HEADER
      row to reflect the target role too, so the picker / banner can

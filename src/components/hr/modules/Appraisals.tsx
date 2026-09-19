@@ -59,7 +59,7 @@ const GOAL_STATUS_MAP: Record<string, string> = {
    MAIN COMPONENT
    ═══════════════════════════════════════════════════ */
 
-export default function AppraisalsModule({ employees, t, lang }: HRModuleProps) {
+export default function AppraisalsModule({ employees, t }: HRModuleProps) {
   /* ── state ── */
   const [cycles, setCycles] = useState<AppraisalCycleRow[]>([]);
   const [selectedCycleId, setSelectedCycleId] = useState<string>("");

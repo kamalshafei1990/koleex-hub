@@ -26,6 +26,7 @@
    --------------------------------------------------------------------------- */
 
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { SESSION_INVALID_EVENT } from "@/lib/session-hints";
 import dynamic from "next/dynamic";
 import SignInIcon from "@/components/icons/ui/SignInIcon";
 import BrandLoading from "@/components/ui/BrandLoading";
@@ -457,6 +458,30 @@ export default function AdminAuth({ children }: Props) {
     } catch {
       setAuthed(false);
     }
+  }, []);
+
+  /* THIS FLAG OUTLIVES THE COOKIE. The read above is the whole decision
+     between "show the Hub" and "ask for a password", and it consults nothing
+     but localStorage — which never expires, while the session cookie it
+     stands for does (30 days, a browser-session cookie on a shared device,
+     or whenever a mobile browser decides to drop it). When they diverge the
+     device is stranded: the Hub paints, every API answers 401, and the
+     screen that could fix it is the one screen the gate will not show.
+     `dropClientSessionHints` (src/lib/session-hints.ts) is fired the moment
+     the server refuses the cookie, and this listener is how that reaches the
+     gate — the form comes back on its own, in this tab and, via `storage`,
+     in every other tab on the device. */
+  useEffect(() => {
+    const onInvalid = () => setAuthed(false);
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === LEGACY_SESSION_KEY && e.newValue !== "true") setAuthed(false);
+    };
+    window.addEventListener(SESSION_INVALID_EVENT, onInvalid);
+    window.addEventListener("storage", onStorage);
+    return () => {
+      window.removeEventListener(SESSION_INVALID_EVENT, onInvalid);
+      window.removeEventListener("storage", onStorage);
+    };
   }, []);
 
   async function handleSignIn(e: React.FormEvent) {

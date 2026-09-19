@@ -1,5 +1,7 @@
 "use client";
 
+import AdminAuth from "@/components/admin/AdminAuth";
+
 /* Orb Lab — a dev/diagnostic page to preview every KoleexOrb reaction in
    isolation. Force each state and watch the animation, independent of the
    AI conversation. Useful to confirm which reactions the .riv actually has
@@ -19,7 +21,7 @@ const STATES: { key: OrbState; label: string }[] = [
   { key: "celebrate", label: "Celebrate" },
 ];
 
-export default function OrbLab() {
+function OrbLabInner() {
   const [state, setState] = useState<OrbState>("idle");
   const [greet, setGreet] = useState(0);
 
@@ -65,5 +67,15 @@ export default function OrbLab() {
         very different in the source .riv file.
       </p>
     </div>
+  );
+}
+
+/* BEHIND THE SAME DOOR AS /ai. A dev harness with no nav link was still a
+   public, unauthenticated page in production (audit, 2026-09-11). */
+export default function OrbLab() {
+  return (
+    <AdminAuth>
+      <OrbLabInner />
+    </AdminAuth>
   );
 }

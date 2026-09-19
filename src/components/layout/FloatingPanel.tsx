@@ -59,6 +59,7 @@ import type {
   DiscussChannelWithState,
   DiscussMessageWithAuthor,
 } from "@/types/supabase";
+import { textDirection } from "@/lib/text-direction";
 
 /* ── Theme hook ── */
 function useTheme() {
@@ -222,6 +223,25 @@ export default function FloatingPanel() {
     };
     window.addEventListener("koleex:copilot-context", handler as EventListener);
     return () => window.removeEventListener("koleex:copilot-context", handler as EventListener);
+  }, []);
+
+  /* ── Open-with-context ("Ask AI" on a product page, 19/09/2026) ──
+     A page can hand the operator straight into the AI tab with the subject
+     already in the composer and the page's hints as chips — one click from
+     a product to a conversation about it. The draft is only PLACED, never
+     sent: the operator reads it and decides. Same event shape as the hints
+     above, plus an optional draft. */
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const handler = (e: Event) => {
+      const ce = e as CustomEvent<{ draft?: string; hints?: CopilotHint[] }>;
+      if (Array.isArray(ce.detail?.hints)) setCopilotHints(ce.detail.hints.slice(0, 4));
+      if (typeof ce.detail?.draft === "string") setAiInput(ce.detail.draft);
+      setTab("ai");
+      setOpen(true);
+    };
+    window.addEventListener("koleex:ai-open", handler as EventListener);
+    return () => window.removeEventListener("koleex:ai-open", handler as EventListener);
   }, []);
 
   /* Restore the rolling FAB conversation (id + its history) the first
@@ -527,10 +547,12 @@ export default function FloatingPanel() {
                   | { type: "start" }
                   | { type: "steps" }
                   | { type: "delta"; text: string }
+                  | { type: "retract" }
                   | { type: "end"; reply?: string; agent?: { finalReply?: string } }
                   | { type: "error"; message?: string };
-                if (json.type === "delta") {
-                  accumulated += json.text;
+                if (json.type === "delta" || json.type === "retract") {
+                  /* A retract clears narration that preceded a lookup. */
+                  accumulated = json.type === "retract" ? "" : accumulated + json.text;
                   setAiMessages(prev => {
                     if (bubbleIndex < 0 || bubbleIndex >= prev.length) return prev;
                     const next = prev.slice();
@@ -1032,8 +1054,12 @@ export default function FloatingPanel() {
                       </div>
                       {/* Message bubble — assistant renders the SAME
                           markdown pipeline as the /ai app (headings,
-                          lists, tables); user text stays literal. */}
-                      <div dir="auto" style={{ unicodeBidi: "plaintext" }} className={`max-w-[75%] px-3 py-2 rounded-2xl text-[13px] leading-relaxed ${
+                          lists, tables); user text stays literal.
+                          Direction is measured from the whole message: a
+                          reply opening with "Koleex Hub…" is still Arabic,
+                          and dir="auto" would have called it English and
+                          reversed it. */}
+                      <div dir={textDirection(m.text)} className={`max-w-[75%] px-3 py-2 rounded-2xl text-[13px] leading-relaxed ${
                         m.role === "user"
                           ? `whitespace-pre-line ${dk ? "bg-white/[0.12] text-white" : "bg-black/[0.08] text-black"}`
                           : dk ? "bg-white/[0.05] text-white/85" : "bg-black/[0.04] text-black/85"

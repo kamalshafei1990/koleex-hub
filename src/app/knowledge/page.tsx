@@ -81,7 +81,7 @@ const knowledgeBases = [
 
 export default function KnowledgePage() {
   return (
-    <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)]">
+    <div className="min-h-full bg-[var(--bg-primary)] text-[var(--text-primary)]">
       <div className="max-w-[1500px] mx-auto px-4 md:px-6 lg:px-8 py-6 md:py-8">
 
         {/* The comment here used to read "Header — matches Hub pattern", and

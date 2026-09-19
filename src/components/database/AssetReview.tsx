@@ -183,9 +183,9 @@ export default function AssetReview({
                 {t(`vl.review.status.${review?.review_status ?? reco.suggested_status}`, REVIEW_STATUS_LABEL[review?.review_status ?? reco.suggested_status])}
               </span>
               {review ? (
-                <span className="rounded-full border border-[var(--border-subtle)] bg-[var(--bg-card)] px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-[var(--text-dim)]">{t("vl.review.decided", "decided")}</span>
+                <span className="rounded-full border border-[var(--border-subtle)] bg-[var(--bg-secondary)] px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-[var(--text-dim)]">{t("vl.review.decided", "decided")}</span>
               ) : (
-                <span className="rounded-full border border-[var(--border-subtle)] bg-[var(--bg-card)] px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-[var(--text-dim)]">{t("vl.review.suggested", "suggested")}</span>
+                <span className="rounded-full border border-[var(--border-subtle)] bg-[var(--bg-secondary)] px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-[var(--text-dim)]">{t("vl.review.suggested", "suggested")}</span>
               )}
             </div>
             <p className="mt-0.5 text-[11.5px] leading-snug text-[var(--text-muted)]">{reco.recommendation}</p>
@@ -249,9 +249,9 @@ export default function AssetReview({
       {/* 4 · Reviewer notes + priority */}
       <Section title={t("vl.review.reviewerNotes", "Reviewer notes")}>
         <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} placeholder={t("vl.review.notesPh", "Notes shown on the review record…")}
-          className="w-full resize-y rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-card)] px-2.5 py-1.5 text-[12px] text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)] placeholder:text-[var(--text-dim)]" />
+          className="w-full resize-y rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-secondary)] px-2.5 py-1.5 text-[12px] text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)] placeholder:text-[var(--text-dim)]" />
         <textarea value={internal} onChange={(e) => setInternal(e.target.value)} rows={1} placeholder={t("vl.review.internalPh", "Internal notes (not customer-facing)…")}
-          className="mt-1.5 w-full resize-y rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-card)] px-2.5 py-1.5 text-[12px] text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)] placeholder:text-[var(--text-dim)]" />
+          className="mt-1.5 w-full resize-y rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-secondary)] px-2.5 py-1.5 text-[12px] text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)] placeholder:text-[var(--text-dim)]" />
         <div className="mt-2 flex items-center gap-1.5">
           <span className="text-[10.5px] uppercase tracking-wide text-[var(--text-dim)]">{t("vl.review.priority", "Priority")}</span>
           {REVIEW_PRIORITIES.map((p) => (
@@ -330,7 +330,7 @@ function ReplacementPicker({ excludeId, onClose, onPick }: { excludeId: string; 
   }, [q, excludeId]);
   return (
     <div className="fixed inset-0 z-[140] flex items-start justify-center bg-black/60 backdrop-blur-sm pt-24" onClick={onClose}>
-      <div className="w-full max-w-sm rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-card)] p-4" onClick={(e) => e.stopPropagation()}>
+      <div className="w-full max-w-sm rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] p-4" onClick={(e) => e.stopPropagation()}>
         <div className="mb-2 flex items-center justify-between">
           <span className="text-[12px] font-semibold text-[var(--text-primary)]">{t("vl.review.pickerTitle", "Link replacement (approved assets)")}</span>
           <button type="button" onClick={onClose} className="text-[var(--text-dim)] hover:text-[var(--text-primary)]"><CrossIcon size={14} /></button>
@@ -373,7 +373,7 @@ function Gauge({ value, tone }: { value: number; tone: "positive" | "warning" | 
 }
 function Pill({ label, value, tone }: { label: string; value: string; tone: string }) {
   return (
-    <span className="inline-flex items-center gap-1 rounded-full border border-[var(--border-subtle)] bg-[var(--bg-card)] px-2 py-0.5">
+    <span className="inline-flex items-center gap-1 rounded-full border border-[var(--border-subtle)] bg-[var(--bg-secondary)] px-2 py-0.5">
       <span className="text-[var(--text-dim)]">{label}</span><span className={`font-semibold capitalize ${tone}`}>{value}</span>
     </span>
   );

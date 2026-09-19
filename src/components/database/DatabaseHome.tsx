@@ -66,7 +66,7 @@ export default function DatabaseHome() {
       {/* Intro */}
       <div className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-5">
         <div className="flex items-start gap-3">
-          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-primary)] text-[var(--text-primary)]"><BoxesIcon size={20} /></span>
+          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[var(--text-primary)]"><BoxesIcon size={20} /></span>
           <div>
             <h2 className="text-[15px] font-semibold text-[var(--text-primary)]">{t("db.home.introTitle", "Centralized data systems")}</h2>
             <p className="mt-1 max-w-2xl text-[12.5px] leading-relaxed text-[var(--text-muted)]">
@@ -83,8 +83,8 @@ export default function DatabaseHome() {
           <Link href="/database/visual-library"
             className="group flex flex-col rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-5 transition-all duration-200 hover:border-[var(--border-color)] hover:bg-[var(--bg-surface-hover)]">
             <div className="flex items-center justify-between">
-              <span className="flex h-11 w-11 items-center justify-center rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-primary)] text-[var(--text-primary)]"><PaletteIcon size={20} /></span>
-              {count !== null && <span className="rounded-full border border-[var(--border-subtle)] bg-[var(--bg-card)] px-2 py-0.5 text-[11px] font-semibold tabular-nums text-[var(--text-muted)]">{count.toLocaleString()}</span>}
+              <span className="flex h-11 w-11 items-center justify-center rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[var(--text-primary)]"><PaletteIcon size={20} /></span>
+              {count !== null && <span className="rounded-full border border-[var(--border-subtle)] bg-[var(--bg-secondary)] px-2 py-0.5 text-[11px] font-semibold tabular-nums text-[var(--text-muted)]">{count.toLocaleString()}</span>}
             </div>
             <div className="mt-3.5 text-[15px] font-semibold text-[var(--text-primary)]">{t("db.home.visualLibrary", "Visual Library")}</div>
             <p className="mt-1 text-[12.5px] leading-relaxed text-[var(--text-muted)]">{t("db.home.vlDesc", "Icons & visual assets — one approved source of truth, with collections, classification and review.")}</p>

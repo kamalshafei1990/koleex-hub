@@ -27,18 +27,50 @@ import "server-only";
    --------------------------------------------------------------------------- */
 
 import type { ToolDef, ToolResult } from "../types";
-import { searchWeb, type WebResult } from "../../ai/web-search";
+import { searchWeb, isMachineQuery, parseTimeRange, type WebResult, type WebImage } from "../../ai/web-search";
+import { isoDateIn } from "../../ai/prompts/blocks";
+import { fenceUntrusted, newFenceId } from "../../ai/security/untrusted";
+import { scanEgress, egressRefusalMessage } from "../../ai/security/egress-scanner";
+import { consumeBudget, limitMode, BUDGETS, subjectFor } from "../../ai/security/rate-limit";
 
 interface SearchArgs {
   query: string;
+  /** True only when the user asked to SEE a picture. Pictures cost seconds
+   *  on the provider's side and are noise on a question words answer. */
+  want_images?: boolean;
+  /** How fresh the pages must be, for "latest / newest / this week"
+   *  questions. Unset means any age. */
+  recency?: "day" | "week" | "month" | "year";
 }
 
 interface SearchData {
-  answer?: string;
-  results: WebResult[];
+  /** The provider's answer and every snippet, inside one untrusted fence —
+   *  the model reads them as data, never as instructions. */
+  findings: string;
+  /** Where each finding came from, structured for citations; the text
+   *  itself lives in `findings`. */
+  results: Array<Pick<WebResult, "title" | "url" | "published">>;
+  /** Pictures the search found. Present only when there are any, so a
+   *  result with none says nothing about pictures at all. */
+  images?: WebImage[];
   /** Repeated into the model's context on every call — a system prompt read
    *  20 messages ago loses to fresh text sitting next to the data. */
   usage_note: string;
+}
+
+/* THE DATE, BESIDE THE RESULTS (owner, 2026-09-11 17:34: "the newest
+   iPhone" was answered from a summary a year old — the model had no date to
+   read the results against, and the search had no window). The search's
+   own date and the rule for reading dated results ride with the findings,
+   where the model is looking. */
+function freshnessNote(searchedOn: string, recency: string | undefined): string {
+  return (
+    `FRESHNESS: this search ran on ${searchedOn}${recency ? ` over the last ${recency}` : ""}. ` +
+    "Results carry their published dates where known; when they disagree, the most recent dated result wins, " +
+    "and a page older than a year is not \"the latest\" anything. Say the date of what you report when it matters. " +
+    "If everything found is old for a 'latest / newest / current' question, search again with recency set to " +
+    "month and the current year in the query before answering."
+  );
 }
 
 const BRAND_NOTE =
@@ -47,13 +79,36 @@ const BRAND_NOTE =
   "machines. Cite the source URL for any figure you take from here, and say " +
   "how fresh it is when a date is given.";
 
+/* Repeated beside the pictures, where the model reads it, for the same
+   reason BRAND_NOTE is: a rule in the data beats a rule twenty messages up. */
+const IMAGE_NOTE =
+  "PICTURES: show one when the user asked to SEE something, or when a picture " +
+  "answers better than words (what a thing looks like), as markdown " +
+  "![description](url) with the url EXACTLY as given — at most two, never a " +
+  "gallery, and never for a question words answer fine. NEVER show another " +
+  "manufacturer's machine or logo; for Koleex products use the product's own " +
+  "photo from the product tools, not a web picture. Say where a picture is " +
+  "from if the user asks. Some hosts do not load from mainland China; a " +
+  "picture that fails to load is not an error to apologise for.";
+
+/* THE NOTE A MACHINE QUERY GETS INSTEAD OF PICTURES. Sent beside the text
+   results so the model reads it where it is about to answer. */
+const MACHINE_NOTE =
+  "NO PICTURES FOR MACHINES FROM THE WEB. This query names a machine or " +
+  "equipment — that is a KOLEEX PRODUCT question. Use searchProducts (then " +
+  "getProductDetails) and show the product's OWN photo from that result. " +
+  "These web results are reference text only; NEVER show, link or describe " +
+  "another manufacturer's machine as an option.";
+
 const searchTheWeb: ToolDef<SearchArgs, SearchData> = {
   name: "search_web",
   description:
     "Search the public internet for CURRENT or PUBLIC information the model cannot know: today's weather, news, exchange rates, shipping or port conditions, public standards and specifications, or any fact that may have changed since training. " +
-    "Call this whenever the user asks something time-sensitive instead of saying you have no live access. " +
+    "Call this whenever the user asks something time-sensitive instead of saying you have no live access — and for any fact about the world outside Koleex (a person, a company, a place, a ranking, a figure) that you would otherwise recall from training: look it up, then answer. " +
+    "For 'latest / newest / current / this week' questions set recency (month for products and releases, week or day for news and prices) and put the current year, from the date block, in the query. " +
     "NEVER put Koleex's own data in the query — no customer names, prices, quotation contents, employee details or internal codes; those have their own tools. " +
-    "Never use it to find or suggest machines from other manufacturers.",
+    "Never use it to find or suggest machines from other manufacturers. " +
+    "Also the way to SHOW a picture of a public thing the user asks to see (a port, a fabric, a place, a stadium): set want_images to true ONLY when the user asked to see a picture, and results then carry pictures you may embed as markdown. Never for machines or equipment — those are Koleex products, shown from the product tools.",
   parameters: {
     type: "object",
     properties: {
@@ -61,6 +116,17 @@ const searchTheWeb: ToolDef<SearchArgs, SearchData> = {
         type: "string",
         description:
           "A short public-web search query, e.g. 'Cairo weather today' or 'USD to CNY rate'. Public terms only.",
+      },
+      want_images: {
+        type: "boolean",
+        description:
+          "true ONLY when the user asked to SEE a picture of a public thing. Leave out otherwise — a date, a rate, the news need no pictures.",
+      },
+      recency: {
+        type: "string",
+        enum: ["day", "week", "month", "year"],
+        description:
+          "Only pages from this recent window. Use for 'latest', 'newest', 'current', 'this week', news, prices, releases. Leave out for timeless facts.",
       },
     },
     required: ["query"],
@@ -71,18 +137,83 @@ const searchTheWeb: ToolDef<SearchArgs, SearchData> = {
   requiredModule: undefined,
   requiredAction: "view",
   minRole: "internal",
-  handler: async (_ctx, args): Promise<ToolResult<SearchData>> => {
+  handler: async (ctx, args): Promise<ToolResult<SearchData>> => {
     const query = String(args?.query ?? "").trim();
     if (!query) {
       return {
         ok: false,
-        permissionStatus: "denied",
+        permissionStatus: "allowed",
         data: null,
         message: "A search query is required.",
       };
     }
 
-    const outcome = await searchWeb(query);
+    /* ── GUARD 1 (audit Issue 2, P0): data egress ──────────────────────────
+       Until now the prohibition above ("NEVER put Koleex's own data in the
+       query") lived ONLY in this description and the system prompt. A rule the
+       model follows only sometimes is not a rule, and a customer name reaching
+       a search vendor returns HTTP 200 — there is no error to notice later.
+       This is the deterministic check that makes the rule real.
+
+       Default ON. AI_EGRESS_SCAN=off is an emergency rollback, not a setting:
+       a security guard that defaults to off is not a guard. */
+    if (process.env.AI_EGRESS_SCAN !== "off") {
+      const verdict = scanEgress(query);
+      if (!verdict.allowed) {
+        /* Logged WITHOUT the query text — the whole point is that this string
+           should not be copied around. The audit row records the attempt via
+           dispatchTool; `matched` says which rule fired, which is what an
+           operator needs to tune it. */
+        console.warn(`[ai.egress.blocked] rule=${verdict.matched} len=${query.length}`);
+        return {
+          ok: false,
+          /* NOT "denied": a denial short-circuits the orchestrator and prints
+             `message` verbatim, which would show English to an Arabic speaker.
+             Reporting it as an ordinary unsuccessful result lets the model
+             relay the refusal in the user's own language — the same contract
+             the not-configured and empty-result paths below already use. */
+          permissionStatus: "allowed",
+          data: null,
+          message: egressRefusalMessage(verdict.reason),
+        };
+      }
+      if (verdict.warnings.length > 0) {
+        console.warn(`[ai.egress.warn] ${verdict.warnings.join(",")} len=${query.length}`);
+      }
+    }
+
+    /* PICTURES ARE OPT-IN, and the opt-in is the model saying the user asked
+       to see something. A search for today's date is not that. */
+    const wantImages = args?.want_images === true;
+    const recency = parseTimeRange(args?.recency);
+
+    /* ── GUARD 2 (security review, 2026-09-12): the vendor's bill ─────────
+       Every lane that can search runs through this handler — the tool loop,
+       the general lane's one hop, a voice call's lookup — so the budget for
+       paid searches lives here and none of them can forget it. Over the
+       line, the model is told plainly and answers without a lookup; the
+       account's turns are not blocked, only its searches. Observe mode logs
+       and lets it through, as the turn budgets do. */
+    if (limitMode() !== "off") {
+      const [perAccount, perTenant] = await Promise.all([
+        consumeBudget(subjectFor.account(ctx.auth.account_id), BUDGETS.searchPerAccount()),
+        consumeBudget(subjectFor.tenant(ctx.auth.tenant_id), BUDGETS.searchPerTenantDay()),
+      ]);
+      const hit = !perAccount.allowed ? perAccount : !perTenant.allowed ? perTenant : null;
+      if (hit && !hit.allowed) {
+        console.warn(`[ai.ratelimit] ep=search_web scope=${!perAccount.allowed ? "account" : "tenant"} count=${hit.count} max=${hit.max} mode=${limitMode()}`);
+        if (limitMode() === "enforce") {
+          return {
+            ok: false,
+            permissionStatus: "allowed",
+            data: null,
+            message: "Web search is paused for a little while — too many lookups in a short time. Answer from what you know, say plainly that you could not look it up just now, and do not present the answer as current.",
+          };
+        }
+      }
+    }
+
+    const outcome = await searchWeb(query, { images: wantImages, timeRange: recency });
 
     /* NOT permissionStatus "denied", even though this is a failure. A denial
        short-circuits the orchestrator and prints `message` to the user
@@ -112,13 +243,39 @@ const searchTheWeb: ToolDef<SearchArgs, SearchData> = {
       };
     }
 
+    /* ── GUARD 2, DETERMINISTIC: a machine query never carries pictures,
+       whatever the provider sent, and says why. The provider is not asked
+       for them either (searchWeb); this is the second lock on the same
+       door, because the door is the one the owner found open. ──────── */
+    const machine = isMachineQuery(query);
+    const images = machine || !wantImages ? [] : outcome.images;
+    /* WHAT THE WEB SAID IS DATA, NOT INSTRUCTIONS. The provider's answer
+       and every snippet come from pages nobody here wrote; they go to the
+       model inside the same nonce fence a document gets, in one block so
+       the framing is paid once. Titles and URLs stay structured beside it —
+       the citations under the reply are built from them (audit, 2026-09-11). */
+    const fenceId = newFenceId();
+    const searchedOn = isoDateIn((ctx as { timezone?: string | null } | null)?.timezone ?? null);
+    const findings = fenceUntrusted(
+      [
+        `Searched on ${searchedOn}${recency ? ` (pages from the last ${recency})` : ""}.`,
+        outcome.answer ? `Summary: ${outcome.answer}` : "",
+        ...outcome.results.map((r, i) => `[${i + 1}] ${r.title} — ${r.url}${r.published ? ` (${r.published})` : ""}\n${r.snippet}`),
+      ].filter(Boolean).join("\n\n"),
+      "web",
+      `web search: ${query}`.slice(0, 120),
+      fenceId,
+    );
     return {
       ok: true,
       permissionStatus: "allowed",
       data: {
-        answer: outcome.answer,
-        results: outcome.results,
-        usage_note: BRAND_NOTE,
+        findings,
+        results: outcome.results.map(({ title, url, published }) => ({ title, url, ...(published ? { published } : {}) })),
+        ...(images.length > 0 ? { images } : {}),
+        usage_note: `${machine
+          ? `${BRAND_NOTE} ${MACHINE_NOTE}`
+          : images.length > 0 ? `${BRAND_NOTE} ${IMAGE_NOTE}` : BRAND_NOTE} ${freshnessNote(searchedOn, recency)}`,
       },
       /* Surfaced to the UI as the "Sources" line under the reply. */
       sources: outcome.results.map((r) => r.url),

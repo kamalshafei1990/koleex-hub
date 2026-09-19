@@ -9,7 +9,8 @@
    operators can see which lots are at risk and act manually.
    --------------------------------------------------------------------------- */
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
+import { useWarmData } from "@/lib/warm-cache";
 import InventoryHeader from "@/components/inventory/InventoryHeader";
 import RrIcon from "@/components/ui/RrIcon";
 import { InventoryEmpty, Panel } from "@/components/inventory/InventoryUi";
@@ -63,44 +64,43 @@ function batchStatusClasses(s: ExpiryStatus): string {
   return "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-200";
 }
 
+type BatchesSnap = {
+  batches: BatchRow[];
+  warehouses: Warehouse[];
+  items: ItemRow[];
+  variants: VariantRow[];
+};
+
 export default function InventoryBatches() {
   const { t } = useTranslation(inventoryT);
 
-  const [batches, setBatches] = useState<BatchRow[]>([]);
-  const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
-  const [items, setItems] = useState<ItemRow[]>([]);
-  const [variants, setVariants] = useState<VariantRow[]>([]);
   const [tab, setTab] = useState<TabKey>("all");
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const [bRes, wRes, iRes, vRes] = await Promise.all([
-        fetch("/api/inventory/batches?limit=500", { cache: "no-store" }),
-        fetch("/api/inventory/warehouses", { cache: "no-store" }),
-        fetch("/api/inventory/items?limit=500", { cache: "no-store" }),
-        fetch("/api/inventory/variants?limit=500", { cache: "no-store" }),
-      ]);
-      if (!bRes.ok) throw new Error(humanizeError(bRes.statusText));
-      const bData = await bRes.json();
-      setBatches(bData.batches ?? []);
-      if (wRes.ok) setWarehouses((await wRes.json()).warehouses ?? []);
-      if (iRes.ok) setItems((await iRes.json()).items ?? []);
-      if (vRes.ok) setVariants((await vRes.json()).variants ?? []);
-    } catch (e) {
-      setError(humanizeError(e));
-    } finally {
-      setLoading(false);
-    }
+  /* Warm: none of these calls takes a user filter, so the response IS the
+     default view — mirrored under a plain key, painted on the first frame,
+     refreshed behind the painted screen. */
+  const fetchAll = useCallback(async () => {
+    const [bRes, wRes, iRes, vRes] = await Promise.all([
+      fetch("/api/inventory/batches?limit=500", { cache: "no-store" }),
+      fetch("/api/inventory/warehouses", { cache: "no-store" }),
+      fetch("/api/inventory/items?limit=500", { cache: "no-store" }),
+      fetch("/api/inventory/variants?limit=500", { cache: "no-store" }),
+    ]);
+    if (!bRes.ok) throw new Error(humanizeError(bRes.statusText));
+    return {
+      batches: (await bRes.json()).batches ?? [],
+      warehouses: wRes.ok ? (await wRes.json()).warehouses ?? [] : [],
+      items: iRes.ok ? (await iRes.json()).items ?? [] : [],
+      variants: vRes.ok ? (await vRes.json()).variants ?? [] : [],
+    } as BatchesSnap;
   }, []);
-
-  useEffect(() => {
-    load();
-  }, [load]);
+  const { data, loading, error: loadError, reload: load } = useWarmData<BatchesSnap>("inv:batches", fetchAll);
+  const batches = useMemo(() => data?.batches ?? [], [data]);
+  const warehouses = useMemo(() => data?.warehouses ?? [], [data]);
+  const items = useMemo(() => data?.items ?? [], [data]);
+  const variants = useMemo(() => data?.variants ?? [], [data]);
+  const error = loadError ? humanizeError(loadError) : null;
 
   const filtered = useMemo(() => {
     if (tab === "all") return batches;

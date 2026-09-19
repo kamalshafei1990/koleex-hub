@@ -8,11 +8,13 @@
    ══════════════════════════════════════════════════════════════ */
 
 import { useEffect, useMemo, useState } from "react";
+import dynamic from "next/dynamic";
 import Link from "next/link";
+import { useSkin } from "@/lib/appearance";
 import { useTranslation } from "@/lib/i18n";
 import { todoT } from "@/lib/translations/todo";
 import { fetchTodos, fetchAssignableEmployees } from "@/lib/todo-admin";
-import { getCurrentAccountIdSync } from "@/lib/identity";
+import { useCurrentAccountId } from "@/lib/identity";
 import { loadScopeContext, type ScopeContext } from "@/lib/scope";
 import type { TodoWithRelations, TodoAssigneeInfo, TodoStatus } from "@/types/supabase";
 import ArrowLeftIcon from "@/components/icons/ui/ArrowLeftIcon";
@@ -59,9 +61,15 @@ function fmtDate(iso: string | null): string {
   return Number.isNaN(d.getTime()) ? "—" : d.toLocaleDateString("en", { month: "short", day: "numeric" });
 }
 
+/* Same ground the To-do list mounts — Core never pays for the canvas. */
+const WavyBackground = dynamic(() => import("@/components/ui/WavyBackground"), { ssr: false });
+
 export default function TodoReportPage() {
   const { t } = useTranslation(todoT);
-  const accountId = getCurrentAccountIdSync();
+  /* Subscribed, not a one-shot read: this whole report is filtered by
+     "assigned by me", so rendering before the id lands showed an empty report
+     that never refilled. */
+  const accountId = useCurrentAccountId();
   const [scopeCtx, setScopeCtx] = useState<ScopeContext | null>(null);
   const [todos, setTodos] = useState<TodoWithRelations[]>([]);
   const [people, setPeople] = useState<TodoAssigneeInfo[]>([]);
@@ -140,10 +148,28 @@ export default function TodoReportPage() {
     { label: t("report.onTimeRate"), value: stats.onTimeRate === null ? "—" : `${stats.onTimeRate}%`, color: "text-violet-400" },
   ];
 
+  const aurora = useSkin() === "aurora";
   const selectCls = "h-9 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[12.5px] text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)]";
 
   return (
-    <div className="bg-[var(--bg-primary)] text-[var(--text-primary)] flex flex-col overflow-hidden w-full" style={{ height: "calc(100dvh - 3.5rem)" }}>
+    /* ── AURORA ──────────────────────────────────────────────────────────
+       Same conversion the To-do list carries, and for the same reason: this
+       report is a page OF that app, and it was the one screen still flat —
+       a plain dark sheet with solid cards while everything around it is
+       glass over the moving ground.
+
+       `kx-app` does the work: globals remaps the app's own tokens under that
+       scope, so the KPI cards, the table and the filter chips below turn
+       translucent together, and Core keeps the original solid values. The
+       ground mounts only under the skin; the content is lifted above it. */
+    <div className="kx-app kx-ground-host relative bg-[var(--bg-primary)] text-[var(--text-primary)] flex flex-col overflow-hidden w-full"
+      style={{ height: "calc(100dvh - var(--kx-header-h, 3.5rem))" }}>
+      {aurora && (
+        <div className="fixed inset-0 z-0 pointer-events-none">
+          <WavyBackground />
+        </div>
+      )}
+      <div className="relative z-[1] flex flex-col min-h-0 flex-1">
       {/* Header */}
       <div className="shrink-0 bg-[var(--bg-primary)] border-b border-[var(--border-color)] w-full">
         <div className="max-w-[1500px] mx-auto px-4 md:px-6 lg:px-8">
@@ -204,7 +230,7 @@ export default function TodoReportPage() {
               {/* Summary tiles */}
               <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2 mb-5">
                 {tiles.map((c) => (
-                  <div key={c.label} className="rounded-xl border border-[var(--border-color)] bg-[var(--bg-secondary)] px-3 py-3 min-w-0">
+                  <div key={c.label} className="kx-glass rounded-xl border border-[var(--border-color)] bg-[var(--bg-secondary)] px-3 py-3 min-w-0">
                     <p className="text-[9px] font-semibold text-[var(--text-dim)] uppercase tracking-wider truncate">{c.label}</p>
                     <p className={`text-[20px] font-bold tabular-nums ${c.color}`}>{c.value}</p>
                   </div>
@@ -218,7 +244,7 @@ export default function TodoReportPage() {
                   <p className="text-[12px] text-[var(--text-dim)]">{t("report.emptyHint")}</p>
                 </div>
               ) : (
-                <div className="rounded-2xl border border-[var(--border-color)] bg-[var(--bg-secondary)] overflow-hidden">
+                <div className="kx-glass rounded-2xl border border-[var(--border-color)] bg-[var(--bg-secondary)] overflow-hidden">
                   <div className="hidden md:grid grid-cols-[1fr_140px_120px_90px_90px] gap-3 px-4 py-2.5 border-b border-[var(--border-subtle)] text-[10px] font-semibold uppercase tracking-wider text-[var(--text-dim)]">
                     <span>{t("report.taskCol")}</span><span>{t("report.forCol")}</span><span>{t("f.status")}</span><span>{t("report.dueCol")}</span><span>{t("report.doneCol")}</span>
                   </div>
@@ -240,6 +266,7 @@ export default function TodoReportPage() {
             </>
           )}
         </div>
+      </div>
       </div>
     </div>
   );

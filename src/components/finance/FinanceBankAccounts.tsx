@@ -15,11 +15,13 @@
 
 import { humanizeError } from "@/lib/ui/humanize-error";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useWarmData } from "@/lib/warm-cache";
 import ConfirmDialog from "@/components/kds/ConfirmDialog";
 import Link from "next/link";
 import FinanceHeader from "@/components/finance/FinanceHeader";
 import { useTranslation } from "@/lib/i18n";
-import { financeT } from "@/lib/translations/finance";
+import { FIN_BANKACCOUNTS } from "@/lib/translations/finance/bankAccounts";
+import { FIN_BANKIMPORTS } from "@/lib/translations/finance/bankImports";
 import { EmptyState, SectionCard } from "@/components/finance/FinanceUi";
 import { MetricCard } from "@/components/finance/FinanceUiX";
 import { ReconciliationBadge } from "@/components/payment/ReconciliationBadge";
@@ -41,6 +43,10 @@ import type {
 import type { BankAccountListItem } from "@/app/api/finance/bank-accounts/route";
 import type { BankAccountDetailResponse } from "@/app/api/finance/bank-accounts/[id]/route";
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
+
+/* Only the namespaces this screen actually reads — see finance.ts. */
+const DICT = { ...FIN_BANKACCOUNTS, ...FIN_BANKIMPORTS } as const;
+
 
 /* ────────────────────────────────────────────────────────────────────────
    Helpers
@@ -65,10 +71,8 @@ function daysSince(iso: string | null): number | null {
    ──────────────────────────────────────────────────────────────────────── */
 
 export default function FinanceBankAccounts() {
-  const { t } = useTranslation(financeT);
+  const { t } = useTranslation(DICT);
   const baseCurrency = useBaseCurrency();
-  const [accounts, setAccounts] = useState<BankAccountListItem[]>([]);
-  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [editing, setEditing] = useState<Partial<BankAccount> | null>(null);
   const [openAccountId, setOpenAccountId] = useState<string | null>(null);
@@ -79,20 +83,19 @@ export default function FinanceBankAccounts() {
   const [detailLoading, setDetailLoading] = useState(false);
   const [movementDrawer, setMovementDrawer] = useState<{ accountId: string } | null>(null);
 
-  const loadList = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const r = await fetch("/api/finance/bank-accounts", { cache: "no-store" });
-      const j = (await r.json().catch(() => ({}))) as { accounts?: BankAccountListItem[]; error?: string };
-      if (!r.ok) throw new Error(humanizeError(j.error ?? `HTTP ${r.status}`));
-      setAccounts(j.accounts ?? []);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
-    } finally {
-      setLoading(false);
-    }
+  /* Warm: no filter goes to the server, so the response IS the default
+     view. Paints from the last answer on the first frame. */
+  const fetchList = useCallback(async () => {
+    const r = await fetch("/api/finance/bank-accounts", { cache: "no-store" });
+    const j = (await r.json().catch(() => ({}))) as { accounts?: BankAccountListItem[]; error?: string };
+    if (!r.ok) throw new Error(humanizeError(j.error ?? `HTTP ${r.status}`));
+    return j.accounts ?? [];
   }, []);
+  /* Only the LIST is warmed. The detail pane is fetched per id and opens on
+     demand — nobody stares at a closed drawer waiting for it. */
+  const { data: accountsData, loading, reload: loadList } =
+    useWarmData<BankAccountListItem[]>("fin:bank-accounts", fetchList);
+  const accounts = useMemo(() => accountsData ?? [], [accountsData]);
 
   const doArchive = useCallback(async (id: string) => {
     const r = await fetch(`/api/finance/bank-accounts/${id}/archive`, {
@@ -118,7 +121,6 @@ export default function FinanceBankAccounts() {
     }
   }, []);
 
-  useEffect(() => { void loadList(); }, [loadList]);
   useEffect(() => { if (openAccountId) void loadDetail(openAccountId); else setDetail(null); }, [openAccountId, loadDetail]);
 
   /* ── KPI strip across the whole tenant. ── */
@@ -312,7 +314,7 @@ function AccountCard({
   onArchive: () => void;
   onSetPrimary: () => void;
 }) {
-  const { t } = useTranslation(financeT);
+  const { t } = useTranslation(DICT);
   const status = account.status;
   const inactive = status !== "active";
   const dsReconciled = daysSince(account.last_reconciled_at);
@@ -459,7 +461,7 @@ function AccountDetail({
   onEdit: () => void;
   onAddMovement: () => void;
 }) {
-  const { t } = useTranslation(financeT);
+  const { t } = useTranslation(DICT);
   const a = detail.account;
   const { movements, imports, reconciliation, counters } = detail;
   const lowCash = a.available_balance < 25_000;
@@ -619,7 +621,7 @@ function ReconStat({ label, value, tone }: { label: string; value: number; tone:
 }
 
 function MovementRow({ movement, accountCurrency }: { movement: CashMovement; accountCurrency: string }) {
-  const { t } = useTranslation(financeT);
+  const { t } = useTranslation(DICT);
   const ccy = movement.currency ?? accountCurrency;
   const dirLabel = movement.direction === "inflow" ? t("bankAccounts.row.moneyIn", "Money in") : t("bankAccounts.row.moneyOut", "Money out");
   const dirTone = movement.direction === "inflow" ? "text-emerald-600 dark:text-emerald-300" : "text-rose-600 dark:text-rose-300";
@@ -649,7 +651,7 @@ function MovementRow({ movement, accountCurrency }: { movement: CashMovement; ac
 }
 
 function ImportRow({ imp }: { imp: BankStatementImport }) {
-  const { t } = useTranslation(financeT);
+  const { t } = useTranslation(DICT);
   return (
     <li className="flex items-start gap-2 py-2">
       <span className="mt-0.5 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-md bg-[var(--bg-surface)]">
@@ -672,7 +674,7 @@ function ImportRow({ imp }: { imp: BankStatementImport }) {
 }
 
 function ImportStatusChip({ status }: { status: BankStatementImport["status"] }) {
-  const { t } = useTranslation(financeT);
+  const { t } = useTranslation(DICT);
   const cls =
     status === "confirmed" ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-300" :
     status === "parsed"    ? "bg-amber-500/15 text-amber-600 dark:text-amber-300" :

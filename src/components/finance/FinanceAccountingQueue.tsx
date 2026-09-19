@@ -27,7 +27,7 @@ import { useInput } from "@/components/kds/useInput";
 import Link from "next/link";
 import FinanceHeader from "@/components/finance/FinanceHeader";
 import { useTranslation } from "@/lib/i18n";
-import { financeT } from "@/lib/translations/finance";
+import { FIN_ACCOUNTING } from "@/lib/translations/finance/accounting";
 import RrIcon from "@/components/ui/RrIcon";
 import { DashboardSection, Eyebrow, Hairline } from "@/components/finance/FinanceDashboardUi";
 
@@ -88,7 +88,7 @@ function fmtMoney(n: number, ccy: string): string {
 }
 
 export default function FinanceAccountingQueue() {
-  const { t } = useTranslation(financeT);
+  const { t } = useTranslation(FIN_ACCOUNTING);
   const relativeAge = (iso: string): string => {
     const ms = Date.now() - new Date(iso).getTime();
     const d = Math.floor(ms / 86_400_000);
@@ -362,7 +362,7 @@ interface CogsRow {
 function InventoryCogsSection() {
   const { showToast, toastElement } = useToast();
 
-  const { t } = useTranslation(financeT);
+  const { t } = useTranslation(FIN_ACCOUNTING);
   const [rows, setRows] = useState<CogsRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -516,7 +516,7 @@ function ActionButtons({
   onRetry: () => void;
   onVoid: () => void;
 }) {
-  const { t } = useTranslation(financeT);
+  const { t } = useTranslation(FIN_ACCOUNTING);
   const isBusy = busy !== null;
   /* Stop the row's onClick from also firing when buttons are tapped. */
   const stop = (e: React.MouseEvent) => e.stopPropagation();
@@ -564,7 +564,7 @@ function ReviewDrawer({
   busy: string | null;
   callAction: (kind: "draft" | "post-draft" | "retry" | "void", body: Record<string, unknown>) => Promise<boolean>;
 }) {
-  const { t } = useTranslation(financeT);
+  const { t } = useTranslation(FIN_ACCOUNTING);
   const KIND_LABEL: Record<Kind, string> = {
     payment: t("accounting.queue.kind.payment", "Payment"),
     expense: t("accounting.queue.kind.expense", "Expense"),
@@ -718,7 +718,7 @@ interface RevenueQueueRow {
 function SalesRevenueSection() {
   const { showToast, toastElement } = useToast();
 
-  const { t } = useTranslation(financeT);
+  const { t } = useTranslation(FIN_ACCOUNTING);
   const [rows, setRows] = useState<RevenueQueueRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);

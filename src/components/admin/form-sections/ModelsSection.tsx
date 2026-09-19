@@ -688,7 +688,7 @@ const lbl = "block text-[10px] font-semibold text-[var(--text-ghost)] uppercase 
                   triggerClassName="h-8 w-full rounded-lg border border-dashed border-[var(--border-subtle)] bg-transparent ps-2 pe-7 text-[12px] text-[var(--text-muted)] outline-none focus:border-[var(--border-focus)] text-start"
                 />
                 <p className="text-[10.5px] leading-relaxed text-[var(--text-ghost)]">
-                  Everything not listed here is inherited from the product's Specifications tab.
+                  Everything not listed here is inherited from the product&apos;s Specifications tab.
                 </p>
               </div>
             </Panel>

@@ -19,8 +19,12 @@
    owns the values object and persistence.
    --------------------------------------------------------------------------- */
 
-import { useMemo, useState, useRef, useEffect } from "react";
+import { Fragment, useMemo, useState, useRef, useEffect } from "react";
 import { useTranslation } from "@/lib/i18n";
+import UnitPicker from "./UnitPicker";
+import {
+  LENGTH_UNITS, MASS_UNITS, displayIn, isLengthUnit, isMassUnit, storeFrom, useEntryUnits,
+} from "@/lib/entry-units";
 import { SPEC_I18N, SPEC_DESC_I18N, SPEC_NAME_I18N } from "@/lib/product-schema/spec-i18n";
 import { PRODUCTS_UI_I18N } from "@/lib/products-ui-i18n";
 import { createPortal } from "react-dom";
@@ -30,8 +34,11 @@ import type {
   SpecField,
   SpecGroup,
 } from "@/types/product-schema";
+import { computeDerivedValue } from "@/lib/product-schema/derived";
 import CheckIcon from "@/components/icons/ui/CheckIcon";
 import AngleDownIcon from "@/components/icons/ui/AngleDownIcon";
+import VisualGlyph from "@/components/product-preview/VisualGlyph";
+import { VISUAL_OPTIONS, FIELD_VISUAL_DOMAIN } from "@/lib/product-schema/visual-options";
 
 /* ── Anchored dropdown menu (portal) ───────────────────────────────
    The specs cards use overflow-hidden, which clips any in-card absolute
@@ -127,55 +134,131 @@ const isFilled = (v: unknown): boolean => {
 const asStringArray = (raw: unknown): string[] =>
   Array.isArray(raw) ? raw.map((x) => String(x)) : [];
 
-/* ── computed fields ───────────────────────────────────────────────
-   Derive one field's value from another (e.g. CBM from packing L×W×H). */
+/* Dimension — three boxes, typed in whatever unit the operator picked and
+   stored in the schema's own (`field.unit`, normally mm).
 
-/* Parse an "L×W×H" string in mm (any separator: × x * , space) → m³, or null
-   when fewer than three positive numbers are present. Rounded to 3 dp. */
-const cbmFromMmDimensions = (raw: unknown): number | null => {
-  if (typeof raw !== "string") return null;
-  const nums = (raw.match(/\d+(?:\.\d+)?/g) ?? []).map(Number).filter((n) => n > 0);
-  if (nums.length < 3) return null;
-  const [l, w, h] = nums;
-  const cbm = (l * w * h) / 1_000_000_000;
-  if (!Number.isFinite(cbm) || cbm <= 0) return null;
-  return Math.round(cbm * 1000) / 1000;
-};
+   The raw-keystroke draft is not optional: converting on every keystroke and
+   echoing the result back turns "1." into Number("1.") = 1 and re-renders as
+   "1", so a decimal could never be typed at all. While a box is being typed
+   into it shows exactly what was typed; the store still receives the
+   converted number on every keystroke. */
+function DimensionField({
+  field, value, onSet,
+}: { field: SpecField; value: unknown; onSet: (v: unknown) => void }) {
+  const { length, mass, setLength, setMass } = useEntryUnits();
+  const canonical = field.unit || "";
+  const entry = isLengthUnit(canonical) ? length : isMassUnit(canonical) ? mass : canonical;
+  const [raw, setRaw] = useState<Record<string, string>>({});
 
-/* PRACTICAL loading capacity (m³), not the brochure volume: real stuffing of
-   crated machinery loses space to crate shape, dunnage and door clearance.
-   Industry rule-of-thumb usable volumes — the operator can always override
-   the result by typing (e.g. when units stack or interlock). */
-const CONTAINER_USABLE_CBM = { c20: 28, c40: 58, c40hq: 68 } as const;
+  const parts = typeof value === "string" ? value.split(/[×xX*,]/).map((x) => x.trim()) : [];
+  const stored = [parts[0] ?? "", parts[1] ?? "", parts[2] ?? ""];
+  const shown = stored.map((v, i) => (raw[i] !== undefined ? raw[i] : displayIn(v, canonical, entry)));
 
-const qtyFromCbm = (raw: unknown, capacity: number): number | null => {
-  const cbm = typeof raw === "number" ? raw : Number(raw);
-  if (!Number.isFinite(cbm) || cbm <= 0) return null;
-  const qty = Math.floor(capacity / cbm);
-  return qty >= 1 ? qty : 0;
-};
+  const setAt = (i: number, typed: string) => {
+    setRaw((m) => ({ ...m, [i]: typed }));
+    const next = [...stored];
+    next[i] = String(storeFrom(typed, canonical, entry));
+    onSet(next.every((x) => x === "") ? undefined : `${next[0]}×${next[1]}×${next[2]}`);
+  };
+  const clearDraft = (i: number) => setRaw((m) => { const n = { ...m }; delete n[i]; return n; });
 
-const computeDerivedValue = (
-  formula: NonNullable<SpecField["computed"]>["formula"],
-  sourceRaw: unknown,
-): number | null => {
-  switch (formula) {
-    case "cbm_m3_from_mm_dimensions":
-      return cbmFromMmDimensions(sourceRaw);
-    case "qty_per_20ft_from_cbm":
-      return qtyFromCbm(sourceRaw, CONTAINER_USABLE_CBM.c20);
-    case "qty_per_40ft_from_cbm":
-      return qtyFromCbm(sourceRaw, CONTAINER_USABLE_CBM.c40);
-    case "qty_per_40hq_from_cbm":
-      return qtyFromCbm(sourceRaw, CONTAINER_USABLE_CBM.c40hq);
-    case "copy_number": {
-      const n = typeof sourceRaw === "number" ? sourceRaw : Number(sourceRaw);
-      return Number.isFinite(n) && n > 0 ? n : null;
-    }
-    default:
-      return null;
+  /* The chip wraps to its own line before the three boxes get squeezed. On a
+     phone, keeping it on the row left each box 51px — 27px of that being
+     usable — and a four-digit crate scrolled inside its own field. */
+  return (
+    <div className="flex flex-wrap items-center gap-2">
+      <div className="flex items-center gap-2 min-w-0 flex-1 basis-[210px]">
+      {[0, 1, 2].map((i) => (
+        <Fragment key={i}>
+          {i > 0 ? <span className="text-[var(--text-ghost)] shrink-0">×</span> : null}
+          <input
+            inputMode="decimal"
+            value={shown[i]}
+            onChange={(e) => setAt(i, e.target.value)}
+            onBlur={() => clearDraft(i)}
+            placeholder={["L", "W", "H"][i]}
+            className={`${inputCls} min-w-0 flex-1`}
+          />
+        </Fragment>
+      ))}
+      </div>
+      {canonical ? (
+        <UnitSuffix
+          canonical={canonical}
+          entry={entry}
+          onPick={(u) => {
+            setRaw({});
+            if (isLengthUnit(u)) setLength(u);
+            else if (isMassUnit(u)) setMass(u);
+          }}
+        />
+      ) : null}
+    </div>
+  );
+}
+
+/* Single number with a unit — same contract as DimensionField. */
+function UnitNumberField({
+  field, value, onSet,
+}: { field: SpecField; value: unknown; onSet: (v: unknown) => void }) {
+  const { length, mass, setLength, setMass } = useEntryUnits();
+  const canonical = field.unit || "";
+  const entry = isLengthUnit(canonical) ? length : isMassUnit(canonical) ? mass : canonical;
+  const [raw, setRaw] = useState<string | undefined>(undefined);
+  const shown = raw !== undefined ? raw : displayIn(value, canonical, entry);
+  /* The picker sits BESIDE the box, not floating inside it: a control laid
+     over an input steals the end of the number, and on the suggestion variant
+     it landed next to that field's own chevron — two arrows a centimetre
+     apart doing different things. */
+  return (
+    <div className="flex items-center gap-2">
+      <input
+        inputMode="decimal"
+        value={shown}
+        onChange={(e) => {
+          setRaw(e.target.value);
+          const v = storeFrom(e.target.value, canonical, entry);
+          onSet(v === "" ? undefined : v);
+        }}
+        onBlur={() => setRaw(undefined)}
+        placeholder="0"
+        className={`${inputCls} min-w-0 flex-1`}
+      />
+      {canonical ? (
+        <UnitSuffix
+          canonical={canonical}
+          entry={entry}
+          onPick={(u) => {
+            setRaw(undefined);
+            if (isLengthUnit(u)) setLength(u);
+            else if (isMassUnit(u)) setMass(u);
+          }}
+        />
+      ) : null}
+    </div>
+  );
+}
+
+/* ── the unit a field is TYPED in ──────────────────────────────────────────
+   A schema field declares the unit it is STORED in (`unit: "mm"`). The
+   catalogue being copied from may print something else entirely, so where the
+   unit is convertible the suffix becomes a picker and the field converts on
+   the way in and out. The stored number never leaves its declared unit — see
+   src/lib/entry-units.ts. */
+function UnitSuffix({
+  canonical, entry, onPick,
+}: {
+  canonical: string;
+  entry: string;
+  onPick: (u: string) => void;
+}) {
+  const opts = isLengthUnit(canonical) ? LENGTH_UNITS : isMassUnit(canonical) ? MASS_UNITS : null;
+  /* Not convertible (W, bar, °C) — the unit is a fact, not a choice. */
+  if (!opts) {
+    return <span className="text-[11px] font-medium text-[var(--text-ghost)] shrink-0">{canonical}</span>;
   }
-};
+  return <UnitPicker value={entry} options={opts} onPick={onPick} canonical={canonical} />;
+}
 
 /* Required-completeness counts a required boolean as "answered" only when the
    operator has explicitly toggled it (true OR false), never when undefined. */
@@ -186,13 +269,18 @@ const requiredFilled = (f: SpecField, v: unknown): boolean => {
 
 /* ── visibility chips ──────────────────────────────────────────── */
 
-const VisBadge = ({ label, tone }: { label: string; tone: "public" | "internal" | "ai" }) => {
+const VisBadge = ({ label, tone }: { label: string; tone: "public" | "internal" | "ai" | "calc" | "edited" }) => {
   const cls =
     tone === "public"
       ? "border-emerald-500/40 text-emerald-600 dark:text-emerald-300"
       : tone === "ai"
         ? "border-[var(--border-subtle)] text-[var(--text-secondary)]"
-        : "border-amber-500/40 text-amber-600 dark:text-amber-300";
+        /* Hub Blue = the Hub's own voice: this number is the FORM talking,
+           not the operator. "Edited" borrows the internal amber because it
+           means the same thing both places — a human overrode the default. */
+        : tone === "calc"
+          ? "border-[#567FB2]/50 text-[#3E6796] dark:text-[#7FA9D6]"
+          : "border-amber-500/40 text-amber-600 dark:text-amber-300";
   return (
     <span
       className={`text-[8.5px] font-bold uppercase tracking-[0.12em] px-1.5 py-px rounded-full border ${cls}`}
@@ -202,10 +290,19 @@ const VisBadge = ({ label, tone }: { label: string; tone: "public" | "internal" 
   );
 };
 
-const FieldBadges = ({ f }: { f: SpecField }) => {
+const FieldBadges = ({ f, calc }: { f: SpecField; calc?: "tracking" | "overridden" | null }) => {
   const { t: fbT } = useTranslation(PRODUCTS_UI_I18N);
   return (
   <span className="inline-flex items-center gap-1">
+    {/* FIVE OF THE FOURTEEN FIELDS ON THE PACKING TAB ARE NOT QUESTIONS.
+        CBM comes from the crate dimensions, the three container counts come
+        from CBM, and Net Weight is a straight copy of Machine Weight — the
+        same number under a second label. They looked exactly like the nine
+        fields that DO need an answer, so the tab read as fourteen things to
+        fill in. The chip says which are the form's own arithmetic, and says
+        when a typed value has stopped following its source. */}
+    {calc === "tracking" ? <VisBadge label={fbT("specs.badgeCalculated", "Calculated")} tone="calc" /> : null}
+    {calc === "overridden" ? <VisBadge label={fbT("specs.badgeEdited", "Edited")} tone="edited" /> : null}
     {f.internalOnly ? (
       <VisBadge label={fbT("specs.visInternal", "Internal")} tone="internal" />
     ) : f.publicVisible ? (
@@ -234,6 +331,13 @@ function SelectField({
   const { open, setOpen, triggerRef, menuRef, rect } = useAnchoredMenu();
   const opts = field.options ?? [];
   const selected = opts.find((o) => o.value === value);
+  /* Option glyphs (owner, 2026-08-20, packing types): inline `icon` wins,
+     else the central visual-options registry supplies it by field domain —
+     so schemas keep declaring plain {value,label} and still get icons.
+     Fields with no domain and no inline icons render exactly as before. */
+  const domain = field.optionSet ?? FIELD_VISUAL_DOMAIN[field.key];
+  const iconFor = (v: string, inline?: string) =>
+    inline ?? (domain ? VISUAL_OPTIONS[domain]?.[v]?.icon : undefined);
   return (
     <div ref={triggerRef} className="relative">
       <button
@@ -241,8 +345,11 @@ function SelectField({
         onClick={() => setOpen((o) => !o)}
         className={`${inputCls} flex items-center justify-between gap-2 text-start`}
       >
-        <span className={`truncate ${selected ? "" : "text-[var(--text-ghost)]"}`}>
-          {selected ? selected.label : "— Select —"}
+        <span className={`flex min-w-0 items-center gap-2 ${selected ? "" : "text-[var(--text-ghost)]"}`}>
+          {selected && iconFor(selected.value, selected.icon) ? (
+            <VisualGlyph token={iconFor(selected.value, selected.icon)!} className="h-4 w-4 shrink-0 opacity-80" />
+          ) : null}
+          <span className="truncate">{selected ? selected.label : "— Select —"}</span>
         </span>
         <AngleDownIcon className={`h-3.5 w-3.5 shrink-0 text-[var(--text-ghost)] transition-transform ${open ? "rotate-180" : ""}`} />
       </button>
@@ -264,7 +371,10 @@ function SelectField({
                 onMouseDown={(e) => { e.preventDefault(); onSet(o.value); setOpen(false); }}
                 className={`${menuItemCls} ${active ? "font-semibold text-[var(--text-primary)]" : "text-[var(--text-secondary)]"}`}
               >
-                <span className="truncate">{o.label}</span>
+                {iconFor(o.value, o.icon) ? (
+                  <VisualGlyph token={iconFor(o.value, o.icon)!} className="h-4 w-4 shrink-0 opacity-80" />
+                ) : null}
+                <span className="flex-1 truncate">{o.label}</span>
                 {active ? <CheckIcon className="h-3.5 w-3.5 shrink-0" /> : null}
               </button>
             );
@@ -287,30 +397,45 @@ function NumberSuggestField({
   onSet: (v: unknown) => void;
 }) {
   const { open, setOpen, triggerRef, menuRef, rect } = useAnchoredMenu();
-  const strVal = value === null || value === undefined ? "" : String(value);
-  const all = field.suggestions ?? [];
+  const { t } = useTranslation(PRODUCTS_UI_I18N);
+  /* Machine Weight is a unit_number WITH suggestions, so it lands here rather
+     than in UnitNumberField — and it was the one weight on the tab still stuck
+     in kilograms. Same contract as everywhere: typed in the operator's unit,
+     stored in the field's own, suggestions shown in the typed unit so "100"
+     does not mean a different machine depending on the switch. */
+  const { length, mass, setLength, setMass } = useEntryUnits();
+  const canonical = field.unit || "";
+  const entry = isLengthUnit(canonical) ? length : isMassUnit(canonical) ? mass : canonical;
+  const convertible = isLengthUnit(canonical) || isMassUnit(canonical);
+  const [raw, setRaw] = useState<string | undefined>(undefined);
+  const strVal = raw !== undefined ? raw : displayIn(value, canonical, entry);
+  const all = (field.suggestions ?? []).map((sug) =>
+    convertible ? Number(displayIn(sug, canonical, entry)) : sug,
+  );
   const q = strVal.trim();
   const filtered = q === "" ? all : all.filter((s) => String(s).startsWith(q));
   const show = filtered.length ? filtered : all;
+  const commit = (typed: string) => {
+    setRaw(typed);
+    const v = storeFrom(typed, canonical, entry);
+    onSet(v === "" ? undefined : v);
+  };
   return (
-    <div ref={triggerRef} className="relative">
+    <div className="flex items-center gap-2">
+    <div ref={triggerRef} className="relative min-w-0 flex-1">
       <input
-        type="number"
+        inputMode="decimal"
         value={strVal}
-        onChange={(e) => { onSet(e.target.value === "" ? undefined : Number(e.target.value)); if (!open) setOpen(true); }}
+        onChange={(e) => { commit(e.target.value); if (!open) setOpen(true); }}
         onFocus={() => setOpen(true)}
+        onBlur={() => setRaw(undefined)}
         placeholder="0"
-        className={`${inputCls} ${field.unit ? "pe-[3.75rem]" : "pe-9"}`}
+        className={`${inputCls} pe-9`}
       />
-      {field.unit ? (
-        <span className="absolute end-8 top-1/2 -translate-y-1/2 text-[11px] font-medium text-[var(--text-ghost)] pointer-events-none">
-          {field.unit}
-        </span>
-      ) : null}
       <button
         type="button"
         tabIndex={-1}
-        aria-label="Toggle suggestions"
+        aria-label={t("specs.toggleSuggestions", "Toggle suggestions")}
         onMouseDown={(e) => { e.preventDefault(); setOpen((o) => !o); }}
         className="absolute end-2.5 top-1/2 -translate-y-1/2 text-[var(--text-ghost)] hover:text-[var(--text-secondary)] transition-colors"
       >
@@ -324,21 +449,32 @@ function NumberSuggestField({
               <button
                 key={String(s)}
                 type="button"
-                onMouseDown={(e) => { e.preventDefault(); onSet(Number(s)); setOpen(false); }}
+                onMouseDown={(e) => { e.preventDefault(); setRaw(undefined); const v = storeFrom(String(s), canonical, entry); onSet(v === "" ? undefined : v); setOpen(false); }}
                 className={`${menuItemCls} ${active ? "font-semibold text-[var(--text-primary)]" : "text-[var(--text-secondary)]"}`}
               >
                 <span>{String(s)}</span>
-                {field.unit ? <span className="text-[11px] text-[var(--text-ghost)]">{field.unit}</span> : null}
+                {canonical ? <span className="text-[11px] text-[var(--text-ghost)]">{entry}</span> : null}
               </button>
             );
           })}
         </DropdownPortal>
       ) : null}
     </div>
+    {canonical ? (
+      <UnitSuffix
+        canonical={canonical}
+        entry={entry}
+        onPick={(u) => {
+          setRaw(undefined);
+          if (isLengthUnit(u)) setLength(u); else if (isMassUnit(u)) setMass(u);
+        }}
+      />
+    ) : null}
+    </div>
   );
 }
 
-function FieldInput({
+export function FieldInput({
   field,
   value,
   onSet,
@@ -435,25 +571,7 @@ function FieldInput({
     if (field.suggestions?.length) {
       return <NumberSuggestField field={field} value={value} onSet={onSet} />;
     }
-    return (
-      <div className="relative">
-        <input
-          type="number"
-          value={value === null || value === undefined ? "" : String(value)}
-          onChange={(e) => {
-            const raw = e.target.value;
-            onSet(raw === "" ? undefined : Number(raw));
-          }}
-          placeholder="0"
-          className={`${inputCls} ${field.unit ? "pe-14" : ""}`}
-        />
-        {field.unit ? (
-          <span className="absolute end-3 top-1/2 -translate-y-1/2 text-[11px] font-medium text-[var(--text-ghost)] pointer-events-none">
-            {field.unit}
-          </span>
-        ) : null}
-      </div>
-    );
+    return <UnitNumberField field={field} value={value} onSet={onSet} />;
   }
 
   /* range — two numbers composed into "min–max" (+ unit) */
@@ -493,40 +611,7 @@ function FieldInput({
      (+ unit). Any separator is accepted on read so legacy free-text values
      still populate the three boxes. */
   if (ft === "dimension") {
-    const parts = typeof value === "string" ? value.split(/[×xX*,]/).map((s) => s.trim()) : [];
-    const [l, w, h] = [parts[0] ?? "", parts[1] ?? "", parts[2] ?? ""];
-    const compose = (a: string, b: string, c: string) =>
-      !a && !b && !c ? undefined : `${a}×${b}×${c}`;
-    return (
-      <div className="flex items-center gap-2">
-        <input
-          type="number"
-          value={l}
-          onChange={(e) => onSet(compose(e.target.value, w, h))}
-          placeholder="L"
-          className={`${inputCls} min-w-0 flex-1`}
-        />
-        <span className="text-[var(--text-ghost)] shrink-0">×</span>
-        <input
-          type="number"
-          value={w}
-          onChange={(e) => onSet(compose(l, e.target.value, h))}
-          placeholder="W"
-          className={`${inputCls} min-w-0 flex-1`}
-        />
-        <span className="text-[var(--text-ghost)] shrink-0">×</span>
-        <input
-          type="number"
-          value={h}
-          onChange={(e) => onSet(compose(l, w, e.target.value))}
-          placeholder="H"
-          className={`${inputCls} min-w-0 flex-1`}
-        />
-        {field.unit ? (
-          <span className="text-[11px] font-medium text-[var(--text-ghost)] shrink-0">{field.unit}</span>
-        ) : null}
-      </div>
-    );
+    return <DimensionField field={field} value={value} onSet={onSet} />;
   }
 
   /* long_text — textarea */
@@ -573,10 +658,17 @@ function GroupCard({
   group,
   values,
   setField,
+  allFields,
 }: {
   group: SpecGroup;
   values: Record<string, unknown>;
   setField: (key: string, v: unknown) => void;
+  /* EVERY field in the schema, not just this group's. A computed field's
+     source is regularly in a DIFFERENT group — Net Weight sits under Packing
+     & Shipping and copies Machine Weight from Physical — and looking the
+     source up inside this group alone made the hint read "auto-fills from
+     the linked field", which names nothing. */
+  allFields: SpecField[];
 }) {
   const { t: ts, lang: specLang } = useTranslation(SPEC_I18N);
   const { t: tui } = useTranslation(PRODUCTS_UI_I18N);
@@ -609,7 +701,7 @@ function GroupCard({
   const pct = total ? Math.round((filled / total) * 100) : 0;
 
   return (
-    <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] overflow-hidden">
+    <div className="kx-glass rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] overflow-hidden">
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
@@ -638,26 +730,73 @@ function GroupCard({
 
       {open ? (
         <div className="px-4 pb-4 pt-4 space-y-5 border-t border-[var(--border-subtle)]">
-          {fields.map((f) => (
+          {fields.map((f) => {
+            /* Is this computed field still the arithmetic, or did someone
+               type over it? Compared against the value the formula produces
+               RIGHT NOW from its source, so editing the source and leaving a
+               stale hand-typed number shows as "Edited" — which is the case
+               worth catching: a CBM that no longer matches its crate. */
+            const derived = f.computed
+              ? computeDerivedValue(f.computed.formula, values[f.computed.from])
+              : null;
+            /* No source value yet = nothing to disagree with. A CBM typed
+               before anyone entered the crate dimensions is just a value, not
+               a number that "stopped following" — flagging it amber would be
+               crying wolf on the most ordinary half-finished product. */
+            const srcFilled = f.computed ? isFilled(values[f.computed.from]) : false;
+            const calc: "tracking" | "overridden" | null = !f.computed
+              ? null
+              : !isFilled(values[f.key])
+                ? "tracking"
+                : !srcFilled
+                  ? null
+                  : derived !== null && Number(values[f.key]) === derived
+                    ? "tracking"
+                    : "overridden";
+            const srcField = f.computed ? allFields.find((x) => x.key === f.computed!.from) : undefined;
+            const srcLabel = srcField ? ts(`f:${srcField.key}`, srcField.label) : tui("specs.linkedField", "the linked field");
+            return (
             <div key={f.key} className="space-y-1.5">
               <div className="flex items-center justify-between gap-2 flex-wrap">
-                <label className="text-[11px] font-semibold text-[var(--text-secondary)] inline-flex items-center gap-1.5">
+                <label className={`text-[11px] font-semibold inline-flex items-center gap-1.5 ${calc === "tracking" ? "text-[var(--text-muted)]" : "text-[var(--text-secondary)]"}`}>
                   <SpecGlyph fieldKey={f.key} />
                   {ts(`f:${f.key}`, f.label)}
                   {f.required ? <span className="text-red-500">*</span> : null}
                 </label>
-                <FieldBadges f={f} />
+                <FieldBadges f={f} calc={calc} />
               </div>
-              <FieldInput
-                field={locField(f)}
-                value={values[f.key]}
-                onSet={(v) => setField(f.key, v)}
-              />
+              {/* Dimmed while it is tracking — the row is still fully editable,
+                  it just stops competing for attention with the fields that
+                  actually need an answer. Full strength the moment it holds a
+                  number of the operator's own. */}
+              <div className={calc === "tracking" ? "opacity-60 focus-within:opacity-100 transition-opacity" : undefined}>
+                <FieldInput
+                  field={locField(f)}
+                  value={values[f.key]}
+                  onSet={(v) => setField(f.key, v)}
+                />
+              </div>
               {f.computed ? (
-                <p className="text-[10px] text-[var(--text-secondary)] leading-relaxed inline-flex items-center gap-1">
-                  <span aria-hidden>↻</span> {tui("specs.autoFillsFrom", "Auto-fills from")}{" "}
-                  {(() => { const src = group.fields.find((x) => x.key === f.computed!.from); return src ? ts(`f:${src.key}`, src.label) : tui("specs.linkedField", "the linked field"); })()} — {tui("specs.canTypeManually", "you can also type it manually.")}
-                </p>
+                calc === "overridden" ? (
+                  <p className="text-[10px] text-amber-600 dark:text-amber-300/90 leading-relaxed inline-flex items-center gap-1.5 flex-wrap">
+                    <span aria-hidden>✎</span>
+                    {tui("specs.typedNotFollowing", "Typed by hand — no longer follows")} {srcLabel}.
+                    {derived !== null ? (
+                      <button
+                        type="button"
+                        onClick={() => setField(f.key, derived)}
+                        className="underline underline-offset-2 font-semibold hover:opacity-80"
+                      >
+                        {tui("specs.recalculate", "Recalculate")} ({derived})
+                      </button>
+                    ) : null}
+                  </p>
+                ) : (
+                  <p className="text-[10px] text-[var(--text-secondary)] leading-relaxed inline-flex items-center gap-1">
+                    <span aria-hidden>↻</span> {tui("specs.calculatedFrom", "Calculated from")}{" "}
+                    {srcLabel} — {tui("specs.canTypeManually", "you can also type it manually.")}
+                  </p>
+                )
               ) : null}
               {f.description ? (
                 <p className="text-[10px] text-[var(--text-ghost)] leading-relaxed">
@@ -665,7 +804,8 @@ function GroupCard({
                 </p>
               ) : null}
             </div>
-          ))}
+            );
+          })}
         </div>
       ) : null}
     </div>
@@ -740,6 +880,11 @@ export default function SchemaSpecsSection({ schema, values, onChange, hideHeade
     () => (schema ? [...schema.groups].sort((a, b) => a.order - b.order) : []),
     [schema],
   );
+  /* Flat field list for cross-group source lookups (see GroupCard.allFields). */
+  const allFields = useMemo(
+    () => (schema?.groups ?? []).flatMap((g) => g.fields ?? []),
+    [schema],
+  );
 
   const { reqTotal, reqFilled } = useMemo(() => {
     let t = 0;
@@ -794,7 +939,7 @@ export default function SchemaSpecsSection({ schema, values, onChange, hideHeade
       ) : null}
 
       {groups.map((g) => (
-        <GroupCard key={g.id} group={g} values={values} setField={setField} />
+        <GroupCard key={g.id} group={g} values={values} setField={setField} allFields={allFields} />
       ))}
     </div>
   );

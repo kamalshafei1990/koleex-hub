@@ -9,6 +9,10 @@
  * quote, invoice, brochure, AI, comparison, filters, etc.) see each field.
  */
 
+/* Type-only: erased at build, so this stays a pure type module and no client
+   code is pulled into server bundles. */
+import type { TranslatableLang } from "@/lib/i18n";
+
 export interface VisibilityFlags {
   internalOnly: boolean;
   publicVisible: boolean;
@@ -76,6 +80,7 @@ export type OptionVisualType =
   | 'plug'
   | 'automation'
   | 'weight'
+  | 'packing'
   | 'generic';
 
 export interface SpecFieldOption {
@@ -221,6 +226,15 @@ export interface ProductKnowledgeBlock {
   visibility: VisibilityFlags;
   aiWeight: number;
   relatedFields?: string[];
+  /* Display translations (2026-08-29). English above stays canonical — it is
+     what the AI layer and every export read; these overlay it for a reader in
+     another language. Blocks had NO place for translations, so knowledge was
+     the one part of a product page that stayed English everywhere.
+     Keyed by TranslatableLang, NOT a hardcoded zh/ar pair: more languages are
+     coming, and adding one to Lang widens this automatically.
+     Lives inside the schema_knowledge jsonb, so no column was added. */
+  title_i18n?: Partial<Record<TranslatableLang, string>>;
+  content_i18n?: Partial<Record<TranslatableLang, string | string[]>>;
 }
 
 export interface ProductSchemaResolution {

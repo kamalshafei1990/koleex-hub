@@ -145,9 +145,12 @@ export default function DiscussAiChat({
         )}
       </div>
 
-      {/* ── Composer — mirrors the Discuss composer ── */}
+      {/* ── Composer — mirrors the Discuss composer. Aurora: the recessed
+          well, same as the AI app's composer (owner: "make Discuss AI
+          composer same"). kx-ai-composer-mini is the identity hook — paint
+          lives in globals under the aurora scope; Core keeps this bar. ── */}
       <div className="shrink-0 border-t border-[var(--border-subtle)] px-3 py-2.5">
-        <div className="flex items-center gap-2 rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-3 py-1.5">
+        <div className="kx-ai-composer-mini flex items-center gap-2 rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-3 py-1.5">
           <input
             type="text"
             value={aiInput}

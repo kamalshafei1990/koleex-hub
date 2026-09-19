@@ -56,17 +56,6 @@ const CONTACTS = "contacts";
 const rtChannelTopic = (channelId: string) => `discuss:channel:${channelId}`;
 const rtAccountTopic = (accountId: string) => `discuss:account:${accountId}`;
 
-/** Silent fallback when a table hasn't been migrated yet. Matches the
- *  detection logic in inbox.ts so behavior is consistent. */
-function isMissingTable(message: string): boolean {
-  const m = message.toLowerCase();
-  return (
-    m.includes("does not exist") ||
-    m.includes("not found") ||
-    m.includes("schema cache") ||
-    m.includes("404")
-  );
-}
 
 /** Route a write through the authenticated server endpoint. Every Discuss
  *  mutation goes through /api/discuss/mutate, so the browser's anon key can
@@ -630,6 +619,40 @@ const broadcastSubs = new Map<
   }
 >();
 
+/** A subscription that held this long is a recovery; shorter is a flap. */
+export const REJOIN_STABLE_MS = 30_000;
+/* A RECOVERY STEPS THE BACKOFF DOWN; IT DOES NOT ZERO IT (owner's session,
+   2026-09-18 17:29-17:31 UTC, `discuss:account`). The flap rule below was
+   already doing its job — the ramp climbed cleanly — and then one
+   subscription held for 34.1s, one tick over REJOIN_STABLE_MS, and the whole
+   session's history was thrown away:
+
+     hold 34.1s  →  retry = 0  →  +0.9s +0.9s +2.1s +4.2s +8.3s +13.9s +36.3s
+     hold 34.1s  →  retry = 0  →  +0.9s +0.9s +2.1s +4.2s +8.3s +13.9s …
+
+   Fourteen socket opens in ten minutes on a link that has never once held a
+   subscription for a full minute. On this owner's link — mainland China, no
+   VPN, the case the whole product is built for — a 34-second subscription is
+   not a healthy channel, it is a slightly longer flap, and treating it as
+   proof of a good link puts the storm straight back.
+
+   Halving keeps both truths: a channel that recovers IS rewarded, and gets
+   back to a short retry after a couple of genuine recoveries; a channel that
+   flaps at 34s forever settles near the 60s cap instead of sprinting back to
+   0.9s. Pure, so the ladder is pinned by the suite without a browser. */
+export function retryAfterRecovery(retry: number): number {
+  return retry > 1 ? Math.floor(retry / 2) : 0;
+}
+/* The least time between two honoured nudges on one topic. `online` and
+   `visibilitychange` arrive in bursts on a phone changing network, and each
+   nudge is a teardown plus a fresh socket. */
+export const KICK_FLOOR_MS = 3_000;
+/** Capped exponential backoff with jitter: 1 s, 2 s, 4 s … 60 s. Pure
+ *  apart from the jitter, which the suite pins by range. */
+export function rejoinDelayMs(retry: number, random: () => number = Math.random): number {
+  return Math.min(60_000, 1_000 * 2 ** Math.min(retry, 6)) * (0.8 + random() * 0.4);
+}
+
 function subscribeBroadcast(topic: string, onPing: (p: PingPayload) => void): () => void {
   let entry = broadcastSubs.get(topic);
   if (!entry) {
@@ -648,11 +671,23 @@ function subscribeBroadcast(topic: string, onPing: (p: PingPayload) => void): ()
          tab-visible events (below) trigger an immediate retry. */
       retry: 0,
       rejoinTimer: null as number | null,
+      /* When the current channel reached SUBSCRIBED, for the flap rule
+         below. A join that dies within seconds is not a recovery. */
+      subscribedAt: 0,
+      /* When the last online/visible nudge was honoured (see kick). */
+      lastKickAt: 0,
+      /* What opened the CURRENT channel, reported on rt.reconnect. A ramp
+         read from metrics alone cannot tell a scheduled rejoin from a nudge,
+         and the difference is the whole diagnosis: the same 250ms gap is
+         normal for a nudge and impossible for a timer (the floor is 800ms).
+         One tag turns the next round of this into a reading. */
+      via: "init" as "init" | "timer" | "kick",
     };
 
     const scope = topic.split(":").slice(0, 2).join(":");
 
-    const join = () => {
+    const join = (via: "init" | "timer" | "kick") => {
+      created.via = via;
       const channel = supabase.channel(topic);
       created.channel = channel;
       channel
@@ -671,13 +706,34 @@ function subscribeBroadcast(topic: string, onPing: (p: PingPayload) => void): ()
           try {
             if (status === "SUBSCRIBED") {
               created.joins += 1;
-              created.retry = 0;
+              created.subscribedAt = performance.now();
+              /* THE FLAP. A channel that subscribes and is closed within a
+                 second, over and over, reset its backoff on every SUBSCRIBED
+                 and rejoined ~once a second for hours (production, 2026-09-07:
+                 the same page reported CLOSED → reconnect every 0.8 s from
+                 15:00 to 17:33, then died mid-call). A subscription counts as
+                 recovered — and the backoff resets — only once it has held
+                 for STABLE_MS; a shorter life keeps climbing the backoff. */
+              if (created.retry > 0 && created.joins > 1) {
+                /* reset deferred: see the CLOSED branch */
+              } else {
+                created.retry = 0;
+              }
               if (created.joins === 1) perfRecord("rt.join_ms", performance.now() - created.t0, { scope });
-              else perfEvent("rt.reconnect", { scope });
+              else perfEvent("rt.reconnect", { scope, via: created.via, r: created.retry });
             } else if (status === "CHANNEL_ERROR" || status === "TIMED_OUT" || status === "CLOSED") {
-              perfEvent("rt.status", { s: status, scope });
+              /* How long this subscription lived, to the second. Without it a
+                 drop is a bare event and the flap rule below cannot be
+                 checked against what actually happened on the link. */
+              const heldMs = created.subscribedAt > 0 ? performance.now() - created.subscribedAt : 0;
+              perfEvent("rt.status", { s: status, scope, held: Math.round(heldMs / 1000) });
+              /* Held long enough to count as a real recovery? Then the wait
+                 steps back down. Otherwise it flapped, and the next wait is
+                 longer than the last. Either way the link's history survives:
+                 see retryAfterRecovery. */
+              if (heldMs >= REJOIN_STABLE_MS) created.retry = retryAfterRecovery(created.retry);
+              created.subscribedAt = 0;
             }
-            perfRecord("rt.channels", broadcastSubs.size);
           } catch { /* metrics never break realtime */ }
           if (status === "CHANNEL_ERROR" || status === "TIMED_OUT" || status === "CLOSED") {
             scheduleRejoin();
@@ -688,27 +744,74 @@ function subscribeBroadcast(topic: string, onPing: (p: PingPayload) => void): ()
     const scheduleRejoin = () => {
       if (created.listeners.size === 0) return; // real teardown, not a drop
       if (created.rejoinTimer != null) return;  // one pending rejoin at a time
-      const delay = Math.min(15_000, 1_000 * 2 ** created.retry) * (0.8 + Math.random() * 0.4);
+      /* NOT WHILE HIDDEN. A background page that rejoins on a timer keeps a
+         socket storm going for hours; the visible/online nudge (kickAll)
+         retries the moment the page is back. */
+      if (typeof document !== "undefined" && document.visibilityState === "hidden") return;
+      /* NOT UNDER A LIVE CALL EITHER (2026-09-08). The metrics of a call
+         that died with the phone's network show this channel closing and
+         rejoining every second or two for the whole call — a socket storm
+         on the same flaky link the call's own socket was fighting for. A
+         call is the one thing on the page that matters while it is up; the
+         channel rejoins the moment it ends (the kx-call-ended nudge). */
+      if (typeof document !== "undefined" && document.querySelector("[data-kx-call-active='1']")) return;
+      const delay = rejoinDelayMs(created.retry);
       created.retry += 1;
       created.rejoinTimer = window.setTimeout(() => {
         created.rejoinTimer = null;
         if (created.listeners.size === 0) return;
         try { supabase.removeChannel(created.channel); } catch { /* ignore */ }
-        join();
+        join("timer");
       }, delay);
     };
 
-    /* Expose an immediate-retry hook for the global online/visible nudges. */
+    /* Expose an immediate-retry hook for the global online/visible nudges.
+
+       IT DOES NOT RESET THE BACKOFF, and that line is the whole point
+       (owner, 2026-09-18, from his own session's metrics). The flap rule
+       above — a join counts as recovered only once it has held for
+       REJOIN_STABLE_MS — was written for the 2026-09-07 storm and it works;
+       this hook was quietly undoing it. `created.retry = 0` sat here, and
+       `kick` fires on `online`, on `kx-call-ended`, and on every return to
+       the tab. On a phone that is changing networks and switching apps —
+       which is the whole of this owner's usage — the ramp never got to
+       climb. His metrics, one session, reconnects on `discuss:account`:
+
+         +0.8s  +1.8s  +4.4s  +7.1s  +15.9s   … then back to +0.8s
+         +1.1s  +1.7s  +4.2s  +7.0s  +13.3s  +27.5s  … and again
+
+       That is the backoff working correctly and being zeroed, over and
+       over, for the length of the session — a socket storm on the same
+       flaky link his voice call is fighting for, which is exactly what the
+       call guard in scheduleRejoin already exists to prevent.
+
+       A nudge means "do not sit out the wait", not "forget what this link
+       has been doing". It still rejoins AT ONCE; what the next failure
+       waits is still owned by the one rule that has evidence behind it —
+       a subscription that held. */
     (created as unknown as { kick: () => void }).kick = () => {
       if (created.status === "SUBSCRIBED" || created.listeners.size === 0) return;
+      /* AND NOT TEN TIMES IN A SECOND. `online` and `visibilitychange` both
+         fire in bursts when a phone changes network; each nudge tears the
+         channel down and opens a new one, so a burst of events was itself a
+         burst of sockets. One nudge per KICK_FLOOR_MS; the rest fall through
+         to the scheduled rejoin, which is still pending. */
+      const now = Date.now();
+      if (now - created.lastKickAt < KICK_FLOOR_MS) return;
+      created.lastKickAt = now;
       if (created.rejoinTimer != null) { window.clearTimeout(created.rejoinTimer); created.rejoinTimer = null; }
-      created.retry = 0;
       try { supabase.removeChannel(created.channel); } catch { /* ignore */ }
-      join();
+      join("kick");
     };
 
-    join();
+    join("init");
     broadcastSubs.set(topic, created);
+    /* The gauge belongs where the SET actually changes — here and in the
+       teardown below. It used to fire inside the status callback as well,
+       once per status change, where the size cannot have moved: on this
+       owner's link that was half of every perf beacon spent re-sending a
+       constant, on the one link in the product that cannot spare it. */
+    perfRecord("rt.channels", broadcastSubs.size);
     entry = created;
   }
   entry.listeners.add(onPing);
@@ -735,6 +838,7 @@ if (typeof window !== "undefined") {
     }
   };
   window.addEventListener("online", kickAll);
+  window.addEventListener("kx-call-ended", kickAll);
   document.addEventListener("visibilitychange", () => {
     if (document.visibilityState === "visible") kickAll();
   });

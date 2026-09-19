@@ -24,10 +24,38 @@ import type { UserContext, ToolResult, PermissionStatus } from "./types";
    Anything not on this list is hashed before it hits the DB so we
    avoid accidentally recording a customer's credit card etc. */
 const SAFE_LOG_KEYS = new Set([
+  /* Identifiers — never secret, and the whole point of an audit row.
+     camelCase set (quotation/product tools). */
   "id", "productId", "customerId", "supplierId", "quotationId",
-  "invoiceId", "employeeId", "query", "limit", "code", "status",
-  "name", "taskId", "conversationId", "module", "action",
+  "invoiceId", "employeeId", "taskId", "conversationId",
+
+  /* snake_case set — AUDIT ISSUE 6 (P0). These are the parameter names the
+     work-management tools ACTUALLY take (`task_id`, `event_id`, `item_id`,
+     `project_id`); only the camelCase `taskId` was listed, so every todo,
+     calendar and planning write was recorded as `<redacted:36ch>`. The
+     consequence: "who asked Koleex AI to delete this task?" could not be
+     answered from the audit table at all — the row that changed was not
+     identified. An id is not sensitive; omitting it only blinded forensics. */
+  "task_id", "event_id", "item_id", "project_id",
+  /* Who a task was assigned to IS the forensic content of a reassignment,
+     and account ids already appear in every audit row's own account_id. */
+  "assign_to_account_ids", "add_account_ids", "remove_account_ids",
+  "replace_with_account_ids",
+
+  /* Control flags — these separate a PREVIEW from an EXECUTION in the log.
+     Without `confirm` the two are nearly indistinguishable after the fact. */
+  "confirm", "done",
+
+  /* Non-sensitive filters and enums. `q` is the same class as `query`,
+     which was already allowed. */
+  "query", "q", "limit", "code", "status", "name", "module", "action",
+  "priority", "type", "days", "mine", "market", "brand", "filter", "due",
 ]);
+
+/* Deliberately NOT allowlisted — free text and personal content stay
+   redacted: title, description, notes, fact, value, key, label, tags, and
+   all date/time arguments. Forensics gets the identifier and the outcome;
+   it does not need the prose. */
 
 function scrubArgs(args: Record<string, unknown>): Record<string, unknown> {
   const out: Record<string, unknown> = {};

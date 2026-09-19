@@ -2445,8 +2445,10 @@ export default function ManagementPage() {
 
       {/* Toast */}
       {toast && (
-        <div className="fixed bottom-20 md:bottom-6 left-1/2 -translate-x-1/2 z-50 animate-in fade-in slide-in-from-bottom-2 duration-200">
-          <div className="px-5 py-2.5 rounded-xl text-[13px] font-medium shadow-2xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] border border-[var(--border-subtle)] flex items-center gap-2">
+        <div className="fixed bottom-20 md:bottom-6 left-1/2 -translate-x-1/2 z-50">
+          {/* entrance on the INNER node — the outer keeps the centering
+              translate, which a transform keyframe would clobber */}
+          <div className="kx-pop-in px-5 py-2.5 rounded-xl text-[13px] font-medium shadow-2xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] border border-[var(--border-subtle)] flex items-center gap-2">
             {toast}
             {toastUndo && (
               <button onClick={() => { toastUndo(); setToast(null); setToastUndo(null); }}

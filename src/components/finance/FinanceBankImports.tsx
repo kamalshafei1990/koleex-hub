@@ -21,7 +21,8 @@ import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import FinanceHeader from "@/components/finance/FinanceHeader";
 import { useTranslation } from "@/lib/i18n";
-import { financeT } from "@/lib/translations/finance";
+import { FIN_BANKIMPORTS } from "@/lib/translations/finance/bankImports";
+import { FIN_RECONCILIATION } from "@/lib/translations/finance/reconciliation";
 import { EmptyState, SectionCard } from "@/components/finance/FinanceUi";
 import { MetricCard } from "@/components/finance/FinanceUiX";
 import RrIcon from "@/components/ui/RrIcon";
@@ -37,8 +38,12 @@ import type {
 type StepKey = "pick" | "upload" | "preview" | "done";
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 
+/* Only the namespaces this screen actually reads — see finance.ts. */
+const DICT = { ...FIN_BANKIMPORTS, ...FIN_RECONCILIATION } as const;
+
+
 export default function FinanceBankImports() {
-  const { t } = useTranslation(financeT);
+  const { t } = useTranslation(DICT);
   const router = useRouter();
   const searchParams = useSearchParams();
   const preselectedAccountId = searchParams.get("account");
@@ -410,7 +415,7 @@ export default function FinanceBankImports() {
    ──────────────────────────────────────────────────────────────────────── */
 
 function Stepper({ step }: { step: StepKey }) {
-  const { t } = useTranslation(financeT);
+  const { t } = useTranslation(DICT);
   const steps: { key: StepKey; label: string }[] = [
     { key: "pick",    label: t("bankImports.step.pick", "Pick account") },
     { key: "upload",  label: t("bankImports.step.upload", "Upload file") },
@@ -454,7 +459,7 @@ const RowCard = memo(function RowCard({
   accountCurrency: string;
   onToggle: (id: string, next: BankStatementRowImportStatus) => void;
 }) {
-  const { t } = useTranslation(financeT);
+  const { t } = useTranslation(DICT);
   const ccy = row.currency ?? accountCurrency;
   const amount = row.amount != null ? fmtMoney(row.amount, ccy, { compact: true }) : "—";
   const directionLabel = row.direction === "inflow" ? t("bankImports.row.moneyIn", "Money in") : row.direction === "outflow" ? t("bankImports.row.moneyOut", "Money out") : "—";
@@ -542,7 +547,7 @@ function RecentImports({
   accounts: BankAccount[];
   onOpen: (imp: BankStatementImport) => void;
 }) {
-  const { t } = useTranslation(financeT);
+  const { t } = useTranslation(DICT);
   if (imports.length === 0) return null;
   const byId = new Map(accounts.map((a) => [a.id, a]));
   const IMPORT_STATUS_LOCAL: Record<string, { label: string; cls: string }> = {

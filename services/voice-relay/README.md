@@ -1,0 +1,111 @@
+# Koleex AI voice relay
+
+The socket lane's vendor connection, carried through Koleex's own domain.
+See the header of `server.mjs` for why it exists and what it refuses.
+
+Must run on Railway in **Singapore** (`asia-southeast1-eqsg3a`). On
+2026-09-12 the service was found in Amsterdam (`ams`): every audio frame of a
+socket-lane call from China crossed to Europe and back before it reached the
+vendor, and the owner's "the voice still has a glitch" call of 04:14 UTC ran
+that path. `railway.json` names the Singapore region, but the deployment of
+04:34 UTC still reported the dashboard's `ams` — Railway's config-as-code is
+deprecated and did not visibly override the region — so the region was also
+changed on the service itself (staged 04:52 UTC; committing a staged change
+needs the owner's two-factor approval in the dashboard). The deploy log's
+first line prints `region=` (`RAILWAY_REPLICA_REGION`): read it after every
+deployment; `asia-southeast1-eqsg3a` is the only acceptable value.
+Environment:
+
+| Variable | Meaning |
+| --- | --- |
+| `VOICE_RELAY_SECRET` | Shared with Vercel's `AI_VOICE_RELAY_SECRET`; signs the admission ticket. Without it every connection is refused. |
+| `VOICE_UPSTREAM_URL` | The vendor's realtime socket (default `wss://api.x.ai/v1/realtime`). |
+| `VOICE_PROTOCOL_PREFIX` | Subprotocol prefix the client secret follows (default `xai-client-secret.`). |
+| `VOICE_RELAY_ORIGINS` | Allowed origin host suffixes, comma-separated (default `koleexgroup.com,vercel.app`). |
+| `PORT` | Set by Railway. |
+
+`GET /health` answers `{ ok, connections, configured }`. The socket path is
+`/v1/realtime?t=<ticket>&model=<id>` with the vendor's subprotocol.
+
+The Vercel side: `AI_VOICE_RELAY_URL` (e.g. `wss://voice.koleexgroup.com/v1/realtime`)
+makes `/api/ai/voice/ws-session` hand browsers the relay's url with a ticket
+instead of the vendor's url. Unset, browsers dial the vendor directly as before.
+
+`npm test` runs the pure checks (ticket, protocol, upstream url, origins).
+
+Resume (2026-09-12): on some paths the browser's socket dies every ~30 s
+(`client-closed code=1006` with frames flowing). A client lost WITHOUT a
+close frame leaves its far-side session parked for `RESUME_GRACE_MS`
+(12 s); frames that arrive meanwhile are held (bounded by
+`MAX_PARK_BYTES`). A redial that presents the same secret with `resume=1`
+is attached to it — the relay sends `{"type":"koleex.relay","resumed":true}`
+first, then the held frames — and the conversation continues where it
+was, with no second configuration and no second far-side session. A
+resume with nothing parked is closed with code 4001 so the client dials
+afresh at once. A caller who hangs up (a close frame) parks nothing. The
+log reads `parked`, `resumed gapMs=… held=…`, and the end line carries
+`resumes=`.
+
+Handover (2026-09-13): a path that cuts every socket at the same age
+(session 14: parked at 28.9 / 59.7 / 90.6 / 121.5 / 152.4 / 183.2 / 214.1 /
+245.0 s — thirty seconds to the second) is predictable, and each resume
+still cost 400–830 ms of silence and the frames in flight. So the client
+learns that age and dials a second socket with `resume=1` BEFORE it: a
+resume that finds the session LIVE, not parked, is a handover — the new
+socket is the session's client from that moment, gets the hello
+(`resumed:true`), and the old socket is closed by the relay with code
+`HANDOVER_CODE` (4002), which the client reads as "done", never as a drop.
+Frames already written to the old socket arrive before its close, in
+order; the vendor's side never notices. The log reads `handover ms=…` and
+the end line carries `handovers=`. `server.handover.test.mjs` proves it
+on real sockets against a fake vendor.
+
+The end line also carries the vendor's PACING (2026-09-12 night), measured
+here where no tunnel and no phone is in the way: `deltas=` audio frames
+received, `audioMs=` their total length, `gaps=` silences longer than
+`PACING_GAP_MS` (250 ms) between two frames of one answer, `maxGap=` the
+longest, and `minAhead=` how far ahead of real time the answer's audio ran
+at its worst (audio delivered minus wall time since the answer's first
+frame; a player with no lead would have run dry by that much when it is
+negative). And the sound itself (2026-09-13): `clicks=` jumps between two
+neighbouring samples no voice makes (`CLICK_JUMP`, ≈0.49 of full scale)
+inside a frame, `edges=` such jumps at the joint between two frames of one
+answer, `peak=` the loudest sample in percent of full scale, `clip=`
+samples pinned at full scale. Each frame is decoded for the count and
+dropped; nothing is kept.
+
+Limits (security review, 2026-09-12): one frame at most 1 MiB; at most 8
+open sockets per client address and 3 per admission ticket (a ticket is one
+call — a redial reuses it, a leak would not stop at three); at most 2 MiB of
+frames held for an upstream that has not opened yet. The client address is
+the LAST hop of `X-Forwarded-For` (the one Railway's edge appended), never
+the first, which anyone can write. `VOICE_RELAY_ORIGINS` on the service
+names the Hub's hosts exactly; the default `vercel.app` suffix is only for a
+service with no variable set.
+
+## Deploying
+
+Railway builds this directory from `main` (root directory `services/voice-relay`,
+watch pattern `services/voice-relay/**` — no leading slash: with one, Railway
+matched nothing and the merge of 2026-09-08 20:56 UTC produced no deployment
+at all, so the relay kept refusing the watchdog's Origin-less probe for hours
+after the fix had merged). A change anywhere under this directory deploys;
+a change elsewhere in the repository does not.
+
+Check after every merge that touches this directory. The merges of #407 and
+#408 (2026-09-11, the `koleex.keepalive` frame answered here instead of being
+forwarded) produced no deployment, with the pattern correct: Railway reported
+**auto-deploy disabled — the repository has no Railway GitHub App
+installation** (`NO_INSTALLATION`). The webhook connection exists; the app is
+not authorised on the repository, so no merge can trigger a build. Until the
+owner installs the Railway GitHub App on `kamalshafei1990/koleex-hub` (Railway
+→ the service → Settings → Source → connect / reinstall, then refresh the
+repository list), every deployment of this relay is manual: the Railway
+dashboard (the service's ⋯ → Deploy latest commit) or the Railway MCP's
+deploy tool with the commit hash. The keepalive reached the relay this way on
+2026-09-12 03:19 UTC (deployment `486769f9`, commit `ac10fd4f`).
+
+Why it matters: until the relay carries a change, a browser's keepalive is
+forwarded to the vendor as an unknown event, which the vendor may answer with
+an `error` event — one the call survives, but that the beacon would file as
+`far-side-error`, and that keeps the frame from doing its job.

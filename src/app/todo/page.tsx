@@ -29,7 +29,6 @@ import CircleIcon from "@/components/icons/ui/CircleIcon";
 import CheckCircleIcon from "@/components/icons/ui/CheckCircleIcon";
 import ExclamationIcon from "@/components/icons/ui/ExclamationIcon";
 import ClockIcon from "@/components/icons/ui/ClockIcon";
-import MoreHorizontalIcon from "@/components/icons/ui/MoreHorizontalIcon";
 import ListTodoIcon from "@/components/icons/ui/ListTodoIcon";
 import PackageIcon from "@/components/icons/ui/PackageIcon";
 import AtSignIcon from "@/components/icons/ui/AtSignIcon";
@@ -51,7 +50,6 @@ import LayoutListIcon from "@/components/icons/ui/LayoutListIcon";
 import LayoutGridIcon from "@/components/icons/ui/LayoutGridIcon";
 import AutoTranslatedText from "@/components/ui/AutoTranslatedText";
 import FilterIcon from "@/components/icons/ui/FilterIcon";
-import AngleUpIcon from "@/components/icons/ui/AngleUpIcon";
 import TodoIcon from "@/components/icons/TodoIcon";
 import MyWorkStrip from "@/components/todo/MyWorkStrip";
 import {
@@ -65,7 +63,7 @@ import { fetchProjects } from "@/lib/projects";
 import type {
   TodoWithRelations, TodoAssigneeInfo, TodoLabelRow, TodoPriority, TodoMetadata, TodoChecklistItem, TodoStatus, TodoRecurrence,
 } from "@/types/supabase";
-import { getCurrentAccountIdSync } from "@/lib/identity";
+import { useCurrentAccountId, getCurrentAccountIdSync } from "@/lib/identity";
 import { usePermissions } from "@/lib/permissions";
 import { loadScopeContext, type ScopeContext } from "@/lib/scope";
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
@@ -158,16 +156,32 @@ function getInitials(name: string | null, username?: string): string {
   return username?.substring(0, 2).toUpperCase() || "?";
 }
 
+/* Pure — module level on purpose: as a useCallback inside the component the
+   React Compiler refused to optimize the whole component ("existing manual
+   memoization could not be preserved"), because a function value in a memo
+   deps array is a mutation risk it cannot rule out. A plain function is
+   provably stable. */
+function involves(t: TodoWithRelations, id: string): boolean {
+  return (
+    t.created_by_account_id === id ||
+    t.assigned_by_account_id === id ||
+    t.assignees.some((a) => a.account_id === id)
+  );
+}
+
 /* ── Avatar ── */
 function MiniAvatar({ info, size = 28 }: { info: TodoAssigneeInfo; size?: number }) {
   // Track load failure so a broken/blocked image degrades to initials instead
   // of the browser's broken-image glyph. Reset when the source changes.
-  const [failed, setFailed] = useState(false);
-  useEffect(() => setFailed(false), [info.avatar_url]);
+  /* The failure remembers WHICH src failed and is derived at render — no
+     reset effect needed, and a new avatar_url is automatically "not failed".
+     (The old reset-in-effect was a synchronous setState cascade.) */
+  const [failedSrc, setFailedSrc] = useState<string | null>(null);
+  const failed = failedSrc !== null && failedSrc === info.avatar_url;
 
   return info.avatar_url && !failed ? (
     <img src={fpAvatar(info.avatar_url)} alt="" className="rounded-full object-cover shrink-0"
-      style={{ width: size, height: size }} onError={() => setFailed(true)} />
+      style={{ width: size, height: size }} onError={() => setFailedSrc(info.avatar_url)} />
   ) : (
     <div className="rounded-full bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-dim)] shrink-0 font-bold"
       style={{ width: size, height: size, fontSize: size * 0.38 }}>
@@ -428,7 +442,7 @@ function TaskModal({ open, editEntry, employees, departments, labels, onClose, o
   const [showExtras, setShowExtras] = useState(false);
   const [projects, setProjects] = useState<{ id: string; name: string }[]>([]);
   const inputRef = useRef<HTMLInputElement>(null);
-  const accountId = getCurrentAccountIdSync();
+  const accountId = useCurrentAccountId();
 
   /* Active projects for the optional "Related project" link. fetchProjects
      returns [] when the user lacks Projects access, which hides the field. */
@@ -773,9 +787,27 @@ function TaskModal({ open, editEntry, employees, departments, labels, onClose, o
           {/* Reminder */}
           <div>
             <label className={lbl}>{t("f.reminder")} <span className="font-normal normal-case">{t("common.optional")}</span></label>
+            {/* The house rule is Day/Month/Year everywhere, and a native
+                datetime-local renders mm/dd/yyyy on an English browser — the
+                one field in this modal that disobeyed while Start/Due used the
+                DMY DatePicker beside it. Same picker now, plus a plain time
+                box (HH:MM has no day-order to get wrong). remindAt keeps the
+                exact "YYYY-MM-DDTHH:MM" shape localInputToIso expects. */}
             <div className="flex items-center gap-2">
-              <input type="datetime-local" value={remindAt} onChange={(e) => setRemindAt(e.target.value)}
-                className="flex-1 h-10 px-3 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[13px] text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)] transition-all" />
+              <div className="flex-1">
+                <DatePicker
+                  value={remindAt.slice(0, 10)}
+                  onChange={(iso) => setRemindAt(iso ? `${iso}T${remindAt.slice(11, 16) || "09:00"}` : "")}
+                  placeholder={t("f.selectDate")}
+                  heightCls="h-10"
+                />
+              </div>
+              <input
+                type="time"
+                value={remindAt.slice(11, 16)}
+                onChange={(e) => { if (remindAt) setRemindAt(`${remindAt.slice(0, 10)}T${e.target.value || "09:00"}`); }}
+                disabled={!remindAt}
+                className="h-10 w-[92px] px-2 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[13px] tabular-nums text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)] transition-all disabled:opacity-40" />
               {remindAt && (
                 <button type="button" onClick={() => setRemindAt("")}
                   className="h-10 px-3 rounded-xl text-[11px] font-medium text-[var(--text-dim)] hover:text-[var(--text-primary)]">
@@ -1454,27 +1486,42 @@ function KpiDashboard({ todos }: { todos: TodoWithRelations[] }) {
    app that mounts it. */
 const WavyBackground = dynamic(() => import("@/components/ui/WavyBackground"), { ssr: false });
 
-const TODO_SNAP_KEY = "kx_todo_snap_v1";
+/* THE MIRROR IS PER ACCOUNT AND HAS A SHELF LIFE. v1 was one key for the
+   whole browser with no date on it: after the tasks were wiped server-side
+   the owner opened the app and watched the old list paint and then vanish
+   — the mirror from days earlier, drawn first, replaced by the empty truth.
+   The same key would also have painted one account's tasks to the next
+   account on a shared browser. Now the key carries the account id, a
+   mirror older than a few hours is not painted at all (the list loads in
+   under a second — a stale first frame is worse than a blank one), and the
+   v1 key is removed on sight. Still `kx_`-prefixed, so sign-out wipes it. */
+const TODO_SNAP_KEY_V1 = "kx_todo_snap_v1";
+const TODO_SNAP_MAX_AGE_MS = 6 * 60 * 60 * 1000;
+const todoSnapKey = () => `kx_todo_snap_v2:${getCurrentAccountIdSync() ?? "anon"}`;
 interface TodoSnap {
   todos: TodoWithRelations[];
   employees: TodoAssigneeInfo[];
   departments: string[];
   labels: TodoLabelRow[];
+  savedAt?: number;
 }
 function readTodoSnap(): TodoSnap | null {
   if (typeof window === "undefined") return null;
   try {
-    const raw = window.localStorage.getItem(TODO_SNAP_KEY);
+    window.localStorage.removeItem(TODO_SNAP_KEY_V1);
+    const raw = window.localStorage.getItem(todoSnapKey());
     if (!raw) return null;
     const s = JSON.parse(raw) as TodoSnap;
-    return Array.isArray(s?.todos) ? s : null;
+    if (!Array.isArray(s?.todos)) return null;
+    if (!s.savedAt || Date.now() - s.savedAt > TODO_SNAP_MAX_AGE_MS) return null;
+    return s;
   } catch { return null; }
 }
 function persistTodoSnap(s: TodoSnap): void {
   try {
     /* Cap rows so the mirror can never brush the localStorage quota; the
        warm paint only needs the first screens, the refresh brings the rest. */
-    window.localStorage.setItem(TODO_SNAP_KEY, JSON.stringify({ ...s, todos: s.todos.slice(0, 400) }));
+    window.localStorage.setItem(todoSnapKey(), JSON.stringify({ ...s, todos: s.todos.slice(0, 400), savedAt: Date.now() }));
   } catch { /* quota — mirror is best-effort */ }
 }
 
@@ -1514,7 +1561,7 @@ export default function TodoPage() {
   const [employees, setEmployees] = useState<TodoAssigneeInfo[]>(snap?.employees ?? []);
   const [departments, setDepartments] = useState<string[]>(snap?.departments ?? []);
   const [labels, setLabels] = useState<TodoLabelRow[]>(snap?.labels ?? []);
-  const accountId = getCurrentAccountIdSync();
+  const accountId = useCurrentAccountId();
   const [scopeCtx, setScopeCtx] = useState<ScopeContext | null>(null);
   /* Super-admin audience lens: "own" (default — SA sees THEIR tasks like any
      user), "all" (every task in the tenant), or an account_id (that user's
@@ -1538,7 +1585,11 @@ export default function TodoPage() {
      the server does the scoping — ctx only feeds the legacy fallback),
      and it also made the realtime effect below resubscribe. */
   const scopeCtxRef = useRef(scopeCtx);
-  scopeCtxRef.current = scopeCtx;
+  /* Written in an effect, not during render (react-hooks/refs): loadAll only
+     reads the ref from handlers and effects, which all run AFTER this effect
+     has stamped the latest value — same freshness, without the render-phase
+     ref write. */
+  useEffect(() => { scopeCtxRef.current = scopeCtx; }, [scopeCtx]);
   const loadAll = useCallback(async () => {
     const [t, e, d, l] = await Promise.all([
       fetchTodos(scopeCtxRef.current),
@@ -1598,6 +1649,13 @@ export default function TodoPage() {
       },
     );
   }, [loadAll]);
+
+  /* Declared ABOVE isTaskOwner on purpose: that closure reads isSA, and a
+     reference that precedes its binding's declaration (legal JS, TDZ at
+     runtime) is what made the React Compiler skip optimizing this whole
+     component — it cannot prove a before-declaration binding immutable. */
+  const permState = usePermissions();
+  const isSA = permState.isSuperAdmin === true;
 
   /* Owners (SA / creator / assigner) complete tasks directly; everyone else
      (assignees + observers) goes through the assigner's approval. */
@@ -1742,11 +1800,7 @@ export default function TodoPage() {
     loadAll();
   };
 
-  const { isSuperAdmin: isSA } = usePermissions();
-  const involves = useCallback((t: TodoWithRelations, id: string) =>
-    t.created_by_account_id === id ||
-    t.assigned_by_account_id === id ||
-    t.assignees.some((a) => a.account_id === id), []);
+
   /* Recurring series: collapse the dead periods.
 
      A daily/weekly/monthly task is stored as one row per period (the template
@@ -1790,7 +1844,7 @@ export default function TodoPage() {
       return seriesTodos.filter((t) => t.assign_to_all || (accountId ? involves(t, accountId) : true));
     }
     return seriesTodos.filter((t) => involves(t, saView));
-  }, [seriesTodos, isSA, saView, accountId, involves]);
+  }, [seriesTodos, isSA, saView, accountId]);
 
   // Filtering
   const filtered = useMemo(() => {

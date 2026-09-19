@@ -5,6 +5,7 @@
    browser Supabase client (read-only summary numbers, RLS-safe). */
 
 import { useEffect, useMemo, useState } from "react";
+import { useWarm, writeWarm } from "@/lib/warm-cache";
 import Link from "next/link";
 import { supabaseAdmin as supabase } from "@/lib/supabase-admin";
 import type { SalesModuleProps } from "../SalesApp";
@@ -34,11 +35,23 @@ interface Stats {
   wonThisMonth: number;
 }
 
+interface FeedItem { id: string; kind: string; label: string; ts: string }
+/* The warm cache holds the DIGESTED screen: those six queries return
+   hundreds of rows, while what is on screen is a few dozen bytes. */
+interface WarmSales { stats: Stats; recent: FeedItem[] }
+
 export default function DashboardModule({ t }: SalesModuleProps) {
 
   const [stats, setStats] = useState<Stats | null>(null);
-  const [recent, setRecent] = useState<{ id: string; kind: string; label: string; ts: string }[]>([]);
+  const [recent, setRecent] = useState<FeedItem[]>([]);
   const [loading, setLoading] = useState(true);
+  /* Measured on production 2026-08-22: /sales took 1945ms to show anything,
+     with the spinner up for about a second — the worst of the ten screens.
+     It fires SIX parallel queries straight from the browser, so there is no
+     single request to make faster; the fix is to stop waiting for them.
+     (Moving those queries behind an API is the separate browser-DB-access
+     programme — orthogonal to this.) */
+  const warm = useWarm<WarmSales>("sales:dashboard");
 
   useEffect(() => {
     let cancelled = false;
@@ -75,7 +88,7 @@ export default function DashboardModule({ t }: SalesModuleProps) {
           .filter((i) => i.issued_at && new Date(i.issued_at) >= monthStart)
           .reduce((a, i) => a + (Number(i.total) || 0), 0);
 
-        setStats({
+        const nextStats: Stats = {
           pipelineValue,
           pipelineCount: pipelineActive.length,
           openQuotes,
@@ -85,7 +98,8 @@ export default function DashboardModule({ t }: SalesModuleProps) {
           activeCustomers: customers.filter((c) => c.is_active !== false).length,
           upcomingTasks: acts.length,
           wonThisMonth,
-        });
+        };
+        setStats(nextStats);
 
         // Build a feed mixing the last few of each kind
         const feed: { id: string; kind: string; label: string; ts: string }[] = [];
@@ -93,7 +107,9 @@ export default function DashboardModule({ t }: SalesModuleProps) {
         for (const i of invoices.slice(0, 3)) feed.push({ id: i.id, kind: "invoice", label: `Invoice — ${i.customer_name || ""}  ${formatMoney(Number(i.total) || 0)}`, ts: i.created_at });
         for (const a of acts.slice(0, 3)) feed.push({ id: a.id, kind: "task",    label: a.title || "Task", ts: a.created_at });
         feed.sort((a, b) => (a.ts < b.ts ? 1 : -1));
-        setRecent(feed.slice(0, 8));
+        const nextRecent = feed.slice(0, 8);
+        setRecent(nextRecent);
+        writeWarm<WarmSales>("sales:dashboard", { stats: nextStats, recent: nextRecent });
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -101,7 +117,12 @@ export default function DashboardModule({ t }: SalesModuleProps) {
     return () => { cancelled = true; };
   }, []);
 
+  /* Fresh always wins; the warm copy only fills the gap the queries leave. */
+  const shownStats = stats ?? warm?.stats ?? null;
+  const shownRecent = stats ? recent : (warm?.recent ?? recent);
+
   const kpis = useMemo(() => {
+    const stats = shownStats;
     if (!stats) return [];
     return [
       { id: "pipelineValue",    icon: LayoutGridIcon, label: t("sales.kpi.pipelineValue"),    value: formatMoney(stats.pipelineValue), sub: `${stats.pipelineCount} ${t("sales.activeCount")}`, href: "/crm" },
@@ -113,9 +134,9 @@ export default function DashboardModule({ t }: SalesModuleProps) {
       { id: "upcomingTasks",    icon: ActivityIcon,   label: t("sales.kpi.upcomingTasks"),    value: String(stats.upcomingTasks), sub: t("sales.recent"),          href: "/crm" },
       { id: "wonThisMonth",     icon: CheckCircleIcon,label: t("sales.kpi.wonThisMonth"),     value: String(stats.wonThisMonth), sub: t("sales.thisMonth"),        href: "/crm" },
     ];
-  }, [stats, t]);
+  }, [shownStats, t]);
 
-  if (loading || !stats) {
+  if (loading && !shownStats) {
     return (
       <div className="h-full flex items-center justify-center text-[var(--text-dim)]">
         <SpinnerIcon size={20} />
@@ -145,11 +166,11 @@ export default function DashboardModule({ t }: SalesModuleProps) {
           <SparklesIcon className="h-3 w-3" />
           {t("sales.recent")}
         </h2>
-        {recent.length === 0 ? (
+        {shownRecent.length === 0 ? (
           <p className="text-[12px] text-[var(--text-dim)]">{t("sales.empty.noActivities")}</p>
         ) : (
           <ul className="space-y-1.5">
-            {recent.map((r) => (
+            {shownRecent.map((r) => (
               <li key={r.kind + r.id} className="flex items-center justify-between gap-2 px-2 py-1.5 rounded-lg hover:bg-[var(--bg-surface)] transition-colors">
                 <div className="flex items-center gap-2 min-w-0">
                   <span className="inline-flex items-center justify-center h-5 px-1.5 rounded text-[9px] font-bold uppercase tracking-wider bg-[var(--bg-surface-subtle)] text-[var(--text-muted)] border border-[var(--border-subtle)] shrink-0">

@@ -20,6 +20,7 @@ import "server-only";
    --------------------------------------------------------------------------- */
 
 import { NextResponse } from "next/server";
+import { activateChecklist } from "@/lib/server/hr-lifecycle";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { requireAuth, requireModuleAction } from "@/lib/server/auth";
 import { hashForWrite } from "@/lib/server/password";
@@ -400,6 +401,7 @@ export async function POST(req: Request) {
       work_email: str(body, "work_email"),
       work_phone: str(body, "work_phone"),
       work_location: str(body, "work_location") || "office",
+      work_country: str(body, "work_country") || null,
       manager_id: str(body, "manager_id"),
       notes: null,
       /* Identity consolidation: home address lives on the person record
@@ -464,6 +466,10 @@ export async function POST(req: Request) {
       { status: 500 },
     );
   }
+
+  /* ── Step 3a: the onboarding checklist starts on the hire date (Phase F;
+     non-fatal, idempotent — HR no longer has to remember to assign it) ── */
+  await activateChecklist(employee.id, "onboarding", str(body, "hire_date") || new Date().toISOString().slice(0, 10), str(body, "department_id"));
 
   /* ── Step 3b: Skill assessments (non-fatal — the hire is already real) ── */
   if (body.skills !== undefined) {
@@ -660,7 +666,7 @@ export async function PUT(req: Request) {
   /* ── Resolve the record we're editing ── */
   const { data: existing, error: exErr } = await supabaseServer
     .from(EMPLOYEES)
-    .select("id, person_id")
+    .select("id, person_id, employment_status")
     .eq("id", employeeId)
     .maybeSingle();
   if (exErr || !existing?.person_id) {
@@ -793,6 +799,7 @@ export async function PUT(req: Request) {
       work_email: str(body, "work_email"),
       work_phone: str(body, "work_phone"),
       work_location: str(body, "work_location") || "office",
+      work_country: str(body, "work_country") || null,
       manager_id: str(body, "manager_id"),
       emergency_contact_name: str(body, "emergency_contact_name"),
       emergency_contact_phone: str(body, "emergency_contact_phone"),
@@ -846,6 +853,15 @@ export async function PUT(req: Request) {
       emergency_contact2_relationship: str(body, "emergency_contact2_relationship"),
     })
     .eq("id", employeeId);
+
+  /* ── Phase F: leaving → the offboarding checklist starts today (once). ── */
+  {
+    const nextStatus = str(body, "employment_status") || "active";
+    const prevStatus = (existing as { employment_status?: string | null }).employment_status ?? "active";
+    if (nextStatus === "terminated" && prevStatus !== "terminated") {
+      await activateChecklist(employeeId, "offboarding", new Date().toISOString().slice(0, 10), str(body, "department_id"));
+    }
+  }
   if (empErr) {
     return NextResponse.json(
       { success: false, error: `Failed to update employee: ${empErr.message}` },

@@ -104,8 +104,13 @@ export default function LeaveManagement({ employees, t, lang }: HRModuleProps) {
     emergency_contact_name: "",
     emergency_contact_phone: "",
   });
-  const [balances, setBalances] = useState<(LeaveBalanceRow & { leave_type_name: string })[] | null>(null);
-  const [balancesLoading, setBalancesLoading] = useState(false);
+  /* Balances remember WHICH employee they were fetched for; `balances` and
+     `balancesLoading` are then derived at render, so switching employee (or
+     closing the modal) never needs a reset-state effect pass. */
+  const [balancesFor, setBalancesFor] = useState<{
+    empId: string;
+    rows: (LeaveBalanceRow & { leave_type_name: string })[];
+  } | null>(null);
   const [selectedLeave, setSelectedLeave] = useState<LeaveRequestWithName | null>(null);
   const [reviewNotes, setReviewNotes] = useState("");
   const [loading, setLoading] = useState(true);
@@ -133,15 +138,17 @@ export default function LeaveManagement({ employees, t, lang }: HRModuleProps) {
   /* ── Selected employee's balances for this year ──
      Loaded only once someone is picked (and only in the create modal), so the
      module still opens with a single round-trip. */
+  const balances =
+    showLeaveModal && leaveForm.employee_id && balancesFor?.empId === leaveForm.employee_id
+      ? balancesFor.rows
+      : null;
+  const balancesLoading = showLeaveModal && !!leaveForm.employee_id && balances === null;
   useEffect(() => {
     const empId = leaveForm.employee_id;
-    if (!showLeaveModal || !empId) { setBalances(null); return; }
+    if (!showLeaveModal || !empId) return;
     let cancelled = false;
-    setBalancesLoading(true);
     fetchLeaveBalances(empId, new Date().getFullYear()).then((rows) => {
-      if (cancelled) return;
-      setBalances(rows);
-      setBalancesLoading(false);
+      if (!cancelled) setBalancesFor({ empId, rows });
     });
     return () => { cancelled = true; };
   }, [showLeaveModal, leaveForm.employee_id]);
@@ -178,13 +185,8 @@ export default function LeaveManagement({ employees, t, lang }: HRModuleProps) {
     : null;
   const balanceAfter = balanceRemaining === null ? null : balanceRemaining - requestedDays;
 
-  /* Untick half day as soon as the range stops being a single date, so the
-     checkbox never sits on while having no effect. */
-  useEffect(() => {
-    if (!isSingleDay && leaveForm.half_day) {
-      setLeaveForm((f) => ({ ...f, half_day: false }));
-    }
-  }, [isSingleDay, leaveForm.half_day]);
+  /* half_day is unticked by the two date handlers the moment the range stops
+     being a single date — no after-render correction pass needed. */
 
   /* Requests by the same person that overlap the chosen range. Double-booking
      leave is the mistake this catches, and it costs nothing extra — the list
@@ -303,6 +305,7 @@ export default function LeaveManagement({ employees, t, lang }: HRModuleProps) {
   const filterOptions = [
     { key: "all", label: t("hr.all") },
     { key: "pending", label: t("hr.pending") },
+    { key: "manager_approved", label: t("hr.status.manager_approved") },
     { key: "approved", label: t("hr.approved") },
     { key: "rejected", label: t("hr.rejected") },
   ];
@@ -590,6 +593,25 @@ export default function LeaveManagement({ employees, t, lang }: HRModuleProps) {
                 </div>
               </div>
             )}
+            {/* Phase B — what the direct manager said, so HR decides with
+                the line's view in front of it. */}
+            <div>
+              <FieldLabel>{t("hr.managerStep")}</FieldLabel>
+              {selectedLeave.manager_reviewed_at ? (
+                <div className="text-[13px] text-[var(--text-primary)]">
+                  {selectedLeave.status === "rejected" ? t("hr.managerRejectedOn") : t("hr.managerApprovedOn")} {fmtDate(selectedLeave.manager_reviewed_at)}
+                  {selectedLeave.manager_notes && (
+                    <div className="mt-1 text-[12px] text-[var(--text-muted)] whitespace-pre-wrap">{selectedLeave.manager_notes}</div>
+                  )}
+                </div>
+              ) : (
+                <div className="text-[13px] text-[var(--text-dim)]">
+                  {employees.find((e) => e.id === selectedLeave.employee_id)?.manager_id
+                    ? t("hr.awaitingManager")
+                    : t("hr.noManagerStep")}
+                </div>
+              )}
+            </div>
             <div>
               <FieldLabel>{t("hr.reviewNotes")}</FieldLabel>
               <textarea
@@ -677,13 +699,15 @@ export default function LeaveManagement({ employees, t, lang }: HRModuleProps) {
               <DatePicker
                 value={leaveForm.start_date}
                 onChange={(iso) =>
-                  setLeaveForm((f) => ({
-                    ...f,
-                    start_date: iso,
+                  setLeaveForm((f) => {
                     /* Keep the range coherent: an end date that now sits
                        before the new start is cleared rather than left wrong. */
-                    end_date: f.end_date && iso && f.end_date < iso ? "" : f.end_date,
-                  }))
+                    const end = f.end_date && iso && f.end_date < iso ? "" : f.end_date;
+                    /* half_day only means something on a single date — untick
+                       it here (and in the end-date handler) rather than in an
+                       after-render effect. */
+                    return { ...f, start_date: iso, end_date: end, half_day: f.half_day && !!iso && iso === end };
+                  })
                 }
                 placeholder={t("hr.pickDate")}
                 lang={lang}
@@ -694,7 +718,7 @@ export default function LeaveManagement({ employees, t, lang }: HRModuleProps) {
               <FieldLabel>{t("hr.endDate")}</FieldLabel>
               <DatePicker
                 value={leaveForm.end_date}
-                onChange={(iso) => setLeaveForm((f) => ({ ...f, end_date: iso }))}
+                onChange={(iso) => setLeaveForm((f) => ({ ...f, end_date: iso, half_day: f.half_day && !!iso && iso === f.start_date }))}
                 placeholder={t("hr.pickDate")}
                 lang={lang}
                 min={leaveForm.start_date || undefined}

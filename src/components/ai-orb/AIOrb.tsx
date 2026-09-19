@@ -70,7 +70,9 @@ export default function AIOrb({
   useEffect(() => {
     try {
       const saved = window.localStorage.getItem("koleex-lang");
-      if (saved) setLang(saved);
+      /* microtask: keeps the read-after-mount behaviour (no SSR/hydration
+         mismatch) without a synchronous setState inside the effect body. */
+      if (saved) queueMicrotask(() => setLang(saved));
     } catch { /* ignore */ }
     const onLang = (e: Event) => setLang((e as CustomEvent<string>).detail || "en");
     window.addEventListener("langchange", onLang);
@@ -326,6 +328,27 @@ export default function AIOrb({
           transform: translate(-50%, -50%) scaleY(calc(1 + var(--kx-orb-audio, 0) * 0.05));
         }
         .kx-aiorb.is-thinking .ind { opacity: 0.85; }
+        /* ── Lively: opt-in by class for a FULL-SIZE orb that must keep its
+           face alive through the audio states — the voice call, where the
+           orb is 200px and on screen for minutes. The 38px avatar beside
+           chat text never gets this: there, a wandering eye distracts. The
+           rules live HERE, beside the ones they override, because a rule
+           in a global sheet loses to this inline sheet at equal
+           specificity — which is exactly how the first attempt lost. The
+           blink keyframe owns the bars' transform (scaleY only, the
+           geometry lock's own allowance); the voice shows on the rings
+           around the orb instead. ── */
+        .kx-aiorb.is-lively.is-listening .ind,
+        .kx-aiorb.is-lively.is-speaking .ind {
+          animation: kxA-blink 6.4s infinite;
+          filter: none;
+          transition: opacity 0.5s ease, filter 0.4s ease;
+        }
+        .kx-aiorb.is-lively.is-listening .gaze,
+        .kx-aiorb.is-lively.is-speaking .gaze { animation: kxA-look 7s ease-in-out infinite; }
+        .kx-aiorb.is-lively.is-listening .aura,
+        .kx-aiorb.is-lively.is-speaking .aura { animation-duration: 7s, 2.2s; }
+        .kx-aiorb.is-lively.is-speaking .inner { opacity: 1; }
         .kx-aiorb.is-success .ind { filter: brightness(1.4) drop-shadow(0 0 10px rgba(255, 255, 255, 0.7)); }
         .kx-aiorb.is-warning .ind { filter: brightness(1.15); }
         .kx-aiorb.is-error .ind { opacity: 0.75; }

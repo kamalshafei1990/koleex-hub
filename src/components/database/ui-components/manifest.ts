@@ -45,12 +45,10 @@ export const UI_COMPONENT_MODULES: UiModule[] = [
       "FamilySharedDivider",
       "FamilySpecGrid",
       "FamilyStrip",
-      "FeatureCardsSection",
       "FieldHelp",
       "KnowledgeSection",
       "MediaSection",
       "MemberIdentityPanel",
-      "MemberLogisticsPanel",
       "MemberPricingPanel",
       "MemberSupplierPanel",
       "ModelsSection",
@@ -92,13 +90,11 @@ export const UI_COMPONENT_MODULES: UiModule[] = [
     "fileCount": 11,
     "kitFiles": 1,
     "components": [
-      "AutoTranslate",
       "EmojiButton",
       "KoleexAiApp",
       "KoleexGlowOrb",
       "KoleexOrb",
       "KoleexOrbIcon",
-      "KoleexRobot",
       "MessageMarkdown",
       "MicButton",
       "ProjectGlyph",
@@ -664,13 +660,10 @@ export const UI_COMPONENT_MODULES: UiModule[] = [
   },
   {
     "key": "product-templates",
-    "fileCount": 4,
-    "kitFiles": 1,
+    "fileCount": 1,
+    "kitFiles": 0,
     "components": [
-      "FieldRenderer",
-      "SectionRenderer",
-      "TemplateForm",
-      "TemplateView"
+      "FieldRenderer"
     ]
   },
   {
@@ -997,16 +990,7 @@ export const UI_COMPONENT_MODULES: UiModule[] = [
     "components": [
       "AiKnowledgePage",
       "AiPage",
-      "Loading",
-      "OrbDemoPage"
-    ]
-  },
-  {
-    "key": "routes \u00b7 ai-face-lab",
-    "fileCount": 1,
-    "kitFiles": 0,
-    "components": [
-      "AiFaceLabPage"
+      "Loading"
     ]
   },
   {
@@ -1452,7 +1436,6 @@ export const UI_COMPONENT_MODULES: UiModule[] = [
     "kitFiles": 1,
     "components": [
       "EditProductPage",
-      "LegacyProductView",
       "Loading",
       "NewProductPage",
       "OgImage",

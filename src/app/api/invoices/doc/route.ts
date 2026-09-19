@@ -50,6 +50,7 @@ export async function GET(req: Request) {
       `id, tenant_id, inv_no, customer_id, status, currency,
        issue_date, due_date, total, amount_paid, balance,
        doc, created_at, updated_at, paid_at,
+       order_id, deal_no,
        customer:customer_id ( id, display_name:name, company_name )`,
     )
     .eq("tenant_id", auth.tenant_id);

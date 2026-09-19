@@ -12,9 +12,16 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import FinanceHeader from "@/components/finance/FinanceHeader";
 import { useTranslation } from "@/lib/i18n";
-import { financeT, translateAccountName } from "@/lib/translations/finance";
+import { FIN_ACCOUNTING } from "@/lib/translations/finance/accounting";
+import { FIN_COMMON } from "@/lib/translations/finance/common";
+import { FIN_PL } from "@/lib/translations/finance/pl";
+import { translateAccountName } from "@/lib/translations/finance/account-names";
 import { Eyebrow, Hairline } from "@/components/finance/FinanceDashboardUi";
 import type { Lang } from "@/lib/i18n";
+
+/* Only the namespaces this screen reads — see finance.ts. */
+const DICT = { ...FIN_ACCOUNTING, ...FIN_COMMON, ...FIN_PL } as const;
+
 
 interface PLAccountLine { account_id: string; code: string; name: string; amount: number }
 interface PLSection { label: string; amount: number; accounts: PLAccountLine[] }
@@ -44,7 +51,7 @@ function pct(n: number): string {
 }
 
 export default function FinanceProfitLoss() {
-  const { t, lang } = useTranslation(financeT);
+  const { t, lang } = useTranslation(DICT);
   const today = useMemo(() => new Date().toISOString().slice(0, 10), []);
   const ytdStart = useMemo(() => `${new Date().getUTCFullYear()}-01-01`, []);
   const [from, setFrom] = useState(ytdStart);

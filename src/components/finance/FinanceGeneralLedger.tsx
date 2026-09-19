@@ -14,10 +14,17 @@ import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 import FinanceHeader from "@/components/finance/FinanceHeader";
 import { useTranslation } from "@/lib/i18n";
-import { financeT, translateAccountName } from "@/lib/translations/finance";
+import { FIN_ACCOUNTING } from "@/lib/translations/finance/accounting";
+import { FIN_COMMON } from "@/lib/translations/finance/common";
+import { FIN_GL } from "@/lib/translations/finance/gl";
+import { translateAccountName } from "@/lib/translations/finance/account-names";
 import { EmptyState } from "@/components/finance/FinanceUi";
 import RrIcon from "@/components/ui/RrIcon";
 import type { AccountingAccount, GeneralLedger } from "@/lib/accounting/types";
+
+/* Only the namespaces this screen reads — see finance.ts. */
+const DICT = { ...FIN_ACCOUNTING, ...FIN_COMMON, ...FIN_GL } as const;
+
 
 function fmt(n: number): string {
   if (Math.abs(n) < 0.005) return "—";
@@ -39,7 +46,7 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 }
 
 export default function FinanceGeneralLedger() {
-  const { t, lang } = useTranslation(financeT);
+  const { t, lang } = useTranslation(DICT);
   const params = useSearchParams();
   const router = useRouter();
   const pathname = usePathname();

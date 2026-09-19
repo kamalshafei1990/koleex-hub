@@ -16,7 +16,6 @@ import {
   selectCls,
   primaryBtnCls,
   cancelBtnCls,
-  fmtDate,
   makeTranslationHelpers,
   JOB_STATUS_MAP,
   STAGE_MAP,
@@ -46,7 +45,7 @@ const STAGES = ["new", "screening", "interview", "offer", "hired", "rejected"] a
    MAIN COMPONENT
    ═══════════════════════════════════════════════════ */
 
-export default function RecruitmentModule({ employees, t, lang }: HRModuleProps) {
+export default function RecruitmentModule({ t }: HRModuleProps) {
   /* ── state ── */
   const [jobPostings, setJobPostings] = useState<JobPostingWithNames[]>([]);
   const [selectedPosting, setSelectedPosting] = useState<JobPostingWithNames | null>(null);

@@ -92,7 +92,7 @@ const listMyPlanning: ToolDef<
     const { data, error } = await q.order("start_at", { ascending: true }).limit(limit);
     if (error) {
       console.error("[tool.listMyPlanning]", error);
-      return { ok: false, permissionStatus: "denied", data: null, message: "Couldn't load your planning right now." };
+      return { ok: false, permissionStatus: "allowed", data: null, message: "Couldn't load your planning right now." };
     }
     const rows = (data ?? []) as Array<Record<string, unknown>>;
     return {
@@ -137,11 +137,11 @@ const createPlanningItem: ToolDef<
   handler: async (ctx, args): Promise<ToolResult<Record<string, unknown> | { preview: Record<string, unknown> }>> => {
     const startAt = String(args.start_at ?? "").trim();
     const endAt = String(args.end_at ?? "").trim();
-    if (!startAt || !endAt) return { ok: false, permissionStatus: "denied", data: null, message: "When is it? I need a start and end time." };
+    if (!startAt || !endAt) return { ok: false, permissionStatus: "allowed", data: null, message: "When is it? I need a start and end time." };
     {
       const s = Date.parse(startAt), e = Date.parse(endAt);
       if (!Number.isNaN(s) && !Number.isNaN(e) && e <= s) {
-        return { ok: false, permissionStatus: "denied", data: null, message: "The end time must be after the start time." };
+        return { ok: false, permissionStatus: "allowed", data: null, message: "The end time must be after the start time." };
       }
     }
     const title = args.title ? String(args.title) : "";
@@ -198,7 +198,7 @@ const createPlanningItem: ToolDef<
 
     if (error) {
       console.error("[tool.createPlanningItem]", error);
-      return { ok: false, permissionStatus: "denied", data: null, message: "Couldn't create the planning item — please try again." };
+      return { ok: false, permissionStatus: "allowed", data: null, message: "Couldn't create the planning item — please try again." };
     }
     return {
       ok: true,
@@ -292,11 +292,11 @@ const updatePlanningItem: ToolDef<
   requiredAction: "edit",
   handler: async (ctx, args): Promise<ToolResult<Record<string, unknown> | { preview: Record<string, unknown> }>> => {
     const id = String(args.item_id ?? "").trim();
-    if (!id) return { ok: false, permissionStatus: "denied", data: null, message: "Which planning item? Pick it from listMyPlanning first." };
-    if (!isUuid(id)) return { ok: false, permissionStatus: "denied", data: null, message: BAD_ID_MESSAGE };
+    if (!id) return { ok: false, permissionStatus: "allowed", data: null, message: "Which planning item? Pick it from listMyPlanning first." };
+    if (!isUuid(id)) return { ok: false, permissionStatus: "allowed", data: null, message: BAD_ID_MESSAGE };
 
     const item = await loadOwnPlanningItem(ctx, id);
-    if (!item) return { ok: false, permissionStatus: "denied", data: null, message: "I can't find that item on your own schedule — pick it again from listMyPlanning. Other people's shifts can only be changed in the Planning app." };
+    if (!item) return { ok: false, permissionStatus: "allowed", data: null, message: "I can't find that item on your own schedule — pick it again from listMyPlanning. Other people's shifts can only be changed in the Planning app." };
 
     const changes: Record<string, unknown> = {};
     if (typeof args.title === "string" && args.title.trim()) changes.title = args.title.trim();
@@ -308,7 +308,7 @@ const updatePlanningItem: ToolDef<
       changes.cancelled_at = new Date().toISOString();
     }
     if (Object.keys(changes).length === 0) {
-      return { ok: false, permissionStatus: "denied", data: null, message: "Nothing to change — tell me what to update (title, notes, times, or cancel it)." };
+      return { ok: false, permissionStatus: "allowed", data: null, message: "Nothing to change — tell me what to update (title, notes, times, or cancel it)." };
     }
 
     /* planning_items CHECK (end_at > start_at): validate the EFFECTIVE
@@ -317,7 +317,7 @@ const updatePlanningItem: ToolDef<
     const effStart = Date.parse((changes.start_at as string | undefined) ?? item.start_at ?? "");
     const effEnd = Date.parse((changes.end_at as string | undefined) ?? item.end_at ?? "");
     if (!Number.isNaN(effStart) && !Number.isNaN(effEnd) && effEnd <= effStart) {
-      return { ok: false, permissionStatus: "denied", data: null, message: "The end time must be after the start time." };
+      return { ok: false, permissionStatus: "allowed", data: null, message: "The end time must be after the start time." };
     }
 
     const label = item.title || item.type || "planning item";
@@ -344,7 +344,7 @@ const updatePlanningItem: ToolDef<
       .eq("tenant_id", ctx.auth.tenant_id);
     if (error) {
       console.error("[tool.updatePlanningItem]", error);
-      return { ok: false, permissionStatus: "denied", data: null, message: "Couldn't update the planning item — please try again." };
+      return { ok: false, permissionStatus: "allowed", data: null, message: "Couldn't update the planning item — please try again." };
     }
     return {
       ok: true,
@@ -376,11 +376,11 @@ const deletePlanningItem: ToolDef<
   requiredAction: "delete",
   handler: async (ctx, args): Promise<ToolResult<Record<string, unknown> | { preview: Record<string, unknown> }>> => {
     const id = String(args.item_id ?? "").trim();
-    if (!id) return { ok: false, permissionStatus: "denied", data: null, message: "Which planning item? Pick it from listMyPlanning first." };
-    if (!isUuid(id)) return { ok: false, permissionStatus: "denied", data: null, message: BAD_ID_MESSAGE };
+    if (!id) return { ok: false, permissionStatus: "allowed", data: null, message: "Which planning item? Pick it from listMyPlanning first." };
+    if (!isUuid(id)) return { ok: false, permissionStatus: "allowed", data: null, message: BAD_ID_MESSAGE };
 
     const item = await loadOwnPlanningItem(ctx, id);
-    if (!item) return { ok: false, permissionStatus: "denied", data: null, message: "I can't find that item on your own schedule — pick it again from listMyPlanning." };
+    if (!item) return { ok: false, permissionStatus: "allowed", data: null, message: "I can't find that item on your own schedule — pick it again from listMyPlanning." };
 
     const label = item.title || item.type || "planning item";
     const when = item.start_at ? ` (${item.start_at})` : "";
@@ -401,7 +401,7 @@ const deletePlanningItem: ToolDef<
       .eq("tenant_id", ctx.auth.tenant_id);
     if (error) {
       console.error("[tool.deletePlanningItem]", error);
-      return { ok: false, permissionStatus: "denied", data: null, message: "Couldn't delete the planning item — please try again." };
+      return { ok: false, permissionStatus: "allowed", data: null, message: "Couldn't delete the planning item — please try again." };
     }
     return {
       ok: true,

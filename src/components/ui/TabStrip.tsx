@@ -112,6 +112,80 @@ export default function TabStrip({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [aurora, activeKey, items.length]);
 
+  /* THE SELECTED TAB HAS TO BE ON SCREEN. The strip scrolls horizontally and
+     never scrolled itself: with twelve sections in 932px, choosing Review
+     moved the selection pill to x=995 — 149px past the right edge — so the
+     content changed while every tab still on screen looked unselected. The
+     tab you just picked is the one thing that must be visible.
+
+     `scrollIntoView` was the obvious call and is NOT the one used, because it
+     also walks every scrollable ancestor — here the whole app shell — and it
+     was measured doing nothing at all in RTL. This computes the one number the
+     strip needs and sets it, so nothing outside the strip moves. */
+  useEffect(() => {
+    const list = listRef.current;
+    if (!list) return;
+    const bring = (smooth: boolean) => {
+      const el = list.querySelector<HTMLElement>('[aria-selected="true"]');
+      if (!el) return;
+      const max = list.scrollWidth - list.clientWidth;
+      if (max <= 1) return;
+      /* RTL scrollLeft runs 0 (at the right-hand start) down to -max, so every
+         reading and every write is normalised through `fromLeft` — the plain
+         "how far from the physical left edge" number the maths wants. */
+      const rtl = getComputedStyle(list).direction === "rtl";
+      const from = rtl ? max + list.scrollLeft : list.scrollLeft;
+      const pad = 12;                                   // a sliver of the neighbour, so it reads as scrollable
+      let want = from;
+      if (el.offsetLeft - pad < from) want = el.offsetLeft - pad;
+      else if (el.offsetLeft + el.offsetWidth + pad > from + list.clientWidth)
+        want = el.offsetLeft + el.offsetWidth + pad - list.clientWidth;
+      want = Math.max(0, Math.min(max, want));
+      if (Math.abs(want - from) < 1) return;
+      const left = rtl ? want - max : want;
+      list.scrollTo({ left, behavior: smooth ? "smooth" : "auto" });
+      /* Smooth scrolling is a no-op in some embedded/preview runtimes, and a
+         tab that stays off screen is the whole bug — so land it either way. */
+      if (smooth) window.setTimeout(() => {
+        const now = rtl ? max + list.scrollLeft : list.scrollLeft;
+        if (Math.abs(now - want) > 2) list.scrollLeft = left;
+      }, 400);
+    };
+    bring(true);
+    /* A narrowing window pushes the selected tab off the end just as surely as
+       selecting an off-screen one does — so watch for it. `bring` is a no-op
+       when the tab is already in view, so this never yanks a strip the user
+       has scrolled themselves. */
+    const ro = new ResizeObserver(() => bring(false));
+    ro.observe(list);
+    return () => ro.disconnect();
+  }, [activeKey]);
+
+  /* Which PHYSICAL edge still has tabs behind it. The scrollbar is hidden by
+     design, so without this the strip cuts a label mid-word and offers no hint
+     that anything else exists.
+
+     Physical, not logical, because `scrollLeft` is physical too — and in RTL
+     it runs 0 (at the right-hand start) down to -max, so the reading has to be
+     normalised before it means anything. `fromLeft` is that normalisation. */
+  const [edges, setEdges] = useState<{ left: boolean; right: boolean }>({ left: false, right: false });
+  useEffect(() => {
+    const list = listRef.current;
+    if (!list) return;
+    const read = () => {
+      const max = list.scrollWidth - list.clientWidth;
+      if (max <= 1) { setEdges({ left: false, right: false }); return; }
+      const rtl = getComputedStyle(list).direction === "rtl";
+      const fromLeft = rtl ? max + list.scrollLeft : list.scrollLeft;
+      setEdges({ left: fromLeft > 1, right: fromLeft < max - 1 });
+    };
+    read();
+    list.addEventListener("scroll", read, { passive: true });
+    const ro = new ResizeObserver(read);
+    ro.observe(list);
+    return () => { list.removeEventListener("scroll", read); ro.disconnect(); };
+  }, [items.length]);
+
   /* Fonts settling after hydration can shift tab widths once — re-measure
      one beat later so the pill never sits a few px off. */
   useEffect(() => {
@@ -124,7 +198,22 @@ export default function TabStrip({
   }, [aurora, activeKey]);
 
   return (
-    <div ref={listRef} role="tablist" aria-label={ariaLabel} className={`${shellCls(pill, glass)} ${className}`}>
+    /* `className` belongs to the WRAPPER, not the scroller: every caller that
+       passes one is positioning the strip in its parent's layout (`flex-1
+       min-w-0`, `inline-flex max-w-full`), and that is the outer box's job. */
+    <div className={`relative min-w-0 ${className}`}>
+      {/* The fades sit OUTSIDE the scroller, over its edges, so they stay put
+          while the tabs move under them. `--bg-secondary` is the shell's own
+          background token — solid under Core, already translucent under
+          Aurora — so the fade is the strip fading, never a patch of a
+          different colour laid on glass. */}
+      {edges.left ? (
+        <span aria-hidden className={`pointer-events-none absolute inset-y-px left-px w-8 z-[1] ${pill ? "rounded-l-full" : "rounded-l-xl"} bg-gradient-to-r from-[var(--bg-secondary)] to-transparent`} />
+      ) : null}
+      {edges.right ? (
+        <span aria-hidden className={`pointer-events-none absolute inset-y-px right-px w-8 z-[1] ${pill ? "rounded-r-full" : "rounded-r-xl"} bg-gradient-to-l from-[var(--bg-secondary)] to-transparent`} />
+      ) : null}
+    <div ref={listRef} role="tablist" aria-label={ariaLabel} className={shellCls(pill, glass)}>
       {aurora && (
         <span
           aria-hidden
@@ -164,6 +253,7 @@ export default function TabStrip({
           </button>
         );
       })}
+    </div>
     </div>
   );
 }

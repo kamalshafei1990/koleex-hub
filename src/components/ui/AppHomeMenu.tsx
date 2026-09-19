@@ -63,7 +63,21 @@ export default function AppHomeMenu({
   hideSearch = false,
 }: AppHomeMenuProps) {
   return (
-    <section data-testid="app-home-menu" aria-label="Quick navigate" className="space-y-3">
+    /* data-kx-pane so the Hub's existing guard
+       `:is(.kx-pd,.kx-app) :is(main,aside,[data-kx-pane]) { overflow-x: clip }`
+       catches this block. Measured on Orders at 375px: this section reported
+       clientWidth 375 against scrollWidth 379 — FOUR pixels, from the `-mx-1`
+       on the pill row inside it. Four pixels of horizontal scroll inside a
+       vertical scroller is invisible with a mouse and a pane that slides
+       under a finger on a touch screen, which is exactly the defect the guard
+       was written for; it simply never matched a <section>. One attribute
+       fixes it in all nine apps that use this menu. */
+    <section
+      data-testid="app-home-menu"
+      data-kx-pane
+      aria-label="Quick navigate"
+      className="space-y-3"
+    >
       {/* Compact, clean search bar */}
       {!hideSearch && (
         <HomeSearchBar
