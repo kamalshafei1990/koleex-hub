@@ -35,6 +35,7 @@ import "server-only";
 
 import { supabaseServer } from "../supabase-server";
 import type { ServerAuthContext } from "../auth";
+import { loadPublicSchemaProduct, type LoadedSchemaProduct, type ProductAudience } from "../product-detail";
 
 export type Audience = "public" | "customer" | "internal";
 
@@ -149,6 +150,50 @@ export function stripInternalModelFields(model: Record<string, unknown>) {
  * gates the two internal tabs on top of the audience test — an internal user
  * without it gets everything EXCEPT Supplier and Price, and is told so.
  */
+/* ── The page, as the AI sees it (rebuild phase 6, 19/09/2026) ──
+   `tabs.page` is EXACTLY what /products/[id] renders, from the same loader
+   (product-detail.ts), in the same audience. Anything the rebuild adds to
+   the page — a section, a fact, a derived figure — reaches the AI here
+   without a second query being written: classification names, hero,
+   highlights + feature cards, the public specs (schema + values), the
+   public knowledge blocks, the family roster, buyer options with the USD
+   the Global FOB moves by, packing as the page derives it, compliance, and
+   the Global FOB itself for a price audience.
+
+   Two things are held back the way the page holds them back:
+     · the internal PRICE SHEET (list prices per model) needs the internal
+       audience AND cost permission — the Price tab is class I;
+     · a customer audience gets what a signed-in Hub account sees on the
+       page, no more.
+   The raw tabs above stay for the operator's internal shape (legacy specs,
+   cost provenance under permission); `page` is what a customer could read. */
+function pageAudience(who: Audience): ProductAudience {
+  return who === "internal" ? "internal" : who === "customer" ? "customer" : "public";
+}
+
+export function pageKnowledge(loaded: LoadedSchemaProduct, who: Audience, costOk: boolean) {
+  const { preview, sections } = loaded;
+  const { modelPrices, logistics: _raw, ...rest } = sections;
+  void _raw; // the page renders `packing`, the derived view; the raw jsonb is not knowledge
+  return {
+    audience: loaded.audience,
+    hero: {
+      name: preview.productName,
+      model: preview.primaryModel,
+      tagline: preview.tagline,
+      brand: preview.brand,
+      poster: preview.posterUrl,
+      mainImage: preview.mainImageUrl,
+      translations: preview.translations,
+    },
+    specs: { schema: preview.schema, values: preview.values },
+    knowledge: preview.knowledge,
+    media: { gallery: preview.galleryUrls, videos: preview.videoUrls, manuals: preview.manuals, ar3d: preview.ar3dUrl },
+    ...rest,
+    modelPrices: who === "internal" && costOk ? modelPrices : null,
+  };
+}
+
 export async function buildProductTabs(opts: {
   productId: string;
   product: Record<string, unknown>;
@@ -163,9 +208,12 @@ export async function buildProductTabs(opts: {
   /* Reads that are worth doing only if the audience may see the result. */
   const wantsHero = tabAllowed("hero", who);
   const wantsOptions = tabAllowed("options", who);
-  const [translations, options] = await Promise.all([
+  const [translations, options, loaded] = await Promise.all([
     wantsHero ? readTranslations(productId) : Promise.resolve([]),
     wantsOptions ? readOptions(productId) : Promise.resolve([]),
+    /* allowUnpublished: the operator asks about drafts too; the audience
+       decides what is shown, the status decides nothing here. */
+    loadPublicSchemaProduct(productId, { allowUnpublished: true, audience: pageAudience(who) }),
   ]);
 
   /* Classify — A. */
@@ -215,6 +263,15 @@ export async function buildProductTabs(opts: {
      decision so one place explains every omission. */
   if (!tabAllowed("supplier", who) || !costOk) withheld.push("supplier");
   if (!tabAllowed("price", who) || !costOk) withheld.push("price");
+
+  /* The product page, verbatim. Null when the product has no resolved
+     schema (the legacy view) — the raw tabs above still answer. */
+  if (loaded) {
+    tabs.page = pageKnowledge(loaded, who, costOk);
+    if (!(who === "internal" && costOk)) withheld.push("page.modelPrices");
+  } else {
+    tabs.page = null;
+  }
 
   return { tabs, withheld };
 }

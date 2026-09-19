@@ -162,6 +162,7 @@
     "validate:product-page-images": "node --import tsx scripts/validate-product-page-images.mts",
     "validate:product-page-brand": "node --import tsx scripts/validate-product-page-brand.mts",
     "validate:product-page-coverage": "node --import tsx scripts/validate-product-page-coverage.mts",
+    "validate:ai-product-page-parity": "NODE_OPTIONS=--conditions=react-server node --import tsx scripts/validate-ai-product-page-parity.mts",
     "validate:finance-i18n": "node --import tsx scripts/validate-finance-i18n.mts",
     "validate:contacts-i18n": "node --import tsx scripts/validate-contacts-i18n.mts"
   },
