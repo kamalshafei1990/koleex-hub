@@ -106,5 +106,18 @@ expect(homeless.length === 0, "every section key is read by the page or excluded
   expect(m.length === 1 && m[0] === "orphanSection", "  (the rule sees the failure direction)");
 }
 
+/* ── 4. the public surface (phase 7): no price, no Hub tool ── */
+console.log("\n§4 the public (website) reader gets no price and no Hub tool");
+const heroSrc = code(fs.readFileSync(path.join(ROOT, "src/components/product-preview/ProductHero.tsx"), "utf8"));
+const previewSrc = code(fs.readFileSync(path.join(ROOT, "src/components/product-preview/ProductPreview.tsx"), "utf8"));
+expect(/PRICE_AUDIENCES[^\n]*new Set\(\["internal", "customer"\]\)/.test(loaderCode), "PRICE_AUDIENCES is exactly internal + customer (no print, no public)");
+expect(/isPublicReader = audience === "public"/.test(previewSrc) && /showAskAi=\{!isPublicReader\}/.test(previewSrc), "ProductPreview hides Ask AI for the public audience");
+expect(/a\.key === "ask_ai" && !p\.showAskAi\) return null/.test(heroSrc), "ProductHero honours showAskAi");
+expect(/if \(isPublicReader\) \{[\s\S]*mailto:\$\{KOLEEX_COMPANY\.email\}/.test(previewSrc), "public Quote is a written request to the company inbox");
+{
+  const mutated = loaderCode.replace('new Set(["internal", "customer"])', 'new Set(["internal", "customer", "public"])');
+  expect(!/PRICE_AUDIENCES[^\n]*new Set\(\["internal", "customer"\]\)/.test(mutated), "  (the rule sees the failure direction)");
+}
+
 console.log(failed ? `\n✗ product page coverage: ${failed} check(s) failed\n` : "\n✓ product page coverage: all checks passed\n");
 process.exit(failed ? 1 : 0);

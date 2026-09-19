@@ -54,6 +54,9 @@ export interface ProductHeroProps {
   selectedCode: string | null;
   onSelectModel: (code: string) => void;
   canCompare: boolean;
+  /** False for the public (website) audience: Koleex AI is a Hub tool, and a
+   *  button that opens nothing is worse than no button. */
+  showAskAi: boolean;
   onAction: (action: HeroAction, modelCode?: string) => void;
   t: (key: string, fallback?: string) => string;
 }
@@ -192,6 +195,7 @@ export default function ProductHero(p: ProductHeroProps) {
           <div className="flex flex-wrap gap-2 pt-1">
             {ACTIONS.map((a) => {
               if (a.key === "compare" && !p.canCompare) return null;
+              if (a.key === "ask_ai" && !p.showAskAi) return null;
               return (
                 <button
                   key={a.key}

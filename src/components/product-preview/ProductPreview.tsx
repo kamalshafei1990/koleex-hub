@@ -39,6 +39,7 @@ import { PRODUCTS_PREVIEW_I18N } from "@/lib/products-preview-i18n";
 import { fetchIconBindings, type BindingsMap } from "@/lib/visual-bindings";
 import { IMG } from "@/lib/cdn";
 import { BrandMark } from "@/components/brand/KoleexMark";
+import { KOLEEX_COMPANY } from "@/components/brand/DocumentBrandStrips";
 import ProductHero, { type HeroAction } from "./ProductHero";
 import ProductHighlights from "./ProductHighlights";
 import ProductOptions from "./ProductOptions";
@@ -455,7 +456,12 @@ export const ProductPreview = (props: ProductPreviewProps) => {
     productId,
     slug,
     sections,
+    audience,
   } = props;
+  /* The website reader (phase 7). No session, no Hub tools: Ask AI is not
+     offered, and Quote becomes a written request to the company inbox —
+     the one path that works without an account. */
+  const isPublicReader = audience === "public";
 
   /* Localize the schema ONCE, at the source: every downstream read of
      group.title / f.label / option.label then shows the reader's language
@@ -835,10 +841,17 @@ export const ProductPreview = (props: ProductPreviewProps) => {
       document.getElementById("kx-compare-pick")?.closest("section")?.scrollIntoView({ behavior: "smooth", block: "start" });
       return;
     }
+    if (isPublicReader) {
+      const model = modelCode ?? primaryModel ?? "";
+      const subject = encodeURIComponent(`Quotation request: ${displayName}${model ? ` (${model})` : ""}`);
+      const body = encodeURIComponent(`${displayName}${model ? ` — ${model}` : ""}\n${typeof window !== "undefined" ? window.location.href : ""}\n\n`);
+      window.location.href = `mailto:${KOLEEX_COMPANY.email}?subject=${subject}&body=${body}`;
+      return;
+    }
     window.dispatchEvent(new CustomEvent("koleex:quote-product", {
       detail: { productId: productId ?? null, slug: slug ?? null, name: displayName, model: modelCode ?? primaryModel ?? null },
     }));
-  }, [displayName, primaryModel, productId, slug, t]);
+  }, [displayName, primaryModel, productId, slug, t, isPublicReader]);
 
   /* ── media flags ── */
   const hasGallery = Array.isArray(galleryUrls) && galleryUrls.length > 0;
@@ -884,6 +897,7 @@ export const ProductPreview = (props: ProductPreviewProps) => {
         selectedCode={selectedCode}
         onSelectModel={(code) => setSelectedCode((prev) => (prev === code ? null : code))}
         canCompare={(siblings ?? []).length > 0}
+        showAskAi={!isPublicReader}
         onAction={onHeroAction}
         t={t}
       />

@@ -44,8 +44,23 @@ export default async function PublicProductPage({
   const loaded = await loadPublicSchemaProduct(slug);
   if (!loaded) notFound();
 
+  /* schema.org Product for the website reader (phase 7). No `offers`: the
+     public audience has no price, and a stale price in a search snippet is
+     worse than none. The brand is named here as data, not drawn as text. */
+  const jsonLd = {
+    "@context": "https://schema.org",
+    "@type": "Product",
+    name: loaded.productName,
+    ...(loaded.preview.primaryModel ? { sku: loaded.preview.primaryModel, mpn: loaded.preview.primaryModel } : {}),
+    ...(loaded.seo.excerpt || loaded.tagline ? { description: loaded.seo.excerpt || loaded.tagline } : {}),
+    ...(loaded.preview.mainImageUrl ? { image: [loaded.preview.mainImageUrl] } : {}),
+    brand: { "@type": "Brand", name: loaded.seo.brand || "KOLEEX" },
+    ...(loaded.sections.classification.category ? { category: loaded.sections.classification.category.name } : {}),
+  };
+
   return (
     <div className="min-h-screen bg-[var(--bg-primary)]">
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
       <header className="border-b border-[var(--border-subtle)]">
         <div className="mx-auto w-full max-w-6xl px-4 md:px-8 py-4">
           <Link
