@@ -312,6 +312,31 @@ const FRESH_BADGE = {
   price:   { key: "list.badgePriceUpdated", fallback: "Price updated", cls: "text-[#047857]", dot: "bg-[#10B981]" },
 } as const;
 
+/* The tag row. Frosted-white chips with dark coloured text and a coloured
+   dot: on the photo's white ground it is the only palette that reads, and
+   on the phone's dark card body the same white chip is simply the most
+   legible thing on it — one look in both places. Static spans: no clock,
+   no fetch, no animation; most cards render none. */
+function FreshnessTags({ fresh, t, className }: {
+  fresh: number;
+  t: (key: string, fallback?: string) => string;
+  className: string;
+}) {
+  return (
+    <div className={`flex flex-wrap gap-1.5 ${className}`}>
+      {freshnessBadges(fresh).map((b) => (
+        <span
+          key={b}
+          className={`inline-flex items-center gap-1.5 h-[22px] px-2 rounded-md border border-black/[0.12] bg-white/95 shadow-sm text-[11px] font-bold uppercase tracking-wide whitespace-nowrap ${FRESH_BADGE[b].cls}`}
+        >
+          <i aria-hidden="true" className={`h-1.5 w-1.5 rounded-full ${FRESH_BADGE[b].dot}`} />
+          {t(FRESH_BADGE[b].key, FRESH_BADGE[b].fallback)}
+        </span>
+      ))}
+    </div>
+  );
+}
+
 const ProductCard = memo(function ProductCard({
   p, imgUrl, models, suppliers, lvl, baseRoute, isInternal, aurora, catMap, subMap, divMap, primaryModelNames, modelNamesList, signal, signalsPending, modelsPending, t, onAskDelete, fx, fxTitle, fob, fobPending, onCardAction,
 }: {
@@ -423,33 +448,22 @@ const ProductCard = memo(function ProductCard({
             after its moment (owner spec 19/09/2026). Catalogue card only:
             Product Data has its own work signals.
 
-            WHERE: the photo's BOTTOM padding strip. The picture is drawn
-            object-contain with p-4, and product shots are landscape, so the
-            bottom 16px of the frame is white on nearly every card — the one
-            place a tag can sit on the photo without sitting on the product.
-            The first version stacked opaque chips top-left over the machine
-            (owner: "it covered the product photo"); the second moved them
-            into the body; the owner asked for the white area, organised.
-            One row, anchored to the bottom-left; if a narrow card cannot fit
-            all three they wrap UPWARD, staying in the strip's corner.
+            WHERE (sm and up): the photo's BOTTOM padding strip. The picture
+            is drawn object-contain with p-4, and product shots are
+            landscape, so the bottom of the frame is white on nearly every
+            card — the one place a tag can sit on the photo without sitting
+            on the product. One row, bottom-left; the three fit one row at
+            the 3-up desktop width. The first version stacked opaque chips
+            top-left over the machine (owner: "it covered the product
+            photo"); the owner then asked for the white area, organised, and
+            then for bigger and clearer.
 
-            LOOK: frosted white chips with dark coloured text and a coloured
-            dot — the photo ground is white-to-#f4f5f7, so this is the only
-            palette that reads on it; the StatusPill tints (light text on a
-            dark tint) vanish here. Static spans, no clock, no fetch, no
-            animation; most cards have none. */}
+            ON A PHONE the card is ~155px wide and the photo is 3:2 — three
+            22px chips would stack three rows high over a third of the
+            picture. So below sm the SAME chips render in the body instead
+            (see FreshnessTags in the body), and this copy is hidden. */}
         {!isInternal && p.fresh ? (
-          <div className="absolute bottom-2 left-2 right-2 flex flex-wrap items-end gap-1">
-            {freshnessBadges(p.fresh).map((b) => (
-              <span
-                key={b}
-                className={`inline-flex items-center gap-1 h-[18px] px-1.5 rounded-md border border-black/10 bg-white/90 text-[9.5px] font-bold uppercase tracking-wide whitespace-nowrap ${FRESH_BADGE[b].cls}`}
-              >
-                <i aria-hidden="true" className={`h-[5px] w-[5px] rounded-full ${FRESH_BADGE[b].dot}`} />
-                {t(FRESH_BADGE[b].key, FRESH_BADGE[b].fallback)}
-              </span>
-            ))}
-          </div>
+          <FreshnessTags fresh={p.fresh} t={t} className="absolute bottom-2.5 left-2.5 right-2.5 items-end max-sm:hidden" />
         ) : null}
 
         {/* Actions (show on hover) — internal only.
@@ -623,6 +637,14 @@ const ProductCard = memo(function ProductCard({
             ))}
           </div>
         )}
+
+        {/* Phone placement of the freshness tags — see the photo-strip copy
+            above for why. The body's variable zone (under the family
+            roster, above the price floor) is where the card already differs
+            per product, so the aligned floor holds. */}
+        {!isInternal && p.fresh ? (
+          <FreshnessTags fresh={p.fresh} t={t} className="mt-2.5 sm:hidden" />
+        ) : null}
 
         {/* ── Global FOB + actions — the CATALOGUE card's commercial half.
             Price is the tier-agnostic Global FOB in USD, computed server-side

@@ -98,7 +98,8 @@ expect(
 
 /* The public response must be shaped by the same helper the card reads. */
 const card = code(fs.readFileSync(path.join(ROOT, "src/components/admin/ProductList.tsx"), "utf8"));
-expect(/freshnessBadges\(p\.fresh\)/.test(card), "ProductCard reads badges through freshnessBadges(p.fresh)");
+expect(/freshnessBadges\(fresh\)/.test(card) && /<FreshnessTags fresh=\{p\.fresh\}/.test(card),
+  "ProductCard hands p.fresh to FreshnessTags, which reads it through freshnessBadges()");
 expect(!/published_at|content_updated_at|price_updated_at/.test(card), "ProductCard never reads a timestamp — bits only");
 
 console.log(failed ? `\n✗ products freshness: ${failed} check(s) failed\n` : "\n✓ products freshness: all checks passed\n");
