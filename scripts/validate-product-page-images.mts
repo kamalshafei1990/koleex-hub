@@ -33,6 +33,7 @@ const FILES = [
   "src/components/product-preview/ProductPreview.tsx",
   "src/app/products/[id]/LegacyProductView.tsx",
   "src/app/products/[id]/page.tsx",
+  "src/components/product-print/ProductPrintDoc.tsx",
 ];
 
 /* Strip comments so a guard cannot trip on its own documentation. */
@@ -87,6 +88,7 @@ const CLIENT_TREE = [
   "src/components/product-preview/ProductCompliance.tsx",
   "src/components/product-preview/ProductPriceInternal.tsx",
   "src/app/products/[id]/LegacyProductView.tsx",
+  "src/components/product-print/ProductPrintDoc.tsx",
 ];
 const barrelImport = /from\s+"@\/lib\/product-schema"/;
 for (const rel of CLIENT_TREE) {

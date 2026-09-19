@@ -33,6 +33,8 @@ const FILES = [
   "src/components/product-preview/ProductHero.tsx",
   "src/components/product-preview/ProductPreview.tsx",
   "src/app/products/[id]/LegacyProductView.tsx",
+  "src/components/product-print/ProductPrintDoc.tsx",
+  "src/app/products/[id]/print/page.tsx",
 ];
 
 const code = (src: string) => src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");

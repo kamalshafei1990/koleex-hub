@@ -318,11 +318,12 @@ export default function ProductHero(p: ProductHeroProps) {
                             </span>
                           ) : null}
                         </div>
-                        {m.name && m.name !== m.code ? (
-                          <div className="text-[12px] text-[var(--text-muted)] truncate max-w-[280px]">{m.name}</div>
-                        ) : m.tagline ? (
-                          <div className="text-[12px] text-[var(--text-muted)] truncate max-w-[280px]">{m.tagline}</div>
-                        ) : null}
+                        {(() => {
+                          const nm = (lang !== "en" && m.nameI18n?.[lang]?.trim()) || m.name;
+                          const tg = (lang !== "en" && m.taglineI18n?.[lang]?.trim()) || m.tagline;
+                          const line = nm && nm !== m.code ? nm : tg;
+                          return line ? <div className="text-[12px] text-[var(--text-muted)] truncate max-w-[280px]">{line}</div> : null;
+                        })()}
                       </td>
                       {diffKeys.map((k) => (
                         <td key={k} className="whitespace-nowrap px-4 py-2.5 text-[13px] text-[var(--text-secondary)] tabular-nums">

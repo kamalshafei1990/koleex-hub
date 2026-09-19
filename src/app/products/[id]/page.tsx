@@ -104,8 +104,18 @@ export default async function ProductDetailPage({
             </h1>
           </div>
         </div>
-        <p className="text-[12px] text-[var(--text-dim)] mb-5 ml-0 md:ml-11">
+        <p className="text-[12px] text-[var(--text-dim)] mb-5 ml-0 md:ml-11 flex flex-wrap gap-x-4">
           <Link href="/products" className="hover:text-[var(--text-muted)] transition-colors">All products</Link>
+          {/* The printed sheet (phase 5): three languages, no price. Staff
+              only — a customer's brochure is handed over, not self-served. */}
+          {audience === "internal" ? (
+            <span className="flex gap-x-2">
+              <span className="text-[var(--text-ghost)]">Print sheet:</span>
+              {(["en", "zh", "ar"] as const).map((l) => (
+                <a key={l} href={`/products/${loaded.slug}/print?lang=${l}`} target="_blank" rel="noopener" className="uppercase hover:text-[var(--text-muted)] transition-colors">{l}</a>
+              ))}
+            </span>
+          ) : null}
         </p>
         <ProductPreview
           {...loaded.preview}

@@ -214,8 +214,9 @@ export interface ProductDetailSections {
   packing: ProductPackingView | null;
   /** Internal price sheet — only when audience === "internal"; null otherwise. */
   modelPrices: ProductModelPriceView[] | null;
-  /** The family roster — every visible model with its identity. */
-  models: Array<{ id: string; code: string; name: string | null; tagline: string | null; primary: boolean; photo: string | null }>;
+  /** The family roster — every visible model with its identity. name/tagline
+   *  carry their zh/ar overlays so the page and the print localise them. */
+  models: Array<{ id: string; code: string; name: string | null; tagline: string | null; nameI18n: Record<string, string> | null; taglineI18n: Record<string, string> | null; primary: boolean; photo: string | null }>;
 }
 
 export interface LoadedSchemaProduct {
@@ -336,7 +337,7 @@ export async function loadPublicSchemaProduct(
         .order("order", { ascending: true }),
       supabase
         .from("product_models")
-        .select('id, model_name, primary_model, tagline, "order", visible, status, specs_overrides, pricing_mode, price_note, global_price, head_only_price, complete_set_price, supports_head_only, supports_complete_set')
+        .select('id, model_name, primary_model, tagline, name_i18n, tagline_i18n, "order", visible, status, specs_overrides, pricing_mode, price_note, global_price, head_only_price, complete_set_price, supports_head_only, supports_complete_set')
         .eq("product_id", product.id)
         .order("order", { ascending: true }),
       supabase
@@ -538,11 +539,14 @@ export async function loadPublicSchemaProduct(
       .filter((m) => m.visible !== false && (m as { status?: string | null }).status !== "discontinued" && (m.primary_model || m.model_name))
       .map((m) => {
         const id = (m as { id?: string }).id ?? "";
+        const mi = m as { name_i18n?: Record<string, string> | null; tagline_i18n?: Record<string, string> | null };
         return {
           id,
           code: (m.primary_model || m.model_name) as string,
           name: m.model_name,
           tagline: m.tagline,
+          nameI18n: mi.name_i18n ?? null,
+          taglineI18n: mi.tagline_i18n ?? null,
           primary: primaryModelId != null && id === primaryModelId,
           photo: photoByModel.get(id) ?? null,
         };
