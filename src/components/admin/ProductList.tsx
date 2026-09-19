@@ -299,15 +299,17 @@ function readModelCache(scopeKey: string): ModelMaps | null {
   } catch { return null; }
 }
 
-/* One entry per freshness bit. The tints are exactly KDS StatusPill's
-   brand / warning / success tones (the Hub's brand blue and its two
-   functional state colours: amber = changed, green = money) — no new
-   colour enters the system. They sit on the card's own surface, never on
-   the photo, so a translucent tint is the right weight here. */
+/* One entry per freshness bit. The chips sit on the photo's white ground,
+   so the text is the DARK shade of each family — the Hub's brand blue in
+   its light-theme value (#2F5C8A, the same --action-ai Core uses) and the
+   700-weight of the two functional state colours (amber = changed,
+   green = money). The dot carries the familiar mid value so the colour
+   still matches its StatusPill sibling at a glance. No new hue enters
+   the system. */
 const FRESH_BADGE = {
-  new:     { key: "list.badgeNew",          fallback: "New",           cls: "bg-[#567FB2]/15 text-[#7FA9D6] border-[#567FB2]/40", dot: "bg-[#7FA9D6]" },
-  updated: { key: "list.badgeUpdated",      fallback: "Updated",       cls: "bg-[#F59E0B]/12 text-[#F59E0B] border-[#F59E0B]/35", dot: "bg-[#F59E0B]" },
-  price:   { key: "list.badgePriceUpdated", fallback: "Price updated", cls: "bg-[#10B981]/12 text-[#10B981] border-[#10B981]/35", dot: "bg-[#10B981]" },
+  new:     { key: "list.badgeNew",          fallback: "New",           cls: "text-[#2F5C8A]", dot: "bg-[#567FB2]" },
+  updated: { key: "list.badgeUpdated",      fallback: "Updated",       cls: "text-[#B45309]", dot: "bg-[#F59E0B]" },
+  price:   { key: "list.badgePriceUpdated", fallback: "Price updated", cls: "text-[#047857]", dot: "bg-[#10B981]" },
 } as const;
 
 const ProductCard = memo(function ProductCard({
@@ -416,6 +418,39 @@ const ProductCard = memo(function ProductCard({
             </span>
           )}
         </div>
+
+        {/* ── Freshness tags — NEW / Updated / Price updated, each for 14 days
+            after its moment (owner spec 19/09/2026). Catalogue card only:
+            Product Data has its own work signals.
+
+            WHERE: the photo's BOTTOM padding strip. The picture is drawn
+            object-contain with p-4, and product shots are landscape, so the
+            bottom 16px of the frame is white on nearly every card — the one
+            place a tag can sit on the photo without sitting on the product.
+            The first version stacked opaque chips top-left over the machine
+            (owner: "it covered the product photo"); the second moved them
+            into the body; the owner asked for the white area, organised.
+            One row, anchored to the bottom-left; if a narrow card cannot fit
+            all three they wrap UPWARD, staying in the strip's corner.
+
+            LOOK: frosted white chips with dark coloured text and a coloured
+            dot — the photo ground is white-to-#f4f5f7, so this is the only
+            palette that reads on it; the StatusPill tints (light text on a
+            dark tint) vanish here. Static spans, no clock, no fetch, no
+            animation; most cards have none. */}
+        {!isInternal && p.fresh ? (
+          <div className="absolute bottom-2 left-2 right-2 flex flex-wrap items-end gap-1">
+            {freshnessBadges(p.fresh).map((b) => (
+              <span
+                key={b}
+                className={`inline-flex items-center gap-1 h-[18px] px-1.5 rounded-md border border-black/10 bg-white/90 text-[9.5px] font-bold uppercase tracking-wide whitespace-nowrap ${FRESH_BADGE[b].cls}`}
+              >
+                <i aria-hidden="true" className={`h-[5px] w-[5px] rounded-full ${FRESH_BADGE[b].dot}`} />
+                {t(FRESH_BADGE[b].key, FRESH_BADGE[b].fallback)}
+              </span>
+            ))}
+          </div>
+        ) : null}
 
         {/* Actions (show on hover) — internal only.
             Edit is a real <Link> (with prefetch), wrapped
@@ -588,38 +623,6 @@ const ProductCard = memo(function ProductCard({
             ))}
           </div>
         )}
-
-        {/* ── Freshness tags — NEW / Updated / Price updated, each for 14 days
-            after its moment (owner spec 19/09/2026). Catalogue card only:
-            Product Data has its own work signals.
-
-            IN THE BODY, NOT ON THE PHOTO. The first version stacked three
-            opaque chips over the top-left of the picture, where the machine
-            usually is (owner: "it covered the product photo"). They now sit
-            in the body's variable zone, under the family roster and above
-            the price floor — the same place and the same chip language as
-            the model codes, so the eye reads them as facts about the
-            product, not stickers on it. The zone is already the one that
-            varies per card, so the floor alignment holds.
-
-            Several may show at once; order is fixed so a card never
-            re-sorts as one expires. The bits arrive with the row; nothing
-            here reads a clock, fetches, or animates — a tag is a static
-            span, and most cards have none. Tints are KDS StatusPill's
-            brand / warning / success tones on the card's own surface. */}
-        {!isInternal && p.fresh ? (
-          <div className="mt-2.5 flex flex-wrap gap-1">
-            {freshnessBadges(p.fresh).map((b) => (
-              <span
-                key={b}
-                className={`inline-flex items-center gap-1 h-[18px] px-1.5 rounded-md border text-[9.5px] font-bold uppercase tracking-wider whitespace-nowrap ${FRESH_BADGE[b].cls}`}
-              >
-                <i aria-hidden="true" className={`h-[5px] w-[5px] rounded-full ${FRESH_BADGE[b].dot}`} />
-                {t(FRESH_BADGE[b].key, FRESH_BADGE[b].fallback)}
-              </span>
-            ))}
-          </div>
-        ) : null}
 
         {/* ── Global FOB + actions — the CATALOGUE card's commercial half.
             Price is the tier-agnostic Global FOB in USD, computed server-side
