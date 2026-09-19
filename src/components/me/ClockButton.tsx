@@ -8,7 +8,7 @@ import type { MyAttendanceRecord, MyHrBundle } from "@/lib/me-hr-types";
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 import PlayIcon from "@/components/icons/ui/PlayIcon";
 import StopIcon from "@/components/icons/ui/StopIcon";
-import { ERROR_KEYS, meFetch } from "./shared";
+import { ERROR_KEYS, browserTz, meFetch } from "./shared";
 
 export default function ClockButton({ today, setBundle, t, size = "md" }: {
   today: MyAttendanceRecord | null;
@@ -28,7 +28,7 @@ export default function ClockButton({ today, setBundle, t, size = "md" }: {
     const res = await meFetch<{ record: MyAttendanceRecord }>("/api/me/hr/attendance", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action }),
+      body: JSON.stringify({ action, tz: browserTz() }),
     });
     setBusy(false);
     if (!res.ok) { setError(t(ERROR_KEYS[res.error] ?? "hr.me.error")); return; }

@@ -27,7 +27,7 @@ import ClockIcon from "@/components/icons/ui/ClockIcon";
 import WalletIcon from "@/components/icons/ui/WalletIcon";
 import DocumentIcon from "@/components/icons/ui/DocumentIcon";
 import ShieldExclamationIcon from "@/components/icons/ui/ShieldExclamationIcon";
-import { ME_TABS, ME_WARM_KEY, meFetch, type MeTab, type MeTabProps } from "./shared";
+import { ME_TABS, ME_WARM_KEY, browserTz, meFetch, type MeTab, type MeTabProps } from "./shared";
 import Overview from "./Overview";
 import Leave from "./Leave";
 import Attendance from "./Attendance";
@@ -69,7 +69,7 @@ export default function MeApp() {
   const [phase, setPhase] = useState<Phase>("loading");
 
   const reload = useCallback(async () => {
-    const res = await meFetch<MyHrBundle>("/api/me/hr", { cache: "no-store" });
+    const res = await meFetch<MyHrBundle>(`/api/me/hr?tz=${encodeURIComponent(browserTz())}`, { cache: "no-store" });
     if (res.ok) {
       setBundle(res.data);
       setPhase("ready");
@@ -109,7 +109,9 @@ export default function MeApp() {
 
   return (
     <div dir={lang === "ar" ? "rtl" : "ltr"} className="min-h-full">
-      <div className="max-w-[1200px] mx-auto px-4 md:px-6 lg:px-8 py-6 md:py-8">
+      {/* pb-28: the floating AI/Discuss chip parks bottom-right; without this
+          a form's Save button at the end of the page scrolls exactly under it. */}
+      <div className="max-w-[1200px] mx-auto px-4 md:px-6 lg:px-8 pt-6 md:pt-8 pb-28">
         <div className="mb-6">
           <PageHeader
             title={t("hr.me.title")}

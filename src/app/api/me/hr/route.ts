@@ -21,20 +21,21 @@ import "server-only";
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { requireAuth } from "@/lib/server/auth";
-import { resolveMyEmployee, todayIso } from "@/lib/server/me-hr";
+import { cleanTz, resolveMyEmployee, todayIso } from "@/lib/server/me-hr";
 import type {
   MyHrBundle, MyLeaveBalance, MyLeaveRequest, MyLeaveType, MyAttendanceRecord, MyPayslip, MyDocument,
 } from "@/lib/me-hr-types";
 
 export const dynamic = "force-dynamic";
 
-export async function GET() {
+export async function GET(req: Request) {
   const auth = await requireAuth();
   if (auth instanceof NextResponse) return auth;
   const me = await resolveMyEmployee(auth);
   if (!me) return NextResponse.json({ error: "not_employee" }, { status: 404 });
 
-  const today = todayIso();
+  /* ?tz=Africa/Cairo — the caller's zone decides which day is "today". */
+  const today = todayIso(cleanTz(new URL(req.url).searchParams.get("tz")));
   const year = Number(today.slice(0, 4));
   const monthStart = `${today.slice(0, 7)}-01`;
 

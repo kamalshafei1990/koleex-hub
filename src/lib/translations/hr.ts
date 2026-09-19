@@ -702,4 +702,9 @@ export const hrT: Translations = {
   "hr.me.emergency2":            { en: "Second emergency contact",        zh: "第二紧急联系人",                ar: "جهة اتصال الطوارئ الثانية" },
   "hr.me.relationship":          { en: "Relationship",                    zh: "关系",                          ar: "صلة القرابة" },
   "hr.me.saved":                 { en: "Saved.",                          zh: "已保存。",                      ar: "تم الحفظ." },
+  /* No {braces} in values here: validate-hr-translations reads each entry up
+     to its first "}" — a {n} placeholder would cut the body short and the
+     entry would be reported as missing a language. %d is the slot. */
+  "hr.me.moreTypes":             { en: "Show all leave types (%d)",       zh: "显示全部假期类型 (%d)",         ar: "عرض كل أنواع الإجازات (%d)" },
+  "hr.me.fewerTypes":            { en: "Show fewer",                      zh: "收起",                          ar: "عرض أقل" },
 };

@@ -1,9 +1,10 @@
 import "server-only";
 
 /* ---------------------------------------------------------------------------
-   POST /api/me/hr/attendance — { action: "in" | "out" } for MYSELF, today,
-   on the SERVER clock. The client sends no time and no date: a phone whose
-   clock is wrong (or a helpful hand) cannot move the punch.
+   POST /api/me/hr/attendance — { action: "in" | "out", tz } for MYSELF, today,
+   on the SERVER clock. The client sends no time and no date — only its IANA
+   zone, which picks the day boundary: a phone whose clock is wrong (or a
+   helpful hand) cannot move the punch, only say which calendar it lives on.
 
    One record per employee per day: "in" refuses when today already has one,
    "out" closes the open one and computes total_hours the same way the HR
@@ -14,7 +15,7 @@ import "server-only";
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { requireAuth } from "@/lib/server/auth";
-import { resolveMyEmployee, todayIso } from "@/lib/server/me-hr";
+import { cleanTz, resolveMyEmployee, todayIso } from "@/lib/server/me-hr";
 
 const COLS = "id, date, clock_in, clock_out, break_minutes, total_hours, status";
 
@@ -24,11 +25,11 @@ export async function POST(req: Request) {
   const me = await resolveMyEmployee(auth);
   if (!me) return NextResponse.json({ error: "not_employee" }, { status: 404 });
 
-  const body = (await req.json().catch(() => null)) as { action?: unknown } | null;
+  const body = (await req.json().catch(() => null)) as { action?: unknown; tz?: unknown } | null;
   const action = body?.action;
   if (action !== "in" && action !== "out") return NextResponse.json({ error: "action must be in|out" }, { status: 400 });
 
-  const today = todayIso();
+  const today = todayIso(cleanTz(body?.tz));
   const now = new Date().toISOString();
   const { data: existing } = await supabaseServer.from("hr_attendance_records")
     .select(COLS).eq("employee_id", me.id).eq("date", today).order("clock_in", { ascending: false }).limit(1).maybeSingle();

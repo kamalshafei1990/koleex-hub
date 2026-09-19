@@ -36,6 +36,13 @@ export default function Leave({ bundle, setBundle, t, lang }: MeTabProps) {
   const [cancelling, setCancelling] = useState<string | null>(null);
   const [confirmCancel, setConfirmCancel] = useState<MyLeaveRequest | null>(null);
   const [more, setMore] = useState(false);
+  const [allBalances, setAllBalances] = useState(false);
+
+  /* Real rows always; virtual ones only for the everyday types unless asked. */
+  const EVERYDAY = ["annual", "sick", "personal", "unpaid"];
+  const primary = balances.filter((b) => !b.virtual || EVERYDAY.includes(b.code));
+  const shownBalances = allBalances ? balances : primary;
+  const hiddenCount = balances.length - primary.length;
 
   const set = <K extends keyof typeof EMPTY_FORM>(k: K, v: (typeof EMPTY_FORM)[K]) => setForm((f) => ({ ...f, [k]: v }));
 
@@ -92,10 +99,12 @@ export default function Leave({ bundle, setBundle, t, lang }: MeTabProps) {
 
   return (
     <div className="space-y-4">
-      {/* Balances */}
-      {balances.length > 0 && (
+      {/* Balances — the ones HR actually set first; the seed catalogue's
+          other types (prod carries 29) stay behind one link so the tab
+          opens on what matters, not on a wall of defaults. */}
+      {shownBalances.length > 0 && (
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          {balances.map((b) => (
+          {shownBalances.map((b) => (
             <div key={b.leaveTypeId} className={`${cardCls} p-4`}>
               <div className="text-[11px] font-semibold uppercase tracking-wider text-[var(--text-dim)] truncate">{typeName(b.leaveTypeId)}</div>
               <div className="mt-1 text-[24px] font-bold leading-none tabular-nums text-[var(--text-primary)]">{fmtNum(b.remaining)}</div>
@@ -104,6 +113,11 @@ export default function Leave({ bundle, setBundle, t, lang }: MeTabProps) {
             </div>
           ))}
         </div>
+      )}
+      {hiddenCount > 0 && (
+        <button type="button" onClick={() => setAllBalances((v) => !v)} className="text-[12px] font-medium text-[#0066FF]">
+          {allBalances ? t("hr.me.fewerTypes") : t("hr.me.moreTypes").replace("%d", String(balances.length))}
+        </button>
       )}
 
       {/* Requests */}

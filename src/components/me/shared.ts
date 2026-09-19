@@ -22,6 +22,12 @@ export interface MeTabProps {
  *  with the tab so it can never show another sign-in's data. */
 export const ME_WARM_KEY = "kx:me:hr:v1";
 
+/** The browser's IANA zone — sent with every request so "today" is the
+ *  employee's day, not UTC's. */
+export const browserTz = (): string => {
+  try { return Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC"; } catch { return "UTC"; }
+};
+
 export const fmtNum = (n: number | null | undefined): string =>
   n === null || n === undefined ? "—" : new Intl.NumberFormat("en-US", { maximumFractionDigits: 2 }).format(n);
 
