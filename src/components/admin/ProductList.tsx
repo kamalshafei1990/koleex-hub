@@ -22,6 +22,7 @@ import { humanizeError } from "@/lib/ui/humanize-error";
 import { useTranslation } from "@/lib/i18n";
 import { StatusPill } from "@/components/kds";
 import { freshnessBadges } from "@/lib/products-freshness";
+import { catalogueFetchInit, markCatalogueFetched } from "@/lib/products-change";
 import { localizedName } from "@/lib/i18n-name";
 /* ⚠️ THE LIST'S OWN DICTIONARY, NOT THE WHOLE ONE. PRODUCTS_UI_I18N carries
    1,165 keys × 3 languages (173 KB of source) and this screen reads 84 of
@@ -1436,8 +1437,12 @@ export default function ProductList() {
           /* ?view=list keeps the response to the ~15 columns this grid
              actually uses; ?paged=1 keeps it to ONE page. Search and filters
              ride along in serverParams and execute in SQL. */
-          const res = await fetch(`/api/products?${serverParams}`, { credentials: "include", signal: ctrl.signal });
+          /* products-change.ts: after a save in Product Data THIS browser's
+             next list request skips its HTTP cache (`cache: "reload"`) —
+             same URL, fresh rows. Every other open uses the normal cache. */
+          const res = await fetch(`/api/products?${serverParams}`, catalogueFetchInit({ credentials: "include", signal: ctrl.signal }));
           if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          markCatalogueFetched();
           const json = (await res.json()) as {
             rows?: ProductRow[]; total?: number | null; hasMore?: boolean;
             models?: { counts: Record<string, number>; primaryModelNames: Record<string, string>; modelNames: Record<string, string[]> };
@@ -1716,7 +1721,7 @@ export default function ProductList() {
     setLoadingMore(true);
     const next = pageRef.current + 1;
     try {
-      const res = await fetch(`/api/products?${serverParams}&page=${next}`, { credentials: "include" });
+      const res = await fetch(`/api/products?${serverParams}&page=${next}`, catalogueFetchInit({ credentials: "include" }));
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const json = (await res.json()) as {
         rows?: ProductRow[]; hasMore?: boolean;

@@ -161,6 +161,7 @@
     "validate:products-freshness": "node --import tsx scripts/validate-products-freshness.mts",
     "validate:product-page-images": "node --import tsx scripts/validate-product-page-images.mts",
     "validate:product-page-brand": "node --import tsx scripts/validate-product-page-brand.mts",
+    "validate:product-page-coverage": "node --import tsx scripts/validate-product-page-coverage.mts",
     "validate:finance-i18n": "node --import tsx scripts/validate-finance-i18n.mts",
     "validate:contacts-i18n": "node --import tsx scripts/validate-contacts-i18n.mts"
   },

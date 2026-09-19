@@ -1,5 +1,6 @@
 "use client";
 
+import { announceProductChange } from "@/lib/products-change";
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { useTopRampOwner } from "@/lib/useTopRampOwner";
 import BoundIcon from "@/components/common/BoundIcon";
@@ -2964,6 +2965,10 @@ export default function ProductForm({ productId }: Props) {
       if (typeof window !== "undefined") {
         try { window.localStorage.removeItem(draftKey); } catch { /* noop */ }
       }
+      /* Sync rule (owner, 19/09/2026): the catalogue's next open shows this
+         save — products-change.ts drops the warm snapshots and makes the
+         next list request bypass the browser's HTTP cache. */
+      announceProductChange(pid);
       if (!isEdit) {
         setTimeout(() => router.push(`${baseRoute}/${pid}/edit`), 800);
       }

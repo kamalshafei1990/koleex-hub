@@ -44,7 +44,7 @@ export const PRICE_AUDIENCES: ReadonlySet<ProductAudience> = new Set(["internal"
 const PRODUCT_PUBLIC_COLUMNS =
   "id, product_name, slug, brand, division_slug, category_slug, subcategory_slug, " +
   "schema_id, schema_version, schema_specs, schema_knowledge, schema_visibility, " +
-  "warranty, country_of_origin, status, visible, featured, hero_poster_url, " +
+  "warranty, country_of_origin, status, visible, hero_poster_url, " +
   "excerpt, meta_title, meta_description, og_image_url, " +
   /* Product-page rebuild (19/09/2026): the sections the page will carry —
      all customer-visible columns already on the row, so ONE read serves

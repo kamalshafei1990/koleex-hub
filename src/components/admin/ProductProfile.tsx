@@ -17,6 +17,7 @@
    All data arrives from GET /api/products/[id]/profile in one round trip.
    --------------------------------------------------------------------------- */
 
+import { announceProductChange } from "@/lib/products-change";
 import { useCallback, useEffect, useMemo, useState, useRef } from "react";
 import { useTopRampOwner } from "@/lib/useTopRampOwner";
 import Link from "next/link";
@@ -1967,6 +1968,10 @@ export default function ProductProfile() {
       };
     });
     setReloadTick((n) => n + 1);
+    /* Sync rule (owner, 19/09/2026): the catalogue's next open must show
+       this. Drops the warm snapshots and makes the next list request bypass
+       the browser's HTTP cache — products-change.ts. */
+    announceProductChange(typeof handle === "string" ? handle : null);
   };
   /* The row glyph for a label — the Visual Library binding table, or nothing. */
   const glyphFor = (label: string) => {

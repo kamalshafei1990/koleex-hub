@@ -165,6 +165,6 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
       readiness,
       costVisible: canSeeCosts,
     },
-    { headers: { "Cache-Control": "private, max-age=15, stale-while-revalidate=120" } },
+    { headers: { "Cache-Control": "private, max-age=15" } },
   );
 }

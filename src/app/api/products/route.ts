@@ -222,8 +222,16 @@ export async function GET(req: Request) {
 
     const body = { ...buildListResponse(rows, listReq, count ?? null), models, groupCounts };
     const { header } = _t.done({ status: 200, paged: 1, rows: rows.length });
+    /* SYNC RULE (owner, 19/09/2026): a change in Product Data shows on the
+       next open. `max-age` alone keeps that promise — within 30 s a repeat
+       open is served from the browser cache, after that it must ask again.
+       The old `stale-while-revalidate=300` broke it: for five minutes the
+       browser answered the app's fetch INSTANTLY WITH THE STALE COPY and
+       revalidated in the background, and the app never re-read, so a
+       renamed product kept its old name for the whole session. The warm
+       snapshot still paints first, so nothing waits on this request. */
     return NextResponse.json(body, {
-      headers: { "Cache-Control": "private, max-age=30, stale-while-revalidate=300", "Server-Timing": header },
+      headers: { "Cache-Control": "private, max-age=30", "Server-Timing": header },
     });
   }
 
@@ -253,7 +261,7 @@ export async function GET(req: Request) {
   const { header } = _t.done({ status: 200, view: listView ? "list" : "full", rows: products.length });
   return NextResponse.json(
     { products },
-    { headers: { "Cache-Control": "private, max-age=120, stale-while-revalidate=900", "Server-Timing": header } },
+    { headers: { "Cache-Control": "private, max-age=60", "Server-Timing": header } },
   );
 }
 
