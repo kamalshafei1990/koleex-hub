@@ -1,0 +1,161 @@
+"use client";
+
+/* ---------------------------------------------------------------------------
+   MeApp — "My HR": the employee's own leave, attendance, payslips, documents
+   and contact details. Identity-scoped — the page shows whoever is signed in
+   and nobody else — so it needs no HR permission and sits in every
+   employee's launcher.
+
+   ONE request (/api/me/hr) feeds all six tabs; the previous payload warm-
+   starts the paint from sessionStorage and the fresh one reconciles. Every
+   mutation returns the rows it changed and the tab patches the bundle in
+   place — no second round-trip to "refresh".
+   --------------------------------------------------------------------------- */
+
+import { useCallback, useEffect, useState, type ComponentType } from "react";
+import { useTranslation } from "@/lib/i18n";
+import { hrT } from "@/lib/translations/hr";
+import type { MyHrBundle } from "@/lib/me-hr-types";
+import PageHeader from "@/components/ui/PageHeader";
+import BrandLoading from "@/components/ui/BrandLoading";
+import { useTabMotion } from "@/components/ui/useTabMotion";
+import { EmptyState, primaryBtnCls } from "@/components/hr/shared";
+import UserCheckIcon from "@/components/icons/ui/UserCheckIcon";
+import LayoutGridIcon from "@/components/icons/ui/LayoutGridIcon";
+import CalendarPlusIcon from "@/components/icons/ui/CalendarPlusIcon";
+import ClockIcon from "@/components/icons/ui/ClockIcon";
+import WalletIcon from "@/components/icons/ui/WalletIcon";
+import DocumentIcon from "@/components/icons/ui/DocumentIcon";
+import ShieldExclamationIcon from "@/components/icons/ui/ShieldExclamationIcon";
+import { ME_TABS, ME_WARM_KEY, meFetch, type MeTab, type MeTabProps } from "./shared";
+import Overview from "./Overview";
+import Leave from "./Leave";
+import Attendance from "./Attendance";
+import Payslips from "./Payslips";
+import Documents from "./Documents";
+import Profile from "./Profile";
+
+const TAB_ICONS: Record<MeTab, ComponentType<{ size?: number; className?: string }>> = {
+  overview: LayoutGridIcon,
+  leave: CalendarPlusIcon,
+  attendance: ClockIcon,
+  payslips: WalletIcon,
+  documents: DocumentIcon,
+  profile: UserCheckIcon,
+};
+
+const TAB_VIEWS: Record<MeTab, ComponentType<MeTabProps>> = {
+  overview: Overview,
+  leave: Leave,
+  attendance: Attendance,
+  payslips: Payslips,
+  documents: Documents,
+  profile: Profile,
+};
+
+type Phase = "loading" | "ready" | "not_employee" | "error";
+
+export default function MeApp() {
+  const { t, lang } = useTranslation(hrT);
+
+  const [tab, setTab] = useState<MeTab>(() => {
+    if (typeof window === "undefined") return "overview";
+    const q = new URLSearchParams(window.location.search).get("tab");
+    return (ME_TABS as string[]).includes(q ?? "") ? (q as MeTab) : "overview";
+  });
+  const tabMotion = useTabMotion(ME_TABS.indexOf(tab));
+
+  const [bundle, setBundle] = useState<MyHrBundle | null>(null);
+  const [phase, setPhase] = useState<Phase>("loading");
+
+  const reload = useCallback(async () => {
+    const res = await meFetch<MyHrBundle>("/api/me/hr", { cache: "no-store" });
+    if (res.ok) {
+      setBundle(res.data);
+      setPhase("ready");
+      try { sessionStorage.setItem(ME_WARM_KEY, JSON.stringify(res.data)); } catch { /* quota */ }
+    } else if (res.status === 404 && res.error === "not_employee") {
+      setPhase("not_employee");
+      try { sessionStorage.removeItem(ME_WARM_KEY); } catch { /* ignore */ }
+    } else {
+      setPhase((p) => (p === "ready" ? p : "error"));
+    }
+  }, []);
+
+  /* Warm start after hydration (a microtask, never a sync setState in the
+     effect body), then the network reconciles underneath. */
+  useEffect(() => {
+    let cancelled = false;
+    try {
+      const raw = sessionStorage.getItem(ME_WARM_KEY);
+      if (raw) {
+        const cached = JSON.parse(raw) as MyHrBundle;
+        if (cached?.employee?.id) {
+          queueMicrotask(() => {
+            if (cancelled) return;
+            setBundle(cached);
+            setPhase("ready");
+          });
+        }
+      }
+    } catch { /* corrupt — the network path covers it */ }
+    /* Deferred a tick for the same reason: the effect body only subscribes;
+       the fetch (and its setState) runs outside it. */
+    void Promise.resolve().then(() => { if (!cancelled) reload(); });
+    return () => { cancelled = true; };
+  }, [reload]);
+
+  const View = TAB_VIEWS[tab];
+
+  return (
+    <div dir={lang === "ar" ? "rtl" : "ltr"} className="min-h-full">
+      <div className="max-w-[1200px] mx-auto px-4 md:px-6 lg:px-8 py-6 md:py-8">
+        <div className="mb-6">
+          <PageHeader
+            title={t("hr.me.title")}
+            subtitle={bundle ? bundle.person.fullName : undefined}
+            icon={<UserCheckIcon size={16} />}
+            tabs={ME_TABS.map((id) => {
+              const Icon = TAB_ICONS[id];
+              return {
+                key: id,
+                label: t(`hr.me.tab.${id}`),
+                icon: <Icon size={12} />,
+                onClick: () => setTab(id),
+                active: tab === id,
+              };
+            })}
+          />
+        </div>
+
+        {phase === "loading" && <BrandLoading className="min-h-[40vh]" />}
+
+        {phase === "not_employee" && (
+          <div className="kx-glass bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)]">
+            <EmptyState icon={ShieldExclamationIcon} title={t("hr.me.notEmployee.title")} subtitle={t("hr.me.notEmployee.body")} />
+          </div>
+        )}
+
+        {phase === "error" && (
+          <div className="kx-glass bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] p-10 text-center">
+            <p className="text-[14px] text-[var(--text-muted)] mb-4">{t("hr.me.error")}</p>
+            <button type="button" onClick={reload} className={primaryBtnCls}>{t("hr.me.retry")}</button>
+          </div>
+        )}
+
+        {phase === "ready" && bundle && (
+          <div key={tab} className={tabMotion}>
+            <View
+              bundle={bundle}
+              setBundle={(next) => setBundle((prev) => (typeof next === "function" ? (prev ? next(prev) : prev) : next))}
+              reload={reload}
+              t={t}
+              lang={lang}
+              setTab={setTab}
+            />
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}

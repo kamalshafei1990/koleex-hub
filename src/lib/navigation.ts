@@ -62,6 +62,7 @@ import SoftwareCenterIcon from "@/components/icons/ui/DownloadIcon";
 import MailIcon from "@/components/icons/MailIcon";
 import KoleexOrbIcon from "@/components/ai/KoleexOrbIcon";
 import HrIcon from "@/components/icons/HrIcon";
+import UserCheckIcon from "@/components/icons/ui/UserCheckIcon";
 import OperationsSidebarIcon from "@/components/icons/OperationsSidebarIcon";
 import CommercialSidebarIcon from "@/components/icons/CommercialSidebarIcon";
 import FinanceSidebarIcon from "@/components/icons/FinanceSidebarIcon";
@@ -239,6 +240,11 @@ export const APP_REGISTRY: AppDef[] = [
   { id: "management",       tKey: "app.management",       name: "Management",        icon: ManagementIcon, route: "/management",       active: true  },
   { id: "employees",        tKey: "app.employees",        name: "Employees",         icon: EmployeesIcon, route: "/employees",        active: true  },
   { id: "hr",               tKey: "app.hr",               name: "HR",                icon: HrIcon,        route: "/hr",               active: true  },
+  /* My HR — every employee's own leave/attendance/payslips/profile. Identity-
+     scoped (the API resolves the caller's employee record; no employee_id is
+     ever taken from the request), so it is openAccess: no role setup needed
+     for a new hire to request leave on day one. Roles can still revoke it. */
+  { id: "me",               tKey: "app.me",               name: "My HR",             icon: UserCheckIcon, route: "/me",               active: true,  newSince: "2026-09-20", openAccess: true },
 
   /* ── Communication ── */
   { id: "discuss",          tKey: "app.discuss",          name: "Discuss",           icon: DiscussIcon,   route: "/discuss",          active: true  },
@@ -329,7 +335,7 @@ export const SIDEBAR_GROUPS: SidebarGroup[] = [
     tKey: "cat.people",
     label: "People",
     icon: PeopleSidebarIcon,
-    appIds: ["hr", "employees", "management"],
+    appIds: ["me", "hr", "employees", "management"],
   },
   {
     id: "communication",

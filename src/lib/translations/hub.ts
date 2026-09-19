@@ -75,6 +75,7 @@ export const hubT: Translations = {
   "app.management":      { en: "Management",       zh: "管理架构",           ar: "الهيكل الإداري" },
   "app.employees":       { en: "Employees",        zh: "员工",              ar: "الموظفين" },
   "app.hr":              { en: "HR",               zh: "人力资源",          ar: "الموارد البشرية" },
+  "app.me":              { en: "My HR",            zh: "我的人事",          ar: "شؤوني الوظيفية" },
   "app.recruitment":     { en: "Recruitment",      zh: "招聘",              ar: "التوظيف" },
   "app.appraisals":      { en: "Appraisals",       zh: "绩效评估",          ar: "التقييمات" },
   "app.appointments":    { en: "Appointments",     zh: "预约",              ar: "المواعيد" },

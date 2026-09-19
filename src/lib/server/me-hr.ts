@@ -64,6 +64,22 @@ export async function resolveMyEmployee(auth: ServerAuthContext): Promise<MyEmpl
   return viaPerson.data ? shape(viaPerson.data as Row) : null;
 }
 
-/** ISO date (YYYY-MM-DD) of "today" — server clock, UTC. Attendance and
- *  leave rows key on it; one convention everywhere. */
-export const todayIso = (): string => new Date().toISOString().slice(0, 10);
+/** ISO date (YYYY-MM-DD) of "today" in the EMPLOYEE's zone. The instant is
+ *  always the server clock (a wrong phone clock cannot move a punch); only
+ *  the day boundary follows the caller's IANA zone, because a Cairo employee
+ *  clocking in at 01:00 local is still "today" to them and to HR, not the
+ *  UTC yesterday. Unknown or missing zone → UTC. */
+export function todayIso(tz?: string | null): string {
+  const now = new Date();
+  if (tz) {
+    try {
+      /* en-CA formats as YYYY-MM-DD; no other locale does without parts. */
+      return new Intl.DateTimeFormat("en-CA", { timeZone: tz, year: "numeric", month: "2-digit", day: "2-digit" }).format(now);
+    } catch { /* not an IANA zone — fall through */ }
+  }
+  return now.toISOString().slice(0, 10);
+}
+
+/** A zone name we are willing to pass to Intl — letters, digits, / _ + - only. */
+export const cleanTz = (v: unknown): string | null =>
+  typeof v === "string" && /^[A-Za-z0-9_+\-\/]{1,64}$/.test(v) ? v : null;

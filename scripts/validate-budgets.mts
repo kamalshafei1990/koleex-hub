@@ -179,11 +179,19 @@ const ROUTE_BUDGETS: Record<string, { chunks: number; kbytes: number }> = {
      which is a separate route with its own manifest. */
   "contracts": { chunks: 10, kbytes: 564 },
   "contacts": { chunks: 10, kbytes: 570 },
-  "crm": { chunks: 10, kbytes: 514 },
-  "customers": { chunks: 10, kbytes: 515 },
+  /* ── +1 KB ON SIX ROUTES, 20/09/2026 ──────────────────────────────────────
+     Not a regression in any of these six screens. Adding the "me" app touched
+     two files that 82% of every route already shares — navigation.ts (the
+     entry) and translations/hub.ts (the app name) — so the shared bundle grew
+     ~1 KB and every route carrying it went up by the same 1 KB. These six sat
+     exactly on their number, so they were the only ones to cross. Raised to
+     the re-measured value, which keeps them as tight as they were; the other
+     routes had the headroom to absorb it and are untouched. */
+  "crm": { chunks: 10, kbytes: 515 },
+  "customers": { chunks: 10, kbytes: 516 },
   "database": { chunks: 11, kbytes: 617 },
   "discuss": { chunks: 11, kbytes: 570 },
-  "documents": { chunks: 10, kbytes: 514 },
+  "documents": { chunks: 10, kbytes: 515 },
   /* Measured 2026-08-20 TWICE — the widget-canvas demo is under active
      development in a parallel session and grew 8→9 chunks within the hour
      (498→508 KB). Budgeted at the second measurement + headroom; if it
@@ -216,11 +224,15 @@ const ROUTE_BUDGETS: Record<string, { chunks: number; kbytes: number }> = {
      baseline, which is the expected shape — the app is one list and one
      detail screen with no library of its own. */
   "orders": { chunks: 10, kbytes: 562 },
-  "planning": { chunks: 10, kbytes: 514 },
+  /* me — MEASURED 20/09/2026 at 11 chunks / 695 KB, +12% as every app line is.
+     The employee self-service app: own profile, attendance, leave, documents,
+     payslips. First budget, set the day the route appeared. */
+  "me": { chunks: 13, kbytes: 778 },
+  "planning": { chunks: 10, kbytes: 515 },
   "price-calculator": { chunks: 12, kbytes: 803 },
   "product-data": { chunks: 12, kbytes: 796 },
   "products": { chunks: 12, kbytes: 791 },
-  "projects": { chunks: 10, kbytes: 514 },
+  "projects": { chunks: 10, kbytes: 515 },
   "purchase": { chunks: 11, kbytes: 622 },
   "quotations": { chunks: 11, kbytes: 850 },
   "roles": { chunks: 12, kbytes: 816 },
@@ -238,7 +250,7 @@ const ROUTE_BUDGETS: Record<string, { chunks: number; kbytes: number }> = {
      the whole reason they are not a TS literal. */
   "shipping": { chunks: 10, kbytes: 581 },
   "software-center": { chunks: 11, kbytes: 618 },
-  "suppliers": { chunks: 10, kbytes: 515 },
+  "suppliers": { chunks: 10, kbytes: 516 },
   /* Measured 9 chunks / 518 KB on the day it shipped, +12% headroom. Sits
      with customers (492) and notes (491): almost all of it is the shared
      baseline, and tesseract.js is a dynamic import so the OCR engine is NOT

@@ -20,6 +20,7 @@
    --------------------------------------------------------------------------- */
 
 import { hrdb as supabase } from "./hr-client";
+import { computeBusinessDays } from "@/lib/hr/leave-days";
 import { fetchEmployeeList } from "./employees-admin";
 import type {
   LeaveTypeRow,
@@ -120,20 +121,6 @@ async function buildEmployeeNameMap(
     console.error("[HR] name map:", err instanceof Error ? err.message : err);
   }
   return map;
-}
-
-/** Compute business days between two dates (Mon-Fri, simplistic). */
-function computeBusinessDays(start: string, end: string): number {
-  const s = new Date(start);
-  const e = new Date(end);
-  let count = 0;
-  const cur = new Date(s);
-  while (cur <= e) {
-    const day = cur.getDay();
-    if (day !== 0 && day !== 6) count++;
-    cur.setDate(cur.getDate() + 1);
-  }
-  return count;
 }
 
 /* ═══════════════════════════════════════════════════

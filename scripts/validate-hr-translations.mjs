@@ -18,7 +18,7 @@ import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
 
 const DICT = "src/lib/translations/hr.ts";
-const ROOTS = ["src/components/hr", "src/app/hr"];
+const ROOTS = ["src/components/hr", "src/app/hr", "src/components/me", "src/app/me"];
 
 /* ── Keys the dictionary defines ── */
 const dictSrc = readFileSync(DICT, "utf8");
