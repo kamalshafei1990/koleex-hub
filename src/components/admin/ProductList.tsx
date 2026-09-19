@@ -349,7 +349,11 @@ const ProductCard = memo(function ProductCard({
     <div
       key={p.id}
       {...kxInspectAttrs({ component: "ProductCard", module: "Product Data", section: "Catalog", recordId: p.slug || p.id })}
-      className="group relative kx-glass kx-hover-card kx-glow-in bg-[var(--bg-secondary)] rounded-xl border border-[var(--border-subtle)] overflow-hidden"
+      /* flex-col: the grid already stretches every card to its row's height
+         (align-items: stretch is the default); this lets the body below
+         USE that height — price + actions sit on the floor of every card,
+         not under whatever content happened to come before them. */
+      className="group relative kx-glass kx-hover-card kx-glow-in bg-[var(--bg-secondary)] rounded-xl border border-[var(--border-subtle)] overflow-hidden flex flex-col"
     >
       {/* Stretched navigation link — covers the whole card and
           is the ONLY card-level anchor, so the edit/delete actions
@@ -364,7 +368,7 @@ const ProductCard = memo(function ProductCard({
           blend in (no white box around the photo).
           No scale on hover — the card lifts, image
           stays put. */}
-      <div className="relative aspect-[4/3] max-sm:aspect-[3/2] bg-gradient-to-b from-white to-[#f4f5f7] overflow-hidden border-b border-black/5">
+      <div className="relative shrink-0 aspect-[4/3] max-sm:aspect-[3/2] bg-gradient-to-b from-white to-[#f4f5f7] overflow-hidden border-b border-black/5">
         {imgUrl ? (
           /* IMG.card = CDN-downscaled 480px render. The raw
              URL here was the original multi-MB upload — the
@@ -465,12 +469,15 @@ const ProductCard = memo(function ProductCard({
         )}
       </div>
 
-      {/* Content — internal cards are a fixed-height flex column so every
-          card in a row lines up: the name slot always reserves two lines,
-          the readiness slot always exists, and the cost row is pinned to
-          the bottom with mt-auto. Without this, a one-line name shifted
-          everything below it up and the grid read as ragged. */}
-      <div className={`p-3.5 md:p-4 max-sm:p-3 ${isInternal ? "flex flex-col min-h-[208px] max-sm:min-h-[164px]" : ""}`}>
+      {/* Content — a flex column on BOTH cards so every card in a row lines
+          up. Internal: fixed min-height, name slot reserves two lines, the
+          cost row is pinned with mt-auto. Public (owner 2026-09-19): the
+          same discipline — title, two-line name slot and category sit at
+          the same y on every card; the family roster is the ONE variable
+          block and lives in the middle; Global FOB + Ask AI / Compare /
+          Quote are pinned to the floor with mt-auto, so a card with three
+          model chips and a card with none end on the same line. */}
+      <div className={`p-3.5 md:p-4 max-sm:p-3 flex flex-col flex-1 ${isInternal ? "min-h-[208px] max-sm:min-h-[164px]" : ""}`}>
         {(() => {
           const mn = primaryModelNames[p.id];
           const hasDistinctName = mn && mn !== p.product_name;
@@ -482,7 +489,7 @@ const ProductCard = memo(function ProductCard({
                 <h3 className="text-[16px] md:text-[18px] font-bold tracking-tight text-[var(--text-primary)] truncate group-hover:text-[var(--text-highlight)] transition-colors">
                   {mn}
                 </h3>
-                <p className={`text-[12px] md:text-[13px] text-[var(--text-muted)] mt-0.5 line-clamp-2 leading-snug ${isInternal ? "min-h-[34px] max-sm:min-h-0" : ""}`}>
+                <p className={`text-[12px] md:text-[13px] text-[var(--text-muted)] mt-0.5 line-clamp-2 leading-snug min-h-[34px] ${isInternal ? "max-sm:min-h-0" : ""}`}>
                   {p.product_name}
                 </p>
               </>
@@ -506,34 +513,13 @@ const ProductCard = memo(function ProductCard({
                   {modelsPending ? "" : t("list.needsName", "Needs name")}
                 </p>
               )}
+              {/* Public: the slot is reserved even when there is nothing to
+                  say in it, so the category line lands on the same y as on
+                  the cards beside it. */}
+              {!isInternal && <p className="mt-0.5 min-h-[34px]" aria-hidden="true" />}
             </>
           );
         })()}
-
-        {/* ── Family chips ── A product that carries several models is a
-            FAMILY; show every member code on the card so someone hunting
-            for XF-600 spots it from outside without opening XF-450.
-            Chips sit ABOVE the stretched card link (z-10) and deep-link
-            the profile straight onto that member. */}
-        {/* Family roster — EVERY member code, always visible (owner rule:
-            never hide a code). An ALIGNED mini-grid, not ragged pills:
-            two tidy columns on desktop, one full-width column on phones —
-            reads like the catalog's own model list. */}
-        {modelNamesList && modelNamesList.length > 1 && (
-          <div className="relative z-10 mt-2 grid grid-cols-2 max-sm:grid-cols-1 gap-1">
-            {modelNamesList.map((code) => (
-              <Link
-                key={code}
-                href={`${baseRoute}/${p.slug || p.id}?model=${encodeURIComponent(code)}`}
-                onClick={(e) => e.stopPropagation()}
-                className="flex items-center min-w-0 px-2 py-1 rounded-md border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] text-[11.5px] font-bold tabular-nums tracking-tight text-[var(--text-primary)] hover:border-[var(--border-focus)] hover:bg-[var(--bg-surface)] transition-colors"
-                title={code}
-              >
-                <span className="truncate">{code}</span>
-              </Link>
-            ))}
-          </div>
-        )}
 
         {/* Category + Subcategory line.
             PUBLIC card only: the internal grid is already grouped by
@@ -564,6 +550,31 @@ const ProductCard = memo(function ProductCard({
           </p>
         )}
 
+        {/* ── Family chips ── A product that carries several models is a
+            FAMILY; show every member code on the card so someone hunting
+            for XF-600 spots it from outside without opening XF-450.
+            Chips sit ABOVE the stretched card link (z-10) and deep-link
+            the profile straight onto that member. */}
+        {/* Family roster — EVERY member code, always visible (owner rule:
+            never hide a code). An ALIGNED mini-grid, not ragged pills:
+            two tidy columns on desktop, one full-width column on phones —
+            reads like the catalog's own model list. */}
+        {modelNamesList && modelNamesList.length > 1 && (
+          <div className="relative z-10 mt-2.5 grid grid-cols-2 max-sm:grid-cols-1 gap-1">
+            {modelNamesList.map((code) => (
+              <Link
+                key={code}
+                href={`${baseRoute}/${p.slug || p.id}?model=${encodeURIComponent(code)}`}
+                onClick={(e) => e.stopPropagation()}
+                className="flex items-center min-w-0 px-2 py-1 rounded-md border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] text-[11.5px] font-bold tabular-nums tracking-tight text-[var(--text-primary)] hover:border-[var(--border-focus)] hover:bg-[var(--bg-surface)] transition-colors"
+                title={code}
+              >
+                <span className="truncate">{code}</span>
+              </Link>
+            ))}
+          </div>
+        )}
+
         {/* ── Global FOB + actions — the CATALOGUE card's commercial half.
             Price is the tier-agnostic Global FOB in USD, computed server-side
             by /api/products/fob-prices from the landed factory cost through
@@ -572,8 +583,13 @@ const ProductCard = memo(function ProductCard({
             derived from never reaches the browser.
             Gated to Hub accounts (owner decision 2026-08-29): the route needs
             a session, and Hub accounts are issued by the owner personally. */}
+        {/* The spacer is the floor's MINIMUM distance from whatever sits
+            above it (the old mt-3); mt-auto on the block below then takes
+            every remaining pixel, so the tallest card in the row looks the
+            same as before and the shorter ones grow here, not at the top. */}
+        {!isInternal && <div className="h-3 shrink-0" aria-hidden="true" />}
         {!isInternal && (
-          <div className="relative z-10 mt-3 pt-3 border-t border-[var(--border-subtle)] flex flex-col gap-2.5">
+          <div className="relative z-10 mt-auto pt-3 border-t border-[var(--border-subtle)] flex flex-col gap-2.5">
             {/* Label ABOVE the figure on a phone, beside it from sm. In the
                 2-up mobile grid the price block is ~147px: a shrink-0 label
                 plus a 22px figure came to ~156px, so the price was clipped
