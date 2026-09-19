@@ -44,14 +44,17 @@ function routeProblems(src: string): string[] {
   for (const chain of chains) {
     const table = chain.match(/^"([a-z_]+)"/)?.[1] ?? "?";
     if (!table.startsWith("hr_") || REFERENCE_TABLES.has(table)) continue;
-    const pinned = /employee_id"?\s*[,:]\s*me\.id/.test(chain);
+    /* Pinned to me — or, for the manager's view, to my reports (teamIds,
+       which the same file must derive from manager_id = me.id). */
+    const pinned = /employee_id"?\s*[,:]\s*me\.id/.test(chain)
+      || (/\.in\("employee_id", teamIds\)/.test(chain) && /\.eq\("manager_id", me\.id\)/.test(c));
     if (!pinned) problems.push(`${table} query not pinned to employee_id = me.id`);
   }
   return problems;
 }
 
 console.log("\n§1 every /api/me/hr route is identity-scoped");
-expect(ROUTES.length >= 6, `${ROUTES.length} routes found under src/app/api/me/hr`, "expected the bundle GET + leave/leave[id]/attendance/profile/upload");
+expect(ROUTES.length >= 7, `${ROUTES.length} routes found under src/app/api/me/hr`, "expected the bundle GET + leave/leave[id]/approvals[id]/attendance/profile/upload");
 for (const r of ROUTES) {
   const p = routeProblems(read(r));
   expect(p.length === 0, r, p.join("; "));
@@ -64,6 +67,20 @@ for (const r of ROUTES) {
   expect(routeProblems(unpinned).some((m) => m.includes("not pinned")), "failure direction: an hr_ query without employee_id = me.id is flagged");
   const noResolve = leave.replace("resolveMyEmployee(auth)", "resolveMyEmployee(auth as never, body)");
   expect(routeProblems(noResolve).length > 0, "failure direction: a route that bypasses resolveMyEmployee(auth) is flagged");
+}
+
+console.log("\n§1b the manager's step acts only as ME, only as a manager");
+{
+  const r = code(read("src/app/api/me/hr/approvals/[id]/route.ts"));
+  expect(/as:\s*"manager"/.test(r) && /reviewerEmployeeId:\s*me\.id/.test(r), "approvals route reviews as manager with reviewerEmployeeId = me.id");
+  expect(!/as:\s*"hr"/.test(r), "approvals route can never review as HR");
+  const lib = code(read("src/lib/server/leave-review.ts"));
+  expect(/emp\.manager_id !== opts\.reviewerEmployeeId\) return \{ ok: false, error: "not_your_report" \}/.test(lib), "leave-review refuses a manager who is not the requester's manager_id");
+  expect(/\.eq\("status", req\.status\)/.test(lib), "leave-review update is compare-and-set on status");
+  const hr = code(read("src/app/api/hr/leave/[id]/review/route.ts"));
+  expect(/requireModuleAction\(auth, "HR", "edit"\)/.test(hr) && /as:\s*"hr"/.test(hr), "HR review route is gated on HR·edit and reviews as hr");
+  const bundle = read("src/app/api/me/hr/route.ts");
+  expect(routeProblems(bundle.replace('.eq("manager_id", me.id)', '.eq("manager_id", String(body?.manager_id))')).length > 0, "failure direction: a team query not derived from manager_id = me.id is flagged");
 }
 
 console.log("\n§2 resolveMyEmployee takes only the session");

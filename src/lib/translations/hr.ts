@@ -510,6 +510,7 @@ export const hrT: Translations = {
 
   /* ── Appraisal Status Labels ── */
   "hr.status.self_review":       { en: "Self Review",                     zh: "自评",                          ar: "تقييم ذاتي" },
+  "hr.status.manager_approved":  { en: "Manager approved",                zh: "主管已批准",                    ar: "وافق المدير" },
   "hr.status.manager_review":    { en: "Manager Review",                  zh: "主管评审",                      ar: "مراجعة المدير" },
 
   /* ── Training Status Labels ── */
@@ -707,4 +708,18 @@ export const hrT: Translations = {
      entry would be reported as missing a language. %d is the slot. */
   "hr.me.moreTypes":             { en: "Show all leave types (%d)",       zh: "显示全部假期类型 (%d)",         ar: "عرض كل أنواع الإجازات (%d)" },
   "hr.me.fewerTypes":            { en: "Show fewer",                      zh: "收起",                          ar: "عرض أقل" },
+  /* ── Phase B: the manager's step ── */
+  "hr.managerStep":              { en: "Manager's decision",              zh: "主管决定",                      ar: "قرار المدير" },
+  "hr.managerApprovedOn":        { en: "Approved by the manager on",      zh: "主管批准于",                    ar: "وافق المدير في" },
+  "hr.managerRejectedOn":        { en: "Declined by the manager on",      zh: "主管拒绝于",                    ar: "رفض المدير في" },
+  "hr.awaitingManager":          { en: "Waiting for the manager",         zh: "等待主管审批",                  ar: "بانتظار المدير" },
+  "hr.noManagerStep":            { en: "No manager step — HR decides directly", zh: "无主管环节 — 由人事直接决定", ar: "لا توجد خطوة مدير — الموارد البشرية تقرر مباشرة" },
+  "hr.me.tab.approvals":         { en: "Approvals",                       zh: "审批",                          ar: "الموافقات" },
+  "hr.me.approvalsTitle":        { en: "Requests waiting for you",        zh: "等待您审批的申请",              ar: "طلبات بانتظار قرارك" },
+  "hr.me.approvalsHint":         { en: "You are the direct manager. Your decision goes to HR for the final word.", zh: "您是直属主管，您的决定将提交人事做最终确认。", ar: "أنت المدير المباشر؛ قرارك يذهب إلى الموارد البشرية للقرار النهائي." },
+  "hr.me.noApprovals":           { en: "Nothing waiting for you",         zh: "暂无待审批的申请",              ar: "لا يوجد ما ينتظر قرارك" },
+  "hr.me.decisionNotes":         { en: "Note for HR and the employee (optional)", zh: "给人事和员工的备注（可选）", ar: "ملاحظة للموارد البشرية والموظف (اختياري)" },
+  "hr.me.decided":               { en: "Decision sent",                   zh: "已提交决定",                    ar: "تم إرسال القرار" },
+  "hr.me.notYourReport":         { en: "This person no longer reports to you.", zh: "此人已不再向您汇报。",   ar: "هذا الشخص لم يعد يتبع لك." },
+  "hr.me.withHr":                { en: "With HR",                         zh: "人事处理中",                    ar: "لدى الموارد البشرية" },
 };

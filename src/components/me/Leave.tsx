@@ -144,6 +144,11 @@ export default function Leave({ bundle, setBundle, t, lang }: MeTabProps) {
                     {r.half_day && r.half_day_period ? ` · ${t(`hr.${r.half_day_period}`)}` : ""}
                   </div>
                   {r.reason && <div className="mt-0.5 text-[12px] text-[var(--text-dim)] truncate">{r.reason}</div>}
+                  {r.manager_reviewed_at && (
+                    <div className="mt-0.5 text-[12px] text-[var(--text-dim)]">
+                      {r.status === "rejected" && !r.reviewed_at ? t("hr.managerRejectedOn") : t("hr.managerApprovedOn")} {fmtDate(r.manager_reviewed_at)}{r.manager_notes ? ` — ${r.manager_notes}` : ""}
+                    </div>
+                  )}
                   {r.review_notes && <div className="mt-0.5 text-[12px] text-[var(--text-dim)]">{t("hr.reviewNotes")}: {r.review_notes}</div>}
                 </div>
                 <div className="flex items-center gap-2 shrink-0">

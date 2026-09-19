@@ -27,9 +27,11 @@ import ClockIcon from "@/components/icons/ui/ClockIcon";
 import WalletIcon from "@/components/icons/ui/WalletIcon";
 import DocumentIcon from "@/components/icons/ui/DocumentIcon";
 import ShieldExclamationIcon from "@/components/icons/ui/ShieldExclamationIcon";
+import CheckCircleIcon from "@/components/icons/ui/CheckCircleIcon";
 import { ME_TABS, ME_WARM_KEY, browserTz, meFetch, type MeTab, type MeTabProps } from "./shared";
 import Overview from "./Overview";
 import Leave from "./Leave";
+import Approvals from "./Approvals";
 import Attendance from "./Attendance";
 import Payslips from "./Payslips";
 import Documents from "./Documents";
@@ -38,6 +40,7 @@ import Profile from "./Profile";
 const TAB_ICONS: Record<MeTab, ComponentType<{ size?: number; className?: string }>> = {
   overview: LayoutGridIcon,
   leave: CalendarPlusIcon,
+  approvals: CheckCircleIcon,
   attendance: ClockIcon,
   payslips: WalletIcon,
   documents: DocumentIcon,
@@ -47,6 +50,7 @@ const TAB_ICONS: Record<MeTab, ComponentType<{ size?: number; className?: string
 const TAB_VIEWS: Record<MeTab, ComponentType<MeTabProps>> = {
   overview: Overview,
   leave: Leave,
+  approvals: Approvals,
   attendance: Attendance,
   payslips: Payslips,
   documents: Documents,
@@ -105,7 +109,11 @@ export default function MeApp() {
     return () => { cancelled = true; };
   }, [reload]);
 
-  const View = TAB_VIEWS[tab];
+  /* The Approvals tab exists only for a manager — and the count on it is
+     the work waiting, not a message count. */
+  const isManager = !!bundle?.team?.isManager;
+  const visibleTabs = ME_TABS.filter((id) => id !== "approvals" || isManager);
+  const View = TAB_VIEWS[tab === "approvals" && !isManager && bundle ? "overview" : tab];
 
   return (
     <div dir={lang === "ar" ? "rtl" : "ltr"} className="min-h-full">
@@ -117,11 +125,12 @@ export default function MeApp() {
             title={t("hr.me.title")}
             subtitle={bundle ? bundle.person.fullName : undefined}
             icon={<UserCheckIcon size={16} />}
-            tabs={ME_TABS.map((id) => {
+            tabs={visibleTabs.map((id) => {
               const Icon = TAB_ICONS[id];
+              const n = id === "approvals" ? bundle?.team.pending.length ?? 0 : 0;
               return {
                 key: id,
-                label: t(`hr.me.tab.${id}`),
+                label: n > 0 ? `${t(`hr.me.tab.${id}`)} · ${n}` : t(`hr.me.tab.${id}`),
                 icon: <Icon size={12} />,
                 onClick: () => setTab(id),
                 active: tab === id,

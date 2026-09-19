@@ -305,6 +305,7 @@ export default function LeaveManagement({ employees, t, lang }: HRModuleProps) {
   const filterOptions = [
     { key: "all", label: t("hr.all") },
     { key: "pending", label: t("hr.pending") },
+    { key: "manager_approved", label: t("hr.status.manager_approved") },
     { key: "approved", label: t("hr.approved") },
     { key: "rejected", label: t("hr.rejected") },
   ];
@@ -592,6 +593,25 @@ export default function LeaveManagement({ employees, t, lang }: HRModuleProps) {
                 </div>
               </div>
             )}
+            {/* Phase B — what the direct manager said, so HR decides with
+                the line's view in front of it. */}
+            <div>
+              <FieldLabel>{t("hr.managerStep")}</FieldLabel>
+              {selectedLeave.manager_reviewed_at ? (
+                <div className="text-[13px] text-[var(--text-primary)]">
+                  {selectedLeave.status === "rejected" ? t("hr.managerRejectedOn") : t("hr.managerApprovedOn")} {fmtDate(selectedLeave.manager_reviewed_at)}
+                  {selectedLeave.manager_notes && (
+                    <div className="mt-1 text-[12px] text-[var(--text-muted)] whitespace-pre-wrap">{selectedLeave.manager_notes}</div>
+                  )}
+                </div>
+              ) : (
+                <div className="text-[13px] text-[var(--text-dim)]">
+                  {employees.find((e) => e.id === selectedLeave.employee_id)?.manager_id
+                    ? t("hr.awaitingManager")
+                    : t("hr.noManagerStep")}
+                </div>
+              )}
+            </div>
             <div>
               <FieldLabel>{t("hr.reviewNotes")}</FieldLabel>
               <textarea

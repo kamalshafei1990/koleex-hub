@@ -23,6 +23,7 @@ import { requireAuth } from "@/lib/server/auth";
 import { resolveMyEmployee } from "@/lib/server/me-hr";
 import { computeBusinessDays, rangesOverlap } from "@/lib/hr/leave-days";
 import { pathBelongsToTenant } from "@/lib/server/storage-tenant";
+import { notifyLeaveFiled } from "@/lib/server/leave-review";
 
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 const str = (v: unknown, max = 500): string | null =>
@@ -107,11 +108,13 @@ export async function POST(req: Request) {
     emergency_contact_name: str(body.emergency_contact_name, 200),
     emergency_contact_phone: str(body.emergency_contact_phone, 64),
     requested_by: me.id,
-  }).select("id, leave_type_id, start_date, end_date, days, half_day, half_day_period, reason, status, reviewed_at, review_notes, attachment_url, created_at").single();
+  }).select("id, leave_type_id, start_date, end_date, days, half_day, half_day_period, reason, status, reviewed_at, review_notes, manager_reviewed_at, manager_notes, attachment_url, created_at").single();
 
   if (error) {
     console.error("[api/me/hr/leave POST]", error.message);
     return NextResponse.json({ error: "Could not file the request." }, { status: 500 });
   }
+  /* Phase B — the first approver (manager, else HR) hears about it. */
+  await notifyLeaveFiled((data as { id: string }).id, auth.tenant_id, auth.account_id);
   return NextResponse.json({ request: data }, { status: 201 });
 }

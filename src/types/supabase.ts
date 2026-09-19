@@ -2170,7 +2170,8 @@ export interface LeaveBalanceRow {
 }
 export type LeaveBalanceInsert = Omit<LeaveBalanceRow, "id" | "created_at" | "updated_at">;
 
-export type LeaveRequestStatus = "pending" | "approved" | "rejected" | "cancelled";
+/** Phase B: `manager_approved` = the direct manager said yes, HR has not yet. */
+export type LeaveRequestStatus = "pending" | "manager_approved" | "approved" | "rejected" | "cancelled";
 
 export interface LeaveRequestRow {
   id: string;
@@ -2201,10 +2202,14 @@ export interface LeaveRequestRow {
   half_day_period: string | null;
   /** Who filed it — self-service vs HR acting on someone's behalf. */
   requested_by: string | null;
+  /* ── Phase B: the manager's step (migration 20260920_leave_manager_review) ── */
+  manager_reviewed_by: string | null;
+  manager_reviewed_at: string | null;
+  manager_notes: string | null;
   created_at: string;
   updated_at: string;
 }
-export type LeaveRequestInsert = Omit<LeaveRequestRow, "id" | "created_at" | "updated_at">;
+export type LeaveRequestInsert = Omit<LeaveRequestRow, "id" | "created_at" | "updated_at" | "manager_reviewed_by" | "manager_reviewed_at" | "manager_notes">;
 
 /** The optional detail block. Every field is nullable in the DB, so callers
  *  may omit the whole thing — used to keep createLeaveRequest's signature

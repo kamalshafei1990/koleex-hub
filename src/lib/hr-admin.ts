@@ -170,7 +170,7 @@ export async function fetchHrDashboardStats(): Promise<HrDashboardStats> {
       supabase
         .from(LEAVE_REQUESTS)
         .select("id", { count: "exact", head: true })
-        .eq("status", "pending"),
+        .in("status", ["pending", "manager_approved"]),
       // Documents expiring within 30 days
       supabase
         .from(HR_DOCUMENTS)
@@ -439,70 +439,33 @@ export async function createLeaveRequest(
   return data as LeaveRequestRow;
 }
 
-/** Approve or reject a leave request and update balance accordingly. */
+/** Approve or reject a leave request — HR's step. Since Phase B this is a
+ *  server route (/api/hr/leave/[id]/review): the state machine, the balance
+ *  deduction and the notifications to the requester live in ONE place,
+ *  shared with the manager's step on /me. `reviewedBy` is kept for callers
+ *  but the server records its own resolution of the caller. */
 export async function reviewLeaveRequest(
   id: string,
   status: "approved" | "rejected",
-  reviewedBy: string | null,
+  _reviewedBy: string | null,
   notes?: string,
 ): Promise<boolean> {
-  // Get the request first
-  const { data: request, error: fetchErr } = await supabase
-    .from(LEAVE_REQUESTS)
-    .select("*")
-    .eq("id", id)
-    .single();
-
-  if (fetchErr || !request) {
-    console.error("[LeaveRequests] Review fetch:", fetchErr?.message);
-    return false;
-  }
-
-  const now = new Date().toISOString();
-
-  // Update request status
-  const { error: updateErr } = await supabase
-    .from(LEAVE_REQUESTS)
-    .update({
-      status,
-      reviewed_by: reviewedBy,
-      reviewed_at: now,
-      review_notes: notes || null,
-    })
-    .eq("id", id);
-
-  if (updateErr) {
-    console.error("[LeaveRequests] Review update:", updateErr.message);
-    return false;
-  }
-
-  // If approved, deduct from leave balance
-  if (status === "approved") {
-    const year = new Date(request.start_date).getFullYear();
-
-    const { data: balance, error: balErr } = await supabase
-      .from(LEAVE_BALANCES)
-      .select("*")
-      .eq("employee_id", request.employee_id)
-      .eq("leave_type_id", request.leave_type_id)
-      .eq("year", year)
-      .maybeSingle();
-
-    if (balErr) {
-      console.error("[LeaveBalances] Deduct fetch:", balErr.message);
-    } else if (balance) {
-      const { error: deductErr } = await supabase
-        .from(LEAVE_BALANCES)
-        .update({ used: (balance.used || 0) + request.days })
-        .eq("id", balance.id);
-
-      if (deductErr) {
-        console.error("[LeaveBalances] Deduct:", deductErr.message);
-      }
+  try {
+    const res = await fetch(`/api/hr/leave/${id}/review`, {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ decision: status === "approved" ? "approve" : "reject", notes: notes ?? null }),
+    });
+    if (!res.ok) {
+      const j = (await res.json().catch(() => null)) as { error?: string } | null;
+      console.error("[LeaveRequests] Review:", j?.error ?? res.status);
     }
+    return res.ok;
+  } catch (err) {
+    console.error("[LeaveRequests] Review:", err instanceof Error ? err.message : err);
+    return false;
   }
-
-  return true;
 }
 
 /** Fetch leave balances for an employee in a given year. */

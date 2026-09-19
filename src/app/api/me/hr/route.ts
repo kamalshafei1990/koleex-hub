@@ -23,7 +23,7 @@ import { supabaseServer } from "@/lib/server/supabase-server";
 import { requireAuth } from "@/lib/server/auth";
 import { cleanTz, resolveMyEmployee, todayIso } from "@/lib/server/me-hr";
 import type {
-  MyHrBundle, MyLeaveBalance, MyLeaveRequest, MyLeaveType, MyAttendanceRecord, MyPayslip, MyDocument,
+  MyHrBundle, MyLeaveBalance, MyLeaveRequest, MyLeaveType, MyAttendanceRecord, MyPayslip, MyDocument, MyTeamRequest,
 } from "@/lib/me-hr-types";
 
 export const dynamic = "force-dynamic";
@@ -58,7 +58,7 @@ export async function GET(req: Request) {
     supabaseServer.from("hr_leave_balances").select("leave_type_id, year, entitled, used, carried_over, adjustment")
       .eq("employee_id", me.id).eq("year", year),
     supabaseServer.from("hr_leave_requests")
-      .select("id, leave_type_id, start_date, end_date, days, half_day, half_day_period, reason, status, reviewed_at, review_notes, attachment_url, created_at")
+      .select("id, leave_type_id, start_date, end_date, days, half_day, half_day_period, reason, status, reviewed_at, review_notes, manager_reviewed_at, manager_notes, attachment_url, created_at")
       .eq("employee_id", me.id).order("start_date", { ascending: false }).limit(50),
     supabaseServer.from("hr_attendance_records")
       .select("id, date, clock_in, clock_out, break_minutes, total_hours, status")
@@ -70,6 +70,24 @@ export async function GET(req: Request) {
       .select("id, name, category, file_url, file_type, expiry_date, created_at")
       .eq("employee_id", me.id).order("created_at", { ascending: false }),
   ]);
+
+  /* Phase B — my reports' requests waiting for me. The team is whoever
+     lists me as manager_id; a request of theirs is mine to decide only while
+     `pending` (HR takes over after). */
+  const { data: reports } = await supabaseServer.from("koleex_employees")
+    .select("id, people(full_name, name_alt)").eq("manager_id", me.id).neq("id", me.id);
+  const reportRows = (reports ?? []) as Array<{ id: string; people?: { full_name?: string | null; name_alt?: string | null } | { full_name?: string | null; name_alt?: string | null }[] | null }>;
+  const teamIds = reportRows.map((r) => r.id);
+  let teamPending: MyTeamRequest[] = [];
+  if (teamIds.length > 0) {
+    const { data: rows } = await supabaseServer.from("hr_leave_requests")
+      .select("id, employee_id, leave_type_id, start_date, end_date, days, half_day, half_day_period, reason, attachment_url, created_at")
+      .in("employee_id", teamIds).eq("status", "pending").order("start_date", { ascending: true }).limit(100);
+    const nameOf = (id: string) => { const r = reportRows.find((x) => x.id === id); const p = Array.isArray(r?.people) ? r?.people[0] : r?.people; return { name: p?.full_name ?? "Employee", alt: p?.name_alt ?? null }; };
+    teamPending = ((rows ?? []) as Array<Omit<MyTeamRequest, "employee_name" | "employee_name_alt">>).map((r) => ({
+      ...r, employee_name: nameOf(r.employee_id).name, employee_name_alt: nameOf(r.employee_id).alt,
+    }));
+  }
 
   /* Manager — the person behind manager_id. Sequential on purpose: it
      depends on nothing above but is needed only when set, which is rare
@@ -154,6 +172,7 @@ export async function GET(req: Request) {
       month: monthRows,
       monthHours: Math.round(monthRows.reduce((s, r) => s + Number(r.total_hours ?? 0), 0) * 100) / 100,
     },
+    team: { isManager: teamIds.length > 0, pending: teamPending },
     payslips: ((payslips.data ?? []) as MyPayslip[]),
     documents: ((documents.data ?? []) as MyDocument[]),
   };

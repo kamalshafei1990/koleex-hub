@@ -55,6 +55,9 @@ export interface EmployeeListItem {
   work_email: string | null;
   work_phone: string | null;
   work_location: string;
+  /** Direct manager (koleex_employees.manager_id) — Phase B reads it to say
+      whether a leave request has a manager step in front of HR. */
+  manager_id: string | null;
   department_name: string | null;
   position_title: string | null;
   department_id: string | null;

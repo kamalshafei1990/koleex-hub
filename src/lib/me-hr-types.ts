@@ -13,8 +13,17 @@ export interface MyLeaveBalance {
 export interface MyLeaveRequest {
   id: string; leave_type_id: string; start_date: string; end_date: string; days: number;
   half_day: boolean; half_day_period: string | null; reason: string | null;
-  status: "pending" | "approved" | "rejected" | "cancelled";
-  reviewed_at: string | null; review_notes: string | null; attachment_url: string | null; created_at: string;
+  status: "pending" | "manager_approved" | "approved" | "rejected" | "cancelled";
+  reviewed_at: string | null; review_notes: string | null;
+  /** Phase B — the manager's step, when there was one. */
+  manager_reviewed_at: string | null; manager_notes: string | null;
+  attachment_url: string | null; created_at: string;
+}
+/** A report's request waiting for ME (their manager) — Phase B. */
+export interface MyTeamRequest {
+  id: string; employee_id: string; employee_name: string; employee_name_alt: string | null;
+  leave_type_id: string; start_date: string; end_date: string; days: number; half_day: boolean;
+  half_day_period: string | null; reason: string | null; attachment_url: string | null; created_at: string;
 }
 export interface MyAttendanceRecord {
   id: string; date: string; clock_in: string | null; clock_out: string | null;
@@ -46,6 +55,8 @@ export interface MyHrBundle {
     emergency1: MyEmergencyContact; emergency2: MyEmergencyContact;
   };
   leave: { types: MyLeaveType[]; balances: MyLeaveBalance[]; requests: MyLeaveRequest[] };
+  /** Present only when I manage someone: their pending requests (Phase B). */
+  team: { isManager: boolean; pending: MyTeamRequest[] };
   attendance: { today: MyAttendanceRecord | null; month: MyAttendanceRecord[]; monthHours: number };
   payslips: MyPayslip[];
   documents: MyDocument[];

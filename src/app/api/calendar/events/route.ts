@@ -302,6 +302,49 @@ export async function GET(req: Request) {
       });
   }
 
+  // Mirror APPROVED leave onto the employee's own calendar as out-of-office —
+  // the same read-only shadow treatment as To-do. Sourced from
+  // hr_leave_requests for the employee behind this account; nothing is
+  // inserted into koleex_calendar_events, so HR's record stays the only
+  // record. Clicking is inert (synthetic `leave:` id).
+  let leaveMirror: unknown[] = [];
+  {
+    const { data: emp } = await supabaseServer
+      .from("koleex_employees").select("id").eq("account_id", accountId).limit(1).maybeSingle();
+    const employeeId = (emp as { id?: string } | null)?.id ?? null;
+    if (employeeId) {
+      const lFrom = from.slice(0, 10);
+      const lTo = to.slice(0, 10);
+      const { data: leaves } = await supabaseServer
+        .from("hr_leave_requests")
+        .select("id, start_date, end_date, half_day, half_day_period, hr_leave_types(name)")
+        .eq("employee_id", employeeId).eq("status", "approved")
+        .lte("start_date", lTo).gte("end_date", lFrom).limit(200);
+      leaveMirror = (leaves ?? []).map((raw) => {
+        const l = raw as { id: string; start_date: string; end_date: string; half_day: boolean; half_day_period: string | null; hr_leave_types?: { name?: string } | { name?: string }[] | null };
+        const t = Array.isArray(l.hr_leave_types) ? l.hr_leave_types[0] : l.hr_leave_types;
+        const half = l.half_day && l.half_day_period ? ` (${l.half_day_period})` : "";
+        return {
+          id: `leave:${l.id}`,
+          account_id: accountId,
+          tenant_id: auth.tenant_id,
+          title: `${t?.name ?? "Leave"}${half}`,
+          description: null,
+          location: null,
+          start_at: `${l.start_date}T00:00:00.000Z`,
+          end_at: `${l.end_date}T23:59:59.999Z`,
+          all_day: true,
+          color: null,
+          is_private: false,
+          event_type: "out_of_office",
+          source: "leave",
+          source_kind: "approved",
+          leave_request_id: l.id,
+        };
+      });
+    }
+  }
+
   // Mirror Project tasks assigned to the viewer onto the Calendar — the same
   // read-only shadow treatment as the To-do mirror. A task appears on its due
   // date (or as a start→due span). Done = muted, overdue = danger, otherwise
@@ -365,6 +408,7 @@ export async function GET(req: Request) {
       ...planningMirror,
       ...todoMirror,
       ...projectTaskMirror,
+      ...leaveMirror,
     ],
   });
 }

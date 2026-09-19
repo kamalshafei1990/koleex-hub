@@ -4,8 +4,9 @@
 
 import type { MyHrBundle } from "@/lib/me-hr-types";
 
-export type MeTab = "overview" | "leave" | "attendance" | "payslips" | "documents" | "profile";
-export const ME_TABS: MeTab[] = ["overview", "leave", "attendance", "payslips", "documents", "profile"];
+export type MeTab = "overview" | "leave" | "approvals" | "attendance" | "payslips" | "documents" | "profile";
+/** Full order; "approvals" is shown only to someone with reports (see MeApp). */
+export const ME_TABS: MeTab[] = ["overview", "leave", "approvals", "attendance", "payslips", "documents", "profile"];
 
 export interface MeTabProps {
   bundle: MyHrBundle;
@@ -46,6 +47,7 @@ export const ERROR_KEYS: Record<string, string> = {
   already_out: "hr.me.alreadyOut",
   not_in: "hr.me.notClockedIn",
   not_pending: "hr.me.notPending",
+  not_your_report: "hr.me.notYourReport",
 };
 
 export async function meFetch<T>(input: string, init?: RequestInit): Promise<{ ok: true; data: T } | { ok: false; error: string; status: number }> {
