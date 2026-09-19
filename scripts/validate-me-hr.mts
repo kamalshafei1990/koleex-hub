@@ -108,10 +108,15 @@ console.log("\n§3 profile PATCH is a whitelist of contact fields only");
 
 console.log("\n§4 one working-day counter");
 {
+  /* The browser no longer counts at all: both filing paths — the employee's
+     own and HR's on-behalf — are server routes that count with the shared
+     calendar-aware function. hr-admin must not grow its own counter back. */
   const admin = code(read("src/lib/hr-admin.ts"));
-  expect(/from "@\/lib\/hr\/leave-days"/.test(admin) && !/function computeBusinessDays/.test(admin), "hr-admin imports computeBusinessDays from leave-days and no longer defines its own");
-  const leave = code(read("src/app/api/me/hr/leave/route.ts"));
-  expect(/from "@\/lib\/hr\/leave-days"/.test(leave), "self-service leave route uses the same counter");
+  expect(!/function computeBusinessDays/.test(admin) && /fetch\("\/api\/hr\/leave"/.test(admin), "hr-admin defines no counter and files HR requests through /api/hr/leave");
+  for (const f of ["src/app/api/me/hr/leave/route.ts", "src/app/api/hr/leave/route.ts"]) {
+    const r = code(read(f));
+    expect(/from "@\/lib\/hr\/leave-days"/.test(r) && /computeBusinessDays\(start, end, calendar\)/.test(r) && /notifyLeaveFiled\(/.test(r), `${f} counts with the country calendar and notifies the first approver`);
+  }
 }
 
 console.log("\n§4b the working calendar is the employee's country's (Phase C)");

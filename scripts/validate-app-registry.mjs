@@ -36,9 +36,12 @@ if (/const\s+PERMISSION_GROUPS\s*:/.test(roles)) {
 /* ── 2. Every active registry app resolves to a governable module ──
    Parse the registry entries we care about: id, name, active, and the
    not-governable exclusions declared in permission-modules. */
+/* `active` may be a literal or an expression (Dashboard is gated on an env
+   flag). An expression counts as active for governance: the app CAN be
+   live, so Roles must be able to govern it and openAccess must be honoured. */
 const entries = [...nav.matchAll(
-  /\{\s*id:\s*"([^"]+)",[\s\S]*?name:\s*"([^"]+)",[\s\S]*?active:\s*(true|false)/g,
-)].map(([, id, name, active]) => ({ id, name, active: active === "true" }));
+  /\{\s*id:\s*"([^"]+)",[\s\S]*?name:\s*"([^"]+)",[\s\S]*?active:\s*([^,}]+)/g,
+)].map(([, id, name, active]) => ({ id, name, active: active.trim() !== "false" }));
 
 if (entries.length < 20) {
   fail.push(`Only parsed ${entries.length} registry entries — the parser is out of date with navigation.ts`);

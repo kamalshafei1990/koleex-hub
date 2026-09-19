@@ -20,7 +20,6 @@
    --------------------------------------------------------------------------- */
 
 import { hrdb as supabase } from "./hr-client";
-import { computeBusinessDays } from "@/lib/hr/leave-days";
 import { fetchEmployeeList } from "./employees-admin";
 import type {
   LeaveTypeRow,
@@ -58,8 +57,6 @@ import type {
   CourseInsert,
   TrainingRecordInsert,
   HrDocumentInsert,
-  EmployeeRow,
-  PersonRow,
 } from "@/types/supabase";
 
 /* ── Table names ── */
@@ -203,8 +200,8 @@ export async function fetchHrDashboardStats(): Promise<HrDashboardStats> {
 
     if (absenceRes.error) console.error("[HR Dashboard] Absences:", absenceRes.error.message);
     else stats.today_absences = absenceRes.count || 0;
-  } catch (err: any) {
-    console.error("[HR Dashboard] Unexpected:", err.message);
+  } catch (err: unknown) {
+    console.error("[HR Dashboard] Unexpected:", err instanceof Error ? err.message : err);
   }
 
   return stats;
@@ -263,7 +260,7 @@ export async function fetchExpiringItems(
 
     // Collect all employee IDs
     const empIds = [
-      ...(visas || []).map((v: any) => v.id),
+      ...((visas || []) as { id: string }[]).map((v) => v.id),
       ...(docs || []).map((d: HrDocumentRow) => d.employee_id),
     ];
     const nameMap = await buildEmployeeNameMap(empIds);
@@ -295,8 +292,8 @@ export async function fetchExpiringItems(
       (a, b) =>
         new Date(a.expiry_date).getTime() - new Date(b.expiry_date).getTime(),
     );
-  } catch (err: any) {
-    console.error("[Expiring] Unexpected:", err.message);
+  } catch (err: unknown) {
+    console.error("[Expiring] Unexpected:", err instanceof Error ? err.message : err);
   }
 
   return items;
@@ -389,7 +386,7 @@ export async function fetchLeaveRequests(
     .in("id", typeIds);
 
   const typeMap = new Map<string, { name: string; code: string }>(
-    (types || []).map((t: any) => [
+    ((types || []) as { id: string; name: string; code?: string | null }[]).map((t) => [
       t.id as string,
       { name: t.name as string, code: (t.code as string) || "" },
     ]),
@@ -403,40 +400,37 @@ export async function fetchLeaveRequests(
   }));
 }
 
-/** Create a leave request. Auto-computes days from start/end dates. */
+/** Create a leave request on behalf of an employee — HR's path. Since
+ *  Phase B/C this is the server route POST /api/hr/leave: the same day
+ *  count (country calendar), overlap check and first-approver notification
+ *  the self-service path gets, so an HR-filed request is not a second-class
+ *  row. `days` from the caller is ignored — the server counts. */
 export async function createLeaveRequest(
   input: Omit<
     LeaveRequestInsert,
     "days" | "status" | "reviewed_by" | "reviewed_at" | "review_notes" | keyof LeaveRequestDetails
   > &
-    /* Detail fields are all nullable — omit them entirely and the row is
-       created exactly as before. */
     Partial<LeaveRequestDetails> & {
       days?: number;
     },
 ): Promise<LeaveRequestRow | null> {
-  const days =
-    input.days ??
-    (input.half_day ? 0.5 : computeBusinessDays(input.start_date, input.end_date));
-
-  const { data, error } = await supabase
-    .from(LEAVE_REQUESTS)
-    .insert({
-      ...input,
-      days,
-      status: "pending",
-      reviewed_by: null,
-      reviewed_at: null,
-      review_notes: null,
-    })
-    .select()
-    .single();
-
-  if (error) {
-    console.error("[LeaveRequests] Create:", error.message);
+  try {
+    const res = await fetch("/api/hr/leave", {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(input),
+    });
+    const json = (await res.json().catch(() => null)) as { request?: LeaveRequestRow; error?: string } | null;
+    if (!res.ok) {
+      console.error("[LeaveRequests] Create:", json?.error ?? res.status);
+      return null;
+    }
+    return json?.request ?? null;
+  } catch (err) {
+    console.error("[LeaveRequests] Create:", err instanceof Error ? err.message : err);
     return null;
   }
-  return data as LeaveRequestRow;
 }
 
 /** Approve or reject a leave request — HR's step. Since Phase B this is a
@@ -495,7 +489,7 @@ export async function fetchLeaveBalances(
     .in("id", typeIds);
 
   const typeMap = new Map<string, string>(
-    (types || []).map((t: any) => [t.id as string, t.name as string]),
+    ((types || []) as { id: string; name: string }[]).map((t) => [t.id, t.name]),
   );
 
   return balances.map((b) => ({
@@ -872,10 +866,10 @@ export async function fetchJobPostings(
     : { data: [] };
 
   const deptMap = new Map<string, string>(
-    (depts || []).map((d: any) => [d.id, d.name as string]),
+    ((depts || []) as { id: string; name: string }[]).map((d) => [d.id, d.name]),
   );
   const posMap = new Map<string, string>(
-    (positions || []).map((p: any) => [p.id, p.title as string]),
+    ((positions || []) as { id: string; title: string }[]).map((p) => [p.id, p.title]),
   );
 
   return postings.map((p) => ({
@@ -953,7 +947,7 @@ export async function fetchApplicants(
     .in("id", jobIds);
 
   const jobMap = new Map<string, string>(
-    (jobs || []).map((j: any) => [j.id, j.title as string]),
+    ((jobs || []) as { id: string; title: string }[]).map((j) => [j.id, j.title]),
   );
 
   return applicants.map((a) => ({
@@ -1253,7 +1247,7 @@ export async function fetchChecklistInstances(
     .in("id", clIds);
 
   const clMap = new Map<string, string>(
-    (checklists || []).map((c: any) => [c.id, c.name as string]),
+    ((checklists || []) as { id: string; name: string }[]).map((c) => [c.id, c.name]),
   );
 
   return instances.map((i) => ({
@@ -1282,7 +1276,7 @@ export async function assignChecklist(
   }
 
   const items = (template as ChecklistRow).items || [];
-  const itemsStatus = items.map((_: any, idx: number) => ({
+  const itemsStatus = items.map((_, idx) => ({
     item_index: idx,
     completed: false,
   }));
@@ -1633,7 +1627,7 @@ export async function fetchTrainingRecords(
     .in("id", courseIds);
 
   const courseMap = new Map<string, string>(
-    (courses || []).map((c: any) => [c.id, c.name as string]),
+    ((courses || []) as { id: string; name: string }[]).map((c) => [c.id, c.name]),
   );
 
   return records.map((r) => ({
