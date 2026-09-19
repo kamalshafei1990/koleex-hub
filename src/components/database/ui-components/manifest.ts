@@ -1436,7 +1436,6 @@ export const UI_COMPONENT_MODULES: UiModule[] = [
     "kitFiles": 1,
     "components": [
       "EditProductPage",
-      "LegacyProductView",
       "Loading",
       "NewProductPage",
       "OgImage",

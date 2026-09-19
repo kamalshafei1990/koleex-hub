@@ -50,7 +50,10 @@ const PRODUCT_PUBLIC_COLUMNS =
      all customer-visible columns already on the row, so ONE read serves
      the page, the AI and the print. Nothing internal is here: cost,
      supplier, MOQ and lead time never enter this loader. */
-  "description, highlights, feature_cards, logistics, ce_certified, rohs_compliant, ip_rating, warranty_months, hs_code, tenant_id";
+  "description, highlights, feature_cards, logistics, ce_certified, rohs_compliant, ip_rating, warranty_months, hs_code, tenant_id, " +
+  /* Typed legacy columns — the only specs a product WITHOUT a template can
+     carry (16 of 394 on 19/09/2026). Shown as the page's basic facts. */
+  "voltage, watt, motor_power_w, machine_weight_kg, machine_dimensions";
 
 interface PublicProductRow {
   id: string;
@@ -82,6 +85,11 @@ interface PublicProductRow {
   warranty_months: number | null;
   hs_code: string | null;
   tenant_id: string | null;
+  voltage: string[] | null;
+  watt: string | null;
+  motor_power_w: number | null;
+  machine_weight_kg: number | null;
+  machine_dimensions: string | null;
 }
 
 /* Buyer options (product_options + product_option_values). The stored
@@ -211,6 +219,10 @@ export interface ProductDetailSections {
   warrantyMonths: number | null;
   /** Buyer options, active ones, in editor order. Empty = no section. */
   options: ProductOptionView[];
+  /** The typed legacy columns, for a product whose classification has no
+   *  spec template yet (schema null). Empty when a template exists — the
+   *  schema then owns these facts. */
+  legacyFacts: Array<{ key: "voltage" | "power" | "weight" | "dimensions"; value: string }>;
   packing: ProductPackingView | null;
   /** Internal price sheet — only when audience === "internal"; null otherwise. */
   modelPrices: ProductModelPriceView[] | null;
@@ -392,26 +404,31 @@ export async function loadPublicSchemaProduct(
     categoryCode: product.category_slug || "",
     subcategoryCode,
   });
-  // No schema → not a schema-backed product; caller falls back.
-  if (!schema) return null;
+  /* No template for this classification (16 of 394 products on 19/09/2026,
+     6 of them active). The page renders without a spec sheet — hero,
+     highlights, knowledge, options, packing, compliance and the typed
+     legacy facts still have homes. The legacy view this used to fall back
+     to is retired. */
 
   // ── Server-side surface filtering (data boundary) ──
   const rawSpecs = (product.schema_specs ?? {}) as Record<string, unknown>;
   const rawKnowledge = (product.schema_knowledge ?? []) as ProductKnowledgeBlock[];
   const websiteFieldKeys = new Set(
-    filterFieldsForSurface(schema.groups.flatMap((g) => g.fields), "website").map((f) => f.key),
+    schema ? filterFieldsForSurface(schema.groups.flatMap((g) => g.fields), "website").map((f) => f.key) : [],
   );
   const publicSpecs: Record<string, unknown> = {};
   for (const [k, v] of Object.entries(rawSpecs)) {
     if (websiteFieldKeys.has(k)) publicSpecs[k] = v;
   }
   const publicKnowledge = filterKnowledgeForSurface(rawKnowledge, "website");
-  const publicSchema: ProductSchemaDefinition = {
-    ...schema,
-    groups: schema.groups
-      .map((g) => ({ ...g, fields: filterFieldsForSurface(g.fields, "website") }))
-      .filter((g) => g.fields.length > 0),
-  };
+  const publicSchema: ProductSchemaDefinition | null = schema
+    ? {
+        ...schema,
+        groups: schema.groups
+          .map((g) => ({ ...g, fields: filterFieldsForSurface(g.fields, "website") }))
+          .filter((g) => g.fields.length > 0),
+      }
+    : null;
 
   // ── Media derivation (real ProductMediaType union values) ──
   const byType = (t: string) => media.filter((m) => m.type === t);
@@ -508,6 +525,16 @@ export async function loadPublicSchemaProduct(
   };
   const packing = packingView(product.logistics);
 
+  const legacyFacts: ProductDetailSections["legacyFacts"] = [];
+  if (!schema) {
+    const volts = (product.voltage ?? []).filter((v) => typeof v === "string" && v.trim());
+    if (volts.length) legacyFacts.push({ key: "voltage", value: volts.join(" / ") });
+    const power = product.motor_power_w != null ? `${product.motor_power_w} W` : (product.watt ?? "").trim();
+    if (power) legacyFacts.push({ key: "power", value: power });
+    if (product.machine_weight_kg != null) legacyFacts.push({ key: "weight", value: `${product.machine_weight_kg} kg` });
+    if ((product.machine_dimensions ?? "").trim()) legacyFacts.push({ key: "dimensions", value: (product.machine_dimensions as string).trim() });
+  }
+
   const modelPrices: ProductModelPriceView[] | null = audience === "internal"
     ? (models as ModelPriceRow[])
         .filter((m) => m.visible !== false && (m.primary_model || m.model_name))
@@ -534,6 +561,7 @@ export async function loadPublicSchemaProduct(
     warrantyMonths: product.warranty_months,
     options,
     packing,
+    legacyFacts,
     modelPrices,
     models: models
       .filter((m) => m.visible !== false && (m as { status?: string | null }).status !== "discontinued" && (m.primary_model || m.model_name))

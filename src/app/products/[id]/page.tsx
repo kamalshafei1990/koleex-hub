@@ -1,23 +1,18 @@
 /**
  * Product detail — /products/[id]   (id may be a slug OR a UUID)
  * ---------------------------------------------------------------------------
- * HYBRID route:
- *   • If the product has a RESOLVED schema → render the schema-driven
- *     <ProductPreview> (the Product Intelligence experience).
- *   • Otherwise → fall back to <LegacyProductView>, the original renderer,
- *     so products that have no schema yet keep working unchanged. (That set
- *     has shrunk as schemas landed: 29 of 271 products as of 2026-08-29, which
- *     is why the legacy renderer is now a dynamic import — see below.)
- *
- * This is how the new experience reaches the route customers actually browse
- * without breaking non-schema products. As more machine-kind schemas land +
- * products get schema_specs, more products automatically upgrade to the new
- * view — no per-product or per-route work.
+ * ONE renderer: the schema-driven <ProductPreview>, for every product. It
+ * used to be a hybrid — products whose classification had no spec template
+ * fell back to a second, legacy product page (2,439 lines). That renderer
+ * retired on 19/09/2026: a product without a template now renders on the
+ * same page as every other, with its typed legacy facts in place of a spec
+ * sheet (product-detail.ts `legacyFacts`). Not found is a real 404.
  */
 
 import Link from "next/link";
 import ProductsIcon from "@/components/icons/ProductsIcon";
 import type { Metadata } from "next";
+import { notFound } from "next/navigation";
 import { preload } from "react-dom";
 import { IMG } from "@/lib/cdn";
 
@@ -25,9 +20,6 @@ import { loadPublicSchemaProduct } from "@/lib/server/product-detail";
 import { getServerAuth } from "@/lib/server/auth";
 import { ProductPreview } from "@/components/product-preview/ProductPreview";
 import ArrowLeftIcon from "@/components/icons/ui/ArrowLeftIcon";
-/* Lazy boundary — see LegacyProductViewLazy.tsx for why the dynamic()
-   call cannot live in this Server Component. */
-import LegacyProductView from "./LegacyProductViewLazy";
 
 export async function generateMetadata({
   params,
@@ -36,7 +28,7 @@ export async function generateMetadata({
 }): Promise<Metadata> {
   const { id } = await params;
   const loaded = await loadPublicSchemaProduct(id);
-  if (!loaded) return {}; // legacy view sets its own document title client-side
+  if (!loaded) return { title: "Product not found — KOLEEX" };
   return {
     title: `${loaded.productName} — KOLEEX`,
     description: loaded.tagline ?? undefined,
@@ -62,10 +54,11 @@ export default async function ProductDetailPage({
     audience,
   });
 
-  // No resolved schema (or non-public / not found) → original renderer.
-  if (!loaded) {
-    return <LegacyProductView />;
-  }
+  /* Not found, or not public for this reader. The legacy renderer this
+     route used to fall back to (2,439 lines, its own second product page)
+     is retired: a product without a spec template renders on the same
+     page as every other, with its typed facts in place of a spec sheet. */
+  if (!loaded) notFound();
 
   /* The hero image is the page's LCP, and it used to be discovered only
      after the client bundle ran — fetched raw, at that. Announce the SAME
@@ -79,7 +72,6 @@ export default async function ProductDetailPage({
       : null;
   if (lcp) preload(lcp, { as: "image" });
 
-  // Schema-backed → the Product Intelligence experience.
   return (
     /* Hub page anatomy (KDS): same max width, padding and header block as
        every other app page — elected icon back button + icon tile + title.

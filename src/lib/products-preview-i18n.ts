@@ -143,4 +143,9 @@ export const PRODUCTS_PREVIEW_I18N: Translations = {
   "preview.headOnly": { en: "Head only", zh: "仅机头", ar: "الرأس فقط" },
   "preview.completeSet": { en: "Complete set", zh: "整套", ar: "طقم كامل" },
   "preview.priceNote": { en: "Note", zh: "备注", ar: "ملاحظة" },
+  /* ── legacy facts (products without a spec template) ── */
+  "preview.fact.voltage": { en: "Voltage", zh: "电压", ar: "الجهد" },
+  "preview.fact.power": { en: "Power", zh: "功率", ar: "القدرة" },
+  "preview.fact.weight": { en: "Weight", zh: "重量", ar: "الوزن" },
+  "preview.fact.dimensions": { en: "Dimensions", zh: "尺寸", ar: "الأبعاد" },
 };

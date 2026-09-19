@@ -17,7 +17,7 @@ import { PRODUCT_ARRAY_COLUMNS, toTextArray } from "@/lib/product-array-columns"
    Resolution (no migration): the schema editor is the SINGLE input; the
    matching typed columns are hidden in the Technical block when the active
    schema covers them, and mirrored from schema_specs → columns at save so
-   legacy readers (LegacyProductView, public API) keep working. Retiring the
+   legacy readers (the public API's typed columns; the legacy page view retired 19/09/2026) keep working. Retiring the
    columns entirely is a later, sign-off step once those readers move to
    schema_specs.
    ═══════════════════════════════════════════════════════════════════ */

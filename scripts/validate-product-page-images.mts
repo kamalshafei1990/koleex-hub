@@ -31,7 +31,6 @@ const expect = (cond: boolean, m: string, why?: string) => (cond ? ok(m) : fail(
 const FILES = [
   "src/components/product-preview/ProductHero.tsx",
   "src/components/product-preview/ProductPreview.tsx",
-  "src/app/products/[id]/LegacyProductView.tsx",
   "src/app/products/[id]/page.tsx",
   "src/components/product-print/ProductPrintDoc.tsx",
 ];
@@ -60,17 +59,17 @@ for (const rel of FILES) {
   const raw = srcs.filter((e) => !wrapped(e));
   expect(raw.length === 0, `${rel} — ${srcs.length} <img>, all through IMG.*`, raw.map((e) => `src={${e}}`).join("\n      "));
 }
-expect(total >= 15, `the rule saw the real images (${total} found; the page had 20 on 19/09/2026)`,
+expect(total >= 10, `the rule saw the real images (${total} found; 14 on 19/09/2026 after the legacy view retired)`,
   "if the count collapsed, the <img> matcher is broken and the guard is passing on nothing");
 
 /* Failure direction: un-wrap one src on a copy and make sure it is caught. */
-const previewSrc = fs.readFileSync(path.join(ROOT, FILES[0]), "utf8");
+const previewSrc = fs.readFileSync(path.join(ROOT, FILES.find((f) => f.endsWith("/ProductHero.tsx"))!), "utf8");
 const mutated = previewSrc.replace("src={IMG.hero(heroImage)}", "src={heroImage}");
 expect(mutated !== previewSrc, "  (mutation applied — the hero site is where it was)");
 expect(imgSrcs(mutated).some((e) => !wrapped(e)), "  (the rule sees the failure direction)");
 
 console.log("\n§2 the LCP image is preloaded with its sized URL");
-const page = code(fs.readFileSync(path.join(ROOT, FILES[3]), "utf8"));
+const page = code(fs.readFileSync(path.join(ROOT, FILES.find((f) => f.endsWith("/page.tsx"))!), "utf8"));
 expect(/preload\(\s*lcp\s*,\s*\{\s*as:\s*"image"/.test(page), "page.tsx preloads the hero/poster");
 expect(/IMG\.poster\(/.test(page) && /IMG\.hero\(/.test(page), "…using the SAME IMG sizes the hero renders",
   "a preload of a different URL than the <img> is a second download, not a head start");
@@ -87,7 +86,6 @@ const CLIENT_TREE = [
   "src/components/product-preview/ProductPacking.tsx",
   "src/components/product-preview/ProductCompliance.tsx",
   "src/components/product-preview/ProductPriceInternal.tsx",
-  "src/app/products/[id]/LegacyProductView.tsx",
   "src/components/product-print/ProductPrintDoc.tsx",
 ];
 const barrelImport = /from\s+"@\/lib\/product-schema"/;

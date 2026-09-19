@@ -32,7 +32,6 @@ const FILES = [
   "src/app/products/[id]/page.tsx",
   "src/components/product-preview/ProductHero.tsx",
   "src/components/product-preview/ProductPreview.tsx",
-  "src/app/products/[id]/LegacyProductView.tsx",
   "src/components/product-print/ProductPrintDoc.tsx",
   "src/app/products/[id]/print/page.tsx",
 ];

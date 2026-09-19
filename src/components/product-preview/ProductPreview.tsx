@@ -860,18 +860,11 @@ export const ProductPreview = (props: ProductPreviewProps) => {
 
   const machineKindLabel = schema?.name ?? null;
 
-  if (isEmptyState) {
-    return (
-      <div className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface)]/40 p-6 md:p-8">
-        <p className="text-sm text-[var(--text-secondary)]">
-          {t(
-            "preview.emptyState",
-            "No schema for this classification. The public preview will appear once a schema is registered for this subcategory.",
-          )}
-        </p>
-      </div>
-    );
-  }
+  /* A product without a template used to bounce to an empty-state box
+     ("no schema for this classification"). The hero, highlights, knowledge,
+     options, packing and compliance never needed the schema; only the spec
+     sheet does, and it simply does not render. `isEmptyState` stays as a
+     signal for the sticky pill (no specs anchor to offer). */
 
   return (
     <div ref={flowRef} className="space-y-20 md:space-y-36 pb-24">
@@ -1252,6 +1245,24 @@ export const ProductPreview = (props: ProductPreviewProps) => {
         </aside>
 
         <div className="space-y-16 md:space-y-24 min-w-0">
+
+      {/* ═══ BASIC FACTS — a product without a spec template (schema null)
+          shows its typed legacy columns here, where the spec sheet would
+          be: voltage, power, weight, dimensions. Empty when a template
+          exists; the schema then owns these facts. ═══ */}
+      {(sections?.legacyFacts ?? []).length > 0 ? (
+        <section className="space-y-4">
+          <SectionHead eyebrow={t("preview.eyebrowLayer3", "In depth")} title={t("preview.technicalSpecifications", "Technical Specifications")} />
+          <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-10 max-w-3xl">
+            {(sections?.legacyFacts ?? []).map((f) => (
+              <div key={f.key} className="flex justify-between gap-4 border-b border-[var(--border-subtle)] py-2.5 text-sm">
+                <dt className="text-[var(--text-ghost)]">{t(`preview.fact.${f.key}`, { voltage: "Voltage", power: "Power", weight: "Weight", dimensions: "Dimensions" }[f.key])}</dt>
+                <dd className="font-medium text-[var(--text-primary)] text-end">{f.value}</dd>
+              </div>
+            ))}
+          </dl>
+        </section>
+      ) : null}
 
       {/* ═══ LAYER 3 — ADVANCED TECHNICAL DATA (progressive disclosure) ═══
           Primary groups open by default; standard/quiet collapsed so the

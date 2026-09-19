@@ -2587,7 +2587,7 @@ export default function ProductForm({ productId }: Props) {
       /* De-dup mirror: when a schema is active it is the single source for the
          overlapping electrical/physical/compliance/fulfillment fields. Copy
          those schema_specs values into the matching legacy columns so
-         LegacyProductView + the public API keep rendering. Spread last so it
+         the public API's typed readers keep working (the legacy view is retired). Spread last so it
          wins over the (now hidden) Technical-block column state. */
       Object.assign(
         productData,
