@@ -105,7 +105,11 @@ const ROUTE_BUDGETS: Record<string, { chunks: number; kbytes: number }> = {
      weight is shared between them rather than in any one page. Neither is
      addressed here; they are now VISIBLE, which is the prerequisite. */
   "contracts/[id]/print": { chunks: 14, kbytes: 1019 },
-  "database/product-specs": { chunks: 12, kbytes: 982 },
+  /* 19/09/2026: the spec icon hub listed the templates by importing the
+     product-schema registry into the browser — the whole registry (532 KB
+     of source) shipped for a list. It now asks /api/product-schema; measured
+     879 → 598 KB. Ceiling 12 KB over the measurement, never up again. */
+  "database/product-specs": { chunks: 9, kbytes: 610 },
   "documents/[id]/print": { chunks: 15, kbytes: 1040 },
   "employees/[id]/edit": { chunks: 15, kbytes: 977 },
   "employees/new": { chunks: 15, kbytes: 974 },

@@ -91,11 +91,14 @@ import type {
 } from "@/types/product-form";
 import { EMPTY_PRODUCT, createEmptyModel, COUNTRIES, LOCALES } from "@/types/product-form";
 import { flagOf, countryName } from "@/lib/countries-dial";
-import {
-  resolveSchema,
-  computeReadiness,
-  type ProductKnowledgeBlock,
-} from "@/lib/product-schema";
+/* ⚠️ NOT the "@/lib/product-schema" barrel: it imports every spec template
+   (532 KB) to build the registry, and this editor is a client module — the
+   whole registry used to ship to the browser to resolve ONE template. The
+   registry's answer now comes from /api/product-schema (product-schema-
+   client.ts); readiness is a pure leaf. validate:schema-barrel guards it. */
+import { computeReadiness } from "@/lib/product-schema/readiness";
+import type { ProductKnowledgeBlock } from "@/types/product-schema";
+import { fetchResolvedSchema, useResolvedSchema } from "@/lib/product-schema-client";
 import { ProductPreview } from "@/components/product-preview/ProductPreview";
 import SchemaSpecsSection from "./form-sections/SchemaSpecsSection";
 import { LogisticsSummary, PackingBlock, LoadingBlock, CustomsExtras, ShippingOrigin } from "./form-sections/LogisticsBlocks";
@@ -1468,11 +1471,11 @@ export default function ProductForm({ productId }: Props) {
      de-duplication: any typed column the schema covers is HIDDEN in the
      Technical block (schema editor is the single input) and mirrored from
      schema_specs → columns at save time. */
-  const activeSpecsSchema = resolveSchema({
+  const { schema: activeSpecsSchema, resolution: activeSchemaResolution } = useResolvedSchema({
     divisionCode: product.division_slug || "",
     categoryCode: product.category_slug || "",
     subcategoryCode: selectedSubcategory?.code || "",
-  }).schema;
+  });
   /* A schema group can be routed to the Logistics tab (formTab:"logistics") —
      shipping-unit data (packing dims, CBM, net/gross weight) lives with
      freight/customs, not machine specs. Split the resolved schema so the Specs
@@ -2480,7 +2483,11 @@ export default function ProductForm({ productId }: Props) {
        returns { schema: null } when no schema is registered for the
        (division, category, subcategory) triple, which we treat as "no
        schema bound" (nulls in DB). */
-    const resolvedSchemaForSave = resolveSchema({
+    /* Awaited, not read from render state: a save fired right after a
+       classification change must persist {schema_id, schema_version} of
+       the NEW template, never of the one still on screen. Cached after the
+       first answer, so this is free on every later save. */
+    const resolvedSchemaForSave = await fetchResolvedSchema({
       divisionCode: product.division_slug || "",
       categoryCode: product.category_slug || "",
       subcategoryCode: selectedSubcategory?.code || "",
@@ -6024,11 +6031,8 @@ export default function ProductForm({ productId }: Props) {
                 Plain consts (not useMemo) because this IIFE runs
                 conditionally on the current step, and hooks can't sit
                 inside a conditional branch. */
-          const resolvedSchemaForReview = resolveSchema({
-            divisionCode: product.division_slug || "",
-            categoryCode: product.category_slug || "",
-            subcategoryCode: selectedSubcategory?.code || "",
-          });
+          /* The same triple the hook above resolved for the Specs editor. */
+          const resolvedSchemaForReview = activeSchemaResolution;
           const primaryModelForReview = models[0];
           const galleryCount = media.filter((m) => m.type === "gallery").length;
           const packingCount = media.filter((m) => m.type === "packing_photo").length;
