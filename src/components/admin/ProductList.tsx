@@ -299,16 +299,15 @@ function readModelCache(scopeKey: string): ModelMaps | null {
   } catch { return null; }
 }
 
-/* One entry per freshness bit. These chips sit ON the product photo, which
-   is usually white, so — like the Featured chip beside them — they are
-   OPAQUE: a translucent tint reads on dark glass and vanishes on a white
-   photo. The three fills are the Hub's brand blue and its two functional
-   state colours (amber = changed, green = money), the same values KDS
-   StatusPill uses; no new colour enters the system. */
+/* One entry per freshness bit. The tints are exactly KDS StatusPill's
+   brand / warning / success tones (the Hub's brand blue and its two
+   functional state colours: amber = changed, green = money) — no new
+   colour enters the system. They sit on the card's own surface, never on
+   the photo, so a translucent tint is the right weight here. */
 const FRESH_BADGE = {
-  new:     { key: "list.badgeNew",          fallback: "New",           cls: "bg-[#567FB2] text-white border-white/20" },
-  updated: { key: "list.badgeUpdated",      fallback: "Updated",       cls: "bg-[#F59E0B] text-black/85 border-white/20" },
-  price:   { key: "list.badgePriceUpdated", fallback: "Price updated", cls: "bg-[#10B981] text-white border-white/20" },
+  new:     { key: "list.badgeNew",          fallback: "New",           cls: "bg-[#567FB2]/15 text-[#7FA9D6] border-[#567FB2]/40", dot: "bg-[#7FA9D6]" },
+  updated: { key: "list.badgeUpdated",      fallback: "Updated",       cls: "bg-[#F59E0B]/12 text-[#F59E0B] border-[#F59E0B]/35", dot: "bg-[#F59E0B]" },
+  price:   { key: "list.badgePriceUpdated", fallback: "Price updated", cls: "bg-[#10B981]/12 text-[#10B981] border-[#10B981]/35", dot: "bg-[#10B981]" },
 } as const;
 
 const ProductCard = memo(function ProductCard({
@@ -416,22 +415,6 @@ const ProductCard = memo(function ProductCard({
               {p.level}
             </span>
           )}
-          {/* Freshness — NEW / Updated / Price updated, each for 14 days
-              after its moment (owner spec 19/09/2026). Catalogue card only:
-              Product Data has its own work signals. Several may show at once;
-              order is fixed so a card never re-sorts as one expires. The
-              bits arrive with the row; nothing here reads a clock, fetches,
-              or animates — a badge is a static span, and most cards have
-              none. Tones are the KDS pill tones: brand blue for the news,
-              amber for "changed", green for money. */}
-          {!isInternal && freshnessBadges(p.fresh).map((b) => (
-            <span
-              key={b}
-              className={`inline-flex items-center px-2 py-0.5 rounded-lg text-[10px] font-bold uppercase tracking-wider border ${FRESH_BADGE[b].cls}`}
-            >
-              {t(FRESH_BADGE[b].key, FRESH_BADGE[b].fallback)}
-            </span>
-          ))}
         </div>
 
         {/* Actions (show on hover) — internal only.
@@ -605,6 +588,38 @@ const ProductCard = memo(function ProductCard({
             ))}
           </div>
         )}
+
+        {/* ── Freshness tags — NEW / Updated / Price updated, each for 14 days
+            after its moment (owner spec 19/09/2026). Catalogue card only:
+            Product Data has its own work signals.
+
+            IN THE BODY, NOT ON THE PHOTO. The first version stacked three
+            opaque chips over the top-left of the picture, where the machine
+            usually is (owner: "it covered the product photo"). They now sit
+            in the body's variable zone, under the family roster and above
+            the price floor — the same place and the same chip language as
+            the model codes, so the eye reads them as facts about the
+            product, not stickers on it. The zone is already the one that
+            varies per card, so the floor alignment holds.
+
+            Several may show at once; order is fixed so a card never
+            re-sorts as one expires. The bits arrive with the row; nothing
+            here reads a clock, fetches, or animates — a tag is a static
+            span, and most cards have none. Tints are KDS StatusPill's
+            brand / warning / success tones on the card's own surface. */}
+        {!isInternal && p.fresh ? (
+          <div className="mt-2.5 flex flex-wrap gap-1">
+            {freshnessBadges(p.fresh).map((b) => (
+              <span
+                key={b}
+                className={`inline-flex items-center gap-1 h-[18px] px-1.5 rounded-md border text-[9.5px] font-bold uppercase tracking-wider whitespace-nowrap ${FRESH_BADGE[b].cls}`}
+              >
+                <i aria-hidden="true" className={`h-[5px] w-[5px] rounded-full ${FRESH_BADGE[b].dot}`} />
+                {t(FRESH_BADGE[b].key, FRESH_BADGE[b].fallback)}
+              </span>
+            ))}
+          </div>
+        ) : null}
 
         {/* ── Global FOB + actions — the CATALOGUE card's commercial half.
             Price is the tier-agnostic Global FOB in USD, computed server-side
