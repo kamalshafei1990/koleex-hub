@@ -406,6 +406,7 @@ export const employeesT: Translations = {
   "tab.overview":       { en: "Overview",                      zh: "概览",                     ar: "نظرة عامة" },
   "tab.activity":       { en: "Activity",                      zh: "动态",                     ar: "النشاط" },
   "tab.hr":             { en: "HR Details",                    zh: "人事详情",                 ar: "تفاصيل الموارد البشرية" },
+  "hr.contractPrint":   { en: "Employment contract",           zh: "劳动合同",                 ar: "عقد العمل" },
   "tab.leave":          { en: "Leave",                         zh: "请假",                     ar: "الإجازات" },
   "tab.attendance":     { en: "Attendance",                    zh: "考勤",                     ar: "الحضور" },
   "tab.payroll":        { en: "Payroll",                       zh: "薪资",                     ar: "الرواتب" },

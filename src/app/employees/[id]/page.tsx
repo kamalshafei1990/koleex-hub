@@ -813,6 +813,18 @@ export default function EmployeeProfilePage({
 
         {tab === "hr" && (
           <>
+            {hrView && (
+              /* Phase F — the employment contract, generated from this record,
+                 one language per print (a signed page must be in ONE language). */
+              <div className="mx-4 md:mx-6 mb-4 flex flex-wrap items-center gap-3 rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] px-4 py-3 text-[13px]">
+                <span className="font-medium text-[var(--text-primary)]">{t("hr.contractPrint")}</span>
+                {(["en", "zh", "ar"] as const).map((l) => (
+                  <a key={l} href={`/employment-contracts/${id}/print?lang=${l}&auto=1`} target="_blank" rel="noopener noreferrer" className="h-8 px-3 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] text-[12px] font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)] inline-flex items-center">
+                    {l === "en" ? "English" : l === "zh" ? "中文" : "العربية"}
+                  </a>
+                ))}
+              </div>
+            )}
             <GroupLabel>{t("grp.compensation")}</GroupLabel>
             <Sec icon={CreditCardIcon} title={t("hr.compensation")}>
               <FieldGrid

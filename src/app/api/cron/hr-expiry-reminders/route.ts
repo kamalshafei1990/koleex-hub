@@ -11,6 +11,7 @@ import "server-only";
    pattern as /api/cron/project-task-reminders. */
 
 import { NextResponse } from "next/server";
+import { ensureProbationReviewTask } from "@/lib/server/hr-lifecycle";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { supersedeUnread } from "@/lib/server/inbox-lifecycle";
 import { sendPushToAccounts } from "@/lib/server/web-push";
@@ -72,7 +73,7 @@ export async function GET(req: Request) {
   ).join(",");
   const { data: empRows, error } = await supabaseServer
     .from("koleex_employees")
-    .select(`id, person_id, employment_status, ${cols}`)
+    .select(`id, person_id, employment_status, manager_id, tenant_id, ${cols}`)
     .eq("employment_status", "active")
     .or(orParts);
   if (error) {
@@ -92,9 +93,16 @@ export async function GET(req: Request) {
   );
 
   let fired = 0;
+  let probationTasks = 0;
   for (const emp of employees) {
     const empName =
       (emp.person_id && nameMap.get(emp.person_id)) || "an employee";
+    /* Phase F — two weeks out, the probation review becomes a TASK for the
+       manager (and HR), not just a reminder in the inbox. Once per employee. */
+    if (await ensureProbationReviewTask({
+      id: emp.id, name: empName, manager_id: (emp.manager_id as string | null) ?? null,
+      probation_end_date: (emp.probation_end_date as string | null) ?? null, tenant_id: (emp.tenant_id as string | null) ?? null,
+    }, today) === "created") probationTasks++;
     for (const field of EXPIRY_FIELDS) {
       const date = emp[field.column] as string | null;
       if (!date) continue;
@@ -146,5 +154,5 @@ export async function GET(req: Request) {
     }
   }
 
-  return NextResponse.json({ ok: true, fired, checked: employees.length });
+  return NextResponse.json({ ok: true, fired, probationTasks, checked: employees.length });
 }
