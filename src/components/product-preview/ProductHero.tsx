@@ -150,20 +150,33 @@ export default function ProductHero(p: ProductHeroProps) {
         </section>
       ) : null}
 
+      {/* ── Classification — the whole width, one line — then the identity
+          grid, held 16px below it (the parent's rhythm is for sections). ── */}
+      <div className="space-y-4">
+          {/* One quiet line: the mark, a hairline, then the path with the
+            subcategory — the level that names the machine kind — carrying
+            the most weight. 12px, sentence case, normal tracking: the old
+            11px uppercase with 0.2em tracking wrapped onto two lines. */}
+        <nav aria-label="Classification" className="flex min-w-0 items-center gap-3 text-[12px] text-[var(--text-dim)]">
+          <BrandMark brand={p.brand} className="h-[10px] shrink-0 text-[var(--text-muted)]" />
+          {crumbs.length > 0 ? <span aria-hidden="true" className="h-3 w-px shrink-0 bg-[var(--border-subtle)]" /> : null}
+          {/* Whole names, never clipped: the path wraps to a second line
+              only when the column is genuinely too narrow (a phone). */}
+          <ol className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5">
+            {crumbs.map((c, i) => (
+              <li key={i} className={`flex items-center gap-1.5 whitespace-nowrap ${i === crumbs.length - 1 ? "font-medium text-[var(--text-secondary)]" : "text-[var(--text-dim)]"}`}>
+                {i > 0 ? <span aria-hidden="true" className="text-[var(--text-ghost)]">›</span> : null}
+                <span>{c}</span>
+              </li>
+            ))}
+          </ol>
+        </nav>
+
       {/* ── Identity + photo ── */}
       <section className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-14 items-center">
         <div className="order-2 lg:order-1 lg:col-span-5 space-y-6">
           {/* Classification. The mark, then the path the product sits on —
               each name in the reader's language. */}
-          <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] font-semibold uppercase tracking-[0.2em] text-[var(--text-faint)]">
-            <BrandMark brand={p.brand} className="h-[11px] text-[var(--text-muted)]" />
-            {crumbs.map((c, i) => (
-              <span key={i} className="flex items-center gap-2">
-                <span className="text-[var(--text-ghost)]" aria-hidden="true">›</span>
-                <span className={i === crumbs.length - 1 ? "text-[var(--text-muted)]" : ""}>{c}</span>
-              </span>
-            ))}
-          </div>
 
           {/* The MODEL is the headline (owner, 19/09/2026): a buyer knows the
               machine by its code — XPH-40-P — and the descriptive name is
@@ -233,6 +246,7 @@ export default function ProductHero(p: ProductHeroProps) {
           </div>
         </div>
       </section>
+      </div>
 
       {/* ── The family, as a table ── */}
       {models.length > 1 ? (

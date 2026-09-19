@@ -30,7 +30,8 @@ export async function generateMetadata({
   const loaded = await loadPublicSchemaProduct(id);
   if (!loaded) return { title: "Product not found — KOLEEX" };
   return {
-    title: `${loaded.productName} — KOLEEX`,
+    /* The tab reads like the header: model first, then the name. */
+    title: `${loaded.preview.primaryModel ? `${loaded.preview.primaryModel} · ` : ""}${loaded.productName} — KOLEEX`,
     description: loaded.tagline ?? undefined,
   };
 }
@@ -91,8 +92,17 @@ export default async function ProductDetailPage({
             <div className="h-8 w-8 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-dim)] shrink-0">
               <ProductsIcon size={16} />
             </div>
-            <h1 className="text-xl md:text-[22px] font-bold tracking-tight truncate">
-              {loaded.preview.productName}
+            {/* The model is how the machine is known (owner, 19/09/2026): it
+                leads the header; the descriptive name follows, lighter. */}
+            <h1 className="min-w-0 flex items-baseline gap-2.5 truncate text-xl md:text-[22px] font-bold tracking-tight">
+              {loaded.preview.primaryModel ? (
+                <>
+                  <span className="shrink-0 tabular-nums">{loaded.preview.primaryModel}</span>
+                  <span className="truncate text-[15px] md:text-[16px] font-medium text-[var(--text-muted)]">{loaded.preview.productName}</span>
+                </>
+              ) : (
+                <span className="truncate">{loaded.preview.productName}</span>
+              )}
             </h1>
           </div>
         </div>
