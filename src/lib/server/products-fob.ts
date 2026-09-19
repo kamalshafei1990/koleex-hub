@@ -33,6 +33,10 @@ export interface FobResult {
   prices: Record<string, FobFigure>;
   /** keyed by model id — only models with their own cost */
   models: Record<string, FobFigure>;
+  /** keyed by the caller's delta key — the USD the Global FOB moves by when
+   *  a buyer option adds `cny` to the product's landed cost. Absent when the
+   *  product has no cost to add to. Only the finished difference leaves. */
+  deltasUsd: Record<string, number>;
   fx: { cnyPerUsd: number } | null;
   reason?: "policy_not_configured";
 }
@@ -52,9 +56,13 @@ interface ModelCostRow {
   pricing_mode: string | null;
 }
 
-const EMPTY: FobResult = { prices: {}, models: {}, fx: null };
+const EMPTY: FobResult = { prices: {}, models: {}, deltasUsd: {}, fx: null };
 
-export async function globalFobForProducts(tenantId: string, ids: string[]): Promise<FobResult> {
+export async function globalFobForProducts(
+  tenantId: string,
+  ids: string[],
+  deltas: Array<{ key: string; productId: string; cny: number }> = [],
+): Promise<FobResult> {
   if (ids.length === 0) return EMPTY;
 
   const ctx = await getPolicySnapshot(tenantId);
@@ -133,5 +141,19 @@ export async function globalFobForProducts(tenantId: string, ids: string[]): Pro
     models[mid] = m.mode === "on_request" ? { fobUsd: null, mode: "on_request" } : { fobUsd: price(m.cost), mode: m.mode };
   }
 
-  return { prices, models, fx: fxCnyPerUsd == null ? null : { cnyPerUsd: fxCnyPerUsd } };
+  /* A buyer option's cost delta priced the same way the product is — the
+     difference between the product at (cost + delta) and at cost. Margins
+     and levels apply to the delta exactly as to the base, so a customer's
+     option price is never a raw factory difference. */
+  const deltasUsd: Record<string, number> = {};
+  for (const d of deltas) {
+    const cost = landed.get(d.productId);
+    if (cost == null || !Number.isFinite(d.cny) || d.cny === 0) continue;
+    const base = price(cost);
+    const withDelta = price(cost + d.cny);
+    if (base == null || withDelta == null) continue;
+    deltasUsd[d.key] = withDelta - base;
+  }
+
+  return { prices, models, deltasUsd, fx: fxCnyPerUsd == null ? null : { cnyPerUsd: fxCnyPerUsd } };
 }

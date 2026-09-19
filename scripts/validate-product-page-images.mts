@@ -74,5 +74,31 @@ expect(/preload\(\s*lcp\s*,\s*\{\s*as:\s*"image"/.test(page), "page.tsx preloads
 expect(/IMG\.poster\(/.test(page) && /IMG\.hero\(/.test(page), "…using the SAME IMG sizes the hero renders",
   "a preload of a different URL than the <img> is a second download, not a head start");
 
+console.log("\n§3 the client tree never imports the product-schema barrel");
+/* index.ts imports every spec template (532 KB of source) to build the
+   server-side registry. A client module that imports ONE helper through it
+   ships the lot. The helpers live in leaf modules; import those. */
+const CLIENT_TREE = [
+  "src/components/product-preview/ProductPreview.tsx",
+  "src/components/product-preview/ProductHero.tsx",
+  "src/components/product-preview/ProductHighlights.tsx",
+  "src/components/product-preview/ProductOptions.tsx",
+  "src/components/product-preview/ProductPacking.tsx",
+  "src/components/product-preview/ProductCompliance.tsx",
+  "src/components/product-preview/ProductPriceInternal.tsx",
+  "src/app/products/[id]/LegacyProductView.tsx",
+];
+const barrelImport = /from\s+"@\/lib\/product-schema"/;
+for (const rel of CLIENT_TREE) {
+  const src = code(fs.readFileSync(path.join(ROOT, rel), "utf8"));
+  expect(!barrelImport.test(src), `${rel} — no import from the @/lib/product-schema barrel`,
+    "import the helper from its leaf module (visibility.ts / visual-options.ts / derived.ts)");
+}
+{
+  const src = code(fs.readFileSync(path.join(ROOT, CLIENT_TREE[0]), "utf8"));
+  const mutated = src.replace('from "@/lib/product-schema/visibility"', 'from "@/lib/product-schema"');
+  expect(mutated !== src && barrelImport.test(mutated), "  (the rule sees the failure direction)");
+}
+
 console.log(failed ? `\n✗ product page images: ${failed} check(s) failed\n` : "\n✓ product page images: all checks passed\n");
 process.exit(failed ? 1 : 0);

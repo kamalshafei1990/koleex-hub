@@ -135,13 +135,17 @@ const ROUTE_BUDGETS: Record<string, { chunks: number; kbytes: number }> = {
   "invoices/[id]/print": { chunks: 14, kbytes: 1040 },
   "product-data/[id]": { chunks: 14, kbytes: 1053 },
   /* Product-page rebuild, 19/09/2026. Phase 0 ratcheted this to the measured
-     853 KB; phase 1 (the new hero + family table, +17 KB measured) sits at
-     870 while the OLD sections it will replace are still in the bundle — the
-     page carries both for now. Phases 2–3 delete the old blocks and the
-     ceiling then drops toward the rebuild's 700 KB target. It never goes up
-     again after this line: every later phase must come in under 875. */
-  "products/[id]": { chunks: 10, kbytes: 875 },
-  "products/preview/[slug]": { chunks: 10, kbytes: 875 },
+     853 KB; phases 1–3 added the hero, highlights and the conditional
+     sections and the page crept to 887. Then the real weight was found:
+     ProductPreview imported five pure helpers through the @/lib/product-schema
+     BARREL, whose index pulls every spec template (532 KB of source) to build
+     the server-side registry — the whole registry rode into the browser
+     bundle of the heaviest page in the Hub. Importing the helpers from their
+     leaf modules took the page from 887 to 607 KB (validate:product-page-images
+     §3 keeps the barrel out). Ceiling set 13 KB over the measured 607 and
+     it never goes up again: every later phase must come in under 620. */
+  "products/[id]": { chunks: 9, kbytes: 620 },
+  "products/preview/[slug]": { chunks: 9, kbytes: 620 },
   "quotations/[id]/print": { chunks: 13, kbytes: 984 },
   "suppliers/[id]": { chunks: 13, kbytes: 1062 },
   /* ── RE-BASELINED 17/09/2026 ──────────────────────────────────────────────

@@ -28,7 +28,7 @@ import type {
   ProductSchemaDefinition,
 } from "@/types/product-schema";
 import type { FeatureCard } from "@/types/supabase";
-import type { ProductLogistics } from "@/lib/logistics";
+import { loadPlan, sumPackages, type ProductLogistics } from "@/lib/logistics";
 import { globalFobForProducts, type FobFigure } from "@/lib/server/products-fob";
 
 /* Who is reading. Decides what the page, the AI and the print may show:
@@ -50,7 +50,7 @@ const PRODUCT_PUBLIC_COLUMNS =
      all customer-visible columns already on the row, so ONE read serves
      the page, the AI and the print. Nothing internal is here: cost,
      supplier, MOQ and lead time never enter this loader. */
-  "description, highlights, feature_cards, logistics, ce_certified, rohs_compliant, ip_rating, warranty_months, tenant_id";
+  "description, highlights, feature_cards, logistics, ce_certified, rohs_compliant, ip_rating, warranty_months, hs_code, tenant_id";
 
 interface PublicProductRow {
   id: string;
@@ -80,7 +80,51 @@ interface PublicProductRow {
   rohs_compliant: boolean | null;
   ip_rating: string | null;
   warranty_months: number | null;
+  hs_code: string | null;
   tenant_id: string | null;
+}
+
+/* Buyer options (product_options + product_option_values). The stored
+   price delta is a supplier COST delta in CNY and never leaves the server:
+   a price audience gets the USD the Global FOB moves by, priced through the
+   same engine as the product; everyone else gets the option without a
+   number. */
+interface OptionRow {
+  id: string; title: string; title_i18n: Record<string, string> | null; kind: string;
+  required: boolean | null; depends_on_value_id: string | null; sort_order: number | null;
+}
+interface OptionValueRow {
+  id: string; option_id: string; label: string; label_i18n: Record<string, string> | null;
+  image_url: string | null; price_delta_cny: number | string | null; weight_delta_kg: number | string | null;
+  is_default: boolean | null; sort_order: number | null;
+}
+export interface ProductOptionView {
+  id: string; title: string; title_i18n: Record<string, string> | null; kind: string; required: boolean;
+  dependsOnValueId: string | null;
+  values: Array<{
+    id: string; label: string; label_i18n: Record<string, string> | null; image: string | null;
+    isDefault: boolean; weightDeltaKg: number | null;
+    /** USD the Global FOB moves by; null when not a price audience or unpriced. */
+    priceDeltaUsd: number | null;
+  }>;
+}
+/** Packing & Logistics, DERIVED HERE. The page used to import lib/logistics
+ *  (sums, container loading) into the browser bundle to draw six numbers;
+ *  the numbers are now computed once on the server with the same functions
+ *  the Logistics tab and the packing list use, and the component only
+ *  prints them. Null when the product has nothing to say. */
+export interface ProductPackingView {
+  facts: Array<{ key: "packing_type" | "wood_treatment" | "net_weight" | "gross_weight" | "cbm" | "stackable" | "port_of_loading"; value: string; unit?: string }>;
+  containers: { c20: number | null; c40: number | null; c40hq: number | null } | null;
+  packages: Array<{ label: string | null; qty: number; l: number | null; w: number | null; h: number | null; grossKg: number | null; photo: string | null }>;
+  dangerousGoods: { kinds: string[]; unNumbers: string | null; notes: string | null } | null;
+}
+
+/** Internal price sheet per model — INTERNAL audience only. Never cost. */
+export interface ProductModelPriceView {
+  id: string; code: string; pricingMode: string | null; priceNote: string | null;
+  globalPrice: number | null; headOnlyPrice: number | null; completeSetPrice: number | null;
+  supportsHeadOnly: boolean; supportsCompleteSet: boolean;
 }
 
 interface MediaRow {
@@ -163,8 +207,13 @@ export interface ProductDetailSections {
   highlights: string[];
   featureCards: FeatureCard[];
   logistics: ProductLogistics | null;
-  compliance: { ce: boolean | null; rohs: boolean | null; ipRating: string | null };
+  compliance: { ce: boolean | null; rohs: boolean | null; ipRating: string | null; hsCode: string | null; countryOfOrigin: string | null; warranty: string | null };
   warrantyMonths: number | null;
+  /** Buyer options, active ones, in editor order. Empty = no section. */
+  options: ProductOptionView[];
+  packing: ProductPackingView | null;
+  /** Internal price sheet — only when audience === "internal"; null otherwise. */
+  modelPrices: ProductModelPriceView[] | null;
   /** The family roster — every visible model with its identity. */
   models: Array<{ id: string; code: string; name: string | null; tagline: string | null; primary: boolean; photo: string | null }>;
 }
@@ -222,6 +271,49 @@ async function fetchProduct(idOrSlug: string): Promise<PublicProductRow | null> 
  * view before publishing. Callers MUST only pass this after verifying the
  * requester is a logged-in hub user — never on a truly public surface.
  */
+const posNum = (v: unknown): number | null => {
+  if (v === null || v === undefined || v === "") return null;
+  const n = Number(v);
+  return Number.isFinite(n) && n > 0 ? n : null;
+};
+
+function packingView(l: ProductLogistics | null): ProductPackingView | null {
+  if (!l) return null;
+  const rows = (l.packages ?? []).filter((r) => posNum(r.l_cm) || posNum(r.w_cm) || posNum(r.h_cm) || posNum(r.gross_kg) || r.label);
+  const sums = sumPackages(rows);
+  const net = posNum(l.net_weight_kg);
+  const gross = posNum(l.gross_weight_kg) ?? (sums.grossKg > 0 ? sums.grossKg : null);
+  const cbm = posNum(l.cbm) ?? (sums.cbm > 0 ? sums.cbm : null);
+  const plan = rows.length > 0 ? loadPlan(rows, { unitsPerPackage: posNum(l.units_per_package) ?? 1 }) : null;
+  const c20 = posNum(l.qty_20ft) ?? (plan && plan.c20.qty > 0 ? plan.c20.qty : null);
+  const c40 = posNum(l.qty_40ft) ?? (plan && plan.c40.qty > 0 ? plan.c40.qty : null);
+  const c40hq = posNum(l.qty_40hq) ?? (plan && plan.c40hq.qty > 0 ? plan.c40hq.qty : null);
+
+  const facts: ProductPackingView["facts"] = [];
+  if (l.packing_type) facts.push({ key: "packing_type", value: l.packing_type.replace(/_/g, " ") });
+  if (l.wood_treatment && l.wood_treatment !== "not_wood") facts.push({ key: "wood_treatment", value: l.wood_treatment.replace(/_/g, " ") });
+  if (net != null) facts.push({ key: "net_weight", value: net.toLocaleString("en-US", { maximumFractionDigits: 1 }), unit: "kg" });
+  if (gross != null) facts.push({ key: "gross_weight", value: gross.toLocaleString("en-US", { maximumFractionDigits: 1 }), unit: "kg" });
+  if (cbm != null) facts.push({ key: "cbm", value: cbm.toLocaleString("en-US", { maximumFractionDigits: 3 }), unit: "m³" });
+  if (l.stackable != null) facts.push({ key: "stackable", value: l.stackable ? `yes${posNum(l.stack_max) ? ` · ×${posNum(l.stack_max)}` : ""}` : "no" });
+  if (l.port_of_loading) facts.push({ key: "port_of_loading", value: l.port_of_loading });
+
+  const dg = l.dangerous_goods?.has
+    ? { kinds: (l.dangerous_goods.kinds ?? []).map((k) => k.replace(/_/g, " ")), unNumbers: l.dangerous_goods.un_numbers ?? null, notes: l.dangerous_goods.notes ?? null }
+    : null;
+  const containers = c20 != null || c40 != null || c40hq != null ? { c20, c40, c40hq } : null;
+  if (facts.length === 0 && rows.length === 0 && !containers && !dg) return null;
+  return {
+    facts,
+    containers,
+    packages: rows.map((r) => ({
+      label: r.label ?? null, qty: posNum(r.qty) ?? 1,
+      l: posNum(r.l_cm), w: posNum(r.w_cm), h: posNum(r.h_cm), grossKg: posNum(r.gross_kg), photo: r.photo_url ?? null,
+    })),
+    dangerousGoods: dg,
+  };
+}
+
 export async function loadPublicSchemaProduct(
   idOrSlug: string,
   opts?: { allowUnpublished?: boolean; audience?: ProductAudience },
@@ -234,7 +326,7 @@ export async function loadPublicSchemaProduct(
   const supabase = getSupabaseServer();
 
   const NAMES = "slug, name, name_zh, name_ar";
-  const [{ data: subcat }, { data: mediaData }, { data: modelData }, { data: translationData }, { data: siblingData }, { data: divRow }, { data: catRow }] =
+  const [{ data: subcat }, { data: mediaData }, { data: modelData }, { data: translationData }, { data: siblingData }, { data: divRow }, { data: catRow }, { data: optionData }] =
     await Promise.all([
       supabase.from("subcategories").select(`code, ${NAMES}`).eq("slug", product.subcategory_slug ?? "").maybeSingle(),
       supabase
@@ -244,7 +336,7 @@ export async function loadPublicSchemaProduct(
         .order("order", { ascending: true }),
       supabase
         .from("product_models")
-        .select('id, model_name, primary_model, tagline, "order", visible, status, specs_overrides')
+        .select('id, model_name, primary_model, tagline, "order", visible, status, specs_overrides, pricing_mode, price_note, global_price, head_only_price, complete_set_price, supports_head_only, supports_complete_set')
         .eq("product_id", product.id)
         .order("order", { ascending: true }),
       supabase
@@ -273,7 +365,17 @@ export async function loadPublicSchemaProduct(
         : Promise.resolve({ data: null }),
       supabase.from("divisions").select(NAMES).eq("slug", product.division_slug ?? "").maybeSingle(),
       supabase.from("categories").select(NAMES).eq("slug", product.category_slug ?? "").maybeSingle(),
+      supabase.from("product_options")
+        .select("id, title, title_i18n, kind, required, depends_on_value_id, sort_order")
+        .eq("product_id", product.id).eq("active", true).order("sort_order", { ascending: true }),
     ]);
+  const optionRows = (optionData as OptionRow[] | null) ?? [];
+  const { data: optionValueData } = optionRows.length > 0
+    ? await supabase.from("product_option_values")
+        .select("id, option_id, label, label_i18n, image_url, price_delta_cny, weight_delta_kg, is_default, sort_order")
+        .in("option_id", optionRows.map((o) => o.id)).eq("active", true).order("sort_order", { ascending: true })
+    : { data: [] as OptionValueRow[] };
+  const optionValues = (optionValueData as OptionValueRow[] | null) ?? [];
 
   const subcategoryCode = (subcat?.code as string | null) ?? "";
   const asName = (r: unknown): TaxonomyName | null => {
@@ -376,10 +478,45 @@ export async function loadPublicSchemaProduct(
      with its figure instead of a placeholder that fills in later. One call,
      one product, model figures included. The cost never leaves the lib. */
   let fob: ProductDetailSections["fob"] = null;
+  let deltasUsd: Record<string, number> = {};
   if (PRICE_AUDIENCES.has(audience) && product.tenant_id) {
-    const r = await globalFobForProducts(product.tenant_id, [product.id]);
-    if (!r.reason) fob = { product: r.prices[product.id] ?? null, models: r.models, fx: r.fx };
+    const deltas = optionValues
+      .map((v) => ({ key: v.id, productId: product.id, cny: v.price_delta_cny == null ? 0 : Number(v.price_delta_cny) }))
+      .filter((d) => Number.isFinite(d.cny) && d.cny !== 0);
+    const r = await globalFobForProducts(product.tenant_id, [product.id], deltas);
+    if (!r.reason) { fob = { product: r.prices[product.id] ?? null, models: r.models, fx: r.fx }; deltasUsd = r.deltasUsd; }
   }
+  const numOrNull = (v: unknown): number | null => {
+    if (v === null || v === undefined || v === "") return null;
+    const n = Number(v); return Number.isFinite(n) ? n : null;
+  };
+  const options: ProductOptionView[] = optionRows.map((o) => ({
+    id: o.id, title: o.title, title_i18n: o.title_i18n, kind: o.kind, required: !!o.required,
+    dependsOnValueId: o.depends_on_value_id,
+    values: optionValues.filter((v) => v.option_id === o.id).map((v) => ({
+      id: v.id, label: v.label, label_i18n: v.label_i18n, image: v.image_url,
+      isDefault: !!v.is_default, weightDeltaKg: numOrNull(v.weight_delta_kg),
+      priceDeltaUsd: v.id in deltasUsd ? deltasUsd[v.id] : null,
+    })),
+  })).filter((o) => o.values.length > 0 || o.kind === "info");
+
+  type ModelPriceRow = ModelRow & {
+    id?: string; pricing_mode?: string | null; price_note?: string | null;
+    global_price?: number | string | null; head_only_price?: number | string | null; complete_set_price?: number | string | null;
+    supports_head_only?: boolean | null; supports_complete_set?: boolean | null;
+  };
+  const packing = packingView(product.logistics);
+
+  const modelPrices: ProductModelPriceView[] | null = audience === "internal"
+    ? (models as ModelPriceRow[])
+        .filter((m) => m.visible !== false && (m.primary_model || m.model_name))
+        .map((m) => ({
+          id: m.id ?? "", code: (m.primary_model || m.model_name) as string,
+          pricingMode: m.pricing_mode ?? null, priceNote: m.price_note ?? null,
+          globalPrice: numOrNull(m.global_price), headOnlyPrice: numOrNull(m.head_only_price), completeSetPrice: numOrNull(m.complete_set_price),
+          supportsHeadOnly: !!m.supports_head_only, supportsCompleteSet: !!m.supports_complete_set,
+        }))
+    : null;
 
   const sections: ProductDetailSections = {
     classification: { division: asName(divRow), category: asName(catRow), subcategory: asName(subcat) },
@@ -389,8 +526,14 @@ export async function loadPublicSchemaProduct(
     highlights: (product.highlights ?? []).filter((h) => typeof h === "string" && h.trim().length > 0),
     featureCards: (product.feature_cards ?? []).filter((c) => c && (c.image_url || c.title)),
     logistics: product.logistics ?? null,
-    compliance: { ce: product.ce_certified, rohs: product.rohs_compliant, ipRating: product.ip_rating },
+    compliance: {
+      ce: product.ce_certified, rohs: product.rohs_compliant, ipRating: product.ip_rating,
+      hsCode: product.hs_code, countryOfOrigin: product.country_of_origin, warranty: product.warranty,
+    },
     warrantyMonths: product.warranty_months,
+    options,
+    packing,
+    modelPrices,
     models: models
       .filter((m) => m.visible !== false && (m as { status?: string | null }).status !== "discontinued" && (m.primary_model || m.model_name))
       .map((m) => {

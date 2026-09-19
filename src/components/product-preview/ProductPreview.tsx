@@ -21,13 +21,15 @@ import type {
   ProductSchemaSurface,
   SpecField,
 } from "@/types/product-schema";
-import {
-  filterFieldsForSurface,
-  filterKnowledgeForSurface,
-  resolveOptionVisual,
-  emphasisForGroup,
-  collectAnchors,
-} from "@/lib/product-schema";
+/* ⚠️ LEAF MODULES, NOT THE BARREL. "@/lib/product-schema" (index.ts) imports
+   every spec template in the system — 532 KB of source — to build the
+   registry that resolveSchema() needs ON THE SERVER. This page only needs
+   five pure helpers, and they live in two files with type-only imports.
+   Importing them through the barrel put the whole registry into the
+   browser bundle of the heaviest page in the Hub (measured 19/09/2026).
+   validate:product-page-images §3 keeps the barrel out of this tree. */
+import { filterFieldsForSurface, filterKnowledgeForSurface } from "@/lib/product-schema/visibility";
+import { resolveOptionVisual, emphasisForGroup, collectAnchors } from "@/lib/product-schema/visual-options";
 import VisualGlyph from "./VisualGlyph";
 import { useTranslation, type Translations } from "@/lib/i18n";
 /* ⚠️ THE PREVIEW'S OWN DICTIONARY, NOT THE EDITOR'S. This read 52 keys out of
@@ -39,6 +41,10 @@ import { IMG } from "@/lib/cdn";
 import { BrandMark } from "@/components/brand/KoleexMark";
 import ProductHero, { type HeroAction } from "./ProductHero";
 import ProductHighlights from "./ProductHighlights";
+import ProductOptions from "./ProductOptions";
+import ProductPacking from "./ProductPacking";
+import ProductCompliance from "./ProductCompliance";
+import ProductPriceInternal from "./ProductPriceInternal";
 import type { ProductAudience, ProductDetailSections } from "@/lib/server/product-detail";
 
 interface ProductLocaleText {
@@ -1133,109 +1139,6 @@ export const ProductPreview = (props: ProductPreviewProps) => {
         </section>
       ) : null}
 
-      {/* ═══ 10b2. MODEL LINEUP — "Choose your model." One product
-          platform, several models differing on a few technical axes
-          (the 988LC catalog pattern). Columns = union of the models'
-          override keys; values inherit from the product spec sheet
-          when a model doesn't override them. ═══ */}
-      {(() => {
-        const list = (variants ?? []).filter((v) => v.code);
-        if (list.length < 2) return null;
-        const keySet: string[] = [];
-        for (const v of list) {
-          for (const k of Object.keys(v.overrides)) {
-            if (!keySet.includes(k)) keySet.push(k);
-          }
-        }
-        if (keySet.length === 0) return null;
-        const fieldsByKey = new Map(visibleFields.map((f) => [f.key, f] as const));
-        const cols = keySet
-          .filter((k) => fieldsByKey.has(k))
-          .sort((a, b) => visibleFields.findIndex((f) => f.key === a) - visibleFields.findIndex((f) => f.key === b))
-          .slice(0, 6);
-        if (cols.length === 0) return null;
-        return (
-          <section className="space-y-8">
-            <SectionHead
-              hero
-              eyebrow={t("preview.eyebrowLineup", "Lineup")}
-              title={t("preview.chooseModel", "Choose your model.")}
-            />
-            <div className="overflow-x-auto rounded-[20px] border border-[var(--border-subtle)]">
-              <table className="w-full border-collapse text-sm">
-                <thead>
-                  <tr className="bg-[var(--bg-surface-subtle)]">
-                    {/* Photo gets its OWN column — never share the model cell. */}
-                    <th className="w-[72px] px-4 py-3.5" aria-label={t("preview.photo", "Photo")} />
-                    <th className="min-w-[200px] px-5 py-3.5 text-start text-[12px] font-bold uppercase tracking-[0.12em] text-[var(--text-primary)] bg-[var(--bg-surface)] border-e border-[var(--border-subtle)]">
-                      {t("preview.model", "Model")}
-                    </th>
-                    {cols.map((k) => {
-                      const f = fieldsByKey.get(k)!;
-                      return (
-                        <th key={k} className="whitespace-nowrap px-5 py-3.5 text-start text-[12px] font-semibold uppercase tracking-[0.12em] text-[var(--text-muted)]">
-                          {f.label ?? k}
-                        </th>
-                      );
-                    })}
-                  </tr>
-                </thead>
-                <tbody>
-                  {list.map((v) => {
-                    const isWanted = selectedCode != null && v.code === selectedCode;
-                    return (
-                    <tr
-                      key={v.code}
-                      /* Click again to UNSELECT — back to the family view. */
-                      onClick={() => setSelectedCode((prev) => (prev === v.code ? null : v.code))}
-                      ref={isWanted && wantedModel === v.code.trim().toLowerCase() ? (el) => { if (el) setTimeout(() => el.scrollIntoView({ block: "center", behavior: "smooth" }), 150); } : undefined}
-                      className={`border-t border-[var(--border-subtle)] cursor-pointer transition-colors ${isWanted ? "bg-[var(--bg-surface-subtle)]" : "hover:bg-[var(--bg-surface-subtle)]/40"}`}
-                    >
-                      {/* Photo column — the model's own shot, else the
-                          FAMILY photo (same inheritance story as specs). */}
-                      <td className={`px-4 py-3 ${isWanted ? "border-s-2 border-s-[#567FB2]" : ""}`}>
-                        {(v.photo || mainImageUrl) ? (
-                          <span className="h-11 w-11 shrink-0 rounded-lg bg-white border border-black/5 overflow-hidden flex items-center justify-center">
-                            {/* eslint-disable-next-line @next/next/no-img-element */}
-                            <img src={IMG.thumb((v.photo || mainImageUrl) as string)} alt="" className="h-full w-full object-contain p-1" loading="lazy" decoding="async" />
-                          </span>
-                        ) : null}
-                      </td>
-                      <td className="min-w-[200px] px-5 py-4 bg-[var(--bg-surface-subtle)]/40 border-e border-[var(--border-subtle)]">
-                        <span className="min-w-0 block">
-                        <div className="text-[15px] font-bold tracking-tight whitespace-nowrap text-[var(--text-primary)]">
-                          {v.code}
-                          {v.primary ? (
-                            <span className="ms-2 align-middle text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded border border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[var(--text-muted)]">
-                              {t("preview.primary", "Primary")}
-                            </span>
-                          ) : null}
-                        </div>
-                        {v.tagline ? (
-                          <div className="mt-0.5 text-[11.5px] text-[var(--text-ghost)]">{v.tagline}</div>
-                        ) : null}
-                        </span>
-                      </td>
-                      {cols.map((k) => {
-                        const f = fieldsByKey.get(k)!;
-                        const raw = k in v.overrides ? v.overrides[k] : familyValues[k];
-                        const inherited = !(k in v.overrides);
-                        return (
-                          <td key={k} className={`px-5 py-4 text-[13.5px] ${inherited ? "text-[var(--text-muted)]" : "font-medium text-[var(--text-primary)]"}`}>
-                            {displayFieldValue(f, raw)}
-                          </td>
-                        );
-                      })}
-                    </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          </section>
-        );
-      })()}
-
       {/* ═══ THE TECHNICAL SPINE — pinned media, scrolling detail ═══
           Owner direction (2026-09-04): the reader must never lose sight of the
           machine while working through its record. XPRI-01 alone carries seven
@@ -1759,6 +1662,19 @@ export const ProductPreview = (props: ProductPreviewProps) => {
       </div>
       {/* ═══ end of the pinned spine — media and downloads go full width ═══ */}
 
+      {/* ═══ PHASE 3 — the conditional sections, each gone entirely when its
+          data is empty: Options · Packing & Logistics · Compliance. Media &
+          Files are the gallery / media / documents sections that follow;
+          the internal Price sheet closes the page. ═══ */}
+      <ProductOptions options={sections?.options ?? []} lang={lang} t={t} />
+      <ProductPacking packing={sections?.packing ?? null} t={t} />
+      <ProductCompliance
+        compliance={sections?.compliance ?? { ce: null, rohs: null, ipRating: null, hsCode: null, countryOfOrigin: countryOfOrigin ?? null, warranty: warranty ?? null }}
+        warrantyMonths={sections?.warrantyMonths ?? null}
+        schemaMarks={complianceFeatures.map((f) => f.label ?? f.key)}
+        t={t}
+      />
+
       {/* ═══ 12. GALLERY ═══ */}
       {hasGallery ? (
         <section id="gallery" className="scroll-mt-32 space-y-8">
@@ -1830,21 +1746,7 @@ export const ProductPreview = (props: ProductPreviewProps) => {
         </section>
       ) : null}
 
-      {/* ═══ 15. COMPLIANCE (quiet) ═══ */}
-      {complianceFeatures.length > 0 ? (
-        <section className="flex flex-wrap items-center gap-2 border-t border-[var(--border-subtle)] pt-6">
-          <span className="text-[10px] uppercase tracking-[0.16em] text-[var(--text-faint)] me-1">{t("preview.compliance", "Compliance")}</span>
-          {complianceFeatures.map((f) => (
-            <span
-              key={f.key}
-              className="inline-flex items-center gap-1.5 rounded-full border border-[var(--border-subtle)] px-2.5 py-1 text-[11px] font-medium text-[var(--text-secondary)]"
-            >
-              <VisualGlyph token="check" className="h-3 w-3" />
-              {f.label ?? f.key}
-            </span>
-          ))}
-        </section>
-      ) : null}
+      <ProductPriceInternal modelPrices={sections?.modelPrices ?? null} t={t} />
 
       {/* ═══ 16. MEDIA COUNT FOOTER ═══ */}
       {mediaCounts && (mediaCounts.photos || mediaCounts.videos || mediaCounts.manuals) ? (
