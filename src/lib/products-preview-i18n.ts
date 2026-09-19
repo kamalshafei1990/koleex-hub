@@ -111,4 +111,7 @@ export const PRODUCTS_PREVIEW_I18N: Translations = {
   "preview.heroFamilyPhoto": { en: "Photo", zh: "图片", ar: "الصورة" },
   "preview.heroFamilySelected": { en: "Showing", zh: "当前显示", ar: "المعروض" },
   "preview.heroAiDraft": { en: "Tell me about", zh: "请介绍", ar: "عرّفني على" },
+  /* ── phase 2: highlights ── */
+  "preview.highlightsEyebrow": { en: "Highlights", zh: "亮点", ar: "أبرز المزايا" },
+  "preview.highlightsTitle": { en: "What stands out.", zh: "突出之处。", ar: "ما يميّزه." },
 };

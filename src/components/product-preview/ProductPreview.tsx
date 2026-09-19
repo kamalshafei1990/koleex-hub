@@ -38,6 +38,7 @@ import { fetchIconBindings, type BindingsMap } from "@/lib/visual-bindings";
 import { IMG } from "@/lib/cdn";
 import { BrandMark } from "@/components/brand/KoleexMark";
 import ProductHero, { type HeroAction } from "./ProductHero";
+import ProductHighlights from "./ProductHighlights";
 import type { ProductAudience, ProductDetailSections } from "@/lib/server/product-detail";
 
 interface ProductLocaleText {
@@ -1019,120 +1020,14 @@ export const ProductPreview = (props: ProductPreviewProps) => {
         </section>
       ) : null}
 
-      {/* ═══ 3. HIGHLIGHTS — Apple "Get the highlights." snap carousel:
-          the strongest claims as swipeable cards, each closing on a shot
-          of the machine. Dots paginate; the rail scrolls free. ═══ */}
-      {(() => {
-        const points = [
-          ...asKnowledgeList(firstKb("selling_points")?.content),
-          ...asKnowledgeList(firstKb("technical_advantages")?.content),
-        ].slice(0, 5);
-        /* Owner rule (2026-08-29): a card shows a photo only when that photo
-           belongs to it. These points come from the knowledge lists, which
-           carry no image of their own — the deck used to borrow gallery and
-           main-render shots by index, pairing e.g. a detection-accuracy claim
-           with whatever photo landed at that position. Text-only cards
-           instead; per-highlight photos live in the Highlights tab. */
-        if (points.length < 2) return null;
-        return (
-          <section className="space-y-8">
-            <h2 className="text-3xl md:text-5xl font-semibold tracking-[-0.02em] text-[var(--text-primary)]">
-              {t("preview.getHighlights", "Get the highlights.")}
-            </h2>
-            <SnapCarousel>
-              {points.map((point, i) => {
-                // Apple shop-card anatomy: bold claim on the card surface,
-                // supporting clause below it.
-                // Theme-aware surface so it reads right in light AND dark.
-                const parts = point.split(/\s+—\s+/);
-                const head = parts[0];
-                const body = parts.slice(1).join(" — ");
-                return (
-                  <div
-                    key={i}
-                    /* Text-only deck: sized to the copy (a photo-height box
-                       with no photo left a tall empty card). */
-                    className="flex min-h-[260px] w-[85%] shrink-0 snap-start flex-col overflow-hidden rounded-[28px] bg-[var(--bg-surface-subtle)] sm:w-[440px]"
-                  >
-                    <div className="p-7 md:p-8">
-                      <h3 className="text-xl md:text-[24px] font-semibold leading-snug tracking-[-0.01em] text-[var(--text-primary)]">
-                        {head}
-                        {/[.!?]$/.test(head) ? "" : "."}
-                      </h3>
-                      {body ? (
-                        <p className="mt-3 text-[14px] md:text-[15px] leading-relaxed text-[var(--text-secondary)]">
-                          {body.charAt(0).toUpperCase() + body.slice(1)}
-                          {/[.!?]$/.test(body) ? "" : "."}
-                        </p>
-                      ) : null}
-                    </div>
-                  </div>
-                );
-              })}
-            </SnapCarousel>
-          </section>
-        );
-      })()}
-
-      {/* ═══ 3b. PERFORMANCE STATEMENT — Apple gradient headline built from
-          the schema's own top metrics (no hardcoded copy). ═══ */}
-      {(() => {
-        const metrics = coreAnchors
-          .filter(({ kind, field: f }) => kind === "metric" && !isEmptyValue(values[f.key]))
-          .slice(0, 3)
-          .map(({ field: f }) => `${displayScalar(values[f.key])}${f.unit ? " " + f.unit : ""}`);
-        if (metrics.length < 2) return null;
-        return (
-          <section data-cascade className="mx-auto max-w-5xl space-y-6 text-center">
-            <div className="text-[13px] md:text-[15px] font-semibold text-[#7FA9D6]">
-              {t("preview.eyebrowPerformance", "Performance")}
-            </div>
-            <p className="bg-gradient-to-r from-[#567FB2] via-[#7FA9D6] to-[#BCD8F0] bg-clip-text text-4xl md:text-8xl font-semibold tracking-[-0.025em] leading-[1.05] text-transparent">
-              {metrics.join(". ")}.
-            </p>
-            {asKnowledgeList(firstKb("technical_advantages")?.content)[0] ? (
-              <p className="mx-auto max-w-2xl text-base md:text-xl font-light leading-relaxed text-[var(--text-muted)]">
-                {asKnowledgeList(firstKb("technical_advantages")!.content)[0]}
-              </p>
-            ) : null}
-          </section>
-        );
-      })()}
-
-      {/* ═══ 3c. EDITORIAL — Apple left-aligned story (headline stack +
-          copy column + full-bleed shot). Headline = the tagline split at
-          its dash; body = the overview knowledge block. ═══ */}
-      {firstKb("overview") ? (
-        <section data-cascade className="space-y-10">
-          <div className="grid grid-cols-1 gap-6 md:grid-cols-12 md:gap-12">
-            <h2 className="md:col-span-5 text-4xl md:text-[3.6rem] font-semibold tracking-[-0.025em] leading-[1.06] text-[var(--text-primary)]">
-              {(displayTagline || displayName)
-                .split("—")
-                .map((part) => part.trim())
-                .filter(Boolean)
-                .map((part, i) => (
-                  <span key={i} className="block">
-                    {part}
-                    {/[.!?]$/.test(part) ? "" : "."}
-                  </span>
-                ))}
-            </h2>
-            <p className="md:col-span-7 md:pt-2 text-base md:text-xl font-light leading-relaxed text-[var(--text-secondary)]">
-              {asKnowledgeList(firstKb("overview")!.content).join(" ")}
-            </p>
-          </div>
-          {(galleryUrls ?? [])[0] ? (
-            <div className="overflow-hidden rounded-3xl">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={IMG.gallery(galleryUrls![0])}
-                alt={displayName}
-                className="aspect-[16/9] md:aspect-[21/10] w-full object-cover"
-              />
-            </div>
-          ) : null}
-        </section>
-      ) : null}
+      {/* ═══ HIGHLIGHTS (rebuild phase 2) — the photo cards with title and
+          description, then the highlight bullets. Product Data's own
+          "Main Devices & Functions" and "Key Highlights", in that order. */}
+      <ProductHighlights
+        cards={sections?.featureCards ?? []}
+        bullets={sections?.highlights ?? []}
+        t={t}
+      />
 
       {/* ═══ 4. MATERIALS ═══ */}
       {materialPicks.length > 0 ? (
@@ -1237,93 +1132,6 @@ export const ProductPreview = (props: ProductPreviewProps) => {
           </div>
         </section>
       ) : null}
-
-      {/* ═══ 7. SELLING POINTS / TECHNICAL ADVANTAGES (knowledge cards) ═══ */}
-      {(firstKb("selling_points") || firstKb("technical_advantages")) ? (
-        <section className="space-y-8">
-          <SectionHead hero eyebrow={t("preview.eyebrowWhyItWins", "Why it wins")} title={t("preview.advantages", "Advantages")} />
-          {/* Apple-style benefit grid: oversized glyph leading each card. */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {[
-              ...asKnowledgeList(firstKb("selling_points")?.content),
-              ...asKnowledgeList(firstKb("technical_advantages")?.content),
-            ].map((point, i) => (
-              <div
-                key={i}
-                className="flex flex-col gap-5 rounded-3xl bg-[var(--bg-surface-subtle)] p-8"
-              >
-                <VisualGlyph token={ADVANTAGE_GLYPHS[i % ADVANTAGE_GLYPHS.length]} className="h-11 w-11 text-[var(--text-primary)]" />
-                <p className="text-[15px] md:text-base leading-relaxed text-[var(--text-primary)]">{point}</p>
-              </div>
-            ))}
-          </div>
-        </section>
-      ) : null}
-
-      {/* ═══ LAYER 2 — SMART PRODUCT INTELLIGENCE ═══
-          Interpreted, benefit-oriented summaries (schema-driven via insight). */}
-      {intelligence.length > 0 ? (
-        <section className="space-y-8">
-          <SectionHead hero eyebrow={t("preview.eyebrowWhatItMeans", "What it means for you")} title={t("preview.takeCloserLook", "Take a closer look.")} />
-          <div className="rounded-3xl bg-[var(--bg-secondary)] border border-[var(--border-subtle)] p-6 md:p-10">
-            <div className="grid grid-cols-1 lg:grid-cols-12 items-center gap-8 lg:gap-12">
-              {/* chip rail — Apple's (+) explorer list */}
-              <div className="order-2 lg:order-1 lg:col-span-5 space-y-2.5">
-                {intelligence.map((it, i) => (
-                  <div key={it.key}>
-                    <button
-                      type="button"
-                      onClick={() => setExplorerIdx(explorerIdx === i ? -1 : i)}
-                      aria-expanded={explorerIdx === i}
-                      className={`inline-flex items-center gap-3 rounded-full border px-2 py-2 pe-5 text-start transition-all ${
-                        explorerIdx === i
-                          ? "border-[var(--border-focus)] bg-[var(--bg-surface)]"
-                          : "border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] hover:border-[var(--border-focus)]"
-                      }`}
-                    >
-                      <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-[18px] leading-none transition-colors ${
-                        explorerIdx === i ? "bg-[var(--bg-inverted)] text-[var(--text-inverted)]" : "bg-[var(--bg-surface)] text-[var(--text-primary)]"
-                      }`}>{explorerIdx === i ? "–" : "+"}</span>
-                      <span className="text-[14px] md:text-[15px] font-semibold text-[var(--text-primary)]">{it.label}</span>
-                      <span className="ms-auto text-[12px] font-medium text-[#7FA9D6]">{it.headline}</span>
-                    </button>
-                    {explorerIdx === i ? (
-                      <div className="mt-2.5 rounded-2xl bg-[var(--bg-surface-subtle)] p-5">
-                        <p className="text-[15px] leading-relaxed text-[var(--text-secondary)]">
-                          <span className="font-semibold text-[var(--text-primary)]">{it.label}. </span>
-                          {it.insight}
-                        </p>
-                      </div>
-                    ) : null}
-                  </div>
-                ))}
-              </div>
-              {/* the product itself */}
-              <div className="order-1 lg:order-2 lg:col-span-7">
-                {mainImageUrl ? (
-                  <div className="overflow-hidden rounded-2xl bg-gradient-to-b from-white to-[#f1f2f4]">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={IMG.gallery(mainImageUrl)} alt={displayName} className="mx-auto max-h-[420px] w-auto object-contain px-6 py-8" />
-                  </div>
-                ) : null}
-              </div>
-            </div>
-          </div>
-        </section>
-      ) : null}
-
-      {/* ═══ FULL-BLEED DETAIL INTERLUDE — Apple-style giant close-up
-          breathing room between the story and the data. ═══ */}
-      {(() => {
-        const shot = (galleryUrls ?? []).filter((u) => u.includes("/products/details/")).slice(-1)[0];
-        if (!shot) return null;
-        return (
-          <section className="-mx-4 md:-mx-6 lg:-mx-8 overflow-hidden">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={IMG.hero(shot)} alt={displayName} className="h-[46vh] md:h-[64vh] w-full object-cover" />
-          </section>
-        );
-      })()}
 
       {/* ═══ 10b2. MODEL LINEUP — "Choose your model." One product
           platform, several models differing on a few technical axes
@@ -1587,6 +1395,199 @@ export const ProductPreview = (props: ProductPreviewProps) => {
         </div>
       ) : null}
 
+      {/* ═══ KNOWLEDGE (rebuild phase 2) — the public knowledge blocks,
+          AFTER the specifications (owner order: Highlights → Specs →
+          Knowledge). Selling points, advantages, overview, intelligence,
+          features, buyer questions, safety, what's included. ═══ */}
+      {/* ═══ 3. HIGHLIGHTS — Apple "Get the highlights." snap carousel:
+          the strongest claims as swipeable cards, each closing on a shot
+          of the machine. Dots paginate; the rail scrolls free. ═══ */}
+      {(() => {
+        const points = [
+          ...asKnowledgeList(firstKb("selling_points")?.content),
+          ...asKnowledgeList(firstKb("technical_advantages")?.content),
+        ].slice(0, 5);
+        /* Owner rule (2026-08-29): a card shows a photo only when that photo
+           belongs to it. These points come from the knowledge lists, which
+           carry no image of their own — the deck used to borrow gallery and
+           main-render shots by index, pairing e.g. a detection-accuracy claim
+           with whatever photo landed at that position. Text-only cards
+           instead; per-highlight photos live in the Highlights tab. */
+        if (points.length < 2) return null;
+        return (
+          <section className="space-y-8">
+            <h2 className="text-3xl md:text-5xl font-semibold tracking-[-0.02em] text-[var(--text-primary)]">
+              {t("preview.getHighlights", "Get the highlights.")}
+            </h2>
+            <SnapCarousel>
+              {points.map((point, i) => {
+                // Apple shop-card anatomy: bold claim on the card surface,
+                // supporting clause below it.
+                // Theme-aware surface so it reads right in light AND dark.
+                const parts = point.split(/\s+—\s+/);
+                const head = parts[0];
+                const body = parts.slice(1).join(" — ");
+                return (
+                  <div
+                    key={i}
+                    /* Text-only deck: sized to the copy (a photo-height box
+                       with no photo left a tall empty card). */
+                    className="flex min-h-[260px] w-[85%] shrink-0 snap-start flex-col overflow-hidden rounded-[28px] bg-[var(--bg-surface-subtle)] sm:w-[440px]"
+                  >
+                    <div className="p-7 md:p-8">
+                      <h3 className="text-xl md:text-[24px] font-semibold leading-snug tracking-[-0.01em] text-[var(--text-primary)]">
+                        {head}
+                        {/[.!?]$/.test(head) ? "" : "."}
+                      </h3>
+                      {body ? (
+                        <p className="mt-3 text-[14px] md:text-[15px] leading-relaxed text-[var(--text-secondary)]">
+                          {body.charAt(0).toUpperCase() + body.slice(1)}
+                          {/[.!?]$/.test(body) ? "" : "."}
+                        </p>
+                      ) : null}
+                    </div>
+                  </div>
+                );
+              })}
+            </SnapCarousel>
+          </section>
+        );
+      })()}
+
+      {/* ═══ 3b. PERFORMANCE STATEMENT — Apple gradient headline built from
+          the schema's own top metrics (no hardcoded copy). ═══ */}
+      {(() => {
+        const metrics = coreAnchors
+          .filter(({ kind, field: f }) => kind === "metric" && !isEmptyValue(values[f.key]))
+          .slice(0, 3)
+          .map(({ field: f }) => `${displayScalar(values[f.key])}${f.unit ? " " + f.unit : ""}`);
+        if (metrics.length < 2) return null;
+        return (
+          <section data-cascade className="mx-auto max-w-5xl space-y-6 text-center">
+            <div className="text-[13px] md:text-[15px] font-semibold text-[#7FA9D6]">
+              {t("preview.eyebrowPerformance", "Performance")}
+            </div>
+            <p className="bg-gradient-to-r from-[#567FB2] via-[#7FA9D6] to-[#BCD8F0] bg-clip-text text-4xl md:text-8xl font-semibold tracking-[-0.025em] leading-[1.05] text-transparent">
+              {metrics.join(". ")}.
+            </p>
+            {asKnowledgeList(firstKb("technical_advantages")?.content)[0] ? (
+              <p className="mx-auto max-w-2xl text-base md:text-xl font-light leading-relaxed text-[var(--text-muted)]">
+                {asKnowledgeList(firstKb("technical_advantages")!.content)[0]}
+              </p>
+            ) : null}
+          </section>
+        );
+      })()}
+
+      {/* ═══ 3c. EDITORIAL — Apple left-aligned story (headline stack +
+          copy column + full-bleed shot). Headline = the tagline split at
+          its dash; body = the overview knowledge block. ═══ */}
+      {firstKb("overview") ? (
+        <section data-cascade className="space-y-10">
+          <div className="grid grid-cols-1 gap-6 md:grid-cols-12 md:gap-12">
+            <h2 className="md:col-span-5 text-4xl md:text-[3.6rem] font-semibold tracking-[-0.025em] leading-[1.06] text-[var(--text-primary)]">
+              {(displayTagline || displayName)
+                .split("—")
+                .map((part) => part.trim())
+                .filter(Boolean)
+                .map((part, i) => (
+                  <span key={i} className="block">
+                    {part}
+                    {/[.!?]$/.test(part) ? "" : "."}
+                  </span>
+                ))}
+            </h2>
+            <p className="md:col-span-7 md:pt-2 text-base md:text-xl font-light leading-relaxed text-[var(--text-secondary)]">
+              {asKnowledgeList(firstKb("overview")!.content).join(" ")}
+            </p>
+          </div>
+          {(galleryUrls ?? [])[0] ? (
+            <div className="overflow-hidden rounded-3xl">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={IMG.gallery(galleryUrls![0])}
+                alt={displayName}
+                className="aspect-[16/9] md:aspect-[21/10] w-full object-cover"
+              />
+            </div>
+          ) : null}
+        </section>
+      ) : null}
+
+      {/* ═══ 7. SELLING POINTS / TECHNICAL ADVANTAGES (knowledge cards) ═══ */}
+      {(firstKb("selling_points") || firstKb("technical_advantages")) ? (
+        <section className="space-y-8">
+          <SectionHead hero eyebrow={t("preview.eyebrowWhyItWins", "Why it wins")} title={t("preview.advantages", "Advantages")} />
+          {/* Apple-style benefit grid: oversized glyph leading each card. */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {[
+              ...asKnowledgeList(firstKb("selling_points")?.content),
+              ...asKnowledgeList(firstKb("technical_advantages")?.content),
+            ].map((point, i) => (
+              <div
+                key={i}
+                className="flex flex-col gap-5 rounded-3xl bg-[var(--bg-surface-subtle)] p-8"
+              >
+                <VisualGlyph token={ADVANTAGE_GLYPHS[i % ADVANTAGE_GLYPHS.length]} className="h-11 w-11 text-[var(--text-primary)]" />
+                <p className="text-[15px] md:text-base leading-relaxed text-[var(--text-primary)]">{point}</p>
+              </div>
+            ))}
+          </div>
+        </section>
+      ) : null}
+
+      {/* ═══ LAYER 2 — SMART PRODUCT INTELLIGENCE ═══
+          Interpreted, benefit-oriented summaries (schema-driven via insight). */}
+      {intelligence.length > 0 ? (
+        <section className="space-y-8">
+          <SectionHead hero eyebrow={t("preview.eyebrowWhatItMeans", "What it means for you")} title={t("preview.takeCloserLook", "Take a closer look.")} />
+          <div className="rounded-3xl bg-[var(--bg-secondary)] border border-[var(--border-subtle)] p-6 md:p-10">
+            <div className="grid grid-cols-1 lg:grid-cols-12 items-center gap-8 lg:gap-12">
+              {/* chip rail — Apple's (+) explorer list */}
+              <div className="order-2 lg:order-1 lg:col-span-5 space-y-2.5">
+                {intelligence.map((it, i) => (
+                  <div key={it.key}>
+                    <button
+                      type="button"
+                      onClick={() => setExplorerIdx(explorerIdx === i ? -1 : i)}
+                      aria-expanded={explorerIdx === i}
+                      className={`inline-flex items-center gap-3 rounded-full border px-2 py-2 pe-5 text-start transition-all ${
+                        explorerIdx === i
+                          ? "border-[var(--border-focus)] bg-[var(--bg-surface)]"
+                          : "border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] hover:border-[var(--border-focus)]"
+                      }`}
+                    >
+                      <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-[18px] leading-none transition-colors ${
+                        explorerIdx === i ? "bg-[var(--bg-inverted)] text-[var(--text-inverted)]" : "bg-[var(--bg-surface)] text-[var(--text-primary)]"
+                      }`}>{explorerIdx === i ? "–" : "+"}</span>
+                      <span className="text-[14px] md:text-[15px] font-semibold text-[var(--text-primary)]">{it.label}</span>
+                      <span className="ms-auto text-[12px] font-medium text-[#7FA9D6]">{it.headline}</span>
+                    </button>
+                    {explorerIdx === i ? (
+                      <div className="mt-2.5 rounded-2xl bg-[var(--bg-surface-subtle)] p-5">
+                        <p className="text-[15px] leading-relaxed text-[var(--text-secondary)]">
+                          <span className="font-semibold text-[var(--text-primary)]">{it.label}. </span>
+                          {it.insight}
+                        </p>
+                      </div>
+                    ) : null}
+                  </div>
+                ))}
+              </div>
+              {/* the product itself */}
+              <div className="order-1 lg:order-2 lg:col-span-7">
+                {mainImageUrl ? (
+                  <div className="overflow-hidden rounded-2xl bg-gradient-to-b from-white to-[#f1f2f4]">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={IMG.gallery(mainImageUrl)} alt={displayName} className="mx-auto max-h-[420px] w-auto object-contain px-6 py-8" />
+                  </div>
+                ) : null}
+              </div>
+            </div>
+          </div>
+        </section>
+      ) : null}
+
       {/* ═══ 9. APPLICATIONS DETAIL / OTHER FEATURES ═══ */}
       {otherFeatures.length > 0 ? (
         <section className="space-y-4">
@@ -1633,6 +1634,50 @@ export const ProductPreview = (props: ProductPreviewProps) => {
         );
       })() : null}
 
+
+      {/* ═══ 10b. WARNINGS & SAFETY (knowledge) ═══ */}
+      {firstKb("warnings") ? (
+        <section className="space-y-4">
+          <SectionHead eyebrow={t("preview.eyebrowSafety", "Before you run it")} title={t("preview.warnings", "Warnings & Safety")} />
+          <ul className="space-y-2 rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] p-5">
+            {asKnowledgeList(firstKb("warnings")!.content).map((item, i) => (
+              <li key={i} className="flex items-start gap-2.5 text-sm text-[var(--text-primary)]">
+                <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--text-primary)]" />
+                <span>{item}</span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
+
+      {/* ═══ 11. WHAT'S INCLUDED / WARRANTY (knowledge) ═══ */}
+      {(firstKb("package_contents") || firstKb("warranty_notes")) ? (
+        <section className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {firstKb("package_contents") ? (
+            <div className="space-y-3">
+              <SectionHead title={t("preview.whatsIncluded", "What's Included")} />
+              <ul className="space-y-2">
+                {asKnowledgeList(firstKb("package_contents")!.content).map((item, i) => (
+                  <li key={i} className="flex items-start gap-2.5 text-sm text-[var(--text-primary)]">
+                    <span className="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full border border-[var(--border-subtle)] text-[var(--text-secondary)]">
+                      <VisualGlyph token="check" className="h-2.5 w-2.5" />
+                    </span>
+                    <span>{item}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
+          {firstKb("warranty_notes") ? (
+            <div className="space-y-3">
+              <SectionHead title={t("preview.warranty", "Warranty")} />
+              <p className="text-sm leading-relaxed text-[var(--text-secondary)]">
+                {asKnowledgeList(firstKb("warranty_notes")!.content).join(" ")}
+              </p>
+            </div>
+          ) : null}
+        </section>
+      ) : null}
 
       {/* ═══ 10c. COMPARE — Apple "Worth the upgrade?" against machines of
           the same family. Dropdown picks the rival; both columns read the
@@ -1707,50 +1752,6 @@ export const ProductPreview = (props: ProductPreviewProps) => {
               </div>
             );
           })()}
-        </section>
-      ) : null}
-
-      {/* ═══ 10b. WARNINGS & SAFETY (knowledge) ═══ */}
-      {firstKb("warnings") ? (
-        <section className="space-y-4">
-          <SectionHead eyebrow={t("preview.eyebrowSafety", "Before you run it")} title={t("preview.warnings", "Warnings & Safety")} />
-          <ul className="space-y-2 rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] p-5">
-            {asKnowledgeList(firstKb("warnings")!.content).map((item, i) => (
-              <li key={i} className="flex items-start gap-2.5 text-sm text-[var(--text-primary)]">
-                <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--text-primary)]" />
-                <span>{item}</span>
-              </li>
-            ))}
-          </ul>
-        </section>
-      ) : null}
-
-      {/* ═══ 11. WHAT'S INCLUDED / WARRANTY (knowledge) ═══ */}
-      {(firstKb("package_contents") || firstKb("warranty_notes")) ? (
-        <section className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {firstKb("package_contents") ? (
-            <div className="space-y-3">
-              <SectionHead title={t("preview.whatsIncluded", "What's Included")} />
-              <ul className="space-y-2">
-                {asKnowledgeList(firstKb("package_contents")!.content).map((item, i) => (
-                  <li key={i} className="flex items-start gap-2.5 text-sm text-[var(--text-primary)]">
-                    <span className="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full border border-[var(--border-subtle)] text-[var(--text-secondary)]">
-                      <VisualGlyph token="check" className="h-2.5 w-2.5" />
-                    </span>
-                    <span>{item}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          ) : null}
-          {firstKb("warranty_notes") ? (
-            <div className="space-y-3">
-              <SectionHead title={t("preview.warranty", "Warranty")} />
-              <p className="text-sm leading-relaxed text-[var(--text-secondary)]">
-                {asKnowledgeList(firstKb("warranty_notes")!.content).join(" ")}
-              </p>
-            </div>
-          ) : null}
         </section>
       ) : null}
 
