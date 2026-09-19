@@ -148,8 +148,8 @@ const ROUTE_BUDGETS: Record<string, { chunks: number; kbytes: number }> = {
      leaf modules took the page from 887 to 607 KB (validate:product-page-images
      §3 keeps the barrel out). Ceiling set 13 KB over the measured 607 and
      it never goes up again: every later phase must come in under 620. */
-  "products/[id]": { chunks: 9, kbytes: 620 },
-  "products/preview/[slug]": { chunks: 9, kbytes: 620 },
+  "products/[id]": { chunks: 9, kbytes: 610 },
+  "products/preview/[slug]": { chunks: 9, kbytes: 610 },
   "quotations/[id]/print": { chunks: 13, kbytes: 984 },
   "suppliers/[id]": { chunks: 13, kbytes: 1062 },
   /* ── RE-BASELINED 17/09/2026 ──────────────────────────────────────────────

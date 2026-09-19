@@ -13,6 +13,7 @@
  * rendered when the product has no packing data.
  */
 import { IMG } from "@/lib/cdn";
+import { SectionHead } from "./shared";
 import type { ProductPackingView } from "@/lib/server/product-detail";
 
 const FACT_LABEL: Record<ProductPackingView["facts"][number]["key"], [string, string]> = {
@@ -41,15 +42,8 @@ export default function ProductPacking({ packing, t }: {
   };
 
   return (
-    <section data-reveal className="space-y-8">
-      <div className="space-y-1">
-        <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--text-faint)]">
-          {t("preview.packingEyebrow", "Shipping")}
-        </div>
-        <h2 className="text-[13px] font-semibold uppercase tracking-[0.14em] text-[var(--text-secondary)]">
-          {t("preview.packingTitle", "Packing & Logistics")}
-        </h2>
-      </div>
+    <section id="packing" className="space-y-6">
+      <SectionHead eyebrow={t("preview.packingEyebrow", "Shipping")} title={t("preview.packingTitle", "Packing & Logistics")} />
 
       {containers ? (
         <div className="grid grid-cols-3 gap-3 max-w-xl">
@@ -111,8 +105,8 @@ export default function ProductPacking({ packing, t }: {
       ) : null}
 
       {dg ? (
-        <div className="rounded-2xl border border-[#F59E0B]/40 bg-[#F59E0B]/[0.06] px-4 py-3 text-sm">
-          <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#F59E0B]">{t("preview.dangerousGoods", "Dangerous goods")}</div>
+        <div className="rounded-xl border border-[var(--border-subtle)] border-s-[3px] border-s-[#FFCC00] bg-[var(--bg-surface-subtle)] px-4 py-3 text-sm">
+          <div className="text-[12px] font-medium uppercase tracking-[0.14em] text-[var(--text-muted)]">{t("preview.dangerousGoods", "Dangerous goods")}</div>
           <div className="mt-1 text-[var(--text-secondary)] capitalize">
             {dg.kinds.join(", ")}
             {dg.unNumbers ? ` · UN ${dg.unNumbers}` : ""}

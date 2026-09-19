@@ -9,6 +9,7 @@
  * tab behind its own permission.
  */
 import type { ProductModelPriceView } from "@/lib/server/product-detail";
+import { SectionHead } from "./shared";
 
 const usd = (n: number | null) => (n == null ? "—" : `$${n.toLocaleString(undefined, { maximumFractionDigits: 0 })}`);
 
@@ -23,15 +24,8 @@ export default function ProductPriceInternal({ modelPrices, t }: {
   const anySet = rows.some((m) => m.supportsCompleteSet || m.completeSetPrice != null);
 
   return (
-    <section data-reveal className="space-y-6">
-      <div className="space-y-1">
-        <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--text-faint)]">
-          {t("preview.priceEyebrow", "Internal")}
-        </div>
-        <h2 className="text-[13px] font-semibold uppercase tracking-[0.14em] text-[var(--text-secondary)]">
-          {t("preview.priceTitle", "Price sheet")}
-        </h2>
-      </div>
+    <section id="price" className="space-y-6">
+      <SectionHead eyebrow={t("preview.priceEyebrow", "Internal")} title={t("preview.priceTitle", "Price sheet")} />
       <div className="overflow-x-auto rounded-2xl border border-[var(--border-subtle)]">
         <table className="w-full border-collapse text-sm">
           <thead>

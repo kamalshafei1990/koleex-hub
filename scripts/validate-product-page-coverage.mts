@@ -51,7 +51,7 @@ const EXCLUDED_SECTIONS: Record<string, string> = {
 
 const migration = fs.readFileSync(path.join(ROOT, "supabase/migrations/20260919_products_freshness.sql"), "utf8");
 const loader = fs.readFileSync(path.join(ROOT, "src/lib/server/product-detail.ts"), "utf8");
-const tree = ["ProductPreview", "ProductHero", "ProductHighlights", "ProductOptions", "ProductPacking", "ProductCompliance", "ProductPriceInternal"]
+const tree = ["ProductPreview", "ProductHero", "ProductHighlights", "ProductOptions", "ProductPacking", "ProductCompliance", "ProductPriceInternal", "ProductKeyFigures", "ProductSpecs", "ProductKnowledge", "ProductMedia", "ProductCompare", "ProductRail"]
   .map((n) => code(fs.readFileSync(path.join(ROOT, `src/components/product-preview/${n}.tsx`), "utf8"))).join("\n");
 
 /* ── 1. customer-visible columns (from the trigger) → loader select ── */

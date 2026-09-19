@@ -13,6 +13,7 @@
  * Nothing rendered when the product has no options.
  */
 import { IMG } from "@/lib/cdn";
+import { SectionHead } from "./shared";
 import type { Lang } from "@/lib/i18n";
 import type { ProductOptionView } from "@/lib/server/product-detail";
 
@@ -29,15 +30,8 @@ export default function ProductOptions({ options, lang, t }: {
 }) {
   if (options.length === 0) return null;
   return (
-    <section data-reveal className="space-y-8">
-      <div className="space-y-1">
-        <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--text-faint)]">
-          {t("preview.optionsEyebrow", "Configure")}
-        </div>
-        <h2 className="text-[13px] font-semibold uppercase tracking-[0.14em] text-[var(--text-secondary)]">
-          {t("preview.optionsTitle", "Options")}
-        </h2>
-      </div>
+    <section id="options" className="space-y-6">
+      <SectionHead eyebrow={t("preview.optionsEyebrow", "Configure")} title={t("preview.optionsTitle", "Options")} />
 
       <div className="space-y-6">
         {options.map((o) => (
@@ -54,7 +48,7 @@ export default function ProductOptions({ options, lang, t }: {
                   <li
                     key={v.id}
                     className={`flex items-center gap-3 rounded-xl border px-3 py-2.5 ${
-                      v.isDefault ? "border-[#567FB2]/50 bg-[var(--bg-surface-subtle)]" : "border-[var(--border-subtle)]"
+                      v.isDefault ? "border-[var(--text-primary)] bg-[var(--bg-surface-subtle)]" : "border-[var(--border-subtle)]"
                     }`}
                   >
                     {v.image ? (

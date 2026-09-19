@@ -8,6 +8,7 @@
  * is nothing to declare.
  */
 import VisualGlyph from "./VisualGlyph";
+import { SectionHead } from "./shared";
 import type { ProductDetailSections } from "@/lib/server/product-detail";
 
 export default function ProductCompliance({ compliance, warrantyMonths, schemaMarks, t }: {
@@ -31,15 +32,8 @@ export default function ProductCompliance({ compliance, warrantyMonths, schemaMa
 
   if (marks.length === 0 && facts.length === 0) return null;
   return (
-    <section data-reveal className="space-y-6">
-      <div className="space-y-1">
-        <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--text-faint)]">
-          {t("preview.complianceEyebrow", "Declared")}
-        </div>
-        <h2 className="text-[13px] font-semibold uppercase tracking-[0.14em] text-[var(--text-secondary)]">
-          {t("preview.compliance", "Compliance")}
-        </h2>
-      </div>
+    <section id="compliance" className="space-y-6">
+      <SectionHead eyebrow={t("preview.complianceEyebrow", "Declared")} title={t("preview.compliance", "Compliance")} />
       {marks.length > 0 ? (
         <div className="flex flex-wrap items-center gap-2">
           {marks.map((m) => (

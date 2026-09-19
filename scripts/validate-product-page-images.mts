@@ -31,6 +31,12 @@ const expect = (cond: boolean, m: string, why?: string) => (cond ? ok(m) : fail(
 const FILES = [
   "src/components/product-preview/ProductHero.tsx",
   "src/components/product-preview/ProductPreview.tsx",
+  "src/components/product-preview/ProductHighlights.tsx",
+  "src/components/product-preview/ProductOptions.tsx",
+  "src/components/product-preview/ProductPacking.tsx",
+  "src/components/product-preview/ProductMedia.tsx",
+  "src/components/product-preview/ProductCompare.tsx",
+  "src/components/product-preview/ProductRail.tsx",
   "src/app/products/[id]/page.tsx",
   "src/components/product-print/ProductPrintDoc.tsx",
 ];
@@ -86,6 +92,13 @@ const CLIENT_TREE = [
   "src/components/product-preview/ProductPacking.tsx",
   "src/components/product-preview/ProductCompliance.tsx",
   "src/components/product-preview/ProductPriceInternal.tsx",
+  "src/components/product-preview/ProductKeyFigures.tsx",
+  "src/components/product-preview/ProductSpecs.tsx",
+  "src/components/product-preview/ProductKnowledge.tsx",
+  "src/components/product-preview/ProductMedia.tsx",
+  "src/components/product-preview/ProductCompare.tsx",
+  "src/components/product-preview/ProductRail.tsx",
+  "src/components/product-preview/shared.tsx",
   "src/components/product-print/ProductPrintDoc.tsx",
 ];
 const barrelImport = /from\s+"@\/lib\/product-schema"/;
