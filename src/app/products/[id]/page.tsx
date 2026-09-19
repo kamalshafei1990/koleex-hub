@@ -18,9 +18,11 @@
 import Link from "next/link";
 import ProductsIcon from "@/components/icons/ProductsIcon";
 import type { Metadata } from "next";
+import { preload } from "react-dom";
+import { IMG } from "@/lib/cdn";
 
 import { loadPublicSchemaProduct } from "@/lib/server/product-detail";
-import { getSessionAccountId } from "@/lib/server/session";
+import { getServerAuth } from "@/lib/server/auth";
 import { ProductPreview } from "@/components/product-preview/ProductPreview";
 import ArrowLeftIcon from "@/components/icons/ui/ArrowLeftIcon";
 /* Lazy boundary — see LegacyProductViewLazy.tsx for why the dynamic()
@@ -49,15 +51,33 @@ export default async function ProductDetailPage({
   const { id } = await params;
   // Logged-in hub users may preview draft/hidden schema products before they
   // are published; anonymous visitors still only see public ones.
-  const accountId = await getSessionAccountId();
+  /* Who is reading decides what the page may show (product-detail.ts,
+     ProductAudience): staff see the Price section, a Hub account sees the
+     Global FOB, nobody signed in sees the public shape and only ACTIVE
+     products. Cached per request, so the metadata call above is free. */
+  const auth = await getServerAuth();
+  const audience = auth ? (auth.user_type === "internal" ? "internal" : "customer") : "public";
   const loaded = await loadPublicSchemaProduct(id, {
-    allowUnpublished: Boolean(accountId),
+    allowUnpublished: Boolean(auth),
+    audience,
   });
 
   // No resolved schema (or non-public / not found) → original renderer.
   if (!loaded) {
     return <LegacyProductView />;
   }
+
+  /* The hero image is the page's LCP, and it used to be discovered only
+     after the client bundle ran — fetched raw, at that. Announce the SAME
+     sized URL the hero will render, so the browser starts it with the
+     HTML. Poster when there is one (it is what paints first), else the
+     main product shot. */
+  const lcp = loaded.preview.posterUrl
+    ? IMG.poster(loaded.preview.posterUrl)
+    : loaded.preview.mainImageUrl
+      ? IMG.hero(loaded.preview.mainImageUrl)
+      : null;
+  if (lcp) preload(lcp, { as: "image" });
 
   // Schema-backed → the Product Intelligence experience.
   return (

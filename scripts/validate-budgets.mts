@@ -134,8 +134,12 @@ const ROUTE_BUDGETS: Record<string, { chunks: number; kbytes: number }> = {
   "finance/visual": { chunks: 14, kbytes: 849 },
   "invoices/[id]/print": { chunks: 14, kbytes: 1040 },
   "product-data/[id]": { chunks: 14, kbytes: 1053 },
-  "products/[id]": { chunks: 12, kbytes: 955 },
-  "products/preview/[slug]": { chunks: 12, kbytes: 954 },
+  /* Ratcheted 19/09/2026 to the measured 853 KB (+7 KB slack) at the start
+     of the product-page rebuild; the rebuild's own target is 700 KB and the
+     ceiling drops there when it lands, not before — a budget below the
+     current weight would block every unrelated push in between. */
+  "products/[id]": { chunks: 10, kbytes: 860 },
+  "products/preview/[slug]": { chunks: 10, kbytes: 860 },
   "quotations/[id]/print": { chunks: 13, kbytes: 984 },
   "suppliers/[id]": { chunks: 13, kbytes: 1062 },
   /* ── RE-BASELINED 17/09/2026 ──────────────────────────────────────────────

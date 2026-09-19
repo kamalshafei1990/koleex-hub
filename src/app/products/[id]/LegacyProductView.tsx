@@ -91,7 +91,7 @@ import SpecGlyph from "@/lib/machine-specs/SpecGlyph";
 import { FIELD_GLYPHS } from "@/lib/machine-specs/icons";
 import { getKindBySlug } from "@/lib/machine-kinds";
 import { IMG } from "@/lib/cdn";
-import KoleexLogo from "@/components/layout/KoleexLogo";
+import { BrandMark } from "@/components/brand/KoleexMark";
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 
 /* ---------------- helpers ---------------- */
@@ -257,7 +257,7 @@ function deriveKeyFeatures(
       icon: <ShieldCheckIcon className="h-5 w-5" />,
       title: "Manufacturer Warranty",
       value: product.warranty,
-      description: "Backed by Koleex support.",
+      description: "Backed by our own support.",
     });
   }
   if (features.length < 4 && product.country_of_origin) {
@@ -1612,22 +1612,11 @@ export default function LegacyProductView() {
                   (or unset, which defaults to Koleex). For any
                   third-party / partner brand, fall back to the
                   uppercase text eyebrow. */}
-              {(() => {
-                const brand = (product.brand || "Koleex").trim();
-                const isKoleex = brand.toLowerCase() === "koleex";
-                if (isKoleex) {
-                  return (
-                    <KoleexLogo
-                      className="h-4 md:h-5 w-auto text-[var(--text-primary)]"
-                    />
-                  );
-                }
-                return (
-                  <p className="text-[12px] font-semibold uppercase tracking-[0.1em] text-[var(--text-muted)]">
-                    {brand}
-                  </p>
-                );
-              })()}
+              <BrandMark
+                brand={product.brand}
+                className="h-4 md:h-5 text-[var(--text-primary)]"
+                textClassName="block text-[12px] font-semibold uppercase tracking-[0.1em] text-[var(--text-muted)]"
+              />
               {/* H1 weight stepped down semibold → medium and size
                   44/56/64 → 40/52/60 px so the title reads as calm
                   identity instead of a heavy headline. The image
@@ -1924,7 +1913,7 @@ export default function LegacyProductView() {
                   {c.image_url && (
                     <div className="w-full aspect-[16/10] bg-[var(--bg-surface)] overflow-hidden">
                       {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={c.image_url} alt={c.title} className="h-full w-full object-contain p-2" loading="lazy" decoding="async" />
+                      <img src={IMG.card(c.image_url)} alt={c.title} className="h-full w-full object-contain p-2" loading="lazy" decoding="async" />
                     </div>
                   )}
                   <div className="p-5">

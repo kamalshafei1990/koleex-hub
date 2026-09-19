@@ -158,4 +158,8 @@ export const IMG = {
   gallery: (url: string | null | undefined) => cdnImage(url, { width: 1200, quality: 78, resize: "contain" }),
   /** Detail page hero — large above-the-fold photo. */
   hero: (url: string | null | undefined) => cdnImage(url, { width: 1400, quality: 78, resize: "contain" }),
+  /* Full-bleed 21:9 hero poster. The stored files are 2520px JPEGs; the
+     widest slot is the 1500px page column, so 1920 clears it with margin
+     and never ships the original. */
+  poster: (url: string | null | undefined) => cdnImage(url, { width: 1920, quality: 78, resize: "contain" }),
 };

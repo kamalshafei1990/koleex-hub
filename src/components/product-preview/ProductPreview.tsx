@@ -35,6 +35,8 @@ import { useTranslation, type Translations } from "@/lib/i18n";
    never renders. See the header of products-preview-i18n.ts. */
 import { PRODUCTS_PREVIEW_I18N } from "@/lib/products-preview-i18n";
 import { fetchIconBindings, type BindingsMap } from "@/lib/visual-bindings";
+import { IMG } from "@/lib/cdn";
+import { BrandMark } from "@/components/brand/KoleexMark";
 
 interface ProductLocaleText {
   locale: string;
@@ -829,19 +831,20 @@ export const ProductPreview = (props: ProductPreviewProps) => {
               />
             ) : (
               // eslint-disable-next-line @next/next/no-img-element
-              <img src={posterUrl} alt={displayName} className="absolute inset-0 h-full w-full object-cover" />
+              <img src={IMG.poster(posterUrl)} alt={displayName} className="absolute inset-0 h-full w-full object-cover" />
             )}
           </section>
           {/* Apple-style identity: centered stack — kicker, huge name,
               light tagline, one CTA. */}
           <div className="mx-auto max-w-3xl space-y-4 pt-4 text-center">
-            {(brand || machineKindLabel) ? (
-              <div className="flex items-center justify-center gap-2 text-[11px] font-semibold uppercase tracking-[0.24em] text-[var(--text-faint)]">
-                {brand ? <span>{brand}</span> : null}
-                {brand && machineKindLabel ? <span className="text-[var(--text-ghost)]">/</span> : null}
+            <div className="flex items-center justify-center gap-2 text-[11px] font-semibold uppercase tracking-[0.24em] text-[var(--text-faint)]">
+                {/* The mark, never the word (owner rule): BrandMark draws the
+                    KOLEEX logo for our own products and the name for a
+                    distributed brand. */}
+                <BrandMark brand={brand} className="h-[11px]" />
+                {machineKindLabel ? <span className="text-[var(--text-ghost)]">/</span> : null}
                 {machineKindLabel ? <span>{machineKindLabel}</span> : null}
               </div>
-            ) : null}
             <h1 className="text-4xl md:text-7xl lg:text-8xl font-semibold tracking-[-0.03em] text-[var(--text-primary)] leading-[1.0]">
               {displayName || t("preview.untitledProduct", "Untitled product")}
             </h1>
@@ -862,7 +865,7 @@ export const ProductPreview = (props: ProductPreviewProps) => {
             <section className="relative overflow-hidden rounded-3xl bg-gradient-to-b from-white to-[#f1f2f4]">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
-                src={heroImage as string}
+                src={IMG.hero(heroImage as string)}
                 alt={displayName}
                 className="mx-auto max-h-[560px] w-auto object-contain px-8 py-12 md:py-16"
               />
@@ -881,13 +884,11 @@ export const ProductPreview = (props: ProductPreviewProps) => {
         {/* LEFT — identity */}
         <div className="order-2 lg:order-1 lg:col-span-5 space-y-7">
           <div className="space-y-4">
-            {(machineKindLabel || brand) ? (
-              <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.24em] text-[var(--text-faint)]">
-                {brand ? <span>{brand}</span> : null}
-                {brand && machineKindLabel ? <span className="text-[var(--border-subtle)]">/</span> : null}
+            <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.24em] text-[var(--text-faint)]">
+                <BrandMark brand={brand} className="h-[11px]" />
+                {machineKindLabel ? <span className="text-[var(--border-subtle)]">/</span> : null}
                 {machineKindLabel ? <span>{machineKindLabel}</span> : null}
               </div>
-            ) : null}
             <h1 className="text-[2.75rem] leading-[1.02] md:text-6xl md:leading-[0.98] font-semibold tracking-[-0.02em] text-[var(--text-primary)]">
               {displayName || t("preview.untitledProduct", "Untitled product")}
             </h1>
@@ -935,7 +936,7 @@ export const ProductPreview = (props: ProductPreviewProps) => {
           <div className="relative w-full aspect-[4/3] md:aspect-[5/4] flex items-center justify-center">
             {heroImage ? (
               // eslint-disable-next-line @next/next/no-img-element
-              <img src={heroImage as string} alt={displayName} className="h-full w-full object-contain drop-shadow-[0_30px_60px_rgba(0,0,0,0.25)]" />
+              <img src={IMG.hero(heroImage as string)} alt={displayName} className="h-full w-full object-contain drop-shadow-[0_30px_60px_rgba(0,0,0,0.25)]" />
             ) : (
               <span className="text-sm text-[var(--text-faint)]">{t("preview.noMainImage", "No main image")}</span>
             )}
@@ -1188,7 +1189,7 @@ export const ProductPreview = (props: ProductPreviewProps) => {
             <div className="overflow-hidden rounded-3xl">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
-                src={galleryUrls![0]}
+                src={IMG.gallery(galleryUrls![0])}
                 alt={displayName}
                 className="aspect-[16/9] md:aspect-[21/10] w-full object-cover"
               />
@@ -1215,7 +1216,7 @@ export const ProductPreview = (props: ProductPreviewProps) => {
                     <div className="aspect-[4/5] w-full overflow-hidden rounded-2xl">
                       {option?.image ? (
                         // eslint-disable-next-line @next/next/no-img-element
-                        <img src={option.image} alt={label} className="h-full w-full object-cover" />
+                        <img src={IMG.card(option.image)} alt={label} className="h-full w-full object-cover" />
                       ) : visual.swatch ? (
                         <div
                           className="h-full w-full"
@@ -1366,7 +1367,7 @@ export const ProductPreview = (props: ProductPreviewProps) => {
                 {mainImageUrl ? (
                   <div className="overflow-hidden rounded-2xl bg-gradient-to-b from-white to-[#f1f2f4]">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={mainImageUrl} alt={displayName} className="mx-auto max-h-[420px] w-auto object-contain px-6 py-8" />
+                    <img src={IMG.gallery(mainImageUrl)} alt={displayName} className="mx-auto max-h-[420px] w-auto object-contain px-6 py-8" />
                   </div>
                 ) : null}
               </div>
@@ -1383,7 +1384,7 @@ export const ProductPreview = (props: ProductPreviewProps) => {
         return (
           <section className="-mx-4 md:-mx-6 lg:-mx-8 overflow-hidden">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={shot} alt={displayName} className="h-[46vh] md:h-[64vh] w-full object-cover" />
+            <img src={IMG.hero(shot)} alt={displayName} className="h-[46vh] md:h-[64vh] w-full object-cover" />
           </section>
         );
       })()}
@@ -1452,7 +1453,7 @@ export const ProductPreview = (props: ProductPreviewProps) => {
                         {(v.photo || mainImageUrl) ? (
                           <span className="h-11 w-11 shrink-0 rounded-lg bg-white border border-black/5 overflow-hidden flex items-center justify-center">
                             {/* eslint-disable-next-line @next/next/no-img-element */}
-                            <img src={(v.photo || mainImageUrl) as string} alt="" className="h-full w-full object-contain p-1" loading="lazy" decoding="async" />
+                            <img src={IMG.thumb((v.photo || mainImageUrl) as string)} alt="" className="h-full w-full object-contain p-1" loading="lazy" decoding="async" />
                           </span>
                         ) : null}
                       </td>
@@ -1516,7 +1517,7 @@ export const ProductPreview = (props: ProductPreviewProps) => {
             <div className="overflow-hidden rounded-2xl border border-[var(--border-subtle)] bg-white">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
-                src={mainImageUrl}
+                src={IMG.row(mainImageUrl)}
                 alt={displayName || productName}
                 className="aspect-[4/3] w-full object-contain p-4"
                 loading="lazy"
@@ -1530,7 +1531,7 @@ export const ProductPreview = (props: ProductPreviewProps) => {
               {(galleryUrls ?? []).slice(0, 4).map((u, i) => (
                 <div key={`${u}-${i}`} className="overflow-hidden rounded-lg border border-[var(--border-subtle)] bg-white">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={u} alt="" className="aspect-square w-full object-contain p-1.5" loading="lazy" decoding="async" />
+                  <img src={IMG.thumb(u)} alt="" className="aspect-square w-full object-contain p-1.5" loading="lazy" decoding="async" />
                 </div>
               ))}
             </div>
@@ -1737,7 +1738,7 @@ export const ProductPreview = (props: ProductPreviewProps) => {
                     <div className="flex h-40 items-center justify-center overflow-hidden rounded-2xl bg-gradient-to-b from-white to-[#f1f2f4] md:h-56">
                       {c.imageUrl ? (
                         // eslint-disable-next-line @next/next/no-img-element
-                        <img src={c.imageUrl} alt={c.name} className="h-full w-full object-contain p-4" />
+                        <img src={IMG.card(c.imageUrl)} alt={c.name} className="h-full w-full object-contain p-4" />
                       ) : (
                         <span className="text-sm text-[#8a8f98]">{t("preview.noImage", "No image")}</span>
                       )}
@@ -1833,7 +1834,7 @@ export const ProductPreview = (props: ProductPreviewProps) => {
                 className="aspect-[4/3] w-[85%] shrink-0 snap-start overflow-hidden rounded-3xl bg-[var(--bg-surface-subtle)] sm:w-[480px] md:w-[640px]"
               >
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={url} alt={`${productName} ${i + 1}`} className="h-full w-full object-cover" />
+                <img src={IMG.gallery(url)} alt={`${productName} ${i + 1}`} className="h-full w-full object-cover" />
               </div>
             ))}
           </SnapCarousel>

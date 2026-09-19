@@ -27,12 +27,29 @@ import type {
   ProductKnowledgeBlock,
   ProductSchemaDefinition,
 } from "@/types/product-schema";
+import type { FeatureCard } from "@/types/supabase";
+import type { ProductLogistics } from "@/lib/logistics";
+
+/* Who is reading. Decides what the page, the AI and the print may show:
+     internal — Hub staff: everything customer-visible plus the Price section
+     customer — a Hub account: everything customer-visible incl. Global FOB
+     print    — the brochure: customer content, NO price (a sheet outlives
+                the day's rate)
+     public   — the website, later: customer content, no price, active only
+   The loader records it; each section reads it. One value, one place. */
+export type ProductAudience = "internal" | "customer" | "print" | "public";
+export const PRICE_AUDIENCES: ReadonlySet<ProductAudience> = new Set(["internal", "customer"]);
 
 const PRODUCT_PUBLIC_COLUMNS =
   "id, product_name, slug, brand, division_slug, category_slug, subcategory_slug, " +
   "schema_id, schema_version, schema_specs, schema_knowledge, schema_visibility, " +
   "warranty, country_of_origin, status, visible, featured, hero_poster_url, " +
-  "excerpt, meta_title, meta_description, og_image_url";
+  "excerpt, meta_title, meta_description, og_image_url, " +
+  /* Product-page rebuild (19/09/2026): the sections the page will carry —
+     all customer-visible columns already on the row, so ONE read serves
+     the page, the AI and the print. Nothing internal is here: cost,
+     supplier, MOQ and lead time never enter this loader. */
+  "description, highlights, feature_cards, logistics, ce_certified, rohs_compliant, ip_rating, warranty_months";
 
 interface PublicProductRow {
   id: string;
@@ -54,6 +71,14 @@ interface PublicProductRow {
   meta_title: string | null;
   meta_description: string | null;
   og_image_url: string | null;
+  description: string | null;
+  highlights: string[] | null;
+  feature_cards: FeatureCard[] | null;
+  logistics: ProductLogistics | null;
+  ce_certified: boolean | null;
+  rohs_compliant: boolean | null;
+  ip_rating: string | null;
+  warranty_months: number | null;
 }
 
 interface MediaRow {
@@ -117,9 +142,25 @@ export interface SchemaProductPreviewProps {
   }[];
 }
 
+/** The product page's sections beyond the hero — read straight from the
+ *  same row, so Product Data and the page cannot disagree. Options and
+ *  prices join here in their own phases (they live in other tables). */
+export interface ProductDetailSections {
+  description: string | null;
+  highlights: string[];
+  featureCards: FeatureCard[];
+  logistics: ProductLogistics | null;
+  compliance: { ce: boolean | null; rohs: boolean | null; ipRating: string | null };
+  warrantyMonths: number | null;
+  /** The family roster — every visible model with its identity. */
+  models: Array<{ id: string; code: string; name: string | null; tagline: string | null; primary: boolean; photo: string | null }>;
+}
+
 export interface LoadedSchemaProduct {
   productName: string;
   tagline: string | null;
+  audience: ProductAudience;
+  sections: ProductDetailSections;
   /* What generateMetadata / the og:image route actually emit — the same
      derivation the admin "Search & Social" preview shows, so the preview
      stays a truthful mirror of the live page. */
@@ -168,8 +209,9 @@ async function fetchProduct(idOrSlug: string): Promise<PublicProductRow | null> 
  */
 export async function loadPublicSchemaProduct(
   idOrSlug: string,
-  opts?: { allowUnpublished?: boolean },
+  opts?: { allowUnpublished?: boolean; audience?: ProductAudience },
 ): Promise<LoadedSchemaProduct | null> {
+  const audience: ProductAudience = opts?.audience ?? "public";
   const product = await fetchProduct(idOrSlug);
   if (!product) return null;
   if (!opts?.allowUnpublished && !isPublic(product)) return null;
@@ -308,9 +350,33 @@ export async function loadPublicSchemaProduct(
     return { name: s.product_name, slug: s.slug, imageUrl: siblingImages.get(s.id) ?? null, values: vals };
   });
 
+  const sections: ProductDetailSections = {
+    description: product.description,
+    highlights: (product.highlights ?? []).filter((h) => typeof h === "string" && h.trim().length > 0),
+    featureCards: (product.feature_cards ?? []).filter((c) => c && (c.image_url || c.title)),
+    logistics: product.logistics ?? null,
+    compliance: { ce: product.ce_certified, rohs: product.rohs_compliant, ipRating: product.ip_rating },
+    warrantyMonths: product.warranty_months,
+    models: models
+      .filter((m) => m.visible !== false && (m as { status?: string | null }).status !== "discontinued" && (m.primary_model || m.model_name))
+      .map((m) => {
+        const id = (m as { id?: string }).id ?? "";
+        return {
+          id,
+          code: (m.primary_model || m.model_name) as string,
+          name: m.model_name,
+          tagline: m.tagline,
+          primary: primaryModelId != null && id === primaryModelId,
+          photo: photoByModel.get(id) ?? null,
+        };
+      }),
+  };
+
   return {
     productName: product.product_name,
     tagline: model?.tagline ?? null,
+    audience,
+    sections,
     seo: {
       brand: product.brand,
       excerpt: product.excerpt,
