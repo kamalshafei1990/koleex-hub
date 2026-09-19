@@ -7,8 +7,12 @@ import "server-only";
    (category 'alert'); no parallel notification UI. Best-effort: a notification
    write must never block the action that triggered it.
 
-   Respects notification_preferences per recipient: prefs[kind].inapp === false
-   suppresses the in-app alert for that admin. Default = on.
+   Two preference stores gate the in-app row, both default-on:
+     · notification_preferences.prefs[kind].inapp === false — the per-kind
+       switches in the Super-Admin "Alert preferences" modal.
+     · accounts.preferences.notifications.security_alerts === false — the
+       "Security alerts" switch in Settings → Notifications, which covers the
+       sign-in noise family only (see suppressedRecipients).
 
    metadata shape: { sam: true, kind, severity, actor, ...extra } so the bell /
    inbox can recognise Super-Admin security alerts.
@@ -19,10 +23,11 @@ import { supersedeUnread } from "@/lib/server/inbox-lifecycle";
 import { sendPushToAccounts } from "@/lib/server/web-push";
 import { emitPings, rtTopic } from "@/lib/server/realtime-broadcast";
 
+/* Every kind here has a live emitter: new_device (activity heartbeat),
+   failed_login_threshold (signin), the rest from audit.ts alertKindForAction.
+   "login" and "new_ip" were declared for years and emitted by nothing. */
 export type AlertKind =
-  | "login"
   | "new_device"
-  | "new_ip"
   | "failed_login_threshold"
   | "data_delete"
   | "price_cost_change"
@@ -100,24 +105,6 @@ async function resolveActorName(id?: string | null): Promise<string | null> {
   }
 }
 
-/** Send a Web Push to every Super Admin's devices (no in-app row). The actor is
- *  excluded. Thin convenience wrapper around sendPushToAccounts() — note that
- *  notifySuperAdmins() already does both in-app + push with per-recipient
- *  preference filtering; use this only when you want push-only delivery. */
-export async function sendPushToSuperAdmins(alert: SaAlert): Promise<void> {
-  try {
-    const admins = await superAdminAccountIds(alert.tenantId);
-    const targets = admins.filter((id) => id !== alert.actorAccountId);
-    if (targets.length === 0) return;
-    const actorName = alert.actorName ?? (await resolveActorName(alert.actorAccountId));
-    await sendPushToAccounts(targets, buildPushPayload(alert, actorName), {
-      actorAccountId: alert.actorAccountId,
-    });
-  } catch (e) {
-    console.error("[sa-notify.sendPushToSuperAdmins]", e instanceof Error ? e.message : e);
-  }
-}
-
 /** Effective Super-Admin account ids in a tenant (account flag OR role flag). */
 export async function superAdminAccountIds(tenantId?: string | null): Promise<string[]> {
   let q = supabaseServer
@@ -148,30 +135,29 @@ export async function superAdminAccountIds(tenantId?: string | null): Promise<st
 async function suppressedRecipients(ids: string[], kind: AlertKind): Promise<Set<string>> {
   const off = new Set<string>();
   if (ids.length === 0) return off;
-  const { data } = await supabaseServer
-    .from("notification_preferences")
-    .select("account_id, prefs")
-    .in("account_id", ids);
-  /* THE SETTINGS TOGGLE NEVER WORKED, and this is the key mismatch that
-     broke it: the Settings tab writes ONE umbrella key — "security_alerts"
-     — while this lookup only ever read the fine-grained kind ("login",
-     "new_device", …). Muting security alerts in Settings therefore did
-     nothing; measured on the owner's inbox as 188 accumulated alert rows.
-     The umbrella now covers the SIGN-IN NOISE family only. The sensitive
-     admin kinds (data_delete, admin_role_change, sensitive_export,
-     settings_change, file_change, price_cost_change) stay unmutable by
-     the umbrella on purpose: a super-admin silencing "someone deleted
-     data" with a broad toggle is a hole, not a preference. */
+  /* The sign-in noise family answers to the "Security alerts" switch in
+     Settings → Notifications (accounts.preferences), the same switch that
+     already gates its push and chime — one switch, three channels. The
+     sensitive admin kinds (data_delete, admin_role_change, sensitive_export,
+     settings_change, file_change, price_cost_change) stay out of its reach
+     on purpose: a super-admin silencing "someone deleted data" with a broad
+     toggle is a hole, not a preference. They answer only to their own row
+     in the Alert preferences modal (notification_preferences). */
   const UMBRELLA_KINDS: ReadonlySet<AlertKind> = new Set([
-    "login", "new_device", "new_ip", "failed_login_threshold", "suspicious",
+    "new_device", "failed_login_threshold", "suspicious",
   ]);
-  for (const row of (data ?? []) as Array<{ account_id: string; prefs: Record<string, unknown> }>) {
+  const [{ data: kindRows }, { data: accountRows }] = await Promise.all([
+    supabaseServer.from("notification_preferences").select("account_id, prefs").in("account_id", ids),
+    UMBRELLA_KINDS.has(kind)
+      ? supabaseServer.from("accounts").select("id, preferences").in("id", ids)
+      : Promise.resolve({ data: [] as Array<{ id: string; preferences: unknown }> }),
+  ]);
+  for (const row of (kindRows ?? []) as Array<{ account_id: string; prefs: Record<string, unknown> | null }>) {
     const pref = row.prefs?.[kind] as { inapp?: boolean } | undefined;
-    if (pref && pref.inapp === false) { off.add(row.account_id); continue; }
-    if (UMBRELLA_KINDS.has(kind)) {
-      const umbrella = row.prefs?.["security_alerts"] as { inapp?: boolean } | undefined;
-      if (umbrella && umbrella.inapp === false) off.add(row.account_id);
-    }
+    if (pref && pref.inapp === false) off.add(row.account_id);
+  }
+  for (const row of (accountRows ?? []) as Array<{ id: string; preferences: { notifications?: Record<string, unknown> } | null }>) {
+    if (row.preferences?.notifications?.security_alerts === false) off.add(row.id);
   }
   return off;
 }

@@ -90,7 +90,7 @@ export async function GET(req: Request) {
       metadata: { type: "ai_brief", day, counts },
     });
     if (inboxErr) { console.error("[cron/ai-brief] inbox:", inboxErr.message); continue; }
-    await sendPushToAccounts([a.id], { title: text.title, body: text.body, url: "/ai?ask=brief", tag: `ai-brief-${day}` })
+    await sendPushToAccounts([a.id], { title: text.title, body: text.body, url: "/ai?ask=brief", tag: `ai-brief-${day}`, kind: "ai_brief" })
       .catch((e) => console.error("[cron/ai-brief] push:", e));
     sent++;
   }

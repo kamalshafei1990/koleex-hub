@@ -150,10 +150,13 @@ export async function sendPushToAccounts(
   const subs = (data ?? []) as SubRow[];
   if (subs.length === 0) return result;
 
+  /* A push with no url lands on the Hub home — never on a Super-Admin page
+     a regular recipient cannot open. Callers that mean the activity monitor
+     say so (sa-notify does). */
   const body = JSON.stringify({
     title: payload.title,
     body: payload.body ?? "",
-    url: payload.url ?? "/super-admin/activity",
+    url: payload.url ?? "/",
     tag: payload.tag,
   });
 

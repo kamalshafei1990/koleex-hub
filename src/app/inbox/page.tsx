@@ -58,6 +58,7 @@ import {
   markAllRead,
   markMessageRead,
   markMessageUnread,
+  subscribeToInboxMessages,
   sendMessage,
   updateMembershipRequestStatus,
   uploadInboxAttachment,
@@ -259,6 +260,23 @@ function categoryBadge(category: InboxMessageWithSender["category"]): {
         label: "Alert",
         className: "bg-red-500/15 text-red-300 border-red-500/30",
       };
+    /* The bell already drew these two; the mailbox called both "Message". */
+    case "task":
+      return {
+        label: "Task",
+        className: "bg-emerald-500/15 text-emerald-300 border-emerald-500/30",
+      };
+    case "calendar":
+      return {
+        label: "Calendar",
+        className: "bg-violet-500/15 text-violet-300 border-violet-500/30",
+      };
+    case "external_email":
+      return {
+        label: "Email",
+        className:
+          "bg-[var(--bg-surface)] text-[var(--text-muted)] border-[var(--border-subtle)]",
+      };
     default:
       return {
         label: "Message",
@@ -326,6 +344,18 @@ export default function InboxPage() {
   useEffect(() => {
     if (!accountLoading) void loadMessages();
   }, [accountLoading, loadMessages]);
+
+  /* Live: a new row for this account reloads the list, so the mailbox stops
+     going stale the moment it is opened. Same ref-counted broadcast channel
+     the bell holds; a burst of inserts collapses into one reload. */
+  useEffect(() => {
+    if (!accountId) return;
+    let timer: number | null = null;
+    return subscribeToInboxMessages(accountId, () => {
+      if (timer !== null) return;
+      timer = window.setTimeout(() => { timer = null; void loadMessages(); }, 400);
+    });
+  }, [accountId, loadMessages]);
 
   const filtered = useMemo(() => {
     let list = messages.filter((m) => matchesMailbox(m, activeMailbox));

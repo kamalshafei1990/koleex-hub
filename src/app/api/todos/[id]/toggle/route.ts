@@ -3,7 +3,7 @@ import "server-only";
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { requireAuth, requireModuleAction } from "@/lib/server/auth";
-import { sendPushToAccounts } from "@/lib/server/web-push";
+import { notifySubmittedForApproval } from "@/lib/server/todo-notify";
 
 /* POST /api/todos/[id]/toggle
    Flip the completed flag.
@@ -82,22 +82,8 @@ export async function POST(
       console.error("[api/todos/[id]/toggle]", error.message);
       return NextResponse.json({ error: "Failed to toggle" }, { status: 500 });
     }
-    if (!withdrawing && t.assigned_by_account_id && t.assigned_by_account_id !== auth.account_id) {
-      const title = t.title ?? "Task";
-      await supabaseServer.from("inbox_messages").insert({
-        recipient_account_id: t.assigned_by_account_id,
-        sender_account_id: auth.account_id,
-        category: "task",
-        subject: `Awaiting your approval: ${title}`,
-        body: `The task "${title}" was submitted as done and needs your confirmation.`,
-        link: `/todo?task=${id}`,
-        metadata: { type: "todo_approval_request", todo_id: id },
-      });
-      await sendPushToAccounts([t.assigned_by_account_id], {
-        title: "Task awaiting your approval",
-        body: title,
-        url: `/todo?task=${id}`,
-      });
+    if (!withdrawing) {
+      await notifySubmittedForApproval({ ...t, id }, auth.account_id);
     }
     return NextResponse.json({ ok: true, approval: withdrawing ? null : "pending" });
   }

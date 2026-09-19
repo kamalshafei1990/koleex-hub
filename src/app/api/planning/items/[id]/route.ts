@@ -2,7 +2,7 @@ import "server-only";
 
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
-import { sendPushToAccounts } from "@/lib/server/web-push";
+import { notifyPlanningPublished } from "@/lib/server/planning-notify";
 import { requireAuth, requireModuleAccess , requireModuleAction} from "@/lib/server/auth";
 
 /* GET    /api/planning/items/:id — fetch a single item
@@ -90,7 +90,7 @@ export async function PATCH(req: Request, { params }: RouteCtx) {
   const becamePublished =
     prev && prev.status !== "published" && data?.status === "published";
   if (becamePublished && data.resource_id) {
-    void notifyAssigneeOnPublish(auth, data);
+    void notifyPlanningPublished(auth, data);
   }
 
   // Two-way sync: completing a planning item that a project task is linked
@@ -102,55 +102,6 @@ export async function PATCH(req: Request, { params }: RouteCtx) {
   }
 
   return NextResponse.json({ item: data });
-}
-
-/** Mirrors the helper in the /publish route — DRYed out so both code
- *  paths notify identically. */
-async function notifyAssigneeOnPublish(
-  auth: { account_id: string; tenant_id: string },
-  item: {
-    id: string;
-    title: string | null;
-    type: string;
-    start_at: string;
-    resource_id: string | null;
-  },
-): Promise<void> {
-  if (!item.resource_id) return;
-  const { data: res } = await supabaseServer
-    .from("planning_resources")
-    .select("account_id")
-    .eq("id", item.resource_id)
-    .maybeSingle();
-  if (!res?.account_id || res.account_id === auth.account_id) return;
-  const start = new Date(item.start_at);
-  const fmt = (d: Date) =>
-    `${d.toLocaleDateString("en", { month: "short", day: "numeric" })} ${d.toLocaleTimeString("en", { hour: "numeric", minute: "2-digit" })}`;
-  await supabaseServer.from("inbox_messages").insert({
-    recipient_account_id: res.account_id,
-    sender_account_id: auth.account_id,
-    tenant_id: auth.tenant_id,
-    category: "system",
-    subject: `You've been scheduled: ${item.title || item.type}`,
-    body: `A ${item.type} has been assigned to you starting ${fmt(start)}.`,
-    link: "/planning",
-    metadata: { source: "planning", planning_item_id: item.id, type: item.type },
-  });
-  try {
-    await sendPushToAccounts(
-      [res.account_id],
-      {
-        title: "You've been scheduled",
-        body: `${item.title || item.type} — ${fmt(start)}`,
-        url: "/planning",
-        tag: `planning:${item.id}`,
-        kind: "planning_published",
-      },
-      { actorAccountId: auth.account_id },
-    );
-  } catch (e) {
-    console.error("[planning] publish push:", e);
-  }
 }
 
 /** When a completed planning item is linked from a project task

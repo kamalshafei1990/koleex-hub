@@ -88,7 +88,9 @@ export async function ensureProbationReviewTask(emp: {
   await supabaseServer.from("inbox_messages").insert(recipients.map((recipient_account_id) => ({
     recipient_account_id, sender_account_id: null, tenant_id: emp.tenant_id, category: "task",
     subject: `New task: ${title}`, body: description, link: `/todo?task=${todoId}`,
-    metadata: { type: "todo_assignment", todo_id: todoId, priority: "high", employee_id: emp.id, kind: "probation_review" },
+    /* `reason`, not `kind`: the classifier reads type ?? kind, so a second
+       classification key here only shadows the first. */
+    metadata: { type: "todo_assignment", todo_id: todoId, priority: "high", employee_id: emp.id, reason: "probation_review" },
   })));
   await sendPushToAccounts(recipients, { title: `New task: ${title}`, body: description, url: `/todo?task=${todoId}`, tag: `todo-${todoId}`, kind: "todo_assignment" }, { actorAccountId: null });
   return "created";

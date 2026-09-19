@@ -179,6 +179,20 @@ function categoryStyle(
           ? "bg-emerald-500/15 text-emerald-300 border-emerald-500/30"
           : "bg-emerald-100 text-emerald-700 border-emerald-200",
       };
+    case "calendar":
+      return {
+        labelKey: "notif.cat.calendar",
+        className: dk
+          ? "bg-violet-500/15 text-violet-300 border-violet-500/30"
+          : "bg-violet-100 text-violet-700 border-violet-200",
+      };
+    case "external_email":
+      return {
+        labelKey: "notif.cat.email",
+        className: dk
+          ? "bg-white/[0.06] text-white/70 border-white/[0.1]"
+          : "bg-black/[0.04] text-black/70 border-black/[0.1]",
+      };
     default:
       return {
         labelKey: "notif.cat.message",

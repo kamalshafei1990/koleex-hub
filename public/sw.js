@@ -134,7 +134,9 @@ self.addEventListener("push", (event) => {
     tag: payload.tag || undefined,
     renotify: Boolean(payload.tag),
     timestamp: Date.now(),
-    data: { url: payload.url || "/super-admin/activity" },
+    /* No url → the Hub home. The old default sent every kind-less push to a
+       Super-Admin page most recipients cannot open. */
+    data: { url: payload.url || "/" },
   };
 
   event.waitUntil(self.registration.showNotification(title, options));

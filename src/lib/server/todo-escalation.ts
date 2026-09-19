@@ -82,6 +82,7 @@ export async function escalateOverdueTodos(now: Date = new Date()): Promise<numb
       body: "A task you assigned is past its due date.",
       url: `/todo?task=${t.id}`,
       tag: `todo-overdue-${t.id}`,
+      kind: "todo_overdue",
     }).catch((e) => console.error("[todo-escalation] push:", e));
 
     // Stamp so we don't re-nag on every cron tick.

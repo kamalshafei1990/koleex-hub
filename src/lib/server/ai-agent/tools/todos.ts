@@ -30,7 +30,7 @@ import "server-only";
    --------------------------------------------------------------------------- */
 
 import { supabaseServer } from "../../supabase-server";
-import { sendPushToAccounts } from "../../web-push";
+import { notifySubmittedForApproval } from "../../todo-notify";
 import { listAssignableEmployees } from "../../assignable-employees";
 import type { ToolDef, ToolResult } from "../types";
 import { isUuid, BAD_ID_MESSAGE } from "../uuid";
@@ -633,21 +633,8 @@ const completeTodo: ToolDef<
         console.error("[tool.completeTodo]", error);
         return { ok: false, permissionStatus: "allowed", data: null, message: "Couldn't update the task — please try again." };
       }
-      if (willSubmit && t.assigned_by_account_id && t.assigned_by_account_id !== acc) {
-        await supabaseServer.from("inbox_messages").insert({
-          recipient_account_id: t.assigned_by_account_id,
-          sender_account_id: acc,
-          category: "task",
-          subject: `Awaiting your approval: ${title}`,
-          body: `The task "${title}" was submitted as done and needs your confirmation.`,
-          link: `/todo?task=${t.id}`,
-          metadata: { type: "todo_approval_request", todo_id: t.id },
-        });
-        await sendPushToAccounts([t.assigned_by_account_id], {
-          title: "Task awaiting your approval",
-          body: title,
-          url: `/todo?task=${t.id}`,
-        });
+      if (willSubmit) {
+        await notifySubmittedForApproval({ id: t.id, title, assigned_by_account_id: t.assigned_by_account_id }, acc);
       }
       return {
         ok: true,

@@ -16,6 +16,8 @@ import "server-only";
 
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { sendPushToAccounts } from "@/lib/server/web-push";
+import { emitPings, rtTopic } from "@/lib/server/realtime-broadcast";
+import { superAdminAccountIds } from "@/lib/server/sa-notify";
 
 export async function notifyLite(opts: {
   tenantId: string | null;
@@ -46,6 +48,9 @@ export async function notifyLite(opts: {
         metadata: { ...(opts.metadata ?? {}), type: opts.type },
       })),
     );
+    /* Wake the recipients' bells now — without the ping the row waited for
+       the 60s poll while every other producer showed up instantly. */
+    await emitPings(to.map((id) => ({ topic: rtTopic.inbox(id) })));
     await sendPushToAccounts(
       to,
       {
@@ -60,20 +65,6 @@ export async function notifyLite(opts: {
   } catch (e) {
     console.error("[notify-lite]", opts.type, e instanceof Error ? e.message : e);
   }
-}
-
-/** Tenant super-admin account ids — the default audience for operational
- *  alerts (low stock) until a finer inventory-role audience exists. */
-export async function tenantAdminAccountIds(tenantId: string | null): Promise<string[]> {
-  let q = supabaseServer
-    .from("accounts")
-    .select("id")
-    .eq("user_type", "internal")
-    .eq("status", "active")
-    .eq("is_super_admin", true);
-  if (tenantId) q = q.eq("tenant_id", tenantId);
-  const { data } = await q;
-  return ((data ?? []) as Array<{ id: string }>).map((a) => a.id);
 }
 
 /* Low-stock: after stock LEAVES a warehouse, compare the new balance with
@@ -116,7 +107,11 @@ export async function checkLowStockAndNotify(
       .gte("created_at", since);
     if ((count ?? 0) > 0) return;
 
-    const admins = await tenantAdminAccountIds(tenantId);
+    /* The default audience for an operational alert is the tenant's Super
+       Admins — the same resolution sa-notify uses (account flag OR role
+       flag). A local copy here only matched the account flag, so an admin
+       whose power came from the role never heard about low stock. */
+    const admins = await superAdminAccountIds(tenantId);
     await notifyLite({
       tenantId,
       recipients: admins,

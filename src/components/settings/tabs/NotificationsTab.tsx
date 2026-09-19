@@ -24,7 +24,7 @@ import { settingsT } from "@/lib/translations/settings";
 import { useMeBootstrap } from "@/lib/me-bootstrap";
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 
-type ActivityKey = keyof Omit<NotificationPrefs, "email" | "in_app" | "quiet_hours">;
+type ActivityKey = keyof Omit<NotificationPrefs, "quiet_hours">;
 
 /* SEVENTEEN SWITCHES IN THREE GROUPS, NOT ONE FLAT RUN.
    This was a single undifferentiated list — the same "not organised enough"
@@ -285,10 +285,10 @@ export default function NotificationsTab({ account, onChanged }: {
   return (
     <div className="space-y-4">
       <PushEnableCard />
-      <SettingsCard title={t("notif.channels")} subtitle={t("notif.channels.sub")}>
-        <SwitchRow label={t("notif.email")} hint={t("notif.email.hint")} checked={n.email} onChange={(v) => patch({ email: v })} />
-        <SwitchRow label={t("notif.inApp")} hint={t("notif.inApp.hint")} checked={n.in_app} onChange={(v) => patch({ in_app: v })} last />
-      </SettingsCard>
+      {/* No "Channels" card. It offered Email (there is no email channel) and
+          In-app (read by nothing) — two switches that changed no behaviour.
+          Push is the card above; the chime is Settings → Sounds; the in-app
+          row is always on, and quiet hours below silence both. */}
 
       {/* One card per group. The gap between cards does the separating, so the
           group titles stay small and the switches keep the whole width. */}

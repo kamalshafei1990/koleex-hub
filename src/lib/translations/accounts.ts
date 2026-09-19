@@ -313,11 +313,6 @@ export const accountsT: Translations = {
   "acc.prefs.themeLight":            { en: "Light",                                                              zh: "浅色",                                                               ar: "فاتح" },
   "acc.prefs.emailSignature":        { en: "Email Signature",                                                    zh: "邮件签名",                                                           ar: "توقيع البريد الإلكتروني" },
   "acc.prefs.signatureHint":         { en: "Appended to outgoing emails from the Koleex Hub.",                   zh: "附加到从 Koleex Hub 发出的电子邮件中。",                                 ar: "يُلحق بالرسائل الصادرة من Koleex Hub." },
-  "acc.prefs.notifications":         { en: "Notifications",                                                      zh: "通知",                                                               ar: "الإشعارات" },
-  "acc.prefs.emailNotifications":    { en: "Email notifications",                                                zh: "邮件通知",                                                           ar: "إشعارات البريد الإلكتروني" },
-  "acc.prefs.emailNotifDesc":        { en: "Send activity and mentions to the login email.",                     zh: "将活动和提及发送到登录邮箱。",                                           ar: "إرسال النشاطات والإشارات إلى البريد الإلكتروني." },
-  "acc.prefs.inAppNotifications":    { en: "In-app notifications",                                               zh: "应用内通知",                                                          ar: "الإشعارات داخل التطبيق" },
-  "acc.prefs.inAppNotifDesc":        { en: "Show a bell indicator inside the hub.",                               zh: "在 Hub 内显示铃铛提示。",                                               ar: "عرض مؤشر الجرس داخل المنصة." },
 
   /* ── Calendar tab ── */
   "acc.cal.timezone":                { en: "Timezone",                                                           zh: "时区",                                                               ar: "المنطقة الزمنية" },

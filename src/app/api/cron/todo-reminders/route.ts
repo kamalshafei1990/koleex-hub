@@ -10,6 +10,7 @@ import "server-only";
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { sendPushToAccounts } from "@/lib/server/web-push";
+import { supersedeUnread } from "@/lib/server/inbox-lifecycle";
 import { spawnDueRecurringTodos } from "@/lib/server/todo-recurrence";
 import { escalateOverdueTodos } from "@/lib/server/todo-escalation";
 
@@ -99,15 +100,7 @@ export async function GET(req: Request) {
       /* Supersede an unread copy of the SAME task's reminder before
          writing today's — the recurrence spawner's lesson applied here:
          reminders inform, they must not accumulate. */
-      const nowIso = new Date().toISOString();
-      await supabaseServer
-        .from("inbox_messages")
-        .update({ read_at: nowIso, archived_at: nowIso })
-        .in("recipient_account_id", recipients)
-        .eq("category", "task")
-        .eq("metadata->>todo_id", t.id)
-        .eq("metadata->>type", "todo_reminder")
-        .is("read_at", null);
+      await supersedeUnread({ recipients, category: "task", meta: { todo_id: t.id, type: "todo_reminder" } });
       await supabaseServer.from("inbox_messages").insert(
         recipients.map((rid) => ({
           recipient_account_id: rid,
@@ -124,6 +117,7 @@ export async function GET(req: Request) {
         body: t.description || "Task reminder",
         url: `/todo?task=${t.id}`,
         tag: `todo-reminder-${t.id}`,
+        kind: "todo_reminder",
       }).catch((e) => console.error("[cron/todo-reminders] push:", e));
     }
     // Stamp regardless so a task with no recipients doesn't loop forever.

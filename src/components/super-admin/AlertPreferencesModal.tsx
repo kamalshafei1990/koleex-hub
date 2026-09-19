@@ -7,8 +7,10 @@ import { useCallback, useEffect, useState } from "react";
 import CrossIcon from "@/components/icons/ui/CrossIcon";
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 
+/* One row per AlertKind that is actually emitted (sa-notify.ts). The
+   "User logins" row toggled a kind nothing has sent since per-login alerts
+   were retired — a switch wired to nothing. */
 const KINDS: Array<{ key: string; label: string }> = [
-  { key: "login", label: "User logins" },
   { key: "new_device", label: "Login from a new device" },
   { key: "failed_login_threshold", label: "Repeated failed logins" },
   { key: "data_delete", label: "Data deletions" },

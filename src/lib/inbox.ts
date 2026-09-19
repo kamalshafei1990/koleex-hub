@@ -1,17 +1,17 @@
 "use client";
 
 /* ---------------------------------------------------------------------------
-   inbox — CRUD helpers for `inbox_messages` + `membership_requests`.
+   inbox — client helpers for `inbox_messages` (+ the membership-request
+   review action the /inbox page performs).
 
    This module is the seam between the UI (NotificationBell, /inbox) and
-   the Supabase tables created in
-   supabase/migrations/create_inbox_and_membership_requests.sql.
+   the gated inbox routes. Reads go through /api/inbox/feed, writes through
+   /api/inbox/mutate; both are session-scoped server-side, so no account id
+   the client passes is ever trusted. Membership requests are CREATED by the
+   public /api/support/membership-request route, never from here.
 
-   All calls are resilient: if the table hasn't been migrated yet (or the
-   network trips), the functions return empty arrays / a stub success so
-   the UI stays usable. That's important because we ship the code before
-   the DB migration; the user applies the migration separately in
-   Supabase Studio.
+   All calls are resilient: a network trip returns an empty list / a stub
+   failure so the always-mounted bell never throws.
    --------------------------------------------------------------------------- */
 
 import { supabaseAdmin as supabase } from "./supabase-admin";
@@ -22,11 +22,8 @@ import type {
   AccountRow,
   InboxMessageRow,
   InboxMessageWithSender,
-  MembershipRequestInsert,
-  MembershipRequestRow,
 } from "@/types/supabase";
 
-const INBOX = "inbox_messages";
 const MEMBERSHIP_REQUESTS = "membership_requests";
 
 /* RLS realtime-lockdown P2: every WRITE to inbox_messages goes through the
@@ -91,69 +88,6 @@ function isMissingTable(message: string): boolean {
 }
 
 /* ── Membership requests ─────────────────────────────────────────────── */
-
-/** Extra fields the "Be a Koleex Member" form collects. Stored inside
- *  `membership_requests.metadata` (JSONB) so we don't need a column
- *  migration every time we add a question. The trigger merges this
- *  metadata into the Super Admin inbox notification so reviewers see
- *  every field in the detail pane. */
-export interface MembershipRequestExtras {
-  phone?: string | null;
-  relationship?: string | null; // "new_prospect" | "existing_customer" | ...
-  job_title?: string | null;
-  country?: string | null;       // country code e.g. "EG"
-  country_name?: string | null;  // human-readable, so admin doesn't decode codes
-  city?: string | null;
-  heard_from?: string | null;    // "linkedin" | "referral" | ...
-}
-
-export async function createMembershipRequest(
-  input: MembershipRequestInsert & { extras?: MembershipRequestExtras },
-): Promise<{ ok: true; request: MembershipRequestRow } | { ok: false; error: string }> {
-  /* Strip empty strings / undefined so the JSONB blob stays tidy. */
-  const extras = input.extras ?? {};
-  const cleanMetadata: Record<string, unknown> = {};
-  for (const [k, v] of Object.entries(extras)) {
-    if (v !== undefined && v !== null && v !== "") cleanMetadata[k] = v;
-  }
-
-  const payload = {
-    full_name: input.full_name,
-    email: input.email,
-    company: input.company ?? null,
-    message: input.message ?? null,
-    source: input.source ?? "login_gate",
-    metadata: cleanMetadata,
-  };
-  const { data, error } = await supabase
-    .from(MEMBERSHIP_REQUESTS)
-    .insert(payload)
-    .select("*")
-    .single();
-  if (error) {
-    console.error("[Inbox] Create membership request:", error.message);
-    return { ok: false, error: error.message };
-  }
-  return { ok: true, request: data as MembershipRequestRow };
-}
-
-export async function fetchMembershipRequests(
-  status?: "pending" | "approved" | "rejected" | "archived",
-): Promise<MembershipRequestRow[]> {
-  let q = supabase
-    .from(MEMBERSHIP_REQUESTS)
-    .select("*")
-    .order("created_at", { ascending: false });
-  if (status) q = q.eq("status", status);
-  const { data, error } = await q;
-  if (error) {
-    if (!isMissingTable(error.message)) {
-      console.error("[Inbox] Fetch membership requests:", error.message);
-    }
-    return [];
-  }
-  return (data as MembershipRequestRow[]) ?? [];
-}
 
 export async function updateMembershipRequestStatus(
   id: string,
@@ -298,23 +232,6 @@ export async function fetchUnreadCount(accountId: string): Promise<number> {
   try {
     const json = await cachedGet<BadgeCounts>("/api/inbox/feed?resource=badges", 5_000);
     return json?.data?.unread ?? 0;
-  } catch {
-    return 0;
-  }
-}
-
-/** Count unread (not archived) TO-DO assignment notifications for one account.
-    Feeds the To-do app-tile notification badge on the home page.
-
-    Note: category `task` is shared — the QA system also writes task-category
-    inbox rows (qa_issue_assigned / qa_status_changed). To-do assignments are
-    the ones the todo fan-out tags with metadata.type = 'todo_assignment', so
-    we filter on that to keep the badge strictly to-do related. */
-export async function fetchUnreadTaskCount(accountId: string): Promise<number> {
-  void accountId; // recipient scope comes from the session server-side
-  try {
-    const json = await cachedGet<BadgeCounts>("/api/inbox/feed?resource=badges", 5_000);
-    return json?.data?.unreadTasks ?? 0;
   } catch {
     return 0;
   }

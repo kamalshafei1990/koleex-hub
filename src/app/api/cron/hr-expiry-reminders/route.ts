@@ -149,6 +149,8 @@ export async function GET(req: Request) {
         title: subject,
         body,
         url: `/employees/${emp.id}`,
+        tag: `hr-expiry:${emp.id}:${field.column}`,
+        kind: "hr_expiry",
       });
       fired++;
     }

@@ -351,15 +351,7 @@ export const discussT: Translations = {
   /* ═══════════════════════════════════════════════════════════════════════════
      PHASE D — NOTIFICATIONS / DND / MUTE
      ═══════════════════════════════════════════════════════════════════════════ */
-  "notif.desktop.enable":    { en: "Enable desktop notifications", zh: "启用桌面通知",      ar: "تفعيل إشعارات سطح المكتب" },
-  "notif.desktop.enabled":   { en: "Desktop notifications on", zh: "桌面通知已开启",        ar: "إشعارات سطح المكتب مفعّلة" },
-  "notif.desktop.denied":    { en: "Blocked by browser. Enable in site settings.", zh: "被浏览器阻止。请在站点设置中启用。", ar: "محظور بواسطة المتصفح. فعّله من إعدادات الموقع." },
-  "notif.sound.on":          { en: "Sound on",                zh: "声音开",               ar: "الصوت يعمل" },
-  "notif.sound.off":         { en: "Sound off",               zh: "声音关",               ar: "الصوت مغلق" },
-  "notif.dnd.on":            { en: "Do Not Disturb",          zh: "免打扰",               ar: "عدم الإزعاج" },
-  "notif.dnd.off":           { en: "DND off",                 zh: "关闭免打扰",            ar: "إيقاف عدم الإزعاج" },
-  "notif.dnd.until":         { en: "Until {time}",            zh: "直到 {time}",          ar: "حتى {time}" },
-  "notif.newMessage":        { en: "New message in {channel}", zh: "{channel} 中有新消息", ar: "رسالة جديدة في {channel}" },
+  "notif.newMessage":        { en: "New message",             zh: "新消息",               ar: "رسالة جديدة" },
   "notif.muted":             { en: "Muted",                   zh: "已静音",               ar: "تم الكتم" },
   "notif.unmuted":           { en: "Notifications on",        zh: "通知开启",              ar: "الإشعارات مفعّلة" },
 

@@ -14,9 +14,14 @@ import "server-only";
      category              → 'task' (normal) | 'alert' (reopen / urgent)
      subject / body        → title / message
      link                  → /issues?issue=<id>  (auto-selects the issue)
-     metadata.qa_type      → fine-grained type (qa_issue_assigned, …) for the
-                             future (digests, preferences, cross-module routing)
+     metadata.type         → the fine-grained type (qa_issue_assigned, …) —
+                             the key the shared classifier reads, so the row
+                             lands under the "QA reports" chip / switch / chime.
+                             (`qa_type` is kept alongside for older readers.)
      tenant_id             → the issue's tenant (recipients are tenant accounts)
+
+   Each row also goes out as a Web Push (kind = the same type), like every
+   other module — QA used to be the one producer with no push at all.
 
    Everything here is best-effort: a notification failure must never break the
    QA mutation that triggered it.
@@ -24,6 +29,7 @@ import "server-only";
 
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { emitPings, rtTopic } from "@/lib/server/realtime-broadcast";
+import { sendPushToAccounts } from "@/lib/server/web-push";
 
 export type QaNotificationType =
   | "qa_issue_assigned"
@@ -99,6 +105,7 @@ export async function notifyIssue(ctx: NotifyContext, targets: NotifyTarget[]): 
     body: t.body.slice(0, 1000),
     link: t.link ?? issueLink(ctx.issueId),
     metadata: {
+      type: t.type,
       qa_type: t.type,
       entity_type: "qa_issue",
       entity_id: ctx.issueId,
@@ -123,8 +130,27 @@ export async function notifyIssue(ctx: NotifyContext, targets: NotifyTarget[]): 
   if (delErr) console.error("[qa notify] collapse", delErr.message);
 
   const { error } = await supabaseServer.from("inbox_messages").insert(rows);
-  if (error) console.error("[qa notify]", error.message);
-  else await emitPings(recipientIds.map((id) => ({ topic: rtTopic.inbox(id) })));
+  if (error) { console.error("[qa notify]", error.message); return; }
+  await emitPings(recipientIds.map((id) => ({ topic: rtTopic.inbox(id) })));
+
+  /* Push mirrors the row, one per recipient (their own title/link — the
+     reporter gets the reporter-safe link). Tagged per issue so a burst of
+     updates on one issue replaces rather than stacks on the lock screen. */
+  await Promise.all(
+    Array.from(byRecipient.entries()).map(([recipientId, t]) =>
+      sendPushToAccounts(
+        [recipientId],
+        {
+          title: t.title.slice(0, 120),
+          body: t.body.slice(0, 200),
+          url: t.link ?? issueLink(ctx.issueId),
+          tag: `qa:${ctx.issueId}`,
+          kind: t.type,
+        },
+        { actorAccountId: ctx.actorId },
+      ).catch((e) => console.error("[qa notify] push:", e instanceof Error ? e.message : e)),
+    ),
+  );
 }
 
 /* ── Mentions ──────────────────────────────────────────────────────────────

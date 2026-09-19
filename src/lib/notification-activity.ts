@@ -39,8 +39,10 @@ export function classifyNotificationActivity(raw: unknown): NotificationActivity
     type.includes("suspicious")
   ) return "security_alerts";
   /* Before the generic word matches: "membership_request" would otherwise
-     fall through to null and the activity would be a dead switch. */
-  if (type.includes("membership")) return "membership_requests";
+     fall through to null and the activity would be a dead switch. A
+     sign-in help request ("support_request") is the same audience asking
+     for the same thing — access — so it rides the same switch. */
+  if (type.includes("membership") || type.includes("support")) return "membership_requests";
   if (type.includes("comment")) return "comments_activity";
   if (type.startsWith("qa")) return "qa_reports";
   if (type.includes("quotation") || type.includes("quote")) return "quotation_activity";

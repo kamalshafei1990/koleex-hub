@@ -8,8 +8,7 @@ import "server-only";
    session account — never a client-supplied id:
 
      · messages[&archived=1][&limit=]  → the caller's inbox (+ sender join)
-     · unread                          → unread, non-archived count
-     · unreadTasks                     → unread to-do assignment count
+     · badges                          → { unread, unreadTasks } in one trip
 
    Freshness is driven by server Broadcast pings on inbox:account:<id> (see
    /api/inbox/mutate + realtime-broadcast.ts), not anon postgres_changes.
@@ -201,49 +200,13 @@ export async function GET(req: Request) {
         return NextResponse.json({ ok: true, data: rows });
       }
 
-      case "unread": {
-        await reconcileFinishedTaskNotifications(me);
-        const { count, error } = await supabaseServer
-          .from(INBOX)
-          .select("*", { count: "exact", head: true })
-          .eq("recipient_account_id", me)
-          .is("read_at", null)
-          .is("archived_at", null);
-        if (error) throw new Error(error.message);
-        return NextResponse.json({ ok: true, data: count ?? 0 }, {
-          // Badge counts feed the home/header; a short SWR cache collapses the
-          // repeated (realtime-triggered) refetches to one round-trip. Realtime
-          // pings still refresh them; the count can lag a few seconds at most.
-          headers: { "Cache-Control": "private, max-age=15, stale-while-revalidate=60" },
-        });
-      }
-
-      case "unreadTasks": {
-        await reconcileFinishedTaskNotifications(me);
-        const { count, error } = await supabaseServer
-          .from(INBOX)
-          .select("*", { count: "exact", head: true })
-          .eq("recipient_account_id", me)
-          .eq("category", "task")
-          .is("read_at", null)
-          .is("archived_at", null);
-        if (error) throw new Error(error.message);
-        return NextResponse.json({ ok: true, data: count ?? 0 }, {
-          // Badge counts feed the home/header; a short SWR cache collapses the
-          // repeated (realtime-triggered) refetches to one round-trip. Realtime
-          // pings still refresh them; the count can lag a few seconds at most.
-          headers: { "Cache-Control": "private, max-age=15, stale-while-revalidate=60" },
-        });
-      }
-
       /* Both badge counts in ONE round trip.
 
-         `unread` and `unreadTasks` are polled once a minute each, by every
-         signed-in user, on every screen — together they were the two most
-         called functional routes in production. They read the same table
-         with the same scope, so asking twice bought nothing but a second
-         border crossing for users in China. The two counts still exist
-         separately above for callers that need only one. */
+         They used to be two resources (`unread`, `unreadTasks`), polled once
+         a minute each by every signed-in user on every screen — together the
+         two most called functional routes in production, reading the same
+         table with the same scope. Every caller moved to this one; the
+         separate resources were retired once nothing asked for them. */
       case "badges": {
         await reconcileFinishedTaskNotifications(me);
         const base = () => supabaseServer
@@ -263,6 +226,9 @@ export async function GET(req: Request) {
         if (tasksRes.error) throw new Error(tasksRes.error.message);
         return NextResponse.json(
           { ok: true, data: { unread: unreadRes.count ?? 0, unreadTasks: tasksRes.count ?? 0 } },
+          // Badge counts feed the home/header; a short SWR cache collapses the
+          // repeated (realtime-triggered) refetches to one round-trip. Realtime
+          // pings still refresh them; the count can lag a few seconds at most.
           { headers: { "Cache-Control": "private, max-age=15, stale-while-revalidate=60" } },
         );
       }

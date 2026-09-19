@@ -8,6 +8,8 @@ import "server-only";
 
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { sendPushToAccounts } from "@/lib/server/web-push";
+import { emitPings, rtTopic } from "@/lib/server/realtime-broadcast";
+import { clearUnreadByMeta } from "@/lib/server/inbox-lifecycle";
 
 interface AuthCtx {
   account_id: string;
@@ -37,6 +39,7 @@ export async function notifyTaskAssigned(auth: AuthCtx, task: TaskLike): Promise
       link: "/projects",
       metadata: { source: "projects", type: "project_task_assigned", task_id: task.id, project_id: task.project_id },
     });
+    await emitPings([{ topic: rtTopic.inbox(to) }]);
     await sendPushToAccounts(
       [to],
       {
@@ -89,6 +92,7 @@ export async function notifyTaskComment(
         metadata: { source: "projects", type: "project_task_comment", task_id: task.id, project_id: task.project_id },
       })),
     );
+    await emitPings(recipients.map((id) => ({ topic: rtTopic.inbox(id) })));
     await sendPushToAccounts(
       recipients,
       {
@@ -103,4 +107,12 @@ export async function notifyTaskComment(
   } catch (e) {
     console.error("[project-notify] comment:", e);
   }
+}
+
+/** The task reached "done": every unread row that pointed at it (assignment,
+ *  comments, the cron's due reminder) is finished business for all its
+ *  recipients. The to-do app has had this clearer since the 2026-08-21 audit;
+ *  project tasks accumulated exactly the pile it was written to stop. */
+export async function clearTaskNotifications(taskId: string): Promise<void> {
+  await clearUnreadByMeta({ task_id: taskId });
 }

@@ -25,6 +25,8 @@
 import { useEffect, useState, type ComponentType } from "react";
 import BellIcon from "@/components/icons/ui/BellIcon";
 import { cachedGet } from "@/lib/client-cache";
+import { publishInboxUnread } from "@/lib/inbox-unread-store";
+import { useCurrentAccount } from "@/lib/identity";
 
 /* ⚠️ NOT next/dynamic. The swap used to hand over to a `dynamic()` wrapper —
    and even with the module ALREADY imported and awaited, that wrapper renders
@@ -38,13 +40,24 @@ import { cachedGet } from "@/lib/client-cache";
 type BellComponent = ComponentType<{ dk: boolean; defaultOpen?: boolean }>;
 
 interface Badges { data?: { unread?: number } }
-interface Channels { data?: { unread_count?: number }[] }
+interface Channels { data?: { unread_count?: number; marked_unread?: boolean }[] }
+
+/* The SAME sum the real bell shows: a conversation the user manually marked
+   unread (dot, count 0) counts as 1 there, so it must here too — otherwise
+   the number changed the moment the panel opened. */
+const discussUnreadOf = (channels: Channels | null) =>
+  (channels?.data ?? []).reduce(
+    (n, c) => n + (c?.unread_count ?? 0) + (c?.marked_unread && !c?.unread_count ? 1 : 0),
+    0,
+  );
 
 export default function NotificationBellGate({ dk }: { dk: boolean }) {
   const [Bell, setBell] = useState<BellComponent | null>(null);
   const [pending, setPending] = useState(false);
   const [count, setCount] = useState(0);
   const opened = Bell !== null;
+  const { account } = useCurrentAccount();
+  const accountId = account?.id ?? null;
 
   /* WAIT for the chunk before handing over. `loading: () => null` plus an
      immediate swap meant that on a cold click — no hover to prefetch, which is
@@ -155,8 +168,12 @@ export default function NotificationBellGate({ dk }: { dk: boolean }) {
         }
         if (!alive) return;
         const unreadInbox = inbox?.data?.unread ?? 0;
-        const unreadDiscuss = (channels?.data ?? []).reduce((n, c) => n + (c?.unread_count ?? 0), 0);
-        setCount(unreadInbox + unreadDiscuss);
+        setCount(unreadInbox + discussUnreadOf(channels));
+        /* The UserMenu's Inbox pill reads the shared store. Only the real
+           bell used to publish there, and the real bell mounts on the first
+           click — so on every ordinary page load the pill said 0. At rest,
+           this is the publisher. */
+        if (inbox) publishInboxUnread(accountId, unreadInbox);
       } catch { /* a missing badge is not worth an error state */ }
     };
     void read();
@@ -164,7 +181,7 @@ export default function NotificationBellGate({ dk }: { dk: boolean }) {
       if (document.visibilityState === "visible") void read();
     }, 60_000);
     return () => { alive = false; window.clearInterval(iv); };
-  }, [opened]);
+  }, [opened, accountId]);
 
   /* Handed over: the real bell renders its own button AND its panel, so the
      stub must disappear or there would be two bells. Rendering the resolved

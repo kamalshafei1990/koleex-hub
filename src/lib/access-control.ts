@@ -234,14 +234,14 @@ export function defaultAccessFromPreset(
 
 export type LanguagePref = "en" | "ar";
 export type ThemePref = "light" | "dark" | "system";
-export type NotificationChannel = "email" | "in_app" | "both";
-
 export interface NotificationPrefs {
-  email: boolean;
-  in_app: boolean;
   /* ── Per-activity toggles (optional; default on) ──
-     Let a user silence specific event types without turning off a whole
-     channel. Consumed by the notification dispatcher when present. */
+     One switch per activity, gating the push (web-push.ts), the chime
+     (NotificationBell) and — for security alerts — the in-app row
+     (sa-notify.ts). The keys mirror NOTIFICATION_ACTIVITIES in
+     lib/notification-activity.ts. There is no channel switch: the Hub has
+     no email channel, and an "in-app" switch that hid the bell row was
+     never read by anything. */
   mentions?: boolean;
   approvals?: boolean;
   assignments?: boolean;
@@ -381,8 +381,6 @@ export const DEFAULT_PREFERENCES: Required<
   wallpaper: { id: "hub-live" },
   profile: { pronouns: "", links: {} },
   notifications: {
-    email: true,
-    in_app: true,
     mentions: true,
     approvals: true,
     assignments: true,
@@ -444,18 +442,16 @@ export function withDefaults(
         whatsapp: p.profile?.links?.whatsapp ?? "",
       },
     },
+    /* Spread, never enumerate. This block used to name eleven keys by hand
+       and silently DROPPED the other eight activities (calendar, projects,
+       inventory, finance, HR, discuss, security, comments) on every read:
+       Settings drew those switches ON while the stored `false` still muted
+       the push — the worst version of a bug, a switch that lies. Defaults
+       first, stored values on top, so a new activity added to
+       DEFAULT_PREFERENCES is complete here without a second edit. */
     notifications: {
-      email:  p.notifications?.email  ?? DEFAULT_PREFERENCES.notifications.email,
-      in_app: p.notifications?.in_app ?? DEFAULT_PREFERENCES.notifications.in_app,
-      mentions: p.notifications?.mentions ?? DEFAULT_PREFERENCES.notifications.mentions,
-      approvals: p.notifications?.approvals ?? DEFAULT_PREFERENCES.notifications.approvals,
-      assignments: p.notifications?.assignments ?? DEFAULT_PREFERENCES.notifications.assignments,
-      tasks_due: p.notifications?.tasks_due ?? DEFAULT_PREFERENCES.notifications.tasks_due,
-      quotation_activity: p.notifications?.quotation_activity ?? DEFAULT_PREFERENCES.notifications.quotation_activity,
-      membership_requests: p.notifications?.membership_requests ?? DEFAULT_PREFERENCES.notifications.membership_requests,
-      low_stock: p.notifications?.low_stock ?? DEFAULT_PREFERENCES.notifications.low_stock,
-      qa_reports: p.notifications?.qa_reports ?? DEFAULT_PREFERENCES.notifications.qa_reports,
-      price_fx: p.notifications?.price_fx ?? DEFAULT_PREFERENCES.notifications.price_fx,
+      ...DEFAULT_PREFERENCES.notifications,
+      ...(p.notifications ?? {}),
       quiet_hours: p.notifications?.quiet_hours ?? { enabled: false, start: "22:00", end: "08:00" },
     },
     display: {

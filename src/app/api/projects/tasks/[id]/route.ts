@@ -2,7 +2,7 @@ import "server-only";
 
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
-import { notifyTaskAssigned } from "@/lib/server/project-notify";
+import { notifyTaskAssigned, clearTaskNotifications } from "@/lib/server/project-notify";
 import { recomputeProjectProgress } from "@/lib/server/project-progress";
 import { requireAuth, requireModuleAccess , requireModuleAction} from "@/lib/server/auth";
 
@@ -83,6 +83,11 @@ export async function PATCH(req: Request, { params }: RouteCtx) {
   const newAssignee = data?.assignee_account_id as string | null;
   if (newAssignee && newAssignee !== prev?.assignee_account_id) {
     void notifyTaskAssigned(auth, data);
+  }
+  /* Done → its assignment / comment / due-reminder rows are finished
+     business for everyone who received them. */
+  if (patch.status === "done" && prev?.status !== "done") {
+    void clearTaskNotifications(id);
   }
   void recomputeProjectProgress(auth.tenant_id, data?.project_id as string | null);
 

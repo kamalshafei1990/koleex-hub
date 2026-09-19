@@ -138,12 +138,16 @@ function humanizeAction(action: string): string {
   return action.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
+/* Most specific word first. `admin` used to be tested before `export` and
+   `setting`, so an "admin_export" or "admin_settings_change" was filed as
+   a role change and answered to the wrong preference row. Deletion stays
+   first on purpose: deleting a price list IS a deletion. */
 function alertKindForAction(action: string): AlertKind {
   if (/delete|remove|purge|destroy/i.test(action)) return "data_delete";
-  if (/price|cost/i.test(action)) return "price_cost_change";
-  if (/permission|role|admin/i.test(action)) return "admin_role_change";
-  if (/setting|policy/i.test(action)) return "settings_change";
   if (/export/i.test(action)) return "sensitive_export";
+  if (/price|cost/i.test(action)) return "price_cost_change";
+  if (/setting|policy/i.test(action)) return "settings_change";
+  if (/permission|role|admin/i.test(action)) return "admin_role_change";
   if (/upload|file/i.test(action)) return "file_change";
   return "suspicious";
 }

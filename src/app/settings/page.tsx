@@ -241,9 +241,7 @@ function SettingsContent() {
      and it says so there. */
   const pushValue = pushPermissionValue(t);
   const notifPrefs = withDefaults(account.preferences).notifications as NotificationPrefs;
-  const mutedCount = Object.entries(notifPrefs).filter(
-    ([k, v]) => k !== "email" && k !== "in_app" && v === false,
-  ).length;
+  const mutedCount = Object.values(notifPrefs).filter((v) => v === false).length;
 
   const sections: SectionDef[] = [
     {

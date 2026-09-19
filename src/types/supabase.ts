@@ -1131,7 +1131,8 @@ export type InboxMessageCategory =
   | "membership_request"
   | "alert"
   | "external_email"
-  | "task";
+  | "task"
+  | "calendar";
 
 /** Direction an inbox message flowed:
  *   internal — in-app Koleex message (original default)
@@ -1146,6 +1147,9 @@ export interface InboxMessageRow {
   id: string;
   recipient_account_id: string;
   sender_account_id: string | null;
+  /** Set by tenant-aware producers; NULL on rows written by the crons and
+   *  the to-do fan-out, which resolve recipients without a tenant. */
+  tenant_id: string | null;
   category: InboxMessageCategory;
   subject: string;
   body: string | null;

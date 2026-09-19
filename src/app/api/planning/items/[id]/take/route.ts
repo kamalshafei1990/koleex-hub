@@ -2,7 +2,8 @@ import "server-only";
 
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
-import { requireAuth, requireModuleAccess , requireModuleAction} from "@/lib/server/auth";
+import { notifyPlanningTaken } from "@/lib/server/planning-notify";
+import { requireAuth, requireModuleAction } from "@/lib/server/auth";
 
 /* POST /api/planning/items/:id/take — claim an open shift.
    The caller must have an employee resource on the same tenant; that
@@ -60,21 +61,7 @@ export async function POST(_req: Request, { params }: RouteCtx) {
   }
 
   // Notify the item's creator that the shift was claimed (fire-and-forget).
-  if (data.created_by_account_id && data.created_by_account_id !== auth.account_id) {
-    const start = new Date(data.start_at);
-    const fmt = (d: Date) =>
-      `${d.toLocaleDateString("en", { month: "short", day: "numeric" })} ${d.toLocaleTimeString("en", { hour: "numeric", minute: "2-digit" })}`;
-    void supabaseServer.from("inbox_messages").insert({
-      recipient_account_id: data.created_by_account_id,
-      sender_account_id: auth.account_id,
-      tenant_id: auth.tenant_id,
-      category: "system",
-      subject: `Open shift taken: ${data.title || data.type}`,
-      body: `${auth.username} claimed the ${data.type} starting ${fmt(start)}.`,
-      link: "/planning",
-      metadata: { source: "planning", planning_item_id: data.id, type: data.type },
-    });
-  }
+  void notifyPlanningTaken(auth, data);
 
   return NextResponse.json({ item: data });
 }

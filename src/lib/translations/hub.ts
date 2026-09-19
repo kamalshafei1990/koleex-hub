@@ -123,6 +123,8 @@ export const hubT: Translations = {
   "notif.cat.system":   { en: "System",           zh: "系统",              ar: "النظام" },
   "notif.cat.alert":    { en: "Alert",            zh: "警报",              ar: "تنبيه" },
   "notif.cat.task":     { en: "Task",             zh: "任务",              ar: "مهمة" },
+  "notif.cat.calendar": { en: "Calendar",         zh: "日历",              ar: "التقويم" },
+  "notif.cat.email":    { en: "Email",            zh: "邮件",              ar: "بريد" },
   "notif.cat.message":  { en: "Message",          zh: "消息",              ar: "رسالة" },
   "notif.justNow":      { en: "just now",         zh: "刚刚",              ar: "الآن" },
   "notif.minAgo":       { en: "{n}m ago",         zh: "{n}分钟前",         ar: "قبل {n} د" },
@@ -130,6 +132,5 @@ export const hubT: Translations = {
   "notif.dayAgo":       { en: "{n}d ago",         zh: "{n}天前",           ar: "قبل {n} يوم" },
   "notif.filter.all":   { en: "All",              zh: "全部",              ar: "الكل" },
   "notif.filter.other": { en: "Other",            zh: "其他",              ar: "أخرى" },
-  "notif.showAll":      { en: "Show all notifications", zh: "显示全部通知", ar: "عرض كل الإشعارات" },
   "notif.noneOfType":   { en: "No notifications of this type", zh: "没有此类型的通知", ar: "لا توجد إشعارات من هذا النوع" },
 };

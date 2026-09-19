@@ -5,6 +5,7 @@ import { supabaseServer } from "@/lib/server/supabase-server";
 import { clearUnreadByMeta } from "@/lib/server/inbox-lifecycle";
 import { requireAuth, requireModuleAction } from "@/lib/server/auth";
 import { sendPushToAccounts } from "@/lib/server/web-push";
+import { notifySubmittedForApproval } from "@/lib/server/todo-notify";
 
 /* PATCH /api/todos/[id] — update fields + optionally re-sync assignees.
    DELETE /api/todos/[id] — remove the todo + assignees/notes (cascade).
@@ -66,29 +67,8 @@ async function isAssigneeOf(id: string, accountId: string): Promise<boolean> {
   return !!data;
 }
 
-/* Notify the assigner that a participant submitted the task for approval. */
-async function notifySubmittedForApproval(
-  t: TodoOwnership,
-  actorId: string,
-): Promise<void> {
-  const assigner = t.assigned_by_account_id;
-  if (!assigner || assigner === actorId) return;
-  const title = t.title ?? "Task";
-  await supabaseServer.from("inbox_messages").insert({
-    recipient_account_id: assigner,
-    sender_account_id: actorId,
-    category: "task",
-    subject: `Awaiting your approval: ${title}`,
-    body: `The task "${title}" was submitted as done and needs your confirmation.`,
-    link: `/todo?task=${t.id}`,
-    metadata: { type: "todo_approval_request", todo_id: t.id },
-  });
-  await sendPushToAccounts([assigner], {
-    title: "Task awaiting your approval",
-    body: title,
-    url: `/todo?task=${t.id}`,
-  });
-}
+/* The "submitted for approval" hand-off lives in lib/server/todo-notify.ts,
+   shared with the toggle route and the AI agent. */
 
 /* Notify assignees when the assigner confirms (done) or reopens the task. */
 async function notifyApprovalDecision(
@@ -128,6 +108,8 @@ async function notifyApprovalDecision(
     title: approved ? "Task confirmed done" : "Task sent back for rework",
     body: approved ? title : reason ? `${title} — ${reason}` : title,
     url: `/todo?task=${t.id}`,
+    tag: `todo-approval-${t.id}`,
+    kind: "todo_approval_decision",
   });
 }
 

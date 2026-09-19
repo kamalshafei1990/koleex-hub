@@ -129,6 +129,7 @@ export async function PUT(
       body: `You're invited — ${when}`,
       url: "/calendar",
       tag: `calendar-invite-${id}`,
+      kind: "calendar_invite",
     }).catch(() => {});
   }
 

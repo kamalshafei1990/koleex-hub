@@ -102,6 +102,7 @@ export async function GET(req: Request) {
       body: `Starts ${whenStr}`,
       url: "/calendar",
       tag: `calendar-reminder-${ev.id}`,
+      kind: "calendar_reminder",
     }).catch((e) => console.error("[cron/calendar-reminders] push:", e));
 
     await supabaseServer

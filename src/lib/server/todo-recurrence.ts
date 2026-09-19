@@ -17,6 +17,7 @@ import "server-only";
 
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { sendPushToAccounts } from "@/lib/server/web-push";
+import { supersedeUnread } from "@/lib/server/inbox-lifecycle";
 
 type Cadence = "daily" | "weekly" | "monthly";
 
@@ -190,14 +191,7 @@ export async function spawnDueRecurringTodos(now: Date = new Date()): Promise<nu
          recipient, same recurring subject, still unread → read+archived
          before the new row lands. A copy the user already read is
          history and stays. */
-      const nowIso = new Date().toISOString();
-      await supabaseServer
-        .from("inbox_messages")
-        .update({ read_at: nowIso, archived_at: nowIso })
-        .in("recipient_account_id", recipients)
-        .eq("category", "task")
-        .eq("subject", `🔁 ${t.title}`)
-        .is("read_at", null);
+      await supersedeUnread({ recipients, category: "task", subject: `🔁 ${t.title}` });
       await supabaseServer.from("inbox_messages").insert(
         recipients.map((rid) => ({
           recipient_account_id: rid,
@@ -214,6 +208,7 @@ export async function spawnDueRecurringTodos(now: Date = new Date()): Promise<nu
         body: t.description || "Recurring task",
         url: `/todo?task=${newId}`,
         tag: `todo-recurring-${newId}`,
+        kind: "todo_recurring",
       }).catch((e) => console.error("[todo-recurrence] push:", e));
     }
 

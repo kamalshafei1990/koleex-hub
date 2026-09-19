@@ -19,6 +19,29 @@ import { notifySuperAdmins } from "@/lib/server/sa-notify";
 
 const STATUSES = new Set(["active", "idle", "offline"]);
 
+async function seenOnSameBrowserRecently(
+  accountId: string,
+  deviceId: string,
+  browser: string | null | undefined,
+  os: string | null | undefined,
+): Promise<boolean> {
+  if (!browser || !os) return false;
+  try {
+    const since = new Date(Date.now() - 30 * 86400_000).toISOString();
+    const { count } = await supabaseServer
+      .from("user_devices")
+      .select("id", { count: "exact", head: true })
+      .eq("account_id", accountId)
+      .neq("device_id", deviceId)
+      .eq("browser", browser)
+      .eq("os", os)
+      .gte("last_seen_at", since);
+    return (count ?? 0) > 0;
+  } catch {
+    return false; // fail loud: an unknown state is a new device
+  }
+}
+
 export async function POST(req: Request) {
   const auth = await getServerAuth();
   if (!auth) return NextResponse.json({ ok: false }, { status: 401 });
@@ -84,7 +107,13 @@ export async function POST(req: Request) {
   }
 
   // First time we've seen this browser for the account → "new device" alert.
-  if (dev.isNew) {
+  // The device id is a localStorage/cookie token, and browsers re-mint it more
+  // often than people change devices (private windows, a cleared site, Safari
+  // dropping storage): the owner alone produced 132 "new device" alerts from
+  // 22 ids on FOUR real browser/OS pairs in three weeks. A fresh id on a
+  // browser+OS this account was seen on within 30 days is the same device
+  // wearing a new token — registered, not alerted.
+  if (dev.isNew && !(await seenOnSameBrowserRecently(accountId, deviceId, meta.browser, meta.os))) {
     await notifySuperAdmins({
       kind: "new_device",
       subject: `${auth.username || "A user"} signed in from a new device`,
