@@ -48,6 +48,10 @@ export const PRODUCTS_LIST_I18N: Translations = {
   "list.allDivisions": { en: "All divisions", zh: "全部事业部", ar: "كل الأقسام" },
   "list.filters": { en: "Filters", zh: "筛选", ar: "التصفية" },
   "list.featured": { en: "Featured", zh: "精选", ar: "مميّز" },
+  /* Freshness badges — 14 days each, see products-freshness.ts. */
+  "list.badgeNew": { en: "New", zh: "新品", ar: "جديد" },
+  "list.badgeUpdated": { en: "Updated", zh: "已更新", ar: "محدَّث" },
+  "list.badgePriceUpdated": { en: "Price updated", zh: "价格更新", ar: "سعر محدَّث" },
   "list.modelOne": { en: "model", zh: "个型号", ar: "موديل" },
   "list.modelMany": { en: "models", zh: "个型号", ar: "موديلات" },
   "list.allCategories": { en: "All categories", zh: "全部类别", ar: "كل الفئات" },

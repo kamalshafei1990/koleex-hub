@@ -279,6 +279,10 @@ export interface FeatureCard {
 
 export interface ProductRow {
   feature_cards?: FeatureCard[] | null;
+  /* Catalogue badges as a bitmask (products-freshness.ts): NEW=1,
+     Updated=2, Price updated=4. Computed by the list API from three
+     timestamps that never reach the browser; absent when 0. */
+  fresh?: number;
   id: string;
   product_name: string;
   slug: string;

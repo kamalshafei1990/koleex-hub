@@ -29,6 +29,7 @@ import { stageTimer } from "@/lib/server/perf";
 import { hasProductDataAccess, LIST_PRODUCT_COLUMNS, PUBLIC_PRODUCT_COLUMNS, requireProductDataAction } from "@/lib/server/product-access";
 import { parseListParams, buildListResponse } from "@/lib/server-list/types";
 import { applyServerList } from "@/lib/server-list/apply";
+import { FRESHNESS_COLUMNS, foldFreshness } from "@/lib/products-freshness";
 import { PRODUCTS_LIST_CONFIG } from "@/lib/server-list/products-config";
 import { resolveProductSearchReach } from "@/lib/server/product-search-reach";
 
@@ -44,7 +45,14 @@ export async function GET(req: Request) {
   const url = new URL(req.url);
   const listView = url.searchParams.get("view") === "list";
   const canSeeSecrets = await hasProductDataAccess(auth);
-  const cols = listView ? LIST_PRODUCT_COLUMNS : canSeeSecrets ? "*" : PUBLIC_PRODUCT_COLUMNS;
+  /* The list ALSO reads the three freshness moments — and folds them into
+     one small `fresh` number before responding (products-freshness.ts says
+     why: 60 KB of timestamps for a fact that is 0 on nearly every row). They
+     are appended here, not in LIST_PRODUCT_COLUMNS, so that constant keeps
+     describing what the browser receives. */
+  const cols = listView
+    ? `${LIST_PRODUCT_COLUMNS}, ${FRESHNESS_COLUMNS.join(", ")}`
+    : canSeeSecrets ? "*" : PUBLIC_PRODUCT_COLUMNS;
   _t.mark("auth");
 
   /* ── ?paged=1 — server-driven list (search / filter / sort / page in SQL) ──
@@ -114,6 +122,8 @@ export async function GET(req: Request) {
        objects and the grid needs no second code path. The cast is only
        because `select()` takes a runtime string, which erases the row type. */
     const rows = (data ?? []) as unknown as Record<string, unknown>[];
+    const now = Date.now();
+    for (const r of rows) foldFreshness(r, now);
 
     /* MODEL CODES TRAVEL WITH THE PAGE. They used to arrive later, in the
        signals payload, and the card is built around them — the heading is the
@@ -235,9 +245,14 @@ export async function GET(req: Request) {
     _t.done({ status: 500 });
     return NextResponse.json({ error: "Failed to load products" }, { status: 500 });
   }
-  const { header } = _t.done({ status: 200, view: listView ? "list" : "full", rows: (data ?? []).length });
+  const products = (data ?? []) as unknown as Record<string, unknown>[];
+  if (listView) {
+    const now = Date.now();
+    for (const r of products) foldFreshness(r, now);
+  }
+  const { header } = _t.done({ status: 200, view: listView ? "list" : "full", rows: products.length });
   return NextResponse.json(
-    { products: data ?? [] },
+    { products },
     { headers: { "Cache-Control": "private, max-age=120, stale-while-revalidate=900", "Server-Timing": header } },
   );
 }

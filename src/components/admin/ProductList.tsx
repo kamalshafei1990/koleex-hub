@@ -21,6 +21,7 @@ import { kxInspectAttrs } from "@/lib/qa/inspector";
 import { humanizeError } from "@/lib/ui/humanize-error";
 import { useTranslation } from "@/lib/i18n";
 import { StatusPill } from "@/components/kds";
+import { freshnessBadges } from "@/lib/products-freshness";
 import { localizedName } from "@/lib/i18n-name";
 /* ⚠️ THE LIST'S OWN DICTIONARY, NOT THE WHOLE ONE. PRODUCTS_UI_I18N carries
    1,165 keys × 3 languages (173 KB of source) and this screen reads 84 of
@@ -298,6 +299,18 @@ function readModelCache(scopeKey: string): ModelMaps | null {
   } catch { return null; }
 }
 
+/* One entry per freshness bit. These chips sit ON the product photo, which
+   is usually white, so — like the Featured chip beside them — they are
+   OPAQUE: a translucent tint reads on dark glass and vanishes on a white
+   photo. The three fills are the Hub's brand blue and its two functional
+   state colours (amber = changed, green = money), the same values KDS
+   StatusPill uses; no new colour enters the system. */
+const FRESH_BADGE = {
+  new:     { key: "list.badgeNew",          fallback: "New",           cls: "bg-[#567FB2] text-white border-white/20" },
+  updated: { key: "list.badgeUpdated",      fallback: "Updated",       cls: "bg-[#F59E0B] text-black/85 border-white/20" },
+  price:   { key: "list.badgePriceUpdated", fallback: "Price updated", cls: "bg-[#10B981] text-white border-white/20" },
+} as const;
+
 const ProductCard = memo(function ProductCard({
   p, imgUrl, models, suppliers, lvl, baseRoute, isInternal, aurora, catMap, subMap, divMap, primaryModelNames, modelNamesList, signal, signalsPending, modelsPending, t, onAskDelete, fx, fxTitle, fob, fobPending, onCardAction,
 }: {
@@ -388,8 +401,10 @@ const ProductCard = memo(function ProductCard({
           </div>
         )}
 
-        {/* Badges overlay */}
-        <div className="absolute top-2.5 left-2.5 flex flex-col gap-1.5">
+        {/* Badges overlay. items-start: a flex column stretches its children
+            to the widest one by default, so a short NEW chip grew to the
+            width of PRICE UPDATED beneath it. Each chip keeps its own width. */}
+        <div className="absolute top-2.5 left-2.5 flex flex-col items-start gap-1.5">
           {p.featured && (
             <span /* no backdrop-blur: the inverted bg is fully opaque, so it blurred nothing while costing a render surface on every card */
                       className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[10px] font-bold uppercase tracking-wider">
@@ -401,6 +416,22 @@ const ProductCard = memo(function ProductCard({
               {p.level}
             </span>
           )}
+          {/* Freshness — NEW / Updated / Price updated, each for 14 days
+              after its moment (owner spec 19/09/2026). Catalogue card only:
+              Product Data has its own work signals. Several may show at once;
+              order is fixed so a card never re-sorts as one expires. The
+              bits arrive with the row; nothing here reads a clock, fetches,
+              or animates — a badge is a static span, and most cards have
+              none. Tones are the KDS pill tones: brand blue for the news,
+              amber for "changed", green for money. */}
+          {!isInternal && freshnessBadges(p.fresh).map((b) => (
+            <span
+              key={b}
+              className={`inline-flex items-center px-2 py-0.5 rounded-lg text-[10px] font-bold uppercase tracking-wider border ${FRESH_BADGE[b].cls}`}
+            >
+              {t(FRESH_BADGE[b].key, FRESH_BADGE[b].fallback)}
+            </span>
+          ))}
         </div>
 
         {/* Actions (show on hover) — internal only.
