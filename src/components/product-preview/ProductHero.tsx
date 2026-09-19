@@ -165,18 +165,28 @@ export default function ProductHero(p: ProductHeroProps) {
             ))}
           </div>
 
-          <div className="space-y-3">
-            <h1 className="text-[2.5rem] leading-[1.02] md:text-[3.5rem] md:leading-[0.98] font-semibold tracking-[-0.02em] text-[var(--text-primary)] text-balance">
-              {p.name}
-            </h1>
+          {/* The MODEL is the headline (owner, 19/09/2026): a buyer knows the
+              machine by its code — XPH-40-P — and the descriptive name is
+              the line under it. When a product has no code the name takes
+              the headline slot instead. */}
+          <div className="space-y-2">
             {heroCode ? (
-              <div className="font-mono text-[13px] tracking-[0.14em] text-[var(--text-muted)]">{heroCode}</div>
-            ) : null}
+              <>
+                <h2 className="text-[40px] leading-none md:text-[48px] font-bold tracking-[-0.02em] tabular-nums text-[var(--text-primary)]">
+                  {heroCode}
+                </h2>
+                <p className="text-[18px] md:text-[20px] leading-snug font-medium text-[var(--text-secondary)] text-balance">{p.name}</p>
+              </>
+            ) : (
+              <h2 className="text-[32px] leading-[1.05] md:text-[40px] font-bold tracking-[-0.02em] text-[var(--text-primary)] text-balance">
+                {p.name}
+              </h2>
+            )}
             {p.tagline ? (
-              <p className="text-xl md:text-2xl font-light text-[var(--text-secondary)] leading-snug max-w-xl">{p.tagline}</p>
+              <p className="pt-2 text-[16px] md:text-[18px] font-light text-[var(--text-secondary)] leading-snug max-w-xl">{p.tagline}</p>
             ) : null}
             {p.excerpt ? (
-              <p className="text-[15px] leading-relaxed text-[var(--text-muted)] max-w-xl">{p.excerpt}</p>
+              <p className="text-[14px] leading-relaxed text-[var(--text-muted)] max-w-xl">{p.excerpt}</p>
             ) : null}
           </div>
 
