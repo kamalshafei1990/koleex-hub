@@ -1,0 +1,15 @@
+-- HR hygiene — retire the legacy `employees` table.
+--
+-- `public.employees` predates the identity system: it was created by hand
+-- in the dashboard (no migration in this repo ever declared it) and nothing
+-- in the Hub has read or written it since koleex_employees became the
+-- person's HR file. Keeping an orphan table with "employees" in its name
+-- next to the real one is how the next reader picks the wrong table.
+--
+-- Zero rows depended on it; koleex_employees and every hr_* table are
+-- untouched.
+--
+-- Applied on production 20/09/2026 with:
+--   npm run db:apply supabase/migrations/20260920_drop_legacy_employees.sql -- --force
+-- (the DROP TABLE is what --force is for; this file is the record.)
+DROP TABLE IF EXISTS public.employees;

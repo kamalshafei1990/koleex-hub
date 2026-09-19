@@ -207,6 +207,42 @@ export async function fetchHrDashboardStats(): Promise<HrDashboardStats> {
   return stats;
 }
 
+/* ═══════════════════════════════════════════════════
+   MODULE PRESENCE
+   ═══════════════════════════════════════════════════ */
+
+export interface HrModulePresence {
+  recruitment: boolean;
+  training: boolean;
+}
+
+/** Whether the optional modules have anything in them yet. The Recruitment
+ *  and Training tabs stay out of the HR strip until their first row exists
+ *  (owner, 20/09/2026): an empty module is a tab that leads nowhere. Three
+ *  head-only counts in one round trip. A failing count reads as "present",
+ *  so a gateway hiccup never hides a tab that has data behind it. */
+export async function fetchHrModulePresence(): Promise<HrModulePresence> {
+  const head = (table: string) =>
+    supabase.from(table).select("id", { count: "exact", head: true });
+  const has = (r: { error: { message: string } | null; count: number | null }) =>
+    r.error ? true : (r.count ?? 0) > 0;
+
+  try {
+    const [postings, courses, records] = await Promise.all([
+      head(JOB_POSTINGS),
+      head(COURSES),
+      head(TRAINING_RECORDS),
+    ]);
+    return {
+      recruitment: has(postings),
+      training: has(courses) || has(records),
+    };
+  } catch (err: unknown) {
+    console.error("[HR Presence] Unexpected:", err instanceof Error ? err.message : err);
+    return { recruitment: true, training: true };
+  }
+}
+
 export interface ExpiringItem {
   type: "visa" | "document";
   employee_id: string;
