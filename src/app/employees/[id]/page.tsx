@@ -31,6 +31,7 @@ import CheckIcon from "@/components/icons/ui/CheckIcon";
 import ArrowRightIcon from "@/components/icons/ui/ArrowRightIcon";
 import AngleDownIcon from "@/components/icons/ui/AngleDownIcon";
 import { resolveHrFileUrl } from "@/components/hr/HrFileField";
+import EmployeeHr360, { HR360_TABS, type Hr360Tab } from "@/components/employees/EmployeeHr360";
 import AngleRightIcon from "@/components/icons/ui/AngleRightIcon";
 import {
   fetchEmployeeProfile,
@@ -57,8 +58,11 @@ const STATUS_COLORS: Record<string, string> = {
   inactive: "text-slate-400 bg-slate-400/10 border-slate-400/20",
 };
 
-const TABS = ["overview", "activity", "hr"] as const;
-type Tab = (typeof TABS)[number];
+const BASE_TABS = ["overview", "activity", "hr"] as const;
+/* Phase E — the HR half of the profile, shown only to a viewer who holds
+   HR·view (the same gate the HR app itself applies to this data). */
+const ALL_TABS = [...BASE_TABS, ...HR360_TABS] as const;
+type Tab = (typeof ALL_TABS)[number];
 
 /* ═══════════════════════════════════════════════════
    HELPERS
@@ -423,6 +427,8 @@ export default function EmployeeProfilePage({
   const [notFound, setNotFound] = useState(false);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<Tab>("overview");
+  const hrView = perms.can("HR", "view");
+  const TABS: readonly Tab[] = hrView ? ALL_TABS : BASE_TABS;
   const tabMotion = useTabMotion(TABS.indexOf(tab));
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -673,7 +679,8 @@ export default function EmployeeProfilePage({
             {TABS.map((tabKey) => {
               const base = tabKey === "overview" ? t("tab.overview")
                 : tabKey === "activity" ? t("tab.activity")
-                : t("tab.hr");
+                : tabKey === "hr" ? t("tab.hr")
+                : t(`tab.${tabKey}`);
               const label = tabKey === "activity" && activity ? `${base} · ${activityTotal}` : base;
               return (
                 <button
@@ -695,6 +702,11 @@ export default function EmployeeProfilePage({
         </div>
 
         <div key={tab} className={tabMotion}>
+        {(HR360_TABS as readonly string[]).includes(tab) && (
+          <div className="px-4 md:px-6 py-4">
+            <EmployeeHr360 employeeId={id} tab={tab as Hr360Tab} />
+          </div>
+        )}
         {tab === "overview" && (
           <>
             <GroupLabel>{t("grp.identity")}</GroupLabel>

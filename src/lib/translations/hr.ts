@@ -815,4 +815,14 @@ export const hrT: Translations = {
   "hr.pay.dailyRate":            { en: "Daily rate",                      zh: "日工资",                        ar: "الأجر اليومي" },
   "hr.status.approved_run":      { en: "Approved",                        zh: "已批准",                        ar: "معتمد" },
   "hr.pay.deductAbsence":        { en: "Deduct absent days (attendance is tracked)", zh: "扣除缺勤天数（已启用考勤）", ar: "خصم أيام الغياب (الحضور مُتتبَّع)" },
+  /* ── Phase E: profile 360 ── */
+  "hr.reviewsTimeline":          { en: "Reviews timeline",                zh: "评估时间线",                    ar: "الخط الزمني للتقييمات" },
+  "hr.noReviews":                { en: "No appraisals, skill or behavior assessments yet", zh: "尚无绩效、技能或行为评估", ar: "لا توجد تقييمات أداء أو مهارات أو سلوك بعد" },
+  "hr.reviewKind.appraisal":     { en: "Appraisal",                       zh: "绩效",                          ar: "تقييم أداء" },
+  "hr.reviewKind.skills":        { en: "Skills",                          zh: "技能",                          ar: "مهارات" },
+  "hr.reviewKind.behavior":      { en: "Behavior",                        zh: "行为",                          ar: "سلوك" },
+  "hr.sk.skillsAssessed":        { en: "skills assessed",                 zh: "项技能已评估",                  ar: "مهارة مُقيَّمة" },
+  "hr.sk.avg":                   { en: "avg",                             zh: "平均",                          ar: "متوسط" },
+  "hr.skills":                   { en: "Skills",                          zh: "技能",                          ar: "المهارات" },
+  "hr.behavior":                 { en: "Behavior",                        zh: "行为",                          ar: "السلوك" },
 };

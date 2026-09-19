@@ -406,6 +406,10 @@ export const employeesT: Translations = {
   "tab.overview":       { en: "Overview",                      zh: "概览",                     ar: "نظرة عامة" },
   "tab.activity":       { en: "Activity",                      zh: "动态",                     ar: "النشاط" },
   "tab.hr":             { en: "HR Details",                    zh: "人事详情",                 ar: "تفاصيل الموارد البشرية" },
+  "tab.leave":          { en: "Leave",                         zh: "请假",                     ar: "الإجازات" },
+  "tab.attendance":     { en: "Attendance",                    zh: "考勤",                     ar: "الحضور" },
+  "tab.payroll":        { en: "Payroll",                       zh: "薪资",                     ar: "الرواتب" },
+  "tab.reviews":        { en: "Reviews",                       zh: "评估",                     ar: "التقييمات" },
 
   "profile.notFound":   { en: "Employee not found",            zh: "未找到员工",               ar: "الموظف غير موجود" },
   "profile.hired":      { en: "Hired {date}",                  zh: "入职 {date}",              ar: "تم التعيين {date}" },
