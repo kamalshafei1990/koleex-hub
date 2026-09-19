@@ -1,5 +1,6 @@
 /* me-hr-types — the wire shape of /api/me/hr, shared by the route and the
  * page. Pure types: safe to import from either side. */
+import type { WorkCalendar } from "@/lib/hr/work-calendar";
 
 export interface MyLeaveType {
   id: string; code: string; name: string; defaultDays: number; requiresDoc: boolean; isPaid: boolean;
@@ -57,6 +58,8 @@ export interface MyHrBundle {
   leave: { types: MyLeaveType[]; balances: MyLeaveBalance[]; requests: MyLeaveRequest[] };
   /** Present only when I manage someone: their pending requests (Phase B). */
   team: { isManager: boolean; pending: MyTeamRequest[] };
+  /** Weekend + public holidays of the country I work in, today → +12 months. */
+  calendar: WorkCalendar;
   attendance: { today: MyAttendanceRecord | null; month: MyAttendanceRecord[]; monthHours: number };
   payslips: MyPayslip[];
   documents: MyDocument[];

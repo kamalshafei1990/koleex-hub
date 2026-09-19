@@ -24,6 +24,7 @@ import { resolveMyEmployee } from "@/lib/server/me-hr";
 import { computeBusinessDays, rangesOverlap } from "@/lib/hr/leave-days";
 import { pathBelongsToTenant } from "@/lib/server/storage-tenant";
 import { notifyLeaveFiled } from "@/lib/server/leave-review";
+import { loadPolicy, loadWorkCalendar, resolveEmployeeCountry } from "@/lib/server/work-calendar";
 
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 const str = (v: unknown, max = 500): string | null =>
@@ -67,7 +68,12 @@ export async function POST(req: Request) {
   }
   if (t.requires_doc && !attachment) return NextResponse.json({ error: "attachment_required" }, { status: 400 });
 
-  const days = halfDay ? 0.5 : computeBusinessDays(start, end);
+  /* Working days per the country I work in — its weekend and its public
+     holidays (Phase C). A Golden Week request costs the days it actually
+     takes off the roster. */
+  const country = await resolveEmployeeCountry(me.id);
+  const calendar = await loadWorkCalendar(auth.tenant_id, country, start, end, await loadPolicy(country));
+  const days = halfDay ? 0.5 : computeBusinessDays(start, end, calendar);
   if (days <= 0) return NextResponse.json({ error: "no_working_days" }, { status: 400 });
 
   const [{ data: mine }, { data: bal }] = await Promise.all([

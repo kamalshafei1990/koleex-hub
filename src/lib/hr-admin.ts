@@ -568,6 +568,62 @@ export async function fetchAttendanceRecords(
   return (data as AttendanceRecordRow[]) || [];
 }
 
+/* ── Phase C — the attendance engine ─────────────────────────────────── */
+
+export type { AttendanceSheet, SheetDay, SheetStatus } from "@/lib/server/attendance-sheet";
+
+/** One employee's month, every day accounted for (server-derived). */
+export async function fetchAttendanceSheet(employeeId: string, month: string): Promise<import("@/lib/server/attendance-sheet").AttendanceSheet | null> {
+  try {
+    const tz = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
+    const res = await fetch(`/api/hr/attendance/sheet?employee_id=${encodeURIComponent(employeeId)}&month=${encodeURIComponent(month)}&tz=${encodeURIComponent(tz)}`, { credentials: "include", cache: "no-store" });
+    if (!res.ok) return null;
+    const j = (await res.json()) as { sheet: import("@/lib/server/attendance-sheet").AttendanceSheet };
+    return j.sheet;
+  } catch (err) {
+    console.error("[Attendance] Sheet:", err instanceof Error ? err.message : err);
+    return null;
+  }
+}
+
+export interface AttendanceImportResult {
+  ok: boolean; error?: string; imported?: number; rows?: number; dryRun?: boolean;
+  problems?: Array<{ line: number; problem: string }>;
+  sample?: Array<{ employee_id: string; date: string; clock_in: string | null; clock_out: string | null; total_hours: number | null; status: string }>;
+}
+/** A fingerprint-device CSV export → attendance records (see the route). */
+export async function importAttendanceCsv(csv: string, dryRun: boolean): Promise<AttendanceImportResult> {
+  try {
+    const res = await fetch("/api/hr/attendance/import", {
+      method: "POST", credentials: "include", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ csv, dryRun }),
+    });
+    const j = (await res.json().catch(() => null)) as Omit<AttendanceImportResult, "ok"> | null;
+    if (!res.ok) return { ok: false, error: j?.error ?? `HTTP ${res.status}`, ...(j ?? {}) };
+    return { ok: true, ...(j ?? {}) };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : "network" };
+  }
+}
+
+export async function fetchAttendancePolicies(): Promise<AttendancePolicyRow[]> {
+  const { data, error } = await supabase.from(ATTENDANCE_POLICIES).select("*").order("is_default", { ascending: false });
+  if (error) { console.error("[Attendance] Policies:", error.message); return []; }
+  return (data as AttendancePolicyRow[]) || [];
+}
+
+export type AttendancePolicyInput = Pick<AttendancePolicyRow, "name" | "country" | "timezone" | "work_start" | "work_end" | "late_threshold_min" | "min_hours" | "weekend_days" | "is_default">;
+/** Create or update a policy. One per country; `is_default` marks the one
+ *  everyone unmatched falls back to. */
+export async function saveAttendancePolicy(id: string | null, input: AttendancePolicyInput): Promise<boolean> {
+  const q = id
+    ? supabase.from(ATTENDANCE_POLICIES).update(input).eq("id", id)
+    : supabase.from(ATTENDANCE_POLICIES).insert(input);
+  const { error } = await q;
+  if (error) { console.error("[Attendance] Save policy:", error.message); return false; }
+  return true;
+}
+
 /** Clock in: create an attendance record with clock_in timestamp. */
 export async function clockIn(
   employeeId: string,

@@ -114,6 +114,18 @@ console.log("\n§4 one working-day counter");
   expect(/from "@\/lib\/hr\/leave-days"/.test(leave), "self-service leave route uses the same counter");
 }
 
+console.log("\n§4b the working calendar is the employee's country's (Phase C)");
+{
+  const leave = code(read("src/app/api/me/hr/leave/route.ts"));
+  expect(/computeBusinessDays\(start, end, calendar\)/.test(leave) && /loadWorkCalendar\(auth\.tenant_id, country/.test(leave), "self-service leave counts days with loadWorkCalendar(country)");
+  expect(!/computeBusinessDays\(start, end\)(?!,)/.test(leave.replace(/computeBusinessDays\(start, end\) > 260/, "")), "no bare Sat/Sun count remains on the request path");
+  const punch = code(read("src/app/api/me/hr/attendance/route.ts"));
+  expect(/lateMinutes\(now, policy\)/.test(punch) && /loadPolicy\(await resolveEmployeeCountry\(me\.id\)\)/.test(punch), "self punch judges late against the employee's country policy");
+  const sheet = code(read("src/lib/server/attendance-sheet.ts"));
+  expect(/\.eq\("employee_id", opts\.employeeId\)/.test(sheet) && (sheet.match(/\.eq\("employee_id", opts\.employeeId\)/g) ?? []).length >= 2, "sheet builder pins records AND leave to the one employee");
+  expect(!/insert\(|upsert\(|update\(/.test(sheet), "sheet builder never writes — derived, not stored");
+}
+
 console.log("\n§5 registry wiring");
 {
   const nav = code(read("src/lib/navigation.ts"));

@@ -77,6 +77,11 @@ export const ATTENDANCE_STATUS_MAP: Record<string, string> = {
   late:     "bg-amber-500/15 text-amber-400 border-amber-500/20",
   absent:   "bg-red-500/15 text-red-400 border-red-500/20",
   half_day: "bg-blue-500/15 text-blue-400 border-blue-500/20",
+  /* Phase C sheet statuses — derived days, muted: they are not punches. */
+  leave:    "bg-blue-500/10 text-blue-400 border-blue-500/15",
+  holiday:  "bg-slate-500/10 text-slate-400 border-slate-500/15",
+  weekend:  "bg-slate-500/10 text-slate-500 border-slate-500/10",
+  future:   "bg-transparent text-[var(--text-faint)] border-transparent",
 };
 
 export const PAYSLIP_STATUS_MAP: Record<string, string> = {

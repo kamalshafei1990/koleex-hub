@@ -51,7 +51,7 @@ export default function Leave({ bundle, setBundle, t, lang }: MeTabProps) {
 
   const dateError = !!form.start_date && !!form.end_date && form.end_date < form.start_date;
   const isSingleDay = !!form.start_date && form.start_date === form.end_date;
-  const working = dateError || !form.start_date || !form.end_date ? 0 : computeBusinessDays(form.start_date, form.end_date);
+  const working = dateError || !form.start_date || !form.end_date ? 0 : computeBusinessDays(form.start_date, form.end_date, bundle.calendar);
   const calendar = dateError || !form.start_date || !form.end_date ? 0 : calendarDays(form.start_date, form.end_date);
   const requested = form.half_day && isSingleDay ? 0.5 : working;
   const selectedType = typeOf(form.leave_type_id);
@@ -217,6 +217,7 @@ export default function Leave({ bundle, setBundle, t, lang }: MeTabProps) {
             {t("hr.duration")}: {requested} {requested === 1 ? t("hr.workingDay") : t("hr.workingDays")} · {calendar} {t("hr.calendarDays")}
           </p>
         )}
+        {bundle.calendar.country && calendar > 0 && <p className="text-[11px] text-[var(--text-faint)]">{t("hr.me.calendarNote")}</p>}
         {overlapping.length > 0 && <p className="text-[12px] text-[#FFCC00]">{t("hr.overlapWarning")}</p>}
         {balance && after !== null && after < 0 && selectedType && selectedType.defaultDays > 0 && <p className="text-[12px] text-[#FF3333]">{t("hr.exceedsBalance")}</p>}
 

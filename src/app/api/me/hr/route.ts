@@ -22,6 +22,7 @@ import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { requireAuth } from "@/lib/server/auth";
 import { cleanTz, resolveMyEmployee, todayIso } from "@/lib/server/me-hr";
+import { loadPolicy, loadWorkCalendar, resolveEmployeeCountry } from "@/lib/server/work-calendar";
 import type {
   MyHrBundle, MyLeaveBalance, MyLeaveRequest, MyLeaveType, MyAttendanceRecord, MyPayslip, MyDocument, MyTeamRequest,
 } from "@/lib/me-hr-types";
@@ -38,6 +39,12 @@ export async function GET(req: Request) {
   const today = todayIso(cleanTz(new URL(req.url).searchParams.get("tz")));
   const year = Number(today.slice(0, 4));
   const monthStart = `${today.slice(0, 7)}-01`;
+
+  /* The working calendar of the country I work in, for the next year — the
+     leave form counts days with it, so the screen and the server agree. */
+  const horizon = new Date(`${today}T00:00:00Z`); horizon.setUTCFullYear(horizon.getUTCFullYear() + 1);
+  const country = await resolveEmployeeCountry(me.id);
+  const calendarP = loadPolicy(country).then((pol) => loadWorkCalendar(auth.tenant_id, country, today, horizon.toISOString().slice(0, 10), pol));
 
   const [person, contacts, assignment, types, balances, requests, month, payslips, documents] = await Promise.all([
     me.personId
@@ -173,6 +180,7 @@ export async function GET(req: Request) {
       monthHours: Math.round(monthRows.reduce((s, r) => s + Number(r.total_hours ?? 0), 0) * 100) / 100,
     },
     team: { isManager: teamIds.length > 0, pending: teamPending },
+    calendar: await calendarP,
     payslips: ((payslips.data ?? []) as MyPayslip[]),
     documents: ((documents.data ?? []) as MyDocument[]),
   };

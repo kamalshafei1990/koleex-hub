@@ -16,6 +16,7 @@ import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { requireAuth } from "@/lib/server/auth";
 import { cleanTz, resolveMyEmployee, todayIso } from "@/lib/server/me-hr";
+import { lateMinutes, loadPolicy, resolveEmployeeCountry } from "@/lib/server/work-calendar";
 
 const COLS = "id, date, clock_in, clock_out, break_minutes, total_hours, status";
 
@@ -37,9 +38,13 @@ export async function POST(req: Request) {
 
   if (action === "in") {
     if (rec) return NextResponse.json({ error: "already_in", record: rec }, { status: 409 });
+    /* Late is judged against the policy of the country I work in, in its
+       own zone — the sheet re-derives it too, this just makes the row honest
+       from the first second. */
+    const policy = await loadPolicy(await resolveEmployeeCountry(me.id));
     const { data, error } = await supabaseServer.from("hr_attendance_records").insert({
       employee_id: me.id, date: today, clock_in: now, clock_out: null,
-      break_minutes: 0, total_hours: null, status: "present", source: "self", notes: null,
+      break_minutes: 0, total_hours: null, status: lateMinutes(now, policy) > 0 ? "late" : "present", source: "self", notes: null,
     }).select(COLS).single();
     if (error) {
       console.error("[api/me/hr/attendance in]", error.message);

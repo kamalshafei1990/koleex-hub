@@ -646,6 +646,8 @@ export interface EmployeeRow {
   contract_end_date: string | null;
   probation_end_date: string | null;
   work_location: WorkLocation;
+  /** Phase C: ISO alpha-2 of the country the employee works in (calendar + policy). */
+  work_country: string | null;
 
   // Bank account
   bank_name: string | null;
@@ -2231,6 +2233,10 @@ export type LeaveRequestDetails = Pick<
 export interface AttendancePolicyRow {
   id: string;
   name: string;
+  /** Phase C: ISO alpha-2 the policy applies to; null = default. */
+  country: string | null;
+  /** IANA zone in which work_start / work_end are read. */
+  timezone: string;
   work_start: string;
   work_end: string;
   late_threshold_min: number;
