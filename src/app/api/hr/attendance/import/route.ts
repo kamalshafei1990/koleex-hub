@@ -95,7 +95,9 @@ export async function POST(req: Request) {
   if (col.employee < 0 || col.date < 0) return NextResponse.json({ error: "missing_columns", need: ["employee", "date"], found: rows[0] }, { status: 400 });
 
   /* Employee numbers → ids (tenant's employees only). */
-  const { data: emps } = await supabaseServer.from("koleex_employees").select("id, employee_number").eq("tenant_id", auth.tenant_id);
+  /* tenant OR null — most employee rows carry no tenant_id (see /api/employees). */
+  const { data: emps } = await supabaseServer.from("koleex_employees").select("id, employee_number")
+    .or(auth.tenant_id ? `tenant_id.eq.${auth.tenant_id},tenant_id.is.null` : "tenant_id.is.null");
   const byNumber = new Map<string, string>();
   for (const e of (emps ?? []) as Array<{ id: string; employee_number: string | null }>) if (e.employee_number) byNumber.set(e.employee_number.trim().toLowerCase(), e.id);
 

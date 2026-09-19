@@ -568,6 +568,68 @@ export async function fetchAttendanceRecords(
   return (data as AttendanceRecordRow[]) || [];
 }
 
+/* ── Phase D — payroll runs (server engine; the client only asks) ────── */
+
+export type { RunResult as PayrollRunResult, PayslipBreakdown, PayrollRule } from "@/lib/server/payroll-run";
+
+export interface PayrollRunRow {
+  id: string; period: string; country: string | null; status: "draft" | "approved" | "paid"; currency: string | null;
+  employees: number; total_gross: number; total_net: number; total_employer: number;
+  created_by: string | null; approved_by: string | null; approved_at: string | null; paid_at: string | null; notes: string | null; created_at: string;
+}
+export interface RunPayslipRow extends PayslipRow {
+  payroll_run_id: string | null; currency: string | null;
+  breakdown: import("@/lib/server/payroll-run").PayslipBreakdown | null; employer_contributions: Record<string, number> | null;
+  koleex_employees?: { employee_number: string | null; people?: { full_name?: string; name_alt?: string | null } | { full_name?: string; name_alt?: string | null }[] | null } | null;
+}
+
+const hrJson = async <T,>(url: string, init?: RequestInit): Promise<{ ok: boolean; status: number; data: T | null; error?: string }> => {
+  try {
+    const res = await fetch(url, { credentials: "include", cache: "no-store", ...init });
+    const j = (await res.json().catch(() => null)) as (T & { error?: string }) | null;
+    return { ok: res.ok, status: res.status, data: res.ok ? j : null, error: res.ok ? undefined : j?.error ?? `HTTP ${res.status}` };
+  } catch (err) { return { ok: false, status: 0, data: null, error: err instanceof Error ? err.message : "network" }; }
+};
+
+export async function fetchPayrollRuns(): Promise<PayrollRunRow[]> {
+  const r = await hrJson<{ runs: PayrollRunRow[] }>("/api/hr/payroll/runs");
+  return r.data?.runs ?? [];
+}
+export async function runPayrollMonth(period: string, country: string | null, deductAbsence = true): Promise<{ ok: boolean; result?: import("@/lib/server/payroll-run").RunResult; error?: string }> {
+  const tz = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
+  const r = await hrJson<{ result: import("@/lib/server/payroll-run").RunResult }>("/api/hr/payroll/runs", {
+    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ period, country, tz, deduct_absence: deductAbsence }),
+  });
+  return r.ok ? { ok: true, result: r.data?.result } : { ok: false, error: r.error };
+}
+export async function fetchPayrollRun(id: string): Promise<{ run: PayrollRunRow; payslips: RunPayslipRow[] } | null> {
+  const r = await hrJson<{ run: PayrollRunRow; payslips: RunPayslipRow[] }>(`/api/hr/payroll/runs/${id}`);
+  return r.data;
+}
+export async function transitionPayrollRun(id: string, action: "approve" | "pay" | "reopen"): Promise<{ ok: boolean; error?: string }> {
+  const r = await hrJson<{ ok: true }>(`/api/hr/payroll/runs/${id}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action }) });
+  return { ok: r.ok, error: r.error };
+}
+
+const PAYROLL_RULES = "hr_payroll_rules";
+export async function fetchPayrollRules(): Promise<import("@/lib/server/payroll-run").PayrollRule[]> {
+  const { data, error } = await supabase.from(PAYROLL_RULES).select("*").order("sort_order");
+  if (error) { console.error("[Payroll] Rules:", error.message); return []; }
+  return (data as import("@/lib/server/payroll-run").PayrollRule[]) || [];
+}
+export type PayrollRuleInput = Omit<import("@/lib/server/payroll-run").PayrollRule, "id">;
+export async function savePayrollRule(id: string | null, input: PayrollRuleInput): Promise<boolean> {
+  const q = id ? supabase.from(PAYROLL_RULES).update(input).eq("id", id) : supabase.from(PAYROLL_RULES).insert(input);
+  const { error } = await q;
+  if (error) { console.error("[Payroll] Save rule:", error.message); return false; }
+  return true;
+}
+export async function deletePayrollRule(id: string): Promise<boolean> {
+  const { error } = await supabase.from(PAYROLL_RULES).delete().eq("id", id);
+  if (error) { console.error("[Payroll] Delete rule:", error.message); return false; }
+  return true;
+}
+
 /* ── Phase C — the attendance engine ─────────────────────────────────── */
 
 export type { AttendanceSheet, SheetDay, SheetStatus } from "@/lib/server/attendance-sheet";

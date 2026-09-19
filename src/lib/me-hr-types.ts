@@ -32,7 +32,7 @@ export interface MyAttendanceRecord {
 }
 export interface MyPayslip {
   id: string; period_start: string; period_end: string; gross_amount: number | null;
-  deductions: Record<string, number> | null; net_amount: number | null; status: string; paid_at: string | null;
+  deductions: Record<string, number> | null; net_amount: number | null; status: string; paid_at: string | null; currency: string | null;
 }
 export interface MyDocument {
   id: string; name: string; category: string; file_url: string; file_type: string | null;

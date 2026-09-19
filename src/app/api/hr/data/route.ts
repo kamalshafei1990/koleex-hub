@@ -36,6 +36,9 @@ const TABLES: Record<string, { write: boolean }> = {
   hr_checklist_instances: { write: true },
   hr_salary_records: { write: true },
   hr_payslips: { write: true },
+  /* Phase D — rules are HR data; runs are written by the payroll engine only. */
+  hr_payroll_rules: { write: true },
+  hr_payroll_runs: { write: false },
   hr_courses: { write: true },
   hr_training_records: { write: true },
   hr_documents: { write: true },

@@ -400,6 +400,7 @@ export async function POST(req: Request) {
       work_email: str(body, "work_email"),
       work_phone: str(body, "work_phone"),
       work_location: str(body, "work_location") || "office",
+      work_country: str(body, "work_country") || null,
       manager_id: str(body, "manager_id"),
       notes: null,
       /* Identity consolidation: home address lives on the person record
@@ -793,6 +794,7 @@ export async function PUT(req: Request) {
       work_email: str(body, "work_email"),
       work_phone: str(body, "work_phone"),
       work_location: str(body, "work_location") || "office",
+      work_country: str(body, "work_country") || null,
       manager_id: str(body, "manager_id"),
       emergency_contact_name: str(body, "emergency_contact_name"),
       emergency_contact_phone: str(body, "emergency_contact_phone"),

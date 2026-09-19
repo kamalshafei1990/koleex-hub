@@ -1026,7 +1026,7 @@ const TRACKED_EMPLOYEE_FIELDS: readonly (keyof EmployeeWizardData)[] = [
   "photo_url", "title", "first_name", "last_name",
   "gender", "birthday", "nationality", "marital_status",
   "personal_phone", "personal_email",
-  "hire_date", "employment_type", "work_email", "work_phone", "work_location",
+  "hire_date", "employment_type", "work_email", "work_phone", "work_location", "work_country",
   "department_id", "position_id",
   "private_address_line1", "private_city", "private_country",
   "emergency_contact_name", "emergency_contact_phone", "emergency_contact_relationship",
@@ -1963,6 +1963,17 @@ export default function EmployeeForm({ mode = "create", employeeId, initial }: E
               )}
               <DateInput name="hire_date" label={t("f.emp.hireDate")} value={form.hire_date} onChange={(v) => set("hire_date", v)} yearFrom={2000} yearTo={2030} required error={errFor("hire_date")} />
               <SelectInput label={t("f.emp.workLocation")} value={form.work_location} onChange={(v) => set("work_location", v)} options={tOpts(t, WORK_LOCATION_OPTIONS)} />
+              {/* Where they WORK (not where they live): picks the working
+                  calendar (weekend + public holidays) and the attendance
+                  policy — Phase C. */}
+              <Combobox
+                label={t("f.emp.workCountry")}
+                value={form.work_country}
+                onChange={(v) => set("work_country", v)}
+                options={countryOptions}
+                placeholder={t("f.ph.selectCountry")}
+                searchPlaceholder="Search 249 countries…"
+              />
               <Combobox
                 label={t("f.emp.manager")}
                 value={form.manager_id}

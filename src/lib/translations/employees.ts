@@ -112,6 +112,7 @@ export const employeesT: Translations = {
   "f.emp.type":         { en: "Employment Type",               zh: "雇佣类型",                 ar: "نوع التوظيف" },
   "f.emp.hireDate":     { en: "Hire Date",                     zh: "入职日期",                 ar: "تاريخ التعيين" },
   "f.emp.workLocation": { en: "Work Location",                 zh: "工作地点",                 ar: "موقع العمل" },
+  "f.emp.workCountry":  { en: "Work Country",                  zh: "工作所在国家",             ar: "دولة العمل" },
   "f.emp.manager":      { en: "Manager / Supervisor",          zh: "经理 / 主管",              ar: "المدير / المشرف" },
   "f.emp.contractEnd":  { en: "Contract End",                  zh: "合同结束",                 ar: "نهاية العقد" },
   "f.emp.probationEnd": { en: "Probation End",                 zh: "试用期结束",               ar: "نهاية فترة التجربة" },

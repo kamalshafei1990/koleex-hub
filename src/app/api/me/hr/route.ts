@@ -71,8 +71,9 @@ export async function GET(req: Request) {
       .select("id, date, clock_in, clock_out, break_minutes, total_hours, status")
       .eq("employee_id", me.id).gte("date", monthStart).lte("date", today).order("date", { ascending: false }),
     supabaseServer.from("hr_payslips")
-      .select("id, period_start, period_end, gross_amount, deductions, net_amount, status, paid_at")
-      .eq("employee_id", me.id).order("period_start", { ascending: false }).limit(24),
+      .select("id, period_start, period_end, gross_amount, deductions, net_amount, status, paid_at, currency")
+      /* A draft is HR's working paper; the employee sees a slip once it is approved. */
+      .eq("employee_id", me.id).in("status", ["approved", "paid"]).order("period_start", { ascending: false }).limit(24),
     supabaseServer.from("hr_documents")
       .select("id, name, category, file_url, file_type, expiry_date, created_at")
       .eq("employee_id", me.id).order("created_at", { ascending: false }),

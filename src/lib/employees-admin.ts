@@ -96,6 +96,8 @@ export interface EmployeeWizardData {
   work_email: string;
   work_phone: string;
   work_location: string;
+  /** Phase C: ISO alpha-2 of the country the employee works in (calendar + attendance policy). */
+  work_country: string;
 
   // Department & Position
   department_id: string;
@@ -218,6 +220,7 @@ export function emptyWizardData(): EmployeeWizardData {
     work_email: "",
     work_phone: "",
     work_location: "office",
+    work_country: "",
     department_id: "",
     department_name: "",
     position_id: "",
@@ -752,6 +755,7 @@ export function wizardDataFromProfile(p: EmployeeWithLinks): EmployeeWizardData 
     work_email: s(emp.work_email),
     work_phone: s(emp.work_phone),
     work_location: s(emp.work_location) || "office",
+    work_country: s(emp.work_country),
 
     department_id: p.assignment?.department_id ?? "",
     position_id: p.assignment?.position_id ?? "",

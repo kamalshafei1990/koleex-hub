@@ -30,6 +30,8 @@ export interface SheetDay {
   source: string | null;
   /** For leave days: the leave type name. */
   note: string | null;
+  /** For leave days: false when the leave type is unpaid (payroll deducts it). */
+  leavePaid: boolean | null;
   recordId: string | null;
 }
 export interface AttendanceSheet {
@@ -51,24 +53,24 @@ export async function buildAttendanceSheet(opts: { employeeId: string; tenantId:
     loadWorkCalendar(opts.tenantId, country, from, to, policy),
     supabaseServer.from("hr_attendance_records").select("id, date, clock_in, clock_out, total_hours, status, source")
       .eq("employee_id", opts.employeeId).gte("date", from).lte("date", to),
-    supabaseServer.from("hr_leave_requests").select("start_date, end_date, half_day, hr_leave_types(name)")
+    supabaseServer.from("hr_leave_requests").select("start_date, end_date, half_day, hr_leave_types(name, is_paid)")
       .eq("employee_id", opts.employeeId).eq("status", "approved").lte("start_date", to).gte("end_date", from),
   ]);
   const byDate = new Map<string, { id: string; date: string; clock_in: string | null; clock_out: string | null; total_hours: number | null; status: string; source: string | null }>();
   for (const r of (recs ?? []) as Array<{ id: string; date: string; clock_in: string | null; clock_out: string | null; total_hours: number | null; status: string; source: string | null }>) byDate.set(r.date, r);
-  const leaveOn = new Map<string, string>();
-  for (const l of (leaves ?? []) as Array<{ start_date: string; end_date: string; half_day: boolean; hr_leave_types?: { name?: string } | { name?: string }[] | null }>) {
+  const leaveOn = new Map<string, { note: string; paid: boolean }>();
+  for (const l of (leaves ?? []) as Array<{ start_date: string; end_date: string; half_day: boolean; hr_leave_types?: { name?: string; is_paid?: boolean } | { name?: string; is_paid?: boolean }[] | null }>) {
     const t = Array.isArray(l.hr_leave_types) ? l.hr_leave_types[0] : l.hr_leave_types;
-    for (const d of days) if (d >= l.start_date && d <= l.end_date) leaveOn.set(d, `${t?.name ?? "Leave"}${l.half_day ? " (½)" : ""}`);
+    for (const d of days) if (d >= l.start_date && d <= l.end_date) leaveOn.set(d, { note: `${t?.name ?? "Leave"}${l.half_day ? " (½)" : ""}`, paid: t?.is_paid !== false });
   }
 
   const summary = { workdays: 0, present: 0, late: 0, absent: 0, leave: 0, hours: 0, overtimeH: 0, lateMin: 0, halfDays: 0 };
   const out: SheetDay[] = days.map((date) => {
     const kind = dayKind(date, calendar);
     const rec = byDate.get(date) ?? null;
-    const base: SheetDay = { date, status: "future", clockIn: rec?.clock_in ?? null, clockOut: rec?.clock_out ?? null, hours: rec?.total_hours ?? null, lateMin: 0, overtimeH: 0, source: rec?.source ?? null, note: null, recordId: rec?.id ?? null };
+    const base: SheetDay = { date, status: "future", clockIn: rec?.clock_in ?? null, clockOut: rec?.clock_out ?? null, hours: rec?.total_hours ?? null, lateMin: 0, overtimeH: 0, source: rec?.source ?? null, note: null, leavePaid: null, recordId: rec?.id ?? null };
     if (kind === "workday") summary.workdays++;
-    if (leaveOn.has(date)) { summary.leave++; return { ...base, status: "leave", note: leaveOn.get(date)! }; }
+    if (leaveOn.has(date)) { const l = leaveOn.get(date)!; summary.leave++; return { ...base, status: "leave", note: l.note, leavePaid: l.paid }; }
     if (kind === "holiday") return { ...base, status: "holiday" };
     if (kind === "weekend") return { ...base, status: "weekend" };
     if (rec) {
