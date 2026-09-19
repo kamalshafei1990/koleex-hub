@@ -107,7 +107,13 @@ export default async function ProductDetailPage({
         <p className="text-[12px] text-[var(--text-dim)] mb-5 ml-0 md:ml-11">
           <Link href="/products" className="hover:text-[var(--text-muted)] transition-colors">All products</Link>
         </p>
-        <ProductPreview {...loaded.preview} />
+        <ProductPreview
+          {...loaded.preview}
+          productId={loaded.id}
+          slug={loaded.slug}
+          audience={loaded.audience}
+          sections={loaded.sections}
+        />
       </div>
     </div>
   );

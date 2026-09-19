@@ -98,4 +98,17 @@ export const PRODUCTS_PREVIEW_I18N: Translations = {
   /* ── 2026-07-30 full-translation sweep: keys that were falling back ── */
   "preview.eyebrowSafety": { en: "Before you run it", zh: "运行之前", ar: "قبل التشغيل" },
   "preview.warnings": { en: "Warnings & Safety", zh: "警告与安全", ar: "التحذيرات والسلامة" },
+  /* ── Product page rebuild, phase 1 (19/09/2026): the hero ── */
+  "preview.heroGlobalFob": { en: "Global FOB", zh: "全球离岸价", ar: "سعر FOB العالمي" },
+  "preview.heroPriceOnRequest": { en: "Price on request", zh: "价格面议", ar: "السعر عند الطلب" },
+  "preview.heroFxNote": { en: "at today's rate", zh: "按今日汇率", ar: "بسعر صرف اليوم" },
+  "preview.heroAskAi": { en: "Ask AI", zh: "问 AI", ar: "اسأل الذكاء الاصطناعي" },
+  "preview.heroCompare": { en: "Compare", zh: "对比", ar: "قارن" },
+  "preview.heroQuote": { en: "Quote", zh: "报价", ar: "عرض سعر" },
+  "preview.heroFamilyEyebrow": { en: "Family", zh: "系列", ar: "العائلة" },
+  "preview.heroFamilyTitle": { en: "Every model in this family", zh: "本系列全部型号", ar: "كل موديلات هذه العائلة" },
+  "preview.heroFamilyModel": { en: "Model", zh: "型号", ar: "الموديل" },
+  "preview.heroFamilyPhoto": { en: "Photo", zh: "图片", ar: "الصورة" },
+  "preview.heroFamilySelected": { en: "Showing", zh: "当前显示", ar: "المعروض" },
+  "preview.heroAiDraft": { en: "Tell me about", zh: "请介绍", ar: "عرّفني على" },
 };

@@ -37,6 +37,8 @@ import { PRODUCTS_PREVIEW_I18N } from "@/lib/products-preview-i18n";
 import { fetchIconBindings, type BindingsMap } from "@/lib/visual-bindings";
 import { IMG } from "@/lib/cdn";
 import { BrandMark } from "@/components/brand/KoleexMark";
+import ProductHero, { type HeroAction } from "./ProductHero";
+import type { ProductAudience, ProductDetailSections } from "@/lib/server/product-detail";
 
 interface ProductLocaleText {
   locale: string;
@@ -82,6 +84,13 @@ interface ProductPreviewProps {
     imageUrl?: string | null;
     values: Record<string, unknown>;
   }[];
+  /* Product-page rebuild (19/09/2026). Optional so /products/preview/[slug]
+     keeps working unchanged; without `sections` the hero draws no
+     classification, no price and no family table. */
+  productId?: string;
+  slug?: string;
+  audience?: ProductAudience;
+  sections?: ProductDetailSections;
 }
 
 /* ── value helpers ─────────────────────────────────────────────── */
@@ -436,6 +445,9 @@ export const ProductPreview = (props: ProductPreviewProps) => {
     warranty,
     variants,
     siblings,
+    productId,
+    slug,
+    sections,
   } = props;
 
   /* Localize the schema ONCE, at the source: every downstream read of
@@ -546,8 +558,6 @@ export const ProductPreview = (props: ProductPreviewProps) => {
     () => (activeVariant ? { ...familyValues, ...activeVariant.overrides } : familyValues),
     [familyValues, activeVariant],
   );
-  const heroImage = (activeVariant?.photo || mainImageUrl) ?? null;
-  const heroCode = activeVariant?.code || primaryModel;
 
   /* ── Apple-style scroll choreography ──
      One IntersectionObserver arms every top-level band: sections drift up
@@ -771,7 +781,57 @@ export const ProductPreview = (props: ProductPreviewProps) => {
     .filter((b) => b.fields.length > 0);
 
   /* ── derived: hero highlight chips (from key_features) ── */
-  const heroHighlights = asKnowledgeList(firstKb("key_features")?.content).slice(0, 4);
+  /* ── Hero plumbing ──
+     The family table's difference columns read the members' overrides by
+     CODE; labels and values are formatted by the same rules as the spec
+     sheet below, so a figure never reads differently in the two places. */
+  const overridesByCode = useMemo(() => {
+    const out: Record<string, Record<string, unknown>> = {};
+    for (const v of variants ?? []) out[v.code] = v.overrides ?? {};
+    return out;
+  }, [variants]);
+  const fieldByKey = useMemo(() => new Map(visibleFields.map((f) => [f.key, f] as const)), [visibleFields]);
+  const heroFieldLabel = useCallback((key: string) => fieldByKey.get(key)?.label ?? key, [fieldByKey]);
+  const heroFormatValue = useCallback((key: string, raw: unknown): string => {
+    const f = fieldByKey.get(key);
+    let display: string;
+    if (Array.isArray(raw)) {
+      display = raw.map((v) => f?.options?.find((o) => o.value === String(v))?.label ?? String(v)).join(", ");
+    } else if (typeof raw === "string") {
+      display = f?.options?.find((o) => o.value === raw)?.label ?? raw;
+    } else if (typeof raw === "boolean") {
+      display = raw ? t("preview.yes", "Yes") : t("preview.no", "No");
+    } else {
+      display = displayScalar(raw);
+    }
+    return f?.unit && display ? `${display} ${f.unit}` : display;
+  }, [fieldByKey, t]);
+
+  /* The three actions. Ask AI opens the floating panel on the AI tab with
+     the product already in the composer (placed, never sent). Compare
+     scrolls to the on-page compare band. Quote announces the product to
+     whichever quotation flow listens — the flow itself is the owner's to
+     specify (same contract as the catalogue card). */
+  const onHeroAction = useCallback((action: HeroAction, modelCode?: string) => {
+    if (typeof window === "undefined") return;
+    const subject = modelCode ? `${displayName} (${modelCode})` : displayName;
+    if (action === "ask_ai") {
+      window.dispatchEvent(new CustomEvent("koleex:ai-open", {
+        detail: {
+          draft: `${t("preview.heroAiDraft", "Tell me about")} ${subject}`,
+          hints: [{ key: `product:${productId ?? slug ?? subject}`, text: subject, severity: "info" }],
+        },
+      }));
+      return;
+    }
+    if (action === "compare") {
+      document.getElementById("kx-compare-pick")?.closest("section")?.scrollIntoView({ behavior: "smooth", block: "start" });
+      return;
+    }
+    window.dispatchEvent(new CustomEvent("koleex:quote-product", {
+      detail: { productId: productId ?? null, slug: slug ?? null, name: displayName, model: modelCode ?? primaryModel ?? null },
+    }));
+  }, [displayName, primaryModel, productId, slug, t]);
 
   /* ── media flags ── */
   const hasGallery = Array.isArray(galleryUrls) && galleryUrls.length > 0;
@@ -795,155 +855,31 @@ export const ProductPreview = (props: ProductPreviewProps) => {
 
   return (
     <div ref={flowRef} className="space-y-20 md:space-y-36 pb-24">
-      {/* ═══ 0. POSTER HEADER (optional) ═══
-          When an admin uploads a designed poster/banner, it leads the page
-          full-bleed with an overlaid identity block + CTA — the "shop window".
-          A subtle bottom scrim keeps the text legible over any image. When no
-          poster is set, the auto-composed cinematic hero below takes over. */}
-      {posterUrl ? (
-        <div data-reveal data-cascade className="space-y-10 md:space-y-14">
-          {/* The poster is the photo, nothing else (owner rule): no scrim, no
-              overlaid copy. Identity + CTA live in their own block below it,
-              where they are readable regardless of what the image shows. */}
-          {/* Full-bleed cinematic hero — escapes the page gutter like an
-              Apple product film; edge-to-edge, no frame. */}
-          <section className="relative -mx-4 md:-mx-6 lg:-mx-8 h-[52vh] md:h-[72vh] overflow-hidden bg-[var(--bg-secondary)]">
-            {heroVideoUrl ? (
-              /* The product film IS the hero: autoplaying, silent, looping —
-                 still photo-only per the owner rule (no overlaid copy). */
-              <video
-                src={heroVideoUrl}
-                poster={posterUrl}
-                autoPlay
-                muted
-                loop
-                playsInline
-                /* React never serialises the muted ATTRIBUTE (facebook/react
-                   #10389), so autoplay policies see an unmuted video and
-                   block it — force the property and kick playback here. */
-                ref={(el) => {
-                  if (el) {
-                    el.muted = true;
-                    el.play().catch(() => {});
-                  }
-                }}
-                className="absolute inset-0 h-full w-full object-cover"
-              />
-            ) : (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={IMG.poster(posterUrl)} alt={displayName} className="absolute inset-0 h-full w-full object-cover" />
-            )}
-          </section>
-          {/* Apple-style identity: centered stack — kicker, huge name,
-              light tagline, one CTA. */}
-          <div className="mx-auto max-w-3xl space-y-4 pt-4 text-center">
-            <div className="flex items-center justify-center gap-2 text-[11px] font-semibold uppercase tracking-[0.24em] text-[var(--text-faint)]">
-                {/* The mark, never the word (owner rule): BrandMark draws the
-                    KOLEEX logo for our own products and the name for a
-                    distributed brand. */}
-                <BrandMark brand={brand} className="h-[11px]" />
-                {machineKindLabel ? <span className="text-[var(--text-ghost)]">/</span> : null}
-                {machineKindLabel ? <span>{machineKindLabel}</span> : null}
-              </div>
-            <h1 className="text-4xl md:text-7xl lg:text-8xl font-semibold tracking-[-0.03em] text-[var(--text-primary)] leading-[1.0]">
-              {displayName || t("preview.untitledProduct", "Untitled product")}
-            </h1>
-            {displayTagline ? (
-              <p className="mx-auto max-w-2xl text-lg md:text-2xl font-light text-[var(--text-muted)] leading-snug">{displayTagline}</p>
-            ) : null}
-            <div className="pt-2">
-              <a href="#overview" className="inline-flex items-center gap-2 h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold hover:opacity-90 transition-all shadow-lg">
-                {t("preview.learnMore", "Learn more")}
-              </a>
-            </div>
-          </div>
-
-          {/* THE main product photo — the floating studio shot on a light
-              well (this is where the primary image lives; the poster above
-              is the campaign banner, this is the product itself). */}
-          {heroImage ? (
-            <section className="relative overflow-hidden rounded-3xl bg-gradient-to-b from-white to-[#f1f2f4]">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={IMG.hero(heroImage as string)}
-                alt={displayName}
-                className="mx-auto max-h-[560px] w-auto object-contain px-8 py-12 md:py-16"
-              />
-            </section>
-          ) : null}
-        </div>
-      ) : null}
-
-      {/* ═══ 1. CINEMATIC HERO (auto-composed; hidden when a custom poster is set) ═══
-          The machine is the protagonist. Generous negative space, a large
-          unframed render, and a calm identity column. No floating cards —
-          the headline stats live in the dedicated band below so nothing
-          duplicates or collides. */}
-      {!posterUrl ? (
-      <section className="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-16 items-center pt-2 md:pt-6">
-        {/* LEFT — identity */}
-        <div className="order-2 lg:order-1 lg:col-span-5 space-y-7">
-          <div className="space-y-4">
-            <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.24em] text-[var(--text-faint)]">
-                <BrandMark brand={brand} className="h-[11px]" />
-                {machineKindLabel ? <span className="text-[var(--border-subtle)]">/</span> : null}
-                {machineKindLabel ? <span>{machineKindLabel}</span> : null}
-              </div>
-            <h1 className="text-[2.75rem] leading-[1.02] md:text-6xl md:leading-[0.98] font-semibold tracking-[-0.02em] text-[var(--text-primary)]">
-              {displayName || t("preview.untitledProduct", "Untitled product")}
-            </h1>
-            {displayTagline ? (
-              <p className="text-xl md:text-2xl font-light text-[var(--text-secondary)] leading-snug max-w-xl">
-                {displayTagline}
-              </p>
-            ) : null}
-            {heroCode ? (
-              <div className="font-mono text-xs text-[var(--text-faint)] tracking-[0.12em] pt-1">{heroCode}</div>
-            ) : null}
-          </div>
-
-          {heroHighlights.length > 0 ? (
-            <ul className="space-y-3 pt-1">
-              {heroHighlights.map((h, i) => (
-                <li key={i} className="flex items-start gap-3 text-[15px] leading-snug text-[var(--text-secondary)]">
-                  <VisualGlyph token="check" className="mt-[3px] h-4 w-4 shrink-0 text-[var(--text-primary)]" />
-                  <span>{h}</span>
-                </li>
-              ))}
-            </ul>
-          ) : null}
-
-          {(warranty || countryOfOrigin) ? (
-            <div className="flex flex-wrap gap-x-8 gap-y-3 pt-2">
-              {warranty ? (
-                <div>
-                  <div className="text-[10px] uppercase tracking-[0.18em] text-[var(--text-faint)]">{t("preview.warranty", "Warranty")}</div>
-                  <div className="mt-0.5 text-sm font-medium text-[var(--text-primary)]">{warranty}</div>
-                </div>
-              ) : null}
-              {countryOfOrigin ? (
-                <div>
-                  <div className="text-[10px] uppercase tracking-[0.18em] text-[var(--text-faint)]">{t("preview.origin", "Origin")}</div>
-                  <div className="mt-0.5 text-sm font-medium text-[var(--text-primary)]">{countryOfOrigin}</div>
-                </div>
-              ) : null}
-            </div>
-          ) : null}
-        </div>
-
-        {/* RIGHT — dominant unframed render */}
-        <div className="order-1 lg:order-2 lg:col-span-7">
-          <div className="relative w-full aspect-[4/3] md:aspect-[5/4] flex items-center justify-center">
-            {heroImage ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={IMG.hero(heroImage as string)} alt={displayName} className="h-full w-full object-contain drop-shadow-[0_30px_60px_rgba(0,0,0,0.25)]" />
-            ) : (
-              <span className="text-sm text-[var(--text-faint)]">{t("preview.noMainImage", "No main image")}</span>
-            )}
-          </div>
-        </div>
-      </section>
-      ) : null}
+      {/* ═══ HERO (rebuild phase 1) — poster when there is one, identity,
+          the photo big and clear, the Global FOB, the family table and the
+          three actions. Everything it shows arrived with the server props. */}
+      <ProductHero
+        name={displayName || t("preview.untitledProduct", "Untitled product")}
+        model={primaryModel ?? null}
+        tagline={displayTagline ?? null}
+        excerpt={(localized?.excerpt || "").trim() || sections?.excerpt || null}
+        brand={brand ?? null}
+        classification={sections?.classification ?? { division: null, category: null, subcategory: null }}
+        lang={lang}
+        posterUrl={posterUrl ?? null}
+        videoUrl={heroVideoUrl}
+        image={mainImageUrl ?? null}
+        models={sections?.models ?? []}
+        overridesByCode={overridesByCode}
+        fieldLabel={heroFieldLabel}
+        formatValue={heroFormatValue}
+        fob={sections?.fob ?? null}
+        selectedCode={selectedCode}
+        onSelectModel={(code) => setSelectedCode((prev) => (prev === code ? null : code))}
+        canCompare={(siblings ?? []).length > 0}
+        onAction={onHeroAction}
+        t={t}
+      />
 
       {/* ── Sticky product pill (Apple pattern): the product's own bar —
           name at the start, section anchors at the end. Lives BELOW the

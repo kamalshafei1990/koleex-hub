@@ -1,9 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireAuth } from "@/lib/server/auth";
-import { supabaseServer } from "@/lib/server/supabase-server";
-import { getPolicySnapshot } from "@/lib/server/commercial-policy";
-import { computePolicyPrice } from "@/lib/server/pricing-engine-policy";
-import { landedCostCny, type ProductSupplierLinkRow } from "@/lib/products-admin";
+import { globalFobForProducts } from "@/lib/server/products-fob";
 
 /* ---------------------------------------------------------------------------
    /api/products/fob-prices — Global FOB (USD) for a LIST of products.
@@ -43,15 +40,6 @@ export const dynamic = "force-dynamic";
 
 const MAX_IDS = 500;
 
-interface LinkRow {
-  product_id: string;
-  is_primary: boolean | null;
-  unit_cost_cny: number | string | null;
-  cost_basis: string | null;
-  cost_includes_tax: boolean | null;
-  cost_extras: ProductSupplierLinkRow["cost_extras"];
-}
-
 export async function POST(req: Request) {
   const auth = await requireAuth();
   if (auth instanceof NextResponse) return auth;
@@ -69,87 +57,13 @@ export async function POST(req: Request) {
   ids = Array.from(new Set(ids)).slice(0, MAX_IDS);
   if (ids.length === 0) return NextResponse.json({ prices: {}, fx: null });
 
-  const ctx = await getPolicySnapshot(auth.tenant_id);
-  if (!ctx.settings) {
+  /* The maths lives in lib/server/products-fob.ts (shared with the product
+     page's server render); this route is its HTTP face for the catalogue
+     card. The wire shape is unchanged: { prices, fx } (+ reason). */
+  const out = await globalFobForProducts(auth.tenant_id, ids);
+  if (out.reason) {
     /* Not an error for the card — it simply has no price to show yet. */
-    return NextResponse.json({ prices: {}, fx: null, reason: "policy_not_configured" });
+    return NextResponse.json({ prices: {}, fx: null, reason: out.reason });
   }
-
-  /* Two reads, both batched over the whole id set — never per product. */
-  const [linkRes, modelRes] = await Promise.all([
-    supabaseServer
-      .from("product_suppliers")
-      .select("product_id, is_primary, unit_cost_cny, cost_basis, cost_includes_tax, cost_extras")
-      .in("product_id", ids),
-    supabaseServer
-      .from("product_models")
-      .select("product_id, cost_price, pricing_mode, \"order\"")
-      .in("product_id", ids)
-      .order("order", { ascending: true }),
-  ]);
-
-  /* Landed cost per product: the PRIMARY supplier link wins; any other link
-     only fills a product that has no primary yet. */
-  const landed = new Map<string, number>();
-  for (const l of ((linkRes.data ?? []) as LinkRow[])) {
-    const { landed: value } = landedCostCny(l);
-    if (value == null || !Number.isFinite(value) || value <= 0) continue;
-    if (l.is_primary || !landed.has(l.product_id)) landed.set(l.product_id, value);
-  }
-
-  /* Fallback + pricing mode from the primary model (rows arrive pre-sorted,
-     so the first row seen for a product is its primary). */
-  const mode = new Map<string, string>();
-  for (const m of ((modelRes.data ?? []) as Array<{
-    product_id: string; cost_price: number | string | null; pricing_mode: string | null;
-  }>)) {
-    if (!mode.has(m.product_id)) mode.set(m.product_id, m.pricing_mode || "fixed");
-    if (landed.has(m.product_id)) continue;
-    const c = m.cost_price == null ? null : Number(m.cost_price);
-    if (c != null && Number.isFinite(c) && c > 0) landed.set(m.product_id, c);
-  }
-
-  const engineCtx = {
-    settings: ctx.settings,
-    productLevels: ctx.productLevels,
-    marketBands: ctx.marketBands,
-    bandCountries: ctx.bandCountries,
-    channelMultipliers: ctx.channelMultipliers,
-    customerTiers: ctx.customerTiers,
-    volumeDiscountTiers: ctx.volumeDiscountTiers,
-    discountTiers: ctx.discountTiers,
-    commissionTiers: ctx.commissionTiers,
-  };
-
-  /* Pure CPU from here — one engine run per product, no further IO. */
-  const prices: Record<string, { fobUsd: number | null; mode: string }> = {};
-  let fxCnyPerUsd: number | null = null;
-
-  for (const id of ids) {
-    const pm = mode.get(id) || "fixed";
-    if (pm === "on_request") {
-      prices[id] = { fobUsd: null, mode: "on_request" };
-      continue;
-    }
-    const cost = landed.get(id);
-    if (cost == null) {
-      prices[id] = { fobUsd: null, mode: pm };
-      continue;
-    }
-    const run = computePolicyPrice(
-      { factoryCostCny: cost, qty: 1, customerCountryCode: null, customerTierCode: null },
-      engineCtx,
-    );
-    const b = run.breakdown;
-    if (fxCnyPerUsd == null && b.fxCnyPerUsd != null) fxCnyPerUsd = b.fxCnyPerUsd;
-    prices[id] = {
-      fobUsd: b.globalFobUsd != null && Number.isFinite(b.globalFobUsd) ? b.globalFobUsd : null,
-      mode: pm,
-    };
-  }
-
-  return NextResponse.json({
-    prices,
-    fx: fxCnyPerUsd == null ? null : { cnyPerUsd: fxCnyPerUsd },
-  });
+  return NextResponse.json({ prices: out.prices, fx: out.fx });
 }

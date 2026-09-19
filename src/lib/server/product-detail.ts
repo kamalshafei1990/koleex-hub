@@ -29,6 +29,7 @@ import type {
 } from "@/types/product-schema";
 import type { FeatureCard } from "@/types/supabase";
 import type { ProductLogistics } from "@/lib/logistics";
+import { globalFobForProducts, type FobFigure } from "@/lib/server/products-fob";
 
 /* Who is reading. Decides what the page, the AI and the print may show:
      internal — Hub staff: everything customer-visible plus the Price section
@@ -49,7 +50,7 @@ const PRODUCT_PUBLIC_COLUMNS =
      all customer-visible columns already on the row, so ONE read serves
      the page, the AI and the print. Nothing internal is here: cost,
      supplier, MOQ and lead time never enter this loader. */
-  "description, highlights, feature_cards, logistics, ce_certified, rohs_compliant, ip_rating, warranty_months";
+  "description, highlights, feature_cards, logistics, ce_certified, rohs_compliant, ip_rating, warranty_months, tenant_id";
 
 interface PublicProductRow {
   id: string;
@@ -79,6 +80,7 @@ interface PublicProductRow {
   rohs_compliant: boolean | null;
   ip_rating: string | null;
   warranty_months: number | null;
+  tenant_id: string | null;
 }
 
 interface MediaRow {
@@ -145,7 +147,18 @@ export interface SchemaProductPreviewProps {
 /** The product page's sections beyond the hero — read straight from the
  *  same row, so Product Data and the page cannot disagree. Options and
  *  prices join here in their own phases (they live in other tables). */
+/** A taxonomy node with its three names; the client picks by language. */
+export interface TaxonomyName { slug: string; name: string; name_zh: string | null; name_ar: string | null }
+
 export interface ProductDetailSections {
+  /** Division › Category › Subcategory, each null when the slug resolves
+   *  to nothing (a product mid-move). */
+  classification: { division: TaxonomyName | null; category: TaxonomyName | null; subcategory: TaxonomyName | null };
+  /** The short pitch under the tagline (products.excerpt). */
+  excerpt: string | null;
+  /** Global FOB in USD — present ONLY for a price audience (PRICE_AUDIENCES);
+   *  null otherwise, and null when Commercial Setup is not configured. */
+  fob: { product: FobFigure | null; models: Record<string, FobFigure>; fx: { cnyPerUsd: number } | null } | null;
   description: string | null;
   highlights: string[];
   featureCards: FeatureCard[];
@@ -157,6 +170,8 @@ export interface ProductDetailSections {
 }
 
 export interface LoadedSchemaProduct {
+  id: string;
+  slug: string;
   productName: string;
   tagline: string | null;
   audience: ProductAudience;
@@ -218,9 +233,10 @@ export async function loadPublicSchemaProduct(
 
   const supabase = getSupabaseServer();
 
-  const [{ data: subcat }, { data: mediaData }, { data: modelData }, { data: translationData }, { data: siblingData }] =
+  const NAMES = "slug, name, name_zh, name_ar";
+  const [{ data: subcat }, { data: mediaData }, { data: modelData }, { data: translationData }, { data: siblingData }, { data: divRow }, { data: catRow }] =
     await Promise.all([
-      supabase.from("subcategories").select("code").eq("slug", product.subcategory_slug ?? "").maybeSingle(),
+      supabase.from("subcategories").select(`code, ${NAMES}`).eq("slug", product.subcategory_slug ?? "").maybeSingle(),
       supabase
         .from("product_media")
         .select('url, alt_text, "order", type, model_id')
@@ -255,9 +271,15 @@ export async function loadPublicSchemaProduct(
             return q;
           })()
         : Promise.resolve({ data: null }),
+      supabase.from("divisions").select(NAMES).eq("slug", product.division_slug ?? "").maybeSingle(),
+      supabase.from("categories").select(NAMES).eq("slug", product.category_slug ?? "").maybeSingle(),
     ]);
 
   const subcategoryCode = (subcat?.code as string | null) ?? "";
+  const asName = (r: unknown): TaxonomyName | null => {
+    const x = r as TaxonomyName | null;
+    return x && x.slug ? { slug: x.slug, name: x.name, name_zh: x.name_zh ?? null, name_ar: x.name_ar ?? null } : null;
+  };
   const media = (mediaData as MediaRow[] | null) ?? [];
   const models = (modelData as ModelRow[] | null) ?? [];
   const model = models.find((r) => !!r.primary_model) ?? models[0] ?? null;
@@ -350,7 +372,19 @@ export async function loadPublicSchemaProduct(
     return { name: s.product_name, slug: s.slug, imageUrl: siblingImages.get(s.id) ?? null, values: vals };
   });
 
+  /* Price only for a price audience, and computed HERE so the hero paints
+     with its figure instead of a placeholder that fills in later. One call,
+     one product, model figures included. The cost never leaves the lib. */
+  let fob: ProductDetailSections["fob"] = null;
+  if (PRICE_AUDIENCES.has(audience) && product.tenant_id) {
+    const r = await globalFobForProducts(product.tenant_id, [product.id]);
+    if (!r.reason) fob = { product: r.prices[product.id] ?? null, models: r.models, fx: r.fx };
+  }
+
   const sections: ProductDetailSections = {
+    classification: { division: asName(divRow), category: asName(catRow), subcategory: asName(subcat) },
+    excerpt: product.excerpt,
+    fob,
     description: product.description,
     highlights: (product.highlights ?? []).filter((h) => typeof h === "string" && h.trim().length > 0),
     featureCards: (product.feature_cards ?? []).filter((c) => c && (c.image_url || c.title)),
@@ -373,6 +407,8 @@ export async function loadPublicSchemaProduct(
   };
 
   return {
+    id: product.id,
+    slug: product.slug,
     productName: product.product_name,
     tagline: model?.tagline ?? null,
     audience,

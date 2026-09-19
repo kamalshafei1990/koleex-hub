@@ -58,7 +58,13 @@ export default async function PublicProductPage({
         </div>
       </header>
       <main className="mx-auto w-full max-w-6xl px-4 md:px-8 py-6 md:py-10">
-        <ProductPreview {...loaded.preview} />
+        <ProductPreview
+          {...loaded.preview}
+          productId={loaded.id}
+          slug={loaded.slug}
+          audience={loaded.audience}
+          sections={loaded.sections}
+        />
       </main>
     </div>
   );

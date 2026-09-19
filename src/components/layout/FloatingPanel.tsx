@@ -225,6 +225,25 @@ export default function FloatingPanel() {
     return () => window.removeEventListener("koleex:copilot-context", handler as EventListener);
   }, []);
 
+  /* ── Open-with-context ("Ask AI" on a product page, 19/09/2026) ──
+     A page can hand the operator straight into the AI tab with the subject
+     already in the composer and the page's hints as chips — one click from
+     a product to a conversation about it. The draft is only PLACED, never
+     sent: the operator reads it and decides. Same event shape as the hints
+     above, plus an optional draft. */
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const handler = (e: Event) => {
+      const ce = e as CustomEvent<{ draft?: string; hints?: CopilotHint[] }>;
+      if (Array.isArray(ce.detail?.hints)) setCopilotHints(ce.detail.hints.slice(0, 4));
+      if (typeof ce.detail?.draft === "string") setAiInput(ce.detail.draft);
+      setTab("ai");
+      setOpen(true);
+    };
+    window.addEventListener("koleex:ai-open", handler as EventListener);
+    return () => window.removeEventListener("koleex:ai-open", handler as EventListener);
+  }, []);
+
   /* Restore the rolling FAB conversation (id + its history) the first
      time the AI tab is shown after mount. 404 → start fresh. */
   useEffect(() => {

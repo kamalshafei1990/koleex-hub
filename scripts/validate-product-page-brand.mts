@@ -30,6 +30,7 @@ const expect = (cond: boolean, m: string, why?: string) => (cond ? ok(m) : fail(
 
 const FILES = [
   "src/app/products/[id]/page.tsx",
+  "src/components/product-preview/ProductHero.tsx",
   "src/components/product-preview/ProductPreview.tsx",
   "src/app/products/[id]/LegacyProductView.tsx",
 ];
@@ -42,6 +43,7 @@ function brandWords(src: string): string[] {
     .replace(/generateMetadata[\s\S]*?\n}\n/, "")            // the tab title lives here
     .replace(/\/brand\/koleex-[a-z-]+\.svg/g, "")           // asset paths
     .replace(/koleexgroup\.com/g, "")                        // the domain
+    .replace(/koleex:[a-z-]+/g, "")                          // window event names (koleex:ai-open)
     .replace(/[A-Za-z_]*[Kk]oleex[A-Za-z_]+/g, "")           // identifiers: KoleexMark, isKoleexBrand, koleexHub…
     .replace(/aria-label="KOLEEX"/g, "");
   return cleaned.split("\n").filter((l) => /\bkoleex\b/i.test(l)).map((l) => l.trim());
@@ -57,8 +59,8 @@ for (const rel of FILES) {
 }
 {
   const src = fs.readFileSync(path.join(ROOT, FILES[1]), "utf8");
-  const mutated = src.replace('<BrandMark brand={brand} className="h-[11px]" />', "<span>KOLEEX</span>");
-  expect(mutated !== src, "  (mutation applied at the kicker)");
+  const mutated = src.replace(/<BrandMark brand=\{p\.brand\}[^/]*\/>/, "<span>KOLEEX</span>");
+  expect(mutated !== src, "  (mutation applied at the hero's brand line)");
   expect(brandWords(mutated).length === 1, "  (the rule sees the failure direction)");
 }
 
@@ -70,9 +72,9 @@ for (const rel of FILES) {
 }
 {
   const src = fs.readFileSync(path.join(ROOT, FILES[1]), "utf8");
-  const mutated = src.replace('<BrandMark brand={brand} className="h-[11px]" />', "<span>{brand}</span>");
+  const mutated = src.replace(/<BrandMark brand=\{p\.brand\}[^/]*\/>/, "<span>{brand}</span>");
   expect(rawBrandRenders(mutated).length === 1, "  (the rule sees the failure direction)");
-  expect(/import \{ BrandMark \} from "@\/components\/brand\/KoleexMark"/.test(src), "ProductPreview imports BrandMark from the one mark component");
+  expect(/import \{ BrandMark \} from "@\/components\/brand\/KoleexMark"/.test(src), "ProductHero imports BrandMark from the one mark component");
 }
 
 console.log(failed ? `\n✗ product page brand: ${failed} check(s) failed\n` : "\n✓ product page brand: all checks passed\n");

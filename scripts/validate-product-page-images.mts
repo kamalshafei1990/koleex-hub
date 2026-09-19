@@ -29,6 +29,7 @@ const fail = (m: string, why?: string) => { failed++; console.error(`  ✗ ${m}$
 const expect = (cond: boolean, m: string, why?: string) => (cond ? ok(m) : fail(m, why));
 
 const FILES = [
+  "src/components/product-preview/ProductHero.tsx",
   "src/components/product-preview/ProductPreview.tsx",
   "src/app/products/[id]/LegacyProductView.tsx",
   "src/app/products/[id]/page.tsx",
@@ -63,12 +64,12 @@ expect(total >= 15, `the rule saw the real images (${total} found; the page had 
 
 /* Failure direction: un-wrap one src on a copy and make sure it is caught. */
 const previewSrc = fs.readFileSync(path.join(ROOT, FILES[0]), "utf8");
-const mutated = previewSrc.replace("src={IMG.hero(heroImage as string)}", "src={heroImage as string}");
+const mutated = previewSrc.replace("src={IMG.hero(heroImage)}", "src={heroImage}");
 expect(mutated !== previewSrc, "  (mutation applied — the hero site is where it was)");
 expect(imgSrcs(mutated).some((e) => !wrapped(e)), "  (the rule sees the failure direction)");
 
 console.log("\n§2 the LCP image is preloaded with its sized URL");
-const page = code(fs.readFileSync(path.join(ROOT, FILES[2]), "utf8"));
+const page = code(fs.readFileSync(path.join(ROOT, FILES[3]), "utf8"));
 expect(/preload\(\s*lcp\s*,\s*\{\s*as:\s*"image"/.test(page), "page.tsx preloads the hero/poster");
 expect(/IMG\.poster\(/.test(page) && /IMG\.hero\(/.test(page), "…using the SAME IMG sizes the hero renders",
   "a preload of a different URL than the <img> is a second download, not a head start");

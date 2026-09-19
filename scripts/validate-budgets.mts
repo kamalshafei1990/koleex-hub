@@ -134,12 +134,14 @@ const ROUTE_BUDGETS: Record<string, { chunks: number; kbytes: number }> = {
   "finance/visual": { chunks: 14, kbytes: 849 },
   "invoices/[id]/print": { chunks: 14, kbytes: 1040 },
   "product-data/[id]": { chunks: 14, kbytes: 1053 },
-  /* Ratcheted 19/09/2026 to the measured 853 KB (+7 KB slack) at the start
-     of the product-page rebuild; the rebuild's own target is 700 KB and the
-     ceiling drops there when it lands, not before — a budget below the
-     current weight would block every unrelated push in between. */
-  "products/[id]": { chunks: 10, kbytes: 860 },
-  "products/preview/[slug]": { chunks: 10, kbytes: 860 },
+  /* Product-page rebuild, 19/09/2026. Phase 0 ratcheted this to the measured
+     853 KB; phase 1 (the new hero + family table, +17 KB measured) sits at
+     870 while the OLD sections it will replace are still in the bundle — the
+     page carries both for now. Phases 2–3 delete the old blocks and the
+     ceiling then drops toward the rebuild's 700 KB target. It never goes up
+     again after this line: every later phase must come in under 875. */
+  "products/[id]": { chunks: 10, kbytes: 875 },
+  "products/preview/[slug]": { chunks: 10, kbytes: 875 },
   "quotations/[id]/print": { chunks: 13, kbytes: 984 },
   "suppliers/[id]": { chunks: 13, kbytes: 1062 },
   /* ── RE-BASELINED 17/09/2026 ──────────────────────────────────────────────
