@@ -125,7 +125,7 @@ export default function FinanceBankAccounts() {
 
   /* ── KPI strip across the whole tenant. ── */
   const tenantKpi = useMemo(() => {
-    let avail = 0, pending = 0, restricted = 0, unrec = 0;
+    let avail = 0, pending = 0, restricted = 0, unrec = 0, gapCount = 0;
     let primary: BankAccountListItem | null = null;
     for (const a of accounts) {
       if (a.status !== "active") continue;
@@ -133,9 +133,10 @@ export default function FinanceBankAccounts() {
       pending   += a.pending_balance;
       restricted += a.restricted_balance;
       unrec     += a.unreconciled_count;
+      if (Math.abs(a.ledger_difference ?? 0) >= 0.01) gapCount += 1;
       if (a.is_primary && !primary) primary = a;
     }
-    return { avail, pending, restricted, unrec, primary, total: accounts.length };
+    return { avail, pending, restricted, unrec, gapCount, primary, total: accounts.length };
   }, [accounts]);
 
   /* ── Group accounts by currency for the grid. ── */
@@ -187,7 +188,7 @@ export default function FinanceBankAccounts() {
           <MetricCard label={t("bankAccounts.kpi.available", "Available")} value={tenantKpi.avail} unit={baseCurrency} hint={t("bankAccounts.kpi.availableHint", "Across active accounts")} loading={loading} />
           <MetricCard label={t("bankAccounts.kpi.pending", "Pending")} value={tenantKpi.pending} unit={baseCurrency} hint={t("bankAccounts.kpi.pendingHint", "Not yet cleared")} loading={loading} />
           <MetricCard label={t("bankAccounts.kpi.restricted", "Restricted")} value={tenantKpi.restricted} unit={baseCurrency} hint={t("bankAccounts.kpi.restrictedHint", "Holds + reserves")} loading={loading} />
-          <MetricCard label={t("bankAccounts.kpi.unreconciled", "Unreconciled movements")} value={tenantKpi.unrec} unit={t("bankAccounts.cm", "cm.")} hint={t("bankAccounts.kpi.unreconciledHint", "Across all accounts")} loading={loading} />
+          <MetricCard label={t("bankAccounts.kpi.ledgerGap", "Ledger vs statement")} value={tenantKpi.gapCount} unit={t("bankAccounts.kpi.accountsUnit", "acct.")} hint={tenantKpi.gapCount === 0 ? t("bankAccounts.kpi.ledgerGapOk", "Every account agrees with the books") : t("bankAccounts.kpi.ledgerGapHint", "Accounts whose books differ from the statement")} loading={loading} />
         </div>
 
         {error && (
@@ -362,6 +363,15 @@ function AccountCard({
         <BalanceCell label={t("bankAccounts.balance.available", "Available")} value={account.available_balance} ccy={account.currency} tone={lowCash ? "warning" : "neutral"} />
         <BalanceCell label={t("bankAccounts.balance.pending", "Pending")}   value={account.pending_balance}   ccy={account.currency} tone="neutral" />
         <BalanceCell label={t("bankAccounts.balance.restricted", "Restricted")} value={account.restricted_balance} ccy={account.currency} tone="neutral" />
+      </div>
+
+      {/* Books vs statement — the number the ledger holds for this account
+          against the balance typed from the bank. A difference is work for
+          reconciliation, not a display choice. */}
+      <div className="grid grid-cols-3 gap-2 rounded-lg border border-[var(--border-faint)] px-3 py-2.5">
+        <BalanceCell label={t("bankAccounts.balance.ledger", "Ledger")} value={account.ledger_balance} ccy={account.currency} tone="neutral" />
+        <BalanceCell label={t("bankAccounts.balance.statement", "Statement")} value={account.current_balance} ccy={account.currency} tone="neutral" />
+        <BalanceCell label={t("bankAccounts.balance.difference", "Difference")} value={account.ledger_difference} ccy={account.currency} tone={Math.abs(account.ledger_difference) >= 0.01 ? "warning" : "neutral"} />
       </div>
 
       {/* Operational counters */}

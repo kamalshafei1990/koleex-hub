@@ -248,6 +248,24 @@ function PeriodCloseSection() {
 
   const locked = state?.locked_through ?? null;
 
+  /* Month-end entries on demand — the close runs them too. */
+  const runMonthEnd = async (action: "depreciation" | "revaluation") => {
+    if (!through) return;
+    setBusy(true); setError(null); setNotice(null);
+    try {
+      const r = await fetch("/api/accounting/month-end", {
+        method: "POST", credentials: "include", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(action === "depreciation" ? { action, through } : { action, as_of: through }),
+      });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) { setError(humanizeError(j.error ?? j.errors?.[0]?.error ?? `HTTP ${r.status}`)); return; }
+      setNotice(action === "depreciation"
+        ? t("setup.period.depDone", "Depreciation posted for {n} month(s)").replace("{n}", String(j.runs ?? 0))
+        : (j.entry_id ? t("setup.period.fxDone", "FX revaluation posted ({no})").replace("{no}", String(j.journal_no ?? "")) : t("setup.period.fxNone", "Nothing to revalue at this date")));
+      await load();
+    } finally { setBusy(false); }
+  };
+
   return (
     <section className="kx-glass rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] px-4 py-3.5">
       <ConfirmDialog
@@ -264,6 +282,7 @@ function PeriodCloseSection() {
           <Eyebrow>{t("setup.period.eyebrow", "Period close")}</Eyebrow>
           <div className="mt-1 text-[15px] text-[var(--text-highlight)]">{t("setup.period.title", "Close the books through a date")}</div>
           <p className="mt-1 text-[11px] text-[var(--text-dim)]">{t("setup.period.hint", "Closing moves the period's revenue and expenses to Retained Earnings in one posted entry and locks every date on or before it. Nothing can be posted, voided or edited inside a closed period.")}</p>
+          <p className="mt-1 text-[11px] text-[var(--text-dim)]">{t("setup.period.monthEndHint", "Before it closes, the period gets its month-end entries: straight-line depreciation for every whole month from the asset register, and a revaluation of foreign-currency bank, receivable and payable balances at the closing rate. Both can also be run here on their own.")}</p>
         </div>
         <div className="text-end">
           <div className="text-[10px] uppercase tracking-[0.14em] text-[var(--text-dim)]">{t("setup.period.lockedThrough", "Locked through")}</div>
@@ -283,6 +302,12 @@ function PeriodCloseSection() {
           onClick={() => setAsk("close")}
           className="h-10 rounded-xl bg-[var(--bg-inverted)] px-5 text-[13px] font-semibold text-[var(--text-inverted)] shadow-lg transition hover:opacity-90 disabled:opacity-50"
         >{t("setup.period.closeBtn", "Close period")}</button>
+        <button type="button" disabled={busy || !through} onClick={() => void runMonthEnd("depreciation")} className="h-10 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] px-4 text-[13px] font-semibold text-[var(--text-muted)] transition hover:border-[var(--border-focus)] hover:text-[var(--text-primary)] disabled:opacity-50">
+          {t("setup.period.runDep", "Run depreciation")}
+        </button>
+        <button type="button" disabled={busy || !through} onClick={() => void runMonthEnd("revaluation")} className="h-10 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] px-4 text-[13px] font-semibold text-[var(--text-muted)] transition hover:border-[var(--border-focus)] hover:text-[var(--text-primary)] disabled:opacity-50">
+          {t("setup.period.runFx", "Revalue FX")}
+        </button>
         {locked && (
           <button type="button" disabled={busy} onClick={() => setAsk("reopen")} className="h-10 rounded-xl px-4 text-[13px] font-medium text-[var(--text-dim)] transition hover:bg-[var(--bg-surface)] hover:text-[var(--text-primary)] disabled:opacity-50">
             {t("setup.period.reopen", "Reopen")}

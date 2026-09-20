@@ -219,4 +219,12 @@ export const FIN_SETUP: Translations = {
   "setup.period.reopened":      { en: "Books reopened",                  zh: "账簿已重新打开",           ar: "أُعيد فتح الدفاتر" },
   "setup.period.history":       { en: "Closing entries",                 zh: "结账分录",                ar: "قيود الإقفال" },
   "setup.period.none":          { en: "None yet.",                       zh: "暂无。",                  ar: "لا شيء بعد." },
+  "setup.period.monthEndHint":  { en: "Before it closes, the period gets its month-end entries: straight-line depreciation for every whole month from the asset register, and a revaluation of foreign-currency bank, receivable and payable balances at the closing rate. Both can also be run here on their own.",
+                                   zh: "结账前会先生成期末分录：按资产登记对每个完整月份计提直线法折旧，并按期末汇率对外币银行、应收与应付余额进行重估。两者也可在此单独运行。",
+                                   ar: "قبل الإقفال تُسجَّل قيود نهاية الشهر: إهلاك بالقسط الثابت عن كل شهر كامل من سجل الأصول، وإعادة تقييم أرصدة البنوك والذمم المدينة والدائنة بالعملات الأجنبية بسعر الإقفال. ويمكن تشغيل كليهما هنا بشكل مستقل." },
+  "setup.period.runDep":        { en: "Run depreciation",                zh: "计提折旧",                ar: "تشغيل الإهلاك" },
+  "setup.period.runFx":         { en: "Revalue FX",                      zh: "外币重估",                ar: "إعادة تقييم العملات" },
+  "setup.period.depDone":       { en: "Depreciation posted for {n} month(s)", zh: "已计提 {n} 个月的折旧", ar: "رُحّل الإهلاك عن {n} شهر" },
+  "setup.period.fxDone":        { en: "FX revaluation posted ({no})",    zh: "外币重估已过账（{no}）",   ar: "رُحّلت إعادة تقييم العملات ({no})" },
+  "setup.period.fxNone":        { en: "Nothing to revalue at this date", zh: "该日期无需重估",          ar: "لا شيء لإعادة تقييمه في هذا التاريخ" },
 };

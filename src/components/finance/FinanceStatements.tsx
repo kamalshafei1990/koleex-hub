@@ -30,17 +30,12 @@ import { useTabMotion } from "@/components/ui/useTabMotion";
 import { useTranslation } from "@/lib/i18n";
 import { FIN_STATEMENTS } from "@/lib/translations/finance/statements";
 import { Eyebrow, Hairline } from "@/components/finance/FinanceDashboardUi";
+import { fmtAccounting as fmtMoney, todayIso } from "@/lib/finance/format";
 
 type Tab = "pl" | "bs" | "cf" | "ar" | "ap" | "inv" | "gp";
 
 const TAB_KEYS: Tab[] = ["pl", "bs", "cf", "ar", "ap", "inv", "gp"];
 
-function fmtMoney(n: number) {
-  if (!Number.isFinite(n)) return "—";
-  if (Math.abs(n) < 0.005) return "—";
-  const abs = Math.abs(n).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-  return n < 0 ? `(${abs})` : abs;
-}
 function fmtQty(n: number) {
   if (!Number.isFinite(n)) return "—";
   return n.toLocaleString("en-US", { maximumFractionDigits: 4 });
@@ -58,7 +53,7 @@ export default function FinanceStatements() {
     { key: "gp",  label: t("statements.tab.gp", "Gross Profit") },
   ];
   void TAB_KEYS;
-  const today = useMemo(() => new Date().toISOString().slice(0, 10), []);
+  const today = useMemo(() => todayIso(), []);
   const yearStart = useMemo(() => `${new Date().getUTCFullYear()}-01-01`, []);
 
   const [tab, setTab] = useState<Tab>("pl");

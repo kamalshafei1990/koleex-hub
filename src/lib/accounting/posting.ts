@@ -94,6 +94,8 @@ export function sourceTableFor(sourceType: JournalSourceType): string | null {
 async function loadAccountsByCode(tenantId: string): Promise<Map<string, AccountingAccount>> {
   /* Idempotent seed — ON CONFLICT DO NOTHING, so a seeded tenant is a no-op. */
   await supabaseServer.rpc("fn_accounting_ensure_coa", { p_tenant_id: tenantId });
+  /* One child of 1010 per bank account, so a bank balance is a ledger figure. */
+  await supabaseServer.rpc("fn_accounting_ensure_bank_accounts", { p_tenant_id: tenantId });
   const { data } = await supabaseServer
     .from("accounting_accounts")
     .select("id, code, name, type, subtype, normal_balance, is_active")
@@ -101,6 +103,33 @@ async function loadAccountsByCode(tenantId: string): Promise<Map<string, Account
   const map = new Map<string, AccountingAccount>();
   for (const a of (data ?? []) as AccountingAccount[]) map.set(a.code, a);
   return map;
+}
+
+interface BankRow { id: string; gl_account_id: string | null; currency: string; is_primary: boolean; status: string }
+
+/** The GL account a bank-side line posts to: the named bank account's own
+ *  sub-account; otherwise the tenant's primary account in that currency,
+ *  then any active account in that currency, then the primary; the parent
+ *  1010 only when the tenant has no bank accounts at all. */
+async function resolveBankGl(tenantId: string, accts: Map<string, AccountingAccount>, bankAccountId: string | null | undefined, currency: string): Promise<AccountingAccount> {
+  const { data } = await supabaseServer
+    .from("finance_bank_accounts")
+    .select("id, gl_account_id, currency, is_primary, status")
+    .eq("tenant_id", tenantId)
+    .is("deleted_at", null);
+  const banks = (data ?? []) as BankRow[];
+  const active = banks.filter((b) => b.status === "active");
+  const ccy = currency.toUpperCase();
+  const pick =
+    (bankAccountId ? banks.find((b) => b.id === bankAccountId) : undefined) ??
+    active.find((b) => b.currency.toUpperCase() === ccy && b.is_primary) ??
+    active.find((b) => b.currency.toUpperCase() === ccy) ??
+    active.find((b) => b.is_primary) ??
+    active[0];
+  if (pick?.gl_account_id) {
+    for (const a of accts.values()) if (a.id === pick.gl_account_id) return a;
+  }
+  return requireAccount(accts, "1010");
 }
 
 function requireAccount(map: Map<string, AccountingAccount>, code: string): AccountingAccount {
@@ -360,17 +389,17 @@ const notApproved = (what: string, status: string | null): PostingError => ({
 async function buildPayment(ctx: PostingContext, paymentId: string): Promise<DraftArgs | PostingError> {
   const { data } = await supabaseServer
     .from("finance_payments")
-    .select("id, direction, party_type, party_id, party_name, amount, currency, payment_date, reference_no, status, approval_status, linked_invoice_id, linked_expense_id")
+    .select("id, direction, party_type, party_id, party_name, amount, currency, payment_date, reference_no, status, approval_status, linked_invoice_id, linked_expense_id, bank_account_id")
     .eq("id", paymentId)
     .eq("tenant_id", ctx.tenantId)
     .maybeSingle();
   if (!data) return { ok: false, error: "Payment not found", code: 404 };
-  const p = data as { id: string; direction: "in" | "out"; party_type: string; party_id: string | null; party_name: string; amount: number; currency: string; payment_date: string; reference_no: string | null; status: string; approval_status: string | null; linked_invoice_id: string | null; linked_expense_id: string | null };
+  const p = data as { id: string; direction: "in" | "out"; party_type: string; party_id: string | null; party_name: string; amount: number; currency: string; payment_date: string; reference_no: string | null; status: string; approval_status: string | null; linked_invoice_id: string | null; linked_expense_id: string | null; bank_account_id: string | null };
   if (p.status !== "completed") return { ok: false, error: `Cannot post a ${p.status} payment`, code: 409 };
   if (!APPROVED.has(p.approval_status ?? "")) return notApproved("Payment", p.approval_status);
 
   const accts = await loadAccountsByCode(ctx.tenantId);
-  const bank = requireAccount(accts, "1010");
+  const bank = await resolveBankGl(ctx.tenantId, accts, p.bank_account_id, p.currency);
   const amt = r2(p.amount);
   const ref = p.reference_no;
   const party = { party_id: p.party_id, party_type: (p.party_type === "customer" || p.party_type === "supplier" ? p.party_type : null) as "customer" | "supplier" | null };
@@ -419,7 +448,7 @@ async function buildPayment(ctx: PostingContext, paymentId: string): Promise<Dra
   return {
     tenantId: ctx.tenantId, postedBy: ctx.postedByAccountId,
     sourceType: "payment", sourceId: p.id, entryDate: p.payment_date, description,
-    metadata: { payment_id: p.id, party_id: p.party_id, party_type: p.party_type, direction: p.direction, invoice_id: p.linked_invoice_id, expense_id: p.linked_expense_id },
+    metadata: { payment_id: p.id, party_id: p.party_id, party_type: p.party_type, direction: p.direction, invoice_id: p.linked_invoice_id, expense_id: p.linked_expense_id, bank_account_id: p.bank_account_id, bank_gl: bank.code },
     lines,
   };
 }
@@ -477,16 +506,16 @@ async function buildExpense(ctx: PostingContext, expenseId: string): Promise<Dra
 async function buildCashMovement(ctx: PostingContext, movementId: string): Promise<DraftArgs | PostingError | { redirectPaymentId: string }> {
   const { data } = await supabaseServer
     .from("finance_cash_movements")
-    .select("id, direction, amount, currency, movement_date, bank_reference, counterparty_name, related_payment_id")
+    .select("id, direction, amount, currency, movement_date, bank_reference, counterparty_name, related_payment_id, bank_account_id")
     .eq("id", movementId)
     .eq("tenant_id", ctx.tenantId)
     .maybeSingle();
   if (!data) return { ok: false, error: "Cash movement not found", code: 404 };
-  const m = data as { id: string; direction: string; amount: number; currency: string; movement_date: string; bank_reference: string | null; counterparty_name: string | null; related_payment_id: string | null };
+  const m = data as { id: string; direction: string; amount: number; currency: string; movement_date: string; bank_reference: string | null; counterparty_name: string | null; related_payment_id: string | null; bank_account_id: string | null };
   if (m.related_payment_id) return { redirectPaymentId: m.related_payment_id };
 
   const accts = await loadAccountsByCode(ctx.tenantId);
-  const bank = requireAccount(accts, "1010");
+  const bank = await resolveBankGl(ctx.tenantId, accts, m.bank_account_id, m.currency);
   const clearing = requireAccount(accts, "1090");
   const amt = r2(m.amount);
   const inflow = m.direction === "inflow";
@@ -495,7 +524,7 @@ async function buildCashMovement(ctx: PostingContext, movementId: string): Promi
     tenantId: ctx.tenantId, postedBy: ctx.postedByAccountId,
     sourceType: "cash_movement", sourceId: m.id, entryDate: m.movement_date,
     description: `Bank movement — ${m.counterparty_name ?? "unattributed"}${ref ? ` (ref ${ref})` : ""}`,
-    metadata: { movement_id: m.id, direction: m.direction, clearing: true },
+    metadata: { movement_id: m.id, direction: m.direction, clearing: true, bank_account_id: m.bank_account_id, bank_gl: bank.code },
     lines: inflow
       ? [
           { account_id: bank.id,     debit: amt, credit: 0,   currency: m.currency, description: "Unclassified inflow", reference: ref },
@@ -702,12 +731,12 @@ async function buildPayroll(ctx: PostingContext, runId: string): Promise<DraftAr
 async function buildFxExchange(ctx: PostingContext, exchangeId: string): Promise<DraftArgs | PostingError> {
   const { data } = await supabaseServer
     .from("finance_fx_exchanges")
-    .select("id, exchange_no, exchange_date, from_currency, to_currency, from_amount, to_amount, status")
+    .select("id, exchange_no, exchange_date, from_currency, to_currency, from_amount, to_amount, status, from_bank_id, to_bank_id")
     .eq("id", exchangeId)
     .eq("tenant_id", ctx.tenantId)
     .maybeSingle();
   if (!data) return { ok: false, error: "FX exchange not found", code: 404 };
-  const x = data as { id: string; exchange_no: string | null; exchange_date: string; from_currency: string; to_currency: string; from_amount: number; to_amount: number; status: string };
+  const x = data as { id: string; exchange_no: string | null; exchange_date: string; from_currency: string; to_currency: string; from_amount: number; to_amount: number; status: string; from_bank_id: string | null; to_bank_id: string | null };
   if (x.status === "voided" || x.status === "cancelled") return { ok: false, error: `Exchange is ${x.status}`, code: 409 };
   const fromAmt = r2(x.from_amount);
   const toAmt = r2(x.to_amount);
@@ -723,11 +752,12 @@ async function buildFxExchange(ctx: PostingContext, exchangeId: string): Promise
   const diff = r2(toAmt * toRate - fromAmt * fromRate); // + gain, − loss in base
 
   const accts = await loadAccountsByCode(ctx.tenantId);
-  const bank = requireAccount(accts, "1010");
+  const toBank = await resolveBankGl(ctx.tenantId, accts, x.to_bank_id, x.to_currency);
+  const fromBank = await resolveBankGl(ctx.tenantId, accts, x.from_bank_id, x.from_currency);
   const ref = x.exchange_no;
   const lines: DraftLine[] = [
-    { account_id: bank.id, debit: toAmt, credit: 0, currency: x.to_currency, exchange_rate: toRate, description: `Bought ${x.to_currency}`, reference: ref },
-    { account_id: bank.id, debit: 0, credit: fromAmt, currency: x.from_currency, exchange_rate: fromRate, description: `Sold ${x.from_currency}`, reference: ref },
+    { account_id: toBank.id, debit: toAmt, credit: 0, currency: x.to_currency, exchange_rate: toRate, description: `Bought ${x.to_currency}`, reference: ref },
+    { account_id: fromBank.id, debit: 0, credit: fromAmt, currency: x.from_currency, exchange_rate: fromRate, description: `Sold ${x.from_currency}`, reference: ref },
   ];
   if (diff > 0) lines.push({ account_id: requireAccount(accts, "4900").id, debit: 0, credit: diff, currency: base, exchange_rate: 1, description: "Realised FX gain", reference: ref });
   if (diff < 0) lines.push({ account_id: requireAccount(accts, "5900").id, debit: -diff, credit: 0, currency: base, exchange_rate: 1, description: "Realised FX loss", reference: ref });

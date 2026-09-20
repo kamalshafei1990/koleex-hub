@@ -25,6 +25,17 @@ export default function FinancePayments() {
   /* Phase 2.3 — review drawer + approver-permission state. */
   const [reviewPayment, setReviewPayment] = useState<FinancePayment | null>(null);
   const [canApprove, setCanApprove] = useState(false);
+  /* Bank accounts for the "paid from / received into" picker: the ledger
+     books the payment on that account's own sub-account. */
+  const [banks, setBanks] = useState<Array<{ id: string; bank_name: string; account_name: string; currency: string; is_primary: boolean; status: string }>>([]);
+  useEffect(() => {
+    let cancelled = false;
+    void fetch("/api/finance/bank-accounts", { cache: "no-store" })
+      .then((r) => r.json())
+      .then((j) => { if (!cancelled) setBanks(((j.accounts ?? []) as typeof banks).filter((b) => b.status === "active")); })
+      .catch(() => { /* picker stays empty; the ledger falls back to the primary account */ });
+    return () => { cancelled = true; };
+  }, []);
   useEffect(() => {
     let cancelled = false;
     void fetch("/api/me/permitted-modules", { cache: "no-store" })
@@ -66,7 +77,8 @@ export default function FinancePayments() {
     payment_date: new Date().toISOString().slice(0, 10),
     status: "completed",
     payment_method: "T/T",
-  }), [baseCurrency]);
+    bank_account_id: banks.find((b) => b.currency === baseCurrency && b.is_primary)?.id ?? banks.find((b) => b.is_primary)?.id ?? null,
+  }), [baseCurrency, banks]);
 
   /* Deep link honoured: /finance/payments?new=1 (Data Entry hub, Smart
      Create) opens the customer-payment form; ?new=out opens supplier. */
@@ -169,6 +181,12 @@ export default function FinancePayments() {
                 </Field>
                 <Field label={t("payments.field.reference", "Reference")}>
                   <input value={editing.reference_no ?? ""} onChange={(e) => setEditing({ ...editing, reference_no: e.target.value })} placeholder={t("payments.field.referencePh", "Bank ref / cheque no.")} className={INPUT} />
+                </Field>
+                <Field label={t("payments.field.bank", "Bank account")}>
+                  <select value={editing.bank_account_id ?? ""} onChange={(e) => setEditing({ ...editing, bank_account_id: e.target.value || null })} className={INPUT}>
+                    <option value="">{t("payments.field.bankAuto", "Primary for currency")}</option>
+                    {banks.map((b) => <option key={b.id} value={b.id}>{b.bank_name} · {b.account_name} ({b.currency})</option>)}
+                  </select>
                 </Field>
                 <Field label={t("payments.field.status", "Status")}>
                   <select value={editing.status ?? "completed"} onChange={(e) => setEditing({ ...editing, status: e.target.value as FinancePayment["status"] })} className={INPUT}>

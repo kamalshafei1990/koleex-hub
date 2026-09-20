@@ -18,6 +18,7 @@ import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { requireAuth, requireModuleAction } from "@/lib/server/auth";
 import { ledgerDraft } from "@/lib/accounting/hooks";
+import { defaultBankAccountId } from "@/lib/finance/bank";
 
 type Body = {
   kind: "requisition" | "order" | "receipt" | "bill" | "payment";
@@ -282,6 +283,7 @@ export async function POST(req: Request) {
             payment_date: str(doc.paid_at) ?? new Date().toISOString().slice(0, 10),
             payment_method: str(doc.method) ?? "bank_transfer",
             reference_no: str(doc.reference) ?? payment_no,
+            bank_account_id: str(doc.bank_account_id) ?? (await defaultBankAccountId(tid, str(doc.currency) ?? "USD")),
             status: "completed",
             approval_status: "approved",
             approved_at: new Date().toISOString(),

@@ -12,6 +12,7 @@ import { FIN_ACCOUNTING } from "@/lib/translations/finance/accounting";
 import { FIN_CF } from "@/lib/translations/finance/cf";
 import { FIN_COMMON } from "@/lib/translations/finance/common";
 import { Eyebrow, Hairline } from "@/components/finance/FinanceDashboardUi";
+import { fmtAccounting as fmt, todayIso } from "@/lib/finance/format";
 
 /* Only the namespaces this screen actually reads — see finance.ts. */
 const DICT = { ...FIN_ACCOUNTING, ...FIN_CF, ...FIN_COMMON } as const;
@@ -31,11 +32,6 @@ interface CashFlowStatement {
   reconciled: boolean;
 }
 
-function fmt(n: number): string {
-  if (Math.abs(n) < 0.005) return "—";
-  const abs = Math.abs(n).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-  return n < 0 ? `(${abs})` : abs;
-}
 
 export default function FinanceCashFlow() {
   const { t } = useTranslation(DICT);
@@ -46,7 +42,7 @@ export default function FinanceCashFlow() {
     if (l.includes("financ")) return "cf.section.financing";
     return "";
   };
-  const today = useMemo(() => new Date().toISOString().slice(0, 10), []);
+  const today = useMemo(() => todayIso(), []);
   const ytdStart = useMemo(() => `${new Date().getUTCFullYear()}-01-01`, []);
   const [from, setFrom] = useState(ytdStart);
   const [to,   setTo]   = useState(today);

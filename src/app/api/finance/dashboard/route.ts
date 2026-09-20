@@ -4,6 +4,7 @@ import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { requireAuth, requireModuleAccess } from "@/lib/server/auth";
 import type { DashboardKpi, DashboardPeriod } from "@/lib/finance/types";
+import { bankLedgerBalances } from "@/lib/finance/bank";
 
 /* GET /api/finance/dashboard?period=week|quarter|year
  *
@@ -433,6 +434,12 @@ export async function GET(req: Request) {
   }).length;
   const gross_margin_pct = total_revenue > 0 ? (gross_profit / total_revenue) * 100 : 0;
 
+  /* Daily bank check: every account's ledger figure against the statement
+     balance the operator holds. A gap is the first thing a manager should
+     hear about, before any profit number. */
+  const bankGaps = Array.from((await bankLedgerBalances(auth.tenant_id).catch(() => new Map())).values())
+    .filter((b) => Math.abs(b.difference) >= 0.01);
+
   const health_reasons: string[] = [];
   let health_status: "healthy" | "watch" | "stress" | "unknown" = "healthy";
   const hasAnyActivity = total_revenue > 0 || total_expenses > 0 || cash_in > 0 || cash_out > 0;
@@ -455,6 +462,10 @@ export async function GET(req: Request) {
     if (accounts_payable > accounts_receivable * 1.5 && health_status === "healthy") {
       health_status = "watch";
       health_reasons.push("Outstanding payables significantly outpace receivables.");
+    }
+    if (bankGaps.length > 0) {
+      if (health_status === "healthy") health_status = "watch";
+      health_reasons.push(`${bankGaps.length} bank account${bankGaps.length === 1 ? "" : "s"} where the books differ from the statement.`);
     }
     if (health_status === "healthy") {
       health_reasons.push("Profit positive, cash flowing, no critical overdue items.");

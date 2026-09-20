@@ -261,6 +261,7 @@ export interface FinancePayment {
   linked_order_id: string | null;
   linked_order_supplier_id: string | null;
   linked_expense_id: string | null;
+  bank_account_id?: string | null;
   notes: string | null;
   created_at: string;
   updated_at: string;

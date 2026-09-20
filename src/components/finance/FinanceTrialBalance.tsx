@@ -19,6 +19,7 @@ import { FIN_TB } from "@/lib/translations/finance/tb";
 import { translateAccountName } from "@/lib/translations/finance/account-names";
 import { EmptyState } from "@/components/finance/FinanceUi";
 import RrIcon from "@/components/ui/RrIcon";
+import { fmtAccounting as fmt, todayIso } from "@/lib/finance/format";
 import type { TrialBalance } from "@/lib/accounting/types";
 
 /* Only the namespaces this screen reads — see finance.ts. */
@@ -33,11 +34,6 @@ const TYPE_GROUPS: Array<{ key: string; label: string; types: string[] }> = [
   { key: "tb.group.expenses",    label: "Expenses",    types: ["expense", "contra_expense"] },
 ];
 
-function fmt(n: number): string {
-  if (Math.abs(n) < 0.005) return "—";
-  const abs = Math.abs(n).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-  return n < 0 ? `(${abs})` : abs;
-}
 
 function Card({ children }: { children: React.ReactNode }) {
   return <div className="kx-glass rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] p-5">{children}</div>;
@@ -54,7 +50,7 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 
 export default function FinanceTrialBalance() {
   const { t, lang } = useTranslation(DICT);
-  const today = useMemo(() => new Date().toISOString().slice(0, 10), []);
+  const today = useMemo(() => todayIso(), []);
   const ninetyAgo = useMemo(() => { const d = new Date(); d.setDate(d.getDate() - 365); return d.toISOString().slice(0, 10); }, []);
   const [from, setFrom] = useState<string>("");          // empty = all-time
   const [to,   setTo]   = useState<string>(today);

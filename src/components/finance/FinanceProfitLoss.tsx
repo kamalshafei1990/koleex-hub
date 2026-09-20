@@ -17,6 +17,7 @@ import { FIN_COMMON } from "@/lib/translations/finance/common";
 import { FIN_PL } from "@/lib/translations/finance/pl";
 import { translateAccountName } from "@/lib/translations/finance/account-names";
 import { Eyebrow, Hairline } from "@/components/finance/FinanceDashboardUi";
+import { fmtAccounting as fmt, todayIso } from "@/lib/finance/format";
 import type { Lang } from "@/lib/i18n";
 
 /* Only the namespaces this screen reads — see finance.ts. */
@@ -40,11 +41,6 @@ interface ProfitLoss {
   comparison?: ProfitLoss;
 }
 
-function fmt(n: number): string {
-  if (Math.abs(n) < 0.005) return "—";
-  const abs = Math.abs(n).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-  return n < 0 ? `(${abs})` : abs;
-}
 function pct(n: number): string {
   if (!Number.isFinite(n)) return "—";
   return `${n.toFixed(1)}%`;
@@ -52,7 +48,7 @@ function pct(n: number): string {
 
 export default function FinanceProfitLoss() {
   const { t, lang } = useTranslation(DICT);
-  const today = useMemo(() => new Date().toISOString().slice(0, 10), []);
+  const today = useMemo(() => todayIso(), []);
   const ytdStart = useMemo(() => `${new Date().getUTCFullYear()}-01-01`, []);
   const [from, setFrom] = useState(ytdStart);
   const [to,   setTo]   = useState(today);

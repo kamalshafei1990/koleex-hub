@@ -62,6 +62,7 @@ export async function POST(req: Request) {
     linked_order_id: body.linked_order_id ?? null,
     linked_order_supplier_id: body.linked_order_supplier_id ?? null,
     linked_expense_id: body.linked_expense_id ?? null,
+    bank_account_id: body.bank_account_id ?? null,
     notes: body.notes ?? null,
     updated_at: new Date().toISOString(),
   };

@@ -31,6 +31,8 @@ export const FIN_PAYMENTS: Translations = {
   "payments.field.reference":    { en: "Reference",               zh: "参考号",                 ar: "المرجع" },
   "payments.field.referencePh":  { en: "Bank ref / cheque no.",   zh: "银行参考号 / 支票号",      ar: "مرجع البنك / رقم الشيك" },
   "payments.field.status":       { en: "Status",                  zh: "状态",                   ar: "الحالة" },
+  "payments.field.bank":         { en: "Bank account",            zh: "银行账户",               ar: "الحساب البنكي" },
+  "payments.field.bankAuto":     { en: "Primary for currency",    zh: "该币种的主账户",          ar: "الحساب الرئيسي للعملة" },
   "payments.field.notes":        { en: "Notes",                   zh: "备注",                   ar: "ملاحظات" },
   "payments.err.missing":        { en: "Please add a party name and amount.", zh: "请添加对方名称和金额。", ar: "أضف اسم الطرف والمبلغ." },
   "payments.err.saveFailed":     { en: "Save failed",             zh: "保存失败",                ar: "فشل الحفظ" },

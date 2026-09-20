@@ -127,4 +127,11 @@ export const FIN_BANKACCOUNTS: Translations = {
   "bankAccounts.imports.dups":  { en: "{n} duplicates",                  zh: "{n} 个重复",              ar: "{n} مكررات" },
   "bankAccounts.imports.errors":{ en: "{n} errors",                      zh: "{n} 个错误",              ar: "{n} أخطاء" },
   "bankAccounts.imports.movements":{ en: "{n} movements",                zh: "{n} 笔流动",              ar: "{n} حركة" },
+  "bankAccounts.balance.ledger":   { en: "Ledger",                        zh: "账面",                    ar: "الدفتر" },
+  "bankAccounts.balance.statement":{ en: "Statement",                     zh: "对账单",                  ar: "كشف البنك" },
+  "bankAccounts.balance.difference":{ en: "Difference",                   zh: "差额",                    ar: "الفرق" },
+  "bankAccounts.kpi.ledgerGap":    { en: "Ledger vs statement",           zh: "账面与对账单",            ar: "الدفتر مقابل الكشف" },
+  "bankAccounts.kpi.accountsUnit": { en: "acct.",                         zh: "个账户",                  ar: "حساب" },
+  "bankAccounts.kpi.ledgerGapOk":  { en: "Every account agrees with the books", zh: "所有账户与账簿一致", ar: "كل الحسابات مطابقة للدفاتر" },
+  "bankAccounts.kpi.ledgerGapHint":{ en: "Accounts whose books differ from the statement", zh: "账面与对账单不一致的账户", ar: "حسابات تختلف دفاترها عن الكشف" },
 };

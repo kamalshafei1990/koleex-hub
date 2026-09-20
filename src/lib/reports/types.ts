@@ -22,7 +22,11 @@ export type ReportType =
   | "reconciliation_report"
   | "treasury_report"
   | "expense_report"
-  | "executive_summary";
+  | "executive_summary"
+  /* Ledger-sourced — the control figures the accountant files and reconciles. */
+  | "vat_return"
+  | "ar_aging_ledger"
+  | "ap_aging_ledger";
 
 export type ReportChannel = "preview" | "pdf" | "print";
 

@@ -5,6 +5,7 @@ import { supabaseServer } from "@/lib/server/supabase-server";
 import { requireAuth, requireModuleAccess, requireModuleAction } from "@/lib/server/auth";
 import { resolveBaseCurrency } from "@/lib/finance/currency";
 import { ledgerDraft } from "@/lib/accounting/hooks";
+import { defaultBankAccountId } from "@/lib/finance/bank";
 
 /* GET  /api/invoices/:id/payments — list payments
    POST /api/invoices/:id/payments — record a customer payment against the
@@ -46,6 +47,7 @@ export async function POST(req: Request, { params }: RouteCtx) {
     received_at?: string | null;
     notes?: string | null;
     currency?: string;
+    bank_account_id?: string | null;
   } | null;
   const amount = Number(body?.amount);
   if (!Number.isFinite(amount) || amount <= 0) return NextResponse.json({ error: "amount must be > 0" }, { status: 400 });
@@ -116,6 +118,7 @@ export async function POST(req: Request, { params }: RouteCtx) {
       approved_at: new Date().toISOString(),
       approved_by: auth.account_id,
       linked_invoice_id: id,
+      bank_account_id: body?.bank_account_id ?? (await defaultBankAccountId(auth.tenant_id, currency)),
       notes: body?.notes ?? (inv.inv_no ? `Invoice ${inv.inv_no}` : null),
       created_by_account_id: auth.account_id,
     })
