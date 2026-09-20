@@ -241,7 +241,7 @@ export default function ExecutiveDashboard() {
             <RrIcon name="plus" size={12} /> Create
           </button>
           <FocusToggle />
-          <Link href="/finance/visual"
+          <Link href="/finance/statements"
                 className="inline-flex items-center gap-1.5 rounded-md border border-white/[0.10] bg-white/[0.04] px-3 py-1.5 text-[12px] hover:bg-white/[0.06]">
             <RrIcon name="balance-scale-left" size={12} /> Statements
           </Link>

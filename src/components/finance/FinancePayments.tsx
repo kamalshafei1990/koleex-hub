@@ -57,7 +57,7 @@ export default function FinancePayments() {
     return { inComp, outComp, pending, net: inComp - outComp };
   }, [rows]);
 
-  const startNew = (direction: FinancePayment["direction"]) => setEditing({
+  const startNew = useCallback((direction: FinancePayment["direction"]) => setEditing({
     direction,
     party_type: direction === "in" ? "customer" : "supplier",
     party_name: "",
@@ -66,7 +66,20 @@ export default function FinancePayments() {
     payment_date: new Date().toISOString().slice(0, 10),
     status: "completed",
     payment_method: "T/T",
-  });
+  }), [baseCurrency]);
+
+  /* Deep link honoured: /finance/payments?new=1 (Data Entry hub, Smart
+     Create) opens the customer-payment form; ?new=out opens supplier. */
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const v = new URLSearchParams(window.location.search).get("new");
+    if (!v) return;
+    const id = window.setTimeout(() => {
+      startNew(v === "out" ? "out" : "in");
+      window.history.replaceState(null, "", window.location.pathname);
+    }, 0);
+    return () => window.clearTimeout(id);
+  }, [startNew]);
 
   const save = async () => {
     if (!editing?.amount || !editing.party_name?.trim()) {

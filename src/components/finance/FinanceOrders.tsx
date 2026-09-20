@@ -198,7 +198,7 @@ export default function FinanceOrders() {
             to payments + AR aging so the operator can act on a
             number, not just admire it. */}
         <div className="mt-6 grid grid-cols-1 gap-3 lg:grid-cols-2">
-          <Link href="/finance/visual" className="block hover:opacity-95" aria-label={t("orders.openIncome.aria", "Open Income Statement")}>
+          <Link href="/finance/statements" className="block hover:opacity-95" aria-label={t("orders.openIncome.aria", "Open Income Statement")}>
             <HeroKpiCard
               label={t("orders.kpi.revenue", "Total Revenue")}
               helpId="finance.revenue"
@@ -210,7 +210,7 @@ export default function FinanceOrders() {
               loading={loading}
             />
           </Link>
-          <Link href="/finance/visual" className="block hover:opacity-95" aria-label={t("orders.openIncome.aria", "Open Income Statement")}>
+          <Link href="/finance/statements" className="block hover:opacity-95" aria-label={t("orders.openIncome.aria", "Open Income Statement")}>
             <HeroKpiCard
               label={t("orders.kpi.netProfit", "Net Profit")}
               helpId="finance.netProfit"

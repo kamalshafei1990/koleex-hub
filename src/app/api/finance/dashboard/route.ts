@@ -73,7 +73,7 @@ export async function GET(req: Request) {
   /* Pull the rows we need for both the current and previous windows in
      parallel. Keep the column selection tight — we only need amounts
      and dates for aggregations. */
-  const [ordersRes, ordersPrevRes, expensesRes, expensesPrevRes, paymentsRes, paymentsPrevRes, suppliersRes] = await Promise.all([
+  const [ordersRes, ordersPrevRes, expensesRes, expensesPrevRes, paymentsRes, paymentsPrevRes, suppliersRes, suppliersPrevRes] = await Promise.all([
     supabaseServer
       .from("finance_orders")
       .select("id, order_no, customer_name, currency, selling_price, tax_refund_value, financial_charges, order_date, payment_status")
@@ -88,38 +88,45 @@ export async function GET(req: Request) {
       .lte("order_date", prevEndISO),
     supabaseServer
       .from("finance_expenses")
-      .select("amount, expense_date, payment_status")
+      .select("id, amount, expense_date, payment_status")
       .eq("tenant_id", auth.tenant_id)
       .gte("expense_date", startISO)
       .lte("expense_date", endISO),
     supabaseServer
       .from("finance_expenses")
-      .select("amount")
+      .select("id, amount, payment_status")
       .eq("tenant_id", auth.tenant_id)
       .gte("expense_date", prevStartISO)
       .lte("expense_date", prevEndISO),
     supabaseServer
       .from("finance_payments")
-      .select("amount, direction, payment_date, status")
+      .select("amount, direction, payment_date, status, linked_expense_id")
       .eq("tenant_id", auth.tenant_id)
       .eq("status", "completed")
       .gte("payment_date", startISO)
       .lte("payment_date", endISO),
     supabaseServer
       .from("finance_payments")
-      .select("amount, direction")
+      .select("amount, direction, linked_expense_id")
       .eq("tenant_id", auth.tenant_id)
       .eq("status", "completed")
       .gte("payment_date", prevStartISO)
       .lte("payment_date", prevEndISO),
-    /* Supplier costs from orders within the current window — joined to
-       limit to recent orders only, matching the revenue window. */
+    /* Supplier costs from orders within each window — joined to limit to
+       the same orders the revenue figure counts, so gross profit and its
+       delta compare like with like. */
     supabaseServer
       .from("finance_order_suppliers")
       .select("supplier_cost, order_id, finance_orders!inner(order_date,tenant_id)")
       .eq("tenant_id", auth.tenant_id)
       .gte("finance_orders.order_date", startISO)
       .lte("finance_orders.order_date", endISO),
+    supabaseServer
+      .from("finance_order_suppliers")
+      .select("supplier_cost, finance_orders!inner(order_date,tenant_id)")
+      .eq("tenant_id", auth.tenant_id)
+      .gte("finance_orders.order_date", prevStartISO)
+      .lte("finance_orders.order_date", prevEndISO),
   ]);
 
   if (ordersRes.error || expensesRes.error || paymentsRes.error) {
@@ -139,13 +146,14 @@ export async function GET(req: Request) {
   const payments = paymentsRes.data ?? [];
   const paymentsPrev = paymentsPrevRes.data ?? [];
   const supplierCosts = suppliersRes.data ?? [];
+  const supplierCostsPrev = suppliersPrevRes.data ?? [];
 
   const total_revenue = orders.reduce((s, o) => s + (Number(o.selling_price) || 0), 0);
   const total_revenue_prev = ordersPrev.reduce((s, o) => s + (Number(o.selling_price) || 0), 0);
-  const total_supplier_cost = supplierCosts.reduce(
-    (s, x) => s + (Number((x as { supplier_cost: number | string }).supplier_cost) || 0),
-    0,
-  );
+  const sumSupplierCost = (rows: unknown[]) =>
+    rows.reduce<number>((s, x) => s + (Number((x as { supplier_cost: number | string }).supplier_cost) || 0), 0);
+  const total_supplier_cost = sumSupplierCost(supplierCosts);
+  const total_supplier_cost_prev = sumSupplierCost(supplierCostsPrev);
   const total_expenses = expenses.reduce((s, e) => s + (Number(e.amount) || 0), 0);
   const total_expenses_prev = expensesPrev.reduce((s, e) => s + (Number(e.amount) || 0), 0);
   const total_tax_refund = orders.reduce(
@@ -172,8 +180,7 @@ export async function GET(req: Request) {
   const gross_profit = total_revenue - total_supplier_cost;
   const net_profit =
     gross_profit - total_expenses + total_tax_refund - total_financial_charges;
-  const gross_profit_prev =
-    total_revenue_prev - 0; /* prev supplier cost not loaded — gross delta is approximate */
+  const gross_profit_prev = total_revenue_prev - total_supplier_cost_prev;
   const net_profit_prev =
     gross_profit_prev - total_expenses_prev + total_tax_refund_prev - total_financial_charges_prev;
 
@@ -189,22 +196,21 @@ export async function GET(req: Request) {
      payment_status='paid' is a common shortcut for "I paid this from
      petty cash / company card / etc." and we want it reflected in
      Cash Out without forcing the operator to also create a payment
-     row. Same treatment in the previous-window number so the delta
-     stays apples-to-apples. */
-  const cash_out_payments = payments
-    .filter((p) => p.direction === "out")
-    .reduce((s, p) => s + (Number(p.amount) || 0), 0);
-  const cash_out_paid_expenses = expenses
-    .filter((e) => (e as { payment_status: string }).payment_status === "paid")
-    .reduce((s, e) => s + (Number(e.amount) || 0), 0);
-  const cash_out = cash_out_payments + cash_out_paid_expenses;
-  const cash_out_payments_prev = paymentsPrev
-    .filter((p) => p.direction === "out")
-    .reduce((s, p) => s + (Number(p.amount) || 0), 0);
-  const cash_out_paid_expenses_prev = expensesPrev
-    .filter((e) => (e as { payment_status?: string }).payment_status === "paid")
-    .reduce((s, e) => s + (Number(e.amount) || 0), 0);
-  const cash_out_prev = cash_out_payments_prev + cash_out_paid_expenses_prev;
+     row. An expense that DOES have a completed payment row is counted
+     once, through the payment. Same treatment in the previous-window
+     number so the delta stays apples-to-apples. */
+  type PayRow = { direction: string; amount: number | string; linked_expense_id?: string | null };
+  type ExpRow = { id: string; amount: number | string; payment_status?: string };
+  const cashOutOf = (pays: PayRow[], exps: ExpRow[]) => {
+    const paidViaPayment = new Set(pays.filter((p) => p.direction === "out" && p.linked_expense_id).map((p) => p.linked_expense_id as string));
+    const outPayments = pays.filter((p) => p.direction === "out").reduce((s, p) => s + (Number(p.amount) || 0), 0);
+    const paidExpenses = exps
+      .filter((e) => e.payment_status === "paid" && !paidViaPayment.has(e.id))
+      .reduce((s, e) => s + (Number(e.amount) || 0), 0);
+    return outPayments + paidExpenses;
+  };
+  const cash_out = cashOutOf(payments as PayRow[], expenses as ExpRow[]);
+  const cash_out_prev = cashOutOf(paymentsPrev as PayRow[], expensesPrev as ExpRow[]);
 
   /* ── Accounts Receivable & Accounts Payable ──
      Point-in-time, not window-based.

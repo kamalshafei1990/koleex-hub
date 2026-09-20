@@ -135,14 +135,16 @@ export async function runPayroll(opts: { tenantId: string | null; period: string
     .or(opts.tenantId ? `tenant_id.eq.${opts.tenantId},tenant_id.is.null` : "tenant_id.is.null");
   const employeeIds = ((emps ?? []) as { id: string }[]).map((e) => e.id);
 
-  /* Existing run row for (period, country) — reused so a re-run replaces drafts. */
+  /* Existing run row for (tenant, period, country) — reused so a re-run
+     replaces drafts. Runs are tenant-scoped: payroll is a ledger source. */
   let runQ = supabaseServer.from("hr_payroll_runs").select("id, status").eq("period", opts.period);
+  runQ = opts.tenantId ? runQ.eq("tenant_id", opts.tenantId) : runQ.is("tenant_id", null);
   runQ = opts.country ? runQ.eq("country", opts.country) : runQ.is("country", null);
-  const { data: existingRun } = await runQ.maybeSingle();
+  const { data: existingRun } = await runQ.limit(1).maybeSingle();
   let runId = (existingRun as { id: string; status: string } | null)?.id ?? null;
   if (!runId) {
     const { data: created, error } = await supabaseServer.from("hr_payroll_runs")
-      .insert({ period: opts.period, country: opts.country, status: "draft", created_by: opts.createdBy }).select("id").single();
+      .insert({ tenant_id: opts.tenantId, period: opts.period, country: opts.country, status: "draft", created_by: opts.createdBy }).select("id").single();
     if (error || !created) throw new Error(error?.message ?? "run insert failed");
     runId = (created as { id: string }).id;
   }
@@ -206,8 +208,10 @@ export async function runPayroll(opts: { tenantId: string | null; period: string
 
 /** draft → approved → paid (and approved → draft to reopen). Moves the run
  *  and every slip in it together. */
-export async function transitionRun(runId: string, action: "approve" | "pay" | "reopen", actor: string | null): Promise<{ ok: boolean; status?: string; error?: string }> {
-  const { data } = await supabaseServer.from("hr_payroll_runs").select("id, status").eq("id", runId).maybeSingle();
+export async function transitionRun(runId: string, action: "approve" | "pay" | "reopen", actor: string | null, tenantId?: string | null): Promise<{ ok: boolean; status?: string; error?: string }> {
+  let q = supabaseServer.from("hr_payroll_runs").select("id, status").eq("id", runId);
+  if (tenantId) q = q.eq("tenant_id", tenantId);
+  const { data } = await q.maybeSingle();
   const run = data as { id: string; status: string } | null;
   if (!run) return { ok: false, error: "not_found" };
   const now = new Date().toISOString();

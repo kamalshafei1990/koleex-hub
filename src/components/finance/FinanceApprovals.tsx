@@ -12,6 +12,7 @@ import { humanizeError } from "@/lib/ui/humanize-error";
 import { useCallback, useMemo, useState } from "react";
 import { useWarmData } from "@/lib/warm-cache";
 import { useInput } from "@/components/kds/useInput";
+import { useToast } from "@/components/kds/useToast";
 import Link from "next/link";
 import {
   ErpEyebrow, ErpHairline, ErpPage, ErpPanel,
@@ -94,6 +95,7 @@ export default function FinanceApprovals() {
 
 
   const { askInput, inputDialog } = useInput();
+  const { showToast, toastElement } = useToast();
   function transition(it: PendingItem, action: "submit" | "approve" | "reject") {
     if (action === "reject") {
       askInput(t("approvals.rejectPrompt", "Reason for rejection (min 3 chars):"), (v) => void doTransition(it, action, v.trim()), {
@@ -116,7 +118,7 @@ export default function FinanceApprovals() {
       if (!r.ok) throw new Error(humanizeError(j.error || `HTTP ${r.status}`));
       await fetchAll();
     } catch (e) {
-      window.alert(e instanceof Error ? e.message : String(e));
+      showToast(e instanceof Error ? e.message : String(e), "error");
     } finally {
       setBusyId(null);
     }
@@ -137,6 +139,7 @@ export default function FinanceApprovals() {
       }
     >
       {inputDialog}
+      {toastElement}
       {loading && <div className="text-sm text-[var(--text-dim)]">{t("common.loading", "Loading…")}</div>}
       {/* The screen's own action errors and a failed refresh share one
           banner — a refresh that fails must not go unseen just because the

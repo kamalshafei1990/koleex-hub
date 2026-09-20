@@ -28,6 +28,7 @@ import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { requireAuth, requireModuleAccess , requireModuleAction} from "@/lib/server/auth";
 import type { ApprovalStatus, FinanceExpense } from "@/lib/finance/types";
+import { ledgerDraft, ledgerVoid } from "@/lib/accounting/hooks";
 
 type Action =
   | "submit"
@@ -182,6 +183,14 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
   if (error) {
     console.error("[expense approval POST]", error.message);
     return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+
+  /* The ledger follows the approval: an approved expense is drafted for
+     posting; an approval taken back reverses whatever was booked. */
+  if (next === "approved" || next === "partially_approved") {
+    await ledgerDraft("expense", id, auth.tenant_id, auth.account_id);
+  } else if (body.action === "reset" && (current === "approved" || current === "partially_approved")) {
+    await ledgerVoid("expense", id, auth.tenant_id, auth.account_id, "Expense approval reset");
   }
   return NextResponse.json({ expense: data as FinanceExpense });
 }

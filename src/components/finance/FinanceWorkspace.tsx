@@ -131,7 +131,7 @@ export default function FinanceWorkspace() {
             </div>
             <div className="grid grid-cols-1 gap-2 sm:grid-cols-4">
               <ErpQuickAction href="/finance/data-entry" icon="pencil"             label={t("workspace.qa.dataEntry",  "Data Entry")}  hint={t("workspace.qa.dataEntryHint",  "Assets · balances · all manual entry")} />
-              <ErpQuickAction href="/finance/visual"     icon="balance-scale-left" label={t("workspace.qa.statements", "Statements")}  hint={t("workspace.qa.statementsHint", "Income · Balance · Cash flow")} />
+              <ErpQuickAction href="/finance/statements"     icon="balance-scale-left" label={t("workspace.qa.statements", "Statements")}  hint={t("workspace.qa.statementsHint", "Income · Balance · Cash flow")} />
               <ErpQuickAction href="/finance/fx-rates"   icon="balance-scale-left" label={t("workspace.qa.fx",         "FX Rates")}    hint={t("workspace.qa.fxHint",         "USD → CNY · stale + missing")} />
               <ErpQuickAction href="/finance/approvals"  icon="badge-check"        label={t("workspace.qa.approvals",  "Approvals")}   hint={t("workspace.qa.approvalsHint",  "Review pending")} />
             </div>
@@ -253,7 +253,7 @@ export default function FinanceWorkspace() {
           {/* Navigation cards */}
           <section className="grid grid-cols-2 gap-2 md:grid-cols-4">
             <NavCard href="/finance/expenses"   icon="receipt"             label={t("workspace.nav.expenses",  "Expenses")}  count={snap.counts.expenses_open} />
-            <NavCard href="/finance/accounting" icon="books"               label={t("workspace.nav.journals",  "Journals")}  count={snap.counts.journals_draft} />
+            <NavCard href="/finance/accounting/queue" icon="books"               label={t("workspace.nav.journals",  "Journals")}  count={snap.counts.journals_draft} />
             <NavCard href="/reports"            icon="newspaper"           label={t("workspace.nav.reports",   "Reports")}   count={null} />
             <NavCard href="/finance/setup?card=fx-rates" icon="balance-scale-left" label={t("workspace.nav.fxActivity", "FX Activity")} count={snap.counts.fx_30d} />
           </section>

@@ -3,6 +3,11 @@ import "server-only";
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { requireAuth, requireModuleAccess, requireModuleAction } from "@/lib/server/auth";
+import { inLedger, ledgerDraft, ledgerVoid, refuseIfInLedger } from "@/lib/accounting/hooks";
+
+/* Fields that change what the ledger recorded for this invoice. Once the
+   invoice is booked they are frozen: void the journal first, then edit. */
+const FINANCIAL_FIELDS = new Set(["customer_id", "currency", "issue_date"]);
 
 type RouteCtx = { params: Promise<{ id: string }> };
 
@@ -63,7 +68,13 @@ export async function PATCH(req: Request, { params }: RouteCtx) {
   for (const k of allowed) if (k in body) patch[k] = body[k];
 
   if (patch.status === "paid") patch.paid_at = new Date().toISOString();
-  if (patch.status === "cancelled" || patch.status === "void") patch.cancelled_at = new Date().toISOString();
+  const cancelling = patch.status === "cancelled" || patch.status === "void";
+  if (cancelling) patch.cancelled_at = new Date().toISOString();
+
+  const booked = await inLedger("invoices", id, auth.tenant_id);
+  if (booked && Object.keys(patch).some((k) => FINANCIAL_FIELDS.has(k))) {
+    return (await refuseIfInLedger("invoices", id, auth.tenant_id))!;
+  }
 
   const { data, error } = await supabaseServer
     .from("invoices")
@@ -73,6 +84,14 @@ export async function PATCH(req: Request, { params }: RouteCtx) {
     .select("*")
     .single();
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+  /* Keep the books in step with the status: an issued invoice gets its
+     revenue entry, a cancelled one gets it reversed. */
+  if (cancelling && booked) {
+    await ledgerVoid("sales_revenue", id, auth.tenant_id, auth.account_id, `Invoice ${patch.status}`);
+  } else if (!booked && typeof patch.status === "string" && ["sent", "partial", "paid", "overdue"].includes(patch.status)) {
+    await ledgerDraft("sales_revenue", id, auth.tenant_id, auth.account_id);
+  }
   return NextResponse.json({ invoice: data });
 }
 
@@ -82,6 +101,9 @@ export async function DELETE(_req: Request, { params }: RouteCtx) {
   const deny = await requireModuleAction(auth, "Invoices", "delete");
   if (deny) return deny;
   const { id } = await params;
+
+  const refuse = await refuseIfInLedger("invoices", id, auth.tenant_id);
+  if (refuse) return refuse;
 
   // Hard delete cascades items + payments via FK.
   const { error } = await supabaseServer

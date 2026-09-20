@@ -24,6 +24,7 @@ import { FIN_SETUP } from "@/lib/translations/finance/setup";
 import { Eyebrow, Hairline } from "@/components/finance/FinanceDashboardUi";
 import RrIcon from "@/components/ui/RrIcon";
 import { humanizeError } from "@/lib/ui/humanize-error";
+import { fmtDMY, fmtMoney } from "@/lib/finance/format";
 
 type CardKey =
   | "base_currency" | "bank_accounts" | "cash_accounts" | "opening_balances"
@@ -47,11 +48,6 @@ interface SetupSnapshot {
   ready: boolean;
   completion: number;
   cards: SetupCard[];
-}
-
-function fmtMoney(n: number, currency: string) {
-  if (!Number.isFinite(n) || Math.abs(n) < 0.005) return "—";
-  return `${Number(n).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${currency}`;
 }
 
 /* ─── Status dot ──────────────────────────────────────────────── */
@@ -181,6 +177,10 @@ export default function FinanceSetup() {
         </div>
       </div>
 
+      <div className="mx-auto max-w-[1500px] px-4 pb-8 sm:px-6">
+        <PeriodCloseSection />
+      </div>
+
       {activeCard && snapshot && (
         <SetupDrawer
           cardKey={activeCard}
@@ -190,6 +190,125 @@ export default function FinanceSetup() {
         />
       )}
     </div>
+  );
+}
+
+/* ─── Period close ───────────────────────────────────────────────
+   The lock date and the close. Reads and writes /api/accounting/periods:
+   closing posts one entry that moves the period's P&L to Retained
+   Earnings and locks every date on or before it. Reopening is a Super
+   Admin action; the API refuses it for anyone else. */
+
+interface PeriodState {
+  locked_through: string | null;
+  locked_at: string | null;
+  closings: Array<{ id: string; journal_no: string; entry_date: string; status: string; description: string | null }>;
+}
+
+function PeriodCloseSection() {
+  const { t } = useTranslation(FIN_SETUP);
+  const [state, setState] = useState<PeriodState | null>(null);
+  const [through, setThrough] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+  const [ask, setAsk] = useState<"close" | "reopen" | null>(null);
+
+  const load = useCallback(async () => {
+    const r = await fetch("/api/accounting/periods", { credentials: "include", cache: "no-store" });
+    const j = await r.json().catch(() => null);
+    if (r.ok && j) setState(j as PeriodState);
+  }, []);
+  useEffect(() => { void load(); }, [load]);
+
+  /* Default the picker to the last day of the previous month — the usual close. */
+  useEffect(() => {
+    if (through) return;
+    const d = new Date(); d.setDate(0);
+    setThrough(fmtDMY(d) === "—" ? "" : d.toISOString().slice(0, 10));
+  }, [through]);
+
+  const run = async (mode: "close" | "reopen") => {
+    setBusy(true); setError(null); setNotice(null);
+    try {
+      const r = await fetch("/api/accounting/periods", {
+        method: mode === "close" ? "POST" : "DELETE",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ through: mode === "close" ? through : null }),
+      });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) { setError(humanizeError(j.error ?? `HTTP ${r.status}`)); return; }
+      setNotice(mode === "close"
+        ? t("setup.period.closed", "Period closed through {date}").replace("{date}", fmtDMY(through))
+        : t("setup.period.reopened", "Books reopened"));
+      await load();
+    } finally { setBusy(false); }
+  };
+
+  const locked = state?.locked_through ?? null;
+
+  return (
+    <section className="kx-glass rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] px-4 py-3.5">
+      <ConfirmDialog
+        open={ask !== null}
+        title={ask === "reopen"
+          ? t("setup.period.reopenConfirm", "Reopen the books? The lock is removed; closing entries stay until voided.")
+          : t("setup.period.confirm", "Close the books through {date}? Draft entries inside the period must be posted or removed first.").replace("{date}", fmtDMY(through))}
+        confirmLabel={ask === "reopen" ? t("setup.period.reopen", "Reopen") : t("setup.period.closeBtn", "Close period")}
+        onCancel={() => setAsk(null)}
+        onConfirm={() => { const m = ask; setAsk(null); if (m) void run(m); }}
+      />
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div className="min-w-0 max-w-xl">
+          <Eyebrow>{t("setup.period.eyebrow", "Period close")}</Eyebrow>
+          <div className="mt-1 text-[15px] text-[var(--text-highlight)]">{t("setup.period.title", "Close the books through a date")}</div>
+          <p className="mt-1 text-[11px] text-[var(--text-dim)]">{t("setup.period.hint", "Closing moves the period's revenue and expenses to Retained Earnings in one posted entry and locks every date on or before it. Nothing can be posted, voided or edited inside a closed period.")}</p>
+        </div>
+        <div className="text-end">
+          <div className="text-[10px] uppercase tracking-[0.14em] text-[var(--text-dim)]">{t("setup.period.lockedThrough", "Locked through")}</div>
+          <div className="mt-0.5 font-mono text-[18px] tabular-nums">{locked ? fmtDMY(locked) : "—"}</div>
+          {!locked && <div className="text-[10.5px] text-[var(--text-dim)]">{t("setup.period.open", "No period closed yet")}</div>}
+        </div>
+      </div>
+
+      <div className="mt-3 flex flex-wrap items-end gap-3">
+        <label className="block">
+          <div className={labelCls}>{t("setup.period.closeThrough", "Close through")}</div>
+          <input type="date" value={through} max={new Date().toISOString().slice(0, 10)} onChange={(e) => setThrough(e.target.value)} className={`${inputCls} w-auto`} />
+        </label>
+        <button
+          type="button"
+          disabled={busy || !through || (locked !== null && through <= locked)}
+          onClick={() => setAsk("close")}
+          className="h-10 rounded-xl bg-[var(--bg-inverted)] px-5 text-[13px] font-semibold text-[var(--text-inverted)] shadow-lg transition hover:opacity-90 disabled:opacity-50"
+        >{t("setup.period.closeBtn", "Close period")}</button>
+        {locked && (
+          <button type="button" disabled={busy} onClick={() => setAsk("reopen")} className="h-10 rounded-xl px-4 text-[13px] font-medium text-[var(--text-dim)] transition hover:bg-[var(--bg-surface)] hover:text-[var(--text-primary)] disabled:opacity-50">
+            {t("setup.period.reopen", "Reopen")}
+          </button>
+        )}
+        {error && <div className="rounded-md border border-rose-500/30 bg-rose-500/10 px-2 py-1.5 text-[11px] text-rose-600 dark:text-rose-300">{error}</div>}
+        {notice && <div className="rounded-md border border-emerald-500/30 bg-emerald-500/10 px-2 py-1.5 text-[11px] text-emerald-700 dark:text-emerald-200">{notice}</div>}
+      </div>
+
+      <div className="mt-4">
+        <div className={labelCls}>{t("setup.period.history", "Closing entries")}</div>
+        {!state || state.closings.length === 0 ? (
+          <div className="text-[11px] text-[var(--text-ghost)]">{t("setup.period.none", "None yet.")}</div>
+        ) : (
+          <ul className="divide-y divide-[var(--border-faint)] text-[11.5px]">
+            {state.closings.map((c) => (
+              <li key={c.id} className="flex items-center justify-between py-1.5">
+                <span className="font-mono text-[var(--text-highlight)]">{c.journal_no}</span>
+                <span className="text-[var(--text-secondary)]">{c.description ?? ""}</span>
+                <span className="font-mono text-[var(--text-dim)]">{fmtDMY(c.entry_date)} · {c.status}</span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    </section>
   );
 }
 

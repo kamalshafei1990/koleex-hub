@@ -15,7 +15,9 @@ export async function GET() {
   if (auth instanceof NextResponse) return auth;
   const deny = await requireModuleAction(auth, "HR", "view");
   if (deny) return deny;
-  const { data } = await supabaseServer.from("hr_payroll_runs").select("*").order("period", { ascending: false }).limit(60);
+  const { data } = await supabaseServer.from("hr_payroll_runs").select("*")
+    .or(`tenant_id.eq.${auth.tenant_id},tenant_id.is.null`)
+    .order("period", { ascending: false }).limit(60);
   return NextResponse.json({ runs: data ?? [] }, { headers: { "Cache-Control": "private, no-store" } });
 }
 

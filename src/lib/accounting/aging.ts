@@ -466,18 +466,18 @@ export async function buildCashFlowSummary(opts: {
   from: string;
   to: string;
 }): Promise<CashFlowSummary> {
-  const { data: payments } = await supabaseServer
-    .from("finance_payments")
-    .select("direction, amount, status, payment_date")
-    .eq("tenant_id", opts.tenantId)
-    .gte("payment_date", opts.from)
-    .lte("payment_date", opts.to)
-    .eq("status", "completed");
+  /* From the LEDGER's cash accounts, in base currency — the operational
+     payments table used to be summed here, which disagreed with the cash
+     flow statement built from the books. */
+  const { data, error } = await supabaseServer.rpc("fn_accounting_cash_flow_lines", {
+    p_tenant_id: opts.tenantId, p_from: opts.from, p_to: opts.to,
+  });
+  if (error) throw new Error(error.message);
   let cIn = 0, cOut = 0, nIn = 0, nOut = 0;
-  for (const p of ((payments ?? []) as Array<{ direction: "in" | "out"; amount: number }>)) {
-    const amt = Number(p.amount) || 0;
-    if (p.direction === "in") { cIn += amt; nIn += 1; }
-    else                       { cOut += amt; nOut += 1; }
+  for (const r of ((data ?? []) as Array<{ impact: number | string }>)) {
+    const v = Number(r.impact) || 0;
+    if (v > 0) { cIn += v; nIn += 1; }
+    else if (v < 0) { cOut += -v; nOut += 1; }
   }
   return {
     from: opts.from, to: opts.to,

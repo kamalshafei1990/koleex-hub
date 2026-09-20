@@ -2,11 +2,12 @@ import "server-only";
 
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
-import { requireAuth, requireModuleAccess , requireModuleAction} from "@/lib/server/auth";
+import { requireAuth, requireModuleAction } from "@/lib/server/auth";
+import { ledgerDraft } from "@/lib/accounting/hooks";
 
-/* POST /api/invoices/:id/send — mark a draft invoice as sent and fire
-   an inbox notification to the customer's account (if they have one)
-   AND to the creator if they're not the sender. */
+/* POST /api/invoices/:id/send — mark a draft invoice as sent, draft its
+   revenue recognition in the ledger (Dr A/R / Cr Revenue / Cr Tax) and
+   fire an inbox notification to the customer's account (if they have one). */
 
 type RouteCtx = { params: Promise<{ id: string }> };
 
@@ -30,6 +31,9 @@ export async function POST(_req: Request, { params }: RouteCtx) {
     .single();
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   if (!data) return NextResponse.json({ error: "Invoice not in a sendable state" }, { status: 400 });
+
+  // An issued invoice is revenue: draft the journal entry now (idempotent on resend).
+  await ledgerDraft("sales_revenue", data.id, auth.tenant_id, auth.account_id);
 
   // Optional: ping the customer's linked account if one exists.
   if (data.customer_id) {

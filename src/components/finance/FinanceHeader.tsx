@@ -4,15 +4,16 @@
    FinanceHeader — thin wrapper around the shared PageHeader.
 
    Same chrome as every other Hub app:
-     · 5 primary tabs: Overview · Orders · Customers · Suppliers · Expenses
-     · "Accounting" tab opens the ··· popup with 20+ accounting routes
-       grouped by Accounting · Banking · Treasury · Reports · Setup
+     · 6 primary tabs: Home · Orders · Customers · Suppliers · Expenses ·
+       Accounting (the queue)
+     · the ··· popup lists every other finance route, grouped by what the
+       operator is doing — Books · Statements · Bank · Treasury · Reports ·
+       Setup — with a one-line blurb each, translated like the labels.
    --------------------------------------------------------------------------- */
 
 import type { ReactNode } from "react";
 import PageHeader, { type PageTab } from "@/components/ui/PageHeader";
 import type { NavGroup } from "@/components/ui/PageNavPopup";
-import RrIcon from "@/components/ui/RrIcon";
 import Button from "@/components/ui/Button";
 import { openSmartCreate } from "@/components/ui/create/SmartCreateDrawer";
 import { useTranslation } from "@/lib/i18n";
@@ -24,7 +25,6 @@ import AppIcon from "@/components/common/AppIcon";
 
 /* Only the namespaces this screen actually reads — see finance.ts. */
 const DICT = { ...FIN_APP, ...FIN_HEADER } as const;
-
 
 export type HealthStatus = "healthy" | "watch" | "stress" | "unknown";
 
@@ -53,8 +53,12 @@ const HEALTH_STYLE: Record<HealthStatus, HealthStyle> = {
   },
 };
 
+type RawTab = { key: string; labelKey: string; fallback: string; icon: PageTab["icon"] };
+type RawItem = { key: string; labelKey: string; fallback: string; icon: NavGroup["items"][number]["icon"]; blurbKey: string; blurb: string };
+type RawGroup = { id: string; labelKey: string; fallback: string; accent: NavGroup["accent"]; items: RawItem[] };
+
 /* The 5 operator tabs + Accounting entry. */
-const PRIMARY_TABS_RAW: Array<{ key: string; labelKey: string; fallback: string; icon: PageTab["icon"] }> = [
+const PRIMARY_TABS_RAW: RawTab[] = [
   { key: "/finance",                    labelKey: "tabs.overview",    fallback: "Overview",   icon: "balance-scale-left" },
   { key: "/finance/orders",             labelKey: "subtab.orders",    fallback: "Orders",     icon: "file-invoice" },
   { key: "/finance/customers",          labelKey: "subtab.customers", fallback: "Customers",  icon: "arrow-down-left" },
@@ -63,66 +67,57 @@ const PRIMARY_TABS_RAW: Array<{ key: string; labelKey: string; fallback: string;
   { key: "/finance/accounting/queue",   labelKey: "tabs.accounting",  fallback: "Accounting", icon: "contract" },
 ];
 
-/* All accounting routes — grouped for the ··· popup. */
-const OVERFLOW_GROUPS_RAW: Array<{ id: string; labelKey: string; fallback: string; accent: NavGroup["accent"]; items: Array<{ key: string; labelKey: string; fallback: string; icon: NavGroup["items"][number]["icon"]; blurb: string }> }> = [
+/* Every other route, grouped by the job the operator is doing. */
+const OVERFLOW_GROUPS_RAW: RawGroup[] = [
   {
-    id: "accounting",
-    labelKey: "tabs.accounting",
-    fallback: "Accounting",
-    accent: ACCENT.blue,
+    id: "books", labelKey: "header.group.books", fallback: "Books", accent: ACCENT.blue,
     items: [
-      { key: "/finance/accounting/queue",          labelKey: "subtab.queue",         fallback: "Queue",          icon: "clock",                blurb: "Pending journal entries" },
-      { key: "/finance/accounting/trial-balance",  labelKey: "subtab.trialBalance",  fallback: "Trial Balance",  icon: "badge-check",          blurb: "All accounts at a glance" },
-      { key: "/finance/accounting/general-ledger", labelKey: "subtab.generalLedger", fallback: "General Ledger", icon: "contract",             blurb: "Every transaction posted" },
-      { key: "/finance/accounting/profit-loss",    labelKey: "subtab.profitLoss",    fallback: "Profit & Loss",  icon: "file-invoice-dollar",  blurb: "Income statement view" },
-      { key: "/finance/accounting/cash-flow",      labelKey: "subtab.cashFlow",      fallback: "Cash Flow",      icon: "wallet",               blurb: "Operating · investing · financing" },
-      { key: "/finance/accounting/equity",         labelKey: "subtab.equity",        fallback: "Equity",         icon: "coins",                blurb: "Owners' equity changes" },
+      { key: "/finance/accounting/queue",          labelKey: "subtab.queue",         fallback: "Accounting queue", icon: "clock",       blurbKey: "header.blurb.queue",        blurb: "Draft, review and post journal entries" },
+      { key: "/finance/accounting/general-ledger", labelKey: "subtab.generalLedger", fallback: "General Ledger",   icon: "contract",    blurbKey: "header.blurb.gl",           blurb: "Every posted line, per account" },
+      { key: "/finance/accounting/trial-balance",  labelKey: "subtab.trialBalance",  fallback: "Trial Balance",    icon: "badge-check", blurbKey: "header.blurb.tb",           blurb: "All account balances at a glance" },
+      { key: "/finance/approvals",                 labelKey: "subtab.approvals",     fallback: "Approvals",        icon: "shield-check", blurbKey: "header.blurb.approvals",   blurb: "Expenses and payments awaiting sign-off" },
     ],
   },
   {
-    id: "banking",
-    labelKey: "tabs.banking",
-    fallback: "Banking",
-    accent: ACCENT.teal,
+    id: "statements", labelKey: "header.group.statements", fallback: "Statements", accent: ACCENT.violet,
     items: [
-      { key: "/finance/bank-accounts",   labelKey: "subtab.bankAccounts",   fallback: "Bank Accounts",   icon: "bank",        blurb: "Active accounts + balances" },
-      { key: "/finance/bank-imports",    labelKey: "subtab.bankImports",    fallback: "Bank Imports",    icon: "upload",      blurb: "CSV / OFX statements" },
-      { key: "/finance/reconciliation",  labelKey: "subtab.reconciliation", fallback: "Reconciliation",  icon: "badge-check", blurb: "Match books to bank" },
-      { key: "/finance/payments",        labelKey: "subtab.payments",       fallback: "Payments",        icon: "wallet",      blurb: "Outgoing + incoming" },
+      { key: "/finance/statements",             labelKey: "subtab.detailedStatements", fallback: "Statements",    icon: "balance-scale-left",  blurbKey: "header.blurb.statements", blurb: "P&L, balance sheet and cash flow together" },
+      { key: "/finance/accounting/profit-loss", labelKey: "subtab.profitLoss",         fallback: "Profit & Loss", icon: "file-invoice-dollar", blurbKey: "header.blurb.pl",         blurb: "Income statement for a period" },
+      { key: "/finance/accounting/cash-flow",   labelKey: "subtab.cashFlow",           fallback: "Cash Flow",     icon: "wallet",              blurbKey: "header.blurb.cf",         blurb: "Operating, investing, financing" },
+      { key: "/finance/accounting/equity",      labelKey: "subtab.equity",             fallback: "Equity",        icon: "coins",               blurbKey: "header.blurb.equity",     blurb: "Owner capital and retained earnings" },
     ],
   },
   {
-    id: "treasury",
-    labelKey: "subtab.treasuryPlans",
-    fallback: "Treasury",
-    accent: ACCENT.amber,
+    id: "bank", labelKey: "tabs.banking", fallback: "Bank", accent: ACCENT.teal,
     items: [
-      { key: "/finance/treasury-forecast", labelKey: "subtab.cashForecast",  fallback: "Cash Forecast",  icon: "arrow-up-right", blurb: "13-week cash projection" },
-      { key: "/finance/treasury-plans",    labelKey: "subtab.treasuryPlans", fallback: "Treasury Plans", icon: "file-invoice",   blurb: "Long-range plans" },
-      { key: "/finance/fx-rates",          labelKey: "home.map.exchangeRates", fallback: "FX Rates",     icon: "coins",          blurb: "Multi-currency rates" },
+      { key: "/finance/bank-accounts",  labelKey: "subtab.bankAccounts",   fallback: "Bank Accounts",  icon: "bank",        blurbKey: "header.blurb.banks",     blurb: "Accounts and balances" },
+      { key: "/finance/payments",       labelKey: "subtab.payments",       fallback: "Payments",       icon: "wallet",      blurbKey: "header.blurb.payments",  blurb: "Money in and money out" },
+      { key: "/finance/bank-imports",   labelKey: "subtab.bankImports",    fallback: "Bank Imports",   icon: "upload",      blurbKey: "header.blurb.imports",   blurb: "Load CSV / OFX statements" },
+      { key: "/finance/reconciliation", labelKey: "subtab.reconciliation", fallback: "Reconciliation", icon: "badge-check", blurbKey: "header.blurb.recon",     blurb: "Match the bank to the books" },
     ],
   },
   {
-    id: "reports",
-    labelKey: "subtab.reports",
-    fallback: "Reports",
-    accent: ACCENT.violet,
+    id: "treasury", labelKey: "subtab.treasuryPlans", fallback: "Treasury", accent: ACCENT.amber,
     items: [
-      { key: "/finance/statements",    labelKey: "subtab.detailedStatements", fallback: "Statements",     icon: "balance-scale-left", blurb: "Detailed financial statements" },
-      { key: "/finance/reports",       labelKey: "subtab.operationalReports", fallback: "Reports",        icon: "file-invoice",       blurb: "Operational reports" },
-      { key: "/finance/intelligence",  labelKey: "subtab.intelligence",       fallback: "Intelligence",   icon: "signal-stream",      blurb: "Insights + alerts" },
+      { key: "/finance/treasury-forecast", labelKey: "subtab.cashForecast",    fallback: "Cash Forecast",  icon: "arrow-up-right", blurbKey: "header.blurb.forecast", blurb: "13-week cash projection" },
+      { key: "/finance/treasury-plans",    labelKey: "subtab.treasuryPlans",   fallback: "Treasury Plans", icon: "file-invoice",   blurbKey: "header.blurb.plans",    blurb: "Long-range cash plans" },
+      { key: "/finance/fx-rates",          labelKey: "home.map.exchangeRates", fallback: "FX Rates",       icon: "coins",          blurbKey: "header.blurb.fx",       blurb: "Rates the ledger converts with" },
     ],
   },
   {
-    id: "setup",
-    labelKey: "subtab.setup",
-    fallback: "Setup",
-    accent: ACCENT.rose,
+    id: "reports", labelKey: "subtab.reports", fallback: "Reports", accent: ACCENT.rose,
     items: [
-      { key: "/finance/approvals",     labelKey: "subtab.approvals",     fallback: "Approvals",     icon: "shield-check", blurb: "Approval workflows" },
-      { key: "/finance/notifications", labelKey: "subtab.reminders",     fallback: "Notifications", icon: "clock",        blurb: "Reminders + alerts" },
-      { key: "/finance/setup",         labelKey: "subtab.setup",         fallback: "Setup",         icon: "shield-check", blurb: "Chart of accounts + rules" },
-      { key: "/finance/workspace",     labelKey: "subtab.workspace",     fallback: "Workspace",     icon: "bank",         blurb: "Pro accounting workspace" },
+      { key: "/finance/reports",       labelKey: "subtab.operationalReports", fallback: "Reports",      icon: "file-invoice",  blurbKey: "header.blurb.reports",       blurb: "Aging, expenses, order profitability" },
+      { key: "/finance/intelligence",  labelKey: "subtab.intelligence",       fallback: "Intelligence", icon: "signal-stream", blurbKey: "header.blurb.intelligence",  blurb: "Insights and alerts" },
+      { key: "/finance/notifications", labelKey: "subtab.reminders",          fallback: "Reminders",    icon: "clock",         blurbKey: "header.blurb.reminders",     blurb: "Due dates and follow-ups" },
+    ],
+  },
+  {
+    id: "setup", labelKey: "subtab.setup", fallback: "Setup", accent: ACCENT.blue,
+    items: [
+      { key: "/finance/setup",      labelKey: "subtab.setup",     fallback: "Setup",      icon: "shield-check", blurbKey: "header.blurb.setup",     blurb: "Base currency, opening balances, period close" },
+      { key: "/finance/data-entry", labelKey: "header.dataEntry", fallback: "Data Entry", icon: "contract",     blurbKey: "header.blurb.dataEntry", blurb: "Where each kind of entry is made" },
+      { key: "/finance/workspace",  labelKey: "subtab.workspace", fallback: "Workspace",  icon: "bank",         blurbKey: "header.blurb.workspace", blurb: "Accountant's overview and shortcuts" },
     ],
   },
 ];
@@ -159,7 +154,7 @@ export default function FinanceHeader({
       key: it.key,
       icon: it.icon,
       label: t(it.labelKey, it.fallback),
-      blurb: it.blurb,
+      blurb: t(it.blurbKey, it.blurb),
     })),
   }));
 
@@ -193,7 +188,7 @@ export default function FinanceHeader({
       popupSubtitle={t("header.popupSubtitle", "Pick where to go.")}
       showTabs={showTabs}
       searchPlaceholder={searchPlaceholder}
-      searchHref="/inventory/search"
+      searchHref="/finance/orders"
     />
   );
 }

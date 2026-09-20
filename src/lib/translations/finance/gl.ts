@@ -34,4 +34,7 @@ export const FIN_GL: Translations = {
   "gl.empty.hint":           { en: "No posted journal lines hit this account in the selected window.",
                                zh: "所选区间内没有针对该科目的已过账分录。",
                                ar: "لا توجد بنود يومية مرحَّلة على هذا الحساب خلال الفترة المختارة." },
+  "gl.pageSummary":          { en: "{from}–{to} of {total}", zh: "第 {from}–{to} 条，共 {total} 条", ar: "{from}–{to} من {total}" },
+  "gl.prev":                 { en: "Prev",            zh: "上一页",      ar: "السابق" },
+  "gl.next":                 { en: "Next",            zh: "下一页",      ar: "التالي" },
 };
