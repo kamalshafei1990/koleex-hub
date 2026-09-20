@@ -74,6 +74,10 @@ export interface PageHeaderProps {
   popupSubtitle?: string;
   showTabs?: boolean;
   /** Search bar placeholder. Omit to hide the search bar entirely. */
+  /** Called with a tab's href when the route is being warmed (idle or hover),
+   *  so an app can warm the DATA behind the tab as well — the route cache
+   *  removes the loading skeleton, the data cache removes the spinner. */
+  onWarmTab?: (href: string) => void;
   searchPlaceholder?: string;
   /** Destination route — receives ?q=<term> on submit. */
   searchHref?: string;
@@ -112,6 +116,7 @@ export default function PageHeader({
   popupTitle: _popupTitle,
   popupSubtitle: _popupSubtitle,
   showTabs = true,
+  onWarmTab,
   searchPlaceholder,
   searchHref,
   onSearchSubmit,
@@ -419,6 +424,7 @@ export default function PageHeader({
           tabs={mergedTabs}
           activeKey={active}
           ariaLabel={`${title} navigation`}
+          onWarmTab={onWarmTab}
         />
       </div>
     )}
@@ -434,10 +440,12 @@ function SlidingPillNav({
   tabs,
   activeKey,
   ariaLabel,
+  onWarmTab,
 }: {
   tabs: PageTab[];
   activeKey: string;
   ariaLabel: string;
+  onWarmTab?: (href: string) => void;
 }) {
   const [tabWidth, setTabWidth] = useState<number>(TAB_WIDTH_LG);
   const trackRef = useRef<HTMLDivElement>(null);
@@ -502,19 +510,38 @@ function SlidingPillNav({
      localhost no matter what we do here. */
   const prefetched = useRef(new Set<string>());
   const warmRoute = useCallback((href: string) => {
-    if (!href.startsWith("/") || prefetched.current.has(href)) return;
+    if (!href.startsWith("/")) return;
+    /* The data warm-up is the app's own (cheap when already fresh, so it
+       may run again on hover after the idle pass); the route fetch is once. */
+    onWarmTab?.(href);
+    if (prefetched.current.has(href)) return;
     prefetched.current.add(href);
     router.prefetch(href);
-  }, [router]);
+  }, [router, onWarmTab]);
 
+  /* Neighbours after a short idle, always. On a connection that can afford
+     it, the REST of the strip follows, one route every 250 ms, so the
+     operator never meets the segment skeleton on a tab they can see. A
+     data-saver or 2G/3G connection keeps the frugal behaviour: neighbours
+     plus hover. (Owner, twice: "each tab loads like I opened a new page".) */
   useEffect(() => {
-    const t = window.setTimeout(() => {
+    const timers: number[] = [];
+    timers.push(window.setTimeout(() => {
       for (const i of [activeIndex - 1, activeIndex + 1]) {
         const href = tabs[i]?.key;
         if (href) warmRoute(href);
       }
-    }, 600);
-    return () => window.clearTimeout(t);
+      const conn = (navigator as Navigator & { connection?: { saveData?: boolean; effectiveType?: string } }).connection;
+      const frugal = !!conn?.saveData || (conn?.effectiveType != null && conn.effectiveType !== "4g");
+      if (frugal) return;
+      const rest = tabs
+        .map((t, i) => ({ href: t.key, i }))
+        .filter(({ href, i }) => href.startsWith("/") && Math.abs(i - activeIndex) > 1);
+      rest.forEach(({ href }, n) => {
+        timers.push(window.setTimeout(() => warmRoute(href), 250 * (n + 1)));
+      });
+    }, 600));
+    return () => { for (const t of timers) window.clearTimeout(t); };
   }, [tabs, activeIndex, warmRoute]);
 
   /* Written straight onto the node rather than held in state. Geometry read

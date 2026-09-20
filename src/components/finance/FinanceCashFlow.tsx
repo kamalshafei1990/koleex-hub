@@ -5,9 +5,10 @@
    Direct-method cash flow from POSTED journal lines.
    --------------------------------------------------------------------------- */
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import FinanceHeader from "@/components/finance/FinanceHeader";
 import { useTranslation } from "@/lib/i18n";
+import { useWarmData } from "@/lib/warm-cache";
 import { FIN_ACCOUNTING } from "@/lib/translations/finance/accounting";
 import { FIN_CF } from "@/lib/translations/finance/cf";
 import { FIN_COMMON } from "@/lib/translations/finance/common";
@@ -46,23 +47,17 @@ export default function FinanceCashFlow() {
   const ytdStart = useMemo(() => `${new Date().getUTCFullYear()}-01-01`, []);
   const [from, setFrom] = useState(ytdStart);
   const [to,   setTo]   = useState(today);
-  const [data, setData] = useState<CashFlowStatement | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const res = await fetch(`/api/accounting/cash-flow?from=${from}&to=${to}`, { cache: "no-store", credentials: "include" });
-      const j = await res.json();
-      if (!res.ok) { setError(j.error ?? `Failed (${res.status})`); setData(null); return; }
-      setData(j.statement as CashFlowStatement);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
-    } finally { setLoading(false); }
+  /* Warm cache keyed by the period: a tab revisited paints its last answer
+     at once and refreshes behind it; a fresh answer skips the request. */
+  const fetchData = useCallback(async () => {
+    const res = await fetch(`/api/accounting/cash-flow?from=${from}&to=${to}`, { cache: "no-store", credentials: "include" });
+    const j = await res.json();
+    if (!res.ok) throw new Error(j.error ?? `Failed (${res.status})`);
+    return j.statement as CashFlowStatement;
   }, [from, to]);
-  useEffect(() => { void load(); }, [load]);
+  const { data, loading, error: loadError } = useWarmData<CashFlowStatement>(`fin:cf:${from}:${to}`, fetchData);
+  const error = loadError ? (loadError instanceof Error ? loadError.message : String(loadError)) : null;
 
   return (
     <div className="min-h-full bg-[var(--bg-primary)] text-[var(--text-primary)]">

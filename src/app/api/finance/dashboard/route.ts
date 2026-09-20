@@ -74,6 +74,39 @@ export async function GET(req: Request) {
   /* Pull the rows we need for both the current and previous windows in
      parallel. Keep the column selection tight — we only need amounts
      and dates for aggregations. */
+  /* Everything that does not depend on the period rows is started here and
+     awaited where it is used, so the request is two round trips deep (the
+     per-order aggregates need the period's order ids), not six. */
+  const today = new Date().toISOString().slice(0, 10);
+  const pointInTime = Promise.all([
+    supabaseServer
+      .from("finance_orders")
+      .select("id, selling_price, payment_status")
+      .eq("tenant_id", auth.tenant_id)
+      .neq("payment_status", "paid"),
+    supabaseServer
+      .from("finance_payments")
+      .select("linked_order_id, amount, direction, status")
+      .eq("tenant_id", auth.tenant_id)
+      .eq("direction", "in")
+      .eq("status", "completed"),
+    supabaseServer
+      .from("finance_order_suppliers")
+      .select("supplier_cost, paid_amount")
+      .eq("tenant_id", auth.tenant_id),
+    supabaseServer
+      .from("finance_expenses")
+      .select("amount, payment_status")
+      .eq("tenant_id", auth.tenant_id)
+      .neq("payment_status", "paid"),
+  ]);
+  const remindersP = supabaseServer
+    .from("finance_notifications")
+    .select("status, due_date")
+    .eq("tenant_id", auth.tenant_id)
+    .in("status", ["scheduled", "snoozed"]);
+  const bankGapsP = bankLedgerBalances(auth.tenant_id).catch(() => new Map());
+
   const [ordersRes, ordersPrevRes, expensesRes, expensesPrevRes, paymentsRes, paymentsPrevRes, suppliersRes, suppliersPrevRes] = await Promise.all([
     supabaseServer
       .from("finance_orders")
@@ -223,28 +256,7 @@ export async function GET(req: Request) {
 
      AP — sum of (supplier_cost − paid_amount) across all order
      supplier lines + unpaid expense amounts. (Already correct.) */
-  const [arOrdersRes, arPaymentsRes, apOrderSuppliersRes, apExpensesRes] = await Promise.all([
-    supabaseServer
-      .from("finance_orders")
-      .select("id, selling_price, payment_status")
-      .eq("tenant_id", auth.tenant_id)
-      .neq("payment_status", "paid"),
-    supabaseServer
-      .from("finance_payments")
-      .select("linked_order_id, amount, direction, status")
-      .eq("tenant_id", auth.tenant_id)
-      .eq("direction", "in")
-      .eq("status", "completed"),
-    supabaseServer
-      .from("finance_order_suppliers")
-      .select("supplier_cost, paid_amount")
-      .eq("tenant_id", auth.tenant_id),
-    supabaseServer
-      .from("finance_expenses")
-      .select("amount, payment_status")
-      .eq("tenant_id", auth.tenant_id)
-      .neq("payment_status", "paid"),
-  ]);
+  const [arOrdersRes, arPaymentsRes, apOrderSuppliersRes, apExpensesRes] = await pointInTime;
 
   /* AR — pair each unpaid order with its completed in-payments and
      subtract. max(0, …) so over-payments don't drag AR negative. */
@@ -420,12 +432,7 @@ export async function GET(req: Request) {
     return s + (Number(row.selling_price) || 0) * 0; /* placeholder, computed below */
   }, 0);
   /* Simple count of reminders we hold today flagged critical / urgent */
-  const today = new Date().toISOString().slice(0, 10);
-  const sevSel = await supabaseServer
-    .from("finance_notifications")
-    .select("status, due_date")
-    .eq("tenant_id", auth.tenant_id)
-    .in("status", ["scheduled", "snoozed"]);
+  const sevSel = await remindersP;
   const critical_reminders = (sevSel.data ?? []).filter((n) => {
     const due = (n as { due_date: string }).due_date;
     if (due >= today) return false;
@@ -437,7 +444,7 @@ export async function GET(req: Request) {
   /* Daily bank check: every account's ledger figure against the statement
      balance the operator holds. A gap is the first thing a manager should
      hear about, before any profit number. */
-  const bankGaps = Array.from((await bankLedgerBalances(auth.tenant_id).catch(() => new Map())).values())
+  const bankGaps = Array.from((await bankGapsP).values())
     .filter((b) => Math.abs(b.difference) >= 0.01);
 
   const health_reasons: string[] = [];

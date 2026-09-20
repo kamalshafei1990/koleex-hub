@@ -22,6 +22,7 @@ import { FIN_HEADER } from "@/lib/translations/finance/header";
 import { ACCENT } from "@/lib/accentColors";
 import { useSearchPlaceholder } from "@/lib/searchPlaceholders";
 import AppIcon from "@/components/common/AppIcon";
+import { warmFinanceRoute } from "@/lib/finance/prefetch";
 
 /* Only the namespaces this screen actually reads — see finance.ts. */
 const DICT = { ...FIN_APP, ...FIN_HEADER } as const;
@@ -187,6 +188,7 @@ export default function FinanceHeader({
       popupTitle={t("app.title", "Finance")}
       popupSubtitle={t("header.popupSubtitle", "Pick where to go.")}
       showTabs={showTabs}
+      onWarmTab={warmFinanceRoute}
       searchPlaceholder={searchPlaceholder}
       searchHref="/finance/orders"
     />

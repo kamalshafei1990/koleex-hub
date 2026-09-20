@@ -44,7 +44,8 @@ export interface BankLedgerBalance {
 
 /** Ledger vs statement per bank account (fn_accounting_bank_balances). */
 export async function bankLedgerBalances(tenantId: string): Promise<Map<string, BankLedgerBalance>> {
-  await supabaseServer.rpc("fn_accounting_ensure_bank_accounts", { p_tenant_id: tenantId });
+  /* Read only. Sub-accounts are created when a bank account is created and
+     by every posting; an account still without one simply reads as zero. */
   const { data } = await supabaseServer.rpc("fn_accounting_bank_balances", { p_tenant_id: tenantId });
   const map = new Map<string, BankLedgerBalance>();
   for (const r of (data ?? []) as Array<Record<string, unknown>>) {

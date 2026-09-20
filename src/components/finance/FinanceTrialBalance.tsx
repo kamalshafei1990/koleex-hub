@@ -9,10 +9,11 @@
    total). Period filter optional; defaults to all-time.
    --------------------------------------------------------------------------- */
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import Link from "next/link";
 import FinanceHeader from "@/components/finance/FinanceHeader";
 import { useTranslation } from "@/lib/i18n";
+import { useWarmData } from "@/lib/warm-cache";
 import { FIN_ACCOUNTING } from "@/lib/translations/finance/accounting";
 import { FIN_COMMON } from "@/lib/translations/finance/common";
 import { FIN_TB } from "@/lib/translations/finance/tb";
@@ -54,28 +55,20 @@ export default function FinanceTrialBalance() {
   const ninetyAgo = useMemo(() => { const d = new Date(); d.setDate(d.getDate() - 365); return d.toISOString().slice(0, 10); }, []);
   const [from, setFrom] = useState<string>("");          // empty = all-time
   const [to,   setTo]   = useState<string>(today);
-  const [data, setData] = useState<TrialBalance | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const qs = new URLSearchParams();
-      if (from) qs.set("from", from);
-      if (to)   qs.set("to", to);
-      const res = await fetch(`/api/accounting/trial-balance?${qs.toString()}`, { cache: "no-store", credentials: "include" });
-      const j = await res.json();
-      if (!res.ok) { setError(j.error ?? `Failed (${res.status})`); setData(null); return; }
-      setData(j.trial_balance as TrialBalance);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
-    } finally {
-      setLoading(false);
-    }
+  /* Warm cache keyed by the period: a tab revisited paints its last answer
+     at once and refreshes behind it; a fresh answer skips the request. */
+  const fetchData = useCallback(async () => {
+    const qs = new URLSearchParams();
+    if (from) qs.set("from", from);
+    if (to)   qs.set("to", to);
+    const res = await fetch(`/api/accounting/trial-balance?${qs.toString()}`, { cache: "no-store", credentials: "include" });
+    const j = await res.json();
+    if (!res.ok) throw new Error(j.error ?? `Failed (${res.status})`);
+    return j.trial_balance as TrialBalance;
   }, [from, to]);
-  useEffect(() => { void load(); }, [load]);
+  const { data, loading, error: loadError } = useWarmData<TrialBalance>(`fin:tb:${from}:${to}`, fetchData);
+  const error = loadError ? (loadError instanceof Error ? loadError.message : String(loadError)) : null;
 
   const grouped = useMemo(() => {
     if (!data) return [];

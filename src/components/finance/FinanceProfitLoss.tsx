@@ -9,9 +9,10 @@
    expenses) with subtotals + margin %.
    --------------------------------------------------------------------------- */
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import FinanceHeader from "@/components/finance/FinanceHeader";
 import { useTranslation } from "@/lib/i18n";
+import { useWarmData } from "@/lib/warm-cache";
 import { FIN_ACCOUNTING } from "@/lib/translations/finance/accounting";
 import { FIN_COMMON } from "@/lib/translations/finance/common";
 import { FIN_PL } from "@/lib/translations/finance/pl";
@@ -53,27 +54,19 @@ export default function FinanceProfitLoss() {
   const [from, setFrom] = useState(ytdStart);
   const [to,   setTo]   = useState(today);
   const [compare, setCompare] = useState(true);
-  const [data, setData] = useState<ProfitLoss | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const qs = new URLSearchParams({ from, to });
-      if (compare) qs.set("compare_prior", "1");
-      const res = await fetch(`/api/accounting/profit-loss?${qs.toString()}`, { cache: "no-store", credentials: "include" });
-      const j = await res.json();
-      if (!res.ok) { setError(j.error ?? `Failed (${res.status})`); setData(null); return; }
-      setData(j.statement as ProfitLoss);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
-    } finally {
-      setLoading(false);
-    }
+  /* Warm cache keyed by the period: a tab revisited paints its last answer
+     at once and refreshes behind it; a fresh answer skips the request. */
+  const fetchData = useCallback(async () => {
+    const qs = new URLSearchParams({ from, to });
+    if (compare) qs.set("compare_prior", "1");
+    const res = await fetch(`/api/accounting/profit-loss?${qs.toString()}`, { cache: "no-store", credentials: "include" });
+    const j = await res.json();
+    if (!res.ok) throw new Error(j.error ?? `Failed (${res.status})`);
+    return j.statement as ProfitLoss;
   }, [from, to, compare]);
-  useEffect(() => { void load(); }, [load]);
+  const { data, loading, error: loadError } = useWarmData<ProfitLoss>(`fin:pl:${from}:${to}:${compare ? 1 : 0}`, fetchData);
+  const error = loadError ? (loadError instanceof Error ? loadError.message : String(loadError)) : null;
 
   /* Variance helper for the comparison column. */
   const variance = (cur: number, prev: number): { amount: number; pct: number } => ({

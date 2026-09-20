@@ -19,6 +19,7 @@
    --------------------------------------------------------------------------- */
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useWarmData } from "@/lib/warm-cache";
 import Link from "next/link";
 import FinanceHeader from "@/components/finance/FinanceHeader";
 import { useTranslation } from "@/lib/i18n";
@@ -124,39 +125,34 @@ export default function FinanceAccountingQueue() {
 
   const [active, setActive] = useState<QueueStatus>("pending");
   const [kind, setKind] = useState<Kind | "all">("all");
-  const [items, setItems] = useState<QueueItem[]>([]);
-  const [counts, setCounts] = useState<Record<QueueStatus, number>>(EMPTY_COUNTS);
-  const [countsByKind, setCountsByKind] = useState<Partial<Record<Kind, number>>>({});
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [selected, setSelected] = useState<QueueItem | null>(null);
   const [checked, setChecked] = useState<Set<string>>(new Set());
   const [busy, setBusy] = useState(false);
   const [voidAsk, setVoidAsk] = useState<QueueItem | null>(null);
   const [journalOpen, setJournalOpen] = useState(false);
 
-  /* One request: rows for the active tab + exact counts for every tab. */
-  const load = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const qs = new URLSearchParams({ status: active, limit: "200" });
-      if (kind !== "all") qs.set("kind", kind);
-      const r = await api<QueueResponse>(`/api/accounting/queue?${qs}`);
-      if (!r.ok) { setError(humanizeError(r.body.error ?? `Failed (${r.status})`)); return; }
-      setItems(r.body.items ?? []);
-      /* Counts come from the whole tenant only when no kind filter is
-         applied; a filtered call would shrink the tab badges. */
-      if (kind === "all") { setCounts(r.body.counts ?? EMPTY_COUNTS); setCountsByKind(r.body.counts_by_kind ?? {}); }
-      else setCounts(r.body.counts ?? EMPTY_COUNTS);
-      setChecked(new Set());
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
-    } finally {
-      setLoading(false);
-    }
+  /* One request: rows for the active tab + exact counts for every tab.
+     Warm-cached per (status, kind): a tab revisited paints at once, the
+     header's hover warm-up fills "pending · all" before the first visit. */
+  const fetchQueue = useCallback(async () => {
+    const qs = new URLSearchParams({ status: active, limit: "200" });
+    if (kind !== "all") qs.set("kind", kind);
+    const r = await api<QueueResponse>(`/api/accounting/queue?${qs}`);
+    if (!r.ok) throw new Error(humanizeError(r.body.error ?? `Failed (${r.status})`));
+    return r.body;
   }, [active, kind]);
-  useEffect(() => { void load(); }, [load]);
+  const { data: queue, loading, error: loadError, reload: load } = useWarmData<QueueResponse>(`fin:queue:${active}:${kind}`, fetchQueue);
+  const error = loadError ? (loadError instanceof Error ? loadError.message : String(loadError)) : null;
+  const items = useMemo(() => queue?.items ?? [], [queue]);
+  const counts = queue?.counts ?? EMPTY_COUNTS;
+  /* Kind badges come from an unfiltered answer only; a filtered call would
+     shrink them to the one kind. */
+  const [countsByKind, setCountsByKind] = useState<Partial<Record<Kind, number>>>({});
+  useEffect(() => {
+    if (kind === "all" && queue?.counts_by_kind) setCountsByKind(queue.counts_by_kind);
+  }, [queue, kind]);
+  /* A new answer means new rows: nothing stays ticked across it. */
+  useEffect(() => { setChecked(new Set()); }, [queue]);
 
   /* Keep the review panel on a row that still exists after a reload. */
   useEffect(() => {
