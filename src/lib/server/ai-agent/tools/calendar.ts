@@ -1,26 +1,28 @@
 import "server-only";
 
 /* ---------------------------------------------------------------------------
-   Calendar tools — agent-facing READ operations on koleex_calendar_events.
+   Calendar tools — the agent's read and write operations on
+   koleex_calendar_events, on the caller's OWN calendar only.
 
-   Security: mirrors src/app/api/calendar/events/route.ts GET. The calendar
-   is a "whose calendar" model — a non-super-admin can only read their OWN
-   calendar. (The route returns [] when a non-SA asks for someone else's.)
-   This tool always reads the caller's own account, so that rule holds by
-   construction. Recurring-series expansion and the planning/to-do/task
-   mirrors the app overlays are omitted in Phase 1 — this returns the user's
-   real calendar events in a window, which is what "what's on my calendar"
-   needs.
+   Same rules as the routes, through the same helpers (lib/server/
+   calendar-access, calendar-notify): the owner or a super admin changes an
+   event, a reschedule re-arms the reminder and tells the guests, a delete
+   tells them it was cancelled and closes every notification about it. The
+   list returns the user's real events in a window; the recurring-series
+   expansion and the module mirrors the app overlays are left to the app.
    --------------------------------------------------------------------------- */
 
 import { supabaseServer } from "../../supabase-server";
 import type { ToolDef, ToolResult } from "../types";
 import { isUuid, BAD_ID_MESSAGE } from "../uuid";
+import { eventAttendeeIds, isEventOwner, loadCalendarEvent, sanitizeEventInput } from "../../calendar-access";
+import { clearEventNotifications, notifyEventChanged } from "../../calendar-notify";
+import { CALENDAR_EVENT_TYPES } from "@/lib/calendar-enums";
 
 const CALENDAR_MODULE = "Calendar";
 
-const EVENT_COLS = `id, title, description, start_at, end_at, all_day,
-  is_private, recurrence, recurrence_until, color, created_at`;
+const EVENT_COLS = `id, title, description, location, event_type, start_at, end_at, all_day,
+  is_private, recurrence, recurrence_until, reminder_minutes, color, created_at`;
 
 /** Default window: now → +N days. */
 function windowISO(days: number): { from: string; to: string } {
@@ -91,8 +93,11 @@ const createCalendarEvent: ToolDef<
     start_at?: string;
     end_at?: string;
     all_day?: boolean;
+    event_type?: string;
+    location?: string;
     description?: string;
     is_private?: boolean;
+    reminder_minutes?: number;
     confirm?: boolean;
   },
   Record<string, unknown> | { preview: Record<string, unknown> }
@@ -107,8 +112,11 @@ const createCalendarEvent: ToolDef<
       start_at: { type: "string", description: "ISO start datetime (required)." },
       end_at: { type: "string", description: "ISO end datetime (required)." },
       all_day: { type: "boolean", description: "All-day event. Default false." },
+      event_type: { type: "string", enum: [...CALENDAR_EVENT_TYPES], description: "meeting (default), task, reminder, event, holiday or out_of_office." },
+      location: { type: "string", description: "Where — a room, an address, a call link." },
       description: { type: "string", description: "Optional details." },
       is_private: { type: "boolean", description: "Mark private. Default false." },
+      reminder_minutes: { type: "integer", description: "Minutes before the start to remind the user (0 = at start). Omit for no reminder." },
       confirm: { type: "boolean", description: "Leave unset to PREVIEW. Set true ONLY after explicit user confirmation." },
     },
     required: ["title", "start_at", "end_at"],
@@ -117,47 +125,44 @@ const createCalendarEvent: ToolDef<
   requiredAction: "create",
   handler: async (ctx, args): Promise<ToolResult<Record<string, unknown> | { preview: Record<string, unknown> }>> => {
     const title = String(args.title ?? "").trim();
-    const startAt = String(args.start_at ?? "").trim();
-    const endAt = String(args.end_at ?? "").trim();
     if (!title) return { ok: false, permissionStatus: "allowed", data: null, message: "What's the event called?" };
-    if (!startAt || !endAt) return { ok: false, permissionStatus: "allowed", data: null, message: "When is it? I need a start and end time." };
-    {
-      // DB CHECK is end_at >= start_at; equal start/end is a zero-length
-      // event the calendar accepts, so only inverted windows are blocked.
-      const s = Date.parse(startAt), e = Date.parse(endAt);
-      if (!Number.isNaN(s) && !Number.isNaN(e) && e < s) {
-        return { ok: false, permissionStatus: "allowed", data: null, message: "The end time can't be before the start time." };
-      }
-    }
+    if (!args.start_at || !args.end_at) return { ok: false, permissionStatus: "allowed", data: null, message: "When is it? I need a start and end time." };
 
-    const normalized = {
+    const input = sanitizeEventInput({
       title,
-      start_at: startAt,
-      end_at: endAt,
+      start_at: args.start_at,
+      end_at: args.end_at,
       all_day: args.all_day === true,
-      description: args.description ? String(args.description) : null,
+      event_type: typeof args.event_type === "string" ? args.event_type : "meeting",
+      location: typeof args.location === "string" ? args.location : null,
+      description: typeof args.description === "string" ? args.description : null,
       is_private: args.is_private === true,
-    };
+      reminder_minutes: Number.isInteger(args.reminder_minutes) ? args.reminder_minutes : null,
+    }, "create");
+    if (!input.ok) {
+      const msg = input.error.includes("end_at must not be before")
+        ? "The end time can't be before the start time."
+        : input.error.includes("datetime")
+          ? "I couldn't read that time — give me a date and time."
+          : `I can't save that: ${input.error}.`;
+      return { ok: false, permissionStatus: "allowed", data: null, message: msg };
+    }
+    const normalized = input.row;
 
     if (args.confirm !== true) {
       return {
         ok: true,
         permissionStatus: "approval_required",
         data: { preview: normalized },
-        message: `Ready to add to your calendar: "${title}" from ${startAt} to ${endAt}${normalized.all_day ? " (all day)" : ""}. Confirm and I'll create it.`,
-        pendingAction: { tool: "createCalendarEvent", args: { ...normalized, confirm: true } },
+        message: `Ready to add to your calendar: "${title}" from ${normalized.start_at} to ${normalized.end_at}${normalized.all_day ? " (all day)" : ""}. Confirm and I'll create it.`,
+        pendingAction: { tool: "createCalendarEvent", args: { ...args, ...normalized, confirm: true } },
       };
     }
 
     const { data, error } = await supabaseServer
       .from("koleex_calendar_events")
       .insert({
-        title: normalized.title,
-        start_at: normalized.start_at,
-        end_at: normalized.end_at,
-        all_day: normalized.all_day,
-        description: normalized.description,
-        is_private: normalized.is_private,
+        ...normalized,
         account_id: ctx.auth.account_id, // own calendar only
         tenant_id: ctx.auth.tenant_id,   // server-side truth
       })
@@ -178,35 +183,9 @@ const createCalendarEvent: ToolDef<
   },
 };
 
-/* ── Shared loader for mutations — same shape as the route's loadEvent(),
-   plus display fields so previews can echo the REAL event. Tenant is part
-   of the query, so cross-tenant ids simply read as not-found. */
-interface EventRow {
-  id: string;
-  account_id: string;
-  tenant_id: string | null;
-  title: string | null;
-  start_at: string | null;
-  end_at: string | null;
-  all_day: boolean | null;
-  description: string | null;
-  is_private: boolean | null;
-}
-
-async function loadEventRow(id: string, tenantId: string | null): Promise<EventRow | null> {
-  let q = supabaseServer
-    .from("koleex_calendar_events")
-    .select("id, account_id, tenant_id, title, start_at, end_at, all_day, description, is_private")
-    .eq("id", id);
-  if (tenantId) q = q.eq("tenant_id", tenantId);
-  const { data } = await q.maybeSingle();
-  return (data as EventRow | null) ?? null;
-}
-
 /* ── Edit event (with confirm) ──
-   Ports /api/calendar/events/[id] PATCH: caller must own the calendar
-   (account_id = me) or be Super Admin; server-managed fields can never be
-   rewritten because only whitelisted fields are built into the patch. */
+   The same rule as /api/calendar/events/[id] PATCH: the owner or a Super
+   Admin, only the writable columns, through the shared sanitizer. */
 const updateCalendarEvent: ToolDef<
   {
     event_id?: string;
@@ -214,15 +193,17 @@ const updateCalendarEvent: ToolDef<
     start_at?: string;
     end_at?: string;
     all_day?: boolean;
+    location?: string;
     description?: string;
     is_private?: boolean;
+    reminder_minutes?: number | null;
     confirm?: boolean;
   },
   Record<string, unknown> | { preview: Record<string, unknown> }
 > = {
   name: "updateCalendarEvent",
   description:
-    "Update (reschedule, rename, edit) an event on the current user's OWN calendar. Resolve the event id via listMyCalendar FIRST — never invent an id. ALWAYS call first WITHOUT confirm to preview the change; only call again with confirm:true after the user explicitly agrees. Pass ONLY the fields being changed; times are ISO datetimes resolved from the current date block.",
+    "Update (reschedule, rename, edit) an event on the current user's OWN calendar. Resolve the event id via listMyCalendar FIRST — never invent an id. ALWAYS call first WITHOUT confirm to preview the change; only call again with confirm:true after the user explicitly agrees. Pass ONLY the fields being changed; times are ISO datetimes resolved from the current date block. Guests are told automatically when the time changes.",
   parameters: {
     type: "object",
     properties: {
@@ -231,8 +212,10 @@ const updateCalendarEvent: ToolDef<
       start_at: { type: "string", description: "New ISO start datetime." },
       end_at: { type: "string", description: "New ISO end datetime." },
       all_day: { type: "boolean", description: "Whether it becomes an all-day event." },
+      location: { type: "string", description: "New location." },
       description: { type: "string", description: "New details text." },
       is_private: { type: "boolean", description: "Whether the event is private." },
+      reminder_minutes: { type: "integer", description: "Minutes before the start to remind (0 = at start); pass null to remove the reminder." },
       confirm: { type: "boolean", description: "Leave unset to PREVIEW. Set true ONLY after the user explicitly confirmed the previewed change." },
     },
     required: ["event_id"],
@@ -244,28 +227,36 @@ const updateCalendarEvent: ToolDef<
     if (!id) return { ok: false, permissionStatus: "allowed", data: null, message: "Which event? Pick it from listMyCalendar first." };
     if (!isUuid(id)) return { ok: false, permissionStatus: "allowed", data: null, message: BAD_ID_MESSAGE };
 
-    const ev = await loadEventRow(id, ctx.auth.tenant_id);
+    const ev = await loadCalendarEvent(id, ctx.auth.tenant_id);
     if (!ev) return { ok: false, permissionStatus: "allowed", data: null, message: "I can't find that event — pick it again from listMyCalendar." };
-    if (ev.account_id !== ctx.auth.account_id && !ctx.isSuperAdmin) {
+    if (!isEventOwner(ev, { accountId: ctx.auth.account_id, isSuperAdmin: ctx.isSuperAdmin })) {
       return { ok: false, permissionStatus: "denied", data: null, message: "You can only edit events on your own calendar." };
     }
 
-    const changes: Record<string, unknown> = {};
-    if (typeof args.title === "string" && args.title.trim()) changes.title = args.title.trim();
-    if (typeof args.start_at === "string" && args.start_at.trim()) changes.start_at = args.start_at.trim();
-    if (typeof args.end_at === "string" && args.end_at.trim()) changes.end_at = args.end_at.trim();
-    if (typeof args.all_day === "boolean") changes.all_day = args.all_day;
-    if (typeof args.description === "string") changes.description = args.description;
-    if (typeof args.is_private === "boolean") changes.is_private = args.is_private;
-    if (Object.keys(changes).length === 0) {
-      return { ok: false, permissionStatus: "allowed", data: null, message: "Nothing to change — tell me what to update (title, times, description, all-day, or privacy)." };
+    const body: Record<string, unknown> = {};
+    if (typeof args.title === "string" && args.title.trim()) body.title = args.title.trim();
+    if (typeof args.start_at === "string" && args.start_at.trim()) body.start_at = args.start_at.trim();
+    if (typeof args.end_at === "string" && args.end_at.trim()) body.end_at = args.end_at.trim();
+    if (typeof args.all_day === "boolean") body.all_day = args.all_day;
+    if (typeof args.location === "string") body.location = args.location;
+    if (typeof args.description === "string") body.description = args.description;
+    if (typeof args.is_private === "boolean") body.is_private = args.is_private;
+    if (args.reminder_minutes === null || Number.isInteger(args.reminder_minutes)) body.reminder_minutes = args.reminder_minutes;
+    if (Object.keys(body).length === 0) {
+      return { ok: false, permissionStatus: "allowed", data: null, message: "Nothing to change — tell me what to update (title, times, location, description, reminder, all-day, or privacy)." };
     }
 
-    const effStart = Date.parse((changes.start_at as string | undefined) ?? ev.start_at ?? "");
-    const effEnd = Date.parse((changes.end_at as string | undefined) ?? ev.end_at ?? "");
-    if (!Number.isNaN(effStart) && !Number.isNaN(effEnd) && effEnd < effStart) {
-      return { ok: false, permissionStatus: "allowed", data: null, message: "The end time can't be before the start time." };
+    const input = sanitizeEventInput(body, "update", ev);
+    if (!input.ok) {
+      const msg = input.error.includes("end_at must not be before")
+        ? "The end time can't be before the start time."
+        : input.error.includes("datetime")
+          ? "I couldn't read that time — give me a date and time."
+          : `I can't save that: ${input.error}.`;
+      return { ok: false, permissionStatus: "allowed", data: null, message: msg };
     }
+    const { reminded_at: _reset, ...changes } = input.row as Record<string, unknown> & { reminded_at?: null };
+    void _reset;
 
     const title = ev.title ?? "Event";
     if (args.confirm !== true) {
@@ -288,13 +279,17 @@ const updateCalendarEvent: ToolDef<
 
     const { data, error } = await supabaseServer
       .from("koleex_calendar_events")
-      .update(changes)
+      .update(input.row)
       .eq("id", id)
       .select("id, title, start_at, end_at, all_day")
       .maybeSingle();
     if (error) {
       console.error("[tool.updateCalendarEvent]", error);
       return { ok: false, permissionStatus: "allowed", data: null, message: "Couldn't update the event — please try again." };
+    }
+    if (input.timeChanged) {
+      const guests = await eventAttendeeIds(id, { excludeDeclined: true });
+      await notifyEventChanged({ ...ev, ...(data ?? {}) }, guests, ctx.auth.account_id, "rescheduled");
     }
     return {
       ok: true,
@@ -306,15 +301,14 @@ const updateCalendarEvent: ToolDef<
   },
 };
 
-/* ── Delete event (with confirm) ──
-   Ports /api/calendar/events/[id] DELETE: own calendar or Super Admin. */
+/* ── Delete event (with confirm) — the owner or a Super Admin ── */
 const deleteCalendarEvent: ToolDef<
   { event_id?: string; confirm?: boolean },
   Record<string, unknown> | { preview: Record<string, unknown> }
 > = {
   name: "deleteCalendarEvent",
   description:
-    "PERMANENTLY delete (cancel) an event on the current user's OWN calendar. Resolve the event id via listMyCalendar FIRST — never invent an id. ALWAYS call first WITHOUT confirm to preview exactly which event will be deleted; only call again with confirm:true after the user explicitly agrees. This cannot be undone.",
+    "PERMANENTLY delete (cancel) an event on the current user's OWN calendar. Resolve the event id via listMyCalendar FIRST — never invent an id. ALWAYS call first WITHOUT confirm to preview exactly which event will be deleted; only call again with confirm:true after the user explicitly agrees. This cannot be undone; guests are told it was cancelled.",
   parameters: {
     type: "object",
     properties: {
@@ -330,9 +324,9 @@ const deleteCalendarEvent: ToolDef<
     if (!id) return { ok: false, permissionStatus: "allowed", data: null, message: "Which event? Pick it from listMyCalendar first." };
     if (!isUuid(id)) return { ok: false, permissionStatus: "allowed", data: null, message: BAD_ID_MESSAGE };
 
-    const ev = await loadEventRow(id, ctx.auth.tenant_id);
+    const ev = await loadCalendarEvent(id, ctx.auth.tenant_id);
     if (!ev) return { ok: false, permissionStatus: "allowed", data: null, message: "I can't find that event — pick it again from listMyCalendar." };
-    if (ev.account_id !== ctx.auth.account_id && !ctx.isSuperAdmin) {
+    if (!isEventOwner(ev, { accountId: ctx.auth.account_id, isSuperAdmin: ctx.isSuperAdmin })) {
       return { ok: false, permissionStatus: "denied", data: null, message: "You can only delete events on your own calendar." };
     }
 
@@ -348,11 +342,14 @@ const deleteCalendarEvent: ToolDef<
       };
     }
 
+    const guests = await eventAttendeeIds(id, { excludeDeclined: true });
     const { error } = await supabaseServer.from("koleex_calendar_events").delete().eq("id", id);
     if (error) {
       console.error("[tool.deleteCalendarEvent]", error);
       return { ok: false, permissionStatus: "allowed", data: null, message: "Couldn't delete the event — please try again." };
     }
+    await clearEventNotifications(id);
+    await notifyEventChanged(ev, guests, ctx.auth.account_id, "cancelled");
     return {
       ok: true,
       permissionStatus: "allowed",

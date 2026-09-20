@@ -4,19 +4,25 @@
    CalendarApp — top-level shell for the Koleex Hub calendar.
 
    Responsibilities:
-   - Pick the active account (from ?account= URL param or first internal).
-   - Load that account's preferences.calendar (timezone, working hours, OOO).
-   - Manage the current focus date + view (month / week / day).
-   - Fetch events in the visible window.
-   - Delegate rendering to MonthView / WeekView / DayView.
-   - Open EventModal for create / edit / delete.
+   - Know whose calendar is open: the signed-in account, or — for a Super
+     Admin — any account picked from the directory (or `?account=`).
+   - Read that account's preferences (timezone, working hours, first day of
+     week) — the viewer's own from the bootstrap payload every screen already
+     has, another account's from the account route.
+   - Manage the focus date + view (month / week / day) and fetch the visible
+     window through the gated route.
+   - Open `?event=<id>` from a notification, on its date.
+   - Delegate rendering to MonthView / WeekView / DayView and open EventModal
+     to create, edit or (for a guest) view and answer.
 
-   Stays fully self-contained — no Google sync, no external APIs. Data lives
-   in koleex_calendar_events and accounts.preferences.calendar.
+   The picker used to be built from the full account directory filtered by a
+   browser-side scope context: a regular employee without the Accounts module
+   got an empty list, no active account, and a calendar that said "pick an
+   account" forever. The server already limits reads to the viewer's own
+   calendar; the picker is a Super Admin tool.
    --------------------------------------------------------------------------- */
 
-import { useCallback, useEffect, useMemo, useState } from "react";
-import Link from "next/link";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import PageHeader from "@/components/ui/PageHeader";
 import AngleLeftIcon from "@/components/icons/ui/AngleLeftIcon";
 import AngleRightIcon from "@/components/icons/ui/AngleRightIcon";
@@ -26,34 +32,28 @@ import ExclamationIcon from "@/components/icons/ui/ExclamationIcon";
 import UserCircle2Icon from "@/components/icons/ui/UserCircle2Icon";
 import CalendarIcon from "@/components/icons/CalendarIcon";
 import type {
+  AccountPreferences,
   AccountRow,
   AccountWithLinks,
   CalendarEventRow,
+  CalendarViewEvent,
 } from "@/types/supabase";
-import {
-  fetchAccounts,
-  fetchAccountWithLinks,
-} from "@/lib/accounts-admin";
+import { fetchAccounts, fetchAccountWithLinks } from "@/lib/accounts-admin";
 import { fetchEventsInRange, deleteEvent, fetchEventById } from "@/lib/calendar-events";
 import { fetchHolidays, expandHolidays, type HolidayRow } from "@/lib/calendar-holidays";
 import { withDefaults } from "@/lib/access-control";
 import { useTranslation } from "@/lib/i18n";
 import { calendarT } from "@/lib/translations/calendar";
-import {
-  loadScopeContext,
-  filterAccessibleAccounts,
-  type ScopeContext,
-} from "@/lib/scope";
-import { getCurrentAccountIdSync } from "@/lib/identity";
+import { useMeBootstrap } from "@/lib/me-bootstrap";
+import { CALENDAR_EVENT_TYPES, EVENT_TYPE_COLORS } from "@/lib/calendar-enums";
 import {
   addDays,
   addMonths,
-  endOfMonth,
-  endOfWeek,
+  formatFullDay,
   formatMonthYear,
   formatWeekRange,
+  roundToNextHalfHour,
   startOfDay,
-  endOfDay,
   startOfMonth,
   startOfWeek,
   type WeekStart,
@@ -62,175 +62,123 @@ import {
 import MonthView from "./MonthView";
 import WeekView from "./WeekView";
 import DayView from "./DayView";
-import EventModal, { type EventDraft } from "./EventModal";
+import EventModal, { type EventDraft, type EventModalMode } from "./EventModal";
 
 type ViewKey = "month" | "week" | "day";
+const VIEWS: ViewKey[] = ["month", "week", "day"];
 
-const viewLabels: Record<ViewKey, string> = {
-  month: "Month",
-  week: "Week",
-  day: "Day",
-};
+interface ModalState {
+  draft: EventDraft;
+  existingId: string | null;
+  mode: EventModalMode;
+}
+
+type OpenableEvent = CalendarEventRow & { invited?: boolean };
 
 export default function CalendarApp() {
-  const { t } = useTranslation(calendarT);
-  // Account selection
-  const [accounts, setAccounts] = useState<AccountRow[]>([]);
-  const [activeAccountId, setActiveAccountId] = useState<string | null>(null);
-  const [activeAccount, setActiveAccount] = useState<AccountWithLinks | null>(
-    null,
-  );
+  const { t, lang } = useTranslation(calendarT);
+  const boot = useMeBootstrap();
+  const viewer = boot.data?.auth ?? null;
+  const viewerId = viewer?.account_id ?? null;
+  const isSA = boot.data?.isSuperAdmin === true;
 
-  // View state
+  /* ── Whose calendar ── */
+  const [accounts, setAccounts] = useState<AccountRow[] | null>(null); // SA directory; null = not loaded
+  const [pickedAccountId, setPickedAccountId] = useState<string | null>(null);
+  const activeAccountId = pickedAccountId ?? viewerId;
+  const viewingOwn = !!viewerId && activeAccountId === viewerId;
+
+  useEffect(() => {
+    if (!isSA) return;
+    let alive = true;
+    const hint = new URLSearchParams(window.location.search).get("account");
+    fetchAccounts().then((list) => {
+      if (!alive) return;
+      setAccounts(list);
+      if (hint && list.some((a) => a.id === hint)) setPickedAccountId(hint);
+    });
+    return () => { alive = false; };
+  }, [isSA]);
+
+  /* ── Preferences of the open calendar ── */
+  const [otherAccount, setOtherAccount] = useState<AccountWithLinks | null>(null);
+  useEffect(() => {
+    if (!activeAccountId || viewingOwn) return;
+    let alive = true;
+    fetchAccountWithLinks(activeAccountId).then((full) => { if (alive) setOtherAccount(full); });
+    return () => { alive = false; };
+  }, [activeAccountId, viewingOwn]);
+
+  const preferences: AccountPreferences = useMemo(() => {
+    if (viewingOwn) {
+      const header = boot.data?.header as { preferences?: AccountPreferences } | null | undefined;
+      return withDefaults(header?.preferences);
+    }
+    return withDefaults(otherAccount && otherAccount.id === activeAccountId ? otherAccount.preferences : null);
+  }, [viewingOwn, boot.data?.header, otherAccount, activeAccountId]);
+  const weekStart: WeekStart = (preferences.display?.week_start as WeekStart) ?? 1;
+  const timezone = preferences.calendar?.timezone || "Asia/Dubai";
+
+  /* ── View state ── */
   const [view, setView] = useState<ViewKey>("month");
   const [focusDate, setFocusDate] = useState<Date>(() => new Date());
 
-  // Data
-  const [events, setEvents] = useState<CalendarEventRow[]>([]);
-  // Holidays (report GEN-10) — per country / customer, weekly / national / official.
-  const [holidayRows, setHolidayRows] = useState<HolidayRow[]>([]);
-  const [holidayCountry, setHolidayCountry] = useState<string>(""); // "" = all
-  const [loadingAccounts, setLoadingAccounts] = useState(true);
-  const [loadingEvents, setLoadingEvents] = useState(false);
-
-  // Modal state
-  const [modalDraft, setModalDraft] = useState<EventDraft | null>(null);
-  const [editingEvent, setEditingEvent] = useState<CalendarEventRow | null>(
-    null,
-  );
-
-  // Feedback
-  const [toast, setToast] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
-
-  // Scope context for the logged-in user — drives whether the "view as
-  // another account" feature actually resolves any events (only Super Admin
-  // can view other accounts' calendars; regular users are restricted to
-  // their own scope).
-  const [scopeCtx, setScopeCtx] = useState<ScopeContext | null>(null);
-  useEffect(() => {
-    const loggedInId = getCurrentAccountIdSync();
-    if (!loggedInId) return;
-    loadScopeContext(loggedInId).then(setScopeCtx);
-  }, []);
-
-  /* ── Initial account load ──
-     The picker shows only accounts the current user is allowed to view.
-     This is Scope-gated: Super Admin + Scope=All see everyone,
-     Scope=Department sees their teammates, Scope=Own sees only themselves.
-     Without scopeCtx loaded yet we fetch everything and filter on the
-     next render once ctx arrives. */
-  useEffect(() => {
-    (async () => {
-      setLoadingAccounts(true);
-      const list = await fetchAccounts();
-
-      // If scope context is already resolved, filter the account list by
-      // what the viewer can access. Otherwise show the full list — the
-      // later effect re-filters once ctx lands.
-      let visible = list;
-      if (scopeCtx) {
-        const visibleIds = await filterAccessibleAccounts(
-          scopeCtx,
-          "Calendar",
-          list.map((a) => a.id),
-        );
-        const allowedSet = new Set(visibleIds);
-        visible = list.filter((a) => allowedSet.has(a.id));
-      }
-      setAccounts(visible);
-
-      // URL hint
-      let pickId: string | null = null;
-      if (typeof window !== "undefined") {
-        const params = new URLSearchParams(window.location.search);
-        pickId = params.get("account");
-      }
-      const chosen =
-        (pickId && visible.find((a) => a.id === pickId)?.id) ||
-        visible.find((a) => a.user_type === "internal")?.id ||
-        visible[0]?.id ||
-        null;
-      setActiveAccountId(chosen);
-      setLoadingAccounts(false);
-    })();
-    // Re-run when scopeCtx arrives so the picker narrows to accessible accounts
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [scopeCtx]);
-
-  /* ── Load account preferences whenever the active account changes ── */
-  useEffect(() => {
-    if (!activeAccountId) {
-      setActiveAccount(null);
-      return;
-    }
-    (async () => {
-      const full = await fetchAccountWithLinks(activeAccountId);
-      setActiveAccount(full);
-    })();
-  }, [activeAccountId]);
-
-  /* The viewer's first-day-of-week (Settings → Language & region). The grid
-     and the fetch window must agree on it, or the month view would request
-     the wrong leading/trailing days. */
-  const weekStart: WeekStart =
-    (withDefaults(activeAccount?.preferences).display?.week_start as WeekStart) ?? 1;
-
-  /* ── Compute the visible time range based on view + focus date ── */
+  /* The visible window: the grid and the fetch must agree on the first day
+     of week, or the month view would request the wrong leading days. */
   const visibleRange = useMemo(() => {
     if (view === "month") {
-      // Include leading / trailing days shown in the grid
       const gridStart = startOfWeek(startOfMonth(focusDate), weekStart);
-      const gridEnd = addDays(gridStart, 42);
-      return { from: gridStart, to: gridEnd };
+      return { from: gridStart, to: addDays(gridStart, 42) };
     }
     if (view === "week") {
-      return {
-        from: startOfWeek(focusDate, weekStart),
-        to: addDays(endOfWeek(focusDate, weekStart), 1),
-      };
+      const from = startOfWeek(focusDate, weekStart);
+      return { from, to: addDays(from, 7) };
     }
-    return { from: startOfDay(focusDate), to: addDays(startOfDay(focusDate), 1) };
+    const from = startOfDay(focusDate);
+    return { from, to: addDays(from, 1) };
   }, [view, focusDate, weekStart]);
 
-  /* ── Fetch events whenever the account or visible window changes ── */
-  const loadEvents = useCallback(async () => {
-    if (!activeAccountId) return;
-    setLoadingEvents(true);
-    const rows = await fetchEventsInRange(
-      activeAccountId,
-      visibleRange.from,
-      visibleRange.to,
-    );
-    setEvents(rows);
-    setLoadingEvents(false);
-    /* scopeCtx is deliberately NOT a dependency any more: the route reads the
-       session and decides scope itself, so a change in the browser's copy of
-       the context cannot change what this fetch is allowed to return. */
-  }, [activeAccountId, visibleRange]);
+  /* ── Events ── */
+  const [events, setEvents] = useState<CalendarViewEvent[]>([]);
+  const [loadedKey, setLoadedKey] = useState<string | null>(null);
+  const [reloadTick, setReloadTick] = useState(0);
+  const fetchKey = `${activeAccountId ?? ""}|${visibleRange.from.getTime()}|${visibleRange.to.getTime()}|${reloadTick}`;
+  const loadingEvents = !!activeAccountId && loadedKey !== fetchKey;
+  const reload = useCallback(() => setReloadTick((n) => n + 1), []);
 
   useEffect(() => {
-    loadEvents();
-  }, [loadEvents]);
+    if (!activeAccountId) return;
+    let alive = true;
+    fetchEventsInRange(activeAccountId, visibleRange.from, visibleRange.to).then((rows) => {
+      if (!alive) return;
+      setEvents(rows);
+      setLoadedKey(fetchKey);
+    });
+    return () => { alive = false; };
+  }, [activeAccountId, visibleRange, fetchKey]);
 
-  /* Holidays load once (tenant-scoped by the API). They're reference data, not
-     windowed, so we fetch the full set and expand into the visible range. */
+  /* A guest's calendar changes when the organizer moves or cancels a
+     meeting; coming back to the tab refetches the window. */
+  useEffect(() => {
+    const onVisible = () => { if (document.visibilityState === "visible") reload(); };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => document.removeEventListener("visibilitychange", onVisible);
+  }, [reload]);
+
+  /* ── Holidays (report GEN-10): tenant reference data, expanded per window ── */
+  const [holidayRows, setHolidayRows] = useState<HolidayRow[]>([]);
+  const [holidayCountry, setHolidayCountry] = useState<string>(""); // "" = all
   useEffect(() => {
     const ctrl = new AbortController();
-    fetchHolidays({ signal: ctrl.signal })
+    fetchHolidays(ctrl.signal)
       .then(setHolidayRows)
-      .catch(() => { /* non-fatal — calendar still works without holidays */ });
+      .catch(() => { /* non-fatal — the calendar works without holidays */ });
     return () => ctrl.abort();
   }, []);
-
   const holidayCountries = useMemo(
-    () =>
-      Array.from(
-        new Set(holidayRows.map((h) => h.country).filter(Boolean) as string[]),
-      ).sort(),
+    () => Array.from(new Set(holidayRows.map((h) => h.country).filter(Boolean) as string[])).sort(),
     [holidayRows],
   );
-
   const holidaysByDay = useMemo(() => {
     const rows = holidayCountry
       ? holidayRows.filter((h) => h.country === holidayCountry || h.scope_type === "customer")
@@ -238,22 +186,68 @@ export default function CalendarApp() {
     return expandHolidays(rows, visibleRange.from, visibleRange.to);
   }, [holidayRows, holidayCountry, visibleRange]);
 
+  /* ── Feedback ── */
+  const [toast, setToast] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
   useEffect(() => {
     if (!toast) return;
-    const t = setTimeout(() => setToast(null), 3500);
-    return () => clearTimeout(t);
+    const id = setTimeout(() => setToast(null), 3500);
+    return () => clearTimeout(id);
   }, [toast]);
+
+  /* ── Modal ── */
+  const [modal, setModal] = useState<ModalState | null>(null);
+
+  const openModalFor = useCallback((e: OpenableEvent) => {
+    const editable = !e.invited && !!viewerId && (isSA || e.account_id === viewerId);
+    setModal({
+      existingId: e.id,
+      mode: editable ? "edit" : "view",
+      draft: {
+        account_id: e.account_id,
+        title: e.title,
+        description: e.description,
+        location: e.location,
+        start_at: e.start_at,
+        end_at: e.end_at,
+        all_day: e.all_day,
+        event_type: e.event_type,
+        color: e.color,
+        is_private: e.is_private ?? false,
+        reminder_minutes: e.reminder_minutes ?? null,
+        recurrence: e.recurrence ?? null,
+        recurrence_until: e.recurrence_until ?? null,
+      },
+    });
+  }, [viewerId, isSA]);
+
+  /* Deep link: notifications point at /calendar?event=<id>. Open it on its
+     date once the viewer is known, then strip the param so a refresh does
+     not reopen it. */
+  const deepLinkHandledRef = useRef(false);
+  useEffect(() => {
+    if (!viewerId || deepLinkHandledRef.current) return;
+    deepLinkHandledRef.current = true;
+    const params = new URLSearchParams(window.location.search);
+    const eventId = params.get("event");
+    if (!eventId) return;
+    params.delete("event");
+    const qs = params.toString();
+    window.history.replaceState(null, "", window.location.pathname + (qs ? `?${qs}` : ""));
+    fetchEventById(eventId).then((ev) => {
+      if (!ev) return;
+      setFocusDate(new Date(ev.start_at));
+      if (isSA && ev.account_id !== viewerId && !ev.invited) setPickedAccountId(ev.account_id);
+      openModalFor(ev);
+    });
+  }, [viewerId, isSA, openModalFor]);
 
   /* ── Navigation ── */
   function goPrev() {
-    setFocusDate((d) =>
-      view === "month" ? addMonths(d, -1) : addDays(d, view === "week" ? -7 : -1),
-    );
+    setFocusDate((d) => (view === "month" ? addMonths(d, -1) : addDays(d, view === "week" ? -7 : -1)));
   }
   function goNext() {
-    setFocusDate((d) =>
-      view === "month" ? addMonths(d, 1) : addDays(d, view === "week" ? 7 : 1),
-    );
+    setFocusDate((d) => (view === "month" ? addMonths(d, 1) : addDays(d, view === "week" ? 7 : 1)));
   }
   function goToday() {
     setFocusDate(new Date());
@@ -262,169 +256,115 @@ export default function CalendarApp() {
   /* ── Event open handlers ── */
   function openNewEvent(dayHint?: Date) {
     if (!activeAccountId) return;
-    const prefs = withDefaults(activeAccount?.preferences);
-    const defaultLen = prefs.calendar?.default_meeting_duration_min ?? 30;
+    const defaultLen = preferences.calendar?.default_meeting_duration_min ?? 30;
     const start = dayHint ? new Date(dayHint) : roundToNextHalfHour(new Date());
-    // If hint was a day (midnight), bump to the default working-hour start
+    // A day hint (midnight) starts at the account's working-hour start.
     if (dayHint && dayHint.getHours() === 0 && dayHint.getMinutes() === 0) {
-      const wh = prefs.calendar?.working_hours?.start || "09:00";
-      const [h, m] = wh.split(":").map(Number);
+      const [h, m] = (preferences.calendar?.working_hours?.start || "09:00").split(":").map(Number);
       start.setHours(h || 9, m || 0, 0, 0);
     }
     const end = new Date(start.getTime() + defaultLen * 60 * 1000);
-    setEditingEvent(null);
-    setModalDraft({
-      account_id: activeAccountId,
-      title: "",
-      description: null,
-      location: null,
-      start_at: start.toISOString(),
-      end_at: end.toISOString(),
-      all_day: false,
-      event_type: "meeting",
-      color: null,
+    setModal({
+      existingId: null,
+      mode: "create",
+      draft: {
+        account_id: activeAccountId,
+        title: "",
+        description: null,
+        location: null,
+        start_at: start.toISOString(),
+        end_at: end.toISOString(),
+        all_day: false,
+        event_type: "meeting",
+        color: null,
+        is_private: false,
+        reminder_minutes: null,
+        recurrence: null,
+        recurrence_until: null,
+      },
     });
   }
 
-  function draftFrom(e: CalendarEventRow): EventDraft {
-    return {
-      account_id: e.account_id,
-      title: e.title,
-      description: e.description,
-      location: e.location,
-      start_at: e.start_at,
-      end_at: e.end_at,
-      all_day: e.all_day,
-      event_type: e.event_type,
-      color: e.color,
-      is_private: e.is_private ?? false,
-      reminder_minutes: e.reminder_minutes ?? null,
-      recurrence: e.recurrence ?? null,
-      recurrence_until: e.recurrence_until ?? null,
-    };
-  }
+  async function openEvent(e: CalendarViewEvent) {
+    /* Mirrors are read-only shadows of another module. A To-do or a project
+       task deep-links to its app; the rest are inert. */
+    if (e.source === "todo" && e.todo_id) { window.location.assign(`/todo?task=${e.todo_id}`); return; }
+    if (e.source === "project") { window.location.assign("/projects"); return; }
+    if (e.source) return;
 
-  async function openEditEvent(e: CalendarEventRow) {
-    /* Mirrored items are read-only shadows of another module — they have no
-       real koleex_calendar_events row to edit. A To-do deep-links to its task
-       in the To-do app; other mirrors (Planning) are simply not editable. */
-    if (typeof e.id === "string" && e.id.startsWith("ptask:")) {
-      // Mirrored project task — open it in the Projects app, never the editor.
-      window.location.assign("/projects");
+    /* An occurrence of a series edits the WHOLE series: open the base row
+       (its true start/end + recurrence rule). */
+    if (e.series_base_id) {
+      const base = await fetchEventById(e.series_base_id);
+      if (!base) { setError(t("err.openSeries")); return; }
+      openModalFor({ ...base, invited: e.invited || base.invited });
       return;
     }
-    if (typeof e.id === "string" && e.id.startsWith("todo:")) {
-      window.location.assign(`/todo?task=${e.id.slice("todo:".length)}`);
-      return;
-    }
-
-    /* Recurring occurrence — its id is `<baseId>~<i>` and it carries
-       `series_base_id`. Editing an occurrence edits the WHOLE series, so open
-       the real base row (its true start/end + recurrence rule). */
-    const seriesBaseId = (e as { series_base_id?: string }).series_base_id;
-    if (seriesBaseId) {
-      const base = await fetchEventById(seriesBaseId);
-      if (!base) {
-        setError("Could not open the recurring event.");
-        return;
-      }
-      setEditingEvent(base);
-      setModalDraft(draftFrom(base));
-      return;
-    }
-
-    // Any other synthetic id (planning:, holiday:, …) is not editable.
-    if (typeof e.id === "string" && e.id.includes(":")) return;
-
-    setEditingEvent(e);
-    setModalDraft(draftFrom(e));
+    openModalFor(e);
   }
 
   async function handleDeleteEvent(id: string) {
     const ok = await deleteEvent(id);
-    if (!ok) {
-      setError("Could not delete the event.");
-      return;
-    }
-    setEvents((prev) => prev.filter((e) => e.id !== id));
-    setToast("Event deleted.");
-    setModalDraft(null);
-    setEditingEvent(null);
+    if (!ok) { setError(t("err.delete")); return; }
+    setToast(t("toast.deleted"));
+    setModal(null);
+    reload();
   }
 
-  function handleSaved(saved: CalendarEventRow) {
-    setEvents((prev) => {
-      const without = prev.filter((e) => e.id !== saved.id);
-      return [...without, saved].sort(
-        (a, b) => new Date(a.start_at).getTime() - new Date(b.start_at).getTime(),
-      );
-    });
-    setToast(editingEvent ? "Event updated." : "Event created.");
-    setModalDraft(null);
-    setEditingEvent(null);
+  /* After a write the window is refetched rather than patched in place: a
+     series edit changes every occurrence, a delete removes rows whose ids
+     (`<base>~<i>`) never matched the base id. */
+  function handleSaved() {
+    setToast(modal?.existingId ? t("toast.updated") : t("toast.created"));
+    setModal(null);
+    reload();
+  }
+  function handleResponded() {
+    setToast(t("toast.responded"));
+    setModal(null);
+    reload();
   }
 
-  const preferences = withDefaults(activeAccount?.preferences);
-  const timezone = preferences.calendar?.timezone || "Asia/Dubai";
-
-  /* ── Title for the current view ── */
   const viewTitle =
-    view === "month"
-      ? formatMonthYear(focusDate)
-      : view === "week"
-        ? formatWeekRange(focusDate)
-        : focusDate.toLocaleDateString(undefined, {
-            weekday: "long",
-            month: "long",
-            day: "numeric",
-            year: "numeric",
-          });
+    view === "month" ? formatMonthYear(focusDate, lang)
+      : view === "week" ? formatWeekRange(focusDate, lang, weekStart)
+        : formatFullDay(focusDate, lang);
+
+  const loadingAccounts = isSA && accounts === null;
 
   return (
     <div className="min-h-full bg-[var(--bg-primary)] text-[var(--text-primary)]">
       <div className="w-full">
-        {/* ── Header ── */}
-        {/* ⚠️ pb-4 IS THE GAP THE OLD SUBTITLE USED TO CARRY. The line this
-            header replaced was `<p … mb-4>`, and that margin was the ONLY
-            thing separating the band from the date row below — the next
-            container has bottom padding but no top padding. Dropping the
-            <p> silently dropped the gap and the two rows collided. */}
+        {/* ── Header ──
+            pb-4 is the gap between the band and the date row below; the next
+            container has bottom padding but no top padding. */}
         <div className="max-w-[1500px] mx-auto px-4 md:px-6 lg:px-8 pt-6 md:pt-8 pb-4">
-          {/* Shared header. This block was a copy of it, so the screen never
-              got the longer BK-4 back button and was still printing "Calendar"
-              under a system bar already saying it.
-
-              The account picker moves to `controls` and the New-event button to
-              `action` — both keep their markup, handlers and disabled logic
-              exactly. The date navigation and the month/week/day switcher stay
-              where they are: those are the calendar's own state, not app
-              navigation, and they belong next to the grid they drive. */}
           <PageHeader
             title={t("app.title")}
             subtitle={`${timezone} · ${t("app.subtitle")}`}
             icon={<CalendarIcon size={16} />}
             showTabs={false}
             controls={
-              <div className="flex items-center gap-2">
-                <UserCircle2Icon className="h-4 w-4 text-[var(--text-dim)]" />
-                <select
-                  value={activeAccountId || ""}
-                  onChange={(e) => setActiveAccountId(e.target.value || null)}
-                  className="h-10 px-3 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[13px] text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)] transition-colors min-w-[200px]"
-                  disabled={loadingAccounts}
-                >
-                  {loadingAccounts && <option>{t("accounts.loading")}</option>}
-                  {!loadingAccounts && accounts.length === 0 && (
-                    <option value="">{t("accounts.none")}</option>
-                  )}
-                  {!loadingAccounts &&
-                    accounts.map((a) => (
-                      <option key={a.id} value={a.id}>
-                        {a.username} · {a.user_type}
-                      </option>
-                    ))}
-                </select>
-              </div>
+              isSA ? (
+                <div className="flex items-center gap-2">
+                  <UserCircle2Icon className="h-4 w-4 text-[var(--text-dim)]" />
+                  <select
+                    value={activeAccountId || ""}
+                    onChange={(e) => setPickedAccountId(e.target.value || null)}
+                    className="h-10 px-3 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[13px] text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)] transition-colors min-w-[200px]"
+                    disabled={loadingAccounts}
+                  >
+                    {loadingAccounts && <option>{t("accounts.loading")}</option>}
+                    {!loadingAccounts && (accounts?.length ?? 0) === 0 && (
+                      <option value="">{t("accounts.none")}</option>
+                    )}
+                    {!loadingAccounts &&
+                      (accounts ?? []).map((a) => (
+                        <option key={a.id} value={a.id}>{a.username} · {a.user_type}</option>
+                      ))}
+                  </select>
+                </div>
+              ) : undefined
             }
             action={
               <button
@@ -439,197 +379,156 @@ export default function CalendarApp() {
         </div>
 
         <div className="max-w-[1500px] mx-auto px-4 md:px-6 lg:px-8 pb-6 md:pb-8">
-        {toast && (
-          <div className="mb-5 rounded-xl border border-emerald-500/30 bg-emerald-500/[0.08] text-emerald-300 px-4 py-3 text-[13px] flex items-start gap-2">
-            <CheckCircleIcon className="h-4 w-4 mt-0.5 shrink-0" />
-            <span>{toast}</span>
-          </div>
-        )}
-        {error && (
-          <div className="mb-5 rounded-xl border border-red-500/30 bg-red-500/[0.08] text-red-300 px-4 py-3 text-[13px] flex items-start gap-2">
-            <ExclamationIcon className="h-4 w-4 mt-0.5 shrink-0" />
-            <span>{error}</span>
-          </div>
-        )}
-
-        {/* ── Toolbar (nav + view switcher) ── */}
-        <div className="flex items-center justify-between gap-3 flex-wrap mb-4">
-          <div className="flex items-center gap-2">
-            <button
-              onClick={goToday}
-              className="h-10 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-muted)] text-[13px] font-semibold hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all"
-            >
-              {t("today")}
-            </button>
-            <div className="flex items-center gap-0.5">
-              <button
-                onClick={goPrev}
-                className="h-10 w-10 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all flex items-center justify-center"
-                title={t("prev")}
-              >
-                <AngleLeftIcon className="h-4 w-4" />
-              </button>
-              <button
-                onClick={goNext}
-                className="h-10 w-10 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all flex items-center justify-center"
-                title={t("next")}
-              >
-                <AngleRightIcon className="h-4 w-4" />
-              </button>
+          {toast && (
+            <div className="mb-5 rounded-xl border border-emerald-500/30 bg-emerald-500/[0.08] text-emerald-300 px-4 py-3 text-[13px] flex items-start gap-2">
+              <CheckCircleIcon className="h-4 w-4 mt-0.5 shrink-0" />
+              <span>{toast}</span>
             </div>
-            <h2 className="ml-2 text-[16px] md:text-[18px] font-bold text-[var(--text-primary)]">
-              {viewTitle}
-            </h2>
-          </div>
-
-          {/* View switcher */}
-          <div className="inline-flex items-center bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] rounded-xl p-1">
-            {(Object.keys(viewLabels) as ViewKey[]).map((v) => {
-              const active = view === v;
-              return (
-                <button
-                  key={v}
-                  onClick={() => setView(v)}
-                  className={`h-8 px-4 rounded-lg text-[12px] font-bold uppercase tracking-wider transition-all ${
-                    active
-                      ? "bg-[var(--bg-inverted)] text-[var(--text-inverted)]"
-                      : "text-[var(--text-dim)] hover:text-[var(--text-primary)]"
-                  }`}
-                >
-                  {t(`view.${v}`, viewLabels[v])}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* Holiday country filter (report GEN-10) — only when holidays exist
-            and we're in the month grid (the view that overlays them). */}
-        {view === "month" && holidayCountries.length > 0 && (
-          <div className="mb-3 flex items-center gap-2">
-            <span className="text-[11px] font-semibold uppercase tracking-wider text-[var(--text-dim)]">
-              {t("calendar.holidays", "Holidays")}
-            </span>
-            <select
-              value={holidayCountry}
-              onChange={(e) => setHolidayCountry(e.target.value)}
-              className="h-8 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-secondary)] px-2.5 text-[12px] text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)]"
-              title={t("calendar.filterByCountry", "Filter holidays by country")}
-            >
-              <option value="">{t("calendar.allCountries", "All countries")}</option>
-              {holidayCountries.map((c) => (
-                <option key={c} value={c}>{c}</option>
-              ))}
-            </select>
-          </div>
-        )}
-
-        {/* ── View body ── */}
-        {/* The month grid is ONE glass surface, so the frost costs one pass.
-            The 31+ day cells inside stay tints on purpose — backdrop-filter is
-            priced per element, and a month of individually-blurred cells is the
-            most expensive thing that could be on this screen for no gain. Same
-            call as Planning's schedule grid. */}
-        <div className="kx-glass bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] overflow-hidden">
-          {!activeAccountId ? (
-            <div className="p-10 text-center text-[13px] text-[var(--text-dim)]">
-              Pick an account above to see its calendar.
-            </div>
-          ) : loadingEvents && events.length === 0 ? (
-            <div className="p-10 text-center text-[13px] text-[var(--text-dim)]">
-              Loading events…
-            </div>
-          ) : view === "month" ? (
-            <MonthView
-              focusDate={focusDate}
-              events={events}
-              preferences={preferences}
-              holidaysByDay={holidaysByDay}
-              onDayClick={(d) => {
-                setFocusDate(d);
-                setView("day");
-              }}
-              onNewEventOnDay={(d) => openNewEvent(d)}
-              onEventClick={openEditEvent}
-            />
-          ) : view === "week" ? (
-            <WeekView
-              focusDate={focusDate}
-              events={events}
-              preferences={preferences}
-              onNewEventAtSlot={(d) => openNewEvent(d)}
-              onEventClick={openEditEvent}
-            />
-          ) : (
-            <DayView
-              focusDate={focusDate}
-              events={events}
-              preferences={preferences}
-              onNewEventAtSlot={(d) => openNewEvent(d)}
-              onEventClick={openEditEvent}
-            />
           )}
-        </div>
+          {error && (
+            <div className="mb-5 rounded-xl border border-red-500/30 bg-red-500/[0.08] text-red-300 px-4 py-3 text-[13px] flex items-start gap-2">
+              <ExclamationIcon className="h-4 w-4 mt-0.5 shrink-0" />
+              <span>{error}</span>
+            </div>
+          )}
 
-        {/* Legend */}
-        <div className="mt-4 flex flex-wrap items-center gap-3 text-[11px] text-[var(--text-dim)]">
-          <LegendDot color="#3B82F6" label="Meeting" />
-          <LegendDot color="#10B981" label="Task" />
-          <LegendDot color="#F59E0B" label="Reminder" />
-          <LegendDot color="#A855F7" label="Event" />
-          <LegendDot color="#EC4899" label="Holiday" />
-          <LegendDot color="#EF4444" label="Out of Office" />
-        </div>
+          {/* ── Toolbar (nav + view switcher) ── */}
+          <div className="flex items-center justify-between gap-3 flex-wrap mb-4">
+            <div className="flex items-center gap-2">
+              <button
+                onClick={goToday}
+                className="h-10 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-muted)] text-[13px] font-semibold hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all"
+              >
+                {t("today")}
+              </button>
+              <div className="flex items-center gap-0.5">
+                <button
+                  onClick={goPrev}
+                  className="h-10 w-10 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all flex items-center justify-center"
+                  title={t("prev")}
+                  aria-label={t("prev")}
+                >
+                  <AngleLeftIcon className="h-4 w-4 rtl:rotate-180" />
+                </button>
+                <button
+                  onClick={goNext}
+                  className="h-10 w-10 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all flex items-center justify-center"
+                  title={t("next")}
+                  aria-label={t("next")}
+                >
+                  <AngleRightIcon className="h-4 w-4 rtl:rotate-180" />
+                </button>
+              </div>
+              <h2 className="ms-2 text-[16px] md:text-[18px] font-bold text-[var(--text-primary)]">{viewTitle}</h2>
+            </div>
+
+            {/* View switcher */}
+            <div className="inline-flex items-center bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] rounded-xl p-1">
+              {VIEWS.map((v) => {
+                const active = view === v;
+                return (
+                  <button
+                    key={v}
+                    onClick={() => setView(v)}
+                    className={`h-8 px-4 rounded-lg text-[12px] font-bold uppercase tracking-wider transition-all ${
+                      active
+                        ? "bg-[var(--bg-inverted)] text-[var(--text-inverted)]"
+                        : "text-[var(--text-dim)] hover:text-[var(--text-primary)]"
+                    }`}
+                  >
+                    {t(`view.${v}`)}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Holiday country filter (report GEN-10) — only when holidays exist
+              and we're in the month grid (the view that overlays them). */}
+          {view === "month" && holidayCountries.length > 0 && (
+            <div className="mb-3 flex items-center gap-2">
+              <span className="text-[11px] font-semibold uppercase tracking-wider text-[var(--text-dim)]">
+                {t("holidays")}
+              </span>
+              <select
+                value={holidayCountry}
+                onChange={(e) => setHolidayCountry(e.target.value)}
+                className="h-8 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-secondary)] px-2.5 text-[12px] text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)]"
+                title={t("holidays.filter")}
+              >
+                <option value="">{t("holidays.all")}</option>
+                {holidayCountries.map((c) => (
+                  <option key={c} value={c}>{c}</option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          {/* ── View body ──
+              The month grid is ONE glass surface, so the frost costs one pass.
+              The day cells inside stay tints on purpose — backdrop-filter is
+              priced per element. Same call as Planning's schedule grid. */}
+          <div className="kx-glass bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] overflow-hidden">
+            {!activeAccountId ? (
+              <div className="p-10 text-center text-[13px] text-[var(--text-dim)]">{t("empty.pickAccount")}</div>
+            ) : loadingEvents && events.length === 0 ? (
+              <div className="p-10 text-center text-[13px] text-[var(--text-dim)]">{t("events.loading")}</div>
+            ) : view === "month" ? (
+              <MonthView
+                focusDate={focusDate}
+                events={events}
+                preferences={preferences}
+                weekStart={weekStart}
+                holidaysByDay={holidaysByDay}
+                onDayClick={(d) => { setFocusDate(d); setView("day"); }}
+                onNewEventOnDay={(d) => openNewEvent(d)}
+                onEventClick={(e) => { void openEvent(e); }}
+              />
+            ) : view === "week" ? (
+              <WeekView
+                focusDate={focusDate}
+                events={events}
+                preferences={preferences}
+                weekStart={weekStart}
+                onNewEventAtSlot={(d) => openNewEvent(d)}
+                onEventClick={(e) => { void openEvent(e); }}
+              />
+            ) : (
+              <DayView
+                focusDate={focusDate}
+                events={events}
+                preferences={preferences}
+                onNewEventAtSlot={(d) => openNewEvent(d)}
+                onEventClick={(e) => { void openEvent(e); }}
+              />
+            )}
+          </div>
+
+          {/* Legend — the same colors the chips and the modal's default swatch use */}
+          <div className="mt-4 flex flex-wrap items-center gap-3 text-[11px] text-[var(--text-dim)]">
+            {CALENDAR_EVENT_TYPES.map((type) => (
+              <span key={type} className="inline-flex items-center gap-1.5">
+                <span className="h-2 w-2 rounded-full" style={{ backgroundColor: EVENT_TYPE_COLORS[type] }} />
+                {t(`type.${type}`)}
+              </span>
+            ))}
+          </div>
         </div>
       </div>
 
-      {/* ── Event Modal ── */}
-      {modalDraft && (
+      {modal && (
         <EventModal
-          draft={modalDraft}
-          existingId={editingEvent?.id || null}
-          onClose={() => {
-            setModalDraft(null);
-            setEditingEvent(null);
-          }}
+          draft={modal.draft}
+          existingId={modal.existingId}
+          mode={modal.mode}
+          viewerId={viewerId}
+          onClose={() => setModal(null)}
           onSaved={handleSaved}
-          onDelete={editingEvent ? () => handleDeleteEvent(editingEvent.id) : undefined}
+          onDelete={modal.mode === "edit" && modal.existingId ? () => handleDeleteEvent(modal.existingId as string) : undefined}
+          onResponded={handleResponded}
           onError={(m) => setError(m)}
         />
       )}
     </div>
   );
 }
-
-function LegendDot({ color, label }: { color: string; label: string }) {
-  return (
-    <span className="inline-flex items-center gap-1.5">
-      <span
-        className="h-2 w-2 rounded-full"
-        style={{ backgroundColor: color }}
-      />
-      {label}
-    </span>
-  );
-}
-
-/** Round a Date forward to the next :00 or :30. */
-function roundToNextHalfHour(d: Date): Date {
-  const x = new Date(d);
-  const m = x.getMinutes();
-  if (m === 0 || m === 30) {
-    x.setSeconds(0, 0);
-    return x;
-  }
-  if (m < 30) {
-    x.setMinutes(30, 0, 0);
-  } else {
-    x.setHours(x.getHours() + 1, 0, 0, 0);
-  }
-  return x;
-}
-
-// Silence unused import warning for endOfMonth / endOfDay — kept in the
-// barrel for the per-view components.
-void endOfMonth;
-void endOfDay;

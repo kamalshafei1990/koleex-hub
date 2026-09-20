@@ -118,6 +118,7 @@ check("the insert writes every field the To-do app writes, people into metadata 
    tool and /api/todos POST call the SAME functions, so the suite proves the
    helper once and then proves both callers use it. */
 const accessSrc = readFileSync("src/lib/server/todo-access.ts", "utf8");
+const internalSrc = readFileSync("src/lib/server/internal-accounts.ts", "utf8");
 const notifySrc = readFileSync("src/lib/server/todo-notify.ts", "utf8");
 const createRouteSrc = readFileSync("src/app/api/todos/route.ts", "utf8");
 check("assignee rows expand a department through koleex_employees and 'everyone' through active internal accounts, then INTERNAL ONLY — as the route does",
@@ -125,7 +126,7 @@ check("assignee rows expand a department through koleex_employees and 'everyone'
   /\.from\("koleex_employees"\)\s*\.select\("account_id"\)\s*\.eq\("department", opts\.department\)/.test(accessSrc) &&
   /\.eq\("user_type", "internal"\)\s*\.eq\("status", "active"\)\s*\.eq\("tenant_id", opts\.tenantId\)/.test(accessSrc) &&
   /return internalAccountIds\(ids, opts\.tenantId\);/.test(accessSrc) &&
-  /\.in\("id", unique\)\s*\.eq\("user_type", "internal"\)\s*\.eq\("status", "active"\)/.test(accessSrc) &&
+  /\.in\("id", unique\)\s*\.eq\("user_type", "internal"\)\s*\.eq\("status", "active"\)/.test(internalSrc) &&
   /const assigneeAccountIds = await resolveAssigneeIds\(\{\s*explicit: assignees\.map\(\(a\) => a\.account_id\),\s*department: departmentName,\s*everyone: toAll,/.test(createSrc) &&
   /await resolveAssigneeIds\(\{/.test(createRouteSrc));
 check("notifications: assignees, then mentions, then observers — never the creator, never twice",

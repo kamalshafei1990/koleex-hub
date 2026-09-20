@@ -6,10 +6,12 @@
      · national — a public/national holiday (a calendar date, optionally annual)
      · official — a company/official non-working day (a calendar date)
 
-   This module is client-safe: types, a fetch helper that hits the API, and a
-   pure expander that turns holiday definitions into concrete dated instances
-   within a visible range so views can overlay them.
+   Client-safe: types, the fetch helper, and a pure expander that turns the
+   definitions into dated instances within a visible range. The same rows
+   drive HR's working calendar on the server (lib/server/work-calendar.ts).
    --------------------------------------------------------------------------- */
+
+import { isoDateKey } from "@/lib/calendar-utils";
 
 export type HolidayType = "weekly" | "national" | "official";
 export type HolidayScope = "country" | "customer";
@@ -37,26 +39,9 @@ export interface HolidayInstance {
   iso: string; // yyyy-mm-dd for the concrete occurrence
 }
 
-function isoOf(d: Date): string {
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${y}-${m}-${day}`;
-}
-
-/** Fetch holiday definitions, optionally filtered by country / customer. */
-export async function fetchHolidays(params?: {
-  country?: string;
-  customerId?: string;
-  signal?: AbortSignal;
-}): Promise<HolidayRow[]> {
-  const qs = new URLSearchParams();
-  if (params?.country) qs.set("country", params.country);
-  if (params?.customerId) qs.set("customer_id", params.customerId);
-  const res = await fetch(`/api/calendar/holidays?${qs.toString()}`, {
-    credentials: "include",
-    signal: params?.signal,
-  });
+/** The tenant's active holiday definitions (the API scopes them). */
+export async function fetchHolidays(signal?: AbortSignal): Promise<HolidayRow[]> {
+  const res = await fetch("/api/calendar/holidays", { credentials: "include", signal });
   if (!res.ok) return [];
   const j = (await res.json()) as { holidays?: HolidayRow[] };
   return j.holidays ?? [];
@@ -97,7 +82,7 @@ export function expandHolidays(
     if (h.holiday_type === "weekly" && h.weekday != null) {
       for (let t = startMs; t <= endMs; t += 86_400_000) {
         const d = new Date(t);
-        if (d.getDay() === h.weekday) push(isoOf(d), h);
+        if (d.getDay() === h.weekday) push(isoDateKey(d), h);
       }
       continue;
     }
@@ -110,18 +95,12 @@ export function expandHolidays(
       for (let y = from.getFullYear(); y <= to.getFullYear(); y++) {
         const occ = new Date(y, base.getMonth(), base.getDate());
         const occMs = occ.getTime();
-        if (occMs >= startMs && occMs <= endMs) push(isoOf(occ), h);
+        if (occMs >= startMs && occMs <= endMs) push(isoDateKey(occ), h);
       }
     } else {
       const occMs = new Date(base.getFullYear(), base.getMonth(), base.getDate()).getTime();
-      if (occMs >= startMs && occMs <= endMs) push(isoOf(base), h);
+      if (occMs >= startMs && occMs <= endMs) push(isoDateKey(base), h);
     }
   }
   return out;
 }
-
-export const HOLIDAY_TYPE_LABELS: Record<HolidayType, string> = {
-  weekly: "Weekly",
-  national: "National",
-  official: "Official",
-};

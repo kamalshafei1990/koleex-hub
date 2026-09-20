@@ -98,7 +98,7 @@ const SHARED_BY_DESIGN: Record<string, string> = {
    names the loader that must exist in the same file for the exemption to hold. */
 const PRE_VERIFIED_LOADERS: Record<string, string> = {
   koleex_todos: "loadTodoRow",
-  koleex_calendar_events: "loadEventRow",
+  koleex_calendar_events: "loadCalendarEvent",
   planning_items: "loadPlanningRow",
 };
 

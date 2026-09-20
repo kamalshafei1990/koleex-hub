@@ -23,21 +23,16 @@
         non-private records plus the user's own records regardless of flag.
 
    What still lives here: the ScopeContext shape and its client loader (from
-   the /api/me/bootstrap payload), the Type C module list, getModuleScope /
-   canViewAccount / filterAccessibleAccounts for the account pickers. The
+   the /api/me/bootstrap payload) and the Type C module list. The
    query-building half (buildScopeFilter, orClauseForScope, privacyClause,
-   logPrivateAccess) was removed once nothing called it: every list is
-   scoped on the SERVER now, and the To-do rule in particular lives in
-   lib/server/todo-scope-rule.ts — this file's MODULE_CONFIGS["To-do"] had
-   quietly drifted from it (no observer branch, no assigner branch).
+   logPrivateAccess) and the browser-side account-picker checks
+   (getModuleScope, canViewAccount, filterAccessibleAccounts — they read
+   koleex_permissions and koleex_employees with the anon key, which RLS
+   answers with nothing) were removed once nothing called them: every list
+   is scoped on the SERVER now, and the To-do rule in particular lives in
+   lib/server/todo-scope-rule.ts. This module no longer touches the
+   database at all.
    --------------------------------------------------------------------------- */
-
-/* supabase-admin is imported lazily so @supabase/supabase-js stays out of
-   the shell's first-load bundle — every call site below is already async. */
-async function sb() {
-  const { supabaseAdmin } = await import("./supabase-admin");
-  return supabaseAdmin;
-}
 
 /** Four scope levels. Order matters: from most restrictive to least. */
 export type DataScope = "private" | "own" | "department" | "all";
@@ -213,144 +208,3 @@ async function loadScopeContextUncached(
   };
 }
 
-/**
- * Look up the effective scope for a specific (role × module) cell. Returns
- * 'private' when no permission row exists — this is the safe default
- * (fail-closed rather than fail-open).
- */
-export async function getModuleScope(
-  ctx: ScopeContext,
-  module_name: string,
-): Promise<DataScope> {
-  // Type C modules (Personal productivity) are hardcoded to Own regardless
-  // of what /roles has configured. This enforces the rule that no non-SA
-  // can see another account's personal data even with Scope = All on their
-  // role — because for Type C, Scope is not configurable.
-  if (TYPE_C_MODULES.has(module_name)) return "own";
-
-  if (!ctx.role_id) return "private";
-  const { data } = await (await sb())
-    .from("koleex_permissions")
-    .select("data_scope")
-    .eq("role_id", ctx.role_id)
-    .eq("module_name", module_name)
-    .maybeSingle();
-  return ((data?.data_scope as DataScope) ?? "private") as DataScope;
-}
-
-/**
- * Decide whether a user is allowed to view another account's records
- * (e.g. another person's Calendar via the account-picker). Used by
- * modules that have an "active account" concept distinct from "records
- * the user created".
- *
- * Rules:
- *   - Super Admin (is_super_admin): yes, any account
- *   - Viewing own account: yes, always
- *   - Scope 'all' on this module: yes, any account
- *   - Scope 'department': yes if the target account is in the same
- *     department as the viewer (via koleex_employees.department)
- *   - Scope 'own' or 'private' + different account: no
- *
- * Returns { allowed, reason } — the reason is useful for UI hints.
- */
-export async function canViewAccount(
-  ctx: ScopeContext,
-  module_name: string,
-  target_account_id: string,
-): Promise<{ allowed: boolean; reason: "sa" | "own" | "scope_all" | "scope_dept" | "denied" | "type_c" }> {
-  if (ctx.is_super_admin) return { allowed: true, reason: "sa" };
-  if (target_account_id === ctx.account_id) return { allowed: true, reason: "own" };
-
-  // Type C modules (Calendar, Todo, Mail, Inbox, Notes): only Super Admin
-  // can view another account's records. No role configuration grants this
-  // — personal productivity data stays personal.
-  if (TYPE_C_MODULES.has(module_name)) {
-    return { allowed: false, reason: "type_c" };
-  }
-
-  const scope = await getModuleScope(ctx, module_name);
-  if (scope === "all") return { allowed: true, reason: "scope_all" };
-
-  if (scope === "department" && ctx.department) {
-    const { data } = await (await sb())
-      .from("koleex_employees")
-      .select("department")
-      .eq("account_id", target_account_id)
-      .maybeSingle();
-    if (data?.department && data.department === ctx.department) {
-      return { allowed: true, reason: "scope_dept" };
-    }
-  }
-
-  return { allowed: false, reason: "denied" };
-}
-
-/**
- * Given a set of candidate account IDs, return only the ones this user is
- * allowed to view under the given module. Lets pickers (e.g. the Calendar
- * account dropdown) show only accessible accounts.
- *
- * Optimised: resolves scope once and batch-checks departments instead of
- * per-account round-trips.
- */
-export async function filterAccessibleAccounts(
-  ctx: ScopeContext,
-  module_name: string,
-  candidate_account_ids: string[],
-): Promise<string[]> {
-  if (candidate_account_ids.length === 0) return [];
-  if (ctx.is_super_admin) return candidate_account_ids;
-
-  // Type C modules: only the viewer's own account, regardless of any
-  // configured Scope on their role.
-  if (TYPE_C_MODULES.has(module_name)) {
-    return candidate_account_ids.filter((id) => id === ctx.account_id);
-  }
-
-  const scope = await getModuleScope(ctx, module_name);
-
-  if (scope === "all") return candidate_account_ids;
-  if (scope === "private" || scope === "own") {
-    return candidate_account_ids.filter((id) => id === ctx.account_id);
-  }
-
-  // Department scope — batch-fetch departments for the candidates
-  if (scope === "department" && ctx.department) {
-    const { data } = await (await sb())
-      .from("koleex_employees")
-      .select("account_id, department")
-      .in("account_id", candidate_account_ids);
-    const sameDept = new Set(
-      ((data ?? []) as { account_id: string; department: string | null }[])
-        .filter((e) => e.department === ctx.department)
-        .map((e) => e.account_id),
-    );
-    // Always include self
-    sameDept.add(ctx.account_id);
-    return candidate_account_ids.filter((id) => sameDept.has(id));
-  }
-
-  // Fallback — only self
-  return candidate_account_ids.filter((id) => id === ctx.account_id);
-}
-
-/* ============================================================================
-   Tenant filtering
-   ============================================================================ */
-
-/**
- * Apply tenant isolation to any query. Every tenant-scoped module wraps
- * its fetch with this: data outside the current tenant is invisible unless
- * the viewer is Super Admin viewing from the host (Koleex) tenant.
- *
- * Super Admin behaviour:
- *   - When their tenant is the host (Koleex), they can see across tenants
- *     if they explicitly ask for it. The default is still to filter by
- *     tenant_id to avoid accidentally leaking data between tenants.
- *   - To switch tenants, the UI surfaces a tenant picker that updates
- *     ctx.tenant_id for subsequent queries.
- *
- * Regular user: always filtered to their own tenant_id. Hard boundary —
- * a customer-tenant account NEVER sees Koleex's records.
- */

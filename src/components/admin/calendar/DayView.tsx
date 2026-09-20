@@ -4,27 +4,33 @@
    DayView — single-day time grid.
 
    Same design language as WeekView but with only one column, bigger event
-   rectangles, and an inline list of the day's events on the right for
-   quick scanning.
+   rectangles, and an inline list of the day's events on the side for quick
+   scanning.
    --------------------------------------------------------------------------- */
 
-import type { CalendarEventRow, AccountPreferences } from "@/types/supabase";
+import type { CalendarViewEvent, AccountPreferences } from "@/types/supabase";
+import { useTranslation } from "@/lib/i18n";
+import { calendarT } from "@/lib/translations/calendar";
 import {
   HOURS_OF_DAY,
   colorForEvent,
   eventLayoutInDay,
   eventsOnDay,
-  isoWeekday,
-  formatTime,
   formatEventTimeRange,
+  formatHourLabel,
+  formatTime,
+  isToday,
+  isoWeekday,
+  nowOffsetPx,
+  workingHoursBand,
 } from "@/lib/calendar-utils";
 
 interface Props {
   focusDate: Date;
-  events: CalendarEventRow[];
+  events: CalendarViewEvent[];
   preferences: AccountPreferences;
   onNewEventAtSlot?: (d: Date) => void;
-  onEventClick?: (e: CalendarEventRow) => void;
+  onEventClick?: (e: CalendarViewEvent) => void;
 }
 
 const HOUR_HEIGHT = 60;
@@ -37,24 +43,12 @@ export default function DayView({
   onNewEventAtSlot,
   onEventClick,
 }: Props) {
-  const wh = preferences.calendar?.working_hours || {
-    start: "09:00",
-    end: "18:00",
-    days: [1, 2, 3, 4, 5],
-  };
-  const iso = isoWeekday(focusDate);
-  const isWorkingDay = wh.days.includes(iso);
-  const [whStartH, whStartM] = wh.start.split(":").map(Number);
-  const [whEndH, whEndM] = wh.end.split(":").map(Number);
-  const workingTopPx = ((whStartH || 0) + (whStartM || 0) / 60) * HOUR_HEIGHT;
-  const workingHeightPx =
-    ((whEndH || 0) +
-      (whEndM || 0) / 60 -
-      ((whStartH || 0) + (whStartM || 0) / 60)) *
-    HOUR_HEIGHT;
-
+  const { t, lang } = useTranslation(calendarT);
+  const wh = preferences.calendar?.working_hours || { start: "09:00", end: "18:00", days: [1, 2, 3, 4, 5] };
+  const isWorkingDay = wh.days.includes(isoWeekday(focusDate));
+  const band = workingHoursBand(wh, HOUR_HEIGHT);
   const dayEvents = eventsOnDay(events, focusDate);
-  const nowOffsetPx = isToday(focusDate) ? getNowOffsetPx() : null;
+  const nowPx = isToday(focusDate) ? nowOffsetPx(HOUR_HEIGHT) : null;
 
   function handleSlotClick(hour: number) {
     const d = new Date(focusDate);
@@ -67,12 +61,7 @@ export default function DayView({
       {/* Time grid */}
       <div className="overflow-x-auto">
         <div style={{ minWidth: 420 }}>
-          <div
-            className="grid relative"
-            style={{
-              gridTemplateColumns: `${TIME_COL_WIDTH}px minmax(0, 1fr)`,
-            }}
-          >
+          <div className="grid relative" style={{ gridTemplateColumns: `${TIME_COL_WIDTH}px minmax(0, 1fr)` }}>
             {/* Hours */}
             <div className="flex flex-col">
               {HOURS_OF_DAY.map((h) => (
@@ -81,23 +70,17 @@ export default function DayView({
                   className="flex items-start justify-end pe-2 pt-1 border-b border-[var(--border-subtle)]"
                   style={{ height: HOUR_HEIGHT }}
                 >
-                  <span className="text-[11px] font-medium text-[var(--text-dim)]">
-                    {formatHourLabel(h)}
-                  </span>
+                  <span className="text-[11px] font-medium text-[var(--text-dim)]">{formatHourLabel(h, lang)}</span>
                 </div>
               ))}
             </div>
 
             {/* Day column */}
-            <div
-              className={`relative border-s border-[var(--border-subtle)] ${
-                !isWorkingDay ? "bg-[var(--bg-primary)]/30" : ""
-              }`}
-            >
-              {isWorkingDay && workingHeightPx > 0 && (
+            <div className={`relative border-s border-[var(--border-subtle)] ${!isWorkingDay ? "bg-[var(--bg-primary)]/30" : ""}`}>
+              {isWorkingDay && band.heightPx > 0 && (
                 <div
                   className="absolute inset-x-0 bg-[var(--bg-surface-subtle)]/50 pointer-events-none"
-                  style={{ top: workingTopPx, height: workingHeightPx }}
+                  style={{ top: band.topPx, height: band.heightPx }}
                 />
               )}
 
@@ -111,11 +94,7 @@ export default function DayView({
               ))}
 
               {dayEvents.map((ev) => {
-                const { topPx, heightPx } = eventLayoutInDay(
-                  ev,
-                  focusDate,
-                  HOUR_HEIGHT,
-                );
+                const { topPx, heightPx } = eventLayoutInDay(ev, focusDate, HOUR_HEIGHT);
                 const color = colorForEvent(ev);
                 return (
                   <button
@@ -134,31 +113,23 @@ export default function DayView({
                       borderLeft: `3px solid ${color}`,
                     }}
                   >
-                    <div className="text-[12px] font-semibold truncate">
-                      {ev.title}
-                    </div>
+                    <div className="text-[12px] font-semibold truncate">{ev.title}</div>
                     {!ev.all_day && heightPx >= 40 && (
                       <div className="text-[10px] opacity-80 truncate">
-                        {formatTime(new Date(ev.start_at))} –{" "}
-                        {formatTime(new Date(ev.end_at))}
+                        {formatTime(new Date(ev.start_at), lang)} – {formatTime(new Date(ev.end_at), lang)}
                       </div>
                     )}
                     {ev.location && heightPx >= 60 && (
-                      <div className="text-[10px] opacity-70 truncate mt-0.5">
-                        {ev.location}
-                      </div>
+                      <div className="text-[10px] opacity-70 truncate mt-0.5">{ev.location}</div>
                     )}
                   </button>
                 );
               })}
 
-              {nowOffsetPx !== null && (
-                <div
-                  className="absolute inset-x-0 pointer-events-none"
-                  style={{ top: nowOffsetPx }}
-                >
+              {nowPx !== null && (
+                <div className="absolute inset-x-0 pointer-events-none" style={{ top: nowPx }}>
                   <div className="h-px bg-red-500" />
-                  <div className="absolute -left-1 -top-1 h-2 w-2 rounded-full bg-red-500" />
+                  <div className="absolute -start-1 -top-1 h-2 w-2 rounded-full bg-red-500" />
                 </div>
               )}
             </div>
@@ -169,12 +140,10 @@ export default function DayView({
       {/* Side event list */}
       <div className="border-s border-[var(--border-subtle)] p-4 md:p-5 bg-[var(--bg-primary)]/50 max-h-[600px] lg:max-h-none overflow-y-auto">
         <h3 className="text-[11px] font-semibold text-[var(--text-dim)] uppercase tracking-wider mb-3">
-          Events · {dayEvents.length}
+          {t("day.events")} · {dayEvents.length}
         </h3>
         {dayEvents.length === 0 ? (
-          <p className="text-[12px] text-[var(--text-dim)]">
-            Nothing scheduled. Click a slot to add an event.
-          </p>
+          <p className="text-[12px] text-[var(--text-dim)]">{t("day.empty")}</p>
         ) : (
           <div className="space-y-2">
             {dayEvents.map((ev) => {
@@ -187,21 +156,14 @@ export default function DayView({
                   className="w-full text-left rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] hover:border-[var(--border-focus)] p-3 transition-all"
                 >
                   <div className="flex items-start gap-2">
-                    <span
-                      className="h-2 w-2 rounded-full mt-1.5 shrink-0"
-                      style={{ backgroundColor: color }}
-                    />
+                    <span className="h-2 w-2 rounded-full mt-1.5 shrink-0" style={{ backgroundColor: color }} />
                     <div className="min-w-0 flex-1">
-                      <p className="text-[13px] font-semibold text-[var(--text-primary)] truncate">
-                        {ev.title}
-                      </p>
+                      <p className="text-[13px] font-semibold text-[var(--text-primary)] truncate">{ev.title}</p>
                       <p className="text-[11px] text-[var(--text-dim)] mt-0.5">
-                        {formatEventTimeRange(ev)}
+                        {formatEventTimeRange(ev, lang, t("f.allDay"))}
                       </p>
                       {ev.location && (
-                        <p className="text-[11px] text-[var(--text-dim)] truncate mt-0.5">
-                          {ev.location}
-                        </p>
+                        <p className="text-[11px] text-[var(--text-dim)] truncate mt-0.5">{ev.location}</p>
                       )}
                     </div>
                   </div>
@@ -213,24 +175,4 @@ export default function DayView({
       </div>
     </div>
   );
-}
-
-function formatHourLabel(h: number): string {
-  const d = new Date();
-  d.setHours(h, 0, 0, 0);
-  return d.toLocaleTimeString(undefined, { hour: "numeric" });
-}
-
-function isToday(d: Date): boolean {
-  const now = new Date();
-  return (
-    d.getFullYear() === now.getFullYear() &&
-    d.getMonth() === now.getMonth() &&
-    d.getDate() === now.getDate()
-  );
-}
-
-function getNowOffsetPx(): number {
-  const now = new Date();
-  return (now.getHours() + now.getMinutes() / 60) * HOUR_HEIGHT;
 }

@@ -4,11 +4,11 @@ import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { requireAuth, requireModuleAction } from "@/lib/server/auth";
 import {
-  internalAccountIds,
   isTodoOwner,
   loadTodoOwnership,
   todoParticipation,
 } from "@/lib/server/todo-access";
+import { internalAccountIds } from "@/lib/server/internal-accounts";
 import {
   clearTodoNotifications,
   notifyApprovalDecision,

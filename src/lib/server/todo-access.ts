@@ -10,13 +10,15 @@ import "server-only";
    five observer checks, in three different shapes. One definition here; the
    routes and the tools call it.
 
-   Also here: the INTERNAL-ONLY filter for assignee ids (a task is company
-   work and can never be handed to a customer/portal login), which the
-   create route, the resync path and the AI tool each carried separately.
+   The INTERNAL-ONLY filter for assignee ids (a task is company work and can
+   never be handed to a customer/portal login) lives in
+   lib/server/internal-accounts.ts — the Calendar guest list applies the
+   same rule.
    --------------------------------------------------------------------------- */
 
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { applyTodoScope, sharedTodoIds, type TodoViewer } from "@/lib/server/todo-scope";
+import { internalAccountIds } from "@/lib/server/internal-accounts";
 
 export interface TodoOwnership {
   id: string;
@@ -89,22 +91,6 @@ export async function canViewTodo(todoId: string, viewer: TodoViewer): Promise<b
   q = applyTodoScope(q, viewer, shared);
   const { data } = await q.maybeSingle();
   return !!data;
-}
-
-/** Keep only ACTIVE INTERNAL accounts of the tenant. Enforced on the server
- *  so it holds whatever the client — or the model — sends. */
-export async function internalAccountIds(ids: string[], tenantId: string | null): Promise<string[]> {
-  const unique = Array.from(new Set(ids.filter(Boolean)));
-  if (unique.length === 0) return [];
-  let q = supabaseServer
-    .from("accounts")
-    .select("id")
-    .in("id", unique)
-    .eq("user_type", "internal")
-    .eq("status", "active");
-  if (tenantId) q = q.eq("tenant_id", tenantId);
-  const { data } = await q;
-  return ((data ?? []) as Array<{ id: string }>).map((a) => a.id);
 }
 
 /** Expand a department and/or "everyone" into account ids, then apply the

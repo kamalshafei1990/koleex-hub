@@ -6,16 +6,20 @@
 
    Click a day → open day view.
    Hover a day → show a "+" button to create a new event on that day.
-   Click an event chip → open the editor.
+   Click an event chip → open it.
    --------------------------------------------------------------------------- */
 
 import PlusIcon from "@/components/icons/ui/PlusIcon";
-import type { CalendarEventRow, AccountPreferences } from "@/types/supabase";
+import type { CalendarViewEvent, AccountPreferences } from "@/types/supabase";
 import type { HolidayInstance } from "@/lib/calendar-holidays";
+import { useTranslation } from "@/lib/i18n";
+import { calendarT } from "@/lib/translations/calendar";
+import { EVENT_TYPE_COLORS } from "@/lib/calendar-enums";
 import {
   eventsOnDay,
   isSameMonth,
   isToday,
+  isoDateKey,
   monthGrid,
   colorForEvent,
   isoWeekday,
@@ -26,41 +30,32 @@ import {
 
 interface Props {
   focusDate: Date;
-  events: CalendarEventRow[];
+  events: CalendarViewEvent[];
   preferences: AccountPreferences;
+  weekStart: WeekStart;
   /* Report GEN-10 — holiday occurrences keyed by yyyy-mm-dd. */
   holidaysByDay?: Record<string, HolidayInstance[]>;
   onDayClick?: (d: Date) => void;
   onNewEventOnDay?: (d: Date) => void;
-  onEventClick?: (e: CalendarEventRow) => void;
+  onEventClick?: (e: CalendarViewEvent) => void;
 }
 
-/* Indexed by ISO weekday (1=Mon..7=Sun) so the header can be rotated to
-   whatever first-day-of-week the viewer picked. */
-const ISO_LABELS: Record<number, string> = {
-  1: "Mon", 2: "Tue", 3: "Wed", 4: "Thu", 5: "Fri", 6: "Sat", 7: "Sun",
-};
 const MAX_CHIPS = 3;
-const HOLIDAY_COLOR = "#EC4899"; // matches the Calendar "Holiday" legend dot
-
-function isoKey(d: Date): string {
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${d.getFullYear()}-${m}-${day}`;
-}
+const HOLIDAY_COLOR = EVENT_TYPE_COLORS.holiday;
 
 export default function MonthView({
   focusDate,
   events,
   preferences,
+  weekStart,
   holidaysByDay,
   onDayClick,
   onNewEventOnDay,
   onEventClick,
 }: Props) {
-  const firstDay: WeekStart = (preferences.display?.week_start as WeekStart) ?? 1;
-  const days = monthGrid(focusDate, firstDay);
-  const columnDays = weekdayOrder(firstDay);   // ISO numbers, in column order
+  const { t, lang } = useTranslation(calendarT);
+  const days = monthGrid(focusDate, weekStart);
+  const columnDays = weekdayOrder(weekStart);   // ISO numbers, in column order
   const workingDays = preferences.calendar?.working_hours?.days || [1, 2, 3, 4, 5];
 
   return (
@@ -68,18 +63,15 @@ export default function MonthView({
       {/* Weekday header */}
       <div className="grid grid-cols-7 border-b border-[var(--border-subtle)]">
         {columnDays.map((iso) => {
-          const label = ISO_LABELS[iso];
           const isWorking = workingDays.includes(iso);
           return (
             <div
               key={iso}
               className={`text-[10px] font-semibold uppercase tracking-wider py-3 text-center ${
-                isWorking
-                  ? "text-[var(--text-muted)]"
-                  : "text-[var(--text-ghost)]"
+                isWorking ? "text-[var(--text-muted)]" : "text-[var(--text-ghost)]"
               }`}
             >
-              {label}
+              {t(`wd.${iso}`)}
             </div>
           );
         })}
@@ -91,11 +83,10 @@ export default function MonthView({
           const inMonth = isSameMonth(day, focusDate);
           const today = isToday(day);
           const dayEvents = eventsOnDay(events, day);
-          const dayHolidays = holidaysByDay?.[isoKey(day)] ?? [];
+          const dayHolidays = holidaysByDay?.[isoDateKey(day)] ?? [];
           const shown = dayEvents.slice(0, MAX_CHIPS);
           const extra = dayEvents.length - shown.length;
-          const iso = isoWeekday(day);
-          const isWorking = workingDays.includes(iso);
+          const isWorking = workingDays.includes(isoWeekday(day));
           const isLastCol = (idx + 1) % 7 === 0;
           const isLastRow = idx >= days.length - 7;
 
@@ -133,14 +124,14 @@ export default function MonthView({
                     onNewEventOnDay?.(day);
                   }}
                   className="h-5 w-5 rounded-md bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] opacity-0 group-hover:opacity-100 transition-all flex items-center justify-center"
-                  title="New event"
+                  title={t("newEvent")}
+                  aria-label={t("newEvent")}
                 >
                   <PlusIcon className="h-3 w-3" />
                 </button>
               </div>
 
-              {/* Holiday chips (report GEN-10) — country / customer rest days
-                  and national / official holidays for the active filter. */}
+              {/* Holiday chips (report GEN-10) */}
               {dayHolidays.length > 0 && (
                 <div className="space-y-1 mb-1">
                   {dayHolidays.map((h) => (
@@ -152,9 +143,8 @@ export default function MonthView({
                         color: HOLIDAY_COLOR,
                         borderLeft: `2px solid ${HOLIDAY_COLOR}`,
                       }}
-                      title={`${h.name} · ${h.type}${h.country ? " · " + h.country : ""}`}
+                      title={`${h.name}${h.country ? " · " + h.country : ""}`}
                     >
-                      <span className="shrink-0 text-[9px]">🎌</span>
                       <span className="truncate">{h.name}</span>
                     </div>
                   ))}
@@ -179,13 +169,11 @@ export default function MonthView({
                         color,
                         borderLeft: `2px solid ${color}`,
                       }}
-                      title={`${ev.title} · ${
-                        ev.all_day ? "All day" : formatTime(new Date(ev.start_at))
-                      }`}
+                      title={`${ev.title} · ${ev.all_day ? t("f.allDay") : formatTime(new Date(ev.start_at), lang)}`}
                     >
                       {!ev.all_day && (
                         <span className="shrink-0 text-[9px] opacity-80">
-                          {formatTime(new Date(ev.start_at))}
+                          {formatTime(new Date(ev.start_at), lang)}
                         </span>
                       )}
                       <span className="truncate">{ev.title}</span>
@@ -193,8 +181,8 @@ export default function MonthView({
                   );
                 })}
                 {extra > 0 && (
-                  <p className="text-[10px] text-[var(--text-dim)] pl-1">
-                    +{extra} more
+                  <p className="text-[10px] text-[var(--text-dim)] ps-1">
+                    +{extra} {t("month.more")}
                   </p>
                 )}
               </div>

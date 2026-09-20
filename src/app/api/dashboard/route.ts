@@ -20,6 +20,7 @@ import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { requireAuth, type ServerAuthContext } from "@/lib/server/auth";
 import { openTodoItems } from "@/lib/todo-open-count";
+import { nextOccurrenceStart, type CalendarRec } from "@/lib/calendar-recurrence";
 import { isOpenAccessModule, PERMISSION_MODULES } from "@/lib/permission-modules";
 
 export const dynamic = "force-dynamic";
@@ -367,28 +368,45 @@ async function projectsWidget(auth: ServerAuthContext): Promise<Widget> {
   return { total: rows.length, deadlines };
 }
 
-/* Calendar: MY upcoming one-off events + how many active series.
-   (Recurring occurrences render via the calendar's own expansion — series
-   are COUNTED here, honestly, rather than pretended into the list.) */
+/* Calendar: MY next five events — one-offs ahead of now and, for each live
+   series, its next occurrence (the same date math the reminder cron uses),
+   merged by date. Series used to be only COUNTED, so a person whose whole
+   week is standing meetings read "nothing scheduled". */
 async function calendarWidget(auth: ServerAuthContext): Promise<Widget> {
-  const nowIso = new Date().toISOString();
+  const now = new Date();
+  const nowIso = now.toISOString();
+  const todayDate = nowIso.slice(0, 10);
   const [oneOff, series] = await Promise.all([
     supabaseServer.from("koleex_calendar_events")
       .select("title, start_at").eq("account_id", auth.account_id)
       .is("recurrence", null).gte("start_at", nowIso)
       .order("start_at", { ascending: true }).limit(5),
     supabaseServer.from("koleex_calendar_events")
-      .select("id", { count: "exact", head: true })
-      .eq("account_id", auth.account_id).not("recurrence", "is", null),
+      .select("title, start_at, recurrence, recurrence_until")
+      .eq("account_id", auth.account_id).not("recurrence", "is", null)
+      .or(`recurrence_until.is.null,recurrence_until.gte.${todayDate}`)
+      .limit(100),
   ]);
   if (oneOff.error) return { error: oneOff.error.message };
   if (series.error) return { error: series.error.message };
-  const now = Date.now();
-  const upcoming = (oneOff.data ?? []).map((r) => ({
-    name: r.title || "—",
-    days: Math.max(0, Math.ceil((new Date(r.start_at as string).getTime() - now) / DAY_MS)),
+  const nowMs = now.getTime();
+  const next: Array<{ name: string; at: number }> = (oneOff.data ?? []).map((r) => ({
+    name: (r.title as string) || "—",
+    at: new Date(r.start_at as string).getTime(),
   }));
-  return { upcoming, seriesCount: series.count ?? 0 };
+  let seriesCount = 0;
+  for (const r of (series.data ?? []) as Array<{ title: string | null; start_at: string; recurrence: CalendarRec; recurrence_until: string | null }>) {
+    const occ = nextOccurrenceStart(r.start_at, r.recurrence, r.recurrence_until, now);
+    if (!occ) continue;
+    seriesCount += 1;
+    next.push({ name: r.title || "—", at: occ.getTime() });
+  }
+  next.sort((a, b) => a.at - b.at);
+  const upcoming = next.slice(0, 5).map((r) => ({
+    name: r.name,
+    days: Math.max(0, Math.ceil((r.at - nowMs) / DAY_MS)),
+  }));
+  return { upcoming, seriesCount };
 }
 
 /* Notes: my recent notes */

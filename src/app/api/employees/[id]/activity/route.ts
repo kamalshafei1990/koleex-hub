@@ -249,7 +249,7 @@ export async function GET(
         (r) => ({
           id: String(r.id),
           title: s(r.title) ?? "Event", subtitle: s(r.start_at),
-          status: s(r.event_type), createdAt: s(r.created_at), href: "/calendar",
+          status: s(r.event_type), createdAt: s(r.created_at), href: `/calendar?event=${String(r.id)}`,
         })),
 
       bucket<Row>("notes", () =>

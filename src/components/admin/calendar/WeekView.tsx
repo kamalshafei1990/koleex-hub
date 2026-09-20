@@ -1,37 +1,42 @@
 "use client";
 
 /* ---------------------------------------------------------------------------
-   WeekView — Monday-anchored week time grid.
+   WeekView — a week time grid anchored on the viewer's first day of week.
 
-   7 columns (Mon..Sun), 24 rows per hour. Working hours from the account's
-   preferences are rendered with a slightly lighter background; non-working
-   days are subtly dimmed. Events are absolute-positioned within each column.
+   7 columns, one row per hour. Working hours from the account's preferences
+   are rendered with a slightly lighter background; non-working days are
+   subtly dimmed. Events are absolute-positioned within each column.
 
    Click an empty slot → create new event at that time.
-   Click an event → open the editor.
+   Click an event → open it.
    --------------------------------------------------------------------------- */
 
-import type { CalendarEventRow, AccountPreferences } from "@/types/supabase";
+import type { CalendarViewEvent, AccountPreferences } from "@/types/supabase";
+import { useTranslation } from "@/lib/i18n";
+import { calendarT } from "@/lib/translations/calendar";
 import {
   HOURS_OF_DAY,
-  addDays,
   colorForEvent,
   eventLayoutInDay,
   eventsOnDay,
+  formatHourLabel,
+  formatTime,
   isSameDay,
   isToday,
   isoWeekday,
-  startOfWeek,
+  nowOffsetPx,
+  weekDays,
+  workingHoursBand,
   type WeekStart,
-  formatTime,
 } from "@/lib/calendar-utils";
 
 interface Props {
   focusDate: Date;
-  events: CalendarEventRow[];
+  events: CalendarViewEvent[];
   preferences: AccountPreferences;
+  weekStart: WeekStart;
   onNewEventAtSlot?: (d: Date) => void;
-  onEventClick?: (e: CalendarEventRow) => void;
+  onEventClick?: (e: CalendarViewEvent) => void;
 }
 
 const HOUR_HEIGHT = 48;
@@ -41,24 +46,14 @@ export default function WeekView({
   focusDate,
   events,
   preferences,
+  weekStart,
   onNewEventAtSlot,
   onEventClick,
 }: Props) {
-  /* First day of week follows Settings → Language & region. */
-  const firstDay: WeekStart = (preferences.display?.week_start as WeekStart) ?? 1;
-  const weekStart = startOfWeek(focusDate, firstDay);
-  const days = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
-  const wh = preferences.calendar?.working_hours || {
-    start: "09:00",
-    end: "18:00",
-    days: [1, 2, 3, 4, 5],
-  };
-  const [whStartH, whStartM] = wh.start.split(":").map(Number);
-  const [whEndH, whEndM] = wh.end.split(":").map(Number);
-  const workingTopPx = ((whStartH || 0) + (whStartM || 0) / 60) * HOUR_HEIGHT;
-  const workingHeightPx =
-    ((whEndH || 0) + (whEndM || 0) / 60 - ((whStartH || 0) + (whStartM || 0) / 60)) *
-    HOUR_HEIGHT;
+  const { t, lang } = useTranslation(calendarT);
+  const days = weekDays(focusDate, weekStart);
+  const wh = preferences.calendar?.working_hours || { start: "09:00", end: "18:00", days: [1, 2, 3, 4, 5] };
+  const band = workingHoursBand(wh, HOUR_HEIGHT);
 
   function handleSlotClick(day: Date, hour: number) {
     const d = new Date(day);
@@ -72,32 +67,25 @@ export default function WeekView({
         {/* Day header */}
         <div
           className="grid sticky top-0 z-10 bg-[var(--bg-secondary)] border-b border-[var(--border-subtle)]"
-          style={{
-            gridTemplateColumns: `${TIME_COL_WIDTH}px repeat(7, minmax(0, 1fr))`,
-          }}
+          style={{ gridTemplateColumns: `${TIME_COL_WIDTH}px repeat(7, minmax(0, 1fr))` }}
         >
           <div />
           {days.map((day) => {
-            const iso = isoWeekday(day);
-            const isWorking = wh.days.includes(iso);
+            const isWorking = wh.days.includes(isoWeekday(day));
             const today = isToday(day);
             return (
               <div
                 key={day.toISOString()}
                 className={`text-center py-3 border-s border-[var(--border-subtle)] ${
-                  isWorking
-                    ? "text-[var(--text-primary)]"
-                    : "text-[var(--text-dim)]"
+                  isWorking ? "text-[var(--text-primary)]" : "text-[var(--text-dim)]"
                 }`}
               >
                 <div className="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-dim)]">
-                  {day.toLocaleDateString(undefined, { weekday: "short" })}
+                  {t(`wd.${isoWeekday(day)}`)}
                 </div>
                 <div
                   className={`inline-flex items-center justify-center h-7 min-w-7 px-2 mt-1 rounded-full text-[13px] font-bold ${
-                    today
-                      ? "bg-[var(--bg-inverted)] text-[var(--text-inverted)]"
-                      : "text-[var(--text-primary)]"
+                    today ? "bg-[var(--bg-inverted)] text-[var(--text-inverted)]" : "text-[var(--text-primary)]"
                   }`}
                 >
                   {day.getDate()}
@@ -110,9 +98,7 @@ export default function WeekView({
         {/* Time grid */}
         <div
           className="grid relative"
-          style={{
-            gridTemplateColumns: `${TIME_COL_WIDTH}px repeat(7, minmax(0, 1fr))`,
-          }}
+          style={{ gridTemplateColumns: `${TIME_COL_WIDTH}px repeat(7, minmax(0, 1fr))` }}
         >
           {/* Hour labels */}
           <div className="flex flex-col">
@@ -122,36 +108,28 @@ export default function WeekView({
                 className="flex items-start justify-end pe-2 pt-1 border-b border-[var(--border-subtle)]"
                 style={{ height: HOUR_HEIGHT }}
               >
-                <span className="text-[10px] font-medium text-[var(--text-dim)]">
-                  {formatHourLabel(h)}
-                </span>
+                <span className="text-[10px] font-medium text-[var(--text-dim)]">{formatHourLabel(h, lang)}</span>
               </div>
             ))}
           </div>
 
           {/* Day columns */}
           {days.map((day) => {
-            const iso = isoWeekday(day);
-            const isWorking = wh.days.includes(iso);
+            const isWorking = wh.days.includes(isoWeekday(day));
             const dayEvents = eventsOnDay(events, day);
-            const today = isToday(day);
-            const nowIndicator = today ? getNowOffsetPx() : null;
+            const nowPx = isToday(day) ? nowOffsetPx(HOUR_HEIGHT) : null;
             return (
               <div
                 key={day.toISOString()}
-                className={`relative border-s border-[var(--border-subtle)] ${
-                  isWorking ? "" : "bg-[var(--bg-primary)]/30"
-                }`}
+                className={`relative border-s border-[var(--border-subtle)] ${isWorking ? "" : "bg-[var(--bg-primary)]/30"}`}
               >
-                {/* Working hours shade */}
-                {isWorking && workingHeightPx > 0 && (
+                {isWorking && band.heightPx > 0 && (
                   <div
                     className="absolute inset-x-0 bg-[var(--bg-surface-subtle)]/50 pointer-events-none"
-                    style={{ top: workingTopPx, height: workingHeightPx }}
+                    style={{ top: band.topPx, height: band.heightPx }}
                   />
                 )}
 
-                {/* Hour rows (clickable) */}
                 {HOURS_OF_DAY.map((h) => (
                   <div
                     key={h}
@@ -161,13 +139,8 @@ export default function WeekView({
                   />
                 ))}
 
-                {/* Events */}
                 {dayEvents.map((ev) => {
-                  const { topPx, heightPx } = eventLayoutInDay(
-                    ev,
-                    day,
-                    HOUR_HEIGHT,
-                  );
+                  const { topPx, heightPx } = eventLayoutInDay(ev, day, HOUR_HEIGHT);
                   const color = colorForEvent(ev);
                   return (
                     <button
@@ -190,25 +163,20 @@ export default function WeekView({
                       <div className="font-semibold truncate">{ev.title}</div>
                       {!ev.all_day && heightPx >= 32 && (
                         <div className="text-[9px] opacity-80 truncate">
-                          {formatTime(new Date(ev.start_at))} –{" "}
-                          {formatTime(new Date(ev.end_at))}
+                          {formatTime(new Date(ev.start_at), lang)} – {formatTime(new Date(ev.end_at), lang)}
                         </div>
                       )}
-                      {isSameDay(new Date(ev.start_at), day) === false && (
-                        <div className="text-[9px] opacity-70">continues</div>
+                      {!isSameDay(new Date(ev.start_at), day) && (
+                        <div className="text-[9px] opacity-70">{t("week.continues")}</div>
                       )}
                     </button>
                   );
                 })}
 
-                {/* "Now" indicator */}
-                {nowIndicator !== null && (
-                  <div
-                    className="absolute inset-x-0 pointer-events-none"
-                    style={{ top: nowIndicator }}
-                  >
+                {nowPx !== null && (
+                  <div className="absolute inset-x-0 pointer-events-none" style={{ top: nowPx }}>
                     <div className="h-px bg-red-500" />
-                    <div className="absolute -left-1 -top-1 h-2 w-2 rounded-full bg-red-500" />
+                    <div className="absolute -start-1 -top-1 h-2 w-2 rounded-full bg-red-500" />
                   </div>
                 )}
               </div>
@@ -218,15 +186,4 @@ export default function WeekView({
       </div>
     </div>
   );
-}
-
-function formatHourLabel(h: number): string {
-  const d = new Date();
-  d.setHours(h, 0, 0, 0);
-  return d.toLocaleTimeString(undefined, { hour: "numeric" });
-}
-
-function getNowOffsetPx(): number {
-  const now = new Date();
-  return (now.getHours() + now.getMinutes() / 60) * HOUR_HEIGHT;
 }

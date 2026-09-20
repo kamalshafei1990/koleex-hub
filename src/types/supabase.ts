@@ -1071,11 +1071,31 @@ export type CalendarEventInsert = Omit<
 >;
 export type CalendarEventUpdate = Partial<CalendarEventInsert>;
 
+/** What GET /api/calendar/events hands the views: real rows, expanded
+ *  occurrences of a series, events the viewer is invited to, and read-only
+ *  mirrors of other modules. The optional fields say which. */
+export type CalendarMirrorSource = "planning" | "todo" | "project" | "leave";
+export interface CalendarViewEvent extends CalendarEventRow {
+  /** Set on each occurrence of a recurring series; the id is `<base>~<i>`. */
+  series_base_id?: string;
+  /** Owned by someone else; the viewer is on the guest list. */
+  invited?: boolean;
+  /** Present on mirrors — never editable as an event. */
+  source?: CalendarMirrorSource;
+  source_kind?: string | null;
+  role_name?: string | null;
+  linked_entity_label?: string | null;
+  todo_id?: string;
+  project_task_id?: string;
+  leave_request_id?: string;
+}
+
+export type CalendarAttendeeStatus = "invited" | "accepted" | "declined";
 export interface CalendarAttendeeRow {
   id: string;
   event_id: string;
   account_id: string;
-  status: "invited" | "accepted" | "declined";
+  status: CalendarAttendeeStatus;
   tenant_id: string | null;
   created_at: string;
 }

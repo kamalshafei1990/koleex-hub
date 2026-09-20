@@ -1,19 +1,20 @@
 "use client";
 
 /* ---------------------------------------------------------------------------
-   EventModal — create / edit a calendar event.
+   EventModal — create, edit or view a calendar event.
 
-   Fields:
-     - Title
-     - Type (meeting / task / reminder / event / holiday / out_of_office)
-     - All-day toggle
-     - Start / End (datetime-local when timed, date when all-day)
-     - Location
-     - Description
-     - Color override (null = default for type)
+   Three modes:
+     · create — a new event on the active calendar
+     · edit   — the organizer (or a super admin) changes it; delete lives here
+     · view   — an INVITED guest reads it and answers the invitation; every
+                field is inert. (A guest used to get the editor and a 403
+                from the server on save.)
 
-   Calls onSaved with the persisted row, or onDelete for the delete button
-   (only shown on existing events).
+   Guests are picked from the same assignable-people list the To-do app uses
+   (/api/todos/assignees): active internal colleagues, which is exactly who
+   the server accepts. The old picker read the full account directory, which
+   needs the Accounts module — a regular employee got an empty list and could
+   not invite anyone.
    --------------------------------------------------------------------------- */
 
 import { useEffect, useMemo, useState } from "react";
@@ -26,84 +27,75 @@ import TrashIcon from "@/components/icons/ui/TrashIcon";
 import DiskIcon from "@/components/icons/ui/DiskIcon";
 import CalendarPlusIcon from "@/components/icons/ui/CalendarPlusIcon";
 import type {
-  AccountRow,
+  CalendarAttendeeStatus,
   CalendarEventRow,
   CalendarEventInsert,
   CalendarEventType,
   CalendarRecurrence,
+  TodoAssigneeInfo,
 } from "@/types/supabase";
-import { fetchAccounts } from "@/lib/accounts-admin";
+import { fetchAssignableEmployees } from "@/lib/todo-admin";
 import {
   createEvent,
   updateEvent,
+  fetchAttendees,
+  saveAttendees,
+  respondToInvite,
+  type CalendarAttendee,
 } from "@/lib/calendar-events";
+import { CALENDAR_EVENT_TYPES, CALENDAR_RECURRENCES, EVENT_TYPE_COLORS } from "@/lib/calendar-enums";
+import { toDateTimeLocal, fromDateTimeLocal, toDateInput, fromDateInput } from "@/lib/calendar-utils";
 
 /* Preset swatches (type colors + a few neutrals) for the color picker. */
 const COLOR_PALETTE = [
   "#3B82F6", "#10B981", "#F59E0B", "#A855F7",
   "#EC4899", "#EF4444", "#0EA5E9", "#64748B",
 ];
-const REMINDER_OPTIONS: { label: string; v: number | null }[] = [
-  { label: "None", v: null },
-  { label: "At start time", v: 0 },
-  { label: "5 minutes before", v: 5 },
-  { label: "10 minutes before", v: 10 },
-  { label: "15 minutes before", v: 15 },
-  { label: "30 minutes before", v: 30 },
-  { label: "1 hour before", v: 60 },
-  { label: "1 day before", v: 1440 },
-];
-const REPEAT_OPTIONS: { label: string; v: CalendarRecurrence }[] = [
-  { label: "Does not repeat", v: null },
-  { label: "Daily", v: "daily" },
-  { label: "Weekly", v: "weekly" },
-  { label: "Monthly", v: "monthly" },
-];
+const REMINDER_MINUTES: Array<number | null> = [null, 0, 5, 10, 15, 30, 60, 1440];
 const DURATION_CHIPS: { label: string; min: number }[] = [
   { label: "15m", min: 15 },
   { label: "30m", min: 30 },
   { label: "1h", min: 60 },
   { label: "2h", min: 120 },
 ];
-import {
-  EVENT_TYPES,
-  EVENT_TYPE_LABELS,
-  EVENT_TYPE_COLORS,
-  toDateTimeLocal,
-  fromDateTimeLocal,
-  toDateInput,
-  fromDateInput,
-  addDays,
-} from "@/lib/calendar-utils";
 
 export type EventDraft = CalendarEventInsert;
+export type EventModalMode = "create" | "edit" | "view";
 
 interface Props {
   draft: EventDraft;
   existingId: string | null;
+  mode: EventModalMode;
+  /** The signed-in account — the guest whose answer PATCH records. */
+  viewerId: string | null;
   onClose: () => void;
   onSaved: (ev: CalendarEventRow) => void;
   onDelete?: () => void;
+  onResponded?: (status: CalendarAttendeeStatus) => void;
   onError?: (msg: string) => void;
 }
 
 const inputClass =
-  "w-full h-10 px-3 rounded-lg bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-dim)] outline-none focus:border-[var(--border-focus)] transition-colors";
+  "w-full h-10 px-3 rounded-lg bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-dim)] outline-none focus:border-[var(--border-focus)] transition-colors disabled:opacity-70";
 const textareaClass =
-  "w-full px-3 py-2 rounded-lg bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-dim)] outline-none focus:border-[var(--border-focus)] transition-colors resize-y";
+  "w-full px-3 py-2 rounded-lg bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-dim)] outline-none focus:border-[var(--border-focus)] transition-colors resize-y disabled:opacity-70";
 const labelClass =
   "block text-[10px] font-semibold text-[var(--text-dim)] mb-1.5 uppercase tracking-wider";
 
 export default function EventModal({
   draft,
   existingId,
+  mode,
+  viewerId,
   onClose,
   onSaved,
   onDelete,
+  onResponded,
   onError,
 }: Props) {
   const { t } = useTranslation(calendarT);
   useScrollLock();
+  const readOnly = mode === "view";
   const [form, setForm] = useState<EventDraft>(draft);
   const [saving, setSaving] = useState(false);
   const [localError, setLocalError] = useState<string | null>(null);
@@ -113,61 +105,52 @@ export default function EventModal({
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
 
-  /* Attendees (invite people). Stored separately from the event row and
-     persisted via the attendees endpoint after the event itself saves. */
-  const [accounts, setAccounts] = useState<AccountRow[]>([]);
+  /* Guests. Stored separately from the event row and persisted via the
+     attendees endpoint after the event itself saves. */
+  const [people, setPeople] = useState<TodoAssigneeInfo[]>([]);
+  const [attendees, setAttendees] = useState<CalendarAttendee[]>([]);
   const [attendeeIds, setAttendeeIds] = useState<string[]>([]);
   const [attendeeSearch, setAttendeeSearch] = useState("");
   const [showGuests, setShowGuests] = useState(false);
 
-  // Load the account directory once; on edit, also load the current attendees.
   useEffect(() => {
     let alive = true;
-    fetchAccounts()
-      .then((list) => { if (alive) setAccounts(list.filter((a) => a.user_type === "internal")); })
-      .catch(() => {});
+    fetchAssignableEmployees().then((list) => { if (alive) setPeople(list); });
     if (existingId) {
-      fetch(`/api/calendar/events/${existingId}/attendees`, { credentials: "include" })
-        .then((r) => (r.ok ? r.json() : null))
-        .then((j: { attendees?: { account_id: string }[] } | null) => {
-          if (alive && j?.attendees) {
-            const ids = j.attendees.map((a) => a.account_id);
-            setAttendeeIds(ids);
-            if (ids.length) setShowGuests(true);
-          }
-        })
-        .catch(() => {});
+      fetchAttendees(existingId).then((list) => {
+        if (!alive) return;
+        setAttendees(list);
+        setAttendeeIds(list.map((a) => a.account_id));
+        if (list.length) setShowGuests(true);
+      });
     }
     return () => { alive = false; };
   }, [existingId]);
 
   const organizerId = form.account_id;
-  const filteredAccounts = useMemo(() => {
-    const q = attendeeSearch.trim().toLowerCase();
-    return accounts
-      .filter((a) => a.id !== organizerId)
-      .filter((a) => {
-        if (!q) return true;
-        const pp = (a as { person?: { full_name?: string | null; name_alt?: string | null } }).person;
-        return (
-          (a.username ?? "").toLowerCase().includes(q) ||
-          (a.login_email ?? "").toLowerCase().includes(q) ||
-          (pp?.full_name ?? "").toLowerCase().includes(q) ||
-          (pp?.name_alt ?? "").toLowerCase().includes(q)
-        );
-      })
-      .slice(0, 40);
-  }, [accounts, attendeeSearch, organizerId]);
+  const myInvite = attendees.find((a) => a.account_id === viewerId) ?? null;
 
+  const filteredPeople = useMemo(() => {
+    const q = attendeeSearch.trim().toLowerCase();
+    return people
+      .filter((p) => p.account_id !== organizerId)
+      .filter((p) =>
+        !q ||
+        (p.username ?? "").toLowerCase().includes(q) ||
+        (p.full_name ?? "").toLowerCase().includes(q) ||
+        (p.name_alt ?? "").toLowerCase().includes(q) ||
+        (p.department ?? "").toLowerCase().includes(q))
+      .slice(0, 40);
+  }, [people, attendeeSearch, organizerId]);
+
+  const personById = useMemo(() => new Map(people.map((p) => [p.account_id, p])), [people]);
   const nameFor = (id: string) => {
-    const a = accounts.find((x) => x.id === id);
-    const p = (a as { person?: { full_name?: string | null } } | undefined)?.person;
-    return p?.full_name || a?.username || a?.login_email || "Someone";
+    const p = personById.get(id);
+    return p?.full_name || p?.username || attendees.find((a) => a.account_id === id)?.name || "—";
   };
-  /** Native/alternate name (e.g. Chinese) for an attendee, or null. */
+  /** Native/alternate name (e.g. Chinese) for a person, or null. */
   const altFor = (id: string) => {
-    const a = accounts.find((x) => x.id === id);
-    const p = (a as { person?: { full_name?: string | null; name_alt?: string | null } } | undefined)?.person;
+    const p = personById.get(id);
     const alt = (p?.name_alt ?? "").trim();
     return alt && alt !== (p?.full_name ?? "").trim() ? alt : null;
   };
@@ -182,9 +165,7 @@ export default function EventModal({
 
   // Close on ESC
   useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
-    };
+    const handler = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
   }, [onClose]);
@@ -205,25 +186,13 @@ export default function EventModal({
       start.setHours(9, 0, 0, 0);
       end.setHours(10, 0, 0, 0);
     }
-    setForm({
-      ...form,
-      all_day: next,
-      start_at: start.toISOString(),
-      end_at: end.toISOString(),
-    });
+    setForm({ ...form, all_day: next, start_at: start.toISOString(), end_at: end.toISOString() });
   }
 
   async function handleSave() {
-    if (!form.title.trim()) {
-      setLocalError("Title is required.");
-      return;
-    }
-    const start = new Date(form.start_at);
-    const end = new Date(form.end_at);
-    if (end < start) {
-      setLocalError("End time must be after start time.");
-      return;
-    }
+    if (readOnly) return;
+    if (!form.title.trim()) { setLocalError(t("err.titleRequired")); return; }
+    if (new Date(form.end_at) < new Date(form.start_at)) { setLocalError(t("err.endBeforeStart")); return; }
     setLocalError(null);
     setSaving(true);
 
@@ -234,23 +203,17 @@ export default function EventModal({
       location: form.location?.trim() || null,
     };
 
-    const saved = existingId
-      ? await updateEvent(existingId, payload)
-      : await createEvent(payload);
-
+    const saved = existingId ? await updateEvent(existingId, payload) : await createEvent(payload);
     setSaving(false);
-    if (!saved) {
-      onError?.(`Could not ${existingId ? "update" : "create"} the event.`);
-      return;
-    }
+    if (!saved) { onError?.(t("err.save")); return; }
 
-    // Bridge: Calendar events with type "task" also appear in the To-do app
+    // Bridge: a NEW Calendar event of type "task" also appears in the To-do app.
     if (!existingId && form.event_type === "task") {
       try {
         const { createTodo } = await import("@/lib/todo-admin");
         await createTodo({
-          title: form.title.trim(),
-          description: form.description?.trim() || null,
+          title: payload.title,
+          description: payload.description,
           priority: "medium",
           due_date: form.start_at,
           source: "calendar",
@@ -258,30 +221,33 @@ export default function EventModal({
           assignee_account_ids: [form.account_id],
         });
       } catch (e) {
-        /* The event is saved; a failed bridge must not undo that — but it is
-           not silent any more (it used to be swallowed as "table may not
-           exist yet", years after the table existed). */
+        /* The event is saved; a failed bridge must not undo that. */
         console.error("[calendar→todo bridge]", e instanceof Error ? e.message : e);
       }
     }
 
-    // Persist the guest list (organizer stripped server-side). Best-effort —
-    // the event is already saved; a failed invite must not lose the event.
-    try {
-      await fetch(`/api/calendar/events/${saved.id}/attendees`, {
-        method: "PUT",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ accountIds: attendeeIds }),
-      });
-    } catch { /* ignore — invites can be re-sent on next edit */ }
+    /* The guest list follows the event. Best-effort — the event is already
+       saved; a failed invite is re-sent on the next edit. */
+    const ok = await saveAttendees(saved.id, attendeeIds);
+    if (!ok) console.error("[Calendar] guests were not saved for", saved.id);
 
     onSaved(saved);
+  }
+
+  async function respond(status: "accepted" | "declined") {
+    if (!existingId) return;
+    setSaving(true);
+    const ok = await respondToInvite(existingId, status);
+    setSaving(false);
+    if (!ok) { onError?.(t("err.respond")); return; }
+    setAttendees((prev) => prev.map((a) => (a.account_id === viewerId ? { ...a, status } : a)));
+    onResponded?.(status);
   }
 
   const startDate = new Date(form.start_at);
   const endDate = new Date(form.end_at);
   const color = form.color || EVENT_TYPE_COLORS[form.event_type];
+  const heading = mode === "create" ? t("modal.new") : mode === "edit" ? t("modal.edit") : t("modal.view");
 
   if (!mounted) return null;
 
@@ -299,21 +265,16 @@ export default function EventModal({
           <div className="flex items-center gap-3 min-w-0">
             <div
               className="h-8 w-8 rounded-lg flex items-center justify-center shrink-0"
-              style={{
-                backgroundColor: color + "22",
-                color,
-                border: `1px solid ${color}55`,
-              }}
+              style={{ backgroundColor: color + "22", color, border: `1px solid ${color}55` }}
             >
               <CalendarPlusIcon className="h-4 w-4" />
             </div>
-            <h2 className="text-[15px] font-bold text-[var(--text-primary)]">
-              {existingId ? t("modal.edit") : t("modal.new")}
-            </h2>
+            <h2 className="text-[15px] font-bold text-[var(--text-primary)]">{heading}</h2>
           </div>
           <button
             type="button"
             onClick={onClose}
+            aria-label={t("modal.close")}
             className="h-8 w-8 rounded-lg bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] flex items-center justify-center transition-all"
           >
             <CrossIcon className="h-4 w-4" />
@@ -322,6 +283,19 @@ export default function EventModal({
 
         {/* Body */}
         <div className="p-5 space-y-4">
+          {readOnly && (
+            <div className="rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] px-3 py-2 text-[12px] text-[var(--text-muted)]">
+              {personById.has(organizerId)
+                ? t("modal.invitedBy").replace("{name}", nameFor(organizerId))
+                : t("modal.invited")}
+              {myInvite && myInvite.status !== "invited" && (
+                <span className="ms-2 font-semibold text-[var(--text-primary)]">
+                  · {myInvite.status === "accepted" ? t("modal.accepted") : t("modal.declined")}
+                </span>
+              )}
+            </div>
+          )}
+
           {/* Title */}
           <div>
             <label className={labelClass}>{t("f.title")}</label>
@@ -330,7 +304,8 @@ export default function EventModal({
               value={form.title}
               onChange={(e) => patch("title", e.target.value)}
               placeholder={t("f.title.placeholder")}
-              autoFocus
+              autoFocus={!readOnly}
+              disabled={readOnly}
             />
           </div>
 
@@ -340,50 +315,49 @@ export default function EventModal({
             <select
               className={inputClass}
               value={form.event_type}
-              onChange={(e) =>
-                patch("event_type", e.target.value as CalendarEventType)
-              }
+              onChange={(e) => patch("event_type", e.target.value as CalendarEventType)}
+              disabled={readOnly}
             >
-              {EVENT_TYPES.map((ev) => (
-                <option key={ev} value={ev}>
-                  {t(`type.${ev}`, EVENT_TYPE_LABELS[ev])}
-                </option>
+              {CALENDAR_EVENT_TYPES.map((ev) => (
+                <option key={ev} value={ev}>{t(`type.${ev}`)}</option>
               ))}
             </select>
           </div>
 
           {/* Color picker — Default (type color) + preset swatches */}
-          <div>
-            <label className={labelClass}>{t("f.color")}</label>
-            <div className="flex items-center gap-2 flex-wrap">
-              <button
-                type="button"
-                onClick={() => patch("color", null)}
-                title="Default (type color)"
-                className={`h-7 px-2.5 rounded-full text-[11px] font-medium border transition-all ${
-                  !form.color
-                    ? "border-[var(--border-focus)] text-[var(--text-primary)]"
-                    : "border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)]"
-                }`}
-              >
-                Default
-              </button>
-              {COLOR_PALETTE.map((c) => (
+          {!readOnly && (
+            <div>
+              <label className={labelClass}>{t("f.color")}</label>
+              <div className="flex items-center gap-2 flex-wrap">
                 <button
-                  key={c}
                   type="button"
-                  onClick={() => patch("color", c)}
-                  aria-label={`Color ${c}`}
-                  className="h-7 w-7 rounded-full border transition-transform hover:scale-110"
-                  style={{
-                    backgroundColor: c,
-                    borderColor: form.color === c ? "var(--text-primary)" : "transparent",
-                    boxShadow: form.color === c ? "0 0 0 2px var(--bg-secondary), 0 0 0 3px var(--text-primary)" : undefined,
-                  }}
-                />
-              ))}
+                  onClick={() => patch("color", null)}
+                  title={t("f.color.defaultHint")}
+                  className={`h-7 px-2.5 rounded-full text-[11px] font-medium border transition-all ${
+                    !form.color
+                      ? "border-[var(--border-focus)] text-[var(--text-primary)]"
+                      : "border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-primary)]"
+                  }`}
+                >
+                  {t("f.color.default")}
+                </button>
+                {COLOR_PALETTE.map((c) => (
+                  <button
+                    key={c}
+                    type="button"
+                    onClick={() => patch("color", c)}
+                    aria-label={`${t("f.color")} ${c}`}
+                    className="h-7 w-7 rounded-full border transition-transform hover:scale-110"
+                    style={{
+                      backgroundColor: c,
+                      borderColor: form.color === c ? "var(--text-primary)" : "transparent",
+                      boxShadow: form.color === c ? "0 0 0 2px var(--bg-secondary), 0 0 0 3px var(--text-primary)" : undefined,
+                    }}
+                  />
+                ))}
+              </div>
             </div>
-          </div>
+          )}
 
           {/* All-day + Private toggles */}
           <div className="flex items-center gap-5">
@@ -392,21 +366,22 @@ export default function EventModal({
                 type="checkbox"
                 checked={form.all_day}
                 onChange={(e) => toggleAllDay(e.target.checked)}
+                disabled={readOnly}
                 className="h-4 w-4 rounded border-[var(--border-subtle)]"
               />
               <span className="text-[13px] text-[var(--text-muted)]">{t("f.allDay")}</span>
             </label>
-            <label className="flex items-center gap-2 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={!!form.is_private}
-                onChange={(e) => patch("is_private", e.target.checked)}
-                className="h-4 w-4 rounded border-[var(--border-subtle)]"
-              />
-              <span className="text-[13px] text-[var(--text-muted)]">
-                {t("f.private", "Private")}
-              </span>
-            </label>
+            {!readOnly && (
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={!!form.is_private}
+                  onChange={(e) => patch("is_private", e.target.checked)}
+                  className="h-4 w-4 rounded border-[var(--border-subtle)]"
+                />
+                <span className="text-[13px] text-[var(--text-muted)]">{t("f.private")}</span>
+              </label>
+            )}
           </div>
 
           {/* Start / End */}
@@ -418,6 +393,7 @@ export default function EventModal({
                   type="date"
                   className={inputClass}
                   value={toDateInput(startDate)}
+                  disabled={readOnly}
                   onChange={(e) => {
                     const d = fromDateInput(e.target.value);
                     d.setHours(0, 0, 0, 0);
@@ -429,10 +405,8 @@ export default function EventModal({
                   type="datetime-local"
                   className={inputClass}
                   value={toDateTimeLocal(startDate)}
-                  onChange={(e) => {
-                    const d = fromDateTimeLocal(e.target.value);
-                    patch("start_at", d.toISOString());
-                  }}
+                  disabled={readOnly}
+                  onChange={(e) => patch("start_at", fromDateTimeLocal(e.target.value).toISOString())}
                 />
               )}
             </div>
@@ -443,6 +417,7 @@ export default function EventModal({
                   type="date"
                   className={inputClass}
                   value={toDateInput(endDate)}
+                  disabled={readOnly}
                   onChange={(e) => {
                     const d = fromDateInput(e.target.value);
                     d.setHours(23, 59, 59, 999);
@@ -454,19 +429,17 @@ export default function EventModal({
                   type="datetime-local"
                   className={inputClass}
                   value={toDateTimeLocal(endDate)}
-                  onChange={(e) => {
-                    const d = fromDateTimeLocal(e.target.value);
-                    patch("end_at", d.toISOString());
-                  }}
+                  disabled={readOnly}
+                  onChange={(e) => patch("end_at", fromDateTimeLocal(e.target.value).toISOString())}
                 />
               )}
             </div>
           </div>
 
           {/* Quick duration chips (timed events only) */}
-          {!form.all_day && (
+          {!form.all_day && !readOnly && (
             <div className="flex items-center gap-2 flex-wrap">
-              <span className="text-[11px] text-[var(--text-dim)] mr-1">{t("f.duration", "Duration")}</span>
+              <span className="text-[11px] text-[var(--text-dim)] me-1">{t("f.duration")}</span>
               {DURATION_CHIPS.map((d) => {
                 const active = endDate.getTime() - startDate.getTime() === d.min * 60_000;
                 return (
@@ -490,34 +463,29 @@ export default function EventModal({
           {/* Reminder + Repeat */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <label className={labelClass}>{t("f.reminder", "Reminder")}</label>
+              <label className={labelClass}>{t("f.reminder")}</label>
               <select
                 className={inputClass}
                 value={form.reminder_minutes ?? ""}
-                onChange={(e) =>
-                  patch("reminder_minutes", e.target.value === "" ? null : Number(e.target.value))
-                }
+                disabled={readOnly}
+                onChange={(e) => patch("reminder_minutes", e.target.value === "" ? null : Number(e.target.value))}
               >
-                {REMINDER_OPTIONS.map((o) => (
-                  <option key={String(o.v)} value={o.v ?? ""}>
-                    {t(`reminder.${o.v ?? "none"}`, o.label)}
-                  </option>
+                {REMINDER_MINUTES.map((v) => (
+                  <option key={String(v)} value={v ?? ""}>{t(`reminder.${v ?? "none"}`)}</option>
                 ))}
               </select>
             </div>
             <div>
-              <label className={labelClass}>{t("f.repeat", "Repeat")}</label>
+              <label className={labelClass}>{t("f.repeat")}</label>
               <select
                 className={inputClass}
                 value={form.recurrence ?? ""}
-                onChange={(e) =>
-                  patch("recurrence", (e.target.value || null) as CalendarRecurrence)
-                }
+                disabled={readOnly}
+                onChange={(e) => patch("recurrence", (e.target.value || null) as CalendarRecurrence)}
               >
-                {REPEAT_OPTIONS.map((o) => (
-                  <option key={String(o.v)} value={o.v ?? ""}>
-                    {t(`repeat.${o.v ?? "none"}`, o.label)}
-                  </option>
+                <option value="">{t("repeat.none")}</option>
+                {CALENDAR_RECURRENCES.map((r) => (
+                  <option key={r} value={r}>{t(`repeat.${r}`)}</option>
                 ))}
               </select>
             </div>
@@ -526,114 +494,132 @@ export default function EventModal({
           {/* Repeat-until (only when a recurrence is set) */}
           {form.recurrence && (
             <div>
-              <label className={labelClass}>{t("f.repeatUntil", "Repeat until")}</label>
+              <label className={labelClass}>{t("f.repeatUntil")}</label>
               <input
                 type="date"
                 className={inputClass}
                 value={form.recurrence_until ?? ""}
+                disabled={readOnly}
                 onChange={(e) => patch("recurrence_until", e.target.value || null)}
               />
-              <p className="mt-1 text-[11px] text-[var(--text-dim)]">
-                {t("f.repeatUntil.hint", "Leave empty to repeat indefinitely.")}
-              </p>
+              {!readOnly && (
+                <p className="mt-1 text-[11px] text-[var(--text-dim)]">{t("f.repeatUntil.hint")}</p>
+              )}
             </div>
           )}
 
-          {/* Invite people (attendees) */}
-          <div>
-            <button
-              type="button"
-              onClick={() => setShowGuests((s) => !s)}
-              className="flex items-center gap-2 text-[13px] font-medium text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors"
-            >
-              <span>{t("f.guests", "Invite people")}</span>
-              {attendeeIds.length > 0 && (
-                <span className="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[10px] font-semibold">
-                  {attendeeIds.length}
-                </span>
-              )}
-            </button>
-
-            {showGuests && (
-              <div className="mt-2 rounded-xl border border-[var(--border-subtle)] overflow-hidden">
-                {attendeeIds.length > 0 && (
-                  <div className="flex flex-wrap gap-1.5 p-2 border-b border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)]">
-                    {attendeeIds.map((id) => (
-                      <span
-                        key={id}
-                        className="inline-flex items-center gap-1 h-6 pl-2 pr-1 rounded-full bg-[var(--bg-secondary)] border border-[var(--border-subtle)] text-[11px] text-[var(--text-primary)]"
-                      >
-                        {nameFor(id)}
-                        {altFor(id) && (
-                          <span lang="zh" className="ms-0.5 text-[0.85em] text-[var(--text-dim)]">
-                            {altFor(id)}
-                          </span>
-                        )}
-                        <button
-                          type="button"
-                          onClick={() => toggleAttendee(id)}
-                          className="h-4 w-4 grid place-items-center rounded-full hover:bg-[var(--bg-surface-subtle)] text-[var(--text-dim)]"
-                          aria-label="Remove"
-                        >
-                          <CrossIcon className="h-2.5 w-2.5" />
-                        </button>
-                      </span>
-                    ))}
-                  </div>
-                )}
-                <input
-                  className="w-full h-9 px-3 text-[13px] bg-transparent outline-none border-b border-[var(--border-subtle)] placeholder:text-[var(--text-dim)]"
-                  value={attendeeSearch}
-                  onChange={(e) => setAttendeeSearch(e.target.value)}
-                  placeholder={t("f.guests.search", "Search people…")}
-                />
-                <div className="max-h-44 overflow-y-auto">
-                  {filteredAccounts.length === 0 ? (
-                    <p className="px-3 py-3 text-[12px] text-[var(--text-dim)]">
-                      {t("f.guests.empty", "No people found.")}
-                    </p>
-                  ) : (
-                    filteredAccounts.map((a) => {
-                      const checked = attendeeIds.includes(a.id);
-                      return (
-                        <button
-                          key={a.id}
-                          type="button"
-                          onClick={() => toggleAttendee(a.id)}
-                          className="w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-[var(--bg-surface-subtle)] transition-colors"
-                        >
-                          <span
-                            className={`h-4 w-4 shrink-0 rounded border flex items-center justify-center ${
-                              checked
-                                ? "bg-[var(--bg-inverted)] border-[var(--bg-inverted)]"
-                                : "border-[var(--border-subtle)]"
-                            }`}
-                          >
-                            {checked && <span className="h-1.5 w-1.5 rounded-sm bg-[var(--text-inverted)]" />}
-                          </span>
-                          <span className="min-w-0">
-                            <span className="block text-[13px] text-[var(--text-primary)] truncate">
-                              {nameFor(a.id)}
-                              {altFor(a.id) && (
-                                <span lang="zh" className="ms-1 text-[0.85em] font-normal text-[var(--text-dim)]">
-                                  {altFor(a.id)}
-                                </span>
-                              )}
-                            </span>
-                            {(a.login_email || a.username) && (
-                              <span className="block text-[11px] text-[var(--text-dim)] truncate">
-                                {a.username ? `@${a.username}` : a.login_email}
-                              </span>
-                            )}
-                          </span>
-                        </button>
-                      );
-                    })
-                  )}
+          {/* Guests */}
+          {readOnly ? (
+            attendees.length > 0 && (
+              <div>
+                <label className={labelClass}>{t("modal.guests")}</label>
+                <div className="flex flex-wrap gap-1.5">
+                  {attendees.map((a) => (
+                    <span
+                      key={a.account_id}
+                      className="inline-flex items-center gap-1 h-6 px-2 rounded-full bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[11px] text-[var(--text-primary)]"
+                    >
+                      {nameFor(a.account_id)}
+                      <span className="text-[var(--text-dim)]">· {t(`status.${a.status}`)}</span>
+                    </span>
+                  ))}
                 </div>
               </div>
-            )}
-          </div>
+            )
+          ) : (
+            <div>
+              <button
+                type="button"
+                onClick={() => setShowGuests((s) => !s)}
+                className="flex items-center gap-2 text-[13px] font-medium text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors"
+              >
+                <span>{t("f.guests")}</span>
+                {attendeeIds.length > 0 && (
+                  <span className="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[10px] font-semibold">
+                    {attendeeIds.length}
+                  </span>
+                )}
+              </button>
+
+              {showGuests && (
+                <div className="mt-2 rounded-xl border border-[var(--border-subtle)] overflow-hidden">
+                  {attendeeIds.length > 0 && (
+                    <div className="flex flex-wrap gap-1.5 p-2 border-b border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)]">
+                      {attendeeIds.map((id) => {
+                        const status = attendees.find((a) => a.account_id === id)?.status;
+                        return (
+                          <span
+                            key={id}
+                            className="inline-flex items-center gap-1 h-6 ps-2 pe-1 rounded-full bg-[var(--bg-secondary)] border border-[var(--border-subtle)] text-[11px] text-[var(--text-primary)]"
+                          >
+                            {nameFor(id)}
+                            {altFor(id) && (
+                              <span lang="zh" className="ms-0.5 text-[0.85em] text-[var(--text-dim)]">{altFor(id)}</span>
+                            )}
+                            {status && status !== "invited" && (
+                              <span className="text-[var(--text-dim)]">· {t(`status.${status}`)}</span>
+                            )}
+                            <button
+                              type="button"
+                              onClick={() => toggleAttendee(id)}
+                              className="h-4 w-4 grid place-items-center rounded-full hover:bg-[var(--bg-surface-subtle)] text-[var(--text-dim)]"
+                              aria-label={t("f.guests.remove")}
+                            >
+                              <CrossIcon className="h-2.5 w-2.5" />
+                            </button>
+                          </span>
+                        );
+                      })}
+                    </div>
+                  )}
+                  <input
+                    className="w-full h-9 px-3 text-[13px] bg-transparent outline-none border-b border-[var(--border-subtle)] placeholder:text-[var(--text-dim)]"
+                    value={attendeeSearch}
+                    onChange={(e) => setAttendeeSearch(e.target.value)}
+                    placeholder={t("f.guests.search")}
+                  />
+                  <div className="max-h-44 overflow-y-auto">
+                    {filteredPeople.length === 0 ? (
+                      <p className="px-3 py-3 text-[12px] text-[var(--text-dim)]">{t("f.guests.empty")}</p>
+                    ) : (
+                      filteredPeople.map((p) => {
+                        const checked = attendeeIds.includes(p.account_id);
+                        return (
+                          <button
+                            key={p.account_id}
+                            type="button"
+                            onClick={() => toggleAttendee(p.account_id)}
+                            className="w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-[var(--bg-surface-subtle)] transition-colors"
+                          >
+                            <span
+                              className={`h-4 w-4 shrink-0 rounded border flex items-center justify-center ${
+                                checked ? "bg-[var(--bg-inverted)] border-[var(--bg-inverted)]" : "border-[var(--border-subtle)]"
+                              }`}
+                            >
+                              {checked && <span className="h-1.5 w-1.5 rounded-sm bg-[var(--text-inverted)]" />}
+                            </span>
+                            <span className="min-w-0">
+                              <span className="block text-[13px] text-[var(--text-primary)] truncate">
+                                {p.full_name || p.username}
+                                {altFor(p.account_id) && (
+                                  <span lang="zh" className="ms-1 text-[0.85em] font-normal text-[var(--text-dim)]">
+                                    {altFor(p.account_id)}
+                                  </span>
+                                )}
+                              </span>
+                              <span className="block text-[11px] text-[var(--text-dim)] truncate">
+                                {[p.position, p.department].filter(Boolean).join(" · ") || `@${p.username}`}
+                              </span>
+                            </span>
+                          </button>
+                        );
+                      })
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Location */}
           <div>
@@ -641,8 +627,9 @@ export default function EventModal({
             <input
               className={inputClass}
               value={form.location ?? ""}
+              disabled={readOnly}
               onChange={(e) => patch("location", e.target.value || null)}
-              placeholder={t("f.location.placeholder")}
+              placeholder={readOnly ? "" : t("f.location.placeholder")}
             />
           </div>
 
@@ -653,8 +640,9 @@ export default function EventModal({
               className={textareaClass}
               rows={3}
               value={form.description ?? ""}
+              disabled={readOnly}
               onChange={(e) => patch("description", e.target.value || null)}
-              placeholder={t("f.description.placeholder")}
+              placeholder={readOnly ? "" : t("f.description.placeholder")}
             />
           </div>
 
@@ -667,7 +655,7 @@ export default function EventModal({
 
         {/* Footer */}
         <div className="flex items-center justify-between gap-2 px-5 py-4 border-t border-[var(--border-subtle)]">
-          {onDelete ? (
+          {mode === "edit" && onDelete ? (
             <button
               type="button"
               onClick={onDelete}
@@ -680,23 +668,57 @@ export default function EventModal({
             <span />
           )}
           <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={onClose}
-              disabled={saving}
-              className="h-10 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-muted)] text-[13px] font-semibold hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all"
-            >
-              {t("modal.cancel")}
-            </button>
-            <button
-              type="button"
-              onClick={handleSave}
-              disabled={saving}
-              className="h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold flex items-center gap-2 transition-all shadow-lg disabled:opacity-60"
-            >
-              <DiskIcon className="h-4 w-4" />
-              {saving ? t("modal.saving") : t("modal.save")}
-            </button>
+            {readOnly ? (
+              <>
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="h-10 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-muted)] text-[13px] font-semibold hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all"
+                >
+                  {t("modal.close")}
+                </button>
+                {myInvite && myInvite.status !== "declined" && (
+                  <button
+                    type="button"
+                    onClick={() => respond("declined")}
+                    disabled={saving}
+                    className="h-10 px-4 rounded-xl bg-red-500/20 border border-red-500/30 text-red-400 text-[13px] font-semibold hover:bg-red-500/30 transition-all disabled:opacity-60"
+                  >
+                    {t("modal.decline")}
+                  </button>
+                )}
+                {myInvite && myInvite.status !== "accepted" && (
+                  <button
+                    type="button"
+                    onClick={() => respond("accepted")}
+                    disabled={saving}
+                    className="h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold transition-all shadow-lg disabled:opacity-60"
+                  >
+                    {t("modal.accept")}
+                  </button>
+                )}
+              </>
+            ) : (
+              <>
+                <button
+                  type="button"
+                  onClick={onClose}
+                  disabled={saving}
+                  className="h-10 px-4 rounded-xl bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[var(--text-muted)] text-[13px] font-semibold hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-all"
+                >
+                  {t("modal.cancel")}
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSave}
+                  disabled={saving}
+                  className="h-10 px-5 rounded-xl bg-[var(--bg-inverted)] text-[var(--text-inverted)] text-[13px] font-semibold flex items-center gap-2 transition-all shadow-lg disabled:opacity-60"
+                >
+                  <DiskIcon className="h-4 w-4" />
+                  {saving ? t("modal.saving") : t("modal.save")}
+                </button>
+              </>
+            )}
           </div>
         </div>
       </div>
@@ -704,6 +726,3 @@ export default function EventModal({
     document.body,
   );
 }
-
-// Silence unused-import warning (used transitively via other helpers).
-void addDays;

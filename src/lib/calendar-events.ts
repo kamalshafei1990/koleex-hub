@@ -1,70 +1,45 @@
 /* ---------------------------------------------------------------------------
    Calendar events — the browser's client for /api/calendar/events.
 
-   Backs the self-contained Koleex Calendar app. No external sync; every
-   event belongs to an account and is rendered in that account's preferred
-   timezone.
-
-   THE BROWSER DOES NOT TOUCH THE DATABASE HERE. Every function calls the API
-   and returns the empty answer on failure. Until 2026-08-09 each one called
-   the API and then, on any non-401/403 outcome, FELL BACK to querying
-   Supabase directly with the anon key — re-implementing the permission rules
-   in the browser as it went. That was worse than slow:
-
-     · a 500 from the API silently downgraded the caller to the browser path,
-       so the weakest code ran exactly when something was already wrong;
-     · the Type C rule (only a Super Admin may read another account's
-       calendar) was enforced twice, in two languages, and only the server
-       copy is authoritative;
-     · every read was a direct cross-border round trip from the browser to
-       ap-northeast-1, where the same query from the function costs ~56 ms.
-
-   `fetchAllEventsForAccount` went with it — nothing called it.
+   THE BROWSER DOES NOT TOUCH THE DATABASE HERE. Every function calls the
+   API and returns the empty answer on failure. Scope, tenant and the
+   private-record rules are applied by the route from the session.
    --------------------------------------------------------------------------- */
 
 import type {
+  CalendarAttendeeStatus,
   CalendarEventRow,
   CalendarEventInsert,
   CalendarEventUpdate,
+  CalendarViewEvent,
 } from "@/types/supabase";
 
-/* ============================================================================
-   Fetch
-   ============================================================================ */
+export interface CalendarAttendee {
+  account_id: string;
+  status: CalendarAttendeeStatus;
+  name: string;
+}
 
-/**
- * Fetch all events for an account within the [rangeStart, rangeEnd) window.
- *
- * Uses overlap semantics: event.start_at < rangeEnd AND event.end_at >= rangeStart.
- * That way an event that started yesterday and ends today is still visible
- * in today's view.
- *
- * Scope, tenant and the private-record rules are applied by the route from the
- * session. The old `ctx` parameter is gone: the browser handing the server a
- * ScopeContext it assembled itself is a suggestion, not a rule, and the route
- * ignored it anyway.
- */
+function logUnlessDenied(what: string, status: number, quiet: number[] = [401, 403]) {
+  if (!quiet.includes(status)) console.error(`[Calendar] ${what}:`, status);
+}
+
+/** Events for an account within [rangeStart, rangeEnd) — its own, the
+ *  occurrences of its series, the events it is invited to, and the mirrors. */
 export async function fetchEventsInRange(
   accountId: string,
   rangeStart: Date,
   rangeEnd: Date,
-): Promise<CalendarEventRow[]> {
+): Promise<CalendarViewEvent[]> {
   const params = new URLSearchParams({
     accountId,
     from: rangeStart.toISOString(),
     to: rangeEnd.toISOString(),
   });
   try {
-    const res = await fetch("/api/calendar/events?" + params.toString(), {
-      credentials: "include",
-    });
-    if (!res.ok) {
-      if (res.status !== 401 && res.status !== 403) {
-        console.error("[Calendar] fetchEventsInRange:", res.status);
-      }
-      return [];
-    }
-    const json = (await res.json()) as { events: CalendarEventRow[] };
+    const res = await fetch("/api/calendar/events?" + params.toString(), { credentials: "include" });
+    if (!res.ok) { logUnlessDenied("fetchEventsInRange", res.status); return []; }
+    const json = (await res.json()) as { events: CalendarViewEvent[] };
     return json.events;
   } catch (e) {
     console.error("[Calendar] fetchEventsInRange failed:", e);
@@ -72,16 +47,12 @@ export async function fetchEventsInRange(
   }
 }
 
-export async function fetchEventById(id: string): Promise<CalendarEventRow | null> {
+/** One real event by id; `invited` is set when the caller is a guest. */
+export async function fetchEventById(id: string): Promise<(CalendarEventRow & { invited?: boolean }) | null> {
   try {
     const res = await fetch("/api/calendar/events/" + id, { credentials: "include" });
-    if (!res.ok) {
-      if (res.status !== 401 && res.status !== 403 && res.status !== 404) {
-        console.error("[Calendar] fetchEventById:", res.status);
-      }
-      return null;
-    }
-    const json = (await res.json()) as { event: CalendarEventRow | null };
+    if (!res.ok) { logUnlessDenied("fetchEventById", res.status, [401, 403, 404]); return null; }
+    const json = (await res.json()) as { event: (CalendarEventRow & { invited?: boolean }) | null };
     return json.event;
   } catch (e) {
     console.error("[Calendar] fetchEventById failed:", e);
@@ -89,13 +60,9 @@ export async function fetchEventById(id: string): Promise<CalendarEventRow | nul
   }
 }
 
-/* ============================================================================
-   Mutations
-   ============================================================================ */
+/* ── Mutations ── */
 
-export async function createEvent(
-  input: CalendarEventInsert,
-): Promise<CalendarEventRow | null> {
+export async function createEvent(input: CalendarEventInsert): Promise<CalendarEventRow | null> {
   try {
     const res = await fetch("/api/calendar/events", {
       method: "POST",
@@ -103,13 +70,8 @@ export async function createEvent(
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(input),
     });
-    if (res.ok) {
-      const json = (await res.json()) as { event: CalendarEventRow | null };
-      return json.event;
-    }
-    if (res.status !== 401 && res.status !== 403) {
-      console.error("[Calendar] createEvent:", res.status);
-    }
+    if (res.ok) return ((await res.json()) as { event: CalendarEventRow | null }).event;
+    logUnlessDenied("createEvent", res.status);
     return null;
   } catch (e) {
     console.error("[Calendar] createEvent failed:", e);
@@ -117,10 +79,7 @@ export async function createEvent(
   }
 }
 
-export async function updateEvent(
-  id: string,
-  patch: CalendarEventUpdate,
-): Promise<CalendarEventRow | null> {
+export async function updateEvent(id: string, patch: CalendarEventUpdate): Promise<CalendarEventRow | null> {
   try {
     const res = await fetch("/api/calendar/events/" + id, {
       method: "PATCH",
@@ -128,13 +87,8 @@ export async function updateEvent(
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(patch),
     });
-    if (res.ok) {
-      const json = (await res.json()) as { event: CalendarEventRow | null };
-      return json.event;
-    }
-    if (res.status !== 401 && res.status !== 403 && res.status !== 404) {
-      console.error("[Calendar] updateEvent:", res.status);
-    }
+    if (res.ok) return ((await res.json()) as { event: CalendarEventRow | null }).event;
+    logUnlessDenied("updateEvent", res.status, [401, 403, 404]);
     return null;
   } catch (e) {
     console.error("[Calendar] updateEvent failed:", e);
@@ -144,17 +98,56 @@ export async function updateEvent(
 
 export async function deleteEvent(id: string): Promise<boolean> {
   try {
-    const res = await fetch("/api/calendar/events/" + id, {
-      method: "DELETE",
-      credentials: "include",
-    });
+    const res = await fetch("/api/calendar/events/" + id, { method: "DELETE", credentials: "include" });
     if (res.ok) return true;
-    if (res.status !== 401 && res.status !== 403 && res.status !== 404) {
-      console.error("[Calendar] deleteEvent:", res.status);
-    }
+    logUnlessDenied("deleteEvent", res.status, [401, 403, 404]);
     return false;
   } catch (e) {
     console.error("[Calendar] deleteEvent failed:", e);
+    return false;
+  }
+}
+
+/* ── Guests ── */
+
+export async function fetchAttendees(eventId: string): Promise<CalendarAttendee[]> {
+  try {
+    const res = await fetch(`/api/calendar/events/${eventId}/attendees`, { credentials: "include" });
+    if (!res.ok) return [];
+    const json = (await res.json()) as { attendees?: CalendarAttendee[] };
+    return json.attendees ?? [];
+  } catch {
+    return [];
+  }
+}
+
+/** Replace the guest list. The organizer is stripped server-side; the newly
+ *  added are invited, the removed have their invitation withdrawn. */
+export async function saveAttendees(eventId: string, accountIds: string[]): Promise<boolean> {
+  try {
+    const res = await fetch(`/api/calendar/events/${eventId}/attendees`, {
+      method: "PUT",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ accountIds }),
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
+/** Answer my own invitation. */
+export async function respondToInvite(eventId: string, status: "accepted" | "declined"): Promise<boolean> {
+  try {
+    const res = await fetch(`/api/calendar/events/${eventId}/attendees`, {
+      method: "PATCH",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status }),
+    });
+    return res.ok;
+  } catch {
     return false;
   }
 }
