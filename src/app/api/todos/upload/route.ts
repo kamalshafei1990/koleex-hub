@@ -58,6 +58,11 @@ export async function POST(req: Request) {
 
   const rawName =
     (form.get("name") as string | null)?.toString().slice(0, 200) || `file.${ext}`;
+  /* The tenant prefix is the only scoping the public bucket has; a session
+     without one must not upload under the literal folder "null". */
+  if (!auth.tenant_id) {
+    return NextResponse.json({ error: "No tenant on this session." }, { status: 403 });
+  }
   const path = `${auth.tenant_id}/${randomUUID()}.${ext}`;
   const { data, error } = await supabaseServer.storage
     .from(BUCKET)

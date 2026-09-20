@@ -255,11 +255,14 @@ export default function EventModal({
           due_date: form.start_at,
           source: "calendar",
           source_id: saved.id,
-          created_by_account_id: form.account_id,
-          assigned_by_account_id: form.account_id,
           assignee_account_ids: [form.account_id],
         });
-      } catch { /* todo table may not exist yet — ignore silently */ }
+      } catch (e) {
+        /* The event is saved; a failed bridge must not undo that — but it is
+           not silent any more (it used to be swallowed as "table may not
+           exist yet", years after the table existed). */
+        console.error("[calendar→todo bridge]", e instanceof Error ? e.message : e);
+      }
     }
 
     // Persist the guest list (organizer stripped server-side). Best-effort —

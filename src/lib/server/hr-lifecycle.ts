@@ -17,7 +17,7 @@ import "server-only";
 
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { hrReviewerAccountIds, employeeAccountId } from "@/lib/server/leave-review";
-import { sendPushToAccounts } from "@/lib/server/web-push";
+import { notifyTodoAssigned, pingTodosChanged } from "@/lib/server/todo-notify";
 
 export const PROBATION_REVIEW_LEAD_DAYS = 14;
 
@@ -41,13 +41,6 @@ export async function activateChecklist(employeeId: string, type: "onboarding" |
     console.error("[hr-lifecycle] checklist:", e instanceof Error ? e.message : e);
     return { started: false, checklistId: null };
   }
-}
-
-/** The employee's current primary department (assignments hang off the person). */
-export async function employeeDepartmentId(personId: string | null): Promise<string | null> {
-  if (!personId) return null;
-  const { data } = await supabaseServer.from("koleex_assignments").select("department_id").eq("person_id", personId).eq("is_active", true).eq("is_primary", true).limit(1).maybeSingle();
-  return (data as { department_id?: string | null } | null)?.department_id ?? null;
 }
 
 /** One probation-review task per employee, created when the end of
@@ -85,13 +78,7 @@ export async function ensureProbationReviewTask(emp: {
   if (error || !todo) { console.error("[hr-lifecycle] probation todo:", error?.message); return "no_recipients"; }
   const todoId = (todo as { id: string }).id;
   await supabaseServer.from("koleex_todo_assignees").insert(recipients.map((account_id) => ({ todo_id: todoId, account_id })));
-  await supabaseServer.from("inbox_messages").insert(recipients.map((recipient_account_id) => ({
-    recipient_account_id, sender_account_id: null, tenant_id: emp.tenant_id, category: "task",
-    subject: `New task: ${title}`, body: description, link: `/todo?task=${todoId}`,
-    /* `reason`, not `kind`: the classifier reads type ?? kind, so a second
-       classification key here only shadows the first. */
-    metadata: { type: "todo_assignment", todo_id: todoId, priority: "high", employee_id: emp.id, reason: "probation_review" },
-  })));
-  await sendPushToAccounts(recipients, { title: `New task: ${title}`, body: description, url: `/todo?task=${todoId}`, tag: `todo-${todoId}`, kind: "todo_assignment" }, { actorAccountId: null });
+  await notifyTodoAssigned({ id: todoId, title, description, priority: "high", tenant_id: emp.tenant_id }, recipients, null);
+  await pingTodosChanged(emp.tenant_id);
   return "created";
 }

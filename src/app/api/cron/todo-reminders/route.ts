@@ -11,6 +11,7 @@ import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { sendPushToAccounts } from "@/lib/server/web-push";
 import { supersedeUnread } from "@/lib/server/inbox-lifecycle";
+import { emitPings, rtTopic } from "@/lib/server/realtime-broadcast";
 import { spawnDueRecurringTodos } from "@/lib/server/todo-recurrence";
 import { escalateOverdueTodos } from "@/lib/server/todo-escalation";
 
@@ -23,6 +24,7 @@ interface DueTodo {
   remind_at: string;
   reminded_at: string | null;
   created_by_account_id: string | null;
+  tenant_id: string | null;
 }
 
 export async function GET(req: Request) {
@@ -60,7 +62,7 @@ export async function GET(req: Request) {
   // name as a literal timestamp and error).
   const { data: rows, error } = await supabaseServer
     .from("koleex_todos")
-    .select("id, title, description, remind_at, reminded_at, created_by_account_id")
+    .select("id, title, description, remind_at, reminded_at, created_by_account_id, tenant_id")
     .lte("remind_at", nowIso)
     .eq("completed", false)
     .limit(200);
@@ -105,6 +107,7 @@ export async function GET(req: Request) {
         recipients.map((rid) => ({
           recipient_account_id: rid,
           sender_account_id: null,
+          tenant_id: t.tenant_id,
           category: "task",
           subject: `⏰ Reminder: ${t.title}`,
           body: t.description || t.title,
@@ -112,6 +115,7 @@ export async function GET(req: Request) {
           metadata: { type: "todo_reminder", todo_id: t.id },
         })),
       );
+      await emitPings(recipients.map((rid) => ({ topic: rtTopic.inbox(rid) })));
       await sendPushToAccounts(recipients, {
         title: `⏰ Reminder: ${t.title}`,
         body: t.description || "Task reminder",

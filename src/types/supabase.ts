@@ -2033,6 +2033,11 @@ export interface TodoRow {
   source_id: string | null;
   assigned_department: string | null;
   assign_to_all: boolean;
+  /** Visible only to the creator and can_view_private roles. */
+  is_private: boolean;
+  tenant_id: string | null;
+  /** When the reminder cron last fired for the current remind_at. */
+  reminded_at: string | null;
   completed_at: string | null;
   created_at: string;
   updated_at: string;
@@ -2077,7 +2082,7 @@ export interface TodoMetadata {
   checklist?: TodoChecklistItem[];
   [key: string]: unknown;
 }
-export type TodoInsert = Omit<TodoRow, "id" | "created_at" | "updated_at" | "completed_at">;
+export type TodoInsert = Omit<TodoRow, "id" | "created_at" | "updated_at" | "completed_at" | "reminded_at">;
 export type TodoUpdate = Partial<TodoInsert> & { completed_at?: string | null };
 
 export interface TodoAssigneeRow {
@@ -2102,6 +2107,7 @@ export interface TodoLabelRow {
   id: string;
   name: string;
   color: string | null;
+  tenant_id: string | null;
   created_at: string;
 }
 export type TodoLabelInsert = Omit<TodoLabelRow, "id" | "created_at">;

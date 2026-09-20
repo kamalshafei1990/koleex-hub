@@ -20,7 +20,7 @@ import "server-only";
 
 import { supabaseServer } from "@/lib/server/supabase-server";
 
-export { applyTodoScope, todoScopeClauses, type TodoViewer } from "@/lib/server/todo-scope-rule";
+export { applyTodoScope, type TodoViewer } from "@/lib/server/todo-scope-rule";
 import type { TodoViewer } from "@/lib/server/todo-scope-rule";
 
 /** The ids of tasks the viewer is an assignee of or observes — the "shared"

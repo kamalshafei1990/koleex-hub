@@ -8,12 +8,14 @@ import "server-only";
 
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { sendPushToAccounts } from "@/lib/server/web-push";
+import { emitPings, rtTopic } from "@/lib/server/realtime-broadcast";
 
 interface Candidate {
   id: string;
   title: string;
   due_date: string | null;
   assigned_by_account_id: string | null;
+  tenant_id: string | null;
   metadata: Record<string, unknown> | null;
 }
 
@@ -25,7 +27,7 @@ export async function escalateOverdueTodos(now: Date = new Date()): Promise<numb
 
   const { data: rows, error } = await supabaseServer
     .from("koleex_todos")
-    .select("id, title, due_date, assigned_by_account_id, metadata")
+    .select("id, title, due_date, assigned_by_account_id, tenant_id, metadata")
     .eq("completed", false)
     .not("due_date", "is", null)
     .not("assigned_by_account_id", "is", null)
@@ -71,12 +73,14 @@ export async function escalateOverdueTodos(now: Date = new Date()): Promise<numb
     await supabaseServer.from("inbox_messages").insert({
       recipient_account_id: assigner,
       sender_account_id: null,
+      tenant_id: t.tenant_id,
       category: "task",
       subject: `⚠️ Overdue: ${t.title}`,
       body: "A task you assigned is past its due date and still open.",
       link: `/todo?task=${t.id}`,
       metadata: { type: "todo_overdue", todo_id: t.id },
     });
+    await emitPings([{ topic: rtTopic.inbox(assigner) }]);
     await sendPushToAccounts([assigner], {
       title: `⚠️ Overdue: ${t.title}`,
       body: "A task you assigned is past its due date.",

@@ -2,11 +2,16 @@ import "server-only";
 
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
-import { requireAuth , requireModuleAction} from "@/lib/server/auth";
+import { requireAuth, requireModuleAction } from "@/lib/server/auth";
+import { canViewTodo } from "@/lib/server/todo-access";
+import { pingTodosChanged } from "@/lib/server/todo-notify";
 
 /* POST /api/todos/[id]/notes — add a note to a todo.
-   Anyone with Todo access who can view this todo can add a note. The
-   author is enforced server-side as auth.account_id. */
+   Anyone who can SEE the todo (the list's own visibility rule) can add a
+   note. The author is enforced server-side as auth.account_id.
+
+   The old check was tenant-only: any account with To-do create could note
+   on any task in the tenant, including private ones it could not list. */
 export async function POST(
   req: Request,
   { params }: { params: Promise<{ id: string }> },
@@ -22,18 +27,14 @@ export async function POST(
     return NextResponse.json({ error: "Empty note" }, { status: 400 });
   }
 
-  // Tenant check — note author must be in same tenant as todo.
-  if (auth.tenant_id) {
-    const { data: todo } = await supabaseServer
-      .from("koleex_todos")
-      .select("tenant_id")
-      .eq("id", todoId)
-      .maybeSingle();
-    if (!todo) return NextResponse.json({ error: "Not found" }, { status: 404 });
-    if ((todo as { tenant_id: string | null }).tenant_id !== auth.tenant_id) {
-      return NextResponse.json({ error: "Not found" }, { status: 404 });
-    }
-  }
+  const visible = await canViewTodo(todoId, {
+    accountId: auth.account_id,
+    tenantId: auth.tenant_id,
+    department: auth.department,
+    isSuperAdmin: auth.is_super_admin,
+    canViewPrivate: auth.can_view_private,
+  });
+  if (!visible) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
   const { data, error } = await supabaseServer
     .from("koleex_todo_notes")
@@ -49,5 +50,6 @@ export async function POST(
     console.error("[api/todos/[id]/notes POST]", error.message);
     return NextResponse.json({ error: "Failed to add note" }, { status: 500 });
   }
+  await pingTodosChanged(auth.tenant_id);
   return NextResponse.json({ note: data });
 }

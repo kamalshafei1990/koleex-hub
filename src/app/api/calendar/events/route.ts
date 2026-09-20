@@ -4,6 +4,7 @@ import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { requireAuth, requireModuleAccess , requireModuleAction} from "@/lib/server/auth";
 import { expandRecurrence, type CalendarRec } from "@/lib/calendar-recurrence";
+import { applyTodoScope, sharedTodoIds, type TodoViewer } from "@/lib/server/todo-scope";
 
 /* GET /api/calendar/events
    Returns events for a given account within [from, to).
@@ -235,26 +236,29 @@ export async function GET(req: Request) {
     const fromDate = from.slice(0, 10);
     const toDate = to.slice(0, 10);
 
-    const { data: asg } = await supabaseServer
-      .from("koleex_todo_assignees")
-      .select("todo_id")
-      .eq("account_id", accountId)
-      .limit(500);
-    const assignedIds = Array.from(
-      new Set((asg ?? []).map((a) => (a as { todo_id: string }).todo_id)),
-    ).slice(0, 400);
-
-    const orExpr = assignedIds.length
-      ? `created_by_account_id.eq.${accountId},id.in.(${assignedIds.join(",")})`
-      : `created_by_account_id.eq.${accountId}`;
-
-    const { data: todos } = await supabaseServer
+    /* THE SAME visibility rule as the To-do list (lib/server/todo-scope.ts).
+       This mirror used to carry its own — creator ∥ assignee only — which
+       dropped department and broadcast tasks the person can see in the app
+       and, worse, ignored is_private: a colleague's private task you were
+       assigned to surfaced here. The viewer is the CALENDAR's account (a
+       super admin browsing someone else's calendar sees that person's
+       tasks, never their own), and it is never a super admin for this rule:
+       a calendar shows one person's work, not the tenant's. */
+    const viewer: TodoViewer = {
+      accountId,
+      tenantId: auth.tenant_id,
+      department: accountId === auth.account_id ? auth.department : null,
+      isSuperAdmin: false,
+      canViewPrivate: accountId === auth.account_id ? auth.can_view_private : false,
+    };
+    const shared = await sharedTodoIds(viewer);
+    let todoQuery = supabaseServer
       .from("koleex_todos")
       .select("id, title, due_date, start_date, priority, status, completed")
       .eq("tenant_id", auth.tenant_id)
-      .is("recurrence", null)
-      .or(orExpr)
-      .limit(1000);
+      .is("recurrence", null);
+    todoQuery = applyTodoScope(todoQuery, viewer, shared);
+    const { data: todos } = await todoQuery.limit(1000);
 
     const todayStr = new Date().toISOString().slice(0, 10);
     const seen = new Set<string>();

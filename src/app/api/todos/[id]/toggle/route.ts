@@ -3,7 +3,8 @@ import "server-only";
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { requireAuth, requireModuleAction } from "@/lib/server/auth";
-import { notifySubmittedForApproval } from "@/lib/server/todo-notify";
+import { loadTodoOwnership, todoParticipation } from "@/lib/server/todo-access";
+import { clearTodoNotifications, notifySubmittedForApproval, pingTodosChanged } from "@/lib/server/todo-notify";
 
 /* POST /api/todos/[id]/toggle
    Flip the completed flag.
@@ -21,50 +22,23 @@ export async function POST(
   const { id } = await params;
   const auth = await requireAuth();
   if (auth instanceof NextResponse) return auth;
-  const deny = await requireModuleAction(auth, "To-do", "create");
+  /* A state change is an EDIT. This route asked for "create", so a role
+     allowed to add tasks but not to change them could still flip any task it
+     could see. */
+  const deny = await requireModuleAction(auth, "To-do", "edit");
   if (deny) return deny;
 
-  // Load the todo + check assignee membership in parallel.
-  const [{ data: todo }, { data: assignee }] = await Promise.all([
-    supabaseServer
-      .from("koleex_todos")
-      .select(
-        "id, title, completed, tenant_id, created_by_account_id, assigned_by_account_id, approval_state, metadata",
-      )
-      .eq("id", id)
-      .maybeSingle(),
-    supabaseServer
-      .from("koleex_todo_assignees")
-      .select("todo_id")
-      .eq("todo_id", id)
-      .eq("account_id", auth.account_id)
-      .maybeSingle(),
+  const [t, { data: row }] = await Promise.all([
+    loadTodoOwnership(id, auth.tenant_id),
+    supabaseServer.from("koleex_todos").select("completed").eq("id", id).maybeSingle(),
   ]);
+  if (!t || !row) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  const completed = Boolean((row as { completed: boolean | null }).completed);
 
-  if (!todo) return NextResponse.json({ error: "Not found" }, { status: 404 });
-  if (auth.tenant_id && (todo as { tenant_id: string | null }).tenant_id !== auth.tenant_id) {
-    return NextResponse.json({ error: "Not found" }, { status: 404 });
-  }
-
-  const t = todo as {
-    id: string;
-    title: string | null;
-    completed: boolean;
-    created_by_account_id: string | null;
-    assigned_by_account_id: string | null;
-    approval_state: string | null;
-    metadata: { observers?: Array<{ account_id?: string }> } | null;
-  };
-
-  const isOwner =
-    auth.is_super_admin ||
-    t.created_by_account_id === auth.account_id ||
-    t.assigned_by_account_id === auth.account_id;
-  const isObserver =
-    Array.isArray(t.metadata?.observers) &&
-    (t.metadata?.observers ?? []).some((o) => o?.account_id === auth.account_id);
-  const isParticipant = !!assignee || isObserver;
-
+  const { isOwner, isParticipant } = await todoParticipation(t, {
+    accountId: auth.account_id,
+    isSuperAdmin: auth.is_super_admin,
+  });
   if (!isOwner && !isParticipant) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
@@ -72,7 +46,7 @@ export async function POST(
   const now = new Date().toISOString();
 
   /* Participant path: completing = submit for approval, not done. */
-  if (!isOwner && !t.completed && t.approval_state !== "approved") {
+  if (!isOwner && !completed && t.approval_state !== "approved") {
     const withdrawing = t.approval_state === "pending";
     const { error } = await supabaseServer
       .from("koleex_todos")
@@ -82,24 +56,24 @@ export async function POST(
       console.error("[api/todos/[id]/toggle]", error.message);
       return NextResponse.json({ error: "Failed to toggle" }, { status: 500 });
     }
-    if (!withdrawing) {
-      await notifySubmittedForApproval({ ...t, id }, auth.account_id);
-    }
+    if (!withdrawing) await notifySubmittedForApproval(t, auth.account_id);
+    await pingTodosChanged(t.tenant_id ?? auth.tenant_id);
     return NextResponse.json({ ok: true, approval: withdrawing ? null : "pending" });
   }
 
+  const completing = !completed;
+  // Owner completing a pending submission = implicit approval, stamped as
+  // such; un-completing clears any stale approval state.
+  const implicitApproval = completing && t.approval_state === "pending";
   const { error } = await supabaseServer
     .from("koleex_todos")
     .update({
-      completed: !t.completed,
-      completed_at: !t.completed ? now : null,
+      completed: completing,
+      completed_at: completing ? now : null,
       // Keep the workflow stage in sync with the checkbox.
-      status: !t.completed ? "done" : "todo",
-      // Owner completing a pending submission = implicit approval;
-      // un-completing clears any stale approval state.
-      approval_state: !t.completed
-        ? (t.approval_state === "pending" ? "approved" : t.approval_state)
-        : null,
+      status: completing ? "done" : "todo",
+      approval_state: completing ? (implicitApproval ? "approved" : t.approval_state) : null,
+      ...(implicitApproval ? { approved_by_account_id: auth.account_id, approved_at: now } : {}),
       updated_at: now,
     })
     .eq("id", id);
@@ -109,23 +83,11 @@ export async function POST(
     return NextResponse.json({ error: "Failed to toggle" }, { status: 500 });
   }
 
-  /* THE LIFECYCLE CLEARER — the first one this system has ever had.
-     The audit counted 28 notification WRITERS and zero clearers, and the
-     owner's words are quoted in the feed route itself: "all of tasks as
-     done, nothing left, but it still have notifications." Completing a
-     task now closes the loop: every still-unread inbox row that POINTS AT
-     THIS TASK (reminders, recurring spawns, assignment notes — matched by
-     metadata.todo_id, all recipients) is marked read+archived. Un-completing
-     does NOT resurrect them: a notification whose moment passed is history,
-     and the un-complete itself is rare enough not to warrant new noise.
-     Best-effort: a failed cleanup must not fail the toggle. */
-  if (!t.completed) {
-    const { error: clearErr } = await supabaseServer
-      .from("inbox_messages")
-      .update({ read_at: now, archived_at: now })
-      .eq("metadata->>todo_id", id)
-      .is("read_at", null);
-    if (clearErr) console.error("[api/todos/[id]/toggle] clear:", clearErr.message);
-  }
+  /* Completing a task closes the loop: every still-unread inbox row that
+     points at it (reminders, recurring spawns, assignment notes — all
+     recipients) is finished business. Un-completing does NOT resurrect
+     them: a notification whose moment passed is history. */
+  if (completing) await clearTodoNotifications(id);
+  await pingTodosChanged(t.tenant_id ?? auth.tenant_id);
   return NextResponse.json({ ok: true });
 }

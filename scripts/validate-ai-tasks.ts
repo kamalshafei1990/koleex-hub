@@ -114,13 +114,28 @@ check("the insert writes every field the To-do app writes, people into metadata 
   /remind_at: normalized\.remind_at,\s*recurrence: normalized\.recurrence,\s*recurrence_until: normalized\.recurrence_until,/.test(createSrc) &&
   /start_date: normalized\.start_date,/.test(createSrc) && /is_private: normalized\.is_private,/.test(createSrc) && /assigned_department: departmentName,\s*assign_to_all: toAll,/.test(createSrc) &&
   /observers: observers\.map\(personRef\)/.test(createSrc) && /mentions: mentions\.map\(personRef\)/.test(createSrc) && /created_via: "koleex-ai"/.test(createSrc));
+/* The expansion and the notifications live in shared helpers now — the
+   tool and /api/todos POST call the SAME functions, so the suite proves the
+   helper once and then proves both callers use it. */
+const accessSrc = readFileSync("src/lib/server/todo-access.ts", "utf8");
+const notifySrc = readFileSync("src/lib/server/todo-notify.ts", "utf8");
+const createRouteSrc = readFileSync("src/app/api/todos/route.ts", "utf8");
 check("assignee rows expand a department through koleex_employees and 'everyone' through active internal accounts, then INTERNAL ONLY — as the route does",
-  /\.from\("koleex_employees"\)\s*\.select\("account_id"\)\s*\.eq\("department", departmentName\)/.test(createSrc) &&
-  /\.eq\("user_type", "internal"\)\s*\.eq\("status", "active"\)/.test(createSrc) && /\.in\("id", assigneeAccountIds\)\s*\.eq\("user_type", "internal"\)/.test(createSrc));
+  /export async function resolveAssigneeIds\(/.test(accessSrc) &&
+  /\.from\("koleex_employees"\)\s*\.select\("account_id"\)\s*\.eq\("department", opts\.department\)/.test(accessSrc) &&
+  /\.eq\("user_type", "internal"\)\s*\.eq\("status", "active"\)\s*\.eq\("tenant_id", opts\.tenantId\)/.test(accessSrc) &&
+  /return internalAccountIds\(ids, opts\.tenantId\);/.test(accessSrc) &&
+  /\.in\("id", unique\)\s*\.eq\("user_type", "internal"\)\s*\.eq\("status", "active"\)/.test(accessSrc) &&
+  /const assigneeAccountIds = await resolveAssigneeIds\(\{\s*explicit: assignees\.map\(\(a\) => a\.account_id\),\s*department: departmentName,\s*everyone: toAll,/.test(createSrc) &&
+  /await resolveAssigneeIds\(\{/.test(createRouteSrc));
 check("notifications: assignees, then mentions, then observers — never the creator, never twice",
-  /const notified = new Set<string>\(\[ctx\.auth\.account_id\]\);/.test(createSrc) && /const fresh = recipients\.filter\(\(id\) => !notified\.has\(id\)\);/.test(createSrc) &&
-  /"todo_assignment"/.test(createSrc) && /"todo_mention"/.test(createSrc) && /"todo_observer"/.test(createSrc) &&
-  createSrc.indexOf('"todo_assignment"') < createSrc.indexOf('"todo_mention"') && createSrc.indexOf('"todo_mention"') < createSrc.indexOf('"todo_observer"'));
+  /const to = Array\.from\(new Set\(opts\.recipients\.filter\(Boolean\)\)\)\.filter\(\(id\) => id !== opts\.actorId\);/.test(notifySrc) &&
+  /type: "todo_assignment"/.test(notifySrc) && /type: `todo_\$\{kind\}`/.test(notifySrc) &&
+  /const notified = new Set<string>\(\[ctx\.auth\.account_id, \.\.\.assigneeAccountIds\]\);/.test(createSrc) &&
+  /\.filter\(\(id\) => !notified\.has\(id\)\)/.test(createSrc) &&
+  /await notifyTodoAssigned\(created, assigneeAccountIds, ctx\.auth\.account_id\);/.test(createSrc) &&
+  /notifyTodoPeopleAdded\(created, "mention", fresh\(/.test(createSrc) && /notifyTodoPeopleAdded\(created, "observer", fresh\(/.test(createSrc) &&
+  createSrc.indexOf("notifyTodoAssigned(created") < createSrc.indexOf('"mention", fresh(') && createSrc.indexOf('"mention", fresh(') < createSrc.indexOf('"observer", fresh('));
 check("the confirmation names the reminder", /I'll remind \$\{who \? "them" : "you"\} \$\{when\.remind\}/.test(createSrc));
 
 const updateSrc = todos.slice(todos.indexOf('name: "updateTodo"'), todos.indexOf("/* ── Reassign (with confirm)"));
@@ -132,7 +147,8 @@ check("updateTodo reads times in the zone, clears with 'none', and refuses an un
   /isNone\(args\.remind_at\) \? null : resolveTaskTime\(args\.remind_at, tz\)/.test(updateSrc) && /I couldn't read that reminder time/.test(updateSrc));
 check("observers change as a whole list previewed by name; the metadata is merged, not replaced; the newly added hear about it",
   /patch\.metadata = \{ \.\.\.\(t\.metadata \?\? \{\}\), observers: nextObservers \}/.test(updateSrc) && /observers → \$\{observerNames\}/.test(updateSrc) &&
-  /const fresh = nextObservers\.map\(\(o\) => o\.account_id\)\.filter\(\(id\) => !before\.has\(id\) && id !== ctx\.auth\.account_id\);/.test(updateSrc));
+  /const fresh = nextObservers\.map\(\(o\) => o\.account_id\)\.filter\(\(id\) => !before\.has\(id\)\);/.test(updateSrc) &&
+  /await notifyTodoPeopleAdded\(\{ id: t\.id, title, description: t\.description, tenant_id: t\.tenant_id \}, "observer", fresh, acc\);/.test(updateSrc));
 check("stopping a recurrence also clears its end date", /if \(changes\.recurrence === null\) changes\.recurrence_until = null;/.test(updateSrc));
 
 console.log("\n── 3. The two lanes are told the secretary's way ──");

@@ -2749,11 +2749,13 @@ function ActivitiesPanel({
           due_date: dueAt ? new Date(dueAt).toISOString() : null,
           source: "crm",
           source_id: createdActivity.id,
-          created_by_account_id: accountId,
-          assigned_by_account_id: accountId,
           assignee_account_ids: accountId ? [accountId] : [],
         });
-      } catch { /* todo table may not exist yet — ignore silently */ }
+      } catch (e) {
+        /* The activity is saved; a failed bridge must not undo that — but it
+           is logged, not swallowed. */
+        console.error("[crm→todo bridge]", e instanceof Error ? e.message : e);
+      }
     }
     setBusy(false);
     setTitle("");

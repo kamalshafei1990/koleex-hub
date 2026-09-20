@@ -18,6 +18,8 @@ import "server-only";
 import { supabaseServer } from "@/lib/server/supabase-server";
 import { sendPushToAccounts } from "@/lib/server/web-push";
 import { supersedeUnread } from "@/lib/server/inbox-lifecycle";
+import { emitPings, rtTopic } from "@/lib/server/realtime-broadcast";
+import { pingTodosChanged } from "@/lib/server/todo-notify";
 
 type Cadence = "daily" | "weekly" | "monthly";
 
@@ -196,6 +198,7 @@ export async function spawnDueRecurringTodos(now: Date = new Date()): Promise<nu
         recipients.map((rid) => ({
           recipient_account_id: rid,
           sender_account_id: null,
+          tenant_id: t.tenant_id,
           category: "task",
           subject: `🔁 ${t.title}`,
           body: t.description || t.title,
@@ -203,6 +206,7 @@ export async function spawnDueRecurringTodos(now: Date = new Date()): Promise<nu
           metadata: { type: "todo_recurring", todo_id: newId, cadence },
         })),
       );
+      await emitPings(recipients.map((rid) => ({ topic: rtTopic.inbox(rid) })));
       await sendPushToAccounts(recipients, {
         title: `🔁 ${t.title}`,
         body: t.description || "Recurring task",
@@ -254,6 +258,7 @@ export async function spawnDueRecurringTodos(now: Date = new Date()): Promise<nu
     }
 
     spawned += 1;
+    await pingTodosChanged(t.tenant_id);
   }
 
   return spawned;

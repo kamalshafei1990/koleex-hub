@@ -7,10 +7,12 @@
      koleex_todo_notes     — per-task comments / notes
      koleex_todo_labels    — custom label catalogue
 
-   Integrations:
-     CRM activities  → source="crm"
-     Calendar events → source="calendar"
-     Inbox           → notification fan-out on assignment (server-side)
+   Integrations (every one goes through /api/todos POST):
+     CRM activities   → source="crm"
+     Calendar events  → source="calendar"
+     HR lifecycle     → source="manual", source_id="probation:<employee>"
+     Koleex AI        → source="manual", metadata.created_via="koleex-ai"
+     Inbox            → notification fan-out on assignment (server-side)
 
    THE BROWSER NO LONGER READS OR WRITES THESE TABLES (2026-08-09). Every
    function called its API route and then, on any outcome that was not a clean
@@ -28,9 +30,12 @@
 
    `resolveAssignees` went with them; /api/todos/assignees does that job.
 
-   Realtime (`subscribeToTodos`) still uses the Supabase client, because live
-   task updates need a socket and there is no first-party replacement yet.
-   That is the only reason this file still touches the client at all. */
+   Realtime (`subscribeToTodos`) still needs the Supabase client for the
+   socket — but it listens for the server's BROADCAST ping on the tenant's
+   `todos` topic and refetches through the gated route. It used to subscribe
+   to anon postgres_changes on koleex_todos, a table locked to the service
+   role, so it never received a single row and the screen only refreshed on
+   its own writes. */
 
 import { supabaseAdmin as supabase } from "./supabase-admin";
 import type {
@@ -42,20 +47,14 @@ import type {
   TodoAssigneeInfo,
   TodoMetadata,
 } from "@/types/supabase";
-import type { ScopeContext } from "./scope";
 import { todoListUrl, TODO_WRITE_VERSION_KEY } from "./todo-list-url";
 
-/* ── Fetch todos with scope enforcement ──
-   When ctx is provided, the fetch filters results to what the user's role
-   allows (own / department / all + is_super_admin bypass + private handling).
-   When ctx is null/undefined the fetch stays wide-open for backwards-compat
-   with integrations that haven't been migrated yet. All UI pages should pass
-   ctx — only Supabase-internal triggers or data migrations may skip it.   */
+/* ── Fetch todos ──
+   The server scopes the list to the session (lib/server/todo-scope.ts):
+   creator / assigner / assignee / observer / department / broadcast, minus
+   private tasks the caller did not create. Nothing is passed from here. */
 
-export async function fetchTodos(
-  ctx?: ScopeContext | null,
-): Promise<TodoWithRelations[]> {
-  void ctx; // the server derives scope from the session; see the file header
+export async function fetchTodos(): Promise<TodoWithRelations[]> {
   try {
     /* ?v=<writes so far> — see bumpTodoWriteVersion. Without it a reload after
        a toggle repaints the cached, pre-toggle list. */
@@ -87,8 +86,8 @@ export async function createTodo(input: {
   status?: "todo" | "in_progress" | "blocked" | "done";
   recurrence?: "daily" | "weekly" | "monthly" | null;
   recurrence_until?: string | null;
-  created_by_account_id?: string | null;
-  assigned_by_account_id?: string | null;
+  /* No created_by / assigned_by: the server sets both from the session.
+     They used to be accepted here, passed by every caller, and dropped. */
   source?: "manual" | "crm" | "calendar";
   source_id?: string | null;
   assignee_account_ids?: string[];
@@ -179,7 +178,7 @@ export async function createTodo(input: {
    `kx_` prefix, so the sign-out wipe in session-caches.ts clears it. Ordinary
    repeat loads with no write in between still keep the 30s cache. */
 
-export function bumpTodoWriteVersion(): void {
+function bumpTodoWriteVersion(): void {
   if (typeof window === "undefined") return;
   try {
     const n = Number(window.localStorage.getItem(TODO_WRITE_VERSION_KEY) ?? "0") + 1;
@@ -385,55 +384,27 @@ export async function fetchDepartments(): Promise<string[]> {
   }
 }
 
-/* ── Realtime subscription for live todo updates ── */
-
+/* ── Realtime: the tenant's `todos` topic ──
+   Every task write on the server (routes, AI tools, the cron's spawns) emits
+   a broadcast ping on `todos:tenant:<id>`; the payload carries nothing, so a
+   world-subscribable topic leaks only "something changed". The screen then
+   refetches through the gated route, which enforces the scope. Pings that
+   land within `debounceMs` collapse into one refetch. */
 export function subscribeToTodos(
-  onInsert: (row: TodoRow) => void,
-  onChange: (row: TodoRow) => void,
-  onDelete: (oldRow: { id: string }) => void,
+  tenantId: string,
+  onChanged: () => void,
+  debounceMs = 400,
 ): () => void {
-  let channel: ReturnType<typeof supabase.channel> | null = null;
-  let disposed = false;
-
-  /* Build a fully-wired channel. On CHANNEL_ERROR the previous code created a
-     bare `supabase.channel(topic).subscribe()` with NO handlers (and never
-     reassigned it) — so after any transient error, live updates stopped and
-     the dead channel leaked. Rebuild the whole subscription instead. */
-  const build = () => {
-    if (disposed) return;
-    const topic = `todos-live-${Date.now()}`;
-    channel = supabase
-      .channel(topic)
-      .on(
-        "postgres_changes" as never,
-        { event: "INSERT", schema: "public", table: "koleex_todos" },
-        (payload: { new: TodoRow }) => onInsert(payload.new),
-      )
-      .on(
-        "postgres_changes" as never,
-        { event: "UPDATE", schema: "public", table: "koleex_todos" },
-        (payload: { new: TodoRow }) => onChange(payload.new),
-      )
-      .on(
-        "postgres_changes" as never,
-        { event: "DELETE", schema: "public", table: "koleex_todos" },
-        (payload: { old: { id: string } }) => onDelete(payload.old),
-      )
-      .subscribe((status: string) => {
-        if (status === "CHANNEL_ERROR" && !disposed) {
-          setTimeout(() => {
-            if (disposed || !channel) return;
-            void supabase.removeChannel(channel);
-            build();
-          }, 3000);
-        }
-      });
-  };
-
-  build();
-
+  let timer: number | null = null;
+  const channel = supabase
+    .channel(`todos:tenant:${tenantId}`)
+    .on("broadcast", { event: "changed" }, () => {
+      if (timer !== null) return;
+      timer = window.setTimeout(() => { timer = null; onChanged(); }, debounceMs);
+    })
+    .subscribe();
   return () => {
-    disposed = true;
-    if (channel) void supabase.removeChannel(channel);
+    if (timer !== null) window.clearTimeout(timer);
+    void supabase.removeChannel(channel);
   };
 }

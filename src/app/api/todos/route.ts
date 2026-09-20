@@ -5,6 +5,9 @@ import { supabaseServer } from "@/lib/server/supabase-server";
 import { requireAuth, requireModuleAccess , requireModuleAction} from "@/lib/server/auth";
 import { countOpenTodos } from "@/lib/todo-open-count";
 import { applyTodoScope, sharedTodoIds, type TodoViewer } from "@/lib/server/todo-scope";
+import { resolveAssigneeIds } from "@/lib/server/todo-access";
+import { notifyTodoAssigned, notifyTodoPeopleAdded, pingTodosChanged } from "@/lib/server/todo-notify";
+import { isTodoPriority, isTodoRecurrence, isTodoStatus } from "@/lib/todo-enums";
 
 /* GET /api/todos
    Returns the enriched todo list (with assignees, assigner, notes) scoped
@@ -289,22 +292,33 @@ export async function POST(req: Request) {
     metadata?: Record<string, unknown>;
   };
 
+  if (typeof body.title !== "string" || !body.title.trim()) {
+    return NextResponse.json({ error: "Title is required" }, { status: 400 });
+  }
+  /* Vocabularies come from lib/todo-enums.ts. The database CHECKs status
+     and priority (an invalid value used to surface as a 500 "Failed to
+     create todo"); recurrence and approval_state are plain text there, so
+     this is their only guard. */
   const status = body.status ?? "todo";
-  const recurrence =
-    body.recurrence === "daily" || body.recurrence === "weekly" || body.recurrence === "monthly"
-      ? body.recurrence
-      : null;
+  const priority = body.priority ?? "medium";
+  if (!isTodoStatus(status) || !isTodoPriority(priority)) {
+    return NextResponse.json({ error: "Invalid status or priority" }, { status: 400 });
+  }
+  if (body.recurrence != null && !isTodoRecurrence(body.recurrence)) {
+    return NextResponse.json({ error: "Invalid recurrence" }, { status: 400 });
+  }
+  const recurrence = body.recurrence ?? null;
   const { data: todo, error } = await supabaseServer
     .from("koleex_todos")
     .insert({
-      title: body.title,
+      title: body.title.trim(),
       metadata: body.metadata && typeof body.metadata === "object" ? body.metadata : {},
       description: body.description ?? null,
       // Keep completed in lockstep with the workflow stage.
       completed: status === "done",
       completed_at: status === "done" ? new Date().toISOString() : null,
       status,
-      priority: body.priority ?? "medium",
+      priority,
       label: body.label ?? null,
       due_date: body.due_date ?? null,
       start_date: body.start_date ?? null,
@@ -333,128 +347,45 @@ export async function POST(req: Request) {
     );
   }
 
-  // Resolve assignee ids: explicit list + department expansion + broadcast.
-  let assigneeIds = body.assignee_account_ids ?? [];
+  const created = todo as { id: string; title: string; description: string | null; priority: string; tenant_id: string | null };
 
-  if (body.assigned_department && auth.tenant_id) {
-    const { data: emps } = await supabaseServer
-      .from("koleex_employees")
-      .select("account_id")
-      .eq("department", body.assigned_department)
-      .eq("tenant_id", auth.tenant_id)
-      .not("account_id", "is", null);
-    const deptIds = (emps ?? [])
-      .map((e) => (e as { account_id: string | null }).account_id)
-      .filter(Boolean) as string[];
-    assigneeIds = Array.from(new Set([...assigneeIds, ...deptIds]));
-  }
-
-  if (body.assign_to_all && auth.tenant_id) {
-    const { data: allAccounts } = await supabaseServer
-      .from("accounts")
-      .select("id")
-      .eq("user_type", "internal")
-      .eq("status", "active")
-      .eq("tenant_id", auth.tenant_id);
-    assigneeIds = (allAccounts ?? []).map((a) => (a as { id: string }).id);
-  }
-
-  /* INTERNAL ONLY. A task is company work, so it can only be assigned to an
-     internal Koleex account — never a customer/portal login. assign_to_all
-     already filtered on user_type; the explicit list and the department
-     expansion did not, so a portal account id posted directly (or an
-     employee row pointing at one) could land in the assignee table and then
-     show up in Top Performers. Filtered here on the SERVER so it holds
-     regardless of what the client sends. */
-  if (assigneeIds.length > 0 && auth.tenant_id) {
-    const { data: internal } = await supabaseServer
-      .from("accounts")
-      .select("id")
-      .in("id", assigneeIds)
-      .eq("user_type", "internal")
-      .eq("tenant_id", auth.tenant_id);
-    assigneeIds = (internal ?? []).map((a) => (a as { id: string }).id);
-  }
-
+  /* Assignees: the explicit list, a department's members, or everyone —
+     expanded and reduced to INTERNAL accounts in lib/server/todo-access.ts
+     (a task is company work; a customer/portal login can never hold one,
+     whatever the client posts). */
+  const assigneeIds = await resolveAssigneeIds({
+    explicit: body.assignee_account_ids ?? [],
+    department: body.assigned_department ?? null,
+    everyone: body.assign_to_all === true,
+    tenantId: auth.tenant_id,
+  });
   if (assigneeIds.length > 0) {
     await supabaseServer.from("koleex_todo_assignees").insert(
-      assigneeIds.map((accountId) => ({
-        todo_id: (todo as { id: string }).id,
-        account_id: accountId,
-      })),
-    );
-
-    // Fan out inbox notifications to every assignee except self.
-    const recipientIds = assigneeIds.filter((id) => id !== auth.account_id);
-    if (recipientIds.length > 0) {
-      const notifs = recipientIds.map((recipientId) => ({
-        recipient_account_id: recipientId,
-        sender_account_id: auth.account_id,
-        category: "task",
-        subject: `New task: ${body.title}`,
-        body: body.description || body.title,
-        link: `/todo?task=${(todo as { id: string }).id}`,
-        metadata: {
-          type: "todo_assignment",
-          todo_id: (todo as { id: string }).id,
-          priority: body.priority ?? "medium",
-        },
-      }));
-      await supabaseServer.from("inbox_messages").insert(notifs);
-    }
-  }
-
-  // Notify @mentioned people (metadata.mentions) — excluding self and anyone
-  // already notified as an assignee, so nobody gets a double ping.
-  const mentionIds = Array.isArray((body.metadata as { mentions?: Array<{ account_id?: string }> } | undefined)?.mentions)
-    ? ((body.metadata as { mentions: Array<{ account_id?: string }> }).mentions)
-        .map((m) => m.account_id)
-        .filter(Boolean) as string[]
-    : [];
-  const alreadyNotified = new Set<string>([auth.account_id, ...assigneeIds]);
-  const mentionRecipients = Array.from(new Set(mentionIds)).filter((id) => !alreadyNotified.has(id));
-  if (mentionRecipients.length > 0) {
-    await supabaseServer.from("inbox_messages").insert(
-      mentionRecipients.map((recipientId) => ({
-        recipient_account_id: recipientId,
-        sender_account_id: auth.account_id,
-        category: "task",
-        subject: `You were mentioned: ${body.title}`,
-        body: body.description || body.title,
-        link: `/todo?task=${(todo as { id: string }).id}`,
-        metadata: { type: "todo_mention", todo_id: (todo as { id: string }).id },
-      })),
-    );
-    mentionRecipients.forEach((id) => alreadyNotified.add(id));
-  }
-
-  // Notify observers (metadata.observers) — they follow the task and can
-  // update its situation, so they should know it exists from the start.
-  const observerIds = Array.isArray((body.metadata as { observers?: Array<{ account_id?: string }> } | undefined)?.observers)
-    ? ((body.metadata as { observers: Array<{ account_id?: string }> }).observers)
-        .map((o) => o.account_id)
-        .filter(Boolean) as string[]
-    : [];
-  const observerRecipients = Array.from(new Set(observerIds)).filter((id) => !alreadyNotified.has(id));
-  if (observerRecipients.length > 0) {
-    await supabaseServer.from("inbox_messages").insert(
-      observerRecipients.map((recipientId) => ({
-        recipient_account_id: recipientId,
-        sender_account_id: auth.account_id,
-        category: "task",
-        subject: `You are now an observer: ${body.title}`,
-        body: body.description || body.title,
-        link: `/todo?task=${(todo as { id: string }).id}`,
-        metadata: { type: "todo_observer", todo_id: (todo as { id: string }).id },
-      })),
+      assigneeIds.map((accountId) => ({ todo_id: created.id, account_id: accountId })),
     );
   }
+
+  /* Notifications: assignees, then @mentions, then observers — never the
+     creator, never the same person twice. */
+  const idsOf = (list: unknown): string[] =>
+    Array.isArray(list) ? (list.map((m) => (m as { account_id?: string })?.account_id).filter(Boolean) as string[]) : [];
+  const meta = (body.metadata ?? {}) as { mentions?: unknown; observers?: unknown };
+  const notified = new Set<string>([auth.account_id, ...assigneeIds]);
+  const fresh = (ids: string[]) => {
+    const out = Array.from(new Set(ids)).filter((id) => !notified.has(id));
+    out.forEach((id) => notified.add(id));
+    return out;
+  };
+  await notifyTodoAssigned(created, assigneeIds, auth.account_id);
+  await notifyTodoPeopleAdded(created, "mention", fresh(idsOf(meta.mentions)), auth.account_id);
+  await notifyTodoPeopleAdded(created, "observer", fresh(idsOf(meta.observers)), auth.account_id);
+  await pingTodosChanged(auth.tenant_id);
 
   return NextResponse.json({ todo });
 }
 
 /* Resolve assignee info (username, full_name, avatar, dept, position) for
-   a batch of account_ids. Mirrors resolveAssignees in todo-admin.ts. */
+   a batch of account_ids — the list's own join, batched. */
 async function resolveAssigneeInfos(
   accountIds: string[],
 ): Promise<AssigneeInfo[]> {

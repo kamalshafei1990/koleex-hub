@@ -27,6 +27,11 @@ export const rtTopic = {
   channel: (channelId: string) => `discuss:channel:${channelId}`,
   account: (accountId: string) => `discuss:account:${accountId}`,
   inbox: (accountId: string) => `inbox:account:${accountId}`,
+  /* One topic per tenant for the To-do app: any task write pings it and the
+     open /todo screens refetch through the gated list route. koleex_todos
+     is service-role only, so the anon postgres_changes subscription the
+     page used to hold never received a row. */
+  todos: (tenantId: string) => `todos:tenant:${tenantId}`,
 };
 
 /** Emit one or more broadcast pings. Never throws — logs and returns. */

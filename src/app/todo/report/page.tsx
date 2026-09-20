@@ -14,9 +14,10 @@ import { useSkin } from "@/lib/appearance";
 import { useTranslation } from "@/lib/i18n";
 import { todoT } from "@/lib/translations/todo";
 import { fetchTodos, fetchAssignableEmployees } from "@/lib/todo-admin";
+import { collapseSeries } from "@/lib/todo-series";
 import { useCurrentAccountId } from "@/lib/identity";
-import { loadScopeContext, type ScopeContext } from "@/lib/scope";
 import type { TodoWithRelations, TodoAssigneeInfo, TodoStatus } from "@/types/supabase";
+import KdsSelect from "@/components/kds/Select";
 import ArrowLeftIcon from "@/components/icons/ui/ArrowLeftIcon";
 import AutoTranslatedText from "@/components/ui/AutoTranslatedText";
 import BarChart3Icon from "@/components/icons/ui/BarChart3Icon";
@@ -55,22 +56,28 @@ const STATUS_TONE: Record<TodoStatus, string> = {
   done: "text-green-400 bg-green-500/10",
 };
 
-function fmtDate(iso: string | null): string {
-  if (!iso) return "—";
-  const d = new Date(iso);
-  return Number.isNaN(d.getTime()) ? "—" : d.toLocaleDateString("en", { month: "short", day: "numeric" });
+/* Display name with the alternate (Chinese) name when it differs. */
+function personLabel(p: { full_name: string | null; username: string; name_alt?: string | null }): string {
+  const base = p.full_name || p.username;
+  const alt = (p.name_alt ?? "").trim();
+  return alt && alt !== (p.full_name ?? "").trim() ? `${base} (${alt})` : base;
 }
+
+const isDone = (r: TodoWithRelations) => r.completed || r.status === "done";
+const dayOf = (iso: string) => iso.split("T")[0];
+/* Finished after its due day. */
+const finishedLate = (r: TodoWithRelations) =>
+  isDone(r) && !!r.due_date && !!r.completed_at && dayOf(r.completed_at) > dayOf(r.due_date);
 
 /* Same ground the To-do list mounts — Core never pays for the canvas. */
 const WavyBackground = dynamic(() => import("@/components/ui/WavyBackground"), { ssr: false });
 
 export default function TodoReportPage() {
-  const { t } = useTranslation(todoT);
+  const { t, lang } = useTranslation(todoT);
   /* Subscribed, not a one-shot read: this whole report is filtered by
      "assigned by me", so rendering before the id lands showed an empty report
      that never refilled. */
   const accountId = useCurrentAccountId();
-  const [scopeCtx, setScopeCtx] = useState<ScopeContext | null>(null);
   const [todos, setTodos] = useState<TodoWithRelations[]>([]);
   const [people, setPeople] = useState<TodoAssigneeInfo[]>([]);
   const [loading, setLoading] = useState(true);
@@ -80,23 +87,29 @@ export default function TodoReportPage() {
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
 
-  useEffect(() => {
-    if (!accountId) return;
-    loadScopeContext(accountId).then(setScopeCtx);
-  }, [accountId]);
+  const fmtDate = (iso: string | null): string => {
+    if (!iso) return "—";
+    const d = new Date(iso);
+    return Number.isNaN(d.getTime()) ? "—" : d.toLocaleDateString(lang, { month: "short", day: "numeric" });
+  };
 
+  /* One fetch. This used to re-run when a scope context resolved a beat
+     after mount — a context the fetch ignored — so every open of the report
+     downloaded the whole list and the roster twice. */
   useEffect(() => {
     let alive = true;
-    Promise.all([fetchTodos(scopeCtx), fetchAssignableEmployees()]).then(([tds, ppl]) => {
+    Promise.all([fetchTodos(), fetchAssignableEmployees()]).then(([tds, ppl]) => {
       if (!alive) return;
       setTodos(tds);
       setPeople(ppl);
       setLoading(false);
     });
     return () => { alive = false; };
-  }, [scopeCtx]);
+  }, []);
 
-  /* Tasks I assigned, to the chosen person, whose due OR created date falls in the period. */
+  /* Tasks I assigned, to the chosen person, whose due OR created date falls
+     in the period. Dead periods of a recurring series are collapsed with the
+     same rule the list uses, so a daily task counts once, not once per day. */
   const rows = useMemo(() => {
     const [start, end] = periodRange(period, from, to);
     const inRange = (iso: string | null) => {
@@ -104,7 +117,7 @@ export default function TodoReportPage() {
       const d = new Date(iso);
       return !Number.isNaN(d.getTime()) && d >= start && d <= end;
     };
-    return todos
+    return collapseSeries(todos)
       .filter((x) => x.assigned_by_account_id === accountId)
       .filter((x) => (person ? x.assignees.some((a) => a.account_id === person) : true))
       .filter((x) => inRange(x.due_date) || inRange(x.created_at));
@@ -112,23 +125,25 @@ export default function TodoReportPage() {
 
   const stats = useMemo(() => {
     const total = rows.length;
-    const by = (s: TodoStatus) => rows.filter((r) => (r.status ?? (r.completed ? "done" : "todo")) === s).length;
-    const done = rows.filter((r) => r.completed || r.status === "done").length;
-    const overdue = rows.filter((r) => !r.completed && r.due_date && r.due_date.split("T")[0] < new Date().toISOString().split("T")[0]).length;
-    const dueDone = rows.filter((r) => (r.completed || r.status === "done") && r.due_date && r.completed_at);
-    const onTime = dueDone.filter((r) => r.completed_at!.split("T")[0] <= r.due_date!.split("T")[0]).length;
+    const stage = (r: TodoWithRelations): TodoStatus => (r.status ?? (r.completed ? "done" : "todo")) as TodoStatus;
+    const by = (s: TodoStatus) => rows.filter((r) => stage(r) === s).length;
+    const done = rows.filter(isDone).length;
+    const today = new Date().toISOString().split("T")[0];
+    const overdue = rows.filter((r) => !r.completed && r.due_date && dayOf(r.due_date) < today).length;
+    const dueDone = rows.filter((r) => isDone(r) && r.due_date && r.completed_at);
+    const onTime = dueDone.filter((r) => !finishedLate(r)).length;
     const onTimeRate = dueDone.length ? Math.round((onTime / dueDone.length) * 100) : null;
     return { total, done, inProgress: by("in_progress"), blocked: by("blocked"), notStarted: by("todo"), overdue, onTimeRate };
   }, [rows]);
 
   const exportCsv = () => {
-    const head = ["Task", "For", "Status", "Due", "Done", "On time"];
+    /* Column headers in the reader's language — the sheet is for them. */
+    const head = [t("report.taskCol"), t("report.forCol"), t("f.status"), t("report.dueCol"), t("report.doneCol"), t("report.onTimeRate")];
     const lines = rows.map((r) => {
       const who = r.assignees.map((a) => a.full_name || a.username).join("; ");
-      const st = r.status ?? (r.completed ? "done" : "todo");
-      const onTime = (r.completed || r.status === "done") && r.due_date && r.completed_at
-        ? (r.completed_at.split("T")[0] <= r.due_date.split("T")[0] ? "yes" : "no") : "";
-      return [r.title, who, st, r.due_date?.split("T")[0] ?? "", r.completed_at?.split("T")[0] ?? "", onTime]
+      const st = (r.status ?? (r.completed ? "done" : "todo")) as TodoStatus;
+      const onTime = isDone(r) && r.due_date && r.completed_at ? (finishedLate(r) ? t("row.late") : t("row.onTime")) : "";
+      return [r.title, who, t("st." + st), r.due_date ? dayOf(r.due_date) : "", r.completed_at ? dayOf(r.completed_at) : "", onTime]
         .map((c) => `"${String(c).replace(/"/g, '""')}"`).join(",");
     });
     const csv = [head.join(","), ...lines].join("\n");
@@ -149,7 +164,7 @@ export default function TodoReportPage() {
   ];
 
   const aurora = useSkin() === "aurora";
-  const selectCls = "h-9 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[12.5px] text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)]";
+  const inputCls = "h-9 px-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[12.5px] text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)]";
 
   return (
     /* ── AURORA ──────────────────────────────────────────────────────────
@@ -188,12 +203,15 @@ export default function TodoReportPage() {
 
           {/* Controls */}
           <div className="flex flex-wrap items-center gap-2 pb-4">
-            <div className="flex items-center gap-1.5">
-              <UsersIcon size={13} className="text-[var(--text-dim)]" />
-              <select value={person} onChange={(e) => setPerson(e.target.value)} className={selectCls + " min-w-[160px]"}>
-                <option value="">{t("report.everyone")}</option>
-                {people.map((p) => { const alt = (p.name_alt ?? "").trim(); const label = (p.full_name || p.username) + (alt && alt !== (p.full_name ?? "").trim() ? ` ${alt}` : ""); return <option key={p.account_id} value={p.account_id}>{label}</option>; })}
-              </select>
+            <div className="flex items-center gap-1.5 min-w-[200px]">
+              <UsersIcon size={13} className="text-[var(--text-dim)] shrink-0" />
+              {/* The Hub's own select, not the OS one — see components/kds/Select.tsx. */}
+              <KdsSelect value={person} onChange={setPerson}
+                options={[
+                  { value: "", label: t("report.everyone") },
+                  ...people.map((p) => ({ value: p.account_id, label: personLabel(p) })),
+                ]}
+                triggerClassName="h-9 w-full ps-3 pe-8 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[12.5px] text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)] cursor-pointer text-start" />
             </div>
             <div className="flex items-center gap-1.5">
               {(["today", "week", "month", "custom"] as Period[]).map((p) => (
@@ -207,9 +225,9 @@ export default function TodoReportPage() {
             </div>
             {period === "custom" && (
               <div className="flex items-center gap-1.5">
-                <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} className={selectCls} />
+                <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} className={inputCls} title={t("filters.fromDate")} />
                 <span className="text-[var(--text-dim)]">→</span>
-                <input type="date" value={to} onChange={(e) => setTo(e.target.value)} className={selectCls} />
+                <input type="date" value={to} onChange={(e) => setTo(e.target.value)} className={inputCls} title={t("filters.toDate")} />
               </div>
             )}
             <button onClick={exportCsv} disabled={rows.length === 0}
@@ -250,11 +268,11 @@ export default function TodoReportPage() {
                   </div>
                   {rows.map((r) => {
                     const st = (r.status ?? (r.completed ? "done" : "todo")) as TodoStatus;
-                    const late = (r.completed || r.status === "done") && r.due_date && r.completed_at && r.completed_at.split("T")[0] > r.due_date.split("T")[0];
+                    const late = finishedLate(r);
                     return (
                       <div key={r.id} className="grid grid-cols-1 md:grid-cols-[1fr_140px_120px_90px_90px] gap-1 md:gap-3 px-4 py-3 border-b border-[var(--border-subtle)] last:border-0 hover:bg-[var(--bg-surface-subtle)] transition-colors">
                         <AutoTranslatedText text={r.title} className={`text-[13px] font-medium truncate ${r.completed ? "line-through text-[var(--text-dim)]" : "text-[var(--text-primary)]"}`} />
-                        <span className="text-[11.5px] text-[var(--text-muted)] truncate">{r.assignees.map((a) => { const base = a.full_name || a.username; const alt = (a.name_alt ?? "").trim(); return alt && alt !== (a.full_name ?? "").trim() ? `${base} (${alt})` : base; }).join(", ") || "—"}</span>
+                        <span className="text-[11.5px] text-[var(--text-muted)] truncate">{r.assignees.map(personLabel).join(", ") || "—"}</span>
                         <span><span className={`inline-flex text-[10px] font-semibold px-1.5 py-0.5 rounded ${STATUS_TONE[st]}`}>{t("st." + st)}</span></span>
                         <span className={`text-[11.5px] ${late ? "text-red-400" : "text-[var(--text-muted)]"}`}>{fmtDate(r.due_date)}</span>
                         <span className="text-[11.5px] text-[var(--text-muted)]">{fmtDate(r.completed_at)}{late ? ` · ${t("row.late")}` : (r.completed_at && r.due_date ? ` · ${t("row.onTime")}` : "")}</span>

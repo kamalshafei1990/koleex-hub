@@ -3,8 +3,11 @@ import "server-only";
 /* ---------------------------------------------------------------------------
    To-do tools — agent-facing operations on koleex_todos.
 
-   Security: every tool ports the EXACT rules of the owning route so the AI
-   can never do more than the caller could in the To-do app itself:
+   Security: every tool applies the SAME rules as the owning route — through
+   the shared modules the routes themselves use (lib/server/todo-access.ts
+   for who may act, todo-notify.ts for what gets sent and cleared,
+   todo-scope.ts for who sees what) — so the AI can never do more than the
+   caller could in the To-do app itself:
    - listMyTodos       ← /api/todos GET visibility scope (creator / assigner /
                           assignee / observer / department / broadcast, plus
                           the private-task overlay; SA skips row scope) —
@@ -30,12 +33,19 @@ import "server-only";
    --------------------------------------------------------------------------- */
 
 import { supabaseServer } from "../../supabase-server";
-import { notifySubmittedForApproval } from "../../todo-notify";
+import {
+  clearTodoNotifications,
+  notifySubmittedForApproval,
+  notifyTodoAssigned,
+  notifyTodoPeopleAdded,
+  pingTodosChanged,
+} from "../../todo-notify";
+import { isTodoAssignee, isTodoObserver, isTodoOwner, resolveAssigneeIds } from "../../todo-access";
 import { listAssignableEmployees } from "../../assignable-employees";
 import type { ToolDef, ToolResult } from "../types";
 import { isUuid, BAD_ID_MESSAGE } from "../uuid";
 import { resolveTaskTime, resolveTaskDay, describeWhen, parseRecurrence } from "./task-time";
-import { buildTaskDraft, dayRangeISO, idList, type Person } from "./task-draft";
+import { buildTaskDraft, dayRangeISO, idList, UNKNOWN_PERSON_MESSAGE, type Person } from "./task-draft";
 import { applyTodoScope, sharedTodoIds, type TodoViewer } from "../../todo-scope";
 
 const TODO_MODULE = "To-do";
@@ -101,12 +111,7 @@ async function resolvePeople(tenantId: string | null, ids: string[], label: stri
     if (a.department) departments.add(a.department.trim().toLowerCase());
   }
   const unknown = ids.filter((id) => !people.has(id));
-  if (unknown.length > 0) {
-    return {
-      ok: false,
-      message: "One or more people didn't match a real team member. Look each person up with findTeamMember and use the account_id it returns.",
-    };
-  }
+  if (unknown.length > 0) return { ok: false, message: UNKNOWN_PERSON_MESSAGE };
   return { ok: true, people, departments };
 }
 
@@ -451,68 +456,43 @@ const createTodo: ToolDef<
       return { ok: false, permissionStatus: "allowed", data: null, message: "Couldn't create the task — please try again." };
     }
     const todoId = (data as { id: string }).id;
+    const created = {
+      id: todoId,
+      title: normalized.title,
+      description: normalized.description,
+      priority: normalized.priority,
+      tenant_id: ctx.auth.tenant_id,
+    };
 
     /* ASSIGNEE ROWS — the explicit list, a department's members, or
-       everyone — exactly as the route expands them, INTERNAL ONLY. */
-    let assigneeAccountIds = assignees.map((a) => a.account_id);
-    if (departmentName && ctx.auth.tenant_id) {
-      const { data: emps } = await supabaseServer
-        .from("koleex_employees")
-        .select("account_id")
-        .eq("department", departmentName)
-        .eq("tenant_id", ctx.auth.tenant_id)
-        .not("account_id", "is", null);
-      const deptIds = (emps ?? []).map((e) => (e as { account_id: string | null }).account_id).filter(Boolean) as string[];
-      assigneeAccountIds = Array.from(new Set([...assigneeAccountIds, ...deptIds]));
-    }
-    if (toAll && ctx.auth.tenant_id) {
-      const { data: allAccounts } = await supabaseServer
-        .from("accounts")
-        .select("id")
-        .eq("user_type", "internal")
-        .eq("status", "active")
-        .eq("tenant_id", ctx.auth.tenant_id);
-      assigneeAccountIds = (allAccounts ?? []).map((a) => (a as { id: string }).id);
-    }
-    if (assigneeAccountIds.length > 0 && ctx.auth.tenant_id) {
-      const { data: internal } = await supabaseServer
-        .from("accounts")
-        .select("id")
-        .in("id", assigneeAccountIds)
-        .eq("user_type", "internal")
-        .eq("tenant_id", ctx.auth.tenant_id);
-      assigneeAccountIds = (internal ?? []).map((a) => (a as { id: string }).id);
-    }
-
-    /* NOTIFICATIONS — mirror /api/todos POST: assignees, then mentions, then
-       observers; never the creator, never the same person twice. */
-    const notified = new Set<string>([ctx.auth.account_id]);
-    const inbox = async (recipients: string[], subject: string, type: string, extra: Record<string, unknown> = {}) => {
-      const fresh = recipients.filter((id) => !notified.has(id));
-      if (fresh.length === 0) return;
-      fresh.forEach((id) => notified.add(id));
-      const { error: nErr } = await supabaseServer.from("inbox_messages").insert(
-        fresh.map((recipientId) => ({
-          recipient_account_id: recipientId,
-          sender_account_id: ctx.auth.account_id,
-          category: "task",
-          subject,
-          body: normalized.description || normalized.title,
-          link: `/todo?task=${todoId}`,
-          metadata: { type, todo_id: todoId, ...extra },
-        })),
-      );
-      if (nErr) console.error(`[tool.createTodo.${type}]`, nErr);
-    };
+       everyone — expanded and reduced to INTERNAL accounts by the same
+       helper the create route uses. */
+    const assigneeAccountIds = await resolveAssigneeIds({
+      explicit: assignees.map((a) => a.account_id),
+      department: departmentName,
+      everyone: toAll,
+      tenantId: ctx.auth.tenant_id,
+    });
     if (assigneeAccountIds.length > 0) {
       const { error: asgErr } = await supabaseServer.from("koleex_todo_assignees").insert(
         assigneeAccountIds.map((accountId) => ({ todo_id: todoId, account_id: accountId })),
       );
       if (asgErr) console.error("[tool.createTodo.assignRows]", asgErr);
-      await inbox(assigneeAccountIds, `New task: ${normalized.title}`, "todo_assignment", { priority: normalized.priority });
     }
-    await inbox(mentions.map((p) => p.account_id), `You were mentioned: ${normalized.title}`, "todo_mention");
-    await inbox(observers.map((p) => p.account_id), `You are now an observer: ${normalized.title}`, "todo_observer");
+
+    /* NOTIFICATIONS — the same helpers as /api/todos POST: assignees, then
+       mentions, then observers; never the creator, never the same person
+       twice. */
+    const notified = new Set<string>([ctx.auth.account_id, ...assigneeAccountIds]);
+    const fresh = (ids: string[]) => {
+      const out = Array.from(new Set(ids)).filter((id) => !notified.has(id));
+      out.forEach((id) => notified.add(id));
+      return out;
+    };
+    await notifyTodoAssigned(created, assigneeAccountIds, ctx.auth.account_id);
+    await notifyTodoPeopleAdded(created, "mention", fresh(mentions.map((p) => p.account_id)), ctx.auth.account_id);
+    await notifyTodoPeopleAdded(created, "observer", fresh(observers.map((p) => p.account_id)), ctx.auth.account_id);
+    await pingTodosChanged(ctx.auth.tenant_id);
 
     const reminderNote = when.remind ? ` I'll remind ${who ? "them" : "you"} ${when.remind}.` : "";
     return {
@@ -559,22 +539,15 @@ const completeTodo: ToolDef<
     if (!isUuid(id)) return { ok: false, permissionStatus: "allowed", data: null, message: BAD_ID_MESSAGE };
     const done = args.done !== false;
 
-    const [t, { data: assignee }] = await Promise.all([
+    const acc = ctx.auth.account_id;
+    const [t, assignee] = await Promise.all([
       loadTodoRow(id, ctx.auth.tenant_id),
-      supabaseServer
-        .from("koleex_todo_assignees")
-        .select("todo_id")
-        .eq("todo_id", id)
-        .eq("account_id", ctx.auth.account_id)
-        .maybeSingle(),
+      isTodoAssignee(id, acc),
     ]);
     if (!t) return { ok: false, permissionStatus: "allowed", data: null, message: "I can't find that task — pick it again from listMyTodos." };
 
-    const acc = ctx.auth.account_id;
-    const isOwner = ctx.isSuperAdmin || t.created_by_account_id === acc || t.assigned_by_account_id === acc;
-    const isObserver =
-      Array.isArray(t.metadata?.observers) &&
-      (t.metadata?.observers ?? []).some((o) => o?.account_id === acc);
+    const isOwner = isTodoOwner(t, { accountId: acc, isSuperAdmin: ctx.isSuperAdmin });
+    const isObserver = isTodoObserver(t, acc);
     if (!isOwner && !assignee && !isObserver) {
       return { ok: false, permissionStatus: "denied", data: null, message: "That task isn't yours to update." };
     }
@@ -634,8 +607,9 @@ const completeTodo: ToolDef<
         return { ok: false, permissionStatus: "allowed", data: null, message: "Couldn't update the task — please try again." };
       }
       if (willSubmit) {
-        await notifySubmittedForApproval({ id: t.id, title, assigned_by_account_id: t.assigned_by_account_id }, acc);
+        await notifySubmittedForApproval({ id: t.id, title, tenant_id: t.tenant_id, assigned_by_account_id: t.assigned_by_account_id }, acc);
       }
+      await pingTodosChanged(t.tenant_id);
       return {
         ok: true,
         permissionStatus: "allowed",
@@ -647,13 +621,18 @@ const completeTodo: ToolDef<
       };
     }
 
+    /* Owner path — the toggle route's rules: an owner completing a pending
+       submission approves it (stamped), and a finished task closes every
+       notification that pointed at it. */
+    const implicitApproval = done && t.approval_state === "pending";
     const { error } = await supabaseServer
       .from("koleex_todos")
       .update({
         completed: done,
         completed_at: done ? now : null,
         status: done ? "done" : "todo",
-        approval_state: done ? (t.approval_state === "pending" ? "approved" : t.approval_state) : null,
+        approval_state: done ? (implicitApproval ? "approved" : t.approval_state) : null,
+        ...(implicitApproval ? { approved_by_account_id: acc, approved_at: now } : {}),
         updated_at: now,
       })
       .eq("id", id);
@@ -661,6 +640,8 @@ const completeTodo: ToolDef<
       console.error("[tool.completeTodo]", error);
       return { ok: false, permissionStatus: "allowed", data: null, message: "Couldn't update the task — please try again." };
     }
+    if (done) await clearTodoNotifications(t.id);
+    await pingTodosChanged(t.tenant_id);
     return {
       ok: true,
       permissionStatus: "allowed",
@@ -726,8 +707,7 @@ const updateTodo: ToolDef<
     if (!t) return { ok: false, permissionStatus: "allowed", data: null, message: "I can't find that task — pick it again from listMyTodos." };
 
     const acc = ctx.auth.account_id;
-    const isOwner = ctx.isSuperAdmin || t.created_by_account_id === acc || t.assigned_by_account_id === acc;
-    if (!isOwner) {
+    if (!isTodoOwner(t, { accountId: acc, isSuperAdmin: ctx.isSuperAdmin })) {
       return {
         ok: false,
         permissionStatus: "denied",
@@ -822,21 +802,10 @@ const updateTodo: ToolDef<
     /* Newly added observers hear about it, as they do from the app. */
     if (nextObservers !== null) {
       const before = new Set(currentObs.map((o) => o.account_id));
-      const fresh = nextObservers.map((o) => o.account_id).filter((id) => !before.has(id) && id !== ctx.auth.account_id);
-      if (fresh.length > 0) {
-        await supabaseServer.from("inbox_messages").insert(
-          fresh.map((recipientId) => ({
-            recipient_account_id: recipientId,
-            sender_account_id: ctx.auth.account_id,
-            category: "task",
-            subject: `You are now an observer: ${title}`,
-            body: t.description || title,
-            link: `/todo?task=${t.id}`,
-            metadata: { type: "todo_observer", todo_id: t.id },
-          })),
-        );
-      }
+      const fresh = nextObservers.map((o) => o.account_id).filter((id) => !before.has(id));
+      await notifyTodoPeopleAdded({ id: t.id, title, description: t.description, tenant_id: t.tenant_id }, "observer", fresh, acc);
     }
+    await pingTodosChanged(t.tenant_id);
     return {
       ok: true,
       permissionStatus: "allowed",
@@ -902,8 +871,7 @@ const reassignTodo: ToolDef<
     if (!t) return { ok: false, permissionStatus: "allowed", data: null, message: "I can't find that task — pick it again from listMyTodos." };
 
     const acc = ctx.auth.account_id;
-    const isOwner = ctx.isSuperAdmin || t.created_by_account_id === acc || t.assigned_by_account_id === acc;
-    if (!isOwner) {
+    if (!isTodoOwner(t, { accountId: acc, isSuperAdmin: ctx.isSuperAdmin })) {
       return { ok: false, permissionStatus: "denied", data: null, message: "Only the task's owner (its creator or assigner) can change who it's assigned to." };
     }
 
@@ -942,12 +910,7 @@ const reassignTodo: ToolDef<
     }
     const byId = new Map(all.map((a) => [a.account_id, a]));
     if (nextIds.some((i) => !byId.has(i))) {
-      return {
-        ok: false,
-        permissionStatus: "allowed",
-        data: null,
-        message: "One or more people didn't match a real team member. Look each person up with findTeamMember and use the account_id it returns.",
-      };
+      return { ok: false, permissionStatus: "allowed", data: null, message: UNKNOWN_PERSON_MESSAGE };
     }
     const nameOf = (aid: string): string => {
       const a = byId.get(aid);
@@ -989,19 +952,12 @@ const reassignTodo: ToolDef<
     }
 
     const added = nextIds.filter((aid) => aid !== acc && !currentIds.includes(aid));
-    if (added.length > 0) {
-      await supabaseServer.from("inbox_messages").insert(
-        added.map((recipientId) => ({
-          recipient_account_id: recipientId,
-          sender_account_id: acc,
-          category: "task",
-          subject: `New task: ${title}`,
-          body: t.description || title,
-          link: `/todo?task=${t.id}`,
-          metadata: { type: "todo_assignment", todo_id: t.id, priority: t.priority ?? "medium" },
-        })),
-      );
-    }
+    await notifyTodoAssigned(
+      { id: t.id, title, description: t.description, priority: t.priority, tenant_id: t.tenant_id },
+      added,
+      acc,
+    );
+    await pingTodosChanged(t.tenant_id);
 
     return {
       ok: true,
@@ -1041,9 +997,7 @@ const deleteTodo: ToolDef<
     const t = await loadTodoRow(id, ctx.auth.tenant_id);
     if (!t) return { ok: false, permissionStatus: "allowed", data: null, message: "I can't find that task — pick it again from listMyTodos." };
 
-    const acc = ctx.auth.account_id;
-    const canDelete = ctx.isSuperAdmin || t.created_by_account_id === acc || t.assigned_by_account_id === acc;
-    if (!canDelete) {
+    if (!isTodoOwner(t, { accountId: ctx.auth.account_id, isSuperAdmin: ctx.isSuperAdmin })) {
       return { ok: false, permissionStatus: "denied", data: null, message: "Only the task's owner (its creator or assigner) can delete it." };
     }
 
@@ -1063,6 +1017,9 @@ const deleteTodo: ToolDef<
       console.error("[tool.deleteTodo]", error);
       return { ok: false, permissionStatus: "allowed", data: null, message: "Couldn't delete the task — please try again." };
     }
+    /* Same as the HTTP DELETE: the task's notifications go with it. */
+    await clearTodoNotifications(t.id);
+    await pingTodosChanged(t.tenant_id);
     return {
       ok: true,
       permissionStatus: "allowed",

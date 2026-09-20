@@ -65,23 +65,24 @@ import type {
 } from "@/types/supabase";
 import { useCurrentAccountId, getCurrentAccountIdSync } from "@/lib/identity";
 import { usePermissions } from "@/lib/permissions";
-import { loadScopeContext, type ScopeContext } from "@/lib/scope";
+import { useMeBootstrap } from "@/lib/me-bootstrap";
+import { collapseSeries } from "@/lib/todo-series";
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 import AppIcon from "@/components/common/AppIcon";
 
-/* ── Priority config ── */
-const PRIORITIES: { value: TodoPriority; label: string; color: string }[] = [
-  { value: "high", label: "High", color: "text-red-400" },
-  { value: "medium", label: "Medium", color: "text-yellow-400" },
-  { value: "low", label: "Low", color: "text-blue-400" },
+/* ── Priority config — labels come from the dictionary (t("p." + value)). ── */
+const PRIORITIES: { value: TodoPriority; color: string }[] = [
+  { value: "high", color: "text-red-400" },
+  { value: "medium", color: "text-yellow-400" },
+  { value: "low", color: "text-blue-400" },
 ];
 
-/* ── Status (workflow stage) config ── */
-const STATUSES: { value: TodoStatus; label: string; dot: string }[] = [
-  { value: "todo", label: "To do", dot: "bg-[var(--text-dim)]" },
-  { value: "in_progress", label: "In progress", dot: "bg-blue-400" },
-  { value: "blocked", label: "Blocked", dot: "bg-red-400" },
-  { value: "done", label: "Done", dot: "bg-green-400" },
+/* ── Status (workflow stage) config — labels via t("st." + value). ── */
+const STATUSES: { value: TodoStatus; dot: string }[] = [
+  { value: "todo", dot: "bg-[var(--text-dim)]" },
+  { value: "in_progress", dot: "bg-blue-400" },
+  { value: "blocked", dot: "bg-red-400" },
+  { value: "done", dot: "bg-green-400" },
 ];
 
 /* ── Recurrence config (Phase C). value=null → one-off task. ── */
@@ -107,40 +108,52 @@ function localInputToIso(v: string): string | null {
 }
 
 /* ── Helpers ── */
-function formatDate(iso: string | null): string {
-  if (!iso) return "";
+type TFn = (key: string, fallback?: string) => string;
+
+/* Whole days from today to the date, in the browser's calendar. */
+function daysFromToday(iso: string): number {
   const d = new Date(iso);
   const now = new Date();
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
   const target = new Date(d.getFullYear(), d.getMonth(), d.getDate());
-  const diff = Math.round((target.getTime() - today.getTime()) / 86400000);
-  if (diff === 0) return "Today";
-  if (diff === 1) return "Tomorrow";
-  if (diff === -1) return "Yesterday";
-  if (diff > 1 && diff <= 6) return d.toLocaleDateString("en", { weekday: "long" });
-  return d.toLocaleDateString("en", { month: "short", day: "numeric" });
+  return Math.round((target.getTime() - today.getTime()) / 86400000);
+}
+const isDueToday = (iso: string | null) => !!iso && daysFromToday(iso) === 0;
+
+/* Relative due-date chip, in the reader's language. It used to return the
+   English words and the grouping logic compared against "Today" — a
+   translation would have broken the list. The grouping uses isDueToday. */
+function formatDate(iso: string | null, t: TFn, lang: string): string {
+  if (!iso) return "";
+  const d = new Date(iso);
+  const diff = daysFromToday(iso);
+  if (diff === 0) return t("date.today");
+  if (diff === 1) return t("date.tomorrow");
+  if (diff === -1) return t("date.yesterday");
+  if (diff > 1 && diff <= 6) return d.toLocaleDateString(lang, { weekday: "long" });
+  return d.toLocaleDateString(lang, { month: "short", day: "numeric" });
 }
 
 /* Which period of a recurring series a row represents ("Today", "Yesterday",
    "Jul 21"). The stored value is date-only, so it is pinned to local midnight
    — parsed bare it would be read as UTC and slip a day west of Greenwich. */
-function formatPeriod(period: string | null | undefined): string {
+function formatPeriod(period: string | null | undefined, t: TFn, lang: string): string {
   if (!period) return "";
-  return formatDate(period.length === 10 ? `${period}T00:00:00` : period);
+  return formatDate(period.length === 10 ? `${period}T00:00:00` : period, t, lang);
 }
 
 /* Absolute date / date-time for the expanded task detail panel. */
-function fmtDetailDate(iso: string | null): string {
+function fmtDetailDate(iso: string | null, lang: string): string {
   if (!iso) return "—";
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return "—";
-  return d.toLocaleDateString("en", { year: "numeric", month: "short", day: "numeric" });
+  return d.toLocaleDateString(lang, { year: "numeric", month: "short", day: "numeric" });
 }
-function fmtDetailDateTime(iso: string | null): string {
+function fmtDetailDateTime(iso: string | null, lang: string): string {
   if (!iso) return "—";
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return "—";
-  return d.toLocaleDateString("en", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
+  return d.toLocaleDateString(lang, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
 }
 
 function isOverdue(dueDate: string | null): boolean {
@@ -442,7 +455,6 @@ function TaskModal({ open, editEntry, employees, departments, labels, onClose, o
   const [showExtras, setShowExtras] = useState(false);
   const [projects, setProjects] = useState<{ id: string; name: string }[]>([]);
   const inputRef = useRef<HTMLInputElement>(null);
-  const accountId = useCurrentAccountId();
 
   /* Active projects for the optional "Related project" link. fetchProjects
      returns [] when the user lacks Projects access, which hides the field. */
@@ -559,8 +571,6 @@ function TaskModal({ open, editEntry, employees, departments, labels, onClose, o
           status,
           recurrence,
           recurrence_until: recurrence ? recurrenceUntil || null : null,
-          created_by_account_id: accountId || null,
-          assigned_by_account_id: accountId || null,
           assignee_account_ids: selectedAssignees,
           assigned_department: selectedDept || null,
           assign_to_all: assignAll,
@@ -631,7 +641,7 @@ function TaskModal({ open, editEntry, employees, departments, labels, onClose, o
 
           {/* Description */}
           <div>
-            <label className={lbl}>{t("f.description")} <span className="font-normal normal-case">(optional)</span></label>
+            <label className={lbl}>{t("f.description")} <span className="font-normal normal-case">{t("common.optional")}</span></label>
             <textarea value={description} onChange={(e) => setDescription(e.target.value)}
               placeholder={t("f.description.placeholder")} rows={4} className={inp + " h-auto py-3 resize-none"} />
           </div>
@@ -648,7 +658,7 @@ function TaskModal({ open, editEntry, employees, departments, labels, onClose, o
                 className={`h-7 px-3 rounded-full text-[11px] font-semibold transition-all border flex items-center gap-1.5 ${
                   assignAll ? "bg-emerald-500/15 border-emerald-500/30 text-emerald-400" : "bg-[var(--bg-surface)] border-[var(--border-subtle)] text-[var(--text-dim)] hover:text-[var(--text-muted)]"
                 }`}>
-                <UsersIcon size={10} /> All
+                <UsersIcon size={10} /> {t("pill.all")}
               </button>
               {departments.map((dept) => (
                 <button key={dept} onClick={() => selectDept(dept)}
@@ -811,7 +821,7 @@ function TaskModal({ open, editEntry, employees, departments, labels, onClose, o
               {remindAt && (
                 <button type="button" onClick={() => setRemindAt("")}
                   className="h-10 px-3 rounded-xl text-[11px] font-medium text-[var(--text-dim)] hover:text-[var(--text-primary)]">
-                  Clear
+                  {t("common.clear")}
                 </button>
               )}
             </div>
@@ -978,7 +988,7 @@ function TaskRow({ task, onToggle, onSetStatus, onApprove, onReopen, onEdit, onD
   selected?: boolean;
   onSelect?: () => void;
 }) {
-  const { t } = useTranslation(todoT);
+  const { t, lang } = useTranslation(todoT);
   const priorityConfig = PRIORITIES.find((p) => p.value === task.priority) || PRIORITIES[1];
   const overdue = !task.completed && isOverdue(task.due_date);
   const checklist = Array.isArray(task.metadata?.checklist) ? task.metadata.checklist : [];
@@ -997,7 +1007,7 @@ function TaskRow({ task, onToggle, onSetStatus, onApprove, onReopen, onEdit, onD
       <div className={`group flex items-start gap-3 px-4 py-3.5 transition-all ${selected ? "bg-[var(--bg-surface-active)]" : "hover:bg-[var(--bg-surface-subtle)]"}`}>
         {/* Bulk-select checkbox (only in select mode) */}
         {selectMode && (
-          <button onClick={onSelect} className="mt-0.5 shrink-0" aria-label="select task">
+          <button onClick={onSelect} className="mt-0.5 shrink-0" aria-label={t("row.selectTask")}>
             {selected
               ? <CheckSquareIcon size={20} className="text-blue-400" />
               : <SquareIcon size={20} className="text-[var(--text-ghost)]" />}
@@ -1062,7 +1072,7 @@ function TaskRow({ task, onToggle, onSetStatus, onApprove, onReopen, onEdit, onD
               <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-[var(--text-primary)] bg-[var(--bg-surface-active)] px-1.5 py-0.5 rounded">
                 <RefreshCwIcon size={9} /> {t("rec." + task.series_cadence)}
                 {task.series_period && (
-                  <span className="font-medium text-[var(--text-faint)]">· {formatPeriod(task.series_period)}</span>
+                  <span className="font-medium text-[var(--text-faint)]">· {formatPeriod(task.series_period, t, lang)}</span>
                 )}
               </span>
             )}
@@ -1076,7 +1086,7 @@ function TaskRow({ task, onToggle, onSetStatus, onApprove, onReopen, onEdit, onD
                 overdue ? "text-red-400" : task.completed ? "text-[var(--text-dim)]" : "text-[var(--text-faint)]"
               }`}>
                 {overdue ? <ExclamationIcon size={10} /> : <ClockIcon size={10} />}
-                {formatDate(task.due_date)}
+                {formatDate(task.due_date, t, lang)}
               </span>
             )}
             {task.source !== "manual" && (
@@ -1234,12 +1244,12 @@ function TaskRow({ task, onToggle, onSetStatus, onApprove, onReopen, onEdit, onD
           {/* Other key fields — only the ones that are set */}
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-2">
             {[
-              task.start_date ? { label: t("f.startDate"), value: fmtDetailDate(task.start_date) } : null,
-              task.due_date ? { label: t("f.dueDate"), value: fmtDetailDate(task.due_date) } : null,
-              task.remind_at ? { label: t("f.reminder"), value: fmtDetailDateTime(task.remind_at) } : null,
+              task.start_date ? { label: t("f.startDate"), value: fmtDetailDate(task.start_date, lang) } : null,
+              task.due_date ? { label: t("f.dueDate"), value: fmtDetailDate(task.due_date, lang) } : null,
+              task.remind_at ? { label: t("f.reminder"), value: fmtDetailDateTime(task.remind_at, lang) } : null,
               task.series_cadence ? { label: t("f.recurrence"), value: t("rec." + task.series_cadence) } : null,
               task.series_cadence && task.series_period
-                ? { label: t("f.occurrence"), value: formatPeriod(task.series_period) }
+                ? { label: t("f.occurrence"), value: formatPeriod(task.series_period, t, lang) }
                 : null,
               task.label ? { label: t("f.label"), value: <AutoTranslatedText text={task.label} plain /> } : null,
             ].filter(Boolean).map((f, i) => (
@@ -1280,7 +1290,7 @@ function TaskRow({ task, onToggle, onSetStatus, onApprove, onReopen, onEdit, onD
               </div>
               <div className="flex-1 min-w-0">
                 <span className="font-semibold text-[var(--text-muted)]">{note.author_full_name || note.author_username}</span>
-                <span className="text-[var(--text-dim)] ml-2">{new Date(note.created_at).toLocaleDateString("en", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}</span>
+                <span className="text-[var(--text-dim)] ml-2">{fmtDetailDateTime(note.created_at, lang)}</span>
                 <AutoTranslatedText text={note.body} block className="text-[var(--text-primary)] mt-0.5" />
               </div>
               {note.author_account_id === currentAccountId && (
@@ -1317,6 +1327,7 @@ function TodoBoard({ tasks, onSetStatus, t }: {
 }) {
   const [dragId, setDragId] = useState<string | null>(null);
   const [overCol, setOverCol] = useState<TodoStatus | null>(null);
+  const { lang } = useTranslation(todoT);
 
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
@@ -1355,7 +1366,7 @@ function TodoBoard({ tasks, onSetStatus, t }: {
                       </span>
                       {task.due_date && (
                         <span className={`inline-flex items-center gap-1 text-[10px] font-medium ${overdue ? "text-red-400" : "text-[var(--text-faint)]"}`}>
-                          <ClockIcon size={9} /> {formatDate(task.due_date)}
+                          <ClockIcon size={9} /> {formatDate(task.due_date, t, lang)}
                         </span>
                       )}
                       {task.assignees.length > 0 && (
@@ -1494,8 +1505,8 @@ const WavyBackground = dynamic(() => import("@/components/ui/WavyBackground"), {
    account on a shared browser. Now the key carries the account id, a
    mirror older than a few hours is not painted at all (the list loads in
    under a second — a stale first frame is worse than a blank one), and the
-   v1 key is removed on sight. Still `kx_`-prefixed, so sign-out wipes it. */
-const TODO_SNAP_KEY_V1 = "kx_todo_snap_v1";
+   Still `kx_`-prefixed, so sign-out wipes it, and listed in storage-guard's
+   cache prefixes so the quota guard may evict it. */
 const TODO_SNAP_MAX_AGE_MS = 6 * 60 * 60 * 1000;
 const todoSnapKey = () => `kx_todo_snap_v2:${getCurrentAccountIdSync() ?? "anon"}`;
 interface TodoSnap {
@@ -1508,7 +1519,6 @@ interface TodoSnap {
 function readTodoSnap(): TodoSnap | null {
   if (typeof window === "undefined") return null;
   try {
-    window.localStorage.removeItem(TODO_SNAP_KEY_V1);
     const raw = window.localStorage.getItem(todoSnapKey());
     if (!raw) return null;
     const s = JSON.parse(raw) as TodoSnap;
@@ -1524,9 +1534,22 @@ function persistTodoSnap(s: TodoSnap): void {
     window.localStorage.setItem(todoSnapKey(), JSON.stringify({ ...s, todos: s.todos.slice(0, 400), savedAt: Date.now() }));
   } catch { /* quota — mirror is best-effort */ }
 }
+/* One round trip for everything the screen shows. The server scopes the
+   list to the session; nothing is resolved here first. (A scope context
+   used to be loaded and threaded through a ref into a fetch that
+   discarded it.) */
+async function fetchAllTodoData(): Promise<TodoSnap> {
+  const [todos, employees, departments, labels] = await Promise.all([
+    fetchTodos(),
+    fetchAssignableEmployees(),
+    fetchDepartments(),
+    fetchTodoLabels(),
+  ]);
+  return { todos, employees, departments, labels };
+}
 
 export default function TodoPage() {
-  const { t } = useTranslation(todoT);
+  const { t, lang } = useTranslation(todoT);
   const aurora = useSkin() === "aurora";
   const [snap] = useState(readTodoSnap);
   const [todos, setTodos] = useState<TodoWithRelations[]>(snap?.todos ?? []);
@@ -1562,7 +1585,9 @@ export default function TodoPage() {
   const [departments, setDepartments] = useState<string[]>(snap?.departments ?? []);
   const [labels, setLabels] = useState<TodoLabelRow[]>(snap?.labels ?? []);
   const accountId = useCurrentAccountId();
-  const [scopeCtx, setScopeCtx] = useState<ScopeContext | null>(null);
+  /* The tenant's realtime topic — from the bootstrap payload every screen
+     already has, never from a second request. */
+  const tenantId = useMeBootstrap().data?.auth?.tenant_id ?? null;
   /* Super-admin audience lens: "own" (default — SA sees THEIR tasks like any
      user), "all" (every task in the tenant), or an account_id (that user's
      tasks). Non-SA callers never see this control; the server already limits
@@ -1570,39 +1595,24 @@ export default function TodoPage() {
   const [saView, setSaView] = useState<string>("own");
   const deepLinkHandledRef = useRef(false);
 
-  // Load scope context once per session so fetchTodos knows which filter
-  // (own / department / all + SA bypass) to apply. Non-blocking — if this
-  // returns null we still render the page with the wide-open fetch.
-  useEffect(() => {
-    if (!accountId) return;
-    loadScopeContext(accountId).then(setScopeCtx);
-  }, [accountId]);
-
-  /* scopeCtx rides a ref so loadAll keeps ONE identity for the whole
-     mount. It used to depend on scopeCtx, which starts null and resolves
-     a beat later — that re-ran this effect and re-fetched the ENTIRE
-     list a second time on every open (the API path ignores ctx anyway;
-     the server does the scoping — ctx only feeds the legacy fallback),
-     and it also made the realtime effect below resubscribe. */
-  const scopeCtxRef = useRef(scopeCtx);
-  /* Written in an effect, not during render (react-hooks/refs): loadAll only
-     reads the ref from handlers and effects, which all run AFTER this effect
-     has stamped the latest value — same freshness, without the render-phase
-     ref write. */
-  useEffect(() => { scopeCtxRef.current = scopeCtx; }, [scopeCtx]);
-  const loadAll = useCallback(async () => {
-    const [t, e, d, l] = await Promise.all([
-      fetchTodos(scopeCtxRef.current),
-      fetchAssignableEmployees(),
-      fetchDepartments(),
-      fetchTodoLabels(),
-    ]);
-    setTodos(t); setEmployees(e); setDepartments(d); setLabels(l);
+  const applyAll = useCallback((snapshot: TodoSnap) => {
+    setTodos(snapshot.todos); setEmployees(snapshot.employees);
+    setDepartments(snapshot.departments); setLabels(snapshot.labels);
     setLoading(false);
-    persistTodoSnap({ todos: t, employees: e, departments: d, labels: l });
+    persistTodoSnap(snapshot);
   }, []);
+  const loadAll = useCallback(async () => {
+    applyAll(await fetchAllTodoData());
+  }, [applyAll]);
 
-  useEffect(() => { loadAll(); }, [loadAll]);
+  /* Mount load: the state lands in the promise callback, never in the
+     effect body itself (react-hooks/set-state-in-effect), and an unmount
+     before the response drops it. */
+  useEffect(() => {
+    let alive = true;
+    void fetchAllTodoData().then((snapshot) => { if (alive) applyAll(snapshot); });
+    return () => { alive = false; };
+  }, [applyAll]);
 
   /* ⚠️ THE SNAPSHOT HAS TO FOLLOW EVERY CHANGE, NOT JUST THE FIRST LOAD.
      It was written only inside loadAll(), which runs once on mount — so
@@ -1639,16 +1649,15 @@ export default function TodoPage() {
     return () => clearTimeout(id);
   }, [loading, todos]);
 
-  /* ── Realtime: auto-refresh when any todo is created/updated/deleted ── */
+  /* ── Realtime: refetch when any task in the tenant changes ──
+     The server pings the tenant's `todos` topic after every write (routes,
+     AI tools, the cron's recurring spawns); the list is refetched through
+     the gated route, which scopes it. Pings within a beat collapse to one
+     refetch, so another user's burst of edits costs one round trip. */
   useEffect(() => {
-    return subscribeToTodos(
-      () => { loadAll(); },   // INSERT  → full refresh to resolve relations
-      () => { loadAll(); },   // UPDATE  → full refresh
-      (old) => {              // DELETE  → optimistic remove + refresh
-        setTodos((prev) => prev.filter((t) => t.id !== old.id));
-      },
-    );
-  }, [loadAll]);
+    if (!tenantId) return;
+    return subscribeToTodos(tenantId, () => { void loadAll(); });
+  }, [tenantId, loadAll]);
 
   /* Declared ABOVE isTaskOwner on purpose: that closure reads isSA, and a
      reference that precedes its binding's declaration (legal JS, TDZ at
@@ -1814,29 +1823,7 @@ export default function TodoPage() {
      been superseded is a day nobody acted on: it carries no information the
      newest period doesn't, so it is dropped. Nothing with work on it is ever
      hidden, and nothing is deleted — this is a display rule only. */
-  const seriesTodos = useMemo(() => {
-    const newestPerSeries = new Map<string, string>();
-    todos.forEach((t) => {
-      if (!t.series_cadence) return;
-      const key = t.recurrence_parent_id ?? t.id;
-      const period = t.series_period ?? "";
-      if (period > (newestPerSeries.get(key) ?? "")) newestPerSeries.set(key, period);
-    });
-    if (newestPerSeries.size === 0) return todos;
-
-    const touched = (t: TodoWithRelations) =>
-      t.completed ||
-      (t.status !== null && t.status !== "todo") ||
-      t.approval_state !== null ||
-      t.notes.length > 0;
-
-    return todos.filter((t) => {
-      if (!t.series_cadence) return true;
-      const key = t.recurrence_parent_id ?? t.id;
-      const isNewest = (t.series_period ?? "") === newestPerSeries.get(key);
-      return isNewest || touched(t);
-    });
-  }, [todos]);
+  const seriesTodos = useMemo(() => collapseSeries(todos), [todos]);
 
   const scopedTodos = useMemo(() => {
     if (!isSA || saView === "all") return seriesTodos;
@@ -1863,16 +1850,18 @@ export default function TodoPage() {
         // ISO string match (2026-04-12)
         if (iso.toLowerCase().includes(q)) return true;
         // Formatted date strings for flexible matching
+        /* In the reader's language — someone typing 四月 or أبريل should
+           find April's tasks the way an English reader typing "Apr" does. */
         const formats = [
-          d.toLocaleDateString("en", { month: "short", day: "numeric" }),               // "Apr 12"
-          d.toLocaleDateString("en", { month: "long", day: "numeric" }),                 // "April 12"
-          d.toLocaleDateString("en", { month: "short", day: "numeric", year: "numeric" }), // "Apr 12, 2026"
-          d.toLocaleDateString("en", { month: "long", day: "numeric", year: "numeric" }), // "April 12, 2026"
-          d.toLocaleDateString("en", { day: "numeric", month: "short" }),                 // "12 Apr"
-          d.toLocaleDateString("en", { month: "long" }),                                  // "April"
-          d.toLocaleDateString("en", { month: "short" }),                                 // "Apr"
-          d.toLocaleDateString("en", { weekday: "long" }),                                // "Saturday"
-          d.toLocaleDateString("en", { weekday: "short" }),                               // "Sat"
+          d.toLocaleDateString(lang, { month: "short", day: "numeric" }),               // "Apr 12"
+          d.toLocaleDateString(lang, { month: "long", day: "numeric" }),                 // "April 12"
+          d.toLocaleDateString(lang, { month: "short", day: "numeric", year: "numeric" }), // "Apr 12, 2026"
+          d.toLocaleDateString(lang, { month: "long", day: "numeric", year: "numeric" }), // "April 12, 2026"
+          d.toLocaleDateString(lang, { day: "numeric", month: "short" }),                 // "12 Apr"
+          d.toLocaleDateString(lang, { month: "long" }),                                  // "April"
+          d.toLocaleDateString(lang, { month: "short" }),                                 // "Apr"
+          d.toLocaleDateString(lang, { weekday: "long" }),                                // "Saturday"
+          d.toLocaleDateString(lang, { weekday: "short" }),                               // "Sat"
           `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}`, // "12/04"
           `${String(d.getMonth() + 1).padStart(2, "0")}/${String(d.getDate()).padStart(2, "0")}`, // "04/12"
         ];
@@ -1965,7 +1954,7 @@ export default function TodoPage() {
     }
 
     return list;
-  }, [scopedTodos, search, filter, priorityFilter, sourceFilter, accountId, cadenceView, statusFilter, labelFilter, deptFilter, assigneeFilter, dateFrom, dateTo]);
+  }, [scopedTodos, search, filter, priorityFilter, sourceFilter, accountId, cadenceView, statusFilter, labelFilter, deptFilter, assigneeFilter, dateFrom, dateTo, lang]);
 
   const stats = useMemo(() => ({
     total: scopedTodos.length,
@@ -1985,8 +1974,8 @@ export default function TodoPage() {
     const active = filtered.filter((t) => !t.completed);
     const completed = filtered.filter((t) => t.completed);
     const overdueList = active.filter((t) => isOverdue(t.due_date));
-    const today = active.filter((t) => t.due_date && formatDate(t.due_date) === "Today" && !isOverdue(t.due_date));
-    const upcoming = active.filter((t) => t.due_date && !isOverdue(t.due_date) && formatDate(t.due_date) !== "Today");
+    const today = active.filter((t) => isDueToday(t.due_date) && !isOverdue(t.due_date));
+    const upcoming = active.filter((t) => t.due_date && !isOverdue(t.due_date) && !isDueToday(t.due_date));
     const noDate = active.filter((t) => !t.due_date);
     return { overdue: overdueList, today, upcoming, noDate, completed };
   }, [filtered]);
@@ -2324,14 +2313,14 @@ export default function TodoPage() {
                     <CalendarRawIcon size={12} className="text-[var(--text-dim)] shrink-0" />
                     <input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)}
                       className="bg-transparent text-[12px] text-[var(--text-primary)] outline-none w-[110px]"
-                      title="From date" />
+                      title={t("filters.fromDate")} />
                   </div>
                   <span className="text-[11px] text-[var(--text-dim)]">→</span>
                   <div className="flex items-center gap-1 h-8 px-2 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)]">
                     <CalendarRawIcon size={12} className="text-[var(--text-dim)] shrink-0" />
                     <input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)}
                       className="bg-transparent text-[12px] text-[var(--text-primary)] outline-none w-[110px]"
-                      title="To date" />
+                      title={t("filters.toDate")} />
                   </div>
                 </div>
 

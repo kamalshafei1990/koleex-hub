@@ -63,7 +63,8 @@ const CACHE_PREFIXES: readonly string[] = [
                              // they are cache and belong here — 103 KB that was
                              // previously unreclaimable.
   "kx_vb_v1",             // visual library
-  "kx_todo_snap_v1",
+  "kx_todo_snap_v2:",     // the To-do warm-start mirror (per account) — up to
+                          // 400 rows with relations; rebuilt on the next open
   "kx:taxo:",             // taxonomy + logos — small, cheap, and rarely stale
 ];
 

@@ -1,7 +1,8 @@
 import "server-only";
 
 /* The pure half of lib/server/todo-scope.ts — the viewer and the clauses —
-   kept apart so a suite can prove the rule without a database. */
+   kept apart so a suite can prove the rule without a database
+   (scripts/validate-ai-tasks.ts does). */
 
 export interface TodoViewer {
   accountId: string;
