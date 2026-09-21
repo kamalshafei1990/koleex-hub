@@ -1,5 +1,8 @@
 import "server-only";
 
+import { INCOTERMS, LEGACY_INCOTERMS, PAYMENT_METHODS, TT_STRUCTURES } from "@/lib/trade-terms/data";
+import { SUMMARY_EN } from "@/lib/trade-terms/summary.en";
+
 /* ---------------------------------------------------------------------------
    ai-agent/trade-terms-knowledge — international trade terms: the Incoterms®
    2020 delivery rules and the methods-of-payment ladder used in export sales.
@@ -41,7 +44,103 @@ export interface TradeTermsSection {
   keywords: string[];
 }
 
+/* ── GENERATED FROM THE SHARED SOURCE ──────────────────────────────────
+   The eleven Incoterms rules, their risk points and the full cost table now
+   live as STRUCTURE in src/lib/trade-terms/data.ts, and the Knowledge app
+   renders from that same structure. This section is built from it rather
+   than written out again, so the agent and the screen can never disagree
+   about who pays freight under CIF.
+
+   Facts that are structure come from data.ts. Facts that are prose stay in
+   the hand-written sections below — the split follows what can be modelled,
+   not what is convenient. */
+function buildCostTable(): string {
+  const head = "| Rule | Export pack/load | Export clearance | Main carriage | Insurance | Import clearance | Duty/VAT | Unload at dest. |";
+  const sep  = "|---|---|---|---|---|---|---|---|";
+  const cell = (p: "seller" | "buyer") => (p === "seller" ? "**S**" : "B");
+  const rows = INCOTERMS.map((i) => {
+    const c = i.costs;
+    const ins = i.insuranceObligation
+      ? `**S** (ICC-${i.insuranceObligation.clauses}, ${i.insuranceObligation.minCoverPct}%)`
+      : cell(c.insurance);
+    return `| ${i.code} | ${cell(c.exportPackLoad)} | ${cell(c.exportClearance)} | ${cell(c.mainCarriage)} | ${ins} | ${cell(c.importClearance)} | ${cell(c.dutyVat)} | ${cell(c.unloadAtDestination)} |`;
+  });
+  return [head, sep, ...rows].join("\n");
+}
+
+const STAGE_WORDS: Record<string, string> = {
+  sellerPremises: "at the seller's premises, not loaded",
+  exportCleared: "when handed to the carrier the buyer nominated",
+  alongsideShip: "when placed alongside the vessel at the named port",
+  onBoard: "when the goods are **on board the vessel** at the named port of shipment",
+  mainCarriage: "during the main carriage",
+  arrivalPort: "at the port of arrival",
+  importCleared: "on arrival, import-cleared, ready for unloading",
+  destination: "on arrival at the named destination, ready for unloading",
+  unloaded: "once unloaded at the named destination",
+};
+
+function buildRiskPoints(): string {
+  return INCOTERMS.map((i) => {
+    const split = i.riskPassesAt !== i.costEndsAt
+      ? ` (cost, however, runs on to ${STAGE_WORDS[i.costEndsAt]} — the C-group split)`
+      : "";
+    return `- **${i.code}** — risk passes ${STAGE_WORDS[i.riskPassesAt]}${split}.`;
+  }).join("\n");
+}
+
+/* The glossary the Knowledge page shows, one line per term, built from the
+   same data.ts + summary.en.ts the page renders from. Thirty-five terms —
+   eleven Incoterms, five retired codes, six payment methods, nine L/C
+   variants, four guarantees, escrow, four T/T structures. The hand-written
+   sections below go deeper on the ones that need it; this is the one place
+   that is guaranteed to know every term the page knows, in the page's own
+   words, so "what is a red clause L/C" is answered the way the screen
+   answers it. */
+const GROUP_TITLE = {
+  method: "Methods of payment (the exporter risk ladder, safest first)",
+  lcType: "Letter of credit — the variants",
+  guarantee: "Bank guarantees (ICC URDG 758)",
+  platform: "Escrow",
+} as const;
+
+function buildGlossary(): string {
+  const inco = INCOTERMS.map((i) =>
+    `- **${i.code}** — ${i.name}${i.aliases ? ` (also written ${i.aliases.join(", ")})` : ""}: ${SUMMARY_EN[i.code]}`);
+  const legacy = LEGACY_INCOTERMS.map((l) =>
+    `- **${l.code}** — ${l.name}: retired in Incoterms® ${l.retiredIn}; read it as **${l.replacedBy}** and ask for the contract to say so.`);
+  const pay = (Object.keys(GROUP_TITLE) as (keyof typeof GROUP_TITLE)[]).map((g) =>
+    `**${GROUP_TITLE[g]}**\n` + PAYMENT_METHODS.filter((p) => p.group === g).map((p) => {
+      const also = p.aliases ? ` — also ${p.aliases.join(", ")}` : "";
+      const who = p.protects ? ` — protects the ${p.protects === "both" ? "seller and the buyer" : p.protects}` : "";
+      return `- **${p.name}${p.abbr ? ` (${p.abbr})` : ""}**${also}${who}: ${SUMMARY_EN[p.id]}`;
+    }).join("\n")).join("\n\n");
+  const tt = TT_STRUCTURES.map((t) => `- **T/T ${t.split}** — ${SUMMARY_EN[t.id]}`).join("\n");
+  return `**Incoterms® 2020 — the eleven rules**\n${inco.join("\n")}\n\n**Retired codes still seen in contracts**\n${legacy.join("\n")}\n\n${pay}\n\n**T/T — the common structures**\n${tt}`;
+}
+
+/* Retrieval handles for the glossary: every code, abbreviation, name and
+   alias, lower-cased — so the section that knows a term is the section that
+   scores when the term is typed. */
+const GLOSSARY_KEYWORDS = Array.from(new Set([
+  "glossary", "what is", "what does", "meaning of", "define", "definition", "explain", "term", "terms",
+  ...INCOTERMS.flatMap((i) => [i.code, i.name, ...(i.aliases ?? [])]),
+  ...LEGACY_INCOTERMS.flatMap((l) => [l.code, l.name, "retired", "obsolete", "old incoterm"]),
+  ...PAYMENT_METHODS.flatMap((p) => [p.name, ...(p.abbr ? [p.abbr] : []), ...(p.aliases ?? [])]),
+  "irrevocable", "confirmed", "sight", "usance", "transferable", "back-to-back", "back to back", "revolving",
+  "red clause", "green clause", "standby", "sblc", "upas", "advance payment guarantee", "apg",
+  "performance guarantee", "performance bond", "bid bond", "tender", "warranty guarantee", "retention",
+  "escrow", "trade assurance", "t/t", "tt", "telegraphic transfer", "30/70", "30 70", "deposit",
+].map((k) => k.toLowerCase())));
+
 export const TRADE_TERMS_KNOWLEDGE: TradeTermsSection[] = [
+  /* ── GENERATED: the page's glossary, every term in one place ─────────── */
+  {
+    title: "Trade & payment terms — glossary (every term on the Knowledge page)",
+    content: buildGlossary(),
+    keywords: GLOSSARY_KEYWORDS,
+  },
+
   /* ── Incoterms: the frame ────────────────────────────────────────────── */
   {
     title: "Incoterms 2020 — what the rules do and do not cover",
@@ -75,38 +174,12 @@ export const TRADE_TERMS_KNOWLEDGE: TradeTermsSection[] = [
   },
   {
     title: "Incoterms — risk transfer point for each rule (the exact moment)",
-    content: `Ordered from least to most seller responsibility:
-- **EXW** — when goods are placed at the buyer's disposal at the named place, NOT loaded.
-- **FCA** — when goods are handed to the buyer's nominated carrier (loaded onto the collecting vehicle if at seller's premises; ready for unloading if elsewhere).
-- **FAS** — when goods are placed alongside the vessel at the named port.
-- **FOB / CFR / CIF** — when goods are **on board the vessel** at the named port of shipment. **All three share the same risk point.** CFR and CIF differ from FOB only in who pays freight (and insurance), NOT in where risk passes.
-- **CPT / CIP** — when goods are handed to the FIRST carrier, which may be far inland from any port.
-- **DAP** — on arrival at the named destination, ready for unloading, still on the arriving vehicle.
-- **DPU** — once unloaded at the named destination.
-- **DDP** — on arrival at destination, import-cleared, ready for unloading.
-
-**⚠ Obsolete wording — never use**: risk under FOB/CFR/CIF does NOT pass at the "ship's rail". That phrase was removed in Incoterms 2010 precisely because it caused decades of dispute; the rule is "on board". Some third-party websites still repeat it. If a customer's contract says "ship's rail", flag it as outdated drafting.`,
+    content: `Ordered from least to most seller responsibility:\n${buildRiskPoints()}\n\n**⚠ Obsolete wording — never use**: risk under FOB/CFR/CIF does NOT pass at the "ship's rail". That phrase was removed in Incoterms 2010 precisely because it caused decades of dispute; the rule is "on board". Some third-party websites still repeat it. If a customer's contract says "ship's rail", flag it as outdated drafting.`,
     keywords: ["risk", "risk transfer", "passes", "transfer point", "on board", "ship's rail", "when does risk", "who bears risk", "damage", "loss", "moment"],
   },
   {
     title: "Incoterms — who pays what (cost allocation table)",
-    content: `S = seller, B = buyer.
-
-| Rule | Export pack/load | Export clearance | Main carriage | Insurance | Import clearance | Duty/VAT | Unload at dest. |
-|---|---|---|---|---|---|---|---|
-| EXW | B | B | B | B | B | B | B |
-| FCA | S | S | B | B | B | B | B |
-| FAS | S | S | B | B | B | B | B |
-| FOB | S | S | B | B | B | B | B |
-| CFR | S | S | **S** | B | B | B | B |
-| CIF | S | S | **S** | **S** (ICC-C, 110%) | B | B | B |
-| CPT | S | S | **S** | B | B | B | B |
-| CIP | S | S | **S** | **S** (ICC-A, 110%) | B | B | B |
-| DAP | S | S | **S** | S (own risk, not obliged) | B | B | B |
-| DPU | S | S | **S** | S (own risk, not obliged) | B | B | **S** |
-| DDP | S | S | **S** | S (own risk, not obliged) | **S** | **S** | B |
-
-Note on the D group: the seller carries risk to destination, so it will normally insure — but the RULE does not oblige it to, unlike CIF and CIP where insurance is a contractual duty owed to the buyer.`,
+    content: `S = seller, B = buyer.\n\n${buildCostTable()}\n\nNote on the D group: the seller carries risk to destination, so it will normally insure — but the RULE does not oblige it to, unlike CIF and CIP where insurance is a contractual duty owed to the buyer.`,
     keywords: ["who pays", "cost", "costs", "freight", "duty", "vat", "insurance", "clearance", "export clearance", "import clearance", "unload", "table", "comparison", "allocation", "responsibility", "obligations"],
   },
   {

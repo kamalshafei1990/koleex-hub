@@ -7,8 +7,20 @@ import CommercialPolicyIcon from "@/components/icons/CommercialPolicyIcon";
 import FileCode2Icon from "@/components/icons/ui/FileCode2Icon";
 import HandshakeIcon from "@/components/icons/ui/HandshakeIcon";
 import WorkflowIcon from "@/components/icons/ui/WorkflowIcon";
+import ShipIcon from "@/components/icons/ui/ShipIcon";
 
 const knowledgeBases = [
+  {
+    id: "trade-terms",
+    title: "Trade & Payment Terms",
+    description:
+      "What FOB, CIF, T/T, L/C and D/A actually mean, and what each one changes for the seller and the buyer. Written for someone who has never exported anything.",
+    icon: ShipIcon,
+    href: "/knowledge/trade-terms",
+    pages: 1,
+    sections: ["Incoterms", "Payment", "Risk", "L/C", "T/T", "Collections"],
+    color: "#7FA9D6",
+  },
   {
     id: "commercial-policy",
     title: "Commercial Policy & Pricing",
