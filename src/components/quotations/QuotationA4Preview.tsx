@@ -30,6 +30,7 @@ import { createPortal } from "react-dom";
 import { useConfirm } from "@/components/kds/useConfirm";
 import { useToast } from "@/components/kds/useToast";
 import { docLabel, docLabels, type DocLabelKey, type DocLang } from "@/lib/doc-labels";
+import { cdnImage } from "@/lib/cdn";
 import ArrowUpIcon from "@/components/icons/ui/ArrowUpIcon";
 import ArrowDownIcon from "@/components/icons/ui/ArrowDownIcon";
 import TrashIcon from "@/components/icons/ui/TrashIcon";
@@ -7562,7 +7563,8 @@ function PictureCell({
       {image ? (
         /* eslint-disable-next-line @next/next/no-img-element */
         <img
-          src={image}
+          src={cdnImage(image, { width: 256, quality: 75 })}
+          decoding="async"
           alt=""
           style={{ width: "100%", height: "100%", objectFit: "contain", pointerEvents: "none" }}
         />
@@ -7778,7 +7780,10 @@ export function StampSignatureBox({
         /* A cross-origin image the canvas cannot read — leave it at 1. */
       }
     };
-    img.src = imageUrl;
+    /* Same-origin through the optimizer: the pixel read above needs a
+       CORS-clean bitmap, and the raw bucket URL is the slow, off-origin one
+       from China. */
+    img.src = cdnImage(imageUrl, { width: 384, quality: 78 });
     return () => {
       cancelled = true;
     };
@@ -7817,7 +7822,8 @@ export function StampSignatureBox({
       {imageUrl ? (
         /* eslint-disable-next-line @next/next/no-img-element */
         <img
-          src={imageUrl}
+          src={cdnImage(imageUrl, { width: 384, quality: 78 })}
+          decoding="async"
           alt=""
           style={{
             width: "100%",

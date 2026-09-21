@@ -18,6 +18,7 @@ import BriefcaseIcon from "@/components/icons/ui/BriefcaseIcon";
 import DownloadIcon from "@/components/icons/ui/DownloadIcon";
 import TableIcon from "@/components/icons/ui/TableIcon";
 import { downloadDocXlsx, money } from "@/lib/excel-export";
+import { cdnImage } from "@/lib/cdn";
 import CopyIcon from "@/components/icons/ui/CopyIcon";
 import PaperPlaneIcon from "@/components/icons/ui/PaperPlaneIcon";
 import EyeIcon from "@/components/icons/ui/EyeIcon";
@@ -2006,7 +2007,7 @@ export default function Quotations() {
       const lineTotal = money((Number(it.unitPrice) || 0) * (Number(it.qty) || 0));
       // Column order matches the document: NO. · ITEM · MODEL · PICTURE · UNIT PRICE · QTY · TOTAL
       rows.push([n, it.description || "", it.model || "", "", money(it.unitPrice), Number(it.qty) || 0, lineTotal]);
-      images.push(it.image || null);
+      images.push(it.image ? cdnImage(it.image, { width: 256, quality: 75 }) : null);
     }
 
     const TL = docLabels(q.docLang);

@@ -21,6 +21,7 @@ import { FormModal, SearchInput } from "@/components/kds";
 import { useTranslation } from "@/lib/i18n";
 import { docsT } from "@/lib/translations/docs";
 import { record } from "@/lib/perf/client";
+import { cdnImage } from "@/lib/cdn";
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 
 export interface PickerRow {
@@ -308,7 +309,7 @@ export default function ProductPickerModal({
               <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-[var(--border-subtle)] bg-white">
                 {row.image_url ? (
                   // eslint-disable-next-line @next/next/no-img-element
-                  <img src={row.image_url} alt="" loading="lazy" className="h-full w-full object-contain" />
+                  <img src={cdnImage(row.image_url, { width: 128, quality: 75 })} alt="" loading="lazy" decoding="async" className="h-full w-full object-contain" />
                 ) : (
                   <span className="text-[18px] text-gray-400">–</span>
                 )}
