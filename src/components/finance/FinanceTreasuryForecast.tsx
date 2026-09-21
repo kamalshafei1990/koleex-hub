@@ -219,7 +219,7 @@ export default function FinanceTreasuryForecast() {
 
   return (
     <div className="min-h-full bg-[var(--bg-primary)] text-[var(--text-primary)]">
-      <div className="mx-auto max-w-[1500px] px-4 py-6 sm:px-6">
+      <div className="pb-6">
         <FinanceHeader
           title={t("forecast.title", "Treasury Forecast")}
           subtitle={t("forecast.subtitle", "Deterministic 90-day cash projection. Apply scenarios to stress-test customer delays, FX shocks, supplier acceleration, and cost shocks.")}

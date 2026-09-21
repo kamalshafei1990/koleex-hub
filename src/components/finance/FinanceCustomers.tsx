@@ -64,7 +64,7 @@ export default function FinanceCustomers() {
   return (
     <div className="min-h-full bg-[var(--bg-primary)] text-[var(--text-primary)]">
       {toastElement}
-      <div className="mx-auto max-w-[1500px] px-4 py-6 sm:px-6">
+      <div className="pb-6">
         <FinanceHeader
           title={t("customers.title", "Customer Accounts")}
           subtitle={t("customers.subtitle", "Revenue, money collected, and money still owed — for every customer you sell to.")}

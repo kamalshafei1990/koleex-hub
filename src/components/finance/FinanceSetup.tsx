@@ -101,7 +101,7 @@ export default function FinanceSetup() {
 
   return (
     <div className="min-h-full bg-[var(--bg-primary)] text-[var(--text-primary)]">
-      <div className="mx-auto max-w-[1500px] space-y-5 px-4 py-6 sm:px-6">
+      <div className="space-y-5 pt-5 pb-6">
         <FinanceHeader
           title={t("setup.title.long", "Financial Setup")}
           subtitle={t("setup.subtitle.long", "One-time onboarding. Fill the cards below in any order; the dashboard tracks progress.")}
@@ -177,7 +177,7 @@ export default function FinanceSetup() {
         </div>
       </div>
 
-      <div className="mx-auto max-w-[1500px] px-4 pb-8 sm:px-6">
+      <div className="pb-8">
         <PeriodCloseSection />
       </div>
 

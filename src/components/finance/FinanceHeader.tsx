@@ -9,10 +9,25 @@
      · the ··· popup lists every other finance route, grouped by what the
        operator is doing — Books · Statements · Bank · Treasury · Reports ·
        Setup — with a one-line blurb each, translated like the labels.
+
+   TWO HALVES, ONE HEADER. `FinanceHeader` (what every page renders) draws
+   nothing: it publishes the page's title, subtitle and actions to
+   finance-header-slot. `FinanceHeaderFrame` (rendered once by the /finance
+   layout) draws the header from that slot. The strip therefore survives
+   every tab switch — it is the same DOM, only its words change — which is
+   the difference between "switching a tab" and "opening a new page". See
+   the slot module for the full reasoning.
    --------------------------------------------------------------------------- */
 
-import type { ReactNode } from "react";
+import { useLayoutEffect, useMemo, type ReactNode } from "react";
+import { usePathname } from "next/navigation";
 import PageHeader, { type PageTab } from "@/components/ui/PageHeader";
+import {
+  publishFinanceHeader,
+  useFinanceHeaderSlot,
+  type FinanceHealthStatus,
+  type FinanceHeaderSlot,
+} from "@/components/finance/finance-header-slot";
 import type { NavGroup } from "@/components/ui/PageNavPopup";
 import Button from "@/components/ui/Button";
 import { openSmartCreate } from "@/components/ui/create/SmartCreateDrawer";
@@ -27,7 +42,7 @@ import { warmFinanceRoute } from "@/lib/finance/prefetch";
 /* Only the namespaces this screen actually reads — see finance.ts. */
 const DICT = { ...FIN_APP, ...FIN_HEADER } as const;
 
-export type HealthStatus = "healthy" | "watch" | "stress" | "unknown";
+export type HealthStatus = FinanceHealthStatus;
 
 interface HealthStyle { dot: string; labelKey: string; labelFallback: string; hintKey: string; hintFallback: string }
 
@@ -123,14 +138,55 @@ const OVERFLOW_GROUPS_RAW: RawGroup[] = [
   },
 ];
 
-export default function FinanceHeader({
-  title,
-  subtitle,
-  action,
-  controls,
-  health,
-  showTabs = true,
-}: {
+/* Routes whose page renders <FinanceHeader/>, i.e. whose header the layout
+   draws. The four screens built on ErpPage (approvals, data entry, FX rates,
+   workspace) carry their own chrome and are left alone; so are the redirects
+   and the print route. Kept as an explicit list rather than derived from the
+   tab tables so a route cannot gain a second header by being added to the
+   popup before its page is converted. */
+const HOISTED_ROUTES = new Set<string>([
+  "/finance",
+  "/finance/orders",
+  "/finance/customers",
+  "/finance/suppliers",
+  "/finance/expenses",
+  "/finance/accounting/queue",
+  "/finance/accounting/general-ledger",
+  "/finance/accounting/trial-balance",
+  "/finance/accounting/profit-loss",
+  "/finance/accounting/cash-flow",
+  "/finance/accounting/equity",
+  "/finance/statements",
+  "/finance/bank-accounts",
+  "/finance/payments",
+  "/finance/bank-imports",
+  "/finance/reconciliation",
+  "/finance/treasury-forecast",
+  "/finance/treasury-plans",
+  "/finance/reports",
+  "/finance/intelligence",
+  "/finance/notifications",
+  "/finance/setup",
+]);
+
+/** Does the /finance layout draw the header for this route? */
+export function hasHoistedHeader(pathname: string): boolean {
+  const p = pathname.length > 1 ? pathname.replace(/\/$/, "") : pathname;
+  return HOISTED_ROUTES.has(p);
+}
+
+/* The tab or popup label for a route — what the frame shows as the title
+   while the page for that route is still on its way (the route loader), and
+   what the prerendered HTML carries before hydration. */
+function routeLabel(pathname: string): RawTab | RawItem | null {
+  const p = pathname.length > 1 ? pathname.replace(/\/$/, "") : pathname;
+  for (const tab of PRIMARY_TABS_RAW) if (tab.key === p) return tab;
+  for (const g of OVERFLOW_GROUPS_RAW) for (const it of g.items) if (it.key === p) return it;
+  return null;
+}
+
+/** What a page renders. Draws nothing — it hands its words to the frame. */
+export default function FinanceHeader(props: {
   title: string;
   subtitle?: string;
   action?: ReactNode;
@@ -138,16 +194,28 @@ export default function FinanceHeader({
   health?: HealthStatus;
   showTabs?: boolean;
 }) {
+  /* Every render, so a title that changes with state (the order editor's
+     "Edit Order 1042") reaches the frame the moment it changes. A layout
+     effect, so the frame repaints in the same frame as the page. */
+  useLayoutEffect(() => { publishFinanceHeader(props); });
+  useLayoutEffect(() => () => publishFinanceHeader(null), []);
+  return null;
+}
+
+/** What the /finance layout renders, once. */
+export function FinanceHeaderFrame() {
   const { t } = useTranslation(DICT);
+  const pathname = usePathname() ?? "";
+  const slot = useFinanceHeaderSlot();
   const searchPlaceholder = useSearchPlaceholder("finance");
 
-  const tabs: PageTab[] = PRIMARY_TABS_RAW.map((tab) => ({
+  const tabs: PageTab[] = useMemo(() => PRIMARY_TABS_RAW.map((tab) => ({
     key: tab.key,
     icon: tab.icon,
     label: t(tab.labelKey, tab.fallback),
-  }));
+  })), [t]);
 
-  const overflowTabs: NavGroup[] = OVERFLOW_GROUPS_RAW.map((g) => ({
+  const overflowTabs: NavGroup[] = useMemo(() => OVERFLOW_GROUPS_RAW.map((g) => ({
     id: g.id,
     label: t(g.labelKey, g.fallback),
     accent: g.accent,
@@ -157,7 +225,18 @@ export default function FinanceHeader({
       label: t(it.labelKey, it.fallback),
       blurb: t(it.blurbKey, it.blurb),
     })),
-  }));
+  })), [t]);
+
+  /* Between pages (the route loader is up, or the HTML has not hydrated yet)
+     the frame wears the destination's tab label. The subtitle is a blank
+     line on purpose: it keeps the hero the height the real subtitle will
+     take, so the tab strip does not hop when the page arrives. */
+  const shown: FinanceHeaderSlot | null = slot ?? (() => {
+    const label = routeLabel(pathname);
+    return label ? { title: t(label.labelKey, label.fallback), subtitle: "\u00A0" } : null;
+  })();
+  if (!shown) return null;
+  const { title, subtitle, action, controls, health, showTabs = true } = shown;
 
   const createBtn = (
     <Button

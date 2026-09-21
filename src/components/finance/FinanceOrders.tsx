@@ -176,7 +176,7 @@ export default function FinanceOrders() {
   return (
     <div className="min-h-full bg-[var(--bg-primary)] text-[var(--text-primary)]">
       {toastElement}
-      <div className="mx-auto max-w-[1500px] px-4 py-6 sm:px-6">
+      <div className="pb-6">
         <FinanceHeader
           title={t("orders.title", "Order Profitability")}
           subtitle={t("orders.subtitle.long", "Track selling price, supplier costs, and realised profit on every order.")}
@@ -681,7 +681,7 @@ function OrderEditor({
         onPick={(row) => supplierPickerIndex !== null && applySupplierPick(supplierPickerIndex, row)}
       />
 
-      <div className="mx-auto max-w-[1500px] px-4 py-6 sm:px-6">
+      <div className="pb-6">
         <FinanceHeader
           title={draft.order.id ? t("orders.editOrder", "Edit Order {no}").replace("{no}", draft.order.order_no) : t("orders.newOrder", "New Order")}
           subtitle={t("orders.editor.subtitle", "Capture the selling price, every supplier cost, and let Koleex compute the profit automatically.")}

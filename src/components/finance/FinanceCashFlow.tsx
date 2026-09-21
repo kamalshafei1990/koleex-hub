@@ -61,7 +61,7 @@ export default function FinanceCashFlow() {
 
   return (
     <div className="min-h-full bg-[var(--bg-primary)] text-[var(--text-primary)]">
-      <div className="mx-auto max-w-[1500px] space-y-4 px-4 py-6 sm:px-6">
+      <div className="space-y-4 pt-4 pb-6">
         <FinanceHeader
           title={t("accounting.cf.title", "Cash Flow Statement")}
           subtitle={t("accounting.cf.subtitle.long", "Direct-method statement built from posted journal lines that touch cash accounts.")}

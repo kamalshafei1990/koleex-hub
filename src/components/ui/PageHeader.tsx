@@ -425,6 +425,7 @@ export default function PageHeader({
           activeKey={active}
           ariaLabel={`${title} navigation`}
           onWarmTab={onWarmTab}
+          alsoWarm={overflowTabs?.flatMap((g) => g.items.map((it) => it.key))}
         />
       </div>
     )}
@@ -441,11 +442,15 @@ function SlidingPillNav({
   activeKey,
   ariaLabel,
   onWarmTab,
+  alsoWarm,
 }: {
   tabs: PageTab[];
   activeKey: string;
   ariaLabel: string;
   onWarmTab?: (href: string) => void;
+  /** Routes behind the ··· popup — warmed after the strip on a connection
+   *  that can afford it, so a popup pick meets no route loader either. */
+  alsoWarm?: string[];
 }) {
   const [tabWidth, setTabWidth] = useState<number>(TAB_WIDTH_LG);
   const trackRef = useRef<HTMLDivElement>(null);
@@ -520,29 +525,46 @@ function SlidingPillNav({
   }, [router, onWarmTab]);
 
   /* Neighbours after a short idle, always. On a connection that can afford
-     it, the REST of the strip follows, one route every 250 ms, so the
-     operator never meets the segment skeleton on a tab they can see. A
-     data-saver or 2G/3G connection keeps the frugal behaviour: neighbours
-     plus hover. (Owner, twice: "each tab loads like I opened a new page".) */
+     it, the REST of the strip follows, one route every 250 ms, and then the
+     popup's routes, so the operator never meets the segment skeleton on a
+     tab they can reach. Only Save-Data and a 2G link keep the frugal
+     behaviour (neighbours plus hover): "3g" is what Chrome reports for any
+     link with a 270 ms+ round trip, which is every staff connection from
+     China to this deployment — the exact users for whom a tab downloaded on
+     the click costs the most. Same threshold as app-prefetch's
+     isPreloadAllowed. (Owner, three times: "each tab loads like I opened a
+     new page".)
+
+     Keyed on the tab HREFS, not the tabs array: the header re-renders with
+     its page and rebuilds that array each time, and a timer reset on every
+     keystroke in a filter never fires at all. */
+  const tabHrefs = tabs.map((t) => t.key).join("\n");
+  const alsoHrefs = (alsoWarm ?? []).join("\n");
   useEffect(() => {
+    const hrefs = tabHrefs.split("\n");
     const timers: number[] = [];
     timers.push(window.setTimeout(() => {
       for (const i of [activeIndex - 1, activeIndex + 1]) {
-        const href = tabs[i]?.key;
+        const href = hrefs[i];
         if (href) warmRoute(href);
       }
       const conn = (navigator as Navigator & { connection?: { saveData?: boolean; effectiveType?: string } }).connection;
-      const frugal = !!conn?.saveData || (conn?.effectiveType != null && conn.effectiveType !== "4g");
+      const frugal = !!conn?.saveData || conn?.effectiveType === "2g" || conn?.effectiveType === "slow-2g";
       if (frugal) return;
-      const rest = tabs
-        .map((t, i) => ({ href: t.key, i }))
-        .filter(({ href, i }) => href.startsWith("/") && Math.abs(i - activeIndex) > 1);
-      rest.forEach(({ href }, n) => {
+      const seen = new Set<string>(hrefs);
+      const rest = hrefs
+        .map((href, i) => ({ href, i }))
+        .filter(({ href, i }) => href.startsWith("/") && Math.abs(i - activeIndex) > 1)
+        .map(({ href }) => href);
+      for (const href of alsoHrefs ? alsoHrefs.split("\n") : []) {
+        if (href.startsWith("/") && !seen.has(href)) { seen.add(href); rest.push(href); }
+      }
+      rest.forEach((href, n) => {
         timers.push(window.setTimeout(() => warmRoute(href), 250 * (n + 1)));
       });
     }, 600));
     return () => { for (const t of timers) window.clearTimeout(t); };
-  }, [tabs, activeIndex, warmRoute]);
+  }, [tabHrefs, alsoHrefs, activeIndex, warmRoute]);
 
   /* Written straight onto the node rather than held in state. Geometry read
      from the DOM can only be measured after layout, and pushing it back

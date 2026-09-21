@@ -64,6 +64,42 @@ const PLAN: Record<string, Array<{ key: string; load: Loader }>> = {
   "/finance/treasury-plans": [
     { key: "fin:treasury-plans", load: async () => (await getJson<{ plans?: unknown[] }>("/api/finance/treasury-plans")).plans ?? [] },
   ],
+  "/finance/approvals": [
+    {
+      key: "fin:approvals",
+      load: async () => {
+        const [pend, act] = await Promise.all([
+          getJson<{ items?: unknown[]; can_approve?: boolean }>("/api/approvals"),
+          getJson<{ items?: unknown[] }>("/api/approvals/activity?limit=40"),
+        ]);
+        return { items: pend.items, canApprove: !!pend.can_approve, activity: act.items };
+      },
+    },
+  ],
+  "/finance/fx-rates": [
+    {
+      key: "fin:fx",
+      load: async () => {
+        const [r, s] = await Promise.all([
+          getJson<{ rates?: unknown[] }>("/api/finance/fx/rates"),
+          getJson<{ status?: unknown }>("/api/finance/fx/status").catch(() => ({} as { status?: unknown })),
+        ]);
+        return { rates: r.rates ?? [], status: s.status ?? null };
+      },
+    },
+  ],
+  "/finance/notifications": [
+    { key: "fin:notifications", load: async () => (await getJson<{ notifications?: unknown[] }>("/api/finance/notifications")).notifications ?? [] },
+  ],
+  "/finance/workspace": [
+    {
+      key: "fin:workspace",
+      load: async () => {
+        const j = await getJson<{ snapshot?: unknown; visibility?: unknown }>("/api/finance/workspace");
+        return { snapshot: j.snapshot, visibility: j.visibility };
+      },
+    },
+  ],
   "/finance/accounting/queue": [
     { key: "fin:queue:pending:all", load: () => getJson("/api/accounting/queue?status=pending&limit=200") },
   ],

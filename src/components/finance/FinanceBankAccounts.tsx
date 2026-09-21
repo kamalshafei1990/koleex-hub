@@ -169,7 +169,7 @@ export default function FinanceBankAccounts() {
 
   return (<>
     <div className="min-h-full bg-[var(--bg-primary)] text-[var(--text-primary)]">
-      <div className="mx-auto max-w-[1500px] px-4 py-6 sm:px-6">
+      <div className="pb-6">
         <FinanceHeader
           title={t("bankAccounts.title", "Bank Accounts")}
           subtitle={t("bankAccounts.subtitle.long", "Manage treasury accounts, monitor balances, and hand statements to reconciliation.")}

@@ -202,7 +202,7 @@ export default function FinanceTreasuryPlans() {
 
   return (<>
     <div className="min-h-full bg-[var(--bg-primary)] text-[var(--text-primary)]">
-      <div className="mx-auto max-w-[1500px] px-4 py-6 sm:px-6">
+      <div className="pb-6">
         <FinanceHeader
           title={t("treasuryPlans.title", "Treasury Plans")}
           subtitle={t("treasuryPlans.subtitle.long", "Saved forecasts under operational governance: review, approve, archive, and compare against current treasury state.")}

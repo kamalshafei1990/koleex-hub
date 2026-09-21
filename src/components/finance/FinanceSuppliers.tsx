@@ -62,7 +62,7 @@ export default function FinanceSuppliers() {
   return (
     <div className="min-h-full bg-[var(--bg-primary)] text-[var(--text-primary)]">
       {toastElement}
-      <div className="mx-auto max-w-[1500px] px-4 py-6 sm:px-6">
+      <div className="pb-6">
         <FinanceHeader
           title={t("suppliers.title", "Supplier Accounts")}
           subtitle={t("suppliers.subtitle", "What you've bought from each supplier, what's paid, and what's still owed.")}

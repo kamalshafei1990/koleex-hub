@@ -233,7 +233,7 @@ export default function FinanceBankImports() {
 
   return (
     <div className="min-h-full bg-[var(--bg-primary)] text-[var(--text-primary)]">
-      <div className="mx-auto max-w-[1500px] px-4 py-6 sm:px-6">
+      <div className="pb-6">
         <FinanceHeader
           title={t("bankImports.title", "Bank Statement Import")}
           subtitle={t("bankImports.subtitle.long", "Upload a CSV or XLSX statement, preview the parsed rows, and hand the new cash movements to the reconciliation queue.")}

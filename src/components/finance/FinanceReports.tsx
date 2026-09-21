@@ -181,7 +181,7 @@ export default function FinanceReports({
   return (
     <div className="min-h-full bg-[var(--bg-primary)] text-[var(--text-primary)]">
       {toastElement}
-      <div className="mx-auto max-w-[1500px] px-4 py-6 sm:px-6">
+      <div className="pb-6">
         <FinanceHeader
           title={t("reports.centre.title", "Reporting Centre")}
           subtitle={t("reports.centre.subtitle", "Generate, print, and export official finance documents. External reports are safe to send; internal ones never leave the company.")}

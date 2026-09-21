@@ -143,7 +143,7 @@ export default function FinanceReconciliation() {
   return (
     <div className="min-h-full bg-[var(--bg-primary)] text-[var(--text-primary)]">
       {inputDialog}
-      <div className="mx-auto max-w-[1500px] px-4 py-6 sm:px-6">
+      <div className="pb-6">
         <FinanceHeader
           title={t("reconciliation.title", "Reconciliation Queue")}
           subtitle={t("reconciliation.subtitle.long", "Deterministic matches between payments and bank movements. You confirm; the engine never reconciles silently.")}

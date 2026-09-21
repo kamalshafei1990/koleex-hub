@@ -179,7 +179,7 @@ export default function FinanceExpenseAnalytics() {
 
   return (
     <div className="min-h-full bg-[var(--bg-primary)] text-[var(--text-primary)]">
-      <div className="mx-auto max-w-[1500px] px-4 py-6 sm:px-6">
+      <div className="pb-6">
         <FinanceHeader
           title={t("expAnalytics.title", "Expense Analytics")}
           subtitle={t("expAnalytics.subtitle.long", "Where the money goes — by category, by order, by trend. Daily entry lives in the Expenses app.")}

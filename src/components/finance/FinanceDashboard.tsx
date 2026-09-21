@@ -376,7 +376,7 @@ export default function FinanceDashboard() {
 
   return (
     <div className="min-h-full bg-[var(--bg-primary)] text-[var(--text-primary)]">
-      <div className="mx-auto max-w-[1500px] px-4 py-5 sm:px-6">
+      <div className="pb-5">
         <FinanceHeader
           title={t("dashboard.title", "Financial Intelligence")}
           subtitle={pressureHeadline(pressure, intelligence.headline, t)}

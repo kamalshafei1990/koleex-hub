@@ -116,7 +116,7 @@ export default function FinanceGeneralLedger() {
 
   return (
     <div className="min-h-full bg-[var(--bg-primary)] text-[var(--text-primary)]">
-      <div className="mx-auto max-w-[1500px] space-y-4 px-4 py-6 sm:px-6">
+      <div className="space-y-4 pt-4 pb-6">
         <FinanceHeader
           title={t("accounting.gl.title", "General Ledger")}
           subtitle={t("accounting.gl.subtitle.long", "Every posted journal line against a chosen account, with a running balance.")}

@@ -58,7 +58,7 @@ export default function FinanceHome() {
 
   return (
     <div className="min-h-full bg-[var(--bg-primary)] text-[var(--text-primary)]">
-      <div className="mx-auto max-w-[1500px] px-4 py-5 sm:px-6">
+      <div className="pb-5">
         <FinanceHeader
           title={t("app.title", "Finance")}
           subtitle={t("app.subtitle", "Income · Balance Sheet · Cash Flow — your full picture at a glance.")}

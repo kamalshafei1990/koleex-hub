@@ -63,7 +63,7 @@ export default function FinanceStatements() {
 
   return (
     <div className="min-h-full bg-[var(--bg-primary)] text-[var(--text-primary)]">
-      <div className="mx-auto max-w-[1500px] space-y-5 px-4 py-6 sm:px-6">
+      <div className="space-y-5 pt-5 pb-6">
         <FinanceHeader
           title={t("statements.title", "Statements")}
           subtitle={t("statements.subtitle.long", "Executive financial picture — P&L, Balance Sheet, Cash Flow, aging, valuation, gross profit.")}
