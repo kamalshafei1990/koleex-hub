@@ -134,6 +134,17 @@ export const docsT: Translations = {
   "btn.delete":          { en: "Delete",           zh: "删除",              ar: "حذف" },
   "btn.opening":         { en: "Opening…",         zh: "正在打开…",         ar: "جارٍ الفتح…" },
 
+  /* ── Undo / redo + housekeeping ── */
+  "tb.undo":             { en: "Undo (Ctrl+Z)",    zh: "撤销 (Ctrl+Z)",     ar: "تراجع (Ctrl+Z)" },
+  "tb.redo":             { en: "Redo (Ctrl+Y)",    zh: "重做 (Ctrl+Y)",     ar: "إعادة (Ctrl+Y)" },
+  "list.compact":        { en: "Shrink {n} old quotations", zh: "压缩 {n} 份旧报价单", ar: "تصغير {n} عرض سعر قديم" },
+  "list.compactHint":    { en: "Move the photos still stored inside these documents to the media library so they open fast",
+                           zh: "将仍存储在这些文档内部的图片移到媒体库，使其快速打开",
+                           ar: "نقل الصور المخزّنة داخل هذه المستندات إلى مكتبة الوسائط لتُفتح بسرعة" },
+  "list.compacting":     { en: "Shrinking… {n} left", zh: "压缩中… 剩余 {n}", ar: "جارٍ التصغير… متبقٍ {n}" },
+  "toast.compactDone":   { en: "{n} quotations now open from the media library.", zh: "{n} 份报价单现在从媒体库打开。", ar: "{n} عرض سعر تُفتح الآن من مكتبة الوسائط." },
+  "toast.compactFail":   { en: "Shrinking stopped: {err}", zh: "压缩已停止：{err}", ar: "توقّف التصغير: {err}" },
+
   /* ── Editor toolbar ── */
   "tb.showPanels":       { en: "Show panels",      zh: "显示面板",          ar: "إظهار اللوحات" },
   "tb.hidePanels":       { en: "Hide panels",      zh: "隐藏面板",          ar: "إخفاء اللوحات" },

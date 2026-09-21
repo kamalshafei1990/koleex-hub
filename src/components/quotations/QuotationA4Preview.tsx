@@ -25,7 +25,7 @@
    click target, same row-delete affordance.
    --------------------------------------------------------------------------- */
 
-import { useCallback, useEffect, useMemo, useRef, useState, type Dispatch, type MutableRefObject, type SetStateAction } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type Dispatch, type MutableRefObject, type SetStateAction } from "react";
 import { createPortal } from "react-dom";
 import { useConfirm } from "@/components/kds/useConfirm";
 import { useToast } from "@/components/kds/useToast";
@@ -456,6 +456,402 @@ const DOC_EDITOR_STYLES = `
   }
 `;
 
+/* ─── Pagination model ─────────────────────────────────────────────────────
+   A sheet is 270 mm tall and `overflow: visible`, so a row the split puts on
+   a sheet it does not fit paints straight over the next sheet — the owner's
+   screenshot: a 59-item quotation with row 4 straddling the bottom edge of
+   sheet 1. Rows used to be costed from their text length only, and a two-line
+   description beside a picture came out ~30 px shorter than it renders.
+
+   The split is now computed from MEASURED layout. The text estimate below
+   still prices the first paint and any row not yet measured (so nothing
+   flashes empty, and the server render has a sensible split); once the
+   document is on screen a ResizeObserver keeps `LayoutMetrics` current and
+   the split is recomputed from real pixels — see the pager in the component.
+
+   Everything is in CSS px of the UNSCALED layout: offsetTop / offsetHeight,
+   which neither the pinch-zoom transform nor the fit-to-width scale touch. */
+
+/* A row is as tall as the tallest thing in it: the picture, or the text.
+   Forced line breaks count as lines of their own, and each break-delimited
+   segment wraps on its own (~34 characters per line in the 206 px description
+   column at 11 px). 112 px is the floor for EVERY row — the NO. cell carries
+   `height: 112` unconditionally so the row-action cluster and the notes panel
+   fit inside the row — so a picture-less one-liner is 112 px tall too. */
+function estimateRowHeight(it: QuotationItem): number {
+  const toLines = (html: string) =>
+    html
+      .replace(/<br\s*\/?>|<\/div>|<\/p>/gi, "\n")
+      .replace(/<[^>]+>/g, " ")
+      .split("\n");
+  const segments = toLines(it.description ?? "");
+  if ((it.model ?? "").trim()) segments.push(...toLines(it.model ?? ""));
+  const lines = Math.max(
+    1,
+    segments.reduce((n, s) => n + Math.max(1, Math.ceil(s.trim().length / 34)), 0),
+  );
+  const textHeight = 26 + lines * 15;
+  return Math.max(112, textHeight);
+}
+
+/* What the split needs to know about the sheet, besides the rows. `null`
+   means "not measured yet" and falls back to the estimate beside it. */
+type LayoutMetrics = {
+  /* Sheet content height: 270 mm less the sheet's own padding. */
+  innerH: number | null;
+  /* Content top → top of the items table on sheet 1 (header, brand strips,
+     meta strip, party cards and the collapsed margin under them). */
+  firstTop: number | null;
+  /* The same on a continuation sheet: just the table's top margin. */
+  midTop: number | null;
+  /* The black column-header row (sheet 1 only). */
+  theadH: number | null;
+  /* The table's own top + bottom border. */
+  frame: number | null;
+  /* What follows the last row inside the table: the totals row, plus the
+     add-row placeholder on screen (it is display:none in print, so there it
+     measures 0 and print gets the room back). */
+  tailH: number | null;
+  /* Totals + T&C + Shipment Details, including the gap above the block. */
+  footerAH: number | null;
+  /* Rendered height of each item row, keyed by its index in items[]. */
+  rows: ReadonlyMap<number, number>;
+};
+
+/* First-paint guesses, taken from the live sheet at 96 dpi. Only the first
+   frame and unmeasured rows ever see them. */
+const EST_INNER_H = 978;
+const EST_FIRST_TOP = 445;
+const EST_MID_TOP = 12;
+const EST_THEAD_H = 58;
+const EST_FRAME = 2;
+const EST_TAIL_H = 40;
+const EST_FOOTER_A_H = 560;
+/* offsetHeight rounds each box to a whole pixel and the sheet's 270 mm is
+   1020.47 px, so a sheet filled to the last pixel can still miss by a few.
+   This is the room kept below the last block on every sheet. */
+const PAGE_SLACK = 6;
+
+const EMPTY_METRICS: LayoutMetrics = {
+  innerH: null,
+  firstTop: null,
+  midTop: null,
+  theadH: null,
+  frame: null,
+  tailH: null,
+  footerAH: null,
+  rows: new Map(),
+};
+
+/* The split itself: how many rows each items sheet holds, and whether the
+   totals block rides the last of them instead of taking a sheet of its own. */
+type PageSplit = { lens: number[]; footerAWithItems: boolean };
+
+function packPages(items: QuotationItem[], m: LayoutMetrics): PageSplit {
+  const innerH = m.innerH ?? EST_INNER_H;
+  const firstTop = m.firstTop ?? EST_FIRST_TOP;
+  const midTop = m.midTop ?? EST_MID_TOP;
+  const theadH = m.theadH ?? EST_THEAD_H;
+  const frame = m.frame ?? EST_FRAME;
+  const tailH = m.tailH ?? EST_TAIL_H;
+  const footerAH = m.footerAH ?? EST_FOOTER_A_H;
+
+  /* Room for rows on sheet 1 (header + column head above them) and on a
+     continuation sheet (only the table's top margin above them). */
+  const budgetFirst = innerH - firstTop - theadH - frame - PAGE_SLACK;
+  const budgetMid = innerH - midTop - frame - PAGE_SLACK;
+  const budgetOf = (page: number) => (page === 0 ? budgetFirst : budgetMid);
+
+  const heights = items.map((it, i) => m.rows.get(i) ?? estimateRowHeight(it));
+  const total = heights.length;
+  const sum = (start: number, n: number) => {
+    let s = 0;
+    for (let i = start; i < start + n; i++) s += heights[i];
+    return s;
+  };
+
+  /* Fill each sheet to its budget. Even 0 items still gets a first sheet —
+     it carries the header, the parties and the table head. A row taller
+     than a whole sheet still gets a sheet of its own: the one case where an
+     overflow is accepted, because there is nowhere else to put it. */
+  let lens: number[] = [];
+  let count = 0;
+  let used = 0;
+  for (const h of heights) {
+    if (count > 0 && used + h > budgetOf(lens.length)) {
+      lens.push(count);
+      count = 0;
+      used = 0;
+    }
+    count += 1;
+    used += h;
+  }
+  lens.push(count);
+
+  /* The sheet that ends the table also carries the table tail. If the last
+     rows plus the tail do not fit, the last row moves to a sheet of its
+     own — one row is always enough to move, since the previous sheet was
+     within budget without the tail. */
+  const lastRows = (ls: number[]) => sum(total - ls[ls.length - 1], ls[ls.length - 1]);
+  if (lens[lens.length - 1] > 1 && lastRows(lens) + tailH > budgetOf(lens.length - 1)) {
+    lens[lens.length - 1] -= 1;
+    lens.push(1);
+  }
+
+  /* BALANCE. A trailing sheet holding one row above 221 mm of white is what
+     the owner saw before. If the last sheet came out less than half full and
+     there is an earlier sheet to borrow from, spread the rows evenly instead
+     — 5 items become 3 + 2, not 4 + 1. Kept only if EVERY sheet still fits
+     its own budget (the first has the header above it, the last the tail
+     below it). */
+  const fits = (ls: number[]) => {
+    let start = 0;
+    for (let p = 0; p < ls.length; p++) {
+      const need = sum(start, ls[p]) + (p === ls.length - 1 ? tailH : 0);
+      if (need > budgetOf(p)) return false;
+      start += ls[p];
+    }
+    return true;
+  };
+  if (lens.length > 1 && lastRows(lens) < budgetMid / 2) {
+    const per = Math.ceil(total / lens.length);
+    const even: number[] = [];
+    for (let s = 0; s < total; s += per) even.push(Math.min(per, total - s));
+    if (even.length === lens.length && fits(even)) lens = even;
+  }
+
+  /* Footer-A rides the last items sheet when the measured room is there.
+     The two footer blocks stay split from each other: together they are
+     269.8 mm against a 270 mm sheet. */
+  const room = budgetOf(lens.length - 1) - lastRows(lens) - tailH;
+  return { lens, footerAWithItems: total > 0 && room >= footerAH };
+}
+
+function sameSplit(a: PageSplit, b: PageSplit): boolean {
+  if (a.footerAWithItems !== b.footerAWithItems || a.lens.length !== b.lens.length) return false;
+  for (let i = 0; i < a.lens.length; i++) if (a.lens[i] !== b.lens[i]) return false;
+  return true;
+}
+
+type PageKind = "items" | "footer-a" | "footer-b";
+type PageEntry = {
+  kind: PageKind;
+  items: QuotationItem[];
+  startIdx: number;
+  /* An items sheet that also carries the totals / T&C block below its
+     table, instead of that block taking a sheet of its own. */
+  withFooterA?: boolean;
+};
+
+function buildPages(items: QuotationItem[], m: LayoutMetrics): PageEntry[] {
+  const split = packPages(items, m);
+  const out: PageEntry[] = [];
+  let startIdx = 0;
+  for (const n of split.lens) {
+    out.push({ kind: "items", items: items.slice(startIdx, startIdx + n), startIdx });
+    startIdx += n;
+  }
+  if (split.footerAWithItems) out[out.length - 1].withFooterA = true;
+  else out.push({ kind: "footer-a", items: [], startIdx: items.length });
+  out.push({ kind: "footer-b", items: [], startIdx: items.length });
+  return out;
+}
+
+/* ─── Reading the layout back ──────────────────────────────────────────────
+   The sheets carry data-pq-* markers (sheet, inner, table, thead, tail, row,
+   footer-a). Every value is an offsetTop / offsetHeight difference taken
+   inside ONE sheet, so whatever sits above the stack — the pinch-zoom
+   transform, the fit-to-width scale, the print page's own wrapper — cancels
+   out. offsetTop is summed up the offsetParent chain rather than read once,
+   because the sheet is `position: relative` on screen but static under
+   @media print, and the sum is right either way. */
+function offsetTopInDocument(el: HTMLElement): number {
+  let y = 0;
+  let n: HTMLElement | null = el;
+  while (n) {
+    y += n.offsetTop;
+    n = n.offsetParent as HTMLElement | null;
+  }
+  return y;
+}
+
+function readLayoutMetrics(root: HTMLElement): LayoutMetrics | null {
+  const sheets = Array.from(root.querySelectorAll<HTMLElement>("[data-pq-sheet]"));
+  const sheet0 = sheets[0];
+  if (!sheet0) return null;
+  const cs = getComputedStyle(sheet0);
+  const padTop = parseFloat(cs.paddingTop) || 0;
+  const padBottom = parseFloat(cs.paddingBottom) || 0;
+  const innerH = sheet0.clientHeight - padTop - padBottom;
+  /* A hidden stack (display:none ancestor) measures 0 everywhere — keep the
+     last good numbers rather than paginate against nothing. */
+  if (!(innerH > 0)) return null;
+
+  let firstTop: number | null = null;
+  let midTop: number | null = null;
+  let theadH: number | null = null;
+  let frame: number | null = null;
+  let tailH: number | null = null;
+  let footerAH: number | null = null;
+
+  for (const sheet of sheets) {
+    const contentTop = offsetTopInDocument(sheet) + padTop;
+    const table = sheet.querySelector<HTMLElement>("[data-pq-table]");
+    /* Where the block after the table starts from: the table's bottom edge,
+       or the content top on a sheet without a table. */
+    let after = contentTop;
+    if (table) {
+      const tableTop = offsetTopInDocument(table);
+      if (sheet === sheet0) firstTop = tableTop - contentTop;
+      else if (midTop == null) midTop = tableTop - contentTop;
+      if (frame == null) frame = table.offsetHeight - table.clientHeight;
+      const thead = table.querySelector<HTMLElement>("[data-pq-thead]");
+      if (thead) theadH = thead.offsetHeight;
+      const tails = table.querySelectorAll<HTMLElement>("[data-pq-tail]");
+      if (tails.length) {
+        let t = 0;
+        tails.forEach((el) => { t += el.offsetHeight; });
+        tailH = t;
+      }
+      after = tableTop + table.offsetHeight;
+    }
+    const footerA = sheet.querySelector<HTMLElement>("[data-pq-footer-a]");
+    if (footerA) footerAH = offsetTopInDocument(footerA) + footerA.offsetHeight - after;
+  }
+
+  const rows = new Map<number, number>();
+  root.querySelectorAll<HTMLElement>("[data-pq-row]").forEach((el) => {
+    const idx = Number(el.dataset.pqRow);
+    const h = el.offsetHeight;
+    if (Number.isInteger(idx) && h > 0) rows.set(idx, h);
+  });
+
+  return { innerH, firstTop, midTop, theadH, frame, tailH, footerAH, rows };
+}
+
+/* Which sheet a row, or the totals block, lands on under a split. */
+function sheetOfRow(split: PageSplit, idx: number): number {
+  let end = 0;
+  for (let p = 0; p < split.lens.length; p++) {
+    end += split.lens[p];
+    if (idx < end) return p;
+  }
+  return split.lens.length - 1;
+}
+function sheetOfFooterA(split: PageSplit): number {
+  return split.footerAWithItems ? split.lens.length - 1 : split.lens.length;
+}
+
+/* The operator is typing in a block that the new split would move to another
+   sheet. Sheets are keyed by index and rows by item index within a sheet, so
+   a block that stays on its sheet keeps its DOM node — and the text typed
+   since the last blur, which only onBlur commits. A block that changes sheet
+   is remounted from state and would lose that text, so for that one case the
+   split waits for focusout. The header inputs and footer-B never move. */
+function editedBlockMoves(root: HTMLElement, before: PageSplit, after: PageSplit): boolean {
+  const ae = document.activeElement;
+  if (!(ae instanceof HTMLElement) || !root.contains(ae)) return false;
+  const editing =
+    ae.isContentEditable ||
+    ae.tagName === "INPUT" ||
+    ae.tagName === "TEXTAREA" ||
+    ae.tagName === "SELECT";
+  if (!editing) return false;
+  const row = ae.closest<HTMLElement>("[data-pq-row]");
+  if (row) {
+    const idx = Number(row.dataset.pqRow);
+    return sheetOfRow(before, idx) !== sheetOfRow(after, idx);
+  }
+  if (ae.closest("[data-pq-footer-a]")) return sheetOfFooterA(before) !== sheetOfFooterA(after);
+  return false;
+}
+
+/* One pager per mounted stack. It owns the ResizeObserver, batches every
+   notification into a single requestAnimationFrame pass, and hands React a
+   new LayoutMetrics only when the split it produces differs from the split
+   already on screen. `sync` is called after every commit to (un)observe the
+   markers that came and went; `dispose` on unmount.
+
+   Why rAF and not a commit inside the observer callback: a commit there
+   resizes the sheets while the browser is still delivering notifications,
+   which trips the "ResizeObserver loop completed with undelivered
+   notifications" error (and the dev overlay). One frame later is safe.
+
+   data-paginated on the root reads "1" once a measured pass has confirmed
+   the split on screen, "0" while a change is still landing. The print page
+   waits for "1" before it declares the document ready. */
+function createPager(
+  root: HTMLElement,
+  io: {
+    items: { readonly current: QuotationItem[] };
+    metrics: { readonly current: LayoutMetrics };
+    commit: (next: LayoutMetrics) => void;
+  },
+) {
+  let raf: number | null = null;
+  let hold = false;
+  let alive = true;
+  const observed = new Set<Element>();
+
+  const pass = () => {
+    raf = null;
+    if (!alive || !root.isConnected) return;
+    const next = readLayoutMetrics(root);
+    if (!next) return;
+    const items = io.items.current;
+    const before = packPages(items, io.metrics.current);
+    const after = packPages(items, next);
+    const changed = !sameSplit(before, after);
+    if (changed && editedBlockMoves(root, before, after)) {
+      hold = true;
+      return;
+    }
+    if (changed) {
+      io.commit(next);
+      /* Verify once the new split has been committed and laid out. */
+      schedule();
+    }
+    root.setAttribute("data-paginated", changed ? "0" : "1");
+  };
+  const schedule = () => {
+    if (!alive || raf != null) return;
+    raf = requestAnimationFrame(pass);
+  };
+  const ro = new ResizeObserver(() => schedule());
+  const onFocusOut = () => {
+    if (!hold) return;
+    hold = false;
+    schedule();
+  };
+  root.addEventListener("focusout", onFocusOut);
+
+  return {
+    sync() {
+      const wanted = new Set<Element>(
+        root.querySelectorAll("[data-pq-sheet], [data-pq-inner], [data-pq-row], [data-pq-footer-a]"),
+      );
+      for (const el of observed) {
+        if (wanted.has(el)) continue;
+        ro.unobserve(el);
+        observed.delete(el);
+      }
+      for (const el of wanted) {
+        if (observed.has(el)) continue;
+        ro.observe(el);
+        observed.add(el);
+      }
+    },
+    dispose() {
+      alive = false;
+      if (raf != null) cancelAnimationFrame(raf);
+      raf = null;
+      ro.disconnect();
+      observed.clear();
+      root.removeEventListener("focusout", onFocusOut);
+    },
+  };
+}
+
 export default function QuotationA4Preview({
   current,
   setCurrent,
@@ -823,196 +1219,51 @@ export default function QuotationA4Preview({
     catch { /* command unsupported — silently ignore */ }
   };
 
-  /* ─── Pagination ─────────────────────────────────────────────────
-     Each page is packed with as many items as it physically holds.
-     Capacities measured from the live render at 96 dpi:
-       · A4 inner content height: 1067 px (297 mm minus 32 + 24 px
-         border-box padding).
-       · Row height: ~110 px (88 px picture cell + 22 px row padding).
-       · Page 1 header section (logo band 94 + brand strips 68 +
-         meta strip 62 + FROM card 200 + QUOTATION TO card 220 +
-         margins ~30 + items thead 30) ≈ 705 px → 360 px left for
-         items → 4 rows × 110 = 440 px (slight overshoot tolerated
-         because real row height is closer to 104 with the smaller
-         picture cell).
-       · Middle page (no thead — header is page-1 only): 1067 px
-         budget → 9 rows × 110 = 990 px, picked 8 for safety.
-       · Last page (items + totals + terms + stamp + bank + footer):
-         footer block ≈ 700 px → 360 px left → 3 rows.
-     If items.length ≤ ITEMS_LAST the whole document collapses to a
-     single page. */
-  /* Reduced page 1 capacity 5 → 4 — the QUOTATION TO card grew when
-     the Phone / Mobile / Email / Web inline grid was added, pushing
-     the header section past 700 px. Five rows × 110 px would land
-     within 5 px of the page bottom (visibly touches the A4 edge),
-     so we drop one row and gain ~110 px of breathing space below
-     the items table on page 1. */
-  /* ── PAGINATION ──
-     Old model: each page tries to hold items AND (on the last page)
-     the entire footer block (Totals + T&C + Shipment Details +
-     Stamp/Sig + Bank + Footer). Problem: the footer block alone
-     measures ~940 px tall while a 270-mm A4 page only has ~978 px
-     of inner content room — leaving ~38 px for items. Anything
-     more than 1 item on the last page overflows the page boundary
-     and (in print) gets clipped OR generates blank trailing sheets.
+  /* ─── Pagination: measured, not guessed ──────────────────────────────────
+     The split (packPages, above the component) is computed from
+     LayoutMetrics. The first paint and every unmeasured row use the text
+     estimate; from then on the pager below keeps the metrics current from
+     the DOM and the split follows real pixels, so a row can never be put on
+     a sheet it does not fit (a single row taller than a sheet excepted).
 
-     New model: split the footer across TWO dedicated pages so each
-     page actually fits inside A4:
-       · pages[0..N-1]   — header + items rows (with thead repeated)
-       · pages[N]        — footer-A: Totals + T&C + Shipment Details
-       · pages[N+1]      — footer-B: Stamp + Sig + Bank + Footer
-     Items pages can now use the full ITEMS_MIDDLE budget on the
-     LAST items page too (no need to leave room for the footer
-     block, which lives on its own pages now). */
-  /* ── How many rows fit, MEASURED rather than assumed ────────────────────
-     This used to be two constants — 4 on the first sheet, 7 after — and the
-     comment above them already knew why that was fragile: "item rows with
-     very long descriptions … are ~200 px tall instead of the usual 110",
-     which silently split a row across two physical sheets.
+     Loop guard: the pager keeps measurements to itself and calls setMetrics
+     only when the split they produce differs from the split on screen. A
+     pass that changes the split schedules one verification pass after the
+     commit lands. While the operator is typing in a cell the split is held
+     and released on focusout, once the cell's onBlur has committed its text
+     — a row moving to another sheet mid-edit would remount the editable and
+     drop what was typed. The React state is set from the observer / rAF
+     callbacks only, never from an effect body. */
+  const [metrics, setMetrics] = useState<LayoutMetrics>(EMPTY_METRICS);
+  const pages = useMemo(() => buildPages(current.items, metrics), [current.items, metrics]);
 
-     It also produced the defect the owner reported. A quotation with ELEVEN
-     items pages as 4 + 7 and both sheets are full; an invoice with FIVE pages
-     as 4 + 1, and the second sheet carries one row above 221 mm of white.
-     Nothing had broken — a fixed first-page count simply fills sheet one to
-     the brim and lets whatever is left be orphaned.
+  /* Mirrors for the pager, which is created once and outlives every render.
+     Layout effects, so both are current before any pass can follow a commit
+     (the verification pass compares against what is actually on screen). */
+  const itemsRef = useRef(current.items);
+  useLayoutEffect(() => { itemsRef.current = current.items; }, [current.items]);
+  const metricsRef = useRef(metrics);
+  useLayoutEffect(() => { metricsRef.current = metrics; }, [metrics]);
 
-     Now each row is costed from its own content and sheets are filled to a
-     measured budget, then BALANCED: if the last items sheet would come out
-     less than half full, the rows are spread evenly instead. Five items page
-     as 3 + 2 rather than 4 + 1.
-
-     Budgets are in px and were measured on the live sheet: page one gives the
-     table 527 px once the header, brand strips, meta strip and party cards
-     are placed (they measure 113 mm together), less 58 px of table head. A
-     continuation sheet has the full 978 px less the same head. */
-  const ITEMS_BUDGET_FIRST = 469;
-  const ITEMS_BUDGET_MIDDLE = 920;
-
-  /* A row is as tall as the tallest thing in it: the picture, or the text.
-     The 112 px picture box is what most rows cost; a long description with no
-     picture can pass it. Estimated rather than measured in the DOM, because
-     measuring means a layout read on every keystroke of the editor. */
-  const rowHeight = (it: QuotationItem): number => {
-    /* Forced line breaks count as lines of their own. A description typed
-       as three short lines is three lines tall however few characters it
-       holds; counting only characters costed it as one, and the extra
-       height painted over the next sheet. Each break-delimited segment is
-       then wrapped on its own, since a break never joins with its
-       neighbour to fill a line. */
-    const toLines = (html: string) =>
-      html
-        .replace(/<br\s*\/?>|<\/div>|<\/p>/gi, "\n")
-        .replace(/<[^>]+>/g, " ")
-        .split("\n");
-    const segments = toLines(it.description ?? "");
-    if ((it.model ?? "").trim()) segments.push(...toLines(it.model ?? ""));
-    /* ~34 characters per line in the 206 px description column at 11 px. */
-    const lines = Math.max(
-      1,
-      segments.reduce((n, s) => n + Math.max(1, Math.ceil(s.trim().length / 34)), 0),
-    );
-    const textHeight = 26 + lines * 15;
-    /* 112 px is the FLOOR FOR EVERY ROW, not just rows with a picture. The
-       NO. cell below carries `height: 112` unconditionally (it has to — the
-       row-action cluster and the notes panel are both 112 px and live in
-       that row), so a picture-less row is 112 px tall too. Costing those at
-       44 px is what overflowed the sheet: five text-only rows measured 560 px
-       against a 469 px budget, and because .quot-a4-doc is overflow:visible
-       the surplus PAINTED OVER the next sheet — the owner's screenshot.
-       Measured on the live document before and after. */
-    return Math.max(112, textHeight);
-  };
-
-  type PageKind = "items" | "footer-a" | "footer-b";
-  type PageEntry = {
-    kind: PageKind;
-    items: QuotationItem[];
-    startIdx: number;
-    /* An items sheet that also carries the totals / T&C block below its
-       table, instead of that block taking a sheet of its own. */
-    withFooterA?: boolean;
-  };
-  const pages = useMemo<PageEntry[]>(() => {
-    const items = current.items;
-    const out: PageEntry[] = [];
-
-    /* Fill by measured height. Even 0 items still gets a first sheet — it
-       carries the header, the parties and the table head. */
-    const chunks: QuotationItem[][] = [];
-    let budget = ITEMS_BUDGET_FIRST;
-    let chunk: QuotationItem[] = [];
-    for (const it of items) {
-      const h = rowHeight(it);
-      if (chunk.length > 0 && h > budget) {
-        chunks.push(chunk);
-        chunk = [];
-        budget = ITEMS_BUDGET_MIDDLE;
-      }
-      chunk.push(it);
-      budget -= h;
-    }
-    chunks.push(chunk);
-
-    /* BALANCE. A trailing sheet holding one row above 221 mm of white is what
-       the owner saw. If the last sheet came out less than half full and there
-       is an earlier sheet to borrow from, spread the rows evenly instead —
-       5 items become 3 + 2, not 4 + 1. Only ever moves rows LATER, so a sheet
-       can never end up over its budget. */
-    if (chunks.length > 1) {
-      const last = chunks[chunks.length - 1];
-      const lastHeight = last.reduce((n, it) => n + rowHeight(it), 0);
-      if (lastHeight < ITEMS_BUDGET_MIDDLE / 2) {
-        const flat = chunks.flat();
-        const per = Math.ceil(flat.length / chunks.length);
-        const rebalanced: QuotationItem[][] = [];
-        for (let i = 0; i < flat.length; i += per) rebalanced.push(flat.slice(i, i + per));
-        /* Keep the rebalance only if the first sheet still fits its smaller
-           budget — it is the one with the header above it. */
-        const firstFits =
-          (rebalanced[0] ?? []).reduce((n, it) => n + rowHeight(it), 0) <= ITEMS_BUDGET_FIRST;
-        if (firstFits && rebalanced.length === chunks.length) {
-          chunks.length = 0;
-          chunks.push(...rebalanced);
-        }
-      }
-    }
-
-    let startIdx = 0;
-    for (const c of chunks) {
-      out.push({ kind: "items", items: c, startIdx });
-      startIdx += c.length;
-    }
-
-    /* ── Footer-A rides the last items sheet when it fits ──────────────────
-       The two footer sheets stay SPLIT from each other: measured on the live
-       document, footer-A is 131 mm and footer-B is 138 mm, so together they
-       are 269.8 mm against a 270 mm sheet — they miss by 0.2 mm, and the
-       original comment here was right to separate them.
-
-       But footer-A does not need a sheet of its own. INV2026-0010 pages as
-       3 + 2 items, and that second items sheet has 191 mm of white below the
-       table while footer-A sits alone on the next one above 214 mm of it.
-       Dropping footer-A onto the last items sheet when the measured room is
-       there saves a whole page and touches nothing about how the goods are
-       drawn.
-
-       FOOTER_A_PX is deliberately generous: the T&C copy and the 14-field
-       Shipment Details grow with real content, and a footer that overflows
-       its sheet is far worse than one that took its own page. */
-    const FOOTER_A_PX = 560;
-    const lastItemsSheet = out[out.length - 1];
-    const usedOnLast = lastItemsSheet.items.reduce((n, it) => n + rowHeight(it), 0);
-    const budgetOnLast = out.length === 1 ? ITEMS_BUDGET_FIRST : ITEMS_BUDGET_MIDDLE;
-    const footerAFitsWithItems = items.length > 0 && budgetOnLast - usedOnLast >= FOOTER_A_PX;
-
-    if (!footerAFitsWithItems) {
-      out.push({ kind: "footer-a", items: [], startIdx: items.length });
-    } else {
-      lastItemsSheet.withFooterA = true;
-    }
-    out.push({ kind: "footer-b", items: [], startIdx: items.length });
-    return out;
-  }, [current.items]);
+  const pagerRef = useRef<ReturnType<typeof createPager> | null>(null);
+  /* One pager for the life of the stack. Layout effect, and declared before
+     the sync below, so it exists by the time the first commit is synced. */
+  useLayoutEffect(() => {
+    const root = stackRef.current;
+    if (!root) return;
+    const pager = createPager(root, { items: itemsRef, metrics: metricsRef, commit: setMetrics });
+    pagerRef.current = pager;
+    return () => {
+      pager.dispose();
+      if (pagerRef.current === pager) pagerRef.current = null;
+    };
+  }, []);
+  /* After EVERY commit: rows and sheets come and go with each split, so the
+     observed set is re-synced from the markers. A querySelectorAll, no
+     layout read — the reads happen in the pass, where layout is clean. */
+  useLayoutEffect(() => {
+    pagerRef.current?.sync();
+  });
 
   return (
     <div ref={pinchHostRef} className="quot-pinch-host">
@@ -1055,6 +1306,7 @@ export default function QuotationA4Preview({
       key={pageIdx}
       id={isFirstPage ? "quotation-a4-preview" : undefined}
       className="quot-a4-doc"
+      data-pq-sheet={pageIdx}
       dir="ltr"
       style={{
         /* Sizing intentionally NOT set here — the CSS @media print
@@ -1077,7 +1329,7 @@ export default function QuotationA4Preview({
         position: "relative",
       }}
     >
-      <div className="quot-doc-inner">
+      <div className="quot-doc-inner" data-pq-inner="">
 
         {isFirstPage && (
           /* Left-gutter settings column — Document settings + Pricing settings
@@ -1556,6 +1808,7 @@ export default function QuotationA4Preview({
         {pageItems.length > 0 && (
         <table
           className="pq-tbl"
+          data-pq-table=""
           cellSpacing={0}
           style={{
             width: "100%",
@@ -1583,7 +1836,7 @@ export default function QuotationA4Preview({
               one header for the whole document, not repeated on every
               sheet). Continuation pages start with their rows directly. */}
           {isFirstPage && (
-          <thead>
+          <thead data-pq-thead="">
             <tr>
               {/* Column widths measured against worst-case real
                   data from the Koleex catalogue:
@@ -1634,7 +1887,7 @@ export default function QuotationA4Preview({
                 const headText = headerTextColor(headBg);
                 const phColor = headText === "#FFFFFF" ? "rgba(255,255,255,0.5)" : "rgba(17,17,17,0.5)";
                 return (
-                  <tr key={idx}>
+                  <tr key={idx} data-pq-row={idx}>
                     <td colSpan={7} style={{ padding: 0 }}>
                       <div style={{ position: "relative", zIndex: (colorPopIdx === idx || addMenuIdx === idx) ? 1000 : undefined, background: headBg, padding: "10px 16px", display: "flex", alignItems: "center", justifyContent: "center", transition: "background 0.15s ease" }}>
                         <div
@@ -1717,7 +1970,7 @@ export default function QuotationA4Preview({
               }
 
               return (
-                <tr key={idx} className="pq-row" style={{ height: "auto", position: "relative" }}>
+                <tr key={idx} className="pq-row" data-pq-row={idx} style={{ height: "auto", position: "relative" }}>
                   {/* The NO. cell carries an explicit height: 112 so
                       the row's <tr> is guaranteed to be at least 112
                       px tall — that's what anchors the row action
@@ -2057,7 +2310,7 @@ export default function QuotationA4Preview({
                 command-bar buttons. Hidden on print via no-print
                 so the saved PDF stays clean. */}
             {isLastItemPage && (
-              <tr className="no-print pq-ghost-row">
+              <tr className="no-print pq-ghost-row" data-pq-tail="">
                 <td
                   colSpan={7}
                   style={{
@@ -2197,7 +2450,7 @@ export default function QuotationA4Preview({
               below the final row — not repeated on every page,
               and not orphaned on the footer-only summary page. */}
           {isLastItemPage && (
-            <tfoot>
+            <tfoot data-pq-tail="">
               <tr>
                 <td
                   colSpan={5}
@@ -2254,7 +2507,14 @@ export default function QuotationA4Preview({
         {/* ── FOOTER PAGE A ──
             Totals + T&C row, then Shipment Details. Sized together
             (~530 px tall) so they fit comfortably inside one A4 page
-            with room for the page header/padding. */}
+            with room for the page header/padding.
+
+            The wrapper is the pager's measuring box for this block (the
+            T&C copy and the Shipment Details grow with real content, so
+            the block is measured, not assumed). A plain block div: the
+            4 px top margin of its first child collapses through it just as
+            it did without the wrapper, so nothing moves on the sheet. */}
+        <div data-pq-footer-a="">
 
         {/* ═══════════════════════════════════════════════════════════════
             (g) BOTTOM ROW — totals (left) + terms (right)
@@ -2527,6 +2787,7 @@ export default function QuotationA4Preview({
               setTermsRevision((x) => x + 1);
             }}
           />
+        </div>
         </div>
 
         {/* Quick Fill modal mount — single instance, opened from the

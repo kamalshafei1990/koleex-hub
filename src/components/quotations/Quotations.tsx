@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useLayoutEffect, useCallback, useRef, useMemo } from "react";
+import { useState, useEffect, useLayoutEffect, useCallback, useReducer, useRef, useMemo } from "react";
 import { statusTone } from "@/lib/doc-status";
 import AuroraShell from "@/components/ui/AuroraShell";
 import { useConfirm } from "@/components/kds/useConfirm";
@@ -31,6 +31,9 @@ import { EmptyState, Modal as KdsModal, Pagination, SearchInput, StatusPill } fr
 import ChevronDownIcon from "@/components/icons/ui/ChevronDownIcon";
 import CheckIcon from "@/components/icons/ui/CheckIcon";
 import CrossIcon from "@/components/icons/ui/CrossIcon";
+import Undo2Icon from "@/components/icons/ui/Undo2Icon";
+import Redo2Icon from "@/components/icons/ui/Redo2Icon";
+import { isPreloadAllowed, readNetworkContext } from "@/lib/app-prefetch";
 import { dialog } from "@/lib/ui-dialog";
 import QuotationPreviewSkeleton from "./QuotationPreviewSkeleton";
 import { type PickResult } from "./ProductPickerModal";
@@ -333,6 +336,145 @@ function fingerprint(q: Quotation): string {
    "we never asked", and say so. */
 class SaveRefusedError extends Error {
   constructor() { super("save refused: document not hydrated yet"); this.name = "SaveRefusedError"; }
+}
+
+/* ── Undo / redo ──
+   Snapshots of the whole document, taken from the state BEFORE each edit.
+   Snapshots share structure with each other (an edit replaces one row, the
+   other rows are the same objects), so a hundred of them cost little. A
+   burst of edits to the same field within COALESCE_MS is one step, so one
+   Undo takes back a typed word or a dragged number, not one character. */
+const HISTORY_MAX = 100;
+const COALESCE_MS = 1200;
+/* Which top-level field changed between two snapshots — "items:3" when
+   exactly row 3 changed, so consecutive edits to different rows stay
+   separate steps. */
+function changeKey(prev: Quotation, next: Quotation): string {
+  const keys = new Set([...Object.keys(prev), ...Object.keys(next)]);
+  const changed: string[] = [];
+  for (const k of keys) {
+    const a = (prev as unknown as Record<string, unknown>)[k];
+    const b = (next as unknown as Record<string, unknown>)[k];
+    if (a !== b) changed.push(k);
+  }
+  if (changed.length === 1 && changed[0] === "items" && prev.items.length === next.items.length) {
+    let idx = -1;
+    let count = 0;
+    for (let i = 0; i < next.items.length; i++) {
+      if (prev.items[i] !== next.items[i]) { idx = i; count++; }
+    }
+    if (count === 1) return `items:${idx}`;
+  }
+  return changed.join(",");
+}
+/* The server owns these; an undo must never resurrect an older version
+   number or quote number, or the next save would report a conflict that
+   never happened. */
+function withServerFields(snapshot: Quotation, live: Quotation): Quotation {
+  return {
+    ...snapshot,
+    id: live.id,
+    invoiceNo: live.invoiceNo || snapshot.invoiceNo,
+    version: live.version,
+    createdAt: live.createdAt,
+    updatedAt: live.updatedAt,
+    updatedByName: live.updatedByName,
+    serverTotal: live.serverTotal,
+  };
+}
+type DocUpdater = Quotation | null | ((prev: Quotation | null) => Quotation | null);
+type HistCommand =
+  | { __hist: "raw"; next: DocUpdater }
+  | { __hist: "reset" }
+  | { __hist: "undo" }
+  | { __hist: "redo" };
+type HistAction = DocUpdater | HistCommand;
+interface HistState { current: Quotation | null; past: Quotation[]; future: Quotation[]; lastKey: string | null; lastAt: number }
+const EMPTY_HIST: HistState = { current: null, past: [], future: [], lastKey: null, lastAt: 0 };
+/** Replace the document without recording a step (server truth, not an edit). */
+const histRaw = (next: DocUpdater): HistCommand => ({ __hist: "raw", next });
+/** Forget the stacks — a different document is on screen now. */
+const HIST_RESET: HistCommand = { __hist: "reset" };
+const HIST_UNDO: HistCommand = { __hist: "undo" };
+const HIST_REDO: HistCommand = { __hist: "redo" };
+const isHistCommand = (a: HistAction): a is HistCommand => !!a && typeof a === "object" && "__hist" in a;
+const resolveDoc = (u: DocUpdater, prev: Quotation | null): Quotation | null => (typeof u === "function" ? u(prev) : u);
+function histReducer(s: HistState, a: HistAction): HistState {
+  if (isHistCommand(a)) {
+    switch (a.__hist) {
+      case "raw":
+        return { ...s, current: resolveDoc(a.next, s.current) };
+      case "reset":
+        return { ...EMPTY_HIST, current: s.current };
+      case "undo": {
+        const prev = s.past[s.past.length - 1];
+        if (!prev || !s.current) return s;
+        return { current: withServerFields(prev, s.current), past: s.past.slice(0, -1), future: [...s.future, s.current], lastKey: null, lastAt: 0 };
+      }
+      case "redo": {
+        const next = s.future[s.future.length - 1];
+        if (!next || !s.current) return s;
+        return { current: withServerFields(next, s.current), past: [...s.past, s.current], future: s.future.slice(0, -1), lastKey: null, lastAt: 0 };
+      }
+    }
+  }
+  const value = resolveDoc(a, s.current);
+  if (!(s.current && value && value !== s.current && value.id === s.current.id)) {
+    return { ...s, current: value };
+  }
+  const key = changeKey(s.current, value);
+  const now = Date.now();
+  const coalesce = s.lastKey === key && now - s.lastAt < COALESCE_MS && s.past.length > 0;
+  return {
+    current: value,
+    past: coalesce ? s.past : [...s.past, s.current].slice(-HISTORY_MAX),
+    future: coalesce ? s.future : [],
+    lastKey: key,
+    lastAt: now,
+  };
+}
+
+/* ── Opening a quotation before it is asked for ──
+   The list carries no items, so every open fetched the full document and
+   showed a one-row placeholder until it arrived. The row the cursor is on is
+   almost certainly the one about to be opened: fetch it on hover / focus and
+   hand it to the editor the instant the click lands. Sixty seconds is long
+   enough for the hover-then-click gap and short enough that a colleague's
+   save in between is caught by the silent refetch the editor still runs. */
+const DOC_WARM_TTL_MS = 60_000;
+const docWarm = new Map<string, { row: RemoteDocRow; at: number }>();
+const docWarmInflight = new Set<string>();
+function warmDoc(id: string): void {
+  if (id.length !== 36 || docWarmInflight.has(id)) return;
+  const have = docWarm.get(id);
+  if (have && Date.now() - have.at < DOC_WARM_TTL_MS) return;
+  docWarmInflight.add(id);
+  fetchDocOne(QUOTATIONS_SYNC, id)
+    .then((row) => { if (row) docWarm.set(id, { row, at: Date.now() }); })
+    .catch(() => { /* the open will fetch normally */ })
+    .finally(() => docWarmInflight.delete(id));
+}
+function readWarmDoc(id: string): RemoteDocRow | null {
+  const have = docWarm.get(id);
+  return have && Date.now() - have.at < DOC_WARM_TTL_MS ? have.row : null;
+}
+
+/* Line photos live in the media bucket; the document keeps the URL. The
+   compressed data URL is still shown at once (and kept as the fallback if
+   the upload fails, e.g. offline) so the operator never waits on a round
+   trip to see the picture. */
+async function uploadItemImage(dataUrl: string): Promise<string | null> {
+  try {
+    const blob = await (await fetch(dataUrl)).blob();
+    const form = new FormData();
+    form.append("file", blob, "item.jpg");
+    const res = await fetch("/api/quotations/item-images", { method: "POST", credentials: "include", body: form });
+    if (!res.ok) return null;
+    const j = (await res.json()) as { url?: string };
+    return typeof j.url === "string" ? j.url : null;
+  } catch {
+    return null;
+  }
 }
 
 /* Default terms shell for a fresh quotation. Each labelled row is
@@ -1222,7 +1364,16 @@ export default function Quotations() {
   const [snap] = useState(readQuotSnap);
   const [quotations, setQuotations] = useState<Quotation[]>(snap ?? []);
   const [view, setView] = useState<"list" | "editor">("list");
-  const [current, setCurrent] = useState<Quotation | null>(null);
+  /* The document plus its undo / redo stacks live in one reducer, so every
+     edit — `setCurrent(next)`, exactly as before — records the snapshot it
+     replaces, and loads / saves / document switches say so explicitly with
+     histRaw() and HIST_RESET (not the operator's edits, never undoable).
+     A reducer rather than a ref: the dispatch is stable, the history is
+     state React owns, and queued functional updates each see the latest
+     document instead of the one committed before the event. */
+  const [hist, setCurrent] = useReducer(histReducer, EMPTY_HIST);
+  const current = hist.current;
+  const histSize = { past: hist.past.length, future: hist.future.length };
   const [loaded, setLoaded] = useState(snap !== null);
   /* Save state for the Save Draft / Save Final buttons. "idle" is the
      resting state; "saving" while the POST is in flight; "saved" for a
@@ -1256,6 +1407,24 @@ export default function Quotations() {
      fetch) without reaching into a state updater — updaters must stay pure. */
   const currentRef = useRef<Quotation | null>(null);
   currentRef.current = current;
+
+  /* Ctrl/Cmd+Z and Ctrl+Y / Ctrl+Shift+Z — outside text fields only. Inside
+     a field the browser's own undo is what the operator expects, and each
+     field commits one history step when it blurs anyway. */
+  useEffect(() => {
+    if (view !== "editor") return;
+    const onKey = (e: KeyboardEvent) => {
+      if (!(e.metaKey || e.ctrlKey) || e.altKey) return;
+      const k = e.key.toLowerCase();
+      if (k !== "z" && k !== "y") return;
+      const el = document.activeElement as HTMLElement | null;
+      if (el && (el.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName))) return;
+      e.preventDefault();
+      setCurrent(k === "y" || e.shiftKey ? HIST_REDO : HIST_UNDO);
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [view]);
   /* Why the list could not load, when it could not. Drives the retry state;
      a failed mount fetch used to leave "Loading…" on screen forever. */
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -1398,7 +1567,8 @@ export default function Quotations() {
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
-    setCurrent(q);
+    setCurrent(histRaw(q));
+    setCurrent(HIST_RESET);
     markSaved(q);            // a pristine new quote isn't "dirty" until edited
     setView("editor");
   }, [markSaved]);
@@ -1423,7 +1593,8 @@ export default function Quotations() {
         const row = await fetchDocOne(QUOTATIONS_SYNC, id);
         if (!row) return;
         const loaded = fromRow(row);
-        setCurrent(loaded);
+        setCurrent(histRaw(loaded));
+        setCurrent(HIST_RESET);
         markSaved(loaded);
         setView("editor");
       } catch (e) {
@@ -1438,25 +1609,32 @@ export default function Quotations() {
      Re-fetch the full quotation by id before mounting the editor —
      otherwise the items table renders as a single empty placeholder. */
   const handleOpen = useCallback(async (q: Quotation) => {
-    // Optimistic mount so the editor opens immediately with header data…
-    const optimistic = { ...q, items: q.items.map((i) => ({ ...i })) };
-    setCurrent(optimistic);
+    /* Warmed on hover? Mount the FULL document at once — no placeholder
+       row, no loading bar. The silent refetch below still runs so a
+       colleague's save in the last minute is picked up. */
+    const warm = readWarmDoc(q.id);
+    const optimistic = warm
+      ? (() => { const h = fromRow(warm); return { ...h, items: h.items.map((i) => ({ ...i })) }; })()
+      : { ...q, items: q.items.map((i) => ({ ...i })) };
+    setCurrent(histRaw(optimistic));
+    setCurrent(HIST_RESET);
     markSaved(optimistic);   // baseline = loaded state (not dirty yet)
     setView("editor");
     // …then hydrate the full doc (with items) from the detail endpoint.
     if (q.id.length === 36) {
       const requestedId = q.id;
-      setHydrating(true);
+      if (!warm) setHydrating(true);
       let full: RemoteDocRow | null = null;
       try {
         full = await fetchDocOne(QUOTATIONS_SYNC, q.id);
+        if (full) docWarm.set(q.id, { row: full, at: Date.now() });
       } catch (e) {
         /* The editor stays open on the header data; the operator sees why
            the items did not arrive instead of a one-row document with no
            explanation (the save guard refuses to persist that state). */
-        showToast(t("toast.loadFail").replace("{err}", humanizeError(e)), "error");
+        if (!warm) showToast(t("toast.loadFail").replace("{err}", humanizeError(e)), "error");
       } finally {
-        setHydrating(false);
+        if (!warm) setHydrating(false);
       }
       /* Guard against a late response overwriting a NEWER open.
          If the operator clicked row A then quickly clicked row B,
@@ -1481,8 +1659,13 @@ export default function Quotations() {
            more than once. */
         const userTouched =
           !!prev && !!baselineRef.current && fingerprint(prev) !== baselineRef.current;
+        /* Nothing to do when the warm copy already was the server copy. */
+        if (!userTouched && prev && fingerprint(prev) === fingerprint(serverView)) return;
         markSaved(serverView);
-        setCurrent(userTouched && prev ? { ...serverView, ...prev, items: serverView.items } : serverView);
+        /* Server truth arriving is not an edit: raw, and the steps taken
+           since the open stay undoable only while they are still on top. */
+        setCurrent(histRaw(userTouched && prev ? { ...serverView, ...prev, items: serverView.items } : serverView));
+        if (!userTouched) setCurrent(HIST_RESET);
       }
     }
   }, [markSaved, showToast, t]);
@@ -1534,7 +1717,8 @@ export default function Quotations() {
         /* Open the new draft in the editor — the operator almost
            always wants to tweak the customer name / address right
            after duplicating, so the extra click would be friction. */
-        setCurrent(next);
+        setCurrent(histRaw(next));
+        setCurrent(HIST_RESET);
         markSaved(next);     // the duplicate is persisted → not dirty yet
         setView("editor");
       } catch (e) {
@@ -1635,7 +1819,8 @@ export default function Quotations() {
           if (typeof performance !== "undefined") {
             record("quotations.save.ack_ms", performance.now() - saveT0);
           }
-          setCurrent(saved);
+          setCurrent(histRaw(saved));   // the server echo is not an edit
+          docWarm.delete(saved.id);
           markSaved(saved);   // clears the dirty flag — editor matches server
           // Tell anyone else viewing this quotation that it just changed.
           if (typeof saved.version === "number") announceSavedRef.current(saved.version);
@@ -1922,7 +2107,8 @@ export default function Quotations() {
         const full = await fetchDocOne(QUOTATIONS_SYNC, working.id);
         if (full) {
           working = fromRow(full);
-          setCurrent(working);
+          setCurrent(histRaw(working));
+          setCurrent(HIST_RESET);
         }
       }
 
@@ -1946,7 +2132,8 @@ export default function Quotations() {
         setTimeout(() => setPdfState("idle"), 2_500);
         return;
       }
-      setCurrent(saved);
+      setCurrent(histRaw(saved));
+      docWarm.delete(saved.id);
       /* The save just landed, so the editor is clean — without this the
          "Unsaved" pill lit up right after a successful export. */
       markSaved(saved);
@@ -2182,7 +2369,8 @@ export default function Quotations() {
       serverTotal: undefined,
       items: current.items.map((it) => ({ ...it })),
     };
-    setCurrent(copy);
+    setCurrent(histRaw(copy));
+    setCurrent(HIST_RESET);
     setView("editor");
   }, [current]);
 
@@ -2494,12 +2682,27 @@ export default function Quotations() {
 
   const handleImageUpload = useCallback(
     async (idx: number, file: File) => {
+      let base64 = "";
       try {
-        const base64 = await compressImage(file);
+        base64 = await compressImage(file);
         updateItem(idx, "image", base64);
       } catch (e) {
         console.error("Image compression failed", e);
+        return;
       }
+      /* Then move it to storage. The swap targets the row that still holds
+         this exact data URL (the operator may have moved rows meanwhile),
+         and is not an undo step of its own — the upload was. */
+      const url = await uploadItemImage(base64);
+      if (!url) return;
+      setCurrent(histRaw((q) => {
+        if (!q) return q;
+        const i = q.items.findIndex((it) => it.image === base64);
+        if (i < 0) return q;
+        const items = q.items.slice();
+        items[i] = { ...items[i], image: url };
+        return { ...q, items };
+      }));
     },
     [updateItem]
   );
@@ -2574,7 +2777,8 @@ export default function Quotations() {
     if (!full) return null;
     const fresh = fromRow(full);
     const serverView = { ...fresh, items: fresh.items.map((i) => ({ ...i })) };
-    setCurrent(serverView);
+    setCurrent(histRaw(serverView));
+    setCurrent(HIST_RESET);
     markSaved(serverView);
     return serverView;
   }, [current, markSaved]);
@@ -2668,6 +2872,59 @@ export default function Quotations() {
   const safePage = Math.min(page, pages);
   const pageRows = filteredQuotations.slice((safePage - 1) * LIST_PAGE_SIZE, safePage * LIST_PAGE_SIZE);
 
+  /* While the list is being read: pull in the document editor's chunk (it
+     is loaded on demand, and the first open used to pay for its download)
+     and warm the two most recent quotations, which are the ones opened
+     most. Gated like every other idle preload — never on Save-Data or 2G. */
+  useEffect(() => {
+    if (view !== "list" || !loaded) return;
+    if (!isPreloadAllowed(readNetworkContext())) return;
+    const timer = window.setTimeout(() => {
+      void import("./QuotationA4Preview");
+      for (const q of sortedQuotations.slice(0, 2)) warmDoc(q.id);
+    }, 1200);
+    return () => window.clearTimeout(timer);
+  }, [view, loaded, sortedQuotations]);
+
+  /* One-off housekeeping, super-admins only: quotations saved before line
+     photos moved to storage still carry them inline and open slowly. The
+     count is fetched once per list visit; the button loops the server
+     endpoint a few documents at a time until none are left. */
+  const [compactPending, setCompactPending] = useState(0);
+  const [compacting, setCompacting] = useState<number | null>(null);
+  useEffect(() => {
+    if (view !== "list" || !isSuperAdmin) return;
+    let alive = true;
+    fetch("/api/quotations/compact-images", { credentials: "include" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((j: { pending?: number } | null) => { if (alive && j) setCompactPending(Number(j.pending) || 0); })
+      .catch(() => {});
+    return () => { alive = false; };
+  }, [view, isSuperAdmin]);
+  const runCompaction = useCallback(async () => {
+    if (compacting !== null) return;
+    setCompacting(compactPending);
+    let total = 0;
+    try {
+      for (let round = 0; round < 60; round++) {
+        const res = await fetch("/api/quotations/compact-images", { method: "POST", credentials: "include" });
+        const j = (await res.json().catch(() => ({}))) as { done?: number; remaining?: number; error?: string };
+        if (!res.ok) throw new Error(j.error || `HTTP ${res.status}`);
+        total += Number(j.done) || 0;
+        const remaining = Number(j.remaining) || 0;
+        setCompacting(remaining);
+        if (remaining === 0 || !(Number(j.done) > 0)) break;
+      }
+      setCompactPending(0);
+      docWarm.clear();
+      showToast(t("toast.compactDone").replace("{n}", String(total)));
+    } catch (e) {
+      showToast(t("toast.compactFail").replace("{err}", humanizeError(e)), "error");
+    } finally {
+      setCompacting(null);
+    }
+  }, [compacting, compactPending, showToast, t]);
+
   if (!loaded) {
     return (
       /* min-h-full, never min-h-screen: the Hub scroller is already
@@ -2719,6 +2976,19 @@ export default function Quotations() {
                 >
                   {t("list.preorder")}
                 </Link>
+                {isSuperAdmin && compactPending > 0 && (
+                  <Button
+                    variant="secondary"
+                    onClick={runCompaction}
+                    disabled={compacting !== null}
+                    loading={compacting !== null}
+                    title={t("list.compactHint")}
+                  >
+                    {compacting !== null
+                      ? t("list.compacting").replace("{n}", String(compacting))
+                      : t("list.compact").replace("{n}", String(compactPending))}
+                  </Button>
+                )}
                 <Button onClick={handleNew} icon={<PlusIcon size={12} />}>
                   {t("quot.new")}
                 </Button>
@@ -2888,6 +3158,8 @@ export default function Quotations() {
                     aria-label={`${t("list.openHint")}: ${q.invoiceNo || t("list.unnamedCustomer")}`}
                     className="kx-glass kx-hover-card bg-[var(--bg-secondary)] border border-[var(--border-subtle)] rounded-xl p-4 sm:p-5 hover:border-[var(--border-strong)] transition cursor-pointer group focus-visible:outline-none focus-visible:border-[var(--border-focus)]"
                     onClick={() => handleOpen(q)}
+                    onPointerEnter={() => warmDoc(q.id)}
+                    onFocus={() => warmDoc(q.id)}
                     onKeyDown={(e) => {
                       if (e.target !== e.currentTarget) return;
                       if (e.key === "Enter" || e.key === " ") { e.preventDefault(); void handleOpen(q); }
@@ -3015,6 +3287,10 @@ export default function Quotations() {
         >
           <span className="hidden sm:inline">{hidePanels ? t("tb.showPanels") : t("tb.hidePanels")}</span>
         </Button>
+        <div className="inline-flex items-center gap-1" role="group" aria-label={`${t("tb.undo")} / ${t("tb.redo")}`}>
+          <Button variant="secondary" size="sm" onClick={() => setCurrent(HIST_UNDO)} disabled={histSize.past === 0} title={t("tb.undo")} aria-label={t("tb.undo")} icon={<Undo2Icon size={14} />} />
+          <Button variant="secondary" size="sm" onClick={() => setCurrent(HIST_REDO)} disabled={histSize.future === 0} title={t("tb.redo")} aria-label={t("tb.redo")} icon={<Redo2Icon size={14} />} />
+        </div>
         {/* Document heading — a top-level decision, so it sits in the
             toolbar rather than inside Quick Fill. */}
         <DocTitlePicker
@@ -3374,7 +3650,8 @@ export default function Quotations() {
               try {
                 const copy = await saveQuotationAsCopy(current);
                 if (copy) {
-                  setCurrent(copy);
+                  setCurrent(histRaw(copy));
+                  setCurrent(HIST_RESET);
                   markSaved(copy);
                   if (typeof copy.version === "number") announceSavedRef.current(copy.version);
                   const list = await loadQuotationsRemote({ fresh: true });

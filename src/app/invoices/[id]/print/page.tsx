@@ -95,6 +95,23 @@ export default function InvoicePrintPage({
       if (typeof document !== "undefined" && "fonts" in document) {
         try { await document.fonts.ready; } catch { /* ignore */ }
       }
+
+      /* The document measures its own rows after paint and may re-split its
+
+         pages once fonts and images settle. Snapshotting before that pass has
+
+         confirmed the split would print the estimate, not the page the screen
+
+         shows — it flags the stack root when the measured split is final. */
+
+      await new Promise<void>((r) => requestAnimationFrame(() => requestAnimationFrame(() => r())));
+
+      const deadline = Date.now() + 3000;
+
+      while (!document.querySelector('.quot-a4-stack[data-paginated="1"]') && Date.now() < deadline) {
+        await new Promise((r) => setTimeout(r, 50));
+
+      }
       if (cancelled) return;
       (window as unknown as { __quotation_pdf_ready__?: boolean }).__quotation_pdf_ready__ = true;
       const params = new URLSearchParams(window.location.search);
