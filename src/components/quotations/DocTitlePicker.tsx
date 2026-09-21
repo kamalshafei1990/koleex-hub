@@ -35,6 +35,8 @@
 
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { useTranslation } from "@/lib/i18n";
+import { docsT } from "@/lib/translations/docs";
 
 export interface DocTitleRow {
   id: string;
@@ -60,6 +62,7 @@ export default function DocTitlePicker({
   fallbackLabel: string;
   onPick: (row: { id?: string; text?: string; noun?: string; validity?: boolean; code?: string }) => void;
 }) {
+  const { t } = useTranslation(docsT);
   const [rows, setRows] = useState<DocTitleRow[]>([]);
   const [open, setOpen] = useState(false);
   const [rect, setRect] = useState<DOMRect | null>(null);
@@ -112,8 +115,8 @@ export default function DocTitlePicker({
 
   const shown = titleText?.trim() || fallbackLabel;
   const groups: Array<["quotation" | "invoice", string]> = [
-    ["quotation", "Before the sale"],
-    ["invoice", "After the sale"],
+    ["quotation", t("dt.beforeSale")],
+    ["invoice", t("dt.afterSale")],
   ];
 
   const choose = (r?: DocTitleRow) => {
@@ -148,7 +151,7 @@ export default function DocTitlePicker({
         ref={triggerRef}
         type="button"
         onClick={() => setOpen((v) => !v)}
-        title="The heading this document prints under"
+        title={t("dt.hint")}
         aria-haspopup="listbox"
         aria-expanded={open}
         style={{
@@ -187,7 +190,7 @@ export default function DocTitlePicker({
             }}
           >
             <MenuRow active={!titleId} onClick={() => choose(undefined)}>
-              <span style={{ opacity: 0.7 }}>Default — {fallbackLabel}</span>
+              <span style={{ opacity: 0.7 }}>{t("dt.default").replace("{label}", fallbackLabel)}</span>
             </MenuRow>
 
             {groups.map(([family, label]) => {

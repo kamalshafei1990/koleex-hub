@@ -39,6 +39,7 @@ export { default as ChartPieIcon } from "./ChartPieIcon";
 export { default as CheckCheckIcon } from "./CheckCheckIcon";
 export { default as CheckCircleIcon } from "./CheckCircleIcon";
 export { default as CheckIcon } from "./CheckIcon";
+export { default as ChevronDownIcon } from "./ChevronDownIcon";
 export { default as CheckSquareIcon } from "./CheckSquareIcon";
 export { default as CircleDollarSignIcon } from "./CircleDollarSignIcon";
 export { default as CircleDotIcon } from "./CircleDotIcon";

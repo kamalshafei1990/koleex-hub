@@ -294,30 +294,6 @@ const T = {
   mono:     "ui-monospace, SFMono-Regular, Menlo, monospace",
 } as const;
 
-/* Cell styles for the compact 4-column Koleex Contact card. Mirrors
-   the meta-table label / value pattern but with tighter padding so
-   the whole 3-row card stays ~92 px tall. */
-const contactLabelCellStyle: React.CSSProperties = {
-  fontWeight: 700,
-  color: "#fff",
-  background: "#0A0A0A",
-  width: 80,
-  fontSize: 10,
-  textTransform: "uppercase",
-  letterSpacing: "0.05em",
-  whiteSpace: "nowrap",
-  border: "1px solid #E5E7EB",
-  padding: "4px 12px",
-  verticalAlign: "middle",
-};
-
-const contactValueCellStyle: React.CSSProperties = {
-  border: "1px solid #E5E7EB",
-  padding: "4px 12px",
-  verticalAlign: "middle",
-  fontSize: 11,
-};
-
 const inputResetStyle: React.CSSProperties = {
   border: "none",
   outline: "none",
@@ -357,6 +333,128 @@ function headerTextColor(bg: string): string {
   const lum = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
   return lum > 0.6 ? "#111111" : "#FFFFFF";
 }
+
+/* Text → markup for a cell fed through dangerouslySetInnerHTML. The numeric
+   cells (price, qty, %, shipping) are contentEditable, and the browser
+   rewrites their text nodes as the operator types; letting React reconcile a
+   child expression against DOM it did not write is what throws `removeChild`
+   there. innerHTML hands the whole string over instead, so it has to be
+   escaped once. */
+function escapeHtml(s: string): string {
+  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
+/* One parser for every typed money / qty / % cell. Operators paste figures
+   in whatever shape the customer sent them — "1,250.00", "1.250,00",
+   "USD 1 250", "2,5" — and the old `replace(/[^0-9.]/g, "")` turned the
+   European ones into 125000 and "2.5" pcs into 25.
+
+     · spaces, NBSP, currency symbols and letters are dropped
+     · both "," and "." present → the LAST one is the decimal separator,
+       the other is grouping
+     · only "," present → grouping when every comma is followed by exactly
+       three digits (1,250 / 1,250,000), the decimal separator otherwise (2,5)
+     · only "." present → grouping when there are several (1.250.000), the
+       decimal separator otherwise
+     · a leading "-" is kept only where the caller allows it (the "Other"
+       totals line can carry a credit); everywhere else it is stripped
+
+   Returns null when nothing numeric is left, and the caller then REVERTS
+   the cell rather than committing 0 over a real figure. */
+function parseNumberInput(raw: string, opts?: { allowNegative?: boolean }): number | null {
+  const negative = !!opts?.allowNegative && /^\s*-/.test(raw);
+  let s = raw.replace(/[^0-9.,]/g, "");
+  if (!/\d/.test(s)) return null;
+  const hasComma = s.includes(",");
+  const hasDot = s.includes(".");
+  if (hasComma && hasDot) {
+    const decimal = s.lastIndexOf(",") > s.lastIndexOf(".") ? "," : ".";
+    const grouping = decimal === "," ? "." : ",";
+    s = s.split(grouping).join("");
+    if (decimal === ",") s = s.replace(",", ".");
+  } else if (hasComma) {
+    s = /^\d+(,\d{3})+$/.test(s) ? s.split(",").join("") : s.replace(",", ".");
+  } else if (hasDot && s.indexOf(".") !== s.lastIndexOf(".")) {
+    s = s.split(".").join("");
+  }
+  const n = Number(s);
+  if (!Number.isFinite(n)) return null;
+  return negative ? -n : n;
+}
+
+/* ── Overlays ─────────────────────────────────────────────────────────────
+   One Escape closes ONE overlay: the one opened last. Every dialog, menu and
+   popover in this file registers here while it is open, so a dropdown inside
+   the Quick Fill modal takes the key before the modal does, and a second
+   press then closes the modal. The hook also moves keyboard focus into the
+   overlay the frame it opens (pass the surface, or the safe default button)
+   so a keyboard user is not left on a control underneath the backdrop. */
+const overlayStack: { close: () => void }[] = [];
+function useOverlay(
+  open: boolean,
+  onClose: () => void,
+  focusRef?: React.RefObject<HTMLElement | null>,
+) {
+  /* Mirrored in an effect, never assigned during render (compiler rule). */
+  const closeRef = useRef(onClose);
+  useEffect(() => { closeRef.current = onClose; }, [onClose]);
+  useEffect(() => {
+    if (!open) return;
+    const entry = { close: () => closeRef.current() };
+    overlayStack.push(entry);
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      if (overlayStack[overlayStack.length - 1] !== entry) return;
+      entry.close();
+    };
+    document.addEventListener("keydown", onKey);
+    focusRef?.current?.focus();
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      const i = overlayStack.indexOf(entry);
+      if (i >= 0) overlayStack.splice(i, 1);
+    };
+  }, [open, focusRef]);
+}
+
+/* Renders a fixed overlay at document.body. The A4 stack sits under the
+   pinch-zoom `transform: scale(zoom)`, and a transformed ancestor is the
+   containing block for every fixed descendant — a backdrop or modal left
+   inside it is positioned against the scaled sheet, scaled with it and
+   clipped by it (BilingualTooltip has the full account). */
+function BodyPortal({ children }: { children: React.ReactNode }) {
+  if (typeof document === "undefined") return null;
+  return createPortal(children, document.body);
+}
+
+/* Editor-only CSS for the document: section-band controls + colour popover,
+   and the one keyboard-focus ring. Emitted ONCE per document (it used to
+   ride along with every section-header row). The focus ring is screen-only
+   and needs !important because the editable cells carry an inline
+   `outline: none` for the mouse case. */
+const DOC_EDITOR_STYLES = `
+  .pq-section-head:empty::before{content:attr(data-ph);color:var(--pq-ph,rgba(255,255,255,0.45));font-weight:600;}
+  .pq-sec-pill{display:flex;align-items:center;gap:6px;background:rgba(0,0,0,0.32);border:1px solid rgba(255,255,255,0.22);border-radius:9px;padding:4px 6px;box-shadow:0 2px 8px rgba(0,0,0,0.3);}
+  .pq-sec-ctrl{width:24px;height:24px;display:inline-flex;align-items:center;justify-content:center;border-radius:6px;border:1px solid rgba(255,255,255,0.28);background:rgba(255,255,255,0.10);color:rgba(255,255,255,0.9);cursor:pointer;padding:0;transition:background .15s ease,border-color .15s ease,color .15s ease;}
+  .pq-sec-ctrl:hover:not(:disabled){background:rgba(255,255,255,0.22);border-color:rgba(255,255,255,0.5);color:#fff;}
+  .pq-sec-ctrl:disabled{opacity:.3;cursor:not-allowed;}
+  .pq-sec-ctrl--danger:hover:not(:disabled){background:rgba(239,68,68,0.3);border-color:rgba(239,68,68,0.7);color:#fff;}
+  .pq-sec-swatch{width:24px;height:24px;padding:0;border:2px solid rgba(255,255,255,0.7);border-radius:6px;cursor:pointer;box-shadow:0 0 0 1px rgba(0,0,0,0.35);}
+  .pq-color-pop{position:absolute;top:calc(100% + 8px);right:0;z-index:1000;width:168px;background:#1A1A1A;border:1px solid #2D2D2D;border-radius:10px;padding:10px;box-shadow:0 12px 34px rgba(0,0,0,0.55);outline:none;}
+  .pq-color-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:7px;}
+  .pq-color-sw{width:20px;height:20px;border-radius:5px;border:1px solid rgba(255,255,255,0.25);cursor:pointer;padding:0;transition:transform .1s ease;}
+  .pq-color-sw:hover{transform:scale(1.14);border-color:rgba(255,255,255,0.7);}
+  .pq-color-sw[data-active="1"]{box-shadow:0 0 0 2px #1A1A1A,0 0 0 4px #0066FF;}
+  .pq-color-custom{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:9px;padding-top:9px;border-top:1px solid #2D2D2D;font-size:10px;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;color:rgba(255,255,255,0.6);}
+  .pq-sec-color{width:30px;height:22px;padding:0;border:1px solid rgba(255,255,255,0.4);border-radius:5px;background:transparent;cursor:pointer;}
+  .pq-sec-color::-webkit-color-swatch-wrapper{padding:0;}
+  .pq-sec-color::-webkit-color-swatch{border:none;border-radius:4px;}
+  .pq-sec-color::-moz-color-swatch{border:none;border-radius:4px;}
+  @media screen {
+    .quot-a4-doc button:focus-visible,
+    .quot-a4-doc [contenteditable="true"]:focus-visible { outline: 2px solid #0066FF !important; outline-offset: 2px; }
+  }
+`;
 
 export default function QuotationA4Preview({
   current,
@@ -409,12 +507,16 @@ export default function QuotationA4Preview({
      render, which fires on every keystroke. rowNumbers[idx] is the
      exact same value (count of non-header rows before idx, +1). */
   const rowNumbers = useMemo(() => {
+    /* A plain loop rather than map-with-a-closure: the compiler's
+       immutability rule reads a counter mutated inside a nested callback as
+       a render-phase reassignment, and a loop says the same thing plainly. */
+    const out: number[] = [];
     let count = 0;
-    return current.items.map((it) => {
-      const n = count + 1;
+    for (const it of current.items) {
+      out.push(count + 1);
       if (it.kind !== "header") count += 1;
-      return n;
-    });
+    }
+    return out;
   }, [current.items]);
 
   /* Paste hygiene. The item description / section title / detail cells are
@@ -449,19 +551,44 @@ export default function QuotationA4Preview({
      The gesture only reads this on touchstart, which is always after commit. */
   const zoomRef = useRef(1);
   useEffect(() => { zoomRef.current = zoom; }, [zoom]);
+  /* A transform doesn't grow the layout box, so without this the magnified
+     sheet would sit in a hole the size of the unmagnified one. */
+  const [pinchH, setPinchH] = useState(0);
+  const pinchHRef = useRef(0);
+  useEffect(() => { pinchHRef.current = pinchH; }, [pinchH]);
   useEffect(() => {
     const host = pinchHostRef.current;
     if (!host) return;
     const MIN = 1, MAX = 4;
     const spread = (t: TouchList) =>
       Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY);
-    let active = false, startSpread = 0, startZoom = 1, anchorX = 0, contentX = 0;
+    let active = false, startSpread = 0, startZoom = 1, anchorX = 0, contentX = 0, liveZoom = 1;
+
+    /* The gesture writes the transform straight onto the box. touchmove runs
+       at ~60 Hz and a setZoom per event re-rendered the whole document each
+       time; the style write is the same three properties React sets from
+       `zoom` below, so the DOM ends the gesture exactly where the committed
+       state then puts it. */
+    const paint = (z: number) => {
+      const box = pinchBoxRef.current;
+      if (!box) return;
+      if (z > 1) {
+        box.style.transform = `scale(${z})`;
+        box.style.transformOrigin = "top left";
+        box.style.marginBottom = pinchHRef.current ? `${pinchHRef.current * (z - 1)}px` : "";
+      } else {
+        box.style.transform = "";
+        box.style.transformOrigin = "";
+        box.style.marginBottom = "";
+      }
+    };
 
     const onStart = (e: TouchEvent) => {
       if (e.touches.length !== 2) return;
       active = true;
       startSpread = spread(e.touches) || 1;
       startZoom = zoomRef.current;
+      liveZoom = startZoom;
       /* Anchor the midpoint between the fingers so the sheet magnifies around
          what the operator is looking at instead of jumping to its top-left. */
       const box = host.getBoundingClientRect();
@@ -471,11 +598,17 @@ export default function QuotationA4Preview({
     const onMove = (e: TouchEvent) => {
       if (!active || e.touches.length !== 2) return;
       e.preventDefault(); // stop the page panning while the pinch is running
-      const next = Math.min(MAX, Math.max(MIN, (startZoom * spread(e.touches)) / startSpread));
-      setZoom(next);
-      host.scrollLeft = contentX * next - anchorX;
+      liveZoom = Math.min(MAX, Math.max(MIN, (startZoom * spread(e.touches)) / startSpread));
+      paint(liveZoom);
+      host.scrollLeft = contentX * liveZoom - anchorX;
     };
-    const onEnd = (e: TouchEvent) => { if (e.touches.length < 2) active = false; };
+    /* Commit once, when the fingers lift: one render instead of sixty a
+       second, and the state React holds matches what is on screen. */
+    const onEnd = (e: TouchEvent) => {
+      if (!active || e.touches.length >= 2) return;
+      active = false;
+      setZoom(liveZoom);
+    };
 
     host.addEventListener("touchstart", onStart, { passive: true });
     host.addEventListener("touchmove", onMove, { passive: false });
@@ -488,9 +621,6 @@ export default function QuotationA4Preview({
       host.removeEventListener("touchcancel", onEnd);
     };
   }, []);
-  /* A transform doesn't grow the layout box, so without this the magnified
-     sheet would sit in a hole the size of the unmagnified one. */
-  const [pinchH, setPinchH] = useState(0);
   useEffect(() => {
     const box = pinchBoxRef.current;
     if (!box) return;
@@ -572,7 +702,13 @@ export default function QuotationA4Preview({
   /* Template label resolver in the DOCUMENT's language. */
   const L = docLabels(current.docLang);
   /* Tax is a PERCENTAGE of the subtotal. taxAmount feeds both the Tax
-     row (computed value display) and the discount base. */
+     row (computed value display) and the discount base.
+
+     Ladder order is a business decision of the owner's, not a bug: tax is
+     applied to the subtotal FIRST, and the whole-bill discount then comes
+     off (subtotal + tax + shipping + other). Rounding happens per line —
+     each amount is fixed to 2 dp before it feeds the next step — so the
+     printed lines always sum to the printed total. Leave it as it is. */
   const taxPctVal = Math.max(0, Math.min(100, Number(current.taxPct) || 0));
   const taxAmount = +(subTotal * (taxPctVal / 100)).toFixed(2);
 
@@ -667,6 +803,10 @@ export default function QuotationA4Preview({
   const [addMenuIdx, setAddMenuIdx] = useState<number | null>(null);
   /* Pending destructive action awaiting confirmation (clear or delete a row). */
   const [confirm, setConfirm] = useState<{ type: "delete" | "clear"; idx: number } | null>(null);
+  /* Escape cancels, and focus lands on Cancel — the safe default for a
+     dialog whose other button deletes a row. */
+  const confirmCancelRef = useRef<HTMLButtonElement | null>(null);
+  useOverlay(confirm !== null, () => setConfirm(null), confirmCancelRef);
   /* Set a section header's band colour (by row index). Goes through
      setCurrent (not updateItem) so the Invoice-doc parent is unaffected. */
   const setHeaderColor = useCallback((rowIdx: number, color: string) => {
@@ -753,9 +893,24 @@ export default function QuotationA4Preview({
      picture can pass it. Estimated rather than measured in the DOM, because
      measuring means a layout read on every keystroke of the editor. */
   const rowHeight = (it: QuotationItem): number => {
-    const text = `${it.description ?? ""} ${it.model ?? ""}`.replace(/<[^>]+>/g, " ");
+    /* Forced line breaks count as lines of their own. A description typed
+       as three short lines is three lines tall however few characters it
+       holds; counting only characters costed it as one, and the extra
+       height painted over the next sheet. Each break-delimited segment is
+       then wrapped on its own, since a break never joins with its
+       neighbour to fill a line. */
+    const toLines = (html: string) =>
+      html
+        .replace(/<br\s*\/?>|<\/div>|<\/p>/gi, "\n")
+        .replace(/<[^>]+>/g, " ")
+        .split("\n");
+    const segments = toLines(it.description ?? "");
+    if ((it.model ?? "").trim()) segments.push(...toLines(it.model ?? ""));
     /* ~34 characters per line in the 206 px description column at 11 px. */
-    const lines = Math.max(1, Math.ceil(text.trim().length / 34));
+    const lines = Math.max(
+      1,
+      segments.reduce((n, s) => n + Math.max(1, Math.ceil(s.trim().length / 34)), 0),
+    );
     const textHeight = 26 + lines * 15;
     /* 112 px is the FLOOR FOR EVERY ROW, not just rows with a picture. The
        NO. cell below carries `height: 112` unconditionally (it has to — the
@@ -857,7 +1012,6 @@ export default function QuotationA4Preview({
     }
     out.push({ kind: "footer-b", items: [], startIdx: items.length });
     return out;
-    /* eslint-disable-next-line react-hooks/exhaustive-deps */
   }, [current.items]);
 
   return (
@@ -876,9 +1030,9 @@ export default function QuotationA4Preview({
       }
     >
     <div ref={stackRef} className={"quot-a4-stack" + (hidePanels ? " gutters-hidden" : "")}>
+    <style>{DOC_EDITOR_STYLES}</style>
     {pages.map((page, pageIdx) => {
       const isFirstPage  = pageIdx === 0;
-      const isLastPage   = pageIdx === pages.length - 1;
       const totalPages   = pages.length;
       const pageItems    = page.items;
       const startItemIdx = page.startIdx;
@@ -1077,10 +1231,7 @@ export default function QuotationA4Preview({
             marginBottom: 12,
           }}
         >
-          <MetaStripCell
-            label={L("meta.date")}
-            isFirst
-          >
+          <MetaStripCell label={L("meta.date")}>
             <input
               value={current.date}
               onChange={(e) => setMeta("date", e.target.value)}
@@ -1347,7 +1498,7 @@ export default function QuotationA4Preview({
                     />
                   </>
                 )}
-                <span style={{ color: T.inkGhost, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em", whiteSpace: "nowrap" }}>Contact Person:</span>
+                <span style={{ color: T.inkGhost, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em", whiteSpace: "nowrap" }}>{L("party.contactPerson")}</span>
                 <input
                   value={current.customerName}
                   onChange={(e) => setMeta("customerName", e.target.value)}
@@ -1485,25 +1636,6 @@ export default function QuotationA4Preview({
                 return (
                   <tr key={idx}>
                     <td colSpan={7} style={{ padding: 0 }}>
-                      <style>{`
-                        .pq-section-head:empty::before{content:attr(data-ph);color:var(--pq-ph,rgba(255,255,255,0.45));font-weight:600;}
-                        .pq-sec-pill{display:flex;align-items:center;gap:6px;background:rgba(0,0,0,0.32);border:1px solid rgba(255,255,255,0.22);border-radius:9px;padding:4px 6px;box-shadow:0 2px 8px rgba(0,0,0,0.3);}
-                        .pq-sec-ctrl{width:24px;height:24px;display:inline-flex;align-items:center;justify-content:center;border-radius:6px;border:1px solid rgba(255,255,255,0.28);background:rgba(255,255,255,0.10);color:rgba(255,255,255,0.9);cursor:pointer;padding:0;transition:background .15s ease,border-color .15s ease,color .15s ease;}
-                        .pq-sec-ctrl:hover:not(:disabled){background:rgba(255,255,255,0.22);border-color:rgba(255,255,255,0.5);color:#fff;}
-                        .pq-sec-ctrl:disabled{opacity:.3;cursor:not-allowed;}
-                        .pq-sec-ctrl--danger:hover:not(:disabled){background:rgba(239,68,68,0.3);border-color:rgba(239,68,68,0.7);color:#fff;}
-                        .pq-sec-swatch{width:24px;height:24px;padding:0;border:2px solid rgba(255,255,255,0.7);border-radius:6px;cursor:pointer;box-shadow:0 0 0 1px rgba(0,0,0,0.35);}
-                        .pq-color-pop{position:absolute;top:calc(100% + 8px);right:0;z-index:1000;width:168px;background:#1A1A1A;border:1px solid #2D2D2D;border-radius:10px;padding:10px;box-shadow:0 12px 34px rgba(0,0,0,0.55);}
-                        .pq-color-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:7px;}
-                        .pq-color-sw{width:20px;height:20px;border-radius:5px;border:1px solid rgba(255,255,255,0.25);cursor:pointer;padding:0;transition:transform .1s ease;}
-                        .pq-color-sw:hover{transform:scale(1.14);border-color:rgba(255,255,255,0.7);}
-                        .pq-color-sw[data-active="1"]{box-shadow:0 0 0 2px #1A1A1A,0 0 0 4px #0066FF;}
-                        .pq-color-custom{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:9px;padding-top:9px;border-top:1px solid #2D2D2D;font-size:10px;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;color:rgba(255,255,255,0.6);}
-                        .pq-sec-color{width:30px;height:22px;padding:0;border:1px solid rgba(255,255,255,0.4);border-radius:5px;background:transparent;cursor:pointer;}
-                        .pq-sec-color::-webkit-color-swatch-wrapper{padding:0;}
-                        .pq-sec-color::-webkit-color-swatch{border:none;border-radius:4px;}
-                        .pq-sec-color::-moz-color-swatch{border:none;border-radius:4px;}
-                      `}</style>
                       <div style={{ position: "relative", zIndex: (colorPopIdx === idx || addMenuIdx === idx) ? 1000 : undefined, background: headBg, padding: "10px 16px", display: "flex", alignItems: "center", justifyContent: "center", transition: "background 0.15s ease" }}>
                         <div
                           className="pq-section-head"
@@ -1548,33 +1680,12 @@ export default function QuotationA4Preview({
                               onClick={() => setColorPopIdx(colorPopIdx === idx ? null : idx)}
                             />
                             {colorPopIdx === idx && (
-                              <>
-                                <div onClick={() => setColorPopIdx(null)} style={{ position: "fixed", inset: 0, zIndex: 49 }} />
-                                <div className="pq-color-pop">
-                                  <div className="pq-color-grid">
-                                    {SECTION_COLOR_PRESETS.map((c) => (
-                                      <button
-                                        key={c}
-                                        type="button"
-                                        className="pq-color-sw"
-                                        data-active={headBg.toLowerCase() === c.toLowerCase() ? "1" : "0"}
-                                        title={c}
-                                        style={{ background: c }}
-                                        onClick={() => { setHeaderColor(idx, c); setColorPopIdx(null); }}
-                                      />
-                                    ))}
-                                  </div>
-                                  <label className="pq-color-custom">
-                                    <span>Custom</span>
-                                    <input
-                                      type="color"
-                                      className="pq-sec-color"
-                                      value={headBg}
-                                      onChange={(e) => setHeaderColor(idx, e.target.value)}
-                                    />
-                                  </label>
-                                </div>
-                              </>
+                              <SectionColorPopover
+                                headBg={headBg}
+                                onPreset={(c) => { setHeaderColor(idx, c); setColorPopIdx(null); }}
+                                onCustom={(c) => setHeaderColor(idx, c)}
+                                onClose={() => setColorPopIdx(null)}
+                              />
                             )}
                           </div>
                           <button type="button" className="pq-sec-ctrl" title="Move section up" disabled={idx === 0} onClick={() => moveItem(idx, -1)}><ArrowUpIcon size={13} /></button>
@@ -1621,6 +1732,7 @@ export default function QuotationA4Preview({
                     <CostPricePanel
                       item={item}
                       idx={idx}
+                      descriptionFocused={focusedItemIdx === idx}
                       standTablePrice={Number(current.standTablePrice) || 0}
                       curSym={curSym}
                       fxRate={Number(current.fxRate) || 7.2}
@@ -1639,7 +1751,10 @@ export default function QuotationA4Preview({
                         contentEditable's text selection survives the
                         click and execCommand applies cleanly. */}
                     {focusedItemIdx === idx && (
-                      <RichTextToolbar exec={exec} />
+                      /* The first row on a sheet has the black table head (or
+                         the sheet edge) directly above it, so its toolbar opens
+                         below the cell instead of over the head. */
+                      <RichTextToolbar exec={exec} placement={localIdx === 0 ? "below" : "above"} />
                     )}
                     <div
                       className="quot-item-rich"
@@ -1701,8 +1816,17 @@ export default function QuotationA4Preview({
                       contentEditable
                       suppressContentEditableWarning
                       onBlur={(e) => {
-                        const val = parseFloat((e.currentTarget.textContent || "0").replace(/[^0-9.]/g, "")) || 0;
-                        updateItem(idx, "unitPrice", val);
+                        const val = parseNumberInput(e.currentTarget.textContent || "");
+                        /* Nothing numeric → revert the cell to the stored price
+                           rather than commit 0 over it. The DOM is rewritten by
+                           hand because React only re-sets innerHTML when the
+                           string it renders changes, and here it does not. */
+                        const next = val == null ? item.unitPrice : val;
+                        e.currentTarget.textContent = next > 0 ? `${fmt(next)} ${curSym}` : "0";
+                        if (val != null) updateItem(idx, "unitPrice", val);
+                      }}
+                      dangerouslySetInnerHTML={{
+                        __html: escapeHtml(item.unitPrice > 0 ? `${fmt(item.unitPrice)} ${curSym}` : "0"),
                       }}
                       style={{
                         textAlign: "center",
@@ -1710,27 +1834,29 @@ export default function QuotationA4Preview({
                         fontVariantNumeric: "tabular-nums",
                         outline: "none",
                       }}
-                    >
-                      {item.unitPrice > 0 ? `${fmt(item.unitPrice)} ${curSym}` : "0"}
-                    </div>
+                    />
                   </Td>
                   <Td align="center">
                     <div
                       contentEditable
                       suppressContentEditableWarning
                       onBlur={(e) => {
-                        const val = parseInt((e.currentTarget.textContent || "0").replace(/[^0-9]/g, ""), 10) || 0;
-                        updateItem(idx, "qty", val);
+                        /* Quantities are whole units everywhere downstream (the
+                           Excel export writes Number(it.qty) into a count column),
+                           so "2.5" rounds to 3 instead of becoming 25. */
+                        const parsed = parseNumberInput(e.currentTarget.textContent || "");
+                        const val = parsed == null ? null : Math.round(parsed);
+                        e.currentTarget.textContent = String(val == null ? item.qty : val);
+                        if (val != null) updateItem(idx, "qty", val);
                       }}
+                      dangerouslySetInnerHTML={{ __html: escapeHtml(String(item.qty)) }}
                       style={{
                         textAlign: "center",
                         fontSize: 11,
                         fontVariantNumeric: "tabular-nums",
                         outline: "none",
                       }}
-                    >
-                      {item.qty}
-                    </div>
+                    />
                   </Td>
                   <Td align="center" style={{ fontWeight: 700, fontVariantNumeric: "tabular-nums" }}>
                     {lineTotal > 0 ? `${fmt(lineTotal)} ${curSym}` : "0"}
@@ -2167,8 +2293,9 @@ export default function QuotationA4Preview({
                       onCommit={(v) => setMeta("shipping", v)}
                     />
                     <TotalsRow
-                      label="Other"
+                      label={L("sum.other")}
                       editable
+                      allowNegative
                       rawValue={current.others}
                       onCommit={(v) => setMeta("others", v)}
                     />
@@ -2762,17 +2889,23 @@ export default function QuotationA4Preview({
       );
     })}
 
-    {/* Confirm dialog for destructive row actions (clear / delete). */}
+    {/* Confirm dialog for destructive row actions (clear / delete).
+        Portalled out of the pinch-zoom transform (see BodyPortal). */}
     {confirm && (
+      <BodyPortal>
       <div
+        className="no-print"
         onClick={() => setConfirm(null)}
         style={{ position: "fixed", inset: 0, zIndex: 4000, background: "rgba(0,0,0,0.55)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}
       >
         <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="pq-confirm-title"
           onClick={(e) => e.stopPropagation()}
           style={{ width: 360, maxWidth: "100%", background: "#fff", borderRadius: 14, padding: 22, boxShadow: "0 24px 60px rgba(0,0,0,0.4)" }}
         >
-          <div style={{ fontSize: 16, fontWeight: 800, color: "#111", marginBottom: 6 }}>
+          <div id="pq-confirm-title" style={{ fontSize: 16, fontWeight: 800, color: "#111", marginBottom: 6 }}>
             {confirm.type === "delete" ? "Delete this row?" : "Clear this row?"}
           </div>
           <div style={{ fontSize: 13, color: "#555", lineHeight: 1.5 }}>
@@ -2782,6 +2915,7 @@ export default function QuotationA4Preview({
           </div>
           <div style={{ marginTop: 20, display: "flex", justifyContent: "flex-end", gap: 10 }}>
             <button
+              ref={confirmCancelRef}
               type="button"
               onClick={() => setConfirm(null)}
               style={{ height: 38, padding: "0 16px", borderRadius: 9, border: "1px solid #D0D0D0", background: "#fff", color: "#111", fontSize: 13, fontWeight: 600, cursor: "pointer" }}
@@ -2802,6 +2936,7 @@ export default function QuotationA4Preview({
           </div>
         </div>
       </div>
+      </BodyPortal>
     )}
     </div>
     </div>
@@ -2809,22 +2944,55 @@ export default function QuotationA4Preview({
   );
 }
 
-/* ─── Sub-components ─────────────────────────────────────────────── */
-
-function RoundedTable({ width, children }: { width?: string; children: React.ReactNode }) {
+/* Colour popover for a section band. A component of its own so it can own
+   the Escape / focus wiring — hooks cannot live inside the row map. The
+   popover is position:absolute against its swatch, so it stays in the
+   sheet rather than going through BodyPortal. */
+function SectionColorPopover({
+  headBg,
+  onPreset,
+  onCustom,
+  onClose,
+}: {
+  headBg: string;
+  onPreset: (c: string) => void;
+  onCustom: (c: string) => void;
+  onClose: () => void;
+}) {
+  const ref = useRef<HTMLDivElement | null>(null);
+  useOverlay(true, onClose, ref);
   return (
-    <div
-      style={{
-        width: width ?? "auto",
-        border: `1px solid ${T.border}`,
-        borderRadius: 12,
-        overflow: "hidden",
-      }}
-    >
-      {children}
-    </div>
+    <>
+      <div onClick={onClose} style={{ position: "fixed", inset: 0, zIndex: 49 }} />
+      <div ref={ref} className="pq-color-pop" role="dialog" aria-modal="true" aria-label="Section colour" tabIndex={-1}>
+        <div className="pq-color-grid">
+          {SECTION_COLOR_PRESETS.map((c) => (
+            <button
+              key={c}
+              type="button"
+              className="pq-color-sw"
+              data-active={headBg.toLowerCase() === c.toLowerCase() ? "1" : "0"}
+              title={c}
+              style={{ background: c }}
+              onClick={() => onPreset(c)}
+            />
+          ))}
+        </div>
+        <label className="pq-color-custom">
+          <span>Custom</span>
+          <input
+            type="color"
+            className="pq-sec-color"
+            value={headBg}
+            onChange={(e) => onCustom(e.target.value)}
+          />
+        </label>
+      </div>
+    </>
   );
 }
+
+/* ─── Sub-components ─────────────────────────────────────────────── */
 
 /* Terms & Conditions box — rich-text WYSIWYG.
    ──────────────────────────────────────────────────────
@@ -2993,11 +3161,43 @@ function TermsArea({
 
   /* Save the live HTML into the parent. Called on blur and after
      every formatting command so an in-flight edit doesn't get lost
-     if the user clicks Save without first blurring the area. */
+     if the user clicks Save without first blurring the area.
+
+     Typing goes through `scheduleCommit` instead: every commit re-runs the
+     multi-pass regex normalisation over the whole terms HTML in the parent,
+     and doing that per keystroke made the editor stutter on long terms.
+     `commit` is the flush — it cancels a pending debounce and writes NOW, so
+     blur and the toolbar actions never race a queued write: whichever runs
+     first commits the latest HTML exactly once. */
+  const commitTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const onCommitRef = useRef(onCommit);
+  useEffect(() => { onCommitRef.current = onCommit; }, [onCommit]);
   const commit = () => {
+    if (commitTimer.current) {
+      clearTimeout(commitTimer.current);
+      commitTimer.current = null;
+    }
     if (!ref.current) return;
-    onCommit(ref.current.innerHTML);
+    onCommitRef.current(ref.current.innerHTML);
   };
+  const scheduleCommit = () => {
+    if (commitTimer.current) clearTimeout(commitTimer.current);
+    commitTimer.current = setTimeout(() => {
+      commitTimer.current = null;
+      commit();
+    }, 250);
+  };
+  /* Unmount with a debounce still pending (the sheet re-paginated under the
+     operator) flushes from the detached node so the last keystrokes land. */
+  useEffect(() => {
+    const el = ref.current;
+    return () => {
+      if (!commitTimer.current) return;
+      clearTimeout(commitTimer.current);
+      commitTimer.current = null;
+      if (el) onCommitRef.current(el.innerHTML);
+    };
+  }, []);
 
   /* `document.execCommand` is officially deprecated but remains the
      simplest cross-browser path for contentEditable formatting. It
@@ -3041,16 +3241,19 @@ function TermsArea({
   };
 
   const handleBlur = () => {
-    /* Defer blur so a toolbar-button click can run exec() before the
-       toolbar collapses. The button's onMouseDown calls preventDefault
-       to avoid yanking the selection, and we clear this timer if the
-       editor regains focus. */
+    /* Flush straight away: a save click right after typing must see the
+       text, and this also settles any debounced write so it cannot fire
+       later on top of a toolbar command. */
+    commit();
+    /* Defer the visual collapse so a toolbar-button click can run exec()
+       before the toolbar disappears. The button's onMouseDown calls
+       preventDefault to avoid yanking the selection, and we clear this
+       timer if the editor regains focus. */
     blurTimer.current = setTimeout(() => {
       setFocused(false);
       setToolbarOpen(false);
       setShowSizePicker(false);
       setShowColorPicker(false);
-      commit();
     }, 150);
   };
 
@@ -3236,10 +3439,9 @@ function TermsArea({
         onBlur={handleBlur}
         onInput={() => {
           /* Live-save while typing keeps current.terms in sync so a
-             save click before blur captures the latest text. We only
-             commit here when the structure is stable; format commands
-             also call commit() directly. */
-          commit();
+             save click before blur captures the latest text — debounced,
+             with blur and the format commands flushing immediately. */
+          scheduleCommit();
         }}
         style={{
           width: "100%",
@@ -3922,23 +4124,31 @@ function estimateDeliveryTransit(
     };
   }
 
-  /* Mode picked but no coords available -> mode-only ranges. */
+  /* No route to measure. The shipping method's own typical transit window
+     (typed into the master list from real sailings) is the next-best
+     answer, so it goes BEFORE the mode-only guess: that guess is just the
+     handling band plus a few days, and it used to shadow the real window
+     for every method that had one. */
+  if (fallbackMin != null && fallbackMax != null) {
+    return {
+      min: fallbackMin,
+      max: fallbackMax,
+      source: "fallback",
+      modeLabel: mode?.profile.label,
+    };
+  }
+
+  /* Mode picked, no coords, no typical window -> handling-only band. We
+     cannot multiply by an unknown distance, so this is the floor for the
+     mode rather than an estimate of the lane. */
   if (mode) {
     const profile = mode.profile;
-    /* Use a representative distance (the median sailing day
-       for the mode times 10 days) so the range comes out
-       sensible; really this is just the handling-only band
-       since we cannot multiply by an unknown distance. */
     return {
       min: profile.handlingMin + 3,
       max: profile.handlingMax + 7,
       source: "mode",
       modeLabel: profile.label,
     };
-  }
-
-  if (fallbackMin != null && fallbackMax != null) {
-    return { min: fallbackMin, max: fallbackMax, source: "fallback" };
   }
   return null;
 }
@@ -3952,110 +4162,6 @@ function formatDeliveryRow(est: TransitEstimate | null, loadingPort: string): st
   return `${range}${after}`;
 }
 
-/* Stub kept temporarily for any other callers that still reference
-   the old port-key helper. New code should use lookupPortGeo. */
-function normalisePortKey(p: string): string {
-  return p
-    .toLowerCase()
-    .replace(/\bport\b/g, "")
-    .replace(/,.*$/, "")
-    .replace(/[^a-z0-9]/g, "")
-    .trim();
-}
-void normalisePortKey;
-
-/* DEPRECATED static table -- kept here for historical reference
-   while the new distance-based estimator stabilises. The runtime
-   no longer reads from it; remove in a future cleanup. */
-const SEA_TRANSIT_DAYS: Record<string, { min: number; max: number }> = {
-  /* ── China → Egypt (primary Koleex lanes) ── */
-  "ningbo→alexandria":    { min: 28, max: 32 },
-  "ningbo→damietta":      { min: 30, max: 34 },
-  "ningbo→portsaid":      { min: 26, max: 30 },
-  "ningbo→suez":          { min: 26, max: 30 },
-  "shanghai→alexandria":  { min: 28, max: 32 },
-  "shanghai→damietta":    { min: 30, max: 34 },
-  "shanghai→portsaid":    { min: 26, max: 30 },
-  "shanghai→suez":        { min: 26, max: 30 },
-  "shenzhen→alexandria":  { min: 26, max: 30 },
-  "shenzhen→damietta":    { min: 28, max: 32 },
-  "shenzhen→portsaid":    { min: 24, max: 28 },
-  "guangzhou→alexandria": { min: 26, max: 30 },
-  "guangzhou→damietta":   { min: 28, max: 32 },
-  "guangzhou→portsaid":   { min: 24, max: 28 },
-  "qingdao→alexandria":   { min: 30, max: 34 },
-  "qingdao→damietta":     { min: 32, max: 36 },
-  "qingdao→portsaid":     { min: 28, max: 32 },
-  "tianjin→alexandria":   { min: 32, max: 36 },
-  "tianjin→damietta":     { min: 34, max: 38 },
-  "tianjin→portsaid":     { min: 30, max: 34 },
-  "xiamen→alexandria":    { min: 28, max: 32 },
-  "xiamen→portsaid":      { min: 26, max: 30 },
-  "yantian→alexandria":   { min: 26, max: 30 },
-  "yantian→damietta":     { min: 28, max: 32 },
-  "yantian→portsaid":     { min: 24, max: 28 },
-
-  /* ── China → Europe ── */
-  "ningbo→hamburg":       { min: 32, max: 36 },
-  "ningbo→rotterdam":     { min: 32, max: 36 },
-  "ningbo→antwerp":       { min: 32, max: 36 },
-  "ningbo→felixstowe":    { min: 32, max: 36 },
-  "ningbo→piraeus":       { min: 24, max: 28 },
-  "shanghai→hamburg":     { min: 32, max: 36 },
-  "shanghai→rotterdam":   { min: 32, max: 36 },
-  "shanghai→antwerp":     { min: 32, max: 36 },
-  "shanghai→felixstowe":  { min: 32, max: 36 },
-  "shanghai→piraeus":     { min: 24, max: 28 },
-  "shenzhen→hamburg":     { min: 30, max: 34 },
-  "shenzhen→rotterdam":   { min: 30, max: 34 },
-  "shenzhen→piraeus":     { min: 22, max: 26 },
-  "qingdao→hamburg":      { min: 36, max: 40 },
-  "qingdao→rotterdam":    { min: 36, max: 40 },
-
-  /* ── China → US ── */
-  "shanghai→losangeles":  { min: 14, max: 18 },
-  "shanghai→longbeach":   { min: 14, max: 18 },
-  "shanghai→oakland":     { min: 15, max: 19 },
-  "shanghai→seattle":     { min: 13, max: 17 },
-  "shanghai→newyork":     { min: 28, max: 34 },
-  "shanghai→savannah":    { min: 28, max: 34 },
-  "shenzhen→losangeles":  { min: 13, max: 17 },
-  "shenzhen→longbeach":   { min: 13, max: 17 },
-  "shenzhen→newyork":     { min: 27, max: 33 },
-  "ningbo→losangeles":    { min: 14, max: 18 },
-  "ningbo→newyork":       { min: 28, max: 34 },
-
-  /* ── China → Asia / Middle East ── */
-  "shanghai→singapore":   { min: 7,  max: 10 },
-  "shanghai→busan":       { min: 3,  max: 5 },
-  "shanghai→tokyo":       { min: 3,  max: 5 },
-  "shanghai→hochiminh":   { min: 7,  max: 10 },
-  "shanghai→bangkok":     { min: 8,  max: 11 },
-  "shanghai→jakarta":     { min: 10, max: 13 },
-  "shanghai→manila":      { min: 7,  max: 10 },
-  "shanghai→colombo":     { min: 14, max: 18 },
-  "shanghai→jebelali":    { min: 18, max: 22 },   // Dubai
-  "shanghai→dubai":       { min: 18, max: 22 },
-  "shanghai→jeddah":      { min: 20, max: 24 },
-  "shanghai→dammam":      { min: 22, max: 26 },
-  "shanghai→doha":        { min: 20, max: 24 },
-  "shanghai→kolkata":     { min: 14, max: 18 },
-  "shanghai→mumbai":      { min: 18, max: 22 },
-  "ningbo→singapore":     { min: 8,  max: 11 },
-  "ningbo→jebelali":      { min: 18, max: 22 },
-  "ningbo→dubai":         { min: 18, max: 22 },
-  "ningbo→jeddah":        { min: 20, max: 24 },
-
-  /* ── China → Africa (other than Egypt) ── */
-  "shanghai→durban":      { min: 32, max: 38 },
-  "shanghai→capetown":    { min: 35, max: 42 },
-  "shanghai→lagos":       { min: 35, max: 42 },
-  "shanghai→mombasa":     { min: 28, max: 34 },
-  "ningbo→durban":        { min: 32, max: 38 },
-  "ningbo→lagos":         { min: 35, max: 42 },
-  "ningbo→mombasa":       { min: 28, max: 34 },
-};
-
 /* ── Port catalogue.
 
    Loading-side: only Chinese ports because Koleex exports from
@@ -4067,9 +4173,8 @@ const SEA_TRANSIT_DAYS: Record<string, { min: number; max: number }> = {
    (top 3-6 per country, plus secondary ports the operator may
    need on rare lanes).
 
-   Values are stored as "Port, Country" so the existing
-   normalisePortKey() inside SEA_TRANSIT_DAYS keeps matching
-   without changes. */
+   Values are stored as "Port, Country" — the same key PORT_GEO
+   uses, so lookupPortGeo() resolves a pick in one map access. */
 type PortOption = { value: string; label: string; sublabel?: string };
 
 const CN_LOADING_PORTS: PortOption[] = [
@@ -5232,12 +5337,6 @@ function CustomSelect({
       setOpenRect(null);
       setHoveredHelp(null);
     };
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        setOpenRect(null);
-        setHoveredHelp(null);
-      }
-    };
     /* Close on background scroll / resize so the floating popover
        doesn't drift away from its trigger -- BUT ignore scroll
        events that originate inside the popover itself, otherwise
@@ -5254,16 +5353,22 @@ function CustomSelect({
       setHoveredHelp(null);
     };
     document.addEventListener("mousedown", onDoc);
-    document.addEventListener("keydown", onKey);
     window.addEventListener("resize", onResize);
     window.addEventListener("scroll", onScroll, true);
     return () => {
       document.removeEventListener("mousedown", onDoc);
-      document.removeEventListener("keydown", onKey);
       window.removeEventListener("resize", onResize);
       window.removeEventListener("scroll", onScroll, true);
     };
   }, [open]);
+  /* Escape goes through the shared overlay stack, so a dropdown open inside
+     the Quick Fill modal closes on the first press and the modal on the
+     second. The search input still swallows the key while it holds a query. */
+  const closePopover = useCallback(() => {
+    setOpenRect(null);
+    setHoveredHelp(null);
+  }, []);
+  useOverlay(open, closePopover);
 
   const selected = options.find((o) => o.value === value);
 
@@ -5362,8 +5467,12 @@ function CustomSelect({
         const flipUp = spaceBelow < 200 && spaceAbove > spaceBelow;
         const maxH = Math.min(POPOVER_MAX_H, Math.max(160, flipUp ? spaceAbove - 12 : spaceBelow - 12));
         const top = flipUp ? Math.max(8, openRect.top - maxH - margin) : openRect.bottom + margin;
+        /* Portalled to body: openRect is already in viewport coordinates,
+           and inside the pinch-zoom transform a fixed box would be placed
+           against the scaled sheet instead (see BodyPortal). */
         return (
-        <div ref={popoverRef} style={{
+        <BodyPortal>
+        <div ref={popoverRef} role="listbox" style={{
           position: "fixed",
           top,
           left: openRect.left,
@@ -5535,6 +5644,7 @@ function CustomSelect({
             </div>
           ))}
         </div>
+        </BodyPortal>
         );
       })()}
     </div>
@@ -5681,11 +5791,6 @@ function HelpTip({ k }: { k: keyof typeof QUICK_FILL_HELP }) {
     </span>
   );
 }
-
-/* Total number of Quick Fill fields used by the "N filled from M"
-   badge. Counts the universal fields only (excludes containerType
-   since that field only applies to FCL sea/inland shipments). */
-const QUICK_FILL_TOTAL = 11;
 
 /* The Shipment & Delivery Details card. Renders factual cargo /
    logistics data in a clean structured grid so it doesn't get
@@ -6037,110 +6142,6 @@ function ShipmentDetailEditableCell({
   );
 }
 
-/* Compact 'Quick Fill' button + modal wrapper. Single chip on the
-   Terms card; click → modal opens with the full QuickFillBar laid
-   out as a tidy two-column form instead of a horizontal flex
-   strip. Every existing picker keeps its real-time behaviour;
-   the modal just hides them behind one button until the operator
-   wants to fill the doc. */
-function TermsQuickFillTrigger({
-  current,
-  onPatch,
-}: {
-  current: Quotation;
-  onPatch: (patch: QuickFillPatch) => void;
-}) {
-  const [open, setOpen] = useState(false);
-
-  /* Quick visual cue of how many fields are already filled. We
-     count the eleven universal fields (containerType is excluded
-     since it only applies to FCL sea/inland shipments). The
-     badge shows "N filled from 11" so the operator can see how
-     close they are to a fully-specified doc at a glance. */
-  const filledCount = useMemo(() => {
-    let n = 0;
-    if (current.paymentTermId)        n++;
-    if (current.incotermId)           n++;
-    if (current.loadingPort)          n++;
-    if (current.dischargePort)        n++;
-    if (current.shippingMethodId)     n++;
-    if (current.shippingMarks)        n++;
-    if (current.leadTimeDays)         n++;
-    if (current.bankCharges)          n++;
-    if (current.cancellationPolicy)   n++;
-    if (current.governingLaw)         n++;
-    if ((current.documentsProvided ?? []).length > 0) n++;
-    return n;
-  }, [current]);
-
-  useEffect(() => {
-    if (!open) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setOpen(false);
-    };
-    document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
-  }, [open]);
-
-  return (
-    <div
-      className="no-print"
-      style={{
-        display: "flex",
-        alignItems: "center",
-        gap: 6,
-        padding: "5px 10px",
-        borderBottom: `1px solid ${T.border}`,
-        background: T.surface,
-      }}
-    >
-      <button
-        type="button"
-        onClick={() => setOpen(true)}
-        style={{
-          display: "inline-flex",
-          alignItems: "center",
-          gap: 6,
-          padding: "4px 10px",
-          borderRadius: 6,
-          border: `1px solid ${T.border}`,
-          background: T.paper,
-          color: T.ink,
-          fontSize: 11,
-          fontWeight: 600,
-          cursor: "pointer",
-        }}
-        title="Open the Quick Fill panel — pick payment terms, route, shipping, cargo, documents, and legal clauses in one place."
-      >
-        <span>⚡</span>
-        <span>Quick Fill</span>
-        <span
-          style={{
-            fontSize: 9,
-            fontWeight: 700,
-            padding: "1px 6px",
-            borderRadius: 4,
-            background: filledCount > 0 ? T.black : "transparent",
-            color: filledCount > 0 ? "#fff" : T.inkGhost,
-            border: filledCount > 0 ? "none" : `1px solid ${T.border}`,
-            marginLeft: 2,
-          }}
-        >
-          {filledCount} filled from {QUICK_FILL_TOTAL}
-        </span>
-      </button>
-
-      {open && (
-        <TermsQuickFillModal
-          current={current}
-          onPatch={onPatch}
-          onClose={() => setOpen(false)}
-        />
-      )}
-    </div>
-  );
-}
-
 /* The actual modal — Apple-style overlay + a card with every Quick
    Fill control organised into labelled sections. Picks land in
    real time on the doc; the operator clicks Done (or Esc / click-
@@ -6437,7 +6438,13 @@ function TermsQuickFillModal({
     selectedMethod?.typical_transit_days_max ?? null,
   );
 
+  /* Escape closes (after any dropdown open inside it), and focus moves onto
+     the card so the keyboard is in the modal, not on the Edit pill below. */
+  const surfaceRef = useRef<HTMLDivElement | null>(null);
+  useOverlay(true, onClose, surfaceRef);
+
   return (
+    <BodyPortal>
     <div
       onClick={(e) => {
         /* Only close on a CLICK that lands on the backdrop itself.
@@ -6459,9 +6466,15 @@ function TermsQuickFillModal({
       }}
     >
       <div
+        ref={surfaceRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label={modalTitle}
+        tabIndex={-1}
         onClick={(e) => e.stopPropagation()}
         className="koleex-quickfill-modal"
         style={{
+          outline: "none",
           background: "#111111",
           color: "#ffffff",
           width: "100%",
@@ -6912,6 +6925,7 @@ function TermsQuickFillModal({
         </div>
       </div>
     </div>
+    </BodyPortal>
   );
 }
 
@@ -7150,666 +7164,6 @@ function DocumentsCheckboxList({
         );
       })}
     </div>
-  );
-}
-
-function QuickFillBar({
-  paymentTermId,
-  incotermId,
-  incotermLocation,
-  loadingPort,
-  dischargePort,
-  shippingMethodId,
-  shippingMarks,
-  containerType,
-  bankCharges,
-  cancellationPolicy,
-  governingLaw,
-  documentsProvided,
-  leadTimeDays,
-  leadTimeBasis,
-  onChange,
-}: {
-  paymentTermId?: string;
-  incotermId?: string;
-  incotermCode?: string;
-  incotermLocation?: string;
-  loadingPort?: string;
-  dischargePort?: string;
-  shippingMethodId?: string;
-  shippingMarks?: string;
-  containerType?: string;
-  bankCharges?: string;
-  cancellationPolicy?: string;
-  governingLaw?: string;
-  documentsProvided?: string[];
-  leadTimeDays?: number;
-  leadTimeBasis?: "after_deposit" | "after_order" | "after_lc_opening";
-  onChange: (patch: QuickFillPatch) => void;
-}) {
-  const [payCats, setPayCats] = useState<PaymentCatLite[]>([]);
-  const [incoterms, setIncoterms] = useState<IncotermLite[]>([]);
-  const [methods, setMethods] = useState<ShippingMethodLite[]>([]);
-
-  useEffect(() => {
-    let cancelled = false;
-    Promise.all([
-      fetch("/api/payment-terms",   { credentials: "include" }).then((r) => r.ok ? r.json() : null),
-      fetch("/api/incoterms",       { credentials: "include" }).then((r) => r.ok ? r.json() : null),
-      fetch("/api/shipping-methods",{ credentials: "include" }).then((r) => r.ok ? r.json() : null),
-    ]).then(([pt, ic, sm]) => {
-      if (cancelled) return;
-      setPayCats((pt?.categories as PaymentCatLite[] | undefined) ?? []);
-      setIncoterms((ic?.rows as IncotermLite[] | undefined) ?? []);
-      setMethods((sm?.rows as ShippingMethodLite[] | undefined) ?? []);
-    });
-    return () => { cancelled = true; };
-  }, []);
-
-  const allPaymentTerms = useMemo(
-    () => payCats.flatMap((c) => c.terms.map((t) => ({ ...t, catName: c.short_name ?? c.name }))),
-    [payCats],
-  );
-  const selectedPayment = useMemo(
-    () => allPaymentTerms.find((t) => t.id === paymentTermId),
-    [allPaymentTerms, paymentTermId],
-  );
-  const selectedIncoterm = useMemo(
-    () => incoterms.find((t) => t.id === incotermId),
-    [incoterms, incotermId],
-  );
-  const selectedMethod = useMemo(
-    () => methods.find((t) => t.id === shippingMethodId),
-    [methods, shippingMethodId],
-  );
-
-  const onPickPayment = (id: string) => {
-    const term = allPaymentTerms.find((t) => t.id === id);
-    if (!term) {
-      onChange({ fields: { paymentTermId: undefined }, termsLineUpdates: { "Payment terms": "" } });
-      return;
-    }
-    onChange({
-      fields: { paymentTermId: id },
-      termsLineUpdates: { "Payment terms": term.label },
-    });
-  };
-
-  /* Incoterm pick — Price Type line uses the official code + name
-     only. The route ports are kept on dedicated 'Loading port:' /
-     'Discharge port:' lines (see the loading/discharge inputs
-     below) so the doc reads cleanly even when the operator hasn't
-     filled both ports yet. */
-  const onPickIncoterm = (id: string) => {
-    const term = incoterms.find((t) => t.id === id);
-    if (!term) {
-      onChange({
-        fields: { incotermId: undefined, incotermCode: undefined },
-        termsLineUpdates: { "Price Type": "" },
-      });
-      return;
-    }
-    /* Store both the FK id AND the short code on the doc so the
-       items-table header can render '(FOB Ningbo, USD)' without
-       fetching the incoterms list. */
-    onChange({
-      fields: { incotermId: id, incotermCode: term.code },
-      termsLineUpdates: { "Price Type": `${term.code} (${term.name})` },
-    });
-  };
-
-  /* Loading + discharge port handlers. Independent of the Incoterm
-     pick — operator can fill them in either order. */
-  const onChangeLoadingPort = (port: string) => {
-    onChange({
-      fields: { loadingPort: port },
-      termsLineUpdates: { "Loading port": port },
-    });
-  };
-  const onChangeDischargePort = (port: string) => {
-    onChange({
-      fields: { dischargePort: port },
-      termsLineUpdates: { "Discharge port": port },
-    });
-  };
-
-  const onPickMethod = (id: string) => {
-    const m = methods.find((t) => t.id === id);
-    if (!m) {
-      onChange({ fields: { shippingMethodId: undefined }, termsLineUpdates: { "Sent by": "" } });
-      return;
-    }
-    const transit =
-      m.typical_transit_days_min != null && m.typical_transit_days_max != null
-        ? ` (${m.typical_transit_days_min}–${m.typical_transit_days_max} days)`
-        : "";
-    onChange({
-      fields: { shippingMethodId: id },
-      termsLineUpdates: { "Sent by": `${m.name}${transit}` },
-    });
-  };
-
-  /* Compact dropdown styles. Matches Apple-pill aesthetic the rest of
-     the Workspace uses. */
-  const selectStyle: React.CSSProperties = {
-    fontSize: 10,
-    padding: "3px 6px",
-    borderRadius: 5,
-    border: `1px solid ${T.border}`,
-    background: T.surface,
-    color: T.ink,
-    outline: "none",
-    minWidth: 100,
-    maxWidth: 160,
-    cursor: "pointer",
-  };
-
-  return (
-    <div
-      className="no-print pq-tc-quickfill"
-      style={{
-        display: "flex",
-        alignItems: "center",
-        gap: 6,
-        padding: "5px 10px",
-        borderBottom: `1px solid ${T.border}`,
-        background: T.surface,
-        flexWrap: "wrap",
-      }}
-    >
-      <span style={{ fontSize: 9, fontWeight: 700, color: T.inkGhost, letterSpacing: "0.08em", textTransform: "uppercase", marginRight: 2 }}>
-        Quick fill
-      </span>
-
-      {/* Payment term */}
-      <select
-        value={paymentTermId ?? ""}
-        onChange={(e) => onPickPayment(e.target.value)}
-        style={selectStyle}
-        title={selectedPayment ? `Payment: ${selectedPayment.label}` : "Pick a payment term"}
-      >
-        <option value="">Payment…</option>
-        {payCats.map((cat) => (
-          <optgroup key={cat.id} label={cat.short_name ?? cat.name}>
-            {cat.terms.map((t) => (
-              <option key={t.id} value={t.id}>
-                {t.short_label ?? t.label}
-              </option>
-            ))}
-          </optgroup>
-        ))}
-      </select>
-
-      {/* Incoterm / price type */}
-      <select
-        value={incotermId ?? ""}
-        onChange={(e) => onPickIncoterm(e.target.value)}
-        style={selectStyle}
-        title={selectedIncoterm ? `${selectedIncoterm.code} — ${selectedIncoterm.name}` : "Pick a price type"}
-      >
-        <option value="">Price type…</option>
-        {incoterms.map((t) => (
-          <option key={t.id} value={t.id}>
-            {t.code} — {t.name}
-          </option>
-        ))}
-      </select>
-      {/* Loading + discharge port — independent of Incoterm, so the
-          operator can capture the China → Egypt route on every quote
-          regardless of which trade term applies. Writes two lines
-          into the terms ('Loading port: Ningbo, China' and
-          'Discharge port: Alexandria, Egypt'). */}
-      <input
-        type="text"
-        value={loadingPort ?? ""}
-        onChange={(e) => onChangeLoadingPort(e.target.value)}
-        placeholder="From port (e.g. Ningbo, China)"
-        style={{
-          ...selectStyle,
-          cursor: "text",
-          minWidth: 130,
-          maxWidth: 200,
-        }}
-        title="Loading port (origin)"
-      />
-      <input
-        type="text"
-        value={dischargePort ?? ""}
-        onChange={(e) => onChangeDischargePort(e.target.value)}
-        placeholder="To port (e.g. Alexandria, Egypt)"
-        style={{
-          ...selectStyle,
-          cursor: "text",
-          minWidth: 130,
-          maxWidth: 200,
-        }}
-        title="Discharge port (destination)"
-      />
-
-      {/* Shipping method */}
-      <select
-        value={shippingMethodId ?? ""}
-        onChange={(e) => onPickMethod(e.target.value)}
-        style={selectStyle}
-        title={selectedMethod ? `Sent by ${selectedMethod.name}` : "Pick a shipping method"}
-      >
-        <option value="">Sent by…</option>
-        {methods.map((m) => (
-          <option key={m.id} value={m.id}>
-            {m.short_name ?? m.name}
-          </option>
-        ))}
-      </select>
-
-      {/* Shipping marks — 'As per buyer's instruction' is the
-          industry default. Picker writes a bold 'Shipping marks:'
-          line into the terms; the operator can still type a custom
-          value directly in the terms body afterwards. */}
-      <select
-        value={shippingMarks ?? ""}
-        onChange={(e) => {
-          const v = e.target.value;
-          onChange({
-            fields: { shippingMarks: v || undefined },
-            termsLineUpdates: { "Shipping marks": v },
-          });
-        }}
-        style={selectStyle}
-        title={shippingMarks || "Pick a shipping-marks rule"}
-      >
-        <option value="">Shipping marks…</option>
-        {SHIPPING_MARKS_OPTIONS.map((opt) => (
-          <option key={opt.value} value={opt.value}>{opt.label}</option>
-        ))}
-      </select>
-
-      {/* Container type — only shown when the picked shipping
-          method is a container-loading mode (Sea FCL / RoRo /
-          Reefer / Break Bulk). Stays hidden for Air / LCL / Road
-          LTL / Courier etc. where 'container type' doesn't apply. */}
-      {(() => {
-        const sub = (selectedMethod?.sub_type ?? "").trim();
-        const showContainer = sub && CONTAINER_TYPE_APPLIES.has(sub);
-        if (!showContainer) return null;
-        return (
-          <select
-            value={containerType ?? ""}
-            onChange={(e) => {
-              const v = e.target.value;
-              onChange({
-                fields: { containerType: v || undefined },
-                termsLineUpdates: { "Container type": v },
-              });
-            }}
-            style={selectStyle}
-            title={containerType || "Pick a container type"}
-          >
-            <option value="">Container…</option>
-            {CONTAINER_TYPE_OPTIONS.map((opt) => (
-              <option key={opt.value} value={opt.value}>{opt.label}</option>
-            ))}
-          </select>
-        );
-      })()}
-
-      {/* Lead-time + ETD/ETA row — kept on the same flex line so the
-          Quick Fill bar stays one strip; wraps on narrow viewports. */}
-      <TimingRow
-        leadTimeDays={leadTimeDays}
-        leadTimeBasis={leadTimeBasis}
-        selectedMethod={selectedMethod}
-        selectStyle={selectStyle}
-        onChange={onChange}
-      />
-
-      {/* Bank charges — boilerplate clause picker. */}
-      <select
-        value={bankCharges ?? ""}
-        onChange={(e) => {
-          const v = e.target.value;
-          onChange({
-            fields: { bankCharges: v || undefined },
-            termsLineUpdates: { "Bank Charges": v },
-          });
-        }}
-        style={selectStyle}
-        title={bankCharges || "Pick a bank-charges clause"}
-      >
-        <option value="">Bank charges…</option>
-        {BANK_CHARGES_OPTIONS.map((opt) => (
-          <option key={opt.value} value={opt.value}>{opt.label}</option>
-        ))}
-      </select>
-
-      {/* Cancellation policy. */}
-      <select
-        value={cancellationPolicy ?? ""}
-        onChange={(e) => {
-          const v = e.target.value;
-          onChange({
-            fields: { cancellationPolicy: v || undefined },
-            termsLineUpdates: { "Cancellation Policy": v },
-          });
-        }}
-        style={selectStyle}
-        title={cancellationPolicy || "Pick a cancellation policy"}
-      >
-        <option value="">Cancellation…</option>
-        {CANCELLATION_OPTIONS.map((opt) => (
-          <option key={opt.value} value={opt.value}>{opt.label}</option>
-        ))}
-      </select>
-
-      {/* Governing law / arbitration seat. */}
-      <select
-        value={governingLaw ?? ""}
-        onChange={(e) => {
-          const v = e.target.value;
-          onChange({
-            fields: { governingLaw: v || undefined },
-            termsLineUpdates: { "Governing Law": v },
-          });
-        }}
-        style={selectStyle}
-        title={governingLaw || "Pick a governing law / arbitration seat"}
-      >
-        <option value="">Governing law…</option>
-        {GOVERNING_LAW_OPTIONS.map((opt) => (
-          <option key={opt.value} value={opt.value}>{opt.label}</option>
-        ))}
-      </select>
-
-      {/* Documents Provided — multi-select widget that pulls from
-          /api/shipping-documents and writes a comma-separated list
-          of short_names into the Documents Provided row. */}
-      <DocumentsPicker
-        value={documentsProvided ?? []}
-        selectStyle={selectStyle}
-        onChange={(next) => {
-          onChange({
-            fields: { documentsProvided: next.length > 0 ? next : undefined },
-            termsLineUpdates: { "Documents Provided": next.join(", ") },
-          });
-        }}
-      />
-    </div>
-  );
-}
-
-/* DocumentsPicker — multi-select dropdown sourced from /api/
-   shipping-documents. Renders a single 'Documents (N)…' chip; on
-   click opens a small popover with checkboxes grouped by category.
-   Picked rows save as their short_name (or code if no short_name)
-   to the doc's documentsProvided[] field. */
-function DocumentsPicker({
-  value,
-  selectStyle,
-  onChange,
-}: {
-  value: string[];
-  selectStyle: React.CSSProperties;
-  onChange: (next: string[]) => void;
-}) {
-  interface DocLite {
-    id: string;
-    code: string;
-    name: string;
-    short_name: string | null;
-    category: string;
-  }
-  const [docs, setDocs] = useState<DocLite[]>([]);
-  const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement | null>(null);
-
-  useEffect(() => {
-    let cancelled = false;
-    fetch("/api/shipping-documents", { credentials: "include" })
-      .then((r) => (r.ok ? r.json() : null))
-      .then((j) => {
-        if (cancelled) return;
-        setDocs((j?.rows as DocLite[] | undefined) ?? []);
-      });
-    return () => { cancelled = true; };
-  }, []);
-
-  useEffect(() => {
-    if (!open) return;
-    const onDoc = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
-    };
-    document.addEventListener("mousedown", onDoc);
-    return () => document.removeEventListener("mousedown", onDoc);
-  }, [open]);
-
-  const toggle = (label: string) => {
-    const set = new Set(value);
-    if (set.has(label)) set.delete(label);
-    else set.add(label);
-    onChange([...set]);
-  };
-
-  const grouped = useMemo(() => {
-    const out: Record<string, DocLite[]> = {};
-    for (const d of docs) {
-      (out[d.category] ??= []).push(d);
-    }
-    return out;
-  }, [docs]);
-
-  return (
-    <div ref={ref} style={{ position: "relative" }}>
-      <button
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        style={{ ...selectStyle, cursor: "pointer", minWidth: 110 }}
-        title={value.length > 0 ? value.join(", ") : "Pick documents to provide"}
-      >
-        {value.length > 0 ? `Documents (${value.length})` : "Documents…"}
-      </button>
-      {open && (
-        <div
-          style={{
-            position: "absolute",
-            top: "calc(100% + 4px)",
-            left: 0,
-            background: T.paper,
-            border: `1px solid ${T.border}`,
-            borderRadius: 8,
-            padding: 8,
-            minWidth: 280,
-            maxWidth: 360,
-            maxHeight: 360,
-            overflowY: "auto",
-            boxShadow: "0 8px 24px rgba(0,0,0,0.12)",
-            zIndex: 50,
-          }}
-        >
-          {Object.keys(grouped).length === 0 && (
-            <div style={{ fontSize: 11, color: T.inkGhost, padding: 8 }}>
-              Loading documents…
-            </div>
-          )}
-          {Object.entries(grouped).map(([cat, list]) => (
-            <div key={cat} style={{ marginBottom: 6 }}>
-              <div
-                style={{
-                  fontSize: 8,
-                  textTransform: "uppercase",
-                  letterSpacing: "0.08em",
-                  color: T.inkGhost,
-                  padding: "4px 6px",
-                  fontWeight: 700,
-                }}
-              >
-                {cat}
-              </div>
-              {list.map((d) => {
-                const label = d.short_name ?? d.code;
-                const checked = value.includes(label);
-                return (
-                  <label
-                    key={d.id}
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 6,
-                      padding: "3px 6px",
-                      borderRadius: 4,
-                      cursor: "pointer",
-                      fontSize: 11,
-                      color: T.ink,
-                    }}
-                    onMouseEnter={(e) => (e.currentTarget.style.background = T.surface)}
-                    onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
-                  >
-                    <input
-                      type="checkbox"
-                      checked={checked}
-                      onChange={() => toggle(label)}
-                      style={{ margin: 0 }}
-                    />
-                    <span style={{ fontWeight: 600 }}>{label}</span>
-                    <span style={{ color: T.inkGhost, fontSize: 10 }}>
-                      — {d.name}
-                    </span>
-                  </label>
-                );
-              })}
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
-/* Timing row inside the Quick Fill bar.
-
-   Two inputs:
-     [Lead time: __ d]   [from: deposit ▾]
-
-   When both lead time + a Shipping Method are picked, we also write
-   an ETD/ETA derived from the method's transit window. Writes three
-   lines into the terms:
-     · Lead time: 30 days after receipt of deposit
-     · ETD:       30 days after receipt of deposit
-     · ETA:       48-65 days after receipt of deposit
-
-   The picker doesn't claim concrete calendar dates because the actual
-   trigger (deposit / order / L/C) hasn't happened at quote time — but
-   the relative window is what the customer always asks about. */
-function TimingRow({
-  leadTimeDays,
-  leadTimeBasis,
-  selectedMethod,
-  selectStyle,
-  onChange,
-}: {
-  leadTimeDays?: number;
-  leadTimeBasis?: "after_deposit" | "after_order" | "after_lc_opening";
-  selectedMethod?: ShippingMethodLite;
-  selectStyle: React.CSSProperties;
-  onChange: (patch: QuickFillPatch) => void;
-}) {
-  const basis = leadTimeBasis ?? "after_deposit";
-  const basisLabel = LEAD_TIME_BASIS_LABEL[basis];
-
-  /* Build the three formatted lines from the current lead time +
-     selected shipping method. Each gets routed to its alias slot
-     so existing 'Lead time:' / 'ETD:' / 'ETA:' lines are replaced
-     in place rather than appended. */
-  /* buildLines now writes only two timing lines:
-       · 'Lead time:' — the production window the operator typed
-       · 'Delivery time:' — combined (lead + transit) when a
-         Shipping Method is also picked
-     The old separate ETD line is dropped — it duplicated the Lead
-     Time value and added noise. The 'Delivery time' canonical key
-     replaces an existing 'Delivery time:' / 'ETA:' / 'ETD:' line
-     via the alias map. */
-  const buildLines = (days?: number, basisKey?: typeof basis): Record<string, string> => {
-    const d = days ?? 0;
-    const b = basisKey ?? basis;
-    const bLabel = LEAD_TIME_BASIS_LABEL[b];
-    if (!d) {
-      return { "Lead time": "", "Delivery time": "" };
-    }
-    const out: Record<string, string> = {
-      "Lead time": `${d} days ${bLabel}`,
-    };
-    const tMin = selectedMethod?.typical_transit_days_min ?? null;
-    const tMax = selectedMethod?.typical_transit_days_max ?? null;
-    if (tMin != null && tMax != null) {
-      const lo = d + tMin;
-      const hi = d + tMax;
-      out["Delivery time"] = `${lo === hi ? lo : `${lo}-${hi}`} days ${bLabel}`;
-    } else {
-      out["Delivery time"] = "";
-    }
-    return out;
-  };
-
-  return (
-    <>
-      <input
-        type="number"
-        min={0}
-        max={999}
-        value={leadTimeDays ?? ""}
-        onChange={(e) => {
-          const raw = e.target.value;
-          const days = raw === "" ? undefined : Math.max(0, Math.min(999, Number(raw)));
-          onChange({
-            fields: { leadTimeDays: days },
-            termsLineUpdates: buildLines(days, basis),
-          });
-        }}
-        placeholder="Lead time"
-        style={{
-          ...selectStyle,
-          cursor: "text",
-          minWidth: 70,
-          maxWidth: 90,
-        }}
-        title="Lead time in days (production + ready-for-shipment)"
-      />
-      {leadTimeDays != null && leadTimeDays > 0 && (
-        <span style={{ fontSize: 9, color: T.inkGhost, fontWeight: 600 }}>days</span>
-      )}
-      <select
-        value={basis}
-        onChange={(e) => {
-          const next = e.target.value as typeof basis;
-          onChange({
-            fields: { leadTimeBasis: next },
-            termsLineUpdates: buildLines(leadTimeDays, next),
-          });
-        }}
-        style={selectStyle}
-        title="What triggers the lead-time clock"
-      >
-        <option value="after_deposit">after deposit</option>
-        <option value="after_order">after order</option>
-        <option value="after_lc_opening">after L/C opening</option>
-      </select>
-      {leadTimeDays != null && leadTimeDays > 0 && selectedMethod &&
-        selectedMethod.typical_transit_days_min != null && selectedMethod.typical_transit_days_max != null && (
-          <span
-            style={{
-              fontSize: 9,
-              color: T.inkSoft,
-              fontWeight: 600,
-              padding: "2px 6px",
-              border: `1px solid ${T.border}`,
-              borderRadius: 4,
-              background: T.paper,
-            }}
-            title="Estimated time of arrival — lead time + shipping transit"
-          >
-            ETA: {leadTimeDays + selectedMethod.typical_transit_days_min}–
-            {leadTimeDays + selectedMethod.typical_transit_days_max} d {basisLabel}
-          </span>
-        )}
-    </>
   );
 }
 
@@ -8113,12 +7467,15 @@ export function StampSignatureBox({
      someone uploading a scan. The box now measures the ink itself, once per
      image, and scales the render so the CIRCLE is 40 mm whatever margin the
      file carries. */
-  const [inkScale, setInkScale] = useState(1);
+  /* Keyed to the URL it was measured from, and DERIVED during render: a
+     freshly attached image reads 1 until its own measurement lands, and
+     clearing the image needs no reset at all — the key no longer matches.
+     That keeps the effect a pure subscriber (it only sets state from the
+     image's onload), which is the shape the compiler's effect rule wants. */
+  const [ink, setInk] = useState<{ url: string; scale: number } | null>(null);
+  const inkScale = aspectSquare && imageUrl && ink?.url === imageUrl ? ink.scale : 1;
   useEffect(() => {
-    if (!imageUrl || !aspectSquare) {
-      setInkScale(1);
-      return;
-    }
+    if (!imageUrl || !aspectSquare) return;
     let cancelled = false;
     const img = new Image();
     img.crossOrigin = "anonymous";
@@ -8155,7 +7512,7 @@ export function StampSignatureBox({
         const fill = Math.max((maxX - minX) / N, (maxY - minY) / N);
         /* Clamped: a wildly wrong measurement must not blow the seal up past
            its box, and a tight crop needs no correction at all. */
-        if (fill > 0.2 && fill < 1) setInkScale(Math.min(1 / fill, 1.6));
+        if (fill > 0.2 && fill < 1) setInk({ url: imageUrl, scale: Math.min(1 / fill, 1.6) });
       } catch {
         /* A cross-origin image the canvas cannot read — leave it at 1. */
       }
@@ -8350,15 +7707,12 @@ export function StampSignatureActions({
 function MetaStripCell({
   label,
   children,
-  isFirst,
   isLast,
 }: {
   label: string;
   children: React.ReactNode;
-  isFirst?: boolean;
   isLast?: boolean;
 }) {
-  void isFirst;
   return (
     <div
       style={{
@@ -8392,48 +7746,6 @@ function MetaStripCell({
         {children}
       </div>
     </div>
-  );
-}
-
-function MetaTableRow({
-  label,
-  children,
-}: {
-  label: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <tr>
-      <td
-        className="pq-ml"
-        style={{
-          fontWeight: 700,
-          color: "#fff",
-          background: T.black,
-          width: 90,
-          fontSize: 10,
-          textTransform: "uppercase",
-          letterSpacing: "0.05em",
-          whiteSpace: "nowrap",
-          border: `1px solid ${T.border}`,
-          padding: "4px 12px",
-          verticalAlign: "middle",
-          height: 28,
-        }}
-      >
-        {label}
-      </td>
-      <td
-        className="pq-mv"
-        style={{
-          border: `1px solid ${T.border}`,
-          padding: "4px 12px",
-          verticalAlign: "middle",
-        }}
-      >
-        {children}
-      </td>
-    </tr>
   );
 }
 
@@ -8565,13 +7877,16 @@ function TaxRow({
             contentEditable
             suppressContentEditableWarning
             onBlur={(e) => {
-              const raw = (e.currentTarget.textContent || "0").replace(/[^0-9.]/g, "");
-              onCommit(Math.max(0, Math.min(100, parseFloat(raw) || 0)));
+              const parsed = parseNumberInput(e.currentTarget.textContent || "");
+              const val = parsed == null ? null : Math.max(0, Math.min(100, parsed));
+              /* Revert on non-numeric input; see the unit-price cell. */
+              const shown = val == null ? pct : val;
+              e.currentTarget.textContent = shown > 0 ? String(shown) : "0";
+              if (val != null) onCommit(val);
             }}
+            dangerouslySetInnerHTML={{ __html: escapeHtml(pct > 0 ? String(pct) : "0") }}
             style={{ outline: "none", minWidth: 24, textAlign: "right" }}
-          >
-            {pct > 0 ? pct : "0"}
-          </span>
+          />
           <span style={{ color: T.inkGhost, fontWeight: 400 }}>%</span>
           <span
             style={{
@@ -8638,14 +7953,16 @@ function DiscountRow({
             contentEditable
             suppressContentEditableWarning
             onBlur={(e) => {
-              const raw = (e.currentTarget.textContent || "0").replace(/[^0-9.]/g, "");
-              const v = Math.max(0, Math.min(100, parseFloat(raw) || 0));
-              onCommit(v);
+              const parsed = parseNumberInput(e.currentTarget.textContent || "");
+              const val = parsed == null ? null : Math.max(0, Math.min(100, parsed));
+              /* Revert on non-numeric input; see the unit-price cell. */
+              const shown = val == null ? pct : val;
+              e.currentTarget.textContent = shown > 0 ? String(shown) : "0";
+              if (val != null) onCommit(val);
             }}
+            dangerouslySetInnerHTML={{ __html: escapeHtml(pct > 0 ? String(pct) : "0") }}
             style={{ outline: "none", minWidth: 24, textAlign: "right" }}
-          >
-            {pct > 0 ? pct : "0"}
-          </span>
+          />
           <span style={{ color: T.inkGhost, fontWeight: 400 }}>%</span>
           <span
             style={{
@@ -8669,6 +7986,7 @@ function TotalsRow({
   rawValue,
   muted,
   editable,
+  allowNegative,
   onCommit,
 }: {
   label: string;
@@ -8676,8 +7994,12 @@ function TotalsRow({
   rawValue?: number;
   muted?: boolean;
   editable?: boolean;
+  /* Only the "Other" line takes a minus sign — it is where a credit or an
+     agreed deduction lands. Shipping can never be negative. */
+  allowNegative?: boolean;
   onCommit?: (val: number) => void;
 }) {
+  const shownValue = (n: number | undefined) => (n ? String(n) : "0");
   return (
     <tr className={muted ? "pq-tfoot-row" : undefined}>
       <td
@@ -8713,13 +8035,14 @@ function TotalsRow({
               contentEditable
               suppressContentEditableWarning
               onBlur={(e) => {
-                const val = parseFloat((e.currentTarget.textContent || "0").replace(/[^0-9.]/g, "")) || 0;
-                onCommit?.(val);
+                const val = parseNumberInput(e.currentTarget.textContent || "", { allowNegative });
+                /* Revert on non-numeric input; see the unit-price cell. */
+                e.currentTarget.textContent = shownValue(val == null ? rawValue : val);
+                if (val != null) onCommit?.(val);
               }}
+              dangerouslySetInnerHTML={{ __html: escapeHtml(shownValue(rawValue)) }}
               style={{ outline: "none", minWidth: 40, textAlign: "right" }}
-            >
-              {rawValue && rawValue > 0 ? rawValue : "0"}
-            </span>
+            />
             <span style={{ color: T.inkGhost, fontWeight: 400 }}>$</span>
           </span>
         ) : (
@@ -8756,6 +8079,9 @@ function AddRowMenu({
   onHeader?: () => void;
   side?: "left" | "right";
 }) {
+  /* Hooks before the early return: Escape closes, focus lands on the menu. */
+  const menuRef = useRef<HTMLDivElement | null>(null);
+  useOverlay(open, onClose, menuRef);
   if (!open) return null;
   const opts: { label: string; glyph: string; fn?: () => void }[] = [
     { label: "Product from catalog", glyph: "▦", fn: onProduct },
@@ -8769,7 +8095,13 @@ function AddRowMenu({
         .pq-add-glyph{display:inline-flex;width:18px;justify-content:center;color:#FFFFFF;font-size:13px;}`}</style>
       <div onClick={onClose} style={{ position: "fixed", inset: 0, zIndex: 998 }} />
       <div
+        ref={menuRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Add a row below"
+        tabIndex={-1}
         style={{
+          outline: "none",
           position: "absolute",
           top: 0,
           ...(side === "left" ? { right: "calc(100% + 8px)" } : { left: "calc(100% + 8px)" }),
@@ -8881,7 +8213,15 @@ const SIZE_OPTIONS: { label: string; value: string }[] = [
   { label: "XL", value: "6" },
 ];
 
-function RichTextToolbar({ exec }: { exec: (cmd: string, value?: string) => void }) {
+function RichTextToolbar({
+  exec,
+  placement = "above",
+}: {
+  exec: (cmd: string, value?: string) => void;
+  /* "above" floats the bar 44 px over the cell; "below" hangs it under the
+     cell for rows that have nothing but the table head above them. */
+  placement?: "above" | "below";
+}) {
   const [showColors, setShowColors] = useState(false);
   const [showSizes, setShowSizes]   = useState(false);
   const rootRef = useRef<HTMLDivElement | null>(null);
@@ -8910,7 +8250,7 @@ function RichTextToolbar({ exec }: { exec: (cmd: string, value?: string) => void
       onMouseDown={stop}
       style={{
         position: "absolute",
-        top: -44,
+        ...(placement === "below" ? { top: "calc(100% + 6px)" } : { top: -44 }),
         left: -4,
         display: "flex",
         alignItems: "center",
@@ -9429,6 +8769,7 @@ const PD_MODEL_CACHE = new Map<string, { found?: boolean; model?: Record<string,
 function CostPricePanel({
   item,
   idx,
+  descriptionFocused,
   standTablePrice,
   curSym,
   fxRate,
@@ -9440,6 +8781,10 @@ function CostPricePanel({
 }: {
   item: QuotationItem;
   idx: number;
+  /* True while this row's description cell has the caret. That cell commits
+     its HTML on blur only, so a description written into the row from here
+     mid-typing would replace the operator's text with the saved one. */
+  descriptionFocused: boolean;
   standTablePrice: number;
   curSym: string;
   fxRate: number;
@@ -9491,6 +8836,9 @@ function CostPricePanel({
   const [saving, setSaving] = useState(false);
   const [saveMsg, setSaveMsg] = useState<string | null>(null);
   const [pricingOpen, setPricingOpen] = useState(false);
+  const pricingSurfaceRef = useRef<HTMLDivElement | null>(null);
+  const closePricing = useCallback(() => setPricingOpen(false), []);
+  useOverlay(pricingOpen, closePricing, pricingSurfaceRef);
   const [pdSuggestion, setPdSuggestion] = useState<
     { headCostRmb: number | null; description: string | null; photo: string | null } | null
   >(null);
@@ -9502,6 +8850,11 @@ function CostPricePanel({
   // deciding which fields are empty vs already filled).
   const itemRef = useRef(item);
   itemRef.current = item;
+  /* Read at the moment the (debounced) lookup lands, not when it was
+     scheduled: the operator may have clicked into the description in
+     between. Mirrored in an effect, never assigned during render. */
+  const descFocusedRef = useRef(descriptionFocused);
+  useEffect(() => { descFocusedRef.current = descriptionFocused; }, [descriptionFocused]);
 
   // Auto-FILL only fires for USER edits, never on open. The editor hydrates an
   // existing quote shortly after mount; filling during that window would
@@ -9545,13 +8898,20 @@ function CostPricePanel({
         if (!cur.costHead) patch.costHead = savedCost; // empty OR 0 → fill
         else if (Number(cur.costHead) !== savedCost) conflict = true;
       }
-      if (savedDesc) {
-        if (!curDescText) patch.description = savedDesc;
-        else if (curDescText !== savedDesc.trim()) conflict = true;
-      }
-      if (savedPhoto) {
-        if (!(cur.image || "").trim()) patch.image = savedPhoto;
-        else if (cur.image !== savedPhoto) conflict = true;
+      /* Description and photo stay untouched while the description cell is
+         being typed in: the row's stored text is stale until blur, so both
+         the "empty → fill" and the conflict test would be judging the wrong
+         value, and the fill would wipe what is on screen. Head cost has no
+         such cell and is applied regardless. */
+      if (!descFocusedRef.current) {
+        if (savedDesc) {
+          if (!curDescText) patch.description = savedDesc;
+          else if (curDescText !== savedDesc.trim()) conflict = true;
+        }
+        if (savedPhoto) {
+          if (!(cur.image || "").trim()) patch.image = savedPhoto;
+          else if (cur.image !== savedPhoto) conflict = true;
+        }
       }
       if (Object.keys(patch).length) setItemField(patch);
       setPdSuggestion(conflict ? { headCostRmb: savedCost, description: savedDesc, photo: savedPhoto } : null);
@@ -9789,8 +9149,11 @@ function CostPricePanel({
         </button>
       </div>
 
-      {/* ── Pricing modal (advanced controls) ───────────────────────────── */}
+      {/* ── Pricing modal (advanced controls) ─────────────────────────────
+          Portalled to body so it is not positioned inside the pinch-zoom
+          transform (see BodyPortal). */}
       {pricingOpen && (
+        <BodyPortal>
         <div
           className="no-print pq-cost-modal"
           onClick={() => setPricingOpen(false)}
@@ -9801,8 +9164,14 @@ function CostPricePanel({
           }}
         >
           <div
+            ref={pricingSurfaceRef}
+            role="dialog"
+            aria-modal="true"
+            aria-label="Pricing and cost"
+            tabIndex={-1}
             onClick={(e) => e.stopPropagation()}
             style={{
+              outline: "none",
               width: 380, maxWidth: "100%", maxHeight: "90vh", overflowY: "auto",
               boxSizing: "border-box", background: "#161616", color: "#fff",
               border: "1px solid #2D2D2D", borderRadius: 14, padding: 18,
@@ -9995,6 +9364,7 @@ function CostPricePanel({
             </div>
           </div>
         </div>
+        </BodyPortal>
       )}
     </>
   );

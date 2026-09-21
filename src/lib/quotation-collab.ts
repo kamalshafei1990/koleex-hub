@@ -63,13 +63,25 @@ export function useQuotationCollab(opts: {
   clearNotice: () => void;
 } {
   const { quotationId, me, status } = opts;
+  /* The hook depends on WHO `me` is, not on the object's identity. Callers
+     build `me` inline from the bootstrap on every render, so depending on
+     the object would re-run every effect each render; depending on nothing
+     (as before) meant a name change never reached the channel. */
+  const meId = me?.id ?? null;
+  const meName = me?.name ?? null;
   const [peers, setPeers] = useState<CollabPeer[]>([]);
   const [saveNotice, setSaveNotice] = useState<SaveNotice | null>(null);
+  /* Flips to true in the SUBSCRIBED callback. The re-track effect below
+     needs it: before this, `channelRef` was assigned synchronously but the
+     effect ran on mount, before the async import had even created the
+     channel — so the initial status was never tracked by that path and a
+     status change that landed mid-subscribe was lost. */
+  const [ready, setReady] = useState(false);
   const channelRef = useRef<RealtimeChannel | null>(null);
   const statusRef = useRef<CollabStatus>(status);
   statusRef.current = status;
 
-  const active = !!quotationId && UUID_RE.test(quotationId || "") && !!me;
+  const active = !!quotationId && UUID_RE.test(quotationId || "") && !!meId;
 
   // Join / leave the channel for this quotation. Keyed only on the id + me.id
   // so changing viewing↔editing does NOT tear down the channel (handled below).
@@ -100,6 +112,14 @@ export function useQuotationCollab(opts: {
         config: { presence: { key: me.id } },
       });
       channelRef.current = channel;
+      /* Assigned the moment the channel exists. Everything below is
+         synchronous, but keeping the teardown next to the creation is what
+         guarantees no code path can leave a channel with no way to remove it. */
+      teardown = () => {
+        channelRef.current = null;
+        setReady(false);
+        try { supa.removeChannel(channel); } catch { /* ignore */ }
+      };
 
       const syncPeers = () => {
         const state = channel.presenceState() as Record<string, Array<Record<string, unknown>>>;
@@ -141,13 +161,9 @@ export function useQuotationCollab(opts: {
         .subscribe((s) => {
           if (s === "SUBSCRIBED") {
             channel.track({ name: me.name, status: statusRef.current, at: new Date().toISOString() });
+            setReady(true);
           }
         });
-
-      teardown = () => {
-        channelRef.current = null;
-        try { supa.removeChannel(channel); } catch { /* ignore */ }
-      };
     })();
 
     return () => {
@@ -157,25 +173,26 @@ export function useQuotationCollab(opts: {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [active, quotationId, me?.id]);
 
-  // Re-track presence when viewing↔editing changes, without re-subscribing.
+  /* Re-track presence when viewing↔editing changes (or the display name
+     does), without re-subscribing. Gated on `ready`: track() before the
+     channel is SUBSCRIBED is a no-op that used to be silently lost. */
   useEffect(() => {
     const ch = channelRef.current;
-    if (!ch || !me) return;
-    try { ch.track({ name: me.name, status, at: new Date().toISOString() }); } catch { /* ignore */ }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [status]);
+    if (!ready || !ch || !meId) return;
+    try { ch.track({ name: meName ?? "", status, at: new Date().toISOString() }); } catch { /* ignore */ }
+  }, [ready, status, meId, meName]);
 
   const announceSaved = useCallback((version: number) => {
     const ch = channelRef.current;
-    if (!ch || !me) return;
+    if (!ch || !meId) return;
     try {
       ch.send({
         type: "broadcast",
         event: "saved",
-        payload: { by: me.id, byName: me.name, version, at: new Date().toISOString() } satisfies SaveNotice,
+        payload: { by: meId, byName: meName ?? "", version, at: new Date().toISOString() } satisfies SaveNotice,
       });
     } catch { /* ignore */ }
-  }, [me]);
+  }, [meId, meName]);
 
   const clearNotice = useCallback(() => setSaveNotice(null), []);
 

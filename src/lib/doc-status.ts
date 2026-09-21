@@ -23,6 +23,25 @@
 export type DocStatus =
   | "draft" | "sent" | "accepted" | "rejected" | "expired" | "paid" | "overdue" | string;
 
+/* ── Quotation status vocabulary ─────────────────────────────────────────
+   ONE list, shared by the API routes (runtime validation) and the pages
+   (transition tables). The detail page used to carry its own seven-value
+   union with "cancelled" and "final" — neither of which the builder knows —
+   so a status chosen there could not be read back by the editor. Legacy
+   "final" is still accepted on the wire and folded into "sent", which is
+   the same mapping the builder's Save Final applies. */
+export const QUOTE_STATUSES = ["draft", "sent", "accepted", "rejected", "expired"] as const;
+export type QuoteStatusValue = (typeof QUOTE_STATUSES)[number];
+
+/** Runtime guard for a status arriving from a request body. Returns the
+ *  canonical value, or null for anything outside the list. */
+export function normaliseQuoteStatus(s: unknown): QuoteStatusValue | null {
+  if (typeof s !== "string") return null;
+  const v = s.trim().toLowerCase();
+  if (v === "final") return "sent";
+  return (QUOTE_STATUSES as readonly string[]).includes(v) ? (v as QuoteStatusValue) : null;
+}
+
 const LADDER: Record<string, string> = {
   accepted: "bg-emerald-500/12 text-emerald-400 border-emerald-500/35",
   paid:     "bg-emerald-500/12 text-emerald-400 border-emerald-500/35",

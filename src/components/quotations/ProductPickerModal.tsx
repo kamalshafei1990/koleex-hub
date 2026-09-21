@@ -17,7 +17,9 @@
    --------------------------------------------------------------------------- */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import CrossIcon from "@/components/icons/ui/CrossIcon";
+import { FormModal, SearchInput } from "@/components/kds";
+import { useTranslation } from "@/lib/i18n";
+import { docsT } from "@/lib/translations/docs";
 import { record } from "@/lib/perf/client";
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 
@@ -92,26 +94,24 @@ export default function ProductPickerModal({
   onClose: () => void;
   onPick: (row: PickResult) => void;
 }) {
+  const { t } = useTranslation(docsT);
   const [query, setQuery] = useState("");
   const [allRows, setAllRows] = useState<PickerRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [activeIdx, setActiveIdx] = useState(0);
-  const inputRef = useRef<HTMLInputElement | null>(null);
   const listRef = useRef<HTMLDivElement | null>(null);
   /* Monotonic token so a slow older response can never overwrite a newer
      one after a rapid type (in addition to AbortController). */
   const seqRef = useRef(0);
 
-  /* Reset transient UI + focus the input each time the modal opens so the
-     previous session's query doesn't flash in. */
+  /* Reset transient UI each time the modal opens so the previous session's
+     query doesn't flash in (the search box autofocuses itself). */
   useEffect(() => {
     if (!open) return;
     setQuery("");
     setError(null);
     setActiveIdx(0);
-    const t = setTimeout(() => inputRef.current?.focus(), 40);
-    return () => clearTimeout(t);
   }, [open]);
 
   /* Bounded server search (Phase 4 Wave 2B.3). Previously the modal
@@ -242,180 +242,92 @@ export default function ProductPickerModal({
     [shown, activeIdx, pick],
   );
 
-  if (!open) return null;
+  const hint = !loading && !error && allRows.length > 0
+    ? `${query.trim()
+        ? t("picker.matches").replace("{n}", String(results.length))
+        : t("picker.products").replace("{n}", String(allRows.length))}${
+        results.length > MAX_RENDER ? ` · ${t("picker.showingTop").replace("{n}", String(MAX_RENDER))}` : ""}`
+    : "";
 
   return (
-    <div
-      onClick={onClose}
-      style={{
-        position: "fixed",
-        inset: 0,
-        background: "rgba(0,0,0,0.55)",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        zIndex: 1000,
-        padding: 16,
-      }}
-    >
-      <div
-        onClick={(e) => e.stopPropagation()}
-        style={{
-          background: "var(--bg-secondary, #1f2937)",
-          color: "var(--text-primary, #e5e7eb)",
-          width: "100%",
-          maxWidth: 720,
-          maxHeight: "85vh",
-          borderRadius: 14,
-          border: "1px solid var(--border-color, #374151)",
-          boxShadow: "0 20px 60px rgba(0,0,0,0.6)",
-          display: "flex",
-          flexDirection: "column",
-          overflow: "hidden",
-        }}
-      >
-        {/* Header */}
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            padding: "14px 18px",
-            borderBottom: "1px solid var(--border-color, #374151)",
-          }}
-        >
-          <div style={{ fontWeight: 600, fontSize: 15 }}>Pick a product</div>
-          <button
-            type="button"
-            onClick={onClose}
-            title="Close"
-            style={{
-              background: "transparent",
-              border: "none",
-              color: "inherit",
-              cursor: "pointer",
-              padding: 4,
-              borderRadius: 6,
-              display: "inline-flex",
-            }}
-          >
-            <CrossIcon className="h-4 w-4" />
-          </button>
-        </div>
-
-        {/* Search input */}
-        <div style={{ padding: "12px 18px", borderBottom: "1px solid var(--border-color, #374151)" }}>
-          <input
-            ref={inputRef}
-            type="text"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            onKeyDown={onInputKeyDown}
-            placeholder="Search model code, SKU or product name…"
-            style={{
-              width: "100%",
-              height: 36,
-              borderRadius: 8,
-              border: "1px solid var(--border-color, #374151)",
-              background: "var(--bg-primary, #111827)",
-              color: "inherit",
-              padding: "0 12px",
-              fontSize: 14,
-              outline: "none",
-            }}
-          />
-          {/* Result count / hint — quiet line under the search box. */}
-          {!loading && !error && allRows.length > 0 && (
-            <div style={{ marginTop: 8, fontSize: 11, opacity: 0.55, display: "flex", justifyContent: "space-between" }}>
-              <span>
-                {query.trim()
-                  ? `${results.length} match${results.length === 1 ? "" : "es"}`
-                  : `${allRows.length} products`}
-                {results.length > MAX_RENDER ? ` · showing top ${MAX_RENDER}` : ""}
-              </span>
-              <span>↑↓ to move · Enter to add</span>
-            </div>
-          )}
-        </div>
-
-        {/* Results */}
-        <div ref={listRef} style={{ overflowY: "auto", flex: 1, padding: 8 }}>
-          {loading && (
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "center", padding: 32, gap: 8, opacity: 0.7 }}>
-              <SpinnerIcon className="h-4 w-4" />
-              <span style={{ fontSize: 13 }}>Loading catalog…</span>
-            </div>
-          )}
-          {!loading && error && (
-            <div style={{ padding: 32, textAlign: "center", color: "#f87171", fontSize: 13 }}>{error}</div>
-          )}
-          {!loading && !error && shown.length === 0 && (
-            <div style={{ padding: 32, textAlign: "center", opacity: 0.6, fontSize: 13 }}>
-              No products match {query ? `"${query}"` : "your catalog yet"}.
-            </div>
-          )}
-          {!loading && shown.map((row, i) => {
-            const active = i === activeIdx;
-            return (
-              <button
-                key={row.model_id}
-                type="button"
-                data-active={active ? "1" : "0"}
-                onClick={() => pick(row)}
-                onMouseMove={() => { if (!active) setActiveIdx(i); }}
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 12,
-                  width: "100%",
-                  padding: 10,
-                  borderRadius: 10,
-                  border: `1px solid ${active ? "var(--border-color, #374151)" : "transparent"}`,
-                  background: active ? "var(--bg-primary, #111827)" : "transparent",
-                  color: "inherit",
-                  cursor: "pointer",
-                  textAlign: "left",
-                  marginBottom: 2,
-                }}
-              >
-                {/* Thumbnail */}
-                <div
-                  style={{
-                    width: 48,
-                    height: 48,
-                    flex: "0 0 48px",
-                    borderRadius: 8,
-                    background: "#ffffff",
-                    border: "1px solid var(--border-color, #374151)",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    overflow: "hidden",
-                  }}
-                >
-                  {row.image_url ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={row.image_url} alt="" loading="lazy" style={{ width: "100%", height: "100%", objectFit: "contain" }} />
-                  ) : (
-                    <span style={{ fontSize: 18, color: "#9ca3af" }}>–</span>
-                  )}
-                </div>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontFamily: "ui-monospace, monospace", fontSize: 12, fontWeight: 600, letterSpacing: "0.02em" }}>
-                    {row.model_name || row.sku || "—"}
-                  </div>
-                  <div style={{ fontSize: 13, opacity: 0.85, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                    {row.product_name}
-                  </div>
-                </div>
-                <div style={{ fontSize: 13, fontVariantNumeric: "tabular-nums", fontWeight: 600 }}>
-                  {row.price > 0 ? `US$ ${row.price.toLocaleString()}` : "—"}
-                </div>
-              </button>
-            );
-          })}
-        </div>
+    <FormModal open={open} onClose={onClose} title={t("picker.productTitle")} width="max-w-2xl">
+      {/* Pinned above the scrolling results — the modal body is the scroll
+          container; the negative top margin closes the body padding
+          above it so nothing scrolls past the search box. */}
+      <div className="sticky top-0 z-[1] -mt-5 bg-[var(--bg-secondary)] pt-5 pb-3">
+        <SearchInput
+          value={query}
+          onChange={setQuery}
+          onKeyDown={onInputKeyDown}
+          placeholder={t("picker.productPh")}
+          autoFocus
+        />
+        {/* Result count / hint — quiet line under the search box. */}
+        {hint && (
+          <div className="mt-2 flex justify-between text-[11px] text-[var(--text-dim)]">
+            <span>{hint}</span>
+            <span className="hidden sm:inline">{t("picker.keys")}</span>
+          </div>
+        )}
       </div>
-    </div>
+
+      <div ref={listRef} className="min-h-[200px]" role="listbox" aria-label={t("picker.productTitle")}>
+        {loading && (
+          <div className="flex items-center justify-center gap-2 py-8 text-[13px] text-[var(--text-dim)]" role="status" aria-live="polite">
+            <SpinnerIcon className="h-4 w-4" />
+            {t("picker.loadingCatalog")}
+          </div>
+        )}
+        {!loading && error && (
+          <div className="py-8 text-center text-[13px] text-rose-400" role="alert">{error}</div>
+        )}
+        {!loading && !error && shown.length === 0 && (
+          <div className="py-8 text-center text-[13px] text-[var(--text-dim)]">
+            {query ? t("picker.noProducts").replace("{q}", query) : t("picker.noProductsYet")}
+          </div>
+        )}
+        {!loading && shown.map((row, i) => {
+          const active = i === activeIdx;
+          return (
+            <button
+              key={row.model_id}
+              type="button"
+              role="option"
+              aria-selected={active}
+              data-active={active ? "1" : "0"}
+              onClick={() => pick(row)}
+              onMouseMove={() => { if (!active) setActiveIdx(i); }}
+              className={`mb-0.5 flex w-full items-center gap-3 rounded-lg border px-2.5 py-2 text-start transition-colors focus-visible:outline-none ${
+                active
+                  ? "border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)]"
+                  : "border-transparent hover:border-[var(--border-subtle)] hover:bg-[var(--bg-surface-subtle)]"
+              }`}
+            >
+              {/* Thumbnail — white behind it on purpose: product photos are
+                  cut-outs on white and read wrong on a dark surface. */}
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-[var(--border-subtle)] bg-white">
+                {row.image_url ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={row.image_url} alt="" loading="lazy" className="h-full w-full object-contain" />
+                ) : (
+                  <span className="text-[18px] text-gray-400">–</span>
+                )}
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="font-mono text-[12px] font-semibold tracking-[0.02em] text-[var(--text-primary)]">
+                  {row.model_name || row.sku || "—"}
+                </div>
+                <div className="truncate text-[13px] text-[var(--text-secondary)]">
+                  {row.product_name}
+                </div>
+              </div>
+              <div className="shrink-0 text-[13px] font-semibold tabular-nums text-[var(--text-primary)]">
+                {row.price > 0 ? `US$ ${row.price.toLocaleString("en-US")}` : "—"}
+              </div>
+            </button>
+          );
+        })}
+      </div>
+    </FormModal>
   );
 }

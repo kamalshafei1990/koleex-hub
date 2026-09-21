@@ -81,10 +81,18 @@ export async function GET(req: Request) {
      for an SKU that lived past that slot returned nothing. The
      full catalog is small enough (one tenant's products) to load
      into memory in one pass, and we cap the OUTPUT after the
-     filter so the response payload stays bounded. */
+     filter so the response payload stays bounded.
+
+     TENANT SCOPE lives on `products` (models and media carry no
+     tenant_id of their own). The products query is the one that is
+     scoped, and every model / media row is then admitted only through
+     the resulting product-id set — a row whose product is not in this
+     tenant's map never reaches the response. Previously `products` was
+     read unscoped, so the picker listed every tenant's catalog. */
   const productsQuery = supabaseServer
     .from("products")
-    .select("id, product_name, status, visible");
+    .select("id, product_name, status, visible")
+    .eq("tenant_id", auth.tenant_id);
   const modelsQuery = supabaseServer
     .from("product_models")
     .select(
@@ -103,21 +111,22 @@ export async function GET(req: Request) {
   ]);
 
   if (productsRes.error || modelsRes.error || mediaRes.error) {
-    const msg =
-      productsRes.error?.message ||
-      modelsRes.error?.message ||
-      mediaRes.error?.message ||
-      "catalog fetch failed";
-    return NextResponse.json({ error: msg }, { status: 500 });
+    console.error(
+      "[api/quotations/catalog-search]",
+      productsRes.error?.message || modelsRes.error?.message || mediaRes.error?.message,
+    );
+    return NextResponse.json({ error: "Catalog fetch failed" }, { status: 500 });
   }
 
   const products = (productsRes.data ?? []) as ProductRow[];
   const productById = new Map(products.map((p) => [p.id, p]));
 
-  /* First image per product. media query is pre-sorted by `order` so
-     `set(...).get(...)` keeps the first one (we only insert if absent). */
+  /* First image per product — tenant products only. media query is
+     pre-sorted by `order` so `set(...).get(...)` keeps the first one
+     (we only insert if absent). */
   const firstImage = new Map<string, string>();
   for (const m of (mediaRes.data ?? []) as MediaRow[]) {
+    if (!productById.has(m.product_id)) continue;
     if (m.url && !firstImage.has(m.product_id)) {
       firstImage.set(m.product_id, m.url);
     }
@@ -126,6 +135,7 @@ export async function GET(req: Request) {
   const needle = q.toLowerCase();
   const out: PickerRow[] = [];
   for (const m of (modelsRes.data ?? []) as ModelRow[]) {
+    /* Not in this tenant's product map → not this tenant's model. */
     const product = productById.get(m.product_id);
     if (!product) continue;
     /* Internal picker — drafts and not-yet-visible products MUST be

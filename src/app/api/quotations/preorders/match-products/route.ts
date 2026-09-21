@@ -1,13 +1,13 @@
 import "server-only";
 
 /* Match preorder model codes to products and return a primary image URL per code.
-   Codes are matched (case-insensitive) against product_models.sku and .model_name,
-   then tenant-verified. Returns { matches: { CODE: url } } — codes with no product
-   or no image are simply omitted. */
+   Codes are matched (case-insensitive) against product_models.sku and .model_name
+   of THIS tenant's products. Returns { matches: { CODE: url } } — codes with no
+   product or no image are simply omitted. */
 
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/server/supabase-server";
-import { requireAuth } from "@/lib/server/auth";
+import { requireAuth, requireModuleAccess } from "@/lib/server/auth";
 
 const SUPA = (process.env.NEXT_PUBLIC_SUPABASE_URL ?? "").trim();
 const publicUrl = (fp: string | null | undefined) =>
@@ -18,6 +18,8 @@ const mediaUrl = (m: { url?: string | null; file_path?: string | null }) =>
 export async function POST(req: Request) {
   const auth = await requireAuth();
   if (auth instanceof NextResponse) return auth;
+  const deny = await requireModuleAccess(auth, "Quotations");
+  if (deny) return deny;
 
   const body = (await req.json().catch(() => null)) as { models?: unknown } | null;
   const codes = Array.isArray(body?.models)
@@ -25,6 +27,23 @@ export async function POST(req: Request) {
     : [];
   if (codes.length === 0) return NextResponse.json({ matches: {} });
   const wanted = new Set(codes);
+
+  /* Tenant scope is decided UP FRONT, on products (models and media carry no
+     tenant_id). Read this tenant's product ids first and admit a model only
+     through that set — the old order matched codes across every tenant's
+     models and re-verified afterwards, which is the wrong way round for a
+     boundary. Kept in memory rather than as an IN() list: a tenant's product
+     set can run to hundreds of ids and that list would not fit a query URL. */
+  const { data: prods, error: pErr } = await supabaseServer
+    .from("products")
+    .select("id")
+    .eq("tenant_id", auth.tenant_id);
+  if (pErr) {
+    console.error("[match-products products]", pErr.message);
+    return NextResponse.json({ error: "Lookup failed." }, { status: 500 });
+  }
+  const tenantProducts = new Set((prods ?? []).map((p) => p.id as string));
+  if (tenantProducts.size === 0) return NextResponse.json({ matches: {} });
 
   // Fetch all models (small table) and match in JS — avoids huge IN() lists.
   const { data: models, error: mErr } = await supabaseServer
@@ -37,7 +56,7 @@ export async function POST(req: Request) {
 
   const codeToModel = new Map<string, { product_id: string; model_id: string }>();
   for (const m of models ?? []) {
-    if (!m.product_id) continue;
+    if (!m.product_id || !tenantProducts.has(m.product_id)) continue;
     for (const raw of [m.sku, m.model_name]) {
       const key = typeof raw === "string" ? raw.trim().toUpperCase() : "";
       if (key && wanted.has(key) && !codeToModel.has(key)) {
@@ -49,23 +68,11 @@ export async function POST(req: Request) {
 
   const matchedProductIds = Array.from(new Set(Array.from(codeToModel.values()).map((v) => v.product_id)));
 
-  // Tenant-verify just the matched products (small list).
-  const { data: prods, error: pErr } = await supabaseServer
-    .from("products")
-    .select("id, tenant_id")
-    .in("id", matchedProductIds);
-  if (pErr) {
-    console.error("[match-products products]", pErr.message);
-    return NextResponse.json({ error: "Lookup failed." }, { status: 500 });
-  }
-  const okProducts = new Set((prods ?? []).filter((p) => p.tenant_id === auth.tenant_id).map((p) => p.id));
-  if (okProducts.size === 0) return NextResponse.json({ matches: {} });
-
   // Media for just the matched products (small list). Alias reserved "order".
   const { data: media, error: medErr } = await supabaseServer
     .from("product_media")
     .select("product_id, model_id, url, file_path, role, type, ord:order")
-    .in("product_id", Array.from(okProducts));
+    .in("product_id", matchedProductIds);
   if (medErr) {
     console.error("[match-products media]", medErr.message);
     return NextResponse.json({ error: "Lookup failed." }, { status: 500 });
@@ -82,7 +89,6 @@ export async function POST(req: Request) {
   const all = media ?? [];
   const matches: Record<string, string> = {};
   for (const [code, ref] of codeToModel) {
-    if (!okProducts.has(ref.product_id)) continue;
     const byModel = pick(all.filter((m) => m.model_id === ref.model_id));
     const best = byModel ?? pick(all.filter((m) => m.product_id === ref.product_id));
     const url = best ? mediaUrl(best) : null;
