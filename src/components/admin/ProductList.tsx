@@ -3348,6 +3348,13 @@ export default function ProductList() {
                --kx-ramp-fade is a LENGTH, not the default 45%: a
                percentage grows with the layer once it covers the strip. */
             className="kx-bar-host max-sm:static sticky z-20 -mx-4 md:-mx-6 lg:-mx-8 px-4 md:px-6 lg:px-8 pt-1.5 pb-3.5 mb-5 bg-[var(--bg-primary)] [--kx-ramp-ext:1rem] [--kx-ramp-fade:4rem]"
+            /* The two numbers the strip cannot live without, and that the
+               rail rewrite dropped for a day: the sticky offset is the
+               MEASURED toolbar height (density resizes the search field),
+               and --kx-ramp-top lifts this bar's single ramp over the bars
+               above it — one ramp per screen (owner). Without `top` a
+               sticky element never sticks. */
+            style={{ top: "var(--kx-pd-tools-h, 52px)", ["--kx-ramp-top" as string]: "26rem" }}
             data-kx-progressive=""
             aria-label={t("list.categories", "Categories")}
           >
