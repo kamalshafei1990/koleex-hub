@@ -3453,7 +3453,7 @@ export default function ProductList() {
                     type="button"
                     aria-pressed={on}
                     onClick={() => { setFilterCat(c.slug); setFilterSub(""); pressRail(); }}
-                    className={`group relative flex flex-col items-center justify-start gap-1 shrink-0 w-[88px] sm:w-auto aspect-square min-w-0 px-1.5 pt-[19px] pb-1.5 rounded-2xl border select-none snap-start transition-colors ${
+                    className={`group relative flex flex-col items-center justify-start gap-1 shrink-0 w-[88px] sm:w-auto aspect-square min-w-0 px-1.5 pt-5 pb-1.5 rounded-2xl border select-none snap-start transition-colors ${
                       coreOn
                         ? "bg-[var(--bg-inverted)] border-transparent"
                         : "kx-glass bg-[var(--bg-card)] border-white/[0.06] kx-hover-card kx-hover-tile kx-glow-in"
@@ -3466,16 +3466,26 @@ export default function ProductList() {
                         different height. Three lines at 10.5px fit the 86px
                         square with no ellipsis — "Printing & heat press
                         equipment" was cut to "…press…" at two. */}
-                    {/* The icon scales WITH the square — 28% of its width (~22px
-                        at the 86px minimum, ~27px on a 109px card, ~33px at the
-                        1500px content cap). A fixed 20px read as a dot on the
-                        wide-screen squares (owner, 22 Sep 2026). */}
+                    {/* THE ICON TAKES THE SQUARE'S SPARE HEIGHT. The vertical
+                        budget of a square is fixed: 20px top — the count pill's
+                        band ends at 20.5px, and at 19 a wide icon's corner met
+                        a three-digit pill ("394" at 94px cards, measured) — the
+                        icon, a 4px gap, up to three 10.5px lines for the name
+                        (36px) and 6px bottom. On the 86–90px squares a tablet or
+                        a phone gets, that leaves ~20px for the icon and nothing
+                        more; on the owner's 109px desktop squares it leaves 40.
+                        So the icon is the slack itself — content width minus
+                        54px (= card − 68), floored at 20px and capped at 38px.
+                        A fixed 20px read as a dot on desktop, and 28% of the
+                        width (27px at 109) was still "adjust the icons size
+                        specially in desktop view" (owner, 22 Sep 2026). Never a
+                        fixed px: re-derive from the budget. */}
                     {c.slug === "" ? (
-                      <LayoutGridIcon className={`w-[28%] h-auto aspect-square shrink-0 ${iconTone}`} />
+                      <LayoutGridIcon className={`w-[clamp(20px,calc(100%_-_54px),38px)] h-auto aspect-square shrink-0 ${iconTone}`} />
                     ) : classIcons.category?.[c.slug] ? (
-                      <ClassMonoIcon src={classIcons.category[c.slug]} className={`w-[28%] h-auto aspect-square shrink-0 ${iconTone}`} />
+                      <ClassMonoIcon src={classIcons.category[c.slug]} className={`w-[clamp(20px,calc(100%_-_54px),38px)] h-auto aspect-square shrink-0 ${iconTone}`} />
                     ) : (
-                      <LayoutGridIcon className={`w-[28%] h-auto aspect-square shrink-0 ${iconTone}`} />
+                      <LayoutGridIcon className={`w-[clamp(20px,calc(100%_-_54px),38px)] h-auto aspect-square shrink-0 ${iconTone}`} />
                     )}
                     {/* The name is CENTRED in the zone under the icon (owner: "the
                         names in the cards the positions not right" — two-line
