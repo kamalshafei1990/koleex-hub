@@ -1,11 +1,12 @@
 "use client";
 
-import { useState, useEffect, useMemo, useRef, useCallback, useDeferredValue, memo } from "react";
+import { useState, useEffect, useLayoutEffect, useMemo, useRef, useCallback, useDeferredValue, memo } from "react";
 import dynamic from "next/dynamic";
 import { useSkin } from "@/lib/appearance";
 import { useTopRampOwner } from "@/lib/useTopRampOwner";
 import KdsSelect from "@/components/kds/Select";
 import TabStrip from "@/components/ui/TabStrip";
+import Collapse from "@/components/ui/Collapse";
 
 /* Aurora ground — the Hub canvas, client-only, mounted only under the skin.
    Lives HERE (not in the two thin page wrappers) so /products and
@@ -2222,6 +2223,33 @@ export default function ProductList() {
     const total = Object.values(counts).reduce((a, b) => a + b, 0);
     return { list, total };
   }, [filterCat, filterSub, facetSubs, filteredSubs, products, lang]);
+  /* The subcategory row stays rendered through its 220ms close (Collapse
+     needs a body to fold), so the last real row is kept as state — derived
+     in render, the pattern the presence hooks use (a ref written during
+     render and a setState in an effect are both lint errors here). */
+  const [subView, setSubView] = useState(subNav);
+  if (subNav && subNav !== subView) setSubView(subNav);
+  /* Counts the presses on the rail (cards and subcategory pills). The grid
+     is keyed on it so it ENTERS after a press — a soft fade, no slide: this
+     is a filter over one list, not a page — instead of popping. Deliberately
+     NOT the filter value: a warm start or a deep link must paint still. */
+  const [railPulse, setRailPulse] = useState(0);
+  /* The rows the rail was pressed over. While `products` is still that same
+     array the new page has not landed, and the grid must not flash the
+     "no matches" panel in between: the client predicate over the OLD rows
+     is empty for any other category. Derived at render, no effect, no ref. */
+  const [pulseProducts, setPulseProducts] = useState<ProductRow[] | null>(null);
+  const pressRail = useCallback(() => { setRailPulse((n) => n + 1); setPulseProducts(products); }, [products]);
+  const railSwitching = pulseProducts !== null && pulseProducts === products;
+  /* The selection SLIDES between cards (owner: "when I press from card to
+     other no smooth motion"). Same mechanic as TabStrip's pill: the pressed
+     card is measured — offsetLeft/Top scroll WITH the phone rail, so the
+     pill stays glued under its card — and one translated element carries
+     the Hub-Blue outline to it. null until measured: the pill is invisible
+     rather than somewhere wrong. Core has no pill; its selected card is the
+     filled inverted square, as every Core selected state is. */
+  const railRef = useRef<HTMLDivElement | null>(null);
+  const [railInd, setRailInd] = useState<{ x: number; y: number; w: number; h: number } | null>(null);
 
   /* Cheap O(1) lookups so the search hot path doesn't re-scan the
      taxonomy arrays for every product on every keystroke. Built
@@ -2631,12 +2659,31 @@ export default function ProductList() {
      over its header at all. Same expression as the JSX guard, deliberately. */
   const railVisible = viewMode === "grid" && categoryNav.list.length > 1;
   useTopRampOwner(railVisible);
+  useLayoutEffect(() => {
+    if (!aurora || !railVisible) { setRailInd(null); return; }
+    const host = railRef.current;
+    if (!host) return;
+    const measure = () => {
+      const el = host.querySelector<HTMLElement>('button[aria-pressed="true"]');
+      setRailInd(el ? { x: el.offsetLeft, y: el.offsetTop, w: el.offsetWidth, h: el.offsetHeight } : null);
+    };
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(host);
+    return () => ro.disconnect();
+  }, [aurora, railVisible, filterCat, categoryNav.list.length]);
 
   /* The division is deliberately NOT counted here: it has its own
      dedicated pill strip below the toolbar, so echoing it again in the
      Filters badge + ACTIVE chips row + "Showing X" line made the page
      top read three ways for one fact (owner: "too messy"). */
-  const activeFilterCount = [filterCat, filterSub, filterBrand, filterLevel, filterSupplier, filterVisible, filterFeatured, filterStatus].filter(Boolean).length;
+  /* The rail OWNS the category/subcategory selection while it is on screen.
+     Counting it here too put an "ACTIVE: Category …" row and a "Showing N of
+     N" line above the divisions strip the moment a card was pressed — the
+     rail jumped ~60px down under the pointer (owner: "the motion is jump").
+     The Filters panel's dropdowns still mirror the same value. */
+  const railOwnedFilters = railVisible ? [filterCat, filterSub].filter(Boolean).length : 0;
+  const activeFilterCount = [filterCat, filterSub, filterBrand, filterLevel, filterSupplier, filterVisible, filterFeatured, filterStatus].filter(Boolean).length - railOwnedFilters;
 
   const clearAllFilters = () => {
     setFilterDiv(""); setFilterCat(""); setFilterSub(""); setFilterBrand("");
@@ -3136,8 +3183,8 @@ export default function ProductList() {
               {(() => {
                 const chips: { label: string; onClear: () => void }[] = [];
                 if (search) chips.push({ label: `"${search}"`, onClear: () => setSearch("") });
-                if (filterCat) chips.push({ label: `${t("filter.category")}: ${catNameBySlug[filterCat] || filterCat}`, onClear: () => { setFilterCat(""); setFilterSub(""); } });
-                if (filterSub) chips.push({ label: `${t("filter.subcategory")}: ${subNameBySlug[filterSub] || filterSub}`, onClear: () => setFilterSub("") });
+                if (filterCat && !railVisible) chips.push({ label: `${t("filter.category")}: ${catNameBySlug[filterCat] || filterCat}`, onClear: () => { setFilterCat(""); setFilterSub(""); } });
+                if (filterSub && !railVisible) chips.push({ label: `${t("filter.subcategory")}: ${subNameBySlug[filterSub] || filterSub}`, onClear: () => setFilterSub("") });
                 if (filterBrand) chips.push({ label: `${t("filter.brand")}: ${filterBrand}`, onClear: () => setFilterBrand("") });
                 if (filterLevel) chips.push({ label: `${t("filter.level")}: ${filterLevel}`, onClear: () => setFilterLevel("") });
                 if (filterSupplier) chips.push({ label: `${t("filter.supplier")}: ${filterSupplier}`, onClear: () => setFilterSupplier("") });
@@ -3277,6 +3324,131 @@ export default function ProductList() {
         )}
 
         {/* Product Grid / List */}
+        {/* THE CATEGORY RAIL SITS ABOVE THE RESULTS CHAIN ON PURPOSE. It is
+            navigation: it must stay mounted while a page loads, while a
+            search finds nothing and while a pressed card's rows are still on
+            their way — the first version lived inside the grid branch, so
+            every press unmounted it for the ~130 ms the "no matches" panel
+            took to be replaced by the new grid: the strip blinked, the
+            sliding pill lost its element and stayed where it was, and the
+            owner saw "the motion is jump". */}
+        {railVisible && (
+          <nav
+            /* ONE ramp for the whole top strip, and it runs BEHIND every
+               component in that strip — owner: "put the blured edge on
+               the back of the top page components and make more longer".
+               The frost starts above the title block and fades over the
+               rail; the title, count and divisions row sit ABOVE it in
+               z-order (see their z-[25]) so they are never blurred away.
+               --kx-ramp-fade is a LENGTH, not the default 45%: a
+               percentage grows with the layer once it covers the strip. */
+            className="kx-bar-host max-sm:static sticky z-20 -mx-4 md:-mx-6 lg:-mx-8 px-4 md:px-6 lg:px-8 pt-1.5 pb-3.5 mb-5 bg-[var(--bg-primary)] [--kx-ramp-ext:1rem] [--kx-ramp-fade:4rem]"
+            data-kx-progressive=""
+            aria-label={t("list.categories", "Categories")}
+          >
+            {/* The screen's ONE progressive edge: four masked layers
+                ramp 3→28px, stretched over the whole top strip. */}
+            <div aria-hidden className="kx-glass-bar kx-bar-prog"><i /><i /><i /><i /></div>
+            {/* SQUARE CATEGORY CARDS THAT FILTER (owner, 22 Sep 2026,
+                picked from five samples). The row used to be anchor tiles
+                that scrolled to a section of the grouped grid; now each
+                card is the category filter itself — "All products" first,
+                then every category of the division that has products,
+                with its icon, name and facet count. One row of squares
+                at the owner's width (auto-fill, 86px minimum); the
+                selected card is inverted like every selected tab in the
+                Hub. On phones the same cards run in ONE sideways-snapping
+                row (84px squares) — the third phone layout for this
+                strip, the one the owner approved in the sample. */}
+            <div
+              ref={railRef}
+              role="group"
+              className="relative flex gap-2 overflow-x-auto snap-x snap-mandatory -mx-4 px-4 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:mx-0 sm:px-0 sm:pb-0.5 sm:overflow-visible sm:grid sm:grid-cols-[repeat(auto-fill,minmax(86px,1fr))] sm:gap-1.5"
+            >
+              {/* The one sliding selection — position and size are data
+                  (inline), the paint and the motion live on the class. */}
+              <span
+                aria-hidden
+                className="kx-rail-ind"
+                style={railInd
+                  ? { transform: `translate(${railInd.x}px, ${railInd.y}px)`, width: railInd.w, height: railInd.h, opacity: 1 }
+                  : { opacity: 0 }}
+              />
+              {[{ slug: "", name: t("list.allProducts", "All products"), count: categoryNav.total }, ...categoryNav.list].map((c) => {
+                const on = filterCat === c.slug;
+                /* Aurora: the pill carries the selection, the card only
+                   speaks in text colour (TabStrip's rule). Core: the
+                   filled inverted square. Hover = the product cards'
+                   hover on this same screen — Hub-Blue ring + inner glow
+                   (kx-hover-card + kx-glow-in); the tile's neon
+                   icon/label recolour is gone (owner: "this not Aurora
+                   hover style"). kx-hover-tile stays ONLY because the
+                   bar-host rule keyed on it lifts the tile's own blur
+                   (never blur on blur inside the frosted strip). */
+                const coreOn = on && !aurora;
+                const tone = on ? (aurora ? "text-[var(--text-primary)]" : "text-[var(--text-inverted)]") : "text-[var(--text-muted)]";
+                const iconTone = on ? (aurora ? "text-[var(--text-primary)]" : "text-[var(--text-inverted)]") : "text-[var(--text-primary)] opacity-90";
+                return (
+                  <button
+                    key={c.slug || "__all"}
+                    type="button"
+                    aria-pressed={on}
+                    onClick={() => { setFilterCat(c.slug); setFilterSub(""); pressRail(); }}
+                    className={`group relative flex flex-col items-center justify-center gap-1.5 shrink-0 w-[84px] sm:w-auto aspect-square min-w-0 px-1.5 pt-4 pb-1.5 rounded-2xl border select-none snap-start transition-colors ${
+                      coreOn
+                        ? "bg-[var(--bg-inverted)] border-transparent"
+                        : "kx-glass bg-[var(--bg-card)] border-white/[0.06] kx-hover-card kx-hover-tile kx-glow-in"
+                    } ${tone}`}
+                  >
+                    <span className={`absolute top-1.5 end-1.5 px-1.5 py-0.5 rounded-full text-[9.5px] leading-none tabular-nums ${on ? "opacity-70" : "bg-[var(--bg-surface-subtle)] text-[var(--text-ghost)]"}`}>{c.count}</span>
+                    {c.slug === "" ? (
+                      <LayoutGridIcon className={`h-[22px] w-[22px] shrink-0 ${iconTone}`} />
+                    ) : classIcons.category?.[c.slug] ? (
+                      <ClassMonoIcon src={classIcons.category[c.slug]} className={`h-[22px] w-[22px] shrink-0 ${iconTone}`} />
+                    ) : (
+                      <LayoutGridIcon className={`h-[22px] w-[22px] shrink-0 ${iconTone}`} />
+                    )}
+                    <span className="w-full text-center text-[10.5px] font-medium leading-[1.15] line-clamp-2">{c.name}</span>
+                  </button>
+                );
+              })}
+            </div>
+            {/* SUBCATEGORIES — the second row unfolds (Collapse, the one
+                sanctioned layout animation) only when the selected
+                category offers a choice: "All <category>" then each
+                subcategory with its count, same facets. It is the
+                canonical TabStrip — pill shape, no glass of its own
+                inside the frosted strip — so its selection slides too. */}
+            <Collapse open={!!subNav}>
+              {subView && (
+                <div className="pt-2">
+                  <TabStrip
+                    ariaLabel={t("list.subcategories", "Subcategories")}
+                    shape="pill"
+                    glass={false}
+                    className="inline-flex max-w-full"
+                    items={[
+                      {
+                        key: "",
+                        label: t("list.allIn", "All {name}").replace("{name}", sentence(catMap[filterCat] ?? filterCat)),
+                        badge: <span className="text-[10px] tabular-nums text-[var(--text-ghost)]">{subView.total}</span>,
+                        active: filterSub === "",
+                        onClick: () => { setFilterSub(""); pressRail(); },
+                      },
+                      ...subView.list.map((x) => ({
+                        key: x.slug,
+                        label: x.name,
+                        badge: <span className="text-[10px] tabular-nums text-[var(--text-ghost)]">{x.count}</span>,
+                        active: filterSub === x.slug,
+                        onClick: () => { setFilterSub(x.slug); pressRail(); },
+                      })),
+                    ]}
+                  />
+                </div>
+              )}
+            </Collapse>
+          </nav>
+        )}
         {loadError === "__auth__" ? (
           <div className="bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] p-16 text-center">
             <ProductsIcon size={48} className="text-[var(--text-barely)] mx-auto mb-4" />
@@ -3352,7 +3524,7 @@ export default function ProductList() {
               ))}
             </div>
           )
-        ) : filtered.length === 0 ? (
+        ) : filtered.length === 0 && !railSwitching ? (
           <div className="bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] p-16 text-center">
             <ProductsIcon size={48} className="text-[var(--text-barely)] mx-auto mb-4" />
             <p className="text-[var(--text-dim)] text-[14px] font-medium">
@@ -3384,104 +3556,6 @@ export default function ProductList() {
              category section keeps render fast even with 600+ cards
              mounted at once. */
           <>
-            {/* ── Category jump-nav ── */}
-            {railVisible && (
-              <nav
-                /* ONE ramp for the whole top strip, and it runs BEHIND every
-                   component in that strip — owner: "put the blured edge on
-                   the back of the top page components and make more longer".
-                   The frost starts above the title block and fades over the
-                   rail; the title, count and divisions row sit ABOVE it in
-                   z-order (see their z-[25]) so they are never blurred away.
-                   --kx-ramp-fade is a LENGTH, not the default 45%: a
-                   percentage grows with the layer once it covers the strip. */
-                className="kx-bar-host max-sm:static sticky z-20 -mx-4 md:-mx-6 lg:-mx-8 px-4 md:px-6 lg:px-8 pt-1.5 pb-3.5 mb-5 bg-[var(--bg-primary)] [--kx-ramp-ext:1rem] [--kx-ramp-fade:4rem]"
-                data-kx-progressive=""
-                aria-label={t("list.categories", "Categories")}
-              >
-                {/* The screen's ONE progressive edge: four masked layers
-                    ramp 3→28px, stretched over the whole top strip. */}
-                <div aria-hidden className="kx-glass-bar kx-bar-prog"><i /><i /><i /><i /></div>
-                {/* SQUARE CATEGORY CARDS THAT FILTER (owner, 22 Sep 2026,
-                    picked from five samples). The row used to be anchor tiles
-                    that scrolled to a section of the grouped grid; now each
-                    card is the category filter itself — "All products" first,
-                    then every category of the division that has products,
-                    with its icon, name and facet count. One row of squares
-                    at the owner's width (auto-fill, 86px minimum); the
-                    selected card is inverted like every selected tab in the
-                    Hub. On phones the same cards run in ONE sideways-snapping
-                    row (84px squares) — the third phone layout for this
-                    strip, the one the owner approved in the sample. */}
-                <div
-                  role="group"
-                  className="flex gap-2 overflow-x-auto snap-x snap-mandatory -mx-4 px-4 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:mx-0 sm:px-0 sm:pb-0.5 sm:overflow-visible sm:grid sm:grid-cols-[repeat(auto-fill,minmax(86px,1fr))] sm:gap-1.5"
-                >
-                  {[{ slug: "", name: t("list.allProducts", "All products"), count: categoryNav.total }, ...categoryNav.list].map((c) => {
-                    const on = filterCat === c.slug;
-                    const iconCls = `h-[22px] w-[22px] shrink-0 ${on ? "text-[var(--text-inverted)]" : "text-[var(--text-primary)] opacity-90"}`;
-                    return (
-                      <button
-                        key={c.slug || "__all"}
-                        type="button"
-                        aria-pressed={on}
-                        onClick={() => { setFilterCat(c.slug); setFilterSub(""); }}
-                        className={`group relative flex flex-col items-center justify-center gap-1.5 shrink-0 w-[84px] sm:w-auto aspect-square min-w-0 px-1.5 pt-4 pb-1.5 rounded-2xl border select-none snap-start transition-transform duration-75 active:scale-[0.97] motion-reduce:transition-none motion-reduce:active:scale-100 ${
-                          on
-                            ? "bg-[var(--bg-inverted)] text-[var(--text-inverted)] border-transparent"
-                            : "kx-glass bg-[var(--bg-card)] text-[var(--text-muted)] border-white/[0.06] kx-hover-card kx-hover-tile kx-tile-neon"
-                        }`}
-                      >
-                        {/* The count in the corner: the card is navigation AND
-                            a size read. Selected = plain figures on the
-                            inverted card; otherwise a faint pill. */}
-                        <span className={`absolute top-1.5 end-1.5 px-1.5 py-0.5 rounded-full text-[9.5px] leading-none tabular-nums ${on ? "text-[var(--text-inverted)] opacity-70" : "bg-[var(--bg-surface-subtle)] text-[var(--text-ghost)]"}`}>{c.count}</span>
-                        {c.slug === "" ? (
-                          <LayoutGridIcon className={`kx-neon-svg ${iconCls}`} />
-                        ) : classIcons.category?.[c.slug] ? (
-                          <ClassMonoIcon src={classIcons.category[c.slug]} className={`kx-neon-icon ${iconCls}`} />
-                        ) : (
-                          <LayoutGridIcon className={`kx-neon-svg ${iconCls}`} />
-                        )}
-                        <span className={`kx-neon-label w-full text-center text-[10.5px] font-medium leading-[1.15] line-clamp-2 ${on ? "text-[var(--text-inverted)]" : ""}`}>{c.name}</span>
-                      </button>
-                    );
-                  })}
-                </div>
-                {/* SUBCATEGORIES — the second row appears only when the
-                    selected category offers a choice (two or more with
-                    products): "All <category>" then each subcategory with its
-                    count, same facets. Progressive disclosure: no space is
-                    spent on it while browsing "All products". */}
-                {subNav && (
-                  <div
-                    role="group"
-                    aria-label={t("list.subcategories", "Subcategories")}
-                    className="mt-2 flex items-center gap-1.5 overflow-x-auto -mx-4 px-4 pb-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:mx-0 sm:px-0 sm:flex-wrap sm:overflow-visible"
-                  >
-                    {[{ slug: "", name: t("list.allIn", "All {name}").replace("{name}", sentence(catMap[filterCat] ?? filterCat)), count: subNav.total }, ...subNav.list].map((x) => {
-                      const on = filterSub === x.slug;
-                      return (
-                        <button
-                          key={x.slug || "__all"}
-                          type="button"
-                          aria-pressed={on}
-                          onClick={() => setFilterSub(x.slug)}
-                          className={`inline-flex shrink-0 items-center gap-1.5 h-7 px-2.5 rounded-full border text-[11px] font-medium select-none transition-colors ${
-                            on
-                              ? "bg-[var(--bg-inverted)] text-[var(--text-inverted)] border-transparent"
-                              : "kx-glass bg-[var(--bg-card)] text-[var(--text-muted)] border-white/[0.06] hover:text-[var(--text-primary)] hover:border-white/[0.16]"
-                          }`}
-                        >
-                          <span className="truncate max-w-[180px]">{x.name}</span>
-                          <span className={`text-[10px] tabular-nums ${on ? "opacity-70" : "text-[var(--text-ghost)]"}`}>{x.count}</span>
-                        </button>
-                      );
-                    })}
-                  </div>
-                )}
-              </nav>
-            )}
 
           {/* 8, not 14: each section now carries 24px of its own bottom padding
               so its cards' hover glow is not clipped by paint containment
@@ -3491,7 +3565,7 @@ export default function ProductList() {
               sections at once. See the rule in globals for the measurement
               (cards flashing blank on a fast scroll: hundreds of live blur
               layers per frame). */}
-          <div className="kx-flat-items space-y-8">
+          <div key={railPulse} className={`kx-flat-items space-y-8${railPulse ? " kx-tab-in-soft" : ""}`}>
           {categoryTree.map((cat) => (
             /* Every section renders; content-visibility:auto skips the paint +
                layout of the offscreen ones. This replaced a progressive-mount

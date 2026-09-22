@@ -2989,6 +2989,37 @@ html[dir="rtl"] .kx-ai-root .kx-ai-bar-title {
   box-shadow: inset 0 0 0 1px rgba(62, 103, 150, 0.75);
 }
 
+/* The category rail's selection (ProductList, owner 22 Sep 2026): the SAME
+   Hub-Blue outlined pill as the TabStrip above it, measured onto the pressed
+   square and SLIDING to the next one. Position and size are data, written
+   inline by the rail; this class owns the paint and the motion. Above the
+   card's hover ring (::after, 1) and inner glow (::before, 2), translucent,
+   so the card stays readable through it. Core keeps its filled inverted
+   square and never shows this. */
+.kx-rail-ind { display: none; }
+[data-kx-skin="aurora"] .kx-rail-ind {
+  display: block;
+  position: absolute;
+  top: 0;
+  left: 0;
+  border-radius: 1rem;
+  pointer-events: none;
+  background: rgba(86, 127, 178, 0.10);
+  box-shadow: inset 0 0 0 1.5px rgba(86, 127, 178, 0.70);
+  transition: transform 320ms cubic-bezier(0.4, 0, 0.2, 1),
+              width 320ms cubic-bezier(0.4, 0, 0.2, 1),
+              height 320ms cubic-bezier(0.4, 0, 0.2, 1),
+              opacity 150ms ease;
+  will-change: transform;
+  z-index: 3;
+}
+[data-kx-skin="aurora"][data-theme="light"] .kx-rail-ind {
+  box-shadow: inset 0 0 0 1.5px rgba(62, 103, 150, 0.75);
+}
+@media (prefers-reduced-motion: reduce) {
+  .kx-rail-ind { transition: none; }
+}
+
 /* The desktop rail is a FLUSH panel: no frame line against the page, the
    same call the owner made on the AI sidebar ("remove the borders"). Core
    keeps its hairline.
