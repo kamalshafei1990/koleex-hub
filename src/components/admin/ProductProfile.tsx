@@ -26,7 +26,7 @@ import { IMG } from "@/lib/cdn";
 import { humanizeError } from "@/lib/ui/humanize-error";
 import { useTranslation } from "@/lib/i18n";
 import { PRODUCTS_UI_I18N } from "@/lib/products-ui-i18n";
-import { fetchClassificationIcons, updateProduct } from "@/lib/products-admin";
+import { fetchClassificationIcons, updateModel, updateProduct } from "@/lib/products-admin";
 import { usePermissions } from "@/lib/permissions";
 import { useMeBootstrap } from "@/lib/me-bootstrap";
 import ConfirmDialog from "@/components/kds/ConfirmDialog";
@@ -950,7 +950,7 @@ function CrateTile({ url, badge, onChange, productId, title }: {
 }
 
 function PackingSheet({
-  logistics, model, product, t, lang, motion, productId, schemaCovers, onSaved, canEdit, onDirtyChange, aiContext,
+  logistics, model, product, t, lang, motion, productId, schemaCovers, onSaved, canEdit, onDirtyChange, aiContext, member, family,
 }: {
   logistics: ProductLogistics;
   model: Record<string, unknown> | undefined;
@@ -962,14 +962,22 @@ function PackingSheet({
   /** Columns the product's spec template owns (its schema_specs is the source
    *  and the column a mirror) — the Physical save writes both, as the form does. */
   schemaCovers: Set<string>;
-  /** The saved patch, so the page can show it before the reload lands. */
-  onSaved: (patch: Record<string, unknown>) => void;
+  /** What was saved, so the page can show it before the reload lands —
+   *  the product patch and/or the member row's patch, keyed by model id. */
+  onSaved: (u: { product?: Record<string, unknown>; models?: Record<string, Record<string, unknown>> }) => void;
   /** No edit permission (or viewing as someone) → no Edit, no "+ section". */
   canEdit: boolean;
   /** Unsaved changes exist — the page guards tab switches and leaving. */
   onDirtyChange: (dirty: boolean) => void;
   /** What the HS-code suggestion is asked about — the editor's own context shape. */
   aiContext: Record<string, unknown>;
+  /** A FOCUSED non-primary member (2026-09-22): `logistics` and `product`
+   *  then arrive as family ⊕ its differences, and Save writes the
+   *  differences to the model row (logistics_overrides / specs_overrides)
+   *  — the editor's rule. Absent = the family is being edited. */
+  member?: { id: string; updated_at: string | null; code: string; specs_overrides: Record<string, unknown>; logistics_overrides: Partial<ProductLogistics> };
+  /** The family's own values, to diff a member's draft against. */
+  family?: { logistics: ProductLogistics; product: Record<string, unknown> | undefined };
 }) {
   /* ── INLINE EDIT, IN THE SHEET'S OWN LAYOUT. Edit does not swap the card
      for the form: every tile stays where it is and the value inside it
@@ -1091,8 +1099,57 @@ function PackingSheet({
     const payload = payloadFor(editing, draft);
     setSaving(true); setSaveErr(null);
     try {
-      await updateProduct(productId, payload);
-      onSaved(payload);
+      if (member && family) {
+        /* MEMBER FOCUS: the crates and the two physical facts are this
+           model's differences from the family; origin, HS code, MOQ and
+           lead time stay the product's. A blank value, or one equal to the
+           family's, is not a difference. */
+        const { logistics: _l, schema_specs: _s, machine_dimensions: _d, machine_weight_kg: _w, ...productPart } = payload;
+        void _l; void _s; void _d; void _w;
+        const isBlank = (v: unknown) => v === null || v === undefined || v === "" || (Array.isArray(v) && v.length === 0);
+        const modelPatch: Record<string, unknown> = {};
+        if ("logistics" in payload) {
+          const fam = (family.logistics ?? {}) as Record<string, unknown>;
+          const ov: Record<string, unknown> = {};
+          for (const [k, v] of Object.entries(draft.logistics as unknown as Record<string, unknown>)) {
+            if (isBlank(v) || JSON.stringify(v) === JSON.stringify(fam[k] ?? null)) continue;
+            ov[k] = v;
+          }
+          modelPatch.logistics_overrides = ov;
+        }
+        if (editing === "physical" || editing === "packing") {
+          const sov = { ...(member.specs_overrides ?? {}) } as Record<string, unknown>;
+          const famP = family.product ?? {};
+          const famW = String((famP.schema_specs as Record<string, unknown> | null)?.machine_weight_kg ?? famP.machine_weight_kg ?? "").trim();
+          const w = draft.machine_weight_kg.trim();
+          if (!w || w === famW) delete sov.machine_weight_kg;
+          else sov.machine_weight_kg = schemaCovers.has("machine_weight_kg") ? parseFloat(w) : w;
+          if (editing === "physical") {
+            const famD = String(famP.machine_dimensions ?? "").trim();
+            const dims = draft.machine_dimensions.trim();
+            if (!dims || dims === famD) delete sov.machine_dimensions; else sov.machine_dimensions = dims;
+          }
+          modelPatch.specs_overrides = sov;
+        }
+        const savedModels: Record<string, Record<string, unknown>> = {};
+        if (Object.keys(productPart).length > 0) await updateProduct(productId, productPart);
+        if (Object.keys(modelPatch).length > 0) {
+          const res = await updateModel(member.id, { ...modelPatch, ...(member.updated_at ? { _expected_updated_at: member.updated_at } : {}) });
+          if (!res.ok) {
+            throw new Error(res.conflict
+              ? t("save.modelConflict", "Model \"{code}\" was changed by someone else while you were editing. Reload the product, check their change, then re-apply yours.").replace("{code}", member.code)
+              : t("save.modelFailed", "Couldn't save model \"{code}\" — the rest of the save was stopped so nothing is half-written. Check your access or try again.").replace("{code}", member.code));
+          }
+          savedModels[member.id] = { ...modelPatch, updated_at: res.updated_at ?? member.updated_at };
+        }
+        onSaved({
+          product: Object.keys(productPart).length ? productPart : undefined,
+          models: Object.keys(savedModels).length ? savedModels : undefined,
+        });
+      } else {
+        await updateProduct(productId, payload);
+        onSaved({ product: payload });
+      }
       setEditing(null); setDraft(null);
     } catch (e) {
       setSaveErr(humanizeError(e));
@@ -1245,6 +1302,11 @@ function PackingSheet({
 
   return (
     <div className="space-y-4" onKeyDown={onKeyDown}>
+      {member && (
+        <p className="text-[11px] text-[#567FB2] font-medium">
+          {t("fam.packingNote", "Editing packing of {code}. A changed field becomes this model's difference; clearing a field reverts it to the family value.").replace("{code}", member.code)}
+        </p>
+      )}
       {machine || ePhys ? (
         <Group motion={motion} icon={<RulerIcon className="h-4 w-4" />} title={t("tech.secPhysical", "Physical (Bare Machine)")} count={t("logistics.physicalBadge", "Dimensions · Weight")} {...gp("physical")}>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 gap-2.5">
@@ -1980,6 +2042,31 @@ export default function ProductProfile() {
   };
   /* products.logistics — the single home for packing since 2026-09-13. */
   const logi = (p?.logistics ?? {}) as ProductLogistics;
+  /* Packing follows the FOCUSED member (2026-09-22): its sheet shows family
+     ⊕ its differences, and Save writes the differences to the model row —
+     the editor's rule. No focus, or the primary, = the family. */
+  const focusMember = focusModel > 0 ? data?.models?.[focusModel] : undefined;
+  const focusSpecOv = (focusMember?.specs_overrides as Record<string, unknown> | null) ?? {};
+  const focusLogi: ProductLogistics = focusMember
+    ? { ...logi, ...((focusMember.logistics_overrides as Partial<ProductLogistics> | null) ?? {}) }
+    : logi;
+  const focusProduct = focusMember && p
+    ? {
+        ...p,
+        machine_dimensions: focusSpecOv.machine_dimensions ?? p.machine_dimensions,
+        machine_weight_kg: focusSpecOv.machine_weight_kg ?? p.machine_weight_kg,
+        schema_specs: { ...((p.schema_specs as Record<string, unknown> | null) ?? {}), ...focusSpecOv },
+      }
+    : p;
+  const focusMemberArg = focusMember
+    ? {
+        id: String(focusMember.id),
+        updated_at: (focusMember.updated_at as string | null) ?? null,
+        code: String(focusMember.primary_model ?? focusMember.model_name ?? ""),
+        specs_overrides: focusSpecOv,
+        logistics_overrides: (focusMember.logistics_overrides as Partial<ProductLogistics> | null) ?? {},
+      }
+    : undefined;
 
   return (
     <div className="kx-pd min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)]">
@@ -2391,9 +2478,9 @@ export default function ProductProfile() {
           was nowhere on it. */}
       {STEPS[step].id === "logistics" && (
         <PackingSheet
-          logistics={logi}
-          model={data.models[0]}
-          product={p}
+          logistics={focusLogi}
+          model={focusMember ?? data.models[0]}
+          product={focusProduct}
           t={t}
           lang={lang}
           motion={tabMotion}
@@ -2402,10 +2489,9 @@ export default function ProductProfile() {
           canEdit={canEdit}
           onDirtyChange={(d) => { dirtyRef.current = d; }}
           aiContext={aiContext}
-          onSaved={(patch) => {
-            setData((prev) => (prev ? { ...prev, product: { ...prev.product, ...patch } } : prev));
-            setReloadTick((n) => n + 1);
-          }}
+          member={focusMemberArg}
+          family={{ logistics: logi, product: p }}
+          onSaved={(u) => mergeSaved(u)}
         />
       )}
 

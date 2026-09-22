@@ -389,6 +389,8 @@ export interface ProductModelRow {
   slug: string;
   sku: string;
   tagline: string | null;
+  /** Per-member packing differences vs products.logistics (partial, same shape). */
+  logistics_overrides?: Record<string, unknown> | null;
   supplier: string | null;
   reference_model: string | null;
   /** Commercial KOLEEX code (e.g. "XCS-7800"). Unique when set.

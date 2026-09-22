@@ -421,7 +421,7 @@ const MODEL_SYNC_KEYS = [
   "container_40ft_qty", "container_40hq_qty", "stock_status",
   "supplier_overrides", "order", "visible", "status", "moq", "lead_time",
   "barcode", "primary_model", "code_prefix", "coding_status",
-  "specs_overrides", "name_i18n", "tagline_i18n",
+  "specs_overrides", "name_i18n", "tagline_i18n", "logistics_overrides",
 ] as const satisfies readonly (keyof ModelFormState)[];
 
 /** Deep-clone the persisted slice of a model's form state (the baseline). */
@@ -1075,6 +1075,7 @@ export default function ProductForm({ productId }: Props) {
           ),
           name_i18n: ((m as { name_i18n?: Record<string, string> | null }).name_i18n) ?? {},
           supplier_overrides: ((m as { supplier_overrides?: Record<string, unknown> | null }).supplier_overrides) ?? {},
+          logistics_overrides: (((m as { logistics_overrides?: Record<string, unknown> | null }).logistics_overrides) ?? {}) as ModelFormState["logistics_overrides"],
           tagline_i18n: ((m as { tagline_i18n?: Record<string, string> | null }).tagline_i18n) ?? {},
         }));
         setModels(mappedModels);
@@ -1551,6 +1552,59 @@ export default function ProductForm({ productId }: Props) {
      a member's typed edits before Save ever ran (2026-08-21). */
   const updateActiveMember = (u: Partial<ModelFormState>) =>
     setModels(prev => prev.map((m, i) => (i === safeActiveMember ? { ...m, ...u } : m)));
+
+  /* ── Packing & Physical, scoped to the selected member (2026-09-22) ──
+     products.logistics and the Physical facts are FAMILY values. A
+     non-primary member shows family ⊕ its own differences and writes ONLY
+     the differences — product_models.logistics_overrides for the crates,
+     specs_overrides for machine dimensions / N.W. — exactly as the Specs
+     tab does. The tab used to bind straight to the product, so packing
+     typed while XPRS-8-190S was selected landed on the family and every
+     member showed it (owner: "the data only follow the hero"). The PRIMARY
+     still edits the family: it IS the baseline. */
+  const isMember = memberCtx && safeActiveMember > 0 && !!activeModel;
+  const memberOverrides = (isMember ? (activeModel.specs_overrides ?? {}) : {}) as Record<string, string>;
+  const memberLogiOverrides = (isMember ? (activeModel.logistics_overrides ?? {}) : {}) as Partial<ProductFormState["logistics"]>;
+  const viewLogistics: ProductFormState["logistics"] = isMember ? { ...(product.logistics || {}), ...memberLogiOverrides } : product.logistics;
+  const blank = (v: unknown) => v === null || v === undefined || v === "" || (Array.isArray(v) && v.length === 0);
+  /* A block's merge-patch → the member's differences: a value that is blank
+     or equal to the family's is not a difference. */
+  const patchViewLogistics = (u: Partial<ProductFormState["logistics"]>) => {
+    if (!isMember) { patchLogistics(u); return; }
+    const fam = (product.logistics || {}) as Record<string, unknown>;
+    const ov = { ...(activeModel.logistics_overrides ?? {}) } as Record<string, unknown>;
+    for (const [k, v] of Object.entries(u)) {
+      if (blank(v) || JSON.stringify(v) === JSON.stringify(fam[k] ?? null)) delete ov[k];
+      else ov[k] = v;
+    }
+    updateActiveMember({ logistics_overrides: ov as ModelFormState["logistics_overrides"] });
+  };
+  /* A member's resolved spec sheet in → its differences out. The Specs
+     tab's rule, shared with the template Physical group on Packing. */
+  const memberSpecsFromNext = (next: Record<string, unknown>) => {
+    const fam = (product.schema_specs || {}) as Record<string, unknown>;
+    const ov: Record<string, string> = {};
+    const norm = (v: unknown) => (blank(v) ? "" : Array.isArray(v) ? v.map(String).join("\u0001") : String(v));
+    for (const [k, v] of Object.entries(next)) {
+      if (norm(v) === "") continue;              /* empty → inherit */
+      if (norm(v) === norm(fam[k])) continue;    /* same as family → inherit */
+      ov[k] = Array.isArray(v) ? v.map(String).join(", ") : String(v);
+    }
+    updateActiveMember({ specs_overrides: ov });
+  };
+  /* The no-template Physical fields and the N.W. box on Packing write the
+     same two keys as differences. */
+  const patchMemberPhysical = (u: Partial<{ machine_dimensions: string; machine_weight_kg: string }>) => {
+    const ov = { ...(activeModel.specs_overrides ?? {}) } as Record<string, string>;
+    for (const [k, v] of Object.entries(u)) {
+      const famV = k === "machine_weight_kg" && schemaCoveredCols.has(k)
+        ? ((product.schema_specs as Record<string, unknown> | null)?.machine_weight_kg ?? product.machine_weight_kg)
+        : (product as unknown as Record<string, unknown>)[k];
+      const s = (v ?? "").trim();
+      if (s === "" || s === String(famV ?? "").trim()) delete ov[k]; else ov[k] = s;
+    }
+    updateActiveMember({ specs_overrides: ov });
+  };
 
   /* ── Hero photo, scoped to the selected member ──
      Declared here rather than beside the other hero helpers above because it
@@ -2642,6 +2696,7 @@ export default function ProductForm({ productId }: Props) {
           container_40hq_qty: m.container_40hq_qty ? parseInt(m.container_40hq_qty, 10) : null,
           stock_status: m.stock_status || null,
           supplier_overrides: m.supplier_overrides && Object.keys(m.supplier_overrides).length ? m.supplier_overrides : null,
+          logistics_overrides: m.logistics_overrides && Object.keys(m.logistics_overrides).length ? m.logistics_overrides : null,
           order: m.order,
           visible: m.visible,
           status: m.status,
@@ -4981,19 +5036,7 @@ export default function ProductForm({ productId }: Props) {
                       <SchemaSpecsSection
                         schema={specsSchema}
                         values={{ ...((product.schema_specs || {}) as Record<string, unknown>), ...((activeModel.specs_overrides || {}) as Record<string, unknown>) }}
-                        onChange={(next) => {
-                          const fam = (product.schema_specs || {}) as Record<string, unknown>;
-                          const ov: Record<string, string> = {};
-                          const norm = (v: unknown) =>
-                            v === null || v === undefined || v === "" || (Array.isArray(v) && v.length === 0)
-                              ? "" : Array.isArray(v) ? v.map(String).join("\u0001") : String(v);
-                          for (const [k, v] of Object.entries(next)) {
-                            if (norm(v) === "") continue;              /* empty → inherit */
-                            if (norm(v) === norm(fam[k])) continue;    /* same as family → inherit */
-                            ov[k] = Array.isArray(v) ? v.map(String).join(", ") : String(v);
-                          }
-                          updateActiveMember({ specs_overrides: ov });
-                        }}
+                        onChange={memberSpecsFromNext}
                       />
                     </>
                   ) : (
@@ -5564,7 +5607,24 @@ export default function ProductForm({ productId }: Props) {
             {/* One line for the whole shipment. Fourteen separate numbers hide
                 their own mistakes; a crate typed in millimetres reads as
                 0.001 m³ right here, where it cannot be missed. */}
-            <LogisticsSummary value={product.logistics} />
+            <LogisticsSummary value={viewLogistics} />
+            {isMember && (
+              <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
+                <p className="text-[11px] text-[#567FB2] font-medium">
+                  {t("fam.packingNote", "Editing packing of {code}. A changed field becomes this model's difference; clearing a field reverts it to the family value.")
+                    .replace("{code}", (activeModel?.primary_model || activeModel?.model_name || ""))}
+                </p>
+                {Object.keys(memberLogiOverrides).length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => updateActiveMember({ logistics_overrides: {} })}
+                    className="text-[11px] font-semibold text-[var(--text-muted)] hover:text-[var(--text-primary)] underline underline-offset-2 transition-colors"
+                  >
+                    {t("fam.packingReset", "Use family packing")}
+                  </button>
+                )}
+              </div>
+            )}
             {/* The per-model packing panel used to sit here, above the
                 family-shared groups, and it asked the SAME eight questions the
                 product-level Packing & Shipping group below asks — packing
@@ -5582,7 +5642,13 @@ export default function ProductForm({ productId }: Props) {
                 tab for both eras. */}
             {(!schemaCoveredCols.has("machine_dimensions") || !schemaCoveredCols.has("machine_weight_kg")) && (
             <Section id="logistics-physical" icon={<RulerIcon className="h-4 w-4" />} title={t("tech.secPhysical", "Physical (Bare Machine)")} badge={t("logistics.physicalBadge", "Dimensions · Weight")}>
-              <PhysicalFields data={product} onChange={updateProduct_} hiddenFields={schemaCoveredCols} />
+              <PhysicalFields
+                data={isMember
+                  ? { machine_dimensions: memberOverrides.machine_dimensions ?? product.machine_dimensions, machine_weight_kg: memberOverrides.machine_weight_kg ?? product.machine_weight_kg }
+                  : product}
+                onChange={isMember ? patchMemberPhysical : updateProduct_}
+                hiddenFields={schemaCoveredCols}
+              />
             </Section>
             )}
 
@@ -5603,8 +5669,8 @@ export default function ProductForm({ productId }: Props) {
               <div id="logistics-packing" className="scroll-mt-28">
                 <SchemaSpecsSection
                   schema={logisticsTabSchema}
-                  values={product.schema_specs || {}}
-                  onChange={(next) => updateProduct_({ schema_specs: next })}
+                  values={isMember ? { ...((product.schema_specs || {}) as Record<string, unknown>), ...memberOverrides } : (product.schema_specs || {})}
+                  onChange={isMember ? memberSpecsFromNext : (next) => updateProduct_({ schema_specs: next })}
                   hideHeader
                 />
               </div>
@@ -5614,16 +5680,19 @@ export default function ProductForm({ productId }: Props) {
                 Fixed fields, every category — the tab's centre of gravity. */}
             <Section id="logistics-packing-fixed" icon={<BoxIcon className="h-4 w-4" />} title={t("logistics.packingSection", "Packing")} badge={t("logistics.packingSectionBadge", "Crates · Weights")}>
               <PackingBlock
-                value={product.logistics}
-                onChange={patchLogistics}
+                value={viewLogistics}
+                onChange={patchViewLogistics}
                 productId={effectiveId || undefined}
                 /* Template products keep N.W. in schema_specs (the column is a
                    mirror written at save); the packing tab read only the column
                    and showed 0 next to a filled Physical — "not synced". */
-                netKg={schemaCoveredCols.has("machine_weight_kg")
+                netKg={isMember && memberOverrides.machine_weight_kg !== undefined
+                  ? memberOverrides.machine_weight_kg
+                  : schemaCoveredCols.has("machine_weight_kg")
                   ? ((product.schema_specs as Record<string, unknown> | null)?.machine_weight_kg as number | string | undefined) ?? product.machine_weight_kg
                   : product.machine_weight_kg}
                 onNetKgChange={(kg) => {
+                  if (isMember) { patchMemberPhysical({ machine_weight_kg: kg }); return; }
                   const n = kg.trim() === "" ? undefined : Number(kg);
                   if (schemaCoveredCols.has("machine_weight_kg")) {
                     const specs = { ...((product.schema_specs as Record<string, unknown> | null) ?? {}) };
@@ -5641,7 +5710,7 @@ export default function ProductForm({ productId }: Props) {
                 of the crates above, and the form used to ask them as if they
                 were facts of their own. */}
             <Section id="logistics-loading" icon={<BoxesIcon className="h-4 w-4" />} title={t("logistics.loadingSection", "Loading & Containers")} badge={t("logistics.loadingSectionBadge", "20ft · 40ft · 40HQ")}>
-              <LoadingBlock value={product.logistics} onChange={patchLogistics} />
+              <LoadingBlock value={viewLogistics} onChange={patchViewLogistics} />
             </Section>
 
             <Section id="logistics-origin" icon={<GlobeIcon className="h-4 w-4" />} title={t("logistics.title", "Origin & Customs")} badge={t("logistics.badge", "Shipping · Customs")}>
@@ -5696,7 +5765,7 @@ export default function ProductForm({ productId }: Props) {
                   inside is regulated. Both are properties of the GOODS, so they
                   belong to the product; Incoterm and destination are the deal's
                   and stay on the quotation. */}
-              <CustomsExtras value={product.logistics} onChange={patchLogistics} />
+              <CustomsExtras value={viewLogistics} onChange={patchViewLogistics} />
             </Section>
 
             {/* Fulfillment Defaults — MOQ + Lead Time cascade to new variants.
@@ -5730,7 +5799,7 @@ export default function ProductForm({ productId }: Props) {
                   </div>
                 </div>
               </div>
-              <ShippingOrigin value={product.logistics} onChange={patchLogistics} />
+              <ShippingOrigin value={viewLogistics} onChange={patchViewLogistics} />
             </Section>
             )}
 

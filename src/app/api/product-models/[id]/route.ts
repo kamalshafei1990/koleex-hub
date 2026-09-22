@@ -31,7 +31,7 @@ const WRITABLE_MODEL_COLUMNS = new Set([
   "head_only_price", "complete_set_price", "weight", "net_weight", "cbm",
   "carton_dimensions", "packing_type", "box_include", "extra_accessories",
   "container_20ft_qty", "container_40ft_qty", "container_40hq_qty",
-  "stock_status", "supplier_overrides", "specs_overrides", "order",
+  "stock_status", "supplier_overrides", "specs_overrides", "logistics_overrides", "order",
   "visible", "status", "moq", "lead_time", "barcode", "primary_model",
   "code_prefix", "coding_status", "name_i18n", "tagline_i18n",
 ]);

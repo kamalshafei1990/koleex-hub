@@ -692,6 +692,8 @@ export const PRODUCTS_UI_I18N: Translations = {
   "fam.c40": { en: "Qty / 40ft", zh: "40尺柜数量", ar: "الكمية / 40 قدم" },
   "fam.c40hq": { en: "Qty / 40HQ", zh: "40高柜数量", ar: "الكمية / 40HQ" },
   "fam.specsNote": { en: "Editing specs of {code}. A changed field becomes this model's difference; clearing a field reverts it to the family value.", zh: "正在编辑 {code} 的规格。修改的字段将成为该型号的差异；清空字段即恢复系列值。", ar: "تحرّر مواصفات {code}. الحقل المعدَّل يصبح فرق هذا الموديل؛ ومسح الحقل يعيده لقيمة العائلة." },
+  "fam.packingNote": { en: "Editing packing of {code}. A changed field becomes this model's difference; clearing a field reverts it to the family value.", zh: "正在编辑 {code} 的包装。修改的字段将成为该型号的差异；清空字段即恢复系列值。", ar: "تحرّر تعبئة {code}. الحقل المعدَّل يصبح فرق هذا الموديل؛ ومسح الحقل يعيده لقيمة العائلة." },
+  "fam.packingReset": { en: "Use family packing", zh: "使用系列包装", ar: "استخدم تعبئة العائلة" },
   "variants.viewGrid": { en: "Catalog grid", zh: "目录表格", ar: "جدول الكتالوج" },
   "variants.viewCards": { en: "Detailed cards", zh: "详细卡片", ar: "بطاقات مفصّلة" },
   "famGrid.hint": { en: "Type in FAMILY once — every model inherits it. Type in a model column only where the catalog shows a different value; that cell becomes the model's difference (blue).", zh: "在“系列”列输入一次——所有型号自动继承。仅当目录中某型号数值不同时，才在该型号列填写；该单元格即成为其差异（蓝色）。", ar: "اكتب في عمود العائلة مرة واحدة — كل الموديلات ترثه. اكتب في عمود الموديل فقط حيث يُظهر الكتالوج قيمة مختلفة؛ تصبح تلك الخلية فرق الموديل (بالأزرق)." },

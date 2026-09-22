@@ -195,6 +195,11 @@ export interface ModelFormState {
      live (owner rule: sub-product supplier page = the primary's values
      until edited manually). */
   supplier_overrides?: Record<string, unknown>;
+  /* Member's PACKING differences vs products.logistics — the same shape,
+     partial: a key present here replaces the family value for this member,
+     an absent key inherits it live. Empty = ships exactly like the family.
+     Column: product_models.logistics_overrides (2026-09-22). */
+  logistics_overrides?: Partial<ProductLogistics>;
 }
 
 export interface MediaFormState {
@@ -442,6 +447,7 @@ export function createEmptyModel(): ModelFormState {
     name_i18n: {},
     tagline_i18n: {},
     supplier_overrides: {},
+    logistics_overrides: {},
     _tempId: crypto.randomUUID(),
     model_name: "",
     slug: "",

@@ -32,7 +32,7 @@ import { collectAnchors, emphasisForGroup } from "@/lib/product-schema/visual-op
 import { useTranslation, type Translations } from "@/lib/i18n";
 import { PRODUCTS_PREVIEW_I18N } from "@/lib/products-preview-i18n";
 import { KOLEEX_COMPANY } from "@/components/brand/DocumentBrandStrips";
-import type { ProductAudience, ProductDetailSections } from "@/lib/server/product-detail";
+import type { ProductAudience, ProductDetailSections, ProductPackingView } from "@/lib/server/product-detail";
 import ProductHero, { type HeroAction } from "./ProductHero";
 import ProductRail, { type RailSection } from "./ProductRail";
 import ProductKeyFigures from "./ProductKeyFigures";
@@ -74,7 +74,7 @@ interface ProductPreviewProps {
   ar3dUrl?: string | null;
   countryOfOrigin?: string | null;
   warranty?: string | null;
-  variants?: Array<{ photo?: string | null; primary?: boolean; code: string; tagline: string | null; overrides: Record<string, unknown> }>;
+  variants?: Array<{ photo?: string | null; primary?: boolean; code: string; tagline: string | null; overrides: Record<string, unknown>; packing?: ProductPackingView | null }>;
   siblings?: { name: string; slug: string; imageUrl?: string | null; values: Record<string, unknown> }[];
   productId?: string;
   slug?: string;
@@ -288,13 +288,13 @@ export const ProductPreview = (props: ProductPreviewProps) => {
     (specGroups.length > 0 || chipRows.length > 0 || legacyFacts.length > 0) ? { id: "specs", label: t("preview.navSpecs", "Specifications") } : null,
     comparison ? { id: "models", label: t("preview.navModels", "Models") } : null,
     sections?.options.length ? { id: "options", label: t("preview.navOptions", "Options") } : null,
-    sections?.packing ? { id: "packing", label: t("preview.navPacking", "Packing") } : null,
+    (activeVariant?.packing ?? sections?.packing) ? { id: "packing", label: t("preview.navPacking", "Packing") } : null,
     hasCompliance ? { id: "compliance", label: t("preview.navCompliance", "Compliance") } : null,
     hasKnowledge ? { id: "knowledge", label: t("preview.navKnowledge", "Knowledge") } : null,
     hasMedia ? { id: "media", label: t("preview.navMedia", "Media & Files") } : null,
     (siblings?.length && anchors.length) ? { id: "compare", label: t("preview.navCompare", "Compare") } : null,
     hasPrice ? { id: "price", label: t("preview.navPrice", "Price sheet") } : null,
-  ].filter((s): s is RailSection => !!s), [anchors.length, sections, specGroups.length, chipRows.length, legacyFacts.length, comparison, hasCompliance, hasKnowledge, hasMedia, siblings?.length, hasPrice, t]);
+  ].filter((s): s is RailSection => !!s), [anchors.length, sections, activeVariant?.packing, specGroups.length, chipRows.length, legacyFacts.length, comparison, hasCompliance, hasKnowledge, hasMedia, siblings?.length, hasPrice, t]);
 
   const [activeId, setActiveId] = useState<string | null>(null);
   useEffect(() => {
@@ -379,7 +379,9 @@ export const ProductPreview = (props: ProductPreviewProps) => {
             t={t}
           />
           <ProductOptions options={sections?.options ?? []} lang={lang} t={t} />
-          <ProductPacking packing={sections?.packing ?? null} t={t} />
+          {/* The selected model's own crates when it ships differently; the
+              family's otherwise (product_models.logistics_overrides). */}
+          <ProductPacking packing={activeVariant?.packing ?? sections?.packing ?? null} t={t} />
           <ProductCompliance
             compliance={sections?.compliance ?? { ce: null, rohs: null, ipRating: null, hsCode: null, countryOfOrigin: countryOfOrigin ?? null, warranty: warranty ?? null }}
             warrantyMonths={sections?.warrantyMonths ?? null}

@@ -149,6 +149,7 @@ interface ModelRow {
   order: number | null;
   visible: boolean | null;
   specs_overrides: Record<string, unknown> | null;
+  logistics_overrides: Record<string, unknown> | null;
 }
 
 /** Localized overlay for the public hero — English stays the base; a row
@@ -186,6 +187,9 @@ export interface SchemaProductPreviewProps {
     code: string;
     tagline: string | null;
     overrides: Record<string, unknown>;
+    /** This model's packing when it crates differently from the family;
+     *  null = the family's packing applies. */
+    packing: ProductPackingView | null;
   }>;
   /** Same-subcategory public products powering the compare band. */
   siblings: {
@@ -349,7 +353,7 @@ export async function loadPublicSchemaProduct(
         .order("order", { ascending: true }),
       supabase
         .from("product_models")
-        .select('id, model_name, primary_model, tagline, name_i18n, tagline_i18n, "order", visible, status, specs_overrides, pricing_mode, price_note, global_price, head_only_price, complete_set_price, supports_head_only, supports_complete_set')
+        .select('id, model_name, primary_model, tagline, name_i18n, tagline_i18n, "order", visible, status, specs_overrides, logistics_overrides, pricing_mode, price_note, global_price, head_only_price, complete_set_price, supports_head_only, supports_complete_set')
         .eq("product_id", product.id)
         .order("order", { ascending: true }),
       supabase
@@ -475,12 +479,20 @@ export async function loadPublicSchemaProduct(
       for (const [k, v] of Object.entries(m.specs_overrides ?? {})) {
         if (websiteFieldKeys.has(k)) overrides[k] = v;
       }
+      /* A member that crates differently carries its own view, derived
+         from family ⊕ its differences by the same engine as the family
+         (2026-09-22). null = "as the family", and the page falls back. */
+      const lo = m.logistics_overrides;
+      const packing = lo && Object.keys(lo).length > 0
+        ? packingView({ ...(product.logistics ?? {}), ...(lo as Partial<ProductLogistics>) })
+        : null;
       return {
         code: (m.primary_model || m.model_name) as string,
         tagline: m.tagline,
         photo: photoByModel.get((m as { id?: string }).id ?? "") ?? null,
         primary: primaryModelId != null && (m as { id?: string }).id === primaryModelId,
         overrides,
+        packing,
       };
     });
 
