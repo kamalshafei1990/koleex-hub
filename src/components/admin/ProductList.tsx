@@ -2627,7 +2627,12 @@ export default function ProductList() {
        callers but not for staff who are allowed to see drafts. In both cases
        the grid falls back to counting what it loaded, exactly as before. */
     const serverCats = isInternal && !filterSupplier ? groupCounts?.categories ?? null : null;
+    /* A selected category owns the whole grid. The union below also carried
+       the PREVIOUS response's group set for the ~130 ms (a second on prod)
+       until the category's own page landed, so pressing Cutting painted nine
+       other headings reading "0 of 67 products · scroll to load" above it. */
     const catSlugs = [...new Set([...Object.keys(catBuckets), ...Object.keys(serverCats ?? {})])]
+      .filter((slug) => !filterCat || slug === filterCat)
       .sort((a, b) => rank(catRank, a) - rank(catRank, b));
     return catSlugs.map(catSlug => {
       const catName = catNameBySlug[catSlug] || (catSlug === "_uncategorized" ? t("list.uncategorized", "Uncategorized") : catSlug);
@@ -2648,7 +2653,7 @@ export default function ProductList() {
        fallback names above, so leaving it out meant switching language
        relaid the whole page and left those two group headings in the
        previous language until some unrelated filter happened to change. */
-  }, [filtered, categories, subcategories, subMap, catNameBySlug, viewMode, groupCounts, isInternal, filterSupplier, t]);
+  }, [filtered, categories, subcategories, subMap, catNameBySlug, viewMode, groupCounts, isInternal, filterSupplier, filterCat, t]);
 
   /* THE CONDITION HAS TO MATCH THE RENDER, EXACTLY.
      The category jump-nav below hosts this screen's long ramp, and it only
@@ -3363,7 +3368,7 @@ export default function ProductList() {
             <div
               ref={railRef}
               role="group"
-              className="relative flex gap-2 overflow-x-auto snap-x snap-mandatory -mx-4 px-4 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:mx-0 sm:px-0 sm:pb-0.5 sm:overflow-visible sm:grid sm:grid-cols-[repeat(auto-fill,minmax(86px,1fr))] sm:gap-1.5"
+              className="relative flex gap-2 overflow-x-auto snap-x snap-mandatory -mx-4 px-4 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:mx-0 sm:px-0 sm:pb-0.5 sm:overflow-visible sm:grid sm:grid-cols-[repeat(auto-fit,minmax(86px,1fr))] sm:gap-1.5"
             >
               {/* The one sliding selection — position and size are data
                   (inline), the paint and the motion live on the class. */}
@@ -3394,21 +3399,34 @@ export default function ProductList() {
                     type="button"
                     aria-pressed={on}
                     onClick={() => { setFilterCat(c.slug); setFilterSub(""); pressRail(); }}
-                    className={`group relative flex flex-col items-center justify-center gap-1.5 shrink-0 w-[84px] sm:w-auto aspect-square min-w-0 px-1.5 pt-4 pb-1.5 rounded-2xl border select-none snap-start transition-colors ${
+                    className={`group relative flex flex-col items-center justify-start gap-1 shrink-0 w-[88px] sm:w-auto aspect-square min-w-0 px-1.5 pt-[19px] pb-1.5 rounded-2xl border select-none snap-start transition-colors ${
                       coreOn
                         ? "bg-[var(--bg-inverted)] border-transparent"
                         : "kx-glass bg-[var(--bg-card)] border-white/[0.06] kx-hover-card kx-hover-tile kx-glow-in"
                     } ${tone}`}
                   >
                     <span className={`absolute top-1.5 end-1.5 px-1.5 py-0.5 rounded-full text-[9.5px] leading-none tabular-nums ${on ? "opacity-70" : "bg-[var(--bg-surface-subtle)] text-[var(--text-ghost)]"}`}>{c.count}</span>
+                    {/* The icon sits on ONE line across the row (fixed top
+                        offset, not centred with the label): names run one to
+                        three lines, and a centred stack floated each icon to a
+                        different height. Three lines at 10.5px fit the 86px
+                        square with no ellipsis — "Printing & heat press
+                        equipment" was cut to "…press…" at two. */}
                     {c.slug === "" ? (
-                      <LayoutGridIcon className={`h-[22px] w-[22px] shrink-0 ${iconTone}`} />
+                      <LayoutGridIcon className={`h-5 w-5 shrink-0 ${iconTone}`} />
                     ) : classIcons.category?.[c.slug] ? (
-                      <ClassMonoIcon src={classIcons.category[c.slug]} className={`h-[22px] w-[22px] shrink-0 ${iconTone}`} />
+                      <ClassMonoIcon src={classIcons.category[c.slug]} className={`h-5 w-5 shrink-0 ${iconTone}`} />
                     ) : (
-                      <LayoutGridIcon className={`h-[22px] w-[22px] shrink-0 ${iconTone}`} />
+                      <LayoutGridIcon className={`h-5 w-5 shrink-0 ${iconTone}`} />
                     )}
-                    <span className="w-full text-center text-[10.5px] font-medium leading-[1.15] line-clamp-2">{c.name}</span>
+                    {/* The name is CENTRED in the zone under the icon (owner: "the
+                        names in the cards the positions not right" — two-line
+                        names hung under the icon with a hole beneath). The
+                        icon line stays fixed across the row; the zone takes
+                        the rest of the square, three lines at most. */}
+                    <span className="flex-1 min-h-0 w-full flex items-center">
+                      <span className="w-full text-center text-[10.5px] font-medium leading-[1.15] line-clamp-3">{c.name}</span>
+                    </span>
                   </button>
                 );
               })}
