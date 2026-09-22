@@ -667,7 +667,21 @@ const ProductCard = memo(function ProductCard({
                 plus a 22px figure came to ~156px, so the price was clipped
                 mid-digit ("$64,79"). Stacking gives the number the full width
                 at every card size. */}
-            <div className="flex flex-col items-start gap-0.5 sm:flex-row sm:items-baseline sm:justify-between sm:gap-2">
+            {/* ONE HEIGHT FOR ALL THREE STATES. Measured on the iPad-portrait
+                grid: the price block was 77px while the placeholder held the
+                line, 72px once a figure landed and 65px on "Price on request"
+                — because the three values had three different line boxes
+                (24 / 22 / 12px) and `items-baseline` let the caption push the
+                row further. Prices arrive in batches of 24, so every card
+                still waiting flipped placeholder → "on request" → placeholder
+                between batches: the card breathed 438 ↔ 450px and the whole
+                row below it danced, twelve times in four seconds.
+
+                So the value is a 24px box whichever of the three it is, and
+                the row is centred, not baseline-aligned — the caption cannot
+                stretch it. The card is now exactly as tall before, during and
+                after the price call. */}
+            <div className="flex flex-col items-start gap-0.5 sm:flex-row sm:items-center sm:justify-between sm:gap-2 sm:h-6">
               {/* The label stays a quiet caption so the figure beside it is
                   unmistakably the thing being read. */}
               <span className="text-[9.5px] uppercase tracking-[0.12em] text-[var(--text-ghost)] truncate max-w-full">
@@ -691,13 +705,13 @@ const ProductCard = memo(function ProductCard({
                 /* The price is the card's headline number — it should read at
                    a glance from across the grid, not sit at label size. */
                 <span
-                  className="text-[22px] leading-none font-bold tabular-nums tracking-tight text-[var(--text-primary)]"
+                  className="inline-flex h-6 items-center text-[22px] leading-none font-bold tabular-nums tracking-tight text-[var(--text-primary)]"
                   title={fxTitle}
                 >
                   ${fob.fobUsd.toLocaleString(undefined, { maximumFractionDigits: 0 })}
                 </span>
               ) : (
-                <span className="text-[11px] font-medium text-[var(--text-dim)]">
+                <span className="inline-flex h-6 items-center text-[11px] font-medium text-[var(--text-dim)]">
                   {t("card.priceOnRequest", "Price on request")}
                 </span>
               )}
@@ -797,14 +811,19 @@ const ProductCard = memo(function ProductCard({
             that we would have to take back (already logged twice on this
             card). */}
         {isInternal && !signal && signalsPending && (
+          /* Row heights are the REAL rows' measured heights — 15 / 20 / 28 /
+             19px — not round numbers. The first version held 12 / 18 / 28 /
+             24: the same 106px in total, but distributed differently, so a
+             card still grew 4px when the strip arrived (readiness +3, chips
+             +2, the price line −5, and mt-auto absorbing the rest unevenly). */
           <div className="mt-3 space-y-2 max-sm:mt-2 max-sm:space-y-1.5 flex flex-col flex-1" aria-hidden>
             <div className="flex items-center gap-2">
               <div className="h-1 flex-1 rounded-full bg-[var(--bg-surface)]" />
-              <span className="h-3 w-7" />
+              <span className="h-[15px] w-7" />
             </div>
-            <div className="flex flex-wrap gap-1"><span className="h-[18px] w-16" /></div>
+            <div className="flex flex-wrap gap-1"><span className="h-5 w-16" /></div>
             <div className="flex items-center gap-2 min-w-0 h-7 max-sm:hidden" />
-            <div className="flex items-baseline gap-2 min-w-0 mt-auto pt-1"><span className="h-5 w-20" /></div>
+            <div className="flex items-baseline gap-2 min-w-0 mt-auto pt-1"><span className="h-[15px] w-20" /></div>
           </div>
         )}
 
@@ -1087,7 +1106,12 @@ export default function ProductList() {
       return parsed.day === new Date().toDateString() ? (parsed.prices ?? {}) : {};
     } catch { return {}; }
   });
-  const [fobPending, setFobPending] = useState(false);
+  /* The catalogue STARTS waiting. With `false` the first frame — before the
+     price effect had even fired — showed "Price on request" on every unpriced
+     card and took it back ~100ms later. The effect flips this off after the
+     last batch, or on failure; a catalogue whose prices are all cached has no
+     unpriced card, so a flag left `true` there changes nothing on screen. */
+  const [fobPending, setFobPending] = useState(!isInternal);
 
   /* Card actions. The three flows (Ask AI · Compare · Add to Quotation) are
      being specified by the owner separately, so this is the single seam they
@@ -1585,7 +1609,16 @@ export default function ProductList() {
         if (!isInternal && !initialFilters.div && d.some(x => x.slug === FLAGSHIP_DIVISION_SLUG)) {
           setFilterDiv(FLAGSHIP_DIVISION_SLUG);
         }
-      } catch { /* secondary data only — the grid renders without it */ }
+      } catch {
+        /* secondary data only — the grid renders without it */
+      } finally {
+        /* The grouped grid waits for `metaReady` so it never paints in one
+           order and re-sorts into another. That wait must end when the call
+           fails too, or a taxonomy outage would leave the skeleton up forever
+           — so the flag is released here, success or not. On failure the grid
+           simply renders in first-appearance order, as it always did. */
+        if (!cancelled) setMetaReady(true);
+      }
     })();
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1773,6 +1806,11 @@ export default function ProductList() {
     const FIRST_PAINT = 24;
     const missing = all.slice(0, FIRST_PAINT);
     let cancelled = false;
+    /* Set when the call cannot deliver prices — network failure, a non-2xx,
+       or a body with no `prices`. The pending flag may only drop on failure
+       or after the LAST batch (see `finally`), and without this a failed
+       middle batch would hold every unpriced card on its placeholder forever. */
+    let failed = false;
     const ctrl = new AbortController();
     setFobPending(true);
     fetch("/api/products/fob-prices", {
@@ -1784,7 +1822,8 @@ export default function ProductList() {
     })
       .then((r) => (r.ok ? r.json() : null))
       .then((j: { prices?: Record<string, { fobUsd: number | null; mode: string }> } | null) => {
-        if (cancelled || !j?.prices) return;
+        if (cancelled) return;
+        if (!j?.prices) { failed = true; return; }
         /* Merge, never replace — an earlier page's prices must survive. */
         setFobPrices((prev) => {
           const next = { ...prev, ...j.prices };
@@ -1797,8 +1836,18 @@ export default function ProductList() {
           return next;
         });
       })
-      .catch(() => { /* price is optional on the card */ })
-      .finally(() => { if (!cancelled) setFobPending(false); });
+      .catch(() => { failed = true; /* price is optional on the card */ })
+      .finally(() => {
+        /* Batches go out one after another (24 ids, then the rest), and this
+           effect re-runs for the next batch only AFTER the previous one has
+           merged. Dropping `pending` at the end of every batch therefore left
+           a gap in which each still-unpriced card said "Price on request",
+           then went back to waiting when the next batch started — a false
+           statement, nine times over on a 213-card catalogue. Pending now
+           holds until the batch that covers the last missing id, or until a
+           batch fails (in which case waiting would never end). */
+        if (!cancelled && (failed || missing.length === all.length)) setFobPending(false);
+      });
     return () => { cancelled = true; ctrl.abort(); };
   }, [isInternal, products, fobPrices]);
 
@@ -2965,13 +3014,20 @@ export default function ProductList() {
             are outlined secondary pills. Horizontally scrollable on
             mobile so long division names don't wrap awkwardly. */}
         {orderedDivisions.length === 0 && !metaReady && (
-          /* Height-reserving skeleton for the divisions bar (matches the
-             real strip: rounded-xl shell, pill row). Prevents the whole
-             page from being pushed down when the taxonomy fetch lands. */
-          <div className="mb-6">
-            <div className="inline-flex items-center gap-1 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] px-1.5 py-1.5">
+          /* Height-reserving skeleton for the divisions bar. It must match the
+             real strip TO THE PIXEL or the whole page moves when the strip
+             lands — and it did not: this held 44px + a 24px margin while the
+             TabStrip below measures 37px (4px padding, 1px border, 27px tabs)
+             + a 16px margin, so every cold open of Product Data hopped the
+             grid 13px upward. The numbers here are the TabStrip's measured
+             ones, not its class names — Aurora trims its padding to 4px. */
+          /* `flex` on the wrapper, not a plain block: an inline-flex shell
+             inside a block sits on a line box and measured 39px, two more
+             than the strip — the last two pixels of the hop. */
+          <div className="mb-4 flex">
+            <div className="inline-flex items-center gap-1 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] px-1 py-1">
               {[88, 132, 108, 96, 84].map((w, i) => (
-                <div key={i} className="h-[30px] rounded-lg bg-[var(--bg-inverted)]/[0.05] animate-pulse" style={{ width: w }} />
+                <div key={i} className="h-[27px] rounded-lg bg-[var(--bg-inverted)]/[0.05] animate-pulse" style={{ width: w }} />
               ))}
             </div>
           </div>
@@ -3101,7 +3157,18 @@ export default function ProductList() {
               {t("action.retry")}
             </button>
           </div>
-        ) : loading ? (
+        ) : loading || !metaReady ? (
+          /* `!metaReady` holds the skeleton until the taxonomy is known, on
+             BOTH front-ends. The grouped view sorts its categories by their
+             taxonomy rank; when the product page landed before the taxonomy
+             (a cold open, two parallel requests, either may win) every rank
+             was "unknown", the sections painted in order of first
+             appearance, and the moment the taxonomy arrived the whole page
+             re-sorted itself — the jump-nav tiles swapped rows (measured,
+             0.0186 in one open) and the sections below shuffled with them.
+             Warm opens read the taxonomy from localStorage synchronously, so
+             `metaReady` starts true there and nothing is delayed; a failed
+             taxonomy call also releases this (see the effect's `finally`). */
           viewMode === "grid" ? (
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
               {[...Array(8)].map((_, i) => (
@@ -3381,7 +3448,14 @@ export default function ProductList() {
                   separates the header from the grid so each category reads as a
                   tidy, self-contained block. */}
               <div className="mb-7">
-                <div className="flex items-center justify-between gap-3">
+                {/* min-h-9 = the icon tile's height. The tile is conditional
+                    on the Icon Hub map, which arrives on its own request; on a
+                    cold open the sections could paint before it and this row
+                    then grew from the title's ~19px to the tile's 32px — a
+                    13px hop of every section on the page (measured; a race,
+                    seen in one cold open of three). The row now holds the
+                    tile's height whether or not the tile has arrived. */}
+                <div className="flex items-center justify-between gap-3 min-h-9">
                   <div className="flex min-w-0 items-center gap-3">
                     {classIcons.category?.[cat.slug] && (
                       <span className="h-9 w-9 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-subtle)] flex items-center justify-center shrink-0">
