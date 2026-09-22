@@ -950,10 +950,9 @@ function CrateTile({ url, badge, onChange, productId, title }: {
 }
 
 function PackingSheet({
-  logistics, model, product, t, lang, motion, productId, schemaCovers, onSaved, canEdit, onDirtyChange, aiContext, member, family,
+  logistics, product, t, lang, motion, productId, schemaCovers, onSaved, canEdit, onDirtyChange, aiContext, member, family,
 }: {
   logistics: ProductLogistics;
-  model: Record<string, unknown> | undefined;
   product: Record<string, unknown> | undefined;
   t: (k: string, fb: string) => string;
   lang: string;
@@ -1198,28 +1197,29 @@ function PackingSheet({
   const mode = L.packing_mode === "per_package" ? "per_package" : "per_unit";
   const perPkg = mode === "per_package" ? Math.max(1, Math.floor(num(L.units_per_package) || 1)) : 1;
   const plan = loadPlan(rows, { unitsPerPackage: perPkg });
-  const m = (k: string) => (model ? (model as Record<string, unknown>)[k] : undefined);
   const pv = (k: string) => (product ? product[k] : undefined);
 
-  /* The product is the source. A product that never saw the new tab still has
-     its numbers on the primary variant, so fall back rather than print an
-     empty sheet over data that exists. */
-  const fromProduct = sums.packageCount > 0 || !!L.packing_type || !!L.net_weight_kg;
+  /* products.logistics is the ONLY source (family ⊕ the focused member's
+     differences, merged by the page). The fallback to the primary model's
+     legacy packing columns went on 2026-09-22 — the five values those
+     columns ever held were duplicates of the product's own. */
+  const packingEntered = sums.packageCount > 0 || !!L.packing_type || !!L.net_weight_kg;
   /* Net weight IS the machine weight (suppliers quote N.W. and G.W.; N.W. is
-     the machine). The packing column is a fallback for rows written before
-     the two were one. */
+     the machine). logistics.net_weight_kg is a fallback for rows written
+     before the two were one. Shown here only once packing exists — a bare
+     N.W. already reads on the Physical card. */
   const specsNet = (product?.schema_specs as Record<string, unknown> | null)?.machine_weight_kg;
-  const netW = fromProduct
+  const netW = packingEntered
     ? (draft ? num(draft.machine_weight_kg) : (num(specsNet) || num(col("machine_weight_kg")))) || L.net_weight_kg
-    : m("net_weight");
-  const grossW = fromProduct ? (sums.grossKg || L.gross_weight_kg) : m("weight");
-  const cbm = fromProduct ? (sums.cbm || L.cbm) : m("cbm");
+    : undefined;
+  const grossW = sums.grossKg || L.gross_weight_kg;
+  const cbm = sums.cbm || L.cbm;
   /* A count the operator typed wins; otherwise the count the crates give —
      the editor shows the calculated number in the box, so the sheet does too. */
-  const q20 = fromProduct ? (L.qty_20ft ?? (plan.c20.qty || undefined)) : m("container_20ft_qty");
-  const q40 = fromProduct ? (L.qty_40ft ?? (plan.c40.qty || undefined)) : m("container_40ft_qty");
-  const q40hq = fromProduct ? (L.qty_40hq ?? (plan.c40hq.qty || undefined)) : m("container_40hq_qty");
-  const pType = fromProduct ? label(PACKING_TYPES, L.packing_type) : (m("packing_type") as string | undefined);
+  const q20 = L.qty_20ft ?? (plan.c20.qty || undefined);
+  const q40 = L.qty_40ft ?? (plan.c40.qty || undefined);
+  const q40hq = L.qty_40hq ?? (plan.c40hq.qty || undefined);
+  const pType = label(PACKING_TYPES, L.packing_type);
   const dg = L.dangerous_goods;
   const dgNames = (dg?.kinds ?? []).map((k) => label(DG_KINDS, k) ?? k);
   const perPkgLabel = mode === "per_package" ? t("pk.pcsWord", "pcs") : t("pk.unitsWord", "units");
@@ -2479,7 +2479,6 @@ export default function ProductProfile() {
       {STEPS[step].id === "logistics" && (
         <PackingSheet
           logistics={focusLogi}
-          model={focusMember ?? data.models[0]}
           product={focusProduct}
           t={t}
           lang={lang}

@@ -28,9 +28,11 @@ const WRITABLE_MODEL_COLUMNS = new Set([
   "product_id", "model_name", "slug", "sku", "tagline", "supplier",
   "reference_model", "cost_price", "pricing_mode", "price_note",
   "global_price", "supports_head_only", "supports_complete_set",
-  "head_only_price", "complete_set_price", "weight", "net_weight", "cbm",
-  "carton_dimensions", "packing_type", "box_include", "extra_accessories",
-  "container_20ft_qty", "container_40ft_qty", "container_40hq_qty",
+  "head_only_price", "complete_set_price",
+  /* The legacy per-model packing columns (weight, net_weight, cbm,
+     carton_dimensions, packing_type, box_include, extra_accessories,
+     container_*_qty) are no longer writable: a member's packing lives in
+     logistics_overrides since 2026-09-22. The columns stay, frozen. */
   "stock_status", "supplier_overrides", "specs_overrides", "logistics_overrides", "order",
   "visible", "status", "moq", "lead_time", "barcode", "primary_model",
   "code_prefix", "coding_status", "name_i18n", "tagline_i18n",

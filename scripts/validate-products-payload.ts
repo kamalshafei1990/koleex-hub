@@ -119,5 +119,25 @@ console.log("\nproducts-payload");
   check("list page 1 counts products per division", /divisionsPromise/.test(s) && /groupCounts = \{[\s\S]*?\.\.\.groupCounts, divisions \}/.test(s));
 }
 
+/* ── 7. ONE home for a model's packing ─────────────────────────────────
+   Until 2026-09-22 a member's crates could be typed in two places — the
+   Packing & Logistics tab (products.logistics, family-wide) and a legacy
+   card on the Variants tab writing ten per-model columns — and neither
+   knew about the other. The member home is product_models
+   .logistics_overrides; the legacy columns are frozen and read by nothing. */
+{
+  const legacy = /\b(carton_dimensions|container_20ft_qty|box_include|extra_accessories)\b/;
+  check("Variants tab renders no per-model packing inputs", !legacy.test(code("src/components/admin/form-sections/ModelsSection.tsx")));
+  check("editor state carries no legacy packing columns",
+    !legacy.test(code("src/types/product-form.ts")) && !legacy.test(code("src/components/admin/ProductForm.tsx")));
+  check("model PATCH refuses the legacy packing columns", !legacy.test(code("src/app/api/product-models/[id]/route.ts")));
+  check("profile packing sheet never reads the model row's legacy packing", !/m\("net_weight"\)|m\("carton_dimensions"\)/.test(code("src/components/admin/ProductProfile.tsx")));
+  check("AI product knowledge reads logistics_overrides, not the legacy columns",
+    /logistics_overrides/.test(code("src/lib/server/ai-agent/product-knowledge.ts")) && !legacy.test(code("src/lib/server/ai-agent/product-knowledge.ts")));
+  check("member packing rides logistics_overrides end to end",
+    ["src/components/admin/ProductForm.tsx", "src/app/api/product-models/[id]/route.ts", "src/lib/server/product-detail.ts", "src/components/admin/ProductProfile.tsx"]
+      .every((f) => /logistics_overrides/.test(code(f))));
+}
+
 console.log(`\nproducts-payload: ${pass} passed, ${fail} failed.`);
 process.exit(fail ? 1 : 0);

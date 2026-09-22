@@ -153,24 +153,12 @@ export interface ModelFormState {
   supports_complete_set: boolean | null;
   head_only_price: string;
   complete_set_price: string;
-  /* Gross / packed weight (kg) — the existing "weight" column has
-     always been the packed/shipment weight. Net (bare-machine)
-     weight is a separate field below so admins can record both
-     NW and GW like a real commercial invoice. */
-  weight: string;
-  net_weight: string;
-  cbm: string;
-  carton_dimensions: string;
-  packing_type: string;
-  box_include: string;
-  extra_accessories: string;
-  /* Logistics / availability — added in the Technical+Models v2 audit.
-     container_20ft_qty / container_40ft_qty: ints kept as strings to
-     allow empty input. stock_status: "in_stock" | "made_to_order" |
-     "pre_order" | "sold_out". */
-  container_20ft_qty: string;
-  container_40ft_qty: string;
-  container_40hq_qty: string;
+  /* The per-model packing columns (weight, net_weight, cbm,
+     carton_dimensions, packing_type, box_include, extra_accessories,
+     container_*_qty) left the form on 2026-09-22: a member's crates live in
+     logistics_overrides below and its N.W. in specs_overrides. The columns
+     still exist on product_models, frozen and read by nothing. */
+  /* Availability: "in_stock" | "made_to_order" | "pre_order" | "sold_out". */
   stock_status: string;
   order: number;
   visible: boolean;
@@ -462,16 +450,6 @@ export function createEmptyModel(): ModelFormState {
     supports_complete_set: null,
     head_only_price: "",
     complete_set_price: "",
-    weight: "",
-    net_weight: "",
-    cbm: "",
-    carton_dimensions: "",
-    packing_type: "",
-    box_include: "",
-    extra_accessories: "",
-    container_20ft_qty: "",
-    container_40ft_qty: "",
-    container_40hq_qty: "",
     stock_status: "",
     order: 0,
     visible: true,

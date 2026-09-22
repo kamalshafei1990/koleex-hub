@@ -416,9 +416,7 @@ const MODEL_SYNC_KEYS = [
   "model_name", "slug", "tagline", "supplier", "reference_model",
   "cost_price", "pricing_mode", "price_note", "global_price",
   "supports_head_only", "supports_complete_set", "head_only_price",
-  "complete_set_price", "weight", "net_weight", "cbm", "carton_dimensions",
-  "packing_type", "box_include", "extra_accessories", "container_20ft_qty",
-  "container_40ft_qty", "container_40hq_qty", "stock_status",
+  "complete_set_price", "stock_status",
   "supplier_overrides", "order", "visible", "status", "moq", "lead_time",
   "barcode", "primary_model", "code_prefix", "coding_status",
   "specs_overrides", "name_i18n", "tagline_i18n", "logistics_overrides",
@@ -1047,16 +1045,6 @@ export default function ProductForm({ productId }: Props) {
           supports_complete_set: m.supports_complete_set,
           head_only_price: m.head_only_price?.toString() || "",
           complete_set_price: m.complete_set_price?.toString() || "",
-          weight: m.weight?.toString() || "",
-          net_weight: m.net_weight?.toString() || "",
-          cbm: m.cbm?.toString() || "",
-          carton_dimensions: m.carton_dimensions || "",
-          packing_type: m.packing_type || "",
-          box_include: m.box_include || "",
-          extra_accessories: m.extra_accessories || "",
-          container_20ft_qty: m.container_20ft_qty?.toString() || "",
-          container_40ft_qty: m.container_40ft_qty?.toString() || "",
-          container_40hq_qty: m.container_40hq_qty?.toString() || "",
           stock_status: m.stock_status || "",
           order: m.order,
           visible: m.visible,
@@ -1663,35 +1651,6 @@ export default function ProductForm({ productId }: Props) {
     setModels(models.filter((_, x) => x !== i).map((m, x) => ({ ...m, order: x })));
     setActiveMember(0);
   };
-
-  /* Product-level packing (Logistics tab, schema_specs) → offered to variant
-     cards as a one-click copy. mm → cm for carton dims; enum → readable. */
-  const productPackingDefaults = (() => {
-    if (!activeSpecsSchema) return null;
-    const sp = (product.schema_specs || {}) as Record<string, unknown>;
-    const str = (v: unknown) => (v === undefined || v === null || v === "" ? undefined : String(v));
-    const dims = (() => {
-      const d = sp.packing_dimensions;
-      if (d && typeof d === "object" && !Array.isArray(d)) {
-        const o = d as { length?: number; width?: number; height?: number };
-        if (o.length && o.width && o.height) return `${o.length / 10} × ${o.width / 10} × ${o.height / 10} cm`;
-      }
-      return undefined;
-    })();
-    const readable = typeof sp.packing_type === "string"
-      ? sp.packing_type.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())
-      : undefined;
-    return {
-      packing_type: readable,
-      carton_dimensions: dims,
-      cbm: str(sp.cbm),
-      net_weight: str(sp.net_weight),
-      gross_weight: str(sp.gross_weight),
-      container_20ft_qty: str(sp.container_20ft_qty),
-      container_40ft_qty: str(sp.container_40ft_qty),
-      container_40hq_qty: str(sp.container_40hq_qty),
-    };
-  })();
 
   /* ── Primary model helpers (shown in Hero) ── */
   const primaryModel = models[0];
@@ -2358,7 +2317,13 @@ export default function ProductForm({ productId }: Props) {
     const safeIdx = Math.max(0, Math.min(idx, steps.length - 1));
     setError("");
     setCurrentStep(safeIdx);
-    if (typeof window !== "undefined") window.scrollTo({ top: 0, behavior: "smooth" });
+    /* The Hub scrolls inside #main-scroll-container, not the window (see
+       MainHeader): a jump from mid-page — the Variants card's "Open Packing
+       & Logistics", "Edit in Hero" — must land at the top of the new tab. */
+    if (typeof window !== "undefined") {
+      window.scrollTo({ top: 0, behavior: "smooth" });
+      document.getElementById("main-scroll-container")?.scrollTo({ top: 0, behavior: "smooth" });
+    }
   };
 
   /* ── P0 #3 · Wizard Data Integrity — required-field source of truth ──
@@ -2684,16 +2649,6 @@ export default function ProductForm({ productId }: Props) {
           supports_complete_set: m.supports_complete_set,
           head_only_price: num(m.head_only_price),
           complete_set_price: num(m.complete_set_price),
-          weight: num(m.weight),                    // gross / packed
-          net_weight: num(m.net_weight),
-          cbm: num(m.cbm),
-          carton_dimensions: m.carton_dimensions || null,
-          packing_type: m.packing_type || null,
-          box_include: m.box_include || null,
-          extra_accessories: m.extra_accessories || null,
-          container_20ft_qty: m.container_20ft_qty ? parseInt(m.container_20ft_qty, 10) : null,
-          container_40ft_qty: m.container_40ft_qty ? parseInt(m.container_40ft_qty, 10) : null,
-          container_40hq_qty: m.container_40hq_qty ? parseInt(m.container_40hq_qty, 10) : null,
           stock_status: m.stock_status || null,
           supplier_overrides: m.supplier_overrides && Object.keys(m.supplier_overrides).length ? m.supplier_overrides : null,
           logistics_overrides: m.logistics_overrides && Object.keys(m.logistics_overrides).length ? m.logistics_overrides : null,
@@ -5246,7 +5201,14 @@ export default function ProductForm({ productId }: Props) {
                       options: (f.options ?? []).map((o) => ({ value: o.value, label: o.label })),
                     })),
                 )}
-                productPacking={productPackingDefaults}
+                /* A model's packing is entered on the Packing & Logistics
+                   tab with the model selected there — the card's button
+                   selects it and jumps (2026-09-22). */
+                onOpenPacking={(idx) => {
+                  setActiveMember(idx);
+                  const li = steps.findIndex((s) => s.id === "logistics");
+                  if (li >= 0) goToStep(li);
+                }}
                 productSpecs={(product.schema_specs || {}) as Record<string, unknown>}
                 modelPhotoUrl={(m) => {
                   const it = modelPhotoOf(m);

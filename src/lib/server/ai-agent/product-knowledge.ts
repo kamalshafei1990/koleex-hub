@@ -123,12 +123,6 @@ function readSpecs(product: Record<string, unknown>) {
 
 const PACKING_PRODUCT_FIELDS = [
   "hs_code", "country_of_origin", "machine_weight_kg",
-  "cbm", "carton_dimensions", "packing_type",
-] as const;
-
-const PACKING_MODEL_FIELDS = [
-  "model_name", "primary_model", "weight", "cbm", "packing_type",
-  "box_include", "extra_accessories", "barcode",
 ] as const;
 
 function pick(row: Record<string, unknown>, keys: readonly string[]) {
@@ -249,12 +243,26 @@ export async function buildProductTabs(opts: {
   if (wantsOptions) tabs.options = options;
   else withheld.push("options");
 
-  /* Packing & Logistics — B, from the product row plus each model's own
-     packing figures (they differ per variant). */
+  /* Packing & Logistics — B. The family's crates are products.logistics;
+     a model that ships differently carries only its DIFFERENCES in
+     product_models.logistics_overrides (2026-09-22), and its own N.W. in
+     specs_overrides. The old per-model packing columns are frozen and no
+     longer knowledge. */
   if (tabAllowed("packing", who)) {
+    const perModel = models
+      .map((m) => {
+        const differences = (m.logistics_overrides ?? null) as Record<string, unknown> | null;
+        const net = ((m.specs_overrides ?? {}) as Record<string, unknown>).machine_weight_kg ?? null;
+        return {
+          model: m.primary_model ?? m.model_name ?? null,
+          ...(differences && Object.keys(differences).length ? { differences } : {}),
+          ...(net != null ? { net_weight_kg: net } : {}),
+        };
+      })
+      .filter((m) => "differences" in m || "net_weight_kg" in m);
     tabs.packing = {
-      product: pick(product, PACKING_PRODUCT_FIELDS),
-      per_model: models.map((m) => pick(m, PACKING_MODEL_FIELDS)),
+      product: { ...pick(product, PACKING_PRODUCT_FIELDS), logistics: product.logistics ?? null },
+      per_model: perModel,
     };
   } else withheld.push("packing");
 
