@@ -163,6 +163,7 @@ const PROFILE_T: Record<string, { en: string; zh: string; ar: string }> = {
   "pp.publicPage":    { en: "Public page",        zh: "客户页面",       ar: "صفحة العميل" },
   "pp.back":          { en: "Back to Product Data", zh: "返回产品数据", ar: "رجوع إلى بيانات المنتجات" },
   "pp.notSet":        { en: "Not set",            zh: "未填写",         ar: "غير محدّد" },
+  "pp.notSetCount":   { en: "not set",            zh: "项未填写",       ar: "غير محدّدة" },
   "pp.untitledVariant": { en: "Untitled variant", zh: "未命名型号", ar: "موديل بلا اسم" },
   /* Price tab */
   "pr.landed":        { en: "Landed cost",        zh: "到岸成本",       ar: "التكلفة الواصلة" },

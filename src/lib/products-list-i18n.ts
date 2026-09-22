@@ -158,6 +158,12 @@ export const PRODUCTS_LIST_I18N: Translations = {
   "card.hidden": { en: "Hidden from customers", zh: "对客户隐藏", ar: "مخفي عن العملاء" },
   "card.hiddenShort": { en: "Hidden", zh: "已隐藏", ar: "مخفي" },
   "card.noCostYet": { en: "Cost not set", zh: "未设置成本", ar: "التكلفة غير محددة" },
+  "card.missingLead": { en: "Missing", zh: "缺少", ar: "ناقص" },
+  "card.gap.photo": { en: "photo", zh: "图片", ar: "الصورة" },
+  "card.gap.specs": { en: "specs", zh: "规格", ar: "المواصفات" },
+  "card.gap.code": { en: "code", zh: "编码", ar: "الكود" },
+  "card.gap.description": { en: "description", zh: "描述", ar: "الوصف" },
+  "card.gap.template": { en: "spec template", zh: "规格模板", ar: "قالب المواصفات" },
   "card.noSupplier": { en: "No supplier linked", zh: "未关联供应商", ar: "لا يوجد مورّد مرتبط" },
   "card.priceFrom": { en: "From", zh: "起", ar: "ابتداءً من" },
 

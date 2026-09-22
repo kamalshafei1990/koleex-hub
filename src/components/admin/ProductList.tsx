@@ -1,12 +1,13 @@
 "use client";
 
-import { useState, useEffect, useLayoutEffect, useMemo, useRef, useCallback, useDeferredValue, memo } from "react";
+import { useState, useEffect, useLayoutEffect, useMemo, useRef, useCallback, useDeferredValue, useSyncExternalStore, memo } from "react";
 import dynamic from "next/dynamic";
 import { useSkin } from "@/lib/appearance";
 import { useTopRampOwner } from "@/lib/useTopRampOwner";
 import KdsSelect from "@/components/kds/Select";
 import TabStrip from "@/components/ui/TabStrip";
 import Collapse from "@/components/ui/Collapse";
+import PopoverPanel from "@/components/kds/PopoverPanel";
 
 /* Aurora ground — the Hub canvas, client-only, mounted only under the skin.
    Lives HERE (not in the two thin page wrappers) so /products and
@@ -599,21 +600,39 @@ const ProductCard = memo(function ProductCard({
             never hide a code). An ALIGNED mini-grid, not ragged pills:
             two tidy columns on desktop, one full-width column on phones —
             reads like the catalog's own model list. */}
-        {modelNamesList && modelNamesList.length > 1 && (
-          <div className="relative z-10 mt-2.5 grid grid-cols-2 max-sm:grid-cols-1 gap-1">
-            {modelNamesList.map((code) => (
-              <Link
-                key={code}
-                href={`${baseRoute}/${p.slug || p.id}?model=${encodeURIComponent(code)}`}
-                onClick={(e) => e.stopPropagation()}
-                className="flex items-center min-w-0 px-2 py-1 max-sm:min-h-[32px] rounded-md border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] text-[11.5px] font-bold tabular-nums tracking-tight text-[var(--text-primary)] hover:border-[var(--border-focus)] hover:bg-[var(--bg-surface)] transition-colors"
-                title={code}
-              >
-                <span className="truncate">{code}</span>
-              </Link>
-            ))}
-          </div>
-        )}
+        {/* Chips size to their code and wrap — a two-column grid cut every
+            long code in half ("XCS-9988/6I…", owner's UI review 22 Sep 2026).
+            Four codes show; a family with more ends in "+N", which opens the
+            product where the whole roster lives. */}
+        {modelNamesList && modelNamesList.length > 1 && (() => {
+          const shown = modelNamesList.slice(0, 4);
+          const rest = modelNamesList.length - shown.length;
+          return (
+            <div className="relative z-10 mt-2.5 flex flex-wrap gap-1">
+              {shown.map((code) => (
+                <Link
+                  key={code}
+                  href={`${baseRoute}/${p.slug || p.id}?model=${encodeURIComponent(code)}`}
+                  onClick={(e) => e.stopPropagation()}
+                  className="inline-flex items-center max-w-full min-w-0 px-2 py-1 max-sm:min-h-[32px] rounded-md border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] text-[11.5px] font-bold tabular-nums tracking-tight text-[var(--text-primary)] hover:border-[var(--border-focus)] hover:bg-[var(--bg-surface)] transition-colors"
+                  title={code}
+                >
+                  <span className="truncate">{code}</span>
+                </Link>
+              ))}
+              {rest > 0 && (
+                <Link
+                  href={`${baseRoute}/${p.slug || p.id}`}
+                  onClick={(e) => e.stopPropagation()}
+                  className="inline-flex items-center px-2 py-1 max-sm:min-h-[32px] rounded-md border border-dashed border-[var(--border-subtle)] text-[11px] font-semibold tabular-nums text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:border-[var(--border-focus)] transition-colors"
+                  title={modelNamesList.slice(4).join(", ")}
+                >
+                  +{rest}
+                </Link>
+              )}
+            </div>
+          );
+        })()}
 
         {/* Phone placement of the freshness tags — see the photo-strip copy
             above for why. The body's variable zone (under the family
@@ -706,7 +725,7 @@ const ProductCard = memo(function ProductCard({
                and Quote is green. Amber and green are the design system's
                FUNCTIONAL state tokens, not new brand colours, so the card
                stays inside the monochrome-plus-accent rule. */}
-            <div className="grid grid-cols-3 max-sm:grid-cols-1 gap-1.5">
+            <div className="grid grid-cols-3 max-sm:grid-cols-2 gap-1.5">
               {([
                 {
                   key: "ask_ai",
@@ -733,7 +752,10 @@ const ProductCard = memo(function ProductCard({
                      overflow:hidden clipped the travelling beam away entirely —
                      the button kept its blue rim and lost its motion. This is
                      the same class the Auto-translate control uses. */
-                  className={`px-2 py-1.5 rounded-lg border bg-[var(--bg-surface-subtle)] text-[10.5px] font-bold whitespace-nowrap transition-all ${a.cls}`}
+                  /* Phones: Ask AI and Quote share a row, Compare takes the
+                     row under them — two rows, not three (owner's UI review,
+                     22 Sep 2026: the 2-up card was ~560px tall). */
+                  className={`px-2 py-1.5 rounded-lg border bg-[var(--bg-surface-subtle)] text-[10.5px] font-bold whitespace-nowrap transition-all ${a.cls}${a.key === "compare" ? " max-sm:col-span-2 max-sm:order-last" : ""}`}
                   title={a.label}
                 >
                   {a.label}
@@ -765,9 +787,13 @@ const ProductCard = memo(function ProductCard({
               {t("card.hiddenShort", "Hidden")}
             </span>
           )}
-          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-[var(--bg-surface)] text-[10px] font-medium text-[var(--text-subtle)]">
-            <BoxesIcon className="h-2.5 w-2.5" /> {models} {models === 1 ? t("list.modelOne", "model") : t("list.modelMany", "models")}
-          </span>
+          {/* Only a FAMILY earns a count — "1 model" on a single-model
+              product was one more pill saying nothing (owner's UI review). */}
+          {models > 1 && (
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-[var(--bg-surface)] text-[10px] font-medium text-[var(--text-subtle)]">
+              <BoxesIcon className="h-2.5 w-2.5" /> {models} {t("list.modelMany", "models")}
+            </span>
+          )}
         </div>
 
         {/* The work strip is the LAST thing to arrive and the tallest thing
@@ -831,27 +857,25 @@ const ProductCard = memo(function ProductCard({
               </span>
             </div>
 
-            {/* Gap chips — shown ONLY when something is missing, so a
-                complete product reads as a clean card. */}
-            {signal.missing.length > 0 && (
-              <div className="flex flex-wrap gap-1 min-h-[18px] max-sm:min-h-0">
-                {signal.missing.map((k) => (
-                  <span
-                    key={k}
-                    className="inline-flex items-center px-1.5 py-0.5 rounded text-[9.5px] font-medium bg-amber-500/10 text-amber-400/90 border border-amber-500/20"
-                  >
-                    {t(`card.missing.${k}`, {
-                      photo: "No photo",
-                      specs: "No specs",
-                      cost: "No cost",
-                      code: "No code",
-                      description: "No description",
-                      template: "No spec template",
-                    }[k] ?? k)}
-                  </span>
-                ))}
-              </div>
-            )}
+            {/* What is still missing — ONE quiet line, not a row of amber
+                chips: twenty cards each wearing "No cost" and "No specs" read
+                as an alarm board (owner's UI review, 22 Sep 2026). Shown only
+                when something is missing, so a complete product stays clean.
+                Cost is left out here: the price slot at the foot of the card
+                already says "Cost not set". */}
+            {(() => {
+              const gaps = signal.missing.filter((k) => k !== "cost");
+              if (gaps.length === 0) return null;
+              const word = (k: string) => t(`card.gap.${k}`, {
+                photo: "photo", specs: "specs", code: "code", description: "description", template: "spec template",
+              }[k] ?? k);
+              return (
+                <p className="flex items-center gap-1.5 min-h-[18px] max-sm:min-h-0 text-[10.5px] text-[var(--text-muted)] min-w-0">
+                  <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-amber-400/80 shrink-0" />
+                  <span className="truncate">{t("card.missingLead", "Missing")}: {gaps.map(word).join(" · ")}</span>
+                </p>
+              );
+            })()}
 
             {/* Supplier — logo + name. Sourcing is the internal card's
                 second question after readiness ("who makes this?"), so it
@@ -2225,6 +2249,19 @@ export default function ProductList() {
      filled inverted square, as every Core selected state is. */
   const railRef = useRef<HTMLDivElement | null>(null);
   const [railInd, setRailInd] = useState<{ x: number; y: number; w: number; h: number } | null>(null);
+  /* Phone or not, from the same 768px line PopoverPanel uses for its sheet
+     mode — read as an external store, so no effect sets state and the value
+     is right on the first client render. */
+  const phone = useSyncExternalStore(
+    (cb) => {
+      const mq = window.matchMedia("(max-width: 767px)");
+      mq.addEventListener("change", cb);
+      return () => mq.removeEventListener("change", cb);
+    },
+    () => window.matchMedia("(max-width: 767px)").matches,
+    () => false,
+  );
+  const filtersBtnRef = useRef<HTMLButtonElement | null>(null);
 
   /* Cheap O(1) lookups so the search hot path doesn't re-scan the
      taxonomy arrays for every product on every keystroke. Built
@@ -2702,6 +2739,78 @@ export default function ProductList() {
 
   const selectClass = "h-10 px-3 rounded-lg bg-[var(--bg-surface-subtle)] border border-[var(--border-subtle)] text-[13px] text-[var(--text-secondary)] outline-none focus:border-[var(--border-focus)]";
 
+  /* The filter fields, once: the inline desktop panel and the phone sheet
+     both render exactly this. */
+  const filterFields = (
+    <>
+                {/* Division, category and subcategory are the two strips
+                    above the grid while the category rail is on screen
+                    (owner's UI review, 22 Sep 2026): repeating them here
+                    made nine dropdowns of a panel that needs six. They come
+                    back in list view, where the rail is not shown. */}
+                {!railVisible && (
+                  <>
+                <div>
+                  <label className="block text-[10px] font-medium text-[var(--text-dim)] mb-1 uppercase tracking-wider">{t("filter.division")}</label>
+                  <KdsSelect value={filterDiv} onChange={(v) => { setFilterDiv(v); setFilterCat(""); setFilterSub(""); }}
+                    options={orderedDivisions.map(d => ({ value: d.slug, label: localizedName(d, lang) }))}
+                    placeholder={t("list.allOption")} triggerClassName={selectClass + " w-full pe-8 text-start"} />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-medium text-[var(--text-dim)] mb-1 uppercase tracking-wider">{t("filter.category")}</label>
+                  <KdsSelect value={filterCat} onChange={(v) => { setFilterCat(v); setFilterSub(""); }} disabled={!filterDiv}
+                    options={filteredCats.map(c => ({ value: c.slug, label: localizedName(c, lang) }))}
+                    placeholder={t("list.allOption")} triggerClassName={selectClass + " w-full pe-8 text-start"} />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-medium text-[var(--text-dim)] mb-1 uppercase tracking-wider">{t("filter.subcategory")}</label>
+                  <KdsSelect value={filterSub} onChange={setFilterSub} disabled={!filterCat}
+                    options={filteredSubs.map(s => ({ value: s.slug, label: localizedName(s, lang) }))}
+                    placeholder={t("list.allOption")} triggerClassName={selectClass + " w-full pe-8 text-start"} />
+                </div>
+                  </>
+                )}
+                {/* Supplier filter is an internal concept — hide on
+                    the public /products catalog. */}
+                {isInternal && (
+                  <div>
+                    <label className="block text-[10px] font-medium text-[var(--text-dim)] mb-1 uppercase tracking-wider">{t("filter.supplier")}</label>
+                    <KdsSelect value={filterSupplier} onChange={setFilterSupplier} options={allSuppliers}
+                      placeholder={t("list.allOption")} triggerClassName={selectClass + " w-full pe-8 text-start"} />
+                  </div>
+                )}
+                <div>
+                  <label className="block text-[10px] font-medium text-[var(--text-dim)] mb-1 uppercase tracking-wider">{t("filter.brand")}</label>
+                  <KdsSelect value={filterBrand} onChange={setFilterBrand} options={allBrands}
+                    placeholder={t("list.allOption")} triggerClassName={selectClass + " w-full pe-8 text-start"} />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-medium text-[var(--text-dim)] mb-1 uppercase tracking-wider">{t("filter.level")}</label>
+                  <KdsSelect value={filterLevel} onChange={setFilterLevel}
+                    options={allLevels.map(l => ({ value: l, label: l.charAt(0).toUpperCase() + l.slice(1) }))}
+                    placeholder={t("list.allOption")} triggerClassName={selectClass + " w-full pe-8 text-start"} />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-medium text-[var(--text-dim)] mb-1 uppercase tracking-wider">{t("filter.visibility")}</label>
+                  <KdsSelect value={filterVisible} onChange={setFilterVisible}
+                    options={[{ value: "visible", label: t("filter.visible") }, { value: "hidden", label: t("filter.hidden") }]}
+                    placeholder={t("list.allOption")} triggerClassName={selectClass + " w-full pe-8 text-start"} />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-medium text-[var(--text-dim)] mb-1 uppercase tracking-wider">{t("filter.status")}</label>
+                  <KdsSelect value={filterStatus} onChange={setFilterStatus}
+                    options={[{ value: "draft", label: t("status.draft") }, { value: "active", label: t("status.active") }, { value: "archived", label: t("status.archived") }]}
+                    placeholder={t("list.allOption")} triggerClassName={selectClass + " w-full pe-8 text-start"} />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-medium text-[var(--text-dim)] mb-1 uppercase tracking-wider">{t("filter.featured")}</label>
+                  <KdsSelect value={filterFeatured} onChange={setFilterFeatured}
+                    options={[{ value: "yes", label: t("filter.isFeatured") }, { value: "no", label: t("filter.notFeatured") }]}
+                    placeholder={t("list.allOption")} triggerClassName={selectClass + " w-full pe-8 text-start"} />
+                </div>
+    </>
+  );
+
   return (
     <div className="kx-pd min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)]">
       {aurora && (
@@ -3039,6 +3148,7 @@ export default function ProductList() {
               </button>
             </div>
             <button
+              ref={filtersBtnRef}
               onClick={() => setShowFilters(!showFilters)}
               /* kx-glass only on the RESTING button: when it is on, kx-seg-on
                  owns the fill, and stacking a glass background over the
@@ -3089,77 +3199,30 @@ export default function ProductList() {
             </p>
           </div>
 
-          {showFilters && (
+          {/* Desktop keeps the panel inline. On a phone the same fields open
+              as a bottom sheet (below): inline, the panel lived inside the
+              sticky toolbar and covered the products while scrolling
+              (owner's UI review, 22 Sep 2026). */}
+          {showFilters && !phone && (
             <div className="mt-4 pt-4 border-t border-[var(--border-subtle)]">
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                {/* Division, category and subcategory are the two strips
-                    above the grid while the category rail is on screen
-                    (owner's UI review, 22 Sep 2026): repeating them here
-                    made nine dropdowns of a panel that needs six. They come
-                    back in list view, where the rail is not shown. */}
-                {!railVisible && (
-                  <>
-                <div>
-                  <label className="block text-[10px] font-medium text-[var(--text-dim)] mb-1 uppercase tracking-wider">{t("filter.division")}</label>
-                  <KdsSelect value={filterDiv} onChange={(v) => { setFilterDiv(v); setFilterCat(""); setFilterSub(""); }}
-                    options={orderedDivisions.map(d => ({ value: d.slug, label: localizedName(d, lang) }))}
-                    placeholder={t("list.allOption")} triggerClassName={selectClass + " w-full pe-8 text-start"} />
-                </div>
-                <div>
-                  <label className="block text-[10px] font-medium text-[var(--text-dim)] mb-1 uppercase tracking-wider">{t("filter.category")}</label>
-                  <KdsSelect value={filterCat} onChange={(v) => { setFilterCat(v); setFilterSub(""); }} disabled={!filterDiv}
-                    options={filteredCats.map(c => ({ value: c.slug, label: localizedName(c, lang) }))}
-                    placeholder={t("list.allOption")} triggerClassName={selectClass + " w-full pe-8 text-start"} />
-                </div>
-                <div>
-                  <label className="block text-[10px] font-medium text-[var(--text-dim)] mb-1 uppercase tracking-wider">{t("filter.subcategory")}</label>
-                  <KdsSelect value={filterSub} onChange={setFilterSub} disabled={!filterCat}
-                    options={filteredSubs.map(s => ({ value: s.slug, label: localizedName(s, lang) }))}
-                    placeholder={t("list.allOption")} triggerClassName={selectClass + " w-full pe-8 text-start"} />
-                </div>
-                  </>
-                )}
-                {/* Supplier filter is an internal concept — hide on
-                    the public /products catalog. */}
-                {isInternal && (
-                  <div>
-                    <label className="block text-[10px] font-medium text-[var(--text-dim)] mb-1 uppercase tracking-wider">{t("filter.supplier")}</label>
-                    <KdsSelect value={filterSupplier} onChange={setFilterSupplier} options={allSuppliers}
-                      placeholder={t("list.allOption")} triggerClassName={selectClass + " w-full pe-8 text-start"} />
-                  </div>
-                )}
-                <div>
-                  <label className="block text-[10px] font-medium text-[var(--text-dim)] mb-1 uppercase tracking-wider">{t("filter.brand")}</label>
-                  <KdsSelect value={filterBrand} onChange={setFilterBrand} options={allBrands}
-                    placeholder={t("list.allOption")} triggerClassName={selectClass + " w-full pe-8 text-start"} />
-                </div>
-                <div>
-                  <label className="block text-[10px] font-medium text-[var(--text-dim)] mb-1 uppercase tracking-wider">{t("filter.level")}</label>
-                  <KdsSelect value={filterLevel} onChange={setFilterLevel}
-                    options={allLevels.map(l => ({ value: l, label: l.charAt(0).toUpperCase() + l.slice(1) }))}
-                    placeholder={t("list.allOption")} triggerClassName={selectClass + " w-full pe-8 text-start"} />
-                </div>
-                <div>
-                  <label className="block text-[10px] font-medium text-[var(--text-dim)] mb-1 uppercase tracking-wider">{t("filter.visibility")}</label>
-                  <KdsSelect value={filterVisible} onChange={setFilterVisible}
-                    options={[{ value: "visible", label: t("filter.visible") }, { value: "hidden", label: t("filter.hidden") }]}
-                    placeholder={t("list.allOption")} triggerClassName={selectClass + " w-full pe-8 text-start"} />
-                </div>
-                <div>
-                  <label className="block text-[10px] font-medium text-[var(--text-dim)] mb-1 uppercase tracking-wider">{t("filter.status")}</label>
-                  <KdsSelect value={filterStatus} onChange={setFilterStatus}
-                    options={[{ value: "draft", label: t("status.draft") }, { value: "active", label: t("status.active") }, { value: "archived", label: t("status.archived") }]}
-                    placeholder={t("list.allOption")} triggerClassName={selectClass + " w-full pe-8 text-start"} />
-                </div>
-                <div>
-                  <label className="block text-[10px] font-medium text-[var(--text-dim)] mb-1 uppercase tracking-wider">{t("filter.featured")}</label>
-                  <KdsSelect value={filterFeatured} onChange={setFilterFeatured}
-                    options={[{ value: "yes", label: t("filter.isFeatured") }, { value: "no", label: t("filter.notFeatured") }]}
-                    placeholder={t("list.allOption")} triggerClassName={selectClass + " w-full pe-8 text-start"} />
-                </div>
+                {filterFields}
               </div>
             </div>
           )}
+          <PopoverPanel
+            anchorRef={filtersBtnRef}
+            open={showFilters && phone}
+            onClose={() => setShowFilters(false)}
+            mobileSheet
+            matchAnchorWidth={false}
+            maxHeight={640}
+            className="p-4"
+          >
+            <div className="grid grid-cols-2 gap-3">
+              {filterFields}
+            </div>
+          </PopoverPanel>
 
           {/* Active filter chips — surfaces every active filter as a
               removable chip so the user always knows what's narrowing

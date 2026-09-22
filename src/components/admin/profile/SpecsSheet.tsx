@@ -225,19 +225,43 @@ export default function SpecsSheet({
         const done = g.fields.filter((f) => filled(specs[f.key])).length;
         return (
           <Group key={g.id} motion={motion} icon={<BoundIcon semanticKey="field.spec_template" className="h-4 w-4" fallback={<Settings2Icon className="h-4 w-4" />} />} title={g.title} count={`${done}/${g.fields.length}`} {...sheet.gp(card, canEdit)}>
-            <div className="divide-y divide-[var(--border-subtle)]">
-              {g.fields.map((f) => (
-                <FieldRow
-                  key={f.key}
-                  label={`${f.label || f.key}${f.required ? " *" : ""}`}
-                  glyph={glyph(f.label || f.key)}
-                  badge={badges(f)}
-                  help={f.description}
-                  value={fmtSpec(f, specs[f.key])}
-                  input={E(card) && d && !f.computed ? <FieldInput field={f} value={d.specs[f.key]} onSet={(v) => setSpec(f.key, v)} /> : undefined}
-                />
-              ))}
-            </div>
+            {/* READ VIEW = the facts that exist. Each empty field used to cost
+                four lines (label, PUBLIC/AI pills, "Not set", the hint), so a
+                half-filled template read as a wall of "Not set" (owner's UI
+                review, 22 Sep 2026). Now: filled rows without pills or hints,
+                and one line counting what is not set, which opens the editor.
+                Editing shows every field with its pills and hint again. */}
+            {(() => {
+              const editing = E(card);
+              const rows = editing ? g.fields : g.fields.filter((f) => filled(specs[f.key]));
+              const unset = g.fields.length - done;
+              return (
+                <div className="divide-y divide-[var(--border-subtle)]">
+                  {rows.map((f) => (
+                    <FieldRow
+                      key={f.key}
+                      label={`${f.label || f.key}${f.required ? " *" : ""}`}
+                      glyph={glyph(f.label || f.key)}
+                      badge={editing ? badges(f) : (f.computed ? <CalcBadge label={t("pk.calculated", "Calculated")} /> : undefined)}
+                      help={editing ? f.description : undefined}
+                      value={fmtSpec(f, specs[f.key])}
+                      input={editing && d && !f.computed ? <FieldInput field={f} value={d.specs[f.key]} onSet={(v) => setSpec(f.key, v)} /> : undefined}
+                    />
+                  ))}
+                  {!editing && unset > 0 && (
+                    <button
+                      type="button"
+                      onClick={canEdit ? () => sheet.begin(card) : undefined}
+                      disabled={!canEdit}
+                      className="w-full flex items-center justify-between gap-3 py-2.5 first:pt-0 last:pb-0 text-[11.5px] text-[var(--text-muted)] disabled:cursor-default enabled:hover:text-[var(--text-primary)] transition-colors"
+                    >
+                      <span className="tabular-nums">{unset} {t("pp.notSetCount", "not set")}</span>
+                      {canEdit && <span className="text-[#7FA9D6] font-medium">{t("action.edit", "Edit")}</span>}
+                    </button>
+                  )}
+                </div>
+              );
+            })()}
           </Group>
         );
       })}
@@ -255,10 +279,14 @@ export default function SpecsSheet({
                 <div key={`${sg.src}:${sg.group}`}>
                   <div className="text-[9.5px] font-bold uppercase tracking-[0.1em] text-[var(--text-ghost)] mb-1">{sg.group}</div>
                   <div className={grid}>
-                    {sg.fields.map((f) => (
-                      <FieldRow key={f.key} label={`${f.label}${f.required ? " *" : ""}`} glyph={glyph(f.label)} help={f.helpText}
+                    {sg.fields.filter((f) => filled(sg.src === "common" ? sewing.common_specs[f.key] : sewing.template_specs[f.key])).map((f) => (
+                      <FieldRow key={f.key} label={`${f.label}${f.required ? " *" : ""}`} glyph={glyph(f.label)}
                         value={fmtTpl(f, sg.src === "common" ? sewing.common_specs[f.key] : sewing.template_specs[f.key])} />
                     ))}
+                    {(() => {
+                      const unset = sg.fields.filter((f) => !filled(sg.src === "common" ? sewing.common_specs[f.key] : sewing.template_specs[f.key])).length;
+                      return unset > 0 ? <p className="py-2.5 text-[11.5px] text-[var(--text-muted)] tabular-nums col-span-full">{unset} {t("pp.notSetCount", "not set")}</p> : null;
+                    })()}
                   </div>
                 </div>
               ))}
