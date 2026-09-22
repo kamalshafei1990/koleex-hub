@@ -12,7 +12,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "@/lib/i18n";
 import { todoT } from "@/lib/translations/todo";
 import type { TodoProductRef, ProductRow, DivisionRow, CategoryRow } from "@/types/supabase";
-import { fetchProducts, fetchDivisions, fetchCategories, fetchClassificationIcons } from "@/lib/products-admin";
+import { fetchProductsSlim, fetchTaxonomyAll, fetchClassificationIcons } from "@/lib/products-admin";
 import SearchIcon from "@/components/icons/ui/SearchIcon";
 import CrossIcon from "@/components/icons/ui/CrossIcon";
 import PackageIcon from "@/components/icons/ui/PackageIcon";
@@ -145,8 +145,14 @@ export default function ProductPicker({
       }))
       .catch(() => ({ thumbs: {} as Record<string, string>, models: {} as Record<string, string> }));
     const iconsP = fetchClassificationIcons().catch(() => ({} as Record<string, Record<string, string>>));
-    Promise.all([fetchProducts(), fetchDivisions(), fetchCategories(), metaP, iconsP])
-      .then(([prods, divs, cats, meta, ico]) => {
+    /* fetchProductsSlim = the list projection (name, taxonomy, status): this
+       picker shows a name, a model code and a thumbnail, and the codes and
+       thumbnails come from media-thumbs. fetchProducts() pulled all 88
+       columns per product (978 KB) for the three it read. fetchTaxonomyAll
+       reads the browser's taxonomy mirror, so divisions + categories cost no
+       round trip on a warm Hub instead of two. */
+    Promise.all([fetchProductsSlim(), fetchTaxonomyAll(), metaP, iconsP])
+      .then(([prods, taxo, meta, ico]) => {
         if (cancelled) return;
         const { thumbs, models } = meta;
         setIcons(ico);
@@ -155,15 +161,15 @@ export default function ProductPicker({
             id: p.id,
             name: p.product_name,
             // Model code is the identifier buyers recognise: KOLEEX model_name /
-            // primary_model first, then any legacy SKU.
-            code: models[p.id] ?? p.internal_sku ?? p.legacy_code ?? null,
-            image: thumbs[p.id] ?? p.hero_poster_url ?? p.og_image_url ?? null,
+            // primary_model (media-thumbs carries the first per product).
+            code: models[p.id] ?? null,
+            image: thumbs[p.id] ?? null,
             division_slug: p.division_slug,
             category_slug: p.category_slug,
           })),
         );
-        setDivisions(divs);
-        setCategories(cats);
+        setDivisions(taxo.divisions);
+        setCategories(taxo.categories);
       })
       .catch(() => {})
       .finally(() => !cancelled && setLoaded(true));

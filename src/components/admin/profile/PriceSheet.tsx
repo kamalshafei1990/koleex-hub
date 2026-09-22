@@ -104,9 +104,16 @@ export default function PriceSheet({
     moq: str(m.moq),
     lead_time: str(m.lead_time),
   });
+  /* ONE definition of the product's cost, the same order the grid's signals
+     use: the SUPPLIER LINK is the record (owner's source-of-truth rule), the
+     variant's cost_price is the fallback. This read `link ? link.cost :
+     model.cost` — so a product with a link that had no figure yet showed
+     "Not set" here while its card showed the variant's cost. */
+  const linkCostRaw = link && link.unit_cost_cny != null ? link.unit_cost_cny : null;
+  const effectiveCostRaw = linkCostRaw ?? primaryModel?.cost_price;
   const begin = (k: Card) => {
     const d: Draft = {
-      cost: str(link ? link.unit_cost_cny : primaryModel?.cost_price),
+      cost: str(effectiveCostRaw),
       options: ((link?.price_options ?? []) as Array<{ price: number | null; note: string; note_i18n?: Record<string, string> | null }>)
         .map((o) => ({ price: o.price === null || o.price === undefined ? "" : String(o.price), note: o.note ?? "", note_i18n: o.note_i18n ?? null })),
       models: Object.fromEntries(models.map((m) => [modelId(m), modelDraftOf(m)])),
@@ -124,7 +131,7 @@ export default function PriceSheet({
   /* ── What the sheet reads from: the draft while editing, the rows otherwise. */
   const eCost = editing === "cost";
   const eSell = editing === "selling";
-  const costStr = eCost && draft ? draft.cost : str(link ? link.unit_cost_cny : primaryModel?.cost_price);
+  const costStr = eCost && draft ? draft.cost : str(effectiveCostRaw);
   const costNum = numOrNull(costStr);
   const options: PriceOpt[] = eCost && draft
     ? draft.options
@@ -460,7 +467,7 @@ export default function PriceSheet({
               const d = eSell && draft ? draft.models[id] : modelDraftOf(m);
               const mode = d.pricing_mode || "fixed";
               const costHere = d.cost_price.trim() ? numOrNull(d.cost_price) : (link ? costNum : null);
-              const costFromLink = !d.cost_price.trim() && !!link && costNum !== null;
+              const costFromLink = !d.cost_price.trim() && linkCostRaw != null && costNum !== null;
               return (
                 <div key={id || i} className="rounded-xl border border-[var(--border-subtle)] p-3">
                   <div className="flex items-center gap-2 mb-3 min-w-0">

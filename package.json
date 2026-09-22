@@ -160,6 +160,7 @@
     "shipping:verify-provider": "node --conditions=react-server --import tsx scripts/shipping/verify-provider.mts",
     "validate:products-i18n": "tsx scripts/validate-products-i18n.ts",
     "validate:products-freshness": "tsx scripts/validate-products-freshness.ts",
+    "validate:products-payload": "tsx scripts/validate-products-payload.ts",
     "validate:product-page-images": "tsx scripts/validate-product-page-images.ts",
     "validate:product-page-brand": "tsx scripts/validate-product-page-brand.ts",
     "validate:product-page-coverage": "tsx scripts/validate-product-page-coverage.ts",

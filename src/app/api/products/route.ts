@@ -157,6 +157,25 @@ export async function GET(req: Request) {
           .then((r) => r)
       : null;
     const groupsPromise = buildGroupCountsQuery()?.then((r) => r) ?? null;
+    /* DIVISIONS WITH PRODUCTS — the whole tenant, NOT the match set. The
+       division strip is navigation: it must show where products exist
+       regardless of the filter currently applied (a strip filtered by its
+       own selection would collapse to one pill). Page 1 only, one indexed
+       column, and the catalogue rule applies (active only for callers
+       without the Product Data grant) so a customer never sees a division
+       whose only products are drafts. Owner (22 Sep 2026): the eight empty
+       divisions were on every customer's screen, promising ranges that do
+       not exist yet. */
+    const divisionsPromise = listReq.page === 1
+      ? (() => {
+          let dq = supabaseServer
+            .from("products")
+            .select("division_slug")
+            .eq("tenant_id", auth.tenant_id);
+          if (!canSeeSecrets) dq = dq.eq("status", "active");
+          return dq.range(0, GROUP_SCAN_MAX - 1).then((r) => r);
+        })()
+      : null;
 
     let models: {
       counts: Record<string, number>;
@@ -194,7 +213,7 @@ export async function GET(req: Request) {
     _t.mark("models");
 
     let groupCounts:
-      | { categories: Record<string, number>; subcategories: Record<string, number>; capped: boolean }
+      | { categories: Record<string, number>; subcategories: Record<string, number>; divisions?: Record<string, number>; capped: boolean }
       | undefined;
     if (groupsPromise) {
       const { data: gRows, error: gErr } = await groupsPromise;
@@ -216,6 +235,20 @@ export async function GET(req: Request) {
         const capped = (gRows?.length ?? 0) >= GROUP_SCAN_MAX;
         if (capped) console.warn("[api/products paged groupCounts] scan capped at", GROUP_SCAN_MAX);
         groupCounts = { categories, subcategories, capped };
+      }
+    }
+    if (divisionsPromise) {
+      const { data: dRows, error: dErr } = await divisionsPromise;
+      /* A failed count must not fail the page; the strip then shows every
+         division, as it always did. */
+      if (dErr) console.error("[api/products paged divisionCounts]", dErr.message);
+      else {
+        const divisions: Record<string, number> = {};
+        for (const d of (dRows ?? []) as { division_slug: string | null }[]) {
+          const k = d.division_slug || "_uncategorized";
+          divisions[k] = (divisions[k] ?? 0) + 1;
+        }
+        groupCounts = { categories: {}, subcategories: {}, capped: false, ...groupCounts, divisions };
       }
     }
     _t.mark("groups");

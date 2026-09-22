@@ -65,7 +65,7 @@ import {
   type InboxAttachment,
   type InboxProductRef,
 } from "@/lib/inbox";
-import { fetchProductMainImages, fetchProducts } from "@/lib/products-admin";
+import { fetchProductMainImages, fetchProductsSlim } from "@/lib/products-admin";
 import { useCurrentAccount } from "@/lib/identity";
 import type { InboxMessageWithSender, ProductRow } from "@/types/supabase";
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
@@ -2255,8 +2255,11 @@ function ProductPickerModal({
   useEffect(() => {
     let cancelled = false;
     (async () => {
+      /* The slim list projection: this picker searches name / slug / brand /
+         tags and keeps an id. fetchProducts() pulled all 88 columns per
+         product — 978 KB measured — for those five fields. */
       const [ps, imgs] = await Promise.all([
-        fetchProducts(),
+        fetchProductsSlim(),
         fetchProductMainImages(),
       ]);
       if (cancelled) return;

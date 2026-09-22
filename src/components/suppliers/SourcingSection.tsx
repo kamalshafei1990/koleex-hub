@@ -106,7 +106,9 @@ export default function SourcingSection({
   const [aCapacity, setACapacity] = useState(""); const [aCapacityUnit, setACapacityUnit] = useState("units / month");
   const [aBusy, setABusy] = useState(false); const [aErr, setAErr] = useState<string | null>(null);
   useEffect(() => { if (!addOpen || products.length) return;
-    fetch("/api/products", { credentials: "include" }).then((r) => r.json()).then((j) => setProducts(Array.isArray(j.products) ? j.products : [])).catch(() => {}); }, [addOpen, products.length]);
+    /* ?view=list: the picker matches on product_name and keeps the row —
+       the full projection was 978 KB for a search box. */
+    fetch("/api/products?view=list", { credentials: "include" }).then((r) => r.json()).then((j) => setProducts(Array.isArray(j.products) ? j.products : [])).catch(() => {}); }, [addOpen, products.length]);
   const productMatches = useMemo(() => {
     const q = pq.trim().toLowerCase(); if (!q) return [];
     return products.filter((p) => str(p, "product_name").toLowerCase().includes(q)).slice(0, 6);

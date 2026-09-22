@@ -144,10 +144,13 @@ function useProducts(open: boolean): ProductOption[] {
     let cancelled = false;
     (async () => {
       /* P0-B: products read goes through /api/products (auth + projection)
-         instead of the anon client. */
+         instead of the anon client.
+         ?view=list — this picker shows a name and keeps an id. Without the
+         view it downloaded the full 88-column row for every product (978 KB,
+         2.5 s measured) to fill a dropdown. */
       let rows: { id: string; product_name: string }[] = [];
       try {
-        const res = await fetch("/api/products", { credentials: "include" });
+        const res = await fetch("/api/products?view=list", { credentials: "include" });
         if (res.ok) {
           const json = (await res.json()) as { products?: { id: string; product_name: string }[] };
           rows = (json.products ?? [])

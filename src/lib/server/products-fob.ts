@@ -23,6 +23,7 @@ import "server-only";
  *   cost shows one price, not the same number repeated with false precision.
  */
 import { supabaseServer } from "@/lib/server/supabase-server";
+import { inChunks } from "@/lib/server/in-chunks";
 import { getPolicySnapshot } from "@/lib/server/commercial-policy";
 import { computePolicyPrice } from "@/lib/server/pricing-engine-policy";
 import { landedCostCny, type ProductSupplierLinkRow } from "@/lib/products-admin";
@@ -68,17 +69,22 @@ export async function globalFobForProducts(
   const ctx = await getPolicySnapshot(tenantId);
   if (!ctx.settings) return { ...EMPTY, reason: "policy_not_configured" };
 
-  /* Two reads, both batched over the whole id set — never per product. */
+  /* Two reads, both batched over the whole id set — never per product.
+     Through inChunks: the catalogue now asks for every unpriced product in
+     ONE call after the first screen, and 500 ids in a single `.in()` URL
+     is past what the HTTP client will send (see in-chunks.ts). */
   const [linkRes, modelRes] = await Promise.all([
-    supabaseServer
-      .from("product_suppliers")
-      .select("product_id, is_primary, unit_cost_cny, cost_basis, cost_includes_tax, cost_extras")
-      .in("product_id", ids),
-    supabaseServer
-      .from("product_models")
-      .select('id, product_id, cost_price, pricing_mode, "order"')
-      .in("product_id", ids)
-      .order("order", { ascending: true }),
+    inChunks<LinkRow>(ids, (chunk) =>
+      supabaseServer
+        .from("product_suppliers")
+        .select("product_id, is_primary, unit_cost_cny, cost_basis, cost_includes_tax, cost_extras")
+        .in("product_id", chunk)),
+    inChunks<ModelCostRow>(ids, (chunk) =>
+      supabaseServer
+        .from("product_models")
+        .select('id, product_id, cost_price, pricing_mode, "order"')
+        .in("product_id", chunk)
+        .order("order", { ascending: true })),
   ]);
 
   /* Landed cost per product: the PRIMARY supplier link wins; any other link

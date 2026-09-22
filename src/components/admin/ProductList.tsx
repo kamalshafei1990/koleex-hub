@@ -1112,6 +1112,8 @@ export default function ProductList() {
      last batch, or on failure; a catalogue whose prices are all cached has no
      unpriced card, so a flag left `true` there changes nothing on screen. */
   const [fobPending, setFobPending] = useState(!isInternal);
+  /* False until the first (above-the-fold) price batch has landed. */
+  const fobTailRef = useRef(false);
 
   /* Card actions. The three flows (Ask AI · Compare · Add to Quotation) are
      being specified by the owner separately, so this is the single seam they
@@ -1173,7 +1175,7 @@ export default function ProductList() {
      is set. null means "server did not send it", and every consumer falls back
      to counting loaded rows, which is exactly the old behaviour. */
   const [groupCounts, setGroupCounts] = useState<
-    { categories: Record<string, number>; subcategories: Record<string, number>; capped: boolean } | null
+    { categories: Record<string, number>; subcategories: Record<string, number>; divisions?: Record<string, number>; capped: boolean } | null
   >(null);
   const [hasMore, setHasMore] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -1470,7 +1472,7 @@ export default function ProductList() {
           const json = (await res.json()) as {
             rows?: ProductRow[]; total?: number | null; hasMore?: boolean;
             models?: { counts: Record<string, number>; primaryModelNames: Record<string, string>; modelNames: Record<string, string[]> };
-            groupCounts?: { categories: Record<string, number>; subcategories: Record<string, number>; capped: boolean };
+            groupCounts?: { categories: Record<string, number>; subcategories: Record<string, number>; divisions?: Record<string, number>; capped: boolean };
           };
           p = json.rows ?? [];
           /* Model codes ride WITH the page now, so the card paints its final
@@ -1624,57 +1626,109 @@ export default function ProductList() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isInternal, retryKey]);
 
-  /* ── Work signals — ONE call per screen open ──
-     Product Data only. Carries three payloads the grid needs and the public
-     catalogue never sees: per-product readiness/gaps/cost/supplier, the model
-     summary (codes, counts, supplier names) and the thumbnail map.
+  /* ── Work signals — PER PAGE, merged ──────────────────────────────────
+     Product Data only. Readiness / gaps / cost / supplier per product, the
+     supplier dictionary, translated names and thumbnails — for the ids this
+     grid is HOLDING, posted the way /api/products/fob-prices is, and merged
+     into state as pages arrive.
+
+     It used to be one GET for the whole catalogue: every product, every
+     model, every supplier link, every contact, on every open — 408 KB at 394
+     products (158 KB of it the model maps the list page already carries),
+     ~3 MB at the owner's 3,000. The list is paged; the signals now follow
+     the page. Same answer per product, same card, a fifth of the bytes.
 
      It answers the same thing regardless of what is typed in the search box
-     or which filters are set, so it is keyed on neither. It used to sit in
-     the load effect above and therefore re-ran on every keystroke: six
-     identical 15KB responses to type one word, each one recomputing readiness
-     for the whole catalogue server-side.
+     or which filters are set, so it is keyed on the loaded ids, never on the
+     query: a filter change that loads NEW products fetches only those.
 
      Still fire-and-forget: a slow or failed signals call must never delay or
      break the grid — the cards simply render without the readiness strip. */
+  const signalsHaveRef = useRef<Set<string>>(new Set());
+  const signalsInflightRef = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    /* Retry = start over, including everything already fetched. */
+    signalsHaveRef.current = new Set();
+    signalsInflightRef.current = new Set();
+  }, [retryKey]);
   useEffect(() => {
     if (!isInternal) return;
+    const want = products
+      .map((p) => p.id)
+      .filter((id) => !signalsHaveRef.current.has(id) && !signalsInflightRef.current.has(id));
+    if (want.length === 0) return;
+    /* The route caps at 500 ids; a longer catalogue asks again on the next
+       pass of this effect, which the merge below triggers. */
+    const ids = want.slice(0, 500);
     let cancelled = false;
     const ctrl = new AbortController();
+    for (const id of ids) signalsInflightRef.current.add(id);
     /* Thumbnails land here or from the standalone media endpoint; one place
-       applies them and persists the warm-start copy, so the next open paints
-       photos with the first frame. */
+       merges them and persists the warm-start copy, so the next open paints
+       photos with the first frame. MERGED, not replaced: each page brings
+       its own slice of the map. */
     const applyImgs = (imgs: Record<string, string>) => {
       if (cancelled) return;
-      setMainImages(imgs);
-      try {
-        const json = JSON.stringify(imgs);
-        if (json.length < 1_000_000) window.localStorage.setItem(`kx_products_imgs_v1:${currentScopeKey()}`, json);
-      } catch { /* quota guard */ }
+      setMainImages((prev) => {
+        const next = { ...prev, ...imgs };
+        try {
+          const json = JSON.stringify(next);
+          if (json.length < 1_000_000) window.localStorage.setItem(`kx_products_imgs_v1:${currentScopeKey()}`, json);
+        } catch { /* quota guard */ }
+        return next;
+      });
     };
-    fetch("/api/products/signals", { credentials: "include", signal: ctrl.signal })
+    type SignalsWire = Omit<ProductSignal, "supplier"> & { supplier: { id: string | null; name?: string } | null };
+    fetch("/api/products/signals", {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ids }),
+      signal: ctrl.signal,
+    })
       .then((r) => {
         if (!r.ok) throw new Error(`HTTP ${r.status}`);
         return r.json();
       })
       .then((j: {
-        signals?: Record<string, ProductSignal>;
-        models?: { counts: Record<string, number>; suppliers: Record<string, string[]>; allSuppliers: string[]; supplierLogos?: Record<string, string>; primaryModelNames: Record<string, string>; modelNames?: Record<string, string[]>; nameAlts?: Record<string, string>; supplierAlt?: Record<string, string> };
+        signals?: Record<string, SignalsWire>;
+        suppliers?: Record<string, { name: string; cn: string | null; logo: string | null }>;
+        allSuppliers?: string[];
+        nameAlts?: Record<string, string>;
         mainImages?: Record<string, string>;
       }) => {
         if (cancelled) return;
-        if (j?.signals) setSignals(j.signals);
-        if (j?.models) {
-          setModelCounts(j.models.counts);
-          setProductSuppliers(j.models.suppliers);
-          if (j.models.nameAlts) setNameAlts(j.models.nameAlts);
-          if (j.models.supplierAlt) setSupplierAlt(j.models.supplierAlt);
-          setAllSuppliers(j.models.allSuppliers);
-          if (j.models.supplierLogos) setSupplierLogos(j.models.supplierLogos);
-          setPrimaryModelNames(j.models.primaryModelNames || {});
-          setModelNames(j.models.modelNames || {});
+        const dict = j.suppliers ?? {};
+        /* The wire carries a supplier ID into the dictionary; the card keeps
+           reading the {id, name, logo} object it always did, built here once
+           per product instead of shipped 394 times. */
+        const nextSignals: Record<string, ProductSignal> = {};
+        const nextSuppliers: Record<string, string[]> = {};
+        const nextAlt: Record<string, string> = {};
+        const nextLogos: Record<string, string> = {};
+        for (const [id, w] of Object.entries(j.signals ?? {})) {
+          let supplier: ProductSignal["supplier"] = null;
+          if (w.supplier) {
+            const d = w.supplier.id ? dict[w.supplier.id] : undefined;
+            if (d) supplier = { id: w.supplier.id, name: d.name, logo: d.logo };
+            else if (w.supplier.name) supplier = { id: null, name: w.supplier.name, logo: null };
+          }
+          nextSignals[id] = { ...w, supplier };
+          if (supplier) {
+            nextSuppliers[id] = [supplier.name];
+            const cn = supplier.id ? dict[supplier.id]?.cn : null;
+            if (cn) nextAlt[id] = cn;
+            if (supplier.logo) nextLogos[supplier.name] = supplier.logo;
+          }
+          signalsHaveRef.current.add(id);
         }
-        if (j?.mainImages) applyImgs(j.mainImages);
+        setSignals((prev) => ({ ...prev, ...nextSignals }));
+        setProductSuppliers((prev) => ({ ...prev, ...nextSuppliers }));
+        setSupplierAlt((prev) => ({ ...prev, ...nextAlt }));
+        setSupplierLogos((prev) => ({ ...prev, ...nextLogos }));
+        if (j.nameAlts) setNameAlts((prev) => ({ ...prev, ...j.nameAlts }));
+        if (j.allSuppliers?.length) setAllSuppliers((prev) => Array.from(new Set([...prev, ...j.allSuppliers!])).sort());
+        if (j.mainImages) applyImgs(j.mainImages);
         /* The supplier answer has arrived — cards may now state it,
            including stating that there ISN'T one. */
         setSignalsReady(true);
@@ -1683,19 +1737,16 @@ export default function ProductList() {
         /* An abort is this effect being torn down, not a failure — running
            the fallback there would fire two more requests on the way out. */
         if (cancelled || (e instanceof DOMException && e.name === "AbortError")) return;
-        /* Signals are optional, but model codes and thumbnails are not — fall
-           back to the standalone endpoints so a signals failure never strips
-           the grid of its identity. */
+        /* Signals are optional, but supplier names and thumbnails are not —
+           fall back to the standalone endpoints so a signals failure never
+           strips the grid of its identity. */
         try {
           const [ms, imgs] = await Promise.all([fetchModelSummaries(), fetchProductMainImages()]);
           if (cancelled) return;
-          setModelCounts(ms.counts);
           setProductSuppliers(ms.suppliers);
           setAllSuppliers(ms.allSuppliers);
           if ((ms as { nameAlts?: Record<string, string> }).nameAlts) setNameAlts((ms as { nameAlts?: Record<string, string> }).nameAlts!);
           if ((ms as { supplierAlt?: Record<string, string> }).supplierAlt) setSupplierAlt((ms as { supplierAlt?: Record<string, string> }).supplierAlt!);
-          setPrimaryModelNames(ms.primaryModelNames || {});
-          setModelNames((ms as { modelNames?: Record<string, string[]> }).modelNames || {});
           applyImgs(imgs);
         } catch { /* grid still renders without either */ }
         /* Released on the fallback too — otherwise a signals outage would
@@ -1703,8 +1754,17 @@ export default function ProductList() {
            than saying "no supplier linked". */
         if (!cancelled) setSignalsReady(true);
       });
-    return () => { cancelled = true; ctrl.abort(); };
-  }, [isInternal, retryKey]);
+    return () => {
+      cancelled = true;
+      ctrl.abort();
+      /* Release the ids HERE, synchronously — not in a `finally` that runs
+         after the abort settles. React StrictMode mounts, unmounts and
+         re-mounts this effect in one tick; if the ids were still marked
+         in-flight when the second mount ran, it would find nothing to fetch,
+         and the aborted first request would never be retried. */
+      for (const id of ids) signalsInflightRef.current.delete(id);
+    };
+  }, [isInternal, retryKey, products]);
 
   /* Finish a SMALL catalogue in the background instead of waiting for scroll.
      Paging by 48 broke something the grid depends on: it groups by category,
@@ -1804,7 +1864,13 @@ export default function ProductList() {
        actually see waited on 261 they cannot. The tail follows in the next
        pass of this effect, once these land. */
     const FIRST_PAINT = 24;
-    const missing = all.slice(0, FIRST_PAINT);
+    /* After the first screen has its prices, the REST goes in ONE request
+       (the route caps at 500 ids). It used to keep going 24 at a time — nine
+       sequential round trips for 213 products, each one ~400 ms on the
+       owner's link, so the last card waited ~3.5 s for a number that could
+       have arrived in the second call. */
+    const FOB_MAX_IDS = 500;
+    const missing = fobTailRef.current ? all.slice(0, FOB_MAX_IDS) : all.slice(0, FIRST_PAINT);
     let cancelled = false;
     /* Set when the call cannot deliver prices — network failure, a non-2xx,
        or a body with no `prices`. The pending flag may only drop on failure
@@ -1824,6 +1890,9 @@ export default function ProductList() {
       .then((j: { prices?: Record<string, { fobUsd: number | null; mode: string }> } | null) => {
         if (cancelled) return;
         if (!j?.prices) { failed = true; return; }
+        /* The first screen is priced; every later pass may ask for
+           everything that is still missing at once. */
+        fobTailRef.current = true;
         /* Merge, never replace — an earlier page's prices must survive. */
         setFobPrices((prev) => {
           const next = { ...prev, ...j.prices };
@@ -2055,11 +2124,29 @@ export default function ProductList() {
      raw `divisions` array is alphabetical from the DB; this keeps
      that ordering for the "rest" but promotes the flagship to the
      head so brand hierarchy is visible at a glance. */
+  /* ONLY DIVISIONS THAT HAVE PRODUCTS (owner, 22 Sep 2026). Eight of the nine
+     divisions in the taxonomy hold nothing yet and were on every customer's
+     screen — Digital Devices, Smart Living, Mobility… — promising ranges that
+     do not exist. The server counts them per tenant with the first page
+     (`groupCounts.divisions`, active-only for the catalogue); until that
+     lands, the loaded rows themselves are the count, which is exact whenever
+     the warm snapshot holds the whole catalogue. The selected division is
+     always kept, so a filter can never point at a pill that vanished. */
+  const divisionCounts = useMemo(() => {
+    if (groupCounts?.divisions) return groupCounts.divisions;
+    const c: Record<string, number> = {};
+    for (const p of products) if (p.division_slug) c[p.division_slug] = (c[p.division_slug] || 0) + 1;
+    return c;
+  }, [groupCounts, products]);
+  /* False only on a cold open before either count exists — the strip holds
+     its skeleton then, rather than painting nine pills and taking eight away. */
+  const divisionCountsKnown = !!groupCounts?.divisions || products.length > 0;
   const orderedDivisions = useMemo(() => {
-    const flagship = divisions.filter(d => d.slug === FLAGSHIP_DIVISION_SLUG);
-    const rest = divisions.filter(d => d.slug !== FLAGSHIP_DIVISION_SLUG);
+    const live = divisions.filter(d => (divisionCounts[d.slug] ?? 0) > 0 || d.slug === filterDiv);
+    const flagship = live.filter(d => d.slug === FLAGSHIP_DIVISION_SLUG);
+    const rest = live.filter(d => d.slug !== FLAGSHIP_DIVISION_SLUG);
     return [...flagship, ...rest];
-  }, [divisions]);
+  }, [divisions, divisionCounts, filterDiv]);
   const catMap = useMemo(() => Object.fromEntries(categories.map(c => [c.slug, localizedName(c, lang)])), [categories, lang]);
 
   const selectedDivId = useMemo(() => divisions.find(d => d.slug === filterDiv)?.id, [divisions, filterDiv]);
@@ -3013,7 +3100,7 @@ export default function ProductList() {
             not selected so it reads as the primary line); the rest
             are outlined secondary pills. Horizontally scrollable on
             mobile so long division names don't wrap awkwardly. */}
-        {orderedDivisions.length === 0 && !metaReady && (
+        {orderedDivisions.length === 0 && (!metaReady || !divisionCountsKnown) && (
           /* Height-reserving skeleton for the divisions bar. It must match the
              real strip TO THE PIXEL or the whole page moves when the strip
              lands — and it did not: this held 44px + a 24px margin while the
