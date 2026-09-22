@@ -23,7 +23,9 @@ export default function ProductRail({ image, name, models, selectedCode, onSelec
   sections: RailSection[];
   activeId: string | null;
 }) {
-  const nav = (
+  /* One section is not navigation — a lone "Compliance" hung under the
+     model chips on thin drafts (owner's UI review, 22 Sep 2026). */
+  const nav = sections.length < 2 ? null : (
     <nav aria-label="Sections">
       <ul className="flex lg:flex-col gap-1 lg:gap-0">
         {sections.map((s) => {

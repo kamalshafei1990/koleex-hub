@@ -27,7 +27,15 @@ export async function generateMetadata({
   params: Promise<{ id: string }>;
 }): Promise<Metadata> {
   const { id } = await params;
-  const loaded = await loadPublicSchemaProduct(id);
+  /* The same reader rule as the page below: a signed-in Hub user previewing
+     a draft used to get a page that rendered fine under a browser tab that
+     said "Product not found" (the metadata read only the public shape). Same
+     arguments as the page's call, so the per-request cache serves both. */
+  const auth = await getServerAuth();
+  const loaded = await loadPublicSchemaProduct(id, {
+    allowUnpublished: Boolean(auth),
+    audience: auth ? (auth.user_type === "internal" ? "internal" : "customer") : "public",
+  });
   if (!loaded) return { title: "Product not found — KOLEEX" };
   return {
     /* The tab reads like the header: model first, then the name. */

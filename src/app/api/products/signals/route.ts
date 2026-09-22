@@ -110,6 +110,24 @@ export interface SignalsSupplier { name: string; cn: string | null; logo: string
    product link — and intersects them. Eight rows today, tens later; the memo
    keeps it off the hot path. A link edit shows here within a minute, which
    is the freshness the signals themselves already advertise. */
+/* The card's supplier line is a LABEL, not a legal document (owner's
+   UI review, 22 Sep 2026): "ZHEJIANG LEJIANG MACHINE CO., LTD" cut to
+   "ZHEJIANG LEJIANG MACHINE C…" on every card. The short trade name the
+   contact carries wins when it differs from the legal name ("KILO (麒龙)",
+   "Stao (狮涛)"), and a legal name typed in capitals is read back in title
+   case — mixed-case names are left exactly as entered. The same string
+   feeds the supplier filter, so the two always agree. */
+function titleCaseShout(s: string): string {
+  const letters = s.replace(/[^A-Za-z]/g, "");
+  if (!letters || letters !== letters.toUpperCase()) return s;
+  return s.toLowerCase().replace(/(^|[\s(\/,.\-])([a-z])/g, (_m, pre, ch) => pre + ch.toUpperCase());
+}
+function readableSupplierName(c: ContactRow): string {
+  const legal = (c.company_name_en || "").trim();
+  const short = (c.display_name || "").trim();
+  const picked = short && short !== legal && short.length <= legal.length ? short : legal || short;
+  return titleCaseShout(picked || (c.company_name_cn || "").trim());
+}
 interface SupplierMemo { at: number; dict: Record<string, SignalsSupplier> }
 const gs = globalThis as typeof globalThis & { __kxSignalSuppliers?: Map<string, SupplierMemo> };
 const SUPPLIER_MEMO_MS = 60_000;
@@ -131,7 +149,7 @@ async function tenantLinkedSuppliers(tenantId: string): Promise<Record<string, S
   const dict: Record<string, SignalsSupplier> = {};
   for (const c of (contactsRes.data ?? []) as ContactRow[]) {
     if (!linked.has(c.id)) continue;
-    const name = c.company_name_en || c.display_name || c.company_name_cn || "";
+    const name = readableSupplierName(c);
     if (!name) continue;
     dict[c.id] = { name, cn: c.company_name_cn, logo: c.photo_url || c.logo_url || null };
   }

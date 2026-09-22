@@ -340,7 +340,7 @@ function FreshnessTags({ fresh, t, className }: {
 }
 
 const ProductCard = memo(function ProductCard({
-  p, imgUrl, models, suppliers, lvl, baseRoute, isInternal, aurora, catMap, subMap, divMap, primaryModelNames, modelNamesList, signal, signalsPending, modelsPending, t, onAskDelete, fx, fxTitle, fob, fobPending, onCardAction,
+  p, imgUrl, models, suppliers, lvl, baseRoute, isInternal, aurora, primaryModelNames, modelNamesList, signal, signalsPending, modelsPending, t, onAskDelete, fx, fxTitle, fob, fobPending, onCardAction,
 }: {
   p: ProductRow;
   imgUrl?: string;
@@ -353,9 +353,6 @@ const ProductCard = memo(function ProductCard({
   lvl: string;
   baseRoute: string;
   isInternal: boolean;
-  catMap: Record<string, string>;
-  subMap: Record<string, string>;
-  divMap: Record<string, string>;
   primaryModelNames: Record<string, string>;
   /* Family roster (all member codes, primary first). Empty/1 → no chips. */
   modelNamesList?: string[];
@@ -586,34 +583,12 @@ const ProductCard = memo(function ProductCard({
           );
         })()}
 
-        {/* Category + Subcategory line.
-            PUBLIC card only: the internal grid is already grouped by
-            category → subcategory headings, so repeating them on every
-            card is pure noise (owner directive 2026-08-03 — the internal
-            card must answer "what's missing / what does it cost", not
-            restate the section it sits in). */}
-        {!isInternal && (
-        <p className="text-[11px] text-[var(--text-dim)] mt-2 truncate flex items-center gap-1.5">
-          <LayersIcon className="h-3 w-3 shrink-0" />
-          <span className="truncate">{catMap[p.category_slug] || p.category_slug}</span>
-          {p.subcategory_slug && subMap[p.subcategory_slug] && (
-            <>
-              <span className="text-[var(--text-ghost)]">·</span>
-              <span className="truncate text-[var(--text-muted)]">{subMap[p.subcategory_slug]}</span>
-            </>
-          )}
-        </p>
-        )}
-
-        {/* Division label — only for non-flagship products.
-            Garment Machinery is the default/home line and
-            gets a clean card; anything else gets tagged so
-            it's clear at a glance which line it belongs to. */}
-        {!isInternal && p.division_slug && p.division_slug !== FLAGSHIP_DIVISION_SLUG && divMap[p.division_slug] && (
-          <p className="text-[10px] text-[var(--text-ghost)] mt-0.5 uppercase tracking-wider truncate">
-            {divMap[p.division_slug]}
-          </p>
-        )}
+        {/* The category + subcategory line the public card used to carry is
+            gone (owner's UI review, 22 Sep 2026): the catalogue grid is
+            grouped by exactly those headings, so every card restated the
+            section it sits in — truncated ("Fabric Preparat… · Spreading
+            Machi…") on top of it. The internal card lost the same line on
+            2026-08-03 for the same reason. */}
 
         {/* ── Family chips ── A product that carries several models is a
             FAMILY; show every member code on the card so someone hunting
@@ -631,7 +606,7 @@ const ProductCard = memo(function ProductCard({
                 key={code}
                 href={`${baseRoute}/${p.slug || p.id}?model=${encodeURIComponent(code)}`}
                 onClick={(e) => e.stopPropagation()}
-                className="flex items-center min-w-0 px-2 py-1 rounded-md border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] text-[11.5px] font-bold tabular-nums tracking-tight text-[var(--text-primary)] hover:border-[var(--border-focus)] hover:bg-[var(--bg-surface)] transition-colors"
+                className="flex items-center min-w-0 px-2 py-1 max-sm:min-h-[32px] rounded-md border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] text-[11.5px] font-bold tabular-nums tracking-tight text-[var(--text-primary)] hover:border-[var(--border-focus)] hover:bg-[var(--bg-surface)] transition-colors"
                 title={code}
               >
                 <span className="truncate">{code}</span>
@@ -3117,6 +3092,13 @@ export default function ProductList() {
           {showFilters && (
             <div className="mt-4 pt-4 border-t border-[var(--border-subtle)]">
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                {/* Division, category and subcategory are the two strips
+                    above the grid while the category rail is on screen
+                    (owner's UI review, 22 Sep 2026): repeating them here
+                    made nine dropdowns of a panel that needs six. They come
+                    back in list view, where the rail is not shown. */}
+                {!railVisible && (
+                  <>
                 <div>
                   <label className="block text-[10px] font-medium text-[var(--text-dim)] mb-1 uppercase tracking-wider">{t("filter.division")}</label>
                   <KdsSelect value={filterDiv} onChange={(v) => { setFilterDiv(v); setFilterCat(""); setFilterSub(""); }}
@@ -3135,6 +3117,8 @@ export default function ProductList() {
                     options={filteredSubs.map(s => ({ value: s.slug, label: localizedName(s, lang) }))}
                     placeholder={t("list.allOption")} triggerClassName={selectClass + " w-full pe-8 text-start"} />
                 </div>
+                  </>
+                )}
                 {/* Supplier filter is an internal concept — hide on
                     the public /products catalog. */}
                 {isInternal && (
@@ -3412,7 +3396,7 @@ export default function ProductList() {
                         : "kx-glass bg-[var(--bg-card)] border-white/[0.06] kx-hover-card kx-hover-tile kx-glow-in"
                     } ${tone}`}
                   >
-                    <span className={`absolute top-1.5 end-1.5 px-1.5 py-0.5 rounded-full text-[9.5px] leading-none tabular-nums ${on ? "opacity-70" : "bg-[var(--bg-surface-subtle)] text-[var(--text-ghost)]"}`}>{c.count}</span>
+                    <span className={`absolute top-1.5 end-1.5 px-1.5 py-0.5 rounded-full text-[9.5px] leading-none tabular-nums ${on ? "opacity-70" : "bg-[var(--bg-surface-subtle)] text-[var(--text-muted)]"}`}>{c.count}</span>
                     {/* The icon sits on ONE line across the row (fixed top
                         offset, not centred with the label): names run one to
                         three lines, and a centred stack floated each icon to a
@@ -3456,14 +3440,14 @@ export default function ProductList() {
                       {
                         key: "",
                         label: t("list.allIn", "All {name}").replace("{name}", sentence(catMap[filterCat] ?? filterCat)),
-                        badge: <span className="text-[10px] tabular-nums text-[var(--text-ghost)]">{subView.total}</span>,
+                        badge: <span className="text-[10px] tabular-nums text-[var(--text-muted)]">{subView.total}</span>,
                         active: filterSub === "",
                         onClick: () => { setFilterSub(""); pressRail(); },
                       },
                       ...subView.list.map((x) => ({
                         key: x.slug,
                         label: x.name,
-                        badge: <span className="text-[10px] tabular-nums text-[var(--text-ghost)]">{x.count}</span>,
+                        badge: <span className="text-[10px] tabular-nums text-[var(--text-muted)]">{x.count}</span>,
                         active: filterSub === x.slug,
                         onClick: () => { setFilterSub(x.slug); pressRail(); },
                       })),
@@ -3636,7 +3620,7 @@ export default function ProductList() {
                       "12 of 214" rather than showing 12 and letting the number
                       imply the category shrank. The count itself is SQL over
                       the whole match set, not a tally of what is on screen. */}
-                  <span className="shrink-0 text-[11px] font-medium text-[var(--text-ghost)] tabular-nums whitespace-nowrap">
+                  <span className="shrink-0 text-[11px] font-medium text-[var(--text-muted)] tabular-nums whitespace-nowrap">
                     {cat.loaded < cat.total
                       ? `${cat.loaded} ${t("list.ofWord", "of")} ${cat.total} ${cat.total === 1 ? t("list.productOne", "product") : t("list.productMany", "products")}`
                       : `${cat.total} ${cat.total === 1 ? t("list.productOne", "product") : t("list.productMany", "products")}`}
@@ -3691,9 +3675,6 @@ export default function ProductList() {
                 baseRoute={baseRoute}
                 isInternal={isInternal}
                 aurora={aurora}
-                catMap={catMap}
-                subMap={subMap}
-                divMap={divMap}
                 primaryModelNames={primaryModelNames}
                 modelNamesList={modelNames[p.id]}
                 signal={signals[p.id]}
