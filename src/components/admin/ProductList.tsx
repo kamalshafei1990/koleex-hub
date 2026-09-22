@@ -1042,21 +1042,6 @@ export default function ProductList() {
       return parsed && typeof parsed === "object" ? parsed : {};
     } catch { return {}; }
   });
-  /* Phone-only: the category grid collapsed to its first two rows.
-     13 categories at 2-up = ~7 rows ≈ half the phone viewport before any
-     product shows (owner screenshot) — the exact reason the original tile
-     grid died. Desktop always shows all; ≥sm ignores this state. */
-  const [catsOpen, setCatsOpen] = useState(false);
-  useEffect(() => {
-    if (!catsOpen) return;
-    const close = (e: Event) => {
-      const t = e.target as HTMLElement | null;
-      if (t && t.closest("[data-kx-cats-menu],[data-kx-cats-trigger]")) return;
-      setCatsOpen(false);
-    };
-    document.addEventListener("pointerdown", close, true);
-    return () => document.removeEventListener("pointerdown", close, true);
-  }, [catsOpen]);
   useEffect(() => {
     let alive = true;
     fetchClassificationIcons().then((v) => {
@@ -1175,7 +1160,7 @@ export default function ProductList() {
      is set. null means "server did not send it", and every consumer falls back
      to counting loaded rows, which is exactly the old behaviour. */
   const [groupCounts, setGroupCounts] = useState<
-    { categories: Record<string, number>; subcategories: Record<string, number>; divisions?: Record<string, number>; capped: boolean } | null
+    { categories: Record<string, number>; subcategories: Record<string, number>; divisions?: Record<string, number>; facets?: { categories: Record<string, number>; subcategories: Record<string, number> }; capped: boolean } | null
   >(null);
   const [hasMore, setHasMore] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -1246,8 +1231,30 @@ export default function ProductList() {
   const initialFiltersRef = useRef<ReturnType<typeof readFilterSnapshot> | null>(null);
   if (initialFiltersRef.current === null) initialFiltersRef.current = readFilterSnapshot();
   const initialFilters = initialFiltersRef.current;
+  /* ?cat= / ?sub= in the address win over the stored snapshot, so a shared
+     or bookmarked category link opens on that category (owner's category
+     rail, 22 Sep 2026). Read once, like the snapshot; the rail writes the
+     selection back into the address below. */
+  const initialUrlFiltersRef = useRef<{ cat?: string; sub?: string } | null>(null);
+  if (initialUrlFiltersRef.current === null) {
+    const sp = typeof window !== "undefined" ? new URLSearchParams(window.location.search) : null;
+    initialUrlFiltersRef.current = { cat: sp?.get("cat") || undefined, sub: sp?.get("sub") || undefined };
+  }
+  const urlFilters = initialUrlFiltersRef.current;
 
   const [filterDiv, setFilterDiv] = useState(() => {
+    /* A category link names its division implicitly: resolve it from the
+       warm taxonomy cache so the division tab and the category card agree,
+       and fall back to "all divisions" rather than a stored division the
+       category is not in (which would show an empty grid). */
+    if (urlFilters.cat) {
+      try {
+        const m = readMetaCache(currentScopeKey());
+        const c = m?.categories?.find((x) => x.slug === urlFilters.cat);
+        const d = c ? m?.divisions?.find((x) => x.id === c.division_id) : null;
+        return d?.slug ?? "";
+      } catch { return ""; }
+    }
     if (initialFilters.div) return initialFilters.div;
     /* Public catalog defaults to the flagship division. Resolve it
        SYNCHRONOUSLY from the warm taxonomy cache when possible — applying
@@ -1261,8 +1268,8 @@ export default function ProductList() {
     }
     return initialFilters.div ?? "";
   });
-  const [filterCat, setFilterCat] = useState(initialFilters.cat ?? "");
-  const [filterSub, setFilterSub] = useState(initialFilters.sub ?? "");
+  const [filterCat, setFilterCat] = useState(urlFilters.cat ?? initialFilters.cat ?? "");
+  const [filterSub, setFilterSub] = useState(urlFilters.sub ?? initialFilters.sub ?? "");
   const [filterBrand, setFilterBrand] = useState(initialFilters.brand ?? "");
   const [filterLevel, setFilterLevel] = useState(initialFilters.level ?? "");
   const [filterSupplier, setFilterSupplier] = useState(initialFilters.supplier ?? "");
@@ -1472,7 +1479,7 @@ export default function ProductList() {
           const json = (await res.json()) as {
             rows?: ProductRow[]; total?: number | null; hasMore?: boolean;
             models?: { counts: Record<string, number>; primaryModelNames: Record<string, string>; modelNames: Record<string, string[]> };
-            groupCounts?: { categories: Record<string, number>; subcategories: Record<string, number>; divisions?: Record<string, number>; capped: boolean };
+            groupCounts?: { categories: Record<string, number>; subcategories: Record<string, number>; divisions?: Record<string, number>; facets?: { categories: Record<string, number>; subcategories: Record<string, number> }; capped: boolean };
           };
           p = json.rows ?? [];
           /* Model codes ride WITH the page now, so the card paints its final
@@ -2084,6 +2091,20 @@ export default function ProductList() {
     deferredSearch, showFilters, viewMode, filterStorageKey,
   ]);
 
+  /* The category selection lives in the address too (?cat=…&sub=…): the
+     back button, a reload and a shared link all land on the same rail card.
+     replaceState, not the router — no navigation, no re-render, and the app
+     router keeps its own history entry (Next reads native history calls). */
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const url = new URL(window.location.href);
+    if (filterCat) url.searchParams.set("cat", filterCat); else url.searchParams.delete("cat");
+    if (filterSub) url.searchParams.set("sub", filterSub); else url.searchParams.delete("sub");
+    const next = url.pathname + url.search + url.hash;
+    const cur = window.location.pathname + window.location.search + window.location.hash;
+    if (next !== cur) window.history.replaceState(window.history.state, "", next);
+  }, [filterCat, filterSub]);
+
   const allBrands = useMemo(() => {
     const set = new Set<string>();
     products.forEach(p => { if (p.brand) set.add(p.brand); });
@@ -2153,6 +2174,54 @@ export default function ProductList() {
   const filteredCats = useMemo(() => selectedDivId ? categories.filter(c => c.division_id === selectedDivId) : categories, [categories, selectedDivId]);
   const selectedCatId = useMemo(() => categories.find(c => c.slug === filterCat)?.id, [categories, filterCat]);
   const filteredSubs = useMemo(() => selectedCatId ? subcategories.filter(s => s.category_id === selectedCatId) : subcategories, [subcategories, selectedCatId]);
+
+  /* ── THE CATEGORY RAIL (owner, 22 Sep 2026): square cards that FILTER ──
+     "All products" first, then every category of the current division that
+     has products — icon, name, count. The counts are the server's FACETS:
+     the match set with the category/subcategory selection removed, so every
+     card keeps its number while one is selected (the group counts collapse
+     to the chosen one). Until facets exist — a warm start from an older
+     snapshot — the group counts, then the loaded rows, stand in. */
+  const sentence = (x: string) => (x ? x.charAt(0).toUpperCase() + x.slice(1).toLowerCase() : x);
+  const facetCats = groupCounts?.facets?.categories ?? groupCounts?.categories ?? null;
+  const facetSubs = groupCounts?.facets?.subcategories ?? groupCounts?.subcategories ?? null;
+  const categoryNav = useMemo(() => {
+    const counts: Record<string, number> = facetCats ? { ...facetCats } : {};
+    if (!facetCats) for (const p of products) { const c = p.category_slug || "_uncategorized"; counts[c] = (counts[c] ?? 0) + 1; }
+    /* Sentence case, exactly as the section headings below print the same
+       names — the taxonomy stores Title Case ("Leather & Footwear
+       Machinery"); a rail in one case over headings in another read as two
+       different lists. */
+    const list = filteredCats
+      .map((c) => ({ slug: c.slug, name: sentence(localizedName(c, lang)), count: counts[c.slug] ?? 0 }))
+      .filter((c) => c.count > 0 || c.slug === filterCat);
+    const total = Object.values(counts).reduce((a, b) => a + b, 0);
+    return { list, total };
+  }, [facetCats, filteredCats, products, lang, filterCat]);
+  /* The second row: the selected category's subcategories, only when there
+     is a choice to make (two or more with products). "All <category>" first. */
+  const subNav = useMemo(() => {
+    if (!filterCat) return null;
+    const counts: Record<string, number> = {};
+    if (facetSubs) {
+      for (const [k, v] of Object.entries(facetSubs)) {
+        const i = k.indexOf("/");
+        if (i > 0 && k.slice(0, i) === filterCat) counts[k.slice(i + 1)] = v;
+      }
+    } else {
+      for (const p of products) {
+        if ((p.category_slug || "_uncategorized") !== filterCat) continue;
+        const sub = p.subcategory_slug || "_uncategorized";
+        counts[sub] = (counts[sub] ?? 0) + 1;
+      }
+    }
+    const list = filteredSubs
+      .map((x) => ({ slug: x.slug, name: sentence(localizedName(x, lang)), count: counts[x.slug] ?? 0 }))
+      .filter((x) => x.count > 0 || x.slug === filterSub);
+    if (list.length < 2 && !filterSub) return null;
+    const total = Object.values(counts).reduce((a, b) => a + b, 0);
+    return { list, total };
+  }, [filterCat, filterSub, facetSubs, filteredSubs, products, lang]);
 
   /* Cheap O(1) lookups so the search hot path doesn't re-scan the
      taxonomy arrays for every product on every keystroke. Built
@@ -2560,7 +2629,8 @@ export default function ProductList() {
      this was wired: the main header pane stood down on the claim, nothing drew
      a ramp because the catalog was empty, and the page ended up with no blur
      over its header at all. Same expression as the JSX guard, deliberately. */
-  useTopRampOwner(categoryTree.length > 1);
+  const railVisible = viewMode === "grid" && categoryNav.list.length > 1;
+  useTopRampOwner(railVisible);
 
   /* The division is deliberately NOT counted here: it has its own
      dedicated pill strip below the toolbar, so echoing it again in the
@@ -3315,198 +3385,101 @@ export default function ProductList() {
              mounted at once. */
           <>
             {/* ── Category jump-nav ── */}
-            {categoryTree.length > 1 && (
+            {railVisible && (
               <nav
                 /* ONE ramp for the whole top strip, and it runs BEHIND every
                    component in that strip — owner: "put the blured edge on
                    the back of the top page components and make more longer".
-
-                   --kx-ramp-top reaches well past the title block so the
-                   frost starts at the top of the page whatever the title
-                   wraps to; anything higher than needed is simply clipped
-                   above the viewport. What made this a dark smear before was
-                   not the height, it was z-order: the title, the count and
-                   the divisions row sat BELOW the ramp and got blurred away
-                   as if they were scrolled-under content. They now carry
-                   `relative z-30` (above the ramp's z-20 host), so the frost
-                   passes behind them and only real scrolling content
-                   dissolves into it. */
-                style={{ top: "var(--kx-pd-tools-h, 52px)", ["--kx-ramp-top" as string]: "26rem" }}
-                /* The tail dies JUST UNDER the category cards. The fade runs
-                   BEHIND the cards (they are this bar's own content, lifted
-                   above the layer, so they stay crisp) and is fully clear
-                   ~25px below them — measured, because at 5rem of overhang
-                   the ramp reached y=451 and swallowed the "Fabric
-                   preparation" heading at y=396, which is the same
-                   blur-over-live-content defect one row further down.
-
-                   --kx-ramp-fade must be a LENGTH here, not the default 45%:
-                   a percentage is taken from the layer's own height, so once
-                   the layer grew to cover the strip the fade grew with it. */
+                   The frost starts above the title block and fades over the
+                   rail; the title, count and divisions row sit ABOVE it in
+                   z-order (see their z-[25]) so they are never blurred away.
+                   --kx-ramp-fade is a LENGTH, not the default 45%: a
+                   percentage grows with the layer once it covers the strip. */
                 className="kx-bar-host max-sm:static sticky z-20 -mx-4 md:-mx-6 lg:-mx-8 px-4 md:px-6 lg:px-8 pt-1.5 pb-3.5 mb-5 bg-[var(--bg-primary)] [--kx-ramp-ext:1rem] [--kx-ramp-fade:4rem]"
                 data-kx-progressive=""
-                aria-label="Categories"
+                aria-label={t("list.categories", "Categories")}
               >
                 {/* The screen's ONE progressive edge: four masked layers
                     ramp 3→28px, stretched over the whole top strip. */}
                 <div aria-hidden className="kx-glass-bar kx-bar-prog"><i /><i /><i /><i /></div>
-                {/* Light secondary jump-nav — quieter than the Divisions filter
-                    above: borderless ghost links with plain muted counts, so the
-                    two rows read as a clear primary/secondary hierarchy. */}
-                {/* Boxed chips (owner, 2026-08-02): bordered mini-tiles with
-                    the category's hub icon + name — secondary-button language
-                    instead of the old ghost text links. */}
-                {/* On a phone the 88px tile grid wrapped to four rows and ate
-                    roughly half the viewport before a single product was
-                    visible. Below `sm` the same links render as ONE
-                    horizontally-scrolling row of compact pills — the exact
-                    language of the Divisions bar above — which costs ~40px
-                    instead of ~380px. From `sm` up the tile grid is unchanged.
-                    One DOM tree, responsive classes: no duplicated markup and
-                    no second copy for screen readers to read out. */}
-                {/* UNIFORM GRID, owner's pick (2026-08-20, sample 2 of 4):
-                    "I don't want have scrolling, I want all can show in the
-                    page with organize way." Every category is visible — equal
-                    columns, names truncating, counts on the trailing edge —
-                    instead of the one scrolling pill row.
-
-                    History, because this bar has flip-flopped: the original
-                    88px tile grid died for pushing the first product to 597px
-                    of a 686px viewport; the scrolling row that replaced it is
-                    what the owner has now rejected. This grid is the middle:
-                    ~2–3 rows of 38px on a laptop (~130px), never a sideways
-                    scroll. On phones the same grid runs 2-up (~7 rows), so
-                    there the bar goes STATIC (max-sm) — a ~320px block may
-                    scroll away with the page, but it must not DOCK over it. */}
-                <div className="hidden sm:grid grid-cols-[repeat(auto-fill,minmax(178px,1fr))] gap-2 pb-0.5">
-                  {categoryTree.map((cat) => (
-                    <a
-                      key={cat.slug}
-                      href={`#cat-${cat.slug}`}
-                      onClick={(e) => {
-                        e.preventDefault();
-                        const el = document.getElementById(`cat-${cat.slug}`);
-                        const sc = document.getElementById("main-scroll-container");
-                        const navEl = e.currentTarget.closest("nav");
-                        if (!el || !sc) return;
-                        /* scrollIntoView put the title BEHIND the docked
-                           chrome (owner: "it didn't take me to the right
-                           place"): block:"start" aligns the section with the
-                           scroller's top edge, and the sticky grid + tools
-                           row then cover exactly that strip. The offset is
-                           measured, not hardcoded, because the grid's height
-                           is 2–3 rows depending on viewport — and on phones
-                           the bar is static, so only a small clearance. */
-                        const stuck = navEl && getComputedStyle(navEl).position === "sticky";
-                        const offset = stuck
-                          ? navEl.getBoundingClientRect().height +
-                            (parseFloat(getComputedStyle(navEl).top) || 0) + 8
-                          : 60;
-                        const targetTop = () =>
-                          el.getBoundingClientRect().top - sc.getBoundingClientRect().top + sc.scrollTop - offset;
-                        sc.scrollTo({ top: targetTop(), behavior: "smooth" });
-                        /* Second half of the miss: the sections render with
-                           content-visibility:auto, so everything below the
-                           fold has an ESTIMATED height until it paints. The
-                           first scroll lands on the estimate; as the passed
-                           sections materialize, the real target moves. Wait
-                           for the scroll to stop (scrollTop stable across a
-                           few frames — works whether or not the browser has
-                           scrollend), then snap the residual error. Bounded:
-                           at most 4 corrections and ~5s of frames, and a
-                           user grabbing the scrollbar mid-flight just makes
-                           the loop finish early. */
-                        let last = -1, still = 0, passes = 0, frames = 0;
-                        const settle = () => {
-                          if (++frames > 300) return;
-                          const cur = sc.scrollTop;
-                          if (cur === last) still += 1; else { still = 0; last = cur; }
-                          if (still >= 3) {
-                            const diff = targetTop() - cur;
-                            if (Math.abs(diff) <= 4 || passes >= 4) return;
-                            passes += 1; still = 0;
-                            sc.scrollTop = cur + diff;
-                          }
-                          requestAnimationFrame(settle);
-                        };
-                        requestAnimationFrame(settle);
-                      }}
-                      className={`group relative flex flex-row items-center justify-start gap-1.5 h-[38px] min-w-0 px-3 rounded-xl kx-glass bg-[var(--bg-card)] border border-white/[0.06] kx-hover-card kx-hover-tile kx-tile-neon select-none transition-transform duration-75 active:scale-[0.97] motion-reduce:transition-none motion-reduce:active:scale-100`}
-                    >
-                      {classIcons.category?.[cat.slug] ? (
-                        <ClassMonoIcon src={classIcons.category[cat.slug]} className="kx-neon-icon h-4 w-4 shrink-0 text-[var(--text-primary)] opacity-90" />
-                      ) : (
-                        <LayoutGridIcon className="kx-neon-svg h-4 w-4 shrink-0 text-[var(--text-primary)] opacity-90" />
-                      )}
-                      <span className="kx-neon-label flex-1 min-w-0 truncate text-[11px] font-medium leading-none text-[var(--text-muted)]">{cat.name}</span>
-                      {/* The count earns the pill its keep: the row is now
-                          navigation AND a size read, which the tile never was. */}
-                      <span className="text-[10px] tabular-nums text-[var(--text-ghost)] shrink-0">{cat.total}</span>
-                    </a>
-                  ))}
+                {/* SQUARE CATEGORY CARDS THAT FILTER (owner, 22 Sep 2026,
+                    picked from five samples). The row used to be anchor tiles
+                    that scrolled to a section of the grouped grid; now each
+                    card is the category filter itself — "All products" first,
+                    then every category of the division that has products,
+                    with its icon, name and facet count. One row of squares
+                    at the owner's width (auto-fill, 86px minimum); the
+                    selected card is inverted like every selected tab in the
+                    Hub. On phones the same cards run in ONE sideways-snapping
+                    row (84px squares) — the third phone layout for this
+                    strip, the one the owner approved in the sample. */}
+                <div
+                  role="group"
+                  className="flex gap-2 overflow-x-auto snap-x snap-mandatory -mx-4 px-4 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:mx-0 sm:px-0 sm:pb-0.5 sm:overflow-visible sm:grid sm:grid-cols-[repeat(auto-fill,minmax(86px,1fr))] sm:gap-1.5"
+                >
+                  {[{ slug: "", name: t("list.allProducts", "All products"), count: categoryNav.total }, ...categoryNav.list].map((c) => {
+                    const on = filterCat === c.slug;
+                    const iconCls = `h-[22px] w-[22px] shrink-0 ${on ? "text-[var(--text-inverted)]" : "text-[var(--text-primary)] opacity-90"}`;
+                    return (
+                      <button
+                        key={c.slug || "__all"}
+                        type="button"
+                        aria-pressed={on}
+                        onClick={() => { setFilterCat(c.slug); setFilterSub(""); }}
+                        className={`group relative flex flex-col items-center justify-center gap-1.5 shrink-0 w-[84px] sm:w-auto aspect-square min-w-0 px-1.5 pt-4 pb-1.5 rounded-2xl border select-none snap-start transition-transform duration-75 active:scale-[0.97] motion-reduce:transition-none motion-reduce:active:scale-100 ${
+                          on
+                            ? "bg-[var(--bg-inverted)] text-[var(--text-inverted)] border-transparent"
+                            : "kx-glass bg-[var(--bg-card)] text-[var(--text-muted)] border-white/[0.06] kx-hover-card kx-hover-tile kx-tile-neon"
+                        }`}
+                      >
+                        {/* The count in the corner: the card is navigation AND
+                            a size read. Selected = plain figures on the
+                            inverted card; otherwise a faint pill. */}
+                        <span className={`absolute top-1.5 end-1.5 px-1.5 py-0.5 rounded-full text-[9.5px] leading-none tabular-nums ${on ? "text-[var(--text-inverted)] opacity-70" : "bg-[var(--bg-surface-subtle)] text-[var(--text-ghost)]"}`}>{c.count}</span>
+                        {c.slug === "" ? (
+                          <LayoutGridIcon className={`kx-neon-svg ${iconCls}`} />
+                        ) : classIcons.category?.[c.slug] ? (
+                          <ClassMonoIcon src={classIcons.category[c.slug]} className={`kx-neon-icon ${iconCls}`} />
+                        ) : (
+                          <LayoutGridIcon className={`kx-neon-svg ${iconCls}`} />
+                        )}
+                        <span className={`kx-neon-label w-full text-center text-[10.5px] font-medium leading-[1.15] line-clamp-2 ${on ? "text-[var(--text-inverted)]" : ""}`}>{c.name}</span>
+                      </button>
+                    );
+                  })}
                 </div>
-                {/* ── PHONES: ONE 40px row + the MN-5 dropdown ──
-                    Third phone layout for this nav, and the owner rejected
-                    the previous two on sight (the full grid ate half the
-                    viewport; the two-row collapse was "still don't like").
-                    Sample 1 of the mobile set: the row names the control,
-                    the tap opens the one canonical dropdown (kx-glass-pop
-                    material + kx-pop-panel shell, per MN-5) listing every
-                    category with its count; picking one jumps and closes.
-                    Desktop keeps the sample-2 grid untouched. */}
-                <div className="sm:hidden relative">
-                  <button
-                    type="button"
-                    aria-expanded={catsOpen}
-                    data-kx-cats-trigger=""
-                    onClick={() => setCatsOpen((o) => !o)}
-                    className="w-full flex items-center gap-2 h-10 px-3 rounded-xl kx-glass bg-[var(--bg-card)] border border-white/[0.06] select-none active:scale-[0.99] transition-transform"
+                {/* SUBCATEGORIES — the second row appears only when the
+                    selected category offers a choice (two or more with
+                    products): "All <category>" then each subcategory with its
+                    count, same facets. Progressive disclosure: no space is
+                    spent on it while browsing "All products". */}
+                {subNav && (
+                  <div
+                    role="group"
+                    aria-label={t("list.subcategories", "Subcategories")}
+                    className="mt-2 flex items-center gap-1.5 overflow-x-auto -mx-4 px-4 pb-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:mx-0 sm:px-0 sm:flex-wrap sm:overflow-visible"
                   >
-                    <LayoutGridIcon className="h-4 w-4 shrink-0 text-[var(--text-primary)] opacity-90" />
-                    <span className="flex-1 text-start text-[12px] font-medium text-[var(--text-primary)]">
-                      {t("list.allCategories")}
-                    </span>
-                    <span className="text-[11px] tabular-nums text-[var(--text-ghost)]">{categoryTree.length}</span>
-                    <span aria-hidden className={`text-[11px] text-[var(--text-ghost)] transition-transform ${catsOpen ? "rotate-180" : ""}`}>⌄</span>
-                  </button>
-                  {catsOpen && (
-                    <>
-                      {/* NO fixed full-screen closer. The first version put an
-                          invisible fixed button over the viewport; dragging on
-                          a fixed element scrolls ITS scrollable ancestor — the
-                          body, which in this shell never scrolls — so with the
-                          panel open every touch-drag went dead. Outside-tap
-                          closing is a document listener instead (below), which
-                          eats nothing. */}
-                      <div className="kx-glass-pop kx-pop-panel kx-pop-dense absolute left-0 right-0 top-[calc(100%+6px)] z-50 max-h-[60vh] overflow-y-auto p-1.5 rounded-2xl" data-kx-cats-menu="">
-                        {categoryTree.map((cat) => (
-                          <a
-                            key={cat.slug}
-                            href={`#cat-${cat.slug}`}
-                            onClick={(e) => {
-                              e.preventDefault();
-                              setCatsOpen(false);
-                              const el = document.getElementById(`cat-${cat.slug}`);
-                              const sc = document.getElementById("main-scroll-container");
-                              if (!el || !sc) return;
-                              const top = el.getBoundingClientRect().top - sc.getBoundingClientRect().top + sc.scrollTop - 60;
-                              sc.scrollTo({ top, behavior: "smooth" });
-                            }}
-                            className="flex items-center gap-2 h-10 px-2.5 rounded-lg text-[12px] text-[var(--text-secondary)]"
-                          >
-                            {classIcons.category?.[cat.slug] ? (
-                              <ClassMonoIcon src={classIcons.category[cat.slug]} className="h-4 w-4 shrink-0 text-[var(--text-primary)] opacity-90" />
-                            ) : (
-                              <LayoutGridIcon className="h-4 w-4 shrink-0 text-[var(--text-primary)] opacity-90" />
-                            )}
-                            <span className="flex-1 min-w-0 truncate">{cat.name}</span>
-                            <span className="text-[10px] tabular-nums text-[var(--text-ghost)]">{cat.total}</span>
-                          </a>
-                        ))}
-                      </div>
-                    </>
-                  )}
-                </div>
+                    {[{ slug: "", name: t("list.allIn", "All {name}").replace("{name}", sentence(catMap[filterCat] ?? filterCat)), count: subNav.total }, ...subNav.list].map((x) => {
+                      const on = filterSub === x.slug;
+                      return (
+                        <button
+                          key={x.slug || "__all"}
+                          type="button"
+                          aria-pressed={on}
+                          onClick={() => setFilterSub(x.slug)}
+                          className={`inline-flex shrink-0 items-center gap-1.5 h-7 px-2.5 rounded-full border text-[11px] font-medium select-none transition-colors ${
+                            on
+                              ? "bg-[var(--bg-inverted)] text-[var(--text-inverted)] border-transparent"
+                              : "kx-glass bg-[var(--bg-card)] text-[var(--text-muted)] border-white/[0.06] hover:text-[var(--text-primary)] hover:border-white/[0.16]"
+                          }`}
+                        >
+                          <span className="truncate max-w-[180px]">{x.name}</span>
+                          <span className={`text-[10px] tabular-nums ${on ? "opacity-70" : "text-[var(--text-ghost)]"}`}>{x.count}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
               </nav>
             )}
 

@@ -139,5 +139,16 @@ console.log("\nproducts-payload");
       .every((f) => /logistics_overrides/.test(code(f))));
 }
 
+/* ── 8. the category rail FILTERS (owner, 22 Sep 2026) ────────────────── */
+{
+  const s = code("src/components/admin/ProductList.tsx");
+  check("category rail no longer jumps to section anchors", !/href=\{`#cat-/.test(s));
+  check("category rail cards are pressed buttons bound to the category filter", /aria-pressed=\{on\}/.test(s) && /setFilterCat\(c\.slug\)/.test(s));
+  check("category rail counts come from the server facets", /groupCounts\?\.facets\?\.categories/.test(s));
+  check("category selection rides the address (?cat=)", /searchParams\.set\("cat", filterCat\)/.test(s));
+  const r = code("src/app/api/products/route.ts");
+  check("list page 1 facets drop the category and subcategory filters", /k !== "category" && k !== "subcategory"/.test(r) && /groupCounts\.facets = /.test(r));
+}
+
 console.log(`\nproducts-payload: ${pass} passed, ${fail} failed.`);
 process.exit(fail ? 1 : 0);

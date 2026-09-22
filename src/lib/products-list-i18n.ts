@@ -55,6 +55,10 @@ export const PRODUCTS_LIST_I18N: Translations = {
   "list.modelOne": { en: "model", zh: "个型号", ar: "موديل" },
   "list.modelMany": { en: "models", zh: "个型号", ar: "موديلات" },
   "list.allCategories": { en: "All categories", zh: "全部类别", ar: "كل الفئات" },
+  "list.allProducts": { en: "All products", zh: "全部产品", ar: "كل المنتجات" },
+  "list.categories": { en: "Categories", zh: "类别", ar: "الفئات" },
+  "list.subcategories": { en: "Subcategories", zh: "子类别", ar: "الفئات الفرعية" },
+  "list.allIn": { en: "All {name}", zh: "全部{name}", ar: "كل {name}" },
   "list.resultsCount": { en: "{n} product(s)", zh: "{n} 个产品", ar: "{n} منتج" },
 
   /* ── List surface: header, search, filters, results (P0 #5a) ────── */
