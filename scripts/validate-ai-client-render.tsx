@@ -1614,6 +1614,30 @@ console.log("\n── An Arabic opening before an English code block reads right
     /if \(!isInstalledApp\(\)\) return;\s*if \(document\.visibilityState !== "visible"\) return;/.test(watcher) &&
     /if \(busyWithSomethingUninterruptible\(\)\) return;/.test(watcher) &&
     /healInstalledApp\(boot\.current, id\);/.test(watcher));
+
+  /* THE MOVE IS CONFIRMED (22 Sep 2026). Three of the four paths onto a new
+     build are silent by design, so the owner pushed, watched the deploy
+     finish, and found no sign in the system that anything had arrived. The
+     watcher now writes a {from, to} note the moment it knows the tab is
+     stale — before any path moves it — and the next boot confirms the
+     arrival once, with the one-line "Updated to the latest version" capsule,
+     if and only if it is no longer on `from`. */
+  const { arrivalFromMarker, updateMarker } = uw;
+  check("a boot that is no longer on the stale build confirms the move — whichever path made it",
+    arrivalFromMarker(updateMarker("a", "b"), "b")?.to === "b" &&
+    arrivalFromMarker(updateMarker("a", "b"), "c")?.from === "a");
+  check("  …a boot still on the stale build says nothing (a CDN still serving the old HTML) and keeps the note for the next try",
+    arrivalFromMarker(updateMarker("a", "b"), "a") === null &&
+    /const a = arrivalFromMarker\(sessionStorage\.getItem\(UPDATE_KEY\), here\);\s*if \(a\) \{\s*sessionStorage\.removeItem\(UPDATE_KEY\);/.test(watcher));
+  check("  …no note, or junk, confirms nothing",
+    arrivalFromMarker(null, "a") === null &&
+    arrivalFromMarker("not json", "a") === null &&
+    arrivalFromMarker(JSON.stringify({ f: 1, t: "b" }), "a") === null);
+  check("  …the note is written the moment staleness is known, BEFORE any path moves the tab, and confirmed only once the new build has gone quiet",
+    /if \(id !== boot\.current && alive\) \{\s*try \{\s*sessionStorage\.setItem\(UPDATE_KEY, updateMarker\(boot\.current, id\)\);/.test(watcher) &&
+    /whenNetworkQuiet\(\{ quietMs: 700, maxWaitMs: 6000 \}\)\.then\(\(\) => \{\s*if \(!alive\) return;[\s\S]{0,400}arrivalFromMarker\(/.test(watcher) &&
+    /timer = window\.setTimeout\(\(\) => setArrived\(null\), ARRIVAL_SHOW_MS\);/.test(watcher) &&
+    /"u\.updated":/.test(watcher));
 }
 
 console.log(`\n${pass} passed, ${failures.length} failed`);
