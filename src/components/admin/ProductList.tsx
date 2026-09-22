@@ -2249,6 +2249,11 @@ export default function ProductList() {
      filled inverted square, as every Core selected state is. */
   const railRef = useRef<HTMLDivElement | null>(null);
   const [railInd, setRailInd] = useState<{ x: number; y: number; w: number; h: number } | null>(null);
+  /* The subcategory shelf has its own sliding selection, measured the same
+     way over its tiles, and a notch that hangs under the selected square —
+     the notch's x is the rail pill's centre, so the two move together. */
+  const shelfRef = useRef<HTMLDivElement | null>(null);
+  const [subInd, setSubInd] = useState<{ x: number; y: number; w: number; h: number } | null>(null);
   /* Phone or not, from the same 768px line PopoverPanel uses for its sheet
      mode — read as an external store, so no effect sets state and the value
      is right on the first client render. */
@@ -2689,6 +2694,19 @@ export default function ProductList() {
     ro.observe(host);
     return () => ro.disconnect();
   }, [aurora, railVisible, filterCat, categoryNav.list.length]);
+  useLayoutEffect(() => {
+    if (!aurora || !railVisible || !subView) { setSubInd(null); return; }
+    const host = shelfRef.current;
+    if (!host) return;
+    const measure = () => {
+      const el = host.querySelector<HTMLElement>('button[aria-pressed="true"]');
+      setSubInd(el ? { x: el.offsetLeft, y: el.offsetTop, w: el.offsetWidth, h: el.offsetHeight } : null);
+    };
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(host);
+    return () => ro.disconnect();
+  }, [aurora, railVisible, subView, filterSub]);
 
   /* The division is deliberately NOT counted here: it has its own
      dedicated pill strip below the toolbar, so echoing it again in the
@@ -3499,37 +3517,75 @@ export default function ProductList() {
                 );
               })}
             </div>
-            {/* SUBCATEGORIES — the second row unfolds (Collapse, the one
-                sanctioned layout animation) only when the selected
-                category offers a choice: "All <category>" then each
-                subcategory with its count, same facets. It is the
-                canonical TabStrip — pill shape, no glass of its own
-                inside the frosted strip — so its selection slides too. */}
-            <Collapse open={!!subNav}>
+            {/* SUBCATEGORIES — a shelf that hangs from the selected square
+                (owner, 22 Sep 2026: "both" of the samples — the glass tiles
+                AND the shelf with the notch). It unfolds (Collapse, the one
+                sanctioned layout animation) only when the selected category
+                offers a choice: "All <category>" first, then each
+                subcategory with its facet count. The tiles are the squares'
+                own recipe at chip size — same glass, same hover, same
+                Hub-Blue sliding selection — so the two rows read as one
+                system: big squares are categories, small tiles their
+                branches. The notch and the gap in the shelf's top line share
+                --kx-notch-x (the rail pill's centre), so the shelf visibly
+                re-hangs under whichever square is pressed. Below 640px there
+                is no frame: the tiles run in one sideways row, bled to the
+                screen edge like the squares above them. The pill TabStrip
+                this replaces was a solid capsule of another material, sat
+                to the left of a full-width row (owner: "this can be in a
+                better shape"). */}
+            {/* min-w-0 on Collapse's own item: it folds its content as a
+                grid track, and a grid item's automatic minimum width is its
+                content — a row of nowrap tiles widened the shelf to 1111px
+                and the whole phone page with it (measured at 375:
+                #main-scroll-container 1143 wide, the horizontal "dancing"
+                the mobile sweep hunted). Nothing INSIDE the item can undo
+                that; the item itself must be allowed to shrink. */}
+            <Collapse open={!!subNav} className="min-w-0">
               {subView && (
-                <div className="pt-2">
-                  <TabStrip
-                    ariaLabel={t("list.subcategories", "Subcategories")}
-                    shape="pill"
-                    glass={false}
-                    className="inline-flex max-w-full"
-                    items={[
-                      {
-                        key: "",
-                        label: t("list.allIn", "All {name}").replace("{name}", sentence(catMap[filterCat] ?? filterCat)),
-                        badge: <span className="text-[10px] tabular-nums text-[var(--text-muted)]">{subView.total}</span>,
-                        active: filterSub === "",
-                        onClick: () => { setFilterSub(""); pressRail(); },
-                      },
-                      ...subView.list.map((x) => ({
-                        key: x.slug,
-                        label: x.name,
-                        badge: <span className="text-[10px] tabular-nums text-[var(--text-muted)]">{x.count}</span>,
-                        active: filterSub === x.slug,
-                        onClick: () => { setFilterSub(x.slug); pressRail(); },
-                      })),
-                    ]}
-                  />
+                <div className="w-full min-w-0 pt-2 sm:pt-3">
+                  <div
+                    ref={shelfRef}
+                    role="group"
+                    aria-label={t("list.subcategories", "Subcategories")}
+                    className="kx-sub-shelf w-full min-w-0"
+                    data-notch={railInd ? "1" : "0"}
+                    style={railInd ? { ["--kx-notch-x" as string]: `${railInd.x + railInd.w / 2}px` } : undefined}
+                  >
+                    <span aria-hidden className="kx-sub-notch" />
+                    <div className="relative min-w-0 flex gap-1.5 overflow-x-auto -mx-4 px-4 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:mx-0 sm:px-0 sm:pb-0 sm:overflow-visible sm:flex-wrap">
+                      <span
+                        aria-hidden
+                        className="kx-rail-ind kx-rail-ind--tile"
+                        style={subInd
+                          ? { transform: `translate(${subInd.x}px, ${subInd.y}px)`, width: subInd.w, height: subInd.h, opacity: 1 }
+                          : { opacity: 0 }}
+                      />
+                      {[
+                        { slug: "", name: t("list.allIn", "All {name}").replace("{name}", sentence(catMap[filterCat] ?? filterCat)), count: subView.total },
+                        ...subView.list,
+                      ].map((x) => {
+                        const on = filterSub === x.slug;
+                        const coreOn = on && !aurora;
+                        return (
+                          <button
+                            key={x.slug || "__all"}
+                            type="button"
+                            aria-pressed={on}
+                            onClick={() => { setFilterSub(x.slug); pressRail(); }}
+                            className={`relative inline-flex shrink-0 items-center gap-2 h-9 ps-3 pe-2 rounded-xl border whitespace-nowrap select-none text-[12.5px] font-medium transition-colors ${
+                              coreOn
+                                ? "bg-[var(--bg-inverted)] border-transparent text-[var(--text-inverted)]"
+                                : `kx-glass bg-[var(--bg-card)] border-white/[0.06] kx-hover-card kx-hover-tile kx-glow-in ${on ? "text-[var(--text-primary)]" : "text-[var(--text-muted)]"}`
+                            }`}
+                          >
+                            <span className="max-w-[16rem] truncate">{x.name}</span>
+                            <span className={`px-1.5 py-0.5 rounded-full text-[10px] leading-none tabular-nums ${on ? "opacity-70" : "bg-[var(--bg-surface-subtle)] text-[var(--text-muted)]"}`}>{x.count}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
                 </div>
               )}
             </Collapse>

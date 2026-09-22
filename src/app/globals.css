@@ -3020,6 +3020,78 @@ html[dir="rtl"] .kx-ai-root .kx-ai-bar-title {
   .kx-rail-ind { transition: none; }
 }
 
+/* SUBCATEGORY SHELF — hangs from the selected category square (Product
+   Data / Products rail, 22 Sep 2026). The shelf has NO CSS border of its
+   own: ::before draws the line so a 13px gap can be punched out of it at
+   --kx-notch-x (two mask layers, composite exclude / webkit xor), and the
+   notch — a rotated square clipped to its upper triangle — fills that gap
+   with the shelf's own fill and the same hairline. Both read --kx-notch-x,
+   which ProductList sets from the rail pill's centre, so the shelf visibly
+   re-hangs under whichever square is pressed, on the pill's own 320ms
+   curve. Translucent fills only: never a blur inside the frosted strip.
+   Below 640px the frame is off — the tiles run in one sideways row. The
+   tiles' selection reuses .kx-rail-ind at the tile radius. */
+.kx-rail-ind--tile { border-radius: 0.75rem; }
+.kx-sub-shelf {
+  position: relative;
+  --kx-shelf-line: var(--border-subtle);
+  --kx-shelf-fill: var(--bg-surface-subtle);
+}
+[data-kx-skin="aurora"] .kx-sub-shelf {
+  --kx-shelf-line: rgba(255, 255, 255, 0.08);
+  --kx-shelf-fill: rgba(255, 255, 255, 0.035);
+}
+[data-kx-skin="aurora"][data-theme="light"] .kx-sub-shelf {
+  --kx-shelf-line: rgba(0, 0, 0, 0.09);
+  --kx-shelf-fill: rgba(0, 0, 0, 0.035);
+}
+.kx-sub-notch { display: none; }
+@media (min-width: 640px) {
+  .kx-sub-shelf {
+    padding: 8px;
+    border-radius: 1rem;
+    background: var(--kx-shelf-fill);
+  }
+  .kx-sub-shelf::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    border: 1px solid var(--kx-shelf-line);
+    pointer-events: none;
+    -webkit-mask-image: linear-gradient(#000 0 0), linear-gradient(#000 0 0);
+    -webkit-mask-size: 100% 100%, 13px 3px;
+    -webkit-mask-position: 0 0, calc(var(--kx-notch-x, -100px) - 6.5px) 0;
+    -webkit-mask-repeat: no-repeat;
+    -webkit-mask-composite: xor;
+    mask-image: linear-gradient(#000 0 0), linear-gradient(#000 0 0);
+    mask-size: 100% 100%, 13px 3px;
+    mask-position: 0 0, calc(var(--kx-notch-x, -100px) - 6.5px) 0;
+    mask-repeat: no-repeat;
+    mask-composite: exclude;
+  }
+  .kx-sub-notch {
+    display: block;
+    position: absolute;
+    top: -6.5px;
+    left: calc(var(--kx-notch-x, 0px) - 6px);
+    width: 12px;
+    height: 12px;
+    transform: rotate(45deg);
+    clip-path: polygon(0 0, 100% 0, 0 100%);
+    border-top: 1px solid var(--kx-shelf-line);
+    border-left: 1px solid var(--kx-shelf-line);
+    border-top-left-radius: 2px;
+    background: var(--kx-shelf-fill);
+    pointer-events: none;
+    transition: left 320ms cubic-bezier(0.4, 0, 0.2, 1), opacity 150ms ease;
+  }
+  .kx-sub-shelf[data-notch="0"] .kx-sub-notch { opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .kx-sub-notch { transition: none; }
+}
+
 /* The desktop rail is a FLUSH panel: no frame line against the page, the
    same call the owner made on the AI sidebar ("remove the borders"). Core
    keeps its hairline.
