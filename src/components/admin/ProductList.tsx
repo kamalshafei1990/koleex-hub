@@ -3466,12 +3466,16 @@ export default function ProductList() {
                         different height. Three lines at 10.5px fit the 86px
                         square with no ellipsis — "Printing & heat press
                         equipment" was cut to "…press…" at two. */}
+                    {/* The icon scales WITH the square — 28% of its width (~22px
+                        at the 86px minimum, ~27px on a 109px card, ~33px at the
+                        1500px content cap). A fixed 20px read as a dot on the
+                        wide-screen squares (owner, 22 Sep 2026). */}
                     {c.slug === "" ? (
-                      <LayoutGridIcon className={`h-5 w-5 shrink-0 ${iconTone}`} />
+                      <LayoutGridIcon className={`w-[28%] h-auto aspect-square shrink-0 ${iconTone}`} />
                     ) : classIcons.category?.[c.slug] ? (
-                      <ClassMonoIcon src={classIcons.category[c.slug]} className={`h-5 w-5 shrink-0 ${iconTone}`} />
+                      <ClassMonoIcon src={classIcons.category[c.slug]} className={`w-[28%] h-auto aspect-square shrink-0 ${iconTone}`} />
                     ) : (
-                      <LayoutGridIcon className={`h-5 w-5 shrink-0 ${iconTone}`} />
+                      <LayoutGridIcon className={`w-[28%] h-auto aspect-square shrink-0 ${iconTone}`} />
                     )}
                     {/* The name is CENTRED in the zone under the icon (owner: "the
                         names in the cards the positions not right" — two-line
