@@ -2303,3 +2303,48 @@ breaking the code on purpose; all three breaks were caught:
 - wandering that may repeat the current shape;
 - wandering while the orb is thinking;
 - Home not wandering.
+
+## Dotted orb colour — Aurora flow under Aurora, the basic orb under Core (2026-09-23)
+
+The owner was shown six colourings, then four drawn over the real Aurora
+ground, and chose **Aurora flow**: the dots wear the wave field's own blues,
+and the colours ripple through the sphere with the field's own noise. His
+condition: *"this only for Aurora style — if I change the system style to
+Core, the orb becomes the basic one."*
+
+**The style decides, nothing else.** `dottedPalette()` reads `data-kx-skin`
+on `<html>`. Aurora gives `"aurora"`. Core, a missing value or an unknown one
+gives `"mono"`, which is the original grey ink byte for byte. The orb watches
+the attribute, so switching the style in Settings recolours every orb on the
+page at once, with no reload. The aura orb is not touched.
+
+**One Aurora in the tree.** The field's palettes and its simplex noise moved
+unchanged from `WavyBackground` to `src/lib/aurora-field.ts`. The field
+imports them from there, and so does the orb (`dotted-orb-ink.ts`), so the
+two cannot drift apart. Goldens taken from the pre-move source lock the field
+to the last bit: same five blues per theme, same grounds, same noise.
+
+**How it looks.**
+- Every ramp stop is one of the field's colours. On a dark ground it runs from
+  ice blue at the top down to steel; on a light ground the field's mid blues
+  run down to its deepest one.
+- Colour belongs to the place on the orb, not to the dot. Dots travel through
+  it as they turn, so a morph needs nothing extra.
+- Near dots stay brighter than far ones, so the sphere keeps its depth.
+
+**Calm and cheap, as promised.**
+- The ripple runs at 0.15 noise units a second; the approved sample ran 0.25.
+- It ripples only on the full-size tuning. A chat-bubble orb (under 40 px)
+  shows the same colours held still.
+- Stillness (the OS setting or the Hub's own) and a machine marked low-power
+  also hold the colours still.
+- The cost is one noise lookup per dot per frame, from a single noise shared
+  by every orb on the page.
+
+**Verified in a browser.** I rendered the real `DottedOrb` in headless
+Chromium under Aurora and Core, in dark and light: blue under Aurora, the
+original grey under Core. Flipping the style on a mounted orb recoloured it
+both ways, with no reload.
+
+**Tests.** `validate:ai-orb` has 171 checks (+12). Each was confirmed by
+breaking the code on purpose, and all 17 breaks were caught.

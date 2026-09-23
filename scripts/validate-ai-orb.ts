@@ -352,7 +352,7 @@ for (const k of ["kxA-life", "kxA-bounce", "kxA-sway", "kxA-gaze", "kxA-hunt", "
   }
   check("morph: the orb morphs on a change of MOTION, never in stillness, and does not restart its loop to do it",
     /if \(prev\.motion !== motion && !wantsStill\(\)\) \{\s*morphRef\.current = \{ from: prev, start: performance\.now\(\), phase: clockRef\.current\?\.phase \?\? 0 \};/.test(dotted) &&
-    /\}, \[size, lightDots, still, stillKey\]\);/.test(dotted) &&
+    /\}, \[size, lightDots, still, stillKey, palette, lowPower\]\);/.test(dotted) &&
     !/\}, \[motion, speed, ink, size, lightDots, still\]\);/.test(dotted) &&
     /paintDots\(morphDots\(from\.dots, to\.dots, size \/ 2, e\)/.test(dotted) &&
     /const p = \(now - m\.start\) \/ DOTTED_MORPH_MS;/.test(dotted));
@@ -400,6 +400,109 @@ for (const k of ["kxA-life", "kxA-bounce", "kxA-sway", "kxA-gaze", "kxA-hunt", "
     /const stateLook = dottedLook\(state, activity, result, size\);/.test(dotted));
   check("dots: the voice moves it on a call (the aura orb's own smoothing, not a second one)",
     /useAudioSmoothing\(rootRef, clamp01\(audioLevel\), audioActive\);/.test(dotted) && /var\(--kx-orb-audio, 0\)/.test(dotted));
+
+  /* ── COLOUR: AURORA FLOW UNDER AURORA, THE BASIC ORB UNDER CORE (owner, 2026-09-23) ── */
+  {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const ink = require("../src/components/ai-orb/dotted-orb-ink") as typeof import("../src/components/ai-orb/dotted-orb-ink");
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const field = require("../src/lib/aurora-field") as typeof import("../src/lib/aurora-field");
+    const { dottedPalette, dottedFlows, rampAt, monoInk, tintedInk, auroraTint, auroraNoise, AURORA_RAMP, AURORA_FLOW_RATE } = ink;
+    check("colour: only the Aurora style dresses the dots — Core, a missing or an unknown style is the basic orb",
+      dottedPalette("aurora") === "aurora" &&
+      (["core", "", "Aurora", "AURORA", "glass", null, undefined] as const).every((s) => dottedPalette(s) === "mono"));
+    const fieldColours = new Set([...field.AURORA_PALETTES.dark.waves, ...field.AURORA_PALETTES.light.waves].map((c) => c.toUpperCase()));
+    check("colour: every stop of the orb's ramp is one of the Aurora field's own colours, top to bottom, on both grounds",
+      (["dark", "light"] as const).every((g) => AURORA_RAMP[g].length === 4 && AURORA_RAMP[g].every((c) => fieldColours.has(c.toUpperCase()))));
+    const rgbOf = (hex: string) => [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16));
+    const same = (a: readonly number[], b: readonly number[]) => a.every((v, i) => Math.abs(v - b[i]) < 1e-9);
+    check("colour: the ramp runs from its first stop to its last and clamps outside, a bad number lands mid-ramp, never NaN",
+      (["dark", "light"] as const).every((g) =>
+        same(rampAt(g, 0), rgbOf(AURORA_RAMP[g][0])) && same(rampAt(g, 1), rgbOf(AURORA_RAMP[g][3])) &&
+        same(rampAt(g, -4), rgbOf(AURORA_RAMP[g][0])) && same(rampAt(g, 9), rgbOf(AURORA_RAMP[g][3])) &&
+        rampAt(g, NaN).every(Number.isFinite)));
+    let table = true;
+    for (const p of ["mono", "aurora"] as const) for (const pr of [20, 64] as const) for (const st of [false, true]) for (const lp of [false, true]) {
+      if (dottedFlows(p, pr, st, lp) !== (p === "aurora" && pr === 64 && !st && !lp)) table = false;
+    }
+    check("colour: the colours ripple only for Aurora at full-size tuning — held still in a chat bubble, in stillness and on a low-power machine",
+      table && AURORA_FLOW_RATE > 0 && AURORA_FLOW_RATE < 0.25);
+    let monoSame = true;
+    for (const dark of [true, false]) for (const w of [-1, 0, 0.13, 0.3, 0.5, 0.77, 1, 3]) for (const a of [0, 0.4, 1]) {
+      const ww = Math.min(1, Math.max(0, w));
+      const g = Math.round((dark ? 1 - ww : ww) * 255);
+      if (monoInk(w, a, dark) !== `rgba(${g},${g},${g},${a})`) monoSame = false;
+    }
+    check("colour: Core's ink is byte for byte the grey the orb drew before colour existed", monoSame);
+    const parse = (css: string) => css.match(/^rgba\((\d+),(\d+),(\d+),([\d.]+)\)$/)?.slice(1).map(Number) ?? null;
+    const luma = (c: number[]) => 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2];
+    let depth = true;
+    for (const g of ["dark", "light"] as const) for (const u of [0, 0.5, 1]) {
+      const tint = rampAt(g, u), darkGround = g === "dark";
+      const near = parse(tintedInk(0, tint, 0.7, darkGround)), far = parse(tintedInk(1, tint, 0.7, darkGround));
+      if (!near || !far || near[3] !== 0.7 || far[3] !== 0.7 || [...near, ...far].some((v) => v < 0 || v > 255)) { depth = false; continue; }
+      if (darkGround ? luma(near) <= luma(far) : luma(near) >= luma(far)) depth = false;
+    }
+    check("colour: a tinted orb keeps its depth — near dots stand out from far ones on either ground — and the alpha passes through", depth);
+    const noise = auroraNoise();
+    let inHull = true, moves = false, steady = true;
+    for (const g of ["dark", "light"] as const) {
+      const stops = AURORA_RAMP[g].map(rgbOf);
+      for (let i = 0; i < 40; i++) {
+        const x = (i * 37) % 112, y = (i * 53) % 112;
+        const c0 = auroraTint(noise, x, y, 112, 0, g), c1 = auroraTint(noise, x, y, 112, 20, g);
+        if (!same(c0, auroraTint(noise, x, y, 112, 0, g))) steady = false;
+        if (!same(c0, c1)) moves = true;
+        for (const c of [c0, c1]) for (let ch = 0; ch < 3; ch++) {
+          const vals = stops.map((s) => s[ch]);
+          if (c[ch] < Math.min(...vals) - 1e-9 || c[ch] > Math.max(...vals) + 1e-9) inHull = false;
+        }
+      }
+    }
+    check("colour: the Aurora colour at a place is one of the ramp's, the same for the same instant, and it drifts as time runs",
+      inHull && moves && steady);
+    const fresh = field.buildNoise3D();
+    check("colour: the orb's ripple IS the field's noise (same seed, same values), built once for the whole page",
+      auroraNoise() === noise && [[0.1, 0.2, 0.3], [1.7, -0.4, 5], [12.5, 3.3, 0.01]].every(([a, b, c]) => fresh(a, b, c) === noise(a, b, c)));
+    check("colour: the orb follows the style, theme, stillness and low-power flags on <html> live, and redraws when they change",
+      /attributeFilter: \["data-theme", "class", "data-kx-skin", "data-kx-lowpower"\],/.test(dotted) &&
+      /return dottedPalette\(document\.documentElement\.dataset\.kxSkin\);/.test(dotted) &&
+      /return document\.documentElement\.hasAttribute\("data-kx-lowpower"\);/.test(dotted) &&
+      /const \[palette, setPalette\] = useState<DottedPalette>\(\(\) => \(typeof document === "undefined" \? "mono" : appPalette\(\)\)\);/.test(dotted) &&
+      /\}, \[size, lightDots, still, stillKey, palette, lowPower\]\);/.test(dotted));
+    check("colour: Core draws the basic ink and nothing else; Aurora tints by place and ripples only when dottedFlows allows",
+      /const noise = palette === "aurora" \? auroraNoise\(\) : null;/.test(dotted) &&
+      /noise\s*\? tintedInk\(white, auroraTint\(noise, x, y, size, flowT, ground\), alpha, lightDots\)\s*: monoInk\(white, alpha, lightDots\);/.test(dotted) &&
+      /const flows = dottedFlows\(palette, preset, still, lowPower\);/.test(dotted) &&
+      /let flowT = flows \? performance\.now\(\) \/ 1000 : 0;/.test(dotted) &&
+      /if \(flows\) flowT = now \/ 1000;/.test(dotted) &&
+      !/const tone = /.test(dotted) && (dotted.match(/ctx\.(fill|stroke)Style = /g) ?? []).length === 2);
+    /* The field is signed-off artwork: moving its palettes and noise out of
+       WavyBackground must not change one pixel. Goldens taken from the
+       pre-move source (seed 1337) — they match it to the last bit. */
+    const golden: [number, number, number, number][] = [
+      [0.1, 0.2, 0.3, -0.6295980693333331], [1.7, -0.4, 5, 0.8030933333333328],
+      [12.5, 3.3, 0.01, 0.13483848462297537], [0.8, 0.6, 0.0013, 0.0006225995275690617],
+    ];
+    check("colour: the Aurora field itself is untouched — same five blues per theme, same grounds, same noise to the last bit",
+      golden.every(([a, b, c, v]) => fresh(a, b, c) === v) &&
+      JSON.stringify(field.AURORA_PALETTES.dark.waves) === JSON.stringify(["#BCD8F0", "#8FB0D4", "#567FB2", "#2E4B6B", "#1B2A3C"]) &&
+      JSON.stringify(field.AURORA_PALETTES.light.waves) === JSON.stringify(["#567FB2", "#8FB0D4", "#3E6796", "#A9C4DE", "#7FA9D6"]) &&
+      field.AURORA_PALETTES.dark.ground === "#05070C" && field.AURORA_PALETTES.light.ground === "#F4F7FA");
+    const wavy = readFileSync(join(srcRoot, "components/ui/WavyBackground.tsx"), "utf8");
+    const defs = (function walk(dir: string): number {
+      let n = 0;
+      for (const e of readdirSync(dir, { withFileTypes: true })) {
+        const p = join(dir, e.name);
+        if (e.isDirectory()) n += walk(p);
+        else if (/\.(ts|tsx)$/.test(e.name)) n += (readFileSync(p, "utf8").match(/function buildNoise3D\(/g) ?? []).length;
+      }
+      return n;
+    })(srcRoot);
+    check("colour: one Aurora in the tree — the wave field takes its palettes and noise from lib/aurora-field and keeps no copy",
+      /import \{ AURORA_PALETTES as PALETTES, buildNoise3D \} from "@\/lib\/aurora-field";/.test(wavy) &&
+      !/const PALETTES = \{/.test(wavy) && !/const GRAD3 = /.test(wavy) && defs === 1);
+  }
 }
 
 if (fail > 0) {
