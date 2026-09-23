@@ -17,7 +17,7 @@ import { usePermissions } from "@/lib/permissions";
 import { requestOpenNew } from "@/lib/use-open-on-new-param";
 
 type Kind =
-  | "quotation" | "invoice" | "po" | "expense" | "customer" | "supplier" | "contact"
+  | "quotation" | "invoice" | "so" | "po" | "bill" | "expense" | "customer" | "supplier" | "contact"
   | "item" | "task" | "event" | "fx" | "asset" | "bank";
 
 interface Tile {
@@ -36,7 +36,9 @@ interface Tile {
 const TILES: Tile[] = [
   { k: "quotation", key: "sc.quotation", icon: "document",            href: "/quotations?new=1",            module: "Quotations", words: "quote offer proforma" },
   { k: "invoice",   key: "sc.invoice",   icon: "file-invoice-dollar", href: "/invoices?new=1",              module: "Invoices",   affects: ["accounting"], words: "bill ar" },
+  { k: "so",        key: "sc.so",        icon: "file-invoice",        href: "/sales/orders?new=1",          module: "Orders",     affects: ["inventory"], words: "so sales order" },
   { k: "po",        key: "sc.po",        icon: "shipping-fast",       href: "/purchase/orders?new=1",       module: "Purchases",  affects: ["inventory"], words: "po purchase buy" },
+  { k: "bill",      key: "sc.bill",      icon: "file-invoice",        href: "/purchase/bills?new=1",        module: "Purchases",  affects: ["accounting"], words: "vendor bill ap payable" },
   { k: "expense",   key: "sc.expense",   icon: "receipt",             href: "/create/expense",              module: "Expenses",   affects: ["accounting"], words: "cost spend" },
   { k: "customer",  key: "sc.customer",  icon: "users",               href: "/create/customer",             module: "Customers",  words: "client buyer" },
   { k: "supplier",  key: "sc.supplier",  icon: "id-badge",            href: "/create/supplier",             module: "Suppliers",  words: "vendor factory" },
@@ -53,15 +55,15 @@ const TILES: Tile[] = [
 const CONTEXT: Array<[string, Kind[]]> = [
   ["/quotations", ["quotation", "customer"]],
   ["/invoices",   ["invoice", "customer"]],
-  ["/sales",      ["quotation", "invoice", "customer"]],
+  ["/sales",      ["so", "quotation", "invoice", "customer"]],
   ["/crm",        ["customer", "quotation", "contact"]],
   ["/customers",  ["customer", "quotation"]],
   ["/suppliers",  ["supplier", "po"]],
   ["/contacts",   ["contact", "customer", "supplier"]],
-  ["/purchase",   ["po", "supplier", "item"]],
+  ["/purchase",   ["po", "bill", "supplier", "item"]],
   ["/inventory",  ["item", "po"]],
   ["/expenses",   ["expense"]],
-  ["/finance",    ["expense", "invoice", "bank", "fx", "asset"]],
+  ["/finance",    ["expense", "invoice", "bill", "bank", "fx", "asset"]],
   ["/todo",       ["task"]],
   ["/calendar",   ["event", "task"]],
 ];

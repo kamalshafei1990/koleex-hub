@@ -5,7 +5,8 @@
    paid) and overdue computation, just on the AP (accounts payable)
    side instead of AR. */
 
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
+import { useOpenOnNewParam } from "@/lib/use-open-on-new-param";
 import type { PurchaseModuleProps, SupplierRef } from "../shared";
 import { cardCls, formatMoney, formatDate, sectionTitleCls, STATUS_TONE_BILL, supplierNames, usePurchaseList } from "../shared";
 import { NewBillDialog } from "../dialogs";
@@ -23,6 +24,8 @@ type Bill = {
 
 export default function BillsModule({ t }: PurchaseModuleProps) {
   const [newOpen, setNewOpen] = useState(false);
+  /* ?new=1 / ?create=1 (Smart Create, Data Entry hub, Purchase home) opens the dialog. */
+  useOpenOnNewParam(useCallback(() => setNewOpen(true), []));
   const { data, loading, reload: load } = usePurchaseList<{ rows: Bill[]; suppliers: SupplierRef[] }>("bills");
   const rows = data?.rows ?? [];
   const supplierName = useMemo(() => supplierNames(data?.suppliers), [data]);

@@ -19,7 +19,7 @@
 
      2. DAY-TO-DAY ENTRIES (ongoing, opens SmartCreate flow)
         · New Expense                    → /create/expense
-        · New Vendor Bill                → /finance/suppliers?new-bill=1
+        · New Vendor Bill                → /purchase/bills?new=1
         · New Invoice                    → /invoices?new=1
         · New Payment                    → /finance/payments?new=1
         · New Sales Order                → /sales/orders?new=1
@@ -63,7 +63,7 @@ const STARTING_DATA: EntryRow[] = [
 
 const DAILY_ENTRIES: EntryRow[] = [
   { href: "/create/expense",                 icon: "receipt",             labelKey: "de.daily.expense.label",  labelFallback: "Record an Expense",    meaningKey: "de.daily.expense.meaning",  meaningFallback: "Operating cost — rent, salaries, marketing.",                       tag: "required" },
-  { href: "/finance/suppliers?new-bill=1",   icon: "file-invoice",        labelKey: "de.daily.bill.label",     labelFallback: "Record a Vendor Bill", meaningKey: "de.daily.bill.meaning",     meaningFallback: "Bill received from a supplier (booked into AP).",                  tag: "recommended" },
+  { href: "/purchase/bills?new=1",           icon: "file-invoice",        labelKey: "de.daily.bill.label",     labelFallback: "Record a Vendor Bill", meaningKey: "de.daily.bill.meaning",     meaningFallback: "Bill received from a supplier (booked into AP).",                  tag: "recommended" },
   { href: "/invoices?new=1",                 icon: "file-invoice-dollar", labelKey: "de.daily.invoice.label",  labelFallback: "Issue an Invoice",     meaningKey: "de.daily.invoice.meaning",  meaningFallback: "Bill sent to a customer (booked into AR).",                        tag: "required" },
   { href: "/finance/payments?new=1",         icon: "money",               labelKey: "de.daily.payment.label",  labelFallback: "Record a Payment",     meaningKey: "de.daily.payment.meaning",  meaningFallback: "Money in or out, linked to an invoice / bill / expense.",          tag: "required" },
   { href: "/sales/orders?new=1",             icon: "file-invoice-dollar", labelKey: "de.daily.so.label",       labelFallback: "New Sales Order",      meaningKey: "de.daily.so.meaning",       meaningFallback: "Commitment to ship to a customer.",                                tag: "required" },

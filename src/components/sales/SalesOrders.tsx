@@ -17,7 +17,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import RrIcon from "@/components/ui/RrIcon";
 import {
   InventoryEmpty,
@@ -25,6 +25,8 @@ import {
   StatusBadge,
 } from "@/components/inventory/InventoryUi";
 import ShipDialog from "@/components/sales/ShipDialog";
+import NewSalesOrderDialog from "@/components/sales/NewSalesOrderDialog";
+import { useOpenOnNewParam } from "@/lib/use-open-on-new-param";
 import { humanizeError } from "@/lib/ui/humanize-error";
 
 interface SoRow {
@@ -88,6 +90,10 @@ export default function SalesOrders() {
   const [dateRange, setDateRange] = useState<DateRangeKey>("90d");
 
   const [shipSoId, setShipSoId] = useState<string | null>(null);
+  const [newOpen, setNewOpen] = useState(false);
+  const router = useRouter();
+  /* ?new=1 (Smart Create, Data Entry hub) opens the new-order form. */
+  useOpenOnNewParam(useCallback(() => setNewOpen(true), []));
 
   /* Debounce search. */
   const debounceRef = useRef<number | null>(null);
@@ -157,6 +163,13 @@ export default function SalesOrders() {
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setNewOpen(true)}
+              className="inline-flex items-center gap-1.5 rounded-md bg-[var(--bg-inverted)] px-3 py-1.5 text-[12px] font-semibold text-[var(--text-inverted)] hover:opacity-90"
+            >
+              <RrIcon name="plus" size={12} /> New order
+            </button>
             <Link
               href="/sales"
               className="inline-flex items-center gap-1.5 rounded-md border border-white/[0.10] bg-white/[0.04] px-3 py-1.5 text-[12px] hover:bg-white/[0.06]"
@@ -307,6 +320,12 @@ export default function SalesOrders() {
           </table>
         </Panel>
       </div>
+
+      <NewSalesOrderDialog
+        open={newOpen}
+        onClose={() => setNewOpen(false)}
+        onCreated={(o) => router.push(`/sales/orders/${o.id}`)}
+      />
 
       {shipSoId && (
         <ShipDialog

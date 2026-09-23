@@ -7,7 +7,8 @@
    request auto-approves or needs a manager / director / CFO sign-
    off before becoming an RFQ or PO. */
 
-import { useState } from "react";
+import { useCallback, useState } from "react";
+import { useOpenOnNewParam } from "@/lib/use-open-on-new-param";
 import type { PurchaseModuleProps } from "../shared";
 import { cardCls, formatMoney, formatDate, sectionTitleCls, STATUS_TONE_REQ, TONE_INFO, usePurchaseList } from "../shared";
 import { NewRequisitionDialog } from "../dialogs";
@@ -43,6 +44,8 @@ const PRIORITY_TONE = [
 
 export default function RequisitionsModule({ t }: PurchaseModuleProps) {
   const [newOpen, setNewOpen] = useState(false);
+  /* ?new=1 / ?create=1 (Smart Create, Data Entry hub, Purchase home) opens the dialog. */
+  useOpenOnNewParam(useCallback(() => setNewOpen(true), []));
   const { data, loading, reload: load } = usePurchaseList<{ rows: Requisition[] }>("requisitions");
   const rows = data?.rows ?? [];
 
