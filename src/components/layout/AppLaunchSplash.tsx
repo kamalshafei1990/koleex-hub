@@ -65,7 +65,7 @@ const CHUNK_ERROR_RE =
 if (typeof window !== "undefined") {
   for (const v of ["dark", "light"]) {
     const img = new Image();
-    img.src = `/brand/hub-logo/koleex-hub-logo-for-${v}-d.webp`;
+    img.src = `/brand/hub-logo/koleex-hub-logo-for-${v}-e.webp`;
   }
   /* Install the request counter with the FIRST module of the shell, not
      with the first loading surface: screens fire their data fetches the

@@ -285,7 +285,7 @@ export default function MainHeader() {
               the rest of the bar doesn't jump when the logo lands. */}
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
-            src={dk ? "/brand/hub-logo/koleex-hub-logo-for-dark-d.webp" : "/brand/hub-logo/koleex-hub-logo-for-light-d.webp"}
+            src={dk ? "/brand/hub-logo/koleex-hub-logo-for-dark-e.webp" : "/brand/hub-logo/koleex-hub-logo-for-light-e.webp"}
             alt="Koleex Hub"
             width={640}
             height={70}

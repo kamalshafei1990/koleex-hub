@@ -45,13 +45,13 @@ interface SupplierRow {
 }
 
 const COMPANY_ASSETS: { label: string; src: string; dark?: boolean }[] = [
-  { label: "Hub logo · light", src: "/brand/hub-logo/koleex-hub-logo-for-light-d.png" },
-  { label: "Hub logo · dark", src: "/brand/hub-logo/koleex-hub-logo-for-dark-d.png", dark: true },
-  { label: "Stacked · light", src: "/brand/hub-logo/koleex-hub-stacked-for-light-d.png" },
-  { label: "Stacked · dark", src: "/brand/hub-logo/koleex-hub-stacked-for-dark-d.png", dark: true },
-  { label: "Mono · light", src: "/brand/hub-logo/koleex-hub-logo-mono-light-d.png" },
-  { label: "Mono · dark", src: "/brand/hub-logo/koleex-hub-logo-mono-dark-d.png", dark: true },
-  { label: "Script", src: "/brand/hub-logo/hub-script-d.png", dark: true },
+  { label: "Hub logo · light", src: "/brand/hub-logo/koleex-hub-logo-for-light-e.png" },
+  { label: "Hub logo · dark", src: "/brand/hub-logo/koleex-hub-logo-for-dark-e.png", dark: true },
+  { label: "Stacked · light", src: "/brand/hub-logo/koleex-hub-stacked-for-light-e.png" },
+  { label: "Stacked · dark", src: "/brand/hub-logo/koleex-hub-stacked-for-dark-e.png", dark: true },
+  { label: "Mono · light", src: "/brand/hub-logo/koleex-hub-logo-mono-light-e.png" },
+  { label: "Mono · dark", src: "/brand/hub-logo/koleex-hub-logo-mono-dark-e.png", dark: true },
+  { label: "Script", src: "/brand/hub-logo/hub-script-e.png", dark: true },
   { label: "AI face", src: "/brand/koleex-ai-face.png", dark: true },
 ];
 
