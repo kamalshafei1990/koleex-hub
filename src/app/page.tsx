@@ -1508,8 +1508,10 @@ export default function HomePage() {
            the same way the search did: the conic painted under a see-through
            fill washes the whole box blue. So the two are separate mechanisms
            now — flat tile glass on the element, and the spinning conic on a
-           masked ::before that paints ONLY the 1.5px rim. The @property
-           angle animates on the element and the pseudo inherits it. */
+           masked ::before that paints ONLY the 1.5px rim. The pseudo runs
+           the spin itself: --ai-card-angle is registered inherits:false, so
+           an angle animated on the element never reached the rim and the
+           glow sat still under Aurora. */
         .ai-card-neon {
           animation: ai-card-spin 3s linear infinite;
           border: 1.5px solid transparent;
@@ -1527,6 +1529,7 @@ export default function HomePage() {
           border-radius: inherit;
           padding: 1.5px;
           pointer-events: none;
+          animation: ai-card-spin 3s linear infinite;
           background: conic-gradient(
             from var(--ai-card-angle),
             rgba(86,127,178,0.75),
