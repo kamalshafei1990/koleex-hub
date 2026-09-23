@@ -192,11 +192,22 @@ const ROUTE_BUDGETS: Record<string, { chunks: number; kbytes: number }> = {
      exactly on their number, so they were the only ones to cross. Raised to
      the re-measured value, which keeps them as tight as they were; the other
      routes had the headroom to absorb it and are untouched. */
-  "crm": { chunks: 10, kbytes: 515 },
-  "customers": { chunks: 10, kbytes: 516 },
+  /* +2 KB on the six below (2026-09-23), measured, not guessed. These six
+     sat within 1 KB of their budget. Once a user can choose the Koleex AI orb
+     (owner, #448), every page that shows an orb also carries the choice. The
+     CRM route, built before the orb shipped (9772d9c) and after, differs by
+     +1,345 bytes, all in the shared shell:
+       ChosenOrb  794 B  (picks aura or dots)
+       orb-style  766 B  (reads the saved choice)
+       lazy stub  102 B  (the dots themselves load on demand)
+     The silent-update code removed from UpdateWatcher offsets part of it.
+     The dots engine (~16 KB) is NOT here: it loads only for users who chose
+     it. Without that, 19 routes failed. */
+  "crm": { chunks: 10, kbytes: 517 },
+  "customers": { chunks: 10, kbytes: 518 },
   "database": { chunks: 11, kbytes: 617 },
   "discuss": { chunks: 11, kbytes: 570 },
-  "documents": { chunks: 10, kbytes: 515 },
+  "documents": { chunks: 10, kbytes: 517 },
   /* Measured 2026-08-20 TWICE — the widget-canvas demo is under active
      development in a parallel session and grew 8→9 chunks within the hour
      (498→508 KB). Budgeted at the second measurement + headroom; if it
@@ -233,11 +244,11 @@ const ROUTE_BUDGETS: Record<string, { chunks: number; kbytes: number }> = {
      The employee self-service app: own profile, attendance, leave, documents,
      payslips. First budget, set the day the route appeared. */
   "me": { chunks: 13, kbytes: 778 },
-  "planning": { chunks: 10, kbytes: 515 },
+  "planning": { chunks: 10, kbytes: 517 },
   "price-calculator": { chunks: 12, kbytes: 803 },
   "product-data": { chunks: 12, kbytes: 796 },
   "products": { chunks: 12, kbytes: 791 },
-  "projects": { chunks: 10, kbytes: 515 },
+  "projects": { chunks: 10, kbytes: 517 },
   "purchase": { chunks: 11, kbytes: 622 },
   "quotations": { chunks: 11, kbytes: 850 },
   "roles": { chunks: 12, kbytes: 816 },
@@ -255,7 +266,7 @@ const ROUTE_BUDGETS: Record<string, { chunks: number; kbytes: number }> = {
      the whole reason they are not a TS literal. */
   "shipping": { chunks: 10, kbytes: 581 },
   "software-center": { chunks: 11, kbytes: 618 },
-  "suppliers": { chunks: 10, kbytes: 516 },
+  "suppliers": { chunks: 10, kbytes: 518 },
   /* Measured 9 chunks / 518 KB on the day it shipped, +12% headroom. Sits
      with customers (492) and notes (491): almost all of it is the shared
      baseline, and tesseract.js is a dynamic import so the OCR engine is NOT

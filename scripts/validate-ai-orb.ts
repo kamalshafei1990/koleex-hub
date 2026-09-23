@@ -268,7 +268,23 @@ for (const k of ["kxA-life", "kxA-bounce", "kxA-sway", "kxA-gaze", "kxA-hunt", "
   const chosen = readFileSync(join(srcRoot, "components/ai-orb/ChosenOrb.tsx"), "utf8");
   check("wiring: ChosenOrb reads the store, and a preview can pin its own style",
     /const chosen = useOrbStyle\(\);/.test(chosen) && /const draw = style \?\? chosen;/.test(chosen) &&
-    /if \(draw === "dots"\) return <DottedOrb/.test(chosen));
+    /if \(draw === "dots"\) \{[\s\S]{0,300}?<DottedOrb \{\.\.\.props\}/.test(chosen));
+  /* The dots load only for whoever chose them: a static import put DottedOrb
+     and its engine in the chunk every orb route shares, and validate:budgets
+     failed on 19 routes. */
+  check("wiring: the dotted orb is loaded on demand, never in the shared bundle every aura user downloads",
+    /const DottedOrb = lazy<React\.ComponentType<DottedOrbProps>>\(\(\) => import\("\.\/DottedOrb"\)\);/.test(chosen) &&
+    /<Suspense fallback=\{null\}>\s*<DottedOrb /.test(chosen) &&
+    /* and not next/dynamic, whose loader runtime lands in the shared shell */
+    !/from "next\/dynamic"/.test(chosen) &&
+    !/^import DottedOrb/m.test(chosen) &&
+    walk(srcRoot).every((f) => {
+      const rel = f.slice(srcRoot.length + 1).replace(/\\/g, "/");
+      if (rel.startsWith("app/ai-orb-lab/") || rel === "components/ai-orb/DottedOrb.tsx") return true;
+      /* `import type` is erased at build time and costs nothing. */
+      return !/^import (?!type )[^;]*from "(?:@\/components\/ai-orb|\.)\/DottedOrb";/m.test(readFileSync(f, "utf8")) &&
+             !/from "thinking-orbs(?:\/engine)?";/.test(readFileSync(f, "utf8"));
+    }));
 
   const tab = readFileSync(join(srcRoot, "components/settings/tabs/AiTab.tsx"), "utf8");
   check("settings: Koleex AI has the picker — each option shown as its own live orb, applied at once and saved to the account",

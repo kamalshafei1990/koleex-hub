@@ -2317,10 +2317,13 @@ console.log("\n── 12. Mute ──");
   /* THE CALL THAT ENDED BY ITSELF: the installed app reloading onto a new
      build mid-call. */
   const uw18 = fs18.readFileSync("src/components/pwa/UpdateWatcher.tsx", "utf8");
-  check("the call screen marks itself as uninterruptible, and the update watcher never reloads over it — on heal or on hide",
+  /* Since 2026-09-23 the watcher reloads only when the user presses Update,
+     and the offer is not shown over a live call (globals.css). */
+  check("the call screen marks itself as uninterruptible, and nothing reloads the page over it — the watcher only offers, and the offer is hidden during a call",
     /data-kx-call-active="1"/.test(scr) &&
     /export function busyWithSomethingUninterruptible\(\): boolean \{\s*return Boolean\(document\.querySelector\("\[data-kx-unsaved='1'\], \[data-kx-call-active='1'\]"\)\);/.test(uw18) &&
-    (uw18.match(/if \(busyWithSomethingUninterruptible\(\)\) return;/g) ?? []).length === 2 &&
+    !/onHide|healInstalledApp/.test(uw18.replace(/\/\*[\s\S]*?\*\//g, "")) &&
+    /body:has\(\[data-kx-call-active='1'\]\) \.kx-update-offer \{ display: none; \}/.test(css18) &&
     !/document\.querySelector\("\[data-kx-unsaved='1'\]"\)/.test(uw18));
   const md18 = fs18.readFileSync("src/components/ai/MessageMarkdown.tsx", "utf8");
   check("  …and in the written thread a picture that fails to load becomes its words, never a broken icon in a frame",

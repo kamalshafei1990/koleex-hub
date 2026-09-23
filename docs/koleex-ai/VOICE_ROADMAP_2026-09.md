@@ -2154,3 +2154,52 @@ purpose:
 - removing the rule fails 1 check;
 - DottedOrb no longer passing its size fails 1 check;
 - widening the rule to every motion fails 1 check.
+
+---
+
+## 2026-09-23 — The update is offered, and the owner presses it
+
+Owner: *"I want to show the update message and I press update to know that
+there is update happened."* The installed app used to update itself without
+asking: it reloaded as soon as it saw a new version, and it reloaded again
+whenever the tab went hidden. So the Mac dock app changed under him and he never
+saw an update arrive. Both paths are removed. The "New version available ·
+Update" capsule now waits until it is pressed, in the browser and in the
+installed app alike.
+
+- **Not over a live call.** The capsule is hidden while the call screen is up
+  (`body:has([data-kx-call-active='1']) .kx-update-offer`), because its button
+  reloads the page and a reload ends the call. It comes back when the call
+  ends.
+- **One silent path stays: `AppLaunchLink`.** A stale tab's chunks are already
+  gone from the new deployment, so opening another app with a soft navigation
+  would fail. That one launch becomes a full navigation, and the "Updated to
+  the latest version" confirmation says so when it lands.
+
+### And the dots stopped costing everyone
+
+**The regression.** `validate:budgets` failed on 19 routes after #448.
+`ChosenOrb` imported `DottedOrb` statically, which put the dots engine
+(~16 KB) into the chunk that every route with an orb shares.
+
+**The fix.** It now loads through React `lazy` (not `next/dynamic`), so only
+users who chose dots download it.
+
+**What remained.** Six routes still sat 1–2 KB over. They had about 1 KB of
+headroom to begin with. I built CRM before the orb (9772d9c) and after: the
+difference is +1,345 bytes, all in the shared shell.
+- `ChosenOrb`: 794 B
+- `orb-style` store: 766 B
+- lazy stub: 102 B
+- The removed update-reload code offsets part of this.
+
+Those six budgets were raised by 2 KB, with that measurement recorded next to
+them.
+
+**Suites.**
+- `validate:ai-client-render` 294 (new update-offer checks). Mutation-tested
+  three ways, each caught: the installed-app self-reload put back, the reload
+  on hide put back, and the offer shown over a call.
+- `validate:ai-orb` 146. A new check fails if anything imports the dots or the
+  engine statically.
+- `validate:voice-client` 799, `validate:budgets` 107/107.
