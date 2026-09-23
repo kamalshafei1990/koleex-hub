@@ -12,6 +12,8 @@ import AdminAuth from "@/components/admin/AdminAuth";
 
 import { useState } from "react";
 import AIOrb from "@/components/ai-orb/AIOrb";
+import DottedOrb from "@/components/ai-orb/DottedOrb";
+import { dottedLook } from "@/components/ai-orb/dotted-orb-map";
 import type { AIOrbActivity, AIOrbResult, AIOrbState } from "@/components/ai-orb/ai-orb-types";
 import { ACTIVITY_FAMILY } from "@/components/ai-orb/ai-orb-types";
 
@@ -115,6 +117,21 @@ function AiOrbLabInner() {
             <p className="mt-2 text-[10px] text-white/35">{sz}px · {lbl}</p>
           </div>
         ))}
+      </div>
+
+      {/* The second style (Settings → Koleex AI → Orb): the same state,
+          drawn as dots, at the sizes the Hub actually uses. */}
+      <div className="flex items-end gap-10 mb-6">
+        {[
+          [160, "dots · lab"], [72, "dots · home"], [38, "dots · chat"], [26, "dots · launcher"],
+        ].map(([sz, lbl]) => (
+          <div key={lbl as string} className="text-center">
+            <DottedOrb state={state} activity={activity} result={result}
+              audioLevel={audio} size={sz as number} surface="dark" />
+            <p className="mt-2 text-[10px] text-white/35">{sz}px · {lbl}</p>
+          </div>
+        ))}
+        <p className="text-[10px] text-white/35 pb-5">motion: {dottedLook(state, activity, result).motion}</p>
       </div>
 
       {/* What is animating right now */}

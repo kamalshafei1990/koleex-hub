@@ -2506,8 +2506,10 @@ console.log("\n── 12. Mute ──");
     /aria-hidden=\{view !== "chat"\}/.test(scr21) && /aria-hidden=\{view !== "orb"\}/.test(scr21) &&
     /\$\{view === "orb" \? "" : "pointer-events-none"\}/.test(scr21) &&
     /className="kx-orb-stage block rounded-full pointer-events-auto/.test(scr21));
-  check("one orb, drawn once: a single AIOrb at call size, no small second orb",
-    (scr21.match(/<AIOrb\b/g) ?? []).length === 1 && !/kx-mini-orb/.test(scr21) && /size=\{200\}/.test(scr21));
+  /* The orb is drawn through ChosenOrb since the user can pick its style
+     (2026-09-23) — still exactly one, whichever style it is. */
+  check("one orb, drawn once: a single orb at call size, no small second orb",
+    (scr21.match(/<ChosenOrb\b/g) ?? []).length === 1 && !/<AIOrb\b/.test(scr21) && !/kx-mini-orb/.test(scr21) && /size=\{200\}/.test(scr21));
   check("  …its flight is measured from its home to the corner slot (FLIP), so it lands exactly, in RTL too, and follows a resize",
     /const home = orbHomeRef\.current\?\.getBoundingClientRect\(\);\s*const corner = cornerRef\.current\?\.getBoundingClientRect\(\);/.test(scr21) &&
     /setTravel\(`translate\(\$\{dx\.toFixed\(1\)\}px, \$\{dy\.toFixed\(1\)\}px\) scale\(\$\{\(corner\.width \/ home\.width\)\.toFixed\(3\)\}\)`\);/.test(scr21) &&
