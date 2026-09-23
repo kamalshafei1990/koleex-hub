@@ -67,11 +67,30 @@ const FAMILY_MOTION: Record<ActivityFamily, DottedMotion> = {
   "ordered-orbit": "weaving",
 };
 
+/* THINKING, SMALL (owner, 2026-09-23, from the live preview: "fix the
+   thinking one"). The orbits are the dotted orb's signature motion and read
+   well from 40 px up. Under that — beside a chat message (38 px), in Discuss
+   (30 px) — the 20 px tuning leaves a few dozen dots scattered across tilted
+   orbits, most of them on the far side and faint: it stops reading as an orb
+   at all, and "thinking" is the state a chat bubble shows most. The solving
+   sphere was the clearest candidate side by side at 38 and 30 px, on dark and
+   light (working, solving, searching, listening, weaving compared): a whole
+   dotted sphere whose bands keep resolving — and it already means "working
+   something out". So small orbs think with it; large ones keep the orbits. */
+const SMALL_WORKING: DottedMotion = "solving";
+
 export function dottedLook(
   state: AIOrbState = "idle",
   activity: AIOrbActivity = "none",
   result: AIOrbResult = "none",
+  size: number = 72,
 ): DottedLook {
+  const look = baseLook(state, activity, result);
+  if (look.motion === "working" && dottedPreset(size) === 20) return { ...look, motion: SMALL_WORKING };
+  return look;
+}
+
+function baseLook(state: AIOrbState, activity: AIOrbActivity, result: AIOrbResult): DottedLook {
   const s = resolveOrbState(state, result);
   switch (s) {
     case "success":
