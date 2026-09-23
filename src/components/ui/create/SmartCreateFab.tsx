@@ -35,7 +35,7 @@ export default function SmartCreateFab() {
       type="button"
       onClick={() => openSmartCreate()}
       aria-label={t("sc.fab")}
-      className="kx-glass-pop fixed start-4 bottom-[calc(env(safe-area-inset-bottom,0px)+var(--kx-actionbar-h,0px)+16px)] z-[55] flex h-12 w-12 items-center justify-center rounded-full border border-[var(--border-subtle)] bg-[var(--bg-secondary)] text-[var(--text-primary)] shadow-lg shadow-black/30 transition-transform active:scale-95 sm:hidden"
+      className="kx-sc-fab kx-glass-pop fixed start-4 bottom-[calc(env(safe-area-inset-bottom,0px)+var(--kx-actionbar-h,0px)+16px)] z-[55] flex h-12 w-12 items-center justify-center rounded-full border border-[var(--border-subtle)] bg-[var(--bg-secondary)] text-[var(--text-primary)] shadow-lg shadow-black/30 transition-transform active:scale-95 sm:hidden"
     >
       <PlusIcon className="h-5 w-5" />
     </button>
