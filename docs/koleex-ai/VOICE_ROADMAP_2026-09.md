@@ -2226,3 +2226,48 @@ user.
 on purpose:
 - idle drawn as solving fails 3;
 - idle at full pace fails 2.
+
+### Follow-up: the shape changes, it does not cut
+
+The owner reported: *"there is no transition in the new orb between shape and
+other — should have a very smart and creative transition"*. I built six live
+samples next to the existing cut: crossfade, morph, gather & burst, vortex,
+dust and scan wipe. He chose **morph**.
+
+**The morph.** `dotted-orb-morph.ts` is pure.
+- A change of motion flies the same dots from the old shape into the new one
+  over 800 ms, eased in and out.
+- Both frames are ordered by angle around the centre. The shorter list is
+  stretched over the longer one, so every dot of both shapes takes part.
+- Each dot's flight is short and stays on its own side of the sphere.
+- Position, radius, ink and alpha are all interpolated.
+
+**Fix: speed changes no longer snap.** The old loop was rebuilt on every change
+and restarted time at the new speed, so even a speed change snapped. Now:
+- the loop reads the current look from a ref, so it is not rebuilt;
+- its clock advances by the current speed;
+- resting → speaking (both the sash) speeds up smoothly and does not morph.
+
+**Other behaviour:**
+- If the user asked for reduced motion, there is no morph. The one still frame
+  is redrawn when the state changes.
+- Offscreen or in a hidden tab, the clock is capped at 100 ms per frame, so the
+  orb does not jump when it comes back.
+
+**Verified in a browser.** The real `DottedOrb`, bundled into a test page and
+rendered in headless Chromium at 200, 72 and 38 px, shows the resting sash, the
+dots in flight at 400 ms, and the thinking shape after.
+
+**Tests.** `validate:ai-orb` has 155 checks (+7):
+- every dot takes part;
+- the morph starts on the old shape and lands on the new one;
+- an empty side fades;
+- real transitions stay inside the box at 30–200 px;
+- the wiring.
+
+Each new check was confirmed by breaking the code on purpose; all of these were
+caught:
+- a cut put back;
+- the loop restarting on motion;
+- pairing that drops dots;
+- a morph that never lands.

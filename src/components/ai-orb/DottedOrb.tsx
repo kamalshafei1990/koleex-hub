@@ -27,7 +27,8 @@ import type { AIOrbProps } from "./ai-orb-types";
 import { clamp01, resolveOrbState } from "./ai-orb-types";
 import { orbStatusLabel } from "./ai-orb-labels";
 import { useAudioSmoothing } from "./useAudioSmoothing";
-import { dottedLook, dottedPreset } from "./dotted-orb-map";
+import { dottedLook, dottedPreset, type DottedLook } from "./dotted-orb-map";
+import { DOTTED_MORPH_MS, easeInOutCubic, morphDots, type MorphDot } from "./dotted-orb-morph";
 
 export interface DottedOrbProps extends AIOrbProps {
   /** "dark" pins light dots — for surfaces that are dark in both themes
@@ -95,6 +96,30 @@ export default function DottedOrb({
 
   const { motion, speed, ink } = look;
 
+  /* THE SHAPE CHANGES; IT DOES NOT CUT (owner, 2026-09-23, choosing MORPH
+     from six live samples — see dotted-orb-morph.ts). The drawing loop no
+     longer restarts when the state changes: it reads the current look from a
+     ref, and a change of MOTION starts a morph from the old one. A change of
+     PACE alone (resting → speaking share the sash) is not a morph: the loop's
+     own clock just runs faster from where it is, so there is no jump. The
+     old code rebuilt the loop and restarted time at the new pace, which is
+     why every change used to snap. */
+  const lookRef = useRef<DottedLook>(look);
+  const clockRef = useRef<{ phase: number; last: number } | null>(null);
+  const morphRef = useRef<{ from: DottedLook; start: number; phase: number } | null>(null);
+  useEffect(() => {
+    const prev = lookRef.current;
+    lookRef.current = { motion, speed, ink };
+    if (prev.motion !== motion && !wantsStill()) {
+      morphRef.current = { from: prev, start: performance.now(), phase: clockRef.current?.phase ?? 0 };
+      if (clockRef.current) clockRef.current.phase = 0;
+    }
+  }, [motion, speed, ink]);
+
+  /* Stillness draws one representative frame, and draws it again when the
+     state changes — that is its only way to show one. */
+  const stillKey = still ? `${motion}|${speed}|${ink}` : "";
+
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -103,20 +128,23 @@ export default function DottedOrb({
     canvas.height = Math.round(size * dpr);
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
+    const preset = dottedPreset(size);
+    const tuning = (l: DottedLook) => resolvePreset(l.motion, preset);
+    const paceOf = (l: DottedLook) => tuning(l).speed * l.speed;
+    const frameOf = (l: DottedLook, phase: number) => {
+      const { mode, opts } = tuning(l);
+      return MODE_FRAMES[mode](size, phase, opts);
+    };
 
-    const { mode, speed: tuned, opts } = resolvePreset(motion, dottedPreset(size));
-    const frameAt = MODE_FRAMES[mode];
-    const pace = tuned * speed;
-
-    const draw = (tSec: number) => {
-      const { dots, lines } = frameAt(size, tSec, opts);
-      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-      ctx.clearRect(0, 0, size, size);
-      /* The engine's ink convention: `white` is the value on paper; on a
-         dark ground it is mirrored so the near dots read bright. */
+    /* The engine's ink convention: `white` is the value on paper; on a dark
+       ground it is mirrored so the near dots read bright. */
+    const tone = (white: number) => {
+      const w = Math.min(1, Math.max(0, white));
+      return Math.round((lightDots ? 1 - w : w) * 255);
+    };
+    const paintLines = (lines: ReturnType<typeof frameOf>["lines"], ink: number) => {
       for (const l of lines) {
-        const w = Math.min(1, Math.max(0, l.white));
-        const g = Math.round((lightDots ? 1 - w : w) * 255);
+        const g = tone(l.white);
         ctx.strokeStyle = `rgba(${g},${g},${g},${(l.a ?? 1) * ink})`;
         ctx.lineWidth = l.w;
         ctx.beginPath();
@@ -124,31 +152,70 @@ export default function DottedOrb({
         ctx.lineTo(l.x2, l.y2);
         ctx.stroke();
       }
+    };
+    const paintDots = (dots: readonly MorphDot[], ink: number) => {
       for (const d of dots) {
-        const w = Math.min(1, Math.max(0, d.white));
-        const g = Math.round((lightDots ? 1 - w : w) * 255);
+        const g = tone(d.white);
         ctx.fillStyle = `rgba(${g},${g},${g},${(d.a ?? 1) * ink})`;
         ctx.beginPath();
-        ctx.arc(d.x, d.y, d.r, 0, Math.PI * 2);
+        ctx.arc(d.x, d.y, Math.max(0.2, d.r), 0, Math.PI * 2);
         ctx.fill();
       }
     };
+    const begin = () => {
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      ctx.clearRect(0, 0, size, size);
+    };
 
     /* Stillness: one representative frame, the one the library itself uses. */
-    if (still) { draw(0.6); return; }
+    if (still) {
+      const f = frameOf(lookRef.current, 0.6);
+      begin();
+      paintLines(f.lines, lookRef.current.ink);
+      paintDots(f.dots, lookRef.current.ink);
+      return;
+    }
 
-    /* One clock for every dotted orb on the page, so two of them side by
-       side (a chat bubble and the header) move in step. */
-    const now = () => (performance.now() / 1000) * pace;
+    const draw = (now: number) => {
+      const cur = lookRef.current;
+      /* The phase starts where a shared clock would put it, so orbs mounted
+         together begin in step; after that it advances by the CURRENT pace,
+         which is what lets a change of pace be smooth. A pause (offscreen,
+         hidden tab) is capped so the orb does not leap on return. */
+      const clock = (clockRef.current ??= { phase: (now / 1000) * paceOf(cur), last: now });
+      const dt = Math.min(0.1, Math.max(0, (now - clock.last) / 1000));
+      clock.last = now;
+      clock.phase += dt * paceOf(cur);
+      begin();
+      const m = morphRef.current;
+      if (m) {
+        const p = (now - m.start) / DOTTED_MORPH_MS;
+        if (p < 1) {
+          m.phase += dt * paceOf(m.from);
+          const e = easeInOutCubic(p);
+          const from = frameOf(m.from, m.phase);
+          const to = frameOf(cur, clock.phase);
+          paintLines(from.lines, m.from.ink * (1 - e));
+          paintLines(to.lines, cur.ink * e);
+          paintDots(morphDots(from.dots, to.dots, size / 2, e), m.from.ink + (cur.ink - m.from.ink) * e);
+          return;
+        }
+        morphRef.current = null;
+      }
+      const f = frameOf(cur, clock.phase);
+      paintLines(f.lines, cur.ink);
+      paintDots(f.dots, cur.ink);
+    };
+
     let raf = 0;
     let running = false;
-    const loop = () => { draw(now()); if (running) raf = requestAnimationFrame(loop); };
+    const loop = (now: number) => { draw(now); if (running) raf = requestAnimationFrame(loop); };
     const start = () => { if (!running) { running = true; raf = requestAnimationFrame(loop); } };
     const stop = () => { running = false; cancelAnimationFrame(raf); };
 
     /* Always one frame, even offscreen — an orb scrolled into view must not
        arrive blank. Then free whenever it cannot be seen. */
-    draw(now());
+    draw(performance.now());
     let visible = true;
     const io = typeof IntersectionObserver !== "undefined"
       ? new IntersectionObserver(([entry]) => {
@@ -168,7 +235,7 @@ export default function DottedOrb({
       io?.disconnect();
       document.removeEventListener("visibilitychange", onVis);
     };
-  }, [motion, speed, ink, size, lightDots, still]);
+  }, [size, lightDots, still, stillKey]);
 
   return (
     <div
