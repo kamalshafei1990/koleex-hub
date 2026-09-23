@@ -103,9 +103,9 @@ export default function BrandLoading({
           <span className="kx-orb-ball" />
           <span className="kx-orb-mark">
             {/* eslint-disable-next-line @next/next/no-img-element -- 17KB webp, no optimization needed */}
-            <img src="/brand/hub-logo/koleex-hub-logo-for-dark.webp" alt="" className="kx-brand-logo-dark" />
+            <img src="/brand/hub-logo/koleex-hub-logo-for-dark-b.webp" alt="" className="kx-brand-logo-dark" />
             {/* eslint-disable-next-line @next/next/no-img-element -- theme twin of the above */}
-            <img src="/brand/hub-logo/koleex-hub-logo-for-light.webp" alt="" className="kx-brand-logo-light" />
+            <img src="/brand/hub-logo/koleex-hub-logo-for-light-b.webp" alt="" className="kx-brand-logo-light" />
             <span className="kx-orb-shine"><i /></span>
           </span>
         </span>
