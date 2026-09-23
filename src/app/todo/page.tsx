@@ -9,6 +9,7 @@ import Link from "next/link";
 import { ScrollLockOverlay } from "@/hooks/useScrollLock";
 import { useTranslation } from "@/lib/i18n";
 import { todoT } from "@/lib/translations/todo";
+import { useOpenOnNewParam } from "@/lib/use-open-on-new-param";
 import PlusIcon from "@/components/icons/ui/PlusIcon";
 import SearchIcon from "@/components/icons/ui/SearchIcon";
 import CrossIcon from "@/components/icons/ui/CrossIcon";
@@ -1577,6 +1578,8 @@ export default function TodoPage() {
   const [dateTo, setDateTo] = useState<string>("");
   const [showFilters, setShowFilters] = useState(false);
   const [modal, setModal] = useState<{ open: boolean; entry: TodoWithRelations | null }>({ open: false, entry: null });
+  /* ?new=1 (Smart Create) opens a blank task. */
+  useOpenOnNewParam(useCallback(() => setModal({ open: true, entry: null }), []));
   const [deleteModal, setDeleteModal] = useState<{ open: boolean; task: TodoWithRelations | null }>({ open: false, task: null });
   const [deleting, setDeleting] = useState(false);
 

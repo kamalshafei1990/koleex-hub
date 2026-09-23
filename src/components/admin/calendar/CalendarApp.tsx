@@ -45,6 +45,7 @@ import { withDefaults } from "@/lib/access-control";
 import { useTranslation } from "@/lib/i18n";
 import { calendarT } from "@/lib/translations/calendar";
 import { useMeBootstrap } from "@/lib/me-bootstrap";
+import { useOpenOnNewParam } from "@/lib/use-open-on-new-param";
 import { CALENDAR_EVENT_TYPES, EVENT_TYPE_COLORS } from "@/lib/calendar-enums";
 import {
   addDays,
@@ -284,6 +285,8 @@ export default function CalendarApp() {
       },
     });
   }
+  /* ?new=1 (Smart Create) opens a new event once the viewer is known. */
+  useOpenOnNewParam(openNewEvent, !!activeAccountId);
 
   async function openEvent(e: CalendarViewEvent) {
     /* Mirrors are read-only shadows of another module. A To-do or a project

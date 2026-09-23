@@ -42,6 +42,7 @@ import OrdersIcon from "@/components/icons/OrdersIcon";
 import BoxIcon from "@/components/icons/ui/BoxIcon";
 import { useRouter } from "next/navigation";
 import { useConfirm } from "@/components/kds/useConfirm";
+import { useOpenOnNewParam } from "@/lib/use-open-on-new-param";
 
 /* ON DEMAND, not on arrival. These two open when someone clicks "add product"
    or "pick customer" — most visits to the list never do either, and a static
@@ -1032,6 +1033,8 @@ export default function Quotations() {
       }
     })();
   }, []);
+  /* ?new=1 (Smart Create) opens a blank invoice in the editor. */
+  useOpenOnNewParam(handleNew);
 
   /* ── Deep link ──
      /invoices?doc=<id> opens that invoice straight into the editor. The

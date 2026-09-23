@@ -16,6 +16,7 @@
 import { humanizeError } from "@/lib/ui/humanize-error";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useWarmData } from "@/lib/warm-cache";
+import { useOpenOnNewParam } from "@/lib/use-open-on-new-param";
 import ConfirmDialog from "@/components/kds/ConfirmDialog";
 import Link from "next/link";
 import FinanceHeader from "@/components/finance/FinanceHeader";
@@ -161,6 +162,9 @@ export default function FinanceBankAccounts() {
     restricted_balance: 0,
     is_primary: accounts.length === 0,
   });
+  /* ?new=1 (Smart Create) opens the new-account form once the list is in,
+     so "primary" and the default currency are decided from real data. */
+  useOpenOnNewParam(startNew, !loading);
 
   const onSaved = useCallback(async () => {
     await loadList();

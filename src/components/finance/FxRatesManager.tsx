@@ -22,6 +22,7 @@ import { SmartField, SmartInput, SmartSelect } from "@/components/ui/create/Smar
 import { humanizeError } from "@/lib/ui/humanize-error";
 import { useBaseCurrencyOptional } from "@/lib/hooks/useBaseCurrency";
 import { useTranslation } from "@/lib/i18n";
+import { useOpenOnNewParam } from "@/lib/use-open-on-new-param";
 import { FIN_COMMON } from "@/lib/translations/finance/common";
 import { FIN_FX } from "@/lib/translations/finance/fx";
 
@@ -97,6 +98,13 @@ export default function FxRatesManager() {
   const status = data?.status ?? null;
 
   useEffect(() => { load(); }, [load]);
+  /* ?new=1 (Smart Create): this page has no dialog — the add form is
+     always on the page — so bring it into view and put the cursor in Rate. */
+  useOpenOnNewParam(useCallback(() => {
+    const el = document.getElementById("kx-fx-add-rate");
+    el?.scrollIntoView({ behavior: "smooth", block: "center" });
+    el?.querySelector<HTMLInputElement>('input[type="number"]')?.focus({ preventScroll: true });
+  }, []), !loading);
 
   async function addRate() {
     if (!rate || Number(rate) <= 0) { setError(t("fx.err.ratePositive", "Rate must be > 0.")); return; }
@@ -288,7 +296,7 @@ export default function FxRatesManager() {
       </section>
 
       {/* Add new rate */}
-      <section>
+      <section id="kx-fx-add-rate">
         <ErpEyebrow>{t("fx.addRateSection", "Add rate")}</ErpEyebrow>
         <ErpPanel className="kx-glass mt-2 px-4 py-4">
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">

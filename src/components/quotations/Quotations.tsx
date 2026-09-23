@@ -55,6 +55,7 @@ import {
 import { useQuotationCollab } from "@/lib/quotation-collab";
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 import DocTitlePicker from "@/components/quotations/DocTitlePicker";
+import { useOpenOnNewParam } from "@/lib/use-open-on-new-param";
 
 /* ON DEMAND, not on arrival. These two open when someone clicks "add product"
    or "pick customer" — most visits to the list never do either, and a static
@@ -1573,6 +1574,8 @@ export default function Quotations() {
     markSaved(q);            // a pristine new quote isn't "dirty" until edited
     setView("editor");
   }, [markSaved]);
+  /* ?new=1 (Smart Create) opens a blank quotation in the editor. */
+  useOpenOnNewParam(handleNew);
 
   /* ── Deep link ──
      /quotations?doc=<id> opens that quotation straight into the editor, so

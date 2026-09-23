@@ -190,6 +190,7 @@ import { useSkin } from "@/lib/appearance";
 import nextDynamic from "next/dynamic";
 import AppIcon from "@/components/common/AppIcon";
 import { uploadToStorage } from "@/lib/storage-client";
+import { useOpenOnNewParam } from "@/lib/use-open-on-new-param";
 
 /* Only the namespaces this screen reads — see contacts.ts. */
 const DICT = { ...CT_ACTION, ...CT_ADD, ...CT_BACK, ...CT_BTN, ...CT_CLASSIFICATIONS, ...CT_CREATE, ...CT_CUSTOMERTAB, ...CT_DELETE, ...CT_DEPT, ...CT_DETAIL, ...CT_EDITCONTACT, ...CT_ENTITY, ...CT_ERROR, ...CT_FIELD, ...CT_FILTER, ...CT_HINT, ...CT_KPI, ...CT_MISC, ...CT_NEWCONTACT, ...CT_NEWCUSTOMER, ...CT_NEWSUPPLIER, ...CT_NOCONTACTSFOUND, ...CT_OWNER, ...CT_PHOTO, ...CT_PIPELINE, ...CT_PLACEHOLDER, ...CT_REFRESHING, ...CT_RESUMETYPE, ...CT_SD, ...CT_SEARCHCUSTOMERS, ...CT_SEARCHPLACEHOLDER, ...CT_SEARCHSUPPLIERS, ...CT_SECTION, ...CT_SELECTCONTACT, ...CT_SETUP, ...CT_SREASON, ...CT_SUBSECTION, ...CT_SUPGROUP, ...CT_SUPPLIER, ...CT_TAB, ...CT_TIER, ...CT_TITLE, ...CT_TOOLTIP, ...CT_TS, ...CT_TYPE, ...CT_TYPECHOOSER, ...CT_UNIT } as const;
@@ -5885,6 +5886,14 @@ export default function Contacts({ filterType }: { filterType?: ContactType } = 
     setMobileShowDetail(true);
     setExpandedFamily(null);
   }, []);
+  /* ?new=1 (Smart Create) does what the header "+" does: the type chooser
+     on /contacts, the person/company step on /customers, a direct add on
+     the other filtered directories. */
+  useOpenOnNewParam(useCallback(() => {
+    if (filterType === "customer") { setTypeChooserStep(2); setShowTypeChooser(true); }
+    else if (filterType) handleAdd(filterType);
+    else { setTypeChooserStep(1); setShowTypeChooser(true); }
+  }, [filterType, handleAdd]));
 
   /* Catalog import → open the REAL New Supplier form (the exact same
      renderFormPanel) inside a modal, pre-filled with the extracted data. The

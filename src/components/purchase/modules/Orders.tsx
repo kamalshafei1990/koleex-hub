@@ -6,7 +6,8 @@
    we're buying with quantities + unit costs, and tracks how much
    has been received and billed against it. */
 
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
+import { useOpenOnNewParam } from "@/lib/use-open-on-new-param";
 import type { PurchaseModuleProps, SupplierRef } from "../shared";
 import { cardCls, formatMoney, formatDate, sectionTitleCls, STATUS_TONE_PO, supplierNames, usePurchaseList } from "../shared";
 import { NewPurchaseOrderDialog } from "../dialogs";
@@ -25,6 +26,8 @@ type PO = {
 
 export default function OrdersModule({ t }: PurchaseModuleProps) {
   const [newOpen, setNewOpen] = useState(false);
+  /* ?new=1 (Smart Create, Purchase home "+") opens the New PO dialog. */
+  useOpenOnNewParam(useCallback(() => setNewOpen(true), []));
   const [receivePoId, setReceivePoId] = useState<string | null>(null);
   const { data, loading, reload: load } = usePurchaseList<{ rows: PO[]; suppliers: SupplierRef[] }>("orders");
   const rows = data?.rows ?? [];

@@ -4,6 +4,7 @@ import "./globals.css";
 import RootShell from "@/components/layout/RootShell";
 import DialogHost from "@/lib/ui-dialog";
 import SmartCreateDrawer from "@/components/ui/create/SmartCreateDrawer";
+import SmartCreateFab from "@/components/ui/create/SmartCreateFab";
 import Providers from "./providers";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import { Analytics } from "@vercel/analytics/next";
@@ -126,6 +127,8 @@ export default function RootLayout({
           {/* Global "+ Create" launcher — callable from header chips,
               mobile action bar, and openSmartCreate() helper. */}
           <SmartCreateDrawer />
+          {/* Phone-only "+" into the same drawer (signed-in screens only). */}
+          <SmartCreateFab />
           {/* Vercel Speed Insights — real-user Core Web Vitals (LCP/INP/CLS)
               with P75 percentiles per route. Sends only performance timings +
               normalized route names; no user content. Dashboard: Vercel →
