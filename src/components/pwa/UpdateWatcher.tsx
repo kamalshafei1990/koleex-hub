@@ -300,7 +300,7 @@ export default function UpdateWatcher() {
               through the image optimizer (256px, ~few KB) and SW-cached. */}
           {/* eslint-disable-next-line @next/next/no-img-element -- tiny optimized brand asset */}
           <img
-            src="/_next/image?url=%2Fbrand%2Fhub-logo%2Fkoleex-hub-logo-for-dark-b.webp&w=256&q=75"
+            src="/_next/image?url=%2Fbrand%2Fhub-logo%2Fkoleex-hub-logo-for-dark-c.webp&w=256&q=75"
             alt=""
             aria-hidden
             className="h-[13px] w-auto shrink-0 opacity-80"
