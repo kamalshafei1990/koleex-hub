@@ -288,20 +288,22 @@ export default function MainHeader() {
             src={dk ? "/brand/hub-logo/koleex-hub-logo-for-dark.webp" : "/brand/hub-logo/koleex-hub-logo-for-light.webp"}
             alt="Koleex Hub"
             width={640}
-            height={99}
+            height={70}
             decoding="async"
             fetchPriority="high"
             /* Dragging the logo out of the header does nothing useful and, in
                the desktop shell, drops a stray image onto whatever is behind
                the window. */
             draggable={false}
-            /* The lockup is ~207px wide at h-8. On a 768 tablet that plus the
+            /* The lockup is ~218px wide at h-6 (Birdman "hub", 2026-09-23 — the
+               lockup is wider and shorter than the script one, so each step is
+               one notch lower to keep KOLEEX at the same size). On a 768 tablet that plus the
                language bar, theme, bell and avatar does not fit the row, and
                the logo — which cannot shrink — was overlapped by the right
                group (measured: logo ended at 231px, the language bar started
                at 166px). It steps down between md and lg, where the space
                actually runs out, and keeps its full size from lg up. */
-            className="w-auto h-5 md:h-6 lg:h-8 select-none [-webkit-user-drag:none]"
+            className="w-auto h-[15px] md:h-[18px] lg:h-6 select-none [-webkit-user-drag:none]"
           />
         </Link>
         {appName && (

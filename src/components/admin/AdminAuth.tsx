@@ -692,7 +692,7 @@ export default function AdminAuth({ children }: Props) {
             only on the viewport — never on the content. */}
         <div className="shrink-0 flex flex-col items-center pt-[clamp(40px,calc((100dvh-665px)/2),200px)] pb-6">
             {/* Hub logo v2 — login screen is always dark, so the for-dark
-                composite (untouched KOLEEX wordmark + gradient hub script). */}
+                composite (untouched KOLEEX wordmark + gradient Birdman "hub"). */}
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src="/brand/hub-logo/koleex-hub-logo-for-dark.webp"
@@ -701,7 +701,7 @@ export default function AdminAuth({ children }: Props) {
                  it, and a blue selection box across the wordmark is the first
                  thing a new user would see on the sign-in screen. */
               draggable={false}
-              className="h-8 w-auto select-none [-webkit-user-drag:none] drop-shadow-[0_0_28px_rgba(255,255,255,0.12)]"
+              className="h-6 w-auto select-none [-webkit-user-drag:none] drop-shadow-[0_0_28px_rgba(255,255,255,0.12)]"
             />
             <div className="mt-3 flex items-center gap-2">
               <span className="h-px w-6 bg-white/15" aria-hidden />
@@ -1216,7 +1216,7 @@ function JoinSuccessPanel({ name, reference, onReset }: JoinSuccessPanelProps) {
             <img
               src="/brand/hub-logo/koleex-hub-logo-for-light.webp"
               alt="Koleex Hub"
-              style={{ height: 30, width: "auto" }}
+              style={{ height: 22, width: "auto" }}
             />
             <p style={{ marginTop: 28, fontSize: 11, letterSpacing: "0.16em", textTransform: "uppercase", color: "#666" }}>
               {t("join.receiptTitle")}

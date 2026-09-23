@@ -303,7 +303,7 @@ export default function UpdateWatcher() {
             src="/_next/image?url=%2Fbrand%2Fhub-logo%2Fkoleex-hub-logo-for-dark.webp&w=256&q=75"
             alt=""
             aria-hidden
-            className="h-[17px] w-auto shrink-0 opacity-80"
+            className="h-[13px] w-auto shrink-0 opacity-80"
           />
           {/* ONE line of text. The reassurance sub-line is gone (owner,
               2026-08-09: "I don't want the text in two lines, I don't mean
