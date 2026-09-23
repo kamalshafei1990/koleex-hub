@@ -48,6 +48,14 @@ export const ERROR_KEYS: Record<string, string> = {
   not_in: "hr.me.notClockedIn",
   not_pending: "hr.me.notPending",
   not_your_report: "hr.me.notYourReport",
+  device_only: "hr.me.deviceOnly",
+  bad_date: "hr.me.errDate",
+  no_times: "hr.me.errNoTimes",
+  no_reason: "hr.me.errReason",
+  no_clock_in: "hr.me.errNoClockIn",
+  out_before_in: "hr.me.errOutBeforeIn",
+  already_pending: "hr.me.errPending",
+  bad_time: "hr.me.errTime",
 };
 
 export async function meFetch<T>(input: string, init?: RequestInit): Promise<{ ok: true; data: T } | { ok: false; error: string; status: number }> {

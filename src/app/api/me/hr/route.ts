@@ -179,6 +179,8 @@ export async function GET(req: Request) {
       today: monthRows.find((r) => r.date === today) ?? null,
       month: monthRows,
       monthHours: Math.round(monthRows.reduce((s, r) => s + Number(r.total_hours ?? 0), 0) * 100) / 100,
+      method: me.punchMethod,
+      remote: me.worksRemote,
     },
     team: { isManager: teamIds.length > 0, pending: teamPending },
     calendar: await calendarP,

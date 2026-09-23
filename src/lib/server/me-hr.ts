@@ -33,20 +33,26 @@ export interface MyEmployee {
   workLocation: string | null;
   managerId: string | null;
   tenantId: string | null;
+  /** 'device' = the office fingerprint device only; 'app' = the My HR button. */
+  punchMethod: "app" | "device";
+  /** Works outside the office — app punches are flagged remote. */
+  worksRemote: boolean;
 }
 
-const EMPLOYEE_COLS = "id, person_id, account_id, employee_number, department, position, hire_date, employment_status, employment_type, work_location, manager_id, tenant_id";
+const EMPLOYEE_COLS = "id, person_id, account_id, employee_number, department, position, hire_date, employment_status, employment_type, work_location, manager_id, punch_method, works_remote, tenant_id";
 
 type Row = {
   id: string; person_id: string | null; account_id: string | null; employee_number: string | null;
   department: string | null; position: string | null; hire_date: string | null; employment_status: string | null;
   employment_type: string | null; work_location: string | null; manager_id: string | null; tenant_id: string | null;
+  punch_method?: string | null; works_remote?: boolean | null;
 };
 
 const shape = (r: Row): MyEmployee => ({
   id: r.id, personId: r.person_id, employeeNumber: r.employee_number, department: r.department,
   position: r.position, hireDate: r.hire_date, employmentStatus: r.employment_status,
   employmentType: r.employment_type, workLocation: r.work_location, managerId: r.manager_id, tenantId: r.tenant_id,
+  punchMethod: r.punch_method === "device" ? "device" : "app", worksRemote: !!r.works_remote,
 });
 
 export async function resolveMyEmployee(auth: ServerAuthContext): Promise<MyEmployee | null> {

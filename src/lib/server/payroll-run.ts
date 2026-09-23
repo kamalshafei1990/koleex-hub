@@ -173,7 +173,10 @@ export async function runPayroll(opts: { tenantId: string | null; period: string
       basic: salary.base_salary, allowances: salary.allowances ?? {}, deductions: salary.deductions ?? {},
       currency: salary.currency || "USD", country, policyName: sheet.policy.name,
       workdays: sheet.summary.workdays, absentDays: opts.deductAbsence === false ? 0 : sheet.summary.absent, unpaidLeaveDays,
-      overtimeHours: sheet.summary.overtimeH, minHours: sheet.policy.minHours, rules,
+      /* Only APPROVED overtime is paid (owner rule, 23 Sep 2026): the sheet's
+         overtimeH is what the punches say; overtimeApprovedH is what HR or the
+         owner accepted. */
+      overtimeHours: sheet.summary.overtimeApprovedH, minHours: sheet.policy.minHours, rules,
     });
     const deductionsJson: Record<string, number> = { ...(salary.deductions ?? {}) };
     for (const l of breakdown.statutory) deductionsJson[l.name] = l.amount;

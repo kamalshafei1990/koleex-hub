@@ -2275,6 +2275,8 @@ export interface AttendancePolicyRow {
   min_hours: number;
   weekend_days: string[];
   is_default: boolean;
+  /** Phase 1: first day attendance counts (ISO date); null = not started. */
+  tracking_from: string | null;
   created_at: string;
 }
 
@@ -2291,6 +2293,10 @@ export interface AttendanceRecordRow {
   status: AttendanceStatus;
   source: string;
   notes: string | null;
+  /** Phase 1 flags: punched from outside the office / closed by the nightly job / changed by HR or an approved request. */
+  remote?: boolean;
+  auto_closed?: boolean;
+  corrected?: boolean;
   created_at: string;
   updated_at: string;
 }

@@ -96,7 +96,7 @@ export default function Overview({ bundle, setBundle, t, setTab }: MeTabProps) {
               <div className="text-[18px] font-medium text-[var(--text-primary)] tabular-nums">{fmtDate(serverDate)}</div>
               <div className="text-[12px] text-[var(--text-dim)] mt-0.5">{todayHint}</div>
             </div>
-            <ClockButton today={today} setBundle={setBundle} t={t} />
+            <ClockButton today={today} setBundle={setBundle} t={t} method={bundle.attendance.method} remote={bundle.attendance.remote} />
           </div>
         </section>
 

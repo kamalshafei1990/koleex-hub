@@ -1,7 +1,12 @@
 "use client";
 
 /* ClockButton — the one control that punches the clock. Overview and the
-   Attendance tab both render it; the server decides the time. */
+   Attendance tab both render it; the server decides the time.
+
+   Phase 1 (23 Sep 2026): an employee whose attendance is taken on the office
+   fingerprint device sees a line saying so instead of the button (the server
+   refuses the punch too); someone who works outside the office is told their
+   punches are marked for HR. */
 
 import { useState } from "react";
 import type { MyAttendanceRecord, MyHrBundle } from "@/lib/me-hr-types";
@@ -10,8 +15,10 @@ import PlayIcon from "@/components/icons/ui/PlayIcon";
 import StopIcon from "@/components/icons/ui/StopIcon";
 import { ERROR_KEYS, browserTz, meFetch } from "./shared";
 
-export default function ClockButton({ today, setBundle, t, size = "md" }: {
+export default function ClockButton({ today, setBundle, t, size = "md", method = "app", remote = false }: {
   today: MyAttendanceRecord | null;
+  method?: "app" | "device";
+  remote?: boolean;
   setBundle: (fn: (prev: MyHrBundle) => MyHrBundle) => void;
   t: (key: string, fallback?: string) => string;
   size?: "md" | "lg";
@@ -37,9 +44,13 @@ export default function ClockButton({ today, setBundle, t, size = "md" }: {
       const rest = prev.attendance.month.filter((r) => r.id !== rec.id);
       const month = [rec, ...rest].sort((a, b) => (a.date < b.date ? 1 : -1));
       const monthHours = Math.round(month.reduce((s, r) => s + Number(r.total_hours ?? 0), 0) * 100) / 100;
-      return { ...prev, attendance: { today: rec, month, monthHours } };
+      return { ...prev, attendance: { ...prev.attendance, today: rec, month, monthHours } };
     });
   };
+
+  if (method === "device") {
+    return <p className="max-w-[260px] text-[12.5px] leading-snug text-[var(--text-dim)]">{t("hr.me.deviceOnly")}</p>;
+  }
 
   const h = size === "lg" ? "h-12 px-6 text-[14px]" : "h-10 px-4 text-[13px]";
   const cls = done
@@ -55,6 +66,7 @@ export default function ClockButton({ today, setBundle, t, size = "md" }: {
         {done ? t("hr.me.dayDone") : action === "in" ? t("hr.me.clockInBtn") : t("hr.clockOutBtn")}
       </button>
       {error && <span className="text-[12px] text-[#FF3333]">{error}</span>}
+      {remote && !error && <span className="max-w-[260px] text-[11.5px] leading-snug text-[var(--text-dim)]">{t("hr.me.remoteNote")}</span>}
     </div>
   );
 }

@@ -81,6 +81,9 @@ export const ATTENDANCE_STATUS_MAP: Record<string, string> = {
   leave:    "bg-blue-500/10 text-blue-400 border-blue-500/15",
   holiday:  "bg-slate-500/10 text-slate-400 border-slate-500/15",
   weekend:  "bg-slate-500/10 text-slate-500 border-slate-500/10",
+  /* Before attendance tracking started (policy tracking_from) or before the
+     hire date — the day is simply not counted, never "absent". */
+  not_tracked: "bg-transparent text-[var(--text-dim)] border-[var(--border-subtle)]",
   future:   "bg-transparent text-[var(--text-faint)] border-transparent",
 };
 

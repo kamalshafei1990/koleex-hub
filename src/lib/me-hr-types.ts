@@ -60,7 +60,13 @@ export interface MyHrBundle {
   team: { isManager: boolean; pending: MyTeamRequest[] };
   /** Weekend + public holidays of the country I work in, today → +12 months. */
   calendar: WorkCalendar;
-  attendance: { today: MyAttendanceRecord | null; month: MyAttendanceRecord[]; monthHours: number };
+  attendance: {
+    today: MyAttendanceRecord | null; month: MyAttendanceRecord[]; monthHours: number;
+    /** 'device' = punches only on the office fingerprint device (the button is hidden). */
+    method: "app" | "device";
+    /** Works outside the office — punches are flagged for HR. */
+    remote: boolean;
+  };
   payslips: MyPayslip[];
   documents: MyDocument[];
 }

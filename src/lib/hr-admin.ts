@@ -683,6 +683,75 @@ export interface AttendanceImportResult {
   problems?: Array<{ line: number; problem: string }>;
   sample?: Array<{ employee_id: string; date: string; clock_in: string | null; clock_out: string | null; total_hours: number | null; status: string }>;
 }
+/* ── Attendance Phase 1 (owner-approved 23 Sep 2026) ─────────────────────
+   Corrections, the overtime queue and per-employee punch settings. Server
+   routes only — the day's times change through ONE writer on the server
+   (attendance-records.ts) so every change leaves an audit row. */
+
+export interface AttendanceCorrectionRow {
+  id: string; employee_id: string; employee_name: string; date: string; kind: "request" | "edit";
+  status: "pending" | "approved" | "rejected" | "applied";
+  clock_in: string | null; clock_out: string | null; break_minutes: number | null; reason: string;
+  decision_note: string | null; created_at: string; decided_at: string | null;
+  current: { clock_in: string | null; clock_out: string | null; break_minutes: number | null } | null;
+  /** The employee's policy zone — every time on this row is shown in it. */
+  timezone: string;
+}
+export interface OvertimeItem {
+  record_id: string; employee_id: string; employee_name: string; date: string;
+  clock_in: string | null; clock_out: string | null; minutes: number; work_end: string; timezone: string;
+}
+export interface AttendanceEmployeeSetting {
+  id: string; name: string; punch_method: "app" | "device"; works_remote: boolean; work_country: string | null; hire_date: string | null;
+}
+
+/** HR sets a day's times. clock_out "" clears it. Times are wall-clock in
+ *  the employee's policy zone; a reason is required. */
+export async function editAttendanceDay(input: {
+  employee_id: string; date: string; clock_in: string; clock_out: string; break_minutes: number; reason: string;
+}): Promise<{ ok: true } | { ok: false; error: string }> {
+  const r = await hrJson<{ record: unknown }>("/api/hr/attendance/record", {
+    method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(input),
+  });
+  return r.ok ? { ok: true } : { ok: false, error: r.error ?? `HTTP ${r.status}` };
+}
+
+export async function fetchAttendanceCorrections(): Promise<{ pending: AttendanceCorrectionRow[]; recent: AttendanceCorrectionRow[] }> {
+  const r = await hrJson<{ pending: AttendanceCorrectionRow[]; recent: AttendanceCorrectionRow[] }>("/api/hr/attendance/corrections");
+  return { pending: r.data?.pending ?? [], recent: r.data?.recent ?? [] };
+}
+
+export async function decideAttendanceCorrection(id: string, decision: "approve" | "reject", note: string): Promise<{ ok: true } | { ok: false; error: string }> {
+  const r = await hrJson<{ ok: true }>(`/api/hr/attendance/corrections/${id}`, {
+    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ decision, note }),
+  });
+  return r.ok ? { ok: true } : { ok: false, error: r.error ?? `HTTP ${r.status}` };
+}
+
+export async function fetchPendingOvertime(): Promise<OvertimeItem[]> {
+  const r = await hrJson<{ items: OvertimeItem[] }>("/api/hr/attendance/overtime");
+  return r.data?.items ?? [];
+}
+
+export async function decideOvertime(decisions: Array<{ record_id: string; decision: "approve" | "reject"; minutes?: number }>): Promise<boolean> {
+  const r = await hrJson<{ ok: true }>("/api/hr/attendance/overtime", {
+    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ decisions }),
+  });
+  return r.ok;
+}
+
+export async function fetchAttendanceEmployees(): Promise<AttendanceEmployeeSetting[]> {
+  const r = await hrJson<{ employees: AttendanceEmployeeSetting[] }>("/api/hr/attendance/employees");
+  return r.data?.employees ?? [];
+}
+
+export async function saveAttendanceEmployee(patch: { employee_id: string; punch_method?: "app" | "device"; works_remote?: boolean; work_country?: string | null }): Promise<boolean> {
+  const r = await hrJson<{ employee: unknown }>("/api/hr/attendance/employees", {
+    method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(patch),
+  });
+  return r.ok;
+}
+
 /** A fingerprint-device CSV export → attendance records (see the route). */
 export async function importAttendanceCsv(csv: string, dryRun: boolean): Promise<AttendanceImportResult> {
   try {
@@ -704,7 +773,7 @@ export async function fetchAttendancePolicies(): Promise<AttendancePolicyRow[]> 
   return (data as AttendancePolicyRow[]) || [];
 }
 
-export type AttendancePolicyInput = Pick<AttendancePolicyRow, "name" | "country" | "timezone" | "work_start" | "work_end" | "late_threshold_min" | "min_hours" | "weekend_days" | "is_default">;
+export type AttendancePolicyInput = Pick<AttendancePolicyRow, "name" | "country" | "timezone" | "work_start" | "work_end" | "late_threshold_min" | "min_hours" | "weekend_days" | "is_default" | "tracking_from">;
 /** Create or update a policy. One per country; `is_default` marks the one
  *  everyone unmatched falls back to. */
 export async function saveAttendancePolicy(id: string | null, input: AttendancePolicyInput): Promise<boolean> {
