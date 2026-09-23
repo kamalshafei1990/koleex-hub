@@ -42,9 +42,12 @@ export interface ChosenOrbProps extends AIOrbProps {
   /** Draw this style regardless of the user's choice — for the previews in
    *  Settings, which must show each option as itself. */
   style?: OrbStyle;
+  /** Dots only: at rest, drift through the shapes (the Home greeting). The
+   *  aura orb has one shape and ignores it. */
+  wander?: boolean;
 }
 
-export default function ChosenOrb({ surface, style, ...props }: ChosenOrbProps) {
+export default function ChosenOrb({ surface, style, wander, ...props }: ChosenOrbProps) {
   const chosen = useOrbStyle();
   const draw = style ?? chosen;
   if (draw === "dots") {
@@ -52,7 +55,7 @@ export default function ChosenOrb({ surface, style, ...props }: ChosenOrbProps) 
     return (
       <span className={`inline-flex shrink-0 ${props.className ?? ""}`} style={{ width: size, height: size }}>
         <Suspense fallback={null}>
-          <DottedOrb {...props} className="" surface={surface} />
+          <DottedOrb {...props} className="" surface={surface} wander={wander} />
         </Suspense>
       </span>
     );

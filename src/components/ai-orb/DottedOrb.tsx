@@ -27,13 +27,16 @@ import type { AIOrbProps } from "./ai-orb-types";
 import { clamp01, resolveOrbState } from "./ai-orb-types";
 import { orbStatusLabel } from "./ai-orb-labels";
 import { useAudioSmoothing } from "./useAudioSmoothing";
-import { dottedLook, dottedPreset, type DottedLook } from "./dotted-orb-map";
+import { DOTTED_WANDER_MS, dottedLook, dottedPreset, nextWanderMotion, type DottedLook, type DottedMotion } from "./dotted-orb-map";
 import { DOTTED_MORPH_MS, easeInOutCubic, morphDots, type MorphDot } from "./dotted-orb-morph";
 
 export interface DottedOrbProps extends AIOrbProps {
   /** "dark" pins light dots — for surfaces that are dark in both themes
    *  (the call screen). "auto" follows the app's theme. */
   surface?: "auto" | "dark";
+  /** At rest, drift through the nine shapes at random, one every
+   *  DOTTED_WANDER_MS (the Home greeting). Any other state shows as usual. */
+  wander?: boolean;
 }
 
 /** The app's own theme on <html>: light only when it says so; the Hub's
@@ -57,11 +60,12 @@ export default function DottedOrb({
   className = "",
   label,
   surface = "auto",
+  wander = false,
 }: DottedOrbProps) {
   const rootRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const visual = resolveOrbState(state, result);
-  const look = dottedLook(state, activity, result, size);
+  const stateLook = dottedLook(state, activity, result, size);
   const audioActive = visual === "listening" || visual === "speaking";
   useAudioSmoothing(rootRef, clamp01(audioLevel), audioActive);
 
@@ -93,6 +97,28 @@ export default function DottedOrb({
     return () => window.removeEventListener("langchange", onLang);
   }, []);
   const statusLabel = label ?? orbStatusLabel(visual, activity, lang);
+
+  /* WANDERING: at rest only, and never for someone who asked for stillness.
+     It starts in the resting shape and leaves it after the first dwell; the
+     moment the state is anything but idle, the state's own look takes over
+     (with a morph, like any other change). Paused while the tab is hidden —
+     nothing is on screen to change. */
+  const wandering = wander && visual === "idle";
+  const [wanderMotion, setWanderMotion] = useState<DottedMotion | null>(null);
+  useEffect(() => {
+    if (!wandering || wantsStill()) return;
+    const id = window.setInterval(() => {
+      if (document.visibilityState === "hidden") return;
+      setWanderMotion((m) => nextWanderMotion(m ?? stateLook.motion, Math.random()));
+    }, DOTTED_WANDER_MS);
+    return () => {
+      window.clearInterval(id);
+      setWanderMotion(null);
+    };
+    // The resting motion is fixed per size; re-arming on it would restart the dwell.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [wandering]);
+  const look: DottedLook = wandering && wanderMotion ? { motion: wanderMotion, speed: 1, ink: 1 } : stateLook;
 
   const { motion, speed, ink } = look;
 
