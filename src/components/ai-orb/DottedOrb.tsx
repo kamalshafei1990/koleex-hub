@@ -29,6 +29,7 @@ import { orbStatusLabel } from "./ai-orb-labels";
 import { useAudioSmoothing } from "./useAudioSmoothing";
 import { DOTTED_WANDER_MS, dottedLook, dottedPreset, nextWanderMotion, type DottedLook, type DottedMotion } from "./dotted-orb-map";
 import { DOTTED_MORPH_MS, easeInOutCubic, morphDots, type MorphDot } from "./dotted-orb-morph";
+import { auroraNoise, auroraTint, dottedFlows, dottedPalette, monoInk, tintedInk, type DottedPalette } from "./dotted-orb-ink";
 
 export interface DottedOrbProps extends AIOrbProps {
   /** "dark" pins light dots — for surfaces that are dark in both themes
@@ -43,6 +44,16 @@ export interface DottedOrbProps extends AIOrbProps {
  *  default is dark. */
 function appIsDark(): boolean {
   return document.documentElement.dataset.theme !== "light";
+}
+
+/** The Hub's style (Aurora or Core) on <html> — it decides the dots' colours. */
+function appPalette(): DottedPalette {
+  return dottedPalette(document.documentElement.dataset.kxSkin);
+}
+
+/** The Hub marked this machine low-power (display-prefs / the bootstrap). */
+function appLowPower(): boolean {
+  return document.documentElement.hasAttribute("data-kx-lowpower");
 }
 
 /** Either the OS or the Hub's own Display setting asks for stillness. */
@@ -69,16 +80,30 @@ export default function DottedOrb({
   const audioActive = visual === "listening" || visual === "speaking";
   useAudioSmoothing(rootRef, clamp01(audioLevel), audioActive);
 
-  /* Theme and stillness are read after mount (no SSR/hydration mismatch) and
-     followed live: the header's theme toggle and the Display tab both change
-     <html>, and an orb already on screen should follow without a reload. */
+  /* Theme, style and stillness are read after mount (no SSR/hydration
+     mismatch) and followed live: the header's theme toggle and the Display
+     and Appearance tabs all change <html>, and an orb already on screen
+     should follow without a reload. Style and low-power are also read on the
+     first client render: they only ever reach the canvas, never the markup,
+     so there is nothing to mismatch — and an Aurora orb never shows one grey
+     frame first. */
   const [dark, setDark] = useState(true);
   const [still, setStill] = useState(false);
+  const [palette, setPalette] = useState<DottedPalette>(() => (typeof document === "undefined" ? "mono" : appPalette()));
+  const [lowPower, setLowPower] = useState(() => typeof document !== "undefined" && appLowPower());
   useEffect(() => {
-    const read = () => { setDark(appIsDark()); setStill(wantsStill()); };
+    const read = () => {
+      setDark(appIsDark());
+      setStill(wantsStill());
+      setPalette(appPalette());
+      setLowPower(appLowPower());
+    };
     read();
     const mo = new MutationObserver(read);
-    mo.observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme", "class"] });
+    mo.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ["data-theme", "class", "data-kx-skin", "data-kx-lowpower"],
+    });
     const mq = window.matchMedia?.("(prefers-reduced-motion: reduce)");
     mq?.addEventListener("change", read);
     return () => { mo.disconnect(); mq?.removeEventListener("change", read); };
@@ -162,16 +187,21 @@ export default function DottedOrb({
       return MODE_FRAMES[mode](size, phase, opts);
     };
 
-    /* The engine's ink convention: `white` is the value on paper; on a dark
-       ground it is mirrored so the near dots read bright. */
-    const tone = (white: number) => {
-      const w = Math.min(1, Math.max(0, white));
-      return Math.round((lightDots ? 1 - w : w) * 255);
-    };
+    /* COLOUR (see dotted-orb-ink.ts). Core: the original grey ink. Aurora:
+       the field's blues, taken at each dot's PLACE on the orb, rippling with
+       the field's noise while `flowT` runs — and held at one instant where
+       dottedFlows() says the ripple is not worth drawing. */
+    const ground = lightDots ? "dark" : "light";
+    const flows = dottedFlows(palette, preset, still, lowPower);
+    const noise = palette === "aurora" ? auroraNoise() : null;
+    let flowT = flows ? performance.now() / 1000 : 0;
+    const inkAt = (white: number, alpha: number, x: number, y: number) =>
+      noise
+        ? tintedInk(white, auroraTint(noise, x, y, size, flowT, ground), alpha, lightDots)
+        : monoInk(white, alpha, lightDots);
     const paintLines = (lines: ReturnType<typeof frameOf>["lines"], ink: number) => {
       for (const l of lines) {
-        const g = tone(l.white);
-        ctx.strokeStyle = `rgba(${g},${g},${g},${(l.a ?? 1) * ink})`;
+        ctx.strokeStyle = inkAt(l.white, (l.a ?? 1) * ink, (l.x1 + l.x2) / 2, (l.y1 + l.y2) / 2);
         ctx.lineWidth = l.w;
         ctx.beginPath();
         ctx.moveTo(l.x1, l.y1);
@@ -181,8 +211,7 @@ export default function DottedOrb({
     };
     const paintDots = (dots: readonly MorphDot[], ink: number) => {
       for (const d of dots) {
-        const g = tone(d.white);
-        ctx.fillStyle = `rgba(${g},${g},${g},${(d.a ?? 1) * ink})`;
+        ctx.fillStyle = inkAt(d.white, (d.a ?? 1) * ink, d.x, d.y);
         ctx.beginPath();
         ctx.arc(d.x, d.y, Math.max(0.2, d.r), 0, Math.PI * 2);
         ctx.fill();
@@ -212,6 +241,7 @@ export default function DottedOrb({
       const dt = Math.min(0.1, Math.max(0, (now - clock.last) / 1000));
       clock.last = now;
       clock.phase += dt * paceOf(cur);
+      if (flows) flowT = now / 1000;
       begin();
       const m = morphRef.current;
       if (m) {
@@ -261,7 +291,7 @@ export default function DottedOrb({
       io?.disconnect();
       document.removeEventListener("visibilitychange", onVis);
     };
-  }, [size, lightDots, still, stillKey]);
+  }, [size, lightDots, still, stillKey, palette, lowPower]);
 
   return (
     <div
