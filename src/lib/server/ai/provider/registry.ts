@@ -187,10 +187,10 @@ function failoverEnabled(): boolean {
 export async function chatWithToolsVia(
   adapters: ReadonlyArray<ProviderAdapter>,
   req: TurnRequest,
-  opts?: { onDelta?: (t: string) => void; failover?: boolean; breaker?: Breaker },
+  opts?: { onDelta?: (t: string) => void; failover?: boolean; breaker?: Breaker; prefer?: ProviderAdapter | null },
 ): Promise<TurnOutcome> {
   const breaker = opts?.breaker ?? providerBreaker;
-  const candidates = configuredAdapters(adapters);
+  const candidates = preferFirst(configuredAdapters(adapters), opts?.prefer ?? null);
   if (candidates.length === 0) {
     return { ok: false, status: 503, bodyText: "no AI provider configured" };
   }
@@ -254,10 +254,25 @@ export async function chatWithToolsVia(
   return last;
 }
 
-/** The one door, over the live registry. */
+/** THE USER'S CHOICE OF KOLEEX MODEL (owner, 2026-09-23). The chosen
+ *  model's adapter moves to the front; everything else keeps its preference
+ *  order behind it, so a chosen model that is down still fails over exactly
+ *  as the registry always has. A preferred adapter that is not configured is
+ *  simply absent — the list is returned unchanged. Pure; exported for the
+ *  suite. */
+export function preferFirst(
+  candidates: ReadonlyArray<ProviderAdapter>,
+  prefer: ProviderAdapter | null,
+): ProviderAdapter[] {
+  if (!prefer || !candidates.includes(prefer)) return [...candidates];
+  return [prefer, ...candidates.filter((a) => a !== prefer)];
+}
+
+/** The one door, over the live registry. `prefer` is the adapter behind the
+ *  user's chosen Koleex model (provider/koleex-model-slots), or null for Auto. */
 export async function chatWithTools(
   req: TurnRequest,
-  opts?: { onDelta?: (t: string) => void },
+  opts?: { onDelta?: (t: string) => void; prefer?: ProviderAdapter | null },
 ): Promise<TurnOutcome> {
   return chatWithToolsVia(REGISTRY, req, opts);
 }

@@ -11,6 +11,7 @@ import "server-only";
    --------------------------------------------------------------------------- */
 
 import type { AgentStep, UserContext } from "@/lib/server/ai-agent/types";
+import type { KoleexModelId } from "@/lib/ai/koleex-models";
 
 export interface TurnInput {
   ctx: UserContext;
@@ -27,6 +28,10 @@ export interface TurnInput {
    *  and put on every line this turn writes. Absent: the conversation id
    *  stands in, as it did before plan G1. */
   traceId?: string | null;
+  /** The Koleex AI model the user chose, AFTER the route resolved it
+   *  (provider/koleex-model-slots). Its provider is tried first; failover is
+   *  unchanged. Absent or "auto": today's preference order. */
+  model?: KoleexModelId;
   /** The composer's globe control was on for this turn. A nudge toward
    *  search_web, never a command — the model still decides. */
   webSearchRequested?: boolean;

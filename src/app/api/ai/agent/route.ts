@@ -57,6 +57,7 @@ import {
 } from "@/lib/server/ai/core/decide-turn";
 import { tryCannedReply } from "@/lib/server/ai/core/canned-replies";
 import { chatWithTools, activeProviderLabel } from "@/lib/server/ai/provider/registry";
+import { adapterForModel, resolveRequestedModel, servedKoleexModel } from "@/lib/server/ai/provider/koleex-model-slots";
 import { generalLaneTools, runGeneralSearchHop, GENERAL_SEARCH_NOTE } from "@/lib/server/ai/core/general-search";
 import { newTraceId, traceFields } from "@/lib/server/ai/observability/turn-trace";
 import { meterTurn } from "@/lib/server/ai/cost/meter";
@@ -173,10 +174,18 @@ export async function POST(req: Request) {
     /** The composer's globe control. A nudge, not a command: it tells the
      *  orchestrator the user explicitly wants the web checked this turn. */
     web_search?: boolean;
+    /** The Koleex AI model the user picked (lib/ai/koleex-models). A REQUEST:
+     *  resolveRequestedModel() decides what is honoured. */
+    model?: unknown;
   };
 
   const content = body.content?.trim();
   const conversationId = body.conversationId;
+  /* THE CLIENT ASKS, THE SERVER DECIDES (owner, 2026-09-23). An unknown or
+     switched-off model is Auto; the chosen model's provider goes first and
+     the others stay behind it as failover. */
+  const chosenModel = resolveRequestedModel(body.model);
+  const prefer = adapterForModel(chosenModel);
   const wantsStream =
     body.stream === true || req.headers.get("accept") === "text/event-stream";
   if (!content) {
@@ -361,6 +370,9 @@ export async function POST(req: Request) {
                  the audit trail is not the browser. See
                  observability/public-provider.ts. */
               agent: withPublicProvider(agent),
+              /* Which Koleex model answered — a Koleex name, never a vendor. Null
+                 when no model did (a canned or degraded reply). */
+              model: servedKoleexModel(agent.provider),
               message: withPublicProvider(assistantInsert.data),
               conversation: { id: conversationId, title: finalTitle },
               total_ms: tEnd - t0,
@@ -381,6 +393,9 @@ export async function POST(req: Request) {
 
     return NextResponse.json({
       agent: withPublicProvider(agent),
+      /* Which Koleex model answered — a Koleex name, never a vendor. Null
+         when no model did (a canned or degraded reply). */
+      model: servedKoleexModel(agent.provider),
       message: withPublicProvider(assistantInsert.data),
       conversation: { id: conversationId, title: finalTitle },
     });
@@ -729,7 +744,7 @@ export async function POST(req: Request) {
                   stream: true,
                   ...(generalTools ? { tools: generalTools, toolChoice: "auto" as const } : {}),
                 },
-                { onDelta },
+                { onDelta, prefer },
               );
               meter(out, `fast-${fastLane}`);
               /* THE HOP. The model asked to look something up: whatever it
@@ -756,7 +771,7 @@ export async function POST(req: Request) {
                 gotFirst = false;
                 out = await chatWithTools(
                   { messages: hop.messages, maxTokens, temperature: 0.3, modelClass: "GENERAL" as const, stream: true },
-                  { onDelta },
+                  { onDelta, prefer },
                 );
                 meter(out, "fast-general+search");
               }
@@ -773,7 +788,7 @@ export async function POST(req: Request) {
                    orchestrator — an empty string was sealed and sent as the
                    reply (bug hunt, 2026-09-12). */
                 fastReply = (out.response.content || accumulated) || null;
-                fastProvider = `${activeProviderLabel()}:fast-${fastLane}${fastSteps.length > 0 ? "+search" : ""}`;
+                fastProvider = `${out.servedBy ? `${out.servedBy}:${out.model ?? "unknown"}` : activeProviderLabel()}:fast-${fastLane}${fastSteps.length > 0 ? "+search" : ""}`;
               } else if (gotFirst) {
                 /* Failed after deltas were already on the client's screen. We
                    cannot un-emit them, so keep what was said rather than
@@ -781,7 +796,7 @@ export async function POST(req: Request) {
                    registry applies the same rule one level down: it does not
                    fail over once a delta has been emitted. */
                 fastReply = accumulated || null;
-                fastProvider = `${activeProviderLabel()}:fast-${fastLane}${fastSteps.length > 0 ? "+search" : ""}`;
+                fastProvider = `${out.servedBy ? `${out.servedBy}:${out.model ?? "unknown"}` : activeProviderLabel()}:fast-${fastLane}${fastSteps.length > 0 ? "+search" : ""}`;
               }
               /* Failed before any delta → fastReply stays null and the turn
                  falls through to orchestrate(), exactly as before. */
@@ -814,6 +829,7 @@ export async function POST(req: Request) {
           } else {
             let liveDeltaCount = 0;
             agent = await orchestrate({
+              model: chosenModel,
               dialect: wantsRewrite ? ("egyptian" as const) : null,
               onDelta: (text) => {
                 liveDeltaCount++;
@@ -963,6 +979,9 @@ export async function POST(req: Request) {
                  the audit trail is not the browser. See
                  observability/public-provider.ts. */
               agent: withPublicProvider(agent),
+              /* Which Koleex model answered — a Koleex name, never a vendor. Null
+                 when no model did (a canned or degraded reply). */
+              model: servedKoleexModel(agent.provider),
               message: withPublicProvider(assistantInsert.data),
               conversation: { id: conversationId, title: finalTitle },
               total_ms: tEnd - t0,
@@ -1060,6 +1079,7 @@ export async function POST(req: Request) {
   );
 
   const agent = await orchestrate({
+    model: chosenModel,
     ctx,
     history,
     userMessage: content + attachBlock,
@@ -1123,6 +1143,9 @@ export async function POST(req: Request) {
 
   return NextResponse.json({
     agent: withPublicProvider(agent),
+    /* Which Koleex model answered — a Koleex name, never a vendor. Null
+       when no model did (a canned or degraded reply). */
+    model: servedKoleexModel(agent.provider),
     message: withPublicProvider(assistantInsert.data),
     conversation: { id: conversationId, title: finalTitle },
   });

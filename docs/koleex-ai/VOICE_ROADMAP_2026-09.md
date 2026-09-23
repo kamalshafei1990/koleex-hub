@@ -2371,3 +2371,30 @@ The session could not set them itself: the Vercel connector returns 403 on proje
 **How to check it.** `/api/ai/providers?probe=1` (super-admin) lists all three providers and sends each one a tiny turn. If the second backup is not configured, the route explains why using its own variable names (`fallback2_not_configured_because`).
 
 **Tests.** `validate:ai-provider` has 183 checks (+27). Each was confirmed by breaking the code on purpose: the order, an unsafe borrow, the own key taking precedence over a borrowed one, the slot's variable names, the slot reading the first slot's settings, and the route probing only two providers.
+
+## Koleex AI models, part 1: the server (2026-09-23)
+
+The owner asked to turn the three providers into Koleex AI models the user can pick from, like the model pickers in the big chat apps. The names are Koleex's own. No vendor is named anywhere the user can see.
+
+| Model | Good at | Voice | Slot behind it |
+|---|---|---|---|
+| **Auto** (default) | Koleex picks per question | yes | no preference: the normal order |
+| **Koleex Blink** | fast answers, translation, Chinese | yes | `AI_FALLBACK_*` |
+| **Koleex Mind** | everyday work: products, prices, quotations | no | the primary adapter |
+| **Koleex Deep** | deep thinking, analysis, long files | yes | `AI_FALLBACK2_*` |
+
+**Where it lives.** `src/lib/ai/koleex-models.ts` is the catalog: ids, names and one-line descriptions in English, Chinese and Arabic. It is shared with the browser and names no vendor, and a test enforces that. `src/lib/server/ai/provider/koleex-model-slots.ts` is the only file that knows which slot stands behind each name, and it is server-only.
+
+**The client asks and the server decides.** The agent route accepts an optional `model` in the body. `resolveRequestedModel` turns any value it doesn't recognise into Auto, and so does a model an operator has switched off. A client can never pick something that doesn't exist or has been switched off.
+
+**A choice is a preference, not a cage.** The chosen model is tried first (`preferFirst` in the registry, applied after the unconfigured providers are filtered out). The others stay behind it as failover exactly as before, so a choice can never leave a user without an answer. The failover kill-switch still applies.
+
+**The reply says which model answered.** Every agent response now carries `model`: `"blink" | "mind" | "deep" | null`. It is derived from the provider that actually served, and only from a configured slot, so the degraded lane that answers without a model is never credited to one. The picker (part 2) will use it to show "answered by Koleex X" after a failover. The fast lane's provider label now records the provider that served rather than the one predicted.
+
+**Operator switch.** `AI_MODELS_DISABLED=deep,blink` (case-insensitive) takes models out of service. Auto can't be switched off.
+
+**The picker's list.** `GET /api/ai/models` (and `/api/v1/ai/models`) sits behind the same sign-in and internal-user check as every Koleex AI endpoint. It returns `{ models: [{ id, available }], default: "auto" }`, with names and booleans only.
+
+**Still to come.** Part 2 adds the picker beside the message box, saved in the account's preferences. Part 3 makes voice calls follow the choice. Part 4 adds smarter Auto routing, the super-admin switch screen and a per-model speed and cost view. Koleex Deep only serves once the four `AI_FALLBACK2_*` variables above are set. Until then it is shown as unavailable.
+
+**Tests.** `validate:ai-models` is a new suite with 47 checks. Each was confirmed by breaking the code on purpose, and all 12 breaks were caught.
