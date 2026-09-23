@@ -142,3 +142,22 @@ function baseLook(state: AIOrbState, activity: AIOrbActivity, result: AIOrbResul
 export function dottedPreset(size: number): 64 | 20 {
   return size < 40 ? 20 : 64;
 }
+
+/* ── WANDERING (owner, 2026-09-23, on the Home greeting: "I want the orb
+   more bigger and changed randomly with the orb motion shapes"). Where a
+   surface asks for it, a resting dotted orb does not sit in one motion: it
+   drifts from shape to shape on its own, each change a morph. Only at rest —
+   the moment the assistant is actually doing something, the orb says what,
+   exactly as everywhere else. */
+
+/** How long the wandering orb stays in one shape before the next. Long
+ *  enough to watch the shape move, short enough to be noticed changing. */
+export const DOTTED_WANDER_MS = 6000;
+
+/** The next shape to wander to: any of the nine except the one it is in,
+ *  so every change is a visible change. `rand` in [0, 1). Pure. */
+export function nextWanderMotion(current: DottedMotion, rand: number): DottedMotion {
+  const others = DOTTED_MOTIONS.filter((m) => m !== current);
+  const i = Math.min(others.length - 1, Math.max(0, Math.floor(rand * others.length)));
+  return others[i];
+}

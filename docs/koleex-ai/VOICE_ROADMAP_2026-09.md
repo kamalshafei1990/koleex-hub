@@ -2271,3 +2271,35 @@ caught:
 - the loop restarting on motion;
 - pairing that drops dots;
 - a morph that never lands.
+
+### Follow-up: on Home, the orb is bigger and wanders
+
+The owner, on the Home greeting: *"I want the orb more bigger and changed
+randomly with the orb motion shapes."*
+
+**Bigger.**
+- From `md` up the orb is 112 px, next to a greeting card of about that height.
+- On a phone it stays 72 px, so the greeting keeps its width.
+- It is one canvas drawn at 112 and scaled into a 72 px box below `md`, so
+  nothing swaps or jumps after load.
+
+**It wanders.** The new `wander` prop passes from `KoleexGlowOrb` through
+`ChosenOrb` to the dots only; the aura orb has a single shape and never
+receives it.
+- At rest, the dotted orb morphs to a random shape every 6 s. It picks any of
+  the other eight, never the one it is already in, so every change is visible.
+- The moment the assistant is doing something (typing the greeting, for
+  example), the state's own look takes over, with a morph like any other
+  change.
+- It never wanders in stillness, and it pauses while the tab is hidden.
+- It is Home only. Everywhere else the orb keeps its states.
+
+**Verified in a browser.** I rendered the real `DottedOrb` in headless
+Chromium. At rest it moved through sash → ring → dotted sphere → sash at
+6-second steps. A "thinking" orb beside it kept its shape the whole time.
+
+**Tests.** `validate:ai-orb` has 159 checks (+4). Each was confirmed by
+breaking the code on purpose; all three breaks were caught:
+- wandering that may repeat the current shape;
+- wandering while the orb is thinking;
+- Home not wandering.

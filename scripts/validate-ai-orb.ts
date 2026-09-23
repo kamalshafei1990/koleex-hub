@@ -360,8 +360,44 @@ for (const k of ["kxA-life", "kxA-bounce", "kxA-sway", "kxA-gaze", "kxA-hunt", "
     /clock\.phase \+= dt \* paceOf\(cur\);/.test(dotted) &&
     /const dt = Math\.min\(0\.1, Math\.max\(0, \(now - clock\.last\) \/ 1000\)\);/.test(dotted) &&
     !/performance\.now\(\) \/ 1000\) \* pace;/.test(dotted));
+  /* ── WANDERING (owner, 2026-09-23, Home greeting) ── */
+  {
+    const { nextWanderMotion, DOTTED_WANDER_MS } = map;
+    let neverSame = true, alwaysValid = true;
+    const reached = new Map<string, Set<string>>();
+    for (const m of DOTTED_MOTIONS) {
+      reached.set(m, new Set());
+      for (let k = 0; k < 64; k++) {
+        const n = nextWanderMotion(m, k / 64);
+        if (n === m) neverSame = false;
+        if (!DOTTED_MOTIONS.includes(n)) alwaysValid = false;
+        reached.get(m)!.add(n);
+      }
+      for (const edge of [0, 0.999999, 1, -0.5, 7]) {
+        const n = nextWanderMotion(m, edge);
+        if (n === m || !DOTTED_MOTIONS.includes(n)) alwaysValid = false;
+      }
+    }
+    check("wander: every change is to a different shape, any of the other eight, even at the edges of the random range",
+      neverSame && alwaysValid && [...reached.values()].every((set) => set.size === DOTTED_MOTIONS.length - 1) && DOTTED_WANDER_MS === 6000);
+  }
+  check("wander: only at rest and never in stillness — the moment the assistant works, the orb says so",
+    /const wandering = wander && visual === "idle";/.test(dotted) &&
+    /if \(!wandering \|\| wantsStill\(\)\) return;/.test(dotted) &&
+    /const look: DottedLook = wandering && wanderMotion \? \{ motion: wanderMotion, speed: 1, ink: 1 \} : stateLook;/.test(dotted) &&
+    /if \(document\.visibilityState === "hidden"\) return;/.test(dotted));
+  check("wander: passed to the dots only — the aura orb has one shape and is never asked",
+    /<DottedOrb \{\.\.\.props\} className="" surface=\{surface\} wander=\{wander\} \/>/.test(chosen) &&
+    /return <AIOrb \{\.\.\.props\} \/>;/.test(chosen) &&
+    /export default function ChosenOrb\(\{ surface, style, wander, \.\.\.props \}/.test(chosen));
+  const home = readFileSync(join(srcRoot, "app/page.tsx"), "utf8");
+  check("home: the greeting's orb is 112px from md up, one canvas scaled into 72px on a phone, and it wanders",
+    /<KoleexGlowOrb state=\{orbState\} greetKey=\{greet\} size=\{112\} wander \/>/.test(home) &&
+    /w-\[72px\] h-\[72px\] md:w-\[112px\] md:h-\[112px\]/.test(home) &&
+    /max-md:scale-\[0\.6429\]/.test(home) && Math.abs(0.6429 * 112 - 72) < 0.01 &&
+    /wander=\{wander\}/.test(glow));
   check("dots: the orb hands its own size to the look, so the small-size rule actually reaches a chat bubble",
-    /const look = dottedLook\(state, activity, result, size\);/.test(dotted));
+    /const stateLook = dottedLook\(state, activity, result, size\);/.test(dotted));
   check("dots: the voice moves it on a call (the aura orb's own smoothing, not a second one)",
     /useAudioSmoothing\(rootRef, clamp01\(audioLevel\), audioActive\);/.test(dotted) && /var\(--kx-orb-audio, 0\)/.test(dotted));
 }

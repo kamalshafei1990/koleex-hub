@@ -28,6 +28,8 @@ interface Props {
   audioLevel?: number;
   progress?: number | null;
   interactive?: boolean;
+  /** Dots style only: at rest, drift through the shapes (Home greeting). */
+  wander?: boolean;
 }
 
 function mapLegacy(state: string | undefined, activity: AIOrbActivity): {
@@ -64,6 +66,7 @@ export default function KoleexGlowOrb({
   audioLevel,
   progress = null,
   interactive,
+  wander,
 }: Props) {
   const mapped = mapLegacy(state, activity);
   const act: AIOrbActivity = activity;
@@ -75,6 +78,7 @@ export default function KoleexGlowOrb({
       audioLevel={audioLevel}
       progress={progress}
       interactive={interactive}
+      wander={wander}
       size={size}
       className={className}
     />
