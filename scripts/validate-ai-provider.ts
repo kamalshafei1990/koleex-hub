@@ -32,7 +32,8 @@ import {
   chatWithToolsVia,
   shouldTryNextProvider,
 } from "../src/lib/server/ai/provider/registry";
-import { openAiCompatibleAdapter, parseFallbackConfig, parseExtraBody, diagnoseFallbackConfig } from "../src/lib/server/ai/provider/adapters/openai-compatible";
+import { openAiCompatibleAdapter, parseFallbackConfig, parseExtraBody, diagnoseFallbackConfig, secondFallbackAdapter, borrowableKeyName, slotKey, readSlotEnv, diagnoseSlot } from "../src/lib/server/ai/provider/adapters/openai-compatible";
+import { registeredAdapters } from "../src/lib/server/ai/provider/registry";
 import { providerRoster } from "../src/lib/server/ai/provider/registry";
 import { createBreaker, admissible } from "../src/lib/server/ai/router/circuit-breaker";
 import { parseClassMap, resolveModel, MODEL_CLASSES } from "../src/lib/server/ai/router/model-classes";
@@ -510,6 +511,70 @@ async function asyncChecks() {
         !out.ok && out.status === 503,
       );
     }
+  }
+
+  console.log("\n── 8b. A second backup slot, and borrowing a key by name (owner, 2026-09-23) ──");
+  /* "Put Grok as a second backup for the chat." The second slot is the same
+     adapter reading AI_FALLBACK2_*, so every rule above holds for it; what is
+     new is the order, and a key borrowed by NAME from one the deployment
+     already holds (the voice lane's), which must never reach a non-AI secret. */
+  {
+    const reg = registeredAdapters();
+    check("the chat tries DeepSeek, then the first backup, then the second — in that order",
+      reg.length === 3 && reg[0].name === "deepseek" && reg[1] === openAiCompatibleAdapter && reg[2] === secondFallbackAdapter);
+    const out2 = await secondFallbackAdapter.chat({ messages: [{ role: "user", content: "x" }], maxTokens: 4, temperature: 0 });
+    check("the second slot is inert until configured, under its own name, and reports 503 rather than fetching",
+      secondFallbackAdapter.configured() === false && secondFallbackAdapter.name === "fallback2" && !out2.ok && out2.status === 503);
+
+    check("an AI provider key may be borrowed by name",
+      borrowableKeyName("AI_VOICE_GROK_API_KEY") === "AI_VOICE_GROK_API_KEY" && borrowableKeyName(" AI_FALLBACK_API_KEY ") === "AI_FALLBACK_API_KEY");
+    for (const bad of ["SUPABASE_SERVICE_ROLE_KEY", "SESSION_SECRET", "CRON_SECRET", "AI_VOICE_RELAY_SECRET", "MAIL_ENCRYPTION_KEY", "DEEPSEEK_API_KEY", "ai_voice_grok_api_key", "AI_API_KEY_X", "", undefined]) {
+      check(`…but never ${bad === undefined ? "nothing" : JSON.stringify(bad)} — only an AI_…_API_KEY name`, borrowableKeyName(bad) === null);
+    }
+
+    const ENV = {
+      AI_FALLBACK2_BASE_URL: "https://grok-gateway.invalid/v1",
+      AI_FALLBACK2_MODEL: "some-text-model",
+      AI_FALLBACK2_LABEL: "grok",
+      AI_FALLBACK2_API_KEY_FROM: "AI_VOICE_GROK_API_KEY",
+      AI_VOICE_GROK_API_KEY: "voice-key",
+      SUPABASE_SERVICE_ROLE_KEY: "db-key",
+    };
+    check("a borrowed key is read from the named variable", slotKey(ENV, "AI_FALLBACK2") === "voice-key");
+    check("a slot's own key wins over a borrowed one", slotKey({ ...ENV, AI_FALLBACK2_API_KEY: "own" }, "AI_FALLBACK2") === "own");
+    check("a refused name yields no key at all — the database key is never reached",
+      slotKey({ ...ENV, AI_FALLBACK2_API_KEY_FROM: "SUPABASE_SERVICE_ROLE_KEY" }, "AI_FALLBACK2") === undefined);
+    check("the slots do not read each other: AI_FALLBACK_* does not configure the second slot",
+      slotKey({ AI_FALLBACK_API_KEY: "k1" }, "AI_FALLBACK2") === undefined && readSlotEnv({ AI_FALLBACK_BASE_URL: "https://a.invalid/v1" }, "AI_FALLBACK2").AI_FALLBACK_BASE_URL === undefined);
+    const cfg = parseFallbackConfig(readSlotEnv(ENV, "AI_FALLBACK2"));
+    check("a complete second slot with a borrowed key configures, under its label, on the same rules",
+      cfg?.label === "grok" && cfg?.model === "some-text-model" && cfg?.chatUrl === "https://grok-gateway.invalid/v1/chat/completions");
+    check("…and the borrowed key never lands in the parsed config", !JSON.stringify(cfg).includes("voice-key"));
+    check("the second slot refuses plaintext too",
+      parseFallbackConfig(readSlotEnv({ ...ENV, AI_FALLBACK2_BASE_URL: "http://grok-gateway.invalid/v1" }, "AI_FALLBACK2")) === null);
+
+    const d0 = diagnoseSlot({}, "AI_FALLBACK2").join("|");
+    check("an unconfigured second slot is explained in ITS variable names",
+      /AI_FALLBACK2_BASE_URL is not set/.test(d0) && /AI_FALLBACK2_MODEL is not set/.test(d0) && /AI_FALLBACK2_API_KEY is not set/.test(d0) && !/AI_FALLBACK_BASE_URL/.test(d0));
+    check("a refused borrow is said as such",
+      /may only name an AI_…_API_KEY variable/.test(diagnoseSlot({ ...ENV, AI_FALLBACK2_API_KEY_FROM: "SUPABASE_SERVICE_ROLE_KEY" }, "AI_FALLBACK2").join("|")));
+    check("a borrow of an unset variable names it",
+      /names AI_VOICE_GROK_API_KEY, which is not set/.test(diagnoseSlot({ ...ENV, AI_VOICE_GROK_API_KEY: "" }, "AI_FALLBACK2").join("|")));
+    check("and no diagnosis ever carries a key's value",
+      ![...diagnoseSlot(ENV, "AI_FALLBACK2"), ...diagnoseSlot({ ...ENV, AI_FALLBACK2_BASE_URL: "http://x.invalid" }, "AI_FALLBACK2")].some((p) => p.includes("voice-key") || p.includes("db-key")));
+    const oac = readFileSync("src/lib/server/ai/provider/adapters/openai-compatible.ts", "utf8");
+    check("each slot's adapter is built from its OWN variables — the second never reads AI_FALLBACK_*",
+      /export const openAiCompatibleAdapter = createOpenAiCompatibleAdapter\("AI_FALLBACK", "fallback"\);/.test(oac) &&
+        /export const secondFallbackAdapter = createOpenAiCompatibleAdapter\("AI_FALLBACK2", "fallback2"\);/.test(oac) &&
+        /const CONFIG = parseFallbackConfig\(readSlotEnv\(process\.env, slot\)\);/.test(oac) &&
+        /const EXTRA_BODY = parseExtraBody\(process\.env\[`\$\{slot\}_EXTRA_BODY`\]\);/.test(oac) &&
+        /const readKey = \(\) => slotKey\(process\.env, slot\);/.test(oac));
+    const route = readFileSync("src/app/api/ai/providers/route.ts", "utf8");
+    check("the status route probes the live registry and explains the second slot too",
+      /const ADAPTERS = registeredAdapters\(\);/.test(route) && /diagnoseSlot\(process\.env, "AI_FALLBACK2"\)/.test(route) &&
+        (route.match(/fallback2_not_configured_because/g) ?? []).length === 2);
+    check("the first slot's diagnosis is unchanged by the refactor",
+      diagnoseSlot({}, "AI_FALLBACK").join("|") === diagnoseFallbackConfig({}).join("|"));
   }
 
   console.log("\n── 9. The circuit breaker: what makes failover fast (Phase 4C) ──");

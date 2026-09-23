@@ -61,13 +61,21 @@ import "server-only";
    --------------------------------------------------------------------------- */
 
 import { deepseekAdapter } from "./adapters/deepseek";
-import { openAiCompatibleAdapter } from "./adapters/openai-compatible";
+import { openAiCompatibleAdapter, secondFallbackAdapter } from "./adapters/openai-compatible";
 import type { ProviderAdapter, TurnOutcome } from "./types";
 import type { TurnRequest } from "./turn-ir";
 import { providerBreaker, admissible, type Breaker } from "@/lib/server/ai/router/circuit-breaker";
 
-/* Ordered by preference. See the header on why DeepSeek is first. */
-const REGISTRY: ProviderAdapter[] = [deepseekAdapter, openAiCompatibleAdapter];
+/* Ordered by preference. See the header on why DeepSeek is first. The two
+   backups follow, AI_FALLBACK_* then AI_FALLBACK2_* (owner, 2026-09-23: Grok
+   as a second backup for the chat) — each inert until its variables are set. */
+const REGISTRY: ProviderAdapter[] = [deepseekAdapter, openAiCompatibleAdapter, secondFallbackAdapter];
+
+/** The live registry, in preference order — for the status route, so it
+ *  probes exactly the providers a turn can reach and no hand-kept copy. */
+export function registeredAdapters(): ReadonlyArray<ProviderAdapter> {
+  return REGISTRY;
+}
 
 /** Pure selection, over any list. Exported so the rule — first CONFIGURED
  *  adapter wins, order is preference — can be tested with fakes rather than

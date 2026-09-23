@@ -47,10 +47,9 @@ import "server-only";
 
 import { NextResponse } from "next/server";
 import { requireAuth } from "@/lib/server/auth";
-import { providerRoster } from "@/lib/server/ai/provider/registry";
+import { providerRoster, registeredAdapters } from "@/lib/server/ai/provider/registry";
 import { chatWithToolsVia } from "@/lib/server/ai/provider/registry";
-import { deepseekAdapter } from "@/lib/server/ai/provider/adapters/deepseek";
-import { openAiCompatibleAdapter, diagnoseFallbackConfig } from "@/lib/server/ai/provider/adapters/openai-compatible";
+import { diagnoseSlot } from "@/lib/server/ai/provider/adapters/openai-compatible";
 import { createBreaker } from "@/lib/server/ai/router/circuit-breaker";
 import { latencyStats } from "@/lib/server/ai/observability/latency-stats";
 import { voiceConfigured, diagnoseVoiceConfig, readAltVoiceEnv, type VoiceEnv } from "@/lib/server/ai/voice/config";
@@ -120,11 +119,11 @@ export async function GET(req: Request) {
      four indistinguishable causes; naming the one that fired is the difference
      between a redeploy and an evening. Variable NAMES only — never values. */
   const fallbackProblems = roster.some((p) => p.name === "fallback" && !p.configured)
-    ? diagnoseFallbackConfig({
-        AI_FALLBACK_BASE_URL: process.env.AI_FALLBACK_BASE_URL,
-        AI_FALLBACK_API_KEY: process.env.AI_FALLBACK_API_KEY,
-        AI_FALLBACK_MODEL: process.env.AI_FALLBACK_MODEL,
-      })
+    ? diagnoseSlot(process.env, "AI_FALLBACK")
+    : null;
+  /* The second backup, the same way, in its own variable names. */
+  const fallback2Problems = roster.some((p) => p.name === "fallback2" && !p.configured)
+    ? diagnoseSlot(process.env, "AI_FALLBACK2")
     : null;
 
   /* VOICE IS REPORTED THE SAME WAY AND FOR A STRONGER REASON. The fallback can
@@ -186,6 +185,7 @@ export async function GET(req: Request) {
       providers: roster,
       configured_count: configured.length,
       ...(fallbackProblems ? { fallback_not_configured_because: fallbackProblems } : {}),
+      ...(fallback2Problems ? { fallback2_not_configured_because: fallback2Problems } : {}),
       voice: voiceStatus,
       image: imageStatus,
       /* Said plainly, because "configured" reads as "working" and is not.
@@ -218,7 +218,7 @@ export async function GET(req: Request) {
      double the wall clock and blow maxDuration. These are I/O waits on
      different hosts, so the overlap costs little, but it is an overlap and the
      numbers should be read as such. */
-  const ADAPTERS = [deepseekAdapter, openAiCompatibleAdapter];
+  const ADAPTERS = registeredAdapters();
   /* Started BEFORE the provider probes are awaited so it overlaps them rather
      than adding its 8s cap to the run. It is one request to a different host,
      so the overlap costs effectively nothing against maxDuration=30. */
@@ -321,6 +321,7 @@ export async function GET(req: Request) {
     providers: roster,
     configured_count: configured.length,
     ...(fallbackProblems ? { fallback_not_configured_because: fallbackProblems } : {}),
+    ...(fallback2Problems ? { fallback2_not_configured_because: fallback2Problems } : {}),
     voice: {
       ...voiceStatus,
       ...(voiceProbe ? { probe: voiceProbe } : {}),
