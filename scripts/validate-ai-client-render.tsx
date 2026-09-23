@@ -1578,42 +1578,32 @@ console.log("\n── An Arabic opening before an English code block reads right
 }
 
 {
-  console.log("\n── The installed app heals onto a new build, and retries if the heal is lost ──");
-  /* ── (owner, 2026-09-18: the Mac dock app and the phone's home screen
-     "not updated".) The guard recorded the ATTEMPT, not the OUTCOME, and
-     recorded it BEFORE the navigation: mark "done", then reload. A reload
-     that never completes — a dropped link mid-navigation, the ordinary
-     failure on this owner's network — left the mark written and the app on
-     the old bundle, and it never tried again.
-
-     Verified first, and these are the things that were NOT broken: the
-     production HTML carries the real build id (matching /api/version), the
-     service worker never caches HTML, and a changed chunk always gets a NEW
-     filename — tested by building twice across a real source change: zero
-     files kept a name while changing content, six got new names. So cached
-     JS cannot go stale; only the heal could, and it did. */
+  console.log("\n── An update is offered, and the user presses it ──");
+  /* (owner, 2026-09-23: "I want to show the update message and I press
+     update to know that there is update happened".) The watcher used to move
+     the tab by itself — a reload the moment the tab went hidden, and the
+     installed app reloading itself on sight — so the dock app changed under
+     him and he never saw an update arrive. Now the capsule offers it, in the
+     browser and the installed app alike, and waits for the button. The one
+     launch that still moves a stale tab is AppLaunchLink's, and only because
+     a soft navigation on a stale bundle fails (its chunks are gone). */
   const watcher = readFileSync("src/components/pwa/UpdateWatcher.tsx", "utf8");
-  const { healAttemptsFor, nextHealRecord, HEAL_ATTEMPTS_MAX } = uw;
-
-  check("an attempt is counted per FROM→TO move, so a lost navigation is tried again rather than written off",
-    HEAL_ATTEMPTS_MAX === 3 &&
-    healAttemptsFor(null, "a", "b") === 0 &&
-    healAttemptsFor(nextHealRecord("a", "b", 1), "a", "b") === 1 &&
-    healAttemptsFor(nextHealRecord("a", "b", 2), "a", "b") === 2);
-  check("  …a heal that WORKED cannot be retried: the next boot's `from` is the new build, so the record is not about this move",
-    healAttemptsFor(nextHealRecord("a", "b", 3), "b", "c") === 0 &&
-    healAttemptsFor(nextHealRecord("a", "b", 3), "b", "b") === 0);
-  check("  …a stuck build is bounded, not infinite — the guard's original job, with a budget of three instead of one",
-    healAttemptsFor(nextHealRecord("a", "b", HEAL_ATTEMPTS_MAX), "a", "b") >= HEAL_ATTEMPTS_MAX &&
-    /const tried = healAttemptsFor\(sessionStorage\.getItem\(HEAL_KEY\), from, id\);\s*if \(tried >= HEAL_ATTEMPTS_MAX\) return;\s*sessionStorage\.setItem\(HEAL_KEY, nextHealRecord\(from, id, tried \+ 1\)\);/.test(watcher));
-  check("  …junk, and the pre-2026-09-18 bare-id record, count as no attempt rather than as a completed heal",
-    healAttemptsFor("not json", "a", "b") === 0 &&
-    healAttemptsFor("b", "a", "b") === 0 &&
-    healAttemptsFor(JSON.stringify({ f: "a", t: "b", n: -1 }), "a", "b") === 0);
-  check("  …and the heal still refuses to interrupt a live call or unsaved work, and still only runs on screen",
-    /if \(!isInstalledApp\(\)\) return;\s*if \(document\.visibilityState !== "visible"\) return;/.test(watcher) &&
-    /if \(busyWithSomethingUninterruptible\(\)\) return;/.test(watcher) &&
-    /healInstalledApp\(boot\.current, id\);/.test(watcher));
+  const watcherCode = watcher.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:])\/\/.*$/gm, "$1");
+  check("the watcher reloads the page in exactly one place — the Update button",
+    (watcherCode.match(/location\.reload\(\)/g) ?? []).length === 1 &&
+    /const onUpdate = \(\) => \{[\s\S]{0,1400}?window\.location\.reload\(\)/.test(watcherCode) &&
+    /onClick=\{onUpdate\}/.test(watcherCode));
+  check("  …no reload when the tab goes hidden, and no self-reload in the installed app",
+    !/onHide/.test(watcherCode) && !/healInstalledApp|isInstalledApp|HEAL_KEY/.test(watcherCode) &&
+    !("healAttemptsFor" in uw) && !("HEAL_ATTEMPTS_MAX" in uw));
+  check("  …a stale tab shows the offer — \"New version available\" with Update — until it is pressed",
+    /if \(id !== boot\.current && alive\) \{[\s\S]{0,600}?setStale\(true\);/.test(watcherCode) &&
+    /\{t\(confirming \? "u\.updated" : "u\.available"\)\}/.test(watcherCode) &&
+    /const confirming = !stale;/.test(watcherCode));
+  const css = readFileSync("src/app/globals.css", "utf8");
+  check("  …and the offer stays off a live call, whose Update button would end it",
+    /\$\{confirming \? "" : "kx-update-offer"\}/.test(watcherCode) &&
+    /body:has\(\[data-kx-call-active='1'\]\) \.kx-update-offer \{ display: none; \}/.test(css));
 
   /* THE MOVE IS CONFIRMED (22 Sep 2026). Three of the four paths onto a new
      build are silent by design, so the owner pushed, watched the deploy

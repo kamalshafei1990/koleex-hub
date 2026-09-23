@@ -1,22 +1,30 @@
 "use client";
 
 /* ---------------------------------------------------------------------------
-   UpdateWatcher — notices a new deployment and moves the tab onto it, so the
-   installed PWA / cached browser stops running stale code after a deploy.
+   UpdateWatcher — notices a new deployment and OFFERS it: a "New version
+   available · Update" capsule, and the tab moves onto the new build when the
+   user presses Update.
+
+   THE USER PRESSES UPDATE (owner, 2026-09-23: "I want to show the update
+   message and I press update to know that there is update happened"). This
+   used to move the tab by itself, three silent ways: a reload the moment the
+   tab went hidden, the installed app reloading itself on sight, and the next
+   app launch turned into a full navigation. The owner never saw an update
+   arrive — the dock app just changed under him. The first two are gone; the
+   capsule waits, in the browser and in the installed app alike, until it is
+   pressed.
+
+   The third stays, and it is not a preference: a stale tab's chunk URLs are
+   already gone from the new deployment, so a soft navigation into another app
+   would fail and bounce to Home. AppLaunchLink turns that one launch into a
+   full navigation, and the "Updated to the latest version" confirmation
+   below says so when it lands.
 
    It polls a tiny no-store /api/version (the deploy's build id) once the page
    has gone quiet, whenever the tab/app becomes visible again, and every 60s
-   while visible. If the id differs from the one this bundle was compiled
-   from, the tab is stale, and four things can move it onto the new build:
-   the "New version available · Update" capsule (a visible, idle browser
-   tab); a reload the moment the tab goes hidden; the next app launch, which
-   AppLaunchLink turns into a full navigation; and the installed app, which
-   reloads itself on sight. The last three are silent on purpose — the user
-   must never watch a full page load — which is why, once the tab has landed
-   on the new build by ANY of those paths, a one-line "Updated to the latest
-   version" capsule confirms it, once, and goes away. Without it the owner
-   pushed, watched the deploy finish, and found no sign in the system that
-   anything had arrived (22 Sep 2026).
+   while visible. Once the tab has landed on the new build — by the button or
+   by that launch — a one-line "Updated to the latest version" capsule confirms
+   it, once, and goes away.
    --------------------------------------------------------------------------- */
 
 import { useEffect, useRef, useState } from "react";
@@ -51,112 +59,15 @@ const T = {
   "u.updated":  { en: "Updated to the latest version", zh: "已更新到最新版本", ar: "تم التحديث إلى أحدث إصدار" },
 };
 
-/* ── THE INSTALLED APP CANNOT HEAL WHILE HIDDEN ──
-   onHide (below) reloads the moment the tab disappears: the work happens
-   off-screen and the user comes back fresh. That is the right trade for every
-   browser, and it is why nothing here auto-reloads in view.
-
-   An installed iOS app never finishes that reload. The WebView is suspended
-   the instant the app leaves the screen, so the navigation is killed
-   mid-flight, and on resume iOS restores the very page it was already
-   showing — including its stale stylesheet. The app can therefore sit on a
-   bundle from weeks ago while Safari on the SAME phone is current. That is
-   exactly what the owner hit: a header fix live in the browser and absent
-   from the home-screen app, with prod verified as serving the new build.
-
-   So standalone heals on the way IN. Once we know the build is stale and the
-   app is on screen, reload. It costs a visible load — the reason no other
-   surface does it — but never updating costs more, and on resume the user has
-   just arrived, which is the cheapest moment there is to spend.
-
-   ONE reload per build id, kept in sessionStorage: if a build somehow keeps
-   reporting stale (an HTML the CDN is still serving from cache, a half-rolled
-   deploy), the guard turns an infinite reload loop into a single wasted load. */
-function isInstalledApp(): boolean {
-  if (typeof window === "undefined") return false;
-  return (
-    window.matchMedia?.("(display-mode: standalone)").matches === true ||
-    (window.navigator as Navigator & { standalone?: boolean }).standalone === true
-  );
-}
-
 /* NEVER MID-CALL. A voice call is WebRTC held by the page; a reload ends it
    and drops the caller into the text chat with no explanation — which is
    exactly what the owner met, twice, on the evening several builds shipped
-   while he was talking: the installed app healed itself onto the new bundle
-   the moment it saw one. Unsaved work and a live call are the same kind of
-   thing: a reason a stale bundle can wait. The call screen marks itself. */
+   while he was talking. Unsaved work and a live call are the same kind of
+   thing: a reason a stale bundle can wait. The call screen marks itself.
+   Read by AppLaunchLink (the one launch that still moves a stale tab); the
+   capsule itself stays off the call screen (globals.css, .kx-update-offer). */
 export function busyWithSomethingUninterruptible(): boolean {
   return Boolean(document.querySelector("[data-kx-unsaved='1'], [data-kx-call-active='1']"));
-}
-
-/* THE HEAL IS TRIED AGAIN IF IT DID NOT LAND (owner, 2026-09-18: the app in
-   the Mac dock and on the phone's home screen "not updated").
-
-   The guard used to be one line — write the build id, reload, and never
-   reload for that id again. It was written to stop an infinite reload loop,
-   and it did. But it recorded the ATTEMPT, not the OUTCOME, and it recorded
-   it BEFORE the navigation:
-
-       mark "done" for build X  →  window.location.reload()
-
-   If that reload never completes — the link drops mid-navigation, which on
-   this owner's network is the ordinary case and not the exotic one — the
-   mark is already written. The app comes back on the OLD bundle, sees the
-   new build id, calls this function, reads its own mark and returns. It
-   never tries again. One lost navigation and the installed app is frozen on
-   that build for the rest of the session, which is exactly the shape of
-   "the dock app is not updated".
-
-   So the record now counts attempts and is keyed FROM→TO. Three things fall
-   out of that:
-
-     · a lost navigation is retried, up to HEAL_ATTEMPTS_MAX;
-     · a heal that WORKED cannot be retried, because the next boot's `from`
-       is the new build and no longer matches the record (and check() will
-       not call this at all once the ids agree);
-     · a genuinely stuck build — an HTML the CDN keeps serving stale — costs
-       three loads instead of an infinite loop, so the original guard's job
-       is still done, just with a bounded budget instead of a budget of one.
-
-   Pure helpers, so the rule is testable without a browser. */
-export const HEAL_ATTEMPTS_MAX = 3;
-const HEAL_KEY = "kx-healed-build";
-
-/** How many times we have already tried to move this app FROM one build TO
- *  another. A record for a different pair — or junk, or the old single-id
- *  format — counts as zero: it is not about this move. Pure. */
-export function healAttemptsFor(raw: string | null, from: string, to: string): number {
-  if (!raw) return 0;
-  try {
-    const v = JSON.parse(raw) as { f?: unknown; t?: unknown; n?: unknown };
-    if (v?.f !== from || v?.t !== to) return 0;
-    return typeof v.n === "number" && Number.isFinite(v.n) && v.n > 0 ? Math.floor(v.n) : 0;
-  } catch {
-    return 0;   /* the pre-2026-09-18 format was a bare id; treat it as no attempt */
-  }
-}
-
-/** The record to write before attempting the move. Pure. */
-export function nextHealRecord(from: string, to: string, attempts: number): string {
-  return JSON.stringify({ f: from, t: to, n: attempts });
-}
-
-function healInstalledApp(from: string, id: string): void {
-  if (!isInstalledApp()) return;
-  if (document.visibilityState !== "visible") return;
-  /* Never interrupt unsaved work or a live call — the same guard onHide and
-     the exit prompts use. A stale bundle can wait for the next resume. */
-  if (busyWithSomethingUninterruptible()) return;
-  try {
-    const tried = healAttemptsFor(sessionStorage.getItem(HEAL_KEY), from, id);
-    if (tried >= HEAL_ATTEMPTS_MAX) return;
-    sessionStorage.setItem(HEAL_KEY, nextHealRecord(from, id, tried + 1));
-  } catch {
-    /* Private mode / storage disabled: the loop guard is best-effort, but a
-       reload that fixes the app is still better than an app frozen forever. */
-  }
-  window.location.reload();
 }
 
 /* ARRIVAL CONFIRMATION. The moment a check finds the tab stale it writes
@@ -224,10 +135,8 @@ export default function UpdateWatcher() {
           };
           g.__kxStaleBuild = true;
           g.__kxStaleBuildId = id;
-          /* The pill is enough everywhere the hide-heal works. It is not
-             enough in the installed app, which may never go hidden-and-back
-             in a way iOS lets us use. */
-          healInstalledApp(boot.current, id);
+          /* And that is all: the capsule offers the update; nothing here
+             reloads the tab. The user presses Update (see the header). */
         }
       } catch {
         /* offline / transient — ignore */
@@ -260,23 +169,6 @@ export default function UpdateWatcher() {
       }
       void check();
     });
-    /* HEAL WHILE HIDDEN. The user must never watch a full page load: the
-       browser keeps the OLD page on screen until the new document commits,
-       so a reload triggered mid-tap looks like "it threw me back to Home,
-       showed loading, then went into the app" (owner, repeatedly). When the
-       tab goes away we reload right then — the work happens off-screen and
-       he comes back to a fresh bundle, so his next tap is a soft, instant
-       navigation with nothing to heal. */
-    const onHide = () => {
-      if (document.visibilityState !== "hidden") return;
-      const g = globalThis as typeof globalThis & { __kxStaleBuild?: boolean };
-      if (!g.__kxStaleBuild) return;
-      /* Never interrupt unsaved work or a live call — the same guard the
-         exit prompts use. */
-      if (busyWithSomethingUninterruptible()) return;
-      window.location.reload();
-    };
-    document.addEventListener("visibilitychange", onHide);
     /* THROTTLED, for the same reason the presence beat is: this fires on
        BOTH visibilitychange and focus, so switching between two windows can
        trigger it twice in a row, and a rapid flicker triggers it per flip.
@@ -300,7 +192,6 @@ export default function UpdateWatcher() {
     }, 60 * 1000);
     return () => {
       alive = false;
-      document.removeEventListener("visibilitychange", onHide);
       document.removeEventListener("visibilitychange", onVis);
       window.removeEventListener("focus", onVis);
       window.clearInterval(iv);
@@ -375,7 +266,7 @@ export default function UpdateWatcher() {
        (0 when there is none, and on desktop where it is display:none), so the
        capsule clears the mobile tab bar instead of covering it — it was
        hiding Home / Create / Ops / Finance completely. */
-    <div className="fixed inset-x-0 bottom-0 z-[400] flex justify-center px-4 pb-[calc(env(safe-area-inset-bottom,0px)+var(--kx-actionbar-h,0px)+12px)] pointer-events-none">
+    <div className={`fixed inset-x-0 bottom-0 z-[400] flex justify-center px-4 pb-[calc(env(safe-area-inset-bottom,0px)+var(--kx-actionbar-h,0px)+12px)] pointer-events-none ${confirming ? "" : "kx-update-offer"}`}>
       {/* Always-BLACK capsule with a slowly travelling Hub Blue glow on the
           border (owner call — both themes, both devices).
 

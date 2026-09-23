@@ -1511,6 +1511,12 @@ html[data-kx-tabslide] #main-scroll-container { overflow-x: clip; }
   initial-value: 0deg;
   inherits: false;
 }
+/* The update offer waits for the user to press it (UpdateWatcher) — but not
+   on top of a live call: its Update button reloads the page, and a reload
+   ends the call. It is simply not shown while the call screen is up, and it
+   is back, still waiting, the moment the call ends. */
+body:has([data-kx-call-active='1']) .kx-update-offer { display: none; }
+
 .kx-update-capsule {
   position: relative;
   background: #000;
