@@ -4852,3 +4852,115 @@ html[dir="rtl"] .kx-ai-root .kx-ai-bar-title {
   .kx-call-orb.is-live .kx-call-ring-2,
   .kx-call-orb.is-live .kx-call-ring-3 { opacity: 0; }
 }
+
+/* ── Smart Create under Aurora ──────────────────────────────────────────
+   Owner (screenshot, twice): "this not aurora style or colors". The panel
+   already wore .kx-glass-pop, but everything INSIDE it was Core paint on
+   glass: solid grey tiles, a grey selection outline, amber / blue chips and
+   an emerald link — none of them in the Aurora palette.
+   Restated in the system's own grammar, scoped to .kx-sc so Core keeps the
+   flat token look exactly:
+     · tile      = a pale glass film with a hairline, not a grey slab
+     · hover     = Hub Blue whisper; keyboard/active = the kx-seg-on ring
+     · icon well = Hub Blue glyph on a blue-tinted well
+     · filter    = the recessed well (the Home search recipe)
+     · chips     = Hub Blue family (Accounting = ice, Inventory = Hub Blue)
+     · dividers + link = Hub Blue hairline / text, no emerald
+   Light mirrors each with the deeper blue used by kx-seg-on light. */
+[data-kx-skin="aurora"] .kx-sc .kx-sc-line { border-color: rgba(127, 169, 214, 0.16); }
+[data-kx-skin="aurora"] .kx-sc .kx-sc-field {
+  background: rgba(3, 5, 9, 0.55);
+  border-color: rgba(255, 255, 255, 0.08);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.10), inset 0 1.5px 4px rgba(0, 0, 0, 0.40);
+}
+[data-kx-skin="aurora"] .kx-sc .kx-sc-field:focus {
+  border-color: rgba(127, 169, 214, 0.60);
+  box-shadow: inset 0 1.5px 4px rgba(0, 0, 0, 0.40), 0 0 0 3px rgba(86, 127, 178, 0.18);
+}
+[data-kx-skin="aurora"] .kx-sc .kx-sc-tile {
+  background: linear-gradient(157deg, rgba(255, 255, 255, 0.06) 0%, rgba(255, 255, 255, 0.02) 60%), rgba(255, 255, 255, 0.02);
+  border-color: rgba(255, 255, 255, 0.08);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+[data-kx-skin="aurora"] .kx-sc .kx-sc-tile:hover {
+  background: rgba(86, 127, 178, 0.08);
+  border-color: rgba(127, 169, 214, 0.30);
+}
+[data-kx-skin="aurora"] .kx-sc .kx-sc-tile[data-active="1"] {
+  background: rgba(86, 127, 178, 0.12);
+  border-color: transparent;
+  box-shadow: inset 0 0 0 1px rgba(86, 127, 178, 0.75), 0 0 18px -6px rgba(86, 127, 178, 0.55);
+}
+[data-kx-skin="aurora"] .kx-sc .kx-sc-icon {
+  background: rgba(86, 127, 178, 0.12);
+  border-color: rgba(127, 169, 214, 0.22);
+  color: #7FA9D6;
+}
+[data-kx-skin="aurora"] .kx-sc .kx-sc-tile[data-active="1"] .kx-sc-icon,
+[data-kx-skin="aurora"] .kx-sc .kx-sc-tile:hover .kx-sc-icon { color: #BCD8F0; border-color: rgba(127, 169, 214, 0.45); }
+[data-kx-skin="aurora"] .kx-sc .kx-sc-chip-acc {
+  background: rgba(188, 216, 240, 0.10);
+  border-color: rgba(188, 216, 240, 0.30);
+  color: #BCD8F0;
+}
+[data-kx-skin="aurora"] .kx-sc .kx-sc-chip-inv {
+  background: rgba(86, 127, 178, 0.18);
+  border-color: rgba(127, 169, 214, 0.45);
+  color: #9EC1E6;
+}
+[data-kx-skin="aurora"] .kx-sc .kx-sc-link { color: #7FA9D6; }
+[data-kx-skin="aurora"] .kx-sc .kx-sc-link:hover { color: #BCD8F0; }
+[data-kx-skin="aurora"] .kx-sc .kx-sc-kbd {
+  background: rgba(86, 127, 178, 0.12);
+  border-color: rgba(127, 169, 214, 0.30);
+  color: #BCD8F0;
+}
+
+[data-kx-skin="aurora"][data-theme="light"] .kx-sc .kx-sc-line { border-color: rgba(62, 103, 150, 0.16); }
+[data-kx-skin="aurora"][data-theme="light"] .kx-sc .kx-sc-field {
+  background: rgba(255, 255, 255, 0.70);
+  border-color: rgba(0, 0, 0, 0.10);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.90), inset 0 1.5px 4px rgba(0, 0, 0, 0.10);
+}
+[data-kx-skin="aurora"][data-theme="light"] .kx-sc .kx-sc-field:focus {
+  border-color: rgba(62, 103, 150, 0.60);
+  box-shadow: inset 0 1.5px 4px rgba(0, 0, 0, 0.08), 0 0 0 3px rgba(86, 127, 178, 0.16);
+}
+[data-kx-skin="aurora"][data-theme="light"] .kx-sc .kx-sc-tile {
+  background: rgba(255, 255, 255, 0.55);
+  border-color: rgba(0, 0, 0, 0.07);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9);
+}
+[data-kx-skin="aurora"][data-theme="light"] .kx-sc .kx-sc-tile:hover {
+  background: rgba(86, 127, 178, 0.08);
+  border-color: rgba(62, 103, 150, 0.30);
+}
+[data-kx-skin="aurora"][data-theme="light"] .kx-sc .kx-sc-tile[data-active="1"] {
+  background: rgba(86, 127, 178, 0.10);
+  border-color: transparent;
+  box-shadow: inset 0 0 0 1px rgba(62, 103, 150, 0.75);
+}
+[data-kx-skin="aurora"][data-theme="light"] .kx-sc .kx-sc-icon {
+  background: rgba(86, 127, 178, 0.10);
+  border-color: rgba(62, 103, 150, 0.22);
+  color: #3E6796;
+}
+[data-kx-skin="aurora"][data-theme="light"] .kx-sc .kx-sc-tile[data-active="1"] .kx-sc-icon,
+[data-kx-skin="aurora"][data-theme="light"] .kx-sc .kx-sc-tile:hover .kx-sc-icon { color: #16324F; border-color: rgba(62, 103, 150, 0.45); }
+[data-kx-skin="aurora"][data-theme="light"] .kx-sc .kx-sc-chip-acc {
+  background: rgba(62, 103, 150, 0.06);
+  border-color: rgba(62, 103, 150, 0.30);
+  color: #3E6796;
+}
+[data-kx-skin="aurora"][data-theme="light"] .kx-sc .kx-sc-chip-inv {
+  background: rgba(62, 103, 150, 0.14);
+  border-color: rgba(62, 103, 150, 0.45);
+  color: #16324F;
+}
+[data-kx-skin="aurora"][data-theme="light"] .kx-sc .kx-sc-link { color: #3E6796; }
+[data-kx-skin="aurora"][data-theme="light"] .kx-sc .kx-sc-link:hover { color: #16324F; }
+[data-kx-skin="aurora"][data-theme="light"] .kx-sc .kx-sc-kbd {
+  background: rgba(62, 103, 150, 0.08);
+  border-color: rgba(62, 103, 150, 0.30);
+  color: #16324F;
+}

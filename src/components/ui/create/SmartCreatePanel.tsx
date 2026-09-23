@@ -195,9 +195,9 @@ export default function SmartCreatePanel({ closing, onClose }: { closing: boolea
         role="dialog"
         aria-modal="true"
         aria-labelledby="kx-smart-create-title"
-        className={`kx-glass-pop kx-pop-in ${closing ? "kx-pop-closing" : ""} w-full max-w-2xl overflow-hidden rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] shadow-2xl shadow-black/40`}
+        className={`kx-sc kx-glass-pop kx-pop-in ${closing ? "kx-pop-closing" : ""} w-full max-w-2xl overflow-hidden rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] shadow-2xl shadow-black/40`}
       >
-        <header className="border-b border-[var(--border-subtle)] px-5 py-3.5">
+        <header className="kx-sc-line border-b border-[var(--border-subtle)] px-5 py-3.5">
           <div className="flex items-center justify-between">
             <div>
               <div className="text-[10px] uppercase tracking-[0.18em] text-[var(--text-dim)]">{t("sc.eyebrow")}</div>
@@ -219,7 +219,7 @@ export default function SmartCreatePanel({ closing, onClose }: { closing: boolea
             aria-expanded="true"
             aria-controls="kx-smart-create-list"
             aria-activedescendant={flat[activeIdx] ? `kx-sc-${flat[activeIdx].k}` : undefined}
-            className="mt-3 w-full rounded-md border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] px-3 py-2 text-[12.5px] text-[var(--text-primary)] outline-none placeholder:text-[var(--text-dim)] focus:border-[var(--border-focus)]"
+            className="kx-sc-field mt-3 w-full rounded-md border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] px-3 py-2 text-[12.5px] text-[var(--text-primary)] outline-none placeholder:text-[var(--text-dim)] focus:border-[var(--border-focus)]"
           />
         </header>
 
@@ -248,13 +248,13 @@ export default function SmartCreatePanel({ closing, onClose }: { closing: boolea
                       data-active={on ? "1" : "0"}
                       onClick={() => pick(tile)}
                       onMouseMove={() => { if (!on) setActive(i); }}
-                      className={`group flex items-center gap-3 rounded-xl border px-3 py-3 text-start transition-colors ${
+                      className={`kx-sc-tile group flex items-center gap-3 rounded-xl border px-3 py-3 text-start transition-[background-color,border-color,box-shadow] duration-150 ${
                         on
                           ? "border-[var(--border-focus)] bg-[var(--bg-surface)]"
                           : "border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)]"
                       }`}
                     >
-                      <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] ${on ? "text-[var(--text-primary)]" : "text-[var(--text-secondary)]"}`}>
+                      <span className={`kx-sc-icon flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] ${on ? "text-[var(--text-primary)]" : "text-[var(--text-secondary)]"}`}>
                         <RrIcon name={tile.icon} size={14} />
                       </span>
                       <div className="min-w-0 flex-1">
@@ -264,12 +264,12 @@ export default function SmartCreatePanel({ closing, onClose }: { closing: boolea
                       {(tile.affects ?? []).length > 0 && (
                         <div className="flex shrink-0 flex-col items-end gap-1">
                           {tile.affects?.includes("accounting") && (
-                            <span title={t("sc.fx.accHint")} className="rounded-full border border-amber-600/25 bg-amber-500/10 px-1.5 py-px text-[9.5px] font-medium text-amber-700 dark:border-amber-300/20 dark:text-amber-200/90">
+                            <span title={t("sc.fx.accHint")} className="kx-sc-chip-acc rounded-full border border-amber-600/25 bg-amber-500/10 px-1.5 py-px text-[9.5px] font-medium text-amber-700 dark:border-amber-300/20 dark:text-amber-200/90">
                               {t("sc.fx.acc")}
                             </span>
                           )}
                           {tile.affects?.includes("inventory") && (
-                            <span title={t("sc.fx.invHint")} className="rounded-full border border-blue-600/25 bg-blue-500/10 px-1.5 py-px text-[9.5px] font-medium text-blue-700 dark:border-blue-300/20 dark:text-blue-200/90">
+                            <span title={t("sc.fx.invHint")} className="kx-sc-chip-inv rounded-full border border-blue-600/25 bg-blue-500/10 px-1.5 py-px text-[9.5px] font-medium text-blue-700 dark:border-blue-300/20 dark:text-blue-200/90">
                               {t("sc.fx.inv")}
                             </span>
                           )}
@@ -283,17 +283,17 @@ export default function SmartCreatePanel({ closing, onClose }: { closing: boolea
           ))}
         </div>
 
-        <footer className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 border-t border-[var(--border-subtle)] px-5 py-2.5 text-[10px] text-[var(--text-dim)]">
+        <footer className="kx-sc-line flex flex-wrap items-center justify-between gap-x-3 gap-y-1 border-t border-[var(--border-subtle)] px-5 py-2.5 text-[10px] text-[var(--text-dim)]">
           <span className="hidden sm:inline">
             {tipBefore}
-            <kbd className="rounded border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] px-1.5 py-0.5 font-mono text-[9.5px]">c</kbd>
+            <kbd className="kx-sc-kbd rounded border border-[var(--border-subtle)] bg-[var(--bg-surface-subtle)] px-1.5 py-0.5 font-mono text-[9.5px]">c</kbd>
             {tipAfter}
           </span>
           {(permsLoading || can("Finance", "view")) && (
             <button
               type="button"
               onClick={() => { onClose(); router.push("/finance/data-entry"); }}
-              className="text-emerald-700 hover:text-emerald-600 dark:text-emerald-200 dark:hover:text-emerald-100"
+              className="kx-sc-link text-emerald-700 hover:text-emerald-600 dark:text-emerald-200 dark:hover:text-emerald-100"
             >
               {t("sc.dataEntry")} <span aria-hidden className="inline-block rtl:-scale-x-100">→</span>
             </button>
