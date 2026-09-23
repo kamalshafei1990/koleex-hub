@@ -178,7 +178,14 @@ for (const k of ["kxA-life", "kxA-bounce", "kxA-sway", "kxA-gaze", "kxA-hunt", "
       dottedLook(st, "none", "none", 30).motion === dottedLook(st, "none", "none", 200).motion) &&
     dottedLook("processing", "searching", "none", 30).motion === "searching");
   check("dots: a search is the scan, on both orbs", dottedLook("processing", "searching").motion === "searching");
-  check("dots: at rest it breathes", dottedLook("idle").motion === "breathing");
+  /* Owner's choice, 2026-09-23. */
+  check("dots: at rest it is the sash, at half its pace", dottedLook("idle").motion === "composing" && dottedLook("idle").speed === 0.5);
+  check("dots: a resting orb is never the picture of a thinking one, at any size",
+    [30, 38, 72, 104, 200].every((sz) =>
+      dottedLook("idle", "none", "none", sz).motion !== dottedLook("thinking", "none", "none", sz).motion));
+  check("dots: at rest it moves slower than it speaks, so the call screen tells them apart",
+    dottedLook("idle").motion === dottedLook("speaking").motion &&
+    dottedLook("idle").speed < dottedLook("speaking").speed);
   check("dots: a live result wins over the base state, as on the aura orb",
     dottedLook("speaking", "none", "error").motion === "breathing" && dottedLook("speaking", "none", "error").ink < 1 &&
     dottedLook("thinking", "none", "success").motion === "shaping");

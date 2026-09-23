@@ -17,7 +17,8 @@
         groups activities into (ACTIVITY_FAMILY), so "searching" is the same
         idea on both orbs: the scan.
      4. Plain thinking is the orbits — the motion the dotted orb is known for.
-     5. Everything at rest breathes.
+     5. At rest it is the sash, at half pace. The slowed, dimmed ring is
+        kept for a warning, an error, sleep and waiting on the user.
 
    Dependency-free and pure, so validate:ai-orb can exercise every state and
    every activity without a browser.
@@ -118,9 +119,19 @@ function baseLook(state: AIOrbState, activity: AIOrbActivity, result: AIOrbResul
       return { motion: "shaping", speed: 1.2, ink: 1 };
     case "sleeping":
       return { motion: "breathing", speed: 0.5, ink: 0.6 };
+    /* AT REST: the sash, at half its pace (owner, 2026-09-23, choosing from
+       all nine motions side by side at 104/72/38/30 px: "composing").
+       The breathing ring it replaces is not a sphere, which is the one
+       thing this orb is. Solving was the other candidate and was ruled out
+       on purpose: it is what a small orb THINKS with, so beside a chat
+       message a resting orb and a thinking one would have been the same
+       picture. The sash is also the speaking motion, but speaking only
+       happens on the call screen, and there it runs at full pace and swells
+       with the voice; at rest it moves at half that and holds still in
+       size. */
     case "idle":
     default:
-      return { motion: "breathing", speed: 1, ink: 1 };
+      return { motion: "composing", speed: 0.5, ink: 1 };
   }
 }
 
