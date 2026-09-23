@@ -1,0 +1,35 @@
+import "server-only";
+
+/* ---------------------------------------------------------------------------
+   GET /api/ai/models — the Koleex AI models the picker may offer, and which
+   of them can answer right now.
+
+   Owner, 2026-09-23: three providers become three Koleex models the user
+   switches between (lib/ai/koleex-models.ts). The picker needs one fact it
+   cannot know itself: whether a model is configured and not switched off —
+   Koleex Deep, for instance, stays unavailable until its slot is set.
+
+   NAMES ONLY. The answer is `{ id, available }` per model: no vendor, no
+   model id, no host — nothing that says who stands behind a name. The same
+   door as every Koleex AI endpoint: signed in, internal accounts only.
+   --------------------------------------------------------------------------- */
+
+import { NextResponse } from "next/server";
+import { requireAuth } from "@/lib/server/auth";
+import { requireInternalUser } from "@/lib/server/ai/require-internal";
+import { modelAvailability } from "@/lib/server/ai/provider/koleex-model-slots";
+import { DEFAULT_KOLEEX_MODEL } from "@/lib/ai/koleex-models";
+
+export const dynamic = "force-dynamic";
+
+export async function GET() {
+  const auth = await requireAuth();
+  if (auth instanceof NextResponse) return auth;
+  const notInternal = requireInternalUser(auth);
+  if (notInternal) return notInternal;
+
+  return NextResponse.json(
+    { models: modelAvailability(), default: DEFAULT_KOLEEX_MODEL },
+    { headers: { "Cache-Control": "private, no-store" } },
+  );
+}

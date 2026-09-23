@@ -52,6 +52,7 @@ import { runDegradedTurn, fallback } from "@/lib/server/ai/core/recovery";
    failover in the picture a hard-coded label would misreport every fallback
    turn, and the label is what the audit trail records. */
 import { chatWithTools, providerConfigured, activeProviderLabel } from "@/lib/server/ai/provider/registry";
+import { adapterForModel } from "@/lib/server/ai/provider/koleex-model-slots";
 import { recordUsage } from "@/lib/server/ai/cost/meter";
 import type { TurnMeta } from "@/lib/server/ai/provider/types";
 import {
@@ -150,7 +151,11 @@ export async function orchestrate(input: TurnInput): Promise<AgentResponse> {
   const {
     ctx, history, userMessage, userLang, dialect, conversationId, onDelta, onStep, onRetract,
     webSearchRequested = false, languageLock = "", taughtAnswers = "", traceId = null,
+    model = "auto",
   } = input;
+  /* The user's chosen Koleex model: its provider goes first, the rest stay
+     behind it as failover (provider/registry preferFirst). */
+  const prefer = adapterForModel(model);
   /* True when a user-uploaded document's extracted text is in play — this
      turn or retained history. Gates the recital exemption in
      sealFinalReply(). */
@@ -357,7 +362,7 @@ export async function orchestrate(input: TurnInput): Promise<AgentResponse> {
          primary speed lever. Advisory: with no AI_MODEL_CLASSES entry every
          class resolves to the adapter's default, which is today's behaviour. */
       modelClass: isBrand ? "GENERAL" : "FAST",
-    });
+    }, { prefer });
     const tPost = Date.now();
     recordUsage({
       tenantId: ctx.auth.tenant_id ?? null,
@@ -504,7 +509,7 @@ export async function orchestrate(input: TurnInput): Promise<AgentResponse> {
           modelClass: "REASONING",
           stream: Boolean(liveEmit),
         },
-        liveEmit ? { onDelta: liveEmit } : undefined,
+        liveEmit ? { onDelta: liveEmit, prefer } : { prefer },
       );
       turnMeta = { servedBy: out.servedBy, model: out.model, ms: out.ms, failedOver: out.failedOver };
       recordUsage({
