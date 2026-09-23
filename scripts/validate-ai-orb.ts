@@ -391,10 +391,11 @@ for (const k of ["kxA-life", "kxA-bounce", "kxA-sway", "kxA-gaze", "kxA-hunt", "
     /return <AIOrb \{\.\.\.props\} \/>;/.test(chosen) &&
     /export default function ChosenOrb\(\{ surface, style, wander, \.\.\.props \}/.test(chosen));
   const home = readFileSync(join(srcRoot, "app/page.tsx"), "utf8");
-  check("home: the greeting's orb is 144px from md up, one canvas scaled into 88px on a phone, and it wanders",
-    /<KoleexGlowOrb state=\{orbState\} greetKey=\{greet\} size=\{144\} wander \/>/.test(home) &&
-    /w-\[88px\] h-\[88px\] md:w-\[144px\] md:h-\[144px\]/.test(home) &&
-    /max-md:scale-\[0\.6111\]/.test(home) && Math.abs(0.6111 * 144 - 88) < 0.01 &&
+  check("home: the greeting's orb is 208px from lg up, one canvas scaled into 168px on an iPad and 100px on a phone, and it wanders",
+    /<KoleexGlowOrb state=\{orbState\} greetKey=\{greet\} size=\{208\} wander \/>/.test(home) &&
+    /w-\[100px\] h-\[100px\] md:w-\[168px\] md:h-\[168px\] lg:w-\[208px\] lg:h-\[208px\]/.test(home) &&
+    /max-md:scale-\[0\.4808\] md:max-lg:scale-\[0\.8077\]/.test(home) &&
+    Math.abs(0.4808 * 208 - 100) < 0.01 && Math.abs(0.8077 * 208 - 168) < 0.01 &&
     /wander=\{wander\}/.test(glow));
   const welcome = readFileSync(join(srcRoot, "components/ai/WelcomeCard.tsx"), "utf8");
   check("welcome: the Koleex AI screen's orb is 144px from md up, one canvas scaled into 128px on a phone",
