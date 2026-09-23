@@ -2348,3 +2348,26 @@ both ways, with no reload.
 
 **Tests.** `validate:ai-orb` has 171 checks (+12). Each was confirmed by
 breaking the code on purpose, and all 17 breaks were caught.
+
+## Chat: a second backup provider (Grok), set by configuration (2026-09-23)
+
+The owner asked to "put Grok as a second backup for the chat". The chat now tries three providers in order: DeepSeek, then `AI_FALLBACK_*`, then `AI_FALLBACK2_*`.
+
+**How it is built.** The second backup is the same OpenAI-compatible adapter as the first, created by `createOpenAiCompatibleAdapter(slot)`, so it follows the same rules: HTTPS only, the key read at call time, protected body keys, and its own entry in the circuit breaker. No vendor is named in code; Grok is only configuration.
+
+**Borrowing the key by name.** A slot can reuse a key the deployment already has: `AI_FALLBACK2_API_KEY_FROM=AI_VOICE_GROK_API_KEY`. The secret is never copied or pasted. Only a name shaped `AI_…_API_KEY` is accepted, so this can never reach the database service key or a session secret.
+
+**Configuration.** Set these four in Vercel (none of them is a secret), then redeploy:
+
+| Variable | Value |
+|---|---|
+| `AI_FALLBACK2_BASE_URL` | `https://api.x.ai/v1` |
+| `AI_FALLBACK2_MODEL` | `grok-4.7` |
+| `AI_FALLBACK2_LABEL` | `grok` |
+| `AI_FALLBACK2_API_KEY_FROM` | `AI_VOICE_GROK_API_KEY` |
+
+The session could not set them itself: the Vercel connector returns 403 on project environment variables.
+
+**How to check it.** `/api/ai/providers?probe=1` (super-admin) lists all three providers and sends each one a tiny turn. If the second backup is not configured, the route explains why using its own variable names (`fallback2_not_configured_because`).
+
+**Tests.** `validate:ai-provider` has 183 checks (+27). Each was confirmed by breaking the code on purpose: the order, an unsafe borrow, the own key taking precedence over a borrowed one, the slot's variable names, the slot reading the first slot's settings, and the route probing only two providers.

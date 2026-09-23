@@ -35,6 +35,19 @@ import "server-only";
    HTTPS IS REQUIRED. The API key travels in an Authorization header; over
    plaintext http:// an operator typo would put a live credential on the wire.
    A non-https base URL disables the adapter rather than downgrading it.
+
+   TWO SLOTS, ONE ADAPTER (owner, 2026-09-23: "put Grok as a second backup for
+   the chat"). The same code serves a second slot read from AI_FALLBACK2_* —
+   same four variables, same rules, its own breaker entry — so a third door is
+   configuration too. The registry tries DeepSeek, then AI_FALLBACK_*, then
+   AI_FALLBACK2_*.
+
+   A SLOT MAY BORROW A KEY THE DEPLOYMENT ALREADY HOLDS, by NAME:
+   `<slot>_API_KEY_FROM=AI_VOICE_GROK_API_KEY` reads that variable instead of
+   asking an operator to paste the same secret twice (keys never pass through
+   chat; a copy is one more place to rotate). Only a name shaped
+   AI_…_API_KEY is accepted, so the indirection can never reach the database
+   service key or a session secret and send it to a chat endpoint.
    --------------------------------------------------------------------------- */
 
 import {
@@ -207,21 +220,66 @@ export function diagnoseFallbackConfig(env: {
   return problems;
 }
 
-/* Read explicitly rather than passing process.env: this project types
-   ProcessEnv strictly, and naming the four variables here is also the only
-   place a reader has to look to know what this adapter consumes. */
-const CONFIG = parseFallbackConfig({
-  AI_FALLBACK_BASE_URL: process.env.AI_FALLBACK_BASE_URL,
-  AI_FALLBACK_API_KEY: process.env.AI_FALLBACK_API_KEY,
-  AI_FALLBACK_MODEL: process.env.AI_FALLBACK_MODEL,
-  AI_FALLBACK_LABEL: process.env.AI_FALLBACK_LABEL,
-});
+/** The two slots. Order here is not preference — the registry decides that. */
+export type FallbackSlot = "AI_FALLBACK" | "AI_FALLBACK2";
 
-function readKey(): string | undefined {
-  return process.env.AI_FALLBACK_API_KEY?.trim() || undefined;
+/** Only these may be borrowed by `<slot>_API_KEY_FROM`: an AI provider key,
+ *  never a database, session or signing secret. Pure; exported for the suite. */
+export function borrowableKeyName(name: string | undefined): string | null {
+  const n = name?.trim();
+  if (!n) return null;
+  return /^AI_[A-Z0-9_]+_API_KEY$/.test(n) ? n : null;
 }
 
-const EXTRA_BODY = parseExtraBody(process.env.AI_FALLBACK_EXTRA_BODY);
+/** A slot's key: its own variable, else the one it names in _API_KEY_FROM
+ *  (when that name is allowed). Read at call time, never stored. */
+export function slotKey(env: Record<string, string | undefined>, slot: FallbackSlot): string | undefined {
+  const own = env[`${slot}_API_KEY`]?.trim();
+  if (own) return own;
+  const from = borrowableKeyName(env[`${slot}_API_KEY_FROM`]);
+  return (from && env[from]?.trim()) || undefined;
+}
+
+/** A slot's variables in the shape parseFallbackConfig and
+ *  diagnoseFallbackConfig read — so the second slot is held to exactly the
+ *  first one's rules. The key is resolved (own or borrowed) for PRESENCE. */
+export function readSlotEnv(env: Record<string, string | undefined>, slot: FallbackSlot) {
+  return {
+    AI_FALLBACK_BASE_URL: env[`${slot}_BASE_URL`],
+    AI_FALLBACK_API_KEY: slotKey(env, slot),
+    AI_FALLBACK_MODEL: env[`${slot}_MODEL`],
+    AI_FALLBACK_LABEL: env[`${slot}_LABEL`],
+  };
+}
+
+/** WHY a slot is unconfigured, in that slot's own variable names. A borrowed
+ *  key that is refused, or names a variable that is not set, is said as such
+ *  rather than as "the key is not set". */
+export function diagnoseSlot(env: Record<string, string | undefined>, slot: FallbackSlot): string[] {
+  const problems = diagnoseFallbackConfig(readSlotEnv(env, slot)).map((p) =>
+    p.replace(/\bAI_FALLBACK_/g, `${slot}_`),
+  );
+  const from = env[`${slot}_API_KEY_FROM`]?.trim();
+  if (from && !env[`${slot}_API_KEY`]?.trim()) {
+    if (!borrowableKeyName(from)) problems.unshift(`${slot}_API_KEY_FROM may only name an AI_…_API_KEY variable`);
+    else if (!env[from]?.trim()) problems.unshift(`${slot}_API_KEY_FROM names ${from}, which is not set`);
+  }
+  return problems;
+}
+
+/** One slot's adapter. Everything is read from the environment once, except
+ *  the key, which is read at call time (see parseFallbackConfig). */
+export function createOpenAiCompatibleAdapter(slot: FallbackSlot, unconfiguredName: string): ProviderAdapter {
+  const CONFIG = parseFallbackConfig(readSlotEnv(process.env, slot));
+  const EXTRA_BODY = parseExtraBody(process.env[`${slot}_EXTRA_BODY`]);
+  const readKey = () => slotKey(process.env, slot);
+  return {
+    name: CONFIG?.label ?? unconfiguredName,
+    configured: () => CONFIG !== null && Boolean(readKey()),
+    model: () => CONFIG?.model ?? "unconfigured",
+    chat: (req, opts) => chatVia(CONFIG, readKey(), EXTRA_BODY, req, opts),
+  };
+}
 
 interface OpenAiChatResponse {
   choices?: Array<{
@@ -259,54 +317,58 @@ function toTurnResponse(json: OpenAiChatResponse): TurnResponse {
   };
 }
 
-export const openAiCompatibleAdapter: ProviderAdapter = {
-  name: CONFIG?.label ?? "fallback",
+async function chatVia(
+  CONFIG: FallbackConfig | null,
+  key: string | undefined,
+  EXTRA_BODY: Record<string, unknown>,
+  req: TurnRequest,
+  opts: Parameters<ProviderAdapter["chat"]>[1],
+): Promise<TurnOutcome> {
+  if (!CONFIG || !key) {
+    return { ok: false, status: 503, bodyText: "fallback provider not configured" };
+  }
+  /* The turn first, the vendor's own switches second — and the merge cannot
+     reach the turn's own keys, so the order here is belt and braces. */
+  const body = {
+    ...toOpenAiBody(req, modelForClass(CONFIG.label, CONFIG.model, req.modelClass)),
+    ...EXTRA_BODY,
+  };
 
-  configured: () => CONFIG !== null && Boolean(readKey()),
-
-  model: () => CONFIG?.model ?? "unconfigured",
-
-  async chat(req: TurnRequest, opts): Promise<TurnOutcome> {
-    const key = readKey();
-    if (!CONFIG || !key) {
-      return { ok: false, status: 503, bodyText: "fallback provider not configured" };
-    }
-    /* The turn first, the vendor's own switches second — and the merge cannot
-       reach the turn's own keys, so the order here is belt and braces. */
-    const body = {
-      ...toOpenAiBody(req, modelForClass(CONFIG.label, CONFIG.model, req.modelClass)),
-      ...EXTRA_BODY,
+  if (opts?.onDelta) {
+    const s = await postChatStreaming(CONFIG.chatUrl, key, body, opts.onDelta);
+    if (!s.ok) return { ok: false, status: s.status || 500, bodyText: s.bodyText };
+    return {
+      ok: true,
+      response: {
+        content: s.content,
+        toolCalls: s.toolCalls.map((c) => ({
+          id: c.id,
+          name: c.function.name,
+          argumentsJson: c.function.arguments,
+        })),
+        finishReason: null,
+        /* Phase 5B. Present only when the provider volunteered it on an SSE
+           frame; null otherwise, and never estimated. */
+        usage: s.usage ?? { inputTokens: null, outputTokens: null },
+      },
     };
+  }
 
-    if (opts?.onDelta) {
-      const s = await postChatStreaming(CONFIG.chatUrl, key, body, opts.onDelta);
-      if (!s.ok) return { ok: false, status: s.status || 500, bodyText: s.bodyText };
-      return {
-        ok: true,
-        response: {
-          content: s.content,
-          toolCalls: s.toolCalls.map((c) => ({
-            id: c.id,
-            name: c.function.name,
-            argumentsJson: c.function.arguments,
-          })),
-          finishReason: null,
-          /* Phase 5B. Present only when the provider volunteered it on an SSE
-             frame; null otherwise, and never estimated. */
-          usage: s.usage ?? { inputTokens: null, outputTokens: null },
-        },
-      };
-    }
+  const res = await postChat(CONFIG.chatUrl, key, body);
+  if (!res.ok) {
+    return { ok: false, status: res.status, bodyText: await res.text().catch(() => "") };
+  }
+  try {
+    return { ok: true, response: toTurnResponse((await res.json()) as OpenAiChatResponse) };
+  } catch (e) {
+    if (!isTransientNetError(e)) throw e;
+    return { ok: false, status: 502, bodyText: "response body terminated mid-read" };
+  }
+}
 
-    const res = await postChat(CONFIG.chatUrl, key, body);
-    if (!res.ok) {
-      return { ok: false, status: res.status, bodyText: await res.text().catch(() => "") };
-    }
-    try {
-      return { ok: true, response: toTurnResponse((await res.json()) as OpenAiChatResponse) };
-    } catch (e) {
-      if (!isTransientNetError(e)) throw e;
-      return { ok: false, status: 502, bodyText: "response body terminated mid-read" };
-    }
-  },
-};
+/** The first backup (AI_FALLBACK_*). The name the rest of the tree has
+ *  always imported. */
+export const openAiCompatibleAdapter = createOpenAiCompatibleAdapter("AI_FALLBACK", "fallback");
+
+/** The second backup (AI_FALLBACK2_*), tried after the first. */
+export const secondFallbackAdapter = createOpenAiCompatibleAdapter("AI_FALLBACK2", "fallback2");
