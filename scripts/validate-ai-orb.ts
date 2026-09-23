@@ -397,6 +397,10 @@ for (const k of ["kxA-life", "kxA-bounce", "kxA-sway", "kxA-gaze", "kxA-hunt", "
     /max-md:scale-\[0\.4808\] md:max-lg:scale-\[0\.8077\]/.test(home) &&
     Math.abs(0.4808 * 208 - 100) < 0.01 && Math.abs(0.8077 * 208 - 168) < 0.01 &&
     /wander=\{wander\}/.test(glow));
+  check("home: the Koleex AI tile draws its orb at 1.8× the icon slot, centred on the slot, so the tile and its label do not move",
+    /const AI_TILE_ORB = 1\.8;/.test(home) &&
+    /const orbPx = Math\.round\(iconPx \* AI_TILE_ORB\);/.test(home) &&
+    /<span className="relative block" style=\{\{ width: iconPx, height: iconPx \}\}>\s*<span className="absolute left-1\/2 top-1\/2 -translate-x-1\/2 -translate-y-1\/2">\s*<AnimatedIcon size=\{orbPx\} animated scaleClass="scale-100" \/>/.test(home));
   const welcome = readFileSync(join(srcRoot, "components/ai/WelcomeCard.tsx"), "utf8");
   check("welcome: the Koleex AI screen's orb is 144px from md up, one canvas scaled into 128px on a phone",
     /<KoleexOrb state="idle" greetKey=\{greet\} size=\{144\} \/>/.test(welcome) &&
