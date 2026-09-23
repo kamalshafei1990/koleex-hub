@@ -2064,3 +2064,70 @@ of this is a reading, not an argument.
 `rt.channels` also stopped firing once per status change — the set cannot
 have changed there — and is recorded where it actually changes. That was
 half of every perf beacon on the one link that cannot spare it.
+
+---
+
+## 2026-09-23 — The orb has a second style, and the user picks it
+
+Owner: *"the user can choose the orb shape … from Koleex Hub Setting or Koleex
+AI setting … and if he choose one so every thing in Koleex Hub related to the
+AI orb will change."* The second style is the dotted thought-orb from
+[thinking-orbs](https://github.com/JakubAntalik/thinking-orbs) (MIT, v0.3.1,
+pinned exactly).
+
+**Where you choose.** Settings → Koleex AI → Orb. The Koleex AI app's own
+settings link already lands on that tab, so it is one picker for both. Each
+option is shown as its own live orb, and the choice applies the moment it is
+tapped, to every orb on screen.
+
+**Where it applies.** Everything goes through one component, `ChosenOrb`:
+KoleexGlowOrb (Home, chat bubbles, welcome card, the app header, Discuss, the
+launcher icon) and the call screen. `validate:ai-orb` fails the build if any
+surface draws `<AIOrb>` or `<DottedOrb>` directly, so a new screen cannot
+quietly ignore the choice.
+
+**Where it is kept.** On the account (`preferences.orb`, `"aura" | "dots"`), so
+phone, iPad and Mac agree. It is also mirrored in localStorage, so the right orb
+is there on the first frame. No schema change: it is one more key in the
+existing jsonb, written through the atomic `account_prefs_merge`, and
+`withDefaults` passes it through so the fifteen wholesale saves don't wipe it.
+
+**Why not the library's own component.** It draws at 64 px and 20 px only, and
+any other size has no tuning. The Hub draws the orb at 26–200 px. So we use the
+library's engine (pure geometry, 6 KB gzipped, no network, no WebGL) and draw it
+ourselves. `dottedPreset()` picks the 20 px tuning below 40 px and the 64 px
+tuning from 40 px up. The suite checks that every motion stays inside its box at
+every size the Hub uses. Drawing it ourselves also gives the dotted orb what the
+library lacks: our state model, the voice level on a call, and the Hub's own
+theme and reduce-motion settings.
+
+**What each state looks like** (`dotted-orb-map.ts`):
+
+| Aura orb | Dotted orb |
+|---|---|
+| idle | breathing |
+| listening | listening |
+| speaking | composing |
+| thinking | working |
+| searching | searching (scan) |
+| analysing / reasoning | solving |
+| translating / connecting | connecting |
+| generating / creating a record | composing |
+| any other action | weaving |
+| success | shaping |
+| error / warning | breathing, slowed and dimmed |
+
+Results stay restrained, no colour, just as on the aura orb.
+
+**Known limit.** Home is rendered on the server. A user who chose dots sees the
+aura orb for one frame there while the page hydrates. Everywhere else (the AI
+app, Discuss, Settings) mounts on the client and reads the choice on the first
+render.
+
+**Suites.** `validate:ai-orb` 142 (+35); `validate:voice-client` pin moved to
+`ChosenOrb`. Mutation-tested five ways, each caught:
+- the call screen drawing `AIOrb` directly
+- `withDefaults` dropping the key
+- speaking drawn like listening
+- the size threshold moved
+- the picker no longer saving

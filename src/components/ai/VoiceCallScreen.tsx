@@ -21,7 +21,7 @@
    --------------------------------------------------------------------------- */
 
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
-import AIOrb from "@/components/ai-orb/AIOrb";
+import ChosenOrb from "@/components/ai-orb/ChosenOrb";
 import { useCallLevel } from "./useCallLevel";
 import { useFocusTrap } from "./useFocusTrap";
 import type { AIOrbState } from "@/components/ai-orb/ai-orb-types";
@@ -743,12 +743,15 @@ export default function VoiceCallScreen({
           <span aria-hidden className="kx-call-ring kx-call-ring-1" />
           <span aria-hidden className="kx-call-ring kx-call-ring-2" />
           <span aria-hidden className="kx-call-ring kx-call-ring-3" />
-          <AIOrb
+          <ChosenOrb
             state={orbState}
             activity={searching && live && !muted ? "searching" : "none"}
             audioLevel={audioLevel}
             size={200}
             interactive
+            /* The call screen is dark in both themes; the dotted orb must
+               draw light dots here even when the Hub is in light mode. */
+            surface="dark"
             /* `is-lively` is the orb's own opt-in (see AIOrb.tsx): at
                call size, in the audio states, the face keeps the home
                page's life — the gaze, the blink, the aura's idle pace. */

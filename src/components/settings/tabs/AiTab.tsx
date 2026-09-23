@@ -37,6 +37,9 @@ import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 import TrashIcon from "@/components/icons/ui/TrashIcon";
 import { useTranslation } from "@/lib/i18n";
 import { settingsT } from "@/lib/translations/settings";
+import { updateAccountPreferences } from "@/lib/accounts-admin";
+import ChosenOrb from "@/components/ai-orb/ChosenOrb";
+import { ORB_STYLES, setOrbStyle, useOrbStyle, type OrbStyle } from "@/components/ai-orb/orb-style";
 
 const API = "/api/ai/personalization";
 /** The hours a morning brief may be sent: early morning to noon. */
@@ -133,6 +136,8 @@ export default function AiTab({ account, onChanged }: {
 
   return (
     <div className="space-y-6">
+      <OrbPicker accountId={account.id} onChanged={onChanged} />
+
       <SettingsGroup header={t("ai.tone.title")} footer={t("ai.guard")}>
         <ControlRow label={t("ai.style")} hint={t(`ai.style.${draft.style}.hint`)}>
           <SelectControl value={draft.style} onChange={(v) => set("style", v)} options={styleOptions} />
@@ -363,6 +368,60 @@ function UsageSection({ t }: { t: (k: string) => string }) {
             )}
           </>
         )}
+      </div>
+    </SettingsGroup>
+  );
+}
+
+/* ── THE ORB ──────────────────────────────────────────────────────────────
+   Owner, 2026-09-23: the user chooses the orb, and every orb in the Hub
+   changes with it. The choice is SHOWN, not named — each option is the live
+   orb itself, moving — the same rule the Display tab's style previews follow.
+
+   It applies the moment it is tapped, everywhere on screen, and saves on its
+   own: it is appearance, not the tone draft below, and a look that waited for
+   a Save button would be a look you could not try on. The account keeps it,
+   so the phone, the iPad and the Mac agree. */
+function OrbPicker({ accountId, onChanged }: { accountId: string; onChanged: () => void }) {
+  const { t } = useTranslation(settingsT);
+  const current = useOrbStyle();
+
+  function pick(style: OrbStyle) {
+    if (style === current) return;
+    setOrbStyle(style);
+    void updateAccountPreferences(accountId, { orb: style }).then((ok) => { if (ok) onChanged(); });
+  }
+
+  return (
+    <SettingsGroup header={t("ai.orb.title")} footer={t("ai.orb.hint")} flush={false}>
+      <div role="radiogroup" aria-label={t("ai.orb.title")} className="flex gap-3 py-2">
+        {ORB_STYLES.map((style) => {
+          const on = style === current;
+          return (
+            <button
+              key={style}
+              type="button"
+              role="radio"
+              aria-checked={on}
+              onClick={() => pick(style)}
+              className={`relative flex flex-1 flex-col items-center gap-2 rounded-2xl border px-3 pt-4 pb-3 transition-[border-color,background-color] duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--border-focus)] ${
+                on
+                  ? "border-[#0066FF] bg-[#0066FF]/[0.06]"
+                  : "border-[var(--border-subtle)] hover:border-[var(--border-strong)]"
+              }`}
+            >
+              {/* Drawn in its own style whatever is chosen — a preview that
+                  followed the choice would show the same orb twice. */}
+              <ChosenOrb style={style} state="thinking" size={64} />
+              <span className="text-[13px] font-medium text-[var(--text-primary)]">{t(`ai.orb.${style}`)}</span>
+              {on && (
+                <span aria-hidden className="absolute top-2 end-2 inline-flex h-5 w-5 items-center justify-center rounded-full bg-[#0066FF] text-white">
+                  <CheckIcon size={12} />
+                </span>
+              )}
+            </button>
+          );
+        })}
       </div>
     </SettingsGroup>
   );

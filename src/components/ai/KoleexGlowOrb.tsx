@@ -7,11 +7,15 @@
    Discuss, launcher icon) speaks the legacy OrbState vocabulary
    ("idle"/"loading"/"typing"/...). This wrapper translates it into the
    typed AIOrb model (state + activity + result) so call sites did not
-   have to change during the motion-system upgrade. New code should
-   prefer <AIOrb> from components/ai-orb directly.
+   have to change during the motion-system upgrade.
+
+   It draws through <ChosenOrb>, so every one of those call sites shows the
+   orb style the user picked in Settings → Koleex AI. New code that speaks
+   the typed model should render <ChosenOrb> — never <AIOrb> directly, or
+   that surface will ignore the user's choice.
    --------------------------------------------------------------------------- */
 
-import AIOrb from "@/components/ai-orb/AIOrb";
+import ChosenOrb from "@/components/ai-orb/ChosenOrb";
 import type { AIOrbActivity, AIOrbResult, AIOrbState } from "@/components/ai-orb/ai-orb-types";
 
 interface Props {
@@ -64,7 +68,7 @@ export default function KoleexGlowOrb({
   const mapped = mapLegacy(state, activity);
   const act: AIOrbActivity = activity;
   return (
-    <AIOrb
+    <ChosenOrb
       state={mapped.state}
       result={mapped.result}
       activity={act}

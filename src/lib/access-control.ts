@@ -362,6 +362,12 @@ export interface AccountPreferences {
      memory controls. Shape and limits live in lib/ai-personalization.ts;
      every prompt lane reads it from here. */
   ai?: AiPersonalization;
+  /* Which drawing of the Koleex AI orb this user sees, everywhere it appears
+     (Home, the chat, the call screen, Discuss). Appearance, not tone — so it
+     lives beside `ai`, not inside it: that slice is normalised by the
+     personalization route and would drop a key it does not know. Values and
+     the store live in components/ai-orb/orb-style.ts. Absent means "aura". */
+  orb?: "aura" | "dots";
 }
 
 /**
@@ -422,6 +428,7 @@ export const DEFAULT_PREFERENCES: Required<
     out_of_office: { enabled: false },
   },
   ai: DEFAULT_AI_PERSONALIZATION,
+  orb: "aura",
 };
 
 /** Merge stored preferences with frontend defaults for display. */
@@ -494,6 +501,9 @@ export function withDefaults(
     /* Same passthrough, same reason as wallpaper: a key this function does
        not name is a key every wholesale save deletes. */
     ai: p.ai ?? DEFAULT_PREFERENCES.ai,
+    /* And again: without this line, changing the language would quietly put
+       the orb back to the default. */
+    orb: p.orb === "dots" ? "dots" : DEFAULT_PREFERENCES.orb,
   };
 }
 
