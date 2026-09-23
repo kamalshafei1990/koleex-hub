@@ -2105,7 +2105,7 @@ theme and reduce-motion settings.
 
 | Aura orb | Dotted orb |
 |---|---|
-| idle | breathing |
+| idle | composing, at half pace (owner's choice, see below) |
 | listening | listening |
 | speaking | composing |
 | thinking | working |
@@ -2203,3 +2203,26 @@ them.
 - `validate:ai-orb` 146. A new check fails if anything imports the dots or the
   engine statically.
 - `validate:voice-client` 799, `validate:budgets` 107/107.
+
+
+### Follow-up: the resting motion is the owner's choice
+
+The owner compared all nine motions side by side, at 104, 72, 38 and 30 px on
+dark and light, and chose **composing**. It replaces the breathing ring, which
+is not a sphere.
+
+**Why not solving?** The owner also asked about solving. It was ruled out
+because it is what a small orb *thinks* with (see the #449 follow-up). Beside a
+chat message, a resting orb and a thinking one would have looked identical.
+
+**Why composing at half pace?** Composing is also the speaking motion. But
+speaking only appears on the call screen, where it runs at full pace and grows
+and shrinks with the voice. At rest it runs at half pace and holds its size.
+
+The slowed, dimmed ring is kept for warning, error, sleep and waiting on the
+user.
+
+`validate:ai-orb` has 148 checks (+2). Each was confirmed by breaking the code
+on purpose:
+- idle drawn as solving fails 3;
+- idle at full pace fails 2.
