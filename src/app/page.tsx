@@ -1513,7 +1513,7 @@ export default function HomePage() {
            an angle animated on the element never reached the rim and the
            glow sat still under Aurora. */
         .ai-card-neon {
-          animation: ai-card-spin 3s linear infinite;
+          animation: ai-card-spin 4s linear infinite;
           border: 1.5px solid transparent;
           background: ${dk ? "rgba(11,14,20,0.55)" : "rgba(255,255,255,0.62)"};
           -webkit-backdrop-filter: blur(16px) saturate(150%);
@@ -1529,7 +1529,7 @@ export default function HomePage() {
           border-radius: inherit;
           padding: 1.5px;
           pointer-events: none;
-          animation: ai-card-spin 3s linear infinite;
+          animation: ai-card-spin 4s linear infinite;
           background: conic-gradient(
             from var(--ai-card-angle),
             rgba(86,127,178,0.75),
@@ -1546,7 +1546,7 @@ export default function HomePage() {
         }
         ` : `
         .ai-card-neon {
-          animation: ai-card-spin 3s linear infinite;
+          animation: ai-card-spin 4s linear infinite;
           border: 1.5px solid transparent;
           background-origin: border-box;
           background-clip: padding-box, border-box;
