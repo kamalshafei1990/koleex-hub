@@ -285,10 +285,10 @@ export default function MainHeader() {
               the rest of the bar doesn't jump when the logo lands. */}
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
-            src={dk ? "/brand/hub-logo/koleex-hub-logo-for-dark-c.webp" : "/brand/hub-logo/koleex-hub-logo-for-light-c.webp"}
+            src={dk ? "/brand/hub-logo/koleex-hub-logo-for-dark-d.webp" : "/brand/hub-logo/koleex-hub-logo-for-light-d.webp"}
             alt="Koleex Hub"
             width={640}
-            height={69}
+            height={70}
             decoding="async"
             fetchPriority="high"
             /* Dragging the logo out of the header does nothing useful and, in

@@ -695,7 +695,7 @@ export default function AdminAuth({ children }: Props) {
                 composite (untouched KOLEEX wordmark + gradient Birdman "hub"). */}
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
-              src="/brand/hub-logo/koleex-hub-logo-for-dark-c.webp"
+              src="/brand/hub-logo/koleex-hub-logo-for-dark-d.webp"
               alt="Koleex Hub"
               /* Same reason as the header: a double-click on an image selects
                  it, and a blue selection box across the wordmark is the first
@@ -1214,7 +1214,7 @@ function JoinSuccessPanel({ name, reference, onReset }: JoinSuccessPanelProps) {
           <div style={{ padding: "48px 56px", fontFamily: "inherit" }}>
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
-              src="/brand/hub-logo/koleex-hub-logo-for-light-c.webp"
+              src="/brand/hub-logo/koleex-hub-logo-for-light-d.webp"
               alt="Koleex Hub"
               style={{ height: 22, width: "auto" }}
             />

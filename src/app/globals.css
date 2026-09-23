@@ -4156,8 +4156,8 @@ html[dir="rtl"] .kx-ai-root .kx-ai-bar-title {
   position: absolute;
   inset: 0;
   overflow: hidden;
-  -webkit-mask: url("/brand/hub-logo/koleex-hub-logo-for-dark-c.webp") center/contain no-repeat;
-  mask: url("/brand/hub-logo/koleex-hub-logo-for-dark-c.webp") center/contain no-repeat;
+  -webkit-mask: url("/brand/hub-logo/koleex-hub-logo-for-dark-d.webp") center/contain no-repeat;
+  mask: url("/brand/hub-logo/koleex-hub-logo-for-dark-d.webp") center/contain no-repeat;
 }
 .kx-orb-shine i {
   position: absolute;
@@ -4176,8 +4176,8 @@ html[dir="rtl"] .kx-ai-root .kx-ai-bar-title {
 }
 [data-theme="light"] .kx-orb-mark img { opacity: .34; }
 [data-theme="light"] .kx-orb-shine {
-  -webkit-mask-image: url("/brand/hub-logo/koleex-hub-logo-for-light-c.webp");
-  mask-image: url("/brand/hub-logo/koleex-hub-logo-for-light-c.webp");
+  -webkit-mask-image: url("/brand/hub-logo/koleex-hub-logo-for-light-d.webp");
+  mask-image: url("/brand/hub-logo/koleex-hub-logo-for-light-d.webp");
 }
 [data-theme="light"] .kx-orb-shine i {
   background: linear-gradient(90deg, transparent, #0A1520 45%, #1B3A57 58%, transparent);
