@@ -162,6 +162,21 @@ for (const k of ["kxA-life", "kxA-bounce", "kxA-sway", "kxA-gaze", "kxA-hunt", "
   check("dots: speaking is the sash — distinct from listening, so a call shows whose turn it is",
     dottedLook("speaking").motion === "composing" && dottedLook("speaking").motion !== dottedLook("listening").motion);
   check("dots: plain thinking is the orbits", dottedLook("thinking").motion === "working");
+  /* Owner, from the live preview: the orbits scatter into loose dots below
+     40 px, and a chat bubble thinks at 38. Small orbs think with the solving
+     sphere; large ones keep the orbits. Checked at the edges of the switch. */
+  check("dots: a small orb thinks with the solving sphere, a large one with the orbits",
+    dottedLook("thinking", "none", "none", 38).motion === "solving" &&
+    dottedLook("thinking", "none", "none", 30).motion === "solving" &&
+    dottedLook("thinking", "none", "none", 39.9).motion === "solving" &&
+    dottedLook("thinking", "none", "none", 40).motion === "working" &&
+    dottedLook("thinking", "none", "none", 200).motion === "working" &&
+    /* the same rule for plain work with no named tool */
+    dottedLook("processing", "none", "none", 38).motion === "solving");
+  check("dots: the small-size rule changes only the orbits — every other state looks the same at any size",
+    (["idle", "listening", "speaking", "success", "error"] as AIOrbState[]).every((st) =>
+      dottedLook(st, "none", "none", 30).motion === dottedLook(st, "none", "none", 200).motion) &&
+    dottedLook("processing", "searching", "none", 30).motion === "searching");
   check("dots: a search is the scan, on both orbs", dottedLook("processing", "searching").motion === "searching");
   check("dots: at rest it breathes", dottedLook("idle").motion === "breathing");
   check("dots: a live result wins over the base state, as on the aura orb",
@@ -268,6 +283,8 @@ for (const k of ["kxA-life", "kxA-bounce", "kxA-sway", "kxA-gaze", "kxA-hunt", "
   check("dots: it rests when it cannot be seen, and holds still when the user asked for stillness",
     /new IntersectionObserver/.test(dotted) && /visibilitychange/.test(dotted) &&
     /kx-reduce-motion/.test(dotted) && /prefers-reduced-motion: reduce/.test(dotted) && /if \(still\) \{ draw\(0\.6\); return; \}/.test(dotted));
+  check("dots: the orb hands its own size to the look, so the small-size rule actually reaches a chat bubble",
+    /const look = dottedLook\(state, activity, result, size\);/.test(dotted));
   check("dots: the voice moves it on a call (the aura orb's own smoothing, not a second one)",
     /useAudioSmoothing\(rootRef, clamp01\(audioLevel\), audioActive\);/.test(dotted) && /var\(--kx-orb-audio, 0\)/.test(dotted));
 }

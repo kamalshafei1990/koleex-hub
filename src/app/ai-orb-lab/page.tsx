@@ -131,7 +131,7 @@ function AiOrbLabInner() {
             <p className="mt-2 text-[10px] text-white/35">{sz}px · {lbl}</p>
           </div>
         ))}
-        <p className="text-[10px] text-white/35 pb-5">motion: {dottedLook(state, activity, result).motion}</p>
+        <p className="text-[10px] text-white/35 pb-5">motion: {dottedLook(state, activity, result).motion} (small: {dottedLook(state, activity, result, 38).motion})</p>
       </div>
 
       {/* What is animating right now */}

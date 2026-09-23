@@ -60,7 +60,7 @@ export default function DottedOrb({
   const rootRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const visual = resolveOrbState(state, result);
-  const look = dottedLook(state, activity, result);
+  const look = dottedLook(state, activity, result, size);
   const audioActive = visual === "listening" || visual === "speaking";
   useAudioSmoothing(rootRef, clamp01(audioLevel), audioActive);
 

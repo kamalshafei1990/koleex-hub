@@ -2131,3 +2131,26 @@ render.
 - speaking drawn like listening
 - the size threshold moved
 - the picker no longer saving
+
+### Follow-up: "thinking" at small size
+
+The owner looked at the live preview and said: *"fix the thinking one"*.
+
+Below 40 px the orbits motion (`working`) falls back to the 20 px tuning. At
+that tuning it is just a few dots scattered on tilted orbits, most of them faint
+on the far side, and it stops looking like an orb. The chat bubble is 38 px and
+shows "thinking" more than anything else.
+
+I rendered five motions side by side at 38 and 30 px, on dark and on light:
+working, solving, searching, listening and weaving. `solving` was the clearest:
+a full dotted sphere whose bands keep settling. It also already means "working
+something out".
+
+So `dottedLook(…, size)` now draws `solving` wherever it would draw `working`
+below 40 px. Nothing else changes by size.
+
+`validate:ai-orb` has 145 checks (+3), each confirmed by breaking the code on
+purpose:
+- removing the rule fails 1 check;
+- DottedOrb no longer passing its size fails 1 check;
+- widening the rule to every motion fails 1 check.
