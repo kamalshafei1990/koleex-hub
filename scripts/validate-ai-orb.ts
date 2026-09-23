@@ -305,7 +305,61 @@ for (const k of ["kxA-life", "kxA-bounce", "kxA-sway", "kxA-gaze", "kxA-hunt", "
   const dotted = readFileSync(join(srcRoot, "components/ai-orb/DottedOrb.tsx"), "utf8");
   check("dots: it rests when it cannot be seen, and holds still when the user asked for stillness",
     /new IntersectionObserver/.test(dotted) && /visibilitychange/.test(dotted) &&
-    /kx-reduce-motion/.test(dotted) && /prefers-reduced-motion: reduce/.test(dotted) && /if \(still\) \{ draw\(0\.6\); return; \}/.test(dotted));
+    /kx-reduce-motion/.test(dotted) && /prefers-reduced-motion: reduce/.test(dotted) && /if \(still\) \{\s*const f = frameOf\(lookRef\.current, 0\.6\);[\s\S]{0,160}?return;\s*\}/.test(dotted));
+  /* ── THE MORPH (owner, 2026-09-23, chosen from six live samples) ──
+     A change of motion is the same dots flying into the new shape. */
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const morph = require("../src/components/ai-orb/dotted-orb-morph") as typeof import("../src/components/ai-orb/dotted-orb-morph");
+  const { morphDots, pairDots, easeInOutCubic, DOTTED_MORPH_MS } = morph;
+  check("morph: 800 ms, eased in and out, from 0 to 1 and nowhere else",
+    DOTTED_MORPH_MS === 800 && easeInOutCubic(0) === 0 && easeInOutCubic(1) === 1 &&
+    Math.abs(easeInOutCubic(0.5) - 0.5) < 1e-9 && easeInOutCubic(-1) === 0 && easeInOutCubic(2) === 1 &&
+    [0.1, 0.3, 0.5, 0.7, 0.9].every((x, i, a) => i === 0 || easeInOutCubic(x) > easeInOutCubic(a[i - 1])));
+  {
+    const c = 36;
+    const A = Array.from({ length: 7 }, (_, i) => ({ x: c + 20 * Math.cos(i), y: c + 20 * Math.sin(i), r: 1, white: 0.2, a: 1 }));
+    const B = Array.from({ length: 12 }, (_, i) => ({ x: c + 10 * Math.cos(i * 0.5), y: c + 10 * Math.sin(i * 0.5), r: 2, white: 0.8, a: 0.5 }));
+    const key = (d: { x: number; y: number }) => `${d.x.toFixed(6)},${d.y.toFixed(6)}`;
+    const at0 = morphDots(A, B, c, 0), at1 = morphDots(A, B, c, 1);
+    check("morph: every dot of both shapes takes part — the longer list sets the count",
+      at0.length === 12 && at1.length === 12 && morphDots(B, A, c, 0).length === 12 &&
+      new Set(pairDots(A, B, c).map(([p]) => key(p))).size === 7 &&
+      new Set(pairDots(A, B, c).map(([, q]) => key(q))).size === 12);
+    check("morph: it starts exactly on the old shape and lands exactly on the new one",
+      at0.every((d) => A.some((q) => key(q) === key(d))) && at1.every((d) => B.some((q) => key(q) === key(d))) &&
+      at1.every((d) => d.r === 2 && Math.abs(d.white - 0.8) < 1e-9 && Math.abs((d.a ?? 1) - 0.5) < 1e-9));
+    check("morph: a side with no dots fades rather than flying from nowhere",
+      morphDots([], B, c, 0.25).every((d) => Math.abs((d.a ?? 1) - 0.125) < 1e-9) &&
+      morphDots(A, [], c, 0.25).every((d) => Math.abs((d.a ?? 1) - 0.75) < 1e-9) && morphDots([], [], c, 0.5).length === 0);
+  }
+  {
+    /* Real shapes, real sizes: every instant of a real change stays inside
+       the orb's box — rest to thinking, thinking to a search, and back. */
+    let inside = true, detail = "";
+    for (const size of [30, 38, 72, 200]) {
+      const changes: [AIOrbState, AIOrbState][] = [["idle", "thinking"], ["thinking", "processing"], ["speaking", "listening"], ["success", "idle"]];
+      for (const [a, b] of changes) {
+        const la = dottedLook(a, a === "processing" ? "searching" : "none", "none", size);
+        const lb = dottedLook(b, b === "processing" ? "searching" : "none", "none", size);
+        const fa = engine.resolvePreset(la.motion, dottedPreset(size)), fb = engine.resolvePreset(lb.motion, dottedPreset(size));
+        for (const e of [0.25, 0.5, 0.75]) {
+          const dots = morphDots(engine.MODE_FRAMES[fa.mode](size, 1.3, fa.opts).dots, engine.MODE_FRAMES[fb.mode](size, 0.4, fb.opts).dots, size / 2, e);
+          for (const d of dots) if (!(d.x - d.r >= -0.5 && d.x + d.r <= size + 0.5 && d.y - d.r >= -0.5 && d.y + d.r <= size + 0.5)) { inside = false; detail = `${a}→${b}@${size} e=${e}`; }
+        }
+      }
+    }
+    check("morph: every instant of a real change of shape stays inside the orb, at every size", inside, detail);
+  }
+  check("morph: the orb morphs on a change of MOTION, never in stillness, and does not restart its loop to do it",
+    /if \(prev\.motion !== motion && !wantsStill\(\)\) \{\s*morphRef\.current = \{ from: prev, start: performance\.now\(\), phase: clockRef\.current\?\.phase \?\? 0 \};/.test(dotted) &&
+    /\}, \[size, lightDots, still, stillKey\]\);/.test(dotted) &&
+    !/\}, \[motion, speed, ink, size, lightDots, still\]\);/.test(dotted) &&
+    /paintDots\(morphDots\(from\.dots, to\.dots, size \/ 2, e\)/.test(dotted) &&
+    /const p = \(now - m\.start\) \/ DOTTED_MORPH_MS;/.test(dotted));
+  check("morph: a change of pace alone (resting to speaking) is smooth — the clock runs on at the new pace instead of restarting",
+    /clock\.phase \+= dt \* paceOf\(cur\);/.test(dotted) &&
+    /const dt = Math\.min\(0\.1, Math\.max\(0, \(now - clock\.last\) \/ 1000\)\);/.test(dotted) &&
+    !/performance\.now\(\) \/ 1000\) \* pace;/.test(dotted));
   check("dots: the orb hands its own size to the look, so the small-size rule actually reaches a chat bubble",
     /const look = dottedLook\(state, activity, result, size\);/.test(dotted));
   check("dots: the voice moves it on a call (the aura orb's own smoothing, not a second one)",
