@@ -368,6 +368,11 @@ export interface AccountPreferences {
      personalization route and would drop a key it does not know. Values and
      the store live in components/ai-orb/orb-style.ts. Absent means "aura". */
   orb?: "aura" | "dots";
+  /* The "My apps" row at the top of Home: the person's pinned app ids in
+     their order, and where they came from ("none" = never set, so Home seeds
+     it once from their own usage; "usage" = seeded; "user" = edited). Shape
+     and rules live in lib/home/my-apps.ts. */
+  home_apps?: { pins: string[]; source: "none" | "usage" | "user" };
 }
 
 /**
@@ -429,6 +434,7 @@ export const DEFAULT_PREFERENCES: Required<
   },
   ai: DEFAULT_AI_PERSONALIZATION,
   orb: "aura",
+  home_apps: { pins: [], source: "none" },
 };
 
 /** Merge stored preferences with frontend defaults for display. */
@@ -504,6 +510,9 @@ export function withDefaults(
     /* And again: without this line, changing the language would quietly put
        the orb back to the default. */
     orb: p.orb === "dots" ? "dots" : DEFAULT_PREFERENCES.orb,
+    /* Same passthrough again. Without this line every Settings save would
+       erase the person's My apps row and Home would re-seed it from usage. */
+    home_apps: p.home_apps ?? DEFAULT_PREFERENCES.home_apps,
   };
 }
 

@@ -167,7 +167,8 @@
     "validate:schema-barrel": "tsx scripts/validate-schema-barrel.ts",
     "validate:ai-product-page-parity": "NODE_OPTIONS=--conditions=react-server tsx scripts/validate-ai-product-page-parity.ts",
     "validate:finance-i18n": "tsx scripts/validate-finance-i18n.ts",
-    "validate:contacts-i18n": "tsx scripts/validate-contacts-i18n.ts"
+    "validate:contacts-i18n": "tsx scripts/validate-contacts-i18n.ts",
+    "validate:home-layout": "tsx scripts/validate-home-layout.ts"
   },
   "dependencies": {
     "@napi-rs/canvas": "^0.1.100",

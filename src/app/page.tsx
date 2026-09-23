@@ -8,7 +8,7 @@
    --------------------------------------------------------------------------- */
 
 import { PRODUCTS_PREFETCH_URL, PRODUCT_DATA_PREFETCH_URL } from "@/lib/products-list-params";
-import { useState, useEffect, useMemo, useCallback, useRef, useSyncExternalStore, memo } from "react";
+import { useState, useEffect, useLayoutEffect, useMemo, useCallback, useRef, useSyncExternalStore, memo } from "react";
 import dynamic from "next/dynamic";
 import { useRouter, usePathname } from "next/navigation";
 import SearchIcon from "@/components/icons/ui/SearchIcon";
@@ -16,6 +16,8 @@ import { type OrbState } from "@/components/ai/KoleexOrb";
 import KoleexGlowOrb from "@/components/ai/KoleexGlowOrb";
 import { useTranslation } from "@/lib/i18n";
 import { hubT } from "@/lib/translations/hub";
+import { homeLauncherT } from "@/lib/translations/home-launcher";
+import type { Translations } from "@/lib/i18n";
 import {
   APP_REGISTRY,
   ALL_APPS_CATEGORIES,
@@ -37,6 +39,15 @@ import { useAfterInteractive } from "@/lib/perf/use-after-interactive";
 import { usePermittedModules } from "@/lib/use-scope";
 import { getMeBootstrapLastError, retryMeBootstrap, useMeBootstrap } from "@/lib/me-bootstrap";
 import { useShortcutHint } from "@/lib/ui/use-shortcut-hint";
+import { launcherColumns, packAppBands } from "@/lib/home/app-bands";
+import {
+  HOME_APPS_NONE, MY_APPS_MAX, MY_APPS_SEED, cacheHomeApps, readCachedHomeApps, readHomeAppsPref,
+  saveHomeApps, seedPins, type HomeAppsPref,
+} from "@/lib/home/my-apps";
+import { whenNetworkQuiet } from "@/lib/net-idle";
+import PlusIcon from "@/components/icons/ui/PlusIcon";
+import MinusIcon from "@/components/icons/ui/MinusIcon";
+import CheckIcon from "@/components/icons/ui/CheckIcon";
 /* Home dashboard is code-split: it only matters after the grid is usable,
    and keeping it out of the critical chunk protects the home budget. */
 /* Timezone label — computed once per client, cached at module level.
@@ -235,6 +246,33 @@ function ClockWidget({ dk = true }: { dk?: boolean }) {
 }
 
 /* ── Full App Card (for grid) ── */
+/* ── Launcher layout (owner pick F, 23 Sep 2026) ──
+   From 640 px up the launcher is size-driven: tiles never narrower than
+   112 px (lib/home/app-bands.ts), groups packed into bands on one column
+   grid, icons 30 px. Below 640 px the phone stack of three columns stays as
+   it was. Read as an external store so the first client render already
+   knows which one it is drawing. */
+/* hubT (shared with the shell) + the launcher's own strings, merged once here
+   so the launcher strings stay in the Home chunk. */
+const HOME_T: Translations = { ...hubT, ...homeLauncherT };
+
+const WIDE_QUERY = "(min-width: 640px)";
+function subscribeWide(cb: () => void): () => void {
+  const mq = window.matchMedia(WIDE_QUERY);
+  mq.addEventListener("change", cb);
+  return () => mq.removeEventListener("change", cb);
+}
+function readWide(): boolean {
+  return window.matchMedia(WIDE_QUERY).matches;
+}
+/** First-render guess of the column count; the layout effect corrects it
+    before the first paint when the measured grid differs. */
+function estimateLauncherColumns(): number {
+  if (typeof window === "undefined") return 10;
+  const vw = window.innerWidth;
+  return launcherColumns(Math.min(vw, 1400) - (vw >= 768 ? 80 : 32));
+}
+
 const AppCard = memo(function AppCard({
   app,
   t,
@@ -243,6 +281,14 @@ const AppCard = memo(function AppCard({
   appUnreadNoun,
   dk,
   onPrefetch,
+  iconPx = 34,
+  edit = null,
+  pinned = false,
+  pinFull = false,
+  onPin,
+  onMoveBy,
+  pinIndex = 0,
+  pinTotal = 0,
 }: {
   app: AppDef;
   t: (key: string, fb: string) => string;
@@ -251,6 +297,17 @@ const AppCard = memo(function AppCard({
   appUnreadNoun: string;
   dk: boolean;
   onPrefetch: (app: AppDef) => void;
+  /** 34 on phones, 30 on the size-driven desktop launcher. */
+  iconPx?: number;
+  /** Edit mode for My apps: "mine" = a tile in the row (drag, −), "catalog" =
+      a tile in the groups below (tap to add or remove). */
+  edit?: "mine" | "catalog" | null;
+  pinned?: boolean;
+  pinFull?: boolean;
+  onPin?: (id: string) => void;
+  onMoveBy?: (id: string, delta: number) => void;
+  pinIndex?: number;
+  pinTotal?: number;
 }) {
   const Icon = app.icon;
   const label = t(app.tKey, app.name);
@@ -271,12 +328,7 @@ const AppCard = memo(function AppCard({
     appUnread > 0
       ? `${appUnread} unread ${appUnreadNoun}${appUnread === 1 ? "" : "s"}`
       : `${appBadgeCount} open item${appBadgeCount === 1 ? "" : "s"}`;
-  return (
-    <AppLaunchLink
-      app={app}
-      onPreload={onPrefetch}
-      aria-label={label}
-      className={`relative flex flex-col items-center justify-center gap-2.5 p-3 aspect-square rounded-2xl transition-[transform,box-shadow,border-color,background-color,opacity] duration-200 select-none outline-none focus-visible:ring-2 ${
+  const tileCls = `relative flex flex-col items-center justify-center gap-2.5 p-3 aspect-square rounded-2xl transition-[transform,box-shadow,border-color,background-color,opacity] duration-200 select-none outline-none focus-visible:ring-2 ${
         dk ? "focus-visible:ring-white/35" : "focus-visible:ring-black/25"
       } ${
         isAi
@@ -294,10 +346,11 @@ const AppCard = memo(function AppCard({
                     : "tile-hover-neon kx-hover-card kx-hover-tile kx-glass bg-[#f8f8f8] border-black/[0.06]"
                 }`
             : `cursor-default border kx-glass ${dk ? "bg-[#0c0c0c] border-white/[0.03]" : "bg-[#f8f8f8] border-black/[0.03]"}`
-      }`}
-    >
+      }`;
+  const body = (
+    <>
 
-      {(badge === "new" || badge === "updated") && (
+      {!edit && (badge === "new" || badge === "updated") && (
         <span
           className={`absolute top-2 start-2 px-1.5 py-0.5 rounded-md text-[9px] font-extrabold tracking-wider uppercase pointer-events-none select-none whitespace-nowrap ${
             badge === "new"
@@ -349,9 +402,9 @@ const AppCard = memo(function AppCard({
                  mask — owner: "the Koleex AI Icon should be our Animated AI
                  face (orb)". The orb is the product's identity and it moves;
                  a bound icon is a flat SVG mask and can never be it. */
-              return <AnimatedIcon size={34} animated scaleClass="scale-100" />;
+              return <AnimatedIcon size={iconPx} animated scaleClass="scale-100" />;
             }
-            return <BoundIcon semanticKey={`app.${app.id}`} className="h-[34px] w-[34px]" fallback={<Icon size={34} />} />;
+            return <BoundIcon semanticKey={`app.${app.id}`} className={iconPx === 30 ? "h-[30px] w-[30px]" : "h-[34px] w-[34px]"} fallback={<Icon size={iconPx} />} />;
           })()}
         </span>
       </span>
@@ -364,6 +417,73 @@ const AppCard = memo(function AppCard({
       }`}>
         {label}
       </span>
+    </>
+  );
+
+  /* ── My apps edit mode ──
+     "catalog": every tile below is a toggle — tap to add it to My apps or
+     take it out; the corner shows + or ✓. "mine": a tile in the row can be
+     dragged to a new place (lib loaded on Edit) or moved with the arrow
+     keys, and its − takes it out. Neither navigates while editing. */
+  const pinText = (pinned ? t("home.unpinApp", "Remove {name} from My apps") : t("home.pinApp", "Add {name} to My apps")).replace("{name}", label);
+  const badgeCls = dk ? "bg-white/[0.08] border-white/20 text-white/85" : "bg-black/[0.05] border-black/15 text-black/70";
+  if (edit === "catalog") {
+    const blocked = !app.active || (!pinned && pinFull);
+    return (
+      <button
+        type="button"
+        data-app-tile={app.id}
+        aria-pressed={pinned}
+        aria-label={app.active && blocked ? t("home.myAppsFull", "My apps is full — remove one to add another") : pinText}
+        disabled={blocked}
+        onClick={() => onPin?.(app.id)}
+        className={`${tileCls} ${blocked ? "opacity-60" : ""}`}
+      >
+        {app.active && (
+          <span aria-hidden className={`absolute top-1.5 start-1.5 z-10 grid h-6 w-6 place-items-center rounded-full border ${pinned ? "bg-[#567FB2] border-[#7FA9D6]/70 text-white" : badgeCls}`}>
+            {pinned ? <CheckIcon size={13} /> : <PlusIcon size={13} />}
+          </span>
+        )}
+        {body}
+      </button>
+    );
+  }
+  if (edit === "mine") {
+    const rtl = typeof document !== "undefined" && document.documentElement.dir === "rtl";
+    return (
+      <div
+        data-pin-id={app.id}
+        tabIndex={0}
+        role="group"
+        aria-label={t("home.moveApp", "{name}, {pos} of {total}. Use the arrow keys to move it.")
+          .replace("{name}", label).replace("{pos}", String(pinIndex + 1)).replace("{total}", String(pinTotal))}
+        onKeyDown={(e) => {
+          if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
+          e.preventDefault();
+          onMoveBy?.(app.id, (e.key === "ArrowRight") !== rtl ? 1 : -1);
+        }}
+        className={`${tileCls.replace("cursor-pointer", "cursor-grab")} touch-none data-[dragging=1]:ring-2 data-[dragging=1]:ring-[#7FA9D6]/80`}
+      >
+        <button
+          type="button"
+          aria-label={pinText}
+          onClick={() => onPin?.(app.id)}
+          className={`absolute top-1.5 start-1.5 z-10 grid h-6 w-6 place-items-center rounded-full border transition-colors ${badgeCls} ${dk ? "hover:bg-white/[0.16]" : "hover:bg-black/[0.1]"}`}
+        >
+          <MinusIcon size={13} />
+        </button>
+        {body}
+      </div>
+    );
+  }
+  return (
+    <AppLaunchLink
+      app={app}
+      onPreload={onPrefetch}
+      aria-label={label}
+      className={tileCls}
+    >
+      {body}
     </AppLaunchLink>
   );
 });
@@ -541,7 +661,7 @@ const AIGreeter = memo(function AIGreeter({
 export default function HomePage() {
   const router = useRouter();
   const pathname = usePathname();
-  const { t, lang } = useTranslation(hubT);
+  const { t, lang } = useTranslation(HOME_T);
   const currentAppId = getActiveAppId(pathname);
   const { account } = useCurrentAccount();
 
@@ -850,6 +970,162 @@ export default function HomePage() {
     })).filter((g) => g.apps.length > 0);
   }, [isSearchOrFilter, visibleRegistry]);
 
+  /* ── Launcher layout: size-driven columns + bands (owner pick F) ──
+     `launcherRef` wraps the whole apps zone, so its width IS the grid's.
+     The first render uses a guess from the window; the layout effect measures
+     and, if the count differs, React re-renders before the first paint — the
+     bands never visibly rearrange. Resizing only re-packs when the column
+     count actually changes. */
+  const wide = useSyncExternalStore(subscribeWide, readWide, () => false);
+  const iconPx = wide ? 30 : 34;
+  const launcherRef = useRef<HTMLDivElement | null>(null);
+  const [cols, setCols] = useState<number>(estimateLauncherColumns);
+  useLayoutEffect(() => {
+    const el = launcherRef.current;
+    if (!el) return;
+    const measure = () => {
+      const next = launcherColumns(el.clientWidth);
+      setCols((c) => (c === next ? c : next));
+    };
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+  const bands = useMemo(
+    () => (wide ? packAppBands(groupedApps.map((g) => g.apps.length), cols) : null),
+    [wide, groupedApps, cols],
+  );
+
+  /* ── My apps (lib/home/my-apps.ts) ──
+     1. the device's copy, read in the initialiser, so a returning visit
+        paints the row on the first frame with no request;
+     2. the account's own value, adopted ONCE when the account arrives
+        (during render, like useWallpaper — an effect would be a second
+        paint), unless the person already edited here;
+     3. never set ("none"): seeded once from their own usage of the last 30
+        days — placeholder tiles hold the row's exact size until it lands, so
+        nothing moves. */
+  const [homeApps, setHomeApps] = useState<HomeAppsPref | null>(() => readCachedHomeApps(getCurrentAccountIdSync()));
+  const [homeAppsFor, setHomeAppsFor] = useState("");
+  const [editedHere, setEditedHere] = useState(false);
+  if (account && homeAppsFor !== account.id && !editedHere) {
+    setHomeAppsFor(account.id);
+    const stored = readHomeAppsPref(account.preferences?.home_apps) ?? HOME_APPS_NONE;
+    const local = readCachedHomeApps(account.id);
+    const next = stored.source === "none" && local && local.source !== "none" ? local : stored;
+    setHomeApps(next);
+    if (next.source !== "none") cacheHomeApps(account.id, next);
+  }
+  const pinnable = useMemo(() => visibleRegistry.filter((a) => a.active), [visibleRegistry]);
+  const appById = useMemo(() => new Map(pinnable.map((a) => [a.id, a])), [pinnable]);
+  const myApps = useMemo(
+    () => (homeApps?.pins ?? []).map((id) => appById.get(id)).filter((a): a is AppDef => !!a),
+    [homeApps, appById],
+  );
+  const pinIds = useMemo(() => myApps.map((a) => a.id), [myApps]);
+  const pinnedSet = useMemo(() => new Set(pinIds), [pinIds]);
+  const seedingMyApps = homeApps === null || (homeApps.source === "none" && homeApps.pins.length === 0);
+  const seedCount = Math.min(MY_APPS_SEED, pinnable.length);
+
+  /* Set on mount, not only in the initialiser: StrictMode (dev) mounts,
+     unmounts and mounts again, and a flag cleared by the first cleanup would
+     stay false and silently drop the seed. */
+  const mountedRef = useRef(true);
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => { mountedRef.current = false; };
+  }, []);
+  const seedStarted = useRef(false);
+  useEffect(() => {
+    if (!account || seedStarted.current || pinnable.length === 0) return;
+    if (!homeApps || homeApps.source !== "none" || homeApps.pins.length > 0) return;
+    seedStarted.current = true;
+    const accountId = account.id;
+    const routed = pinnable.map((a) => ({ id: a.id, route: a.route }));
+    void whenNetworkQuiet({ quietMs: 300, maxWaitMs: 2500 }).then(async () => {
+      let views: Record<string, number> = {};
+      let ok = false;
+      try {
+        const qs = encodeURIComponent(routed.map((r) => r.route).join(","));
+        const res = await fetch(`/api/home/app-usage?routes=${qs}`, { credentials: "include", cache: "no-store" });
+        if (res.ok) {
+          views = ((await res.json()) as { views?: Record<string, number> }).views ?? {};
+          ok = true;
+        }
+      } catch {
+        /* offline: the row is filled in launcher order for this visit and
+           seeded properly next time */
+      }
+      if (!mountedRef.current) return;
+      const next: HomeAppsPref = { pins: seedPins(views, routed), source: ok ? "usage" : "none" };
+      setHomeApps(next);
+      if (ok) {
+        cacheHomeApps(accountId, next);
+        void saveHomeApps(accountId, next);
+      }
+    });
+  }, [account, homeApps, pinnable]);
+
+  const [editingApps, setEditingApps] = useState(false);
+  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pendingSave = useRef<(() => void) | null>(null);
+  const commitPins = useCallback((pins: string[]) => {
+    const next: HomeAppsPref = { pins: pins.slice(0, MY_APPS_MAX), source: "user" };
+    const accountId = account?.id ?? getCurrentAccountIdSync();
+    setEditedHere(true);
+    setHomeApps(next);
+    cacheHomeApps(accountId, next);
+    if (saveTimer.current) clearTimeout(saveTimer.current);
+    pendingSave.current = () => { void saveHomeApps(accountId, next); };
+    saveTimer.current = setTimeout(() => { pendingSave.current?.(); pendingSave.current = null; }, 600);
+  }, [account]);
+  /* A save still waiting when Home unmounts goes out immediately. */
+  useEffect(() => () => {
+    if (saveTimer.current) clearTimeout(saveTimer.current);
+    pendingSave.current?.();
+  }, []);
+  const togglePin = useCallback((id: string) => {
+    if (pinIds.includes(id)) commitPins(pinIds.filter((x) => x !== id));
+    else if (pinIds.length < MY_APPS_MAX) commitPins([...pinIds, id]);
+  }, [pinIds, commitPins]);
+  const movePin = useCallback((fromId: string, toId: string) => {
+    const from = pinIds.indexOf(fromId);
+    const to = pinIds.indexOf(toId);
+    if (from < 0 || to < 0 || from === to) return;
+    const next = [...pinIds];
+    next.splice(from, 1);
+    next.splice(to, 0, fromId);
+    commitPins(next);
+  }, [pinIds, commitPins]);
+  const movePinBy = useCallback((id: string, delta: number) => {
+    const from = pinIds.indexOf(id);
+    const to = from + delta;
+    if (from < 0 || to < 0 || to >= pinIds.length) return;
+    movePin(id, pinIds[to]);
+  }, [pinIds, movePin]);
+  const movePinRef = useRef(movePin);
+  useEffect(() => { movePinRef.current = movePin; }, [movePin]);
+  const myAppsGridRef = useRef<HTMLDivElement | null>(null);
+  /* Drag to reorder is its own chunk, fetched the first time Edit is tapped. */
+  useEffect(() => {
+    if (!editingApps) return;
+    let detach: (() => void) | undefined;
+    let alive = true;
+    void import("@/components/home/my-apps-reorder").then(({ attachReorder }) => {
+      const grid = myAppsGridRef.current;
+      if (!alive || !grid) return;
+      detach = attachReorder(grid, (a, b) => movePinRef.current(a, b));
+    });
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setEditingApps(false); };
+    window.addEventListener("keydown", onKey);
+    return () => {
+      alive = false;
+      detach?.();
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [editingApps]);
+
 
   /* Tier-A idle preload (evidence-based). Once the permitted set is known and
      the network/device permits, warm the few most-launched apps the user is
@@ -901,6 +1177,30 @@ export default function HomePage() {
 
 
 
+  /* One tile, three contexts: the My apps row ("mine"), the groups below
+     ("catalog") and search results (null). Edit mode only applies to the
+     first two. */
+  const renderCard = (app: AppDef, where: "mine" | "catalog" | null, pinIndex = 0) => (
+    <AppCard
+      key={app.id}
+      app={app}
+      t={t}
+      isCurrentApp={currentAppId === app.id}
+      appUnread={app.id === "discuss" ? discussUnread : app.id === "todo" ? todoUnread : 0}
+      appUnreadNoun={app.id === "todo" ? "task" : "message"}
+      dk={dk}
+      onPrefetch={prefetchApp}
+      iconPx={iconPx}
+      edit={editingApps && where ? where : null}
+      pinned={pinnedSet.has(app.id)}
+      pinFull={pinIds.length >= MY_APPS_MAX}
+      onPin={togglePin}
+      onMoveBy={movePinBy}
+      pinIndex={pinIndex}
+      pinTotal={pinIds.length}
+    />
+  );
+
   /* kx-wp-root on the div below: this root paints its OWN opaque colour, so a
      Core wallpaper — which is painted on `body` — would sit invisible behind
      it. Deliberately NOT kx-app: that class also remaps vars under Aurora, and
@@ -909,6 +1209,7 @@ export default function HomePage() {
      The comment lives here rather than above the element because a JSX comment
      before the returned root makes it a second sibling, which is a syntax
      error — the same slip that broke KpiCard across thirteen apps. */
+
   return (
     <div className={`kx-wp-root ${dk ? "bg-[#0A0A0A]" : "bg-white"} min-h-screen transition-colors duration-300`}>
       {/* THE GROUND — Aurora only. Every other surface on this page switches
@@ -1034,7 +1335,11 @@ export default function HomePage() {
         {/* Mobile-resilience: while the permission bootstrap is in
             flight or has failed (timeout / 5xx / lost mobile signal),
             render a calm loading skeleton or a Retry banner instead
-            of a silent empty grid. */}
+            of a silent empty grid.
+
+            `launcherRef` wraps the whole zone: its width is the grid width
+            the column count is measured from. */}
+        <div ref={launcherRef}>
         {permLoading && permittedModules.size === 0 ? (
           <AppGridSkeleton dk={dk} />
         ) : visibleRegistry.length === 0 ? (
@@ -1046,50 +1351,120 @@ export default function HomePage() {
             }}
           />
         ) : isSearchOrFilter ? (
-          /* Flat grid when searching or filtering by category */
-          <div className={`${introMotion ? "kx-grid " : ""}grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-7 xl:grid-cols-8 gap-3`}>
-            {filteredApps.map((app) => (
-              <AppCard
-                key={app.id}
-                app={app}
-                t={t}
-                isCurrentApp={currentAppId === app.id}
-                appUnread={app.id === "discuss" ? discussUnread : app.id === "todo" ? todoUnread : 0}
-                appUnreadNoun={app.id === "todo" ? "task" : "message"}
-                dk={dk}
-                onPrefetch={prefetchApp}
-              />
-            ))}
+          /* Flat grid when searching or filtering by category — the same
+             size-driven columns as the launcher from 640 px up. */
+          <div className={`${introMotion ? "kx-grid " : ""}grid grid-cols-3 sm:grid-cols-[repeat(auto-fill,minmax(112px,1fr))] gap-3`}>
+            {filteredApps.map((app) => renderCard(app, null))}
           </div>
         ) : (
-          /* Grouped by category when showing all */
-          <div className="space-y-7">
-            {groupedApps.map((group) => (
-              <div key={group.id}>
-                <div className="flex items-center gap-2.5 mb-3">
-                  <span className={`text-[11px] font-semibold tracking-[1px] uppercase ${dk ? "text-white/25" : "text-black/25"}`}>
-                    {t(group.tKey, group.label)}
+          <>
+            {/* ── MY APPS (owner pick F, 23 Sep 2026) ──
+                The person's own apps first, one row on a 1440 px screen,
+                then every app by group below — the full catalogue stays
+                complete, so an app can be in both places. Edit turns the
+                row into a drag-to-reorder list and every tile below into
+                an add / remove toggle. */}
+            <section className="mb-7" aria-label={t("home.myApps", "My apps")}>
+              <div className="flex items-center gap-2.5 mb-3 min-h-7">
+                <span className={`shrink-0 text-[11px] font-semibold tracking-[1px] uppercase ${dk ? "text-white/25" : "text-black/25"}`}>
+                  {t("home.myApps", "My apps")}
+                </span>
+                <div className={`flex-1 h-px ${dk ? "bg-white/[0.04]" : "bg-black/[0.04]"}`} />
+                {editingApps && (
+                  <span className={`hidden sm:block min-w-0 truncate text-[11.5px] ${dk ? "text-white/45" : "text-black/45"}`}>
+                    {t("home.myAppsEditHint", "Drag to reorder · tap an app below to add or remove it")}
                   </span>
-                  <div className={`flex-1 h-px ${dk ? "bg-white/[0.04]" : "bg-black/[0.04]"}`} />
-                </div>
-                <div className={`${introMotion ? "kx-grid " : ""}grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-7 xl:grid-cols-8 gap-3`}>
-                  {group.apps.map((app) => (
-                    <AppCard
-                      key={app.id}
-                      app={app}
-                      t={t}
-                      isCurrentApp={currentAppId === app.id}
-                      appUnread={app.id === "discuss" ? discussUnread : app.id === "todo" ? todoUnread : 0}
-                      appUnreadNoun={app.id === "todo" ? "task" : "message"}
-                      dk={dk}
-                      onPrefetch={prefetchApp}
-                    />
+                )}
+                {!seedingMyApps && (
+                  <button
+                    type="button"
+                    onClick={() => setEditingApps((v) => !v)}
+                    aria-pressed={editingApps}
+                    className={`shrink-0 h-7 max-sm:h-10 px-2.5 max-sm:px-3.5 rounded-lg text-[11.5px] font-medium transition-colors ${
+                      editingApps
+                        ? "text-[#BCD8F0] bg-[#567FB2]/20 hover:bg-[#567FB2]/30"
+                        : dk ? "text-white/55 hover:text-white hover:bg-white/[0.06]" : "text-black/55 hover:text-black hover:bg-black/[0.05]"
+                    }`}
+                  >
+                    {editingApps ? t("home.doneApps", "Done") : t("home.editApps", "Edit")}
+                  </button>
+                )}
+              </div>
+              {seedingMyApps ? (
+                <div aria-hidden className={wide ? "grid gap-3" : "grid grid-cols-3 gap-3"} style={wide ? { gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))` } : undefined}>
+                  {Array.from({ length: seedCount }).map((_, i) => (
+                    <div key={i} className={`aspect-square rounded-2xl border animate-pulse ${dk ? "bg-white/[0.03] border-white/[0.04]" : "bg-black/[0.025] border-black/[0.05]"}`} />
                   ))}
                 </div>
+              ) : myApps.length === 0 ? (
+                <div className={`rounded-2xl border border-dashed px-4 py-5 text-center text-[12px] ${dk ? "border-white/[0.1] text-white/45" : "border-black/[0.12] text-black/45"}`}>
+                  {t("home.myAppsEmpty", "Tap Edit to pin the apps you use most")}
+                </div>
+              ) : (
+                <div
+                  ref={myAppsGridRef}
+                  className={`${introMotion ? "kx-grid " : ""}grid ${wide ? "" : "grid-cols-3"} gap-3`}
+                  style={wide ? { gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))` } : undefined}
+                >
+                  {myApps.map((app, i) => renderCard(app, "mine", i))}
+                </div>
+              )}
+            </section>
+
+            {bands ? (
+              /* Every group a closed block on ONE column grid: groups in a band
+                 share the header line and the row count, so every tile lines
+                 up with the tiles above and below it. */
+              <div>
+                {bands.map((band, bi) => (
+                  <div
+                    key={bi}
+                    className="grid gap-x-3 items-start mb-7 last:mb-0"
+                    style={{ gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))` }}
+                  >
+                    {band.groups.map(({ index, span }) => {
+                      const group = groupedApps[index];
+                      return (
+                        <div key={group.id} className="min-w-0" style={{ gridColumn: `span ${span} / span ${span}` }}>
+                          <div className="flex items-center gap-2.5 mb-3">
+                            <span className={`min-w-0 truncate text-[11px] font-semibold tracking-[1px] uppercase ${dk ? "text-white/25" : "text-black/25"}`}>
+                              {t(group.tKey, group.label)}
+                            </span>
+                            <div className={`flex-1 h-px ${dk ? "bg-white/[0.04]" : "bg-black/[0.04]"}`} />
+                          </div>
+                          <div
+                            className={`${introMotion ? "kx-grid " : ""}grid gap-3`}
+                            style={{ gridTemplateColumns: `repeat(${span}, minmax(0, 1fr))` }}
+                          >
+                            {group.apps.map((app) => renderCard(app, "catalog"))}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                ))}
               </div>
-            ))}
-          </div>
+            ) : (
+              /* Phones: the stack of groups, three columns, as it was. */
+              <div className="space-y-7">
+                {groupedApps.map((group) => (
+                  <div key={group.id}>
+                    <div className="flex items-center gap-2.5 mb-3">
+                      <span className={`text-[11px] font-semibold tracking-[1px] uppercase ${dk ? "text-white/25" : "text-black/25"}`}>
+                        {t(group.tKey, group.label)}
+                      </span>
+                      <div className={`flex-1 h-px ${dk ? "bg-white/[0.04]" : "bg-black/[0.04]"}`} />
+                    </div>
+                    <div className={`${introMotion ? "kx-grid " : ""}grid grid-cols-3 gap-3`}>
+                      {group.apps.map((app) => renderCard(app, "catalog"))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </>
         )}
+        </div>
       </div>
 
       {/* AI card animated neon border */}
@@ -1280,11 +1655,11 @@ function AppGridSkeleton({ dk }: { dk: boolean }) {
         <span className="inline-block h-2 w-2 animate-pulse rounded-full bg-emerald-400/70" />
         Loading your apps…
       </div>
-      <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-7 xl:grid-cols-8 gap-3">
+      <div className="grid grid-cols-3 sm:grid-cols-[repeat(auto-fill,minmax(112px,1fr))] gap-3">
         {Array.from({ length: 14 }).map((_, i) => (
           <div
             key={i}
-            className={`aspect-[1/1.1] rounded-2xl border ${cellCls} animate-pulse`}
+            className={`aspect-square rounded-2xl border ${cellCls} animate-pulse`}
             style={{ animationDelay: `${i * 60}ms` }}
           />
         ))}
