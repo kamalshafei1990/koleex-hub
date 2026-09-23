@@ -48,7 +48,15 @@ export default function WelcomeCard({
   }, []);
   return (
     <div className="flex flex-col items-center justify-center min-h-[50vh] text-center px-2 py-4 md:py-8">
-      <KoleexOrb state="idle" greetKey={greet} size={104} className="mb-4 md:mb-6" />
+      {/* BIGGER (owner, 2026-09-23: "make the new orb … more bigger", size
+          left to us): 144px from md up, like the Home greeting; 128px on a
+          phone, so the suggestions stay in view. One canvas drawn at 144 and
+          scaled in its box below md — no size swap after load. */}
+      <div className="relative shrink-0 w-[128px] h-[128px] md:w-[144px] md:h-[144px] mb-4 md:mb-6">
+        <div className="absolute top-0 start-0 max-md:scale-[0.8889] origin-top-left rtl:origin-top-right">
+          <KoleexOrb state="idle" greetKey={greet} size={144} />
+        </div>
+      </div>
       <h2 className="text-[22px] md:text-[26px] font-bold tracking-tight text-[var(--text-primary)] mb-2.5 leading-tight">
         {greeting}
       </h2>
