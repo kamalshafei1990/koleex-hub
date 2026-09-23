@@ -391,11 +391,16 @@ for (const k of ["kxA-life", "kxA-bounce", "kxA-sway", "kxA-gaze", "kxA-hunt", "
     /return <AIOrb \{\.\.\.props\} \/>;/.test(chosen) &&
     /export default function ChosenOrb\(\{ surface, style, wander, \.\.\.props \}/.test(chosen));
   const home = readFileSync(join(srcRoot, "app/page.tsx"), "utf8");
-  check("home: the greeting's orb is 112px from md up, one canvas scaled into 72px on a phone, and it wanders",
-    /<KoleexGlowOrb state=\{orbState\} greetKey=\{greet\} size=\{112\} wander \/>/.test(home) &&
-    /w-\[72px\] h-\[72px\] md:w-\[112px\] md:h-\[112px\]/.test(home) &&
-    /max-md:scale-\[0\.6429\]/.test(home) && Math.abs(0.6429 * 112 - 72) < 0.01 &&
+  check("home: the greeting's orb is 144px from md up, one canvas scaled into 88px on a phone, and it wanders",
+    /<KoleexGlowOrb state=\{orbState\} greetKey=\{greet\} size=\{144\} wander \/>/.test(home) &&
+    /w-\[88px\] h-\[88px\] md:w-\[144px\] md:h-\[144px\]/.test(home) &&
+    /max-md:scale-\[0\.6111\]/.test(home) && Math.abs(0.6111 * 144 - 88) < 0.01 &&
     /wander=\{wander\}/.test(glow));
+  const welcome = readFileSync(join(srcRoot, "components/ai/WelcomeCard.tsx"), "utf8");
+  check("welcome: the Koleex AI screen's orb is 144px from md up, one canvas scaled into 128px on a phone",
+    /<KoleexOrb state="idle" greetKey=\{greet\} size=\{144\} \/>/.test(welcome) &&
+    /w-\[128px\] h-\[128px\] md:w-\[144px\] md:h-\[144px\]/.test(welcome) &&
+    /max-md:scale-\[0\.8889\]/.test(welcome) && Math.abs(0.8889 * 144 - 128) < 0.01);
   check("dots: the orb hands its own size to the look, so the small-size rule actually reaches a chat bubble",
     /const stateLook = dottedLook\(state, activity, result, size\);/.test(dotted));
   check("dots: the voice moves it on a call (the aura orb's own smoothing, not a second one)",

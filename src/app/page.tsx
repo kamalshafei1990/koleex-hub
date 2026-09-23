@@ -594,14 +594,15 @@ const AIGreeter = memo(function AIGreeter({
       {/* The CSS glow-orb is the system-wide AI face (owner-approved). */}
       {/* BIGGER, AND IT WANDERS (owner, 2026-09-23, on this greeting: "I
           want the orb more bigger and changed randomly with the orb motion
-          shapes"). 112px from md up, beside a card about that tall; 72px on
-          a phone, where the greeting needs the width. The orb is drawn once
-          at 112 and scaled in its 72px box below md, so there is one canvas
-          and no size swap after load. `wander`: the dotted orb, at rest,
-          drifts through its shapes; the aura orb ignores it. */}
-      <div className="relative shrink-0 w-[72px] h-[72px] md:w-[112px] md:h-[112px]">
-        <div className="absolute top-0 start-0 max-md:scale-[0.6429] origin-top-left rtl:origin-top-right">
-          <KoleexGlowOrb state={orbState} greetKey={greet} size={112} wander />
+          shapes", then "more bigger" again, size left to us). 144px from md
+          up; 88px on a phone, where the greeting card beside it needs the
+          width. The orb is drawn once at 144 and scaled in its 88px box
+          below md, so there is one canvas and no size swap after load.
+          `wander`: the dotted orb, at rest, drifts through its shapes; the
+          aura orb ignores it. */}
+      <div className="relative shrink-0 w-[88px] h-[88px] md:w-[144px] md:h-[144px]">
+        <div className="absolute top-0 start-0 max-md:scale-[0.6111] origin-top-left rtl:origin-top-right">
+          <KoleexGlowOrb state={orbState} greetKey={greet} size={144} wander />
         </div>
       </div>
       <div
