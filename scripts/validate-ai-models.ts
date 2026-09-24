@@ -67,7 +67,7 @@ async function main() {
       (["en", "zh", "ar"] as const).every((l) => KOLEEX_MODEL_INFO[id].name[l] === `Koleex ${id[0].toUpperCase()}${id.slice(1)}`)));
   check("Mind is text only; Blink, Deep and Auto can hold a call",
     KOLEEX_MODEL_INFO.mind.voice === false && KOLEEX_MODEL_INFO.blink.voice && KOLEEX_MODEL_INFO.deep.voice && KOLEEX_MODEL_INFO.auto.voice);
-  const catalogSrc = readFileSync("src/lib/ai/koleex-models.ts", "utf8");
+  const catalogSrc = readFileSync("src/lib/ai/koleex-models.ts", "utf8") + readFileSync("src/lib/ai/koleex-model-ids.ts", "utf8");
   check("the catalog the browser ships names no vendor — not in a name, a line, or a comment",
     !VENDOR.test(catalogSrc) && !VENDOR.test(JSON.stringify(KOLEEX_MODEL_INFO)));
   check("…and it is not server-only, because the picker renders it", !/import "server-only"/.test(catalogSrc));
@@ -180,6 +180,46 @@ async function main() {
     /const auth = await requireAuth\(\);\s*if \(auth instanceof NextResponse\) return auth;\s*const notInternal = requireInternalUser\(auth\);\s*if \(notInternal\) return notInternal;/.test(modelsRoute) &&
       /models: modelAvailability\(\)/.test(modelsRoute) && /private, no-store/.test(modelsRoute));
   check("…and the versioned path is the same handler", /export \{ GET \} from "\.\.\/\.\.\/\.\.\/ai\/models\/route";/.test(readFileSync("src/app/api/v1/ai/models/route.ts", "utf8")));
+
+  console.log("\n── 6. The picker and the saved choice ──");
+  const { withDefaults } = await import("../src/lib/access-control");
+  check("the choice is kept on the account and survives every wholesale save",
+    withDefaults({ ai_model: "deep" }).ai_model === "deep" && withDefaults({}).ai_model === "auto" &&
+      withDefaults({ ai_model: "gpt" as never }).ai_model === "auto");
+  const store = readFileSync("src/components/ai/model-choice.ts", "utf8");
+  check("the store reads through the catalog's normaliser, and a just-made choice outranks a stale account",
+    /normalizeKoleexModel\(localStorage\.getItem\(KEY\)\)/.test(store) &&
+      /if \(Date\.now\(\) < localWriteUntil\) return;/.test(store));
+  const app = readFileSync("src/components/ai/KoleexAiApp.tsx", "utf8");
+  check("the account's choice reaches the store on every account refresh — in the app, not on every route",
+    /useEffect\(\(\) => \{\s*if \(account\) syncModelChoiceFromAccount\(account\.preferences\?\.ai_model\);\s*\}, \[account\]\);/.test(app) &&
+      !/model-choice|koleex-models"/.test(readFileSync("src/lib/display-prefs.tsx", "utf8")) &&
+      !/koleex-models"/.test(readFileSync("src/lib/access-control.ts", "utf8")));
+  check("every turn carries the choice, and the send callback re-binds when it changes",
+    /model: modelChoice,\s*\}\),\s*signal: aborter\.signal,/.test(app) &&
+      /\[input, activeId, lang, stopTts, attachments, webSearch, modelChoice,/.test(app));
+  check("both reply paths record who answered, through the served-model normaliser",
+    /servedModel: normalizeServingModel\(json\?\.model\),/.test(app) &&
+      /servedModel = normalizeServingModel\(json\.model\);/.test(app) &&
+      (app.match(/askedModel: modelChoice,/g) ?? []).length === 2);
+  check("choosing saves to the account as well as this device",
+    /setModelChoice\(m\);[\s\S]{0,120}updateAccountPreferences\(account\.id, \{ ai_model: m \}\)/.test(app));
+  const bubble = readFileSync("src/components/ai/Bubble.tsx", "utf8");
+  check("the reply says who answered only when a chosen model did not",
+    /msg\.askedModel && msg\.askedModel !== "auto" && msg\.servedModel && msg\.servedModel !== msg\.askedModel/.test(bubble));
+  const picker = readFileSync("src/components/ai/ModelPicker.tsx", "utf8");
+  check("the picker asks the server what is available and will not pick an unavailable model",
+    /fetch\("\/api\/ai\/models"/.test(picker) && /if \(avail\[id\] === false\) return;/.test(picker));
+  check("…and names no vendor", !VENDOR.test(picker) && !VENDOR.test(store));
+  const { COPY } = await import("../src/components/ai/copy");
+  check("its words exist in English, Chinese and Arabic, and name no vendor",
+    (["en", "zh", "ar"] as const).every((l) =>
+      ["model", "modelUnavailable", "modelTextOnly", "answeredByModel"].every((k) => {
+        const v = (COPY[l] as unknown as Record<string, unknown>)[k];
+        return typeof v === "string" && v.trim().length > 0 && !VENDOR.test(v);
+      })) && (["en", "zh", "ar"] as const).every((l) => COPY[l].answeredByModel.includes("{model}")));
+  check("the button's short name drops only the brand prefix",
+    (["blink", "mind", "deep"] as const).every((id) => KOLEEX_MODEL_INFO[id].short.en === KOLEEX_MODEL_INFO[id].name.en.replace(/^Koleex /, "")));
 
   console.log(`\n${pass} passed, ${fail} failed`);
   if (fail > 0) process.exit(1);

@@ -87,6 +87,10 @@ import { normalizeAiPersonalization } from "@/lib/ai-personalization";
    extraction was then proved by rendering the pre-split component and the new
    one with identical props and diffing the HTML. */
 import { Bubble } from "@/components/ai/Bubble";
+import ModelPicker from "@/components/ai/ModelPicker";
+import { useModelChoice, setModelChoice, syncModelChoiceFromAccount } from "@/components/ai/model-choice";
+import { normalizeServingModel, type KoleexModelId } from "@/lib/ai/koleex-models";
+import { updateAccountPreferences } from "@/lib/accounts-admin";
 import { SectionHeader, ProjectRow, SidebarRow, RowMenu, groupByDate } from "@/components/ai/Sidebar";
 
 
@@ -153,7 +157,22 @@ export default function KoleexAiApp() {
   const { askInput, inputDialog } = useInput();
   const { lang } = useTranslation({}) as unknown as { lang: Lang };
   const copy = COPY[lang] ?? COPY.en;
-  const { account } = useCurrentAccount();
+  const { account, refresh: refreshAccount } = useCurrentAccount();
+  /* The Koleex model this user asks for (the picker beside the message box).
+     Sent with every turn; the server resolves it and says who answered. */
+  const modelChoice = useModelChoice();
+  /* Follow the account's choice (another device may have changed it). Here,
+     not in display-prefs: only this app shows the picker, and every other
+     route in the Hub would otherwise ship the store for nothing. */
+  useEffect(() => {
+    if (account) syncModelChoiceFromAccount(account.preferences?.ai_model);
+  }, [account]);
+  const chooseModel = useCallback((m: KoleexModelId) => {
+    setModelChoice(m);
+    if (account?.id) {
+      void updateAccountPreferences(account.id, { ai_model: m }).then((ok) => { if (ok) refreshAccount(); });
+    }
+  }, [account?.id, refreshAccount]);
 
   const [conversations, setConversations] = useState<ConversationRow[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -1163,6 +1182,10 @@ export default function KoleexAiApp() {
                nudge in the system prompt. The user's own message is never
                rewritten to carry the request. */
             web_search: webSearch,
+            /* What the user ASKED for. The server resolves it — an unknown
+               or switched-off model is Auto — and answers with the model
+               that actually served. */
+            model: modelChoice,
           }),
           signal: aborter.signal,
         });
@@ -1179,6 +1202,7 @@ export default function KoleexAiApp() {
           const json = (await res.json().catch(() => null)) as
             | {
                 agent?: { steps: AgentStep[]; finalReply: string; provider: string };
+                model?: unknown;
                 message?: ChatMsg;
                 conversation?: { id: string; title: string };
                 error?: string;
@@ -1204,6 +1228,8 @@ export default function KoleexAiApp() {
               next[idx] = {
                 ...persisted,
                 steps: json?.agent?.steps ?? [],
+                askedModel: modelChoice,
+                servedModel: normalizeServingModel(json?.model),
               };
               return next;
             });
@@ -1267,6 +1293,7 @@ export default function KoleexAiApp() {
         let finalSteps: AgentStep[] = [];
         let convUpdateId: string | null = null;
         let convUpdateTitle: string | null = null;
+        let servedModel: ReturnType<typeof normalizeServingModel> = null;
 
         const pushPatch = (patch: Partial<ChatMsg>) => {
           /* Audit P0 #1/#2 — if the user has switched to a different
@@ -1333,6 +1360,7 @@ export default function KoleexAiApp() {
                       };
                       message: ChatMsg;
                       conversation: { id: string; title: string };
+                      model?: unknown;
                     }
                   | { type: "error"; message?: string };
 
@@ -1354,6 +1382,7 @@ export default function KoleexAiApp() {
                   flushContentNow();
                   finalMessage = json.message;
                   finalSteps = json.agent.steps;
+                  servedModel = normalizeServingModel(json.model);
                   convUpdateId = json.conversation.id;
                   convUpdateTitle = json.conversation.title;
                 } else if (json.type === "error") {
@@ -1377,6 +1406,8 @@ export default function KoleexAiApp() {
             next[idx] = {
               ...finalMessage!,
               steps: finalSteps,
+              askedModel: modelChoice,
+              servedModel,
             };
             return next;
           });
@@ -1457,7 +1488,7 @@ export default function KoleexAiApp() {
         setSending(false);
       }
     },
-    [input, activeId, lang, stopTts, attachments, webSearch, createConversation, copy, resizeComposer, bumpConversation],
+    [input, activeId, lang, stopTts, attachments, webSearch, modelChoice, createConversation, copy, resizeComposer, bumpConversation],
   );
 
   /* ── Phase 12: message-level actions ────────────────────────── */
@@ -3148,6 +3179,14 @@ export default function KoleexAiApp() {
                   </div>
 
                   <div className="flex items-center gap-0.5">
+                    {/* THE MODEL. "Auto ⌄" — the name of the Koleex model
+                        this user asks for; opens the list. */}
+                    <ModelPicker
+                      value={modelChoice}
+                      onChange={chooseModel}
+                      lang={lang}
+                      copy={copy}
+                    />
                     {/* ONE VOICE CONTROL (audit, 2026-09-11). The dictation mic and
                         the Speak pill sat side by side under the same waveform
                         glyph — three meanings for one shape across the

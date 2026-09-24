@@ -2398,3 +2398,15 @@ The owner asked to turn the three providers into Koleex AI models the user can p
 **Still to come.** Part 2 adds the picker beside the message box, saved in the account's preferences. Part 3 makes voice calls follow the choice. Part 4 adds smarter Auto routing, the super-admin switch screen and a per-model speed and cost view. Koleex Deep only serves once the four `AI_FALLBACK2_*` variables above are set. Until then it is shown as unavailable.
 
 **Tests.** `validate:ai-models` is a new suite with 47 checks. Each was confirmed by breaking the code on purpose, and all 12 breaks were caught.
+
+## Koleex AI models, part 2: the picker (2026-09-23)
+
+A button beside the message box shows the model in use ("Auto ⌄", "Mind ⌄"). Tapping it opens the list: each model's name, what it is good at, a "Text only" tag on Mind, and a tick on the current one. The list opens above the whole message box, so it never covers what the user is typing. It works in English, Chinese and Arabic, including right-to-left.
+
+**Saved like the orb style.** The choice is stored on the account as `preferences.ai_model`, so the phone, the iPad and the Mac agree. It is copied to the browser's storage so the right name shows on the first frame. `withDefaults` passes it through, so saving another setting never resets it to Auto. The store is `components/ai/model-choice.ts`.
+
+**Available means the server says so.** The picker reads `/api/ai/models`. A model that is not set up, or has been switched off, is dimmed with "Not available right now" and can't be chosen. If that list fails to load, nothing is granted: the server still resolves the choice on every turn.
+
+**Who answered.** Every turn sends `model`. When a chosen model did not answer, because it was down or not set up and the turn failed over, the reply shows a quiet "Answered by Koleex X" under it. Auto, or the model that was asked for, gets no note. This note is only in the browser and is never saved.
+
+**Tests.** `validate:ai-models` now has 58 checks (+11). Each was confirmed by breaking the code on purpose, and all 7 breaks were caught.

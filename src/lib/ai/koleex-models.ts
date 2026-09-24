@@ -22,14 +22,16 @@
    the model that actually served — which, after a failover, can differ.
    --------------------------------------------------------------------------- */
 
-export type KoleexModelId = "auto" | "blink" | "mind" | "deep";
-/** A model that can actually answer a turn — "auto" is a choice, not one. */
-export type KoleexServingModel = Exclude<KoleexModelId, "auto">;
-
-/** Picker order: Auto first, then fastest to deepest. */
-export const KOLEEX_MODELS: readonly KoleexModelId[] = ["auto", "blink", "mind", "deep"] as const;
-export const KOLEEX_SERVING_MODELS: readonly KoleexServingModel[] = ["blink", "mind", "deep"] as const;
-export const DEFAULT_KOLEEX_MODEL: KoleexModelId = "auto";
+export {
+  KOLEEX_MODELS,
+  KOLEEX_SERVING_MODELS,
+  DEFAULT_KOLEEX_MODEL,
+  normalizeKoleexModel,
+  normalizeServingModel,
+  type KoleexModelId,
+  type KoleexServingModel,
+} from "./koleex-model-ids";
+import type { KoleexModelId } from "./koleex-model-ids";
 
 type Copy = { en: string; zh: string; ar: string };
 
@@ -37,6 +39,9 @@ export interface KoleexModelInfo {
   id: KoleexModelId;
   /** Brand names are not translated; "Auto" is, because it is a word. */
   name: Copy;
+  /** What the picker's button says — the name without "Koleex", which the
+   *  whole screen already says. */
+  short: Copy;
   /** One line under the name: what it is good at. */
   blurb: Copy;
   /** Can it hold a voice call? A text-only model hands a call to Auto. */
@@ -47,6 +52,7 @@ export const KOLEEX_MODEL_INFO: Readonly<Record<KoleexModelId, KoleexModelInfo>>
   auto: {
     id: "auto",
     name: { en: "Auto", zh: "自动", ar: "تلقائي" },
+    short: { en: "Auto", zh: "自动", ar: "تلقائي" },
     blurb: {
       en: "Picks the best model for each question",
       zh: "为每个问题自动选择最合适的模型",
@@ -57,6 +63,7 @@ export const KOLEEX_MODEL_INFO: Readonly<Record<KoleexModelId, KoleexModelInfo>>
   blink: {
     id: "blink",
     name: { en: "Koleex Blink", zh: "Koleex Blink", ar: "Koleex Blink" },
+    short: { en: "Blink", zh: "Blink", ar: "Blink" },
     blurb: {
       en: "Fast answers, translation and Chinese",
       zh: "快速回答、翻译与中文",
@@ -67,6 +74,7 @@ export const KOLEEX_MODEL_INFO: Readonly<Record<KoleexModelId, KoleexModelInfo>>
   mind: {
     id: "mind",
     name: { en: "Koleex Mind", zh: "Koleex Mind", ar: "Koleex Mind" },
+    short: { en: "Mind", zh: "Mind", ar: "Mind" },
     blurb: {
       en: "Everyday work: products, prices and quotations",
       zh: "日常工作：产品、价格与报价",
@@ -77,6 +85,7 @@ export const KOLEEX_MODEL_INFO: Readonly<Record<KoleexModelId, KoleexModelInfo>>
   deep: {
     id: "deep",
     name: { en: "Koleex Deep", zh: "Koleex Deep", ar: "Koleex Deep" },
+    short: { en: "Deep", zh: "Deep", ar: "Deep" },
     blurb: {
       en: "Deep thinking: analysis and long files",
       zh: "深度思考：分析与长文件",
@@ -85,18 +94,3 @@ export const KOLEEX_MODEL_INFO: Readonly<Record<KoleexModelId, KoleexModelInfo>>
     voice: true,
   },
 };
-
-/** Anything that is not a known model is Auto — an old client, a typo, or a
- *  hand-made request can never select something that does not exist. Pure. */
-export function normalizeKoleexModel(v: unknown): KoleexModelId {
-  return typeof v === "string" && (KOLEEX_MODELS as readonly string[]).includes(v)
-    ? (v as KoleexModelId)
-    : DEFAULT_KOLEEX_MODEL;
-}
-
-/** Same rule for a model that served a turn: only the three, else null. */
-export function normalizeServingModel(v: unknown): KoleexServingModel | null {
-  return typeof v === "string" && (KOLEEX_SERVING_MODELS as readonly string[]).includes(v)
-    ? (v as KoleexServingModel)
-    : null;
-}

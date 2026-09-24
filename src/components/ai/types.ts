@@ -11,6 +11,8 @@
    over HTTP without any server code in its bundle.
    --------------------------------------------------------------------------- */
 
+import type { KoleexModelId, KoleexServingModel } from "@/lib/ai/koleex-models";
+
 export type MsgRole = "user" | "assistant" | "system";
 export interface AgentStep {
   kind: "answer" | "tool-call" | "tool-result" | "recommendation" | "draft" | "denied" | "question";
@@ -50,6 +52,12 @@ export interface ChatMsg {
    *  The attachment is read, described and forgotten (see
    *  /api/ai/attachments); this field does not change that contract. */
   attachedFiles?: Array<{ name: string; url: string | null }>;
+  /** The Koleex model the user asked for on this turn, and the one that
+   *  actually answered (null: no model answered — a canned or degraded
+   *  reply). Browser-only, never persisted; the bubble says "Answered by …"
+   *  when a chosen model was not the one that replied. */
+  askedModel?: KoleexModelId;
+  servedModel?: KoleexServingModel | null;
 }
 export interface ConversationRow {
   id: string;
