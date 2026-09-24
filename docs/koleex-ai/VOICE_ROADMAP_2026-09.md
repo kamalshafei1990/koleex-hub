@@ -2475,3 +2475,17 @@ Owner: "make a deep check for this app and fix any issue or bug". Five read-only
   - **A turn no model could answer is a failed turn** (`AgentResponse.failed`). It used to be revealed and saved as the assistant's reply and logged ok=1. Now the stream sends a bare error frame (the browser words it in the user's language), the JSON path answers 503, nothing is saved, and it is logged ok=0.
 
 **Tests.** `validate:ai-deepcheck` has 43 checks (+14), with pins updated in client-render, streaming, core-boundaries and models. Each fix was confirmed by breaking the code on purpose, and all 8 breaks were caught.
+
+## Deep check 2026-09-24, phase 4: speed
+
+- **Still background in the chat.** Per the owner's choice, `<WavyBackground still />` draws one frame. Before, the full-screen field redrew and re-blurred every frame under the glass, the composer and a streaming reply, which was the biggest battery and jank cost on a phone. The Hub's own Reduce Motion setting (`kx-reduce-motion`) is now honoured by the background everywhere.
+- **Streaming no longer redraws the sidebar.** `SidebarRow` is memoised, and its handlers take the row, so the app passes the same functions on every render. Before, every streamed frame (~60/s) re-rendered every chat row, even with the drawer hidden.
+- **The reply being written is parsed when the device has time.** `MessageMarkdown` parses a `useDeferredValue` of its content, so the growing answer is no longer fully re-parsed on every frame.
+- **Lighter first open:**
+  - react-markdown (~42 KB gz) is lazy-loaded with a plain-text fallback, and warmed 1.2 s after the app is up. The app always opens on an empty chat.
+  - The accounts admin client (~28 KB gz) is imported only when a model choice is saved.
+- **One orb stylesheet.** `<style href precedence>` hoists and de-duplicates it. Before, each assistant reply injected its own 17 KB copy.
+- **Failover sooner.** A streaming provider that sends no headers is dropped after 30 s instead of 120 s, controlled by `AI_HTTP_HEADER_TIMEOUT_MS` and never above `AI_HTTP_TIMEOUT_MS`. The stall budget still protects slow but healthy answers.
+- **Time to first token.** The per-account and per-tenant rate-limit round trip now runs beside the ownership and reply-language reads. A refused turn still returns before any write.
+
+**Tests.** `validate:ai-deepcheck` has 51 checks (+8), with pins updated in client-render, export and models. Each change was confirmed by breaking the code on purpose, and all 6 breaks were caught.

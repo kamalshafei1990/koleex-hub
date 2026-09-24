@@ -157,7 +157,13 @@ export default function AIOrb({
         </div>
       </div>
 
-      <style>{`
+      {/* ONE STYLESHEET FOR EVERY ORB (deep check, 2026-09-24). A plain
+          <style> is not de-duplicated, and every assistant reply carries an
+          orb — thirty replies meant thirty copies of these 17 KB, walked by
+          every style recalculation while a reply streamed. With `href` and
+          `precedence` React 19 hoists it to <head> once, however many orbs
+          are on the screen. */}
+      <style href="kx-aiorb-styles" precedence="kx-aiorb">{`
         .kx-aiorb {
           position: relative;
           flex: none;

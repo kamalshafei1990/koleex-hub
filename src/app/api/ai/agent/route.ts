@@ -153,11 +153,23 @@ export async function POST(req: Request) {
   /* The body is parsed alongside the budget round trip — it needs nothing
      from it (audit, 2026-09-07). */
   const bodyP = req.json().catch(() => ({}));
-  if (limitMode() !== "off") {
-    const [perAccount, perTenant] = await Promise.all([
-      consumeBudget(subjectFor.account(auth.account_id), BUDGETS.turnPerAccount()),
-      consumeBudget(subjectFor.tenant(auth.tenant_id), BUDGETS.turnPerTenant()),
-    ]);
+  /* THE BUDGET RUNS BESIDE THE OWNERSHIP READ (deep check, 2026-09-24): both
+     are round trips and neither needs the other, so the conversation lookup
+     no longer waits for the counter. The verdict is still applied BEFORE any
+     write or provider call — `budgetGate` is awaited just ahead of the
+     ownership check below, and a refused turn returns there. */
+  const budgetP = limitMode() !== "off"
+    ? Promise.all([
+        consumeBudget(subjectFor.account(auth.account_id), BUDGETS.turnPerAccount()),
+        consumeBudget(subjectFor.tenant(auth.tenant_id), BUDGETS.turnPerTenant()),
+      ])
+    : null;
+  /* A request refused for its body (400/413) returns before the gate is
+     read; the counter's promise must not become an unhandled rejection. */
+  void budgetP?.catch(() => undefined);
+  const budgetGate = async (): Promise<NextResponse | null> => {
+    if (!budgetP) return null;
+    const [perAccount, perTenant] = await budgetP;
     const hit = !perAccount.allowed ? perAccount : !perTenant.allowed ? perTenant : null;
     if (hit && !hit.allowed) {
       const scope = !perAccount.allowed ? "account" : "tenant";
@@ -169,7 +181,8 @@ export async function POST(req: Request) {
         );
       }
     }
-  }
+    return null;
+  };
 
   const body = (await bodyP) as {
     conversationId?: string;
@@ -254,7 +267,8 @@ export async function POST(req: Request) {
      should be side-effect-free. The reply-language READ beside it needs
      nothing from it and used to wait a full round trip for it (audit,
      2026-09-07); a read on a 404 costs nothing. */
-  const [{ data: conv }, storedLang] = await Promise.all([
+  const [refused, { data: conv }, storedLang] = await Promise.all([
+    budgetGate(),
     supabaseServer
       .from("ai_conversations")
       .select("id, title, message_count")
@@ -265,6 +279,7 @@ export async function POST(req: Request) {
     getReplyLanguage(auth.account_id),
   ]);
   const tConv = Date.now();
+  if (refused) return refused;
   if (!conv) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }

@@ -8,7 +8,7 @@
    they are one concern: what the left panel is made of.
    --------------------------------------------------------------------------- */
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import ProjectGlyph from "@/components/ai/ProjectGlyph";
 import type { AiProject } from "@/lib/ai-projects";
@@ -101,7 +101,14 @@ export function ProjectRow({
 
 /* ── Sidebar row with hover actions ── */
 
-export function SidebarRow({
+/* ONE ROW, REDRAWN ONLY WHEN ITS OWN THINGS CHANGE (deep check, 2026-09-24).
+   Every row used to take fresh arrow functions from the app, so each
+   streamed frame of a reply — about sixty a second — re-rendered every chat
+   in the list, hidden drawer or not. The handlers now take the row, the app
+   passes the same functions every time, and the row is memoised. */
+export const SidebarRow = memo(SidebarRowImpl);
+
+function SidebarRowImpl({
   row,
   active,
   projects,
@@ -118,17 +125,17 @@ export function SidebarRow({
   active: boolean;
   projects: AiProject[];
   copy: typeof COPY["en"];
-  onOpen: () => void;
-  onRename: () => void;
-  onDelete: () => void;
-  onTogglePin: () => void;
-  onMove: (projectId: string | null) => void;
+  onOpen: (id: string) => void;
+  onRename: (id: string, title: string) => void;
+  onDelete: (id: string) => void;
+  onTogglePin: (row: ConversationRow) => void;
+  onMove: (row: ConversationRow, projectId: string | null) => void;
   /** Where the search matched inside the chat (roadmap C2): one dim line
    *  under the title, only while searching. Absent means the row is as it
    *  always was. */
   hint?: string;
   /** One chat as a printable page (roadmap D5). Absent means no menu item. */
-  onExport?: () => void;
+  onExport?: (id: string) => void;
 }) {
   const pinned = !!row.pinned;
   const inProject = row.project_id ?? null;
@@ -144,30 +151,30 @@ export function SidebarRow({
       key: "pin",
       label: pinned ? copy.unpin : copy.pin,
       icon: pinned ? <PinOffIcon className="h-3 w-3" /> : <PinIcon className="h-3 w-3" />,
-      onSelect: onTogglePin,
+      onSelect: () => onTogglePin(row),
     },
     {
       key: "rename",
       label: copy.rename,
       icon: <PencilIcon className="h-3 w-3" />,
-      onSelect: onRename,
+      onSelect: () => onRename(row.id, row.title),
     },
     { key: "sep-move", separator: true, label: copy.moveTo },
     {
       key: "none",
       label: copy.noProject,
       selected: inProject === null,
-      onSelect: () => onMove(null),
+      onSelect: () => onMove(row, null),
     },
     ...projects.map((p) => ({
       key: `p-${p.id}`,
       label: p.name,
       icon: <ProjectGlyph icon={p.icon} color={p.color} size={12} />,
       selected: inProject === p.id,
-      onSelect: () => onMove(p.id),
+      onSelect: () => onMove(row, p.id),
     })),
     ...(onExport
-      ? [{ key: "export", label: copy.exportChat, icon: <Share2Icon className="h-3 w-3" />, onSelect: onExport } as MenuItem]
+      ? [{ key: "export", label: copy.exportChat, icon: <Share2Icon className="h-3 w-3" />, onSelect: () => onExport(row.id) } as MenuItem]
       : []),
     { key: "sep-danger", separator: true },
     {
@@ -175,7 +182,7 @@ export function SidebarRow({
       label: copy.delete,
       icon: <TrashIcon className="h-3 w-3" />,
       danger: true,
-      onSelect: onDelete,
+      onSelect: () => onDelete(row.id),
     },
   ];
 
@@ -191,7 +198,7 @@ export function SidebarRow({
           : "hover:bg-[var(--bg-surface-subtle)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
       }`}
     >
-      <button type="button" onClick={onOpen} className="flex-1 min-w-0 text-start rounded-lg" aria-current={active ? "page" : undefined}>
+      <button type="button" onClick={() => onOpen(row.id)} className="flex-1 min-w-0 text-start rounded-lg" aria-current={active ? "page" : undefined}>
         {/* THE TITLE KEEPS THE LIST'S EDGE. dir="auto" shapes an Arabic title
             correctly, but on its own it also right-aligned it, so in an
             English sidebar Arabic chats sat against the pin while English
@@ -206,7 +213,7 @@ export function SidebarRow({
           it can't be mistaken for a button you have to press to keep it. */}
       <button
         type="button"
-        onClick={(e) => { e.stopPropagation(); onTogglePin(); }}
+        onClick={(e) => { e.stopPropagation(); onTogglePin(row); }}
         className={`h-6 w-6 rounded-lg flex items-center justify-center shrink-0 ${
           pinned
             ? "text-[var(--text-dim)] group-hover:text-[var(--text-primary)]"

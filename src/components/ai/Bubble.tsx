@@ -11,14 +11,19 @@
    one with identical props and diffing the HTML.
    --------------------------------------------------------------------------- */
 
-import { memo, useCallback, useMemo, useRef, useState } from "react";
+import { lazy, memo, Suspense, useCallback, useMemo, useRef, useState } from "react";
 import { type Lang } from "@/lib/i18n";
 import { type OrbState } from "@/components/ai/KoleexOrb";
 import KoleexOrb from "@/components/ai/KoleexGlowOrb";
 import type { AIOrbActivity } from "@/components/ai-orb/ai-orb-types";
 import TypingIndicator from "@/components/ai/TypingIndicator";
 import ActivityLine from "@/components/ai/ActivityLine";
-import MessageMarkdown from "@/components/ai/MessageMarkdown";
+/* THE MARKDOWN RENDERER LOADS WHEN A REPLY NEEDS IT (deep check,
+   2026-09-24): react-markdown and its parsers are ~42 KB gzipped, and the
+   app always opens on an empty new chat, which needs none of it. The app
+   warms it in the background once it is up (KoleexAiApp); until it lands, a
+   reply shows as plain text in the same place. */
+const MessageMarkdown = lazy(() => import("@/components/ai/MessageMarkdown"));
 import { textDirection, textLang, textScript } from "@/lib/text-direction";
 import DraftCard from "@/components/ai/DraftCard";
 import TaskCard, { type TaskCardState } from "@/components/ai/TaskCard";
@@ -388,7 +393,11 @@ function BubbleImpl({
                 | undefined;
               const options = q?.options ?? [];
               if (options.length === 0) {
-                return <MessageMarkdown content={msg.content} lang={lang} dir={bubbleDir} />;
+                return (
+                  <Suspense fallback={<div className="whitespace-pre-wrap" dir={bubbleDir}>{msg.content}</div>}>
+                    <MessageMarkdown content={msg.content} lang={lang} dir={bubbleDir} />
+                  </Suspense>
+                );
               }
               /* The card OUTLIVES the answer. It stays in the transcript with
                  the chosen row marked and the rest faded, because the question

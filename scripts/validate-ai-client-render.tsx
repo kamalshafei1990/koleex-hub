@@ -1360,7 +1360,8 @@ console.log("\n── The keyboard is kept where the eyes are (audit, 2026-09-11
     /window\.matchMedia\("\(max-width: 767px\)"\)/.test(app));
   check("sidebar rows are not buttons holding buttons: the title is the button, pin and menu are its siblings; the row menu walks with arrow keys and hands focus back",
     !/\n\s+role="button"\n/.test(side) &&
-    /<button type="button" onClick=\{onOpen\} className="flex-1 min-w-0 text-start rounded-lg" aria-current=\{active \? "page" : undefined\}>/.test(side) &&
+    /* The chat row's handlers take the row (memoised row, deep check 2026-09-24). */
+    /<button type="button" onClick=\{\(\) => onOpen\(row\.id\)\} className="flex-1 min-w-0 text-start rounded-lg" aria-current=\{active \? "page" : undefined\}>/.test(side) &&
     /<button type="button" onClick=\{onOpen\} className="flex-1 min-w-0 flex items-center gap-2 text-start rounded-lg">/.test(side) &&
     /if \(e\.key === "ArrowDown"\) go\(i \+ 1\);\s*else if \(e\.key === "ArrowUp"\) go\(i - 1\);\s*else if \(e\.key === "Home"\) go\(0\);\s*else if \(e\.key === "End"\) go\(items\.length - 1\);/.test(side) &&
     /const closeMenu = useCallback\(\(\) => \{\s*setOpen\(false\);\s*btnRef\.current\?\.focus\(\{ preventScroll: true \}\);/.test(side) &&

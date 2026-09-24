@@ -55,11 +55,12 @@ console.log("\n── 2. The route and the sidebar, read ──");
     /console\.log\(`\[ai\.conversations\.export\] ok messages=/.test(route) && !/console\.\w+\([^)]*content/.test(route));
   const sidebar = readFileSync("src/components/ai/Sidebar.tsx", "utf8");
   check("the row menu offers Export / print only when a handler is given, above the danger separator",
-    /\.\.\.\(onExport\s*\?\s*\[\{ key: "export", label: copy\.exportChat,[\s\S]{0,140}?onSelect: onExport \} as MenuItem\]\s*:\s*\[\]\),\s*\{ key: "sep-danger"/.test(sidebar));
+    /\.\.\.\(onExport\s*\?\s*\[\{ key: "export", label: copy\.exportChat,[\s\S]{0,140}?onSelect: \(\) => onExport\(row\.id\) \} as MenuItem\]\s*:\s*\[\]\),\s*\{ key: "sep-danger"/.test(sidebar));
   const app = readFileSync("src/components/ai/KoleexAiApp.tsx", "utf8");
   check("every chat row opens the export in a new tab with the caller's language",
     /window\.open\(`\/api\/ai\/conversations\/\$\{encodeURIComponent\(id\)\}\/export\?lang=\$\{lang\}`, "_blank", "noopener"\)/.test(app) &&
-    (app.match(/onExport=\{\(\) => exportConversation\(c\.id\)\}/g) ?? []).length === 3);
+    /* One stable handler for every row (the row is memoised); it gets the id. */
+    (app.match(/onExport=\{exportConversation\}/g) ?? []).length === 3);
 }
 
 console.log(`\n${pass} passed, ${failures.length} failed`);

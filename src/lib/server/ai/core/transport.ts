@@ -107,6 +107,14 @@ const SYNTH_NET_FAIL = () =>
    turn into an instant failure. */
 const DEFAULT_TIMEOUT_MS = 120_000;
 const DEFAULT_STALL_MS = 45_000;
+/* A STREAM'S HEADERS COME AT ONCE (deep check, 2026-09-24). A streaming
+   provider answers with its headers before it generates — seconds, not
+   minutes — so waiting the whole 120 s for them only meant that a provider
+   that accepted the connection and hung held the turn for two minutes
+   before failover could try the next one. 30 s is still generous; the
+   stall budget, not this, guards a slow but healthy answer. Tunable, and
+   never longer than the general budget. */
+const DEFAULT_STREAM_HEADER_MS = 30_000;
 const MIN_TIMEOUT_MS = 5_000;
 const MAX_TIMEOUT_MS = 300_000;
 
@@ -227,7 +235,10 @@ export async function postChatStreaming(
      they arrive that timer is cleared and replaced by a stall timer that is
      re-armed after every chunk. So the abort always means "this provider has
      gone silent", never "this answer is taking a while". */
-  const headerBudget = timeoutMs(process.env.AI_HTTP_TIMEOUT_MS, DEFAULT_TIMEOUT_MS);
+  const headerBudget = Math.min(
+    timeoutMs(process.env.AI_HTTP_TIMEOUT_MS, DEFAULT_TIMEOUT_MS),
+    timeoutMs(process.env.AI_HTTP_HEADER_TIMEOUT_MS, DEFAULT_STREAM_HEADER_MS),
+  );
   const stallBudget = timeoutMs(process.env.AI_HTTP_STALL_MS, DEFAULT_STALL_MS);
   const ctrl = new AbortController();
   let deadline: ReturnType<typeof setTimeout> | null = setTimeout(() => ctrl.abort(), headerBudget);

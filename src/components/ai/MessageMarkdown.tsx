@@ -26,7 +26,7 @@
    "what does **bold** mean?" should see "**bold**", not "bold".
    --------------------------------------------------------------------------- */
 
-import { isValidElement, useCallback, useMemo, useState, type ReactNode } from "react";
+import { isValidElement, useCallback, useDeferredValue, useMemo, useState, type ReactNode } from "react";
 import { COPY } from "@/components/ai/copy";
 import type { Lang } from "@/lib/i18n";
 import ReactMarkdown from "react-markdown";
@@ -104,11 +104,18 @@ function CodeBlock({
 }
 
 export default function MessageMarkdown({
-  content,
+  content: liveContent,
   className,
   lang = "en",
   dir,
 }: Props): React.ReactElement {
+  /* THE STREAMING REPLY IS PARSED WHEN THE DEVICE HAS TIME (deep check,
+     2026-09-24). The memo below saves the bubbles whose words did not change,
+     but the one being written changes every frame, and each change re-parsed
+     the WHOLE answer — cost that grows with its length, sixty times a second
+     on a phone. A deferred value lets React render the newest text when it
+     can and skip the frames it cannot; a finished reply is unaffected. */
+  const content = useDeferredValue(liveContent);
   const [lightbox, setLightbox] = useState<LightboxPhoto | null>(null);
   const closeLightbox = useCallback(() => setLightbox(null), []);
   const copy = COPY[lang] ?? COPY.en;
