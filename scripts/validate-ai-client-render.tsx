@@ -179,6 +179,18 @@ console.log("\n── 7. The transcript bubble (Phase 2J, completed) ──");
   check("an assistant message renders its content", text(assistant).includes("Three widths are available."));
   check("a user message renders differently from an assistant one", assistant !== user);
   check("Arabic text is detected as RTL", textDirection("مرحبا") === "rtl" && textDirection("hello") === "ltr");
+  /* THE THREAD, UI/UX pass 2026-09-24: one orb (on the latest reply, the
+     older ones keep an empty gutter so nothing shifts), no avatar beside your
+     own words, and an older reply's actions wait for hover, focus or a tap. */
+  const older = html(<Bubble {...({ msg, isLast: false, lang: "en", onCopy: () => true } as any)} />);
+  check("the latest reply carries the orb; an older one keeps only its gutter, the same width",
+    !/data-orb-gutter/.test(assistant) && /data-orb-gutter/.test(older) && /class="w-\[38px\] shrink-0"/.test(older));
+  check("your own message has no avatar or initial beside it",
+    !/rounded-full overflow-hidden/.test(user) && !/>M</.test(user) && /bg-\[var\(--bg-surface-hover\)\]/.test(user) && !/bg-\[var\(--bg-inverted\)\] text-\[var\(--text-inverted\)\]/.test(user));
+  const latestActs = html(<Bubble {...({ msg, isLast: true, lang: "en", onCopy: () => true } as any)} />);
+  check("the latest reply shows its actions; an older one hides them until hover, focus or a tap",
+    /role="toolbar"/.test(latestActs) && !/opacity-0 group-hover\/msg:opacity-100/.test(latestActs) &&
+      /<div class="opacity-0 group-hover\/msg:opacity-100 focus-within:opacity-100 transition-opacity"><div role="toolbar"/.test(older));
 
   const withQuestion: any = { msg: { ...msg, steps: [
     { kind: "question", payload: { question: "Which spreading machine?", lang: "en", options: [
@@ -978,7 +990,7 @@ console.log("\n── The product, shown: on the call screen and in the answer �
   const bubbleSrc = readFileSync("src/components/ai/Bubble.tsx", "utf8");
   const welcomeSrc = readFileSync("src/components/ai/WelcomeCard.tsx", "utf8");
   check("every glass surface in the chat is its own positioning context, so the rim stays on it and off the text",
-    /"kx-glass relative bg-\[var\(--bg-secondary\)\]/.test(bubbleSrc) && /className="kx-glass relative group flex/.test(welcomeSrc));
+    /"kx-glass relative text-\[var\(--text-primary\)\]"/.test(bubbleSrc) && /className="kx-glass relative group flex/.test(welcomeSrc));
 }
 
 {
@@ -1422,9 +1434,9 @@ console.log("\n── Arabic and Chinese at their own size; the sidebar title ke
   const msg: any = { id: "m1", role: "assistant", created_at: "2026-09-13T10:00:00Z" };
   const bubbleOf = (content: string) => html(<Bubble {...({ msg: { ...msg, content }, userInitial: "M", isLast: true, lang: "en" } as any)} />);
   check("a Chinese reply reads at 16px like an Arabic one, and both carry their lang; English stays at 14",
-    /dir="ltr" lang="zh" class="rounded-2xl leading-relaxed px-5 py-3.5 text-\[16px\]/.test(bubbleOf("三种宽度可选：1.8米、2.2米和2.6米。")) &&
-    /dir="rtl" lang="ar" class="rounded-2xl leading-relaxed px-5 py-3.5 text-\[16px\]/.test(bubbleOf("تتوفر ثلاثة عروض للماكينة.")) &&
-    /dir="ltr" lang="en" class="rounded-2xl leading-relaxed px-5 py-3.5 text-\[14px\]/.test(bubbleOf("Three widths are available.")));
+    /dir="ltr" lang="zh" class="leading-relaxed kx-ai-reply max-w-full text-\[16px\]/.test(bubbleOf("三种宽度可选：1.8米、2.2米和2.6米。")) &&
+    /dir="rtl" lang="ar" class="leading-relaxed kx-ai-reply max-w-full text-\[16px\]/.test(bubbleOf("تتوفر ثلاثة عروض للماكينة.")) &&
+    /dir="ltr" lang="en" class="leading-relaxed kx-ai-reply max-w-full text-\[14px\]/.test(bubbleOf("Three widths are available.")));
 
   const tiles = html(<WelcomeCard copy={COPY.ar} onPick={() => {}} firstName="" />);
   check("the welcome tiles carry the language of their words", /class="kx-ai-tile-text flex-1 leading-snug" lang="ar">/.test(tiles) &&

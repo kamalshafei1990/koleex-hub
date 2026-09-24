@@ -2876,11 +2876,6 @@ export default function KoleexAiApp() {
                 <Bubble
                   key={m.id}
                   msg={m}
-                  userAvatar={account?.avatar_url || account?.person?.avatar_url || null}
-                  userInitial={(account?.username || account?.person?.full_name || "U")
-                    .trim()
-                    .charAt(0)
-                    .toUpperCase()}
                   isLast={i === messages.length - 1}
                   /* What the user replied to THIS message. When the message
                      is a question card, that reply IS the chosen option, so

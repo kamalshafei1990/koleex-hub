@@ -232,5 +232,26 @@ console.log("\n── 8. Design, part 1: a quieter screen ──");
       !/text-tertiary|var\(--danger|var\(--brand|12\.5px|bg-\[#0066FF\]/.test(card) && /lang === "ar" \? "←" : "→"/.test(card));
 }
 
+console.log("\n── 9. Design, part 2: the thread ──");
+{
+  const bubble = read("src/components/ai/Bubble.tsx");
+  const css = read("src/app/globals.css");
+  check("a reply is plain text in Core and keeps the glass card only under Aurora",
+    /isUser \? "rounded-2xl whitespace-pre-wrap px-4 py-2\.5" : "kx-ai-reply max-w-full"/.test(bubble) &&
+      /\.kx-ai-reply \{ padding: 2px 0; \}/.test(css) && /\[data-kx-skin="aurora"\] \.kx-ai-reply \{\s*padding: 14px 20px;/.test(css) &&
+      !/"kx-glass relative bg-\[var\(--bg-secondary\)\] border/.test(bubble));
+  check("a tap on an older message reveals its actions, but never steals a tap from a button or link inside it",
+    /if \(isLast \|\| editing\) return;\s*if \(\(e\.target as HTMLElement\)\.closest\("button, a, input, textarea, select, \[role=button\]"\)\) return;\s*setRevealed\(\(v\) => !v\);/.test(bubble));
+  check("the edit control is hidden like the actions, except while editing",
+    /\$\{editing \? "" : revealCls\}/.test(bubble) && /<PencilIcon size=\{12\} \/>/.test(bubble) && !/✎/.test(bubble));
+  check("message actions use the shared icon library; the thumbs were drawn into it",
+    /<CopyIcon size=\{ICON\} \/>/.test(bubble) && /<Volume2Icon size=\{ICON\} \/>/.test(bubble) && /<RefreshCwIcon size=\{ICON\} \/>/.test(bubble) &&
+      /<ThumbsUpIcon size=\{ICON\}/.test(bubble) && !/viewBox="0 0 24 24" width=\{ICON\}/.test(bubble) &&
+      /export \{ default as ThumbsUpIcon \} from "\.\/ThumbsUpIcon";/.test(read("src/components/icons/ui/index.ts")) &&
+      /strokeWidth=\{2\}/.test(read("src/components/icons/ui/ThumbsUpIcon.tsx")));
+  check("attachment chips in your bubble use the theme's border, not a white line that vanished in light mode",
+    !/border-white\/15/.test(bubble));
+}
+
 console.log(`\n${pass} passed, ${fail} failed`);
 if (fail > 0) process.exit(1);

@@ -31,14 +31,19 @@ import PhotoLightbox, { type LightboxPhoto } from "@/components/ai/PhotoLightbox
 import type { ChatMsg, QuotationDraftPayload } from "@/components/ai/types";
 import { COPY } from "@/components/ai/copy";
 import { KOLEEX_MODEL_INFO } from "@/lib/ai/koleex-models";
+import CopyIcon from "@/components/icons/ui/CopyIcon";
+import CheckIcon from "@/components/icons/ui/CheckIcon";
+import Volume2Icon from "@/components/icons/ui/Volume2Icon";
+import RefreshCwIcon from "@/components/icons/ui/RefreshCwIcon";
+import PencilIcon from "@/components/icons/ui/PencilIcon";
+import ThumbsUpIcon from "@/components/icons/ui/ThumbsUpIcon";
+import ThumbsDownIcon from "@/components/icons/ui/ThumbsDownIcon";
 
 /* ── Bubble ── */
 
 
 function BubbleImpl({
   msg,
-  userAvatar,
-  userInitial,
   isLast,
   answeredWith,
   canRegenerate,
@@ -57,8 +62,10 @@ function BubbleImpl({
   orbActivity = "none",
 }: {
   msg: ChatMsg;
+  /** No longer drawn (UI/UX pass, 2026-09-24: your own face beside every
+   *  message you wrote said nothing); accepted so older callers still type. */
   userAvatar?: string | null;
-  userInitial: string;
+  userInitial?: string;
   isLast?: boolean;
   answeredWith?: string | null;
   /** Live orb reaction for THIS bubble — only the last assistant message
@@ -137,6 +144,15 @@ function BubbleImpl({
      content. Placeholder bubbles (empty content = typing dots)
      get no actions. */
   const showActions = !isUser && !!msg.content;
+  /* ACTIONS ON THE LATEST REPLY ONLY (UI/UX pass, 2026-09-24). A row of five
+     icons under every answer turned a long thread into a column of toolbars.
+     The last reply keeps its row; an older one shows it on hover or keyboard
+     focus, and on a touch screen after a tap on the message itself. */
+  const [revealed, setRevealed] = useState(false);
+  const actionsAlwaysOn = !!isLast || revealed;
+  const revealCls = actionsAlwaysOn
+    ? ""
+    : "opacity-0 group-hover/msg:opacity-100 focus-within:opacity-100 transition-opacity";
 
 
   /* Phase 13: edit-and-retry state. Only user messages can be
@@ -189,10 +205,11 @@ function BubbleImpl({
     ? ((taskStep.payload as { preview?: unknown }).preview as Record<string, unknown> | undefined) ?? null
     : null;
   const taskState: TaskCardState = taskStatus ?? { state: "pending" };
-  /* Both sides now get an avatar so the transcript reads like a real
-     conversation — matches the ChatGPT / Gemini visual pattern Kamal
-     referenced. User side: real profile photo (or initial fallback).
-     AI side: the animated AI face icon with its neon gradient. */
+  /* ONE ORB, ON THE LATEST REPLY (UI/UX pass, 2026-09-24). The orb is the
+     character and it shows what Koleex AI is doing — so it sits where the
+     work is: the newest message. Older replies keep its column as an empty
+     gutter, so nothing shifts sideways when the orb moves on to the next
+     answer. Your own messages carry no avatar: you know who wrote them. */
   return (
     <div
       /* Audit P1 #1 — let the row inherit the document direction so
@@ -201,12 +218,19 @@ function BubbleImpl({
          kept the visual gap fine but broke a11y reading order.
          flex-row-reverse on user bubbles below keeps the layout
          "right-aligned" without forcing LTR on the document. */
-      className={`flex items-start gap-3 ${isUser ? "justify-end" : "justify-start"}`}
+      className={`group/msg flex items-start gap-3 ${isUser ? "justify-end" : "justify-start"}`}
+      onClick={(e) => {
+        /* A tap on an older message shows its actions (touch has no hover).
+           Taps on the message's own controls and links are theirs. */
+        if (isLast || editing) return;
+        if ((e.target as HTMLElement).closest("button, a, input, textarea, select, [role=button]")) return;
+        setRevealed((v) => !v);
+      }}
     >
-      {!isUser && (
-        <KoleexOrb state={orbState} activity={orbActivity} size={38} className="shrink-0" />
-      )}
-      <div className={`flex flex-col gap-2 max-w-[85%] ${isUser ? "items-end" : "items-start"}`}>
+      {!isUser && (isLast
+        ? <KoleexOrb state={orbState} activity={orbActivity} size={38} className="shrink-0" />
+        : <span aria-hidden className="w-[38px] shrink-0" data-orb-gutter />)}
+      <div className={`flex flex-col gap-2 ${isUser ? "max-w-[85%] items-end" : "min-w-0 flex-1 items-start"}`}>
         {/* Tool-step chips are NOT rendered (owner directive 2026-08-03:
             "just give the answer direct"). The steps still exist on the
             message — the orb's activity label uses the latest tool-call,
@@ -259,24 +283,23 @@ function BubbleImpl({
             ref={bubbleRef}
             dir={bubbleDir}
             lang={bubbleLang}
-            className={`rounded-2xl leading-relaxed ${
-              isUser ? "whitespace-pre-wrap px-4 py-2.5" : "px-5 py-3.5"
+            className={`leading-relaxed ${
+              isUser ? "rounded-2xl whitespace-pre-wrap px-4 py-2.5" : "kx-ai-reply max-w-full"
             } ${
               bubbleScript === "ar" || bubbleScript === "zh" ? "text-[16px]" : "text-[14px]"
             } ${
               isUser
-                ? "bg-[var(--bg-inverted)] text-[var(--text-inverted)]"
-                : /* Aurora: assistant bubbles wear the tile glass (owner ask).
-                     Measured safe: 140 glass tiles over the moving ground
-                     dropped 0 frames, and the low-power arm strips blur on
-                     weak machines. User bubbles keep the inverted fill — the
-                     contrast IS their identity. */
-                  /* `relative`, because the Aurora rim is a ::before with
-                     position:absolute; inset:0 — drawn against the nearest
-                     positioned ancestor. Without this it was drawn against
-                     the chat column, a stray hairline across the text: the
-                     owner's "hidden border covering the text". */
-                  "kx-glass relative bg-[var(--bg-secondary)] border border-[var(--border-subtle)] text-[var(--text-primary)]"
+                /* A quiet grey, not the inverted block: your words are
+                   the question, not the loudest thing on the screen. */
+                ? "bg-[var(--bg-surface-hover)] text-[var(--text-primary)]"
+                : /* PLAIN TEXT IN CORE, GLASS UNDER AURORA. A reply is the
+                     content itself, so in Core it sits on the page like a
+                     document (UI/UX pass, 2026-09-24). Under Aurora it keeps
+                     the tile glass the owner asked for — .kx-ai-reply adds
+                     the padding, rim and radius only there (globals.css).
+                     `relative`: the Aurora rim is a ::before drawn against
+                     the nearest positioned ancestor. */
+                  "kx-glass relative text-[var(--text-primary)]"
             }`}
             style={{
               ...(rtl
@@ -338,7 +361,7 @@ function BubbleImpl({
                             key={`${f.name}-${i}`}
                             type="button"
                             onClick={() => setOpenPhoto({ url, label: f.name })}
-                            className="block overflow-hidden rounded-xl border border-white/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0066FF]"
+                            className="block overflow-hidden rounded-xl border border-[var(--border-subtle)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0066FF]"
                             aria-label={f.name}
                             title={f.name}
                           >
@@ -348,7 +371,7 @@ function BubbleImpl({
                         ) : (
                           <span
                             key={`${f.name}-${i}`}
-                            className="inline-flex max-w-[240px] items-center gap-1.5 rounded-lg border border-white/15 px-2 py-1 text-[12px]"
+                            className="inline-flex max-w-[240px] items-center gap-1.5 rounded-lg border border-[var(--border-subtle)] px-2 py-1 text-[12px]"
                             title={f.name}
                           >
                             <span aria-hidden>📎</span>
@@ -609,7 +632,7 @@ function BubbleImpl({
             with new text) or Save/Cancel while editing. Only shown
             when the parent supplied onEdit and allowed it. */}
         {isUser && showEditButton && (
-          <div className="mt-1 flex items-center gap-2 text-[12px] text-[var(--text-dim)]">
+          <div className={`mt-1 flex items-center gap-2 text-[12px] text-[var(--text-dim)] ${editing ? "" : revealCls}`}>
             {editing ? (
               <>
                 <button
@@ -639,7 +662,8 @@ function BubbleImpl({
                 className="inline-flex items-center gap-1 px-2 py-1 rounded-lg hover:bg-[var(--bg-surface-subtle)] hover:text-[var(--text-primary)] transition-colors"
                 aria-label={copy.editAndRetry}
               >
-                ✎ {copy.editShort}
+                <span aria-hidden className="inline-flex"><PencilIcon size={12} /></span>
+                {copy.editShort}
               </button>
             )}
           </div>
@@ -652,6 +676,7 @@ function BubbleImpl({
             the bubble div so it doesn't inherit the bubble's padding /
             background. */}
         {showActions && (
+          <div className={revealCls}>
           <BubbleActions
             msg={msg}
             isLast={!!isLast}
@@ -663,23 +688,9 @@ function BubbleImpl({
             onFeedback={onFeedback}
             lang={lang}
           />
+          </div>
         )}
       </div>
-      {isUser && (
-        <div
-          className="h-8 w-8 rounded-full overflow-hidden flex items-center justify-center shrink-0 bg-[var(--bg-surface)] border border-[var(--border-subtle)]"
-          aria-hidden
-        >
-          {userAvatar ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={userAvatar} alt="" className="h-full w-full object-cover" />
-          ) : (
-            <span className="text-[12px] font-bold text-[var(--text-primary)]">
-              {userInitial}
-            </span>
-          )}
-        </div>
-      )}
     </div>
   );
 }
@@ -741,19 +752,7 @@ export function BubbleActions({
         aria-label={copied ? copy.copied : copy.copyMessage}
         title={copied ? copy.copied : copy.copyMessage}
       >
-        {copied ? (
-          <svg aria-hidden viewBox="0 0 24 24" width={ICON} height={ICON} fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
-            <polyline points="20 6 9 17 4 12" />
-          </svg>
-        ) : (
-          /* Lucide "copy" — two overlapping rounded rectangles. The
-             previous variant used a single rect + escape-path which
-             didn't read as a duplicate at small sizes. */
-          <svg aria-hidden viewBox="0 0 24 24" width={ICON} height={ICON} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
-            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
-          </svg>
-        )}
+        {copied ? <CheckIcon size={ICON} /> : <CopyIcon size={ICON} />}
       </button>
       {onSpeak && msg.content && (
         <button
@@ -763,16 +762,7 @@ export function BubbleActions({
           aria-label={copy.readAloud}
           title={copy.readAloud}
         >
-          {/* Lucide volume-2 redrawn on a 20×20 viewBox so the
-              speaker triangle + arc waves actually fill the box.
-              The original 24×24 lucide path only used the left
-              ~17 units, which made the icon look noticeably
-              smaller next to copy / regenerate / 👍 / 👎. */}
-          <svg aria-hidden viewBox="0 0 20 20" width={ICON} height={ICON} fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
-            <polygon points="9 3 4 7 1 7 1 13 4 13 9 17 9 3" />
-            <path d="M13 6.5a4.5 4.5 0 0 1 0 7" />
-            <path d="M16 4a8 8 0 0 1 0 12" />
-          </svg>
+          <Volume2Icon size={ICON} />
         </button>
       )}
       {isLast && onRegenerate && (
@@ -784,12 +774,7 @@ export function BubbleActions({
           aria-label={copy.regenerate}
           title={copy.regenerate}
         >
-          <svg aria-hidden viewBox="0 0 24 24" width={ICON} height={ICON} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M3 12a9 9 0 0 1 15.5-6.36L21 8" />
-            <path d="M21 3v5h-5" />
-            <path d="M21 12a9 9 0 0 1-15.5 6.36L3 16" />
-            <path d="M3 21v-5h5" />
-          </svg>
+          <RefreshCwIcon size={ICON} />
         </button>
       )}
       {onFeedback && (
@@ -802,9 +787,7 @@ export function BubbleActions({
             aria-label={copy.goodResponse}
             title={copy.goodResponse}
           >
-            <svg aria-hidden viewBox="0 0 24 24" width={ICON} height={ICON} fill={vote === "up" ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3zM7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3" />
-            </svg>
+            <ThumbsUpIcon size={ICON} fill={vote === "up" ? "currentColor" : "none"} />
           </button>
           <button
             type="button"
@@ -813,9 +796,7 @@ export function BubbleActions({
             aria-label={copy.badResponse}
             title={copy.badResponse}
           >
-            <svg aria-hidden viewBox="0 0 24 24" width={ICON} height={ICON} fill={vote === "down" ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M10 15v4a3 3 0 0 0 3 3l4-9V2H5.72a2 2 0 0 0-2 1.7l-1.38 9a2 2 0 0 0 2 2.3zM17 2h2.67A2.31 2.31 0 0 1 22 4v7a2.31 2.31 0 0 1-2.33 2H17" />
-            </svg>
+            <ThumbsDownIcon size={ICON} fill={vote === "down" ? "currentColor" : "none"} />
           </button>
         </>
       )}

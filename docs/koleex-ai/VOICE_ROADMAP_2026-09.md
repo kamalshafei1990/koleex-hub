@@ -2523,3 +2523,18 @@ Owner: "make a deep check for this app and fix any issue or bug". Five read-only
   - the "Open in To-do" arrow points the right way in Arabic.
 
 **Tests.** `validate:ai-deepcheck` has 59 checks (+8), with pins updated in client-render and tasks. Each rule was confirmed by breaking the code on purpose, and all 8 breaks were caught. Screenshots were taken at 375 px in English, Arabic and Chinese, dark and light.
+
+## Deep check 2026-09-24, phase 6b: design, the thread
+
+- **One orb, on the latest reply.** The orb is the character and shows what Koleex AI is doing, so it sits on the newest message. Older replies keep its 38 px column as an empty gutter, so nothing shifts sideways when the orb moves to the next answer.
+- **No avatar beside your own messages.** The initial or photo circle said nothing.
+- **Your messages are a quiet grey** (`--bg-surface-hover`), not the inverted black/white block.
+- **Replies are plain text in Core**, like a document (`.kx-ai-reply`). Under Aurora they keep the glass card the owner asked for; the padding, rim and radius live only in that skin's CSS.
+- **Actions on the latest reply only.** An older reply shows copy / listen / 👍 👎 on hover or keyboard focus, and on a touch screen after a tap on the message. The tap never steals a tap from a button or link inside it. The per-message Edit works the same way and stays visible while editing.
+- **Library icons.** Copy, Check, Volume2, RefreshCw and Pencil come from `icons/ui`. ThumbsUp and ThumbsDown were drawn into the library in the house stroke grammar and exported from the barrel. The inline SVGs and the "✎" text glyph are gone.
+- **Attachment chips in your bubble** use the theme border; `border-white/15` vanished in light mode.
+
+**Tests.**
+- `validate:ai-deepcheck` has 64 checks (+5), and `validate:ai-client-render` has 3 new rendered checks.
+- Each rule was confirmed by breaking the code on purpose, and all 6 breaks were caught.
+- Screenshots were taken at 375 px: English dark, Arabic light, and Aurora.

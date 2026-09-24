@@ -2310,6 +2310,17 @@ body:has([data-kx-call-active='1']) .kx-update-offer { display: none; }
    dropdown panels) keeps real glass. Those are a handful of surfaces per
    screen, they sit over moving content, and their blur is the skin. This
    rule is for the many, not the few. */
+/* KOLEEX AI — A REPLY IS THE CONTENT (UI/UX pass, 2026-09-24). In Core the
+   assistant's answer sits on the page as plain text, like a document; under
+   Aurora it keeps the tile glass the owner asked for, so only there does it
+   get the padding, rim and radius of a card. */
+.kx-ai-reply { padding: 2px 0; }
+[data-kx-skin="aurora"] .kx-ai-reply {
+  padding: 14px 20px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 16px;
+}
+
 [data-kx-skin="aurora"] .kx-flat-items .kx-glass {
   -webkit-backdrop-filter: none;
   backdrop-filter: none;

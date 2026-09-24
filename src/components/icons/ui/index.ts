@@ -192,6 +192,8 @@ export { default as TableIcon } from "./TableIcon";
 export { default as TabletIcon } from "./TabletIcon";
 export { default as TagsIcon } from "./TagsIcon";
 export { default as TargetIcon } from "./TargetIcon";
+export { default as ThumbsDownIcon } from "./ThumbsDownIcon";
+export { default as ThumbsUpIcon } from "./ThumbsUpIcon";
 export { default as TimerIcon } from "./TimerIcon";
 export { default as ToggleOffIcon } from "./ToggleOffIcon";
 export { default as TrashIcon } from "./TrashIcon";
