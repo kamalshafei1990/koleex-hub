@@ -58,6 +58,7 @@ import {
 import { tryCannedReply } from "@/lib/server/ai/core/canned-replies";
 import { chatWithTools, activeProviderLabel } from "@/lib/server/ai/provider/registry";
 import { adapterForModel, resolveRequestedModel, servedKoleexModel } from "@/lib/server/ai/provider/koleex-model-slots";
+import { switchedOffModels } from "@/lib/server/ai/provider/model-switches";
 import { generalLaneTools, runGeneralSearchHop, GENERAL_SEARCH_NOTE } from "@/lib/server/ai/core/general-search";
 import { newTraceId, traceFields } from "@/lib/server/ai/observability/turn-trace";
 import { meterTurn } from "@/lib/server/ai/cost/meter";
@@ -204,7 +205,9 @@ export async function POST(req: Request) {
   /* THE CLIENT ASKS, THE SERVER DECIDES (owner, 2026-09-23). An unknown or
      switched-off model is Auto; the chosen model's provider goes first and
      the others stay behind it as failover. */
-  const chosenModel = resolveRequestedModel(body.model);
+  /* The owner's switches ride along (model-switches.ts, cached half a
+     minute — no database trip on an ordinary turn). */
+  const chosenModel = resolveRequestedModel(body.model, await switchedOffModels());
   const prefer = adapterForModel(chosenModel);
   const wantsStream =
     body.stream === true || req.headers.get("accept") === "text/event-stream";

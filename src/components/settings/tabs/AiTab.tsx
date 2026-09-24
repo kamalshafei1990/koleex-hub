@@ -35,8 +35,9 @@ import { ControlRow, Segmented, SelectControl, SettingsGroup, SwitchRow } from "
 import CheckIcon from "@/components/icons/ui/CheckIcon";
 import SpinnerIcon from "@/components/icons/ui/SpinnerIcon";
 import TrashIcon from "@/components/icons/ui/TrashIcon";
-import { useTranslation } from "@/lib/i18n";
+import { useTranslation, type Lang } from "@/lib/i18n";
 import { settingsT } from "@/lib/translations/settings";
+import { KOLEEX_MODEL_INFO, type KoleexServingModel } from "@/lib/ai/koleex-models";
 import { updateAccountPreferences } from "@/lib/accounts-admin";
 import ChosenOrb from "@/components/ai-orb/ChosenOrb";
 import { ORB_STYLES, setOrbStyle, useOrbStyle, type OrbStyle } from "@/components/ai-orb/orb-style";
@@ -52,7 +53,7 @@ export default function AiTab({ account, onChanged }: {
   account: AccountWithLinks;
   onChanged: () => void;
 }) {
-  const { t } = useTranslation(settingsT);
+  const { t, lang } = useTranslation(settingsT);
 
   /* The account arrives with its preferences, so the form has a first
      value before the fetch answers; the fetch adds the memory facts and
@@ -270,6 +271,7 @@ export default function AiTab({ account, onChanged }: {
       {/* ── USAGE, FOR THE OWNER (roadmap D3) ─────────────────────────────
           Only a super admin sees it, and the server decides that again on
           the request: this flag only saves a fetch that would be refused. */}
+      {account.is_super_admin && <ModelSwitchesSection t={t} lang={lang} />}
       {account.is_super_admin && <UsageSection t={t} />}
 
       {/* Same bar as Profile: sticky, and clear of the floating dock's gutter. */}
@@ -290,6 +292,85 @@ export default function AiTab({ account, onChanged }: {
         </div>
       </div>
     </div>
+  );
+}
+
+
+/* ── KOLEEX MODELS, ON AND OFF, FOR EVERYONE (models 4/4) ──────────────
+   The owner's runtime switch per model. The server says what exists
+   (/api/ai/models `admin`, super admin only) and decides again on every
+   write (/api/platform-settings, super admin only); this only draws it.
+   A model whose slot is not set up, or that the deploy-time switch has off,
+   is shown but cannot be flipped from here. */
+type ModelAdminRow = { id: KoleexServingModel; configured: boolean; off: boolean; env_off: boolean };
+
+function ModelSwitchesSection({ t, lang }: { t: (k: string) => string; lang: Lang }) {
+  const [rows, setRows] = useState<ModelAdminRow[] | null | "failed">(null);
+  const [saving, setSaving] = useState<KoleexServingModel | null>(null);
+  const [failed, setFailed] = useState(false);
+  const l = lang === "zh" || lang === "ar" ? lang : "en";
+  useEffect(() => {
+    const ctl = new AbortController();
+    fetch("/api/ai/models", { credentials: "include", signal: ctl.signal })
+      .then((r) => (r.ok ? r.json() : Promise.reject(new Error(String(r.status)))))
+      .then((body: { admin?: ModelAdminRow[] }) => {
+        if (!ctl.signal.aborted) setRows(Array.isArray(body.admin) ? body.admin : "failed");
+      })
+      .catch(() => { if (!ctl.signal.aborted) setRows("failed"); });
+    return () => ctl.abort();
+  }, []);
+
+  async function flip(id: KoleexServingModel, on: boolean) {
+    if (saving || !Array.isArray(rows)) return;
+    setSaving(id);
+    setFailed(false);
+    try {
+      const res = await fetch("/api/platform-settings", {
+        method: "PATCH",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ key: `ai_model_off_${id}`, value: !on }),
+      });
+      if (!res.ok) throw new Error(String(res.status));
+      setRows((cur) => (Array.isArray(cur) ? cur.map((r) => (r.id === id ? { ...r, off: !on } : r)) : cur));
+    } catch {
+      setFailed(true);
+    } finally {
+      setSaving(null);
+    }
+  }
+
+  const note: Record<KoleexServingModel, string> = {
+    blink: t("ai.models.blinkHint"),
+    mind: t("ai.models.mindHint"),
+    deep: t("ai.models.deepHint"),
+  };
+  return (
+    <SettingsGroup header={t("ai.models.title")} footer={t("ai.models.desc")}>
+      {rows === null ? (
+        <div className="flex justify-center py-6"><SpinnerIcon className="h-4 w-4 text-[var(--text-dim)]" /></div>
+      ) : rows === "failed" ? (
+        <p className="py-3 text-[12px] text-[#FF3333]">{t("ai.models.failed")}</p>
+      ) : (
+        <div data-model-switches>
+          {rows.map((r, i) => {
+            const state = !r.configured ? t("ai.models.notSetUp") : r.env_off ? t("ai.models.envOff") : null;
+            return (
+              <SwitchRow
+                key={r.id}
+                label={KOLEEX_MODEL_INFO[r.id].name[l]}
+                hint={[state, note[r.id]].filter(Boolean).join(" · ")}
+                checked={r.configured && !r.env_off && !r.off}
+                disabled={!r.configured || r.env_off || saving !== null}
+                onChange={(on) => void flip(r.id, on)}
+                last={i === rows.length - 1 && !failed}
+              />
+            );
+          })}
+          {failed && <p className="py-2 text-[12px] text-[#FF3333]" role="status">{t("ai.models.saveFailed")}</p>}
+        </div>
+      )}
+    </SettingsGroup>
   );
 }
 

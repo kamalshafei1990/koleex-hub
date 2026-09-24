@@ -65,6 +65,8 @@ import { openAiCompatibleAdapter, secondFallbackAdapter } from "./adapters/opena
 import type { ProviderAdapter, TurnOutcome } from "./types";
 import type { TurnRequest } from "./turn-ir";
 import { providerBreaker, admissible, type Breaker } from "@/lib/server/ai/router/circuit-breaker";
+import { switchedOffModels } from "./model-switches";
+import { adapterForModel } from "./koleex-model-slots";
 
 /* Ordered by preference. See the header on why DeepSeek is first. The two
    backups follow, AI_FALLBACK_* then AI_FALLBACK2_* (owner, 2026-09-23: Grok
@@ -187,10 +189,19 @@ function failoverEnabled(): boolean {
 export async function chatWithToolsVia(
   adapters: ReadonlyArray<ProviderAdapter>,
   req: TurnRequest,
-  opts?: { onDelta?: (t: string) => void; failover?: boolean; breaker?: Breaker; prefer?: ProviderAdapter | null },
+  opts?: {
+    onDelta?: (t: string) => void;
+    failover?: boolean;
+    breaker?: Breaker;
+    prefer?: ProviderAdapter | null;
+    /** Switched off by an operator (model-switches.ts): not tried — unless
+     *  nothing else is configured, because a switch must never be what
+     *  leaves a user without an answer. */
+    exclude?: ReadonlySet<ProviderAdapter>;
+  },
 ): Promise<TurnOutcome> {
   const breaker = opts?.breaker ?? providerBreaker;
-  const candidates = preferFirst(configuredAdapters(adapters), opts?.prefer ?? null);
+  const candidates = preferFirst(withoutSwitchedOff(configuredAdapters(adapters), opts?.exclude), opts?.prefer ?? null);
   if (candidates.length === 0) {
     return { ok: false, status: 503, bodyText: "no AI provider configured" };
   }
@@ -268,13 +279,34 @@ export function preferFirst(
   return [prefer, ...candidates.filter((a) => a !== prefer)];
 }
 
+/** THE OWNER'S OFF SWITCHES (models 4/4). Drop the switched-off adapters —
+ *  but if that would leave nothing, keep the list as it was: every model
+ *  switched off is a mistake to survive, not an outage to cause. Pure;
+ *  exported for the suite. */
+export function withoutSwitchedOff(
+  candidates: ReadonlyArray<ProviderAdapter>,
+  exclude: ReadonlySet<ProviderAdapter> | undefined,
+): ProviderAdapter[] {
+  if (!exclude || exclude.size === 0) return [...candidates];
+  const kept = candidates.filter((a) => !exclude.has(a));
+  return kept.length > 0 ? kept : [...candidates];
+}
+
 /** The one door, over the live registry. `prefer` is the adapter behind the
- *  user's chosen Koleex model (provider/koleex-model-slots), or null for Auto. */
+ *  user's chosen Koleex model (provider/koleex-model-slots), or null for Auto.
+ *  The operator's switches are read here, once for every caller, so no turn
+ *  path can forget them. */
 export async function chatWithTools(
   req: TurnRequest,
   opts?: { onDelta?: (t: string) => void; prefer?: ProviderAdapter | null },
 ): Promise<TurnOutcome> {
-  return chatWithToolsVia(REGISTRY, req, opts);
+  const off = await switchedOffModels();
+  const exclude = new Set<ProviderAdapter>();
+  for (const m of off) {
+    const a = adapterForModel(m);
+    if (a) exclude.add(a);
+  }
+  return chatWithToolsVia(REGISTRY, req, { ...opts, exclude });
 }
 
 /** The `provider` string reported on an AgentResponse, e.g. "deepseek:deepseek-chat".

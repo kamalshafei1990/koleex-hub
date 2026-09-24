@@ -32,7 +32,8 @@ import {
   modelAvailability,
   modelAvailable,
 } from "../src/lib/server/ai/provider/koleex-model-slots";
-import { preferFirst, chatWithToolsVia } from "../src/lib/server/ai/provider/registry";
+import { preferFirst, chatWithToolsVia, withoutSwitchedOff } from "../src/lib/server/ai/provider/registry";
+import { MODEL_SWITCH_KEYS, isModelSwitchKey, parseSwitchRows, SWITCH_TTL_MS } from "../src/lib/server/ai/provider/model-switches";
 import { deepseekAdapter } from "../src/lib/server/ai/provider/adapters/deepseek";
 import { openAiCompatibleAdapter, secondFallbackAdapter } from "../src/lib/server/ai/provider/adapters/openai-compatible";
 import { createBreaker } from "../src/lib/server/ai/router/circuit-breaker";
@@ -158,7 +159,7 @@ async function main() {
   console.log("\n── 5. Wiring ──");
   const route = readFileSync("src/app/api/ai/agent/route.ts", "utf8");
   check("the route resolves the request on the server and derives the preference from it",
-    /const chosenModel = resolveRequestedModel\(body\.model\);\s*const prefer = adapterForModel\(chosenModel\);/.test(route));
+    /const chosenModel = resolveRequestedModel\(body\.model, await switchedOffModels\(\)\);\s*const prefer = adapterForModel\(chosenModel\);/.test(route));
   check("both fast-lane calls carry the preference",
     (route.match(/\{ onDelta, prefer \}/g) ?? []).length === 2 && !/\{ onDelta \},/.test(route));
   check("both orchestrator calls carry the chosen model",
@@ -174,11 +175,11 @@ async function main() {
       /\}, \{ prefer \}\);/.test(orch) && /liveEmit \? \{ onDelta: liveEmit, prefer \} : \{ prefer \},/.test(orch));
   const reg = readFileSync("src/lib/server/ai/provider/registry.ts", "utf8");
   check("the registry reorders only the CONFIGURED candidates, before the breaker",
-    /const candidates = preferFirst\(configuredAdapters\(adapters\), opts\?\.prefer \?\? null\);/.test(reg));
+    /const candidates = preferFirst\(withoutSwitchedOff\(configuredAdapters\(adapters\), opts\?\.exclude\), opts\?\.prefer \?\? null\);/.test(reg));
   const modelsRoute = readFileSync("src/app/api/ai/models/route.ts", "utf8");
   check("the models endpoint is behind the same door as every Koleex AI endpoint",
     /const auth = await requireAuth\(\);\s*if \(auth instanceof NextResponse\) return auth;\s*const notInternal = requireInternalUser\(auth\);\s*if \(notInternal\) return notInternal;/.test(modelsRoute) &&
-      /models: modelAvailability\(\)/.test(modelsRoute) && /private, no-store/.test(modelsRoute));
+      /models: modelAvailability\(off\)/.test(modelsRoute) && /private, no-store/.test(modelsRoute));
   check("…and the versioned path is the same handler", /export \{ GET \} from "\.\.\/\.\.\/\.\.\/ai\/models\/route";/.test(readFileSync("src/app/api/v1/ai/models/route.ts", "utf8")));
 
   console.log("\n── 6. The picker and the saved choice ──");
@@ -243,6 +244,73 @@ async function main() {
   const scr = readFileSync("src/components/ai/VoiceCallScreen.tsx", "utf8");
   check("the call's settings list the Koleex models by their Koleex names, and a Mind call says it is on Auto",
     /KOLEEX_MODEL_INFO\[m\]\.name\[lang\]/.test(scr) && /\{model === "mind" && laneNote !== "international-unreachable" && \(/.test(scr) && !/Qwen|Grok|DeepSeek|xAI|Alibaba/.test(scr.slice(scr.indexOf("THE MODEL (2026-09-23; the Line"), scr.indexOf("{onSelectTalkMode && ("))));
+
+  console.log("\n── 8. The owner's switches (models 4/4) ──");
+  {
+    check("one key per model, and only those keys count as switches",
+      MODEL_SWITCH_KEYS.mind === "ai_model_off_mind" && MODEL_SWITCH_KEYS.blink === "ai_model_off_blink" && MODEL_SWITCH_KEYS.deep === "ai_model_off_deep" &&
+        isModelSwitchKey("ai_model_off_deep") && !isModelSwitchKey("qa_reporter_enabled") && !isModelSwitchKey("ai_model_off_auto") && !isModelSwitchKey(null));
+    const off = parseSwitchRows([
+      { key: "ai_model_off_deep", value: true },
+      { key: "ai_model_off_blink", value: "true" },
+      { key: "ai_model_off_mind", value: false },
+      { key: "qa_reporter_enabled", value: true },
+    ]);
+    check("only an explicit true switches a model off; a string, a false or another key never does",
+      off.has("deep") && !off.has("blink") && !off.has("mind") && off.size === 1 && parseSwitchRows([]).size === 0);
+
+    const A = fake("a", ok("A")), B = fake("b", ok("B")), C = fake("c", ok("C"));
+    check("a switched-off adapter is dropped; the order of the rest is kept",
+      withoutSwitchedOff([A, B, C], new Set([A])).map((x) => x.name).join() === "b,c");
+    check("…but switching EVERY model off never leaves a user without an answer: the list is kept",
+      withoutSwitchedOff([A, B], new Set([A, B])).map((x) => x.name).join() === "a,b" &&
+        withoutSwitchedOff([A, B], undefined).map((x) => x.name).join() === "a,b");
+    const out = await chatWithToolsVia([A, B, C], req, { exclude: new Set([A]), breaker: createBreaker() });
+    check("Auto with the first model switched off is answered by the next, and never calls the switched-off one",
+      out.ok && out.servedBy === "b" && A.calls === 0);
+    const D = fake("d", ok("D")), E = fake("e", down);
+    const out2 = await chatWithToolsVia([D, E], req, { exclude: new Set([D]), breaker: createBreaker() });
+    check("…and a switched-off model is not a failover target while another is configured",
+      !out2.ok && D.calls === 0 && E.calls === 1);
+    const F = fake("f", ok("F")), G = fake("g", ok("G"), false);
+    const out3 = await chatWithToolsVia([F, G], req, { exclude: new Set([F]), breaker: createBreaker() });
+    check("…unless it is the only configured model — then it still answers",
+      out3.ok && out3.servedBy === "f");
+
+    const sw = readFileSync("src/lib/server/ai/provider/model-switches.ts", "utf8");
+    check("the switches are read at most once per half minute, a failed read keeps the last known state, and env and table both count",
+      SWITCH_TTL_MS === 30_000 && /if \(cache && now - cache\.at < SWITCH_TTL_MS\) return cache\.off;/.test(sw) &&
+        /const kept = cache\?\.off \?\? new Set<KoleexServingModel>\(\);/.test(sw) &&
+        /return new Set<KoleexServingModel>\(\[\.\.\.env, \.\.\.table\]\);/.test(sw) &&
+        /\.from\("platform_settings"\)\s*\.select\("key, value"\)\s*\.in\("key", Object\.values\(MODEL_SWITCH_KEYS\)\)/.test(sw));
+    const reg = readFileSync("src/lib/server/ai/provider/registry.ts", "utf8");
+    check("every turn path goes through the one door that reads the switches",
+      /export async function chatWithTools\([\s\S]{0,300}?const off = await switchedOffModels\(\);[\s\S]{0,300}?return chatWithToolsVia\(REGISTRY, req, \{ \.\.\.opts, exclude \}\);/.test(reg) &&
+        /preferFirst\(withoutSwitchedOff\(configuredAdapters\(adapters\), opts\?\.exclude\), opts\?\.prefer \?\? null\)/.test(reg));
+    const route = readFileSync("src/app/api/ai/agent/route.ts", "utf8");
+    check("the chat route resolves the user's choice against the switches",
+      /const chosenModel = resolveRequestedModel\(body\.model, await switchedOffModels\(\)\);/.test(route));
+    const models = readFileSync("src/app/api/ai/models/route.ts", "utf8");
+    check("/api/ai/models answers availability with the switches, and the admin block only to a super admin — names only",
+      /models: modelAvailability\(off\)/.test(models) && /if \(auth\.is_super_admin\) \{[\s\S]{0,400}?body\.admin = KOLEEX_SERVING_MODELS\.map/.test(models) &&
+        !/model\(\)|\.name\b|providerRoster/.test(models));
+    const ps = readFileSync("src/app/api/platform-settings/route.ts", "utf8");
+    check("only a super admin can flip a switch, only booleans, only known keys; the switches are not readable by everyone; a flip is live at once on that instance",
+      /if \(!auth\.is_super_admin\) \{\s*return NextResponse\.json\(\{ error: "Super admin only" \}, \{ status: 403 \}\);/.test(ps) &&
+        /if \(\(!READABLE\.includes\(key\) && !modelSwitch\) \|\| typeof body\.value !== "boolean"\)/.test(ps) &&
+        /const READABLE = \["qa_reporter_enabled"\] as const;/.test(ps) && /if \(modelSwitch\) \{\s*[\s\S]{0,200}?invalidateModelSwitches\(\);/.test(ps));
+    const vs = readFileSync("src/app/api/ai/voice/session/route.ts", "utf8");
+    const ws = readFileSync("src/app/api/ai/voice/ws-session/route.ts", "utf8");
+    check("Koleex Deep switched off also closes its call line; the mainland lane is never switched off from here",
+      /const deepOff = \(await switchedOffModels\(\)\)\.has\("deep"\);\s*const grok = deepOff \? null : parseGrokVoiceConfig/.test(vs) &&
+        /const deepOff = \(await switchedOffModels\(\)\)\.has\("deep"\);\s*const cfg = deepOff \? null : parseGrokVoiceConfig/.test(ws) &&
+        !/has\("blink"\)/.test(vs + ws));
+    const tab = readFileSync("src/components/settings/tabs/AiTab.tsx", "utf8");
+    check("Settings → Koleex AI shows the switches to a super admin only, by Koleex name, and a model not set up (or off by the server) cannot be flipped",
+      /\{account\.is_super_admin && <ModelSwitchesSection t=\{t\} lang=\{lang\} \/>\}/.test(tab) &&
+        /label=\{KOLEEX_MODEL_INFO\[r\.id\]\.name\[l\]\}/.test(tab) && /disabled=\{!r\.configured \|\| r\.env_off \|\| saving !== null\}/.test(tab) &&
+        /body: JSON\.stringify\(\{ key: `ai_model_off_\$\{id\}`, value: !on \}\)/.test(tab) && !/Qwen|Grok|DeepSeek|xAI|Alibaba/.test(tab));
+  }
 
   console.log(`\n${pass} passed, ${fail} failed`);
   if (fail > 0) process.exit(1);

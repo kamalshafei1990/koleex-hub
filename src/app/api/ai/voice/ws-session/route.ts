@@ -28,6 +28,7 @@ import "server-only";
    --------------------------------------------------------------------------- */
 
 import { NextResponse } from "next/server";
+import { switchedOffModels } from "@/lib/server/ai/provider/model-switches";
 import { authorizeVoice } from "@/lib/server/ai/voice/gate";
 import { consumeBudget, limitMode, subjectFor } from "@/lib/server/ai/security/rate-limit";
 import { supabaseServer } from "@/lib/server/supabase-server";
@@ -117,7 +118,10 @@ export async function POST(req: Request) {
     }
   }
 
-  const cfg = parseGrokVoiceConfig(readGrokVoiceEnv());
+  /* Koleex Deep switched off by the owner (models 4/4): this is its lane, so
+     no ticket — the caller's device falls back to the mainland lane. */
+  const deepOff = (await switchedOffModels()).has("deep");
+  const cfg = deepOff ? null : parseGrokVoiceConfig(readGrokVoiceEnv());
   const apiKey = process.env.AI_VOICE_GROK_API_KEY?.trim() || "";
   if (!cfg || !apiKey) {
     return NextResponse.json({ error: "Voice is not available right now." }, { status: 503 });

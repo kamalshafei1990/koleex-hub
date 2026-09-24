@@ -18,9 +18,12 @@ import "server-only";
    the others exactly as it always has — the user is answered, and told by
    name which model answered. A choice can never leave a user without a reply.
 
-   THE OPERATOR SWITCH. `AI_MODELS_DISABLED=deep,blink` takes models out of
-   service: a request for one is treated as Auto, and the picker is told it
-   is unavailable. Server-side, so no client can opt back in.
+   THE OPERATOR SWITCHES. `AI_MODELS_DISABLED=deep,blink` (deploy time) and
+   the owner's switches in Settings → Koleex AI (runtime, model-switches.ts)
+   take models out of service: a request for one is treated as Auto, the
+   picker is told it is unavailable, and the turn does not fail over to it
+   unless it is the only model left (registry.chatWithTools). Server-side, so
+   no client can opt back in.
    --------------------------------------------------------------------------- */
 
 import type { ProviderAdapter } from "./types";
@@ -57,6 +60,18 @@ export function parseDisabledModels(raw: string | undefined): ReadonlySet<Koleex
 
 function disabledModels(): ReadonlySet<KoleexServingModel> {
   return parseDisabledModels(process.env.AI_MODELS_DISABLED);
+}
+
+/** Is this model's slot configured (keys present), switched off or not? */
+export function modelConfigured(
+  model: KoleexServingModel,
+  slots: Readonly<Record<KoleexServingModel, ProviderAdapter>> = SLOTS,
+): boolean {
+  try {
+    return slots[model].configured();
+  } catch {
+    return false;
+  }
 }
 
 /** Can this model serve right now — configured, and not switched off? */
@@ -106,8 +121,9 @@ export function servedKoleexModel(
 }
 
 /** Every model and whether it can serve — for the picker. Names only. */
-export function modelAvailability(): Array<{ id: KoleexModelId; available: boolean }> {
-  const disabled = disabledModels();
+export function modelAvailability(
+  disabled: ReadonlySet<KoleexServingModel> = disabledModels(),
+): Array<{ id: KoleexModelId; available: boolean }> {
   return [
     { id: "auto", available: true },
     ...KOLEEX_SERVING_MODELS.map((id) => ({ id, available: modelAvailable(id, disabled) })),
