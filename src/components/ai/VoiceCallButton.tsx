@@ -643,6 +643,12 @@ export default function VoiceCallButton({
     return () => {
       window.removeEventListener("pagehide", onPageHide);
       beacon("unmounted");
+      sessionRef.current?.stop();
+      sessionRef.current = null;
+      /* The last settled turn is often still queued at the moment the screen
+         goes. `finish` posts with keepalive so it outlives the unmount. */
+      void persisterRef.current?.finish();
+      persisterRef.current = null;
       /* Deep's pending dial (DEEP_REDIAL_DELAY_MS) must not start a call
          under a screen that is gone, nor keep its microphone. */
       const redial = deepRedialRef.current;
@@ -651,12 +657,6 @@ export default function VoiceCallButton({
         redial.mic?.getTracks().forEach((t) => t.stop());
         deepRedialRef.current = null;
       }
-      sessionRef.current?.stop();
-      sessionRef.current = null;
-      /* The last settled turn is often still queued at the moment the screen
-         goes. `finish` posts with keepalive so it outlives the unmount. */
-      void persisterRef.current?.finish();
-      persisterRef.current = null;
       tonesRef.current?.close();
       tonesRef.current = null;
       /* THE REST OF THE RELEASE, on the exit that skipped it. The wake lock

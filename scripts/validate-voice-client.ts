@@ -2064,7 +2064,7 @@ console.log("\n── 12. Mute ──");
   const hangUpAt16 = btn.indexOf("const releaseCall");
   const hangUpBody = btn.slice(hangUpAt16, btn.indexOf("}, [", hangUpAt16));
   check("hanging up closes the tone context and resets ready", /tonesRef\.current\?\.close\(\)/.test(hangUpBody) && /setReady\(false\)/.test(hangUpBody) && /chimedRef\.current = false/.test(hangUpBody));
-  check("  …and so does unmount", /persisterRef\.current = null;\s*tonesRef\.current\?\.close\(\);\s*tonesRef\.current = null;[\s\S]{0,1400}?releaseWakeLock\(\);\s*clearSearchTimer\(\);[\s\S]{0,400}?clearCallPulse\([\s\S]{0,200}?\);\s*\};\s*\}, \[releaseWakeLock, clearSearchTimer\]\);/.test(btn));
+  check("  …and so does unmount", /persisterRef\.current = null;\s*(?:\/\*[^*]*\*\/\s*const redial = deepRedialRef\.current;[\s\S]{0,260}?deepRedialRef\.current = null;\s*\}\s*)?tonesRef\.current\?\.close\(\);\s*tonesRef\.current = null;[\s\S]{0,1400}?releaseWakeLock\(\);\s*clearSearchTimer\(\);[\s\S]{0,400}?clearCallPulse\([\s\S]{0,200}?\);\s*\};\s*\}, \[releaseWakeLock, clearSearchTimer\]\);/.test(btn));
   check("the screen is told ready separately from live", /ready=\{ready\}/.test(btn));
   const scr = fs16.readFileSync("src/components/ai/VoiceCallScreen.tsx", "utf8");
   check("the screen says connecting until READY, not merely live — and says so differently when it is slow", /: !live \|\| !ready\s*\? \(connectingSlow \? copy\.connectingSlow : copy\.connecting\)/.test(scr) && /\{soundBlocked && onEnableSound && \(/.test(scr));
@@ -3077,7 +3077,7 @@ function describeErrorCheck(): boolean {
       /if \(deepRedial\) \{\s*deepRedialedRef\.current = true;[\s\S]{0,200}?setState\("connecting"\);[\s\S]{0,400}?timer: setTimeout\(\(\) => \{\s*deepRedialRef\.current = null;\s*void startCallRef\.current\?\.\(\{ resume: true, mic: keptMic \}\);\s*\}, DEEP_REDIAL_DELAY_MS\),\s*\};\s*return;\s*\}\s*if \(canFallBack\)/.test(btn) &&
       /resumesRef\.current = 0;\s*deepRedialedRef\.current = false;\s*\}/.test(btn));
     check("  …a call released (or a screen unmounted) during the pause cancels the dial and gives the microphone back; the beacon says `redial=deep`",
-      /beacon\("unmounted"\);\s*\/\*[^*]*\*\/\s*const redial = deepRedialRef\.current;\s*if \(redial\) \{\s*clearTimeout\(redial\.timer\);\s*redial\.mic\?\.getTracks\(\)\.forEach\(\(t\) => t\.stop\(\)\);\s*deepRedialRef\.current = null;\s*\}\s*sessionRef\.current\?\.stop\(\);/.test(btn) &&
+      /beacon\("unmounted"\);[\s\S]{0,600}?persisterRef\.current = null;\s*\/\*[^*]*\*\/\s*const redial = deepRedialRef\.current;\s*if \(redial\) \{\s*clearTimeout\(redial\.timer\);\s*redial\.mic\?\.getTracks\(\)\.forEach\(\(t\) => t\.stop\(\)\);\s*deepRedialRef\.current = null;\s*\}\s*tonesRef\.current\?\.close\(\);/.test(btn) &&
       /const releaseCall = useCallback\(\(\) => \{\s*const redial = deepRedialRef\.current;\s*if \(redial\) \{\s*clearTimeout\(redial\.timer\);\s*redial\.mic\?\.getTracks\(\)\.forEach\(\(t\) => t\.stop\(\)\);\s*deepRedialRef\.current = null;\s*\}/.test(btn) &&
       /\(body\.redial === "deep" \? " redial=deep" : ""\)/.test(fs26.readFileSync("src/app/api/ai/voice/telemetry/route.ts", "utf8")));
     check("  …the first `error` the far side sends is beaconed once with its bounded message, so a refused field on a new vendor names itself",
