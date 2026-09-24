@@ -119,7 +119,14 @@ const WAVE_OPACITY = 0.5;
 const OVERDRAW = 80;
 
 export default function WavyBackground(
-  { theme: forced, topLight }: { theme?: "dark" | "light"; topLight?: boolean } = {},
+  { theme: forced, topLight, still: stillProp = false }: {
+    theme?: "dark" | "light";
+    topLight?: boolean;
+    /** Draw one frame and never loop. The Koleex AI chat asks for this
+     *  (owner, 2026-09-24: "still in the chat") — the same ground, without a
+     *  full-screen redraw and re-blur every frame under a streaming reply. */
+    still?: boolean;
+  } = {},
 ) {
   const ref = useRef<HTMLCanvasElement>(null);
   /* Follows the document by default — read once per mount and re-read on the
@@ -206,7 +213,13 @@ export default function WavyBackground(
       /Android|iPhone|iPad|iPod|Mobile|HarmonyOS/i.test(navigator.userAgent) ||
       navigator.maxTouchPoints > 1;
     const weak = !mobile && (navigator.hardwareConcurrency || 8) <= 4;
-    const still = window.matchMedia("(prefers-reduced-motion: reduce)").matches || weak;
+    /* Reduced motion — the system's AND the Hub's own setting
+       (kx-reduce-motion, Settings → Display), which this ignored. */
+    const still =
+      stillProp ||
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches ||
+      document.documentElement.classList.contains("kx-reduce-motion") ||
+      weak;
 
     /* RATIO 1, WHICH IS WHAT THE ORIGINAL DOES.
 
@@ -341,7 +354,7 @@ export default function WavyBackground(
      colours are read once when the draw loop starts, so without it the canvas
      keeps painting the previous colour until something else happens to
      remount it — the swatch would look dead. */
-  }, [theme, topLight, showCanvas, wallpaper?.tint]);
+  }, [theme, topLight, showCanvas, wallpaper?.tint, stillProp]);
 
   return (
     <>

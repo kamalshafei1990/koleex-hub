@@ -90,7 +90,6 @@ import { Bubble } from "@/components/ai/Bubble";
 import ModelPicker from "@/components/ai/ModelPicker";
 import { useModelChoice, setModelChoice, syncModelChoiceFromAccount } from "@/components/ai/model-choice";
 import { normalizeServingModel, type KoleexModelId } from "@/lib/ai/koleex-models";
-import { updateAccountPreferences } from "@/lib/accounts-admin";
 import { SectionHeader, ProjectRow, SidebarRow, RowMenu, groupByDate } from "@/components/ai/Sidebar";
 
 
@@ -170,7 +169,14 @@ export default function KoleexAiApp() {
   const chooseModel = useCallback((m: KoleexModelId) => {
     setModelChoice(m);
     if (account?.id) {
-      void updateAccountPreferences(account.id, { ai_model: m }).then((ok) => { if (ok) refreshAccount(); });
+      /* The accounts client is the whole admin module (password resets, API
+         keys…) — loaded for this one save, not on every open of the app
+         (deep check, 2026-09-24: ~28 KB gzipped off the first load). */
+      const id = account.id;
+      void import("@/lib/accounts-admin")
+        .then(({ updateAccountPreferences }) => updateAccountPreferences(id, { ai_model: m }))
+        .then((ok) => { if (ok) refreshAccount(); })
+        .catch(() => { /* offline: kept on this device, saved next time */ });
     }
   }, [account?.id, refreshAccount]);
 
@@ -374,6 +380,12 @@ export default function KoleexAiApp() {
     ttsHandleRef.current?.cancel();
     ttsHandleRef.current = null;
     setAiSpeaking(false);
+  }, []);
+  /* WARM THE MARKDOWN RENDERER once the app is up (Bubble loads it lazily):
+     the first reply then finds it already here. */
+  useEffect(() => {
+    const t = window.setTimeout(() => { void import("@/components/ai/MessageMarkdown"); }, 1200);
+    return () => window.clearTimeout(t);
   }, []);
   /* LEAVING THE APP ENDS ITS TURN (deep check, 2026-09-24). Nothing aborted
      the stream or silenced the speech on the way out, so a voice turn could
@@ -2423,7 +2435,11 @@ export default function KoleexAiApp() {
           keeps this solid bg-primary page untouched. */}
       {aurora && !callLive && (
         <div className="fixed inset-0 z-0 pointer-events-none" aria-hidden>
-          <WavyBackground />
+          {/* STILL IN THE CHAT (owner, 2026-09-24). The moving field redrew
+              and re-blurred the whole screen every frame under the glass,
+              the composer and a streaming reply — the biggest battery and
+              jank cost on a phone. Same ground, one frame. */}
+          <WavyBackground still />
         </div>
       )}
 
@@ -2637,12 +2653,12 @@ export default function KoleexAiApp() {
                     active={c.id === activeId}
                     projects={projects}
                     copy={copy}
-                    onOpen={() => openConversation(c.id)}
-                    onRename={() => renameConversation(c.id, c.title)}
-                    onDelete={() => requestDeleteConversation(c.id)}
-                    onTogglePin={() => togglePin(c)}
-                    onMove={(pid) => moveConversation(c, pid)}
-                      onExport={() => exportConversation(c.id)}
+                    onOpen={openConversation}
+                    onRename={renameConversation}
+                    onDelete={requestDeleteConversation}
+                    onTogglePin={togglePin}
+                    onMove={moveConversation}
+                    onExport={exportConversation}
                   />
                 ))
               )}
@@ -2749,12 +2765,12 @@ export default function KoleexAiApp() {
                       active={c.id === activeId}
                       projects={projects}
                       copy={copy}
-                      onOpen={() => openConversation(c.id)}
-                      onRename={() => renameConversation(c.id, c.title)}
-                      onDelete={() => requestDeleteConversation(c.id)}
-                      onTogglePin={() => togglePin(c)}
-                      onMove={(pid) => moveConversation(c, pid)}
-                      onExport={() => exportConversation(c.id)}
+                      onOpen={openConversation}
+                    onRename={renameConversation}
+                    onDelete={requestDeleteConversation}
+                    onTogglePin={togglePin}
+                    onMove={moveConversation}
+                    onExport={exportConversation}
                     />
                   ))}
                   {groups.map((g) => (
@@ -2768,12 +2784,12 @@ export default function KoleexAiApp() {
                           projects={projects}
                           copy={copy}
                           hint={searching ? contentHits[c.id] : undefined}
-                          onOpen={() => openConversation(c.id)}
-                          onRename={() => renameConversation(c.id, c.title)}
-                          onDelete={() => requestDeleteConversation(c.id)}
-                          onTogglePin={() => togglePin(c)}
-                          onMove={(pid) => moveConversation(c, pid)}
-                      onExport={() => exportConversation(c.id)}
+                          onOpen={openConversation}
+                    onRename={renameConversation}
+                    onDelete={requestDeleteConversation}
+                    onTogglePin={togglePin}
+                    onMove={moveConversation}
+                    onExport={exportConversation}
                         />
                       ))}
                     </div>

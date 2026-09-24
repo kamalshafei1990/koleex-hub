@@ -203,7 +203,7 @@ async function main() {
       /servedModel = normalizeServingModel\(json\.model\);/.test(app) &&
       (app.match(/askedModel: modelChoice,/g) ?? []).length === 2);
   check("choosing saves to the account as well as this device",
-    /setModelChoice\(m\);[\s\S]{0,120}updateAccountPreferences\(account\.id, \{ ai_model: m \}\)/.test(app));
+    /setModelChoice\(m\);[\s\S]{0,500}import\("@\/lib\/accounts-admin"\)\s*\.then\(\(\{ updateAccountPreferences \}\) => updateAccountPreferences\(id, \{ ai_model: m \}\)\)/.test(app));
   const bubble = readFileSync("src/components/ai/Bubble.tsx", "utf8");
   check("the reply says who answered only when a chosen model did not",
     /msg\.askedModel && msg\.askedModel !== "auto" && msg\.servedModel && msg\.servedModel !== msg\.askedModel/.test(bubble));

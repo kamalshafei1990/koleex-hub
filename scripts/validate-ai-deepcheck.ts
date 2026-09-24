@@ -164,5 +164,39 @@ console.log("\n── 6. Chat: no duplicate sends, no stuck spinners, Stop reall
       /if \(agent\.failed\) \{[\s\S]{0,300}ok: false[\s\S]{0,120}return NextResponse\.json\(\{ error: "unavailable" \}, \{ status: 503 \}\);/.test(route));
 }
 
+console.log("\n── 7. Speed ──");
+{
+  const app = read("src/components/ai/KoleexAiApp.tsx");
+  const wavy = read("src/components/ui/WavyBackground.tsx");
+  check("the chat's background is still (owner, 2026-09-24): one frame, no loop — and the Hub's own Reduce Motion is honoured everywhere",
+    /<WavyBackground still \/>/.test(app) && /stillProp \|\|\s*window\.matchMedia\("\(prefers-reduced-motion: reduce\)"\)\.matches \|\|\s*document\.documentElement\.classList\.contains\("kx-reduce-motion"\)/.test(wavy) &&
+      /if \(still\) return;/.test(wavy));
+  const side = read("src/components/ai/Sidebar.tsx");
+  check("chat rows are memoised and the app hands every row the SAME handlers, so a streaming reply no longer redraws the list",
+    /export const SidebarRow = memo\(SidebarRowImpl\);/.test(side) &&
+      (app.match(/onOpen=\{openConversation\}\s*onRename=\{renameConversation\}\s*onDelete=\{requestDeleteConversation\}\s*onTogglePin=\{togglePin\}\s*onMove=\{moveConversation\}\s*onExport=\{exportConversation\}/g) ?? []).length === 3 &&
+      !/onOpen=\{\(\) => openConversation\(c\.id\)\}/.test(app));
+  const md = read("src/components/ai/MessageMarkdown.tsx");
+  check("the reply being written is parsed when the device has time (deferred), not on every frame",
+    /const content = useDeferredValue\(liveContent\);/.test(md));
+  const bubble = read("src/components/ai/Bubble.tsx");
+  check("the markdown renderer is loaded when a reply needs it, with the plain text in its place until then — and warmed after the app is up",
+    /const MessageMarkdown = lazy\(\(\) => import\("@\/components\/ai\/MessageMarkdown"\)\);/.test(bubble) &&
+      !/^import MessageMarkdown from/m.test(bubble) && /<Suspense fallback=\{<div className="whitespace-pre-wrap"/.test(bubble) &&
+      /void import\("@\/components\/ai\/MessageMarkdown"\);/.test(app));
+  check("the accounts admin client is loaded for the one save that needs it, not with the app",
+    !/^import \{ updateAccountPreferences \} from "@\/lib\/accounts-admin";/m.test(app) && /import\("@\/lib\/accounts-admin"\)/.test(app));
+  check("one orb stylesheet for the whole screen (hoisted and de-duplicated), not one per reply",
+    /<style href="kx-aiorb-styles" precedence="kx-aiorb">/.test(read("src/components/ai-orb/AIOrb.tsx")));
+  const transport = read("src/lib/server/ai/core/transport.ts");
+  check("a streaming provider that never sends headers is given up on in 30 s, not 120, so failover can try the next one",
+    /const DEFAULT_STREAM_HEADER_MS = 30_000;/.test(transport) &&
+      /const headerBudget = Math\.min\(\s*timeoutMs\(process\.env\.AI_HTTP_TIMEOUT_MS, DEFAULT_TIMEOUT_MS\),\s*timeoutMs\(process\.env\.AI_HTTP_HEADER_TIMEOUT_MS, DEFAULT_STREAM_HEADER_MS\),\s*\);/.test(transport));
+  const route = read("src/app/api/ai/agent/route.ts");
+  check("the rate-limit round trip runs beside the ownership read, and a refused turn still returns before any write",
+    /const \[refused, \{ data: conv \}, storedLang\] = await Promise\.all\(\[\s*budgetGate\(\),/.test(route) &&
+      route.indexOf("if (refused) return refused;") > 0 && route.indexOf("if (refused) return refused;") < route.indexOf('.from("ai_messages")'));
+}
+
 console.log(`\n${pass} passed, ${fail} failed`);
 if (fail > 0) process.exit(1);
