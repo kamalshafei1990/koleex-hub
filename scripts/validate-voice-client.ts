@@ -4014,7 +4014,7 @@ function describeErrorCheck(): boolean {
   check("the button gives the stream meters NO stream on the socket lane and reads the session's levels instead; the lane is state set when the call starts",
     /const micLevelRtc = useStreamLevel\(wsLane \? null : micStream, listening\);/.test(btn) && /const farLevelRtc = useReceiverLevel\(sessionRef, !wsLane && connected && phase === "speaking"\);/.test(btn) &&
     /const wsLevels = useSessionLevels\(sessionRef, wsLane && connected\);/.test(btn) && /const micLevel = wsLane \? wsLevels\.mic : micLevelRtc;/.test(btn) &&
-    /if \(sessionRef\.current\) return;\s*setLaneState\(transportRef\.current\);/.test(btn));
+    /if \(sessionRef\.current\) return;\s*if \(!opts\?\.resume\) applyModelLane\(\);\s*setLaneState\(transportRef\.current\);/.test(btn));
   /* 2026-09-12, "pulses while Koleex AI talks": the assistant's remote track
      is never tapped by a second AudioContext any more — its level comes from
      the receiver. */
@@ -4548,23 +4548,25 @@ function describeErrorCheck(): boolean {
   check("the picker offers the settled lane's own voices (the names are the same on both lines), keeps both lists, and tells the sheet which line is chosen and whether there are two",
     /const offerFor = \(lane: "rtc" \| "ws"\) => \{\s*const list = byLane\[lane\]\.length > 0 \? byLane\[lane\] : byLane\.rtc;\s*setVoices\(list\);\s*setVoiceKey\(\(cur\) => pickVoiceKey\(cur \?\? readSavedVoiceKey\(\), list\)\);\s*setChosenLane\(lane\);/.test(btn) &&
     /byLaneRef\.current = byLane;/.test(btn) && /setLanesAvailable\(byLane\.rtc\.length > 0 && byLane\.ws\.length > 0\);/.test(btn) &&
-    /lane=\{chosenLane\}\s*onSelectLane=\{lanesAvailable \? selectLane : undefined\}/.test(btn));
-  check("choosing a line moves the next call there, saves it as the device's verdict, re-arms the one fall-back, clears the note, offers that line's voices with the current one kept, and rebuilds a running call",
-    /const selectLane = useCallback\(\(lane: "rtc" \| "ws"\) => \{\s*if \(lane === transportRef\.current\) return;\s*transportRef\.current = lane;\s*saveLane\(lane, Date\.now\(\), "user"\);\s*laneFellBackRef\.current = false;\s*setLaneNote\(null\);\s*const list = byLaneRef\.current\[lane\]\.length > 0 \? byLaneRef\.current\[lane\] : byLaneRef\.current\.rtc;\s*setVoices\(list\);\s*const next = pickVoiceKey\(voiceKeyRef\.current \?\? readSavedVoiceKey\(\), list\);\s*voiceKeyRef\.current = next;\s*setVoiceKey\(next\);\s*setChosenLane\(lane\);\s*rebuildCall\(\);\s*\}, \[rebuildCall\]\);/.test(btn) &&
+    /lane=\{chosenLane\}\s*model=\{model\}\s*onSelectModel=\{lanesAvailable \? selectModel : undefined\}/.test(btn));
+  check("choosing a model on the call is the same choice as the composer's picker, saved through the parent; a model on another line rebuilds the call there with that line's voices, the current one kept; the same line changes nothing under the caller",
+    /const selectModel = useCallback\(\(m: KoleexModelId\) => \{\s*if \(m === modelRef\.current\) return;\s*modelRef\.current = m;\s*if \(onChooseModelRef\.current\) onChooseModelRef\.current\(m\);\s*else setModelChoice\(m\);\s*const \{ lane, pinned \} = laneForModel\(m\);\s*lanePinnedRef\.current = pinned;\s*setLaneNote\(m === "deep" && lane === "rtc" \? "international-unreachable" : null\);\s*if \(lane === transportRef\.current\) return;\s*transportRef\.current = lane;\s*offerLane\(lane\);\s*rebuildCall\(\);\s*\}, \[laneForModel, offerLane, rebuildCall\]\);/.test(btn) &&
+    /const offerLane = useCallback\(\(lane: "rtc" \| "ws"\) => \{\s*const list = byLaneRef\.current\[lane\]\.length > 0 \? byLaneRef\.current\[lane\] : byLaneRef\.current\.rtc;\s*setVoices\(list\);\s*const next = pickVoiceKey\(voiceKeyRef\.current \?\? readSavedVoiceKey\(\), list\);\s*voiceKeyRef\.current = next;\s*setVoiceKey\(next\);\s*setChosenLane\(lane\);\s*\}, \[\]\);/.test(btn) &&
     /const selectVoice = useCallback\(\(key: string\) => \{\s*setVoiceKey\(key\);\s*voiceKeyRef\.current = key;\s*saveVoiceKey\(key\);\s*if \(sessionRef\.current\) playSound\("voice-switched"\);\s*rebuildCall\(\);\s*\}, \[rebuildCall\]\);/.test(btn) &&
     /const rebuildCall = useCallback\(\(\) => \{\s*const current = sessionRef\.current;\s*if \(!current\) return;/.test(btn));
   check("a fall-back to the mainland line moves the current voice onto the mainland list — state AND ref, before the next start — marks the line, and says so on the screen",
     /const fallToMainlandVoice = useCallback\(\(\) => \{\s*const next = pickVoiceKey\(voiceKeyRef\.current \?\? readSavedVoiceKey\(\), byLaneRef\.current\.rtc\);\s*voiceKeyRef\.current = next;\s*setVoiceKey\(next\);\s*setChosenLane\("rtc"\);\s*setLaneNote\("international-unreachable"\);\s*\}, \[\]\);/.test(btn) &&
     /saveLane\("rtc", Date\.now\(\), "call"\);\s*fallToMainlandVoice\(\);\s*setReady\(false\);/.test(btn) && /saveLane\("rtc", Date\.now\(\), "call"\);\s*fallToMainlandVoice\(\);\s*\}/.test(btn) &&
     /laneNote=\{laneNote\}/.test(btn));
-  check("the screen draws the line control only when it is given one — two pills, the chosen one pressed, the international one honest about its need — names the lines and never a vendor, and carries the note in three languages",
-    /\{onSelectLane && \(/.test(scr) && /\(\["rtc", "ws"\] as const\)\.map\(\(l\) => \{\s*const on = lane === l;/.test(scr) && /data-lane=\{l\}/.test(scr) && /onClick=\{\(\) => onSelectLane\(l\)\}/.test(scr) &&
-    /\{l === "ws" \? copy\.laneInternational : copy\.laneMainland\}/.test(scr) && /\{copy\.lineHint\}/.test(scr) &&
-    /laneNote === "international-unreachable" && \(/.test(scr) &&
-    ["en", "zh", "ar"].every((l) => { const blk = scr.slice(scr.indexOf(`  ${l}: {`)); return /linePick: "/.test(blk) && /lineHint: "/.test(blk) && /laneMainland: "/.test(blk) && /laneInternational: "/.test(blk) && /laneUnreachable: "/.test(blk); }) &&
-    !/(linePick|lineHint|laneMainland|laneInternational|laneUnreachable): "[^"]*(Qwen|Grok|xAI|Alibaba|通义|千问)/i.test(scr));
-  check("  …and the line control keeps the talk-mode control's own divider when it is the section above it",
-    /<div className=\{voices\.length > 0 \|\| onSelectLane \? "mt-6 pt-5 border-t border-white\/10" : ""\}>/.test(scr));
+  check("the screen draws the model list only when it is given one — the four Koleex models, the chosen one checked, each naming its line (never a vendor), Mind shown but not choosable — and carries the notes in three languages",
+    /\{onSelectModel && \(/.test(scr) && /\{KOLEEX_MODELS\.map\(\(m\) => \{\s*const on = model === m;\s*const off = !KOLEEX_MODEL_INFO\[m\]\.voice;/.test(scr) &&
+    /data-model=\{m\}/.test(scr) && /onClick=\{\(\) => \{ if \(!off\) onSelectModel\(m\); \}\}/.test(scr) &&
+    /m === "blink" \? copy\.laneMainland\s*: m === "deep" \? copy\.laneInternational\s*: m === "mind" \? copy\.modelTextOnly/.test(scr) && /\{copy\.lineHint\}/.test(scr) &&
+    /laneNote === "international-unreachable" && \(/.test(scr) && /\{model === "mind" && \(/.test(scr) &&
+    ["en", "zh", "ar"].every((l) => { const blk = scr.slice(scr.indexOf(`  ${l}: {`)); return /modelPick: "/.test(blk) && /modelLineAuto: "/.test(blk) && /modelTextOnly: "/.test(blk) && /mindCallNote: "/.test(blk) && /lineHint: "/.test(blk) && /laneMainland: "/.test(blk) && /laneInternational: "/.test(blk) && /laneUnreachable: "/.test(blk); }) &&
+    !/(modelPick|modelLineAuto|modelTextOnly|mindCallNote|lineHint|laneMainland|laneInternational|laneUnreachable): "[^"]*(Qwen|Grok|xAI|Alibaba|DeepSeek|通义|千问)/i.test(scr));
+  check("  …and the model list keeps the talk-mode control's own divider when it is the section above it",
+    /<div className=\{voices\.length > 0 \|\| onSelectModel \? "mt-6 pt-5 border-t border-white\/10" : ""\}>/.test(scr));
 }
 /* ── 38. THE CALL SHEET IS THE CALL'S SETTINGS, AND IT CAN BE SWIPED AWAY (audit, 2026-09-11) ── */
 console.log("\n── 38. call settings sheet: title, voice heading, swipe-down, readable captions ──");
@@ -4643,8 +4645,8 @@ console.log("\n── 40. lane verdicts carry their source; status line; memoise
     JSON.stringify(pref.parseSavedLane(JSON.stringify({ lane: "ws", at: now, source: "user" }))) === JSON.stringify({ lane: "ws", at: now, source: "user" }) &&
     JSON.stringify(pref.parseSavedLane(JSON.stringify({ lane: "ws", at: now, source: "hacker" }))) === JSON.stringify({ lane: "ws", at: now }));
   const btn = fsD.readFileSync("src/components/ai/VoiceCallButton.tsx", "utf8");
-  check("  …the button names the source at every save: the Line control says user, the probe says probe, a call that came up or fell back says call",
-    /saveLane\(lane, Date\.now\(\), "user"\)/.test(btn) && /saveLane\(ok \? "ws" : "rtc", Date\.now\(\), "probe"\)/.test(btn) &&
+  check("  …the button names the source at every save: the probe says probe, a call that came up or fell back says call — and nothing writes a hand-picked line any more (the model pins it at each start instead)",
+    !/saveLane\([^)]*"user"\)/.test(btn) && /saveLane\(ok \? "ws" : "rtc", Date\.now\(\), "probe"\)/.test(btn) &&
     (btn.match(/saveLane\("rtc", Date\.now\(\), "call"\)/g) ?? []).length === 2 && /saveLane\("ws", Date\.now\(\), "call"\)/.test(btn) &&
     !/saveLane\([^,)]*\)/.test(btn));
   const scr = fsD.readFileSync("src/components/ai/VoiceCallScreen.tsx", "utf8");

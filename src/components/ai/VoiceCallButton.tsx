@@ -60,8 +60,10 @@ import { CallTones, browserToneContext } from "@/lib/voice/tones";
 import { pickSttLang, readSavedSttLang, saveSttLang, learnSttLang, type SttLang } from "@/lib/voice/stt-lang";
 import {
   pickVoiceKey, readSavedVoiceKey, saveVoiceKey, readSavedRegion, saveRegion, decideLane, readSavedLane, saveLane, startingLane, verdictIsFresh, type VoicesByLane,
-  readSavedTalkMode, saveTalkMode, type TalkMode,
+  readSavedTalkMode, saveTalkMode, type TalkMode, pinnedLaneFor,
 } from "@/lib/voice/voice-pref";
+import { useModelChoice, setModelChoice } from "@/components/ai/model-choice";
+import type { KoleexModelId } from "@/lib/ai/koleex-model-ids";
 import { requestCallSummary, shouldSummarise } from "@/lib/voice/summary";
 import { playSound, primeSounds, prefetchCues, setCueSink } from "@/lib/sounds/player";
 import { holdSoundEngine } from "@/lib/notificationSound";
@@ -233,6 +235,10 @@ export type VoiceCallButtonProps = {
    *  the gap between the last spoken turn and the summary row is not a
    *  silence (UI review, 2026-09-12). */
   onSummaryPending?: (pending: boolean) => void;
+  /** The caller chose a Koleex model in the call's settings: the parent
+   *  saves it on the account, the same choice as the picker beside the
+   *  message box. Without it the choice is kept on this device only. */
+  onChooseModel?: (model: KoleexModelId) => void;
 };
 
 export default function VoiceCallButton({
@@ -252,6 +258,7 @@ export default function VoiceCallButton({
   onTurnUpdated,
   onInterrupted,
   onSummaryPending,
+  onChooseModel,
 }: VoiceCallButtonProps) {
   const [state, setState] = useState<VoiceState>("idle");
   /** The lane the current call is on, for render: the socket lane meters
@@ -283,6 +290,23 @@ export default function VoiceCallButton({
      network that blocks the vendor's host, a refused secret — is retried
      ONCE on the other lane, silently, before the caller sees a failure. */
   const laneFellBackRef = useRef(false);
+  /* THE KOLEEX MODEL PICKS THE LINE (owner, 2026-09-23; voice-pref
+     pinnedLaneFor). Blink is the mainland line, Deep the international one;
+     Auto and Mind leave the lane rules above to decide. Read at each call's
+     start — a ref, because the start runs outside a render. */
+  const model = useModelChoice();
+  const modelRef = useRef<KoleexModelId>(model);
+  useEffect(() => { modelRef.current = model; }, [model]);
+  const onChooseModelRef = useRef(onChooseModel);
+  useEffect(() => { onChooseModelRef.current = onChooseModel; }, [onChooseModel]);
+  /* What the deployment said (the Auto lane's default) and whether it has an
+     international line at all — null until the config read answers, which
+     counts as "yes" so a quick tap on Deep is not sent to the other line. */
+  const serverLaneRef = useRef<"rtc" | "ws" | null>(null);
+  const wsKnownRef = useRef<boolean | null>(null);
+  /* The last call's lane came from a model's pin, so going back to Auto must
+     put the lane rules' answer back rather than keep the pinned line. */
+  const lanePinnedRef = useRef(false);
   /* The first `error` event of a call is beaconed with its message: it is
      how a refused session configuration on a new vendor gets diagnosed. */
   const errorBeaconedRef = useRef(false);
@@ -492,6 +516,8 @@ export default function VoiceCallButton({
            overrides a mainland default; a stale one is re-checked, in the
            background, so the tap that starts a call never waits on it. */
         const server: "rtc" | "ws" = body.transport === "ws" ? "ws" : "rtc";
+        serverLaneRef.current = server;
+        wsKnownRef.current = byLane.ws.length > 0 || body.ws_available === true;
         const decided = decideLane(server, readSavedLane(), Date.now());
         /* NOT UNDER A CALL (2026-09-08 05:52: the tap came three seconds
            after the page opened and this answer came after the tap; moving
@@ -870,8 +896,43 @@ export default function VoiceCallButton({
     sendVoiceTelemetry({ reason: "far-side-error", lane: transportRef.current, err: errorMessageOf(data), ...(diag ?? {}) });
   }, []);
 
+  /* A LANE'S OWN VOICES, the current one kept (the same key names a voice
+     on both lines), in state and in the ref the next start reads. */
+  const offerLane = useCallback((lane: "rtc" | "ws") => {
+    const list = byLaneRef.current[lane].length > 0 ? byLaneRef.current[lane] : byLaneRef.current.rtc;
+    setVoices(list);
+    const next = pickVoiceKey(voiceKeyRef.current ?? readSavedVoiceKey(), list);
+    voiceKeyRef.current = next;
+    setVoiceKey(next);
+    setChosenLane(lane);
+  }, []);
+  /* The line a model asks for: its pin, else what the lane rules say now. */
+  const laneForModel = useCallback((m: KoleexModelId): { lane: "rtc" | "ws"; pinned: boolean } => {
+    const pin = pinnedLaneFor(m, { wsAvailable: wsKnownRef.current !== false, fellBack: laneFellBackRef.current });
+    if (pin) return { lane: pin, pinned: true };
+    const saved = readSavedLane();
+    const now = Date.now();
+    return { lane: serverLaneRef.current ? decideLane(serverLaneRef.current, saved, now).lane : startingLane(saved, now), pinned: false };
+  }, []);
+  /* AT EACH NEW CALL (not a resume — a call coming back keeps its line):
+     a pinned model puts the call on its line; Auto after a pin puts the
+     lane rules' answer back; Auto after Auto touches nothing, so the lane
+     machinery above is exactly what it was. Deep that cannot have its line
+     says so on the screen. */
+  const applyModelLane = useCallback(() => {
+    const m = modelRef.current;
+    const { lane, pinned } = laneForModel(m);
+    if ((pinned || lanePinnedRef.current) && lane !== transportRef.current) {
+      transportRef.current = lane;
+      offerLane(lane);
+    }
+    lanePinnedRef.current = pinned;
+    if (m === "deep" && lane === "rtc") setLaneNote("international-unreachable");
+  }, [laneForModel, offerLane]);
+
   const startCall = useCallback(async (opts?: { resume?: boolean; mic?: MediaStream | null }) => {
     if (sessionRef.current) return;
+    if (!opts?.resume) applyModelLane();
     setLaneState(transportRef.current);
     /* Beacons a flaky link held back go with the next call's first request. */
     flushVoiceTelemetry();
@@ -1255,7 +1316,7 @@ export default function VoiceCallButton({
     errorBeaconedRef.current = false;
     sessionRef.current = session;
     await session.start();
-  }, [clearSearchTimer, acquireWakeLock, reportFirstError, fallToMainlandVoice, releaseCall, recheckLaneAfterFallback]);
+  }, [clearSearchTimer, acquireWakeLock, reportFirstError, fallToMainlandVoice, releaseCall, recheckLaneAfterFallback, applyModelLane]);
   useEffect(() => { startCallRef.current = startCall; }, [startCall]);
 
   /* ONE METER PER SIDE, AND ONLY THE ACTIVE ONE RUNS. Measuring both at once
@@ -1574,20 +1635,25 @@ export default function VoiceCallButton({
      not answer is tried once more and then said on the screen, and offers
      that line's voices (the same names; the current one is kept when the
      line carries it). Under a call, the call is rebuilt on the new line. */
-  const selectLane = useCallback((lane: "rtc" | "ws") => {
+  /* THE MODEL, CHOSEN ON THE CALL (the Line control's successor, 2026-09-23).
+     The same choice as the picker beside the message box — saved on the
+     account through the parent. When the model's line differs from the
+     running call's, the call is rebuilt there with the words kept; a model
+     on the same line (Auto ↔ Mind, or Auto already on it) changes nothing
+     under the caller. */
+  const selectModel = useCallback((m: KoleexModelId) => {
+    if (m === modelRef.current) return;
+    modelRef.current = m;
+    if (onChooseModelRef.current) onChooseModelRef.current(m);
+    else setModelChoice(m);
+    const { lane, pinned } = laneForModel(m);
+    lanePinnedRef.current = pinned;
+    setLaneNote(m === "deep" && lane === "rtc" ? "international-unreachable" : null);
     if (lane === transportRef.current) return;
     transportRef.current = lane;
-    saveLane(lane, Date.now(), "user");
-    laneFellBackRef.current = false;
-    setLaneNote(null);
-    const list = byLaneRef.current[lane].length > 0 ? byLaneRef.current[lane] : byLaneRef.current.rtc;
-    setVoices(list);
-    const next = pickVoiceKey(voiceKeyRef.current ?? readSavedVoiceKey(), list);
-    voiceKeyRef.current = next;
-    setVoiceKey(next);
-    setChosenLane(lane);
+    offerLane(lane);
     rebuildCall();
-  }, [rebuildCall]);
+  }, [laneForModel, offerLane, rebuildCall]);
 
   const busy = state === "requesting-mic" || state === "connecting";
   const labels = LABEL_COPY[lang];
@@ -1687,7 +1753,8 @@ export default function VoiceCallButton({
           selectedVoice={voiceKey}
           onSelectVoice={selectVoice}
           lane={chosenLane}
-          onSelectLane={lanesAvailable ? selectLane : undefined}
+          model={model}
+          onSelectModel={lanesAvailable ? selectModel : undefined}
           onPreviewVoice={previewVoice}
           onStopPreview={stopPreview}
           onSendText={sendTyped}

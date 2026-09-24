@@ -29,6 +29,7 @@ import VoiceTranscript, { PhotoTile } from "@/components/ai/VoiceTranscript";
 import { type TranscriptLine, type TranscriptPhoto, type VoicePhase } from "@/lib/voice/events";
 import { type Lang } from "@/lib/i18n";
 import { type TalkMode } from "@/lib/voice/voice-pref";
+import { KOLEEX_MODELS, KOLEEX_MODEL_INFO, type KoleexModelId } from "@/lib/ai/koleex-models";
 import PhotoLightbox from "@/components/ai/PhotoLightbox";
 import KoleexLogo from "@/components/layout/KoleexLogo";
 import { textDirection, textLang } from "@/lib/text-direction";
@@ -108,7 +109,14 @@ const COPY: Record<Lang, {
      and the international line, never a vendor's name. And the note when
      the international line could not be reached and the call went on
      without it. */
-  linePick: string;
+  /** The model list in the call's settings (2026-09-23) — the Line
+   *  control's successor: Blink is the mainland line, Deep the
+   *  international one, Auto the line that works here. */
+  modelPick: string;
+  modelLineAuto: string;
+  modelTextOnly: string;
+  /** Under the status when the chosen model is Mind (text only). */
+  mindCallNote: string;
   lineHint: string;
   /** The sheet holds voice, line and talk mode — it is the call's settings. */
   callSettings: string;
@@ -152,9 +160,12 @@ const COPY: Record<Lang, {
     voiceUse: "Use this voice",
     voiceUseNamed: "Use {name}",
     voiceCurrent: "Current",
-    linePick: "Line",
+    modelPick: "Model",
+    modelLineAuto: "The line that works on your network",
+    modelTextOnly: "Text only — a call uses Auto",
+    mindCallNote: "Koleex Mind is text only — this call is on Auto.",
     callSettings: "Call settings",
-    lineHint: "The international line needs a network that reaches it. If it can't be reached, the call continues on the China (Mainland) line.",
+    lineHint: "Koleex Deep uses the international line, which needs a network that reaches it. If it can't be reached, the call continues on the China (Mainland) line.",
     laneMainland: "China (Mainland) line",
     laneInternational: "International line",
     laneUnreachable: "The international line can't be reached from your network right now — continuing on the China (Mainland) line.",
@@ -212,9 +223,12 @@ const COPY: Record<Lang, {
     voiceUse: "使用这个音色",
     voiceUseNamed: "使用 {name}",
     voiceCurrent: "当前",
-    linePick: "线路",
+    modelPick: "模型",
+    modelLineAuto: "自动使用你的网络能连通的线路",
+    modelTextOnly: "仅文字——通话使用自动",
+    mindCallNote: "Koleex Mind 仅支持文字——本次通话使用自动。",
     callSettings: "通话设置",
-    lineHint: "国际线路需要能连通它的网络；连不上时，通话会继续走中国（内地）线路。",
+    lineHint: "Koleex Deep 使用国际线路，需要能连通它的网络；连不上时，通话会继续走中国（内地）线路。",
     laneMainland: "中国（内地）线路",
     laneInternational: "国际线路",
     laneUnreachable: "当前网络无法连接国际线路，已改用中国（内地）线路继续。",
@@ -272,9 +286,12 @@ const COPY: Record<Lang, {
     voiceUse: "استخدم الصوت ده",
     voiceUseNamed: "استخدم {name}",
     voiceCurrent: "الحالي",
-    linePick: "الخط",
+    modelPick: "الموديل",
+    modelLineAuto: "الخط اللي شغّال على شبكتك",
+    modelTextOnly: "كتابة بس — المكالمة بتبقى على تلقائي",
+    mindCallNote: "Koleex Mind كتابة بس — المكالمة دي على تلقائي.",
     callSettings: "إعدادات المكالمة",
-    lineHint: "الخط الدولي محتاج شبكة توصل له. لو ما وصلش، المكالمة بتكمل على خط الصين (البر الرئيسي).",
+    lineHint: "Koleex Deep بيستخدم الخط الدولي، ومحتاج شبكة توصل له. لو ما وصلش، المكالمة بتكمل على خط الصين (البر الرئيسي).",
     laneMainland: "خط الصين (البر الرئيسي)",
     laneInternational: "الخط الدولي",
     laneUnreachable: "الخط الدولي مش متاح من شبكتك دلوقتي، كمّلنا على خط الصين (البر الرئيسي).",
@@ -337,12 +354,15 @@ export type VoiceCallScreenProps = {
    *  Empty means no picker is drawn: a control that cannot be used is noise. */
   voices?: readonly { key: string; label: string }[];
   selectedVoice?: string | null;
-  /** THE LINE (2026-09-11). The voice names are the product's on both
-   *  lines; the line is its own choice. Present, the sheet draws two
-   *  pills — the mainland line and the international line, never a vendor
-   *  — with the current one pressed. Absent, no control: one line. */
+  /** The line the next call (or this one) is on — shown beside Auto, so
+   *  the caller can see which line Auto found. */
   lane?: "rtc" | "ws";
-  onSelectLane?: (lane: "rtc" | "ws") => void;
+  /** THE MODEL (2026-09-23), which on a call IS the line: Blink the
+   *  mainland line, Deep the international one, Auto the lane rules'
+   *  answer, Mind text only. Present, the sheet lists the models with the
+   *  current one pressed; absent, no control (one line). */
+  model?: KoleexModelId;
+  onSelectModel?: (model: KoleexModelId) => void;
   /** The international line was asked for and did not answer; the call
    *  went on over the mainland line. Said under the status, once. */
   laneNote?: "international-unreachable" | null;
@@ -413,7 +433,8 @@ export default function VoiceCallScreen({
   connectingSlow = false,
   laneNote = null,
   lane = "rtc",
-  onSelectLane,
+  model = "auto",
+  onSelectModel,
   onRetry,
   soundBlocked = false,
   onEnableSound,
@@ -831,6 +852,9 @@ export default function VoiceCallScreen({
         </p>
         {laneNote === "international-unreachable" && (
           <p className="mt-2 max-w-[28rem] text-[12px] text-[#AAAAAA]" role="status">{copy.laneUnreachable}</p>
+        )}
+        {model === "mind" && (
+          <p className="mt-2 max-w-[28rem] text-[12px] text-[#AAAAAA]" role="status">{copy.mindCallNote}</p>
         )}
         {/* A SLOW HANDSHAKE OFFERS A WAY OUT THAT IS NOT "END": one tap
             rebuilds the call — on the other lane when this one never came
@@ -1384,28 +1408,41 @@ export default function VoiceCallScreen({
                 does not close the sheet or rebuild the call — the parent
                 gates the microphone at once — so the hint under it can be
                 read after choosing. */}
-            {/* THE LINE (2026-09-11). Two pills, one pressed, like the talk
-                mode below. Choosing rebuilds the call on the other line with
-                the words kept (VoiceCallButton.selectLane); the hint says
-                what happens when the international line does not answer. */}
-            {onSelectLane && (
+            {/* THE MODEL (2026-09-23; the Line control's successor). The
+                same list as the picker beside the message box, and on a
+                call each model says which line it is: Auto the one that
+                works here, Blink the mainland line, Deep the international
+                one. Mind is text only — shown, not choosable, so the caller
+                learns why it is not a voice. Choosing rebuilds the call on
+                the model's line with the words kept
+                (VoiceCallButton.selectModel). */}
+            {onSelectModel && (
               <div className={voices.length > 0 ? "mt-6 pt-5 border-t border-white/10" : ""}>
-                <h3 className="text-[13px] font-semibold text-[#AAAAAA] mb-3">{copy.linePick}</h3>
-                <div role="group" aria-label={copy.linePick} className="grid grid-cols-2 gap-2 rounded-2xl bg-white/[0.04] p-1">
-                  {(["rtc", "ws"] as const).map((l) => {
-                    const on = lane === l;
+                <h3 className="text-[13px] font-semibold text-[#AAAAAA] mb-3">{copy.modelPick}</h3>
+                <div role="radiogroup" aria-label={copy.modelPick} className="flex flex-col gap-1 rounded-2xl bg-white/[0.04] p-1">
+                  {KOLEEX_MODELS.map((m) => {
+                    const on = model === m;
+                    const off = !KOLEEX_MODEL_INFO[m].voice;
+                    const line = m === "blink" ? copy.laneMainland
+                      : m === "deep" ? copy.laneInternational
+                      : m === "mind" ? copy.modelTextOnly
+                      : on ? `${copy.modelLineAuto} · ${lane === "ws" ? copy.laneInternational : copy.laneMainland}`
+                      : copy.modelLineAuto;
                     return (
                       <button
-                        key={l}
+                        key={m}
                         type="button"
-                        aria-pressed={on}
-                        data-lane={l}
-                        onClick={() => onSelectLane(l)}
-                        className={`h-11 rounded-xl text-[13px] font-semibold transition-[background-color,color] duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0066FF] ${
-                          on ? "bg-white text-[#0D0D0D]" : "text-[#AAAAAA] hover:text-white"
+                        role="radio"
+                        aria-checked={on}
+                        aria-disabled={off || undefined}
+                        data-model={m}
+                        onClick={() => { if (!off) onSelectModel(m); }}
+                        className={`min-h-[52px] rounded-xl px-4 py-2 text-start transition-[background-color,color] duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0066FF] ${
+                          on ? "bg-white text-[#0D0D0D]" : off ? "text-[#AAAAAA]/60 cursor-not-allowed" : "text-white hover:bg-white/[0.06]"
                         }`}
                       >
-                        {l === "ws" ? copy.laneInternational : copy.laneMainland}
+                        <span className="block text-[14px] font-semibold">{KOLEEX_MODEL_INFO[m].name[lang]}</span>
+                        <span className={`block text-[12px] ${on ? "text-[#0D0D0D]/70" : "text-[#AAAAAA]"}`}>{line}</span>
                       </button>
                     );
                   })}
@@ -1414,7 +1451,7 @@ export default function VoiceCallScreen({
               </div>
             )}
             {onSelectTalkMode && (
-              <div className={voices.length > 0 || onSelectLane ? "mt-6 pt-5 border-t border-white/10" : ""}>
+              <div className={voices.length > 0 || onSelectModel ? "mt-6 pt-5 border-t border-white/10" : ""}>
                 <h3 className="text-[13px] font-semibold text-[#AAAAAA] mb-3">{copy.modePick}</h3>
                 <div role="group" aria-label={copy.modePick} className="grid grid-cols-2 gap-2 rounded-2xl bg-white/[0.04] p-1">
                   {(["hands-free", "hold"] as const).map((mode) => {

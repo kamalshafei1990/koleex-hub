@@ -3216,6 +3216,10 @@ export default function KoleexAiApp() {
                       onTurnUpdated={onVoiceTurnUpdated}
                       onInterrupted={onVoiceInterrupted}
                       onSummaryPending={setSummaryPending}
+                      /* The model chosen in the call's settings is the same
+                         choice as the picker beside this box — saved on the
+                         account the same way. */
+                      onChooseModel={chooseModel}
                     />
 
                     {/* Send / Stop — inverted bg circle, anchors the row. */}

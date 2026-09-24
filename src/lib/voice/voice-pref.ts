@@ -13,6 +13,8 @@
    voice the vendor uses when none is asked for.
    --------------------------------------------------------------------------- */
 
+import type { KoleexModelId } from "@/lib/ai/koleex-model-ids";
+
 export const VOICE_STORAGE_KEY = "koleex-voice-voice";
 
 /**
@@ -361,4 +363,27 @@ export function saveLane(lane: VoiceLane, now: number = Date.now(), source: Lane
   } catch {
     /* storage refused — the next call probes again */
   }
+}
+
+/* ── THE KOLEEX MODEL DECIDES THE LINE (owner, 2026-09-23) ─────────────────
+   The call follows the model chosen beside the message box. Two of the
+   models ARE a line — that is what they are made of on a call:
+
+     blink  → the China (Mainland) line  ("rtc")
+     deep   → the international line     ("ws")
+     auto   → no pin: the lane rules above decide, as they always have
+     mind   → text only; a call on Mind is a call on Auto, and says so
+
+   A PIN IS A PREFERENCE, NOT A CAGE, the same rule as the chat. Deep on a
+   device whose international line has already failed this screen (the one
+   fall-back, VoiceCallButton.laneFellBackRef), or on a deployment that has
+   no international line at all, is placed on the mainland line — the call
+   is answered, and the screen says why. Pure. */
+export function pinnedLaneFor(
+  model: KoleexModelId,
+  opts: { wsAvailable: boolean; fellBack: boolean },
+): VoiceLane | null {
+  if (model === "blink") return "rtc";
+  if (model === "deep") return opts.wsAvailable && !opts.fellBack ? "ws" : "rtc";
+  return null;
 }
