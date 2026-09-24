@@ -305,6 +305,10 @@ export type TranscriptLine = {
   photos?: readonly TranscriptPhoto[];
   /** The far side's item id for a spoken caller turn, when it sent one. */
   itemId?: string;
+  /** An assistant line closed EARLY by a dropped connection, not by its own
+   *  `done`. A continuation of the same answer may still arrive (a relay
+   *  resume carries on the same response) and is folded back into it. */
+  cut?: boolean;
 };
 
 /** How far back a caller's item is looked for. Two lines is the ordinary
@@ -484,6 +488,29 @@ export function appendTranscript(
       : {}),
     ...(open.itemId ?? update.itemId ? { itemId: open.itemId ?? update.itemId } : {}),
   };
+  /* THE REST OF AN ANSWER THE DROP CUT, ARRIVING ON THE RESUMED LINE (deep
+     check, 2026-09-24: "repeated sentences"). A relay resume continues the
+     SAME response: its remaining deltas open a new line, and its `done`
+     carries the whole answer — which begins with the words the cut line
+     already holds. Kept as two lines, the thread showed the start of the
+     answer twice. When the answer's final text extends the cut line just
+     before it, the two are one: the cut line takes the whole text, in its
+     place (the persister corrects the row it wrote), and the continuation
+     line goes. Only a line marked `cut` — never an answer that ended on
+     its own. */
+  if (update.final && update.role === "assistant" && !update.incremental) {
+    const prev = openIdx > 0 ? lines[openIdx - 1] : undefined;
+    if (prev && prev.cut && prev.role === "assistant" && prev.final && merged.text && extendsUtterance(prev.text, merged.text)) {
+      const { cut: _wasCut, ...kept } = prev;
+      void _wasCut;
+      const joined: TranscriptLine = {
+        ...kept,
+        text: merged.text,
+        ...(!(prev.photos && prev.photos.length > 0) && merged.photos && merged.photos.length > 0 ? { photos: merged.photos } : {}),
+      };
+      return [...lines.slice(0, openIdx - 1), joined, ...lines.slice(openIdx + 1)];
+    }
+  }
   const out = [...lines];
   out[openIdx] = merged;
   return out;
@@ -518,7 +545,11 @@ export function settleStaleLines(lines: readonly TranscriptLine[]): TranscriptLi
  * left as it is — an empty open line is dropped, not settled into a blank
  * row. Same two-line look-back as appendTranscript. Pure.
  */
-export function settleOpenLine(lines: readonly TranscriptLine[], role: TranscriptRole): TranscriptLine[] {
+export function settleOpenLine(
+  lines: readonly TranscriptLine[],
+  role: TranscriptRole,
+  opts: { cut?: boolean } = {},
+): TranscriptLine[] {
   for (let i = lines.length - 1; i >= 0 && i >= lines.length - 2; i--) {
     const line = lines[i];
     if (line.final) continue;
@@ -528,7 +559,9 @@ export function settleOpenLine(lines: readonly TranscriptLine[], role: Transcrip
       out.splice(i, 1);
       return out;
     }
-    out[i] = { ...line, final: true };
+    /* Closed by a drop (opts.cut): marked, so the resumed rest of the same
+       answer can fold back into it (appendTranscript). */
+    out[i] = { ...line, final: true, ...(opts.cut ? { cut: true } : {}) };
     return out;
   }
   return [...lines];

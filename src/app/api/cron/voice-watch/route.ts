@@ -108,6 +108,14 @@ export async function GET(req: Request) {
      thing that has been failing; whether the status was the expected 400 is
      the second, separate question probe.verdict already answers. Never the
      URL, never the key, never the vendor's own words. */
+  /* AN ERROR IS AN OUTAGE A CALLER WOULD HIT (deep check, 2026-09-24). The
+     primary region has refused this function's connection on almost every
+     run for weeks — 365 error lines in 17 days — while every real call went
+     straight to the alternate and connected in ~60 ms ("first=alt"). The
+     error level cried wolf. A slot that fails while ANOTHER slot is healthy
+     is logged at warn (still visible, still `fail`); an error means no slot
+     can serve a call. */
+  const servable = configured.some((r) => r.probe!.reachable && r.probe!.credential_ok);
   const rows = configured.map((r) => {
     const probe = r.probe!;
     const region = r.env.AI_VOICE_REGION_LABEL?.trim() || "default";
@@ -121,7 +129,7 @@ export async function GET(req: Request) {
     /* Both at a level the log tool shows (2026-09-11: the first "ok" from
        Beijing after the key change was invisible — "no fail line" was the
        only evidence, and absence is a poor witness). */
-    if (healthy) console.warn(line);
+    if (healthy || servable) console.warn(line);
     else console.error(line);
     return {
       slot: r.slot,

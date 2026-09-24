@@ -2441,3 +2441,19 @@ Owner: "make a deep check for this app and fix any issue or bug". Five read-only
 - **Knowledge-base text is fenced** as untrusted document content, like attachments and web results.
 
 **Tests.** `validate:ai-deepcheck` is a new suite (18 checks), and `validate:ai-confirm-ledger` has 35 (+9). Each was confirmed by breaking the code on purpose, and all 7 breaks were caught.
+
+## Deep check 2026-09-24, phase 2: voice
+
+- **Pulses and cut sentences on the international line.** The worklet sink *transfers* each audio buffer, and `gate.push(samples.length)` ran after the transfer, so it read 0 every time. The playout gate believed the buffer was always empty: it opened each answer on its timer and closed on every small gap, leaving 0.85–1.45 s of silence inside sentences whose next frames were milliseconds away. The length is now read before the push. The old test pinned the bug; it now pins the fix.
+- **"Let me check…" and then silence.** A lookup's answer was sent on the socket its question arrived on. On the socket lane that socket is replaced every ~24 s (handover) and after a cut (resume), and the relay drops frames from a socket it no longer holds. A handover, or a redial the relay reports as `resumed`, now links the old channel to the new one, and answers follow that link. A fresh session gets no link, because its far side never asked the question.
+- **Confirm on a call never saved.** The tap sent no `conversation_id`, so the ledger looked for a preview recorded under no conversation and refused. The pending write now carries the conversation id the session used, and the tap sends it.
+- **Repeated sentences after a drop.** A drop now marks the open answer as `cut`. When a resumed relay continues the same answer, its final text (which starts with the cut words) folds back into that line, and the persister corrects the saved row. An answer that ended on its own, or a fresh answer that doesn't continue the cut one, stays a separate line.
+- **Socket lifetime.** A redial's socket age starts at its own `onopen`, so a refused resume can no longer teach a wrong lifetime.
+- **Voice watchdog.** The primary region has refused the watchdog on almost every run for weeks (365 errors in 17 days), while real calls connect on the alternate in ~60 ms. A slot failing while another is healthy is now logged at warn; error means no slot can serve a call.
+- **Call settings sheet.** It is capped at 85 dvh and scrolls; on desktop it is at most 480 px wide. The model rows use plain words: Blink "Fastest in China", Deep "The strongest", Auto "Picks what works best on your network", plus the model it is using.
+- **Not changed here, and why:**
+  - *Relay ticket expiry on long calls (~10 min).* The fix is in `services/voice-relay`, which needs a Railway redeploy.
+  - *Handover frame ordering.* Also a relay change.
+  - *`CRON_SECRET`.* Kept identical to the other crons, because I can't confirm the variable is set in production.
+
+**Tests.** `validate:ai-deepcheck` has 29 checks (+11: behaviour tests on the transcript fold plus source pins). The `validate:voice-client` and `validate:ai-voice` pins were updated to the new code. Each fix was confirmed by breaking the code on purpose, and all 7 breaks were caught.

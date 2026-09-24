@@ -161,14 +161,14 @@ const COPY: Record<Lang, {
     voiceUseNamed: "Use {name}",
     voiceCurrent: "Current",
     modelPick: "Model",
-    modelLineAuto: "The line that works on your network",
+    modelLineAuto: "Picks what works best on your network",
     modelTextOnly: "Text only — a call uses Auto",
     mindCallNote: "Koleex Mind is text only — this call is on Auto.",
     callSettings: "Call settings",
-    lineHint: "Koleex Deep uses the international line, which needs a network that reaches it. If it can't be reached, the call continues on the China (Mainland) line.",
-    laneMainland: "China (Mainland) line",
-    laneInternational: "International line",
-    laneUnreachable: "The international line can't be reached from your network right now — continuing on the China (Mainland) line.",
+    lineHint: "Koleex Deep needs a network that reaches it. If it can't be reached, the call continues on Koleex Blink.",
+    laneMainland: "Fastest in China",
+    laneInternational: "The strongest",
+    laneUnreachable: "Koleex Deep can't be reached from your network right now — continuing on Koleex Blink.",
     close: "Close",
     holdToTalk: "Hold to talk",
     holdRelease: "Let go when done",
@@ -224,14 +224,14 @@ const COPY: Record<Lang, {
     voiceUseNamed: "使用 {name}",
     voiceCurrent: "当前",
     modelPick: "模型",
-    modelLineAuto: "自动使用你的网络能连通的线路",
+    modelLineAuto: "自动选择最适合你网络的",
     modelTextOnly: "仅文字——通话使用自动",
     mindCallNote: "Koleex Mind 仅支持文字——本次通话使用自动。",
     callSettings: "通话设置",
-    lineHint: "Koleex Deep 使用国际线路，需要能连通它的网络；连不上时，通话会继续走中国（内地）线路。",
-    laneMainland: "中国（内地）线路",
-    laneInternational: "国际线路",
-    laneUnreachable: "当前网络无法连接国际线路，已改用中国（内地）线路继续。",
+    lineHint: "Koleex Deep 需要能连通它的网络；连不上时，通话会改用 Koleex Blink 继续。",
+    laneMainland: "在中国最快",
+    laneInternational: "最强",
+    laneUnreachable: "当前网络无法连接 Koleex Deep，已改用 Koleex Blink 继续。",
     close: "关闭",
     holdToTalk: "按住说话",
     holdRelease: "说完松开",
@@ -287,14 +287,14 @@ const COPY: Record<Lang, {
     voiceUseNamed: "استخدم {name}",
     voiceCurrent: "الحالي",
     modelPick: "الموديل",
-    modelLineAuto: "الخط اللي شغّال على شبكتك",
+    modelLineAuto: "بيختار الأنسب لشبكتك",
     modelTextOnly: "كتابة بس — المكالمة بتبقى على تلقائي",
     mindCallNote: "Koleex Mind كتابة بس — المكالمة دي على تلقائي.",
     callSettings: "إعدادات المكالمة",
-    lineHint: "Koleex Deep بيستخدم الخط الدولي، ومحتاج شبكة توصل له. لو ما وصلش، المكالمة بتكمل على خط الصين (البر الرئيسي).",
-    laneMainland: "خط الصين (البر الرئيسي)",
-    laneInternational: "الخط الدولي",
-    laneUnreachable: "الخط الدولي مش متاح من شبكتك دلوقتي، كمّلنا على خط الصين (البر الرئيسي).",
+    lineHint: "Koleex Deep محتاج شبكة توصل له. لو ما وصلش، المكالمة بتكمل على Koleex Blink.",
+    laneMainland: "الأسرع في الصين",
+    laneInternational: "الأقوى",
+    laneUnreachable: "Koleex Deep مش واصل من شبكتك دلوقتي، كمّلنا على Koleex Blink.",
     close: "اقفل",
     holdToTalk: "اضغط واتكلم",
     holdRelease: "سيب لما تخلص",
@@ -1272,7 +1272,10 @@ export default function VoiceCallScreen({
               simply reaches the edge now. */}
           <div
             ref={sheetRef}
-            className="kx-sheet-in relative rounded-t-3xl border-t border-white/10 bg-[#111111] px-6 pt-3 text-white"
+            /* NEVER TALLER THAN THE SCREEN, AND NEVER EDGE TO EDGE ON A DESK
+               (deep check, 2026-09-24: 961 px on an 844 px phone, title and
+               close button above the top edge, no way to scroll to them). */
+            className="kx-sheet-in relative w-full max-h-[85dvh] overflow-y-auto overscroll-contain md:mx-auto md:max-w-[480px] rounded-t-3xl border-t border-white/10 bg-[#111111] px-6 pt-3 text-white"
             style={{
               paddingBottom: "calc(2rem + env(safe-area-inset-bottom, 0px))",
               /* `translate`, not `transform`: the entrance animation owns transform. */
@@ -1426,7 +1429,8 @@ export default function VoiceCallScreen({
                     const line = m === "blink" ? copy.laneMainland
                       : m === "deep" ? copy.laneInternational
                       : m === "mind" ? copy.modelTextOnly
-                      : on ? `${copy.modelLineAuto} · ${lane === "ws" ? copy.laneInternational : copy.laneMainland}`
+                      /* Auto, in use: which model it is answering with. */
+                      : on ? `${copy.modelLineAuto} · ${KOLEEX_MODEL_INFO[lane === "ws" ? "deep" : "blink"].name[lang]}`
                       : copy.modelLineAuto;
                     return (
                       <button

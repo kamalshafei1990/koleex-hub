@@ -11,6 +11,8 @@
    --------------------------------------------------------------------------- */
 
 import { readFileSync } from "node:fs";
+import * as ev from "../src/lib/voice/events";
+import type { TranscriptLine as L } from "../src/lib/voice/events";
 
 let pass = 0;
 let fail = 0;
@@ -76,6 +78,47 @@ console.log("\n── 4. Knowledge-base text is data, not instructions ──");
   check("the nudge's document lines go into the prompt inside the per-turn untrusted fence",
     /fenceUntrusted\(lines\.join\("\\n"\), "document", "Koleex knowledge base", newFenceId\(\)\)/.test(nudge) &&
       !/\+\s*lines\.join\("\\n"\)\s*\)/.test(nudge));
+}
+
+console.log("\n── 5. Voice: the call keeps its words, its answers and its sound ──");
+{
+  const q: L = { role: "user", text: "How much is the machine?", final: true };
+  const opened = ev.appendTranscript([q], { role: "assistant", text: "The machine costs", incremental: true, final: false });
+  const cut = ev.settleOpenLine(opened, "assistant", { cut: true });
+  check("a drop closes the open answer with its words, marked as cut", cut.length === 2 && cut[1].final && cut[1].cut === true && cut[1].text === "The machine costs");
+  check("…an answer that ends on its own is never marked", ev.settleOpenLine(opened, "assistant")[1].cut === undefined);
+  const rest = ev.appendTranscript(cut, { role: "assistant", text: " five hundred dollars.", incremental: true, final: false });
+  const done = ev.appendTranscript(rest, { role: "assistant", text: "The machine costs five hundred dollars.", final: true });
+  check("the resumed rest of the SAME answer folds back into the cut line — one answer in the thread, not its start twice",
+    done.length === 2 && done[1].text === "The machine costs five hundred dollars." && done[1].final && done[1].cut === undefined);
+  const settledOnItsOwn = ev.settleOpenLine(opened, "assistant");
+  const next = ev.appendTranscript(ev.appendTranscript(settledOnItsOwn, { role: "assistant", text: " more", incremental: true, final: false }),
+    { role: "assistant", text: "The machine costs more than that.", final: true });
+  check("…a new answer after one that ended on its own stays its own line, even when it starts the same way", next.length === 3);
+  const other = ev.appendTranscript(ev.appendTranscript(cut, { role: "assistant", text: "Sorry", incremental: true, final: false }),
+    { role: "assistant", text: "Sorry, the line dropped. What was the question?", final: true });
+  check("…and a fresh answer after a cut (a new far side) that does not continue it is kept apart", other.length === 3 && other[1].text === "The machine costs");
+
+  const session = read("src/lib/voice/session.ts");
+  check("a lookup's answer and the request to carry on go to the socket that continues the session, not the one the question came on",
+    /private sendToolResult\(origin: VoiceChannel, callId: string, output: unknown\): void \{\s*const channel = this\.liveChannelFor\(origin\);/.test(session) &&
+      /private sendResponseCreate\(origin: VoiceChannel\): void \{\s*const channel = this\.liveChannelFor\(origin\);/.test(session));
+  check("…the link is made by a handover and by a redial the relay RESUMED — never by a fresh session",
+    /if \(this\.channel && this\.channel !== channel\) this\.channelSuccessor\.set\(this\.channel, channel\);\s*this\.channel = channel;\s*this\.wsOpenedAt = this\.clock\(\);/.test(session) &&
+      /if \(hello\.resumed\) \{[\s\S]{0,160}if \(previousChannel && previousChannel !== channel\) this\.channelSuccessor\.set\(previousChannel, channel\);/.test(session) &&
+      (session.match(/channelSuccessor\.set\(/g) ?? []).length === 2);
+  check("a redial's socket age starts at its own open, so a refused resume cannot teach a wrong lifetime",
+    /this\.ws = ws;\s*\/\*[\s\S]*?\*\/\s*this\.wsOpenedAt = 0;/.test(session));
+  const wa = read("src/lib/voice/ws-audio.ts");
+  check("the far side's audio is counted BEFORE the worklet takes the buffer (a transferred buffer reads empty)",
+    /const n = samples\.length;\s*if \(sink\) sink\.push\(samples\);[\s\S]{0,140}gate\.push\(n\);/.test(wa));
+  const btn = read("src/components/ai/VoiceCallButton.tsx");
+  check("Confirm on a call names the conversation its preview was recorded under",
+    /conversationId: sessionRef\.current\?\.callConversationId \?\? null/.test(btn) &&
+      /via: "tap",[\s\S]{0,400}\.\.\.\(pending\.conversationId \? \{ conversation_id: pending\.conversationId \} : \{\}\),/.test(btn));
+  const watch = read("src/app/api/cron/voice-watch/route.ts");
+  check("the voice watchdog calls it an error only when no region can serve a call",
+    /if \(healthy \|\| servable\) console\.warn\(line\);\s*else console\.error\(line\);/.test(watch));
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

@@ -447,7 +447,7 @@ export default function VoiceCallButton({
      exact arguments its confirming phase needs arrived beside the model's
      envelope and sit here until the caller taps Confirm or Cancel on the
      card. `saved` flashes the outcome for a moment. */
-  const [pendingWrite, setPendingWrite] = useState<{ tool: string; args: Record<string, unknown>; message: string; preview?: Record<string, unknown> } | null>(null);
+  const [pendingWrite, setPendingWrite] = useState<{ tool: string; args: Record<string, unknown>; message: string; preview?: Record<string, unknown>; conversationId?: string | null } | null>(null);
   const [writeSaved, setWriteSaved] = useState(false);
   const [writeBusy, setWriteBusy] = useState(false);
   const [writeError, setWriteError] = useState(false);
@@ -732,6 +732,11 @@ export default function VoiceCallButton({
           call_id: `tap-${Date.now().toString(36)}`,
           arguments: JSON.stringify({ ...pending.args, confirm: true }),
           via: "tap",
+          /* THE SAME CONVERSATION AS THE PREVIEW (deep check, 2026-09-24).
+             Without it the ledger looked for a preview recorded under no
+             conversation, found none, and every Confirm on a call started
+             from a thread was refused — the task never saved. */
+          ...(pending.conversationId ? { conversation_id: pending.conversationId } : {}),
         }),
       });
       const body = res.ok ? ((await res.json()) as { output?: { ok?: boolean; status?: string } }) : null;
@@ -1041,7 +1046,9 @@ export default function VoiceCallButton({
            instead of being glued onto the cut one. */
         if (next === "reconnecting") {
           playSound("call-reconnecting");
-          const cut = settleOpenLine(linesRef.current, "assistant");
+          /* Marked as cut by the drop: a resumed relay continues the same
+             answer, and its rest folds back into this line (events.ts). */
+          const cut = settleOpenLine(linesRef.current, "assistant", { cut: true });
           if (cut.length !== linesRef.current.length || cut.some((l, i) => l !== linesRef.current[i])) {
             linesRef.current = cut;
             setLines(cut);
@@ -1202,7 +1209,9 @@ export default function VoiceCallButton({
       onPendingWrite: (_name, pending, message, preview) => {
         setWriteError(false);
         setWriteSaved(false);
-        setPendingWrite({ tool: pending.tool, args: pending.args, message, preview });
+        /* The conversation the preview was recorded under travels with it:
+           the tap must name the same one (see confirmWrite). */
+        setPendingWrite({ tool: pending.tool, args: pending.args, message, preview, conversationId: sessionRef.current?.callConversationId ?? null });
         playSound("approval-needed");
       },
       onToolResult: (_name, output) => {
