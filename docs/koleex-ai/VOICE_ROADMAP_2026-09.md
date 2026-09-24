@@ -2575,3 +2575,16 @@ Owner: "make a deep check for this app and fix any issue or bug". Five read-only
   - Deep off also removes the socket call lane (voice session route and ws-session route).
   - Blink's mainland voice lane is never switched off from here.
 - **Tests:** `validate:ai-models` has 79 checks (+14). Each rule was confirmed by breaking the code on purpose, and all 6 breaks were caught.
+
+## Koleex models 4/4, step 2: Auto that learns (2026-09-24)
+
+- **`router/auto-rank.ts`, in memory per instance** (like the breaker): no storage, no network.
+- **A recent failure** (a provider fault in the last 2 minutes) moves a model behind the healthy ones. It stays in the list for failover, and returns to its place after 2 minutes or on its next answer.
+- **Chronic slowness** moves a model behind the faster one. It applies when the model's time to the first word (to the answer, when not streaming) is more than 2× another healthy model's, with at least 5 answers each.
+- **Otherwise the registry order stands.** It is a decision (see `provider/registry.ts`), not a race. The user's own choice still goes first. Nothing is removed.
+- **Wiring:**
+  - `chatWithToolsVia({ auto })` ranks before `preferFirst` and records each attempt: first-delta time on success, and a failure on a provider fault.
+  - `chatWithTools` hands in the instance's stats.
+  - One `[ai.auto] order=` log line when the order changes, names only.
+- **Tests:** `validate:ai-models` has 91 checks (+12). Each rule was confirmed by breaking the code on purpose, and all 5 breaks were caught.
+- **Deferred by the owner (2026-09-24):** the cost-and-speed view. The owner approved four nullable columns on `ai_messages` (tokens in/out, cost, time) for when it is built.

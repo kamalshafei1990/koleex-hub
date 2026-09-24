@@ -33,6 +33,7 @@ import {
   modelAvailable,
 } from "../src/lib/server/ai/provider/koleex-model-slots";
 import { preferFirst, chatWithToolsVia, withoutSwitchedOff } from "../src/lib/server/ai/provider/registry";
+import { createAutoStats, rankForAuto, RECENT_FAIL_MS, MIN_SAMPLES, SLOW_FACTOR } from "../src/lib/server/ai/router/auto-rank";
 import { MODEL_SWITCH_KEYS, isModelSwitchKey, parseSwitchRows, SWITCH_TTL_MS } from "../src/lib/server/ai/provider/model-switches";
 import { deepseekAdapter } from "../src/lib/server/ai/provider/adapters/deepseek";
 import { openAiCompatibleAdapter, secondFallbackAdapter } from "../src/lib/server/ai/provider/adapters/openai-compatible";
@@ -175,7 +176,7 @@ async function main() {
       /\}, \{ prefer \}\);/.test(orch) && /liveEmit \? \{ onDelta: liveEmit, prefer \} : \{ prefer \},/.test(orch));
   const reg = readFileSync("src/lib/server/ai/provider/registry.ts", "utf8");
   check("the registry reorders only the CONFIGURED candidates, before the breaker",
-    /const candidates = preferFirst\(withoutSwitchedOff\(configuredAdapters\(adapters\), opts\?\.exclude\), opts\?\.prefer \?\? null\);/.test(reg));
+    /const base = withoutSwitchedOff\(configuredAdapters\(adapters\), opts\?\.exclude\);[\s\S]{0,200}?const candidates = preferFirst\(ranked, opts\?\.prefer \?\? null\);/.test(reg));
   const modelsRoute = readFileSync("src/app/api/ai/models/route.ts", "utf8");
   check("the models endpoint is behind the same door as every Koleex AI endpoint",
     /const auth = await requireAuth\(\);\s*if \(auth instanceof NextResponse\) return auth;\s*const notInternal = requireInternalUser\(auth\);\s*if \(notInternal\) return notInternal;/.test(modelsRoute) &&
@@ -285,8 +286,8 @@ async function main() {
         /\.from\("platform_settings"\)\s*\.select\("key, value"\)\s*\.in\("key", Object\.values\(MODEL_SWITCH_KEYS\)\)/.test(sw));
     const reg = readFileSync("src/lib/server/ai/provider/registry.ts", "utf8");
     check("every turn path goes through the one door that reads the switches",
-      /export async function chatWithTools\([\s\S]{0,300}?const off = await switchedOffModels\(\);[\s\S]{0,300}?return chatWithToolsVia\(REGISTRY, req, \{ \.\.\.opts, exclude \}\);/.test(reg) &&
-        /preferFirst\(withoutSwitchedOff\(configuredAdapters\(adapters\), opts\?\.exclude\), opts\?\.prefer \?\? null\)/.test(reg));
+      /export async function chatWithTools\([\s\S]{0,300}?const off = await switchedOffModels\(\);[\s\S]{0,300}?return chatWithToolsVia\(REGISTRY, req, \{ \.\.\.opts, exclude, auto: autoStats \}\);/.test(reg) &&
+        /const base = withoutSwitchedOff\(configuredAdapters\(adapters\), opts\?\.exclude\);/.test(reg));
     const route = readFileSync("src/app/api/ai/agent/route.ts", "utf8");
     check("the chat route resolves the user's choice against the switches",
       /const chosenModel = resolveRequestedModel\(body\.model, await switchedOffModels\(\)\);/.test(route));
@@ -310,6 +311,61 @@ async function main() {
       /\{account\.is_super_admin && <ModelSwitchesSection t=\{t\} lang=\{lang\} \/>\}/.test(tab) &&
         /label=\{KOLEEX_MODEL_INFO\[r\.id\]\.name\[l\]\}/.test(tab) && /disabled=\{!r\.configured \|\| r\.env_off \|\| saving !== null\}/.test(tab) &&
         /body: JSON\.stringify\(\{ key: `ai_model_off_\$\{id\}`, value: !on \}\)/.test(tab) && !/Qwen|Grok|DeepSeek|xAI|Alibaba/.test(tab));
+  }
+
+  console.log("\n── 9. Auto that learns (models 4/4, step 2) ──");
+  {
+    const A = fake("a", ok("A")), B = fake("b", ok("B")), C = fake("c", ok("C"));
+    const names = (xs: ReadonlyArray<{ name: string }>) => xs.map((x) => x.name).join();
+    const t0 = 1_000_000;
+    {
+      const st = createAutoStats();
+      check("with no evidence Auto keeps the registry order", names(rankForAuto([A, B, C], st, t0)) === "a,b,c");
+      st.recordFailure("a", t0);
+      check("a model that failed in the last two minutes goes behind the healthy ones — still in the list, for failover",
+        names(rankForAuto([A, B, C], st, t0 + 1000)) === "b,c,a");
+      check("…and comes back to its place once the two minutes pass",
+        RECENT_FAIL_MS === 120_000 && names(rankForAuto([A, B, C], st, t0 + RECENT_FAIL_MS + 1)) === "a,b,c");
+      st.recordSuccess("a", 400);
+      check("…or at once when it answers again", names(rankForAuto([A, B, C], st, t0 + 2000)) === "a,b,c");
+      st.recordFailure("b", t0); st.recordFailure("c", t0); st.recordFailure("a", t0);
+      check("every model failing recently changes nothing but order — nobody is removed",
+        rankForAuto([A, B, C], st, t0 + 1000).length === 3 && names(rankForAuto([A, B, C], st, t0 + 1000)) === "a,b,c");
+    }
+    {
+      const st = createAutoStats();
+      for (let i = 0; i < MIN_SAMPLES; i++) { st.recordSuccess("a", 3000); st.recordSuccess("b", 800); }
+      check("a model more than twice as slow to its first word as another healthy one moves behind it",
+        SLOW_FACTOR === 2 && names(rankForAuto([A, B, C], st, t0)) === "b,c,a");
+      const st2 = createAutoStats();
+      for (let i = 0; i < MIN_SAMPLES; i++) { st2.recordSuccess("a", 1500); st2.recordSuccess("b", 800); }
+      check("…but a model of similar speed keeps the registry's place (the order is a decision, not a race)",
+        names(rankForAuto([A, B, C], st2, t0)) === "a,b,c");
+      const st3 = createAutoStats();
+      for (let i = 0; i < MIN_SAMPLES - 1; i++) { st3.recordSuccess("a", 9000); st3.recordSuccess("b", 100); }
+      check("…and only on real evidence: fewer than five answers each moves nothing",
+        MIN_SAMPLES === 5 && names(rankForAuto([A, B, C], st3, t0)) === "a,b,c");
+    }
+    {
+      const st = createAutoStats();
+      const D = fake("d", down), E = fake("e", ok("E"));
+      await chatWithToolsVia([D, E], req, { auto: st, breaker: createBreaker() });
+      const out = await chatWithToolsVia([D, E], req, { auto: st, breaker: createBreaker() });
+      check("in the loop: a provider fault is learnt, and the next Auto turn goes to the healthy model first",
+        out.ok && out.servedBy === "e" && D.calls === 1 && E.calls === 2);
+      const out2 = await chatWithToolsVia([D, E], req, { auto: st, prefer: D, breaker: createBreaker() });
+      check("…but the user's own choice still goes first", D.calls === 2 && out2.servedBy === "e");
+      const F = fake("f", ok("F")), G = fake("g", ok("G"));
+      const st2 = createAutoStats();
+      await chatWithToolsVia([F, G], req, { auto: st2, breaker: createBreaker() });
+      check("…and a success is recorded as the model's time", (st2.get("f")?.samples ?? 0) === 1 && G.calls === 0);
+    }
+    const reg = readFileSync("src/lib/server/ai/provider/registry.ts", "utf8");
+    check("the live door learns: chatWithTools hands the instance's stats in; the speed is taken to the first word when streaming",
+      /return chatWithToolsVia\(REGISTRY, req, \{ \.\.\.opts, exclude, auto: autoStats \}\);/.test(reg) &&
+        /const ranked = auto \? rankForAuto\(base, auto\) : base;[\s\S]{0,120}?const candidates = preferFirst\(ranked, opts\?\.prefer \?\? null\);/.test(reg) &&
+        /auto\?\.recordSuccess\(adapter\.name, \(firstDeltaAt \|\| Date\.now\(\)\) - attemptAt\);/.test(reg) &&
+        /if \(providerFault\) \{\s*breaker\.recordFailure\(adapter\.name\);\s*auto\?\.recordFailure\(adapter\.name\);/.test(reg));
   }
 
   console.log(`\n${pass} passed, ${fail} failed`);
