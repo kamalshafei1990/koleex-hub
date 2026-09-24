@@ -156,6 +156,9 @@ export async function orchestrate(input: TurnInput): Promise<AgentResponse> {
   /* The user's chosen Koleex model: its provider goes first, the rest stay
      behind it as failover (provider/registry preferFirst). */
   const prefer = adapterForModel(model);
+  /* The previews this turn made. A confirm of one of them in the same turn is
+     the model agreeing for the user, and dispatchTool refuses it. */
+  const turnPreviews = new Set<string>();
   /* True when a user-uploaded document's extracted text is in play — this
      turn or retained history. Gates the recital exemption in
      sealFinalReply(). */
@@ -744,6 +747,7 @@ export async function orchestrate(input: TurnInput): Promise<AgentResponse> {
         const tTool = Date.now();
         const result = await koleexHub.invoke(ctx, tc.function.name, parsedArgs, {
           conversationId,
+          turnPreviews,
         });
         /* Plan G1: the lookup's duration and outcome, on the turn's trace.
            Name and numbers only — never the arguments or the result. */

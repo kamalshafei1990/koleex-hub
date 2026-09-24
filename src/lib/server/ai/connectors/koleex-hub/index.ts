@@ -45,6 +45,8 @@ import type { OpenAiTool } from "@/lib/server/ai/provider/turn-ir";
 
 export interface HubInvokeOptions {
   conversationId?: string | null;
+  /** One set per model turn — see DispatchOptions.turnPreviews. */
+  turnPreviews?: Set<string>;
 }
 
 export interface KoleexHubConnector {

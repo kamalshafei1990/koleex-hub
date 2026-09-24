@@ -3,7 +3,6 @@ import { requireAuth } from "@/lib/server/auth";
 import { requireInternalUser } from "@/lib/server/ai/require-internal";
 import { consumeBudget, limitMode, BUDGETS, subjectFor } from "@/lib/server/ai/security/rate-limit";
 import { describeImage, questionForPrompt } from "@/lib/server/ai/vision";
-import { supabaseServer } from "@/lib/server/supabase-server";
 import { assembleParts, partsFolder, removeParts, sweepStaleParts, MAX_PARTS_SERVER, UPLOAD_ID_RE } from "@/lib/server/ai/attachment-parts";
 
 /* ---------------------------------------------------------------------------
@@ -241,52 +240,15 @@ async function extractOne(file: IncomingFile, question: string): Promise<Extract
   }
 }
 
-/* ── Storage-hop mode ─────────────────────────────────────────────────────
-   Big files never cross this function as bytes: the browser uploads them to
-   Supabase Storage directly (signed URL — same pattern as the finance
-   documents), then posts JSON refs here. We download, extract, and DELETE
-   the temp object in all cases: the privacy contract of this endpoint is
-   "read, described, and forgotten", and the hop must not quietly turn into
-   a store. Paths are restricted to the caller's own ai-attachments prefix
-   so a ref cannot point this endpoint at an arbitrary object. */
+/* ── Storage-hop mode: RETIRED (deep check, 2026-09-24) ────────────────────
+   A ref could name a storage `path` directly; this endpoint downloaded it,
+   read it, and DELETED it. Its guard accepted any path under
+   `ai-attachments/` — every account's and every tenant's — while its comment
+   said "the caller's own prefix". The client stopped using the mode when the
+   relay below arrived (every big file now goes through /chunk into a folder
+   composed from the signed-in account), so the mode is gone rather than
+   patched: a ref without `upload` is refused. */
 interface StorageRef { name?: unknown; path?: unknown; type?: unknown; size?: unknown; upload?: unknown; parts?: unknown }
-
-async function extractFromStorage(ref: StorageRef, question: string): Promise<ExtractResult> {
-  const name = (typeof ref.name === "string" && ref.name ? ref.name : "file").slice(0, 120);
-  const path = typeof ref.path === "string" ? ref.path : "";
-  if (!path || path.includes("..") || !/(^|\/)ai-attachments\//.test(path)) {
-    return { name, error: "read_failed" };
-  }
-  try {
-    /* The download of a big object can die mid-body (socket cut) — that
-       throws from arrayBuffer(), it is not returned as {error}. One retry,
-       then a clean per-file failure instead of a route-level 500. */
-    let buf: Uint8Array | null = null;
-    for (let attempt = 0; attempt < 2 && !buf; attempt++) {
-      try {
-        const { data, error } = await supabaseServer.storage.from("media").download(path);
-        if (error || !data) {
-          console.error("[ai.attachments] storage download failed", path, error?.message);
-        } else {
-          buf = new Uint8Array(await data.arrayBuffer());
-        }
-      } catch (e) {
-        console.error("[ai.attachments] storage download threw", path, e);
-      }
-    }
-    if (!buf) return { name, error: "read_failed" };
-    return await extractOne({
-      name,
-      type: typeof ref.type === "string" ? ref.type : "",
-      size: buf.byteLength,
-      bytes: async () => buf!,
-    }, question);
-  } finally {
-    /* Best-effort cleanup, success or failure — the object was transport,
-       not storage. */
-    void supabaseServer.storage.from("media").remove([path]).catch(() => undefined);
-  }
-}
 
 /* ── Relay mode (2026-09-04) ──────────────────────────────────────────────
    The pieces came through /api/ai/attachments/chunk into the CALLER's own
@@ -317,7 +279,7 @@ async function extractFromParts(ref: StorageRef, accountId: string, question: st
 }
 
 export async function POST(req: Request) {
-  const auth = await requireAuth();
+  const auth = await requireAuth(req);
   if (auth instanceof NextResponse) return auth;
   {
     const notInternal = requireInternalUser(auth);
@@ -353,8 +315,8 @@ export async function POST(req: Request) {
     return NextResponse.json({ files: results });
   };
 
-  /* JSON mode: {files:[{name,path,type,size} | {name,upload,parts,type,size}], question?}
-     — storage refs (the direct road) or relayed pieces. Big files, so one at
+  /* JSON mode: {files:[{name,upload,parts,type,size}], question?} — relayed
+     pieces. Big files, so one at
      a time: two catalogues joined in parallel is twice the memory. */
   const ctype = (req.headers.get("content-type") || "").toLowerCase();
   if (ctype.includes("application/json")) {
@@ -371,7 +333,9 @@ export async function POST(req: Request) {
         keep.add(ref.upload.toLowerCase());
         results.push(await extractFromParts(ref, auth.account_id, question));
       } else {
-        results.push(await extractFromStorage(ref, question));
+        /* No direct storage paths (the retired mode above). */
+        const name = (typeof ref.name === "string" && ref.name ? ref.name : "file").slice(0, 120);
+        results.push({ name, error: "read_failed" });
       }
     }
     if (keep.size > 0) void sweepStaleParts(auth.account_id, keep);

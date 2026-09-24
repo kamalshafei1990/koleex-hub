@@ -26,6 +26,8 @@ import {
   consumePendingAction,
   riskClassFor,
   UNCONFIRMED_MESSAGE,
+  SAME_TURN_CONFIRM_MESSAGE,
+  turnPreviewKey,
 } from "../ai/security/pending-actions";
 import { raceTimeout, timeoutFor } from "../ai/skills/timeout";
 import { validateArgs, validationMode, formatValidationLine } from "../ai/skills/validate";
@@ -183,6 +185,14 @@ export function openAiToolSchemas(ctx: UserContext): Array<{
 
 export interface DispatchOptions {
   conversationId?: string | null;
+  /** THE PREVIEWS THIS TURN MADE (deep check, 2026-09-24). The ledger proves
+   *  a preview exists; it cannot prove the USER saw it. Inside one model
+   *  turn the model could preview a write and confirm it on its next
+   *  iteration — a colleague-written task description, a document, a tool
+   *  result is enough to steer it there — and the row would match. The
+   *  orchestrator passes one set per turn: a confirm of a preview in it is
+   *  refused, so consent can only come from a later user message or a tap. */
+  turnPreviews?: Set<string>;
 }
 
 export async function dispatchTool(
@@ -280,6 +290,28 @@ export async function dispatchTool(
      caused to be written. The model cannot fabricate one. A confirm carrying
      DIFFERENT arguments hashes differently and is refused: a changed action
      needs a new preview, which is the correct answer, not a bug. */
+  /* THE MODEL CANNOT AGREE ON THE USER'S BEHALF (see turnPreviews). Checked
+     before the ledger and whatever its mode — it needs no database, and a
+     ledger switched off must not reopen it. */
+  if (args.confirm === true && opts.turnPreviews?.has(turnPreviewKey(name, args))) {
+    console.warn(`[ai.ledger.same-turn] tool=${name}`);
+    const result: ToolResult = {
+      ok: false,
+      permissionStatus: "allowed",
+      data: null,
+      message: SAME_TURN_CONFIRM_MESSAGE,
+    };
+    await logToolCall({
+      ctx,
+      conversationId: opts.conversationId ?? null,
+      toolName: name,
+      args,
+      result,
+      latencyMs: Date.now() - startedAt,
+    });
+    return result;
+  }
+
   const mode = ledgerMode();
   if (mode !== "off" && args.confirm === true) {
     const consumed = await consumePendingAction({
@@ -366,6 +398,7 @@ export async function dispatchTool(
      returned by all 15 write tools and read by nothing. */
   const pending = (result as { pendingAction?: { tool: string; args: Record<string, unknown> } })
     .pendingAction;
+  if (pending && result.ok) opts.turnPreviews?.add(turnPreviewKey(pending.tool ?? name, pending.args ?? {}));
   if (mode !== "off" && pending && result.ok) {
     await recordPendingAction({
       ctx,

@@ -14,7 +14,7 @@
    ========================================================================== */
 
 import { readFileSync } from "node:fs";
-import { normalizeArgs, hashArgs, riskClassFor, ledgerMode } from "../src/lib/server/ai/security/pending-actions";
+import { normalizeArgs, hashArgs, riskClassFor, ledgerMode, turnPreviewKey, SAME_TURN_CONFIRM_MESSAGE } from "../src/lib/server/ai/security/pending-actions";
 
 let pass = 0, fail = 0;
 function check(name: string, cond: boolean, detail?: string) {
@@ -143,6 +143,37 @@ console.log("\n── The MECHANISM, not just the maths (Phase 7 review) ──"
     "a tool returning a preview records a pending row for the follow-up confirm",
     /recordPendingAction\(\{/.test(body) && /pendingAction/.test(body),
   );
+}
+
+console.log("\n── The model cannot agree for the user (deep check, 2026-09-24) ──");
+{
+  check("a turn remembers a preview by tool and intent — the confirm's own key matches it",
+    turnPreviewKey("deleteTodo", { task_id: "a" }) === turnPreviewKey("deleteTodo", { task_id: "a", confirm: true }));
+  check("…and a different tool or record is a different key",
+    turnPreviewKey("deleteTodo", { task_id: "a" }) !== turnPreviewKey("deleteTodo", { task_id: "b" }) &&
+      turnPreviewKey("deleteTodo", { task_id: "a" }) !== turnPreviewKey("updateTodo", { task_id: "a" }));
+  check("the refusal tells the model to stop and wait, never that it is done",
+    /wait for\s+their answer/i.test(SAME_TURN_CONFIRM_MESSAGE.replace(/\s+/g, " ")) && /do not say it is done/i.test(SAME_TURN_CONFIRM_MESSAGE));
+  const reg = readFileSync("src/lib/server/ai-agent/tool-registry.ts", "utf8");
+  const body = reg.slice(reg.indexOf("export async function dispatchTool("));
+  const guardIdx = body.indexOf("opts.turnPreviews?.has(turnPreviewKey(name, args))");
+  const ledgerIdx = body.indexOf("consumePendingAction({");
+  const handlerIdx = body.indexOf("tool.handler(ctx, args)");
+  check(`a same-turn confirm is refused BEFORE the ledger and the handler (guard@${guardIdx}, ledger@${ledgerIdx}, handler@${handlerIdx})`,
+    guardIdx > 0 && guardIdx < ledgerIdx && guardIdx < handlerIdx &&
+      /if \(args\.confirm === true && opts\.turnPreviews\?\.has\(turnPreviewKey\(name, args\)\)\) \{[\s\S]{0,120}message: SAME_TURN_CONFIRM_MESSAGE/.test(body.replace(/\/\*[\s\S]*?\*\//g, "").replace(/console\.warn\([^)]*\);/g, "").replace(/const result: ToolResult = \{\s*ok: false,\s*permissionStatus: "allowed",\s*data: null,\s*/g, "")));
+  check("…whatever the ledger's mode: the guard sits outside the mode check",
+    guardIdx < body.indexOf("const mode = ledgerMode();"));
+  check("every preview a turn makes is added to its set",
+    /if \(pending && result\.ok\) opts\.turnPreviews\?\.add\(turnPreviewKey\(pending\.tool \?\? name, pending\.args \?\? \{\}\)\);/.test(body));
+  const orch = readFileSync("src/lib/server/ai-agent/orchestrator.ts", "utf8");
+  check("the orchestrator makes one set per turn and hands it to every tool call",
+    /const turnPreviews = new Set<string>\(\);/.test(orch) && /koleexHub\.invoke\(ctx, tc\.function\.name, parsedArgs, \{\s*conversationId,\s*turnPreviews,\s*\}\)/.test(orch));
+  const hub = readFileSync("src/lib/server/ai/connectors/koleex-hub/index.ts", "utf8");
+  check("…and the connector carries it through to dispatchTool", /turnPreviews\?: Set<string>;/.test(hub) && /return dispatchTool\(ctx, toolName, args, opts\);/.test(hub));
+  const confirmRoute = readFileSync("src/app/api/ai/agent/confirm/route.ts", "utf8");
+  check("the user's own tap (the confirm route) is a later request with no turn set, so it still consumes the preview",
+    !/turnPreviews/.test(confirmRoute));
 }
 
 console.log(`\n${pass} passed, ${fail} failed\n`);

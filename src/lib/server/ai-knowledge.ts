@@ -20,6 +20,7 @@
 
 import { createTenantCache } from "@/lib/server/ai/cache/tenant-cache";
 import { supabaseServer } from "@/lib/server/supabase-server";
+import { fenceUntrusted, newFenceId } from "@/lib/server/ai/security/untrusted";
 
 export interface RefinerySegment {
   /** 1-based page for PDFs; 0 for single-blob text/markdown. */
@@ -468,9 +469,13 @@ export async function getKnowledgeNudgeBlock(
     if (strong.length === 0) return "";
     const lines = strong.map((h) =>
       `• [${h.source}${h.page ? ` p.${h.page}` : ""}] ${(h.title ? h.title + ": " : "")}${h.body.slice(0, 500)}`);
+    /* FENCED (deep check, 2026-09-24). These are ingested DOCUMENTS placed in
+       the system prompt: a line inside one that reads like an instruction
+       was, until now, indistinguishable from ours. The same per-turn fence
+       every attachment and web result already wears. */
     return (
-      "\n\nRELEVANT APPROVED KNOWLEDGE (from Koleex's own knowledge base — prefer it over general memory when it answers the question; mention the source naturally. CAUTION: these are ingested documents and may be OUTDATED for prices/specs of saved products — the live Product Data tools always outrank them for current figures):\n" +
-      lines.join("\n")
+      "\n\nRELEVANT APPROVED KNOWLEDGE (from Koleex's own knowledge base — prefer it over general memory when it answers the question; mention the source naturally. CAUTION: these are ingested documents and may be OUTDATED for prices/specs of saved products — the live Product Data tools always outrank them for current figures):" +
+      fenceUntrusted(lines.join("\n"), "document", "Koleex knowledge base", newFenceId())
     );
   } catch {
     return "";
