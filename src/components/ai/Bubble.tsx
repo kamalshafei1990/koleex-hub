@@ -34,15 +34,6 @@ import { KOLEEX_MODEL_INFO } from "@/lib/ai/koleex-models";
 
 /* ── Bubble ── */
 
-/** Arabic / Persian / Hebrew scripts → force RTL direction + slightly
- *  larger type (Arabic glyphs read smaller than Latin at the same px
- *  because of their narrower x-height). Works per-bubble so a Chinese
- *  user can still get an Arabic translation reply rendered correctly
- *  regardless of the surrounding UI language. */
-const RTL_RE = /[\u0590-\u05FF\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]/;
-export function isRtl(text: string): boolean {
-  return RTL_RE.test(text);
-}
 
 function BubbleImpl({
   msg,

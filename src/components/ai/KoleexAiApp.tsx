@@ -57,6 +57,7 @@ import { markdownToPlainText, bubbleHtmlForClipboard } from "@/lib/markdown-clip
 import { useCurrentAccount, getCurrentAccountIdSync } from "@/lib/identity";
 import { ConfirmDialog } from "@/components/notes/NotesDialog";
 import { humanizeError } from "@/lib/ui/humanize-error";
+import { isNetworkError } from "@/lib/ai/network-error";
 import MoreHorizontalIcon from "@/components/icons/ui/MoreHorizontalIcon";
 import ProjectGlyph from "@/components/ai/ProjectGlyph";
 import {
@@ -659,11 +660,6 @@ export default function KoleexAiApp() {
     loadConversations();
   }, [loadConversations]);
 
-  /* Set once the address has been read (a ?c= opens its chat) or the
-     caller started a chat; kept so a late sidebar load never opens
-     anything on its own. */
-  const restoredRef = useRef(false);
-
   /* ── Load a conversation's messages ── */
   /* THE LIBRARY (roadmap C3) takes the main pane while open; opening any
      chat, or starting one, puts the chat back. */
@@ -685,7 +681,6 @@ export default function KoleexAiApp() {
      pushes, the restore on load replaces, and popstate applies what the URL
      says without pushing again (fromHistoryRef). */
   const fromHistoryRef = useRef(false);
-  const urlModeRef = useRef<"push" | "replace">("push");
   const syncUrl = useCallback((next: { c: string | null; view: "library" | "calls" | null }, mode: "push" | "replace") => {
     if (typeof window === "undefined" || fromHistoryRef.current) return;
     const url = new URL(window.location.href);
@@ -702,8 +697,7 @@ export default function KoleexAiApp() {
     async (id: string) => {
       setLibraryOpen(false);
       setCallsOpen(false);
-      syncUrl({ c: id, view: null }, urlModeRef.current);
-      urlModeRef.current = "push";
+      syncUrl({ c: id, view: null }, "push");
       /* THE CHAT THAT IS ALREADY OPEN STAYS AS IT IS. "Open drawer, tap the
          highlighted chat to go back" used to abort the reply in flight and
          reload the thread (audit, 2026-09-07). */
@@ -782,8 +776,6 @@ export default function KoleexAiApp() {
     loadingConvRef.current = false;
     setLoadError(false);
     setSidebarOpen(false);
-    /* Same race guard as send() — see the comment there for why. */
-    restoredRef.current = true;
   }, [revokeMessagePreviews, syncUrl]);
 
   /* THE URL ON LOAD, and Back / Forward afterwards. A ?c= in the address
@@ -794,7 +786,6 @@ export default function KoleexAiApp() {
     const c = params.get("c");
     const view = params.get("view");
     if (c && /^[0-9a-f-]{8,}$/i.test(c)) {
-      restoredRef.current = true;
       fromHistoryRef.current = true;
       try { void openConversation(c); } finally { fromHistoryRef.current = false; }
     }
@@ -892,16 +883,6 @@ export default function KoleexAiApp() {
     /* send() activates it itself, and only if the user is still here (see
        its first-message race); the call's persister wants it at once. */
     if (opts.activate !== false) setActiveId(conversation.id);
-    /* Fix: mark auto-restore as done so it doesn't race us on
-       the first-ever send. Without this, the effect that watches
-       `conversations` would fire post-render, read the activeId
-       we just wrote to localStorage, match the brand-new conv,
-       and call openConversation(newId) — which resets messages
-       to [] and fetches server state (empty because we haven't
-       POSTed to /api/ai/agent yet). End result: the user's
-       message + placeholder get wiped, and the SSE stream has
-       no placeholder to update, so the send appears to vanish. */
-    restoredRef.current = true;
     return conversation.id;
   }, [activeProjectId]);
 
@@ -1227,7 +1208,7 @@ export default function KoleexAiApp() {
           }
         } catch (e) {
           const raw = e instanceof Error ? e.message : "unknown error";
-          const isNetwork = e instanceof TypeError || /failed to fetch|networkerror|load failed/i.test(raw);
+          const isNetwork = isNetworkError(e);
           failure = isNetwork
             ? humanizeError("NetworkError")
             : `${copy.attachError}: ${raw}`;
@@ -1574,9 +1555,7 @@ export default function KoleexAiApp() {
              server error. Both drop the placeholder, but the message
              is humanized so the user doesn't see the raw cause. */
           const raw = e instanceof Error ? e.message : String(e);
-          const isNetwork =
-            (e instanceof TypeError && /failed to fetch|networkerror|load failed/i.test(raw)) ||
-            /networkerror|net::err|the operation was aborted/i.test(raw);
+          const isNetwork = isNetworkError(e);
           /* A dropped send puts its words back in the composer (below), so
              its bubble goes too — kept, the resend showed the message twice. */
           setMessages((prev) => prev.filter((m) => m.id !== placeholderId && !(isNetwork && m.id === optimistic.id)));

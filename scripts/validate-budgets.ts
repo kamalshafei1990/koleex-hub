@@ -933,6 +933,34 @@ console.log("\nK. Knowledge coding system vs the taxonomy");
           `${zombies.join(", ")} — these were removed or recoded by CL-0020/CL-0021`);
 }
 
+/* ── J. The Koleex AI app's own weight ─────────────────────────────────────
+   Section B reads a route's client-reference manifest, and /ai mounts its
+   app through next/dynamic — so B measured the shell and never the app
+   (deep check, 2026-09-24: 434 KB "for /ai" while the app itself was a
+   further 372 KB nobody watched). The app chunk is found by a string only it
+   contains; the markdown renderer must stay OUT of it (lazy since the deep
+   check), and its size has a ceiling. Measured 115 KB after the deep check;
+   the ceiling is that plus ~12%. */
+console.log("\nJ. Koleex AI app chunk");
+{
+  const dir = path.join(NEXT, "static", "chunks");
+  const files = fs.existsSync(dir) ? fs.readdirSync(dir).filter((f) => f.endsWith(".js")) : [];
+  const app = files.filter((f) => fs.readFileSync(path.join(dir, f), "utf8").includes("koleex-ai-conversations-cache-v3"));
+  if (app.length === 0) {
+    bad("Koleex AI app chunk", "not found — did the cache key or the build move?");
+  } else {
+    const bytes = app.reduce((n, f) => n + fs.statSync(path.join(dir, f)).size, 0);
+    const MAX_KB = 130;
+    kb(bytes) <= MAX_KB
+      ? ok(`ai app: ${app.length} chunk(s) / ${kb(bytes)} KB`, `budget ${MAX_KB} KB`)
+      : bad(`ai app: ${app.length} chunk(s) / ${kb(bytes)} KB`, `budget ${MAX_KB} KB`);
+    const withMarkdown = app.filter((f) => /remark-gfm|micromark/.test(fs.readFileSync(path.join(dir, f), "utf8")));
+    withMarkdown.length === 0
+      ? ok("the markdown renderer is not in the app chunk", "lazy — loads with the first reply")
+      : bad("the markdown renderer is back in the app chunk", withMarkdown.join(", "));
+  }
+}
+
 console.log(`\n${fail === 0 ? "✓" : "✗"} budgets: ${pass} passed, ${fail} failed`);
 if (fail > 0 && !REPORT_ONLY) {
   console.error("\nDo NOT raise a budget to make this pass. Find what was added.\n" +

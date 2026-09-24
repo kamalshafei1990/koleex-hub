@@ -27,7 +27,7 @@ import * as uw from "../src/components/pwa/UpdateWatcher";
 import { renderToStaticMarkup } from "react-dom/server";
 import type { ReactElement } from "react";
 import DraftCard from "../src/components/ai/DraftCard";
-import { Bubble, isRtl } from "../src/components/ai/Bubble";
+import { Bubble } from "../src/components/ai/Bubble";
 import { SectionHeader, SidebarRow, groupByDate } from "../src/components/ai/Sidebar";
 import WelcomeCard from "../src/components/ai/WelcomeCard";
 import ProjectDialog from "../src/components/ai/ProjectDialog";
@@ -178,7 +178,7 @@ console.log("\n── 7. The transcript bubble (Phase 2J, completed) ──");
   const user = html(<Bubble {...({ msg: { ...msg, role: "user", content: "which widths?" }, userInitial: "M", lang: "en" } as any)} />);
   check("an assistant message renders its content", text(assistant).includes("Three widths are available."));
   check("a user message renders differently from an assistant one", assistant !== user);
-  check("Arabic text is detected as RTL", isRtl("مرحبا") && !isRtl("hello"));
+  check("Arabic text is detected as RTL", textDirection("مرحبا") === "rtl" && textDirection("hello") === "ltr");
 
   const withQuestion: any = { msg: { ...msg, steps: [
     { kind: "question", payload: { question: "Which spreading machine?", lang: "en", options: [
@@ -1297,7 +1297,7 @@ console.log("\n── The address carries the place: ?c=<chat>, ?view=library|ca
   check("opening a chat, a new chat and the Library / Calls views write the query string; the restore on load replaces instead of pushing",
     /const syncUrl = useCallback\(\(next: \{ c: string \| null; view: "library" \| "calls" \| null \}, mode: "push" \| "replace"\) => \{/.test(app) &&
     /if \(typeof window === "undefined" \|\| fromHistoryRef\.current\) return;/.test(app) &&
-    /setCallsOpen\(false\);\s*syncUrl\(\{ c: id, view: null \}, urlModeRef\.current\);\s*urlModeRef\.current = "push";/.test(app) &&
+    /setCallsOpen\(false\);\s*syncUrl\(\{ c: id, view: null \}, "push"\);/.test(app) &&
     /setCallsOpen\(false\);\s*syncUrl\(\{ c: null, view: null \}, "push"\);/.test(app) &&
     /syncUrl\(\{ c: activeIdRef\.current, view: "library" \}, "push"\)/.test(app) && /syncUrl\(\{ c: activeIdRef\.current, view: "calls" \}, "push"\)/.test(app) &&
     !/openConversation\(stored\)/.test(app));
@@ -1330,7 +1330,7 @@ console.log("\n── The address carries the place: ?c=<chat>, ?view=library|ca
         /className="absolute pointer-events-none kx-aurora-canvas"/.test(canvas);
     })());
   check("  …a ?c= in the address wins over the remembered chat on load, and Back / Forward apply the address without pushing again",
-    /const c = params\.get\("c"\);[\s\S]{0,200}?restoredRef\.current = true;\s*fromHistoryRef\.current = true;\s*try \{ void openConversation\(c\); \} finally \{ fromHistoryRef\.current = false; \}/.test(app) &&
+    /const c = params\.get\("c"\);[\s\S]{0,200}?fromHistoryRef\.current = true;\s*try \{ void openConversation\(c\); \} finally \{ fromHistoryRef\.current = false; \}/.test(app) &&
     /window\.addEventListener\("popstate", onPop\);/.test(app) &&
     /if \(c !== activeIdRef\.current\) void openConversation\(c\);\s*\} else if \(activeIdRef\.current\) \{\s*void startNewChat\(\);/.test(app));
 }

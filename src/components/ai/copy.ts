@@ -41,7 +41,6 @@ export const COPY: Record<Lang, {
   summaryWriting: string;
   dropHere: string;
   recommended: string;
-  orTypeYourOwn: string;
   otherOption: string;
   otherPlaceholder: string;
   otherSend: string;
@@ -239,7 +238,6 @@ export const COPY: Record<Lang, {
     summaryWriting: "Writing the call summary…",
     dropHere: "Drop files to attach",
     recommended: "Recommended",
-    orTypeYourOwn: "Or type your own answer below.",
     otherOption: "Something else",
     otherPlaceholder: "Tell me what you mean…",
     otherSend: "Send",
@@ -387,7 +385,6 @@ export const COPY: Record<Lang, {
     summaryWriting: "正在整理通话摘要…",
     dropHere: "拖放文件以附加",
     recommended: "推荐",
-    orTypeYourOwn: "或在下方输入你自己的答案。",
     otherOption: "其他",
     otherPlaceholder: "请说明你的意思…",
     otherSend: "发送",
@@ -534,7 +531,6 @@ export const COPY: Record<Lang, {
     summaryWriting: "بكتب ملخص المكالمة…",
     dropHere: "أفلت الملفات لإرفاقها",
     recommended: "موصى به",
-    orTypeYourOwn: "أو اكتب إجابتك بنفسك في الأسفل.",
     otherOption: "حاجة تانية",
     otherPlaceholder: "اكتبلي قصدك إيه…",
     otherSend: "ابعت",
