@@ -273,7 +273,11 @@ const ROUTE_BUDGETS: Record<string, { chunks: number; kbytes: number }> = {
      in this number. */
   "travel": { chunks: 10, kbytes: 580 },
   "todo": { chunks: 12, kbytes: 964 },
-  "translator": { chunks: 11, kbytes: 595 },
+  /* +1 KB, 2026-09-24: 595 → 596 measured. The account preferences now
+     validate the Koleex AI model choice (lib/ai/koleex-model-ids.ts, ~350 B
+     minified, shared baseline); it tipped this route over a KB boundary. The
+     picker's catalog and store stay in the AI app's own chunk. */
+  "translator": { chunks: 11, kbytes: 596 },
   "website": { chunks: 11, kbytes: 600 },
 };
 console.log("\nB. Route entry weight");

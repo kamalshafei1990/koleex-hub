@@ -25,6 +25,7 @@ import TaskCard, { type TaskCardState } from "@/components/ai/TaskCard";
 import PhotoLightbox, { type LightboxPhoto } from "@/components/ai/PhotoLightbox";
 import type { ChatMsg, QuotationDraftPayload } from "@/components/ai/types";
 import { COPY } from "@/components/ai/copy";
+import { KOLEEX_MODEL_INFO } from "@/lib/ai/koleex-models";
 
 /* ── Bubble ── */
 
@@ -592,6 +593,16 @@ function BubbleImpl({
               <rect x="6" y="6" width="12" height="12" rx="2" />
             </svg>
             {copy.stopped}
+          </span>
+        )}
+        {/* ANSWERED BY ANOTHER MODEL. The user chose a Koleex model and a
+            different one replied — the chosen one was down, not set up, or
+            switched off, and the turn failed over rather than leave them
+            without an answer. Said plainly, by Koleex name, and only then:
+            Auto, or the model that was asked for, needs no note. */}
+        {!isUser && msg.askedModel && msg.askedModel !== "auto" && msg.servedModel && msg.servedModel !== msg.askedModel && (
+          <span className="inline-flex items-center gap-1 text-[12px] text-[var(--text-dim)]">
+            {copy.answeredByModel.replace("{model}", KOLEEX_MODEL_INFO[msg.servedModel].name[lang === "zh" || lang === "ar" ? lang : "en"])}
           </span>
         )}
         {/* Phase 13: user-side action row — Edit (re-runs the turn

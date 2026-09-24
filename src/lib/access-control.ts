@@ -1,4 +1,5 @@
 import { DEFAULT_AI_PERSONALIZATION, type AiPersonalization } from "@/lib/ai-personalization";
+import { normalizeKoleexModel, type KoleexModelId } from "@/lib/ai/koleex-model-ids";
 
 /* ---------------------------------------------------------------------------
    Access Control Catalog — module keys, access levels, and preferences shape
@@ -368,6 +369,12 @@ export interface AccountPreferences {
      personalization route and would drop a key it does not know. Values and
      the store live in components/ai-orb/orb-style.ts. Absent means "aura". */
   orb?: "aura" | "dots";
+  /* Which Koleex AI model this user asks for (the picker beside the message
+     box). A preference the server resolves, never a permission: an unknown
+     or switched-off model is served as Auto. Values and the store live in
+     lib/ai/koleex-models.ts and components/ai/model-choice.ts. Absent means
+     "auto". */
+  ai_model?: KoleexModelId;
   /* The "My apps" row at the top of Home: the person's pinned app ids in
      their order, and where they came from ("none" = never set, so Home seeds
      it once from their own usage; "usage" = seeded; "user" = edited). Shape
@@ -434,6 +441,7 @@ export const DEFAULT_PREFERENCES: Required<
   },
   ai: DEFAULT_AI_PERSONALIZATION,
   orb: "aura",
+  ai_model: "auto",
   home_apps: { pins: [], source: "none" },
 };
 
@@ -510,6 +518,9 @@ export function withDefaults(
     /* And again: without this line, changing the language would quietly put
        the orb back to the default. */
     orb: p.orb === "dots" ? "dots" : DEFAULT_PREFERENCES.orb,
+    /* And the model choice, for the same reason: a language change must not
+       quietly put the picker back to Auto. */
+    ai_model: normalizeKoleexModel(p.ai_model),
     /* Same passthrough again. Without this line every Settings save would
        erase the person's My apps row and Home would re-seed it from usage. */
     home_apps: p.home_apps ?? DEFAULT_PREFERENCES.home_apps,

@@ -31,6 +31,13 @@ export const COPY: Record<Lang, {
   renamePrompt: string;
   footer: string;
   stopped: string;
+  /** The model picker beside the message box. */
+  model: string;
+  modelUnavailable: string;
+  modelTextOnly: string;
+  /** Under a reply that a different model answered than the one asked for;
+   *  {model} is the Koleex name. */
+  answeredByModel: string;
   summaryWriting: string;
   dropHere: string;
   recommended: string;
@@ -225,6 +232,10 @@ export const COPY: Record<Lang, {
     renamePrompt: "New title",
     footer: "Koleex AI — Powered by Koleex Technology Systems",
     stopped: "Stopped",
+    model: "Model",
+    modelUnavailable: "Not available right now",
+    modelTextOnly: "Text only",
+    answeredByModel: "Answered by {model}",
     summaryWriting: "Writing the call summary…",
     dropHere: "Drop files to attach",
     recommended: "Recommended",
@@ -369,6 +380,10 @@ export const COPY: Record<Lang, {
     renamePrompt: "新标题",
     footer: "Koleex AI — 由 Koleex 技术系统驱动",
     stopped: "已停止",
+    model: "模型",
+    modelUnavailable: "暂时不可用",
+    modelTextOnly: "仅文字",
+    answeredByModel: "由 {model} 回答",
     summaryWriting: "正在整理通话摘要…",
     dropHere: "拖放文件以附加",
     recommended: "推荐",
@@ -512,6 +527,10 @@ export const COPY: Record<Lang, {
     renamePrompt: "عنوان جديد",
     footer: "Koleex AI — بدعم من أنظمة Koleex التقنية",
     stopped: "تم الإيقاف",
+    model: "الموديل",
+    modelUnavailable: "مش متاح دلوقتي",
+    modelTextOnly: "كتابة بس",
+    answeredByModel: "رد عليك {model}",
     summaryWriting: "بكتب ملخص المكالمة…",
     dropHere: "أفلت الملفات لإرفاقها",
     recommended: "موصى به",
