@@ -174,7 +174,8 @@ check("the session reads the preview strictly (an object, not an array) and hand
   /const preview = p\.preview && typeof p\.preview === "object" && !Array\.isArray\(p\.preview\) \? \(p\.preview as Record<string, unknown>\) : undefined;/.test(sess) &&
   /this\.events\.onPendingWrite\?\.\(call\.name, \{ tool: p\.tool, args: p\.args as Record<string, unknown> \}, typeof msg === "string" \? msg : "", preview\);/.test(sess));
 const btn = readFileSync("src/components/ai/VoiceCallButton.tsx", "utf8");
-check("the button keeps the preview with the pending write", /setPendingWrite\(\{ tool: pending\.tool, args: pending\.args, message, preview \}\);/.test(btn));
+check("the button keeps the preview with the pending write — and the conversation it was recorded under, which the tap must name",
+  /setPendingWrite\(\{ tool: pending\.tool, args: pending\.args, message, preview, conversationId: sessionRef\.current\?\.callConversationId \?\? null \}\);/.test(btn));
 const screen = readFileSync("src/components/ai/VoiceCallScreen.tsx", "utf8");
 check("the card words the due and reminder times from the preview (raw arguments as fallback) and names the people, with the tap unchanged",
   /const pv = pendingWrite\.preview \?\? \{\};/.test(screen) && /remind \? `\$\{copy\.remind\} \$\{remind\}` : ""/.test(screen) && /people\.length \? `\$\{copy\.forPeople\} \$\{people\.join\(", "\)\}` : ""/.test(screen) &&
