@@ -2502,3 +2502,24 @@ Owner: "make a deep check for this app and fix any issue or bug". Five read-only
 - **Held for phase 6:**
   - The inline SVGs in the message actions and the composer move to library icons there, because both rows are being redesigned.
   - The large `KoleexAiApp` split (sidebar, composer, turn logic) is also done with the redesign, so those screens are rewritten once, not twice.
+
+## Deep check 2026-09-24, phase 6a: design, a quieter screen
+
+- **One "+" in the message box** (`ComposerAddMenu`). It holds two items: "Files and photos" (the picker opens inside the tap, which iOS requires) and "Search the web". This replaces three round buttons: attach, emoji and globe. While search is on, a "Search ×" chip sits beside the "+" and turns it off, so the mode can't be forgotten inside a menu.
+- **The emoji picker is gone** (`EmojiButton.tsx` and the 700-line `emojiData.ts`). The phone's keyboard already has emoji.
+- **Removed:**
+  - the "Koleex AI — Powered by …" line under the box;
+  - the header subtitle that repeated the welcome text;
+  - the sidebar's own back arrow on desktop, where the page header has one (the phone keeps it, since that drawer is its only way home);
+  - the second "New project" row under a header that already has "+".
+- **The pin shows only on pinned chats.** On a phone, every row used to show one. Pinning an unpinned chat is in the row's menu.
+- **Menus portalled to `<body>` now carry the AI colours** (`.kx-ai-tokens`). Before, the row menu's red "Delete" rendered in plain text colour.
+- **Row menu improvements.** It opens on the correct side in Arabic, uses 13 px text, and has 44 px rows on touch screens.
+- **Egyptian Arabic throughout the chat.** Examples: النهاردة / امبارح / أقدم, رد حلو / رد مش كويس, وقّف الرد, ابعت, الأنسب, القايمة. The greeting uses each language's own punctuation ("أهلاً يا Kamal", "你好，Kamal。"), not "مرحبًا, Kamal.". The two attachment errors no longer say the same thing.
+- **Task card:**
+  - priority is shown in the reader's language ("High priority", "أولوية عالية");
+  - the colours come from the app's own tokens (it named four that don't exist);
+  - no half-pixel text sizes;
+  - the "Open in To-do" arrow points the right way in Arabic.
+
+**Tests.** `validate:ai-deepcheck` has 59 checks (+8), with pins updated in client-render and tasks. Each rule was confirmed by breaking the code on purpose, and all 8 breaks were caught. Screenshots were taken at 375 px in English, Arabic and Chinese, dark and light.

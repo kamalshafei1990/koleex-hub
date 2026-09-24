@@ -198,5 +198,39 @@ console.log("\n── 7. Speed ──");
       route.indexOf("if (refused) return refused;") > 0 && route.indexOf("if (refused) return refused;") < route.indexOf('.from("ai_messages")'));
 }
 
+console.log("\n── 8. Design, part 1: a quieter screen ──");
+{
+  const app = read("src/components/ai/KoleexAiApp.tsx");
+  const menu = read("src/components/ai/ComposerAddMenu.tsx");
+  const copyTs = read("src/components/ai/copy.ts");
+  check("the message box has ONE '+' (files and photos, web search) and no emoji picker",
+    /<ComposerAddMenu\s+onAttach=\{openFilePicker\}\s+webSearch=\{webSearch\}\s+onWebSearchChange=\{setWebSearch\}/.test(app) &&
+      !/EmojiButton|insertEmoji/.test(app) && !/aria-label=\{copy\.searchWeb\}/.test(app));
+  check("  …the file picker opens inside the tap (iOS needs the gesture), and search that is ON stays visible as a chip that turns it off",
+    /onClick=\{\(\) => \{[\s\S]{0,200}?onAttach\(\);\s*setOpen\(false\);/.test(menu) &&
+      /\{webSearch && \(\s*<button[\s\S]{0,80}?onClick=\{\(\) => onWebSearchChange\(false\)\}/.test(menu) &&
+      /role="menuitemcheckbox"\s+aria-checked=\{webSearch\}/.test(menu));
+  check("no 'Powered by' line under the box, no second subtitle in the header",
+    !/copy\.footer/.test(app) && !/footer:/.test(copyTs) && (app.match(/copy\.welcomeSub/g) ?? []).length === 0);
+  check("the sidebar's back arrow is phone-only (the desktop header has its own); no second 'New project' row",
+    /className="md:hidden h-8 w-8 flex items-center justify-center rounded-lg[^"]*"\s+title=\{copy\.back\}/.test(app) &&
+      /\{projects\.length > 0 && \(/.test(app) && !/projects\.length === 0 \? \(/.test(app));
+  const side = read("src/components/ai/Sidebar.tsx");
+  check("only a pinned chat shows a pin; pinning an unpinned one is in its menu",
+    /\{pinned && \(\s*<button/.test(side) && !/\[@media\(hover:none\)\]:opacity-100 focus-visible:opacity-100 text-\[var\(--text-dim\)\] hover:text-\[var\(--text-primary\)\]"/.test(side) &&
+      /key: "pin",\s*label: pinned \? copy\.unpin : copy\.pin/.test(side));
+  check("the menus portalled to <body> carry the AI colours (the red Delete was plain text), and the row menu opens on the correct side in Arabic",
+    /\.kx-ai-root, \.kx-call-root, \.kx-ai-tokens \{/.test(read("src/app/globals.css")) &&
+      /kx-pop-panel kx-ai-tokens/.test(side) && /kx-pop-panel kx-ai-tokens/.test(menu) && /kx-pop-panel kx-ai-tokens/.test(read("src/components/ai/ModelPicker.tsx")) &&
+      /rtl \? r\.left : r\.right - W/.test(side) && /\[@media\(pointer:coarse\)\]:min-h-11/.test(side));
+  check("the greeting uses each language's own punctuation — no 'مرحبًا, Kamal.'",
+    /welcomeTitleNamed: "أهلاً يا \{name\}"/.test(copyTs) && /welcomeTitleNamed: "你好，\{name\}。"/.test(copyTs) &&
+      /copy\.welcomeTitleNamed\.replace\("\{name\}", firstName\)/.test(read("src/components/ai/WelcomeCard.tsx")));
+  const card = read("src/components/ai/TaskCard.tsx");
+  check("a task card says the priority in the reader's language and uses the app's own colours",
+    /priority === "high" \? copy\.priorityHigh : priority === "low" \? copy\.priorityLow : ""/.test(card) &&
+      !/text-tertiary|var\(--danger|var\(--brand|12\.5px|bg-\[#0066FF\]/.test(card) && /lang === "ar" \? "←" : "→"/.test(card));
+}
+
 console.log(`\n${pass} passed, ${fail} failed`);
 if (fail > 0) process.exit(1);

@@ -17,6 +17,9 @@ export const COPY: Record<Lang, {
   newChat: string;
   placeholder: string;
   welcomeTitle: string;
+  /* The greeting with a first name, in each language's own punctuation —
+     "مرحبًا, Kamal." put a Latin comma and full stop in an Arabic line. */
+  welcomeTitleNamed: string;
   welcomeSub: string;
   thinking: string;
   noChats: string;
@@ -29,7 +32,6 @@ export const COPY: Record<Lang, {
   rename: string;
   confirmDelete: string;
   renamePrompt: string;
-  footer: string;
   stopped: string;
   /** The model picker beside the message box. */
   model: string;
@@ -56,6 +58,9 @@ export const COPY: Record<Lang, {
   taskCancelled: string;
   openTodo: string;
   due: string;
+  /* The priority words on a task card — the tool's own values are English. */
+  priorityHigh: string;
+  priorityLow: string;
   remind: string;
   forPeople: string;
   observers: string;
@@ -111,8 +116,6 @@ export const COPY: Record<Lang, {
   back: string;
   seeMore: string;
   seeLess: string;
-  webSearchOn: string;
-  webSearchOff: string;
   save: string;
   cancel: string;
   /* ── CONTROL LABELS ────────────────────────────────────────────────────
@@ -134,8 +137,6 @@ export const COPY: Record<Lang, {
   editAndRetry: string;
   saveAndRetry: string;
   cancelEdit: string;
-  emojiPicker: string;
-  searchEmoji: string;
   closeSidebar: string;
   collapseSidebar: string;
   expandSidebar: string;
@@ -144,8 +145,13 @@ export const COPY: Record<Lang, {
   personalize: string;
   backToHub: string;
   jumpToLatest: string;
-  attachFile: string;
   searchWeb: string;
+  /* The one "+" in the message box (ComposerAddMenu) and the chip that
+     shows web search is on. */
+  addMenu: string;
+  attachFilesPhotos: string;
+  webSearchChip: string;
+  webSearchChipOff: string;
   stopGenerating: string;
   send: string;
   /* The composer and the edit box have no visible label — a placeholder is
@@ -155,12 +161,6 @@ export const COPY: Record<Lang, {
   /* `thinking` is the words on screen; this is what a screen reader
      announces for the same state, which needs a subject to make sense. */
   thinkingAria: string;
-  /* THE EMOJI PICKER'S CATEGORY NAMES, keyed by the id in emojiData.
-     They live here rather than in that file because emojiData is 700 lines
-     of emoji and adding three languages to every category row would bury
-     the eight strings that actually need translating. */
-  emojiCategories: Record<string, string>;
-  insertEmoji: string;
   /** The mark on a message that was spoken on a call rather than typed. */
   voiceMessage: string;
   /* Audit 2026-09-07: every string a person could READ was English on the
@@ -207,6 +207,8 @@ export const COPY: Record<Lang, {
     taskCancelled: "Not saved",
     openTodo: "Open in To-do",
     due: "Due",
+    priorityHigh: "High priority",
+    priorityLow: "Low priority",
     remind: "Reminder",
     forPeople: "For",
     observers: "Following",
@@ -217,6 +219,7 @@ export const COPY: Record<Lang, {
     newChat: "New chat",
     placeholder: "Ask Koleex AI…",
     welcomeTitle: "Hi",
+    welcomeTitleNamed: "Hi, {name}.",
     welcomeSub: "What's on your mind? I'm Koleex AI — ask me anything, big or small.",
     thinking: "Thinking…",
     noChats: "No chats yet",
@@ -229,7 +232,6 @@ export const COPY: Record<Lang, {
     rename: "Rename",
     confirmDelete: "Delete this conversation?",
     renamePrompt: "New title",
-    footer: "Koleex AI — Powered by Koleex Technology Systems",
     stopped: "Stopped",
     model: "Model",
     modelUnavailable: "Not available right now",
@@ -281,8 +283,6 @@ export const COPY: Record<Lang, {
     back: "Back",
     seeMore: "See more",
     seeLess: "See less",
-    webSearchOn: "Web search: on",
-    webSearchOff: "Web search: off",
     save: "Save",
     cancel: "Cancel",
     readAloud: "Read aloud",
@@ -293,8 +293,6 @@ export const COPY: Record<Lang, {
     editAndRetry: "Edit and retry",
     saveAndRetry: "Save and retry",
     cancelEdit: "Cancel edit",
-    emojiPicker: "Emoji picker",
-    searchEmoji: "Search emoji",
     closeSidebar: "Close sidebar",
     collapseSidebar: "Collapse sidebar",
     expandSidebar: "Expand sidebar",
@@ -302,15 +300,16 @@ export const COPY: Record<Lang, {
     personalize: "Personalize Koleex AI",
     backToHub: "Back to Hub",
     jumpToLatest: "Jump to latest",
-    attachFile: "Attach file",
     searchWeb: "Search the web",
+    addMenu: "Add files and more",
+    attachFilesPhotos: "Files and photos",
+    webSearchChip: "Search",
+    webSearchChipOff: "Turn off web search",
     stopGenerating: "Stop generating",
     send: "Send",
     composerLabel: "Message Koleex AI",
     editMessageLabel: "Edit your message",
     thinkingAria: "Koleex AI is thinking",
-    emojiCategories: { smileys: "Smileys & People", nature: "Animals & Nature", food: "Food & Drink", activity: "Activity", travel: "Travel & Places", objects: "Objects", symbols: "Symbols", flags: "Flags" },
-    insertEmoji: "Insert",
     voiceMessage: "Spoken on a call",
     attachDefaultPrompt: "Please read the attached file(s) and give me the key points.",
     latest: "Latest",
@@ -354,6 +353,8 @@ export const COPY: Record<Lang, {
     taskCancelled: "未保存",
     openTodo: "在待办中打开",
     due: "截止",
+    priorityHigh: "高优先级",
+    priorityLow: "低优先级",
     remind: "提醒",
     forPeople: "给",
     observers: "关注",
@@ -364,6 +365,7 @@ export const COPY: Record<Lang, {
     newChat: "新建对话",
     placeholder: "向 Koleex AI 提问…",
     welcomeTitle: "你好",
+    welcomeTitleNamed: "你好，{name}。",
     welcomeSub: "想聊点什么？我是 Koleex AI — 大事小事都可以问我。",
     thinking: "思考中…",
     noChats: "还没有对话",
@@ -376,7 +378,6 @@ export const COPY: Record<Lang, {
     rename: "重命名",
     confirmDelete: "删除这个对话？",
     renamePrompt: "新标题",
-    footer: "Koleex AI — 由 Koleex 技术系统驱动",
     stopped: "已停止",
     model: "模型",
     modelUnavailable: "暂时不可用",
@@ -427,8 +428,6 @@ export const COPY: Record<Lang, {
     back: "返回",
     seeMore: "查看更多",
     seeLess: "收起",
-    webSearchOn: "联网搜索：开",
-    webSearchOff: "联网搜索：关",
     save: "保存",
     cancel: "取消",
     readAloud: "朗读",
@@ -439,8 +438,6 @@ export const COPY: Record<Lang, {
     editAndRetry: "编辑并重新发送",
     saveAndRetry: "保存并重新发送",
     cancelEdit: "取消编辑",
-    emojiPicker: "表情选择器",
-    searchEmoji: "搜索表情",
     closeSidebar: "关闭侧边栏",
     collapseSidebar: "收起侧边栏",
     expandSidebar: "展开侧边栏",
@@ -448,15 +445,16 @@ export const COPY: Record<Lang, {
     personalize: "个性化 Koleex AI",
     backToHub: "返回 Hub",
     jumpToLatest: "跳到最新",
-    attachFile: "添加文件",
     searchWeb: "联网搜索",
+    addMenu: "添加文件等",
+    attachFilesPhotos: "文件和照片",
+    webSearchChip: "搜索",
+    webSearchChipOff: "关闭联网搜索",
     stopGenerating: "停止生成",
     send: "发送",
     composerLabel: "给 Koleex AI 发送消息",
     editMessageLabel: "编辑你的消息",
     thinkingAria: "Koleex AI 正在思考",
-    emojiCategories: { smileys: "笑脸与人物", nature: "动物与自然", food: "食物与饮料", activity: "活动", travel: "旅行与地点", objects: "物品", symbols: "符号", flags: "旗帜" },
-    insertEmoji: "插入",
     voiceMessage: "通话中所说",
     attachDefaultPrompt: "请阅读附件并告诉我要点。",
     latest: "最新",
@@ -500,6 +498,8 @@ export const COPY: Record<Lang, {
     taskCancelled: "لم تُحفظ",
     openTodo: "افتح في المهام",
     due: "موعدها",
+    priorityHigh: "أولوية عالية",
+    priorityLow: "أولوية قليلة",
     remind: "تذكير",
     forPeople: "لـ",
     observers: "يتابع",
@@ -509,101 +509,98 @@ export const COPY: Record<Lang, {
     starts: "يبدأ",
     newChat: "محادثة جديدة",
     placeholder: "اسأل Koleex AI…",
-    welcomeTitle: "مرحبًا",
+    welcomeTitle: "أهلاً",
+    welcomeTitleNamed: "أهلاً يا {name}",
     welcomeSub: "في إيه في دماغك؟ أنا Koleex AI — اسألني أي حاجة، صغيرة ولا كبيرة.",
     thinking: "بفكّر…",
     noChats: "مفيش محادثات لسه",
-    today: "اليوم",
-    yesterday: "أمس",
+    today: "النهاردة",
+    yesterday: "امبارح",
     previous7: "آخر 7 أيام",
-    previous30: "آخر 30 يومًا",
-    earlier: "قبل ذلك",
-    delete: "حذف",
+    previous30: "آخر 30 يوم",
+    earlier: "أقدم",
+    delete: "امسح",
     rename: "غيّر الاسم",
     confirmDelete: "تمسح المحادثة دي؟",
     renamePrompt: "عنوان جديد",
-    footer: "Koleex AI — بدعم من أنظمة Koleex التقنية",
-    stopped: "تم الإيقاف",
+    stopped: "اتوقف",
     model: "الموديل",
     modelUnavailable: "مش متاح دلوقتي",
     modelTextOnly: "كتابة بس",
     answeredByModel: "رد عليك {model}",
     summaryWriting: "بكتب ملخص المكالمة…",
-    dropHere: "أفلت الملفات لإرفاقها",
-    recommended: "موصى به",
+    dropHere: "سيب الملفات هنا",
+    recommended: "الأنسب",
     otherOption: "حاجة تانية",
     otherPlaceholder: "اكتبلي قصدك إيه…",
     otherSend: "ابعت",
-    searchChats: "ابحث في المحادثات…",
-    noSearchResults: "مفيش محادثات مطابقة للبحث.",
-    openSidebar: "افتح الشريط الجانبي",
+    searchChats: "دوّر في المحادثات…",
+    noSearchResults: "مفيش محادثات بالكلام ده.",
+    openSidebar: "افتح القايمة",
     removeFile: "شيل {name}",
-    uploading: "جارٍ رفع",
+    uploading: "بيترفع",
     attachUnreadableImage: "مقدرناش نقرا الصورة دي — جرّب صورة أوضح",
     attachNoText: "مفيش نص مقروء في الملف",
     attachTooLarge: "أكبر من الحد المسموح (15MB للصور / 200MB للملفات)",
-    attachUnsupported: "نوع الملف مش مدعوم",
+    attachUnsupported: "نوع الملف ده مش بيتقري",
     messageTooLong: "الرسالة دي طويلة أوي على مرة واحدة. قسّمها أو ارفعها كملف.",
     offline: "مفيش نت دلوقتي — رسالتك هتتبعت أول ما ترجع.",
-    callCutOff: "المكالمة اللي فاتت اتقطعت — الأبلكيشن اتقفل من غيرك.",
+    callCutOff: "المكالمة اللي فاتت اتقطعت — التطبيق اتقفل لوحده.",
     continueCall: "كمّل المكالمة",
-    dismiss: "إخفاء",
+    dismiss: "تمام",
     projects: "المشاريع",
     newProject: "مشروع جديد",
-    editProject: "تعديل المشروع",
+    editProject: "عدّل المشروع",
     projectName: "اسم المشروع",
     projectIcon: "الأيقونة",
     projectColor: "اللون",
-    deleteProject: "حذف المشروع",
+    deleteProject: "امسح المشروع",
     confirmDeleteProject:
       "تمسح المشروع ده؟ محادثاته هتفضل موجودة — وهترجع للقائمة الرئيسية.",
     emptyProject: "مفيش محادثات هنا لسه",
-    pin: "تثبيت",
-    unpin: "إلغاء التثبيت",
+    pin: "ثبّت",
+    unpin: "شيل التثبيت",
     pinned: "مثبّتة",
-    moveTo: "نقل إلى",
-    noProject: "بدون مشروع",
-    more: "المزيد",
+    moveTo: "انقل لـ",
+    noProject: "من غير مشروع",
+    more: "كمان",
     recents: "الأحدث",
     library: "المكتبة",
     libraryEmpty: "مفيش صور لسه. الصور اللي ظهرت في محادثاتك هتتجمع هنا.",
     openChat: "افتح المحادثة",
     calls: "المكالمات",
     callsEmpty: "مفيش مكالمات لسه. لما مكالمة تخلص بكلام حقيقي، ملخصها هيظهر هنا.",
-    exportChat: "تصدير / طباعة",
+    exportChat: "صدّر / اطبع",
     back: "رجوع",
-    seeMore: "عرض المزيد",
-    seeLess: "عرض أقل",
-    webSearchOn: "البحث في الويب: مفعّل",
-    webSearchOff: "البحث في الويب: متوقّف",
-    save: "حفظ",
+    seeMore: "شوف أكتر",
+    seeLess: "شوف أقل",
+    save: "احفظ",
     cancel: "إلغاء",
     readAloud: "اسمع الرد",
     regenerate: "رد تاني",
-    goodResponse: "إجابة جيدة",
-    badResponse: "إجابة سيئة",
-    messageActions: "إجراءات الرسالة",
+    goodResponse: "رد حلو",
+    badResponse: "رد مش كويس",
+    messageActions: "اختيارات الرسالة",
     editAndRetry: "عدّل وابعت تاني",
     saveAndRetry: "احفظ وابعت تاني",
-    cancelEdit: "إلغاء التعديل",
-    emojiPicker: "اختيار الرموز",
-    searchEmoji: "ابحث عن رمز",
-    closeSidebar: "إغلاق الشريط الجانبي",
-    collapseSidebar: "طيّ الشريط الجانبي",
-    expandSidebar: "توسيع الشريط الجانبي",
+    cancelEdit: "سيب التعديل",
+    closeSidebar: "اقفل القايمة",
+    collapseSidebar: "صغّر القايمة",
+    expandSidebar: "افتح القايمة",
     aiKnowledge: "معرفة Koleex AI",
     personalize: "تخصيص Koleex AI",
-    backToHub: "العودة إلى Hub",
-    jumpToLatest: "الانتقال إلى الأحدث",
-    attachFile: "إرفاق ملف",
-    searchWeb: "البحث في الويب",
-    stopGenerating: "إيقاف التوليد",
-    send: "إرسال",
-    composerLabel: "اكتب رسالة إلى Koleex AI",
-    editMessageLabel: "تعديل رسالتك",
+    backToHub: "ارجع للـ Hub",
+    jumpToLatest: "انزل لآخر رسالة",
+    searchWeb: "دوّر في النت",
+    addMenu: "ضيف ملفات وغيرها",
+    attachFilesPhotos: "ملفات وصور",
+    webSearchChip: "بحث",
+    webSearchChipOff: "اقفل البحث في النت",
+    stopGenerating: "وقّف الرد",
+    send: "ابعت",
+    composerLabel: "اكتب رسالة لـ Koleex AI",
+    editMessageLabel: "عدّل رسالتك",
     thinkingAria: "Koleex AI يفكّر",
-    emojiCategories: { smileys: "الوجوه والأشخاص", nature: "الحيوانات والطبيعة", food: "الطعام والشراب", activity: "الأنشطة", travel: "السفر والأماكن", objects: "الأشياء", symbols: "الرموز", flags: "الأعلام" },
-    insertEmoji: "إدراج",
     voiceMessage: "اتقالت في مكالمة",
     attachDefaultPrompt: "اقرا الملف المرفق وقولي أهم النقط.",
     latest: "الأحدث",
@@ -614,11 +611,11 @@ export const COPY: Record<Lang, {
     closePhoto: "اقفل الصورة",
     loadFailed: "مش قادرين نحمّل ده دلوقتي. اتأكد من النت وجرّب تاني.",
     retry: "جرّب تاني",
-    supportedFiles: "الملفات المدعومة: صور، PDF، Excel، TXT، MD، CSV، JSON.",
+    supportedFiles: "الملفات اللي بتتقري: صور، PDF، Excel، TXT، MD، CSV، JSON.",
     fileTooLarge: "{name} حجمه {size}MB — الحد {cap}MB لـ{kind}.",
     kindImages: "الصور",
-    kindDocuments: "المستندات",
-    attachError: "مقدرناش نقرا المرفق",
+    kindDocuments: "الملفات",
+    attachError: "حصلت مشكلة في المرفق",
     attachNothingRead: "مقدرناش نقرا المرفق.",
     noReply: "مفيش رد وصل.",
     aiUnavailable: "Koleex AI مش متاح دلوقتي.",
@@ -630,10 +627,10 @@ export const COPY: Record<Lang, {
     linesCount: "{n} بنود",
     reviewInQuotations: "افتحها في عروض الأسعار ←",
     prompts: [
-      "اعطيني بريف اليوم: اجتماعاتي، المهام اللي موعدها النهاردة، التذكيرات، وإيه اللي محتاجني الأول.",
-      "ساعدني في كتابة رد مهذب على رسالة من عميل.",
-      "اشرح لي ببساطة كيف تعمل شرائح الأسعار.",
-      "ترجم إلى الإنجليزية: الرجاء تأكيد التسليم بحلول يوم الجمعة.",
+      "قولي يومي النهاردة: اجتماعاتي، المهام اللي معادها النهاردة، التذكيرات، وإيه اللي محتاجني الأول.",
+      "ساعدني أكتب رد محترم على رسالة من عميل.",
+      "اشرحلي ببساطة شرائح الأسعار بتشتغل إزاي.",
+      "ترجم للإنجليزي: الرجاء تأكيد التسليم بحلول يوم الجمعة.",
     ],
   },
 };

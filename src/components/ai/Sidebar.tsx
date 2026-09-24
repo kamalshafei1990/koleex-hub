@@ -209,25 +209,22 @@ function SidebarRowImpl({
         <span className="kx-ai-row-title block text-[13px] truncate" dir="auto" lang={textLang(row.title)}>{row.title}</span>
         {hint && <span className="kx-ai-row-title block text-[12px] truncate text-[var(--text-dim)]" dir="auto" lang={textLang(hint)} data-search-hint>{hint}</span>}
       </button>
-      {/* The pin marks the row while it is pinned and hides again on hover so
-          it can't be mistaken for a button you have to press to keep it. */}
-      <button
-        type="button"
-        onClick={(e) => { e.stopPropagation(); onTogglePin(row); }}
-        className={`h-6 w-6 rounded-lg flex items-center justify-center shrink-0 ${
-          pinned
-            ? "text-[var(--text-dim)] group-hover:text-[var(--text-primary)]"
-            /* VISIBLE WHERE THERE IS NO HOVER. On a phone a tap has no hover,
-               so an opacity-0 control was unreachable — the only tappable thing
-               was the row, which opened the chat (audit, 2026-09-07). */
-            : "opacity-0 group-hover:opacity-100 [@media(hover:none)]:opacity-100 focus-visible:opacity-100 text-[var(--text-dim)] hover:text-[var(--text-primary)]"
-        }`}
-        title={pinned ? copy.unpin : copy.pin}
-        aria-label={pinned ? copy.unpin : copy.pin}
-        aria-pressed={pinned}
-      >
-        <PinIcon className="h-3 w-3" />
-      </button>
+      {/* ONLY A PINNED ROW SHOWS THE PIN (UI/UX pass, 2026-09-24). On a phone
+          — no hover — every row used to carry a pin, so a list of twenty
+          chats read as twenty pins. Pinning lives in the row's menu; the
+          mark here says "this one is pinned" and a tap on it unpins. */}
+      {pinned && (
+        <button
+          type="button"
+          onClick={(e) => { e.stopPropagation(); onTogglePin(row); }}
+          className="h-6 w-6 rounded-lg flex items-center justify-center shrink-0 text-[var(--text-dim)] group-hover:text-[var(--text-primary)]"
+          title={copy.unpin}
+          aria-label={copy.unpin}
+          aria-pressed
+        >
+          <PinIcon className="h-3 w-3" />
+        </button>
+      )}
       <RowMenu label={copy.more} items={items} />
     </div>
   );
@@ -256,6 +253,7 @@ export function RowMenu({
     left: number;
     maxHeight: number;
   } | null>(null);
+  const [dir, setDir] = useState<"ltr" | "rtl">("ltr");
   const btnRef = useRef<HTMLButtonElement | null>(null);
   const menuRef = useRef<HTMLDivElement | null>(null);
   /* Closing by keyboard or by choosing hands focus back to the trigger; the
@@ -300,7 +298,12 @@ export function RowMenu({
        computed from the maximum height would leave a short menu floating a
        hundred pixels away from the button that opened it. */
     const dropDown = below >= Math.min(PREFERRED_H, above) || below >= 200;
-    const left = Math.min(Math.max(EDGE, r.right - W), window.innerWidth - W - EDGE);
+    /* Hang from the button's outer edge: its right in English and Chinese,
+       its left in Arabic, where the menu would otherwise open over the
+       chat list's own edge. */
+    const rtl = getComputedStyle(el).direction === "rtl";
+    setDir(rtl ? "rtl" : "ltr");
+    const left = Math.min(Math.max(EDGE, rtl ? r.left : r.right - W), window.innerWidth - W - EDGE);
 
     setPos(
       dropDown
@@ -369,7 +372,8 @@ export function RowMenu({
             role="menu"
             aria-label={label}
             onKeyDown={onMenuKey}
-            className="kx-pop-panel fixed z-[61] w-52 overflow-y-auto py-1"
+            dir={dir}
+            className="kx-pop-panel kx-ai-tokens fixed z-[61] w-52 overflow-y-auto py-1"
             style={{
               top: pos.top,
               bottom: pos.bottom,
@@ -399,7 +403,9 @@ export function RowMenu({
                     closeMenu();
                     it.onSelect?.();
                   }}
-                  className={`w-full px-3 py-1.5 text-[12px] flex items-center gap-2 text-start hover:bg-[var(--bg-surface-subtle)] ${
+                  /* 44 px rows where the pointer is a finger — at 12 px text and
+                     6 px padding a thumb covered two items at once. */
+                  className={`w-full px-3 py-1.5 [@media(pointer:coarse)]:min-h-11 text-[13px] flex items-center gap-2 text-start hover:bg-[var(--bg-surface-subtle)] focus:outline-none focus-visible:bg-[var(--bg-surface-subtle)] ${
                     it.danger
                       ? "text-[var(--kx-ai-danger-text)]"
                       : it.selected

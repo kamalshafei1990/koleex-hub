@@ -2392,7 +2392,11 @@ body:has([data-kx-call-active='1']) .kx-update-offer { display: none; }
    are what components/ai now uses; --accent is pointed at Hub Blue inside
    the app so the shared controls follow. Radii and type come from Tailwind's
    own 8/12/16/24 and 12/13/14/16/18 steps — no half-pixel sizes. */
-.kx-ai-root, .kx-call-root {
+/* .kx-ai-tokens: the menus the app PORTALS to <body> (row menu, model
+   picker, the "+" menu) sit outside .kx-ai-root and lost every token here —
+   the row menu's red "Delete" rendered in plain text colour (UI pass,
+   2026-09-24). They carry this class so they read the same values. */
+.kx-ai-root, .kx-call-root, .kx-ai-tokens {
   --kx-ai-accent: #0066FF;
   --kx-ai-accent-strong: #0052CC;
   --kx-ai-accent-soft: rgba(0,102,255,0.12);
@@ -2410,7 +2414,7 @@ body:has([data-kx-call-active='1']) .kx-update-offer { display: none; }
   --kx-ai-danger-line: rgba(255,51,51,0.30);
 }
 .kx-ai-root { --accent: var(--kx-ai-accent); }
-[data-theme="light"] .kx-ai-root {
+[data-theme="light"] .kx-ai-root, [data-theme="light"] .kx-ai-tokens {
   --kx-ai-warning-text: #8A6D00;
   --kx-ai-danger-text: #C62828;
 }

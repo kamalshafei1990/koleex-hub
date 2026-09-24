@@ -33,7 +33,7 @@ export default function WelcomeCard({
      then suggestion tiles in a 2-column grid (matching the
      "What do you want to do?" pattern on /finance). No drop-shadow
      halos, no glass blur, no centered-pill chips. */
-  const greeting = firstName ? `${copy.welcomeTitle}, ${firstName}.` : copy.welcomeTitle;
+  const greeting = firstName ? copy.welcomeTitleNamed.replace("{name}", firstName) : copy.welcomeTitle;
   /* One-shot "jump" greet shortly after the welcome screen mounts, so the
      orb waves hello when you open Koleex AI. greetKey starts at 0 (no fire
      on mount) then flips to 1 → fires the jump reaction once. */

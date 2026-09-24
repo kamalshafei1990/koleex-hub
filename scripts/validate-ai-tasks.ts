@@ -277,7 +277,7 @@ const copySrc = readFileSync("src/components/ai/copy.ts", "utf8");
 check("the first welcome tile asks for the day's brief, in all three languages",
   /prompts: \[\s*"Give me my brief for today: my meetings, tasks due, reminders, and what needs me first\.",/.test(copySrc) &&
   /prompts: \[\s*"给我今天的简报：会议、到期任务、提醒，以及我最该先做什么。",/.test(copySrc) &&
-  /prompts: \[\s*"اعطيني بريف اليوم: اجتماعاتي، المهام اللي موعدها النهاردة، التذكيرات، وإيه اللي محتاجني الأول\.",/.test(copySrc));
+  /prompts: \[\s*"قولي يومي النهاردة: اجتماعاتي، المهام اللي معادها النهاردة، التذكيرات، وإيه اللي محتاجني الأول\.",/.test(copySrc));
 
 console.log("\n── 8. Phases 5–6: one scope rule; the morning brief at the hour you chose; the drifted columns on record ──");
 const me = { accountId: "me-1", tenantId: "t-1", department: "Sales", isSuperAdmin: false, canViewPrivate: false };
