@@ -238,4 +238,8 @@ export interface AgentResponse {
   provider: string;
   /** Conversation id this turn belongs to. */
   conversationId: string;
+  /** No model could answer and nothing was rescued: `finalReply` is only the
+   *  apology. The route must not save it as the assistant's answer or reveal
+   *  it as one — it reports a failed turn instead (deep check, 2026-09-24). */
+  failed?: true;
 }

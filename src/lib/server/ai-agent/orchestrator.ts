@@ -151,7 +151,7 @@ export async function orchestrate(input: TurnInput): Promise<AgentResponse> {
   const {
     ctx, history, userMessage, userLang, dialect, conversationId, onDelta, onStep, onRetract,
     webSearchRequested = false, languageLock = "", taughtAnswers = "", traceId = null,
-    model = "auto",
+    model = "auto", isCancelled,
   } = input;
   /* The user's chosen Koleex model: its provider goes first, the rest stay
      behind it as failover (provider/registry preferFirst). */
@@ -444,6 +444,8 @@ export async function orchestrate(input: TurnInput): Promise<AgentResponse> {
   let forcedTrade = false;
 
   for (let iter = 0; iter < MAX_ITERATIONS; iter++) {
+    /* Stopped: no further round (see TurnInput.isCancelled). */
+    if (isCancelled?.()) return { steps, finalReply: "", provider: servedLabel(turnMeta), conversationId, failed: true };
     /* After the per-turn tool budget is spent, disable tools so the
        model can only produce a final answer. */
     /* Force the card on choice-shaped turns once the lookups are done —
@@ -572,6 +574,7 @@ export async function orchestrate(input: TurnInput): Promise<AgentResponse> {
         finalReply: safeReply,
         provider: servedLabel(turnMeta),
         conversationId,
+        failed: true,
       };
     }
 
@@ -664,6 +667,10 @@ export async function orchestrate(input: TurnInput): Promise<AgentResponse> {
       content: content || null,
       tool_calls: dedupedCalls,
     });
+
+    /* Stopped while the model was choosing its tools: none of them runs —
+       above all, no write the user stopped short of. */
+    if (isCancelled?.()) return { steps, finalReply: "", provider: servedLabel(turnMeta), conversationId, failed: true };
 
     // Execute tool calls in parallel. Each dispatched through the registry,
     // which runs permission + audit + error isolation.

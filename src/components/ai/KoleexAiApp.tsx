@@ -375,22 +375,58 @@ export default function KoleexAiApp() {
     ttsHandleRef.current = null;
     setAiSpeaking(false);
   }, []);
+  /* LEAVING THE APP ENDS ITS TURN (deep check, 2026-09-24). Nothing aborted
+     the stream or silenced the speech on the way out, so a voice turn could
+     start reading its answer aloud on another page. Refs, read at unmount. */
+  useEffect(() => () => {
+    abortRef.current?.abort();
+    ttsHandleRef.current?.cancel();
+    ttsHandleRef.current = null;
+  }, []);
   const [loadingConv, setLoadingConv] = useState(false);
   /* A CHAT THAT FAILED TO LOAD IS NOT AN EMPTY CHAT. With messages left at
      [] the greeting card rendered under a red banner, which reads as "this
      chat is empty" (audit, 2026-09-11). This shows a retry card instead. */
   const [loadError, setLoadError] = useState(false);
+  /* Task-card outcomes, by message id (see onConfirmTask). Declared up here
+     because send() carries an outcome across the placeholder → saved-row id
+     swap: a card tapped while its reply was still streaming used to fall
+     back to "pending" when the real id arrived, inviting a second Save. */
+  const [taskCards, setTaskCards] = useState<Record<string, TaskCardState>>({});
+  const carryTaskCard = useCallback((fromId: string, toId: string) => {
+    if (fromId === toId) return;
+    setTaskCards((prev) => {
+      if (!prev[fromId]) return prev;
+      const { [fromId]: moved, ...rest } = prev;
+      return { ...rest, [toId]: moved };
+    });
+  }, []);
+  /* Read by openConversation: a chat whose load FAILED is not "already
+     open" — tapping it again, or Retry, must load it. */
+  const loadErrorRef = useRef(false);
+  useEffect(() => { loadErrorRef.current = loadError; }, [loadError]);
   /* THE NETWORK, AS THE DEVICE REPORTS IT. Offline shows a line above the
      composer, disables the call, and resends the message a drop put back in
      the composer once the network returns — if it is still there unchanged. */
   const [online, setOnline] = useState(true);
-  const resendRef = useRef<{ text: string; conversationId: string | null } | null>(null);
+  const resendRef = useRef<{ text: string; conversationId: string | null; afterReturn: number } | null>(null);
   const onlineRef = useRef(true);
+  /* HOW MANY TIMES THE NETWORK HAS COME BACK. The resend waits for the next
+     one (deep check, 2026-09-24): it used to fire whenever `online` was true
+     — which, on a link that drops while the device still says online (the
+     ordinary case here, Safari's "Load failed"), was at once and again after
+     every failure: one duplicated message per retry until one got through. */
+  const [onlineReturn, setOnlineReturn] = useState(0);
+  const onlineReturnRef = useRef(0);
   useEffect(() => {
     const sync = () => {
       const now = typeof navigator === "undefined" || navigator.onLine !== false;
       /* The cue is for the RETURN, not the state: once, on the edge. */
-      if (!onlineRef.current && now) playSound("back-online");
+      if (!onlineRef.current && now) {
+        playSound("back-online");
+        onlineReturnRef.current += 1;
+        setOnlineReturn(onlineReturnRef.current);
+      }
       onlineRef.current = now;
       setOnline(now);
     };
@@ -659,7 +695,9 @@ export default function KoleexAiApp() {
       /* THE CHAT THAT IS ALREADY OPEN STAYS AS IT IS. "Open drawer, tap the
          highlighted chat to go back" used to abort the reply in flight and
          reload the thread (audit, 2026-09-07). */
-      if (id === activeIdRef.current && !loadingConvRef.current) {
+      /* …unless its load failed: then this IS the retry (deep check,
+         2026-09-24: the error card's Retry did nothing at all). */
+      if (id === activeIdRef.current && !loadingConvRef.current && !loadErrorRef.current) {
         setSidebarOpen(false);
         return;
       }
@@ -725,6 +763,12 @@ export default function KoleexAiApp() {
     setMessages([]);
     setInput("");
     setError(null);
+    /* A load in flight or failed belongs to the chat just left: its spinner
+       and its error card must not follow the user here (deep check,
+       2026-09-24) — openReqRef above already stops its result landing. */
+    setLoadingConv(false);
+    loadingConvRef.current = false;
+    setLoadError(false);
     setSidebarOpen(false);
     /* Same race guard as send() — see the comment there for why. */
     restoredRef.current = true;
@@ -797,7 +841,7 @@ export default function KoleexAiApp() {
      call that begins on an empty screen needs it too, the moment its first
      settled turn wants somewhere to go. The restore-race note inside applies
      to both callers equally, which is why this is one function and not two. */
-  const createConversation = useCallback(async (): Promise<string | null> => {
+  const createConversation = useCallback(async (opts: { activate?: boolean } = {}): Promise<string | null> => {
     /* EVERY FAILURE LEAVES BY THE `null` DOOR (owner, 2026-09-18: "fix any
        issue in this app"). This returned null for a refusal and THREW for a
        dropped link — and the one caller that matters, send(), awaits it at a
@@ -833,7 +877,9 @@ export default function KoleexAiApp() {
     }
     if (!conversation?.id) return null;
     setConversations((prev) => [conversation, ...prev]);
-    setActiveId(conversation.id);
+    /* send() activates it itself, and only if the user is still here (see
+       its first-message race); the call's persister wants it at once. */
+    if (opts.activate !== false) setActiveId(conversation.id);
     /* Fix: mark auto-restore as done so it doesn't race us on
        the first-ever send. Without this, the effect that watches
        `conversations` would fire post-render, read the activeId
@@ -949,7 +995,13 @@ export default function KoleexAiApp() {
   const send = useCallback(
     async (textOverride?: string, viaVoice = false) => {
       const text = (textOverride ?? input).trim();
-      const filesToSend = attachments;
+      /* A TURN THAT IS NOT THE COMPOSER'S — Regenerate, Edit, a tapped
+         answer — leaves the composer alone (deep check, 2026-09-24): it used
+         to wipe the half-written draft and take the files attached to it
+         along with the retried turn. Dictation IS the composer's turn,
+         spoken instead of typed, so it keeps both. */
+      const fromComposer = textOverride === undefined || viaVoice;
+      const filesToSend = fromComposer ? attachments : [];
       if (!text && filesToSend.length === 0) return;
       /* Synchronous guard: flip ref BEFORE any await so a rapid second
          Send click / Enter press can't slip past the state check. */
@@ -976,13 +1028,30 @@ export default function KoleexAiApp() {
       const aborter = new AbortController();
       abortRef.current = aborter;
       if (!conversationId) {
-        const created = await createConversation();
-        if (!created) {
-          setError(copy.couldNotStartChat);
+        const created = await createConversation({ activate: false });
+        /* THE USER MOVED ON WHILE THE CHAT WAS BEING MADE (deep check,
+           2026-09-24). Opening another chat, or Stop, aborts this turn — but
+           the new chat used to be activated anyway when the POST came back:
+           the screen showed chat B under chat A's id, the message was
+           silently dropped, and the next one went into the empty new chat.
+           Now the turn ends here: the new chat stays in the list, nothing is
+           switched, and the words go back into the composer if the user is
+           still on the new-chat screen. */
+        if (aborter.signal.aborted) {
+          if (activeIdRef.current === null) setInput((cur) => (cur.trim() ? cur : text));
+          abortRef.current = null;
           sendingRef.current = false;
           setSending(false);
           return;
         }
+        if (!created) {
+          setError(copy.couldNotStartChat);
+          abortRef.current = null;
+          sendingRef.current = false;
+          setSending(false);
+          return;
+        }
+        setActiveId(created);
         conversationId = created;
         /* The stale-delta guard below compares against THIS turn's chat; a
            first message used to compare against null and never guard. */
@@ -1030,13 +1099,15 @@ export default function KoleexAiApp() {
           steps: [],
         },
       ]);
-      setInput("");
-      /* Autosize reset: onChange doesn't fire on programmatic clear,
-         so reset the textarea height manually after sending. */
-      if (composerRef.current) {
-        composerRef.current.style.height = "auto";
+      if (fromComposer) {
+        setInput("");
+        /* Autosize reset: onChange doesn't fire on programmatic clear,
+           so reset the textarea height manually after sending. */
+        if (composerRef.current) {
+          composerRef.current.style.height = "auto";
+        }
+        setAttachments([]);
       }
-      setAttachments([]);
 
       /* ── Attachments: extract text server-side so it can ride along with
          the message. The question is ABOUT the file, so when nothing could
@@ -1179,7 +1250,13 @@ export default function KoleexAiApp() {
         /* Phase 12: the turn's controller (made at the top of send). On user
            Stop click we call .abort() which closes the fetch + reader, stops
            the SSE loop, and lets the finally block clean up state. */
-        if (aborter.signal.aborted) return;
+        /* Stopped before the request left: the bubbles go and the words
+           come back — an empty "thinking" bubble must not stay for ever. */
+        if (aborter.signal.aborted) {
+          setMessages((prev) => prev.filter((m) => m.id !== optimistic.id && m.id !== placeholderId));
+          if (activeIdRef.current === conversationId) setInput((cur) => (cur.trim() ? cur : text));
+          return;
+        }
         const res = await fetch(`/api/ai/agent`, {
           method: "POST",
           credentials: "include",
@@ -1237,6 +1314,7 @@ export default function KoleexAiApp() {
               content: fallbackReply,
               created_at: new Date().toISOString(),
             };
+            carryTaskCard(placeholderId, persisted.id);
             setMessages((prev) => {
               const idx = prev.findIndex((m) => m.id === placeholderId);
               if (idx < 0) return prev;
@@ -1415,6 +1493,7 @@ export default function KoleexAiApp() {
            final steps (id/created_at now come from Supabase, not the
            temporary placeholder). */
         if (finalMessage) {
+          carryTaskCard(placeholderId, finalMessage.id);
           setMessages((prev) => {
             const idx = prev.findIndex((m) => m.id === placeholderId);
             if (idx < 0) return prev;
@@ -1482,18 +1561,20 @@ export default function KoleexAiApp() {
              rejects with TypeError "Failed to fetch") from a generic
              server error. Both drop the placeholder, but the message
              is humanized so the user doesn't see the raw cause. */
-          setMessages((prev) => prev.filter((m) => m.id !== placeholderId));
           const raw = e instanceof Error ? e.message : String(e);
           const isNetwork =
             (e instanceof TypeError && /failed to fetch|networkerror|load failed/i.test(raw)) ||
             /networkerror|net::err|the operation was aborted/i.test(raw);
+          /* A dropped send puts its words back in the composer (below), so
+             its bubble goes too — kept, the resend showed the message twice. */
+          setMessages((prev) => prev.filter((m) => m.id !== placeholderId && !(isNetwork && m.id === optimistic.id)));
           setError(humanizeError(isNetwork ? "NetworkError" : raw));
           /* Owner report: "I write a message and can't send it" — a dropped
              stream lost the text as well as the answer, so the only recovery
              was retyping. On this link a drop is routine, so put the message
              back in the composer: one tap resends instead of rewriting. */
           if (isNetwork && activeIdRef.current === conversationId) {
-            resendRef.current = { text, conversationId };
+            resendRef.current = { text, conversationId, afterReturn: onlineReturnRef.current };
             setInput((cur) => (cur.trim() ? cur : text));
             resizeComposer();
           }
@@ -1504,7 +1585,7 @@ export default function KoleexAiApp() {
         setSending(false);
       }
     },
-    [input, activeId, lang, stopTts, attachments, webSearch, modelChoice, createConversation, copy, resizeComposer, bumpConversation],
+    [input, activeId, lang, stopTts, attachments, webSearch, modelChoice, createConversation, copy, resizeComposer, bumpConversation, carryTaskCard],
   );
 
   /* ── Phase 12: message-level actions ────────────────────────── */
@@ -1693,7 +1774,6 @@ export default function KoleexAiApp() {
      next turn knows the task exists. Cancel only closes the card: the
      recorded preview expires on its own. Outcomes are browser state, keyed
      by message id, like the question card's pick. */
-  const [taskCards, setTaskCards] = useState<Record<string, TaskCardState>>({});
   const onConfirmTask = useCallback(async (msgId: string, pending: { tool: string; args: Record<string, unknown> }) => {
     const conversationId = activeIdRef.current;
     if (!conversationId) return;
@@ -1792,24 +1872,39 @@ export default function KoleexAiApp() {
     /* ConfirmDialog never closes itself on confirm — the parent must.
        Close first so a slow DELETE doesn't leave the dialog hanging. */
     setPendingDeleteId(null);
-    const res = await fetch(`/api/ai/conversations/${id}`, {
-      method: "DELETE",
-      credentials: "include",
-    });
+    /* A dropped link is an error the user is told about, not an unhandled
+       rejection with nothing on screen (deep check, 2026-09-24). */
+    let res: Response;
+    try {
+      res = await fetch(`/api/ai/conversations/${encodeURIComponent(id)}`, {
+        method: "DELETE",
+        credentials: "include",
+      });
+    } catch {
+      setError(humanizeError("NetworkError"));
+      return;
+    }
     if (!res.ok) {
       setError(humanizeError(`HTTP ${res.status}`));
       return;
     }
     setConversations((prev) => prev.filter((c) => c.id !== id));
     playSound("deleted");
-    if (activeId === id) {
+    if (activeIdRef.current === id) {
       /* A reply still streaming into a chat that no longer exists would
-         leave the welcome screen stuck on "sending" (audit, 2026-09-07). */
+         leave the welcome screen stuck on "sending" (audit, 2026-09-07).
+         A load of it still in flight must not land either, and the
+         address must stop naming it. */
       abortRef.current?.abort();
+      openReqRef.current = "";
       setActiveId(null);
       setMessages([]);
+      setLoadingConv(false);
+      loadingConvRef.current = false;
+      setLoadError(false);
+      syncUrl({ c: null, view: null }, "replace");
     }
-  }, [activeId, pendingDeleteId]);
+  }, [pendingDeleteId, syncUrl]);
 
   /* Declared before renameConversation — a closure referencing a binding
      declared later (TDZ) blocks React Compiler analysis for the whole
@@ -1993,10 +2088,12 @@ export default function KoleexAiApp() {
     if (!online) return;
     const pending = resendRef.current;
     if (!pending) return;
+    /* Only after the network has actually come back since the drop. */
+    if (onlineReturn <= pending.afterReturn) return;
     if (input.trim() !== pending.text.trim() || activeIdRef.current !== pending.conversationId) return;
     resendRef.current = null;
     void send();
-  }, [online, input, send]);
+  }, [online, onlineReturn, input, send]);
 
   /* ── Phase 13: sidebar search ──
      Simple substring filter on title + last_preview. Case-insensitive.

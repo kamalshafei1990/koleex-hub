@@ -55,6 +55,10 @@ export interface TurnInput {
    *  call that narrated first, the route is told to clear what it showed
    *  before the real answer streams. */
   onRetract?: () => void;
+  /** THE USER PRESSED STOP (deep check, 2026-09-24). Read before each model
+   *  round and before any tool runs: a stopped turn runs no more lookups and
+   *  no writes, and ends as a failed turn — nothing is saved as a reply. */
+  isCancelled?: () => boolean;
 }
 
 

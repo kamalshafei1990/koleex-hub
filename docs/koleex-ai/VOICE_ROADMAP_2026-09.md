@@ -2457,3 +2457,21 @@ Owner: "make a deep check for this app and fix any issue or bug". Five read-only
   - *`CRON_SECRET`.* Kept identical to the other crons, because I can't confirm the variable is set in production.
 
 **Tests.** `validate:ai-deepcheck` has 29 checks (+11: behaviour tests on the transcript fold plus source pins). The `validate:voice-client` and `validate:ai-voice` pins were updated to the new code. Each fix was confirmed by breaking the code on purpose, and all 7 breaks were caught.
+
+## Deep check 2026-09-24, phase 3: chat
+
+- **Duplicate sends on a flaky link.** A dropped send was resent whenever `online` was true. On a link that drops while the device still says it is online (Safari's "Load failed"), that meant at once, and again after every failure: one duplicated message per retry. Now the resend waits until the network has actually come back since the drop (`onlineReturn` counter). The dropped message's bubble is also removed, because its words go back into the composer.
+- **Retry did nothing.** A chat whose load failed was treated as "already open". It no longer is.
+- **New chat kept the previous chat's spinner and error card.** They are now cleared.
+- **First-message race.** If the user opened another chat (or pressed Stop) while the new chat's POST was pending, the new chat was activated anyway: chat B was shown under chat A's id, and the message was lost. `createConversation({ activate: false })` now lets `send()` activate the chat only if the turn is still live.
+- **Stop before the request left.** It used to leave an empty "thinking" bubble for ever. Now both bubbles go and the words come back.
+- **Regenerate, Edit and tapped answers wiped the composer's draft and files.** Only a turn sent from the composer (typed or dictated) clears it now.
+- **Leaving the app** aborts the reply and silences the read-aloud.
+- **Task card outcomes** now carry across the placeholder → saved-row id swap.
+- **Delete on a dead link** now says so; deleting the open chat also stops its load and clears `?c=`.
+- **Code fences with no language** are drawn as code blocks.
+- **Server side:**
+  - **Stop reaches the server.** The stream's `cancel()` sets `stopped` and every frame goes through `emit()`. The orchestrator checks `isCancelled()` before each model round and before any tool runs, so no write happens after Stop.
+  - **A turn no model could answer is a failed turn** (`AgentResponse.failed`). It used to be revealed and saved as the assistant's reply and logged ok=1. Now the stream sends a bare error frame (the browser words it in the user's language), the JSON path answers 503, nothing is saved, and it is logged ok=0.
+
+**Tests.** `validate:ai-deepcheck` has 43 checks (+14), with pins updated in client-render, streaming, core-boundaries and models. Each fix was confirmed by breaking the code on purpose, and all 8 breaks were caught.
