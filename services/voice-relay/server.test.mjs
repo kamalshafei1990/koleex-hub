@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { signTicket, verifyTicket, tokenFromProtocols, upstreamUrlFor, originAllowed, TICKET_MAX_AGE_S, isKeepalive, KEEPALIVE_FRAME, clientAddress, MAX_PER_TICKET, MAX_PENDING_BYTES, MAX_FRAME_BYTES, relayHello, shouldPark, RESUME_GRACE_MS, MAX_PARK_BYTES, NO_SESSION_CODE, createPacing, audioMsOf, PACING_GAP_MS, WIRE_RATE, scanPcm16, CLICK_JUMP, CLIP_LEVEL } from "./server.mjs";
+import { signTicket, verifyTicket, resumeTicketOk, hostPattern, MAX_SESSION_MS, tokenFromProtocols, upstreamUrlFor, originAllowed, TICKET_MAX_AGE_S, isKeepalive, KEEPALIVE_FRAME, clientAddress, MAX_PER_TICKET, MAX_PENDING_BYTES, MAX_FRAME_BYTES, relayHello, shouldPark, RESUME_GRACE_MS, MAX_PARK_BYTES, NO_SESSION_CODE, createPacing, audioMsOf, PACING_GAP_MS, WIRE_RATE, scanPcm16, CLICK_JUMP, CLIP_LEVEL } from "./server.mjs";
 
 test("the per-address cap keys on the hop the edge appended, never on what the browser wrote in front", () => {
   assert.equal(clientAddress("1.2.3.4", "10.0.0.9"), "1.2.3.4");
@@ -45,6 +45,11 @@ test("origins: Koleex domains and Vercel previews, nothing else", () => {
   assert.equal(originAllowed("https://hub.koleexgroup.com"), true);
   assert.equal(originAllowed("https://koleex-hub-git-x.vercel.app"), true);
   assert.equal(originAllowed("https://evil.com"), false);
+  assert.equal(originAllowed("https://someone-else.vercel.app"), false, "not every Vercel site: only Koleex's own (koleex-*)");
+  assert.equal(originAllowed("https://koleex-hub.evil.vercel.app"), false, "the pattern's star never crosses a dot");
+  assert.equal(originAllowed("https://koleex-preview.vercel.app"), true);
+  assert.equal(hostPattern("koleex-*.vercel.app").test("koleex-hub-git-a-b.vercel.app"), true);
+  assert.equal(hostPattern("koleex-*.vercel.app").test("koleex-hubxvercel.app"), false, "the dot is literal");
   assert.equal(originAllowed("https://koleexgroup.com.evil.com"), false);
   assert.equal(originAllowed(undefined), true, "no Origin is not a browser: the watchdog's Node socket; the ticket still gates it");
   assert.equal(originAllowed(""), true);
@@ -125,4 +130,22 @@ test("the sound itself is read for clicks, joints, peak and clipping — counted
   p.note('{"type":"response.output_audio.done"}', 20);
   p.note(delta([-20000, -20000, 32767, 32767]), 5000); // a new answer: no joint counted; one click, two clipped
   assert.equal(p.summary(), "deltas=3 audioMs=0 gaps=0 maxGap=10 minAhead=-10 clicks=1 edges=1 peak=100 clip=2");
+});
+
+test("a resume may present an expired ticket only for the live or parked session that same ticket opened", () => {
+  const now = Math.floor(Date.now() / 1000);
+  const t = signTicket(SECRET, "tok-r", now - 900); // expired fifteen minutes ago
+  assert.equal(verifyTicket(SECRET, "tok-r", t, now), false, "expired, strictly");
+  assert.equal(verifyTicket(SECRET, "tok-r", t, now, 1000), true, "inside a grace");
+  assert.equal(verifyTicket(SECRET, "tok-r", t, now, 60), false, "outside a shorter one");
+  const live = new Map([["tok-r", { ticketKey: t }]]);
+  const parked = new Map();
+  assert.equal(resumeTicketOk(SECRET, "tok-r", t, [live, parked], now), true, "the session is here and this ticket opened it");
+  assert.equal(resumeTicketOk(SECRET, "tok-r", t, [new Map(), new Map([["tok-r", { ticketKey: t }]])], now), true, "parked counts too");
+  assert.equal(resumeTicketOk(SECRET, "tok-r", t, [new Map(), new Map()], now), false, "no session: refused");
+  const other = signTicket(SECRET, "tok-r", now - 600);
+  assert.equal(resumeTicketOk(SECRET, "tok-r", other, [live, parked], now), false, "a different ticket for the same secret: refused");
+  assert.equal(resumeTicketOk("wrong", "tok-r", t, [live, parked], now), false, "the signature is still checked");
+  const ancient = signTicket(SECRET, "tok-a", now - Math.ceil(MAX_SESSION_MS / 1000) - 60);
+  assert.equal(resumeTicketOk(SECRET, "tok-a", ancient, [new Map([["tok-a", { ticketKey: ancient }]]), new Map()], now), false, "never longer than a session may last");
 });

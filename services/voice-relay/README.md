@@ -21,7 +21,7 @@ Environment:
 | `VOICE_RELAY_SECRET` | Shared with Vercel's `AI_VOICE_RELAY_SECRET`; signs the admission ticket. Without it every connection is refused. |
 | `VOICE_UPSTREAM_URL` | The vendor's realtime socket (default `wss://api.x.ai/v1/realtime`). |
 | `VOICE_PROTOCOL_PREFIX` | Subprotocol prefix the client secret follows (default `xai-client-secret.`). |
-| `VOICE_RELAY_ORIGINS` | Allowed origin host suffixes, comma-separated (default `koleexgroup.com,vercel.app`). |
+| `VOICE_RELAY_ORIGINS` | Allowed origins, comma-separated: a plain entry is a host suffix, an entry with `*` a whole-host pattern (`*` = letters, digits, hyphens; never a dot). Default `koleexgroup.com,koleex-*.vercel.app` (was `vercel.app`, which admitted every Vercel site). |
 | `PORT` | Set by Railway. |
 
 `GET /health` answers `{ ok, connections, configured }`. The socket path is
@@ -80,8 +80,27 @@ call — a redial reuses it, a leak would not stop at three); at most 2 MiB of
 frames held for an upstream that has not opened yet. The client address is
 the LAST hop of `X-Forwarded-For` (the one Railway's edge appended), never
 the first, which anyone can write. `VOICE_RELAY_ORIGINS` on the service
-names the Hub's hosts exactly; the default `vercel.app` suffix is only for a
-service with no variable set.
+names the Hub's hosts exactly; the default (`koleexgroup.com,koleex-*.vercel.app`)
+is only for a service with no variable set.
+
+Tickets and long calls (2026-09-24): a ticket lives ten minutes (the client
+secret's own lifetime), and every handover and resume presents it again —
+so from minute ten every handover was refused (`refused ticket code=403`)
+and an international call ended at about ten minutes. A RESUME of a session
+that is still here (live or parked) and that the SAME ticket opened is now
+admitted on an expired ticket, for as long as a session may last
+(`MAX_SESSION_MS`); the log reads `resume on an expired ticket`. The
+signature is still checked, and a fresh dial on an expired ticket is refused
+as before (`resumeTicketOk`).
+
+Handover order (2026-09-24): the client reads both sockets during a
+handover, and nothing ordered one against the other — the answer's next
+frame on the new socket could be played before the last frames still
+travelling on the old one. The relay now HOLDS what the vendor sends until
+the old socket's close handshake completes (the client answered the close,
+so it has read every frame before it), then releases it in order, and after
+`HANDOVER_DRAIN_MS` (1.5 s) at the latest, so an old path that never answers
+cannot stall the call.
 
 ## Deploying
 
